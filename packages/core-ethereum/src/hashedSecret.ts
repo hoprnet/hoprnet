@@ -1,5 +1,4 @@
 import type HoprEthereum from '.'
-import { isWinningTicket } from './utils'
 import { Hash } from './types'
 
 import Debug from 'debug'
@@ -8,7 +7,6 @@ const log = Debug('hopr-core-ethereum:hashedSecret')
 import { randomBytes } from 'crypto'
 import { u8aEquals, u8aToHex, u8aConcat } from '@hoprnet/hopr-utils'
 import { publicKeyConvert } from 'secp256k1'
-import { AcknowledgedTicket } from './types'
 
 export const GIANT_STEP_WIDTH = 10000
 export const TOTAL_ITERATIONS = 100000

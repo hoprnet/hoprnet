@@ -186,7 +186,7 @@ export default class HoprEthereum implements HoprCoreConnector {
       throw Error(`invalid status '${this._status}', could not initialize`)
     }
 
-    this._initializing = new Promise(async (resolve, reject) => {
+    this._initializing = new Promise(async (resolve) => {
       // initialize stuff
       await Promise.all([
         // confirm web3 is connected

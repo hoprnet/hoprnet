@@ -352,7 +352,7 @@ describe('HoprChannels', function () {
         it("'partyA' and 'partyB' should fund a total of 1 HOPR", async function () {
           const totalAmount = web3.utils.toWei('1', 'ether')
           const partyAAmount = web3.utils.toWei('0.2', 'ether')
-          const partyBAmount = web3.utils.toWei('0.8', 'ether')
+          //const partyBAmount = web3.utils.toWei('0.8', 'ether')
           await hoprToken.approve(hoprChannels.address, totalAmount, {
             from: partyA
           })

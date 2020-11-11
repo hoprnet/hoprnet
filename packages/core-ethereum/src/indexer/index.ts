@@ -27,13 +27,6 @@ const SMALLEST_PUBLIC_KEY = new Public(u8aConcat(new Uint8Array([0x02]), new Uin
 const BIGGEST_PUBLIC_KEY = new Public(u8aConcat(new Uint8Array([0x03]), new Uint8Array(32).fill(0xff)))
 
 /**
- * @returns a custom event id for logging purposes.
- */
-function getEventId(event: LightEvent<any>): string {
-  return `${event.event}-${event.transactionHash}-${event.transactionIndex}-${event.logIndex}`
-}
-
-/**
  * Returns true if 'newChannelEntry' is more recent.
  *
  * @param oldChannelEntry

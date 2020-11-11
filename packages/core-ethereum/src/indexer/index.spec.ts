@@ -66,7 +66,7 @@ describe('test indexer', function () {
     it('should not store channel before confirmations', async function () {
       this.timeout(durations.seconds(5))
 
-      const uncompressedPubKeyA = publicKeyConvert(userA.pubKey, false).slice(1)
+      //const uncompressedPubKeyA = publicKeyConvert(userA.pubKey, false).slice(1)
       const uncompressedPubKeyB = publicKeyConvert(userB.pubKey, false).slice(1)
 
       // await connector.hoprChannels.methods

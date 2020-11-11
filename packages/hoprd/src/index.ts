@@ -3,21 +3,16 @@ import Hopr from '@hoprnet/hopr-core'
 import type { HoprOptions } from '@hoprnet/hopr-core'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import PeerId from 'peer-id'
-import Multiaddr from 'multiaddr'
-import debug from 'debug'
-import { encode, decode } from 'rlp'
+import { decode } from 'rlp'
 // @ts-ignore
 import Multihash from 'multihashes'
 import bs58 from 'bs58'
 import { addPubKey } from '@hoprnet/hopr-core/lib/utils'
 import { getBootstrapAddresses } from '@hoprnet/hopr-utils'
 import { commands } from '@hoprnet/hopr-chat'
-import { LogStream, Socket } from './logs'
+import { LogStream } from './logs'
 import { AdminServer } from './admin'
-import chalk from 'chalk'
 import * as yargs from 'yargs'
-
-let debugLog = debug('hoprd')
 
 /**
  * TEMPORARY HACK - copy pasted from
@@ -138,7 +133,6 @@ async function generateNodeOptions(): Promise<HoprOptions> {
 
 async function main() {
   let node: Hopr<HoprCoreConnector>
-  let addr: Multiaddr
   let logs = new LogStream()
   let adminServer = undefined
   let settings: any = {}

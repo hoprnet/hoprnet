@@ -39,7 +39,7 @@ export const BACKGROUND_COLOR = 'ffffa0'
 
 export function renderHoprLogo() {
   v2.forEach((line) => {
-    let str = line.replace(/\<span style="color:\#([0-9A-F]+);"\>(.)\<\/span\>/g, (match, p1, p2) =>
+    let str = line.replace(/\<span style="color:\#([0-9A-F]+);"\>(.)\<\/span\>/g, (_match, p1, p2) =>
       chalk.bold.bgHex(BACKGROUND_COLOR).hex(p1)(p2)
     )
 

@@ -38,6 +38,7 @@ import { getAcknowledgedTickets, submitAcknowledgedTicket } from './utils/ticket
 import * as DbKeys from './dbKeys'
 import EventEmitter from 'events'
 import path from 'path'
+import { Mixer } from './mixer'
 
 const verbose = Debug('hopr-core:verbose')
 
@@ -83,6 +84,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
 
   private running: boolean
   private crawlTimeout: NodeJS.Timeout
+  private mixer: Mixer<Chain>
 
   /**
    * @constructor
@@ -96,6 +98,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       this.emit('hopr:peer:connection', conn.remotePeer)
     })
 
+    this.mixer = new Mixer()
     this.initializedWithOptions = options
     this.output = (arr: Uint8Array) => {
       this.emit('hopr:message', arr)
@@ -108,6 +111,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     this.isBootstrapNode = options.bootstrapNode || false
     this._interactions = new Interactions(
       this,
+      this.mixer,
       (conn: Connection) => this._network.crawler.handleCrawlRequest(conn),
       (remotePeer: PeerId) => this._network.heartbeat.emit('beat', remotePeer)
     )

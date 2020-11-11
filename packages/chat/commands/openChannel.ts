@@ -1,5 +1,4 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 import type PeerId from 'peer-id'
 import { startDelayedInterval, u8aToHex, moveDecimalPoint } from '@hoprnet/hopr-utils'
