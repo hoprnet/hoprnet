@@ -52,8 +52,8 @@ class WebRTCConnection implements MultiaddrConnection {
 
       console.log(`available after connect`)
 
-      this._webRTCStateKnown = true
-      this._webRTCAvailable = true
+      // this._webRTCStateKnown = true
+      // this._webRTCAvailable = true
       this._switchPromise.resolve()
     })
 
