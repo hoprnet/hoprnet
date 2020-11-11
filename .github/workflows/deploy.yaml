@@ -1,7 +1,7 @@
 name: HOPR Deploy
 on:
   push:
-    branches: ['master', 'release/**']
+    branches: ['master', 'release/**', 'avado']
     paths-ignore:
       - 'docs/**'
 
@@ -150,7 +150,8 @@ jobs:
         working-directory: packages/avado
         run: |
           docker-compose build
-          sudo npm install -g @dappnode/dappnodesdk@0.2.9-beta.0
+          sudo npm install -g git+https://github.com/AvadoDServer/AVADOSDK.git
+          #sudo npm install -g @dappnode/dappnodesdk@0.2.9-beta.0
           dappnodesdk increase minor
           sed -i 's/version"[ ]*:[ ]*"[0-9]*\.[0-9]*\.[0-9]*"/version": "${{ env.RELEASE }}"/' ./dappnode_package.json
           cat ./dappnode_package.json | grep 'version'
