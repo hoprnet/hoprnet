@@ -48,9 +48,10 @@ export function getPeersIdsAsString(
  */
 export async function getMyOpenChannels(node: Hopr<HoprCoreConnector>): Promise<PeerId[]> {
   return Promise.all(
-      (await node.getAllOpenChannels()).map(async (channel: ChannelData) => {
-    return await pubKeyToPeerId(channel.offChainCounterparty)
-  }))
+    (await node.getAllOpenChannels()).map(async (channel: ChannelData) => {
+      return await pubKeyToPeerId(channel.offChainCounterparty)
+    })
+  )
 }
 
 /**

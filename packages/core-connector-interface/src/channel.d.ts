@@ -135,7 +135,7 @@ export enum ChannelStatus {
 export interface ChannelData {
   readonly channelId: Hash
   readonly settlementWindow: Moment
-  readonly status: ChannelStatus 
+  readonly status: ChannelStatus
   readonly state: ChannelType
   readonly balanceA: Balance
   readonly balance: Balance

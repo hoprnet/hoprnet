@@ -19,8 +19,14 @@ export default class ListOpenChannels extends AbstractCommand {
     return 'Lists your currently open channels'
   }
 
-  private generateOutput(id: string, myBalance: string, totalBalance: string, peerId: string, status: ChannelStatus): string {
-    let statusString = (['UNINITIALISED', 'FUNDING', 'OPEN', 'PENDING'])[status]
+  private generateOutput(
+    id: string,
+    myBalance: string,
+    totalBalance: string,
+    peerId: string,
+    status: ChannelStatus
+  ): string {
+    let statusString = ['UNINITIALISED', 'FUNDING', 'OPEN', 'PENDING'][status]
     return `
       Channel         ${styleValue(id, 'hash')}
       CounterParty    ${styleValue(peerId, 'peerId')}
