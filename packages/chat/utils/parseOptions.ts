@@ -92,7 +92,6 @@ export async function parseOptions(): Promise<HoprOptions> {
     throw new Error('Cannot launch without a network')
   }
 
-  let addr: Multiaddr
   let bootstrapServers: Multiaddr[] = []
 
   if (!cli_options.bootstrapNode) {

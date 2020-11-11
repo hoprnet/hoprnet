@@ -33,6 +33,7 @@ export class LogStream {
 
   error(message: string, trace: string) {
     this.log(message)
+    this.log(trace)
   }
 
   logFatalError(message: string) {

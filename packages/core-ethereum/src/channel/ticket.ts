@@ -19,7 +19,7 @@ class TicketStatic {
 
   public async submit(
     ticket: AcknowledgedTicket,
-    ticketIndex: Uint8Array
+    _ticketIndex: Uint8Array
   ): Promise<
     | {
         status: 'SUCCESS'
