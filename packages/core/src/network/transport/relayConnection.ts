@@ -174,7 +174,12 @@ class RelayConnection implements MultiaddrConnection {
           } else if (u8aEquals(SUFFIX, RESTART)) {
             log(`RESTART received. Ending stream ...`)
 
-            // this._tmpWebRTC = this._webRTCUpgradeInbound()
+            if (this.webRTC != null) {
+              try {
+                this.webRTC.destroy()
+                this.webRTC = this._webRTCUpgradeInbound()
+              } catch {}
+            }
             this._onReconnect(this.switch(), this._counterparty)
           } else if (u8aEquals(SUFFIX, PING)) {
             log(`PING received`)
@@ -484,12 +489,7 @@ class RelayConnection implements MultiaddrConnection {
           } catch (err) {
             err(`WebRTC error:`, err)
           }
-          if (this._tmpWebRTC == null) {
-            this.webRTC = this._webRTCUpgradeInbound()
-          } else {
-            this.webRTC = this._tmpWebRTC
-            this._tmpWebRTC = undefined
-          }
+
           webRTCdone = false
           webRTCstream = this._getWebRTCStream()
           webRTCPromise = webRTCstream.next().then(webRTCSourceFunction)
