@@ -154,6 +154,7 @@ class WebRTCConnection implements MultiaddrConnection {
 
           sink(
             (async function* () {
+              console.log(`before defer.promise`)
               await defer.promise
 
               if (!graceFullyMigrated) {
