@@ -122,7 +122,7 @@ describe('test utils', function () {
 
       let winProb = utils.computeWinningProbability(prob)
 
-      assert(prob - utils.getWinProbabilityAsFloat(winProb) <= 0.0001)
+      assert(Math.abs(prob - utils.getWinProbabilityAsFloat(winProb)) <= 0.0001)
     }
   })
 })
