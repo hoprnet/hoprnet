@@ -13,7 +13,6 @@ class WebRTCConnection implements MultiaddrConnection {
   private _switchPromise: DeferredPromise<void>
   private _webRTCStateKnown: boolean
   private _webRTCAvailable: boolean
-  private _migrated: boolean
   private _destroyed: boolean
   private _webRTCTimeout?: NodeJS.Timeout
 
@@ -149,7 +148,6 @@ class WebRTCConnection implements MultiaddrConnection {
         clearTimeout(this._webRTCTimeout)
         if (this._webRTCAvailable) {
           const sink = toIterable.sink(this.channel)
-          this._migrated = true
 
           sink(
             (async function* () {
@@ -190,21 +188,17 @@ class WebRTCConnection implements MultiaddrConnection {
       return Promise.resolve()
     }
 
-    if (this.timeline == null) {
-      this.timeline = {
-        open: Date.now(),
-        closed: Date.now()
-      }
-    } else {
-      this.timeline.closed = Date.now()
+    this.timeline.closed = Date.now()
+
+    try {
+      this.channel.destroy()
+    } catch (err) {
+      err(`WebRTC error while destroying: ${err}`)
     }
 
-    if (this._migrated) {
-      return Promise.resolve(this.channel.destroy())
-    } else {
-      this.channel.destroy()
-      return this.conn.close()
-    }
+    this.conn.close()
+
+    this._destroyed = true
   }
 }
 
