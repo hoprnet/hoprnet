@@ -1796,6 +1796,11 @@
   resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core-connector-interface/-/hopr-core-connector-interface-1.45.0-alpha.0.tgz#ce73c72ee227269fb702d484a0ea86b10d228217"
   integrity sha512-OwWhSZfa9uXNkT/B9PAHIxGcQhs15FTdUB+ukGNrZBVTa0JvaGmsyLcxxoJjOwvsrb36ZsXc6Mh5GLRIHjNIXQ==
 
+"@hoprnet/hopr-core-connector-interface@1.54.0-next.42":
+  version "1.54.0-next.42"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core-connector-interface/-/hopr-core-connector-interface-1.54.0-next.42.tgz#6112ce8e85caa48c6beb372e04bae799888b3587"
+  integrity sha512-lb5ySEXjTEmV8ip/av+NqjD9+jnA93MZLq3SO6a1upbAfbuVhCBc0kpIYiheXmfy9G5DvjvQURgMJ7J+xyeX2g==
+
 "@hoprnet/hopr-core-ethereum@1.45.0-alpha.0":
   version "1.45.0-alpha.0"
   resolved "https://registry.yarnpkg.com/@hoprnet/hopr-core-ethereum/-/hopr-core-ethereum-1.45.0-alpha.0.tgz#7f03ffde4700bc85e47e6b154ac6bffa2a038231"
