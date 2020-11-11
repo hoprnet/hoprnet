@@ -158,7 +158,11 @@ class RelayConnection implements MultiaddrConnection {
         const [PREFIX, SUFFIX] = [received.subarray(0, 1), received.subarray(1)]
 
         if (u8aEquals(PREFIX, RELAY_PAYLOAD_PREFIX)) {
-          this._msgs.push({ done: false, value: SUFFIX, iteration: this._iteration })
+          if (SUFFIX.length > 0) {
+            this._msgs.push({ done: false, value: SUFFIX, iteration: this._iteration })
+          } else {
+            this._msgs.push({ done: true, value: undefined, iteration: this._iteration })
+          }
           this._msgPromise?.resolve()
         } else if (u8aEquals(PREFIX, RELAY_STATUS_PREFIX)) {
           if (u8aEquals(SUFFIX, STOP)) {
@@ -227,7 +231,8 @@ class RelayConnection implements MultiaddrConnection {
         }
 
         if (current == null || current.done) {
-          break
+          console.log(`exiting`)
+          return
         }
 
         yield this._msgs.shift().value as Uint8Array
@@ -237,6 +242,7 @@ class RelayConnection implements MultiaddrConnection {
 
       await this._msgPromise.promise
     }
+    console.log(`done`)
   }
 
   private _createSink(source: Stream['source']): Promise<void> {

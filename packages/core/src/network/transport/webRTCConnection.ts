@@ -161,13 +161,6 @@ class WebRTCConnection implements MultiaddrConnection {
               }
             })()
           )
-
-          // setImmediate(() => {
-          //   this.conn.close().then(() => {
-          //     console.log(`sink migrated`)
-          //     this._migrated = true
-          //   })
-          // })
         }
       }
     }
@@ -177,65 +170,11 @@ class WebRTCConnection implements MultiaddrConnection {
         this._webRTCTimeout = setTimeout(endWebRTCUpgrade, WEBRTC_UPGRADE_TIMEOUT)
       }
 
-      let streamMsgReceived = false
-      let streamMsg: Uint8Array
-      let streamDone = false
-
-      function streamSourceFunction(arg: IteratorResult<Uint8Array, void>) {
-        console.log(`webRTCConnection source`, arg)
-        streamMsgReceived = true
-        streamDone = arg.done
-
-        if (!arg.done) {
-          streamMsg = arg.value as Uint8Array
-        }
-      }
-
-      let streamPromise = this.conn.source.next().then(streamSourceFunction)
-
-      while (true) {
-        // if (!this._webRTCStateKnown) {
-        await Promise.race([
-          // prettier-ignore
-          streamPromise
-          // this._switchPromise.promise
-        ])
-
-        if (streamMsgReceived) {
-          console.log(`stream iteration`)
-          streamMsgReceived = false
-
-          if (streamDone || streamMsg.length == 0) {
-            break
-          }
-
-          console.log(`getting from relayConnection`, streamMsg)
-
-          yield streamMsg
-          streamPromise = this.conn.source.next().then(streamSourceFunction)
-        }
-      }
+      yield* this.conn.source
 
       if (this._webRTCAvailable || !this._webRTCStateKnown) {
-        console.log(`here`)
-
         clearTimeout(this._webRTCTimeout)
         await this._switchPromise.promise
-
-        // while (!streamDone) {
-        //   await streamPromise
-
-        //   yield streamMsg
-        //   streamPromise = this.conn.source.next().then(streamSourceFunction)
-        // }
-
-        //if (this._webRTCAvailable) {
-        // setImmediate(() => {
-        //   this.conn.close().then(() => {
-        //     this._migrated = true
-        //     console.log(`source migrated`)
-        //   })
-        // })
 
         yield* this.channel[Symbol.asyncIterator]() as Stream['source']
       }

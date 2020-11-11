@@ -1,5 +1,6 @@
 import { WebRTCConnection } from './webRTCConnection'
 import Peer from 'simple-peer'
+import { yellow } from 'chalk'
 
 // @ts-ignore
 import wrtc = require('wrtc')
@@ -46,7 +47,7 @@ describe('test overwritable connection', function () {
               msg = _msg.slice()
             }
 
-            console.log(`receiver #${_iteration}`, new TextDecoder().decode(msg))
+            console.log(yellow(`receiver #${_iteration}`, new TextDecoder().decode(msg)))
           } else {
             console.log(`received empty message`, _msg)
           }
