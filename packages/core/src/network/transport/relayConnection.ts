@@ -483,17 +483,11 @@ class RelayConnection implements MultiaddrConnection {
         switchPromise = this._switchPromise.promise.then(switchFunction)
 
         if (iteration > 1 && this.webRTC != null) {
-          log(`resetting WebRTC`)
-          try {
-            this.webRTC.destroy()
-          } catch (err) {
-            err(`WebRTC error:`, err)
-          }
-
+          log(`resetting WebRTC stream`)
           webRTCdone = false
           webRTCstream = this._getWebRTCStream()
           webRTCPromise = webRTCstream.next().then(webRTCSourceFunction)
-          log(`resetting WebRTC done`)
+          log(`resetting WebRTC stream done`)
         }
       }
     }
