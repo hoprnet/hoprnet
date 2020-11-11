@@ -115,4 +115,14 @@ describe('test utils', function () {
       assert(Math.abs(utils.computeWinningProbability(rnd)[0] / 255) - rnd < 1 / 256)
     }
   })
+
+  it('should compute a winning probability and convert it to float', function () {
+    for (let i = 0; i < 10; i++) {
+      let prob = Math.random()
+
+      let winProb = utils.computeWinningProbability(prob)
+
+      assert(Math.abs(prob - utils.getWinProbabilityAsFloat(winProb)) <= 0.0001)
+    }
+  })
 })
