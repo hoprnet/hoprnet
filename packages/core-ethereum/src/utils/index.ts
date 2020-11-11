@@ -7,7 +7,15 @@ import { PromiEvent, TransactionReceipt, TransactionConfig } from 'web3-core'
 import { BlockTransactionString } from 'web3-eth'
 import Web3 from 'web3'
 import Debug from 'debug'
-import { u8aCompare, u8aConcat, u8aEquals, A_STRICLY_LESS_THAN_B, A_EQUALS_B, durations } from '@hoprnet/hopr-utils'
+import {
+  u8aCompare,
+  u8aConcat,
+  u8aEquals,
+  A_STRICLY_LESS_THAN_B,
+  A_EQUALS_B,
+  durations,
+  u8aToNumber
+} from '@hoprnet/hopr-utils'
 import { AccountId, Balance, Hash, Signature } from '../types'
 import { ContractEventEmitter } from '../tsc/web3/types'
 import { ChannelStatus } from '../types/channel'
@@ -177,6 +185,31 @@ export function computeWinningProbability(prob: number): Uint8Array {
   let divisor = new BN(0).bincn(prob.toString(2).slice(2).length)
 
   return new Uint8Array(new BN(0).bincn(256).isubn(1).imul(dividend).div(divisor).toArray('be', Hash.SIZE))
+}
+
+/**
+ * Transforms Uint256 encoded probabilities into floats.
+ *
+ * @notice mostly used to check a ticket's winning probability.
+ *
+ * @notice the precision is very limited
+ *
+ * @param winProb Uint256-encoded version of winning probability
+ */
+export function getWinProbabilityAsFloat(winProb: Uint8Array): number {
+  if (winProb.length != Hash.SIZE) {
+    throw Error(`Invalid array. Expected an array of ${Hash.SIZE} elements but got one with ${winProb?.length}.`)
+  }
+
+  if (u8aEquals(winProb, new Uint8Array(Hash.SIZE).fill(0xff))) {
+    return 1
+  }
+
+  if (u8aEquals(winProb, new Uint8Array(Hash.SIZE).fill(0x00))) {
+    return 0
+  }
+
+  return u8aToNumber(winProb.slice(0, 3)) / u8aToNumber(new Uint8Array(3).fill(0xff))
 }
 
 /**
