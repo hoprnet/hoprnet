@@ -2,7 +2,7 @@ import PeerId from 'peer-id'
 import Multiaddr from 'multiaddr'
 import dns from 'dns'
 
-const BOOTSTRAP_ADDRESS = process.env.HOPR_BOOTSTRAP_ADDRESS || '_dnsaddr.bootstrap.basodino.develop.hoprnet.org'
+const BOOTSTRAP_ADDRESS = process.env.HOPR_BOOTSTRAP_ADDRESS || '_dnsaddr.bootstrap.zurich.telemetry.develop'
 
 /** Load Bootstrap node addresses.
  *   - If a string of comma separated multiaddrs is passed, use this first
