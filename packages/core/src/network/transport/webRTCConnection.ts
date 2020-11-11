@@ -89,6 +89,8 @@ class WebRTCConnection implements MultiaddrConnection {
 
       let defer = Defer<void>()
 
+      let graceFullyMigrated = false
+
       this.conn.sink(
         async function* (this: WebRTCConnection): Stream['source'] {
           if (this._webRTCTimeout == null) {
@@ -123,6 +125,7 @@ class WebRTCConnection implements MultiaddrConnection {
 
                 if (!this._webRTCAvailable) {
                   sourcePromise = source.next().then(sourceFunction)
+                  graceFullyMigrated = true
                 }
               }
             } else {
@@ -152,6 +155,13 @@ class WebRTCConnection implements MultiaddrConnection {
           sink(
             (async function* () {
               await defer.promise
+
+              if (!graceFullyMigrated) {
+                console.log(`!graceFullyMigrated`)
+                await sourcePromise
+
+                yield sourceMsg
+              }
               console.log(`start sinking into WebRTC`)
 
               for await (const msg of source) {
