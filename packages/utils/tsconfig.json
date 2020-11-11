@@ -1,17 +1,7 @@
 {
+  "extends": "../../tsconfig.json",
   "compilerOptions": {
-    "esModuleInterop": true,
     "outDir": "./lib",
-    "noImplicitAny": true,
-    "lib": ["es2019", "dom"],
-    "module": "commonjs",
-    "target": "es2019",
-    "strict": true,
-    "resolveJsonModule": true,
-    "experimentalDecorators": true,
-    "noEmit": true,
-    "skipLibCheck": true,
-    "declaration": true
   },
   "include": ["src/**/*"]
 }

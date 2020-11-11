@@ -1,4 +1,3 @@
-import PeerId from 'peer-id'
 import Multiaddr from 'multiaddr'
 import dns from 'dns'
 
@@ -11,7 +10,6 @@ const BOOTSTRAP_ADDRESS = process.env.HOPR_BOOTSTRAP_ADDRESS || '_dnsaddr.bootst
  */
 export async function getBootstrapAddresses(addrs?: string): Promise<Multiaddr[]> {
   let addresses: string[]
-  let servers: Multiaddr[] = []
 
   if (addrs) {
     addresses = addrs.split(',')
