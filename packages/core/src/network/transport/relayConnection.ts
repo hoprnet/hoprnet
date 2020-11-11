@@ -38,7 +38,7 @@ class RelayConnection implements MultiaddrConnection {
   private _iteration: number
 
   private _onReconnect: (newStream: MultiaddrConnection, counterparty: PeerId) => Promise<void>
-  // private _webRTCUpgradeInbound: () => SimplePeer
+  private _webRTCUpgradeInbound: () => SimplePeer
 
   public webRTC: SimplePeer
   public localAddr: Multiaddr
@@ -87,7 +87,7 @@ class RelayConnection implements MultiaddrConnection {
     this._stream = opts.stream
 
     this._onReconnect = opts.onReconnect
-    // this._webRTCUpgradeInbound = opts.webRTCUpgradeInbound
+    this._webRTCUpgradeInbound = opts.webRTCUpgradeInbound
 
     this._counterparty = opts.counterparty
 
@@ -488,24 +488,24 @@ class RelayConnection implements MultiaddrConnection {
         streamPromise = currentSource.next().then(streamSourceFunction(iteration))
         switchPromise = this._switchPromise.promise.then(switchFunction)
 
-        // if (iteration > 1 && this.webRTC != null) {
-        //   log(`resetting WebRTC`)
-        //   try {
-        //     this.webRTC.destroy()
-        //   } catch (err) {
-        //     err(`WebRTC error:`, err)
-        //   }
-        //   if (this._tmpWebRTC == null) {
-        //     this.webRTC = this._webRTCUpgradeInbound()
-        //   } else {
-        //     this.webRTC = this._tmpWebRTC
-        //     this._tmpWebRTC = undefined
-        //   }
-        //   webRTCdone = false
-        //   webRTCstream = this._getWebRTCStream()
-        //   webRTCPromise = webRTCstream.next().then(webRTCSourceFunction)
-        //   log(`resetting WebRTC done`)
-        // }
+        if (iteration > 1 && this.webRTC != null) {
+          log(`resetting WebRTC`)
+          try {
+            this.webRTC.destroy()
+          } catch (err) {
+            err(`WebRTC error:`, err)
+          }
+          if (this._tmpWebRTC == null) {
+            this.webRTC = this._webRTCUpgradeInbound()
+          } else {
+            this.webRTC = this._tmpWebRTC
+            this._tmpWebRTC = undefined
+          }
+          webRTCdone = false
+          webRTCstream = this._getWebRTCStream()
+          webRTCPromise = webRTCstream.next().then(webRTCSourceFunction)
+          log(`resetting WebRTC done`)
+        }
       }
     }
   }
