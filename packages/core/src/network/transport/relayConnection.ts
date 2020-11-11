@@ -177,8 +177,8 @@ class RelayConnection implements MultiaddrConnection {
             if (this.webRTC != null) {
               try {
                 this.webRTC.destroy()
-                this.webRTC = this._webRTCUpgradeInbound()
               } catch {}
+              this.webRTC = this._webRTCUpgradeInbound()
             }
             this._onReconnect(this.switch(), this._counterparty)
           } else if (u8aEquals(SUFFIX, PING)) {

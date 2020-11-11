@@ -172,7 +172,10 @@ class WebRTCConnection implements MultiaddrConnection {
 
       if (this._webRTCAvailable || !this._webRTCStateKnown) {
         clearTimeout(this._webRTCTimeout)
+
         await this._switchPromise.promise
+
+        console.log(`source_ migrated`)
 
         yield* this.channel[Symbol.asyncIterator]() as Stream['source']
       }
