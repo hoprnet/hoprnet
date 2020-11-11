@@ -128,6 +128,7 @@ class WebRTCConnection implements MultiaddrConnection {
                 }
               }
             } else {
+              console.log(`fallback branch`)
               await sourcePromise
 
               if (sourceDone) {
