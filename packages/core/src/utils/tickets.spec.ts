@@ -80,7 +80,7 @@ const createNode = ({
   } as unknown) as Hopr<Chain>
 }
 
-describe.only('unit test validateUnacknowledgedTicket', function () {
+describe('unit test validateUnacknowledgedTicket', function () {
   const sender = PeerId.createFromB58String('16Uiu2HAmM9KAPaXA4eAz58Q7Eb3LEkDvLarU4utkyLwDeEK6vM5m')
   const target = PeerId.createFromB58String('16Uiu2HAm5g4fTADcjPQrtp9LtN2wCmPJTQPD7vMnWCZp4kwKCVUT')
 
