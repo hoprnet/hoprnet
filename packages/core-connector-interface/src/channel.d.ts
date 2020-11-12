@@ -37,9 +37,9 @@ declare interface ChannelStatic {
   /**
    * Checks whether the channel exists on-chain and off-chain, i.e. in our database.
    * Returns `true` if the channel exists on-chain AND off-chain.
-   * @param counterparty AccountId of the counterparty
+   * @param counterparty public key of the counterparty
    */
-  isOpen(counterparty: AccountId): Promise<boolean>
+  isOpen(counterparty: Uint8Array): Promise<boolean>
 
   /**
    * Opens a new payment channel and initializes the on-chain data.

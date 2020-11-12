@@ -3,9 +3,9 @@ import LibP2P from 'libp2p'
 import chalk from 'chalk'
 
 import PeerId from 'peer-id'
-const RELAY_FEE = 1
 
 import { pubKeyToPeerId } from '../../utils'
+import { validateUnacknowledgedTicket } from '../../utils/tickets'
 import { u8aConcat, u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
 
 import { Header, deriveTicketKey, deriveTicketKeyBlinding, deriveTagParameters, deriveTicketLastKey } from './header'
@@ -18,9 +18,9 @@ import Debug from 'debug'
 
 import Hopr from '../../'
 
-import HoprCoreConnector, { Types, Channel } from '@hoprnet/hopr-core-connector-interface'
+import HoprCoreConnector, { Types } from '@hoprnet/hopr-core-connector-interface'
 import { UnacknowledgedTicket } from '../ticket'
-import { getUnacknowledgedTickets, getAcknowledgedTickets } from '../../utils/tickets'
+import { RELAY_FEE } from '../../constants'
 
 const log = Debug('hopr-core:message:packet')
 const verbose = Debug('hopr-core:verbose:message:packet')
@@ -223,11 +223,10 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
         node._interactions.payments.onChainKey.interact(path[0])
       )
 
-      const newFee = new node.paymentChannels.types.Balance(100)
+      const ticketAmount = new BN(String(node.ticketAmount)).add(fee)
 
-      // log(Object.getOwnPropertyNames(newFee))
       // @ts-ignore
-      packet._ticket = await channel.ticket.create(newFee, ticketChallenge, 1.0, {
+      packet._ticket = await channel.ticket.create(ticketAmount, ticketChallenge, node.ticketWinProb, {
         bytes: packet.buffer,
         offset: packet.ticketOffset
       })
@@ -275,72 +274,11 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
       ;[sender, target] = await Promise.all([this.getSenderPeerId(), this.getTargetPeerId()])
 
       // perform various ticket validation checks before receiving an ACK
-      // NOTE: validating tickets is not performant at all
-
-      const chain = this.node.paymentChannels
-      const myAccountId = await chain.account.address
-      const counterpartyPubKey = sender.pubKey.marshal()
-      const counterpartyAccountId = await chain.utils.pubKeyToAccountId(counterpartyPubKey)
-      // const channelId = await chain.utils.getId(myAccountId, counterpartyAccountId)
-      const ticket = (await this.ticket).ticket
-      const amPartyA = chain.utils.isPartyA(myAccountId, counterpartyAccountId)
-
-      // channel MUST be open,
-      // (performance) we are making a request to blockchain
-      const channelIsOpen = await chain.channel.isOpen(counterpartyAccountId)
-      if (!channelIsOpen) {
-        throw Error(`Payment channel with '${u8aToHex(counterpartyAccountId)}' is not open`)
-      }
-
-      // channel MUST exist in our DB
-      let channel: Channel
-      try {
-        channel = await chain.channel.create(
-          counterpartyPubKey,
-          async () => new chain.types.Public(counterpartyPubKey),
-          undefined,
-          undefined
-        )
-      } catch (err) {
-        throw Error(`Stored payment channel with '${u8aToHex(counterpartyAccountId)}' not found`)
-      }
-
-      // get all tickets between me and counterparty
-      // (performance) no way to filter tickets of counterparty
-      const tickets: Types.Ticket[] = await Promise.all([
-        getUnacknowledgedTickets(this.node),
-        getAcknowledgedTickets(this.node)
-      ])
-        .then(async ([unAcks, acks]) => {
-          const unAckTickets = await Promise.all(
-            unAcks.map(async (unAck) => {
-              return (await unAck.signedTicket).ticket
-            })
-          )
-
-          const ackTickets = await Promise.all(
-            acks.map(async (ack) => {
-              return (await ack.ackTicket.signedTicket).ticket
-            })
-          )
-
-          return [...unAckTickets, ...ackTickets]
-        })
-        .then((tickets) => {
-          return tickets.filter((ticket) => u8aEquals(ticket.counterparty, counterpartyAccountId))
-        })
-
-      // calculate total unredeemed balance
-      const unredeemedBalance = tickets.reduce((total, ticket) => {
-        return new chain.types.Balance(total.add(ticket.amount))
-      }, new chain.types.Balance(0))
-      // (performance) we are making a request to blockchain
-      const counterpartyBalance = await (amPartyA ? channel.balance_b : channel.balance_a)
-
-      // ensure counterparty has enough funds
-      if (unredeemedBalance.add(new chain.types.Balance(ticket.amount)).lt(counterpartyBalance)) {
-        throw Error(`Counterparty ${u8aToHex(counterpartyAccountId)} doesn't have enough funds in payment channel.`)
-      }
+      await validateUnacknowledgedTicket({
+        node: this.node,
+        signedTicket: await this.ticket,
+        senderPeerId: sender
+      })
     }
 
     this.message.decrypt(this.header.derivedSecret)

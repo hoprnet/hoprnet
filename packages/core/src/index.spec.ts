@@ -41,9 +41,9 @@ describe('test hopr-core', function () {
     const peerId = await privKeyToPeerId(NODE_SEEDS[0])
     node = await Hopr.create({
       debug: true,
+      bootstrapNode: true,
       peerId,
       createDbIfNotExist: true,
-      bootstrapNode: true,
       network: 'ethereum',
       provider: 'ws://127.0.0.1:8545',
       hosts: {

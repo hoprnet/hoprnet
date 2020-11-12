@@ -10,11 +10,25 @@ import SECIO = require('libp2p-secio')
 import TCP from './network/transport'
 
 import { Packet } from './messages/packet'
-import { PACKET_SIZE, MAX_HOPS, VERSION, CRAWL_TIMEOUT } from './constants'
+import {
+  PACKET_SIZE,
+  MAX_HOPS,
+  VERSION,
+  CRAWL_TIMEOUT,
+  DEFAULT_TICKET_AMOUNT,
+  DEFAULT_TICKET_WIN_PROB
+} from './constants'
 
 import { Network } from './network'
 
-import { addPubKey, getPeerId, getAddrs, pubKeyToPeerId } from './utils'
+import {
+  addPubKey,
+  getPeerId,
+  getAddrs,
+  pubKeyToPeerId,
+  getAcknowledgedTickets,
+  submitAcknowledgedTicket
+} from './utils'
 import { createDirectoryIfNotExists, u8aToHex } from '@hoprnet/hopr-utils'
 import { existsSync } from 'fs'
 
@@ -34,7 +48,6 @@ import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 import BN from 'bn.js'
 
 import { Interactions } from './interactions'
-import { getAcknowledgedTickets, submitAcknowledgedTicket } from './utils/tickets'
 import * as DbKeys from './dbKeys'
 import EventEmitter from 'events'
 import path from 'path'
@@ -49,6 +62,10 @@ interface NetOptions {
 
 export type HoprOptions = {
   debug: boolean
+  network: string
+  provider: string
+  ticketAmount?: number
+  ticketWinProb?: number
   db?: LevelUp
   dbPath?: string
   createDbIfNotExist?: boolean
@@ -56,10 +73,8 @@ export type HoprOptions = {
   password?: string
   id?: number // TODO - kill this opaque accessor of db files...
   bootstrapNode?: boolean
-  network: string
   connector?: HoprCoreConnectorStatic
   bootstrapServers?: Multiaddr[]
-  provider: string
   output?: (encoded: Uint8Array) => void
   hosts?: {
     ip4?: NetOptions
@@ -81,6 +96,8 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
   public isBootstrapNode: boolean
   public bootstrapServers: Multiaddr[]
   public initializedWithOptions: HoprOptions
+  public ticketAmount: number = DEFAULT_TICKET_AMOUNT
+  public ticketWinProb: number = DEFAULT_TICKET_WIN_PROB
 
   private running: boolean
   private crawlTimeout: NodeJS.Timeout
@@ -116,6 +133,9 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       (remotePeer: PeerId) => this._network.heartbeat.emit('beat', remotePeer)
     )
     this._network = new Network(this._libp2p, this._interactions, options)
+
+    if (options.ticketAmount) this.ticketAmount = options.ticketAmount
+    if (options.ticketWinProb) this.ticketWinProb = options.ticketWinProb
 
     verbose('# STARTED NODE')
     verbose('ID', this.getId().toB58String())

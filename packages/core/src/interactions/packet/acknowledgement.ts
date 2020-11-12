@@ -138,8 +138,6 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
           }
         )
 
-        // @TODO: check after received ACK
-
         if (!(await this.node.paymentChannels.account.reservePreImageIfIsWinning(acknowledgedTicket))) {
           log(`Got a ticket that is not a win. Dropping ticket.`)
           await this.node.db.del(Buffer.from(unAcknowledgedDbKey))
