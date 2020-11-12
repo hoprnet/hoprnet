@@ -21,6 +21,7 @@ RUN echo "source $NVM_DIR/nvm.sh \
     && nvm alias default $NODE_VERSION \
     && nvm use default" | bash
 
-RUN ls $NVM_DIR/versions/node/v$NODE_VERSION/lib/node_modules
-RUN npm install -g @hoprnet/hoprd@v1.54.5
-RUN DEBUG=hopr* hoprd --admin --init
+RUN mkdir /hoprd
+WORKDIR /hoprd
+RUN sudo env "PATH=$PATH" npm install --unsafe-perm=true -g @hoprnet/hoprd@v1.54.5
+#RUN DEBUG=hopr* hoprd --init --password="foo" --run="balance"
