@@ -10786,9 +10786,9 @@ hardhat-typechain@^0.3.3:
   integrity sha512-NrqP7Zng28prV3YT0lXoo1pXtZxoNCMfiZIWkf1HXjjID42JLLfSOTsvlb0okDMpz4tJaEEkgADJO69sKZxw+Q==
 
 hardhat@^2.0.2:
-  version "2.0.2"
-  resolved "https://registry.yarnpkg.com/hardhat/-/hardhat-2.0.2.tgz#30c3c5a49f950aad2e39c479208b4132052dc735"
-  integrity sha512-P8SMYsWeC0OakmHUAgL9STalidQ1bAHFHFroPyvnfljei7EPHaIQpS6QursoZ+KVNkPTnKC+9m1Lky8nnKIjuw==
+  version "2.0.3"
+  resolved "https://registry.yarnpkg.com/hardhat/-/hardhat-2.0.3.tgz#35e07060d9854d4182f201aeaa1c05316bd7e4d3"
+  integrity sha512-mDygAl+1qd5KBdXQBfc3R5XmC/rVdYYbEuOTSQY3rlncVu9gfockZVDsHtAMPw/FiBIRMApLcOceK7D1XQmHRw==
   dependencies:
     "@nomiclabs/ethereumjs-vm" "^4.1.1"
     "@sentry/node" "^5.18.1"
