@@ -1631,14 +1631,14 @@
     retry-request "^4.1.1"
     teeny-request "^7.0.0"
 
-"@google-cloud/firestore@^4.0.0":
-  version "4.5.0"
-  resolved "https://registry.yarnpkg.com/@google-cloud/firestore/-/firestore-4.5.0.tgz#6308fda60496b662680241ccc7c7bee4516b8ff9"
-  integrity sha512-sExt4E+TlBqyv4l/av6kBZ4YGS99Cc3P5UvLRNj9z41mT9ekPGhIzptbj4K6O7h0KCyDIDOiJdi4gUPH9lip4g==
+"@google-cloud/firestore@^4.5.0":
+  version "4.7.1"
+  resolved "https://registry.yarnpkg.com/@google-cloud/firestore/-/firestore-4.7.1.tgz#d170c72ecda6286ebab460765511103362da7b21"
+  integrity sha512-Qici+WKB6uRdDS1S3CaxGrIaCl4Bck70DYSzA5dZFkTU03Jj5DKXC4PYeUkfCAiB4haj7tzx+2ye7rhLxPclhQ==
   dependencies:
     fast-deep-equal "^3.1.1"
     functional-red-black-tree "^1.0.1"
-    google-gax "^2.2.0"
+    google-gax "^2.9.2"
 
 "@google-cloud/paginator@^2.0.0":
   version "2.0.3"
@@ -3827,9 +3827,9 @@
     web3 "*"
 
 "@types/ws@^7.2.6":
-  version "7.2.9"
-  resolved "https://registry.yarnpkg.com/@types/ws/-/ws-7.2.9.tgz#cadfac473acfab192678a487c3ecbb13a503547f"
-  integrity sha512-gmXYAXr7G4BrRMnkGQGkGonc3ArVro9VZd//C1uns/qqsJyl2dxaJdlPMhZbcq5MTxFFC+ttFWtHSfVW5+hlRA==
+  version "7.4.0"
+  resolved "https://registry.yarnpkg.com/@types/ws/-/ws-7.4.0.tgz#499690ea08736e05a8186113dac37769ab251a0e"
+  integrity sha512-Y29uQ3Uy+58bZrFLhX36hcI3Np37nqWE7ky5tjiDoy1GDZnIwVxS0CgF+s+1bXMzjKBFy+fqaRfb708iNzdinw==
   dependencies:
     "@types/node" "*"
 
@@ -9740,9 +9740,9 @@ find-yarn-workspace-root@^1.2.1:
     micromatch "^3.1.4"
 
 firebase-admin@^9.1.1:
-  version "9.3.0"
-  resolved "https://registry.yarnpkg.com/firebase-admin/-/firebase-admin-9.3.0.tgz#05f3efb1bb97f17b2c562f4b59820a381d2f903f"
-  integrity sha512-qMUITOp2QKLLc2o0/wSiDC2OO2knejjieZN/8Or9AzfFk8ftTcUKq5ALNlQXu+7aUzGe0IwSJq9TVnkIU0h1xw==
+  version "9.4.0"
+  resolved "https://registry.yarnpkg.com/firebase-admin/-/firebase-admin-9.4.0.tgz#52a191eac86b0c7d8994ab169ac36dc649ecadec"
+  integrity sha512-0X0qeKaU5UlKbblWZXw3CTwtD94Z6dfEVftrTOSjBPPDgWcXbY+i+LOtZ0S2cUjLgu8Ms1tUDzCxaPdNLvAUzg==
   dependencies:
     "@firebase/database" "^0.6.10"
     "@firebase/database-types" "^0.5.2"
@@ -9751,16 +9751,17 @@ firebase-admin@^9.1.1:
     jsonwebtoken "^8.5.1"
     node-forge "^0.10.0"
   optionalDependencies:
-    "@google-cloud/firestore" "^4.0.0"
+    "@google-cloud/firestore" "^4.5.0"
     "@google-cloud/storage" "^5.3.0"
 
 firebase-tools@^8.12.0:
-  version "8.15.1"
-  resolved "https://registry.yarnpkg.com/firebase-tools/-/firebase-tools-8.15.1.tgz#1d94d0ecc74f5e592ccb70fc54e92a508bd7f5b2"
-  integrity sha512-u2Kn2w5rWZLybBNmThVppHvZq5/23aZfBcvT0eon26bxX+nK7ApV6KS4DyaDR1tBH4vqL9LVHBVy0lVhAe2EyQ==
+  version "8.16.1"
+  resolved "https://registry.yarnpkg.com/firebase-tools/-/firebase-tools-8.16.1.tgz#f1737ec16dbf6dd79c8b23b0e26f576e7fc906d0"
+  integrity sha512-D5foH0EMg2retKViCFgrH3x8OVjDcfgyw6NWg97RsRHWcEvHx+yMylSfIZIVEzqblrrxRxW/dYwEk1HRETbrYA==
   dependencies:
     "@google-cloud/pubsub" "^1.7.0"
     JSONStream "^1.2.1"
+    abort-controller "^3.0.0"
     archiver "^3.0.0"
     body-parser "^1.19.0"
     chokidar "^3.0.2"
@@ -10561,7 +10562,7 @@ google-auth-library@^5.0.0, google-auth-library@^5.5.0:
     jws "^4.0.0"
     lru-cache "^5.0.0"
 
-google-auth-library@^6.0.0, google-auth-library@^6.1.1:
+google-auth-library@^6.0.0, google-auth-library@^6.1.1, google-auth-library@^6.1.3:
   version "6.1.3"
   resolved "https://registry.yarnpkg.com/google-auth-library/-/google-auth-library-6.1.3.tgz#39d868140b70d0c4b32c6f6d8f4ccc1400d84dca"
   integrity sha512-m9mwvY3GWbr7ZYEbl61isWmk+fvTmOt0YNUfPOUY2VH8K5pZlAIWJjxEi0PqR3OjMretyiQLI6GURMrPSwHQ2g==
@@ -10597,17 +10598,17 @@ google-gax@^1.14.2:
     semver "^6.0.0"
     walkdir "^0.4.0"
 
-google-gax@^2.2.0:
-  version "2.9.1"
-  resolved "https://registry.yarnpkg.com/google-gax/-/google-gax-2.9.1.tgz#939ccf9cf062cca51a0511c07b00248b9a69175a"
-  integrity sha512-KQ7HiMTB/PAzKv3OU00x6tC1H7MHvSxQfon5BSyW5o+lkMgRA8xoqvlxZCBC1dlW1azOPGF8vScy8QgFmhaQ9Q==
+google-gax@^2.9.2:
+  version "2.9.2"
+  resolved "https://registry.yarnpkg.com/google-gax/-/google-gax-2.9.2.tgz#780b2c0fc031c864007e1e198a9b90c7e946cca0"
+  integrity sha512-Pve4osEzNKpBZqFXMfGKBbKCtgnHpUe5IQMh5Ou+Xtg8nLcba94L3gF0xgM5phMdGRRqJn0SMjcuEVmOYu7EBg==
   dependencies:
     "@grpc/grpc-js" "~1.1.1"
     "@grpc/proto-loader" "^0.5.1"
     "@types/long" "^4.0.0"
     abort-controller "^3.0.0"
     duplexify "^4.0.0"
-    google-auth-library "^6.0.0"
+    google-auth-library "^6.1.3"
     is-stream-ended "^0.1.4"
     node-fetch "^2.6.1"
     protobufjs "^6.9.0"
@@ -10735,15 +10736,15 @@ grpc-tools@^1.9.0:
     node-pre-gyp "^0.15.0"
 
 grpc@^1.24.3:
-  version "1.24.3"
-  resolved "https://registry.yarnpkg.com/grpc/-/grpc-1.24.3.tgz#92efe28dfc1250dca179b8133e40b4f2341473d9"
-  integrity sha512-EDemzuZTfhM0hgrXqC4PtR76O3t+hTIYJYR5vgiW0yt2WJqo4mhxUqZUirzUQz34Psz7dbLp38C6Cl7Ij2vXRQ==
+  version "1.24.4"
+  resolved "https://registry.yarnpkg.com/grpc/-/grpc-1.24.4.tgz#9240a3ea33cfaf04cd32ce8346798709bbd6782d"
+  integrity sha512-mHRAwuitCMuSHo1tp1+Zc0sz3cYa7pkhVJ77pkIXD5gcVORtkRiyW6msXYqTDT+35jazg98lbO3XzuTo2+XrcA==
   dependencies:
     "@types/bytebuffer" "^5.0.40"
     lodash.camelcase "^4.3.0"
     lodash.clone "^4.5.0"
     nan "^2.13.2"
-    node-pre-gyp "^0.15.0"
+    node-pre-gyp "^0.16.0"
     protobufjs "^5.0.3"
 
 gtoken@^4.1.0:
@@ -10817,9 +10818,9 @@ hardhat-typechain@^0.3.3:
   integrity sha512-NrqP7Zng28prV3YT0lXoo1pXtZxoNCMfiZIWkf1HXjjID42JLLfSOTsvlb0okDMpz4tJaEEkgADJO69sKZxw+Q==
 
 hardhat@^2.0.2:
-  version "2.0.2"
-  resolved "https://registry.yarnpkg.com/hardhat/-/hardhat-2.0.2.tgz#30c3c5a49f950aad2e39c479208b4132052dc735"
-  integrity sha512-P8SMYsWeC0OakmHUAgL9STalidQ1bAHFHFroPyvnfljei7EPHaIQpS6QursoZ+KVNkPTnKC+9m1Lky8nnKIjuw==
+  version "2.0.3"
+  resolved "https://registry.yarnpkg.com/hardhat/-/hardhat-2.0.3.tgz#35e07060d9854d4182f201aeaa1c05316bd7e4d3"
+  integrity sha512-mDygAl+1qd5KBdXQBfc3R5XmC/rVdYYbEuOTSQY3rlncVu9gfockZVDsHtAMPw/FiBIRMApLcOceK7D1XQmHRw==
   dependencies:
     "@nomiclabs/ethereumjs-vm" "^4.1.1"
     "@sentry/node" "^5.18.1"
@@ -15119,6 +15120,22 @@ node-pre-gyp@^0.15.0:
   version "0.15.0"
   resolved "https://registry.yarnpkg.com/node-pre-gyp/-/node-pre-gyp-0.15.0.tgz#c2fc383276b74c7ffa842925241553e8b40f1087"
   integrity sha512-7QcZa8/fpaU/BKenjcaeFF9hLz2+7S9AqyXFhlH/rilsQ/hPZKK32RtR5EQHJElgu+q5RfbJ34KriI79UWaorA==
+  dependencies:
+    detect-libc "^1.0.2"
+    mkdirp "^0.5.3"
+    needle "^2.5.0"
+    nopt "^4.0.1"
+    npm-packlist "^1.1.6"
+    npmlog "^4.0.2"
+    rc "^1.2.7"
+    rimraf "^2.6.1"
+    semver "^5.3.0"
+    tar "^4.4.2"
+
+node-pre-gyp@^0.16.0:
+  version "0.16.0"
+  resolved "https://registry.yarnpkg.com/node-pre-gyp/-/node-pre-gyp-0.16.0.tgz#238fa540364784e5015dfcdba78da3937e18dbdc"
+  integrity sha512-4efGA+X/YXAHLi1hN8KaPrILULaUn2nWecFrn1k2I+99HpoyvcOGEbtcOxpDiUwPF2ZANMJDh32qwOUPenuR1g==
   dependencies:
     detect-libc "^1.0.2"
     mkdirp "^0.5.3"
