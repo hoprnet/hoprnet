@@ -98,7 +98,7 @@ export class AdminServer {
     if (node.bootstrapServers.length == 1) {
       this.cmds.execute(`alias ${node.bootstrapServers[0].getPeerId()} bootstrap`)
     } else {
-      node.bootstrapServers.forEach( (x, i) => {
+      node.bootstrapServers.forEach((x, i) => {
         this.cmds.execute(`alias ${x.getPeerId()}  bootstrap${i}`)
       })
     }
