@@ -120,7 +120,7 @@ async function generateNodeOptions(): Promise<HoprOptions> {
     bootstrapNode: argv.runAsBootstrap,
     createDbIfNotExist: argv.init,
     network: argv.network,
-    bootstrapServers: argv.bootstrap ? [] : [...(await getBootstrapAddresses(argv.bootstrapServers)).values()],
+    bootstrapServers: argv.runAsBootstrap ? [] : [...(await getBootstrapAddresses(argv.bootstrapServers)).values()],
     provider: argv.provider,
     hosts: parseHosts()
   }
