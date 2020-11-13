@@ -71,10 +71,14 @@ const argv = yargs
     describe: 'List all the options used to run the HOPR node, but quit instead of starting',
     default: false
   })
-  .option('bootstrap', {
+  .option('runAsBootstrap', {
     boolean: true,
     describe: 'run as a bootstrap node',
     default: false
+  })
+  .option('bootstrapServers', {
+    describe: 'manually specify bootstrap servers',
+    default: undefined
   })
   .option('data', {
     describe: 'manually specify the database directory to use',
@@ -113,11 +117,11 @@ function parseHosts(): HoprOptions['hosts'] {
 async function generateNodeOptions(): Promise<HoprOptions> {
   let options: HoprOptions = {
     debug: Boolean(process.env.HOPR_DEBUG),
-    network: argv.network,
-    provider: argv.provider,
-    bootstrapNode: argv.bootstrap,
+    bootstrapNode: argv.runAsBootstrap,
     createDbIfNotExist: argv.init,
-    bootstrapServers: argv.bootstrap ? [] : [...(await getBootstrapAddresses()).values()],
+    network: argv.network,
+    bootstrapServers: argv.runAsBootstrap ? [] : [...(await getBootstrapAddresses(argv.bootstrapServers)).values()],
+    provider: argv.provider,
     hosts: parseHosts()
   }
 
