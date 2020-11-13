@@ -182,10 +182,7 @@ export async function validateUnacknowledgedTicket({
     throw Error(`Stored payment channel with '${senderB58}' not found`)
   }
 
-  // @TODO: checking whether the redeemer’s account counter matches ticket’s epoch
-  // @TODO: tickets / per sec ?
-  // @TODO: check challenge
-
+  // @TODO: check whether the redeemer’s account counter matches ticket’s epoch
   // @TODO: uncomment
   // // get all tickets between me and counterparty
   // // (performance) no way to filter tickets of counterparty
