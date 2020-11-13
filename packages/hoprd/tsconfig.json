@@ -1,6 +1,14 @@
 {
-  "extends": "../../tsconfig.json",
   "compilerOptions": {
+    "esModuleInterop": true,
+    "lib": ["es2019", "dom"],
+    "module": "commonjs",
+    "target": "es2019",
+    "declaration": true,
+    "skipLibCheck": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "sourceMap": true
     "outDir": "./lib"
   },
   "include": ["src/**/*.ts"]
