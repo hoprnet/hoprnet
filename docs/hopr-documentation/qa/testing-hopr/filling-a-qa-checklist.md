@@ -24,13 +24,13 @@ If you do not have a Google Suite account or would prefer not to use it, you dow
 
 To properly complete the QA checklist, you need to be able to run at least one of the following:
 
-- **HOPR Chat \(source code, Docker image or executable binary\)**
-- **HOPRd \(source code or HOPR PC\)**
+* **HOPR Chat \(source code, Docker image or executable binary\)**
+* **HOPRd \(source code or HOPR PC\)**
 
 In addition, you need to be connected to a network that has one of the following bots running:
 
-- **Randobot**
-- **Coverbot**
+* **Randobot**
+* **Coverbot**
 
 To obtain the latest releases and addresses of these bots per network, please go to our Releases page.
 
@@ -42,8 +42,8 @@ After gethering all the necessary information, make sure to start some recording
 
 Work through all the tasks in the template, and mark them with one of the following as you go along:
 
-- **OK** - The application behaves as expected.
-- **BUG** - The application does not behave as expected.
+* **OK** - The application behaves as expected.
+* **BUG** - The application does not behave as expected.
 
 {% hint style="info" %}
 To use HOPR, bear in mind you'll need both native and hopr tokens in the network you are testing. Reach out to the team on Discord and/or Telegram to support you with these currencies and/or follow our **Getting Started** instructions for more information.
@@ -54,3 +54,4 @@ To use HOPR, bear in mind you'll need both native and hopr tokens in the network
 After completing the checklist or reaching a point where you can no longer proceed due to a bug, make sure to note down all the bugs you encountered and submit a [Bug Report](https://github.com/hoprnet/hoprnet/issues/new?assignees=&labels=bug&template=bug-report.md&title=) in our GitHub repository.
 
 Finally, send your recording via [WeTransfer](https://wetransfer.com/) and/or other file sharing application, alongside your checklist file to [qa@hoprnet.org](mailto:qa@hoprnet.org). Please include your name and HOPR version in your email.
+

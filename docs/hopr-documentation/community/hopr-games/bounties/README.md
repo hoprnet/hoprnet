@@ -25,8 +25,8 @@ To get started with **HOPR Chat**, please visit our quick start \***\*page to do
 
 Completing the HOPR Games bounties will always require you the following:
 
-- Run a **HOPR Node** \(either via **HOPR Chat** or else\)
-- Engage with HOPR‘s social media presence
+* Run a **HOPR Node** \(either via **HOPR Chat** or else\)
+* Engage with HOPR‘s social media presence
 
 Not only this will help us avoid Sybil Attacks \(i.e. bots or individuals just trying to solve the Bounties via spam attacks\), but also helps us showcase use-cases for the **HOPR Protocol** across social media.
 
@@ -50,9 +50,10 @@ Upon successfully complete a HOPR Games bounty, you will receive a URL with pre-
 
 Bounties are usually launched on a **bi-weekly basis**, and we try to support multiple timezones whenever possible. All our bounties will be shared over our social media channels, and you can reach the HOPR Association team members via these same channels to get some support.
 
-- Twitter - [https://twitter.com/hoprnet](https://twitter.com/hoprnet)
-- Telegram - [https://t.me/hoprnet](https://t.me/hoprnet)
-- Medium - [https://medium.com/hoprnet](https://medium.com/hoprnet)
-- Reddit - [https://www.reddit.com/r/HOPR/](https://www.reddit.com/r/HOPR/)
-- Email - [contact@hoprnet.org](mailto:contact@hoprnet.org)
-- Discord - [https://discord.gg/5FWSfq7](https://discord.gg/5FWSfq7)
+* Twitter - [https://twitter.com/hoprnet](https://twitter.com/hoprnet)
+* Telegram - [https://t.me/hoprnet](https://t.me/hoprnet)
+* Medium - [https://medium.com/hoprnet](https://medium.com/hoprnet)
+* Reddit - [https://www.reddit.com/r/HOPR/](https://www.reddit.com/r/HOPR/)
+* Email - [contact@hoprnet.org](mailto:contact@hoprnet.org)
+* Discord - [https://discord.gg/5FWSfq7](https://discord.gg/5FWSfq7)
+
