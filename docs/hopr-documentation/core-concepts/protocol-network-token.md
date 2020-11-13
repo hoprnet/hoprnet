@@ -59,6 +59,17 @@ Basòdino v2 participants: The password for today's task is the same as the name
 
 **16Uiu2HAkvc8JAxoKb1BzZo7SYMt8iMQi8FrPCEZLDHRm13mu8JEn**
 
+For example, if the password was HOPR, send :HOPR:
+
+\(But the password isn't HOPR!\)
+
+Make sure you have **includeRecipient** set to true or we can't log your address. If you can't send the message, please try crawling the network until you can see 500 nodes. If it still doesn't work, try again after 30 minutes.
+
+This is NOT a bot, so you won't get a response. If you didn't get an error message, it worked.
+
+One entry per person, please! Multiple guesses will be deleted.
+{% endhint %}
+
 For example: :PASSWORD:
 
 Make sure you have **includeRecipient** set to true or we can't log your address. If you can't send the message, please try crawling the network until you can see 500 nodes. If it still doesn't work, try again after 30 minutes.
