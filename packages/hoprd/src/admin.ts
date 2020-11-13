@@ -94,6 +94,14 @@ export class AdminServer {
     // Setup some noise
     connectionReport(this.node, this.logs)
     reportMemoryUsage(this.logs)
+
+    if (node.bootstrapServers.length == 1) {
+      this.cmds.execute(`alias ${node.bootstrapServers[0].getPeerId()} bootstrap`)
+    } else {
+      node.bootstrapServers.forEach( (x, i) => {
+        this.cmds.execute(`alias ${x.getPeerId()}  bootstrap${i}`)
+      })
+    }
   }
 }
 

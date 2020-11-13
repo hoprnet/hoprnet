@@ -12,21 +12,21 @@ CHARLIE_PORT=9877
 
 # Check Databases
 echo "alice"
-hoprd --data="$FIXTURES/alice" --password="$DBPASS" --init --bootstrap --run "myAddress" 
-hoprd --data="$FIXTURES/alice" --password="$DBPASS" --bootstrap --run "balance" 
+hoprd --data="$FIXTURES/alice" --password="$DBPASS" --init --runAsBootstrap --run "myAddress" 
+hoprd --data="$FIXTURES/alice" --password="$DBPASS" --runAsBootstrap --run "balance" 
 
 echo "bob"
-hoprd --data="$FIXTURES/bob" --password="$DBPASS" --init --bootstrap --run "myAddress"
-hoprd --data="$FIXTURES/bob" --password="$DBPASS" --bootstrap --run "balance"
+hoprd --data="$FIXTURES/bob" --password="$DBPASS" --init --runAsBootstrap --run "myAddress"
+hoprd --data="$FIXTURES/bob" --password="$DBPASS" --runAsBootstrap --run "balance"
 
 echo "charlie"
-hoprd --data="$FIXTURES/charlie" --password="$DBPASS" --init --bootstrap --run "myAddress"
-hoprd --data="$FIXTURES/charlie" --password="$DBPASS" --bootstrap --run "balance"
+hoprd --data="$FIXTURES/charlie" --password="$DBPASS" --init --runAsBootstrap --run "myAddress"
+hoprd --data="$FIXTURES/charlie" --password="$DBPASS" --runAsBootstrap --run "balance"
 
 # Store addresses
-ALICE=$(hoprd --data="$FIXTURES/alice" --password="$DBPASS" --bootstrap --run "myAddress hopr")
-BOB=$(hoprd --data="$FIXTURES/bob" --password="$DBPASS" --bootstrap --run="myAddress hopr")
-CHARLIE=$(hoprd --data="$FIXTURES/charlie" --password="$DBPASS" --bootstrap --run "myAddress hopr")
+ALICE=$(hoprd --data="$FIXTURES/alice" --password="$DBPASS" --runAsBootstrap --run "myAddress hopr")
+BOB=$(hoprd --data="$FIXTURES/bob" --password="$DBPASS" --runAsBootstrap --run="myAddress hopr")
+CHARLIE=$(hoprd --data="$FIXTURES/charlie" --password="$DBPASS" --runAsBootstrap --run "myAddress hopr")
 
 function finish {
   # Cleanup
@@ -36,7 +36,7 @@ function finish {
 trap finish EXIT
 
 # Run bob as bootstrap node
-hoprd --data="$FIXTURES/bob" --password="$DBPASS" --host="$BOB_ADDR:$BOB_PORT" --bootstrap &
+hoprd --data="$FIXTURES/bob" --password="$DBPASS" --host="$BOB_ADDR:$BOB_PORT" --runAsBootstrap &
 BOB_PID="$!"
 BOB_MULTIADDR=/ip4/$BOB_ADDR/tcp/$BOB_PORT/p2p/$BOB
 export HOPR_BOOTSTRAP_SERVERS=$BOB_MULTIADDR 
