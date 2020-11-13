@@ -19,7 +19,7 @@ export async function parseOptions(): Promise<HoprOptions> {
 
   let cli_options = getopts(process.argv.slice(2), {
     boolean: ['debug', 'bootstrapNode', 'help', 'listConnectors', 'verbose', 'init'],
-    string: ['network', 'password', 'ticketAmount', 'ticketWinProb'],
+    string: ['network', 'password'],
     alias: {
       l: 'listConnectors',
       p: 'password',
@@ -113,8 +113,6 @@ export async function parseOptions(): Promise<HoprOptions> {
     network: cli_options.network,
     bootstrapServers: bootstrapServers,
     provider: provider,
-    ticketAmount: cli_options.ticketAmount,
-    ticketWinProb: cli_options.ticketWinProb,
     createDbIfNotExist: cli_options.init || false,
     output(encoded: Uint8Array) {
       const { latency, msg } = decodeMessage(encoded)

@@ -85,16 +85,6 @@ const argv = yargs
     describe: "initialize a database if it doesn't already exist",
     default: false
   })
-  .option('ticketAmount', {
-    number: true,
-    describe: '',
-    default: 1000000000000000 // 0.001 HOPR @TODO: convert from HOPR to HOPRli
-  })
-  .option('ticketWinProb', {
-    number: true,
-    describe: '',
-    default: 1 // 100% // @TODO: validate input 0-1
-  })
   .option('settings', {
     descripe: 'Settings, same as in the repl (JSON)',
     default: '{}'
@@ -125,8 +115,6 @@ async function generateNodeOptions(): Promise<HoprOptions> {
     debug: Boolean(process.env.HOPR_DEBUG),
     network: argv.network,
     provider: argv.provider,
-    ticketAmount: argv.ticketAmount,
-    ticketWinProb: argv.ticketWinProb,
     bootstrapNode: argv.bootstrap,
     createDbIfNotExist: argv.init,
     bootstrapServers: argv.bootstrap ? [] : [...(await getBootstrapAddresses()).values()],

@@ -10,14 +10,7 @@ import SECIO = require('libp2p-secio')
 import TCP from './network/transport'
 
 import { Packet } from './messages/packet'
-import {
-  PACKET_SIZE,
-  MAX_HOPS,
-  VERSION,
-  CRAWL_TIMEOUT,
-  DEFAULT_TICKET_AMOUNT,
-  DEFAULT_TICKET_WIN_PROB
-} from './constants'
+import { PACKET_SIZE, MAX_HOPS, VERSION, CRAWL_TIMEOUT, TICKET_AMOUNT, TICKET_WIN_PROB } from './constants'
 
 import { Network } from './network'
 
@@ -96,8 +89,8 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
   public isBootstrapNode: boolean
   public bootstrapServers: Multiaddr[]
   public initializedWithOptions: HoprOptions
-  public ticketAmount: number = DEFAULT_TICKET_AMOUNT
-  public ticketWinProb: number = DEFAULT_TICKET_WIN_PROB
+  public ticketAmount: number = TICKET_AMOUNT
+  public ticketWinProb: number = TICKET_WIN_PROB
 
   private running: boolean
   private crawlTimeout: NodeJS.Timeout
