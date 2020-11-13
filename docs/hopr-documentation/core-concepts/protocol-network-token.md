@@ -34,9 +34,9 @@ As a result, it is necessary to encourage participation **by compensating the pr
 
 **HOPR** \(pronounced 'hopper'\) is
 
-* a privacy-preserving messaging protocol \(**HOPR Protocol**\),
-* a decentralised network \(**HOPR Network**\),
-* with an economical incentive \(**HOPR Token**\) on top of a blockchain.
+- a privacy-preserving messaging protocol \(**HOPR Protocol**\),
+- a decentralised network \(**HOPR Network**\),
+- with an economical incentive \(**HOPR Token**\) on top of a blockchain.
 
 Software and hardware implementations of the **HOPR Protocol** can function as **HOPR Nodes**, which in turn create the _decentralised network_ known as the **HOPR Network.** Users of the **HOPR Network** can relay messages through multiple “hops” using different **HOPR** **Nodes**. In exchange of running stable **HOPR Nodes**, these _intermediate nodes_ get paid via a blockchain using _payment channels_, in the form of a probability of earning a digital token \(**HOPR Token**\) as an economical incentive for their services.
 
@@ -55,22 +55,17 @@ Messages transferred using the **HOPR Protocol** are embedded within SPHINX pack
 The payment layer uses off-chain payments via payment channels to settle balances for HOPR Node operators. In order to process transactions, HOPR Node operators need to stake assets, and upon successful data relay, are given a _ticket_ which has a _probability_ of earning HOPR Tokens. These tokens can then be settled upon closing the payment channel, and used within the network as means of payment for requesting services from other HOPR Nodes.
 
 {% hint style="danger" %}
-Basòdino v2 participants: The password for today's task is the same as the name of the packet format HOPR uses. Send ONLY the password, in all caps, between two colons to: 
+Basòdino v2 participants: The password for today's task is the same as the name of the packet format HOPR uses. Send ONLY the password, in all caps, between two colons to:
 
-**16Uiu2HAkvc8JAxoKb1BzZo7SYMt8iMQi8FrPCEZLDHRm13mu8JEn**  
-  
-For example, if the password was HOPR, send :HOPR:  
-  
-\(But the password isn't HOPR!\)   
-  
-Make sure you have **includeRecipient** set to true or we can't log your address. If you can't send the message, please try crawling the network until you can see 500 nodes. If it still doesn't work, try again after 30 minutes.  
-  
-This is NOT a bot, so you won't get a response. If you didn't get an error message, it worked.  
-  
+**16Uiu2HAkvc8JAxoKb1BzZo7SYMt8iMQi8FrPCEZLDHRm13mu8JEn**
+
+For example, if the password was HOPR, send :HOPR:
+
+\(But the password isn't HOPR!\)
+
+Make sure you have **includeRecipient** set to true or we can't log your address. If you can't send the message, please try crawling the network until you can see 500 nodes. If it still doesn't work, try again after 30 minutes.
+
+This is NOT a bot, so you won't get a response. If you didn't get an error message, it worked.
+
 One entry per person, please! Multiple guesses will be deleted.
 {% endhint %}
-
-  
-  
-
-

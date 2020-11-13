@@ -126,4 +126,3 @@ Congratulations! You have successfully sent a message through the HOPR Network!
 {% hint style="info" %}
 If you get a `Timeout Error,` please run `crawl` a few times. At the beginning of your HOPR Chat session, your node might have yet to discover RandoBot, so try again later or report your error to our [Discord](https://discord.gg/5FWSfq7) channel.
 {% endhint %}
-

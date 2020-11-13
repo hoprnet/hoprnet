@@ -25,4 +25,3 @@ Since the version **HOPR Chat** that uses Nodejs to work has additional precompi
 ![Windows prompting access to write to your current directory](../../.gitbook/assets/image%20%282%29%20%282%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29.png)
 
 Clicking “Share It” will allow you to run **HOPR Chat** successfully.
-
