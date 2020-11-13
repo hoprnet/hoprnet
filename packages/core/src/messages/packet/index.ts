@@ -20,7 +20,6 @@ import Hopr from '../../'
 
 import HoprCoreConnector, { Types } from '@hoprnet/hopr-core-connector-interface'
 import { UnacknowledgedTicket } from '../ticket'
-import { RELAY_FEE } from '../../constants'
 
 const log = Debug('hopr-core:message:packet')
 const verbose = Debug('hopr-core:verbose:message:packet')
@@ -184,7 +183,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
 
     packet._header = header
 
-    const fee = new BN(secrets.length - 1, 10).imul(new BN(RELAY_FEE, 10))
+    const fee = new BN(secrets.length - 1, 10).imul(new BN(node.ticketAmount, 10))
 
     log('---------- New Packet ----------')
     path
@@ -223,9 +222,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
         node._interactions.payments.onChainKey.interact(path[0])
       )
 
-      const ticketAmount = new Balance(new BN(String(node.ticketAmount)).add(fee))
-
-      packet._ticket = await channel.ticket.create(ticketAmount, ticketChallenge, node.ticketWinProb, {
+      packet._ticket = await channel.ticket.create(new Balance(fee), ticketChallenge, node.ticketWinProb, {
         bytes: packet.buffer,
         offset: packet.ticketOffset
       })
@@ -347,13 +344,13 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     )
 
     // get new ticket amount
-    // @TODO: validate ticket amount
-    const ticketAmount = new Balance(ticket.amount.isub(new BN(RELAY_FEE, 10)))
+    // @TODO: validate ticket amount & fee
+    const fee = new Balance(ticket.amount.isub(new BN(this.node.ticketAmount, 10)))
 
-    if (ticketAmount.gtn(0)) {
+    if (fee.gtn(0)) {
       const channelBalance = ChannelBalance.create(undefined, {
-        balance: ticketAmount,
-        balance_a: amPartyA ? ticketAmount : new BN(0)
+        balance: fee,
+        balance_a: amPartyA ? fee : new BN(0)
       })
 
       const channel = await chain.channel.create(
@@ -364,11 +361,11 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
           this.node._interactions.payments.open.interact(target, channelBalance)
       )
 
-      this._ticket = await channel.ticket.create(ticketAmount, this.header.encryptionKey, this.node.ticketWinProb, {
+      this._ticket = await channel.ticket.create(fee, this.header.encryptionKey, this.node.ticketWinProb, {
         bytes: this.buffer,
         offset: this.ticketOffset
       })
-    } else if (ticketAmount.isZero()) {
+    } else if (fee.isZero()) {
       this._ticket = await chain.channel.createDummyChannelTicket(
         await chain.utils.pubKeyToAccountId(target.pubKey.marshal()),
         this.header.encryptionKey,
@@ -378,18 +375,20 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
         }
       )
     } else {
-      throw Error(`Cannot forward ${ticketAmount.toNumber()}`)
+      throw Error(`Cannot forward ${fee.toNumber()}`)
     }
 
     log(
       `Received ${chalk.magenta(
-        `${chain.utils.convertUnit(new Balance(new BN(String(RELAY_FEE))), 'wei', 'ether').toString()} HOPR`
+        `${chain.utils
+          .convertUnit(new Balance(new BN(String(this.node.ticketAmount))), 'wei', 'ether')
+          .toString()} HOPR`
       )} on channel ${chalk.yellow(channelIdOutgoing.toString())}.`
     )
 
     this.header.transformForNextNode()
 
-    this._challenge = await Challenge.create<Chain>(chain, this.header.hashedKeyHalf, ticketAmount, {
+    this._challenge = await Challenge.create<Chain>(chain, this.header.hashedKeyHalf, fee, {
       bytes: this.buffer,
       offset: this.challengeOffset
     }).sign(sender)
