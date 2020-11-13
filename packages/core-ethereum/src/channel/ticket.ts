@@ -37,14 +37,16 @@ class TicketStatic {
     const ticketChallenge = ticket.response
 
     try {
-      this.coreConnector.log('Submitting ticket', ticketChallenge)
+      this.coreConnector.log('Submitting ticket', u8aToHex(ticketChallenge))
 
       const { hoprChannels, signTransaction, account, utils } = this.coreConnector
       const { r, s, v } = utils.getSignatureParameters((await ticket.signedTicket).signature)
 
       const hasPreImage = !u8aEquals(ticket.preImage, EMPTY_PRE_IMAGE)
       if (!hasPreImage) {
-        this.coreConnector.log(`Failed to submit ticket ${ticketChallenge}: ${this.INVALID_MESSAGES.NO_PRE_IMAGE}`)
+        this.coreConnector.log(
+          `Failed to submit ticket ${u8aToHex(ticketChallenge)}: ${this.INVALID_MESSAGES.NO_PRE_IMAGE}`
+        )
         return {
           status: 'FAILURE',
           message: this.INVALID_MESSAGES.NO_PRE_IMAGE
@@ -53,7 +55,9 @@ class TicketStatic {
 
       const validChallenge = await checkChallenge((await ticket.signedTicket).ticket.challenge, ticket.response)
       if (!validChallenge) {
-        this.coreConnector.log(`Failed to submit ticket ${ticketChallenge}: ${this.INVALID_MESSAGES.INVALID_CHALLENGE}`)
+        this.coreConnector.log(
+          `Failed to submit ticket ${u8aToHex(ticketChallenge)}: ${this.INVALID_MESSAGES.INVALID_CHALLENGE}`
+        )
         return {
           status: 'FAILURE',
           message: this.INVALID_MESSAGES.INVALID_CHALLENGE
@@ -67,7 +71,9 @@ class TicketStatic {
         (await ticket.signedTicket).ticket.winProb
       )
       if (!isWinning) {
-        this.coreConnector.log(`Failed to submit ticket ${ticketChallenge}: ${this.INVALID_MESSAGES.NOT_WINNING}`)
+        this.coreConnector.log(
+          `Failed to submit ticket ${u8aToHex(ticketChallenge)}: ${this.INVALID_MESSAGES.NOT_WINNING}`
+        )
         return {
           status: 'FAILURE',
           message: this.INVALID_MESSAGES.NOT_WINNING
@@ -95,13 +101,13 @@ class TicketStatic {
       ticket.redeemed = true
       this.coreConnector.account.updateLocalState(ticket.preImage)
 
-      this.coreConnector.log('Successfully submitted ticket', ticketChallenge)
+      this.coreConnector.log('Successfully submitted ticket', u8aToHex(ticketChallenge))
       return {
         status: 'SUCCESS',
         receipt: transaction.transactionHash
       }
     } catch (err) {
-      this.coreConnector.log('Unexpected error when submitting ticket', ticketChallenge, err)
+      this.coreConnector.log('Unexpected error when submitting ticket', u8aToHex(ticketChallenge), err)
       return {
         status: 'ERROR',
         error: err

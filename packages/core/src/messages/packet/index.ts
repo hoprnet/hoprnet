@@ -345,7 +345,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
 
     // get new ticket amount
     // @TODO: validate ticket amount & fee
-    const fee = new Balance(ticket.amount.isub(new BN(this.node.ticketAmount, 10)))
+    const fee = new Balance(ticket.amount.isub(new BN(this.node.ticketAmount)))
 
     if (fee.gtn(0)) {
       const channelBalance = ChannelBalance.create(undefined, {
@@ -378,13 +378,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
       throw Error(`Cannot forward ${fee.toNumber()}`)
     }
 
-    log(
-      `Received ${chalk.magenta(
-        `${chain.utils
-          .convertUnit(new Balance(new BN(String(this.node.ticketAmount))), 'wei', 'ether')
-          .toString()} HOPR`
-      )} on channel ${chalk.yellow(channelIdOutgoing.toString())}.`
-    )
+    log(`Received ticket on channel ${chalk.yellow(u8aToHex(channelIdOutgoing))}`)
 
     this.header.transformForNextNode()
 

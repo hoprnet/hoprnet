@@ -1,6 +1,7 @@
 import type Chain from '@hoprnet/hopr-core-connector-interface'
 import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '..'
+import { stringToU8a } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 import PeerId from 'peer-id'
 import chaiAsPromised from 'chai-as-promised'
@@ -10,13 +11,29 @@ import { validateUnacknowledgedTicket } from './tickets'
 
 chai.use(chaiAsPromised)
 
-const createTicket = ({ sender, amount = 1, winProb = 1 }: { sender: PeerId; amount?: number; winProb?: number }) => {
+// target is party A, sender is party B
+const target = PeerId.createFromB58String('16Uiu2HAm5g4fTADcjPQrtp9LtN2wCmPJTQPD7vMnWCZp4kwKCVUT')
+const sender = PeerId.createFromB58String('16Uiu2HAmM9KAPaXA4eAz58Q7Eb3LEkDvLarU4utkyLwDeEK6vM5m')
+const targetAddress = stringToU8a('0xf3a509473be4bcd8af0d1961d75a5a3dc9e47ba0')
+const senderAddress = stringToU8a('0x65e78d07acf7b654e5ae6777a93ebbf30f639356')
+
+const createTicket = ({
+  sender,
+  amount = 1,
+  winProb = 1,
+  epoch = 1
+}: {
+  sender: PeerId
+  amount?: number
+  winProb?: number
+  epoch?: number
+}) => {
   return ({
     counterparty: sender.pubKey.marshal(),
     challenge: sender.pubKey.marshal(),
-    epoch: new BN(1),
     amount: new BN(amount),
-    winProb: new Uint8Array(winProb)
+    winProb: new Uint8Array(winProb),
+    epoch: new BN(epoch)
   } as unknown) as Types.Ticket
 }
 
@@ -38,41 +55,57 @@ const createSignedTicket = ({
 const createNode = ({
   sender,
   target,
+  accountNonce = 1,
   ticketAmount = 1,
   ticketWinProb = 1,
   isChannelOpen = true,
   isChannelStored = true,
+  channelBalance = {
+    balance_a: new BN(0),
+    balance_b: new BN(100)
+  },
   getWinProbabilityAsFloat = 1
 }: {
   sender: PeerId
   target: PeerId
+  accountNonce?: number
   ticketAmount?: number
   ticketWinProb?: number
   isChannelOpen?: boolean
   isChannelStored?: boolean
+  channelBalance?: {
+    balance_a: BN
+    balance_b: BN
+  }
   getWinProbabilityAsFloat?: number
 }) => {
+  const pubKeyToAccountId = sinon.stub()
+  pubKeyToAccountId.withArgs(sender.pubKey.marshal()).returns(Promise.resolve(senderAddress))
+  pubKeyToAccountId.withArgs(target.pubKey.marshal()).returns(Promise.resolve(targetAddress))
+
+  const isPartyA = sinon.stub()
+  isPartyA.withArgs(targetAddress, senderAddress).returns(true)
+  isPartyA.withArgs(senderAddress, targetAddress).returns(false)
+
   return ({
     ticketAmount: ticketAmount,
     ticketWinProb: ticketWinProb,
     paymentChannels: {
       account: {
-        address: target.pubKey.marshal()
+        address: targetAddress,
+        nonce: Promise.resolve(accountNonce)
       },
       utils: {
-        isPartyA: sinon
-          .stub()
-          .withArgs(target.pubKey.marshal(), sender.pubKey.marshal())
-          .returns(Promise.resolve(true)),
-        pubKeyToAccountId: sinon.stub().withArgs(sender.pubKey.marshal()).returns(Promise.resolve('he')),
+        isPartyA: isPartyA,
+        pubKeyToAccountId,
         getWinProbabilityAsFloat: sinon.stub().returns(getWinProbabilityAsFloat)
       },
       channel: {
         isOpen: sinon.stub().returns(Promise.resolve(isChannelOpen)),
         create: isChannelStored
           ? sinon.stub().returns({
-              balance_a: 100,
-              balance_b: 50
+              balance_a: Promise.resolve(channelBalance.balance_a),
+              balance_b: Promise.resolve(channelBalance.balance_b)
             })
           : sinon.stub().throws()
       }
@@ -81,8 +114,23 @@ const createNode = ({
 }
 
 describe('unit test validateUnacknowledgedTicket', function () {
-  const sender = PeerId.createFromB58String('16Uiu2HAmM9KAPaXA4eAz58Q7Eb3LEkDvLarU4utkyLwDeEK6vM5m')
-  const target = PeerId.createFromB58String('16Uiu2HAm5g4fTADcjPQrtp9LtN2wCmPJTQPD7vMnWCZp4kwKCVUT')
+  it('should pass if ticket is okay', async function () {
+    const node = createNode({
+      sender,
+      target
+    })
+    const signedTicket = createSignedTicket({
+      sender
+    })
+
+    return expect(
+      validateUnacknowledgedTicket({
+        node,
+        signedTicket,
+        senderPeerId: sender
+      })
+    ).to.eventually.to.not.rejected
+  })
 
   it('should throw when signer is not sender', async function () {
     const node = createNode({
@@ -178,4 +226,64 @@ describe('unit test validateUnacknowledgedTicket', function () {
       })
     ).to.eventually.rejectedWith('not found')
   })
+
+  it('should throw if ticket epoch does not match our account counter', async function () {
+    const node = createNode({
+      sender,
+      target,
+      accountNonce: 2
+    })
+    const signedTicket = createSignedTicket({
+      sender
+    })
+
+    return expect(
+      validateUnacknowledgedTicket({
+        node,
+        signedTicket,
+        senderPeerId: sender
+      })
+    ).to.eventually.rejectedWith('does not match our account counter')
+  })
+
+  it('should throw if channel does not have enough funds', async function () {
+    const node = createNode({
+      sender,
+      target,
+      channelBalance: {
+        balance_a: new BN(100),
+        balance_b: new BN(0)
+      }
+    })
+    const signedTicket = createSignedTicket({
+      sender
+    })
+
+    return expect(
+      validateUnacknowledgedTicket({
+        node,
+        signedTicket,
+        senderPeerId: sender
+      })
+    ).to.eventually.rejectedWith('Payment channel does not have enough funds')
+  })
+
+  // @TODO: implement test
+  // it('should throw if channel does not have enough funds when you include unredeemed tickets', async function () {
+  //   const node = createNode({
+  //     sender,
+  //     target
+  //   })
+  //   const signedTicket = createSignedTicket({
+  //     sender
+  //   })
+
+  //   return expect(
+  //     validateUnacknowledgedTicket({
+  //       node,
+  //       signedTicket,
+  //       senderPeerId: sender
+  //     })
+  //   ).to.eventually.rejectedWith('Payment channel does not have enough funds when you include unredeemed tickets')
+  // })
 })

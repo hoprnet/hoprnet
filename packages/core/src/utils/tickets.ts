@@ -1,5 +1,5 @@
 import type Chain from '@hoprnet/hopr-core-connector-interface'
-import type { Types } from '@hoprnet/hopr-core-connector-interface'
+import type { Types, Channel } from '@hoprnet/hopr-core-connector-interface'
 import type PeerId from 'peer-id'
 import type Hopr from '..'
 import { u8aEquals } from '@hoprnet/hopr-utils'
@@ -17,6 +17,7 @@ export type OperationStatus = OperationSuccess | OperationFailure | OperationErr
  */
 export async function getUnacknowledgedTickets(node: Hopr<Chain>): Promise<UnacknowledgedTicket<Chain>[]> {
   const tickets: UnacknowledgedTicket<Chain>[] = []
+  const unAcknowledgedTicketSize = UnacknowledgedTicket.SIZE(node.paymentChannels)
 
   return new Promise((resolve, reject) => {
     node.db
@@ -25,6 +26,8 @@ export async function getUnacknowledgedTickets(node: Hopr<Chain>): Promise<Unack
       })
       .on('error', (err) => reject(err))
       .on('data', ({ value }: { value: Buffer }) => {
+        if (value.buffer.byteLength !== unAcknowledgedTicketSize) return
+
         tickets.push(
           new UnacknowledgedTicket(node.paymentChannels, {
             bytes: value.buffer,
@@ -76,6 +79,34 @@ export async function getAcknowledgedTickets(
         })
       })
       .on('end', () => resolve(Promise.all(promises)))
+  })
+}
+
+/**
+ * Get all tickets, both unacknowledged and acknowledged
+ * @param node
+ * @returns an array of all tickets
+ */
+export async function getAllTickets(node: Hopr<Chain>): Promise<Types.Ticket[]> {
+  return Promise.all([getUnacknowledgedTickets(node), getAcknowledgedTickets(node)]).then(async ([unAcks, acks]) => {
+    const unAckTickets = await Promise.all(
+      unAcks.map(async (unAck) => {
+        return (await unAck.signedTicket).ticket
+      })
+    )
+
+    const ackTickets = await Promise.all(
+      acks.map(async (ack) => {
+        return (await ack.ackTicket.signedTicket).ticket
+      })
+    )
+
+    console.log({
+      unAckTickets: unAckTickets.length,
+      ackTickets: ackTickets.length
+    })
+
+    return [...unAckTickets, ...ackTickets]
   })
 }
 
@@ -144,11 +175,11 @@ export async function validateUnacknowledgedTicket({
 }): Promise<void> {
   const ticket = signedTicket.ticket
   const chain = node.paymentChannels
-  // const selfAccountId = await chain.account.address
+  const selfAccountId = await chain.account.address
   const senderB58 = senderPeerId.toB58String()
   const senderPubKey = senderPeerId.pubKey.marshal()
-  // const senderAccountId = await chain.utils.pubKeyToAccountId(senderPubKey)
-  // const amPartyA = chain.utils.isPartyA(selfAccountId, senderAccountId)
+  const senderAccountId = await chain.utils.pubKeyToAccountId(senderPubKey)
+  const amPartyA = chain.utils.isPartyA(selfAccountId, senderAccountId)
 
   // ticket signer MUST be the sender
   if (!u8aEquals(await signedTicket.signer, senderPubKey)) {
@@ -166,7 +197,7 @@ export async function validateUnacknowledgedTicket({
     throw Error(`Ticket winning probability '${winProb}' is lower than '${node.ticketWinProb}'`)
   }
 
-  // channel MUST be open,
+  // channel MUST be open
   // (performance) we are making a request to blockchain
   const channelIsOpen = await chain.channel.isOpen(senderPubKey)
   if (!channelIsOpen) {
@@ -174,47 +205,48 @@ export async function validateUnacknowledgedTicket({
   }
 
   // channel MUST exist in our DB
-  // let channel: Channel
+  let channel: Channel
   try {
-    // channel = await chain.channel.create(
-    await chain.channel.create(senderPubKey, async () => new chain.types.Public(senderPubKey), undefined, undefined)
+    channel = await chain.channel.create(
+      senderPubKey,
+      async () => new chain.types.Public(senderPubKey),
+      undefined,
+      undefined
+    )
   } catch (err) {
     throw Error(`Stored payment channel with '${senderB58}' not found`)
   }
 
-  // @TODO: check whether the redeemer’s account counter matches ticket’s epoch
-  // @TODO: uncomment
-  // // get all tickets between me and counterparty
-  // // (performance) no way to filter tickets of counterparty
-  // const tickets: Types.Ticket[] = await Promise.all([getUnacknowledgedTickets(node), getAcknowledgedTickets(node)])
-  //   .then(async ([unAcks, acks]) => {
-  //     const unAckTickets = await Promise.all(
-  //       unAcks.map(async (unAck) => {
-  //         return (await unAck.signedTicket).ticket
-  //       })
-  //     )
+  // ticket's epoch MUST match our account nonce
+  // (performance) we are making a request to blockchain
+  const epoch = await node.paymentChannels.account.ticketEpoch
+  if (!ticket.epoch.eq(epoch)) {
+    throw Error(`Ticket epoch '${ticket.epoch.toString()}' does not match our account counter ${epoch.toString()}`)
+  }
 
-  //     const ackTickets = await Promise.all(
-  //       acks.map(async (ack) => {
-  //         return (await ack.ackTicket.signedTicket).ticket
-  //       })
-  //     )
+  // channel MUST have enough funds
+  // (performance) we are making a request to blockchain
+  const senderBalance = await (amPartyA ? channel.balance_b : channel.balance_a)
+  if (senderBalance.lt(ticket.amount)) {
+    throw Error(`Payment channel does not have enough funds`)
+  }
 
-  //     return [...unAckTickets, ...ackTickets]
+  // // channel MUST have enough funds
+  // // (performance) tickets are stored by key, we can't query sender's tickets efficiently
+  // const tickets: Types.Ticket[] = await getAllTickets(node).then((tickets) => {
+  //   return tickets.filter((ticket) => {
+  //     // @TODO: better validate stored tickets / handle epoch change
+  //     return u8aEquals(ticket.counterparty, selfAccountId) && ticket.epoch.eq(epoch)
   //   })
-  //   .then((tickets) => {
-  //     return tickets.filter((ticket) => u8aEquals(ticket.counterparty, senderAccountId))
-  //   })
+  // })
 
   // // calculate total unredeemed balance
   // const unredeemedBalance = tickets.reduce((total, ticket) => {
   //   return new BN(total.add(ticket.amount))
   // }, new BN(0))
-  // // (performance) we are making a request to blockchain
-  // const senderBalance = await (amPartyA ? channel.balance_b : channel.balance_a)
 
   // // ensure sender has enough funds
   // if (unredeemedBalance.add(new BN(ticket.amount)).gt(senderBalance)) {
-  //   throw Error(`Ticket sender ${senderB58} doesn't have enough funds in payment channel.`)
+  //   throw Error(`Payment channel does not have enough funds when you include unredeemed tickets`)
   // }
 }
