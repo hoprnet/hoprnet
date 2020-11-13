@@ -483,10 +483,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     return getAcknowledgedTickets(this)
   }
 
-  public async submitAcknowledgedTicket(
-    ackTicket: Parameters<typeof submitAcknowledgedTicket>['1'],
-    index: Parameters<typeof submitAcknowledgedTicket>['2']
-  ) {
+  public async submitAcknowledgedTicket(ackTicket: Types.AcknowledgedTicket, index: Uint8Array) {
     return submitAcknowledgedTicket(this, ackTicket, index)
   }
 

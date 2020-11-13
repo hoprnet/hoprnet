@@ -10,7 +10,7 @@ import { validateUnacknowledgedTicket } from './tickets'
 
 chai.use(chaiAsPromised)
 
-const createTicket = ({ sender, amount = 1, winProb = 1 }: { sender: PeerId; amount: number; winProb?: number }) => {
+const createTicket = ({ sender, amount = 1, winProb = 1 }: { sender: PeerId; amount?: number; winProb?: number }) => {
   return ({
     counterparty: sender.pubKey.marshal(),
     challenge: sender.pubKey.marshal(),
