@@ -55,7 +55,7 @@ const createSignedTicket = ({
 const createNode = ({
   sender,
   target,
-  accountNonce = 1,
+  ticketEpoch = new BN(1),
   ticketAmount = 1,
   ticketWinProb = 1,
   isChannelOpen = true,
@@ -68,7 +68,7 @@ const createNode = ({
 }: {
   sender: PeerId
   target: PeerId
-  accountNonce?: number
+  ticketEpoch?: BN
   ticketAmount?: number
   ticketWinProb?: number
   isChannelOpen?: boolean
@@ -93,7 +93,7 @@ const createNode = ({
     paymentChannels: {
       account: {
         address: targetAddress,
-        nonce: Promise.resolve(accountNonce)
+        ticketEpoch: Promise.resolve(ticketEpoch)
       },
       utils: {
         isPartyA: isPartyA,
@@ -231,7 +231,7 @@ describe('unit test validateUnacknowledgedTicket', function () {
     const node = createNode({
       sender,
       target,
-      accountNonce: 2
+      ticketEpoch: new BN(2)
     })
     const signedTicket = createSignedTicket({
       sender

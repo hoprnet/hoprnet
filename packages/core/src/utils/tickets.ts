@@ -219,7 +219,7 @@ export async function validateUnacknowledgedTicket({
 
   // ticket's epoch MUST match our account nonce
   // (performance) we are making a request to blockchain
-  const epoch = await node.paymentChannels.account.ticketEpoch
+  const epoch = await chain.account.ticketEpoch
   if (!ticket.epoch.eq(epoch)) {
     throw Error(`Ticket epoch '${ticket.epoch.toString()}' does not match our account counter ${epoch.toString()}`)
   }
