@@ -8,7 +8,7 @@
     "skipLibCheck": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "sourceMap": true
+    "sourceMap": true,
     "outDir": "./lib"
   },
   "include": ["src/**/*.ts"]
