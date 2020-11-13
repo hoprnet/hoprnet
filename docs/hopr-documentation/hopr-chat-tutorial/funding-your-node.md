@@ -6,8 +6,8 @@ description: Funding your node with native and HOPR tokens
 
 Next, you need to send tokens to your HOPR node. To use HOPR, you'll need two types of token:
 
-- a HOPR token
-- the native token of the blockchain the HOPR token is linked to
+* a HOPR token
+* the native token of the blockchain the HOPR token is linked to
 
 In our current testnet, the native token is MATIC and the HOPR token is hosted on the Matic Network.
 
@@ -23,7 +23,7 @@ It costs MATIC to open payment channels and perform certain other testnet action
 
 If your node is unfunded, you can find your MATIC address by simply starting the HOPR Chat client. HOPR Chat will recognize that your node is unfunded, and won't proceed. It will tell you your address, so you can send MATIC. Once your node is funded, you can find your address by typing `myAddress`.
 
-![](../.gitbook/assets/no-funds%20%283%29%20%282%29%20%281%29.png)
+![](../.gitbook/assets/no-funds%20%283%29%20%282%29%20%281%29%20%281%29.png)
 
 You can ask for MATIC in our [**Telegram**](https://t.me/hoprnet) or [**Discord**](https://discord.gg/dEAWC4G) channels. A HOPR ambassador will be glad to fund your wallet. If you need more instructions on how to buy and send MATIC, head [**here**](../core-concepts/tokens/native-tokens.md#getting-xdai).
 
@@ -62,7 +62,6 @@ To withdraw MATIC, simply specify the amount and the destination address. You'll
 ```text
 withdraw [amount] native [MATIC address]
 ```
-
 {% endtab %}
 
 {% tab title="Withdrawing HOPR" %}
@@ -73,6 +72,6 @@ To withdraw, type:
 ```text
 withdraw [amount] HOPR [ETH address]
 ```
-
 {% endtab %}
 {% endtabs %}
+

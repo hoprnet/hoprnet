@@ -7,3 +7,4 @@ As a user, you can specify how many hops your data will make before it reaches i
 {% hint style="warning" %}
 You can choose zero hops. This is called **direct routing**, and the data is sent straight to the recipient. This doesn't cost HOPR tokens, but it also doesn't have any privacy benefits, so it is not recommended.
 {% endhint %}
+
