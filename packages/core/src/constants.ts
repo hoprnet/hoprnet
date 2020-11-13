@@ -1,7 +1,8 @@
 import { durations } from '@hoprnet/hopr-utils'
 
 export const CRAWLING_RESPONSE_NODES = 10
-// export const RELAY_FEE = toWei('100', 'wei')
+export const TICKET_AMOUNT = 1000000000000000 // 0.001 HOPR
+export const TICKET_WIN_PROB = 1 // 100%
 export const PACKET_SIZE = 500
 export const MAX_HOPS = 3
 export const MARSHALLED_PUBLIC_KEY_SIZE = 37

@@ -71,7 +71,7 @@ export async function privKeyToPubKey(privKey: Uint8Array): Promise<Uint8Array> 
       }.`
     )
 
-  return publicKeyCreate(privKey)
+  return publicKeyCreate(privKey, true)
 }
 
 /**

@@ -8,7 +8,7 @@ const assertMatch = (test: any, pattern: RegExp) => {
   assert(test.match(pattern), `should match ${pattern}`)
 }
 
-let mockNode = sinon.fake()
+let mockNode = sinon.fake() as any
 
 describe('Commands', () => {
   it('can import commands', () => {
@@ -64,7 +64,7 @@ describe('Commands', () => {
   */
 
   it('myAddress', async () => {
-    let mockNode = sinon.fake()
+    let mockNode = sinon.fake() as any
     mockNode.paymentChannels = sinon.fake()
     mockNode.paymentChannels.constants = sinon.fake()
     mockNode.paymentChannels.utils = sinon.fake()
@@ -103,10 +103,10 @@ describe('Commands', () => {
 
   it('multisend', async () => {
     let seq = 0
-    let mockNode = sinon.fake()
+    let mockNode = sinon.fake() as any
     mockNode.sendMessage = sinon.fake()
 
-    let mockReadline = sinon.fake()
+    let mockReadline = sinon.fake() as any
     mockReadline.write = sinon.fake()
     mockReadline.pause = sinon.fake()
     mockReadline.resume = sinon.fake()

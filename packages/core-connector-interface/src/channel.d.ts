@@ -37,9 +37,9 @@ declare interface ChannelStatic {
   /**
    * Checks whether the channel exists on-chain and off-chain, i.e. in our database.
    * Returns `true` if the channel exists on-chain AND off-chain.
-   * @param counterparty AccountId of the counterparty
+   * @param counterparty public key of the counterparty
    */
-  isOpen(counterparty: AccountId): Promise<boolean>
+  isOpen(counterparty: Uint8Array): Promise<boolean>
 
   /**
    * Opens a new payment channel and initializes the on-chain data.
@@ -59,6 +59,27 @@ declare interface ChannelStatic {
     onData: (channel: Channel, ...props: any[]) => Promise<T>,
     onEnd: (promises: Promise<T>[], ...props: any[]) => R
   ): Promise<R>
+
+  /**
+   * Get stored channel
+   * @param counterPartyPubKey the public key of the counterparty in which we have a stored channel with
+   * @returns a promise tha resolves into a 'SignedChannel'
+   */
+  getOffChainState(counterparty: Uint8Array): Promise<SignedChannel>
+
+  /**
+   * Get on-chain channel data
+   * @param counterPartyPubKey the public key of the counterparty in which we have a channel with
+   * @returns a promise tha resolves into on chain channel data
+   */
+  getOnChainState(
+    channelId: Hash
+  ): Promise<{
+    deposit: string
+    partyABalance: string
+    closureTime: string
+    stateCounter: string
+  }>
 
   /**
    * Fetches all channel instances from the database and initiates a settlement on
@@ -140,6 +161,8 @@ declare interface Channel {
 
   // Current balance of partyA
   readonly balance_a: Promise<Balance>
+  // Current balance of partyB
+  readonly balance_b: Promise<Balance>
 
   // Current total balance (sum of balance_a and balance_b)
   readonly balance: Promise<Balance>
