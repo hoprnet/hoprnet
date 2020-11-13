@@ -5,8 +5,3 @@ More information about the second version of Basodino can be found on our Medium
 {% hint style="info" %}
 If you're looking for the password for a daily task, check out the Core Concepts page on our Protocol, Network and Token in these docs.
 {% endhint %}
-
-  
-  
-
-
