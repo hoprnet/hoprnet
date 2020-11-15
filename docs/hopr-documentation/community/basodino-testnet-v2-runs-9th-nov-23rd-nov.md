@@ -10,18 +10,16 @@ There are 200,000 HOPR up for grabs in Basodino v2.
 
 As the first Daily Task, the community were invited to vote on the prize distribution, the results can be found [here](https://medium.com/hoprnet/bas%C3%B2dino-v2-prize-distribution-vote-results-f8b28305caa8).
 
-### Daily Task List
+## Daily Task List
 
 Here's a list of the daily tasks so far:
 
-| Day | Task                      | Points  |
-| :-- | :------------------------ | :------ |
-| 1   | Prize Distribution Vote   | 50 / 60 |
-| 2   | Basodino v1 Feedback Form | 250     |
-| 3   | Network Diagnostics Form  | 200     |
-| 4   | Node Message              | 200     |
-| 5   | Find the Password!        | 200     |
+| Day | Task | Points |
+| :--- | :--- | :--- |
+| 1 | Prize Distribution Vote | 50 / 60 |
+| 2 | Basodino v1 Feedback Form | 250 |
+| 3 | Network Diagnostics Form | 200 |
+| 4 | Node Message | 200 |
+| 5 | Find the Password! | 200 |
+| 6 | Build the HOPR Playlist | 200 |
 
-{% hint style="info" %}
-If you're looking for the password for a daily task, check out the Core Concepts page on our Protocol, Network and Token in these docs.
-{% endhint %}
