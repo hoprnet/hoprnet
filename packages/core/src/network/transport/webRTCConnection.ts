@@ -169,7 +169,7 @@ class WebRTCConnection implements MultiaddrConnection {
               console.log(`start sinking into WebRTC`)
 
               for await (const msg of source) {
-                console.log(`sinking into webrtc`, msg)
+                console.log(`sinking into webrtc`, new TextDecoder().decode(msg.slice()))
                 yield msg.slice()
               }
             })()
