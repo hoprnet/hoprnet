@@ -3,12 +3,11 @@ import { randomSubset } from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'
 import { findPath, Channel } from '.'
 
-
 async function generateGraph(nodesCount: number) {
   const nodes = []
 
   for (let i = 0; i < nodesCount; i++) {
-    nodes.push(await PeerId.create({bits: 512}))
+    nodes.push(await PeerId.create({ bits: 512 }))
   }
 
   const edges = new Map<PeerId, PeerId[]>()
@@ -16,8 +15,11 @@ async function generateGraph(nodesCount: number) {
   console.log('add edges')
 
   // Random graph
-  nodes.forEach(n => {
-    edges.set(n, randomSubset(nodes, 5).filter(x => !x.equals(n)))
+  nodes.forEach((n) => {
+    edges.set(
+      n,
+      randomSubset(nodes, 5).filter((x) => !x.equals(n))
+    )
   })
   return { nodes, edges }
 }
