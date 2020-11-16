@@ -558,10 +558,10 @@
     }
   },
   "0.100.0": {
-    "hash": "/ipfs/QmYQcGFmuqDcAZDNYKm6NyJFqgbccsQCvdqnzmYcog4Lrg",
+    "hash": "/ipfs/QmXH3BBkzW8D7FkNwbQruhhkrAj5DctT8bbHCWxRvKaNoD",
     "type": "manifest",
     "uploadedTo": {
-      "http://80.208.229.228:5001": "Mon, 16 Nov 2020 08:43:18 GMT"
+      "http://80.208.229.228:5001": "Mon, 16 Nov 2020 09:17:54 GMT"
     }
   }
 }
