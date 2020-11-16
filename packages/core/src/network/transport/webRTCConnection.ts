@@ -185,11 +185,12 @@ class WebRTCConnection implements MultiaddrConnection {
       while (true) {
         let result = await this.conn.source.next()
 
+        console.log(result)
+
         if (result.done) {
           break
         }
 
-        console.log(result)
         yield (result.value as Uint8Array).slice()
       }
 
