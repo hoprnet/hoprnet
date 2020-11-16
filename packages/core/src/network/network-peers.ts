@@ -176,6 +176,23 @@ class NetworkPeers {
   reset() {
     this.peers = []
   }
+
+  // @returns a float between 0 (completely unreliable) and 1 (completely
+  // reliable) estimating the quality of service of a peer's network connection
+  public qualityOf(peer: PeerId): number {
+    // TODO replace this
+    for (let entry of this.peers){
+      if (entry.id.equals(peer)) {
+        return 1
+      }
+    }
+    for (let entry of this.deletedPeers){
+      if (entry.id.equals(peer)) {
+        return 0
+      }
+    } 
+    return 0.2 // Unknown
+  }
 }
 
 export default NetworkPeers

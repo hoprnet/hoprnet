@@ -7,29 +7,21 @@ export type Path = PeerId[]
 
 const compare = (a: Path, b: Path) => b.length - a.length
 
-const filter = (_node: PeerId) => true
-
 const MAX_ITERATIONS = 200
+const QUALITY_THRESHOLD = 0.5
 
 export type Channel = [PeerId, PeerId, number] // [A, B, stake]
 
 export async function findPath(
   start: PeerId,
-  _destination: PeerId,
+  destination: PeerId,
   hops: number,
-  _networkPeers: NetworkPeers,
+  networkPeers: NetworkPeers,
   getChannelsFromPeer: (partyA: PeerId) => Promise<Channel[]>
 ): Promise<Path> {
-  /*
-    const exclude = [
-      destination.pubKey.marshal(),
-      ...this.bootstrapServers.map((ma) => PeerId.createFromB58String(ma.getPeerId()).pubKey.marshal())
-    ].map((pubKey) => new this.paymentChannels.types.Public(pubKey))
-*/
-  /*
-}
-*/
-
+  const filter = (node: PeerId) => {
+    return !node.equals(destination) && networkPeers.qualityOf(node) > QUALITY_THRESHOLD 
+  }
   let queue = new Heap<Path>(compare)
   let iterations = 0
 

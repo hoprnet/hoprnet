@@ -2,6 +2,7 @@ import assert from 'assert'
 import { randomSubset } from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'
 import { findPath, Channel } from '.'
+import type NetworkPeers from '../network/network-peers'
 
 async function generateGraph(nodesCount: number) {
   const nodes = []
@@ -48,11 +49,11 @@ function noCircles(path: PeerId[]) {
 
 describe('test pathfinder', function () {
   it('should find a path', async function () {
-    console.log('generateing graph')
     const { nodes, edges } = await generateGraph(10)
-    console.log('generated')
+    const dest = await PeerId.create()
     const getChannelsFromPeer = (a: PeerId): Promise<Channel[]> => Promise.resolve(edges.get(a).map((b) => [a, b, 0]))
-    const path = await findPath(nodes[0], undefined, 3, undefined, getChannelsFromPeer)
+    const mockNetwork = { qualityOf: (_p) => 1 } as NetworkPeers
+    const path = await findPath(nodes[0], dest, 3, mockNetwork, getChannelsFromPeer)
 
     assert(
       path.length == 3 && noCircles(path) && validPath(path, edges),
