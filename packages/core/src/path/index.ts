@@ -9,7 +9,7 @@ const compare = (a: Path, b: Path) => b.length - a.length
 
 const filter = (_node: PeerId) => true
 
-const MAX_ITERATIONS = 2000
+const MAX_ITERATIONS = 200
 
 export type Channel = [PeerId, PeerId, number] // [A, B, stake]
 
@@ -44,7 +44,8 @@ export async function findPath(
     })
   )
 
-  while (queue.length > 0 && iterations++ < MAX_ITERATIONS) {
+  while (queue.length > 0 && iterations < MAX_ITERATIONS) {
+    console.log(queue.length, iterations)
     iterations++
     const currentPath = queue.peek() as Path
 
