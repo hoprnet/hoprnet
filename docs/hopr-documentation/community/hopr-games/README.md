@@ -12,7 +12,7 @@ To showcase the usage of the HOPR Protocol, we've created the **HOPR Games**, a 
 
 ## Goals
 
-The HOPR Games should help grow & develop HOPR as a project. It should teach our community about our product, as well as data privacy. HOPR Games is devised with these goals at heart:
+The HOPR Games should help grow & develop HOPR as a project. It should teach our members about our product, as well as data privacy. HOPR Games is devised with these goals at heart:
 
 * **Teach \(α\)**. We have to educate people about HOPR. We must also discover what problems there are with our protocol.
 * **Media outreach \(β\).** We have to grow our reach via social media platforms. We should distribute HOPR to multiple outlets for more exposure.
