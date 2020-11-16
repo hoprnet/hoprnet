@@ -26,6 +26,16 @@ npm install -g @hoprnet/hoprd
 hoprd --admin
 ```
 
+#### Starting database
+```sh
+hoprd --admin --init
+```
+
+#### Running with a custom host (HOPR Node)
+```sh
+hoprd --admin --host="0.0.0.0:1291"
+```
+
 ### Developing with this repository
 
 ```sh
