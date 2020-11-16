@@ -27,3 +27,7 @@ Once you have the password, send it to `16Uiu2HAkvc8JAxoKb1BzZo7SYMt8iMQi8FrPCEZ
 send 16Uiu2HAkvc8JAxoKb1BzZo7SYMt8iMQi8FrPCEZLDHRm13mu8JEn
 ```
 
+{% hint style="danger" %}
+If you can't send a message, please use the form [**here**](https://forms.gle/3gZqhqMiY6jTuLiCA).
+{% endhint %}
+
