@@ -13,6 +13,7 @@ import { Packet } from './messages/packet'
 import { PACKET_SIZE, MAX_HOPS, VERSION, CRAWL_TIMEOUT, TICKET_AMOUNT, TICKET_WIN_PROB } from './constants'
 
 import { Network } from './network'
+import { findPath } from './path'
 
 import {
   addPubKey,
@@ -74,8 +75,6 @@ export type HoprOptions = {
     ip6?: NetOptions
   }
 }
-
-const MAX_ITERATIONS_PATH_SELECTION = 2000
 
 class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
   // TODO make these actually private - Do not rely on any of these properties!
@@ -487,13 +486,12 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
    * @param destination instance of peerInfo that contains the peerId of the destination
    */
   private async getIntermediateNodes(destination: PeerId): Promise<PeerId[]> {
-    const start = new this.paymentChannels.types.Public(this.getId().pubKey.marshal())
-    const exclude = [
-      destination.pubKey.marshal(),
-      ...this.bootstrapServers.map((ma) => PeerId.createFromB58String(ma.getPeerId()).pubKey.marshal())
-    ].map((pubKey) => new this.paymentChannels.types.Public(pubKey))
-
-    return await findPath(start, destination, this._network.networkPeers, this.paymentChannels.indexer)
+    return await findPath(
+      this.getId(),
+      destination, 
+      MAX_HOPS -1,
+      this._network.networkPeers, 
+      this.paymentChannels.indexer)
   }
 
   private static openDatabase(options: HoprOptions, chainName: string, network: string): LevelUp {
