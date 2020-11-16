@@ -112,7 +112,6 @@ class WebRTCConnection implements MultiaddrConnection {
                   break
                 }
 
-
                 console.log(
                   `this._webRTCAvailable`,
                   this._webRTCAvailable,
