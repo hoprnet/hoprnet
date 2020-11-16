@@ -11,18 +11,14 @@ const filter = (_node: PeerId) => false
 
 const MAX_ITERATIONS = 2000
 
-type Channel = [PeerId, PeerId, number] // [A, B, stake]
-
-export interface Indexer {
-  getFrom(a: PeerId): Promise<Channel[]>
-}
+export type Channel = [PeerId, PeerId, number] // [A, B, stake]
 
 export async function findPath(
   start: PeerId,
   _destination: PeerId,
   hops: number,
   _networkPeers: NetworkPeers,
-  indexer: Indexer
+  getChannelsFromPeer: (partyA: PeerId) => Promise<Channel[]>
 ): Promise<Path> {
   /*
   const startP = new Public(start.getId().pubKey.marshal())
@@ -33,13 +29,6 @@ export async function findPath(
 */
   /*
 }
-
-async findPath(
-  start: Public,
-  targetLength: number,
-  maxIterations: number,
-  filter?: (node: Public) => boolean
-): Promise<Public[]> {
 */
 
   let queue = new Heap<Path>(compare)
@@ -47,7 +36,7 @@ async findPath(
 
   // Preprocessing
   queue.addAll(
-    (await indexer.getFrom(start)).map((channel) => {
+    (await getChannelsFromPeer(start)).map((channel) => {
       if (start.equals(channel[0])) {
         return [channel[1]]
       } else {
@@ -66,7 +55,7 @@ async findPath(
 
     const lastNode = currentPath[currentPath.length - 1]
 
-    const newNodes = (await indexer.getFrom(lastNode))
+    const newNodes = (await getChannelsFromPeer(lastNode))
       .filter((c: Channel) => !currentPath.includes(c[1]) && (filter == null || filter(c[1])))
       .map((channel) => {
         if (lastNode.equals(channel[0])) {

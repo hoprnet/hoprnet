@@ -1,8 +1,7 @@
 import assert from 'assert'
-import type HoprEthereum from '..'
-import { randomBytes } from 'crypto'
 import { gcd } from '@hoprnet/hopr-utils'
-import type { Path } from '.'
+import PeerId from 'peer-id'
+import { findPath, Channel } from '.'
 
 function findGenerator(nodesCount: number, previousGenerator?: number) {
   for (let i = previousGenerator != null ? previousGenerator + 1 : 2; i < nodesCount; i++) {
@@ -17,10 +16,10 @@ async function generateGraph(nodesCount: number) {
   const nodes = []
 
   for (let i = 0; i < nodesCount; i++) {
-    nodes.push(await Public.fromPrivKey(randomBytes(32)))
+    nodes.push(await PeerId.create())
   }
 
-  const edges = new Map<Public, Public[]>()
+  const edges = new Map<PeerId, PeerId[]>()
 
   if (nodesCount <= 1) {
     return { nodes, edges }
@@ -57,36 +56,7 @@ async function generateGraph(nodesCount: number) {
   return { nodes, edges }
 }
 
-function generateConnector(edges: Map<Public, Public[]>) {
-  const connector = ({
-    indexer: {
-      get({ partyA }: { partyA: Public }, filter?: (node: Public) => boolean) {
-        let connectedNodes = edges.get(partyA)
-
-        if (filter != null) {
-          connectedNodes = connectedNodes.filter(filter)
-        }
-
-        if (connectedNodes == null) {
-          return Promise.resolve([])
-        }
-
-        return connectedNodes.map((partyB) => {
-          return {
-            partyA,
-            partyB
-          }
-        })
-      }
-    }
-  } as unknown) as HoprEthereum
-
-  connector.path = new Path(connector)
-
-  return connector
-}
-
-function validPath(path: Public[], edges: Map<Public, Public[]>) {
+function validPath(path: PeerId[], edges: Map<PeerId, PeerId[]>) {
   for (let i = 0; i < path.length - 1; i++) {
     const edgeSet = edges.get(path[i])
 
@@ -98,7 +68,7 @@ function validPath(path: Public[], edges: Map<Public, Public[]>) {
   return true
 }
 
-function noCircles(path: Public[]) {
+function noCircles(path: PeerId[]) {
   for (let i = 1; i < path.length; i++) {
     if (path.slice(0, i).includes(path[i]) || path.slice(i + 1).includes(path[i])) {
       return false
@@ -111,10 +81,8 @@ function noCircles(path: Public[]) {
 describe('test pathfinder', function () {
   it('should find a path', async function () {
     const { nodes, edges } = await generateGraph(101)
-
-    const connector = generateConnector(edges)
-
-    const path = await findPath(nodes[0], undefined, 8, undefined, connector)
+    const getChannelsFromPeer = (a: PeerId): Promise<Channel[]> => Promise.resolve(edges.get(a).map(b => [a, b, 0]))
+    const path = await findPath(nodes[0], undefined, 8, undefined, getChannelsFromPeer)
 
     assert(
       path.length == 8 && noCircles(path) && validPath(path, edges),
