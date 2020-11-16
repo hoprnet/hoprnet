@@ -18,7 +18,6 @@ import pipe from 'it-pipe'
 
 import type { Handler } from 'libp2p'
 
-import type { Challenge } from '../../messages/packet/challenge'
 import { durations } from '@hoprnet/hopr-utils'
 import { getTokens, Token } from '../../utils'
 import { Mixer } from '../../mixer'
@@ -108,12 +107,9 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector> implements Abstr
       if (this.mixer.poppable()) {
         try {
           packet = this.mixer.pop()
-          let receivedChallenge: Challenge<Chain>
-          let ticketKey: Uint8Array
 
-          const result = await packet.forwardTransform()
-          receivedChallenge = result.receivedChallenge
-          ticketKey = result.ticketKey
+          const { receivedChallenge, ticketKey } = await packet.forwardTransform()
+
           ;[sender, target] = await Promise.all([packet.getSenderPeerId(), packet.getTargetPeerId()])
 
           setImmediate(async () => {
