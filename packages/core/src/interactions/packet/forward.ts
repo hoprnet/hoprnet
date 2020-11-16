@@ -131,7 +131,8 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector> implements Abstr
             await this.interact(target, packet)
           }
         } catch (error) {
-          verbose('Error while handling packet:', error)
+          log('Error while handling packet')
+          verbose('Error while handling packet', error)
         }
       } else {
         // Wait a bit for packet

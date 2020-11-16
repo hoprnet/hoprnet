@@ -277,7 +277,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
           senderPeerId: sender
         })
       } catch (error) {
-        verbose('Error validating unacknowledged ticket', error.message)
+        verbose('Could not validate unacknowledged ticket', error.message)
         throw error
       }
     }
