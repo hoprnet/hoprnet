@@ -123,11 +123,12 @@ class WebRTCConnection implements MultiaddrConnection {
                 console.log(`sinking into relay connection`, new TextDecoder().decode(sourceMsg.slice()))
 
                 yield sourceMsg.slice()
-                
+
+                sourcePromise = source.next().then(sourceFunction)
+
                 console.log(`after yield`)
 
                 if (!this._webRTCAvailable) {
-                  sourcePromise = source.next().then(sourceFunction)
                   graceFullyMigrated = true
                 }
               }
