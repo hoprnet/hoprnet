@@ -91,6 +91,13 @@ class WebRTCConnection implements MultiaddrConnection {
 
       let graceFullyMigrated = false
 
+      let promiseTriggered = false
+
+      let streamSwitched = false
+      let switchPromise = this._switchPromise.promise.then(() => {
+        streamSwitched = false
+      })
+
       this.conn.sink(
         async function* (this: WebRTCConnection): Stream['source'] {
           if (this._webRTCTimeout == null) {
@@ -102,11 +109,15 @@ class WebRTCConnection implements MultiaddrConnection {
             if (!this._webRTCStateKnown) {
               await Promise.race([
                 // prettier-ignore
-                sourcePromise
+                sourcePromise,
+                switchPromise
               ])
               console.log(`after Promise.race sourceReceived`, sourceReceived, `sourceDone`, sourceDone)
 
-              if (sourceReceived) {
+              if (streamSwitched) {
+                break
+              } else if (sourceReceived) {
+                promiseTriggered = false
                 sourceReceived = false
 
                 if (sourceDone) {
@@ -128,7 +139,9 @@ class WebRTCConnection implements MultiaddrConnection {
 
                 if (!this._webRTCAvailable) {
                   console.log(`source.next()`)
+
                   sourcePromise = source.next().then(sourceFunction)
+                  promiseTriggered = true
 
                   graceFullyMigrated = true
                 }
@@ -163,14 +176,27 @@ class WebRTCConnection implements MultiaddrConnection {
               console.log(`before defer.promise`, graceFullyMigrated)
               // await defer.promise
 
-              if (!graceFullyMigrated) {
-                console.log(`!graceFullyMigrated`)
-                // await sourcePromise
+              if (promiseTriggered && !sourceReceived) {
+                console.log(`promiseTriggered && !sourceReceived`)
+                await sourcePromise
 
-                if (sourceMsg != null) {
-                  yield sourceMsg
-                }
+                yield sourceMsg
+                console.log(`after promiseTriggered && !sourceReceived`)
               }
+
+              if (promiseTriggered && sourceReceived) {
+                console.log(`promiseTriggered && sourceReceived`)
+                yield sourceMsg
+                console.log(`after promiseTriggered && sourceReceived`)
+              }
+              // if (!graceFullyMigrated) {
+              //   console.log(`!graceFullyMigrated`)
+              //   // await sourcePromise
+
+              //   if (sourceMsg != null) {
+              //     yield sourceMsg
+              //   }
+              // }
               console.log(`start sinking into WebRTC`)
 
               for await (const msg of source) {
