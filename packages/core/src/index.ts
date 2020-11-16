@@ -493,16 +493,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       ...this.bootstrapServers.map((ma) => PeerId.createFromB58String(ma.getPeerId()).pubKey.marshal())
     ].map((pubKey) => new this.paymentChannels.types.Public(pubKey))
 
-    return await Promise.all(
-      (
-        await this.paymentChannels.path.findPath(
-          start,
-          MAX_HOPS - 1, // Need a hop for destination node
-          MAX_ITERATIONS_PATH_SELECTION,
-          (node) => !exclude.includes(node)
-        )
-      ).map((pubKey) => pubKeyToPeerId(pubKey))
-    )
+    return await findPath(start, destination, this._network.networkPeers, this.paymentChannels.indexer)
   }
 
   private static openDatabase(options: HoprOptions, chainName: string, network: string): LevelUp {

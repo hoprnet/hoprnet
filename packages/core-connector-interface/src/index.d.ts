@@ -5,7 +5,6 @@ import type * as Types from './types'
 import type * as DbKeys from './dbKeys'
 import type * as Constants from './constants'
 import type Indexer from './indexer'
-import type PathSelection from './pathSelection'
 
 export type Currencies = 'NATIVE' | 'HOPR'
 
@@ -132,11 +131,6 @@ declare interface HoprCoreConnector {
    * Returns an instance of Indexer.
    */
   readonly indexer: Indexer
-
-  /**
-   * Instance of the path finding algortihm
-   */
-  readonly path: PathSelection
 
   /**
    * Returns unique information about the connector.

@@ -16,7 +16,6 @@ import * as constants from './constants'
 import * as config from './config'
 import Account from './account'
 import HashedSecret from './hashedSecret'
-import Path from './path'
 import debug from 'debug'
 
 const HoprChannelsAbi = abis.HoprChannels
@@ -38,7 +37,6 @@ export default class HoprEthereum implements HoprCoreConnector {
   public indexer: Indexer
   public account: Account
   public hashedSecret: HashedSecret
-  public path: Path
 
   constructor(
     public db: LevelUp,
@@ -58,7 +56,6 @@ export default class HoprEthereum implements HoprCoreConnector {
     this.indexer = new Indexer(this)
     this.types = new types()
     this.channel = new ChannelFactory(this)
-    this.path = new Path(this)
 
     this.signTransaction = utils.TransactionSigner(web3, privateKey)
     this.log = utils.Log()
