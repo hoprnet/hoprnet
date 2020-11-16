@@ -106,34 +106,32 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector> implements Abstr
 
     while (this.mixer.notEmpty()) {
       if (this.mixer.poppable()) {
-        packet = this.mixer.pop()
-        let receivedChallenge: Challenge<Chain>
-        let ticketKey: Uint8Array
-
         try {
+          packet = this.mixer.pop()
+          let receivedChallenge: Challenge<Chain>
+          let ticketKey: Uint8Array
+
           const result = await packet.forwardTransform()
           receivedChallenge = result.receivedChallenge
           ticketKey = result.ticketKey
-        } catch (error) {
-          verbose('Error while handling packet:', error.message)
-          continue
-        }
+          ;[sender, target] = await Promise.all([packet.getSenderPeerId(), packet.getTargetPeerId()])
 
-        ;[sender, target] = await Promise.all([packet.getSenderPeerId(), packet.getTargetPeerId()])
+          setImmediate(async () => {
+            const ack = new Acknowledgement(this.node.paymentChannels, undefined, {
+              key: ticketKey,
+              challenge: receivedChallenge
+            })
 
-        setImmediate(async () => {
-          const ack = new Acknowledgement(this.node.paymentChannels, undefined, {
-            key: ticketKey,
-            challenge: receivedChallenge
+            await this.node._interactions.packet.acknowledgment.interact(sender, await ack.sign(this.node.getId()))
           })
 
-          await this.node._interactions.packet.acknowledgment.interact(sender, await ack.sign(this.node.getId()))
-        })
-
-        if (this.node.getId().isEqual(target)) {
-          this.node.output(packet.message.plaintext)
-        } else {
-          await this.interact(target, packet)
+          if (this.node.getId().isEqual(target)) {
+            this.node.output(packet.message.plaintext)
+          } else {
+            await this.interact(target, packet)
+          }
+        } catch (error) {
+          verbose('Error while handling packet:', error)
         }
       } else {
         // Wait a bit for packet
