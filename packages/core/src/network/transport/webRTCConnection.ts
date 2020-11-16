@@ -89,7 +89,7 @@ class WebRTCConnection implements MultiaddrConnection {
 
       let defer = Defer<void>()
 
-      let graceFullyMigrated = false
+      // let graceFullyMigrated = false
 
       let promiseTriggered = false
 
@@ -143,7 +143,7 @@ class WebRTCConnection implements MultiaddrConnection {
                   sourcePromise = source.next().then(sourceFunction)
                   promiseTriggered = true
 
-                  graceFullyMigrated = true
+                  // graceFullyMigrated = true
                 }
               }
             } else {
