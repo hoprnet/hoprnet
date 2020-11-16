@@ -119,10 +119,11 @@ class WebRTCConnection implements MultiaddrConnection {
                   this._webRTCStateKnown
                 )
 
+                yield sourceMsg.slice()
+
                 if (!this._webRTCAvailable) {
                   console.log(`sinking into relay connection`, new TextDecoder().decode(sourceMsg.slice()))
 
-                  yield sourceMsg.slice()
 
                   sourcePromise = source.next().then(sourceFunction)
                   graceFullyMigrated = true
