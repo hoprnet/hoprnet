@@ -98,11 +98,11 @@ class WebRTCConnection implements MultiaddrConnection {
           }
 
           while (!this._webRTCAvailable) {
+            console.log(`sink iteration`)
             if (!this._webRTCStateKnown) {
               await Promise.race([
                 // prettier-ignore
                 sourcePromise
-                // this._switchPromise.promise
               ])
 
               if (sourceReceived) {
@@ -119,11 +119,10 @@ class WebRTCConnection implements MultiaddrConnection {
                   this._webRTCStateKnown
                 )
 
-                yield sourceMsg.slice()
-
                 if (!this._webRTCAvailable) {
                   console.log(`sinking into relay connection`, new TextDecoder().decode(sourceMsg.slice()))
 
+                  yield sourceMsg.slice()
 
                   sourcePromise = source.next().then(sourceFunction)
                   graceFullyMigrated = true
@@ -146,9 +145,9 @@ class WebRTCConnection implements MultiaddrConnection {
         }.call(this)
       )
 
-      if (!this._webRTCStateKnown || this._webRTCAvailable) {
-        await this._switchPromise.promise
+      await this._switchPromise.promise
 
+      if (this._webRTCAvailable) {
         clearTimeout(this._webRTCTimeout)
         if (this._webRTCAvailable) {
           const sink = toIterable.sink(this.channel)
