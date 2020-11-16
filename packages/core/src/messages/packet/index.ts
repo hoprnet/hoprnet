@@ -5,7 +5,7 @@ import chalk from 'chalk'
 import PeerId from 'peer-id'
 
 import { pubKeyToPeerId } from '../../utils'
-import { getAllTickets, validateUnacknowledgedTicket } from '../../utils/tickets'
+import { getTickets, validateUnacknowledgedTicket } from '../../utils/tickets'
 import { u8aConcat, u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
 
 import { Header, deriveTicketKey, deriveTicketKeyBlinding, deriveTagParameters, deriveTicketLastKey } from './header'
@@ -275,7 +275,10 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
         senderPeerId: sender,
         targetPeerId: target,
         signedTicket: await this.ticket,
-        getAllTickets: () => getAllTickets(this.node)
+        getTickets: () =>
+          getTickets(this.node, {
+            signer: sender.pubKey.marshal()
+          })
       })
     }
 

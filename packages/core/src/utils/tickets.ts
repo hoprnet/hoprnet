@@ -13,9 +13,15 @@ export type OperationStatus = OperationSuccess | OperationFailure | OperationErr
 
 /**
  * Get all unacknowledged tickets
+ * @param filter optionally filter by signer
  * @returns an array of all unacknowledged tickets
  */
-export async function getUnacknowledgedTickets(node: Hopr<Chain>): Promise<UnacknowledgedTicket<Chain>[]> {
+export async function getUnacknowledgedTickets(
+  node: Hopr<Chain>,
+  filter?: {
+    signer: Uint8Array
+  }
+): Promise<UnacknowledgedTicket<Chain>[]> {
   const tickets: UnacknowledgedTicket<Chain>[] = []
   const unAcknowledgedTicketSize = UnacknowledgedTicket.SIZE(node.paymentChannels)
 
@@ -25,26 +31,59 @@ export async function getUnacknowledgedTickets(node: Hopr<Chain>): Promise<Unack
         gte: Buffer.from(node._dbKeys.UnAcknowledgedTickets(new Uint8Array(0x00)))
       })
       .on('error', (err) => reject(err))
-      .on('data', ({ value }: { value: Buffer }) => {
+      .on('data', async ({ value }: { value: Buffer }) => {
         if (value.buffer.byteLength !== unAcknowledgedTicketSize) return
 
-        tickets.push(
-          new UnacknowledgedTicket(node.paymentChannels, {
-            bytes: value.buffer,
-            offset: value.byteOffset
-          })
-        )
+        const unAckTicket = new UnacknowledgedTicket(node.paymentChannels, {
+          bytes: value.buffer,
+          offset: value.byteOffset
+        })
+
+        // if signer provided doesn't match our ticket's signer dont add it to the list
+        if (filter?.signer && !u8aEquals(await (await unAckTicket.signedTicket).signer, filter.signer)) {
+          return
+        }
+
+        tickets.push(unAckTicket)
       })
       .on('end', () => resolve(Promise.all(tickets)))
   })
 }
 
 /**
+ * Delete unacknowledged tickets
+ * @param filter optionally filter by signer
+ */
+export async function deleteUnacknowledgedTickets(
+  node: Hopr<Chain>,
+  filter?: {
+    signer: Uint8Array
+  }
+): Promise<void> {
+  const tickets = await getUnacknowledgedTickets(node, filter)
+
+  await node.db.batch(
+    await Promise.all(
+      tickets.map<any>(async (ticket) => {
+        return {
+          type: 'del',
+          key: Buffer.from(node._dbKeys.UnAcknowledgedTickets((await ticket.signedTicket).ticket.challenge))
+        }
+      })
+    )
+  )
+}
+
+/**
  * Get all acknowledged tickets
+ * @param filter optionally filter by signer
  * @returns an array of all acknowledged tickets
  */
 export async function getAcknowledgedTickets(
-  node: Hopr<Chain>
+  node: Hopr<Chain>,
+  filter?: {
+    signer: Uint8Array
+  }
 ): Promise<
   {
     ackTicket: Types.AcknowledgedTicket
@@ -64,7 +103,7 @@ export async function getAcknowledgedTickets(
         gte: Buffer.from(node._dbKeys.AcknowledgedTickets(new Uint8Array(0x00)))
       })
       .on('error', (err) => reject(err))
-      .on('data', ({ key, value }: { key: Buffer; value: Buffer }) => {
+      .on('data', async ({ key, value }: { key: Buffer; value: Buffer }) => {
         if (value.buffer.byteLength !== acknowledgedTicketSize) return
 
         const index = node._dbKeys.AcknowledgedTicketsParse(key)
@@ -72,6 +111,11 @@ export async function getAcknowledgedTickets(
           bytes: value.buffer,
           offset: value.byteOffset
         })
+
+        // if signer provided doesn't match our ticket's signer dont add it to the lis
+        if (filter?.signer && !u8aEquals(await (await ackTicket.signedTicket).signer, filter.signer)) {
+          return
+        }
 
         promises.push({
           ackTicket,
@@ -83,16 +127,27 @@ export async function getAcknowledgedTickets(
 }
 
 /**
- * Get all signed tickets, both unacknowledged and acknowledged
- * @param node
- * @returns an array of all signed tickets
+ * Delete acknowledged tickets
+ * @param filter optionally filter by signer
  */
-export async function getAllTickets(node: Hopr<Chain>): Promise<Types.SignedTicket[]> {
-  return Promise.all([getUnacknowledgedTickets(node), getAcknowledgedTickets(node)]).then(async ([unAcks, acks]) => {
-    const unAckTickets = await Promise.all(unAcks.map((o) => o.signedTicket))
-    const ackTickets = await Promise.all(acks.map((o) => o.ackTicket.signedTicket))
-    return [...unAckTickets, ...ackTickets]
-  })
+export async function deleteAcknowledgedTickets(
+  node: Hopr<Chain>,
+  filter?: {
+    signer: Uint8Array
+  }
+): Promise<void> {
+  const tickets = await getAcknowledgedTickets(node, filter)
+
+  await node.db.batch(
+    await Promise.all(
+      tickets.map<any>(async (ticket) => {
+        return {
+          type: 'del',
+          key: Buffer.from(node._dbKeys.AcknowledgedTickets((await ticket.ackTicket.signedTicket).ticket.challenge))
+        }
+      })
+    )
+  )
 }
 
 /**
@@ -148,19 +203,55 @@ export async function submitAcknowledgedTicket(
   }
 }
 
+/**
+ * Get signed tickets, both unacknowledged and acknowledged
+ * @param node
+ * @param filter optionally filter by signer
+ * @returns an array of signed tickets
+ */
+export async function getTickets(
+  node: Hopr<Chain>,
+  filter?: {
+    signer: Uint8Array
+  }
+): Promise<Types.SignedTicket[]> {
+  return Promise.all([getUnacknowledgedTickets(node, filter), getAcknowledgedTickets(node, filter)]).then(
+    async ([unAcks, acks]) => {
+      const unAckTickets = await Promise.all(unAcks.map((o) => o.signedTicket))
+      const ackTickets = await Promise.all(acks.map((o) => o.ackTicket.signedTicket))
+      return [...unAckTickets, ...ackTickets]
+    }
+  )
+}
+
+/**
+ * Get signed tickets, both unacknowledged and acknowledged
+ * @param node
+ * @param filter optionally filter by signer
+ * @returns an array of signed tickets
+ */
+export async function deleteTickets(
+  node: Hopr<Chain>,
+  filter?: {
+    signer: Uint8Array
+  }
+): Promise<void> {
+  await Promise.all([deleteUnacknowledgedTickets(node, filter), deleteAcknowledgedTickets(node, filter)])
+}
+
 // NOTE: currently validating tickets is not performant
 export async function validateUnacknowledgedTicket({
   node,
   senderPeerId,
   targetPeerId,
   signedTicket,
-  getAllTickets
+  getTickets
 }: {
   node: Hopr<Chain>
   senderPeerId: PeerId
   targetPeerId: PeerId
   signedTicket: Types.SignedTicket
-  getAllTickets: () => Promise<Types.SignedTicket[]>
+  getTickets: () => Promise<Types.SignedTicket[]>
 }): Promise<void> {
   const ticket = signedTicket.ticket
   const chain = node.paymentChannels
@@ -224,29 +315,15 @@ export async function validateUnacknowledgedTicket({
   // channel MUST have enough funds
   // (performance) tickets are stored by key, we can't query sender's tickets efficiently
   // we retrieve all signed tickets and filter the ones between sender and target
-  const tickets = await getAllTickets().then(async (signedTickets) => {
-    const tickets: Types.Ticket[] = []
-    let signedTicket: Types.SignedTicket
-
-    while ((signedTicket = signedTickets.pop())) {
-      const signer = await signedTicket.signer
-
-      const valid =
-        u8aEquals(signedTicket.ticket.counterparty, selfPubKey) &&
-        u8aEquals(signer, senderPubKey) &&
-        signedTicket.ticket.epoch.eq(epoch)
-
-      if (!valid) continue
-
-      tickets.push(signedTicket.ticket)
-    }
-
-    return tickets
+  const signedTickets = await getTickets().then(async (signedTickets) => {
+    return signedTickets.filter((signedTicket) => {
+      return u8aEquals(signedTicket.ticket.counterparty, selfPubKey) && signedTicket.ticket.epoch.eq(epoch)
+    })
   })
 
   // calculate total unredeemed balance
-  const unredeemedBalance = tickets.reduce((total, ticket) => {
-    return new BN(total.add(ticket.amount))
+  const unredeemedBalance = signedTickets.reduce((total, signedTicket) => {
+    return new BN(total.add(signedTicket.ticket.amount))
   }, new BN(0))
 
   // ensure sender has enough funds

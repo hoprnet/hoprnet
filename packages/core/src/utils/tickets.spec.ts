@@ -119,7 +119,7 @@ const createMockNode = ({
   } as unknown) as Hopr<Chain>
 }
 
-const getAllTicketsMock = async () => []
+const getTicketsMock = async () => []
 
 describe('unit test validateUnacknowledgedTicket', function () {
   it('should pass if ticket is okay', async function () {
@@ -132,7 +132,7 @@ describe('unit test validateUnacknowledgedTicket', function () {
         senderPeerId: SENDER,
         targetPeerId: TARGET,
         signedTicket,
-        getAllTickets: getAllTicketsMock
+        getTickets: getTicketsMock
       })
     ).to.eventually.to.not.rejected
   })
@@ -147,7 +147,7 @@ describe('unit test validateUnacknowledgedTicket', function () {
         senderPeerId: await PeerId.create(),
         targetPeerId: TARGET,
         signedTicket,
-        getAllTickets: getAllTicketsMock
+        getTickets: getTicketsMock
       })
     ).to.eventually.rejectedWith('The signer of the ticket does not match the sender')
   })
@@ -164,7 +164,7 @@ describe('unit test validateUnacknowledgedTicket', function () {
         senderPeerId: SENDER,
         targetPeerId: TARGET,
         signedTicket,
-        getAllTickets: getAllTicketsMock
+        getTickets: getTicketsMock
       })
     ).to.eventually.rejectedWith('Ticket amount')
   })
@@ -183,7 +183,7 @@ describe('unit test validateUnacknowledgedTicket', function () {
         senderPeerId: SENDER,
         targetPeerId: TARGET,
         signedTicket,
-        getAllTickets: getAllTicketsMock
+        getTickets: getTicketsMock
       })
     ).to.eventually.rejectedWith('Ticket winning probability')
   })
@@ -200,7 +200,7 @@ describe('unit test validateUnacknowledgedTicket', function () {
         senderPeerId: SENDER,
         targetPeerId: TARGET,
         signedTicket,
-        getAllTickets: getAllTicketsMock
+        getTickets: getTicketsMock
       })
     ).to.eventually.rejectedWith('is not open')
   })
@@ -217,7 +217,7 @@ describe('unit test validateUnacknowledgedTicket', function () {
         senderPeerId: SENDER,
         targetPeerId: TARGET,
         signedTicket,
-        getAllTickets: getAllTicketsMock
+        getTickets: getTicketsMock
       })
     ).to.eventually.rejectedWith('not found')
   })
@@ -234,7 +234,7 @@ describe('unit test validateUnacknowledgedTicket', function () {
         senderPeerId: SENDER,
         targetPeerId: TARGET,
         signedTicket,
-        getAllTickets: getAllTicketsMock
+        getTickets: getTicketsMock
       })
     ).to.eventually.rejectedWith('does not match our account counter')
   })
@@ -254,7 +254,7 @@ describe('unit test validateUnacknowledgedTicket', function () {
         senderPeerId: SENDER,
         targetPeerId: TARGET,
         signedTicket,
-        getAllTickets: getAllTicketsMock
+        getTickets: getTicketsMock
       })
     ).to.eventually.rejectedWith('Payment channel does not have enough funds')
   })
@@ -274,7 +274,7 @@ describe('unit test validateUnacknowledgedTicket', function () {
         senderPeerId: SENDER,
         targetPeerId: TARGET,
         signedTicket,
-        getAllTickets: async () => ticketsInDb
+        getTickets: async () => ticketsInDb
       })
     ).to.eventually.rejectedWith('Payment channel does not have enough funds when you include unredeemed tickets')
   })
