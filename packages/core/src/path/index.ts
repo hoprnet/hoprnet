@@ -18,13 +18,13 @@ export interface Indexer {
 }
 
 export async function findPath(
-    start: PeerId,
-    _destination: PeerId,
-    hops: number,
-    _networkPeers: NetworkPeers,
-    indexer: Indexer
-  ): Promise<Path>{
-    /*
+  start: PeerId,
+  _destination: PeerId,
+  hops: number,
+  _networkPeers: NetworkPeers,
+  indexer: Indexer
+): Promise<Path> {
+  /*
   const startP = new Public(start.getId().pubKey.marshal())
     const exclude = [
       destination.pubKey.marshal(),
@@ -66,16 +66,15 @@ async findPath(
 
     const lastNode = currentPath[currentPath.length - 1]
 
-    const newNodes = (
-      (await indexer.getFrom(lastNode)).filter((c: Channel) => !currentPath.includes(c[1]) && (filter == null || filter(c[1]))
-      )
-    ).map((channel) => {
-      if (lastNode.equals(channel[0])) {
-        return channel[1]
-      } else {
-        return channel[0]
-      }
-    })
+    const newNodes = (await indexer.getFrom(lastNode))
+      .filter((c: Channel) => !currentPath.includes(c[1]) && (filter == null || filter(c[1])))
+      .map((channel) => {
+        if (lastNode.equals(channel[0])) {
+          return channel[1]
+        } else {
+          return channel[0]
+        }
+      })
 
     if (newNodes.length == 0) {
       queue.pop()
