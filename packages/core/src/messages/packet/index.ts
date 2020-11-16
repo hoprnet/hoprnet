@@ -5,7 +5,7 @@ import chalk from 'chalk'
 import PeerId from 'peer-id'
 
 import { pubKeyToPeerId } from '../../utils'
-import { validateUnacknowledgedTicket } from '../../utils/tickets'
+import { getAllTickets, validateUnacknowledgedTicket } from '../../utils/tickets'
 import { u8aConcat, u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
 
 import { Header, deriveTicketKey, deriveTicketKeyBlinding, deriveTagParameters, deriveTicketLastKey } from './header'
@@ -272,8 +272,10 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
       // perform various ticket validation checks before receiving an ACK
       await validateUnacknowledgedTicket({
         node: this.node,
+        senderPeerId: sender,
+        targetPeerId: target,
         signedTicket: await this.ticket,
-        senderPeerId: sender
+        getAllTickets: () => getAllTickets(this.node)
       })
     }
 
