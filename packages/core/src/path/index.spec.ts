@@ -81,7 +81,7 @@ function noCircles(path: PeerId[]) {
 describe('test pathfinder', function () {
   it('should find a path', async function () {
     const { nodes, edges } = await generateGraph(101)
-    const getChannelsFromPeer = (a: PeerId): Promise<Channel[]> => Promise.resolve(edges.get(a).map(b => [a, b, 0]))
+    const getChannelsFromPeer = (a: PeerId): Promise<Channel[]> => Promise.resolve(edges.get(a).map((b) => [a, b, 0]))
     const path = await findPath(nodes[0], undefined, 8, undefined, getChannelsFromPeer)
 
     assert(
