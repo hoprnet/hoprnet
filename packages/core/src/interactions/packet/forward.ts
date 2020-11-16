@@ -2,8 +2,9 @@ import { PROTOCOL_STRING } from '../../constants'
 import { Packet } from '../../messages/packet'
 import { Acknowledgement } from '../../messages/acknowledgement'
 
-import debug from 'debug'
-const log = debug('hopr-core:forward')
+import Debug from 'debug'
+const log = Debug('hopr-core:forward')
+const verbose = Debug('hopr-core:verbose:forward')
 
 import type PeerId from 'peer-id'
 import chalk from 'chalk'
@@ -17,6 +18,7 @@ import pipe from 'it-pipe'
 
 import type { Handler } from 'libp2p'
 
+import type { Challenge } from '../../messages/packet/challenge'
 import { durations } from '@hoprnet/hopr-utils'
 import { getTokens, Token } from '../../utils'
 import { Mixer } from '../../mixer'
@@ -105,8 +107,17 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector> implements Abstr
     while (this.mixer.notEmpty()) {
       if (this.mixer.poppable()) {
         packet = this.mixer.pop()
+        let receivedChallenge: Challenge<Chain>
+        let ticketKey: Uint8Array
 
-        let { receivedChallenge, ticketKey } = await packet.forwardTransform()
+        try {
+          const result = await packet.forwardTransform()
+          receivedChallenge = result.receivedChallenge
+          ticketKey = result.ticketKey
+        } catch (error) {
+          verbose('Error while handling packet:', error.message)
+          continue
+        }
 
         ;[sender, target] = await Promise.all([packet.getSenderPeerId(), packet.getTargetPeerId()])
 

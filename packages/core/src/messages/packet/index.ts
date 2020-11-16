@@ -270,11 +270,16 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
       ;[sender, target] = await Promise.all([this.getSenderPeerId(), this.getTargetPeerId()])
 
       // perform various ticket validation checks before receiving an ACK
-      await validateUnacknowledgedTicket({
-        node: this.node,
-        signedTicket: await this.ticket,
-        senderPeerId: sender
-      })
+      try {
+        await validateUnacknowledgedTicket({
+          node: this.node,
+          signedTicket: await this.ticket,
+          senderPeerId: sender
+        })
+      } catch (error) {
+        verbose('Error validating unacknowledged ticket', error.message)
+        throw error
+      }
     }
 
     this.message.decrypt(this.header.derivedSecret)
