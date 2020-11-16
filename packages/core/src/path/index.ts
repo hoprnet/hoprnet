@@ -1,22 +1,31 @@
 import Heap from 'heap-js'
 import { randomInteger } from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'
-import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import type NetworkPeers from '../network/network-peers'
 
-type Path = PeerId[]
+export type Path = PeerId[]
 
 const compare = (a: Path, b: Path) => b.length - a.length
+
+const filter = (_node: PeerId) => false
+
 const MAX_ITERATIONS = 2000
+
+type Channel = [PeerId, PeerId, number] // [A, B, stake]
+
+export interface Indexer {
+  getFrom(a: PeerId): Promise<Channel[]>
+}
 
 export async function findPath(
     start: PeerId,
-    destination: PeerId,
+    _destination: PeerId,
     hops: number,
-    networkPeers: NetworkPeers,
-    indexer: Types.Indexer
+    _networkPeers: NetworkPeers,
+    indexer: Indexer
   ): Promise<Path>{
     /*
+  const startP = new Public(start.getId().pubKey.marshal())
     const exclude = [
       destination.pubKey.marshal(),
       ...this.bootstrapServers.map((ma) => PeerId.createFromB58String(ma.getPeerId()).pubKey.marshal())
@@ -33,18 +42,17 @@ async findPath(
 ): Promise<Public[]> {
 */
 
-  const startP = new Public(start.getId().pubKey.marshal())
   let queue = new Heap<Path>(compare)
   let iterations = 0
   
 
   // Preprocessing
   queue.addAll(
-    (await indexer.get({ partyA: start })).map((channel) => {
-      if (startP.eq(channel.partyA)) {
-        return [channel.partyB]
+    (await indexer.getFrom(start)).map((channel) => {
+      if (start.equals(channel[0])) {
+        return [channel[1]]
       } else {
-        return [channel.partyA]
+        return [channel[0]]
       }
     })
   )
@@ -61,15 +69,13 @@ async findPath(
     const lastNode = currentPath[currentPath.length - 1]
 
     const newNodes = (
-      await this.indexer.get(
-        { partyA: lastNode },
-        (node: Public) => !currentPath.includes(node) && (filter == null || filter(node))
+      (await indexer.getFrom(lastNode)).filter((c: Channel) => !currentPath.includes(c[1]) && (filter == null || filter(c[1]))
       )
     ).map((channel) => {
-      if (lastNode.eq(channel.partyA)) {
-        return channel.partyB
+      if (lastNode.equals(channel[0])) {
+        return channel[1]
       } else {
-        return channel.partyA
+        return channel[0]
       }
     })
 
@@ -78,9 +84,9 @@ async findPath(
       continue
     }
 
-    let nextNode: Public = newNodes[randomInteger(0, newNodes.length)]
+    let nextNode: PeerId = newNodes[randomInteger(0, newNodes.length)]
 
-    if (nextNode.eq(lastNode)) {
+    if (nextNode.equals(lastNode)) {
       if (newNodes.length == 1) {
         queue.pop()
       }

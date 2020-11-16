@@ -486,12 +486,19 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
    * @param destination instance of peerInfo that contains the peerId of the destination
    */
   private async getIntermediateNodes(destination: PeerId): Promise<PeerId[]> {
+    let toPub = (p: PeerId) => new this.paymentChannels.types.Public(p.pubKey.marshal())
+    let fromPub = (p) => p 
     return await findPath(
       this.getId(),
       destination, 
       MAX_HOPS -1,
       this._network.networkPeers, 
-      this.paymentChannels.indexer)
+      {
+        getFrom: async (p: PeerId) => {
+          let chans = await this.paymentChannels.indexer.get({partyA: toPub(p)})
+          return chans.map(c => [fromPub(c.partyA), fromPub(c.partyB), 0])
+        }
+      })
   }
 
   private static openDatabase(options: HoprOptions, chainName: string, network: string): LevelUp {

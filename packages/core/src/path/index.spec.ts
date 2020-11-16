@@ -1,10 +1,8 @@
 import assert from 'assert'
 import type HoprEthereum from '..'
 import { randomBytes } from 'crypto'
-import { Public } from '../types'
 import { gcd } from '@hoprnet/hopr-utils'
-
-import Path from '.'
+import type { Path } from '.'
 
 function findGenerator(nodesCount: number, previousGenerator?: number) {
   for (let i = previousGenerator != null ? previousGenerator + 1 : 2; i < nodesCount; i++) {
@@ -110,15 +108,13 @@ function noCircles(path: Public[]) {
   return true
 }
 
-const MAX_ITERATIONS = 1000
-
 describe('test pathfinder', function () {
   it('should find a path', async function () {
     const { nodes, edges } = await generateGraph(101)
 
     const connector = generateConnector(edges)
 
-    const path = await connector.path.findPath(nodes[0], 8, MAX_ITERATIONS)
+    const path = await findPath(nodes[0], undefined, 8, undefined, connector)
 
     assert(
       path.length == 8 && noCircles(path) && validPath(path, edges),
