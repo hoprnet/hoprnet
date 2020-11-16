@@ -180,13 +180,13 @@ class WebRTCConnection implements MultiaddrConnection {
                 console.log(`promiseTriggered && !sourceReceived`)
                 await sourcePromise
 
-                yield sourceMsg
+                yield sourceMsg.slice()
                 console.log(`after promiseTriggered && !sourceReceived`)
               }
 
               if (promiseTriggered && sourceReceived) {
                 console.log(`promiseTriggered && sourceReceived`)
-                yield sourceMsg
+                yield sourceMsg.slice()
                 console.log(`after promiseTriggered && sourceReceived`)
               }
               // if (!graceFullyMigrated) {
