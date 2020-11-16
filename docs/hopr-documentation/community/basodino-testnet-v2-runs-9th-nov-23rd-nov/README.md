@@ -22,4 +22,6 @@ Here's a list of the daily tasks so far:
 | 4 | Node Message | 200 |
 | 5 | Find the Password! | 200 |
 | 6 | Build the HOPR Playlist | 200 |
+| 7 | HOPR Playlist Redux | 200 |
+| 8 | [**Find the Password, Part 2!**](daily-task-day-8.md)\*\*\*\* | 200 |
 
