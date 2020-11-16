@@ -124,9 +124,9 @@ class WebRTCConnection implements MultiaddrConnection {
 
                 yield sourceMsg.slice()
 
-                sourcePromise = source.next().then(sourceFunction)
-
                 console.log(`after yield`)
+
+                sourcePromise = source.next().then(sourceFunction)
 
                 if (!this._webRTCAvailable) {
                   graceFullyMigrated = true
