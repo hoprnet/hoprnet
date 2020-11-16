@@ -1,44 +1,22 @@
 ---
 description: >-
-  We'd like to introduce HOPR Games, a project to showcase the usage of the HOPR
-  Protocol.
+  We'd like to tell you about HOPR Games, a project to showcase the usage of the
+  HOPR Protocol.
 ---
 
 # HOPR Games
 
 To showcase the usage of the HOPR Protocol, we've created the **HOPR Games**, a series of games & other activities which work via the HOPR Protocol.
 
-![](../../.gitbook/assets/hopr_tweet%20%282%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29.gif)
+![](../../.gitbook/assets/hopr-no-n.png)
 
 ## Goals
 
-The HOPR Games are meant to help grow and develop HOPR as a project by interacting with our community and learning about their experience with the product. The following are the goals the HOPR Association has in mind when organising HOPR Games sessions:
+The HOPR Games should help grow & develop HOPR as a project. It should teach our community about our product, as well as data privacy. HOPR Games is devised with these goals at heart:
 
-* **Teach and learn \(α\)**. We want to educate our community about HOPR, its technology and benefits. At the same time, we want to learn from the community about any drawbacks or challenges they encounter.
-* **Media awareness \(β\).** We want to increase our reach and network connections by leveraging on social media platforms. We are looking to get HOPR exposed to multiple outlets as much as possible to increase our exposure.
-* **Recruit members \(γ\).** We want to add new users to our community — from traders, developers, miners to curious-minded people. We are creating an environment where like-minded people can rally behind our goal and all benefit from our mission.
-* **Enhance the project \(δ\).** We want to expand the functionality of the protocol, its applications and use cases around it. By listening to our users, we can find organic features which solve problems for both experienced and novice users.
-* **Test protocol \(ε\).** We want to push the limits of our technology beyond our shared understanding of what it can and cannot do. To ensure HOPR can withstand a production load, we need to challenge it at every step.
-
-## Activities
-
-Activities are actions or events community members can participate in during HOPR Games to earn rewards from the HOPR Association. In exchange for completing an activity, a community member will be rewarded with native digital tokens \(e.g. xDAI\).
-
-{% hint style="info" %}
-We'll soon release the capability to issue non-transferable $HOPR tokens as rewards to community members that complete some of our activities.
-{% endhint %}
-
-Activities are split into three categories: **bounties**, **games**, and **experiments**. Activities in each category help the HOPR Association to target specific individuals and achieve different goals:
-
-### Bounties
-
-Bounties are **short-lived**, **asynchronous**, **specific** and have expected results. Bounties are **bi-weekly**, and use **eurogame**-like dynamics to be completed \(i.e., no direct competition, although there may be indirect competition in the form of time pressure or a limited prize fund\).
-
-### Games
-
-Games are **short-lived**, **synchronous**, **open-ended** and can have unexpected results \(e.g. no winners might be an outcome of a game\). Games are **bi-weekly**, and use **amerigame**-like dynamics to be completed \(i.e., direct competition against other users\).
-
-### Experiments
-
-Experiments are **long-lived**, **asynchronous**, **open-ended** and can have **unexpected** results. Experiments are **monthly** or **quarterly**, have little notice, and are meant to test our project.
+* **Teach \(α\)**. We have to educate people about HOPR. We must also discover what problems there are with our protocol.
+* **Media outreach \(β\).** We have to grow our reach via social media platforms. We should distribute HOPR to multiple outlets for more exposure.
+* **Recruit members \(γ\).** We should attract users — from traders & developers to the just curious. We'll create a broad ecosystem where people should be able to rally to our goals.
+* **Improve the project \(δ\).** We have to improve the protocol & its use cases. Our users will help us discover features which solve problems for all users.
+* **Test protocol \(ε\).** We should push the limits of our protocol outside of our shared idea of what it does. To make sure HOPR will survive this load, we should stress it at every step.
 
