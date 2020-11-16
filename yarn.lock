@@ -9740,9 +9740,9 @@ find-yarn-workspace-root@^1.2.1:
     micromatch "^3.1.4"
 
 firebase-admin@^9.1.1:
-  version "9.4.0"
-  resolved "https://registry.yarnpkg.com/firebase-admin/-/firebase-admin-9.4.0.tgz#52a191eac86b0c7d8994ab169ac36dc649ecadec"
-  integrity sha512-0X0qeKaU5UlKbblWZXw3CTwtD94Z6dfEVftrTOSjBPPDgWcXbY+i+LOtZ0S2cUjLgu8Ms1tUDzCxaPdNLvAUzg==
+  version "9.4.1"
+  resolved "https://registry.yarnpkg.com/firebase-admin/-/firebase-admin-9.4.1.tgz#9b8704320dd8894dfa4acc70c66237323cba12ed"
+  integrity sha512-y9r2Mz2x1WTr60YrCDqz8Lw70DlwIvRIieVltP+UdRogkVpfnvyd+bi4D0KPlujW3teqcFPmxuzsXB+DP5vGfQ==
   dependencies:
     "@firebase/database" "^0.6.10"
     "@firebase/database-types" "^0.5.2"
