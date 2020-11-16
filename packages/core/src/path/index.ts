@@ -31,7 +31,7 @@ export async function findPath(
       ...this.bootstrapServers.map((ma) => PeerId.createFromB58String(ma.getPeerId()).pubKey.marshal())
     ].map((pubKey) => new this.paymentChannels.types.Public(pubKey))
 */
-/*
+  /*
 }
 
 async findPath(
@@ -44,7 +44,6 @@ async findPath(
 
   let queue = new Heap<Path>(compare)
   let iterations = 0
-  
 
   // Preprocessing
   queue.addAll(
@@ -56,7 +55,6 @@ async findPath(
       }
     })
   )
-
 
   while (queue.length > 0 && iterations++ < MAX_ITERATIONS) {
     iterations++
