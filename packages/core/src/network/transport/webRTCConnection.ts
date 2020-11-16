@@ -98,12 +98,13 @@ class WebRTCConnection implements MultiaddrConnection {
           }
 
           while (!this._webRTCAvailable) {
-            console.log(`sink iteration`)
+            console.log(`sink iteration`, this._webRTCAvailable, this._webRTCStateKnown)
             if (!this._webRTCStateKnown) {
               await Promise.race([
                 // prettier-ignore
                 sourcePromise
               ])
+              console.log(`after Promise.race sourceReceived`, sourceReceived, `sourceDone`, sourceDone)
 
               if (sourceReceived) {
                 sourceReceived = false
