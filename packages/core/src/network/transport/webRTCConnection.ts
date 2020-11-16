@@ -197,11 +197,12 @@ class WebRTCConnection implements MultiaddrConnection {
       //yield* this.conn.source
 
       console.log(`before await switchPromise`)
+      await this._switchPromise.promise
+
 
       if (this._webRTCAvailable || !this._webRTCStateKnown) {
         clearTimeout(this._webRTCTimeout)
 
-        await this._switchPromise.promise
 
         console.log(`source_ migrated`)
 
