@@ -173,9 +173,6 @@ class WebRTCConnection implements MultiaddrConnection {
 
           sink(
             (async function* () {
-              console.log(`before defer.promise`, graceFullyMigrated)
-              // await defer.promise
-
               if (promiseTriggered && !sourceReceived) {
                 console.log(`promiseTriggered && !sourceReceived`)
                 await sourcePromise
@@ -229,8 +226,10 @@ class WebRTCConnection implements MultiaddrConnection {
 
       // yield* this.conn.source
 
-      console.log(`before await switchPromise`)
-      await this._switchPromise.promise
+      console.log(`before await switchPromise`, this._webRTCAvailable)
+      if (!this._webRTCStateKnown) {
+        await this._switchPromise.promise
+      }
       console.log(`after await switchPromise`, this._webRTCAvailable, this._webRTCStateKnown)
 
       if (this._webRTCAvailable || !this._webRTCStateKnown) {
