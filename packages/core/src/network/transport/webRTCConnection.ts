@@ -227,7 +227,7 @@ class WebRTCConnection implements MultiaddrConnection {
       // yield* this.conn.source
 
       console.log(`before await switchPromise`, this._webRTCAvailable)
-      if (!this._webRTCStateKnown) {
+      if (!this._webRTCStateKnown || this._webRTCAvailable) {
         await this._switchPromise.promise
       }
       console.log(`after await switchPromise`, this._webRTCAvailable, this._webRTCStateKnown)
