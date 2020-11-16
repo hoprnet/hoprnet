@@ -195,7 +195,7 @@ class WebRTCConnection implements MultiaddrConnection {
         yield (result.value as Uint8Array).slice()
       }
 
-      //yield* this.conn.source
+      // yield* this.conn.source
 
       console.log(`before await switchPromise`)
       await this._switchPromise.promise
