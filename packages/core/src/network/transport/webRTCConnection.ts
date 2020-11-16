@@ -145,7 +145,7 @@ class WebRTCConnection implements MultiaddrConnection {
         }.call(this)
       )
 
-      await this._switchPromise.promise
+      await defer.promise
 
       if (this._webRTCAvailable) {
         clearTimeout(this._webRTCTimeout)
