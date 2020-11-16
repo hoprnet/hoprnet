@@ -12,17 +12,18 @@ My second’s in PRIVACY, but isn’t in SPY
   
 My third’s found within the mysterious SPHINX   
   
-My fourth is a letter not found at [**these**](../hopr-games/) [**l**](../hopr-games/#goals)**inks**.  
+My fourth is a letter not found [**at**](../hopr-games/) [**these**](../hopr-games/#goals) [**links**](../hopr-games/#extra-daily-task-clue).  
   
 My fifth and my sixth are both in METADATA  
   
 My whole is how HOPR makes life online safer.  
   
   
-
-
-Once you have the password, send it to   
   
   
+Once you have the password, send it to `16Uiu2HAkvc8JAxoKb1BzZo7SYMt8iMQi8FrPCEZLDHRm13mu8JEn`
 
+```text
+send 16Uiu2HAkvc8JAxoKb1BzZo7SYMt8iMQi8FrPCEZLDHRm13mu8JEn
+```
 

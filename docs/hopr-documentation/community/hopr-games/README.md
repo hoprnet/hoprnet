@@ -20,3 +20,11 @@ The HOPR Games should help grow & develop HOPR as a project. It should teach our
 * **Improve the project \(δ\).** We have to improve the protocol & its use cases. Our users will help us discover features which solve problems for all users.
 * **Test protocol \(ε\).** We should push the limits of our protocol outside of our shared idea of what it does. To make sure HOPR will survive this load, we should stress it at every step.
 
+## Extra Daily Task Clue
+
+{% hint style="danger" %}
+Yes, I rewrote this whole page just for today's riddle!
+{% endhint %}
+
+
+
