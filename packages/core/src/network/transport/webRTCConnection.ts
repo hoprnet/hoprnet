@@ -189,7 +189,7 @@ class WebRTCConnection implements MultiaddrConnection {
           break
         }
 
-        console.log((result.value as Uint8Array).slice())
+        console.log(result)
         yield (result.value as Uint8Array).slice()
       }
 
