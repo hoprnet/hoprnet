@@ -13,3 +13,4 @@ The **HOPR Protocol** is a privacy-preserving messaging protocol able to create 
 ### HOPR Node
 
 A **HOPR Node** is an internet-ready, bootstrap-connected, running instance of a software or hardware implementation of the **HOPR Protocol**.
+

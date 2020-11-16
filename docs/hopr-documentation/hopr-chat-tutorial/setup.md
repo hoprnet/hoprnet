@@ -32,29 +32,29 @@ Before doing anything else, you need to install [Docker Desktop](https://hub.doc
 
 Depending of your distribution, please follow the official guidelines for how to install and run Docker on your workstation.
 
-- [Installing Docker in Ubuntu](https://docs.docker.com/engine/install/ubuntu/)
-- [Installing Docker in Fedora](https://docs.docker.com/engine/install/fedora/)
-- [Installing Docker in Debian](https://docs.docker.com/engine/install/debian/)
-- [Installing Docker in CentOS](https://docs.docker.com/engine/install/centos/)
-- Visit [Docker Hub ](https://hub.docker.com/editions/community/docker-ce-desktop-mac/)and download **Docker Desktop** to your computer.
-- Follow the wizard steps to ensure Docker is installed.
-- Ensure the installation was successful by running `docker ps` in your terminal.
-- Go to [Docker Hub](https://docs.docker.com/toolbox/overview/) to download **Docker Toolbox** to your computer.
-- Follow-up the wizard steps to ensure Docker is installed.
-- Ensure the installation was successful by running `docker ps`
-- Go to [Docker ](https://www.docker.com/products/docker-desktop)and download **Docker Desktop** to your computer.
-- Follow-up the wizard steps to ensure Docker is installed.
-- Ensure the installation was successful by running `docker ps`
+* [Installing Docker in Ubuntu](https://docs.docker.com/engine/install/ubuntu/)
+* [Installing Docker in Fedora](https://docs.docker.com/engine/install/fedora/)
+* [Installing Docker in Debian](https://docs.docker.com/engine/install/debian/)
+* [Installing Docker in CentOS](https://docs.docker.com/engine/install/centos/)
+* Visit [Docker Hub ](https://hub.docker.com/editions/community/docker-ce-desktop-mac/)and download **Docker Desktop** to your computer.
+* Follow the wizard steps to ensure Docker is installed.
+* Ensure the installation was successful by running `docker ps` in your terminal.
+* Go to [Docker Hub](https://docs.docker.com/toolbox/overview/) to download **Docker Toolbox** to your computer.
+* Follow-up the wizard steps to ensure Docker is installed.
+* Ensure the installation was successful by running `docker ps`
+* Go to [Docker ](https://www.docker.com/products/docker-desktop)and download **Docker Desktop** to your computer.
+* Follow-up the wizard steps to ensure Docker is installed.
+* Ensure the installation was successful by running `docker ps`
 
 #### Downloading HOPR Chat image from Docker Hub
 
 Once Docker is up and running, you need to download a valid **HOPR Chat** Docker Image. To do so, run `docker pull hopr/chat` from your terminal. This process may take some time depending on your internet connection, as it will download around `0.5 GB` from our [Docker Hub Registry](https://hub.docker.com/r/hopr/chat).
 
-![Currently HOPR Chat is about ~0.5 GB, please be patient.](../.gitbook/assets/docker_install_macos%20%283%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29.gif)
+![Currently HOPR Chat is about ~0.5 GB, please be patient.](../.gitbook/assets/docker_install_macos%20%283%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29.gif)
 
 To ensure your machine has successfully downloaded **HOPR Chat,** run `docker images`. You will be shown the **HOPR Chat** image being installed locally, ready to be run.
 
-![HOPR Chat distributed as a Docker image](../.gitbook/assets/docker_images%20%283%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29.gif)
+![HOPR Chat distributed as a Docker image](../.gitbook/assets/docker_images%20%283%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29.gif)
 
 {% hint style="info" %}
 Docker images can quickly go out of date. We recommend reviewing which are the latest images available to be used before downloading one. You can see all our available images and their publication date in our public [Docker registry](https://gcr.io/hoprassociation/hopr-chat).
@@ -72,19 +72,15 @@ To install nvm on Linux or macOS, please follow the instructions on their [GitHu
 
 {% tabs %}
 {% tab title="cURL" %}
-
 ```text
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.35.3/install.sh | bash
 ```
-
 {% endtab %}
 
 {% tab title="Wget" %}
-
 ```text
 wget -qO- https://raw.githubusercontent.com/nvm-sh/nvm/v0.35.3/install.sh | bash
 ```
-
 {% endtab %}
 {% endtabs %}
 
@@ -105,7 +101,7 @@ $ nvm use v12.9.1
 
 If everything was done properly, you can run `node --version` to see your current `node` version, alongside running basic commands as shown when running simply `node` in your terminal.
 
-![](../.gitbook/assets/node%20%284%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29.gif)
+![](../.gitbook/assets/node%20%284%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29.gif)
 
 ## **Running HOPR Chat**
 
@@ -117,7 +113,6 @@ To run **HOPR Chat** via Docker**,** you need to copy and paste the following co
 
 {% tabs %}
 {% tab title="ch-t-01" %}
-
 ```text
 docker run -v $(pwd)/db:/app/db \
 -e HOST_IPV4=0.0.0.0:9091 \
@@ -125,11 +120,9 @@ docker run -v $(pwd)/db:/app/db \
 -e ETHEREUM_PROVIDER=wss://kovan.infura.io/ws/v3/f7240372c1b442a6885ce9bb825ebc36 \
 -p 9091:9091 -it hopr/chat -p switzerland
 ```
-
 {% endtab %}
 
 {% tab title="ch-t-02" %}
-
 ```text
 docker run -v $(pwd)/db:/app/db \
 -e HOST_IPV4=0.0.0.0:9091 \
@@ -137,7 +130,6 @@ docker run -v $(pwd)/db:/app/db \
 -e ETHEREUM_PROVIDER=wss://kovan.infura.io/ws/v3/f7240372c1b442a6885ce9bb825ebc36 \
 -p 9091:9091 -it hopr/chat -p switzerland
 ```
-
 {% endtab %}
 {% endtabs %}
 
@@ -145,7 +137,6 @@ docker run -v $(pwd)/db:/app/db \
 
 {% tabs %}
 {% tab title="ch-t-01" %}
-
 ```text
 docker run -v %cd%/db:/app/db ^
 -e HOST_IPV4=0.0.0.0:9091 ^
@@ -153,11 +144,9 @@ docker run -v %cd%/db:/app/db ^
 -e ETHEREUM_PROVIDER=wss://kovan.infura.io/ws/v3/f7240372c1b442a6885ce9bb825ebc36 ^
 -p 9091:9091 -it hopr/chat -p switzerland
 ```
-
 {% endtab %}
 
 {% tab title="ch-t-02" %}
-
 ```text
 docker run -v %cd%/db:/app/db ^
 -e HOST_IPV4=0.0.0.0:9091 ^
@@ -165,13 +154,12 @@ docker run -v %cd%/db:/app/db ^
 -e ETHEREUM_PROVIDER=wss://kovan.infura.io/ws/v3/f7240372c1b442a6885ce9bb825ebc36 ^
 -p 9091:9091 -it hopr/chat -p switzerland
 ```
-
 {% endtab %}
 {% endtabs %}
 
 You will be welcomed by the following message.
 
-![](../.gitbook/assets/hopr%20%283%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29.gif)
+![](../.gitbook/assets/hopr%20%283%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29.gif)
 
 If you get an `Unable to connect to Bootstrap node` message, use other bootstrap nodes. Our bootstrap nodes are available as `TXT` records behind our `hoprnet.org` domain, so you can see them using the `dig` command in any linux computer.
 
@@ -211,7 +199,7 @@ Depending on your configuration and version of **HOPR Chat**, you might need to 
 
 To run **HOPR Chat** via Node.js**,** you can simply download our pre-compiled binary for each version. You can find these binaries in our [Releases](https://github.com/hoprnet/hopr-core/releases) page inside a zip file.
 
-![Please select the correct distribution for your operating system.](../.gitbook/assets/image%20%288%29%20%283%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29.png)
+![Please select the correct distribution for your operating system.](../.gitbook/assets/image%20%288%29%20%283%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29.png)
 
 These files have **HOPR Chat** pre-configured and compiled to work in your system. Click on the executable file inside that folder to see **HOPR Chat** up and running. Depending on your distribution, this file might be different.
 
@@ -257,12 +245,13 @@ In case you are using a version of **HOPR Chat** with **HOPR Core** `<v0.6.10`, 
 
 Now, let's find some nodes to talk to. To do this, run `crawl`, which will show you other users that are connected to the **HOPR Network** and are available to chat.
 
-![The crawl command will show you other connected nodes.](../.gitbook/assets/running_hopr_chat_and_crawling%20%283%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29.gif)
+![The crawl command will show you other connected nodes.](../.gitbook/assets/running_hopr_chat_and_crawling%20%283%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29.gif)
 
 To talk to other users, copy another connected user address and send a message to them with the `send` command. This will look something like: `send 16Uiu2HAmCtWxx3Ky3ZjtWj1whkezdRvMAYKU9f57CRPj2FkPtWsD`
 
 **HOPR Chat** will then prompt you for a message to send.
 
-![Your message will be sent privately through the HOPR network](../.gitbook/assets/running_hopr_chat_and_sending%20%283%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29.gif)
+![Your message will be sent privately through the HOPR network](../.gitbook/assets/running_hopr_chat_and_sending%20%283%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29.gif)
 
 Congratulations! You have communicated with another node using a privacy-preserving decentralised protocol. **HOPR Chat** is just a proof of concept right now, but you can already see the capabilities of the protocol. Click next to learn about **Bootstrap Nodes,** or go back to see the general introduction about **HOPR Chat.**
+

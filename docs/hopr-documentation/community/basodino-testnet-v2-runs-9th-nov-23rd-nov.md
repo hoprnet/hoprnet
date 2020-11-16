@@ -14,11 +14,12 @@ As the first Daily Task, the community were invited to vote on the prize distrib
 
 Here's a list of the daily tasks so far:
 
-| Day | Task                      | Points  |
-| :-- | :------------------------ | :------ |
-| 1   | Prize Distribution Vote   | 50 / 60 |
-| 2   | Basodino v1 Feedback Form | 250     |
-| 3   | Network Diagnostics Form  | 200     |
-| 4   | Node Message              | 200     |
-| 5   | Find the Password!        | 200     |
-| 6   | Build the HOPR Playlist   | 200     |
+| Day | Task | Points |
+| :--- | :--- | :--- |
+| 1 | Prize Distribution Vote | 50 / 60 |
+| 2 | Basodino v1 Feedback Form | 250 |
+| 3 | Network Diagnostics Form | 200 |
+| 4 | Node Message | 200 |
+| 5 | Find the Password! | 200 |
+| 6 | Build the HOPR Playlist | 200 |
+

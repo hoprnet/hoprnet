@@ -16,9 +16,9 @@ CoverBot is the latest in a series of bots running on the HOPR network which wil
 
 Before you register with CoverBot, you'll need the following things:
 
-- Your HOPR address
-- `includeRecipient` turned on
-- A Twitter account
+* Your HOPR address
+* `includeRecipient` turned on
+* A Twitter account
 
 The first two items were covered in the previous sections in this tutorial, [**Exploring the Network**](../hopr-chat-tutorial/exploring-the-network.md#finding-your-address) and [**Messaging RandoBot**](../hopr-chat-tutorial/randobot.md#step-2-turn-on-includerecipient), respectively.
 
@@ -32,13 +32,13 @@ Your Twitter handle will be your name on the testnet scoreboard.
 
 Your tweet needs to include:
 
-- your HOPR address
-- the @hoprnet handle
-- the \#Basodino hashtag
+* your HOPR address
+* the @hoprnet handle
+* the \#Basodino hashtag
 
 An example is shown below:
 
-![](../.gitbook/assets/example-tweet%20%281%29%20%281%29%20%281%29.png)
+![](../.gitbook/assets/example-tweet%20%281%29%20%281%29%20%281%29%20%281%29.png)
 
 The bot should be able to parse any tweet which includes these three things, so feel free to add comments and even emojis. But if you're having difficulty registering, try again with a simpler tweet.
 
@@ -56,7 +56,7 @@ send 16Uiu2HAm79TuiHcEtjcELXAwcjEX6Sh7qGDbiqZbDvHSicRyPm9R [URL of your tweet]
 
 Then press Enter.
 
-![](../.gitbook/assets/coverbot-avado-success%20%281%29%20%281%29%20%281%29.png)
+![](../.gitbook/assets/coverbot-avado-success%20%281%29%20%281%29%20%281%29%20%281%29.png)
 
 The bot will now check your tweet and will send you a verification message if you're successful. If there's an error, the bot will try and explain what has gone wrong so you can fix it.
 
@@ -66,7 +66,7 @@ Now that your address is whitelisted with the bot, you can earn tickets by relay
 
 Every 30 seconds, the bot will randomly select an address from the whitelist and ping it to check that it's online. If is, it will send cover traffic to itself via that node.
 
-![](../.gitbook/assets/coverbot-avado-relaying%20%281%29%20%281%29%20%281%29.png)
+![](../.gitbook/assets/coverbot-avado-relaying%20%281%29%20%281%29%20%281%29%20%281%29.png)
 
 If the CoverBot selects your address, you'll receive a ticket which can be redeemed for HOPR. You'll also receive a verification message.
 
@@ -77,3 +77,4 @@ The more your node is online, the greater your chance of earning tickets, so try
 ## Check Your Score
 
 You can see the current leaderboard at [**https://network.hoprnet.org**](https://network.hoprnet.org)\*\*\*\*
+

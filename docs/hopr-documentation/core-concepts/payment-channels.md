@@ -1,7 +1,7 @@
 # Payment Channels
 
-- **OPEN -** The channel is currently open and funded, so data can be relayed between your node and the target node.
-- **PENDING** - A request has been placed to close the channel. After the cool-off period \(currently 2 minutes\), the channel is able to be closed.
+* **OPEN -** The channel is currently open and funded, so data can be relayed between your node and the target node.
+* **PENDING** - A request has been placed to close the channel. After the cool-off period \(currently 2 minutes\), the channel is able to be closed.
 
 You will then be shown a list of open channels, along with their status. The two status options are:
 
@@ -100,3 +100,4 @@ You can verify any of the receipts you get on an xDAI block explorer. For exampl
 Type `balance`, and you'll see that your xHOPR balance has reduced by the amount you funded the channel with. Your xDAI balance will also have slightly decreased. This is the fee for opening the payment channel.
 
 Once a payment channel is closed, any unspent HOPR tokens in the channel will be returned to your balance. You can check this by typing `balance`.
+
