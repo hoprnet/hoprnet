@@ -56,7 +56,7 @@
 
 ## Community
 
-* [HOPR Games \(Curre\_tly taki\_g a Hiatus\)](community/hopr-games/README.md)
+* [HOPR Games](community/hopr-games/README.md)
   * [Bounties](community/hopr-games/bounties/README.md)
     * [Bouncer Bot](community/hopr-games/bounties/bouncer-bot.md)
 * [Säntis Testnet \(Ended 06 Oct 2020\)](community/saentis-testnet.md)

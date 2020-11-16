@@ -1,12 +1,12 @@
 ---
 description: >-
-  Introducing HOPR Games, a community engagement strategy to showcase the usage
-  of the HOPR Protocol, sponsored by the HOPR Association.
+  We'd like to introduce HOPR Games, a project to showcase the usage of the HOPR
+  Protocol.
 ---
 
-# HOPR Games \(Curre\_tly taki\_g a Hiatus\)
+# HOPR Games
 
-In order to showcase the usage of the HOPR Protocol, the HOPR Association has created the **HOPR Games**, an interactive online games, bounties and experiments challenges meant to be accomplished using the HOPR Protocol.
+To showcase the usage of the HOPR Protocol, we've created the **HOPR Games**, a series of games & other activities which work via the HOPR Protocol.
 
 ![](../../.gitbook/assets/hopr_tweet%20%282%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29.gif)
 
