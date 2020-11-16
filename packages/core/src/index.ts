@@ -488,10 +488,11 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
   private async getIntermediateNodes(destination: PeerId): Promise<PeerId[]> {
     return await findPath(
       this.getId(),
-      destination, 
-      MAX_HOPS -1,
-      this._network.networkPeers, 
-      this.paymentChannels.indexer)
+      destination,
+      MAX_HOPS - 1,
+      this._network.networkPeers,
+      this.paymentChannels.indexer
+    )
   }
 
   private static openDatabase(options: HoprOptions, chainName: string, network: string): LevelUp {

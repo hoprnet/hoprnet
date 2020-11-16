@@ -10,19 +10,19 @@ const compare = (a: Path, b: Path) => b.length - a.length
 const MAX_ITERATIONS = 2000
 
 export async function findPath(
-    start: PeerId,
-    destination: PeerId,
-    hops: number,
-    networkPeers: NetworkPeers,
-    indexer: Types.Indexer
-  ): Promise<Path>{
-    /*
+  start: PeerId,
+  destination: PeerId,
+  hops: number,
+  networkPeers: NetworkPeers,
+  indexer: Types.Indexer
+): Promise<Path> {
+  /*
     const exclude = [
       destination.pubKey.marshal(),
       ...this.bootstrapServers.map((ma) => PeerId.createFromB58String(ma.getPeerId()).pubKey.marshal())
     ].map((pubKey) => new this.paymentChannels.types.Public(pubKey))
 */
-/*
+  /*
 }
 
 async findPath(
@@ -36,7 +36,6 @@ async findPath(
   const startP = new Public(start.getId().pubKey.marshal())
   let queue = new Heap<Path>(compare)
   let iterations = 0
-  
 
   // Preprocessing
   queue.addAll(
@@ -48,7 +47,6 @@ async findPath(
       }
     })
   )
-
 
   while (queue.length > 0 && iterations++ < MAX_ITERATIONS) {
     iterations++
