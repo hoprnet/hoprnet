@@ -7,7 +7,7 @@ export type Path = PeerId[]
 
 const compare = (a: Path, b: Path) => b.length - a.length
 
-const filter = (_node: PeerId) => false
+const filter = (_node: PeerId) => true
 
 const MAX_ITERATIONS = 2000
 
@@ -21,7 +21,6 @@ export async function findPath(
   getChannelsFromPeer: (partyA: PeerId) => Promise<Channel[]>
 ): Promise<Path> {
   /*
-  const startP = new Public(start.getId().pubKey.marshal())
     const exclude = [
       destination.pubKey.marshal(),
       ...this.bootstrapServers.map((ma) => PeerId.createFromB58String(ma.getPeerId()).pubKey.marshal())
