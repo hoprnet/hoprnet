@@ -106,7 +106,7 @@ The `Terminal` application might look different depending on your operating syst
 
 After your `Terminal` or `Powershell` is open, please type `node -v` in the prompt and press `Enter`. Ensure there's an empty space between the words `node` and `-v`
 
-![Type &#x201C;node -v&#x201D; to find your node version. It should show v12.18.2](../.gitbook/assets/node-version%20%283%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29.gif)
+![Type “node -v” to find your node version. It should show v12.18.2](../.gitbook/assets/node-version%20%283%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29.gif)
 
 If your screen shows `v12.18.2` you are ready to go!
 
@@ -207,4 +207,3 @@ Running these commands will bring up a screen similar the one shown below. Congr
 To get started with the testnet, visit the [**Funding Your Node**](funding-your-node.md) page. To learn more about our network, please go to our **Core Concepts** section. You can also learn how to connect to a different network by going to our [**Advanced Setup**](setup.md)**.** For more information and updates about the **HOPR Network**, please follow our [Twitter](https://twitter.com/hoprnet). For questions and additional information, please go to our [Telegram](https://t.me/hoprnet) channel.
 
 If you do not want to connect to the **HOPR Network** anymore, you can just close the terminal window in which you have **HOPR Chat** running. To **uninstall** just delete the `HOPR Chat` folder you downloaded.
-
