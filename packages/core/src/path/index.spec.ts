@@ -49,7 +49,6 @@ function checkPath(path: PeerId[], edges: Map<PeerId, PeerId[]>) {
 }
 
 const TEST_NODES = Array.from({length: 5}).map((_, i) => fakePeerId(i))
-console.log(TEST_NODES)
 
 // Bidirectional star, all pass through node 0
 const STAR = new Map<PeerId, PeerId[]>()
@@ -57,22 +56,20 @@ STAR.set(TEST_NODES[1], [TEST_NODES[0]])
 STAR.set(TEST_NODES[2], [TEST_NODES[0]])
 STAR.set(TEST_NODES[3], [TEST_NODES[0]])
 STAR.set(TEST_NODES[4], [TEST_NODES[0]])
-STAR.set(TEST_NODES[0], [TEST_NODES[1]])
-STAR.set(TEST_NODES[0], [TEST_NODES[2]])
-STAR.set(TEST_NODES[0], [TEST_NODES[3]])
-STAR.set(TEST_NODES[0], [TEST_NODES[4]])
+STAR.set(TEST_NODES[0], [TEST_NODES[1], TEST_NODES[2], TEST_NODES[3], TEST_NODES[4]])
 
 const RELIABLE_NETWORK = { qualityOf: (_p) => 1 } as NetworkPeers
+const STAKE_1 = () => 1
 
-function fakeIndexer(edges: Map<PeerId, PeerId[]>): Indexer {
+function fakeIndexer(edges: Map<PeerId, PeerId[]>, stakes: (i: PeerId) => number): Indexer {
   return {
-    getChannelsFromPeer: (a: PeerId) => Promise.resolve(edges.get(a).map((b) => [a, b, 0 as any]))
+    getChannelsFromPeer: (a: PeerId) => Promise.resolve(edges.get(a).map((b) => [a, b, stakes(a) as any]))
   }
 }
 
 describe('test pathfinder', function () {
   it('should find a path through a reliable star', async function () {
-    const path = await findPath(TEST_NODES[1], fakePeerId(6), 3, RELIABLE_NETWORK, fakeIndexer(STAR))
+    const path = await findPath(TEST_NODES[1], fakePeerId(6), 3, RELIABLE_NETWORK, fakeIndexer(STAR, STAKE_1))
     checkPath(path, STAR)
     assert(path.length == 3, 'Should find a valid acyclic path')
   })
