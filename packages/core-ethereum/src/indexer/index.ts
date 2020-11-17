@@ -1,4 +1,4 @@
-import type { Indexer as IIndexer } from '@hoprnet/hopr-core-connector-interface'
+import type { Indexer as IIndexer, IndexerChannel} from '@hoprnet/hopr-core-connector-interface'
 import type HoprEthereum from '..'
 import BN from 'bn.js'
 import chalk from 'chalk'
@@ -48,10 +48,19 @@ function isConfirmedBlock(blockNumber: number, onChainBlockNumber: number): bool
   return blockNumber + MAX_CONFIRMATIONS <= onChainBlockNumber
 }
 
-async function getStake(partyA: Public, partyB: Public, connector: HoprEthereum): Promise<Balance> {
-  const channelId = await getId(partyA, partyB)
+async function getStake(source: Public, dest: Public, connector: HoprEthereum): Promise<Balance> {
+  let channelId // Hackery because of bidirectional stuff
+  if (isPartyA(source, dest)){
+    channelId = await getId(source, dest)
+  } else {
+    channelId = await getId(dest, source)
+  }
   const state = await connector.hoprChannels.methods.channels(channelId.toHex()).call()
-  return new Balance(state.partyABalance)
+  if (isPartyA(source, dest)){
+    return new Balance(state.partyABalance)
+  } else {
+    return new Balance(state.deposit - state.partyABalance)
+  }
 }
 
 /**
@@ -87,13 +96,16 @@ class Indexer implements IIndexer {
       return 0
     }
   }
+  public async getChannelsFrom(source: PeerId): Promise<IndexerChannel[]> {
+
+  }
 
   /**
    * Check if channel entry exists.
    *
    * @returns promise that resolves to true or false
    */
-  public async has(partyA: Public, partyB: Public): Promise<boolean> {
+  private async has(partyA: Public, partyB: Public): Promise<boolean> {
     const { dbKeys, db } = this.connector
 
     try {
@@ -197,7 +209,7 @@ class Indexer implements IIndexer {
    * @param query
    * @returns promise that resolves to a list of channel entries
    */
-  public async get(
+  private async get(
     query?: { partyA?: Public; partyB?: Public },
     filter?: (node: Public) => boolean
   ): Promise<Channel[]> {
