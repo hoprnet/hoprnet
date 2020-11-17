@@ -176,12 +176,15 @@ class WebRTCConnection implements MultiaddrConnection {
               if (promiseTriggered && !sourceReceived) {
                 console.log(`promiseTriggered && !sourceReceived`)
                 await sourcePromise
-                console.log(`after await promiseTriggered && !sourceReceived`)
+
+                console.log(`sinking into webrtc`, new TextDecoder().decode(sourceMsg.slice()))
 
                 yield sourceMsg.slice()
                 console.log(`after promiseTriggered && !sourceReceived`)
               } else if (promiseTriggered && sourceReceived) {
                 console.log(`promiseTriggered && sourceReceived`)
+                console.log(`sinking into webrtc`, new TextDecoder().decode(sourceMsg.slice()))
+
                 yield sourceMsg.slice()
                 console.log(`after promiseTriggered && sourceReceived`)
               }
