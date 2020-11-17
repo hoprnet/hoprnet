@@ -16,9 +16,9 @@ CoverBot is the latest in a series of bots running on the HOPR network which wil
 
 Before you register with CoverBot, you'll need the following things:
 
-* Your HOPR address
-* `includeRecipient` turned on
-* A Twitter account
+- Your HOPR address
+- `includeRecipient` turned on
+- A Twitter account
 
 The first two items were covered in the previous sections in this tutorial, [**Exploring the Network**](../hopr-chat-tutorial/exploring-the-network.md#finding-your-address) and [**Messaging RandoBot**](../hopr-chat-tutorial/randobot.md#step-2-turn-on-includerecipient), respectively.
 
@@ -32,9 +32,9 @@ Your Twitter handle will be your name on the testnet scoreboard.
 
 Your tweet needs to include:
 
-* your HOPR address
-* the @hoprnet handle
-* the \#Basodino hashtag
+- your HOPR address
+- the @hoprnet handle
+- the \#Basodino hashtag
 
 An example is shown below:
 
@@ -77,4 +77,3 @@ The more your node is online, the greater your chance of earning tickets, so try
 ## Check Your Score
 
 You can see the current leaderboard at [**https://network.hoprnet.org**](https://network.hoprnet.org)\*\*\*\*
-
