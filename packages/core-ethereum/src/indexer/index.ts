@@ -10,6 +10,7 @@ import { Log, isPartyA, events, getId } from '../utils'
 import { MAX_CONFIRMATIONS } from '../config'
 import { ContractEventLog } from '../tsc/web3/types'
 import { Log as OnChainLog } from 'web3-core'
+import PeerId from 'peer-id'
 import Heap from 'heap-js'
 
 // we save up some memory by only caching the event data we use
@@ -17,7 +18,7 @@ type LightEvent<E extends ContractEventLog<any>> = Pick<
   E,
   'event' | 'blockNumber' | 'transactionHash' | 'transactionIndex' | 'logIndex' | 'returnValues'
 >
-type Channel = { partyA: Public; partyB: Public; channelEntry: ChannelEntry; stake: Balance }
+type Channel = { partyA: Public; partyB: Public; channelEntry: ChannelEntry }
 export type OpenedChannelEvent = LightEvent<ContractEventLog<{ opener: Public; counterparty: Public }>>
 export type ClosedChannelEvent = LightEvent<
   ContractEventLog<{ closer: Public; counterparty: Public; partyAAmount?: BN; partyBAmount?: BN }>
@@ -46,21 +47,6 @@ function isMoreRecent(oldChannelEntry: ChannelEntry, newChannelEntry: ChannelEnt
  */
 function isConfirmedBlock(blockNumber: number, onChainBlockNumber: number): boolean {
   return blockNumber + MAX_CONFIRMATIONS <= onChainBlockNumber
-}
-
-async function getStake(source: Public, dest: Public, connector: HoprEthereum): Promise<Balance> {
-  let channelId // Hackery because of bidirectional stuff
-  if (isPartyA(source, dest)){
-    channelId = await getId(source, dest)
-  } else {
-    channelId = await getId(dest, source)
-  }
-  const state = await connector.hoprChannels.methods.channels(channelId.toHex()).call()
-  if (isPartyA(source, dest)){
-    return new Balance(state.partyABalance)
-  } else {
-    return new Balance(state.deposit - state.partyABalance)
-  }
 }
 
 /**
@@ -96,15 +82,28 @@ class Indexer implements IIndexer {
       return 0
     }
   }
-  public async getChannelsFrom(source: PeerId): Promise<IndexerChannel[]> {
 
+  public async getChannelsFrom(source: PeerId): Promise<IndexerChannel[]> {
+    const sourcePubKey = new Public(source.pubKey.marshal())
+    const channels = await this.getAll(sourcePubKey)
+    let cout: IndexerChannel[] = []
+    for (let channel of channels){
+      const channelId = await getId(channel.partyA, channel.partyB)
+      const state = await this.connector.hoprChannels.methods.channels(channelId.toHex()).call()
+      if (sourcePubKey.eq(channel.partyA)){
+        cout.push([source, await pubKeyToPeerId(channel.partyB), new Balance(state.partyABalance)])
+      } else {
+        cout.push([source, await pubKeyToPeerId(channel.partyA), new Balance(state.partyBBalance)])
+      }
+    }
+
+    return cout
   }
 
   /**
    * Check if channel entry exists.
    *
    * @returns promise that resolves to true or false
-   */
   private async has(partyA: Public, partyB: Public): Promise<boolean> {
     const { dbKeys, db } = this.connector
 
@@ -118,6 +117,7 @@ class Indexer implements IIndexer {
 
     return true
   }
+   */
 
   /**
    * Get all stored channel entries, if party is provided,
@@ -150,13 +150,10 @@ class Indexer implements IIndexer {
             offset: value.byteOffset
           })
 
-          getStake(partyA, partyB, this.connector).then((stake) => {
-            channels.push({
-              partyA,
-              partyB,
-              channelEntry,
-              stake
-            })
+          channels.push({
+            partyA,
+            partyB,
+            channelEntry
           })
         })
         .on('end', () => resolve(channels))
@@ -192,8 +189,7 @@ class Indexer implements IIndexer {
     return {
       partyA,
       partyB,
-      channelEntry,
-      stake: await getStake(partyA, partyB, this.connector)
+      channelEntry
     }
   }
 
