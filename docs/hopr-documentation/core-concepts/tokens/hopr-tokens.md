@@ -17,4 +17,3 @@ You can check your testnet HOPR balance at any time by typing `balance` in HOPR 
 {% hint style="danger" %}
 **IMPORTANT:** The testnet HOPR token will only work on our HOPR testnets. It is not the final HOPR token that will run on mainnet and for legal reasons testnet HOPR tokens cannot be transferred to HOPR tokens. Prizes for our testnets will be solely determined by your final score on the testnet leaderboard, not the number of testnet HOPR tokens you control.
 {% endhint %}
-
