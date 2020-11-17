@@ -2,8 +2,9 @@ import { PROTOCOL_STRING } from '../../constants'
 import { Packet } from '../../messages/packet'
 import { Acknowledgement } from '../../messages/acknowledgement'
 
-import debug from 'debug'
-const log = debug('hopr-core:forward')
+import Debug from 'debug'
+const log = Debug('hopr-core:forward')
+const verbose = Debug('hopr-core:verbose:forward')
 
 import type PeerId from 'peer-id'
 import chalk from 'chalk'
@@ -104,25 +105,30 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector> implements Abstr
 
     while (this.mixer.notEmpty()) {
       if (this.mixer.poppable()) {
-        packet = this.mixer.pop()
+        try {
+          packet = this.mixer.pop()
 
-        let { receivedChallenge, ticketKey } = await packet.forwardTransform()
+          const { receivedChallenge, ticketKey } = await packet.forwardTransform()
 
-        ;[sender, target] = await Promise.all([packet.getSenderPeerId(), packet.getTargetPeerId()])
+          ;[sender, target] = await Promise.all([packet.getSenderPeerId(), packet.getTargetPeerId()])
 
-        setImmediate(async () => {
-          const ack = new Acknowledgement(this.node.paymentChannels, undefined, {
-            key: ticketKey,
-            challenge: receivedChallenge
+          setImmediate(async () => {
+            const ack = new Acknowledgement(this.node.paymentChannels, undefined, {
+              key: ticketKey,
+              challenge: receivedChallenge
+            })
+
+            await this.node._interactions.packet.acknowledgment.interact(sender, await ack.sign(this.node.getId()))
           })
 
-          await this.node._interactions.packet.acknowledgment.interact(sender, await ack.sign(this.node.getId()))
-        })
-
-        if (this.node.getId().isEqual(target)) {
-          this.node.output(packet.message.plaintext)
-        } else {
-          await this.interact(target, packet)
+          if (this.node.getId().isEqual(target)) {
+            this.node.output(packet.message.plaintext)
+          } else {
+            await this.interact(target, packet)
+          }
+        } catch (error) {
+          log('Error while handling packet')
+          verbose('Error while handling packet', error)
         }
       } else {
         // Wait a bit for packet

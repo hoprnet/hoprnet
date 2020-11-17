@@ -7,7 +7,7 @@ import PeerId from 'peer-id'
 import chaiAsPromised from 'chai-as-promised'
 import chai, { expect } from 'chai'
 import sinon from 'sinon'
-import { validateUnacknowledgedTicket } from './tickets'
+import { validateUnacknowledgedTicket, validateCreatedTicket } from './tickets'
 
 chai.use(chaiAsPromised)
 
@@ -277,5 +277,33 @@ describe('unit test validateUnacknowledgedTicket', function () {
         getTickets: async () => ticketsInDb
       })
     ).to.eventually.rejectedWith('Payment channel does not have enough funds when you include unredeemed tickets')
+  })
+})
+
+describe('unit test validateCreatedTicket', function () {
+  it('should pass if ticket is okay', async function () {
+    const signedTicket = createSignedTicket({
+      sender
+    })
+
+    return expect(
+      validateCreatedTicket({
+        myBalance: new BN(1),
+        signedTicket
+      })
+    ).to.eventually.to.not.rejected
+  })
+
+  it('should throw when signer is not sender', async function () {
+    const signedTicket = createSignedTicket({
+      sender
+    })
+
+    return expect(
+      validateCreatedTicket({
+        myBalance: new BN(0),
+        signedTicket
+      })
+    ).to.eventually.rejectedWith('Payment channel does not have enough funds')
   })
 })
