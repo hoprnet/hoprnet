@@ -15,4 +15,3 @@ To run **HOPR Chat** as a bootstrap node, pass a `-b` flag to the run command.
 ## Available Bootstrap Nodes
 
 Feel free to use any \(or all\) of the following URLs as your `BOOTSTRAP_SERVERS` parameter in your **HOPR Chat** Docker image. Each of our **Bootstrap Nodes** are located in different countries and serve a specific environment. You can find our Bootstrap Nodes by querying our `TXT` records from our `hoprnet.org` `_dnsaddr.bootstrap` subdomain. Quickly see those in [https://www.whatsmydns.net/\#TXT/\_dnsaddr.bootstrap.testnet.hoprnet.org](https://www.whatsmydns.net/#TXT/_dnsaddr.bootstrap.testnet.hoprnet.org).
-
