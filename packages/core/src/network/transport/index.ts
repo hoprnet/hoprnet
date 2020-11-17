@@ -17,7 +17,7 @@ import type {
   ConnHandler,
   Handler,
   MultiaddrConnection
-  //ConnectionManager
+  // ConnectionManager
 } from 'libp2p'
 import chalk from 'chalk'
 import { WebRTCUpgrader } from './webrtc'
