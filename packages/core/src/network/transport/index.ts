@@ -45,7 +45,7 @@ class TCP {
   private relays?: Multiaddr[]
   private stunServers: Multiaddr[]
   private _relay: Relay
-  private _connectionManager: ConnectionManager
+  // private _connectionManager: ConnectionManager
   private _webRTCUpgrader: WebRTCUpgrader
   private connHandler: ConnHandler
 
@@ -96,7 +96,7 @@ class TCP {
     this._peerId = libp2p.peerId
     this._multiaddrs = libp2p.multiaddrs
     this._upgrader = upgrader
-    this._connectionManager = libp2p.connectionManager
+    // this._connectionManager = libp2p.connectionManager
 
     if (this._useWebRTC) {
       this._webRTCUpgrader = new WebRTCUpgrader({ stunServers: this.stunServers })
