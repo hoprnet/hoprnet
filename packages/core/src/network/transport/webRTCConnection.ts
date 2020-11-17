@@ -57,9 +57,9 @@ class WebRTCConnection implements MultiaddrConnection {
       this._switchPromise.resolve()
     })
 
-    const endWebRTCUpgrade = () => {
+    const endWebRTCUpgrade = (err?: any) => {
       clearTimeout(this._webRTCTimeout)
-      console.log(`error thrown`)
+      console.log(`error thrown`, err)
       this._webRTCStateKnown = true
       this._webRTCAvailable = false
       this._switchPromise.resolve()
