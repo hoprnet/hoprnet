@@ -163,7 +163,9 @@ export async function submitAcknowledgedTicket(
   }
 }
 
-// NOTE: currently validating tickets is not performant
+/**
+ * Validate unacknowledged tickets as we receive them
+ */
 export async function validateUnacknowledgedTicket({
   node,
   signedTicket,
@@ -249,4 +251,22 @@ export async function validateUnacknowledgedTicket({
   // if (unredeemedBalance.add(new BN(ticket.amount)).gt(senderBalance)) {
   //   throw Error(`Payment channel does not have enough funds when you include unredeemed tickets`)
   // }
+}
+
+/**
+ * Validate newly created tickets
+ * @param ops
+ */
+export async function validateCreatedTicket({
+  myBalance,
+  signedTicket
+}: {
+  myBalance: BN
+  signedTicket: Types.SignedTicket
+}) {
+  const { ticket } = signedTicket
+
+  if (myBalance.lt(ticket.amount)) {
+    throw Error(`Payment channel does not have enough funds ${myBalance.toString()} < ${ticket.amount.toString()}`)
+  }
 }

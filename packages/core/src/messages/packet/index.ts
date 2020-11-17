@@ -5,7 +5,7 @@ import chalk from 'chalk'
 import PeerId from 'peer-id'
 
 import { pubKeyToPeerId } from '../../utils'
-import { validateUnacknowledgedTicket } from '../../utils/tickets'
+import { validateUnacknowledgedTicket, validateCreatedTicket } from '../../utils/tickets'
 import { u8aConcat, u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
 
 import { Header, deriveTicketKey, deriveTicketKeyBlinding, deriveTagParameters, deriveTicketLastKey } from './header'
@@ -183,7 +183,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
 
     packet._header = header
 
-    const fee = new BN(secrets.length - 1, 10).imul(new BN(node.ticketAmount, 10))
+    const fee = new BN(secrets.length - 1).imul(new BN(node.ticketAmount))
 
     log('---------- New Packet ----------')
     path
@@ -225,6 +225,14 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
       packet._ticket = await channel.ticket.create(new Balance(fee), ticketChallenge, node.ticketWinProb, {
         bytes: packet.buffer,
         offset: packet.ticketOffset
+      })
+
+      const myAccountId = await chain.utils.pubKeyToAccountId(node.getId().pubKey.marshal())
+      const counterpartyAccountId = await chain.utils.pubKeyToAccountId(channel.counterparty)
+      const amPartyA = chain.utils.isPartyA(myAccountId, counterpartyAccountId)
+      await validateCreatedTicket({
+        myBalance: await (amPartyA ? channel.balance_a : channel.balance_b),
+        signedTicket: packet._ticket
       })
     } else if (secrets.length == 1) {
       packet._ticket = await chain.channel.createDummyChannelTicket(
@@ -349,7 +357,6 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     )
 
     // get new ticket amount
-    // @TODO: validate ticket amount & fee
     const fee = new Balance(ticket.amount.isub(new BN(this.node.ticketAmount)))
 
     if (fee.gtn(0)) {
@@ -370,6 +377,11 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
         bytes: this.buffer,
         offset: this.ticketOffset
       })
+
+      await validateCreatedTicket({
+        myBalance: await (amPartyA ? channel.balance_a : channel.balance_b),
+        signedTicket: this._ticket
+      })
     } else if (fee.isZero()) {
       this._ticket = await chain.channel.createDummyChannelTicket(
         await chain.utils.pubKeyToAccountId(target.pubKey.marshal()),
@@ -380,7 +392,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
         }
       )
     } else {
-      throw Error(`Cannot forward ${fee.toNumber()}`)
+      throw Error(`Cannot forward packet`)
     }
 
     log(`Received ticket on channel ${chalk.yellow(u8aToHex(channelIdOutgoing))}`)
