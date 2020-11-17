@@ -2,11 +2,11 @@
 name: Feature Request
 about: Request a new feature, or change to an existing one
 title: ''
-labels: 'feature, needs review'
+labels: 'feature, s:new issue'
 assignees: ''
 ---
 
-<!--- Please DO NOT remove the automatically added 'needs review' label -->
+<!--- Please DO NOT remove the automatically added 's:new issue' label -->
 <!--- Provide a general summary of the issue in the Title above -->
 
 ### Is your feature related to a problem?
