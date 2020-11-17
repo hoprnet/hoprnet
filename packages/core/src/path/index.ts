@@ -18,6 +18,7 @@ export async function findPath(
   networkPeers: NetworkPeers,
   indexer: Indexer
 ): Promise<Path> {
+  console.log('find path from', start, 'to ', destination, 'length', hops)
   const filter = (node: PeerId) => {
     return !node.equals(destination) && networkPeers.qualityOf(node) > QUALITY_THRESHOLD
   }

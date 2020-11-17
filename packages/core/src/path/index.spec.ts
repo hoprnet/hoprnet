@@ -1,14 +1,22 @@
 import assert from 'assert'
-import { randomSubset } from '@hoprnet/hopr-utils'
+//import { randomSubset } from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'
 import { findPath } from '.'
 import type NetworkPeers from '../network/network-peers'
+import type { Indexer } from '@hoprnet/hopr-core-connector-interface'
 
-async function generateGraph(nodesCount: number) {
+function fakePeerId(i: number): PeerId{
+  return {
+    id: i,
+    equals: x => x.id == i
+  } as unknown as PeerId
+}
+/*
+async function generateRandomGraph(nodesCount: number) {
   const nodes = []
 
   for (let i = 0; i < nodesCount; i++) {
-    nodes.push(await PeerId.create({ bits: 512 }))
+    nodes.push(fakePeerId(i))
   }
 
   const edges = new Map<PeerId, PeerId[]>()
@@ -23,43 +31,49 @@ async function generateGraph(nodesCount: number) {
     )
   })
   return { nodes, edges }
-}
+}*/
 
-function validPath(path: PeerId[], edges: Map<PeerId, PeerId[]>) {
+function checkPath(path: PeerId[], edges: Map<PeerId, PeerId[]>) {
   for (let i = 0; i < path.length - 1; i++) {
     const edgeSet = edges.get(path[i])
-
-    if (edgeSet == null || !edgeSet.includes(path[i + 1])) {
-      return false
+    if (edgeSet == null){
+      throw new Error('Invalid path missing edge ' + i)
+    }
+    if(!edgeSet.includes(path[i + 1])) {
+      throw new Error('Invalid path, next edge missing ' + i)
+    }
+    if (i > 0 && path.slice(0, i).includes(path[i]) || path.slice(i + 1).includes(path[i])) {
+      throw new Error('Invalid path - contains cycle')
     }
   }
-
-  return true
 }
 
-function noCircles(path: PeerId[]) {
-  for (let i = 1; i < path.length; i++) {
-    if (path.slice(0, i).includes(path[i]) || path.slice(i + 1).includes(path[i])) {
-      return false
-    }
-  }
+const TEST_NODES = Array.from({length: 5}).map((_, i) => fakePeerId(i))
+console.log(TEST_NODES)
 
-  return true
+// Bidirectional star, all pass through node 0
+const STAR = new Map<PeerId, PeerId[]>()
+STAR.set(TEST_NODES[1], [TEST_NODES[0]])
+STAR.set(TEST_NODES[2], [TEST_NODES[0]])
+STAR.set(TEST_NODES[3], [TEST_NODES[0]])
+STAR.set(TEST_NODES[4], [TEST_NODES[0]])
+STAR.set(TEST_NODES[0], [TEST_NODES[1]])
+STAR.set(TEST_NODES[0], [TEST_NODES[2]])
+STAR.set(TEST_NODES[0], [TEST_NODES[3]])
+STAR.set(TEST_NODES[0], [TEST_NODES[4]])
+
+const RELIABLE_NETWORK = { qualityOf: (_p) => 1 } as NetworkPeers
+
+function fakeIndexer(edges: Map<PeerId, PeerId[]>): Indexer {
+  return {
+    getChannelsFromPeer: (a: PeerId) => Promise.resolve(edges.get(a).map((b) => [a, b, 0 as any]))
+  }
 }
 
 describe('test pathfinder', function () {
-  it('should find a path', async function () {
-    const { nodes, edges } = await generateGraph(10)
-    const dest = await PeerId.create()
-    const indexer = {
-      getChannelsFromPeer: (a: PeerId) => Promise.resolve(edges.get(a).map((b) => [a, b, 0]))
-    } as any
-    const mockNetwork = { qualityOf: (_p) => 1 } as NetworkPeers
-    const path = await findPath(nodes[0], dest, 3, mockNetwork, indexer)
-
-    assert(
-      path.length == 3 && noCircles(path) && validPath(path, edges),
-      'Should find a valid acyclic path that goes through all nodes'
-    )
+  it('should find a path through a reliable star', async function () {
+    const path = await findPath(TEST_NODES[1], fakePeerId(6), 3, RELIABLE_NETWORK, fakeIndexer(STAR))
+    checkPath(path, STAR)
+    assert(path.length == 3, 'Should find a valid acyclic path')
   })
 })
