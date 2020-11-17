@@ -6,7 +6,7 @@ import { Subscription } from 'web3-core-subscriptions'
 import { BlockHeader } from 'web3-eth'
 import { u8aToNumber, u8aConcat, u8aToHex } from '@hoprnet/hopr-utils'
 import { ChannelEntry, Public, Balance } from '../types'
-import { Log, isPartyA, events } from '../utils'
+import { Log, isPartyA, events, getId } from '../utils'
 import { MAX_CONFIRMATIONS } from '../config'
 import { ContractEventLog } from '../tsc/web3/types'
 import { Log as OnChainLog } from 'web3-core'
@@ -46,6 +46,12 @@ function isMoreRecent(oldChannelEntry: ChannelEntry, newChannelEntry: ChannelEnt
  */
 function isConfirmedBlock(blockNumber: number, onChainBlockNumber: number): boolean {
   return blockNumber + MAX_CONFIRMATIONS <= onChainBlockNumber
+}
+
+async function getStake(partyA: Public, partyB: Public): Promise<Balance> {
+  const channelId = await getId(partyA, partyB) 
+  const state = await this.connector.hoprChannels.methods.channels(channelId.toHex()).call()
+  return new Balance(state.partyABalance)
 }
 
 /**
@@ -132,13 +138,13 @@ class Indexer implements IIndexer {
             offset: value.byteOffset
           })
 
-          const stake = new Balance(0) // await this.connector.web3.eth.
-
-          channels.push({
-            partyA,
-            partyB,
-            channelEntry,
-            stake
+          getStake(partyA, partyB).then(stake => {
+            channels.push({
+              partyA,
+              partyB,
+              channelEntry,
+              stake
+            })
           })
         })
         .on('end', () => resolve(channels))
@@ -171,12 +177,11 @@ class Indexer implements IIndexer {
       offset: _entry.byteOffset
     })
 
-    const stake = new Balance(0) // await this.connector.web3.eth.
     return {
       partyA,
       partyB,
       channelEntry,
-      stake
+      stake: await getStake(partyA, partyB)
     }
   }
 
