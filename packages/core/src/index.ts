@@ -117,6 +117,8 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
 
       deleteTickets(this, {
         signer: u8aEquals(partyA, myPubKey) ? partyB : partyA
+      }).catch((error) => {
+        verbose('Error while deleting tickets', error)
       })
     })
 

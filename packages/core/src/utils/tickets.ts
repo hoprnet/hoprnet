@@ -286,6 +286,7 @@ export async function validateUnacknowledgedTicket({
   }
 
   // channel MUST exist in our DB
+  // (performance) we are making a request to blockchain
   let channel: Channel
   try {
     channel = await chain.channel.create(
