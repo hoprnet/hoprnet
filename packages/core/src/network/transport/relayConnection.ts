@@ -260,7 +260,7 @@ class RelayConnection implements MultiaddrConnection {
         }
 
         if (current == null || current.done) {
-          console.log(`exiting`)
+          console.log(`exiting current`, current, `this._msgs`, this._msgs)
           return
         }
 
