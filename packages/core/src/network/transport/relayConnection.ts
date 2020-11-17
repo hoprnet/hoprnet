@@ -32,6 +32,13 @@ class RelayConnection implements MultiaddrConnection {
   private _msgPromise: DeferredPromise<void>
   private _msgs: (IteratorResult<Uint8Array, void> & { iteration: number })[]
 
+  private _webRTCdone: boolean
+  private _webRTCmsg?: Uint8Array
+  private _webRTCresolved: boolean
+  private _webRTCstream: Stream['source']
+  private _webRTCSourceFunction: (arg: IteratorResult<Uint8Array, void>) => void
+  private _webRTCPromise: Promise<void>
+
   private _statusMessagePromise: DeferredPromise<void>
   private _statusMessages: Uint8Array[]
 
@@ -95,6 +102,18 @@ class RelayConnection implements MultiaddrConnection {
     this.remoteAddr = Multiaddr(`/p2p/${opts.counterparty.toB58String()}`)
 
     this.webRTC = opts.webRTC
+
+    this._webRTCresolved = false
+    this._webRTCdone = this.webRTC == null
+
+    this._webRTCSourceFunction = (arg: IteratorResult<Uint8Array, void>) => {
+      this._webRTCresolved = true
+      this._webRTCdone = arg.done
+
+      if (!arg.done) {
+        this._webRTCmsg = arg.value as Uint8Array
+      }
+    }
 
     this._iteration = 0
 
@@ -179,6 +198,11 @@ class RelayConnection implements MultiaddrConnection {
                 this.webRTC.destroy()
               } catch {}
               this.webRTC = this._webRTCUpgradeInbound()
+              log(`resetting WebRTC stream`)
+              this._webRTCdone = false
+              this._webRTCstream = this._getWebRTCStream()
+              this._webRTCPromise = this._webRTCstream.next().then(this._webRTCSourceFunction)
+              log(`resetting WebRTC stream done`)
             }
             this._onReconnect(this.switch(), this._counterparty)
           } else if (u8aEquals(SUFFIX, PING)) {
@@ -303,10 +327,6 @@ class RelayConnection implements MultiaddrConnection {
     let streamMsg: Uint8Array
     let streamDone = true
 
-    let webRTCresolved = false
-    let webRTCdone = this.webRTC == null
-    let webRTCmsg: Uint8Array
-
     let streamClosed = false
 
     const closePromise = this._closePromise.promise.then(() => {
@@ -330,15 +350,6 @@ class RelayConnection implements MultiaddrConnection {
       }
     }
 
-    const webRTCSourceFunction = (arg: IteratorResult<Uint8Array, void>) => {
-      webRTCresolved = true
-      webRTCdone = arg.done
-
-      if (!arg.done) {
-        webRTCmsg = arg.value as Uint8Array
-      }
-    }
-
     let statusMessageAvailable = this._statusMessages.length > 0
 
     const statusSourceFunction = () => {
@@ -349,10 +360,6 @@ class RelayConnection implements MultiaddrConnection {
       this._statusMessages.length > 0
         ? Promise.resolve()
         : this._statusMessagePromise.promise.then(statusSourceFunction)
-
-    let webRTCstream: Stream['source']
-
-    let webRTCPromise: Promise<void>
 
     let streamSwitched = false
 
@@ -365,35 +372,35 @@ class RelayConnection implements MultiaddrConnection {
     let switchPromise = this._switchPromise.promise.then(switchFunction)
 
     while (true) {
-      if (!webRTCdone && !streamDone) {
+      if (!this._webRTCdone && !streamDone) {
         if (streamPromise == null) {
           streamPromise = currentSource.next().then(streamSourceFunction(iteration))
         }
-        if (webRTCstream == null) {
-          webRTCstream = this._getWebRTCStream()
+        if (this._webRTCstream == null) {
+          this._webRTCstream = this._getWebRTCStream()
         }
-        if (webRTCPromise == null) {
-          webRTCPromise = webRTCstream.next().then(webRTCSourceFunction)
+        if (this._webRTCPromise == null) {
+          this._webRTCPromise = this._webRTCstream.next().then(this._webRTCSourceFunction)
         }
         await Promise.race([
           // prettier-ignore
           streamPromise,
           statusPromise,
-          webRTCPromise,
+          this._webRTCPromise,
           switchPromise,
           closePromise
         ])
-      } else if (!webRTCdone) {
-        if (webRTCstream == null) {
-          webRTCstream = this._getWebRTCStream.call(this)
+      } else if (!this._webRTCdone) {
+        if (this._webRTCstream == null) {
+          this._webRTCstream = this._getWebRTCStream.call(this)
         }
-        if (webRTCPromise == null) {
-          webRTCPromise = webRTCstream.next().then(webRTCSourceFunction)
+        if (this._webRTCPromise == null) {
+          this._webRTCPromise = this._webRTCstream.next().then(this._webRTCSourceFunction)
         }
         await Promise.race([
           // prettier-ignore
           statusPromise,
-          webRTCPromise,
+          this._webRTCPromise,
           switchPromise,
           closePromise
         ])
@@ -438,15 +445,18 @@ class RelayConnection implements MultiaddrConnection {
         }
 
         streamPromise = currentSource.next().then(streamSourceFunction(iteration))
-      } else if (webRTCresolved) {
-        webRTCresolved = false
+      } else if (this._webRTCresolved) {
+        this._webRTCresolved = false
 
-        if (webRTCdone) {
-          webRTCPromise = undefined
+        if (this._webRTCdone) {
+          this._webRTCPromise = undefined
           continue
         }
 
-        yield (new BL([(RELAY_WEBRTC_PREFIX as unknown) as BL, (webRTCmsg as unknown) as BL]) as unknown) as Uint8Array
+        yield (new BL([
+          (RELAY_WEBRTC_PREFIX as unknown) as BL,
+          (this._webRTCmsg as unknown) as BL
+        ]) as unknown) as Uint8Array
 
         if (streamClosed) {
           this._destroyed = true
@@ -455,7 +465,7 @@ class RelayConnection implements MultiaddrConnection {
           break
         }
 
-        webRTCPromise = webRTCstream.next().then(webRTCSourceFunction)
+        this._webRTCPromise = this._webRTCstream.next().then(this._webRTCSourceFunction)
       } else if (streamClosed) {
         if (!this._destroyed) {
           this._destroyed = true
@@ -482,13 +492,8 @@ class RelayConnection implements MultiaddrConnection {
         streamPromise = currentSource.next().then(streamSourceFunction(iteration))
         switchPromise = this._switchPromise.promise.then(switchFunction)
 
-        if (iteration > 1 && this.webRTC != null) {
-          log(`resetting WebRTC stream`)
-          webRTCdone = false
-          webRTCstream = this._getWebRTCStream()
-          webRTCPromise = webRTCstream.next().then(webRTCSourceFunction)
-          log(`resetting WebRTC stream done`)
-        }
+        // if (iteration > 1 && this.webRTC != null) {
+        // }
       }
     }
   }
