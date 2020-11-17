@@ -4,7 +4,7 @@ import { Balance } from './types'
 type Channel = [PeerId, PeerId, Balance]
 
 declare interface Indexer {
-  getChannelsFrom(source: PeerId): Promise<Channel[]>
+  getChannelsFromPeer(source: PeerId): Promise<Channel[]>
 }
 
 export { Channel }

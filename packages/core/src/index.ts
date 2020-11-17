@@ -19,11 +19,11 @@ import {
   addPubKey,
   getPeerId,
   getAddrs,
-  pubKeyToPeerId,
   getAcknowledgedTickets,
   submitAcknowledgedTicket
 } from './utils'
-import { createDirectoryIfNotExists, u8aToHex } from '@hoprnet/hopr-utils'
+import { createDirectoryIfNotExists, u8aToHex, pubKeyToPeerId
+} from '@hoprnet/hopr-utils'
 import { existsSync } from 'fs'
 
 import levelup, { LevelUp } from 'levelup'
@@ -486,16 +486,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
    * @param destination instance of peerInfo that contains the peerId of the destination
    */
   private async getIntermediateNodes(destination: PeerId): Promise<PeerId[]> {
-    let toPub = (p: PeerId) => new this.paymentChannels.types.Public(p.pubKey.marshal())
-    let getChannelsFromPeer = async (p: PeerId) => {
-      let chans = await this.paymentChannels.indexer.get({ partyA: toPub(p) })
-      let cout = []
-      for (let c of chans) {
-        cout.push([await pubKeyToPeerId(c.partyA), await pubKeyToPeerId(c.partyB), 0])
-      }
-      return cout
-    }
-    return await findPath(this.getId(), destination, MAX_HOPS - 1, this._network.networkPeers, getChannelsFromPeer)
+    return await findPath(this.getId(), destination, MAX_HOPS - 1, this._network.networkPeers, this.paymentChannels.indexer)
   }
 
   private static openDatabase(options: HoprOptions, chainName: string, network: string): LevelUp {

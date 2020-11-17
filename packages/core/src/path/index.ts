@@ -2,6 +2,7 @@ import Heap from 'heap-js'
 import { randomInteger } from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'
 import type NetworkPeers from '../network/network-peers'
+import type { Indexer, IndexerChannel } from '@hoprnet/hopr-core-connector-interface'
 
 export type Path = PeerId[]
 
@@ -10,14 +11,13 @@ const compare = (a: Path, b: Path) => b.length - a.length
 const MAX_ITERATIONS = 200
 const QUALITY_THRESHOLD = 0.5
 
-export type Channel = [PeerId, PeerId, number] // [A, B, stake]
 
 export async function findPath(
   start: PeerId,
   destination: PeerId,
   hops: number,
   networkPeers: NetworkPeers,
-  getChannelsFromPeer: (partyA: PeerId) => Promise<Channel[]>
+  indexer: Indexer 
 ): Promise<Path> {
   const filter = (node: PeerId) => {
     return !node.equals(destination) && networkPeers.qualityOf(node) > QUALITY_THRESHOLD
@@ -27,7 +27,7 @@ export async function findPath(
 
   // Preprocessing
   queue.addAll(
-    (await getChannelsFromPeer(start)).map((channel) => {
+    (await indexer.getChannelsFromPeer(start)).map((channel) => {
       if (start.equals(channel[0])) {
         return [channel[1]]
       } else {
@@ -47,8 +47,8 @@ export async function findPath(
 
     const lastNode = currentPath[currentPath.length - 1]
 
-    const newNodes = (await getChannelsFromPeer(lastNode))
-      .filter((c: Channel) => !currentPath.includes(c[1]) && (filter == null || filter(c[1])))
+    const newNodes = (await indexer.getChannelsFromPeer(lastNode))
+      .filter((c: IndexerChannel) => !currentPath.includes(c[1]) && (filter == null || filter(c[1])))
       .map((channel) => {
         if (lastNode.equals(channel[0])) {
           return channel[1]
