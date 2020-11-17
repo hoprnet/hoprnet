@@ -491,9 +491,6 @@ class RelayConnection implements MultiaddrConnection {
         streamDone = false
         streamPromise = currentSource.next().then(streamSourceFunction(iteration))
         switchPromise = this._switchPromise.promise.then(switchFunction)
-
-        // if (iteration > 1 && this.webRTC != null) {
-        // }
       }
     }
   }
