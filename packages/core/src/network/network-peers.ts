@@ -181,16 +181,16 @@ class NetworkPeers {
   // reliable) estimating the quality of service of a peer's network connection
   public qualityOf(peer: PeerId): number {
     // TODO replace this
-    for (let entry of this.peers){
+    for (let entry of this.peers) {
       if (entry.id.equals(peer)) {
         return 1
       }
     }
-    for (let entry of this.deletedPeers){
+    for (let entry of this.deletedPeers) {
       if (entry.id.equals(peer)) {
         return 0
       }
-    } 
+    }
     return 0.2 // Unknown
   }
 }

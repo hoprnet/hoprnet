@@ -20,7 +20,7 @@ export async function findPath(
   getChannelsFromPeer: (partyA: PeerId) => Promise<Channel[]>
 ): Promise<Path> {
   const filter = (node: PeerId) => {
-    return !node.equals(destination) && networkPeers.qualityOf(node) > QUALITY_THRESHOLD 
+    return !node.equals(destination) && networkPeers.qualityOf(node) > QUALITY_THRESHOLD
   }
   let queue = new Heap<Path>(compare)
   let iterations = 0
