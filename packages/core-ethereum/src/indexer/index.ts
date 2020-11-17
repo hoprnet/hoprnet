@@ -17,7 +17,7 @@ type LightEvent<E extends ContractEventLog<any>> = Pick<
   E,
   'event' | 'blockNumber' | 'transactionHash' | 'transactionIndex' | 'logIndex' | 'returnValues'
 >
-type Channel = { partyA: Public; partyB: Public; channelEntry: ChannelEntry, stake: Balance}
+type Channel = { partyA: Public; partyB: Public; channelEntry: ChannelEntry; stake: Balance }
 export type OpenedChannelEvent = LightEvent<ContractEventLog<{ opener: Public; counterparty: Public }>>
 export type ClosedChannelEvent = LightEvent<
   ContractEventLog<{ closer: Public; counterparty: Public; partyAAmount?: BN; partyBAmount?: BN }>
@@ -132,7 +132,7 @@ class Indexer implements IIndexer {
             offset: value.byteOffset
           })
 
-          const stake = new Balance(0)// await this.connector.web3.eth.
+          const stake = new Balance(0) // await this.connector.web3.eth.
 
           channels.push({
             partyA,
@@ -171,7 +171,7 @@ class Indexer implements IIndexer {
       offset: _entry.byteOffset
     })
 
-    const stake = new Balance(0)// await this.connector.web3.eth.
+    const stake = new Balance(0) // await this.connector.web3.eth.
     return {
       partyA,
       partyB,
