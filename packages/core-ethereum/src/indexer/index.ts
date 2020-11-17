@@ -1,4 +1,4 @@
-import type { Indexer as IIndexer, IndexerChannel} from '@hoprnet/hopr-core-connector-interface'
+import type { Indexer as IIndexer, IndexerChannel } from '@hoprnet/hopr-core-connector-interface'
 import type HoprEthereum from '..'
 import BN from 'bn.js'
 import chalk from 'chalk'
@@ -87,10 +87,10 @@ class Indexer implements IIndexer {
     const sourcePubKey = new Public(source.pubKey.marshal())
     const channels = await this.getAll(sourcePubKey)
     let cout: IndexerChannel[] = []
-    for (let channel of channels){
+    for (let channel of channels) {
       const channelId = await getId(channel.partyA, channel.partyB)
       const state = await this.connector.hoprChannels.methods.channels(channelId.toHex()).call()
-      if (sourcePubKey.eq(channel.partyA)){
+      if (sourcePubKey.eq(channel.partyA)) {
         cout.push([source, await pubKeyToPeerId(channel.partyB), new Balance(state.partyABalance)])
       } else {
         const partyBBalance = new Balance(state.deposit).sub(new Balance(state.partyABalance))

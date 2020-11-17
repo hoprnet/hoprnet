@@ -15,15 +15,8 @@ import { PACKET_SIZE, MAX_HOPS, VERSION, CRAWL_TIMEOUT, TICKET_AMOUNT, TICKET_WI
 import { Network } from './network'
 import { findPath } from './path'
 
-import {
-  addPubKey,
-  getPeerId,
-  getAddrs,
-  getAcknowledgedTickets,
-  submitAcknowledgedTicket
-} from './utils'
-import { createDirectoryIfNotExists, u8aToHex, pubKeyToPeerId
-} from '@hoprnet/hopr-utils'
+import { addPubKey, getPeerId, getAddrs, getAcknowledgedTickets, submitAcknowledgedTicket } from './utils'
+import { createDirectoryIfNotExists, u8aToHex, pubKeyToPeerId } from '@hoprnet/hopr-utils'
 import { existsSync } from 'fs'
 
 import levelup, { LevelUp } from 'levelup'
@@ -486,7 +479,13 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
    * @param destination instance of peerInfo that contains the peerId of the destination
    */
   private async getIntermediateNodes(destination: PeerId): Promise<PeerId[]> {
-    return await findPath(this.getId(), destination, MAX_HOPS - 1, this._network.networkPeers, this.paymentChannels.indexer)
+    return await findPath(
+      this.getId(),
+      destination,
+      MAX_HOPS - 1,
+      this._network.networkPeers,
+      this.paymentChannels.indexer
+    )
   }
 
   private static openDatabase(options: HoprOptions, chainName: string, network: string): LevelUp {

@@ -11,13 +11,12 @@ const compare = (a: Path, b: Path) => b.length - a.length
 const MAX_ITERATIONS = 200
 const QUALITY_THRESHOLD = 0.5
 
-
 export async function findPath(
   start: PeerId,
   destination: PeerId,
   hops: number,
   networkPeers: NetworkPeers,
-  indexer: Indexer 
+  indexer: Indexer
 ): Promise<Path> {
   const filter = (node: PeerId) => {
     return !node.equals(destination) && networkPeers.qualityOf(node) > QUALITY_THRESHOLD

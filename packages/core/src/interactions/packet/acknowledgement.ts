@@ -20,7 +20,7 @@ import type { Handler } from 'libp2p'
 import EventEmitter from 'events'
 
 import { PROTOCOL_ACKNOWLEDGEMENT } from '../../constants'
-import { u8aToHex, durations, u8aConcat, toU8a, u8aToNumber, pubKeyToPeerId  } from '@hoprnet/hopr-utils'
+import { u8aToHex, durations, u8aConcat, toU8a, u8aToNumber, pubKeyToPeerId } from '@hoprnet/hopr-utils'
 import { UnacknowledgedTicket } from '../../messages/ticket'
 
 import { ACKNOWLEDGED_TICKET_INDEX_LENGTH } from '../../dbKeys'
