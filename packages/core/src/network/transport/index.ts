@@ -124,7 +124,7 @@ class TCP {
       newStream.sink(
         (async function* () {
           for (let i = 0; i < 7; i++) {
-            await new Promise(resolve => setTimeout(resolve, 40))
+            await new Promise((resolve) => setTimeout(resolve, 40))
             yield new TextEncoder().encode(`msg #${i}`)
           }
         })()
