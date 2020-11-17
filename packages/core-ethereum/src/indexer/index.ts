@@ -48,9 +48,9 @@ function isConfirmedBlock(blockNumber: number, onChainBlockNumber: number): bool
   return blockNumber + MAX_CONFIRMATIONS <= onChainBlockNumber
 }
 
-async function getStake(partyA: Public, partyB: Public): Promise<Balance> {
+async function getStake(partyA: Public, partyB: Public, connector: HoprEthereum): Promise<Balance> {
   const channelId = await getId(partyA, partyB) 
-  const state = await this.connector.hoprChannels.methods.channels(channelId.toHex()).call()
+  const state = await connector.hoprChannels.methods.channels(channelId.toHex()).call()
   return new Balance(state.partyABalance)
 }
 
@@ -138,7 +138,7 @@ class Indexer implements IIndexer {
             offset: value.byteOffset
           })
 
-          getStake(partyA, partyB).then(stake => {
+          getStake(partyA, partyB, this.connector).then(stake => {
             channels.push({
               partyA,
               partyB,
@@ -181,7 +181,7 @@ class Indexer implements IIndexer {
       partyA,
       partyB,
       channelEntry,
-      stake: await getStake(partyA, partyB)
+      stake: await getStake(partyA, partyB, this.connector)
     }
   }
 
