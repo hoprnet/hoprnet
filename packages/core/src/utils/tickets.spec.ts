@@ -288,7 +288,7 @@ describe('unit test validateUnacknowledgedTicket', function () {
   // })
 })
 
-describe('unit test verifyCreatedTicket', function () {
+describe('unit test validateCreatedTicket', function () {
   it('should pass if ticket is okay', async function () {
     const signedTicket = createSignedTicket({
       sender
