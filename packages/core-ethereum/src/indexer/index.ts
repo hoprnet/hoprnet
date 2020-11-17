@@ -4,7 +4,7 @@ import BN from 'bn.js'
 import chalk from 'chalk'
 import { Subscription } from 'web3-core-subscriptions'
 import { BlockHeader } from 'web3-eth'
-import { u8aToNumber, u8aConcat, u8aToHex } from '@hoprnet/hopr-utils'
+import { u8aToNumber, u8aConcat, u8aToHex, pubKeyToPeerId } from '@hoprnet/hopr-utils'
 import { ChannelEntry, Public, Balance } from '../types'
 import { Log, isPartyA, events, getId } from '../utils'
 import { MAX_CONFIRMATIONS } from '../config'
@@ -83,7 +83,7 @@ class Indexer implements IIndexer {
     }
   }
 
-  public async getChannelsFrom(source: PeerId): Promise<IndexerChannel[]> {
+  public async getChannelsFromPeer(source: PeerId): Promise<IndexerChannel[]> {
     const sourcePubKey = new Public(source.pubKey.marshal())
     const channels = await this.getAll(sourcePubKey)
     let cout: IndexerChannel[] = []
@@ -93,7 +93,8 @@ class Indexer implements IIndexer {
       if (sourcePubKey.eq(channel.partyA)){
         cout.push([source, await pubKeyToPeerId(channel.partyB), new Balance(state.partyABalance)])
       } else {
-        cout.push([source, await pubKeyToPeerId(channel.partyA), new Balance(state.partyBBalance)])
+        const partyBBalance = new Balance(state.deposit).sub(new Balance(state.partyABalance))
+        cout.push([source, await pubKeyToPeerId(channel.partyA), partyBBalance])
       }
     }
 
@@ -205,7 +206,7 @@ class Indexer implements IIndexer {
    * @param query
    * @returns promise that resolves to a list of channel entries
    */
-  private async get(
+  public async get(
     query?: { partyA?: Public; partyB?: Public },
     filter?: (node: Public) => boolean
   ): Promise<Channel[]> {

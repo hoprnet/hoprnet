@@ -18,8 +18,7 @@ import PeerId from 'peer-id'
 
 import { RELAY_CIRCUIT_TIMEOUT, RELAY, OK, FAIL, FAIL_COULD_NOT_REACH_COUNTERPARTY, DELIVERY } from './constants'
 
-import { pubKeyToPeerId } from '../../utils'
-import { u8aCompare, u8aEquals } from '@hoprnet/hopr-utils'
+import { u8aCompare, u8aEquals, pubKeyToPeerId} from '@hoprnet/hopr-utils'
 
 import { RelayContext } from './relayContext'
 

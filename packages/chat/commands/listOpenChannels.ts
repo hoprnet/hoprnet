@@ -1,7 +1,6 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
-import { pubKeyToPeerId } from '@hoprnet/hopr-core/lib/utils'
-import { moveDecimalPoint, u8aToHex } from '@hoprnet/hopr-utils'
+import { moveDecimalPoint, u8aToHex, pubKeyToPeerId } from '@hoprnet/hopr-utils'
 import chalk from 'chalk'
 import { getMyOpenChannelInstances } from '../utils/openChannels'
 import { AbstractCommand } from './abstractCommand'

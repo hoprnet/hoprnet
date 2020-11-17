@@ -4,9 +4,8 @@ import chalk from 'chalk'
 
 import PeerId from 'peer-id'
 
-import { pubKeyToPeerId } from '../../utils'
 import { validateUnacknowledgedTicket } from '../../utils/tickets'
-import { u8aConcat, u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
+import { u8aConcat, u8aEquals, u8aToHex, pubKeyToPeerId} from '@hoprnet/hopr-utils'
 
 import { Header, deriveTicketKey, deriveTicketKeyBlinding, deriveTagParameters, deriveTicketLastKey } from './header'
 import { Challenge } from './challenge'
