@@ -216,7 +216,7 @@ class WebRTCConnection implements MultiaddrConnection {
       while (true) {
         let result = await this.conn.source.next()
 
-        console.log(result)
+        console.log(`getting from relayConnection`, result)
 
         if (result.done) {
           break
