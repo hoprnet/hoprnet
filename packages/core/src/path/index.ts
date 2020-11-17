@@ -56,10 +56,5 @@ export async function findPath(
     toPush.push(nextChannel[1])
     queue.push(toPush)
   }
-
-  if (queue.length > 0) {
-    return queue.peek()
-  } else {
-    throw new Error('Path not found')
-  }
+  throw new Error('Path not found')
 }
