@@ -16,7 +16,7 @@ import type {
   DialOptions,
   ConnHandler,
   Handler,
-  MultiaddrConnection,
+  MultiaddrConnection
   // ConnectionManager
 } from 'libp2p'
 import chalk from 'chalk'
