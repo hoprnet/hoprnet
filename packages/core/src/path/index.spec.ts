@@ -5,11 +5,11 @@ import { findPath } from '.'
 import type NetworkPeers from '../network/network-peers'
 import type { Indexer } from '@hoprnet/hopr-core-connector-interface'
 
-function fakePeerId(i: number): PeerId{
-  return {
+function fakePeerId(i: number): PeerId {
+  return ({
     id: i,
-    equals: x => x.id == i
-  } as unknown as PeerId
+    equals: (x) => x.id == i
+  } as unknown) as PeerId
 }
 /*
 async function generateRandomGraph(nodesCount: number) {
@@ -36,19 +36,19 @@ async function generateRandomGraph(nodesCount: number) {
 function checkPath(path: PeerId[], edges: Map<PeerId, PeerId[]>) {
   for (let i = 0; i < path.length - 1; i++) {
     const edgeSet = edges.get(path[i])
-    if (edgeSet == null){
+    if (edgeSet == null) {
       throw new Error('Invalid path missing edge ' + i)
     }
-    if(!edgeSet.includes(path[i + 1])) {
+    if (!edgeSet.includes(path[i + 1])) {
       throw new Error('Invalid path, next edge missing ' + i)
     }
-    if (i > 0 && path.slice(0, i).includes(path[i]) || path.slice(i + 1).includes(path[i])) {
+    if ((i > 0 && path.slice(0, i).includes(path[i])) || path.slice(i + 1).includes(path[i])) {
       throw new Error('Invalid path - contains cycle')
     }
   }
 }
 
-const TEST_NODES = Array.from({length: 5}).map((_, i) => fakePeerId(i))
+const TEST_NODES = Array.from({ length: 5 }).map((_, i) => fakePeerId(i))
 
 // Bidirectional star, all pass through node 0
 const STAR = new Map<PeerId, PeerId[]>()

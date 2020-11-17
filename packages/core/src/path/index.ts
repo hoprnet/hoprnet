@@ -24,33 +24,33 @@ export async function findPath(
   }
   let queue = new Heap<Path>(compare)
   let iterations = 0
-  queue.addAll((await indexer.getChannelsFromPeer(start)).map(x => [start, x[1]]))
+  queue.addAll((await indexer.getChannelsFromPeer(start)).map((x) => [start, x[1]]))
 
   while (queue.length > 0 && iterations < MAX_ITERATIONS) {
     console.log(queue.length, iterations)
     iterations++
     const currentPath = queue.peek() as Path
-    console.log(">>", currentPath)
+    console.log('>>', currentPath)
 
     if (currentPath.length == hops) {
       return currentPath
     }
 
     const lastNode = currentPath[currentPath.length - 1]
-    console.log("->", lastNode)
+    console.log('->', lastNode)
 
     const newNodes = (await indexer.getChannelsFromPeer(lastNode))
-      .filter(c => !currentPath.includes(c[1]))
-      .filter(c => filter(c[1]))
-    
-    console.log(">>", newNodes.length)
+      .filter((c) => !currentPath.includes(c[1]))
+      .filter((c) => filter(c[1]))
+
+    console.log('>>', newNodes.length)
 
     if (newNodes.length == 0) {
       queue.pop()
       continue
     }
 
-    let nextChannel: IndexerChannel= newNodes[randomInteger(0, newNodes.length)]
+    let nextChannel: IndexerChannel = newNodes[randomInteger(0, newNodes.length)]
 
     const toPush = Array.from(currentPath)
     toPush.push(nextChannel[1])
