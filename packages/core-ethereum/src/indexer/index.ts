@@ -1,12 +1,12 @@
-import type { Indexer as IIndexer } from '@hoprnet/hopr-core-connector-interface'
+import type { Indexer as IIndexer, IndexerChannel} from '@hoprnet/hopr-core-connector-interface'
 import type HoprEthereum from '..'
 import BN from 'bn.js'
 import chalk from 'chalk'
 import { Subscription } from 'web3-core-subscriptions'
 import { BlockHeader } from 'web3-eth'
 import { u8aToNumber, u8aConcat, u8aToHex } from '@hoprnet/hopr-utils'
-import { ChannelEntry, Public } from '../types'
-import { Log, isPartyA, events } from '../utils'
+import { ChannelEntry, Public, Balance } from '../types'
+import { Log, isPartyA, events, getId } from '../utils'
 import { MAX_CONFIRMATIONS } from '../config'
 import { ContractEventLog } from '../tsc/web3/types'
 import { Log as OnChainLog } from 'web3-core'
@@ -17,7 +17,7 @@ type LightEvent<E extends ContractEventLog<any>> = Pick<
   E,
   'event' | 'blockNumber' | 'transactionHash' | 'transactionIndex' | 'logIndex' | 'returnValues'
 >
-type Channel = { partyA: Public; partyB: Public; channelEntry: ChannelEntry }
+type Channel = { partyA: Public; partyB: Public; channelEntry: ChannelEntry; stake: Balance }
 export type OpenedChannelEvent = LightEvent<ContractEventLog<{ opener: Public; counterparty: Public }>>
 export type ClosedChannelEvent = LightEvent<
   ContractEventLog<{ closer: Public; counterparty: Public; partyAAmount?: BN; partyBAmount?: BN }>
@@ -46,6 +46,21 @@ function isMoreRecent(oldChannelEntry: ChannelEntry, newChannelEntry: ChannelEnt
  */
 function isConfirmedBlock(blockNumber: number, onChainBlockNumber: number): boolean {
   return blockNumber + MAX_CONFIRMATIONS <= onChainBlockNumber
+}
+
+async function getStake(source: Public, dest: Public, connector: HoprEthereum): Promise<Balance> {
+  let channelId // Hackery because of bidirectional stuff
+  if (isPartyA(source, dest)){
+    channelId = await getId(source, dest)
+  } else {
+    channelId = await getId(dest, source)
+  }
+  const state = await connector.hoprChannels.methods.channels(channelId.toHex()).call()
+  if (isPartyA(source, dest)){
+    return new Balance(state.partyABalance)
+  } else {
+    return new Balance(state.deposit - state.partyABalance)
+  }
 }
 
 /**
@@ -81,13 +96,16 @@ class Indexer implements IIndexer {
       return 0
     }
   }
+  public async getChannelsFrom(source: PeerId): Promise<IndexerChannel[]> {
+
+  }
 
   /**
    * Check if channel entry exists.
    *
    * @returns promise that resolves to true or false
    */
-  public async has(partyA: Public, partyB: Public): Promise<boolean> {
+  private async has(partyA: Public, partyB: Public): Promise<boolean> {
     const { dbKeys, db } = this.connector
 
     try {
@@ -132,10 +150,13 @@ class Indexer implements IIndexer {
             offset: value.byteOffset
           })
 
-          channels.push({
-            partyA,
-            partyB,
-            channelEntry
+          getStake(partyA, partyB, this.connector).then((stake) => {
+            channels.push({
+              partyA,
+              partyB,
+              channelEntry,
+              stake
+            })
           })
         })
         .on('end', () => resolve(channels))
@@ -171,7 +192,8 @@ class Indexer implements IIndexer {
     return {
       partyA,
       partyB,
-      channelEntry
+      channelEntry,
+      stake: await getStake(partyA, partyB, this.connector)
     }
   }
 
@@ -187,7 +209,7 @@ class Indexer implements IIndexer {
    * @param query
    * @returns promise that resolves to a list of channel entries
    */
-  public async get(
+  private async get(
     query?: { partyA?: Public; partyB?: Public },
     filter?: (node: Public) => boolean
   ): Promise<Channel[]> {
