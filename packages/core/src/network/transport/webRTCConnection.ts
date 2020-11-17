@@ -77,6 +77,7 @@ class WebRTCConnection implements MultiaddrConnection {
       let sourceDone = false
 
       function sourceFunction(arg: IteratorResult<Uint8Array, void>) {
+        console.log(`inside source function`, arg)
         sourceReceived = true
         sourceDone = arg.done
 
