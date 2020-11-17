@@ -3,6 +3,7 @@ import { Public } from './types'
 type ChannelEntry = {
   partyA: Public
   partyB: Public
+  stake: Balance
 }
 
 declare interface Indexer {

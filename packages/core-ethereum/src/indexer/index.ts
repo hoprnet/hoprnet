@@ -5,7 +5,7 @@ import chalk from 'chalk'
 import { Subscription } from 'web3-core-subscriptions'
 import { BlockHeader } from 'web3-eth'
 import { u8aToNumber, u8aConcat, u8aToHex } from '@hoprnet/hopr-utils'
-import { ChannelEntry, Public } from '../types'
+import { ChannelEntry, Public, Balance } from '../types'
 import { Log, isPartyA, events } from '../utils'
 import { MAX_CONFIRMATIONS } from '../config'
 import { ContractEventLog } from '../tsc/web3/types'
@@ -17,7 +17,7 @@ type LightEvent<E extends ContractEventLog<any>> = Pick<
   E,
   'event' | 'blockNumber' | 'transactionHash' | 'transactionIndex' | 'logIndex' | 'returnValues'
 >
-type Channel = { partyA: Public; partyB: Public; channelEntry: ChannelEntry }
+type Channel = { partyA: Public; partyB: Public; channelEntry: ChannelEntry, stake: Balance}
 export type OpenedChannelEvent = LightEvent<ContractEventLog<{ opener: Public; counterparty: Public }>>
 export type ClosedChannelEvent = LightEvent<
   ContractEventLog<{ closer: Public; counterparty: Public; partyAAmount?: BN; partyBAmount?: BN }>
@@ -132,10 +132,13 @@ class Indexer implements IIndexer {
             offset: value.byteOffset
           })
 
+          const stake = new Balance(0)// await this.connector.web3.eth.
+
           channels.push({
             partyA,
             partyB,
-            channelEntry
+            channelEntry,
+            stake
           })
         })
         .on('end', () => resolve(channels))
@@ -168,10 +171,12 @@ class Indexer implements IIndexer {
       offset: _entry.byteOffset
     })
 
+    const stake = new Balance(0)// await this.connector.web3.eth.
     return {
       partyA,
       partyB,
-      channelEntry
+      channelEntry,
+      stake
     }
   }
 
