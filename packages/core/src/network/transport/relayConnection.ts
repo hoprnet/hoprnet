@@ -255,11 +255,17 @@ class RelayConnection implements MultiaddrConnection {
         let current = this._msgs[0]
 
         while (current != null && current.iteration < i) {
-          this._msgs.shift()
+          console.log(`dropping message`, new TextDecoder().decode(this._msgs.shift()?.value || new Uint8Array([])))
+
           current = this._msgs[0]
         }
 
-        if (current == null || current.done) {
+        if (current == null) {
+          console.log(`break current yield`, current, `this._msgs`, this._msgs)
+          break
+        }
+
+        if (current.done) {
           console.log(`exiting current`, current, `this._msgs`, this._msgs)
           return
         }
