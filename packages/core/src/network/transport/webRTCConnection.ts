@@ -92,7 +92,7 @@ class WebRTCConnection implements MultiaddrConnection {
 
       // let graceFullyMigrated = false
 
-      let promiseTriggered = false
+      let promiseTriggered = true
 
       let streamSwitched = false
       let switchPromise = this._switchPromise.promise.then(() => {
