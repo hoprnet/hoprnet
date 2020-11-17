@@ -121,11 +121,19 @@ class TCP {
         })
       }
 
-      let newConn = await this._upgrader.upgradeInbound(newStream)
+      newStream.sink(
+        (async function* () {
+          for (let i = 0; i < 7; i++) {
+            yield new TextEncoder().encode(`msg #${i}`)
+          }
+        })()
+      )
 
-      this._connectionManager.connections.set(counterparty.toB58String(), [newConn])
+      // let newConn = await this._upgrader.upgradeInbound(newStream)
 
-      this.connHandler?.(newConn)
+      // this._connectionManager.connections.set(counterparty.toB58String(), [newConn])
+
+      // this.connHandler?.(newConn)
     } catch (err) {
       error(err)
     }

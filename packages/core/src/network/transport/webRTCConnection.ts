@@ -164,7 +164,6 @@ class WebRTCConnection implements MultiaddrConnection {
       )
 
       await defer.promise
-      console.log(`after defer.promise this._webRTCAvailable`, this._webRTCAvailable)
 
       if (this._webRTCAvailable) {
         clearTimeout(this._webRTCTimeout)
