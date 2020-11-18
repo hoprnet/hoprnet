@@ -117,7 +117,7 @@ class TCP {
           conn: newStream,
           self: this._peerId,
           counterparty,
-          channel: (newStream as RelayConnection)._tmpWebRTC || (newStream as RelayConnection).webRTC
+          channel: (newStream as RelayConnection).webRTC
         })
       }
 
@@ -233,6 +233,16 @@ class TCP {
   async dialWithRelay(ma: Multiaddr, relays: Multiaddr[], options?: DialOptions): Promise<Connection> {
     let conn = await this._relay.establishRelayedConnection(ma, relays, this.onReconnect.bind(this), options)
 
+    // conn.sink(
+    //   (async function* () {
+    //     for (let i = 0; i < 7; i++) {
+    //       await new Promise((resolve) => setTimeout(resolve, 40))
+    //       yield new TextEncoder().encode(`msg from initiator #${i}`)
+    //     }
+    //   })()
+    // )
+
+    // await new Promise((resolve) => setTimeout(resolve, 500))
     return await this._upgrader.upgradeOutbound(conn)
   }
 

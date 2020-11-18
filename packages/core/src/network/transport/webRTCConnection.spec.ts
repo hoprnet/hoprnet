@@ -9,7 +9,7 @@ import { u8aConcat } from '@hoprnet/hopr-utils'
 import { RELAY_PAYLOAD_PREFIX } from './constants'
 import { RelayContext } from './relayContext'
 import { RelayConnection } from './relayConnection'
-import type { Stream } from 'libp2p'
+import type { MultiaddrConnection, Stream } from 'libp2p'
 //import assert from 'assert'
 
 import Pair from 'it-pair'
@@ -34,7 +34,7 @@ describe('test overwritable connection', function () {
             yield msg
           }
 
-          await new Promise((resolve) => setTimeout(resolve, 10))
+          await new Promise((resolve) => setTimeout(resolve, 40))
         }
       })(),
       sink: async (source: Stream['source']) => {
@@ -65,6 +65,7 @@ describe('test overwritable connection', function () {
     const connectionA = [Pair(), Pair()]
     const connectionB = [Pair(), Pair()]
 
+    // Define relays
     const relaySideA = new RelayContext({
       sink: connectionA[0].sink,
       source: connectionA[1].source
@@ -75,9 +76,11 @@ describe('test overwritable connection', function () {
       source: connectionB[1].source
     })
 
+    // Wire relay internally
     relaySideA.sink(relaySideB.source)
     relaySideB.sink(relaySideA.source)
 
+    // Get WebRTC instances
     const PeerA = new Peer({ wrtc, initiator: true, trickle: true })
     const PeerB = new Peer({ wrtc, trickle: true })
 
@@ -97,17 +100,39 @@ describe('test overwritable connection', function () {
       channel: PeerA
     })
 
+    const ctx = new RelayConnection({
+      stream: {
+        sink: connectionB[1].sink,
+        source: connectionB[0].source
+      },
+      self: partyB,
+      counterparty: partyB,
+      webRTC: PeerB,
+      onReconnect: async (newStream: MultiaddrConnection, counterparty: PeerId) => {
+        console.log(`reconnected`)
+
+        iteration++
+        console.log(`in reconnect: iteration ${iteration}`)
+        const demoStream = getStream({ usePrefix: false })
+
+        const newConn = new WebRTCConnection({
+          conn: newStream,
+          self: partyA,
+          counterparty,
+          channel: (newStream as RelayConnection).webRTC
+        })
+
+        newConn.sink(demoStream.source)
+        demoStream.sink(newConn.source)
+
+        newStream.sink(demoStream.source)
+        demoStream.sink(newStream.source)
+      },
+      webRTCUpgradeInbound: () => new Peer({ wrtc, trickle: true })
+    })
+
     const ctxB = new WebRTCConnection({
-      conn: new RelayConnection({
-        stream: {
-          sink: connectionB[1].sink,
-          source: connectionB[0].source
-        },
-        self: partyB,
-        counterparty: partyB,
-        webRTC: PeerB,
-        onReconnect: async () => {}
-      }),
+      conn: ctx,
       self: partyB,
       counterparty: partyA,
       channel: PeerB
@@ -123,112 +148,39 @@ describe('test overwritable connection', function () {
     ctxB.sink(streamB.source)
     streamB.sink(ctxB.source)
 
-    // let pingPromise: Promise<number>
-    // setTimeout(() => {
-    //   iteration++
-    //   pingPromise = ctxSender.ping()
-    //   ctxCounterparty.update(getStream({ usePrefix: true }))
-    // }, 200)
+    setTimeout(() => {
+      const newConnectionA = [Pair(), Pair()]
 
-    // await new Promise((resolve) => setTimeout(resolve, 1000))
+      const newPeerA = new Peer({ wrtc, initiator: true, trickle: true })
 
-    // assert((await pingPromise) > 0)
+      iteration++
+      const newStreamA = getStream({ usePrefix: false })
 
-    // await ctx.close()
+      const newConn = new WebRTCConnection({
+        conn: new RelayConnection({
+          stream: {
+            sink: newConnectionA[1].sink,
+            source: newConnectionA[0].source
+          },
+          self: partyA,
+          counterparty: partyB,
+          webRTC: newPeerA,
+          onReconnect: async () => {}
+        }),
+        self: partyA,
+        counterparty: partyB,
+        channel: newPeerA
+      })
 
-    await new Promise((resolve) => setTimeout(resolve, 2000))
+      relaySideA.update({
+        sink: newConnectionA[0].sink,
+        source: newConnectionA[1].source
+      })
+
+      newConn.sink(newStreamA.source)
+      newStreamA.sink(newConn.source)
+    }, 200)
+
+    await new Promise((resolve) => setTimeout(resolve, 4000))
   })
 })
-
-// async function main() {
-//   const AliceBob = Pair()
-//   const BobAlice = Pair()
-
-//   const Alice = await PeerId.create({ keyType: 'secp256k1' })
-//   const Bob = await PeerId.create({ keyType: 'secp256k1' })
-
-//   const PeerAlice = new Peer({ wrtc, initiator: true, trickle: true })
-//   const PeerBob = new Peer({ wrtc, trickle: true })
-
-//   // await new Promise(resolve => {
-//   // })
-
-//   const a = new WebRTCConnection({
-//     conn: new RelayConnection({
-//       stream: {
-//         sink: AliceBob.sink,
-//         source: BobAlice.source
-//       } as MultiaddrConnection,
-//       counterparty: Bob,
-//       self: Alice,
-//       webRTC: PeerAlice,
-//       onReconnect: async () => {}
-//     }),
-//     self: Alice,
-//     counterparty: Bob,
-//     channel: PeerAlice
-//   })
-
-//   const b = new WebRTCConnection({
-//     conn: new RelayConnection({
-//       stream: {
-//         sink: BobAlice.sink,
-//         source: AliceBob.source
-//       } as MultiaddrConnection,
-//       self: Bob,
-//       counterparty: Alice,
-//       webRTC: PeerBob,
-//       onReconnect: async () => {}
-//     }),
-//     self: Bob,
-//     counterparty: Alice,
-//     channel: PeerBob
-//   })
-
-//   a.sink(
-//     (async function* () {
-//       while (true) {
-//         await new Promise((resolve) => setTimeout(resolve, 1000))
-//         yield new TextEncoder().encode(`fancy WebRTC message`)
-//       }
-//     })()
-//   )
-
-//   // b.sink(
-//   //   (async function* () {
-//   //     while (true) {
-//   //       await new Promise((resolve) => setTimeout(resolve, 1000))
-//   //       yield new TextEncoder().encode(`fancy WebRTC message`)
-//   //     }
-//   //   })()
-//   // )
-
-//   function foo({ done, value }: { done?: boolean | void; value?: Uint8Array | void }) {
-//     if (value) {
-//       console.log(new TextDecoder().decode(value))
-//     }
-
-//     if (!done) {
-//       b.source.next().then(foo)
-//     }
-//   }
-
-//   // function bar({ done, value }: { done?: boolean | void; value?: Uint8Array | void }) {
-//   //   if (value) {
-//   //     console.log(new TextDecoder().decode(value))
-//   //   }
-
-//   //   if (!done) {
-//   //     b.source.next().then(foo)
-//   //   }
-//   // }
-
-//   b.source.next().then(foo)
-//   //a.source.next().then(bar)
-
-//   //PeerBob.on('signal', (msg: any) => setTimeout(() => PeerAlice.signal(msg), 150))
-
-//   //PeerAlice.on('signal', (msg: any) => setTimeout(() => PeerBob.signal(msg), 150))
-// }
-
-// main()

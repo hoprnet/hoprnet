@@ -53,8 +53,6 @@ class RelayConnection implements MultiaddrConnection {
 
   private _counterparty: PeerId
 
-  public _tmpWebRTC: SimplePeer
-
   public source: Stream['source']
   public sink: Stream['sink']
   public close: (err?: Error) => Promise<void>

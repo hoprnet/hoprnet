@@ -216,8 +216,6 @@ class WebRTCConnection implements MultiaddrConnection {
       while (true) {
         let result = await this.conn.source.next()
 
-        console.log(`getting from relayConnection`, result)
-
         if (result.done) {
           break
         }
@@ -253,22 +251,21 @@ class WebRTCConnection implements MultiaddrConnection {
   }
 
   async close(_err?: Error): Promise<void> {
-    console.log(`destroy called`)
-    // if (this.destroyed) {
-    //   return Promise.resolve()
-    // }
+    if (this.destroyed) {
+      return Promise.resolve()
+    }
 
-    // this.timeline.closed = Date.now()
+    this.timeline.closed = Date.now()
 
-    // try {
-    //   this.channel.destroy()
-    // } catch (err) {
-    //   err(`WebRTC error while destroying: ${err}`)
-    // }
+    try {
+      this.channel.destroy()
+    } catch (err) {
+      err(`WebRTC error while destroying: ${err}`)
+    }
 
-    // this.conn.close()
+    this.conn.close()
 
-    // this._destroyed = true
+    this._destroyed = true
   }
 }
 
