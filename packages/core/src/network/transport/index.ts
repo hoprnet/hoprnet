@@ -16,8 +16,8 @@ import type {
   DialOptions,
   ConnHandler,
   Handler,
-  MultiaddrConnection
-  // ConnectionManager
+  MultiaddrConnection,
+  ConnectionManager
 } from 'libp2p'
 import chalk from 'chalk'
 import { WebRTCUpgrader } from './webrtc'
@@ -45,7 +45,7 @@ class TCP {
   private relays?: Multiaddr[]
   private stunServers: Multiaddr[]
   private _relay: Relay
-  //private _connectionManager: ConnectionManager
+  private _connectionManager: ConnectionManager
   private _webRTCUpgrader: WebRTCUpgrader
   private connHandler: ConnHandler
 
@@ -96,7 +96,7 @@ class TCP {
     this._peerId = libp2p.peerId
     this._multiaddrs = libp2p.multiaddrs
     this._upgrader = upgrader
-    //this._connectionManager = libp2p.connectionManager
+    this._connectionManager = libp2p.connectionManager
 
     if (this._useWebRTC) {
       this._webRTCUpgrader = new WebRTCUpgrader({ stunServers: this.stunServers })
@@ -112,7 +112,9 @@ class TCP {
     log(`####### inside reconnect #######`)
 
     try {
+      console.log(`this in reconnect`, this)
       if (this._webRTCUpgrader != null) {
+        console.log(`inside 'good' branch`)
         newStream = new WebRTCConnection({
           conn: newStream,
           self: this._peerId,
@@ -130,21 +132,21 @@ class TCP {
       //   })()
       // )
 
-      while (true) {
-        let result = await newStream.source.next()
+      // while (true) {
+      //   let result = await newStream.source.next()
 
-        console.log(result)
+      //   console.log(result)
 
-        if (result.done) {
-          break
-        }
-      }
+      //   if (result.done) {
+      //     break
+      //   }
+      // }
 
-      // let newConn = await this._upgrader.upgradeInbound(newStream)
+      let newConn = await this._upgrader.upgradeInbound(newStream)
 
-      // this._connectionManager.connections.set(counterparty.toB58String(), [newConn])
+      this._connectionManager.connections.set(counterparty.toB58String(), [newConn])
 
-      // this.connHandler?.(newConn)
+      this.connHandler?.(newConn)
     } catch (err) {
       error(err)
     }
