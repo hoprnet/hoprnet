@@ -3,6 +3,8 @@ import { randomInteger } from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'
 import type NetworkPeers from '../network/network-peers'
 import type { Indexer, IndexerChannel } from '@hoprnet/hopr-core-connector-interface'
+import Debug from 'debug'
+const log = Debug('hopr-core:pathfinder')
 
 export type Path = PeerId[]
 
@@ -18,7 +20,7 @@ export async function findPath(
   networkPeers: NetworkPeers,
   indexer: Indexer
 ): Promise<Path> {
-  console.log('find path from', start, 'to ', destination, 'length', hops)
+  log('find path from', start.toB58String(), 'to ', destination.toB58String(), 'length', hops)
   const filter = (node: PeerId) => {
     return !node.equals(destination) && networkPeers.qualityOf(node) > QUALITY_THRESHOLD
   }
@@ -27,23 +29,19 @@ export async function findPath(
   queue.addAll((await indexer.getChannelsFromPeer(start)).map((x) => [start, x[1]]))
 
   while (queue.length > 0 && iterations < MAX_ITERATIONS) {
-    console.log(queue.length, iterations)
     iterations++
     const currentPath = queue.peek() as Path
-    console.log('>>', currentPath)
 
     if (currentPath.length == hops) {
+      log('Path of correct length found', currentPath.map(x => x.toB58String()).join(','))
       return currentPath
     }
 
     const lastNode = currentPath[currentPath.length - 1]
-    console.log('->', lastNode)
 
     const newNodes = (await indexer.getChannelsFromPeer(lastNode))
       .filter((c) => !currentPath.includes(c[1]))
       .filter((c) => filter(c[1]))
-
-    console.log('>>', newNodes.length)
 
     if (newNodes.length == 0) {
       queue.pop()
@@ -56,5 +54,7 @@ export async function findPath(
     toPush.push(nextChannel[1])
     queue.push(toPush)
   }
+
+  log('Path not found')
   throw new Error('Path not found')
 }

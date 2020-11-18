@@ -7,7 +7,8 @@ import type { Indexer } from '@hoprnet/hopr-core-connector-interface'
 function fakePeerId(i: number): PeerId {
   return ({
     id: i,
-    equals: (x) => x.id == i
+    equals: (x) => x.id == i,
+    toB58String: () => i
   } as unknown) as PeerId
 }
 
@@ -26,32 +27,33 @@ function checkPath(path: PeerId[], edges: Map<PeerId, PeerId[]>) {
   }
 }
 
-const TEST_NODES = Array.from({ length: 5 }).map((_, i) => fakePeerId(i))
-const RELIABLE_NETWORK = { qualityOf: (_p) => 1 } as NetworkPeers
-const UNRELIABLE_NETWORK = { qualityOf: (p) => ((p.id as any) % 3 == 0 ? 0 : 1) } as NetworkPeers // Node 3 is down
-const STAKE_1 = () => 1
+describe('test pathfinder with some simple topologies', function () {
 
-// Bidirectional star, all pass through node 0
-const STAR = new Map<PeerId, PeerId[]>()
-STAR.set(TEST_NODES[1], [TEST_NODES[0]])
-STAR.set(TEST_NODES[2], [TEST_NODES[0]])
-STAR.set(TEST_NODES[3], [TEST_NODES[0]])
-STAR.set(TEST_NODES[4], [TEST_NODES[0]])
-STAR.set(TEST_NODES[0], [TEST_NODES[1], TEST_NODES[2], TEST_NODES[3], TEST_NODES[4]])
+  const TEST_NODES = Array.from({ length: 5 }).map((_, i) => fakePeerId(i))
+  const RELIABLE_NETWORK = { qualityOf: (_p) => 1 } as NetworkPeers
+  const UNRELIABLE_NETWORK = { qualityOf: (p) => ((p.id as any) % 3 == 0 ? 0 : 1) } as NetworkPeers // Node 3 is down
+  const STAKE_1 = () => 1
 
-const ARROW = new Map<PeerId, PeerId[]>()
-ARROW.set(TEST_NODES[0], [TEST_NODES[1]])
-ARROW.set(TEST_NODES[1], [TEST_NODES[2]])
-ARROW.set(TEST_NODES[2], [TEST_NODES[3]])
-ARROW.set(TEST_NODES[3], [TEST_NODES[4]])
+  // Bidirectional star, all pass through node 0
+  const STAR = new Map<PeerId, PeerId[]>()
+  STAR.set(TEST_NODES[1], [TEST_NODES[0]])
+  STAR.set(TEST_NODES[2], [TEST_NODES[0]])
+  STAR.set(TEST_NODES[3], [TEST_NODES[0]])
+  STAR.set(TEST_NODES[4], [TEST_NODES[0]])
+  STAR.set(TEST_NODES[0], [TEST_NODES[1], TEST_NODES[2], TEST_NODES[3], TEST_NODES[4]])
 
-function fakeIndexer(edges: Map<PeerId, PeerId[]>, stakes: (i: PeerId) => number): Indexer {
-  return {
-    getChannelsFromPeer: (a: PeerId) => Promise.resolve(edges.get(a).map((b) => [a, b, stakes(a) as any]))
+  const ARROW = new Map<PeerId, PeerId[]>()
+  ARROW.set(TEST_NODES[0], [TEST_NODES[1]])
+  ARROW.set(TEST_NODES[1], [TEST_NODES[2]])
+  ARROW.set(TEST_NODES[2], [TEST_NODES[3]])
+  ARROW.set(TEST_NODES[3], [TEST_NODES[4]])
+
+  function fakeIndexer(edges: Map<PeerId, PeerId[]>, stakes: (i: PeerId) => number): Indexer {
+    return {
+      getChannelsFromPeer: (a: PeerId) => Promise.resolve(edges.get(a).map((b) => [a, b, stakes(a) as any]))
+    }
   }
-}
 
-describe('test pathfinder', function () {
   it('should find a path through a reliable star', async function () {
     const path = await findPath(TEST_NODES[1], fakePeerId(6), 3, RELIABLE_NETWORK, fakeIndexer(STAR, STAKE_1))
     checkPath(path, STAR)
