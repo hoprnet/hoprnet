@@ -40,7 +40,7 @@ export async function findPath(
   // Weight a node based on stake, and a random component.
   const weight = (edge: Edge): number => {
     const rand = randomness > 0 ? randomInteger(0, randomness) : 1 // TODO use float
-    return stake(edge) * rand 
+    return stake(edge) * rand
   }
 
   const compareWeight = (a: Edge, b: Edge) => weight(b) - weight(a)
@@ -49,7 +49,7 @@ export async function findPath(
   const pathWeight = (a: ChannelPath): number => a.map(weight).reduce(sum, 0)
 
   const comparePath = (a: ChannelPath, b: ChannelPath) => {
-    return pathWeight(b) - pathWeight(a) 
+    return pathWeight(b) - pathWeight(a)
   }
 
   let queue = new Heap<ChannelPath>(comparePath)
@@ -59,9 +59,14 @@ export async function findPath(
 
   while (queue.length > 0 && iterations++ < MAX_ITERATIONS) {
     const currentPath = queue.peek()
-    log('current path', pathFrom(currentPath)
-          .map((x) => x.toB58String())
-          .join(','), 'weight', pathWeight(currentPath))
+    log(
+      'current path',
+      pathFrom(currentPath)
+        .map((x) => x.toB58String())
+        .join(','),
+      'weight',
+      pathWeight(currentPath)
+    )
 
     if (pathFrom(currentPath).length == hops) {
       log(
