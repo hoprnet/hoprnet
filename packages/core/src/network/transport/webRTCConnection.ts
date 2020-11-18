@@ -217,12 +217,7 @@ class WebRTCConnection implements MultiaddrConnection {
 
         console.log(`source_ migrated`)
 
-        let it = this.channel[Symbol.asyncIterator]() as Stream['source']
-
-        for await (const msg of it) {
-          console.log(`from WebRTC`, msg)
-          yield msg
-        }
+        yield* this.channel[Symbol.asyncIterator]() as Stream['source']
       }
     }.call(this)
   }
