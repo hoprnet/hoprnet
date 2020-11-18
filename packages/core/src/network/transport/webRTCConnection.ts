@@ -6,6 +6,9 @@ import Multiaddr from 'multiaddr'
 import type PeerId from 'peer-id'
 import { durations } from '@hoprnet/hopr-utils'
 import toIterable from 'stream-to-it'
+import Debug from 'debug'
+
+const log = Debug('hopr-core:transport')
 
 const WEBRTC_UPGRADE_TIMEOUT = durations.seconds(1)
 
@@ -57,7 +60,7 @@ class WebRTCConnection implements MultiaddrConnection {
 
     const endWebRTCUpgrade = (err?: any) => {
       clearTimeout(this._webRTCTimeout)
-      console.log(`error thrown`, err)
+      log(`ending WebRTC upgrade due error: ${err}`)
       this._webRTCStateKnown = true
       this._webRTCAvailable = false
       this._switchPromise.resolve()
@@ -118,8 +121,6 @@ class WebRTCConnection implements MultiaddrConnection {
                   break
                 }
 
-                console.log(`sinking into relay connection`, new TextDecoder().decode(sourceMsg.slice()))
-
                 yield sourceMsg.slice()
 
                 if (!this._webRTCAvailable) {
@@ -128,7 +129,7 @@ class WebRTCConnection implements MultiaddrConnection {
                 }
               }
             } else {
-              console.log(`fallback branch`)
+              log(`fallback to relayed connection`)
               await sourcePromise
 
               if (sourceDone) {
@@ -140,7 +141,6 @@ class WebRTCConnection implements MultiaddrConnection {
             }
           }
           defer.resolve()
-          console.log(`sink returned`)
         }.call(this)
       )
 
@@ -154,24 +154,16 @@ class WebRTCConnection implements MultiaddrConnection {
           sink(
             (async function* () {
               if (promiseTriggered && !sourceReceived) {
-                console.log(`promiseTriggered && !sourceReceived`)
                 await sourcePromise
 
-                console.log(`sinking into webrtc`, new TextDecoder().decode(sourceMsg.slice()))
-
                 yield sourceMsg.slice()
-                console.log(`after promiseTriggered && !sourceReceived`)
               } else if (promiseTriggered && sourceReceived) {
-                console.log(`promiseTriggered && sourceReceived`)
-                console.log(`sinking into webrtc`, new TextDecoder().decode(sourceMsg.slice()))
-
                 yield sourceMsg.slice()
-                console.log(`after promiseTriggered && sourceReceived`)
               }
-              console.log(`start sinking into WebRTC`)
+
+              log(`switching to direct WebRTC connection with peer ${this.remoteAddr.getPeerId()}`)
 
               for await (const msg of source) {
-                console.log(`sinking into webrtc`, new TextDecoder().decode(msg.slice()))
                 yield msg.slice()
               }
             })()
@@ -193,7 +185,7 @@ class WebRTCConnection implements MultiaddrConnection {
 
       if (this._webRTCAvailable || !this._webRTCStateKnown) {
         clearTimeout(this._webRTCTimeout)
-
+        log(`webRTC handover done. Using direct connection to peer ${this.remoteAddr.getPeerId()}`)
         yield* this.channel[Symbol.asyncIterator]() as Stream['source']
       }
     }.call(this)
@@ -213,7 +205,7 @@ class WebRTCConnection implements MultiaddrConnection {
     try {
       this.channel.destroy()
     } catch (err) {
-      err(`WebRTC error while destroying: ${err}`)
+      err(`WebRTC error while destroying connection to peer ${this.remoteAddr.getPeerId()}. Error: ${err}`)
     }
 
     this.conn.close()

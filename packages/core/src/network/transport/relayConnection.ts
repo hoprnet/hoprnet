@@ -217,11 +217,10 @@ class RelayConnection implements MultiaddrConnection {
             error(`Received invalid status message ${u8aToHex(SUFFIX || new Uint8Array([]))}. Dropping message.`)
           }
         } else if (u8aEquals(PREFIX, RELAY_WEBRTC_PREFIX)) {
-          // console.log(`Receiving fancy WebRTC message`, JSON.parse(new TextDecoder().decode(received.slice(1))))
           try {
             this.webRTC?.signal(JSON.parse(new TextDecoder().decode(received.slice(1))))
           } catch (err) {
-            console.log(`WebRTC error:`, err)
+            error(`WebRTC error:`, err)
           }
         } else {
           error(`Received invalid prefix <${u8aToHex(PREFIX || new Uint8Array([]))}. Dropping message.`)
@@ -255,18 +254,20 @@ class RelayConnection implements MultiaddrConnection {
         let current = this._msgs[0]
 
         while (current != null && current.iteration < i) {
-          console.log(`dropping message`, new TextDecoder().decode(this._msgs.shift()?.value || new Uint8Array([])))
+          log(
+            `dropping message <${new TextDecoder().decode(
+              this._msgs.shift()?.value || new Uint8Array([])
+            )}> from peer ${this.remoteAddr.getPeerId()}`
+          )
 
           current = this._msgs[0]
         }
 
         if (current == null) {
-          console.log(`break current yield`, current, `this._msgs`, this._msgs)
           break
         }
 
         if (current.done) {
-          console.log(`exiting current`, current, `this._msgs`, this._msgs)
           return
         }
 
