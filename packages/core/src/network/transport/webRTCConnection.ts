@@ -75,7 +75,6 @@ class WebRTCConnection implements MultiaddrConnection {
       let sourceDone = false
 
       function sourceFunction(arg: IteratorResult<Uint8Array, void>) {
-        console.log(`inside source function`, arg)
         sourceReceived = true
         sourceDone = arg.done
 
@@ -169,14 +168,6 @@ class WebRTCConnection implements MultiaddrConnection {
                 yield sourceMsg.slice()
                 console.log(`after promiseTriggered && sourceReceived`)
               }
-              // if (!graceFullyMigrated) {
-              //   console.log(`!graceFullyMigrated`)
-              //   // await sourcePromise
-
-              //   if (sourceMsg != null) {
-              //     yield sourceMsg
-              //   }
-              // }
               console.log(`start sinking into WebRTC`)
 
               for await (const msg of source) {
@@ -196,16 +187,12 @@ class WebRTCConnection implements MultiaddrConnection {
 
       yield* this.conn.source
 
-      console.log(`before await switchPromise`, this._webRTCAvailable)
       if (!this._webRTCStateKnown || this._webRTCAvailable) {
         await this._switchPromise.promise
       }
-      console.log(`after await switchPromise`, this._webRTCAvailable, this._webRTCStateKnown)
 
       if (this._webRTCAvailable || !this._webRTCStateKnown) {
         clearTimeout(this._webRTCTimeout)
-
-        console.log(`source_ migrated`)
 
         yield* this.channel[Symbol.asyncIterator]() as Stream['source']
       }
