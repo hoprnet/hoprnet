@@ -88,7 +88,7 @@ class Channel extends Uint8ArrayE implements Types.Channel {
 
   async sign(
     privKey: Uint8Array,
-    pubKey: Uint8Array | undefined,
+    _pubKey: Uint8Array | undefined,
     arr?: {
       bytes: ArrayBuffer
       offset: number

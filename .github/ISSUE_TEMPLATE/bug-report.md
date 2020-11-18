@@ -2,11 +2,11 @@
 name: Bug report
 about: Create a report to help us improve
 title: ''
-labels: 'bug, needs review'
+labels: 'bug, s:new issue'
 assignees: ''
 ---
 
-<!--- Please DO NOT remove the automatically added 'needs review' label -->
+<!--- Please DO NOT remove the automatically added 's:new issue' label -->
 <!--- Provide a general summary of the issue in the Title above -->
 
 ## Expected Behavior

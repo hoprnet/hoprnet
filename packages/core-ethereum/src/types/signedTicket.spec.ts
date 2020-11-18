@@ -26,13 +26,15 @@ const generateTicketData = async (receiver: AccountId) => {
 }
 
 describe('test signedTicket construction', async function () {
-  const [userA, userB] = await Promise.all(
+  //@ts-ignore
+  const [_userA, userB] = await Promise.all(
     testconfigs.DEMO_ACCOUNTS.slice(0, 2).map(
       async (str: string) => await pubKeyToAccountId(await privKeyToPubKey(stringToU8a(str)))
     )
   )
 
-  const [userAPrivKey, userBPrivKey] = testconfigs.DEMO_ACCOUNTS.slice(0, 2).map((str: string) => stringToU8a(str))
+  //@ts-ignore
+  const [userAPrivKey, _userBPrivKey] = testconfigs.DEMO_ACCOUNTS.slice(0, 2).map((str: string) => stringToU8a(str))
 
   const userAPubKey = await privKeyToPubKey(stringToU8a(testconfigs.DEMO_ACCOUNTS[0]))
 

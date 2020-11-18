@@ -14,7 +14,7 @@ To seem how many tickets you currently have, type:
 tickets
 ```
 
-![](../.gitbook/assets/avado-tickets.png)
+![](../.gitbook/assets/avado-tickets%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29.png)
 
 To redeem your tickets, type:
 
@@ -24,7 +24,7 @@ redeemTickets
 
 This will redeem all of your tickets. The testnet HOPR from these tickets will be added to your balance. You'll get a notification as each ticket is redeemed, liked this:
 
-![](../.gitbook/assets/avado-redeeming-tickets.png)
+![](../.gitbook/assets/avado-redeeming-tickets%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29.png)
 
 {% hint style="warning" %}
 Redeeming tickets requires calling the HOPR smart contract, so can take some time. You will be notified as each ticket is redeemed.
@@ -33,3 +33,4 @@ Redeeming tickets requires calling the HOPR smart contract, so can take some tim
 {% hint style="danger" %}
 Redeeming tickets requires calling the HOPR smart contract, so will incur a small fee in the native currency. Make sure you have enough in your `balance` to complete this action.
 {% endhint %}
+

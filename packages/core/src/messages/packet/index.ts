@@ -3,9 +3,9 @@ import LibP2P from 'libp2p'
 import chalk from 'chalk'
 
 import PeerId from 'peer-id'
-const RELAY_FEE = 1
 
 import { pubKeyToPeerId } from '../../utils'
+import { validateUnacknowledgedTicket, validateCreatedTicket } from '../../utils/tickets'
 import { u8aConcat, u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
 
 import { Header, deriveTicketKey, deriveTicketKeyBlinding, deriveTagParameters, deriveTicketLastKey } from './header'
@@ -167,7 +167,10 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     msg: Uint8Array,
     path: PeerId[]
   ): Promise<Packet<Chain>> {
-    const arr = new Uint8Array(Packet.SIZE(node.paymentChannels)).fill(0x00)
+    const chain = node.paymentChannels
+    const { Balance } = chain.types
+
+    const arr = new Uint8Array(Packet.SIZE(chain)).fill(0x00)
     const packet = new Packet<Chain>(node, libp2p, {
       bytes: arr.buffer,
       offset: arr.byteOffset
@@ -180,7 +183,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
 
     packet._header = header
 
-    const fee = new BN(secrets.length - 1, 10).imul(new BN(RELAY_FEE, 10))
+    const fee = new BN(secrets.length - 1).imul(new BN(node.ticketAmount))
 
     log('---------- New Packet ----------')
     path
@@ -190,8 +193,8 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     log('--------------------------------')
 
     packet._challenge = await Challenge.create(
-      node.paymentChannels,
-      await node.paymentChannels.utils.hash(deriveTicketKeyBlinding(secrets[0])),
+      chain,
+      await chain.utils.hash(deriveTicketKeyBlinding(secrets[0])),
       fee,
       {
         bytes: packet.buffer,
@@ -204,35 +207,36 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
       offset: packet.messageOffset
     }).onionEncrypt(secrets)
 
-    const ticketChallenge = await node.paymentChannels.utils.hash(
+    const ticketChallenge = await chain.utils.hash(
       secrets.length == 1
         ? deriveTicketLastKey(secrets[0])
-        : await node.paymentChannels.utils.hash(
-            u8aConcat(
-              deriveTicketKey(secrets[0]),
-              await node.paymentChannels.utils.hash(deriveTicketKeyBlinding(secrets[1]))
-            )
+        : await chain.utils.hash(
+            u8aConcat(deriveTicketKey(secrets[0]), await chain.utils.hash(deriveTicketKeyBlinding(secrets[1])))
           )
     )
 
     if (secrets.length > 1) {
       log(`before creating channel`)
 
-      const channel = await node.paymentChannels.channel.create(path[0].pubKey.marshal(), (_counterparty: Uint8Array) =>
+      const channel = await chain.channel.create(path[0].pubKey.marshal(), (_counterparty: Uint8Array) =>
         node._interactions.payments.onChainKey.interact(path[0])
       )
 
-      const newFee = new node.paymentChannels.types.Balance(100)
-
-      // log(Object.getOwnPropertyNames(newFee))
-      // @ts-ignore
-      packet._ticket = await channel.ticket.create(newFee, ticketChallenge, 1.0, {
+      packet._ticket = await channel.ticket.create(new Balance(fee), ticketChallenge, node.ticketWinProb, {
         bytes: packet.buffer,
         offset: packet.ticketOffset
       })
+
+      const myAccountId = await chain.utils.pubKeyToAccountId(node.getId().pubKey.marshal())
+      const counterpartyAccountId = await chain.utils.pubKeyToAccountId(channel.counterparty)
+      const amPartyA = chain.utils.isPartyA(myAccountId, counterpartyAccountId)
+      await validateCreatedTicket({
+        myBalance: await (amPartyA ? channel.balance_a : channel.balance_b),
+        signedTicket: packet._ticket
+      })
     } else if (secrets.length == 1) {
-      packet._ticket = await node.paymentChannels.channel.createDummyChannelTicket(
-        await node.paymentChannels.utils.pubKeyToAccountId(path[0].pubKey.marshal()),
+      packet._ticket = await chain.channel.createDummyChannelTicket(
+        await chain.utils.pubKeyToAccountId(path[0].pubKey.marshal()),
         ticketChallenge,
         {
           bytes: packet.buffer,
@@ -273,10 +277,16 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     if (!isRecipient) {
       ;[sender, target] = await Promise.all([this.getSenderPeerId(), this.getTargetPeerId()])
 
-      // check if channel exists
-
-      if (!(await this.node.paymentChannels.channel.isOpen(new Uint8Array(sender.pubKey.marshal())))) {
-        throw Error('Payment channel is not open')
+      // perform various ticket validation checks before receiving an ACK
+      try {
+        await validateUnacknowledgedTicket({
+          node: this.node,
+          signedTicket: await this.ticket,
+          senderPeerId: sender
+        })
+      } catch (error) {
+        verbose('Could not validate unacknowledged ticket', error.message)
+        throw error
       }
     }
 
@@ -318,52 +328,44 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
    * @param target peer Id of the next node
 
    */
-  async prepareForward(_sender: PeerId, target: PeerId): Promise<void> {
-    if (
-      !u8aEquals(
-        await this.node.paymentChannels.utils.hash(
-          await this.node.paymentChannels.utils.hash(
-            u8aConcat(deriveTicketKey(this.header.derivedSecret), this.header.hashedKeyHalf)
-          )
-        ),
-        (await this.ticket).ticket.challenge
-      )
-    ) {
+  async prepareForward(_originalSender: PeerId, target: PeerId): Promise<void> {
+    const chain = this.node.paymentChannels
+    const { Balance, ChannelBalance } = chain.types
+    const signedTicket = await this.ticket
+    const ticket = signedTicket.ticket
+    const sender = this.libp2p.peerId
+    const senderAccountId = await chain.utils.pubKeyToAccountId(sender.pubKey.marshal())
+    const targetAccountId = await chain.utils.pubKeyToAccountId(target.pubKey.marshal())
+    const amPartyA = chain.utils.isPartyA(senderAccountId, targetAccountId)
+    const challenge = u8aConcat(deriveTicketKey(this.header.derivedSecret), this.header.hashedKeyHalf)
+
+    if (!u8aEquals(await chain.utils.hash(await chain.utils.hash(challenge)), ticket.challenge)) {
       verbose('Error preparing to forward')
       throw Error('Error preparing forward')
     }
 
-    const channelIdOutgoing = await this.node.paymentChannels.utils.getId(
-      await this.node.paymentChannels.utils.pubKeyToAccountId(this.libp2p.peerId.pubKey.marshal()),
-      await this.node.paymentChannels.utils.pubKeyToAccountId(target.pubKey.marshal())
-    )
-
-    const unacknowledged = new UnacknowledgedTicket(this.node.paymentChannels, undefined, {
-      signedTicket: await this.ticket,
+    const channelIdOutgoing = await chain.utils.getId(senderAccountId, targetAccountId)
+    const unacknowledged = new UnacknowledgedTicket(chain, undefined, {
+      signedTicket,
       secretA: deriveTicketKey(this.header.derivedSecret)
     })
 
-    log(
-      `During forward: storing hashedKey`,
-      u8aToHex(this.header.hashedKeyHalf),
-      `we are ${this.libp2p.peerId.toB58String()}`
-    )
+    log(`During forward: storing hashedKey`, u8aToHex(this.header.hashedKeyHalf), `we are ${sender.toB58String()}`)
     await this.node.db.put(
       Buffer.from(this.node._dbKeys.UnAcknowledgedTickets(this.header.hashedKeyHalf)),
       Buffer.from(unacknowledged)
     )
 
-    const receivedMoney = (await this.ticket).ticket.getEmbeddedFunds()
+    // get new ticket amount
+    const fee = new Balance(ticket.amount.isub(new BN(this.node.ticketAmount)))
 
-    const forwardedFunds = receivedMoney.isub(new BN(RELAY_FEE, 10))
-
-    if (forwardedFunds.gtn(0)) {
-      const channelBalance = this.node.paymentChannels.types.ChannelBalance.create(undefined, {
-        balance: new BN(10000),
-        balance_a: new BN(5000)
+    if (fee.gtn(0)) {
+      const channelBalance = ChannelBalance.create(undefined, {
+        balance: fee,
+        balance_a: amPartyA ? fee : new BN(0)
       })
 
-      const channel = await this.node.paymentChannels.channel.create(
+      const channel = await chain.channel.create(
         target.pubKey.marshal(),
         (_counterparty: Uint8Array) => this.node._interactions.payments.onChainKey.interact(target),
         channelBalance,
@@ -371,19 +373,18 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
           this.node._interactions.payments.open.interact(target, channelBalance)
       )
 
-      this._ticket = await channel.ticket.create(
-        // @ts-ignore
-        forwardedFunds,
-        this.header.encryptionKey,
-        1.0,
-        {
-          bytes: this.buffer,
-          offset: this.ticketOffset
-        }
-      )
-    } else if (forwardedFunds.isZero()) {
-      this._ticket = await this.node.paymentChannels.channel.createDummyChannelTicket(
-        await this.node.paymentChannels.utils.pubKeyToAccountId(target.pubKey.marshal()),
+      this._ticket = await channel.ticket.create(fee, this.header.encryptionKey, this.node.ticketWinProb, {
+        bytes: this.buffer,
+        offset: this.ticketOffset
+      })
+
+      await validateCreatedTicket({
+        myBalance: await (amPartyA ? channel.balance_a : channel.balance_b),
+        signedTicket: this._ticket
+      })
+    } else if (fee.isZero()) {
+      this._ticket = await chain.channel.createDummyChannelTicket(
+        await chain.utils.pubKeyToAccountId(target.pubKey.marshal()),
         this.header.encryptionKey,
         {
           bytes: this.buffer,
@@ -391,26 +392,17 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
         }
       )
     } else {
-      throw Error(`Cannot forward ${forwardedFunds.toNumber()}`)
+      throw Error(`Cannot forward packet`)
     }
 
-    log(
-      `Received ${chalk.magenta(
-        `${this.node.paymentChannels.utils.convertUnit(receivedMoney, 'wei', 'ether').toString()} ETH`
-      )} on channel ${chalk.yellow(channelIdOutgoing.toString())}.`
-    )
+    log(`Received ticket on channel ${chalk.yellow(u8aToHex(channelIdOutgoing))}`)
 
     this.header.transformForNextNode()
 
-    this._challenge = await Challenge.create<Chain>(
-      this.node.paymentChannels,
-      this.header.hashedKeyHalf,
-      forwardedFunds,
-      {
-        bytes: this.buffer,
-        offset: this.challengeOffset
-      }
-    ).sign(this.libp2p.peerId)
+    this._challenge = await Challenge.create<Chain>(chain, this.header.hashedKeyHalf, fee, {
+      bytes: this.buffer,
+      offset: this.challengeOffset
+    }).sign(sender)
   }
 
   /**

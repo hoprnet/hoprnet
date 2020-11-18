@@ -1,8 +1,7 @@
-import PeerId from 'peer-id'
 import Multiaddr from 'multiaddr'
 import dns from 'dns'
 
-const BOOTSTRAP_ADDRESS = process.env.HOPR_BOOTSTRAP_ADDRESS || '_dnsaddr.bootstrap.basodino.develop.hoprnet.org'
+const BOOTSTRAP_ADDRESS = process.env.HOPR_BOOTSTRAP_ADDRESS || '_dnsaddr.bootstrap.matic.develop.hoprnet.org'
 
 /** Load Bootstrap node addresses.
  *   - If a string of comma separated multiaddrs is passed, use this first
@@ -11,7 +10,6 @@ const BOOTSTRAP_ADDRESS = process.env.HOPR_BOOTSTRAP_ADDRESS || '_dnsaddr.bootst
  */
 export async function getBootstrapAddresses(addrs?: string): Promise<Multiaddr[]> {
   let addresses: string[]
-  let servers: Multiaddr[] = []
 
   if (addrs) {
     addresses = addrs.split(',')

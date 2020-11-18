@@ -1,14 +1,16 @@
 {
-  "extends": "@tsconfig/node12/tsconfig.json",
   "compilerOptions": {
     "esModuleInterop": true,
-    "outDir": "./lib",
     "lib": ["es2019", "dom"],
     "module": "commonjs",
     "target": "es2019",
     "declaration": true,
-    "resolveJsonModule": true,
-    "sourceMap": true
+    "skipLibCheck": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "sourceMap": true,
+    "outDir": "./lib"
   },
+  "exclude": ["lib"],
   "include": ["src/**/*.ts"]
 }

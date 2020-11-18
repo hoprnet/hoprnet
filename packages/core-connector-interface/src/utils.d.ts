@@ -65,3 +65,20 @@ export declare function verify(msg: Uint8Array, signature: Signature, pubkey: Ui
  * ```
  */
 export declare function convertUnit(amount: Balance, sourceUnit: string, targetUnit: string): Balance
+
+/**
+ * Compute the winning probability that is set for a ticket
+ * @param prob Desired winning probability of a ticket, e.g. 0.6 resp. 60%
+ */
+export declare function computeWinningProbability(prob: number): Uint8Array
+
+/**
+ * Transforms Uint256 encoded probabilities into floats.
+ *
+ * @notice mostly used to check a ticket's winning probability.
+ *
+ * @notice the precision is very limited
+ *
+ * @param winProb Uint256-encoded version of winning probability
+ */
+export declare function getWinProbabilityAsFloat(winProb: Uint8Array): number

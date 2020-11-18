@@ -8,7 +8,7 @@ const assertMatch = (test: any, pattern: RegExp) => {
   assert(test.match(pattern), `should match ${pattern}`)
 }
 
-let mockNode = sinon.fake()
+let mockNode = sinon.fake() as any
 
 describe('Commands', () => {
   it('can import commands', () => {
@@ -64,7 +64,7 @@ describe('Commands', () => {
   */
 
   it('myAddress', async () => {
-    let mockNode = sinon.fake()
+    let mockNode = sinon.fake() as any
     mockNode.paymentChannels = sinon.fake()
     mockNode.paymentChannels.constants = sinon.fake()
     mockNode.paymentChannels.utils = sinon.fake()
@@ -103,10 +103,10 @@ describe('Commands', () => {
 
   it('multisend', async () => {
     let seq = 0
-    let mockNode = sinon.fake()
+    let mockNode = sinon.fake() as any
     mockNode.sendMessage = sinon.fake()
 
-    let mockReadline = sinon.fake()
+    let mockReadline = sinon.fake() as any
     mockReadline.write = sinon.fake()
     mockReadline.pause = sinon.fake()
     mockReadline.resume = sinon.fake()
@@ -196,16 +196,14 @@ describe('Commands', () => {
     assert(mockNode.sendMessage.calledOnce)
   })
 
-  // it('close channel', async () => {
-  //   let mockNode: any = jest.fn()
-  //   mockNode.paymentChannels = jest.fn()
-  //   mockNode.paymentChannels.channel = jest.fn()
-  //   mockNode.paymentChannels.channel.create = jest.fn(async () => ({
-  //     status: undefined
-  //   }))
+  it('close channel', async () => {
+    let mockNode: any = sinon.fake()
+    mockNode.closeChannel = sinon.fake(async () => ({
+      status: undefined
+    }))
 
-  //   let cmds = new mod.Commands(mockNode)
-  //   const r = await cmds.execute('close 16Uiu2HAmAJStiomwq27Kkvtat8KiEHLBSnAkkKCqZmLYKVLtkiB7')
-  //   expect(r).toMatch(/To close a channel, it must be open or pending for closure/)
-  // })
+    let cmds = new mod.Commands(mockNode)
+    const r = await cmds.execute('close 16Uiu2HAmAJStiomwq27Kkvtat8KiEHLBSnAkkKCqZmLYKVLtkiB7')
+    assertMatch(r, /Initiated channel closure/)
+  })
 })

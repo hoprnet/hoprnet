@@ -1,11 +1,7 @@
 {
+  "extends": "../../tsconfig.json",
   "compilerOptions": {
-    "esModuleInterop": true,
-    "noEmit": true,
-    "lib": ["es2019", "dom"],
-    "module": "commonjs",
-    "target": "es2019",
-    "strict": true
+    "noEmit": true
   },
   "include": ["src/**/*.ts"]
 }

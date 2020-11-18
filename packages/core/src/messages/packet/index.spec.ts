@@ -14,6 +14,10 @@ import { connectionHelper } from '../../test-utils'
 const log = Debug(`hopr-core:testing`)
 
 const TWO_SECONDS = durations.seconds(2)
+const CHANNEL_DEPOSIT = 200 // HOPRli
+const BALANCE_A = 100 // HOPRli
+const TICKET_AMOUNT = 10 // HOPRli
+const TICKET_WIN_PROB = 1 // 100%
 
 async function generateNode(id: number): Promise<Hopr<HoprEthereum>> {
   // Start HOPR in DEBUG_MODE and use demo seeds
@@ -23,11 +27,38 @@ async function generateNode(id: number): Promise<Hopr<HoprEthereum>> {
     connector: HoprEthereum,
     provider: GANACHE_URI,
     network: 'ethereum',
-    debug: true
+    debug: true,
+    ticketAmount: TICKET_AMOUNT,
+    ticketWinProb: TICKET_WIN_PROB
   })) as Hopr<HoprEthereum>
 }
 
 const GANACHE_URI = `ws://127.0.0.1:8545`
+
+const NOOP = () => {}
+
+function cleanUpReceiveChecker<Chain extends HoprCoreConnector>(nodes: Hopr<Chain>[]) {
+  for (const node of nodes) {
+    node.output = NOOP
+  }
+}
+
+function receiveChecker<Chain extends HoprCoreConnector>(msgs: Uint8Array[], node: Hopr<Chain>) {
+  const remainingMessages = msgs.slice()
+
+  return new Promise<void>((resolve) => {
+    node.output = (arr: Uint8Array) => {
+      for (let i = 0; i < remainingMessages.length; i++) {
+        if (u8aEquals(remainingMessages[i], arr)) {
+          remainingMessages.splice(i, 1)
+        }
+      }
+      if (remainingMessages.length == 0) {
+        return resolve()
+      }
+    }
+  })
+}
 
 describe('packet/index.spec.ts test packet composition and decomposition', function () {
   this.timeout(30000)
@@ -38,8 +69,8 @@ describe('packet/index.spec.ts test packet composition and decomposition', funct
     connectionHelper(nodes.map((n) => n._libp2p))
 
     new nodes[0].paymentChannels.types.ChannelBalance(undefined, {
-      balance: new BN(200),
-      balance_a: new BN(100)
+      balance: new BN(CHANNEL_DEPOSIT),
+      balance_a: new BN(BALANCE_A)
     }),
       async (bal) => {
         const channel = nodes[0].paymentChannels.types.Channel.createFunded(bal)
@@ -52,16 +83,16 @@ describe('packet/index.spec.ts test packet composition and decomposition', funct
 
     async function openChannel(a: number, b: number) {
       let channelBalance = new nodes[a].paymentChannels.types.ChannelBalance(undefined, {
-        balance: new BN(200),
-        balance_a: new BN(100)
+        balance: new BN(CHANNEL_DEPOSIT),
+        balance_a: new BN(BALANCE_A)
       })
 
       await nodes[a].paymentChannels.channel.create(
         nodes[b].getId().pubKey.marshal(),
         undefined, //async () => nodes[b].getId().pubKey.marshal(),
         new nodes[a].paymentChannels.types.ChannelBalance(undefined, {
-          balance: new BN(200),
-          balance_a: new BN(100)
+          balance: new BN(CHANNEL_DEPOSIT),
+          balance_a: new BN(BALANCE_A)
         }),
         (_channelBalance) => nodes[a]._interactions.payments.open.interact(nodes[b].getId(), channelBalance) as any
       )
@@ -148,28 +179,3 @@ describe('packet/index.spec.ts test packet composition and decomposition', funct
     await Promise.all(nodes.map((node: Hopr<HoprEthereum>) => node.stop()))
   })
 })
-
-const NOOP = () => {}
-
-function cleanUpReceiveChecker<Chain extends HoprCoreConnector>(nodes: Hopr<Chain>[]) {
-  for (const node of nodes) {
-    node.output = NOOP
-  }
-}
-
-function receiveChecker<Chain extends HoprCoreConnector>(msgs: Uint8Array[], node: Hopr<Chain>) {
-  const remainingMessages = msgs.slice()
-
-  return new Promise<void>((resolve) => {
-    node.output = (arr: Uint8Array) => {
-      for (let i = 0; i < remainingMessages.length; i++) {
-        if (u8aEquals(remainingMessages[i], arr)) {
-          remainingMessages.splice(i, 1)
-        }
-      }
-      if (remainingMessages.length == 0) {
-        return resolve()
-      }
-    }
-  })
-}

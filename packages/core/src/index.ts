@@ -10,11 +10,18 @@ import SECIO = require('libp2p-secio')
 import TCP from './network/transport'
 
 import { Packet } from './messages/packet'
-import { PACKET_SIZE, MAX_HOPS, VERSION, CRAWL_TIMEOUT } from './constants'
+import { PACKET_SIZE, MAX_HOPS, VERSION, CRAWL_TIMEOUT, TICKET_AMOUNT, TICKET_WIN_PROB } from './constants'
 
 import { Network } from './network'
 
-import { addPubKey, getPeerId, getAddrs, pubKeyToPeerId } from './utils'
+import {
+  addPubKey,
+  getPeerId,
+  getAddrs,
+  pubKeyToPeerId,
+  getAcknowledgedTickets,
+  submitAcknowledgedTicket
+} from './utils'
 import { createDirectoryIfNotExists, u8aToHex } from '@hoprnet/hopr-utils'
 import { existsSync } from 'fs'
 
@@ -37,6 +44,7 @@ import { Interactions } from './interactions'
 import * as DbKeys from './dbKeys'
 import EventEmitter from 'events'
 import path from 'path'
+import { Mixer } from './mixer'
 
 const verbose = Debug('hopr-core:verbose')
 
@@ -45,13 +53,12 @@ interface NetOptions {
   port: number
 }
 
-type OperationSuccess = { status: 'SUCCESS'; receipt: string }
-type OperationFailure = { status: 'FAILURE'; message: string }
-type OperationError = { status: 'ERROR'; error: Error | string }
-export type OperationStatus = OperationSuccess | OperationFailure | OperationError
-
 export type HoprOptions = {
   debug: boolean
+  network: string
+  provider: string
+  ticketAmount?: number
+  ticketWinProb?: number
   db?: LevelUp
   dbPath?: string
   createDbIfNotExist?: boolean
@@ -59,10 +66,8 @@ export type HoprOptions = {
   password?: string
   id?: number // TODO - kill this opaque accessor of db files...
   bootstrapNode?: boolean
-  network: string
   connector?: HoprCoreConnectorStatic
   bootstrapServers?: Multiaddr[]
-  provider: string
   output?: (encoded: Uint8Array) => void
   hosts?: {
     ip4?: NetOptions
@@ -84,9 +89,12 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
   public isBootstrapNode: boolean
   public bootstrapServers: Multiaddr[]
   public initializedWithOptions: HoprOptions
+  public ticketAmount: number = TICKET_AMOUNT
+  public ticketWinProb: number = TICKET_WIN_PROB
 
   private running: boolean
   private crawlTimeout: NodeJS.Timeout
+  private mixer: Mixer<Chain>
 
   /**
    * @constructor
@@ -100,6 +108,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       this.emit('hopr:peer:connection', conn.remotePeer)
     })
 
+    this.mixer = new Mixer()
     this.initializedWithOptions = options
     this.output = (arr: Uint8Array) => {
       this.emit('hopr:message', arr)
@@ -112,10 +121,14 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     this.isBootstrapNode = options.bootstrapNode || false
     this._interactions = new Interactions(
       this,
+      this.mixer,
       (conn: Connection) => this._network.crawler.handleCrawlRequest(conn),
       (remotePeer: PeerId) => this._network.heartbeat.emit('beat', remotePeer)
     )
     this._network = new Network(this._libp2p, this._interactions, options)
+
+    if (options.ticketAmount) this.ticketAmount = options.ticketAmount
+    if (options.ticketWinProb) this.ticketWinProb = options.ticketWinProb
 
     verbose('# STARTED NODE')
     verbose('ID', this.getId().toB58String())
@@ -459,6 +472,14 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     return { receipt, status }
   }
 
+  public async getAcknowledgedTickets() {
+    return getAcknowledgedTickets(this)
+  }
+
+  public async submitAcknowledgedTicket(ackTicket: Types.AcknowledgedTicket, index: Uint8Array) {
+    return submitAcknowledgedTicket(this, ackTicket, index)
+  }
+
   /**
    * Takes a destination and samples randomly intermediate nodes
    * that will relay that message before it reaches its destination.
@@ -515,95 +536,6 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     }
     // @ts-ignore
     return levelup(leveldown(dbPath))
-  }
-
-  /**
-   * Get all acknowledged tickets
-   * @returns an array of all acknowledged tickets
-   */
-  public async getAcknowledgedTickets(): Promise<
-    {
-      ackTicket: Types.AcknowledgedTicket
-      index: Uint8Array
-    }[]
-  > {
-    const { AcknowledgedTicket } = this.paymentChannels.types
-    const acknowledgedTicketSize = AcknowledgedTicket.SIZE(this.paymentChannels)
-    let promises: {
-      ackTicket: Types.AcknowledgedTicket
-      index: Uint8Array
-    }[] = []
-
-    return new Promise((resolve, reject) => {
-      this.db
-        .createReadStream({
-          gte: Buffer.from(this._dbKeys.AcknowledgedTickets(new Uint8Array(0x00)))
-        })
-        .on('error', (err) => reject(err))
-        .on('data', ({ key, value }: { key: Buffer; value: Buffer }) => {
-          if (value.buffer.byteLength !== acknowledgedTicketSize) return
-
-          const index = this._dbKeys.AcknowledgedTicketsParse(key)
-          const ackTicket = AcknowledgedTicket.create(this.paymentChannels, {
-            bytes: value.buffer,
-            offset: value.byteOffset
-          })
-
-          promises.push({
-            ackTicket,
-            index
-          })
-        })
-        .on('end', () => resolve(Promise.all(promises)))
-    })
-  }
-
-  /**
-   * Update Acknowledged Ticket in database
-   * @param ackTicket Uint8Array
-   * @param index Uint8Array
-   */
-  private async updateAcknowledgedTicket(ackTicket: Types.AcknowledgedTicket, index: Uint8Array): Promise<void> {
-    await this.db.put(Buffer.from(this._dbKeys.AcknowledgedTickets(index)), Buffer.from(ackTicket))
-  }
-
-  /**
-   * Delete Acknowledged Ticket in database
-   * @param index Uint8Array
-   */
-  private async deleteAcknowledgedTicket(index: Uint8Array): Promise<void> {
-    await this.db.del(Buffer.from(this._dbKeys.AcknowledgedTickets(index)))
-  }
-
-  /**
-   * Submit Acknowledged Ticket and update database
-   * @param ackTicket Uint8Array
-   * @param index Uint8Array
-   */
-  public async submitAcknowledgedTicket(
-    ackTicket: Types.AcknowledgedTicket,
-    index: Uint8Array
-  ): Promise<OperationStatus> {
-    try {
-      const result = await this.paymentChannels.channel.tickets.submit(ackTicket, index)
-
-      if (result.status === 'SUCCESS') {
-        ackTicket.redeemed = true
-        await this.updateAcknowledgedTicket(ackTicket, index)
-      } else if (result.status === 'FAILURE') {
-        await this.deleteAcknowledgedTicket(index)
-      } else if (result.status === 'ERROR') {
-        await this.deleteAcknowledgedTicket(index)
-        // @TODO: better handle this
-      }
-
-      return result
-    } catch (err) {
-      return {
-        status: 'ERROR',
-        error: err
-      }
-    }
   }
 }
 

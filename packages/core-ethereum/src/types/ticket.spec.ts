@@ -1,7 +1,7 @@
 import assert from 'assert'
 import { randomBytes } from 'crypto'
 import BN from 'bn.js'
-import { stringToU8a, randomInteger, u8aToHex } from '@hoprnet/hopr-utils'
+import { stringToU8a, randomInteger } from '@hoprnet/hopr-utils'
 import { AccountId, Ticket, Hash, TicketEpoch, Balance } from '.'
 import { privKeyToPubKey, pubKeyToAccountId } from '../utils'
 import * as testconfigs from '../config.spec'

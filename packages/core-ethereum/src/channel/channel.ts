@@ -1,4 +1,5 @@
 import type { Channel as IChannel } from '@hoprnet/hopr-core-connector-interface'
+import BN from 'bn.js'
 import { u8aToHex } from '@hoprnet/hopr-utils'
 import { Balance, Channel as ChannelType, Hash, Moment, Public, SignedChannel } from '../types'
 import TicketFactory from './ticket'
@@ -124,6 +125,17 @@ class Channel implements IChannel {
     return new Promise<Balance>(async (resolve, reject) => {
       try {
         return resolve(new Balance((await this.onChainChannel).partyABalance))
+      } catch (error) {
+        return reject(error)
+      }
+    })
+  }
+
+  get balance_b(): Promise<Balance> {
+    return new Promise<Balance>(async (resolve, reject) => {
+      try {
+        const { deposit, partyABalance } = await this.onChainChannel
+        return resolve(new Balance(new BN(deposit).sub(new BN(partyABalance))))
       } catch (error) {
         return reject(error)
       }
