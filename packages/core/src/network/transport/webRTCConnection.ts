@@ -50,8 +50,6 @@ class WebRTCConnection implements MultiaddrConnection {
     this.channel.once('connect', () => {
       clearTimeout(this._webRTCTimeout)
 
-      console.log(`available after connect`)
-
       this._webRTCStateKnown = true
       this._webRTCAvailable = true
       this._switchPromise.resolve()
@@ -90,8 +88,6 @@ class WebRTCConnection implements MultiaddrConnection {
 
       let defer = Defer<void>()
 
-      // let graceFullyMigrated = false
-
       let promiseTriggered = true
 
       let streamSwitched = false
@@ -106,14 +102,12 @@ class WebRTCConnection implements MultiaddrConnection {
           }
 
           while (!this._webRTCAvailable) {
-            console.log(`sink iteration`, this._webRTCAvailable, this._webRTCStateKnown)
             if (!this._webRTCStateKnown) {
               await Promise.race([
                 // prettier-ignore
                 sourcePromise,
                 switchPromise
               ])
-              console.log(`after Promise.race sourceReceived`, sourceReceived, `sourceDone`, sourceDone)
 
               if (streamSwitched) {
                 break
@@ -125,26 +119,13 @@ class WebRTCConnection implements MultiaddrConnection {
                   break
                 }
 
-                console.log(
-                  `this._webRTCAvailable`,
-                  this._webRTCAvailable,
-                  `this._webRTCStateKnown`,
-                  this._webRTCStateKnown
-                )
-
                 console.log(`sinking into relay connection`, new TextDecoder().decode(sourceMsg.slice()))
 
                 yield sourceMsg.slice()
 
-                console.log(`after yield`)
-
                 if (!this._webRTCAvailable) {
-                  console.log(`source.next()`)
-
                   sourcePromise = source.next().then(sourceFunction)
                   promiseTriggered = true
-
-                  // graceFullyMigrated = true
                 }
               }
             } else {

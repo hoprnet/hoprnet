@@ -112,9 +112,7 @@ class TCP {
     log(`####### inside reconnect #######`)
 
     try {
-      console.log(`this in reconnect`, this)
       if (this._webRTCUpgrader != null) {
-        console.log(`inside 'good' branch`)
         newStream = new WebRTCConnection({
           conn: newStream,
           self: this._peerId,
@@ -122,25 +120,6 @@ class TCP {
           channel: (newStream as RelayConnection).webRTC
         })
       }
-
-      // newStream.sink(
-      //   (async function* () {
-      //     for (let i = 0; i < 7; i++) {
-      //       await new Promise((resolve) => setTimeout(resolve, 40))
-      //       yield new TextEncoder().encode(`msg #${i}`)
-      //     }
-      //   })()
-      // )
-
-      // while (true) {
-      //   let result = await newStream.source.next()
-
-      //   console.log(result)
-
-      //   if (result.done) {
-      //     break
-      //   }
-      // }
 
       let newConn = await this._upgrader.upgradeInbound(newStream)
 
@@ -235,16 +214,6 @@ class TCP {
   async dialWithRelay(ma: Multiaddr, relays: Multiaddr[], options?: DialOptions): Promise<Connection> {
     let conn = await this._relay.establishRelayedConnection(ma, relays, this.onReconnect.bind(this), options)
 
-    // conn.sink(
-    //   (async function* () {
-    //     for (let i = 0; i < 7; i++) {
-    //       await new Promise((resolve) => setTimeout(resolve, 40))
-    //       yield new TextEncoder().encode(`msg from initiator #${i}`)
-    //     }
-    //   })()
-    // )
-
-    // await new Promise((resolve) => setTimeout(resolve, 500))
     return await this._upgrader.upgradeOutbound(conn)
   }
 
