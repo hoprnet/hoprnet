@@ -7,11 +7,17 @@ import Debug from 'debug'
 const log = Debug('hopr-core:pathfinder')
 
 export type Path = PeerId[]
+type ChannelPath = IndexerChannel[]
 
-const compare = (a: Path, b: Path) => b.length - a.length
-
-const MAX_ITERATIONS = 200
+const MAX_ITERATIONS = 100
 const QUALITY_THRESHOLD = 0.5
+
+const next = (c: IndexerChannel):PeerId => c[1]
+const pathFrom = (c: ChannelPath): Path => [c[0][0]].concat(c.map(next))
+const compare = (a: ChannelPath, b: ChannelPath) => b.length - a.length
+const filterCycles = (c: IndexerChannel, p: ChannelPath): boolean => 
+  !pathFrom(p).find(x => x.equals(next(c)))
+
 
 export async function findPath(
   start: PeerId,
@@ -21,38 +27,40 @@ export async function findPath(
   indexer: Indexer
 ): Promise<Path> {
   log('find path from', start.toB58String(), 'to ', destination.toB58String(), 'length', hops)
+
   const filter = (node: PeerId) => {
     return !node.equals(destination) && networkPeers.qualityOf(node) > QUALITY_THRESHOLD
   }
-  let queue = new Heap<Path>(compare)
+
+  let queue = new Heap<ChannelPath>(compare)
+  let deadEnds = new Set<string>()
   let iterations = 0
-  queue.addAll((await indexer.getChannelsFromPeer(start)).map((x) => [start, x[1]]))
+  queue.addAll((await indexer.getChannelsFromPeer(start)).map(x => [x]))
 
-  while (queue.length > 0 && iterations < MAX_ITERATIONS) {
-    iterations++
-    const currentPath = queue.peek() as Path
+  while (queue.length > 0 && iterations++ < MAX_ITERATIONS) {
+    const currentPath = queue.peek()
 
-    if (currentPath.length == hops) {
-      log('Path of correct length found', currentPath.map(x => x.toB58String()).join(','))
-      return currentPath
+    if (pathFrom(currentPath).length == hops) {
+      log('Path of correct length found', 
+          pathFrom(currentPath).map(x => x.toB58String()).join(','))
+      return pathFrom(currentPath)
     }
 
-    const lastNode = currentPath[currentPath.length - 1]
+    const lastPeer = next(currentPath[currentPath.length - 1])
+    const newChannels = (await indexer.getChannelsFromPeer(lastPeer))
+      .filter(c => filterCycles(c, currentPath)) 
+      .filter(c => !deadEnds.has(next(c).toB58String()))
+      .filter(c => filter(next(c)))
 
-    const newNodes = (await indexer.getChannelsFromPeer(lastNode))
-      .filter((c) => !currentPath.includes(c[1]))
-      .filter((c) => filter(c[1]))
-
-    if (newNodes.length == 0) {
+    if (newChannels.length == 0) {
       queue.pop()
-      continue
+      deadEnds.add(lastPeer.toB58String())
+    } else {
+      let nextChannel = newChannels[randomInteger(0, newChannels.length)]
+      const toPush = Array.from(currentPath)
+      toPush.push(nextChannel)
+      queue.push(toPush)
     }
-
-    let nextChannel: IndexerChannel = newNodes[randomInteger(0, newNodes.length)]
-
-    const toPush = Array.from(currentPath)
-    toPush.push(nextChannel[1])
-    queue.push(toPush)
   }
 
   log('Path not found')

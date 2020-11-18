@@ -1,4 +1,4 @@
-/*import { Ganache } from '@hoprnet/hopr-testing'
+import { Ganache } from '@hoprnet/hopr-testing'
 import { addresses, compile, migrate, fund } from '@hoprnet/hopr-ethereum'
 
 let ganache
@@ -15,4 +15,3 @@ export const mochaGlobalSetup = async () => {
 export const mochaGlobalTeardown = async () => {
   await ganache.stop()
 }
-*/
