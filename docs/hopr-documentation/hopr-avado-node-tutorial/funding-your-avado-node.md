@@ -23,7 +23,7 @@ It costs MATIC to open payment channels and perform certain other testnet action
 
 If your node is unfunded, you can find your MATIC address by simply starting the HOPR dApp. Your AVADO node will report that it is unfunded and won't proceed. It will tell you your address, so you can send MATIC.
 
-![This message will display when you need to fund your AVADO node with MATIC](../.gitbook/assets/avado-matic-no-funds%20%281%29%20%281%29%20%281%29%20%281%29.png)
+![This message will display when you need to fund your AVADO node with MATIC](../.gitbook/assets/avado-matic-no-funds%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29.png)
 
 You can ask for MATIC in our [**Telegram**](https://t.me/hoprnet) or [**Discord**](https://discord.gg/dEAWC4G) channels. A HOPR ambassador will be glad to fund your wallet. If you need more instructions on how to buy and send MATIC, head [**here**](../core-concepts/tokens/native-tokens.md#getting-xdai).
 
@@ -33,11 +33,11 @@ Currently, HOPR Chat doesn't always notify you if an action has failed due to la
 
 Once you've sent MATIC to your node, restart the HOPR dApp from MyDapps in your AVADO dashboard. The HOPR package is the one labelled `hopr.avado.dnp.dappnode.eth`.
 
-![Restarting your HOPR dApp](../.gitbook/assets/avado-restart-hopr%20%281%29%20%281%29%20%281%29%20%281%29.png)
+![Restarting your HOPR dApp](../.gitbook/assets/avado-restart-hopr%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29.png)
 
 When you press restart, you'll see the following warning:
 
-![](../.gitbook/assets/avado-restart-warning%20%281%29%20%281%29%20%281%29%20%281%29.png)
+![](../.gitbook/assets/avado-restart-warning%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29.png)
 
 This is fine. Just click "Restart" to proceed.
 
