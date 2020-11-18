@@ -282,9 +282,7 @@ describe('unit test validateUnacknowledgedTicket', function () {
 
 describe('unit test validateCreatedTicket', function () {
   it('should pass if ticket is okay', async function () {
-    const signedTicket = createSignedTicket({
-      sender
-    })
+    const signedTicket = createMockSignedTicket({})
 
     return expect(
       validateCreatedTicket({
@@ -295,9 +293,7 @@ describe('unit test validateCreatedTicket', function () {
   })
 
   it('should throw when signer is not sender', async function () {
-    const signedTicket = createSignedTicket({
-      sender
-    })
+    const signedTicket = createMockSignedTicket({})
 
     return expect(
       validateCreatedTicket({

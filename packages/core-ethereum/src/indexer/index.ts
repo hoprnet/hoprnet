@@ -1,13 +1,12 @@
 import type { Indexer as IIndexer } from '@hoprnet/hopr-core-connector-interface'
 import type HoprEthereum from '..'
-import EventEmitter from 'events'
 import BN from 'bn.js'
 import chalk from 'chalk'
 import { Subscription } from 'web3-core-subscriptions'
 import { BlockHeader } from 'web3-eth'
 import { u8aToNumber, u8aConcat, u8aToHex } from '@hoprnet/hopr-utils'
 import { ChannelEntry, Public } from '../types'
-import { Log, isPartyA, events, getId } from '../utils'
+import { Log, isPartyA, events } from '../utils'
 import { MAX_CONFIRMATIONS } from '../config'
 import { ContractEventLog } from '../tsc/web3/types'
 import { Log as OnChainLog } from 'web3-core'
@@ -52,7 +51,7 @@ function isConfirmedBlock(blockNumber: number, onChainBlockNumber: number): bool
 /**
  * Simple indexer to keep track of all open payment channels.
  */
-class Indexer extends EventEmitter implements IIndexer {
+class Indexer implements IIndexer {
   private log = Log(['channels'])
   private status: 'started' | 'stopped' = 'stopped'
   private unconfirmedEvents: (OpenedChannelEvent | ClosedChannelEvent)[] = []
@@ -62,9 +61,7 @@ class Indexer extends EventEmitter implements IIndexer {
   private openedChannelEvent?: Subscription<OnChainLog>
   private closedChannelEvent?: Subscription<OnChainLog>
 
-  constructor(private connector: HoprEthereum) {
-    super()
-  }
+  constructor(private connector: HoprEthereum) {}
 
   /**
    * Returns the latest confirmed block number.
@@ -274,10 +271,7 @@ class Indexer extends EventEmitter implements IIndexer {
   private async onOpenedChannel(event: OpenedChannelEvent): Promise<void> {
     let partyA: Public, partyB: Public
 
-    const userA = await event.returnValues.opener.toAccountId()
-    const userB = await event.returnValues.counterparty.toAccountId()
-
-    if (isPartyA(userA, userB)) {
+    if (isPartyA(await event.returnValues.opener.toAccountId(), await event.returnValues.counterparty.toAccountId())) {
       partyA = event.returnValues.opener
       partyB = event.returnValues.counterparty
     } else {
@@ -301,20 +295,12 @@ class Indexer extends EventEmitter implements IIndexer {
     }
 
     this.store(partyA, partyB, newChannelEntry)
-    this.emit('channelOpened', {
-      partyA,
-      partyB,
-      id: await getId(partyA, partyB)
-    })
   }
 
   private async onClosedChannel(event: ClosedChannelEvent): Promise<void> {
     let partyA: Public, partyB: Public
 
-    const userA = await event.returnValues.closer.toAccountId()
-    const userB = await event.returnValues.counterparty.toAccountId()
-
-    if (isPartyA(userA, userB)) {
+    if (isPartyA(await event.returnValues.closer.toAccountId(), await event.returnValues.counterparty.toAccountId())) {
       partyA = event.returnValues.closer
       partyB = event.returnValues.counterparty
     } else {
@@ -340,11 +326,6 @@ class Indexer extends EventEmitter implements IIndexer {
     }
 
     await this.delete(partyA, partyB)
-    this.emit('channelClosed', {
-      partyA,
-      partyB,
-      id: await getId(partyA, partyB)
-    })
   }
 
   /**

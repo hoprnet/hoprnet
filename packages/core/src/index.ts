@@ -20,8 +20,7 @@ import {
   getAddrs,
   pubKeyToPeerId,
   getAcknowledgedTickets,
-  submitAcknowledgedTicket,
-  deleteTickets
+  submitAcknowledgedTicket
 } from './utils'
 import { createDirectoryIfNotExists, u8aToHex } from '@hoprnet/hopr-utils'
 import { existsSync } from 'fs'
@@ -39,7 +38,6 @@ import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type { HoprCoreConnectorStatic, Types } from '@hoprnet/hopr-core-connector-interface'
 import type { CrawlInfo } from './network/crawler'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
-import { u8aEquals } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 
 import { Interactions } from './interactions'
@@ -108,18 +106,6 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     super()
     this._libp2p.connectionManager.on('peer:connect', (conn: Connection) => {
       this.emit('hopr:peer:connection', conn.remotePeer)
-    })
-    // once a channel is closed delete all tickets
-    this.paymentChannels.indexer.on('channelClosed', ({ partyA, partyB }) => {
-      const myPubKey = this.getId().pubKey.marshal()
-      const myChannel = u8aEquals(partyA, myPubKey) || u8aEquals(partyB, myPubKey)
-      if (!myChannel) return
-
-      deleteTickets(this, {
-        signer: u8aEquals(partyA, myPubKey) ? partyB : partyA
-      }).catch((error) => {
-        verbose('Error while deleting tickets', error)
-      })
     })
 
     this.mixer = new Mixer()
