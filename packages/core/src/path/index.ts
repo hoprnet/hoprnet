@@ -8,16 +8,17 @@ const log = Debug('hopr-core:pathfinder')
 
 export type Path = PeerId[]
 type ChannelPath = IndexerChannel[]
+type Edge = IndexerChannel
 
+// TODO move to consts
 const MAX_ITERATIONS = 100
 const QUALITY_THRESHOLD = 0.5
 
 const sum = (a: number, b: number) => a + b
-const next = (c: IndexerChannel): PeerId => c[1]
-const stake = (c: IndexerChannel): number => c[2]
+const next = (c: Edge): PeerId => c[1]
+const stake = (c: Edge): number => c[2]
 const pathFrom = (c: ChannelPath): Path => [c[0][0]].concat(c.map(next))
-//const comparePath = (a: ChannelPath, b: ChannelPath) => b.length - a.length
-const filterCycles = (c: IndexerChannel, p: ChannelPath): boolean => !pathFrom(p).find((x) => x.equals(next(c)))
+const filterCycles = (c: Edge, p: ChannelPath): boolean => !pathFrom(p).find((x) => x.equals(next(c)))
 
 /*
  * Find a path through the payment channels.
@@ -29,21 +30,27 @@ export async function findPath(
   hops: number,
   networkPeers: NetworkPeers,
   indexer: Indexer,
-  randomness: number
+  randomness: number // Proportion of randomness in stake.
 ): Promise<Path> {
   log('find path from', start.toB58String(), 'to ', destination.toB58String(), 'length', hops)
 
-  const filter = (node: PeerId) => {
-    return !node.equals(destination) && networkPeers.qualityOf(node) > QUALITY_THRESHOLD
-  }
+  // Discard destination or low QoS nodes.
+  const filter = (node: PeerId) => !node.equals(destination) && networkPeers.qualityOf(node) > QUALITY_THRESHOLD
 
-  const weight = (edge: IndexerChannel): number => {
-    const rand = randomness > 0 ? randomInteger(0, randomness) : 1
+  // Weight a node based on stake, and a random component.
+  const weight = (edge: Edge): number => {
+    const rand = randomness > 0 ? randomInteger(0, randomness) : 1 // TODO use float
     return stake(edge) * rand 
   }
 
+  const compareWeight = (a: Edge, b: Edge) => weight(b) - weight(a)
+
+  // Weight the path with the sum of it's edges weight
+  const pathWeight = (a: ChannelPath): number => a.map(weight).reduce(sum, 0)
+
   const comparePath = (a: ChannelPath, b: ChannelPath) => {
-    return b.map(weight).reduce(sum, 0) - a.map(weight).reduce(sum, 0)
+    console.log(pathWeight(a), pathWeight(b))
+    return pathWeight(b) - pathWeight(a) 
   }
 
   let queue = new Heap<ChannelPath>(comparePath)
@@ -53,6 +60,9 @@ export async function findPath(
 
   while (queue.length > 0 && iterations++ < MAX_ITERATIONS) {
     const currentPath = queue.peek()
+    log('current path', pathFrom(currentPath)
+          .map((x) => x.toB58String())
+          .join(','), 'weight', pathWeight(currentPath))
 
     if (pathFrom(currentPath).length == hops) {
       log(
@@ -69,14 +79,14 @@ export async function findPath(
       .filter((c) => filterCycles(c, currentPath))
       .filter((c) => !deadEnds.has(next(c).toB58String()))
       .filter((c) => filter(next(c)))
+      .sort(compareWeight)
 
     if (newChannels.length == 0) {
       queue.pop()
       deadEnds.add(lastPeer.toB58String())
     } else {
-      let nextChannel = newChannels[randomInteger(0, newChannels.length)]
       const toPush = Array.from(currentPath)
-      toPush.push(nextChannel)
+      toPush.push(newChannels[0])
       queue.push(toPush)
     }
   }

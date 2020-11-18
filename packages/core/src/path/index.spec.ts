@@ -32,6 +32,7 @@ describe('test pathfinder with some simple topologies', function () {
   const RELIABLE_NETWORK = { qualityOf: (_p) => 1 } as NetworkPeers
   const UNRELIABLE_NETWORK = { qualityOf: (p) => ((p.id as any) % 3 == 0 ? 0 : 1) } as NetworkPeers // Node 3 is down
   const STAKE_1 = () => 1
+  const STAKE_N = (x) => x.id + 0.1
 
   // Bidirectional star, all pass through node 0
   const STAR = new Map<PeerId, PeerId[]>()
@@ -49,7 +50,7 @@ describe('test pathfinder with some simple topologies', function () {
 
   function fakeIndexer(edges: Map<PeerId, PeerId[]>, stakes: (i: PeerId) => number): Indexer {
     return {
-      getChannelsFromPeer: (a: PeerId) => Promise.resolve((edges.get(a) || []).map((b) => [a, b, stakes(a) as any]))
+      getChannelsFromPeer: (a: PeerId) => Promise.resolve((edges.get(a) || []).map((b) => [a, b, stakes(b) as any]))
     }
   }
 
@@ -57,6 +58,12 @@ describe('test pathfinder with some simple topologies', function () {
     const path = await findPath(TEST_NODES[1], fakePeerId(6), 3, RELIABLE_NETWORK, fakeIndexer(STAR, STAKE_1), 0)
     checkPath(path, STAR)
     assert(path.length == 3, 'Should find a valid acyclic path')
+  })
+
+  it('should find the most valuable path through a reliable star', async function () {
+    const path = await findPath(TEST_NODES[1], fakePeerId(6), 3, RELIABLE_NETWORK, fakeIndexer(STAR, STAKE_N), 0)
+    checkPath(path, STAR)
+    assert(path[2].id as any == 4, 'Last hop should be 4 (most valuable choice)')
   })
 
   it('should not find a path if it doesnt exist', async () => {
