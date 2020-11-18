@@ -30,18 +30,18 @@ You are ready to go!
 
 ### Additional Requirements
 
-* Twitter Account with &gt;25 followers.
-* xDAI wallet \(e.g. Metamask w/xDAI RPC, [https://xdai.io/](https://xdai.io/)\)
+- Twitter Account with &gt;25 followers.
+- xDAI wallet \(e.g. Metamask w/xDAI RPC, [https://xdai.io/](https://xdai.io/)\)
 
 ## Sessions
 
-* 21st of August at 4pm CEST
-* 23rd of August at 12pm CEST
+- 21st of August at 4pm CEST
+- 23rd of August at 12pm CEST
 
 ## Prices
 
-* 1st Session - 150 xDAI pool, 10 xDAI per participant
-* 2nd Session - 150 xDAI pool, 10 xDAI per participant
+- 1st Session - 150 xDAI pool, 10 xDAI per participant
+- 2nd Session - 150 xDAI pool, 10 xDAI per participant
 
 ## Bot Address
 
@@ -94,4 +94,3 @@ Now, you can send messages to `bouncerbot` just by typing `send bouncerbot`.
 Time to get into the party! Message `bouncerbot` to try and enter the party. It might take multiple tries before you can get in. Good luck!
 
 ![](https://media.giphy.com/media/xT5LMWSMSsE5lji9LW/giphy.gif)
-
