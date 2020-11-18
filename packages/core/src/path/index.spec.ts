@@ -54,7 +54,7 @@ describe('test pathfinder with some simple topologies', function () {
   }
 
   it('should find a path through a reliable star', async function () {
-    const path = await findPath(TEST_NODES[1], fakePeerId(6), 3, RELIABLE_NETWORK, fakeIndexer(STAR, STAKE_1))
+    const path = await findPath(TEST_NODES[1], fakePeerId(6), 3, RELIABLE_NETWORK, fakeIndexer(STAR, STAKE_1), 0)
     checkPath(path, STAR)
     assert(path.length == 3, 'Should find a valid acyclic path')
   })
@@ -62,7 +62,7 @@ describe('test pathfinder with some simple topologies', function () {
   it('should not find a path if it doesnt exist', async () => {
     let thrown = false
     try {
-      await findPath(TEST_NODES[1], fakePeerId(6), 4, RELIABLE_NETWORK, fakeIndexer(STAR, STAKE_1))
+      await findPath(TEST_NODES[1], fakePeerId(6), 4, RELIABLE_NETWORK, fakeIndexer(STAR, STAKE_1), 0)
     } catch (e) {
       thrown = true
     }
@@ -70,7 +70,7 @@ describe('test pathfinder with some simple topologies', function () {
   })
 
   it('should find a path through a reliable arrow', async () => {
-    const path = await findPath(TEST_NODES[0], fakePeerId(6), 5, RELIABLE_NETWORK, fakeIndexer(ARROW, STAKE_1))
+    const path = await findPath(TEST_NODES[0], fakePeerId(6), 5, RELIABLE_NETWORK, fakeIndexer(ARROW, STAKE_1), 0)
     checkPath(path, ARROW)
     assert(path.length == 5, 'Should find a valid acyclic path')
   })
@@ -78,7 +78,7 @@ describe('test pathfinder with some simple topologies', function () {
   it('should not find a path if a node is unreliable', async () => {
     let thrown = false
     try {
-      await findPath(TEST_NODES[0], fakePeerId(6), 4, UNRELIABLE_NETWORK, fakeIndexer(ARROW, STAKE_1))
+      await findPath(TEST_NODES[0], fakePeerId(6), 4, UNRELIABLE_NETWORK, fakeIndexer(ARROW, STAKE_1), 0)
     } catch (e) {
       thrown = true
     }

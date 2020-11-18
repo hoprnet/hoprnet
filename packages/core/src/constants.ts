@@ -32,3 +32,4 @@ export const HEARTBEAT_TIMEOUT = durations.seconds(3)
 export const CRAWL_TIMEOUT = 100_000 // ~15 mins
 
 export const MAX_PACKET_DELAY = 200
+export const PATH_RANDOMNESS = 1000

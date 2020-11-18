@@ -12,17 +12,24 @@ type ChannelPath = IndexerChannel[]
 const MAX_ITERATIONS = 100
 const QUALITY_THRESHOLD = 0.5
 
+const sum = (a: number, b: number) => a + b
 const next = (c: IndexerChannel): PeerId => c[1]
+const stake = (c: IndexerChannel): number => c[2]
 const pathFrom = (c: ChannelPath): Path => [c[0][0]].concat(c.map(next))
-const compare = (a: ChannelPath, b: ChannelPath) => b.length - a.length
+//const comparePath = (a: ChannelPath, b: ChannelPath) => b.length - a.length
 const filterCycles = (c: IndexerChannel, p: ChannelPath): boolean => !pathFrom(p).find((x) => x.equals(next(c)))
 
+/*
+ * Find a path through the payment channels.
+ *
+ */
 export async function findPath(
   start: PeerId,
   destination: PeerId,
   hops: number,
   networkPeers: NetworkPeers,
-  indexer: Indexer
+  indexer: Indexer,
+  randomness: number
 ): Promise<Path> {
   log('find path from', start.toB58String(), 'to ', destination.toB58String(), 'length', hops)
 
@@ -30,7 +37,16 @@ export async function findPath(
     return !node.equals(destination) && networkPeers.qualityOf(node) > QUALITY_THRESHOLD
   }
 
-  let queue = new Heap<ChannelPath>(compare)
+  const weight = (edge: IndexerChannel): number => {
+    const rand = randomness > 0 ? randomInteger(0, randomness) : 1
+    return stake(edge) * rand 
+  }
+
+  const comparePath = (a: ChannelPath, b: ChannelPath) => {
+    return b.map(weight).reduce(sum, 0) - a.map(weight).reduce(sum, 0)
+  }
+
+  let queue = new Heap<ChannelPath>(comparePath)
   let deadEnds = new Set<string>()
   let iterations = 0
   queue.addAll((await indexer.getChannelsFromPeer(start)).map((x) => [x]))
