@@ -63,7 +63,7 @@ describe('test pathfinder with some simple topologies', function () {
   it('should find the most valuable path through a reliable star', async function () {
     const path = await findPath(TEST_NODES[1], fakePeerId(6), 3, RELIABLE_NETWORK, fakeIndexer(STAR, STAKE_N), 0)
     checkPath(path, STAR)
-    assert(path[2].id as any == 4, 'Last hop should be 4 (most valuable choice)')
+    assert((path[2].id as any) == 4, 'Last hop should be 4 (most valuable choice)')
   })
 
   it('should not find a path if it doesnt exist', async () => {

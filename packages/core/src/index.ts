@@ -10,7 +10,15 @@ import SECIO = require('libp2p-secio')
 import TCP from './network/transport'
 
 import { Packet } from './messages/packet'
-import { PACKET_SIZE, MAX_HOPS, VERSION, CRAWL_TIMEOUT, TICKET_AMOUNT, TICKET_WIN_PROB, PATH_RANDOMNESS } from './constants'
+import {
+  PACKET_SIZE,
+  MAX_HOPS,
+  VERSION,
+  CRAWL_TIMEOUT,
+  TICKET_AMOUNT,
+  TICKET_WIN_PROB,
+  PATH_RANDOMNESS
+} from './constants'
 
 import { Network } from './network'
 import { findPath } from './path'

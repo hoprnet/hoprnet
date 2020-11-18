@@ -48,7 +48,7 @@ export async function findPath(
   const pathWeight = (a: ChannelPath): number => a.map(weight).reduce(sum, 0)
 
   const comparePath = (a: ChannelPath, b: ChannelPath) => {
-    return pathWeight(b) - pathWeight(a) 
+    return pathWeight(b) - pathWeight(a)
   }
 
   let queue = new Heap<ChannelPath>(comparePath)
