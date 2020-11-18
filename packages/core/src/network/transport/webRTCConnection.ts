@@ -194,17 +194,7 @@ class WebRTCConnection implements MultiaddrConnection {
         this._webRTCTimeout = setTimeout(endWebRTCUpgrade, WEBRTC_UPGRADE_TIMEOUT)
       }
 
-      while (true) {
-        let result = await this.conn.source.next()
-
-        if (result.done) {
-          break
-        }
-
-        yield (result.value as Uint8Array).slice()
-      }
-
-      // yield* this.conn.source
+      yield* this.conn.source
 
       console.log(`before await switchPromise`, this._webRTCAvailable)
       if (!this._webRTCStateKnown || this._webRTCAvailable) {
