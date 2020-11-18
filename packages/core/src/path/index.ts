@@ -16,13 +16,16 @@ const stake = (c: Edge): number => c[2] // TODO cast from BN
 const pathFrom = (c: ChannelPath): Path => [c[0][0]].concat(c.map(next))
 const filterCycles = (c: Edge, p: ChannelPath): boolean => !pathFrom(p).find((x) => x.equals(next(c)))
 const rand = () => Math.random() // TODO - swap for something crypto safe
-const debugPath = (p: ChannelPath) => pathFrom(p).map((x) => x.toB58String()).join(',')
+const debugPath = (p: ChannelPath) =>
+  pathFrom(p)
+    .map((x) => x.toB58String())
+    .join(',')
 
 /**
  * Find a path through the payment channels.
  *
  * @returns path as Array<PeerId> (including start, but not including
- * destination 
+ * destination
  */
 export async function findPath(
   start: PeerId,
@@ -37,7 +40,7 @@ export async function findPath(
   // Weight a node based on stake, and a random component.
   const weight = (edge: Edge): number => {
     // Minimum is 'stake', therefore weight is monotonically increasing
-    const r = 1 + (rand() * randomness) 
+    const r = 1 + rand() * randomness
     // Log scale, but minimum 1 weight per edge
     return Math.log(1 + stake(edge) * r)
   }
@@ -65,12 +68,13 @@ export async function findPath(
 
     const lastPeer = next(currentPath[currentPath.length - 1])
     const newChannels = (await indexer.getChannelsFromPeer(lastPeer))
-      .filter(c => ( 
-        !destination.equals(next(c)) && 
-        networkPeers.qualityOf(next(c)) > NETWORK_QUALITY_THRESHOLD &&
-        filterCycles(c, currentPath) &&
-        !deadEnds.has(next(c).toB58String())
-      ))
+      .filter(
+        (c) =>
+          !destination.equals(next(c)) &&
+          networkPeers.qualityOf(next(c)) > NETWORK_QUALITY_THRESHOLD &&
+          filterCycles(c, currentPath) &&
+          !deadEnds.has(next(c).toB58String())
+      )
       .sort(compareWeight)
 
     if (newChannels.length == 0) {

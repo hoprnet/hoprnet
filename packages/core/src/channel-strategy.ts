@@ -5,7 +5,7 @@ import BN from 'bn.js'
 export type ChannelsToOpen = [PeerId, BN]
 
 export interface ChannelStrategy {
-  tick(balance: BN, indexer: Indexer): Promise<ChannelsToOpen[]>;
+  tick(balance: BN, indexer: Indexer): Promise<ChannelsToOpen[]>
 }
 
 // Don't auto open any channels
