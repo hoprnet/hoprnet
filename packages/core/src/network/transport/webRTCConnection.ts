@@ -152,7 +152,7 @@ class WebRTCConnection implements MultiaddrConnection {
           const sink = toIterable.sink(this.channel)
 
           sink(
-            (async function* () {
+            async function* () {
               if (promiseTriggered && !sourceReceived) {
                 await sourcePromise
 
@@ -166,7 +166,7 @@ class WebRTCConnection implements MultiaddrConnection {
               for await (const msg of source) {
                 yield msg.slice()
               }
-            })()
+            }.call(this)
           )
         }
       }
