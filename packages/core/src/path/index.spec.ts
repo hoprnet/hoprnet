@@ -28,7 +28,6 @@ function checkPath(path: PeerId[], edges: Map<PeerId, PeerId[]>) {
 }
 
 describe('test pathfinder with some simple topologies', function () {
-
   const TEST_NODES = Array.from({ length: 5 }).map((_, i) => fakePeerId(i))
   const RELIABLE_NETWORK = { qualityOf: (_p) => 1 } as NetworkPeers
   const UNRELIABLE_NETWORK = { qualityOf: (p) => ((p.id as any) % 3 == 0 ? 0 : 1) } as NetworkPeers // Node 3 is down
