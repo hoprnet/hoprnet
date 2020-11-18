@@ -149,7 +149,7 @@ class RelayContext {
         }
 
         if (u8aEquals(RELAY_WEBRTC_PREFIX, PREFIX)) {
-          console.log(`Relaying fancy WebRTC message`, new TextDecoder().decode(SUFFIX))
+          verbose(`Relaying fancy WebRTC message`, new TextDecoder().decode(SUFFIX))
         }
 
         if (u8aEquals(PREFIX, RELAY_STATUS_PREFIX)) {

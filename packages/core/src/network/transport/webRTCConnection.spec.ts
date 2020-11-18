@@ -17,6 +17,7 @@ import Pair from 'it-pair'
 import PeerId from 'peer-id'
 
 describe('test overwritable connection', function () {
+  this.timeout(3000)
   let iteration = 0
 
   function getStream({ usePrefix }: { usePrefix: boolean }): Stream {
@@ -181,6 +182,6 @@ describe('test overwritable connection', function () {
       newStreamA.sink(newConn.source)
     }, 200)
 
-    await new Promise((resolve) => setTimeout(resolve, 4000))
+    await new Promise((resolve) => setTimeout(resolve, 2000))
   })
 })

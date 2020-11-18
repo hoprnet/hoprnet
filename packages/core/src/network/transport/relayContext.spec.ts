@@ -2,7 +2,7 @@ import { u8aConcat } from '@hoprnet/hopr-utils'
 import { RELAY_PAYLOAD_PREFIX } from './constants'
 import { RelayContext } from './relayContext'
 import { RelayConnection } from './relayConnection'
-import type { Stream } from 'libp2p'
+import type { MultiaddrConnection, Stream } from 'libp2p'
 import assert from 'assert'
 
 import Pair from 'it-pair'
@@ -31,7 +31,7 @@ describe('test overwritable connection', function () {
             yield msg
           }
 
-          //await new Promise((resolve) => setTimeout(resolve, 40))
+          await new Promise((resolve) => setTimeout(resolve, 20))
         }
       })(),
       sink: async (source: Stream['source']) => {
@@ -160,9 +160,8 @@ describe('test overwritable connection', function () {
       },
       self,
       counterparty,
-      onReconnect: async () => {
+      onReconnect: async (newStream: MultiaddrConnection) => {
         console.log(`reconnected`)
-        const newStream = ctx.switch()
 
         iteration++
         console.log(`in reconnect: iteration ${iteration}`)
