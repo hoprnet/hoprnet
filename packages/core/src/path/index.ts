@@ -49,7 +49,6 @@ export async function findPath(
   const pathWeight = (a: ChannelPath): number => a.map(weight).reduce(sum, 0)
 
   const comparePath = (a: ChannelPath, b: ChannelPath) => {
-    console.log(pathWeight(a), pathWeight(b))
     return pathWeight(b) - pathWeight(a) 
   }
 
