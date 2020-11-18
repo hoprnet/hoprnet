@@ -137,6 +137,8 @@ class TicketFactory {
       .call()
       .then((res) => new TicketEpoch(Number(res.counter)))
 
+    const channelStateCounter = await this.channel.stateCounter
+
     const signedTicket = new SignedTicket(arr)
 
     const ticket = new Ticket(
@@ -149,7 +151,8 @@ class TicketFactory {
         challenge,
         epoch,
         amount,
-        winProb: ticketWinProb
+        winProb: ticketWinProb,
+        channelStateCounter
       }
     )
 

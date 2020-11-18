@@ -18,6 +18,7 @@ declare interface TicketStatic {
       epoch: TicketEpoch
       amount: Balance
       winProb: Hash
+      channelStateCounter: TicketEpoch
     }
   ): Ticket
 }
@@ -27,6 +28,7 @@ declare interface Ticket {
   epoch: TicketEpoch
   amount: Balance
   winProb: Hash
+  channelStateCounter: TicketEpoch
 
   // computed properties
   hash: Promise<Hash>

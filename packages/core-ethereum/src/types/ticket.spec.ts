@@ -16,13 +16,15 @@ describe('test ticket construction', async function () {
     const epoch = new TicketEpoch(123)
     const amount = new Balance(34567)
     const winProb = new Hash(new BN(new Uint8Array(Hash.SIZE).fill(0xff)).div(WIN_PROB).toArray('le', Hash.SIZE))
+    const channelStateCounter = new TicketEpoch(0)
 
     return {
       counterparty: userA,
       challenge,
       epoch,
       amount,
-      winProb
+      winProb,
+      channelStateCounter
     }
   }
   it('should create new ticket using struct', async function () {
@@ -81,15 +83,16 @@ describe('test ticket construction', async function () {
     const challenge = new Hash(stringToU8a('0x12047ebc6ea03568f4c81b75a4cd827785fe97206d9b22fd5364a9db1f50e234'))
     const epoch = new TicketEpoch(1)
     const amount = new Balance('0000000002c68af0bb140000', 16)
-
     const winProb = new Hash(stringToU8a('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'))
+    const channelStateCounter = new TicketEpoch(0)
 
     const ticketA = new Ticket(undefined, {
       counterparty,
       challenge,
       epoch,
       amount,
-      winProb
+      winProb,
+      channelStateCounter
     })
 
     const ticketB = new Ticket({
@@ -105,7 +108,8 @@ describe('test ticket construction', async function () {
       challenge,
       epoch: new TicketEpoch(2),
       amount,
-      winProb
+      winProb,
+      channelStateCounter
     })
 
     assert(!expectedHash.eq(await wrongTicket.hash), 'ticket hash must be different')
@@ -118,15 +122,16 @@ describe('test ticket construction', async function () {
     const challenge = new Hash(stringToU8a('0x91e787e6eef8cb5ddd0815e0f7f91dbe34d2a7bb2e99357039649baf61684c96'))
     const epoch = new TicketEpoch(2)
     const amount = new Balance('000000000de0b6b3a7640000', 16)
-
     const winProb = new Hash(stringToU8a('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'))
+    const channelStateCounter = new TicketEpoch(0)
 
     const ticketA = new Ticket(undefined, {
       counterparty,
       challenge,
       epoch,
       amount,
-      winProb
+      winProb,
+      channelStateCounter
     })
 
     const ticketB = new Ticket({
@@ -142,7 +147,8 @@ describe('test ticket construction', async function () {
       challenge,
       epoch: new TicketEpoch(1),
       amount,
-      winProb
+      winProb,
+      channelStateCounter
     })
 
     assert(!expectedHash.eq(await wrongTicket.hash), 'ticket hash must be different')

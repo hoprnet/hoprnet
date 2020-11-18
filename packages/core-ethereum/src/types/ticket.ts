@@ -32,6 +32,7 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
       epoch: TicketEpoch
       amount: Balance
       winProb: Hash
+      channelStateCounter: TicketEpoch
     }
   ) {
     if (arr == null && struct == null) {
@@ -50,6 +51,10 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
       this.set(new Uint8Array(struct.epoch.toBuffer('be', EPOCH_SIZE)), this.epochOffset - this.byteOffset)
       this.set(new Uint8Array(struct.amount.toBuffer('be', AMOUNT_SIZE)), this.amountOffset - this.byteOffset)
       this.set(struct.winProb, this.winProbOffset - this.byteOffset)
+      this.set(
+        new Uint8Array(struct.channelStateCounter.toBuffer('be', EPOCH_SIZE)),
+        this.channelStateCounterOffset - this.byteOffset
+      )
     }
   }
 
@@ -101,6 +106,14 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
     return new Hash(new Uint8Array(this.buffer, this.winProbOffset, Hash.SIZE))
   }
 
+  get channelStateCounterOffset(): number {
+    return this.byteOffset + AccountId.SIZE + Hash.SIZE + EPOCH_SIZE + AMOUNT_SIZE + EPOCH_SIZE
+  }
+
+  get channelStateCounter(): TicketEpoch {
+    return new TicketEpoch(new Uint8Array(this.buffer, this.channelStateCounterOffset, EPOCH_SIZE))
+  }
+
   get hash(): Promise<Hash> {
     return Promise.resolve(toEthSignedMessageHash(u8aToHex(this)))
   }
@@ -135,6 +148,7 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
       epoch: TicketEpoch
       amount: Balance
       winProb: Hash
+      channelStateCounter: TicketEpoch
     }
   ): Ticket {
     return new Ticket(arr, struct)

@@ -308,6 +308,16 @@ export async function validateUnacknowledgedTicket({
     throw Error(`Ticket epoch '${ticket.epoch.toString()}' does not match our account counter ${epoch.toString()}`)
   }
 
+  // ticket's channelStateCounter MUST match the current channel state counter
+  // (performance) we are making a request to blockchain
+  const currentChannelIteration = chain.utils.stateCounterToIteration((await channel.stateCounter).toNumber())
+  const ticketChannelIteration = chain.utils.stateCounterToIteration(ticket.channelStateCounter.toNumber())
+  if (ticketChannelIteration != currentChannelIteration) {
+    throw Error(
+      `Ticket was created for a different channel iteration ${ticketChannelIteration} != ${currentChannelIteration}`
+    )
+  }
+
   // channel MUST have enough funds
   // (performance) we are making a request to blockchain
   const senderBalance = await (amPartyA ? channel.balance_b : channel.balance_a)
@@ -320,7 +330,13 @@ export async function validateUnacknowledgedTicket({
   // we retrieve all signed tickets and filter the ones between sender and target
   const signedTickets = await getTickets().then(async (signedTickets) => {
     return signedTickets.filter((signedTicket) => {
-      return u8aEquals(signedTicket.ticket.counterparty, selfPubKey) && signedTicket.ticket.epoch.eq(epoch)
+      const ticketChannelIteration = chain.utils.stateCounterToIteration(ticket.channelStateCounter.toNumber())
+
+      return (
+        u8aEquals(signedTicket.ticket.counterparty, selfPubKey) &&
+        signedTicket.ticket.epoch.eq(epoch) &&
+        ticketChannelIteration == currentChannelIteration
+      )
     })
   })
 
