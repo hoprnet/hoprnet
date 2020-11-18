@@ -4,7 +4,6 @@ export const CRAWLING_RESPONSE_NODES = 10
 export const TICKET_AMOUNT = 1000000000000000 // 0.001 HOPR
 export const TICKET_WIN_PROB = 1 // 100%
 export const PACKET_SIZE = 500
-export const MAX_HOPS = 3
 export const MARSHALLED_PUBLIC_KEY_SIZE = 37
 export const NAME = 'ipfs' // 'hopr'
 
@@ -32,4 +31,8 @@ export const HEARTBEAT_TIMEOUT = durations.seconds(3)
 export const CRAWL_TIMEOUT = 100_000 // ~15 mins
 
 export const MAX_PACKET_DELAY = 200
-export const PATH_RANDOMNESS = 1000
+
+export const MAX_HOPS = 3
+export const PATH_RANDOMNESS = 0.1 
+export const MAX_PATH_ITERATIONS = 100
+export const NETWORK_QUALITY_THRESHOLD = 0.5
