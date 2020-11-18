@@ -6,6 +6,7 @@ import Multiaddr from 'multiaddr'
 import type PeerId from 'peer-id'
 import { durations } from '@hoprnet/hopr-utils'
 import toIterable from 'stream-to-it'
+import { blue, red } from 'chalk'
 import Debug from 'debug'
 
 const log = Debug('hopr-core:transport')
@@ -161,7 +162,7 @@ class WebRTCConnection implements MultiaddrConnection {
                 yield sourceMsg.slice()
               }
 
-              log(`switching to direct WebRTC connection with peer ${this.remoteAddr.getPeerId()}`)
+              log(`switching to direct WebRTC connection with peer ${blue(this.remoteAddr.getPeerId())}`)
 
               for await (const msg of source) {
                 yield msg.slice()
@@ -185,7 +186,7 @@ class WebRTCConnection implements MultiaddrConnection {
 
       if (this._webRTCAvailable || !this._webRTCStateKnown) {
         clearTimeout(this._webRTCTimeout)
-        log(`webRTC handover done. Using direct connection to peer ${this.remoteAddr.getPeerId()}`)
+        log(`webRTC handover done. Using direct connection to peer ${blue(this.remoteAddr.getPeerId())}`)
         yield* this.channel[Symbol.asyncIterator]() as Stream['source']
       }
     }.call(this)
@@ -205,7 +206,7 @@ class WebRTCConnection implements MultiaddrConnection {
     try {
       this.channel.destroy()
     } catch (err) {
-      err(`WebRTC error while destroying connection to peer ${this.remoteAddr.getPeerId()}. Error: ${err}`)
+      err(`WebRTC error while destroying connection to peer ${blue(this.remoteAddr.getPeerId())}. Error: ${red(err)}`)
     }
 
     this.conn.close()
