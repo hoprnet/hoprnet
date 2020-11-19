@@ -6,7 +6,7 @@ services:
       dockerfile: ./Dockerfile
       args:
         network: matic-testnet
-    image: 'hopr.avado.dnp.dappnode.eth:1.55.1'
+    image: 'hopr.avado.dnp.dappnode.eth:1.55.2'
     restart: always
     volumes:
       - type: volume
