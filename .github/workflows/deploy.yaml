@@ -220,10 +220,10 @@ jobs:
           gcloud builds submit --tag gcr.io/hoprassociation/hoprd:${{ env.RELEASE }}
 
   deploy_bootstrap_node:
-    name: Deploy Bootstrap node (master push == develop)
+    name: Deploy Bootstrap node
     runs-on: ubuntu-latest
     needs: [build_hoprd_docker]
-    if: github.ref == 'refs/heads/master'
+    if: github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')
     steps:
       - uses: actions/checkout@v2
       - name: Update repo from latest pushes.
@@ -243,28 +243,52 @@ jobs:
       - name: Set Project for Google Cloud HOPR Association
         working-directory: packages/hoprd
         run: gcloud config set project ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
-      - name: Kill old master BS node
+      - name: Detect which IP we should be using (to replace for a better strategy)
         run: |
-          gcloud compute instances delete hopr-develop-bootstrap \
-            --keep-disks=data \
+          if [[ $( ${{ github.ref }} == 'refs/heads/master') ]]; then
+            echo "RELEASE_NAME=master >> $GITHUB_ENV &&
+            echo "IP_ADDRESS=34.65.102.152" >> $GITHUB_ENV
+          else
+            echo "RELEASE_NAME=$(echo ${{ github.ref }} | sed -e "s#refs/heads/releases/##g")" >> $GITHUB_ENV &&
+            echo "IP_ADDRESS=34.65.5.42" >> $GITHUB_ENV
+          fi
+      - name: Detect whether we have created already the server
+        run: |
+          if [[ $(gcloud compute instances list | grep hopr-bootstrap-${{ env.RELEASE_NAME }}) ]]; then
+            echo "GCLOUD_UPDATE_CONTAINER=true" >> $GITHUB_ENV
+          else
+            echo "GCLOUD_CREATE_CONTAINER=true" >> $GITHUB_ENV
+          fi
+      - name: Verify environment variables
+        run: |
+          echo "Release: ${{ env.RELEASE }}" &&
+          echo "Updating? ${{ env.GCLOUD_UPDATE_CONTAINER }}" &&
+          echo "IP Address ${{ env.IP_ADDRESS }}" &&
+          echo "Release Name: ${{ env.RELEASE_NAME }}"
+      - name: Update bootstrap node with a new container image
+        if: env.GCLOUD_UPDATE_CONTAINER
+        run: |
+          gcloud compute instances update-container hopr-bootstrap-${{ env.RELEASE_NAME }} \
             --zone=europe-west6-a \
-            --no-user-output-enabled || true
-
-      - name: Spawn new BS node
+            --container-image=gcr.io/hoprassociation/hoprd:${{ env.RELEASE }} \
+            --container-mount-disk name=bs-${{ env.RELEASE_NAME }},mount-path="/app/db"
+      - name: Create new bootstrap node with a given IP for a specific release
+        if: env.GCLOUD_CREATE_CONTAINER
         run: |
-          gcloud compute instances create-with-container hopr-develop-bootstrap \
+          gcloud compute instances create-with-container hopr-bootstrap-${{ env.RELEASE_NAME }} \
             --zone=europe-west6-a \
             --machine-type=e2-medium \
-            --network-interface=address=34.65.102.152,network-tier=PREMIUM,subnet=default  \
+            --network-interface=address=${{ env.IP_ADDRESS }},network-tier=PREMIUM,subnet=default \
             --metadata=google-logging-enabled=true --maintenance-policy=MIGRATE \
-            --disk name=cd-bootstrap-develop-01 \
+            --create-disk name=bs-${{ env.RELEASE_NAME }},size=10GB,type=pd-ssd,mode=rw \
             --container-mount-disk mount-path="/app/db" \
-            --tags=hopr-node,boosttrap,develop \
+            --tags=hopr-node,web-client,portainer \
             --boot-disk-size=10GB --boot-disk-type=pd-standard \
             --container-env=^,@^DEBUG=hopr\*,@NODE_OPTIONS=--max-old-space-size=4096 \
             --container-image=gcr.io/hoprassociation/hoprd:${{ env.RELEASE }} \
             --container-arg="--password" --container-arg="${{ secrets.BS_PASSWORD }}" \
             --container-arg="--env" --container-arg="matic" \
+            --container-arg="--init" --container-arg="true" \
             --container-arg="--bootstrap" --container-arg="true" \
             --container-arg="--admin" \
             --container-restart-policy=always
