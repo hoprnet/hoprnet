@@ -28,6 +28,8 @@ export function handleStunRequest(socket: Socket, data: Buffer, rinfo: RemoteInf
   if (req.loadBuffer(data)) {
     // if STUN message is BINDING_REQUEST and valid content
     if (req.isBindingRequest({ fingerprint: true })) {
+      verbose(`stun request received`, rinfo.address, rinfo.port)
+
       const res = req.createBindingResponse(true).setXorMappedAddressAttribute(rinfo).setFingerprintAttribute()
 
       socket.send(res.toBuffer(), rinfo.port, rinfo.address)
@@ -60,7 +62,6 @@ export function getExternalIp(
     let timeout: NodeJS.Timeout
 
     const msgHandler = (msg: Buffer) => {
-      verbose(`stun received`)
       const res = stun.createBlank()
 
       const backup = console.log
@@ -79,6 +80,7 @@ export function getExternalIp(
             return false
           })
         ) {
+          verbose(`stun response received`)
           tids.splice(index, 1)
           const attr = res.getXorMappedAddressAttribute() || res.getMappedAddressAttribute()
 
