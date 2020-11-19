@@ -86,7 +86,7 @@ class Indexer implements IIndexer {
     }
   }
 
-  private async toIndexerChannel(source: PeerId, channel:Channel): Promise<IndexerChannel>{
+  private async toIndexerChannel(source: PeerId, channel: Channel): Promise<IndexerChannel> {
     const sourcePubKey = new Public(source.pubKey.marshal())
     const channelId = await getId(channel.partyA, channel.partyB)
     const state = await this.connector.hoprChannels.methods.channels(channelId.toHex()).call()
@@ -98,7 +98,7 @@ class Indexer implements IIndexer {
     }
   }
 
-  public onNewChannels(handler: () => void ): void {
+  public onNewChannels(handler: () => void): void {
     this.newChannelHandler = handler
   }
 

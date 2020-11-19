@@ -1,4 +1,4 @@
-import type { Indexer, IndexerChannel} from '@hoprnet/hopr-core-connector-interface'
+import type { Indexer, IndexerChannel } from '@hoprnet/hopr-core-connector-interface'
 import Heap from 'heap-js'
 import PeerId from 'peer-id'
 import BN from 'bn.js'
@@ -17,7 +17,7 @@ export class PassiveStrategy implements ChannelStrategy {
   }
 }
 
-// Open channel to as many peers as possible 
+// Open channel to as many peers as possible
 export class PromiscuousStrategy implements ChannelStrategy {
   private queue
 
@@ -36,7 +36,7 @@ export class PromiscuousStrategy implements ChannelStrategy {
 
       toOpen.push([next, MINIMUM_REASONABLE_CHANNEL_STAKE])
       balance.isubn(MINIMUM_REASONABLE_CHANNEL_STAKE)
-      this.queue.addAll((await indexer.getChannelsFromPeer(next)).filter(x => !toOpen.find(y => y[0] == x)))
+      this.queue.addAll((await indexer.getChannelsFromPeer(next)).filter((x) => !toOpen.find((y) => y[0] == x)))
     }
     return toOpen
   }
