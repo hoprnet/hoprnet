@@ -19,7 +19,7 @@
     "dev:chatbot:coverbot": "DEBUG=hopr-chatbot:coverbot ts-node src/index.ts",
     "format": "prettier --write \"src/**/*.(ts|js)\" \"test/**/*.ts\"",
     "start": "node dist/index.js",
-    "start:basodino": "DEBUG=hopr-chatbot* BOT_NAM=randobot ETHEREUM_PROVIDER=wss://xdai.poanetwork.dev/wss HOST_IPV4=0.0.0.0:9093 HOPR_BOOTSTRAP_ADDRESS=_dnsaddr.bootstrap.basodino.develop.hoprnet.org node dist/index.js",
+    "start:luzern": "DEBUG=hopr-chatbot* BOT_NAME=randobot ETHEREUM_PROVIDER=wss://ws-mainnet.matic.network HOST_IPV4=0.0.0.0:9093 HOPR_BOOTSTRAP_ADDRESS=_dnsaddr.bootstrap.luzern.telemetry.hoprnet.org node dist/index.js",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "mocha"
   },
