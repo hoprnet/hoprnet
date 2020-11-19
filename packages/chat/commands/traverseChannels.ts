@@ -4,7 +4,6 @@ import { AbstractCommand } from './abstractCommand'
 import type PeerID from 'peer-id'
 
 export default class TraverseChannels extends AbstractCommand {
-
   constructor(public node: Hopr<HoprCoreConnector>) {
     super()
   }
@@ -22,15 +21,21 @@ export default class TraverseChannels extends AbstractCommand {
       return `\n${prev}...`
     }
     const chans = await this.node.paymentChannels.indexer.getChannelsFromPeer(id)
-    if (chans.length == 0 ) {
+    if (chans.length == 0) {
       return `\n${prev} - ${id.toB58String()}*`
     } else {
       let out = ''
-      for (let x of chans){
+      for (let x of chans) {
         if (x[1].toB58String() === parent) {
           out += `\n${prev} - ${id.toB58String()} - [${x[2]}, BIDIRECTIONAL]`
         } else {
-          out += await this.iter(depth + 1, maxDepth, x[1], `\n${prev} - ${id.toB58String()} - [${x[2]}]`, id.toB58String())
+          out += await this.iter(
+            depth + 1,
+            maxDepth,
+            x[1],
+            `\n${prev} - ${id.toB58String()} - [${x[2]}]`,
+            id.toB58String()
+          )
         }
       }
       return out
@@ -39,9 +44,9 @@ export default class TraverseChannels extends AbstractCommand {
 
   public async execute(query: string): Promise<string> {
     let maxDepth = 5
-    if (parseInt(query.trim(), 10)){
+    if (parseInt(query.trim(), 10)) {
       maxDepth = parseInt(query, 10)
     }
-    return await this.iter(0, maxDepth, this.node.getId(), '', '');
+    return await this.iter(0, maxDepth, this.node.getId(), '', '')
   }
 }
