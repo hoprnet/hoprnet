@@ -1,7 +1,7 @@
 import Heap from 'heap-js'
 import PeerId from 'peer-id'
 import type NetworkPeers from '../network/network-peers'
-import type { Indexer, IndexerChannel as Edge} from '@hoprnet/hopr-core-connector-interface'
+import type { Indexer, IndexerChannel as Edge } from '@hoprnet/hopr-core-connector-interface'
 import { NETWORK_QUALITY_THRESHOLD, MAX_PATH_ITERATIONS } from '../constants'
 import Debug from 'debug'
 import BN from 'bn.js'
