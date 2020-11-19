@@ -46,6 +46,7 @@ import { Interactions } from './interactions'
 import * as DbKeys from './dbKeys'
 import EventEmitter from 'events'
 import path from 'path'
+import { ChannelStrategy, PassiveStrategy, PromiscuousStrategy } from './channel-strategy'
 import { Mixer } from './mixer'
 
 const verbose = Debug('hopr-core:verbose')
@@ -54,6 +55,8 @@ interface NetOptions {
   ip: string
   port: number
 }
+
+export type ChannelStrategyNames = 'PASSIVE' | 'PROMISCUOUS'
 
 export type HoprOptions = {
   debug: boolean
@@ -71,6 +74,7 @@ export type HoprOptions = {
   connector?: HoprCoreConnectorStatic
   bootstrapServers?: Multiaddr[]
   output?: (encoded: Uint8Array) => void
+  strategy?: ChannelStrategyNames
   hosts?: {
     ip4?: NetOptions
     ip6?: NetOptions
@@ -95,6 +99,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
   private running: boolean
   private crawlTimeout: NodeJS.Timeout
   private mixer: Mixer<Chain>
+  private strategy: ChannelStrategy
 
   /**
    * @constructor
@@ -109,6 +114,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     })
 
     this.mixer = new Mixer()
+    this.setChannelStrategy(options.strategy || 'PASSIVE')
     this.initializedWithOptions = options
     this.output = (arr: Uint8Array) => {
       this.emit('hopr:message', arr)
@@ -198,6 +204,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
         }
       }
     })
+
     return await new Hopr<CoreConnector>(options, libp2p, db, connector).start()
   }
 
@@ -248,6 +255,18 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       this._libp2p.start().then(() => Promise.all([this.connectToBootstrapServers(), this._network.start()])),
       this.paymentChannels?.start()
     ])
+
+    this.paymentChannels.indexer.onNewChannels(async () => {
+      verbose('new payment channels, auto opening tick')
+      //let currentChannels = this.getOpenChannels()
+      const balance = await this.getBalance()
+      const nextChannels = await this.strategy.tick(balance, this.paymentChannels.indexer)
+      verbose('strategy wants to open', nextChannels.length, 'new channels')
+      for (let channelToOpen of nextChannels){
+        const hash = await this.openChannel(channelToOpen[0], channelToOpen[1])
+        verbose('- opened', hash)
+      }
+    })
 
     log(`Available under the following addresses:`)
 
@@ -393,6 +412,20 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     let crawlInfo = await this.crawl()
     this.emit('hopr:crawl:completed', crawlInfo)
     this.crawlTimeout = setTimeout(() => this.periodicCrawl(), CRAWL_TIMEOUT)
+  }
+
+
+  public setChannelStrategy(strategy: ChannelStrategyNames) {
+    if (strategy == 'PASSIVE') {
+      this.strategy = new PassiveStrategy()
+    }
+    if (strategy == 'PROMISCUOUS'){
+      this.strategy = new PromiscuousStrategy(this.getId())
+    }
+  }
+
+  public async getBalance(): Promise<BN>{
+    return await this.paymentChannels.account.balance
   }
 
   /**

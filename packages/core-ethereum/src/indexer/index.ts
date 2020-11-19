@@ -61,8 +61,11 @@ class Indexer implements IIndexer {
   private newBlockEvent?: Subscription<BlockHeader>
   private openedChannelEvent?: Subscription<OnChainLog>
   private closedChannelEvent?: Subscription<OnChainLog>
+  private newChannelHandler: () => void
 
-  constructor(private connector: HoprEthereum) {}
+  constructor(private connector: HoprEthereum) {
+    this.newChannelHandler = () => {}
+  }
 
   /**
    * Returns the latest confirmed block number.
@@ -83,19 +86,26 @@ class Indexer implements IIndexer {
     }
   }
 
+  public onNewChannels(handler: () => void ): void {
+    this.newChannelHandler = handler
+  }
+
   public async getChannelsFromPeer(source: PeerId): Promise<IndexerChannel[]> {
+    let channelToIndexerChannel = async (channel): IndexerChannel => {
+      const channelId = await getId(channel.partyA, channel.partyB)
+      const state = await this.connector.hoprChannels.methods.channels(channelId.toHex()).call()
+      if (sourcePubKey.eq(channel.partyA)) {
+        return [source, await pubKeyToPeerId(channel.partyB), new Balance(state.partyABalance)]
+      } else {
+        const partyBBalance = new Balance(state.deposit).sub(new Balance(state.partyABalance))
+        return [source, await pubKeyToPeerId(channel.partyA), partyBBalance]
+      }
+    }
     const sourcePubKey = new Public(source.pubKey.marshal())
     const channels = await this.getAll(sourcePubKey)
     let cout: IndexerChannel[] = []
     for (let channel of channels) {
-      const channelId = await getId(channel.partyA, channel.partyB)
-      const state = await this.connector.hoprChannels.methods.channels(channelId.toHex()).call()
-      if (sourcePubKey.eq(channel.partyA)) {
-        cout.push([source, await pubKeyToPeerId(channel.partyB), new Balance(state.partyABalance)])
-      } else {
-        const partyBBalance = new Balance(state.deposit).sub(new Balance(state.partyABalance))
-        cout.push([source, await pubKeyToPeerId(channel.partyA), partyBBalance])
-      }
+      cout.push(channelToIndexerChannel(channel))
     }
 
     return cout
@@ -314,6 +324,7 @@ class Indexer implements IIndexer {
     }
 
     this.store(partyA, partyB, newChannelEntry)
+    this.newChannelHandler()
   }
 
   private async onClosedChannel(event: ClosedChannelEvent): Promise<void> {
