@@ -20,7 +20,7 @@ export class PassiveStrategy implements ChannelStrategy {
 export class PromiscuousStrategy implements ChannelStrategy {
   async tick(balance: BN, indexer: Indexer): Promise<ChannelsToOpen[]> {
     let toOpen = []
-    let i = 0;
+    let i = 0
     while (balance.gtn(0) && i++ < MAX_NEW_CHANNELS_PER_TICK) {
       toOpen.push([await indexer.getRandomChannel(), MINIMUM_REASONABLE_CHANNEL_STAKE])
       balance.isubn(MINIMUM_REASONABLE_CHANNEL_STAKE)
