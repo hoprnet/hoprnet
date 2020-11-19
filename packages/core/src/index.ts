@@ -262,7 +262,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       const balance = await this.getBalance()
       const nextChannels = await this.strategy.tick(balance, this.paymentChannels.indexer)
       verbose('strategy wants to open', nextChannels.length, 'new channels')
-      for (let channelToOpen of nextChannels){
+      for (let channelToOpen of nextChannels) {
         const hash = await this.openChannel(channelToOpen[0], channelToOpen[1])
         verbose('- opened', hash)
       }
@@ -414,17 +414,16 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     this.crawlTimeout = setTimeout(() => this.periodicCrawl(), CRAWL_TIMEOUT)
   }
 
-
   public setChannelStrategy(strategy: ChannelStrategyNames) {
     if (strategy == 'PASSIVE') {
       this.strategy = new PassiveStrategy()
     }
-    if (strategy == 'PROMISCUOUS'){
+    if (strategy == 'PROMISCUOUS') {
       this.strategy = new PromiscuousStrategy(this.getId())
     }
   }
 
-  public async getBalance(): Promise<BN>{
+  public async getBalance(): Promise<BN> {
     return await this.paymentChannels.account.balance
   }
 

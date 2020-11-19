@@ -86,7 +86,7 @@ class Indexer implements IIndexer {
     }
   }
 
-  public onNewChannels(handler: () => void ): void {
+  public onNewChannels(handler: () => void): void {
     this.newChannelHandler = handler
   }
 
