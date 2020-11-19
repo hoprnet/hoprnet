@@ -113,7 +113,7 @@ class Indexer implements IIndexer {
     const channels = await this.getAll(sourcePubKey)
     let cout: IndexerChannel[] = []
     for (let channel of channels) {
-      cout.push(this.toIndexerChannel(source, channel))
+      cout.push(await this.toIndexerChannel(source, channel))
     }
 
     return cout
