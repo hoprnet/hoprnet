@@ -7,8 +7,6 @@ import { Crawler as CrawlerInteraction } from '../interactions/network/crawler'
 import Multiaddr from 'multiaddr'
 import { Network } from './index'
 import { Interactions } from '../interactions'
-import { BlacklistedEntry } from './network-peers'
-import { BLACKLIST_TIMEOUT } from '../constants'
 import { generateLibP2PMock } from '../test-utils'
 
 let mockConnection = (p: PeerId, addr: Multiaddr): Connection => {
@@ -81,37 +79,6 @@ describe('network/crawler test crawler', function () {
     // Simulate node failure
     await Bob.node.stop()
     assert(Chris.network.networkPeers.has(Bob.node.peerId), 'Chris should know about Bob')
-    // Simulates a heartbeat run that kicks out Bob
-    Alice.network.networkPeers.blacklistPeer(Bob.node.peerId)
-    await Alice.network.crawler.crawl()
-
-    assert(
-      !Alice.network.networkPeers.has(Bob.node.peerId),
-      'Alice should not add Bob to her networkPeers after blacklisting him'
-    )
-    assert(
-      Alice.network.networkPeers.deletedPeers.some((entry: BlacklistedEntry) => entry.id.equals(Bob.node.peerId)),
-      'Alice should have blacklisted Bob'
-    )
-
-    // Remove Bob from blacklist
-    Alice.network.networkPeers.deletedPeers[0].deletedAt -= BLACKLIST_TIMEOUT + 1
-
-    Alice.node.connectionManager.emit('peer:connect', mockConnection(Chris.node.peerId, Chris.address))
-
-    await Alice.network.crawler.crawl()
-
-    assert(Alice.network.networkPeers.deletedPeers.length == 0, 'Alice should have no deleted peers')
-
-    // Alice.network.networkPeers.push({
-    //   id: Bob.peerInfo.id.toB58String(),
-    //   lastSeen: Date.now()
-    // })
-
-    await new Promise((resolve) => setTimeout(resolve, 500))
-
-    assert(Alice.network.networkPeers.has(Bob.node.peerId), 'Alice should know Bob again')
-
     await Promise.all([Alice.node.stop(), Bob.node.stop(), Chris.node.stop(), Dave.node.stop(), Eve.node.stop()])
   })
 

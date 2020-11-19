@@ -1,5 +1,4 @@
 import assert from 'assert'
-import { BLACKLIST_TIMEOUT } from '../constants'
 import PeerId from 'peer-id'
 
 import PeerStore from './network-peers'
@@ -12,73 +11,29 @@ const IDS = [
 ].map((x) => PeerId.createFromB58String(x))
 
 describe('test PeerStore', function () {
-  const networkPeers = new PeerStore([])
 
-  it('should push and pop elements', function () {
-    assert(networkPeers.length == 0, 'networkPeers must be empty')
-    networkPeers.push({
-      id: IDS[0],
-      lastSeen: Date.now()
-    })
-
-    networkPeers.push({
-      id: IDS[1],
-      lastSeen: Date.now() - 10
-    })
-
-    assert(networkPeers.top(1)[0].id === IDS[1], `Recently seen peer should be on top.`)
-    assert(networkPeers.top(2)[1].id === IDS[0], 'Less recently seen peer should be second.')
-
-    networkPeers.push({
-      id: IDS[0],
-      lastSeen: Date.now() - 20
-    })
-
-    assert(networkPeers.peers.length == 2, `Updating a peer should not increase the heap size.`)
-    assert(
-      networkPeers.top(1)[0].id === IDS[0],
-      `Updating a peer with a more recent 'lastSeen' property should change the order`
-    )
-
-    networkPeers.pop()
-    assert(
-      networkPeers.top(1)[0].id === IDS[1],
-      `After removing the most recently seen peer, the less recently seen peer should be at top.`
-    )
-
-    networkPeers.reset()
+  it('should register new peers', function () {
+    const networkPeers = new PeerStore([])
+    assert(networkPeers.length() == 0, 'networkPeers must be empty')
+    networkPeers.register(IDS[0])
+    networkPeers.register(IDS[1])
+    assert(networkPeers.length() == 2, 'now has 2 peers')
+    networkPeers.register(IDS[0])
+    assert(networkPeers.length() == 2, `Updating a peer should not increase the heap size.`)
   })
 
   it('should allow randomSubset to be taken of peer ids', function () {
-    IDS.forEach((id) => {
-      networkPeers.push({
-        id,
-        lastSeen: Date.now()
-      })
-    })
-
-    networkPeers.randomSubset(3)
-
-    networkPeers.reset()
+    const networkPeers = new PeerStore(IDS)
+    assert(networkPeers.randomSubset(3).length == 3)
   })
 
-  it('should push, pop and blacklist peers', function () {
-    assert(networkPeers.length == 0, 'networkPeers must be empty')
+  it('should _ping_ peers', async function () {
+    const networkPeers = new PeerStore([])
+    assert(networkPeers.length() == 0, 'networkPeers must be empty')
+    await networkPeers.pingOldest(() => { throw new Error('Empty networkPeers in ping') })
+    networkPeers.register(IDS[0])
 
-    networkPeers.wipeBlacklist()
-    networkPeers.blacklistPeer(IDS[0])
-
-    assert(networkPeers.deletedPeers.length == 1, `blacklist must contain the just blacklisted node`)
-
-    networkPeers.push({
-      id: IDS[0],
-      lastSeen: Date.now()
-    })
-
-    assert(networkPeers.length == 0, `adding a blacklisted peers must not change the networkPeers`)
-
-    networkPeers.wipeBlacklist()
-
+/*
     //assert(networkPeers.deletedPeers.length == 0, `blacklist must be empty now`)
 
     networkPeers.push({
@@ -108,5 +63,7 @@ describe('test PeerStore', function () {
       networkPeers.deletedPeers.length == 0 && networkPeers.peers.length == 0,
       `blacklist must be empty and there must be no nodes in the networkPeers`
     )
+    */
   })
+
 })

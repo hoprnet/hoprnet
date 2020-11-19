@@ -7,7 +7,6 @@ import { MAX_HOPS, CRAWLING_RESPONSE_NODES } from '../constants'
 import { CrawlResponse, CrawlStatus } from '../messages'
 import PeerId from 'peer-id'
 import type { Connection } from 'libp2p'
-import type { Entry } from './network-peers'
 import NetworkPeerStore from './network-peers'
 import { peerHasOnlyPublicAddresses, isOnPrivateNet /*, PRIVATE_NETS */ } from '../filters'
 import debug from 'debug'
@@ -91,9 +90,7 @@ class Crawler {
 
       log(`Crawling started`)
 
-      this.networkPeers.cleanupBlacklist()
-
-      unContactedPeers.push(...this.networkPeers.peers.map((entry: Entry) => entry.id.toB58String()))
+      unContactedPeers.push(...this.networkPeers.all().map((p) => p.toB58String()))
       verbose(`added ${unContactedPeers.length} peers to crawl list`)
 
       if (filter != null) {
@@ -209,14 +206,11 @@ class Crawler {
             ) {
               unContactedPeers.push(peer.toB58String())
 
-              let beforeInserting = this.networkPeers.length
-              this.networkPeers.push({
-                id: peer,
-                lastSeen: 0
-              })
+              let beforeInserting = this.networkPeers.length()
+              this.networkPeers.register(peer)
 
               if (filter == null || filter(peer)) {
-                current = current + this.networkPeers.length - beforeInserting
+                current = current + this.networkPeers.length() - beforeInserting
               }
               this.putPeer(addresses[i])
             }

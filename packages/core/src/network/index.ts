@@ -7,7 +7,6 @@ import NetworkPeers from './network-peers'
 import Stun from './stun'
 import Multiaddr from 'multiaddr'
 import PeerId from 'peer-id'
-import type { Connection } from 'libp2p'
 
 type TestOpts = {
   crawl?: { timeoutIntentionally?: boolean }
@@ -48,11 +47,6 @@ class Network {
       putPeer,
       testingOptions?.crawl
     )
-
-    node.connectionManager.on('peer:connect', (conn: Connection) => {
-      this.networkPeers.onPeerConnect(conn.remotePeer)
-      this.heartbeat.connectionListener(conn.remotePeer)
-    })
 
     if (options.bootstrapNode) {
       this.stun = new Stun(options.hosts)

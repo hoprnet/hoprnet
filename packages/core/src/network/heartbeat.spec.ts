@@ -70,10 +70,7 @@ describe('check heartbeat mechanism', function () {
     // Simulate a node failure
     await Chris.node.stop()
 
-    for (let i = 0; i < Alice.network.networkPeers.peers.length; i++) {
-      Alice.network.networkPeers.peers[i].lastSeen = 0
-    }
-
+    //TODO simulate wait for it to be oldest
     // Check whether a node failure gets detected
     await Alice.network.heartbeat.checkNodes()
 

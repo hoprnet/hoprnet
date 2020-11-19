@@ -111,6 +111,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     super()
     this._libp2p.connectionManager.on('peer:connect', (conn: Connection) => {
       this.emit('hopr:peer:connection', conn.remotePeer)
+      this._network.networkPeers.register(conn.remotePeer)
     })
 
     this.mixer = new Mixer()
@@ -391,18 +392,12 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       throw Error(`Expecting a non-empty destination.`)
     }
     let info = ''
-    if (!this._network.networkPeers.has(destination)) {
-      info = '[Pinging unknown peer]'
-    }
-    if (this._network.networkPeers.hasBlacklisted(destination)) {
-      info = '[Ping blacklisted peer]'
-    }
     let latency = await this._interactions.network.heartbeat.interact(destination)
     return { latency, info }
   }
 
   public getConnectedPeers(): PeerId[] {
-    return this._network.networkPeers.peers.map((x) => x.id)
+    return this._network.networkPeers.all()
   }
 
   public async crawl(filter?: (peer: PeerId) => boolean): Promise<CrawlInfo> {

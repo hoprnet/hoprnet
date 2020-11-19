@@ -1,9 +1,8 @@
 import NetworkPeerStore from './network-peers'
 import debug from 'debug'
-import { getTokens, Token } from '../utils'
 import PeerId from 'peer-id'
 import { EventEmitter } from 'events'
-import { randomInteger } from '@hoprnet/hopr-utils'
+import { randomInteger, limitConcurrency} from '@hoprnet/hopr-utils'
 import {
   HEARTBEAT_REFRESH_TIME,
   HEARTBEAT_INTERVAL_LOWER_BOUND,
@@ -27,64 +26,29 @@ class Heartbeat extends EventEmitter {
   }
 
   connectionListener(peer: PeerId) {
-    this.networkPeers.push({
-      id: peer,
-      lastSeen: Date.now()
-    })
+    this.networkPeers.register(peer)
   }
 
   async checkNodes(): Promise<void> {
-    log(`Checking nodes`)
-    this.networkPeers.debugLog()
-
-    const promises: Promise<void>[] = Array.from({ length: MAX_PARALLEL_CONNECTIONS })
-    const tokens = getTokens(MAX_PARALLEL_CONNECTIONS)
-
     const THRESHOLD_TIME = Date.now() - HEARTBEAT_REFRESH_TIME
-
-    const queryNode = async (peer: PeerId, token: Token): Promise<void> => {
-      while (tokens.length > 0 && this.networkPeers.updatedSince(THRESHOLD_TIME)) {
-        let nextPeer = this.networkPeers.pop()
-        let token = tokens.pop() as Token
-
-        promises[token] = queryNode(nextPeer.id, token)
-      }
-
-      let currentPeerId: PeerId
-
-      while (true) {
-        currentPeerId = peer
-
+    log(`Checking nodes older than ${THRESHOLD_TIME}`)
+    const queryOldest = async(): Promise<void> => {
+      await this.networkPeers.pingOldest(async (id: PeerId ) => {
         try {
-          await this.interaction.interact(currentPeerId)
-
-          this.networkPeers.push({
-            id: currentPeerId,
-            lastSeen: Date.now()
-          })
+          await this.interaction.interact(id)
+          return true
         } catch (err) {
-          await this.hangUp(currentPeerId)
-          this.networkPeers.blacklistPeer(peer)
-          log(`Blacklisting node ${peer.toB58String()}`)
-        }
-
-        if (this.networkPeers.updatedSince(THRESHOLD_TIME)) {
-          peer = this.networkPeers.pop().id
-        } else {
-          break
-        }
-      }
-
-      promises[token] = undefined
-      tokens.push(token)
+          await this.hangUp(id)
+          return false
+        } 
+      })
     }
 
-    if (this.networkPeers.updatedSince(THRESHOLD_TIME)) {
-      let token = tokens.pop() as Token
-      promises[token] = queryNode(this.networkPeers.pop().id, token)
-    }
-
-    await Promise.all(promises)
+    await limitConcurrency<void>(
+      MAX_PARALLEL_CONNECTIONS, 
+      () => this.networkPeers.containsOlderThan(THRESHOLD_TIME),
+      queryOldest
+    )
   }
 
   setTimeout() {
