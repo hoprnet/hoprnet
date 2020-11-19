@@ -289,6 +289,6 @@ jobs:
             --container-arg="--password" --container-arg="${{ secrets.BS_PASSWORD }}" \
             --container-arg="--env" --container-arg="matic" \
             --container-arg="--init" --container-arg="true" \
-            --container-arg="--bootstrap" --container-arg="true" \
+            --container-arg="--runAsBootstrap" --container-arg="true" \
             --container-arg="--admin" \
             --container-restart-policy=always
