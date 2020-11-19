@@ -420,7 +420,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       this.strategy = new PassiveStrategy()
     }
     if (strategy == 'PROMISCUOUS'){
-      this.strategy = new PromiscuousStrategy(this.getId())
+      this.strategy = new PromiscuousStrategy()
     }
   }
 

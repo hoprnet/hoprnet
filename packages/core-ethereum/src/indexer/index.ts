@@ -4,7 +4,7 @@ import BN from 'bn.js'
 import chalk from 'chalk'
 import { Subscription } from 'web3-core-subscriptions'
 import { BlockHeader } from 'web3-eth'
-import { u8aToNumber, u8aConcat, u8aToHex, pubKeyToPeerId } from '@hoprnet/hopr-utils'
+import { u8aToNumber, u8aConcat, u8aToHex, pubKeyToPeerId, randomInteger } from '@hoprnet/hopr-utils'
 import { ChannelEntry, Public, Balance } from '../types'
 import { Log, isPartyA, events, getId } from '../utils'
 import { MAX_CONFIRMATIONS } from '../config'
@@ -86,26 +86,34 @@ class Indexer implements IIndexer {
     }
   }
 
+  private async toIndexerChannel(source: PeerId, channel:Channel): Promise<IndexerChannel>{
+    const sourcePubKey = new Public(source.pubKey.marshal())
+    const channelId = await getId(channel.partyA, channel.partyB)
+    const state = await this.connector.hoprChannels.methods.channels(channelId.toHex()).call()
+    if (sourcePubKey.eq(channel.partyA)) {
+      return [source, await pubKeyToPeerId(channel.partyB), new Balance(state.partyABalance)]
+    } else {
+      const partyBBalance = new Balance(state.deposit).sub(new Balance(state.partyABalance))
+      return [source, await pubKeyToPeerId(channel.partyA), partyBBalance]
+    }
+  }
+
   public onNewChannels(handler: () => void ): void {
     this.newChannelHandler = handler
   }
 
+  public async getRandomChannel(): Promise<IndexerChannel> {
+    const all = await this.getAll(undefined)
+    const random = all[randomInteger(0, all.length)]
+    return this.toIndexerChannel(await pubKeyToPeerId(random.partyA), random)
+  }
+
   public async getChannelsFromPeer(source: PeerId): Promise<IndexerChannel[]> {
-    let channelToIndexerChannel = async (channel): IndexerChannel => {
-      const channelId = await getId(channel.partyA, channel.partyB)
-      const state = await this.connector.hoprChannels.methods.channels(channelId.toHex()).call()
-      if (sourcePubKey.eq(channel.partyA)) {
-        return [source, await pubKeyToPeerId(channel.partyB), new Balance(state.partyABalance)]
-      } else {
-        const partyBBalance = new Balance(state.deposit).sub(new Balance(state.partyABalance))
-        return [source, await pubKeyToPeerId(channel.partyA), partyBBalance]
-      }
-    }
     const sourcePubKey = new Public(source.pubKey.marshal())
     const channels = await this.getAll(sourcePubKey)
     let cout: IndexerChannel[] = []
     for (let channel of channels) {
-      cout.push(channelToIndexerChannel(channel))
+      cout.push(this.toIndexerChannel(source, channel))
     }
 
     return cout

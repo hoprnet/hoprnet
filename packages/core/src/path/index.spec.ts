@@ -51,7 +51,7 @@ describe('test pathfinder with some simple topologies', function () {
   function fakeIndexer(edges: Map<PeerId, PeerId[]>, stakes: (i: PeerId) => number): Indexer {
     return {
       getChannelsFromPeer: (a: PeerId) => Promise.resolve((edges.get(a) || []).map((b) => [a, b, stakes(b) as any]))
-    }
+    } as Indexer
   }
 
   it('should find a path through a reliable star', async function () {

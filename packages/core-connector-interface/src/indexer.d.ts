@@ -4,6 +4,7 @@ import { Balance } from './types'
 type Channel = [PeerId, PeerId, Balance]
 
 declare interface Indexer {
+  getRandomChannel(): Promise<Channel>
   getChannelsFromPeer(source: PeerId): Promise<Channel[]>
   onNewChannels(handler: () => void): void
 }

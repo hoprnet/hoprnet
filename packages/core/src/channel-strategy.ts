@@ -21,14 +21,15 @@ export class PassiveStrategy implements ChannelStrategy {
 export class PromiscuousStrategy implements ChannelStrategy {
   private queue
 
-  constructor(private id: PeerId) {
+  constructor() {
     let compare = (a, b) => b[2] - a[2] // TODO
     this.queue = new Heap<IndexerChannel>(compare)
   }
 
   async tick(balance: BN, indexer: Indexer): Promise<ChannelsToOpen[]> {
     let toOpen = []
-    this.queue.addAll(await indexer.getChannelsFromPeer(this.id))
+    const startNode = await indexer.getRandomChannel()
+    this.queue.addAll(await indexer.getChannelsFromPeer(startNode[0]))
 
     while (balance.gtn(0) && this.queue.length) {
       let next = this.queue.pop()[1]
