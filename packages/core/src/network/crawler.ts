@@ -19,7 +19,7 @@ const verbose = debug('hopr-core:verbose:crawler')
 const blue = chalk.blue
 
 const MAX_PARALLEL_REQUESTS = 7
-export const CRAWL_TIMEOUT = 4 * 1000
+export const CRAWL_TIMEOUT = 2 * 1000
 
 export type CrawlInfo = {
   contacted: PeerId[]
