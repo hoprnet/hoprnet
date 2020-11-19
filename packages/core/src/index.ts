@@ -256,9 +256,10 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       this.paymentChannels?.start()
     ])
 
-    this.paymentChannels.indexer.onNewChannels(async () => {
+    this.paymentChannels.indexer.onNewChannels(async () => { //TODO async(newChannels) => {
       verbose('new payment channels, auto opening tick')
-      //let currentChannels = this.getOpenChannels()
+      //TODO this._network.networkPeers.addInterestingPeer(newPeer)
+      //TODO let currentChannels = this.getOpenChannels()
       const balance = await this.getBalance()
       const nextChannels = await this.strategy.tick(balance, this.paymentChannels.indexer)
       verbose('strategy wants to open', nextChannels.length, 'new channels')

@@ -1,19 +1,18 @@
 import Heap from 'heap-js'
 import PeerId from 'peer-id'
 import type NetworkPeers from '../network/network-peers'
-import type { Indexer, IndexerChannel } from '@hoprnet/hopr-core-connector-interface'
+import type { Indexer, IndexerChannel as Edge} from '@hoprnet/hopr-core-connector-interface'
 import { NETWORK_QUALITY_THRESHOLD, MAX_PATH_ITERATIONS } from '../constants'
 import Debug from 'debug'
 import BN from 'bn.js'
 const log = Debug('hopr-core:pathfinder')
 
 export type Path = PeerId[]
-type ChannelPath = IndexerChannel[]
-type Edge = IndexerChannel
+type ChannelPath = Edge[]
 
 const sum = (a: number, b: number) => a + b
 const next = (c: Edge): PeerId => c[1]
-const stake = (c: Edge): BN => c[2] // TODO cast from BN
+const stake = (c: Edge): BN => c[2]
 const pathFrom = (c: ChannelPath): Path => [c[0][0]].concat(c.map(next))
 const filterCycles = (c: Edge, p: ChannelPath): boolean => !pathFrom(p).find((x) => x.equals(next(c)))
 const rand = () => Math.random() // TODO - swap for something crypto safe
