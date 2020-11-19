@@ -25,3 +25,4 @@ Here's a list of the daily tasks so far:
 | 7   | HOPR Playlist Redux        | 200             |
 | 8   | Find the Password, Part 2! | 200             |
 | 9   | Push Your Luck             | 200 + up to 500 |
+| 10  | Find the Password III      | 300             |

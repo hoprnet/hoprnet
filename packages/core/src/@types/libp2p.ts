@@ -4,8 +4,8 @@ declare module 'libp2p' {
   type EventEmitter = import('events').EventEmitter
 
   export type Stream = {
-    sink: (source: AsyncGenerator<Uint8Array, Uint8Array | undefined>) => Promise<void>
-    source: AsyncGenerator<Uint8Array, Uint8Array | undefined>
+    sink: (source: AsyncGenerator<Uint8Array, void>) => Promise<void>
+    source: AsyncGenerator<Uint8Array, void>
   }
 
   export interface Connection {
@@ -104,6 +104,14 @@ declare module 'libp2p' {
     connectToPeer(peer: PeerId | Multiaddr | string, options?: any): Promise<Connection>
   }
 
+  export interface ConnectionManager extends EventEmitter {
+    connections: Map<string, [Connection]>
+  }
+
+  export interface Registrar {
+    getConnection(peerId: PeerId): Connection | null
+  }
+
   export type ConnHandler = (conn: Connection) => void
 
   export interface Listener extends EventEmitter {
@@ -122,15 +130,15 @@ declare module 'libp2p' {
     dialProtocol: (addr: Multiaddr | PeerId, protocol: string, options?: { signal: AbortSignal }) => Promise<Handler>
     hangUp: (addr: PeerId | Multiaddr | string) => Promise<void>
     peerStore: PeerStore
-    peerRouting: {
-      findPeer: (addr: PeerId) => Promise<PeerRoute>
-    }
+    peerRouting: PeerRouting
     handle: (protocol: string | string[], handler: (struct: { connection: any; stream: any }) => void) => void
     start(): Promise<any>
     stop(): Promise<void>
 
     multiaddrs: Multiaddr[]
-    connectionManager: EventEmitter
+    connectionManager: ConnectionManager // Undoumented
+    registrar: Registrar // Undocumented
+    _dht: { peerRouting: PeerRouting } | undefined // Undocumented
 
     peerId: PeerId // ATTN: Not documented API
   }
