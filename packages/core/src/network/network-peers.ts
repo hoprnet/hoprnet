@@ -24,7 +24,7 @@ class NetworkPeers {
   }
 
   private find(peer: PeerId): Entry | undefined {
-    return this.peers.find(x => x.id.toB58String() === peer.toB58String())
+    return this.peers.find((x) => x.id.toB58String() === peer.toB58String())
   }
 
   constructor(existingPeers: Array<PeerId>) {
@@ -36,13 +36,13 @@ class NetworkPeers {
     heap.heapify(this.peers, this.compareLastPing)
   }
 
-  public async pingOldest(interaction: (PeerID) => Promise<boolean>):Promise<void>{
+  public async pingOldest(interaction: (PeerID) => Promise<boolean>): Promise<void> {
     const entry = heap.heappop(this.peers, this.compareLastPing)
-    entry.heartbeatsSent ++
+    entry.heartbeatsSent++
     entry.lastSeen = Date.now()
-    entry.lastPingSuccess = await interaction(entry.id) 
-    if (entry.lastPingSuccess){
-      entry.heartbeatsSuccess ++
+    entry.lastPingSuccess = await interaction(entry.id)
+    if (entry.lastPingSuccess) {
+      entry.heartbeatsSuccess++
     }
   }
 
@@ -57,16 +57,20 @@ class NetworkPeers {
 
   public register(id: PeerId) {
     if (!this.find(id)) {
-      heap.heappush(this.peers, {id, heartbeatsSent: 0, heartbeatsSuccess: 0, lastSeen: Date.now(), lastPingSuccess: true}, this.compareLastPing)
+      heap.heappush(
+        this.peers,
+        { id, heartbeatsSent: 0, heartbeatsSuccess: 0, lastSeen: Date.now(), lastPingSuccess: true },
+        this.compareLastPing
+      )
     }
   }
 
   public length(): number {
     return this.peers.length
   }
-  
-  public all(): PeerId[]{
-    return this.peers.map(x => x.id)
+
+  public all(): PeerId[] {
+    return this.peers.map((x) => x.id)
   }
 
   public has(peer: PeerId): boolean {

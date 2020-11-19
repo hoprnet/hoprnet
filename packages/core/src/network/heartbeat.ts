@@ -2,7 +2,7 @@ import NetworkPeerStore from './network-peers'
 import debug from 'debug'
 import PeerId from 'peer-id'
 import { EventEmitter } from 'events'
-import { randomInteger, limitConcurrency} from '@hoprnet/hopr-utils'
+import { randomInteger, limitConcurrency } from '@hoprnet/hopr-utils'
 import {
   HEARTBEAT_REFRESH_TIME,
   HEARTBEAT_INTERVAL_LOWER_BOUND,
@@ -32,20 +32,20 @@ class Heartbeat extends EventEmitter {
   async checkNodes(): Promise<void> {
     const THRESHOLD_TIME = Date.now() - HEARTBEAT_REFRESH_TIME
     log(`Checking nodes older than ${THRESHOLD_TIME}`)
-    const queryOldest = async(): Promise<void> => {
-      await this.networkPeers.pingOldest(async (id: PeerId ) => {
+    const queryOldest = async (): Promise<void> => {
+      await this.networkPeers.pingOldest(async (id: PeerId) => {
         try {
           await this.interaction.interact(id)
           return true
         } catch (err) {
           await this.hangUp(id)
           return false
-        } 
+        }
       })
     }
 
     await limitConcurrency<void>(
-      MAX_PARALLEL_CONNECTIONS, 
+      MAX_PARALLEL_CONNECTIONS,
       () => this.networkPeers.containsOlderThan(THRESHOLD_TIME),
       queryOldest
     )

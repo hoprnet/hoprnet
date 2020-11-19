@@ -11,7 +11,6 @@ const IDS = [
 ].map((x) => PeerId.createFromB58String(x))
 
 describe('test PeerStore', function () {
-
   it('should register new peers', function () {
     const networkPeers = new PeerStore([])
     assert(networkPeers.length() == 0, 'networkPeers must be empty')
@@ -30,10 +29,12 @@ describe('test PeerStore', function () {
   it('should _ping_ peers', async function () {
     const networkPeers = new PeerStore([])
     assert(networkPeers.length() == 0, 'networkPeers must be empty')
-    await networkPeers.pingOldest(() => { throw new Error('Empty networkPeers in ping') })
+    await networkPeers.pingOldest(() => {
+      throw new Error('Empty networkPeers in ping')
+    })
     networkPeers.register(IDS[0])
 
-/*
+    /*
     //assert(networkPeers.deletedPeers.length == 0, `blacklist must be empty now`)
 
     networkPeers.push({
@@ -65,5 +66,4 @@ describe('test PeerStore', function () {
     )
     */
   })
-
 })
