@@ -249,7 +249,7 @@ jobs:
             echo "RELEASE_NAME=master >> $GITHUB_ENV &&
             echo "IP_ADDRESS=34.65.102.152" >> $GITHUB_ENV
           else
-            echo "RELEASE_NAME=$(echo ${{ github.ref }} | sed -e "s#refs/heads/releases/##g")" >> $GITHUB_ENV &&
+            echo "RELEASE_NAME=$(echo ${{ github.ref }} | sed -e "s#refs/heads/release/##g")" >> $GITHUB_ENV &&
             echo "IP_ADDRESS=34.65.5.42" >> $GITHUB_ENV
           fi
       - name: Detect whether we have created already the server
