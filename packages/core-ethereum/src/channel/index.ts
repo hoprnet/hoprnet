@@ -128,7 +128,7 @@ class ChannelFactory {
         epoch: new TicketEpoch(0),
         amount: new Balance(0),
         winProb,
-        channelStateCounter: new TicketEpoch(0)
+        channelIteration: new TicketEpoch(0)
       }
     )
 

@@ -21,8 +21,12 @@ const generateChannelData = async () => {
   })
 }
 
-describe('test signedChannel construction', async function () {
-  const userAPubKey = await utils.privKeyToPubKey(userA)
+describe('test signedChannel construction', function () {
+  let userAPubKey: Uint8Array
+
+  before(async function () {
+    userAPubKey = await utils.privKeyToPubKey(userA)
+  })
 
   it('should create new signedChannel using struct', async function () {
     const channel = await generateChannelData()

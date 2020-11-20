@@ -22,13 +22,13 @@ const createMockTicket = ({
   amount = new BN(1),
   winProb = new Uint8Array(1),
   epoch = new BN(1),
-  channelStateCounter = new BN(1)
+  channelIteration = new BN(1)
 }: {
   target?: PeerId
   amount?: BN
   winProb?: Uint8Array
   epoch?: BN
-  channelStateCounter?: BN
+  channelIteration?: BN
 }) => {
   return ({
     counterparty: target.pubKey.marshal(),
@@ -36,7 +36,7 @@ const createMockTicket = ({
     amount,
     winProb,
     epoch,
-    channelStateCounter
+    channelIteration
   } as unknown) as Types.Ticket
 }
 
@@ -45,16 +45,16 @@ const createMockSignedTicket = ({
   target = TARGET,
   amount = new BN(1),
   winProb = new Uint8Array(1),
-  channelStateCounter = new BN(1)
+  channelIteration = new BN(1)
 }: {
   sender?: PeerId
   target?: PeerId
   amount?: BN
   winProb?: Uint8Array
-  channelStateCounter?: BN
+  channelIteration?: BN
 }) => {
   return ({
-    ticket: createMockTicket({ target, amount, winProb, channelStateCounter }),
+    ticket: createMockTicket({ target, amount, winProb, channelIteration }),
     signer: Promise.resolve(sender.pubKey.marshal())
   } as unknown) as Types.SignedTicket
 }
@@ -251,7 +251,7 @@ describe('unit test validateUnacknowledgedTicket', function () {
   it("should throw if ticket's channel iteration does not match the current channel iteration", async function () {
     const node = createMockNode({})
     const signedTicket = createMockSignedTicket({
-      channelStateCounter: new BN(11)
+      channelIteration: new BN(2)
     })
 
     return expect(

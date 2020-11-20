@@ -26,13 +26,13 @@ class Channel extends Uint8ArrayE implements Types.Channel {
       moment?: Moment
     }
   ) {
-    if (arr == null) {
+    if (!arr) {
       super(Channel.SIZE)
     } else {
       super(arr.bytes, arr.offset, Channel.SIZE)
     }
 
-    if (struct != null) {
+    if (struct) {
       this.set(struct.state, ChannelBalance.SIZE)
 
       if (struct.balance) {
@@ -60,7 +60,7 @@ class Channel extends Uint8ArrayE implements Types.Channel {
   }
 
   get rawState(): ChannelState {
-    if (this._rawState == null) {
+    if (!this._rawState) {
       this._rawState = new ChannelState({
         bytes: this.buffer,
         offset: this.byteOffset + ChannelBalance.SIZE

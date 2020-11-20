@@ -14,7 +14,7 @@ const generateTicketData = async (receiver: AccountId) => {
   const amount = new Balance(15)
   const winProb = new Hash(new BN(new Uint8Array(Hash.SIZE).fill(0xff)).div(WIN_PROB).toArray('le', Hash.SIZE))
   const onChainSecret = new Hash(randomBytes(27))
-  const channelStateCounter = new TicketEpoch(0)
+  const channelIteration = new TicketEpoch(0)
 
   return {
     counterparty: receiver,
@@ -23,7 +23,7 @@ const generateTicketData = async (receiver: AccountId) => {
     amount,
     winProb,
     onChainSecret,
-    channelStateCounter
+    channelIteration
   }
 }
 

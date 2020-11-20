@@ -13,13 +13,13 @@ class Signature extends Uint8ArrayE implements Types.Signature {
       recovery: number
     }
   ) {
-    if (arr == null) {
+    if (!arr) {
       super(Signature.SIZE)
     } else {
       super(arr.bytes, arr.offset, Signature.SIZE)
     }
 
-    if (struct != null) {
+    if (struct) {
       this.set(struct.signature, this.signatureOffset - this.byteOffset)
       this.set([struct.recovery], this.recoveryOffset - this.byteOffset)
     }

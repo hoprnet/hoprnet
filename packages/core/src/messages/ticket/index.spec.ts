@@ -63,7 +63,7 @@ describe(`check serialization and deserialization of ticket objects`, function (
         challenge,
         epoch: new node.paymentChannels.types.TicketEpoch(0),
         winProb: new node.paymentChannels.types.Hash(new Uint8Array(32).fill(0xff)),
-        channelStateCounter: new node.paymentChannels.types.TicketEpoch(0)
+        channelIteration: new node.paymentChannels.types.TicketEpoch(0)
       }
     )
 

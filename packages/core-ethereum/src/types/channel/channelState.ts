@@ -13,13 +13,13 @@ class ChannelState extends Uint8Array implements Types.ChannelState {
       state: number
     }
   ) {
-    if (arr == null) {
+    if (!arr) {
       super(ChannelState.SIZE)
     } else {
       super(arr.bytes, arr.offset, ChannelState.SIZE)
     }
 
-    if (struct != null) {
+    if (struct) {
       this.set(toU8a(struct.state, 1))
     }
   }

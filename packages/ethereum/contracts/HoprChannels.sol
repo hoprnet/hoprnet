@@ -241,47 +241,46 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         bytes32 hashedSecretASecretB,
         uint256 amount,
         bytes32 winProb,
+        address counterparty,
         bytes32 r,
         bytes32 s,
         uint8 v
     ) external {
         require(amount > 0, "HoprChannels: amount must be strictly greater than zero");
         require(amount < (1 << 96), "HoprChannels: Invalid amount");
-
-        Account storage recipientAccount = accounts[msg.sender];
-
         require(
-            recipientAccount.hashedSecret == bytes27(keccak256(abi.encodePacked(bytes27(preImage)))),
+            accounts[msg.sender].hashedSecret == bytes27(keccak256(abi.encodePacked(bytes27(preImage)))),
             "HoprChannels: Given value is not a pre-image of the stored on-chain secret"
-        );
-
-        bytes32 challenge = keccak256(abi.encodePacked(hashedSecretASecretB));
-
-        bytes32 hashedTicket = ECDSA.toEthSignedMessageHash(
-            "99",
-            abi.encodePacked(msg.sender, challenge, uint24(recipientAccount.counter), uint96(amount), winProb)
         );
 
         (address partyA, , Channel storage channel, ChannelStatus status) = getChannel(
             msg.sender,
-            ECDSA.recover(hashedTicket, r, s, v)
+            counterparty
         );
-
+        bytes32 challenge = keccak256(abi.encodePacked(hashedSecretASecretB));
+        bytes32 hashedTicket = ECDSA.toEthSignedMessageHash(
+            "102",
+            abi.encodePacked(
+                msg.sender,
+                challenge,
+                uint24(accounts[msg.sender].counter),
+                uint96(amount),
+                winProb,
+                uint24(getChannelIteration(channel))
+            )
+        );
+        require(ECDSA.recover(hashedTicket, r, s, v) == counterparty, "HashedTicket signer does not match our counterparty");
         require(channel.stateCounter != uint24(0), "HoprChannels: Channel does not exist");
-
         require(!redeemedTickets[hashedTicket], "Ticket must not be used twice");
 
         bytes32 luck = keccak256(abi.encodePacked(hashedTicket, bytes27(preImage), hashedSecretASecretB));
-
         require(uint256(luck) <= uint256(winProb), "HoprChannels: ticket must be a win");
-
         require(
             status == ChannelStatus.OPEN || status == ChannelStatus.PENDING,
             "HoprChannels: channel must be 'OPEN' or 'PENDING'"
         );
 
-        recipientAccount.hashedSecret = bytes27(preImage);
-
+        accounts[msg.sender].hashedSecret = bytes27(preImage);
         redeemedTickets[hashedTicket] = true;
 
         if (msg.sender == partyA) {
@@ -506,10 +505,18 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
 
     /**
      * @notice returns 'ChannelStatus'
-     * @param channel Channel
+     * @param channel a channel
      */
     function getChannelStatus(Channel memory channel) internal pure returns (ChannelStatus) {
         return ChannelStatus(channel.stateCounter % 10);
+    }
+
+    /**
+     * @param channel a channel
+     * @return channel's iteration
+     */
+    function getChannelIteration(Channel memory channel) internal pure returns (uint24) {
+        return (channel.stateCounter / 10) + 1;
     }
 
     /**
