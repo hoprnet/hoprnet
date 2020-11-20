@@ -93,7 +93,7 @@ class NetworkPeers {
   // reliable) estimating the quality of service of a peer's network connection
   public qualityOf(peer: PeerId): number {
     let entry = this.find(peer)
-    if (entry) {
+    if (entry && entry.heartbeatsSent > 0) {
       return entry.heartbeatsSuccess / entry.heartbeatsSent
     }
     return 0.2 // Unknown
