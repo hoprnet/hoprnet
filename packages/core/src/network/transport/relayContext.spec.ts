@@ -44,12 +44,9 @@ describe('test overwritable connection', function () {
               msg = _msg.slice()
             }
 
-            console.log(`receiver #${_iteration}`, new TextDecoder().decode(msg))
           } else {
-            console.log(`received empty message`, _msg)
           }
         }
-        console.log(`sinkDone`)
       }
     }
   }
@@ -161,10 +158,7 @@ describe('test overwritable connection', function () {
       self,
       counterparty,
       onReconnect: async (newStream: MultiaddrConnection) => {
-        console.log(`reconnected`)
-
         iteration++
-        console.log(`in reconnect: iteration ${iteration}`)
         const demoStream = getStream({ usePrefix: false })
 
         newStream.sink(demoStream.source)
