@@ -1,37 +1,29 @@
-import NetworkPeerStore from './network-peers'
+import type NetworkPeerStore from './network-peers'
+import type PeerId from 'peer-id'
 import debug from 'debug'
-import PeerId from 'peer-id'
-import { EventEmitter } from 'events'
 import { randomInteger, limitConcurrency } from '@hoprnet/hopr-utils'
 import {
-  HEARTBEAT_REFRESH_TIME,
-  HEARTBEAT_INTERVAL_LOWER_BOUND,
-  HEARTBEAT_INTERVAL_UPPER_BOUND,
+  HEARTBEAT_REFRESH,
+  HEARTBEAT_INTERVAL,
+  HEARTBEAT_INTERVAL_VARIANCE,
   MAX_PARALLEL_CONNECTIONS
 } from '../constants'
 import { Heartbeat as HeartbeatInteraction } from '../interactions/network/heartbeat'
 
 const log = debug('hopr-core:heartbeat')
 
-class Heartbeat extends EventEmitter {
-  timeout: any
+export default class Heartbeat {
+  timeout: NodeJS.Timeout
 
   constructor(
     private networkPeers: NetworkPeerStore,
     private interaction: HeartbeatInteraction,
     private hangUp: (addr: PeerId) => Promise<void>
-  ) {
-    super()
-    super.on('beat', this.connectionListener.bind(this))
-  }
+  ) {}
 
-  connectionListener(peer: PeerId) {
-    this.networkPeers.register(peer)
-  }
-
-  async checkNodes(): Promise<void> {
-    const THRESHOLD_TIME = Date.now() - HEARTBEAT_REFRESH_TIME
-    log(`Checking nodes older than ${THRESHOLD_TIME}`)
+  private async checkNodes(): Promise<void> {
+    const thresholdTime = Date.now() - HEARTBEAT_REFRESH
+    log(`Checking nodes older than ${thresholdTime}`)
 
     const queryOldest = async (): Promise<void> => {
       await this.networkPeers.pingOldest(async (id: PeerId) => {
@@ -50,27 +42,25 @@ class Heartbeat extends EventEmitter {
 
     await limitConcurrency<void>(
       MAX_PARALLEL_CONNECTIONS,
-      () => !this.networkPeers.containsOlderThan(THRESHOLD_TIME),
+      () => !this.networkPeers.containsOlderThan(thresholdTime),
       queryOldest
     )
   }
 
-  setTimeout() {
+  private tick() {
     this.timeout = setTimeout(async () => {
       await this.checkNodes()
-      this.setTimeout()
-    }, randomInteger(HEARTBEAT_INTERVAL_LOWER_BOUND, HEARTBEAT_INTERVAL_UPPER_BOUND))
+      this.tick()
+    }, randomInteger(HEARTBEAT_INTERVAL, HEARTBEAT_INTERVAL + HEARTBEAT_INTERVAL_VARIANCE))
   }
 
-  start(): void {
-    this.setTimeout()
-    log(`Heartbeat mechanism started`)
+  public start() {
+    this.tick()
+    log(`Heartbeat started`)
   }
 
-  stop(): void {
+  public stop() {
     clearTimeout(this.timeout)
-    log(`Heartbeat mechanism stopped`)
+    log(`Heartbeat stopped`)
   }
 }
-
-export default Heartbeat

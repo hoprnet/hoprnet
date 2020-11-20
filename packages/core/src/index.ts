@@ -130,7 +130,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       this,
       this.mixer,
       (conn: Connection) => this._network.crawler.handleCrawlRequest(conn),
-      (remotePeer: PeerId) => this._network.heartbeat.emit('beat', remotePeer)
+      (peer: PeerId) => this._network.networkPeers.register(peer),
     )
     this._network = new Network(this._libp2p, this._interactions, options)
 
