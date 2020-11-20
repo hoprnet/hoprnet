@@ -1,6 +1,5 @@
 import Heartbeat from './heartbeat'
 import NetworkPeerStore from './network-peers'
-import PeerId from 'peer-id'
 import assert from 'assert'
 import { HEARTBEAT_REFRESH } from '../constants'
 // @ts-ignore
@@ -34,14 +33,14 @@ describe('unit test heartbeat', async () => {
   })
 
   it('check nodes is noop with only new peers', async () => {
-    peers.register(PeerId.createFromB58String('16Uiu2HAmShu5QQs3LKEXjzmnqcT8E3YqyxKtVTurWYp8caM5jYJq'))
+    peers.register(fakePeerId(1))
     await heartbeat.__forTestOnly_checkNodes()
     assert(hangUp.notCalled)
     assert(interaction.interact.notCalled)
   })
 
   it('check nodes interacts with an old peer', async () => {
-    peers.register(PeerId.createFromB58String('16Uiu2HAmShu5QQs3LKEXjzmnqcT8E3YqyxKtVTurWYp8caM5jYJw'))
+    peers.register(fakePeerId(2))
     clock.tick(HEARTBEAT_REFRESH * 2)
     await heartbeat.__forTestOnly_checkNodes()
     assert(hangUp.notCalled, 'shouldnt call hangup')
@@ -72,12 +71,10 @@ describe('unit test heartbeat', async () => {
     assert(chris.peers.has(alice.id), `Chris should know about Alice now.`)
     assert(bob.peers.has(alice.id), `Bob should know about Alice now.`)
 
-    console.log('>>> setup')
     // Alice heartbeat, all available
-    //let heartbeatPromise = alice.heartbeat.__forTestOnly_checkNodes()
+    let heartbeatPromise = alice.heartbeat.__forTestOnly_checkNodes()
     clock.tick(HEARTBEAT_REFRESH * 2)
-    //await heartbeatPromise
-    console.log('>>> heartbeat')
+    await heartbeatPromise
 
     // Chris dies, alice heartbeats again
     //chris.stop

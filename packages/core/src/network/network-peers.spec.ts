@@ -30,11 +30,12 @@ describe('test PeerStore', async function () {
     })
     networkPeers.register(id)
     assert(networkPeers.qualityOf(id) < Q, 'initial peers have low quality')
+    assert(networkPeers.length() === 1)
 
     await networkPeers.pingOldest(() => Promise.resolve(true))
     assert(networkPeers.qualityOf(id) > Q, 'after first successful ping, peer is good quality')
     await networkPeers.pingOldest(() => Promise.resolve(false))
-    assert(networkPeers.qualityOf(id) < Q, 'after 50% failed pings, peer is bad quality')
+    assert(networkPeers.qualityOf(id) <= Q, 'after 50% failed pings, peer is bad quality')
 
     await networkPeers.pingOldest(() => Promise.resolve(true))
     await networkPeers.pingOldest(() => Promise.resolve(true))

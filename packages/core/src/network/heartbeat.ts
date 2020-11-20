@@ -65,6 +65,6 @@ export default class Heartbeat {
   }
 
   public async __forTestOnly_checkNodes() {
-    this.checkNodes()
+    return await this.checkNodes()
   }
 }

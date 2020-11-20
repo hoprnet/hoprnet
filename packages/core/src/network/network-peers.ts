@@ -39,6 +39,7 @@ class NetworkPeers {
     }
     entry.heartbeatsSent++
     entry.lastSeen = Date.now()
+    heap.heappush(this.peers, entry, this.compareLastPing)
     entry.lastPingSuccess = await interaction(entry.id)
     if (entry.lastPingSuccess) {
       entry.heartbeatsSuccess++
