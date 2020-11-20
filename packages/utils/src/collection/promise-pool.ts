@@ -1,11 +1,13 @@
 export async function limitConcurrency<T>(
   maxConcurrency: number,
   exitCond: () => boolean,
-  createPromise: () => Promise<T>
+  createPromise: () => Promise<T>,
+  maxIterations:number = 1e3
 ): Promise<T[]> {
   const ret: Promise<T>[] = []
-  const executing = []
-  while (!exitCond()) {
+  const executing: Promise<void>[] = []
+  let i = 0;
+  while (!exitCond() && i++ < maxIterations) {
     const p = createPromise()
     ret.push(p)
     const e = p.then(() => executing.splice(executing.indexOf(e), 1))

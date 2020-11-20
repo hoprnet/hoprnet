@@ -84,7 +84,7 @@ describe('network/crawler test crawler', function () {
   })
 
   it('should crawl the network and timeout while crawling', async function () {
-    this.timeout(5e3)
+    this.timeout(500)
 
     let timeoutCorrectly = false
     let before = Date.now()

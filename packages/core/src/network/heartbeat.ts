@@ -32,12 +32,16 @@ class Heartbeat extends EventEmitter {
   async checkNodes(): Promise<void> {
     const THRESHOLD_TIME = Date.now() - HEARTBEAT_REFRESH_TIME
     log(`Checking nodes older than ${THRESHOLD_TIME}`)
+
     const queryOldest = async (): Promise<void> => {
       await this.networkPeers.pingOldest(async (id: PeerId) => {
+        log('ping', id.toB58String())
         try {
           await this.interaction.interact(id)
+          log('ping success to', id.toB58String())
           return true
         } catch (err) {
+          log('ping failed to', id.toB58String(), err)
           await this.hangUp(id)
           return false
         }
@@ -46,7 +50,7 @@ class Heartbeat extends EventEmitter {
 
     await limitConcurrency<void>(
       MAX_PARALLEL_CONNECTIONS,
-      () => this.networkPeers.containsOlderThan(THRESHOLD_TIME),
+      () => !this.networkPeers.containsOlderThan(THRESHOLD_TIME),
       queryOldest
     )
   }
