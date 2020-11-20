@@ -27,7 +27,7 @@ async function generateMocks(options?: { timeoutIntentionally: boolean }, addr =
   } as Interactions<any>
 
   const network = new Network(node, interactions, {} as any, { crawl: options })
-  node.connectionManager.on('peer:connect', (conn: Connection) =>{
+  node.connectionManager.on('peer:connect', (conn: Connection) => {
     network.networkPeers.register(conn.remotePeer)
     node.peerStore.addressBook.add(conn.remotePeer, [conn.remoteAddr])
   })
