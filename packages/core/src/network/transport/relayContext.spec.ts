@@ -38,7 +38,7 @@ describe('test overwritable connection', function () {
         //let msg: Uint8Array
         for await (const _msg of source) {
           if (_msg != null) {
-           /* if (usePrefix) {
+            /* if (usePrefix) {
               msg = _msg.slice(1)
             } else {
               msg = _msg.slice()
