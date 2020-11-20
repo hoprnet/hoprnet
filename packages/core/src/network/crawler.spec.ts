@@ -27,9 +27,10 @@ async function generateMocks(options?: { timeoutIntentionally: boolean }, addr =
   } as Interactions<any>
 
   const network = new Network(node, interactions, {} as any, { crawl: options })
-  node.connectionManager.on('peer:connect', (conn: Connection) =>
+  node.connectionManager.on('peer:connect', (conn: Connection) =>{
+    network.networkPeers.register(conn.remotePeer)
     node.peerStore.addressBook.add(conn.remotePeer, [conn.remoteAddr])
-  )
+  })
 
   return {
     node,
@@ -55,19 +56,19 @@ describe('network/crawler test crawler', function () {
     Alice.node.connectionManager.emit('peer:connect', mockConnection(Bob.node.peerId, Bob.address))
     await Alice.network.crawler.crawl()
 
-    assert(Alice.network.networkPeers.has(Bob.node.peerId), 'Alice should know about Bob')
+    assert(Alice.network.networkPeers.has(Bob.node.peerId), 'Alice should know about Bob, 1')
 
     Bob.node.connectionManager.emit('peer:connect', mockConnection(Chris.node.peerId, Chris.address))
     assert(Bob.network.networkPeers.has(Chris.node.peerId), 'Bob should know about Chris')
 
     await Alice.network.crawler.crawl()
-    assert(Alice.network.networkPeers.has(Bob.node.peerId), 'Alice should know about Bob')
+    assert(Alice.network.networkPeers.has(Bob.node.peerId), 'Alice should know about Bob, 2')
     assert(Alice.network.networkPeers.has(Chris.node.peerId), 'Alice should know about Chris')
 
     Chris.node.connectionManager.emit('peer:connect', mockConnection(Dave.node.peerId, Dave.address))
     await Alice.network.crawler.crawl()
 
-    assert(Alice.network.networkPeers.has(Bob.node.peerId), 'Alice should know about Bob')
+    assert(Alice.network.networkPeers.has(Bob.node.peerId), 'Alice should know about Bob, 3')
     assert(Alice.network.networkPeers.has(Chris.node.peerId), 'Alice should know about Chris')
     assert(Alice.network.networkPeers.has(Dave.node.peerId), 'Alice should know about Dave')
 
