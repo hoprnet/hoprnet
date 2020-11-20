@@ -1,5 +1,5 @@
-import dgram, { RemoteInfo } from 'dgram'
-import type { Socket } from 'dgram'
+import dgram from 'dgram'
+import type { Socket, RemoteInfo } from 'dgram'
 import { getExternalIp, handleStunRequest } from './stun'
 import Multiaddr from 'multiaddr'
 import assert from 'assert'
@@ -8,8 +8,8 @@ import { once } from 'events'
 // const TIMEOUT = 1000
 
 describe('test STUN', function () {
-  let client
-  let servers
+  let client: Socket
+  let servers: Socket[]
 
   before(() => {
     servers = Array.from({ length: 4 }).map((_) => {

@@ -29,7 +29,7 @@ class Network {
 
     const getPeer = (id: PeerId): Multiaddr[] => {
       let addrs = node.peerStore.addressBook.get(id)
-      return addrs.map((a) => {
+      return addrs?.map((a) => {
         if (!a.multiaddr.getPeerId()) {
           return a.multiaddr.encapsulate(`/p2p/${id.toB58String()}`)
         }
