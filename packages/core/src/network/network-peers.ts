@@ -38,7 +38,7 @@ class NetworkPeers {
 
   public async pingOldest(interaction: (PeerID) => Promise<boolean>): Promise<void> {
     const entry = heap.heappop(this.peers, this.compareLastPing)
-    if (!entry) { 
+    if (!entry) {
       return Promise.resolve()
     }
     entry.heartbeatsSent++
