@@ -18,7 +18,7 @@ describe('unit test heartbeat', async () => {
   } as any
 
   beforeEach(() => {
-    clock = sinon.useFakeTimers(Date.now());
+    clock = sinon.useFakeTimers(Date.now())
     peers = new NetworkPeerStore([])
     heartbeat = new Heartbeat(peers, interaction, hangUp)
   })
@@ -48,12 +48,12 @@ describe('unit test heartbeat', async () => {
     assert(interaction.interact.calledOnce, 'should call interact')
   })
 
-  it('test heartbeat flow', async() => {
+  it('test heartbeat flow', async () => {
     let generateMock = (i) => {
-      let id = fakePeerId(i) 
+      let id = fakePeerId(i)
       let peers = new NetworkPeerStore([])
       let heartbeat = new Heartbeat(peers, interaction, hangUp)
-      return {peers, interaction, id, heartbeat}
+      return { peers, interaction, id, heartbeat }
     }
     let alice = generateMock(1)
     let bob = generateMock(2)
@@ -72,12 +72,12 @@ describe('unit test heartbeat', async () => {
     assert(chris.peers.has(alice.id), `Chris should know about Alice now.`)
     assert(bob.peers.has(alice.id), `Bob should know about Alice now.`)
 
-    console.log(">>> setup")
+    console.log('>>> setup')
     // Alice heartbeat, all available
     //let heartbeatPromise = alice.heartbeat.__forTestOnly_checkNodes()
     clock.tick(HEARTBEAT_REFRESH * 2)
     //await heartbeatPromise
-    console.log(">>> heartbeat")
+    console.log('>>> heartbeat')
 
     // Chris dies, alice heartbeats again
     //chris.stop

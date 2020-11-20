@@ -53,7 +53,7 @@ export async function generateLibP2PMock(addr = '/ip4/0.0.0.0/tcp/0'): Promise<L
   }
 }
 
-export function fakePeerId(i: number): PeerId{
+export function fakePeerId(i: number): PeerId {
   return ({
     id: i,
     equals: (x) => x.id == i,
