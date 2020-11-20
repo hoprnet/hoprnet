@@ -4,14 +4,7 @@ import { findPath } from '.'
 import type NetworkPeers from '../network/network-peers'
 import type { Indexer } from '@hoprnet/hopr-core-connector-interface'
 import BN from 'bn.js'
-
-function fakePeerId(i: number): PeerId {
-  return ({
-    id: i,
-    equals: (x) => x.id == i,
-    toB58String: () => i
-  } as unknown) as PeerId
-}
+import { fakePeerId } from '../test-utils'
 
 function checkPath(path: PeerId[], edges: Map<PeerId, PeerId[]>) {
   for (let i = 0; i < path.length - 1; i++) {

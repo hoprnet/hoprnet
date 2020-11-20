@@ -63,4 +63,8 @@ export default class Heartbeat {
     clearTimeout(this.timeout)
     log(`Heartbeat stopped`)
   }
+
+  public async __forTestOnly_checkNodes(){
+    this.checkNodes()
+  } 
 }

@@ -52,3 +52,11 @@ export async function generateLibP2PMock(addr = '/ip4/0.0.0.0/tcp/0'): Promise<L
     address: getAddress(node)
   }
 }
+
+export function fakePeerId(i: number): PeerId{
+  return ({
+    id: i,
+    equals: (x) => x.id == i,
+    toB58String: () => i
+  } as unknown) as PeerId
+}
