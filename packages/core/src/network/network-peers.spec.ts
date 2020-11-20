@@ -22,7 +22,7 @@ describe('test PeerStore', async function () {
   })
 
   it('should _ping_ peers', async function () {
-    const id = fakePeerId(5) 
+    const id = fakePeerId(5)
     const networkPeers = new PeerStore([])
     assert(networkPeers.length() == 0, 'networkPeers must be empty')
     await networkPeers.pingOldest(() => {

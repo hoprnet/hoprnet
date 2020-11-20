@@ -64,7 +64,7 @@ export default class Heartbeat {
     log(`Heartbeat stopped`)
   }
 
-  public async __forTestOnly_checkNodes(){
+  public async __forTestOnly_checkNodes() {
     this.checkNodes()
-  } 
+  }
 }
