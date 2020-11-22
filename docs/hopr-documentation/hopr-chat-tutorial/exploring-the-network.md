@@ -43,3 +43,4 @@ Matic Address:  0xabe565d06c810dac59a02560ea4ea83cda2e995f
 ```
 
 Now that we've scoped out the network, it's time to start sending some messages. The next section will explain how.
+
