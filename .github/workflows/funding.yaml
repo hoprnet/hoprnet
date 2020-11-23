@@ -48,7 +48,7 @@ jobs:
 
       - name: Check HOPR balance
         run: |
-          ethers --rpc $RPC_URL --account $RAW_KEY eval 'accounts[0].getAddress().then(address => (new ethers.Contract("$ADDRESS",["$ABI"], new ethers.providers.JsonRpcProvider($RPC_URL))).balanceOf(address).then(b => formatEther(b)))'
+          ethers --rpc ${{ env.RPC_URL }} --account ${{ env.RAW_KEY }} eval 'accounts[0].getAddress().then(address => (new ethers.Contract("${{ env.ADDRESS }}",["${{ env.ABI }}"], new ethers.providers.JsonRpcProvider($RPC_URL))).balanceOf(address).then(b => formatEther(b)))'
         env:
           RAW_KEY: ${{ secrets.FUNDING_WALLET_PRIVATE_KEY }}
           RPC_URL: ${{ secrets[matrix.rpc_url] }}
