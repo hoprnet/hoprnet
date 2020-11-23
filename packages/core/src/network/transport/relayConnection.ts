@@ -42,7 +42,7 @@ class RelayConnection implements MultiaddrConnection {
   private _statusMessagePromise: DeferredPromise<void>
   private _statusMessages: Uint8Array[]
 
-  private _iteration: number
+  public _iteration: number
 
   private _onReconnect: (newStream: MultiaddrConnection, counterparty: PeerId) => Promise<void>
   private _webRTCUpgradeInbound: () => SimplePeer
@@ -193,7 +193,7 @@ class RelayConnection implements MultiaddrConnection {
 
             if (this.webRTC != null) {
               try {
-                this.webRTC.destroy()
+                await new Promise((resolve) => this.webRTC._destroy(undefined, resolve))
               } catch {}
               this.webRTC = this._webRTCUpgradeInbound()
               log(`resetting WebRTC stream`)
@@ -204,6 +204,8 @@ class RelayConnection implements MultiaddrConnection {
               this._webRTCPromise = this._webRTCstream.next().then(this._webRTCSourceFunction)
               log(`resetting WebRTC stream done`)
             }
+
+            this._iteration++
             this._onReconnect(this.switch(), this._counterparty)
           } else if (u8aEquals(SUFFIX, PING)) {
             log(`PING received`)
@@ -505,7 +507,7 @@ class RelayConnection implements MultiaddrConnection {
   switch(): MultiaddrConnection {
     return {
       ...this,
-      source: this._createSource(++this._iteration),
+      source: this._createSource(this._iteration),
       sink: this._createSink.bind(this)
     }
   }
