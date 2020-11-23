@@ -26,3 +26,7 @@ Here's a list of the daily tasks so far:
 | 8   | Find the Password, Part 2! | 200             |
 | 9   | Push Your Luck             | 200 + up to 500 |
 | 10  | Find the Password III      | 300             |
+| 11  | Push Your Luck 2           | 200 + up to 500 |
+| 12  | Don't Ask...               | -50 to 500      |
+| 13  | Find the Password IV       | 400             |
+| 14  | ???                        | ???             |

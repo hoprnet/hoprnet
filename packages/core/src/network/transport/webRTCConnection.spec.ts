@@ -312,11 +312,6 @@ describe('test overwritable connection', function () {
     ctxB.sink(streamB.source)
     streamB.sink(ctxB.source)
 
-    // setTimeout(() => {
-    //   console.log(`error`)
-    //   PeerA.emit('error')
-    // })
-
     setTimeout(() => {
       const newConnectionA = [Pair(), Pair()]
 
