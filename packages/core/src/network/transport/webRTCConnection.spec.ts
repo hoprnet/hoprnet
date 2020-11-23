@@ -31,7 +31,7 @@ describe('test overwritable connection', function () {
 
         let MSG_TIMEOUT = 10
 
-        for (; i < (WEBRTC_UPGRADE_TIMEOUT / MSG_TIMEOUT) + 5; i++) {
+        for (; i < WEBRTC_UPGRADE_TIMEOUT / MSG_TIMEOUT + 5; i++) {
           msg = new TextEncoder().encode(`iteration ${_iteration} - msg no. ${i}`)
           if (arg.usePrefix) {
             yield u8aConcat(RELAY_PAYLOAD_PREFIX, msg)
