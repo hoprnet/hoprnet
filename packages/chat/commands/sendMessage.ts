@@ -69,7 +69,7 @@ export class SendMessage extends SendMessageBase {
 
       // manual mode
       if (state.routing === 'manual' && state.routingPath.length === 0) {
-        throw Error('Cannot send a message using manual mode.')
+        throw Error('Cannot send a message using manual mode, please specify path.')
       }
       // direct mode
       else if (state.routing === 'direct') {
@@ -80,7 +80,9 @@ export class SendMessage extends SendMessageBase {
         return this.sendMessage(state, peerId, message, async () => {
           return state.routingPath
         })
-      } else {
+      }
+      // mode not found
+      else {
         throw Error(`Routing '${state.routing}' does not exist.`)
       }
     } catch (err) {
@@ -113,8 +115,14 @@ export class SendMessageFancy extends SendMessageBase {
       const messageQuestion = styleValue(`Type your message and press ENTER to send:`, 'highlight') + '\n'
       const message = await new Promise<string>((resolve) => this.rl.question(messageQuestion, resolve))
 
+      // peerIds are specified in `state.routing`
+      if (state.routingPath.length > 0) {
+        return this.sendMessage(state, peerId, message, async () => {
+          return state.routingPath
+        })
+      }
       // manual mode
-      if (state.routing === 'manual') {
+      else if (state.routing === 'manual') {
         clearString(messageQuestion + message, this.rl)
         console.log(`Sending message to ${styleValue(query, 'peerId')} ...`)
 
@@ -126,12 +134,8 @@ export class SendMessageFancy extends SendMessageBase {
       else if (state.routing === 'direct') {
         return this.sendMessage(state, peerId, message, async () => [])
       }
-      // peerIds are specified in `state.routing`
-      else if (state.routingPath.length > 0) {
-        return this.sendMessage(state, peerId, message, async () => {
-          return state.routingPath
-        })
-      } else {
+      // mode not found
+      else {
         throw Error(`Routing '${state.routing}' does not exist.`)
       }
     } catch (err) {
