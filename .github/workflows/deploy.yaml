@@ -1,7 +1,7 @@
 name: HOPR Deploy
 on:
   push:
-    branches: ['master', 'release/**', 'avado']
+    branches: ['master', 'release/**', 'avado', '!debug/**']
     paths-ignore:
       - 'docs/**'
 
