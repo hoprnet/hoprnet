@@ -135,7 +135,10 @@ class Crawler {
 
   public async answerCrawl(callerAddress: Multiaddr): Promise<Multiaddr[]> {
     return this.networkPeers
-      .randomSubset(CRAWLING_RESPONSE_NODES, (id: PeerId) => !id.equals(this.id) && !id.equals(this.stringToPeerId(callerAddress.getPeerId())))
+      .randomSubset(
+        CRAWLING_RESPONSE_NODES,
+        (id: PeerId) => !id.equals(this.id) && !id.equals(this.stringToPeerId(callerAddress.getPeerId()))
+      )
       .map(this.getPeer) // NB: Multiple addrs per peer.
       .flat()
       .filter((ma: Multiaddr) => shouldIncludePeerInCrawlResponse(ma, callerAddress))
