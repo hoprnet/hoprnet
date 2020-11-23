@@ -32,24 +32,29 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
       epoch: TicketEpoch
       amount: Balance
       winProb: Hash
+      channelIteration: TicketEpoch
     }
   ) {
-    if (arr == null && struct == null) {
+    if (!arr && !struct) {
       throw Error(`Invalid constructor arguments.`)
     }
 
-    if (arr == null) {
+    if (!arr) {
       super(Ticket.SIZE)
     } else {
       super(arr.bytes, arr.offset, Ticket.SIZE)
     }
 
-    if (struct != null) {
+    if (struct) {
       this.set(struct.counterparty, this.counterpartyOffset - this.byteOffset)
       this.set(struct.challenge, this.challengeOffset - this.byteOffset)
       this.set(new Uint8Array(struct.epoch.toBuffer('be', EPOCH_SIZE)), this.epochOffset - this.byteOffset)
       this.set(new Uint8Array(struct.amount.toBuffer('be', AMOUNT_SIZE)), this.amountOffset - this.byteOffset)
       this.set(struct.winProb, this.winProbOffset - this.byteOffset)
+      this.set(
+        new Uint8Array(struct.channelIteration.toBuffer('be', EPOCH_SIZE)),
+        this.channelIterationOffset - this.byteOffset
+      )
     }
   }
 
@@ -101,12 +106,20 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
     return new Hash(new Uint8Array(this.buffer, this.winProbOffset, Hash.SIZE))
   }
 
+  get channelIterationOffset(): number {
+    return this.byteOffset + AccountId.SIZE + Hash.SIZE + EPOCH_SIZE + AMOUNT_SIZE + Hash.SIZE
+  }
+
+  get channelIteration(): TicketEpoch {
+    return new TicketEpoch(new Uint8Array(this.buffer, this.channelIterationOffset, EPOCH_SIZE))
+  }
+
   get hash(): Promise<Hash> {
     return Promise.resolve(toEthSignedMessageHash(u8aToHex(this)))
   }
 
   static get SIZE(): number {
-    return AccountId.SIZE + Hash.SIZE + EPOCH_SIZE + AMOUNT_SIZE + Hash.SIZE
+    return AccountId.SIZE + Hash.SIZE + EPOCH_SIZE + AMOUNT_SIZE + Hash.SIZE + EPOCH_SIZE
   }
 
   getEmbeddedFunds(): Balance {
@@ -135,6 +148,7 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
       epoch: TicketEpoch
       amount: Balance
       winProb: Hash
+      channelIteration: TicketEpoch
     }
   ): Ticket {
     return new Ticket(arr, struct)

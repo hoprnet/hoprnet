@@ -1,7 +1,7 @@
 import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import { Moment } from '..'
 import { Uint8ArrayE } from '../extended'
-import { hash, stateCountToStatus, sign } from '../../utils'
+import { hash, stateCounterToStatus, sign } from '../../utils'
 import ChannelState from './channelState'
 import ChannelBalance from './channelBalance'
 
@@ -26,13 +26,13 @@ class Channel extends Uint8ArrayE implements Types.Channel {
       moment?: Moment
     }
   ) {
-    if (arr == null) {
+    if (!arr) {
       super(Channel.SIZE)
     } else {
       super(arr.bytes, arr.offset, Channel.SIZE)
     }
 
-    if (struct != null) {
+    if (struct) {
       this.set(struct.state, ChannelBalance.SIZE)
 
       if (struct.balance) {
@@ -60,7 +60,7 @@ class Channel extends Uint8ArrayE implements Types.Channel {
   }
 
   get rawState(): ChannelState {
-    if (this._rawState == null) {
+    if (!this._rawState) {
       this._rawState = new ChannelState({
         bytes: this.buffer,
         offset: this.byteOffset + ChannelBalance.SIZE
@@ -79,7 +79,7 @@ class Channel extends Uint8ArrayE implements Types.Channel {
   }
 
   get _status(): ChannelStatus {
-    return stateCountToStatus(this.rawState.toNumber())
+    return stateCounterToStatus(this.rawState.toNumber())
   }
 
   get hash() {
@@ -111,7 +111,7 @@ class Channel extends Uint8ArrayE implements Types.Channel {
 
   // @TODO fix size
   static get SIZE(): number {
-    // const state = stateCountToStatus(_state.toNumber())
+    // const state = stateCounterToStatus(_state.toNumber())
     // if ([ChannelStatus.FUNDING, ChannelStatus.OPEN].includes(state)) {
     return ChannelBalance.SIZE + ChannelState.SIZE
     // }

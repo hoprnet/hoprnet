@@ -1,7 +1,7 @@
 import type { Channel as IChannel } from '@hoprnet/hopr-core-connector-interface'
 import BN from 'bn.js'
-import { u8aToHex } from '@hoprnet/hopr-utils'
-import { Balance, Channel as ChannelType, Hash, Moment, Public, SignedChannel } from '../types'
+import { u8aToHex, toU8a } from '@hoprnet/hopr-utils'
+import { Balance, Channel as ChannelType, Hash, Moment, Public, SignedChannel, TicketEpoch } from '../types'
 import TicketFactory from './ticket'
 import { ChannelStatus } from '../types/channel'
 import { hash } from '../utils'
@@ -46,11 +46,22 @@ class Channel implements IChannel {
     })
   }
 
+  get stateCounter(): Promise<TicketEpoch> {
+    return new Promise<TicketEpoch>(async (resolve, reject) => {
+      try {
+        const channel = await this.onChainChannel
+        return resolve(new TicketEpoch(toU8a(Number(channel.stateCounter))))
+      } catch (error) {
+        return reject(error)
+      }
+    })
+  }
+
   get status() {
     return new Promise<'UNINITIALISED' | 'FUNDING' | 'OPEN' | 'PENDING'>(async (resolve, reject) => {
       try {
-        const channel = await this.onChainChannel
-        const status = Number(channel.stateCounter) % 10
+        const stateCounter = await this.stateCounter
+        const status = Number(stateCounter.toNumber()) % 10
 
         if (status >= Object.keys(ChannelStatus).length) {
           throw Error("status like this doesn't exist")

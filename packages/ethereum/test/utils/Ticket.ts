@@ -15,6 +15,7 @@ const Ticket = ({
   amount,
   counter,
   winProbPercent,
+  channelIteration = 1,
   counterPartySecret
 }: {
   web3: any
@@ -25,10 +26,12 @@ const Ticket = ({
   amount: string
   counter: number
   winProbPercent: string // max 100
+  channelIteration?: number
   counterPartySecret?: string // needs to be bytes32
 }): {
   channelId: string // return channel ID
   challenge: string // return hashed alternative
+  channelIteration: number // return channel iteration
   winProb: string // return winProb in bytes32
   encodedTicket: string // return hashed alternative
   signature: string // signature of encodedTicket
@@ -64,7 +67,8 @@ const Ticket = ({
     [challenge, 'bytes', 32],
     [counter, 'number', 3],
     [amount, 'number', 12],
-    [winProb, 'bytes', 32]
+    [winProb, 'bytes', 32],
+    [channelIteration, 'number', 3]
   ]
 
   const encodedTicket = raw
@@ -84,6 +88,7 @@ const Ticket = ({
     channelId,
     challenge,
     winProb,
+    channelIteration,
     encodedTicket,
     signature,
     porSecret,

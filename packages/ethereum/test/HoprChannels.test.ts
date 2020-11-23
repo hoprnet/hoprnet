@@ -57,6 +57,7 @@ describe('HoprChannels', function () {
     before(async function () {
       await reset()
     })
+
     context("make payments between 'partyA' and 'partyB' using a fresh channel and 'fundChannel'", function () {
       const partyASecret1 = keccak256({
         type: 'bytes27',
@@ -218,6 +219,7 @@ describe('HoprChannels', function () {
           ticket.porSecret,
           ticket.amount,
           ticket.winProb,
+          partyB,
           ticket.r,
           ticket.s,
           ticket.v,
@@ -251,6 +253,7 @@ describe('HoprChannels', function () {
           ticket.porSecret,
           ticket.amount,
           ticket.winProb,
+          partyA,
           ticket.r,
           ticket.s,
           ticket.v,
@@ -297,6 +300,7 @@ describe('HoprChannels', function () {
           ticket.porSecret,
           ticket.amount,
           ticket.winProb,
+          partyB,
           ticket.r,
           ticket.s,
           ticket.v,
@@ -330,6 +334,7 @@ describe('HoprChannels', function () {
         expect(channel.stateCounter.eq(new BN(10))).to.be.equal(true, 'wrong stateCounter')
       })
     })
+
     context(
       "make payments between 'partyA' and 'partyB' using a recycled channel and 'fundChannelWithSig'",
       function () {
@@ -470,13 +475,15 @@ describe('HoprChannels', function () {
             counterPartySecret: partyASecret2,
             amount: web3.utils.toWei('0.3', 'ether'),
             counter: 2,
-            winProbPercent: '100'
+            winProbPercent: '100',
+            channelIteration: 2
           })
           await hoprChannels.redeemTicket(
             ticket.counterPartySecret,
             ticket.porSecret,
             ticket.amount,
             ticket.winProb,
+            partyB,
             ticket.r,
             ticket.s,
             ticket.v,
@@ -503,13 +510,15 @@ describe('HoprChannels', function () {
             counterPartySecret: partyBSecret2,
             amount: web3.utils.toWei('0.5', 'ether'),
             counter: 2,
-            winProbPercent: '100'
+            winProbPercent: '100',
+            channelIteration: 2
           })
           await hoprChannels.redeemTicket(
             ticket.counterPartySecret,
             ticket.porSecret,
             ticket.amount,
             ticket.winProb,
+            partyA,
             ticket.r,
             ticket.s,
             ticket.v,
@@ -548,13 +557,15 @@ describe('HoprChannels', function () {
             counterPartySecret: partyASecret1,
             amount: web3.utils.toWei('1', 'ether'),
             counter: 2,
-            winProbPercent: '100'
+            winProbPercent: '100',
+            channelIteration: 2
           })
           await hoprChannels.redeemTicket(
             ticket.counterPartySecret,
             ticket.porSecret,
             ticket.amount,
             ticket.winProb,
+            partyB,
             ticket.r,
             ticket.s,
             ticket.v,
@@ -878,6 +889,7 @@ describe('HoprChannels', function () {
         ticket.porSecret,
         ticket.amount,
         ticket.winProb,
+        partyA,
         ticket.r,
         ticket.s,
         ticket.v
@@ -889,6 +901,7 @@ describe('HoprChannels', function () {
           ticket.porSecret,
           ticket.amount,
           ticket.winProb,
+          partyA,
           ticket.r,
           ticket.s,
           ticket.v

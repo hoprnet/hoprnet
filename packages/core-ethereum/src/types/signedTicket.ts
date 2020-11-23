@@ -20,18 +20,18 @@ class SignedTicket extends Uint8ArrayE implements Types.SignedTicket {
       ticket?: Ticket
     }
   ) {
-    if (arr == null) {
+    if (!arr) {
       super(SignedTicket.SIZE)
     } else {
       super(arr.bytes, arr.offset, SignedTicket.SIZE)
     }
 
-    if (struct != null) {
-      if (struct.signature != null) {
+    if (struct) {
+      if (struct.signature) {
         this.set(struct.signature, this.signatureOffset - this.byteOffset)
       }
 
-      if (struct.ticket != null) {
+      if (struct.ticket) {
         const ticket = struct.ticket.toU8a()
 
         if (ticket.length == Ticket.SIZE) {
@@ -58,7 +58,7 @@ class SignedTicket extends Uint8ArrayE implements Types.SignedTicket {
   }
 
   get ticket(): Ticket {
-    if (this._ticket == null) {
+    if (!this._ticket) {
       this._ticket = new Ticket({
         bytes: this.buffer,
         offset: this.ticketOffset
@@ -73,7 +73,7 @@ class SignedTicket extends Uint8ArrayE implements Types.SignedTicket {
   }
 
   get signature(): Signature {
-    if (this._signature == null) {
+    if (!this._signature) {
       this._signature = new Signature({
         bytes: this.buffer,
         offset: this.signatureOffset

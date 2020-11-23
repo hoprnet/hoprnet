@@ -15,13 +15,13 @@ class ChannelEntry extends Uint8ArrayE {
       logIndex: BN
     }
   ) {
-    if (arr == null) {
+    if (!arr) {
       super(ChannelEntry.SIZE)
     } else {
       super(arr.bytes, arr.offset, ChannelEntry.SIZE)
     }
 
-    if (struct != null) {
+    if (struct) {
       // we convert values to string because of this issue
       // https://github.com/indutny/bn.js/issues/206
       const blockNumber = new BNE(struct.blockNumber.toString())
