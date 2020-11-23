@@ -5,7 +5,7 @@ import BN from 'bn.js'
 import PeerId from 'peer-id'
 import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import { randomBytes } from 'crypto'
-import { u8aEquals } from '@hoprnet/hopr-utils'
+import { randomInteger, u8aEquals } from '@hoprnet/hopr-utils'
 
 describe('test creation & verification of a challenge', function () {
   it('should create a verifiable challenge', async function () {
@@ -14,22 +14,25 @@ describe('test creation & verification of a challenge', function () {
       types: new Types()
     } as unknown) as HoprCoreConnector
 
-    const secret = randomBytes(32)
+    for (let i = 0; i < 10; i++) {
+      const secret = randomBytes(32)
 
-    const peerId = await PeerId.create({
-      keyType: 'secp256k1'
-    })
+      const peerId = await PeerId.create({
+        keyType: 'secp256k1'
+      })
 
-    const challenge = await Challenge.create(paymentChannels, secret, new BN(0)).sign(peerId)
+      const challenge = await Challenge.create(paymentChannels, secret, new BN(0)).sign(peerId)
 
-    assert(await challenge.verify(peerId), `Previously generated signature should be valid.`)
+      assert(await challenge.verify(peerId), `Previously generated signature should be valid.`)
 
-    assert(u8aEquals(await challenge.counterparty, peerId.pubKey.marshal()), `recovered pubKey should be equal.`)
+      assert(u8aEquals(await challenge.counterparty, peerId.pubKey.marshal()), `recovered pubKey should be equal.`)
 
-    challenge[0] ^= 0xff
-    try {
-      await challenge.verify(peerId)
-      assert.fail(`Manipulated signature should be with high probability invalid.`)
-    } catch {}
+      let exponent = randomInteger(0, 8)
+      let index = randomInteger(0, challenge.length)
+
+      challenge[index] = challenge[index] ^ (1 << exponent)
+
+      assert(!(await challenge.verify(peerId)), `Bit-flipped signature should not be valid.`)
+    }
   })
 })
