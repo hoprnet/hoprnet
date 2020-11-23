@@ -193,9 +193,11 @@ class RelayConnection implements MultiaddrConnection {
 
             if (this.webRTC != null) {
               try {
-                await new Promise((resolve) => this.webRTC._destroy(undefined, resolve))
+                this.webRTC.destroy(undefined)
               } catch {}
+
               this.webRTC = this._webRTCUpgradeInbound()
+
               log(`resetting WebRTC stream`)
               this._webRTCdone = false
               this._webRTCresolved = false
