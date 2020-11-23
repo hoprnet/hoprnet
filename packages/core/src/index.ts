@@ -84,7 +84,6 @@ export type HoprOptions = {
 class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
   // TODO make these actually private - Do not rely on any of these properties!
   public _interactions: Interactions<Chain>
-  public _network: Network
   // Allows us to construct HOPR with falsy options
   public _debug: boolean
   public _dbKeys = DbKeys
@@ -100,6 +99,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
   private crawlTimeout: NodeJS.Timeout
   private mixer: Mixer<Chain>
   private strategy: ChannelStrategy
+  private network: Network
 
   /**
    * @constructor
@@ -111,7 +111,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     super()
     this._libp2p.connectionManager.on('peer:connect', (conn: Connection) => {
       this.emit('hopr:peer:connection', conn.remotePeer)
-      this._network.networkPeers.register(conn.remotePeer)
+      this.network.networkPeers.register(conn.remotePeer)
     })
 
     this.mixer = new Mixer()
@@ -129,10 +129,10 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     this._interactions = new Interactions(
       this,
       this.mixer,
-      (conn: Connection) => this._network.crawler.handleCrawlRequest(conn),
-      (peer: PeerId) => this._network.networkPeers.register(peer)
+      (conn: Connection) => this.network.crawler.handleCrawlRequest(conn),
+      (peer: PeerId) => this.network.networkPeers.register(peer)
     )
-    this._network = new Network(this._libp2p, this._interactions, options)
+    this.network = new Network(this._libp2p, this._interactions, options)
 
     if (options.ticketAmount) this.ticketAmount = options.ticketAmount
     if (options.ticketWinProb) this.ticketWinProb = options.ticketWinProb
@@ -253,7 +253,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
    */
   public async start(): Promise<Hopr<Chain>> {
     await Promise.all([
-      this._libp2p.start().then(() => Promise.all([this.connectToBootstrapServers(), this._network.start()])),
+      this._libp2p.start().then(() => Promise.all([this.connectToBootstrapServers(), this.network.start()])),
       this.paymentChannels?.start()
     ])
 
@@ -288,7 +288,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     }
     clearTimeout(this.crawlTimeout)
     this.running = false
-    await Promise.all([this._network.stop(), this.paymentChannels?.stop().then(() => log(`Connector stopped.`))])
+    await Promise.all([this.network.stop(), this.paymentChannels?.stop().then(() => log(`Connector stopped.`))])
 
     await Promise.all([this.db?.close().then(() => log(`Database closed.`)), this._libp2p.stop()])
 
@@ -398,11 +398,11 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
   }
 
   public getConnectedPeers(): PeerId[] {
-    return this._network.networkPeers.all()
+    return this.network.networkPeers.all()
   }
 
   public async crawl(filter?: (peer: PeerId) => boolean): Promise<CrawlInfo> {
-    return this._network.crawler.crawl(filter)
+    return this.network.crawler.crawl(filter)
   }
 
   private async periodicCrawl() {
@@ -520,7 +520,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       this.getId(),
       destination,
       MAX_HOPS - 1,
-      this._network.networkPeers,
+      this.network.networkPeers,
       this.paymentChannels.indexer,
       PATH_RANDOMNESS
     )

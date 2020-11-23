@@ -8,16 +8,13 @@ import Stun from './stun'
 import Multiaddr from 'multiaddr'
 import PeerId from 'peer-id'
 
-type TestOpts = {
-  crawl?: { timeoutIntentionally?: boolean }
-}
 class Network {
   public crawler: Crawler
   public heartbeat: Heartbeat
   public networkPeers: NetworkPeers
   public stun?: Stun
 
-  constructor(node: LibP2P, interactions: Interactions<any>, private options: HoprOptions, testingOptions?: TestOpts) {
+  constructor(node: LibP2P, interactions: Interactions<any>, private options: HoprOptions) {
     // These are temporary, and will be replaced by accessors to the addressBook
     const putPeer = (ma: Multiaddr) => {
       if (!ma.getPeerId()) {
@@ -44,8 +41,7 @@ class Network {
       this.networkPeers,
       interactions.network.crawler,
       getPeer,
-      putPeer,
-      testingOptions?.crawl
+      putPeer
     )
 
     if (options.bootstrapNode) {

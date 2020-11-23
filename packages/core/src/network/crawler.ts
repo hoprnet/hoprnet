@@ -12,7 +12,6 @@ import Multiaddr from 'multiaddr'
 import { Crawler as CrawlInteraction } from '../interactions/network/crawler'
 
 const log = debug('hopr-core:crawler')
-const stringToPeerId = (s: string): PeerId => PeerId.createFromB58String(s)
 
 export type CrawlInfo = {
   contacted: PeerId[]
@@ -47,19 +46,18 @@ class Crawler {
     private crawlInteraction: CrawlInteraction,
     private getPeer: (peer: PeerId) => Multiaddr[],
     private putPeer: (ma: Multiaddr) => void,
+    private stringToPeerId: (id: string) => PeerId = (s) => PeerId.createFromB58String(s) // TODO for testing
   ) {}
 
   /**
    * @param filter
    */
-  async crawl(filter?: (peer: PeerId) => boolean): Promise<CrawlInfo> {
-    log('creating a crawl')
+  async crawl(filter: (peer: PeerId) => boolean = () => true): Promise<CrawlInfo> {
     const errors: Error[] = []
     const contacted = new Set<string>()
     let queue = new Heap<CrawlEdge>()
     queue.addAll(this.networkPeers.all().filter(filter).map(p => weight(p)))
     const before = queue.length // number of peers before crawling
-    filter = filter || (() => true)
 
     let aborted = false
     const abort = new AbortController()
@@ -103,17 +101,16 @@ class Crawler {
           if (!addresses[i].getPeerId()) {
             throw Error('address does not contain peer id: ' + addresses[i].toString())
           }
-          const peer = PeerId.createFromCID(addresses[i].getPeerId())
+          const peer = this.stringToPeerId(addresses[i].getPeerId())
 
-          if (peer.equals(this.id) || contacted.has(peer.toB58String()) || !filter(peer)) {
+          if (peer.equals(this.id) || contacted.has(peer.toB58String()) || !filter(peer) ||has(queue, peer)) {
+            log('skipping', peer.toB58String())
             continue
           }
-
-          if (!has(queue, peer)) {
-            queue.push(weight(peer))
-            this.putPeer(addresses[i])
-            this.networkPeers.register(peer)
-          }
+          queue.push(weight(peer))
+          this.putPeer(addresses[i])
+          this.networkPeers.register(peer)
+          log('adding to queue', peer)
         }
       } catch (err) {
         log('error querying peer', err)
@@ -133,7 +130,7 @@ class Crawler {
     this.debugStats(contacted, errors, contacted.size, before)
     log('crawl complete')
     return {
-      contacted: Array.from(contacted.values()).map((x: string) => stringToPeerId(x)),
+      contacted: Array.from(contacted.values()).map((x: string) => this.stringToPeerId(x)),
       errors
     }
   }
