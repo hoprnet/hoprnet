@@ -117,7 +117,8 @@ class TCP {
           conn: newStream,
           self: this._peerId,
           counterparty,
-          channel: (newStream as RelayConnection).webRTC
+          channel: (newStream as RelayConnection).webRTC,
+          iteration: (newStream as RelayConnection)._iteration
         })
       }
 
