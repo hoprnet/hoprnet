@@ -7,6 +7,7 @@ import NetworkPeers from './network-peers'
 import Stun from './stun'
 import Multiaddr from 'multiaddr'
 import PeerId from 'peer-id'
+import type { Indexer } from '@hoprnet/hopr-core-connector-interface'
 
 class Network {
   public crawler: Crawler
@@ -14,7 +15,7 @@ class Network {
   public networkPeers: NetworkPeers
   public stun?: Stun
 
-  constructor(node: LibP2P, interactions: Interactions<any>, private options: HoprOptions) {
+  constructor(node: LibP2P, interactions: Interactions<any>, options: HoprOptions, indexer: Indexer) {
     // These are temporary, and will be replaced by accessors to the addressBook
     const putPeer = (ma: Multiaddr) => {
       if (!ma.getPeerId()) {
@@ -36,7 +37,7 @@ class Network {
 
     this.networkPeers = new NetworkPeers(Array.from(node.peerStore.peers.values()).map((x) => x.id))
     this.heartbeat = new Heartbeat(this.networkPeers, interactions.network.heartbeat, node.hangUp.bind(node))
-    this.crawler = new Crawler(node.peerId, this.networkPeers, interactions.network.crawler, getPeer, putPeer)
+    this.crawler = new Crawler(node.peerId, this.networkPeers, interactions.network.crawler, indexer, getPeer, putPeer)
 
     if (options.bootstrapNode) {
       this.stun = new Stun(options.hosts)
@@ -44,7 +45,7 @@ class Network {
   }
 
   async start() {
-    if (this.options.bootstrapNode) {
+    if (this.stun) {
       await this.stun?.startServer()
     }
 
@@ -52,7 +53,7 @@ class Network {
   }
 
   async stop() {
-    if (this.options.bootstrapNode) {
+    if (this.stun) {
       await this.stun?.stopServer()
     }
 

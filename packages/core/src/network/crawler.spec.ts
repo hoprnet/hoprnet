@@ -13,12 +13,16 @@ function generateMock(i) {
     interact: (peerId) => _MOCKS[peerId.toB58String()].all().map(fakeAddress)
   } as any
 
+  const indexer = {
+    getChannelsFromPeer: () => []
+  } as any
+
   const getPeer = sinon.fake()
   const putPeer = sinon.fake()
   let id = fakePeerId(i)
   let address = fakeAddress(id)
   let peers = new NetworkPeerStore([])
-  const crawler = new Crawler(id, peers, interactions, getPeer, putPeer, (s) => fakePeerId(s))
+  const crawler = new Crawler(id, peers, interactions, indexer, getPeer, putPeer, (s) => fakePeerId(s))
 
   _MOCKS[id.toB58String()] = peers
   return {

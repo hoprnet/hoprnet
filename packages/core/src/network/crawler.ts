@@ -1,11 +1,12 @@
 import Heap from 'heap-js'
-import { randomInteger, limitConcurrency, timeoutAfter } from '@hoprnet/hopr-utils'
+import { limitConcurrency, timeoutAfter } from '@hoprnet/hopr-utils'
 import { CRAWLING_RESPONSE_NODES, MAX_PARALLEL_CONNECTIONS, CRAWL_FAIL_TIMEOUT, CRAWL_MAX_SIZE } from '../constants'
 import PeerId from 'peer-id'
 import NetworkPeerStore from './network-peers'
 import { peerHasOnlyPublicAddresses, isOnPrivateNet, PRIVATE_NETS } from '../filters'
 import debug from 'debug'
 import Multiaddr from 'multiaddr'
+import type { Indexer, IndexerChannel } from '@hoprnet/hopr-core-connector-interface'
 import { Crawler as CrawlInteraction } from '../interactions/network/crawler'
 
 const log = debug('hopr-core:crawler')
@@ -34,31 +35,39 @@ export const shouldIncludePeerInCrawlResponse = (peer: Multiaddr, them: Multiadd
   return true
 }
 
-const weight = (p: PeerId): CrawlEdge => [p, randomInteger(0, 10)] // TODO
+
+const compareWeight = (a, b) => b[1] - a[1] 
 
 class Crawler {
   constructor(
     private id: PeerId,
     private networkPeers: NetworkPeerStore,
     private crawlInteraction: CrawlInteraction,
+    private indexer: Indexer,
     private getPeer: (peer: PeerId) => Multiaddr[],
     private putPeer: (ma: Multiaddr) => void,
     private stringToPeerId: (id: string) => PeerId = (s) => PeerId.createFromB58String(s) // TODO for testing
   ) {}
 
+
+  private async weight (p: PeerId): Promise<CrawlEdge> {
+    const peerEdges = await this.indexer.getChannelsFromPeer(p)
+    const outgoingStake = peerEdges.reduce((x: IndexerChannel, y: IndexerChannel) => x[2] + y[2], 0)
+    return [p, outgoingStake * Math.random()]
+  }
   /**
    * @param filter
    */
   async crawl(filter: (peer: PeerId) => boolean = () => true): Promise<CrawlInfo> {
     const errors: Error[] = []
     const contacted = new Set<string>()
-    let queue = new Heap<CrawlEdge>()
-    queue.addAll(
+    let queue = new Heap<CrawlEdge>(compareWeight)
+    queue.addAll(await Promise.all(
       this.networkPeers
         .all()
         .filter(filter)
-        .map((p) => weight(p))
-    )
+        .map(async (p) => this.weight(p))
+    ))
     const before = queue.length // number of peers before crawling
 
     log(`Crawling started`)
@@ -95,7 +104,7 @@ class Crawler {
             log('skipping', peer.toB58String())
             continue
           }
-          queue.push(weight(peer))
+          queue.push(await this.weight(peer))
           this.putPeer(addresses[i])
           this.networkPeers.register(peer)
           log('adding to queue', peer.toB58String())

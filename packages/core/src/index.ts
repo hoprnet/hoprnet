@@ -132,7 +132,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       (addr: Multiaddr) => this.network.crawler.answerCrawl(addr),
       (peer: PeerId) => this.network.networkPeers.register(peer)
     )
-    this.network = new Network(this._libp2p, this._interactions, options)
+    this.network = new Network(this._libp2p, this._interactions, options, this.paymentChannels.indexer)
 
     if (options.ticketAmount) this.ticketAmount = options.ticketAmount
     if (options.ticketWinProb) this.ticketWinProb = options.ticketWinProb
