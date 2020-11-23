@@ -9,7 +9,7 @@ import PeerId from 'peer-id'
 import type { Connection } from 'libp2p'
 import type { Entry } from './network-peers'
 import NetworkPeerStore from './network-peers'
-import { peerHasOnlyPublicAddresses, isOnPrivateNet, PRIVATE_NETS } from '../filters'
+import { peerHasOnlyPublicAddresses, isOnPrivateNet/*, PRIVATE_NETS */ } from '../filters'
 import debug from 'debug'
 import Multiaddr from 'multiaddr'
 import { Crawler as CrawlInteraction } from '../interactions/network/crawler'
@@ -30,18 +30,18 @@ let stringToPeerId = (s: string): PeerId => {
   return PeerId.createFromB58String(s)
 }
 
-export const shouldIncludePeerInCrawlResponse = (peer: Multiaddr, them: Multiaddr): boolean => {
+export const shouldIncludePeerInCrawlResponse = (_peer: Multiaddr, _them: Multiaddr): boolean => {
   // We are being requested a crawl from a node that is on a remote network, so
   // it does not benefit them for us to give them addresses on our private
   // network, therefore let's first filter these out.
-  if (
-    ['ip4', 'ip6', 'dns4', 'dns6'].includes(them.protoNames()[0]) &&
-    !them.nodeAddress().address.match(PRIVATE_NETS) &&
-    isOnPrivateNet(peer)
-  ) {
-    verbose('rejecting peer from crawl results as it only has private addresses, and the requesting node is remote')
-    return false // Reject peer
-  }
+  // if (
+  //   ['ip4', 'ip6', 'dns4', 'dns6'].includes(them.protoNames()[0]) &&
+  //   !them.nodeAddress().address.match(PRIVATE_NETS) &&
+  //   isOnPrivateNet(peer)
+  // ) {
+  //   verbose('rejecting peer from crawl results as it only has private addresses, and the requesting node is remote')
+  //   return false // Reject peer
+  // }
   return true
 }
 
