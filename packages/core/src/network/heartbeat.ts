@@ -13,7 +13,7 @@ import { Heartbeat as HeartbeatInteraction } from '../interactions/network/heart
 const log = debug('hopr-core:heartbeat')
 
 export default class Heartbeat {
-  timeout: NodeJS.Timeout
+  private timeout: NodeJS.Timeout
 
   constructor(
     private networkPeers: NetworkPeerStore,
