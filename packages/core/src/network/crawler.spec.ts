@@ -2,7 +2,7 @@ import assert from 'assert'
 import PeerId from 'peer-id'
 import type { Connection } from 'libp2p'
 
-import { CRAWL_TIMEOUT /*, shouldIncludePeerInCrawlResponse */ } from './crawler'
+import { CRAWL_TIMEOUT, shouldIncludePeerInCrawlResponse } from './crawler'
 import { Crawler as CrawlerInteraction } from '../interactions/network/crawler'
 import Multiaddr from 'multiaddr'
 import { Network } from './index'
@@ -10,6 +10,7 @@ import { Interactions } from '../interactions'
 import { BlacklistedEntry } from './network-peers'
 import { BLACKLIST_TIMEOUT } from '../constants'
 import { generateLibP2PMock } from '../test-utils'
+import { durations } from '@hoprnet/hopr-utils'
 
 let mockConnection = (p: PeerId, addr: Multiaddr): Connection => {
   return { remotePeer: p, remoteAddr: addr } as Connection
@@ -116,7 +117,7 @@ describe('network/crawler test crawler', function () {
   })
 
   it('should crawl the network and timeout while crawling', async function () {
-    this.timeout(5e3)
+    this.timeout(durations.seconds(3 * CRAWL_TIMEOUT + 100))
 
     let timeoutCorrectly = false
     let before = Date.now()
@@ -153,13 +154,13 @@ describe('network/crawler test crawler', function () {
     await Promise.all([Alice.node.stop(), Bob.node.stop(), Chris.node.stop()])
   })
   // @TODO redo crawl filtering
-  // it('shouldIncludePeerInCrawlResponse', async () => {
-  //   assert(
-  //     shouldIncludePeerInCrawlResponse(Multiaddr('/ip4/123.4.5.6/tcp/5000'), Multiaddr('/ip4/12.34.56.7/tcp/5000'))
-  //   )
-  //   assert(shouldIncludePeerInCrawlResponse(Multiaddr('/ip4/127.0.0.1/tcp/1000'), Multiaddr('/ip4/127.0.0.1/tcp/5000')))
-  //   assert(
-  //     !shouldIncludePeerInCrawlResponse(Multiaddr('/ip4/127.0.0.1/tcp/5000'), Multiaddr('/ip4/12.34.56.7/tcp/5000'))
-  //   )
-  // })
+  it('shouldIncludePeerInCrawlResponse', async () => {
+    assert(
+      shouldIncludePeerInCrawlResponse(Multiaddr('/ip4/123.4.5.6/tcp/5000'), Multiaddr('/ip4/12.34.56.7/tcp/5000'))
+    )
+    assert(shouldIncludePeerInCrawlResponse(Multiaddr('/ip4/127.0.0.1/tcp/1000'), Multiaddr('/ip4/127.0.0.1/tcp/5000')))
+    assert(
+      !shouldIncludePeerInCrawlResponse(Multiaddr('/ip4/127.0.0.1/tcp/5000'), Multiaddr('/ip4/12.34.56.7/tcp/5000'))
+    )
+  })
 })
