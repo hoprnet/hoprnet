@@ -93,12 +93,15 @@ describe('test utils', function () {
       const message = generateMsg()
       const signature = await utils.sign(message, privKey)
       assert(await utils.verify(message, signature, pubKey), `check that signature is verifiable`)
-  
-      let exponent = randomInteger(0,8)
+
+      let exponent = randomInteger(0, 8)
       let index = randomInteger(0, message.length)
 
       message[index] = message[index] ^ (1 << exponent)
-      assert(!(await utils.verify(message, signature, pubKey)), `check that signature becomes invalid once we flip one bit`)
+      assert(
+        !(await utils.verify(message, signature, pubKey)),
+        `check that signature becomes invalid once we flip one bit`
+      )
     }
   })
 
