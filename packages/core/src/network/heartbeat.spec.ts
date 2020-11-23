@@ -1,7 +1,7 @@
 import Heartbeat from './heartbeat'
 import NetworkPeerStore from './network-peers'
 import assert from 'assert'
-import { HEARTBEAT_REFRESH } from '../constants'
+import { HEARTBEAT_REFRESH, NETWORK_QUALITY_THRESHOLD } from '../constants'
 // @ts-ignore
 import sinon from 'sinon'
 import { fakePeerId } from '../test-utils'
@@ -72,17 +72,24 @@ describe('unit test heartbeat', async () => {
     assert(bob.peers.has(alice.id), `Bob should know about Alice now.`)
 
     // Alice heartbeat, all available
-    let heartbeatPromise = alice.heartbeat.__forTestOnly_checkNodes()
     clock.tick(HEARTBEAT_REFRESH * 2)
-    await heartbeatPromise
+    await alice.heartbeat.__forTestOnly_checkNodes()
 
+    assert(alice.peers.qualityOf(bob.id)  > NETWORK_QUALITY_THRESHOLD, 'bob is high q')
+    assert(alice.peers.qualityOf(chris.id)  > NETWORK_QUALITY_THRESHOLD, 'chris is high q')
+    
     // Chris dies, alice heartbeats again
-    //chris.stop
+    alice.interaction.interact = sinon.fake(id => {
+      if (id === chris.id) {
+        throw new Error('FAIL')
+      }
+      return Promise.resolve()
+    })
 
-    //TODO simulate wait for it to be oldest
-    // Check whether a node failure gets detected
-    // TODO await Alice.network.heartbeat.checkNodes()
-    // TODO assert(!Alice.network.networkPeers.has(Chris.node.peerId), `Alice should have removed Chris.`)
-    return
+    clock.tick(HEARTBEAT_REFRESH * 2)
+    await alice.heartbeat.__forTestOnly_checkNodes()
+    alice.peers.debugLog()
+    assert(alice.peers.qualityOf(bob.id)  > NETWORK_QUALITY_THRESHOLD, 'bob is still high q')
+    assert(alice.peers.qualityOf(chris.id) <= NETWORK_QUALITY_THRESHOLD, 'chris is now low q')
   })
 })

@@ -79,7 +79,7 @@ class NetworkPeers {
 
   public debugLog() {
     log(`current nodes:`)
-    this.peers.forEach((node: Entry) => log(node.id.toB58String()))
+    this.peers.forEach((e: Entry) => log(`id: ${e.id.toB58String()}, q: ${this.qualityOf(e.id)}`))
   }
 
   public containsOlderThan(ts): boolean {
