@@ -1,7 +1,7 @@
 import assert from 'assert'
 import { randomBytes } from 'crypto'
 import secp256k1 from 'secp256k1'
-import { stringToU8a, u8aEquals } from '@hoprnet/hopr-utils'
+import { randomInteger, stringToU8a, u8aEquals } from '@hoprnet/hopr-utils'
 import * as utils from '.'
 
 const pair = {
@@ -12,7 +12,7 @@ const pair = {
 
 const generatePair = () => {
   // generate private key
-  let privKey
+  let privKey: Uint8Array
   do {
     privKey = randomBytes(32)
   } while (!secp256k1.privateKeyVerify(privKey))
@@ -89,12 +89,20 @@ describe('test utils', function () {
   it('should sign and verify messages', async function () {
     const { privKey, pubKey } = generatePair()
 
-    const message = generateMsg()
-    const signature = await utils.sign(message, privKey)
-    assert(await utils.verify(message, signature, pubKey), `check that signature is verifiable`)
+    for (let i = 0; i < 40; i++) {
+      const message = generateMsg()
+      const signature = await utils.sign(message, privKey)
+      assert(await utils.verify(message, signature, pubKey), `check that signature is verifiable`)
 
-    message[0] ^= 0xff
-    assert(!(await utils.verify(message, signature, pubKey)), `check that manipulated message is not verifiable`)
+      let exponent = randomInteger(0, 8)
+      let index = randomInteger(0, message.length)
+
+      message[index] = message[index] ^ (1 << exponent)
+      assert(
+        !(await utils.verify(message, signature, pubKey)),
+        `check that signature becomes invalid once we flip one bit`
+      )
+    }
   })
 
   it('should get private key using public key', async function () {
