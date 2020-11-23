@@ -81,7 +81,7 @@ class WebRTCConnection implements MultiaddrConnection {
       })
     }
 
-    this.channel.once('iceTimeout', endWebRTCUpgrade)
+    //this.channel.once('iceTimeout', endWebRTCUpgrade)
     this.channel.once('error', endWebRTCUpgrade)
 
     this.sink = async (source: Stream['source']): Promise<void> => {
