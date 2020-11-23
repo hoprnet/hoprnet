@@ -33,4 +33,3 @@ To find your own address, type `myAddress`. Once again, you'll need to click the
 ![](../.gitbook/assets/avado-myaddress%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29.png)
 
 Now that we've scoped out the network, it's time to start sending some messages. The next section will explain how.
-

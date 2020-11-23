@@ -154,13 +154,15 @@ function shouldBehaveLikeERC20(errorPrefix, initialSupply, initialHolder, recipi
   })
 
   describe('approve', function () {
-    shouldBehaveLikeERC20Approve(errorPrefix, initialHolder, recipient, initialSupply, function (
-      owner,
-      spender,
-      amount
-    ) {
-      return this.token.approve(spender, amount, { from: owner })
-    })
+    shouldBehaveLikeERC20Approve(
+      errorPrefix,
+      initialHolder,
+      recipient,
+      initialSupply,
+      function (owner, spender, amount) {
+        return this.token.approve(spender, amount, { from: owner })
+      }
+    )
   })
 }
 
