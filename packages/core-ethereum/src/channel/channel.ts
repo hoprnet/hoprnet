@@ -8,8 +8,6 @@ import { hash } from '../utils'
 
 import type HoprEthereum from '..'
 
-import { OnChainChannel } from './types'
-
 class Channel implements IChannel {
   private _signedChannel: SignedChannel
   private _settlementWindow?: Moment
@@ -36,10 +34,17 @@ class Channel implements IChannel {
     this.ticket = new TicketFactory(this)
   }
 
-  private get onChainChannel(): Promise<OnChainChannel> {
-    return new Promise<OnChainChannel>(async (resolve, reject) => {
+  private get onChainChannel(): Promise<{
+    deposit: string
+    partyABalance: string
+    closureTime: string
+    stateCounter: string
+    closureByPartyA: boolean
+  }> {
+    return new Promise(async (resolve, reject) => {
       try {
-        return resolve(await this.coreConnector.channel.getOnChainState(await this.channelId))
+        const channelId = await this.channelId
+        return resolve(this.coreConnector.channel.getOnChainState(channelId))
       } catch (error) {
         return reject(error)
       }

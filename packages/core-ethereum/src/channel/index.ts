@@ -23,7 +23,6 @@ import Channel from './channel'
 import { Uint8ArrayE } from '../types/extended'
 
 import { CHANNEL_STATES } from './constants'
-import { OnChainChannel } from './types'
 import { Log } from 'web3-core'
 import { TicketStatic } from './ticket'
 
@@ -73,7 +72,7 @@ class ChannelFactory {
     const channelId = new Hash(await getId(await this.coreConnector.account.address, counterparty))
 
     const [onChain, offChain]: [boolean, boolean] = await Promise.all([
-      this.coreConnector.channel.getOnChainState(channelId).then((channel: OnChainChannel) => {
+      this.coreConnector.channel.getOnChainState(channelId).then((channel) => {
         const state = Number(channel.stateCounter) % CHANNEL_STATES
         return state === ChannelStatus.OPEN || state === ChannelStatus.PENDING
       }),
@@ -322,7 +321,7 @@ class ChannelFactory {
     return this.coreConnector.db.del(Buffer.from(this.coreConnector.dbKeys.Channel(counterparty)))
   }
 
-  getOnChainState(channelId: Hash): Promise<OnChainChannel> {
+  getOnChainState(channelId: Hash) {
     return this.coreConnector.hoprChannels.methods.channels(channelId.toHex()).call()
   }
 
