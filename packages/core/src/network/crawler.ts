@@ -35,8 +35,7 @@ export const shouldIncludePeerInCrawlResponse = (peer: Multiaddr, them: Multiadd
   return true
 }
 
-
-const compareWeight = (a, b) => b[1] - a[1] 
+const compareWeight = (a, b) => b[1] - a[1]
 
 class Crawler {
   constructor(
@@ -49,8 +48,7 @@ class Crawler {
     private stringToPeerId: (id: string) => PeerId = (s) => PeerId.createFromB58String(s) // TODO for testing
   ) {}
 
-
-  private async weight (p: PeerId): Promise<CrawlEdge> {
+  private async weight(p: PeerId): Promise<CrawlEdge> {
     const peerEdges = await this.indexer.getChannelsFromPeer(p)
     const outgoingStake = peerEdges.reduce((x: IndexerChannel, y: IndexerChannel) => x[2] + y[2], 0)
     return [p, outgoingStake * Math.random()]
@@ -62,12 +60,14 @@ class Crawler {
     const errors: Error[] = []
     const contacted = new Set<string>()
     let queue = new Heap<CrawlEdge>(compareWeight)
-    queue.addAll(await Promise.all(
-      this.networkPeers
-        .all()
-        .filter(filter)
-        .map(async (p) => this.weight(p))
-    ))
+    queue.addAll(
+      await Promise.all(
+        this.networkPeers
+          .all()
+          .filter(filter)
+          .map(async (p) => this.weight(p))
+      )
+    )
     const before = queue.length // number of peers before crawling
 
     log(`Crawling started`)
