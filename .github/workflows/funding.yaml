@@ -31,7 +31,7 @@ jobs:
       - name: Check wallet address
         shell: bash {0}
         run: |
-          echo "Address: $(ethers --acount $RAW_KEY eval 'accounts[0].getAddress().then(address => address)')"
+          echo "Address: $(ethers --account $RAW_KEY eval 'accounts[0].getAddress().then(address => address)')"
         env:
           RAW_KEY: ${{ secrets.FUNDING_WALLET_PRIVATE_KEY }}
           RPC_URL: ${{ secrets[matrix.rpc_url] }}
