@@ -28,13 +28,18 @@ jobs:
       - name: Install ethers
         run: npm install -g @ethersproject/cli
 
-      - name: Check balance of wallets
+      - name: Check wallet address
         shell: bash {0}
         run: |
-          echo "Funding Wallet: $ADDRESS"
-          echo "Address Confirmation: $(ethers --acount $RAW_KEY eval 'accounts[0].getAddress().then(address => address)')"
+          echo "Address: $(ethers --acount $RAW_KEY eval 'accounts[0].getAddress().then(address => address)')"
+        env:
+          RAW_KEY: ${{ secrets.FUNDING_WALLET_PRIVATE_KEY }}
+          RPC_URL: ${{ secrets[matrix.rpc_url] }}
+
+      - name: Check wallet balance
+        shell: bash {0}
+        run: |
           echo "Balance: $(ethers --rpc $RPC_URL --account $RAW_KEY eval 'accounts[0].getBalance().then(b => formatEther(b))')"
         env:
           RAW_KEY: ${{ secrets.FUNDING_WALLET_PRIVATE_KEY }}
-          ADDRESS: ${{ secrets.FUNDING_WALLET_ADDRESS }}
           RPC_URL: ${{ secrets[matrix.rpc_url] }}
