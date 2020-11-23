@@ -185,7 +185,7 @@ class WebRTCConnection implements MultiaddrConnection {
 
                 // @ts-ignore
                 if (this.channel.connected && this._iteration == (this.conn as RelayConnection)._iteration) {
-                  yield result.value
+                  yield (result.value as Uint8Array).slice()
                 } else {
                   console.log(`break`)
                   break
