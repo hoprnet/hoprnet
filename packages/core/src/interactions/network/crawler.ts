@@ -15,12 +15,27 @@ const verbose = debug('hopr-core:verbose:crawl-interaction')
 class Crawler implements AbstractInteraction {
   protocols: string[] = [PROTOCOL_CRAWLING]
 
-  constructor(private node: LibP2P, private handleCrawlRequest: (conn: Connection) => void) {
+  constructor(private node: LibP2P, private getPeers: (remoteAddress: Multiaddr) => Promise<Multiaddr[]>) {
     this.node.handle(this.protocols, this.handler.bind(this))
   }
 
   handler(struct: Handler) {
     pipe(this.handleCrawlRequest(struct.connection), struct.stream)
+  }
+
+  async *handleCrawlRequest(conn: Connection) {
+    log('crawl requested')
+    const selectedNodes = await this.getPeers(conn.remoteAddr)
+    if (selectedNodes.length > 0) {
+      yield new CrawlResponse(undefined, {
+        status: CrawlStatus.OK,
+        addresses: selectedNodes
+      })
+    } else {
+      yield new CrawlResponse(undefined, {
+        status: CrawlStatus.FAIL
+      })
+    }
   }
 
   interact(counterparty: PeerId, options: { signal: AbortSignal }): Promise<Multiaddr[]> {

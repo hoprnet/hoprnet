@@ -1,9 +1,7 @@
 import Heap from 'heap-js'
 import { randomInteger, limitConcurrency, timeoutAfter } from '@hoprnet/hopr-utils'
 import { CRAWLING_RESPONSE_NODES, MAX_PARALLEL_CONNECTIONS, CRAWL_FAIL_TIMEOUT, CRAWL_MAX_SIZE } from '../constants'
-import { CrawlResponse, CrawlStatus } from '../messages'
 import PeerId from 'peer-id'
-import type { Connection } from 'libp2p'
 import NetworkPeerStore from './network-peers'
 import { peerHasOnlyPublicAddresses, isOnPrivateNet, PRIVATE_NETS } from '../filters'
 import debug from 'debug'
@@ -126,27 +124,12 @@ class Crawler {
     }
   }
 
-  private async answerCrawl(callerId: PeerId, callerAddress: Multiaddr): Promise<Multiaddr[]> {
+  public async answerCrawl(callerAddress: Multiaddr): Promise<Multiaddr[]> {
     return this.networkPeers
-      .randomSubset(CRAWLING_RESPONSE_NODES, (id: PeerId) => !id.equals(this.id) && !id.equals(callerId))
+      .randomSubset(CRAWLING_RESPONSE_NODES, (id: PeerId) => !id.equals(this.id) && !id.equals(this.stringToPeerId(callerAddress.getPeerId())))
       .map(this.getPeer) // NB: Multiple addrs per peer.
       .flat()
       .filter((ma: Multiaddr) => shouldIncludePeerInCrawlResponse(ma, callerAddress))
-  }
-
-  async *handleCrawlRequest(this: Crawler, conn: Connection) {
-    log('crawl requested')
-    const selectedNodes = await this.answerCrawl(conn.remotePeer, conn.remoteAddr)
-    if (selectedNodes.length > 0) {
-      yield new CrawlResponse(undefined, {
-        status: CrawlStatus.OK,
-        addresses: selectedNodes
-      })
-    } else {
-      yield new CrawlResponse(undefined, {
-        status: CrawlStatus.FAIL
-      })
-    }
   }
 
   private debugStats(contactedPeerIds: Set<string>, errors: Error[], now: number, before: number) {

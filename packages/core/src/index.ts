@@ -129,7 +129,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     this._interactions = new Interactions(
       this,
       this.mixer,
-      (conn: Connection) => this.network.crawler.handleCrawlRequest(conn),
+      (addr: Multiaddr) => this.network.crawler.answerCrawl(addr),
       (peer: PeerId) => this.network.networkPeers.register(peer)
     )
     this.network = new Network(this._libp2p, this._interactions, options)
