@@ -27,7 +27,9 @@ export const MAX_PARALLEL_CONNECTIONS = 10
 
 export const HEARTBEAT_TIMEOUT = durations.seconds(3)
 
-export const CRAWL_TIMEOUT = 100_000 // ~15 mins
+export const CRAWL_TIMEOUT = 100_000 // ~15 mins - interval between crawls
+export const CRAWL_FAIL_TIMEOUT = 20_000 // Total crawl timeout 
+export const CRAWL_MAX_SIZE = 200 // Max peers to contact per crawl
 
 export const MAX_PACKET_DELAY = 200
 
@@ -37,3 +39,4 @@ export const MAX_PATH_ITERATIONS = 100
 export const NETWORK_QUALITY_THRESHOLD = 0.5
 export const MINIMUM_REASONABLE_CHANNEL_STAKE = 10 * TICKET_AMOUNT
 export const MAX_NEW_CHANNELS_PER_TICK = 10
+
