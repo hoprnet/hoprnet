@@ -16,7 +16,7 @@ jobs:
         include:
           - networks: matic
             rpc_url: FUNDING_RPC_MATIC_URL
-            token_address: 0x4774fEd3f2838f504006BE53155cA9cbDDEe9f0c
+            token_address: "0x4774fEd3f2838f504006BE53155cA9cbDDEe9f0c"
             abi_function: "function balanceOf(address owner) view returns (uint256)"
 
     steps:
