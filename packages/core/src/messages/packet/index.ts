@@ -2,7 +2,7 @@ import BN from 'bn.js'
 import LibP2P from 'libp2p'
 import chalk from 'chalk'
 import PeerId from 'peer-id'
-import { u8aConcat, u8aEquals, u8aToHex, pubKeyToPeerId } from '@hoprnet/hopr-utils'
+import { getTickets, u8aConcat, u8aEquals, u8aToHex, pubKeyToPeerId } from '@hoprnet/hopr-utils'
 import { validateUnacknowledgedTicket, validateCreatedTicket } from '../../utils/tickets'
 import { Header, deriveTicketKey, deriveTicketKeyBlinding, deriveTagParameters, deriveTicketLastKey } from './header'
 import { Challenge } from './challenge'
@@ -270,12 +270,16 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     if (!isRecipient) {
       ;[sender, target] = await Promise.all([this.getSenderPeerId(), this.getTargetPeerId()])
 
-      // perform various ticket validation checks before receiving an ACK
       try {
         await validateUnacknowledgedTicket({
           node: this.node,
+          senderPeerId: sender,
+          targetPeerId: target,
           signedTicket: await this.ticket,
-          senderPeerId: sender
+          getTickets: () =>
+            getTickets(this.node, {
+              signer: sender.pubKey.marshal()
+            })
         })
       } catch (error) {
         verbose('Could not validate unacknowledged ticket', error.message)

@@ -19,10 +19,11 @@ const formatChannel = (res: AsyncReturnType<HoprChannelsInstance['channels']>) =
   deposit: res[0],
   partyABalance: res[1],
   closureTime: res[2],
-  stateCounter: res[3]
+  stateCounter: res[3],
+  closureByPartyA: res[4]
 })
 
-describe('HoprChannels', function () {
+describe.only('HoprChannels', function () {
   const partyAPrivKey = NODE_SEEDS[1]
   const partyBPrivKey = NODE_SEEDS[0]
   const depositAmount = web3.utils.toWei('1', 'ether')
@@ -57,6 +58,7 @@ describe('HoprChannels', function () {
     before(async function () {
       await reset()
     })
+
     context("make payments between 'partyA' and 'partyB' using a fresh channel and 'fundChannel'", function () {
       const partyASecret1 = keccak256({
         type: 'bytes27',
@@ -218,6 +220,7 @@ describe('HoprChannels', function () {
           ticket.porSecret,
           ticket.amount,
           ticket.winProb,
+          partyB,
           ticket.r,
           ticket.s,
           ticket.v,
@@ -251,6 +254,7 @@ describe('HoprChannels', function () {
           ticket.porSecret,
           ticket.amount,
           ticket.winProb,
+          partyA,
           ticket.r,
           ticket.s,
           ticket.v,
@@ -297,6 +301,7 @@ describe('HoprChannels', function () {
           ticket.porSecret,
           ticket.amount,
           ticket.winProb,
+          partyB,
           ticket.r,
           ticket.s,
           ticket.v,
@@ -330,6 +335,7 @@ describe('HoprChannels', function () {
         expect(channel.stateCounter.eq(new BN(10))).to.be.equal(true, 'wrong stateCounter')
       })
     })
+
     context(
       "make payments between 'partyA' and 'partyB' using a recycled channel and 'fundChannelWithSig'",
       function () {
@@ -470,13 +476,15 @@ describe('HoprChannels', function () {
             counterPartySecret: partyASecret2,
             amount: web3.utils.toWei('0.3', 'ether'),
             counter: 2,
-            winProbPercent: '100'
+            winProbPercent: '100',
+            channelIteration: 2
           })
           await hoprChannels.redeemTicket(
             ticket.counterPartySecret,
             ticket.porSecret,
             ticket.amount,
             ticket.winProb,
+            partyB,
             ticket.r,
             ticket.s,
             ticket.v,
@@ -503,13 +511,15 @@ describe('HoprChannels', function () {
             counterPartySecret: partyBSecret2,
             amount: web3.utils.toWei('0.5', 'ether'),
             counter: 2,
-            winProbPercent: '100'
+            winProbPercent: '100',
+            channelIteration: 2
           })
           await hoprChannels.redeemTicket(
             ticket.counterPartySecret,
             ticket.porSecret,
             ticket.amount,
             ticket.winProb,
+            partyA,
             ticket.r,
             ticket.s,
             ticket.v,
@@ -548,13 +558,15 @@ describe('HoprChannels', function () {
             counterPartySecret: partyASecret1,
             amount: web3.utils.toWei('1', 'ether'),
             counter: 2,
-            winProbPercent: '100'
+            winProbPercent: '100',
+            channelIteration: 2
           })
           await hoprChannels.redeemTicket(
             ticket.counterPartySecret,
             ticket.porSecret,
             ticket.amount,
             ticket.winProb,
+            partyB,
             ticket.r,
             ticket.s,
             ticket.v,
@@ -878,6 +890,7 @@ describe('HoprChannels', function () {
         ticket.porSecret,
         ticket.amount,
         ticket.winProb,
+        partyA,
         ticket.r,
         ticket.s,
         ticket.v
@@ -889,6 +902,7 @@ describe('HoprChannels', function () {
           ticket.porSecret,
           ticket.amount,
           ticket.winProb,
+          partyA,
           ticket.r,
           ticket.s,
           ticket.v
@@ -966,7 +980,7 @@ describe('HoprChannels', function () {
       )
     })
 
-    it("should fail when 'claimChannelClosure' before closureTime", async function () {
+    it('should initiate channel closure by partyA', async function () {
       const secretHashA = keccak256({
         type: 'string',
         value: 'partyA secret'
@@ -998,6 +1012,167 @@ describe('HoprChannels', function () {
           from: partyB
         }
       )
+
+      await hoprToken.send(
+        hoprChannels.address,
+        depositAmount,
+        web3.eth.abi.encodeParameters(['address', 'address'], [partyA, partyB])
+      )
+
+      await hoprChannels.openChannel(partyB, {
+        from: partyA
+      })
+
+      await hoprChannels.initiateChannelClosure(partyB, {
+        from: partyA
+      })
+
+      const channel = await hoprChannels.channels(getChannelId(partyA, partyB)).then(formatChannel)
+      expect(channel.stateCounter.toString()).to.be.equal('3', 'wrong stateCounter')
+      expect(channel.closureByPartyA).to.be.true
+    })
+
+    it('should initiate channel closure by partyB', async function () {
+      const secretHashA = keccak256({
+        type: 'string',
+        value: 'partyA secret'
+      }).slice(0, 56)
+
+      const pubKeyA = secp256k1.publicKeyCreate(stringToU8a(partyAPrivKey), false).slice(1)
+
+      await hoprChannels.init(
+        u8aToHex(pubKeyA.slice(0, 32), true),
+        u8aToHex(pubKeyA.slice(32, 64), true),
+        secretHashA,
+        {
+          from: partyA
+        }
+      )
+
+      const secretHashB = keccak256({
+        type: 'string',
+        value: 'partyA secret'
+      }).slice(0, 56)
+
+      const pubKeyB = secp256k1.publicKeyCreate(stringToU8a(partyBPrivKey), false).slice(1)
+
+      await hoprChannels.init(
+        u8aToHex(pubKeyB.slice(0, 32), true),
+        u8aToHex(pubKeyB.slice(32, 64), true),
+        secretHashB,
+        {
+          from: partyB
+        }
+      )
+
+      await hoprToken.send(
+        hoprChannels.address,
+        depositAmount,
+        web3.eth.abi.encodeParameters(['address', 'address'], [partyA, partyB])
+      )
+
+      await hoprChannels.openChannel(partyB, {
+        from: partyA
+      })
+
+      await hoprChannels.initiateChannelClosure(partyA, {
+        from: partyB
+      })
+
+      const channel = await hoprChannels.channels(getChannelId(partyA, partyB)).then(formatChannel)
+      expect(channel.stateCounter.toString()).to.be.equal('3', 'wrong stateCounter')
+      expect(channel.closureByPartyA).to.be.false
+    })
+
+    it("should 'claimChannelClosure' before 'closureTime' when partyA is initiator", async function () {
+      const secretHashA = keccak256({
+        type: 'string',
+        value: 'partyA secret'
+      }).slice(0, 56)
+
+      const pubKeyA = secp256k1.publicKeyCreate(stringToU8a(partyAPrivKey), false).slice(1)
+
+      await hoprChannels.init(
+        u8aToHex(pubKeyA.slice(0, 32), true),
+        u8aToHex(pubKeyA.slice(32, 64), true),
+        secretHashA,
+        {
+          from: partyA
+        }
+      )
+
+      const secretHashB = keccak256({
+        type: 'string',
+        value: 'partyA secret'
+      }).slice(0, 56)
+
+      const pubKeyB = secp256k1.publicKeyCreate(stringToU8a(partyBPrivKey), false).slice(1)
+
+      await hoprChannels.init(
+        u8aToHex(pubKeyB.slice(0, 32), true),
+        u8aToHex(pubKeyB.slice(32, 64), true),
+        secretHashB,
+        {
+          from: partyB
+        }
+      )
+
+      await hoprToken.send(
+        hoprChannels.address,
+        depositAmount,
+        web3.eth.abi.encodeParameters(['address', 'address'], [partyA, partyB])
+      )
+
+      await hoprChannels.openChannel(partyB, {
+        from: partyA
+      })
+
+      await hoprChannels.initiateChannelClosure(partyA, {
+        from: partyB
+      })
+
+      await hoprChannels.claimChannelClosure(partyB, {
+        from: partyA
+      })
+
+      const channel = await hoprChannels.channels(getChannelId(partyA, partyB)).then(formatChannel)
+      expect(channel.stateCounter.toString()).to.be.equal('10', 'wrong stateCounter')
+      expect(channel.closureByPartyA).to.be.false
+    })
+
+    it("should fail when 'claimChannelClosure' is called before 'closureTime'", async function () {
+      const secretHashA = keccak256({
+        type: 'string',
+        value: 'partyA secret'
+      }).slice(0, 56)
+
+      const pubKeyA = secp256k1.publicKeyCreate(stringToU8a(partyAPrivKey), false).slice(1)
+
+      await hoprChannels.init(
+        u8aToHex(pubKeyA.slice(0, 32), true),
+        u8aToHex(pubKeyA.slice(32, 64), true),
+        secretHashA,
+        {
+          from: partyA
+        }
+      )
+
+      const secretHashB = keccak256({
+        type: 'string',
+        value: 'partyA secret'
+      }).slice(0, 56)
+
+      const pubKeyB = secp256k1.publicKeyCreate(stringToU8a(partyBPrivKey), false).slice(1)
+
+      await hoprChannels.init(
+        u8aToHex(pubKeyB.slice(0, 32), true),
+        u8aToHex(pubKeyB.slice(32, 64), true),
+        secretHashB,
+        {
+          from: partyB
+        }
+      )
+
       await hoprToken.send(
         hoprChannels.address,
         depositAmount,

@@ -116,18 +116,22 @@ class Relay {
 
     if (this._webRTCUpgrader != null) {
       let channel = this._webRTCUpgrader.upgradeOutbound()
-      return new WebRTCConnection({
-        conn: new RelayConnection({
-          stream,
-          self: this._peerId,
-          counterparty: destination,
-          onReconnect,
-          webRTC: channel,
-          webRTCUpgradeInbound: this._webRTCUpgrader.upgradeInbound.bind(this._webRTCUpgrader)
-        }),
+
+      let newConn = new RelayConnection({
+        stream,
         self: this._peerId,
         counterparty: destination,
-        channel
+        onReconnect,
+        webRTC: channel,
+        webRTCUpgradeInbound: this._webRTCUpgrader.upgradeInbound.bind(this._webRTCUpgrader)
+      })
+
+      return new WebRTCConnection({
+        conn: newConn,
+        self: this._peerId,
+        counterparty: destination,
+        channel,
+        iteration: newConn._iteration
       })
     } else {
       return new RelayConnection({
@@ -155,18 +159,22 @@ class Relay {
 
     if (this._webRTCUpgrader != null) {
       let channel = this._webRTCUpgrader.upgradeInbound()
-      return new WebRTCConnection({
-        conn: new RelayConnection({
-          stream,
-          self: this._peerId,
-          counterparty,
-          onReconnect,
-          webRTC: channel,
-          webRTCUpgradeInbound: this._webRTCUpgrader.upgradeInbound.bind(this._webRTCUpgrader)
-        }),
+
+      let newConn = new RelayConnection({
+        stream,
         self: this._peerId,
         counterparty,
-        channel
+        onReconnect,
+        webRTC: channel,
+        webRTCUpgradeInbound: this._webRTCUpgrader.upgradeInbound.bind(this._webRTCUpgrader)
+      })
+
+      return new WebRTCConnection({
+        conn: newConn,
+        self: this._peerId,
+        counterparty,
+        channel,
+        iteration: newConn._iteration
       })
     } else {
       return new RelayConnection({

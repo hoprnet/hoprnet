@@ -1,7 +1,13 @@
 import type IChannel from '.'
 import { u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
 import { Hash, TicketEpoch, Balance, SignedTicket, Ticket, AcknowledgedTicket } from '../types'
-import { pubKeyToAccountId, computeWinningProbability, isWinningTicket, checkChallenge } from '../utils'
+import {
+  pubKeyToAccountId,
+  computeWinningProbability,
+  isWinningTicket,
+  checkChallenge,
+  stateCounterToIteration
+} from '../utils'
 import type HoprEthereum from '..'
 import { HASHED_SECRET_WIDTH } from '../hashedSecret'
 
@@ -18,7 +24,7 @@ class TicketStatic {
   constructor(public coreConnector: HoprEthereum) {}
 
   public async submit(
-    ticket: AcknowledgedTicket,
+    ackTicket: AcknowledgedTicket,
     _ticketIndex: Uint8Array
   ): Promise<
     | {
@@ -34,15 +40,18 @@ class TicketStatic {
         error: Error | string
       }
   > {
-    const ticketChallenge = ticket.response
+    const ticketChallenge = ackTicket.response
 
     try {
+      const signedTicket = await ackTicket.signedTicket
+      const ticket = signedTicket.ticket
+
       this.coreConnector.log('Submitting ticket', u8aToHex(ticketChallenge))
 
       const { hoprChannels, signTransaction, account, utils } = this.coreConnector
-      const { r, s, v } = utils.getSignatureParameters((await ticket.signedTicket).signature)
+      const { r, s, v } = utils.getSignatureParameters(signedTicket.signature)
 
-      const hasPreImage = !u8aEquals(ticket.preImage, EMPTY_PRE_IMAGE)
+      const hasPreImage = !u8aEquals(ackTicket.preImage, EMPTY_PRE_IMAGE)
       if (!hasPreImage) {
         this.coreConnector.log(
           `Failed to submit ticket ${u8aToHex(ticketChallenge)}: ${this.INVALID_MESSAGES.NO_PRE_IMAGE}`
@@ -53,7 +62,7 @@ class TicketStatic {
         }
       }
 
-      const validChallenge = await checkChallenge((await ticket.signedTicket).ticket.challenge, ticket.response)
+      const validChallenge = await checkChallenge(ticket.challenge, ackTicket.response)
       if (!validChallenge) {
         this.coreConnector.log(
           `Failed to submit ticket ${u8aToHex(ticketChallenge)}: ${this.INVALID_MESSAGES.INVALID_CHALLENGE}`
@@ -64,12 +73,7 @@ class TicketStatic {
         }
       }
 
-      const isWinning = await isWinningTicket(
-        await (await ticket.signedTicket).ticket.hash,
-        ticket.response,
-        ticket.preImage,
-        (await ticket.signedTicket).ticket.winProb
-      )
+      const isWinning = await isWinningTicket(await ticket.hash, ackTicket.response, ackTicket.preImage, ticket.winProb)
       if (!isWinning) {
         this.coreConnector.log(
           `Failed to submit ticket ${u8aToHex(ticketChallenge)}: ${this.INVALID_MESSAGES.NOT_WINNING}`
@@ -80,6 +84,8 @@ class TicketStatic {
         }
       }
 
+      const counterparty = await this.coreConnector.utils.pubKeyToAccountId(await signedTicket.signer)
+
       const transaction = await signTransaction(
         {
           from: (await account.address).toHex(),
@@ -87,10 +93,11 @@ class TicketStatic {
           nonce: (await account.nonce).valueOf()
         },
         hoprChannels.methods.redeemTicket(
-          u8aToHex(ticket.preImage),
-          u8aToHex(ticket.response),
-          (await ticket.signedTicket).ticket.amount.toString(),
-          u8aToHex((await ticket.signedTicket).ticket.winProb),
+          u8aToHex(ackTicket.preImage),
+          u8aToHex(ackTicket.response),
+          ticket.amount.toString(),
+          u8aToHex(ticket.winProb),
+          u8aToHex(counterparty),
           u8aToHex(r),
           u8aToHex(s),
           v + 27
@@ -98,8 +105,8 @@ class TicketStatic {
       )
 
       await transaction.send()
-      ticket.redeemed = true
-      this.coreConnector.account.updateLocalState(ticket.preImage)
+      ackTicket.redeemed = true
+      this.coreConnector.account.updateLocalState(ackTicket.preImage)
 
       this.coreConnector.log('Successfully submitted ticket', u8aToHex(ticketChallenge))
       return {
@@ -137,6 +144,8 @@ class TicketFactory {
       .call()
       .then((res) => new TicketEpoch(Number(res.counter)))
 
+    const channelIteration = new TicketEpoch(stateCounterToIteration((await this.channel.stateCounter).toNumber()))
+
     const signedTicket = new SignedTicket(arr)
 
     const ticket = new Ticket(
@@ -149,7 +158,8 @@ class TicketFactory {
         challenge,
         epoch,
         amount,
-        winProb: ticketWinProb
+        winProb: ticketWinProb,
+        channelIteration
       }
     )
 

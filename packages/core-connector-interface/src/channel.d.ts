@@ -153,6 +153,9 @@ declare interface Channel {
   // Timestamp once the channel can be settled
   readonly settlementWindow: Promise<Moment>
 
+  // Current state counter of the channel
+  readonly stateCounter: Promise<TicketEpoch>
+
   // Current status of the channel
   readonly status: Promise<'UNINITIALISED' | 'FUNDING' | 'OPEN' | 'PENDING'>
 

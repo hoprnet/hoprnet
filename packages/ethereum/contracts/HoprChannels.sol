@@ -37,6 +37,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
          * stateCounter mod 10 == 2: open
          * stateCounter mod 10 == 3: pending
          */
+        bool closureByPartyA; // channel closure was initiated by party A
     }
 
     // setup ERC1820
@@ -241,47 +242,46 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         bytes32 hashedSecretASecretB,
         uint256 amount,
         bytes32 winProb,
+        address counterparty,
         bytes32 r,
         bytes32 s,
         uint8 v
     ) external {
         require(amount > 0, "HoprChannels: amount must be strictly greater than zero");
         require(amount < (1 << 96), "HoprChannels: Invalid amount");
-
-        Account storage recipientAccount = accounts[msg.sender];
-
         require(
-            recipientAccount.hashedSecret == bytes27(keccak256(abi.encodePacked(bytes27(preImage)))),
+            accounts[msg.sender].hashedSecret == bytes27(keccak256(abi.encodePacked(bytes27(preImage)))),
             "HoprChannels: Given value is not a pre-image of the stored on-chain secret"
-        );
-
-        bytes32 challenge = keccak256(abi.encodePacked(hashedSecretASecretB));
-
-        bytes32 hashedTicket = ECDSA.toEthSignedMessageHash(
-            "99",
-            abi.encodePacked(msg.sender, challenge, uint24(recipientAccount.counter), uint96(amount), winProb)
         );
 
         (address partyA, , Channel storage channel, ChannelStatus status) = getChannel(
             msg.sender,
-            ECDSA.recover(hashedTicket, r, s, v)
+            counterparty
         );
-
+        bytes32 challenge = keccak256(abi.encodePacked(hashedSecretASecretB));
+        bytes32 hashedTicket = ECDSA.toEthSignedMessageHash(
+            "102",
+            abi.encodePacked(
+                msg.sender,
+                challenge,
+                uint24(accounts[msg.sender].counter),
+                uint96(amount),
+                winProb,
+                uint24(getChannelIteration(channel))
+            )
+        );
+        require(ECDSA.recover(hashedTicket, r, s, v) == counterparty, "HashedTicket signer does not match our counterparty");
         require(channel.stateCounter != uint24(0), "HoprChannels: Channel does not exist");
-
         require(!redeemedTickets[hashedTicket], "Ticket must not be used twice");
 
         bytes32 luck = keccak256(abi.encodePacked(hashedTicket, bytes27(preImage), hashedSecretASecretB));
-
         require(uint256(luck) <= uint256(winProb), "HoprChannels: ticket must be a win");
-
         require(
             status == ChannelStatus.OPEN || status == ChannelStatus.PENDING,
             "HoprChannels: channel must be 'OPEN' or 'PENDING'"
         );
 
-        recipientAccount.hashedSecret = bytes27(preImage);
-
+        accounts[msg.sender].hashedSecret = bytes27(preImage);
         redeemedTickets[hashedTicket] = true;
 
         if (msg.sender == partyA) {
@@ -308,7 +308,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     function initiateChannelClosure(address counterparty) external {
         address initiator = msg.sender;
 
-        (, , Channel storage channel, ChannelStatus status) = getChannel(initiator, counterparty);
+        (address partyA, , Channel storage channel, ChannelStatus status) = getChannel(initiator, counterparty);
 
         require(status == ChannelStatus.OPEN, "HoprChannels: channel must be 'OPEN'");
 
@@ -318,6 +318,10 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
 
         require(channel.stateCounter + 1 < (1 << 24), "HoprChannels: Preventing stateCounter overflow");
         channel.stateCounter += 1;
+
+        if (initiator == partyA) {
+            channel.closureByPartyA = true;
+        }
 
         emitInitiatedChannelClosure(initiator, counterparty, channel.closureTime);
     }
@@ -338,9 +342,14 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         );
 
         require(channel.stateCounter + 7 < (1 << 24), "Preventing stateCounter overflow");
-
         require(status == ChannelStatus.PENDING, "HoprChannels: channel must be 'PENDING'");
-        require(now >= uint256(channel.closureTime), "HoprChannels: 'closureTime' has not passed");
+
+        if (
+            channel.closureByPartyA && (initiator == partyA) ||
+            !channel.closureByPartyA && (initiator == partyB)
+        ) {
+            require(now >= uint256(channel.closureTime), "HoprChannels: 'closureTime' has not passed");
+        }
 
         // settle balances
         if (channel.partyABalance > 0) {
@@ -357,6 +366,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         delete channel.deposit; // channel.deposit = 0
         delete channel.partyABalance; // channel.partyABalance = 0
         delete channel.closureTime; // channel.closureTime = 0
+        delete channel.closureByPartyA; // channel.closureByPartyA = false
 
         // The state counter indicates the recycling generation and ensures that both parties are using the correct generation.
         // Increase state counter so that we can re-use the same channel after it has been closed.
@@ -506,10 +516,18 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
 
     /**
      * @notice returns 'ChannelStatus'
-     * @param channel Channel
+     * @param channel a channel
      */
     function getChannelStatus(Channel memory channel) internal pure returns (ChannelStatus) {
         return ChannelStatus(channel.stateCounter % 10);
+    }
+
+    /**
+     * @param channel a channel
+     * @return channel's iteration
+     */
+    function getChannelIteration(Channel memory channel) internal pure returns (uint24) {
+        return (channel.stateCounter / 10) + 1;
     }
 
     /**

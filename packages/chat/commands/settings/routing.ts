@@ -31,6 +31,10 @@ export async function routingPathToPeerIds(path: string): Promise<PeerId[]> {
   )
 }
 
+/**
+ * @param state
+ * @returns routing option OR a specified routing path
+ */
 export function getRouting(state: GlobalState): string {
   if (state.routingPath.length > 0) return state.routingPath.map((peerId) => peerId.toB58String()).join(',')
   return state.routing

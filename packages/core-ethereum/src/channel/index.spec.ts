@@ -12,7 +12,7 @@ import Web3 from 'web3'
 import { HoprToken } from '../tsc/web3/HoprToken'
 import { Await } from '../tsc/utils'
 import { Channel as ChannelType, ChannelStatus, ChannelBalance, ChannelState } from '../types/channel'
-import { AcknowledgedTicket, Balance, SignedChannel, SignedTicket } from '../types'
+import { AcknowledgedTicket, Balance, SignedChannel, SignedTicket, AccountId } from '../types'
 import CoreConnector from '..'
 import Channel from '.'
 import * as testconfigs from '../config.spec'
@@ -30,7 +30,13 @@ describe('test Channel class', function () {
   let counterpartysCoreConnector: CoreConnector
   let funder: Await<ReturnType<typeof getPrivKeyData>>
 
-  async function getTicketData(winProb: number = DEFAULT_WIN_PROB) {
+  async function getTicketData({
+    counterparty,
+    winProb = DEFAULT_WIN_PROB
+  }: {
+    counterparty: AccountId
+    winProb?: number
+  }) {
     const secretA = randomBytes(32)
     const secretB = randomBytes(32)
     const challenge = await createChallenge(secretA, secretB)
@@ -40,6 +46,7 @@ describe('test Channel class', function () {
       secretB,
       response: await hash(u8aConcat(secretA, secretB)),
       winProb,
+      counterparty,
       challenge
     }
   }
@@ -123,8 +130,14 @@ describe('test Channel class', function () {
       }
     )
 
-    const firstTicket = await getTicketData()
+    const myAddress = await coreConnector.utils.pubKeyToAccountId(coreConnector.account.keys.onChain.pubKey)
+    const counterpartyAddress = await coreConnector.utils.pubKeyToAccountId(
+      counterpartysCoreConnector.account.keys.onChain.pubKey
+    )
 
+    const firstTicket = await getTicketData({
+      counterparty: myAddress
+    })
     const firstAckedTicket = new AcknowledgedTicket(coreConnector, undefined, {
       response: firstTicket.response
     })
@@ -178,7 +191,16 @@ describe('test Channel class', function () {
 
     const hashedSecretBefore = await counterpartysChannel.coreConnector.account.onChainSecret
 
-    await counterpartysCoreConnector.channel.tickets.submit(firstAckedTicket, new Uint8Array())
+    try {
+      const result = await counterpartysCoreConnector.channel.tickets.submit(firstAckedTicket, new Uint8Array())
+      if (result.status === 'ERROR') {
+        throw result.error
+      } else if (result.status === 'FAILURE') {
+        throw Error(result.message)
+      }
+    } catch (error) {
+      throw error
+    }
 
     const hashedSecretAfter = await counterpartysChannel.coreConnector.account.onChainSecret
 
@@ -202,7 +224,10 @@ describe('test Channel class', function () {
     let nextSignedTicket: SignedTicket
 
     for (let i = 0; i < ATTEMPTS; i++) {
-      ticketData = await getTicketData(0.5)
+      ticketData = await getTicketData({
+        counterparty: counterpartyAddress,
+        winProb: 0.5
+      })
       let ackedTicket = new AcknowledgedTicket(counterpartysCoreConnector, undefined, {
         response: ticketData.response
       })

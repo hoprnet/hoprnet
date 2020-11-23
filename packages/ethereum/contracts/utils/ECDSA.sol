@@ -11,7 +11,6 @@ pragma solidity ^0.6.0;
 library ECDSA {
     // y^2 = x^3 + 7 mod p, where p is FIELD_ORDER
     uint256 constant FIELD_ORDER = 0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f;
-
     uint256 constant CURVE_ORDER = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141;
     uint256 constant HALF_CURVE_ORDER = (CURVE_ORDER - 1) / 2;
 

@@ -334,15 +334,15 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     for (let n = 0; n < msg.length / PACKET_SIZE; n++) {
       promises.push(
         new Promise<void>(async (resolve, reject) => {
-          let path: PeerId[]
+          let intermediatePath: PeerId[]
           if (getIntermediateNodesManually != undefined) {
-            verbose('manually creating path')
-            path = await getIntermediateNodesManually()
+            verbose('manually creating intermediatePath')
+            intermediatePath = await getIntermediateNodesManually()
           } else {
-            path = await this.getIntermediateNodes(destination)
+            intermediatePath = await this.getIntermediateNodes(destination)
           }
 
-          path.push(destination)
+          const path: PeerId[] = [].concat(intermediatePath, [destination])
 
           let packet: Packet<Chain>
           verbose('creating packet with path', path.map((pId: PeerId) => pId.toB58String()).join(', \n'))

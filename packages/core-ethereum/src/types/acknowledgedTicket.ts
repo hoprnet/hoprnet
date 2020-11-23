@@ -24,7 +24,7 @@ class AcknowledgedTicket extends Uint8Array {
       redeemed?: boolean
     }
   ) {
-    if (arr == null) {
+    if (!arr) {
       super(AcknowledgedTicket.SIZE(paymentChannels))
     } else {
       super(arr.bytes, arr.offset, AcknowledgedTicket.SIZE(paymentChannels))
@@ -32,23 +32,23 @@ class AcknowledgedTicket extends Uint8Array {
 
     this.paymentChannels = paymentChannels
 
-    if (struct != null) {
-      if (struct.signedTicket != null) {
+    if (struct) {
+      if (struct.signedTicket) {
         this.set(struct.signedTicket, this.signedTicketOffset - this.byteOffset)
         this._signedTicket = struct.signedTicket
       }
 
-      if (struct.response != null) {
+      if (struct.response) {
         this.set(struct.response, this.responseOffset - this.byteOffset)
         this._response = struct.response
       }
 
-      if (struct.preImage != null) {
+      if (struct.preImage) {
         this.set(struct.preImage, this.preImageOffset - this.byteOffset)
         this._preImage = struct.preImage
       }
 
-      if (struct.redeemed != null) {
+      if (struct.redeemed) {
         this.set([struct.redeemed ? 1 : 0], this.redeemedOffset - this.byteOffset)
       }
     }
@@ -63,7 +63,7 @@ class AcknowledgedTicket extends Uint8Array {
   }
 
   get signedTicket(): Promise<SignedTicket> {
-    if (this._signedTicket != null) {
+    if (this._signedTicket) {
       return Promise.resolve(this._signedTicket)
     }
 
@@ -82,7 +82,7 @@ class AcknowledgedTicket extends Uint8Array {
   }
 
   get response(): Hash {
-    if (this._response == null) {
+    if (!this._response) {
       this._response = new this.paymentChannels.types.Hash(
         new Uint8Array(this.buffer, this.responseOffset, this.paymentChannels.types.Hash.SIZE)
       )
@@ -96,7 +96,7 @@ class AcknowledgedTicket extends Uint8Array {
   }
 
   get preImage(): Hash {
-    if (this._preImage == null) {
+    if (!this._preImage) {
       this._preImage = new this.paymentChannels.types.Hash(
         new Uint8Array(this.buffer, this.preImageOffset, HASHED_SECRET_WIDTH)
       )
