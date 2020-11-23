@@ -18,8 +18,7 @@ function generateMock(i) {
   let id = fakePeerId(i)
   let address = fakeAddress(id)
   let peers = new NetworkPeerStore([])
-  const crawler = new Crawler(id, peers, interactions, getPeer, putPeer,
-                              (s) => fakePeerId(s))
+  const crawler = new Crawler(id, peers, interactions, getPeer, putPeer, (s) => fakePeerId(s))
 
   _MOCKS[id.toB58String()] = peers
   return {
@@ -72,10 +71,10 @@ describe('network/crawler test crawler', function () {
     const Chris = generateMock('chris')
     const oldInteract = Alice.interactions.interact
     Alice.interactions.interact = (id) => {
-      if (id.equals(Bob.id)){
+      if (id.equals(Bob.id)) {
         return new Promise(() => {}) // Never resolve
       }
-      return oldInteract(id) 
+      return oldInteract(id)
     }
 
     await Alice.crawler.crawl() // No-op
@@ -92,14 +91,13 @@ describe('network/crawler test crawler', function () {
     clock.restore()
   })
 
-
-   it('crawl shouldIncludePeerInCrawlResponse', async () => {
-     assert(
-       shouldIncludePeerInCrawlResponse(Multiaddr('/ip4/123.4.5.6/tcp/5000'), Multiaddr('/ip4/12.34.56.7/tcp/5000'))
-     )
-     assert(shouldIncludePeerInCrawlResponse(Multiaddr('/ip4/127.0.0.1/tcp/1000'), Multiaddr('/ip4/127.0.0.1/tcp/5000')))
-     assert(
+  it('crawl shouldIncludePeerInCrawlResponse', async () => {
+    assert(
+      shouldIncludePeerInCrawlResponse(Multiaddr('/ip4/123.4.5.6/tcp/5000'), Multiaddr('/ip4/12.34.56.7/tcp/5000'))
+    )
+    assert(shouldIncludePeerInCrawlResponse(Multiaddr('/ip4/127.0.0.1/tcp/1000'), Multiaddr('/ip4/127.0.0.1/tcp/5000')))
+    assert(
       !shouldIncludePeerInCrawlResponse(Multiaddr('/ip4/127.0.0.1/tcp/5000'), Multiaddr('/ip4/12.34.56.7/tcp/5000'))
-     )
-   })
+    )
+  })
 })

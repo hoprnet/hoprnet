@@ -36,13 +36,7 @@ class Network {
 
     this.networkPeers = new NetworkPeers(Array.from(node.peerStore.peers.values()).map((x) => x.id))
     this.heartbeat = new Heartbeat(this.networkPeers, interactions.network.heartbeat, node.hangUp.bind(node))
-    this.crawler = new Crawler(
-      node.peerId,
-      this.networkPeers,
-      interactions.network.crawler,
-      getPeer,
-      putPeer
-    )
+    this.crawler = new Crawler(node.peerId, this.networkPeers, interactions.network.crawler, getPeer, putPeer)
 
     if (options.bootstrapNode) {
       this.stun = new Stun(options.hosts)

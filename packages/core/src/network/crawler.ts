@@ -1,5 +1,5 @@
 import Heap from 'heap-js'
-import { randomInteger, limitConcurrency, timeoutAfter} from '@hoprnet/hopr-utils'
+import { randomInteger, limitConcurrency, timeoutAfter } from '@hoprnet/hopr-utils'
 import { CRAWLING_RESPONSE_NODES, MAX_PARALLEL_CONNECTIONS, CRAWL_FAIL_TIMEOUT, CRAWL_MAX_SIZE } from '../constants'
 import { CrawlResponse, CrawlStatus } from '../messages'
 import PeerId from 'peer-id'
@@ -36,7 +36,7 @@ export const shouldIncludePeerInCrawlResponse = (peer: Multiaddr, them: Multiadd
   return true
 }
 
-const weight = (p: PeerId):CrawlEdge => [p, randomInteger(0, 10)] // TODO
+const weight = (p: PeerId): CrawlEdge => [p, randomInteger(0, 10)] // TODO
 
 class Crawler {
   constructor(
@@ -55,11 +55,16 @@ class Crawler {
     const errors: Error[] = []
     const contacted = new Set<string>()
     let queue = new Heap<CrawlEdge>()
-    queue.addAll(this.networkPeers.all().filter(filter).map(p => weight(p)))
+    queue.addAll(
+      this.networkPeers
+        .all()
+        .filter(filter)
+        .map((p) => weight(p))
+    )
     const before = queue.length // number of peers before crawling
 
     log(`Crawling started`)
-    const isDone = () => (contacted.size >= CRAWL_MAX_SIZE || queue.length == 0)
+    const isDone = () => contacted.size >= CRAWL_MAX_SIZE || queue.length == 0
 
     const queryNode = async (abortSignal): Promise<void> => {
       let peer = queue.pop()[0]
@@ -80,11 +85,7 @@ class Crawler {
           addresses = addresses.filter((ma) => !isOnPrivateNet(ma))
         }
 
-        log(
-          `received [${addresses.map((p: Multiaddr) => p.getPeerId()).join(', ')}] from peer ${
-            peer.toB58String()
-          }`
-        )
+        log(`received [${addresses.map((p: Multiaddr) => p.getPeerId()).join(', ')}] from peer ${peer.toB58String()}`)
 
         for (let i = 0; i < addresses.length; i++) {
           if (!addresses[i].getPeerId()) {
@@ -92,7 +93,7 @@ class Crawler {
           }
           const peer = this.stringToPeerId(addresses[i].getPeerId())
 
-          if (peer.equals(this.id) || contacted.has(peer.toB58String()) || !filter(peer) ||has(queue, peer)) {
+          if (peer.equals(this.id) || contacted.has(peer.toB58String()) || !filter(peer) || has(queue, peer)) {
             log('skipping', peer.toB58String())
             continue
           }
@@ -108,12 +109,8 @@ class Crawler {
     }
 
     try {
-      await timeoutAfter((abortSignal) => 
-        limitConcurrency(
-          MAX_PARALLEL_CONNECTIONS,
-          isDone, 
-          () => queryNode(abortSignal)
-        ),
+      await timeoutAfter(
+        (abortSignal) => limitConcurrency(MAX_PARALLEL_CONNECTIONS, isDone, () => queryNode(abortSignal)),
         CRAWL_FAIL_TIMEOUT
       )
     } catch (e) {
@@ -155,10 +152,10 @@ class Crawler {
   private debugStats(contactedPeerIds: Set<string>, errors: Error[], now: number, before: number) {
     log(`Crawling results:\n- contacted nodes: ${contactedPeerIds.size}\n- new nodes: ${now - before}\n- total: ${now}`)
     log('Contacted:')
-    contactedPeerIds.forEach(p => log('- ', p))
+    contactedPeerIds.forEach((p) => log('- ', p))
     if (errors.length > 0) {
       log(`Errors while crawling`)
-      errors.forEach(e => log(' - ', e.message))
+      errors.forEach((e) => log(' - ', e.message))
     }
   }
 }

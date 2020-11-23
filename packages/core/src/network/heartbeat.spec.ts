@@ -75,11 +75,11 @@ describe('unit test heartbeat', async () => {
     clock.tick(HEARTBEAT_REFRESH * 2)
     await alice.heartbeat.__forTestOnly_checkNodes()
 
-    assert(alice.peers.qualityOf(bob.id)  > NETWORK_QUALITY_THRESHOLD, 'bob is high q')
-    assert(alice.peers.qualityOf(chris.id)  > NETWORK_QUALITY_THRESHOLD, 'chris is high q')
-    
+    assert(alice.peers.qualityOf(bob.id) > NETWORK_QUALITY_THRESHOLD, 'bob is high q')
+    assert(alice.peers.qualityOf(chris.id) > NETWORK_QUALITY_THRESHOLD, 'chris is high q')
+
     // Chris dies, alice heartbeats again
-    alice.interaction.interact = sinon.fake(id => {
+    alice.interaction.interact = sinon.fake((id) => {
       if (id === chris.id) {
         throw new Error('FAIL')
       }
@@ -89,7 +89,7 @@ describe('unit test heartbeat', async () => {
     clock.tick(HEARTBEAT_REFRESH * 2)
     await alice.heartbeat.__forTestOnly_checkNodes()
     alice.peers.debugLog()
-    assert(alice.peers.qualityOf(bob.id)  > NETWORK_QUALITY_THRESHOLD, 'bob is still high q')
+    assert(alice.peers.qualityOf(bob.id) > NETWORK_QUALITY_THRESHOLD, 'bob is still high q')
     assert(alice.peers.qualityOf(chris.id) <= NETWORK_QUALITY_THRESHOLD, 'chris is now low q')
   })
 })
