@@ -1,5 +1,5 @@
 import assert from 'assert'
-//import { CRAWL_FAIL_TIMEOUT } from '../constants'
+import { CRAWL_FAIL_TIMEOUT } from '../constants'
 import { Crawler, shouldIncludePeerInCrawlResponse } from './crawler'
 import Multiaddr from 'multiaddr'
 import NetworkPeerStore from './network-peers'
@@ -66,37 +66,30 @@ describe('network/crawler test crawler', function () {
   })
 
   it('should crawl the network and timeout while crawling', async function () {
-    /*
-    this.timeout(5e3)
+    let clock = sinon.useFakeTimers(Date.now())
+    const Alice = generateMock('alice')
+    const Bob = generateMock('bob')
+    const Chris = generateMock('chris')
+    const oldInteract = Alice.interactions.interact
+    Alice.interactions.interact = (id) => {
+      if (id.equals(Bob.id)){
+        return new Promise(() => {}) // Never resolve
+      }
+      return oldInteract(id) 
+    }
 
-    let timeoutCorrectly = false
-    let before = Date.now()
-    const [Alice, Bob, Chris] = await Promise.all([
-      generateMocks(),
-      generateMocks(),//timeoutIntentionally: true
-      generateMocks()//{timeoutIntentionally: true
-    ])
-
-    await Alice.crawler.crawl()
-    Alice.node.connectionManager.emit('peer:connect', mockConnection(Bob.id, Bob.address))
-    await Alice.crawler.crawl()
-    Bob.node.connectionManager.emit('peer:connect', mockConnection(Chris.id, Chris.address))
-    await Alice.crawler.crawl()
-
-    await new Promise((resolve) => setTimeout(resolve, 100))
-    await Bob.node.stop()
-    await Alice.crawler.crawl()
-    await new Promise((resolve) => setTimeout(resolve, 200))
-
-    timeoutCorrectly = true
-
-    const after = Date.now() - before
-
-    assert(
-      timeoutCorrectly && after < 3 * CRAWL_FAIL_TIMEOUT && after >= 2 * CRAWL_FAIL_TIMEOUT,
-      `Crawling should timeout correctly`
-    )
-    */
+    await Alice.crawler.crawl() // No-op
+    Alice.peers.register(Bob.id)
+    let prom = Alice.crawler.crawl() // Crawl bob, and timeout
+    clock.tick(CRAWL_FAIL_TIMEOUT * 2)
+    await prom
+    assert(!Alice.peers.has(Chris.id), 'Alice does not know about Chris')
+    Bob.peers.register(Chris.id)
+    let prom2 = Alice.crawler.crawl() // Crawl bob and timeout again.
+    clock.tick(CRAWL_FAIL_TIMEOUT * 2)
+    await prom2
+    assert(!Alice.peers.has(Chris.id), 'Alice does not know about Chris')
+    clock.restore()
   })
 
 

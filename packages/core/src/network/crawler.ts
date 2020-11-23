@@ -1,6 +1,5 @@
-import AbortController from 'abort-controller'
 import Heap from 'heap-js'
-import { randomInteger, limitConcurrency } from '@hoprnet/hopr-utils'
+import { randomInteger, limitConcurrency, timeoutAfter} from '@hoprnet/hopr-utils'
 import { CRAWLING_RESPONSE_NODES, MAX_PARALLEL_CONNECTIONS, CRAWL_FAIL_TIMEOUT, CRAWL_MAX_SIZE } from '../constants'
 import { CrawlResponse, CrawlStatus } from '../messages'
 import PeerId from 'peer-id'
@@ -59,26 +58,16 @@ class Crawler {
     queue.addAll(this.networkPeers.all().filter(filter).map(p => weight(p)))
     const before = queue.length // number of peers before crawling
 
-    let aborted = false
-    const abort = new AbortController()
-    const timeout = setTimeout(() => {
-      aborted = true
-      log('aborting crawl due to timeout')
-      abort.abort()
-      this.debugStats(contacted, errors, queue.length, before)
-    }, CRAWL_FAIL_TIMEOUT)
-
     log(`Crawling started`)
+    const isDone = () => (contacted.size >= CRAWL_MAX_SIZE || queue.length == 0)
 
-    const isDone = () => (aborted || contacted.size >= CRAWL_MAX_SIZE || queue.length == 0)
-
-    const queryNode = async (): Promise<void> => {
+    const queryNode = async (abortSignal): Promise<void> => {
       let peer = queue.pop()[0]
       contacted.add(peer.toB58String())
       try {
         log(`querying ${peer.toB58String()}`)
         let addresses = await this.crawlInteraction.interact(peer, {
-          signal: abort.signal
+          signal: abortSignal
         })
 
         const addrs = this.getPeer(peer)
@@ -110,7 +99,7 @@ class Crawler {
           queue.push(weight(peer))
           this.putPeer(addresses[i])
           this.networkPeers.register(peer)
-          log('adding to queue', peer)
+          log('adding to queue', peer.toB58String())
         }
       } catch (err) {
         log('error querying peer', err)
@@ -118,13 +107,18 @@ class Crawler {
       }
     }
 
-    await limitConcurrency(
-      MAX_PARALLEL_CONNECTIONS,
-      isDone, 
-      queryNode)
-
-    if (!aborted) {
-      clearTimeout(timeout)
+    try {
+      await timeoutAfter((abortSignal) => 
+        limitConcurrency(
+          MAX_PARALLEL_CONNECTIONS,
+          isDone, 
+          () => queryNode(abortSignal)
+        ),
+        CRAWL_FAIL_TIMEOUT
+      )
+    } catch (e) {
+      log('Error', e)
+      // timeouts are ok
     }
 
     this.debugStats(contacted, errors, contacted.size, before)
