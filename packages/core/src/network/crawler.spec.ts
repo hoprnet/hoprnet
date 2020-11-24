@@ -1,6 +1,7 @@
 import assert from 'assert'
 import { CRAWL_FAIL_TIMEOUT } from '../constants'
 import { Crawler, shouldIncludePeerInCrawlResponse } from './crawler'
+
 import Multiaddr from 'multiaddr'
 import NetworkPeerStore from './network-peers'
 import { fakePeerId, fakeAddress } from '../test-utils'

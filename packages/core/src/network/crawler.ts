@@ -3,7 +3,7 @@ import { limitConcurrency, timeoutAfter } from '@hoprnet/hopr-utils'
 import { CRAWLING_RESPONSE_NODES, MAX_PARALLEL_CONNECTIONS, CRAWL_FAIL_TIMEOUT, CRAWL_MAX_SIZE } from '../constants'
 import PeerId from 'peer-id'
 import NetworkPeerStore from './network-peers'
-import { peerHasOnlyPublicAddresses, isOnPrivateNet, PRIVATE_NETS } from '../filters'
+import { peerHasOnlyPublicAddresses, isOnPrivateNet /*, PRIVATE_NETS */ } from '../filters'
 import debug from 'debug'
 import Multiaddr from 'multiaddr'
 import type { Indexer, IndexerChannel } from '@hoprnet/hopr-core-connector-interface'
@@ -19,7 +19,7 @@ export type CrawlInfo = {
 type CrawlEdge = [PeerId, Number] // ID, weight
 const has = (queue: Heap<CrawlEdge>, peer) => queue.contains(peer, (e) => e[0].equals(peer))
 
-export const shouldIncludePeerInCrawlResponse = (peer: Multiaddr, them: Multiaddr): boolean => {
+export const shouldIncludePeerInCrawlResponse = (_peer: Multiaddr, _them: Multiaddr): boolean => {
   // We are being requested a crawl from a node that is on a remote network, so
   // it does not benefit them for us to give them addresses on our private
   // network, therefore let's first filter these out.
@@ -32,6 +32,7 @@ export const shouldIncludePeerInCrawlResponse = (peer: Multiaddr, them: Multiadd
     // and the requesting node is remote
     return false
   }
+
   return true
 }
 
