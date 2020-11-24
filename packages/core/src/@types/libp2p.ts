@@ -100,8 +100,26 @@ declare module 'libp2p' {
     handle(protocol: string, handler: Handler): void
   }
 
+  interface TimeoutController {
+    clear(): void
+  }
+
+  interface DialRequest {
+    addrs: Multiaddr[]
+    dialer: Dialer
+    // @TODO
+    dialAction: any
+  }
   export interface Dialer {
     connectToPeer(peer: PeerId | Multiaddr | string, options?: any): Promise<Connection>
+    _pendingDials: {
+      [index: string]: {
+        dialRequest: DialRequest
+        controller: TimeoutController
+        promise: Promise<Connection>
+        destroy(): void
+      }
+    }
   }
 
   export interface ConnectionManager extends EventEmitter {
@@ -126,7 +144,7 @@ declare module 'libp2p' {
     // @TODO add libp2p types
     emit: (event: string, ...args: any[]) => void
     dial: (addr: Multiaddr | PeerId, options?: { signal: AbortSignal }) => Promise<Handler>
-    dialer: any // TODO
+    dialer: Dialer
     dialProtocol: (addr: Multiaddr | PeerId, protocol: string, options?: { signal: AbortSignal }) => Promise<Handler>
     hangUp: (addr: PeerId | Multiaddr | string) => Promise<void>
     peerStore: PeerStore
