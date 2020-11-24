@@ -7,7 +7,7 @@ import debug from 'debug'
 import { socketToConn } from './socket-to-conn'
 import Listener from './listener'
 import { CODE_P2P, DELIVERY } from './constants'
-import type  Multiaddr from 'multiaddr'
+import type Multiaddr from 'multiaddr'
 import PeerId from 'peer-id'
 import type libp2p from 'libp2p'
 import type {
