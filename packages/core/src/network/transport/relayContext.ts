@@ -235,7 +235,6 @@ class RelayContext {
       let switchPromise = this._switchPromise.promise.then(switchFunction)
 
       while (!sourceDone) {
-        console.log(`drain iteration`)
         if (iteration != _iteration) {
           break
         }

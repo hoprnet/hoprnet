@@ -191,7 +191,6 @@ class WebRTCConnection implements MultiaddrConnection {
                   break
                 }
               }
-              console.log(red(`done with WebRTC sink`))
             }.call(this)
           )
         }
