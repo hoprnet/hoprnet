@@ -1,4 +1,5 @@
 import { durations } from '@hoprnet/hopr-utils'
+import BN from 'bn.js'
 
 export const CRAWLING_RESPONSE_NODES = 10
 export const TICKET_AMOUNT = 1000000000000000 // 0.001 HOPR
@@ -37,5 +38,5 @@ export const MAX_HOPS = 3
 export const PATH_RANDOMNESS = 0.1
 export const MAX_PATH_ITERATIONS = 100
 export const NETWORK_QUALITY_THRESHOLD = 0.5
-export const MINIMUM_REASONABLE_CHANNEL_STAKE = 10 * TICKET_AMOUNT
+export const MINIMUM_REASONABLE_CHANNEL_STAKE = (new BN(TICKET_AMOUNT)).muln(10)
 export const MAX_NEW_CHANNELS_PER_TICK = 10

@@ -32,7 +32,7 @@ export class PromiscuousStrategy implements ChannelStrategy {
         break
       }
       toOpen.push([randomChannel, MINIMUM_REASONABLE_CHANNEL_STAKE])
-      balance.isubn(MINIMUM_REASONABLE_CHANNEL_STAKE)
+      balance.isub(MINIMUM_REASONABLE_CHANNEL_STAKE)
     }
     return toOpen
   }
