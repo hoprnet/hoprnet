@@ -4,8 +4,7 @@ import debug from 'debug'
 import wrtc = require('wrtc')
 import type Multiaddr from 'multiaddr'
 
-const log = debug('hopr-core:transport:webrtc')
-// const error = debug('hopr-core:transport:error')
+const error = debug('hopr-core:transport:error')
 const verbose = debug('hopr-core:verbose:transport:webrtc')
 
 class WebRTCUpgrader {
@@ -42,48 +41,27 @@ class WebRTCUpgrader {
       config: this._stunServers
     })
 
-    const onTimeout = () => {
-      verbose('Timeout upgrading to webrtc', channel.address())
-      channel.destroy()
-    }
-
     const onAbort = () => {
       channel.destroy()
       verbose('abort')
     }
 
-    const onConnect = (): void => {
-      verbose('connected')
-      done()
-    }
-
-    const onError = (err?: Error) => {
-      log(`WebRTC with failed. Error was: ${err}`)
-
-      channel.removeListener('iceTimeout', onTimeout)
-      channel.removeListener('connect', onConnect)
-
-      signal?.removeEventListener('abort', onAbort)
-    }
-
     const done = async (err?: Error) => {
-      verbose('Completed')
-
-      channel.removeListener('iceTimeout', onTimeout)
-      channel.removeListener('connect', onConnect)
-      channel.removeListener('error', onError)
+      channel.removeListener('connect', done)
+      channel.removeListener('error', done)
 
       signal?.removeEventListener('abort', onAbort)
 
       if (err) {
-        verbose('Failed', err)
+        error(`WebRTC connection update failed. Error was: ${err}`)
         channel.destroy()
+      } else {
+        verbose('WebRTC execution completed')
       }
     }
 
-    channel.on('error', onError)
-    channel.once('connect', onConnect)
-    channel.once('iceTimeout', onTimeout)
+    channel.on('error', done)
+    channel.once('connect', done)
 
     signal?.addEventListener('abort', onAbort)
 

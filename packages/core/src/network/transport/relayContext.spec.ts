@@ -1,4 +1,4 @@
-import { u8aConcat } from '@hoprnet/hopr-utils'
+import { durations, u8aConcat } from '@hoprnet/hopr-utils'
 import { RELAY_PAYLOAD_PREFIX } from './constants'
 import { RelayContext } from './relayContext'
 import { RelayConnection } from './relayConnection'
@@ -133,6 +133,7 @@ describe('test overwritable connection', function () {
   // })
 
   it('should simulate a reconnect', async function () {
+    this.timeout(durations.seconds(3))
     const connectionA = Pair()
     const connectionB = Pair()
 
@@ -182,7 +183,7 @@ describe('test overwritable connection', function () {
       ctxCounterparty.update(getStream({ usePrefix: true }))
     }, 200)
 
-    await new Promise((resolve) => setTimeout(resolve, 1000))
+    await new Promise((resolve) => setTimeout(resolve, 2000))
 
     assert((await pingPromise) > 0)
 
