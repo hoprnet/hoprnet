@@ -15,13 +15,8 @@ class Network {
   public stun?: Stun
 
   constructor(node: LibP2P, interactions: Interactions<any>, options: HoprOptions) {
-    // These are temporary, and will be replaced by accessors to the addressBook
-    const putPeer = (ma: Multiaddr) => {
-      if (!ma.getPeerId()) {
-        throw new Error('Cannot store a peer without an ID')
-      }
-      const pid = PeerId.createFromCID(ma.getPeerId())
-      node.peerStore.addressBook.add(pid, [ma])
+    const putPeer = (_ma: Multiaddr) => {
+      /* No-op */
     }
 
     const getPeer = (id: PeerId): Multiaddr[] => {
