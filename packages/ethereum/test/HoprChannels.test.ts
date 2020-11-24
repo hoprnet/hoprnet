@@ -894,19 +894,19 @@ describe('HoprChannels', function () {
         ticket.v + 27
       )
 
-      // await expectRevert(
-      //   hoprChannels.redeemTicket(
-      //     preImageB,
-      //     ticket.porSecret,
-      //     ticket.amount,
-      //     ticket.winProb,
-      //     partyA,
-      //     u8aToHex(ticket.r),
-      //     u8aToHex(ticket.s),
-      //     ticket.v + 27
-      //   ),
-      //   vmErrorMessage('HoprChannels: Given value is not a pre-image of the stored on-chain secret')
-      // )
+      await expectRevert(
+        hoprChannels.redeemTicket(
+          preImageB,
+          ticket.porSecret,
+          ticket.amount,
+          ticket.winProb,
+          partyA,
+          u8aToHex(ticket.r),
+          u8aToHex(ticket.s),
+          ticket.v + 27
+        ),
+        vmErrorMessage('HoprChannels: Given value is not a pre-image of the stored on-chain secret')
+      )
     })
 
     it('should fail when creating an open channel a second time', async function () {
