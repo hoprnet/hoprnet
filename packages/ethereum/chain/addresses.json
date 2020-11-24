@@ -16,7 +16,7 @@
   },
   "matic": {
     "HoprToken": "0x4774fEd3f2838f504006BE53155cA9cbDDEe9f0c",
-    "HoprChannels": "0x25E2e5D8EcC4fE46a9505079Ed29266779dC7D6f",
-    "HoprMinter": "0x83c3Df21FeDFF9f92669953ac12686Cf144e375C"
+    "HoprChannels": "0xE345a588e9d7DcCD0E92E6E00EF097EA8a0eFDB0",
+    "HoprMinter": "0x517a5d6A55a2eF146168A4b858b99e5d68EC2613"
   }
 }

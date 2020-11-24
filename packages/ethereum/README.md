@@ -66,11 +66,14 @@ yarn coverage
 
 # Migrating
 
-For public network migrations (rinkeby, kovan, etc), you will have to create a [.env](./.env.example) file within the root of the project, this file allows you to use your own mnemonic and infura api key securely.
+For public network migrations (rinkeby, kovan, [etc](./utils/networks.ts)), you will have to create a [.env](./.env.example) file within the root directory of this project.
 
 ```bash
 yarn network # starts a locally hosted network
 yarn migrate
+
+# deploying smart contract on a public network
+yarn migrate --network matic
 ```
 
 # Contracts
