@@ -101,6 +101,7 @@ const createMockNode = ({
   stateCounterToIteration.withArgs(11).returns(2)
 
   return ({
+    getId: sinon.stub().returns(target),
     ticketAmount: ticketAmount,
     ticketWinProb: ticketWinProb,
     paymentChannels: {
@@ -139,7 +140,6 @@ describe('unit test validateUnacknowledgedTicket', function () {
       validateUnacknowledgedTicket({
         node,
         senderPeerId: SENDER,
-        targetPeerId: TARGET,
         signedTicket,
         getTickets: getTicketsMock
       })
@@ -154,7 +154,6 @@ describe('unit test validateUnacknowledgedTicket', function () {
       validateUnacknowledgedTicket({
         node,
         senderPeerId: await PeerId.create(),
-        targetPeerId: TARGET,
         signedTicket,
         getTickets: getTicketsMock
       })
@@ -171,7 +170,6 @@ describe('unit test validateUnacknowledgedTicket', function () {
       validateUnacknowledgedTicket({
         node,
         senderPeerId: SENDER,
-        targetPeerId: TARGET,
         signedTicket,
         getTickets: getTicketsMock
       })
@@ -190,7 +188,6 @@ describe('unit test validateUnacknowledgedTicket', function () {
       validateUnacknowledgedTicket({
         node,
         senderPeerId: SENDER,
-        targetPeerId: TARGET,
         signedTicket,
         getTickets: getTicketsMock
       })
@@ -207,7 +204,6 @@ describe('unit test validateUnacknowledgedTicket', function () {
       validateUnacknowledgedTicket({
         node,
         senderPeerId: SENDER,
-        targetPeerId: TARGET,
         signedTicket,
         getTickets: getTicketsMock
       })
@@ -224,7 +220,6 @@ describe('unit test validateUnacknowledgedTicket', function () {
       validateUnacknowledgedTicket({
         node,
         senderPeerId: SENDER,
-        targetPeerId: TARGET,
         signedTicket,
         getTickets: getTicketsMock
       })
@@ -241,7 +236,6 @@ describe('unit test validateUnacknowledgedTicket', function () {
       validateUnacknowledgedTicket({
         node,
         senderPeerId: SENDER,
-        targetPeerId: TARGET,
         signedTicket,
         getTickets: getTicketsMock
       })
@@ -258,7 +252,6 @@ describe('unit test validateUnacknowledgedTicket', function () {
       validateUnacknowledgedTicket({
         node,
         senderPeerId: SENDER,
-        targetPeerId: TARGET,
         signedTicket,
         getTickets: getTicketsMock
       })
@@ -276,7 +269,6 @@ describe('unit test validateUnacknowledgedTicket', function () {
       validateUnacknowledgedTicket({
         node,
         senderPeerId: SENDER,
-        targetPeerId: TARGET,
         signedTicket,
         getTickets: getTicketsMock
       })
@@ -296,7 +288,6 @@ describe('unit test validateUnacknowledgedTicket', function () {
       validateUnacknowledgedTicket({
         node,
         senderPeerId: SENDER,
-        targetPeerId: TARGET,
         signedTicket,
         getTickets: async () => ticketsInDb
       })

@@ -281,7 +281,6 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
         await validateUnacknowledgedTicket({
           node: this.node,
           senderPeerId: sender,
-          targetPeerId: target,
           signedTicket: await this.ticket,
           getTickets: () =>
             getTickets(this.node, {
@@ -337,7 +336,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     const { Balance, ChannelBalance } = chain.types
     const signedTicket = await this.ticket
     const ticket = signedTicket.ticket
-    const sender = this.libp2p.peerId
+    const sender = this.node.getId()
     const senderAccountId = await chain.utils.pubKeyToAccountId(sender.pubKey.marshal())
     const targetAccountId = await chain.utils.pubKeyToAccountId(target.pubKey.marshal())
     const amPartyA = chain.utils.isPartyA(senderAccountId, targetAccountId)
