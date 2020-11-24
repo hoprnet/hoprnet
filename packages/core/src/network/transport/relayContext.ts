@@ -148,10 +148,6 @@ class RelayContext {
           continue
         }
 
-        if (u8aEquals(RELAY_WEBRTC_PREFIX, PREFIX)) {
-          verbose(`Relaying fancy WebRTC message`, new TextDecoder().decode(SUFFIX))
-        }
-
         if (u8aEquals(PREFIX, RELAY_STATUS_PREFIX)) {
           if (u8aEquals(SUFFIX, STOP)) {
             verbose(`STOP relayed`)
@@ -235,7 +231,6 @@ class RelayContext {
       let switchPromise = this._switchPromise.promise.then(switchFunction)
 
       while (!sourceDone) {
-        console.log(`drain iteration`)
         if (iteration != _iteration) {
           break
         }
