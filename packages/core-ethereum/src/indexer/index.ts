@@ -104,7 +104,7 @@ class Indexer implements IIndexer {
 
   public async getRandomChannel(): Promise<IndexerChannel | undefined> {
     const all = await this.getAll(undefined)
-    if (all.length === 0){
+    if (all.length === 0) {
       return undefined
     }
     const random = randomChoice(all)
