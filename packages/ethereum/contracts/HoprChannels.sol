@@ -16,8 +16,6 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     // an account has set a new secret hash
     event SecretHashSet(address indexed account, bytes27 secretHash, uint32 counter);
 
-    // the payment channel has been funded
-
     struct Account {
         uint256 accountX; // second part of account's public key
         bytes27 hashedSecret; // account's hashedSecret
@@ -155,7 +153,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
 
         address counterparty = ECDSA.recover(
             ECDSA.toEthSignedMessageHash(
-                "160",
+                "167",
                 abi.encode(stateCounter, initiator, additionalDeposit, partyAAmount, notAfter)
             ),
             r,
@@ -260,7 +258,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         );
         bytes32 challenge = keccak256(abi.encodePacked(hashedSecretASecretB));
         bytes32 hashedTicket = ECDSA.toEthSignedMessageHash(
-            "102",
+            "109",
             abi.encodePacked(
                 msg.sender,
                 challenge,

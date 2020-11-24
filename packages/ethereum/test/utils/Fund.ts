@@ -1,7 +1,7 @@
+import { stringToU8a } from '@hoprnet/hopr-utils'
 import { encode, signMessage } from './random'
 
 type IFund = (args: {
-  web3: any
   stateCounter: string
   initiator: string
   deposit: string
@@ -9,17 +9,17 @@ type IFund = (args: {
   notAfter: string
   signerPrivKey: string
 }) => {
-  encodedFund: string // return hashed alternative
-  signature: string // signature of hashedTicket
-  r: string
-  s: string
-  v: string
+  encodedFund: string
+  signature: Uint8Array // signature of hashedTicket
+  r: Uint8Array
+  s: Uint8Array
+  v: number
 }
 
 /*
   prepares fund payload
 */
-const Fund: IFund = ({ web3, stateCounter, initiator, deposit, partyAAmount, notAfter, signerPrivKey }) => {
+const Fund: IFund = ({ stateCounter, initiator, deposit, partyAAmount, notAfter, signerPrivKey }) => {
   const encodedFund = encode([
     { type: 'uint256', value: stateCounter },
     { type: 'address', value: initiator },
@@ -28,7 +28,7 @@ const Fund: IFund = ({ web3, stateCounter, initiator, deposit, partyAAmount, not
     { type: 'uint256', value: notAfter }
   ])
 
-  const { signature, r, s, v } = signMessage(web3, encodedFund, signerPrivKey)
+  const { signature, r, s, v } = signMessage(encodedFund, stringToU8a(signerPrivKey))
 
   return {
     encodedFund,
