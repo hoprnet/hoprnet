@@ -346,6 +346,6 @@ describe('test overwritable connection', function () {
       newStreamA.sink(newConn.source)
     }, WEBRTC_UPGRADE_TIMEOUT + 400)
 
-    await new Promise((resolve) => setTimeout(resolve, 2000))
+    await new Promise((resolve) => setTimeout(resolve, 3000))
   })
 })
