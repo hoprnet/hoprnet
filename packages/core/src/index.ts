@@ -245,9 +245,9 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     }
   }
 
-  private async tickChannelStrategy(newChannels: IndexerChannel[]){
+  private async tickChannelStrategy(newChannels: IndexerChannel[]) {
     verbose('new payment channels, auto opening tick')
-    for (const channel of newChannels){
+    for (const channel of newChannels) {
       this.network.networkPeers.register(channel[0]) // Listen to nodes with outgoing stake
     }
     const currentChannels = await this.getOpenChannels()
@@ -263,14 +263,14 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
   private async getOpenChannels(): Promise<IndexerChannel[]> {
     let channels: Channel[] = []
     await this.paymentChannels.channel.getAll(
-        async (channel: Channel) => {
-          channels.push(channel)
-        },
-        async (promises: Promise<void>[]) => {
-          await Promise.all(promises)
-        }
-      )
-    return channels.map(c => [this.getId(), c.counterparty, c.balance_a]) // TODO partyB
+      async (channel: Channel) => {
+        channels.push(channel)
+      },
+      async (promises: Promise<void>[]) => {
+        await Promise.all(promises)
+      }
+    )
+    return channels.map((c) => [this.getId(), c.counterparty, c.balance_a]) // TODO partyB
   }
 
   /**

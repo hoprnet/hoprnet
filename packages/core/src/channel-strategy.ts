@@ -6,12 +6,17 @@ import { MINIMUM_REASONABLE_CHANNEL_STAKE, MAX_NEW_CHANNELS_PER_TICK } from './c
 export type ChannelsToOpen = [PeerId, BN]
 
 export interface ChannelStrategy {
-  tick(balance: BN, newChannels: IndexerChannel[], currentChannels: IndexerChannel[], indexer: Indexer): Promise<ChannelsToOpen[]> 
+  tick(
+    balance: BN,
+    newChannels: IndexerChannel[],
+    currentChannels: IndexerChannel[],
+    indexer: Indexer
+  ): Promise<ChannelsToOpen[]>
 }
 
 // Don't auto open any channels
 export class PassiveStrategy implements ChannelStrategy {
-  async tick(_balance: BN, _n, _c,  _indexer: Indexer): Promise<ChannelsToOpen[]> {
+  async tick(_balance: BN, _n, _c, _indexer: Indexer): Promise<ChannelsToOpen[]> {
     return []
   }
 }
