@@ -185,7 +185,7 @@ describe('test overwritable connection', function () {
 
     await new Promise((resolve) => setTimeout(resolve, 2000))
 
-    assert((await pingPromise) > 0)
+    assert((await pingPromise) >= 0)
 
     await ctx.close()
   })
