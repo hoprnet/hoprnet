@@ -293,7 +293,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     log(`Available under the following addresses:`)
 
     this._libp2p.multiaddrs.forEach((ma: Multiaddr) => log(ma.toString()))
-    await this.periodicCrawl()
+    await this.periodicCheck()
     this.running = true
     return this
   }
@@ -424,10 +424,12 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     return this.network.crawler.crawl(filter)
   }
 
-  private async periodicCrawl() {
+  private async periodicCheck() {
+    log('periodic check')
+    await this.tickChannelStrategy([])
     let crawlInfo = await this.crawl()
     this.emit('hopr:crawl:completed', crawlInfo)
-    this.crawlTimeout = setTimeout(() => this.periodicCrawl(), CRAWL_TIMEOUT)
+    this.crawlTimeout = setTimeout(() => this.periodicCheck(), CRAWL_TIMEOUT)
   }
 
   public setChannelStrategy(strategy: ChannelStrategyNames) {
