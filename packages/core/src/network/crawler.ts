@@ -6,7 +6,6 @@ import NetworkPeerStore from './network-peers'
 import { peerHasOnlyPublicAddresses, isOnPrivateNet, PRIVATE_NETS } from '../filters'
 import debug from 'debug'
 import Multiaddr from 'multiaddr'
-import type { Indexer, IndexerChannel } from '@hoprnet/hopr-core-connector-interface'
 import { Crawler as CrawlInteraction } from '../interactions/network/crawler'
 
 const log = debug('hopr-core:crawler')
@@ -43,16 +42,18 @@ class Crawler {
     private id: PeerId,
     private networkPeers: NetworkPeerStore,
     private crawlInteraction: CrawlInteraction,
-    private indexer: Indexer,
     private getPeer: (peer: PeerId) => Multiaddr[],
     private putPeer: (ma: Multiaddr) => void,
     private stringToPeerId: (id: string) => PeerId = (s) => PeerId.createFromB58String(s) // TODO for testing
   ) {}
 
   private async weight(p: PeerId): Promise<CrawlEdge> {
+    return [p, Math.random()]
+    /*
     const peerEdges = await this.indexer.getChannelsFromPeer(p)
     const outgoingStake = peerEdges.reduce((x: IndexerChannel, y: IndexerChannel) => x[2] + y[2], 0)
     return [p, outgoingStake * Math.random()]
+    */
   }
   /**
    * @param filter
