@@ -115,7 +115,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     })
 
     this.mixer = new Mixer()
-    this.setChannelStrategy(options.strategy || 'PASSIVE')
+    this.setChannelStrategy(options.strategy || 'PROMISCUOUS')
     this.initializedWithOptions = options
     this.output = (arr: Uint8Array) => {
       this.emit('hopr:message', arr)
