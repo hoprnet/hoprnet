@@ -227,7 +227,9 @@ class TCP {
     const socket = await this._connect(ma, options)
     const maConn = socketToConn(socket, { remoteAddr: ma, signal: options?.signal })
 
-    verbose(`Establishing a direct connection to ${maConn.remoteAddr.toString()} was successful. Continuing with the handshakes.`)
+    verbose(
+      `Establishing a direct connection to ${maConn.remoteAddr.toString()} was successful. Continuing with the handshakes.`
+    )
     const conn = await this._upgrader.upgradeOutbound(maConn)
     verbose('outbound direct connection %s upgraded', maConn.remoteAddr)
     return conn
