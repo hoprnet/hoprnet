@@ -55,6 +55,10 @@ yarn util:regenerate
 yarn setup
 ```
 
+### Migrating smart contracts
+
+See [packages/ethereum](./packages/ethereum/README.md#migrating)
+
 ### Running applications
 
 ```sh
