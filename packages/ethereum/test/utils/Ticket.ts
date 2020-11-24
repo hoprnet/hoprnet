@@ -1,4 +1,5 @@
 import BigNumber from 'bignumber.js'
+import { stringToU8a } from '@hoprnet/hopr-utils'
 import { keccak256, MAX_UINT256, createChallenge, signMessage, getChannelId } from './random'
 
 BigNumber.config({ EXPONENTIAL_AT: 1e9 })
@@ -33,15 +34,15 @@ const Ticket = ({
   challenge: string // return hashed alternative
   channelIteration: number // return channel iteration
   winProb: string // return winProb in bytes32
-  encodedTicket: string // return hashed alternative
-  signature: string // signature of encodedTicket
   porSecret: string // same as input
   amount: string // same as input
   hashedCounterPartySecret?: string // return hashed alternative
   counterPartySecret?: string // same as input
-  r: string
-  s: string
-  v: string
+  encodedTicket: string
+  signature: Uint8Array // signature of encodedTicket
+  r: Uint8Array
+  s: Uint8Array
+  v: number
 } => {
   // proof of relay related hashes
   const challenge = createChallenge(porSecret)
@@ -82,19 +83,19 @@ const Ticket = ({
     }, '0x')
     .toLowerCase()
 
-  const { signature, r, s, v } = signMessage(web3, encodedTicket, signerPrivKey)
+  const { signature, r, s, v } = signMessage(encodedTicket, stringToU8a(signerPrivKey))
 
   return {
     channelId,
     challenge,
     winProb,
     channelIteration,
-    encodedTicket,
-    signature,
     porSecret,
     amount,
     counterPartySecret,
     hashedCounterPartySecret,
+    encodedTicket,
+    signature,
     r,
     s,
     v
