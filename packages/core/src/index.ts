@@ -261,16 +261,18 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
   }
 
   private async getOpenChannels(): Promise<IndexerChannel[]> {
-    let channels: Channel[] = []
+    let channels: IndexerChannel[] = []
     await this.paymentChannels.channel.getAll(
       async (channel: Channel) => {
-        channels.push(channel)
+        const pubKey = await channel.offChainCounterparty
+        const peerId = await pubKeyToPeerId(pubKey)
+        channels.push([peerId, channel.balance]) // TODO partyA?
       },
       async (promises: Promise<void>[]) => {
         await Promise.all(promises)
       }
     )
-    return channels.map((c) => [this.getId(), c.counterparty, c.balance_a]) // TODO partyB
+    return channels
   }
 
   /**
