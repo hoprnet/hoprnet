@@ -2,6 +2,8 @@ import type { Indexer, IndexerChannel } from '@hoprnet/hopr-core-connector-inter
 import PeerId from 'peer-id'
 import BN from 'bn.js'
 import { MINIMUM_REASONABLE_CHANNEL_STAKE, MAX_NEW_CHANNELS_PER_TICK } from './constants'
+import debug from 'debug'
+const log = debug('hopr-core:channel-strategy')
 
 export type ChannelsToOpen = [PeerId, BN]
 
@@ -34,6 +36,7 @@ export class PromiscuousStrategy implements ChannelStrategy {
       toOpen.push([randomChannel, MINIMUM_REASONABLE_CHANNEL_STAKE])
       balance.isub(MINIMUM_REASONABLE_CHANNEL_STAKE)
     }
+    log('Promiscuous toOpen', toOpen.map(x => x[0].toB58String() + ':' + x[1].toString()).join(','))
     return toOpen
   }
 }
