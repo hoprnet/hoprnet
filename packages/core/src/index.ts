@@ -37,7 +37,7 @@ const log = Debug(`hopr-core`)
 
 import PeerId from 'peer-id'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-import type { HoprCoreConnectorStatic, Types } from '@hoprnet/hopr-core-connector-interface'
+import type { HoprCoreConnectorStatic, Types, Channel, IndexerChannel } from '@hoprnet/hopr-core-connector-interface'
 import type { CrawlInfo } from './network/crawler'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 import BN from 'bn.js'
@@ -245,6 +245,34 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     }
   }
 
+  private async tickChannelStrategy(newChannels: IndexerChannel[]){
+    verbose('new payment channels, auto opening tick')
+    for (const channel of newChannels){
+      this.network.networkPeers.register(channel[0]) // Listen to nodes with outgoing stake
+    }
+    const currentChannels = await this.getOpenChannels()
+    const balance = await this.getBalance()
+    const nextChannels = await this.strategy.tick(balance, newChannels, currentChannels, this.paymentChannels.indexer)
+    verbose('strategy wants to open', nextChannels.length, 'new channels')
+    for (let channelToOpen of nextChannels) {
+      const hash = await this.openChannel(channelToOpen[0], channelToOpen[1])
+      verbose('- opened', hash)
+    }
+  }
+
+  private async getOpenChannels(): Promise<IndexerChannel[]> {
+    let channels: Channel[] = []
+    await this.paymentChannels.channel.getAll(
+        async (channel: Channel) => {
+          channels.push(channel)
+        },
+        async (promises: Promise<void>[]) => {
+          await Promise.all(promises)
+        }
+      )
+    return channels.map(c => [this.getId(), c.counterparty, c.balance_a]) // TODO partyB
+  }
+
   /**
    * This method starts the node and registers all necessary handlers. It will
    * also open the database and creates one if it doesn't exists.
@@ -257,19 +285,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       this.paymentChannels?.start()
     ])
 
-    this.paymentChannels.indexer.onNewChannels(async () => {
-      //TODO async(newChannels) => {
-      verbose('new payment channels, auto opening tick')
-      //TODO this._network.networkPeers.addInterestingPeer(newPeer)
-      //TODO let currentChannels = this.getOpenChannels()
-      const balance = await this.getBalance()
-      const nextChannels = await this.strategy.tick(balance, this.paymentChannels.indexer)
-      verbose('strategy wants to open', nextChannels.length, 'new channels')
-      for (let channelToOpen of nextChannels) {
-        const hash = await this.openChannel(channelToOpen[0], channelToOpen[1])
-        verbose('- opened', hash)
-      }
-    })
+    this.paymentChannels.indexer.onNewChannels(async () => await this.tickChannelStrategy([])) // TODO from indexer new channels
 
     log(`Available under the following addresses:`)
 
