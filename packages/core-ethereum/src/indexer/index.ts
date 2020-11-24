@@ -61,7 +61,7 @@ class Indexer implements IIndexer {
   private newBlockEvent?: Subscription<BlockHeader>
   private openedChannelEvent?: Subscription<OnChainLog>
   private closedChannelEvent?: Subscription<OnChainLog>
-  private newChannelHandler: () => void
+  private newChannelHandler: (newChannels: IndexerChannel[]) => void
 
   constructor(private connector: HoprEthereum) {
     this.newChannelHandler = () => {}
@@ -98,7 +98,7 @@ class Indexer implements IIndexer {
     }
   }
 
-  public onNewChannels(handler: () => void): void {
+  public onNewChannels(handler: (newChannels: IndexerChannel[]) => void): void {
     this.newChannelHandler = handler
   }
 
@@ -332,7 +332,7 @@ class Indexer implements IIndexer {
     }
 
     this.store(partyA, partyB, newChannelEntry)
-    this.newChannelHandler()
+    this.newChannelHandler([]) // TODO - pass new channels
   }
 
   private async onClosedChannel(event: ClosedChannelEvent): Promise<void> {
