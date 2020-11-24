@@ -1,6 +1,6 @@
 import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import BN from 'bn.js'
-import { stringToU8a, u8aToHex } from '@hoprnet/hopr-utils'
+import { stringToU8a, u8aToHex, u8aConcat } from '@hoprnet/hopr-utils'
 import { AccountId, Balance, Hash, Signature, TicketEpoch } from '.'
 import { Uint8ArrayE } from '../types/extended'
 import { sign } from '../utils'
@@ -17,7 +17,9 @@ const AMOUNT_SIZE = 12
  * @returns a hash
  */
 function toEthSignedMessageHash(msg: string): Hash {
-  return new Hash(stringToU8a(web3.eth.accounts.hashMessage(msg)))
+  const messageWithHOPR = u8aConcat(stringToU8a(Web3.utils.toHex('HOPRnet')), stringToU8a(msg))
+  const messageWithHOPRHex = u8aToHex(messageWithHOPR)
+  return new Hash(stringToU8a(web3.eth.accounts.hashMessage(messageWithHOPRHex)))
 }
 
 class Ticket extends Uint8ArrayE implements Types.Ticket {

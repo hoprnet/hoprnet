@@ -139,14 +139,11 @@ library ECDSA {
     }
 
     /**
-     * @dev Returns an Ethereum Signed Message, created from a `message`. This
-     * replicates the behavior of the
-     * https://github.com/ethereum/wiki/wiki/JSON-RPC#eth_sign[`eth_sign`]
-     * JSON-RPC method.
-     *
-     * See {recover}.
+     * @dev Returns an Ethereum and HOPRnet Signed Message.
+     * Replicates the behavior of the https://github.com/ethereum/wiki/wiki/JSON-RPC#eth_sign[`eth_sign`]
+     * JSON-RPC method but also includes "HOPRnet" in the message.
      */
     function toEthSignedMessageHash(string memory length, bytes memory message) internal pure returns (bytes32) {
-        return keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n", length, message));
+        return keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n", length, "HOPRnet", message));
     }
 }

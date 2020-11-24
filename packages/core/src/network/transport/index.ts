@@ -5,13 +5,14 @@ import mafmt from 'mafmt'
 import errCode from 'err-code'
 import debug from 'debug'
 import { socketToConn } from './socket-to-conn'
-import libp2p from 'libp2p'
 import Listener from './listener'
 import { CODE_P2P, DELIVERY } from './constants'
-import Multiaddr from 'multiaddr'
+import type Multiaddr from 'multiaddr'
 import PeerId from 'peer-id'
+import type libp2p from 'libp2p'
 import type {
   Connection,
+  Dialer,
   Upgrader,
   DialOptions,
   ConnHandler,
@@ -46,6 +47,7 @@ class TCP {
   private stunServers: Multiaddr[]
   private _relay: Relay
   private _connectionManager: ConnectionManager
+  private _dialer: Dialer
   private _webRTCUpgrader: WebRTCUpgrader
   private connHandler: ConnHandler
 
@@ -97,6 +99,7 @@ class TCP {
     this._multiaddrs = libp2p.multiaddrs
     this._upgrader = upgrader
     this._connectionManager = libp2p.connectionManager
+    this._dialer = libp2p.dialer
 
     if (this._useWebRTC) {
       this._webRTCUpgrader = new WebRTCUpgrader({ stunServers: this.stunServers })
@@ -124,6 +127,7 @@ class TCP {
 
       let newConn = await this._upgrader.upgradeInbound(newStream)
 
+      this._dialer._pendingDials[counterparty.toB58String()]?.destroy()
       this._connectionManager.connections.set(counterparty.toB58String(), [newConn])
 
       this.connHandler?.(newConn)
