@@ -4,7 +4,7 @@ import BN from 'bn.js'
 import chalk from 'chalk'
 import { Subscription } from 'web3-core-subscriptions'
 import { BlockHeader } from 'web3-eth'
-import { u8aToNumber, u8aConcat, u8aToHex, pubKeyToPeerId, randomInteger } from '@hoprnet/hopr-utils'
+import { u8aToNumber, u8aConcat, u8aToHex, pubKeyToPeerId, randomChoice } from '@hoprnet/hopr-utils'
 import { ChannelEntry, Public, Balance } from '../types'
 import { Log, isPartyA, events, getId } from '../utils'
 import { MAX_CONFIRMATIONS } from '../config'
@@ -102,9 +102,12 @@ class Indexer implements IIndexer {
     this.newChannelHandler = handler
   }
 
-  public async getRandomChannel(): Promise<IndexerChannel> {
+  public async getRandomChannel(): Promise<IndexerChannel | undefined> {
     const all = await this.getAll(undefined)
-    const random = all[randomInteger(0, all.length)]
+    if (all.length === 0){
+      return undefined
+    }
+    const random = randomChoice(all)
     return this.toIndexerChannel(await pubKeyToPeerId(random.partyA), random)
   }
 

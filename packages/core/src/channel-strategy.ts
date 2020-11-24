@@ -27,7 +27,11 @@ export class PromiscuousStrategy implements ChannelStrategy {
     let toOpen = []
     let i = 0
     while (balance.gtn(0) && i++ < MAX_NEW_CHANNELS_PER_TICK) {
-      toOpen.push([await indexer.getRandomChannel(), MINIMUM_REASONABLE_CHANNEL_STAKE])
+      let randomChannel = await indexer.getRandomChannel()
+      if (randomChannel === undefined){
+        break
+      }
+      toOpen.push([randomChannel, MINIMUM_REASONABLE_CHANNEL_STAKE])
       balance.isubn(MINIMUM_REASONABLE_CHANNEL_STAKE)
     }
     return toOpen
