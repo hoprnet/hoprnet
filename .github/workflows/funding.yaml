@@ -2,7 +2,7 @@ name: Funding Account
 
 on:
   push:
-    branches: ['debug/**']
+    branches: ['**']
     paths-ignore:
       - 'docs/**'
 
