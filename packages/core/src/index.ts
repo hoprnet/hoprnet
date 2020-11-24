@@ -285,7 +285,9 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       this.paymentChannels?.start()
     ])
 
-    this.paymentChannels.indexer.onNewChannels((newChannels) => {this.tickChannelStrategy(newChannels)})
+    this.paymentChannels.indexer.onNewChannels((newChannels) => {
+      this.tickChannelStrategy(newChannels)
+    })
     log(`Available under the following addresses:`)
 
     this._libp2p.multiaddrs.forEach((ma: Multiaddr) => log(ma.toString()))
