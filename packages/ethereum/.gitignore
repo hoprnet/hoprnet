@@ -30,9 +30,6 @@ scTopics
 # distribution files
 lib
 
-# @TODO: remove this once refactor is complete
-temp
-
 # Hardhat
 hardhat
 

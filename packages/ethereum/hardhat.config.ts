@@ -2,6 +2,7 @@
 require('dotenv').config()
 // load hardhat plugins
 import 'hardhat-typechain'
+import 'hardhat-deploy'
 import '@nomiclabs/hardhat-truffle5'
 import '@nomiclabs/hardhat-etherscan'
 import '@nomiclabs/hardhat-solhint'
@@ -9,21 +10,10 @@ import '@nomiclabs/hardhat-solhint'
 import { HardhatUserConfig, task, types } from 'hardhat/config'
 import { NODE_SEEDS, BOOTSTRAP_SEEDS } from '@hoprnet/hopr-demo-seeds'
 import Web3 from 'web3'
-import { mapValues } from 'lodash'
 import { MigrationOptions, getRpcOptions } from './utils/networks'
 
 const { PRIVATE_KEY, INFURA, MATIC_VIGIL, ETHERSCAN } = process.env
-
-const publicNetworks: HardhatUserConfig['networks'] = mapValues(
-  getRpcOptions({ infura: INFURA, maticvigil: MATIC_VIGIL }),
-  (config) =>
-    ({
-      chainId: config.chainId,
-      url: config.httpUrl,
-      gasMultiplier: 1.1,
-      accounts: PRIVATE_KEY ? [PRIVATE_KEY] : []
-    } as HardhatUserConfig['networks']['hardhat'])
-)
+const GAS_MULTIPLIER = 1.1
 
 const devSeeds = NODE_SEEDS.concat(BOOTSTRAP_SEEDS).map((privateKey) => ({
   privateKey,
@@ -34,13 +24,52 @@ const hardhatConfig: HardhatUserConfig = {
   defaultNetwork: 'localhost',
   networks: {
     hardhat: {
+      live: false,
+      tags: ['test', 'local'],
       accounts: devSeeds
     },
     localhost: {
+      live: false,
+      tags: ['local'],
       url: 'http://localhost:8545',
       accounts: devSeeds.map(({ privateKey }) => privateKey)
     },
-    ...publicNetworks
+    mainnet: {
+      live: true,
+      tags: [],
+      chainId: 1,
+      gasMultiplier: GAS_MULTIPLIER,
+      url: `https://mainnet.infura.io/v3/${INFURA}`,
+      accounts: PRIVATE_KEY ? [PRIVATE_KEY] : []
+    },
+    kovan: {
+      live: true,
+      tags: ['staging'],
+      chainId: 42,
+      gasMultiplier: GAS_MULTIPLIER,
+      url: `https://kovan.infura.io/v3/${INFURA}`,
+      accounts: PRIVATE_KEY ? [PRIVATE_KEY] : []
+    },
+    xdai: {
+      live: true,
+      tags: ['staging'],
+      chainId: 100,
+      gasMultiplier: GAS_MULTIPLIER,
+      url: `https://xdai.poanetwork.dev`,
+      accounts: PRIVATE_KEY ? [PRIVATE_KEY] : []
+    },
+    matic: {
+      live: true,
+      tags: ['staging'],
+      chainId: 137,
+      gasMultiplier: GAS_MULTIPLIER,
+      url: `https://rpc-mainnet.maticvigil.com/v1/${MATIC_VIGIL}`,
+      accounts: PRIVATE_KEY ? [PRIVATE_KEY] : []
+    }
+  },
+  namedAccounts: {
+    deployer: 0,
+    singleFaucetMinter: '0x1A387b5103f28bc6601d085A3dDC878dEE631A56'
   },
   solidity: {
     version: '0.6.6',
@@ -55,7 +84,8 @@ const hardhatConfig: HardhatUserConfig = {
     sources: './contracts',
     tests: './test',
     cache: './hardhat/cache',
-    artifacts: './hardhat/artifacts'
+    artifacts: './hardhat/artifacts',
+    deployments: './deployments'
   },
   typechain: {
     outDir: './types',
