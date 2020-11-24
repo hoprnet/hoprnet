@@ -2,7 +2,7 @@ name: HOPR Lint and fix
 
 on:
   push:
-    branches: ['**', '!debug/**']
+    branches: ['**']
     paths-ignore:
       - 'docs/**'
 
