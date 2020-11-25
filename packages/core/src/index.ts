@@ -258,8 +258,8 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       this.network.networkPeers.register(channelToOpen[0])
       try {
         // Opening channels can fail if we can't establish a connection.
-        const hash = await this.openChannel(channelToOpen[0], channelToOpen[1])
-        verbose('- opened', hash)
+        const hash = await this.openChannel(...channelToOpen)
+        verbose('- opened', channelToOpen, hash)
       } catch (e) {
         log('error when trying to open strategy channels', e)
       }

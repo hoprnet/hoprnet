@@ -109,7 +109,8 @@ export async function getPartyOpenChannels(node: Hopr<HoprCoreConnector>, party:
   return peers.reduce((acc: PeerId[], { peer, accountId }) => {
     if (
       channels.find((channel) => {
-        return u8aEquals(accountId, channel[1])
+        const counterparty = channel[1]
+        return u8aEquals(accountId, counterparty)
       })
     ) {
       acc.push(peer)
