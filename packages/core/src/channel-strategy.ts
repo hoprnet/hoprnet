@@ -28,8 +28,7 @@ export class PassiveStrategy implements ChannelStrategy {
 
 // Open channel to as many peers as possible
 export class PromiscuousStrategy implements ChannelStrategy {
-  async tick(balance: BN, _n, currentChannels, indexer: Indexer): Promise<ChannelsToOpen[]> {
-    console.log(currentChannels)
+  async tick(balance: BN, _n, currentChannels: IndexerChannel[], indexer: Indexer): Promise<ChannelsToOpen[]> {
     let toOpen = []
     let i = 0
     while (balance.gtn(0) && i++ < MAX_NEW_CHANNELS_PER_TICK) {
