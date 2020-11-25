@@ -1,6 +1,7 @@
 /// <reference path="./@types/libp2p.ts" />
 import LibP2P from 'libp2p'
 import type { Connection } from 'libp2p'
+// @ts-ignore
 import MPLEX = require('libp2p-mplex')
 // @ts-ignore
 import KadDHT = require('libp2p-kad-dht')
@@ -32,9 +33,6 @@ import leveldown from 'leveldown'
 import Multiaddr from 'multiaddr'
 import chalk from 'chalk'
 
-import Debug from 'debug'
-const log = Debug(`hopr-core`)
-
 import PeerId from 'peer-id'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type { HoprCoreConnectorStatic, Types, Channel, IndexerChannel } from '@hoprnet/hopr-core-connector-interface'
@@ -49,6 +47,8 @@ import path from 'path'
 import { ChannelStrategy, PassiveStrategy, PromiscuousStrategy } from './channel-strategy'
 import { Mixer } from './mixer'
 
+import Debug from 'debug'
+const log = Debug(`hopr-core`)
 const verbose = Debug('hopr-core:verbose')
 
 interface NetOptions {

@@ -4,7 +4,7 @@ import Multiaddr from 'multiaddr'
 
 describe('filters', () => {
   it('peers', async () => {
-    const unConnectedPeer = []
+    const unConnectedPeer: Multiaddr[] = []
     assert(peerHasOnlyPublicAddresses(unConnectedPeer) == false)
     assert(peerHasOnlyPrivateAddresses(unConnectedPeer) == false)
 

@@ -26,7 +26,7 @@ describe('test pathfinder with some simple topologies', function () {
   const RELIABLE_NETWORK = { qualityOf: (_p) => 1 } as NetworkPeers
   const UNRELIABLE_NETWORK = { qualityOf: (p) => ((p.id as any) % 3 == 0 ? 0 : 1) } as NetworkPeers // Node 3 is down
   const STAKE_1 = () => new BN(1)
-  const STAKE_N = (x) => new BN(x.id + 0.1)
+  const STAKE_N = (x: PeerId) => new BN(x.id as unknown as number + 0.1)
 
   // Bidirectional star, all pass through node 0
   const STAR = new Map<PeerId, PeerId[]>()

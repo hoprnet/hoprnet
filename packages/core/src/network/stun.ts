@@ -33,7 +33,7 @@ class Stun {
         }
       }, STUN_TIMEOUT)
       const socket = dgram.createSocket({ type: 'udp4' })
-      const tids = []
+      const tids: string[] = []
 
       for (let i = 0; i < addresses.length; i++) {
         tids.push(stun.generateTransactionId())
@@ -100,7 +100,7 @@ class Stun {
     throw Error(`Cannot create STUN socket due to invalid configuration.`)
   }
 
-  async startServer(port = undefined) {
+  async startServer(port?: number) {
     return new Promise(async (resolve) => {
       this.socket = this.getSocket()
 

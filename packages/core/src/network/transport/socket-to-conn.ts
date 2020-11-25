@@ -5,7 +5,7 @@ import abortable from 'abortable-iterator'
 import debug from 'debug'
 import toIterable from 'stream-to-it'
 
-import toMultiaddr = require('libp2p-utils/src/ip-port-to-multiaddr')
+import toMultiaddr from 'libp2p-utils/src/ip-port-to-multiaddr'
 
 import { MultiaddrConnection, Stream } from 'libp2p'
 import type Multiaddr from 'multiaddr'

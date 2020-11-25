@@ -129,7 +129,7 @@ const createMockNode = ({
   } as unknown) as Hopr<Chain>
 }
 
-const getTicketsMock = async () => []
+const getTicketsMock = async (): Promise<Types.SignedTicket[]> => []
 
 describe('unit test validateUnacknowledgedTicket', function () {
   it('should pass if ticket is okay', async function () {

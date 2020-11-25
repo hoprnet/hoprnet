@@ -62,7 +62,7 @@ class Crawler {
     log(`Crawling started`)
     const isDone = () => contacted.size >= CRAWL_MAX_SIZE || queue.length == 0
 
-    const queryNode = async (abortSignal): Promise<void> => {
+    const queryNode = async (abortSignal: AbortSignal): Promise<void> => {
       let peer = queue.pop()[0]
       contacted.add(peer.toB58String())
       try {

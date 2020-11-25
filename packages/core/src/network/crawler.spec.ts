@@ -1,4 +1,5 @@
 import assert from 'assert'
+import type PeerId from 'peer-id'
 import { CRAWL_FAIL_TIMEOUT } from '../constants'
 import { Crawler, shouldIncludePeerInCrawlResponse } from './crawler'
 import Multiaddr from 'multiaddr'
@@ -6,11 +7,11 @@ import NetworkPeerStore from './network-peers'
 import { fakePeerId, fakeAddress } from '../test-utils'
 import sinon from 'sinon'
 
-const _MOCKS = {}
+const _MOCKS: { [index: string]: any } = {}
 
-function generateMock(i) {
+function generateMock(i: string | number) {
   const interactions = {
-    interact: (peerId) => _MOCKS[peerId.toB58String()].all().map(fakeAddress)
+    interact: (peerId: PeerId) => _MOCKS[peerId.toB58String()].all().map(fakeAddress)
   } as any
 
   const getPeer = sinon.fake()
@@ -70,7 +71,7 @@ describe('network/crawler test crawler', function () {
     const Bob = generateMock('bob')
     const Chris = generateMock('chris')
     const oldInteract = Alice.interactions.interact
-    Alice.interactions.interact = (id) => {
+    Alice.interactions.interact = (id: PeerId) => {
       if (id.equals(Bob.id)) {
         return new Promise(() => {}) // Never resolve
       }
