@@ -10,19 +10,21 @@ import SECIO = require('libp2p-secio')
 import TCP from './network/transport'
 
 import { Packet } from './messages/packet'
-import { PACKET_SIZE, MAX_HOPS, VERSION, CRAWL_TIMEOUT, TICKET_AMOUNT, TICKET_WIN_PROB } from './constants'
+import {
+  PACKET_SIZE,
+  MAX_HOPS,
+  VERSION,
+  CRAWL_TIMEOUT,
+  TICKET_AMOUNT,
+  TICKET_WIN_PROB,
+  PATH_RANDOMNESS
+} from './constants'
 
 import { Network } from './network'
+import { findPath } from './path'
 
-import {
-  addPubKey,
-  getPeerId,
-  getAddrs,
-  pubKeyToPeerId,
-  getAcknowledgedTickets,
-  submitAcknowledgedTicket
-} from './utils'
-import { createDirectoryIfNotExists, u8aToHex } from '@hoprnet/hopr-utils'
+import { addPubKey, getPeerId, getAddrs, getAcknowledgedTickets, submitAcknowledgedTicket } from './utils'
+import { createDirectoryIfNotExists, u8aToHex, pubKeyToPeerId } from '@hoprnet/hopr-utils'
 import { existsSync } from 'fs'
 
 import levelup, { LevelUp } from 'levelup'
@@ -35,7 +37,7 @@ const log = Debug(`hopr-core`)
 
 import PeerId from 'peer-id'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-import type { HoprCoreConnectorStatic, Types } from '@hoprnet/hopr-core-connector-interface'
+import type { HoprCoreConnectorStatic, Types, Channel, IndexerChannel } from '@hoprnet/hopr-core-connector-interface'
 import type { CrawlInfo } from './network/crawler'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 import BN from 'bn.js'
@@ -44,6 +46,7 @@ import { Interactions } from './interactions'
 import * as DbKeys from './dbKeys'
 import EventEmitter from 'events'
 import path from 'path'
+import { ChannelStrategy, PassiveStrategy, PromiscuousStrategy } from './channel-strategy'
 import { Mixer } from './mixer'
 
 const verbose = Debug('hopr-core:verbose')
@@ -52,6 +55,8 @@ interface NetOptions {
   ip: string
   port: number
 }
+
+export type ChannelStrategyNames = 'PASSIVE' | 'PROMISCUOUS'
 
 export type HoprOptions = {
   debug: boolean
@@ -69,18 +74,16 @@ export type HoprOptions = {
   connector?: HoprCoreConnectorStatic
   bootstrapServers?: Multiaddr[]
   output?: (encoded: Uint8Array) => void
+  strategy?: ChannelStrategyNames
   hosts?: {
     ip4?: NetOptions
     ip6?: NetOptions
   }
 }
 
-const MAX_ITERATIONS_PATH_SELECTION = 2000
-
 class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
   // TODO make these actually private - Do not rely on any of these properties!
   public _interactions: Interactions<Chain>
-  public _network: Network
   // Allows us to construct HOPR with falsy options
   public _debug: boolean
   public _dbKeys = DbKeys
@@ -95,6 +98,8 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
   private running: boolean
   private crawlTimeout: NodeJS.Timeout
   private mixer: Mixer<Chain>
+  private strategy: ChannelStrategy
+  private network: Network
 
   /**
    * @constructor
@@ -106,9 +111,11 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     super()
     this._libp2p.connectionManager.on('peer:connect', (conn: Connection) => {
       this.emit('hopr:peer:connection', conn.remotePeer)
+      this.network.networkPeers.register(conn.remotePeer)
     })
 
     this.mixer = new Mixer()
+    this.setChannelStrategy(options.strategy || 'PROMISCUOUS')
     this.initializedWithOptions = options
     this.output = (arr: Uint8Array) => {
       this.emit('hopr:message', arr)
@@ -122,10 +129,10 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     this._interactions = new Interactions(
       this,
       this.mixer,
-      (conn: Connection) => this._network.crawler.handleCrawlRequest(conn),
-      (remotePeer: PeerId) => this._network.heartbeat.emit('beat', remotePeer)
+      (addr: Multiaddr) => this.network.crawler.answerCrawl(addr),
+      (peer: PeerId) => this.network.networkPeers.register(peer)
     )
-    this._network = new Network(this._libp2p, this._interactions, options)
+    this.network = new Network(this._libp2p, this._interactions, options)
 
     if (options.ticketAmount) this.ticketAmount = options.ticketAmount
     if (options.ticketWinProb) this.ticketWinProb = options.ticketWinProb
@@ -198,6 +205,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
         }
       }
     })
+
     return await new Hopr<CoreConnector>(options, libp2p, db, connector).start()
   }
 
@@ -237,6 +245,42 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     }
   }
 
+  private async tickChannelStrategy(newChannels: IndexerChannel[]) {
+    verbose('new payment channels, auto opening tick')
+    for (const channel of newChannels) {
+      this.network.networkPeers.register(channel[0]) // Listen to nodes with outgoing stake
+    }
+    const currentChannels = await this.getOpenChannels()
+    const balance = await this.getBalance()
+    const nextChannels = await this.strategy.tick(balance, newChannels, currentChannels, this.paymentChannels.indexer)
+    verbose(`${this.strategy} strategy wants to open`, nextChannels.length, 'new channels')
+    for (let channelToOpen of nextChannels) {
+      this.network.networkPeers.register(channelToOpen[0])
+      try {
+        // Opening channels can fail if we can't establish a connection.
+        const hash = await this.openChannel(...channelToOpen)
+        verbose('- opened', channelToOpen, hash)
+      } catch (e) {
+        log('error when trying to open strategy channels', e)
+      }
+    }
+  }
+
+  private async getOpenChannels(): Promise<IndexerChannel[]> {
+    let channels: IndexerChannel[] = []
+    await this.paymentChannels.channel.getAll(
+      async (channel: Channel) => {
+        const pubKey = await channel.offChainCounterparty
+        const peerId = await pubKeyToPeerId(pubKey)
+        channels.push([this.getId(), peerId, await channel.balance]) // TODO partyA?
+      },
+      async (promises: Promise<void>[]) => {
+        await Promise.all(promises)
+      }
+    )
+    return channels
+  }
+
   /**
    * This method starts the node and registers all necessary handlers. It will
    * also open the database and creates one if it doesn't exists.
@@ -245,14 +289,17 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
    */
   public async start(): Promise<Hopr<Chain>> {
     await Promise.all([
-      this._libp2p.start().then(() => Promise.all([this.connectToBootstrapServers(), this._network.start()])),
+      this._libp2p.start().then(() => Promise.all([this.connectToBootstrapServers(), this.network.start()])),
       this.paymentChannels?.start()
     ])
 
+    this.paymentChannels.indexer.onNewChannels((newChannels) => {
+      this.tickChannelStrategy(newChannels)
+    })
     log(`Available under the following addresses:`)
 
     this._libp2p.multiaddrs.forEach((ma: Multiaddr) => log(ma.toString()))
-    await this.periodicCrawl()
+    await this.periodicCheck()
     this.running = true
     return this
   }
@@ -266,7 +313,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     }
     clearTimeout(this.crawlTimeout)
     this.running = false
-    await Promise.all([this._network.stop(), this.paymentChannels?.stop().then(() => log(`Connector stopped.`))])
+    await Promise.all([this.network.stop(), this.paymentChannels?.stop().then(() => log(`Connector stopped.`))])
 
     await Promise.all([this.db?.close().then(() => log(`Database closed.`)), this._libp2p.stop()])
 
@@ -371,28 +418,37 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       throw Error(`Expecting a non-empty destination.`)
     }
     let info = ''
-    if (!this._network.networkPeers.has(destination)) {
-      info = '[Pinging unknown peer]'
-    }
-    if (this._network.networkPeers.hasBlacklisted(destination)) {
-      info = '[Ping blacklisted peer]'
-    }
     let latency = await this._interactions.network.heartbeat.interact(destination)
     return { latency, info }
   }
 
   public getConnectedPeers(): PeerId[] {
-    return this._network.networkPeers.peers.map((x) => x.id)
+    return this.network.networkPeers.all()
   }
 
   public async crawl(filter?: (peer: PeerId) => boolean): Promise<CrawlInfo> {
-    return this._network.crawler.crawl(filter)
+    return this.network.crawler.crawl(filter)
   }
 
-  private async periodicCrawl() {
+  private async periodicCheck() {
+    log('periodic check')
+    await this.tickChannelStrategy([])
     let crawlInfo = await this.crawl()
     this.emit('hopr:crawl:completed', crawlInfo)
-    this.crawlTimeout = setTimeout(() => this.periodicCrawl(), CRAWL_TIMEOUT)
+    this.crawlTimeout = setTimeout(() => this.periodicCheck(), CRAWL_TIMEOUT)
+  }
+
+  public setChannelStrategy(strategy: ChannelStrategyNames) {
+    if (strategy == 'PASSIVE') {
+      this.strategy = new PassiveStrategy()
+    }
+    if (strategy == 'PROMISCUOUS') {
+      this.strategy = new PromiscuousStrategy()
+    }
+  }
+
+  public async getBalance(): Promise<BN> {
+    return await this.paymentChannels.account.balance
   }
 
   /**
@@ -487,21 +543,13 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
    * @param destination instance of peerInfo that contains the peerId of the destination
    */
   private async getIntermediateNodes(destination: PeerId): Promise<PeerId[]> {
-    const start = new this.paymentChannels.types.Public(this.getId().pubKey.marshal())
-    const exclude = [
-      destination.pubKey.marshal(),
-      ...this.bootstrapServers.map((ma) => PeerId.createFromB58String(ma.getPeerId()).pubKey.marshal())
-    ].map((pubKey) => new this.paymentChannels.types.Public(pubKey))
-
-    return await Promise.all(
-      (
-        await this.paymentChannels.path.findPath(
-          start,
-          MAX_HOPS - 1, // Need a hop for destination node
-          MAX_ITERATIONS_PATH_SELECTION,
-          (node) => !exclude.includes(node)
-        )
-      ).map((pubKey) => pubKeyToPeerId(pubKey))
+    return await findPath(
+      this.getId(),
+      destination,
+      MAX_HOPS - 1,
+      this.network.networkPeers,
+      this.paymentChannels.indexer,
+      PATH_RANDOMNESS
     )
   }
 

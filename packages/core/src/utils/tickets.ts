@@ -46,7 +46,7 @@ export async function getUnacknowledgedTickets(
 
         tickets.push(unAckTicket)
       })
-      .on('end', () => resolve(Promise.all(tickets)))
+      .on('end', () => resolve(tickets))
   })
 }
 
@@ -92,7 +92,7 @@ export async function getAcknowledgedTickets(
 > {
   const { AcknowledgedTicket } = node.paymentChannels.types
   const acknowledgedTicketSize = AcknowledgedTicket.SIZE(node.paymentChannels)
-  let promises: {
+  const results: {
     ackTicket: Types.AcknowledgedTicket
     index: Uint8Array
   }[] = []
@@ -112,17 +112,17 @@ export async function getAcknowledgedTickets(
           offset: value.byteOffset
         })
 
-        // if signer provided doesn't match our ticket's signer dont add it to the lis
+        // if signer provided doesn't match our ticket's signer dont add it to the list
         if (filter?.signer && !u8aEquals(await (await ackTicket.signedTicket).signer, filter.signer)) {
           return
         }
 
-        promises.push({
+        results.push({
           ackTicket,
           index
         })
       })
-      .on('end', () => resolve(Promise.all(promises)))
+      .on('end', () => resolve(results))
   })
 }
 
@@ -219,6 +219,7 @@ export async function getTickets(
     async ([unAcks, acks]) => {
       const unAckTickets = await Promise.all(unAcks.map((o) => o.signedTicket))
       const ackTickets = await Promise.all(acks.map((o) => o.ackTicket.signedTicket))
+
       return [...unAckTickets, ...ackTickets]
     }
   )
@@ -245,19 +246,17 @@ export async function deleteTickets(
 export async function validateUnacknowledgedTicket({
   node,
   senderPeerId,
-  targetPeerId,
   signedTicket,
   getTickets
 }: {
   node: Hopr<Chain>
   senderPeerId: PeerId
-  targetPeerId: PeerId
   signedTicket: Types.SignedTicket
   getTickets: () => Promise<Types.SignedTicket[]>
 }): Promise<void> {
   const ticket = signedTicket.ticket
   const chain = node.paymentChannels
-  const selfPubKey = targetPeerId.pubKey.marshal()
+  const selfPubKey = node.getId().pubKey.marshal()
   const selfAccountId = await chain.utils.pubKeyToAccountId(selfPubKey)
   const senderB58 = senderPeerId.toB58String()
   const senderPubKey = senderPeerId.pubKey.marshal()
@@ -331,9 +330,9 @@ export async function validateUnacknowledgedTicket({
   const signedTickets = await getTickets().then(async (signedTickets) => {
     return signedTickets.filter((signedTicket) => {
       return (
-        u8aEquals(signedTicket.ticket.counterparty, selfPubKey) &&
+        u8aEquals(signedTicket.ticket.counterparty, selfAccountId) &&
         signedTicket.ticket.epoch.eq(epoch) &&
-        ticket.channelIteration.toNumber() == currentChannelIteration
+        ticket.channelIteration.toNumber() === currentChannelIteration
       )
     })
   })

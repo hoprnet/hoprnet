@@ -45,7 +45,7 @@ echo "Bootstrap Bob running as pid $BOB_PID on $BOB_MULTIADDR"
 # Ping bootstrapnode
 hoprd --data="$FIXTURES/alice" --password="$DBPASS" --run="info"
 hoprd --data="$FIXTURES/alice" --password="$DBPASS" --run="ping $BOB"
-hoprd --data="$FIXTURES/alice" --password="$DBPASS" --run="crawl; listConnectedPeers "
+hoprd --data="$FIXTURES/alice" --password="$DBPASS" --run="_DEPRECATED_crawl; listConnectedPeers "
 
 # Start charlie
 hoprd --data="$FIXTURES/charlie" --password="$DBPASS" --host="$CHARLIE_ADDR:$CHARLIE_PORT" &
@@ -53,8 +53,8 @@ CHARLIE_PID="$!"
 echo "Charlie running as pid $CHARLIE as $CHARLIE on $CHARLIE_ADDR:$CHARLIE_PORT"
 
 # Ping Charlie
-hoprd --data="$FIXTURES/alice" --password="$DBPASS" --run="crawl; ping $CHARLIE"
+hoprd --data="$FIXTURES/alice" --password="$DBPASS" --run="_DEPRECATED_crawl; ping $CHARLIE"
 
 # Open channel alice -> bob and send a-b-c
-#DEBUG=hopr* hoprd --data="$FIXTURES/alice" --password="$DBPASS" --run="crawl; open $BOB 0.01; send $CHARLIE hi"
+#DEBUG=hopr* hoprd --data="$FIXTURES/alice" --password="$DBPASS" --run="_DEPRECATED_crawl; open $BOB 0.01; send $CHARLIE hi"
 
