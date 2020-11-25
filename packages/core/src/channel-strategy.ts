@@ -10,6 +10,16 @@ const dest = (c: ChannelsToOpen) => c[0]
 const outgoingPeer = (c: IndexerChannel) => c[0]
 const indexerDest = (c: IndexerChannel) => c[1]
 
+/**
+* Staked nodes will likely want to automate opening and closing of channels. By
+* implementing the following interface, they can decide how to allocate their
+* stake to best attract traffic with a useful channel graph.
+*
+* Implementors should bear in mind:
+* - Churn is expensive
+* - Path finding will prefer high stakes, and high availability of nodes.
+*
+*/
 export interface ChannelStrategy {
   tick(
     balance: BN,
@@ -17,6 +27,7 @@ export interface ChannelStrategy {
     currentChannels: IndexerChannel[],
     indexer: Indexer
   ): Promise<ChannelsToOpen[]>
+  // TBD: Include ChannelsToClose as well.
 }
 
 // Don't auto open any channels
