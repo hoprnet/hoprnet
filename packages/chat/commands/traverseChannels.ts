@@ -26,7 +26,7 @@ export default class TraverseChannels extends AbstractCommand {
     } else {
       let out = ''
       for (let x of chans) {
-        const [, peerId, weight] = x;
+        const [, peerId, weight] = x
         if (peerId.toB58String() === parent) {
           out += `\n${prev} - ${id.toB58String()} - [${weight}, BIDIRECTIONAL]`
         } else {
