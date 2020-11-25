@@ -6,7 +6,7 @@ import errCode from 'err-code'
 import debug from 'debug'
 import { socketToConn } from './socket-to-conn'
 import Listener from './listener'
-import { CODE_P2P, DELIVERY } from './constants'
+import { CODE_P2P, DELIVERY, USE_WEBRTC } from './constants'
 import type Multiaddr from 'multiaddr'
 import PeerId from 'peer-id'
 import type libp2p from 'libp2p'
@@ -59,10 +59,6 @@ class TCP {
     upgrader: Upgrader
     libp2p: libp2p
     bootstrapServers?: Multiaddr[]
-    useWebRTC?: boolean
-    failIntentionallyOnWebRTC?: boolean
-    timeoutIntentionallyOnWebRTC?: Promise<void>
-    answerIntentionallyWithIncorrectMessages?: boolean
   }) {
     if (!upgrader) {
       throw new Error('An upgrader must be provided. See https://github.com/libp2p/interface-transport#upgrader.')
@@ -89,12 +85,12 @@ class TCP {
             this.stunServers.push(this.relays[i])
             break
           default:
-            throw Error('Invalid family')
+            throw Error(`Invalid address family. Got ${opts.family}`)
         }
       }
     }
 
-    this._useWebRTC = true // useWebRTC === undefined ? USE_WEBRTC : useWebRTC
+    this._useWebRTC = USE_WEBRTC
     this._peerId = libp2p.peerId
     this._multiaddrs = libp2p.multiaddrs
     this._upgrader = upgrader
@@ -108,10 +104,14 @@ class TCP {
     libp2p.handle(DELIVERY, this.handleDelivery.bind(this))
 
     this._relay = new Relay(libp2p, this._webRTCUpgrader)
-    verbose(`Created TCP stack (Stun: ${this.stunServers?.map((server: Multiaddr) => server.toString()).join(',')}`)
+    verbose(
+      `Created ${this[Symbol.toStringTag]} stack (Stun: ${this.stunServers
+        ?.map((server: Multiaddr) => server.toString())
+        .join(',')}`
+    )
   }
 
-  async onReconnect(this: TCP, newStream: MultiaddrConnection, counterparty: PeerId) {
+  async onReconnect(this: TCP, newStream: MultiaddrConnection, counterparty: PeerId): Promise<void> {
     log(`####### inside reconnect #######`)
 
     try {
@@ -136,7 +136,7 @@ class TCP {
     }
   }
 
-  async handleDelivery(handler: Handler) {
+  async handleDelivery(handler: Handler): Promise<void> {
     let newConn: Connection
 
     try {
@@ -153,10 +153,10 @@ class TCP {
 
   /**
    * @async
-   * @param {Multiaddr} ma
-   * @param {object} options
-   * @param {AbortSignal} options.signal Used to abort dial requests
-   * @returns {Connection} An upgraded Connection
+   * @param ma
+   * @param options
+   * @param options.signal Used to abort dial requests
+   * @returns An upgraded Connection
    */
   async dial(ma: Multiaddr, options?: DialOptions): Promise<Connection> {
     options = options || {}
@@ -170,7 +170,7 @@ class TCP {
     ) {
       try {
         verbose('attempting to dial directly', ma.toString())
-        return await this.dialDirectly(ma, options)
+        return await this._dialDirectly(ma, options)
       } catch (err) {
         if (
           (err.code != null && ['ECONNREFUSED', 'ECONNRESET', 'EPIPE', 'EHOSTUNREACH'].includes(err.code)) ||
@@ -211,36 +211,37 @@ class TCP {
     }
 
     verbose('dialing with relay ', ma.toString())
-    const conn = await this.dialWithRelay(ma, potentialRelays, options)
+    const conn = await this._dialWithRelay(ma, potentialRelays, options)
     log(`relayed connection established`)
     return conn
   }
 
-  async dialWithRelay(ma: Multiaddr, relays: Multiaddr[], options?: DialOptions): Promise<Connection> {
+  private async _dialWithRelay(ma: Multiaddr, relays: Multiaddr[], options?: DialOptions): Promise<Connection> {
     let conn = await this._relay.establishRelayedConnection(ma, relays, this.onReconnect.bind(this), options)
 
     return await this._upgrader.upgradeOutbound(conn)
   }
 
-  async dialDirectly(ma: Multiaddr, options?: DialOptions): Promise<Connection> {
-    log(`[${chalk.blue(this._peerId.toB58String())}] dialing ${chalk.yellow(ma.toString())} directly`)
+  private async _dialDirectly(ma: Multiaddr, options?: DialOptions): Promise<Connection> {
+    log(`Attempting to dial ${chalk.yellow(ma.toString())} directly`)
     const socket = await this._connect(ma, options)
     const maConn = socketToConn(socket, { remoteAddr: ma, signal: options?.signal })
 
-    log('new outbound direct connection %s', maConn.remoteAddr)
+    verbose(
+      `Establishing a direct connection to ${maConn.remoteAddr.toString()} was successful. Continuing with the handshakes.`
+    )
     const conn = await this._upgrader.upgradeOutbound(maConn)
-    log('outbound direct connection %s upgraded', maConn.remoteAddr)
+    verbose('outbound direct connection %s upgraded', maConn.remoteAddr)
     return conn
   }
 
   /**
-   * @private
-   * @param {Multiaddr} ma
-   * @param {object} options
-   * @param {AbortSignal} options.signal Used to abort dial requests
-   * @returns {Promise<Socket>} Resolves a TCP Socket
+   * @param ma
+   * @param options
+   * @param options.signal Used to abort dial requests
+   * @returns Resolves a TCP Socket
    */
-  _connect(ma: Multiaddr, options: DialOptions): Promise<Socket> {
+  private _connect(ma: Multiaddr, options: DialOptions): Promise<Socket> {
     if (options.signal && options.signal.aborted) {
       throw new AbortError()
     }
@@ -304,8 +305,8 @@ class TCP {
    * Creates a TCP listener. The provided `handler` function will be called
    * anytime a new incoming Connection has been successfully upgraded via
    * `upgrader.upgradeInbound`.
-   * @param {function(Connection)} handler
-   * @returns {Listener} A TCP listener
+   * @param handler
+   * @returns A TCP listener
    */
   createListener(options: any, handler: (connection: Connection) => void): Listener {
     if (options == null) {
