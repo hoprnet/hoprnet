@@ -31,7 +31,6 @@ export const shouldIncludePeerInCrawlResponse = (peer: Multiaddr, them: Multiadd
     // and the requesting node is remote
     return false
   }
-
   return true
 }
 

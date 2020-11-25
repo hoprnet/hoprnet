@@ -41,7 +41,7 @@ describe('test acknowledgement generation', function () {
       let exponent = randomInteger(0, 8)
       let index = randomInteger(0, ack.length)
 
-      ack[index] = challenge[index] ^ (1 << exponent)
+      ack[index] = ack[index] ^ (1 << exponent)
 
       assert(!(await ack.verify(receiver)), `Signature should not be valid after a bit-flip`)
     }
