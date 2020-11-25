@@ -6,6 +6,9 @@ import debug from 'debug'
 const log = debug('hopr-core:channel-strategy')
 
 export type ChannelsToOpen = [PeerId, BN]
+const dest = (c: ChannelsToOpen) => c[0]
+const outgoingPeer = (c: IndexerChannel) => c[0]
+const indexerDest = (c: IndexerChannel) => c[1]
 
 export interface ChannelStrategy {
   tick(
@@ -25,7 +28,8 @@ export class PassiveStrategy implements ChannelStrategy {
 
 // Open channel to as many peers as possible
 export class PromiscuousStrategy implements ChannelStrategy {
-  async tick(balance: BN, _n, _c, indexer: Indexer): Promise<ChannelsToOpen[]> {
+  async tick(balance: BN, _n, currentChannels, indexer: Indexer): Promise<ChannelsToOpen[]> {
+    console.log(currentChannels)
     let toOpen = []
     let i = 0
     while (balance.gtn(0) && i++ < MAX_NEW_CHANNELS_PER_TICK) {
@@ -33,10 +37,13 @@ export class PromiscuousStrategy implements ChannelStrategy {
       if (randomChannel === undefined) {
         break
       }
-      toOpen.push([randomChannel, MINIMUM_REASONABLE_CHANNEL_STAKE])
-      balance.isub(MINIMUM_REASONABLE_CHANNEL_STAKE)
+      if (!toOpen.find(x => dest(x).equals(outgoingPeer(randomChannel))) &&
+          !currentChannels.find(x => indexerDest(x).equals(outgoingPeer(randomChannel)))){
+        toOpen.push([outgoingPeer(randomChannel), MINIMUM_REASONABLE_CHANNEL_STAKE])
+        balance.isub(MINIMUM_REASONABLE_CHANNEL_STAKE)
+      }
     }
-    log('Promiscuous toOpen', toOpen.map(x => x[0].toB58String() + ':' + x[1].toString()).join(','))
+    log('Promiscuous toOpen: ', toOpen.map(x => x[0].toB58String() + ':' + x[1].toString()).join('\n-'))
     return toOpen
   }
 }
