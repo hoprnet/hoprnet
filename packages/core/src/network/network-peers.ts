@@ -97,7 +97,7 @@ class NetworkPeers {
     if (entry && entry.heartbeatsSent > 0) {
       return entry.heartbeatsSuccess / entry.heartbeatsSent
     }
-    return 0.2 // Unknown
+    return 0.2 // Unknown // TBD
   }
 }
 
