@@ -195,10 +195,15 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
           }
         },
         peerDiscovery: {
-          autoDial: false
+          autoDial: true
         },
         dht: {
-          enabled: true
+          enabled: true,
+          randomWalk: {
+            enabled: true, 
+            interval: 60e3,
+            timeout: 10e3
+          }
         },
         relay: {
           enabled: false
