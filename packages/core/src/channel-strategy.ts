@@ -28,6 +28,7 @@ export interface ChannelStrategy {
     indexer: Indexer
   ): Promise<ChannelsToOpen[]>
   // TBD: Include ChannelsToClose as well.
+  // TBD: Pass quality information from networkPeers?
 }
 
 // Don't auto open any channels
