@@ -18,20 +18,20 @@ const SENDER = PeerId.createFromB58String('16Uiu2HAmM9KAPaXA4eAz58Q7Eb3LEkDvLarU
 const SENDER_ADDRESS = stringToU8a('0x65e78d07acf7b654e5ae6777a93ebbf30f639356')
 
 const createMockTicket = ({
-  target = TARGET,
+  targetAddress = TARGET_ADDRESS,
   amount = new BN(1),
   winProb = new Uint8Array(1),
   epoch = new BN(1),
   channelIteration = new BN(1)
 }: {
-  target?: PeerId
+  targetAddress?: Uint8Array
   amount?: BN
   winProb?: Uint8Array
   epoch?: BN
   channelIteration?: BN
 }) => {
   return ({
-    counterparty: target.pubKey.marshal(),
+    counterparty: targetAddress,
     challenge: new Uint8Array(),
     amount,
     winProb,
@@ -42,19 +42,19 @@ const createMockTicket = ({
 
 const createMockSignedTicket = ({
   sender = SENDER,
-  target = TARGET,
+  targetAddress = TARGET_ADDRESS,
   amount = new BN(1),
   winProb = new Uint8Array(1),
   channelIteration = new BN(1)
 }: {
   sender?: PeerId
-  target?: PeerId
+  targetAddress?: Uint8Array
   amount?: BN
   winProb?: Uint8Array
   channelIteration?: BN
 }) => {
   return ({
-    ticket: createMockTicket({ target, amount, winProb, channelIteration }),
+    ticket: createMockTicket({ targetAddress, amount, winProb, channelIteration }),
     signer: Promise.resolve(sender.pubKey.marshal())
   } as unknown) as Types.SignedTicket
 }
@@ -101,6 +101,7 @@ const createMockNode = ({
   stateCounterToIteration.withArgs(11).returns(2)
 
   return ({
+    getId: sinon.stub().returns(target),
     ticketAmount: ticketAmount,
     ticketWinProb: ticketWinProb,
     paymentChannels: {
@@ -139,7 +140,6 @@ describe('unit test validateUnacknowledgedTicket', function () {
       validateUnacknowledgedTicket({
         node,
         senderPeerId: SENDER,
-        targetPeerId: TARGET,
         signedTicket,
         getTickets: getTicketsMock
       })
@@ -154,7 +154,6 @@ describe('unit test validateUnacknowledgedTicket', function () {
       validateUnacknowledgedTicket({
         node,
         senderPeerId: await PeerId.create(),
-        targetPeerId: TARGET,
         signedTicket,
         getTickets: getTicketsMock
       })
@@ -171,7 +170,6 @@ describe('unit test validateUnacknowledgedTicket', function () {
       validateUnacknowledgedTicket({
         node,
         senderPeerId: SENDER,
-        targetPeerId: TARGET,
         signedTicket,
         getTickets: getTicketsMock
       })
@@ -190,7 +188,6 @@ describe('unit test validateUnacknowledgedTicket', function () {
       validateUnacknowledgedTicket({
         node,
         senderPeerId: SENDER,
-        targetPeerId: TARGET,
         signedTicket,
         getTickets: getTicketsMock
       })
@@ -207,7 +204,6 @@ describe('unit test validateUnacknowledgedTicket', function () {
       validateUnacknowledgedTicket({
         node,
         senderPeerId: SENDER,
-        targetPeerId: TARGET,
         signedTicket,
         getTickets: getTicketsMock
       })
@@ -224,7 +220,6 @@ describe('unit test validateUnacknowledgedTicket', function () {
       validateUnacknowledgedTicket({
         node,
         senderPeerId: SENDER,
-        targetPeerId: TARGET,
         signedTicket,
         getTickets: getTicketsMock
       })
@@ -241,7 +236,6 @@ describe('unit test validateUnacknowledgedTicket', function () {
       validateUnacknowledgedTicket({
         node,
         senderPeerId: SENDER,
-        targetPeerId: TARGET,
         signedTicket,
         getTickets: getTicketsMock
       })
@@ -258,7 +252,6 @@ describe('unit test validateUnacknowledgedTicket', function () {
       validateUnacknowledgedTicket({
         node,
         senderPeerId: SENDER,
-        targetPeerId: TARGET,
         signedTicket,
         getTickets: getTicketsMock
       })
@@ -276,7 +269,6 @@ describe('unit test validateUnacknowledgedTicket', function () {
       validateUnacknowledgedTicket({
         node,
         senderPeerId: SENDER,
-        targetPeerId: TARGET,
         signedTicket,
         getTickets: getTicketsMock
       })
@@ -296,7 +288,6 @@ describe('unit test validateUnacknowledgedTicket', function () {
       validateUnacknowledgedTicket({
         node,
         senderPeerId: SENDER,
-        targetPeerId: TARGET,
         signedTicket,
         getTickets: async () => ticketsInDb
       })
