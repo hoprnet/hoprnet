@@ -16,7 +16,7 @@ export type CrawlInfo = {
 }
 
 type CrawlEdge = [PeerId, Number] // ID, weight
-const has = (queue: Heap<CrawlEdge>, peer) => queue.contains(peer, (e) => e[0].equals(peer))
+const has = (queue: Heap<CrawlEdge>, peer: PeerId) => queue.contains(peer as any, (e) => e[0].equals(peer))
 
 export const shouldIncludePeerInCrawlResponse = (peer: Multiaddr, them: Multiaddr): boolean => {
   // We are being requested a crawl from a node that is on a remote network, so

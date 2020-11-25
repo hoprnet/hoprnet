@@ -82,8 +82,8 @@ class NetworkPeers {
     this.peers.forEach((e: Entry) => log(`id: ${e.id.toB58String()}, q: ${this.qualityOf(e.id)}`))
   }
 
-  public containsOlderThan(ts): boolean {
-    return this.peers.length > 0 && heap.heaptop(this.peers, 1, this.compareLastPing)[0].lastSeen < ts
+  public containsOlderThan(timestamp: Number): boolean {
+    return this.peers.length > 0 && heap.heaptop(this.peers, 1, this.compareLastPing)[0].lastSeen < timestamp
   }
 
   public lastSeen(peer: PeerId): number {
