@@ -292,3 +292,17 @@ jobs:
             --container-arg="--runAsBootstrap" --container-arg="true" \
             --container-arg="--admin" \
             --container-restart-policy=always
+      - name: Stop bootstrap node to get the address from the database
+        run: |
+          gcloud compute ssh --zone=europe-west6-a hopr-develop-02-delete \
+          -- 'export DOCKER_IMAGE=gcr.io/hoprassociation/hoprd:${{ env.RELEASE }} && docker stop $(docker ps -q --filter "ancestor=$DOCKER_IMAGE")'
+
+      - name: Get address from bootstrap server to fund later
+        run: |
+          export BS_ADDRESS=$(gcloud compute ssh --zone=europe-west6-a hopr-develop-02-delete \
+          -- "docker run -v /mnt/disks/gce-containers-mounts/gce-persistent-disks/bs-${{ env.RELEASE_NAME }}:/app/db -it node:erbium-buster sh -c 'npm install --unsafe-perm=true -g @hoprnet/hoprd@v${{ env.RELEASE_NAME }} && hoprd --data=\"/app/db/ethereum/testnet/bootstrap\" --password=\"${{ secrets.BS_PASSWORD }}\" --runAsBootstrap --run \"myAddress native\"'") && \
+          echo "BS_ADDRESS=$BS_ADDRESS" >> $GITHUB_ENV
+
+      - name: Verify bootstrap server address from previous step
+        run: |
+          echo "Bootstrap Server Address: ${{ env.BS_ADDRESS }}"
