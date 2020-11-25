@@ -6,9 +6,9 @@ import debug from 'debug'
 const log = debug('hopr-core:channel-strategy')
 
 export type ChannelsToOpen = [PeerId, BN]
-const dest = (c: ChannelsToOpen) => c[0]
-const outgoingPeer = (c: IndexerChannel) => c[0]
-const indexerDest = (c: IndexerChannel) => c[1]
+const dest = (c: ChannelsToOpen): PeerId => c[0]
+const outgoingPeer = (c: IndexerChannel): PeerId => c[0]
+const indexerDest = (c: IndexerChannel): PeerId => c[1]
 
 /**
 * Staked nodes will likely want to automate opening and closing of channels. By
@@ -40,6 +40,7 @@ export class PassiveStrategy implements ChannelStrategy {
 // Open channel to as many peers as possible
 export class PromiscuousStrategy implements ChannelStrategy {
   async tick(balance: BN, _n, currentChannels: IndexerChannel[], indexer: Indexer): Promise<ChannelsToOpen[]> {
+    log('currently open', currentChannels)
     let toOpen = []
     let i = 0
     while (balance.gtn(0) && i++ < MAX_NEW_CHANNELS_PER_TICK) {
