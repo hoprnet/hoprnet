@@ -254,9 +254,13 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     const balance = await this.getBalance()
     const nextChannels = await this.strategy.tick(balance, newChannels, currentChannels, this.paymentChannels.indexer)
     verbose('strategy wants to open', nextChannels.length, 'new channels')
-    for (let channelToOpen of nextChannels) {
-      const hash = await this.openChannel(channelToOpen[0], channelToOpen[1])
-      verbose('- opened', hash)
+    try {
+      for (let channelToOpen of nextChannels) {
+        const hash = await this.openChannel(channelToOpen[0], channelToOpen[1])
+        verbose('- opened', hash)
+      }
+    } catch (e) {
+      log('error when trying to open strategy channels', e)
     }
   }
 
@@ -293,7 +297,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     log(`Available under the following addresses:`)
 
     this._libp2p.multiaddrs.forEach((ma: Multiaddr) => log(ma.toString()))
-    setTimeout(() => this.periodicCheck(), 1)
+    await this.periodicCheck()
     this.running = true
     return this
   }

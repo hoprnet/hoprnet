@@ -42,7 +42,7 @@ export class PromiscuousStrategy implements ChannelStrategy {
         balance.isub(MINIMUM_REASONABLE_CHANNEL_STAKE)
       }
     }
-    log('Promiscuous toOpen: ', toOpen.map(x => x[0].toB58String() + ':' + x[1].toString()).join('\n-'))
+    log('Promiscuous toOpen:\n', toOpen.map(x => x[0].toB58String() + ':' + x[1].toString()).join('\n-'))
     return toOpen
   }
 }
