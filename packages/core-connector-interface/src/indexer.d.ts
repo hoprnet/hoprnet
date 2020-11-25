@@ -1,7 +1,6 @@
 import { Balance } from './types'
 
-// Source -> Dest, stake
-type Channel = [PeerId, PeerId, Balance]
+type Channel = [source: PeerId, destination: PeerId, stake: Balance]
 
 declare interface Indexer {
   getRandomChannel(): Promise<Channel | undefined>
