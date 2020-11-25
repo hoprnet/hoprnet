@@ -67,7 +67,10 @@ describe('test signedTicket construction', async function () {
     assert(signedTicket.ticket.amount.eq(ticketData.amount), 'wrong amount')
     assert(signedTicket.ticket.winProb.eq(ticketData.winProb), 'wrong winProb')
 
-    signedTicket[randomInteger(1, SignedTicket.SIZE)] = randomBytes(1)[0]
+    let exponent = randomInteger(0, 8)
+    let index = randomInteger(0, signedTicket.length)
+
+    signedTicket[index] = signedTicket[index] ^ (1 << exponent)
 
     assert(!(await signedTicket.verify(userAPubKey)), 'tweaked signature should not be valid')
   })
@@ -104,11 +107,16 @@ describe('test signedTicket construction', async function () {
     assert(signedTicketB.ticket.amount.eq(ticketData.amount), 'wrong amount')
     assert(signedTicketB.ticket.winProb.eq(ticketData.winProb), 'wrong winProb')
 
-    signedTicketA[randomInteger(1, SignedTicket.SIZE)] = randomBytes(1)[0]
+    let exponentA = randomInteger(0, 8)
+    let indexA = randomInteger(0, signedTicketA.length)
 
+    signedTicketA[indexA] = signedTicketA[indexA] ^ (1 << exponentA)
     assert(!(await signedTicketA.verify(userAPubKey)), 'tweaked signature should not be valid')
 
-    signedTicketB[randomInteger(1, SignedTicket.SIZE)] = randomBytes(1)[0]
+    let exponentB = randomInteger(0, 8)
+    let indexB = randomInteger(0, signedTicketB.length)
+
+    signedTicketB[indexB] = signedTicketB[indexB] ^ (1 << exponentB)
 
     assert(!(await signedTicketB.verify(userAPubKey)), 'tweaked signature should not be valid')
   })
@@ -150,7 +158,10 @@ describe('test signedTicket construction', async function () {
     assert(signedTicket.ticket.amount.eq(ticketData.amount), 'wrong amount')
     assert(signedTicket.ticket.winProb.eq(ticketData.winProb), 'wrong winProb')
 
-    signedTicket[randomInteger(1, SignedTicket.SIZE)] = randomBytes(1)[0]
+    let exponent = randomInteger(0, 8)
+    let index = randomInteger(0, signedTicket.length)
+
+    signedTicket[index] = signedTicket[index] ^ (1 << exponent)
 
     assert(!(await signedTicket.verify(userAPubKey)), 'tweaked signature should not be valid')
   })
