@@ -200,7 +200,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
         dht: {
           enabled: true,
           randomWalk: {
-            enabled: true, 
+            enabled: true,
             interval: 60e3,
             timeout: 10e3
           }
