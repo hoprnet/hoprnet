@@ -36,8 +36,10 @@ export class PromiscuousStrategy implements ChannelStrategy {
       if (randomChannel === undefined) {
         break
       }
-      if (!toOpen.find(x => dest(x).equals(outgoingPeer(randomChannel))) &&
-          !currentChannels.find(x => indexerDest(x).equals(outgoingPeer(randomChannel)))){
+      if (
+        !toOpen.find((x) => dest(x).equals(outgoingPeer(randomChannel))) &&
+        !currentChannels.find((x) => indexerDest(x).equals(outgoingPeer(randomChannel)))
+      ) {
         toOpen.push([outgoingPeer(randomChannel), MINIMUM_REASONABLE_CHANNEL_STAKE])
         balance.isub(MINIMUM_REASONABLE_CHANNEL_STAKE)
       }
