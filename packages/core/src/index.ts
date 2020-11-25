@@ -272,7 +272,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       async (channel: Channel) => {
         const pubKey = await channel.offChainCounterparty
         const peerId = await pubKeyToPeerId(pubKey)
-        channels.push([peerId, channel.balance]) // TODO partyA?
+        channels.push([this.getId(), peerId, await channel.balance]) // TODO partyA?
       },
       async (promises: Promise<void>[]) => {
         await Promise.all(promises)
