@@ -1,108 +1,71 @@
-import NetworkPeerStore from './network-peers'
+import type NetworkPeerStore from './network-peers'
+import type PeerId from 'peer-id'
 import debug from 'debug'
-import { getTokens, Token } from '../utils'
-import PeerId from 'peer-id'
-import { EventEmitter } from 'events'
-import { randomInteger } from '@hoprnet/hopr-utils'
+import { randomInteger, limitConcurrency } from '@hoprnet/hopr-utils'
 import {
-  HEARTBEAT_REFRESH_TIME,
-  HEARTBEAT_INTERVAL_LOWER_BOUND,
-  HEARTBEAT_INTERVAL_UPPER_BOUND,
+  HEARTBEAT_REFRESH,
+  HEARTBEAT_INTERVAL,
+  HEARTBEAT_INTERVAL_VARIANCE,
   MAX_PARALLEL_CONNECTIONS
 } from '../constants'
 import { Heartbeat as HeartbeatInteraction } from '../interactions/network/heartbeat'
 
 const log = debug('hopr-core:heartbeat')
 
-class Heartbeat extends EventEmitter {
-  timeout: any
+export default class Heartbeat {
+  private timeout: NodeJS.Timeout
 
   constructor(
     private networkPeers: NetworkPeerStore,
     private interaction: HeartbeatInteraction,
     private hangUp: (addr: PeerId) => Promise<void>
-  ) {
-    super()
-    super.on('beat', this.connectionListener.bind(this))
-  }
+  ) {}
 
-  connectionListener(peer: PeerId) {
-    this.networkPeers.push({
-      id: peer,
-      lastSeen: Date.now()
-    })
-  }
+  private async checkNodes(): Promise<void> {
+    const thresholdTime = Date.now() - HEARTBEAT_REFRESH
+    log(`Checking nodes older than ${thresholdTime}`)
 
-  async checkNodes(): Promise<void> {
-    log(`Checking nodes`)
-    this.networkPeers.debugLog()
-
-    const promises: Promise<void>[] = Array.from({ length: MAX_PARALLEL_CONNECTIONS })
-    const tokens = getTokens(MAX_PARALLEL_CONNECTIONS)
-
-    const THRESHOLD_TIME = Date.now() - HEARTBEAT_REFRESH_TIME
-
-    const queryNode = async (peer: PeerId, token: Token): Promise<void> => {
-      while (tokens.length > 0 && this.networkPeers.updatedSince(THRESHOLD_TIME)) {
-        let nextPeer = this.networkPeers.pop()
-        let token = tokens.pop() as Token
-
-        promises[token] = queryNode(nextPeer.id, token)
-      }
-
-      let currentPeerId: PeerId
-
-      while (true) {
-        currentPeerId = peer
-
+    const queryOldest = async (): Promise<void> => {
+      await this.networkPeers.pingOldest(async (id: PeerId) => {
+        log('ping', id.toB58String())
         try {
-          await this.interaction.interact(currentPeerId)
-
-          this.networkPeers.push({
-            id: currentPeerId,
-            lastSeen: Date.now()
-          })
+          await this.interaction.interact(id)
+          log('ping success to', id.toB58String())
+          return true
         } catch (err) {
-          await this.hangUp(currentPeerId)
-          this.networkPeers.blacklistPeer(peer)
-          log(`Blacklisting node ${peer.toB58String()}`)
+          log('ping failed to', id.toB58String(), err)
+          await this.hangUp(id)
+          return false
         }
-
-        if (this.networkPeers.updatedSince(THRESHOLD_TIME)) {
-          peer = this.networkPeers.pop().id
-        } else {
-          break
-        }
-      }
-
-      promises[token] = undefined
-      tokens.push(token)
+      })
     }
 
-    if (this.networkPeers.updatedSince(THRESHOLD_TIME)) {
-      let token = tokens.pop() as Token
-      promises[token] = queryNode(this.networkPeers.pop().id, token)
-    }
-
-    await Promise.all(promises)
+    await limitConcurrency<void>(
+      MAX_PARALLEL_CONNECTIONS,
+      () => !this.networkPeers.containsOlderThan(thresholdTime),
+      queryOldest
+    )
+    this.networkPeers.debugLog()
   }
 
-  setTimeout() {
+  private tick() {
     this.timeout = setTimeout(async () => {
       await this.checkNodes()
-      this.setTimeout()
-    }, randomInteger(HEARTBEAT_INTERVAL_LOWER_BOUND, HEARTBEAT_INTERVAL_UPPER_BOUND))
+      this.tick()
+    }, randomInteger(HEARTBEAT_INTERVAL, HEARTBEAT_INTERVAL + HEARTBEAT_INTERVAL_VARIANCE))
   }
 
-  start(): void {
-    this.setTimeout()
-    log(`Heartbeat mechanism started`)
+  public start() {
+    this.tick()
+    log(`Heartbeat started`)
   }
 
-  stop(): void {
+  public stop() {
     clearTimeout(this.timeout)
-    log(`Heartbeat mechanism stopped`)
+    log(`Heartbeat stopped`)
+  }
+
+  public async __forTestOnly_checkNodes() {
+    return await this.checkNodes()
   }
 }
-
-export default Heartbeat

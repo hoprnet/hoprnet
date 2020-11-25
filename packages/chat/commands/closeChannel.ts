@@ -4,7 +4,7 @@ import type Hopr from '@hoprnet/hopr-core'
 import type PeerId from 'peer-id'
 import type { AutoCompleteResult } from './abstractCommand'
 import chalk from 'chalk'
-import { pubKeyToPeerId } from '@hoprnet/hopr-core/lib/utils'
+import { pubKeyToPeerId } from '@hoprnet/hopr-utils'
 import { AbstractCommand } from './abstractCommand'
 import { checkPeerIdInput, styleValue } from '../utils'
 

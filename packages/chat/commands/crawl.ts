@@ -10,7 +10,7 @@ export default class Crawl extends AbstractCommand {
   }
 
   public name() {
-    return 'crawl'
+    return '_DEPRECATED_crawl'
   }
 
   public help() {

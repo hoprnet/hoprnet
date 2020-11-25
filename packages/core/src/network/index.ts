@@ -7,25 +7,16 @@ import NetworkPeers from './network-peers'
 import Stun from './stun'
 import Multiaddr from 'multiaddr'
 import PeerId from 'peer-id'
-import type { Connection } from 'libp2p'
 
-type TestOpts = {
-  crawl?: { timeoutIntentionally?: boolean }
-}
 class Network {
   public crawler: Crawler
   public heartbeat: Heartbeat
   public networkPeers: NetworkPeers
   public stun?: Stun
 
-  constructor(node: LibP2P, interactions: Interactions<any>, private options: HoprOptions, testingOptions?: TestOpts) {
-    // These are temporary, and will be replaced by accessors to the addressBook
-    const putPeer = (ma: Multiaddr) => {
-      if (!ma.getPeerId()) {
-        throw new Error('Cannot store a peer without an ID')
-      }
-      const pid = PeerId.createFromCID(ma.getPeerId())
-      node.peerStore.addressBook.add(pid, [ma])
+  constructor(node: LibP2P, interactions: Interactions<any>, options: HoprOptions) {
+    const putPeer = (_ma: Multiaddr) => {
+      /* No-op */
     }
 
     const getPeer = (id: PeerId): Multiaddr[] => {
@@ -40,19 +31,7 @@ class Network {
 
     this.networkPeers = new NetworkPeers(Array.from(node.peerStore.peers.values()).map((x) => x.id))
     this.heartbeat = new Heartbeat(this.networkPeers, interactions.network.heartbeat, node.hangUp.bind(node))
-    this.crawler = new Crawler(
-      node.peerId,
-      this.networkPeers,
-      interactions.network.crawler,
-      getPeer,
-      putPeer,
-      testingOptions?.crawl
-    )
-
-    node.connectionManager.on('peer:connect', (conn: Connection) => {
-      this.networkPeers.onPeerConnect(conn.remotePeer)
-      this.heartbeat.connectionListener(conn.remotePeer)
-    })
+    this.crawler = new Crawler(node.peerId, this.networkPeers, interactions.network.crawler, getPeer, putPeer)
 
     if (options.bootstrapNode) {
       this.stun = new Stun(options.hosts)
@@ -60,7 +39,7 @@ class Network {
   }
 
   async start() {
-    if (this.options.bootstrapNode) {
+    if (this.stun) {
       await this.stun?.startServer()
     }
 
@@ -68,7 +47,7 @@ class Network {
   }
 
   async stop() {
-    if (this.options.bootstrapNode) {
+    if (this.stun) {
       await this.stun?.stopServer()
     }
 

@@ -1,23 +1,16 @@
 import BN from 'bn.js'
 import LibP2P from 'libp2p'
 import chalk from 'chalk'
-
 import PeerId from 'peer-id'
-
-import { pubKeyToPeerId } from '../../utils'
+import { u8aConcat, u8aEquals, u8aToHex, pubKeyToPeerId } from '@hoprnet/hopr-utils'
 import { getTickets, validateUnacknowledgedTicket, validateCreatedTicket } from '../../utils/tickets'
-import { u8aConcat, u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
-
 import { Header, deriveTicketKey, deriveTicketKeyBlinding, deriveTagParameters, deriveTicketLastKey } from './header'
 import { Challenge } from './challenge'
 import { PacketTag } from '../../dbKeys'
 import Message from './message'
 import { LevelUp } from 'levelup'
-
 import Debug from 'debug'
-
 import Hopr from '../../'
-
 import HoprCoreConnector, { Types } from '@hoprnet/hopr-core-connector-interface'
 import { UnacknowledgedTicket } from '../ticket'
 

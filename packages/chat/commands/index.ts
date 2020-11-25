@@ -21,6 +21,7 @@ import Tickets from './tickets'
 import RedeemTickets from './redeemTickets'
 import Settings from './settings'
 import Withdraw from './withdraw'
+import TraverseChannels from './traverseChannels'
 import readline from 'readline'
 import { Alias } from './alias'
 import { Info } from './info'
@@ -55,6 +56,7 @@ export class Commands {
       new RedeemTickets(node),
       new Settings(),
       new Alias(node),
+      new TraverseChannels(node),
       new Withdraw(node)
     ]
 

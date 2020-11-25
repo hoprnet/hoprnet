@@ -60,3 +60,10 @@ export function randomInteger(start: number, end?: number): number {
 
   return end == null ? result : start + result
 }
+
+export function randomChoice<T>(collection: T[]): T {
+  if (collection.length === 0) {
+    throw new Error('empty collection, cannot choose random element')
+  }
+  return collection[randomInteger(0, collection.length)]
+}
