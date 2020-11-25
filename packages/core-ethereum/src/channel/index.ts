@@ -168,6 +168,7 @@ class ChannelFactory {
     sign?: (channelBalance: ChannelBalance) => Promise<SignedChannel>
   ): Promise<Channel> {
     const counterparty = await pubKeyToAccountId(counterpartyPubKey)
+    const amPartyA = isPartyA(await this.coreConnector.account.address, counterparty)
     let channel: Channel
     let signedChannel: SignedChannel
 
@@ -184,18 +185,18 @@ class ChannelFactory {
       })
       channel = new Channel(this.coreConnector, counterpartyPubKey, signedChannel)
     } else if (sign != null && channelBalance != null) {
-      let amount: Balance
-      if (isPartyA(await this.coreConnector.account.address, counterparty)) {
-        amount = channelBalance.balance_a
-      } else {
-        amount = new Balance(channelBalance.balance.sub(channelBalance.balance_a))
+      channel = new Channel(this.coreConnector, counterpartyPubKey, signedChannel)
+
+      const amountToFund = new Balance(
+        amPartyA ? channelBalance.balance_a : channelBalance.balance.sub(channelBalance.balance_a)
+      )
+      const amountFunded = await (amPartyA ? channel.balance_a : channel.balance_b)
+
+      if (amountFunded.lt(amountToFund)) {
+        await this.increaseFunds(counterparty, new Balance(amountToFund.sub(amountFunded)))
       }
 
-      await this.increaseFunds(counterparty, amount)
-
       signedChannel = await sign(channelBalance)
-
-      channel = new Channel(this.coreConnector, counterpartyPubKey, signedChannel)
 
       await waitForConfirmation(
         (
