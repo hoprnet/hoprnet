@@ -1,4 +1,4 @@
-import { durations, u8aConcat } from '@hoprnet/hopr-utils'
+import { durations, u8aConcat, u8aEquals } from '@hoprnet/hopr-utils'
 import { RELAY_PAYLOAD_PREFIX } from './constants'
 import { RelayContext } from './relayContext'
 import { RelayConnection } from './relayConnection'
@@ -7,150 +7,117 @@ import assert from 'assert'
 
 import Pair from 'it-pair'
 
-import Debug from 'debug'
 import PeerId from 'peer-id'
 
-const log = Debug(`hopr-core:transport`)
+interface DebugMessage {
+  messageId: number
+  iteration: number
+}
 
 describe('test overwritable connection', function () {
   let iteration = 0
 
-  function getStream({ usePrefix }: { usePrefix: boolean }): Stream {
+  /**
+   * Starts a duplex stream that sends numbered messages and checks
+   * whether the received messages came from the same sender and in
+   * expected order.
+   * @param arg options
+   */
+  function getStream(arg: { usePrefix: boolean; designatedReceiverId?: number }): Stream {
     let _iteration = iteration
+
+    let lastId = -1
+    let receiver = arg.designatedReceiverId
 
     return {
       source: (async function* () {
-        log(`source triggered in .spec`)
         let i = 0
         let msg: Uint8Array
-        for (; i < 7; i++) {
-          msg = new TextEncoder().encode(`iteration ${_iteration} - msg no. ${i}`)
-          if (usePrefix) {
+
+        for (; i < 15; i++) {
+          msg = new TextEncoder().encode(
+            JSON.stringify({
+              iteration: _iteration,
+              messageId: i
+            })
+          )
+
+          if (arg.usePrefix) {
             yield u8aConcat(RELAY_PAYLOAD_PREFIX, msg)
           } else {
             yield msg
           }
 
-          await new Promise((resolve) => setTimeout(resolve, 20))
+          await new Promise((resolve) => setTimeout(resolve, 10))
         }
       })(),
       sink: async (source: Stream['source']) => {
         let msg: Uint8Array
+
         for await (const _msg of source) {
           if (_msg != null) {
-            if (usePrefix) {
+            if (arg.usePrefix) {
+              if (!u8aEquals(_msg.slice(0, 1), RELAY_PAYLOAD_PREFIX)) {
+                continue
+              }
+
+              if (_msg.slice(1).length == 0) {
+                continue
+              }
+
               msg = _msg.slice(1)
             } else {
               msg = _msg.slice()
             }
 
-            console.log(`receiver #${_iteration}`, new TextDecoder().decode(msg))
+            let decoded = JSON.parse(new TextDecoder().decode(msg)) as DebugMessage
+
+            assert(decoded.messageId == lastId + 1)
+
+            if (receiver == null) {
+              receiver = decoded.iteration
+            } else {
+              assert(receiver == decoded.iteration)
+            }
+
+            lastId = decoded.messageId
           } else {
-            console.log(`received empty message`, _msg)
+            assert.fail(`received empty message`)
           }
         }
-        console.log(`sinkDone`)
       }
     }
   }
 
-  // it('should create a connection and overwrite it', async function () {
-  //   const ctx = new RelayContext(getStream({ usePrefix: true }))
-
-  //   let interval = setInterval(
-  //     () =>
-  //       setImmediate(() => {
-  //         ctx.update(getStream({ usePrefix: true }))
-  //         iteration++
-  //       }),
-  //     500
-  //   )
-
-  //   let done = false
-
-  //   setTimeout(() => {
-  //     done = true
-  //     log(`timeout done`)
-  //     clearInterval(interval)
-  //   }, 3000)
-
-  //   let i = 0
-  //   ctx.sink(
-  //     (async function* () {
-  //       await new Promise((resolve) => setTimeout(resolve, 123))
-  //       while (i < 28) {
-  //         yield u8aConcat(RELAY_PAYLOAD_PREFIX, new TextEncoder().encode(`msg from initial party #${i++}`))
-  //         await new Promise((resolve) => setTimeout(resolve, 100))
-  //       }
-  //     })()
-  //   )
-
-  //   // @TODO count messages
-
-  //   for await (const msg of ctx.source) {
-  //     if (done) {
-  //       break
-  //     }
-  //     console.log(`initial source <${new TextDecoder().decode(msg.slice())}>`)
-  //   }
-  // })
-
-  // it('should simulate relay usage', async function () {
-  //   const streamA = getStream({ usePrefix: true })
-  //   const streamB = getStream({ usePrefix: true })
-
-  //   const [self, counterparty] = await Promise.all(
-  //     Array.from({ length: 2 }).map(() => PeerId.create({ keyType: 'secp256k1' }))
-  //   )
-
-  //   const AtoB = Pair()
-  //   const BtoA = Pair()
-
-  //   const ctxA = new RelayConnection({
-  //     stream: {
-  //       sink: AtoB.sink,
-  //       source: BtoA.source
-  //     },
-  //     onReconnect: async () => {},
-  //     self,
-  //     counterparty
-  //   })
-
-  //   const ctxB = new RelayContext({
-  //     sink: BtoA.sink,
-  //     source: AtoB.source
-  //   })
-
-  //   streamA.sink(ctxA.source)
-  //   ctxA.sink(streamA.source)
-
-  //   streamB.sink(ctxB.source)
-  //   ctxB.sink(streamB.source)
-
-  //   console.log(`ping`, await ctxB.ping())
-
-  //   await new Promise((resolve) => setTimeout(resolve, 2000))
-  // })
-
   it('should simulate a reconnect', async function () {
     this.timeout(durations.seconds(3))
+
+    // Sample two IDs
+    const [self, counterparty] = await Promise.all(
+      Array.from({ length: 2 }).map(() => PeerId.create({ keyType: 'secp256k1' }))
+    )
+
+    // Get low-level connections between A, B
     const connectionA = Pair()
     const connectionB = Pair()
 
+    // @ts-ignore
+    let newSenderId = -1
+
+    // Generate sender-side of relay
     const ctxSender = new RelayContext({
       sink: connectionA.sink,
       source: connectionB.source
     })
 
+    // Generate counterparty-side of relay
     const ctxCounterparty = new RelayContext(getStream({ usePrefix: true }))
 
+    // Internally wiring relay
     ctxSender.sink(ctxCounterparty.source)
     ctxCounterparty.sink(ctxSender.source)
 
-    const [self, counterparty] = await Promise.all(
-      Array.from({ length: 2 }).map(() => PeerId.create({ keyType: 'secp256k1' }))
-    )
-
+    // Getting a demo stream
     iteration++
     const receiverStream = getStream({ usePrefix: false })
 
@@ -162,11 +129,8 @@ describe('test overwritable connection', function () {
       self,
       counterparty,
       onReconnect: async (newStream: MultiaddrConnection) => {
-        console.log(`reconnected`)
-
         iteration++
-        console.log(`in reconnect: iteration ${iteration}`)
-        const demoStream = getStream({ usePrefix: false })
+        const demoStream = getStream({ usePrefix: false, designatedReceiverId: newSenderId })
 
         newStream.sink(demoStream.source)
         demoStream.sink(newStream.source)
@@ -177,14 +141,19 @@ describe('test overwritable connection', function () {
     receiverStream.sink(ctx.source)
 
     let pingPromise: Promise<number>
+
+    // Trigger a reconnect after a timeout
     setTimeout(() => {
       iteration++
       pingPromise = ctxSender.ping()
+      newSenderId = iteration
       ctxCounterparty.update(getStream({ usePrefix: true }))
     }, 200)
 
     await new Promise((resolve) => setTimeout(resolve, 2000))
 
+    // Make sure that we the ping went through
+    // Note that `result == -1` means timeout
     assert((await pingPromise) >= 0)
 
     await ctx.close()

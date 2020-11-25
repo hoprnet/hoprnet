@@ -1,28 +1,41 @@
 import { WebRTCConnection, WEBRTC_UPGRADE_TIMEOUT } from './webRTCConnection'
 import Peer from 'simple-peer'
-import { yellow } from 'chalk'
 
 // @ts-ignore
 import wrtc = require('wrtc')
 
-import { durations, u8aConcat } from '@hoprnet/hopr-utils'
+import { u8aConcat, durations } from '@hoprnet/hopr-utils'
 import { RELAY_PAYLOAD_PREFIX } from './constants'
 import { RelayContext } from './relayContext'
 import { RelayConnection } from './relayConnection'
 import type { MultiaddrConnection, Stream } from 'libp2p'
-//import assert from 'assert'
+import assert from 'assert'
 
 import Pair from 'it-pair'
 
 import PeerId from 'peer-id'
 import { EventEmitter } from 'events'
 
+interface DebugMessage {
+  messageId: number
+  iteration: number
+}
+
 describe('test overwritable connection', function () {
   this.timeout(10000)
   let iteration = 0
 
-  function getStream(arg: { usePrefix: boolean }): Stream {
+  /**
+   * Starts a duplex stream that sends numbered messages and checks
+   * whether the received messages came from the same sender and in
+   * expected order.
+   * @param arg options
+   */
+  function getStream(arg: { usePrefix: boolean; designatedReceiverId?: number }): Stream {
     let _iteration = iteration
+
+    let lastId = -1
+    let receiver = arg.designatedReceiverId
 
     return {
       source: (async function* () {
@@ -32,7 +45,13 @@ describe('test overwritable connection', function () {
         let MSG_TIMEOUT = 10
 
         for (; i < WEBRTC_UPGRADE_TIMEOUT / MSG_TIMEOUT + 5; i++) {
-          msg = new TextEncoder().encode(`iteration ${_iteration} - msg no. ${i}`)
+          msg = new TextEncoder().encode(
+            JSON.stringify({
+              iteration: _iteration,
+              messageId: i
+            })
+          )
+
           if (arg.usePrefix) {
             yield u8aConcat(RELAY_PAYLOAD_PREFIX, msg)
           } else {
@@ -44,6 +63,7 @@ describe('test overwritable connection', function () {
       })(),
       sink: async (source: Stream['source']) => {
         let msg: Uint8Array
+
         for await (const _msg of source) {
           if (_msg != null) {
             if (arg.usePrefix) {
@@ -52,16 +72,29 @@ describe('test overwritable connection', function () {
               msg = _msg.slice()
             }
 
-            console.log(yellow(`receiver #${_iteration}`, new TextDecoder().decode(msg)))
+            let decoded = JSON.parse(new TextDecoder().decode(msg)) as DebugMessage
+
+            assert(decoded.messageId == lastId + 1)
+
+            if (receiver == null) {
+              receiver = decoded.iteration
+            } else {
+              assert(receiver == decoded.iteration)
+            }
+
+            lastId = decoded.messageId
           } else {
-            console.log(`received empty message`, _msg)
+            assert.fail(`received empty message`)
           }
         }
-        console.log(`sinkDone`)
       }
     }
   }
 
+  /**
+   * Returns a SimplePeer instance that has mocks for all methods that are
+   * required by the transport module.
+   */
   function fakeWebRTC(): Peer.Instance {
     const peer = new EventEmitter()
 
@@ -83,7 +116,8 @@ describe('test overwritable connection', function () {
     return peer as Peer.Instance
   }
 
-  it('should simulate a reconnect', async function () {
+  it('should simulate a reconnect after a WebRTC upgrade', async function () {
+    // Sample two parties
     const [partyA, partyB] = await Promise.all(
       Array.from({ length: 2 }).map(() => PeerId.create({ keyType: 'secp256k1' }))
     )
@@ -91,18 +125,17 @@ describe('test overwritable connection', function () {
     const connectionA = [Pair(), Pair()]
     const connectionB = [Pair(), Pair()]
 
-    // Define relays
+    // Define relay - one side for A, one side for B
     const relaySideA = new RelayContext({
       sink: connectionA[0].sink,
       source: connectionA[1].source
     })
-
     const relaySideB = new RelayContext({
       sink: connectionB[0].sink,
       source: connectionB[1].source
     })
 
-    // Wire relay internally
+    // Wire both sides of the relay
     relaySideA.sink(relaySideB.source)
     relaySideB.sink(relaySideA.source)
 
@@ -110,6 +143,11 @@ describe('test overwritable connection', function () {
     const PeerA = new Peer({ wrtc, initiator: true, trickle: true })
     const PeerB = new Peer({ wrtc, trickle: true })
 
+    // Store the id of the new sender after a reconnect
+    // @ts-ignore
+    let newSenderId: number
+
+    // Simulated partyA
     const ctxA = new WebRTCConnection({
       conn: new RelayConnection({
         stream: {
@@ -136,13 +174,10 @@ describe('test overwritable connection', function () {
       counterparty: partyB,
       webRTC: PeerB,
       onReconnect: async (newStream: MultiaddrConnection, counterparty: PeerId) => {
-        console.log(`reconnected`)
-
         iteration++
-        console.log(`in reconnect: iteration ${iteration}`)
-        const demoStream = getStream({ usePrefix: false })
 
-        console.log((newStream as RelayConnection)._iteration)
+        const demoStream = getStream({ usePrefix: false, designatedReceiverId: newSenderId })
+
         const newConn = new WebRTCConnection({
           conn: newStream,
           self: partyA,
@@ -160,6 +195,7 @@ describe('test overwritable connection', function () {
       webRTCUpgradeInbound: () => new Peer({ wrtc, trickle: true })
     })
 
+    // Simulated partyB
     const ctxB = new WebRTCConnection({
       conn: ctx,
       self: partyB,
@@ -168,16 +204,22 @@ describe('test overwritable connection', function () {
       iteration: 0
     })
 
+    // Start duplex streams in both directions
+    // A -> B
+    // B -> A
     const streamA = getStream({ usePrefix: false })
     iteration++
     const streamB = getStream({ usePrefix: false })
 
+    // Pipe the streams
     ctxA.sink(streamA.source)
     streamA.sink(ctxA.source)
 
     ctxB.sink(streamB.source)
     streamB.sink(ctxB.source)
 
+    // Initiate a reconnect after a timeout
+    // Note that this will interrupt the previous stream
     setTimeout(() => {
       const newConnectionA = [Pair(), Pair()]
 
@@ -208,16 +250,19 @@ describe('test overwritable connection', function () {
         source: newConnectionA[1].source
       })
 
+      newSenderId = iteration
+
       newConn.sink(newStreamA.source)
       newStreamA.sink(newConn.source)
     }, 200)
 
-    await new Promise((resolve) => setTimeout(resolve, 7000))
+    await new Promise((resolve) => setTimeout(resolve, 4000))
   })
 
   it('should simulate a fallback to a relayed connection', async function () {
     this.timeout(durations.seconds(10))
 
+    // Sample two parties
     const [partyA, partyB] = await Promise.all(
       Array.from({ length: 2 }).map(() => PeerId.create({ keyType: 'secp256k1' }))
     )
@@ -225,7 +270,7 @@ describe('test overwritable connection', function () {
     const connectionA = [Pair(), Pair()]
     const connectionB = [Pair(), Pair()]
 
-    // Define relays
+    // Initiate both sides of the relay - sideA, sideB
     const relaySideA = new RelayContext({
       sink: connectionA[0].sink,
       source: connectionA[1].source
@@ -240,9 +285,12 @@ describe('test overwritable connection', function () {
     relaySideA.sink(relaySideB.source)
     relaySideB.sink(relaySideA.source)
 
-    // Get WebRTC instances
-    const PeerA = fakeWebRTC()
+    // Get fake WebRTC instances to trigger a WebRTC timeout
+    const PeerA = new Peer({ wrtc, initiator: true, trickle: true })
     const PeerB = fakeWebRTC()
+
+    // @ts-ignore
+    let newSenderId = -1
 
     const ctxA = new WebRTCConnection({
       conn: new RelayConnection({
@@ -270,13 +318,9 @@ describe('test overwritable connection', function () {
       counterparty: partyB,
       webRTC: PeerB,
       onReconnect: async (newStream: MultiaddrConnection, counterparty: PeerId) => {
-        console.log(`reconnected`)
-
         iteration++
-        console.log(`in reconnect: iteration ${iteration}`)
-        const demoStream = getStream({ usePrefix: false })
+        const demoStream = getStream({ usePrefix: false, designatedReceiverId: newSenderId })
 
-        console.log((newStream as RelayConnection)._iteration)
         const newConn = new WebRTCConnection({
           conn: newStream,
           self: partyA,
@@ -320,6 +364,8 @@ describe('test overwritable connection', function () {
       iteration++
       const newStreamA = getStream({ usePrefix: false })
 
+      newSenderId = iteration
+
       const newConn = new WebRTCConnection({
         conn: new RelayConnection({
           stream: {
@@ -346,6 +392,6 @@ describe('test overwritable connection', function () {
       newStreamA.sink(newConn.source)
     }, WEBRTC_UPGRADE_TIMEOUT + 400)
 
-    await new Promise((resolve) => setTimeout(resolve, 3000))
+    await new Promise((resolve) => setTimeout(resolve, 4000))
   })
 })
