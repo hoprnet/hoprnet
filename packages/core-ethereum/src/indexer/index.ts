@@ -1,15 +1,16 @@
-import type { Indexer as IIndexer } from '@hoprnet/hopr-core-connector-interface'
+import type { Indexer as IIndexer, IndexerChannel } from '@hoprnet/hopr-core-connector-interface'
 import type HoprEthereum from '..'
 import BN from 'bn.js'
 import chalk from 'chalk'
 import { Subscription } from 'web3-core-subscriptions'
 import { BlockHeader } from 'web3-eth'
-import { u8aToNumber, u8aConcat, u8aToHex } from '@hoprnet/hopr-utils'
-import { ChannelEntry, Public } from '../types'
-import { Log, isPartyA, events } from '../utils'
+import { u8aToNumber, u8aConcat, u8aToHex, pubKeyToPeerId, randomChoice } from '@hoprnet/hopr-utils'
+import { ChannelEntry, Public, Balance } from '../types'
+import { Log, isPartyA, events, getId } from '../utils'
 import { MAX_CONFIRMATIONS } from '../config'
 import { ContractEventLog } from '../tsc/web3/types'
 import { Log as OnChainLog } from 'web3-core'
+import PeerId from 'peer-id'
 import Heap from 'heap-js'
 
 // we save up some memory by only caching the event data we use
@@ -60,8 +61,11 @@ class Indexer implements IIndexer {
   private newBlockEvent?: Subscription<BlockHeader>
   private openedChannelEvent?: Subscription<OnChainLog>
   private closedChannelEvent?: Subscription<OnChainLog>
+  private newChannelHandler: (newChannels: IndexerChannel[]) => void
 
-  constructor(private connector: HoprEthereum) {}
+  constructor(private connector: HoprEthereum) {
+    this.newChannelHandler = () => {}
+  }
 
   /**
    * Returns the latest confirmed block number.
@@ -82,12 +86,47 @@ class Indexer implements IIndexer {
     }
   }
 
+  private async toIndexerChannel(source: PeerId, channel: Channel): Promise<IndexerChannel> {
+    const sourcePubKey = new Public(source.pubKey.marshal())
+    const channelId = await getId(channel.partyA, channel.partyB)
+    const state = await this.connector.hoprChannels.methods.channels(channelId.toHex()).call()
+    if (sourcePubKey.eq(channel.partyA)) {
+      return [source, await pubKeyToPeerId(channel.partyB), new Balance(state.partyABalance)]
+    } else {
+      const partyBBalance = new Balance(state.deposit).sub(new Balance(state.partyABalance))
+      return [source, await pubKeyToPeerId(channel.partyA), partyBBalance]
+    }
+  }
+
+  public onNewChannels(handler: (newChannels: IndexerChannel[]) => void): void {
+    this.newChannelHandler = handler
+  }
+
+  public async getRandomChannel(): Promise<IndexerChannel | undefined> {
+    const all = await this.getAll(undefined)
+    if (all.length === 0) {
+      return undefined
+    }
+    const random = randomChoice(all)
+    return this.toIndexerChannel(await pubKeyToPeerId(random.partyA), random)
+  }
+
+  public async getChannelsFromPeer(source: PeerId): Promise<IndexerChannel[]> {
+    const sourcePubKey = new Public(source.pubKey.marshal())
+    const channels = await this.getAll(sourcePubKey)
+    let cout: IndexerChannel[] = []
+    for (let channel of channels) {
+      cout.push(await this.toIndexerChannel(source, channel))
+    }
+
+    return cout
+  }
+
   /**
    * Check if channel entry exists.
    *
    * @returns promise that resolves to true or false
-   */
-  public async has(partyA: Public, partyB: Public): Promise<boolean> {
+  private async has(partyA: Public, partyB: Public): Promise<boolean> {
     const { dbKeys, db } = this.connector
 
     try {
@@ -100,6 +139,7 @@ class Indexer implements IIndexer {
 
     return true
   }
+   */
 
   /**
    * Get all stored channel entries, if party is provided,
@@ -295,6 +335,7 @@ class Indexer implements IIndexer {
     }
 
     this.store(partyA, partyB, newChannelEntry)
+    this.newChannelHandler([]) // TODO - pass new channels
   }
 
   private async onClosedChannel(event: ClosedChannelEvent): Promise<void> {

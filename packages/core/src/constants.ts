@@ -1,10 +1,10 @@
 import { durations } from '@hoprnet/hopr-utils'
+import BN from 'bn.js'
 
 export const CRAWLING_RESPONSE_NODES = 10
 export const TICKET_AMOUNT = 1000000000000000 // 0.001 HOPR
 export const TICKET_WIN_PROB = 1 // 100%
 export const PACKET_SIZE = 500
-export const MAX_HOPS = 3
 export const MARSHALLED_PUBLIC_KEY_SIZE = 37
 export const NAME = 'ipfs' // 'hopr'
 
@@ -20,15 +20,23 @@ export const PROTOCOL_ONCHAIN_KEY = `/${PROTOCOL_NAME}/onChainKey/${VERSION}`
 export const PROTOCOL_HEARTBEAT = `/${PROTOCOL_NAME}/heartbeat/${VERSION}`
 export const DEFAULT_STUN_PORT = 3478
 
-export const HEARTBEAT_REFRESH_TIME = 103 * 1000
-export const HEARTBEAT_INTERVAL_LOWER_BOUND = 41 * 1000
-export const HEARTBEAT_INTERVAL_UPPER_BOUND = 59 * 1000
+export const HEARTBEAT_REFRESH = 103000
+export const HEARTBEAT_INTERVAL = 50000
+export const HEARTBEAT_INTERVAL_VARIANCE = 5000
 
 export const MAX_PARALLEL_CONNECTIONS = 10
 
-export const BLACKLIST_TIMEOUT = durations.seconds(47)
 export const HEARTBEAT_TIMEOUT = durations.seconds(3)
 
-export const CRAWL_TIMEOUT = 100_000 // ~15 mins
+export const CRAWL_TIMEOUT = 100_000 // ~15 mins - interval between crawls
+export const CRAWL_FAIL_TIMEOUT = 20_000 // Total crawl timeout
+export const CRAWL_MAX_SIZE = 200 // Max peers to contact per crawl
 
 export const MAX_PACKET_DELAY = 200
+
+export const MAX_HOPS = 3
+export const PATH_RANDOMNESS = 0.1
+export const MAX_PATH_ITERATIONS = 100
+export const NETWORK_QUALITY_THRESHOLD = 0.5
+export const MINIMUM_REASONABLE_CHANNEL_STAKE = new BN(TICKET_AMOUNT).muln(10)
+export const MAX_NEW_CHANNELS_PER_TICK = 10

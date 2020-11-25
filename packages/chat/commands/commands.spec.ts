@@ -46,7 +46,7 @@ describe('Commands', () => {
     mockNode.crawl = sinon.fake.returns({ contacted: [] })
 
     let cmds = new mod.Commands(mockNode)
-    assertMatch(await cmds.execute('crawl'), /Crawled network, contacted/)
+    assertMatch(await cmds.execute('_DEPRECATED_crawl'), /Crawled network, contacted/)
   })
 
   it('help', async () => {

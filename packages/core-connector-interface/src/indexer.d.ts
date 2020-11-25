@@ -1,14 +1,12 @@
-import { Public } from './types'
+import { Balance } from './types'
 
-type ChannelEntry = {
-  partyA: Public
-  partyB: Public
-}
+type Channel = [source: PeerId, destination: PeerId, stake: Balance]
 
 declare interface Indexer {
-  has(partyA: Public, partyB: Public): Promise<boolean>
-  get(query?: { partyA?: Public; partyB?: Public }): Promise<ChannelEntry[]>
+  getRandomChannel(): Promise<Channel | undefined>
+  getChannelsFromPeer(source: PeerId): Promise<Channel[]>
+  onNewChannels(handler: (newChannels: Channel[]) => void): void
 }
 
-export { ChannelEntry }
+export { Channel }
 export default Indexer
