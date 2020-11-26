@@ -22,7 +22,7 @@ const indexerDest = (c: IndexerChannel): PeerId => c[1]
  */
 export interface ChannelStrategy {
   [Symbol.toStringTag]: string
-  
+
   tick(
     balance: BN,
     newChannels: IndexerChannel[],
