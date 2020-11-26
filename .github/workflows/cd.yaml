@@ -82,12 +82,9 @@ jobs:
 
       - name: Get address from bootstrap docker container and write it into server
         run: |
-          gcloud compute ssh --zone=europe-west6-a ${{ env.GCLOUD_VM_NAME }} \
-          -- "docker run -v $HOME:/root/tmp -v ${{ env.GCLOUD_VM_DISK }}:/app/db --entrypoint=node -it gcr.io/hoprassociation/hoprd:${{ env.RELEASE_VERSION }} index.js --data='/app/db/ethereum/testnet/bootstrap' --password='${{ secrets.BS_PASSWORD }}' --runAsBootstrap --run 'myAddress native' > /root/tmp/address.txt"
-
-      - name: Get address from server and store it as an env variable
-        run: |
-          echo "BOOTSTRAP_ADDRESS=$(gcloud compute ssh --zone=europe-west6-a ${{ env.GCLOUD_VM_NAME }} -- cat address.txt)" >> $GITHUB_ENV
+          export BOOTSTRAP_ADDRESS=$(gcloud compute ssh --zone=europe-west6-a ${{ env.GCLOUD_VM_NAME }} \
+          -- "docker run -v $HOME:/root/tmp -v ${{ env.GCLOUD_VM_DISK }}:/app/db --entrypoint=node -it gcr.io/hoprassociation/hoprd:${{ env.RELEASE_VERSION }} index.js --data='/app/db/ethereum/testnet/bootstrap' --password='${{ secrets.BS_PASSWORD }}' --runAsBootstrap --run 'myAddress native'") &&
+          echo "BOOTSTRAP_ADDRESS=$BOOTSTRAP_ADDRESS" >> $GITHUB_ENV
 
       - name: Verify bootstrap server address from previous step
         run: |
