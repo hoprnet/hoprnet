@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-core-ethereum",
-  "version": "1.55.0-next.41",
+  "version": "1.57.0-next.1",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -27,8 +27,8 @@
     "yarn": "1"
   },
   "dependencies": {
-    "@hoprnet/hopr-ethereum": "1.55.0-next.41",
-    "@hoprnet/hopr-utils": "1.55.0-next.41",
+    "@hoprnet/hopr-ethereum": "1.57.0-next.1",
+    "@hoprnet/hopr-utils": "1.57.0-next.1",
     "bn.js": "^5.1.2",
     "chalk": "^4.1.0",
     "debug": "^4.1.1",
@@ -44,9 +44,9 @@
     "web3-eth-contract": "^1.2.11"
   },
   "devDependencies": {
-    "@hoprnet/hopr-core-connector-interface": "1.55.0-next.41",
-    "@hoprnet/hopr-demo-seeds": "1.55.0-next.41",
-    "@hoprnet/hopr-testing": "1.55.0-next.41",
+    "@hoprnet/hopr-core-connector-interface": "1.57.0-next.1",
+    "@hoprnet/hopr-demo-seeds": "1.57.0-next.1",
+    "@hoprnet/hopr-testing": "1.57.0-next.1",
     "@types/debug": "^4.1.5",
     "@types/keccak": "^3.0.1",
     "@types/levelup": "^4.3.0",
