@@ -77,14 +77,12 @@ jobs:
       - name: Stop bootstrap node to get the address from the database
         run: |
           gcloud compute ssh --zone=europe-west6-a ${{ env.GCLOUD_VM_NAME }} \
-          -- 'export DOCKER_IMAGE=gcr.io/hoprassociation/hoprd:${{ env.RELEASE_VERSION }} && \
-          docker stop $(docker ps -q --filter "ancestor=$DOCKER_IMAGE")'
+          -- 'export DOCKER_IMAGE=gcr.io/hoprassociation/hoprd:${{ env.RELEASE_VERSION }} && docker stop $(docker ps -q --filter "ancestor=$DOCKER_IMAGE")'
 
       - name: Get address from bootstrap docker container and write it into server
         run: |
           gcloud compute ssh --zone=europe-west6-a ${{ env.GCLOUD_VM_NAME }} \
-          -- "docker run -v $HOME:/root/tmp -v ${{ env.GCLOUD_VM_DISK }}:/app/db -it node:erbium-buster \
-          sh -c 'npm install --unsafe-perm=true -g @hoprnet/hoprd@v${{ env.RELEASE_VERSION }} && hoprd --data=\"/app/db/ethereum/testnet/bootstrap\" --password=\"${{ secrets.BS_PASSWORD }}\" --runAsBootstrap --run \"myAddress native\" > /root/tmp/address.txt'"
+          -- "docker run -v $HOME:/root/tmp -v ${{ env.GCLOUD_VM_DISK }}:/app/db -it node:erbium-buster sh -c 'npm install --unsafe-perm=true -g @hoprnet/hoprd@v${{ env.RELEASE_VERSION }} && hoprd --data=\"/app/db/ethereum/testnet/bootstrap\" --password=\"${{ secrets.BS_PASSWORD }}\" --runAsBootstrap --run \"myAddress native\" > /root/tmp/address.txt'"
 
       - name: Get address from server and store it as an env variable
         run: |
