@@ -1,0 +1,71 @@
+name: 'Continous Deployment'
+
+on:
+  push:
+    branches:
+      - cd/**
+
+jobs:
+  cd:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Get version from package.json
+        run: echo "RELEASE_VERSION=$(node -p -e "require('./packages/hoprd/package.json').version")" >> $GITHUB_ENV
+
+      - name: Setup Google Cloud Credentials
+        uses: GoogleCloudPlatform/github-actions/setup-gcloud@master
+        with:
+          version: '290.0.1'
+          service_account_key: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+          export_default_credentials: true
+
+      - name: Set Project for Google Cloud HOPR Association
+        run: gcloud config set project ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
+
+      - name: Update our environment with the RELEASE_ variables (NAME, IP)
+        run: GITHUB_REF=${{ github.ref }} bash scripts/cd/release_env.sh >> $GITHUB_ENV
+          
+      - name: Update our environment with the GCLOUD_ variables (UPDATE_CONTAINER, CREATE_CONTAINER)
+        run: RELEASE_NAME=${{ env.RELEASE_NAME }} bash scripts/cd/gcloud_env.sh
+        
+      - name: Verify environment variables
+        run: |
+          echo "Release Version: ${{ env.RELEASE_VERSION }}" &&
+          echo "Release IP: ${{ env.RELEASE_IP }}" &&
+          echo "Release Name: ${{ env.RELEASE_NAME }}" &&
+          echo "Gcloud Updating?: ${{ env.GCLOUD_UPDATE_CONTAINER }}"
+          
+      - name: Update bootstrap node with a new container image
+        if: env.GCLOUD_UPDATE_CONTAINER
+        run: |
+          gcloud compute instances update-container bootstrap-${{ env.RELEASE_NAME }} \
+            --zone=europe-west6-a \
+            --container-image=gcr.io/hoprassociation/hoprd:${{ env.RELEASE_VERSION }} \
+            --container-mount-disk name=bs-${{ env.RELEASE_NAME }},mount-path="/app/db"
+
+      - name: Create new bootstrap node with a given IP for a specific release
+        if: env.GCLOUD_CREATE_CONTAINER
+        run: |
+          gcloud compute instances create-with-container bootstrap-${{ env.RELEASE_NAME }} \
+            --zone=europe-west6-a \
+            --machine-type=e2-medium \
+            --network-interface=address=${{ env.RELEASE_IP }},network-tier=PREMIUM,subnet=default \
+            --metadata=google-logging-enabled=true --maintenance-policy=MIGRATE \
+            --create-disk name=bs-${{ env.RELEASE_NAME }},size=10GB,type=pd-ssd,mode=rw \
+            --container-mount-disk mount-path="/app/db" \
+            --tags=hopr-node,web-client,portainer \
+            --boot-disk-size=10GB --boot-disk-type=pd-standard \
+            --container-env=^,@^DEBUG=hopr\*,@NODE_OPTIONS=--max-old-space-size=4096 \
+            --container-image=gcr.io/hoprassociation/hoprd:${{ env.RELEASE_VERSION }} \
+            --container-arg="--password" --container-arg="${{ secrets.BS_PASSWORD }}" \
+            --container-arg="--env" --container-arg="matic" \
+            --container-arg="--init" --container-arg="true" \
+            --container-arg="--bootstrap" --container-arg="true" \
+            --container-arg="--admin" \
+            --container-restart-policy=always
