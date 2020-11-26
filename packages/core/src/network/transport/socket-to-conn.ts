@@ -1,5 +1,6 @@
 /// <reference path="../../@types/it-handshake.ts" />
 /// <reference path="../../@types/stream-to-it.ts" />
+/// <reference path="../../@types/libp2p-utils.ts" />
 
 import abortable from 'abortable-iterator'
 import debug from 'debug'

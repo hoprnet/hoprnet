@@ -1,3 +1,5 @@
+/// <reference path="../../@types/it-pair.ts" />
+
 import { durations, u8aConcat, u8aEquals } from '@hoprnet/hopr-utils'
 import { RELAY_PAYLOAD_PREFIX } from './constants'
 import { RelayContext } from './relayContext'
