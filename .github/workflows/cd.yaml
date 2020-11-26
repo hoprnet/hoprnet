@@ -119,7 +119,7 @@ jobs:
       - name: Fund bootstrap server address if account is empty
         if: env.BOOTSTRAP_ADDRESS_BALANCE == '0.0'
         run: |
-          ethers --rpc ${{ env.RPC_URL }} --account ${{ env.RAW_KEY }} send ${{ env.ADDRESS }} 0.01291
+          ethers --rpc ${{ env.RPC_URL }} --account ${{ env.RAW_KEY }} send ${{ env.ADDRESS }} 0.01291 --yes
         env:
           RAW_KEY: ${{ secrets.FUNDING_WALLET_PRIVATE_KEY }}
           RPC_URL: ${{ secrets.FUNDING_RPC_MATIC_URL }}
