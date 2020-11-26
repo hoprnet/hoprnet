@@ -40,11 +40,13 @@ jobs:
           echo "Release IP: ${{ env.RELEASE_IP }}" &&
           echo "Release Name: ${{ env.RELEASE_NAME }}" &&
           echo "Gcloud Updating?: ${{ env.GCLOUD_UPDATE_CONTAINER }}"
+          echo "Gcloud Create?: ${{ env.GCLOUD_CREATE_CONTAINER }}"
+          echo "Gcloud VM name: ${{ env.GCLOUD_VM_NAME }}"
           
       - name: Update bootstrap node with a new container image
         if: env.GCLOUD_UPDATE_CONTAINER
         run: |
-          gcloud compute instances update-container bootstrap-${{ env.RELEASE_NAME }} \
+          gcloud compute instances update-container ${{ env.GCLOUD_VM_NAME }} \
             --zone=europe-west6-a \
             --container-image=gcr.io/hoprassociation/hoprd:${{ env.RELEASE_VERSION }} \
             --container-mount-disk name=bs-${{ env.RELEASE_NAME }},mount-path="/app/db"
@@ -52,7 +54,7 @@ jobs:
       - name: Create new bootstrap node with a given IP for a specific release
         if: env.GCLOUD_CREATE_CONTAINER
         run: |
-          gcloud compute instances create-with-container bootstrap-${{ env.RELEASE_NAME }} \
+          gcloud compute instances create-with-container ${{ env.GCLOUD_VM_NAME }} \
             --zone=europe-west6-a \
             --machine-type=e2-medium \
             --network-interface=address=${{ env.RELEASE_IP }},network-tier=PREMIUM,subnet=default \
@@ -69,3 +71,26 @@ jobs:
             --container-arg="--bootstrap" --container-arg="true" \
             --container-arg="--admin" \
             --container-restart-policy=always
+
+      - name: Store disk name in our environment for further usage
+        run: echo "GCLOUD_VM_DISK=/mnt/disks/gce-containers-mounts/gce-persistent-disks/bs-${{ env.RELEASE_NAME }}" >> $GITHUB_ENV
+
+      - name: Stop bootstrap node to get the address from the database
+        run: |
+          gcloud compute ssh --zone=europe-west6-a ${{ env.GCLOUD_VM_NAME }} \
+          -- 'export DOCKER_IMAGE=gcr.io/hoprassociation/hoprd:${{ env.RELEASE_VERSION }} && \
+          docker stop $(docker ps -q --filter "ancestor=$DOCKER_IMAGE")'
+
+      - name: Get address from bootstrap docker container and write it into server
+        run: |
+          gcloud compute ssh --zone=europe-west6-a ${{ env.GCLOUD_VM_NAME }} \
+          -- "docker run -v $HOME:/root/tmp -v ${{ env.GCLOUD_VM_DISK }}:/app/db -it node:erbium-buster \
+          sh -c 'npm install --unsafe-perm=true -g @hoprnet/hoprd@v${{ env.RELEASE_VERSION }} && hoprd --data=\"/app/db/ethereum/testnet/bootstrap\" --password=\"${{ secrets.BS_PASSWORD }}\" --runAsBootstrap --run \"myAddress native\" > /root/tmp/address.txt'"
+
+      - name: Get address from server and store it as an env variable
+        run: |
+          echo "BOOTSTRAP_ADDRESS=$(gcloud compute ssh --zone=europe-west6-a ${{ env.GCLOUD_VM_NAME }} -- cat address.txt)" >> $GITHUB_ENV
+
+      - name: Verify bootstrap server address from previous step
+        run: |
+          echo "Bootstrap Server Address: ${{ env.BOOTSTRAP_ADDRESS }}"
