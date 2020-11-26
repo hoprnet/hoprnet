@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/chat-bot",
-  "version": "1.55.0-next.42",
+  "version": "1.55.0-next.43",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -28,10 +28,10 @@
     "yarn": "1"
   },
   "dependencies": {
-    "@hoprnet/hopr-core": "1.55.0-next.42",
-    "@hoprnet/hopr-core-connector-interface": "1.55.0-next.42",
-    "@hoprnet/hopr-core-ethereum": "1.55.0-next.42",
-    "@hoprnet/hopr-utils": "1.55.0-next.42",
+    "@hoprnet/hopr-core": "1.55.0-next.43",
+    "@hoprnet/hopr-core-connector-interface": "1.55.0-next.43",
+    "@hoprnet/hopr-core-ethereum": "1.55.0-next.43",
+    "@hoprnet/hopr-utils": "1.55.0-next.43",
     "@hoprnet/twitter-api-client": "^0.1.9",
     "@linkdrop/sdk": "1.1.6",
     "debug": "4.2.0",
