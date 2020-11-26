@@ -45,8 +45,9 @@ jobs:
           
       - name: Update bootstrap node with a new container image
         if: |
-          env.GCLOUD_ACTION_CONTAINER == 'update' &&
-          env.GCLOUD_VM_IMAGE != "gcr.io/hoprassociation/hoprd:$env.RELEASE_VERSION"
+          env.GCLOUD_ACTION_CONTAINER == 'update'
+          #@TODO: Avoid updating if the image is already the same.
+          #env.GCLOUD_VM_IMAGE != "gcr.io/hoprassociation/hoprd:$env.RELEASE_VERSION"
         run: |
           gcloud compute instances update-container ${{ env.GCLOUD_VM_NAME }} \
             --zone=europe-west6-a \
