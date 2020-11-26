@@ -44,7 +44,7 @@ jobs:
           echo "Gcloud VM image: ${{ env.GCLOUD_VM_IMAGE }}"
           
       - name: Update bootstrap node with a new container image
-        if: env.GCLOUD_ACTION_CONTAINER == 'update' && env.GCLOUD_VM_IMAGE != "gcr.io/hoprassociation/hoprd:${{ env.RELEASE_VERSION }}"
+        if: env.GCLOUD_ACTION_CONTAINER == 'update' && env.GCLOUD_VM_IMAGE != 'gcr.io/hoprassociation/hoprd:${{ env.RELEASE_VERSION }}'
         run: |
           gcloud compute instances update-container ${{ env.GCLOUD_VM_NAME }} \
             --zone=europe-west6-a \
@@ -82,7 +82,7 @@ jobs:
 
       - name: Get address from bootstrap docker container and write it into server
         run: |
-          export BOOTSTRAP_ADDRESS=$(gcloud compute ssh --zone=europe-west6-a ${{ env.GCLOUD_VM_NAME }} \
+          export BOOTSTRAP_ADDRESS=$(gcloud compute ssh --ssh-flag='-t' --zone=europe-west6-a ${{ env.GCLOUD_VM_NAME }} \
           -- "docker run -v $HOME:/root/tmp -v ${{ env.GCLOUD_VM_DISK }}:/app/db --entrypoint=node -it gcr.io/hoprassociation/hoprd:${{ env.RELEASE_VERSION }} index.js --data='/app/db/ethereum/testnet/bootstrap' --password='${{ secrets.BS_PASSWORD }}' --runAsBootstrap --run 'myAddress native'") &&
           echo "BOOTSTRAP_ADDRESS=$BOOTSTRAP_ADDRESS" >> $GITHUB_ENV
 
