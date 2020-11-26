@@ -81,7 +81,8 @@ jobs:
             --container-restart-policy=always
 
       - name: Wait for container to be restarted or created by konlet
-        run: sleep 1m
+        if: env.GCLOUD_ACTION_CONTAINER == 'create'
+        run: sleep 2m
 
       - name: Store disk name in our environment for further usage
         run: echo "GCLOUD_VM_DISK=/mnt/disks/gce-containers-mounts/gce-persistent-disks/bs-${{ env.RELEASE_NAME }}" >> $GITHUB_ENV
