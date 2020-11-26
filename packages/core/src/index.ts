@@ -96,7 +96,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
   public ticketWinProb: number = TICKET_WIN_PROB
 
   private running: boolean
-  private crawlTimeout: NodeJS.Timeout
+  private checkTimeout: NodeJS.Timeout
   private mixer: Mixer<Chain>
   private strategy: ChannelStrategy
   private network: Network
@@ -299,7 +299,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     log(`Available under the following addresses:`)
 
     this._libp2p.multiaddrs.forEach((ma: Multiaddr) => log(ma.toString()))
-    await this.periodicCheck()
+    this.periodicCheck()
     this.running = true
     return this
   }
@@ -311,7 +311,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     if (!this.running) {
       return Promise.resolve()
     }
-    clearTimeout(this.crawlTimeout)
+    clearTimeout(this.checkTimeout)
     this.running = false
     await Promise.all([this.network.stop(), this.paymentChannels?.stop().then(() => log(`Connector stopped.`))])
 
@@ -432,10 +432,14 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
 
   private async periodicCheck() {
     log('periodic check')
-    await this.tickChannelStrategy([])
-    let crawlInfo = await this.crawl()
-    this.emit('hopr:crawl:completed', crawlInfo)
-    this.crawlTimeout = setTimeout(() => this.periodicCheck(), CRAWL_TIMEOUT)
+    try {
+      await this.tickChannelStrategy([])
+      let crawlInfo = await this.crawl()
+      this.emit('hopr:crawl:completed', crawlInfo)
+    } catch (e) {
+      log('error in periodic check', e)
+    }
+    this.checkTimeout = setTimeout(() => this.periodicCheck(), CRAWL_TIMEOUT)
   }
 
   public setChannelStrategy(strategy: ChannelStrategyNames) {
