@@ -24,9 +24,10 @@ import {
 import { Network } from './network'
 import { findPath } from './path'
 
-import { addPubKey, getPeerId, getAddrs, getAcknowledgedTickets, submitAcknowledgedTicket } from './utils'
+import { addPubKey, getAcknowledgedTickets, submitAcknowledgedTicket } from './utils'
 import { createDirectoryIfNotExists, u8aToHex, pubKeyToPeerId } from '@hoprnet/hopr-utils'
 import { existsSync } from 'fs'
+import getIdentity from './identity'
 
 import levelup, { LevelUp } from 'levelup'
 import leveldown from 'leveldown'
@@ -155,8 +156,8 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
   ): Promise<Hopr<CoreConnector>> {
     const Connector = options.connector ?? HoprCoreEthereum
     const db = Hopr.openDatabase(options, Connector.constants.CHAIN_NAME, Connector.constants.NETWORK)
-    const id = await getPeerId(options, db)
-    const addresses = await getAddrs(id, options)
+
+    const { id, addresses } = await getIdentity(options)
 
     if (
       !options.debug &&
@@ -181,7 +182,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
         denyTTL: 1,
         denyAttempts: Infinity
       },
-      // The libp2p modules for this libp2p bundle
+      // libp2p modules
       modules: {
         transport: [TCP],
         streamMuxer: [MPLEX],
@@ -253,7 +254,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     const currentChannels = await this.getOpenChannels()
     const balance = await this.getBalance()
     const nextChannels = await this.strategy.tick(balance, newChannels, currentChannels, this.paymentChannels.indexer)
-    verbose(`${this.strategy} strategy wants to open`, nextChannels.length, 'new channels')
+    verbose(`${this.strategy[Symbol.toStringTag]} strategy wants to open`, nextChannels.length, 'new channels')
     for (let channelToOpen of nextChannels) {
       this.network.networkPeers.register(channelToOpen[0])
       try {

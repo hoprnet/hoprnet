@@ -1,23 +1,23 @@
-import { HoprOptions } from '../../'
+import type { HoprOptions } from '.'
 
-import { keys } from 'libp2p-crypto'
 import { LevelUp } from 'levelup'
-import chalk from 'chalk'
-import { deserializeKeyPair, serializeKeyPair, askForPassword, privKeyToPeerId } from '..'
+import { blue } from 'chalk'
+import { deserializeKeyPair, serializeKeyPair, askForPassword, privKeyToPeerId } from './utils'
 import debug from 'debug'
-const log = debug('hopr-core:peer-info')
+
+const log = debug('hopr-core:identity')
 
 import { NODE_SEEDS, BOOTSTRAP_SEEDS } from '@hoprnet/hopr-demo-seeds'
 
 import PeerId from 'peer-id'
 import Multiaddr from 'multiaddr'
 
-import { KeyPair } from '../../dbKeys'
+import { KeyPair } from './dbKeys'
 
 /**
  * Assemble the addresses that we are using
  */
-async function getAddrs(id: PeerId, options: HoprOptions): Promise<Multiaddr[]> {
+function getAddrs(id: PeerId, options: HoprOptions): Multiaddr[] {
   const addrs = []
 
   if (options.hosts === undefined || (options.hosts.ip4 === undefined && options.hosts.ip6 === undefined)) {
@@ -57,50 +57,71 @@ async function getAddrs(id: PeerId, options: HoprOptions): Promise<Multiaddr[]> 
   return addrs.map((addr: Multiaddr) => addr.encapsulate(`/p2p/${id.toB58String()}`))
 }
 
-/**
- * Checks whether we have gotten any peerId in through the options.
- */
-async function getPeerId(options: HoprOptions, db?: LevelUp): Promise<PeerId> {
+function getDebugId(options: HoprOptions): string {
+  let properId = options.id != null && isFinite(options.id)
+
+  let privKey: string
+
+  if (options.bootstrapNode) {
+    if (properId) {
+      if (options.id > BOOTSTRAP_SEEDS.length) {
+        throw Error(
+          `Unable to access bootstrap seed number ${options.id} out of ${BOOTSTRAP_SEEDS.length} bootstrap seeds.`
+        )
+      }
+      privKey = BOOTSTRAP_SEEDS[options.id]
+    }
+    privKey = BOOTSTRAP_SEEDS[0]
+  } else {
+    if (properId) {
+      if (options.id >= NODE_SEEDS.length) {
+        throw Error(`Unable to access node seed number ${options.id} out of ${NODE_SEEDS.length} node seeds.`)
+      }
+      privKey = NODE_SEEDS[options.id]
+    }
+  }
+
+  return privKey
+}
+
+async function getPeerId(options: HoprOptions): Promise<PeerId> {
   if (options.peerId != null && PeerId.isPeerId(options.peerId)) {
     return options.peerId
   }
 
-  if (options.debug) {
-    if (options.id != null && isFinite(options.id)) {
-      if (options.bootstrapNode) {
-        if (options.id >= BOOTSTRAP_SEEDS.length) {
-          throw Error(
-            `Unable to access bootstrap seed number ${options.id} out of ${BOOTSTRAP_SEEDS.length} bootstrap seeds.`
-          )
-        }
-        return await privKeyToPeerId(BOOTSTRAP_SEEDS[options.id])
-      } else {
-        if (options.id >= NODE_SEEDS.length) {
-          throw Error(`Unable to access node seed number ${options.id} out of ${NODE_SEEDS.length} node seeds.`)
-        }
-        return await privKeyToPeerId(NODE_SEEDS[options.id])
-      }
-    } else if (options.bootstrapNode) {
-      return await privKeyToPeerId(BOOTSTRAP_SEEDS[0])
-    }
-  } else if (options.id != null && isFinite(options.id)) {
+  if (options.id != null && isFinite(options.id) && !options.debug) {
     throw Error(`Demo Ids are only available in DEBUG_MODE. Consider setting DEBUG_MODE to 'true' in .env`)
   }
 
-  if (db == null) {
+  let privKey: Uint8Array | string
+
+  if (options.debug) {
+    privKey = getDebugId(options)
+
+    if (privKey != null) {
+      return privKeyToPeerId(privKey)
+    }
+
+    log(`Warning: Running in debug mode with keypair stored in database.`)
+  }
+
+  if (options.db == null) {
     throw Error('Cannot get/store any peerId without a database handle.')
   }
 
-  return getFromDatabase(db, options.password)
+  return getFromDatabase(options.db, options.password)
 }
 
 /**
  * Try to retrieve Id from database
+ * @param db database handle
+ * @param pw password to keypair decrypt
  */
 async function getFromDatabase(db: LevelUp, pw?: string): Promise<PeerId> {
   let serializedKeyPair: Uint8Array
+
   try {
-    serializedKeyPair = (await db.get(Buffer.from(KeyPair))) as Uint8Array
+    serializedKeyPair = await db.get(Buffer.from(KeyPair))
   } catch (err) {
     log('Error loading keys from db', err)
     // No identity in database
@@ -111,8 +132,7 @@ async function getFromDatabase(db: LevelUp, pw?: string): Promise<PeerId> {
 }
 
 async function recoverIdentity(serializedKeyPair: Uint8Array, pw?: string): Promise<PeerId> {
-  let peerId: PeerId | undefined
-  let done = false
+  let peerId: PeerId
 
   if (pw !== undefined) {
     try {
@@ -124,30 +144,37 @@ async function recoverIdentity(serializedKeyPair: Uint8Array, pw?: string): Prom
     }
   }
 
-  while (!done) {
+  while (true) {
     pw = await askForPassword('Please type in the password that was used to encrypt to key.')
 
     try {
       peerId = await deserializeKeyPair(serializedKeyPair, new TextEncoder().encode(pw))
-      done = true
+      break
     } catch {}
   }
 
-  log(`Successfully recovered ${chalk.blue((peerId as PeerId).toB58String())} from database.`)
+  log(`Successfully recovered ${blue(peerId.toB58String())} from database.`)
 
-  return peerId as PeerId
+  return peerId
 }
 
 async function createIdentity(db: LevelUp, pw?: string): Promise<PeerId> {
   pw = pw !== undefined ? pw : await askForPassword('Please type in a password to encrypt the secret key.')
 
-  const key = await keys.generateKeyPair('secp256k1', 256)
-  const peerId = await PeerId.createFromPrivKey(key.bytes)
+  const peerId = await PeerId.create({ keyType: 'secp256k1' })
 
   const serializedKeyPair = await serializeKeyPair(peerId, new TextEncoder().encode(pw))
+
   await db.put(Buffer.from(KeyPair), serializedKeyPair)
 
   return peerId
 }
 
-export { getPeerId, getAddrs }
+export default async function getIdentity(options: HoprOptions) {
+  let id = await getPeerId(options)
+
+  return {
+    id,
+    addresses: getAddrs(id, options)
+  }
+}
