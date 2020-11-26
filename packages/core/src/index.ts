@@ -290,17 +290,25 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
    */
   public async start(): Promise<Hopr<Chain>> {
     await Promise.all([
-      this._libp2p.start().then(() => Promise.all([this.connectToBootstrapServers(), this.network.start()])),
+      this._libp2p.start().then(() =>
+        Promise.all([
+          // prettier-ignore
+          this.connectToBootstrapServers(),
+          this.network.start()
+        ])
+      ),
       this.paymentChannels?.start()
     ])
 
     this.paymentChannels.indexer.onNewChannels((newChannels) => {
       this.tickChannelStrategy(newChannels)
     })
+
     log(`Available under the following addresses:`)
 
     this._libp2p.multiaddrs.forEach((ma: Multiaddr) => log(ma.toString()))
     await this.periodicCheck()
+
     this.running = true
     return this
   }
