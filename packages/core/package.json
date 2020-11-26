@@ -32,7 +32,6 @@
   },
   "dependencies": {
     "@hoprnet/hopr-core-ethereum": "1.55.0-next.41",
-    "@hoprnet/hopr-demo-seeds": "1.55.0-next.41",
     "@hoprnet/hopr-utils": "1.55.0-next.41",
     "abort-controller": "^3.0.0",
     "abortable-iterator": "^3.0.0",
@@ -66,6 +65,7 @@
   },
   "devDependencies": {
     "@hoprnet/hopr-core-connector-interface": "1.55.0-next.41",
+    "@hoprnet/hopr-demo-seeds": "1.55.0-next.41",
     "@hoprnet/hopr-ethereum": "1.55.0-next.41",
     "@hoprnet/hopr-testing": "1.55.0-next.41",
     "@types/bl": "^2.1.0",
