@@ -32,7 +32,7 @@ jobs:
         run: GITHUB_REF=${{ github.ref }} bash scripts/cd/release_env.sh >> $GITHUB_ENV
           
       - name: Update our environment with the GCLOUD_ variables (UPDATE_CONTAINER, CREATE_CONTAINER)
-        run: RELEASE_NAME=${{ env.RELEASE_NAME }} bash scripts/cd/gcloud_env.sh
+        run: RELEASE_NAME=${{ env.RELEASE_NAME }} bash scripts/cd/gcloud_env.sh >> $GITHUB_ENV
         
       - name: Verify environment variables
         run: |
