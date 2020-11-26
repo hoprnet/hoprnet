@@ -44,7 +44,9 @@ jobs:
           echo "Gcloud VM image: ${{ env.GCLOUD_VM_IMAGE }}"
           
       - name: Update bootstrap node with a new container image
-        if: env.GCLOUD_ACTION_CONTAINER == 'update' && env.GCLOUD_VM_IMAGE != 'gcr.io/hoprassociation/hoprd:${{ env.RELEASE_VERSION }}'
+        if: |
+          env.GCLOUD_ACTION_CONTAINER == 'update' &&
+          env.GCLOUD_VM_IMAGE != "gcr.io/hoprassociation/hoprd:$env.RELEASE_VERSION"
         run: |
           gcloud compute instances update-container ${{ env.GCLOUD_VM_NAME }} \
             --zone=europe-west6-a \
