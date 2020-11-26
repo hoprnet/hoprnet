@@ -44,10 +44,7 @@ jobs:
           echo "Gcloud VM image: ${{ env.GCLOUD_VM_IMAGE }}"
           
       - name: Update bootstrap node with a new container image
-        if: |
-          env.GCLOUD_ACTION_CONTAINER == 'update'
-          #@TODO: Avoid updating if the image is already the same.
-          #env.GCLOUD_VM_IMAGE != "gcr.io/hoprassociation/hoprd:$env.RELEASE_VERSION"
+        if: env.GCLOUD_ACTION_CONTAINER == 'update'
         run: |
           gcloud compute instances update-container ${{ env.GCLOUD_VM_NAME }} \
             --zone=europe-west6-a \
@@ -68,7 +65,7 @@ jobs:
             --boot-disk-size=10GB --boot-disk-type=pd-standard \
             --container-env=^,@^DEBUG=hopr\*,@NODE_OPTIONS=--max-old-space-size=4096 \
             --container-image=gcr.io/hoprassociation/hoprd:${{ env.RELEASE_VERSION }} \
-            --container-arg="--password" --container-arg="${{ secrets.BS_PASSWORD }}" \
+            --container-arg="--password" --container-arg="changeme" \
             --container-arg="--env" --container-arg="matic" \
             --container-arg="--init" --container-arg="true" \
             --container-arg="--bootstrap" --container-arg="true" \
@@ -86,7 +83,7 @@ jobs:
       - name: Get address from bootstrap docker container and write it into server
         run: |
           export BOOTSTRAP_ADDRESS=$(gcloud compute ssh --ssh-flag='-t' --zone=europe-west6-a ${{ env.GCLOUD_VM_NAME }} \
-          -- "docker run -v $HOME:/root/tmp -v ${{ env.GCLOUD_VM_DISK }}:/app/db --entrypoint=node -it gcr.io/hoprassociation/hoprd:${{ env.RELEASE_VERSION }} index.js --data='/app/db/ethereum/testnet/bootstrap' --password='${{ secrets.BS_PASSWORD }}' --runAsBootstrap --run 'myAddress native'") &&
+          -- "docker run -v $HOME:/root/tmp -v ${{ env.GCLOUD_VM_DISK }}:/app/db --entrypoint=node -it gcr.io/hoprassociation/hoprd:${{ env.RELEASE_VERSION }} index.js --data='/app/db/ethereum/testnet/bootstrap' --password='changeme' --runAsBootstrap --run 'myAddress native'") &&
           echo "BOOTSTRAP_ADDRESS=$BOOTSTRAP_ADDRESS" >> $GITHUB_ENV
 
       - name: Verify bootstrap server address from previous step
