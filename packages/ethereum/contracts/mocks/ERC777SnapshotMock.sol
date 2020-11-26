@@ -1,6 +1,5 @@
-pragma solidity ^0.6.0;
-
 // SPDX-License-Identifier: LGPL-3.0-only
+pragma solidity ^0.6.0;
 
 import "../ERC777/ERC777Snapshot.sol";
 

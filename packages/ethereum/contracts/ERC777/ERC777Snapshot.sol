@@ -1,6 +1,5 @@
-pragma solidity ^0.6.0;
-
 // SPDX-License-Identifier: LGPL-3.0-only
+pragma solidity ^0.6.0;
 
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/Arrays.sol";

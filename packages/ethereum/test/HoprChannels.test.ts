@@ -645,7 +645,7 @@ describe('HoprChannels', function () {
           u8aToHex(incorrectPubKey.slice(32, 64), true),
           secretHash
         ),
-        vmErrorMessage("HoprChannels: Given public key must match 'msg.sender'")
+        vmErrorMessage("Given public key must match 'msg.sender'")
       )
 
       const pubKey = secp256k1.publicKeyCreate(stringToU8a(partyBPrivKey), false).slice(1)
@@ -664,12 +664,12 @@ describe('HoprChannels', function () {
 
       await expectRevert(
         hoprChannels.init(u8aToHex(pubKey.slice(0, 32), true), u8aToHex(pubKey.slice(32, 64), true), secretHash),
-        vmErrorMessage('HoprChannels: Account must not be set')
+        vmErrorMessage('Account must not be set')
       )
 
       await expectRevert(
         hoprChannels.init(constants.ZERO_ADDRESS, u8aToHex(pubKey.slice(32, 64), true), secretHash),
-        vmErrorMessage('HoprChannels: first component of public key must not be zero')
+        vmErrorMessage('first component of public key must not be zero')
       )
 
       await expectRevert(
@@ -678,7 +678,7 @@ describe('HoprChannels', function () {
           u8aToHex(pubKey.slice(32, 64), true),
           constants.ZERO_ADDRESS
         ),
-        vmErrorMessage('HoprChannels: HashedSecret must not be empty')
+        vmErrorMessage('HashedSecret must not be empty')
       )
     })
 
@@ -694,7 +694,7 @@ describe('HoprChannels', function () {
         hoprChannels.setHashedSecret(secretHash, {
           from: partyB
         }),
-        vmErrorMessage('HoprChannels: msg.sender must have called init() before')
+        vmErrorMessage('msg.sender must have called init() before')
       )
 
       await hoprChannels.init(u8aToHex(pubKey.slice(0, 32), true), u8aToHex(pubKey.slice(32, 64), true), secretHash)
@@ -703,7 +703,7 @@ describe('HoprChannels', function () {
         hoprChannels.setHashedSecret(secretHash, {
           from: partyB
         }),
-        vmErrorMessage('HoprChannels: new and old hashedSecrets are the same')
+        vmErrorMessage('new and old hashedSecrets are the same')
       )
 
       const secretHash2 = keccak256({
@@ -905,7 +905,7 @@ describe('HoprChannels', function () {
           u8aToHex(ticket.s),
           ticket.v + 27
         ),
-        vmErrorMessage('HoprChannels: Given value is not a pre-image of the stored on-chain secret')
+        vmErrorMessage('Given value is not a pre-image of the stored on-chain secret')
       )
     })
 
@@ -956,7 +956,7 @@ describe('HoprChannels', function () {
         hoprChannels.openChannel(partyB, {
           from: partyA
         }),
-        vmErrorMessage(`HoprChannels: channel must be in 'FUNDED' state`)
+        vmErrorMessage(`channel must be in 'FUNDED' state`)
       )
     })
 
@@ -1189,7 +1189,7 @@ describe('HoprChannels', function () {
         hoprChannels.claimChannelClosure(partyB, {
           from: partyA
         }),
-        vmErrorMessage("HoprChannels: 'closureTime' has not passed")
+        vmErrorMessage("'closureTime' has not passed")
       )
     })
   })

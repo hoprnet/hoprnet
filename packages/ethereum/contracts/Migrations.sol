@@ -2,9 +2,8 @@
     Not used at the moment, keeping it here for the upcoming
     deployment refactor.
 */
-pragma solidity ^0.6.0;
-
 // SPDX-License-Identifier: LGPL-3.0-only
+pragma solidity ^0.6.0;
 
 contract Migrations {
     address public owner;
