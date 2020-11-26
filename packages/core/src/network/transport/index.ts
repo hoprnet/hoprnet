@@ -173,7 +173,7 @@ class TCP {
         return await this._dialDirectly(ma, options)
       } catch (err) {
         if (
-          (err.code != null && ['ECONNREFUSED', 'ECONNRESET', 'EPIPE', 'EHOSTUNREACH'].includes(err.code)) ||
+          (err.code != null && ['ECONNREFUSED', 'ECONNRESET', 'EPIPE', 'EHOSTUNREACH', 'ETIMEOUT'].includes(err.code)) ||
           err.type === 'aborted'
         ) {
           // expected case, continue

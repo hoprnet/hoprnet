@@ -90,6 +90,10 @@ class Stun {
   }
 
   getSocket() {
+    if (this.hosts === undefined) {
+      return dgram.createSocket({ type: 'udp4' })
+    }
+    
     if (this.hosts.ip4 !== undefined && this.hosts.ip6 !== undefined) {
       return dgram.createSocket({ type: 'udp6' })
     } else if (this.hosts.ip4 !== undefined) {
