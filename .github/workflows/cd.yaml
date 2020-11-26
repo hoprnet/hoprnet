@@ -76,11 +76,15 @@ jobs:
             --container-arg="--password" --container-arg="${{ secrets.BS_PASSWORD }}" \
             --container-arg="--env" --container-arg="matic" \
             --container-arg="--init" --container-arg="true" \
-            --container-arg="--bootstrap" --container-arg="true" \
+            --container-arg="--runAsBootstrap" --container-arg="true" \
             --container-arg="--admin" \
             --container-restart-policy=always
 
-      - name: Wait for container to be restarted or created by konlet
+      - name: Wait for container to be updated by konlet
+        if: env.GCLOUD_ACTION_CONTAINER == 'update'
+        run: sleep 30s
+
+      - name: Wait for container to be created by konlet
         if: env.GCLOUD_ACTION_CONTAINER == 'create'
         run: sleep 2m
 
