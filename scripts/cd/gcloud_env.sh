@@ -11,6 +11,7 @@ fi
 
 if [[ $(gcloud compute instances list | grep ${ENV}-bootstrap) ]]; then
   echo "GCLOUD_ACTION_CONTAINER=update"
+  echo "GCLOUD_VM_IMAGE=$(gcloud compute instances describe ${ENV}-bootstrap --zone=europe-west6-a --format='value[](metadata.items.gce-container-declaration)' | grep image | tr -s ' ' | cut -f3 -d' ')"
 else
   echo "GCLOUD_ACTION_CONTAINER=create"
 fi
