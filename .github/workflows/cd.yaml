@@ -88,7 +88,7 @@ jobs:
           gcloud compute ssh --zone=europe-west6-a ${{ env.GCLOUD_VM_NAME }} \
           -- 'export DOCKER_IMAGE=gcr.io/hoprassociation/hoprd:${{ env.RELEASE_VERSION }} && docker stop $(docker ps -q --filter "ancestor=$DOCKER_IMAGE")'
 
-      - name: Get address from bootstrap docker container and write it into server
+      - name: Get ethereum address from bootstrap docker container and save it
         run: |
           GCLOUD_VM_NAME=${{ env.GCLOUD_VM_NAME }} \
           GCLOUD_VM_DISK=${{ env.GCLOUD_VM_DISK }} \
@@ -137,5 +137,26 @@ jobs:
           RAW_KEY: ${{ secrets.FUNDING_WALLET_PRIVATE_KEY }}
           RPC_URL: ${{ secrets.FUNDING_RPC_MATIC_URL }}
           ADDRESS: ${{ env.BOOTSTRAP_ADDRESS }}
+      
+      - name: Get HOPR address from bootstrap docker container now that its funded
+        run: |
+          GCLOUD_VM_NAME=${{ env.GCLOUD_VM_NAME }} \
+          GCLOUD_VM_DISK=${{ env.GCLOUD_VM_DISK }} \
+          BS_PASSWORD="changeme" \
+          RELEASE_NAME=${{ env.RELEASE_NAME }} \
+          bash scripts/cd/hopr_env.sh >> $GITHUB_ENV
+
+      - name: Verify bootstrap server HOPR address from previous step
+        run: |
+          echo "Bootstrap Server HOPR Address: ${{ env.BOOTSTRAP_HOPR_ADDRESS }}"
+
+      - name: Restart bootstrap server container
+        run: |
+          gcloud compute ssh --zone=europe-west6-a ${{ env.GCLOUD_VM_NAME }} \
+          -- 'export DOCKER_IMAGE=gcr.io/hoprassociation/hoprd:${{ env.RELEASE_VERSION }} && docker restart $(docker ps -qa --filter "ancestor=$DOCKER_IMAGE")'
+
+      - name: Echo the bootstrap server multiaddress
+        run: |
+          echo "/${{ env.RELEASE_IP }}/tcp/9091/p2p/${{ env.BOOTSTRAP_HOPR_ADDRESS }}"
         
 
