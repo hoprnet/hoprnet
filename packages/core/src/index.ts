@@ -299,7 +299,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     log(`Available under the following addresses:`)
 
     this._libp2p.multiaddrs.forEach((ma: Multiaddr) => log(ma.toString()))
-    await this.periodicCheck()
+    this.periodicCheck()
     this.running = true
     return this
   }
