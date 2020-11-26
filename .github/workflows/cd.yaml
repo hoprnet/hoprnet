@@ -44,7 +44,7 @@ jobs:
 
       - name: Get latest images from the current bootstrap node
         if: env.GCLOUD_ACTION_CONTAINER == 'update'
-        run: echo "GCLOUD_VM_IMAGE=$(gcloud compute instances describe debug-bootstrap --format='value[](metadata.items.gce-container-declaration)' | grep image | tr -s ' ' | cut -f3 -d' ')" >> $GIHUB_ENV
+        run: echo "GCLOUD_VM_IMAGE=$(gcloud compute instances describe debug-bootstrap --zone=europe-west6-a --format='value[](metadata.items.gce-container-declaration)' | grep image | tr -s ' ' | cut -f3 -d' ')" >> $GIHUB_ENV
           
       - name: Update bootstrap node with a new container image
         if: env.GCLOUD_ACTION_CONTAINER == 'update' && env.GCLOUD_VM_IMAGE != "gcr.io/hoprassociation/hoprd:${{ env.RELEASE_VERSION }}"
