@@ -41,6 +41,8 @@ RUN yarn buildAdmin
 FROM node:12.9.1-buster AS runtime
 
 ENV NODE_ENV 'production'
+ENV NEXT_TELEMETRY_DISABLED 1
+
 WORKDIR /app
 
 # Server
