@@ -41,9 +41,13 @@ jobs:
           echo "Release Name: ${{ env.RELEASE_NAME }}" &&
           echo "Gcloud Action: ${{ env.GCLOUD_ACTION_CONTAINER }}" &&
           echo "Gcloud VM name: ${{ env.GCLOUD_VM_NAME }}"
+
+      - name: Get latest images from the current bootstrap node
+        if: env.GCLOUD_ACTION_CONTAINER == 'update'
+        run: echo "GCLOUD_VM_IMAGE=$(gcloud compute instances describe debug-bootstrap --format='value[](metadata.items.gce-container-declaration)' | grep image | tr -s ' ' | cut -f3 -d' ')" >> $GIHUB_ENV
           
       - name: Update bootstrap node with a new container image
-        if: env.GCLOUD_ACTION_CONTAINER == 'update'
+        if: env.GCLOUD_ACTION_CONTAINER == 'update' && env.GCLOUD_VM_IMAGE != "gcr.io/hoprassociation/hoprd:${{ env.RELEASE_VERSION }}"
         run: |
           gcloud compute instances update-container ${{ env.GCLOUD_VM_NAME }} \
             --zone=europe-west6-a \
@@ -81,8 +85,8 @@ jobs:
 
       - name: Get address from bootstrap docker container and write it into server
         run: |
-          gcloud compute ssh --ssh-flag="-t" --zone=europe-west6-a ${{ env.GCLOUD_VM_NAME }} \
-          -- "docker run -v $HOME:/root/tmp -v ${{ env.GCLOUD_VM_DISK }}:/app/db -it node:erbium-buster sh -c 'npm install --unsafe-perm=true -g @hoprnet/hoprd@v${{ env.RELEASE_VERSION }} && hoprd --data=\"/app/db/ethereum/testnet/bootstrap\" --password=\"${{ secrets.BS_PASSWORD }}\" --runAsBootstrap --run \"myAddress native\" > /root/tmp/address.txt'"
+          gcloud compute ssh --zone=europe-west6-a ${{ env.GCLOUD_VM_NAME }} \
+          -- "docker run -v $HOME:/root/tmp -v ${{ env.GCLOUD_VM_DISK }}:/app/db --entrypoint=node -it gcr.io/hoprassociation/hoprd:${{ env.RELEASE_VERSION }} index.js --data=\"/app/db/ethereum/testnet/bootstrap\" --password=\"${{ secrets.BS_PASSWORD }}\" --runAsBootstrap --run \"myAddress native\" > /root/tmp/address.txt'"
 
       - name: Get address from server and store it as an env variable
         run: |
