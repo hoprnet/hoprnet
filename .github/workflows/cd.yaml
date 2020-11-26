@@ -111,6 +111,31 @@ jobs:
 
       - name: Verify bootstrap server balance from previous step
         run: |
-          echo "Bootstrap Address Balance: ${{ env.BOOTSTRAP_ADDRESS_BALANCE }}"
+          echo "Bootstrap Address Balance: ${{ env.BOOTSTRAP_ADDRESS_BALANCE }}" &&
+          echo "BOOTSTRAP_ADDRESS_BALANCE=${{ env.BOOTSTRAP_ADDRESS_BALANCE }}" >> $GITHUB_ENV
         env:
           BOOTSTRAP_ADDRESS_BALANCE: ${{ steps.bootstrap_balance.outputs.bootstrap_balance }}
+
+      - name: Fund bootstrap server address if account is empty
+        if: env.BOOTSTRAP_ADDRESS_BALANCE == '0.0'
+        run: |
+          ethers --rpc ${{ env.RPC_URL }} --account ${{ env.RAW_KEY }} send ${{ env.ADDRESS }} 0.01291
+        env:
+          RAW_KEY: ${{ secrets.FUNDING_WALLET_PRIVATE_KEY }}
+          RPC_URL: ${{ secrets.FUNDING_RPC_MATIC_URL }}
+          ADDRESS: ${{ env.BOOTSTRAP_ADDRESS }}
+
+      - name: Wait for ethers transaction to go through
+        if: env.BOOTSTRAP_ADDRESS_BALANCE == '0.0'
+        run: sleep 1m
+
+      - name: Check bootstrap server balance one more time.
+        if: env.BOOTSTRAP_ADDRESS_BALANCE == '0.0'
+        run: |
+          echo "Balance: $(ethers --rpc ${{ env.RPC_URL }} --account ${{ env.RAW_KEY }} eval 'new ethers.providers.JsonRpcProvider("${{ env.RPC_URL }}").getBalance("${{ env.ADDRESS }}").then(b => formatEther(b))')"
+        env:
+          RAW_KEY: ${{ secrets.FUNDING_WALLET_PRIVATE_KEY }}
+          RPC_URL: ${{ secrets.FUNDING_RPC_MATIC_URL }}
+          ADDRESS: ${{ env.BOOTSTRAP_ADDRESS }}
+        
+
