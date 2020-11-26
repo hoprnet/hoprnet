@@ -14,6 +14,7 @@ import { LogStream } from './logs'
 import { AdminServer } from './admin'
 import * as yargs from 'yargs'
 
+
 /**
  * TEMPORARY HACK - copy pasted from
  * https://github.com/hoprnet/hopr-chat/blob/master/utils/checkPeerId.ts
