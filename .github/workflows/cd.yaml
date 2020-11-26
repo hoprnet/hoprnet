@@ -39,12 +39,11 @@ jobs:
           echo "Release Version: ${{ env.RELEASE_VERSION }}" &&
           echo "Release IP: ${{ env.RELEASE_IP }}" &&
           echo "Release Name: ${{ env.RELEASE_NAME }}" &&
-          echo "Gcloud Updating?: ${{ env.GCLOUD_UPDATE_CONTAINER }}"
-          echo "Gcloud Create?: ${{ env.GCLOUD_CREATE_CONTAINER }}"
+          echo "Gcloud Action: ${{ env.GCLOUD_ACTION_CONTAINER }}" &&
           echo "Gcloud VM name: ${{ env.GCLOUD_VM_NAME }}"
           
       - name: Update bootstrap node with a new container image
-        if: env.GCLOUD_UPDATE_CONTAINER
+        if: env.GCLOUD_ACTION_CONTAINER == update
         run: |
           gcloud compute instances update-container ${{ env.GCLOUD_VM_NAME }} \
             --zone=europe-west6-a \
@@ -52,7 +51,7 @@ jobs:
             --container-mount-disk name=bs-${{ env.RELEASE_NAME }},mount-path="/app/db"
 
       - name: Create new bootstrap node with a given IP for a specific release
-        if: env.GCLOUD_CREATE_CONTAINER
+        if: env.GCLOUD_ACTION_CONTAINER == create
         run: |
           gcloud compute instances create-with-container ${{ env.GCLOUD_VM_NAME }} \
             --zone=europe-west6-a \
