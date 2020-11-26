@@ -10,7 +10,7 @@ set -eu
 _GCLOUD_SSH_COMMAND="gcloud compute ssh --ssh-flag='-t' --zone=europe-west6-a $GCLOUD_VM_NAME"
 _DOCKER_ENTRYPOINT="docker run -v $GCLOUD_VM_DISK:/app/db --entrypoint=node"
 _DOCKER_IMAGE="-it gcr.io/hoprassociation/hoprd:$RELEASE_VERSION"
-_DOCKER_ARGUMENTS="index.js --data='/app/db' --password='$BS_PASSWORD' --runAsBootstrap --run 'myAddress native'"
+_DOCKER_ARGUMENTS="index.js --password='$BS_PASSWORD' --runAsBootstrap --run 'myAddress native'"
 
 BOOTSTRAP_ADDRESS_COMMAND="$_GCLOUD_SSH_COMMAND -- \"$_DOCKER_ENTRYPOINT $_DOCKER_IMAGE $_DOCKER_ARGUMENTS\""
 BOOTSTRAP_ADDRESS=$(eval $BOOTSTRAP_ADDRESS_COMMAND 2>&1 | grep -Eo "0x[a-fA-F0-9]{40}")

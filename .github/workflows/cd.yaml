@@ -73,12 +73,15 @@ jobs:
             --boot-disk-size=10GB --boot-disk-type=pd-standard \
             --container-env=^,@^DEBUG=hopr\*,@NODE_OPTIONS=--max-old-space-size=4096 \
             --container-image=gcr.io/hoprassociation/hoprd:${{ env.RELEASE_VERSION }} \
-            --container-arg="--password" --container-arg="changeme" \
+            --container-arg="--password" --container-arg="${{ secrets.BS_PASSWORD }}" \
             --container-arg="--env" --container-arg="matic" \
             --container-arg="--init" --container-arg="true" \
             --container-arg="--bootstrap" --container-arg="true" \
             --container-arg="--admin" \
             --container-restart-policy=always
+
+      - name: Wait for container to be restarted or created by konlet
+        run: sleep 1m
 
       - name: Store disk name in our environment for further usage
         run: echo "GCLOUD_VM_DISK=/mnt/disks/gce-containers-mounts/gce-persistent-disks/bs-${{ env.RELEASE_NAME }}" >> $GITHUB_ENV
@@ -92,7 +95,7 @@ jobs:
         run: |
           GCLOUD_VM_NAME=${{ env.GCLOUD_VM_NAME }} \
           GCLOUD_VM_DISK=${{ env.GCLOUD_VM_DISK }} \
-          BS_PASSWORD="changeme" \
+          BS_PASSWORD=${{ secrets.BS_PASSWORD }} \
           RELEASE_NAME=${{ env.RELEASE_NAME }} \
           bash scripts/cd/address_env.sh >> $GITHUB_ENV
 
@@ -142,7 +145,7 @@ jobs:
         run: |
           GCLOUD_VM_NAME=${{ env.GCLOUD_VM_NAME }} \
           GCLOUD_VM_DISK=${{ env.GCLOUD_VM_DISK }} \
-          BS_PASSWORD="changeme" \
+          BS_PASSWORD=${{ secrets.BS_PASSWORD }} \
           RELEASE_NAME=${{ env.RELEASE_NAME }} \
           bash scripts/cd/hopr_env.sh >> $GITHUB_ENV
 
