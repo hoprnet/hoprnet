@@ -150,10 +150,9 @@ jobs:
         run: |
           echo "Bootstrap Server HOPR Address: ${{ env.BOOTSTRAP_HOPR_ADDRESS }}"
 
-      - name: Restart bootstrap server container
+      - name: Restart bootstrap server virtual machine to restart main container
         run: |
-          gcloud compute ssh --zone=europe-west6-a ${{ env.GCLOUD_VM_NAME }} \
-          -- 'export DOCKER_IMAGE=gcr.io/hoprassociation/hoprd:${{ env.RELEASE_VERSION }} && docker restart $(docker ps -qa --filter "ancestor=$DOCKER_IMAGE")'
+          gcloud compute instances reset --zone=europe-west6-a ${{ env.GCLOUD_VM_NAME }}
 
       - name: Echo the bootstrap server multiaddress
         run: |
