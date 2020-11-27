@@ -31,8 +31,9 @@ export interface ChannelStrategy {
   // TBD: Pass quality information from networkPeers?
 }
 
-const logChannels = (c: ChannelsToOpen[]): string => c.map(x => x[0].toB58String() + ':' + x[1].toString()).join(', ')
-const logIndexerChannels = (c: IndexerChannel[]): string => c.map(x => x[1].toB58String() + ':' + x[2].toString()).join(', ')
+const logChannels = (c: ChannelsToOpen[]): string => c.map((x) => x[0].toB58String() + ':' + x[1].toString()).join(', ')
+const logIndexerChannels = (c: IndexerChannel[]): string =>
+  c.map((x) => x[1].toB58String() + ':' + x[2].toString()).join(', ')
 
 // Don't auto open any channels
 export class PassiveStrategy implements ChannelStrategy {
