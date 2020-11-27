@@ -29,7 +29,6 @@ export interface ChannelStrategy {
     indexer: Indexer
   ): Promise<ChannelsToOpen[]>
   // TBD: Include ChannelsToClose as well.
-  // TBD: Pass quality information from networkPeers?
 }
 
 const logChannels = (c: ChannelsToOpen[]): string => c.map((x) => x[0].toB58String() + ':' + x[1].toString()).join(', ')

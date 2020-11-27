@@ -6,7 +6,7 @@ import { Subscription } from 'web3-core-subscriptions'
 import { BlockHeader } from 'web3-eth'
 import { u8aToNumber, u8aConcat, u8aToHex, pubKeyToPeerId, randomChoice } from '@hoprnet/hopr-utils'
 import { ChannelEntry, Public, Balance } from '../types'
-import { Log, isPartyA, events, getId } from '../utils'
+import { Log, isPartyA, events, getId, pubKeyToAccountId } from '../utils'
 import { MAX_CONFIRMATIONS } from '../config'
 import { ContractEventLog } from '../tsc/web3/types'
 import { Log as OnChainLog } from 'web3-core'
@@ -88,7 +88,7 @@ class Indexer implements IIndexer {
 
   private async toIndexerChannel(source: PeerId, channel: Channel): Promise<IndexerChannel> {
     const sourcePubKey = new Public(source.pubKey.marshal())
-    const channelId = await getId(channel.partyA, channel.partyB)
+    const channelId = await getId(await pubKeyToAccountId(channel.partyA), await pubKeyToAccountId(channel.partyB))
     const state = await this.connector.hoprChannels.methods.channels(channelId.toHex()).call()
     if (sourcePubKey.eq(channel.partyA)) {
       return [source, await pubKeyToPeerId(channel.partyB), new Balance(state.partyABalance)]
