@@ -117,7 +117,7 @@ class Indexer implements IIndexer {
     let cout: IndexerChannel[] = []
     for (let channel of channels) {
       let directed = await this.toIndexerChannel(source, channel)
-      if (directed[2].gtn(0)){
+      if (directed[2].gtn(0)) {
         cout.push(directed)
       }
     }
