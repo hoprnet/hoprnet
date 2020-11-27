@@ -95,6 +95,7 @@ export class AdminServer {
     connectionReport(this.node, this.logs)
     reportMemoryUsage(this.logs)
 
+    this.cmds.execute(`alias ${node.getId().toB58String()} me`)
     if (node.bootstrapServers.length == 1) {
       this.cmds.execute(`alias ${node.bootstrapServers[0].getPeerId()} bootstrap`)
     } else {

@@ -5,6 +5,9 @@ import { Balance, Channel as ChannelType, Hash, Moment, Public, SignedChannel, T
 import TicketFactory from './ticket'
 import { ChannelStatus } from '../types/channel'
 import { hash } from '../utils'
+import debug from 'debug'
+
+const log = debug('hopr-ethereum:channel')
 
 import type HoprEthereum from '..'
 
@@ -21,7 +24,7 @@ class Channel implements IChannel {
     // check if channel still exists
     this.status.then((status) => {
       if (status === 'UNINITIALISED') {
-        this.coreConnector.log.log('found channel off-chain but its closed on-chain')
+        log('found channel off-chain but its closed on-chain')
         this.onClose()
       }
     })
