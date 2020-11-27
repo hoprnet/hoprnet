@@ -44,7 +44,7 @@ export default class TraverseChannels extends AbstractCommand {
   }
 
   public async execute(query: string): Promise<string> {
-    let maxDepth = 5
+    let maxDepth = 2
     if (parseInt(query.trim(), 10)) {
       maxDepth = parseInt(query, 10)
     }
