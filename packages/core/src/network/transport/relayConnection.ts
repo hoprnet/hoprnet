@@ -221,10 +221,12 @@ class RelayConnection implements MultiaddrConnection {
             error(`Received invalid status message ${u8aToHex(SUFFIX || new Uint8Array([]))}. Dropping message.`)
           }
         } else if (u8aEquals(PREFIX, RELAY_WEBRTC_PREFIX)) {
-          try {
-            this.webRTC?.signal(JSON.parse(new TextDecoder().decode(received.slice(1))))
-          } catch (err) {
-            error(`WebRTC error:`, err)
+          if (this.webRTC != null && !this.webRTC.destroyed) {
+            try {
+              this.webRTC.signal(JSON.parse(new TextDecoder().decode(received.slice(1))))
+            } catch (err) {
+              error(`WebRTC error:`, err)
+            }
           }
         } else {
           error(`Received invalid prefix <${u8aToHex(PREFIX || new Uint8Array([]))}. Dropping message.`)
@@ -308,14 +310,24 @@ class RelayConnection implements MultiaddrConnection {
     }
     this.webRTC.on('signal', onSignal)
 
-    this.webRTC.once('connect', () => {
+    const end = (err?: Error) => {
+      if (err) {
+        this.webRTC.removeListener('connect', end)
+        error(err)
+      } else {
+        this.webRTC.removeListener('error', end)
+      }
+
       done = true
       this.webRTC.removeListener('signal', onSignal)
       defer.resolve()
-    })
+    }
+
+    this.webRTC.once('connect', end)
+    this.webRTC.once('error', end)
 
     while (!done) {
-      while (webRTCmessages.length > 0) {
+      while (!done && webRTCmessages.length > 0) {
         yield webRTCmessages.shift()
       }
 
@@ -326,10 +338,6 @@ class RelayConnection implements MultiaddrConnection {
       waiting = true
 
       await defer.promise
-
-      if (done) {
-        break
-      }
     }
   }
 
