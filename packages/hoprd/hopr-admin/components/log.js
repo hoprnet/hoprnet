@@ -45,7 +45,7 @@ export function LogLine(props) {
       <time>{props.value.ts.slice(11)}</time>
       <pre>{msg}</pre>
       <div className={styles.loglineicons}>
-        {ids.map((x) => (
+        {ids.slice(0, 1).map((x) => (
           <Jazzicon key={x} diameter={15} address={x} />
         ))}
         &nbsp;

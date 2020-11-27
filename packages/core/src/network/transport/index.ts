@@ -2,6 +2,7 @@ import net from 'net'
 import { AbortError } from 'abortable-iterator'
 import type { Socket } from 'net'
 import mafmt from 'mafmt'
+// @ts-ignore
 import errCode from 'err-code'
 import debug from 'debug'
 import { socketToConn } from './socket-to-conn'
