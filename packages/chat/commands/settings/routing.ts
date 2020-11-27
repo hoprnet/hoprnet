@@ -4,7 +4,7 @@ import { styleValue, getOptions, checkPeerIdInput } from '../../utils'
 
 const ROUTING_PATH_PREFIX = 'path='
 
-export const options: ReadonlyArray<GlobalState['routing']> = ['manual', 'direct']
+export const options: ReadonlyArray<GlobalState['routing']> = ['manual', 'direct', 'auto']
 
 /**
  * Convert a query to a routing path

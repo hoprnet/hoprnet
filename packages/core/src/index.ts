@@ -445,10 +445,13 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
   public setChannelStrategy(strategy: ChannelStrategyNames) {
     if (strategy == 'PASSIVE') {
       this.strategy = new PassiveStrategy()
+      return
     }
     if (strategy == 'PROMISCUOUS') {
       this.strategy = new PromiscuousStrategy()
+      return
     }
+    throw new Error('Unknown strategy')
   }
 
   public async getBalance(): Promise<BN> {
