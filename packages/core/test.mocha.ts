@@ -9,7 +9,7 @@ export const mochaGlobalSetup = async () => {
 
   await compile()
   await migrate()
-  await fund(`--address ${addresses?.localhost?.HoprToken} --accounts-to-fund 4`)
+  await fund(`--address ${addresses?.localhost?.HoprToken} --accounts-to-fund 5`)
 }
 
 export const mochaGlobalTeardown = async () => {

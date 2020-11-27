@@ -7,77 +7,79 @@ import debug from 'debug'
 
 const log = debug('hopr-core:identity')
 
-import { NODE_SEEDS, BOOTSTRAP_SEEDS } from '@hoprnet/hopr-demo-seeds'
-
 import PeerId from 'peer-id'
 import Multiaddr from 'multiaddr'
 
 import { KeyPair } from './dbKeys'
 
+const DEFAULT_PORT = 9091
 /**
  * Assemble the addresses that we are using
  */
 function getAddrs(id: PeerId, options: HoprOptions): Multiaddr[] {
+  let properId = options.id != null && isFinite(options.id) && options.id >= 0
+
   const addrs = []
 
   if (options.hosts === undefined || (options.hosts.ip4 === undefined && options.hosts.ip6 === undefined)) {
-    let ip4Port = 9091
-    // ============================= Only for testing ============================================================
-    if (options.id != null && Number.isInteger(options.id)) {
-      ip4Port += (options.id + 1) * 2
-    }
-    // ===========================================================================================================
-    addrs.push(Multiaddr(`/ip4/0.0.0.0/tcp/${ip4Port}`))
+    let port = options.debug && properId ? DEFAULT_PORT + options.id : DEFAULT_PORT
+
+    addrs.push(Multiaddr(`/ip4/0.0.0.0/tcp/${port}`))
   }
 
   if (options.hosts !== undefined) {
     if (options.hosts.ip4 === undefined && options.hosts.ip6 === undefined) {
       throw Error(`Unable to detect to which interface we should listen`)
     }
+
     if (options.hosts.ip4 !== undefined) {
-      let ip4Port = options.hosts.ip4.port
-      // ============================= Only for testing ============================================================
-      if (options.id != null && Number.isInteger(options.id)) {
-        ip4Port += (options.id + 1) * 2
-      }
-      // ===========================================================================================================
+      let ip4Port = options.debug && properId ? options.hosts.ip4.port + options.id : options.hosts.ip4.port
+
       addrs.push(Multiaddr(`/ip4/${options.hosts.ip4.ip}/tcp/${ip4Port}`))
     }
 
     if (options.hosts.ip6 !== undefined) {
-      let ip6Port = options.hosts.ip6.port
-      // ============================= Only for testing ============================================================
-      if (options.id != null && Number.isInteger(options.id)) {
-        ip6Port += (options.id + 1) * 2
-      }
-      // ===========================================================================================================
+      let ip6Port = options.debug && properId ? options.hosts.ip6.port + options.id : options.hosts.ip6.port
+
       addrs.push(Multiaddr(`/ip6/${options.hosts.ip6.ip}/tcp/${ip6Port}`))
     }
   }
+
   return addrs.map((addr: Multiaddr) => addr.encapsulate(`/p2p/${id.toB58String()}`))
 }
 
-function getDebugId(options: HoprOptions): string {
+async function getDebugId(options: HoprOptions): Promise<string> {
   let properId = options.id != null && isFinite(options.id)
 
   let privKey: string
 
+  let seeds: {
+    BOOTSTRAP_SEEDS: string[]
+    NODE_SEEDS: string[]
+  }
+
+  try {
+    seeds = await import('@hoprnet/hopr-demo-seeds')
+  } catch (err) {
+    throw Error(`Cannot use demo secrets because devDependency module @hoprnet/hopr-demo-seeds is not installed.`)
+  }
+
   if (options.bootstrapNode) {
     if (properId) {
-      if (options.id > BOOTSTRAP_SEEDS.length) {
+      if (options.id > seeds.BOOTSTRAP_SEEDS.length) {
         throw Error(
-          `Unable to access bootstrap seed number ${options.id} out of ${BOOTSTRAP_SEEDS.length} bootstrap seeds.`
+          `Unable to access bootstrap seed number ${options.id} out of ${seeds.BOOTSTRAP_SEEDS.length} bootstrap seeds.`
         )
       }
-      privKey = BOOTSTRAP_SEEDS[options.id]
+      privKey = seeds.BOOTSTRAP_SEEDS[options.id]
     }
-    privKey = BOOTSTRAP_SEEDS[0]
+    privKey = seeds.BOOTSTRAP_SEEDS[0]
   } else {
     if (properId) {
-      if (options.id >= NODE_SEEDS.length) {
-        throw Error(`Unable to access node seed number ${options.id} out of ${NODE_SEEDS.length} node seeds.`)
+      if (options.id >= seeds.NODE_SEEDS.length) {
+        throw Error(`Unable to access node seed number ${options.id} out of ${seeds.NODE_SEEDS.length} node seeds.`)
       }
-      privKey = NODE_SEEDS[options.id]
+      privKey = seeds.NODE_SEEDS[options.id]
     }
   }
 
@@ -96,7 +98,7 @@ async function getPeerId(options: HoprOptions): Promise<PeerId> {
   let privKey: Uint8Array | string
 
   if (options.debug) {
-    privKey = getDebugId(options)
+    privKey = await getDebugId(options)
 
     if (privKey != null) {
       return privKeyToPeerId(privKey)
