@@ -2,15 +2,15 @@ import Heartbeat from './heartbeat'
 import NetworkPeerStore from './network-peers'
 import assert from 'assert'
 import { HEARTBEAT_REFRESH, NETWORK_QUALITY_THRESHOLD } from '../constants'
-// @ts-ignore
 import sinon from 'sinon'
 import { fakePeerId } from '../test-utils'
+import type PeerId from 'peer-id'
 
 describe('unit test heartbeat', async () => {
-  let heartbeat
+  let heartbeat: Heartbeat
   let hangUp = sinon.fake.resolves(undefined)
   let peers: NetworkPeerStore
-  let clock
+  let clock: any
 
   let interaction = {
     interact: sinon.fake.resolves(true)
@@ -48,7 +48,7 @@ describe('unit test heartbeat', async () => {
   })
 
   it('test heartbeat flow', async () => {
-    let generateMock = (i) => {
+    let generateMock = (i: string | number) => {
       let id = fakePeerId(i)
       let peers = new NetworkPeerStore([])
       let heartbeat = new Heartbeat(peers, interaction, hangUp)
@@ -58,7 +58,7 @@ describe('unit test heartbeat', async () => {
     let bob = generateMock(2)
     let chris = generateMock(3)
 
-    let dial = (source, dest) => {
+    let dial = (source: any, dest: any) => {
       source.peers.register(dest.id)
       dest.peers.register(source.id)
     }
@@ -79,8 +79,8 @@ describe('unit test heartbeat', async () => {
     assert(alice.peers.qualityOf(chris.id) > NETWORK_QUALITY_THRESHOLD, 'chris is high q')
 
     // Chris dies, alice heartbeats again
-    alice.interaction.interact = sinon.fake((id) => {
-      if (id === chris.id) {
+    alice.interaction.interact = sinon.fake((id: PeerId) => {
+      if (id.equals(chris.id)) {
         throw new Error('FAIL')
       }
       return Promise.resolve()

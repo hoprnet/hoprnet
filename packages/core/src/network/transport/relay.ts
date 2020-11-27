@@ -72,7 +72,7 @@ class Relay {
       let relayConnection = await this._tryPotentialRelay(potentialRelays[i], destination, onReconnect)
 
       if (relayConnection != null) {
-        return relayConnection
+        return relayConnection as RelayConnection
       }
     }
 
@@ -88,7 +88,7 @@ class Relay {
     destination: PeerId,
     onReconnect: (newStream: MultiaddrConnection, counterparty: PeerId) => Promise<void>,
     options?: DialOptions
-  ) {
+  ): Promise<RelayConnection | WebRTCConnection | void> {
     let relayConnection: Connection
     try {
       relayConnection = await this.connectToRelay(potentialRelay, options)
@@ -146,14 +146,19 @@ class Relay {
   async handleRelayConnection(
     conn: Handler,
     onReconnect: (newStream: MultiaddrConnection, counterparty: PeerId) => Promise<void>
-  ): Promise<MultiaddrConnection> {
-    const { stream, counterparty } = await this.handleHandshake(conn.stream)
+  ): Promise<MultiaddrConnection | void> {
+    const handShakeResult = await this.handleHandshake(conn.stream)
 
-    log(`incoming connection from ${counterparty.toB58String()}`)
-
-    if (stream == null) {
+    if (handShakeResult == null || (handShakeResult as { stream: Stream; counterparty: PeerId }).stream == null) {
       return
     }
+
+    log(
+      `incoming connection from ${(handShakeResult as {
+        stream: Stream
+        counterparty: PeerId
+      }).counterparty.toB58String()}`
+    )
 
     log(`counterparty relayed connection established`)
 
@@ -161,9 +166,9 @@ class Relay {
       let channel = this._webRTCUpgrader.upgradeInbound()
 
       let newConn = new RelayConnection({
-        stream,
+        stream: (handShakeResult as { stream: Stream; counterparty: PeerId }).stream,
         self: this._peerId,
-        counterparty,
+        counterparty: (handShakeResult as { stream: Stream; counterparty: PeerId }).counterparty,
         onReconnect,
         webRTC: channel,
         webRTCUpgradeInbound: this._webRTCUpgrader.upgradeInbound.bind(this._webRTCUpgrader)
@@ -172,15 +177,15 @@ class Relay {
       return new WebRTCConnection({
         conn: newConn,
         self: this._peerId,
-        counterparty,
+        counterparty: (handShakeResult as { stream: Stream; counterparty: PeerId }).counterparty,
         channel,
         iteration: newConn._iteration
       })
     } else {
       return new RelayConnection({
-        stream,
+        stream: (handShakeResult as { stream: Stream; counterparty: PeerId }).stream,
         self: this._peerId,
-        counterparty,
+        counterparty: (handShakeResult as { stream: Stream; counterparty: PeerId }).counterparty,
         onReconnect
       })
     }
@@ -251,7 +256,7 @@ class Relay {
     return shaker.stream
   }
 
-  private async handleHandshake(stream: Stream): Promise<{ stream: Stream; counterparty: PeerId }> {
+  private async handleHandshake(stream: Stream): Promise<{ stream: Stream; counterparty: PeerId } | void> {
     let shaker = handshake(stream)
 
     let pubKeySender: Uint8Array | undefined

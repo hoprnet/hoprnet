@@ -1,6 +1,7 @@
 import SimplePeer from 'simple-peer'
 import debug from 'debug'
 
+// @ts-ignore
 import wrtc = require('wrtc')
 import type Multiaddr from 'multiaddr'
 

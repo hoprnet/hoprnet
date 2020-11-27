@@ -1,6 +1,7 @@
 /// <reference path="./@types/libp2p.ts" />
 import LibP2P from 'libp2p'
 import type { Connection } from 'libp2p'
+// @ts-ignore
 import MPLEX = require('libp2p-mplex')
 // @ts-ignore
 import KadDHT = require('libp2p-kad-dht')
@@ -23,17 +24,15 @@ import {
 import { Network } from './network'
 import { findPath } from './path'
 
-import { addPubKey, getPeerId, getAddrs, getAcknowledgedTickets, submitAcknowledgedTicket } from './utils'
+import { addPubKey, getAcknowledgedTickets, submitAcknowledgedTicket } from './utils'
 import { createDirectoryIfNotExists, u8aToHex, pubKeyToPeerId } from '@hoprnet/hopr-utils'
 import { existsSync } from 'fs'
+import getIdentity from './identity'
 
 import levelup, { LevelUp } from 'levelup'
 import leveldown from 'leveldown'
 import Multiaddr from 'multiaddr'
 import chalk from 'chalk'
-
-import Debug from 'debug'
-const log = Debug(`hopr-core`)
 
 import PeerId from 'peer-id'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
@@ -49,6 +48,8 @@ import path from 'path'
 import { ChannelStrategy, PassiveStrategy, PromiscuousStrategy } from './channel-strategy'
 import { Mixer } from './mixer'
 
+import Debug from 'debug'
+const log = Debug(`hopr-core`)
 const verbose = Debug('hopr-core:verbose')
 
 interface NetOptions {
@@ -155,8 +156,11 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
   ): Promise<Hopr<CoreConnector>> {
     const Connector = options.connector ?? HoprCoreEthereum
     const db = Hopr.openDatabase(options, Connector.constants.CHAIN_NAME, Connector.constants.NETWORK)
-    const id = await getPeerId(options, db)
-    const addresses = await getAddrs(id, options)
+
+    const { id, addresses } = await getIdentity({
+      ...options,
+      db
+    })
 
     if (
       !options.debug &&
@@ -181,7 +185,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
         denyTTL: 1,
         denyAttempts: Infinity
       },
-      // The libp2p modules for this libp2p bundle
+      // libp2p modules
       modules: {
         transport: [TCP],
         streamMuxer: [MPLEX],
@@ -295,13 +299,20 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
    */
   public async start(): Promise<Hopr<Chain>> {
     await Promise.all([
-      this._libp2p.start().then(() => Promise.all([this.connectToBootstrapServers(), this.network.start()])),
+      this._libp2p.start().then(() =>
+        Promise.all([
+          // prettier-ignore
+          this.connectToBootstrapServers(),
+          this.network.start()
+        ])
+      ),
       this.paymentChannels?.start()
     ])
 
     this.paymentChannels.indexer.onNewChannels((newChannels) => {
       this.tickChannelStrategy(newChannels)
     })
+
     log(`Available under the following addresses:`)
 
     this._libp2p.multiaddrs.forEach((ma: Multiaddr) => log(ma.toString()))

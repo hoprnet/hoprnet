@@ -62,7 +62,7 @@ class Crawler {
     log(`Crawling started`)
     const isDone = () => contacted.size >= CRAWL_MAX_SIZE || queue.length == 0
 
-    const queryNode = async (abortSignal): Promise<void> => {
+    const queryNode = async (abortSignal: AbortSignal): Promise<void> => {
       let peer = queue.pop()[0]
       contacted.add(peer.toB58String())
       try {
@@ -126,7 +126,9 @@ class Crawler {
     return this.networkPeers
       .randomSubset(
         CRAWLING_RESPONSE_NODES,
-        (id: PeerId) => !id.equals(this.id) && !id.equals(this.stringToPeerId(callerAddress.getPeerId()))
+        (id: PeerId) =>
+          !id.equals(this.id) &&
+          (callerAddress.getPeerId() == null || !id.equals(this.stringToPeerId(callerAddress.getPeerId())))
       )
       .map(this.getPeer) // NB: Multiple addrs per peer.
       .flat()

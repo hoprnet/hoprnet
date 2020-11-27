@@ -32,7 +32,7 @@ class NetworkPeers {
     heap.heapify(this.peers, this.compareLastPing)
   }
 
-  public async pingOldest(interaction: (PeerID) => Promise<boolean>): Promise<void> {
+  public async pingOldest(interaction: (PeerID: PeerId) => Promise<boolean>): Promise<void> {
     const entry = heap.heappop(this.peers, this.compareLastPing)
     if (!entry) {
       return Promise.resolve()
@@ -97,6 +97,7 @@ class NetworkPeers {
     if (entry && entry.heartbeatsSent > 0) {
       return entry.heartbeatsSuccess / entry.heartbeatsSent
     }
+    // @TODO
     return 0.2 // Unknown // TBD
   }
 }

@@ -21,6 +21,8 @@ const indexerDest = (c: IndexerChannel): PeerId => c[1]
  *
  */
 export interface ChannelStrategy {
+  [Symbol.toStringTag]: string
+
   tick(
     balance: BN,
     newChannels: IndexerChannel[],
@@ -53,7 +55,9 @@ export class PromiscuousStrategy implements ChannelStrategy {
   ): Promise<ChannelsToOpen[]> {
     log('currently open', logIndexerChannels(currentChannels))
     let toOpen = []
+
     let i = 0
+
     while (balance.gtn(0) && i++ < MAX_NEW_CHANNELS_PER_TICK) {
       let randomChannel = await indexer.getRandomChannel()
       if (randomChannel === undefined) {
