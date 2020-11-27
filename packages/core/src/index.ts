@@ -157,7 +157,10 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     const Connector = options.connector ?? HoprCoreEthereum
     const db = Hopr.openDatabase(options, Connector.constants.CHAIN_NAME, Connector.constants.NETWORK)
 
-    const { id, addresses } = await getIdentity(options)
+    const { id, addresses } = await getIdentity({
+      ...options,
+      db
+    })
 
     if (
       !options.debug &&
