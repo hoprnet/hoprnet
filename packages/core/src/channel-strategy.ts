@@ -31,6 +31,9 @@ export interface ChannelStrategy {
   // TBD: Pass quality information from networkPeers?
 }
 
+const logChannels = (c: ChannelsToOpen[]): string => c.map(x => x[0].toB58String() + ':' + x[1].toString()).join(', ')
+const logIndexerChannels = (c: IndexerChannel[]): string => c.map(x => x[1].toB58String() + ':' + x[2].toString()).join(', ')
+
 // Don't auto open any channels
 export class PassiveStrategy implements ChannelStrategy {
   async tick(_balance: BN, _n, _c, _indexer: Indexer): Promise<ChannelsToOpen[]> {
@@ -41,7 +44,7 @@ export class PassiveStrategy implements ChannelStrategy {
 // Open channel to as many peers as possible
 export class PromiscuousStrategy implements ChannelStrategy {
   async tick(balance: BN, _n, currentChannels: IndexerChannel[], indexer: Indexer): Promise<ChannelsToOpen[]> {
-    log('currently open', currentChannels)
+    log('currently open', logIndexerChannels(currentChannels))
     let toOpen = []
     let i = 0
     while (balance.gtn(0) && i++ < MAX_NEW_CHANNELS_PER_TICK) {
@@ -57,7 +60,7 @@ export class PromiscuousStrategy implements ChannelStrategy {
         balance.isub(MINIMUM_REASONABLE_CHANNEL_STAKE)
       }
     }
-    log('Promiscuous toOpen:\n', toOpen.map((x) => x[0].toB58String() + ':' + x[1].toString()).join('\n-'))
+    log('Promiscuous toOpen: ', logChannels(toOpen))
     return toOpen
   }
 }
