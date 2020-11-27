@@ -92,8 +92,8 @@ export function socketToConn(
 
     timeline: { open: Date.now() },
 
-    close() {
-      if (socket.destroyed) return
+    close(): Promise<void> {
+      if (socket.destroyed) return Promise.resolve()
 
       return new Promise<void>((resolve, reject) => {
         const start = Date.now()

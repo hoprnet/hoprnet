@@ -142,7 +142,11 @@ class TCP {
     try {
       let relayConnection = await this._relay.handleRelayConnection(handler, this.onReconnect.bind(this))
 
-      newConn = await this._upgrader.upgradeInbound(relayConnection)
+      if (relayConnection == null) {
+        return
+      }
+
+      newConn = await this._upgrader.upgradeInbound(relayConnection as MultiaddrConnection)
     } catch (err) {
       error(`Could not upgrade relayed connection. Error was: ${err}`)
       return

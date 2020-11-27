@@ -40,26 +40,26 @@ class OnChainKey<Chain extends HoprCoreConnector> implements AbstractInteraction
       )
     }
 
-    return pipe(struct.stream, onReception)
-  }
-}
-
-async function onReception(source: any): Promise<Types.Public> {
-  let result: Uint8Array
-  for await (const msg of source) {
-    if (msg == null || msg.length == 0) {
-      throw Error(`received ${msg} but expected a public key`)
-    }
-
-    if (result != null) {
-      // ignore any further messages
-      continue
-    } else {
-      result = msg.slice()
-    }
+    return pipe(struct.stream, this.onReception.bind(this))
   }
 
-  return new this.node.paymentChannels.types.Public(result)
+  async onReception(source: any): Promise<Types.Public> {
+    let result: Uint8Array
+    for await (const msg of source) {
+      if (msg == null || msg.length == 0) {
+        throw Error(`received ${msg} but expected a public key`)
+      }
+  
+      if (result != null) {
+        // ignore any further messages
+        continue
+      } else {
+        result = msg.slice()
+      }
+    }
+  
+    return new this.node.paymentChannels.types.Public(result)
+  }
 }
 
 export { OnChainKey }
