@@ -141,7 +141,9 @@ class WebRTCConnection implements MultiaddrConnection {
           }
 
           if (this._webRTCStateKnown && !this._webRTCAvailable) {
-            console.log(`fallback to relayed connection`)
+            log(
+              `WebRTC upgrade failed. Falling back to a relayed connection with peer ${opts.counterparty.toB58String()}.`
+            )
 
             await sourcePromise
 
@@ -186,7 +188,6 @@ class WebRTCConnection implements MultiaddrConnection {
                 if (this.channel.connected && this._iteration == (this.conn as RelayConnection)._iteration) {
                   yield (result.value as Uint8Array).slice()
                 } else {
-                  console.log(`break`)
                   break
                 }
               }

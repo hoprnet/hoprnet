@@ -7,7 +7,7 @@ declare module 'it-handshake' {
     }
     writer: {
       end(): void
-      push(msg: Uint8Array)
+      push(msg: Uint8Array): void
     }
     stream: Stream
     rest(): void

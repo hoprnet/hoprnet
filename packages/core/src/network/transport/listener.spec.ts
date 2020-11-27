@@ -1,7 +1,7 @@
 import assert from 'assert'
 import Listener from './listener'
 import Multiaddr from 'multiaddr'
-import { Upgrader } from 'libp2p'
+import type { MultiaddrConnection, Upgrader } from 'libp2p'
 import type { Connection } from 'libp2p'
 import dgram, { Socket, RemoteInfo } from 'dgram'
 import { handleStunRequest } from './stun'
@@ -85,7 +85,7 @@ describe('transport/listener.spec check listening to sockets', function () {
             msgReceived[index].received.resolve()
           },
           ({
-            upgradeInbound: async (conn) => conn
+            upgradeInbound: async (conn: MultiaddrConnection) => conn
           } as unknown) as Upgrader,
           stunServers
         )

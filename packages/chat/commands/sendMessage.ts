@@ -70,9 +70,9 @@ export class SendMessage extends SendMessageBase {
       // manual mode
       if (state.routing === 'manual' && state.routingPath.length === 0) {
         throw Error('Cannot send a message using manual mode, please specify path.')
-      }
-      // direct mode
-      else if (state.routing === 'direct') {
+      } else if (state.routing === 'auto') {
+        return this.sendMessage(state, peerId, message)
+      } else if (state.routing === 'direct') {
         return this.sendMessage(state, peerId, message, async () => [])
       }
       // peerIds are specified in `state.routing`

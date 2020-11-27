@@ -1,11 +1,12 @@
 /// <reference path="../../@types/it-handshake.ts" />
 /// <reference path="../../@types/stream-to-it.ts" />
+/// <reference path="../../@types/libp2p-utils.ts" />
 
 import abortable from 'abortable-iterator'
 import debug from 'debug'
 import toIterable from 'stream-to-it'
 
-import toMultiaddr = require('libp2p-utils/src/ip-port-to-multiaddr')
+import toMultiaddr from 'libp2p-utils/src/ip-port-to-multiaddr'
 
 import { MultiaddrConnection, Stream } from 'libp2p'
 import type Multiaddr from 'multiaddr'
@@ -91,8 +92,8 @@ export function socketToConn(
 
     timeline: { open: Date.now() },
 
-    close() {
-      if (socket.destroyed) return
+    close(): Promise<void> {
+      if (socket.destroyed) return Promise.resolve()
 
       return new Promise<void>((resolve, reject) => {
         const start = Date.now()

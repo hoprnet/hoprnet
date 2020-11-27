@@ -7,7 +7,7 @@ import { NODE_SEEDS } from '@hoprnet/hopr-demo-seeds'
 import Multiaddr from 'multiaddr'
 
 describe('test hopr-core', function () {
-  let node
+  let node: Hopr<any>
 
   afterEach(async function () {
     await node.stop()
