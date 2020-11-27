@@ -252,7 +252,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     }
     const currentChannels = await this.getOpenChannels()
     const balance = await this.getBalance()
-    const nextChannels = await this.strategy.tick(balance, newChannels, currentChannels, this.paymentChannels.indexer)
+    const nextChannels = await this.strategy.tick(balance, newChannels, currentChannels, this.network.networkPeers.qualityOf.bind(this.network.networkPeers), this.paymentChannels.indexer)
     verbose(`strategy wants to open`, nextChannels.length, 'new channels')
     for (let channelToOpen of nextChannels) {
       this.network.networkPeers.register(channelToOpen[0])
