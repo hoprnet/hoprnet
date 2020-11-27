@@ -17,7 +17,7 @@ export default class TraverseChannels extends AbstractCommand {
   }
 
   private async iter(depth: number, maxDepth: number, id: PeerID, prev: string, parent: string): Promise<string> {
-    if (depth > maxDepth) {
+    if (depth >= maxDepth) {
       return `\n${prev}...`
     }
     const chans = await this.node.paymentChannels.indexer.getChannelsFromPeer(id)
