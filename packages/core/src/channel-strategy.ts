@@ -25,7 +25,7 @@ export interface ChannelStrategy {
     balance: BN,
     newChannels: IndexerChannel[],
     currentChannels: IndexerChannel[],
-    qualityOf: (p: PeerId) => Number, 
+    qualityOf: (p: PeerId) => Number,
     indexer: Indexer
   ): Promise<ChannelsToOpen[]>
   // TBD: Include ChannelsToClose as well.
@@ -45,7 +45,13 @@ export class PassiveStrategy implements ChannelStrategy {
 
 // Open channel to as many peers as possible
 export class PromiscuousStrategy implements ChannelStrategy {
-  async tick(balance: BN, _n, currentChannels: IndexerChannel[], qualityOf, indexer: Indexer): Promise<ChannelsToOpen[]> {
+  async tick(
+    balance: BN,
+    _n,
+    currentChannels: IndexerChannel[],
+    qualityOf,
+    indexer: Indexer
+  ): Promise<ChannelsToOpen[]> {
     log('currently open', logIndexerChannels(currentChannels))
     let toOpen = []
     let i = 0
