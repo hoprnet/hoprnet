@@ -21,6 +21,8 @@ const indexerDest = (c: IndexerChannel): PeerId => c[1]
  *
  */
 export interface ChannelStrategy {
+  [Symbol.toStringTag]: string
+
   tick(
     balance: BN,
     newChannels: IndexerChannel[],
@@ -33,17 +35,31 @@ export interface ChannelStrategy {
 
 // Don't auto open any channels
 export class PassiveStrategy implements ChannelStrategy {
-  async tick(_balance: BN, _n, _c, _indexer: Indexer): Promise<ChannelsToOpen[]> {
+  get [Symbol.toStringTag]() {
+    return 'PassiveStrategy'
+  }
+
+  async tick(_balance: BN, _n: IndexerChannel[], _c: IndexerChannel[], _indexer: Indexer): Promise<ChannelsToOpen[]> {
     return []
   }
 }
 
 // Open channel to as many peers as possible
 export class PromiscuousStrategy implements ChannelStrategy {
-  async tick(balance: BN, _n, currentChannels: IndexerChannel[], indexer: Indexer): Promise<ChannelsToOpen[]> {
+  get [Symbol.toStringTag]() {
+    return 'PromiscuousStrategy'
+  }
+
+  async tick(
+    balance: BN,
+    _n: IndexerChannel[],
+    currentChannels: IndexerChannel[],
+    indexer: Indexer
+  ): Promise<ChannelsToOpen[]> {
     log('currently open', currentChannels)
-    let toOpen = []
+    let toOpen: [peer: PeerId, stake: BN][] = []
     let i = 0
+
     while (balance.gtn(0) && i++ < MAX_NEW_CHANNELS_PER_TICK) {
       let randomChannel = await indexer.getRandomChannel()
       if (randomChannel === undefined) {

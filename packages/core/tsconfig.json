@@ -1,6 +1,10 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
+    "noImplicitReturns": true,
+    "noImplicitThis": true,
+    "strictBindCallApply": true,
+    "noImplicitAny": true,
     "outDir": "lib"
   },
   "exclude": ["lib", "node_modules"],
