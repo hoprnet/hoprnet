@@ -308,14 +308,24 @@ class RelayConnection implements MultiaddrConnection {
     }
     this.webRTC.on('signal', onSignal)
 
-    this.webRTC.once('connect', () => {
+    const end = (err?: Error) => {
+      if (err) {
+        this.webRTC.removeListener('connect', end)
+        error(err)
+      } else {
+        this.webRTC.removeListener('error', end)
+      }
+
       done = true
       this.webRTC.removeListener('signal', onSignal)
       defer.resolve()
-    })
+    }
+
+    this.webRTC.once('connect', end)
+    this.webRTC.once('error', end)
 
     while (!done) {
-      while (webRTCmessages.length > 0) {
+      while (!done && webRTCmessages.length > 0) {
         yield webRTCmessages.shift()
       }
 
@@ -326,10 +336,6 @@ class RelayConnection implements MultiaddrConnection {
       waiting = true
 
       await defer.promise
-
-      if (done) {
-        break
-      }
     }
   }
 
