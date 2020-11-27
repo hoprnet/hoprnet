@@ -17,10 +17,10 @@ export class SetStrategy extends AbstractCommand {
 
   async execute(query: string): Promise<string> {
     try {
-      this.node.setChannelStrategy(query as any) 
-      return "Strategy was set"
+      this.node.setChannelStrategy(query as any)
+      return 'Strategy was set'
     } catch {
-      return "Could not set strategy. Try PASSIVE or PROMISCUOUS"
+      return 'Could not set strategy. Try PASSIVE or PROMISCUOUS'
     }
   }
 }
