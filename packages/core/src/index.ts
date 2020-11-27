@@ -256,8 +256,14 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     }
     const currentChannels = await this.getOpenChannels()
     const balance = await this.getBalance()
-    const nextChannels = await this.strategy.tick(balance, newChannels, currentChannels, this.paymentChannels.indexer)
-    verbose(`${this.strategy[Symbol.toStringTag]} strategy wants to open`, nextChannels.length, 'new channels')
+    const nextChannels = await this.strategy.tick(
+      balance,
+      newChannels,
+      currentChannels,
+      this.network.networkPeers.qualityOf.bind(this.network.networkPeers),
+      this.paymentChannels.indexer
+    )
+    verbose(`strategy wants to open`, nextChannels.length, 'new channels')
     for (let channelToOpen of nextChannels) {
       this.network.networkPeers.register(channelToOpen[0])
       try {
@@ -456,10 +462,13 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
   public setChannelStrategy(strategy: ChannelStrategyNames) {
     if (strategy == 'PASSIVE') {
       this.strategy = new PassiveStrategy()
+      return
     }
     if (strategy == 'PROMISCUOUS') {
       this.strategy = new PromiscuousStrategy()
+      return
     }
+    throw new Error('Unknown strategy')
   }
 
   public async getBalance(): Promise<BN> {

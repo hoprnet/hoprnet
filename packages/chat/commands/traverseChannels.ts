@@ -17,8 +17,8 @@ export default class TraverseChannels extends AbstractCommand {
   }
 
   private async iter(depth: number, maxDepth: number, id: PeerID, prev: string, parent: string): Promise<string> {
-    if (depth > maxDepth) {
-      return `\n${prev}...`
+    if (depth >= maxDepth) {
+      return ''
     }
     const chans = await this.node.paymentChannels.indexer.getChannelsFromPeer(id)
     if (chans.length == 0) {
@@ -30,13 +30,17 @@ export default class TraverseChannels extends AbstractCommand {
         if (peerId.toB58String() === parent) {
           out += `\n${prev} - ${id.toB58String()} - [${weight}, BIDIRECTIONAL]`
         } else {
-          out += await this.iter(
-            depth + 1,
-            maxDepth,
-            peerId,
-            `\n${prev} - ${id.toB58String()} - [${weight}]`,
-            id.toB58String()
-          )
+          if (depth + 1 < maxDepth) {
+            out += await this.iter(
+              depth + 1,
+              maxDepth,
+              peerId,
+              `\n${prev} - ${id.toB58String()} - [${weight}]`,
+              id.toB58String()
+            )
+          } else {
+            out += `\n${prev} - ${id.toB58String()} - [${weight}] - ${peerId.toB58String()}...`
+          }
         }
       }
       return out
@@ -44,7 +48,7 @@ export default class TraverseChannels extends AbstractCommand {
   }
 
   public async execute(query: string): Promise<string> {
-    let maxDepth = 5
+    let maxDepth = 2
     if (parseInt(query.trim(), 10)) {
       maxDepth = parseInt(query, 10)
     }
