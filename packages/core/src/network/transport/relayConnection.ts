@@ -221,10 +221,12 @@ class RelayConnection implements MultiaddrConnection {
             error(`Received invalid status message ${u8aToHex(SUFFIX || new Uint8Array([]))}. Dropping message.`)
           }
         } else if (u8aEquals(PREFIX, RELAY_WEBRTC_PREFIX)) {
-          try {
-            this.webRTC?.signal(JSON.parse(new TextDecoder().decode(received.slice(1))))
-          } catch (err) {
-            error(`WebRTC error:`, err)
+          if (this.webRTC != null && !this.webRTC.destroyed) {
+            try {
+              this.webRTC.signal(JSON.parse(new TextDecoder().decode(received.slice(1))))
+            } catch (err) {
+              error(`WebRTC error:`, err)
+            }
           }
         } else {
           error(`Received invalid prefix <${u8aToHex(PREFIX || new Uint8Array([]))}. Dropping message.`)
