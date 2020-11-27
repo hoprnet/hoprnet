@@ -49,7 +49,7 @@ class OnChainKey<Chain extends HoprCoreConnector> implements AbstractInteraction
       if (msg == null || msg.length == 0) {
         throw Error(`received ${msg} but expected a public key`)
       }
-  
+
       if (result != null) {
         // ignore any further messages
         continue
@@ -57,7 +57,7 @@ class OnChainKey<Chain extends HoprCoreConnector> implements AbstractInteraction
         result = msg.slice()
       }
     }
-  
+
     return new this.node.paymentChannels.types.Public(result)
   }
 }
