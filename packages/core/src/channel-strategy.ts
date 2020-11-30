@@ -37,7 +37,13 @@ const logIndexerChannels = (c: IndexerChannel[]): string =>
 
 // Don't auto open any channels
 export class PassiveStrategy implements ChannelStrategy {
-  async tick(_balance: BN, _n: IndexerChannel[], _c: IndexerChannel[], _q:(p: PeerId) => Number, _indexer: Indexer): Promise<ChannelsToOpen[]> {
+  async tick(
+    _balance: BN,
+    _n: IndexerChannel[],
+    _c: IndexerChannel[],
+    _q: (p: PeerId) => Number,
+    _indexer: Indexer
+  ): Promise<ChannelsToOpen[]> {
     return []
   }
 }

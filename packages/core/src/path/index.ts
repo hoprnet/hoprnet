@@ -45,7 +45,7 @@ export async function findPath(
     return stake(edge).addn(1).muln(r) //log()
   }
 
-  const compareWeight = (a: Edge, b: Edge) => weight(b).gte(weight(a)) ? 1 : -1
+  const compareWeight = (a: Edge, b: Edge) => (weight(b).gte(weight(a)) ? 1 : -1)
 
   // Weight the path with the sum of its' edges weight
   const pathWeight = (a: ChannelPath): BN => a.map(weight).reduce(sum, new BN(0))
@@ -74,7 +74,7 @@ export async function findPath(
           networkPeers.qualityOf(next(c)) > NETWORK_QUALITY_THRESHOLD &&
           filterCycles(c, currentPath) &&
           !deadEnds.has(next(c).toB58String())
-       )
+      )
       .sort(compareWeight)
 
     if (newChannels.length == 0) {
