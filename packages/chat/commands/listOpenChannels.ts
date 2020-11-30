@@ -104,6 +104,10 @@ export default class ListOpenChannels extends AbstractCommand {
             balance_a
           }))
 
+          const status = channelData.status
+          // do not print UNINITIALISED channels
+          if (status === 'UNINITIALISED') continue
+
           const selfIsPartyA = utils.isPartyA(self, counterParty)
           const totalBalance = moveDecimalPoint(channelData.balance.toString(), types.Balance.DECIMALS * -1)
           const myBalance = moveDecimalPoint(
@@ -111,7 +115,6 @@ export default class ListOpenChannels extends AbstractCommand {
             types.Balance.DECIMALS * -1
           )
           const peerId = (await pubKeyToPeerId(channelData.offChainCounterparty)).toB58String()
-          const status = channelData.status
 
           result.push(
             this.generateOutput({
