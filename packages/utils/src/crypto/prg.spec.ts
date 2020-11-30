@@ -19,7 +19,10 @@ describe('Test Pseudo-Random Generator', async function () {
     const start = randomInteger(0, 250)
     const secondSlice = prg.digest(start, start + length)
     assert(secondSlice.length == length, `check size`)
-    assert(u8aEquals(secondSlice, digest.slice(start, start + length)), `check that slice somewhere in the middle is the same`)
+    assert(
+      u8aEquals(secondSlice, digest.slice(start, start + length)),
+      `check that slice somewhere in the middle is the same`
+    )
     assert(
       u8aEquals(PRG.createPRG(key, iv).digest(start, start + length), prg.digest(start, start + length)),
       `check that slice somewhere in the middle is the same when computed by different methods`
