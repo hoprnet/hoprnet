@@ -10,7 +10,7 @@ export async function limitConcurrency<T>(
   while (!exitCond() && i++ < maxIterations) {
     const p = createPromise()
     ret.push(p)
-    const e = p.then(() => executing.splice(executing.indexOf(e), 1))
+    const e: Promise<void> = p.then(() => executing.splice(executing.indexOf(e), 1)[0])
     executing.push(e)
     if (executing.length >= maxConcurrency) {
       await Promise.race(executing)
