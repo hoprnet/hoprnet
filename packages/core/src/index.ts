@@ -586,7 +586,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     if (options.dbPath) {
       dbPath = options.dbPath
     } else {
-      dbPath = `${process.cwd()}/db/${chainName}/${network}/`
+      dbPath = path.join(process.cwd(), 'db', chainName, network)
       if (options.bootstrapNode) {
         dbPath += `bootstrap`
       } else if (options.id != null && Number.isInteger(options.id)) {
