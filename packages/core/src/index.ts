@@ -25,8 +25,8 @@ import { Network } from './network'
 import { findPath } from './path'
 
 import { addPubKey, getAcknowledgedTickets, submitAcknowledgedTicket } from './utils'
-import { createDirectoryIfNotExists, u8aToHex, pubKeyToPeerId } from '@hoprnet/hopr-utils'
-import { existsSync } from 'fs'
+import { u8aToHex, pubKeyToPeerId } from '@hoprnet/hopr-utils'
+import { existsSync, mkdirSync } from 'fs'
 import getIdentity from './identity'
 
 import levelup, { LevelUp } from 'levelup'
@@ -604,7 +604,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     if (!existsSync(dbPath)) {
       verbose('db does not exist, creating?:', options.createDbIfNotExist)
       if (options.createDbIfNotExist) {
-        createDirectoryIfNotExists(dbPath)
+        mkdirSync(dbPath, { recursive: true })
       } else {
         throw new Error('Database does not exist: ' + dbPath)
       }
