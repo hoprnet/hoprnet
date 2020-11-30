@@ -15,4 +15,3 @@ To help us test HOPR, the HOPR Association team frequently runs **incentivized t
 The HOPR Association team also produces release checklists, where we provide a performance breakdown of each version for basic tasks as executed by team members, ambassadors, and/or other members of the community. The goal is to provide a trail of features that have been proven to work at particular points in time, to avoid functional regressions which standard unit or integration tests cannot pick up. As these tests are conducted by different individuals in various settings, we can identify unexpected behaviour for every minor release.
 
 {% embed url="https://docs.google.com/spreadsheets/d/1DJzgFshwWoZE6MEM916WIYYuSmzePaBPIZV0jlIQHU4/edit?usp=sharing" caption="" %}
-
