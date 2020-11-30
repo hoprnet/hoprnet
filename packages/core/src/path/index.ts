@@ -10,7 +10,7 @@ const log = Debug('hopr-core:pathfinder')
 export type Path = PeerId[]
 type ChannelPath = Edge[]
 
-const sum = (a: number, b: number) => a + b
+const sum = (a: BN, b: BN) => a.add(b)
 const next = (c: Edge): PeerId => c[1]
 const stake = (c: Edge): BN => c[2]
 const pathFrom = (c: ChannelPath): Path => [c[0][0]].concat(c.map(next))
@@ -38,20 +38,20 @@ export async function findPath(
   log('find path from', start.toB58String(), 'to ', destination.toB58String(), 'length', hops)
 
   // Weight a node based on stake, and a random component.
-  const weight = (edge: Edge): number => {
+  const weight = (edge: Edge): BN => {
     // Minimum is 'stake', therefore weight is monotonically increasing
     const r = 1 + rand() * randomness
     // Log scale, but minimum 1 weight per edge
-    return Math.log(1 + stake(edge).toNumber() * r)
+    return stake(edge).addn(1).muln(r) //log()
   }
 
-  const compareWeight = (a: Edge, b: Edge) => weight(b) - weight(a)
+  const compareWeight = (a: Edge, b: Edge) => weight(b).gte(weight(a)) ? 1 : -1
 
   // Weight the path with the sum of its' edges weight
-  const pathWeight = (a: ChannelPath): number => a.map(weight).reduce(sum, 0)
+  const pathWeight = (a: ChannelPath): BN => a.map(weight).reduce(sum, new BN(0))
 
-  const comparePath = (a: ChannelPath, b: ChannelPath) => {
-    return pathWeight(b) - pathWeight(a)
+  const comparePath = (a: ChannelPath, b: ChannelPath): number => {
+    return pathWeight(b).gte(pathWeight(a)) ? 1 : -1
   }
 
   let queue = new Heap<ChannelPath>(comparePath)
@@ -74,7 +74,7 @@ export async function findPath(
           networkPeers.qualityOf(next(c)) > NETWORK_QUALITY_THRESHOLD &&
           filterCycles(c, currentPath) &&
           !deadEnds.has(next(c).toB58String())
-      )
+       )
       .sort(compareWeight)
 
     if (newChannels.length == 0) {
