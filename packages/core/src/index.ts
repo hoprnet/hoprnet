@@ -586,15 +586,18 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     if (options.dbPath) {
       dbPath = options.dbPath
     } else {
-      dbPath = path.join(process.cwd(), 'db', chainName, network)
+      let folder: string
       if (options.bootstrapNode) {
-        dbPath += `bootstrap`
+        folder = `bootstrap`
       } else if (options.id != null && Number.isInteger(options.id)) {
-        dbPath += `node_${options.id}`
+        folder = `node_${options.id}`
       } else {
-        dbPath += `node`
+        folder = `node`
       }
+
+      dbPath = path.join(process.cwd(), 'db', chainName, network, folder)
     }
+
     dbPath = path.resolve(dbPath)
 
     verbose('using db at ', dbPath)
