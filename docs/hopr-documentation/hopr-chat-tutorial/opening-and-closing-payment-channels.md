@@ -173,3 +173,4 @@ Finally, check your balance with `balance`. You'll see that the tokens you stake
 {% hint style="info" %}
 Because RandoBot cannot redeem tickets, you'll get all of your staked xHOPR back, even though you sent a multi-hop message. Normally, you would expect the node at the other end of the party to redeem their tickets, reducing your balance slightly.
 {% endhint %}
+
