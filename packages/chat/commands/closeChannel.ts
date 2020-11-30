@@ -5,7 +5,7 @@ import type PeerId from 'peer-id'
 import type { AutoCompleteResult } from './abstractCommand'
 import chalk from 'chalk'
 import { pubKeyToPeerId } from '@hoprnet/hopr-utils'
-import { AbstractCommand } from './abstractCommand'
+import { AbstractCommand, GlobalState } from './abstractCommand'
 import { checkPeerIdInput, styleValue } from '../utils'
 
 export default class CloseChannel extends AbstractCommand {
@@ -21,14 +21,14 @@ export default class CloseChannel extends AbstractCommand {
     return 'Close an open channel'
   }
 
-  async execute(query?: string): Promise<string | void> {
+  async execute(query: string, state: GlobalState): Promise<string | void> {
     if (query == null) {
       return styleValue(`Invalid arguments. Expected 'close <peerId>'. Received '${query}'`, 'failure')
     }
 
     let peerId: PeerId
     try {
-      peerId = await checkPeerIdInput(query)
+      peerId = await checkPeerIdInput(query, state)
     } catch (err) {
       return styleValue(err.message, 'failure')
     }

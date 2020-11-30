@@ -127,7 +127,7 @@ export class SendMessageFancy extends SendMessageBase {
         console.log(`Sending message to ${styleValue(query, 'peerId')} ...`)
 
         return this.sendMessage(state, peerId, message, async () => {
-          return this.selectIntermediateNodes(this.rl, peerId)
+          return this.selectIntermediateNodes(state, this.rl, peerId)
         })
       }
       // direct mode
@@ -143,7 +143,11 @@ export class SendMessageFancy extends SendMessageBase {
     }
   }
 
-  public async selectIntermediateNodes(rl: readline.Interface, destination: PeerId): Promise<PeerId[]> {
+  public async selectIntermediateNodes(
+    state: GlobalState,
+    rl: readline.Interface,
+    destination: PeerId
+  ): Promise<PeerId[]> {
     let done = false
     let selected: PeerId[] = []
 
@@ -185,7 +189,7 @@ export class SendMessageFancy extends SendMessageBase {
 
           let peerId: PeerId
           try {
-            peerId = await checkPeerIdInput(query)
+            peerId = await checkPeerIdInput(query, state)
           } catch (err) {
             console.log(styleValue(err.message, 'failure'))
             return
