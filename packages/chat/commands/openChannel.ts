@@ -6,7 +6,7 @@ import BN from 'bn.js'
 import chalk from 'chalk'
 import readline from 'readline'
 import { checkPeerIdInput, getPeers, getOpenChannels, styleValue } from '../utils'
-import { AbstractCommand, AutoCompleteResult } from './abstractCommand'
+import { AbstractCommand, AutoCompleteResult, GlobalState } from './abstractCommand'
 
 export abstract class OpenChannelBase extends AbstractCommand {
   constructor(public node: Hopr<HoprCoreConnector>) {
@@ -58,6 +58,30 @@ export abstract class OpenChannelBase extends AbstractCommand {
 
     return [hits.length ? hits.map((str: string) => `open ${str}`) : ['open'], line]
   }
+
+  public async open(state: GlobalState, counterpartyStr: string, amountToFundStr: string): Promise<string> {
+    const { types } = this.node.paymentChannels
+
+    let counterparty: PeerId
+    try {
+      counterparty = await checkPeerIdInput(counterpartyStr, state)
+    } catch (err) {
+      return styleValue(err.message, 'failure')
+    }
+
+    const amountToFund = new BN(moveDecimalPoint(amountToFundStr, types.Balance.DECIMALS))
+    await this.validateAmountToFund(amountToFund)
+
+    const unsubscribe = startDelayedInterval(`Submitted transaction. Waiting for confirmation`)
+    try {
+      const { channelId } = await this.node.openChannel(counterparty, amountToFund)
+      unsubscribe()
+      return `${chalk.green(`Successfully opened channel`)} ${styleValue(u8aToHex(channelId), 'hash')}`
+    } catch (err) {
+      unsubscribe()
+      return styleValue(err.message, 'failure')
+    }
+  }
 }
 
 export class OpenChannel extends OpenChannelBase {
@@ -66,32 +90,14 @@ export class OpenChannel extends OpenChannelBase {
    * with another party.
    * @param query peerId string to send message to
    */
-  public async execute(query: string): Promise<string> {
+  public async execute(query: string, state: GlobalState): Promise<string> {
     const [err, counterPartyB58Str, amountToFundStr] = this._assertUsage(query, [
       "counterParty's PeerId",
       'amountToFund'
     ])
     if (err) return styleValue(err, 'failure')
 
-    let counterParty: PeerId
-    try {
-      counterParty = await checkPeerIdInput(counterPartyB58Str)
-    } catch (err) {
-      return styleValue(err.message, 'failure')
-    }
-
-    const { types } = this.node.paymentChannels
-    const amountToFund = new BN(moveDecimalPoint(amountToFundStr, types.Balance.DECIMALS))
-
-    const unsubscribe = startDelayedInterval(`Submitted transaction. Waiting for confirmation`)
-    try {
-      const { channelId } = await this.node.openChannel(counterParty, amountToFund)
-      unsubscribe()
-      return `${chalk.green(`Successfully opened channel`)} ${styleValue(u8aToHex(channelId), 'hash')}`
-    } catch (err) {
-      unsubscribe()
-      return styleValue(err.message, 'failure')
-    }
+    return this.open(state, counterPartyB58Str, amountToFundStr)
   }
 }
 
@@ -100,7 +106,7 @@ export class OpenChannelFancy extends OpenChannelBase {
     super(node)
   }
 
-  private async selectFundAmount(): Promise<BN> {
+  private async selectFundAmount(): Promise<string> {
     const { types, account } = this.node.paymentChannels
     const myAvailableTokens = await account.balance
     const myAvailableTokensDisplay = moveDecimalPoint(myAvailableTokens.toString(), types.Balance.DECIMALS * -1)
@@ -109,19 +115,8 @@ export class OpenChannelFancy extends OpenChannelBase {
       types.Balance.SYMBOL
     } available) shall get staked? : `
 
-    const amountToFund = await new Promise<string>((resolve) => this.rl.question(tokenQuestion, resolve)).then(
-      (input) => {
-        return new BN(moveDecimalPoint(input, types.Balance.DECIMALS))
-      }
-    )
-
-    try {
-      await this.validateAmountToFund(amountToFund)
-      return amountToFund
-    } catch (err) {
-      console.log(styleValue(err.message, 'failure'))
-      return this.selectFundAmount()
-    }
+    const amountToFund = await new Promise<string>((resolve) => this.rl.question(tokenQuestion, resolve))
+    return amountToFund
   }
 
   /**
@@ -129,28 +124,12 @@ export class OpenChannelFancy extends OpenChannelBase {
    * with another party.
    * @param query peerId string to send message to
    */
-  public async execute(query?: string): Promise<string> {
-    if (query == null || query == '') {
+  public async execute(query: string, state: GlobalState): Promise<string> {
+    if (!query) {
       return styleValue(`Invalid arguments. Expected 'open <peerId>'. Received '${query}'`, 'failure')
     }
 
-    let counterParty: PeerId
-    try {
-      counterParty = await checkPeerIdInput(query)
-    } catch (err) {
-      return styleValue(err.message, 'failure')
-    }
-
     const amountToFund = await this.selectFundAmount()
-
-    const unsubscribe = startDelayedInterval(`Submitted transaction. Waiting for confirmation`)
-    try {
-      const { channelId } = await this.node.openChannel(counterParty, amountToFund)
-      unsubscribe()
-      return `${chalk.green(`Successfully opened channel`)} ${styleValue(u8aToHex(channelId), 'hash')}`
-    } catch (err) {
-      unsubscribe()
-      return styleValue(err.message, 'failure')
-    }
+    return this.open(state, query, amountToFund)
   }
 }
