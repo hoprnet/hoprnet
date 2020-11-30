@@ -18,9 +18,9 @@ CoverBot is the latest in a series of bots running on the HOPR network which wil
 
 Before you register with CoverBot, you'll need the following things:
 
-- Your HOPR address
-- `includeRecipient` turned on
-- A Twitter account
+* Your HOPR address
+* `includeRecipient` turned on
+* A Twitter account
 
 The first two items were covered in the previous sections in this tutorial, [**Exploring the Network**](exploring-the-network.md#finding-your-address) and [**Messaging RandoBot**](randobot.md#step-2-turn-on-includerecipient), respectively.
 
@@ -34,13 +34,13 @@ Your Twitter handle will be your name on the testnet scoreboard.
 
 Your tweet needs to include:
 
-- your HOPR address
-- the @hoprnet handle
-- the \#Basodino hashtag
+* your HOPR address
+* the @hoprnet handle
+* the \#Basodino hashtag
 
 An example is shown below:
 
-![](../.gitbook/assets/example-tweet%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%282%29.png)
+![](../.gitbook/assets/example-tweet%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%282%29%20%281%29.png)
 
 The bot should be able to parse any tweet which includes these three things, so feel free to add comments and even emojis. But if you're having difficulty registering, try again with a simpler tweet.
 
@@ -58,7 +58,7 @@ send 16Uiu2HAm79TuiHcEtjcELXAwcjEX6Sh7qGDbiqZbDvHSicRyPm9R
 
 Then press Enter. Now paste the URL of your tweet and press Enter again. The bot will now check your tweet and will send you a verification message if you're successful.
 
-![](../.gitbook/assets/verification-1%20%282%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29.png)
+![](../.gitbook/assets/verification-1%20%282%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29.png)
 
 ## Step 4: Stay Online to Earn Tickets!
 
@@ -68,7 +68,7 @@ Every 30 seconds, the bot will randomly select an address from the whitelist and
 
 If the CoverBot selects your address, you'll receive a ticket which can be redeemed for HOPR. You'll also receive a verification message.
 
-![](../.gitbook/assets/verification-2%20%282%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29.png)
+![](../.gitbook/assets/verification-2%20%282%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29.png)
 
 {% hint style="info" %}
 The more your node is online, the greater your chance of earning tickets, so try to maximize your node uptime.
@@ -77,3 +77,4 @@ The more your node is online, the greater your chance of earning tickets, so try
 ## Check Your Score
 
 You can see the current leaderboard at [**https://network.hoprnet.org**](https://network.hoprnet.org)\*\*\*\*
+

@@ -31,3 +31,4 @@ If you want to keep your address from a previous version, copy the `db` folder b
 {% hint style="danger" %}
 If you haven't used HOPR Chat for a while, some commands and features are likely to have changed. We recommend following the rest of the tutorial to get up to speed.
 {% endhint %}
+

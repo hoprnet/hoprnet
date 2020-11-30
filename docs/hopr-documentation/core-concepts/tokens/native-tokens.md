@@ -20,22 +20,23 @@ To get MATIC for yourself, you'll need to add the network to your Ethereum walle
 
 To configure the MATIC Network, click the Network button at the top of your Metamask wallet.
 
-![](../../.gitbook/assets/matic-metamask-1%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29.png)
+![](../../.gitbook/assets/matic-metamask-1%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29.png)
 
 A drop-down menu will appear. Click "Custom RPC"
 
-![](../../.gitbook/assets/matic-metamask-2%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29.png)
+![](../../.gitbook/assets/matic-metamask-2%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29.png)
 
 A form will appear. Fill in the fields with the following information:
 
-- **Network Name:** Matic Mainnet
-- **New RPC URL:** [https://rpc-mainnet.matic.network](https://rpc-mainnet.matic.network)
-- **ChainID:** 137
-- **Symbol:** MATIC
-- **Block Explorer URL:** [https://explorer.matic.network](https://explorer.matic.network)
+* **Network Name:** Matic Mainnet
+* **New RPC URL:** [https://rpc-mainnet.matic.network](https://rpc-mainnet.matic.network)
+* **ChainID:** 137
+* **Symbol:** MATIC
+* **Block Explorer URL:** [https://explorer.matic.network](https://explorer.matic.network)
 
 To get MATIC, you can use the MATIC bridge at [https://wallet.matic.network/](https://wallet.matic.network/) to convert them from ETH. You can also use a tool such as [Uniswap](https://app.uniswap.org).
 
 Once you have MATIC in your Metamask wallet, send some to your node wallet, at the address shown when your node starts up.
 
 Once you've sent MATIC to your node, restart it. When your node restarts, your balance will be automatically detected and you can proceed.
+

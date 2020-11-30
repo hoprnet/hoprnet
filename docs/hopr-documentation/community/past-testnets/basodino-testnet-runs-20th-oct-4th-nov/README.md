@@ -2,4 +2,5 @@
 description: The current incentivized testnet
 ---
 
-# Basòdino Testnet \(Runs 20th Oct - 4th Nov\)
+# Basòdino Testnet \(Ended 4th Nov 2020\)
+
