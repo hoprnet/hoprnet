@@ -33,4 +33,4 @@ A [transport module](https://github.com/libp2p/js-libp2p-interfaces/tree/master/
   - perform WebRTC handshake(s)
   - upgrade to direct connection if possible
 - use nodes in the network as STUN and TURN servers
-- proper reconnect handling
+- reconnect handling

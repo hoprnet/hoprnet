@@ -1,0 +1,78 @@
+{
+  "name": "@hoprnet/hopr-connect",
+  "version": "1.0",
+  "description": "A libp2p-complaint transport module that handles NAT traversal",
+  "repository": "https://github.com/hoprnet/hopr-connect.git",
+  "homepage": "https://github.com/hoprnet/hopr-connect",
+  "license": "GPL-3.0-only",
+  "keywords": [
+    "nat-traversal",
+    "libp2p"
+  ],
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "files": [
+    "lib/",
+    "!*.spec.ts",
+    "!*.spec.d.ts",
+    "!*.spec.js",
+    "!*.spec.js.map"
+  ],
+  "engines": {
+    "node": "12",
+    "yarn": "1"
+  },
+  "scripts": {
+    "clean": "rimraf ./lib",
+    "build": "yarn clean && tsc -p .",
+    "test": "node --trace-warnings --unhandled-rejections=strict node_modules/.bin/mocha --reporter=tap --full-trace --exit",
+    "prepublishOnly": "yarn build"
+  },
+  "dependencies": {
+    "@hoprnet/hopr-utils": "^1.57.0-next.13",
+    "abort-controller": "3.0.0",
+    "bl": "^4.0.3",
+    "debug": "^4.3.1",
+    "it-handshake": "~1.0.2",
+    "libp2p-utils": "^0.2.3",
+    "mafmt": "^8.0.1",
+    "multiaddr": "~8.1.1",
+    "p-defer": "~3.0.0",
+    "peer-id": "~0.14.2",
+    "simple-peer": "9.9.3",
+    "webrtc-stun": "~3.0.0",
+    "wrtc": "0.4.6"
+  },
+  "devDependencies": {
+    "@types/bl": "~2.1.0",
+    "@types/debug": "^4.1.5",
+    "@types/mocha": "~8.0.4",
+    "@types/node": "12",
+    "@types/simple-peer": "9",
+    "memdown": "^5.1.0",
+    "prettier": "~2.2.1",
+    "mocha": "^8.0.1",
+    "rimraf": "^3.0.2",
+    "ts-node": "~9.0.0",
+    "typescript": "^4.0.3"
+  },
+  "mocha": {
+    "extension": [
+      "ts"
+    ],
+    "spec": "**/*.spec.ts",
+    "require": [
+      "ts-node/register"
+    ]
+  },
+  "prettier": {
+    "tabWidth": 2,
+    "semi": false,
+    "singleQuote": true,
+    "printWidth": 120,
+    "trailingComma": "none"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
