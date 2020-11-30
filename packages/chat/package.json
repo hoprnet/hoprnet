@@ -50,7 +50,7 @@
     "dotenv-expand": "~5.1.0",
     "getopts": "^2.2.5",
     "multiaddr": "8.1.1",
-    "multihashes": "~3.0.1",
+    "multihashes": "~3.1.0",
     "peer-id": "0.14.2",
     "readline": "~1.3.0",
     "rlp": "~2.2.5",

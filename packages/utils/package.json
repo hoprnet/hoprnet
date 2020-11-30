@@ -28,7 +28,7 @@
     "bignumber.js": "^9.0.0",
     "libp2p-crypto": "0.18.0",
     "multiaddr": "8.1.1",
-    "multihashes": "~3.0.1",
+    "multihashes": "~3.1.0",
     "peer-id": "0.14.2",
     "strip-ansi": "^6.0.0"
   },

@@ -52,7 +52,7 @@
     "libp2p-secio": "0.13.1",
     "mafmt": "8.0.1",
     "multiaddr": "8.1.1",
-    "multihashes": "3.0.1",
+    "multihashes": "3.1.0",
     "p-defer": "^3.0.0",
     "peer-id": "0.14.2",
     "read": "~1.0.7",
