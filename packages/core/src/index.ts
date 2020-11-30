@@ -25,8 +25,8 @@ import { Network } from './network'
 import { findPath } from './path'
 
 import { addPubKey, getAcknowledgedTickets, submitAcknowledgedTicket } from './utils'
-import { createDirectoryIfNotExists, u8aToHex, pubKeyToPeerId } from '@hoprnet/hopr-utils'
-import { existsSync } from 'fs'
+import { u8aToHex, pubKeyToPeerId } from '@hoprnet/hopr-utils'
+import { existsSync, mkdirSync } from 'fs'
 import getIdentity from './identity'
 
 import levelup, { LevelUp } from 'levelup'
@@ -586,22 +586,25 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     if (options.dbPath) {
       dbPath = options.dbPath
     } else {
-      dbPath = path.join(process.cwd(), 'db', chainName, network)
+      let folder: string
       if (options.bootstrapNode) {
-        dbPath += `bootstrap`
+        folder = `bootstrap`
       } else if (options.id != null && Number.isInteger(options.id)) {
-        dbPath += `node_${options.id}`
+        folder = `node_${options.id}`
       } else {
-        dbPath += `node`
+        folder = `node`
       }
+
+      dbPath = path.join(process.cwd(), 'db', chainName, network, folder)
     }
+
     dbPath = path.resolve(dbPath)
 
     verbose('using db at ', dbPath)
     if (!existsSync(dbPath)) {
       verbose('db does not exist, creating?:', options.createDbIfNotExist)
       if (options.createDbIfNotExist) {
-        createDirectoryIfNotExists(dbPath)
+        mkdirSync(dbPath, { recursive: true })
       } else {
         throw new Error('Database does not exist: ' + dbPath)
       }
