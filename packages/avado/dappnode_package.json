@@ -22,9 +22,7 @@
   },
   "author": "HOPR",
   "license": "(C)",
-  "dependencies": {
-    "ethchain-geth.public.dappnode.eth": "QmUXyN676JcdakoX9LhcusPkb9NmCTb5uDBbDZF8pJ2YNh"
-  },
+  "dependencies": {},
   "links": {
     "OnboardingWizard": "http://my.hopr.avado.dnp.dappnode.eth:3000"
   }
