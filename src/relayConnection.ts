@@ -109,7 +109,8 @@ class RelayConnection implements MultiaddrConnection {
     this.webRTC = opts.webRTC
 
     this._webRTCresolved = false
-    this._webRTCStreamResult = { done: false, value: new Uint8Array() }
+    this._webRTCStreamResult =
+      opts.webRTC != undefined ? { done: false, value: new Uint8Array() } : { done: true, value: undefined }
 
     this._webRTCSourceFunction = (arg: IteratorResult<Uint8Array, void>) => {
       this._webRTCresolved = true
@@ -293,7 +294,7 @@ class RelayConnection implements MultiaddrConnection {
 
   private async *_getWebRTCStream(this: RelayConnection): Stream['source'] {
     if (this.webRTC == undefined) {
-      throw Error(`Cannot listen to a WebRTC because there was none given.`)
+      throw Error(`Cannot listen to a WebRTC instance because there was none given.`)
     }
 
     let defer = Defer<void>()
