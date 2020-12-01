@@ -10,7 +10,8 @@ export function u8aAdd(inplace: boolean, a: Uint8Array, b: Uint8Array): Uint8Arr
   let result = inplace ? a : new Uint8Array(a.length)
 
   let overflow = 0
-  let tmp
+  let tmp: number
+
   for (let offset = a.length; offset > 0; offset--) {
     tmp = a[offset - 1] + b[offset - 1] + overflow
     overflow = tmp >> 8
