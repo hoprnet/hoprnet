@@ -438,7 +438,9 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     } catch (err) {
       if (err.type === 'NotFoundError' || err.notFound === undefined || !err.notFound) {
         await db.put(Buffer.from(key), Buffer.from(''))
-        return
+        return false
+      } else {
+        throw err
       }
     }
 

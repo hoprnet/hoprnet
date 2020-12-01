@@ -2,6 +2,7 @@ import net from 'net'
 import { AbortError } from 'abortable-iterator'
 import type { Socket } from 'net'
 import mafmt from 'mafmt'
+// @ts-ignore
 import errCode from 'err-code'
 import debug from 'debug'
 import { socketToConn } from './socket-to-conn'
@@ -142,7 +143,11 @@ class TCP {
     try {
       let relayConnection = await this._relay.handleRelayConnection(handler, this.onReconnect.bind(this))
 
-      newConn = await this._upgrader.upgradeInbound(relayConnection)
+      if (relayConnection == null) {
+        return
+      }
+
+      newConn = await this._upgrader.upgradeInbound(relayConnection as MultiaddrConnection)
     } catch (err) {
       error(`Could not upgrade relayed connection. Error was: ${err}`)
       return
@@ -173,7 +178,8 @@ class TCP {
         return await this._dialDirectly(ma, options)
       } catch (err) {
         if (
-          (err.code != null && ['ECONNREFUSED', 'ECONNRESET', 'EPIPE', 'EHOSTUNREACH'].includes(err.code)) ||
+          (err.code != null &&
+            ['ECONNREFUSED', 'ECONNRESET', 'EPIPE', 'EHOSTUNREACH', 'ETIMEOUT'].includes(err.code)) ||
           err.type === 'aborted'
         ) {
           // expected case, continue

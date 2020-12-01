@@ -1,12 +1,12 @@
 import assert from 'assert'
 
-import { existsSync } from 'fs'
-import { clearDirectory, createDirectoryIfNotExists } from '.'
+import { existsSync, mkdirSync } from 'fs'
+import { clearDirectory } from '.'
 
 describe('test clean directory', function () {
   it('should delete the directory structure recursively', function () {
     const directory = `filesystem_test/test/sth else/`
-    createDirectoryIfNotExists(`${__dirname}/${directory}`)
+    mkdirSync(`${__dirname}/${directory}`, { recursive: true })
 
     assert(existsSync(`${__dirname}/${directory}`))
 

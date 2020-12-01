@@ -14,11 +14,11 @@ The following instructions are meant to be followed by individuals interested in
 
 Using your browser, go to our [QA master template](https://docs.google.com/spreadsheets/d/1DJzgFshwWoZE6MEM916WIYYuSmzePaBPIZV0jlIQHU4/edit#gid=947619674). If you have a Google Suite account, you can just click the “Master Template” sheet and select the option “copy to” &gt; “new spreadsheet”. A new spreadsheet will be copied into your Google Drive for you to fill in.
 
-![Quickly copying our master template to a new spreadsheet.](../../.gitbook/assets/image%20%2823%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29.png)
+![Quickly copying our master template to a new spreadsheet.](../../.gitbook/assets/image%20%2823%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29.png)
 
 If you do not have a Google Suite account or would prefer not to use it, you download the original .xlsx file and use another Excel editor to go to the next step.
 
-![You can always download our Excel document and modify it with your favourite editor.](../../.gitbook/assets/image%20%2824%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29.png)
+![You can always download our Excel document and modify it with your favourite editor.](../../.gitbook/assets/image%20%2824%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29.png)
 
 ## Step 2 - Get the latest releases.
 

@@ -17,4 +17,4 @@ Please bear in mind that to run **HOPR Chat** using **Docker** in your computer,
 
 Follow our quick start guide to learn how to install and use **HOPR Chat** on your system.
 
-![](../../.gitbook/assets/hopr-chat-testnet%20%284%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%282%29.gif)
+![](../../.gitbook/assets/hopr-chat-testnet%20%284%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%282%29%20%281%29.gif)

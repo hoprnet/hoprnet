@@ -20,11 +20,11 @@ To get MATIC for yourself, you'll need to add the network to your Ethereum walle
 
 To configure the MATIC Network, click the Network button at the top of your Metamask wallet.
 
-![](../../.gitbook/assets/matic-metamask-1%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29.png)
+![](../../.gitbook/assets/matic-metamask-1%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29.png)
 
 A drop-down menu will appear. Click "Custom RPC"
 
-![](../../.gitbook/assets/matic-metamask-2%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29.png)
+![](../../.gitbook/assets/matic-metamask-2%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29.png)
 
 A form will appear. Fill in the fields with the following information:
 

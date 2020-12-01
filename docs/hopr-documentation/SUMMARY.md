@@ -59,10 +59,11 @@
 - [HOPR Games](community/hopr-games/README.md)
   - [Bounties](community/hopr-games/bounties/README.md)
     - [Bouncer Bot](community/hopr-games/bounties/bouncer-bot.md)
-- [Säntis Testnet \(Ended 06 Oct 2020\)](community/saentis-testnet.md)
-- [Basòdino Testnet \(Runs 20th Oct - 4th Nov\)](community/basodino-testnet-runs-20th-oct-4th-nov/README.md)
-  - [Prize Fund and Scoreboard](community/basodino-testnet-runs-20th-oct-4th-nov/prize-fund-and-scoreboard.md)
-- [Basòdino Testnet v2 \(Runs 9th Nov - 23rd Nov\)](community/basodino-testnet-v2-runs-9th-nov-23rd-nov.md)
+- [Past Testnets](community/past-testnets/README.md)
+  - [Säntis Testnet \(Ended 06 Oct 2020\)](community/past-testnets/saentis-testnet.md)
+  - [Basòdino Testnet \(Ended 4th Nov 2020\)](community/past-testnets/basodino-testnet-runs-20th-oct-4th-nov/README.md)
+    - [Prize Fund and Scoreboard](community/past-testnets/basodino-testnet-runs-20th-oct-4th-nov/prize-fund-and-scoreboard.md)
+  - [Basòdino Testnet v2 \(Ended 23rd Nov 2020\)](community/past-testnets/basodino-testnet-v2-runs-9th-nov-23rd-nov.md)
 
 ## QA
 

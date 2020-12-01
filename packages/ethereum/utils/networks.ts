@@ -1,5 +1,7 @@
+import Web3 from 'web3'
+
 export type PrivateNetwork = 'localhost'
-export type PublicNetwork = 'mainnet' | 'kovan' | 'xdai' | 'matic'
+export type PublicNetwork = 'mainnet' | 'kovan' | 'xdai' | 'matic' | 'binance'
 export type Network = PublicNetwork | PrivateNetwork
 export type MigrationOptions = {
   shouldVerify: boolean
@@ -10,6 +12,7 @@ export type RpcOptions = {
   chainId: number
   httpUrl: string
   wsUrl: string
+  gasPrice?: number
 }
 
 export const migrationOptions: { [key in Network]: MigrationOptions } = {
@@ -34,6 +37,11 @@ export const migrationOptions: { [key in Network]: MigrationOptions } = {
     revokeRoles: false
   },
   matic: {
+    shouldVerify: false,
+    mintUsing: 'minter',
+    revokeRoles: false
+  },
+  binance: {
     shouldVerify: false,
     mintUsing: 'minter',
     revokeRoles: false
@@ -64,6 +72,12 @@ export function getRpcOptions(ops?: { infura?: string; maticvigil?: string }): {
       chainId: 137,
       httpUrl: `https://rpc-mainnet.maticvigil.com/v1/${maticvigil}`,
       wsUrl: `wss://rpc-mainnet.maticvigil.com/v1/${maticvigil}`
+    },
+    binance: {
+      chainId: 56,
+      httpUrl: 'https://bsc-dataseed.binance.org',
+      wsUrl: 'wss://bsc-ws-node.nariox.org:443',
+      gasPrice: Number(Web3.utils.toWei('20', 'gwei'))
     }
   }
 }

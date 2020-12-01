@@ -34,7 +34,7 @@ describe('test hashedSecret', function () {
     const network = Utils.getNetworkName(chainId) as Network
 
     const connector = ({
-      signTransaction: Utils.TransactionSigner(web3, stringToU8a(NODE_SEEDS[0])),
+      signTransaction: Utils.TransactionSigner(web3, network, stringToU8a(NODE_SEEDS[0])),
       hoprChannels: new web3.eth.Contract(HoprChannelsAbi as any, addresses[network].HoprChannels),
       web3,
       db: LevelUp(Memdown()),

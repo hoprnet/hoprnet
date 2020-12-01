@@ -1,6 +1,7 @@
 /// <reference path="./@types/libp2p.ts" />
 import LibP2P from 'libp2p'
 import type { Connection } from 'libp2p'
+// @ts-ignore
 import MPLEX = require('libp2p-mplex')
 // @ts-ignore
 import KadDHT = require('libp2p-kad-dht')
@@ -23,17 +24,15 @@ import {
 import { Network } from './network'
 import { findPath } from './path'
 
-import { addPubKey, getPeerId, getAddrs, getAcknowledgedTickets, submitAcknowledgedTicket } from './utils'
-import { createDirectoryIfNotExists, u8aToHex, pubKeyToPeerId } from '@hoprnet/hopr-utils'
-import { existsSync } from 'fs'
+import { addPubKey, getAcknowledgedTickets, submitAcknowledgedTicket } from './utils'
+import { u8aToHex, pubKeyToPeerId } from '@hoprnet/hopr-utils'
+import { existsSync, mkdirSync } from 'fs'
+import getIdentity from './identity'
 
 import levelup, { LevelUp } from 'levelup'
 import leveldown from 'leveldown'
 import Multiaddr from 'multiaddr'
 import chalk from 'chalk'
-
-import Debug from 'debug'
-const log = Debug(`hopr-core`)
 
 import PeerId from 'peer-id'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
@@ -49,6 +48,8 @@ import path from 'path'
 import { ChannelStrategy, PassiveStrategy, PromiscuousStrategy } from './channel-strategy'
 import { Mixer } from './mixer'
 
+import Debug from 'debug'
+const log = Debug(`hopr-core`)
 const verbose = Debug('hopr-core:verbose')
 
 interface NetOptions {
@@ -96,7 +97,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
   public ticketWinProb: number = TICKET_WIN_PROB
 
   private running: boolean
-  private crawlTimeout: NodeJS.Timeout
+  private checkTimeout: NodeJS.Timeout
   private mixer: Mixer<Chain>
   private strategy: ChannelStrategy
   private network: Network
@@ -155,8 +156,11 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
   ): Promise<Hopr<CoreConnector>> {
     const Connector = options.connector ?? HoprCoreEthereum
     const db = Hopr.openDatabase(options, Connector.constants.CHAIN_NAME, Connector.constants.NETWORK)
-    const id = await getPeerId(options, db)
-    const addresses = await getAddrs(id, options)
+
+    const { id, addresses } = await getIdentity({
+      ...options,
+      db
+    })
 
     if (
       !options.debug &&
@@ -181,7 +185,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
         denyTTL: 1,
         denyAttempts: Infinity
       },
-      // The libp2p modules for this libp2p bundle
+      // libp2p modules
       modules: {
         transport: [TCP],
         streamMuxer: [MPLEX],
@@ -252,8 +256,14 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     }
     const currentChannels = await this.getOpenChannels()
     const balance = await this.getBalance()
-    const nextChannels = await this.strategy.tick(balance, newChannels, currentChannels, this.paymentChannels.indexer)
-    verbose(`${this.strategy} strategy wants to open`, nextChannels.length, 'new channels')
+    const nextChannels = await this.strategy.tick(
+      balance,
+      newChannels,
+      currentChannels,
+      this.network.networkPeers.qualityOf.bind(this.network.networkPeers),
+      this.paymentChannels.indexer
+    )
+    verbose(`strategy wants to open`, nextChannels.length, 'new channels')
     for (let channelToOpen of nextChannels) {
       this.network.networkPeers.register(channelToOpen[0])
       try {
@@ -289,17 +299,24 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
    */
   public async start(): Promise<Hopr<Chain>> {
     await Promise.all([
-      this._libp2p.start().then(() => Promise.all([this.connectToBootstrapServers(), this.network.start()])),
+      this._libp2p.start().then(() =>
+        Promise.all([
+          // prettier-ignore
+          this.connectToBootstrapServers(),
+          this.network.start()
+        ])
+      ),
       this.paymentChannels?.start()
     ])
 
     this.paymentChannels.indexer.onNewChannels((newChannels) => {
       this.tickChannelStrategy(newChannels)
     })
+
     log(`Available under the following addresses:`)
 
     this._libp2p.multiaddrs.forEach((ma: Multiaddr) => log(ma.toString()))
-    await this.periodicCheck()
+    this.periodicCheck()
     this.running = true
     return this
   }
@@ -311,7 +328,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     if (!this.running) {
       return Promise.resolve()
     }
-    clearTimeout(this.crawlTimeout)
+    clearTimeout(this.checkTimeout)
     this.running = false
     await Promise.all([this.network.stop(), this.paymentChannels?.stop().then(() => log(`Connector stopped.`))])
 
@@ -432,19 +449,26 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
 
   private async periodicCheck() {
     log('periodic check')
-    await this.tickChannelStrategy([])
-    let crawlInfo = await this.crawl()
-    this.emit('hopr:crawl:completed', crawlInfo)
-    this.crawlTimeout = setTimeout(() => this.periodicCheck(), CRAWL_TIMEOUT)
+    try {
+      await this.tickChannelStrategy([])
+      let crawlInfo = await this.crawl()
+      this.emit('hopr:crawl:completed', crawlInfo)
+    } catch (e) {
+      log('error in periodic check', e)
+    }
+    this.checkTimeout = setTimeout(() => this.periodicCheck(), CRAWL_TIMEOUT)
   }
 
   public setChannelStrategy(strategy: ChannelStrategyNames) {
     if (strategy == 'PASSIVE') {
       this.strategy = new PassiveStrategy()
+      return
     }
     if (strategy == 'PROMISCUOUS') {
       this.strategy = new PromiscuousStrategy()
+      return
     }
+    throw new Error('Unknown strategy')
   }
 
   public async getBalance(): Promise<BN> {
@@ -562,22 +586,25 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     if (options.dbPath) {
       dbPath = options.dbPath
     } else {
-      dbPath = `${process.cwd()}/db/${chainName}/${network}/`
+      let folder: string
       if (options.bootstrapNode) {
-        dbPath += `bootstrap`
+        folder = `bootstrap`
       } else if (options.id != null && Number.isInteger(options.id)) {
-        dbPath += `node_${options.id}`
+        folder = `node_${options.id}`
       } else {
-        dbPath += `node`
+        folder = `node`
       }
+
+      dbPath = path.join(process.cwd(), 'db', chainName, network, folder)
     }
+
     dbPath = path.resolve(dbPath)
 
     verbose('using db at ', dbPath)
     if (!existsSync(dbPath)) {
       verbose('db does not exist, creating?:', options.createDbIfNotExist)
       if (options.createDbIfNotExist) {
-        createDirectoryIfNotExists(dbPath)
+        mkdirSync(dbPath, { recursive: true })
       } else {
         throw new Error('Database does not exist: ' + dbPath)
       }

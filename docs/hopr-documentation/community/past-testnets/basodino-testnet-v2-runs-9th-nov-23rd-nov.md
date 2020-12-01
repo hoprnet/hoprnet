@@ -1,12 +1,12 @@
-# Basòdino Testnet v2 \(Runs 9th Nov - 23rd Nov\)
+# Basòdino Testnet v2 \(Ended 23rd Nov 2020\)
 
-We decided to reopend the Basòdino testnet for two more weeks, starting on 9th Novemeber.
+We decided to reopen the Basòdino testnet for two more weeks, starting on 9th Novemeber.
 
 The second version of the Basòdino testnet uses the same version of HOPR chat as Basòdino v1, and if you participated in Basòdino v1 you will automatically be registered for v2. Just fire up your node to begin relaying data from CoverBot.
 
-Basòdino v2 also comes with daily tasks. At 3pm CET each day, head to our Telegram channel to find out the new task. Points will be added to the leaderboard the following day.
+Basòdino v2 also marked the introduction of daily tasks. At 3pm CET each day, a new task was announced via our Telegram channel, which ran until 3pm CET the following day.
 
-There are 200,000 HOPR up for grabs in Basodino v2.
+There were 200,000 HOPR up for grabs in Basodino v2.
 
 As the first Daily Task, the community were invited to vote on the prize distribution, the results can be found [here](https://medium.com/hoprnet/bas%C3%B2dino-v2-prize-distribution-vote-results-f8b28305caa8).
 
