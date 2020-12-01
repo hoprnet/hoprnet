@@ -230,8 +230,7 @@ export default class HoprEthereum implements HoprCoreConnector {
             value: amount
           })
 
-          tx.send()
-          resolve(tx.transactionHash)
+          tx.send().once('transactionHash', (hash) => resolve(hash))
         } else {
           const tx = await this.signTransaction(
             {
@@ -242,8 +241,7 @@ export default class HoprEthereum implements HoprCoreConnector {
             this.hoprToken.methods.transfer(recipient, amount)
           )
 
-          tx.send()
-          resolve(tx.transactionHash)
+          tx.send().once('transactionHash', (hash) => resolve(hash))
         }
       } catch (err) {
         reject(err)
