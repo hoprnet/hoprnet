@@ -5,10 +5,7 @@ import Multiaddr from 'multiaddr'
 import assert from 'assert'
 import { once } from 'events'
 
-// const TIMEOUT = 1000
-
 describe('test STUN', function () {
-  let client: Socket
   let servers: Socket[]
 
   before(() => {
@@ -20,10 +17,6 @@ describe('test STUN', function () {
       })
       return server
     })
-    client = dgram.createSocket('udp4')
-    client.on('error', (e) => {
-      throw e
-    })
   })
 
   it('should perform a STUN request', async function () {
@@ -33,14 +26,13 @@ describe('test STUN', function () {
         return once(server, 'listening')
       })
     )
-    client.bind()
-    await once(client, 'listening')
 
     const multiAddrs = servers.map((server: Socket) => Multiaddr.fromNodeAddress(server.address() as any, 'udp'))
 
-    const result = await getExternalIp(multiAddrs, client)
+    console.log(multiAddrs)
+    const result = await getExternalIp(multiAddrs, servers[0])
 
-    assert(client.address().port === result.port, 'Ports should match')
+    assert(servers[0].address().port === result.port, 'Ports should match')
     /*
      // DISABLED - with IP4 the address changes from 0.0.0.0 to 127.0.0.1
      // IPV6 doesn't work at present.
@@ -50,6 +42,12 @@ describe('test STUN', function () {
     */
   })
 
+  it('should get our external address from a public server if there is no other server given', async function () {
+    let result = await getExternalIp(undefined, servers[0])
+
+    assert(result != null, 'server should be able to detect its external address')
+  })
+
   after(async () => {
     await Promise.all(
       servers.map((server) => {
@@ -57,8 +55,7 @@ describe('test STUN', function () {
         return once(server, 'close')
       })
     )
-    client.close()
-    await once(client, 'close')
+
     await new Promise<void>((resolve) => setTimeout(() => resolve(), 500))
   })
 })

@@ -81,8 +81,8 @@ export function getExternalIp(multiAddrs: Multiaddr[] | undefined, socket: Socke
           tids.splice(index!, 1)
           const attr = res.getXorMappedAddressAttribute() || res.getMappedAddressAttribute()
 
-          if (attr != null) {
-            if (result == null) {
+          if (attr != undefined) {
+            if (result == undefined) {
               result = attr
             } else if (tids.length == 0 || attr.port != result.port || attr.address !== result.address) {
               socket.removeListener('message', msgHandler)
@@ -90,7 +90,7 @@ export function getExternalIp(multiAddrs: Multiaddr[] | undefined, socket: Socke
               // _finished = true
               clearTimeout(timeout)
 
-              if (attr.address === result.address && attr.port == result.port) {
+              if (attr.address !== result.address || attr.port != result.port) {
                 reject()
               }
 
@@ -129,7 +129,7 @@ export function getExternalIp(multiAddrs: Multiaddr[] | undefined, socket: Socke
     timeout = setTimeout(() => {
       // @TODO add assert call
       // _finished = true
-      if (result == null) {
+      if (result == undefined) {
         reject(Error(`Timeout. Could not complete STUN request in time.`))
       } else {
         resolve(result)
