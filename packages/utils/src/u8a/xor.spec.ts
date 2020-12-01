@@ -6,7 +6,7 @@ describe('testing XORing Uint8Array', function () {
     let a = new Uint8Array([0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0])
     let b = new Uint8Array([255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255])
 
-    let aXORb = new Uint8Array([255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255])
+    let aXORb = new Uint8Array(15).fill(255)
 
     assert.deepStrictEqual(u8aXOR(false, a, b), aXORb)
 
@@ -17,9 +17,9 @@ describe('testing XORing Uint8Array', function () {
   it('should XOR more than two arrays', function () {
     let a = new Uint8Array([0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0])
     let b = new Uint8Array([255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255])
-    let c = new Uint8Array([15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15])
+    let c = new Uint8Array(15).fill(15)
 
-    let aXORbXORc = new Uint8Array([240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240])
+    let aXORbXORc = new Uint8Array(15).fill(240)
 
     assert.deepStrictEqual(u8aXOR(false, a, b, c), aXORbXORc)
 
