@@ -1,5 +1,5 @@
 import type { TransactionObject } from '../tsc/web3/types'
-import type { Network } from '@hoprnet/hopr-ethereum'
+import { Network, getRpcOptions } from '@hoprnet/hopr-ethereum'
 import assert from 'assert'
 import { publicKeyConvert, publicKeyCreate, ecdsaSign, ecdsaRecover, ecdsaVerify } from 'secp256k1'
 import createKeccakHash from 'keccak'
@@ -25,6 +25,8 @@ import * as events from './events'
 import BN from 'bn.js'
 
 export { time, events }
+
+const rpcOps = getRpcOptions()
 
 /**
  * @param self our node's accountId
@@ -373,8 +375,8 @@ export function getNetworkName(chainId: number): Network {
     //   return 'goerli'
     case 42:
       return 'kovan'
-    // case 77:
-    //   return 'solkol'
+    case 56:
+      return 'binance'
     case 100:
       return 'xdai'
     case 137:
@@ -419,7 +421,7 @@ export function stateCounterToIteration(stateCounter: number): number {
  * @returns signer
  */
 // @TODO: switch to web3js-accounts wallet if it's safe
-export function TransactionSigner(web3: Web3, privKey: Uint8Array) {
+export function TransactionSigner(web3: Web3, network: Network, privKey: Uint8Array) {
   const privKeyStr = new Hash(privKey).toHex()
 
   return async function signTransaction<T>(
@@ -430,7 +432,7 @@ export function TransactionSigner(web3: Web3, privKey: Uint8Array) {
   ) {
     const abi = txObject ? txObject.encodeABI() : undefined
     const gas = 200e3
-    const gasPrice = 1e9
+    const gasPrice = rpcOps[network].gasPrice ?? 1e9
 
     // @TODO: provide some of the values to avoid multiple calls
     const signedTransaction = await web3.eth.accounts.signTransaction(

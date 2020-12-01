@@ -57,7 +57,7 @@ export default class HoprEthereum implements HoprCoreConnector {
     this.types = new types()
     this.channel = new ChannelFactory(this)
 
-    this.signTransaction = utils.TransactionSigner(web3, privateKey)
+    this.signTransaction = utils.TransactionSigner(web3, this.network, privateKey)
     this.log = utils.Log()
   }
 

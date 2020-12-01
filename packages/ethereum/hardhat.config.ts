@@ -21,6 +21,7 @@ const publicNetworks: HardhatUserConfig['networks'] = mapValues(
       chainId: config.chainId,
       url: config.httpUrl,
       gasMultiplier: 1.1,
+      gasPrice: config.gasPrice ?? 'auto',
       accounts: PRIVATE_KEY ? [PRIVATE_KEY] : []
     } as HardhatUserConfig['networks']['hardhat'])
 )
