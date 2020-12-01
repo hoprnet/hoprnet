@@ -48,7 +48,7 @@ const argv = yargs
   })
   .option('provider', {
     describe: 'A provider url for the Network you specified',
-    default: 'wss://ws-mainnet.matic.network'
+    default: 'wss://bsc-ws-node.nariox.org:443'
   })
   .option('host', {
     describe: 'The network host to run the HOPR node on.',
