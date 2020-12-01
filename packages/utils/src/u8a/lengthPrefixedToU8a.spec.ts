@@ -45,7 +45,10 @@ describe('test length-prefixed to u8a', function () {
 
     assert.throws(() => lengthPrefixedToU8a(new Uint8Array([]), new Uint8Array([1]), 2))
 
-    assert.deepStrictEqual(lengthPrefixedToU8a(new Uint8Array([0, 0, 0, 1, 1, 1, 0]), undefined, 7), new Uint8Array([1])),
+    assert.deepStrictEqual(
+      lengthPrefixedToU8a(new Uint8Array([0, 0, 0, 1, 1, 1, 0]), undefined, 7),
+      new Uint8Array([1])
+    ),
       new Uint8Array([1])
   })
 })
