@@ -43,17 +43,26 @@ describe('transport/listener.spec check listening to sockets', function () {
     const stunServers = [await startStunServer(9391, msgReceived[0]), await startStunServer(9392, msgReceived[1])]
 
     for (let i = 0; i < 2; i++) {
-      listener = new Listener(() => {}, (undefined as unknown) as Upgrader, [
-        Multiaddr(`/ip4/127.0.0.1/udp/${stunServers[0].address().port}`),
-        Multiaddr(`/ip4/127.0.0.1/udp/${stunServers[1].address().port}`)
-      ])
+      listener = new Listener(
+        () => {},
+        (undefined as unknown) as Upgrader,
+        [
+          Multiaddr(`/ip4/127.0.0.1/udp/${stunServers[0].address().port}`),
+          Multiaddr(`/ip4/127.0.0.1/udp/${stunServers[1].address().port}`)
+        ],
+        await PeerId.create({ keyType: 'secp256k1' })
+      )
       await listener.listen(Multiaddr(`/ip4/127.0.0.1/tcp/9390/p2p/${peerId.toB58String()}`))
       await listener.close()
     }
 
     await Promise.all(msgReceived.map((received) => received.msgReceived.promise))
 
-    await Promise.all(stunServers.map((s) => new Promise((resolve) => s.close(resolve))))
+    await Promise.all(
+      stunServers.map(
+        (s) => new Promise<void>((resolve) => s.close(resolve))
+      )
+    )
 
     await new Promise((resolve) => setTimeout(resolve, 200))
     assert(
@@ -87,7 +96,8 @@ describe('transport/listener.spec check listening to sockets', function () {
           ({
             upgradeInbound: async (conn: MultiaddrConnection) => conn
           } as unknown) as Upgrader,
-          stunServers
+          stunServers,
+          await PeerId.create({ keyType: 'secp256k1' })
         )
 
         await listener.listen(Multiaddr(`/ip6/::/tcp/${9390 + index}/p2p/${peerId.toB58String()}`))
@@ -102,7 +112,7 @@ describe('transport/listener.spec check listening to sockets', function () {
       }))
 
       await Promise.all([
-        new Promise((resolve) => {
+        new Promise<void>((resolve) => {
           const socket = net.createConnection(
             {
               host: '127.0.0.1',
@@ -116,7 +126,7 @@ describe('transport/listener.spec check listening to sockets', function () {
             }
           )
         }),
-        new Promise((resolve) => {
+        new Promise<void>((resolve) => {
           const socket = net.createConnection(
             {
               host: '::1',

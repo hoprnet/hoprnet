@@ -1,4 +1,6 @@
-import { version } from '../package.json'
+import { version, name } from '../package.json'
+
+export const NAME = name.replace(/@[a-zA-z0-9\-]+\//,'')
 
 // p2p multi-address code
 export const CODE_P2P = 421
@@ -16,6 +18,8 @@ export const WEBRTC_TIMEOUT = 2400
 export const OK = new TextEncoder().encode('OK')
 export const FAIL = new TextEncoder().encode('FAIL')
 export const FAIL_COULD_NOT_REACH_COUNTERPARTY = new TextEncoder().encode('FAIL_COULD_NOT_REACH_COUNTERPARTY')
+export const FAIL_COULD_NOT_IDENTIFY_PEER = new TextEncoder().encode('FAIL_COULD_NOT_IDENTIFY_INITIATOR')
+
 export const STOP = new TextEncoder().encode('STOP')
 export const RESTART = new TextEncoder().encode('RESTART')
 export const PING = new TextEncoder().encode('PING')

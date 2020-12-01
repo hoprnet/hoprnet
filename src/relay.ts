@@ -15,7 +15,15 @@ import handshake, { Handshake } from 'it-handshake'
 import Multiaddr from 'multiaddr'
 import PeerId from 'peer-id'
 
-import { RELAY_CIRCUIT_TIMEOUT, RELAY, OK, FAIL, FAIL_COULD_NOT_REACH_COUNTERPARTY, DELIVERY } from './constants'
+import {
+  RELAY_CIRCUIT_TIMEOUT,
+  RELAY,
+  OK,
+  FAIL,
+  FAIL_COULD_NOT_REACH_COUNTERPARTY,
+  FAIL_COULD_NOT_IDENTIFY_PEER,
+  DELIVERY
+} from './constants'
 
 import { u8aCompare, u8aEquals, pubKeyToPeerId } from '@hoprnet/hopr-utils'
 
@@ -24,7 +32,7 @@ import { RelayContext } from './relayContext'
 import { RelayConnection } from './relayConnection'
 import { WebRTCConnection } from './webRTCConnection'
 
-import type { Connection, DialOptions, Handler, MultiaddrConnection, Stream } from 'libp2p'
+import type { Connection, DialOptions, Handler, Stream } from 'libp2p'
 
 class Relay {
   private _dialer: libp2p['dialer']
@@ -42,9 +50,7 @@ class Relay {
 
     this._streams = new Map<string, { [index: string]: RelayContext }>()
 
-    if (webRTCUpgrader != null) {
-      this._webRTCUpgrader = webRTCUpgrader
-    }
+    this._webRTCUpgrader = webRTCUpgrader
 
     libp2p.handle(RELAY, this.handleRelay.bind(this))
   }
@@ -52,9 +58,9 @@ class Relay {
   async establishRelayedConnection(
     ma: Multiaddr,
     relays: Multiaddr[],
-    onReconnect: (newStream: MultiaddrConnection, counterparty: PeerId) => Promise<void>,
+    onReconnect: (newStream: RelayConnection, counterparty: PeerId) => Promise<void>,
     options?: DialOptions
-  ): Promise<MultiaddrConnection> {
+  ): Promise<RelayConnection> {
     const destination = PeerId.createFromCID(ma.getPeerId())
 
     if (options?.signal?.aborted) {
@@ -85,7 +91,7 @@ class Relay {
   private async _tryPotentialRelay(
     potentialRelay: Multiaddr,
     destination: PeerId,
-    onReconnect: (newStream: MultiaddrConnection, counterparty: PeerId) => Promise<void>,
+    onReconnect: (newStream: RelayConnection, counterparty: PeerId) => Promise<void>,
     options?: DialOptions
   ): Promise<RelayConnection | WebRTCConnection | void> {
     let relayConnection: Connection
@@ -121,8 +127,10 @@ class Relay {
         self: this._peerId,
         counterparty: destination,
         onReconnect,
-        webRTC: channel,
-        webRTCUpgradeInbound: this._webRTCUpgrader.upgradeInbound.bind(this._webRTCUpgrader)
+        webRTC: {
+          channel,
+          upgradeInbound: this._webRTCUpgrader.upgradeInbound.bind(this._webRTCUpgrader)
+        }
       })
 
       return new WebRTCConnection({
@@ -144,11 +152,11 @@ class Relay {
 
   async handleRelayConnection(
     conn: Handler,
-    onReconnect: (newStream: MultiaddrConnection, counterparty: PeerId) => Promise<void>
-  ): Promise<MultiaddrConnection | void> {
+    onReconnect: (newStream: RelayConnection, counterparty: PeerId) => Promise<void>
+  ): Promise<RelayConnection | WebRTCConnection | void> {
     const handShakeResult = await this.handleHandshake(conn.stream)
 
-    if (handShakeResult == null || (handShakeResult as { stream: Stream; counterparty: PeerId }).stream == null) {
+    if (handShakeResult == undefined || handShakeResult.stream == undefined) {
       return
     }
 
@@ -161,7 +169,7 @@ class Relay {
 
     log(`counterparty relayed connection established`)
 
-    if (this._webRTCUpgrader != null) {
+    if (this._webRTCUpgrader != undefined) {
       let channel = this._webRTCUpgrader.upgradeInbound()
 
       let newConn = new RelayConnection({
@@ -169,8 +177,10 @@ class Relay {
         self: this._peerId,
         counterparty: (handShakeResult as { stream: Stream; counterparty: PeerId }).counterparty,
         onReconnect,
-        webRTC: channel,
-        webRTCUpgradeInbound: this._webRTCUpgrader.upgradeInbound.bind(this._webRTCUpgrader)
+        webRTC: {
+          channel,
+          upgradeInbound: this._webRTCUpgrader.upgradeInbound.bind(this._webRTCUpgrader)
+        }
       })
 
       return new WebRTCConnection({
@@ -204,8 +214,12 @@ class Relay {
           try {
             relayConnection = await this._dialer.connectToPeer(newAddress.multiaddrs[0], { signal: options?.signal })
           } catch (err) {
-            log(`Dialling potential relay ${relay.getPeerId()} after querying DHT failed. Error was ${err}`)
+            throw new Error(`Dialling potential relay ${relay.getPeerId()} after querying DHT failed. Error was ${err}`)
           }
+        } else {
+          throw Error(
+            `Could not reach relay ${relay.toString()} and we have no opportunity to find out a more recent address.`
+          )
         }
       }
 
@@ -288,7 +302,7 @@ class Relay {
     return { stream: shaker.stream, counterparty }
   }
 
-  private async handleRelay({ stream, connection }: Handler) {
+  private async handleRelay({ stream, connection }: Handler): Promise<void> {
     log(`handle relay request`)
     const shaker = handshake(stream)
 
@@ -300,9 +314,18 @@ class Relay {
       error(err)
     }
 
-    if (pubKeySender == null) {
+    if (connection == undefined || connection.remotePeer == undefined) {
+      error(`Could not identify peer. Ending relayed connection.`)
+      shaker.write(FAIL_COULD_NOT_IDENTIFY_PEER)
+      shaker.rest()
+      return
+    }
+
+    if (pubKeySender == undefined) {
       error(
-        `Received empty message from peer ${chalk.yellow(connection?.remotePeer.toB58String())} during connection setup`
+        `Received empty message from peer ${chalk.yellow(
+          connection.remotePeer.toB58String()
+        )}. Ending stream because we cannot identify counterparty.`
       )
       shaker.write(FAIL)
       shaker.rest()
@@ -316,7 +339,7 @@ class Relay {
     } catch (err) {
       error(
         `Peer ${chalk.yellow(
-          connection?.remotePeer.toB58String()
+          connection.remotePeer.toB58String()
         )} asked to establish relayed connection to invalid counterparty. Error was ${err}. Received message ${pubKeySender}`
       )
       shaker.write(FAIL)
@@ -324,8 +347,8 @@ class Relay {
       return
     }
 
-    // @TODO
-    if (connection?.remotePeer != null && counterparty.equals(connection.remotePeer)) {
+    if (connection.remotePeer != null && counterparty.equals(connection.remotePeer)) {
+      error(`Peer ${connection.remotePeer}`)
       shaker.write(FAIL)
       shaker.rest()
       return
@@ -364,7 +387,7 @@ class Relay {
       error(err)
     }
 
-    if (forwardingErrThrown || deliveryStream == null) {
+    if (forwardingErrThrown || deliveryStream! == null) {
       // @TODO end deliveryStream
       shaker.write(FAIL_COULD_NOT_REACH_COUNTERPARTY)
       shaker.rest()
@@ -393,7 +416,7 @@ class Relay {
     this._streams.set(channelId, streams)
   }
 
-  private async establishForwarding(initiator: PeerId, counterparty: PeerId) {
+  private async establishForwarding(initiator: PeerId, counterparty: PeerId): Promise<Stream> {
     let timeout: any
 
     let newConn = this._registrar.getConnection(counterparty)

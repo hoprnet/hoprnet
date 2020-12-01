@@ -4,7 +4,7 @@ import { durations, u8aConcat, u8aEquals } from '@hoprnet/hopr-utils'
 import { RELAY_PAYLOAD_PREFIX } from './constants'
 import { RelayContext } from './relayContext'
 import { RelayConnection } from './relayConnection'
-import type { MultiaddrConnection, Stream } from 'libp2p'
+import type { Stream } from 'libp2p'
 import assert from 'assert'
 
 import Pair from 'it-pair'
@@ -130,7 +130,7 @@ describe('test overwritable connection', function () {
       },
       self,
       counterparty,
-      onReconnect: async (newStream: MultiaddrConnection) => {
+      onReconnect: async (newStream: RelayConnection) => {
         iteration++
         const demoStream = getStream({ usePrefix: false, designatedReceiverId: newSenderId })
 
@@ -156,7 +156,7 @@ describe('test overwritable connection', function () {
 
     // Make sure that we the ping went through
     // Note that `result == -1` means timeout
-    assert((await pingPromise) >= 0)
+    assert((await pingPromise!) >= 0)
 
     await ctx.close()
   })

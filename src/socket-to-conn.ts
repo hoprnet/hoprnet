@@ -56,7 +56,7 @@ export function socketToConn(
   const { sink, source } = toIterable.duplex(socket)
   const maConn: MultiaddrConnection = {
     async sink(source) {
-      if (options.signal) {
+      if (options?.signal) {
         source = abortable(source, options?.signal) as Stream['source']
       }
 
@@ -85,10 +85,11 @@ export function socketToConn(
 
     conn: socket,
 
-    localAddr: options.localAddr || toWebrtcMultiaddr(socket.localAddress, socket.localPort),
+    localAddr: options.localAddr ?? toWebrtcMultiaddr(socket.localAddress, socket.localPort),
 
     // If the remote address was passed, use it - it may have the peer ID encapsulated
-    remoteAddr: options.remoteAddr || toWebrtcMultiaddr(socket.remoteAddress, socket.remotePort),
+    // @ts-ignore @TODO
+    remoteAddr: options.remoteAddr ?? toWebrtcMultiaddr(socket.remoteAddress, socket.remotePort),
 
     timeline: { open: Date.now() },
 

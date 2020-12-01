@@ -6,7 +6,8 @@ import debug from 'debug'
 
 import { socketToConn } from './socket-to-conn'
 import { CODE_P2P } from './constants'
-import type { Connection } from 'libp2p'
+import type { Connection, ConnHandler } from 'libp2p'
+import type PeerId from 'peer-id'
 import { MultiaddrConnection, Upgrader } from 'libp2p'
 import Multiaddr from 'multiaddr'
 
@@ -49,18 +50,18 @@ class Listener extends EventEmitter {
 
   private state: State
 
-  private listeningAddr: Multiaddr
-  private peerId: string
+  private listeningAddr?: Multiaddr
 
-  private externalAddress: {
+  private externalAddress?: {
     address: string
     port: number
   }
 
   constructor(
-    private handler: (conn: Connection) => void,
+    private handler: ConnHandler | undefined,
     private upgrader: Upgrader,
-    private stunServers: Multiaddr[]
+    private stunServers: Multiaddr[] | undefined,
+    private peerId: PeerId
   ) {
     super()
 
@@ -103,16 +104,17 @@ class Listener extends EventEmitter {
       throw Error(`Cannot listen after 'close()' has been called`)
     }
 
-    this.listeningAddr = ma
-    this.peerId = ma.getPeerId()
+    if (this.peerId.toB58String() !== ma.getPeerId()) {
+      let tmpListeningAddr = ma.decapsulateCode(CODE_P2P)
 
-    if (this.peerId == null) {
-      this.listeningAddr = ma.decapsulateCode(CODE_P2P)
-
-      verbose(`No peerId for ${ma.toString()}`)
-      if (!this.listeningAddr.isThinWaistAddress()) {
-        throw Error(`Unable to bind socket to <${this.listeningAddr.toString()}>`)
+      if (!tmpListeningAddr.isThinWaistAddress()) {
+        throw Error(`Unable to bind socket to <${tmpListeningAddr.toString()}>`)
       }
+
+      // Replace wrong PeerId in given listeningAddr
+      this.listeningAddr = tmpListeningAddr.encapsulate(`/p2p/${this.peerId.toB58String()}`)
+    } else {
+      this.listeningAddr = ma
     }
 
     const options = this.listeningAddr.toOptions()
@@ -125,7 +127,7 @@ class Listener extends EventEmitter {
     })
 
     await Promise.all([
-      new Promise((resolve, reject) =>
+      new Promise<void>((resolve, reject) =>
         this.tcpSocket.listen(options, (err?: Error) => {
           if (err) return reject(err)
           log('Listening on %s', this.tcpSocket.address())
@@ -133,7 +135,7 @@ class Listener extends EventEmitter {
         })
       ),
       // @TODO handle socket bind error(s)
-      new Promise((resolve /*, reject*/) =>
+      new Promise<void>((resolve /*, reject*/) =>
         this.udpSocket.bind(options.port, async () => {
           try {
             this.externalAddress = await getExternalIp(this.stunServers, this.udpSocket)
@@ -178,18 +180,18 @@ class Listener extends EventEmitter {
     let addrs: Multiaddr[] = []
     const address = this.tcpSocket.address() as AddressInfo
 
-    if (this.externalAddress != null && this.externalAddress.port == null) {
+    if (this.externalAddress == undefined) {
       log(`Attention: Bidirectional NAT detected. Publishing no public IPv4 address to the DHT`)
 
       addrs.push(Multiaddr(`/p2p/${this.peerId}`))
 
       addrs.push(
-        ...getAddrs(address.port, this.peerId, {
+        ...getAddrs(address.port, this.peerId.toB58String(), {
           includeLocalhostIPv4: true,
           useIPv6: false
         })
       )
-    } else if (this.externalAddress != null && this.externalAddress.port != null) {
+    } else {
       addrs.push(
         Multiaddr.fromNodeAddress(
           {
@@ -202,13 +204,11 @@ class Listener extends EventEmitter {
       )
 
       addrs.push(
-        ...getAddrs(address.port, this.peerId, {
+        ...getAddrs(address.port, this.peerId.toB58String(), {
           includeLocalhostIPv4: true,
           useIPv6: false
         })
       )
-    } else {
-      addrs.push(this.listeningAddr)
     }
 
     return addrs
@@ -230,7 +230,7 @@ class Listener extends EventEmitter {
     // Avoid uncaught errors caused by unstable connections
     socket.on('error', (err) => error('socket error', err))
 
-    let maConn: MultiaddrConnection
+    let maConn: MultiaddrConnection | undefined
     let conn: Connection
     try {
       maConn = socketToConn(socket, { listeningAddr: this.listeningAddr })
@@ -238,7 +238,12 @@ class Listener extends EventEmitter {
       conn = await this.upgrader.upgradeInbound(maConn)
     } catch (err) {
       error('inbound connection failed', err)
-      return attemptClose(maConn)
+
+      if (maConn != undefined) {
+        return attemptClose(maConn)
+      }
+
+      return
     }
 
     log('inbound connection %s upgraded', maConn.remoteAddr)

@@ -11,6 +11,11 @@ export type Interface = {
   address: string
 }
 
+type ConnectionInfo = {
+  port: number
+  address: string
+}
+
 export const STUN_TIMEOUT = 1000
 
 export const PUBLIC_STUN_SERVERS = [
@@ -38,24 +43,16 @@ export function handleStunRequest(socket: Socket, data: Buffer, rinfo: RemoteInf
   console.log = backup
 }
 
-export function getExternalIp(
-  multiAddrs: Multiaddr[],
-  socket: Socket
-): Promise<{
-  port: number
-  address: string
-}> {
-  if (multiAddrs == null || multiAddrs.length == 0) {
-    multiAddrs = PUBLIC_STUN_SERVERS
-  }
-  return new Promise((resolve, reject) => {
+export function getExternalIp(multiAddrs: Multiaddr[] | undefined, socket: Socket): Promise<ConnectionInfo> {
+  return new Promise<ConnectionInfo>((resolve, reject) => {
+    if (multiAddrs == undefined || multiAddrs.length == 0) {
+      multiAddrs = PUBLIC_STUN_SERVERS
+    }
+
     verbose(`Getting external IP by using ${multiAddrs.map((m) => m.toString()).join(',')}`)
     const tids = Array.from({ length: multiAddrs.length }).map(stun.generateTransactionId)
 
-    let result: {
-      address: string
-      port: number
-    }
+    let result: ConnectionInfo
 
     // @TODO add assert call
     // let _finished = false
@@ -81,7 +78,7 @@ export function getExternalIp(
           })
         ) {
           verbose(`stun response received`)
-          tids.splice(index, 1)
+          tids.splice(index!, 1)
           const attr = res.getXorMappedAddressAttribute() || res.getMappedAddressAttribute()
 
           if (attr != null) {
@@ -92,9 +89,14 @@ export function getExternalIp(
               // @TODO add assert call
               // _finished = true
               clearTimeout(timeout)
+
+              if (attr.address === result.address && attr.port == result.port) {
+                reject()
+              }
+
               resolve({
-                address: attr.address === result.address ? attr.address : undefined,
-                port: attr.port == result.port ? attr.port : undefined
+                address: attr.address,
+                port: attr.port
               })
             }
           }

@@ -7,7 +7,7 @@ import errCode from 'err-code'
 import debug from 'debug'
 import { socketToConn } from './socket-to-conn'
 import Listener from './listener'
-import { CODE_P2P, DELIVERY, USE_WEBRTC } from './constants'
+import { NAME, CODE_P2P, DELIVERY, USE_WEBRTC } from './constants'
 import type Multiaddr from 'multiaddr'
 import PeerId from 'peer-id'
 import type libp2p from 'libp2p'
@@ -32,12 +32,11 @@ const error = debug('hopr-core:transport:error')
 const verbose = debug('hopr-core:verbose:transport')
 
 /**
- * @class TCP
+ * @class HoprConnect
  */
-class TCP {
+class HoprConnect {
   get [Symbol.toStringTag]() {
-    // @TODO change this to sth more meaningful
-    return 'TCP'
+    return NAME
   }
 
   private _useWebRTC: boolean
@@ -45,12 +44,12 @@ class TCP {
   private _peerId: PeerId
   private _multiaddrs: Multiaddr[]
   private relays?: Multiaddr[]
-  private stunServers: Multiaddr[]
+  private stunServers?: Multiaddr[]
   private _relay: Relay
   private _connectionManager: ConnectionManager
   private _dialer: Dialer
-  private _webRTCUpgrader: WebRTCUpgrader
-  private connHandler: ConnHandler
+  private _webRTCUpgrader?: WebRTCUpgrader
+  private connHandler?: ConnHandler
 
   constructor({
     upgrader,
@@ -69,7 +68,7 @@ class TCP {
       throw new Error('Transport module needs access to libp2p.')
     }
 
-    if (bootstrapServers?.length > 0) {
+    if (bootstrapServers != undefined && bootstrapServers.length > 0) {
       this.relays = bootstrapServers.filter(
         (ma: Multiaddr) => ma !== undefined && !libp2p.peerId.equals(PeerId.createFromCID(ma.getPeerId()))
       )
@@ -112,21 +111,25 @@ class TCP {
     )
   }
 
-  async onReconnect(this: TCP, newStream: MultiaddrConnection, counterparty: PeerId): Promise<void> {
+  async onReconnect(this: HoprConnect, newStream: RelayConnection, counterparty: PeerId): Promise<void> {
     log(`####### inside reconnect #######`)
 
+    let newConn: Connection
+
     try {
-      if (this._webRTCUpgrader != null) {
-        newStream = new WebRTCConnection({
-          conn: newStream,
-          self: this._peerId,
-          counterparty,
-          channel: (newStream as RelayConnection).webRTC,
-          iteration: (newStream as RelayConnection)._iteration
-        })
+      if (this._webRTCUpgrader != undefined) {
+        newConn = await this._upgrader.upgradeInbound(
+          new WebRTCConnection({
+            conn: newStream,
+            self: this._peerId,
+            counterparty,
+            channel: newStream.webRTC!.channel,
+            iteration: newStream._iteration
+          })
+        )
       }
 
-      let newConn = await this._upgrader.upgradeInbound(newStream)
+      newConn = await this._upgrader.upgradeInbound(newStream)
 
       this._dialer._pendingDials[counterparty.toB58String()]?.destroy()
       this._connectionManager.connections.set(counterparty.toB58String(), [newConn])
@@ -137,7 +140,7 @@ class TCP {
     }
   }
 
-  async handleDelivery(handler: Handler): Promise<void> {
+  async handleDelivery(this: HoprConnect, handler: Handler): Promise<void> {
     let newConn: Connection
 
     try {
@@ -166,7 +169,7 @@ class TCP {
   async dial(ma: Multiaddr, options?: DialOptions): Promise<Connection> {
     options = options || {}
 
-    let error: Error
+    let error: Error | undefined
     if (
       // uncommenting next line forces our node to use a relayed connection to any node execpt for the bootstrap server
       (this.relays == null || this.relays.some((mAddr: Multiaddr) => ma.getPeerId() === mAddr.getPeerId())) &&
@@ -193,12 +196,12 @@ class TCP {
       }
     }
 
-    if (this.relays === undefined) {
+    if (this.relays == undefined || this.relays.length == 0) {
       throw Error(
         `Could not connect ${chalk.yellow(
           ma.toString()
         )} because we can't connect directly and we have no potential relays.${
-          error != null ? ` Connection error was:\n${error}` : ''
+          error != undefined ? ` Connection error was:\n${error}` : ''
         }`
       )
     }
@@ -210,7 +213,7 @@ class TCP {
       throw Error(
         `Destination ${chalk.yellow(
           ma.toString()
-        )} cannot be accessed and directly and there is no other relay node known.${
+        )} cannot be accessed and directly and there is no other relay node known except ourself.${
           error != null ? ` Connection error was:\n${error}` : ''
         }`
       )
@@ -247,8 +250,8 @@ class TCP {
    * @param options.signal Used to abort dial requests
    * @returns Resolves a TCP Socket
    */
-  private _connect(ma: Multiaddr, options: DialOptions): Promise<Socket> {
-    if (options.signal && options.signal.aborted) {
+  private _connect(ma: Multiaddr, options?: DialOptions): Promise<Socket> {
+    if (options?.signal?.aborted) {
       throw new AbortError()
     }
 
@@ -266,6 +269,7 @@ class TCP {
         verbose('Error connecting:', err)
         // ENETUNREACH
         // ECONNREFUSED
+        // @TODO check error(s)
         err.message = `connection error ${cOpts.host}:${cOpts.port}: ${err.message}`
         done(err)
       }
@@ -292,7 +296,7 @@ class TCP {
         rawSocket.removeListener('error', onError)
         rawSocket.removeListener('timeout', onTimeout)
         rawSocket.removeListener('connect', onConnect)
-        options.signal?.removeEventListener('abort', onAbort)
+        options?.signal?.removeEventListener('abort', onAbort)
 
         if (err) {
           return reject(err)
@@ -303,7 +307,7 @@ class TCP {
       rawSocket.on('error', onError)
       rawSocket.on('timeout', onTimeout)
       rawSocket.on('connect', onConnect)
-      options.signal?.addEventListener('abort', onAbort)
+      options?.signal?.addEventListener('abort', onAbort)
     })
   }
 
@@ -320,7 +324,7 @@ class TCP {
     } else {
       this.connHandler = handler
     }
-    return new Listener(this.connHandler, this._upgrader, this.stunServers)
+    return new Listener(this.connHandler, this._upgrader, this.stunServers, this._peerId)
   }
 
   /**
@@ -331,9 +335,9 @@ class TCP {
   filter(multiaddrs: Multiaddr[]): Multiaddr[] {
     multiaddrs = Array.isArray(multiaddrs) ? multiaddrs : [multiaddrs]
     verbose('filtering multiaddrs')
-    return multiaddrs.filter((ma: Multiaddr) => {
-      return mafmt.TCP.matches(ma.decapsulateCode(CODE_P2P)) || mafmt.P2P.matches(ma)
-    })
+    return multiaddrs.filter(
+      (ma: Multiaddr) => mafmt.TCP.matches(ma.decapsulateCode(CODE_P2P)) || mafmt.P2P.matches(ma)
+    )
   }
 
   /**
@@ -369,4 +373,4 @@ class TCP {
   }
 }
 
-export default TCP
+export default HoprConnect
