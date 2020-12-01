@@ -40,6 +40,7 @@
     "p-defer": "~3.0.0",
     "peer-id": "~0.14.2",
     "simple-peer": "9.9.3",
+    "stream-to-it": "^0.2.2",
     "webrtc-stun": "~3.0.0",
     "wrtc": "0.4.6"
   },
@@ -48,6 +49,7 @@
     "@types/mocha": "~8.0.4",
     "@types/node": "12",
     "@types/simple-peer": "9",
+    "it-pair": "^1.0.0",
     "memdown": "^5.1.0",
     "prettier": "~2.2.1",
     "mocha": "^8.0.1",
