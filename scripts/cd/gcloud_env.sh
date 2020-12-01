@@ -16,4 +16,5 @@ else
   echo "GCLOUD_ACTION_CONTAINER=create"
 fi
 
+echo "GCLOUD_VM_DISK=/mnt/disks/gce-containers-mounts/gce-persistent-disks/bs-${ENV}"
 echo "GCLOUD_VM_NAME=${ENV}-bootstrap"
