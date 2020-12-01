@@ -432,7 +432,7 @@ export function TransactionSigner(web3: Web3, network: Network, privKey: Uint8Ar
   ) {
     const abi = txObject ? txObject.encodeABI() : undefined
     const gas = 200e3
-    const gasPrice = rpcOps[network].gasPrice ?? 1e9
+    const gasPrice = rpcOps[network]?.gasPrice ?? 1e9
 
     // @TODO: provide some of the values to avoid multiple calls
     const signedTransaction = await web3.eth.accounts.signTransaction(
