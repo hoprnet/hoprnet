@@ -20,14 +20,14 @@ const parsePromises = (envMap) => (envs) => envs.forEach(({ stdout, stderr }) =>
 const main = async () => {
   try {
     const envMap = {}
-    envMap.RELEASE_VERSION = RELEASE_VERSION;
-    envMap.BS_PASSWORD = BS_PASSWORD;
+    envMap.RELEASE_VERSION = RELEASE_VERSION
+    envMap.BS_PASSWORD = BS_PASSWORD
     await Promise.all([execFile(releaseEnvScript), execFile(gcloudEnvScript)]).then(parsePromises(envMap))
-    return envMap;
+    return envMap
   } catch (e) {
     console.error('Error', e)
     return {}
   }
 }
 
-module.exports = main;
+module.exports = main
