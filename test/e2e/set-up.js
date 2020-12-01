@@ -21,7 +21,7 @@ const main = async () => {
       execFile(addressEnvScript)
     ]
     const resolvedEnvPromises = await Promise.all(envPromises)
-    resolvedEnvPromises.map(
+    resolvedEnvPromises.forEach(
       ({stdout, stderr}) => parseStdout(stdout, envMap)
     )
     console.log(envMap)
