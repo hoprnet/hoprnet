@@ -29,6 +29,7 @@ async function main(
   console.log(deployer)
 
   console.log('Running task "migrate" with config:', {
+    deployer,
     network: network.name,
     ...migrationOptions
   })
@@ -37,6 +38,7 @@ async function main(
   const addresses = {}
 
   // deploy ERC1820Registry
+  // @TODO: when ERC1820Registry is missing in a public network, it cant be deployed
   console.log('Deploying ERC1820Registry')
   const ERC1820Registry = await singletons.ERC1820Registry(deployer)
   console.log(`Deployed or Found ERC1820Registry: ${ERC1820Registry.address}`)

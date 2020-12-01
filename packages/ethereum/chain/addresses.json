@@ -18,5 +18,10 @@
     "HoprToken": "0x4774fEd3f2838f504006BE53155cA9cbDDEe9f0c",
     "HoprChannels": "0xE345a588e9d7DcCD0E92E6E00EF097EA8a0eFDB0",
     "HoprMinter": "0x517a5d6A55a2eF146168A4b858b99e5d68EC2613"
+  },
+  "binance": {
+    "HoprToken": "0x9cf282412730c268f24fe877A3483ed230A3060c",
+    "HoprChannels": "0x504a24F1398Be1824C35Bc5964b23Ba292991dA5",
+    "HoprMinter": "0xED50BFb9a7ac69D778DC6EBebA5885FdB9A9f427"
   }
 }
