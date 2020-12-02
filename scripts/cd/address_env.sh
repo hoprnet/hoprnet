@@ -4,8 +4,8 @@
 # @param {('**')} RELEASE_VERSION - The version of the docker image
 # @param {('**')} BS_PASSWORD - The password of the bootstrap server
 # @requires gcloud
-
 set -eu
+[[ ! $(type -P "gcloud") ]] && { echo "gcloud is NOT in PATH, exiting." 1>&2; exit 1; }
 
 _GCLOUD_SSH_COMMAND="gcloud compute ssh --ssh-flag='-t' --zone=europe-west6-a $GCLOUD_VM_NAME"
 _DOCKER_ENTRYPOINT="docker run -v $GCLOUD_VM_DISK:/app/db --entrypoint=node"

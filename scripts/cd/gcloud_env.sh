@@ -2,6 +2,7 @@
 # @param {('master'|'**')} RELEASE_NAME - The name of the release to deploy
 # @requires gcloud
 set -e
+[[ ! $(type -P "gcloud") ]] && { echo "gcloud is NOT in PATH, exiting." 1>&2; exit 1; }
 
 if [[ -z "${RELEASE_NAME}" ]]; then
   ENV="master"
