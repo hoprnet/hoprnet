@@ -13,8 +13,8 @@ const gcloudEnvScript = DIR_NAME + 'gcloud_env.sh'
 const main = async () => {
   try {
     const envMap = {}
-    envMap.RELEASE_VERSION = RELEASE_VERSION;
-    envMap.BS_PASSWORD = BS_PASSWORD;
+    envMap.RELEASE_VERSION = RELEASE_VERSION
+    envMap.BS_PASSWORD = BS_PASSWORD
     await Promise.all([execFile(releaseEnvScript), execFile(gcloudEnvScript)]).then(utils.parsePromises(envMap))
     return envMap;
   } catch (e) {
@@ -23,4 +23,4 @@ const main = async () => {
   }
 }
 
-module.exports = main;
+module.exports = main
