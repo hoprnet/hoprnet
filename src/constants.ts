@@ -1,4 +1,5 @@
-import { version, name } from '../package.json'
+// @ts-ignore
+const { name, version } = require('../package.json')
 
 export const NAME = name.replace(/@[a-zA-z0-9\-]+\//, '')
 

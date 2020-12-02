@@ -1,2 +1,8 @@
+# Node.js packets
 node_modules
+
+# Built typescript
 lib
+
+# npm packets
+*.tgz

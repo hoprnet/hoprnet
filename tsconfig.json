@@ -1,7 +1,6 @@
 {
   "compilerOptions": {
-    "resolveJsonModule": true,
-    "lib": ["es2019", "dom"],
+    "lib": ["es2019", "dom", "es2020.promise", "es2020.bigint", "es2020.string"],
     "module": "commonjs",
     "target": "es2019",
     "declaration": true,
@@ -12,8 +11,8 @@
     "esModuleInterop": true,
     "noImplicitReturns": true,
     "strict": true,
-    "outDir": "lib"
+    "outDir": "lib",
+    "forceConsistentCasingInFileNames": true
   },
-  "exclude": ["lib", "node_modules"],
   "include": ["src/**/*.ts"]
 }
