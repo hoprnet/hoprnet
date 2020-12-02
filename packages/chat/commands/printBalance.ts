@@ -31,7 +31,7 @@ export default class PrintBalance extends AbstractCommand {
     })
 
     // @TODO: use 'NativeBalance' and 'Balance' to display currencies
-    const nativePrefix = 'Matic Balance:'
+    const nativePrefix = 'BNB Balance:'
     const nativeBalance = await paymentChannels.account.nativeBalance.then((b) => {
       return moveDecimalPoint(b.toString(), NativeBalance.DECIMALS * -1)
     })
@@ -41,7 +41,7 @@ export default class PrintBalance extends AbstractCommand {
     // TODO: use 'NativeBalance' and 'Balance' to display currencies
     return [
       `${hoprPrefix.padEnd(prefixLength, ' ')}${styleValue(hoprBalance, 'number')} HOPR`,
-      `${nativePrefix.padEnd(prefixLength, ' ')}${styleValue(nativeBalance, 'number')} Matic`
+      `${nativePrefix.padEnd(prefixLength, ' ')}${styleValue(nativeBalance, 'number')} BNB`
     ].join('\n')
   }
 }
