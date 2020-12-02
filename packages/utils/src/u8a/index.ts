@@ -1,5 +1,6 @@
 export * from './constants'
 
+export * from './allocate'
 export * from './concat'
 
 export * from './xor'
