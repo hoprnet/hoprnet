@@ -25,6 +25,9 @@ on:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           yarn install --frozen-lockfile
+      - name: Link & Build
+        run: |
+          yarn build
       - name: Publish to NPM Registry
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
