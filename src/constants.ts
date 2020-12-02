@@ -1,6 +1,6 @@
 import { version, name } from '../package.json'
 
-export const NAME = name.replace(/@[a-zA-z0-9\-]+\//,'')
+export const NAME = name.replace(/@[a-zA-z0-9\-]+\//, '')
 
 // p2p multi-address code
 export const CODE_P2P = 421
