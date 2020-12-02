@@ -3,13 +3,13 @@ set -e
 shopt -s expand_aliases
 
 # Variables
-NETWORK=wss://ws-mainnet.matic.network
+PROVIDER=wss://ws-mainnet.matic.network
 BOB_ADDR=127.0.0.1
 BOB_PORT=9876
 CHARLIE_ADDR=127.0.0.1
 CHARLIE_PORT=9877
 
-alias hoprd="node packages/hoprd/lib/index.js --network $NETWORK"
+alias hoprd="node packages/hoprd/lib/index.js --provider $PROVIDER"
 
 # Check Databases
 echo "alice"
