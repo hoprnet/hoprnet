@@ -31,6 +31,7 @@
     "prepublishOnly": "yarn build"
   },
   "dependencies": {
+    "@hoprnet/hopr-connect": "github.com/hoprnet/hopr-connect",
     "@hoprnet/hopr-core-ethereum": "1.57.0-next.18",
     "@hoprnet/hopr-utils": "1.57.0-next.18",
     "abort-controller": "^3.0.0",
