@@ -1,7 +1,8 @@
 import AbortController from 'abort-controller'
+import type { AbortSignal } from 'abort-controller'
 
 // Reject the body promise if it hasn't settled after timeout
-export function timeoutAfter<T>(body: (abortSignal) => Promise<T>, timeout: number): Promise<T> {
+export function timeoutAfter<T>(body: (abortSignal: AbortSignal) => Promise<T>, timeout: number): Promise<T> {
   const abortController = new AbortController()
   const timeoutPromise = new Promise<T>((_resolve, reject) => {
     setTimeout(() => {
