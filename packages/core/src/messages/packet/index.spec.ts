@@ -32,7 +32,6 @@ async function generateNode(
   bootstrapServers?: Multiaddr[]
 ): Promise<Hopr<HoprEthereum>> {
   // Start HOPR in DEBUG_MODE and use demo seeds
-  console.log('Node', id, NODE_SEEDS[id], await privKeyToPeerId(NODE_SEEDS[id]))
   return (await Hopr.create({
     id,
     peerId: await privKeyToPeerId(NODE_SEEDS[id]),

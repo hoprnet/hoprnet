@@ -1,9 +1,7 @@
 import type HoprEthereum from '.'
 import { Hash } from './types'
-
-//import Debug from 'debug'
-//const log = Debug('hopr-core-ethereum:hashedSecret')
-
+import Debug from 'debug'
+const log = Debug('hopr-core-ethereum:hashedSecret')
 import { randomBytes } from 'crypto'
 import { u8aEquals, u8aToHex, u8aConcat } from '@hoprnet/hopr-utils'
 import { publicKeyConvert } from 'secp256k1'
@@ -82,14 +80,14 @@ class HashedSecret {
   }
 
   private async storeSecretOnChain(secret: Hash): Promise<void> {
-    console.log('storing secret on chain')
+    log('storing secret on chain')
     const account = await this.coreConnector.hoprChannels.methods
       .accounts((await this.coreConnector.account.address).toHex())
       .call()
 
     if (isNullAccount(account.accountX)) {
       const uncompressedPubKey = publicKeyConvert(this.coreConnector.account.keys.onChain.pubKey, false).slice(1)
-      console.log('account is also null, calling channel.init')
+      log('account is also null, calling channel.init')
       try {
         await this.coreConnector.utils.waitForConfirmation(
           (
@@ -113,14 +111,14 @@ class HashedSecret {
           // calls may be in flight at once, and therefore we may have init
           // called on an initialized account. If so, trying again should solve
           // the problem.
-          console.log('race condition encountered in HoprChannel.init - retrying')
+          log('race condition encountered in HoprChannel.init - retrying')
           return this.storeSecretOnChain(secret)
         }
         throw e
       }
     } else {
       // @TODO this is potentially dangerous because it increases the account counter
-      console.log('account is already on chain, storing secret.')
+      log('account is already on chain, storing secret.')
       try {
         await this.coreConnector.utils.waitForConfirmation(
           (
@@ -143,7 +141,7 @@ class HashedSecret {
       }
     }
 
-    console.log('stored on chain')
+    log('stored on chain')
   }
 
   private async calcOnChainSecretFromDb(debug: boolean): Promise<Hash> {
@@ -267,7 +265,7 @@ class HashedSecret {
         await this.findPreImage(onChainSecret)
         return { initialized: true, onChainSecret, offChainSecret }
       } catch (err) {
-        console.log(err)
+        log(err)
       }
     }
     return { initialized: false, onChainSecret, offChainSecret }
@@ -279,7 +277,7 @@ class HashedSecret {
   public async initialize(debug?: boolean): Promise<void> {
     const { initialized, onChainSecret, offChainSecret } = await this.check()
     if (initialized) {
-      console.log(`Secret is initialized.`)
+      log(`Secret is initialized.`)
       return
     }
 
@@ -288,20 +286,20 @@ class HashedSecret {
     const onlyOnChain = !bothEmpty && !bothExist && typeof onChainSecret !== 'undefined'
 
     if (bothEmpty) {
-      console.log(`Secret not found, initializing..`)
+      log(`Secret not found, initializing..`)
     } else if (bothExist) {
-      console.log(`Secret is found but failed to find preimage, reinitializing..`)
+      log(`Secret is found but failed to find preimage, reinitializing..`)
     } else if (onlyOnChain) {
-      console.log(`Secret is present on-chain but not off-chain, reinitializing..`)
+      log(`Secret is present on-chain but not off-chain, reinitializing..`)
     } else {
-      console.log(`Secret is present off-chain but not on-chain, submitting..`)
+      log(`Secret is present off-chain but not on-chain, submitting..`)
     }
 
     if (bothEmpty || bothExist || onlyOnChain) {
       const offChainSecret = await this.createAndStoreSecretOffChain(debug)
-      console.log('... secret generated, storing')
+      log('... secret generated, storing')
       await this.storeSecretOnChain(offChainSecret)
-      console.log('... initialized')
+      log('... initialized')
     } else {
       const onChainSecret = await this.calcOnChainSecretFromDb(debug)
       await this.storeSecretOnChain(onChainSecret)

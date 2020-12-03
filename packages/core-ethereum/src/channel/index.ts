@@ -219,7 +219,6 @@ class ChannelFactory {
           Buffer.from(signedChannel)
         )
       } catch (e) {
-        console.log(e)
         if (e.message.match(/counterparty must have called init/)) {
           throw new Error('Cannot open channel to an uninitialized counterparty')
         }
