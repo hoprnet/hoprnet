@@ -5,7 +5,7 @@ services:
       context: ../hoprd
       dockerfile: ./Dockerfile
       args:
-        network: matic-testnet
+        network: bnb-testnet
     image: 'hopr.avado.dnp.dappnode.eth:0.100.0'
     restart: always
     volumes:

@@ -34,30 +34,35 @@ export function randomInteger(start: number, end?: number): number {
 
   let bytes = randomBytes(byteAmount)
 
-  let bitCounter = 0
   let byteCounter = 0
+  let bitCounter = 0
 
-  const nextBit = (): number => {
-    let result = bytes[byteCounter] % 2
-    bytes[byteCounter] = bytes[byteCounter] >> 1
-    if (++bitCounter == 8) {
+  const nextBit = (): boolean => {
+    let result = Boolean(bytes[byteCounter] & (1 << bitCounter))
+
+    if (bitCounter == 8) {
       bitCounter = 0
       byteCounter++
+    } else {
+      bitCounter++
     }
+
     return result
   }
 
   let result = 0
   for (let i = 0; i < byteAmount; i++) {
     for (let j = 0; j < 8; j++) {
-      if ((result | (1 << (i * 8 + j))) < interval) {
+      let offset = i * 8 + j
+      if ((result | (1 << offset)) < interval) {
         if (nextBit()) {
-          result |= 1 << (i * 8 + j)
+          result |= 1 << offset
         }
       }
     }
   }
 
+  // Projects interval from [0, end - start) to [start, end)
   return end == null ? result : start + result
 }
 

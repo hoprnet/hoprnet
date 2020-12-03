@@ -55,7 +55,11 @@ jobs:
         shell: bash {0}
         run: |
           shopt -s expand_aliases
-          alias hoprd="node packages/hoprd/lib/index.js"
+
+          # Variables
+          PROVIDER=wss://ws-mainnet.matic.network
+
+          alias hoprd="node packages/hoprd/lib/index.js --provider $PROVIDER"
 
           echo "alice"
           hoprd --data='./test/fixtures/alice' --password="$DBPASS" --runAsBootstrap --run "myAddress" 

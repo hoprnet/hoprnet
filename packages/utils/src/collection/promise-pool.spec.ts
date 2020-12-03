@@ -3,8 +3,8 @@ import assert from 'assert'
 
 describe('testing promise pool', () => {
   it('limitConcurrency should be similar to promise.all below a threshold', async () => {
-    let resolveA
-    let resolveB
+    let resolveA: (arg: number) => void
+    let resolveB: (arg: number) => void
     let a: Promise<number> = new Promise((r) => {
       resolveA = r
     })
@@ -29,8 +29,8 @@ describe('testing promise pool', () => {
   it('limitConcurrency should run a maximum of maxConcurrency promises at once', async () => {
     let totalPromises = 5
     let maxConcurrency = 3
-    let resolvers = []
-    let promises = []
+    let resolvers: (() => void)[] = []
+    let promises: Promise<void>[] = []
     for (let i = 0; i < totalPromises; i++) {
       promises.push(
         new Promise((r) => {
@@ -51,8 +51,8 @@ describe('testing promise pool', () => {
   })
 
   it('should act like Promise.all - rejections cause exit', async () => {
-    let resolveA
-    let rejectB
+    let resolveA: (arg: number) => void
+    let rejectB: () => void
     let a: Promise<number> = new Promise((r) => {
       resolveA = r
     })
