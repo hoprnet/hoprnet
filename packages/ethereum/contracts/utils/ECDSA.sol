@@ -3,9 +3,6 @@ pragma solidity ^0.6.0;
 
 /**
  * @dev Elliptic Curve Digital Signature Algorithm (ECDSA) operations.
- *
- * These functions can be used to verify that a message was signed by the holder
- * of the private keys of a given address.
  */
 library ECDSA {
     // y^2 = x^3 + 7 mod p, where p is FIELD_ORDER
@@ -23,71 +20,10 @@ library ECDSA {
     }
 
     /**
-     * @dev Computes the Ethereum address from a public key given as a
-     * compressed EC-point.
+     * @dev @TODO: update
      */
-    function compressedPubKeyToEthereumAddress(uint256 compressedX, uint8 odd) internal returns (address) {
-        (uint256 x, uint256 y) = decompress(compressedX, odd);
-        return pubKeyToEthereumAddress(x, y);
-    }
-
-    function compress(uint256 x, uint256 y) internal pure returns (uint256, uint8) {
-        return (x, uint8(y % 2));
-    }
-
-    /**
-     * @dev Decompresses a compressed elliptic curve point and
-     * returns the uncompressed version.
-     * @notice secp256k1: y^2 = x^3 + 7 (mod p)
-     * "Converts from (x, 1 / 0) to (x,y)"
-     */
-    function decompress(uint256 x, uint8 odd) internal returns (uint256, uint256) {
-        uint256 sqrY = addmod(7, mulmod(mulmod(x, x, FIELD_ORDER), x, FIELD_ORDER), FIELD_ORDER);
-
-        uint256 sqrtExponent = (FIELD_ORDER + 1) / 4;
-
-        uint256 y;
-
-        /* solhint-disable no-inline-assembly */
-        assembly {
-            // free memory pointer
-            let memPtr := mload(0x40)
-
-            // length of base, exponent, modulus
-            mstore(memPtr, 0x20)
-            mstore(add(memPtr, 0x20), 0x20)
-            mstore(add(memPtr, 0x40), 0x20)
-
-            // assign base, exponent, modulus
-            mstore(add(memPtr, 0x60), sqrY)
-            mstore(add(memPtr, 0x80), sqrtExponent)
-            mstore(add(memPtr, 0xa0), FIELD_ORDER)
-
-            // call the precompiled contract BigModExp (0x05)
-            let success := call(gas(), 0x05, 0x0, memPtr, 0xc0, memPtr, 0x20)
-
-            switch success
-                case 0 {
-                    revert(0x0, 0x0)
-                }
-                default {
-                    y := mload(memPtr)
-                }
-        }
-        /* solhint-enable no-inline-assembly */
-
-        bool isOdd = y % 2 == 1;
-
-        if ((isOdd && odd == 0) || (!isOdd && odd == 1)) {
-            y = FIELD_ORDER - y;
-        }
-
-        return (x, y);
-    }
-
-    function validate(uint256 x, uint256 y) public pure returns (bool) {
+    function validate(uint256 x, uint256 y) internal pure returns (bool) {
         uint256 rightHandSide = addmod(7, mulmod(mulmod(x, x, FIELD_ORDER), x, FIELD_ORDER), FIELD_ORDER);
-
         uint256 leftHandSide = mulmod(y, y, FIELD_ORDER);
 
         return leftHandSide == rightHandSide;

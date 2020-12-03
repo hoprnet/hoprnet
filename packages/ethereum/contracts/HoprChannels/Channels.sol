@@ -1,0 +1,283 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+pragma solidity ^0.6.0;
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+contract Channels {
+    /**
+     * @dev Possible channel statuses.
+     * We find out the channel's status by
+     * using {_getChannelStatus}.
+     */
+    enum ChannelStatus { CLOSED, OPEN, PENDING_TO_CLOSE }
+
+    /**
+     * @dev A channel struct
+     */
+    struct Channel {
+        uint256 deposit; // total tokens in deposit
+        uint256 partyABalance; // tokens that are claimable by partyA
+        uint256 closureTime; // the time when the channel can be closed by either party
+        uint256 status; // status of the channel
+        bool closureByPartyA; // channel closure was initiated by party A
+    }
+
+    /**
+     * @dev Seconds it takes until we can finalize channel closure once,
+     * channel closure has been initialized.
+     */
+    uint256 public secsClosure;
+
+    /**
+     * @dev Stored channels keyed by their channel ids
+     */
+    mapping(bytes32 => Channel) public channels;
+
+    /**
+     * @dev Funds a channel, then emits
+     * {ChannelFunded} event.
+     * @param funder the address of the funder
+     * @param accountA the address of accountA
+     * @param accountB the address of accountB
+     * @param amountA amount to fund accountA
+     * @param amountB amount to fund accountB
+     */
+    function _fundChannel(
+        address funder,
+        address accountA,
+        address accountB,
+        uint256 amountA,
+        uint256 amountB
+    ) internal {
+        require(accountA != accountB, "'accountA' and 'accountB' must not be the same");
+        require(accountA != address(0), "'accountA' must not be empty");
+        require(accountB != address(0), "'accountB' must not be empty");
+        require(amountA > 0 || amountB > 0, "'amountA' or 'amountB' must be greater than 0");
+
+        (,,, Channel storage channel) = _getChannel(accountA, accountB);
+
+        // @TODO: use SafeMath
+        channel.deposit += (amountA + amountB);
+
+        if (_isPartyA(accountA, accountB)) {
+            channel.partyABalance += amountA;
+        }
+
+        emit ChannelFunded(
+            accountA,
+            accountB,
+            funder,
+            channel.deposit,
+            channel.partyABalance
+        );
+    }
+
+    /**
+     * @dev Opens a channel, then emits
+     * {ChannelOpened} event.
+     * @param opener the address of the opener
+     * @param counterparty the address of the counterparty
+     */
+    function _openChannel(
+        address opener,
+        address counterparty
+    ) internal {
+        require(opener != counterparty, "'opener' and 'counterparty' must not be the same");
+        require(opener != address(0), "'opener' must not be empty");
+        require(counterparty != address(0), "'counterparty' must not be empty");
+
+        (,,, Channel storage channel) = _getChannel(opener, counterparty);
+        ChannelStatus channelStatus = _getChannelStatus(channel);
+        require(channelStatus == ChannelStatus.CLOSED, "channel must be closed in order to open");
+
+        channel.status += 1;
+
+        emit ChannelOpened(opener, counterparty);
+    }
+
+    /**
+     * @dev Initialize channel closure, updates channel's
+     * closure time, when the cool-off period is over,
+     * user may finalize closure, then emits
+     * {ChannelPendingToClose} event.
+     * @param initiator the address of the initiator
+     * @param counterparty the address of the counterparty
+     */
+    function _initiateChannelClosure(
+        address initiator,
+        address counterparty
+    ) internal {
+        require(initiator != counterparty, "'initiator' and 'counterparty' must not be the same");
+        require(initiator != address(0), "'initiator' must not be empty");
+        require(counterparty != address(0), "'counterparty' must not be empty");
+
+        (,,, Channel storage channel) = _getChannel(initiator, counterparty);
+        ChannelStatus channelStatus = _getChannelStatus(channel);
+        require(
+            channelStatus == ChannelStatus.OPEN,
+            "channel must be open"
+        );
+
+        // solhint-disable-next-line
+        channel.closureTime = now + secsClosure;
+        channel.status += 1;
+
+        bool isPartyA = _isPartyA(initiator, counterparty);
+        if (isPartyA) {
+            channel.closureByPartyA = true;
+        }
+
+        emit ChannelPendingToClose(initiator, counterparty, channel.closureTime);
+    }
+
+    /**
+     * @dev Finalize channel closure, if cool-off period
+     * is over it will close the channel and transfer funds
+     * to the parties involved, then emits
+     * {ChannelClosed} event.
+     * @param token an ERC20 compatible token
+     * @param initiator the address of the initiator
+     * @param counterparty the address of the counterparty
+     */
+    function _finalizeChannelClosure(
+        IERC20 token,
+        address initiator,
+        address counterparty
+    ) internal {
+        require(initiator != counterparty, "'initiator' and 'counterparty' must not be the same");
+        require(initiator != address(0), "'initiator' must not be empty");
+        require(counterparty != address(0), "'counterparty' must not be empty");
+
+        (address partyA, address partyB,, Channel storage channel) = _getChannel(initiator, counterparty);
+        ChannelStatus channelStatus = _getChannelStatus(channel);
+        require(
+            channelStatus == ChannelStatus.PENDING_TO_CLOSE,
+            "channel must be pending to close"
+        );
+
+        if (
+            channel.closureByPartyA && (initiator == partyA) ||
+            !channel.closureByPartyA && (initiator == partyB)
+        ) {
+            require(now >= channel.closureTime, "'closureTime' has not passed");
+        }
+
+        uint256 partyAAmount = channel.partyABalance;
+        uint256 partyBAmount = channel.deposit - channel.partyABalance;
+
+        // settle balances
+        if (partyAAmount > 0) {
+            token.transfer(partyA, partyAAmount);
+        }
+        if (partyBAmount > 0) {
+            token.transfer(partyB, partyBAmount);
+        }
+
+        channel.status += 7;
+        delete channel.deposit; // channel.deposit = 0
+        delete channel.partyABalance; // channel.partyABalance = 0
+        delete channel.closureTime; // channel.closureTime = 0
+        delete channel.closureByPartyA; // channel.closureByPartyA = false
+
+        emit ChannelClosed(initiator, counterparty, partyAAmount, partyBAmount);
+    }
+
+    /**
+     * @param accountA the address of accountA
+     * @param accountB the address of accountB
+     * @return a tuple of partyA, partyB, channelId, channel
+     */
+    function _getChannel(address accountA, address accountB)
+        internal
+        view
+        returns (
+            address,
+            address,
+            bytes32,
+            Channel storage
+        )
+    {
+        (address partyA, address partyB) = _getParties(accountA, accountB);
+        bytes32 channelId = _getChannelId(partyA, partyB);
+        Channel storage channel = channels[channelId];
+
+        return (partyA, partyB, channelId, channel);
+    }
+
+    /**
+     * @param partyA the address of partyA
+     * @param partyB the address of partyB
+     * @return the channel id by hashing partyA and partyB
+     */
+    function _getChannelId(address partyA, address partyB) internal pure returns (bytes32) {
+        return keccak256(abi.encodePacked(partyA, partyB));
+    }
+
+    /**
+     * @param channel a channel
+     * @return the channel's status in 'ChannelStatus'
+     */
+    function _getChannelStatus(Channel memory channel) internal pure returns (ChannelStatus) {
+        return ChannelStatus(channel.status % 10);
+    }
+
+    /**
+     * @param channel a channel
+     * @return the channel's iteration
+     */
+    function _getChannelIteration(Channel memory channel) internal pure returns (uint256) {
+        return (channel.status / 10) + 1;
+    }
+
+    /**
+     * @param accountA the address of accountA
+     * @param accountB the address of accountB
+     * @return true if accountA is partyA
+     */
+    function _isPartyA(address accountA, address accountB) internal pure returns (bool) {
+        return uint160(accountA) < uint160(accountB);
+    }
+
+    /**
+     * @param accountA the address of accountA
+     * @param accountB the address of accountB
+     * @return a tuple representing partyA and partyB
+     */
+    function _getParties(address accountA, address accountB) internal pure returns (address, address) {
+        if (_isPartyA(accountA, accountB)) {
+            return (accountA, accountB);
+        } else {
+            return (accountB, accountA);
+        }
+    }
+
+    event ChannelFunded(
+        address indexed accountA,
+        address indexed accountB,
+        // @TODO: remove this and rely on `msg.sender`
+        address funder,
+        uint256 deposit,
+        uint256 partyABalance
+    );
+
+    event ChannelOpened(
+        // @TODO: remove this and rely on `msg.sender`
+        address indexed opener,
+        address indexed counterParty
+    );
+
+    event ChannelPendingToClose(
+        // @TODO: remove this and rely on `msg.sender`
+        address indexed initiator,
+        address indexed counterParty,
+        uint256 closureTime
+    );
+
+    event ChannelClosed(
+        // @TODO: remove this and rely on `msg.sender`
+        address indexed initiator,
+        address indexed counterParty,
+        uint256 partyAAmount,
+        uint256 partyBAmount
+    );
+}
