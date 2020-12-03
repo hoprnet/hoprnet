@@ -1,3 +1,8 @@
+// @ts-ignore
+const { name, version } = require('../package.json')
+
+export const NAME = name.replace(/@[a-zA-z0-9\-]+\//, '')
+
 // p2p multi-address code
 export const CODE_P2P = 421
 export const CODE_CIRCUIT = 290
@@ -25,5 +30,5 @@ export const RELAY_PAYLOAD_PREFIX = new Uint8Array([0])
 export const RELAY_STATUS_PREFIX = new Uint8Array([1])
 export const RELAY_WEBRTC_PREFIX = new Uint8Array([2])
 
-export const RELAY = `/hopr/relay-register/0.0.6`
-export const DELIVERY = `/hopr/delivery-register/0.0.6`
+export const RELAY = `/hopr/relay-register/${version}`
+export const DELIVERY = `/hopr/delivery-register/${version}`
