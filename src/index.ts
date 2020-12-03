@@ -7,7 +7,7 @@ import errCode from 'err-code'
 import debug from 'debug'
 import { socketToConn } from './socket-to-conn'
 import Listener from './listener'
-import { NAME, CODE_P2P, DELIVERY, USE_WEBRTC } from './constants'
+import { CODE_P2P, DELIVERY, USE_WEBRTC } from './constants'
 import type Multiaddr from 'multiaddr'
 import PeerId from 'peer-id'
 import type libp2p from 'libp2p'
@@ -36,7 +36,7 @@ const verbose = debug('hopr-core:verbose:transport')
  */
 class HoprConnect {
   get [Symbol.toStringTag]() {
-    return NAME
+    return 'HoprConnect'
   }
 
   private _useWebRTC: boolean
