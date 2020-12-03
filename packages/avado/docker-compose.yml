@@ -5,8 +5,6 @@ services:
       context: ../hoprd
       dockerfile: ./Dockerfile
     entrypoint: ['node', '/app/index.js', '--password=open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ01', '--admin', '--init']
-      args:
-        network: bnb-testnet
     image: 'hopr.avado.dnp.dappnode.eth:1.57.2'
     restart: always
     volumes:
