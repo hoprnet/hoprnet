@@ -49,10 +49,10 @@ contract Channels {
         uint256 amountA,
         uint256 amountB
     ) internal {
-        require(accountA != accountB, "'accountA' and 'accountB' must not be the same");
-        require(accountA != address(0), "'accountA' must not be empty");
-        require(accountB != address(0), "'accountB' must not be empty");
-        require(amountA > 0 || amountB > 0, "'amountA' or 'amountB' must be greater than 0");
+        require(accountA != accountB, "accountA and accountB must not be the same");
+        require(accountA != address(0), "accountA must not be empty");
+        require(accountB != address(0), "accountB must not be empty");
+        require(amountA > 0 || amountB > 0, "amountA or amountB must be greater than 0");
 
         (,,, Channel storage channel) = _getChannel(accountA, accountB);
 
@@ -82,9 +82,9 @@ contract Channels {
         address opener,
         address counterparty
     ) internal {
-        require(opener != counterparty, "'opener' and 'counterparty' must not be the same");
-        require(opener != address(0), "'opener' must not be empty");
-        require(counterparty != address(0), "'counterparty' must not be empty");
+        require(opener != counterparty, "opener and counterparty must not be the same");
+        require(opener != address(0), "opener must not be empty");
+        require(counterparty != address(0), "counterparty must not be empty");
 
         (,,, Channel storage channel) = _getChannel(opener, counterparty);
         ChannelStatus channelStatus = _getChannelStatus(channel);
@@ -107,9 +107,9 @@ contract Channels {
         address initiator,
         address counterparty
     ) internal {
-        require(initiator != counterparty, "'initiator' and 'counterparty' must not be the same");
-        require(initiator != address(0), "'initiator' must not be empty");
-        require(counterparty != address(0), "'counterparty' must not be empty");
+        require(initiator != counterparty, "initiator and counterparty must not be the same");
+        require(initiator != address(0), "initiator must not be empty");
+        require(counterparty != address(0), "counterparty must not be empty");
 
         (,,, Channel storage channel) = _getChannel(initiator, counterparty);
         ChannelStatus channelStatus = _getChannelStatus(channel);
@@ -144,9 +144,9 @@ contract Channels {
         address initiator,
         address counterparty
     ) internal {
-        require(initiator != counterparty, "'initiator' and 'counterparty' must not be the same");
-        require(initiator != address(0), "'initiator' must not be empty");
-        require(counterparty != address(0), "'counterparty' must not be empty");
+        require(initiator != counterparty, "initiator and counterparty must not be the same");
+        require(initiator != address(0), "initiator must not be empty");
+        require(counterparty != address(0), "counterparty must not be empty");
 
         (address partyA, address partyB,, Channel storage channel) = _getChannel(initiator, counterparty);
         ChannelStatus channelStatus = _getChannelStatus(channel);
@@ -159,7 +159,7 @@ contract Channels {
             channel.closureByPartyA && (initiator == partyA) ||
             !channel.closureByPartyA && (initiator == partyB)
         ) {
-            require(now >= channel.closureTime, "'closureTime' has not passed");
+            require(channel.closureTime < now, "closureTime must be smaller than now");
         }
 
         uint256 partyAAmount = channel.partyABalance;

@@ -71,7 +71,7 @@ contract Tickets is Accounts, Channels {
     ) internal {
         require(
             accounts[account].secret == keccak256(abi.encodePacked(secretPreImage)),
-            "Given value is not a pre-image of the stored on-chain secret"
+            "secretPreImage must be the hash of account's secret"
         );
     }
 
@@ -81,7 +81,7 @@ contract Tickets is Accounts, Channels {
         ChannelStatus channelStatus = _getChannelStatus(channel);
         require(
             channelStatus == ChannelStatus.OPEN || channelStatus == ChannelStatus.PENDING_TO_CLOSE,
-            "channel must be 'OPEN' or 'PENDING_TO_CLOSE'"
+            "channel must be open or pending to close"
         );
     }
 
@@ -115,7 +115,7 @@ contract Tickets is Accounts, Channels {
         bytes32 s,
         uint8 v
     ) internal {
-        require(ECDSA.recover(ticketHash, r, s, v) == counterparty, "ticketHash signer does not match our counterparty");
+        require(ECDSA.recover(ticketHash, r, s, v) == counterparty, "signer must match the counterparty");
         require(!tickets[ticketHash], "ticket must not be used twice");
     }
 
