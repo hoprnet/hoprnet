@@ -3,9 +3,9 @@
 
 
 "@hoprnet/hopr-utils@^1.57.0-next.13":
-  version "1.57.0-next.13"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-1.57.0-next.13.tgz#358ad56ef5691cd4fb3b93ac75966fd5f288aeb9"
-  integrity sha512-nWPZEa6UGWiG1JAaOxDnD1959e05a5GaiCCHX0U48ITK38+G1ym4l6QrLQ6eY2zX1LzP1MWD8fu+l/o3Ke6ZOQ==
+  version "1.57.0-next.20"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-1.57.0-next.20.tgz#1630f8f87a2212ecac5aed40ad2768f4f057b4f1"
+  integrity sha512-y3DFRv+c3oYVWY4d0JIspqZsvU4h6xpuyiKprOFeF915aWGi3bb85aepnIiC6pZ5mOPkTowZ752hdyrBsA0xJQ==
   dependencies:
     bignumber.js "^9.0.0"
     libp2p-crypto "0.18.0"
