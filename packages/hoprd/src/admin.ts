@@ -15,8 +15,6 @@ import { NODE_ENV } from './env'
 
 let debugLog = debug('hoprd:admin')
 
-const weiToEth = (eth) => (eth / 10e18).toFixed(4)
-
 export class AdminServer {
   private app: any
   private server: Server | undefined
@@ -104,7 +102,7 @@ export class AdminServer {
       this.logs.log(
         `- The account associated with this node has no funds,\n` +
           `  in order to fund gas for protocol overhead you will need to send\n` +
-          `  at least ${weiToEth(MIN_NATIVE_BALANCE)} to ${addr}`
+          `  at least ${new node.paymentChannels.types.Balance(MIN_NATIVE_BALANCE).toFormattedString()} to ${addr}`
       )
     })
 
