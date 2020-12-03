@@ -12,10 +12,10 @@ The HOPR Association team members have agreed on the following development workf
 
 ## Rules
 
-* All PR‘s should track to master.
-* All PR‘s have to be approved by two team members.
-* All PR‘s must pass all status checks before merging.
-* `master` tracks `release/**`, but releases do not track `master`. i.e. we always merge `release/**` back to `master`, but we do not merge `master` back to a frozen `release`.
+- All PR‘s should track to master.
+- All PR‘s have to be approved by two team members.
+- All PR‘s must pass all status checks before merging.
+- `master` tracks `release/**`, but releases do not track `master`. i.e. we always merge `release/**` back to `master`, but we do not merge `master` back to a frozen `release`.
 
 ## Workflow
 
@@ -49,7 +49,7 @@ We made active use of actions to automate tasks trivial to our workflow.
 
 ## Branches
 
-- `master`: In our case, `master` is a **prerelease** branch - tests *must* pass, and code *should* be stable, but its *acceptable* to have issues.
+- `master`: In our case, `master` is a **prerelease** branch - tests _must_ pass, and code _should_ be stable, but its _acceptable_ to have issues.
 
 - `release/**`: Every week on Thursdays at 12 pm CEST, we cut a `release/**` branch, using an internal name to identify the release.
 
