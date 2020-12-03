@@ -22,19 +22,18 @@ export default class PrintBalance extends AbstractCommand {
    * @notice triggered by the CLI
    */
   public async execute(): Promise<string> {
-    const { paymentChannels } = this.node
-    const { Balance, NativeBalance } = paymentChannels.types
+    const { Balance, NativeBalance } = this.node.paymentChannels.types
 
     const hoprPrefix = 'HOPR Balance:'
-    const hoprBalance = await paymentChannels.account.balance.then((b) => {
+    const hoprBalance = await this.node.getBalance().then((b) => {
       return moveDecimalPoint(b.toString(), Balance.DECIMALS * -1)
     })
 
     // @TODO: use 'NativeBalance' and 'Balance' to display currencies
-    const nativePrefix = 'BNB Balance:'
-    const nativeBalance = await paymentChannels.account.nativeBalance.then((b) => {
+    const nativeBalance = await this.node.getNativeBalance().then((b) => {
       return moveDecimalPoint(b.toString(), NativeBalance.DECIMALS * -1)
     })
+    const nativePrefix = 'BNB Balance:'
 
     const prefixLength = Math.max(hoprPrefix.length, nativePrefix.length) + 2
 

@@ -1,14 +1,14 @@
 import type HoprEthereum from '.'
 import { Hash } from './types'
 
-import Debug from 'debug'
-const log = Debug('hopr-core-ethereum:hashedSecret')
+//import Debug from 'debug'
+//const log = Debug('hopr-core-ethereum:hashedSecret')
 
 import { randomBytes } from 'crypto'
 import { u8aEquals, u8aToHex, u8aConcat } from '@hoprnet/hopr-utils'
 import { publicKeyConvert } from 'secp256k1'
 
-export const GIANT_STEP_WIDTH = 10000
+export const DB_ITERATION_BLOCK_SIZE = 10000
 export const TOTAL_ITERATIONS = 100000
 export const HASHED_SECRET_WIDTH = 27
 
@@ -17,23 +17,21 @@ export type PreImageResult = {
   index: number
 }
 
+const isNullAccount = (a: string) => a == null || ['0', '0x', '0x'.padEnd(66, '0')].includes(a)
+
 class HashedSecret {
   constructor(private coreConnector: HoprEthereum) {}
 
   /**
    * @returns a promise that resolves to a Hash if secret is found
    */
-  private async getOnChainSecret(): Promise<Hash | void> {
-    return this.coreConnector.account.onChainSecret
-  }
-
-  /**
-   * @returns a promise that resolves to a Hash if secret is found
-   */
   private async getOffChainSecret(): Promise<Hash | undefined> {
     try {
-      return (await this.coreConnector.db.get(Buffer.from(this.coreConnector.dbKeys.OnChainSecret()))) as any
-    } catch {
+      return await this.coreConnector.db.get(Buffer.from(this.coreConnector.dbKeys.OnChainSecret()))
+    } catch (err) {
+      if (!err.notFound) {
+        throw err
+      }
       return undefined
     }
   }
@@ -61,16 +59,14 @@ class HashedSecret {
    * We store the last result.
    * @returns a promise that resolves to a Hash if secret is found
    */
-  private async createAndStoreSecretOffChain(): Promise<Hash> {
-    let onChainSecret = this.coreConnector.options.debug
-      ? await this.getDebugAccountSecret()
-      : new Hash(randomBytes(HASHED_SECRET_WIDTH))
+  private async createAndStoreSecretOffChain(debug: boolean): Promise<Hash> {
+    let onChainSecret = debug ? await this.getDebugAccountSecret() : new Hash(randomBytes(HASHED_SECRET_WIDTH))
 
     let onChainSecretIntermediary = onChainSecret
     let dbBatch = this.coreConnector.db.batch()
 
     for (let i = 0; i < TOTAL_ITERATIONS; i++) {
-      if (i % GIANT_STEP_WIDTH == 0) {
+      if (i % DB_ITERATION_BLOCK_SIZE == 0) {
         dbBatch = dbBatch.put(
           Buffer.from(this.coreConnector.dbKeys.OnChainSecretIntermediary(i)),
           Buffer.from(onChainSecretIntermediary)
@@ -82,58 +78,76 @@ class HashedSecret {
     }
 
     await dbBatch.write()
-
     return onChainSecretIntermediary
   }
 
-  /**
-   * Store secret onchain.
-   */
-  private async storeSecretOnChain(secret: Hash, nonce?: number): Promise<void> {
+  private async storeSecretOnChain(secret: Hash): Promise<void> {
+    console.log('storing secret on chain')
     const account = await this.coreConnector.hoprChannels.methods
       .accounts((await this.coreConnector.account.address).toHex())
       .call()
 
-    const _nonce = nonce ? nonce : await this.coreConnector.account.nonce
-
-    if (account.accountX == null || ['0', '0x', '0x'.padEnd(66, '0')].includes(account.accountX)) {
+    if (isNullAccount(account.accountX)) {
       const uncompressedPubKey = publicKeyConvert(this.coreConnector.account.keys.onChain.pubKey, false).slice(1)
-
-      await this.coreConnector.utils.waitForConfirmation(
-        (
-          await this.coreConnector.signTransaction(
-            {
-              from: (await this.coreConnector.account.address).toHex(),
-              to: this.coreConnector.hoprChannels.options.address,
-              nonce: _nonce
-            },
-            this.coreConnector.hoprChannels.methods.init(
-              u8aToHex(uncompressedPubKey.slice(0, 32)),
-              u8aToHex(uncompressedPubKey.slice(32, 64)),
-              u8aToHex(secret)
+      console.log('account is also null, calling channel.init')
+      try {
+        await this.coreConnector.utils.waitForConfirmation(
+          (
+            await this.coreConnector.signTransaction(
+              {
+                from: (await this.coreConnector.account.address).toHex(),
+                to: this.coreConnector.hoprChannels.options.address,
+                nonce: await this.coreConnector.account.nonce
+              },
+              this.coreConnector.hoprChannels.methods.init(
+                u8aToHex(uncompressedPubKey.slice(0, 32)),
+                u8aToHex(uncompressedPubKey.slice(32, 64)),
+                u8aToHex(secret)
+              )
             )
-          )
-        ).send()
-      )
+          ).send()
+        )
+      } catch (e) {
+        if (e.message.match(/Account must not be set/)) {
+          // There is a potential race condition due to the fact that 2 init
+          // calls may be in flight at once, and therefore we may have init
+          // called on an initialized account. If so, trying again should solve
+          // the problem.
+          console.log('race condition encountered in HoprChannel.init - retrying')
+          return this.storeSecretOnChain(secret)
+        }
+        throw e
+      }
     } else {
       // @TODO this is potentially dangerous because it increases the account counter
-      await this.coreConnector.utils.waitForConfirmation(
-        (
-          await this.coreConnector.signTransaction(
-            {
-              from: (await this.coreConnector.account.address).toHex(),
-              to: this.coreConnector.hoprChannels.options.address,
-              nonce: _nonce
-            },
-            this.coreConnector.hoprChannels.methods.setHashedSecret(u8aToHex(secret))
-          )
-        ).send()
-      )
+      console.log('account is already on chain, storing secret.')
+      try {
+        await this.coreConnector.utils.waitForConfirmation(
+          (
+            await this.coreConnector.signTransaction(
+              {
+                from: (await this.coreConnector.account.address).toHex(),
+                to: this.coreConnector.hoprChannels.options.address,
+                nonce: await this.coreConnector.account.nonce
+              },
+              this.coreConnector.hoprChannels.methods.setHashedSecret(u8aToHex(secret))
+            )
+          ).send()
+        )
+      } catch (e) {
+        if (e.message.match(/new and old hashedSecrets are the same/)) {
+          // NBD. no-op
+          return
+        }
+        throw e
+      }
     }
+
+    console.log('stored on chain')
   }
 
-  private async calcOnChainSecretFromDb(): Promise<Hash> {
-    let closestIntermediary = TOTAL_ITERATIONS - GIANT_STEP_WIDTH
+  private async calcOnChainSecretFromDb(debug: boolean): Promise<Hash> {
+    let closestIntermediary = TOTAL_ITERATIONS - DB_ITERATION_BLOCK_SIZE
 
     let intermediary: Uint8Array
     while (closestIntermediary > 0) {
@@ -146,7 +160,7 @@ class HashedSecret {
         if (!err.notFound) {
           throw err
         }
-        closestIntermediary -= GIANT_STEP_WIDTH
+        closestIntermediary -= DB_ITERATION_BLOCK_SIZE
       }
     }
 
@@ -160,7 +174,7 @@ class HashedSecret {
           throw err
         }
 
-        return this.createAndStoreSecretOffChain()
+        return this.createAndStoreSecretOffChain(debug)
       }
     }
 
@@ -183,7 +197,7 @@ class HashedSecret {
       )
     }
 
-    let closestIntermediary = TOTAL_ITERATIONS - GIANT_STEP_WIDTH
+    let closestIntermediary = TOTAL_ITERATIONS - DB_ITERATION_BLOCK_SIZE
     let intermediary: Uint8Array
     let upperBound = TOTAL_ITERATIONS
 
@@ -203,7 +217,7 @@ class HashedSecret {
             if (closestIntermediary == 0) {
               throw Error(`Could not find pre-image`)
             } else {
-              closestIntermediary -= GIANT_STEP_WIDTH
+              closestIntermediary -= DB_ITERATION_BLOCK_SIZE
             }
           } else {
             throw err
@@ -222,7 +236,7 @@ class HashedSecret {
         }
       }
 
-      closestIntermediary -= GIANT_STEP_WIDTH
+      closestIntermediary -= DB_ITERATION_BLOCK_SIZE
     } while (!found && closestIntermediary >= 0)
 
     if (!found) {
@@ -239,40 +253,33 @@ class HashedSecret {
    */
   public async check(): Promise<{
     initialized: boolean
-    onChainSecret?: Hash
-    offChainSecret?: Hash
+    onChainSecret: Hash | undefined
+    offChainSecret: Hash | undefined
   }> {
-    const [onChainSecret, offChainSecret] = await Promise.all([this.getOnChainSecret(), this.getOffChainSecret()])
-    const bothEmpty = typeof onChainSecret === 'undefined' && typeof offChainSecret === 'undefined'
-    const bothExist = !bothEmpty && typeof onChainSecret !== 'undefined' && typeof offChainSecret !== 'undefined'
+    const [onChainSecret, offChainSecret] = await Promise.all([
+      this.coreConnector.account.onChainSecret,
+      this.getOffChainSecret()
+    ])
 
-    // both are empty
-    if (bothEmpty) {
-      return { initialized: false }
-    }
     // both exist
-    else if (bothExist) {
+    if (onChainSecret && offChainSecret) {
       try {
         await this.findPreImage(onChainSecret)
         return { initialized: true, onChainSecret, offChainSecret }
       } catch (err) {
-        log(err)
-        return { initialized: false, onChainSecret, offChainSecret }
+        console.log(err)
       }
     }
-    // only one of them exists
-    else {
-      return { initialized: false, onChainSecret, offChainSecret }
-    }
+    return { initialized: false, onChainSecret, offChainSecret }
   }
 
   /**
    * Initializes hashedSecret.
    */
-  public async initialize(nonce?: number): Promise<void> {
+  public async initialize(debug?: boolean): Promise<void> {
     const { initialized, onChainSecret, offChainSecret } = await this.check()
     if (initialized) {
-      log(`Secret is initialized.`)
+      console.log(`Secret is initialized.`)
       return
     }
 
@@ -281,21 +288,23 @@ class HashedSecret {
     const onlyOnChain = !bothEmpty && !bothExist && typeof onChainSecret !== 'undefined'
 
     if (bothEmpty) {
-      log(`Secret not found, initializing..`)
+      console.log(`Secret not found, initializing..`)
     } else if (bothExist) {
-      log(`Secret is found but failed to find preimage, reinitializing..`)
+      console.log(`Secret is found but failed to find preimage, reinitializing..`)
     } else if (onlyOnChain) {
-      log(`Secret is present on-chain but not off-chain, reinitializing..`)
+      console.log(`Secret is present on-chain but not off-chain, reinitializing..`)
     } else {
-      log(`Secret is present off-chain but not on-chain, submitting..`)
+      console.log(`Secret is present off-chain but not on-chain, submitting..`)
     }
 
     if (bothEmpty || bothExist || onlyOnChain) {
-      const offChainSecret = await this.createAndStoreSecretOffChain()
-      await this.storeSecretOnChain(offChainSecret, nonce)
+      const offChainSecret = await this.createAndStoreSecretOffChain(debug)
+      console.log('... secret generated, storing')
+      await this.storeSecretOnChain(offChainSecret)
+      console.log('... initialized')
     } else {
-      const onChainSecret = await this.calcOnChainSecretFromDb()
-      await this.storeSecretOnChain(onChainSecret, nonce)
+      const onChainSecret = await this.calcOnChainSecretFromDb(debug)
+      await this.storeSecretOnChain(onChainSecret)
     }
   }
 }

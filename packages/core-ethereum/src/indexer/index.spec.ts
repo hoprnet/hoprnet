@@ -54,6 +54,7 @@ describe('test indexer', function () {
     connector = await createNode(userA.privKey)
 
     await connector.start()
+    await connector.initOnchainValues()
     await connector.db.clear()
   })
 

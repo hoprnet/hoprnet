@@ -1,4 +1,4 @@
-import Hopr from '@hoprnet/hopr-core'
+import Hopr, { MIN_NATIVE_BALANCE } from '@hoprnet/hopr-core'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import { commands } from '@hoprnet/hopr-chat'
 import http from 'http'
@@ -14,6 +14,8 @@ import { LogStream } from './logs'
 import { NODE_ENV } from './env'
 
 let debugLog = debug('hoprd:admin')
+
+const weiToEth = (eth) => (eth / 10e18).toFixed(4)
 
 export class AdminServer {
   private app: any
@@ -89,6 +91,21 @@ export class AdminServer {
 
     this.node.on('hopr:crawl:completed', () => {
       this.logs.log('Crawled network')
+    })
+
+    this.node.on('hopr:warning:unfunded', (addr) => {
+      this.logs.log(
+        `- The account associated with this node has no HOPR,\n` +
+          `  in order to send messages, or open channels, you will need to send some to ${addr}`
+      )
+    })
+
+    this.node.on('hopr:warning:unfundedNative', (addr) => {
+      this.logs.log(
+        `- The account associated with this node has no funds,\n` +
+          `  in order to fund gas for protocol overhead you will need to send\n` +
+          `  at least ${weiToEth(MIN_NATIVE_BALANCE)} to ${addr}`
+      )
     })
 
     // Setup some noise

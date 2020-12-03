@@ -21,17 +21,16 @@ import debug from 'debug'
 const HoprChannelsAbi = abis.HoprChannels
 const HoprTokenAbi = abis.HoprToken
 
-const debugLog = debug('hopr-core-ethereum')
+const log = debug('hopr-core-ethereum')
 let provider: WebsocketProvider
 
 export default class HoprEthereum implements HoprCoreConnector {
-  private _status: 'uninitialized' | 'initialized' | 'started' | 'stopped' = 'uninitialized'
-  private _initializing?: Promise<void>
-  private _starting?: Promise<void>
+  private _status: 'dead' | 'alive' = 'dead'
+  private _starting?: Promise<HoprEthereum>
   private _stopping?: Promise<void>
-  public signTransaction: ReturnType<typeof utils.TransactionSigner>
-  public log: ReturnType<typeof utils['Log']>
+  private _debug: boolean
 
+  public signTransaction: ReturnType<typeof utils.TransactionSigner>
   public channel: ChannelFactory
   public types: types
   public indexer: Indexer
@@ -45,9 +44,7 @@ export default class HoprEthereum implements HoprCoreConnector {
     public network: Network,
     public hoprChannels: HoprChannels,
     public hoprToken: HoprToken,
-    public options: {
-      debug: boolean
-    },
+    debug: boolean,
     privateKey: Uint8Array,
     publicKey: Uint8Array
   ) {
@@ -56,9 +53,8 @@ export default class HoprEthereum implements HoprCoreConnector {
     this.indexer = new Indexer(this)
     this.types = new types()
     this.channel = new ChannelFactory(this)
-
+    this._debug = debug
     this.signTransaction = utils.TransactionSigner(web3, this.network, privateKey)
-    this.log = utils.Log()
   }
 
   readonly dbKeys = dbkeys
@@ -66,45 +62,31 @@ export default class HoprEthereum implements HoprCoreConnector {
   readonly constants = constants
   readonly CHAIN_NAME = 'HOPR on Ethereum'
 
+  private async _start(): Promise<HoprEthereum> {
+    await this.waitForWeb3()
+    // await this.initOnchainValues()
+    await this.indexer.start()
+    await provider.connect()
+    this._status = 'alive'
+    log(chalk.green('Connector started'))
+    return this
+  }
+
   /**
    * Initialises the connector, e.g. connect to a blockchain node.
    */
-  async start() {
-    this.log('Starting connector..')
-
-    if (typeof this._starting !== 'undefined') {
-      this.log('Connector is already starting..')
-      return this._starting
-    } else if (this._status === 'started') {
-      this.log('Connector has already started')
-      return
-    } else if (this._status === 'uninitialized' && typeof this._initializing === 'undefined') {
-      this.log('Connector was asked to start but state was not asked to initialize, initializing..')
-      this.initialize().catch((err: Error) => {
-        this.log(chalk.red(err.message))
-      })
+  public async start(): Promise<HoprEthereum> {
+    log('Starting connector..')
+    if (this._status === 'alive') {
+      log('Connector has already started')
+      return Promise.resolve(this)
     }
-
-    this._starting = Promise.resolve()
-      .then(async () => {
-        // agnostic check if connector can start
-        while (this._status !== 'initialized') {
-          await utils.wait(1 * 1e3)
-        }
-
-        // restart
-        await Promise.all([this.indexer.start(), provider.connect()])
-
-        this._status = 'started'
-        this.log(chalk.green('Connector started'))
-      })
-      .catch((err: Error) => {
-        this.log(chalk.red(`Connector failed to start: ${err.message}`))
-      })
-      .finally(() => {
+    if (!this._starting) {
+      this._starting = this._start()
+      this._starting.finally(() => {
         this._starting = undefined
       })
-
+    }
     return this._starting
   }
 
@@ -112,110 +94,65 @@ export default class HoprEthereum implements HoprCoreConnector {
    * Stops the connector.
    */
   async stop(): Promise<void> {
-    this.log('Stopping connector..')
-
+    log('Stopping connector..')
     if (typeof this._stopping !== 'undefined') {
-      this.log('Connector is already stopping..')
       return this._stopping
-    } else if (this._status === 'stopped') {
-      this.log('Connector has already stopped')
+    } else if (this._status === 'dead') {
       return
     }
 
     this._stopping = Promise.resolve()
       .then(async () => {
-        // connector is starting
-        if (typeof this._starting !== 'undefined') {
-          debugLog('Stopping after started')
-          this.log("Connector will stop once it's started")
-          // @TODO: cancel initializing & starting
+        if (this._starting) {
+          log("Connector will stop once it's started")
           await this._starting
         }
 
         await this.indexer.stop()
         await this.account.stop()
         provider.disconnect(1000, 'Stopping HOPR node.')
-
-        this._status = 'stopped'
-        this.log(chalk.green('Connector stopped'))
-      })
-      .catch((err: Error) => {
-        this.log(chalk.red(`Connector failed to stop: ${err.message}`))
+        this._status = 'dead'
+        log(chalk.green('Connector stopped'))
       })
       .finally(() => {
         this._stopping = undefined
       })
-
     return this._stopping
   }
 
   get started() {
-    return this._status === 'started'
+    return this._status === 'alive'
   }
 
   /**
    * Initializes the on-chain values of our account.
-   * @param nonce optional specify nonce of the account to run multiple queries simultaneously
    */
-  async initOnchainValues(nonce?: number): Promise<void> {
-    try {
-      await this.hashedSecret.initialize(nonce)
-    } catch (err) {
-      this.log(chalk.red('Unable to submit secret'))
-      this.log(chalk.red(err.message))
-    }
-  }
-
-  /**
-   * Initializes connector, insures that connector is only initialized once,
-   * and it only resolves once it's done initializing.
-   */
-  async initialize(): Promise<void> {
-    this.log('Initializing connector..')
-
-    if (typeof this._initializing !== 'undefined') {
-      this.log('Connector is already initializing..')
-      return this._initializing
-    } else if (this._status === 'initialized') {
-      this.log('Connector has already initialized')
-      return Promise.resolve()
-    } else if (this._status !== 'uninitialized') {
-      throw Error(`invalid status '${this._status}', could not initialize`)
-    }
-
-    this._initializing = new Promise(async (resolve) => {
-      // initialize stuff
-      await Promise.all([
-        // confirm web3 is connected
-        this.checkWeb3(),
-        // start channels indexing
-        this.indexer.start(),
-        // always call init on-chain values,
-        this.initOnchainValues()
-      ])
-
-      this._status = 'initialized'
-      this.log(chalk.green('Connector initialized'))
-      this._initializing = undefined
-      resolve()
-    })
-    return this._initializing
+  public async initOnchainValues(): Promise<void> {
+    await this.hashedSecret.initialize(this._debug) // no-op if already initialized
   }
 
   /**
    * Checks whether web3 connection is alive
    * @returns a promise resolved true if web3 connection is alive
    */
-  async checkWeb3(): Promise<void> {
-    let isListening
-    try {
-      isListening = await this.web3.eth.net.isListening()
-    } catch (err) {
-      this.log(chalk.red(`error checking web3: ${err.message}`))
-    }
-
-    if (!isListening) {
+  private async checkWeb3(): Promise<void> {
+    if (!(await this.web3.eth.net.isListening())) {
       throw Error('web3 is not connected')
+    }
+  }
+
+  // Web3's API leaves a lot to be desired...
+  private async waitForWeb3(iterations: number = 0): Promise<void> {
+    try {
+      return await this.checkWeb3()
+    } catch (e) {
+      log('error when waiting for web3, try again', e)
+      await utils.wait(1 * 1e3)
+      if (iterations < 2) {
+        this.waitForWeb3(iterations + 1)
+      } else {
+        throw new Error('giving up connecting to web3 after ' + iterations + 'attempts')
+      }
     }
   }
 
@@ -249,6 +186,10 @@ export default class HoprEthereum implements HoprCoreConnector {
     })
   }
 
+  public async hexAccountAddress(): Promise<string> {
+    return (await this.account.address).toHex()
+  }
+
   /**
    * Creates an uninitialised instance.
    *
@@ -258,7 +199,7 @@ export default class HoprEthereum implements HoprCoreConnector {
    * @param options.debug debug mode, will generate account secrets using account's public key
    * @returns a promise resolved to the connector
    */
-  static async create(
+  public static async create(
     db: LevelUp,
     seed: Uint8Array,
     options?: { id?: number; provider?: string; debug?: boolean }
@@ -279,9 +220,6 @@ export default class HoprEthereum implements HoprCoreConnector {
     const network = utils.getNetworkName(chainId) as Network
 
     if (typeof addresses?.[network]?.HoprChannels === 'undefined') {
-      throw Error(`channel contract address from network ${network} not found`)
-    }
-    if (typeof addresses?.[network]?.HoprToken === 'undefined') {
       throw Error(`token contract address from network ${network} not found`)
     }
 
@@ -295,25 +233,11 @@ export default class HoprEthereum implements HoprCoreConnector {
       network,
       hoprChannels,
       hoprToken,
-      { debug: options?.debug || false },
+      options?.debug || false,
       seed,
       publicKey
     )
-    coreConnector.log(`using blockchain address ${(await coreConnector.account.address).toHex()}`)
-
-    const account = (await coreConnector.account.address).toHex()
-    coreConnector.log(`using blockchain address ${account}`)
-
-    if (+(await web3.eth.getBalance(account)) === 0) {
-      throw Error(`account has no funds, please add some on ${account}`)
-    }
-
-    // begin initializing
-    coreConnector.initialize().catch((err: Error) => {
-      coreConnector.log(chalk.red(`coreConnector.initialize error: ${err.message}`))
-    })
-    coreConnector.start()
-
+    log(`using blockchain address ${await coreConnector.hexAccountAddress()}`)
     return coreConnector
   }
 
