@@ -14,6 +14,9 @@ declare interface NativeBalanceStatic {
   readonly DECIMALS: number
 
   new (nativeBalance: BN | number, ...props: any[]): NativeBalance
+
+  // Readable version of the balance
+  toFormattedString(): string
 }
 
 declare interface NativeBalance extends BN {

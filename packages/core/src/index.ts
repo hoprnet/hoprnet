@@ -495,11 +495,11 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     throw new Error('Unknown strategy')
   }
 
-  public async getBalance(): Promise<BN> {
+  public async getBalance(): Promise<Types.Balance> {
     return await this.paymentChannels.account.balance
   }
 
-  public async getNativeBalance(): Promise<BN> {
+  public async getNativeBalance(): Promise<Types.NativeBalance> {
     return await this.paymentChannels.account.nativeBalance
   }
 
