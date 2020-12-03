@@ -14,13 +14,13 @@ declare interface BalanceStatic {
   readonly DECIMALS: number
 
   new (balance: BN | number, ...props: any[]): Balance
-
-  // Readable version of the balance
-  toFormattedString(): string
 }
 
 declare interface Balance extends BN {
   toU8a(): Uint8Array
+
+  // Readable version of the balance
+  toFormattedString(): string
 }
 
 declare var Balance: BalanceStatic
