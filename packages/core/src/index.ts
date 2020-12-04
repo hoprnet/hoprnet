@@ -95,7 +95,6 @@ const defaultDBPath = (id: string | number, isBootstrap: boolean): string => {
   return path.join(process.cwd(), 'db', VERSION, folder)
 }
 
-
 class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
   // TODO make these actually private - Do not rely on any of these properties!
   public _interactions: Interactions<Chain>
