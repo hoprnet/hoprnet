@@ -83,6 +83,19 @@ export type HoprOptions = {
   }
 }
 
+const defaultDBPath = (id: string | number, isBootstrap: boolean): string => {
+  let folder: string
+  if (isBootstrap) {
+    folder = `bootstrap`
+  } else if (id) {
+    folder = `node_${id}`
+  } else {
+    folder = `node`
+  }
+  return path.join(process.cwd(), 'db', VERSION, folder)
+}
+
+
 class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
   // TODO make these actually private - Do not rely on any of these properties!
   public _interactions: Interactions<Chain>
@@ -156,7 +169,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     options: HoprOptions
   ): Promise<Hopr<CoreConnector>> {
     const Connector = options.connector ?? HoprCoreEthereum
-    const db = Hopr.openDatabase(options, Connector.constants.CHAIN_NAME, Connector.constants.NETWORK)
+    const db = Hopr.openDatabase(options)
 
     const { id, addresses } = await getIdentity({
       ...options,
@@ -617,7 +630,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     )
   }
 
-  private static openDatabase(options: HoprOptions, chainName: string, network: string): LevelUp {
+  private static openDatabase(options: HoprOptions): LevelUp {
     if (options.db) {
       return options.db
     }
@@ -626,16 +639,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     if (options.dbPath) {
       dbPath = options.dbPath
     } else {
-      let folder: string
-      if (options.bootstrapNode) {
-        folder = `bootstrap`
-      } else if (options.id != null && Number.isInteger(options.id)) {
-        folder = `node_${options.id}`
-      } else {
-        folder = `node`
-      }
-
-      dbPath = path.join(process.cwd(), 'db', chainName, network, folder)
+      dbPath = defaultDBPath(options.id, options.bootstrapNode)
     }
 
     dbPath = path.resolve(dbPath)
