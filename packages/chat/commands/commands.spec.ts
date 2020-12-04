@@ -36,11 +36,6 @@ describe('Commands', () => {
     assert(mockNode.ping.calledOnce)
   })
 
-  it('version', async () => {
-    let cmds = new mod.Commands(mockNode)
-    assertMatch(await cmds.execute('version'), /hopr-core/)
-  })
-
   it('crawl', async () => {
     mockNode.getConnectedPeers = () => []
     mockNode.crawl = sinon.fake.returns({ contacted: [] })
