@@ -386,9 +386,9 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
               intermediatePath = await this.getIntermediateNodes(destination)
             } catch (e) {
               reject(e)
-              return;
+              return
             }
-            if (!intermediatePath || !intermediatePath.length){
+            if (!intermediatePath || !intermediatePath.length) {
               reject(new Error('bad path'))
             }
           }

@@ -81,7 +81,7 @@ class NetworkPeers {
     }
     let out = ''
     out += `current nodes:\n`
-    this.peers.forEach((e: Entry) => out += `- id: ${e.id.toB58String()}, quality: ${this.qualityOf(e.id)}\n`)
+    this.peers.forEach((e: Entry) => (out += `- id: ${e.id.toB58String()}, quality: ${this.qualityOf(e.id)}\n`))
     return out
   }
 
