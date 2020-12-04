@@ -13,8 +13,10 @@ export function toU8a(arg: number, length?: number): Uint8Array {
 }
 
 /**
- * Converts a string to a Uint8Array and optionally adds some padding to match
+ * Converts a **HEX** string to a Uint8Array and optionally adds some padding to match
  * the desired size.
+ * @example
+ * stringToU8a('0xDEadBeeF') // Uint8Array [ 222, 173, 190, 239 ]
  * @notice Throws an error in case a length was provided and the result does not fit.
  * @param str string to convert
  * @param length desired length of the Uint8Array
