@@ -18,7 +18,8 @@ import {
   CRAWL_TIMEOUT,
   TICKET_AMOUNT,
   TICKET_WIN_PROB,
-  PATH_RANDOMNESS
+  PATH_RANDOMNESS,
+  MIN_NATIVE_BALANCE
 } from './constants'
 
 import { Network } from './network'
@@ -306,7 +307,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
           this.network.start()
         ])
       ),
-      this.paymentChannels?.start()
+      this.paymentChannels.start()
     ])
 
     this.paymentChannels.indexer.onNewChannels((newChannels) => {
@@ -330,7 +331,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     }
     clearTimeout(this.checkTimeout)
     this.running = false
-    await Promise.all([this.network.stop(), this.paymentChannels?.stop().then(() => log(`Connector stopped.`))])
+    await Promise.all([this.network.stop(), this.paymentChannels.stop()])
 
     await Promise.all([this.db?.close().then(() => log(`Database closed.`)), this._libp2p.stop()])
 
@@ -447,12 +448,35 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     return this.network.crawler.crawl(filter)
   }
 
+  private async checkBalances() {
+    const balance = await this.getBalance()
+    let unfunded = false
+    if (balance.lten(0)) {
+      const address = await this.paymentChannels.hexAccountAddress()
+      log('unfunded node', address)
+      this.emit('hopr:warning:unfunded', address)
+      unfunded = true
+    }
+    const nativeBalance = await this.getNativeBalance()
+    if (nativeBalance.lten(MIN_NATIVE_BALANCE)) {
+      const address = await this.paymentChannels.hexAccountAddress()
+      log('unfunded node', address)
+      this.emit('hopr:warning:unfundedNative', address)
+      unfunded = true
+    }
+    if (!unfunded) {
+      // Technically we only have to do this the first time, but there are no
+      // side effects to doing this on each tick.
+      this.paymentChannels.initOnchainValues() // No-op if called many times.
+    }
+  }
+
   private async periodicCheck() {
     log('periodic check')
     try {
+      await this.checkBalances()
       await this.tickChannelStrategy([])
-      let crawlInfo = await this.crawl()
-      this.emit('hopr:crawl:completed', crawlInfo)
+      this.emit('hopr:crawl:completed', await this.crawl())
     } catch (e) {
       log('error in periodic check', e)
     }
@@ -471,8 +495,12 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     throw new Error('Unknown strategy')
   }
 
-  public async getBalance(): Promise<BN> {
+  public async getBalance(): Promise<Types.Balance> {
     return await this.paymentChannels.account.balance
+  }
+
+  public async getNativeBalance(): Promise<Types.NativeBalance> {
+    return await this.paymentChannels.account.nativeBalance
   }
 
   /**
@@ -615,3 +643,4 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
 }
 
 export { Hopr as default, LibP2P }
+export * from './constants'

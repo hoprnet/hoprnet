@@ -157,9 +157,9 @@ describe('test hashedSecret', function () {
     //   this.timeout(durations.seconds(22))
     //   await connector.hashedSecret.initialize()
 
-    //   for (let i = 0; i < TOTAL_ITERATIONS / GIANT_STEP_WIDTH; i++) {
+    //   for (let i = 0; i < TOTAL_ITERATIONS / DB_ITERATION_BLOCK_SIZE; i++) {
     //     assert(
-    //       (await connector.db.get(Buffer.from(connector.dbKeys.OnChainSecretIntermediary(i * GIANT_STEP_WIDTH)))) !=
+    //       (await connector.db.get(Buffer.from(connector.dbKeys.OnChainSecretIntermediary(i * DB_ITERATION_BLOCK_SIZE)))) !=
     //         null
     //     )
     //   }
