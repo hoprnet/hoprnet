@@ -13,9 +13,9 @@ The HOPR Association team members have agreed on the following development workf
 ## Rules
 
 - All PR‘s should track to master.
-- All PR‘s have to be approved by two team members.
+- All PR‘s have to be approved by a team member different from the one who created the PR.
 - All PR‘s must pass all status checks before merging.
-- `master` tracks `release/**`, but releases do not track `master`. i.e. we always merge `release/**` back to `master`, but we do not merge `master` back to a frozen `release`.
+- Releases can be merged back to master, but not always necessary.
 
 ## Workflow
 
@@ -33,7 +33,7 @@ The HOPR Association team members have agreed on the following development workf
 
 1. On Thursdays at 12 pm CEST, the PM Lead of the week will code-freeze `master` by creating a `release/**` branch tracking `master`. Release specific changes will be done in this branch to trigger this particular release then.
 
-2. **(TEMPORAL, see #709)** After the `release/**` action has completed, we then crease a `cd/**` branch tracking `release/**`.
+2. **(TEMPORARY, see #709)** After the `release/**` action has completed, we then crease a `cd/**` branch tracking `release/**`.
 
 3. The instructions with the release, how to test and what bootstrap server to use, are then shared in our social media channels.
 
@@ -41,11 +41,11 @@ The HOPR Association team members have agreed on the following development workf
 
 We made active use of actions to automate tasks trivial to our workflow.
 
-- **Patch Version Bump**. When a PR to `master` is merged, an action bumps the package.json by a `patch` and commits that change to `master`.
+- **Pre-release Version Bump**. When a PR to `master` is merged, an action bumps the package.json pre-release version and commits that change to `master`.
 
 - **Tag Release**. When a PR to `master` is merged, a tag is pushed specifying that feature on that version.
 
-- **Release Version Bump**. When a `release/**` branch is pushed with a new commit, an action bumps the package.json by a `minor` and commits that change to the `release` branch. Further pushes on `release` branches would then bump the version by a `patch`.
+- **Release Version Bump**. On first build, a `release/**` bumps the package.json by a `minor`, clearing the `pre-release` tag. Subsequent commits on `release` branches bump the `patch` version.
 
 ## Branches
 
@@ -53,9 +53,7 @@ We made active use of actions to automate tasks trivial to our workflow.
 
 - `release/**`: Every week on Thursdays at 12 pm CEST, we cut a `release/**` branch, using an internal name to identify the release.
 
-- `hotfix/**/**`: Hotfixes to be PR's to release branches. The release branch should then be pulled back into master.
-
-- `cd/**` **TEMPORAL, see (#709)**: After a successful release, we then branch out a `cd` branch which will deploy the artefacts based on the release builds from our CI.
+- `cd/**` **TEMPORARY, see (#709)**: After a successful release, we then branch out a `cd` branch which will deploy the artefacts based on the release builds from our CI.
 
 ## Additional Notes
 
