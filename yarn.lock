@@ -2,10 +2,10 @@
 # yarn lockfile v1
 
 
-"@hoprnet/hopr-utils@^1.57.0-next.13":
-  version "1.57.0-next.20"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-1.57.0-next.20.tgz#1630f8f87a2212ecac5aed40ad2768f4f057b4f1"
-  integrity sha512-y3DFRv+c3oYVWY4d0JIspqZsvU4h6xpuyiKprOFeF915aWGi3bb85aepnIiC6pZ5mOPkTowZ752hdyrBsA0xJQ==
+"@hoprnet/hopr-utils@^1.57.6":
+  version "1.57.6"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-1.57.6.tgz#3d7ece45f17ac6c0be9762ada0b3d49be3f11c65"
+  integrity sha512-220SAEfab0Kx67r/Lnv7CPlbDM7Cs1aiy5nfA1d0OlXhhL6MIzsT8VoLO0c41/NpfCe9guhmhAFxVrkwcHtTeA==
   dependencies:
     bignumber.js "^9.0.0"
     libp2p-crypto "0.18.0"
@@ -23,6 +23,11 @@
   version "4.1.5"
   resolved "https://registry.yarnpkg.com/@types/debug/-/debug-4.1.5.tgz#b14efa8852b7768d898906613c23f688713e02cd"
   integrity sha512-Q1y515GcOdTHgagaVFhHnIFQ38ygs/kmxdNpvpou+raI9UO3YZcHDngBSYKQklcKlvA7iuQlmIKbzvmxcOE9CQ==
+
+"@types/err-code@^2.0.0":
+  version "2.0.0"
+  resolved "https://registry.yarnpkg.com/@types/err-code/-/err-code-2.0.0.tgz#42550e9e7a487e6c64342799e803f33d4d0f985c"
+  integrity sha512-JDCwFVL1a8EE7gU7C9ugjEixhY2cqmeZwxf7QXYf2waEkTN4n033UYxlKib/xq+oNqLWimY46/3Pcs6xTXL65Q==
 
 "@types/mocha@~8.0.4":
   version "8.0.4"
@@ -355,6 +360,11 @@ core-util-is@~1.0.0:
   version "1.0.2"
   resolved "https://registry.yarnpkg.com/core-util-is/-/core-util-is-1.0.2.tgz#b5fd54220aa2bc5ab57aab7140c940754503c1a7"
   integrity sha1-tf1UIgqivFq1eqtxQMlAdUUDwac=
+
+create-require@^1.1.0:
+  version "1.1.1"
+  resolved "https://registry.yarnpkg.com/create-require/-/create-require-1.1.1.tgz#c1d7e8f1e5f6cfc9ff65f9cd352d37348756c333"
+  integrity sha512-dcKFX3jn0MpIaXjisoRvexIJVEKzaq7z2rZKxf+MSr9TkdmHmsU4m2lcLojrj/FHl8mk5VxMmYA+ftRkP/3oKQ==
 
 debug@4.2.0:
   version "4.2.0"
@@ -1568,12 +1578,13 @@ to-regex-range@^5.0.1:
   dependencies:
     is-number "^7.0.0"
 
-ts-node@~9.0.0:
-  version "9.0.0"
-  resolved "https://registry.yarnpkg.com/ts-node/-/ts-node-9.0.0.tgz#e7699d2a110cc8c0d3b831715e417688683460b3"
-  integrity sha512-/TqB4SnererCDR/vb4S/QvSZvzQMJN8daAslg7MeaiHvD8rDZsSfXmNeNumyZZzMned72Xoq/isQljYSt8Ynfg==
+ts-node@~9.1.0:
+  version "9.1.0"
+  resolved "https://registry.yarnpkg.com/ts-node/-/ts-node-9.1.0.tgz#95eae4c6d0f94f2545884078e1eb1b14d2155639"
+  integrity sha512-0yqcL4sgruCvM+w64LiAfNJo6+lHfCYc5Ajj4yiLNkJ9oZ2HWaa+Kso7htYOOxVQ7+csAjdUjffOe9PIqC4pMg==
   dependencies:
     arg "^4.1.0"
+    create-require "^1.1.0"
     diff "^4.0.1"
     make-error "^1.1.1"
     source-map-support "^0.5.17"

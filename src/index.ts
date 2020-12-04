@@ -2,7 +2,6 @@ import net from 'net'
 import { AbortError } from 'abortable-iterator'
 import type { Socket } from 'net'
 import mafmt from 'mafmt'
-// @ts-ignore
 import errCode from 'err-code'
 import debug from 'debug'
 import { socketToConn } from './socket-to-conn'
@@ -12,7 +11,6 @@ import type Multiaddr from 'multiaddr'
 import PeerId from 'peer-id'
 import type libp2p from 'libp2p'
 import type {
-  Connection,
   Dialer,
   Upgrader,
   DialOptions,
@@ -21,11 +19,13 @@ import type {
   MultiaddrConnection,
   ConnectionManager
 } from 'libp2p'
+import { Transport, Connection } from 'libp2p-interfaces'
 import chalk from 'chalk'
 import { WebRTCUpgrader } from './webrtc'
 import Relay from './relay'
 import { WebRTCConnection } from './webRTCConnection'
 import type { RelayConnection } from './relayConnection'
+import { Discovery } from './discovery'
 
 const log = debug('hopr-core:transport')
 const error = debug('hopr-core:transport:error')
@@ -34,10 +34,12 @@ const verbose = debug('hopr-core:verbose:transport')
 /**
  * @class HoprConnect
  */
-class HoprConnect {
+class HoprConnect implements Transport {
   get [Symbol.toStringTag]() {
     return 'HoprConnect'
   }
+
+  public discovery: Discovery
 
   private _useWebRTC: boolean
   private _upgrader: Upgrader
@@ -101,6 +103,8 @@ class HoprConnect {
       this._webRTCUpgrader = new WebRTCUpgrader({ stunServers: this.stunServers })
     }
 
+    this.discovery = new Discovery()
+
     libp2p.handle(DELIVERY, this.handleDelivery.bind(this))
 
     this._relay = new Relay(libp2p, this._webRTCUpgrader)
@@ -155,6 +159,8 @@ class HoprConnect {
       error(`Could not upgrade relayed connection. Error was: ${err}`)
       return
     }
+
+    this.discovery._peerDiscovered(newConn.remotePeer, [newConn.remoteAddr])
 
     this.connHandler?.(newConn)
   }

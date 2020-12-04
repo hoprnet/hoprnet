@@ -2,35 +2,8 @@ declare module 'libp2p' {
   type PeerId = import('peer-id')
   type Multiaddr = import('multiaddr')
   type EventEmitter = import('events').EventEmitter
-
-  export type Stream = {
-    sink: (source: AsyncGenerator<Uint8Array, void>) => Promise<void>
-    source: AsyncGenerator<Uint8Array, void>
-  }
-
-  export interface Connection {
-    localAddr: Multiaddr
-    remoteAddr: Multiaddr
-    localPeer: PeerId
-    remotePeer: PeerId
-    newStream(
-      protocols?: string[]
-    ): Promise<{
-      protocol: string
-      stream: Stream
-    }>
-    close(): Promise<void>
-    getStreams(): any[]
-    stat: {
-      direction: 'outbound' | 'inbound'
-      timeline: {
-        open: number
-        upgraded: number
-      }
-      multiplexer?: any
-      encryption?: any
-    }
-  }
+  type AbortSignal = import('abort-controller').AbortSignal
+  type Connection = import('libp2p-interfaces').Connection
 
   export type PeerRoute = {
     id: PeerId
@@ -66,6 +39,11 @@ declare module 'libp2p' {
   export interface DialOptions {
     signal?: AbortSignal
     relay?: PeerId
+  }
+
+  export type Stream = {
+    sink: (source: Stream['source']) => Promise<void>
+    source: AsyncGenerator<Uint8Array, void>
   }
 
   export type Handler = {

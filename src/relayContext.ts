@@ -86,7 +86,7 @@ class RelayContext {
   }
 
   private async *_createSource(): Stream['source'] {
-    let result: IteratorResult<Uint8Array, void> = { done: false, value: new Uint8Array() }
+    let result: IteratorResult<Uint8Array, void> | undefined
 
     let iteration = 0
     const sourceFunction = (_iteration: number) => (arg: IteratorResult<Uint8Array, void>) => {
@@ -108,7 +108,7 @@ class RelayContext {
     let switchPromise = this._switchPromise.promise.then(switchFunction)
 
     while (true) {
-      if (!result.done) {
+      if (result == undefined || !result.done) {
         await Promise.race([
           // prettier-ignore
           sourcePromise,
@@ -120,7 +120,7 @@ class RelayContext {
 
       if (streamSwitched) {
         streamSwitched = false
-        result.done = false
+        result = undefined
         currentSource = tmpSource!
         switchPromise = this._switchPromise.promise.then(switchFunction)
         yield u8aConcat(RELAY_STATUS_PREFIX, RESTART)
@@ -129,7 +129,7 @@ class RelayContext {
         continue
       }
 
-      if (result.done) {
+      if (result == undefined || result.done) {
         continue
       }
 
@@ -195,7 +195,7 @@ class RelayContext {
   private async _createSink(source: Stream['source']): Promise<void> {
     let currentSink = this._stream.sink
 
-    let result: IteratorResult<Uint8Array> = { done: false, value: new Uint8Array() }
+    let result: IteratorResult<Uint8Array> | undefined
 
     let iteration = 0
     const sourceFunction = (arg: IteratorResult<Uint8Array, void>) => {
@@ -221,7 +221,7 @@ class RelayContext {
 
       let switchPromise = this._switchPromise.promise.then(switchFunction)
 
-      while (!result.done) {
+      while (result == undefined || !result.done) {
         if (iteration != _iteration) {
           break
         }
@@ -244,7 +244,7 @@ class RelayContext {
             yield this._statusMessages.shift()!
           }
 
-          if (!result.done) {
+          if (result == undefined || !result.done) {
             this._statusMessagePromise = Defer<void>()
 
             statusPromise = this._statusMessagePromise.promise.then(statusSourceFunction)
@@ -256,7 +256,7 @@ class RelayContext {
           break
         }
 
-        if (result.done) {
+        if (result == undefined || result.done) {
           break
         }
 
@@ -275,7 +275,7 @@ class RelayContext {
       }
     }
 
-    while (!result.done) {
+    while (result == undefined || !result.done) {
       currentSink(drain.call(this, iteration))
 
       currentSink = (await this._switchPromise.promise).sink

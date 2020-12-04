@@ -29,7 +29,6 @@ describe('test STUN', function () {
 
     const multiAddrs = servers.map((server: Socket) => Multiaddr.fromNodeAddress(server.address() as any, 'udp'))
 
-    console.log(multiAddrs)
     const result = await getExternalIp(multiAddrs, servers[0])
 
     assert(servers[0].address().port === result.port, 'Ports should match')

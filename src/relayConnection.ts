@@ -34,7 +34,7 @@ class RelayConnection implements MultiaddrConnection {
   private _msgPromise: DeferredPromise<void>
   private _msgs: (IteratorResult<Uint8Array, void> & { iteration: number })[]
 
-  private _webRTCStreamResult: IteratorResult<Uint8Array, void>
+  private _webRTCStreamResult?: IteratorResult<Uint8Array, void>
   private _webRTCresolved: boolean
   private _webRTCstream?: Stream['source']
   private _webRTCSourceFunction: (arg: IteratorResult<Uint8Array, void>) => void
@@ -109,8 +109,7 @@ class RelayConnection implements MultiaddrConnection {
     this.webRTC = opts.webRTC
 
     this._webRTCresolved = false
-    this._webRTCStreamResult =
-      opts.webRTC != undefined ? { done: false, value: new Uint8Array() } : { done: true, value: undefined }
+    this._webRTCStreamResult = opts.webRTC != undefined ? undefined : { done: true, value: undefined }
 
     this._webRTCSourceFunction = (arg: IteratorResult<Uint8Array, void>) => {
       this._webRTCresolved = true
@@ -145,7 +144,7 @@ class RelayConnection implements MultiaddrConnection {
     })
 
     let streamResolved = false
-    let streamResult: IteratorResult<Uint8Array, void> = { done: false, value: new Uint8Array() }
+    let streamResult: IteratorResult<Uint8Array, void> | undefined
 
     function sourceFunction(arg: IteratorResult<Uint8Array, void>) {
       streamResolved = true
@@ -155,7 +154,7 @@ class RelayConnection implements MultiaddrConnection {
 
     let streamPromise = this._stream.source.next().then(sourceFunction)
 
-    while (!streamResult.done) {
+    while (streamResult == undefined || !streamResult.done) {
       await Promise.race([
         // prettier-ignore
         streamPromise,
@@ -165,7 +164,7 @@ class RelayConnection implements MultiaddrConnection {
       if (streamResolved) {
         streamResolved = false
 
-        if (streamResult.done || streamClosed) {
+        if (streamResult == undefined || streamResult.done || streamClosed) {
           this._msgs.push({ done: true, value: undefined, iteration: this._iteration })
           log(`ending stream because 'streamDone' was set to 'true'.`)
           break
@@ -200,7 +199,7 @@ class RelayConnection implements MultiaddrConnection {
               this.webRTC.channel = this.webRTC.upgradeInbound()
 
               log(`resetting WebRTC stream`)
-              this._webRTCStreamResult = { done: false, value: new Uint8Array() }
+              this._webRTCStreamResult = undefined
               this._webRTCresolved = false
               this._webRTCstream = this._getWebRTCStream()
               this._webRTCPromise = this._webRTCstream.next().then(this._webRTCSourceFunction)
@@ -231,7 +230,7 @@ class RelayConnection implements MultiaddrConnection {
         }
 
         streamPromise = this._stream.source.next().then(sourceFunction)
-      } else if (streamClosed || streamResult.done) {
+      } else if (streamClosed || streamResult == undefined || streamResult.done) {
         if (!this._destroyed) {
           if (!this._sinkTriggered) {
             this._stream.sink(
@@ -341,7 +340,7 @@ class RelayConnection implements MultiaddrConnection {
   private async *sinkFunction(this: RelayConnection): Stream['source'] {
     let streamResolved = false
 
-    let streamResult: IteratorResult<Uint8Array, void> = { done: true, value: undefined }
+    let streamResult: IteratorResult<Uint8Array, void> | undefined = { done: true, value: undefined }
 
     let streamClosed = false
 
@@ -385,7 +384,10 @@ class RelayConnection implements MultiaddrConnection {
     let switchPromise = this._switchPromise.promise.then(switchFunction)
 
     while (true) {
-      if (!this._webRTCStreamResult.done && !streamResult.done) {
+      if (
+        (this._webRTCStreamResult == undefined || !this._webRTCStreamResult.done) &&
+        (streamResult == undefined || !streamResult.done)
+      ) {
         streamPromise = streamPromise ?? currentSource!.next().then(streamSourceFunction(iteration))
 
         this._webRTCstream = this._webRTCstream ?? this._getWebRTCStream()
@@ -399,7 +401,7 @@ class RelayConnection implements MultiaddrConnection {
           switchPromise,
           closePromise
         ])
-      } else if (!this._webRTCStreamResult.done) {
+      } else if (this._webRTCStreamResult == undefined || !this._webRTCStreamResult.done) {
         this._webRTCstream = this._webRTCstream ?? this._getWebRTCStream()
 
         this._webRTCPromise = this._webRTCPromise ?? this._webRTCstream.next().then(this._webRTCSourceFunction)
@@ -411,7 +413,7 @@ class RelayConnection implements MultiaddrConnection {
           switchPromise,
           closePromise
         ])
-      } else if (!streamResult.done) {
+      } else if (streamResult == undefined || !streamResult.done) {
         streamPromise = streamPromise ?? currentSource!.next().then(streamSourceFunction(iteration))
 
         await Promise.race([
@@ -433,14 +435,15 @@ class RelayConnection implements MultiaddrConnection {
       if (streamResolved) {
         streamResolved = false
 
-        if (streamResult.done) {
+        if (streamResult == undefined || streamResult.done) {
           yield new BL([RELAY_PAYLOAD_PREFIX])
 
           streamPromise = undefined
           continue
         }
 
-        yield new BL([RELAY_PAYLOAD_PREFIX, streamResult.value])
+        // @TODO explain this to Typescript properly
+        yield new BL([RELAY_PAYLOAD_PREFIX, (streamResult as IteratorYieldResult<Uint8Array>) .value])
 
         if (streamClosed) {
           this._destroyed = true
@@ -453,7 +456,7 @@ class RelayConnection implements MultiaddrConnection {
       } else if (this._webRTCresolved) {
         this._webRTCresolved = false
 
-        if (this._webRTCStreamResult.done) {
+        if (this._webRTCStreamResult == undefined || this._webRTCStreamResult.done) {
           this._webRTCPromise = undefined
           continue
         }
@@ -490,7 +493,7 @@ class RelayConnection implements MultiaddrConnection {
         streamSwitched = false
         currentSource = tmpSource!
         this._switchPromise = Defer<Stream['source']>()
-        streamResult = { done: false, value: new Uint8Array() }
+        streamResult = undefined
         streamPromise = currentSource.next().then(streamSourceFunction(iteration))
         switchPromise = this._switchPromise.promise.then(switchFunction)
       }

@@ -7,6 +7,7 @@ import debug from 'debug'
 import { socketToConn } from './socket-to-conn'
 import { CODE_P2P } from './constants'
 import type { Connection, ConnHandler } from 'libp2p'
+import type { Listener as InterfaceListener } from 'libp2p-interfaces'
 import type PeerId from 'peer-id'
 import { MultiaddrConnection, Upgrader } from 'libp2p'
 import Multiaddr from 'multiaddr'
@@ -43,7 +44,7 @@ enum State {
   CLOSED
 }
 
-class Listener extends EventEmitter {
+class Listener extends EventEmitter implements InterfaceListener {
   private __connections: MultiaddrConnection[]
   private tcpSocket: net.Server
   private udpSocket: dgram.Socket
