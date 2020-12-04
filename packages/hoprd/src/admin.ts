@@ -124,7 +124,7 @@ export class AdminServer {
 export async function reportMemoryUsage(logs: LogStream) {
   const used = process.memoryUsage()
   const usage = process.resourceUsage()
-  logs.log(`Process stats: mem ${used.rss / 1024}k (max: ${usage.maxRSS / 1024}k) ` + `cputime: ${usage.userCPUTime}`)
+  debugLog(`Process stats: mem ${used.rss / 1024}k (max: ${usage.maxRSS / 1024}k) ` + `cputime: ${usage.userCPUTime}`)
   setTimeout(() => reportMemoryUsage(logs), 60_000)
 }
 
