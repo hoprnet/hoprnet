@@ -382,7 +382,15 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
             verbose('manually creating intermediatePath')
             intermediatePath = await getIntermediateNodesManually()
           } else {
-            intermediatePath = await this.getIntermediateNodes(destination)
+            try {
+              intermediatePath = await this.getIntermediateNodes(destination)
+            } catch (e) {
+              reject(e)
+              return;
+            }
+            if (!intermediatePath || !intermediatePath.length){
+              reject(new Error('bad path'))
+            }
           }
 
           const path: PeerId[] = [].concat(intermediatePath, [destination])
