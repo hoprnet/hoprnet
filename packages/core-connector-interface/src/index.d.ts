@@ -79,7 +79,7 @@ declare interface HoprCoreConnector {
   /**
    * Initialises the connector, e.g. connect to a blockchain node.
    */
-  start(): Promise<void>
+  start(): Promise<HoprCoreConnector>
 
   /**
    * Stops the connector, e.g. disconnect from a blockchain node and save all
@@ -100,6 +100,8 @@ declare interface HoprCoreConnector {
    * @param amount specify the amount that will be withdrawn
    */
   withdraw(currency: Currencies, recipient: string, amount: string): Promise<string>
+
+  hexAccountAddress(): Promise<string>
 
   /**
    * (Static) utils to use in the connector module

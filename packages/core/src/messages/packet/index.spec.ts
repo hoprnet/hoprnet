@@ -16,8 +16,7 @@ import { NODE_SEEDS } from '@hoprnet/hopr-demo-seeds'
 import type Multiaddr from 'multiaddr'
 
 const TWO_SECONDS = durations.seconds(2)
-const CHANNEL_DEPOSIT = 200 // HOPRli
-const BALANCE_A = 100 // HOPRli
+const CHANNEL_DEPOSIT = new BN(200) // HOPRli
 const TICKET_AMOUNT = 10 // HOPRli
 const TICKET_WIN_PROB = 1 // 100%
 
@@ -80,20 +79,7 @@ async function getTicketsFromDatabase(node: Hopr<any>): Promise<AcknowledgedTick
  * @param b second party
  */
 async function openChannel(a: Hopr<HoprEthereum>, b: Hopr<HoprEthereum>) {
-  let channelBalance = new a.paymentChannels.types.ChannelBalance(undefined, {
-    balance: new BN(CHANNEL_DEPOSIT),
-    balance_a: new BN(BALANCE_A)
-  })
-
-  await a.paymentChannels.channel.create(
-    b.getId().pubKey.marshal(),
-    undefined, // async () => nodes[b].getId().pubKey.marshal(),
-    new a.paymentChannels.types.ChannelBalance(undefined, {
-      balance: new BN(CHANNEL_DEPOSIT),
-      balance_a: new BN(BALANCE_A)
-    }),
-    (_channelBalance: any) => a._interactions.payments.open.interact(b.getId(), channelBalance) as any
-  )
+  await a.openChannel(b.getId(), CHANNEL_DEPOSIT)
 }
 
 const GANACHE_URI = `ws://127.0.0.1:8545`
@@ -133,7 +119,7 @@ function receiveChecker<Chain extends HoprCoreConnector>(msgs: Uint8Array[], nod
 }
 
 describe('test packet composition and decomposition', function () {
-  this.timeout(30000)
+  this.timeout(60000)
 
   it('should create packets and decompose them', async function () {
     const bs = await generateNode(0, true)

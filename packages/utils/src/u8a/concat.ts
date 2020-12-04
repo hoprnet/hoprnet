@@ -8,6 +8,10 @@
  * ); // [1, 2, 3, 4, 5, 6]
  */
 export function u8aConcat(...list: (Uint8Array | undefined)[]): Uint8Array {
+  if (list == undefined || list.length == 0) {
+    return new Uint8Array()
+  }
+
   let totalLength = 0
 
   const listLength = list.length

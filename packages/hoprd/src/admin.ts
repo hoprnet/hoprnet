@@ -1,4 +1,4 @@
-import Hopr from '@hoprnet/hopr-core'
+import Hopr, { MIN_NATIVE_BALANCE } from '@hoprnet/hopr-core'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import { commands } from '@hoprnet/hopr-chat'
 import http from 'http'
@@ -89,6 +89,21 @@ export class AdminServer {
 
     this.node.on('hopr:crawl:completed', () => {
       this.logs.log('Crawled network')
+    })
+
+    this.node.on('hopr:warning:unfunded', (addr) => {
+      this.logs.log(
+        `- The account associated with this node has no HOPR,\n` +
+          `  in order to send messages, or open channels, you will need to send some to ${addr}`
+      )
+    })
+
+    this.node.on('hopr:warning:unfundedNative', (addr) => {
+      this.logs.log(
+        `- The account associated with this node has no funds,\n` +
+          `  in order to fund gas for protocol overhead you will need to send\n` +
+          `  at least ${new node.paymentChannels.types.Balance(MIN_NATIVE_BALANCE).toFormattedString()} to ${addr}`
+      )
     })
 
     // Setup some noise
