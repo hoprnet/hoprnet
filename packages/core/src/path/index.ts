@@ -13,7 +13,7 @@ type ChannelPath = Edge[]
 const sum = (a: BN, b: BN) => a.add(b)
 const next = (c: Edge): PeerId => c[1]
 const stake = (c: Edge): BN => c[2]
-const pathFrom = (c: ChannelPath): Path => [c[0][0]].concat(c.map(next))
+const pathFrom = (c: ChannelPath): Path => c.map(next) // Doesn't include ourself [0]
 const filterCycles = (c: Edge, p: ChannelPath): boolean => !pathFrom(p).find((x) => x.equals(next(c)))
 const rand = () => Math.random() // TODO - swap for something crypto safe
 const debugPath = (p: ChannelPath) =>
