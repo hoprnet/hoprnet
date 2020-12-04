@@ -34,3 +34,12 @@ A [transport module](https://github.com/libp2p/js-libp2p-interfaces/tree/master/
   - upgrade to direct connection if possible
 - use nodes in the network as STUN and TURN servers
 - reconnect handling
+
+## Contributors
+
+- [Jose Perez Aguinaga](https://github.com/jjperezaguinaga)
+- [Peter Braden](https://github.com/peterbraden)
+- [Sebastian Bürgel](https://github.com/scbuergel)
+- [Robert Kiel](https://github.com/robertkiel)
+
+and the rest of the HOPR team!
