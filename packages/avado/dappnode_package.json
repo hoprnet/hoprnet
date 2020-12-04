@@ -13,7 +13,8 @@
       "DEBUG=hopr*"
     ],
     "ports": [
-      "3000:3000/tcp"
+      "3000:3000/tcp",
+      "9091:9091/tcp"
     ],
     "path": "hopr.avado.dnp.dappnode.eth_1.57.5.tar.xz",
     "hash": "/ipfs/QmRnccgBgiirrMNpvoHfkqsFgpPJ4bqwTW3SLCFBQYQxu2",
