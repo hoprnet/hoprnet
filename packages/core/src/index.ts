@@ -444,6 +444,10 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     return this.network.networkPeers.all()
   }
 
+  public connectionReport(): string {
+    return this.network.networkPeers.debugLog()
+  }
+
   public async crawl(filter?: (peer: PeerId) => boolean): Promise<CrawlInfo> {
     return this.network.crawler.crawl(filter)
   }

@@ -1,8 +1,6 @@
 import heap from 'heap-js'
 import { randomSubset } from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'
-import debug from 'debug'
-const log = debug('hopr-core:network-peers')
 
 type Entry = {
   id: PeerId
@@ -77,9 +75,14 @@ class NetworkPeers {
     return this.peers.findIndex((entry: Entry) => entry.id.equals(peer)) >= 0
   }
 
-  public debugLog() {
-    log(`current nodes:`)
-    this.peers.forEach((e: Entry) => log(`id: ${e.id.toB58String()}, q: ${this.qualityOf(e.id)}`))
+  public debugLog(): string {
+    if (this.peers.length == 0) {
+      return 'no connected peers'
+    }
+    let out = ''
+    out += `current nodes:\n`
+    this.peers.forEach((e: Entry) => out += `- id: ${e.id.toB58String()}, quality: ${this.qualityOf(e.id)}\n`)
+    return out
   }
 
   public containsOlderThan(timestamp: Number): boolean {
