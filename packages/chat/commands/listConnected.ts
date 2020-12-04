@@ -8,11 +8,11 @@ export default class ListConnectedPeers extends AbstractCommand {
   }
 
   public name() {
-    return 'listConnectedPeers'
+    return 'peers'
   }
 
   public help() {
-    return 'Lists connected HOPR nodes'
+    return 'Lists connected and interesting HOPR nodes'
   }
 
   public async execute(): Promise<string | void> {
