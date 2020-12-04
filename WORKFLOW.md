@@ -21,7 +21,7 @@ The HOPR Association team members have agreed on the following development workf
 
 ### Daily Development
 
-1. A team-member or an external contributor writes code in a **feature branch**, or in their own fork. The feature branch should track an **issue**, and describe its role (e.g. “fixes 341")
+1. A team-member or an external contributor writes code in a **feature branch**, or in their own fork. The feature branch describe its goal, and any ticket it is related to. (e.g. “fixes 341")
 
 2. Immediately after the creation of the branch, create a draft pull-request to stay up to date on progress. That way, every push on will build the project and runs the tests.
 
