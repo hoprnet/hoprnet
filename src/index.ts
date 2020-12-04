@@ -27,9 +27,9 @@ import { WebRTCConnection } from './webRTCConnection'
 import type { RelayConnection } from './relayConnection'
 import { Discovery } from './discovery'
 
-const log = debug('hopr-core:transport')
-const error = debug('hopr-core:transport:error')
-const verbose = debug('hopr-core:verbose:transport')
+const log = debug('hopr-connect')
+const error = debug('hopr-connect:error')
+const verbose = debug('hopr-connect:verbose')
 
 /**
  * @class HoprConnect

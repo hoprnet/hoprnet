@@ -4,9 +4,9 @@ import Defer, { DeferredPromise } from 'p-defer'
 import type { Stream } from 'libp2p'
 
 import Debug from 'debug'
-const log = Debug(`hopr-core:transport`)
-const verbose = Debug(`hopr-core:verbose:transport`)
-const error = Debug(`hopr-core:transport:error`)
+const log = Debug(`hopr-connect`)
+const verbose = Debug(`hopr-connect:verbose`)
+const error = Debug(`hopr-connect:error`)
 
 import {
   RELAY_STATUS_PREFIX,

@@ -1,5 +1,13 @@
 <a name="0.1"></a>
 
+## [0.1.1](https://github.com/hoprnet/hopr-connect/compare/0.1...0.1.1) (2020-12-04)
+
+### Fixes
+
+* use `hopr-connect` in Debug strings
+
+<a name="0.1"></a>
+
 ## [0.1](https://github.com/hoprnet/hopr-connect/compare/0.0.8...0.1) (2020-12-04)
 
 ### Features

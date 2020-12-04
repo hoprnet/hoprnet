@@ -1,9 +1,9 @@
 /// <reference path="./@types/it-handshake.ts" />
 
 import debug from 'debug'
-const log = debug('hopr-core:transport')
-const error = debug('hopr-core:transport:error')
-const verbose = debug('hopr-core:verbose:transport:error')
+const log = debug('hopr-connect')
+const error = debug('hopr-connect:error')
+const verbose = debug('hopr-connect:verbose:error')
 
 import AbortController from 'abort-controller'
 import chalk from 'chalk'

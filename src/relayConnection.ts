@@ -21,8 +21,8 @@ import type PeerId from 'peer-id'
 
 import Debug from 'debug'
 
-const log = Debug('hopr-core:transport')
-const error = Debug('hopr-core:transport:error')
+const log = Debug('hopr-connect')
+const error = Debug('hopr-connect:error')
 
 class RelayConnection implements MultiaddrConnection {
   private _closePromise: DeferredPromise<void>

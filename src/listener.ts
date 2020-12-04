@@ -15,9 +15,9 @@ import Multiaddr from 'multiaddr'
 import { handleStunRequest, getExternalIp } from './stun'
 import { getAddrs } from './addrs'
 
-const log = debug('hopr-core:transport:listener')
-const error = debug('hopr-core:transport:listener:error')
-const verbose = debug('hopr-core:verbose:listener:error')
+const log = debug('hopr-connect:listener')
+const error = debug('hopr-connect:listener:error')
+const verbose = debug('hopr-connect:verbose:listener:error')
 
 const SOCKET_CLOSE_TIMEOUT = 400
 

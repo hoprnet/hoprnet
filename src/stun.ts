@@ -3,7 +3,7 @@ import type { Socket, RemoteInfo } from 'dgram'
 import Multiaddr from 'multiaddr'
 import debug from 'debug'
 
-const verbose = debug('hopr-core:verbose:transport:stun')
+const verbose = debug('hopr-connect:verbose:stun')
 
 export type Interface = {
   family: 'IPv4' | 'IPv6'

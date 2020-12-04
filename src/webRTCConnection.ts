@@ -9,8 +9,8 @@ import toIterable from 'stream-to-it'
 import Debug from 'debug'
 import { RelayConnection } from './relayConnection'
 
-const log = Debug('hopr-core:transport')
-const verbose = Debug('hopr-core:verbose:transport')
+const log = Debug('hopr-connect')
+const verbose = Debug('hopr-connect:verbose')
 
 export const WEBRTC_UPGRADE_TIMEOUT = durations.seconds(1)
 

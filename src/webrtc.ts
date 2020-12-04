@@ -5,8 +5,8 @@ import debug from 'debug'
 import wrtc = require('wrtc')
 import type Multiaddr from 'multiaddr'
 
-const error = debug('hopr-core:transport:error')
-const verbose = debug('hopr-core:verbose:transport:webrtc')
+const error = debug('hopr-connect:error')
+const verbose = debug('hopr-connect:verbose:webrtc')
 
 class WebRTCUpgrader {
   private _stunServers?: {
