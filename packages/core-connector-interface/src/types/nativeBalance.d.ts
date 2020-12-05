@@ -18,6 +18,9 @@ declare interface NativeBalanceStatic {
 
 declare interface NativeBalance extends BN {
   toU8a(): Uint8Array
+
+  // Readable version of the balance
+  toFormattedString(): string
 }
 
 declare var NativeBalance: NativeBalanceStatic

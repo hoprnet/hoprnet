@@ -25,6 +25,8 @@ import { Uint8ArrayE } from '../types/extended'
 import { CHANNEL_STATES } from './constants'
 import { Log } from 'web3-core'
 import { TicketStatic } from './ticket'
+import debug from 'debug'
+const log = debug('hopr-core-ethereum:channel')
 
 const EMPTY_SIGNATURE = new Uint8Array(Signature.SIZE).fill(0x00)
 const WIN_PROB = new BN(1)
@@ -90,7 +92,7 @@ class ChannelFactory {
 
     if (onChain != offChain) {
       if (!onChain && offChain) {
-        this.coreConnector.log(`Channel ${u8aToHex(channelId)} exists off-chain but not on-chain, deleting data.`)
+        log(`Channel ${u8aToHex(channelId)} exists off-chain but not on-chain, deleting data.`)
         await this.coreConnector.channel.deleteOffChainState(counterpartyPubKey)
       } else {
         throw Error(`Channel ${u8aToHex(channelId)} exists on-chain but not off-chain.`)
@@ -169,11 +171,9 @@ class ChannelFactory {
   ): Promise<Channel> {
     const counterparty = await pubKeyToAccountId(counterpartyPubKey)
     const amPartyA = isPartyA(await this.coreConnector.account.address, counterparty)
-    let channel: Channel
     let signedChannel: SignedChannel
 
-    // const hashedSecret = await this.coreConnector.hashedSecret.check()
-    // if (!hashedSecret.initialized) await this.coreConnector.initOnchainValues()
+    await this.coreConnector.initOnchainValues()
 
     if (await this.isOpen(counterpartyPubKey)) {
       const record = (await this.coreConnector.db.get(
@@ -183,9 +183,11 @@ class ChannelFactory {
         bytes: record.buffer,
         offset: record.byteOffset
       })
-      channel = new Channel(this.coreConnector, counterpartyPubKey, signedChannel)
-    } else if (sign != null && channelBalance != null) {
-      channel = new Channel(this.coreConnector, counterpartyPubKey, signedChannel)
+      return new Channel(this.coreConnector, counterpartyPubKey, signedChannel)
+    }
+
+    if (sign != null && channelBalance != null) {
+      const channel = new Channel(this.coreConnector, counterpartyPubKey, signedChannel)
 
       const amountToFund = new Balance(
         amPartyA ? channelBalance.balance_a : channelBalance.balance.sub(channelBalance.balance_a)
@@ -198,28 +200,34 @@ class ChannelFactory {
 
       signedChannel = await sign(channelBalance)
 
-      await waitForConfirmation(
-        (
-          await this.coreConnector.signTransaction(
-            {
-              from: (await this.coreConnector.account.address).toHex(),
-              to: this.coreConnector.hoprChannels.options.address,
-              nonce: await this.coreConnector.account.nonce
-            },
-            this.coreConnector.hoprChannels.methods.openChannel(counterparty.toHex())
-          )
-        ).send()
-      )
+      try {
+        await waitForConfirmation(
+          (
+            await this.coreConnector.signTransaction(
+              {
+                from: (await this.coreConnector.account.address).toHex(),
+                to: this.coreConnector.hoprChannels.options.address,
+                nonce: await this.coreConnector.account.nonce
+              },
+              this.coreConnector.hoprChannels.methods.openChannel(counterparty.toHex())
+            )
+          ).send()
+        )
 
-      await this.coreConnector.db.put(
-        Buffer.from(this.coreConnector.dbKeys.Channel(counterpartyPubKey)),
-        Buffer.from(signedChannel)
-      )
-    } else {
-      throw Error('Cannot open channel. Channel is not open and no sign function was given.')
+        await this.coreConnector.db.put(
+          Buffer.from(this.coreConnector.dbKeys.Channel(counterpartyPubKey)),
+          Buffer.from(signedChannel)
+        )
+      } catch (e) {
+        if (e.message.match(/counterparty must have called init/)) {
+          throw new Error('Cannot open channel to an uninitialized counterparty')
+        }
+        throw e
+      }
+
+      return channel
     }
-
-    return channel
+    throw Error('Cannot open channel. Channel is not open and no sign function was given.')
   }
 
   getAll<T, R>(onData: (channel: Channel) => Promise<T>, onEnd: (promises: Promise<T>[]) => R): Promise<R> {

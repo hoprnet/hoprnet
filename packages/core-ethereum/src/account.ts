@@ -4,9 +4,10 @@ import { AccountId, AcknowledgedTicket, Balance, Hash, NativeBalance, TicketEpoc
 import { isWinningTicket, pubKeyToAccountId } from './utils'
 import { ContractEventEmitter } from './tsc/web3/types'
 import { PreImageResult } from './hashedSecret'
-
 import { HASHED_SECRET_WIDTH } from './hashedSecret'
 export const EMPTY_HASHED_SECRET = new Uint8Array(HASHED_SECRET_WIDTH).fill(0x00)
+import debug from 'debug'
+const log = debug('hopr-core-ethereum:account')
 
 class Account {
   private _address?: AccountId
@@ -91,7 +92,9 @@ class Account {
   }
 
   async stop() {
-    this._ticketEpochListener.removeAllListeners()
+    if (this._ticketEpochListener) {
+      this._ticketEpochListener.removeAllListeners()
+    }
   }
 
   get nonce(): Promise<number> {
@@ -212,19 +215,19 @@ class Account {
             }
           })
           .on('data', (event) => {
-            this.coreConnector.log('new ticketEpoch', event.returnValues.counter)
+            log('new ticketEpoch', event.returnValues.counter)
 
             this._ticketEpoch = new TicketEpoch(event.returnValues.counter)
             this._onChainSecret = new Hash(stringToU8a(event.returnValues.secretHash), Hash.SIZE)
           })
           .on('error', (error) => {
-            this.coreConnector.log('error listening to SecretHashSet events', error.message)
+            log('error listening to SecretHashSet events', error.message)
 
             this._ticketEpochListener?.removeAllListeners()
             this._ticketEpoch = undefined
           })
       } catch (err) {
-        this.coreConnector.log(err)
+        log(err)
         this._ticketEpochListener?.removeAllListeners()
       }
     }
