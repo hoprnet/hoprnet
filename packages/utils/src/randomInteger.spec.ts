@@ -1,5 +1,6 @@
 import assert from 'assert'
 import { randomInteger } from './randomInteger'
+import { u8aAdd } from './u8a'
 
 describe('testing random-number generator', function () {
   let ATTEMPTS = 10000
@@ -32,5 +33,37 @@ describe('testing random-number generator', function () {
     assert.throws(() => randomInteger(-1))
 
     assert.throws(() => randomInteger(-1, -2))
+  })
+
+  it('should yield correct values for edge cases', function () {
+    const MAX_INTEGER = Math.pow(2, 31)
+
+    assert(randomInteger(0, MAX_INTEGER, new Uint8Array(4).fill(0xff)) == MAX_INTEGER - 1)
+
+    assert.throws(() => randomInteger(0, MAX_INTEGER + 1, new Uint8Array(4).fill(0xff)))
+
+    assert(randomInteger(0, 1) == 0)
+
+    assert.throws(() => randomInteger(0))
+
+    assert(randomInteger(23, 24) == 23)
+  })
+
+  it('should verify the randomInteger by using deterministic seeds', function () {
+    const LENGTH = 2
+
+    const LOWERBOUND = 27
+    const UPPERBOUND = 480
+    const bytes = new Uint8Array(LENGTH).fill(0)
+
+    const ONE = new Uint8Array(LENGTH).fill(0)
+    ONE[ONE.length - 1] = 1
+
+    for (let i = 0; i < ATTEMPTS; i++) {
+      u8aAdd(true, bytes, ONE)
+
+      let result = randomInteger(LOWERBOUND, UPPERBOUND, bytes)
+      assert(result < UPPERBOUND && result >= LOWERBOUND)
+    }
   })
 })
