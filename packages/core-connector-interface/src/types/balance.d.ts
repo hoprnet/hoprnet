@@ -18,6 +18,9 @@ declare interface BalanceStatic {
 
 declare interface Balance extends BN {
   toU8a(): Uint8Array
+
+  // Readable version of the balance
+  toFormattedString(): string
 }
 
 declare var Balance: BalanceStatic

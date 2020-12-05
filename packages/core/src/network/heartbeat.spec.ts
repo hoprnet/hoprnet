@@ -88,7 +88,6 @@ describe('unit test heartbeat', async () => {
 
     clock.tick(HEARTBEAT_REFRESH * 2)
     await alice.heartbeat.__forTestOnly_checkNodes()
-    alice.peers.debugLog()
     assert(alice.peers.qualityOf(bob.id) > NETWORK_QUALITY_THRESHOLD, 'bob is still high q')
     assert(alice.peers.qualityOf(chris.id) <= NETWORK_QUALITY_THRESHOLD, 'chris is now low q')
   })

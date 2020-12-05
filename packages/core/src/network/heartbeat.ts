@@ -45,7 +45,7 @@ export default class Heartbeat {
       () => !this.networkPeers.containsOlderThan(thresholdTime),
       queryOldest
     )
-    this.networkPeers.debugLog()
+    log(this.networkPeers.debugLog())
   }
 
   private tick() {
