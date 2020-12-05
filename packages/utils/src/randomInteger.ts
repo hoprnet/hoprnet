@@ -44,7 +44,12 @@ export function randomInteger(start: number, end?: number, seed?: Uint8Array): n
 
   let result = 0
 
-  for (let i = 0; i < bitAmount; i++) {
+  let i = 0
+  for (; i + 8 < bitAmount; i += 8) {
+    result |= bytes[bytes.length - Math.floor(i / 8) - 1] << i
+  }
+
+  for (; i < bitAmount; i++) {
     if ((result | (1 << i)) < interval) {
       let index = Math.floor(i / 8)
       let offset = i % 8
