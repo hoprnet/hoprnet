@@ -9,7 +9,7 @@ export function toU8a(arg: number, length?: number): Uint8Array {
     throw Error('Not implemented')
   }
 
-  if (length <= 4 && arg > (1 << length * 8)) {
+  if (length <= 4 && arg > 1 << (length * 8)) {
     throw Error(`Argument <${arg}> does not fit into desired length <${length}>.`)
   }
 
