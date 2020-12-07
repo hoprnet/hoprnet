@@ -1,7 +1,6 @@
 import assert from 'assert'
 import PeerId from 'peer-id'
 import { convertPubKeyFromPeerId, convertPubKeyFromB58String, hasB58String, getB58String } from '.'
-import { validTweetsMap } from './tweets'
 // @ts-ignore
 import * as multihashes from 'multihashes'
 
@@ -40,9 +39,6 @@ describe(`test hasB58String`, function () {
     const response = hasB58String(tweet)
     assert(response === true)
   })
-  it(`should return true for all valid tweets`, function () {
-    assert(validTweetsMap.every(hasB58String) === true)
-  })
 })
 
 describe(`test hasB58String`, function () {
@@ -65,8 +61,5 @@ describe(`test hasB58String`, function () {
     `
     const response = getB58String(tweet)
     assert(response === '16Uiu2HAkz2s8kLcY7KTSkQBDUmfD8eSgKVnYRt8dLM36jDgZ5Z7d')
-  })
-  it(`should return a string of 53 characters for all valid tweets`, function () {
-    assert(validTweetsMap.every((tweet) => getB58String(tweet).length === 53) === true)
   })
 })
