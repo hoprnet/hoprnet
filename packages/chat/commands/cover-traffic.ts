@@ -9,7 +9,7 @@ export class CoverTraffic extends AbstractCommand {
   private seq: number = 0
   private timeout: NodeJS.Timeout | undefined
   private registered: boolean
-  
+
   private messagesSent: number
   private messagesReceived: number
   private totalLatency: number
@@ -31,27 +31,26 @@ export class CoverTraffic extends AbstractCommand {
     return 'Generate chaff messages to provide cover (start/stop)'
   }
 
-  private tick(){
-    const payload = encode([this.identifier, this.seq++, Date.now()]) 
+  private tick() {
+    const payload = encode([this.identifier, this.seq++, Date.now()])
     this.node.sendMessage(payload, this.node.getId())
-    this.messagesSent ++
+    this.messagesSent++
     setTimeout(this.tick.bind(this), INTERVAL)
   }
 
-  private handleMessage(msg: Uint8Array){
+  private handleMessage(msg: Uint8Array) {
     const decoded = decode(msg)
-    if (decoded[0] === this.identifier){
+    if (decoded[0] === this.identifier) {
       const ts = decoded[2]
       this.totalLatency += Date.now() - ts
-      this.messagesReceived ++ 
+      this.messagesReceived++
     }
   }
 
-  private stats(): string{
+  private stats(): string {
     const reliability = ((this.messagesReceived / this.messagesSent) * 100).toFixed(2)
     const latency = this.totalLatency / this.messagesReceived
-    return `${this.messagesSent} messages sent, ` +
-              `reliability = ${reliability}%, average latency is ${latency}`
+    return `${this.messagesSent} messages sent, ` + `reliability = ${reliability}%, average latency is ${latency}`
   }
 
   public async execute(query: string): Promise<string> {
@@ -62,12 +61,12 @@ export class CoverTraffic extends AbstractCommand {
       }
       setTimeout(this.tick.bind(this), INTERVAL)
       return 'started'
-    } 
-    if (query === 'stop' && this.timeout){
+    }
+    if (query === 'stop' && this.timeout) {
       clearTimeout(this.timeout)
       return 'stopped'
     }
-    if (query === 'stats'){
+    if (query === 'stats') {
       return this.stats()
     }
   }
