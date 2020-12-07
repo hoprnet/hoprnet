@@ -34,19 +34,19 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Accounts, Channel
      * @dev Initializes an account,
      * stores it's public key, secret and counter,
      * then emits {AccountInitialized} and {AccountSecretUpdated} events.
-     * @param pubKeyA first half of the public key
-     * @param pubKeyB second half of the public key
      * @param secret account's secret
+     * @param pubKeyFirstHalf first half of the public key
+     * @param pubKeySecondHalf second half of the public key
      */
     function initializeAccount(
-        uint256 pubKeyA,
-        uint256 pubKeyB,
-        bytes32 secret
+        bytes32 secret,
+        uint256 pubKeyFirstHalf,
+        uint256 pubKeySecondHalf
     ) external {
         _initializeAccount(
             msg.sender,
-            pubKeyA,
-            pubKeyB,
+            pubKeyFirstHalf,
+            pubKeySecondHalf,
             secret
         );
     }
@@ -56,10 +56,10 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Accounts, Channel
      * then emits {AccountSecretUpdated} event.
      * @param secret account's secret
      */
-    function updateAccountSecret(
+    function updateAccount(
         bytes32 secret
     ) external {
-        _updateAccountSecret(msg.sender, secret);
+        _updateAccount(msg.sender, secret);
     }
 
     /**

@@ -22,23 +22,24 @@ contract Accounts {
      * stores it's public key, secret and counter,
      * then emits {AccountInitialized} and {AccountSecretUpdated} events.
      * @param account the address of the account
-     * @param pubKeyA first half of the public key
-     * @param pubKeyB second half of the public key
+     * @param pubKeyFirstHalf first half of the public key
+     * @param pubKeySecondHalf second half of the public key
      * @param secret account's secret
      */
     function _initializeAccount(
         address account,
-        uint256 pubKeyA,
-        uint256 pubKeyB,
+        uint256 pubKeyFirstHalf,
+        uint256 pubKeySecondHalf,
         bytes32 secret
     ) internal {
-        require(pubKeyA != uint256(0), "account pubKeyA must not be empty");
-        require(pubKeyB != uint256(0), "account pubKeyB must not be empty");
-        require(ECDSA.pubKeyToEthereumAddress(pubKeyA, pubKeyB) == account, "public key does not match caller");
+        require(
+            ECDSA.pubKeyToEthereumAddress(pubKeyFirstHalf, pubKeySecondHalf) == account,
+            "public key does not match account"
+        );
 
-        _updateAccountSecret(account, secret);
+        _updateAccount(account, secret);
 
-        emit AccountInitialized(account, pubKeyA, pubKeyB);
+        emit AccountInitialized(account, pubKeyFirstHalf, pubKeySecondHalf);
     }
 
     /**
@@ -47,7 +48,7 @@ contract Accounts {
      * @param account the address of the account
      * @param secret account's secret
      */
-    function _updateAccountSecret(
+    function _updateAccount(
         address account,
         bytes32 secret
     ) internal {
@@ -65,8 +66,8 @@ contract Accounts {
     event AccountInitialized(
         // @TODO: remove this and rely on `msg.sender`
         address indexed account,
-        uint256 pubKeyA,
-        uint256 pubKeyB
+        uint256 pubKeyFirstHalf,
+        uint256 pubKeySecondHalf
     );
 
     event AccountSecretUpdated(

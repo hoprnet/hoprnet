@@ -1,7 +1,6 @@
 import type { Network } from '../utils/networks'
 import allAddresses from './addresses.json'
 
-// @TODO: dynamically type this
 export type ContractNames = 'HoprToken' | 'HoprChannels'
 
 export const addresses: {
