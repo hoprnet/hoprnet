@@ -1,7 +1,6 @@
 import { durations } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 
-export const CRAWLING_RESPONSE_NODES = 10
 export const TICKET_AMOUNT = 1000000000000000 // 0.001 HOPR
 export const TICKET_WIN_PROB = 1 // 100%
 export const PACKET_SIZE = 500
@@ -15,7 +14,6 @@ const PROTOCOL_NAME = 'hopr'
 
 export const PROTOCOL_STRING = `/${PROTOCOL_NAME}/msg/${VERSION}`
 export const PROTOCOL_ACKNOWLEDGEMENT = `/${PROTOCOL_NAME}/ack/${VERSION}`
-export const PROTOCOL_CRAWLING = `/${PROTOCOL_NAME}/crawl/${VERSION}`
 export const PROTOCOL_PAYMENT_CHANNEL = `/${PROTOCOL_NAME}/payment/open/${VERSION}`
 export const PROTOCOL_ONCHAIN_KEY = `/${PROTOCOL_NAME}/onChainKey/${VERSION}`
 export const PROTOCOL_HEARTBEAT = `/${PROTOCOL_NAME}/heartbeat/${VERSION}`
@@ -29,10 +27,6 @@ export const MAX_PARALLEL_CONNECTIONS = 10
 
 export const HEARTBEAT_TIMEOUT = durations.seconds(3)
 
-export const CRAWL_TIMEOUT = 10_000 // ~2m- interval between crawls
-export const CRAWL_FAIL_TIMEOUT = 20_000 // Total crawl timeout
-export const CRAWL_MAX_SIZE = 200 // Max peers to contact per crawl
-
 export const MAX_PACKET_DELAY = 200
 
 export const MAX_HOPS = 3
@@ -43,3 +37,5 @@ export const MINIMUM_REASONABLE_CHANNEL_STAKE = new BN(TICKET_AMOUNT).muln(10)
 export const MAX_NEW_CHANNELS_PER_TICK = 10
 
 export const MIN_NATIVE_BALANCE = 1000
+
+export const CHECK_TIMEOUT = 30000
