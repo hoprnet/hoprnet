@@ -1,4 +1,5 @@
 /// <reference path="./@types/libp2p.ts" />
+
 import LibP2P from 'libp2p'
 import type { Connection } from 'libp2p'
 // @ts-ignore
@@ -8,7 +9,7 @@ import KadDHT = require('libp2p-kad-dht')
 // @ts-ignore
 import SECIO = require('libp2p-secio')
 
-import TCP from './network/transport'
+import HoprConnect from '@hoprnet/hopr-connect'
 
 import { Packet } from './messages/packet'
 import {
@@ -18,7 +19,8 @@ import {
   CRAWL_TIMEOUT,
   TICKET_AMOUNT,
   TICKET_WIN_PROB,
-  PATH_RANDOMNESS
+  PATH_RANDOMNESS,
+  MIN_NATIVE_BALANCE
 } from './constants'
 
 import { Network } from './network'
@@ -80,6 +82,18 @@ export type HoprOptions = {
     ip4?: NetOptions
     ip6?: NetOptions
   }
+}
+
+const defaultDBPath = (id: string | number, isBootstrap: boolean): string => {
+  let folder: string
+  if (isBootstrap) {
+    folder = `bootstrap`
+  } else if (id) {
+    folder = `node_${id}`
+  } else {
+    folder = `node`
+  }
+  return path.join(process.cwd(), 'db', VERSION, folder)
 }
 
 class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
@@ -155,7 +169,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     options: HoprOptions
   ): Promise<Hopr<CoreConnector>> {
     const Connector = options.connector ?? HoprCoreEthereum
-    const db = Hopr.openDatabase(options, Connector.constants.CHAIN_NAME, Connector.constants.NETWORK)
+    const db = Hopr.openDatabase(options)
 
     const { id, addresses } = await getIdentity({
       ...options,
@@ -187,14 +201,14 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       },
       // libp2p modules
       modules: {
-        transport: [TCP],
+        transport: [HoprConnect],
         streamMuxer: [MPLEX],
         connEncryption: [SECIO],
         dht: KadDHT
       },
       config: {
         transport: {
-          TCP: {
+          HoprConnect: {
             bootstrapServers: options.bootstrapServers
           }
         },
@@ -306,7 +320,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
           this.network.start()
         ])
       ),
-      this.paymentChannels?.start()
+      this.paymentChannels.start()
     ])
 
     this.paymentChannels.indexer.onNewChannels((newChannels) => {
@@ -330,7 +344,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     }
     clearTimeout(this.checkTimeout)
     this.running = false
-    await Promise.all([this.network.stop(), this.paymentChannels?.stop().then(() => log(`Connector stopped.`))])
+    await Promise.all([this.network.stop(), this.paymentChannels.stop()])
 
     await Promise.all([this.db?.close().then(() => log(`Database closed.`)), this._libp2p.stop()])
 
@@ -381,7 +395,15 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
             verbose('manually creating intermediatePath')
             intermediatePath = await getIntermediateNodesManually()
           } else {
-            intermediatePath = await this.getIntermediateNodes(destination)
+            try {
+              intermediatePath = await this.getIntermediateNodes(destination)
+            } catch (e) {
+              reject(e)
+              return
+            }
+            if (!intermediatePath || !intermediatePath.length) {
+              reject(new Error('bad path'))
+            }
           }
 
           const path: PeerId[] = [].concat(intermediatePath, [destination])
@@ -443,16 +465,43 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     return this.network.networkPeers.all()
   }
 
+  public connectionReport(): string {
+    return this.network.networkPeers.debugLog()
+  }
+
   public async crawl(filter?: (peer: PeerId) => boolean): Promise<CrawlInfo> {
     return this.network.crawler.crawl(filter)
+  }
+
+  private async checkBalances() {
+    const balance = await this.getBalance()
+    let unfunded = false
+    if (balance.lten(0)) {
+      const address = await this.paymentChannels.hexAccountAddress()
+      log('unfunded node', address)
+      this.emit('hopr:warning:unfunded', address)
+      unfunded = true
+    }
+    const nativeBalance = await this.getNativeBalance()
+    if (nativeBalance.lten(MIN_NATIVE_BALANCE)) {
+      const address = await this.paymentChannels.hexAccountAddress()
+      log('unfunded node', address)
+      this.emit('hopr:warning:unfundedNative', address)
+      unfunded = true
+    }
+    if (!unfunded) {
+      // Technically we only have to do this the first time, but there are no
+      // side effects to doing this on each tick.
+      this.paymentChannels.initOnchainValues() // No-op if called many times.
+    }
   }
 
   private async periodicCheck() {
     log('periodic check')
     try {
+      await this.checkBalances()
       await this.tickChannelStrategy([])
-      let crawlInfo = await this.crawl()
-      this.emit('hopr:crawl:completed', crawlInfo)
+      this.emit('hopr:crawl:completed', await this.crawl())
     } catch (e) {
       log('error in periodic check', e)
     }
@@ -471,8 +520,12 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     throw new Error('Unknown strategy')
   }
 
-  public async getBalance(): Promise<BN> {
+  public async getBalance(): Promise<Types.Balance> {
     return await this.paymentChannels.account.balance
+  }
+
+  public async getNativeBalance(): Promise<Types.NativeBalance> {
+    return await this.paymentChannels.account.nativeBalance
   }
 
   /**
@@ -577,7 +630,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     )
   }
 
-  private static openDatabase(options: HoprOptions, chainName: string, network: string): LevelUp {
+  private static openDatabase(options: HoprOptions): LevelUp {
     if (options.db) {
       return options.db
     }
@@ -586,16 +639,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     if (options.dbPath) {
       dbPath = options.dbPath
     } else {
-      let folder: string
-      if (options.bootstrapNode) {
-        folder = `bootstrap`
-      } else if (options.id != null && Number.isInteger(options.id)) {
-        folder = `node_${options.id}`
-      } else {
-        folder = `node`
-      }
-
-      dbPath = path.join(process.cwd(), 'db', chainName, network, folder)
+      dbPath = defaultDBPath(options.id, options.bootstrapNode)
     }
 
     dbPath = path.resolve(dbPath)
@@ -615,3 +659,4 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
 }
 
 export { Hopr as default, LibP2P }
+export * from './constants'

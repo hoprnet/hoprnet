@@ -142,7 +142,7 @@ async function main() {
   let settings: any = {}
 
   function logMessageToNode(msg: Uint8Array) {
-    logs.log('#### NODE RECEIVED MESSAGE ####')
+    logs.log(`#### NODE RECEIVED MESSAGE [${new Date().toISOString()}] ####`)
     try {
       let [decoded, time] = decode(msg) as [Buffer, Buffer]
       logs.log('Message:', decoded.toString())
