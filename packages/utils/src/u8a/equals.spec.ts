@@ -31,6 +31,5 @@ describe('test u8a equals', function () {
     assert(!u8aEquals(new Uint8Array(), new Uint8Array(), undefined))
 
     assert(u8aEquals(new Uint8Array(7).fill(0xff), new Uint8Array(7).fill(0xff)))
-
   })
 })
