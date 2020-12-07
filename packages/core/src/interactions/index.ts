@@ -1,6 +1,5 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '..'
-import type Multiaddr from 'multiaddr'
 import PeerId from 'peer-id'
 
 import { PaymentInteractions } from './payments'
@@ -16,11 +15,10 @@ class Interactions<Chain extends HoprCoreConnector> {
   constructor(
     node: Hopr<Chain>,
     mixer: Mixer<Chain>,
-    answerCrawl: (addr: Multiaddr) => Promise<Multiaddr[]>,
     heartbeat: (remotePeer: PeerId) => void
   ) {
     this.payments = new PaymentInteractions(node)
-    this.network = new NetworkInteractions(node._libp2p, answerCrawl, heartbeat)
+    this.network = new NetworkInteractions(node._libp2p, heartbeat)
     this.packet = new PacketInteractions(node, mixer)
   }
 }
