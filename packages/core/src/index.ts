@@ -1,4 +1,5 @@
 /// <reference path="./@types/libp2p.ts" />
+
 import LibP2P from 'libp2p'
 import type { Connection } from 'libp2p'
 // @ts-ignore
@@ -8,14 +9,14 @@ import KadDHT = require('libp2p-kad-dht')
 // @ts-ignore
 import SECIO = require('libp2p-secio')
 
-import TCP from './network/transport'
+import HoprConnect from '@hoprnet/hopr-connect'
 
 import { Packet } from './messages/packet'
 import {
   PACKET_SIZE,
   MAX_HOPS,
   VERSION,
-  CRAWL_TIMEOUT,
+  CHECK_TIMEOUT,
   TICKET_AMOUNT,
   TICKET_WIN_PROB,
   PATH_RANDOMNESS,
@@ -38,7 +39,6 @@ import chalk from 'chalk'
 import PeerId from 'peer-id'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type { HoprCoreConnectorStatic, Types, Channel, IndexerChannel } from '@hoprnet/hopr-core-connector-interface'
-import type { CrawlInfo } from './network/crawler'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 import BN from 'bn.js'
 
@@ -81,6 +81,18 @@ export type HoprOptions = {
     ip4?: NetOptions
     ip6?: NetOptions
   }
+}
+
+const defaultDBPath = (id: string | number, isBootstrap: boolean): string => {
+  let folder: string
+  if (isBootstrap) {
+    folder = `bootstrap`
+  } else if (id) {
+    folder = `node_${id}`
+  } else {
+    folder = `node`
+  }
+  return path.join(process.cwd(), 'db', VERSION, folder)
 }
 
 class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
@@ -128,12 +140,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     }
     this.bootstrapServers = options.bootstrapServers || []
     this.isBootstrapNode = options.bootstrapNode || false
-    this._interactions = new Interactions(
-      this,
-      this.mixer,
-      (addr: Multiaddr) => this.network.crawler.answerCrawl(addr),
-      (peer: PeerId) => this.network.networkPeers.register(peer)
-    )
+    this._interactions = new Interactions(this, this.mixer, (peer: PeerId) => this.network.networkPeers.register(peer))
     this.network = new Network(this._libp2p, this._interactions, options)
 
     if (options.ticketAmount) this.ticketAmount = options.ticketAmount
@@ -156,7 +163,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     options: HoprOptions
   ): Promise<Hopr<CoreConnector>> {
     const Connector = options.connector ?? HoprCoreEthereum
-    const db = Hopr.openDatabase(options, Connector.constants.CHAIN_NAME, Connector.constants.NETWORK)
+    const db = Hopr.openDatabase(options)
 
     const { id, addresses } = await getIdentity({
       ...options,
@@ -188,14 +195,14 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       },
       // libp2p modules
       modules: {
-        transport: [TCP],
+        transport: [HoprConnect],
         streamMuxer: [MPLEX],
         connEncryption: [SECIO],
         dht: KadDHT
       },
       config: {
         transport: {
-          TCP: {
+          HoprConnect: {
             bootstrapServers: options.bootstrapServers
           }
         },
@@ -382,7 +389,15 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
             verbose('manually creating intermediatePath')
             intermediatePath = await getIntermediateNodesManually()
           } else {
-            intermediatePath = await this.getIntermediateNodes(destination)
+            try {
+              intermediatePath = await this.getIntermediateNodes(destination)
+            } catch (e) {
+              reject(e)
+              return
+            }
+            if (!intermediatePath || !intermediatePath.length) {
+              reject(new Error('bad path'))
+            }
           }
 
           const path: PeerId[] = [].concat(intermediatePath, [destination])
@@ -444,8 +459,8 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     return this.network.networkPeers.all()
   }
 
-  public async crawl(filter?: (peer: PeerId) => boolean): Promise<CrawlInfo> {
-    return this.network.crawler.crawl(filter)
+  public connectionReport(): string {
+    return this.network.networkPeers.debugLog()
   }
 
   private async checkBalances() {
@@ -476,11 +491,10 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     try {
       await this.checkBalances()
       await this.tickChannelStrategy([])
-      this.emit('hopr:crawl:completed', await this.crawl())
     } catch (e) {
       log('error in periodic check', e)
     }
-    this.checkTimeout = setTimeout(() => this.periodicCheck(), CRAWL_TIMEOUT)
+    this.checkTimeout = setTimeout(() => this.periodicCheck(), CHECK_TIMEOUT)
   }
 
   public setChannelStrategy(strategy: ChannelStrategyNames) {
@@ -605,7 +619,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     )
   }
 
-  private static openDatabase(options: HoprOptions, chainName: string, network: string): LevelUp {
+  private static openDatabase(options: HoprOptions): LevelUp {
     if (options.db) {
       return options.db
     }
@@ -614,16 +628,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     if (options.dbPath) {
       dbPath = options.dbPath
     } else {
-      let folder: string
-      if (options.bootstrapNode) {
-        folder = `bootstrap`
-      } else if (options.id != null && Number.isInteger(options.id)) {
-        folder = `node_${options.id}`
-      } else {
-        folder = `node`
-      }
-
-      dbPath = path.join(process.cwd(), 'db', chainName, network, folder)
+      dbPath = defaultDBPath(options.id, options.bootstrapNode)
     }
 
     dbPath = path.resolve(dbPath)

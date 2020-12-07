@@ -39,7 +39,7 @@ export abstract class SendMessageBase extends AbstractCommand {
     try {
       await this.node.sendMessage(encodeMessage(message), recipient, getIntermediateNodes)
     } catch (err) {
-      return styleValue('Could not send message.', 'failure')
+      return styleValue(`Could not send message. (${err})`, 'failure')
     }
   }
 
