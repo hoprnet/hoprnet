@@ -4,9 +4,9 @@ services:
     build:
       context: ../hoprd
       dockerfile: ./Dockerfile
-      args:
-        network: bnb-testnet
-    image: 'hopr.avado.dnp.dappnode.eth:0.100.0'
+    entrypoint: node
+    command: /app/index.js --password=open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ01 --admin --init
+    image: 'hopr.avado.dnp.dappnode.eth:1.57.5'
     restart: always
     volumes:
       - type: volume

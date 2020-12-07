@@ -31,5 +31,6 @@
     "singleQuote": true,
     "printWidth": 120,
     "trailingComma": "none"
-  }
+  },
+  "version": null
 }

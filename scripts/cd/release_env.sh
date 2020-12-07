@@ -9,6 +9,7 @@ declare -A environments=(
   ["master"]="34.65.102.152"
   ["luzern"]="34.65.5.42"
   ["zug"]="34.65.158.118"
+  ["larnaca"]="34.65.66.167"
 )
 
 if [[ -z "${GITHUB_REF}" ]]; then
