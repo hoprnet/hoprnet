@@ -211,7 +211,7 @@ export function getWinProbabilityAsFloat(winProb: Uint8Array): number {
     return 0
   }
 
-  return u8aToNumber(winProb.slice(0, 3)) / u8aToNumber(new Uint8Array(3).fill(0xff))
+  return (u8aToNumber(winProb.slice(0, 3)) as number) / (u8aToNumber(new Uint8Array(3).fill(0xff)) as number)
 }
 
 /**

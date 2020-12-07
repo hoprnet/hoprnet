@@ -115,9 +115,9 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
         let ticketCounter: Uint8Array
         try {
           ticketCounter = toU8a(
-            u8aToNumber(
+            (u8aToNumber(
               (await this.node.db.get(Buffer.from(this.node._dbKeys.AcknowledgedTicketCounter()))) as Uint8Array
-            ) + 1,
+            ) as number) + 1,
             ACKNOWLEDGED_TICKET_INDEX_LENGTH
           )
         } catch (err) {
