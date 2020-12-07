@@ -46,7 +46,7 @@ contract Tickets is Accounts, Channels {
             recipient,
             accounts[recipient].counter,
             proofOfRelaySecret,
-            _getChannelIteration(channel),
+            _getChannelIteration(channel.status),
             amount,
             winProb
         );
@@ -78,7 +78,7 @@ contract Tickets is Accounts, Channels {
     function _validateChannelStatus(
         Channel memory channel
     ) internal {
-        ChannelStatus channelStatus = _getChannelStatus(channel);
+        ChannelStatus channelStatus = _getChannelStatus(channel.status);
         require(
             channelStatus == ChannelStatus.OPEN || channelStatus == ChannelStatus.PENDING_TO_CLOSE,
             "channel must be open or pending to close"

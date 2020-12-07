@@ -1,0 +1,88 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+pragma solidity ^0.6.0;
+
+import "../HoprChannels/Channels.sol";
+
+contract ChannelsMock is Channels {
+    constructor(uint256 _secsClosure) public {
+        secsClosure = _secsClosure;
+    }
+
+    function fundChannel(
+        address funder,
+        address accountA,
+        address accountB,
+        uint256 amountA,
+        uint256 amountB
+    ) external {
+        _fundChannel(funder, accountA, accountB, amountA, amountB);
+    }
+
+    function openChannel(
+        address opener,
+        address counterparty
+    ) external {
+        _openChannel(opener, counterparty);
+    }
+
+    function initiateChannelClosure(
+        address initiator,
+        address counterparty
+    ) external {
+        _initiateChannelClosure(initiator, counterparty);
+    }
+
+    function finalizeChannelClosure(
+        IERC20 token,
+        address initiator,
+        address counterparty
+    ) external {
+        _finalizeChannelClosure(token, initiator, counterparty);
+    }
+
+    function getChannel(
+        address accountA,
+        address accountB
+    ) external returns (
+        address,
+        address,
+        bytes32
+    ) {
+        (address partyA, address partyB, bytes32 channelId,) = _getChannel(accountA, accountB);
+
+        return (partyA, partyB, channelId);
+    }
+
+    function getChannelId(
+        address partyA,
+        address partyB
+    ) external returns (bytes32) {
+        return _getChannelId(partyA, partyB);
+    }
+
+    function getChannelStatus(
+        uint256 status
+    ) external returns (ChannelStatus) {
+        return _getChannelStatus(status);
+    }
+
+    function getChannelIteration(
+        uint256 status
+    ) external returns (uint256) {
+        return _getChannelIteration(status);
+    }
+
+    function isPartyA(
+        address accountA,
+        address accountB
+    ) external returns (bool) {
+        return _isPartyA(accountA, accountB);
+    }
+
+    function getParties(
+        address accountA,
+        address accountB
+    ) external returns (address, address) {
+        return _getParties(accountA, accountB);
+    }
+}

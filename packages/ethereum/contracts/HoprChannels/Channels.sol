@@ -2,6 +2,7 @@
 pragma solidity ^0.6.0;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "../utils/console.sol";
 
 contract Channels {
     /**
@@ -58,10 +59,7 @@ contract Channels {
 
         // @TODO: use SafeMath
         channel.deposit += (amountA + amountB);
-
-        if (_isPartyA(accountA, accountB)) {
-            channel.partyABalance += amountA;
-        }
+        channel.partyABalance += amountA;
 
         emit ChannelFunded(
             accountA,
@@ -87,7 +85,9 @@ contract Channels {
         require(counterparty != address(0), "counterparty must not be empty");
 
         (,,, Channel storage channel) = _getChannel(opener, counterparty);
-        ChannelStatus channelStatus = _getChannelStatus(channel);
+        require(channel.deposit > 0, "channel must be funded");
+
+        ChannelStatus channelStatus = _getChannelStatus(channel.status);
         require(channelStatus == ChannelStatus.CLOSED, "channel must be closed in order to open");
 
         channel.status += 1;
@@ -112,7 +112,7 @@ contract Channels {
         require(counterparty != address(0), "counterparty must not be empty");
 
         (,,, Channel storage channel) = _getChannel(initiator, counterparty);
-        ChannelStatus channelStatus = _getChannelStatus(channel);
+        ChannelStatus channelStatus = _getChannelStatus(channel.status);
         require(
             channelStatus == ChannelStatus.OPEN,
             "channel must be open"
@@ -144,12 +144,13 @@ contract Channels {
         address initiator,
         address counterparty
     ) internal {
+        require(address(token) != address(0), "token must not be empty");
         require(initiator != counterparty, "initiator and counterparty must not be the same");
         require(initiator != address(0), "initiator must not be empty");
         require(counterparty != address(0), "counterparty must not be empty");
 
         (address partyA, address partyB,, Channel storage channel) = _getChannel(initiator, counterparty);
-        ChannelStatus channelStatus = _getChannelStatus(channel);
+        ChannelStatus channelStatus = _getChannelStatus(channel.status);
         require(
             channelStatus == ChannelStatus.PENDING_TO_CLOSE,
             "channel must be pending to close"
@@ -159,7 +160,7 @@ contract Channels {
             channel.closureByPartyA && (initiator == partyA) ||
             !channel.closureByPartyA && (initiator == partyB)
         ) {
-            require(channel.closureTime < now, "closureTime must be smaller than now");
+            require(channel.closureTime < now, "closureTime must be before now");
         }
 
         uint256 partyAAmount = channel.partyABalance;
@@ -173,7 +174,7 @@ contract Channels {
             token.transfer(partyB, partyBAmount);
         }
 
-        channel.status += 7;
+        channel.status += 8;
         delete channel.deposit; // channel.deposit = 0
         delete channel.partyABalance; // channel.partyABalance = 0
         delete channel.closureTime; // channel.closureTime = 0
@@ -214,19 +215,19 @@ contract Channels {
     }
 
     /**
-     * @param channel a channel
+     * @param status channel's status
      * @return the channel's status in 'ChannelStatus'
      */
-    function _getChannelStatus(Channel memory channel) internal pure returns (ChannelStatus) {
-        return ChannelStatus(channel.status % 10);
+    function _getChannelStatus(uint256 status) internal pure returns (ChannelStatus) {
+        return ChannelStatus(status % 10);
     }
 
     /**
-     * @param channel a channel
+     * @param status channel's status
      * @return the channel's iteration
      */
-    function _getChannelIteration(Channel memory channel) internal pure returns (uint256) {
-        return (channel.status / 10) + 1;
+    function _getChannelIteration(uint256 status) internal pure returns (uint256) {
+        return (status / 10) + 1;
     }
 
     /**
@@ -263,20 +264,20 @@ contract Channels {
     event ChannelOpened(
         // @TODO: remove this and rely on `msg.sender`
         address indexed opener,
-        address indexed counterParty
+        address indexed counterparty
     );
 
     event ChannelPendingToClose(
         // @TODO: remove this and rely on `msg.sender`
         address indexed initiator,
-        address indexed counterParty,
+        address indexed counterparty,
         uint256 closureTime
     );
 
     event ChannelClosed(
         // @TODO: remove this and rely on `msg.sender`
         address indexed initiator,
-        address indexed counterParty,
+        address indexed counterparty,
         uint256 partyAAmount,
         uint256 partyBAmount
     );

@@ -1,10 +1,11 @@
 import { expectEvent, expectRevert, constants } from '@openzeppelin/test-helpers'
 import { vmErrorMessage } from '../utils'
-import { formatAccount, ACCOUNT_A_ADDRESS, ACCOUNT_A_PUBKEY, ACCOUNT_B_PUBKEY, SECRET, SECRET_PRE_IMAGE } from './utils'
+import { formatAccount } from './utils'
+import { ACCOUNT_A_ADDRESS, ACCOUNT_A_PUBKEY, ACCOUNT_B_PUBKEY, SECRET, SECRET_PRE_IMAGE } from './constants'
 
 const Accounts = artifacts.require('AccountsMock')
 
-describe.only('Accounts', function () {
+describe('Accounts', function () {
   it('should initialize account', async function () {
     const accounts = await Accounts.new()
 
