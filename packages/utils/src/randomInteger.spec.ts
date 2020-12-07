@@ -28,7 +28,7 @@ describe('testing random-number generator', function () {
   it('should throw error for falsy interval input', function () {
     assert.throws(() => randomInteger(2, 1))
 
-    assert.throws(() => randomInteger(Math.pow(2, 32)))
+    assert.throws(() => randomInteger(2 ** 32))
 
     assert.throws(() => randomInteger(-1))
 
@@ -36,11 +36,13 @@ describe('testing random-number generator', function () {
   })
 
   it('should yield correct values for edge cases', function () {
-    const MAX_INTEGER = Math.pow(2, 31)
+    const MAX_INTEGER = 2 ** 31
 
     assert(randomInteger(0, MAX_INTEGER, new Uint8Array(4).fill(0xff)) == MAX_INTEGER - 1)
 
     assert.throws(() => randomInteger(0, MAX_INTEGER + 1, new Uint8Array(4).fill(0xff)))
+
+    assert(randomInteger(0, 2 ** 24, new Uint8Array(4).fill(0xff)) == 2 ** 24 - 1)
 
     assert(randomInteger(0, 1) == 0)
 

@@ -2,8 +2,17 @@ import { randomBytes } from 'crypto'
 
 const MAX_SAFE_INTEGER = 2147483648
 /**
- * @param start
- * @param end
+ * Returns a random value between `start` and `end`.
+ * @example
+ * ```
+ * randomInteger(3) // result in { 0, 1, 2 }
+ * randomInteger(0, 3) // result in { 0, 1, 2 }
+ * randomInteger(7, 9) // result in { 7, 8 }
+ * randomInteger(8, 9) == 8
+ * ```
+ * @param start start of the interval
+ * @param end end of the interval
+ * @param seed [optional] DO NOT USE THIS set seed manually
  * @returns random number between @param start and @param end
  */
 export function randomInteger(start: number, end?: number, seed?: Uint8Array): number {
@@ -45,8 +54,9 @@ export function randomInteger(start: number, end?: number, seed?: Uint8Array): n
   let result = 0
 
   let i = 0
-  for (; i + 8 + 1 < bitAmount; i += 8) {
-    result |= bytes[bytes.length - Math.floor(i / 8) - 1] << i
+  // Only copy third byte from seed if our interval has at least 25 bytes
+  for (; i + 8 < bitAmount; i += 8) {
+    result |= bytes[bytes.length - (i >> 3) - 1] << i
   }
 
   for (; i < bitAmount; i++) {
@@ -60,7 +70,7 @@ export function randomInteger(start: number, end?: number, seed?: Uint8Array): n
   }
 
   // Projects interval from [0, end - start) to [start, end)
-  return end == null ? result : start + result
+  return end == undefined ? result : start + result
 }
 
 export function randomChoice<T>(collection: T[]): T {
