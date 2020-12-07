@@ -38,22 +38,20 @@ export function randomInteger(start: number, end?: number, seed?: Uint8Array): n
 
   const bitAmount = 32 - Math.clz32(interval - 1)
 
-  const byteAmount = Math.ceil(bitAmount / 8)
+  const byteAmount = bitAmount >> 3
 
   let bytes = seed ?? randomBytes(byteAmount)
 
   let result = 0
 
   let i = 0
-  for (; i + 8 < bitAmount; i += 8) {
+  for (; i + 8 + 1 < bitAmount; i += 8) {
     result |= bytes[bytes.length - Math.floor(i / 8) - 1] << i
   }
 
   for (; i < bitAmount; i++) {
     if ((result | (1 << i)) < interval) {
-      let index = Math.floor(i / 8)
-      let offset = i % 8
-      let decision = bytes[bytes.length - index - 1] & (1 << offset)
+      let decision = bytes[bytes.length - (i >> 3) - 1] & (1 << (i & 7))
 
       if (decision) {
         result |= 1 << i
