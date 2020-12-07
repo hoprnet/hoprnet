@@ -1,4 +1,5 @@
 /// <reference path="./@types/libp2p.ts" />
+
 import LibP2P from 'libp2p'
 import type { Connection } from 'libp2p'
 // @ts-ignore
@@ -8,7 +9,7 @@ import KadDHT = require('libp2p-kad-dht')
 // @ts-ignore
 import SECIO = require('libp2p-secio')
 
-import TCP from './network/transport'
+import HoprConnect from '@hoprnet/hopr-connect'
 
 import { Packet } from './messages/packet'
 import {
@@ -200,14 +201,14 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       },
       // libp2p modules
       modules: {
-        transport: [TCP],
+        transport: [HoprConnect],
         streamMuxer: [MPLEX],
         connEncryption: [SECIO],
         dht: KadDHT
       },
       config: {
         transport: {
-          TCP: {
+          HoprConnect: {
             bootstrapServers: options.bootstrapServers
           }
         },
