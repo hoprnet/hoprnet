@@ -43,7 +43,7 @@ contract ChannelsMock is Channels {
     function getChannel(
         address accountA,
         address accountB
-    ) external returns (
+    ) external view returns (
         address,
         address,
         bytes32
@@ -56,33 +56,33 @@ contract ChannelsMock is Channels {
     function getChannelId(
         address partyA,
         address partyB
-    ) external returns (bytes32) {
+    ) external pure returns (bytes32) {
         return _getChannelId(partyA, partyB);
     }
 
     function getChannelStatus(
         uint256 status
-    ) external returns (ChannelStatus) {
+    ) external pure returns (ChannelStatus) {
         return _getChannelStatus(status);
     }
 
     function getChannelIteration(
         uint256 status
-    ) external returns (uint256) {
+    ) external pure returns (uint256) {
         return _getChannelIteration(status);
     }
 
     function isPartyA(
         address accountA,
         address accountB
-    ) external returns (bool) {
+    ) external pure returns (bool) {
         return _isPartyA(accountA, accountB);
     }
 
     function getParties(
         address accountA,
         address accountB
-    ) external returns (address, address) {
+    ) external pure returns (address, address) {
         return _getParties(accountA, accountB);
     }
 }

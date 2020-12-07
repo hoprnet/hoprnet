@@ -35,25 +35,42 @@ contract Tickets is Accounts, Channels {
         bytes32 s,
         uint8 v
     ) internal {
-        _validateAccountPreImage(recipient, secretPreImage);
         (,,, Channel storage channel) = _getChannel(
             recipient,
             counterparty
         );
-        _validateChannelStatus(channel);
+        require(
+            _getChannelStatus(channel.status) != ChannelStatus.CLOSED,
+            "channel must be open or pending to close"
+        );
+
+        Account storage account = accounts[recipient];
+        require(
+            account.secret == keccak256(abi.encodePacked(secretPreImage)),
+            "secretPreImage must be the hash of secret"
+        );
 
         bytes32 ticketHash = _getTicketHash(
             recipient,
-            accounts[recipient].counter,
+            account.counter,
             proofOfRelaySecret,
             _getChannelIteration(channel.status),
             amount,
             winProb
         );
-        _validateTicketHash(ticketHash, counterparty, r, s, v);
-        _validateLuck(ticketHash, secretPreImage, proofOfRelaySecret, winProb);
+        require(!tickets[ticketHash], "ticket must not be used twice");
+        require(ECDSA.recover(ticketHash, r, s, v) == counterparty, "signer must match the counterparty");
+        require(
+            uint256(_getTicketLuck(
+                ticketHash,
+                secretPreImage,
+                proofOfRelaySecret,
+                winProb
+            )) <= uint256(winProb),
+            "ticket must be a win"
+        );
 
-        accounts[recipient].secret = secretPreImage;
+        account.secret = secretPreImage;
         tickets[ticketHash] = true;
 
         if (_isPartyA(recipient, counterparty)) {
@@ -63,26 +80,6 @@ contract Tickets is Accounts, Channels {
             // @TODO: add SafeMath
             channel.partyABalance -= amount;
         }
-    }
-
-    function _validateAccountPreImage(
-        address account,
-        bytes32 secretPreImage
-    ) internal {
-        require(
-            accounts[account].secret == keccak256(abi.encodePacked(secretPreImage)),
-            "secretPreImage must be the hash of account's secret"
-        );
-    }
-
-    function _validateChannelStatus(
-        Channel memory channel
-    ) internal {
-        ChannelStatus channelStatus = _getChannelStatus(channel.status);
-        require(
-            channelStatus == ChannelStatus.OPEN || channelStatus == ChannelStatus.PENDING_TO_CLOSE,
-            "channel must be open or pending to close"
-        );
     }
 
     function _getTicketHash(
@@ -108,24 +105,12 @@ contract Tickets is Accounts, Channels {
         );
     }
 
-    function _validateTicketHash(
-        bytes32 ticketHash,
-        address counterparty,
-        bytes32 r,
-        bytes32 s,
-        uint8 v
-    ) internal {
-        require(ECDSA.recover(ticketHash, r, s, v) == counterparty, "signer must match the counterparty");
-        require(!tickets[ticketHash], "ticket must not be used twice");
-    }
-
-    function _validateLuck(
+    function _getTicketLuck(
         bytes32 ticketHash,
         bytes32 secretPreImage,
         bytes32 proofOfRelaySecret,
         bytes32 winProb
-    ) internal {
-        bytes32 luck = keccak256(abi.encodePacked(ticketHash, secretPreImage, proofOfRelaySecret));
-        require(uint256(luck) <= uint256(winProb), "ticket must be a win");
+    ) internal pure returns (bytes32) {
+        return keccak256(abi.encodePacked(ticketHash, secretPreImage, proofOfRelaySecret));
     }
 }
