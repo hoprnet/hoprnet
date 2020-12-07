@@ -4,7 +4,6 @@ import type PeerId from 'peer-id'
 import { AutoCompleteResult } from './abstractCommand'
 import { AbstractCommand, GlobalState, CommandResponse } from './abstractCommand'
 import CloseChannel from './closeChannel'
-import Crawl from './crawl'
 import ListCommands from './listCommands'
 // import ListConnectors from './listConnectors'
 import ListOpenChannels from './listOpenChannels'
@@ -43,7 +42,6 @@ export class Commands {
 
     this.commands = [
       new CloseChannel(node),
-      new Crawl(node),
       new Info(node),
       new ListCommands(() => this.commands),
       // new ListConnectors(),
@@ -109,7 +107,7 @@ export class Commands {
       return await cmd.execute(query || '', this.state)
     }
 
-    return 'Unknown command!'
+    return `${cmd}: Unknown command!`
   }
 
   public async autocomplete(message: string): Promise<AutoCompleteResult> {

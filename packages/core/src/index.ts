@@ -16,7 +16,7 @@ import {
   PACKET_SIZE,
   MAX_HOPS,
   VERSION,
-  CRAWL_TIMEOUT,
+  CHECK_TIMEOUT,
   TICKET_AMOUNT,
   TICKET_WIN_PROB,
   PATH_RANDOMNESS,
@@ -39,7 +39,6 @@ import chalk from 'chalk'
 import PeerId from 'peer-id'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type { HoprCoreConnectorStatic, Types, Channel, IndexerChannel } from '@hoprnet/hopr-core-connector-interface'
-import type { CrawlInfo } from './network/crawler'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 import BN from 'bn.js'
 
@@ -141,12 +140,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     }
     this.bootstrapServers = options.bootstrapServers || []
     this.isBootstrapNode = options.bootstrapNode || false
-    this._interactions = new Interactions(
-      this,
-      this.mixer,
-      (addr: Multiaddr) => this.network.crawler.answerCrawl(addr),
-      (peer: PeerId) => this.network.networkPeers.register(peer)
-    )
+    this._interactions = new Interactions(this, this.mixer, (peer: PeerId) => this.network.networkPeers.register(peer))
     this.network = new Network(this._libp2p, this._interactions, options)
 
     if (options.ticketAmount) this.ticketAmount = options.ticketAmount
@@ -469,10 +463,6 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     return this.network.networkPeers.debugLog()
   }
 
-  public async crawl(filter?: (peer: PeerId) => boolean): Promise<CrawlInfo> {
-    return this.network.crawler.crawl(filter)
-  }
-
   private async checkBalances() {
     const balance = await this.getBalance()
     let unfunded = false
@@ -501,11 +491,10 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     try {
       await this.checkBalances()
       await this.tickChannelStrategy([])
-      this.emit('hopr:crawl:completed', await this.crawl())
     } catch (e) {
       log('error in periodic check', e)
     }
-    this.checkTimeout = setTimeout(() => this.periodicCheck(), CRAWL_TIMEOUT)
+    this.checkTimeout = setTimeout(() => this.periodicCheck(), CHECK_TIMEOUT)
   }
 
   public setChannelStrategy(strategy: ChannelStrategyNames) {
