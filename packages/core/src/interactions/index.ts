@@ -12,11 +12,7 @@ class Interactions<Chain extends HoprCoreConnector> {
   public network: NetworkInteractions
   public packet: PacketInteractions<Chain>
 
-  constructor(
-    node: Hopr<Chain>,
-    mixer: Mixer<Chain>,
-    heartbeat: (remotePeer: PeerId) => void
-  ) {
+  constructor(node: Hopr<Chain>, mixer: Mixer<Chain>, heartbeat: (remotePeer: PeerId) => void) {
     this.payments = new PaymentInteractions(node)
     this.network = new NetworkInteractions(node._libp2p, heartbeat)
     this.packet = new PacketInteractions(node, mixer)
