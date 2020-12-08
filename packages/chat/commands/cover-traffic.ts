@@ -5,6 +5,19 @@ import { AbstractCommand } from './abstractCommand'
 
 const INTERVAL = 1000
 
+/*
+ * Generate Cover Traffic
+ *
+ * We add "useless" packets to our network at a random rate to avoid exposing
+ * real packets to be distinguished and/or isolated by a node with some sort of
+ * heuristic. Thus, by implementing this "decoy traffic", we reduce the attack
+ * vector on our users and increase the general privacy of the network.
+ *
+ * This is currently a first step implementation that simply sends regular
+ * messages through the network to itself, allowing it to also monitor network
+ * success metrics.
+ *
+ */
 export class CoverTraffic extends AbstractCommand {
   private seq: number = 0
   private timeout: NodeJS.Timeout | undefined
@@ -56,6 +69,7 @@ export class CoverTraffic extends AbstractCommand {
   public async execute(query: string): Promise<string> {
     if (query === 'start' && !this.timeout) {
       if (!this.registered) {
+        // Intercept message event to monitor success rate.
         this.node.on('hopr:message', this.handleMessage.bind(this))
         this.registered = true
       }
