@@ -36,8 +36,6 @@ export async function iterateHash(
     throw Error(`Cannot compute hash because no seed was given through the 'hint' function or the 'seed' argument.`)
   }
 
-  console.log(i)
-
   for (; i < iterations; i++) {
     if (stepSize != undefined && i % stepSize == 0) {
       intermediates.push({

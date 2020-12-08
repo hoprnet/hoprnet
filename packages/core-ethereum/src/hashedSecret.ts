@@ -74,7 +74,7 @@ class HashedSecret {
 
     let dbBatch = this.coreConnector.db.batch()
 
-    const result = await iterateHash(onChainSecret, this.hashFunction, TOTAL_ITERATIONS, DB_ITERATION_BLOCK_SIZE)
+    const result = await iterateHash(onChainSecret, this.hashFunction.bind(this), TOTAL_ITERATIONS, DB_ITERATION_BLOCK_SIZE)
 
     for (const intermediate of result.intermediates) {
       dbBatch = dbBatch.put(
@@ -156,7 +156,7 @@ class HashedSecret {
   private async calcOnChainSecretFromDb(debug?: boolean): Promise<Hash | never> {
     let result = await iterateHash(
       debug == true ? await this.getDebugAccountSecret() : undefined,
-      this.hashFunction,
+      this.hashFunction.bind(this),
       TOTAL_ITERATIONS,
       DB_ITERATION_BLOCK_SIZE,
       this.hint.bind(this)
@@ -183,19 +183,8 @@ class HashedSecret {
 
     let result = await recoverIteratedHash(
       hash,
-      this.hashFunction,
-      async (index: number) => {
-        try {
-          return await this.coreConnector.db.get(
-            Buffer.from(this.coreConnector.dbKeys.OnChainSecretIntermediary(index))
-          )
-        } catch (err) {
-          if (err.notFound) {
-            return
-          }
-          throw err
-        }
-      },
+      this.hashFunction.bind(this),
+      this.hint.bind(this),
       TOTAL_ITERATIONS,
       DB_ITERATION_BLOCK_SIZE
     )
