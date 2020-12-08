@@ -9,7 +9,43 @@ export function toU8a(arg: number, length?: number): Uint8Array {
     throw Error('Not implemented')
   }
 
-  return stringToU8a(arg.toString(16), length)
+  if (length < 4 && arg > 1 << (length * 8)) {
+    throw Error(`Argument <${arg}> does not fit into desired length <${length}>.`)
+  }
+
+  if (arg == 0) {
+    return new Uint8Array(length ?? 1).fill(0)
+  }
+
+  const buf = new Uint8Array(4)
+
+  const view = new DataView(buf.buffer, 0)
+
+  view.setUint32(0, arg)
+
+  if (length == undefined) {
+    if (buf[0]) {
+      return buf
+    }
+
+    if (buf[1]) {
+      return buf.slice(1)
+    }
+
+    if (buf[2]) {
+      return buf.slice(2)
+    }
+
+    return buf.slice(3)
+  } else if (length <= 4) {
+    return buf.slice(4 - length)
+  } else if (length > 4) {
+    let result = new Uint8Array(length)
+
+    result.set(buf, length - 4)
+
+    return result
+  }
 }
 
 /**

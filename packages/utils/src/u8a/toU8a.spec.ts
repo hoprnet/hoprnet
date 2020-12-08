@@ -35,9 +35,15 @@ describe('test number to u8a', function () {
 
     assert.throws(() => toU8a(12345, 1))
 
-    assert.deepEqual(toU8a(1, 2), new Uint8Array([0x00, 0x01]))
+    assert.deepStrictEqual(toU8a(1, 2), new Uint8Array([0x00, 0x01]))
 
-    assert.deepEqual(toU8a(1, 3), new Uint8Array([0x00, 0x00, 0x01]))
+    assert.deepStrictEqual(toU8a(1, 3), new Uint8Array([0x00, 0x00, 0x01]))
+
+    assert.deepStrictEqual(toU8a(1, 4), new Uint8Array([0x00, 0x00, 0x00, 0x01]))
+
+    assert.deepStrictEqual(toU8a(2, 4), new Uint8Array([0x00, 0x00, 0x00, 0x02]))
+
+    assert.deepStrictEqual(toU8a(1, 5), new Uint8Array([0x00, 0x00, 0x00, 0x00, 0x01]))
   })
 
   it('should return a u8a', function () {
