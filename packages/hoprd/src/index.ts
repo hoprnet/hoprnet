@@ -64,6 +64,14 @@ const argv = yargs
     describe: 'Run a rest interface on localhost:3001',
     default: false
   })
+  .option('restHost', {
+    describe: 'Updates the host for the rest server',
+    default: 'localhost'
+  })
+  .option('restPort', {
+    describe: 'Updates the port for the rest server',
+    default: 3001
+  })
   .option('password', {
     describe: 'A password to encrypt your keys'
   })
@@ -191,8 +199,11 @@ async function main() {
         })
       )
 
-      http.createServer(service).listen(3001, '0.0.0.0', function () {
-        logs.log('Rest server listening on port 3001')
+      const hostname = argv.restHost || "localhost"
+      const port = argv.restPort || 3001
+
+      http.createServer(service).listen(port, hostname, function () {
+        logs.log(`Rest server on ${hostname} listening on port ${port}`)
       })
     }
 
