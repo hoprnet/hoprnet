@@ -35,7 +35,9 @@ The HOPR Association team members have agreed on the following development workf
 
 2. **(TEMPORARY, see #709)** After the `release/**` action has completed, we then crease a `cd/**` branch tracking `release/**`.
 
-3. The instructions with the release, how to test and what bootstrap server to use, are then shared in our social media channels.
+3. The `CHANGELOG.md` file is updated with the GitHub pull requests merged during that milestone.
+
+4. The instructions with the release, how to test and what bootstrap server to use, are then shared in our social media channels.
 
 ## Actions
 
