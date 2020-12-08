@@ -2,7 +2,7 @@
     Not used at the moment, keeping it here for the upcoming
     deployment refactor.
 */
-// SPDX-License-Identifier: LGPL-3.0-only
+// SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.6.0;
 
 contract Migrations {
