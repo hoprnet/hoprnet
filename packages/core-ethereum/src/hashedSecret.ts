@@ -74,7 +74,12 @@ class HashedSecret {
 
     let dbBatch = this.coreConnector.db.batch()
 
-    const result = await iterateHash(onChainSecret, this.hashFunction.bind(this), TOTAL_ITERATIONS, DB_ITERATION_BLOCK_SIZE)
+    const result = await iterateHash(
+      onChainSecret,
+      this.hashFunction.bind(this),
+      TOTAL_ITERATIONS,
+      DB_ITERATION_BLOCK_SIZE
+    )
 
     for (const intermediate of result.intermediates) {
       dbBatch = dbBatch.put(
