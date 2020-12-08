@@ -2,9 +2,9 @@ import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 import { moveDecimalPoint, u8aToHex, pubKeyToPeerId } from '@hoprnet/hopr-utils'
 import chalk from 'chalk'
-import { getMyOpenChannelInstances } from '../utils/openChannels'
+import { getMyOpenChannelInstances } from './utils/openChannels'
 import { AbstractCommand } from './abstractCommand'
-import { getPaddingLength, styleValue } from '../utils'
+import { getPaddingLength, styleValue } from './utils'
 
 export default class ListOpenChannels extends AbstractCommand {
   constructor(public node: Hopr<HoprCoreConnector>) {

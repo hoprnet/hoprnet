@@ -1,4 +1,4 @@
-import { getPaddingLength, styleValue, getOptions } from '../../utils'
+import { getPaddingLength, styleValue, getOptions } from '../utils'
 import { AbstractCommand, GlobalState, AutoCompleteResult } from '../abstractCommand'
 import { IncludeRecipient } from './includeRecipient'
 import { Routing } from './routing'

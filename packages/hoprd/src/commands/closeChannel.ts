@@ -6,7 +6,7 @@ import type { AutoCompleteResult } from './abstractCommand'
 import chalk from 'chalk'
 import { pubKeyToPeerId } from '@hoprnet/hopr-utils'
 import { AbstractCommand, GlobalState } from './abstractCommand'
-import { checkPeerIdInput, styleValue } from '../utils'
+import { checkPeerIdInput, styleValue } from './utils'
 
 export default class CloseChannel extends AbstractCommand {
   constructor(public node: Hopr<HoprCoreConnector>) {

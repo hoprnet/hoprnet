@@ -1,4 +1,3 @@
-import chalk from 'chalk'
 import { cli_options } from './cliOptions'
 
 const FIRST_OPTION_OFFSET = 1
@@ -76,26 +75,14 @@ export function getPaddingLength(items: string[], addExtraPadding: boolean = tru
   return Math.max(...items.map((str) => str.length)) + (addExtraPadding ? EXTRA_PADDING : 0)
 }
 
-export const CHALK_COLORS = {
-  boolean: chalk.hex('#BA55D3'),
-  number: chalk.blue,
-  success: chalk.green,
-  failure: chalk.red,
-  peerId: chalk.green,
-  hash: chalk.yellow,
-  highlight: chalk.yellow
-}
 
 export const CHALK_STRINGS = {
-  yes: CHALK_COLORS.success('y'),
-  no: CHALK_COLORS.failure('N')
+  yes:'y',
+  no: 'N'
 }
 
-export function styleValue(value: any, type?: keyof typeof CHALK_COLORS): string {
-  const color: chalk.Chalk = (type && CHALK_COLORS[type]) || (CHALK_COLORS as any)[typeof value]
-
-  if (typeof color === 'undefined') return String(value)
-  return color(value)
+export function styleValue(value: any, _type?: any): string {
+  return value // no-op[
 }
 
 export function getOptions(

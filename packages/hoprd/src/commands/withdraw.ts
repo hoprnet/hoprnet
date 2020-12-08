@@ -3,7 +3,7 @@ import type { Currencies } from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 import { moveDecimalPoint } from '@hoprnet/hopr-utils'
 import { AbstractCommand, AutoCompleteResult } from './abstractCommand'
-import { styleValue } from '../utils'
+import { styleValue } from './utils'
 
 export default class Withdraw extends AbstractCommand {
   private arguments = ['amount (ETH, HOPR)', 'currency (native, hopr)', 'recipient (blockchain address)']

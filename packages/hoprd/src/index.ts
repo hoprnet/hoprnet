@@ -9,7 +9,7 @@ import Multihash from 'multihashes'
 import bs58 from 'bs58'
 import { addPubKey } from '@hoprnet/hopr-core/lib/utils'
 import { getBootstrapAddresses } from '@hoprnet/hopr-utils'
-import { commands } from './commands'
+import { Commands } from './commands'
 import { LogStream } from './logs'
 import { AdminServer } from './admin'
 import * as yargs from 'yargs'
@@ -189,7 +189,7 @@ async function main() {
 
     if (argv.run && argv.run !== '') {
       // Run a single command and then exit.
-      let cmds = new commands.Commands(node)
+      let cmds = new Commands(node)
       if (argv.settings) {
         cmds.setState(settings)
       }

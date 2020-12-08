@@ -5,7 +5,7 @@ import { startDelayedInterval, u8aToHex, moveDecimalPoint } from '@hoprnet/hopr-
 import BN from 'bn.js'
 import chalk from 'chalk'
 import readline from 'readline'
-import { checkPeerIdInput, getPeers, getOpenChannels, styleValue } from '../utils'
+import { checkPeerIdInput, getPeers, getOpenChannels, styleValue } from './utils'
 import { AbstractCommand, AutoCompleteResult, GlobalState } from './abstractCommand'
 
 export abstract class OpenChannelBase extends AbstractCommand {

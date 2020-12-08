@@ -1,8 +1,7 @@
-import * as root from '../index'
+import * as mod from './index'
 import assert from 'assert'
 // @ts-ignore
 import sinon from 'sinon'
-const mod = root.commands
 
 const assertMatch = (test: any, pattern: RegExp) => {
   assert(test.match(pattern), `should match ${pattern}`)

@@ -1,6 +1,6 @@
 import type PeerId from 'peer-id'
 import { AbstractCommand, AutoCompleteResult, GlobalState } from '../abstractCommand'
-import { styleValue, getOptions, checkPeerIdInput } from '../../utils'
+import { styleValue, getOptions, checkPeerIdInput } from '../utils'
 
 const ROUTING_PATH_PREFIX = 'path='
 

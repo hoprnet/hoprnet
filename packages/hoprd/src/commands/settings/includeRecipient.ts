@@ -1,5 +1,5 @@
 import { AbstractCommand, AutoCompleteResult, GlobalState } from '../abstractCommand'
-import { styleValue, getOptions } from '../../utils'
+import { styleValue, getOptions } from '../utils'
 
 export class IncludeRecipient extends AbstractCommand {
   private readonly options: GlobalState['includeRecipient'][] = [true, false]

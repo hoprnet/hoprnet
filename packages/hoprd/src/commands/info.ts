@@ -1,8 +1,7 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 import { AbstractCommand } from './abstractCommand'
-import { styleValue } from '../utils'
-import Multiaddr from 'multiaddr'
+import { styleValue } from './utils'
 
 export class Info extends AbstractCommand {
   constructor(public node: Hopr<HoprCoreConnector>) {
@@ -21,7 +20,7 @@ export class Info extends AbstractCommand {
     // @TODO Add connector info etc.
     return [
       `Bootstrap Servers: ${this.node.bootstrapServers.map((p) => styleValue(p.getPeerId(), 'peerId'))}`,
-      `Available at: ${this.node.getAddresses().map((ma: Multiaddr) => ma.toString())}`
+      `Available at: ${this.node.getAddresses().map((ma) => ma.toString())}`
     ].join('\n')
   }
 }

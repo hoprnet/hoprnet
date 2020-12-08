@@ -2,7 +2,7 @@ import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 import { moveDecimalPoint } from '@hoprnet/hopr-utils'
 import { AbstractCommand } from './abstractCommand'
-import { countSignedTickets, toSignedTickets, styleValue } from '../utils'
+import { countSignedTickets, toSignedTickets, styleValue } from './utils'
 
 export default class Tickets extends AbstractCommand {
   constructor(public node: Hopr<HoprCoreConnector>) {

@@ -1,7 +1,7 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 import { AbstractCommand } from './abstractCommand'
-import { styleValue } from '../utils'
+import { styleValue } from './utils'
 
 export default class PrintBalance extends AbstractCommand {
   constructor(public node: Hopr<HoprCoreConnector>) {
