@@ -128,7 +128,7 @@ describe('test hashedSecret', function () {
               to: connector.hoprChannels.options.address,
               nonce: await connector.account.nonce
             },
-            connector.hoprChannels.methods.setHashedSecret(preImage.preImage.toHex())
+            connector.hoprChannels.methods.setHashedSecret(new Types.Hash(preImage.preImage).toHex())
           )
         ).send()
       )
@@ -216,7 +216,7 @@ describe('test hashedSecret', function () {
               to: connector.hoprChannels.options.address,
               nonce: await connector.account.nonce
             },
-            connector.hoprChannels.methods.setHashedSecret(preImage.preImage.toHex())
+            connector.hoprChannels.methods.setHashedSecret(new Types.Hash(preImage.preImage).toHex())
           )
         ).send()
       )

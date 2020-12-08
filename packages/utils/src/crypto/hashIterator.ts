@@ -61,7 +61,7 @@ export async function recoverIteratedHash(
   maxIterations: number,
   stepSize?: number,
   indexHint?: number
-): Promise<Intermediate | void> {
+): Promise<Intermediate | undefined> {
   let closestIntermediate: number
   if (indexHint != undefined) {
     closestIntermediate = indexHint

@@ -3,17 +3,14 @@ import { Hash } from './types'
 import Debug from 'debug'
 const log = Debug('hopr-core-ethereum:hashedSecret')
 import { randomBytes } from 'crypto'
-import { u8aEquals, u8aToHex, u8aConcat } from '@hoprnet/hopr-utils'
+import { u8aToHex, u8aConcat, iterateHash, recoverIteratedHash } from '@hoprnet/hopr-utils'
+import type { Intermediate } from '@hoprnet/hopr-utils'
+
 import { publicKeyConvert } from 'secp256k1'
 
 export const DB_ITERATION_BLOCK_SIZE = 10000
 export const TOTAL_ITERATIONS = 100000
 export const HASHED_SECRET_WIDTH = 27
-
-export type PreImageResult = {
-  preImage: Hash
-  index: number
-}
 
 const isNullAccount = (a: string) => a == null || ['0', '0x', '0x'.padEnd(66, '0')].includes(a)
 
@@ -30,7 +27,7 @@ class HashedSecret {
       if (!err.notFound) {
         throw err
       }
-      return undefined
+      return
     }
   }
 
@@ -51,6 +48,21 @@ class HashedSecret {
     )
   }
 
+  private async hashFunction(msg: Uint8Array): Promise<Uint8Array> {
+    // @TODO salt this
+    return (await this.coreConnector.utils.hash(msg)).slice(0, HASHED_SECRET_WIDTH)
+  }
+
+  private async hint(index: number): Promise<Uint8Array | undefined> {
+    try {
+      return await this.coreConnector.db.get(Buffer.from(this.coreConnector.dbKeys.OnChainSecretIntermediary(index)))
+    } catch (err) {
+      if (err.notFound) {
+        return
+      }
+      throw err
+    }
+  }
   /**
    * Creates a random secret OR a deterministic one if running in debug mode,
    * it will then loop X amount of times, on each loop we hash the previous result.
@@ -60,23 +72,20 @@ class HashedSecret {
   private async createAndStoreSecretOffChain(debug: boolean): Promise<Hash> {
     let onChainSecret = debug ? await this.getDebugAccountSecret() : new Hash(randomBytes(HASHED_SECRET_WIDTH))
 
-    let onChainSecretIntermediary = onChainSecret
     let dbBatch = this.coreConnector.db.batch()
 
-    for (let i = 0; i < TOTAL_ITERATIONS; i++) {
-      if (i % DB_ITERATION_BLOCK_SIZE == 0) {
-        dbBatch = dbBatch.put(
-          Buffer.from(this.coreConnector.dbKeys.OnChainSecretIntermediary(i)),
-          Buffer.from(onChainSecretIntermediary)
-        )
-      }
-      onChainSecretIntermediary = new Hash(
-        (await this.coreConnector.utils.hash(onChainSecretIntermediary)).slice(0, HASHED_SECRET_WIDTH)
+    const result = await iterateHash(onChainSecret, this.hashFunction, TOTAL_ITERATIONS, DB_ITERATION_BLOCK_SIZE)
+
+    for (const intermediate of result.intermediates) {
+      dbBatch = dbBatch.put(
+        Buffer.from(this.coreConnector.dbKeys.OnChainSecretIntermediary(intermediate.iteration)),
+        Buffer.from(intermediate.preImage)
       )
     }
 
     await dbBatch.write()
-    return onChainSecretIntermediary
+
+    return new Hash(result.hash)
   }
 
   private async storeSecretOnChain(secret: Hash): Promise<void> {
@@ -144,43 +153,20 @@ class HashedSecret {
     log('stored on chain')
   }
 
-  private async calcOnChainSecretFromDb(debug: boolean): Promise<Hash> {
-    let closestIntermediary = TOTAL_ITERATIONS - DB_ITERATION_BLOCK_SIZE
+  private async calcOnChainSecretFromDb(debug?: boolean): Promise<Hash | never> {
+    let result = await iterateHash(
+      debug == true ? await this.getDebugAccountSecret() : undefined,
+      this.hashFunction,
+      TOTAL_ITERATIONS,
+      DB_ITERATION_BLOCK_SIZE,
+      this.hint.bind(this)
+    )
 
-    let intermediary: Uint8Array
-    while (closestIntermediary > 0) {
-      try {
-        intermediary = (await this.coreConnector.db.get(
-          Buffer.from(this.coreConnector.dbKeys.OnChainSecretIntermediary(closestIntermediary))
-        )) as Uint8Array
-        break
-      } catch (err) {
-        if (!err.notFound) {
-          throw err
-        }
-        closestIntermediary -= DB_ITERATION_BLOCK_SIZE
-      }
+    if (result == undefined) {
+      return await this.createAndStoreSecretOffChain(debug)
     }
 
-    if (closestIntermediary == 0) {
-      try {
-        intermediary = (await this.coreConnector.db.get(
-          Buffer.from(this.coreConnector.dbKeys.OnChainSecret())
-        )) as Uint8Array
-      } catch (err) {
-        if (!err.notFound) {
-          throw err
-        }
-
-        return this.createAndStoreSecretOffChain(debug)
-      }
-    }
-
-    for (let i = 0; i < TOTAL_ITERATIONS - closestIntermediary; i++) {
-      intermediary = (await this.coreConnector.utils.hash(intermediary)).slice(0, HASHED_SECRET_WIDTH)
-    }
-
-    return new Hash(intermediary)
+    return new Hash(result.hash)
   }
 
   /**
@@ -188,60 +174,37 @@ class HashedSecret {
    * values from the database.
    * @param hash the hash to find a preImage for
    */
-  public async findPreImage(hash: Uint8Array): Promise<PreImageResult> {
+  public async findPreImage(hash: Uint8Array): Promise<Intermediate> {
     if (hash.length != HASHED_SECRET_WIDTH) {
       throw Error(
         `Invalid length. Expected a Uint8Array with ${HASHED_SECRET_WIDTH} elements but got one with ${hash.length}`
       )
     }
 
-    let closestIntermediary = TOTAL_ITERATIONS - DB_ITERATION_BLOCK_SIZE
-    let intermediary: Uint8Array
-    let upperBound = TOTAL_ITERATIONS
-
-    let hashedIntermediary: Uint8Array
-    let found = false
-    let index: number
-
-    do {
-      while (true) {
+    let result = await recoverIteratedHash(
+      hash,
+      this.hashFunction,
+      async (index: number) => {
         try {
-          intermediary = (await this.coreConnector.db.get(
-            Buffer.from(this.coreConnector.dbKeys.OnChainSecretIntermediary(closestIntermediary))
-          )) as Uint8Array
-          break
+          return await this.coreConnector.db.get(
+            Buffer.from(this.coreConnector.dbKeys.OnChainSecretIntermediary(index))
+          )
         } catch (err) {
           if (err.notFound) {
-            if (closestIntermediary == 0) {
-              throw Error(`Could not find pre-image`)
-            } else {
-              closestIntermediary -= DB_ITERATION_BLOCK_SIZE
-            }
-          } else {
-            throw err
+            return
           }
+          throw err
         }
-      }
+      },
+      TOTAL_ITERATIONS,
+      DB_ITERATION_BLOCK_SIZE
+    )
 
-      for (let i = 0; i < upperBound - closestIntermediary; i++) {
-        hashedIntermediary = (await this.coreConnector.utils.hash(intermediary)).slice(0, HASHED_SECRET_WIDTH)
-        if (u8aEquals(hashedIntermediary, hash)) {
-          found = true
-          index = closestIntermediary + i
-          break
-        } else {
-          intermediary = hashedIntermediary
-        }
-      }
-
-      closestIntermediary -= DB_ITERATION_BLOCK_SIZE
-    } while (!found && closestIntermediary >= 0)
-
-    if (!found) {
-      throw Error('Preimage not found')
+    if (result == undefined) {
+      throw Error(`Could not find preImage.`)
     }
 
-    return { preImage: new Hash(intermediary), index }
+    return result
   }
 
   /**
@@ -260,7 +223,7 @@ class HashedSecret {
     ])
 
     // both exist
-    if (onChainSecret && offChainSecret) {
+    if (onChainSecret != undefined && offChainSecret != undefined) {
       try {
         await this.findPreImage(onChainSecret)
         return { initialized: true, onChainSecret, offChainSecret }
