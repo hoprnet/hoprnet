@@ -39,7 +39,7 @@ export default class TraverseChannels extends AbstractCommand {
               id.toB58String()
             )
           } else {
-            out += `\n${prev} - ${id.toB58String()} - [${weight}] - ${peerId.toB58String()}...`
+            out += `\n${prev} - ${id.toB58String()} - [${weight.toFormattedString()}] - ${peerId.toB58String()}...`
           }
         }
       }
