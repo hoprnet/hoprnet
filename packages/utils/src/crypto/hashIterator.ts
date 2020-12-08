@@ -1,0 +1,76 @@
+import { u8aEquals } from '../u8a'
+
+export interface Intermediate {
+  iteration: number
+  preImage: Uint8Array
+}
+export async function iterateHash(
+  seed: Uint8Array,
+  hashFunc: (preImage: Uint8Array) => Promise<Uint8Array> | Uint8Array,
+  iterations: number,
+  stepSize: number
+): Promise<{
+  hash: Uint8Array
+  intermediates: Intermediate[]
+}> {
+  const intermediates: Intermediate[] = []
+
+  let intermediate = seed
+  for (let i = 0; i < iterations; i++) {
+    if (stepSize != undefined && i % stepSize == 0) {
+      intermediates.push({
+        iteration: i,
+        preImage: intermediate
+      })
+    }
+    intermediate = await hashFunc(intermediate)
+  }
+
+  return {
+    hash: intermediate,
+    intermediates
+  }
+}
+
+export async function recoverIteratedHash(
+  hashValue: Uint8Array,
+  hashFunc: (preImage: Uint8Array) => Promise<Uint8Array> | Uint8Array,
+  hint: (index: number) => Uint8Array | undefined | Promise<Uint8Array | undefined>,
+  maxIterations: number,
+  stepSize?: number,
+  indexHint?: number
+): Promise<Intermediate | void> {
+  let closestIntermediate: number
+  if (indexHint != undefined) {
+    closestIntermediate = indexHint
+  } else if (stepSize != undefined && stepSize > 0) {
+    closestIntermediate = maxIterations - (maxIterations % stepSize)
+  } else {
+    closestIntermediate = 0
+  }
+
+  let intermediate: Uint8Array
+  for (; closestIntermediate >= 0; closestIntermediate -= stepSize) {
+    intermediate = await hint(closestIntermediate)
+
+    if (intermediate == undefined) {
+      if (closestIntermediate == 0) {
+        return
+      }
+
+      continue
+    }
+
+    for (let i = 0; i < stepSize; i++) {
+      let _tmp = await hashFunc(intermediate)
+
+      if (u8aEquals(_tmp, hashValue)) {
+        return {
+          preImage: intermediate,
+          iteration: closestIntermediate + i
+        }
+      }
+      intermediate = _tmp
+    }
+  }
+}
