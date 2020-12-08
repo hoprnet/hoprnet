@@ -1,7 +1,7 @@
 import { expectEvent, expectRevert, constants } from '@openzeppelin/test-helpers'
 import { vmErrorMessage } from '../utils'
 import { formatAccount } from './utils'
-import { ACCOUNT_A, ACCOUNT_B, SECRET, SECRET_PRE_IMAGE } from './constants'
+import { ACCOUNT_A, ACCOUNT_B, SECRET_2, SECRET_1 } from './constants'
 
 const Accounts = artifacts.require('AccountsMock')
 
@@ -13,7 +13,7 @@ describe('Accounts', function () {
       ACCOUNT_A.address,
       ACCOUNT_A.pubKeyFirstHalf,
       ACCOUNT_A.pubKeySecondHalf,
-      SECRET
+      SECRET_2
     )
 
     expectEvent(response, 'AccountInitialized', {
@@ -24,11 +24,11 @@ describe('Accounts', function () {
 
     expectEvent(response, 'AccountSecretUpdated', {
       account: ACCOUNT_A.address,
-      secret: SECRET
+      secret: SECRET_2
     })
 
     const account = await accounts.accounts(ACCOUNT_A.address).then(formatAccount)
-    expect(account.secret).to.equal(SECRET)
+    expect(account.secret).to.equal(SECRET_2)
     expect(account.counter.toString()).to.equal('1')
   })
 
@@ -37,7 +37,7 @@ describe('Accounts', function () {
 
     // give wrong public key
     await expectRevert(
-      accounts.initializeAccount(ACCOUNT_A.address, ACCOUNT_B.pubKeyFirstHalf, ACCOUNT_B.pubKeySecondHalf, SECRET),
+      accounts.initializeAccount(ACCOUNT_A.address, ACCOUNT_B.pubKeyFirstHalf, ACCOUNT_B.pubKeySecondHalf, SECRET_1),
       vmErrorMessage('public key does not match account')
     )
   })
@@ -45,24 +45,24 @@ describe('Accounts', function () {
   it("should update account's secret", async function () {
     const accounts = await Accounts.new()
 
-    await accounts.initializeAccount(ACCOUNT_A.address, ACCOUNT_A.pubKeyFirstHalf, ACCOUNT_A.pubKeySecondHalf, SECRET)
+    await accounts.initializeAccount(ACCOUNT_A.address, ACCOUNT_A.pubKeyFirstHalf, ACCOUNT_A.pubKeySecondHalf, SECRET_2)
 
-    const response = await accounts.updateAccount(ACCOUNT_A.address, SECRET_PRE_IMAGE)
+    const response = await accounts.updateAccount(ACCOUNT_A.address, SECRET_1)
 
     expectEvent(response, 'AccountSecretUpdated', {
       account: ACCOUNT_A.address,
-      secret: SECRET_PRE_IMAGE
+      secret: SECRET_1
     })
 
     const account = await accounts.accounts(ACCOUNT_A.address).then(formatAccount)
-    expect(account.secret).to.equal(SECRET_PRE_IMAGE)
+    expect(account.secret).to.equal(SECRET_1)
     expect(account.counter.toString()).to.equal('2')
   })
 
   it("should fail to update account's secret when secret is empty", async function () {
     const accounts = await Accounts.new()
 
-    await accounts.initializeAccount(ACCOUNT_A.address, ACCOUNT_A.pubKeyFirstHalf, ACCOUNT_A.pubKeySecondHalf, SECRET)
+    await accounts.initializeAccount(ACCOUNT_A.address, ACCOUNT_A.pubKeyFirstHalf, ACCOUNT_A.pubKeySecondHalf, SECRET_1)
 
     // give empty SECRET
     await expectRevert(
@@ -74,11 +74,11 @@ describe('Accounts', function () {
   it("should fail to update account's secret when secret is the same as before", async function () {
     const accounts = await Accounts.new()
 
-    await accounts.initializeAccount(ACCOUNT_A.address, ACCOUNT_A.pubKeyFirstHalf, ACCOUNT_A.pubKeySecondHalf, SECRET)
+    await accounts.initializeAccount(ACCOUNT_A.address, ACCOUNT_A.pubKeyFirstHalf, ACCOUNT_A.pubKeySecondHalf, SECRET_1)
 
     // give same SECRET
     await expectRevert(
-      accounts.updateAccount(ACCOUNT_A.address, SECRET),
+      accounts.updateAccount(ACCOUNT_A.address, SECRET_1),
       vmErrorMessage('secret must not be the same as before')
     )
   })

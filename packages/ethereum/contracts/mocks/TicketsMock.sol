@@ -22,15 +22,21 @@ contract TicketsMock is AccountsMock, ChannelsMock, Tickets {
         _redeemTicket(recipient, counterparty, secretPreImage, proofOfRelaySecret, amount, winProb, r, s, v);
     }
 
-    function getTicketHash(
+    function getEncodedTicket(
         address recipient,
         uint256 recipientCounter,
         bytes32 proofOfRelaySecret,
         uint256 channelIteration,
         uint256 amount,
         bytes32 winProb
-    ) external pure {
-        _getTicketHash(recipient, recipientCounter, proofOfRelaySecret, channelIteration, amount, winProb);
+    ) external pure returns (bytes memory) {
+        return _getEncodedTicket(recipient, recipientCounter, proofOfRelaySecret, channelIteration, amount, winProb);
+    }
+
+    function getTicketHash(
+        bytes calldata packedTicket
+    ) external pure returns (bytes32) {
+        return _getTicketHash(packedTicket);
     }
 
     function getTicketLuck(
@@ -38,7 +44,7 @@ contract TicketsMock is AccountsMock, ChannelsMock, Tickets {
         bytes32 secretPreImage,
         bytes32 proofOfRelaySecret,
         bytes32 winProb
-    ) external pure {
-        _getTicketLuck(ticketHash, secretPreImage, proofOfRelaySecret, winProb);
+    ) external pure returns (bytes32) {
+        return _getTicketLuck(ticketHash, secretPreImage, proofOfRelaySecret, winProb);
     }
 }

@@ -35,6 +35,12 @@ contract Tickets is Accounts, Channels {
         bytes32 s,
         uint8 v
     ) internal {
+        Account storage account = accounts[recipient];
+        require(
+            account.secret == keccak256(abi.encodePacked(secretPreImage)),
+            "secretPreImage must be the hash of recipient's secret"
+        );
+
         (,,, Channel storage channel) = _getChannel(
             recipient,
             counterparty
@@ -44,19 +50,15 @@ contract Tickets is Accounts, Channels {
             "channel must be open or pending to close"
         );
 
-        Account storage account = accounts[recipient];
-        require(
-            account.secret == keccak256(abi.encodePacked(secretPreImage)),
-            "secretPreImage must be the hash of secret"
-        );
-
         bytes32 ticketHash = _getTicketHash(
-            recipient,
-            account.counter,
-            proofOfRelaySecret,
-            _getChannelIteration(channel.status),
-            amount,
-            winProb
+            _getEncodedTicket(
+                recipient,
+                account.counter,
+                proofOfRelaySecret,
+                _getChannelIteration(channel.status),
+                amount,
+                winProb
+            )
         );
         require(!tickets[ticketHash], "ticket must not be used twice");
         require(ECDSA.recover(ticketHash, r, s, v) == counterparty, "signer must match the counterparty");
@@ -82,35 +84,56 @@ contract Tickets is Accounts, Channels {
         }
     }
 
-    function _getTicketHash(
+    /**
+     * @dev Encode ticket data
+     * @return bytes
+     */
+    function _getEncodedTicket(
         address recipient,
         uint256 recipientCounter,
         bytes32 proofOfRelaySecret,
         uint256 channelIteration,
         uint256 amount,
         bytes32 winProb
-    ) internal pure returns (bytes32) {
+    ) internal pure returns (bytes memory) {
         bytes32 challenge = keccak256(abi.encodePacked(proofOfRelaySecret));
 
-        return ECDSA.toEthSignedMessageHash(
-            "109",
-            abi.encodePacked(
-                recipient,
-                challenge,
-                recipientCounter,
-                amount,
-                winProb,
-                channelIteration
-            )
+        return abi.encodePacked(
+            recipient,
+            challenge,
+            recipientCounter,
+            amount,
+            winProb,
+            channelIteration
         );
     }
 
+    /**
+     * @dev Prefix the ticket message and return
+     * the actual hash that was used to sign
+     * the ticket with.
+     * @return prefixed ticket hash
+     */
+    function _getTicketHash(
+        bytes memory packedTicket
+    ) internal pure returns (bytes32) {
+        return ECDSA.toEthSignedMessageHash(
+            "187",
+            packedTicket
+        );
+    }
+
+    /**
+     * @dev Get the ticket's "luck" by
+     * hashing provided values.
+     * @return luck
+     */
     function _getTicketLuck(
         bytes32 ticketHash,
         bytes32 secretPreImage,
         bytes32 proofOfRelaySecret,
         bytes32 winProb
     ) internal pure returns (bytes32) {
-        return keccak256(abi.encodePacked(ticketHash, secretPreImage, proofOfRelaySecret));
+        return keccak256(abi.encodePacked(ticketHash, secretPreImage, proofOfRelaySecret, winProb));
     }
 }

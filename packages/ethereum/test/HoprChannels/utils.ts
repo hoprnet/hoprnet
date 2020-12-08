@@ -7,7 +7,7 @@ import { publicKeyConvert, publicKeyCreate, ecdsaSign } from 'secp256k1'
 import { constants } from '@openzeppelin/test-helpers'
 import { stringToU8a, u8aToHex, u8aConcat } from '@hoprnet/hopr-utils'
 
-const { numberToHex, encodePacked, soliditySha3, toChecksumAddress } = Web3.utils
+const { numberToHex, encodePacked, soliditySha3, toChecksumAddress, toHex } = Web3.utils
 
 /**
  * @param response web3 response
@@ -42,50 +42,12 @@ export const ERC777Mock = (ERC777: ERC777MockContract, initialHolder: string, in
 }
 
 /**
- * Upscale a percentage (0-100) to uint256's maximum number
- * @param percent
- */
-export const percentToUint256 = (percent: number): string => {
-  return numberToHex(new BN(percent).mul(constants.MAX_UINT256).idivn(100).toString())
-}
-
-/**
- * Convert a ticket into a hash.
- * @param ticket
- * @return ticket's hash
- */
-export const hashTicket = (ticket: Ticket): string => {
-  return encodePacked(
-    {
-      type: 'address',
-      value: ticket.recipient
-    },
-    {
-      type: 'bytes32',
-      value: ticket.proofOfRelaySecret
-    },
-    {
-      type: 'uint256',
-      value: ticket.counter
-    },
-    {
-      type: 'uint256',
-      value: ticket.amount
-    },
-    {
-      type: 'uint256',
-      value: ticket.winProb
-    }
-  )
-}
-
-/**
  * Prefix message with our special message
  * @param message
  * @returns hashed message
  */
 export const prefixMessage = (message: string): Uint8Array => {
-  const messageWithHOPR = u8aConcat(stringToU8a(Web3.utils.toHex('HOPRnet')), stringToU8a(message))
+  const messageWithHOPR = u8aConcat(stringToU8a(toHex('HOPRnet')), stringToU8a(message))
   const messageWithHOPRHex = u8aToHex(messageWithHOPR)
 
   return stringToU8a(
@@ -113,7 +75,7 @@ export const signMessage = (
   message: string,
   privKey: Uint8Array
 ): { signature: Uint8Array; r: Uint8Array; s: Uint8Array; v: number } => {
-  const { signature, recid } = ecdsaSign(prefixMessage(message), privKey)
+  const { signature, recid } = ecdsaSign(stringToU8a(message), privKey)
 
   return {
     signature: signature,
@@ -129,15 +91,16 @@ export const signMessage = (
  * @returns Account
  */
 export const createAccount = (privKey: string): Account => {
-  const pubKey = publicKeyCreate(stringToU8a(privKey), false)
-  const firstHalf = new BN(pubKey.slice(0, 32))
-  const secondHalf = new BN(pubKey.slice(32, 64))
+  const pubKey = publicKeyCreate(stringToU8a(privKey), true)
+  const pubKeyUncompressed = publicKeyConvert(pubKey, false).slice(1)
+  const firstHalf = new BN(pubKeyUncompressed.slice(0, 32))
+  const secondHalf = new BN(pubKeyUncompressed.slice(32, 64))
   const address = toChecksumAddress(
     u8aToHex(
       stringToU8a(
         soliditySha3({
           type: 'bytes',
-          value: u8aToHex(publicKeyConvert(pubKey, false).slice(1))
+          value: u8aToHex(pubKeyUncompressed)
         })
       ).slice(12)
     )
@@ -153,22 +116,116 @@ export const createAccount = (privKey: string): Account => {
 }
 
 /**
+ * Upscale a percentage (0-100) to uint256's maximum number
+ * @param percent
+ */
+export const percentToUint256 = (percent: number): string => {
+  return numberToHex(new BN(percent).mul(constants.MAX_UINT256).idivn(100).toString())
+}
+
+/**
+ * Encode ticket data that is used to create a ticket hash
+ * @param ticket
+ * @return ticket's hash
+ */
+export const getEncodedTicket = (ticket: Ticket): string => {
+  const challenge = soliditySha3({
+    type: 'bytes32',
+    value: ticket.proofOfRelaySecret
+  })
+
+  return encodePacked(
+    {
+      type: 'address',
+      value: ticket.recipient
+    },
+    {
+      type: 'bytes32',
+      value: challenge
+    },
+    {
+      type: 'uint256',
+      value: ticket.counter
+    },
+    {
+      type: 'uint256',
+      value: ticket.amount
+    },
+    {
+      type: 'bytes32', //@TODO: change to uint256?
+      value: ticket.winProb
+    },
+    {
+      type: 'uint256',
+      value: ticket.iteration
+    }
+  )
+}
+
+/**
+ * Get ticket's luck in bytes32
+ * @param ticket
+ * @param hash ticketHash
+ * @param secret recipient's secret
+ * @returns ticket's luck
+ */
+export const getTicketLuck = (ticket: Ticket, hash: string, secret: string): string => {
+  const encoded = encodePacked(
+    {
+      type: 'bytes32',
+      value: hash
+    },
+    {
+      type: 'bytes32',
+      value: secret
+    },
+    {
+      type: 'bytes32',
+      value: ticket.proofOfRelaySecret
+    },
+    {
+      type: 'bytes32', //@TODO: change to uint256?
+      value: ticket.winProb
+    }
+  )
+
+  return soliditySha3({
+    type: 'bytes',
+    value: encoded
+  })
+}
+
+/**
  * Given ticket data, generate a ticket for testing
  * @param ticket
  */
 export const createTicket = (
   ticket: Ticket,
-  account: Account
-): Ticket & { counterparty: string; hash: string; signature: string; r: string; s: string; v: number } => {
-  const hash = hashTicket(ticket)
-  const { signature, r, s, v } = signMessage(u8aToHex(prefixMessage(hash)), stringToU8a(account.privKey))
+  account: Account,
+  secret: string
+): Ticket & {
+  counterparty: string
+  encoded: string
+  hash: string
+  luck: string
+  signature: string
+  r: string
+  s: string
+  v: number
+} => {
+  const encoded = getEncodedTicket(ticket)
+  const hash = u8aToHex(prefixMessage(encoded))
+  const luck = getTicketLuck(ticket, hash, secret)
+  const { signature, r, s, v } = signMessage(hash, stringToU8a(account.privKey))
 
   return {
     ...ticket,
+    encoded,
     hash,
+    luck,
     r: u8aToHex(r),
     s: u8aToHex(s),
-    v,
+    v: v + 27, // why add 27? https://bitcoin.stackexchange.com/a/38909
     signature: u8aToHex(signature),
     counterparty: account.address
   }
