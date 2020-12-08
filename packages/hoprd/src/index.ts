@@ -197,6 +197,9 @@ async function main() {
       let toRun = argv.run.split(';')
 
       for (let c of toRun) {
+        if (c === 'daemonize') {
+          return
+        }
         let resp = await cmds.execute(c)
         console.log(resp)
       }
