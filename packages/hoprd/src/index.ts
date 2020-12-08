@@ -185,9 +185,11 @@ async function main() {
       const service = require('restana')()
 
       service.get('/api/rest/v1/version', (_, res) => res.send({ version: FULL_VERSION }))
-      service.get('/api/rest/v1/address/eth', async (_, res) => res.send({
-        address: (await node.paymentChannels.hexAccountAddress())
-      }))
+      service.get('/api/rest/v1/address/eth', async (_, res) =>
+        res.send({
+          address: await node.paymentChannels.hexAccountAddress()
+        })
+      )
 
       http.createServer(service).listen(3001, '0.0.0.0', function () {
         logs.log('Rest server listening on port 3001')
