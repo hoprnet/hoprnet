@@ -5,10 +5,11 @@ export interface Intermediate {
   preImage: Uint8Array
 }
 export async function iterateHash(
-  seed: Uint8Array,
+  seed: Uint8Array | undefined,
   hashFunc: (preImage: Uint8Array) => Promise<Uint8Array> | Uint8Array,
   iterations: number,
-  stepSize: number
+  stepSize: number,
+  hint?: (index: number) => Uint8Array | undefined | Promise<Uint8Array | undefined>
 ): Promise<{
   hash: Uint8Array
   intermediates: Intermediate[]
@@ -16,7 +17,28 @@ export async function iterateHash(
   const intermediates: Intermediate[] = []
 
   let intermediate = seed
-  for (let i = 0; i < iterations; i++) {
+  let i = 0
+  if (hint != undefined) {
+    let closest = iterations - (iterations % stepSize)
+
+    for (; closest >= 0; closest -= stepSize) {
+      let tmp = await hint(closest)
+
+      if (tmp != undefined) {
+        intermediate = tmp
+        i = closest
+        break
+      }
+    }
+  }
+
+  if (intermediate == undefined && seed == undefined) {
+    throw Error(`Cannot compute hash because no seed was given through the 'hint' function or the 'seed' argument.`)
+  }
+
+  console.log(i)
+
+  for (; i < iterations; i++) {
     if (stepSize != undefined && i % stepSize == 0) {
       intermediates.push({
         iteration: i,
