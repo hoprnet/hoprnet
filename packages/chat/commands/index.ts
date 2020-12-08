@@ -25,6 +25,7 @@ import readline from 'readline'
 import { Alias } from './alias'
 import { Info } from './info'
 import { SetStrategy } from './strategy'
+import { CoverTraffic } from './cover-traffic'
 
 export class Commands {
   readonly commands: AbstractCommand[]
@@ -57,7 +58,8 @@ export class Commands {
       new Alias(node),
       new TraverseChannels(node),
       new Withdraw(node),
-      new SetStrategy(node)
+      new SetStrategy(node),
+      new CoverTraffic(node)
     ]
 
     if (rl) {
@@ -105,7 +107,7 @@ export class Commands {
       return await cmd.execute(query || '', this.state)
     }
 
-    return 'Unknown command!'
+    return `${cmd}: Unknown command!`
   }
 
   public async autocomplete(message: string): Promise<AutoCompleteResult> {
