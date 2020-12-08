@@ -22,20 +22,30 @@ describe('test hash iterator', function () {
       ]
     }
 
-    assert.deepStrictEqual(expected, await iterateHash(new Uint8Array(HASH_LENGTH).fill(0x00), hashFunc, MAX_ITERATIONS, STEPSIZE))
+    assert.deepStrictEqual(
+      expected,
+      await iterateHash(new Uint8Array(HASH_LENGTH).fill(0x00), hashFunc, MAX_ITERATIONS, STEPSIZE)
+    )
 
     for (let i = 1; i <= MAX_ITERATIONS; i++) {
-      assert.deepStrictEqual({
-        preImage: toU8a(i - 1, 4),
-        iteration: i - 1
-      }, await recoverIteratedHash(toU8a(i, 4), hashFunc, (i: number) => {
-        if (i % STEPSIZE == 0) {
-          return toU8a(i, 4)
-        }
-      }, MAX_ITERATIONS, STEPSIZE))
-      
+      assert.deepStrictEqual(
+        {
+          preImage: toU8a(i - 1, 4),
+          iteration: i - 1
+        },
+        await recoverIteratedHash(
+          toU8a(i, 4),
+          hashFunc,
+          (i: number) => {
+            if (i % STEPSIZE == 0) {
+              return toU8a(i, 4)
+            }
+          },
+          MAX_ITERATIONS,
+          STEPSIZE
+        )
+      )
     }
     // console.log()
-
   })
 })
