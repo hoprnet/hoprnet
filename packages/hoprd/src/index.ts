@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import Hopr from '@hoprnet/hopr-core'
+import Hopr, { FULL_VERSION } from '@hoprnet/hopr-core'
 import type { HoprOptions } from '@hoprnet/hopr-core'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import PeerId from 'peer-id'
@@ -57,6 +57,11 @@ const argv = yargs
   .option('admin', {
     boolean: true,
     describe: 'Run an admin interface on localhost:3000',
+    default: false
+  })
+  .option('rest', {
+    boolean: true,
+    describe: 'Run a rest interface on localhost:3001',
     default: false
   })
   .option('password', {
@@ -174,6 +179,20 @@ async function main() {
   try {
     node = await Hopr.create(options)
     logs.log('Created HOPR Node')
+
+    if (argv.rest) {
+      const http = require('http')
+      const service = require('restana')()
+
+      service.get('/api/rest/v1/version', (_, res) => res.send({ version: FULL_VERSION }))
+      service.get('/api/rest/v1/address/eth', async (_, res) => res.send({
+        address: (await node.paymentChannels.hexAccountAddress())
+      }))
+
+      http.createServer(service).listen(3001, '0.0.0.0', function () {
+        logs.log('Rest server listening on port 3001')
+      })
+    }
 
     node.on('hopr:message', logMessageToNode)
 

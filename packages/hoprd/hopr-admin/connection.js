@@ -46,7 +46,7 @@ export class Connection {
 
   connect() {
     console.log('Connecting ...')
-    var client = new WebSocket('ws://' + window.location.host)
+    var client = new WebSocket('wss://' + window.location.host)
     console.log('Web socket created')
 
     client.onopen = () => {
