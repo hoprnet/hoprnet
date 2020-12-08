@@ -48,7 +48,7 @@ export class CoverTraffic extends AbstractCommand {
     const payload = encode([this.identifier, this.seq++, Date.now()])
     this.node.sendMessage(payload, this.node.getId())
     this.messagesSent++
-    this.timeout = setTimeout(this.tick.bind(this), INTERVAL)
+    this.timeout = setTimeout(this.tick.bind(this), INTERVAL) // tick again after interval
   }
 
   private handleMessage(msg: Uint8Array) {
