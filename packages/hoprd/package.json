@@ -24,7 +24,6 @@
   },
   "license": "",
   "dependencies": {
-    "@hoprnet/hopr-chat": "1.57.0-next.20",
     "@hoprnet/hopr-core": "1.57.0-next.20",
     "@hoprnet/hopr-core-connector-interface": "1.57.0-next.20",
     "@hoprnet/hopr-server": "1.45.0-alpha.0",
