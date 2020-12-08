@@ -76,7 +76,7 @@ class Indexer implements IIndexer {
     try {
       return u8aToNumber(
         (await this.connector.db.get(Buffer.from(this.connector.dbKeys.ConfirmedBlockNumber()))) as Uint8Array
-      )
+      ) as number
     } catch (err) {
       if (err.notFound == null) {
         throw err

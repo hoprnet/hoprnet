@@ -22,7 +22,7 @@ export function lengthPrefixedToU8a(arg: Uint8Array, additionalPadding?: Uint8Ar
     )
   }
 
-  let arrLength = u8aToNumber(arg.subarray(0, LENGTH_PREFIX_LENGTH))
+  let arrLength = u8aToNumber(arg.subarray(0, LENGTH_PREFIX_LENGTH)) as number
 
   if (!Number.isInteger(arrLength)) {
     throw Error(`Invalid encoded length.`)
