@@ -75,9 +75,8 @@ export function getPaddingLength(items: string[], addExtraPadding: boolean = tru
   return Math.max(...items.map((str) => str.length)) + (addExtraPadding ? EXTRA_PADDING : 0)
 }
 
-
 export const CHALK_STRINGS = {
-  yes:'y',
+  yes: 'y',
   no: 'N'
 }
 
