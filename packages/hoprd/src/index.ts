@@ -199,7 +199,7 @@ async function main() {
         })
       )
 
-      const hostname = argv.restHost || "localhost"
+      const hostname = argv.restHost || 'localhost'
       const port = argv.restPort || 3001
 
       http.createServer(service).listen(port, hostname, function () {
