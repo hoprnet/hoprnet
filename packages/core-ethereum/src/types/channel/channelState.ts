@@ -30,7 +30,7 @@ class ChannelState extends Uint8Array implements Types.ChannelState {
 
   // @TODO remove this
   toNumber(): number {
-    return u8aToNumber(this)
+    return u8aToNumber(this) as number
   }
 
   static get SIZE() {

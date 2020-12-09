@@ -51,7 +51,6 @@ yarn setup
 
 # if you run into errors during setup
 yarn util:reset
-yarn util:regenerate
 yarn setup
 ```
 

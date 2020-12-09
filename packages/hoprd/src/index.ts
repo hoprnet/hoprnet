@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import Hopr from '@hoprnet/hopr-core'
+import Hopr, { FULL_VERSION } from '@hoprnet/hopr-core'
 import type { HoprOptions } from '@hoprnet/hopr-core'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import PeerId from 'peer-id'
@@ -58,6 +58,19 @@ const argv = yargs
     boolean: true,
     describe: 'Run an admin interface on localhost:3000',
     default: false
+  })
+  .option('rest', {
+    boolean: true,
+    describe: 'Run a rest interface on localhost:3001',
+    default: false
+  })
+  .option('restHost', {
+    describe: 'Updates the host for the rest server',
+    default: 'localhost'
+  })
+  .option('restPort', {
+    describe: 'Updates the port for the rest server',
+    default: 3001
   })
   .option('password', {
     describe: 'A password to encrypt your keys'
@@ -175,6 +188,25 @@ async function main() {
     node = await Hopr.create(options)
     logs.log('Created HOPR Node')
 
+    if (argv.rest) {
+      const http = require('http')
+      const service = require('restana')()
+
+      service.get('/api/rest/v1/version', (_, res) => res.send({ version: FULL_VERSION }))
+      service.get('/api/rest/v1/address/eth', async (_, res) =>
+        res.send({
+          address: await node.paymentChannels.hexAccountAddress()
+        })
+      )
+
+      const hostname = argv.restHost || 'localhost'
+      const port = argv.restPort || 3001
+
+      http.createServer(service).listen(port, hostname, function () {
+        logs.log(`Rest server on ${hostname} listening on port ${port}`)
+      })
+    }
+
     node.on('hopr:message', logMessageToNode)
 
     process.once('exit', async () => {
@@ -197,6 +229,9 @@ async function main() {
       let toRun = argv.run.split(';')
 
       for (let c of toRun) {
+        if (c === 'daemonize') {
+          return
+        }
         let resp = await cmds.execute(c)
         console.log(resp)
       }
