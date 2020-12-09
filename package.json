@@ -49,7 +49,7 @@
   "devDependencies": {
     "@types/debug": "^4.1.5",
     "@types/err-code": "^2.0.0",
-    "@types/mocha": "~8.0.4",
+    "@types/mocha": "~8.2.0",
     "@types/node": "12",
     "@types/simple-peer": "9",
     "it-pair": "^1.0.0",
