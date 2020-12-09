@@ -34,3 +34,30 @@ A [transport module](https://github.com/libp2p/js-libp2p-interfaces/tree/master/
   - upgrade to direct connection if possible
 - use nodes in the network as STUN and TURN servers
 - reconnect handling
+
+## Usage
+
+```ts
+const libp2p = require('libp2p')
+const Mplex = require('libp2p-mplex')
+const SECIO = require('libp2p-secio')
+
+import HoprConnect from 'hopr-connect'
+import Multiaddr from 'multiaddr'
+
+const node = await libp2p.create({
+  modules: {
+    transport: [HoprConnect],
+    streamMuxer: [MPLEX],
+    connEncryption: [NOISE],
+    peerDiscovery: [HoprConnect.discovery]
+  },
+  config: {
+    HoprConnect: {
+      bootstrapServers: [
+        Multiaddr('/ip4/1.2.3.4/')
+      ]
+    }
+  }
+})
+```

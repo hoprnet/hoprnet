@@ -175,12 +175,15 @@ class HoprConnect implements Transport {
   async dial(ma: Multiaddr, options?: DialOptions): Promise<Connection> {
     options = options || {}
 
+    if (ma.getPeerId() === this._peerId.toB58String()) {
+      throw Error(`Cannot dial ourself`)
+    }
+
     let error: Error | undefined
     if (
       // uncommenting next line forces our node to use a relayed connection to any node execpt for the bootstrap server
       // (this.relays == null || this.relays.some((mAddr: Multiaddr) => ma.getPeerId() === mAddr.getPeerId())) &&
-      ['ip4', 'ip6', 'dns4', 'dns6'].includes(ma.protoNames()[0]) &&
-      this.isRealisticAddress(ma)
+      this.attemptDirectDial(ma)
     ) {
       try {
         verbose('attempting to dial directly', ma.toString())
@@ -324,8 +327,8 @@ class HoprConnect implements Transport {
    * @param handler
    * @returns A TCP listener
    */
-  createListener(options: any, handler: (connection: Connection) => void): Listener {
-    if (options == null) {
+  createListener(options: any | undefined, handler: (connection: Connection) => void): Listener {
+    if (typeof options === 'function') {
       this.connHandler = options
     } else {
       this.connHandler = handler
@@ -339,40 +342,30 @@ class HoprConnect implements Transport {
    * @returns Valid TCP multiaddrs
    */
   filter(multiaddrs: Multiaddr[]): Multiaddr[] {
-    multiaddrs = Array.isArray(multiaddrs) ? multiaddrs : [multiaddrs]
-    verbose('filtering multiaddrs')
-    return multiaddrs.filter(
+    return (Array.isArray(multiaddrs) ? multiaddrs : [multiaddrs]).filter(
       (ma: Multiaddr) => mafmt.TCP.matches(ma.decapsulateCode(CODE_P2P)) || mafmt.P2P.matches(ma)
     )
   }
 
   /**
-   * Filters unrealistic addresses
+   * Return true if we should attempt a direct dial.
    * @param ma Multiaddr to check
    */
-  private isRealisticAddress(ma: Multiaddr): boolean {
-    if (ma.getPeerId() === this._peerId.toB58String()) {
-      log('Tried to dial self, skipping.')
+  private attemptDirectDial(ma: Multiaddr): boolean {
+    let protoNames = ma.protoNames()
+    if (!['ip4', 'ip6', 'dns4', 'dns6'].includes(protoNames[0])) {
+      // We cannot call other protocols directly
       return false
     }
 
-    if (ma.protoNames()[0] === 'p2p') {
-      return true
-    }
+    let cOpts = ma.toOptions()
 
-    if (
-      ['ip4', 'ip6', 'dns4', 'dns6'].includes(ma.protoNames()[0]) &&
-      this._multiaddrs
-        .map((ma: Multiaddr) => ma.nodeAddress())
-        .filter(
-          (x) =>
-            x.address === ma.nodeAddress().address || // Same private network
-            ma.nodeAddress().address === '127.0.0.1' // localhost
-        )
-        .filter((x) => x.port == ma.nodeAddress().port).length // Same port // Therefore dialing self.
-    ) {
-      log(`Tried to dial host on same network / port - aborting: ${ma.toString()}`)
-      return false
+    for (const mAddr of this._multiaddrs) {
+      const ownOpts = mAddr.toOptions()
+
+      if (ownOpts.host === cOpts.host && ownOpts.port == cOpts.port) {
+        return false
+      }
     }
 
     return true
