@@ -13,7 +13,7 @@
   "scripts": {
     "clean": "rimraf ./lib && rimraf ./types",
     "build": "yarn clean && yarn build:sol && tsc && cp -R ./chain/abis ./lib/chain/abis",
-    "build:sol": "hardhat compile && hardhat extract",
+    "build:sol": "hardhat compile && hardhat postCompile",
     "fund": "hardhat fund",
     "migrate": "hardhat migrate",
     "network": "hardhat node --network hardhat",

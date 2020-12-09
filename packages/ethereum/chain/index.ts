@@ -1,10 +1,10 @@
-import type { Network } from '../utils/networks'
 import allAddresses from './addresses.json'
 
 export type ContractNames = 'HoprToken' | 'HoprChannels'
+export type Networks = 'localhost' | 'mainnet' | 'kovan' | 'xdai' | 'matic' | 'binance'
 
 export const addresses: {
-  [network in Network]?: {
+  [network in Networks]?: {
     [name in ContractNames]?: string
   }
 } = allAddresses

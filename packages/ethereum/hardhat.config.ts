@@ -37,7 +37,7 @@ const hardhatConfig: HardhatUserConfig = {
     },
     mainnet: {
       live: true,
-      tags: ['production'],
+      tags: ['production', 'etherscan'],
       chainId: 1,
       gasMultiplier: GAS_MULTIPLIER,
       url: `https://mainnet.infura.io/v3/${INFURA}`,
@@ -45,7 +45,7 @@ const hardhatConfig: HardhatUserConfig = {
     },
     kovan: {
       live: true,
-      tags: ['staging'],
+      tags: ['staging', 'etherscan'],
       chainId: 42,
       gasMultiplier: GAS_MULTIPLIER,
       url: `https://kovan.infura.io/v3/${INFURA}`,
@@ -108,10 +108,12 @@ task('fund', 'Fund demo accounts', async (...args: any[]) => {
   .addOptionalParam<string>('amount', 'Amount of HOPR to fund', Web3.utils.toWei('1000000', 'ether'), types.string)
   .addOptionalParam<number>('accountsToFund', 'Amount of accounts to fund from demo seeds', 0, types.int)
 
-// 'hardhat-deploy' has an export method which we don't use,
-// our 'export' alternative allows us to only retrieve the data we need
-task('extract', 'Extract ABIs to specified folder', async (...args: any[]) => {
-  return (await import('./tasks/extract')).default(args[0], args[1], args[2])
-}).addFlag('target', 'Folder to output contents to')
+task('postCompile', 'Use export task and then update abis folder', async (...args: any[]) => {
+  return (await import('./tasks/postCompile')).default(args[0], args[1])
+})
+
+task('postDeploy', 'Use export task and then update addresses folder', async (...args: any[]) => {
+  return (await import('./tasks/postDeploy')).default(args[0], args[1])
+})
 
 export default hardhatConfig

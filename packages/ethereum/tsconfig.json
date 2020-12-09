@@ -5,6 +5,6 @@
     "resolveJsonModule": true,
     "types": ["./types"]
   },
-  "include": ["./hardhat.config.ts", "index.ts", "types", "test", "tasks", "utils", "chain", "deploy"],
+  "include": ["./hardhat.config.ts", "index.ts", "types", "test", "tasks", "chain", "deploy"],
   "exclude": ["lib"]
 }
