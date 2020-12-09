@@ -35,6 +35,7 @@ backups
 
 # Hardhat
 hardhat
+deployments
 
 # typechain
 types
