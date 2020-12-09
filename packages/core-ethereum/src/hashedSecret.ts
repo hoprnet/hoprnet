@@ -48,9 +48,13 @@ class HashedSecret {
     )
   }
 
-  private async hashFunction(msg: Uint8Array): Promise<Uint8Array> {
-    // @TODO salt this
-    return (await this.coreConnector.utils.hash(msg)).slice(0, HASHED_SECRET_WIDTH)
+  public async hashFunction(msg: Uint8Array): Promise<Uint8Array> {
+    let toHash = msg
+
+    // @TODO Uncomment this to have salted hashes
+    // let toHash = u8aConcat(new TextEncoder().encode('HOPRnet'), await this.coreConnector.account.address, msg)
+
+    return (await this.coreConnector.utils.hash(toHash)).slice(0, HASHED_SECRET_WIDTH)
   }
 
   private async hint(index: number): Promise<Uint8Array | undefined> {
@@ -74,7 +78,12 @@ class HashedSecret {
 
     let dbBatch = this.coreConnector.db.batch()
 
-    const result = await iterateHash(onChainSecret, this.hashFunction.bind(this), TOTAL_ITERATIONS, DB_ITERATION_BLOCK_SIZE)
+    const result = await iterateHash(
+      onChainSecret,
+      this.hashFunction.bind(this),
+      TOTAL_ITERATIONS,
+      DB_ITERATION_BLOCK_SIZE
+    )
 
     for (const intermediate of result.intermediates) {
       dbBatch = dbBatch.put(
