@@ -31,10 +31,11 @@ scTopics
 lib
 
 # @TODO: remove this once refactor is complete
-temp
+backups
 
 # Hardhat
 hardhat
+deployments
 
 # typechain
 types

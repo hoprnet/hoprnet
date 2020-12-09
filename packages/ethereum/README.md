@@ -69,10 +69,10 @@ yarn coverage
 For public network migrations (rinkeby, kovan, [etc](./utils/networks.ts)), you will have to create a [.env](./.env.example) file within the root directory of this project.
 
 ```bash
-yarn network # starts a locally hosted network
-yarn migrate
+# local migration
+yarn network
 
-# deploying smart contract on a public network
+# public migration
 yarn migrate --network matic
 ```
 

@@ -39,7 +39,7 @@ describe('HoprToken', function () {
       hoprToken.mint(userA, 1, '0x00', '0x00', {
         from: userA
       }),
-      vmErrorMessage('HoprToken: caller does not have minter role')
+      vmErrorMessage('caller does not have minter role')
     )
   })
 

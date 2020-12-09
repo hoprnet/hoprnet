@@ -1,4 +1,4 @@
-import runner from './utils/runner'
+import runner from './tasks/utils/runner'
 
 export async function compile(args: string = '') {
   await runner(`yarn build:sol${args ? ' ' + args : ''}`)
@@ -12,5 +12,4 @@ export async function fund(args: string = '') {
   await runner(`yarn fund${args ? ' ' + args : ''}`)
 }
 
-export * from './utils/networks'
 export * from './chain'

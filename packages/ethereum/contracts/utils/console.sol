@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: MIT
+// copied from https://github.com/nomiclabs/hardhat
+// @TODO: use library (currently blocked by hoisting)
 pragma solidity >= 0.4.22 <0.8.0;
 
 library console {
