@@ -4,16 +4,17 @@ require('dotenv').config()
 import 'hardhat-typechain'
 import 'hardhat-deploy'
 import '@nomiclabs/hardhat-truffle5'
-import '@nomiclabs/hardhat-etherscan'
 import '@nomiclabs/hardhat-solhint'
 
 import { HardhatUserConfig, task, types } from 'hardhat/config'
 import { NODE_SEEDS, BOOTSTRAP_SEEDS } from '@hoprnet/hopr-demo-seeds'
 import Web3 from 'web3'
-import { MigrationOptions, getRpcOptions } from './utils/networks'
 
 const { PRIVATE_KEY, INFURA, MATIC_VIGIL, ETHERSCAN } = process.env
 const GAS_MULTIPLIER = 1.1
+
+// set 'ETHERSCAN_API_KEY' so 'hardhat-deploy' can read it
+process.env.ETHERSCAN_API_KEY = ETHERSCAN
 
 const devSeeds = NODE_SEEDS.concat(BOOTSTRAP_SEEDS).map((privateKey) => ({
   privateKey,
@@ -25,7 +26,7 @@ const hardhatConfig: HardhatUserConfig = {
   networks: {
     hardhat: {
       live: false,
-      tags: ['test', 'local'],
+      tags: ['local', 'test'],
       accounts: devSeeds
     },
     localhost: {
@@ -36,7 +37,7 @@ const hardhatConfig: HardhatUserConfig = {
     },
     mainnet: {
       live: true,
-      tags: [],
+      tags: ['production'],
       chainId: 1,
       gasMultiplier: GAS_MULTIPLIER,
       url: `https://mainnet.infura.io/v3/${INFURA}`,
@@ -65,11 +66,18 @@ const hardhatConfig: HardhatUserConfig = {
       gasMultiplier: GAS_MULTIPLIER,
       url: `https://rpc-mainnet.maticvigil.com/v1/${MATIC_VIGIL}`,
       accounts: PRIVATE_KEY ? [PRIVATE_KEY] : []
+    },
+    binance: {
+      live: true,
+      tags: ['staging'],
+      chainId: 56,
+      url: 'https://bsc-dataseed.binance.org',
+      accounts: PRIVATE_KEY ? [PRIVATE_KEY] : [],
+      gas: Number(Web3.utils.toWei('20', 'gwei')) // binance chain requires >= 20gwei
     }
   },
   namedAccounts: {
-    deployer: 0,
-    singleFaucetMinter: '0x1A387b5103f28bc6601d085A3dDC878dEE631A56'
+    deployer: 0
   },
   solidity: {
     version: '0.6.6',
@@ -90,37 +98,8 @@ const hardhatConfig: HardhatUserConfig = {
   typechain: {
     outDir: './types',
     target: 'truffle-v5'
-  },
-  etherscan: {
-    apiKey: ETHERSCAN
   }
 }
-
-// create our own migration task since there isn't one implemented
-// see https://github.com/nomiclabs/hardhat/issues/381
-task('migrate', 'Migrate contracts', async (...args: any[]) => {
-  // lazy load this as it breaks hardhat due to '@openzeppelin/test-helpers'
-  // also required because we need to build typechain first
-  return (await import('./tasks/migrate')).default(args[0], args[1], args[2])
-})
-  .addOptionalParam<MigrationOptions['shouldVerify']>(
-    'shouldVerify',
-    'Try to verify contracts using etherscan',
-    false,
-    types.boolean
-  )
-  .addOptionalParam<MigrationOptions['mintUsing']>(
-    'mintUsing',
-    'Mint using "minter" or "faucet"',
-    'minter',
-    types.string
-  )
-  .addOptionalParam<MigrationOptions['revokeRoles']>(
-    'revokeRoles',
-    'Revoke admin roles from deployer',
-    false,
-    types.boolean
-  )
 
 task('fund', 'Fund demo accounts', async (...args: any[]) => {
   return (await import('./tasks/fund')).default(args[0], args[1], args[2])
@@ -129,6 +108,8 @@ task('fund', 'Fund demo accounts', async (...args: any[]) => {
   .addOptionalParam<string>('amount', 'Amount of HOPR to fund', Web3.utils.toWei('1000000', 'ether'), types.string)
   .addOptionalParam<number>('accountsToFund', 'Amount of accounts to fund from demo seeds', 0, types.int)
 
+// 'hardhat-deploy' has an export method which we don't use,
+// our 'export' alternative allows us to only retrieve the data we need
 task('extract', 'Extract ABIs to specified folder', async (...args: any[]) => {
   return (await import('./tasks/extract')).default(args[0], args[1], args[2])
 }).addFlag('target', 'Folder to output contents to')
