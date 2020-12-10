@@ -7,14 +7,12 @@ shopt -s expand_aliases
 
 # ENV Variables:
 # - RELEASE: release version, ie. 1.51.1-next.0
-# - RPC: provider address, ie https://rpc-mainnet.matic.network
+# - GITHUB_REF: ie. /refs/heads/mybranch
+# - RPC: provider address, ie https://rpc-mainnet.matic.networuk
 # - FUNDING_PRIV_KEY: funding private key, raw
+# - BS_PASSWORD: database password${{ secrets.BS_PASSWORD }} \
 
-
-# GCLOUD_VM_NAME=${{ env.GCLOUD_VM_NAME }} \
 # GCLOUD_VM_DISK=${{ env.GCLOUD_VM_DISK }} \
-# BS_PASSWORD=${{ secrets.BS_PASSWORD }} \
-# RELEASE_NAME=${{ env.RELEASE_NAME }} \
 
 MIN_FUNDS=0.01291
 HOPRD_IMAGE="gcr.io/hoprassociation/hoprd:$RELEASE_VERSION"
@@ -117,8 +115,10 @@ get_hopr_address() {
 
 start_bootstrap() {
   get_environment
-  echo $RELEASE_NAME
+  echo "Starting bootstrap server for r:$RELEASE_NAME at $RELEASE_IP"
 
+  GCLOUD_VM_NAME="$RELEASE_NAME-bootstrap"
+  echo "VM: $GCLOUD_VM_NAME"
   exit 0
   BOOTSTRAP_ETH_ADDRESS=$(get_eth_address)
   BOOTSTRAP_HOPR_ADDRESS=$(get_hopr_address)
