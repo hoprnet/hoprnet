@@ -1,7 +1,7 @@
 ---
 description: A general introduction to the HOPR ecosystem.
 ---
-{% hint style="danger" %} These docs are currently being updated to reflect major changes to our software since our last release. In the meantime, you can visit our [github](www.github.com/hoprnet/hoprnet) for basic instructions on how to install and run a node. {% endhint %}
+{% hint style="danger" %} These docs are currently being updated to reflect major changes to our software since our last release. In the meantime, you can visit our [github](https://github.com/hoprnet/hoprnet) for basic instructions on how to install and run a node. {% endhint %}
 
 # Overview
 
