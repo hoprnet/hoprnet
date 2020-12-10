@@ -2,8 +2,7 @@ version: '3.4'
 services:
   hopr.avado.dnp.dappnode.eth:
     build:
-      context: ../hoprd
-      dockerfile: ./Dockerfile
+      image: gcr.io/hoprassociation/hoprd:${RELEASE}
       args:
         network: bnb-testnet
     image: 'hopr.avado.dnp.dappnode.eth:0.100.0'
