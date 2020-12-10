@@ -4,8 +4,7 @@ services:
     build:
       context: ../hoprd
       dockerfile: ./Dockerfile
-      args:
-        network: bnb-testnet
+    command: '--password="open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0" --init --admin'
     image: 'hopr.avado.dnp.dappnode.eth:0.100.0'
     restart: always
     volumes:

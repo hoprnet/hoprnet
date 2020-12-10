@@ -1,9 +1,10 @@
 {
   "name": "@hoprnet/hoprd",
-  "version": "1.57.0-next.20",
+  "version": "1.57.0-next.25",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
+  "license": "LGPL-3.0-only",
   "main": "lib/index.js",
   "author": "Peter Braden (HOPR) <peter.braden@hoprnet.org>",
   "bin": {
@@ -20,14 +21,13 @@
     "test": "mocha",
     "prepublishOnly": "yarn build",
     "start": "node lib/index.js --admin",
-    "dev": "yarn build  && NODE_ENV=development yarn start"
+    "dev": "yarn build && NODE_ENV=development yarn start"
   },
-  "license": "",
   "dependencies": {
-    "@hoprnet/hopr-core": "1.57.0-next.20",
-    "@hoprnet/hopr-core-connector-interface": "1.57.0-next.20",
+    "@hoprnet/hopr-core": "1.57.0-next.25",
+    "@hoprnet/hopr-core-connector-interface": "1.57.0-next.25",
     "@hoprnet/hopr-server": "1.45.0-alpha.0",
-    "@hoprnet/hopr-utils": "1.57.0-next.20",
+    "@hoprnet/hopr-utils": "1.57.0-next.25",
     "@types/bs58": "^4.0.1",
     "@types/clear": "^0.1.0",
     "@types/yargs": "^15.0.9",
@@ -38,6 +38,7 @@
     "peer-id": "0",
     "react": "17.0.1",
     "react-dom": "17.0.1",
+    "restana": "^4.8.0",
     "rlp": "^2.2.6",
     "tiny-hashes": "^1.0.1",
     "yargs": "^16.0.3"
