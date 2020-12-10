@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hoprd",
-  "version": "1.58.0",
+  "version": "1.58.1",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -24,7 +24,7 @@
     "dev": "yarn build && NODE_ENV=development yarn start"
   },
   "dependencies": {
-    "@hoprnet/hopr-core": "^1.58.0",
+    "@hoprnet/hopr-core": "^1.58.1",
     "@hoprnet/hopr-core-connector-interface": "^1.58.0",
     "@hoprnet/hopr-server": "1.45.0-alpha.0",
     "@hoprnet/hopr-utils": "^1.58.0",
