@@ -25,6 +25,15 @@ DOCKER_ARGS="-v $GCLOUD_VM_DISK:/app/db --entrypoint=node -it $HOPRD_IMAGE"
 alias wallet="ethers --rpc $RPC --account $FUNDING_PRIV_KEY"
 alias gssh="gcloud compute ssh --ssh-flag='-t' --zone=europe-west6-a"
 
+# $1=version string, semver
+function get_version_maj_min() {
+  # From https://github.com/cloudflare/semver_bash/blob/master/semver.sh
+  local RE='[^0-9]*\([0-9]*\)[.]\([0-9]*\)[.]\([0-9]*\)\([0-9A-Za-z-]*\)'
+  local MAJ=$(echo "$1" | sed -e "s#$RE#\1#")
+  local MIN=$(echo "$1" | sed -e "s#$RE#\2#")
+  echo "$MAJ.$MIN"
+}
+
 # ===== Load env variables for the current github ref =====
 # Takes:
 # - GITHUB_REF
@@ -41,7 +50,7 @@ get_environment() {
   fi
 
   case "$BRANCH" in release/*)
-    VERSION_MAJ_MIN= 
+    VERSION_MAJ_MIN=$(get_version_maj_min $RELEASE) 
     if [ "$VERSION_MAJ_MIN" == '1.58' ]; then
       RELEASE_NAME='queretaro'
       RELEASE_IP='34.65.207.39'
