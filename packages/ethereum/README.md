@@ -18,10 +18,9 @@ Hopr-ethereum contains the on-chain logic that is used to process payments for [
 - [Coverage](#coverage)
 - [Migrating](#migrating)
 - [Contracts](#contracts)
-  - [HoprChannel](#hoprchannel)
   - [HoprToken](#hoprtoken)
+  - [HoprChannel](#hoprchannel)
   - [Linting](#linting)
-- [Future Improvements](#future-improvements)
 
 # Requirements
 
@@ -48,7 +47,6 @@ yarn build
 # Testing
 
 ```bash
-# Runs `truffle test`
 yarn test
 ```
 
@@ -57,9 +55,7 @@ yarn test
 # Coverage
 
 ```bash
-# 1. Runs solidity-coverage
-# 2. Stores result in `coverage` folder
-yarn coverage
+npx hardhat coverage
 ```
 
 > tip: see coverage results by launching `./coverage/index.html`
@@ -70,15 +66,13 @@ For public network migrations (rinkeby, kovan, [etc](./utils/networks.ts)), you 
 
 ```bash
 # local migration
-yarn network
+yarn network --network localhost
 
 # public migration
 yarn migrate --network matic
 ```
 
 # Contracts
-
-## HoprChannel
 
 ## HoprToken
 
@@ -91,12 +85,8 @@ Decimals: 18
 Total Supply: 100,000,000
 ```
 
+## HoprChannel
+
 ## Linting
 
-We use solhint's default preset to perform linting onto our smart contracts.
-
-# Future Improvements
-
-- **ganache-cli-coverage**: eventually we would like to switch to [ganache-core-coverage](https://github.com/OpenZeppelin/ganache-core-coverage) once it matures enough. [#issue](https://forum.openzeppelin.com/t/how-is-solidity-coverage-integrated-into-openzeppelin/1323/3)
-
-- **redundant compiles**: when running `yarn test` or `yarn coverage`, we always make sure to generate the latest typescript types, this requires us to compile the contracts. Internally, both scripts use `truffle test` which recompiles the contracts even though they haven't changed. [#issue](https://github.com/trufflesuite/truffle/issues/469) [#solution](https://github.com/trufflesuite/truffle/issues/2661)
+We use solhint's recommended preset to perform linting onto our smart contracts.

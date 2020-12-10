@@ -16,8 +16,8 @@
     "build:sol": "hardhat compile && hardhat postCompile",
     "fund": "hardhat fund",
     "migrate": "hardhat migrate",
-    "network": "hardhat node --network hardhat",
-    "test": "hardhat test --no-compile --network hardhat",
+    "network": "hardhat node",
+    "test": "hardhat test --no-compile",
     "prepublishOnly": "yarn build"
   },
   "dependencies": {
@@ -31,6 +31,7 @@
     "dotenv": "^8.2.0",
     "hardhat": "^2.0.5",
     "hardhat-deploy": "^0.7.0-beta.38",
+    "hardhat-gas-reporter": "^1.0.3",
     "hardhat-typechain": "^0.3.3",
     "secp256k1": "^4.0.2",
     "solidity-coverage": "^0.7.13",

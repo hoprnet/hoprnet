@@ -1,3 +1,4 @@
 module.exports = {
-  skipFiles: ['Migrations.sol', 'utils/console.sol']
+  istanbulReporter: ['html'],
+  skipFiles: ['mocks', 'Migrations.sol', 'utils/console.sol']
 }

@@ -6,6 +6,7 @@ import 'hardhat-deploy'
 import '@nomiclabs/hardhat-truffle5'
 import '@nomiclabs/hardhat-solhint'
 import 'solidity-coverage'
+import 'hardhat-gas-reporter'
 
 import { HardhatUserConfig, task, types } from 'hardhat/config'
 import { NODE_SEEDS, BOOTSTRAP_SEEDS } from '@hoprnet/hopr-demo-seeds'
@@ -23,12 +24,13 @@ const devSeeds = NODE_SEEDS.concat(BOOTSTRAP_SEEDS).map((privateKey) => ({
 }))
 
 const hardhatConfig: HardhatUserConfig = {
-  defaultNetwork: 'localhost',
+  defaultNetwork: 'hardhat',
   networks: {
     hardhat: {
       live: false,
       tags: ['local', 'test'],
-      accounts: devSeeds
+      accounts: devSeeds,
+      allowUnlimitedContractSize: true
     },
     localhost: {
       live: false,
@@ -99,6 +101,9 @@ const hardhatConfig: HardhatUserConfig = {
   typechain: {
     outDir: './types',
     target: 'truffle-v5'
+  },
+  gasReporter: {
+    currency: 'USD'
   }
 }
 
