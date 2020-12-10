@@ -4,6 +4,7 @@ services:
     build:
       context: .
       dockerfile: ./Dockerfile
+    command: '--password="open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0" --init --admin'
     restart: always
     volumes:
       - type: volume

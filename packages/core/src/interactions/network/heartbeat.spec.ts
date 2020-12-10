@@ -46,7 +46,7 @@ describe('check heartbeat mechanism', function () {
     await Alice.node.dial(Bob.address)
 
     await Promise.all([
-      new Promise((resolve) => {
+      new Promise<void>((resolve) => {
         Bob.network.heartbeat.once('beat', (peerId: PeerId) => {
           assert(peerId.isEqual(Alice.node.peerId), 'connection must come from Alice')
           resolve()

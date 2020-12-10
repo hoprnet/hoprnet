@@ -88,7 +88,7 @@ describe('test connector', function () {
         })
       }
 
-      return new Promise(async (resolve, reject) => {
+      return new Promise<void>(async (resolve, reject) => {
         try {
           const receiver = await createAccountAndFund(web3, hoprToken, owner)
 

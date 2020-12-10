@@ -1,6 +1,6 @@
 import Hopr, { MIN_NATIVE_BALANCE } from '@hoprnet/hopr-core'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-import { commands } from '@hoprnet/hopr-chat'
+import { Commands } from './commands'
 import http from 'http'
 import fs from 'fs'
 import ws from 'ws'
@@ -82,7 +82,7 @@ export class AdminServer {
 
   registerNode(node: Hopr<HoprCoreConnector>, settings?: any) {
     this.node = node
-    this.cmds = new commands.Commands(node)
+    this.cmds = new Commands(node)
     if (settings) {
       this.cmds.setState(settings)
     }

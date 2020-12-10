@@ -3,7 +3,7 @@ import { stringToU8a, u8aEquals } from '@hoprnet/hopr-utils'
 import { AccountId, AcknowledgedTicket, Balance, Hash, NativeBalance, TicketEpoch } from './types'
 import { isWinningTicket, pubKeyToAccountId } from './utils'
 import { ContractEventEmitter } from './tsc/web3/types'
-import { PreImageResult } from './hashedSecret'
+import type { Intermediate } from '@hoprnet/hopr-utils'
 import { HASHED_SECRET_WIDTH } from './hashedSecret'
 export const EMPTY_HASHED_SECRET = new Uint8Array(HASHED_SECRET_WIDTH).fill(0x00)
 import debug from 'debug'
@@ -55,26 +55,26 @@ class Account {
     this._preImageIterator = async function* (this: Account) {
       let ticket: AcknowledgedTicket = yield
 
-      let currentPreImage: Promise<PreImageResult> = this.coreConnector.hashedSecret.findPreImage(
+      let currentPreImage: Promise<Intermediate> = this.coreConnector.hashedSecret.findPreImage(
         await this.onChainSecret
       )
 
-      let tmp: PreImageResult = await currentPreImage
+      let tmp: Intermediate = await currentPreImage
 
       while (true) {
         if (
           await isWinningTicket(
             await (await ticket.signedTicket).ticket.hash,
             ticket.response,
-            tmp.preImage,
+            new Hash(tmp.preImage),
             (await ticket.signedTicket).ticket.winProb
           )
         ) {
           currentPreImage = this.coreConnector.hashedSecret.findPreImage(tmp.preImage)
 
-          ticket.preImage = tmp.preImage
+          ticket.preImage = new Hash(tmp.preImage)
 
-          if (tmp.index == 0) {
+          if (tmp.iteration == 0) {
             // @TODO dispatch call of next hashedSecret submit
             return true
           } else {
