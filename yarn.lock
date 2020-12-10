@@ -1473,18 +1473,6 @@
     peer-id "0.14.2"
     strip-ansi "^6.0.0"
 
-"@hoprnet/hopr-utils@^1.57.6":
-  version "1.57.7"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-1.57.7.tgz#91f00f22782bb1c1d1f0866c51e7d7f564521c5e"
-  integrity sha512-+z5ct6mV4v/nxat9h1p/fDq1jvMJRlAQBxYcBSE2sdGnwgatFxictuEr4BAvwHLGg1zWQFXmfzShFex2CMiJVw==
-  dependencies:
-    bignumber.js "^9.0.0"
-    libp2p-crypto "0.18.0"
-    multiaddr "8.1.1"
-    multihashes "~3.1.0"
-    peer-id "0.14.2"
-    strip-ansi "^6.0.0"
-
 "@lerna/add@3.21.0":
   version "3.21.0"
   resolved "https://registry.yarnpkg.com/@lerna/add/-/add-3.21.0.tgz#27007bde71cc7b0a2969ab3c2f0ae41578b4577b"
