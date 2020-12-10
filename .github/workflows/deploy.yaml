@@ -341,16 +341,9 @@ jobs:
           RELEASE_NAME=${{ env.RELEASE_NAME }} \
           bash scripts/cd/hopr_env.sh >> $GITHUB_ENV
 
-      - name: Verify bootstrap server HOPR address from previous step
-        run: |
-          echo "Bootstrap Server HOPR Address: ${{ env.BOOTSTRAP_HOPR_ADDRESS }}"
-
       - name: Restart bootstrap server virtual machine to restart main container
-        run: |
+          echo "Bootstrap Server HOPR Address: ${{ env.BOOTSTRAP_HOPR_ADDRESS }}"
           gcloud compute instances reset --zone=europe-west6-a ${{ env.GCLOUD_VM_NAME }}
-
-      - name: Echo the bootstrap server multiaddress
-        run: |
-          echo "/${{ env.RELEASE_IP }}/tcp/9091/p2p/${{ env.BOOTSTRAP_HOPR_ADDRESS }}"
+          echo "Bootstrap multiaddr: /${{ env.RELEASE_IP }}/tcp/9091/p2p/${{ env.BOOTSTRAP_HOPR_ADDRESS }}"
         
 
