@@ -5,7 +5,9 @@ import type { CommandResponse } from './abstractCommand'
 import sinon from 'sinon'
 
 const assertMatch = (test: CommandResponse, pattern: RegExp) => {
-  if (!test) { throw new Error('cannot match empty string') } 
+  if (!test) {
+    throw new Error('cannot match empty string')
+  }
   assert(test.match(pattern), `should match ${pattern}`)
 }
 
