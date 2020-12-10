@@ -1,12 +1,12 @@
 import Web3 from 'web3'
-import { percentToUint256, createAccount, createTicket } from './utils'
+import { percentToUint256, createTicket } from './utils'
+import { ACCOUNT_A, ACCOUNT_B } from '../constants'
 
 const { soliditySha3 } = Web3.utils
 
 // accountA == partyA
-export const ACCOUNT_A = createAccount('0xf54bd518dd7e3e42710e9a96c92b1b244727df5a5afae34611089bee344d6bd4')
 // accountB == partyB
-export const ACCOUNT_B = createAccount('0xf344315b0389d60ace0c8a5f36da6612d268019c2d88ff77cdb2b37f0ec7ddd5')
+export { ACCOUNT_A, ACCOUNT_B }
 /**
  * Channel id of account A and B
  */

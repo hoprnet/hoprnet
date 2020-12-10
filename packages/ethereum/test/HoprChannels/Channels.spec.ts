@@ -1,6 +1,6 @@
 import { deployments } from 'hardhat'
 import { expectEvent, expectRevert, constants, singletons, time } from '@openzeppelin/test-helpers'
-import { formatChannel, ERC777Mock } from './utils'
+import { formatChannel } from './utils'
 import { ACCOUNT_A, ACCOUNT_B, ACCOUNT_AB_CHANNEL_ID } from './constants'
 
 const ERC777 = artifacts.require('ERC777Mock')
@@ -13,7 +13,7 @@ const useFixtures = deployments.createFixture(async (_deployments, { secsClosure
   await singletons.ERC1820Registry(deployer)
 
   // deploy ERC777Mock
-  const token = await ERC777Mock(ERC777, deployer, '100')
+  const token = await ERC777.new(deployer, '100', 'Token', 'TKN', [])
   // deploy ChannelsMock
   const channels = await Channels.new(secsClosure ?? '0')
 
