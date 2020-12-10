@@ -2268,9 +2268,9 @@
     util.promisify "^1.0.0"
 
 "@nomiclabs/hardhat-etherscan@^2.0.0":
-  version "2.0.1"
-  resolved "https://registry.yarnpkg.com/@nomiclabs/hardhat-etherscan/-/hardhat-etherscan-2.0.1.tgz#576c162b0c2b8f5913b3853f4591e98ccc1c2e4d"
-  integrity sha512-5xPh5xhLXO1tDO0VTc4qlqqgv2m1bL+pXLSFibUVJ2EzzXHKn1C4ioHmYgseIkoNC3iG19cSJ7gRcQz4u54pGQ==
+  version "2.1.0"
+  resolved "https://registry.yarnpkg.com/@nomiclabs/hardhat-etherscan/-/hardhat-etherscan-2.1.0.tgz#08512c3e602155dc0d2becb193cd2e0155867839"
+  integrity sha512-YK9/UZI1Ct9TYfqZJnjIERlFC7bFrG0eUS2O0kFrH8RjLdcQXBI0GNpxXGAuDbotBg0t8wRKHibbK50TQu0ybA==
   dependencies:
     "@ethersproject/abi" "^5.0.2"
     "@ethersproject/address" "^5.0.2"
