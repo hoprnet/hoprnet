@@ -1,7 +1,6 @@
 import PeerId from 'peer-id'
 import { keys, PublicKey } from 'libp2p-crypto'
-// @ts-ignore
-import * as multihashes from 'multihashes'
+import multihashes from 'multihashes'
 
 /**
  * Regular expresion used to match b58Strings
@@ -16,7 +15,7 @@ export const b58StringRegex = /16Uiu2HA[A-Za-z0-9]{1,45}/i
  * @param peerId the PeerId used to generate a public key
  */
 export async function convertPubKeyFromPeerId(peerId: PeerId): Promise<PublicKey> {
-  return await keys.unmarshalPublicKey(multihashes.decode(peerId.toBytes()).digest)
+  return keys.unmarshalPublicKey(multihashes.decode(peerId.toBytes()).digest)
 }
 
 /**

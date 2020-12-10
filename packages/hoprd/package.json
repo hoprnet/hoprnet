@@ -4,6 +4,7 @@
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
+  "license": "LGPL-3.0-only",
   "main": "lib/index.js",
   "author": "Peter Braden (HOPR) <peter.braden@hoprnet.org>",
   "bin": {
@@ -22,7 +23,6 @@
     "start": "node lib/index.js --admin",
     "dev": "yarn build && NODE_ENV=development yarn start"
   },
-  "license": "",
   "dependencies": {
     "@hoprnet/hopr-chat": "1.57.0-next.24",
     "@hoprnet/hopr-core": "1.57.0-next.24",
