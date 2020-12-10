@@ -15,7 +15,7 @@ export class IncludeRecipient extends AbstractCommand {
   public async execute(query: string, state: GlobalState): Promise<string | void> {
     // return the current value of includeRecipient
     if (!query) {
-      return styleValue(state.includeRecipient)
+      return styleValue('' + state.includeRecipient)
     }
 
     if (!query.match(/true|false/i)) {
