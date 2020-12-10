@@ -328,7 +328,7 @@ class HoprConnect implements Transport {
    * @returns A TCP listener
    */
   createListener(options: any | undefined, handler: (connection: Connection) => void): Listener {
-    if (typeof options === 'function') {
+    if (arguments.length == 1 && typeof options === 'function') {
       this.connHandler = options
     } else {
       this.connHandler = handler

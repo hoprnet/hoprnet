@@ -37,6 +37,28 @@ A [transport module](https://github.com/libp2p/js-libp2p-interfaces/tree/master/
 
 ## Usage
 
+Start a bootstrapServer
+
+```ts
+const libp2p = require('libp2p')
+const Mplex = require('libp2p-mplex')
+const SECIO = require('libp2p-secio')
+
+import HoprConnect from 'hopr-connect'
+import Multiaddr from 'multiaddr'
+
+const node = await libp2p.create({
+  modules: {
+    transport: [HoprConnect],
+    streamMuxer: [MPLEX],
+    connEncryption: [NOISE],
+    peerDiscovery: [HoprConnect.discovery]
+  }
+})
+```
+
+Assume that the bootstrap server was started at `1.2.3.4:9091`
+
 ```ts
 const libp2p = require('libp2p')
 const Mplex = require('libp2p-mplex')
@@ -55,7 +77,7 @@ const node = await libp2p.create({
   config: {
     HoprConnect: {
       bootstrapServers: [
-        Multiaddr('/ip4/1.2.3.4/')
+        Multiaddr('/ip4/1.2.3.4/tcp/9091')
       ]
     }
   }
