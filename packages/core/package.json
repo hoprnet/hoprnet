@@ -53,10 +53,7 @@
     "peer-id": "0.14.2",
     "read": "~1.0.7",
     "rlp": "~2.2.6",
-    "secp256k1": "~4.0.2",
-    "simple-peer": "~9.9.3",
-    "webrtc-stun": "^3.0.0",
-    "wrtc": "0.4.6"
+    "secp256k1": "~4.0.2"
   },
   "devDependencies": {
     "@hoprnet/hopr-core-connector-interface": "^1.58.0",
