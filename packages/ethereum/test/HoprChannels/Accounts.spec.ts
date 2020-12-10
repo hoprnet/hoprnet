@@ -1,3 +1,4 @@
+import { deployments } from 'hardhat'
 import { expectEvent, expectRevert, constants } from '@openzeppelin/test-helpers'
 import { vmErrorMessage } from '../utils'
 import { formatAccount } from './utils'
@@ -5,9 +6,17 @@ import { ACCOUNT_A, ACCOUNT_B, SECRET_2, SECRET_1 } from './constants'
 
 const Accounts = artifacts.require('AccountsMock')
 
+const useFixtures = deployments.createFixture(async () => {
+  const accounts = await Accounts.new()
+
+  return {
+    accounts
+  }
+})
+
 describe('Accounts', function () {
   it('should initialize account', async function () {
-    const accounts = await Accounts.new()
+    const { accounts } = await useFixtures()
 
     const response = await accounts.initializeAccount(
       ACCOUNT_A.address,
@@ -33,7 +42,7 @@ describe('Accounts', function () {
   })
 
   it('should fail to initialize account when public key is wrong', async function () {
-    const accounts = await Accounts.new()
+    const { accounts } = await useFixtures()
 
     // give wrong public key
     await expectRevert(
@@ -43,7 +52,7 @@ describe('Accounts', function () {
   })
 
   it("should update account's secret", async function () {
-    const accounts = await Accounts.new()
+    const { accounts } = await useFixtures()
 
     await accounts.initializeAccount(ACCOUNT_A.address, ACCOUNT_A.pubKeyFirstHalf, ACCOUNT_A.pubKeySecondHalf, SECRET_2)
 
@@ -60,7 +69,7 @@ describe('Accounts', function () {
   })
 
   it("should fail to update account's secret when secret is empty", async function () {
-    const accounts = await Accounts.new()
+    const { accounts } = await useFixtures()
 
     await accounts.initializeAccount(ACCOUNT_A.address, ACCOUNT_A.pubKeyFirstHalf, ACCOUNT_A.pubKeySecondHalf, SECRET_1)
 
@@ -72,7 +81,7 @@ describe('Accounts', function () {
   })
 
   it("should fail to update account's secret when secret is the same as before", async function () {
-    const accounts = await Accounts.new()
+    const { accounts } = await useFixtures()
 
     await accounts.initializeAccount(ACCOUNT_A.address, ACCOUNT_A.pubKeyFirstHalf, ACCOUNT_A.pubKeySecondHalf, SECRET_1)
 

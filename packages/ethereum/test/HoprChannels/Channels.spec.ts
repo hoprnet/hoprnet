@@ -1,3 +1,4 @@
+import { deployments } from 'hardhat'
 import { expectEvent, expectRevert, constants, singletons, time } from '@openzeppelin/test-helpers'
 import { formatChannel, ERC777Mock } from './utils'
 import { ACCOUNT_A, ACCOUNT_B, ACCOUNT_AB_CHANNEL_ID } from './constants'
@@ -5,19 +6,27 @@ import { ACCOUNT_A, ACCOUNT_B, ACCOUNT_AB_CHANNEL_ID } from './constants'
 const ERC777 = artifacts.require('ERC777Mock')
 const Channels = artifacts.require('ChannelsMock')
 
+const useFixtures = deployments.createFixture(async (_deployments, { secsClosure }: { secsClosure?: string } = {}) => {
+  const [deployer] = await web3.eth.getAccounts()
+
+  // deploy ERC1820Registry required by ERC777 token
+  await singletons.ERC1820Registry(deployer)
+
+  // deploy ERC777Mock
+  const token = await ERC777Mock(ERC777, deployer, '100')
+  // deploy ChannelsMock
+  const channels = await Channels.new(secsClosure ?? '0')
+
+  return {
+    token,
+    channels,
+    deployer
+  }
+})
+
 describe('Channels', function () {
-  let deployer: string
-
-  before(async function () {
-    const accounts = await web3.eth.getAccounts()
-    deployer = accounts[0]
-
-    // deploy ERC1820Registry required by ERC777 token
-    await singletons.ERC1820Registry(deployer)
-  })
-
   it('should fund channel', async function () {
-    const channels = await Channels.new('0')
+    const { channels } = await useFixtures()
 
     const response = await channels.fundChannel(ACCOUNT_A.address, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
 
@@ -38,7 +47,7 @@ describe('Channels', function () {
   })
 
   it('should fail to fund channel', async function () {
-    const channels = await Channels.new('0')
+    const { channels } = await useFixtures()
 
     await expectRevert(
       channels.fundChannel(ACCOUNT_A.address, ACCOUNT_A.address, ACCOUNT_A.address, '70', '30'),
@@ -62,7 +71,7 @@ describe('Channels', function () {
   })
 
   it('should open channel', async function () {
-    const channels = await Channels.new('0')
+    const { channels } = await useFixtures()
 
     await channels.fundChannel(ACCOUNT_A.address, ACCOUNT_A.address, ACCOUNT_B.address, '100', '0')
     const response = await channels.openChannel(ACCOUNT_A.address, ACCOUNT_B.address)
@@ -81,7 +90,7 @@ describe('Channels', function () {
   })
 
   it('should fail to open channel', async function () {
-    const channels = await Channels.new('0')
+    const { channels } = await useFixtures()
 
     await expectRevert(
       channels.openChannel(ACCOUNT_A.address, ACCOUNT_A.address),
@@ -99,7 +108,7 @@ describe('Channels', function () {
   })
 
   it('should fail to open channel when channel is already open', async function () {
-    const channels = await Channels.new('0')
+    const { channels } = await useFixtures()
 
     await channels.fundChannel(ACCOUNT_A.address, ACCOUNT_A.address, ACCOUNT_B.address, '100', '0')
     await channels.openChannel(ACCOUNT_A.address, ACCOUNT_B.address)
@@ -111,7 +120,7 @@ describe('Channels', function () {
   })
 
   it('should initialize channel closure', async function () {
-    const channels = await Channels.new('0')
+    const { channels } = await useFixtures()
 
     await channels.fundChannel(ACCOUNT_A.address, ACCOUNT_A.address, ACCOUNT_B.address, '100', '0')
     await channels.openChannel(ACCOUNT_A.address, ACCOUNT_B.address)
@@ -131,13 +140,13 @@ describe('Channels', function () {
   })
 
   it('should fail to initialize channel closure when channel is not open', async function () {
-    const channels = await Channels.new('0')
+    const { channels } = await useFixtures()
 
     await expectRevert(channels.initiateChannelClosure(ACCOUNT_A.address, ACCOUNT_B.address), 'channel must be open')
   })
 
   it('should fail to initialize channel closure', async function () {
-    const channels = await Channels.new('0')
+    const { channels } = await useFixtures()
 
     await channels.fundChannel(ACCOUNT_A.address, ACCOUNT_A.address, ACCOUNT_B.address, '100', '0')
     await channels.openChannel(ACCOUNT_A.address, ACCOUNT_B.address)
@@ -159,8 +168,7 @@ describe('Channels', function () {
   })
 
   it('should finalize channel closure', async function () {
-    const token = await ERC777Mock(ERC777, deployer, '100')
-    const channels = await Channels.new('0')
+    const { token, channels, deployer } = await useFixtures()
 
     // transfer tokens to contract
     await token.transfer(channels.address, '100')
@@ -190,8 +198,7 @@ describe('Channels', function () {
   })
 
   it('should finalize channel closure immediately', async function () {
-    const token = await ERC777Mock(ERC777, deployer, '100')
-    const channels = await Channels.new(time.duration.minutes(5))
+    const { token, channels, deployer } = await useFixtures({ secsClosure: time.duration.minutes(5) })
 
     // transfer tokens to contract
     await token.transfer(channels.address, '100')
@@ -221,8 +228,7 @@ describe('Channels', function () {
   })
 
   it('should fail to finalize channel closure when is not pending', async function () {
-    const token = await ERC777Mock(ERC777, deployer, '100')
-    const channels = await Channels.new('0')
+    const { token, channels, deployer } = await useFixtures()
 
     // transfer tokens to contract
     await token.transfer(channels.address, '100')
@@ -236,8 +242,7 @@ describe('Channels', function () {
   })
 
   it('should fail to finalize channel closure', async function () {
-    const token = await ERC777Mock(ERC777, deployer, '100')
-    const channels = await Channels.new(time.duration.minutes(5))
+    const { token, channels, deployer } = await useFixtures({ secsClosure: time.duration.minutes(5) })
 
     // transfer tokens to contract
     await token.transfer(channels.address, '100')
