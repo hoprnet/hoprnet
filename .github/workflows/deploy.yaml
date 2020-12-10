@@ -211,7 +211,7 @@ jobs:
         run: npm install -g @ethersproject/cli
 
       - name: Get version from package.json
-        run: echo "RELEASE_VERSION=$(node -p -e "require('./packages/hoprd/package.json').version")" >> $GITHUB_ENV
+        run: echo "RELEASE=$(node -p -e "require('./packages/hoprd/package.json').version")" >> $GITHUB_ENV
 
       - name: Setup Google Cloud Credentials
         uses: GoogleCloudPlatform/github-actions/setup-gcloud@master
@@ -223,51 +223,13 @@ jobs:
       - name: Set Project for Google Cloud HOPR Association
         run: gcloud config set project ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
 
-          
-      - name: Update bootstrap node with a new container image
-        if: env.GCLOUD_ACTION_CONTAINER == 'update'
+      - name: Run start script
         run: |
-          gcloud compute instances update-container ${{ env.GCLOUD_VM_NAME }} \
-            --zone=europe-west6-a \
-            --container-image=gcr.io/hoprassociation/hoprd:${{ env.RELEASE_VERSION }} \
-            --container-mount-disk name=bs-${{ env.RELEASE_NAME }},mount-path="/app/db"
-
-      - name: Create new bootstrap node with a given IP for a specific release
-        if: env.GCLOUD_ACTION_CONTAINER == 'create'
-        run: |
-          gcloud compute instances create-with-container ${{ env.GCLOUD_VM_NAME }} \
-            --zone=europe-west6-a \
-            --machine-type=e2-medium \
-            --network-interface=address=${{ env.RELEASE_IP }},network-tier=PREMIUM,subnet=default \
-            --metadata=google-logging-enabled=true --maintenance-policy=MIGRATE \
-            --create-disk name=bs-${{ env.RELEASE_NAME }},size=10GB,type=pd-ssd,mode=rw \
-            --container-mount-disk mount-path="/app/db" \
-            --tags=hopr-node,web-client,portainer \
-            --boot-disk-size=10GB --boot-disk-type=pd-standard \
-            --container-env=^,@^DEBUG=hopr\*,@NODE_OPTIONS=--max-old-space-size=4096 \
-            --container-image=gcr.io/hoprassociation/hoprd:${{ env.RELEASE_VERSION }} \
-            --container-arg="--password" --container-arg="${{ secrets.BS_PASSWORD }}" \
-            --container-arg="--env" --container-arg="matic" \
-            --container-arg="--init" --container-arg="true" \
-            --container-arg="--runAsBootstrap" --container-arg="true" \
-            --container-arg="--admin" \
-            --container-restart-policy=always
-
-      - name: Wait for container to be updated by konlet
-        if: env.GCLOUD_ACTION_CONTAINER == 'update'
-        run: sleep 30s
-
-      - name: Wait for container to be created by konlet
-        if: env.GCLOUD_ACTION_CONTAINER == 'create'
-        run: sleep 2m
-
-      - name: Store disk name in our environment for further usage
-        run: echo "GCLOUD_VM_DISK=/mnt/disks/gce-containers-mounts/gce-persistent-disks/bs-${{ env.RELEASE_NAME }}" >> $GITHUB_ENV
-
-      - name: Stop bootstrap node to get the address from the database
-        run: |
-          gcloud compute ssh --zone=europe-west6-a ${{ env.GCLOUD_VM_NAME }} \
-          -- 'export DOCKER_IMAGE=gcr.io/hoprassociation/hoprd:${{ env.RELEASE_VERSION }} && docker stop $(docker ps -q --filter "ancestor=$DOCKER_IMAGE")'
-
+          bash scripts/cd/start-bootstrap-server.sh
+        env:
+          FUNDING_PRIV_KEY: ${{ secrets.FUNDING_WALLET_PRIVATE_KEY }}
+          RPC: ${{ secrets.FUNDING_RPC_MATIC_URL }}
+          GITHUB_REF: ${{ github.ref }}
+          BS_PASSWORD: ${{ secrets.BS_PASSWORD }}
 
 

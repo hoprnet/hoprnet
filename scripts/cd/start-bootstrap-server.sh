@@ -12,8 +12,6 @@ shopt -s expand_aliases
 # - FUNDING_PRIV_KEY: funding private key, raw
 # - BS_PASSWORD: database password${{ secrets.BS_PASSWORD }} \
 
-# GCLOUD_VM_DISK=${{ env.GCLOUD_VM_DISK }} \
-
 MIN_FUNDS=0.01291
 HOPRD_IMAGE="gcr.io/hoprassociation/hoprd:$RELEASE_VERSION"
 HOPRD_ARGS="--data='/app/db/ethereum/testnet/bootstrap' --password='$BS_PASSWORD'"
@@ -85,17 +83,21 @@ get_environment() {
   exit 1
 }
 
+# Set:
+# - GCLOUD_VM_NAME
+# - GCLOUD_VM_IMAGE?
 get_gcloud_target() {
   GCLOUD_VM_NAME="$RELEASE_NAME-bootstrap"
   if [[ $(gcloud compute instances list | grep $GCLOUD_VM_NAME) ]]; then
-    GCLOUD_ACTION_CONTAINER=update
+    echo "Container exists, updating"
     GCLOUD_VM_IMAGE=$(gcloud compute instances describe $GCLOUD_VM_NAME --zone=europe-west6-a --format='value[](metadata.items.gce-container-declaration)' | grep image | tr -s ' ' | cut -f3 -d' ')
+    echo "GCloud VM IMAGE: $GCLOUD_VM_IMAGE"
+    update_container_with_image
   else
-    GCLOUD_ACTION_CONTAINER=create
+    echo "No container found, creating"
+    create_instance_with_image
   fi
 }
-
-
 
 # $1=account (hex)
 balance() {
@@ -114,7 +116,6 @@ fund_if_empty() {
   fi
 }
 
-
 get_eth_address(){
   gssh $GCLOUD_VM_NAME -- docker run $DOCKER_ARGS index.js $HOPRD_ARGS --runAsBootstrap run 'myAddress native'
 }
@@ -123,18 +124,53 @@ get_hopr_address() {
   gssh $GCLOUD_VM_NAME -- docker run $DOCKER_ARGS index.js $HOPRD_ARGS --runAsBootstrap --run 'myAddress hopr'
 }
 
+update_container_with_image() {
+  gcloud compute instances update-container ${{ env.GCLOUD_VM_NAME }} \
+    --zone=europe-west6-a \
+    --container-image=gcr.io/hoprassociation/hoprd:${{ env.RELEASE_VERSION }} \
+    --container-mount-disk name=bs-${{ env.RELEASE_NAME }},mount-path="/app/db"
+
+  sleep 30s
+}
+
+create_instance_with_image() {
+  gcloud compute instances create-with-container ${{ env.GCLOUD_VM_NAME }} \
+    --zone=europe-west6-a \
+    --machine-type=e2-medium \
+    --network-interface=address=${{ env.RELEASE_IP }},network-tier=PREMIUM,subnet=default \
+    --metadata=google-logging-enabled=true --maintenance-policy=MIGRATE \
+    --create-disk name=bs-${{ env.RELEASE_NAME }},size=10GB,type=pd-ssd,mode=rw \
+    --container-mount-disk mount-path="/app/db" \
+    --tags=hopr-node,web-client,portainer \
+    --boot-disk-size=10GB --boot-disk-type=pd-standard \
+    --container-env=^,@^DEBUG=hopr\*,@NODE_OPTIONS=--max-old-space-size=4096 \
+    --container-image=gcr.io/hoprassociation/hoprd:${{ env.RELEASE_VERSION }} \
+    --container-arg="--password" --container-arg="${{ secrets.BS_PASSWORD }}" \
+    --container-arg="--env" --container-arg="matic" \
+    --container-arg="--init" --container-arg="true" \
+    --container-arg="--runAsBootstrap" --container-arg="true" \
+    --container-arg="--admin" \
+    --container-restart-policy=always
+
+  sleep 2m
+}
+
 start_bootstrap() {
   get_environment
   echo "Starting bootstrap server for r:$RELEASE_NAME at $RELEASE_IP"
+
   get_gcloud_target
   echo "Release Version: $RELEASE"
   echo "Release IP: $RELEASE_IP"
   echo "Release Name: $RELEASE_NAME"
-  echo "GCloud Action: $GCLOUD_ACTION_CONTAINER"
   echo "GCloud VM name: $GCLOUD_VM_NAME"
-  echo "GCloud VM image: $GCLOUD_VM_IMAGE"
 
-  exit 0
+  GCLOUD_VM_DISK=/mnt/disks/gce-containers-mounts/gce-persistent-disks/bs-$RELEASE_NAME
+
+  #Stop bootstrap node to get the address from the database
+  gcloud compute ssh --zone=europe-west6-a ${{ env.GCLOUD_VM_NAME }} \
+    -- 'export DOCKER_IMAGE=gcr.io/hoprassociation/hoprd:${{ env.RELEASE_VERSION }} && docker stop $(docker ps -q --filter "ancestor=$DOCKER_IMAGE")'
+
   BOOTSTRAP_ETH_ADDRESS=$(get_eth_address)
   BOOTSTRAP_HOPR_ADDRESS=$(get_hopr_address)
 
