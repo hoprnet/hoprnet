@@ -223,20 +223,6 @@ jobs:
       - name: Set Project for Google Cloud HOPR Association
         run: gcloud config set project ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
 
-      - name: Update our environment with the RELEASE_ variables (NAME, IP)
-        run: GITHUB_REF=${{ github.ref }} bash scripts/cd/release_env.sh >> $GITHUB_ENV
-          
-      - name: Update our environment with the GCLOUD_ variables (UPDATE_CONTAINER, CREATE_CONTAINER)
-        run: RELEASE_NAME=${{ env.RELEASE_NAME }} bash scripts/cd/gcloud_env.sh >> $GITHUB_ENV
-        
-      - name: Verify environment variables
-        run: |
-          echo "Release Version: ${{ env.RELEASE_VERSION }}" &&
-          echo "Release IP: ${{ env.RELEASE_IP }}" &&
-          echo "Release Name: ${{ env.RELEASE_NAME }}" &&
-          echo "Gcloud Action: ${{ env.GCLOUD_ACTION_CONTAINER }}" &&
-          echo "Gcloud VM name: ${{ env.GCLOUD_VM_NAME }}"
-          echo "Gcloud VM image: ${{ env.GCLOUD_VM_IMAGE }}"
           
       - name: Update bootstrap node with a new container image
         if: env.GCLOUD_ACTION_CONTAINER == 'update'
@@ -283,67 +269,5 @@ jobs:
           gcloud compute ssh --zone=europe-west6-a ${{ env.GCLOUD_VM_NAME }} \
           -- 'export DOCKER_IMAGE=gcr.io/hoprassociation/hoprd:${{ env.RELEASE_VERSION }} && docker stop $(docker ps -q --filter "ancestor=$DOCKER_IMAGE")'
 
-      - name: Get ethereum address from bootstrap docker container and save it
-        run: |
-          GCLOUD_VM_NAME=${{ env.GCLOUD_VM_NAME }} \
-          GCLOUD_VM_DISK=${{ env.GCLOUD_VM_DISK }} \
-          BS_PASSWORD=${{ secrets.BS_PASSWORD }} \
-          RELEASE_NAME=${{ env.RELEASE_NAME }} \
-          bash scripts/cd/address_env.sh >> $GITHUB_ENV
 
-      - name: Verify bootstrap server address from previous step
-        run: |
-          echo "Bootstrap Server Address: ${{ env.BOOTSTRAP_ADDRESS }}"
-
-      - name: Check bootstrap server balance
-        id: bootstrap_balance
-        run: |
-          echo "::set-output name=bootstrap_balance::$(ethers --rpc ${{ env.RPC_URL }} --account ${{ env.RAW_KEY }} eval 'new ethers.providers.JsonRpcProvider("${{ env.RPC_URL }}").getBalance("${{ env.ADDRESS }}").then(b => formatEther(b))')"
-        env:
-          RAW_KEY: ${{ secrets.FUNDING_WALLET_PRIVATE_KEY }}
-          RPC_URL: ${{ secrets.FUNDING_RPC_MATIC_URL }}
-          ADDRESS: ${{ env.BOOTSTRAP_ADDRESS }}
-
-      - name: Verify bootstrap server balance from previous step
-        run: |
-          echo "Bootstrap Address Balance: ${{ env.BOOTSTRAP_ADDRESS_BALANCE }}" &&
-          echo "BOOTSTRAP_ADDRESS_BALANCE=${{ env.BOOTSTRAP_ADDRESS_BALANCE }}" >> $GITHUB_ENV
-        env:
-          BOOTSTRAP_ADDRESS_BALANCE: ${{ steps.bootstrap_balance.outputs.bootstrap_balance }}
-
-      - name: Fund bootstrap server address if account is empty
-        if: env.BOOTSTRAP_ADDRESS_BALANCE == '0.0'
-        run: |
-          ethers --rpc ${{ env.RPC_URL }} --account ${{ env.RAW_KEY }} send ${{ env.ADDRESS }} 0.01291 --yes
-        env:
-          RAW_KEY: ${{ secrets.FUNDING_WALLET_PRIVATE_KEY }}
-          RPC_URL: ${{ secrets.FUNDING_RPC_MATIC_URL }}
-          ADDRESS: ${{ env.BOOTSTRAP_ADDRESS }}
-
-      - name: Wait for ethers transaction to go through
-        if: env.BOOTSTRAP_ADDRESS_BALANCE == '0.0'
-        run: sleep 1m
-
-      - name: Check bootstrap server balance one more time.
-        if: env.BOOTSTRAP_ADDRESS_BALANCE == '0.0'
-        run: |
-          echo "Balance: $(ethers --rpc ${{ env.RPC_URL }} --account ${{ env.RAW_KEY }} eval 'new ethers.providers.JsonRpcProvider("${{ env.RPC_URL }}").getBalance("${{ env.ADDRESS }}").then(b => formatEther(b))')"
-        env:
-          RAW_KEY: ${{ secrets.FUNDING_WALLET_PRIVATE_KEY }}
-          RPC_URL: ${{ secrets.FUNDING_RPC_MATIC_URL }}
-          ADDRESS: ${{ env.BOOTSTRAP_ADDRESS }}
-      
-      - name: Get HOPR address from bootstrap docker container now that its funded
-        run: |
-          GCLOUD_VM_NAME=${{ env.GCLOUD_VM_NAME }} \
-          GCLOUD_VM_DISK=${{ env.GCLOUD_VM_DISK }} \
-          BS_PASSWORD=${{ secrets.BS_PASSWORD }} \
-          RELEASE_NAME=${{ env.RELEASE_NAME }} \
-          bash scripts/cd/hopr_env.sh >> $GITHUB_ENV
-
-      - name: Restart bootstrap server virtual machine to restart main container
-          echo "Bootstrap Server HOPR Address: ${{ env.BOOTSTRAP_HOPR_ADDRESS }}"
-          gcloud compute instances reset --zone=europe-west6-a ${{ env.GCLOUD_VM_NAME }}
-          echo "Bootstrap multiaddr: /${{ env.RELEASE_IP }}/tcp/9091/p2p/${{ env.BOOTSTRAP_HOPR_ADDRESS }}"
-        
 

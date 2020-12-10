@@ -85,6 +85,16 @@ get_environment() {
   exit 1
 }
 
+get_gcloud_target() {
+  GCLOUD_VM_NAME="$RELEASE_NAME-bootstrap"
+  if [[ $(gcloud compute instances list | grep $GCLOUD_VM_NAME) ]]; then
+    GCLOUD_ACTION_CONTAINER=update
+    GCLOUD_VM_IMAGE=$(gcloud compute instances describe $GCLOUD_VM_NAME --zone=europe-west6-a --format='value[](metadata.items.gce-container-declaration)' | grep image | tr -s ' ' | cut -f3 -d' ')
+  else
+    GCLOUD_ACTION_CONTAINER=create
+  fi
+}
+
 
 
 # $1=account (hex)
@@ -116,9 +126,14 @@ get_hopr_address() {
 start_bootstrap() {
   get_environment
   echo "Starting bootstrap server for r:$RELEASE_NAME at $RELEASE_IP"
+  get_gcloud_target
+  echo "Release Version: $RELEASE"
+  echo "Release IP: $RELEASE_IP"
+  echo "Release Name: $RELEASE_NAME"
+  echo "GCloud Action: $GCLOUD_ACTION_CONTAINER"
+  echo "GCloud VM name: $GCLOUD_VM_NAME"
+  echo "GCloud VM image: $GCLOUD_VM_IMAGE"
 
-  GCLOUD_VM_NAME="$RELEASE_NAME-bootstrap"
-  echo "VM: $GCLOUD_VM_NAME"
   exit 0
   BOOTSTRAP_ETH_ADDRESS=$(get_eth_address)
   BOOTSTRAP_HOPR_ADDRESS=$(get_hopr_address)
