@@ -12,7 +12,11 @@
   },
   "files": [
     "lib",
-    "hopr-admin/.next"
+    "hopr-admin/.next",
+    "!*.spec.ts",
+    "!*.spec.d.ts",
+    "!*.spec.js",
+    "!*.spec.js.map"
   ],
   "scripts": {
     "clean": "rimraf ./lib",
