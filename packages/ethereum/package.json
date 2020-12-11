@@ -46,7 +46,7 @@
     "@types/chai": "^4.2.14",
     "@types/lodash": "^4.14.162",
     "@types/mocha": "^8.0.3",
-    "@types/node": "^12",
+    "@types/node": "^14",
     "@types/secp256k1": "^4.0.1",
     "chai": "^4.2.0",
     "rimraf": "^3.0.2",
