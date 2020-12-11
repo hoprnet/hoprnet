@@ -17,9 +17,7 @@ MIN_FUNDS=0.01291
 HOPRD_ARGS="--data='/app/db/ethereum/testnet/bootstrap' --password='$BS_PASSWORD'"
 ZONE="--zone=europe-west6-a"
 
-# ------ Aliases -------
 alias wallet="ethers --rpc $RPC --account $FUNDING_PRIV_KEY"
-alias gssh="gcloud compute ssh --ssh-flag='-t' $ZONE"
 
 # $1=version string, semver
 function get_version_maj_min() {
@@ -131,37 +129,31 @@ get_hopr_address() {
 }
 
 
-gcloud_update() {
+update_or_create_bootstrap_vm() {
   if [[ $(gcloud_find_vm_with_name $(gcloud_vm_name)) ]]; then
     echo "Container exists, updating"
     echo "Previous GCloud VM Image: $(gcloud_get_image_running_on_vm $(gcloud_vm_name))"
     gcloud_update_container_with_image $(gcloud_vm_name) $(hoprd_image) $(gcloud_disk_name) "/app/db"
   else
     echo "No container found, creating"
-    create_instance_with_image $(hoprd_image)
+    gcloud compute instances create-with-container $(gcloud_vm_name) }} $ZONE \
+      --machine-type=e2-medium \
+      --network-interface=address=$RELEASE_IP,network-tier=PREMIUM,subnet=default \
+      --metadata=google-logging-enabled=true --maintenance-policy=MIGRATE \
+      --create-disk name=$(gcloud_disk_name),size=10GB,type=pd-ssd,mode=rw \
+      --container-mount-disk mount-path="/app/db" \
+      --tags=hopr-node,web-client,portainer \
+      --boot-disk-size=10GB --boot-disk-type=pd-standard \
+      --container-env=^,@^DEBUG=hopr\*,@NODE_OPTIONS=--max-old-space-size=4096 \
+      --container-image=$(hoprd_image) \
+      --container-arg="--password" --container-arg="$BS_PASSWORD" \
+      --container-arg="--init" --container-arg="true" \
+      --container-arg="--runAsBootstrap" --container-arg="true" \
+      --container-arg="--admin" \
+      --container-restart-policy=always
+    sleep 2m
   fi
 }
-
-# $1 = container-image 
-create_instance_with_image() {
-  gcloud compute instances create-with-container $(gcloud_vm_name) }} $ZONE \
-    --machine-type=e2-medium \
-    --network-interface=address=$RELEASE_IP,network-tier=PREMIUM,subnet=default \
-    --metadata=google-logging-enabled=true --maintenance-policy=MIGRATE \
-    --create-disk name=$(gcloud_disk_name),size=10GB,type=pd-ssd,mode=rw \
-    --container-mount-disk mount-path="/app/db" \
-    --tags=hopr-node,web-client,portainer \
-    --boot-disk-size=10GB --boot-disk-type=pd-standard \
-    --container-env=^,@^DEBUG=hopr\*,@NODE_OPTIONS=--max-old-space-size=4096 \
-    --container-image=$(hoprd_image) \
-    --container-arg="--password" --container-arg="$BS_PASSWORD" \
-    --container-arg="--init" --container-arg="true" \
-    --container-arg="--runAsBootstrap" --container-arg="true" \
-    --container-arg="--admin" \
-    --container-restart-policy=always
-  sleep 2m
-}
-
 
 start_bootstrap() {
   get_environment
@@ -172,7 +164,7 @@ start_bootstrap() {
   echo "- Release Name: $RELEASE_NAME"
   echo "- GCloud VM name: $(gcloud_vm_name)"
 
-  gcloud_update
+  update_or_create_bootstrap_vm
   GCLOUD_VM_DISK=/mnt/disks/gce-containers-mounts/gce-persistent-disks/$(gcloud_disk_name)
 
   #Stop bootstrap node to get the address from the database
