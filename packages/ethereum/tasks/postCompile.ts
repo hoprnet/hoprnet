@@ -7,6 +7,11 @@ const { readFile, writeFile, mkdir } = promises
 const CHAIN_DIR = join(__dirname, '..', 'chain')
 const ABIS_DIR = join(CHAIN_DIR, 'abis')
 
+/**
+ * Updates chain/abis folder after compilation.
+ * @param _params
+ * @param hre
+ */
 async function main(_params, hre: HardhatRuntimeEnvironment) {
   const { run } = hre
   const fileDir = join(hre.config.paths.cache, 'deployed_contracts.json')

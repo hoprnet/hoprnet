@@ -5,12 +5,14 @@ import "@openzeppelin/contracts/introspection/IERC1820Registry.sol";
 import "@openzeppelin/contracts/introspection/ERC1820Implementer.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC777/IERC777Recipient.sol";
-// import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "./Accounts.sol";
 import "./Channels.sol";
 import "./Tickets.sol";
 
 contract HoprChannels is IERC777Recipient, ERC1820Implementer, Accounts, Channels, Tickets {
+    using SafeERC20 for IERC20;
+
     // required by ERC1820 spec
     IERC1820Registry internal constant _ERC1820_REGISTRY = IERC1820Registry(0x1820a4B7618BdE71Dce8cdc73aAB6C95905faD24);
     // required by ERC777 spec
@@ -76,6 +78,9 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Accounts, Channel
         uint256 amountA,
         uint256 amountB
     ) external {
+        // @TODO: use SafeMath
+        token.safeTransferFrom(msg.sender, address(this), amountA + amountB);
+
         _fundChannel(
             msg.sender,
             accountA,
@@ -113,6 +118,9 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Accounts, Channel
             opener == accountA || opener == accountB,
             "opener must be accountA or accountB"
         );
+
+        // @TODO: use SafeMath
+        token.safeTransferFrom(msg.sender, address(this), amountA + amountB);
 
         address counterparty;
         if (opener == accountA) {

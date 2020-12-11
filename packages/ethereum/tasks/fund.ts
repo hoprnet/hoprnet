@@ -1,5 +1,8 @@
 import type { HardhatRuntimeEnvironment, RunSuperFunction } from 'hardhat/types'
 
+/**
+ * Funds all unlocked accounts with HOPR
+ */
 async function main(
   { address, amount, accountsToFund }: { address: string; amount: string; accountsToFund: number },
   { web3, network, artifacts }: HardhatRuntimeEnvironment,

@@ -1,13 +1,14 @@
 import type { AsyncReturnType } from 'type-fest'
-import type { HoprChannelsInstance, ERC777MockContract } from '../../types'
-import type { Account, Ticket } from './types'
+import type { HoprChannelsInstance } from '../../types'
+import type { Account } from '../types'
+import type { Ticket } from './types'
+import { prefixMessage, signMessage } from '../utils'
 import Web3 from 'web3'
 import BN from 'bn.js'
-import { publicKeyConvert, publicKeyCreate, ecdsaSign } from 'secp256k1'
 import { constants } from '@openzeppelin/test-helpers'
-import { stringToU8a, u8aToHex, u8aConcat } from '@hoprnet/hopr-utils'
+import { stringToU8a, u8aToHex } from '@hoprnet/hopr-utils'
 
-const { numberToHex, encodePacked, soliditySha3, toChecksumAddress, toHex } = Web3.utils
+const { numberToHex, encodePacked, soliditySha3 } = Web3.utils
 
 /**
  * @param response web3 response
@@ -29,91 +30,6 @@ export const formatChannel = (response: AsyncReturnType<HoprChannelsInstance['ch
   status: response[3],
   closureByPartyA: response[4]
 })
-
-/**
- * Create an ERC777 token instance to use in tests
- * @param ERC777 an ERC777Mock contract artifact
- * @param initialHolder ethereum address
- * @param initialBalance
- * @returns A ERC777Mock token instance
- */
-export const ERC777Mock = (ERC777: ERC777MockContract, initialHolder: string, initialBalance: string) => {
-  return ERC777.new(initialHolder, initialBalance, 'Token', 'TKN', [])
-}
-
-/**
- * Prefix message with our special message
- * @param message
- * @returns hashed message
- */
-export const prefixMessage = (message: string): Uint8Array => {
-  const messageWithHOPR = u8aConcat(stringToU8a(toHex('HOPRnet')), stringToU8a(message))
-  const messageWithHOPRHex = u8aToHex(messageWithHOPR)
-
-  return stringToU8a(
-    soliditySha3(
-      {
-        type: 'string',
-        value: '\x19Ethereum Signed Message:\n'
-      },
-      {
-        type: 'string',
-        value: messageWithHOPR.length.toString()
-      },
-      { type: 'bytes', value: messageWithHOPRHex }
-    )
-  )
-}
-
-/**
- * Sign message using private key provided
- * @param message
- * @param privKey
- * @returns signature properties
- */
-export const signMessage = (
-  message: string,
-  privKey: Uint8Array
-): { signature: Uint8Array; r: Uint8Array; s: Uint8Array; v: number } => {
-  const { signature, recid } = ecdsaSign(stringToU8a(message), privKey)
-
-  return {
-    signature: signature,
-    r: signature.slice(0, 32),
-    s: signature.slice(32, 64),
-    v: recid
-  }
-}
-
-/**
- * Given a private key generate necessary data for testing
- * @param privKey
- * @returns Account
- */
-export const createAccount = (privKey: string): Account => {
-  const pubKey = publicKeyCreate(stringToU8a(privKey), true)
-  const pubKeyUncompressed = publicKeyConvert(pubKey, false).slice(1)
-  const firstHalf = new BN(pubKeyUncompressed.slice(0, 32))
-  const secondHalf = new BN(pubKeyUncompressed.slice(32, 64))
-  const address = toChecksumAddress(
-    u8aToHex(
-      stringToU8a(
-        soliditySha3({
-          type: 'bytes',
-          value: u8aToHex(pubKeyUncompressed)
-        })
-      ).slice(12)
-    )
-  )
-
-  return {
-    privKey,
-    pubKey: u8aToHex(pubKey),
-    pubKeyFirstHalf: firstHalf,
-    pubKeySecondHalf: secondHalf,
-    address
-  }
-}
 
 /**
  * Upscale a percentage (0-100) to uint256's maximum number
@@ -204,6 +120,7 @@ export const createTicket = (
   account: Account,
   secret: string
 ): Ticket & {
+  secret: string
   counterparty: string
   encoded: string
   hash: string
@@ -220,6 +137,7 @@ export const createTicket = (
 
   return {
     ...ticket,
+    secret,
     encoded,
     hash,
     luck,

@@ -50,6 +50,7 @@ contract Channels {
         uint256 amountA,
         uint256 amountB
     ) internal {
+        // require(funder != address(0), "funder must not be empty");
         require(accountA != accountB, "accountA and accountB must not be the same");
         require(accountA != address(0), "accountA must not be empty");
         require(accountB != address(0), "accountB must not be empty");
@@ -59,7 +60,9 @@ contract Channels {
 
         // @TODO: use SafeMath
         channel.deposit += (amountA + amountB);
-        channel.partyABalance += amountA;
+        if (_isPartyA(accountA, accountB)) {
+            channel.partyABalance += amountA;
+        }
 
         emit ChannelFunded(
             accountA,
@@ -164,6 +167,7 @@ contract Channels {
         }
 
         uint256 partyAAmount = channel.partyABalance;
+        // @TODO: add SafeMath
         uint256 partyBAmount = channel.deposit - channel.partyABalance;
 
         // settle balances
@@ -174,6 +178,8 @@ contract Channels {
             token.transfer(partyB, partyBAmount);
         }
 
+        // The state counter indicates the recycling generation and ensures that both parties are using the correct generation.
+        // Increase state counter so that we can re-use the same channel after it has been closed.
         channel.status += 8;
         delete channel.deposit; // channel.deposit = 0
         delete channel.partyABalance; // channel.partyABalance = 0

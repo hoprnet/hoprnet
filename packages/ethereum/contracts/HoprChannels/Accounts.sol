@@ -32,6 +32,11 @@ contract Accounts {
         uint256 pubKeySecondHalf,
         bytes32 secret
     ) internal {
+        require(account != address(0), "account must not be empty");
+        require(pubKeyFirstHalf != uint256(0), "pubKeyFirstHalf must not be empty");
+        require(pubKeySecondHalf != uint256(0), "pubKeySecondHalf must not be empty");
+        // require(secret != bytes32(0), "secret must not be empty");
+
         require(
             ECDSA.pubKeyToEthereumAddress(pubKeyFirstHalf, pubKeySecondHalf) == account,
             "public key does not match account"

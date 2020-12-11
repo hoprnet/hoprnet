@@ -18,6 +18,8 @@ examples
 # code coverage directories
 coverage
 .nyc_output
+# see https://github.com/gotwarlost/istanbul/issues/743
+!sc-istanbul/lib/assets
 
 # build scripts
 Makefile

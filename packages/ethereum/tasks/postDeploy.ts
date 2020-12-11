@@ -8,9 +8,14 @@ const CHAIN_DIR = join(__dirname, '..', 'chain')
 const ADDRESSES_DIR = CHAIN_DIR
 const ADDRESSES_FILE = join(CHAIN_DIR, 'addresses.json')
 
-// 1. export contract data into 'hardhat/cache/deployed_contracts.json'
-// 2. export addresses to 'chain/addresses.json'
-// 3. verify smart contracts if possible
+/**
+ * Updates chain/addresses.json file after deployment.
+ * 1. export contract data into 'hardhat/cache/deployed_contracts.json'
+ * 2. export addresses to 'chain/addresses.json'
+ * 3. verify smart contracts if possible
+ * @param _params
+ * @param hre
+ */
 async function main(_params, hre: HardhatRuntimeEnvironment) {
   const { run, network } = hre
   const fileDir = join(hre.config.paths.cache, 'deployed_contracts.json')
