@@ -129,7 +129,6 @@ update_container_with_image() {
     --zone=europe-west6-a \
     --container-image=gcr.io/hoprassociation/hoprd:${{ env.RELEASE_VERSION }} \
     --container-mount-disk name=bs-${{ env.RELEASE_NAME }},mount-path="/app/db"
-
   sleep 30s
 }
 
@@ -151,7 +150,6 @@ create_instance_with_image() {
     --container-arg="--runAsBootstrap" --container-arg="true" \
     --container-arg="--admin" \
     --container-restart-policy=always
-
   sleep 2m
 }
 
