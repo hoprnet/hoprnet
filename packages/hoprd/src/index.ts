@@ -168,11 +168,9 @@ async function main() {
       service.get('/api/v1/address/hopr', async (_, res) =>
         res.send(await node.getId().toB58String())
       )
-
-      const hostname = argv.restHost || 'localhost'
-      const port = argv.restPort || 3001
-
-      http.createServer(service).listen(port, hostname, function () {
+      const hostname = argv.restHost
+      const port = argv.restPort
+      http.createServer(service).listen(port, hostname, () => {
         logs.log(`Rest server on ${hostname} listening on port ${port}`)
       })
     }
