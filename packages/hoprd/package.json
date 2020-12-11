@@ -46,10 +46,10 @@
     "@hoprnet/hopr-core-connector-interface": "1.57.0-next.29",
     "@types/bs58": "^4.0.1",
     "@types/debug": "^4.1.5",
-    "@types/mocha": "^8.0.3",
+    "@types/mocha": "^8.2.0",
     "@types/node": "^12",
     "@types/yargs": "^15.0.9",
-    "mocha": "^8.0.1",
+    "mocha": "^8.2.0",
     "rimraf": "^3.0.2",
     "typescript": "^4.1"
   },
