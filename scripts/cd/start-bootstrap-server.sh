@@ -132,26 +132,15 @@ get_hopr_address() {
 
 
 gcloud_update() {
-  if [[ $(gcloud compute instances list | grep $(gcloud_vm_name)) ]]; then
+  if [[ $(gcloud_find_vm_with_name $(gcloud_vm_name)) ]]; then
     echo "Container exists, updating"
-    local GCLOUD_VM_IMAGE=$(gcloud compute instances describe $(gcloud_vm_name) $ZONE --format='value[](metadata.items.gce-container-declaration)' | grep image | tr -s ' ' | cut -f3 -d' ')
-    echo "Previous GCloud VM Image: $GCLOUD_VM_IMAGE"
-    update_container_with_image $(hoprd_image) $(gcloud_disk_name)
+    echo "Previous GCloud VM Image: $(gcloud_get_image_running_on_vm $(gcloud_vm_name))"
+    gcloud_update_container_with_image $(gcloud_vm_name) $(hoprd_image) $(gcloud_disk_name) "/app/db"
   else
     echo "No container found, creating"
     create_instance_with_image $(hoprd_image)
   fi
 }
-
-# $1 = container-image
-# $2 = disk name
-update_container_with_image() {
-  echo "Updating container $1 $2"
-  gcloud compute instances update-container $(gcloud_vm_name) $ZONE \
-    --container-image=$1 --container-mount-disk name=$2,mount-path="/app/db"
-  sleep 30s
-}
-
 
 # $1 = container-image 
 create_instance_with_image() {
@@ -178,10 +167,10 @@ start_bootstrap() {
   get_environment
 
   echo "Starting bootstrap server for r:$RELEASE_NAME at $RELEASE_IP"
-  echo "Release Version: $RELEASE"
-  echo "Release IP: $RELEASE_IP"
-  echo "Release Name: $RELEASE_NAME"
-  echo "GCloud VM name: $(gcloud_vm_name)"
+  echo "- Release Version: $RELEASE"
+  echo "- Release IP: $RELEASE_IP"
+  echo "- Release Name: $RELEASE_NAME"
+  echo "- GCloud VM name: $(gcloud_vm_name)"
 
   gcloud_update
   GCLOUD_VM_DISK=/mnt/disks/gce-containers-mounts/gce-persistent-disks/$(gcloud_disk_name)
