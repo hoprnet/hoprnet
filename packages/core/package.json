@@ -45,7 +45,7 @@
     "levelup": "~4.4.0",
     "libp2p": "0.29.3",
     "libp2p-crypto": "0.18.0",
-    "libp2p-kad-dht": "0.20.1",
+    "libp2p-kad-dht": "0.20.3",
     "libp2p-mplex": "0.10.1",
     "libp2p-secio": "0.13.1",
     "multiaddr": "8.1.1",

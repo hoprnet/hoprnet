@@ -10150,10 +10150,10 @@ libp2p-interfaces@^0.5.1:
     streaming-iterables "^5.0.2"
     uint8arrays "^1.1.0"
 
-libp2p-kad-dht@0.20.1:
-  version "0.20.1"
-  resolved "https://registry.yarnpkg.com/libp2p-kad-dht/-/libp2p-kad-dht-0.20.1.tgz#fa72ded6dcc18fccd4a4a891849de88cd06ddc00"
-  integrity sha512-khffe6L6O6oU53LO8BrI3bULH4i6FLibvFEyV+7FAPXnFYhTKHa9TsIifkL/MEAfLI0hI9QN4NwMf0DpOLMvDA==
+libp2p-kad-dht@0.20.3:
+  version "0.20.3"
+  resolved "https://registry.yarnpkg.com/libp2p-kad-dht/-/libp2p-kad-dht-0.20.3.tgz#8cc434358708c9c610e30b85bc0b5fcd6c42b39d"
+  integrity sha512-AHFasvp60xYRhyfSsjlP4O08MPt43TbtbtrOt7Yh9wuciYc7RL0p4mZ+bGLrU1WujFVulUQZULEpCPAz6k9Rqg==
   dependencies:
     abort-controller "^3.0.0"
     async "^2.6.2"
