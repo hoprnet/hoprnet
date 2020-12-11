@@ -11,6 +11,7 @@ import 'hardhat-gas-reporter'
 import { HardhatUserConfig, task, types } from 'hardhat/config'
 import { NODE_SEEDS, BOOTSTRAP_SEEDS } from '@hoprnet/hopr-demo-seeds'
 import Web3 from 'web3'
+import { ACCOUNT_DEPLOYER_PRIVKEY, ACCOUNT_A_PRIVKEY, ACCOUNT_B_PRIVKEY } from './test/constants'
 
 const { PRIVATE_KEY, INFURA, MATIC_VIGIL, ETHERSCAN } = process.env
 const GAS_MULTIPLIER = 1.1
@@ -18,10 +19,17 @@ const GAS_MULTIPLIER = 1.1
 // set 'ETHERSCAN_API_KEY' so 'hardhat-deploy' can read it
 process.env.ETHERSCAN_API_KEY = ETHERSCAN
 
-const devSeeds = NODE_SEEDS.concat(BOOTSTRAP_SEEDS).map((privateKey) => ({
-  privateKey,
-  balance: Web3.utils.toWei('10000', 'ether')
-}))
+// legacy: use hopr-demo-seeds
+const localhostPrivKeys = NODE_SEEDS.concat(BOOTSTRAP_SEEDS)
+
+// private keys used by tests
+// @TODO: fix legacy dependancy
+const hardhatPrivKeys = localhostPrivKeys
+  .concat([ACCOUNT_DEPLOYER_PRIVKEY, ACCOUNT_A_PRIVKEY, ACCOUNT_B_PRIVKEY])
+  .map((privateKey) => ({
+    privateKey,
+    balance: Web3.utils.toWei('10000', 'ether')
+  }))
 
 const hardhatConfig: HardhatUserConfig = {
   defaultNetwork: 'hardhat',
@@ -29,14 +37,14 @@ const hardhatConfig: HardhatUserConfig = {
     hardhat: {
       live: false,
       tags: ['local', 'test'],
-      accounts: devSeeds,
-      allowUnlimitedContractSize: true
+      accounts: hardhatPrivKeys,
+      allowUnlimitedContractSize: true // TODO: investigate
     },
     localhost: {
       live: false,
       tags: ['local'],
       url: 'http://localhost:8545',
-      accounts: devSeeds.map(({ privateKey }) => privateKey)
+      accounts: localhostPrivKeys
     },
     mainnet: {
       live: true,
@@ -107,7 +115,7 @@ const hardhatConfig: HardhatUserConfig = {
   }
 }
 
-task('fund', 'Fund demo accounts', async (...args: any[]) => {
+task('fund', "Fund node's accounts by specifying HoprToken address", async (...args: any[]) => {
   return (await import('./tasks/fund')).default(args[0], args[1], args[2])
 })
   .addParam<string>('address', 'HoprToken contract address', undefined, types.string)

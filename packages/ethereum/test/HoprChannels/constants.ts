@@ -12,6 +12,9 @@ export { ACCOUNT_A, ACCOUNT_B }
  */
 export const ACCOUNT_AB_CHANNEL_ID = '0xa5bc13ae60ec79a8babc6d0d4074c1cefd5d5fc19fafe71457214d46c90714d8'
 
+export const PROOF_OF_RELAY_SECRET_0 = soliditySha3({ type: 'string', value: 'PROOF_OF_RELAY_SECRET_0' })
+export const PROOF_OF_RELAY_SECRET_1 = soliditySha3({ type: 'string', value: 'PROOF_OF_RELAY_SECRET_1' })
+
 export const SECRET_0 = soliditySha3({ type: 'string', value: 'secret' })
 export const SECRET_1 = soliditySha3({ type: 'bytes32', value: SECRET_0 })
 export const SECRET_2 = soliditySha3({ type: 'bytes32', value: SECRET_1 })
@@ -25,7 +28,7 @@ export const WIN_PROB_0 = percentToUint256(0)
 export const TICKET_AB_WIN = createTicket(
   {
     recipient: ACCOUNT_B.address,
-    proofOfRelaySecret: SECRET_1,
+    proofOfRelaySecret: PROOF_OF_RELAY_SECRET_0,
     counter: '1',
     amount: '10',
     winProb: WIN_PROB_100,
@@ -36,12 +39,31 @@ export const TICKET_AB_WIN = createTicket(
 )
 
 /**
+ * Winning ticket created by accountA for accountB.
+ * Compared to TICKET_AB_WIN it has different proof of secret,
+ * this effectively makes it a different ticket that can be
+ * redeemed.
+ */
+export const TICKET_AB_WIN_2 = createTicket(
+  {
+    recipient: ACCOUNT_B.address,
+    proofOfRelaySecret: PROOF_OF_RELAY_SECRET_1,
+    counter: '1',
+    amount: '10',
+    winProb: WIN_PROB_100,
+    iteration: '1'
+  },
+  ACCOUNT_A,
+  SECRET_0
+)
+
+/**
  * Losing ticket created by accountA for accountB
  */
 export const TICKET_AB_LOSS = createTicket(
   {
     recipient: ACCOUNT_B.address,
-    proofOfRelaySecret: SECRET_1,
+    proofOfRelaySecret: PROOF_OF_RELAY_SECRET_0,
     counter: '1',
     amount: '10',
     winProb: WIN_PROB_0,
@@ -57,7 +79,7 @@ export const TICKET_AB_LOSS = createTicket(
 export const TICKET_BA_WIN = createTicket(
   {
     recipient: ACCOUNT_A.address,
-    proofOfRelaySecret: SECRET_1,
+    proofOfRelaySecret: PROOF_OF_RELAY_SECRET_0,
     counter: '1',
     amount: '10',
     winProb: WIN_PROB_100,
@@ -65,4 +87,23 @@ export const TICKET_BA_WIN = createTicket(
   },
   ACCOUNT_B,
   SECRET_1
+)
+
+/**
+ * Winning ticket created by accountB for accountA.
+ * Compared to TICKET_BA_WIN it has different proof of secret,
+ * this effectively makes it a different ticket that can be
+ * redeemed.
+ */
+export const TICKET_BA_WIN_2 = createTicket(
+  {
+    recipient: ACCOUNT_A.address,
+    proofOfRelaySecret: PROOF_OF_RELAY_SECRET_1,
+    counter: '1',
+    amount: '10',
+    winProb: WIN_PROB_100,
+    iteration: '1'
+  },
+  ACCOUNT_B,
+  SECRET_0
 )

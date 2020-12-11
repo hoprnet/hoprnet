@@ -313,6 +313,13 @@ describe('Channels', function () {
     expect(isPartyA).to.be.true
   })
 
+  it('should not be partyA', async function () {
+    const channels = await Channels.new('0')
+
+    const isPartyA = await channels.isPartyA.call(ACCOUNT_B.address, ACCOUNT_A.address)
+    expect(isPartyA).to.be.false
+  })
+
   it('should get partyA and partyB', async function () {
     const channels = await Channels.new('0')
 
@@ -321,29 +328,3 @@ describe('Channels', function () {
     expect(parties[1]).to.be.equal(ACCOUNT_B.address)
   })
 })
-
-// it.skip('should fund channel by hook', async function () {
-//   const token = await ERC777Mock(ERC777, ACCOUNT_A.address, '100')
-//   const channels = await Channels.new("0")
-
-//   const response = await token.send(
-//     channels.address,
-//     '100',
-//     web3.eth.abi.encodeParameters(['address', 'address'], [ACCOUNT_A.address, ACCOUNT_B.address])
-//   )
-
-//   expectEvent(response, 'ChannelFunded', {
-//     accountA: ACCOUNT_A.address,
-//     accountB: ACCOUNT_B.address,
-//     funder: ACCOUNT_A.address,
-//     deposit: '100',
-//     partyABalance: '100'
-//   })
-
-//   const channel = await channels.channels(ACCOUNT_AB_CHANNEL_ID).then(formatChannel)
-//   expect(channel.deposit.toString()).to.equal('100')
-//   expect(channel.partyABalance.toString()).to.equal('100')
-//   expect(channel.closureTime.toString()).to.equal('0')
-//   expect(channel.status.toString()).to.equal('0')
-//   expect(channel.closureByPartyA).to.be.false
-// })

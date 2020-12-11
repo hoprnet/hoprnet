@@ -120,6 +120,7 @@ export const createTicket = (
   account: Account,
   secret: string
 ): Ticket & {
+  secret: string
   counterparty: string
   encoded: string
   hash: string
@@ -136,6 +137,7 @@ export const createTicket = (
 
   return {
     ...ticket,
+    secret,
     encoded,
     hash,
     luck,

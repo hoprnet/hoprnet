@@ -59,7 +59,9 @@ contract Channels {
 
         // @TODO: use SafeMath
         channel.deposit += (amountA + amountB);
-        channel.partyABalance += amountA;
+        if (_isPartyA(accountA, accountB)) {
+            channel.partyABalance += amountA;
+        }
 
         emit ChannelFunded(
             accountA,
