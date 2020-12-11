@@ -2,6 +2,7 @@
 set -e #u
 shopt -s expand_aliases
 
+source scripts/cd/gcloud.sh
 
 # ---- CONTINUOUS DEPLOYMENT: Start a bootstrap server -----
 
@@ -14,10 +15,11 @@ shopt -s expand_aliases
 
 MIN_FUNDS=0.01291
 HOPRD_ARGS="--data='/app/db/ethereum/testnet/bootstrap' --password='$BS_PASSWORD'"
+ZONE="--zone=europe-west6-a"
 
 # ------ Aliases -------
 alias wallet="ethers --rpc $RPC --account $FUNDING_PRIV_KEY"
-alias gssh="gcloud compute ssh --ssh-flag='-t' --zone=europe-west6-a"
+alias gssh="gcloud compute ssh --ssh-flag='-t' $ZONE"
 
 # $1=version string, semver
 function get_version_maj_min() {
@@ -29,16 +31,23 @@ function get_version_maj_min() {
 }
 
 hoprd_image() {
+  # For example ...hoprd:1.0.1-next-1234
   echo "gcr.io/hoprassociation/hoprd:$RELEASE"
 }
 
 gcloud_vm_name() {
+  # For example, larnaca-bootstrap, master-bootstrap
   echo "$RELEASE_NAME-bootstrap"
+}
+
+gcloud_disk_name() {
+  echo "bs-$RELEASE_NAME"
 }
 
 # ===== Load env variables for the current github ref =====
 # Takes:
 # - GITHUB_REF
+# - RELEASE
 # Sets: 
 # - RELEASE_NAME
 # - RELEASE_IP
@@ -125,9 +134,9 @@ get_hopr_address() {
 gcloud_update() {
   if [[ $(gcloud compute instances list | grep $(gcloud_vm_name)) ]]; then
     echo "Container exists, updating"
-    local GCLOUD_VM_IMAGE=$(gcloud compute instances describe $(gcloud_vm_name) --zone=europe-west6-a --format='value[](metadata.items.gce-container-declaration)' | grep image | tr -s ' ' | cut -f3 -d' ')
-    echo "GCloud VM IMAGE: $GCLOUD_VM_IMAGE"
-    update_container_with_image $(hoprd_image) bs-$RELEASE_NAME
+    local GCLOUD_VM_IMAGE=$(gcloud compute instances describe $(gcloud_vm_name) $ZONE --format='value[](metadata.items.gce-container-declaration)' | grep image | tr -s ' ' | cut -f3 -d' ')
+    echo "Previous GCloud VM Image: $GCLOUD_VM_IMAGE"
+    update_container_with_image $(hoprd_image) $(gcloud_disk_name)
   else
     echo "No container found, creating"
     create_instance_with_image $(hoprd_image)
@@ -135,10 +144,10 @@ gcloud_update() {
 }
 
 # $1 = container-image
-# $2 = name
+# $2 = disk name
 update_container_with_image() {
-  gcloud compute instances update-container $(gcloud_vm_name) \
-    --zone=europe-west6-a \
+  echo "Updating container $1 $2"
+  gcloud compute instances update-container $(gcloud_vm_name) $ZONE \
     --container-image=$1 --container-mount-disk name=$2,mount-path="/app/db"
   sleep 30s
 }
@@ -146,12 +155,11 @@ update_container_with_image() {
 
 # $1 = container-image 
 create_instance_with_image() {
-  gcloud compute instances create-with-container $(gcloud_vm_name) }} \
-    --zone=europe-west6-a \
+  gcloud compute instances create-with-container $(gcloud_vm_name) }} $ZONE \
     --machine-type=e2-medium \
     --network-interface=address=$RELEASE_IP,network-tier=PREMIUM,subnet=default \
     --metadata=google-logging-enabled=true --maintenance-policy=MIGRATE \
-    --create-disk name=bs-$RELEASE_NAME,size=10GB,type=pd-ssd,mode=rw \
+    --create-disk name=$(gcloud_disk_name),size=10GB,type=pd-ssd,mode=rw \
     --container-mount-disk mount-path="/app/db" \
     --tags=hopr-node,web-client,portainer \
     --boot-disk-size=10GB --boot-disk-type=pd-standard \
@@ -165,21 +173,21 @@ create_instance_with_image() {
   sleep 2m
 }
 
+
 start_bootstrap() {
   get_environment
-  echo "Starting bootstrap server for r:$RELEASE_NAME at $RELEASE_IP"
 
+  echo "Starting bootstrap server for r:$RELEASE_NAME at $RELEASE_IP"
   echo "Release Version: $RELEASE"
   echo "Release IP: $RELEASE_IP"
   echo "Release Name: $RELEASE_NAME"
   echo "GCloud VM name: $(gcloud_vm_name)"
 
   gcloud_update
-  GCLOUD_VM_DISK=/mnt/disks/gce-containers-mounts/gce-persistent-disks/bs-$RELEASE_NAME
+  GCLOUD_VM_DISK=/mnt/disks/gce-containers-mounts/gce-persistent-disks/$(gcloud_disk_name)
 
   #Stop bootstrap node to get the address from the database
-  gcloud compute ssh --zone=europe-west6-a ${{ env.(gcloud_vm_name) }} \
-    -- 'export DOCKER_IMAGE=gcr.io/hoprassociation/hoprd:${{ env.RELEASE_VERSION }} && docker stop $(docker ps -q --filter "ancestor=$DOCKER_IMAGE")'
+  gcloud_stop $(gcloud_vm_name) $(hoprd_image)
 
   BOOTSTRAP_ETH_ADDRESS=$(get_eth_address)
   BOOTSTRAP_HOPR_ADDRESS=$(get_hopr_address)
@@ -190,7 +198,7 @@ start_bootstrap() {
   fund_if_empty $BOOTSTRAP_ADDRESS
 
   # Restart bootstrap server virtual machine to restart main container
-  gcloud compute instances reset --zone=europe-west6-a ${(gcloud_vm_name) }
+  gcloud compute instances reset $ZONE ${(gcloud_vm_name) }
   echo "Bootstrap multiaddr: /${ RELEASE_IP }/tcp/9091/p2p/$BOOTSTRAP_HOPR_ADDRESS"
 }
 
