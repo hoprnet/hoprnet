@@ -35,6 +35,16 @@ contract Tickets is Accounts, Channels {
         bytes32 s,
         uint8 v
     ) internal {
+        require(recipient != address(0), "recipient must not be empty");
+        require(counterparty != address(0), "counterparty must not be empty");
+        require(secretPreImage != bytes32(0), "secretPreImage must not be empty");
+        require(proofOfRelaySecret != bytes32(0), "proofOfRelaySecret must not be empty");
+        require(amount != uint256(0), "amount must not be empty");
+        // require(winProb != bytes32(0), "winProb must not be empty");
+        require(r != bytes32(0), "r must not be empty");
+        require(s != bytes32(0), "s must not be empty");
+        require(v != uint8(0), "v must not be empty");
+
         Account storage account = accounts[recipient];
         require(
             account.secret == keccak256(abi.encodePacked(secretPreImage)),
