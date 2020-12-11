@@ -1,7 +1,7 @@
 name: HOPR Deploy
 on:
   push:
-    branches: ['master', 'release/**', 'avado']
+    branches: ['master', 'release/**', 'avado', 'build-steps']
     paths-ignore:
       - 'docs/**'
 
@@ -128,7 +128,7 @@ jobs:
   build_hoprd_docker:
     name: Build HOPRD Docker
     runs-on: ubuntu-latest
-      #needs: [build]
+    needs: [build]
     steps:
       - uses: actions/checkout@v2
       - name: Update repo from latest pushes.
@@ -188,6 +188,7 @@ jobs:
           git commit -m "Avado CI: new release"
           git pull origin ${{ github.ref }}
           git push origin ${{ github.ref }}
+
           # http://go.ava.do/install/<IPFS HASH>
 
   deploy_instances:
