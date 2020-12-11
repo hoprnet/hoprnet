@@ -12,9 +12,9 @@ source scripts/cd/start-bootstrap-server.sh
 #
 
 # -- Setup Dependencies --
-npm install -g @ethersproject/cli
+#npm list @ethersproject/cli || npm install -g @ethersproject/cli
 
-#Get version from package.json
+# Get version from package.json
 RELEASE=$(node -p -e "require('./packages/hoprd/package.json').version")
 
 start_bootstrap

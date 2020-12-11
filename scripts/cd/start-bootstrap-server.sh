@@ -22,7 +22,8 @@ alias wallet="ethers --rpc $RPC --account $FUNDING_PRIV_KEY"
 # $1=version string, semver
 function get_version_maj_min() {
   # From https://github.com/cloudflare/semver_bash/blob/master/semver.sh
-  local RE='[^0-9]*\([0-9]*\)[.]\([0-9]*\)[.]\([0-9]*\)\([0-9A-Za-z-]*\)'
+  # Fixed https://github.com/cloudflare/semver_bash/issues/4
+  local RE='[^0-9]*\([0-9]*\)[.]\([0-9]*\)[.]\([0-9]*\)\([0-9A-Za-z-]*\).*'
   local MAJ=$(echo "$1" | sed -e "s#$RE#\1#")
   local MIN=$(echo "$1" | sed -e "s#$RE#\2#")
   echo "$MAJ.$MIN"
