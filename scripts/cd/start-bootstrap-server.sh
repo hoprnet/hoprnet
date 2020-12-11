@@ -62,13 +62,13 @@ fund_if_empty() {
 }
 
 get_eth_address(){
-  DOCKER_ARGS="-v $GCLOUD_VM_DISK:/app/db --entrypoint=node -it $(hoprd_image)"
-  gssh $(gcloud_vm_name) -- docker run $DOCKER_ARGS index.js $HOPRD_ARGS --runAsBootstrap run 'myAddress native'
+  local ADDR=$(curl $RELEASE_IP:3001/api/v1/address/eth)
+  echo $ADDR
 }
 
 get_hopr_address() {
-  DOCKER_ARGS="-v $GCLOUD_VM_DISK:/app/db --entrypoint=node -it $(hoprd_image)"
-  gssh $(gcloud_vm_name) -- docker run $DOCKER_ARGS index.js $HOPRD_ARGS --runAsBootstrap --run 'myAddress hopr'
+  local ADDR=$(curl $RELEASE_IP:3001/api/v1/address/hopr)
+  echo $ADDR
 }
 
 
@@ -117,17 +117,12 @@ start_bootstrap() {
   update_or_create_bootstrap_vm
 
   #GCLOUD_VM_DISK=/mnt/disks/gce-containers-mounts/gce-persistent-disks/$(gcloud_disk_name)
-
-  #BOOTSTRAP_ETH_ADDRESS=$(get_eth_address)
-  #BOOTSTRAP_HOPR_ADDRESS=$(get_hopr_address)
+  BOOTSTRAP_ETH_ADDRESS=$(get_eth_address)
+  BOOTSTRAP_HOPR_ADDRESS=$(get_hopr_address)
 
   echo "Bootstrap Server ETH Address: $BOOTSTRAP_ETH_ADDRESS"
   echo "Bootstrap Server HOPR Address: $BOOTSTRAP_HOPR_ADDRESS"
 
-  #fund_if_empty $BOOTSTRAP_ADDRESS
-
-  # Restart bootstrap server virtual machine to restart main container
-  #gcloud compute instances reset $ZONE ${(gcloud_vm_name) }
-  #echo "Bootstrap multiaddr: /${ RELEASE_IP }/tcp/9091/p2p/$BOOTSTRAP_HOPR_ADDRESS"
+  fund_if_empty $BOOTSTRAP_ADDRESS
 }
 
