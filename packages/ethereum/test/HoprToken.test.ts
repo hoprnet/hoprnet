@@ -4,7 +4,7 @@ import { vmErrorMessage } from './utils'
 
 const HoprToken = artifacts.require('HoprToken')
 
-const useFixtures = deployments.createFixture(async (_deployments, { secsClosure }: { secsClosure?: string } = {}) => {
+const useFixtures = deployments.createFixture(async () => {
   const [deployer, userA] = await web3.eth.getAccounts()
 
   // deploy ERC1820Registry required by ERC777 token
