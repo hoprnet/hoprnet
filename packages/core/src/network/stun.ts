@@ -134,7 +134,7 @@ class Stun {
 }
 
 function releaseSocketFromPort(socket: Socket) {
-  return new Promise((resolve, reject) => {
+  return new Promise<void>((resolve, reject) => {
     const onClose = () => {
       socket.removeListener('error', onError)
       resolve()

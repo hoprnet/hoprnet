@@ -48,6 +48,8 @@ contract Tickets is Accounts, Channels {
         Account storage account = accounts[recipient];
         require(
             account.secret == keccak256(abi.encodePacked(secretPreImage)),
+            // @TODO: add salt
+            // accounts[msg.sender].hashedSecret == bytes27(keccak256(abi.encodePacked("HOPRnet", msg.sender, bytes27(preImage)))),
             "secretPreImage must be the hash of recipient's secret"
         );
 
