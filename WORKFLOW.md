@@ -7,16 +7,16 @@ workflow to streamline the process we use to implement the HOPR protocol.
 
 ## Principles
 
-- **Automation-first**: Rely on automation as much as possible.  **Tests & CI**:
+- **Automation-first**: Rely on automation as much as possible. **Tests & CI**:
 - Tests should prevent bad deployments and API regressions. Continuous
 - integration ensures all our code is tested before being merged into our
-- baseline.  **Releases & CD**: Every week, we do a code-freeze in our codebase
+- baseline. **Releases & CD**: Every week, we do a code-freeze in our codebase
 - by branching out a specific release, which we then deploy on every change.
 
 ## Rules
 
 - All PR‘s have to be approved by a team member different from the one who
-- created the PR.  All PR‘s must pass all status checks before merging.
+- created the PR. All PR‘s must pass all status checks before merging.
 - Releases can be merged back to master, but not always necessary.
 
 ## Workflow
@@ -44,7 +44,7 @@ workflow to streamline the process we use to implement the HOPR protocol.
 
 1. On Thursdays at 12 pm CEST, the PM Lead of the week will code-freeze `master`
    by creating a `release/**` branch tracking `master`. Release specific changes
-   will be done in this branch to trigger this particular release. 
+   will be done in this branch to trigger this particular release.
 
 2. The `CHANGELOG.md` file is updated with the GitHub pull requests merged
    during that milestone.
@@ -73,4 +73,3 @@ We made active use of actions to automate tasks trivial to our workflow.
 
 - `release/**`: Every week on Thursdays at 12 pm CEST, we cut a `release/**`
   branch, using an internal name to identify the release.
-
