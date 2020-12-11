@@ -1,7 +1,6 @@
 #!/bin/bash
 set -e #u
 shopt -s expand_aliases
-set -o xtrace
 
 # ------ GCloud utilities ------
 #
@@ -10,9 +9,7 @@ set -o xtrace
 
 ZONE="--zone=europe-west6-a"
 
-
 alias gssh="gcloud compute ssh --ssh-flag='-t' $ZONE"
-
 
 # $1 = VM name
 gcloud_find_vm_with_name() {
@@ -43,5 +40,5 @@ gcloud_update_container_with_image() {
 # $2 - docker image
 gcloud_stop() {
   echo "Stopping docker image:$2 on vm $1"
-  gssh $1 -- "export DOCKER_IMAGE=$2 && docker stop '\$(docker ps -q --filter ancestor=\$DOCKER_IMAGE)'"
+  gssh $1 -- "export DOCKER_IMAGE=$2 && docker stop \$(docker ps -q --filter ancestor=\$DOCKER_IMAGE)"
 }

@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e #u
 shopt -s expand_aliases
-set -o xtrace
+#set -o xtrace
 
 source scripts/cd/start-bootstrap-server.sh
 

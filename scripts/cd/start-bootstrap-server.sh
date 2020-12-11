@@ -3,6 +3,7 @@ set -e #u
 shopt -s expand_aliases
 
 source scripts/cd/gcloud.sh
+source scripts/cd/environments.sh
 
 # ---- CONTINUOUS DEPLOYMENT: Start a bootstrap server -----
 
@@ -43,65 +44,6 @@ gcloud_disk_name() {
   echo "bs-$RELEASE_NAME"
 }
 
-# ===== Load env variables for the current github ref =====
-# Takes:
-# - GITHUB_REF
-# - RELEASE
-# Sets: 
-# - RELEASE_NAME
-# - RELEASE_IP
-get_environment() {
-  BRANCH=$(echo "$GITHUB_REF" | sed -e "s#refs/heads/##g") # Removing `refs/heads`
-
-  if [ "$BRANCH" == 'master' ]; then
-    RELEASE_NAME='master'
-    RELEASE_IP='34.65.102.152'
-    return
-  fi
-
-  case "$BRANCH" in release/*)
-    VERSION_MAJ_MIN=$(get_version_maj_min $RELEASE) 
-    if [ "$VERSION_MAJ_MIN" == '1.58' ]; then
-      RELEASE_NAME='queretaro'
-      RELEASE_IP='34.65.207.39'
-      return
-    fi
-
-    if [ "$VERSION_MAJ_MIN" == '1.57' ]; then
-      RELEASE_NAME='larnaca'
-      RELEASE_IP='unknown'
-      return
-    fi
-    if [ "$VERSION_MAJ_MIN" == '1.56' ]; then
-      RELEASE_NAME='luzern'
-      RELEASE_IP='34.65.5.42'
-      return
-    fi
-    if [ "$VERSION_MAJ_MIN" == '1.55' ]; then
-      RELEASE_NAME='zug'
-      RELEASE_IP='34.65.158.118'
-      return
-    fi
-    if [ "$VERSION_MAJ_MIN" == '1.54' ]; then
-      RELEASE_NAME='zurich'
-      RELEASE_IP='unknown'
-      return
-    fi
-
-    if [ "$VERSION_MAJ_MIN" == '1.0' ]; then
-      RELEASE_NAME='debug'
-      RELEASE_IP='34.65.56.229'
-      return
-    fi
-
-    echo "Unknown version: $VERSION_MAJ_MIN"
-  esac
-
-  echo "Unknown release / environment: '$BRANCH'"
-  exit 1
-}
-
-
 # $1=account (hex)
 balance() {
   wallet eval "new ethers.providers.JsonRpcProvider('$RPC').getBalance('$1').then(b => formatEther(b))"
@@ -133,11 +75,16 @@ get_hopr_address() {
 update_or_create_bootstrap_vm() {
   if [[ $(gcloud_find_vm_with_name $(gcloud_vm_name)) ]]; then
     echo "Container exists, updating"
-    echo "Previous GCloud VM Image: $(gcloud_get_image_running_on_vm $(gcloud_vm_name))"
+    PREV=$(gcloud_get_image_running_on_vm $(gcloud_vm_name))
+    if [ "$PREV" == "$(hoprd_image)" ]; then 
+      echo "Same version of image is currently running. Skipping update to $PREV"
+      return 0
+    fi
+    echo "Previous GCloud VM Image: $PREV"
     gcloud_update_container_with_image $(gcloud_vm_name) $(hoprd_image) $(gcloud_disk_name) "/app/db"
   else
-    echo "No container found, creating"
-    gcloud compute instances create-with-container $(gcloud_vm_name) }} $ZONE \
+    echo "No container found, creating $(gcloud_vm_name)"
+    gcloud compute instances create-with-container $(gcloud_vm_name) $ZONE \
       --machine-type=e2-medium \
       --network-interface=address=$RELEASE_IP,network-tier=PREMIUM,subnet=default \
       --metadata=google-logging-enabled=true --maintenance-policy=MIGRATE \
@@ -150,6 +97,8 @@ update_or_create_bootstrap_vm() {
       --container-arg="--password" --container-arg="$BS_PASSWORD" \
       --container-arg="--init" --container-arg="true" \
       --container-arg="--runAsBootstrap" --container-arg="true" \
+      --container-arg="--rest" --container-arg="true" \
+      --container-arg="--restHost" --container-arg="0.0.0.0" \
       --container-arg="--admin" \
       --container-restart-policy=always
     sleep 2m
@@ -166,21 +115,19 @@ start_bootstrap() {
   echo "- GCloud VM name: $(gcloud_vm_name)"
 
   update_or_create_bootstrap_vm
-  GCLOUD_VM_DISK=/mnt/disks/gce-containers-mounts/gce-persistent-disks/$(gcloud_disk_name)
 
-  #Stop bootstrap node to get the address from the database
-  gcloud_stop $(gcloud_vm_name) $(hoprd_image)
+  #GCLOUD_VM_DISK=/mnt/disks/gce-containers-mounts/gce-persistent-disks/$(gcloud_disk_name)
 
-  BOOTSTRAP_ETH_ADDRESS=$(get_eth_address)
-  BOOTSTRAP_HOPR_ADDRESS=$(get_hopr_address)
+  #BOOTSTRAP_ETH_ADDRESS=$(get_eth_address)
+  #BOOTSTRAP_HOPR_ADDRESS=$(get_hopr_address)
 
   echo "Bootstrap Server ETH Address: $BOOTSTRAP_ETH_ADDRESS"
   echo "Bootstrap Server HOPR Address: $BOOTSTRAP_HOPR_ADDRESS"
 
-  fund_if_empty $BOOTSTRAP_ADDRESS
+  #fund_if_empty $BOOTSTRAP_ADDRESS
 
   # Restart bootstrap server virtual machine to restart main container
-  gcloud compute instances reset $ZONE ${(gcloud_vm_name) }
-  echo "Bootstrap multiaddr: /${ RELEASE_IP }/tcp/9091/p2p/$BOOTSTRAP_HOPR_ADDRESS"
+  #gcloud compute instances reset $ZONE ${(gcloud_vm_name) }
+  #echo "Bootstrap multiaddr: /${ RELEASE_IP }/tcp/9091/p2p/$BOOTSTRAP_HOPR_ADDRESS"
 }
 
