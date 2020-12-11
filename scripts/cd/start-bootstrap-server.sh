@@ -183,4 +183,3 @@ start_bootstrap() {
   echo "Bootstrap multiaddr: /${ RELEASE_IP }/tcp/9091/p2p/$BOOTSTRAP_HOPR_ADDRESS"
 }
 
-start_bootstrap
