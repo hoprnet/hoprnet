@@ -13,7 +13,7 @@ shopt -s expand_aliases
 # - BS_PASSWORD: database password${{ secrets.BS_PASSWORD }} \
 
 MIN_FUNDS=0.01291
-HOPRD_IMAGE="gcr.io/hoprassociation/hoprd:$RELEASE_VERSION"
+HOPRD_IMAGE="gcr.io/hoprassociation/hoprd:$RELEASE"
 HOPRD_ARGS="--data='/app/db/ethereum/testnet/bootstrap' --password='$BS_PASSWORD'"
 DOCKER_ARGS="-v $GCLOUD_VM_DISK:/app/db --entrypoint=node -it $HOPRD_IMAGE"
 
@@ -74,25 +74,29 @@ get_environment() {
       return
     fi
 
+    if [ "$VERSION_MAJ_MIN" == '1.0' ]; then
+      RELEASE_NAME='debug'
+      RELEASE_IP='34.65.56.229'
+      return
+    fi
+
     echo "Unknown version: $VERSION_MAJ_MIN"
   esac
 
   echo "Unknown release / environment: '$BRANCH'"
-  #RELEASE_NAME=debug
-  #RELEASE_IP="34.65.56.229"
   exit 1
 }
 
+
 # Set:
 # - GCLOUD_VM_NAME
-# - GCLOUD_VM_IMAGE?
-get_gcloud_target() {
+gcloud_update() {
   GCLOUD_VM_NAME="$RELEASE_NAME-bootstrap"
   if [[ $(gcloud compute instances list | grep $GCLOUD_VM_NAME) ]]; then
     echo "Container exists, updating"
-    GCLOUD_VM_IMAGE=$(gcloud compute instances describe $GCLOUD_VM_NAME --zone=europe-west6-a --format='value[](metadata.items.gce-container-declaration)' | grep image | tr -s ' ' | cut -f3 -d' ')
+    local GCLOUD_VM_IMAGE=$(gcloud compute instances describe $GCLOUD_VM_NAME --zone=europe-west6-a --format='value[](metadata.items.gce-container-declaration)' | grep image | tr -s ' ' | cut -f3 -d' ')
     echo "GCloud VM IMAGE: $GCLOUD_VM_IMAGE"
-    update_container_with_image
+    update_container_with_image gcr.io/hoprassociation/hoprd:$RELEASE bs-$RELEASE_NAME
   else
     echo "No container found, creating"
     create_instance_with_image
@@ -124,16 +128,18 @@ get_hopr_address() {
   gssh $GCLOUD_VM_NAME -- docker run $DOCKER_ARGS index.js $HOPRD_ARGS --runAsBootstrap --run 'myAddress hopr'
 }
 
+
+# $1 = container-image
+# $2 = name
 update_container_with_image() {
-  gcloud compute instances update-container ${{ env.GCLOUD_VM_NAME }} \
+  gcloud compute instances update-container $GCLOUD_VM_NAME \
     --zone=europe-west6-a \
-    --container-image=gcr.io/hoprassociation/hoprd:${{ env.RELEASE_VERSION }} \
-    --container-mount-disk name=bs-${{ env.RELEASE_NAME }},mount-path="/app/db"
+    --container-image=$1 --container-mount-disk name=$2,mount-path="/app/db"
   sleep 30s
 }
 
 create_instance_with_image() {
-  gcloud compute instances create-with-container ${{ env.GCLOUD_VM_NAME }} \
+  gcloud compute instances create-with-container $GCLOUD_VM_NAME }} \
     --zone=europe-west6-a \
     --machine-type=e2-medium \
     --network-interface=address=${{ env.RELEASE_IP }},network-tier=PREMIUM,subnet=default \
@@ -157,7 +163,7 @@ start_bootstrap() {
   get_environment
   echo "Starting bootstrap server for r:$RELEASE_NAME at $RELEASE_IP"
 
-  get_gcloud_target
+  gcloud_update
   echo "Release Version: $RELEASE"
   echo "Release IP: $RELEASE_IP"
   echo "Release Name: $RELEASE_NAME"
