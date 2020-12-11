@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-protos",
-  "version": "1.57.0-next.27",
+  "version": "1.57.0-next.31",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -34,7 +34,7 @@
   },
   "devDependencies": {
     "@types/google-protobuf": "^3.7.2",
-    "@types/node": "^12.11.0",
+    "@types/node": "^12",
     "glob": "^7.1.6",
     "grpc-tools": "^1.9.0",
     "microbundle": "^0.12.2",
@@ -43,7 +43,7 @@
     "replace": "^1.2.0",
     "rimraf": "^3.0.2",
     "ts-protoc-gen": "^0.13.0",
-    "typescript": "^4.0.3"
+    "typescript": "^4.1"
   },
   "peerDependencies": {
     "grpc-web": "^1.2.0"

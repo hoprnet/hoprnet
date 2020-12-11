@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-core-connector-interface",
-  "version": "1.57.0-next.27",
+  "version": "1.57.0-next.31",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -23,7 +23,7 @@
   "devDependencies": {
     "@types/bn.js": "^4.11.6",
     "@types/levelup": "^4.3.0",
-    "typescript": "4.0"
+    "typescript": "^4.1"
   },
   "publishConfig": {
     "access": "public"
