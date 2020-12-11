@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-core-ethereum",
-  "version": "1.57.0-next.26",
+  "version": "1.57.0-next.29",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -27,8 +27,8 @@
     "yarn": "1"
   },
   "dependencies": {
-    "@hoprnet/hopr-ethereum": "1.57.0-next.26",
-    "@hoprnet/hopr-utils": "1.57.0-next.26",
+    "@hoprnet/hopr-ethereum": "1.57.0-next.29",
+    "@hoprnet/hopr-utils": "1.57.0-next.29",
     "bn.js": "^5.1.2",
     "chalk": "^4.1.0",
     "debug": "^4.1.1",
@@ -44,15 +44,15 @@
     "web3-eth-contract": "^1.2.11"
   },
   "devDependencies": {
-    "@hoprnet/hopr-core-connector-interface": "1.57.0-next.26",
-    "@hoprnet/hopr-demo-seeds": "1.57.0-next.26",
-    "@hoprnet/hopr-testing": "1.57.0-next.26",
+    "@hoprnet/hopr-core-connector-interface": "1.57.0-next.29",
+    "@hoprnet/hopr-demo-seeds": "1.57.0-next.29",
+    "@hoprnet/hopr-testing": "1.57.0-next.29",
     "@types/debug": "^4.1.5",
     "@types/keccak": "^3.0.1",
     "@types/levelup": "^4.3.0",
     "@types/memdown": "^3.0.0",
     "@types/mocha": "^8.0.3",
-    "@types/node": "^12.12.8",
+    "@types/node": "^12",
     "@types/secp256k1": "^4.0.1",
     "it-pipe": "^1.1.0",
     "levelup": "^4.4.0",
@@ -63,7 +63,7 @@
     "ts-node": "^9.0.0",
     "typechain": "^4.0.0",
     "typechain-target-web3-v1": "^1.0.4",
-    "typescript": "^4.0"
+    "typescript": "^4.1"
   },
   "mocha": {
     "extension": [

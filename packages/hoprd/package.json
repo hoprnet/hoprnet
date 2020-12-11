@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hoprd",
-  "version": "1.57.0-next.26",
+  "version": "1.57.0-next.29",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -24,8 +24,8 @@
     "dev": "yarn build && NODE_ENV=development yarn start"
   },
   "dependencies": {
-    "@hoprnet/hopr-core": "1.57.0-next.26",
-    "@hoprnet/hopr-utils": "1.57.0-next.26",
+    "@hoprnet/hopr-core": "1.57.0-next.29",
+    "@hoprnet/hopr-utils": "1.57.0-next.29",
     "bs58": "^4.0.1",
     "jazzicon": "^1.5.0",
     "multihashes": "^3.0.1",
@@ -39,11 +39,11 @@
     "yargs": "^16.0.3"
   },
   "devDependencies": {
-    "@hoprnet/hopr-core-connector-interface": "1.57.0-next.26",
+    "@hoprnet/hopr-core-connector-interface": "1.57.0-next.29",
     "@types/bs58": "^4.0.1",
     "@types/debug": "^4.1.5",
     "@types/mocha": "^8.0.3",
-    "@types/node": ">=4.2.0 < 13",
+    "@types/node": "^12",
     "@types/yargs": "^15.0.9",
     "mocha": "^8.0.1",
     "rimraf": "^3.0.2",
