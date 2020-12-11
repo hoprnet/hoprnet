@@ -33,11 +33,19 @@ The HOPR Association team members have agreed on the following development workf
 
 1. On Thursdays at 12 pm CEST, the PM Lead of the week will code-freeze `master` by creating a `release/**` branch tracking `master`. Release specific changes will be done in this branch to trigger this particular release then.
 
-2. **(TEMPORARY, see #709)** After the `release/**` action has completed, we then crease a `cd/**` branch tracking `release/**`.
+2. Insert name and IP of the new bootstrap server machine into `scripts/cd/release_env.sh`, e.g. `["queretaro"]="34.65.207.39" `
 
-3. The `CHANGELOG.md` file is updated with the GitHub pull requests merged during that milestone.
+3. Update DNS entry for `_dnsaddr.<releaseNativeCurrency>.<releaseName>.bootstrap.hoprnet.org/` such that it points to e.g. `dnsaddr=/ip4/34.65.207.39/tcp/9091/p2p/16Uiu2HAm42d5mgfFWhKwrRajV6Qa5u92Z9wdPTY36WPYh3J5MfHz`. Verify this with `dig -t TXT _dnsaddr.<releaseNativeCurrency>.<releaseName>.bootstrap.hoprnet.org`.
 
-4. The instructions with the release, how to test and what bootstrap server to use, are then shared in our social media channels.
+4. **(TEMPORARY, see #709)** After the `release/**` action has completed.
+
+5. Make sure that `package.json` has been updated to the intended version. We use to create a new minor version for weekly releases. If it didn't update properly, update it to the next minor version with `lerna version minor`.
+
+6. We then create a `cd/**` branch tracking `release/**`.
+
+7. The `CHANGELOG.md` file is updated with the GitHub pull requests merged during that milestone.
+
+8. The instructions with the release, how to test and what bootstrap server to use, are then shared in our social media channels.
 
 ## Actions
 
