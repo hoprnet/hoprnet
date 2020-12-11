@@ -49,14 +49,13 @@ workflow to streamline the process we use to implement the HOPR protocol.
 1.1 The IP for the bootstrap node currently needs to be manually assigned.
 
 1.2 Insert name and IP of the new bootstrap server machine into
-     `scripts/cd/environment.sh`
+`scripts/cd/environment.sh`
 
 1.3 Update DNS entry for
-    `_dnsaddr.<releaseNativeCurrency>.<releaseName>.bootstrap.hoprnet.org/`
-    such that it points to e.g.
-    `dnsaddr=/ip4/34.65.207.39/tcp/9091/p2p/16Uiu2HAm42d5mgfFWhKwrRajV6Qa5u92Z9wdPTY36WPYh3J5MfHz`.
-    Verify this with `dig -t TXT
-    _dnsaddr.<releaseNativeCurrency>.<releaseName>.bootstrap.hoprnet.org`.
+`_dnsaddr.<releaseNativeCurrency>.<releaseName>.bootstrap.hoprnet.org/`
+such that it points to e.g.
+`dnsaddr=/ip4/34.65.207.39/tcp/9091/p2p/16Uiu2HAm42d5mgfFWhKwrRajV6Qa5u92Z9wdPTY36WPYh3J5MfHz`.
+Verify this with `dig -t TXT _dnsaddr.<releaseNativeCurrency>.<releaseName>.bootstrap.hoprnet.org`.
 
 2. The `CHANGELOG.md` file is updated with the GitHub pull requests merged
    during that milestone.
