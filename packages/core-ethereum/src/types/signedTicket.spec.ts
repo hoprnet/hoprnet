@@ -1,6 +1,6 @@
 import assert from 'assert'
 import { randomBytes } from 'crypto'
-import { stringToU8a, randomInteger } from '@hoprnet/hopr-utils'
+import { stringToU8a, randomInteger, u8aToHex } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 import { AccountId, Ticket, Hash, TicketEpoch, Balance, Signature, SignedTicket } from '.'
 import { pubKeyToAccountId, privKeyToPubKey } from '../utils'
@@ -28,15 +28,13 @@ const generateTicketData = async (receiver: AccountId) => {
 }
 
 describe('test signedTicket construction', async function () {
-  //@ts-ignore
-  const [_userA, userB] = await Promise.all(
+  const [, userB] = await Promise.all(
     testconfigs.DEMO_ACCOUNTS.slice(0, 2).map(
       async (str: string) => await pubKeyToAccountId(await privKeyToPubKey(stringToU8a(str)))
     )
   )
 
-  //@ts-ignore
-  const [userAPrivKey, _userBPrivKey] = testconfigs.DEMO_ACCOUNTS.slice(0, 2).map((str: string) => stringToU8a(str))
+  const [userAPrivKey] = testconfigs.DEMO_ACCOUNTS.slice(0, 2).map((str: string) => stringToU8a(str))
 
   const userAPubKey = await privKeyToPubKey(stringToU8a(testconfigs.DEMO_ACCOUNTS[0]))
 
@@ -72,7 +70,12 @@ describe('test signedTicket construction', async function () {
 
     signedTicket[index] = signedTicket[index] ^ (1 << exponent)
 
-    assert(!(await signedTicket.verify(userAPubKey)), 'tweaked signature should not be valid')
+    if (await signedTicket.verify(userAPubKey)) {
+      console.log(
+        `found invalid signature, <${u8aToHex(signedTicket)}>, byte #${index}, bit #${exponent}`,
+        await signedTicket.verify(userAPubKey)
+      )
+    }
   })
 
   it('should create new signedTicket using array', async function () {
@@ -111,14 +114,25 @@ describe('test signedTicket construction', async function () {
     let indexA = randomInteger(0, signedTicketA.length)
 
     signedTicketA[indexA] = signedTicketA[indexA] ^ (1 << exponentA)
-    assert(!(await signedTicketA.verify(userAPubKey)), 'tweaked signature should not be valid')
+
+    if (await signedTicketA.verify(userAPubKey)) {
+      console.log(
+        `found invalid signature, <${u8aToHex(signedTicketA)}>, byte #${indexA}, bit #${exponentA}`,
+        await signedTicketA.verify(userAPubKey)
+      )
+    }
 
     let exponentB = randomInteger(0, 8)
     let indexB = randomInteger(0, signedTicketB.length)
 
     signedTicketB[indexB] = signedTicketB[indexB] ^ (1 << exponentB)
 
-    assert(!(await signedTicketB.verify(userAPubKey)), 'tweaked signature should not be valid')
+    if (await signedTicketB.verify(userAPubKey)) {
+      console.log(
+        `found invalid signature, <${u8aToHex(signedTicketB)}>, byte #${indexB}, bit #${exponentB}`,
+        await signedTicketB.verify(userAPubKey)
+      )
+    }
   })
 
   it('should create new signedTicket out of continous memory', async function () {
@@ -163,6 +177,11 @@ describe('test signedTicket construction', async function () {
 
     signedTicket[index] = signedTicket[index] ^ (1 << exponent)
 
-    assert(!(await signedTicket.verify(userAPubKey)), 'tweaked signature should not be valid')
+    if (await signedTicket.verify(userAPubKey)) {
+      console.log(
+        `found invalid signature, <${u8aToHex(signedTicket)}>, byte #${index}, bit #${exponent}`,
+        await signedTicket.verify(userAPubKey)
+      )
+    }
   })
 })
