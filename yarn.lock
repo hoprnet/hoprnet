@@ -10238,10 +10238,10 @@ libp2p-utils@^0.2.0, libp2p-utils@^0.2.3:
     multiaddr "^8.0.0"
     private-ip "^2.1.1"
 
-libp2p@0.29.3:
-  version "0.29.3"
-  resolved "https://registry.yarnpkg.com/libp2p/-/libp2p-0.29.3.tgz#9cee0f44a300a5ac22f2805e5da57d98df442664"
-  integrity sha512-voILMLwpDqe/KafqaeH7CsmMNtOagV7ln6vNl0/2Lgq4zyY+vCmlzULRaStSagU+9V0QWoSoPmIgQdZ/Ydelhw==
+libp2p@0.29.4:
+  version "0.29.4"
+  resolved "https://registry.yarnpkg.com/libp2p/-/libp2p-0.29.4.tgz#95247793185badb603ef82c36f21455ec6943dfb"
+  integrity sha512-RACD3rvhgBTcLDtILwN8lE2z3GV5OCR1Se/wQ9UPYArSImsoikKjGQMvW0vZl9W3adUqmJOUs7CJWTUvdTAOpw==
   dependencies:
     abort-controller "^3.0.0"
     aggregate-error "^3.0.1"
