@@ -3,21 +3,44 @@ set -e #u
 shopt -s expand_aliases
 
 
-GCLOUD_INCLUDED=1
 
 # ------ GCloud utilities ------
 #
 # NB. functions here should not rely on any external env. variables, or functions
 # not in this file, as this is intended for reuse in various scenarios.
 
+GCLOUD_INCLUDED=1 # So we can test for inclusion
 ZONE="--zone=europe-west6-a"
 REGION="--region=europe-west6"
 
 alias gssh="gcloud compute ssh --ssh-flag='-t' $ZONE"
 
+
+# $1 = role (ie. bootstrap)
+# Requires:
+# - VERSION_MAJ_MIN
+# - RELEASE_NAME
+gcloud_vm_name() {
+  # For example, 1-57-larnaca-bootstrap, prerelease-master-bootstrap
+  echo "bootstrap-$(echo $VERSION_MAJ_MIN | sed 's/\./-/g')-$RELEASE_NAME"
+}
+
+# Get or create an IP address
+# $1 = name
+gcloud_get_address() { 
+  local ip=$(gcloud compute addresses describe $1 $REGION 2>&1)
+  # Google does not return an appropriate exit code :(
+  if [ "$(echo "$ip" | grep 'ERROR')" ]; then
+    echo "No address, creating"
+    gcloud compute addresses create $1 $REGION
+    local ip=$(gcloud compute addresses describe $1 $REGION 2>&1)
+  fi
+  echo $ip | awk '{ print $2 }'
+}
+
 # $1 = VM name
 gcloud_find_vm_with_name() {
-  echo $(gcloud compute instances list | grep '$1')
+  echo $(gcloud compute instances list | grep "$1")
 }
 
 # $1 - VM name

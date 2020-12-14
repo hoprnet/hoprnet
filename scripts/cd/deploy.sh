@@ -9,7 +9,6 @@ source scripts/cd/start-bootstrap-server.sh
 #
 # This is run on pushes to master, or release/**
 #
-#
 
 # -- Setup Dependencies --
 ethers --version || npm install -g @ethersproject/cli

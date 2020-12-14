@@ -25,11 +25,6 @@ hoprd_image() {
   echo "gcr.io/hoprassociation/hoprd:$RELEASE"
 }
 
-gcloud_vm_name() {
-  # For example, 1.57-larnaca-bootstrap, prerelease-master-bootstrap
-  echo "$VERSION_MAJ_MIN-$RELEASE_NAME-bootstrap"
-}
-
 gcloud_disk_name() {
   # NB: needs to be short
   echo "bs-$VERSION_MAJ_MIN-$RELEASE_NAME"
@@ -52,32 +47,36 @@ fund_if_empty() {
   fi
 }
 
+# $1 = IP
 get_eth_address(){
-  local ADDR=$(curl $RELEASE_IP:3001/api/v1/address/eth)
+  local ADDR=$(curl $1:3001/api/v1/address/eth)
   echo $ADDR
 }
 
+# $1 = IP
 get_hopr_address() {
-  local ADDR=$(curl $RELEASE_IP:3001/api/v1/address/hopr)
+  local ADDR=$(curl $1:3001/api/v1/address/hopr)
   echo $ADDR
 }
 
 
+# $1 = vm name
 update_or_create_bootstrap_vm() {
-  if [[ $(gcloud_find_vm_with_name $(gcloud_vm_name)) ]]; then
+  if [[ $(gcloud_find_vm_with_name $1) ]]; then
     echo "Container exists, updating"
-    PREV=$(gcloud_get_image_running_on_vm $(gcloud_vm_name))
+    PREV=$(gcloud_get_image_running_on_vm $1)
     if [ "$PREV" == "$(hoprd_image)" ]; then 
       echo "Same version of image is currently running. Skipping update to $PREV"
       return 0
     fi
     echo "Previous GCloud VM Image: $PREV"
-    gcloud_update_container_with_image $(gcloud_vm_name) $(hoprd_image) $(gcloud_disk_name) "/app/db"
+    gcloud_update_container_with_image $1 $(hoprd_image) $(gcloud_disk_name) "/app/db"
   else
-    echo "No container found, creating $(gcloud_vm_name)"
-    gcloud compute instances create-with-container $(gcloud_vm_name) $ZONE \
+    echo "No container found, creating $1"
+    local ip=$(gcloud_get_address $1)
+    gcloud compute instances create-with-container $1 $ZONE \
       --machine-type=e2-medium \
-      --network-interface=address=$RELEASE_IP,network-tier=PREMIUM,subnet=default \
+      --network-interface=address=$ip,network-tier=PREMIUM,subnet=default \
       --metadata=google-logging-enabled=true --maintenance-policy=MIGRATE \
       --create-disk name=$(gcloud_disk_name),size=10GB,type=pd-ssd,mode=rw \
       --container-mount-disk mount-path="/app/db" \
@@ -98,18 +97,20 @@ update_or_create_bootstrap_vm() {
 
 start_bootstrap() {
   get_environment
+  local vm_name=$(gcloud_vm_name bootstrap)
+  local ip=$(gcloud_get_address $vm_name)
 
-  echo "Starting bootstrap server for r:$RELEASE_NAME at $RELEASE_IP"
+  echo "Starting bootstrap server for r:$RELEASE_NAME at $ip"
   echo "- Release Version: $RELEASE"
-  echo "- Release IP: $RELEASE_IP"
+  echo "- Release IP: $ip"
   echo "- Release Name: $RELEASE_NAME"
-  echo "- GCloud VM name: $(gcloud_vm_name)"
+  echo "- GCloud VM name: $vm_name"
 
-  update_or_create_bootstrap_vm
+  update_or_create_bootstrap_vm $vm_name
 
   #GCLOUD_VM_DISK=/mnt/disks/gce-containers-mounts/gce-persistent-disks/$(gcloud_disk_name)
-  BOOTSTRAP_ETH_ADDRESS=$(get_eth_address)
-  BOOTSTRAP_HOPR_ADDRESS=$(get_hopr_address)
+  BOOTSTRAP_ETH_ADDRESS=$(get_eth_address $ip)
+  BOOTSTRAP_HOPR_ADDRESS=$(get_hopr_address $ip)
 
   echo "Bootstrap Server ETH Address: $BOOTSTRAP_ETH_ADDRESS"
   echo "Bootstrap Server HOPR Address: $BOOTSTRAP_HOPR_ADDRESS"
