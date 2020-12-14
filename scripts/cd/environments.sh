@@ -1,3 +1,15 @@
+#!/bin/bash
+
+# $1=version string, semver
+function get_version_maj_min() {
+  # From https://github.com/cloudflare/semver_bash/blob/master/semver.sh
+  # Fixed https://github.com/cloudflare/semver_bash/issues/4
+  local RE='[^0-9]*\([0-9]*\)[.]\([0-9]*\)[.]\([0-9]*\)\([0-9A-Za-z-]*\).*'
+  local MAJ=$(echo "$1" | sed -e "s#$RE#\1#")
+  local MIN=$(echo "$1" | sed -e "s#$RE#\2#")
+  echo "$MAJ.$MIN"
+}
+
 # ===== Load env variables for the current github ref =====
 # Takes:
 # - GITHUB_REF
@@ -51,5 +63,6 @@ get_environment() {
   #exit 1
   RELEASE_NAME='debug'
   RELEASE_IP='34.65.56.229'
+  VERSION_MAJ_MIN='dbg'
 }
 

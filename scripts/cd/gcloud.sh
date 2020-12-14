@@ -2,18 +2,22 @@
 set -e #u
 shopt -s expand_aliases
 
+
+GCLOUD_INCLUDED=1
+
 # ------ GCloud utilities ------
 #
 # NB. functions here should not rely on any external env. variables, or functions
 # not in this file, as this is intended for reuse in various scenarios.
 
 ZONE="--zone=europe-west6-a"
+REGION="--region=europe-west6"
 
 alias gssh="gcloud compute ssh --ssh-flag='-t' $ZONE"
 
 # $1 = VM name
 gcloud_find_vm_with_name() {
-  echo $(gcloud compute instances list | grep $1)
+  echo $(gcloud compute instances list | grep '$1')
 }
 
 # $1 - VM name
