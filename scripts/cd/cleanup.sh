@@ -4,7 +4,10 @@ if [ -z "$GCLOUD_INCLUDED" ]; then
   source scripts/cd/gcloud.sh 
 fi
 
-OLD_RELEASES='zurich zug luzern basodino'
+if [ -z "$OLD_RELEASES" ]; then
+  source scripts/cd/environments.sh 
+fi
+
 
 cleanup_ips() {
   local IPS=$(gcloud compute addresses list)
@@ -28,9 +31,20 @@ cleanup_instances() {
       echo "- stopping $name"
       gcloud compute instances stop $name $ZONE
     done
+
+    echo "$INSTANCES" | grep $old | grep 'TERMINATED' | while read -r instance; do
+      local name=$(echo "$instance" | awk '{ print $1 }')
+      local zone=$(echo "$instance" | awk '{ print $2 }')
+      echo "- deleting terminated instance $name"
+      gcloud compute instances delete $name --zone=$zone --keep-disks=data --quiet
+    done
   done
 }
 
-#cleanup_ips
-cleanup_instances
+cleanup () {
+  cleanup_ips
+  cleanup_instances
+}
+
+cleanup
 

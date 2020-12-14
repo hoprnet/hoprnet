@@ -10,6 +10,9 @@ function get_version_maj_min() {
   echo "$MAJ.$MIN"
 }
 
+# These will be cleaned up and machines stopped
+OLD_RELEASES='zurich zug luzern basodino saentis'
+
 # ===== Load env variables for the current github ref =====
 # Takes:
 # - GITHUB_REF
