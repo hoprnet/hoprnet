@@ -167,7 +167,11 @@ async function main() {
       service.get('/api/v1/version', (_, res) => res.send({ version: FULL_VERSION }))
       service.get('/api/v1/address/eth', async (_, res) => res.send(await node.paymentChannels.hexAccountAddress()))
       service.get('/api/v1/address/hopr', async (_, res) => res.send(await node.getId().toB58String()))
-      service.post('/api/v1/send', (req, res) => res.send({ message: req.body.message }))
+      service.post('/api/v1/send', async (req, res) => {
+        const cmds = new Commands(node)
+        await cmds.execute(`send ${req.body.peerId} ${req.body.message}`)
+        return res.send({ peerId: req.body.peerId, message: req.body.message, status: 'ok' });
+      })
     
       const hostname = argv.restHost || 'localhost'
       const port = argv.restPort || 3001
