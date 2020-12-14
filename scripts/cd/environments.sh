@@ -5,12 +5,14 @@
 # Sets: 
 # - RELEASE_NAME
 # - RELEASE_IP
+# - VERSION_MAJ_MIN
 get_environment() {
   BRANCH=$(echo "$GITHUB_REF" | sed -e "s#refs/heads/##g") # Removing `refs/heads`
 
   if [ "$BRANCH" == 'master' ]; then
     RELEASE_NAME='master'
     RELEASE_IP='34.65.102.152'
+    VERSION_MAJ_MIN='prerelease'
     return
   fi
 

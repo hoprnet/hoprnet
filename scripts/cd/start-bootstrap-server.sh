@@ -36,12 +36,13 @@ hoprd_image() {
 }
 
 gcloud_vm_name() {
-  # For example, larnaca-bootstrap, master-bootstrap
-  echo "$RELEASE_NAME-bootstrap"
+  # For example, 1.57-larnaca-bootstrap, prerelease-master-bootstrap
+  echo "$VERSION_MAJ_MIN-$RELEASE_NAME-bootstrap"
 }
 
 gcloud_disk_name() {
-  echo "bs-$RELEASE_NAME"
+  # NB: needs to be short
+  echo "bs-$VERSION_MAJ_MIN-$RELEASE_NAME"
 }
 
 # $1=account (hex)
