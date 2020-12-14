@@ -28,7 +28,7 @@
     "ganache-core": "2.13.1"
   },
   "devDependencies": {
-    "@types/node": "^12",
+    "@types/node": "^13",
     "rimraf": "^3.0.2",
     "typescript": "^4.1"
   }
