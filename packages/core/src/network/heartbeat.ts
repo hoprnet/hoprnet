@@ -23,7 +23,7 @@ export default class Heartbeat {
 
   private async checkNodes(): Promise<void> {
     const thresholdTime = Date.now() - HEARTBEAT_REFRESH
-    log(`Checking nodes older than ${new Date(thresholdTime).toLocaleString()}`)
+    log(`Checking nodes older than ${thresholdTime} (${new Date(thresholdTime).toLocaleString()})`)
 
     const queryOldest = async (): Promise<void> => {
       await this.networkPeers.pingOldest(async (id: PeerId) => {
