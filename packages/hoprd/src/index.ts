@@ -160,14 +160,15 @@ async function main() {
     if (argv.rest) {
       const http = require('http')
       const service = require('restana')()
+      const bodyParser = require('body-parser')
 
-      service.get('/api/rest/v1/version', (_, res) => res.send({ version: FULL_VERSION }))
-      service.get('/api/rest/v1/address/eth', async (_, res) =>
-        res.send({
-          address: await node.paymentChannels.hexAccountAddress()
-        })
-      )
+      service.use(bodyParser.json())
 
+      service.get('/api/v1/version', (_, res) => res.send({ version: FULL_VERSION }))
+      service.get('/api/v1/address/eth', async (_, res) => res.send(await node.paymentChannels.hexAccountAddress()))
+      service.get('/api/v1/address/hopr', async (_, res) => res.send(await node.getId().toB58String()))
+      service.post('/api/v1/send', (req, res) => res.send({ message: req.body.message }))
+    
       const hostname = argv.restHost || 'localhost'
       const port = argv.restPort || 3001
 
