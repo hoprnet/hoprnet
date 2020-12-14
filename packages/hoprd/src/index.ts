@@ -170,9 +170,9 @@ async function main() {
       service.post('/api/v1/send', async (req, res) => {
         const cmds = new Commands(node)
         await cmds.execute(`send ${req.body.peerId} ${req.body.message}`)
-        return res.send({ peerId: req.body.peerId, message: req.body.message, status: 'ok' });
+        return res.send({ peerId: req.body.peerId, message: req.body.message, status: 'ok' })
       })
-    
+
       const hostname = argv.restHost || 'localhost'
       const port = argv.restPort || 3001
 
