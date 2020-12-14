@@ -984,10 +984,24 @@ ms@2.1.2, ms@^2.1.1:
   resolved "https://registry.yarnpkg.com/ms/-/ms-2.1.2.tgz#d09d1f357b443f493382a8eb3ccd183872ae6009"
   integrity sha512-sGkPx+VjMtmA6MX27oA4FBFELFCZZ4S4XqeGOXCv68tT+jb3vk/RyaKWP0PTKyWtmLSM0b+adUTEvbs1PEaH2w==
 
-multiaddr@8.1.1, multiaddr@^8.0.0, multiaddr@~8.1.1:
+multiaddr@8.1.1:
   version "8.1.1"
   resolved "https://registry.yarnpkg.com/multiaddr/-/multiaddr-8.1.1.tgz#d86315deed93752fa68b4199fee56f8b4a516a2b"
   integrity sha512-Dyur7rWX44MlgKIqVA2dYPOZx/UwG60PVSffJ5S17uo6Pu31lftJXShMEfPtUDGHnyALAOWOuC3X/iPhDtw4Vg==
+  dependencies:
+    cids "^1.0.0"
+    class-is "^1.1.0"
+    dns-over-http-resolver "^1.0.0"
+    err-code "^2.0.3"
+    is-ip "^3.1.0"
+    multibase "^3.0.0"
+    uint8arrays "^1.1.0"
+    varint "^5.0.0"
+
+multiaddr@^8.0.0, multiaddr@~8.1.1:
+  version "8.1.2"
+  resolved "https://registry.yarnpkg.com/multiaddr/-/multiaddr-8.1.2.tgz#74060ff8636ba1c01b2cf0ffd53950b852fa9b1f"
+  integrity sha512-r13IzW8+Sv9zab9Gt8RPMIN2WkptIPq99EpAzg4IbJ/zTELhiEwXWr9bAmEatSCI4j/LSA6ESJzvz95JZ+ZYXQ==
   dependencies:
     cids "^1.0.0"
     class-is "^1.1.0"
