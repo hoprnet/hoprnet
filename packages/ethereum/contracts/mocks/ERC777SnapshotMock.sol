@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.6.0;
+pragma solidity ^0.7.5;
 
 import "../ERC777/ERC777Snapshot.sol";
 
@@ -9,7 +9,7 @@ contract ERC777SnapshotMock is ERC777Snapshot {
         string memory symbol,
         address initialAccount,
         uint256 initialBalance
-    ) public ERC777(name, symbol, new address[](0)) {
+    ) ERC777(name, symbol, new address[](0)) {
         _mint(initialAccount, initialBalance, "", "");
     }
 

@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.6.0;
+pragma solidity ^0.7.5;
 
 import "../HoprChannels/Channels.sol";
 
 contract ChannelsMock is Channels {
-    constructor(uint256 _secsClosure) public {
+    constructor(uint256 _secsClosure) {
         secsClosure = _secsClosure;
     }
 

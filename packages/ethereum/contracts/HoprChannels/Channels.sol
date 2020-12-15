@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.6.0;
+pragma solidity ^0.7.5;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "../utils/console.sol";
@@ -122,7 +122,7 @@ contract Channels {
         );
 
         // solhint-disable-next-line
-        channel.closureTime = now + secsClosure;
+        channel.closureTime = block.timestamp + secsClosure;
         channel.status += 1;
 
         bool isPartyA = _isPartyA(initiator, counterparty);
@@ -163,7 +163,7 @@ contract Channels {
             channel.closureByPartyA && (initiator == partyA) ||
             !channel.closureByPartyA && (initiator == partyB)
         ) {
-            require(channel.closureTime < now, "closureTime must be before now");
+            require(channel.closureTime < block.timestamp, "closureTime must be before now");
         }
 
         uint256 partyAAmount = channel.partyABalance;
