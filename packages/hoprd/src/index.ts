@@ -161,17 +161,12 @@ async function main() {
       const http = require('http')
       const service = require('restana')()
 
-      service.get('/api/rest/v1/version', (_, res) => res.send({ version: FULL_VERSION }))
-      service.get('/api/rest/v1/address/eth', async (_, res) =>
-        res.send({
-          address: await node.paymentChannels.hexAccountAddress()
-        })
-      )
-
-      const hostname = argv.restHost || 'localhost'
-      const port = argv.restPort || 3001
-
-      http.createServer(service).listen(port, hostname, function () {
+      service.get('/api/v1/version', (_, res) => res.send(FULL_VERSION))
+      service.get('/api/v1/address/eth', async (_, res) => res.send(await node.paymentChannels.hexAccountAddress()))
+      service.get('/api/v1/address/hopr', async (_, res) => res.send(await node.getId().toB58String()))
+      const hostname = argv.restHost
+      const port = argv.restPort
+      http.createServer(service).listen(port, hostname, () => {
         logs.log(`Rest server on ${hostname} listening on port ${port}`)
       })
     }
