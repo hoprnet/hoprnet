@@ -27,6 +27,7 @@ import BN from 'bn.js'
 export { time, events }
 
 const rpcOps = getRpcOptions()
+const log = Log(['transaction'])
 
 /**
  * @param self our node's accountId
@@ -433,23 +434,27 @@ export function TransactionSigner(web3: Web3, network: Network, privKey: Uint8Ar
     const abi = txObject ? txObject.encodeABI() : undefined
     const gas = 200e3
     const gasPrice = rpcOps[network]?.gasPrice ?? 1e9
+    const options = {
+      gas,
+      gasPrice,
+      ...txConfig,
+      data: abi
+    }
 
     // @TODO: provide some of the values to avoid multiple calls
-    const signedTransaction = await web3.eth.accounts.signTransaction(
-      {
-        gas,
-        gasPrice,
-        ...txConfig,
-        data: abi
-      },
-      privKeyStr
-    )
+    const signedTransaction = await web3.eth.accounts.signTransaction(options, privKeyStr)
 
     function send() {
       if (signedTransaction.rawTransaction == null) {
         throw Error(`Cannot process transaction because Web3.js did not give us the raw transaction.`)
       }
 
+      log('Sending transaction %O', {
+        gas: options.gas,
+        gasPrice: options.gasPrice,
+        nonce: options.nonce,
+        hash: signedTransaction.rawTransaction
+      })
       return web3.eth.sendSignedTransaction(signedTransaction.rawTransaction)
     }
 
