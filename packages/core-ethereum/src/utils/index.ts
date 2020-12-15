@@ -449,7 +449,7 @@ export function TransactionSigner(web3: Web3, network: Network, privKey: Uint8Ar
         throw Error(`Cannot process transaction because Web3.js did not give us the raw transaction.`)
       }
 
-      log('Sending transaction %O', {
+      log('Sending transaction %o', {
         gas: options.gas,
         gasPrice: options.gasPrice,
         nonce: options.nonce,
