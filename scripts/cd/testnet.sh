@@ -7,10 +7,10 @@ MIN_FUNDS=0.01291
 HOPRD_ARGS="--data='/app/db/ethereum/testnet/bootstrap' --password='$BS_PASSWORD'"
 ZONE="--zone=europe-west6-a"
 
-# $1 = role (ie. bootstrap)
+# $1 = role (ie. bootstrap, node-4)
 # $2 = network name
 vm_name() {
-  echo "$1-$2"
+  echo "$2-$1"
 }
 
 # $1 = vm name
@@ -45,9 +45,10 @@ get_hopr_address() {
   echo $(curl $1:3001/api/v1/address/hopr)
 }
 
+
 # $1 = vm name
 # $2 = docker image
-update_or_create_bootstrap_vm() {
+update_if_existing() {
   if [[ $(gcloud_find_vm_with_name $1) ]]; then
     echo "Container exists, updating"
     PREV=$(gcloud_get_image_running_on_vm $1)
@@ -59,16 +60,21 @@ update_or_create_bootstrap_vm() {
     gcloud_update_container_with_image $1 $2 "$(disk_name $1)" "/app/db"
     sleep 60
   else
+    echo "no container"
+  fi
+
+}
+
+# $1 = vm name
+# $2 = docker image
+update_or_create_bootstrap_vm() {
+  if [ "$(update_if_existing $1 $2)" = "no container" ]; then
     echo "No container found, creating $1"
     local ip=$(gcloud_get_address $1)
-    gcloud compute instances create-with-container $1 $ZONE \
-      --machine-type=e2-medium \
+    gcloud compute instances create-with-container $1 $GCLOUD_DEFAULTS \
       --network-interface=address=$ip,network-tier=PREMIUM,subnet=default \
-      --metadata=google-logging-enabled=true --maintenance-policy=MIGRATE \
       --create-disk name=$(disk_name $1),size=10GB,type=pd-ssd,mode=rw \
       --container-mount-disk mount-path="/app/db" \
-      --tags=hopr-node,web-client,rest-client,portainer \
-      --boot-disk-size=10GB --boot-disk-type=pd-standard \
       --container-env=^,@^DEBUG=hopr\*,@NODE_OPTIONS=--max-old-space-size=4096 \
       --container-image=$2 \
       --container-arg="--password" --container-arg="$BS_PASSWORD" \
@@ -82,19 +88,50 @@ update_or_create_bootstrap_vm() {
   fi
 }
 
+# $1 = vm name
+# $2 = docker image
+# $3 = BS multiaddr
+start_testnode_vm() {
+  if [ "$(update_if_existing $1 $2)" = "no container" ]; then
+    gcloud compute instances create-with-container $1 $GCLOUD_DEFAULTS \
+      --create-disk name=$(disk_name $1),size=10GB,type=pd-ssd,mode=rw \
+      --container-mount-disk mount-path="/app/db" \
+      --container-env=^,@^DEBUG=hopr\*,@NODE_OPTIONS=--max-old-space-size=4096 \
+      --container-image=$2 \
+      --container-arg="--password" --container-arg="$BS_PASSWORD" \
+      --container-arg="--init" --container-arg="true" \
+      --container-arg="--rest" --container-arg="true" \
+      --container-arg="--restHost" --container-arg="0.0.0.0" \
+      --container-arg="--admin" \
+      --container-restart-policy=always
+  fi
+}
+
 # $1 network name
 # $2 docker image
 start_bootstrap() {
   local vm=$(vm_name bootstrap $1)
-  echo "- Starting bootstrap server for $1 at ($vm) with $2"
+  echo "- Starting bootstrap server for $1 at ($vm) with $2" 1>&2
   local ip=$(gcloud_get_address $vm)
-  echo "- public ip for bootstrap server: $ip"
-  update_or_create_bootstrap_vm $vm $2
+  echo "- public ip for bootstrap server: $ip" 1>&2
+  update_or_create_bootstrap_vm $vm $2 1>&2
   BOOTSTRAP_ETH_ADDRESS=$(get_eth_address $ip)
   BOOTSTRAP_HOPR_ADDRESS=$(get_hopr_address $ip)
-  echo "- Bootstrap Server ETH Address: $BOOTSTRAP_ETH_ADDRESS"
-  echo "- Bootstrap Server HOPR Address: $BOOTSTRAP_HOPR_ADDRESS"
-  fund_if_empty $BOOTSTRAP_ETH_ADDRESS
+  echo "- Bootstrap Server ETH Address: $BOOTSTRAP_ETH_ADDRESS" 1>&2
+  echo "- Bootstrap Server HOPR Address: $BOOTSTRAP_HOPR_ADDRESS" 1>&2
+  #TODO fund_if_empty $BOOTSTRAP_ETH_ADDRESS
+
+  echo "/ip4/$ip/tcp/9091/p2p/$BOOTSTRAP_HOPR_ADDRESS"
+}
+
+# $1 network name
+# $2 docker image
+# $3 node number
+# $4 bootstrap multiaddr
+start_testnode() {
+  local vm=$(vm_name "node-$3" $1)
+  echo "- Starting test node $vm with $2"
+  start_testnode_vm $vm $2 $4
 }
 
 # ----- Start Testnet -------
@@ -109,11 +146,13 @@ start_bootstrap() {
 # $3 docker image
 start_testnet() {
   # First node is always bootstrap
-  start_bootstrap $1 $3
+  bs_addr=$(start_bootstrap $1 $3)
+  echo "- bootstrap addr: $bs_addr"
 
   for i in $(seq 2 $2);
   do
     echo "Start node $i"
+    start_testnode $1 $3 $i $bs_addr
   done
 }
 

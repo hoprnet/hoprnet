@@ -19,7 +19,7 @@ OLD_RELEASES='zurich zug luzern basodino saentis debug-dbg'
 # - RELEASE
 # Sets: 
 # - RELEASE_NAME
-# - RELEASE_IP
+# - RELEASE_IP deprecated
 # - VERSION_MAJ_MIN
 get_environment() {
   BRANCH=$(echo "$GITHUB_REF" | sed -e "s#refs/heads/##g") # Removing `refs/heads`
