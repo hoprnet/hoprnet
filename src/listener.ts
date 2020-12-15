@@ -4,7 +4,6 @@ import dgram, { RemoteInfo } from 'dgram'
 import { EventEmitter } from 'events'
 import debug from 'debug'
 
-import { socketToConn } from './socket-to-conn'
 import { CODE_P2P } from './constants'
 import type { Connection, ConnHandler } from 'libp2p'
 import type { Listener as InterfaceListener } from 'libp2p-interfaces'
@@ -14,6 +13,7 @@ import Multiaddr from 'multiaddr'
 
 import { handleStunRequest, getExternalIp } from './stun'
 import { getAddrs } from './addrs'
+import { TCPConnection } from './tcp'
 
 const log = debug('hopr-connect:listener')
 const error = debug('hopr-connect:listener:error')
@@ -105,6 +105,15 @@ class Listener extends EventEmitter implements InterfaceListener {
       throw Error(`Cannot listen after 'close()' has been called`)
     }
 
+    const protos = ma.protoNames()
+    if (!['ip4', 'ip6'].includes(protos[0])) {
+      throw Error(`Can only bind to IPv4 or IPv6 addresses`)
+    }
+
+    if (protos.length > 1 && protos[1] !== 'tcp') {
+      throw Error(`Can only bind to TCP sockets`)
+    }
+
     if (this.peerId.toB58String() !== ma.getPeerId()) {
       let tmpListeningAddr = ma.decapsulateCode(CODE_P2P)
 
@@ -113,6 +122,7 @@ class Listener extends EventEmitter implements InterfaceListener {
       }
 
       // Replace wrong PeerId in given listeningAddr
+      log(`replacing peerId in ${ma.toString()} by ${this.peerId.toB58String()}`)
       this.listeningAddr = tmpListeningAddr.encapsulate(`/p2p/${this.peerId.toB58String()}`)
     } else {
       this.listeningAddr = ma
@@ -128,25 +138,40 @@ class Listener extends EventEmitter implements InterfaceListener {
     })
 
     await Promise.all([
-      new Promise<void>((resolve, reject) =>
-        this.tcpSocket.listen(options, (err?: Error) => {
-          if (err) return reject(err)
-          log('Listening on %s', this.tcpSocket.address())
-          resolve()
-        })
-      ),
-      // @TODO handle socket bind error(s)
-      new Promise<void>((resolve /*, reject*/) =>
-        this.udpSocket.bind(options.port, async () => {
-          try {
-            this.externalAddress = await getExternalIp(this.stunServers, this.udpSocket)
-          } catch (err) {
-            error(`Unable to fetch external address using STUN. Error was: ${err}`)
-          }
+      new Promise<void>((resolve, reject) => {
+        try {
+          this.tcpSocket.listen(options, (err?: Error) => {
+            if (err) {
+              return reject(err)
+            }
 
-          resolve()
-        })
-      )
+            log('Listening on %s', this.tcpSocket.address())
+            resolve()
+          })
+        } catch (err) {
+          error(`Could bind to TCP socket. Error was: ${err.message}`)
+          reject()
+        }
+      }),
+      new Promise<void>((resolve, reject) => {
+        this.udpSocket.once('error', reject)
+
+        try {
+          this.udpSocket.bind(options.port, async () => {
+            this.udpSocket.removeListener('error', reject)
+            try {
+              this.externalAddress = await getExternalIp(this.stunServers, this.udpSocket)
+            } catch (err) {
+              error(`Unable to fetch external address using STUN. Error was: ${err}`)
+            }
+
+            resolve()
+          })
+        } catch (err) {
+          error(`Could bind UDP socket. Error was: ${err.message}`)
+          reject()
+        }
+      })
     ])
 
     this.state = State.LISTENING
@@ -188,6 +213,7 @@ class Listener extends EventEmitter implements InterfaceListener {
 
       addrs.push(
         ...getAddrs(address.port, this.peerId.toB58String(), {
+          includeLocalIPv4: true,
           includeLocalhostIPv4: true,
           useIPv6: false
         })
@@ -206,6 +232,7 @@ class Listener extends EventEmitter implements InterfaceListener {
 
       addrs.push(
         ...getAddrs(address.port, this.peerId.toB58String(), {
+          includeLocalIPv4: true,
           includeLocalhostIPv4: true,
           useIPv6: false
         })
@@ -221,7 +248,13 @@ class Listener extends EventEmitter implements InterfaceListener {
 
     const untrackConn = () => {
       verbose(`currently tracking ${this.__connections.length} connections --`)
-      this.__connections = this.__connections.filter((c: MultiaddrConnection) => c !== maConn)
+      let index = this.__connections.findIndex((c: MultiaddrConnection) => c !== maConn)
+
+      if ([index, 1].includes(this.__connections.length)) {
+        this.__connections.pop()
+      } else {
+        this.__connections[index] = this.__connections.pop() as MultiaddrConnection
+      }
     }
 
     maConn.conn.once('close', untrackConn)
@@ -234,7 +267,7 @@ class Listener extends EventEmitter implements InterfaceListener {
     let maConn: MultiaddrConnection | undefined
     let conn: Connection
     try {
-      maConn = socketToConn(socket, { listeningAddr: this.listeningAddr })
+      maConn = TCPConnection.fromSocket(socket)
       log('new inbound connection %s', maConn.remoteAddr)
       conn = await this.upgrader.upgradeInbound(maConn)
     } catch (err) {

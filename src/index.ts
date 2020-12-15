@@ -1,26 +1,14 @@
-import net from 'net'
-import { AbortError } from 'abortable-iterator'
-import type { Socket } from 'net'
 import mafmt from 'mafmt'
-import errCode from 'err-code'
 import debug from 'debug'
-import { socketToConn } from './socket-to-conn'
 import Listener from './listener'
 import { CODE_P2P, DELIVERY, USE_WEBRTC } from './constants'
 import type Multiaddr from 'multiaddr'
 import PeerId from 'peer-id'
 import type libp2p from 'libp2p'
-import type {
-  Dialer,
-  Upgrader,
-  DialOptions,
-  ConnHandler,
-  Handler,
-  MultiaddrConnection,
-  ConnectionManager
-} from 'libp2p'
+import type { Dialer, Upgrader, DialOptions, ConnHandler, Handler, ConnectionManager } from 'libp2p'
 import { Transport, Connection } from 'libp2p-interfaces'
 import chalk from 'chalk'
+import { TCPConnection } from './tcp'
 import { WebRTCUpgrader } from './webrtc'
 import Relay from './relay'
 import { WebRTCConnection } from './webRTCConnection'
@@ -41,7 +29,6 @@ class HoprConnect implements Transport {
 
   public discovery: Discovery
 
-  private _useWebRTC: boolean
   private _upgrader: Upgrader
   private _peerId: PeerId
   private _multiaddrs: Multiaddr[]
@@ -72,7 +59,7 @@ class HoprConnect implements Transport {
 
     if (bootstrapServers != undefined && bootstrapServers.length > 0) {
       this.relays = bootstrapServers.filter(
-        (ma: Multiaddr) => ma !== undefined && !libp2p.peerId.equals(PeerId.createFromCID(ma.getPeerId()))
+        (ma: Multiaddr) => ma != undefined && !libp2p.peerId.equals(PeerId.createFromCID(ma.getPeerId()))
       )
 
       this.stunServers = []
@@ -87,25 +74,24 @@ class HoprConnect implements Transport {
             this.stunServers.push(this.relays[i])
             break
           default:
-            throw Error(`Invalid address family. Got ${opts.family}`)
+            throw Error(`Invalid address family as STUN server. Got ${opts.family}`)
         }
       }
     }
 
-    this._useWebRTC = USE_WEBRTC
     this._peerId = libp2p.peerId
     this._multiaddrs = libp2p.multiaddrs
     this._upgrader = upgrader
     this._connectionManager = libp2p.connectionManager
     this._dialer = libp2p.dialer
 
-    if (this._useWebRTC) {
+    if (USE_WEBRTC) {
       this._webRTCUpgrader = new WebRTCUpgrader({ stunServers: this.stunServers })
     }
 
     this.discovery = new Discovery()
 
-    libp2p.handle(DELIVERY, this.handleDelivery.bind(this))
+    libp2p.handle(DELIVERY, this.handleIncoming.bind(this))
 
     this._relay = new Relay(libp2p, this._webRTCUpgrader)
     verbose(
@@ -115,79 +101,29 @@ class HoprConnect implements Transport {
     )
   }
 
-  async onReconnect(this: HoprConnect, newStream: RelayConnection, counterparty: PeerId): Promise<void> {
-    log(`####### inside reconnect #######`)
-
-    let newConn: Connection
-
-    try {
-      if (this._webRTCUpgrader != undefined) {
-        newConn = await this._upgrader.upgradeInbound(
-          new WebRTCConnection({
-            conn: newStream,
-            self: this._peerId,
-            counterparty,
-            channel: newStream.webRTC!.channel,
-            iteration: newStream._iteration
-          })
-        )
-      }
-
-      newConn = await this._upgrader.upgradeInbound(newStream)
-
-      this._dialer._pendingDials[counterparty.toB58String()]?.destroy()
-      this._connectionManager.connections.set(counterparty.toB58String(), [newConn])
-
-      this.connHandler?.(newConn)
-    } catch (err) {
-      error(err)
-    }
-  }
-
-  async handleDelivery(this: HoprConnect, handler: Handler): Promise<void> {
-    let newConn: Connection
-
-    try {
-      let relayConnection = await this._relay.handleRelayConnection(handler, this.onReconnect.bind(this))
-
-      if (relayConnection == null) {
-        return
-      }
-
-      newConn = await this._upgrader.upgradeInbound(relayConnection as MultiaddrConnection)
-    } catch (err) {
-      error(`Could not upgrade relayed connection. Error was: ${err}`)
-      return
-    }
-
-    this.discovery._peerDiscovered(newConn.remotePeer, [newConn.remoteAddr])
-
-    this.connHandler?.(newConn)
-  }
-
   /**
-   * @async
-   * @param ma
-   * @param options
-   * @param options.signal Used to abort dial requests
+   * Tries to establish a connection to the given destination
+   * @param ma destination
+   * @param options optional dial options
    * @returns An upgraded Connection
    */
-  async dial(ma: Multiaddr, options?: DialOptions): Promise<Connection> {
-    options = options || {}
+  async dial(ma: Multiaddr, options: DialOptions = {}): Promise<Connection> {
+    if (ma.getPeerId() === this._peerId.toB58String()) {
+      throw Error(`Cannot dial ourself`)
+    }
 
     let error: Error | undefined
     if (
       // uncommenting next line forces our node to use a relayed connection to any node execpt for the bootstrap server
       // (this.relays == null || this.relays.some((mAddr: Multiaddr) => ma.getPeerId() === mAddr.getPeerId())) &&
-      ['ip4', 'ip6', 'dns4', 'dns6'].includes(ma.protoNames()[0]) &&
-      this.isRealisticAddress(ma)
+      this.shouldAttemptDirectDial(ma)
     ) {
       try {
         verbose('attempting to dial directly', ma.toString())
         return await this._dialDirectly(ma, options)
       } catch (err) {
         if (
-          (err.code != null &&
+          (err.code != undefined && err.code != null &&
             ['ECONNREFUSED', 'ECONNRESET', 'EPIPE', 'EHOSTUNREACH', 'ETIMEOUT'].includes(err.code)) ||
           err.type === 'aborted'
         ) {
@@ -212,10 +148,10 @@ class HoprConnect implements Transport {
       )
     }
 
-    // Check whether we know some relays that we can use
+    // Prevent us from using our destination as a relay
     const potentialRelays = this.relays?.filter((mAddr: Multiaddr) => mAddr.getPeerId() !== ma.getPeerId())
 
-    if (potentialRelays == null || potentialRelays.length == 0) {
+    if (potentialRelays == undefined || potentialRelays.length == 0) {
       throw Error(
         `Destination ${chalk.yellow(
           ma.toString()
@@ -231,92 +167,6 @@ class HoprConnect implements Transport {
     return conn
   }
 
-  private async _dialWithRelay(ma: Multiaddr, relays: Multiaddr[], options?: DialOptions): Promise<Connection> {
-    let conn = await this._relay.establishRelayedConnection(ma, relays, this.onReconnect.bind(this), options)
-
-    return await this._upgrader.upgradeOutbound(conn)
-  }
-
-  private async _dialDirectly(ma: Multiaddr, options?: DialOptions): Promise<Connection> {
-    log(`Attempting to dial ${chalk.yellow(ma.toString())} directly`)
-    const socket = await this._connect(ma, options)
-    const maConn = socketToConn(socket, { remoteAddr: ma, signal: options?.signal })
-
-    verbose(
-      `Establishing a direct connection to ${maConn.remoteAddr.toString()} was successful. Continuing with the handshakes.`
-    )
-    const conn = await this._upgrader.upgradeOutbound(maConn)
-    verbose('outbound direct connection %s upgraded', maConn.remoteAddr)
-    return conn
-  }
-
-  /**
-   * @param ma
-   * @param options
-   * @param options.signal Used to abort dial requests
-   * @returns Resolves a TCP Socket
-   */
-  private _connect(ma: Multiaddr, options?: DialOptions): Promise<Socket> {
-    if (options?.signal?.aborted) {
-      throw new AbortError()
-    }
-
-    return new Promise<Socket>((resolve, reject) => {
-      const start = Date.now()
-      const cOpts = ma.toOptions()
-
-      log('dialing %j', cOpts)
-      const rawSocket = net.createConnection({
-        host: cOpts.host,
-        port: cOpts.port
-      })
-
-      const onError = (err: Error) => {
-        verbose('Error connecting:', err)
-        // ENETUNREACH
-        // ECONNREFUSED
-        // @TODO check error(s)
-        err.message = `connection error ${cOpts.host}:${cOpts.port}: ${err.message}`
-        done(err)
-      }
-
-      const onTimeout = () => {
-        log('connnection timeout %s:%s', cOpts.host, cOpts.port)
-        const err = errCode(new Error(`connection timeout after ${Date.now() - start}ms`), 'ERR_CONNECT_TIMEOUT')
-        // Note: this will result in onError() being called
-        rawSocket.emit('error', err)
-      }
-
-      const onConnect = () => {
-        log('connection opened %j', cOpts)
-        done()
-      }
-
-      const onAbort = () => {
-        log('connection aborted %j', cOpts)
-        rawSocket.destroy()
-        done(new AbortError())
-      }
-
-      const done = (err?: Error) => {
-        rawSocket.removeListener('error', onError)
-        rawSocket.removeListener('timeout', onTimeout)
-        rawSocket.removeListener('connect', onConnect)
-        options?.signal?.removeEventListener('abort', onAbort)
-
-        if (err) {
-          return reject(err)
-        }
-        resolve(rawSocket)
-      }
-
-      rawSocket.on('error', onError)
-      rawSocket.on('timeout', onTimeout)
-      rawSocket.on('connect', onConnect)
-      options?.signal?.addEventListener('abort', onAbort)
-    })
-  }
-
   /**
    * Creates a TCP listener. The provided `handler` function will be called
    * anytime a new incoming Connection has been successfully upgraded via
@@ -324,8 +174,8 @@ class HoprConnect implements Transport {
    * @param handler
    * @returns A TCP listener
    */
-  createListener(options: any, handler: (connection: Connection) => void): Listener {
-    if (options == null) {
+  createListener(options: any | undefined, handler: (connection: Connection) => void): Listener {
+    if (arguments.length == 1 && typeof options === 'function') {
       this.connHandler = options
     } else {
       this.connHandler = handler
@@ -334,45 +184,127 @@ class HoprConnect implements Transport {
   }
 
   /**
-   * Takes a list of `Multiaddr`s and returns only valid TCP addresses
+   * Takes a list of Multiaddrs and returns those addrs that we can use.
+   * @example
+   * Multiaddr(`/ip4/127.0.0.1/tcp/0`) // working
+   * Multiaddr(`/p2p/16Uiu2HAmCPgzWWQWNAn2E3UXx1G3CMzxbPfLr1SFzKqnFjDcbdwg`) // working
    * @param multiaddrs
-   * @returns Valid TCP multiaddrs
+   * @returns applicable Multiaddrs
    */
   filter(multiaddrs: Multiaddr[]): Multiaddr[] {
-    multiaddrs = Array.isArray(multiaddrs) ? multiaddrs : [multiaddrs]
-    verbose('filtering multiaddrs')
-    return multiaddrs.filter(
+    return (Array.isArray(multiaddrs) ? multiaddrs : [multiaddrs]).filter(
       (ma: Multiaddr) => mafmt.TCP.matches(ma.decapsulateCode(CODE_P2P)) || mafmt.P2P.matches(ma)
     )
   }
 
   /**
-   * Filters unrealistic addresses
+   * Attempts to establish a relayed connection to one of the given relays.
+   * @param ma destination
+   * @param relays potential relays that we can use
+   * @param options optional dial options
+   */
+  private async _dialWithRelay(ma: Multiaddr, relays: Multiaddr[], options?: DialOptions): Promise<Connection> {
+    let conn = await this._relay.establishRelayedConnection(ma, relays, this.onReconnect.bind(this), options)
+
+    return await this._upgrader.upgradeOutbound(conn)
+  }
+
+  /**
+   * Attempts to establish a direct connection
+   * @param ma destination
+   * @param options optional dial options
+   */
+  private async _dialDirectly(ma: Multiaddr, options?: DialOptions): Promise<Connection> {
+    log(`Attempting to dial ${chalk.yellow(ma.toString())} directly`)
+    const maConn = await TCPConnection.create(ma, options)
+
+    verbose(
+      `Establishing a direct connection to ${maConn.remoteAddr.toString()} was successful. Continuing with the handshake.`
+    )
+    const conn = await this._upgrader.upgradeOutbound(maConn)
+    verbose('outbound direct connection %s upgraded', maConn.remoteAddr)
+    return conn
+  }
+
+  /**
+   * Dialed once a reconnect happens
+   * @param newStream new relayed connection
+   * @param counterparty counterparty of the relayed connection
+   */
+  private async onReconnect(this: HoprConnect, newStream: RelayConnection, counterparty: PeerId): Promise<void> {
+    log(`####### inside reconnect #######`)
+
+    let newConn: Connection
+
+    try {
+      if (this._webRTCUpgrader != undefined) {
+        newConn = await this._upgrader.upgradeInbound(
+          new WebRTCConnection({
+            conn: newStream,
+            self: this._peerId,
+            counterparty,
+            channel: newStream.webRTC!.channel,
+            iteration: newStream._iteration
+          })
+        )
+      }
+
+      newConn = await this._upgrader.upgradeInbound(newStream)
+    } catch (err) {
+      error(err)
+      return
+    }
+
+    this._dialer._pendingDials[counterparty.toB58String()]?.destroy()
+    this._connectionManager.connections.set(counterparty.toB58String(), [newConn])
+
+    this.connHandler?.(newConn)
+  }
+
+  /**
+   * Dialed once a relayed connection is establishing
+   * @param handler handles the relayed connection
+   */
+  private async handleIncoming(this: HoprConnect, handler: Handler): Promise<void> {
+    let newConn: Connection
+
+    try {
+      let relayConnection = await this._relay.handleRelayConnection(handler, this.onReconnect.bind(this))
+
+      if (relayConnection == undefined) {
+        return
+      }
+
+      newConn = await this._upgrader.upgradeInbound(relayConnection)
+    } catch (err) {
+      error(`Could not upgrade relayed connection. Error was: ${err}`)
+      return
+    }
+
+    this.discovery._peerDiscovered(newConn.remotePeer, [newConn.remoteAddr])
+
+    this.connHandler?.(newConn)
+  }
+
+  /**
+   * Return true if we should attempt a direct dial.
    * @param ma Multiaddr to check
    */
-  private isRealisticAddress(ma: Multiaddr): boolean {
-    if (ma.getPeerId() === this._peerId.toB58String()) {
-      log('Tried to dial self, skipping.')
+  private shouldAttemptDirectDial(ma: Multiaddr): boolean {
+    let protoNames = ma.protoNames()
+    if (!['ip4', 'ip6', 'dns4', 'dns6'].includes(protoNames[0])) {
+      // We cannot call other protocols directly
       return false
     }
 
-    if (ma.protoNames()[0] === 'p2p') {
-      return true
-    }
+    let cOpts = ma.toOptions()
 
-    if (
-      ['ip4', 'ip6', 'dns4', 'dns6'].includes(ma.protoNames()[0]) &&
-      this._multiaddrs
-        .map((ma: Multiaddr) => ma.nodeAddress())
-        .filter(
-          (x) =>
-            x.address === ma.nodeAddress().address || // Same private network
-            ma.nodeAddress().address === '127.0.0.1' // localhost
-        )
-        .filter((x) => x.port == ma.nodeAddress().port).length // Same port // Therefore dialing self.
-    ) {
-      log(`Tried to dial host on same network / port - aborting: ${ma.toString()}`)
-      return false
+    for (const mAddr of this._multiaddrs) {
+      const ownOpts = mAddr.toOptions()
+
+      if (ownOpts.host === cOpts.host && ownOpts.port == cOpts.port) {
+        return false
+      }
     }
 
     return true

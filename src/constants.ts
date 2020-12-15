@@ -1,11 +1,12 @@
+import Multiaddr from 'multiaddr'
+
 // @ts-ignore
 const { name, version } = require('../package.json')
 
 export const NAME = name.replace(/@[a-zA-z0-9\-]+\//, '')
 
 // p2p multi-address code
-export const CODE_P2P = 421
-export const CODE_CIRCUIT = 290
+export const CODE_P2P = Multiaddr.protocols.names['p2p'].code
 
 // Time to wait for a connection to close gracefully before destroying it manually
 export const CLOSE_TIMEOUT = 6000

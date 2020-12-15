@@ -18,6 +18,7 @@ type ConnectionInfo = {
 
 export const STUN_TIMEOUT = 1000
 
+// Only used to determine the external address of the bootstrap server
 export const PUBLIC_STUN_SERVERS = [
   Multiaddr(`/dns4/stun.sipgate.net/udp/3478`),
   Multiaddr(`/dns4/stun.callwithus.com/udp/3478`),

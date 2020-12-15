@@ -38,12 +38,17 @@ declare module 'libp2p-interfaces' {
     on<U extends keyof PeerDiscoveryEvents>(event: U, listener: PeerDiscoveryEvents[U]): this
     emit<U extends keyof PeerDiscoveryEvents>(event: U, ...args: Parameters<PeerDiscoveryEvents[U]>): boolean
 
-    tag: string
     start(): Promise<void>
     stop(): Promise<void>
   }
 
-  export var PeerDiscovery: PeerDiscovery
+  interface PeerDiscoveryConstructor {
+    new (): PeerDiscovery
+
+    tag: string
+  }
+
+  export var PeerDiscovery: PeerDiscoveryConstructor
 
   interface ListenerEvents {
     listening: () => void
@@ -66,6 +71,7 @@ declare module 'libp2p-interfaces' {
     filter(mas: Multiaddr[]): Multiaddr[]
     dial(ma: Multiaddr, opts?: { signal?: AbortSignal }): Promise<Connection>
     createListener(opts: any, handlerFunction: (conn: Connection) => void): Listener
+    discovery?: PeerDiscovery
   }
   interface TransportConstructor {
     new (args: { upgrader: Upgrader; libp2p: LibP2P }): Transport

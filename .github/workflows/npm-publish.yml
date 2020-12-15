@@ -30,8 +30,8 @@ jobs:
         registry-url: 'https://registry.npmjs.org'
         # Defaults to the user or organization that owns the workflow file
         scope: '@mona' 
-    - run: yarn
-    - run: yarn publish
+    - run: yarn    
+    - run: npm publish
       env:
         NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
   publish-gpr:
@@ -45,6 +45,6 @@ jobs:
           registry-url: https://npm.pkg.github.com/
           scope: '@octocat' 
       - run: yarn
-      - run: yarn publish
+      - run: npm publish
         env:
           NODE_AUTH_TOKEN: ${{secrets.GITHUB_TOKEN}}

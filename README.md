@@ -35,7 +35,72 @@ A [transport module](https://github.com/libp2p/js-libp2p-interfaces/tree/master/
 - use nodes in the network as STUN and TURN servers
 - reconnect handling
 
-## Contributors
+## Usage
+
+### Dependencies
+
+- [ ] Node.js 12.x
+- [ ] yarn
+
+```sh
+yarn add libp2p
+yarn add libp2p-mplex
+yarn add libp2p-secio
+yarn add hopr-connect
+```
+
+### Startup
+
+Start a bootstrapServer
+
+```ts
+const libp2p = require('libp2p')
+const MPLEX = require('libp2p-mplex')
+const SECIO = require('libp2p-secio')
+
+import HoprConnect from 'hopr-connect'
+import Multiaddr from 'multiaddr'
+
+const node = await libp2p.create({
+  modules: {
+    transport: [HoprConnect],
+    streamMuxer: [MPLEX],
+    connEncryption: [SECIO],
+    peerDiscovery: [HoprConnect.discovery]
+  },
+  addresses: {
+    listen: Multiaddr(`/ip4/127.0.0.1/tcp/9091`)
+  }
+})
+```
+
+Start another client
+
+```ts
+const libp2p = require('libp2p')
+const MPLEX = require('libp2p-mplex')
+const SECIO = require('libp2p-secio')
+
+import HoprConnect from 'hopr-connect'
+import Multiaddr from 'multiaddr'
+
+const node = await libp2p.create({
+  modules: {
+    transport: [HoprConnect],
+    streamMuxer: [MPLEX],
+    connEncryption: [SECIO],
+    peerDiscovery: [HoprConnect.discovery]
+  },
+  config: {
+    HoprConnect: {
+      bootstrapServers: [
+        Multiaddr('/ip4/127.0.0.1/tcp/9091')
+      ]
+    }
+  }
+})
+```
+## Contributors [in alphabetical order]
 
 - [Jose Perez Aguinaga](https://github.com/jjperezaguinaga)
 - [Peter Braden](https://github.com/peterbraden)

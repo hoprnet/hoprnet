@@ -1,18 +1,18 @@
 declare module 'it-handshake' {
   type Stream = import('libp2p').Stream
 
-  export type Handshake = {
+  export type Handshake<T> = {
     reader: {
-      next(bytes: number): Promise<Uint8Array>
+      next(bytes: number): Promise<T>
     }
     writer: {
       end(): void
-      push(msg: Uint8Array): void
+      push(msg: T): void
     }
     stream: Stream
     rest(): void
-    write(msg: Uint8Array): void
-    read(): Promise<Uint8Array>
+    write(msg: T): void
+    read(): Promise<T>
   }
-  export default function (stream: Stream): Handshake
+  export default function<T> (stream: Stream): Handshake<T>
 }
