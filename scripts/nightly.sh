@@ -8,13 +8,20 @@ source scripts/cleanup.sh
 
 # Get version from package.json
 RELEASE=$(node -p -e "require('./packages/hoprd/package.json').version")
+IMG="gcr.io/hoprassociation/hoprd:$RELEASE"
 
 source scripts/dependencies.sh
-start_testnet nightly 5 "gcr.io/hoprassociation/hoprd:$RELEASE" 
 
-sleep 72000 # 20mins
+echo "Cleaning up devops before running nightly testnet"
+cleanup
+echo "Starting nightly testnet"
+start_testnet nightly 3 $IMG
+
+#sleep 72000 # 20mins
 
 # TODO download logs
+gcloud_get_logs nightly-bootstrap $IMG 
+
 
 cleanup
 

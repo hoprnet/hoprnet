@@ -73,3 +73,13 @@ gcloud_stop() {
   echo "Stopping docker image:$2 on vm $1"
   gssh $1 -- "export DOCKER_IMAGE=$2 && docker stop \$(docker ps -q --filter ancestor=\$DOCKER_IMAGE)"
 }
+
+# $1 - vm name
+# $2 - docker image
+gcloud_get_logs() {
+  local container_name=$(gssh $1 -- "docker ps -q --filter ancestor=$2")
+  local full_id=$(gssh $1 -- "docker inspect --format="{{.Id}}" $container_name")
+  gcloud compute scp $1:/var/lib/docker/containers/$full_id-json.log ./_tmp_logs
+  cat ./_tmp_logs
+  rm ./_tmp_logs
+}

@@ -123,8 +123,7 @@ start_bootstrap() {
   BOOTSTRAP_HOPR_ADDRESS=$(get_hopr_address $ip)
   echo "- Bootstrap Server ETH Address: $BOOTSTRAP_ETH_ADDRESS" 1>&2
   echo "- Bootstrap Server HOPR Address: $BOOTSTRAP_HOPR_ADDRESS" 1>&2
-  #TODO fund_if_empty $BOOTSTRAP_ETH_ADDRESS
-
+  fund_if_empty $BOOTSTRAP_ETH_ADDRESS 1>&2
   echo "/ip4/$ip/tcp/9091/p2p/$BOOTSTRAP_HOPR_ADDRESS"
 }
 

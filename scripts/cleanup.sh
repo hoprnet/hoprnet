@@ -46,5 +46,3 @@ cleanup () {
   cleanup_instances
 }
 
-cleanup
-
