@@ -3,14 +3,8 @@ set -e #u
 shopt -s expand_aliases
 #set -o xtrace
 
-source scripts/cd/environments.sh
-source scripts/cd/testnet.sh
-
-
-hoprd_image() {
-  # For example ...hoprd:1.0.1-next-1234
-  echo "gcr.io/hoprassociation/hoprd:$RELEASE"
-}
+source scripts/environments.sh
+source scripts/testnet.sh
 
 # ---- On Deployment -----
 #
@@ -26,8 +20,7 @@ if [ -z "$RPC" ]; then
   RPC=https://rpc-mainnet.matic.network
 fi
 
-# -- Setup Dependencies --
-ethers --version || npm install -g @ethersproject/cli
+source scripts/dependencies.sh
 
 # Get version from package.json
 RELEASE=$(node -p -e "require('./packages/hoprd/package.json').version")
@@ -41,4 +34,4 @@ TESTNET_SIZE=3
 color()(set -o pipefail;"$@" 2>&1>&3|sed $'s,.*,\e[31m&\e[m,'>&2)3>&1
 
 echo "Starting testnet '$TESTNET_NAME' with $TESTNET_SIZE nodes"
-color start_testnet $TESTNET_NAME $TESTNET_SIZE $(hoprd_image)
+color start_testnet $TESTNET_NAME $TESTNET_SIZE "gcr.io/hoprassociation/hoprd:$RELEASE" 

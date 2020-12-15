@@ -1,7 +1,9 @@
 #!/bin/bash
 set -e #u
 
-source scripts/cd/gcloud.sh
+if [ -z "$GCLOUD_INCLUDED" ]; then
+  source scripts/gcloud.sh 
+fi
 
 MIN_FUNDS=0.01291
 HOPRD_ARGS="--data='/app/db/ethereum/testnet/bootstrap' --password='$BS_PASSWORD'"

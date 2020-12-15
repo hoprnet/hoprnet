@@ -1,8 +1,5 @@
 #!/bin/bash
 set -e #u
-shopt -s expand_aliases
-
-
 
 # ------ GCloud utilities ------
 #
