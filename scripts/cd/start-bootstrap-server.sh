@@ -18,7 +18,6 @@ MIN_FUNDS=0.01291
 HOPRD_ARGS="--data='/app/db/ethereum/testnet/bootstrap' --password='$BS_PASSWORD'"
 ZONE="--zone=europe-west6-a"
 
-alias wallet="ethers --rpc $RPC --account $FUNDING_PRIV_KEY"
 
 hoprd_image() {
   # For example ...hoprd:1.0.1-next-1234
@@ -32,7 +31,7 @@ gcloud_disk_name() {
 
 # $1=account (hex)
 balance() {
-  wallet eval "new ethers.providers.JsonRpcProvider('$RPC').getBalance('$1').then(b => formatEther(b))"
+  ethers eval "new ethers.providers.JsonRpcProvider('$RPC').getBalance('$1').then(b => formatEther(b))"
 }
 
 # $1=account (hex)
@@ -40,10 +39,10 @@ fund_if_empty() {
   echo "Checking balance of $1"
   local BALANCE="$(balance $1)"
   echo "Balance is $BALANCE"
-  if [$BALANCE = '0.0']; then
+  if [ "$BALANCE" = '0.0' ]; then
     echo "Funding account ..."
-    wallet send $1 $MIN_FUNDS --yes
-    sleep 1m
+    ethers send --rpc "$RPC" --account "$FUNDING_PRIV_KEY" "$1" $MIN_FUNDS --yes
+    sleep 60
   fi
 }
 
@@ -71,6 +70,7 @@ update_or_create_bootstrap_vm() {
     fi
     echo "Previous GCloud VM Image: $PREV"
     gcloud_update_container_with_image $1 $(hoprd_image) $(gcloud_disk_name) "/app/db"
+    sleep 60
   else
     echo "No container found, creating $1"
     local ip=$(gcloud_get_address $1)
@@ -80,7 +80,7 @@ update_or_create_bootstrap_vm() {
       --metadata=google-logging-enabled=true --maintenance-policy=MIGRATE \
       --create-disk name=$(gcloud_disk_name),size=10GB,type=pd-ssd,mode=rw \
       --container-mount-disk mount-path="/app/db" \
-      --tags=hopr-node,web-client,portainer \
+      --tags=hopr-node,web-client,rest-client,portainer \
       --boot-disk-size=10GB --boot-disk-type=pd-standard \
       --container-env=^,@^DEBUG=hopr\*,@NODE_OPTIONS=--max-old-space-size=4096 \
       --container-image=$(hoprd_image) \
@@ -91,7 +91,7 @@ update_or_create_bootstrap_vm() {
       --container-arg="--restHost" --container-arg="0.0.0.0" \
       --container-arg="--admin" \
       --container-restart-policy=always
-    sleep 2m
+    sleep 120
   fi
 }
 
@@ -115,6 +115,6 @@ start_bootstrap() {
   echo "Bootstrap Server ETH Address: $BOOTSTRAP_ETH_ADDRESS"
   echo "Bootstrap Server HOPR Address: $BOOTSTRAP_HOPR_ADDRESS"
 
-  fund_if_empty $BOOTSTRAP_ADDRESS
+  fund_if_empty $BOOTSTRAP_ETH_ADDRESS
 }
 
