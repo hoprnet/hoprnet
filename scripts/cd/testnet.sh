@@ -86,8 +86,9 @@ update_or_create_bootstrap_vm() {
 # $2 docker image
 start_bootstrap() {
   local vm=$(vm_name bootstrap $1)
+  echo "- Starting bootstrap server for $1 at ($vm) with $2"
   local ip=$(gcloud_get_address $vm)
-  echo "- Starting bootstrap server for $1 at $ip ($vm) with $2"
+  echo "- public ip for bootstrap server: $ip"
   update_or_create_bootstrap_vm $vm $2
   BOOTSTRAP_ETH_ADDRESS=$(get_eth_address $ip)
   BOOTSTRAP_HOPR_ADDRESS=$(get_hopr_address $ip)
@@ -115,6 +116,4 @@ start_testnet() {
     echo "Start node $i"
   done
 }
-
-start_testnet "test" 3 "gcr.io/hoprassociation/hoprd:1.57.0-next.36"
 

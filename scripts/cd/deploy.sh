@@ -35,6 +35,8 @@ RELEASE=$(node -p -e "require('./packages/hoprd/package.json').version")
 # Get RELEASE_NAME, from environment
 get_environment
 
+TESTNET_NAME="$RELEASE_NAME-$VERSION_MAJ_MIN"
+TESTNET_SIZE=3
 
-
-start_testnet $RELEASE_NAME 1 $(hoprd_image)
+echo "Starting testnet '$TESTNET_NAME' with $TESTNET_SIZE nodes"
+start_testnet $TESTNET_NAME $TESTNET_SIZE $(hoprd_image)

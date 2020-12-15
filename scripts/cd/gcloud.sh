@@ -31,7 +31,7 @@ gcloud_get_address() {
   local ip=$(gcloud compute addresses describe $1 $REGION 2>&1)
   # Google does not return an appropriate exit code :(
   if [ "$(echo "$ip" | grep 'ERROR')" ]; then
-    echo "No address, creating"
+    echo "No address, creating" 1>&2
     gcloud compute addresses create $1 $REGION
     local ip=$(gcloud compute addresses describe $1 $REGION 2>&1)
   fi

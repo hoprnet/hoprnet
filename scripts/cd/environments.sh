@@ -11,7 +11,7 @@ function get_version_maj_min() {
 }
 
 # These will be cleaned up and machines stopped
-OLD_RELEASES='zurich zug luzern basodino saentis'
+OLD_RELEASES='zurich zug luzern basodino saentis debug-dbg'
 
 # ===== Load env variables for the current github ref =====
 # Takes:
