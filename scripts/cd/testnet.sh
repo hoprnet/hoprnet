@@ -50,10 +50,10 @@ get_hopr_address() {
 # $2 = docker image
 update_if_existing() {
   if [[ $(gcloud_find_vm_with_name $1) ]]; then
-    echo "Container exists, updating"
+    echo "Container exists, updating" 1>&2
     PREV=$(gcloud_get_image_running_on_vm $1)
     if [ "$PREV" == "$2" ]; then 
-      echo "Same version of image is currently running. Skipping update to $PREV"
+      echo "Same version of image is currently running. Skipping update to $PREV" 1>&2
       return 0
     fi
     echo "Previous GCloud VM Image: $PREV"
@@ -102,6 +102,8 @@ start_testnode_vm() {
       --container-arg="--init" --container-arg="true" \
       --container-arg="--rest" --container-arg="true" \
       --container-arg="--restHost" --container-arg="0.0.0.0" \
+      --container-arg="--bootstrapServers" --container-arg="$3" \
+      --container-arg="--run" --container-arg="cover-traffic start;daemonize" \
       --container-arg="--admin" \
       --container-restart-policy=always
   fi
