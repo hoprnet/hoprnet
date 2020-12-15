@@ -100,3 +100,11 @@ const node = await libp2p.create({
   }
 })
 ```
+## Contributors [in alphabetical order]
+
+- [Jose Perez Aguinaga](https://github.com/jjperezaguinaga)
+- [Peter Braden](https://github.com/peterbraden)
+- [Sebastian Bürgel](https://github.com/scbuergel)
+- [Robert Kiel](https://github.com/robertkiel)
+
+and the rest of the HOPR team!
