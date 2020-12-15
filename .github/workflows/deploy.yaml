@@ -212,7 +212,7 @@ jobs:
         run: gcloud config set project ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
       - name: Run start script
         run: |
-          bash scripts/cd/deploy.sh
+          bash scripts/deploy.sh
         env:
           FUNDING_PRIV_KEY: ${{ secrets.FUNDING_WALLET_PRIVATE_KEY }}
           RPC: ${{ secrets.FUNDING_RPC_MATIC_URL }}
