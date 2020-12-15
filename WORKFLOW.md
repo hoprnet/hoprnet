@@ -7,11 +7,17 @@ workflow to streamline the process we use to implement the HOPR protocol.
 
 ## Principles
 
-- **Automation-first**: Rely on automation as much as possible. **Tests & CI**:
-- Tests should prevent bad deployments and API regressions. Continuous
-- integration ensures all our code is tested before being merged into our
-- baseline. **Releases & CD**: Every week, we do a code-freeze in our codebase
-- by branching out a specific release, which we then deploy on every change.
+### Automation-first
+Rely on automation as much as possible.
+
+### Tests & CI
+Tests should prevent bad deployments and API regressions. Continuous
+integration ensures all our code is tested before being merged into our
+baseline.
+
+### Releases & CD
+Every week, we do a code-freeze in our codebase
+by branching out a specific release, which we then deploy on every change.
 
 ## Rules
 
@@ -49,7 +55,7 @@ workflow to streamline the process we use to implement the HOPR protocol.
 1.1 The IP for the bootstrap node currently needs to be manually assigned.
 
 1.2 Insert name and IP of the new bootstrap server machine into
-`scripts/cd/environment.sh`
+`scripts/environment.sh`
 
 1.3 Update DNS entry for
 `_dnsaddr.<releaseNativeCurrency>.<releaseName>.bootstrap.hoprnet.org/`
@@ -67,15 +73,17 @@ Verify this with `dig -t TXT _dnsaddr.<releaseNativeCurrency>.<releaseName>.boot
 
 We made active use of actions to automate tasks trivial to our workflow.
 
-- **Pre-release Version Bump**. When a PR to `master` is merged, an action bumps
-- the package.json pre-release version and commits that change to `master`.
+### Pre-release Version Bump
+When a PR to `master` is merged, an action bumps the package.json pre-release 
+version and commits that change to `master`.
 
-- **Tag Release**. When a PR to `master` is merged, a tag is pushed specifying
-- that feature on that version.
+### Tag Release
+When a PR to `master` is merged, a tag is pushed specifying that feature on that version.
 
-- **Release Version Bump**. On first build, a `release/**` bumps the
-- package.json by a `minor`, clearing the `pre-release` tag. Subsequent commits
-- on `release` branches bump the `patch` version.
+### Release Version Bump
+On first build, a `release/**` bumps the package.json by a `minor`, clearing 
+the `pre-release` tag. Subsequent commits on `release` branches bump the 
+`patch` version.
 
 ## Branches
 
