@@ -453,7 +453,7 @@ export function TransactionSigner(web3: Web3, network: Network, privKey: Uint8Ar
         gas: options.gas,
         gasPrice: options.gasPrice,
         nonce: options.nonce,
-        hash: signedTransaction.rawTransaction
+        hash: signedTransaction.transactionHash
       })
       return web3.eth.sendSignedTransaction(signedTransaction.rawTransaction)
     }
