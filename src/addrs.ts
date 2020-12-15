@@ -1,8 +1,11 @@
-import { networkInterfaces } from 'os'
+import { networkInterfaces, NetworkInterfaceInfo } from 'os'
 import Multiaddr from 'multiaddr'
 
+import Debug from 'debug'
+const log = Debug('hopr-connect')
+
 export function isAnyAddress(ma: Multiaddr) {
-  if (!['ip4', 'ip6', 'dns4', 'dns6'].includes(ma.protoNames()[0])) {
+  if (!['ip4', 'ip6'].includes(ma.protoNames()[0])) {
     return false
   }
 
@@ -51,6 +54,7 @@ export function getAddrs(
   port: number,
   peerId: string,
   options?: {
+    interface?: string
     useIPv4?: boolean
     useIPv6?: boolean
     includeLocalIPv4?: boolean
@@ -59,7 +63,23 @@ export function getAddrs(
     includeLocalhostIPv6?: boolean
   }
 ) {
-  const interfaces = Object.values(networkInterfaces())
+  let interfaces: NetworkInterfaceInfo[][]
+
+  if (options?.interface != undefined) {
+    let _tmp = networkInterfaces()[options.interface]
+
+    if (_tmp == undefined) {
+      log(
+        `Interface <${options.interface}> does not exist on this machine. Available are <${Object.keys(
+          networkInterfaces()
+        ).join(', ')}>`
+      )
+      return []
+    }
+    interfaces = [_tmp]
+  } else {
+    interfaces = Object.values(networkInterfaces())
+  }
 
   const multiaddrs: Multiaddr[] = []
 
@@ -68,28 +88,28 @@ export function getAddrs(
 
     for (let j = 0; j < addresses.length; j++) {
       if (isLinkLocaleAddress(addresses[j].address, addresses[j].family)) {
-        if (addresses[j].family === 'IPv4' && (options == null || options.includeLocalIPv4 != true)) {
+        if (addresses[j].family === 'IPv4' && (options == undefined || options.includeLocalIPv4 != true)) {
           continue
         }
-        if (addresses[j].family === 'IPv6' && (options == null || options.includeLocalIPv6 != true)) {
+        if (addresses[j].family === 'IPv6' && (options == undefined || options.includeLocalIPv6 != true)) {
           continue
         }
       }
 
       if (isLocalhostAddress(addresses[j].address, addresses[j].family)) {
-        if (addresses[j].family === 'IPv4' && (options == null || options.includeLocalhostIPv4 != true)) {
+        if (addresses[j].family === 'IPv4' && (options == undefined || options.includeLocalhostIPv4 != true)) {
           continue
         }
-        if (addresses[j].family === 'IPv6' && (options == null || options.includeLocalhostIPv6 != true)) {
+        if (addresses[j].family === 'IPv6' && (options == undefined || options.includeLocalhostIPv6 != true)) {
           continue
         }
       }
 
-      if (addresses[j].family === 'IPv4' && options != null && options.useIPv4 == false) {
+      if (addresses[j].family === 'IPv4' && options != undefined && options.useIPv4 == false) {
         continue
       }
 
-      if (addresses[j].family === 'IPv6' && options != null && options.useIPv6 == false) {
+      if (addresses[j].family === 'IPv6' && options != undefined && options.useIPv6 == false) {
         continue
       }
 

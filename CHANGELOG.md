@@ -1,4 +1,14 @@
-<a name="0.1"></a>
+<a name="0.1.2"></a>
+
+## [0.1.2](https://github.com/hoprnet/hopr-connect/compare/0.1.1...0.1.2) (2020-12-15)
+
+### Fixes
+
+* improved addressing and effective countermeasures against self-dials
+* stronger typing
+* various control-flow fixes
+
+<a name="0.1.1"></a>
 
 ## [0.1.1](https://github.com/hoprnet/hopr-connect/compare/0.1...0.1.1) (2020-12-04)
 

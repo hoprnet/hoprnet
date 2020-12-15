@@ -8,7 +8,7 @@ declare module 'stream-to-it' {
   export function duplex<T>(
     stream: Duplex
   ): {
-    sink: (stream: AsyncGenerator<T, T | void>) => Promise<void>
-    source: AsyncGenerator<T, T | void>
+    sink: (stream: AsyncGenerator<T, void>) => Promise<void>
+    source: AsyncGenerator<T, void>
   }
 }

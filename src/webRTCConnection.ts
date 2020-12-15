@@ -97,7 +97,7 @@ class WebRTCConnection implements MultiaddrConnection {
         sourceDone = arg.done || false
 
         if (!arg.done) {
-          sourceMsg = arg.value as Uint8Array
+          sourceMsg = arg.value
         }
       }
 
@@ -172,7 +172,7 @@ class WebRTCConnection implements MultiaddrConnection {
 
         if (this._webRTCAvailable) {
           toIterable.sink(this.channel)(
-            async function* (this: WebRTCConnection) {
+            async function* (this: WebRTCConnection): Stream['source'] {
               if (promiseTriggered && !sourceReceived) {
                 if (!sourceReceived) {
                   await sourcePromise
@@ -193,7 +193,7 @@ class WebRTCConnection implements MultiaddrConnection {
 
                 // @ts-ignore
                 if (this.channel.connected && this._iteration == (this.conn as RelayConnection)._iteration) {
-                  yield (result.value as Uint8Array).slice()
+                  yield result.value.slice()
                 } else {
                   break
                 }

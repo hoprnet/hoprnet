@@ -37,11 +37,25 @@ A [transport module](https://github.com/libp2p/js-libp2p-interfaces/tree/master/
 
 ## Usage
 
+### Dependencies
+
+- [ ] Node.js 12.x
+- [ ] yarn
+
+```sh
+yarn add libp2p
+yarn add libp2p-mplex
+yarn add libp2p-secio
+yarn add hopr-connect
+```
+
+### Startup
+
 Start a bootstrapServer
 
 ```ts
 const libp2p = require('libp2p')
-const Mplex = require('libp2p-mplex')
+const MPLEX = require('libp2p-mplex')
 const SECIO = require('libp2p-secio')
 
 import HoprConnect from 'hopr-connect'
@@ -51,17 +65,20 @@ const node = await libp2p.create({
   modules: {
     transport: [HoprConnect],
     streamMuxer: [MPLEX],
-    connEncryption: [NOISE],
+    connEncryption: [SECIO],
     peerDiscovery: [HoprConnect.discovery]
+  },
+  addresses: {
+    listen: Multiaddr(`/ip4/127.0.0.1/tcp/9091`)
   }
 })
 ```
 
-Assume that the bootstrap server was started at `1.2.3.4:9091`
+Start another client
 
 ```ts
 const libp2p = require('libp2p')
-const Mplex = require('libp2p-mplex')
+const MPLEX = require('libp2p-mplex')
 const SECIO = require('libp2p-secio')
 
 import HoprConnect from 'hopr-connect'
@@ -71,13 +88,13 @@ const node = await libp2p.create({
   modules: {
     transport: [HoprConnect],
     streamMuxer: [MPLEX],
-    connEncryption: [NOISE],
+    connEncryption: [SECIO],
     peerDiscovery: [HoprConnect.discovery]
   },
   config: {
     HoprConnect: {
       bootstrapServers: [
-        Multiaddr('/ip4/1.2.3.4/tcp/9091')
+        Multiaddr('/ip4/127.0.0.1/tcp/9091')
       ]
     }
   }
