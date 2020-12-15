@@ -29,7 +29,7 @@ fund_if_empty() {
   local BALANCE="$(balance $1)"
   echo "Balance is $BALANCE"
   if [ "$BALANCE" = '0.0' ]; then
-    echo "Funding account ..."
+    echo "Funding account ... $RPC -> $1 $MIN_FUNDS"
     ethers send --rpc "$RPC" --account "$FUNDING_PRIV_KEY" "$1" $MIN_FUNDS --yes
     sleep 60
   fi
