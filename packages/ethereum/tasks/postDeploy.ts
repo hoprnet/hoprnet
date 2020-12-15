@@ -1,5 +1,5 @@
 import type { HardhatRuntimeEnvironment } from 'hardhat/types'
-import type { DeployFunction, Export } from 'hardhat-deploy/types'
+import type { Export } from 'hardhat-deploy/types'
 import { join } from 'path'
 import { promises, existsSync } from 'fs'
 

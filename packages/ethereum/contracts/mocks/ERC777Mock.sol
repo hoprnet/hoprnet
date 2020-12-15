@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.6.0;
+pragma solidity ^0.7.5;
 
 import "@openzeppelin/contracts/GSN/Context.sol";
 import "@openzeppelin/contracts/token/ERC777/ERC777.sol";
@@ -11,7 +11,7 @@ contract ERC777Mock is Context, ERC777 {
         string memory name,
         string memory symbol,
         address[] memory defaultOperators
-    ) public ERC777(name, symbol, defaultOperators) {
+    ) ERC777(name, symbol, defaultOperators) {
         _mint(initialHolder, initialBalance, "", "");
     }
 
