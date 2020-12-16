@@ -1,8 +1,11 @@
+/// <reference path="./@types/libp2p-interfaces.ts" />
+
 import net, { AddressInfo, Socket as TCPSocket } from 'net'
 import dgram, { RemoteInfo } from 'dgram'
 
 import { EventEmitter } from 'events'
 import debug from 'debug'
+import { NetworkInterfaceInfo, networkInterfaces } from 'os'
 
 import { CODE_P2P } from './constants'
 import type { Connection, ConnHandler } from 'libp2p'
@@ -12,7 +15,7 @@ import { MultiaddrConnection, Upgrader } from 'libp2p'
 import Multiaddr from 'multiaddr'
 
 import { handleStunRequest, getExternalIp } from './stun'
-import { getAddrs } from './addrs'
+import { getAddrs, isAnyAddress } from './addrs'
 import { TCPConnection } from './tcp'
 
 const log = debug('hopr-connect:listener')
@@ -62,7 +65,8 @@ class Listener extends EventEmitter implements InterfaceListener {
     private handler: ConnHandler | undefined,
     private upgrader: Upgrader,
     private stunServers: Multiaddr[] | undefined,
-    private peerId: PeerId
+    private peerId: PeerId,
+    private _interface: string | undefined
   ) {
     super()
 
@@ -122,13 +126,38 @@ class Listener extends EventEmitter implements InterfaceListener {
       }
 
       // Replace wrong PeerId in given listeningAddr
-      log(`replacing peerId in ${ma.toString()} by ${this.peerId.toB58String()}`)
+      log(`replacing peerId in ${ma.toString()} by our peerId which is ${this.peerId.toB58String()}`)
       this.listeningAddr = tmpListeningAddr.encapsulate(`/p2p/${this.peerId.toB58String()}`)
     } else {
       this.listeningAddr = ma
     }
 
     const options = this.listeningAddr.toOptions()
+
+    if (this._interface != undefined) {
+      const osInterface = networkInterfaces()[this._interface].filter(
+        (iface: NetworkInterfaceInfo) => iface.family.toLowerCase() == options.family && !iface.internal
+      )
+
+      if (osInterface == undefined) {
+        throw Error(`Desired interface <${this._interface}> does not exist or does not have any external addresses.`)
+      }
+
+      const index = osInterface.findIndex((iface) => options.host == iface.address)
+
+      if (!isAnyAddress(ma) && index < 0) {
+        throw Error(
+          `Could not bind to interface ${this._interface} on address ${
+            options.host
+          } because it was configured with a different addresses: ${osInterface
+            .map((iface) => iface.address)
+            .join(`, `)}`
+        )
+      }
+
+      // @TODO figure what to do if there is more than one address
+      options.host = osInterface[0].address
+    }
 
     // Prevent from sending a STUN request to ourself
     this.stunServers = this.stunServers?.filter((ma) => {

@@ -22,9 +22,9 @@ export function isAnyAddress(ma: Multiaddr) {
   return false
 }
 
-function isLinkLocaleAddress(address: string, family: 'IPv4' | 'IPv6') {
-  switch (family) {
-    case 'IPv4':
+export function isLinkLocaleAddress(address: string, family: 'IPv4' | 'IPv6' | 'ipv4' | 'ipv6') {
+  switch (family.toLowerCase()) {
+    case 'ipv4':
       return (
         address.startsWith('192.168.') ||
         address.startsWith('10.') ||
@@ -32,7 +32,7 @@ function isLinkLocaleAddress(address: string, family: 'IPv4' | 'IPv6') {
         address.startsWith('169.254.') ||
         address.startsWith('100.64')
       )
-    case 'IPv6':
+    case 'ipv6':
       return address.startsWith('fe80')
     default:
       throw Error(`Invalid address family`)
