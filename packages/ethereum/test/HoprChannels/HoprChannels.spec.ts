@@ -108,7 +108,7 @@ describe('HoprChannels', function () {
     expect(accountABalance.toString()).to.equal('0')
   })
 
-  it.only('should fund using send', async function () {
+  it('should fund using send', async function () {
     const { hoprToken, hoprChannels } = await useFixtures()
 
     const response = await hoprToken.send(
