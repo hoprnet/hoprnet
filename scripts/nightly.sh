@@ -6,6 +6,10 @@ source scripts/cleanup.sh
 
 # ----- Nightly integration / network test. --------
 
+if [ -z "$RPC" ]; then
+  RPC=https://rpc-mainnet.matic.network
+fi
+
 # Get version from package.json
 RELEASE=$(node -p -e "require('./packages/hoprd/package.json').version")
 IMG="gcr.io/hoprassociation/hoprd:$RELEASE"

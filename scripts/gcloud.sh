@@ -44,7 +44,7 @@ gcloud_get_address() {
 
 # $1 = VM name
 gcloud_find_vm_with_name() {
-  echo $(gcloud compute instances list | grep "$1")
+  echo $(gcloud compute instances list | grep "$1" | grep 'RUNNING')
 }
 
 # $1 - VM name
