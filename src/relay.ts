@@ -67,14 +67,15 @@ class Relay {
       throw new Error()
     }
 
-    const potentialRelays = relays.filter((mAddr: Multiaddr) => mAddr.getPeerId() !== this._peerId.toB58String())
+    const invalidPeerIds = [ma.getPeerId(), this._peerId.toB58String()]
 
-    if (potentialRelays.length == 0) {
-      throw Error(`Filtered list of relays and there is no one left to establish a connection. `)
-    }
+    for (const potentialRelay of relays) {
+      if (invalidPeerIds.includes(potentialRelay.getPeerId())) {
+        log(`Skipping ${potentialRelay.getPeerId()} because we cannot use destination as relay node.`)
+        continue
+      }
 
-    for (let i = 0; i < potentialRelays.length; i++) {
-      let relayConnection = await this._tryPotentialRelay(potentialRelays[i], destination, onReconnect)
+      let relayConnection = await this._tryPotentialRelay(potentialRelay, destination, onReconnect)
 
       if (relayConnection != null) {
         return relayConnection as RelayConnection
@@ -83,7 +84,7 @@ class Relay {
 
     throw Error(
       `Unable to establish a connection to any known relay node. Tried ${chalk.yellow(
-        potentialRelays.map((potentialRelay: Multiaddr) => potentialRelay.toString()).join(`, `)
+        relays.map((potentialRelay: Multiaddr) => potentialRelay.toString()).join(`, `)
       )}`
     )
   }

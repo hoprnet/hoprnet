@@ -19,6 +19,8 @@ const log = debug('hopr-connect')
 const error = debug('hopr-connect:error')
 const verbose = debug('hopr-connect:verbose')
 
+const EXPECTED_DIAL_ERRORS = ['ECONNREFUSED', 'ECONNRESET', 'EPIPE', 'EHOSTUNREACH', 'ETIMEOUT']
+
 /**
  * @class HoprConnect
  */
@@ -38,28 +40,21 @@ class HoprConnect implements Transport {
   private _connectionManager: ConnectionManager
   private _dialer: Dialer
   private _webRTCUpgrader?: WebRTCUpgrader
+  private _interface?: string
   private connHandler?: ConnHandler
 
-  constructor({
-    upgrader,
-    libp2p,
-    bootstrapServers
-  }: {
-    upgrader: Upgrader
-    libp2p: libp2p
-    bootstrapServers?: Multiaddr[]
-  }) {
-    if (!upgrader) {
+  constructor(opts: { upgrader: Upgrader; libp2p: libp2p; bootstrapServers?: Multiaddr[]; interface?: string }) {
+    if (!opts.upgrader) {
       throw new Error('An upgrader must be provided. See https://github.com/libp2p/interface-transport#upgrader.')
     }
 
-    if (!libp2p) {
+    if (!opts.libp2p) {
       throw new Error('Transport module needs access to libp2p.')
     }
 
-    if (bootstrapServers != undefined && bootstrapServers.length > 0) {
-      this.relays = bootstrapServers.filter(
-        (ma: Multiaddr) => ma != undefined && !libp2p.peerId.equals(PeerId.createFromCID(ma.getPeerId()))
+    if (opts.bootstrapServers != undefined && opts.bootstrapServers.length > 0) {
+      this.relays = opts.bootstrapServers.filter(
+        (ma: Multiaddr) => ma != undefined && !opts.libp2p.peerId.equals(PeerId.createFromCID(ma.getPeerId()))
       )
 
       this.stunServers = []
@@ -79,11 +74,12 @@ class HoprConnect implements Transport {
       }
     }
 
-    this._peerId = libp2p.peerId
-    this._multiaddrs = libp2p.multiaddrs
-    this._upgrader = upgrader
-    this._connectionManager = libp2p.connectionManager
-    this._dialer = libp2p.dialer
+    this._peerId = opts.libp2p.peerId
+    this._multiaddrs = opts.libp2p.multiaddrs
+    this._upgrader = opts.upgrader
+    this._connectionManager = opts.libp2p.connectionManager
+    this._dialer = opts.libp2p.dialer
+    this._interface = opts.interface
 
     if (USE_WEBRTC) {
       this._webRTCUpgrader = new WebRTCUpgrader({ stunServers: this.stunServers })
@@ -91,9 +87,9 @@ class HoprConnect implements Transport {
 
     this.discovery = new Discovery()
 
-    libp2p.handle(DELIVERY, this.handleIncoming.bind(this))
+    opts.libp2p.handle(DELIVERY, this.handleIncoming.bind(this))
 
-    this._relay = new Relay(libp2p, this._webRTCUpgrader)
+    this._relay = new Relay(opts.libp2p, this._webRTCUpgrader)
     verbose(
       `Created ${this[Symbol.toStringTag]} stack (Stun: ${this.stunServers
         ?.map((server: Multiaddr) => server.toString())
@@ -112,7 +108,7 @@ class HoprConnect implements Transport {
       throw Error(`Cannot dial ourself`)
     }
 
-    let error: Error | undefined
+    let err: Error | undefined
     if (
       // uncommenting next line forces our node to use a relayed connection to any node execpt for the bootstrap server
       // (this.relays == null || this.relays.some((mAddr: Multiaddr) => ma.getPeerId() === mAddr.getPeerId())) &&
@@ -121,48 +117,27 @@ class HoprConnect implements Transport {
       try {
         verbose('attempting to dial directly', ma.toString())
         return await this._dialDirectly(ma, options)
-      } catch (err) {
-        if (
-          (err.code != undefined && err.code != null &&
-            ['ECONNREFUSED', 'ECONNRESET', 'EPIPE', 'EHOSTUNREACH', 'ETIMEOUT'].includes(err.code)) ||
-          err.type === 'aborted'
-        ) {
+      } catch (_err) {
+        if ((_err != null && EXPECTED_DIAL_ERRORS.includes(_err.code)) || _err.type === 'aborted') {
           // expected case, continue
-          error = err
+          err = _err
         } else {
           // Unexpected error, ie:
           // type === aborted
-          verbose(`Dial directly unexpected error ${err}`)
-          throw err
+          error(`Dial directly unexpected error ${_err}`)
+          throw _err
         }
       }
     }
 
     if (this.relays == undefined || this.relays.length == 0) {
       throw Error(
-        `Could not connect ${chalk.yellow(
-          ma.toString()
-        )} because we can't connect directly and we have no potential relays.${
-          error != undefined ? ` Connection error was:\n${error}` : ''
-        }`
-      )
-    }
-
-    // Prevent us from using our destination as a relay
-    const potentialRelays = this.relays?.filter((mAddr: Multiaddr) => mAddr.getPeerId() !== ma.getPeerId())
-
-    if (potentialRelays == undefined || potentialRelays.length == 0) {
-      throw Error(
-        `Destination ${chalk.yellow(
-          ma.toString()
-        )} cannot be accessed and directly and there is no other relay node known except ourself.${
-          error != null ? ` Connection error was:\n${error}` : ''
-        }`
+        `Could not connect to ${chalk.yellow(ma.toString())}: Direct connection failed and there are no relays known.`
       )
     }
 
     verbose('dialing with relay ', ma.toString())
-    const conn = await this._dialWithRelay(ma, potentialRelays, options)
+    const conn = await this._dialWithRelay(ma, this.relays, options)
     log(`relayed connection established`)
     return conn
   }
@@ -180,7 +155,7 @@ class HoprConnect implements Transport {
     } else {
       this.connHandler = handler
     }
-    return new Listener(this.connHandler, this._upgrader, this.stunServers, this._peerId)
+    return new Listener(this.connHandler, this._upgrader, this.stunServers, this._peerId, this._interface)
   }
 
   /**

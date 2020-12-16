@@ -63,7 +63,8 @@ describe('test TCP connection', function () {
       },
       upgrader,
       undefined,
-      await PeerId.create({ keyType: 'secp256k1' })
+      await PeerId.create({ keyType: 'secp256k1' }),
+      undefined
     )
 
     await listener.listen(Multiaddr('/ip4/127.0.0.1/tcp/9091'))

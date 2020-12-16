@@ -11,6 +11,8 @@ import PeerId from 'peer-id'
 import net from 'net'
 import Defer, { DeferredPromise } from 'p-defer'
 
+import { networkInterfaces } from 'os'
+
 describe('transport/listener.spec check listening to sockets', function () {
   this.timeout(5000)
   async function startStunServer(port: number, state: { msgReceived: DeferredPromise<void> }): Promise<Socket> {
@@ -52,7 +54,8 @@ describe('transport/listener.spec check listening to sockets', function () {
           Multiaddr(`/ip4/127.0.0.1/udp/${stunServers[0].address().port}`),
           Multiaddr(`/ip4/127.0.0.1/udp/${stunServers[1].address().port}`)
         ],
-        await PeerId.create({ keyType: 'secp256k1' })
+        await PeerId.create({ keyType: 'secp256k1' }),
+        undefined
       )
       await listener.listen(Multiaddr(`/ip4/127.0.0.1/tcp/9390/p2p/${peerId.toB58String()}`))
       await listener.close()
@@ -99,7 +102,8 @@ describe('transport/listener.spec check listening to sockets', function () {
             upgradeInbound: async (conn: MultiaddrConnection) => conn
           } as unknown) as Upgrader,
           stunServers,
-          await PeerId.create({ keyType: 'secp256k1' })
+          await PeerId.create({ keyType: 'secp256k1' }),
+          undefined
         )
 
         await listener.listen(Multiaddr(`/ip6/::/tcp/${9390 + index}/p2p/${peerId.toB58String()}`))
@@ -149,5 +153,41 @@ describe('transport/listener.spec check listening to sockets', function () {
     await Promise.all(listeners.map((listener) => listener.close()))
 
     await new Promise((resolve) => setTimeout(resolve, 200))
+  })
+
+  it('should bind to specific interfaces', async function () {
+    const validInterfaces = Object.keys(networkInterfaces()).filter((iface) =>
+      networkInterfaces()[iface].some((x) => !x.internal)
+    )
+
+    if (validInterfaces.length == 0) {
+      return
+    }
+
+    const peerId = await PeerId.create({ keyType: 'secp256k1' })
+
+    const listener = new Listener(
+      (conn: Connection) => {
+        // @ts-ignore
+        conn.conn.end()
+      },
+      ({
+        upgradeInbound: async (conn: MultiaddrConnection) => conn
+      } as unknown) as Upgrader,
+      undefined,
+      await PeerId.create({ keyType: 'secp256k1' }),
+      validInterfaces[0]
+    )
+
+    let errThrown = false
+    try {
+      await listener.listen(Multiaddr(`/ip4/192.168.1.4/tcp/0/p2p/${peerId.toB58String()}`))
+    } catch {
+      errThrown = true
+    }
+
+    assert(errThrown)
+
+    await listener.close()
   })
 })
