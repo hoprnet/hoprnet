@@ -108,7 +108,6 @@ class HoprConnect implements Transport {
       throw Error(`Cannot dial ourself`)
     }
 
-    let err: Error | undefined
     if (
       // uncommenting next line forces our node to use a relayed connection to any node execpt for the bootstrap server
       // (this.relays == null || this.relays.some((mAddr: Multiaddr) => ma.getPeerId() === mAddr.getPeerId())) &&
@@ -117,15 +116,15 @@ class HoprConnect implements Transport {
       try {
         verbose('attempting to dial directly', ma.toString())
         return await this._dialDirectly(ma, options)
-      } catch (_err) {
-        if ((_err != null && EXPECTED_DIAL_ERRORS.includes(_err.code)) || _err.type === 'aborted') {
+      } catch (err) {
+        if ((err != null && EXPECTED_DIAL_ERRORS.includes(err.code)) || err.type === 'aborted') {
           // expected case, continue
-          err = _err
+          verbose(err)
         } else {
           // Unexpected error, ie:
           // type === aborted
-          error(`Dial directly unexpected error ${_err}`)
-          throw _err
+          error(`Dial directly unexpected error ${err}`)
+          throw err
         }
       }
     }
