@@ -39,15 +39,8 @@ A [transport module](https://github.com/libp2p/js-libp2p-interfaces/tree/master/
 
 ### Dependencies
 
-- [ ] Node.js 12.x
-- [ ] yarn
-
-```sh
-yarn add libp2p
-yarn add libp2p-mplex
-yarn add libp2p-secio
-yarn add hopr-connect
-```
+- Node.js 12.x
+- yarn
 
 ### Startup
 
@@ -93,13 +86,12 @@ const node = await libp2p.create({
   },
   config: {
     HoprConnect: {
-      bootstrapServers: [
-        Multiaddr('/ip4/127.0.0.1/tcp/9091')
-      ]
+      bootstrapServers: [Multiaddr('/ip4/127.0.0.1/tcp/9091')]
     }
   }
 })
 ```
+
 ## Contributors [in alphabetical order]
 
 - [Jose Perez Aguinaga](https://github.com/jjperezaguinaga)
