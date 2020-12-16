@@ -77,9 +77,7 @@ gcloud_stop() {
 # $1 - vm name
 # $2 - docker image
 gcloud_get_logs() {
-  local container_name=$(gssh $1 -- "docker ps -q --filter ancestor=$2")
-  local full_id=$(gssh $1 -- "docker inspect --format="{{.Id}}" $container_name")
-  gcloud compute scp $1:/var/lib/docker/containers/$full_id-json.log ./_tmp_logs
-  cat ./_tmp_logs
-  rm ./_tmp_logs
+  # Docker sucks and gives us warnings in stdout.
+  local id=$(gcloud compute ssh $ZONE $1 --command "docker ps -q --filter ancestor='$2' | xargs docker inspect --format='{{.Id}}'" | grep -v 'warning')
+  gcloud compute ssh $ZONE $1 --command "docker logs $id"
 }
