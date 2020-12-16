@@ -2,7 +2,7 @@ name: HOPR Nightly Integration Test
 on:
   schedule:
     - cron: '* * * * *' 
-  workflow_dispatch
+  workflow_dispatch:
 
 jobs:
   run:
