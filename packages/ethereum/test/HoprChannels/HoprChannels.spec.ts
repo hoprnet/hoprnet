@@ -48,14 +48,14 @@ const useFixtures = deployments.createFixture(async () => {
 })
 
 describe('HoprChannels', function () {
-  it('should fund', async function () {
+  it('should fund one direction', async function () {
     const { hoprToken, hoprChannels } = await useFixtures()
 
     await hoprToken.approve(hoprChannels.address, '70', {
       from: ACCOUNT_A.address
     })
 
-    const response = await hoprChannels.fundChannel(ACCOUNT_A.address, ACCOUNT_B.address, '70', '0', {
+    const response = await hoprChannels.fundChannel(ACCOUNT_A.address, ACCOUNT_B.address, '70', {
       from: ACCOUNT_A.address
     })
 
@@ -78,13 +78,43 @@ describe('HoprChannels', function () {
     expect(accountABalance.toString()).to.equal('30')
   })
 
-  it('should fund using send', async function () {
+  it('should fund both directions', async function () {
+    const { hoprToken, hoprChannels } = await useFixtures()
+
+    await hoprToken.approve(hoprChannels.address, '100', {
+      from: ACCOUNT_A.address
+    })
+
+    const response = await hoprChannels.fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30', {
+      from: ACCOUNT_A.address
+    })
+
+    expectEvent(response, 'ChannelFunded', {
+      accountA: ACCOUNT_A.address,
+      accountB: ACCOUNT_B.address,
+      funder: ACCOUNT_A.address,
+      deposit: '100',
+      partyABalance: '70'
+    })
+
+    const channel = await hoprChannels.channels(ACCOUNT_AB_CHANNEL_ID).then(formatChannel)
+    expect(channel.deposit.toString()).to.equal('100')
+    expect(channel.partyABalance.toString()).to.equal('70')
+    expect(channel.closureTime.toString()).to.equal('0')
+    expect(channel.status.toString()).to.equal('0')
+    expect(channel.closureByPartyA).to.be.false
+
+    const accountABalance = await hoprToken.balanceOf(ACCOUNT_A.address)
+    expect(accountABalance.toString()).to.equal('0')
+  })
+
+  it.only('should fund using send', async function () {
     const { hoprToken, hoprChannels } = await useFixtures()
 
     const response = await hoprToken.send(
       hoprChannels.address,
       '70',
-      web3.eth.abi.encodeParameters(['address', 'address'], [ACCOUNT_A.address, ACCOUNT_B.address]),
+      web3.eth.abi.encodeParameters(['bool', 'address', 'address'], [false, ACCOUNT_A.address, ACCOUNT_B.address]),
       {
         from: ACCOUNT_A.address
       }
@@ -213,7 +243,7 @@ describe('HoprChannels intergration tests', function () {
         from: ACCOUNT_A.address
       })
 
-      const response = await hoprChannels.fundChannel(ACCOUNT_A.address, ACCOUNT_B.address, '70', '0', {
+      const response = await hoprChannels.fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '0', {
         from: ACCOUNT_A.address
       })
 
@@ -237,7 +267,7 @@ describe('HoprChannels intergration tests', function () {
       const response = await hoprToken.send(
         hoprChannels.address,
         '30',
-        web3.eth.abi.encodeParameters(['address', 'address'], [ACCOUNT_B.address, ACCOUNT_A.address]),
+        web3.eth.abi.encodeParameters(['bool', 'address', 'address'], [false, ACCOUNT_B.address, ACCOUNT_A.address]),
         {
           from: ACCOUNT_B.address
         }
