@@ -8,14 +8,17 @@ workflow to streamline the process we use to implement the HOPR protocol.
 ## Principles
 
 ### Automation-first
+
 Rely on automation as much as possible.
 
 ### Tests & CI
+
 Tests should prevent bad deployments and API regressions. Continuous
 integration ensures all our code is tested before being merged into our
 baseline.
 
 ### Releases & CD
+
 Every week, we do a code-freeze in our codebase
 by branching out a specific release, which we then deploy on every change.
 
@@ -74,15 +77,18 @@ Verify this with `dig -t TXT _dnsaddr.<releaseNativeCurrency>.<releaseName>.boot
 We made active use of actions to automate tasks trivial to our workflow.
 
 ### Pre-release Version Bump
-When a PR to `master` is merged, an action bumps the package.json pre-release 
+
+When a PR to `master` is merged, an action bumps the package.json pre-release
 version and commits that change to `master`.
 
 ### Tag Release
+
 When a PR to `master` is merged, a tag is pushed specifying that feature on that version.
 
 ### Release Version Bump
-On first build, a `release/**` bumps the package.json by a `minor`, clearing 
-the `pre-release` tag. Subsequent commits on `release` branches bump the 
+
+On first build, a `release/**` bumps the package.json by a `minor`, clearing
+the `pre-release` tag. Subsequent commits on `release` branches bump the
 `patch` version.
 
 ## Branches
