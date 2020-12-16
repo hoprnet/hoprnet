@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-connect",
-  "version": "0.1.1",
+  "version": "0.1.3",
   "description": "A libp2p-complaint transport module that handles NAT traversal",
   "repository": "https://github.com/hoprnet/hopr-connect.git",
   "homepage": "https://github.com/hoprnet/hopr-connect",
