@@ -75,7 +75,7 @@ update_or_create_bootstrap_vm() {
     local ip=$(gcloud_get_address $1)
     gcloud compute instances create-with-container $1 $GCLOUD_DEFAULTS \
       --network-interface=address=$ip,network-tier=PREMIUM,subnet=default \
-      --create-disk name=$(disk_name $1),size=10GB,type=pd-ssd,mode=rw \
+      --create-disk name=$(disk_name $1),size=10GB,type=pd-balanced,mode=rw \
       --container-mount-disk mount-path="/app/db" \
       --container-env=^,@^DEBUG=hopr\*,@NODE_OPTIONS=--max-old-space-size=4096 \
       --container-image=$2 \
@@ -96,7 +96,7 @@ update_or_create_bootstrap_vm() {
 start_testnode_vm() {
   if [ "$(update_if_existing $1 $2)" = "no container" ]; then
     gcloud compute instances create-with-container $1 $GCLOUD_DEFAULTS \
-      --create-disk name=$(disk_name $1),size=10GB,type=pd-ssd,mode=rw \
+      --create-disk name=$(disk_name $1),size=10GB,type=pd-standard,mode=rw \
       --container-mount-disk mount-path="/app/db" \
       --container-env=^,@^DEBUG=hopr\*,@NODE_OPTIONS=--max-old-space-size=4096 \
       --container-image=$2 \
