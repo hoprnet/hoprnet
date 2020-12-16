@@ -15726,10 +15726,10 @@ ts-pnp@^1.1.6:
   resolved "https://registry.yarnpkg.com/ts-pnp/-/ts-pnp-1.2.0.tgz#a500ad084b0798f1c3071af391e65912c86bca92"
   integrity sha512-csd+vJOb/gkzvcCHgTGSChYpy5f1/XKNsmvBGO4JXS+z1v2HobugDz4s1IeFXM3wZB44uczs+eazB5Q/ccdhQw==
 
-ts-protoc-gen@^0.13.0:
-  version "0.13.0"
-  resolved "https://registry.yarnpkg.com/ts-protoc-gen/-/ts-protoc-gen-0.13.0.tgz#2763ae4e4a1a7d7001d53d2f3043357c691701ea"
-  integrity sha512-j18X4rkDBbG/ZHUJy88WFeZP6mStGow5uREaohowlHXTu3/N7WcpyPhb7Vh6wN38ERmc/AkT9gqT98+vtlRhJA==
+ts-protoc-gen@^0.14.0:
+  version "0.14.0"
+  resolved "https://registry.yarnpkg.com/ts-protoc-gen/-/ts-protoc-gen-0.14.0.tgz#a6f4c3fc37d1d449915551c18404fb7e9aa8fef6"
+  integrity sha512-2z6w2HioMCMVNcgNHBcEvudmQfzrn+3BjAlz+xgYZ9L0o8n8UG8WUiTJcbXHFiEg2SU8IltwH2pm1otLoMSKwg==
   dependencies:
     google-protobuf "^3.6.1"
 

@@ -42,7 +42,7 @@
     "protoc-gen-grpc-web": "^1.2.0",
     "replace": "^1.2.0",
     "rimraf": "^3.0.2",
-    "ts-protoc-gen": "^0.13.0",
+    "ts-protoc-gen": "^0.14.0",
     "typescript": "^4.1"
   },
   "peerDependencies": {
