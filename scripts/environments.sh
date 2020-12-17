@@ -11,7 +11,7 @@ function get_version_maj_min() {
 }
 
 # These will be cleaned up and machines stopped
-OLD_RELEASES='zurich zug luzern basodino saentis debug-dbg nightly'
+OLD_RELEASES='zurich zug luzern larnaca basodino saentis debug-dbg nightly'
 
 # ===== Load env variables for the current github ref =====
 # Takes:
@@ -35,8 +35,9 @@ get_environment() {
     VERSION_MAJ_MIN=$(get_version_maj_min $RELEASE) 
 
     if [ "$VERSION_MAJ_MIN" == '1.59' ]; then
-      RELEASE_NAME="mainz"
+      RELEASE_NAME='mainz'
       # From this release on, RELEASE_IP is deprecated
+      return
     fi
 
     if [ "$VERSION_MAJ_MIN" == '1.58' ]; then
@@ -69,7 +70,7 @@ get_environment() {
   esac
 
   echo "Unknown release / environment: '$BRANCH'"
-  #exit 1
+  exit 1
   RELEASE_NAME='debug'
   RELEASE_IP='34.65.56.229'
   VERSION_MAJ_MIN='dbg'

@@ -395,10 +395,10 @@
   resolved "https://registry.yarnpkg.com/@hapi/hoek/-/hoek-9.1.0.tgz#6c9eafc78c1529248f8f4d92b0799a712b6052c6"
   integrity sha512-i9YbZPN3QgfighY/1X1Pu118VUz2Fmmhd6b2n0/O8YVgGGfw0FbUYoA97k7FkpGJ+pLCFEDLUmAPPV4D1kpeFw==
 
-"@hoprnet/hopr-connect@0.1.5":
-  version "0.1.5"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-connect/-/hopr-connect-0.1.5.tgz#6806e3a1e6587507dce58e9ef4ab578f52cb0c86"
-  integrity sha512-KuxDJ849Mpuuya3lJkO4x/W9IsNN6A0lie4F1TX43QuJNJmzFLQ/kHieFZzGDyi+QtcJoqNqLr+50GXRBVlxjA==
+"@hoprnet/hopr-connect@0.1.1":
+  version "0.1.1"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-connect/-/hopr-connect-0.1.1.tgz#5dbb9815a2a02f65634d343dbc8b7e2d7434e59c"
+  integrity sha512-WkLd92AuXWLfVJAdc8fMY8rG3T/PJVL2Ns+dAB14CUwXdf7ltzcSOv+Igmej+jEVywTMB+9DCjyANMoUp+05gQ==
   dependencies:
     "@hoprnet/hopr-utils" "^1.57.6"
     abort-controller "3.0.0"
@@ -407,25 +407,13 @@
     it-handshake "~1.0.2"
     libp2p-utils "^0.2.3"
     mafmt "^8.0.1"
-    multiaddr "~8.1.2"
+    multiaddr "~8.1.1"
     p-defer "~3.0.0"
     peer-id "~0.14.2"
     simple-peer "9.9.3"
     stream-to-it "^0.2.2"
     webrtc-stun "~3.0.0"
     wrtc "0.4.6"
-
-"@hoprnet/hopr-utils@^1.57.6":
-  version "1.58.6"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-1.58.6.tgz#7364be2e9e12038f9531f3dddf7154821d829ae4"
-  integrity sha512-BGgP4R2ltR0U2hm2TNoKDN2JAvJ5opGMt/MH97l8Vi3wRI0u5E5uO9A4bF1gyZbQFH9LLuc8nbMyIoqXj0FEVw==
-  dependencies:
-    bignumber.js "^9.0.0"
-    libp2p-crypto "0.18.0"
-    multiaddr "8.1.1"
-    multihashes "~3.1.0"
-    peer-id "0.14.2"
-    strip-ansi "^6.0.0"
 
 "@lerna/add@3.21.0":
   version "3.21.0"
@@ -9505,21 +9493,7 @@ ms@^2.0.0, ms@^2.1.1:
   resolved "https://registry.yarnpkg.com/ms/-/ms-2.1.3.tgz#574c8138ce1d2b5861f0b44579dbadd60c6615b2"
   integrity sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==
 
-multiaddr@8.1.1:
-  version "8.1.1"
-  resolved "https://registry.yarnpkg.com/multiaddr/-/multiaddr-8.1.1.tgz#d86315deed93752fa68b4199fee56f8b4a516a2b"
-  integrity sha512-Dyur7rWX44MlgKIqVA2dYPOZx/UwG60PVSffJ5S17uo6Pu31lftJXShMEfPtUDGHnyALAOWOuC3X/iPhDtw4Vg==
-  dependencies:
-    cids "^1.0.0"
-    class-is "^1.1.0"
-    dns-over-http-resolver "^1.0.0"
-    err-code "^2.0.3"
-    is-ip "^3.1.0"
-    multibase "^3.0.0"
-    uint8arrays "^1.1.0"
-    varint "^5.0.0"
-
-multiaddr@8.1.2, multiaddr@^8.0.0, multiaddr@^8.1.0, multiaddr@~8.1.2:
+multiaddr@8.1.2, multiaddr@^8.0.0, multiaddr@^8.1.0, multiaddr@~8.1.1:
   version "8.1.2"
   resolved "https://registry.yarnpkg.com/multiaddr/-/multiaddr-8.1.2.tgz#74060ff8636ba1c01b2cf0ffd53950b852fa9b1f"
   integrity sha512-r13IzW8+Sv9zab9Gt8RPMIN2WkptIPq99EpAzg4IbJ/zTELhiEwXWr9bAmEatSCI4j/LSA6ESJzvz95JZ+ZYXQ==
