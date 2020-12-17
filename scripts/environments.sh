@@ -35,7 +35,7 @@ get_environment() {
     VERSION_MAJ_MIN=$(get_version_maj_min $RELEASE) 
 
     if [ "$VERSION_MAJ_MIN" == '1.59' ]; then
-      RELEASE_NAME="mainz"
+      RELEASE_NAME='mainz'
       # From this release on, RELEASE_IP is deprecated
       return
     fi
