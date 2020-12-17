@@ -46,3 +46,6 @@ cleanup () {
   cleanup_instances
 }
 
+if [ "$0" = "./scripts/cleanup.sh" ]; then
+  cleanup
+fi
