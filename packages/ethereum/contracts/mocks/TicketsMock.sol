@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.7.5;
+pragma solidity 0.7.5;
 
 import "./AccountsMock.sol";
 import "./ChannelsMock.sol";
 import "../HoprChannels/Tickets.sol";
 
 contract TicketsMock is AccountsMock, ChannelsMock, Tickets {
-    constructor(uint256 _secsClosure) ChannelsMock(_secsClosure) {}
+    constructor(uint32 _secsClosure) ChannelsMock(_secsClosure) {}
 
     function redeemTicket(
         address recipient,

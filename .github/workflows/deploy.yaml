@@ -1,7 +1,7 @@
 name: HOPR Deploy
 on:
   push:
-    branches: ['master', 'release/**', 'avado', '!cd/**']
+    branches: ['master', 'release/**', 'avado']
     paths-ignore:
       - 'docs/**'
 
@@ -124,10 +124,39 @@ jobs:
           draft: false
           prerelease: false
 
+
+  build_hoprd_docker:
+    name: Build HOPRD Docker
+    runs-on: ubuntu-latest
+    needs: [build]
+    steps:
+      - uses: actions/checkout@v2
+      - name: Update repo from latest pushes.
+        run: |
+          git config --global user.email "noreply@hoprnet.org"
+          git config --global user.name "HOPR Versioning robot"
+          git config pull.rebase false
+          git pull origin ${{ github.ref }} # This should pull new packages with versions etc.
+      - name: Setup Google Cloud Credentials
+        uses: GoogleCloudPlatform/github-actions/setup-gcloud@master
+        with:
+          version: '290.0.1'
+          service_account_key: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+          export_default_credentials: true
+      - name: Get version from package.json
+        run: echo "RELEASE=$(node -p -e "require('./packages/hoprd/package.json').version")" >> $GITHUB_ENV 
+      - name: Set Project for Google Cloud HOPR Association
+        working-directory: packages/hoprd
+        run: gcloud config set project ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
+      - name: Building Docker image using Google Cloud Build
+        working-directory: packages/hoprd
+        run:
+          gcloud builds submit --tag gcr.io/hoprassociation/hoprd:${{ env.RELEASE }}
+
   avado:
     name: Build Avado (master or release pushes)
     runs-on: ubuntu-latest
-    needs: [build]
+    needs: [build_hoprd_docker]
     steps:
       - uses: actions/checkout@v2
       - name: Update repo from latest pushes.
@@ -162,30 +191,32 @@ jobs:
 
           # http://go.ava.do/install/<IPFS HASH>
 
-  build_hoprd_docker:
-    name: Build HOPRD Docker
+  deploy_instances:
+    name: 'Continuous Deployment: Deploy instances'
     runs-on: ubuntu-latest
-    needs: [build]
+    needs: [build_hoprd_docker]
     steps:
       - uses: actions/checkout@v2
-      - name: Update repo from latest pushes.
-        run: |
-          git config --global user.email "noreply@hoprnet.org"
-          git config --global user.name "HOPR Versioning robot"
-          git config pull.rebase false
-          git pull origin ${{ github.ref }} # This should pull new packages with versions etc.
+      - name: Use Node.js 12
+        uses: actions/setup-node@v1
+        with:
+          node-version: 12
+          registry-url: https://registry.npmjs.org/
       - name: Setup Google Cloud Credentials
         uses: GoogleCloudPlatform/github-actions/setup-gcloud@master
         with:
           version: '290.0.1'
           service_account_key: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
           export_default_credentials: true
-      - name: Get version from package.json
-        run: echo "RELEASE=$(node -p -e "require('./packages/hoprd/package.json').version")" >> $GITHUB_ENV 
       - name: Set Project for Google Cloud HOPR Association
-        working-directory: packages/hoprd
         run: gcloud config set project ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
-      - name: Building Docker image using Google Cloud Build
-        working-directory: packages/hoprd
-        run:
-          gcloud builds submit --tag gcr.io/hoprassociation/hoprd:${{ env.RELEASE }}
+      - name: Run start script
+        run: |
+          bash scripts/deploy.sh
+        env:
+          FUNDING_PRIV_KEY: ${{ secrets.FUNDING_WALLET_PRIVATE_KEY }}
+          RPC: ${{ secrets.FUNDING_RPC_MATIC_URL }}
+          GITHUB_REF: ${{ github.ref }}
+          BS_PASSWORD: ${{ secrets.BS_PASSWORD }}
+
+

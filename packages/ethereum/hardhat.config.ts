@@ -111,7 +111,8 @@ const hardhatConfig: HardhatUserConfig = {
     target: 'truffle-v5'
   },
   gasReporter: {
-    currency: 'USD'
+    currency: 'USD',
+    excludeContracts: ['mocks', 'Migrations.sol', 'utils/console.sol']
   }
 }
 

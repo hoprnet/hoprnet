@@ -26,6 +26,11 @@ npm install -g @hoprnet/hoprd
 hoprd --admin
 ```
 
+### Running in a docker container
+
+We maintain a docker container at
+`gcr.io/hoprassociation/hoprd:$RELEASE`
+
 #### Starting database
 
 ```sh

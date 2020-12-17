@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.7.5;
+pragma solidity 0.7.5;
 
 import "../HoprChannels/Channels.sol";
 
 contract ChannelsMock is Channels {
-    constructor(uint256 _secsClosure) {
+    constructor(uint32 _secsClosure) {
         secsClosure = _secsClosure;
     }
 
@@ -61,13 +61,13 @@ contract ChannelsMock is Channels {
     }
 
     function getChannelStatus(
-        uint256 status
+        uint24 status
     ) external pure returns (ChannelStatus) {
         return _getChannelStatus(status);
     }
 
     function getChannelIteration(
-        uint256 status
+        uint24 status
     ) external pure returns (uint256) {
         return _getChannelIteration(status);
     }

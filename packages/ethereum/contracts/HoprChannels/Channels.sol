@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.7.5;
+pragma solidity 0.7.5;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "../utils/console.sol";
@@ -16,18 +16,25 @@ contract Channels {
      * @dev A channel struct
      */
     struct Channel {
-        uint256 deposit; // total tokens in deposit
-        uint256 partyABalance; // tokens that are claimable by partyA
-        uint256 closureTime; // the time when the channel can be closed by either party
-        uint256 status; // status of the channel
-        bool closureByPartyA; // channel closure was initiated by party A
+        // total tokens in deposit
+        uint256 deposit;
+        // tokens that are claimable by partyA
+        uint256 partyABalance;
+        // the time when the channel can be closed by either party
+        // overloads at year 2106
+        uint32 closureTime;
+        // status of the channel
+        // overloads at >16777215
+        uint24 status;
+        // channel closure was initiated by party A
+        bool closureByPartyA;
     }
 
     /**
      * @dev Seconds it takes until we can finalize channel closure once,
      * channel closure has been initialized.
      */
-    uint256 public secsClosure;
+    uint32 public secsClosure;
 
     /**
      * @dev Stored channels keyed by their channel ids
@@ -121,8 +128,8 @@ contract Channels {
             "channel must be open"
         );
 
-        // solhint-disable-next-line
-        channel.closureTime = block.timestamp + secsClosure;
+        // TODO: use SafeMath
+        channel.closureTime = _currentBlockTimestamp() + secsClosure;
         channel.status += 1;
 
         bool isPartyA = _isPartyA(initiator, counterparty);
@@ -163,7 +170,7 @@ contract Channels {
             channel.closureByPartyA && (initiator == partyA) ||
             !channel.closureByPartyA && (initiator == partyB)
         ) {
-            require(channel.closureTime < block.timestamp, "closureTime must be before now");
+            require(channel.closureTime < _currentBlockTimestamp(), "closureTime must be before now");
         }
 
         uint256 partyAAmount = channel.partyABalance;
@@ -224,7 +231,7 @@ contract Channels {
      * @param status channel's status
      * @return the channel's status in 'ChannelStatus'
      */
-    function _getChannelStatus(uint256 status) internal pure returns (ChannelStatus) {
+    function _getChannelStatus(uint24 status) internal pure returns (ChannelStatus) {
         return ChannelStatus(status % 10);
     }
 
@@ -232,7 +239,7 @@ contract Channels {
      * @param status channel's status
      * @return the channel's iteration
      */
-    function _getChannelIteration(uint256 status) internal pure returns (uint256) {
+    function _getChannelIteration(uint24 status) internal pure returns (uint256) {
         return (status / 10) + 1;
     }
 
@@ -256,6 +263,14 @@ contract Channels {
         } else {
             return (accountB, accountA);
         }
+    }
+
+    /**
+     * @return the current timestamp
+     */
+    function _currentBlockTimestamp() internal view returns (uint32) {
+        // solhint-disable-next-line
+        return uint32(block.timestamp % 2 ** 32);
     }
 
     event ChannelFunded(

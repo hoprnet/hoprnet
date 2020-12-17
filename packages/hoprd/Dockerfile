@@ -1,10 +1,4 @@
-#
 # Run HOPRd  within a single container.
-#
-# NB. This is not a long term solution, so you probably don't want to rely on 
-# this, our ultimate goal is a single HOPRd process, but this is a quick solution
-# to expedite our HOPR node work.
-#
 
 # -- BASE STAGE --------------------------------
 
@@ -55,7 +49,7 @@ VOLUME ["/app/db"]
 
 # Admin web server
 EXPOSE 3000
-# REST API 
+# REST API
 EXPOSE 3001
 
 ENTRYPOINT ["node", "/app/index.js"]
