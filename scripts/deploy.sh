@@ -5,6 +5,7 @@ shopt -s expand_aliases
 
 source scripts/environments.sh
 source scripts/testnet.sh
+source scripts/cleanup.sh
 
 # ---- On Deployment -----
 #
@@ -33,5 +34,7 @@ TESTNET_SIZE=2
 
 color()(set -o pipefail;"$@" 2>&1>&3|sed $'s,.*,\e[31m&\e[m,'>&2)3>&1
 
+echo "Cleaning up before deploy"
+cleanup
 echo "Starting testnet '$TESTNET_NAME' with $TESTNET_SIZE nodes"
 color start_testnet $TESTNET_NAME $TESTNET_SIZE "gcr.io/hoprassociation/hoprd:$RELEASE" 
