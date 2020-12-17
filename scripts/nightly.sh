@@ -15,8 +15,8 @@ RELEASE=$(node -p -e "require('./packages/hoprd/package.json').version")
 IMG="gcr.io/hoprassociation/hoprd:$RELEASE"
 
 source scripts/dependencies.sh
-#echo "Cleaning up devops before running nightly testnet"
-#cleanup
+echo "Cleaning up devops before running nightly testnet"
+cleanup
 echo "Starting nightly testnet"
 start_testnet nightly 2 $IMG
 echo "Testnet up and running. Leaving it for 20 mins"
