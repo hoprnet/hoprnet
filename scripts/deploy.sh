@@ -28,8 +28,8 @@ RELEASE=$(node -p -e "require('./packages/hoprd/package.json').version")
 # Get RELEASE_NAME, from environment
 get_environment
 
-TESTNET_NAME="$RELEASE_NAME-$VERSION_MAJ_MIN"
-TESTNET_SIZE=3
+TESTNET_NAME="$RELEASE_NAME$-(echo $VERSION_MAJ_MIN | sed 's/\./-/g')"
+TESTNET_SIZE=2
 
 color()(set -o pipefail;"$@" 2>&1>&3|sed $'s,.*,\e[31m&\e[m,'>&2)3>&1
 
