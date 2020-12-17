@@ -33,6 +33,12 @@ get_environment() {
 
   case "$BRANCH" in release/*)
     VERSION_MAJ_MIN=$(get_version_maj_min $RELEASE) 
+
+    if [ "$VERSION_MAJ_MIN" == '1.59' ]; then
+      RELEASE_NAME="mainz"
+      # From this release on, RELEASE_IP is deprecated
+    fi
+
     if [ "$VERSION_MAJ_MIN" == '1.58' ]; then
       RELEASE_NAME='queretaro'
       RELEASE_IP='34.65.207.39'
