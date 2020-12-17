@@ -108,37 +108,6 @@ describe('HoprChannels', function () {
     expect(accountABalance.toString()).to.equal('0')
   })
 
-  it('should fund using send', async function () {
-    const { hoprToken, hoprChannels } = await useFixtures()
-
-    const response = await hoprToken.send(
-      hoprChannels.address,
-      '70',
-      web3.eth.abi.encodeParameters(['bool', 'address', 'address'], [false, ACCOUNT_A.address, ACCOUNT_B.address]),
-      {
-        from: ACCOUNT_A.address
-      }
-    )
-
-    expectEvent.inTransaction(response.tx, HoprChannels, 'ChannelFunded', {
-      accountA: ACCOUNT_A.address,
-      accountB: ACCOUNT_B.address,
-      funder: ACCOUNT_A.address,
-      deposit: '70',
-      partyABalance: '70'
-    })
-
-    const channel = await hoprChannels.channels(ACCOUNT_AB_CHANNEL_ID).then(formatChannel)
-    expect(channel.deposit.toString()).to.equal('70')
-    expect(channel.partyABalance.toString()).to.equal('70')
-    expect(channel.closureTime.toString()).to.equal('0')
-    expect(channel.status.toString()).to.equal('0')
-    expect(channel.closureByPartyA).to.be.false
-
-    const accountABalance = await hoprToken.balanceOf(ACCOUNT_A.address)
-    expect(accountABalance.toString()).to.equal('30')
-  })
-
   it('should fund and open channel', async function () {
     const { hoprToken, hoprChannels } = await useFixtures()
 
@@ -172,6 +141,171 @@ describe('HoprChannels', function () {
 
     const accountABalance = await hoprToken.balanceOf(ACCOUNT_A.address)
     expect(accountABalance.toString()).to.equal('30')
+  })
+
+  it('should fund and open channel by accountB', async function () {
+    const { hoprToken, hoprChannels } = await useFixtures()
+
+    await hoprToken.approve(hoprChannels.address, '70', {
+      from: ACCOUNT_B.address
+    })
+
+    const response = await hoprChannels.fundAndOpenChannel(ACCOUNT_A.address, ACCOUNT_B.address, '70', '0', {
+      from: ACCOUNT_B.address
+    })
+
+    expectEvent(response, 'ChannelFunded', {
+      accountA: ACCOUNT_A.address,
+      accountB: ACCOUNT_B.address,
+      funder: ACCOUNT_B.address,
+      deposit: '70',
+      partyABalance: '70'
+    })
+
+    expectEvent(response, 'ChannelOpened', {
+      opener: ACCOUNT_B.address,
+      counterparty: ACCOUNT_A.address
+    })
+
+    const channel = await hoprChannels.channels(ACCOUNT_AB_CHANNEL_ID).then(formatChannel)
+    expect(channel.deposit.toString()).to.equal('70')
+    expect(channel.partyABalance.toString()).to.equal('70')
+    expect(channel.closureTime.toString()).to.equal('0')
+    expect(channel.status.toString()).to.equal('1')
+    expect(channel.closureByPartyA).to.be.false
+
+    const accountBBalance = await hoprToken.balanceOf(ACCOUNT_B.address)
+    expect(accountBBalance.toString()).to.equal('30')
+  })
+
+  it('should fund using send', async function () {
+    const { hoprToken, hoprChannels } = await useFixtures()
+
+    const response = await hoprToken.send(
+      hoprChannels.address,
+      '70',
+      web3.eth.abi.encodeParameters(['bool', 'address', 'address'], [false, ACCOUNT_A.address, ACCOUNT_B.address]),
+      {
+        from: ACCOUNT_A.address
+      }
+    )
+
+    expectEvent.inTransaction(response.tx, HoprChannels, 'ChannelFunded', {
+      accountA: ACCOUNT_A.address,
+      accountB: ACCOUNT_B.address,
+      funder: ACCOUNT_A.address,
+      deposit: '70',
+      partyABalance: '70'
+    })
+
+    const channel = await hoprChannels.channels(ACCOUNT_AB_CHANNEL_ID).then(formatChannel)
+    expect(channel.deposit.toString()).to.equal('70')
+    expect(channel.partyABalance.toString()).to.equal('70')
+    expect(channel.closureTime.toString()).to.equal('0')
+    expect(channel.status.toString()).to.equal('0')
+    expect(channel.closureByPartyA).to.be.false
+
+    const accountABalance = await hoprToken.balanceOf(ACCOUNT_A.address)
+    expect(accountABalance.toString()).to.equal('30')
+  })
+
+  it('should fund and open using send', async function () {
+    const { hoprToken, hoprChannels } = await useFixtures()
+
+    const response = await hoprToken.send(
+      hoprChannels.address,
+      '70',
+      web3.eth.abi.encodeParameters(['bool', 'address', 'address'], [true, ACCOUNT_A.address, ACCOUNT_B.address]),
+      {
+        from: ACCOUNT_A.address
+      }
+    )
+
+    expectEvent.inTransaction(response.tx, HoprChannels, 'ChannelFunded', {
+      accountA: ACCOUNT_A.address,
+      accountB: ACCOUNT_B.address,
+      funder: ACCOUNT_A.address,
+      deposit: '70',
+      partyABalance: '70'
+    })
+
+    const channel = await hoprChannels.channels(ACCOUNT_AB_CHANNEL_ID).then(formatChannel)
+    expect(channel.deposit.toString()).to.equal('70')
+    expect(channel.partyABalance.toString()).to.equal('70')
+    expect(channel.closureTime.toString()).to.equal('0')
+    expect(channel.status.toString()).to.equal('1')
+    expect(channel.closureByPartyA).to.be.false
+
+    const accountABalance = await hoprToken.balanceOf(ACCOUNT_A.address)
+    expect(accountABalance.toString()).to.equal('30')
+  })
+
+  it('should fund both parties using send', async function () {
+    const { hoprToken, hoprChannels } = await useFixtures()
+
+    const response = await hoprToken.send(
+      hoprChannels.address,
+      '100',
+      web3.eth.abi.encodeParameters(
+        ['bool', 'address', 'address', 'uint256', 'uint256'],
+        [false, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30']
+      ),
+      {
+        from: ACCOUNT_A.address
+      }
+    )
+
+    expectEvent.inTransaction(response.tx, HoprChannels, 'ChannelFunded', {
+      accountA: ACCOUNT_A.address,
+      accountB: ACCOUNT_B.address,
+      funder: ACCOUNT_A.address,
+      deposit: '100',
+      partyABalance: '70'
+    })
+
+    const channel = await hoprChannels.channels(ACCOUNT_AB_CHANNEL_ID).then(formatChannel)
+    expect(channel.deposit.toString()).to.equal('100')
+    expect(channel.partyABalance.toString()).to.equal('70')
+    expect(channel.closureTime.toString()).to.equal('0')
+    expect(channel.status.toString()).to.equal('0')
+    expect(channel.closureByPartyA).to.be.false
+
+    const accountABalance = await hoprToken.balanceOf(ACCOUNT_A.address)
+    expect(accountABalance.toString()).to.equal('0')
+  })
+
+  it('should fund both parties and open using send', async function () {
+    const { hoprToken, hoprChannels } = await useFixtures()
+
+    const response = await hoprToken.send(
+      hoprChannels.address,
+      '100',
+      web3.eth.abi.encodeParameters(
+        ['bool', 'address', 'address', 'uint256', 'uint256'],
+        [true, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30']
+      ),
+      {
+        from: ACCOUNT_A.address
+      }
+    )
+
+    expectEvent.inTransaction(response.tx, HoprChannels, 'ChannelFunded', {
+      accountA: ACCOUNT_A.address,
+      accountB: ACCOUNT_B.address,
+      funder: ACCOUNT_A.address,
+      deposit: '100',
+      partyABalance: '70'
+    })
+
+    const channel = await hoprChannels.channels(ACCOUNT_AB_CHANNEL_ID).then(formatChannel)
+    expect(channel.deposit.toString()).to.equal('100')
+    expect(channel.partyABalance.toString()).to.equal('70')
+    expect(channel.closureTime.toString()).to.equal('0')
+    expect(channel.status.toString()).to.equal('1')
+    expect(channel.closureByPartyA).to.be.false
+
+    const accountABalance = await hoprToken.balanceOf(ACCOUNT_A.address)
+    expect(accountABalance.toString()).to.equal('0')
   })
 })
 

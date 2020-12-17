@@ -132,7 +132,7 @@ contract Channels {
             "channel must be open"
         );
 
-        // @TODO: do we need SafeMath check here?
+        // @TODO: check with team, do we need SafeMath check here?
         channel.closureTime = _currentBlockTimestamp() + secsClosure;
         channel.status = channel.status.add(1);
 

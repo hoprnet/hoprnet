@@ -46,9 +46,9 @@ library SafeUint24 {
      *
      * - The divisor cannot be zero.
      */
-    function div(uint256 a, uint256 b) internal pure returns (uint256) {
+    function div(uint24 a, uint24 b) internal pure returns (uint24) {
         require(b > 0, "SafeUint24: division by zero");
-        uint256 c = a / b;
+        uint24 c = a / b;
         // assert(a == b * c + a % b); // There is no case in which this doesn't hold
 
         return c;
@@ -66,7 +66,7 @@ library SafeUint24 {
      *
      * - The divisor cannot be zero.
      */
-    function mod(uint256 a, uint256 b) internal pure returns (uint256) {
+    function mod(uint24 a, uint24 b) internal pure returns (uint24) {
         require(b != 0, "SafeUint24: modulo by zero");
         return a % b;
     }

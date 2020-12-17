@@ -214,6 +214,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Accounts, Channel
         );
     }
 
+    // @TODO: check with team, is this function too complex?
     /**
      * A hook triggered when HOPR tokens are send to this contract.
      *

@@ -1,8 +1,8 @@
 import { deployments } from 'hardhat'
 import { constants } from '@openzeppelin/test-helpers'
 import Web3 from 'web3'
-import { signMessage, prefixMessage } from './utils'
-import { ACCOUNT_A } from './constants'
+import { signMessage, prefixMessage } from '../utils'
+import { ACCOUNT_A } from '../constants'
 import { stringToU8a, u8aToHex } from '@hoprnet/hopr-utils'
 
 const { soliditySha3 } = Web3.utils
