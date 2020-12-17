@@ -26,7 +26,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Accounts, Channel
      * @param _token HoprToken address
      * @param _secsClosure seconds until a channel can be closed
      */
-    constructor(address _token, uint256 _secsClosure) {
+    constructor(address _token, uint32 _secsClosure) {
         token = IERC20(_token);
         secsClosure = _secsClosure;
         _ERC1820_REGISTRY.setInterfaceImplementer(address(this), TOKENS_RECIPIENT_INTERFACE_HASH, address(this));

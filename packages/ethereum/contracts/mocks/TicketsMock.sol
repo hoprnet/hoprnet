@@ -6,7 +6,7 @@ import "./ChannelsMock.sol";
 import "../HoprChannels/Tickets.sol";
 
 contract TicketsMock is AccountsMock, ChannelsMock, Tickets {
-    constructor(uint256 _secsClosure) ChannelsMock(_secsClosure) {}
+    constructor(uint32 _secsClosure) ChannelsMock(_secsClosure) {}
 
     function redeemTicket(
         address recipient,
