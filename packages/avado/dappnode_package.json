@@ -13,11 +13,12 @@
       "DEBUG=hopr*"
     ],
     "ports": [
-      "3000:3000/tcp"
+      "3000:3000/tcp",
+      "3001:3001/tcp"
     ],
     "path": "hopr.avado.dnp.dappnode.eth_0.100.0.tar.xz",
-    "hash": "/ipfs/QmPqMwKxqeg7Hz9mdRN5fcNpSSCWRfWnpQbgMpGJ32VWas",
-    "size": 230781744,
+    "hash": "/ipfs/QmTrQVrNjxMeNKzwbkVLw5Gso2afevGE59Xc5VZrNqGKoj",
+    "size": 230956808,
     "restart": "always"
   },
   "author": "HOPR",

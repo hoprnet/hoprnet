@@ -2,7 +2,7 @@ name: HOPR Test
 
 on:
   push:
-    branches: ['**', '!cd/**']
+    branches: ['**']
     paths-ignore:
       - 'docs/**'
 

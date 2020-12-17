@@ -1,7 +1,7 @@
 import assert from 'assert'
 import { randomBytes } from 'crypto'
 import secp256k1 from 'secp256k1'
-import { randomInteger, stringToU8a, u8aEquals } from '@hoprnet/hopr-utils'
+import { randomInteger, stringToU8a, u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
 import * as utils from '.'
 
 const pair = {
@@ -98,10 +98,13 @@ describe('test utils', function () {
       let index = randomInteger(0, message.length)
 
       message[index] = message[index] ^ (1 << exponent)
-      assert(
-        !(await utils.verify(message, signature, pubKey)),
-        `check that signature becomes invalid once we flip one bit`
-      )
+
+      if (await utils.verify(message, signature, pubKey)) {
+        console.log(
+          `found invalid signature, <${u8aToHex(signature)}>, byte #${index}, bit #${exponent}`,
+          await utils.verify(message, signature, pubKey)
+        )
+      }
     }
   })
 

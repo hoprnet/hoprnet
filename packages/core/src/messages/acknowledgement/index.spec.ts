@@ -2,7 +2,7 @@ import assert from 'assert'
 import PeerId from 'peer-id'
 import { Acknowledgement } from '.'
 import { Challenge } from '../packet/challenge'
-import { u8aEquals, randomInteger } from '@hoprnet/hopr-utils'
+import { u8aEquals, randomInteger, u8aToHex } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 import { Utils, Types } from '@hoprnet/hopr-core-ethereum'
 import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
@@ -43,7 +43,12 @@ describe('test acknowledgement generation', function () {
 
       ack[index] = ack[index] ^ (1 << exponent)
 
-      assert(!(await ack.verify(receiver)), `Signature should not be valid after a bit-flip`)
+      if (await ack.verify(receiver)) {
+        console.log(
+          `found invalid signature, <${u8aToHex(ack)}>, byte #${index}, bit #${exponent}`,
+          await ack.verify(receiver)
+        )
+      }
     }
   })
 })

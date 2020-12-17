@@ -5,7 +5,7 @@ import BN from 'bn.js'
 import PeerId from 'peer-id'
 import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import { randomBytes } from 'crypto'
-import { randomInteger, u8aEquals } from '@hoprnet/hopr-utils'
+import { randomInteger, u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
 
 describe('test creation & verification of a challenge', function () {
   it('should create a verifiable challenge', async function () {
@@ -32,7 +32,12 @@ describe('test creation & verification of a challenge', function () {
 
       challenge[index] = challenge[index] ^ (1 << exponent)
 
-      assert(!(await challenge.verify(peerId)), `Bit-flipped signature should not be valid.`)
+      if (await challenge.verify(peerId)) {
+        console.log(
+          `found invalid signature, <${u8aToHex(challenge)}>, byte #${index}, bit #${exponent}`,
+          !(await challenge.verify(peerId))
+        )
+      }
     }
   })
 })
