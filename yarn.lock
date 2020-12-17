@@ -1611,10 +1611,10 @@
     strip-indent "^2.0.0"
     super-split "^1.1.0"
 
-"@typechain/truffle-v5@^3.0.0":
-  version "3.0.0"
-  resolved "https://registry.yarnpkg.com/@typechain/truffle-v5/-/truffle-v5-3.0.0.tgz#b6ac355a9dc00cf489be5b04c3ea181b8288844f"
-  integrity sha512-VxVujI2gygQ2fC42qulFKu0rM/i7v02yg0AVG1LtgnmppYUHIEf46HwLOtfMY1Sd3mBMVqc0ewi3UNnnNKNABQ==
+"@typechain/truffle-v5@^4.0.0":
+  version "4.0.0"
+  resolved "https://registry.yarnpkg.com/@typechain/truffle-v5/-/truffle-v5-4.0.0.tgz#a20747f9a64eba66723b82112e96e85239ac35cd"
+  integrity sha512-J1/ZXzyWIxQF+vEhTD4qPN3IJKmIuLDtYSgIVqbX4OyEpwcXPqa9+SYEpTRlvlURuAlf8nFFjPr6MdllpPvBbQ==
 
 "@types/abstract-leveldown@*":
   version "5.0.1"
