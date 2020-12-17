@@ -1,10 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.7.5;
 
+import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "../utils/console.sol";
+import "../utils/SafeUint24.sol";
 
 contract Channels {
+    using SafeMath for uint256;
+    using SafeUint24 for uint24;
+
     /**
      * @dev Possible channel statuses.
      * We find out the channel's status by
@@ -21,7 +26,7 @@ contract Channels {
         // tokens that are claimable by partyA
         uint256 partyABalance;
         // the time when the channel can be closed by either party
-        // overloads at year 2106
+        // overloads at year >2105
         uint32 closureTime;
         // status of the channel
         // overloads at >16777215
@@ -57,7 +62,7 @@ contract Channels {
         uint256 amountA,
         uint256 amountB
     ) internal {
-        // require(funder != address(0), "funder must not be empty");
+        require(funder != address(0), "funder must not be empty");
         require(accountA != accountB, "accountA and accountB must not be the same");
         require(accountA != address(0), "accountA must not be empty");
         require(accountB != address(0), "accountB must not be empty");
@@ -65,10 +70,9 @@ contract Channels {
 
         (,,, Channel storage channel) = _getChannel(accountA, accountB);
 
-        // @TODO: use SafeMath
-        channel.deposit += (amountA + amountB);
+        channel.deposit = channel.deposit.add(amountA).add(amountB);
         if (_isPartyA(accountA, accountB)) {
-            channel.partyABalance += amountA;
+            channel.partyABalance = channel.partyABalance.add(amountA);
         }
 
         emit ChannelFunded(
@@ -100,7 +104,7 @@ contract Channels {
         ChannelStatus channelStatus = _getChannelStatus(channel.status);
         require(channelStatus == ChannelStatus.CLOSED, "channel must be closed in order to open");
 
-        channel.status += 1;
+        channel.status = channel.status.add(1);
 
         emit ChannelOpened(opener, counterparty);
     }
@@ -128,9 +132,9 @@ contract Channels {
             "channel must be open"
         );
 
-        // TODO: use SafeMath
+        // @TODO: do we need SafeMath check here?
         channel.closureTime = _currentBlockTimestamp() + secsClosure;
-        channel.status += 1;
+        channel.status = channel.status.add(1);
 
         bool isPartyA = _isPartyA(initiator, counterparty);
         if (isPartyA) {
@@ -174,8 +178,7 @@ contract Channels {
         }
 
         uint256 partyAAmount = channel.partyABalance;
-        // @TODO: add SafeMath
-        uint256 partyBAmount = channel.deposit - channel.partyABalance;
+        uint256 partyBAmount = channel.deposit.sub(channel.partyABalance);
 
         // settle balances
         if (partyAAmount > 0) {
@@ -187,7 +190,7 @@ contract Channels {
 
         // The state counter indicates the recycling generation and ensures that both parties are using the correct generation.
         // Increase state counter so that we can re-use the same channel after it has been closed.
-        channel.status += 8;
+        channel.status = channel.status.add(8);
         delete channel.deposit; // channel.deposit = 0
         delete channel.partyABalance; // channel.partyABalance = 0
         delete channel.closureTime; // channel.closureTime = 0
@@ -232,7 +235,7 @@ contract Channels {
      * @return the channel's status in 'ChannelStatus'
      */
     function _getChannelStatus(uint24 status) internal pure returns (ChannelStatus) {
-        return ChannelStatus(status % 10);
+        return ChannelStatus(status.mod(10));
     }
 
     /**
@@ -240,7 +243,7 @@ contract Channels {
      * @return the channel's iteration
      */
     function _getChannelIteration(uint24 status) internal pure returns (uint256) {
-        return (status / 10) + 1;
+        return status.div(10).add(1);
     }
 
     /**

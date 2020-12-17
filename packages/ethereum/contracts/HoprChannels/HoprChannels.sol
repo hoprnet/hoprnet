@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.7.5;
 
+import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/introspection/IERC1820Registry.sol";
 import "@openzeppelin/contracts/introspection/ERC1820Implementer.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -11,6 +12,7 @@ import "./Channels.sol";
 import "./Tickets.sol";
 
 contract HoprChannels is IERC777Recipient, ERC1820Implementer, Accounts, Channels, Tickets {
+    using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
     // required by ERC1820 spec
@@ -78,8 +80,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Accounts, Channel
         uint256 amountA,
         uint256 amountB
     ) external {
-        // @TODO: use SafeMath
-        token.safeTransferFrom(msg.sender, address(this), amountA + amountB);
+        token.safeTransferFrom(msg.sender, address(this), amountA.add(amountB));
 
         _fundChannel(
             msg.sender,
@@ -119,8 +120,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Accounts, Channel
             "opener must be accountA or accountB"
         );
 
-        // @TODO: use SafeMath
-        token.safeTransferFrom(msg.sender, address(this), amountA + amountB);
+        token.safeTransferFrom(msg.sender, address(this), amountA.add(amountB));
 
         address counterparty;
         if (opener == accountA) {

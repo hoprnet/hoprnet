@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.7.5;
 
+import "@openzeppelin/contracts/math/SafeMath.sol";
 import "./Accounts.sol";
 import "./Channels.sol";
 import "../utils/ECDSA.sol";
 
 contract Tickets is Accounts, Channels {
+    using SafeMath for uint256;
+
     /**
      * @dev Stored hashes of tickets keyed by their challenge,
      * true if ticket has been redeemed.
@@ -88,11 +91,9 @@ contract Tickets is Accounts, Channels {
         tickets[ticketHash] = true;
 
         if (_isPartyA(recipient, counterparty)) {
-            // @TODO: add SafeMath
-            channel.partyABalance += amount;
+            channel.partyABalance = channel.partyABalance.add(amount);
         } else {
-            // @TODO: add SafeMath
-            channel.partyABalance -= amount;
+            channel.partyABalance = channel.partyABalance.sub(amount);
         }
     }
 
