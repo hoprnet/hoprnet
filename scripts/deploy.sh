@@ -35,5 +35,5 @@ TESTNET_SIZE=2
 echo "Cleaning up before deploy"
 cleanup
 
-echo "Starting testnet '$TESTNET_NAME' with $TESTNET_SIZE nodes"
+echo "Starting testnet '$TESTNET_NAME' with $TESTNET_SIZE nodes and image hoprd:$RELEASE"
 start_testnet $TESTNET_NAME $TESTNET_SIZE "gcr.io/hoprassociation/hoprd:$RELEASE" 
