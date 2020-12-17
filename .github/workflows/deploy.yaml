@@ -215,7 +215,6 @@ jobs:
           bash scripts/deploy.sh
         env:
           FUNDING_PRIV_KEY: ${{ secrets.FUNDING_WALLET_PRIVATE_KEY }}
-          RPC: ${{ secrets.FUNDING_RPC_MATIC_URL }}
           GITHUB_REF: ${{ github.ref }}
           BS_PASSWORD: ${{ secrets.BS_PASSWORD }}
 

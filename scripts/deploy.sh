@@ -18,7 +18,7 @@ source scripts/cleanup.sh
 # - BS_PASSWORD: database password
 
 if [ -z "$RPC" ]; then
-  RPC=https://rpc-mainnet.matic.network
+  RPC=https://bsc-dataseed.binance.org/
 fi
 
 source scripts/dependencies.sh
