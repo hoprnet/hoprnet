@@ -19,6 +19,11 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Accounts, Channel
     IERC1820Registry internal constant _ERC1820_REGISTRY = IERC1820Registry(0x1820a4B7618BdE71Dce8cdc73aAB6C95905faD24);
     // required by ERC777 spec
     bytes32 public constant TOKENS_RECIPIENT_INTERFACE_HASH = keccak256("ERC777TokensRecipient");
+    // used by {tokensReceived} to distinguish which function to call after tokens are sent
+    uint256 public FUND_CHANNEL_SIZE = abi.encode(false, address(0), address(0)).length;
+    // used by {tokensReceived} to distinguish which function to call after tokens are sent
+    uint256 public FUND_CHANNEL_MULTI_SIZE = abi.encode(false, address(0), address(0), uint256(0), uint256(0)).length;
+
     /**
      * @dev HoprToken, the token that will be used to settle payments
      */
@@ -67,14 +72,37 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Accounts, Channel
     }
 
     /**
-     * @dev Funds a channel, then emits
-     * {ChannelFunded} event.
+     * @dev Funds a channel in one direction,
+     * then emits {ChannelFunded} event.
+     * @param account the address of the recipient
+     * @param counterparty the address of the counterparty
+     * @param amount amount to fund
+     */
+    function fundChannel(
+        address account,
+        address counterparty,
+        uint256 amount
+    ) external {
+        token.safeTransferFrom(msg.sender, address(this), amount);
+
+        _fundChannel(
+            msg.sender,
+            account,
+            counterparty,
+            amount,
+            0
+        );
+    }
+
+    /**
+     * @dev Funds a channel, in both directions,
+     * then emits {ChannelFunded} event.
      * @param accountA the address of accountA
      * @param accountB the address of accountB
      * @param amountA amount to fund accountA
      * @param amountB amount to fund accountB
      */
-    function fundChannel(
+    function fundChannelMulti(
         address accountA,
         address accountB,
         uint256 amountA,
@@ -208,10 +236,39 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer, Accounts, Channel
     ) external override {
         require(msg.sender == address(token), "caller must be HoprToken");
 
-        // only call 'fundChannel' when the operator is not HoprChannels
-        if (operator != address(this)) {
-            (address recipient, address counterparty) = abi.decode(userData, (address, address));
-            _fundChannel(from, recipient, counterparty, amount, 0);
+        if (
+            operator == address(this) || // must not be triggered by HoprChannels
+            from == address(0) // ignore 'mint'
+        ) {
+            return;
+        }
+
+        // must be one of our supported functions
+        require(
+            userData.length == FUND_CHANNEL_SIZE ||
+            userData.length == FUND_CHANNEL_MULTI_SIZE,
+            "userData must match one of our supported functions"
+        );
+
+        bool shouldOpen;
+        address accountA;
+        address accountB;
+        uint256 amountA;
+        uint256 amountB;
+
+        if (userData.length == FUND_CHANNEL_SIZE) {
+            (shouldOpen, accountA, accountB) = abi.decode(userData, (bool, address, address));
+            amountA = amount;
+        } else {
+            (shouldOpen, accountA, accountB, amountA, amountB) = abi.decode(userData, (bool, address, address, uint256, uint256));
+            require(amount == amountA + amountB, "amount sent must be equal to amount specified");
+        }
+
+        _fundChannel(from, accountA, accountB, amountA, amountB);
+
+        if (shouldOpen) {
+            require(from == accountA || from == accountB, "funder must be either accountA or accountB");
+            _openChannel(accountA, accountB);
         }
     }
 }
