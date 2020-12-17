@@ -48,6 +48,8 @@ gcloud_find_vm_with_name() {
 }
 
 # $1 - VM name
+# Warning, using `--format='value[](metadata*)` is an unsupported API by gcloud and can change any time.
+# More information on https://cloud.google.com/compute/docs/storing-retrieving-metadata
 gcloud_get_image_running_on_vm() {
   echo $(gcloud compute instances describe $1 $ZONE \
     --format='value[](metadata.items.gce-container-declaration)' \
