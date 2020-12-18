@@ -1,4 +1,4 @@
-import type { HardhatRuntimeEnvironment } from 'hardhat/types'
+import type { HardhatRuntimeEnvironment, RunSuperFunction } from 'hardhat/types'
 import type { Export } from 'hardhat-deploy/types'
 import { join } from 'path'
 import { promises, existsSync } from 'fs'
@@ -9,12 +9,9 @@ const ABIS_DIR = join(CHAIN_DIR, 'abis')
 
 /**
  * Updates chain/abis folder after compilation.
- * @param _params
- * @param hre
  */
-async function main(_params, hre: HardhatRuntimeEnvironment) {
-  const { run } = hre
-  const fileDir = join(hre.config.paths.cache, 'deployed_contracts.json')
+async function main(_params, { run, config }: HardhatRuntimeEnvironment, _runSuper: RunSuperFunction<any>) {
+  const fileDir = join(config.paths.cache, 'deployed_contracts.json')
 
   // use hardhat-deploy export to get data about the contracts
   await run('export', { export: fileDir })
@@ -26,6 +23,7 @@ async function main(_params, hre: HardhatRuntimeEnvironment) {
     await mkdir(ABIS_DIR, { recursive: true })
   }
 
+  // store abi files
   return Promise.all(
     Object.entries(result.contracts).map(([contractName, { abi }]) => {
       return writeFile(join(ABIS_DIR, `${contractName}.json`), JSON.stringify(abi, null, 2))

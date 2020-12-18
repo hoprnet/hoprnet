@@ -59,6 +59,7 @@ const hardhatConfig: HardhatUserConfig = {
       tags: ['staging', 'etherscan'],
       chainId: 42,
       gasMultiplier: GAS_MULTIPLIER,
+      gas: Number(Web3.utils.toWei('1', 'gwei')),
       url: `https://kovan.infura.io/v3/${INFURA}`,
       accounts: PRIVATE_KEY ? [PRIVATE_KEY] : []
     },
@@ -82,9 +83,10 @@ const hardhatConfig: HardhatUserConfig = {
       live: true,
       tags: ['staging'],
       chainId: 56,
+      gasMultiplier: GAS_MULTIPLIER,
+      gas: Number(Web3.utils.toWei('20', 'gwei')), // binance chain requires >= 20gwei
       url: 'https://bsc-dataseed.binance.org',
-      accounts: PRIVATE_KEY ? [PRIVATE_KEY] : [],
-      gas: Number(Web3.utils.toWei('20', 'gwei')) // binance chain requires >= 20gwei
+      accounts: PRIVATE_KEY ? [PRIVATE_KEY] : []
     }
   },
   namedAccounts: {
@@ -119,16 +121,19 @@ const hardhatConfig: HardhatUserConfig = {
 task('fund', "Fund node's accounts by specifying HoprToken address", async (...args: any[]) => {
   return (await import('./tasks/fund')).default(args[0], args[1], args[2])
 })
-  .addParam<string>('address', 'HoprToken contract address', undefined, types.string)
   .addOptionalParam<string>('amount', 'Amount of HOPR to fund', Web3.utils.toWei('1000000', 'ether'), types.string)
   .addOptionalParam<number>('accountsToFund', 'Amount of accounts to fund from demo seeds', 0, types.int)
 
 task('postCompile', 'Use export task and then update abis folder', async (...args: any[]) => {
-  return (await import('./tasks/postCompile')).default(args[0], args[1])
+  return (await import('./tasks/postCompile')).default(args[0], args[1], args[2])
 })
 
 task('postDeploy', 'Use export task and then update addresses folder', async (...args: any[]) => {
-  return (await import('./tasks/postDeploy')).default(args[0], args[1])
+  return (await import('./tasks/postDeploy')).default(args[0], args[1], args[2])
+})
+
+task('accounts', 'View unlocked accounts', async (...args: any[]) => {
+  return (await import('./tasks/getAccounts')).default(args[0], args[1], args[2])
 })
 
 export default hardhatConfig

@@ -1,4 +1,4 @@
-import type { HardhatRuntimeEnvironment } from 'hardhat/types'
+import type { HardhatRuntimeEnvironment, RunSuperFunction } from 'hardhat/types'
 import type { Export } from 'hardhat-deploy/types'
 import { join } from 'path'
 import { promises, existsSync } from 'fs'
@@ -13,12 +13,9 @@ const ADDRESSES_FILE = join(CHAIN_DIR, 'addresses.json')
  * 1. export contract data into 'hardhat/cache/deployed_contracts.json'
  * 2. export addresses to 'chain/addresses.json'
  * 3. verify smart contracts if possible
- * @param _params
- * @param hre
  */
-async function main(_params, hre: HardhatRuntimeEnvironment) {
-  const { run, network } = hre
-  const fileDir = join(hre.config.paths.cache, 'deployed_contracts.json')
+async function main(_params, { run, config, network }: HardhatRuntimeEnvironment, _runSuper: RunSuperFunction<any>) {
+  const fileDir = join(config.paths.cache, 'deployed_contracts.json')
 
   // use hardhat-deploy export to get data about the contracts
   await run('export', { export: fileDir })
@@ -40,11 +37,13 @@ async function main(_params, hre: HardhatRuntimeEnvironment) {
     prevAddresses = {}
   }
 
+  // update addresses
   for (const [contract, { address }] of Object.entries(data.contracts)) {
     if (!prevAddresses[network.name]) prevAddresses[network.name] = {}
     prevAddresses[network.name][contract] = address
   }
 
+  // store addresses.json file
   await writeFile(ADDRESSES_FILE, JSON.stringify(prevAddresses, null, 2))
 
   // try to verify
