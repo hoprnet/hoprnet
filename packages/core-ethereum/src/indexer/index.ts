@@ -107,6 +107,7 @@ class Indexer implements IIndexer {
   public async getRandomChannel(): Promise<IndexerChannel | undefined> {
     const all = await this.getAll(undefined)
     if (all.length === 0) {
+      log('no channels exist in indexer')
       return undefined
     }
     const random = randomChoice(all)
