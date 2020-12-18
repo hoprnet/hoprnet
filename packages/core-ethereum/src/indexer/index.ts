@@ -6,12 +6,15 @@ import { Subscription } from 'web3-core-subscriptions'
 import { BlockHeader } from 'web3-eth'
 import { u8aToNumber, u8aConcat, u8aToHex, pubKeyToPeerId, randomChoice } from '@hoprnet/hopr-utils'
 import { ChannelEntry, Public, Balance } from '../types'
-import { Log, isPartyA, events, getId, pubKeyToAccountId } from '../utils'
+import { isPartyA, events, getId, pubKeyToAccountId } from '../utils'
 import { MAX_CONFIRMATIONS } from '../config'
 import { ContractEventLog } from '../tsc/web3/types'
 import { Log as OnChainLog } from 'web3-core'
 import PeerId from 'peer-id'
 import Heap from 'heap-js'
+import debug from 'debug'
+
+const log = debug('hopr:indexer')
 
 // we save up some memory by only caching the event data we use
 type LightEvent<E extends ContractEventLog<any>> = Pick<
@@ -53,7 +56,6 @@ function isConfirmedBlock(blockNumber: number, onChainBlockNumber: number): bool
  * Simple indexer to keep track of all open payment channels.
  */
 class Indexer implements IIndexer {
-  private log = Log(['channels'])
   private status: 'started' | 'stopped' = 'stopped'
   private unconfirmedEvents: (OpenedChannelEvent | ClosedChannelEvent)[] = []
   private starting?: Promise<boolean>
@@ -105,6 +107,7 @@ class Indexer implements IIndexer {
   public async getRandomChannel(): Promise<IndexerChannel | undefined> {
     const all = await this.getAll(undefined)
     if (all.length === 0) {
+      log('no channels exist in indexer')
       return undefined
     }
     const random = randomChoice(all)
@@ -255,7 +258,7 @@ class Indexer implements IIndexer {
     const { dbKeys, db } = this.connector
     const { blockNumber, logIndex, transactionIndex } = channelEntry
 
-    this.log(
+    log(
       `storing channel ${partyA.toHex()}-${partyB.toHex()}:${blockNumber.toString()}-${transactionIndex.toString()}-${logIndex.toString()}`
     )
 
@@ -275,7 +278,7 @@ class Indexer implements IIndexer {
 
   // delete a channel
   private async delete(partyA: Public, partyB: Public): Promise<void> {
-    this.log(`deleting channel ${u8aToHex(partyA)}-${u8aToHex(partyB)}`)
+    log(`deleting channel ${u8aToHex(partyA)}-${u8aToHex(partyB)}`)
 
     const { dbKeys, db } = this.connector
 
@@ -380,7 +383,7 @@ class Indexer implements IIndexer {
    * @returns true if start was succesful
    */
   public async start(): Promise<boolean> {
-    this.log(`Starting indexer...`)
+    log(`Starting indexer...`)
 
     if (typeof this.starting !== 'undefined') {
       return this.starting
@@ -401,7 +404,7 @@ class Indexer implements IIndexer {
           fromBlock = fromBlock - MAX_CONFIRMATIONS
         }
 
-        this.log(`starting to pull events from block ${fromBlock}..`)
+        log(`starting to pull events from block ${fromBlock}..`)
 
         this.newBlockEvent = this.connector.web3.eth
           .subscribe('newBlockHeaders')
@@ -442,10 +445,10 @@ class Indexer implements IIndexer {
           .on('data', (_event) => this.processClosedChannelEvent(_event, onChainBlockNumber))
 
         this.status = 'started'
-        this.log(chalk.green('Indexer started!'))
+        log(chalk.green('Indexer started!'))
         return resolve(true)
       } catch (err) {
-        this.log(err.message)
+        log(err.message)
 
         return this.stop()
       }
@@ -462,7 +465,7 @@ class Indexer implements IIndexer {
    * @returns true if stop was succesful
    */
   public async stop(): Promise<boolean> {
-    this.log(`Stopping indexer...`)
+    log(`Stopping indexer...`)
 
     if (this.starting != null) {
       throw Error('cannot stop while starting')
@@ -479,10 +482,10 @@ class Indexer implements IIndexer {
         this.closedChannelEvent?.unsubscribe()
 
         this.status = 'stopped'
-        this.log(chalk.green('Indexer stopped!'))
+        log(chalk.green('Indexer stopped!'))
         return resolve(true)
       } catch (err) {
-        this.log(err.message)
+        log(err.message)
 
         return resolve(false)
       }
