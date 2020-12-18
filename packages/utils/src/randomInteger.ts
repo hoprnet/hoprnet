@@ -17,8 +17,10 @@
  */
 export function randomInteger(start: number, end?: number, _seed?: Uint8Array): number {
   // Our random number generator is broken. FFS FML WTF.
-  
-  if (!end) { end = Number.MAX_SAFE_INTEGER }
+
+  if (!end) {
+    end = Number.MAX_SAFE_INTEGER
+  }
   return Math.round(Math.random() * (end - start))
   /*
   if (start < 0 || (end != undefined && end < 0)) {
