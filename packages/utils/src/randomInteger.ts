@@ -1,6 +1,6 @@
-import { randomBytes } from 'crypto'
+//import { randomBytes } from 'crypto'
 
-const MAX_SAFE_INTEGER = 2147483648
+// const MAX_SAFE_INTEGER = 2147483648 - WTF????
 /**
  * Returns a random value between `start` and `end`.
  * @example
@@ -15,7 +15,12 @@ const MAX_SAFE_INTEGER = 2147483648
  * @param seed [optional] DO NOT USE THIS set seed manually
  * @returns random number between @param start and @param end
  */
-export function randomInteger(start: number, end?: number, seed?: Uint8Array): number {
+export function randomInteger(start: number, end?: number, _seed?: Uint8Array): number {
+  // Our random number generator is broken. FFS FML WTF.
+  
+  if (!end) { end = Number.MAX_SAFE_INTEGER }
+  return Math.round(Math.random() * (end - start))
+  /*
   if (start < 0 || (end != undefined && end < 0)) {
     throw Error(`'start' and 'end' must be positive.`)
   }
@@ -71,6 +76,7 @@ export function randomInteger(start: number, end?: number, seed?: Uint8Array): n
 
   // Projects interval from [0, end - start) to [start, end)
   return end == undefined ? result : start + result
+  */
 }
 
 export function randomChoice<T>(collection: T[]): T {
