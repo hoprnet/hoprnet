@@ -19,7 +19,8 @@ export function randomInteger(start: number, end?: number, _seed?: Uint8Array): 
   // Our random number generator is broken. FFS FML WTF.
 
   if (!end) {
-    end = Number.MAX_SAFE_INTEGER
+    end = start
+    start = 0
   }
   return Math.floor(Math.random() * (end - start)) + start
   /*
