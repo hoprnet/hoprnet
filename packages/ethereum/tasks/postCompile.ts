@@ -38,7 +38,7 @@ async function main(_params, { run, config }: HardhatRuntimeEnvironment, _runSup
     }
   }
 
-  // store updated data.json
+  // store abi file
   return Promise.all(
     Object.entries(abis).map(([contractName, abi]) => {
       return writeFile(join(OUTPUT_DIR, `${contractName}.json`), JSON.stringify(abi, null, 2))
