@@ -268,7 +268,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       balance,
       newChannels,
       currentChannels,
-      this.network.networkPeers.qualityOf.bind(this.network.networkPeers),
+      this.network.networkPeers,
       this.paymentChannels.indexer
     )
     verbose(`strategy wants to open`, nextChannels.length, 'new channels')
