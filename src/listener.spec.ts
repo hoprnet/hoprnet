@@ -5,11 +5,14 @@ import Listener from './listener'
 import Multiaddr from 'multiaddr'
 import type { MultiaddrConnection, Upgrader } from 'libp2p'
 import type { Connection } from 'libp2p'
-import dgram, { Socket, RemoteInfo } from 'dgram'
+import dgram from 'dgram'
+import type { Socket, RemoteInfo } from 'dgram'
 import { handleStunRequest } from './stun'
 import PeerId from 'peer-id'
 import net from 'net'
-import Defer, { DeferredPromise } from 'p-defer'
+import Defer from 'p-defer'
+import type { DeferredPromise } from 'p-defer'
+import * as stun from 'webrtc-stun'
 
 import { networkInterfaces } from 'os'
 
@@ -189,5 +192,58 @@ describe('transport/listener.spec check listening to sockets', function () {
     assert(errThrown)
 
     await listener.close()
+  })
+
+  it('should do a STUN request', async function () {
+    const defer = Defer<void>()
+    const listener = new Listener(
+      (conn: Connection) => {
+        // @ts-ignore
+        conn.conn.end()
+      },
+      ({
+        upgradeInbound: async (conn: MultiaddrConnection) => conn
+      } as unknown) as Upgrader,
+      undefined,
+      await PeerId.create({ keyType: 'secp256k1' }),
+      undefined
+    )
+
+    await listener.listen(Multiaddr(`/ip4/0.0.0.0/tcp/0`))
+
+    const socket = dgram.createSocket({ type: 'udp4' })
+    const tid = stun.generateTransactionId()
+
+    socket.on('message', (msg) => {
+      const res = stun.createBlank()
+
+      // if msg is valid STUN message
+      if (res.loadBuffer(msg)) {
+        // if msg is BINDING_RESPONSE_SUCCESS and valid content
+        if (res.isBindingResponseSuccess({ transactionId: tid })) {
+          const attr = res.getXorMappedAddressAttribute()
+          // if msg includes attr
+          if (attr) {
+            defer.resolve()
+          }
+        }
+      }
+
+      socket.close()
+    })
+
+    const req = stun.createBindingRequest(tid).setFingerprintAttribute()
+
+    const addrs = listener.getAddrs()
+
+    const cOpts = addrs[1].toOptions()
+
+    socket.send(req.toBuffer(), cOpts.port, `localhost`)
+
+    await new Promise((resolve) => setTimeout(resolve, 100))
+
+    await listener.close()
+
+    await defer.promise
   })
 })

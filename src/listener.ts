@@ -166,27 +166,36 @@ class Listener extends EventEmitter implements InterfaceListener {
       return cOpts.host !== options.host || cOpts.port !== options.port
     })
 
-    await Promise.all([
-      new Promise<void>((resolve, reject) => {
+    const listenTCP = (port?: number) =>
+      new Promise<number>((resolve, reject) => {
         try {
-          this.tcpSocket.listen(options, (err?: Error) => {
-            if (err) {
-              return reject(err)
-            }
+          this.tcpSocket.listen(
+            port != undefined
+              ? {
+                  ...options,
+                  port
+                }
+              : options,
+            (err?: Error) => {
+              if (err) {
+                return reject(err)
+              }
 
-            log('Listening on %s', this.tcpSocket.address())
-            resolve()
-          })
+              log('Listening on %s', this.tcpSocket.address())
+              resolve((this.tcpSocket.address() as AddressInfo).port)
+            }
+          )
         } catch (err) {
           error(`Could bind to TCP socket. Error was: ${err.message}`)
           reject()
         }
-      }),
-      new Promise<void>((resolve, reject) => {
-        this.udpSocket.once('error', reject)
+      })
 
+    const listenUDP = (port?: number) =>
+      new Promise<number>((resolve, reject) => {
+        this.udpSocket.once('error', reject)
         try {
-          this.udpSocket.bind(options.port, async () => {
+          this.udpSocket.bind(port ?? options.port, async () => {
             this.udpSocket.removeListener('error', reject)
             try {
               this.externalAddress = await getExternalIp(this.stunServers, this.udpSocket)
@@ -194,14 +203,19 @@ class Listener extends EventEmitter implements InterfaceListener {
               error(`Unable to fetch external address using STUN. Error was: ${err}`)
             }
 
-            resolve()
+            resolve(this.udpSocket.address().port)
           })
         } catch (err) {
           error(`Could bind UDP socket. Error was: ${err.message}`)
           reject()
         }
       })
-    ])
+
+    if (options.port == 0 || options.port == null) {
+      await listenTCP().then((port) => listenUDP(port))
+    } else {
+      await Promise.all([listenTCP(), listenUDP()])
+    }
 
     this.state = State.LISTENING
   }
