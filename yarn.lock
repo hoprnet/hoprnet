@@ -6815,9 +6815,9 @@ hard-rejection@^2.1.0:
   integrity sha512-VIZB+ibDhx7ObhAe7OVtoEbuP4h/MuOTHJ+J8h/eBXotJYl0fBgR72xDFCKgIh22OJZIOVNxBMWuhAr10r8HdA==
 
 hardhat-typechain@^0.3.3:
-  version "0.3.3"
-  resolved "https://registry.yarnpkg.com/hardhat-typechain/-/hardhat-typechain-0.3.3.tgz#cef7996d2054aecd5e6b7677130b2f2b1fe9d352"
-  integrity sha512-NrqP7Zng28prV3YT0lXoo1pXtZxoNCMfiZIWkf1HXjjID42JLLfSOTsvlb0okDMpz4tJaEEkgADJO69sKZxw+Q==
+  version "0.3.4"
+  resolved "https://registry.yarnpkg.com/hardhat-typechain/-/hardhat-typechain-0.3.4.tgz#6d7d86184152b5a3c83bde0fbbb26224b6fbfd70"
+  integrity sha512-oI9YSutDfZnRlAV1bYTpLkBHw4rkhz9JDWAEXz2PR34ylpgLWxPFbPiHT5QXadGTlBqJUAT6JSTxCK1kADMkjA==
 
 hardhat@^2.0.2:
   version "2.0.5"
