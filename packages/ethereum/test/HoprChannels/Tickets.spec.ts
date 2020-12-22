@@ -25,7 +25,7 @@ const useFixtures = deployments.createFixture(async (_deployments, { secsClosure
   // deploy ERC777Mock
   const token = await ERC777.new(deployer, '100', 'Token', 'TKN', [])
   // deploy TicketsMock
-  const tickets = await Tickets.new(secsClosure ?? '0')
+  const tickets = await Tickets.new(token.address, secsClosure ?? '0')
 
   return {
     token,
@@ -38,11 +38,16 @@ describe('Tickets', function () {
   it('should redeem ticket', async function () {
     const { tickets, deployer } = await useFixtures()
 
-    await tickets.initializeAccount(ACCOUNT_B.address, ACCOUNT_B.pubKeyFirstHalf, ACCOUNT_B.pubKeySecondHalf, SECRET_2)
-    await tickets.fundChannel(deployer, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
-    await tickets.openChannel(ACCOUNT_A.address, ACCOUNT_B.address)
+    await tickets.initializeAccountInternal(
+      ACCOUNT_B.address,
+      ACCOUNT_B.pubKeyFirstHalf,
+      ACCOUNT_B.pubKeySecondHalf,
+      SECRET_2
+    )
+    await tickets.fundChannelInternal(deployer, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
+    await tickets.openChannelInternal(ACCOUNT_A.address, ACCOUNT_B.address)
 
-    await tickets.redeemTicket(
+    await tickets.redeemTicketInternal(
       TICKET_AB_WIN.recipient,
       TICKET_AB_WIN.counterparty,
       TICKET_AB_WIN.secret,
@@ -71,10 +76,15 @@ describe('Tickets', function () {
   it('should fail to redeem ticket when channel in closed', async function () {
     const { tickets } = await useFixtures()
 
-    await tickets.initializeAccount(ACCOUNT_B.address, ACCOUNT_B.pubKeyFirstHalf, ACCOUNT_B.pubKeySecondHalf, SECRET_2)
+    await tickets.initializeAccountInternal(
+      ACCOUNT_B.address,
+      ACCOUNT_B.pubKeyFirstHalf,
+      ACCOUNT_B.pubKeySecondHalf,
+      SECRET_2
+    )
 
     await expectRevert(
-      tickets.redeemTicket(
+      tickets.redeemTicketInternal(
         TICKET_AB_WIN.recipient,
         TICKET_AB_WIN.counterparty,
         TICKET_AB_WIN.secret,
@@ -92,20 +102,35 @@ describe('Tickets', function () {
   it('should fail to redeem ticket when channel in in different iteration', async function () {
     const { token, tickets, deployer } = await useFixtures()
 
-    await tickets.initializeAccount(ACCOUNT_B.address, ACCOUNT_B.pubKeyFirstHalf, ACCOUNT_B.pubKeySecondHalf, SECRET_2)
+    await tickets.initializeAccountInternal(
+      ACCOUNT_B.address,
+      ACCOUNT_B.pubKeyFirstHalf,
+      ACCOUNT_B.pubKeySecondHalf,
+      SECRET_2
+    )
 
+    // transfer tokens to contract
+    await token.send(
+      tickets.address,
+      '100',
+      web3.eth.abi.encodeParameters(
+        ['bool', 'address', 'address', 'uint256', 'uint256'],
+        [false, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30']
+      ),
+      {
+        from: deployer
+      }
+    )
     // open channel and then close it
-    await token.transfer(tickets.address, '100')
-    await tickets.fundChannel(deployer, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
-    await tickets.openChannel(ACCOUNT_A.address, ACCOUNT_B.address)
-    await tickets.initiateChannelClosure(ACCOUNT_A.address, ACCOUNT_B.address)
-    await tickets.finalizeChannelClosure(token.address, ACCOUNT_A.address, ACCOUNT_B.address)
+    await tickets.openChannelInternal(ACCOUNT_A.address, ACCOUNT_B.address)
+    await tickets.initiateChannelClosureInternal(ACCOUNT_A.address, ACCOUNT_B.address)
+    await tickets.finalizeChannelClosureInternal(ACCOUNT_A.address, ACCOUNT_B.address)
     // refund and open channel
-    await tickets.fundChannel(deployer, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
-    await tickets.openChannel(ACCOUNT_A.address, ACCOUNT_B.address)
+    await tickets.fundChannelInternal(deployer, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
+    await tickets.openChannelInternal(ACCOUNT_A.address, ACCOUNT_B.address)
 
     await expectRevert(
-      tickets.redeemTicket(
+      tickets.redeemTicketInternal(
         TICKET_AB_WIN.recipient,
         TICKET_AB_WIN.counterparty,
         TICKET_AB_WIN.secret,
@@ -123,11 +148,16 @@ describe('Tickets', function () {
   it('should fail to redeem ticket when ticket has been already redeemed', async function () {
     const { tickets, deployer } = await useFixtures()
 
-    await tickets.initializeAccount(ACCOUNT_B.address, ACCOUNT_B.pubKeyFirstHalf, ACCOUNT_B.pubKeySecondHalf, SECRET_2)
-    await tickets.fundChannel(deployer, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
-    await tickets.openChannel(ACCOUNT_A.address, ACCOUNT_B.address)
+    await tickets.initializeAccountInternal(
+      ACCOUNT_B.address,
+      ACCOUNT_B.pubKeyFirstHalf,
+      ACCOUNT_B.pubKeySecondHalf,
+      SECRET_2
+    )
+    await tickets.fundChannelInternal(deployer, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
+    await tickets.openChannelInternal(ACCOUNT_A.address, ACCOUNT_B.address)
 
-    await tickets.redeemTicket(
+    await tickets.redeemTicketInternal(
       TICKET_AB_WIN.recipient,
       TICKET_AB_WIN.counterparty,
       TICKET_AB_WIN.secret,
@@ -140,7 +170,7 @@ describe('Tickets', function () {
     )
 
     await expectRevert(
-      tickets.redeemTicket(
+      tickets.redeemTicketInternal(
         TICKET_AB_WIN.recipient,
         TICKET_AB_WIN.counterparty,
         SECRET_0, // give the next secret so this ticket becomes redeemable
@@ -158,12 +188,17 @@ describe('Tickets', function () {
   it('should fail to redeem ticket when signer is not the issuer', async function () {
     const { tickets, deployer } = await useFixtures()
 
-    await tickets.initializeAccount(ACCOUNT_B.address, ACCOUNT_B.pubKeyFirstHalf, ACCOUNT_B.pubKeySecondHalf, SECRET_2)
-    await tickets.fundChannel(deployer, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
-    await tickets.openChannel(ACCOUNT_A.address, ACCOUNT_B.address)
+    await tickets.initializeAccountInternal(
+      ACCOUNT_B.address,
+      ACCOUNT_B.pubKeyFirstHalf,
+      ACCOUNT_B.pubKeySecondHalf,
+      SECRET_2
+    )
+    await tickets.fundChannelInternal(deployer, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
+    await tickets.openChannelInternal(ACCOUNT_A.address, ACCOUNT_B.address)
 
     await expectRevert(
-      tickets.redeemTicket(
+      tickets.redeemTicketInternal(
         TICKET_AB_WIN.recipient,
         TICKET_AB_WIN.counterparty,
         TICKET_AB_WIN.secret,
@@ -181,12 +216,17 @@ describe('Tickets', function () {
   it("should fail to redeem ticket if it's a loss", async function () {
     const { tickets, deployer } = await useFixtures()
 
-    await tickets.initializeAccount(ACCOUNT_B.address, ACCOUNT_B.pubKeyFirstHalf, ACCOUNT_B.pubKeySecondHalf, SECRET_2)
-    await tickets.fundChannel(deployer, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
-    await tickets.openChannel(ACCOUNT_A.address, ACCOUNT_B.address)
+    await tickets.initializeAccountInternal(
+      ACCOUNT_B.address,
+      ACCOUNT_B.pubKeyFirstHalf,
+      ACCOUNT_B.pubKeySecondHalf,
+      SECRET_2
+    )
+    await tickets.fundChannelInternal(deployer, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
+    await tickets.openChannelInternal(ACCOUNT_A.address, ACCOUNT_B.address)
 
     await expectRevert(
-      tickets.redeemTicket(
+      tickets.redeemTicketInternal(
         TICKET_AB_LOSS.recipient,
         TICKET_AB_LOSS.counterparty,
         TICKET_AB_LOSS.secret,
@@ -204,7 +244,7 @@ describe('Tickets', function () {
   it('should pack ticket', async function () {
     const { tickets } = await useFixtures()
 
-    const encoded = await tickets.getEncodedTicket(
+    const encoded = await tickets.getEncodedTicketInternal(
       TICKET_AB_WIN.recipient,
       TICKET_AB_WIN.counter,
       TICKET_AB_WIN.proofOfRelaySecret,
@@ -218,14 +258,14 @@ describe('Tickets', function () {
   it('should hash ticket', async function () {
     const { tickets } = await useFixtures()
 
-    const hash = await tickets.getTicketHash(TICKET_AB_WIN.encoded)
+    const hash = await tickets.getTicketHashInternal(TICKET_AB_WIN.encoded)
     expect(hash).to.equal(TICKET_AB_WIN.hash)
   })
 
   it("should get ticket's luck", async function () {
     const { tickets } = await useFixtures()
 
-    const luck = await tickets.getTicketLuck(
+    const luck = await tickets.getTicketLuckInternal(
       TICKET_AB_WIN.hash,
       TICKET_AB_WIN.secret,
       TICKET_AB_WIN.proofOfRelaySecret,

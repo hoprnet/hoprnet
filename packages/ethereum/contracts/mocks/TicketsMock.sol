@@ -1,14 +1,65 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.7.5;
 
-import "./AccountsMock.sol";
-import "./ChannelsMock.sol";
-import "../HoprChannels/Tickets.sol";
+import "../HoprChannels.sol";
 
-contract TicketsMock is AccountsMock, ChannelsMock, Tickets {
-    constructor(uint32 _secsClosure) ChannelsMock(_secsClosure) {}
+contract TicketsMock is HoprChannels {
+    constructor(address _token, uint32 _secsClosure)
+    HoprChannels(_token, _secsClosure) {}
 
-    function redeemTicket(
+    function initializeAccountInternal(
+        address sender,
+        uint256 pubKeyFirstHalf,
+        uint256 pubKeySecondHalf,
+        bytes32 secret
+    ) external {
+        _initializeAccount(
+            sender,
+            pubKeyFirstHalf,
+            pubKeySecondHalf,
+            secret
+        );
+    }
+
+    function updateAccountInternal(
+        address sender,
+        bytes32 secret
+    ) external {
+        _updateAccount(sender, secret);
+    }
+
+    function fundChannelInternal(
+        address funder,
+        address accountA,
+        address accountB,
+        uint256 amountA,
+        uint256 amountB
+    ) external {
+        _fundChannel(funder, accountA, accountB, amountA, amountB);
+    }
+
+    function openChannelInternal(
+        address opener,
+        address counterparty
+    ) external {
+        _openChannel(opener, counterparty);
+    }
+
+    function initiateChannelClosureInternal(
+        address initiator,
+        address counterparty
+    ) external {
+        _initiateChannelClosure(initiator, counterparty);
+    }
+
+    function finalizeChannelClosureInternal(
+        address initiator,
+        address counterparty
+    ) external {
+        _finalizeChannelClosure(initiator, counterparty);
+    }
+
+    function redeemTicketInternal(
         address recipient,
         address counterparty,
         bytes32 secretPreImage,
@@ -22,7 +73,7 @@ contract TicketsMock is AccountsMock, ChannelsMock, Tickets {
         _redeemTicket(recipient, counterparty, secretPreImage, proofOfRelaySecret, amount, winProb, r, s, v);
     }
 
-    function getEncodedTicket(
+    function getEncodedTicketInternal(
         address recipient,
         uint256 recipientCounter,
         bytes32 proofOfRelaySecret,
@@ -33,13 +84,13 @@ contract TicketsMock is AccountsMock, ChannelsMock, Tickets {
         return _getEncodedTicket(recipient, recipientCounter, proofOfRelaySecret, channelIteration, amount, winProb);
     }
 
-    function getTicketHash(
+    function getTicketHashInternal(
         bytes calldata packedTicket
     ) external pure returns (bytes32) {
         return _getTicketHash(packedTicket);
     }
 
-    function getTicketLuck(
+    function getTicketLuckInternal(
         bytes32 ticketHash,
         bytes32 secretPreImage,
         bytes32 proofOfRelaySecret,

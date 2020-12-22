@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.7.5;
 
-import "../HoprChannels/Channels.sol";
+import "../HoprChannels.sol";
 
-contract ChannelsMock is Channels {
-    constructor(uint32 _secsClosure) {
-        secsClosure = _secsClosure;
-    }
+contract ChannelsMock is HoprChannels {
+    constructor(address _token, uint32 _secsClosure)
+    HoprChannels(_token, _secsClosure) {}
 
-    function fundChannel(
+    function fundChannelInternal(
         address funder,
         address accountA,
         address accountB,
@@ -18,29 +17,28 @@ contract ChannelsMock is Channels {
         _fundChannel(funder, accountA, accountB, amountA, amountB);
     }
 
-    function openChannel(
+    function openChannelInternal(
         address opener,
         address counterparty
     ) external {
         _openChannel(opener, counterparty);
     }
 
-    function initiateChannelClosure(
+    function initiateChannelClosureInternal(
         address initiator,
         address counterparty
     ) external {
         _initiateChannelClosure(initiator, counterparty);
     }
 
-    function finalizeChannelClosure(
-        IERC20 token,
+    function finalizeChannelClosureInternal(
         address initiator,
         address counterparty
     ) external {
-        _finalizeChannelClosure(token, initiator, counterparty);
+        _finalizeChannelClosure(initiator, counterparty);
     }
 
-    function getChannel(
+    function getChannelInternal(
         address accountA,
         address accountB
     ) external view returns (
@@ -53,33 +51,33 @@ contract ChannelsMock is Channels {
         return (partyA, partyB, channelId);
     }
 
-    function getChannelId(
+    function getChannelIdInternal(
         address partyA,
         address partyB
     ) external pure returns (bytes32) {
         return _getChannelId(partyA, partyB);
     }
 
-    function getChannelStatus(
+    function getChannelStatusInternal(
         uint24 status
     ) external pure returns (ChannelStatus) {
         return _getChannelStatus(status);
     }
 
-    function getChannelIteration(
+    function getChannelIterationInternal(
         uint24 status
     ) external pure returns (uint256) {
         return _getChannelIteration(status);
     }
 
-    function isPartyA(
+    function isPartyAInternal(
         address accountA,
         address accountB
     ) external pure returns (bool) {
         return _isPartyA(accountA, accountB);
     }
 
-    function getParties(
+    function getPartiesInternal(
         address accountA,
         address accountB
     ) external pure returns (address, address) {

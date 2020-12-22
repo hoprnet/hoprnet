@@ -1,5 +1,5 @@
 import { deployments } from 'hardhat'
-import { expectEvent, expectRevert, constants } from '@openzeppelin/test-helpers'
+import { singletons, expectEvent, expectRevert, constants } from '@openzeppelin/test-helpers'
 import { vmErrorMessage } from '../utils'
 import { formatAccount } from './utils'
 import { ACCOUNT_A, ACCOUNT_B, SECRET_2, SECRET_1 } from './constants'
@@ -7,7 +7,12 @@ import { ACCOUNT_A, ACCOUNT_B, SECRET_2, SECRET_1 } from './constants'
 const Accounts = artifacts.require('AccountsMock')
 
 const useFixtures = deployments.createFixture(async () => {
-  const accounts = await Accounts.new()
+  const [deployer] = await web3.eth.getAccounts()
+
+  // deploy ERC1820Registry required by ERC777 token
+  await singletons.ERC1820Registry(deployer)
+
+  const accounts = await Accounts.new(constants.ZERO_ADDRESS, '0')
 
   return {
     accounts
@@ -18,7 +23,7 @@ describe('Accounts', function () {
   it('should initialize account', async function () {
     const { accounts } = await useFixtures()
 
-    const response = await accounts.initializeAccount(
+    const response = await accounts.initializeAccountInternal(
       ACCOUNT_A.address,
       ACCOUNT_A.pubKeyFirstHalf,
       ACCOUNT_A.pubKeySecondHalf,
@@ -46,7 +51,12 @@ describe('Accounts', function () {
 
     // give wrong public key
     await expectRevert(
-      accounts.initializeAccount(ACCOUNT_A.address, ACCOUNT_B.pubKeyFirstHalf, ACCOUNT_B.pubKeySecondHalf, SECRET_1),
+      accounts.initializeAccountInternal(
+        ACCOUNT_A.address,
+        ACCOUNT_B.pubKeyFirstHalf,
+        ACCOUNT_B.pubKeySecondHalf,
+        SECRET_1
+      ),
       vmErrorMessage('public key does not match account')
     )
   })
@@ -54,9 +64,14 @@ describe('Accounts', function () {
   it("should update account's secret", async function () {
     const { accounts } = await useFixtures()
 
-    await accounts.initializeAccount(ACCOUNT_A.address, ACCOUNT_A.pubKeyFirstHalf, ACCOUNT_A.pubKeySecondHalf, SECRET_2)
+    await accounts.initializeAccountInternal(
+      ACCOUNT_A.address,
+      ACCOUNT_A.pubKeyFirstHalf,
+      ACCOUNT_A.pubKeySecondHalf,
+      SECRET_2
+    )
 
-    const response = await accounts.updateAccount(ACCOUNT_A.address, SECRET_1)
+    const response = await accounts.updateAccountInternal(ACCOUNT_A.address, SECRET_1)
 
     expectEvent(response, 'AccountSecretUpdated', {
       account: ACCOUNT_A.address,
@@ -71,11 +86,16 @@ describe('Accounts', function () {
   it("should fail to update account's secret when secret is empty", async function () {
     const { accounts } = await useFixtures()
 
-    await accounts.initializeAccount(ACCOUNT_A.address, ACCOUNT_A.pubKeyFirstHalf, ACCOUNT_A.pubKeySecondHalf, SECRET_1)
+    await accounts.initializeAccountInternal(
+      ACCOUNT_A.address,
+      ACCOUNT_A.pubKeyFirstHalf,
+      ACCOUNT_A.pubKeySecondHalf,
+      SECRET_1
+    )
 
     // give empty SECRET
     await expectRevert(
-      accounts.updateAccount(ACCOUNT_A.address, constants.ZERO_BYTES32),
+      accounts.updateAccountInternal(ACCOUNT_A.address, constants.ZERO_BYTES32),
       vmErrorMessage('secret must not be empty')
     )
   })
@@ -83,11 +103,16 @@ describe('Accounts', function () {
   it("should fail to update account's secret when secret is the same as before", async function () {
     const { accounts } = await useFixtures()
 
-    await accounts.initializeAccount(ACCOUNT_A.address, ACCOUNT_A.pubKeyFirstHalf, ACCOUNT_A.pubKeySecondHalf, SECRET_1)
+    await accounts.initializeAccountInternal(
+      ACCOUNT_A.address,
+      ACCOUNT_A.pubKeyFirstHalf,
+      ACCOUNT_A.pubKeySecondHalf,
+      SECRET_1
+    )
 
     // give same SECRET
     await expectRevert(
-      accounts.updateAccount(ACCOUNT_A.address, SECRET_1),
+      accounts.updateAccountInternal(ACCOUNT_A.address, SECRET_1),
       vmErrorMessage('secret must not be the same as before')
     )
   })
