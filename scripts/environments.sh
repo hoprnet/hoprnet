@@ -34,6 +34,11 @@ get_environment() {
   case "$BRANCH" in release/*)
     VERSION_MAJ_MIN=$(get_version_maj_min $RELEASE) 
 
+    if [ "$VERSION_MAJ_MIN" == '1.60' ]; then
+      RELEASE_NAME='mainz'
+      # Mistake: https://github.com/hoprnet/hoprnet/pull/893#issuecomment-750318579
+      return
+    fi
     if [ "$VERSION_MAJ_MIN" == '1.59' ]; then
       RELEASE_NAME='mainz'
       # From this release on, RELEASE_IP is deprecated
