@@ -654,5 +654,12 @@
     "uploadedTo": {
       "http://80.208.229.228:5001": "Wed, 23 Dec 2020 14:52:29 GMT"
     }
+  },
+  "1.61.0": {
+    "hash": "/ipfs/QmaQsyLt2yYK2J4NAvmkxYMn11impvUBE1vNDsgZemzkEe",
+    "type": "manifest",
+    "uploadedTo": {
+      "http://80.208.229.228:5001": "Wed, 23 Dec 2020 17:02:47 GMT"
+    }
   }
 }
