@@ -37,12 +37,7 @@ export class AdminServer {
 
     this.app = next({
       dev: NODE_ENV === 'development',
-      dir: adminPath,
-      conf: {
-        devIndicators: {
-          autoPrerender: false
-        }
-      }
+      dir: adminPath
     })
     const handle = this.app.getRequestHandler()
     await this.app.prepare()

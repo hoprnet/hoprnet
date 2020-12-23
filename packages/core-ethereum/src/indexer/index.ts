@@ -110,6 +110,7 @@ class Indexer implements IIndexer {
       log('no channels exist in indexer')
       return undefined
     }
+    log('picking random from ', all.length, ' channels')
     const random = randomChoice(all)
     return this.toIndexerChannel(await pubKeyToPeerId(random.partyA), random)
   }
