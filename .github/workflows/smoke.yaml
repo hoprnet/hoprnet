@@ -23,6 +23,7 @@ jobs:
           node-version: 12
           registry-url: https://registry.npmjs.org/
 
+      # before uncommenting: https://github.com/hoprnet/hoprnet/issues/922
       # - name: Get yarn cache directory path
       #   id: yarn-cache-dir-path
       #   run: echo "::set-output name=dir::$(yarn cache dir)"
