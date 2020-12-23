@@ -36,7 +36,7 @@ get_environment() {
 
     if [ "$VERSION_MAJ_MIN" == '1.60' ]; then
       RELEASE_NAME='mainz'
-      # Mistake: https://github.com/hoprnet/hoprnet/pull/893#issuecomment-750318579
+      # Released by mistake: https://github.com/hoprnet/hoprnet/pull/893#issuecomment-750318579
       return
     fi
     if [ "$VERSION_MAJ_MIN" == '1.59' ]; then
