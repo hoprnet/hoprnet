@@ -35,7 +35,7 @@ get_environment() {
     VERSION_MAJ_MIN=$(get_version_maj_min $RELEASE) 
 
     if [ "$VERSION_MAJ_MIN" == '1.61' ]; then
-      RELEASE_NAME='cape_town'
+      RELEASE_NAME='cape-town'
       return
     fi
 
