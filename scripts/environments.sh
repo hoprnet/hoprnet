@@ -34,6 +34,11 @@ get_environment() {
   case "$BRANCH" in release/*)
     VERSION_MAJ_MIN=$(get_version_maj_min $RELEASE) 
 
+    if [ "$VERSION_MAJ_MIN" == '1.61' ]; then
+      RELEASE_NAME='cape_town'
+      return
+    fi
+
     if [ "$VERSION_MAJ_MIN" == '1.60' ]; then
       RELEASE_NAME='mainz'
       # Released by mistake: https://github.com/hoprnet/hoprnet/pull/893#issuecomment-750318579
