@@ -28,6 +28,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
      * @dev An account struct, used to represent an account's state
      */
     struct Account {
+        // @TODO: optimize struct
         bytes32 secret; // account's hashed secret
         uint256 counter; // increases everytime 'secret' is changed
     }
@@ -43,6 +44,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
      * @dev A channel struct, used to represent a channel's state
      */
     struct Channel {
+        // @TODO: optimize struct
         // total tokens in deposit
         uint256 deposit;
         // tokens that are claimable by partyA
