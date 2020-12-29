@@ -430,6 +430,18 @@
     webrtc-stun "~3.0.0"
     wrtc "0.4.6"
 
+"@hoprnet/hopr-utils@^1.57.6":
+  version "1.61.1"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-1.61.1.tgz#a71fd08cf3621f25e3db07af5f125a10fe82fe70"
+  integrity sha512-6KAn3K74eIaDPDoQi0n2a6iwe/J17LSs11EJY8lsD7Wwc4eKodXP10hNgXLHR9L4DJ6BeNVSe8Rb4CoOtL4FrQ==
+  dependencies:
+    bignumber.js "^9.0.0"
+    libp2p-crypto "0.18.0"
+    multiaddr "8.1.2"
+    multihashes "~3.1.0"
+    peer-id "0.14.2"
+    strip-ansi "^6.0.0"
+
 "@lerna/add@3.21.0":
   version "3.21.0"
   resolved "https://registry.yarnpkg.com/@lerna/add/-/add-3.21.0.tgz#27007bde71cc7b0a2969ab3c2f0ae41578b4577b"
@@ -8437,10 +8449,10 @@ libp2p-secio@0.13.1:
     protons "^2.0.0"
     uint8arrays "^1.1.0"
 
-libp2p-tcp@0.15.1, libp2p-tcp@^0.15.0:
-  version "0.15.1"
-  resolved "https://registry.yarnpkg.com/libp2p-tcp/-/libp2p-tcp-0.15.1.tgz#644b83abf46f213ee9476d2db4135636f0a17d17"
-  integrity sha512-alvgZ3lSNUyiz4vJOqvm6RpMQN9d17gSJa+VT+2pYLGf82o8pX3QvyhltMkBG7u9I+qZAkD6L27s8o0h38dpOg==
+libp2p-tcp@0.15.2, libp2p-tcp@^0.15.0:
+  version "0.15.2"
+  resolved "https://registry.yarnpkg.com/libp2p-tcp/-/libp2p-tcp-0.15.2.tgz#308a845a9462d89f638d669b916ebddfdad7dea9"
+  integrity sha512-sJwzP6+iWj2QYwo3ab8DycWWGbjxHFm6Cv0mDj8nzkiebLnm36wMs5wXVDiSgerPITAOHE9SPTOOqaST8Y1rnw==
   dependencies:
     abortable-iterator "^3.0.0"
     class-is "^1.1.0"

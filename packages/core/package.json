@@ -73,7 +73,7 @@
     "@types/sinon": "^9.0.8",
     "chai": "^4.2.0",
     "chai-as-promised": "^7.1.1",
-    "libp2p-tcp": "0.15.1",
+    "libp2p-tcp": "0.15.2",
     "memdown": "^5.1.0",
     "mocha": "^8.2.0",
     "rimraf": "^3.0.2",
