@@ -8449,10 +8449,10 @@ libp2p-secio@0.13.1:
     protons "^2.0.0"
     uint8arrays "^1.1.0"
 
-libp2p-tcp@0.15.1, libp2p-tcp@^0.15.0:
-  version "0.15.1"
-  resolved "https://registry.yarnpkg.com/libp2p-tcp/-/libp2p-tcp-0.15.1.tgz#644b83abf46f213ee9476d2db4135636f0a17d17"
-  integrity sha512-alvgZ3lSNUyiz4vJOqvm6RpMQN9d17gSJa+VT+2pYLGf82o8pX3QvyhltMkBG7u9I+qZAkD6L27s8o0h38dpOg==
+libp2p-tcp@0.15.2, libp2p-tcp@^0.15.0:
+  version "0.15.2"
+  resolved "https://registry.yarnpkg.com/libp2p-tcp/-/libp2p-tcp-0.15.2.tgz#308a845a9462d89f638d669b916ebddfdad7dea9"
+  integrity sha512-sJwzP6+iWj2QYwo3ab8DycWWGbjxHFm6Cv0mDj8nzkiebLnm36wMs5wXVDiSgerPITAOHE9SPTOOqaST8Y1rnw==
   dependencies:
     abortable-iterator "^3.0.0"
     class-is "^1.1.0"
