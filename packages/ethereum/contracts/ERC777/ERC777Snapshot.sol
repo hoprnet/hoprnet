@@ -5,17 +5,16 @@ pragma solidity ^0.6.0;
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/Arrays.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
-import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/token/ERC777/ERC777.sol";
 
 /**
- * @dev This contract extends an ERC20 token with a snapshot mechanism. When a snapshot is created, the balances and
+ * @dev This contract extends an ERC777 token with a snapshot mechanism. When a snapshot is created, the balances and
  * total supply at the time are recorded for later access.
  *
  * This can be used to safely create mechanisms based on token balances such as trustless dividends or weighted voting.
  * In naive implementations it's possible to perform a "double spend" attack by reusing the same balance from different
  * accounts. By using snapshots to calculate dividends or voting power, those attacks no longer apply. It can also be
- * used to create an efficient ERC20 forking mechanism.
+ * used to create an efficient ERC777 forking mechanism.
  *
  * Snapshots are created by the internal {_snapshot} function, which will emit the {Snapshot} event and return a
  * snapshot id. To get the total supply at the time of a snapshot, call the function {totalSupplyAt} with the snapshot
@@ -28,11 +27,14 @@ import "@openzeppelin/contracts/token/ERC777/ERC777.sol";
  * n)_ in the number of snapshots that have been created, although _n_ for a specific account will generally be much
  * smaller since identical balances in subsequent snapshots are stored as a single entry.
  *
- * There is a constant overhead for normal ERC20 transfers due to the additional snapshot bookkeeping. This overhead is
+ * There is a constant overhead for normal ERC777 transfers due to the additional snapshot bookkeeping. This overhead is
  * only significant for the first transfer that immediately follows a snapshot for a particular account. Subsequent
  * transfers will have normal cost until the next snapshot, and so on.
  */
 abstract contract ERC777Snapshot is ERC777 {
+    // This is pretty much a copy of OpenZeppelin's ERC20Snapshot:
+    // https://github.com/OpenZeppelin/openzeppelin-contracts/blob/9daa0d4d2fadc594d6756a83648c80007276ac04/contracts/token/ERC20/ERC20Snapshot.sol
+
     // Inspired by Jordi Baylina's MiniMeToken to record historical balances:
     // https://github.com/Giveth/minimd/blob/ea04d950eea153a04c51fa510b068b9dded390cb/contracts/MiniMeToken.sol
 
@@ -47,7 +49,7 @@ abstract contract ERC777Snapshot is ERC777 {
         uint256[] values;
     }
 
-    mapping(address => Snapshots) private _accountBalanceSnapshots;
+    mapping (address => Snapshots) private _accountBalanceSnapshots;
     Snapshots private _totalSupplySnapshots;
 
     // Snapshot ids increase monotonically, with the first value being 1. An id of 0 is invalid.
@@ -73,7 +75,7 @@ abstract contract ERC777Snapshot is ERC777 {
      *
      * First, it can be used to increase the cost of retrieval of values from snapshots, although it will grow
      * logarithmically thus rendering this attack ineffective in the long term. Second, it can be used to target
-     * specific accounts and increase the cost of ERC20 transfers for them, in the ways specified in the Gas Costs
+     * specific accounts and increase the cost of ERC777 transfers for them, in the ways specified in the Gas Costs
      * section above.
      *
      * We haven't measured the actual numbers; if this is something you're interested in please reach out to us.
@@ -99,37 +101,36 @@ abstract contract ERC777Snapshot is ERC777 {
     /**
      * @dev Retrieves the total supply at the time `snapshotId` was created.
      */
-    function totalSupplyAt(uint256 snapshotId) public view returns (uint256) {
+    function totalSupplyAt(uint256 snapshotId) public view returns(uint256) {
         (bool snapshotted, uint256 value) = _valueAt(snapshotId, _totalSupplySnapshots);
 
         return snapshotted ? value : totalSupply();
     }
 
-    // use _beforeTokenTransfer hook to capture instances where a balance or total supply is modified
-    function _beforeTokenTransfer(
-        address operator,
-        address from,
-        address to,
-        uint256 amount
-    ) internal virtual override {
-        super._beforeTokenTransfer(operator, from, to, amount);
 
-        if (from == address(0)) {
-            // handle '_mint'
-            _updateAccountSnapshot(to);
-            _updateTotalSupplySnapshot();
-        } else if (to == address(0)) {
-            // handle '_burn'
-            _updateAccountSnapshot(from);
-            _updateTotalSupplySnapshot();
-        } else {
-            // handle '_move'
-            _updateAccountSnapshot(from);
-            _updateAccountSnapshot(to);
-        }
+    // Update balance and/or total supply snapshots before the values are modified. This is implemented
+    // in the _beforeTokenTransfer hook, which is executed for _mint, _burn, and _transfer operations.
+    function _beforeTokenTransfer(address operator, address from, address to, uint256 amount) internal virtual override {
+      super._beforeTokenTransfer(operator, from, to, amount);
+
+      if (from == address(0)) {
+        // mint
+        _updateAccountSnapshot(to);
+        _updateTotalSupplySnapshot();
+      } else if (to == address(0)) {
+        // burn
+        _updateAccountSnapshot(from);
+        _updateTotalSupplySnapshot();
+      } else {
+        // transfer
+        _updateAccountSnapshot(from);
+        _updateAccountSnapshot(to);
+      }
     }
 
-    function _valueAt(uint256 snapshotId, Snapshots storage snapshots) private view returns (bool, uint256) {
+    function _valueAt(uint256 snapshotId, Snapshots storage snapshots)
+        private view returns (bool, uint256)
+    {
         require(snapshotId > 0, "ERC777Snapshot: id is 0");
         // solhint-disable-next-line max-line-length
         require(snapshotId <= _currentSnapshotId.current(), "ERC777Snapshot: nonexistent id");
