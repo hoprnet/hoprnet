@@ -84,9 +84,10 @@ export class Connection {
       console.log('Web socket closed')
       this.setConnecting(true)
       this.appendMessage(' --- < Lost Connection, attempting to reconnect... > ---')
+      var self = this
       setTimeout(function () {
         try {
-          connect()
+          self.connect()
           console.log('connection')
         } catch (e) {
           console.log('Error connecting', e)

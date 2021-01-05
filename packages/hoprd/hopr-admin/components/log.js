@@ -65,6 +65,7 @@ export function Logs(props) {
   return (
     <div className={cls}>
       <div ref={container}>
+        { props.connecting && <span>Attempting to connect</span> }
         {props.messages.map((x) => (
           <LogLine value={x} />
         ))}
