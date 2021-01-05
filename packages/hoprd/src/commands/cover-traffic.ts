@@ -37,7 +37,7 @@ export class CoverTraffic extends AbstractCommand {
   }
 
   public name() {
-    return 'cover-traffic'
+    return 'covertraffic'
   }
 
   public help() {
