@@ -61,7 +61,7 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector> implements Abstr
         clearTimeout(timeout)
 
         return reject(
-          Error(`Failed to send packet to ${counterparty.toB58String()}. Increase log level for further information.`)
+          Error(`Failed to send packet to ${counterparty.toB58String()}. ${err.message}`)
         )
       }
 

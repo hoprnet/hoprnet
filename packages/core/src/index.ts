@@ -58,7 +58,7 @@ interface NetOptions {
   port: number
 }
 
-export type ChannelStrategyNames = 'PASSIVE' | 'PROMISCUOUS'
+export type ChannelStrategyNames = 'passive' | 'promiscuous'
 
 export type HoprOptions = {
   debug: boolean
@@ -129,7 +129,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     })
 
     this.mixer = new Mixer()
-    this.setChannelStrategy(options.strategy || 'PROMISCUOUS')
+    this.setChannelStrategy(options.strategy || 'promiscuous')
     this.initializedWithOptions = options
     this.output = (arr: Uint8Array) => {
       this.emit('hopr:message', arr)
@@ -498,15 +498,19 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
   }
 
   public setChannelStrategy(strategy: ChannelStrategyNames) {
-    if (strategy == 'PASSIVE') {
+    if (strategy == 'passive') {
       this.strategy = new PassiveStrategy()
       return
     }
-    if (strategy == 'PROMISCUOUS') {
+    if (strategy == 'promiscuous') {
       this.strategy = new PromiscuousStrategy()
       return
     }
     throw new Error('Unknown strategy')
+  }
+
+  public getChannelStrategy(): string {
+    return this.strategy.name
   }
 
   public async getBalance(): Promise<Types.Balance> {

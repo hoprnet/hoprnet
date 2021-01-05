@@ -156,18 +156,18 @@ describe('Commands', () => {
     assertMatch(ir, /false/)
   })
 
-  it('settings routing', async () => {
+  it('settings strategy', async () => {
     let mockNode: any = sinon.fake()
+    let setCalled = ''
+    mockNode.setStrategy = (s: string) => {
+      setCalled = s
+    }
     let cmds = new mod.Commands(mockNode)
 
-    let ir = await cmds.execute('settings routing')
-    assertMatch(ir, /direct/)
-    await cmds.execute('settings routing manual')
-    ir = await cmds.execute('settings routing')
-    assertMatch(ir, /manual/)
-    await cmds.execute('settings routing direct')
-    ir = await cmds.execute('settings routing')
-    assertMatch(ir, /direct/)
+    let ir = await cmds.execute('settings strategy')
+    assertMatch(ir, /promiscuous/)
+    await cmds.execute('settings strategy passive')
+    assert(setCalled === 'passive')
   })
 
   it('alias addresses', async () => {

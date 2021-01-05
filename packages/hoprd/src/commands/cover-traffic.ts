@@ -53,6 +53,7 @@ export class CoverTraffic extends AbstractCommand {
 
   private handleMessage(msg: Uint8Array) {
     const decoded = decode(msg)
+    console.log(decoded)
     if (decoded[0] === this.identifier) {
       const ts = decoded[2]
       this.totalLatency += Date.now() - ts
@@ -61,6 +62,9 @@ export class CoverTraffic extends AbstractCommand {
   }
 
   private stats(): string {
+    if (this.messagesReceived < 1) {
+      return `${this.messagesSent} messages sent, no messages received`
+    }
     const reliability = ((this.messagesReceived / this.messagesSent) * 100).toFixed(2)
     const latency = this.totalLatency / this.messagesReceived
     return `${this.messagesSent} messages sent, ` + `reliability = ${reliability}%, average latency is ${latency}`
