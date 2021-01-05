@@ -82,7 +82,6 @@ export class AdminServer {
       this.logs.subscribe(socket)
     })
 
-
     this.node.on('hopr:crawl:completed', () => {
       this.logs.log('Crawled network')
     })

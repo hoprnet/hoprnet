@@ -20,7 +20,11 @@ export default class Settings extends AbstractCommand {
     super()
     this.settings = {
       includeRecipient: ['Prepends your address to all messages (true|false)', booleanSetter('includeRecipient')],
-      strategy: ['Set an automatic strategy for the node. (passive|promiscuous)', this.setStrategy.bind(this), this.getStrategy.bind(this)]
+      strategy: [
+        'Set an automatic strategy for the node. (passive|promiscuous)',
+        this.setStrategy.bind(this),
+        this.getStrategy.bind(this)
+      ]
     }
   }
 
@@ -54,10 +58,9 @@ export default class Settings extends AbstractCommand {
       return [setting, this.getState(setting, state)]
     })
 
-
     const results: string[] = []
     const keyPadding = getPaddingLength(Object.keys(this.settings))
-    const valuePadding = getPaddingLength(entries.map(x => x[1] + ''))
+    const valuePadding = getPaddingLength(entries.map((x) => x[1] + ''))
     for (const [key, value] of entries) {
       results.push(key.padEnd(keyPadding) + styleValue(value + '').padEnd(valuePadding) + this.settings[key][0])
     }
@@ -65,7 +68,7 @@ export default class Settings extends AbstractCommand {
   }
 
   private getState(setting: string, state: GlobalState): string {
-    if (this.settings[setting] && this.settings[setting][2]){
+    if (this.settings[setting] && this.settings[setting][2]) {
       // Use getter
       return this.settings[setting][2]()
     }
