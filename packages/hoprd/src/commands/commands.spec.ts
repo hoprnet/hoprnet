@@ -53,7 +53,7 @@ describe('Commands', () => {
   })
   */
 
-  it('myAddress', async () => {
+  it('address', async () => {
     let mockNode = sinon.fake() as any
     mockNode.paymentChannels = sinon.fake()
     mockNode.paymentChannels.constants = sinon.fake()
@@ -65,7 +65,7 @@ describe('Commands', () => {
       pubKey: { marshal: sinon.fake() }
     })
     let cmds = new mod.Commands(mockNode)
-    assertMatch(await cmds.execute('myAddress'), /HOPR/)
+    assertMatch(await cmds.execute('address'), /HOPR/)
   })
 
   it('send message', async () => {
@@ -135,11 +135,11 @@ describe('Commands', () => {
 
   it('settings', async () => {
     let mockNode: any = sinon.fake()
+    mockNode.getChannelStrategy = (): string => '' 
     let cmds = new mod.Commands(mockNode)
 
     let ir = await cmds.execute('settings')
     assertMatch(ir, /includeRecipient/)
-    assertMatch(ir, /routing/)
   })
 
   it('settings includeRecipient', async () => {
