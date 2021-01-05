@@ -45,7 +45,7 @@ export class CoverTraffic extends AbstractCommand {
   }
 
   private async tick() {
-    try { 
+    try {
       const payload = encode([this.identifier, this.seq++, Date.now()])
       await this.node.sendMessage(payload, this.node.getId())
       this.messagesSent++
