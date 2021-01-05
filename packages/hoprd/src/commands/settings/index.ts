@@ -64,8 +64,13 @@ export default class Settings extends AbstractCommand {
     return results.join('\n')
   }
 
+<<<<<<< HEAD
   private getState(setting: string, state: GlobalState): string {
     if (this.settings[setting] && this.settings[setting][2]){
+=======
+  private getState(setting: string, state: GlobalState) {
+    if (this.settings[setting] && this.settings[setting][2]) {
+>>>>>>> 79f235078aba3c9065ad47703b7f238e8b41b100
       // Use getter
       return this.settings[setting][2]()
     }
