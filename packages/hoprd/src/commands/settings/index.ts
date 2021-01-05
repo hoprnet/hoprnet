@@ -9,12 +9,9 @@ function booleanSetter(name: string) {
       return styleValue(`Invalid option.`, 'failure')
     }
     state[name] = !!query.match(/true/i)
-    return `You have set your “${styleValue(name, 'highlight')}” settings to “${styleValue(
-      state[name]
-    )}”.`
+    return `You have set your “${styleValue(name, 'highlight')}” settings to “${styleValue(state[name])}”.`
   }
 }
-
 
 export default class Settings extends AbstractCommand {
   private paddingLength: number
@@ -23,8 +20,8 @@ export default class Settings extends AbstractCommand {
   constructor(private node: Hopr<HoprCoreConnector>) {
     super()
     this.settings = {
-      'includeRecipient': ['Prepends your address to all messages (true|false)', booleanSetter('includeRecipient')],
-      'strategy': ['set an automatic strategy for the node. (PASSIVE|PROMISCUOUS)', this.setStrategy.bind(this)]
+      includeRecipient: ['Prepends your address to all messages (true|false)', booleanSetter('includeRecipient')],
+      strategy: ['set an automatic strategy for the node. (PASSIVE|PROMISCUOUS)', this.setStrategy.bind(this)]
     }
     this.paddingLength = getPaddingLength(Object.keys(this.settings))
   }
@@ -47,10 +44,10 @@ export default class Settings extends AbstractCommand {
   }
 
   private get settingsKeys(): string[] {
-    return Object.keys(this.settings) 
+    return Object.keys(this.settings)
   }
 
-  private listSettings (state: GlobalState): string {
+  private listSettings(state: GlobalState): string {
     const entries = this.settingsKeys.map((setting) => {
       return [setting, this.getState(setting, state)]
     })
@@ -63,7 +60,7 @@ export default class Settings extends AbstractCommand {
     return results.join('\n')
   }
 
-  private getState(setting: string, state: GlobalState){
+  private getState(setting: string, state: GlobalState) {
     return state[setting]
   }
 

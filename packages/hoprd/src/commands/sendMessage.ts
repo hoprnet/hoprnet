@@ -3,7 +3,7 @@ import type Hopr from '@hoprnet/hopr-core'
 import type { AutoCompleteResult, CommandResponse } from './abstractCommand'
 import type PeerId from 'peer-id'
 import { MAX_HOPS } from '@hoprnet/hopr-core/lib/constants'
-import { checkPeerIdInput, encodeMessage,getPeerIdsAndAliases, styleValue } from './utils'
+import { checkPeerIdInput, encodeMessage, getPeerIdsAndAliases, styleValue } from './utils'
 import { AbstractCommand, GlobalState } from './abstractCommand'
 
 export abstract class SendMessageBase extends AbstractCommand {
@@ -58,10 +58,14 @@ export class SendMessage extends SendMessageBase {
       let [err, peerIdString, message] = this._assertUsage(query, ['PeerId', 'Message'])
       if (err) throw Error(err)
 
-      if (peerIdString.includes(',')){ // Manual routing
+      if (peerIdString.includes(',')) {
+        // Manual routing
         // Direct routing can be done with ,recipient
         const path = await Promise.all(
-          peerIdString.split(',').filter(Boolean).map(x => checkPeerIdInput(x, state))
+          peerIdString
+            .split(',')
+            .filter(Boolean)
+            .map((x) => checkPeerIdInput(x, state))
         )
         if (path.length > MAX_HOPS + 1) {
           throw new Error('Cannot create path longer than MAX_HOPS')

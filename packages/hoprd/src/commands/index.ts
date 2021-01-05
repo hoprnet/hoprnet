@@ -34,7 +34,7 @@ export class Commands {
   constructor(public node: Hopr<HoprCoreConnector>, rl?: readline.Interface) {
     this.state = {
       aliases: new Map<string, PeerId>(),
-      includeRecipient: false,
+      includeRecipient: false
     }
 
     this.commands = [
