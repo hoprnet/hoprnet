@@ -1,28 +1,41 @@
-import { getPaddingLength, styleValue, getOptions } from '../utils'
-import { AbstractCommand, GlobalState, AutoCompleteResult } from '../abstractCommand'
-import { IncludeRecipient } from './includeRecipient'
-import { Routing } from './routing'
+import { getPaddingLength, styleValue } from '../utils'
+import { AbstractCommand, GlobalState } from '../abstractCommand'
+import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
+import type Hopr from '@hoprnet/hopr-core'
 
-// to add a new setting, include it here and in class this.settings
-type SettingsDirectory = {
-  [key in keyof Pick<GlobalState, 'includeRecipient' | 'routing'>]: IncludeRecipient | Routing
+function booleanSetter(name: string) {
+  return function setter(query: string, state: GlobalState): string {
+    if (!query.match(/true|false/i)) {
+      return styleValue(`Invalid option.`, 'failure')
+    }
+    state[name] = !!query.match(/true/i)
+    return `You have set your “${styleValue(name, 'highlight')}” settings to “${styleValue(
+      state[name]
+    )}”.`
+  }
 }
-type SettingsKeys = keyof SettingsDirectory
-type SettingsValues = GlobalState[SettingsKeys]
+
 
 export default class Settings extends AbstractCommand {
-  private settings: SettingsDirectory
   private paddingLength: number
+  private settings
 
-  constructor() {
+  constructor(private node: Hopr<HoprCoreConnector>) {
     super()
-
-    // to add a new setting, include it here
     this.settings = {
-      includeRecipient: new IncludeRecipient(),
-      routing: new Routing()
+      'includeRecipient': ['Prepends your address to all messages (true|false)', booleanSetter('includeRecipient')],
+      'strategy': ['set an automatic strategy for the node. (PASSIVE|PROMISCUOUS)', this.setStrategy.bind(this)]
     }
     this.paddingLength = getPaddingLength(Object.keys(this.settings))
+  }
+
+  private async setStrategy(query: string): Promise<string> {
+    try {
+      this.node.setChannelStrategy(query as any)
+      return 'Strategy was set'
+    } catch {
+      return 'Could not set strategy. Try PASSIVE or PROMISCUOUS'
+    }
   }
 
   public name() {
@@ -33,39 +46,51 @@ export default class Settings extends AbstractCommand {
     return 'list your current settings'
   }
 
-  private get settingsKeys(): SettingsKeys[] {
-    return Object.keys(this.settings) as SettingsKeys[]
+  private get settingsKeys(): string[] {
+    return Object.keys(this.settings) 
+  }
+
+  private listSettings (state: GlobalState): string {
+    const entries = this.settingsKeys.map((setting) => {
+      return [setting, this.getState(setting, state)]
+    })
+
+    const results: string[] = []
+    for (const [key, value] of entries) {
+      results.push(key.padEnd(this.paddingLength) + styleValue(value))
+    }
+
+    return results.join('\n')
+  }
+
+  private getState(setting: string, state: GlobalState){
+    return state[setting]
   }
 
   public async execute(query: string, state: GlobalState): Promise<string | void> {
-    // nothing provided, just show current settings
     if (!query) {
-      const entries = this.settingsKeys.map<[SettingsKeys, SettingsValues]>((setting) => {
-        return [setting, state[setting] as SettingsValues]
-      })
-
-      const results: string[] = []
-      for (const [key, value] of entries) {
-        results.push(key.padEnd(this.paddingLength) + styleValue(value))
-      }
-
-      return results.join('\n')
+      return this.listSettings(state)
     }
 
     const [setting, ...optionArray] = query.split(' ')
     const option = optionArray.join(' ')
+
+    if (!option) {
+      return this.getState(setting, state)
+    }
 
     // found an exact match, run the setting's execute
     const matchesASetting = this.settingsKeys.find((s) => {
       return s === setting
     })
     if (typeof matchesASetting !== 'undefined') {
-      return this.settings[matchesASetting].execute(option, state)
+      return this.settings[matchesASetting][1](option, state)
     }
 
     return styleValue(`Setting “${styleValue(setting)}” does not exist.`, 'failure')
   }
 
+  /*
   public async autocomplete(query: string, line: string): Promise<AutoCompleteResult> {
     // nothing provided, just show all settings
     if (!query) {
@@ -73,7 +98,7 @@ export default class Settings extends AbstractCommand {
         getOptions(
           Object.values(this.settings).map((setting) => {
             return {
-              value: setting.name(),
+              value: setting.name ? setting.name(),
               description: setting.help()
             }
           }),
@@ -105,4 +130,5 @@ export default class Settings extends AbstractCommand {
     // show nothing
     return [[this.name()], line]
   }
+  */
 }

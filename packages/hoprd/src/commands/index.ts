@@ -12,7 +12,7 @@ import { OpenChannelFancy, OpenChannel } from './openChannel'
 import Ping from './ping'
 import PrintAddress from './printAddress'
 import PrintBalance from './printBalance'
-import { SendMessageFancy, SendMessage } from './sendMessage'
+import { SendMessage } from './sendMessage'
 import { MultiSendMessage } from './multisend'
 import StopNode from './stopNode'
 import Version from './version'
@@ -24,7 +24,6 @@ import TraverseChannels from './traverseChannels'
 import readline from 'readline'
 import { Alias } from './alias'
 import { Info } from './info'
-import { SetStrategy } from './strategy'
 import { CoverTraffic } from './cover-traffic'
 
 export class Commands {
@@ -36,8 +35,6 @@ export class Commands {
     this.state = {
       aliases: new Map<string, PeerId>(),
       includeRecipient: false,
-      routing: 'direct',
-      routingPath: []
     }
 
     this.commands = [
@@ -54,21 +51,19 @@ export class Commands {
       new Version(),
       new Tickets(node),
       new RedeemTickets(node),
-      new Settings(),
+      new Settings(node),
       new Alias(node),
       new TraverseChannels(node),
       new Withdraw(node),
-      new SetStrategy(node),
-      new CoverTraffic(node)
+      new CoverTraffic(node),
+      new SendMessage(node)
     ]
 
     if (rl) {
       this.commands.push(new OpenChannelFancy(node, rl))
-      this.commands.push(new SendMessageFancy(node, rl))
       this.commands.push(new MultiSendMessage(node, rl))
     } else {
       this.commands.push(new OpenChannel(node))
-      this.commands.push(new SendMessage(node))
     }
 
     this.commandMap = new Map()
