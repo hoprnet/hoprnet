@@ -202,6 +202,78 @@ contract('ERC777Snapshot', function (accounts) {
           })
         })
       })
+
+      context('with balance changes after the snapshot using send', function () {
+        beforeEach(async function () {
+          await this.token.send(recipient, new BN('10'), '0x00', { from: initialHolder })
+          await this.token.mint(recipient, new BN('50'), '0x00', '0x00')
+          await this.token.burn(initialHolder, new BN('20'), '0x00', '0x00')
+        })
+
+        it('returns the balances before the changes', async function () {
+          expect(await this.token.balanceOfAt(initialHolder, this.initialSnapshotId)).to.be.bignumber.equal(
+            initialSupply
+          )
+          expect(await this.token.balanceOfAt(recipient, this.initialSnapshotId)).to.be.bignumber.equal('0')
+          expect(await this.token.balanceOfAt(other, this.initialSnapshotId)).to.be.bignumber.equal('0')
+        })
+
+        context('with a second snapshot after supply changes', function () {
+          beforeEach(async function () {
+            this.secondSnapshotId = new BN('2')
+
+            const { logs } = await this.token.snapshot()
+            expectEvent.inLogs(logs, 'Snapshot', { id: this.secondSnapshotId })
+          })
+
+          it('snapshots return the balances before and after the changes', async function () {
+            expect(await this.token.balanceOfAt(initialHolder, this.initialSnapshotId)).to.be.bignumber.equal(
+              initialSupply
+            )
+            expect(await this.token.balanceOfAt(recipient, this.initialSnapshotId)).to.be.bignumber.equal('0')
+            expect(await this.token.balanceOfAt(other, this.initialSnapshotId)).to.be.bignumber.equal('0')
+
+            expect(await this.token.balanceOfAt(initialHolder, this.secondSnapshotId)).to.be.bignumber.equal(
+              await this.token.balanceOf(initialHolder)
+            )
+            expect(await this.token.balanceOfAt(recipient, this.secondSnapshotId)).to.be.bignumber.equal(
+              await this.token.balanceOf(recipient)
+            )
+            expect(await this.token.balanceOfAt(other, this.secondSnapshotId)).to.be.bignumber.equal(
+              await this.token.balanceOf(other)
+            )
+          })
+        })
+
+        context('with multiple snapshots after supply changes', function () {
+          beforeEach(async function () {
+            this.secondSnapshotIds = ['2', '3', '4']
+
+            for (const id of this.secondSnapshotIds) {
+              const { logs } = await this.token.snapshot()
+              expectEvent.inLogs(logs, 'Snapshot', { id })
+            }
+          })
+
+          it('all posterior snapshots return the supply after the changes', async function () {
+            expect(await this.token.balanceOfAt(initialHolder, this.initialSnapshotId)).to.be.bignumber.equal(
+              initialSupply
+            )
+            expect(await this.token.balanceOfAt(recipient, this.initialSnapshotId)).to.be.bignumber.equal('0')
+            expect(await this.token.balanceOfAt(other, this.initialSnapshotId)).to.be.bignumber.equal('0')
+
+            for (const id of this.secondSnapshotIds) {
+              expect(await this.token.balanceOfAt(initialHolder, id)).to.be.bignumber.equal(
+                await this.token.balanceOf(initialHolder)
+              )
+              expect(await this.token.balanceOfAt(recipient, id)).to.be.bignumber.equal(
+                await this.token.balanceOf(recipient)
+              )
+              expect(await this.token.balanceOfAt(other, id)).to.be.bignumber.equal(await this.token.balanceOf(other))
+            }
+          })
+        })
+      })
     })
   })
 })
