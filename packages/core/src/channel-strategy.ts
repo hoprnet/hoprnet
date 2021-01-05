@@ -40,7 +40,7 @@ const logIndexerChannels = (c: IndexerChannel[]): string =>
 
 // Don't auto open any channels
 export class PassiveStrategy implements ChannelStrategy {
-  name: 'passive'
+  name = 'passive'
 
   async tick(
     _balance: BN,
@@ -55,7 +55,7 @@ export class PassiveStrategy implements ChannelStrategy {
 
 // Open channel to as many peers as possible
 export class PromiscuousStrategy implements ChannelStrategy {
-  name: 'promiscuous'
+  name = 'promiscuous'
 
   async tick(
     balance: BN,
