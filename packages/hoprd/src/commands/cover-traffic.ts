@@ -44,10 +44,14 @@ export class CoverTraffic extends AbstractCommand {
     return 'Generate chaff messages to provide cover (start/stop)'
   }
 
-  private tick() {
-    const payload = encode([this.identifier, this.seq++, Date.now()])
-    this.node.sendMessage(payload, this.node.getId())
-    this.messagesSent++
+  private async tick() {
+    try { 
+      const payload = encode([this.identifier, this.seq++, Date.now()])
+      await this.node.sendMessage(payload, this.node.getId())
+      this.messagesSent++
+    } catch (e) {
+      // No-op
+    }
     this.timeout = setTimeout(this.tick.bind(this), INTERVAL) // tick again after interval
   }
 
