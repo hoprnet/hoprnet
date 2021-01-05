@@ -159,9 +159,10 @@ describe('Commands', () => {
   it('settings strategy', async () => {
     let mockNode: any = sinon.fake()
     let setCalled = ''
-    mockNode.setStrategy = (s: string) => {
+    mockNode.setChannelStrategy = (s: string) => {
       setCalled = s
     }
+    mockNode.getChannelStrategy = (): string => setCalled
     let cmds = new mod.Commands(mockNode)
 
     let ir = await cmds.execute('settings strategy')
