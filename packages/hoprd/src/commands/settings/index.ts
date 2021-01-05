@@ -21,7 +21,11 @@ export default class Settings extends AbstractCommand {
     super()
     this.settings = {
       includeRecipient: ['Prepends your address to all messages (true|false)', booleanSetter('includeRecipient')],
-      strategy: ['set an automatic strategy for the node. (PASSIVE|PROMISCUOUS)', this.setStrategy.bind(this), this.getStrategy.bind(this)]
+      strategy: [
+        'set an automatic strategy for the node. (PASSIVE|PROMISCUOUS)',
+        this.setStrategy.bind(this),
+        this.getStrategy.bind(this)
+      ]
     }
     this.paddingLength = getPaddingLength(Object.keys(this.settings))
   }
@@ -65,7 +69,7 @@ export default class Settings extends AbstractCommand {
   }
 
   private getState(setting: string, state: GlobalState) {
-    if (this.settings[setting] && this.settings[setting][2]){
+    if (this.settings[setting] && this.settings[setting][2]) {
       // Use getter
       return this.settings[setting][2]()
     }
