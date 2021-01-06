@@ -81,7 +81,6 @@ describe('Commands', () => {
     assert(mockNode.sendMessage.calledTwice, 'send message not called')
     await cmds.execute('send ,test2 Hello, world')
     assert(mockNode.sendMessage.callCount == 3, 'send message not called x3')
-
   })
 
   it('autocomplete sendmessage', async () => {
@@ -205,10 +204,10 @@ describe('Commands', () => {
     assertMatch(r, /Initiated channel closure/)
   })
 
-  it('cover traffic', async() => {
-    var clock = sinon.useFakeTimers(Date.now());
+  it('cover traffic', async () => {
+    var clock = sinon.useFakeTimers(Date.now())
     let mockNode: any = sinon.fake()
-    let receive;
+    let receive
     mockNode.on = (ev, f) => {
       assert(ev == 'hopr:message')
       receive = f
@@ -221,11 +220,11 @@ describe('Commands', () => {
       return Promise.resolve()
     }
     let cmds = new mod.Commands(mockNode)
-    assertMatch(await (cmds.execute('covertraffic start')), /started/)
+    assertMatch(await cmds.execute('covertraffic start'), /started/)
     await clock.tickAsync(30_000)
-    assertMatch(await (cmds.execute('covertraffic stop')), /stopped/)
-    assertMatch(await (cmds.execute('covertraffic stats')), /messages sent/)
-    assertMatch(await (cmds.execute('covertraffic stats')), /reliability/)
+    assertMatch(await cmds.execute('covertraffic stop'), /stopped/)
+    assertMatch(await cmds.execute('covertraffic stats'), /messages sent/)
+    assertMatch(await cmds.execute('covertraffic stats'), /reliability/)
 
     clock.restore()
   })

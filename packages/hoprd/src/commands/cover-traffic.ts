@@ -50,7 +50,7 @@ export class CoverTraffic extends AbstractCommand {
       await this.node.sendMessage(payload, this.node.getId())
       this.messagesSent++
     } catch (e) {
-      console.log("Error", e)
+      console.log('Error', e)
       // No-op
     }
     this.timeout = setTimeout(this.tick.bind(this), INTERVAL) // tick again after interval
@@ -60,7 +60,7 @@ export class CoverTraffic extends AbstractCommand {
     const decoded = decode(msg)
     if (decoded[0].toString() === this.identifier) {
       const ts = parseInt(decoded[2].toString('hex'), 16)
-      this.totalLatency += (Date.now() - ts)
+      this.totalLatency += Date.now() - ts
       this.messagesReceived++
     }
   }

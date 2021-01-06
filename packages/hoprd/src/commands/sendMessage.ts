@@ -32,7 +32,6 @@ export abstract class SendMessageBase extends AbstractCommand {
   ): Promise<string | void> {
     const message = state.includeRecipient ? this.insertMyAddress(rawMessage) : rawMessage
 
-
     try {
       await this.node.sendMessage(encodeMessage(message), recipient, getIntermediateNodes)
     } catch (err) {
@@ -71,7 +70,12 @@ export class SendMessage extends SendMessageBase {
         }
 
         const recipient = path[path.length - 1]
-        console.log(`Sending message to ${styleValue(recipient.toB58String(), 'peerId')} via ${path.slice(0, path.length -1)} ...`)
+        console.log(
+          `Sending message to ${styleValue(recipient.toB58String(), 'peerId')} via ${path.slice(
+            0,
+            path.length - 1
+          )} ...`
+        )
         return this.sendMessage(state, recipient, message, async () => {
           return path.slice(0, path.length - 1)
         })
