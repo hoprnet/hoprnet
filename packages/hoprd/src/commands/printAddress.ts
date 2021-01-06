@@ -10,7 +10,7 @@ export default class PrintAddress extends AbstractCommand {
   }
 
   public name() {
-    return 'myAddress'
+    return 'address'
   }
 
   public help() {
