@@ -8,7 +8,7 @@ const assertMatch = (test: CommandResponse, pattern: RegExp) => {
   if (!test) {
     throw new Error('cannot match empty string')
   }
-  assert(test.match(pattern), `should match ${pattern}`)
+  assert(test.match(pattern), `${test} should match ${pattern}`)
 }
 
 let mockNode = sinon.fake() as any
@@ -72,8 +72,16 @@ describe('Commands', () => {
     mockNode.sendMessage = sinon.fake()
     let cmds = new mod.Commands(mockNode)
     await cmds.execute('send 16Uiu2HAmAJStiomwq27Kkvtat8KiEHLBSnAkkKCqZmLYKVLtkiB7 Hello, world')
-    assert(mockNode.sendMessage.calledOnce)
+    assert(mockNode.sendMessage.calledOnce, 'send message not called')
     assertMatch(await cmds.execute('send unknown-alias Hello, world'), /invalid/i)
+
+    await cmds.execute('alias 16Uiu2HAmAJStiomwq27Kkvtat8KiEHLBSnAkkKCqZmLYKVLtkiB7 test')
+    await cmds.execute('alias 16Uiu2HAkyXRaL7fKu4qcjaKuo4WXizrpK63Ltd6kG2tH6oSV58AW test2')
+    await cmds.execute('send test,test2 Hello, world')
+    assert(mockNode.sendMessage.calledTwice, 'send message not called')
+    await cmds.execute('send ,test2 Hello, world')
+    assert(mockNode.sendMessage.callCount == 3, 'send message not called x3')
+
   })
 
   it('autocomplete sendmessage', async () => {
@@ -87,7 +95,6 @@ describe('Commands', () => {
     assert((await cmds.autocomplete('send foo'))[0][0] == '')
 
     await cmds.execute('alias 16Uiu2HAmAJStiomwq27Kkvtat8KiEHLBSnAkkKCqZmLYKVLtkiB7 test')
-
     assert((await cmds.autocomplete('send t'))[0][0] == 'send test')
   })
 
@@ -158,7 +165,7 @@ describe('Commands', () => {
 
   it('settings strategy', async () => {
     let mockNode: any = sinon.fake()
-    let setCalled = ''
+    let setCalled = 'promiscuous'
     mockNode.setChannelStrategy = (s: string) => {
       setCalled = s
     }
@@ -177,7 +184,7 @@ describe('Commands', () => {
     let cmds = new mod.Commands(mockNode)
 
     let aliases = await cmds.execute('alias')
-    assertMatch(aliases, /No aliases found./)
+    assertMatch(aliases, /No aliases found/)
 
     await cmds.execute('alias 16Uiu2HAmQDFS8a4Bj5PGaTqQLME5SZTRNikz9nUPT3G4T6YL9o7V test')
 
@@ -196,5 +203,10 @@ describe('Commands', () => {
     let cmds = new mod.Commands(mockNode)
     const r = await cmds.execute('close 16Uiu2HAmAJStiomwq27Kkvtat8KiEHLBSnAkkKCqZmLYKVLtkiB7')
     assertMatch(r, /Initiated channel closure/)
+  })
+
+  it('cover traffic', async() => {
+
+
   })
 })

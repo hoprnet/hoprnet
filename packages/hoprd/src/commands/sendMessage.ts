@@ -32,7 +32,6 @@ export abstract class SendMessageBase extends AbstractCommand {
   ): Promise<string | void> {
     const message = state.includeRecipient ? this.insertMyAddress(rawMessage) : rawMessage
 
-    console.log(`Sending message to ${styleValue(recipient.toB58String(), 'peerId')} ...`)
 
     try {
       await this.node.sendMessage(encodeMessage(message), recipient, getIntermediateNodes)
@@ -55,7 +54,7 @@ export abstract class SendMessageBase extends AbstractCommand {
 export class SendMessage extends SendMessageBase {
   public async execute(query: string, state: GlobalState): Promise<CommandResponse> {
     try {
-      let [err, peerIdString, message] = this._assertUsage(query, ['PeerId', 'Message'])
+      let [err, peerIdString, message] = this._assertUsage(query, ['PeerId', 'Message'], /([A-Za-z0-9_,]+)\s(.*)/)
       if (err) throw Error(err)
 
       if (peerIdString.includes(',')) {
@@ -72,6 +71,7 @@ export class SendMessage extends SendMessageBase {
         }
 
         const recipient = path[path.length - 1]
+        console.log(`Sending message to ${styleValue(recipient.toB58String(), 'peerId')} via ${path.slice(0, path.length -1)} ...`)
         return this.sendMessage(state, recipient, message, async () => {
           return path.slice(0, path.length - 1)
         })
@@ -79,6 +79,7 @@ export class SendMessage extends SendMessageBase {
 
       let peerId = await checkPeerIdInput(peerIdString, state)
 
+      console.log(`Sending message to ${styleValue(peerId.toB58String(), 'peerId')} ...`)
       return this.sendMessage(state, peerId, message)
     } catch (err) {
       return styleValue(err.message, 'failure')
