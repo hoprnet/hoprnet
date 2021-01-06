@@ -27,13 +27,13 @@ export class CoverTraffic extends AbstractCommand {
   private messagesReceived: number
   private totalLatency: number
 
-  private identifier: number
+  private identifier: string
   constructor(public node: Hopr<HoprCoreConnector>) {
     super()
     this.messagesSent = 0
     this.messagesReceived = 0
     this.totalLatency = 0
-    this.identifier = Math.random()
+    this.identifier = Math.random() + ''
   }
 
   public name() {
@@ -50,6 +50,7 @@ export class CoverTraffic extends AbstractCommand {
       await this.node.sendMessage(payload, this.node.getId())
       this.messagesSent++
     } catch (e) {
+      console.log("Error", e)
       // No-op
     }
     this.timeout = setTimeout(this.tick.bind(this), INTERVAL) // tick again after interval
@@ -57,10 +58,9 @@ export class CoverTraffic extends AbstractCommand {
 
   private handleMessage(msg: Uint8Array) {
     const decoded = decode(msg)
-    console.log(decoded)
-    if (decoded[0] === this.identifier) {
-      const ts = decoded[2]
-      this.totalLatency += Date.now() - ts
+    if (decoded[0].toString() === this.identifier) {
+      const ts = parseInt(decoded[2].toString('hex'), 16)
+      this.totalLatency += (Date.now() - ts)
       this.messagesReceived++
     }
   }
@@ -81,7 +81,7 @@ export class CoverTraffic extends AbstractCommand {
         this.node.on('hopr:message', this.handleMessage.bind(this))
         this.registered = true
       }
-      setTimeout(this.tick.bind(this), INTERVAL)
+      this.timeout = setTimeout(this.tick.bind(this), INTERVAL)
       return 'started'
     }
     if (query === 'stop' && this.timeout) {

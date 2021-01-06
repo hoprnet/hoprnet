@@ -206,7 +206,27 @@ describe('Commands', () => {
   })
 
   it('cover traffic', async() => {
+    var clock = sinon.useFakeTimers(Date.now());
+    let mockNode: any = sinon.fake()
+    let receive;
+    mockNode.on = (ev, f) => {
+      assert(ev == 'hopr:message')
+      receive = f
+    }
+    mockNode.getId = () => 'node'
+    mockNode.sendMessage = (m, id) => {
+      assert(m, 'send message takes message')
+      assert(id == mockNode.getId(), 'sends to self')
+      setTimeout(() => receive(m), 300)
+      return Promise.resolve()
+    }
+    let cmds = new mod.Commands(mockNode)
+    assertMatch(await (cmds.execute('covertraffic start')), /started/)
+    await clock.tickAsync(30_000)
+    assertMatch(await (cmds.execute('covertraffic stop')), /stopped/)
+    assertMatch(await (cmds.execute('covertraffic stats')), /messages sent/)
+    assertMatch(await (cmds.execute('covertraffic stats')), /reliability/)
 
-
+    clock.restore()
   })
 })
