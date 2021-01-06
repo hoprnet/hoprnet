@@ -14,9 +14,9 @@ pragma solidity 0.7.5;
  * Using this library instead of the unchecked operations eliminates an entire
  * class of bugs, so it's recommended to use it always.
  *
- * This is a modified version of OZ's SafeMath but aimed for uint24.
+ * This is a modified version of OZ's SafeMath but aimed for uint96.
  */
-library SafeUint24 {
+library SafeUint96 {
   /**
    * @dev Returns the addition of two unsigned integers, reverting on
    * overflow.
@@ -27,8 +27,8 @@ library SafeUint24 {
    *
    * - Addition cannot overflow.
    */
-  function add(uint24 a, uint24 b) internal pure returns (uint24) {
-    uint24 c = a + b;
+  function add(uint96 a, uint96 b) internal pure returns (uint96) {
+    uint96 c = a + b;
     require(c >= a, 'SafeUint24: addition overflow');
 
     return c;
@@ -46,9 +46,9 @@ library SafeUint24 {
    *
    * - The divisor cannot be zero.
    */
-  function div(uint24 a, uint24 b) internal pure returns (uint24) {
+  function div(uint96 a, uint96 b) internal pure returns (uint96) {
     require(b > 0, 'SafeUint24: division by zero');
-    uint24 c = a / b;
+    uint96 c = a / b;
     // assert(a == b * c + a % b); // There is no case in which this doesn't hold
 
     return c;
@@ -66,7 +66,7 @@ library SafeUint24 {
    *
    * - The divisor cannot be zero.
    */
-  function mod(uint24 a, uint24 b) internal pure returns (uint24) {
+  function mod(uint96 a, uint96 b) internal pure returns (uint96) {
     require(b != 0, 'SafeUint24: modulo by zero');
     return a % b;
   }
@@ -81,9 +81,9 @@ library SafeUint24 {
    *
    * - Subtraction cannot overflow.
    */
-  function sub(uint24 a, uint24 b) internal pure returns (uint24) {
-    require(b <= a, 'SafeMath24: subtraction overflow');
-    uint24 c = a - b;
+  function sub(uint96 a, uint96 b) internal pure returns (uint96) {
+    require(b <= a, 'SafeMath96: subtraction overflow');
+    uint96 c = a - b;
 
     return c;
   }
