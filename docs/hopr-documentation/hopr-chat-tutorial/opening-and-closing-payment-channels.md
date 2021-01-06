@@ -69,7 +69,7 @@ You will then be shown a list of open channels, along with their status. The two
 
 ### Send A Multi-Hop Message
 
-Now let's send your first multi-hop message! We'll send it from your node, via randobot, and back to your node. Find your address using `myAddress`, then set an alias for it \(e.g., "myNode"\) using `alias`.
+Now let's send your first multi-hop message! We'll send it from your node, via randobot, and back to your node. Find your address using `address`, then set an alias for it \(e.g., "myNode"\) using `alias`.
 
 {% hint style="info" %}
 For a refresher on aliases, visit [**this page**](randobot.md#step-3-set-an-alias).

@@ -21,7 +21,7 @@ You currently need 0.02 MATIC in your node address to participate in the testnet
 It costs MATIC to open payment channels and perform certain other testnet actions, but 0.02 should be more than enough.
 {% endhint %}
 
-If your node is unfunded, you can find your MATIC address by simply starting the HOPR Chat client. HOPR Chat will recognize that your node is unfunded, and won't proceed. It will tell you your address, so you can send MATIC. Once your node is funded, you can find your address by typing `myAddress`.
+If your node is unfunded, you can find your MATIC address by simply starting the HOPR Chat client. HOPR Chat will recognize that your node is unfunded, and won't proceed. It will tell you your address, so you can send MATIC. Once your node is funded, you can find your address by typing `address`.
 
 ![](../.gitbook/assets/no-funds%20%283%29%20%282%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29.png)
 

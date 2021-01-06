@@ -42,7 +42,7 @@ You can check on your payment channels by typing `openChannels`:
 
 ## Send A Multi-Hop Message
 
-Now let's send your first multi-hop message! We'll send it from your node, via randobot, and back to your node. Find your address using `myAddress`. Then type:`send <your address> <intermediate node> <your message>`.
+Now let's send your first multi-hop message! We'll send it from your node, via randobot, and back to your node. Find your address using `address`. Then type:`send <your address> <intermediate node> <your message>`.
 
 {% hint style="info" %}
 To make this simpler, you can also set an alias for your own address. For a refresher on aliases, visit [**this page**](talking-with-randobot.md#step-3-set-an-alias).
