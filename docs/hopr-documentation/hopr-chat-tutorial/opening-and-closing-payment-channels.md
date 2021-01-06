@@ -49,14 +49,14 @@ Opening a payment channel involves an interaction with the HOPR smart contract, 
 
 To view your currently opened payment channels, type:
 
-You can check on your payment channels by typing `openChannels`.
+You can check on your payment channels by typing `channels`.
 
 ```text
-openChannels
+channels
 ```
 
 ```text
-> openChannels
+> channels
 
 Channel        :  0x361b9b66eb914e786f420c21f5c0c780565678dd459e57d2b3ef59af96ac781a
 CounterParty   :  16Uiu2HAmNtoQri1X4ikUzCqjFQptRSLSVKnVzMmtZiCHCHkdWJr7
@@ -69,7 +69,7 @@ You will then be shown a list of open channels, along with their status. The two
 
 ### Send A Multi-Hop Message
 
-Now let's send your first multi-hop message! We'll send it from your node, via randobot, and back to your node. Find your address using `myAddress`, then set an alias for it \(e.g., "myNode"\) using `alias`.
+Now let's send your first multi-hop message! We'll send it from your node, via randobot, and back to your node. Find your address using `address`, then set an alias for it \(e.g., "myNode"\) using `alias`.
 
 {% hint style="info" %}
 For a refresher on aliases, visit [**this page**](randobot.md#step-3-set-an-alias).
@@ -135,10 +135,10 @@ You will get a notification that the channel is being closed, along with a recei
 Initiated channel closure, receipt: 0xb62fb7c764118dffef63348c1ecaad0caba84d1ee7d3049a3cc916694ba9fea6
 ```
 
-If you now check the status of your channel by typing `openChannels`, you'll see the status has changed to `PENDING`.
+If you now check the status of your channel by typing `channels`, you'll see the status has changed to `PENDING`.
 
 ```text
-> openChannels
+> channels
 
 Channel        :  0xb15a70555e5d9bd65afe19823ed3a68838ad02c863143d321146fa5bbc6110af
 CounterParty   :  16Uiu2HAmNtoQri1X4ikUzCqjFQptRSLSVKnVzMmtZiCHCHkdWJr7
@@ -160,10 +160,10 @@ Once two minutes have passed, send the `close` command again:
 Closing channel, receipt: 0x4c764bc7d3a162ec28670000ca13f2c052c0023bf6ae8dbb546532795f8f4c70
 ```
 
-Now when you type `openChannels`, you should see that there are none. The channel to RandoBot has been successfully closed.
+Now when you type `channels`, you should see that there are none. The channel to RandoBot has been successfully closed.
 
 ```text
-> openChannels
+> channels
 
 No open channels found.
 ```

@@ -6,7 +6,7 @@
 You will then be shown a list of open channels, along with their status. The two status options are:
 
 ```text
-openChannels
+channels
 ```
 
 To view your currently opened payment channels, type:
