@@ -1,9 +1,7 @@
+// SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.6.0;
 
-// SPDX-License-Identifier: LGPL-3.0-only
-
 import "@openzeppelin/contracts/math/SafeMath.sol";
-// import "@openzeppelin/contracts/utils/Arrays.sol";
 import "@openzeppelin/contracts/token/ERC777/ERC777.sol";
 import "../utils/console.sol";
 
@@ -15,7 +13,6 @@ abstract contract ERC777Snapshot is ERC777 {
     // https://github.com/Giveth/minime/blob/ea04d950eea153a04c51fa510b068b9dded390cb/contracts/MiniMeToken.sol
 
     using SafeMath for uint256;
-    // using Arrays for uint256[];
 
     /**
      * @dev `Snapshot` is the structure that attaches a block number to a
