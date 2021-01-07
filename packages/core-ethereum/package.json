@@ -27,6 +27,7 @@
     "yarn": "1"
   },
   "dependencies": {
+    "async-mutex": "^0.2.6",
     "@hoprnet/hopr-ethereum": "1.61.0-next.11",
     "@hoprnet/hopr-utils": "1.61.0-next.11",
     "bn.js": "^5.1.2",
@@ -54,6 +55,7 @@
     "@types/mocha": "^8.2.0",
     "@types/node": "^12",
     "@types/secp256k1": "^4.0.1",
+    "chai": "^4.2.0",
     "it-pipe": "^1.1.0",
     "levelup": "^4.4.0",
     "memdown": "^5.1.0",
