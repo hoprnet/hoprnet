@@ -16,11 +16,11 @@ jobs:
         with:
           node-version: 12
           registry-url: https://registry.npmjs.org/
-      - uses: actions/cache@v2
-        id: cache
-        with:
-          path: 'node_modules'
-          key: ${{ runner.os }}-modules-${{ hashFiles('yarn.lock') }}
+            #      - uses: actions/cache@v2
+            #        id: cache
+            #        with:
+            #          path: 'node_modules'
+            #          key: ${{ runner.os }}-modules-${{ hashFiles('yarn.lock') }}
 
       - name: Install dependencies 
         run: |
@@ -150,8 +150,10 @@ jobs:
         run: gcloud config set project ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
       - name: Building Docker image using Google Cloud Build
         working-directory: packages/hoprd
-        run:
+        run: | # TODO - actually parse semver to tag v1
           gcloud builds submit --tag gcr.io/hoprassociation/hoprd:${{ env.RELEASE }}
+          gcloud container images add-tag gcr.io/hoprassociation/hoprd:${{ env.RELEASE }} gcr.io/hoprassociation/hoprd:1
+          gcloud container images add-tag gcr.io/hoprassociation/hoprd:${{ env.RELEASE }} gcr.io/hoprassociation/hoprd:latest 
 
   avado:
     name: Build Avado (master or release pushes)

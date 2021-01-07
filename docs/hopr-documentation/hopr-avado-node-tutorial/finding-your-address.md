@@ -28,7 +28,7 @@ Addresses are shown in their shortened form, showing only the last five characte
 
 ## Finding Your Own Address
 
-To find your own address, type `myAddress`. Once again, you'll need to click the short-form address to expand it. The `myAddress` command will also show the wallet address you used to fund your account.
+To find your own address, type `address`. Once again, you'll need to click the short-form address to expand it. The `address` command will also show the wallet address you used to fund your account.
 
 ![](../.gitbook/assets/avado-myaddress%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29.png)
 

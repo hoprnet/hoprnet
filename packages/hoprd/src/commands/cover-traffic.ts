@@ -27,40 +27,48 @@ export class CoverTraffic extends AbstractCommand {
   private messagesReceived: number
   private totalLatency: number
 
-  private identifier: number
+  private identifier: string
   constructor(public node: Hopr<HoprCoreConnector>) {
     super()
     this.messagesSent = 0
     this.messagesReceived = 0
     this.totalLatency = 0
-    this.identifier = Math.random()
+    this.identifier = Math.random() + ''
   }
 
   public name() {
-    return 'cover-traffic'
+    return 'covertraffic'
   }
 
   public help() {
     return 'Generate chaff messages to provide cover (start/stop)'
   }
 
-  private tick() {
-    const payload = encode([this.identifier, this.seq++, Date.now()])
-    this.node.sendMessage(payload, this.node.getId())
-    this.messagesSent++
+  private async tick() {
+    try {
+      const payload = encode([this.identifier, this.seq++, Date.now()])
+      await this.node.sendMessage(payload, this.node.getId())
+      this.messagesSent++
+    } catch (e) {
+      console.log('Error', e)
+      // No-op
+    }
     this.timeout = setTimeout(this.tick.bind(this), INTERVAL) // tick again after interval
   }
 
   private handleMessage(msg: Uint8Array) {
     const decoded = decode(msg)
-    if (decoded[0] === this.identifier) {
-      const ts = decoded[2]
+    if (decoded[0].toString() === this.identifier) {
+      const ts = parseInt(decoded[2].toString('hex'), 16)
       this.totalLatency += Date.now() - ts
       this.messagesReceived++
     }
   }
 
   private stats(): string {
+    if (this.messagesReceived < 1) {
+      return `${this.messagesSent} messages sent, no messages received`
+    }
     const reliability = ((this.messagesReceived / this.messagesSent) * 100).toFixed(2)
     const latency = this.totalLatency / this.messagesReceived
     return `${this.messagesSent} messages sent, ` + `reliability = ${reliability}%, average latency is ${latency}`
@@ -73,7 +81,7 @@ export class CoverTraffic extends AbstractCommand {
         this.node.on('hopr:message', this.handleMessage.bind(this))
         this.registered = true
       }
-      setTimeout(this.tick.bind(this), INTERVAL)
+      this.timeout = setTimeout(this.tick.bind(this), INTERVAL)
       return 'started'
     }
     if (query === 'stop' && this.timeout) {

@@ -12,7 +12,7 @@ export default class ListOpenChannels extends AbstractCommand {
   }
 
   public name() {
-    return 'openChannels'
+    return 'channels'
   }
 
   public help() {

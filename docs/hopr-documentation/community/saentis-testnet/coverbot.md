@@ -18,10 +18,10 @@ CoverBot is the latest in a series of bots running on the HOPR network which wil
 
 With your node up and running, you are now ready to type and communicate with other users on the **HOPR Network**, including the bot which oversees the testnet.
 
-Communication is achieved using **HOPR addresses.** To find your node's address, type `myAddress` and press `Enter` inside **HOPR Chat** or your **HOPR Node PC** app**.** Something like the following will show up:
+Communication is achieved using **HOPR addresses.** To find your node's address, type `address` and press `Enter` inside **HOPR Chat** or your **HOPR Node PC** app**.** Something like the following will show up:
 
 ```text
-> myAddress
+> address
 ethereum:  0x9e95cdcb480f133b0c1af70613d1488ee01bf53e
 HOPR:      16Uiu2HAm34oK6EyA2SuFo9rHXpm5Kwy6C8MeJ26JaRFBzgdQqVpZ
 ```

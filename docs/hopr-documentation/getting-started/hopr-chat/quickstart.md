@@ -194,15 +194,15 @@ Running these commands will bring up a screen similar the one shown below. Congr
 
 ## Step 4 - Get Your HOPR Address
 
-With **HOPR Chat** up and running, you are now ready to type and communicate with other users on the **HOPR Network.** To do so, you need to get your **HOPR Address.** To do so, write `myAddress` and press `Enter` inside **HOPR Chat.** Something like the following will show up:
+With **HOPR Chat** up and running, you are now ready to type and communicate with other users on the **HOPR Network.** To do so, you need to get your **HOPR Address.** To do so, write `address` and press `Enter` inside **HOPR Chat.** Something like the following will show up:
 
 ```text
-> myAddress
+> address
 ethereum:  0x9e95cdcb480f133b0c1af70613d1488ee01bf53e
 HOPR:      16Uiu2HAm34oK6EyA2SuFo9rHXpm5Kwy6C8MeJ26JaRFBzgdQqVpZ
 ```
 
-Share your address shown by the `myAddress` command to other people. Your HOPR Address starts with `16Uiu2` and it’s the only thing other people need to know to send you messages. Use a separate channel to share your HOPR Address with your friends.
+Share your address shown by the `address` command to other people. Your HOPR Address starts with `16Uiu2` and it’s the only thing other people need to know to send you messages. Use a separate channel to share your HOPR Address with your friends.
 
 ## Step 5 - Send Messages to Other HOPR Nodes
 

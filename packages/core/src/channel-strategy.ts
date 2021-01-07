@@ -22,6 +22,8 @@ const indexerDest = (c: IndexerChannel): PeerId => c[1]
  *
  */
 export interface ChannelStrategy {
+  name: string
+
   tick(
     balance: BN,
     newChannels: IndexerChannel[],
@@ -38,6 +40,8 @@ const logIndexerChannels = (c: IndexerChannel[]): string =>
 
 // Don't auto open any channels
 export class PassiveStrategy implements ChannelStrategy {
+  name = 'passive'
+
   async tick(
     _balance: BN,
     _n: IndexerChannel[],
@@ -51,6 +55,8 @@ export class PassiveStrategy implements ChannelStrategy {
 
 // Open channel to as many peers as possible
 export class PromiscuousStrategy implements ChannelStrategy {
+  name = 'promiscuous'
+
   async tick(
     balance: BN,
     _n: IndexerChannel[],

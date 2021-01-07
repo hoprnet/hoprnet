@@ -47,6 +47,17 @@ export class AdminServer {
       handle(req, res, parsedUrl)
     })
 
+    this.server.listen(this.port)
+    this.logs.log('Admin server listening on port ' + this.port)
+  }
+
+  registerNode(node: Hopr<HoprCoreConnector>, settings?: any) {
+    this.node = node
+    this.cmds = new Commands(node)
+    if (settings) {
+      this.cmds.setState(settings)
+    }
+
     this.wsServer = new ws.Server({ server: this.server })
 
     this.wsServer.on('connection', (socket: any) => {
@@ -70,17 +81,6 @@ export class AdminServer {
       })
       this.logs.subscribe(socket)
     })
-
-    this.server.listen(this.port)
-    this.logs.log('Admin server listening on port ' + this.port)
-  }
-
-  registerNode(node: Hopr<HoprCoreConnector>, settings?: any) {
-    this.node = node
-    this.cmds = new Commands(node)
-    if (settings) {
-      this.cmds.setState(settings)
-    }
 
     this.node.on('hopr:crawl:completed', () => {
       this.logs.log('Crawled network')

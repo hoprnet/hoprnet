@@ -52,7 +52,7 @@ CoverBot looks for three things when it parses your tweet:
 - the @hoprnet tag
 - the \#HOPRNetwork hashtag
 
-Make sure you have all three of those in your tweet correctly. If you don't know your HOPR address, type `myAddress` at the prompt in HOPR Chat or your hardware node.
+Make sure you have all three of those in your tweet correctly. If you don't know your HOPR address, type `address` at the prompt in HOPR Chat or your hardware node.
 
 Make sure you're sending the full URL, including https:// . Don't send anything else in your message to the bot. Make sure you have includeRecipient turned on.
 

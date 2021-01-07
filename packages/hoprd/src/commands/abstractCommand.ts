@@ -8,8 +8,6 @@ export type CommandResponse = string | void
 export type GlobalState = {
   aliases: Map<string, PeerId>
   includeRecipient: boolean
-  routing: 'direct' | 'manual' | 'auto'
-  routingPath: PeerId[]
 }
 
 // REPL Command

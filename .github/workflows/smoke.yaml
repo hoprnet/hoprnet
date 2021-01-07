@@ -23,16 +23,16 @@ jobs:
           node-version: 12
           registry-url: https://registry.npmjs.org/
 
-      - name: Get yarn cache directory path
-        id: yarn-cache-dir-path
-        run: echo "::set-output name=dir::$(yarn cache dir)"
-      - uses: actions/cache@v1
-        id: yarn-cache # use this to check for `cache-hit` (`steps.yarn-cache.outputs.cache-hit != 'true'`)
-        with:
-          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
-          key: ${{ runner.os }}-yarn-${{ hashFiles('yarn.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-yarn-
+            #      - name: Get yarn cache directory path
+            #        id: yarn-cache-dir-path
+            #        run: echo "::set-output name=dir::$(yarn cache dir)"
+            #      - uses: actions/cache@v1
+            #        id: yarn-cache # use this to check for `cache-hit` (`steps.yarn-cache.outputs.cache-hit != 'true'`)
+            #        with:
+            #          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+            #          key: ${{ runner.os }}-yarn-${{ hashFiles('yarn.lock') }}
+            #          restore-keys: |
+            #            ${{ runner.os }}-yarn-
 
       - name: Install dependencies
         run: |
@@ -62,15 +62,15 @@ jobs:
           alias hoprd="node packages/hoprd/lib/index.js --provider $PROVIDER"
 
           echo "alice"
-          hoprd --data='./test/fixtures/alice' --password="$DBPASS" --runAsBootstrap --run "myAddress" 
+          hoprd --data='./test/fixtures/alice' --password="$DBPASS" --runAsBootstrap --run "address" 
           hoprd --data='./test/fixtures/alice' --password="$DBPASS" --runAsBootstrap --run "balance" 
 
           echo "bob"
-          hoprd --data='./test/fixtures/bob' --password="$DBPASS" --runAsBootstrap --run "myAddress"
+          hoprd --data='./test/fixtures/bob' --password="$DBPASS" --runAsBootstrap --run "address"
           hoprd --data='./test/fixtures/bob' --password="$DBPASS" --runAsBootstrap --run "balance"
 
           echo "charlie"
-          hoprd --data='./test/fixtures/charlie' --password="$DBPASS" --runAsBootstrap --run "myAddress"
+          hoprd --data='./test/fixtures/charlie' --password="$DBPASS" --runAsBootstrap --run "address"
           hoprd --data='./test/fixtures/charlie' --password="$DBPASS" --runAsBootstrap --run "balance"
         env:
           DBPASS: ${{ secrets.SMOKETESTPASSWORD }}

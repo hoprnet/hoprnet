@@ -1,28 +1,44 @@
-import { getPaddingLength, styleValue, getOptions } from '../utils'
-import { AbstractCommand, GlobalState, AutoCompleteResult } from '../abstractCommand'
-import { IncludeRecipient } from './includeRecipient'
-import { Routing } from './routing'
+import { getPaddingLength, styleValue } from '../utils'
+import { AbstractCommand, GlobalState } from '../abstractCommand'
+import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
+import type Hopr from '@hoprnet/hopr-core'
 
-// to add a new setting, include it here and in class this.settings
-type SettingsDirectory = {
-  [key in keyof Pick<GlobalState, 'includeRecipient' | 'routing'>]: IncludeRecipient | Routing
+function booleanSetter(name: string) {
+  return function setter(query: string, state: GlobalState): string {
+    if (!query.match(/true|false/i)) {
+      return styleValue(`Invalid option.`, 'failure')
+    }
+    state[name] = !!query.match(/true/i)
+    return `You have set your “${styleValue(name, 'highlight')}” settings to “${styleValue(state[name])}”.`
+  }
 }
-type SettingsKeys = keyof SettingsDirectory
-type SettingsValues = GlobalState[SettingsKeys]
 
 export default class Settings extends AbstractCommand {
-  private settings: SettingsDirectory
-  private paddingLength: number
+  private settings
 
-  constructor() {
+  constructor(private node: Hopr<HoprCoreConnector>) {
     super()
-
-    // to add a new setting, include it here
     this.settings = {
-      includeRecipient: new IncludeRecipient(),
-      routing: new Routing()
+      includeRecipient: ['Prepends your address to all messages (true|false)', booleanSetter('includeRecipient')],
+      strategy: [
+        'Set an automatic strategy for the node. (passive|promiscuous)',
+        this.setStrategy.bind(this),
+        this.getStrategy.bind(this)
+      ]
     }
-    this.paddingLength = getPaddingLength(Object.keys(this.settings))
+  }
+
+  private async setStrategy(query: string): Promise<string> {
+    try {
+      this.node.setChannelStrategy(query as any)
+      return 'Strategy was set'
+    } catch {
+      return 'Could not set strategy. Try PASSIVE or PROMISCUOUS'
+    }
+  }
+
+  private getStrategy(): string {
+    return this.node.getChannelStrategy()
   }
 
   public name() {
@@ -33,76 +49,52 @@ export default class Settings extends AbstractCommand {
     return 'list your current settings'
   }
 
-  private get settingsKeys(): SettingsKeys[] {
-    return Object.keys(this.settings) as SettingsKeys[]
+  private get settingsKeys(): string[] {
+    return Object.keys(this.settings)
+  }
+
+  private listSettings(state: GlobalState): string {
+    const entries = this.settingsKeys.map((setting) => {
+      return [setting, this.getState(setting, state)]
+    })
+
+    const results: string[] = []
+    const keyPadding = getPaddingLength(Object.keys(this.settings))
+    const valuePadding = getPaddingLength(entries.map((x) => x[1] + ''))
+    for (const [key, value] of entries) {
+      results.push(key.padEnd(keyPadding) + styleValue(value + '').padEnd(valuePadding) + this.settings[key][0])
+    }
+    return results.join('\n')
+  }
+
+  private getState(setting: string, state: GlobalState): string {
+    if (this.settings[setting] && this.settings[setting][2]) {
+      // Use getter
+      return this.settings[setting][2]()
+    }
+    return state[setting]
   }
 
   public async execute(query: string, state: GlobalState): Promise<string | void> {
-    // nothing provided, just show current settings
     if (!query) {
-      const entries = this.settingsKeys.map<[SettingsKeys, SettingsValues]>((setting) => {
-        return [setting, state[setting] as SettingsValues]
-      })
-
-      const results: string[] = []
-      for (const [key, value] of entries) {
-        results.push(key.padEnd(this.paddingLength) + styleValue(value))
-      }
-
-      return results.join('\n')
+      return this.listSettings(state)
     }
 
     const [setting, ...optionArray] = query.split(' ')
     const option = optionArray.join(' ')
+
+    if (!option) {
+      return setting + ': ' + this.getState(setting, state)
+    }
 
     // found an exact match, run the setting's execute
     const matchesASetting = this.settingsKeys.find((s) => {
       return s === setting
     })
     if (typeof matchesASetting !== 'undefined') {
-      return this.settings[matchesASetting].execute(option, state)
+      return this.settings[matchesASetting][1](option, state)
     }
 
     return styleValue(`Setting “${styleValue(setting)}” does not exist.`, 'failure')
-  }
-
-  public async autocomplete(query: string, line: string): Promise<AutoCompleteResult> {
-    // nothing provided, just show all settings
-    if (!query) {
-      return [
-        getOptions(
-          Object.values(this.settings).map((setting) => {
-            return {
-              value: setting.name(),
-              description: setting.help()
-            }
-          }),
-          'vertical'
-        ),
-        line
-      ]
-    }
-
-    // found an exact match, run the setting's autocomplete
-    const matchesASetting = this.settingsKeys.find((s) => {
-      return s === query
-    })
-    if (typeof matchesASetting !== 'undefined') {
-      const [, , ...subQueryArray] = line.split(' ')
-      const subQuery = subQueryArray.join(' ')
-
-      return this.settings[matchesASetting].autocomplete(subQuery, line)
-    }
-
-    // matches a setting partly, show matched settings
-    const matchesPartlyASetting = this.settingsKeys.filter((s) => {
-      return s.startsWith(query)
-    })
-    if (matchesPartlyASetting.length > 0) {
-      return [matchesPartlyASetting.map((str: string) => `${this.name()} ${str}`), line]
-    }
-
-    // show nothing
-    return [[this.name()], line]
   }
 }
