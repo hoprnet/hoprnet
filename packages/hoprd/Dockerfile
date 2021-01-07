@@ -36,6 +36,7 @@ FROM node:12.9.1-buster AS runtime
 
 ENV NODE_ENV 'production'
 ENV NEXT_TELEMETRY_DISABLED 1
+ENV DEBUG 'hopr*'
 
 WORKDIR /app
 
