@@ -3,6 +3,10 @@ node_modules
 
 db
 
+bin
+
+.vscode
+
 *.swp
 .vercel
 
