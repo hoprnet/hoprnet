@@ -5,8 +5,8 @@ import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type { HoprChannels } from './tsc/web3/HoprChannels'
 import type { HoprToken } from './tsc/web3/HoprToken'
 import Web3 from 'web3'
-import { Network, addresses, abis } from '@hoprnet/hopr-ethereum'
 import chalk from 'chalk'
+import { Network, addresses, abis } from '@hoprnet/hopr-ethereum'
 import { ChannelFactory } from './channel'
 import types from './types'
 import Indexer from './indexer'
@@ -30,7 +30,6 @@ export default class HoprEthereum implements HoprCoreConnector {
   private _stopping?: Promise<void>
   private _debug: boolean
 
-  public signTransaction: ReturnType<typeof utils.TransactionSigner>
   public channel: ChannelFactory
   public types: types
   public indexer: Indexer
@@ -54,7 +53,6 @@ export default class HoprEthereum implements HoprCoreConnector {
     this.types = new types()
     this.channel = new ChannelFactory(this)
     this._debug = debug
-    this.signTransaction = utils.TransactionSigner(web3, this.network, privateKey)
   }
 
   readonly dbKeys = dbkeys
@@ -160,20 +158,18 @@ export default class HoprEthereum implements HoprCoreConnector {
     return new Promise<string>(async (resolve, reject) => {
       try {
         if (currency === 'NATIVE') {
-          const tx = await this.signTransaction({
+          const tx = await this.account.signTransaction({
             from: (await this.account.address).toHex(),
             to: recipient,
-            nonce: await this.account.nonce,
             value: amount
           })
 
           tx.send().once('transactionHash', (hash) => resolve(hash))
         } else {
-          const tx = await this.signTransaction(
+          const tx = await this.account.signTransaction(
             {
               from: (await this.account.address).toHex(),
-              to: this.hoprToken.options.address,
-              nonce: await this.account.nonce
+              to: this.hoprToken.options.address
             },
             this.hoprToken.methods.transfer(recipient, amount)
           )

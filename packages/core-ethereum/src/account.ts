@@ -1,22 +1,28 @@
 import type HoprEthereum from '.'
-import { stringToU8a, u8aEquals } from '@hoprnet/hopr-utils'
+import type { TransactionObject } from './tsc/web3/types'
+import type { TransactionConfig } from 'web3-core'
+import { getRpcOptions } from '@hoprnet/hopr-ethereum'
+import { Intermediate, stringToU8a, u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
+import NonceTracker, { Transaction } from './nonce-tracker'
 import { AccountId, AcknowledgedTicket, Balance, Hash, NativeBalance, TicketEpoch } from './types'
 import { isWinningTicket, pubKeyToAccountId } from './utils'
 import { ContractEventEmitter } from './tsc/web3/types'
-import type { Intermediate } from '@hoprnet/hopr-utils'
 import { HASHED_SECRET_WIDTH } from './hashedSecret'
 export const EMPTY_HASHED_SECRET = new Uint8Array(HASHED_SECRET_WIDTH).fill(0x00)
 import debug from 'debug'
 const log = debug('hopr-core-ethereum:account')
 
+const rpcOps = getRpcOptions()
+
 class Account {
   private _address?: AccountId
-  private _nonceIterator: AsyncIterator<number>
   private _preImageIterator: AsyncGenerator<boolean, boolean, AcknowledgedTicket>
-
   private _ticketEpoch?: TicketEpoch
   private _ticketEpochListener?: ContractEventEmitter<any>
   private _onChainSecret?: Hash
+  private _nonceTracker: NonceTracker
+  private _confirmed_transactions = new Map<string, Transaction>()
+  private _pending_transactions = new Map<string, Transaction>()
 
   /**
    * The accounts keys:
@@ -44,13 +50,13 @@ class Account {
       }
     }
 
-    this._nonceIterator = async function* (this: Account) {
-      let nonce = await this.coreConnector.web3.eth.getTransactionCount((await this.address).toHex())
-
-      while (true) {
-        yield nonce++
-      }
-    }.call(this)
+    this._nonceTracker = new NonceTracker({
+      getLatestBlockNumber: () => coreConnector.web3.eth.getBlockNumber(),
+      getTransactionCount: async (address: string, blockNumber?: number) =>
+        coreConnector.web3.eth.getTransactionCount(address, blockNumber),
+      getConfirmedTransactions: () => Array.from(this._confirmed_transactions.values()),
+      getPendingTransactions: () => Array.from(this._pending_transactions.values())
+    })
 
     this._preImageIterator = async function* (this: Account) {
       let ticket: AcknowledgedTicket = yield
@@ -98,7 +104,9 @@ class Account {
   }
 
   get nonce(): Promise<number> {
-    return this._nonceIterator.next().then((res) => res.value)
+    return this._nonceTracker
+      .getNonceLock(this._address.toHex())
+      .then((res) => res.nonceDetails.params.highestSuggested)
   }
 
   /**
@@ -200,6 +208,88 @@ class Account {
 
   updateLocalState(onChainSecret: Hash) {
     this._onChainSecret = onChainSecret
+  }
+
+  // @TODO: switch to web3js-accounts
+  public async signTransaction<T>(
+    // config put in .send
+    txConfig: Omit<TransactionConfig, 'nonce'>,
+    // return of our contract method in web3.Contract instance
+    txObject?: TransactionObject<T>
+  ) {
+    const { web3, network } = this.coreConnector
+
+    const abi = txObject ? txObject.encodeABI() : undefined
+    const gas = 200e3
+
+    // set gasPrice
+    let gasPrice: number = 1e9
+    // specified in network settings
+    if (rpcOps[network]?.gasPrice) gasPrice = rpcOps[network]?.gasPrice
+    // let's web3 pick gas price
+    if (network === 'mainnet') return undefined
+
+    // @TODO: potential deadlock, needs to be improved
+    const nonceLock = await this._nonceTracker.getNonceLock(this._address.toHex())
+
+    // @TODO: provide some of the values to avoid multiple calls
+    const options = {
+      gas,
+      gasPrice,
+      ...txConfig,
+      nonce: nonceLock.nextNonce,
+      data: abi
+    }
+
+    const signedTransaction = await web3.eth.accounts.signTransaction(options, u8aToHex(this.keys.onChain.privKey))
+
+    const send = () => {
+      if (signedTransaction.rawTransaction == null) {
+        throw Error('Cannot process transaction because Web3.js did not give us the raw transaction.')
+      }
+
+      log('Sending transaction %o', {
+        gas: options.gas,
+        gasPrice: options.gasPrice,
+        nonce: options.nonce,
+        hash: signedTransaction.transactionHash
+      })
+
+      const event = web3.eth.sendSignedTransaction(signedTransaction.rawTransaction)
+      this._pending_transactions.set(signedTransaction.transactionHash, {
+        hash: signedTransaction.transactionHash,
+        nonce: options.nonce
+      })
+      log('Added pending transaction %s %i', signedTransaction.transactionHash, options.nonce)
+      nonceLock.releaseLock()
+
+      // @TODO: cleanup old txs
+      event.once('receipt', () => {
+        log('Moving transaction to confirmed %s %i', signedTransaction.transactionHash, options.nonce)
+        this._pending_transactions.delete(signedTransaction.transactionHash)
+        this._confirmed_transactions.set(signedTransaction.transactionHash, {
+          hash: signedTransaction.transactionHash,
+          nonce: options.nonce
+        })
+      })
+      event.once('error', (error) => {
+        log(
+          'Removing failed transaction %s %i with error %s',
+          signedTransaction.transactionHash,
+          options.nonce,
+          error.message
+        )
+        this._pending_transactions.delete(signedTransaction.transactionHash)
+        this._confirmed_transactions.delete(signedTransaction.transactionHash)
+      })
+
+      return event
+    }
+
+    return {
+      send,
+      transactionHash: signedTransaction.transactionHash
+    }
   }
 
   private async attachAccountDataListener() {
