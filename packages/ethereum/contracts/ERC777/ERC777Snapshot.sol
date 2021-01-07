@@ -83,7 +83,7 @@ abstract contract ERC777Snapshot is ERC777 {
             // burn
             updateValueAtNow(accountSnapshots[from], balanceOf(from).sub(amount));
             updateValueAtNow(totalSupplySnapshots, totalSupply().sub(amount));
-        } else {
+        } else if (from != to) {
             // transfer
             updateValueAtNow(accountSnapshots[from], balanceOf(from).sub(amount));
             updateValueAtNow(accountSnapshots[to], balanceOf(to).add(amount));
