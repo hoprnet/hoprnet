@@ -14,10 +14,6 @@ contract ERC777SnapshotMock is ERC777Snapshot {
         _mint(initialAccount, initialBalance, "", "");
     }
 
-    function snapshot() public {
-        _snapshot();
-    }
-
     function mint(
         address to,
         uint256 amount,
