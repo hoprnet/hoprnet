@@ -1,7 +1,7 @@
-// import { compile } from '@hoprnet/hopr-ethereum'
+import { compile } from '@hoprnet/hopr-ethereum'
 
-// export const mochaGlobalSetup = async () => {
-//   await compile()
-// }
+export const mochaGlobalSetup = async () => {
+  await compile()
+}
 
-// export const mochaGlobalTeardown = async () => {}
+export const mochaGlobalTeardown = async () => {}
