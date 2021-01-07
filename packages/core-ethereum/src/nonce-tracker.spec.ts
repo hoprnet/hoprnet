@@ -199,7 +199,7 @@ describe('nonce-tracker', function () {
     nonceLock.releaseLock()
   })
 
-  it('should create nonce 5 after network nonce When all three return different values', async function () {
+  it('should create nonce 50 after network nonce When all three return different values', async function () {
     confirmedTxs = mockTxGen.generateMulti({}, { count: 10 })
     pendingTxs = mockTxGen.generateMulti(
       {
@@ -219,7 +219,7 @@ describe('nonce-tracker', function () {
     nonceLock.releaseLock()
   })
 
-  it('should create nonce 7 after network nonce Faq issue 67', async function () {
+  it('should create nonce 74 after network nonce', async function () {
     confirmedTxs = mockTxGen.generateMulti({}, { count: 64 })
     pendingTxs = mockTxGen.generateMulti({}, { count: 10 })
     nonceTracker = new NonceTracker({
