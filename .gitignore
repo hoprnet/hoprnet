@@ -1,16 +1,20 @@
+# Node.js modules
 node_modules
+
+# OSX files
 .DS_Store
 
+# Client database
 db
 
+# Build artifacts
 bin
 
+# VS Code config
 .vscode
 
 *.swp
 .vercel
-
-.DS_Store
 
 test/local-fixtures
 
