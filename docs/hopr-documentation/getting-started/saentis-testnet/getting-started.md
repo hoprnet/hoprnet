@@ -59,7 +59,7 @@ Next, you need to send xDAI to your HOPR node. You currently need 0.02 xDAI in y
 xDAI is a USD stablecoin, so 0.02 xDAI is worth around 2 cents. It costs xDAI to open payment channels and perform certain other testnet actions, but 0.02 is more than enough.
 {% endhint %}
 
-If your node is unfunded, you can find your xDAI address by simply starting the HOPR Chat client. HOPR Chat will recognize that your node is unfunded, and won't proceed. It will tell you your address, so you can send xDAI. Once your node is funded, you can find your address by typing `myAddress`.
+If your node is unfunded, you can find your xDAI address by simply starting the HOPR Chat client. HOPR Chat will recognize that your node is unfunded, and won't proceed. It will tell you your address, so you can send xDAI. Once your node is funded, you can find your address by typing `address`.
 
 ![](../../.gitbook/assets/no-funds.png)
 

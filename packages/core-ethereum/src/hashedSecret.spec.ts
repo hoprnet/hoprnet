@@ -10,7 +10,6 @@ import LevelUp from 'levelup'
 import { Ganache } from '@hoprnet/hopr-testing'
 import { Network, addresses, abis } from '@hoprnet/hopr-ethereum'
 import { migrate, fund } from '@hoprnet/hopr-ethereum'
-import { NODE_SEEDS } from '@hoprnet/hopr-demo-seeds'
 import Web3 from 'web3'
 import type { WebsocketProvider } from 'web3-core'
 import * as testconfigs from './config.spec'
@@ -34,7 +33,6 @@ describe('test hashedSecret', function () {
     const network = Utils.getNetworkName(chainId) as Network
 
     const connector = ({
-      signTransaction: Utils.TransactionSigner(web3, network, stringToU8a(NODE_SEEDS[0])),
       hoprChannels: new web3.eth.Contract(HoprChannelsAbi as any, addresses[network].HoprChannels),
       web3,
       db: LevelUp(Memdown()),
@@ -127,11 +125,10 @@ describe('test hashedSecret', function () {
 
       await connector.utils.waitForConfirmation(
         (
-          await connector.signTransaction(
+          await connector.account.signTransaction(
             {
               from: (await connector.account.address).toHex(),
-              to: connector.hoprChannels.options.address,
-              nonce: await connector.account.nonce
+              to: connector.hoprChannels.options.address
             },
             connector.hoprChannels.methods.setHashedSecret(new Types.Hash(preImage.preImage).toHex())
           )
@@ -220,11 +217,10 @@ describe('test hashedSecret', function () {
 
       await connector.utils.waitForConfirmation(
         (
-          await connector.signTransaction(
+          await connector.account.signTransaction(
             {
               from: (await connector.account.address).toHex(),
-              to: connector.hoprChannels.options.address,
-              nonce: await connector.account.nonce
+              to: connector.hoprChannels.options.address
             },
             connector.hoprChannels.methods.setHashedSecret(new Types.Hash(preImage.preImage).toHex())
           )

@@ -34,10 +34,10 @@ The list of connected peers will sometimes show fewer nodes than the number retu
 
 ## Finding Your Address
 
-To find your own address, type `myAddress`. This will also show the ETH wallet address you used to fund your account. For example:
+To find your own address, type `address`. This will also show the ETH wallet address you used to fund your account. For example:
 
 ```text
-> myAddress
+> address
 HOPR Address:  16Uiu2HAmEvFnLE6cjcAaXCFv4K2zP5Sb8HHXSAEQbBVzVJyCczg5
 Matic Address:  0xabe565d06c810dac59a02560ea4ea83cda2e995f
 ```

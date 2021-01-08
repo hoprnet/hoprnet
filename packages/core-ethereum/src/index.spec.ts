@@ -44,32 +44,6 @@ describe('test connector', function () {
     await ganache.stop()
   })
 
-  describe('nonces', function () {
-    const parallel = 5
-
-    it('should generate nonces in parallel', async function () {
-      const latestNonce = await web3.eth.getTransactionCount(owner.address.toHex())
-      const results = await Promise.all(
-        Array.from({ length: parallel }).map(async (_, expectedNonce) => {
-          const nonce = await connector.account.nonce
-          return nonce === latestNonce + expectedNonce
-        })
-      )
-
-      assert(
-        results.every((r) => r),
-        'incorrect nonces'
-      )
-    })
-
-    it('should generate next nonce', async function () {
-      const latestNonce = await web3.eth.getTransactionCount(owner.address.toHex())
-      const nonce = await connector.account.nonce
-
-      assert.equal(nonce, latestNonce + parallel, 'incorrect next nonce')
-    })
-  })
-
   // @TODO: move this test to utils
   describe('events', function () {
     it('should clear events once resolved', function () {

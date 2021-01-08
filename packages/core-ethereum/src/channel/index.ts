@@ -40,25 +40,26 @@ class ChannelFactory {
 
   async increaseFunds(counterparty: AccountId, amount: Balance): Promise<void> {
     try {
-      const balance = await this.coreConnector.account.balance
+      const { account } = this.coreConnector
+
+      const balance = await account.balance
       if (balance.isZero()) {
         throw Error(ERRORS.OOF_HOPR)
       }
 
       await waitForConfirmation(
         (
-          await this.coreConnector.signTransaction(
+          await account.signTransaction(
             {
-              from: (await this.coreConnector.account.address).toHex(),
-              to: this.coreConnector.hoprToken.options.address,
-              nonce: await this.coreConnector.account.nonce
+              from: (await account.address).toHex(),
+              to: this.coreConnector.hoprToken.options.address
             },
             this.coreConnector.hoprToken.methods.send(
               this.coreConnector.hoprChannels.options.address,
               amount.toString(),
               this.coreConnector.web3.eth.abi.encodeParameters(
                 ['address', 'address'],
-                [(await this.coreConnector.account.address).toHex(), counterparty.toHex()]
+                [(await account.address).toHex(), counterparty.toHex()]
               )
             )
           )
@@ -169,8 +170,9 @@ class ChannelFactory {
     channelBalance?: ChannelBalance,
     sign?: (channelBalance: ChannelBalance) => Promise<SignedChannel>
   ): Promise<Channel> {
+    const { account } = this.coreConnector
     const counterparty = await pubKeyToAccountId(counterpartyPubKey)
-    const amPartyA = isPartyA(await this.coreConnector.account.address, counterparty)
+    const amPartyA = isPartyA(await account.address, counterparty)
     let signedChannel: SignedChannel
 
     await this.coreConnector.initOnchainValues()
@@ -203,11 +205,10 @@ class ChannelFactory {
       try {
         await waitForConfirmation(
           (
-            await this.coreConnector.signTransaction(
+            await account.signTransaction(
               {
-                from: (await this.coreConnector.account.address).toHex(),
-                to: this.coreConnector.hoprChannels.options.address,
-                nonce: await this.coreConnector.account.nonce
+                from: (await account.address).toHex(),
+                to: this.coreConnector.hoprChannels.options.address
               },
               this.coreConnector.hoprChannels.methods.openChannel(counterparty.toHex())
             )
