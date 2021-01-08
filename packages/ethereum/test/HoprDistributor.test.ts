@@ -11,9 +11,8 @@ const SCHEDULE_UNSET = 'SCHEDULE_UNSET'
 const SCHEDULE_1_MIN_ALL = 'SCHEDULE_1_MIN_ALL'
 const SCHEDULE_TEAM = 'SCHEDULE_TEAM'
 
-describe.only('HoprDistributor', function () {
+describe('HoprDistributor', function () {
   let owner: string
-  let userA: string
   let token: HoprTokenInstance
   let distributor: HoprDistributorInstance
   let multiplier: number
@@ -27,7 +26,7 @@ describe.only('HoprDistributor', function () {
   }
 
   before(async function () {
-    ;[owner, userA] = await web3.eth.getAccounts()
+    ;[owner] = await web3.eth.getAccounts()
     await singletons.ERC1820Registry(owner)
   })
 
