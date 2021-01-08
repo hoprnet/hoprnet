@@ -125,7 +125,7 @@ abstract contract ERC777Snapshot is ERC777 {
             if (snapshots[mid].fromBlock <= _block) {
                 min = mid;
             } else {
-                max = mid-1;
+                max = mid - 1;
             }
         }
         return snapshots[min].value;

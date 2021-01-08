@@ -1,5 +1,6 @@
-import { singletons, BN } from '@openzeppelin/test-helpers'
-import { ERC777SnapshotMockContract, ERC777SnapshotMockInstance } from '../../../types'
+import type { ERC777SnapshotMockContract, ERC777SnapshotMockInstance } from '../../../types'
+import { singletons, BN, constants, expectRevert } from '@openzeppelin/test-helpers'
+import { vmErrorMessage } from '../../utils'
 
 const ERC777SnapshotMock: ERC777SnapshotMockContract = artifacts.require('ERC777SnapshotMock')
 
@@ -22,6 +23,13 @@ describe('ERC777Snapshot', function () {
     await singletons.ERC1820Registry(initialHolder)
     token = await ERC777SnapshotMock.new(name, symbol, initialHolder, initialSupply)
     initialMintBlock = await latestBlockNumber()
+  })
+
+  it('should revert when trying to snapshot unsupported amount', async function () {
+    await expectRevert(
+      token.updateValueAtNowAccount(initialHolder, constants.MAX_UINT256),
+      vmErrorMessage('casting overflow')
+    )
   })
 
   describe('totalSupplyAt', function () {
