@@ -3,7 +3,6 @@ import { BN, singletons, time, expectRevert } from '@openzeppelin/test-helpers'
 import { durations } from '@hoprnet/hopr-utils'
 import { web3 } from 'hardhat'
 import { HoprTokenInstance, HoprDistributorInstance } from '../types'
-// import { vmErrorMessage } from './utils'
 
 const HoprToken = artifacts.require('HoprToken')
 const HoprDistributor = artifacts.require('HoprDistributor')
@@ -11,10 +10,6 @@ const HoprDistributor = artifacts.require('HoprDistributor')
 const SCHEDULE_UNSET = 'SCHEDULE_UNSET'
 const SCHEDULE_1_MIN_ALL = 'SCHEDULE_1_MIN_ALL'
 const SCHEDULE_TEAM = 'SCHEDULE_TEAM'
-
-// const addTime = (timestamp: string, duration: number): string => {
-//   return new BN(timestamp).add(new BN(String(duration))).toString()
-// }
 
 describe.only('HoprDistributor', function () {
   let owner: string
@@ -37,9 +32,13 @@ describe.only('HoprDistributor', function () {
   })
 
   // @TODO: use fixture when we merge refactor
-  const reset = async (startTime?: string) => {
+  const reset = async (startTime?: string, maxMintAmount?: string) => {
     token = await HoprToken.new()
-    distributor = await HoprDistributor.new(startTime ?? (await getLatestBlockTimestamp()), token.address)
+    distributor = await HoprDistributor.new(
+      token.address,
+      startTime ?? (await getLatestBlockTimestamp()),
+      maxMintAmount ?? '500'
+    )
     multiplier = (await distributor.MULTIPLIER()).toNumber()
 
     await token.grantRole(await token.MINTER_ROLE(), distributor.address, {
@@ -57,21 +56,35 @@ describe.only('HoprDistributor', function () {
       expect((await distributor.getClaimable.call(owner, SCHEDULE_1_MIN_ALL)).toString()).to.equal('0')
     })
 
-    it('should not be able to add schedule again', async function () {
+    it('should fail to add schedule again', async function () {
       await expectRevert(distributor.addSchedule([], [], SCHEDULE_1_MIN_ALL), 'Schedule must not exist')
     })
 
-    it('should not be able to add schedule with mismatching inputs', async function () {
+    it('should fail to add schedule with mismatching inputs', async function () {
       await expectRevert(
         distributor.addSchedule(['1'], [], SCHEDULE_UNSET),
         'Durations and percents must have equal length'
       )
     })
 
-    it('should not be able to add schedule when durations are not in ascending order', async function () {
+    it('should fail to add schedule when durations are not in ascending order', async function () {
       await expectRevert(
         distributor.addSchedule(['5', '1'], ['50', '50'], SCHEDULE_UNSET),
         'Durations must be added in ascending order'
+      )
+    })
+
+    it('should fail to add schedule when durations are not in ascending order', async function () {
+      await expectRevert(
+        distributor.addSchedule(['5', '1'], ['50', '50'], SCHEDULE_UNSET),
+        'Durations must be added in ascending order'
+      )
+    })
+
+    it('should fail to add schedule when percent is higher than multiplier', async function () {
+      await expectRevert(
+        distributor.addSchedule(['1', '1'], ['50', String(Number(multiplier) + 1)], SCHEDULE_UNSET),
+        'Percent provided must be smaller or equal to MULTIPLIER'
       )
     })
   })
@@ -92,14 +105,14 @@ describe.only('HoprDistributor', function () {
       expect((await distributor.getClaimable.call(owner, SCHEDULE_1_MIN_ALL)).toString()).to.equal('0')
     })
 
-    it('should not be able to add allocation with mismatching inputs', async function () {
+    it('should fail to add allocation with mismatching inputs', async function () {
       await expectRevert(
         distributor.addAllocations([owner], [], SCHEDULE_1_MIN_ALL),
         'Accounts and amounts must have equal length'
       )
     })
 
-    it('should not be able to add allocation again', async function () {
+    it('should fail to add allocation again', async function () {
       await expectRevert(distributor.addAllocations([owner], ['100'], SCHEDULE_1_MIN_ALL), 'Allocation must not exist')
     })
   })
@@ -224,6 +237,37 @@ describe.only('HoprDistributor', function () {
       await distributor.claim(SCHEDULE_TEAM)
       expect((await distributor.getClaimable.call(owner, SCHEDULE_TEAM)).toString()).to.equal('0')
       expect((await token.balanceOf.call(owner)).toString()).to.equal('200')
+    })
+  })
+
+  describe('revoke', function () {
+    before(async function () {
+      await reset()
+
+      await distributor.addSchedule([durations.minutes(1)], [toSolPercent(1)], SCHEDULE_1_MIN_ALL)
+      await distributor.addAllocations([owner], ['100'], SCHEDULE_1_MIN_ALL)
+    })
+
+    it('should fail to claim after revoked', async function () {
+      await distributor.revokeAccount(owner, SCHEDULE_1_MIN_ALL)
+      await expectRevert(distributor.claim(SCHEDULE_1_MIN_ALL), 'Account is revoked')
+    })
+
+    it('should fail to revoke if allocation does not exist', async function () {
+      await expectRevert(distributor.revokeAccount(owner, SCHEDULE_UNSET), 'Allocation must exist')
+    })
+  })
+
+  describe('max mint', function () {
+    before(async function () {
+      await reset(undefined, '50')
+
+      await distributor.addSchedule([0], [toSolPercent(1)], SCHEDULE_1_MIN_ALL)
+      await distributor.addAllocations([owner], ['51'], SCHEDULE_1_MIN_ALL)
+    })
+
+    it('should fail to claim if max mint is reached', async function () {
+      await expectRevert.assertion(distributor.claim(SCHEDULE_1_MIN_ALL))
     })
   })
 })

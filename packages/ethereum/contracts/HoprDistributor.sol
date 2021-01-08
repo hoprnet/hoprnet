@@ -9,14 +9,18 @@ import "./utils/console.sol";
 contract HoprDistributor is Ownable {
     using SafeMath for uint256;
 
-    // we use the maximum value of uint32 to help us
-    // create more accurate calculations
-    uint32 public constant MULTIPLIER = 2 ** 32 - 1;
+    // helps us create more accurate calculations
+    uint32 public constant MULTIPLIER = 10 ** 6;
+
+    // total amount minted
+    uint128 public totalMinted = 0;
 
     // time where the contract will consider as starting time
     uint32 public startTime;
     // token which will be used
     HoprToken public token;
+    // maximum tokens allowed to be minted
+    uint128 public maxMintAmount;
 
     // A {Schedule} that defined when and how much will be claimed
     // from an {Allocation}
@@ -31,6 +35,7 @@ contract HoprDistributor is Ownable {
         uint128 amount;
         uint128 claimed;
         uint32 lastClaim;
+        bool revoked; // account can no longer claim
     }
 
     // schedule name -> Schedule
@@ -44,9 +49,24 @@ contract HoprDistributor is Ownable {
      * @param _startTime The timestamp to start counting
      * @param _token The token which we will mint
      */
-    constructor(uint32 _startTime, HoprToken _token) public {
+    constructor(HoprToken _token, uint32 _startTime, uint128 _maxMintAmount) public {
         startTime = _startTime;
         token = _token;
+        maxMintAmount = _maxMintAmount;
+    }
+
+    /**
+     * @dev Revokes the ability for an account to claim on the
+     * specified schedule.
+     * @param account the account to crevoke
+     * @param scheduleName the schedule name
+     */
+    function revokeAccount(
+        address account,
+        string calldata scheduleName
+    ) external onlyOwner {
+        require(allocations[account][scheduleName].amount != 0, "Allocation must exist");
+        allocations[account][scheduleName].revoked = true;
     }
 
     /**
@@ -68,13 +88,11 @@ contract HoprDistributor is Ownable {
         require(durations.length == percents.length, "Durations and percents must have equal length");
 
         uint32 lastDuration = 0;
-        // uint32 totalPercent = 0;
         for (uint256 i = 0; i < durations.length; i++) {
             require(lastDuration <= durations[i], "Durations must be added in ascending order");
             lastDuration = durations[i];
-            // totalPercent = _addUint32(totalPercent, percents[i]);
+            require(percents[i] <= MULTIPLIER, "Percent provided must be smaller or equal to MULTIPLIER");
         }
-        // require(totalPercent == MULTIPLIER, "Total percent is not 100%");
 
         schedules[name] = Schedule(durations, percents);
     }
@@ -101,7 +119,8 @@ contract HoprDistributor is Ownable {
             allocations[accounts[i]][scheduleName] = Allocation(
                 amounts[i],
                 0,
-                0
+                0,
+                false
             );
         }
     }
@@ -140,6 +159,7 @@ contract HoprDistributor is Ownable {
     function _claim(address account, string memory scheduleName) internal {
         Allocation storage allocation = allocations[account][scheduleName];
         require(allocation.amount > 0, "There is nothing to claim");
+        require(!allocation.revoked, "Account is revoked");
 
         Schedule storage schedule = schedules[scheduleName];
 
@@ -151,6 +171,13 @@ contract HoprDistributor is Ownable {
         // Trying to claim more than allocated
         assert(claimable <= newClaimed);
 
+        uint128 newTotalMinted = _addUint128(totalMinted, claimable);
+        // Total amount minted should be less or equal than specified
+        // we only check this when a user claims, not when allocations
+        // are added
+        assert(newTotalMinted <= maxMintAmount);
+
+        totalMinted = newTotalMinted;
         allocation.claimed = newClaimed;
         allocation.lastClaim = _currentBlockTimestamp();
 
