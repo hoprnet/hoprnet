@@ -115,13 +115,7 @@ contract HoprDistributor is Ownable {
 
         for (uint256 i = 0; i < accounts.length; i++) {
             require(allocations[accounts[i]][scheduleName].amount == 0, "Allocation must not exist");
-
-            allocations[accounts[i]][scheduleName] = Allocation(
-                amounts[i],
-                0,
-                0,
-                false
-            );
+            allocations[accounts[i]][scheduleName].amount = amounts[i];
         }
     }
 
