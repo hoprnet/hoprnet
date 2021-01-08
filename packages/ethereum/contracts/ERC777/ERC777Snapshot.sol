@@ -3,10 +3,20 @@ pragma solidity ^0.6.0;
 
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC777/ERC777.sol";
-import "../utils/console.sol";
 
 /**
- * @dev TODO: add documentantion
+ * @dev This contract extends an ERC777 token with a snapshot mechanism. When a snapshot is created, the balances and
+ * total supply at the time are recorded for later access.
+ *
+ * This can be used to safely create mechanisms based on token balances such as trustless dividends or weighted voting.
+ * In naive implementations it's possible to perform a "double spend" attack by reusing the same balance from different
+ * accounts. By using snapshots to calculate dividends or voting power, those attacks no longer apply. It can also be
+ * used to create an efficient ERC20 forking mechanism.
+ *
+ * Snapshots are created by the internal {updateValueAtNow} function.
+ * To get the total supply at the time of a snapshot, call the function {totalSupplyAt} with a block number.
+ * To get the balance of an account at the time of a snapshot, call the {balanceOfAt} function with a block number
+ * and the account address.
  */
 abstract contract ERC777Snapshot is ERC777 {
     // Inspired by Jordi Baylina's MiniMeToken to record historical balances:
@@ -26,7 +36,7 @@ abstract contract ERC777Snapshot is ERC777 {
         uint128 value;
     }
 
-    // `balances` is the map that tracks the balance of each address, in this
+    // `accountSnapshots` is the map that tracks the balance of each address, in this
     //  contract when the balance changes the block number that the change
     //  occurred is also included in the map
     mapping (address => Snapshot[]) public accountSnapshots;
@@ -40,7 +50,7 @@ abstract contract ERC777Snapshot is ERC777 {
      * @param _blockNumber The block number when the balance is queried
      * @return The balance at `_blockNumber`
      */
-    function balanceOfAt(address _owner, uint _blockNumber) external view returns (uint) {
+    function balanceOfAt(address _owner, uint256 _blockNumber) external view returns (uint) {
         if (
             (accountSnapshots[_owner].length == 0) ||
             (accountSnapshots[_owner][0].fromBlock > _blockNumber)
@@ -56,7 +66,7 @@ abstract contract ERC777Snapshot is ERC777 {
      * @param _blockNumber The block number when the totalSupply is queried
      * @return The total amount of tokens at `_blockNumber`
      */
-    function totalSupplyAt(uint _blockNumber) external view returns(uint) {
+    function totalSupplyAt(uint256 _blockNumber) external view returns(uint) {
         if (
             (totalSupplySnapshots.length == 0) ||
             (totalSupplySnapshots[0].fromBlock > _blockNumber)
@@ -100,20 +110,19 @@ abstract contract ERC777Snapshot is ERC777 {
         if (snapshots.length == 0) return 0;
 
         // Shortcut for the actual value
-        if (_block >= snapshots[snapshots.length-1].fromBlock) {
-            return snapshots[snapshots.length-1].value;
+        if (_block >= snapshots[snapshots.length - 1].fromBlock) {
+            return snapshots[snapshots.length - 1].value;
         }
         if (_block < snapshots[0].fromBlock) {
             return 0;
         }
 
         // Binary search of the value in the array
-        // TODO: maybe use OZs Array util
         uint min = 0;
-        uint max = snapshots.length-1;
+        uint max = snapshots.length - 1;
         while (max > min) {
-            uint mid = (max + min + 1)/ 2;
-            if (snapshots[mid].fromBlock<=_block) {
+            uint mid = (max + min + 1) / 2;
+            if (snapshots[mid].fromBlock <= _block) {
                 min = mid;
             } else {
                 max = mid-1;
@@ -129,11 +138,12 @@ abstract contract ERC777Snapshot is ERC777 {
      * @param _value The new number of tokens
      */
     function updateValueAtNow(Snapshot[] storage snapshots, uint256 _value) internal {
+        require(_value <= uint128(-1), "casting overflow");
+
         if (
             (snapshots.length == 0) ||
-            (snapshots[snapshots.length -1].fromBlock < block.number)
+            (snapshots[snapshots.length - 1].fromBlock < block.number)
         ) {
-            // TODO: check gas costs / best practises
             snapshots.push(
                 Snapshot(
                     uint128(block.number),
@@ -141,7 +151,7 @@ abstract contract ERC777Snapshot is ERC777 {
                 )
             );
         } else {
-            snapshots[snapshots.length-1].value = uint128(_value);
+            snapshots[snapshots.length - 1].value = uint128(_value);
         }
     }
 }
