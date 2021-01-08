@@ -20,7 +20,8 @@ async function main(
 
   for (const account of accounts) {
     await hoprToken.mint(account, amount, '0x00', '0x00', {
-      from: owner
+      from: owner,
+      gas: 200e3
     })
 
     console.log(`Funded: ${account}`)

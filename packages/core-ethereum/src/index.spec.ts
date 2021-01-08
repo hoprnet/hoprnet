@@ -123,7 +123,8 @@ describe('test withdraw', function () {
     connector = await createNode(alice.privKey)
 
     await hoprToken.methods.mint(alice.address.toHex(), 100, '0x0', '0x0').send({
-      from: alice.address.toHex()
+      from: alice.address.toHex(),
+      gas: 200e3
     })
 
     await connector.start()
