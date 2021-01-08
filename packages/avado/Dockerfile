@@ -7,4 +7,4 @@ EXPOSE 3000
 # REST API
 EXPOSE 3001
 
-ENTRYPOINT ["node", "/app/index.js"]
+ENTRYPOINT ["node", "/app/index.js", "--password='open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0'", "--init", "--admin"]

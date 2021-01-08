@@ -5,8 +5,7 @@ services:
       context: .
       dockerfile: ./Dockerfile
     environment:
-      DEBUG: 'hopr*'
-    command: 'node /app/index.js --password="open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0" --init --admin'
+      DEBUG: hopr*
     restart: always
     volumes:
       - type: volume
