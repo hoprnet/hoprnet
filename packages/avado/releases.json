@@ -558,10 +558,10 @@
     }
   },
   "0.100.0": {
-    "hash": "/ipfs/QmZ1wcgYPFiDndnFRgHFtMYjLgWWbejM5dZfQyW6Q6MPwZ",
+    "hash": "/ipfs/QmNwfJZZAeCoR7AC97czNF2921Fm11Ae9ksNzAXMKAntRP",
     "type": "manifest",
     "uploadedTo": {
-      "dappnode": "Fri, 08 Jan 2021 14:52:36 GMT"
+      "http://80.208.229.228:5001": "Thu, 07 Jan 2021 13:29:56 GMT"
     }
   },
   "1.55.0": {

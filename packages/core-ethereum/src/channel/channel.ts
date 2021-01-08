@@ -194,6 +194,7 @@ class Channel implements IChannel {
   }
 
   async initiateSettlement(): Promise<string> {
+    const { account } = this.coreConnector
     const status = await this.status
     let receipt: string
 
@@ -203,11 +204,10 @@ class Channel implements IChannel {
       }
 
       if (status === 'OPEN') {
-        const tx = await this.coreConnector.signTransaction(
+        const tx = await account.signTransaction(
           {
-            from: (await this.coreConnector.account.address).toHex(),
-            to: this.coreConnector.hoprChannels.options.address,
-            nonce: await this.coreConnector.account.nonce
+            from: (await account.address).toHex(),
+            to: this.coreConnector.hoprChannels.options.address
           },
           this.coreConnector.hoprChannels.methods.initiateChannelClosure(
             u8aToHex(await this.coreConnector.utils.pubKeyToAccountId(this.counterparty))
@@ -217,11 +217,10 @@ class Channel implements IChannel {
         receipt = tx.transactionHash
         tx.send()
       } else if (status === 'PENDING') {
-        const tx = await this.coreConnector.signTransaction(
+        const tx = await account.signTransaction(
           {
-            from: (await this.coreConnector.account.address).toHex(),
-            to: this.coreConnector.hoprChannels.options.address,
-            nonce: await this.coreConnector.account.nonce
+            from: (await account.address).toHex(),
+            to: this.coreConnector.hoprChannels.options.address
           },
           this.coreConnector.hoprChannels.methods.claimChannelClosure(
             u8aToHex(await this.coreConnector.utils.pubKeyToAccountId(this.counterparty))

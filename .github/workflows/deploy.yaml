@@ -155,7 +155,6 @@ jobs:
           gcloud container images add-tag gcr.io/hoprassociation/hoprd:${{ env.RELEASE }} gcr.io/hoprassociation/hoprd:1
           gcloud container images add-tag gcr.io/hoprassociation/hoprd:${{ env.RELEASE }} gcr.io/hoprassociation/hoprd:latest 
 
-
   avado:
     name: Build Avado (master or release pushes)
     runs-on: ubuntu-latest

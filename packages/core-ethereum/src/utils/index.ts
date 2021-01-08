@@ -1,9 +1,8 @@
-import type { TransactionObject } from '../tsc/web3/types'
-import { Network, getRpcOptions } from '@hoprnet/hopr-ethereum'
+import { Network } from '@hoprnet/hopr-ethereum'
 import assert from 'assert'
 import { publicKeyConvert, publicKeyCreate, ecdsaSign, ecdsaRecover, ecdsaVerify } from 'secp256k1'
 import createKeccakHash from 'keccak'
-import { PromiEvent, TransactionReceipt, TransactionConfig } from 'web3-core'
+import { PromiEvent, TransactionReceipt } from 'web3-core'
 import { BlockTransactionString } from 'web3-eth'
 import Web3 from 'web3'
 import Debug from 'debug'
@@ -25,9 +24,6 @@ import * as events from './events'
 import BN from 'bn.js'
 
 export { time, events }
-
-const rpcOps = getRpcOptions()
-const log = Log(['transaction'])
 
 /**
  * @param self our node's accountId
@@ -412,57 +408,6 @@ export function stateCounterToStatus(stateCounter: number): ChannelStatus {
  */
 export function stateCounterToIteration(stateCounter: number): number {
   return Math.ceil(Number(stateCounter) / 10)
-}
-
-/**
- * A signer factory that signs transactions using the given private key.
- *
- * @param web3 a web3 instance
- * @param privKey the private key to sign transactions with
- * @returns signer
- */
-// @TODO: switch to web3js-accounts wallet if it's safe
-export function TransactionSigner(web3: Web3, network: Network, privKey: Uint8Array) {
-  const privKeyStr = new Hash(privKey).toHex()
-
-  return async function signTransaction<T>(
-    // config put in .send
-    txConfig: TransactionConfig,
-    // return of our contract method in web3.Contract instance
-    txObject?: TransactionObject<T>
-  ) {
-    const abi = txObject ? txObject.encodeABI() : undefined
-    const gas = 200e3
-    const gasPrice = rpcOps[network]?.gasPrice ?? 1e9
-    const options = {
-      gas,
-      gasPrice,
-      ...txConfig,
-      data: abi
-    }
-
-    // @TODO: provide some of the values to avoid multiple calls
-    const signedTransaction = await web3.eth.accounts.signTransaction(options, privKeyStr)
-
-    function send() {
-      if (signedTransaction.rawTransaction == null) {
-        throw Error(`Cannot process transaction because Web3.js did not give us the raw transaction.`)
-      }
-
-      log('Sending transaction %o', {
-        gas: options.gas,
-        gasPrice: options.gasPrice,
-        nonce: options.nonce,
-        hash: signedTransaction.transactionHash
-      })
-      return web3.eth.sendSignedTransaction(signedTransaction.rawTransaction)
-    }
-
-    return {
-      send,
-      transactionHash: signedTransaction.transactionHash
-    }
-  }
 }
 
 /**
