@@ -95,6 +95,8 @@ contract HoprDistributor is Ownable {
         }
 
         schedules[name] = Schedule(durations, percents);
+
+        emit ScheduleAdded(durations, percents, name);
     }
 
     /**
@@ -116,6 +118,8 @@ contract HoprDistributor is Ownable {
         for (uint256 i = 0; i < accounts.length; i++) {
             require(allocations[accounts[i]][scheduleName].amount == 0, "Allocation must not exist");
             allocations[accounts[i]][scheduleName].amount = amounts[i];
+
+            emit AllocationAdded(accounts[i], amounts[i], scheduleName);
         }
     }
 
@@ -177,6 +181,8 @@ contract HoprDistributor is Ownable {
 
         // mint tokens
         token.mint(account, claimable, "", "");
+
+        emit Claimed(account, claimable, scheduleName);
     }
 
     /**
@@ -251,4 +257,8 @@ contract HoprDistributor is Ownable {
 
         return c;
     }
+
+    event ScheduleAdded(uint32[] durations, uint32[] percents, string name);
+    event AllocationAdded(address indexed account, uint128 amount, string scheduleName);
+    event Claimed(address indexed account, uint128 amount, string scheduleName);
 }

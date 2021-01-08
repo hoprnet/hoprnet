@@ -1,5 +1,5 @@
 import { expect } from 'chai'
-import { BN, singletons, time, expectRevert } from '@openzeppelin/test-helpers'
+import { singletons, time, expectRevert, expectEvent } from '@openzeppelin/test-helpers'
 import { durations } from '@hoprnet/hopr-utils'
 import { web3 } from 'hardhat'
 import { HoprTokenInstance, HoprDistributorInstance } from '../types'
@@ -11,7 +11,7 @@ const SCHEDULE_UNSET = 'SCHEDULE_UNSET'
 const SCHEDULE_1_MIN_ALL = 'SCHEDULE_1_MIN_ALL'
 const SCHEDULE_TEAM = 'SCHEDULE_TEAM'
 
-describe('HoprDistributor', function () {
+describe.only('HoprDistributor', function () {
   let owner: string
   let userA: string
   let token: HoprTokenInstance
@@ -52,8 +52,17 @@ describe('HoprDistributor', function () {
     })
 
     it('should add schedule', async function () {
-      await distributor.addSchedule([durations.minutes(1)], [toSolPercent(1)], SCHEDULE_1_MIN_ALL)
+      const _durations = [durations.minutes(1)]
+      const percents = [toSolPercent(1)]
+
+      const response = await distributor.addSchedule(_durations, percents, SCHEDULE_1_MIN_ALL)
       expect((await distributor.getClaimable.call(owner, SCHEDULE_1_MIN_ALL)).toString()).to.equal('0')
+
+      expectEvent(response, 'ScheduleAdded', {
+        // durations: [new BN(String(_durations))],
+        // percents: [new BN(percents)],
+        name: SCHEDULE_1_MIN_ALL
+      })
     })
 
     it('should fail to add schedule again', async function () {
@@ -99,8 +108,17 @@ describe('HoprDistributor', function () {
     })
 
     it('should add allocation', async function () {
+      const accounts = [owner]
+      const amounts = ['100']
+
       await distributor.addSchedule([durations.minutes(1)], [toSolPercent(1)], SCHEDULE_1_MIN_ALL)
-      await distributor.addAllocations([owner], ['100'], SCHEDULE_1_MIN_ALL)
+      const response = await distributor.addAllocations(accounts, amounts, SCHEDULE_1_MIN_ALL)
+
+      expectEvent(response, 'AllocationAdded', {
+        account: accounts[0],
+        amount: amounts[0],
+        scheduleName: SCHEDULE_1_MIN_ALL
+      })
 
       expect((await distributor.getClaimable.call(owner, SCHEDULE_1_MIN_ALL)).toString()).to.equal('0')
     })
@@ -207,9 +225,15 @@ describe('HoprDistributor', function () {
     it('should claim 100 after 2 minutes using SCHEDULE_1_MIN_ALL', async function () {
       await time.increase(durations.minutes(2))
 
-      await distributor.claim(SCHEDULE_1_MIN_ALL)
+      const response = await distributor.claim(SCHEDULE_1_MIN_ALL)
       expect((await distributor.getClaimable.call(owner, SCHEDULE_1_MIN_ALL)).toString()).to.equal('0')
       expect((await token.balanceOf.call(owner)).toString()).to.equal('100')
+
+      expectEvent(response, 'Claimed', {
+        account: owner,
+        amount: '100',
+        scheduleName: SCHEDULE_1_MIN_ALL
+      })
     })
 
     it('should claim 0 after 2 minutes using SCHEDULE_TEAM', async function () {
@@ -220,27 +244,48 @@ describe('HoprDistributor', function () {
 
     it('should claim 14 after 5 minutes using SCHEDULE_TEAM', async function () {
       await time.increase(durations.minutes(2))
-      await distributor.claim(SCHEDULE_TEAM)
+
+      const response = await distributor.claim(SCHEDULE_TEAM)
       expect((await distributor.getClaimable.call(owner, SCHEDULE_TEAM)).toString()).to.equal('0')
       expect((await token.balanceOf.call(owner)).toString()).to.equal('114')
+
+      expectEvent(response, 'Claimed', {
+        account: owner,
+        amount: '14',
+        scheduleName: SCHEDULE_TEAM
+      })
     })
 
     it('should claim 28 after 8 minutes using SCHEDULE_TEAM', async function () {
       await time.increase(durations.minutes(2))
-      await distributor.claim(SCHEDULE_TEAM)
+
+      const response = await distributor.claim(SCHEDULE_TEAM)
       expect((await distributor.getClaimable.call(owner, SCHEDULE_TEAM)).toString()).to.equal('0')
       expect((await token.balanceOf.call(owner)).toString()).to.equal('128')
+
+      expectEvent(response, 'Claimed', {
+        account: owner,
+        amount: '14',
+        scheduleName: SCHEDULE_TEAM
+      })
     })
 
     it('should claim 100 after 17 minutes using SCHEDULE_TEAM', async function () {
       await time.increase(durations.minutes(10))
-      await distributor.claim(SCHEDULE_TEAM)
+
+      const response = await distributor.claim(SCHEDULE_TEAM)
       expect((await distributor.getClaimable.call(owner, SCHEDULE_TEAM)).toString()).to.equal('0')
       expect((await token.balanceOf.call(owner)).toString()).to.equal('200')
+
+      expectEvent(response, 'Claimed', {
+        account: owner,
+        amount: '72',
+        scheduleName: SCHEDULE_TEAM
+      })
     })
   })
 
-  describe('claimFor', function () {
+  describe('claim', function () {
     before(async function () {
       await reset()
 
@@ -274,9 +319,15 @@ describe('HoprDistributor', function () {
     it('should claim 100 after 2 minutes using SCHEDULE_1_MIN_ALL', async function () {
       await time.increase(durations.minutes(2))
 
-      await distributor.claimFor(owner, SCHEDULE_1_MIN_ALL)
+      const response = await distributor.claimFor(owner, SCHEDULE_1_MIN_ALL)
       expect((await distributor.getClaimable.call(owner, SCHEDULE_1_MIN_ALL)).toString()).to.equal('0')
       expect((await token.balanceOf.call(owner)).toString()).to.equal('100')
+
+      expectEvent(response, 'Claimed', {
+        account: owner,
+        amount: '100',
+        scheduleName: SCHEDULE_1_MIN_ALL
+      })
     })
 
     it('should claim 0 after 2 minutes using SCHEDULE_TEAM', async function () {
@@ -287,23 +338,44 @@ describe('HoprDistributor', function () {
 
     it('should claim 14 after 5 minutes using SCHEDULE_TEAM', async function () {
       await time.increase(durations.minutes(2))
-      await distributor.claimFor(owner, SCHEDULE_TEAM)
+
+      const response = await distributor.claimFor(owner, SCHEDULE_TEAM)
       expect((await distributor.getClaimable.call(owner, SCHEDULE_TEAM)).toString()).to.equal('0')
       expect((await token.balanceOf.call(owner)).toString()).to.equal('114')
+
+      expectEvent(response, 'Claimed', {
+        account: owner,
+        amount: '14',
+        scheduleName: SCHEDULE_TEAM
+      })
     })
 
     it('should claim 28 after 8 minutes using SCHEDULE_TEAM', async function () {
       await time.increase(durations.minutes(2))
-      await distributor.claimFor(owner, SCHEDULE_TEAM)
+
+      const response = await distributor.claimFor(owner, SCHEDULE_TEAM)
       expect((await distributor.getClaimable.call(owner, SCHEDULE_TEAM)).toString()).to.equal('0')
       expect((await token.balanceOf.call(owner)).toString()).to.equal('128')
+
+      expectEvent(response, 'Claimed', {
+        account: owner,
+        amount: '14',
+        scheduleName: SCHEDULE_TEAM
+      })
     })
 
     it('should claim 100 after 17 minutes using SCHEDULE_TEAM', async function () {
       await time.increase(durations.minutes(10))
-      await distributor.claimFor(owner, SCHEDULE_TEAM)
+
+      const response = await distributor.claimFor(owner, SCHEDULE_TEAM)
       expect((await distributor.getClaimable.call(owner, SCHEDULE_TEAM)).toString()).to.equal('0')
       expect((await token.balanceOf.call(owner)).toString()).to.equal('200')
+
+      expectEvent(response, 'Claimed', {
+        account: owner,
+        amount: '72',
+        scheduleName: SCHEDULE_TEAM
+      })
     })
   })
 
