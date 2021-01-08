@@ -6,8 +6,8 @@
     "target": "es2019",
     "declaration": true,
     "skipLibCheck": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
     "sourceMap": true,
     "forceConsistentCasingInFileNames": true
   },
