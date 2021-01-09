@@ -50,7 +50,7 @@ abstract contract ERC777Snapshot is ERC777 {
      * @param _blockNumber The block number when the balance is queried
      * @return The balance at `_blockNumber`
      */
-    function balanceOfAt(address _owner, uint256 _blockNumber) external view returns (uint) {
+    function balanceOfAt(address _owner, uint128 _blockNumber) external view returns (uint256) {
         if (
             (accountSnapshots[_owner].length == 0) ||
             (accountSnapshots[_owner][0].fromBlock > _blockNumber)
@@ -66,7 +66,7 @@ abstract contract ERC777Snapshot is ERC777 {
      * @param _blockNumber The block number when the totalSupply is queried
      * @return The total amount of tokens at `_blockNumber`
      */
-    function totalSupplyAt(uint256 _blockNumber) external view returns(uint) {
+    function totalSupplyAt(uint128 _blockNumber) external view returns(uint256) {
         if (
             (totalSupplySnapshots.length == 0) ||
             (totalSupplySnapshots[0].fromBlock > _blockNumber)
@@ -105,8 +105,8 @@ abstract contract ERC777Snapshot is ERC777 {
      */
     function _valueAt(
         Snapshot[] storage snapshots,
-        uint _block
-    ) view internal returns (uint) {
+        uint128 _block
+    ) view internal returns (uint256) {
         if (snapshots.length == 0) return 0;
 
         // Shortcut for the actual value
@@ -118,10 +118,10 @@ abstract contract ERC777Snapshot is ERC777 {
         }
 
         // Binary search of the value in the array
-        uint min = 0;
-        uint max = snapshots.length - 1;
+        uint256 min = 0;
+        uint256 max = snapshots.length - 1;
         while (max > min) {
-            uint mid = (max + min + 1) / 2;
+            uint256 mid = (max + min + 1) / 2;
             if (snapshots[mid].fromBlock <= _block) {
                 min = mid;
             } else {
