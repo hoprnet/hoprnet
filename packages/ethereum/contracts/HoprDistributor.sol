@@ -1,14 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.6.0;
 
-import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./HoprToken.sol";
 import "./utils/console.sol";
 
 contract HoprDistributor is Ownable {
-    using SafeMath for uint256;
-
     // helps us create more accurate calculations
     uint32 public constant MULTIPLIER = 10 ** 6;
 
@@ -163,7 +160,7 @@ contract HoprDistributor is Ownable {
      * @param scheduleName the schedule name
      * @return claimable amount
      */
-    function getClaimable(address account, string calldata scheduleName) external view returns (uint256) {
+    function getClaimable(address account, string calldata scheduleName) external view returns (uint128) {
         return _getClaimable(schedules[scheduleName], allocations[account][scheduleName]);
     }
 
