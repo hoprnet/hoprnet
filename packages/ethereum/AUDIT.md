@@ -1,3 +1,13 @@
+# Scope
+
+To be audited:
+
+- [HoprToken.sol](./contracts/HoprToken.sol)
+- [ERC777Snapshot.sol](./contracts/ERC777/ERC777Snapshot.sol)
+- [HoprDistributor.sol](./contracts/HoprDistributor.sol)
+
+# The main smart contracts
+
 ## HoprToken
 
 [[source code](./contracts/HoprToken.sol)]

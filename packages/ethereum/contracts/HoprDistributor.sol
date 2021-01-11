@@ -3,7 +3,6 @@ pragma solidity ^0.6.0;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./HoprToken.sol";
-import "./utils/console.sol";
 
 contract HoprDistributor is Ownable {
     // helps us create more accurate calculations
