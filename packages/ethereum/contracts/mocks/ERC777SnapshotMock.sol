@@ -14,25 +14,28 @@ contract ERC777SnapshotMock is ERC777Snapshot {
         _mint(initialAccount, initialBalance, "", "");
     }
 
-    function snapshot() public {
-        _snapshot();
+    function updateValueAtNowAccount(
+        address account,
+        uint256 value
+    ) external {
+        updateValueAtNow(accountSnapshots[account], value);
     }
 
     function mint(
         address to,
         uint256 amount,
-        bytes memory userData,
-        bytes memory operatorData
-    ) public {
+        bytes calldata userData,
+        bytes calldata operatorData
+    ) external {
         _mint(to, amount, userData, operatorData);
     }
 
     function burn(
         address account,
         uint256 amount,
-        bytes memory userData,
-        bytes memory operatorData
-    ) public {
+        bytes calldata userData,
+        bytes calldata operatorData
+    ) external {
         _burn(account, amount, userData, operatorData);
     }
 }
