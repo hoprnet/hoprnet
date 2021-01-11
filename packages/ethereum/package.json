@@ -18,6 +18,7 @@
     "migrate": "hardhat migrate",
     "network": "hardhat node --network hardhat",
     "test": "hardhat test --no-compile --network hardhat",
+    "coverage": "hardhat coverage --network hardhat",
     "prepublishOnly": "yarn build"
   },
   "dependencies": {
