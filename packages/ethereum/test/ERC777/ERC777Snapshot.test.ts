@@ -1,6 +1,6 @@
-import type { ERC777SnapshotMockContract, ERC777SnapshotMockInstance } from '../../../types'
+import type { ERC777SnapshotMockContract, ERC777SnapshotMockInstance } from '../../types'
 import { singletons, BN, constants, expectRevert } from '@openzeppelin/test-helpers'
-import { vmErrorMessage } from '../../utils'
+import { vmErrorMessage } from '../utils'
 
 const ERC777SnapshotMock: ERC777SnapshotMockContract = artifacts.require('ERC777SnapshotMock')
 
