@@ -11,7 +11,7 @@ const SCHEDULE_UNSET = 'SCHEDULE_UNSET'
 const SCHEDULE_1_MIN_ALL = 'SCHEDULE_1_MIN_ALL'
 const SCHEDULE_TEAM = 'SCHEDULE_TEAM'
 
-describe('HoprDistributor', function () {
+describe.only('HoprDistributor', function () {
   let owner: string
   let token: HoprTokenInstance
   let distributor: HoprDistributorInstance
@@ -52,9 +52,9 @@ describe('HoprDistributor', function () {
 
     it('should add schedule', async function () {
       const _durations = [durations.minutes(1)]
-      const percents = [toSolPercent(1)]
+      const _percents = [toSolPercent(1)]
 
-      const response = await distributor.addSchedule(_durations, percents, SCHEDULE_1_MIN_ALL)
+      const response = await distributor.addSchedule(_durations, _percents, SCHEDULE_1_MIN_ALL)
       expect((await distributor.getClaimable.call(owner, SCHEDULE_1_MIN_ALL)).toString()).to.equal('0')
 
       expectEvent(response, 'ScheduleAdded', {
@@ -62,6 +62,10 @@ describe('HoprDistributor', function () {
         // percents: [new BN(percents)],
         name: SCHEDULE_1_MIN_ALL
       })
+
+      const { 0: scDurations, 1: scPercents } = await distributor.getSchedule(SCHEDULE_1_MIN_ALL)
+      expect(scDurations[0].toString()).to.equal(String(_durations[0]))
+      expect(scPercents[0].toString()).to.equal(_percents[0])
     })
 
     it('should fail to add schedule again', async function () {
@@ -119,6 +123,7 @@ describe('HoprDistributor', function () {
         scheduleName: SCHEDULE_1_MIN_ALL
       })
 
+      expect((await distributor.totalToBeMinted()).toString()).to.equal(amounts[0])
       expect((await distributor.getClaimable.call(owner, SCHEDULE_1_MIN_ALL)).toString()).to.equal('0')
     })
 
@@ -131,6 +136,23 @@ describe('HoprDistributor', function () {
 
     it('should fail to add allocation again', async function () {
       await expectRevert(distributor.addAllocations([owner], ['100'], SCHEDULE_1_MIN_ALL), 'Allocation must not exist')
+    })
+
+    it('should add second allocation', async function () {
+      const accounts = [owner]
+      const amounts = ['200']
+
+      await distributor.addSchedule([durations.minutes(1)], [toSolPercent(1)], SCHEDULE_TEAM)
+      const response = await distributor.addAllocations(accounts, amounts, SCHEDULE_TEAM)
+
+      expectEvent(response, 'AllocationAdded', {
+        account: accounts[0],
+        amount: amounts[0],
+        scheduleName: SCHEDULE_TEAM
+      })
+
+      expect((await distributor.totalToBeMinted()).toString()).to.equal('300')
+      expect((await distributor.getClaimable.call(owner, SCHEDULE_TEAM)).toString()).to.equal('0')
     })
   })
 
@@ -284,7 +306,7 @@ describe('HoprDistributor', function () {
     })
   })
 
-  describe('claim', function () {
+  describe('claimFor', function () {
     before(async function () {
       await reset()
 
@@ -383,12 +405,30 @@ describe('HoprDistributor', function () {
       await reset()
 
       await distributor.addSchedule([durations.minutes(1)], [toSolPercent(1)], SCHEDULE_1_MIN_ALL)
+      await distributor.addSchedule(
+        [durations.minutes(2), durations.minutes(4)],
+        [toSolPercent(1 / 2), toSolPercent(1 / 2)],
+        SCHEDULE_TEAM
+      )
+
       await distributor.addAllocations([owner], ['100'], SCHEDULE_1_MIN_ALL)
+      await distributor.addAllocations([owner], ['200'], SCHEDULE_TEAM)
     })
 
-    it('should fail to claim after revoked', async function () {
+    it('should fail to claim SCHEDULE_1_MIN_ALL after revoked', async function () {
       await distributor.revokeAccount(owner, SCHEDULE_1_MIN_ALL)
+
+      expect((await distributor.totalToBeMinted()).toString()).to.equal('200')
       await expectRevert(distributor.claim(SCHEDULE_1_MIN_ALL), 'Account is revoked')
+    })
+
+    it('should fail to claim SCHEDULE_TEAM after revoked', async function () {
+      await time.increase(durations.minutes(2))
+
+      await distributor.claim(SCHEDULE_TEAM)
+      await distributor.revokeAccount(owner, SCHEDULE_TEAM)
+      expect((await distributor.totalToBeMinted()).toString()).to.equal('100')
+      await expectRevert(distributor.claim(SCHEDULE_TEAM), 'Account is revoked')
     })
 
     it('should fail to revoke if allocation does not exist', async function () {
@@ -401,11 +441,14 @@ describe('HoprDistributor', function () {
       await reset(undefined, '50')
 
       await distributor.addSchedule([0], [toSolPercent(1)], SCHEDULE_1_MIN_ALL)
-      await distributor.addAllocations([owner], ['51'], SCHEDULE_1_MIN_ALL)
     })
 
-    it('should fail to claim if max mint is reached', async function () {
-      await expectRevert.assertion(distributor.claim(SCHEDULE_1_MIN_ALL))
+    it('should fail to allocate if totalToBeMinted is higher than max mint', async function () {
+      await expectRevert.assertion(distributor.addAllocations([owner], ['51'], SCHEDULE_1_MIN_ALL))
     })
+
+    // it('should fail to claim if max mint is reached', async function () {
+    //   await expectRevert.assertion(distributor.claim(SCHEDULE_1_MIN_ALL))
+    // })
   })
 })

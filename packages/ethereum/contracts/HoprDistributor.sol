@@ -14,6 +14,8 @@ contract HoprDistributor is Ownable {
 
     // total amount minted
     uint128 public totalMinted = 0;
+    // how many tokens will be minted (the sum of all allocations)
+    uint128 public totalToBeMinted = 0;
 
     // time where the contract will consider as starting time
     uint32 public startTime;
@@ -39,11 +41,11 @@ contract HoprDistributor is Ownable {
     }
 
     // schedule name -> Schedule
-    mapping(string => Schedule) private schedules;
+    mapping(string => Schedule) internal schedules;
 
     // account -> schedule name -> Allocation
     // allows for an account to have more than one type of Schedule
-    mapping(address => mapping(string => Allocation)) private allocations;
+    mapping(address => mapping(string => Allocation)) public allocations;
 
     /**
      * @param _startTime The timestamp to start counting
@@ -56,6 +58,17 @@ contract HoprDistributor is Ownable {
     }
 
     /**
+     * @param name the schedule name
+     * @return the schedule
+     */
+    function getSchedule(string calldata name) external view returns (uint32[] memory, uint32[] memory) {
+        return (
+            schedules[name].durations,
+            schedules[name].percents
+        );
+    }
+
+    /**
      * @dev Revokes the ability for an account to claim on the
      * specified schedule.
      * @param account the account to crevoke
@@ -65,8 +78,11 @@ contract HoprDistributor is Ownable {
         address account,
         string calldata scheduleName
     ) external onlyOwner {
-        require(allocations[account][scheduleName].amount != 0, "Allocation must exist");
-        allocations[account][scheduleName].revoked = true;
+        Allocation storage allocation = allocations[account][scheduleName];
+        require(allocation.amount != 0, "Allocation must exist");
+
+        allocation.revoked = true;
+        totalToBeMinted = _subUint128(totalToBeMinted, _subUint128(allocation.amount, allocation.claimed));
     }
 
     /**
@@ -118,6 +134,8 @@ contract HoprDistributor is Ownable {
         for (uint256 i = 0; i < accounts.length; i++) {
             require(allocations[accounts[i]][scheduleName].amount == 0, "Allocation must not exist");
             allocations[accounts[i]][scheduleName].amount = amounts[i];
+            totalToBeMinted = _addUint128(totalToBeMinted, amounts[i]);
+            assert(totalToBeMinted <= maxMintAmount);
 
             emit AllocationAdded(accounts[i], amounts[i], scheduleName);
         }
@@ -202,7 +220,7 @@ contract HoprDistributor is Ownable {
         // last unlock has passed
         if (_addUint32(startTime, schedule.durations[schedule.durations.length - 1]) < _currentBlockTimestamp()) {
             // make sure to exclude already claimed amount
-            return allocation.amount - allocation.claimed;
+            return _subUint128(allocation.amount, allocation.claimed);
         }
 
         uint128 claimable = 0;
@@ -226,6 +244,7 @@ contract HoprDistributor is Ownable {
         return uint32(block.timestamp % 2 ** 32);
     }
 
+    // SafeMath variations
     function _addUint32(uint32 a, uint32 b) internal pure returns (uint32) {
         uint32 c = a + b;
         require(c >= a, "uint32 addition overflow");
@@ -236,6 +255,13 @@ contract HoprDistributor is Ownable {
     function _addUint128(uint128 a, uint128 b) internal pure returns (uint128) {
         uint128 c = a + b;
         require(c >= a, "uint128 addition overflow");
+
+        return c;
+    }
+
+    function _subUint128(uint128 a, uint128 b) internal pure returns (uint128) {
+        require(b <= a, "uint128 subtraction overflow");
+        uint128 c = a - b;
 
         return c;
     }
