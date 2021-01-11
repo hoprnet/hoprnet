@@ -5,6 +5,7 @@ import 'hardhat-typechain'
 import '@nomiclabs/hardhat-truffle5'
 import '@nomiclabs/hardhat-etherscan'
 import '@nomiclabs/hardhat-solhint'
+import 'solidity-coverage'
 
 import { HardhatUserConfig, task, types } from 'hardhat/config'
 import { NODE_SEEDS, BOOTSTRAP_SEEDS } from '@hoprnet/hopr-demo-seeds'
