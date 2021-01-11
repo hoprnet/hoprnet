@@ -11,7 +11,7 @@ const SCHEDULE_UNSET = 'SCHEDULE_UNSET'
 const SCHEDULE_1_MIN_ALL = 'SCHEDULE_1_MIN_ALL'
 const SCHEDULE_TEAM = 'SCHEDULE_TEAM'
 
-describe.only('HoprDistributor', function () {
+describe('HoprDistributor', function () {
   let owner: string
   let token: HoprTokenInstance
   let distributor: HoprDistributorInstance
