@@ -1,6 +1,6 @@
 import BN from 'bn.js'
 import LibP2P from 'libp2p'
-import chalk from 'chalk'
+import { blue, green } from 'chalk'
 import PeerId from 'peer-id'
 import { u8aConcat, u8aEquals, u8aToHex, pubKeyToPeerId } from '@hoprnet/hopr-utils'
 import { getTickets, validateUnacknowledgedTicket, validateCreatedTicket } from '../../utils/tickets'
@@ -181,8 +181,8 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     log('---------- New Packet ----------')
     path
       .slice(0, Math.max(0, path.length - 1))
-      .forEach((peerId, index) => log(`Intermediate ${index} : ${chalk.blue(peerId.toB58String())}`))
-    log(`Destination    : ${chalk.blue(path[path.length - 1].toB58String())}`)
+      .forEach((peerId, index) => log(`Intermediate ${index} : ${blue(peerId.toB58String())}`))
+    log(`Destination    : ${blue(path[path.length - 1].toB58String())}`)
     log('--------------------------------')
 
     packet._challenge = await Challenge.create(
@@ -340,13 +340,16 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
       throw Error('Error preparing forward')
     }
 
-    const channelIdOutgoing = await chain.utils.getId(senderAccountId, targetAccountId)
     const unacknowledged = new UnacknowledgedTicket(chain, undefined, {
       signedTicket,
       secretA: deriveTicketKey(this.header.derivedSecret)
     })
 
-    log(`During forward: storing hashedKey`, u8aToHex(this.header.hashedKeyHalf), `we are ${sender.toB58String()}`)
+    log(
+      `Storing unacknowledged ticket. Expecting to receive a preImage for ${green(
+        u8aToHex(this.header.hashedKeyHalf)
+      )} from ${blue(target.toB58String())}`
+    )
     await this.node.db.put(
       Buffer.from(this.node._dbKeys.UnAcknowledgedTickets(this.header.hashedKeyHalf)),
       Buffer.from(unacknowledged)
@@ -390,8 +393,6 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     } else {
       throw Error(`Cannot forward packet`)
     }
-
-    log(`Received ticket on channel ${chalk.yellow(u8aToHex(channelIdOutgoing))}`)
 
     this.header.transformForNextNode()
 
