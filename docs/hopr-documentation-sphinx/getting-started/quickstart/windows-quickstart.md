@@ -64,7 +64,7 @@ docker run -v %cd%/db:/app/db ^
 
 You will be welcomed by the following message.
 
-![HOPR Chat will prompt you to request funds online.](../.gitbook/assets/image%20%285%29.png)
+![HOPR Chat will prompt you to request funds online.](../.gitbook/assets/image.png)
 
 **Please copy your HOPR Chat account address,** as you will need it in further steps. **HOPR Chat** has been started bootstrapped successfully, now you need to fund your **HOPR Chat** account with some KETH, [Kovan’s Network](https://kovan-testnet.github.io/website/) testnet ETH tokens.
 
@@ -79,11 +79,11 @@ Copy your account from Step 3, and paste it in the following websites.
 
 **HOPR Chat** will not fully initialize until your account has been funded with some Kovan ETH and HOPR. After the tokens have landed in your account, you are ready to use **HOPR Chat.** Execute the same command shared in Step 3 to see the following screen.
 
-![HOPR Chat fully working after having its account funded](../.gitbook/assets/image%20%281%29.png)
+![HOPR Chat fully working after having its account funded](../.gitbook/assets/image.png)
 
 You verify your balance from your **HOPR Chat** account, execute the command `balance` to see the following screen:
 
-![HOPR Chat will tell you its balance in Kovan ETH and HOPR tokens](../.gitbook/assets/image%20%284%29.png)
+![HOPR Chat will tell you its balance in Kovan ETH and HOPR tokens](../.gitbook/assets/image.png)
 
 Your **HOPR Chat** instance is ready to be used!
 
@@ -93,11 +93,11 @@ With **HOPR Chat** up and running, you can now send messages to any connected no
 
 First, ensure you have enough **HOPR Tokens** to send and receive messages. Run `balance` to see the previous screen from Step 4. Now, let's ensure there are some nodes to talk to. To do so, run `crawl`, which will show you existing users you can talk to.
 
-![The crawl command will show you other connected nodes.](../.gitbook/assets/image%20%283%29.png)
+![The crawl command will show you other connected nodes.](../.gitbook/assets/image.png)
 
 To talk to other users, copy another connected user address and send a message to them with the `send` command. This will look something like `send 16Uiu2HAmCtWxx3Ky3ZjtWj1whkezdRvMAYKU9f57CRPj2FkPtWsD`, which will trigger **HOPR Chat** to prompt you for a message to send.
 
-![Your message will be sent privately through the HOPR network](../.gitbook/assets/image%20%286%29.png)
+![Your message will be sent privately through the HOPR network](../.gitbook/assets/image.png)
 
 Congratulations! You have communicated with another individual using a privacy-preserving decentralised protocol. **HOPR Chat** is right now only a Proof-of-Concept but it can already show you the capabilities the protocol can have.
 
@@ -107,7 +107,7 @@ Congratulations! You have communicated with another individual using a privacy-p
 
 **HOPR Chat** requires write access to a working directory to store important data in your computer. If you didn't started your command line with elevated privileges, you might be prompted to give access to your current working directory.
 
-![Windows prompting access to write to your current directory](../.gitbook/assets/image%20%282%29.png)
+![Windows prompting access to write to your current directory](../.gitbook/assets/image.png)
 
 ### Bootstrap Nodes
 

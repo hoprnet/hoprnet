@@ -22,6 +22,6 @@ Since the version **HOPR Chat** that uses Nodejs to work has additional precompi
 
 **HOPR Chat** requires write access to a working directory to store important data in your computer. If you didn't started your command line with elevated privileges, you might be prompted to give access to your current working directory.
 
-![Windows prompting access to write to your current directory](../.gitbook/assets/image%20%282%29.png)
+![Windows prompting access to write to your current directory](../.gitbook/assets/image.png)
 
 Clicking “Share It” will allow you to run **HOPR Chat** successfully.

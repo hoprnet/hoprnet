@@ -40,7 +40,7 @@ Your tweet needs to include:
 
 An example is shown below:
 
-![](.gitbook/assets/example-tweet%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%282%29%20%281%29.png)
+![](.gitbook/assets/example-tweet.png)
 
 The bot should be able to parse any tweet which includes these three things, so feel free to add comments and even emojis. But if you're having difficulty registering, try again with a simpler tweet.
 
@@ -58,7 +58,7 @@ send 16Uiu2HAm79TuiHcEtjcELXAwcjEX6Sh7qGDbiqZbDvHSicRyPm9R
 
 Then press Enter. Now paste the URL of your tweet and press Enter again. The bot will now check your tweet and will send you a verification message if you're successful.
 
-![](.gitbook/assets/verification-1%20%282%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29.png)
+![](.gitbook/assets/verification-1.png)
 
 ## Step 4: Stay Online to Earn Tickets!
 
@@ -68,7 +68,7 @@ Every 30 seconds, the bot will randomly select an address from the whitelist and
 
 If the CoverBot selects your address, you'll receive a ticket which can be redeemed for HOPR. You'll also receive a verification message.
 
-![](.gitbook/assets/verification-2%20%282%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29.png)
+![](.gitbook/assets/verification-2.png)
 
 {% hint style="info" %}
 The more your node is online, the greater your chance of earning tickets, so try to maximize your node uptime.

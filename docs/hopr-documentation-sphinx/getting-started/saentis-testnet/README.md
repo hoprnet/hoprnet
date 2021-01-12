@@ -20,7 +20,7 @@ If you already have HOPR Chat installed or a HOPR PC Node, head to [https://saen
 
 If you're having difficulty, check out the [**Troubleshooting**](troubleshooting.md) page or talk to us on our \***\*[**Discord channel\*\*](https://discord.gg/wUSYqpD).
 
-![The Säntis web interface](../.gitbook/assets/saentis-ui%20%281%29.png)
+![The Säntis web interface](../.gitbook/assets/saentis-ui.png)
 
 {% hint style="info" %}
 Säntis is named after a mountain in HOPR's home country of Switzerland. On a clear day, you can see six different countries from the summit!

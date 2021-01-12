@@ -166,7 +166,7 @@ The contents fo the extracted folder should look as follows:
 {% tab title="Windows" %}
 For Windows, double-click the file named `start-hopr-chat` with `.bat` extension and described as `Windows Batch File` in its Type attribute.
 
-![HOPR Chat executable file for Windows.](../.gitbook/assets/image%20%2814%29.png)
+![HOPR Chat executable file for Windows.](../.gitbook/assets/image.png)
 {% endtab %}
 
 {% tab title="MacOS" %}
