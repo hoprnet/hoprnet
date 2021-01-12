@@ -1,9 +1,10 @@
-import NonceTracker, { Transaction } from './nonce-tracker'
 import { expect } from 'chai'
+import NonceTracker, { Transaction } from './nonce-tracker'
+import { durations } from '@hoprnet/hopr-utils'
 
 const USER_ADDRESS = '0x7d3517b0d011698406d6e0aed8453f0be2697926'
 
-describe('nonce-tracker', function () {
+describe.only('nonce-tracker', function () {
   let nonceTracker: NonceTracker
   let mockTxGen: MockTxGen
   let pendingTxs: Transaction[] = []
@@ -232,6 +233,32 @@ describe('nonce-tracker', function () {
     const nonceLock = await nonceTracker.getNonceLock(USER_ADDRESS)
     expect(nonceLock.nextNonce).to.equal(74, `nonce should be 74 got ${nonceLock.nextNonce}`)
     nonceLock.releaseLock()
+  })
+
+  it('should ignore long-time pending transactions', async function () {
+    const minPending = durations.seconds(30)
+
+    nonceTracker = new NonceTracker({
+      getLatestBlockNumber: async () => 1,
+      getTransactionCount: getTransactionCountFromConfirmed,
+      getPendingTransactions: () => pendingTxs,
+      getConfirmedTransactions: () => confirmedTxs,
+      minPending
+    })
+
+    let createdAt = new Date().getTime() - minPending
+
+    pendingTxs = [
+      mockTxGen.generate({ createdAt }),
+      mockTxGen.generate({ createdAt: (createdAt += durations.seconds(10)) }),
+      mockTxGen.generate({ createdAt: (createdAt += durations.seconds(10)) }),
+      mockTxGen.generate({ createdAt: (createdAt += durations.seconds(10)) }),
+      mockTxGen.generate({ createdAt: (createdAt += durations.seconds(10)) })
+    ]
+
+    const nonceLock = await nonceTracker.getNonceLock(USER_ADDRESS)
+    nonceLock.releaseLock()
+    expect(nonceLock.nextNonce).to.equal(1, `nonce should be 1 got ${nonceLock.nextNonce}`)
   })
 })
 

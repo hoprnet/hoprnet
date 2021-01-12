@@ -1,5 +1,5 @@
-import TransactionManager from './transaction-manager'
 import { expect } from 'chai'
+import TransactionManager from './transaction-manager'
 
 const TX: [string, { nonce: number }] = ['0', { nonce: 0 }]
 
