@@ -12,8 +12,6 @@ To implement this process, a HOPR node implements a **Connector Interface** that
 
 Although the first interaction of the HOPR network is on the Ethereum network, HOPR is by design **Chain Agnostic,** which means that HOPR nodes can eventually implement different payment channels in different Blockchains. At the time of writing, HOPR is also able to implement a [Polkadot-enabled payment gateway.](https://github.com/hoprnet/hopr-polkadot)
 
-# Contents
-
 # Table of contents
 
 - [HOPR](README.md)

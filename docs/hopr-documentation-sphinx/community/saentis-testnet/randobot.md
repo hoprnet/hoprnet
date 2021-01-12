@@ -24,7 +24,7 @@ Obviously, in most use cases we want people who we contact \(but not anyone else
 
 Type `includeRecipient`and then type `y` to confirm. From now on, every message you send will also be sent with your address. Now when you message the RandoBot, it will know your address and will be able to reply and add you to its database.
 
-![](../../.gitbook/assets/include-recipient.png)
+![](../.gitbook/assets/include-recipient.png)
 
 {% hint style="info" %}
 You can always see whether you have turned on `includeRecipient` by running the `settings` command.

@@ -33,6 +33,6 @@ Kovan **HOPR Tokens** change depending on the contract used for your version of 
 
 **HOPR Chat** will not fully initialise until your account has been funded with some Kovan ETH and HOPR. After the tokens have landed in your account, you are ready to use **HOPR Chat.** Execute the same command shared in Step 3 to see the following screen.
 
-![HOPR Chat will tell you its balance in Kovan ETH and HOPR tokens](../../.gitbook/assets/running_hopr_chat_w_balance.gif)
+![HOPR Chat will tell you its balance in Kovan ETH and HOPR tokens](../.gitbook/assets/running_hopr_chat_w_balance.gif)
 
 Your **HOPR Chat** instance is ready to be used!

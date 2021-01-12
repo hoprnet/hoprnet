@@ -8,7 +8,7 @@ description: >-
 
 To showcase the usage of the HOPR Protocol, we've created the **HOPR Games**, a series of games or other activities which work via the HOPR Protocol.
 
-![](../../.gitbook/assets/hopr-no-n%20%281%29%20%281%29%20%281%29.png)
+![](../.gitbook/assets/hopr-no-n%20%281%29%20%281%29%20%281%29.png)
 
 ## Goals
 

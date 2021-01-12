@@ -45,7 +45,7 @@ To connect using HOPR Chat, you'll need to download the latest version.
 
 If you have a HOPR Node PC, it should automatically updated to the latest version of HOPR Säntis. All you have to do is fund your node, as explained in the next section, and then restart.
 
-![](../../.gitbook/assets/avado-no-funds.png)
+![](../.gitbook/assets/avado-no-funds.png)
 
 {% hint style="warning" %}
 The node will ask you to send 0.1 xDAI to your account. This is a typo. You only need to send 0.02 xDAI. Apologies, and we'll update this in the next version.
@@ -61,7 +61,7 @@ xDAI is a USD stablecoin, so 0.02 xDAI is worth around 2 cents. It costs xDAI to
 
 If your node is unfunded, you can find your xDAI address by simply starting the HOPR Chat client. HOPR Chat will recognize that your node is unfunded, and won't proceed. It will tell you your address, so you can send xDAI. Once your node is funded, you can find your address by typing `address`.
 
-![](../../.gitbook/assets/no-funds.png)
+![](../.gitbook/assets/no-funds.png)
 
 If you need more instructions on how to buy and send xDAI, see the next section: **Funding Your Node**
 

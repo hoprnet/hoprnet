@@ -68,11 +68,11 @@ Depending of your distribution, please follow the official guidelines for how to
 
 Once Docker is up and running, you need to download a valid **HOPR Chat** Docker Image. To do so, run `docker pull hopr/chat` from your terminal. This process may take some time depending on your internet connection, as it will download around `0.5 GB` from our [Docker Hub Registry](https://hub.docker.com/r/hopr/chat).
 
-![Currently HOPR Chat is about ~0.5 GB, please be patient.](../../.gitbook/assets/docker_install_macos.gif)
+![Currently HOPR Chat is about ~0.5 GB, please be patient.](../.gitbook/assets/docker_install_macos.gif)
 
 To ensure your machine has successfully downloaded **HOPR Chat,** run `docker images`. You will be shown the **HOPR Chat** image being installed locally, ready to be run.
 
-![HOPR Chat distributed as a Docker image](../../.gitbook/assets/docker_images.gif)
+![HOPR Chat distributed as a Docker image](../.gitbook/assets/docker_images.gif)
 
 {% hint style="info" %}
 Docker images can quickly go out of date. We recommend reviewing which are the latest images available to be used before downloading one. You can see all our available images and their publication date in our public [Docker registry](https://gcr.io/hoprassociation/hopr-chat).
@@ -123,7 +123,7 @@ $ nvm use v12.9.1
 
 If everything was done properly, you can run `node --version` to see your current `node` version, alongside running basic commands as shown when running simply `node` in your terminal.
 
-![](../../.gitbook/assets/node.gif)
+![](../.gitbook/assets/node.gif)
 
 ## **Running HOPR Chat**
 
@@ -189,7 +189,7 @@ docker run -v %cd%/db:/app/db ^
 
 You will be welcomed by the following message.
 
-![](../../.gitbook/assets/hopr.gif)
+![](../.gitbook/assets/hopr.gif)
 
 If you get an `Unable to connect to Bootstrap node` message, use other bootstrap nodes. Our bootstrap nodes are available as `TXT` records behind our `hoprnet.org` domain, so you can see them using the `dig` command in any linux computer.
 
@@ -229,7 +229,7 @@ Depending on your configuration and version of **HOPR Chat**, you might need to 
 
 To run **HOPR Chat** via Node.js**,** you can simply download our pre-compiled binary for each version. You can find these binaries in our [Releases](https://github.com/hoprnet/hopr-core/releases) page inside a zip file.
 
-![Please select the correct distribution for your operating system.](../../.gitbook/assets/image%20%288%29.png)
+![Please select the correct distribution for your operating system.](../.gitbook/assets/image%20%288%29.png)
 
 These files have **HOPR Chat** pre-configured and compiled to work in your system. Click on the executable file inside that folder to see **HOPR Chat** up and running. Depending on your distribution, this file might be different.
 
@@ -275,12 +275,12 @@ In case you are using a version of **HOPR Chat** with **HOPR Core** `<v0.6.10`, 
 
 Now, let's find some nodes to talk to. To do this, run `crawl`, which will show you other users that are connected to the **HOPR Network** and are available to chat.
 
-![The crawl command will show you other connected nodes.](../../.gitbook/assets/running_hopr_chat_and_crawling.gif)
+![The crawl command will show you other connected nodes.](../.gitbook/assets/running_hopr_chat_and_crawling.gif)
 
 To talk to other users, copy another connected user address and send a message to them with the `send` command. This will look something like: `send 16Uiu2HAmCtWxx3Ky3ZjtWj1whkezdRvMAYKU9f57CRPj2FkPtWsD`
 
 **HOPR Chat** will then prompt you for a message to send.
 
-![Your message will be sent privately through the HOPR network](../../.gitbook/assets/running_hopr_chat_and_sending.gif)
+![Your message will be sent privately through the HOPR network](../.gitbook/assets/running_hopr_chat_and_sending.gif)
 
 Congratulations! You have communicated with another node using a privacy-preserving decentralised protocol. **HOPR Chat** is just a proof of concept right now, but you can already see the capabilities of the protocol. Click next to learn about **Bootstrap Nodes,** or go back to see the general introduction about **HOPR Chat.**
