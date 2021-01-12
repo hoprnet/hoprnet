@@ -1,8 +1,8 @@
----
+<!-- ---
 description: >-
   More information about CoverBot, which simulates sending cover traffic through
   the HOPR network
----
+--- -->
 
 # Registering with CoverBot
 

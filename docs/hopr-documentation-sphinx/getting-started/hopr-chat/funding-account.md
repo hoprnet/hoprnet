@@ -1,8 +1,8 @@
----
+<!-- ---
 description: >-
   Instructions on how to fund your HOPR Chat account under Kovan network
   whenever its needed.
----
+--- -->
 
 # Funding account
 

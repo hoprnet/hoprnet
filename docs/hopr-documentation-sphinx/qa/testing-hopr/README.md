@@ -1,6 +1,6 @@
----
+<!-- ---
 description: An introduction to our Quality Assurance (QA) process within HOPR
----
+--- -->
 
 # Testing HOPR
 

@@ -1,8 +1,8 @@
----
+<!-- ---
 description: >-
   A step-by-step guide to getting a HOPR node running on the Säntis testnet,
   using the HOPR Chat node app
----
+--- -->
 
 # First Time Users
 

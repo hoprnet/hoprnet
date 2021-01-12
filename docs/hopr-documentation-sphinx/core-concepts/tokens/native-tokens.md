@@ -1,6 +1,6 @@
----
+<!-- ---
 description: 'Learn about why HOPR needs two kinds of tokens to run, and how to get them.'
----
+--- -->
 
 # Native Tokens
 

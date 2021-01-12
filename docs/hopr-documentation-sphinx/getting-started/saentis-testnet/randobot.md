@@ -1,8 +1,8 @@
----
+<!-- ---
 description: >-
   More information about RandoBot, a bot to help you verify your network
   connection in the Säntis network.
----
+--- -->
 
 # Talking with RandoBot
 

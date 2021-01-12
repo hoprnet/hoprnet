@@ -1,6 +1,6 @@
----
+<!-- ---
 description: An incentivized HOPR testnet running on xDAI Chain
----
+--- -->
 
 # Säntis Testnet
 

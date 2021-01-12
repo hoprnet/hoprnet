@@ -1,6 +1,6 @@
----
+<!-- ---
 description: An introduction to bootstrap nodes inside HOPR Chat
----
+--- -->
 
 # Bootstrap Nodes
 

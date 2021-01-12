@@ -1,6 +1,6 @@
----
+<!-- ---
 description: Key features of HOPR.
----
+--- -->
 
 # Key features
 

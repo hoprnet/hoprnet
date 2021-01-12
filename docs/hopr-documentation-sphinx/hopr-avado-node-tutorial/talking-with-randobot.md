@@ -1,8 +1,8 @@
----
+<!-- ---
 description: >-
   More information about using RandoBot to verify your network connection, test
   out the messaging flow, and act as a relay node.
----
+--- -->
 
 # Messaging Randobot
 

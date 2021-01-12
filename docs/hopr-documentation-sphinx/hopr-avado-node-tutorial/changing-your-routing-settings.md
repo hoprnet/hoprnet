@@ -1,6 +1,6 @@
----
+<!-- ---
 description: Change your routing settings to start using HOPR's privacy features
----
+--- -->
 
 # Changing Your Routing Settings
 

@@ -1,8 +1,8 @@
----
+<!-- ---
 description: >-
   We'd like to tell you about HOPR Games, a project to showcase the usage of the
   HOPR Protocol.
----
+--- -->
 
 # HOPR Games
 

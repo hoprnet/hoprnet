@@ -1,8 +1,8 @@
----
+<!-- ---
 description: >-
   Instructions on how to execute a QA checklist for a specific release to
   support the development and testing of HOPR
----
+--- -->
 
 # Filling a QA checklist
 

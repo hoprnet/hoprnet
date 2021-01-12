@@ -1,6 +1,6 @@
----
+<!-- ---
 description: Send your first multi-hop message
----
+--- -->
 
 # Sending A Multi-hop Message Using A Payment Channel
 

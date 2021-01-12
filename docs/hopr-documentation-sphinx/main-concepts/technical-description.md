@@ -1,6 +1,6 @@
----
+<!-- ---
 description: A technical description to HOPR.
----
+--- -->
 
 # Technical Description
 

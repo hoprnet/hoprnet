@@ -1,6 +1,6 @@
----
+<!-- ---
 description: Additional information and details about the HOPR Chat node app.
----
+--- -->
 
 # HOPR Chat
 

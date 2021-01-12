@@ -1,6 +1,6 @@
----
+<!-- ---
 description: Funding your AVADO node
----
+--- -->
 
 # Funding Your AVADO Node
 

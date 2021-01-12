@@ -1,6 +1,6 @@
----
+<!-- ---
 description: Earning rewards on Säntis
----
+--- -->
 
 # Scoreboard and Prizes
 

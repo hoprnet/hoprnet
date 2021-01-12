@@ -1,6 +1,6 @@
----
+<!-- ---
 description: Step and step guide to quickly start using HOPR Chat
----
+--- -->
 
 # Quickstart
 

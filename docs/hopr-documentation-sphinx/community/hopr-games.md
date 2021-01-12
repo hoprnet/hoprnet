@@ -1,8 +1,8 @@
----
+<!-- ---
 description: >-
   Introducing HOPR Games, a community engagement strategy to showcase the usage
   of the HOPR Protocol, sponsored by the HOPR Association.
----
+--- -->
 
 # HOPR Games
 

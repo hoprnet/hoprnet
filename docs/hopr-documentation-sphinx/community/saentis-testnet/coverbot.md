@@ -1,6 +1,6 @@
----
+<!-- ---
 description: 'More information about CoverBot, one of the bots overseeing the Säntis testnet'
----
+--- -->
 
 # Registering with CoverBot
 

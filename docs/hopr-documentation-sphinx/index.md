@@ -12,74 +12,74 @@ To implement this process, a HOPR node implements a **Connector Interface** that
 
 Although the first interaction of the HOPR network is on the Ethereum network, HOPR is by design **Chain Agnostic,** which means that HOPR nodes can eventually implement different payment channels in different Blockchains. At the time of writing, HOPR is also able to implement a [Polkadot-enabled payment gateway.](https://github.com/hoprnet/hopr-polkadot)
 
-# Table of contents
+```eval_rst
+.. toctree::
+   :maxdepth: 1
 
-- [HOPR](README.md)
+   README.md
 
-## Getting started
+.. toctree::
+   :maxdepth: 1
+   :caption: Getting Started
 
-- [First Time Users: Start Here](getting-started/hopr-chat.md)
+   getting-started/hopr-chat.md
 
-## HOPR Chat Tutorial
+.. toctree::
+   :maxdepth: 1
+   :caption: HOPR AVADO Node Tutorial
 
-- [First Time Setup](hopr-chat-tutorial/quickstart.md)
-- [Previous Users](hopr-chat-tutorial/getting-started.md)
-- [Funding Your Node](hopr-chat-tutorial/funding-your-node.md)
-- [Exploring The Network](hopr-chat-tutorial/exploring-the-network.md)
-- [Messaging RandoBot](hopr-chat-tutorial/randobot.md)
-- [Registering with CoverBot](hopr-chat-tutorial/coverbot.md)
-- [Earning and Redeeming Tickets](hopr-chat-tutorial/redeeming-tickets.md)
-- [Changing Your Routing Settings](hopr-chat-tutorial/changing-your-routing-settings.md)
-- [Sending a Multi-Hop Message Using a Payment Channel](hopr-chat-tutorial/opening-and-closing-payment-channels.md)
-- [Withdrawing Funds](hopr-chat-tutorial/withdrawing-funds.md)
-- [Advanced Setup](hopr-chat-tutorial/setup.md)
-- [Troubleshooting](hopr-chat-tutorial/troubleshooting.md)
+   hopr-avado-node-tutorial/setting-up-your-avado-node.md
+   hopr-avado-node-tutorial/funding-your-avado-node.md
+   hopr-avado-node-tutorial/finding-your-address.md
+   hopr-avado-node-tutorial/talking-with-randobot.md
+   hopr-avado-node-tutorial/registering-with-coverbot.md
+   hopr-avado-node-tutorial/redeeming-tickets.md
+   hopr-avado-node-tutorial/changing-your-routing-settings.md
+   hopr-avado-node-tutorial/sending-a-multi-hop-message.md
+   hopr-avado-node-tutorial/withdrawing-funds.md
 
-## HOPR AVADO Node Tutorial
+.. toctree::
+   :maxdepth: 1
+   :caption: Core Concepts
 
-- [Setting Up Your AVADO Node](hopr-avado-node-tutorial/setting-up-your-avado-node.md)
-- [Funding Your AVADO Node](hopr-avado-node-tutorial/funding-your-avado-node.md)
-- [Exploring The Network](hopr-avado-node-tutorial/finding-your-address.md)
-- [Messaging Randobot](hopr-avado-node-tutorial/talking-with-randobot.md)
-- [Registering With CoverBot](hopr-avado-node-tutorial/registering-with-coverbot.md)
-- [Earning and Redeeming Tickets](hopr-avado-node-tutorial/redeeming-tickets.md)
-- [Changing Your Routing Settings](hopr-avado-node-tutorial/changing-your-routing-settings.md)
-- [Sending A Multi-hop Message Using A Payment Channel](hopr-avado-node-tutorial/sending-a-multi-hop-message.md)
-- [Withdrawing Funds](hopr-avado-node-tutorial/withdrawing-funds.md)
+   core-concepts/overview.md
+   core-concepts/protocol-network-token.md
+   core-concepts/hopr-chat/README.md
+   core-concepts/hopr-chat/troubleshooting.md
+   core-concepts/proof-of-relay/README.md
+   core-concepts/proof-of-relay/routing-settings.md
+   core-concepts/bootstrap-nodes.md
+   core-concepts/cover-traffic.md
+   core-concepts/tokens/README.md
+   core-concepts/tokens/native-tokens.md
+   core-concepts/tokens/hopr-tokens.md
+   core-concepts/payment-channels.md
+   core-concepts/tickets.md
 
-## Core Concepts
+.. toctree::
+   :maxdepth: 1
+   :caption: Resources
 
-- [Overview](core-concepts/overview.md)
-- [Protocol, Network and Token](core-concepts/protocol-network-token.md)
-- [HOPR Chat](core-concepts/hopr-chat/README.md)
-  - [Troubleshooting](core-concepts/hopr-chat/troubleshooting.md)
-- [Proof of Relay](core-concepts/proof-of-relay/README.md)
-  - [Routing Settings](core-concepts/proof-of-relay/routing-settings.md)
-- [Bootstrap Nodes](core-concepts/bootstrap-nodes.md)
-- [Cover Traffic](core-concepts/cover-traffic.md)
-- [Tokens](core-concepts/tokens/README.md)
-  - [Native Tokens](core-concepts/tokens/native-tokens.md)
-  - [Testnet HOPR Tokens](core-concepts/tokens/hopr-tokens.md)
-- [Payment Channels](core-concepts/payment-channels.md)
-- [Tickets](core-concepts/tickets.md)
+   resources/glossary.md
+   resources/releases.md
 
-## Resources
+.. toctree::
+   :maxdepth: 1
+   :caption: Community
 
-- [Glossary](resources/glossary.md)
-- [Releases](resources/releases.md)
+   community/hopr-games/README.md
+   community/hopr-games/bounties/README.md
+   community/hopr-games/bounties/bouncer-bot.md
+   community/past-testnets/README.md
+   community/past-testnets/saentis-testnet.md
+   community/past-testnets/basodino-testnet-runs-20th-oct-4th-nov/README.md
+   community/past-testnets/basodino-testnet-runs-20th-oct-4th-nov/prize-fund-and-scoreboard.md
+   community/past-testnets/basodino-testnet-v2-runs-9th-nov-23rd-nov.md
 
-## Community
+.. toctree::
+   :maxdepth: 1
+   :caption: QA
 
-- [HOPR Games](community/hopr-games/README.md)
-  - [Bounties](community/hopr-games/bounties/README.md)
-    - [Bouncer Bot](community/hopr-games/bounties/bouncer-bot.md)
-- [Past Testnets](community/past-testnets/README.md)
-  - [Säntis Testnet \(Ended 06 Oct 2020\)](community/past-testnets/saentis-testnet.md)
-  - [Basòdino Testnet \(Ended 4th Nov 2020\)](community/past-testnets/basodino-testnet-runs-20th-oct-4th-nov/README.md)
-    - [Prize Fund and Scoreboard](community/past-testnets/basodino-testnet-runs-20th-oct-4th-nov/prize-fund-and-scoreboard.md)
-  - [Basòdino Testnet v2 \(Ended 23rd Nov 2020\)](community/past-testnets/basodino-testnet-v2-runs-9th-nov-23rd-nov.md)
-
-## QA
-
-- [Testing HOPR](qa/testing-hopr/README.md)
-  - [Filling a QA checklist](qa/testing-hopr/filling-a-qa-checklist.md)
+   qa/testing-hopr/README.md
+   qa/testing-hopr/filling-a-qa-checklist.md
+```

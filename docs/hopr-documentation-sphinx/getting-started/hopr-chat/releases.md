@@ -1,6 +1,6 @@
----
+<!-- ---
 description: Links to the latest versions of HOPR Chat
----
+--- -->
 
 # Releases
 

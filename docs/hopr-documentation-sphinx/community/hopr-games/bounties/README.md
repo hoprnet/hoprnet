@@ -1,9 +1,9 @@
----
+<!-- ---
 description: >-
   A general introduction to the HOPR Games Bounties, our asynchronous challenges
   for people who want to earn tokens, test HOPR technology and learn about the
   HOPR network.
----
+--- -->
 
 # Bounties
 

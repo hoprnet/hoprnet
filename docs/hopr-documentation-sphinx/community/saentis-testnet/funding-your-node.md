@@ -1,6 +1,6 @@
----
+<!-- ---
 description: Funding your node with xDAI to participate in the testnet
----
+--- -->
 
 # Funding Your Node
 

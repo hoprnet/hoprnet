@@ -1,6 +1,6 @@
----
+<!-- ---
 description: Changing Data Privacy For Good.
----
+--- -->
 
 {% hint style="danger" %}
 These docs are currently being updated to reflect major changes to our software since our last release. In the meantime, you can visit our [github](https://www.github.com/hoprnet/hoprnet) for basic instructions on how to install and run a node.

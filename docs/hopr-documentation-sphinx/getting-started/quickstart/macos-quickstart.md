@@ -1,6 +1,6 @@
----
+<!-- ---
 description: Get familiar with HOPR on your Mac or Unix based system.
----
+--- -->
 
 # MacOS/Linux Quickstart
 

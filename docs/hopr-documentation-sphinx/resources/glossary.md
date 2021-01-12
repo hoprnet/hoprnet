@@ -1,6 +1,6 @@
----
+<!-- ---
 description: A breakdown of all the concepts and terminology used within the HOPR ecosystem
----
+--- -->
 
 # Glossary
 

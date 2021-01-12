@@ -1,6 +1,7 @@
----
+<!-- ---
 description: 'HOPR Games Bounty #3 - Can you get into the party?'
 ---
+ -->
 
 # Bouncer Bot
 

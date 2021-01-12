@@ -1,6 +1,6 @@
----
+<!-- ---
 description: Getting started with Säntis
----
+--- -->
 
 # Säntis for Previous Users
 

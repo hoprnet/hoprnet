@@ -1,6 +1,7 @@
----
+<!-- ---
 description: Learn the advanced setup information for using HOPR Chat on your system
 ---
+ -->
 
 # Advanced Setup
 

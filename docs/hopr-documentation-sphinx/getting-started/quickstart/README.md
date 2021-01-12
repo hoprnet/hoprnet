@@ -1,6 +1,6 @@
----
+<!-- ---
 description: Getting familiar with HOPR.
----
+--- -->
 
 # Quickstart
 

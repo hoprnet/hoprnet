@@ -1,6 +1,6 @@
----
+<!-- ---
 description: Getting started with HOPR
----
+--- -->
 
 # First Time Users: Start Here
 

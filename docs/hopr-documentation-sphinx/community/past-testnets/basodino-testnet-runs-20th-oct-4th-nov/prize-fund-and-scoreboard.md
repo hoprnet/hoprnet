@@ -1,6 +1,6 @@
----
+<!-- ---
 description: Learn more about the Basòdino testnet prize fund
----
+--- -->
 
 # Prize Fund and Scoreboard
 

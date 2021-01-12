@@ -1,6 +1,6 @@
----
+<!-- ---
 description: The tokens used on the HOPR network
----
+--- -->
 
 # Tokens
 

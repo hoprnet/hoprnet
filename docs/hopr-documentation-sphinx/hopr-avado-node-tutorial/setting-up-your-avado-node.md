@@ -1,6 +1,6 @@
----
+<!-- ---
 description: Getting started with a HOPR AVADO Node
----
+--- -->
 
 # Setting Up Your AVADO Node
 

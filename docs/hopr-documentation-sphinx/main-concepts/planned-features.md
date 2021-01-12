@@ -1,6 +1,6 @@
----
+<!-- ---
 description: Upcoming features.
----
+--- -->
 
 # Planned features
 

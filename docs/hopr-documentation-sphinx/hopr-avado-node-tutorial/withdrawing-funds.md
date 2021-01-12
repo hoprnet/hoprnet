@@ -1,6 +1,6 @@
----
+<!-- ---
 description: How to withdraw funds from your node
----
+--- -->
 
 # Withdrawing Funds
 

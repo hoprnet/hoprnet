@@ -1,6 +1,6 @@
----
+<!-- ---
 description: Earning tickets for relaying data and redeeming them for HOPR
----
+--- -->
 
 # Earning and Redeeming Tickets
 

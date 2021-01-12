@@ -1,6 +1,6 @@
----
+<!-- ---
 description: 'Checking for other online nodes, and finding your HOPR node address.'
----
+--- -->
 
 # Exploring The Network
 

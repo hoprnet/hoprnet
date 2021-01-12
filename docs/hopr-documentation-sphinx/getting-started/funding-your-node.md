@@ -1,6 +1,6 @@
----
+<!-- ---
 description: Funding your node with xDAI
----
+--- -->
 
 # Funding Your Node
 

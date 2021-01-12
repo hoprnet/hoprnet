@@ -1,6 +1,6 @@
----
+<!-- ---
 description: Get familiar with HOPR on your Windows computer.
----
+--- -->
 
 # Windows Quickstart
 

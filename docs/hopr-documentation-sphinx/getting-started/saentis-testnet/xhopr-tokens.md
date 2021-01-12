@@ -1,6 +1,6 @@
----
+<!-- ---
 description: 'The rundown on xHOPR, the token used for the Säntis testnet'
----
+--- -->
 
 # xHOPR Tokens
 

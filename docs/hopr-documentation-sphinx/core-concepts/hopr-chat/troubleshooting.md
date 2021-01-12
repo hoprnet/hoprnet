@@ -1,6 +1,6 @@
----
+<!-- ---
 description: Common errors that might show in your work station when running HOPR Chat.
----
+--- -->
 
 # Troubleshooting
 

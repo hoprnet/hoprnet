@@ -1,6 +1,6 @@
----
+<!-- ---
 description: An introduction to the motivations behind HOPR.
----
+--- -->
 
 # Background
 
