@@ -9,7 +9,7 @@ import debug from 'debug'
 const log = debug('hopr-core:acknowledgement')
 const error = debug('hopr-core:acknowledgement:error')
 
-import chalk from 'chalk'
+import { green, red, blue, yellow } from 'chalk'
 
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '../../'
@@ -20,10 +20,12 @@ import type { Handler } from 'libp2p'
 import EventEmitter from 'events'
 
 import { PROTOCOL_ACKNOWLEDGEMENT } from '../../constants'
-import { u8aToHex, durations, u8aConcat, toU8a, u8aToNumber, pubKeyToPeerId } from '@hoprnet/hopr-utils'
+import { u8aToHex, durations, u8aConcat, toU8a, u8aToNumber, pubKeyToPeerId, u8aAdd } from '@hoprnet/hopr-utils'
 import { UnacknowledgedTicket } from '../../messages/ticket'
 
 import { ACKNOWLEDGED_TICKET_INDEX_LENGTH } from '../../dbKeys'
+
+const ONE = toU8a(1, 8)
 
 const ACKNOWLEDGEMENT_TIMEOUT = durations.seconds(2)
 
@@ -61,9 +63,7 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
         })
       } catch (err) {
         clearTimeout(timeout)
-        error(
-          `Could not transfer acknowledgement to ${counterparty.toB58String()}. Error was: ${chalk.red(err.message)}.`
-        )
+        error(`Could not transfer acknowledgement to ${counterparty.toB58String()}. Error was: ${red(err.message)}.`)
         return
       }
 
@@ -89,15 +89,15 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
 
       let tmp: Uint8Array
       try {
-        tmp = (await this.node.db.get(Buffer.from(unAcknowledgedDbKey))) as Uint8Array
+        tmp = await this.node.db.get(Buffer.from(unAcknowledgedDbKey))
       } catch (err) {
         if (err.notFound) {
           error(
-            `received unknown acknowledgement from party ${chalk.blue(
+            `received unknown acknowledgement from party ${blue(
               (await pubKeyToPeerId(await acknowledgement.responseSigningParty)).toB58String()
-            )} for challenge ${chalk.yellow(u8aToHex(await acknowledgement.hashedKey))} - response was ${chalk.green(
+            )} for challenge ${yellow(u8aToHex(await acknowledgement.hashedKey))} - response was ${green(
               u8aToHex(await acknowledgement.hashedKey)
-            )}. ${chalk.red('Dropping acknowledgement')}.`
+            )}. ${red('Dropping acknowledgement')}.`
           )
 
           continue
@@ -114,12 +114,9 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
 
         let ticketCounter: Uint8Array
         try {
-          ticketCounter = toU8a(
-            (u8aToNumber(
-              (await this.node.db.get(Buffer.from(this.node._dbKeys.AcknowledgedTicketCounter()))) as Uint8Array
-            ) as number) + 1,
-            ACKNOWLEDGED_TICKET_INDEX_LENGTH
-          )
+          let tmpTicketCounter = await this.node.db.get(Buffer.from(this.node._dbKeys.AcknowledgedTicketCounter()))
+
+          ticketCounter = u8aAdd(true, tmpTicketCounter, ONE)
         } catch (err) {
           // Set ticketCounter to initial value
           ticketCounter = toU8a(0, ACKNOWLEDGED_TICKET_INDEX_LENGTH)
@@ -137,14 +134,20 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
           }
         )
 
-        if (!(await this.node.paymentChannels.account.reservePreImageIfIsWinning(acknowledgedTicket))) {
+        const isWinningTicket = await this.node.paymentChannels.account.reservePreImageIfIsWinning(acknowledgedTicket)
+
+        if (!isWinningTicket) {
           log(`Got a ticket that is not a win. Dropping ticket.`)
           await this.node.db.del(Buffer.from(unAcknowledgedDbKey))
         }
 
         const acknowledgedDbKey = this.node._dbKeys.AcknowledgedTickets(ticketCounter)
 
-        log(`storing ticket`, ticketCounter, `we are`, this.node.getId().toB58String())
+        log(
+          `Storing ticket #${u8aToNumber(ticketCounter)} from ${blue(
+            (await pubKeyToPeerId(await acknowledgement.responseSigningParty)).toB58String()
+          )}. Ticket contains preImage for ${green(u8aToHex(await acknowledgement.hashedKey))}`
+        )
 
         try {
           await this.node.db
@@ -154,7 +157,7 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
             .put(Buffer.from(this.node._dbKeys.AcknowledgedTicketCounter()), Buffer.from(ticketCounter))
             .write()
         } catch (err) {
-          error(`Error while writing to database. Error was ${chalk.red(err.message)}.`)
+          error(`Error while writing to database. Error was ${red(err.message)}.`)
         }
       } else {
         // Deleting dummy DB entry

@@ -15,6 +15,10 @@ import { privKeyToPeerId } from '../../utils'
 import { NODE_SEEDS } from '@hoprnet/hopr-demo-seeds'
 import type Multiaddr from 'multiaddr'
 
+import Debug from 'debug'
+
+const log = Debug(`hopr-core:test`)
+
 const TWO_SECONDS = durations.seconds(2)
 const CHANNEL_DEPOSIT = new BN(200) // HOPRli
 const TICKET_AMOUNT = 10 // HOPRli
@@ -188,6 +192,7 @@ describe('test packet composition and decomposition', function () {
 
       for (let k = 0; k < tickets.length; k++) {
         await node.paymentChannels.channel.tickets.submit(tickets[k] as any, undefined as any)
+        log(`ticket submitted`)
       }
     }
 
