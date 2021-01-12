@@ -133,7 +133,7 @@ start_bootstrap() {
 # $4 bootstrap multiaddr
 start_testnode() {
   local vm=$(vm_name "node-$3" $1)
-  echo "- Starting test node $vm with $2"
+  echo "- Starting test node $vm with $2, bs: $4"
   start_testnode_vm $vm $2 $4
 }
 
