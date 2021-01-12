@@ -2,12 +2,10 @@
 
 import LibP2P from 'libp2p'
 import type { Connection } from 'libp2p'
-// @ts-ignore
-import MPLEX = require('libp2p-mplex')
-// @ts-ignore
-import KadDHT = require('libp2p-kad-dht')
-// @ts-ignore
-import SECIO = require('libp2p-secio')
+
+const MPLEX = require('libp2p-mplex')
+const KadDHT = require('libp2p-kad-dht')
+const SECIO = require('libp2p-secio')
 
 import HoprConnect from '@hoprnet/hopr-connect'
 
@@ -615,7 +613,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     return await findPath(
       this.getId(),
       destination,
-      MAX_HOPS - 1,
+      MAX_HOPS,
       this.network.networkPeers,
       this.paymentChannels.indexer,
       PATH_RANDOMNESS
@@ -645,7 +643,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
         throw new Error('Database does not exist: ' + dbPath)
       }
     }
-    // @ts-ignore
+
     return levelup(leveldown(dbPath))
   }
 }
