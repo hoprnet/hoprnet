@@ -240,7 +240,7 @@ class MockTxGen {
 
   public generate(tx: Partial<Transaction> = {}): Transaction {
     const nonce = tx.nonce ?? 0
-    return { from: USER_ADDRESS, ...tx, nonce }
+    return { from: USER_ADDRESS, ...tx, nonce, createdAt: new Date().getTime() }
   }
 
   public generateMulti(
