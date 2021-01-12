@@ -204,6 +204,12 @@ jobs:
         with:
           node-version: 12
           registry-url: https://registry.npmjs.org/
+      - name: Update repo from latest pushes.
+        run: |
+          git config --global user.email "noreply@hoprnet.org"
+          git config --global user.name "HOPR Versioning robot"
+          git config pull.rebase false
+          git pull origin ${{ github.ref }} # This should pull new packages with versions etc.
       - name: Setup Google Cloud Credentials
         uses: GoogleCloudPlatform/github-actions/setup-gcloud@master
         with:
