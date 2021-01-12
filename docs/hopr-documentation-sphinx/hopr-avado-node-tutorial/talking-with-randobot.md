@@ -22,7 +22,7 @@ First, let's make sure your node can reach RandoBot. Click in the blue bar at th
 
 If everything if working correctly, you should receive a pong back from the bot.
 
-![](.gitbook/assets/avado-ping-randobot.png)
+![](../.gitbook/assets/avado-ping-randobot.png)
 
 If you can't ping the bot, please check the [**Troubleshooting**](../hopr-chat-tutorial/troubleshooting.md) \*\*\*\*guide or ask for help in Telegram or Discord.
 
@@ -40,7 +40,7 @@ settings includeRecipient true
 
 From now on, every message you send will also be sent with your address. Now when you message the RandoBot, it will know your address and will be able to reply.
 
-![](.gitbook/assets/avado-includerecipient.png)
+![](../.gitbook/assets/avado-includerecipient.png)
 
 To turn this off, type:
 
@@ -81,7 +81,7 @@ alias 16Uiu2HAmCK23BB3RW82MkTBjUjNCKya9Xcb5S85AXPvzjfk2gXNm randobot
 
 You will receive a notification that the alias has been set.
 
-![Setting an alias for RandoBot](.gitbook/assets/avado-alias-randobot.png)
+![Setting an alias for RandoBot](../.gitbook/assets/avado-alias-randobot.png)
 
 {% hint style="warning" %}
 Aliases are just a temporary feature of your chat session. Aliases are not visible to other users, and they will reset when you shut down your node.
@@ -97,7 +97,7 @@ send randobot hi
 
 If successful, RandoBot will pick a series of random words and say those to you. They are random, so don't get offended!
 
-![A message from RandoBot](.gitbook/assets/avado-message-randobot.png)
+![A message from RandoBot](../.gitbook/assets/avado-message-randobot.png)
 
 Congratulations! You have successfully sent a message through the HOPR Network!
 

@@ -68,7 +68,7 @@ You can also go to the official Node.js website to [download](https://nodejs.org
 
 To install Node.js, double-click the file you just downloaded to start the install wizard. The wizard will guide you installing Node.js on your operating system. In most cases, you'll just want to click “Next” for all the options given, similar to the image shown.
 
-![](.gitbook/assets/windows_install_nodejs.webp)
+![](../.gitbook/assets/windows_install_nodejs.webp)
 
 ### Test Node.js
 
@@ -84,7 +84,7 @@ In Windows, we'll open the `Powershell` application. To do this, you'll need to:
 2. Type “Powershell” until the app `Windows Powershell` shows up.
 3. Press `Enter` or click to open it. A prompt for you to type will show up.
 
-![](.gitbook/assets/powershell_open.webp)
+![](../.gitbook/assets/powershell_open.webp)
 {% endtab %}
 
 {% tab title="MacOS" %}
@@ -94,7 +94,7 @@ Follow the next instructions to open the `Terminal` application:
 2. Type “Terminal” until the app `Terminal` shows up.
 3. Press `Enter` to open it. A prompt for you to type will show up.
 
-![](.gitbook/assets/terminal_open.webp)
+![](../.gitbook/assets/terminal_open.webp)
 {% endtab %}
 
 {% tab title="Linux" %}
@@ -106,7 +106,7 @@ The `Terminal` application might look different depending on your operating syst
 
 After your `Terminal` or `Powershell` is open, please type `node -v` in the prompt and press `Enter`. Ensure there's an empty space between the words `node` and `-v`
 
-![Type “node -v” to find your node version. It should show v12.18.2](.gitbook/assets/node-version.gif)
+![Type “node -v” to find your node version. It should show v12.18.2](../.gitbook/assets/node-version.gif)
 
 If your screen shows `v12.18.2` you are ready to go!
 
@@ -144,13 +144,13 @@ Right now, **HOPR Chat** is distributed as a .zip file, so you will need to “u
 {% tab title="Windows" %}
 For Windows, select the option “Extract All” in the File Explorer to extract **HOPR Chat** files.
 
-![](.gitbook/assets/downloading_hopr_bin.webp)
+![](../.gitbook/assets/downloading_hopr_bin.webp)
 {% endtab %}
 
 {% tab title="MacOS" %}
 For MacOS, just double click on the `.zip` file you downloaded to see the contents of the **HOPR Chat** application.
 
-![HOPR Chat contents of the extracted content should look as follows.](.gitbook/assets/hopr-macos-contents.webp)
+![HOPR Chat contents of the extracted content should look as follows.](../.gitbook/assets/hopr-macos-contents.webp)
 
 You can also do this from your Browser by just clicking the tab that shows up the downloaded folder.
 {% endtab %}
@@ -164,7 +164,7 @@ $ unzip hopr-chat-nodebin-linux.zip
 
 The contents fo the extracted folder should look as follows:
 
-![HOPR Chat contents extracted as seen in a Linux terminal using the ls command](.gitbook/assets/hopr-linux-contents.webp)
+![HOPR Chat contents extracted as seen in a Linux terminal using the ls command](../.gitbook/assets/hopr-linux-contents.webp)
 {% endtab %}
 {% endtabs %}
 
@@ -176,31 +176,31 @@ The contents fo the extracted folder should look as follows:
 {% tab title="Windows" %}
 For Windows, double-click the file named `start-hopr-chat` with `.bat` extension and described as `Windows Batch File` in its Type attribute.
 
-![HOPR Chat executable file for Windows.](.gitbook/assets/image.png)
+![HOPR Chat executable file for Windows.](../.gitbook/assets/image.png)
 {% endtab %}
 
 {% tab title="MacOS" %}
 For macOS, double-click on the file named `start-hopr-chat.command` with `.command` extension and described as `Terminal shell script` in its Kind attribute.
 
-![HOPR Chat executable as seen in MacOS](.gitbook/assets/hopr-macos-contents.webp)
+![HOPR Chat executable as seen in MacOS](../.gitbook/assets/hopr-macos-contents.webp)
 
 When opening the `start-hopr-chat.command` file, you will be prompted by `Gatekeeper`, the security mechanism from macOS, that the application has been downloaded by a non-recognised URL. This is a security mechanism activated by default in macOS.
 
 To go ahead, you will need to tell `Gatekeeper` that the application is to be trusted. To do so, open `Security & Privacy` in your `System Preferences` and click `Open Anyway`under the `General` tab. This will prompt `Gatekeeper` to ask you again to open **HOPR Chat** with an option to actually run it. Select `Open` and you will see **HOPR Chat** in your screen.
 
-![](.gitbook/assets/hopr_macos_gatekeeper.webp)
+![](../.gitbook/assets/hopr_macos_gatekeeper.webp)
 {% endtab %}
 
 {% tab title="Linux" %}
 For Linux-based systems, execute the file named `start-hopr-chat.sh` with `.sh` extension and provided with executable permissions on your directory.
 
-![HOPR Chat executable as seen in a Linux terminal](.gitbook/assets/hopr-linux-contents.webp)
+![HOPR Chat executable as seen in a Linux terminal](../.gitbook/assets/hopr-linux-contents.webp)
 {% endtab %}
 {% endtabs %}
 
 Running these commands will bring up a screen similar the one shown below. Congratulations! You are now running **HOPR Chat**.
 
-![HOPR Chat Testnet up and running.](.gitbook/assets/hopr-chat-testnet.gif)
+![HOPR Chat Testnet up and running.](../.gitbook/assets/hopr-chat-testnet.gif)
 
 ## Next Steps
 
