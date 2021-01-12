@@ -3,6 +3,16 @@ import os
 
 sys.path.insert(0, os.path.abspath('.'))
 
+# The master toctree document.
+master_doc = 'index'
+
+# General information about the project.
+project = u'hoprnet'
+copyright = u'2021 HOPR Association, all rights reserved'
+# author = u'test'
+
+# If true, figures, tables and code-blocks are
+# automatically numbered if they have a caption.
 numfig = True
 
 extensions = []
