@@ -403,7 +403,6 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
           const path: PeerId[] = [].concat(intermediatePath, [destination])
 
           let packet: Packet<Chain>
-          verbose('creating packet with path', path.map((pId: PeerId) => pId.toB58String()).join(', \n'))
           try {
             packet = await Packet.create(
               this,

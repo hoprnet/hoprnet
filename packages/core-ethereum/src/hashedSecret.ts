@@ -98,7 +98,7 @@ class HashedSecret {
   }
 
   private async storeSecretOnChain(secret: Hash): Promise<void> {
-    log('storing secret on chain')
+    log(`storing secret on chain, setting secret to ${u8aToHex(secret)}`)
     const account = await this.coreConnector.hoprChannels.methods
       .accounts((await this.coreConnector.account.address).toHex())
       .call()
