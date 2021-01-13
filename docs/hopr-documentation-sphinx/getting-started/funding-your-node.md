@@ -22,7 +22,7 @@ Later, you can check your balance by typing `balance`.
 
 To withdraw funds from your node, use the `withdraw` command. test
 
-````eval_rst
+<!-- ````eval_rst
 .. content-tabs::
 
     .. tab-container:: tab1
@@ -44,4 +44,18 @@ To withdraw funds from your node, use the `withdraw` command. test
         ```text
         withdraw [amount] HOPR [ETH address]
         ```
-````
+```` -->
+
+```eval_rst
+.. content-tabs::
+
+    .. tab-container:: tab1
+        :title: Tab title one
+
+        Content for tab one
+
+    .. tab-container:: tab2
+        :title: Tab title two
+
+        Content for tab two
+```

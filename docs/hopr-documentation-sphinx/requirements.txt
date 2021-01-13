@@ -1,3 +1,4 @@
-# sphinx>=4.0.0
-recommonmark>=0.5.0
-sphinx-rtd-theme>=0.3.1
+sphinx==1.8.5
+recommonmark==0.7.1
+sphinx-rtd-theme==0.5.1
+sphinxcontrib-contentui==0.2.2

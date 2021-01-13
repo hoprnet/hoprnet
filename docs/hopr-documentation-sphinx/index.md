@@ -19,6 +19,7 @@ Although the first interaction of the HOPR network is on the Ethereum network, H
 
    getting-started/README.md
    getting-started/hoprd.md
+   getting-started/funding-your-node.md
 
 .. toctree::
    :maxdepth: 1
