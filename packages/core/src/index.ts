@@ -264,13 +264,18 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     }
     const currentChannels = await this.getOpenChannels()
     const balance = await this.getBalance()
-    const nextChannels = await this.strategy.tick(
+    const [nextChannels, closeChannels] = await this.strategy.tick(
       balance,
       newChannels,
       currentChannels,
       this.network.networkPeers,
       this.paymentChannels.indexer
     )
+    verbose(`strategy wants to close ${closeChannels.length} channels`)
+    for (let toClose of closeChannels) {
+      await this.closeChannel(toClose)
+      verbose(`closed channel to ${toClose.toB58String()}`)
+    }
     verbose(`strategy wants to open`, nextChannels.length, 'new channels')
     for (let channelToOpen of nextChannels) {
       this.network.networkPeers.register(channelToOpen[0])

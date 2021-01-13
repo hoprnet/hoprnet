@@ -69,11 +69,15 @@ export async function findPath(
     const lastPeer = next(currentPath[currentPath.length - 1])
     const newChannels = (await indexer.getChannelsFromPeer(lastPeer))
       .filter(
-        (c) =>
-          !destination.equals(next(c)) &&
-          networkPeers.qualityOf(next(c)) > NETWORK_QUALITY_THRESHOLD &&
-          filterCycles(c, currentPath) &&
-          !deadEnds.has(next(c).toB58String())
+        (c) => {
+          networkPeers.register(next(c))
+          return (
+            !destination.equals(next(c)) &&
+            networkPeers.qualityOf(next(c)) > NETWORK_QUALITY_THRESHOLD &&
+            filterCycles(c, currentPath) &&
+            !deadEnds.has(next(c).toB58String())
+          )
+        }
       )
       .sort(compareWeight)
 
