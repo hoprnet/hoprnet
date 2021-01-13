@@ -50,7 +50,6 @@ export class CoverTraffic extends AbstractCommand {
   private async tick() {
     log('attempting cover packet')
     this.messagesSent++
-    this.timeout = setTimeout(this.tick.bind(this), INTERVAL) // tick again after interval
     try {
       const payload = encode([this.identifier, this.seq++, Date.now()])
       await this.node.sendMessage(payload, this.node.getId())
@@ -59,6 +58,7 @@ export class CoverTraffic extends AbstractCommand {
       log('error sending', e)
       // No-op
     }
+    this.timeout = setTimeout(this.tick.bind(this), INTERVAL) // tick again after interval
   }
 
   private handleMessage(msg: Uint8Array) {
