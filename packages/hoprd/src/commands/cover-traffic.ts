@@ -92,6 +92,7 @@ export class CoverTraffic extends AbstractCommand {
     }
     if (query === 'stop' && this.timeout) {
       clearTimeout(this.timeout)
+      delete this.timeout
       return 'stopped'
     }
     if (query === 'stats') {
