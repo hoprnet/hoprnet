@@ -86,6 +86,14 @@ export class AdminServer {
       this.logs.log('Crawled network')
     })
 
+    this.node.on('hopr:channel:opened', (channel) => {
+      this.logs.log(`Opened channel to ${channel[0].toB58String()}`)
+    })
+
+    this.node.on('hopr:channel:closed', (peer) => {
+      this.logs.log(`Closed channel to ${peer.toB58String()}`)
+    })
+
     this.node.on('hopr:warning:unfunded', (addr) => {
       this.logs.log(
         `- The account associated with this node has no HOPR,\n` +
