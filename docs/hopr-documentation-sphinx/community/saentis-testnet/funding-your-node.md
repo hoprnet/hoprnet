@@ -14,7 +14,7 @@ First, you'll need to load some ETH into your Ethereum wallet. [MetaMask](https:
 
 Next, you'll need to convert some ETH into xDAI. There are several tools you can use to do this. The simplest is to connect your wallet to the tool at [xdai.io](https://xdai.io), where you can swap ETH to DAI and then DAI to xDAI.
 
-![](../../.gitbook/assets/xdai-burner.png)
+![](../../images/xdai-burner.png)
 
 Finally, you'll need to send some xDAI to your node. Because xDAI is a separate chain, you'll need to change the network settings in MetaMask. [The xDAI docs have a step-by-step guide for this](https://www.xdaichain.com/for-users/wallets/metamask/metamask-setup).
 

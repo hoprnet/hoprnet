@@ -19,11 +19,11 @@ Using your DAppStore manager, paste `QmZPsazCHREvYnGbFfDVXDSXh5AtTRrzHUGbi4eN7Ce
 
 The existing version of **HOPR Node** available in the store is a bit limited, and does not have yet all the features the normal client has. We are working to sync the **HOPR Node** client with our existing **HOPR Chat** application. In the meantime, to participate with the bounty, you need to manually include your address as the command `includeRecipient` isn't available at the moment in your node. To do so, just add your address into the "message" section, followed by a colon \(`:`\).
 
-![An example on how to send a message from a HOPR Node in an AVADO/DAppNode](../../../.gitbook/assets/image.png)
+![An example on how to send a message from a HOPR Node in an AVADO/DAppNode](../../../images/image.png)
 
 The bot responses will show up in your terminal logs.
 
-![](../../../.gitbook/assets/image.png)
+![](../../../images/image.png)
 
 Follow the instructions and do not hesitate to reach us in [Telegram](http://t.me/hoprnet) for questions.
 
@@ -66,7 +66,7 @@ Important! Only HOPR Chat versions v1.4.0 and later will work with this bounty. 
 
 Next, fire up **HOPR Chat**! You should be able to see a prompt to showcase everything is ready for you to type, right after the text “Connecting to bootstrap nodes” show up.
 
-![](../../../.gitbook/assets/image.png)
+![](../../../images/image.png)
 
 **Time to identify yourself**
 
@@ -78,7 +78,7 @@ Make sure you run `includeRecipient` before proceeding! Otherwise, BouncerBot wi
 
 You can always see whether you are including your address in **HOPR Chat** by typing `settings`.
 
-![](../../../.gitbook/assets/image.png)
+![](../../../images/image.png)
 
 **Name the bot**
 

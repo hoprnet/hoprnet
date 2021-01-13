@@ -27,7 +27,7 @@ settings routing manual
 
 You'll see the following notification:
 
-![Changing your routing settings](../.gitbook/assets/avado-manual-routing.png)
+![Changing your routing settings](../images/avado-manual-routing.png)
 
 You can check your routing settings at any time by typing `settings`.
 

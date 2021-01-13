@@ -62,7 +62,7 @@ settings includeRecipient true
 
 From now on, every message you send will also be sent with your address. Now when you message the CoverBot, it will know your address and will be able to reply and add you to its database.
 
-![](../../.gitbook/assets/include-recipient.png)
+![](../../images/include-recipient.png)
 
 ## Step 4: Register With The Bot
 
@@ -70,7 +70,7 @@ Now that you've sent your tweet, and turned on `includeRecipient`, you need to r
 
 Type `send 16Uiu2HAmDutxTfS5rTvBNU4BmmBC86fEkScEHFSiV17YkKLD4rxA` then press Enter. Now paste the URL of your tweet and press Enter again. The bot will now check your tweet and will send you a verification message if you're successful.
 
-![](../../.gitbook/assets/verification-1.png)
+![](../../images/verification-1.png)
 
 ## Step 5: Stay Online to Earn Tickets!
 
@@ -80,7 +80,7 @@ Every 30 seconds, the bot will randomly select an address from the whitelist and
 
 If the CoverBot selects your address, you'll receive a ticket which can be redeemed for xHOPR. You'll also receive a verification message.
 
-![](../../.gitbook/assets/verification-2.png)
+![](../../images/verification-2.png)
 
 {% hint style="info" %}
 The more your node is online, the greater your chance of earning tickets, so try to maximize your node uptime.

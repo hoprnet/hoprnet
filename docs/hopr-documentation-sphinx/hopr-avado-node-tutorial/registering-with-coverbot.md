@@ -38,7 +38,7 @@ Your tweet needs to include:
 
 An example is shown below:
 
-![](../.gitbook/assets/example-tweet.png)
+![](../images/example-tweet.png)
 
 The bot should be able to parse any tweet which includes these three things, so feel free to add comments and even emojis. But if you're having difficulty registering, try again with a simpler tweet.
 
@@ -56,7 +56,7 @@ send 16Uiu2HAm79TuiHcEtjcELXAwcjEX6Sh7qGDbiqZbDvHSicRyPm9R [URL of your tweet]
 
 Then press Enter.
 
-![](../.gitbook/assets/coverbot-avado-success.png)
+![](../images/coverbot-avado-success.png)
 
 The bot will now check your tweet and will send you a verification message if you're successful. If there's an error, the bot will try and explain what has gone wrong so you can fix it.
 
@@ -66,7 +66,7 @@ Now that your address is whitelisted with the bot, you can earn tickets by relay
 
 Every 30 seconds, the bot will randomly select an address from the whitelist and ping it to check that it's online. If is, it will send cover traffic to itself via that node.
 
-![](../.gitbook/assets/coverbot-avado-relaying.png)
+![](../images/coverbot-avado-relaying.png)
 
 If the CoverBot selects your address, you'll receive a ticket which can be redeemed for HOPR. You'll also receive a verification message.
 

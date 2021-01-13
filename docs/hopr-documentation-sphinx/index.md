@@ -8,20 +8,16 @@ In its first implementation, HOPR relies on the **Ethereum Blockchain** as its f
 
 To implement this process, a HOPR node implements a **Connector Interface** that communicates to the Ethereum network using its popular web library, **Web3.js.** These interfaces allow HOPR nodes to monitor, approve, sign and verify when a message is transfered, and thus close a State Channel and get their \$HOPR earned. Each node verify each other, avoiding foul play and rewarding only **Honest Relayers**.
 
-![](.gitbook/assets/paper.bloc.8-2.png)
+![](./images/paper.bloc.8-2.png)
 
 Although the first interaction of the HOPR network is on the Ethereum network, HOPR is by design **Chain Agnostic,** which means that HOPR nodes can eventually implement different payment channels in different Blockchains. At the time of writing, HOPR is also able to implement a [Polkadot-enabled payment gateway.](https://github.com/hoprnet/hopr-polkadot)
 
 ```eval_rst
 .. toctree::
    :maxdepth: 1
-
-   README.md
-
-.. toctree::
-   :maxdepth: 1
    :caption: Getting Started
 
+   getting-started/README.md
    getting-started/hopr-chat.md
 
 .. toctree::

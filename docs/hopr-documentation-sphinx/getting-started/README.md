@@ -2,11 +2,12 @@
 description: Changing Data Privacy For Good.
 --- -->
 
-{% hint style="danger" %}
-These docs are currently being updated to reflect major changes to our software since our last release. In the meantime, you can visit our [github](https://www.github.com/hoprnet/hoprnet) for basic instructions on how to install and run a node.
-{% endhint %}
+```eval_rst
+.. DANGER::
+   These docs are currently being updated to reflect major changes to our software since our last release. In the meantime, you can visit our `github <https://www.github.com/hoprnet/hoprnet>`_ for basic instructions on how to install and run a node.
+```
 
-# HOPR
+# README
 
 HOPR \(pronounced 'hopper'\) is a **privacy-preserving messaging protocol** **\(HOPR protocol\)** and a **decentralized network \(HOPR network\)** with **economic incentives \(HOPR token\) on a blockchain**.
 

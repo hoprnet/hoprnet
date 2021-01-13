@@ -26,7 +26,7 @@ open 16Uiu2HAmNtoQri1X4ikUzCqjFQptRSLSVKnVzMmtZiCHCHkdWJr7 0.01
 
 This can take a few seconds to work, because your node will need to interact with the HOPR smart contract. Once it does, you'll see a notification that the channel has been opened, along with a receipt.
 
-![Opening a channel to RandoBot](../.gitbook/assets/avado-channel-to-randobot.png)
+![Opening a channel to RandoBot](../images/avado-channel-to-randobot.png)
 
 {% hint style="info" %}
 You can verify any of the receipts you get on an xDAI block explorer. For example: [https://blockscout.com/poa/xdai/](https://blockscout.com/poa/xdai/)
@@ -38,7 +38,7 @@ Type `balance`, and you'll see that your xHOPR balance has reduced by the amount
 
 You can check on your payment channels by typing `channels`:
 
-![Currently open channels](../.gitbook/assets/avado-open-channels.png)
+![Currently open channels](../images/avado-open-channels.png)
 
 ## Send A Multi-Hop Message
 
