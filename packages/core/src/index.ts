@@ -273,6 +273,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     )
     verbose(`strategy wants to close ${closeChannels.length} channels`)
     for (let toClose of closeChannels) {
+      verbose(`closing ${toClose}`)
       await this.closeChannel(toClose)
       verbose(`closed channel to ${toClose.toB58String()}`)
     }
