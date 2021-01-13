@@ -276,6 +276,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       verbose(`closing ${toClose}`)
       await this.closeChannel(toClose)
       verbose(`closed channel to ${toClose.toB58String()}`)
+      this.emit('hopr:channel:closed', toClose)
     }
     verbose(`strategy wants to open`, nextChannels.length, 'new channels')
     for (let channelToOpen of nextChannels) {
@@ -284,6 +285,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
         // Opening channels can fail if we can't establish a connection.
         const hash = await this.openChannel(...channelToOpen)
         verbose('- opened', channelToOpen, hash)
+        this.emit('hopr:channel:opened', channelToOpen)
       } catch (e) {
         log('error when trying to open strategy channels', e)
       }
