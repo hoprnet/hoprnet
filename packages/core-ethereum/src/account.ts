@@ -2,7 +2,7 @@ import type HoprEthereum from '.'
 import type { TransactionObject } from './tsc/web3/types'
 import type { TransactionConfig } from 'web3-core'
 import { getRpcOptions } from '@hoprnet/hopr-ethereum'
-import { Intermediate, stringToU8a, u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
+import { durations, Intermediate, stringToU8a, u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
 import NonceTracker from './nonce-tracker'
 import TransactionManager from './transaction-manager'
 import { AccountId, AcknowledgedTicket, Balance, Hash, NativeBalance, TicketEpoch } from './types'
@@ -55,7 +55,8 @@ class Account {
       getTransactionCount: async (address: string, blockNumber?: number) =>
         coreConnector.web3.eth.getTransactionCount(address, blockNumber),
       getConfirmedTransactions: () => Array.from(this._transactions.confirmed.values()),
-      getPendingTransactions: () => Array.from(this._transactions.pending.values())
+      getPendingTransactions: () => Array.from(this._transactions.pending.values()),
+      minPending: durations.minutes(15)
     })
 
     this._preImageIterator = async function* (this: Account) {

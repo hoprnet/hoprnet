@@ -133,7 +133,9 @@ export default class NonceTracker {
       const nextNetworkNonce = networkNonceResult.nonce
       const highestSuggested = Math.max(nextNetworkNonce, highestLocallyConfirmed)
 
-      const pendingTxs: Transaction[] = this._ignoreOldTxs(this.getPendingTransactions(address))
+      const allPendingTxs = this.getPendingTransactions(address)
+      // if a struck tx is found, we overwrite pending txs
+      const pendingTxs = this._containsStuckTx(allPendingTxs) ? [] : allPendingTxs
       const localNonceResult = this._getHighestContinuousFrom(pendingTxs, highestSuggested)
 
       const nonceDetails: NonceDetails = {
@@ -162,18 +164,24 @@ export default class NonceTracker {
   }
 
   /**
-   * It's possible we encounter transactions that are pending for a very long time.
-   * We need to be able to handle that, with this function, we are ignoring
-   * transactions that have been pending for more than {minPending} ms.
-   * This allows nonce-tracker to eventually re-use their nonces.
+   * It's possible we encounter transactions that are pending for a very long time,
+   * this can happen if a transaction is under-funded.
+   * This function will return `true` if it finds a pending transaction that has
+   * been pending for more than {minPending} ms.
    * @param txs
-   * @return txs that are not older than {minPending}
+   * @return true if it contains a stuck transaction
    */
-  private _ignoreOldTxs(txs: Transaction[]): Transaction[] {
-    if (!this.minPending) return txs
+  private _containsStuckTx(txs: Transaction[]): boolean {
+    if (!this.minPending) return false
 
-    const max = new Date().getTime() + this.minPending
-    return txs.filter((tx) => tx.createdAt < max)
+    const now = new Date().getTime()
+    console.log('_containsStuckTx', new Date(now).toISOString())
+
+    // checks if one of the txs is stuck
+    return txs.some((tx) => {
+      const deadline = tx.createdAt + this.minPending
+      return now - deadline < 0
+    })
   }
 
   private async _globalMutexFree(): Promise<void> {

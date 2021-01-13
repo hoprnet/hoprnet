@@ -4,9 +4,8 @@ import { durations } from '@hoprnet/hopr-utils'
 
 const USER_ADDRESS = '0x7d3517b0d011698406d6e0aed8453f0be2697926'
 
-describe.only('nonce-tracker', function () {
+describe('nonce-tracker', function () {
   let nonceTracker: NonceTracker
-  let mockTxGen: MockTxGen
   let pendingTxs: Transaction[] = []
   let confirmedTxs: Transaction[] = []
 
@@ -25,7 +24,6 @@ describe.only('nonce-tracker', function () {
       getPendingTransactions: () => pendingTxs,
       getConfirmedTransactions: () => confirmedTxs
     })
-    mockTxGen = new MockTxGen()
     pendingTxs = []
     confirmedTxs = []
   })
@@ -33,7 +31,7 @@ describe.only('nonce-tracker', function () {
   it('should create nonces from 1 to 10', async function () {
     for (let i = 0; i < 10; i++) {
       const nonceLock = await nonceTracker.getNonceLock(USER_ADDRESS)
-      pendingTxs.push(mockTxGen.generate({ nonce: nonceLock.nextNonce }))
+      pendingTxs.push(genTx({ nonce: nonceLock.nextNonce }))
       nonceLock.releaseLock()
     }
 
@@ -41,11 +39,11 @@ describe.only('nonce-tracker', function () {
   })
 
   it('should create nonces from 5 to 10 because we have 5 confirmed', async function () {
-    confirmedTxs = mockTxGen.generateMulti({}, { fromNonce: 0, count: 5 })
+    confirmedTxs = genMultiTx({ fromNonce: 0, count: 5 })
 
     for (let i = 0; i < 5; i++) {
       const nonceLock = await nonceTracker.getNonceLock(USER_ADDRESS)
-      pendingTxs.push(mockTxGen.generate({ nonce: nonceLock.nextNonce }))
+      pendingTxs.push(genTx({ nonce: nonceLock.nextNonce }))
       nonceLock.releaseLock()
     }
 
@@ -53,8 +51,8 @@ describe.only('nonce-tracker', function () {
   })
 
   it('should create nonce 4 when we have 3 confirmed and 1 pending', async function () {
-    confirmedTxs = mockTxGen.generateMulti({}, { fromNonce: 0, count: 3 })
-    pendingTxs = mockTxGen.generateMulti({}, { fromNonce: 3, count: 1 })
+    confirmedTxs = genMultiTx({ fromNonce: 0, count: 3 })
+    pendingTxs = genMultiTx({ fromNonce: 3, count: 1 })
 
     const nonceLock = await nonceTracker.getNonceLock(USER_ADDRESS)
     nonceLock.releaseLock()
@@ -63,13 +61,13 @@ describe.only('nonce-tracker', function () {
   })
 
   it('should create nonce 2 again when nonce 2 has failed', async function () {
-    confirmedTxs = mockTxGen.generateMulti({}, { fromNonce: 0, count: 1 })
+    confirmedTxs = genMultiTx({ fromNonce: 0, count: 1 })
 
     const nonceLock = await nonceTracker.getNonceLock(USER_ADDRESS)
     nonceLock.releaseLock()
     expect(nonceLock.nextNonce).to.equal(1)
     // add to pending
-    pendingTxs.push(mockTxGen.generate({ nonce: nonceLock.nextNonce }))
+    pendingTxs.push(genTx({ nonce: nonceLock.nextNonce }))
 
     // next nonce should be 2
     const secondNonceLock = await nonceTracker.getNonceLock(USER_ADDRESS)
@@ -92,13 +90,10 @@ describe.only('nonce-tracker', function () {
       getConfirmedTransactions: () => confirmedTxs
     })
 
-    pendingTxs = mockTxGen.generateMulti(
-      {},
-      {
-        fromNonce: 3,
-        count: 29
-      }
-    )
+    pendingTxs = genMultiTx({
+      fromNonce: 3,
+      count: 29
+    })
 
     const nonceLock = await nonceTracker.getNonceLock(USER_ADDRESS)
     nonceLock.releaseLock()
@@ -112,13 +107,11 @@ describe.only('nonce-tracker', function () {
   })
 
   it('should create nonce 2 when duplicate nonces exist', async function () {
-    confirmedTxs = mockTxGen.generateMulti({}, { count: 1 })
-    pendingTxs = mockTxGen.generateMulti(
-      {
-        nonce: 1
-      },
-      { count: 5 }
-    )
+    confirmedTxs = genMultiTx({ count: 1 })
+    pendingTxs = genMultiTx({
+      forceNonce: 1,
+      count: 5
+    })
 
     const nonceLock = await nonceTracker.getNonceLock(USER_ADDRESS)
     expect(nonceLock.nextNonce).to.be.equal(2, `nonce should be 2 got ${nonceLock.nextNonce}`)
@@ -133,7 +126,7 @@ describe.only('nonce-tracker', function () {
       getConfirmedTransactions: () => confirmedTxs
     })
 
-    confirmedTxs = mockTxGen.generateMulti({}, { count: 3 })
+    confirmedTxs = genMultiTx({ count: 3 })
 
     const nonceLock = await nonceTracker.getNonceLock(USER_ADDRESS)
     expect(nonceLock.nextNonce).to.equal(3, `nonce should be 3 got ${nonceLock.nextNonce}`)
@@ -148,7 +141,7 @@ describe.only('nonce-tracker', function () {
       getConfirmedTransactions: () => confirmedTxs
     })
 
-    pendingTxs = mockTxGen.generateMulti({}, { count: 2 })
+    pendingTxs = genMultiTx({ count: 2 })
 
     const nonceLock = await nonceTracker.getNonceLock(USER_ADDRESS)
     expect(nonceLock.nextNonce).to.equal(2, `nonce should be 2 got ${nonceLock.nextNonce}`)
@@ -163,7 +156,7 @@ describe.only('nonce-tracker', function () {
       getConfirmedTransactions: () => confirmedTxs
     })
 
-    pendingTxs = mockTxGen.generateMulti({}, { count: 2 })
+    pendingTxs = genMultiTx({ count: 2 })
 
     const nonceLock = await nonceTracker.getNonceLock(USER_ADDRESS)
     expect(nonceLock.nextNonce).to.equal(5, `nonce should be 5 got ${nonceLock.nextNonce}`)
@@ -171,7 +164,7 @@ describe.only('nonce-tracker', function () {
   })
 
   it('should create nonce 5 after those when there are some pending nonces below the remote one and some over.', async function () {
-    pendingTxs = mockTxGen.generateMulti({}, { count: 5 })
+    pendingTxs = genMultiTx({ count: 5 })
     nonceTracker = new NonceTracker({
       getLatestBlockNumber: async () => 1,
       getTransactionCount: async () => 3,
@@ -185,9 +178,9 @@ describe.only('nonce-tracker', function () {
   })
 
   it('should create 0 nonce after network nonce when there are pending nonces non sequentially over the network nonce', async function () {
-    mockTxGen.generateMulti({}, { count: 5 })
-    // 5 over that number
-    pendingTxs = mockTxGen.generateMulti({}, { count: 5 })
+    genMultiTx({ count: 5 })
+    pendingTxs = genMultiTx({ count: 5, fromNonce: 5 })
+
     nonceTracker = new NonceTracker({
       getLatestBlockNumber: async () => 1,
       getTransactionCount: async () => 0,
@@ -201,13 +194,11 @@ describe.only('nonce-tracker', function () {
   })
 
   it('should create nonce 50 after network nonce When all three return different values', async function () {
-    confirmedTxs = mockTxGen.generateMulti({}, { count: 10 })
-    pendingTxs = mockTxGen.generateMulti(
-      {
-        nonce: 100
-      },
-      { count: 1 }
-    )
+    confirmedTxs = genMultiTx({ count: 10 })
+    pendingTxs = genMultiTx({
+      forceNonce: 100,
+      count: 1
+    })
     nonceTracker = new NonceTracker({
       getLatestBlockNumber: async () => 1,
       getTransactionCount: async () => 50,
@@ -221,8 +212,8 @@ describe.only('nonce-tracker', function () {
   })
 
   it('should create nonce 74 after network nonce', async function () {
-    confirmedTxs = mockTxGen.generateMulti({}, { count: 64 })
-    pendingTxs = mockTxGen.generateMulti({}, { count: 10 })
+    confirmedTxs = genMultiTx({ count: 64 })
+    pendingTxs = genMultiTx({ count: 10, fromNonce: 64 })
     nonceTracker = new NonceTracker({
       getLatestBlockNumber: async () => 1,
       getTransactionCount: async () => 64,
@@ -233,6 +224,29 @@ describe.only('nonce-tracker', function () {
     const nonceLock = await nonceTracker.getNonceLock(USER_ADDRESS)
     expect(nonceLock.nextNonce).to.equal(74, `nonce should be 74 got ${nonceLock.nextNonce}`)
     nonceLock.releaseLock()
+  })
+
+  it('should not ignore long-time pending transactions when minPending is not provided', async function () {
+    nonceTracker = new NonceTracker({
+      getLatestBlockNumber: async () => 1,
+      getTransactionCount: getTransactionCountFromConfirmed,
+      getPendingTransactions: () => pendingTxs,
+      getConfirmedTransactions: () => confirmedTxs
+    })
+
+    let createdAt = new Date().getTime() - durations.seconds(30)
+
+    pendingTxs = [
+      genTx({ nonce: 0, createdAt }),
+      genTx({ nonce: 1, createdAt: (createdAt += durations.seconds(10)) }),
+      genTx({ nonce: 2, createdAt: (createdAt += durations.seconds(10)) }),
+      genTx({ nonce: 3, createdAt: (createdAt += durations.seconds(10)) }),
+      genTx({ nonce: 4, createdAt: (createdAt += durations.seconds(10)) })
+    ]
+
+    const nonceLock = await nonceTracker.getNonceLock(USER_ADDRESS)
+    nonceLock.releaseLock()
+    expect(nonceLock.nextNonce).to.equal(5, `nonce should be 5 got ${nonceLock.nextNonce}`)
   })
 
   it('should ignore long-time pending transactions', async function () {
@@ -249,41 +263,36 @@ describe.only('nonce-tracker', function () {
     let createdAt = new Date().getTime() - minPending
 
     pendingTxs = [
-      mockTxGen.generate({ createdAt }),
-      mockTxGen.generate({ createdAt: (createdAt += durations.seconds(10)) }),
-      mockTxGen.generate({ createdAt: (createdAt += durations.seconds(10)) }),
-      mockTxGen.generate({ createdAt: (createdAt += durations.seconds(10)) }),
-      mockTxGen.generate({ createdAt: (createdAt += durations.seconds(10)) })
+      genTx({ nonce: 0, createdAt }),
+      genTx({ nonce: 1, createdAt: (createdAt += durations.seconds(10)) }),
+      genTx({ nonce: 2, createdAt: (createdAt += durations.seconds(10)) }),
+      genTx({ nonce: 3, createdAt: (createdAt += durations.seconds(10)) }),
+      genTx({ nonce: 4, createdAt: (createdAt += durations.seconds(10)) })
     ]
 
     const nonceLock = await nonceTracker.getNonceLock(USER_ADDRESS)
     nonceLock.releaseLock()
-    expect(nonceLock.nextNonce).to.equal(1, `nonce should be 1 got ${nonceLock.nextNonce}`)
+    expect(nonceLock.nextNonce).to.equal(0, `nonce should be 0 got ${nonceLock.nextNonce}`)
   })
 })
 
-class MockTxGen {
-  private txs: Transaction[] = []
+const genTx = (opts: { nonce: number; createdAt?: number }): Transaction => {
+  const { createdAt = new Date().getTime() } = opts
+  return { ...opts, from: USER_ADDRESS, createdAt }
+}
 
-  public generate(tx: Partial<Transaction> = {}): Transaction {
-    const nonce = tx.nonce ?? 0
-    return { from: USER_ADDRESS, ...tx, nonce, createdAt: new Date().getTime() }
+const genMultiTx = (opts: {
+  count?: number
+  fromNonce?: number
+  forceNonce?: number
+  createdAt?: number
+}): Transaction[] => {
+  const { count = 1, fromNonce = 0, forceNonce, createdAt } = opts
+  const txs: Transaction[] = []
+
+  for (let i = 0; i < count; i++) {
+    txs.push(genTx({ nonce: forceNonce ?? fromNonce + i, createdAt }))
   }
 
-  public generateMulti(
-    tx: Partial<Transaction> = {},
-    opts: { count?: number; fromNonce?: number } = {}
-  ): Transaction[] {
-    const { count = 1, fromNonce } = opts
-    const txs = []
-    let nonce = fromNonce || this.txs.length
-
-    for (let i = 0; i < count; i++) {
-      txs.push(this.generate({ ...tx, nonce: tx.nonce ?? nonce }))
-      nonce += 1
-    }
-
-    this.txs = this.txs.concat(txs)
-    return txs
-  }
+  return txs
 }
