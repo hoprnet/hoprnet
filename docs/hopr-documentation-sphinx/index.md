@@ -18,7 +18,7 @@ Although the first interaction of the HOPR network is on the Ethereum network, H
    :caption: Getting Started
 
    getting-started/README.md
-   getting-started/hopr-chat.md
+   getting-started/hoprd.md
 
 .. toctree::
    :maxdepth: 1
@@ -40,8 +40,8 @@ Although the first interaction of the HOPR network is on the Ethereum network, H
 
    core-concepts/overview.md
    core-concepts/protocol-network-token.md
-   core-concepts/hopr-chat/README.md
-   core-concepts/hopr-chat/troubleshooting.md
+   core-concepts/hoprd/README.md
+   core-concepts/hoprd/troubleshooting.md
    core-concepts/proof-of-relay/README.md
    core-concepts/proof-of-relay/routing-settings.md
    core-concepts/bootstrap-nodes.md

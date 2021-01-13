@@ -24,6 +24,7 @@ redeemTickets
 
 This will redeem all of your tickets. The HOPR from these tickets will be added to your balance.
 
-{% hint style="warning" %}
-Redeeming tickets requires calling the HOPR smart contract, so can take some time. You will be notified as each ticket is redeemed.
-{% endhint %}
+```eval_rst
+.. WARNING::
+   Redeeming tickets requires calling the HOPR smart contract, so can take some time. You will be notified as each ticket is redeemed.
+```
