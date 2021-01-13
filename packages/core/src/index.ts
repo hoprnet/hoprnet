@@ -619,11 +619,11 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
    *
    * @param destination instance of peerInfo that contains the peerId of the destination
    */
-  private async getIntermediateNodes(destination: PeerId): Promise<PeerId[]> {
+  public async getIntermediateNodes(destination: PeerId, maxHops: number = MAX_HOPS): Promise<PeerId[]> {
     return await findPath(
       this.getId(),
       destination,
-      MAX_HOPS - 1,
+      maxHops - 1,
       this.network.networkPeers,
       this.paymentChannels.indexer,
       PATH_RANDOMNESS
