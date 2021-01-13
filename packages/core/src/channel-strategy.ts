@@ -69,7 +69,7 @@ export class PromiscuousStrategy implements ChannelStrategy {
     let toOpen: ChannelsToOpen[] = []
 
     let i = 0
-    let toClose = currentChannels.filter(x => peers.qualityOf(x) < 0.1)
+    let toClose = currentChannels.filter((x: IndexerChannel) => peers.qualityOf(indexerDest(x)) < 0.1)
 
     while (balance.gtn(0) && i++ < MAX_NEW_CHANNELS_PER_TICK) {
       let randomChannel = await indexer.getRandomChannel()
