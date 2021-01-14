@@ -85,11 +85,12 @@ describe('test creation & transformation of a header', function () {
       }).map(() => PeerId.create({ keyType: 'secp256k1' }))
     )
 
-    const lastPeerId = peerIds[peerIds.length - 1]
     const { header, identifier, secrets } = await createAndDecomposeHeader(getNode(), peerIds)
+    const lastPeerId = peerIds[peerIds.length - 1]
+    const lastSecret = secrets[secrets.length - 1]
 
     header.deriveSecret(lastPeerId.privKey.marshal(), true)
-    assert(u8aEquals(header.derivedSecret, secrets[2]), `pre-computed secret and derived secret should be the same`)
+    assert(u8aEquals(header.derivedSecret, lastSecret), `pre-computed secret and derived secret should be the same`)
 
     assert(header.verify(), `MAC should be valid`)
     header.extractHeaderInformation(true)
