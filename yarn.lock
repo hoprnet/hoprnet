@@ -9431,13 +9431,13 @@ multicodec@^2.0.0, multicodec@^2.1.0:
     uint8arrays "1.1.0"
     varint "^6.0.0"
 
-multihashes@3.1.0, multihashes@^3.0.1, multihashes@~3.1.0:
-  version "3.1.0"
-  resolved "https://registry.yarnpkg.com/multihashes/-/multihashes-3.1.0.tgz#aada18fc55169ae044c3455e2264024bd00f5690"
-  integrity sha512-snU+w6aZy5bTrrqIHW3wkT0MfHmxcpOsaVNJt0NzUnseksbjFDVUZjSmhDMAVOVnIdLMS7xHjo55pKlBIGmC3g==
+multihashes@3.1.1, multihashes@^3.0.1, multihashes@~3.1.0:
+  version "3.1.1"
+  resolved "https://registry.yarnpkg.com/multihashes/-/multihashes-3.1.1.tgz#4e0bbf1e4f3d5118f3621ec8d4404aee47a7d32b"
+  integrity sha512-oF4BesRWbr5BbcRr1/QCDlZK+An8LWBPHVPYKt/foDpqNtXX/l0lm/rmAjI8dDYruPO90OaGcAWI3KS5vNJdNw==
   dependencies:
     multibase "^3.1.0"
-    uint8arrays "^1.0.0"
+    uint8arrays "^2.0.5"
     varint "^6.0.0"
 
 multihashes@^0.4.15, multihashes@~0.4.15:
@@ -13218,6 +13218,14 @@ uint8arrays@1.1.0, uint8arrays@^1.0.0, uint8arrays@^1.1.0:
     multibase "^3.0.0"
     web-encoding "^1.0.2"
 
+uint8arrays@^2.0.5:
+  version "2.0.5"
+  resolved "https://registry.yarnpkg.com/uint8arrays/-/uint8arrays-2.0.5.tgz#763d0c3dd8e1d05b656d2e60c8a9a53096a47d9e"
+  integrity sha512-1HSktgwqtYIwVn1mg3GcnqKhHH9oC4kVgdD/43cxMWwhP8rihKcFPmToDzS1XtbvVvlR8XxTk/DUBf0C83qNIg==
+  dependencies:
+    multibase "^3.0.0"
+    web-encoding "^1.0.5"
+
 ultron@~1.1.0:
   version "1.1.1"
   resolved "https://registry.yarnpkg.com/ultron/-/ultron-1.1.1.tgz#9fe1536a10a664a65266a1e3ccf85fd36302bc9c"
@@ -13543,7 +13551,7 @@ wcwidth@^1.0.0:
   dependencies:
     defaults "^1.0.3"
 
-web-encoding@^1.0.2, web-encoding@^1.0.4:
+web-encoding@^1.0.2, web-encoding@^1.0.4, web-encoding@^1.0.5:
   version "1.0.6"
   resolved "https://registry.yarnpkg.com/web-encoding/-/web-encoding-1.0.6.tgz#ec631356ee523b4474ecbcae680440bd1e79416a"
   integrity sha512-26wEnRPEFAc5d5lmH1Q/DuvWEYsRF1D2alX2jlKpdmqv7cj+BbANL7Xlcl9r4s72Eg9kItZa9RWVbBMC9dMv4w==
