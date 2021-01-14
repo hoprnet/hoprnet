@@ -15,6 +15,7 @@ import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import { randomBytes } from 'crypto'
 import secp256k1 from 'secp256k1'
 import { u8aEquals } from '@hoprnet/hopr-utils'
+import { MAX_HOPS } from '../../../constants'
 
 describe('test creation & transformation of a header', function () {
   async function createAndDecomposeHeader(
@@ -78,22 +79,24 @@ describe('test creation & transformation of a header', function () {
   })
 
   it('should create a header', async function () {
-    const peerIds = await Promise.all([
-      PeerId.create({ keyType: 'secp256k1' }),
-      PeerId.create({ keyType: 'secp256k1' }),
-      PeerId.create({ keyType: 'secp256k1' })
-    ])
+    const peerIds = await Promise.all(
+      Array.from({
+        length: MAX_HOPS
+      }).map(() => PeerId.create({ keyType: 'secp256k1' }))
+    )
 
     const { header, identifier, secrets } = await createAndDecomposeHeader(getNode(), peerIds)
+    const lastPeerId = peerIds[peerIds.length - 1]
+    const lastSecret = secrets[secrets.length - 1]
 
-    header.deriveSecret(peerIds[2].privKey.marshal(), true)
-    assert(u8aEquals(header.derivedSecret, secrets[2]), `pre-computed secret and derived secret should be the same`)
+    header.deriveSecret(lastPeerId.privKey.marshal(), true)
+    assert(u8aEquals(header.derivedSecret, lastSecret), `pre-computed secret and derived secret should be the same`)
 
     assert(header.verify(), `MAC should be valid`)
     header.extractHeaderInformation(true)
 
     assert(
-      u8aEquals(peerIds[2].pubKey.marshal(), header.address),
+      u8aEquals(lastPeerId.pubKey.marshal(), header.address),
       `Decrypted address should be the same as the final recipient`
     )
 
