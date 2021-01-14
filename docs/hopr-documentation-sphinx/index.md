@@ -1,3 +1,8 @@
+```eval_rst
+.. DANGER::
+   These docs are currently being updated to reflect major changes to our software since our last release. In the meantime, you can visit our `github <https://www.github.com/hoprnet/hoprnet>`_ for basic instructions on how to install and run a node.
+```
+
 # Overview
 
 The HOPR ecosystem is a two-platform network with dynamic components powering its communication and incentivization mechanisms.
