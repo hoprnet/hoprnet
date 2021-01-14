@@ -30,7 +30,7 @@ RELEASE=$(node -p -e "require('./packages/hoprd/package.json').version")
 get_environment
 
 TESTNET_NAME="$RELEASE_NAME-$(echo "$VERSION_MAJ_MIN" | sed 's/\./-/g')"
-TESTNET_SIZE=2
+TESTNET_SIZE=5
 
 echo "Cleaning up before deploy"
 cleanup

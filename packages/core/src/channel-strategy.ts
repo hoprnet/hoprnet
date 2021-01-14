@@ -7,6 +7,7 @@ import type NetworkPeers from './network/network-peers'
 const log = debug('hopr-core:channel-strategy')
 
 export type ChannelsToOpen = [PeerId, BN]
+export type ChannelsToClose = PeerId
 const dest = (c: ChannelsToOpen): PeerId => c[0]
 const outgoingPeer = (c: IndexerChannel): PeerId => c[0]
 const indexerDest = (c: IndexerChannel): PeerId => c[1]
@@ -30,7 +31,7 @@ export interface ChannelStrategy {
     currentChannels: IndexerChannel[],
     networkPeers: NetworkPeers,
     indexer: Indexer
-  ): Promise<ChannelsToOpen[]>
+  ): Promise<[ChannelsToOpen[], ChannelsToClose[]]>
   // TBD: Include ChannelsToClose as well.
 }
 
@@ -48,8 +49,8 @@ export class PassiveStrategy implements ChannelStrategy {
     _c: IndexerChannel[],
     _p: NetworkPeers,
     _indexer: Indexer
-  ): Promise<ChannelsToOpen[]> {
-    return []
+  ): Promise<[ChannelsToOpen[], ChannelsToClose[]]> {
+    return [[], []]
   }
 }
 
@@ -63,11 +64,14 @@ export class PromiscuousStrategy implements ChannelStrategy {
     currentChannels: IndexerChannel[],
     peers: NetworkPeers,
     indexer: Indexer
-  ): Promise<ChannelsToOpen[]> {
+  ): Promise<[ChannelsToOpen[], ChannelsToClose[]]> {
     log('currently open', logIndexerChannels(currentChannels))
     let toOpen: ChannelsToOpen[] = []
 
     let i = 0
+    let toClose = currentChannels
+      .filter((x: IndexerChannel) => peers.qualityOf(indexerDest(x)) < 0.1)
+      .map((x) => indexerDest(x))
 
     while (balance.gtn(0) && i++ < MAX_NEW_CHANNELS_PER_TICK) {
       let randomChannel = await indexer.getRandomChannel()
@@ -87,6 +91,6 @@ export class PromiscuousStrategy implements ChannelStrategy {
       }
     }
     log('Promiscuous toOpen: ', logChannels(toOpen))
-    return toOpen
+    return [toOpen, toClose]
   }
 }

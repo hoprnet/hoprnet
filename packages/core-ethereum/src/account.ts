@@ -9,10 +9,11 @@ import { AccountId, AcknowledgedTicket, Balance, Hash, NativeBalance, TicketEpoc
 import { isWinningTicket, pubKeyToAccountId } from './utils'
 import { ContractEventEmitter } from './tsc/web3/types'
 import { HASHED_SECRET_WIDTH } from './hashedSecret'
-export const EMPTY_HASHED_SECRET = new Uint8Array(HASHED_SECRET_WIDTH).fill(0x00)
+
 import debug from 'debug'
 const log = debug('hopr-core-ethereum:account')
 
+export const EMPTY_HASHED_SECRET = new Uint8Array(HASHED_SECRET_WIDTH).fill(0x00)
 const rpcOps = getRpcOptions()
 
 class Account {
@@ -93,7 +94,7 @@ class Account {
           yield false
         }
 
-        ticket = yield false
+        ticket = yield
       }
     }.call(this)
   }

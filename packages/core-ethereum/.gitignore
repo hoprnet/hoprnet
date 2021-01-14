@@ -19,6 +19,7 @@ src/tsc/web3
 
 # Typescript builds
 lib
+test.mocha.js
 
 # Ethereum artifacts
 src/ethereum

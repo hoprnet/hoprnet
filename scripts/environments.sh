@@ -11,7 +11,7 @@ function get_version_maj_min() {
 }
 
 # These will be cleaned up and machines stopped
-OLD_RELEASES='zurich zug luzern larnaca basodino saentis debug-dbg nightly'
+OLD_RELEASES='zurich zug luzern larnaca queretaro basodino saentis debug-dbg nightly'
 
 # ===== Load env variables for the current github ref =====
 # Takes:
@@ -34,6 +34,10 @@ get_environment() {
   case "$BRANCH" in release/*)
     VERSION_MAJ_MIN=$(get_version_maj_min $RELEASE) 
 
+    if [ "$VERSION_MAJ_MIN" == '1.61' ]; then
+      RELEASE_NAME='nyc'
+      return
+    fi
     if [ "$VERSION_MAJ_MIN" == '1.60' ]; then
       RELEASE_NAME='mainz'
       # Released by mistake: https://github.com/hoprnet/hoprnet/pull/893#issuecomment-750318579
