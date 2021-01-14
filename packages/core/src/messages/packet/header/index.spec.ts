@@ -15,6 +15,7 @@ import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import { randomBytes } from 'crypto'
 import secp256k1 from 'secp256k1'
 import { u8aEquals } from '@hoprnet/hopr-utils'
+import { MAX_HOPS } from '../../../constants'
 
 describe('test creation & transformation of a header', function () {
   async function createAndDecomposeHeader(
@@ -78,11 +79,11 @@ describe('test creation & transformation of a header', function () {
   })
 
   it('should create a header', async function () {
-    const peerIds = await Promise.all([
-      PeerId.create({ keyType: 'secp256k1' }),
-      PeerId.create({ keyType: 'secp256k1' }),
-      PeerId.create({ keyType: 'secp256k1' })
-    ])
+    const peerIds = await Promise.all(
+      Array.from({
+        length: MAX_HOPS
+      }).map(() => PeerId.create({ keyType: 'secp256k1' }))
+    )
 
     const { header, identifier, secrets } = await createAndDecomposeHeader(getNode(), peerIds)
 
