@@ -270,8 +270,21 @@ class Account {
         this._transactions.moveToConfirmed(signedTransaction.transactionHash)
       })
       event.once('error', (error) => {
-        log('Transaction failed %s %i with error %s', signedTransaction.transactionHash, options.nonce, error.message)
-        this._transactions.remove(signedTransaction.transactionHash)
+        const receipt = error['receipt']
+        log(
+          'Transaction failed %s %i with error %s',
+          signedTransaction.transactionHash,
+          options.nonce,
+          error.message,
+          receipt ? receipt : undefined
+        )
+
+        // mean tx was confirmed & reverted
+        if (receipt) {
+          this._transactions.moveToConfirmed(signedTransaction.transactionHash)
+        } else {
+          this._transactions.remove(signedTransaction.transactionHash)
+        }
       })
 
       return event

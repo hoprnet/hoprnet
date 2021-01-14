@@ -16,5 +16,5 @@ export const ADDRESS_LENGTH = 20
 
 export const ERRORS = {
   OOF_HOPR: 'Insufficient HOPR tokens.',
-  OOF_ETH: 'Insufficient ETH.'
+  OOF_NATIVE: 'Insufficient NATIVE funds.'
 }

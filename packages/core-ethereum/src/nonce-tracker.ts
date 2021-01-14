@@ -175,7 +175,6 @@ export default class NonceTracker {
     if (!this.minPending) return false
 
     const now = new Date().getTime()
-    console.log('_containsStuckTx', new Date(now).toISOString())
 
     // checks if one of the txs is stuck
     return txs.some((tx) => {
