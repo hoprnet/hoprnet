@@ -4,9 +4,9 @@
 
 ### Fixes
 
-* improved addressing and effective countermeasures against self-dials
-* stronger typing
-* various control-flow fixes
+- improved addressing and effective countermeasures against self-dials
+- stronger typing
+- various control-flow fixes
 
 <a name="0.1.1"></a>
 
@@ -14,7 +14,7 @@
 
 ### Fixes
 
-* use `hopr-connect` in Debug strings
+- use `hopr-connect` in Debug strings
 
 <a name="0.1"></a>
 

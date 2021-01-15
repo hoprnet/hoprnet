@@ -118,7 +118,7 @@ declare module 'libp2p' {
 
   export default class LibP2P {
     constructor(options: any) //: LibP2P
-    static create(options: any): any
+    static create(options: any): Promise<LibP2P>
     // @TODO add libp2p types
     emit: (event: string, ...args: any[]) => void
     dial: (addr: Multiaddr | PeerId, options?: { signal: AbortSignal }) => Promise<Handler>
@@ -127,8 +127,8 @@ declare module 'libp2p' {
     hangUp: (addr: PeerId | Multiaddr | string) => Promise<void>
     peerStore: PeerStore
     peerRouting: PeerRouting
-    handle: (protocol: string | string[], handler: (struct: { connection: any; stream: any }) => void) => void
-    start(): Promise<any>
+    handle: (protocol: string | string[], handler: (struct: Handler) => void) => void
+    start(): Promise<void>
     stop(): Promise<void>
 
     multiaddrs: Multiaddr[]

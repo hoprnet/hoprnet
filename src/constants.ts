@@ -21,15 +21,20 @@ export const OK = new TextEncoder().encode('OK')
 export const FAIL = new TextEncoder().encode('FAIL')
 export const FAIL_COULD_NOT_REACH_COUNTERPARTY = new TextEncoder().encode('FAIL_COULD_NOT_REACH_COUNTERPARTY')
 export const FAIL_COULD_NOT_IDENTIFY_PEER = new TextEncoder().encode('FAIL_COULD_NOT_IDENTIFY_INITIATOR')
+export const FAIL_LOOPBACKS_ARE_NOT_ALLOWED = new TextEncoder().encode('FAIL_LOOPBACKS_ARE_NOT_ALLOWED')
+export const FAIL_INVALID_PUBLIC_KEY = new TextEncoder().encode('FAIL_INVALID_PUBLIC_KEY')
 
+export const MIGRATE = new TextEncoder().encode('MIGRATE')
 export const STOP = new TextEncoder().encode('STOP')
 export const RESTART = new TextEncoder().encode('RESTART')
 export const PING = new TextEncoder().encode('PING')
-export const PING_RESPONSE = new TextEncoder().encode('PING_RESPONSE')
+export const PONG = new TextEncoder().encode('PONG')
 
 export const RELAY_PAYLOAD_PREFIX = new Uint8Array([0])
 export const RELAY_STATUS_PREFIX = new Uint8Array([1])
 export const RELAY_WEBRTC_PREFIX = new Uint8Array([2])
+export const RELAY_CONNECTION_STATUS_PREFIX = new Uint8Array([3])
+export const VALID_PREFIXES = [...RELAY_PAYLOAD_PREFIX, ...RELAY_STATUS_PREFIX, ...RELAY_WEBRTC_PREFIX, ...RELAY_CONNECTION_STATUS_PREFIX]
 
 export const RELAY = `/hopr/relay-register/${version}`
 export const DELIVERY = `/hopr/delivery-register/${version}`

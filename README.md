@@ -99,4 +99,4 @@ const node = await libp2p.create({
 - [Sebastian Bürgel](https://github.com/scbuergel)
 - [Robert Kiel](https://github.com/robertkiel)
 
-and the rest of the HOPR team!
+and the rest of the [HOPR](https://hoprnet.org) team!

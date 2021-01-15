@@ -32,7 +32,7 @@ class WebRTCConnection implements MultiaddrConnection {
 
   private channel: SimplePeer
 
-  public conn: MultiaddrConnection
+  public conn: RelayConnection
 
   public timeline: {
     open: number
@@ -40,7 +40,7 @@ class WebRTCConnection implements MultiaddrConnection {
   }
 
   constructor(opts: {
-    conn: MultiaddrConnection
+    conn: RelayConnection
     channel: SimplePeer
     self: PeerId
     counterparty: PeerId
@@ -88,17 +88,12 @@ class WebRTCConnection implements MultiaddrConnection {
     this.channel.once('error', endWebRTCUpgrade)
 
     this.sink = async (source: Stream['source']): Promise<void> => {
+      let sourceResult: IteratorResult<Uint8Array, void> | undefined
       let sourceReceived = false
-      let sourceMsg: Uint8Array
-      let sourceDone = false
 
       function sourceFunction(arg: IteratorResult<Uint8Array, void>) {
         sourceReceived = true
-        sourceDone = arg.done || false
-
-        if (!arg.done) {
-          sourceMsg = arg.value
-        }
+        sourceResult = arg
       }
 
       let sourcePromise = source.next().then(sourceFunction)
@@ -109,7 +104,7 @@ class WebRTCConnection implements MultiaddrConnection {
 
       let streamSwitched = false
       let switchPromise = this._switchPromise.promise.then(() => {
-        streamSwitched = false
+        streamSwitched = true
       })
 
       this.conn.sink(
@@ -126,39 +121,43 @@ class WebRTCConnection implements MultiaddrConnection {
             ])
 
             if (streamSwitched) {
+              streamSwitched = false
               break
-            } else if (sourceReceived) {
-              promiseTriggered = false
-              sourceReceived = false
+            }
 
-              if (sourceDone) {
-                break
-              }
+            promiseTriggered = false
+            sourceReceived = false
 
-              yield sourceMsg.slice()
+            if (sourceResult == undefined || sourceResult.done) {
+              break
+            }
 
-              if (!this._webRTCAvailable) {
-                sourcePromise = source.next().then(sourceFunction)
-                promiseTriggered = true
-              }
+            yield sourceResult.value.slice()
+
+            if (!this._webRTCAvailable) {
+              sourcePromise = source.next().then(sourceFunction)
+              promiseTriggered = true
+            } else {
+              yield new Uint8Array()
             }
           }
 
           if (this._webRTCStateKnown && !this._webRTCAvailable) {
             log(
-              `WebRTC upgrade failed. Falling back to a relayed connection with peer ${opts.counterparty.toB58String()}.`
+              `WebRTC connection upgrade failed. Continue using relayed connection with peer ${opts.counterparty.toB58String()}.`
             )
 
             await sourcePromise
 
-            if (sourceDone) {
+            if (sourceResult == undefined || sourceResult.done) {
               return
             }
 
-            yield sourceMsg.slice()
+            yield sourceResult.value.slice()
 
             yield* source
           }
+
           defer.resolve()
         }.call(this)
       )
@@ -173,26 +172,41 @@ class WebRTCConnection implements MultiaddrConnection {
         if (this._webRTCAvailable) {
           toIterable.sink(this.channel)(
             async function* (this: WebRTCConnection): Stream['source'] {
+              console.log(`after defer`, promiseTriggered, sourceReceived)
+
               if (promiseTriggered && !sourceReceived) {
                 if (!sourceReceived) {
                   await sourcePromise
                 }
 
-                yield sourceMsg.slice()
+                console.log(`after defer`, promiseTriggered, sourceReceived, sourceResult)
+
+                if (sourceResult != undefined && !sourceResult.done) {
+                  yield sourceResult.value.slice()
+                }
               }
 
               log(`switching to direct WebRTC connection with peer ${this.remoteAddr.getPeerId()}`)
 
-              // @ts-ignore
-              while (this.channel.connected && this._iteration == (this.conn as RelayConnection)._iteration) {
+              while (
+                // @ts-ignore
+                this.channel.connected &&
+                this._iteration == this.conn._iteration
+              ) {
+                await new Promise((resolve) => setTimeout(resolve, 100))
+                console.log(`sinking into WebRTC`)
                 const result = await source.next()
 
                 if (result.done) {
                   break
                 }
 
-                // @ts-ignore
-                if (this.channel.connected && this._iteration == (this.conn as RelayConnection)._iteration) {
+                if (
+                  // @ts-ignore
+                  this.channel.connected &&
+                  this._iteration == this.conn._iteration
+                ) {
+                  console.log(`sinking ${new TextDecoder().decode(result.value.slice())} into WebRTC`)
                   yield result.value.slice()
                 } else {
                   break
@@ -209,17 +223,25 @@ class WebRTCConnection implements MultiaddrConnection {
         this._webRTCTimeout = setTimeout(endWebRTCUpgrade, WEBRTC_UPGRADE_TIMEOUT)
       }
 
+      // @TODO
+      // end is not coming
       yield* this.conn.source
 
+      console.log(`stream has ended`)
       if (!this._webRTCStateKnown || this._webRTCAvailable) {
         await this._switchPromise.promise
       }
+      console.log(`after waiting for switch`)
 
       if (this._webRTCAvailable || !this._webRTCStateKnown) {
         clearTimeout(this._webRTCTimeout)
         log(`webRTC handover done. Using direct connection to peer ${this.remoteAddr.getPeerId()}`)
 
-        yield* this.channel[Symbol.asyncIterator]() as Stream['source']
+        for await (const msg of this.channel[Symbol.asyncIterator]() as Stream['source']) {
+          console.log(`getting from WebRTC ${new TextDecoder().decode(msg)}`)
+          yield msg
+        }
+        // yield* this.channel[Symbol.asyncIterator]() as Stream['source']
       }
     }.call(this)
   }

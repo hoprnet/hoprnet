@@ -31,6 +31,7 @@ class HoprConnect implements Transport {
 
   public discovery: Discovery
 
+  private __noDirectConnections?: boolean
   private _upgrader: Upgrader
   private _peerId: PeerId
   private _multiaddrs: Multiaddr[]
@@ -43,7 +44,13 @@ class HoprConnect implements Transport {
   private _interface?: string
   private connHandler?: ConnHandler
 
-  constructor(opts: { upgrader: Upgrader; libp2p: libp2p; bootstrapServers?: Multiaddr[]; interface?: string }) {
+  constructor(opts: {
+    upgrader: Upgrader
+    libp2p: libp2p
+    bootstrapServers?: Multiaddr[] | Multiaddr
+    interface?: string
+    __noDirectConnections: boolean
+  }) {
     if (!opts.upgrader) {
       throw new Error('An upgrader must be provided. See https://github.com/libp2p/interface-transport#upgrader.')
     }
@@ -52,24 +59,40 @@ class HoprConnect implements Transport {
       throw new Error('Transport module needs access to libp2p.')
     }
 
-    if (opts.bootstrapServers != undefined && opts.bootstrapServers.length > 0) {
-      this.relays = opts.bootstrapServers.filter(
-        (ma: Multiaddr) => ma != undefined && !opts.libp2p.peerId.equals(PeerId.createFromCID(ma.getPeerId()))
-      )
+    if (opts.bootstrapServers != undefined) {
+      if (!Array.isArray(opts.bootstrapServers)) {
+        opts.bootstrapServers = [opts.bootstrapServers]
+      }
 
-      this.stunServers = []
-      for (let i = 0; i < this.relays.length; i++) {
-        const opts = this.relays[i].toOptions()
+      for (const bs of opts.bootstrapServers) {
+        const bsPeerId = bs.getPeerId()
 
-        switch (opts.family) {
+        if (bsPeerId != undefined)
+          if (opts.libp2p.peerId.equals(PeerId.createFromCID(bs.getPeerId()))) {
+            continue
+          }
+
+        const cOpts = bs.toOptions()
+
+        if (this.relays == undefined) {
+          this.relays = [bs]
+        } else {
+          this.relays.push(bs)
+        }
+
+        switch (cOpts.family) {
           case 'ipv6':
             // We do not use STUN for IPv6 for the moment
             break
           case 'ipv4':
-            this.stunServers.push(this.relays[i])
+            if (this.stunServers == undefined) {
+              this.stunServers = [bs]
+            } else {
+              this.stunServers.push(bs)
+            }
             break
           default:
-            throw Error(`Invalid address family as STUN server. Got ${opts.family}`)
+            throw Error(`Invalid address family as STUN server. Got ${cOpts.family}`)
         }
       }
     }
@@ -90,10 +113,15 @@ class HoprConnect implements Transport {
     opts.libp2p.handle(DELIVERY, this.handleIncoming.bind(this))
 
     this._relay = new Relay(opts.libp2p, this._webRTCUpgrader)
+
+    // Used for testing
+    this.__noDirectConnections = opts.__noDirectConnections
+    console.log(this.__noDirectConnections)
+
     verbose(
       `Created ${this[Symbol.toStringTag]} stack (Stun: ${this.stunServers
         ?.map((server: Multiaddr) => server.toString())
-        .join(',')}`
+        .join(',')})`
     )
   }
 
@@ -108,11 +136,7 @@ class HoprConnect implements Transport {
       throw Error(`Cannot dial ourself`)
     }
 
-    if (
-      // uncommenting next line forces our node to use a relayed connection to any node execpt for the bootstrap server
-      // (this.relays == null || this.relays.some((mAddr: Multiaddr) => ma.getPeerId() === mAddr.getPeerId())) &&
-      this.shouldAttemptDirectDial(ma)
-    ) {
+    if (this.shouldAttemptDirectDial(ma)) {
       try {
         verbose('attempting to dial directly', ma.toString())
         return await this._dialDirectly(ma, options)
@@ -236,14 +260,14 @@ class HoprConnect implements Transport {
   }
 
   /**
-   * Dialed once a relayed connection is establishing
+   * Called once a relayed connection is establishing
    * @param handler handles the relayed connection
    */
   private async handleIncoming(this: HoprConnect, handler: Handler): Promise<void> {
     let newConn: Connection
 
     try {
-      let relayConnection = await this._relay.handleRelayConnection(handler, this.onReconnect.bind(this))
+      const relayConnection = await this._relay.handleRelayConnection(handler, this.onReconnect.bind(this))
 
       if (relayConnection == undefined) {
         return
@@ -265,6 +289,17 @@ class HoprConnect implements Transport {
    * @param ma Multiaddr to check
    */
   private shouldAttemptDirectDial(ma: Multiaddr): boolean {
+    // Forces node to only use relayed connection and
+    // don't try a direct dial attempt.
+    // Used for testing
+    console.log(this.relays?.some((mAddr: Multiaddr) => ma.getPeerId() === mAddr.getPeerId()))
+    if (
+      this.__noDirectConnections &&
+      (this.relays == undefined || !this.relays.some((mAddr: Multiaddr) => ma.getPeerId() === mAddr.getPeerId()))
+    ) {
+      return false
+    }
+    // uncommenting next line forces our node to use a relayed connection to any node execpt for the bootstrap server
     let protoNames = ma.protoNames()
     if (!['ip4', 'ip6', 'dns4', 'dns6'].includes(protoNames[0])) {
       // We cannot call other protocols directly

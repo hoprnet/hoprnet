@@ -10,7 +10,7 @@ import chalk from 'chalk'
 import libp2p from 'libp2p'
 import { WebRTCUpgrader } from './webrtc'
 
-import handshake, { Handshake } from 'it-handshake'
+import handshake from 'it-handshake'
 
 import Multiaddr from 'multiaddr'
 import PeerId from 'peer-id'
@@ -18,11 +18,13 @@ import PeerId from 'peer-id'
 import {
   RELAY_CIRCUIT_TIMEOUT,
   RELAY,
+  DELIVERY,
   OK,
   FAIL,
   FAIL_COULD_NOT_REACH_COUNTERPARTY,
   FAIL_COULD_NOT_IDENTIFY_PEER,
-  DELIVERY
+  FAIL_LOOPBACKS_ARE_NOT_ALLOWED,
+  FAIL_INVALID_PUBLIC_KEY
 } from './constants'
 
 import { u8aCompare, u8aEquals, pubKeyToPeerId } from '@hoprnet/hopr-utils'
@@ -34,6 +36,10 @@ import { WebRTCConnection } from './webRTCConnection'
 
 import type { Connection, DialOptions, Handler, Stream } from 'libp2p'
 
+type Libp2pStream = {
+  protocol: string
+  stream: Stream
+}
 class Relay {
   private _dialer: libp2p['dialer']
   private _registrar: libp2p['registrar']
@@ -77,14 +83,17 @@ class Relay {
 
       let relayConnection = await this._tryPotentialRelay(potentialRelay, destination, onReconnect)
 
-      if (relayConnection != null) {
+      if (relayConnection != undefined) {
         return relayConnection as RelayConnection
       }
     }
 
     throw Error(
       `Unable to establish a connection to any known relay node. Tried ${chalk.yellow(
-        relays.map((potentialRelay: Multiaddr) => potentialRelay.toString()).join(`, `)
+        relays
+          .filter((ma) => invalidPeerIds.includes(ma.getPeerId()))
+          .map((potentialRelay: Multiaddr) => potentialRelay.toString())
+          .join(`, `)
       )}`
     )
   }
@@ -120,7 +129,7 @@ class Relay {
       return
     }
 
-    if (this._webRTCUpgrader != null) {
+    if (this._webRTCUpgrader != undefined) {
       let channel = this._webRTCUpgrader.upgradeOutbound()
 
       let newConn = new RelayConnection({
@@ -157,7 +166,7 @@ class Relay {
   ): Promise<RelayConnection | WebRTCConnection | undefined> {
     const handShakeResult = await this.handleHandshake(conn.stream)
 
-    if (handShakeResult == undefined || handShakeResult.stream == undefined) {
+    if (handShakeResult == undefined) {
       return
     }
 
@@ -197,6 +206,7 @@ class Relay {
   }
 
   private async connectToRelay(relay: Multiaddr, options?: DialOptions): Promise<Connection> {
+    console.log(relay)
     let relayConnection = this._registrar.getConnection(PeerId.createFromCID(relay.getPeerId()))
 
     if (relayConnection == undefined || relayConnection == null) {
@@ -235,13 +245,15 @@ class Relay {
   }
 
   private async performHandshake(relayConnection: Connection, relay: PeerId, destination: PeerId): Promise<Stream> {
-    let shaker: Handshake<Uint8Array>
+    let stream: Libp2pStream
 
     try {
-      shaker = handshake((await relayConnection.newStream([RELAY])).stream)
+      stream = await relayConnection.newStream([RELAY])
     } catch (err) {
-      throw Error(`failed to establish stream with ${relay.toB58String()}. Error was: ${err}`)
+      throw Error(`Failed to establish new stream on protocol ${RELAY} with ${relay.toB58String()}. Error was: ${err}`)
     }
+
+    let shaker = handshake<Uint8Array>(stream.stream)
 
     shaker.write(destination.pubKey.marshal())
 
@@ -332,21 +344,22 @@ class Relay {
     let counterparty: PeerId
     try {
       counterparty = await pubKeyToPeerId(pubKeySender)
-      log(`counterparty identified as ${counterparty.toB58String()}`)
     } catch (err) {
       error(
         `Peer ${chalk.yellow(
           connection.remotePeer.toB58String()
         )} asked to establish relayed connection to invalid counterparty. Error was ${err}. Received message ${pubKeySender}`
       )
-      shaker.write(FAIL)
+      shaker.write(FAIL_INVALID_PUBLIC_KEY)
       shaker.rest()
       return
     }
 
+    log(`counterparty identified as ${counterparty.toB58String()}`)
+
     if (connection.remotePeer != null && counterparty.equals(connection.remotePeer)) {
-      error(`Peer ${connection.remotePeer}`)
-      shaker.write(FAIL)
+      error(`Peer ${connection.remotePeer} is trying to loopback to itself. Dropping connection.`)
+      shaker.write(FAIL_LOOPBACKS_ARE_NOT_ALLOWED)
       shaker.rest()
       return
     }
@@ -356,9 +369,12 @@ class Relay {
     let contextEntry = this._streams.get(channelId)
 
     if (contextEntry != undefined) {
-      verbose(`stream between ${connection.remotePeer.toB58String()} and ${counterparty.toB58String()} exists.`)
-      if ((await contextEntry[counterparty.toB58String()].ping()) > 0) {
-        verbose(`stream to ${counterparty.toB58String()} is alive. Using existing stream`)
+      verbose(`Relay context between ${connection.remotePeer.toB58String()} and ${counterparty.toB58String()} exists.`)
+
+      const latency = await contextEntry[counterparty.toB58String()].ping()
+
+      if (latency >= 0) {
+        verbose(`stream to ${counterparty.toB58String()} is alive (latency: ${latency} ms). Using existing stream`)
 
         shaker.write(OK)
         shaker.rest()
@@ -374,25 +390,24 @@ class Relay {
       `${connection.remotePeer.toB58String()} to ${counterparty.toB58String()} had no connection. Establishing a new one`
     )
 
-    let forwardingErrThrown = false
     let deliveryStream: Stream
 
     try {
       deliveryStream = await this.establishForwarding(connection.remotePeer, counterparty)
     } catch (err) {
-      forwardingErrThrown = true
-      error(err)
-    }
-
-    if (forwardingErrThrown || deliveryStream! == null) {
-      // @TODO end deliveryStream
       shaker.write(FAIL_COULD_NOT_REACH_COUNTERPARTY)
       shaker.rest()
 
       if (contextEntry != undefined) {
+        // @TODO close previous instances
         this._streams.delete(channelId)
       }
 
+      error(
+        `Could not establish relayed connection because contacting ${counterparty.toB58String()} was not successful. Error was: ${err}`
+      )
+
+      // Break up connection attempt
       return
     }
 
@@ -414,7 +429,7 @@ class Relay {
   }
 
   private async establishForwarding(initiator: PeerId, counterparty: PeerId): Promise<Stream> {
-    let timeout: any
+    let timeout: NodeJS.Timeout | undefined
 
     let newConn = this._registrar.getConnection(counterparty)
 
@@ -449,7 +464,9 @@ class Relay {
 
     const { stream: newStream } = await newConn.newStream([DELIVERY])
 
-    timeout && clearTimeout(timeout)
+    if (timeout != undefined) {
+      clearTimeout(timeout)
+    }
 
     const toCounterparty = handshake<Uint8Array>(newStream)
 
@@ -459,12 +476,14 @@ class Relay {
     try {
       answer = (await toCounterparty.read())?.slice()
     } catch (err) {
+      newConn.close()
       throw Error(`Error while trying to decode answer. Error was: ${err}`)
     }
 
     toCounterparty.rest()
 
     if (answer == undefined || answer == null || !u8aEquals(answer, OK)) {
+      newConn.close()
       throw Error(`Could not relay to peer ${counterparty.toB58String()} because we are unable to deliver packets.`)
     }
 

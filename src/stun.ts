@@ -1,8 +1,10 @@
 import * as stun from 'webrtc-stun'
+
 import type { Socket, RemoteInfo } from 'dgram'
 import Multiaddr from 'multiaddr'
 import debug from 'debug'
 
+const error = debug('hopr-connect:error')
 const verbose = debug('hopr-connect:verbose:stun')
 
 export type Interface = {
@@ -28,18 +30,25 @@ export const PUBLIC_STUN_SERVERS = [
 export function handleStunRequest(socket: Socket, data: Buffer, rinfo: RemoteInfo): void {
   const req = stun.createBlank()
 
+  console.log(`here`)
+  // Overwrite console.log because 'webrtc-stun' package
+  // pollutes console output
   const backup = console.log
   console.log = () => {}
-  // if msg is valid STUN message
+
   if (req.loadBuffer(data)) {
     // if STUN message is BINDING_REQUEST and valid content
     if (req.isBindingRequest({ fingerprint: true })) {
-      verbose(`stun request received`, rinfo.address, rinfo.port)
+      verbose(`Received STUN request from ${rinfo.address}:${rinfo.port}`)
 
       const res = req.createBindingResponse(true).setXorMappedAddressAttribute(rinfo).setFingerprintAttribute()
 
       socket.send(res.toBuffer(), rinfo.port, rinfo.address)
+    } else if (!req.isBindingResponseSuccess()) {
+      error(`Received a STUN message that is not a binding request. Dropping message.`)
     }
+  } else {
+    error(`Received a message that is not a STUN message. Dropping message.`)
   }
   console.log = backup
 }
@@ -62,30 +71,32 @@ export function getExternalIp(multiAddrs: Multiaddr[] | undefined, socket: Socke
     const msgHandler = (msg: Buffer) => {
       const res = stun.createBlank()
 
+      // Overwrite console.log because 'webrtc-stun' package
+      // pollutes console output
       const backup = console.log
       console.log = () => {}
 
       if (res.loadBuffer(msg)) {
-        let index: number
+        let index: number = tids.findIndex((tid: string) => {
+          if (res.isBindingResponseSuccess({ transactionId: tid })) {
+            return true
+          }
 
-        if (
-          tids.some((tid: string, _index: number) => {
-            if (res.isBindingResponseSuccess({ transactionId: tid })) {
-              index = _index
-              return true
-            }
+          return false
+        })
 
-            return false
-          })
-        ) {
-          verbose(`stun response received`)
-          tids.splice(index!, 1)
+        if (index >= 0) {
+          tids.splice(index, 1)
           const attr = res.getXorMappedAddressAttribute() || res.getMappedAddressAttribute()
 
-          if (attr != undefined) {
+          if (attr != null) {
+            verbose(`Received STUN response. External address seems to be: ${attr.address}:${attr.port}`)
+
             if (result == undefined) {
               result = attr
-            } else if (tids.length == 0 || attr.port != result.port || attr.address !== result.address) {
+            }
+
+            if (tids.length == 0 || attr.port != result.port || attr.address !== result.address) {
               socket.removeListener('message', msgHandler)
               // @TODO add assert call
               // _finished = true
@@ -100,7 +111,11 @@ export function getExternalIp(multiAddrs: Multiaddr[] | undefined, socket: Socke
                 port: attr.port
               })
             }
+          } else {
+            error(`STUN response seems to have neither MappedAddress nor XORMappedAddress set. Dropping message`)
           }
+        } else {
+          error(`Received STUN response with invalid transactionId. Dropping response.`)
         }
       }
       console.log = backup
@@ -113,21 +128,21 @@ export function getExternalIp(multiAddrs: Multiaddr[] | undefined, socket: Socke
 
     multiAddrs.forEach((ma: Multiaddr, index: number) => {
       if (!['ip4', 'ip6', 'dns4', 'dns6'].includes(ma.protoNames()[0])) {
+        error(`Cannot contact STUN server ${ma.toString()} because the host is unknown.`)
         return
       }
 
       const nodeAddress = ma.nodeAddress()
 
-      const res = stun
-        .createBindingRequest(tids[index])
-        //.setSoftwareAttribute(`${pkg.name}@${pkg.version}`)
-        .setFingerprintAttribute()
+      const res = stun.createBindingRequest(tids[index]).setFingerprintAttribute()
 
-      verbose(`STUN request sent`, nodeAddress)
-      socket.send(res.toBuffer(), parseInt(nodeAddress.port, 10), nodeAddress.address)
+      verbose(`STUN request sent to ${nodeAddress.address}:${nodeAddress.port}`)
+
+      socket.send(res.toBuffer(), nodeAddress.port as any, nodeAddress.address)
     })
 
     timeout = setTimeout(() => {
+      socket.removeListener('message', msgHandler)
       // @TODO add assert call
       // _finished = true
       if (result == undefined) {
