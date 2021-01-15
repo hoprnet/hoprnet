@@ -2,7 +2,7 @@
 
 # -- BASE STAGE --------------------------------
 
-FROM node:12.9.1-buster AS base
+FROM node@sha256:966f569423c977e862b4e5b1f01234720dd212394cd13f5904d47864aece5417 AS base
 WORKDIR /hoprd
 
 RUN apt-get update && \
@@ -32,7 +32,7 @@ RUN yarn buildAdmin
 
 # -- RUNTIME STAGE ------------------------------\
 
-FROM node:12.9.1-buster AS runtime
+FROM node@sha256:966f569423c977e862b4e5b1f01234720dd212394cd13f5904d47864aece5417 AS runtime
 
 ENV NODE_ENV 'production'
 ENV NEXT_TELEMETRY_DISABLED 1
