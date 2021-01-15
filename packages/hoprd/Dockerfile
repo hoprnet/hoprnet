@@ -2,6 +2,18 @@
 
 # -- BASE STAGE --------------------------------
 
+# Based on https://snyk.io/blog/10-best-practices-to-containerize-nodejs-web-applications-with-docker/
+# From the #1 recommendation “Use explicit and deterministic Docker base image tags”
+
+# Docker image builds are inconsistent. Just like we’re using lockfiles to get a deterministic
+# npm install behavior every time we install npm packages, we’d also like to get deterministic
+# docker image builds. If we build the image from node—which effectively means the node:latest
+# tag—then every build will pull a newly built Docker image of node.
+
+# Originally node:12.9.1-buster, obtained by
+# $ docker pull node:12.9.1-buster
+# $ docker images --digests
+# and pasted the sha.
 FROM node@sha256:966f569423c977e862b4e5b1f01234720dd212394cd13f5904d47864aece5417 AS base
 WORKDIR /hoprd
 
