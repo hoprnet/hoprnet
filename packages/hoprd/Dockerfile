@@ -34,6 +34,9 @@ RUN yarn buildAdmin
 
 FROM node@sha256:966f569423c977e862b4e5b1f01234720dd212394cd13f5904d47864aece5417 AS runtime
 
+RUN wget https://github.com/Yelp/dumb-init/releases/download/v1.2.4/dumb-init_1.2.4_amd64.deb
+RUN dpkg -i dumb-init_*.deb
+
 ENV NODE_ENV 'production'
 ENV NEXT_TELEMETRY_DISABLED 1
 ENV DEBUG 'hopr*'
@@ -53,4 +56,4 @@ EXPOSE 3000
 # REST API
 EXPOSE 3001
 
-ENTRYPOINT ["node", "/app/index.js"]
+ENTRYPOINT ["dumb-init", "node", "/app/index.js"]

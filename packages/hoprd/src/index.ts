@@ -173,12 +173,6 @@ async function main() {
 
     node.on('hopr:message', logMessageToNode)
 
-    process.once('exit', async () => {
-      await node.stop()
-      logs.log('Process exiting')
-      return
-    })
-
     if (adminServer) {
       adminServer.registerNode(node)
     }
@@ -211,6 +205,16 @@ async function main() {
       process.exit(1)
     }
   }
+
+  async function stopGracefully(signal) {
+    await node.stop()
+    logs.log(`Process exiting with signal ${signal}`)
+    return
+  }
+
+  process.once('exit', stopGracefully)
+  process.on('SIGINT', stopGracefully)
+  process.on('SIGTERM', stopGracefully)
 }
 
 main()
