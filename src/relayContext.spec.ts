@@ -6,6 +6,7 @@ import { durations, u8aConcat, u8aEquals } from '@hoprnet/hopr-utils'
 import { PING, RELAY_PAYLOAD_PREFIX } from './constants'
 import { RelayContext } from './relayContext'
 import { RelayConnection } from './relayConnection'
+import { pipe } from 'it-pipe'
 import type { Stream } from 'libp2p'
 import assert from 'assert'
 
@@ -165,7 +166,41 @@ describe('test overwritable connection', function () {
   //   await ctx.close()
   // })
 
-  it('should perform a low-level ping', async function () {
+  // it('should perform a low-level ping', async function () {
+  //   const [self, counterparty] = await Promise.all(
+  //     Array.from({ length: 2 }).map(() => PeerId.create({ keyType: 'secp256k1' }))
+  //   )
+
+  //   // Get low-level connections between A, B
+  //   const connectionA = Pair()
+  //   const connectionB = Pair()
+  //   new RelayConnection({
+  //     stream: {
+  //       sink: connectionB.sink,
+  //       source: connectionA.source
+  //     },
+  //     self,
+  //     counterparty,
+  //     onReconnect: async () => {}
+  //   })
+  //   const ctxRelay = new RelayContext({
+  //     sink: connectionA.sink,
+  //     source: connectionB.source
+  //   })
+
+  //   // ctxSender.sink((async function * () {
+  //   //   yield new Uint8Array([RELAY_PAYLOAD_PREFIX, 1])
+  //   // })())
+
+  //   const PING_ATTEMPTS = 4
+  //   for (let i = 0; i < PING_ATTEMPTS; i++) {
+  //     assert((await ctxRelay.ping()) >= 0, 'Ping must not timeout')
+  //   }
+
+  //   await new Promise((resolve) => setTimeout(resolve, 1000))
+  // })
+
+  it('should echo messages', async function () {
     const [self, counterparty] = await Promise.all(
       Array.from({ length: 2 }).map(() => PeerId.create({ keyType: 'secp256k1' }))
     )
@@ -173,7 +208,7 @@ describe('test overwritable connection', function () {
     // Get low-level connections between A, B
     const connectionA = Pair()
     const connectionB = Pair()
-    new RelayConnection({
+    const ctxClient = new RelayConnection({
       stream: {
         sink: connectionB.sink,
         source: connectionA.source
@@ -182,45 +217,37 @@ describe('test overwritable connection', function () {
       counterparty,
       onReconnect: async () => {}
     })
+
     const ctxRelay = new RelayContext({
       sink: connectionA.sink,
       source: connectionB.source
     })
 
-    // ctxSender.sink((async function * () {
-    //   yield new Uint8Array([RELAY_PAYLOAD_PREFIX, 1])
-    // })())
+    ctxClient.sink((async function*() {
+      yield new Uint8Array([1])
+      yield new Uint8Array([2])
+      yield new Uint8Array([3])
+    })())
 
-    const PING_ATTEMPTS = 4
-    for (let i = 0; i < PING_ATTEMPTS; i++) {
-      assert((await ctxRelay.ping()) >= 0, 'Ping must not timeout')
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-  })
-
-  it('should echo messages a low-level ping', async function () {
-    const [self, counterparty] = await Promise.all(
-      Array.from({ length: 2 }).map(() => PeerId.create({ keyType: 'secp256k1' }))
+    pipe(
+      // prettier-ignore
+      ctxRelay.source,
+      async (source: Stream['source']) => {
+        for await (const msg of source) {
+          console.log(msg)
+        }
+      }
     )
 
-    // Get low-level connections between A, B
-    const connectionA = Pair()
-    const connectionB = Pair()
-    new RelayConnection({
-      stream: {
-        sink: connectionB.sink,
-        source: connectionA.source
-      },
-      self,
-      counterparty,
-      onReconnect: async () => {}
-    })
-
-    const ctxSender = new RelayContext({
-      sink: connectionA.sink,
-      source: connectionB.source
-    })
+    // pipe(
+    //   // prettier-ignore
+    //   ctxClient.source,
+    //   async function (source: Stream['source']) {
+    //     for await (const msg of source) {
+    //       console.log(new TextDecoder().decode(msg.slice()))
+    //     }
+    //   }
+    // )
 
     await new Promise((resolve) => setTimeout(resolve, 1000))
   })

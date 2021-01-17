@@ -23,7 +23,6 @@ type WebRTC = {
 }
 
 class RelayConnection implements MultiaddrConnection {
-  private _closePromise: DeferredPromise<void>
   private _stream: Stream
   private _destroyed: boolean
   private _sinkTriggered: boolean
@@ -35,13 +34,18 @@ class RelayConnection implements MultiaddrConnection {
   private _webRTCStreamResult?: IteratorResult<Uint8Array, void>
   private _webRTCresolved: boolean
   private _webRTCstream?: Stream['source']
-  private _webRTCSourceFunction: (arg: IteratorResult<Uint8Array, void>) => void
-  private _webRTCPromise?: Promise<void>
+  private _webRTCSourceFunction: (arg: IteratorResult<Uint8Array, void>) => IteratorResult<Uint8Array, void>
+  private _webRTCPromise?: Promise<IteratorResult<Uint8Array, void>>
+
+  private _closePromise: DeferredPromise<void>
 
   private _statusMessagePromise: DeferredPromise<void>
   private _statusMessages: Uint8Array[]
 
   public _iteration: number
+
+  private _sinkSourceAttached: boolean
+  private _sinkSourceAttachedPromise: DeferredPromise<Stream['source']>
 
   private _onReconnect: (newStream: RelayConnection, counterparty: PeerId) => Promise<void>
 
@@ -58,10 +62,7 @@ class RelayConnection implements MultiaddrConnection {
 
   public conn: Stream
 
-  public timeline: {
-    open: number
-    close?: number
-  }
+  public timeline: MultiaddrConnection['timeline']
 
   constructor(opts: {
     stream: Stream
@@ -73,8 +74,6 @@ class RelayConnection implements MultiaddrConnection {
     this.timeline = {
       open: Date.now()
     }
-
-    this._closePromise = Defer<void>()
 
     this._switchPromise = Defer<Stream['source']>()
     this._msgPromise = Defer<void>()
@@ -95,6 +94,8 @@ class RelayConnection implements MultiaddrConnection {
 
     this._counterparty = opts.counterparty
 
+    this._closePromise = Defer<void>()
+
     this.localAddr = Multiaddr(`/p2p/${opts.self.toB58String()}`)
     this.remoteAddr = Multiaddr(`/p2p/${opts.counterparty.toB58String()}`)
 
@@ -106,18 +107,23 @@ class RelayConnection implements MultiaddrConnection {
     this._webRTCSourceFunction = (arg: IteratorResult<Uint8Array, void>) => {
       this._webRTCresolved = true
 
-      this._webRTCStreamResult = arg
+      return arg
     }
 
     this._iteration = 0
 
     this.source = this._createSource.call(this, this._iteration)
 
+    this._sinkSourceAttached = false
+    this._sinkSourceAttachedPromise = Defer<Stream['source']>()
+
     this._stream.sink(this.sinkFunction())
 
     this.sink = this._createSink.bind(this)
 
     this.close = (_err?: Error): Promise<void> => {
+      this._statusMessages.unshift(Uint8Array.from([...RELAY_STATUS_PREFIX, ...STOP]))
+      this._statusMessagePromise.resolve()
       this._closePromise.resolve()
 
       this.timeline.close = Date.now()
@@ -271,7 +277,9 @@ class RelayConnection implements MultiaddrConnection {
   }
 
   private _createSink(source: Stream['source']): Promise<void> {
-    this._switchPromise.resolve(source)
+    // @TODO add support for Iterables such as arrays
+    this._sinkSourceAttached = true
+    this._sinkSourceAttachedPromise.resolve(source)
 
     this._sinkTriggered = true
 
@@ -338,33 +346,10 @@ class RelayConnection implements MultiaddrConnection {
   }
 
   private async *sinkFunction(this: RelayConnection): Stream['source'] {
+    type SinkType = Stream['sink'] | Stream['source'] | IteratorResult<Uint8Array, void> | undefined | void
     log(`sinkFunction`)
-    let streamResolved = false
-    let skippedMsg = false
-    let streamResult: IteratorResult<Uint8Array, void> | undefined
-
-    let streamClosed = false
-
-    const closePromise = this._closePromise.promise.then(() => {
-      streamClosed = true
-    })
-
     let currentSource: Stream['source'] | undefined
-    let tmpSource: Stream['source']
-    let streamPromise: Promise<void> | undefined
-
-    let iteration = 0
-
-    const streamSourceFunction = (_iteration: number) => (arg: IteratorResult<Uint8Array, void>) => {
-      // console.log(`sinking to relay`, arg.done ? undefined : new TextDecoder().decode(arg.value.slice()), iteration, _iteration)
-      streamResolved = true
-
-      if (iteration == _iteration) {
-        streamResult = arg
-      } else {
-        skippedMsg = true
-      }
-    }
+    let streamPromise: Promise<IteratorResult<Uint8Array, void>> | undefined
 
     let statusMessageAvailable = this._statusMessages.length > 0
 
@@ -376,23 +361,31 @@ class RelayConnection implements MultiaddrConnection {
 
     let streamSwitched = false
 
+    let result: SinkType
+
     const switchFunction = (newSource: Stream['source']) => {
       console.log(`inside switch function`)
       streamSwitched = true
-      tmpSource = newSource
-      iteration++
+
+      return newSource
     }
 
     let switchPromise = this._switchPromise.promise.then(switchFunction)
 
     while (true) {
-      let promises: Promise<void>[] = [switchPromise, closePromise]
+      let promises: Promise<SinkType>[] = []
+
+      if (currentSource == undefined) {
+        promises.push(this._sinkSourceAttachedPromise.promise)
+      }
+
+      promises.push(switchPromise)
 
       statusPromise = statusPromise ?? this._statusMessagePromise.promise.then(statusSourceFunction)
-
       promises.push(statusPromise)
-      if ((streamResult == undefined || !streamResult.done) && currentSource != undefined) {
-        streamPromise = streamPromise ?? currentSource.next().then(streamSourceFunction(iteration))
+
+      if ((result == undefined || !(result as IteratorResult<Uint8Array, void>).done) && currentSource != undefined) {
+        streamPromise = streamPromise ?? currentSource.next()
 
         promises.push(streamPromise)
       }
@@ -404,90 +397,94 @@ class RelayConnection implements MultiaddrConnection {
         promises.push(this._webRTCPromise)
       }
 
+      // (0. Handle source attach)
       // 1. Handle stream switch
-      // 2. Handle stream close
-      // 3. Handle status messages
-      // 4. Handle payload messages
-      // 5. Handle WebRTC signalling messages
-      await Promise.race(promises)
+      // 2. Handle status messages
+      // 3. Handle payload messages
+      // 4. Handle WebRTC signalling messages
+      result = await Promise.race(promises)
 
-      log(`sink promise`)
+      if (this._sinkSourceAttached) {
+        this._sinkSourceAttached = false
+
+        // @TODO do this properly
+        currentSource = result as Stream['source']
+        result = undefined
+        continue
+      }
+
+      if (statusMessageAvailable) {
+        if (this._statusMessages.length > 0) {
+          if (u8aEquals(Uint8Array.from([...RELAY_STATUS_PREFIX, ...STOP]), this._statusMessages[0])) {
+            yield this._statusMessages[0]
+            this._destroyed = true
+            break
+          } else {
+            yield this._statusMessages.shift() as Uint8Array
+          }
+        }
+
+        // @TODO fix condition
+        if (
+          this._statusMessages.length == 0 ||
+          (result != undefined && (result as IteratorResult<Uint8Array, void>).done != true)
+        ) {
+          statusMessageAvailable = false
+
+          this._statusMessagePromise = Defer<void>()
+
+          statusPromise = this._statusMessagePromise.promise.then(statusSourceFunction)
+        }
+
+        continue
+      }
 
       if (this._webRTCresolved) {
         this._webRTCresolved = false
 
-        if (this._webRTCStreamResult == undefined || this._webRTCStreamResult.done) {
+        const received = result as IteratorResult<Uint8Array, void>
+
+        if (received == undefined || received.done) {
           this._webRTCPromise = undefined
           continue
         }
 
-        yield new BL([RELAY_WEBRTC_PREFIX, this._webRTCStreamResult.value])
+        yield new BL([RELAY_WEBRTC_PREFIX, received.value])
 
-        if (streamClosed) {
-          this._destroyed = true
-
-          yield u8aConcat(RELAY_STATUS_PREFIX, STOP)
-          break
-        }
-
+        result = undefined
         this._webRTCPromise = this._webRTCstream!.next().then(this._webRTCSourceFunction)
         continue
-      } else if (streamClosed) {
-        if (!this._destroyed) {
-          this._destroyed = true
+      }
 
-          yield u8aConcat(RELAY_STATUS_PREFIX, STOP)
-        }
-
-        break
-      } else if (statusMessageAvailable) {
-        statusMessageAvailable = false
-        while (this._statusMessages.length > 0) {
-          yield this._statusMessages.shift() as Uint8Array
-        }
-
-        this._statusMessagePromise = Defer<void>()
-
-        statusPromise = this._statusMessagePromise.promise.then(statusSourceFunction)
-        continue
-      } else if (streamSwitched) {
-        log(`RelayConnection: after stream switch sink operation`, iteration)
+      if (streamSwitched) {
+        log(`RelayConnection: after stream switch sink operation`)
         streamSwitched = false
         // @TODO explain this to Typescript properly
-        currentSource = tmpSource!
+        currentSource = result as Stream['source']
         this._switchPromise = Defer<Stream['source']>()
-        console.log(`stream before switch`, streamResult, streamResolved)
-        streamResult = undefined
-        streamPromise = currentSource.next().then(streamSourceFunction(iteration))
+        console.log(`stream before switch`, result, streamPromise)
+        result = undefined
+        streamPromise = currentSource.next()
         switchPromise = this._switchPromise.promise.then(switchFunction)
-        continue
-      }
-
-      if (skippedMsg) {
-        skippedMsg = false
-        streamPromise = (currentSource as Stream['source']).next().then(streamSourceFunction(iteration))
 
         continue
       }
 
-      if (streamResult == undefined || streamResult.done) {
-        console.log(`##### EMPTY message #####`, streamResult, streamResult)
+      const received = result as IteratorResult<Uint8Array, void>
+
+      if (received == undefined || received.done) {
+        console.log(`##### EMPTY message #####`, received)
         yield new BL([RELAY_PAYLOAD_PREFIX])
 
         streamPromise = undefined
         continue
       }
 
-      yield new BL([RELAY_PAYLOAD_PREFIX, streamResult.value])
+      yield new BL([RELAY_PAYLOAD_PREFIX, received.value])
 
-      if (streamClosed) {
-        this._destroyed = true
+      result = undefined
 
-        yield u8aConcat(RELAY_STATUS_PREFIX, STOP)
-        break
-      }
-
-      streamPromise = (currentSource as Stream['source']).next().then(streamSourceFunction(iteration))
+      streamPromise = (currentSource as Stream['source']).next()
     }
   }
 

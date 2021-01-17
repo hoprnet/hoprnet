@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { u8aConcat, u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
 import Defer, { DeferredPromise } from 'p-defer'
 
@@ -25,6 +24,9 @@ class RelayContext {
   private _switchPromise: DeferredPromise<Stream>
   private _streamSourceSwitchPromise: DeferredPromise<Stream['source']>
   private _streamSinkSwitchPromise: DeferredPromise<Stream['sink']>
+
+  private _sinkSourceAttached: boolean
+  private _sinkSourceAttachedPromise: DeferredPromise<Stream['source']>
 
   private _statusMessagePromise: DeferredPromise<void>
   private _statusMessages: Uint8Array[] = []
@@ -54,16 +56,21 @@ class RelayContext {
     this._sourceSwitched = false
     this._sinkSwitched = false
 
+    this._sinkSourceAttached = false
+    this._sinkSourceAttachedPromise = Defer<Stream['source']>()
+
     this._streamSourceSwitchPromise = Defer<Stream['source']>()
     this._streamSinkSwitchPromise = Defer<Stream['sink']>()
 
     this._currentSource = this._stream.source
 
     this.source = this._createSource()
-    this.source.next()
+    // this.source.next()
 
     this.sink = (source: Stream['source']): Promise<void> => {
-      this._streamSourceSwitchPromise.resolve(source)
+      // @TODO add support for Iterables such as Arrays
+      this._sinkSourceAttached = true
+      this._sinkSourceAttachedPromise.resolve(source)
 
       return Promise.resolve()
     }
@@ -123,120 +130,140 @@ class RelayContext {
     this._switchPromise.promise.then(this.switchFunction.bind(this))
   }
 
-  private async *_createSource(): Stream['source'] {
-    log(`source called`)
-    let result: Stream['source'] | IteratorResult<Uint8Array, void> | undefined
+  private _createSource(): Stream['source'] {
+    const iterator: Stream['source'] = (async function* (this: RelayContext) {
+      log(`source called`)
+      let result: Stream['source'] | IteratorResult<Uint8Array, void> | undefined
 
-    const next = () => {
-      result = undefined
-
-      this._sourcePromise = this._currentSource.next()
-    }
-
-    while (true) {
-      console.log(`sourcing`)
-      const promises: Promise<Stream['source'] | IteratorResult<Uint8Array, void>>[] = [
-        this._streamSourceSwitchPromise.promise
-      ]
-
-      if (result == undefined || (result as IteratorResult<Uint8Array, void>).done != true) {
-        this._sourcePromise = this._sourcePromise ?? this._currentSource.next()
-
-        promises.push(this._sourcePromise)
-      }
-
-      // 1. Handle Stream switches
-      // 2. Handle payload / status messages
-      result = await Promise.race(promises)
-
-      if (result == undefined) {
-        // @TODO throw Error to make debugging easier
-        throw Error(`source result == undefined. Should not happen.`)
-      }
-
-      if (this._sourceSwitched) {
-        this._sourceSwitched = false
-
-        this._stream.source = result as Stream['source']
-
+      const next = () => {
         result = undefined
 
-        this._streamSourceSwitchPromise = Defer<Stream['source']>()
-        yield u8aConcat(RELAY_STATUS_PREFIX, RESTART)
-
         this._sourcePromise = this._currentSource.next()
-        continue
       }
 
-      if ((result as IteratorResult<Uint8Array, void>).done) {
-        continue
-      }
+      while (true) {
+        console.log(`sourcing`)
+        const promises: Promise<Stream['source'] | IteratorResult<Uint8Array, void>>[] = [
+          this._streamSourceSwitchPromise.promise
+        ]
 
-      const received = (result as IteratorYieldResult<Uint8Array>).value.slice()
+        if (result == undefined || (result as IteratorResult<Uint8Array, void>).done != true) {
+          this._sourcePromise = this._sourcePromise ?? this._currentSource.next()
 
-      if (received.length == 0) {
-        next()
-
-        // Ignore empty messages
-        continue
-      }
-
-      const [PREFIX, SUFFIX] = [received.subarray(0, 1), received.subarray(1)]
-
-      if (!VALID_PREFIXES.includes(PREFIX[0])) {
-        error(`Invalid prefix: Got <${u8aToHex(PREFIX ?? new Uint8Array())}>. Dropping message in relayContext.`)
-
-        next()
-
-        // Ignore invalid prefixes
-        continue
-      }
-
-      // Interprete relay sub-protocol
-      if (u8aEquals(PREFIX, RELAY_STATUS_PREFIX)) {
-        if (u8aEquals(SUFFIX, PING)) {
-          verbose(`PING received`)
-          this._statusMessages.push(u8aConcat(RELAY_STATUS_PREFIX, PONG))
-
-          this._statusMessagePromise.resolve()
-
-          // Don't forward ping
-        } else if (u8aEquals(SUFFIX, PONG)) {
-          verbose(`PONG received`)
-
-          this._pingResponsePromise?.resolve()
-
-          // Don't forward pong message
+          promises.push(this._sourcePromise)
         }
 
-        next()
+        console.log(`this.sourcePromise`, this._sourcePromise)
 
-        continue
-        // Interprete connection sub-protocol
-      } else if (u8aEquals(PREFIX, RELAY_CONNECTION_STATUS_PREFIX)) {
-        if (u8aEquals(SUFFIX, STOP)) {
-          verbose(`STOP relayed`)
+        // 1. Handle Stream switches
+        // 2. Handle payload / status messages
+        result = await Promise.race(promises)
 
-          // forward STOP message
-          yield received
+        console.log(`result`, result)
 
-          // close stream
-          break
-        } else if (u8aEquals(SUFFIX, RESTART)) {
-          verbose(`RESTART relayed`)
+        if (result == undefined) {
+          // @TODO throw Error to make debugging easier
+          throw Error(`source result == undefined. Should not happen.`)
         }
 
-        yield received
+        if (this._sourceSwitched) {
+          console.log(`sourceSwitched`)
+          this._sourceSwitched = false
+
+          this._stream.source = result as Stream['source']
+
+          result = undefined
+
+          this._streamSourceSwitchPromise = Defer<Stream['source']>()
+          console.log(`sinking restart`)
+          yield u8aConcat(RELAY_STATUS_PREFIX, RESTART)
+
+          this._sourcePromise = this._currentSource.next()
+          continue
+        }
+
+        const received = result as IteratorYieldResult<Uint8Array>
+
+        if (received.done) {
+          continue
+        }
+
+        if (received.value.length == 0) {
+          next()
+
+          // Ignore empty messages
+          continue
+        }
+
+        const [PREFIX, SUFFIX] = [received.value.slice().subarray(0, 1), received.value.slice().subarray(1)]
+
+        if (!VALID_PREFIXES.includes(PREFIX[0])) {
+          error(`Invalid prefix: Got <${u8aToHex(PREFIX ?? new Uint8Array())}>. Dropping message in relayContext.`)
+
+          next()
+
+          // Ignore invalid prefixes
+          continue
+        }
+
+        // Interprete relay sub-protocol
+        if (u8aEquals(PREFIX, RELAY_STATUS_PREFIX)) {
+          if (u8aEquals(SUFFIX, PING)) {
+            verbose(`PING received`)
+            this._statusMessages.push(u8aConcat(RELAY_STATUS_PREFIX, PONG))
+
+            this._statusMessagePromise.resolve()
+
+            // Don't forward ping
+          } else if (u8aEquals(SUFFIX, PONG)) {
+            verbose(`PONG received`)
+
+            this._pingResponsePromise?.resolve()
+
+            // Don't forward pong message
+          }
+
+          next()
+
+          continue
+          // Interprete connection sub-protocol
+        } else if (u8aEquals(PREFIX, RELAY_CONNECTION_STATUS_PREFIX)) {
+          if (u8aEquals(SUFFIX, STOP)) {
+            verbose(`STOP relayed`)
+
+            // forward STOP message
+            yield received.value
+
+            // close stream
+            break
+          } else if (u8aEquals(SUFFIX, RESTART)) {
+            verbose(`RESTART relayed`)
+          }
+
+          yield received.value
+
+          next()
+
+          continue
+        }
+
+        yield received.value
 
         next()
-
-        continue
       }
+    }).call(this)
 
-      yield received
+    let result = iterator.next()
 
-      next()
-    }
+    return (async function* () {
+      const received = await result
+      if (received.done) {
+        return
+      }
+      yield received.value
+
+      yield* iterator
+    })()
   }
 
   private async _createSink(): Promise<void> {
@@ -256,15 +283,19 @@ class RelayContext {
     let statusPromise = this._statusMessagePromise.promise.then(statusSourceFunction)
 
     async function* drain(this: RelayContext): Stream['source'] {
-      let result: Stream['sink'] | IteratorResult<Uint8Array, void> | void
+      type SinkResult = Stream['sink'] | Stream['source'] | IteratorResult<Uint8Array, void> | void
 
-      let i = 0
+      let result: SinkResult
+
       while (true) {
         console.log(`sinking`, result)
-        const promises: Promise<Stream['sink'] | IteratorResult<Uint8Array, void> | void>[] = [
-          this._streamSinkSwitchPromise.promise,
-          statusPromise
-        ]
+        const promises: Promise<SinkResult>[] = []
+
+        if (currentSource == undefined) {
+          promises.push(this._sinkSourceAttachedPromise.promise)
+        }
+
+        promises.push(this._streamSinkSwitchPromise.promise, statusPromise)
 
         if (
           currentSource != undefined &&
@@ -276,12 +307,19 @@ class RelayContext {
           promises.push(sourcePromise)
         }
 
+        // (0. Handle source attach)
         // 1. Handle stream switches
         // 2. Handle status messages
         // 3. Handle payload messages
         result = await Promise.race(promises)
 
         // console.log(`after await`, statusMessageAvailable, streamSwitched, promises)
+
+        if (this._sinkSourceAttached) {
+          this._sinkSourceAttached = false
+          currentSource = result as Stream['source']
+          continue
+        }
 
         if (statusMessageAvailable) {
           if (this._statusMessages.length > 0) {
