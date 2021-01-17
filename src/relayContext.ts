@@ -131,7 +131,7 @@ class RelayContext {
   }
 
   private _createSource(): Stream['source'] {
-    const iterator: Stream['source'] = (async function* (this: RelayContext) {
+    const iterator: Stream['source'] = async function* (this: RelayContext) {
       log(`source called`)
       let result: Stream['source'] | IteratorResult<Uint8Array, void> | undefined
 
@@ -142,7 +142,6 @@ class RelayContext {
       }
 
       while (true) {
-        console.log(`sourcing`)
         const promises: Promise<Stream['source'] | IteratorResult<Uint8Array, void>>[] = [
           this._streamSourceSwitchPromise.promise
         ]
@@ -153,13 +152,9 @@ class RelayContext {
           promises.push(this._sourcePromise)
         }
 
-        console.log(`this.sourcePromise`, this._sourcePromise)
-
         // 1. Handle Stream switches
         // 2. Handle payload / status messages
         result = await Promise.race(promises)
-
-        console.log(`result`, result)
 
         if (result == undefined) {
           // @TODO throw Error to make debugging easier
@@ -251,7 +246,7 @@ class RelayContext {
 
         next()
       }
-    }).call(this)
+    }.call(this)
 
     let result = iterator.next()
 
@@ -288,7 +283,6 @@ class RelayContext {
       let result: SinkResult
 
       while (true) {
-        console.log(`sinking`, result)
         const promises: Promise<SinkResult>[] = []
 
         if (currentSource == undefined) {
@@ -299,8 +293,7 @@ class RelayContext {
 
         if (
           currentSource != undefined &&
-          result != undefined &&
-          (result as IteratorResult<Uint8Array, void>).done != true
+          (result == undefined || (result as IteratorResult<Uint8Array, void>).done != true)
         ) {
           sourcePromise = sourcePromise ?? currentSource.next()
 
@@ -313,11 +306,11 @@ class RelayContext {
         // 3. Handle payload messages
         result = await Promise.race(promises)
 
-        // console.log(`after await`, statusMessageAvailable, streamSwitched, promises)
-
         if (this._sinkSourceAttached) {
           this._sinkSourceAttached = false
           currentSource = result as Stream['source']
+
+          result = undefined
           continue
         }
 
@@ -344,27 +337,28 @@ class RelayContext {
           break
         }
 
-        if ((result as IteratorResult<Uint8Array, void>).done) {
+        let received = result as IteratorResult<Uint8Array>
+
+        if (received.done) {
           continue
         }
 
-        let received = (result as IteratorYieldResult<Uint8Array>).value.slice()
-
-        let [PREFIX, SUFFIX] = [received.slice(0, 1), received.slice(1)]
+        let [PREFIX, SUFFIX] = [received.value.slice(0, 1), received.value.slice(1)]
 
         if (u8aEquals(PREFIX, RELAY_STATUS_PREFIX) && u8aEquals(SUFFIX, STOP)) {
-          yield received
+          yield received.value
           break
         }
 
-        yield received
+        yield received.value
+
+        result = undefined
 
         sourcePromise = currentSource?.next()
       }
     }
 
     while (true) {
-      console.log(`sinnking`)
       currentSink(drain.call(this))
 
       currentSink = await this._streamSinkSwitchPromise.promise

@@ -3,7 +3,7 @@
 
 // @ts-nocheck
 import { durations, u8aConcat, u8aEquals } from '@hoprnet/hopr-utils'
-import { PING, RELAY_PAYLOAD_PREFIX } from './constants'
+import { RELAY_PAYLOAD_PREFIX } from './constants'
 import { RelayContext } from './relayContext'
 import { RelayConnection } from './relayConnection'
 import { pipe } from 'it-pipe'
@@ -147,13 +147,13 @@ describe('test overwritable connection', function () {
   //   let pingPromise: Promise<number>
 
   //   // Trigger a reconnect after a timeout
-  //   setTimeout(async () => {
-  //     iteration++
-  //     await new Promise((resolve) => setTimeout(resolve, 100))
-  //     pingPromise = ctxSender.ping()
-  //     newSenderId = iteration
-  //     ctxCounterparty.update(getStream({ usePrefix: true }))
-  //   }, 200)
+  //   // setTimeout(async () => {
+  //   //   iteration++
+  //   //   await new Promise((resolve) => setTimeout(resolve, 100))
+  //   //   pingPromise = ctxSender.ping()
+  //   //   newSenderId = iteration
+  //   //   ctxCounterparty.update(getStream({ usePrefix: true }))
+  //   // }, 200)
 
   //   await new Promise((resolve) => setTimeout(resolve, 2500))
   //   console.log(`TIMEOUT done`)
@@ -166,39 +166,37 @@ describe('test overwritable connection', function () {
   //   await ctx.close()
   // })
 
-  // it('should perform a low-level ping', async function () {
-  //   const [self, counterparty] = await Promise.all(
-  //     Array.from({ length: 2 }).map(() => PeerId.create({ keyType: 'secp256k1' }))
-  //   )
+  it('should perform a low-level ping', async function () {
+    const [self, counterparty] = await Promise.all(
+      Array.from({ length: 2 }).map(() => PeerId.create({ keyType: 'secp256k1' }))
+    )
 
-  //   // Get low-level connections between A, B
-  //   const connectionA = Pair()
-  //   const connectionB = Pair()
-  //   new RelayConnection({
-  //     stream: {
-  //       sink: connectionB.sink,
-  //       source: connectionA.source
-  //     },
-  //     self,
-  //     counterparty,
-  //     onReconnect: async () => {}
-  //   })
-  //   const ctxRelay = new RelayContext({
-  //     sink: connectionA.sink,
-  //     source: connectionB.source
-  //   })
+    // Get low-level connections between A, B
+    const connectionA = Pair()
+    const connectionB = Pair()
+    const ctxClient = new RelayConnection({
+      stream: {
+        sink: connectionB.sink,
+        source: connectionA.source
+      },
+      self,
+      counterparty,
+      onReconnect: async () => {}
+    })
+    const ctxRelay = new RelayContext({
+      sink: connectionA.sink,
+      source: connectionB.source
+    })
 
-  //   // ctxSender.sink((async function * () {
-  //   //   yield new Uint8Array([RELAY_PAYLOAD_PREFIX, 1])
-  //   // })())
+    const PING_ATTEMPTS = 4
+    for (let i = 0; i < PING_ATTEMPTS; i++) {
+      assert((await ctxRelay.ping()) >= 0, 'Ping must not timeout')
+    }
 
-  //   const PING_ATTEMPTS = 4
-  //   for (let i = 0; i < PING_ATTEMPTS; i++) {
-  //     assert((await ctxRelay.ping()) >= 0, 'Ping must not timeout')
-  //   }
+    await ctxClient.close()
 
-  //   await new Promise((resolve) => setTimeout(resolve, 1000))
-  // })
+    assert(ctxClient.destroyed, `Connection must be destroyed`)
+  })
 
   it('should echo messages', async function () {
     const [self, counterparty] = await Promise.all(
@@ -223,32 +221,28 @@ describe('test overwritable connection', function () {
       source: connectionB.source
     })
 
-    ctxClient.sink((async function*() {
-      yield new Uint8Array([1])
-      yield new Uint8Array([2])
-      yield new Uint8Array([3])
-    })())
+    ctxRelay.sink(ctxRelay.source)
 
-    pipe(
+    ctxClient.sink(
+      (async function* () {
+        yield new TextEncoder().encode('first')
+        yield new TextEncoder().encode('second')
+        yield new TextEncoder().encode('third')
+      })()
+    )
+
+    await pipe(
       // prettier-ignore
-      ctxRelay.source,
-      async (source: Stream['source']) => {
+      ctxClient.source,
+      async function (source: Stream['source']) {
         for await (const msg of source) {
-          console.log(msg)
+          console.log(new TextDecoder().decode(msg.slice()))
         }
       }
     )
 
-    // pipe(
-    //   // prettier-ignore
-    //   ctxClient.source,
-    //   async function (source: Stream['source']) {
-    //     for await (const msg of source) {
-    //       console.log(new TextDecoder().decode(msg.slice()))
-    //     }
-    //   }
-    // )
+    await ctxClient.close()
 
-    await new Promise((resolve) => setTimeout(resolve, 1000))
+    assert(ctxClient.destroyed, `Connection must be destroyed`)
   })
 })
