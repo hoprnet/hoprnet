@@ -95,7 +95,7 @@ export class AdminServer {
     })
 
     this.node.on('hopr:warning:unfunded', (addr) => {
-      const min = (new node.paymentChannels.types.Balance(0)).toFormattedString.apply(SUGGESTED_NATIVE_BALANCE)
+      const min = new node.paymentChannels.types.Balance(0).toFormattedString.apply(SUGGESTED_NATIVE_BALANCE)
       this.logs.log(
         `- The account associated with this node has no funds,\n` +
           `  in order to send messages, or open channels, you will need to send` +
