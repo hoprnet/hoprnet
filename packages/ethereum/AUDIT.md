@@ -38,21 +38,21 @@ The HoprDistributor smart contract should:
 
 - allow deployer to specify HoprToken address, start time and maximum mint amount on smart contract creation
 - allow the owner to specify a different start time until the previously defined start time has been reached
-
-- allow the owner to add a schedule
-- not accept the same schedule name more than once
-- not accept invalid schedules with different array lengths
-- not accept invalid schedules with durations that are not in ascending order
-- not allow schedules which in total distribute more than 100% of their allocation
-
-- allow the owner should to add allocations
-- not allow for allocations to be added to schedules that do not exist
-- not accept invalid allocations with different array lengths
-- not allow the owner to
-- not allow the owner to add allocations that exceed the total amount of mintable tokens
-- allow any user to claim tokens if they are eligible for the specified schedule at that time
-- allow any account to claim tokens for an eligible account so that the eligible account does not need to send the transaction or pay for gas themselves
-
-- allow the owner to revoke a user from claiming their tokens
-- prevent an account to claim any tokens from the time that their allocation has been revoked, this includes tokens which were already due to be released but that users has not claimed yet - for sake of clarity such tokens should also not be claimable anymore
-- not allow the owner to revoke allocations or schedules that do not exist
+- [schedule]
+  - allow the owner to add a schedule
+  - not accept the same schedule name more than once
+  - not accept invalid schedules with different array lengths
+  - not accept invalid schedules with durations that are not in ascending order
+  - not allow schedules which in total distribute more than 100% of their allocation
+- [allocation]
+  - allow the owner should to add allocations
+  - not allow for allocations to be added to schedules that do not exist
+  - not accept invalid allocations with different array lengths
+  - not allow the owner to
+  - not allow the owner to add allocations that exceed the total amount of mintable tokens
+  - allow any user to claim tokens if they are eligible for the specified schedule at that time
+  - allow any account to claim tokens for an eligible account so that the eligible account does not need to send the transaction or pay for gas themselves
+- [revoke]
+  - allow the owner to revoke a user from claiming their tokens
+  - prevent an account to claim any tokens from the time that their allocation has been revoked, this includes tokens which were already due to be released but that users has not claimed yet - for sake of clarity such tokens should also not be claimable anymore
+  - not allow the owner to revoke allocations or schedules that do not exist
