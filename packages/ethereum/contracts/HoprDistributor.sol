@@ -5,21 +5,6 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "./HoprToken.sol";
 
 contract HoprDistributor is Ownable {
-    // helps us create more accurate calculations
-    uint32 public constant MULTIPLIER = 10 ** 6;
-
-    // total amount minted
-    uint128 public totalMinted = 0;
-    // how many tokens will be minted (the sum of all allocations)
-    uint128 public totalToBeMinted = 0;
-
-    // time where the contract will consider as starting time
-    uint32 public startTime;
-    // token which will be used
-    HoprToken public token;
-    // maximum tokens allowed to be minted
-    uint128 public maxMintAmount;
-
     // A {Schedule} that defined when and how much will be claimed
     // from an {Allocation}
     struct Schedule {
@@ -36,6 +21,21 @@ contract HoprDistributor is Ownable {
         bool revoked; // account can no longer claim
     }
 
+    // helps us create more accurate calculations
+    uint32 public constant MULTIPLIER = 10 ** 6;
+
+    // total amount minted
+    uint128 public totalMinted = 0;
+    // how many tokens will be minted (the sum of all allocations)
+    uint128 public totalToBeMinted = 0;
+
+    // time where the contract will consider as starting time
+    uint32 public startTime;
+    // token which will be used
+    HoprToken public token;
+    // maximum tokens allowed to be minted
+    uint128 public maxMintAmount;
+
     // schedule name -> Schedule
     mapping(string => Schedule) internal schedules;
 
@@ -43,9 +43,13 @@ contract HoprDistributor is Ownable {
     // allows for an account to have more than one type of Schedule
     mapping(address => mapping(string => Allocation)) public allocations;
 
+    event ScheduleAdded(uint32[] durations, uint32[] percents, string name);
+    event AllocationAdded(address indexed account, uint128 amount, string scheduleName);
+    event Claimed(address indexed account, uint128 amount, string scheduleName);
+
     /**
-     * @param _startTime The timestamp to start counting
-     * @param _token The token which we will mint
+     * @param _startTime the timestamp to start counting
+     * @param _token the token which we will mint
      */
     constructor(HoprToken _token, uint32 _startTime, uint128 _maxMintAmount) public {
         startTime = _startTime;
@@ -62,6 +66,16 @@ contract HoprDistributor is Ownable {
             schedules[name].durations,
             schedules[name].percents
         );
+    }
+
+    /**
+     * @dev Allows the owner to update the start time,
+     * in case there are unforeseen issues in the long schedule.
+     * @param _startTime the new timestamp to start counting
+     */
+    function updateStartTime(uint32 _startTime) external onlyOwner {
+        require(startTime > _currentBlockTimestamp(), "Previous start time must not be reached");
+        startTime = _startTime;
     }
 
     /**
@@ -101,7 +115,7 @@ contract HoprDistributor is Ownable {
 
         uint32 lastDuration = 0;
         for (uint256 i = 0; i < durations.length; i++) {
-            require(lastDuration <= durations[i], "Durations must be added in ascending order");
+            require(lastDuration < durations[i], "Durations must be added in ascending order");
             lastDuration = durations[i];
             require(percents[i] <= MULTIPLIER, "Percent provided must be smaller or equal to MULTIPLIER");
         }
@@ -279,8 +293,4 @@ contract HoprDistributor is Ownable {
 
         return c;
     }
-
-    event ScheduleAdded(uint32[] durations, uint32[] percents, string name);
-    event AllocationAdded(address indexed account, uint128 amount, string scheduleName);
-    event Claimed(address indexed account, uint128 amount, string scheduleName);
 }

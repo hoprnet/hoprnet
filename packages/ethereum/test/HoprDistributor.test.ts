@@ -1,8 +1,9 @@
 import { expect } from 'chai'
-import { singletons, time, expectRevert, expectEvent } from '@openzeppelin/test-helpers'
+import { singletons, time, expectRevert, expectEvent, BN } from '@openzeppelin/test-helpers'
 import { durations } from '@hoprnet/hopr-utils'
 import { web3 } from 'hardhat'
 import { HoprTokenInstance, HoprDistributorInstance } from '../types'
+import { vmErrorMessage } from './utils'
 
 const HoprToken = artifacts.require('HoprToken')
 const HoprDistributor = artifacts.require('HoprDistributor')
@@ -44,6 +45,29 @@ describe('HoprDistributor', function () {
       from: owner
     })
   }
+
+  describe('start time', function () {
+    let startTime: string
+
+    beforeEach(async function () {
+      startTime = new BN(await getLatestBlockTimestamp()).add(new BN(String(durations.minutes(5)))).toString()
+
+      await reset(startTime)
+    })
+
+    it('should update start time', async function () {
+      expect((await distributor.startTime()).toString()).to.equal(startTime)
+
+      await distributor.updateStartTime('1')
+      expect((await distributor.startTime()).toString()).to.equal('1')
+    })
+
+    it('should fail to update start time', async function () {
+      await time.increase(durations.minutes(10))
+
+      await expectRevert(distributor.updateStartTime('1'), vmErrorMessage('Previous start time must not be reached'))
+    })
+  })
 
   describe('schedules', function () {
     before(async function () {
@@ -95,7 +119,7 @@ describe('HoprDistributor', function () {
 
     it('should fail to add schedule when percent is higher than multiplier', async function () {
       await expectRevert(
-        distributor.addSchedule(['1', '1'], ['50', String(Number(multiplier) + 1)], SCHEDULE_UNSET),
+        distributor.addSchedule(['1', '2'], ['50', String(Number(multiplier) + 1)], SCHEDULE_UNSET),
         'Percent provided must be smaller or equal to MULTIPLIER'
       )
     })
@@ -440,7 +464,7 @@ describe('HoprDistributor', function () {
     before(async function () {
       await reset(undefined, '50')
 
-      await distributor.addSchedule([0], [toSolPercent(1)], SCHEDULE_1_MIN_ALL)
+      await distributor.addSchedule([1], [toSolPercent(1)], SCHEDULE_1_MIN_ALL)
     })
 
     it('should fail to allocate if totalToBeMinted is higher than max mint', async function () {
