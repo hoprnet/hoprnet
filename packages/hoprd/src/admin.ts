@@ -95,19 +95,19 @@ export class AdminServer {
     })
 
     this.node.on('hopr:warning:unfunded', (addr) => {
-      const min = (new node.paymentChannels.types.Balance(0)).toFormattedString.apply(MIN_NATIVE_BALANCE)
+      const min = new node.paymentChannels.types.Balance(0).toFormattedString.apply(MIN_NATIVE_BALANCE)
       this.logs.log(
         `- The account associated with this node has no funds,\n` +
-        `  in order to send messages, or open channels, you will need to send` +
-        `  at least ${min} to ${addr}`
+          `  in order to send messages, or open channels, you will need to send` +
+          `  at least ${min} to ${addr}`
       )
     })
 
     this.node.on('hopr:warning:unfundedNative', (addr) => {
       this.logs.log(
         `- The account associated with this node has no BNB,\n` +
-        `  in order to fund gas for protocol overhead you will need to send\n` +
-        `  0.025 BNB to ${addr}`
+          `  in order to fund gas for protocol overhead you will need to send\n` +
+          `  0.025 BNB to ${addr}`
       )
     })
 
