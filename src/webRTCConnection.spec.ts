@@ -1,3 +1,7 @@
+/// <reference path="./@types/it-pair.ts" />
+/// <reference path="./@types/libp2p.ts" />
+/// <reference path="./@types/stream-to-it.ts" />
+
 import { WebRTCConnection, WEBRTC_UPGRADE_TIMEOUT } from './webRTCConnection'
 import Peer from 'simple-peer'
 
