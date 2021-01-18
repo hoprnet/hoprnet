@@ -1,11 +1,7 @@
 // import libp2p from 'libp2p'
-// // @ts-ignore
 // import MPLEX = require('libp2p-mplex')
-// // @ts-ignore
 // import KadDHT = require('libp2p-kad-dht')
-// // @ts-ignore
 // import SECIO = require('libp2p-secio')
-// // @ts-ignore
 // import TCP from 'libp2p-tcp'
 
 // import { Handler, MultiaddrConnection, Stream } from 'libp2p'

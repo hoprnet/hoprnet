@@ -1,12 +1,14 @@
-import { u8aConcat, u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
+import { u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
+import { randomBytes } from 'crypto'
+
 import Defer, { DeferredPromise } from 'p-defer'
 
 import type { Stream } from 'libp2p'
 
 import Debug from 'debug'
-const log = Debug(`hopr-connect`)
-const verbose = Debug(`hopr-connect:verbose`)
-const error = Debug(`hopr-connect:error`)
+const _log = Debug(`hopr-connect`)
+const _verbose = Debug(`hopr-connect:verbose`)
+const _error = Debug(`hopr-connect:error`)
 
 import {
   RELAY_STATUS_PREFIX,
@@ -25,6 +27,8 @@ class RelayContext {
   private _streamSourceSwitchPromise: DeferredPromise<Stream['source']>
   private _streamSinkSwitchPromise: DeferredPromise<Stream['sink']>
 
+  private _id: string
+
   private _sinkSourceAttached: boolean
   private _sinkSourceAttachedPromise: DeferredPromise<Stream['source']>
 
@@ -37,8 +41,6 @@ class RelayContext {
   private _sourceSwitched: boolean
   private _sinkSwitched: boolean
 
-  private _currentSource: Stream['source']
-
   public source: Stream['source']
   public sink: Stream['sink']
   public ping: (ms?: number) => Promise<number>
@@ -48,6 +50,8 @@ class RelayContext {
     this._switchPromise = Defer<Stream>()
 
     this._switchPromise.promise.then(this.switchFunction.bind(this))
+
+    this._id = u8aToHex(randomBytes(4), false)
 
     this._statusMessagePromise = Defer<void>()
     this._statusMessages = []
@@ -62,8 +66,6 @@ class RelayContext {
     this._streamSourceSwitchPromise = Defer<Stream['source']>()
     this._streamSinkSwitchPromise = Defer<Stream['sink']>()
 
-    this._currentSource = this._stream.source
-
     this.source = this._createSource()
     // this.source.next()
 
@@ -76,7 +78,7 @@ class RelayContext {
     }
 
     this.ping = async (ms: number = DEFAULT_PING_TIMEOUT) => {
-      log(`ping`)
+      this.log(`ping`)
       let start = Date.now()
       this._pingResponsePromise = Defer<void>()
 
@@ -85,13 +87,13 @@ class RelayContext {
 
       const timeoutPromise = new Promise<void>((resolve) => {
         timeout = setTimeout(() => {
-          log(`ping timeout done`)
+          this.log(`ping timeout done`)
           timeoutDone = true
           resolve()
         }, ms)
       })
 
-      this._statusMessages.push(u8aConcat(RELAY_STATUS_PREFIX, PING))
+      this._statusMessages.push(Uint8Array.from([...RELAY_STATUS_PREFIX, ...PING]))
       this._statusMessagePromise.resolve()
 
       await Promise.race([
@@ -109,13 +111,25 @@ class RelayContext {
     }
 
     this.update = (newStream: Stream) => {
-      log(`updating`)
+      this.log(`updating`)
       let tmpPromise = this._switchPromise
       this._switchPromise = Defer<Stream>()
       tmpPromise.resolve(newStream)
     }
 
     this._createSink()
+  }
+
+  private log(..._: any[]) {
+    _log(`[${this._id}]`, ...arguments)
+  }
+
+  private verbose(..._: any[]) {
+    _verbose(`[${this._id}]`, ...arguments)
+  }
+
+  private error(..._: any[]) {
+    _error(`[${this._id}]`, ...arguments)
   }
 
   private switchFunction(stream: Stream): void {
@@ -132,13 +146,13 @@ class RelayContext {
 
   private _createSource(): Stream['source'] {
     const iterator: Stream['source'] = async function* (this: RelayContext) {
-      log(`source called`)
+      this.log(`source called`)
       let result: Stream['source'] | IteratorResult<Uint8Array, void> | undefined
 
       const next = () => {
         result = undefined
 
-        this._sourcePromise = this._currentSource.next()
+        this._sourcePromise = this._stream.source.next()
       }
 
       while (true) {
@@ -147,7 +161,7 @@ class RelayContext {
         ]
 
         if (result == undefined || (result as IteratorResult<Uint8Array, void>).done != true) {
-          this._sourcePromise = this._sourcePromise ?? this._currentSource.next()
+          this._sourcePromise = this._sourcePromise ?? this._stream.source.next()
 
           promises.push(this._sourcePromise)
         }
@@ -171,9 +185,9 @@ class RelayContext {
 
           this._streamSourceSwitchPromise = Defer<Stream['source']>()
           console.log(`sinking restart`)
-          yield u8aConcat(RELAY_STATUS_PREFIX, RESTART)
+          yield Uint8Array.from([...RELAY_STATUS_PREFIX, ...RESTART])
 
-          this._sourcePromise = this._currentSource.next()
+          this._sourcePromise = this._stream.source.next()
           continue
         }
 
@@ -184,6 +198,7 @@ class RelayContext {
         }
 
         if (received.value.length == 0) {
+          this.log(`got empty message`)
           next()
 
           // Ignore empty messages
@@ -193,7 +208,7 @@ class RelayContext {
         const [PREFIX, SUFFIX] = [received.value.slice().subarray(0, 1), received.value.slice().subarray(1)]
 
         if (!VALID_PREFIXES.includes(PREFIX[0])) {
-          error(`Invalid prefix: Got <${u8aToHex(PREFIX ?? new Uint8Array())}>. Dropping message in relayContext.`)
+          this.error(`Invalid prefix: Got <${u8aToHex(PREFIX ?? new Uint8Array())}>. Dropping message in relayContext.`)
 
           next()
 
@@ -204,14 +219,14 @@ class RelayContext {
         // Interprete relay sub-protocol
         if (u8aEquals(PREFIX, RELAY_STATUS_PREFIX)) {
           if (u8aEquals(SUFFIX, PING)) {
-            verbose(`PING received`)
-            this._statusMessages.push(u8aConcat(RELAY_STATUS_PREFIX, PONG))
+            this.verbose(`PING received`)
+            this._statusMessages.push(Uint8Array.from([...RELAY_STATUS_PREFIX, ...PONG]))
 
             this._statusMessagePromise.resolve()
 
             // Don't forward ping
           } else if (u8aEquals(SUFFIX, PONG)) {
-            verbose(`PONG received`)
+            this.verbose(`PONG received`)
 
             this._pingResponsePromise?.resolve()
 
@@ -224,7 +239,7 @@ class RelayContext {
           // Interprete connection sub-protocol
         } else if (u8aEquals(PREFIX, RELAY_CONNECTION_STATUS_PREFIX)) {
           if (u8aEquals(SUFFIX, STOP)) {
-            verbose(`STOP relayed`)
+            this.verbose(`STOP relayed`)
 
             // forward STOP message
             yield received.value
@@ -232,9 +247,10 @@ class RelayContext {
             // close stream
             break
           } else if (u8aEquals(SUFFIX, RESTART)) {
-            verbose(`RESTART relayed`)
+            this.verbose(`RESTART relayed`)
           }
 
+          this.log(`sourcing`, received.value)
           yield received.value
 
           next()
@@ -262,7 +278,7 @@ class RelayContext {
   }
 
   private async _createSink(): Promise<void> {
-    log(`createSink called`)
+    this.log(`createSink called`)
     let currentSink = this._stream.sink
 
     let sourcePromise: Promise<IteratorResult<Uint8Array, void>> | undefined
@@ -277,7 +293,10 @@ class RelayContext {
 
     let statusPromise = this._statusMessagePromise.promise.then(statusSourceFunction)
 
+    let switchPromise = Defer<void>()
+
     async function* drain(this: RelayContext): Stream['source'] {
+      console.log(`########## DRAIN CALLLEDD ################################`)
       type SinkResult = Stream['sink'] | Stream['source'] | IteratorResult<Uint8Array, void> | void
 
       let result: SinkResult
@@ -306,6 +325,8 @@ class RelayContext {
         // 3. Handle payload messages
         result = await Promise.race(promises)
 
+        this.log(`promises`, promises)
+
         if (this._sinkSourceAttached) {
           this._sinkSourceAttached = false
           currentSource = result as Stream['source']
@@ -333,7 +354,17 @@ class RelayContext {
         }
 
         if (this._sinkSwitched) {
+          currentSink = result as Stream['sink']
+          this._streamSinkSwitchPromise = Defer<Stream['sink']>()
+
+          let tmpPromise = switchPromise
+          switchPromise = Defer<void>()
+
+          sourcePromise = undefined
           this._sinkSwitched = false
+
+          tmpPromise.resolve()
+          console.log(`sinkSwitched`)
           break
         }
 
@@ -343,28 +374,32 @@ class RelayContext {
           continue
         }
 
-        let [PREFIX, SUFFIX] = [received.value.slice(0, 1), received.value.slice(1)]
+        this.log(`result after special event handling`, received.value?.slice?.())
 
-        if (u8aEquals(PREFIX, RELAY_STATUS_PREFIX) && u8aEquals(SUFFIX, STOP)) {
+        try {
+          let [PREFIX, SUFFIX] = [received.value.slice(0, 1), received.value.slice(1)]
+
+          if (u8aEquals(PREFIX, RELAY_STATUS_PREFIX) && u8aEquals(SUFFIX, STOP)) {
+            yield received.value
+            break
+          }
+
           yield received.value
-          break
+
+          result = undefined
+
+          sourcePromise = currentSource?.next()
+        } catch (err) {
+          this.error(err)
+          throw err
         }
-
-        yield received.value
-
-        result = undefined
-
-        sourcePromise = currentSource?.next()
       }
     }
 
     while (true) {
       currentSink(drain.call(this))
 
-      currentSink = await this._streamSinkSwitchPromise.promise
-
-      this._sinkSwitched = false
-      this._streamSinkSwitchPromise = Defer<Stream['sink']>()
+      await switchPromise.promise
     }
   }
 }

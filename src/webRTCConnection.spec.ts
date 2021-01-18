@@ -1,10 +1,9 @@
 import { WebRTCConnection, WEBRTC_UPGRADE_TIMEOUT } from './webRTCConnection'
 import Peer from 'simple-peer'
 
-// @ts-ignore
-import wrtc = require('wrtc')
+const wrtc = require('wrtc')
 
-import { u8aConcat, durations } from '@hoprnet/hopr-utils'
+import { durations } from '@hoprnet/hopr-utils'
 import { RELAY_PAYLOAD_PREFIX } from './constants'
 import { RelayContext } from './relayContext'
 import { RelayConnection } from './relayConnection'
@@ -53,7 +52,7 @@ describe('test overwritable connection', function () {
           )
 
           if (arg.usePrefix) {
-            yield u8aConcat(RELAY_PAYLOAD_PREFIX, msg)
+            yield Uint8Array.from([...RELAY_PAYLOAD_PREFIX, ...msg])
           } else {
             yield msg
           }
