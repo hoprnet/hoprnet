@@ -7,6 +7,7 @@ To be audited:
 - [HoprDistributor.sol](./contracts/HoprDistributor.sol)
 
 # Scope of Audit
+
 These smart contracts are expected to run on the current Ethereum main chain as described below.
 
 ## HoprToken
@@ -16,6 +17,7 @@ These smart contracts are expected to run on the current Ethereum main chain as 
 HoprToken is an ERC777 and ERC20 compatible token, it also allows for querrying balance data at a specific block. To achieve that we have [extended](./contracts/ERC777/ERC777Snapshot.sol) OZ's ERC777 contract and implemented a snapshotting mechanism similar to the [minime token](https://github.com/Giveth/minime/blob/ea04d950eea153a04c51fa510b068b9dded390cb/contracts/MiniMeToken.sol).
 
 The HoprToken smart contract should:
+
 - be ERC20 compatible
 - be ERC777 compatible
 - allow a user with role "MINTER_ROLE" to be able to mint tokens
@@ -46,7 +48,7 @@ The HoprDistributor smart contract should:
 - allow the owner should to add allocations
 - not allow for allocations to be added to schedules that do not exist
 - not accept invalid allocations with different array lengths
-- not allow the owner to 
+- not allow the owner to
 - not allow the owner to add allocations that exceed the total amount of mintable tokens
 - allow any user to claim tokens if they are eligible for the specified schedule at that time
 - allow any account to claim tokens for an eligible account so that the eligible account does not need to send the transaction or pay for gas themselves
@@ -54,4 +56,3 @@ The HoprDistributor smart contract should:
 - allow the owner to revoke a user from claiming their tokens
 - prevent an account to claim any tokens from the time that their allocation has been revoked, this includes tokens which were already due to be released but that users has not claimed yet - for sake of clarity such tokens should also not be claimable anymore
 - not allow the owner to revoke allocations or schedules that do not exist
-
