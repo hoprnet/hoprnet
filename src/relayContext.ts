@@ -121,15 +121,15 @@ class RelayContext {
   }
 
   private log(..._: any[]) {
-    _log(`[${this._id}]`, ...arguments)
+    _log(`RX [${this._id}]`, ...arguments)
   }
 
   private verbose(..._: any[]) {
-    _verbose(`[${this._id}]`, ...arguments)
+    _verbose(`RX [${this._id}]`, ...arguments)
   }
 
   private error(..._: any[]) {
-    _error(`[${this._id}]`, ...arguments)
+    _error(`RX [${this._id}]`, ...arguments)
   }
 
   private switchFunction(stream: Stream): void {
@@ -296,7 +296,6 @@ class RelayContext {
     let switchPromise = Defer<void>()
 
     async function* drain(this: RelayContext): Stream['source'] {
-      console.log(`########## DRAIN CALLLEDD ################################`)
       type SinkResult = Stream['sink'] | Stream['source'] | IteratorResult<Uint8Array, void> | void
 
       let result: SinkResult

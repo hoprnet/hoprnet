@@ -33,8 +33,8 @@ class RelayConnection implements MultiaddrConnection {
   private _msgPromise: DeferredPromise<void>
   private _msgs: (IteratorResult<Uint8Array, void> & { iteration: number })[]
 
-  private _webRTCStreamResult?: IteratorResult<Uint8Array, void>
-  private _webRTCresolved: boolean
+  private _webRTCdone?: boolean
+  private _webRTCresolved?: boolean
   private _webRTCstream?: Stream['source']
   private _webRTCSourceFunction: (arg: IteratorResult<Uint8Array, void>) => IteratorResult<Uint8Array, void>
   private _webRTCPromise?: Promise<IteratorResult<Uint8Array, void>>
@@ -111,8 +111,7 @@ class RelayConnection implements MultiaddrConnection {
 
     this.webRTC = opts.webRTC
 
-    this._webRTCresolved = false
-    this._webRTCStreamResult = opts.webRTC != undefined ? undefined : { done: true, value: undefined }
+    this._webRTCdone = opts.webRTC == undefined
 
     this._webRTCSourceFunction = (arg: IteratorResult<Uint8Array, void>) => {
       this._webRTCresolved = true
@@ -146,15 +145,15 @@ class RelayConnection implements MultiaddrConnection {
   }
 
   private log(..._: any[]) {
-    _log(`[${this._id}]`, ...arguments)
+    _log(`RC [${this._id}]`, ...arguments)
   }
 
   private verbose(..._: any[]) {
-    _verbose(`[${this._id}]`, ...arguments)
+    _verbose(`RC [${this._id}]`, ...arguments)
   }
 
   private error(..._: any[]) {
-    _error(`[${this._id}]`, ...arguments)
+    _error(`RC [${this._id}]`, ...arguments)
   }
 
   private async _drainSource() {
@@ -231,8 +230,6 @@ class RelayConnection implements MultiaddrConnection {
             this.webRTC.channel = this.webRTC.upgradeInbound()
 
             this.log(`resetting WebRTC stream`)
-            this._webRTCStreamResult = undefined
-            this._webRTCresolved = false
             this._webRTCstream = this._getWebRTCStream()
             this._webRTCPromise = this._webRTCstream.next().then(this._webRTCSourceFunction)
             this.log(`resetting WebRTC stream done`)
@@ -314,6 +311,9 @@ class RelayConnection implements MultiaddrConnection {
   }
 
   private async *_getWebRTCStream(this: RelayConnection): Stream['source'] {
+    this._webRTCdone = false
+    this._webRTCresolved = false
+
     if (this.webRTC == undefined) {
       throw Error(`Cannot listen to a WebRTC instance because there was none given.`)
     }
@@ -412,12 +412,15 @@ class RelayConnection implements MultiaddrConnection {
       promises.push(statusPromise)
 
       if ((result == undefined || !(result as IteratorResult<Uint8Array, void>).done) && currentSource != undefined) {
+        console.log(`adding streamPromise`)
         streamPromise = streamPromise ?? currentSource.next()
 
         promises.push(streamPromise)
       }
 
-      if (this._webRTCStreamResult == undefined || !this._webRTCStreamResult.done) {
+      if (!this._webRTCdone) {
+        console.log(`adding webRTCPromise`, this._webRTCdone)
+
         this._webRTCstream = this._webRTCstream ?? this._getWebRTCStream()
         this._webRTCPromise = this._webRTCPromise ?? this._webRTCstream.next().then(this._webRTCSourceFunction)
 
@@ -473,7 +476,11 @@ class RelayConnection implements MultiaddrConnection {
 
         const received = result as IteratorResult<Uint8Array, void>
 
+        console.log(`webrtc message`, received)
+
         if (received == undefined || received.done) {
+          this.verbose(`Stop sinking WebRTC signaling messages`)
+          this._webRTCdone = true
           this._webRTCPromise = undefined
           continue
         }
