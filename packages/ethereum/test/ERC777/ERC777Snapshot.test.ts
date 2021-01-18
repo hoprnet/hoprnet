@@ -215,4 +215,34 @@ describe('ERC777Snapshot', function () {
       })
     })
   })
+
+  describe('valueAt', function () {
+    it('should return account balance 0 at block 0', async function () {
+      const balance = await token.getAccountValueAt(initialHolder, 0)
+      expect(balance.toString()).to.equal('0')
+    })
+
+    it('should return unknown account balance 0 at block 0', async function () {
+      const balance = await token.getAccountValueAt(other, 0)
+      expect(balance.toString()).to.equal('0')
+    })
+
+    it('should return total supply balance 0 at block 0', async function () {
+      const totalSupply = await token.getTotalSupplyValueAt(0)
+      expect(totalSupply.toString()).to.equal('0')
+    })
+
+    it('should return account balance at block', async function () {
+      const blockNumber = await latestBlockNumber()
+      const blocks = 10
+
+      for (let i = 0; i < blocks; i++) {
+        await token.transfer(recipient, 1)
+      }
+
+      for (let i = 0; i < blocks; i++) {
+        expect((await token.balanceOfAt(recipient, blockNumber + i + 1)).toString()).to.equal(String(i + 1))
+      }
+    })
+  })
 })

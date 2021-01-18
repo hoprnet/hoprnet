@@ -14,6 +14,19 @@ contract ERC777SnapshotMock is ERC777Snapshot {
         _mint(initialAccount, initialBalance, "", "");
     }
 
+    function getAccountValueAt(
+        address _owner,
+        uint128 _blockNumber
+    ) external view returns (uint128) {
+        _valueAt(accountSnapshots[_owner], _blockNumber);
+    }
+
+    function getTotalSupplyValueAt(
+        uint128 _blockNumber
+    ) external view returns (uint128) {
+        _valueAt(totalSupplySnapshots, _blockNumber);
+    }
+
     function updateValueAtNowAccount(
         address account,
         uint256 value

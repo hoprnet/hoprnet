@@ -339,6 +339,10 @@ describe('HoprDistributor', function () {
         scheduleName: SCHEDULE_TEAM
       })
     })
+
+    it('should fail to claim when there is nothing to claim', async function () {
+      await expectRevert(distributor.claim(SCHEDULE_UNSET), 'There is nothing to claim')
+    })
   })
 
   describe('claimFor', function () {
@@ -434,6 +438,10 @@ describe('HoprDistributor', function () {
         amount: '76',
         scheduleName: SCHEDULE_TEAM
       })
+    })
+
+    it('should fail to claim when there is nothing to claim', async function () {
+      await expectRevert(distributor.claimFor(owner, SCHEDULE_UNSET), 'There is nothing to claim')
     })
   })
 
