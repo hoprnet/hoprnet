@@ -206,10 +206,9 @@ async function main() {
     }
   }
 
-  async function stopGracefully(signal) {
-    await node.stop()
+  function stopGracefully(signal) {
     logs.log(`Process exiting with signal ${signal}`)
-    return
+    process.exit()
   }
 
   process.once('exit', stopGracefully)
