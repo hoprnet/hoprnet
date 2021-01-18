@@ -154,7 +154,7 @@ describe('test overwritable connection', function () {
       ctxRelayCounterparty.update(getStream({ usePrefix: true }))
     }, 100)
 
-    await new Promise((resolve) => setTimeout(resolve, 2500))
+    await new Promise((resolve) => setTimeout(resolve, 1000))
 
     // Make sure that we the ping went through
     // Note that `result == -1` means timeout

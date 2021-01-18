@@ -1,8 +1,10 @@
 /// <reference path="./@types/bl.ts" />
+/// <reference path="./@types/libp2p.ts" />
 
 import Multiaddr from 'multiaddr'
 import BL from 'bl'
 import type { MultiaddrConnection, Stream } from 'libp2p'
+import { randomBytes } from 'crypto'
 import Defer, { DeferredPromise } from 'p-defer'
 import { RELAY_PAYLOAD_PREFIX, RELAY_STATUS_PREFIX, RELAY_WEBRTC_PREFIX, RESTART, STOP, PING, PONG } from './constants'
 import { u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
@@ -13,9 +15,9 @@ import type PeerId from 'peer-id'
 
 import Debug from 'debug'
 
-const log = Debug('hopr-connect')
-const verbose = Debug('hopr-connect:verbose')
-const error = Debug('hopr-connect:error')
+const _log = Debug('hopr-connect')
+const _verbose = Debug('hopr-connect:verbose')
+const _error = Debug('hopr-connect:error')
 
 type WebRTC = {
   channel: SimplePeer
@@ -45,6 +47,8 @@ class RelayConnection implements MultiaddrConnection {
   private _statusMessages: Uint8Array[]
 
   public _iteration: number
+
+  public _id: string
 
   private _sinkSourceAttached: boolean
   private _sinkSourceAttachedPromise: DeferredPromise<Stream['source']>
@@ -100,6 +104,8 @@ class RelayConnection implements MultiaddrConnection {
 
     this._closePromise = Defer<void>()
 
+    this._id = u8aToHex(randomBytes(4), false)
+
     this.localAddr = Multiaddr(`/p2p/${opts.self.toB58String()}`)
     this.remoteAddr = Multiaddr(`/p2p/${opts.counterparty.toB58String()}`)
 
@@ -126,6 +132,7 @@ class RelayConnection implements MultiaddrConnection {
     this.sink = this._createSink.bind(this)
 
     this.close = (_err?: Error): Promise<void> => {
+      this.verbose(`close called`)
       this._statusMessages.unshift(Uint8Array.from([...RELAY_STATUS_PREFIX, ...STOP]))
       this._statusMessagePromise.resolve()
       this._closePromise.resolve()
@@ -136,6 +143,18 @@ class RelayConnection implements MultiaddrConnection {
     }
 
     this._drainSource()
+  }
+
+  private log(..._: any[]) {
+    _log(`[${this._id}]`, ...arguments)
+  }
+
+  private verbose(..._: any[]) {
+    _verbose(`[${this._id}]`, ...arguments)
+  }
+
+  private error(..._: any[]) {
+    _error(`[${this._id}]`, ...arguments)
   }
 
   private async _drainSource() {
@@ -159,6 +178,8 @@ class RelayConnection implements MultiaddrConnection {
 
       if (streamClosed) {
         if (!this._destroyed) {
+          console.log(`sunk`)
+
           if (!this._sinkTriggered) {
             this._stream.sink(
               (async function* () {
@@ -169,14 +190,17 @@ class RelayConnection implements MultiaddrConnection {
           this._destroyedPromise.resolve()
           this._destroyed = true
         }
-        this._msgs.push({ done: true, value: undefined, iteration: this._iteration })
+        this._msgs.unshift({ done: true, value: undefined, iteration: this._iteration })
+        this._msgPromise.resolve()
+        this.log(`streamClosed`, this._msgs)
+
         break
       }
 
       const received = result as IteratorResult<Uint8Array, void>
       if (received == undefined || received.done) {
         this._msgs.push({ done: true, value: undefined, iteration: this._iteration })
-        log(`ending stream because 'streamDone' was set to 'true'.`)
+        this.log(`ending stream because 'streamDone' was set to 'true'.`)
         break
       }
 
@@ -192,12 +216,12 @@ class RelayConnection implements MultiaddrConnection {
       } else if (u8aEquals(PREFIX, RELAY_STATUS_PREFIX)) {
         if (u8aEquals(SUFFIX, STOP)) {
           this._destroyed = true
-          this._msgs.push({ done: true, value: undefined, iteration: this._iteration })
-          this._msgPromise?.resolve()
+          this._msgs.unshift({ done: true, value: undefined, iteration: this._iteration })
+          this._msgPromise.resolve()
 
           break
         } else if (u8aEquals(SUFFIX, RESTART)) {
-          log(`RESTART received. Ending stream ...`)
+          this.log(`RESTART received. Ending stream ...`)
 
           if (this.webRTC != undefined) {
             try {
@@ -206,18 +230,18 @@ class RelayConnection implements MultiaddrConnection {
 
             this.webRTC.channel = this.webRTC.upgradeInbound()
 
-            log(`resetting WebRTC stream`)
+            this.log(`resetting WebRTC stream`)
             this._webRTCStreamResult = undefined
             this._webRTCresolved = false
             this._webRTCstream = this._getWebRTCStream()
             this._webRTCPromise = this._webRTCstream.next().then(this._webRTCSourceFunction)
-            log(`resetting WebRTC stream done`)
+            this.log(`resetting WebRTC stream done`)
           }
 
           this._iteration++
           this._onReconnect(this.switch(), this._counterparty)
         } else if (u8aEquals(SUFFIX, PING)) {
-          verbose(`PING received`)
+          this.verbose(`PING received`)
           this._statusMessages.push(Uint8Array.from([...RELAY_STATUS_PREFIX, ...PONG]))
 
           let tmpPromise = this._statusMessagePromise
@@ -225,16 +249,16 @@ class RelayConnection implements MultiaddrConnection {
 
           // Don't forward ping to receiver
         } else {
-          error(`Received invalid status message ${u8aToHex(SUFFIX || new Uint8Array([]))}. Dropping message.`)
+          this.error(`Received invalid status message ${u8aToHex(SUFFIX || new Uint8Array([]))}. Dropping message.`)
         }
       } else if (u8aEquals(PREFIX, RELAY_WEBRTC_PREFIX)) {
         try {
           this.webRTC?.channel.signal(JSON.parse(new TextDecoder().decode(SUFFIX)))
         } catch (err) {
-          error(`WebRTC error:`, err)
+          this.error(`WebRTC error:`, err)
         }
       } else {
-        error(`Received invalid prefix <${u8aToHex(PREFIX || new Uint8Array([]))}. Dropping message.`)
+        this.error(`Received invalid prefix <${u8aToHex(PREFIX || new Uint8Array([]))}. Dropping message.`)
       }
 
       result = undefined
@@ -253,7 +277,7 @@ class RelayConnection implements MultiaddrConnection {
         let current = this._msgs.shift()
 
         while (current != undefined && current.iteration < i) {
-          log(
+          this.log(
             `dropping message <${new TextDecoder().decode(
               current.value || new Uint8Array()
             )}> from peer ${this.remoteAddr.getPeerId()}`
@@ -350,7 +374,7 @@ class RelayConnection implements MultiaddrConnection {
 
   private async *sinkFunction(this: RelayConnection): Stream['source'] {
     type SinkType = Stream['sink'] | Stream['source'] | IteratorResult<Uint8Array, void> | undefined | void
-    log(`sinkFunction`)
+    this.log(`sinkFunction`)
     let currentSource: Stream['source'] | undefined
     let streamPromise: Promise<IteratorResult<Uint8Array, void>> | undefined
 
@@ -418,6 +442,7 @@ class RelayConnection implements MultiaddrConnection {
 
       if (statusMessageAvailable) {
         if (this._statusMessages.length > 0) {
+          this.log(`this._statusMessages`, this._statusMessages)
           if (u8aEquals(Uint8Array.from([...RELAY_STATUS_PREFIX, ...STOP]), this._statusMessages[0])) {
             this._destroyedPromise.resolve()
             this._destroyed = true
@@ -461,7 +486,7 @@ class RelayConnection implements MultiaddrConnection {
       }
 
       if (streamSwitched) {
-        log(`RelayConnection: after stream switch sink operation`)
+        this.log(`RelayConnection: after stream switch sink operation`)
         streamSwitched = false
         // @TODO explain this to Typescript properly
         currentSource = result as Stream['source']
