@@ -120,11 +120,17 @@ contract HoprDistributor is Ownable {
         require(durations.length == percents.length, "Durations and percents must have equal length");
 
         uint128 lastDuration = 0;
+        uint128 totalPercent = 0;
+
         for (uint256 i = 0; i < durations.length; i++) {
             require(lastDuration < durations[i], "Durations must be added in ascending order");
             lastDuration = durations[i];
+
             require(percents[i] <= MULTIPLIER, "Percent provided must be smaller or equal to MULTIPLIER");
+            totalPercent = _addUint128(totalPercent, percents[i]);
         }
+
+        require(totalPercent == MULTIPLIER, "Percents must sum to MULTIPLIER amount");
 
         schedules[name] = Schedule(durations, percents);
 
