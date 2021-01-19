@@ -4,13 +4,15 @@ import Defer, { DeferredPromise } from 'p-defer'
 import type { Instance as SimplePeer } from 'simple-peer'
 import Multiaddr from 'multiaddr'
 import type PeerId from 'peer-id'
-import { durations } from '@hoprnet/hopr-utils'
+import { durations, u8aToHex } from '@hoprnet/hopr-utils'
 import toIterable from 'stream-to-it'
 import Debug from 'debug'
 import { RelayConnection } from './relayConnection'
+import { randomBytes } from 'crypto'
 
-const log = Debug('hopr-connect')
-const verbose = Debug('hopr-connect:verbose')
+const _log = Debug('hopr-connect')
+const _error = Debug('hopr-connect:error')
+const _verbose = Debug('hopr-connect:verbose')
 
 export const WEBRTC_UPGRADE_TIMEOUT = durations.seconds(1)
 
@@ -33,6 +35,8 @@ class WebRTCConnection implements MultiaddrConnection {
   private channel: SimplePeer
 
   public conn: RelayConnection
+
+  private _id: string
 
   public timeline: {
     open: number
@@ -61,6 +65,8 @@ class WebRTCConnection implements MultiaddrConnection {
       open: Date.now()
     }
 
+    this._id = u8aToHex(randomBytes(4), false)
+
     this.channel.once('connect', () => {
       if (this._webRTCTimeout != undefined) {
         clearTimeout(this._webRTCTimeout)
@@ -76,7 +82,7 @@ class WebRTCConnection implements MultiaddrConnection {
         clearTimeout(this._webRTCTimeout)
       }
 
-      log(`ending WebRTC upgrade due error: ${err}`)
+      this.log(`ending WebRTC upgrade due error: ${err}`)
       this._webRTCStateKnown = true
       this._webRTCAvailable = false
       this._switchPromise.resolve()
@@ -88,12 +94,13 @@ class WebRTCConnection implements MultiaddrConnection {
     this.channel.once('error', endWebRTCUpgrade)
 
     this.sink = async (source: Stream['source']): Promise<void> => {
-      let sourceResult: IteratorResult<Uint8Array, void> | undefined
+      type SinkType = IteratorResult<Uint8Array, void> | void
       let sourceReceived = false
 
       function sourceFunction(arg: IteratorResult<Uint8Array, void>) {
         sourceReceived = true
-        sourceResult = arg
+
+        return arg
       }
 
       let sourcePromise = source.next().then(sourceFunction)
@@ -103,9 +110,12 @@ class WebRTCConnection implements MultiaddrConnection {
       let promiseTriggered = true
 
       let streamSwitched = false
+
       let switchPromise = this._switchPromise.promise.then(() => {
         streamSwitched = true
       })
+
+      let result: SinkType
 
       this.conn.sink(
         async function* (this: WebRTCConnection): Stream['source'] {
@@ -114,7 +124,7 @@ class WebRTCConnection implements MultiaddrConnection {
           }
 
           while (!this._webRTCAvailable && !this._webRTCStateKnown) {
-            await Promise.race([
+            result = await Promise.race([
               // prettier-ignore
               sourcePromise,
               switchPromise
@@ -128,11 +138,13 @@ class WebRTCConnection implements MultiaddrConnection {
             promiseTriggered = false
             sourceReceived = false
 
-            if (sourceResult == undefined || sourceResult.done) {
+            const received = result as IteratorResult<Uint8Array, void>
+
+            if (received == undefined || received.done) {
               break
             }
 
-            yield sourceResult.value.slice()
+            yield received.value.slice()
 
             if (!this._webRTCAvailable) {
               sourcePromise = source.next().then(sourceFunction)
@@ -143,17 +155,17 @@ class WebRTCConnection implements MultiaddrConnection {
           }
 
           if (this._webRTCStateKnown && !this._webRTCAvailable) {
-            log(
+            this.log(
               `WebRTC connection upgrade failed. Continue using relayed connection with peer ${opts.counterparty.toB58String()}.`
             )
 
-            await sourcePromise
+            result = await sourcePromise
 
-            if (sourceResult == undefined || sourceResult.done) {
+            if (result == undefined || result.done) {
               return
             }
 
-            yield sourceResult.value.slice()
+            yield result.value.slice()
 
             yield* source
           }
@@ -176,17 +188,17 @@ class WebRTCConnection implements MultiaddrConnection {
 
               if (promiseTriggered && !sourceReceived) {
                 if (!sourceReceived) {
-                  await sourcePromise
+                  result = await sourcePromise
                 }
 
-                console.log(`after defer`, promiseTriggered, sourceReceived, sourceResult)
+                console.log(`after defer`, promiseTriggered, sourceReceived, result)
 
-                if (sourceResult != undefined && !sourceResult.done) {
-                  yield sourceResult.value.slice()
+                if (result != undefined && !result.done) {
+                  yield result.value.slice()
                 }
               }
 
-              log(`switching to direct WebRTC connection with peer ${this.remoteAddr.getPeerId()}`)
+              this.log(`switching to direct WebRTC connection with peer ${this.remoteAddr.getPeerId()}`)
 
               while (
                 // @ts-ignore
@@ -235,7 +247,7 @@ class WebRTCConnection implements MultiaddrConnection {
 
       if (this._webRTCAvailable || !this._webRTCStateKnown) {
         clearTimeout(this._webRTCTimeout)
-        log(`webRTC handover done. Using direct connection to peer ${this.remoteAddr.getPeerId()}`)
+        this.log(`webRTC handover done. Using direct connection to peer ${this.remoteAddr.getPeerId()}`)
 
         for await (const msg of this.channel[Symbol.asyncIterator]() as Stream['source']) {
           console.log(`getting from WebRTC ${new TextDecoder().decode(msg)}`)
@@ -244,6 +256,18 @@ class WebRTCConnection implements MultiaddrConnection {
         // yield* this.channel[Symbol.asyncIterator]() as Stream['source']
       }
     }.call(this)
+  }
+
+  private log(..._: any[]) {
+    _log(`RX [${this._id}]`, ...arguments)
+  }
+
+  private verbose(..._: any[]) {
+    _verbose(`RX [${this._id}]`, ...arguments)
+  }
+
+  private error(..._: any[]) {
+    _error(`RX [${this._id}]`, ...arguments)
   }
 
   get destroyed(): boolean {
@@ -266,8 +290,8 @@ class WebRTCConnection implements MultiaddrConnection {
     try {
       this.conn.close()
     } catch (err) {
-      err(`Error while trying to close relayed connection. Increase log level to display error.`)
-      verbose(err)
+      this.error(`Error while trying to close relayed connection. Increase log level to display error.`)
+      this.verbose(err)
     }
 
     this._destroyed = true

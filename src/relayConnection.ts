@@ -484,6 +484,7 @@ class RelayConnection implements MultiaddrConnection {
 
       if (streamSwitched) {
         streamSwitched = false
+
         switchPromise = this._switchPromise.promise.then(switchFunction)
         this.verbose(`Stream switched`)
         currentSource = undefined
@@ -512,7 +513,6 @@ class RelayConnection implements MultiaddrConnection {
   switch(): RelayConnection {
     let tmpPromise = this._switchPromise
     this._switchPromise = Defer<void>()
-
     tmpPromise.resolve()
 
     this.source = this._createSource(++this._iteration)
