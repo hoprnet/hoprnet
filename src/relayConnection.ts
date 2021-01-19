@@ -29,14 +29,12 @@ class RelayConnection implements MultiaddrConnection {
   private _destroyed: boolean
   private _sinkTriggered: boolean
 
-  private _switchPromise: DeferredPromise<Stream['source']>
   private _msgPromise: DeferredPromise<void>
   private _msgs: (IteratorResult<Uint8Array, void> & { iteration: number })[]
 
   private _webRTCdone?: boolean
   private _webRTCresolved?: boolean
   private _webRTCstream?: Stream['source']
-  private _webRTCSourceFunction: (arg: IteratorResult<Uint8Array, void>) => IteratorResult<Uint8Array, void>
   private _webRTCPromise?: Promise<IteratorResult<Uint8Array, void>>
 
   private _destroyedPromise: DeferredPromise<void>
@@ -52,6 +50,7 @@ class RelayConnection implements MultiaddrConnection {
 
   private _sinkSourceAttached: boolean
   private _sinkSourceAttachedPromise: DeferredPromise<Stream['source']>
+  private _switchPromise: DeferredPromise<void>
 
   private _onReconnect: (newStream: RelayConnection, counterparty: PeerId) => Promise<void>
 
@@ -63,8 +62,6 @@ class RelayConnection implements MultiaddrConnection {
   private _counterparty: PeerId
 
   public source: Stream['source']
-  public sink: Stream['sink']
-  public close: (err?: Error) => Promise<void>
 
   public conn: Stream
 
@@ -81,7 +78,6 @@ class RelayConnection implements MultiaddrConnection {
       open: Date.now()
     }
 
-    this._switchPromise = Defer<Stream['source']>()
     this._msgPromise = Defer<void>()
 
     this._destroyedPromise = Defer<void>()
@@ -113,35 +109,34 @@ class RelayConnection implements MultiaddrConnection {
 
     this._webRTCdone = opts.webRTC == undefined
 
-    this._webRTCSourceFunction = (arg: IteratorResult<Uint8Array, void>) => {
-      this._webRTCresolved = true
-
-      return arg
-    }
-
     this._iteration = 0
 
     this.source = this._createSource.call(this, this._iteration)
 
     this._sinkSourceAttached = false
     this._sinkSourceAttachedPromise = Defer<Stream['source']>()
+    this._switchPromise = Defer<void>()
 
     this._stream.sink(this.sinkFunction())
 
-    this.sink = this._createSink.bind(this)
-
-    this.close = (_err?: Error): Promise<void> => {
-      this.verbose(`close called`)
-      this._statusMessages.unshift(Uint8Array.from([...RELAY_STATUS_PREFIX, ...STOP]))
-      this._statusMessagePromise.resolve()
-      this._closePromise.resolve()
-
-      this.timeline.close = Date.now()
-
-      return this._destroyedPromise.promise
-    }
-
     this._drainSource()
+  }
+
+  private _webRTCSourceFunction(arg: IteratorResult<Uint8Array, void>): IteratorResult<Uint8Array, void> {
+    this._webRTCresolved = true
+
+    return arg
+  }
+
+  public close(_err?: Error): Promise<void> {
+    this.verbose(`close called`)
+    this._statusMessages.unshift(Uint8Array.from([...RELAY_STATUS_PREFIX, ...STOP]))
+    this._statusMessagePromise.resolve()
+    this._closePromise.resolve()
+
+    this.timeline.close = Date.now()
+
+    return this._destroyedPromise.promise
   }
 
   private log(..._: any[]) {
@@ -233,7 +228,7 @@ class RelayConnection implements MultiaddrConnection {
 
             this.log(`resetting WebRTC stream`)
             this._webRTCstream = this._getWebRTCStream()
-            this._webRTCPromise = this._webRTCstream.next().then(this._webRTCSourceFunction)
+            this._webRTCPromise = undefined
             this.log(`resetting WebRTC stream done`)
           }
 
@@ -302,7 +297,7 @@ class RelayConnection implements MultiaddrConnection {
     }
   }
 
-  private _createSink(source: Stream['source']): Promise<void> {
+  public sink(source: Stream['source']): Promise<void> {
     // @TODO add support for Iterables such as arrays
     this._sinkSourceAttached = true
     this._sinkTriggered = true
@@ -373,7 +368,7 @@ class RelayConnection implements MultiaddrConnection {
   }
 
   private async *sinkFunction(this: RelayConnection): Stream['source'] {
-    type SinkType = Stream['sink'] | Stream['source'] | IteratorResult<Uint8Array, void> | undefined | void
+    type SinkType = Stream['source'] | IteratorResult<Uint8Array, void> | undefined | void
     this.log(`sinkFunction`)
     let currentSource: Stream['source'] | undefined
     let streamPromise: Promise<IteratorResult<Uint8Array, void>> | undefined
@@ -387,17 +382,13 @@ class RelayConnection implements MultiaddrConnection {
     let statusPromise: Promise<void> | undefined
 
     let streamSwitched = false
-
-    let result: SinkType
-
-    const switchFunction = (newSource: Stream['source']) => {
-      console.log(`inside switch function`)
+    const switchFunction = () => {
       streamSwitched = true
-
-      return newSource
     }
 
     let switchPromise = this._switchPromise.promise.then(switchFunction)
+
+    let result: SinkType
 
     while (true) {
       let promises: Promise<SinkType>[] = []
@@ -422,7 +413,8 @@ class RelayConnection implements MultiaddrConnection {
         console.log(`adding webRTCPromise`, this._webRTCdone)
 
         this._webRTCstream = this._webRTCstream ?? this._getWebRTCStream()
-        this._webRTCPromise = this._webRTCPromise ?? this._webRTCstream.next().then(this._webRTCSourceFunction)
+        this._webRTCPromise =
+          this._webRTCPromise ?? this._webRTCstream.next().then(this._webRTCSourceFunction.bind(this))
 
         promises.push(this._webRTCPromise)
       }
@@ -436,8 +428,8 @@ class RelayConnection implements MultiaddrConnection {
 
       if (this._sinkSourceAttached) {
         this._sinkSourceAttached = false
+        this._sinkSourceAttachedPromise = Defer<Stream['source']>()
 
-        // @TODO do this properly
         currentSource = result as Stream['source']
         result = undefined
         continue
@@ -486,20 +478,15 @@ class RelayConnection implements MultiaddrConnection {
         yield new BL([RELAY_WEBRTC_PREFIX, received.value])
 
         result = undefined
-        this._webRTCPromise = this._webRTCstream!.next().then(this._webRTCSourceFunction)
+        this._webRTCPromise = this._webRTCstream!.next().then(this._webRTCSourceFunction.bind(this))
         continue
       }
 
       if (streamSwitched) {
-        this.log(`RelayConnection: after stream switch sink operation`)
         streamSwitched = false
-        // @TODO explain this to Typescript properly
-        currentSource = result as Stream['source']
-        this._switchPromise = Defer<Stream['source']>()
-        console.log(`stream before switch`, result, streamPromise)
-        result = undefined
-        streamPromise = currentSource.next()
         switchPromise = this._switchPromise.promise.then(switchFunction)
+        this.verbose(`Stream switched`)
+        currentSource = undefined
 
         continue
       }
@@ -523,11 +510,14 @@ class RelayConnection implements MultiaddrConnection {
   }
 
   switch(): RelayConnection {
-    return {
-      ...this,
-      source: this._createSource(this._iteration),
-      sink: this._createSink.bind(this)
-    }
+    let tmpPromise = this._switchPromise
+    this._switchPromise = Defer<void>()
+
+    tmpPromise.resolve()
+
+    this.source = this._createSource(++this._iteration)
+
+    return this
   }
 
   get destroyed(): boolean {

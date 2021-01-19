@@ -350,6 +350,7 @@ describe('test relay connection', function () {
     const TEST_MESSAGES = ['first', 'second', 'third'].map((x) => new TextEncoder().encode(x))
 
     const selfReconnectTriggered = Defer<void>()
+
     const ctxSelf = new RelayConnection({
       stream: {
         source: selfSource,
@@ -365,6 +366,7 @@ describe('test relay connection', function () {
             yield* TEST_MESSAGES
           })()
         )
+
         selfReconnectTriggered.resolve()
       }
     })
@@ -396,7 +398,7 @@ describe('test relay connection', function () {
         await newStream.close()
 
         // @TODO reconnected stream does not close properly
-        // assert(newStream.destroyed)
+        assert(newStream.destroyed)
 
         counterpartyReconnectTriggered.resolve()
       }
@@ -407,24 +409,9 @@ describe('test relay connection', function () {
 
     assert(counterpartyMessagesReceived, `Counterparty must the receive all messages`)
 
-    console.log(ctxSelf.destroyed, ctxCounterparty.destroyed)
-    // ctxSelf.sink(
-    //   (async function* () {
-    //     yield* TEST_MESSAGES
-    //   })()
-    // )
+    await new Promise((resolve) => setTimeout(resolve, 100))
 
-    // let i = 0
-    // let messagesReceived = false
-    // for await (const msg of ctxCounterparty.source) {
-    //   assert(u8aEquals(TEST_MESSAGES[i], msg.slice()))
-
-    //   if (i == TEST_MESSAGES.length - 1) {
-    //     messagesReceived = true
-    //   }
-    //   i++
-    // }
-
-    // assert(messagesReceived, 'messages must be received')
+    assert(ctxSelf.destroyed, `First instance must be destroyed`)
+    assert(ctxCounterparty.destroyed, `First instance must be destroyed`)
   })
 })
