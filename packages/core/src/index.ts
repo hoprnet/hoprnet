@@ -480,7 +480,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       unfunded = true
     }
     const nativeBalance = await this.getNativeBalance()
-    if (nativeBalance.lten(MIN_NATIVE_BALANCE)) {
+    if (nativeBalance.lte(MIN_NATIVE_BALANCE)) {
       const address = await this.paymentChannels.hexAccountAddress()
       log('unfunded node', address)
       this.emit('hopr:warning:unfundedNative', address)

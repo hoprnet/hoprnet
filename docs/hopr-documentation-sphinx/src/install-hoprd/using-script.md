@@ -51,8 +51,4 @@ Then visit http://localhost:3000 on your browser.
 
 ### Save logs from a VPS
 
-in the _local_ computer:
-
-```bash
-$ scp `<VPS username>`@`<VPS ip address>`:~/hoprd-logs.txt ~/
-```
+Please take a look over at [hopr-sh's README file](https://github.com/hoprnet/hopr-sh/blob/main/README.md) for instructions.

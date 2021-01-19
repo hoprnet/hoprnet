@@ -1,7 +1,7 @@
 import { durations } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 
-export const TICKET_AMOUNT = 1000000000000000 // 0.001 HOPR
+export const TICKET_AMOUNT = 10000000000000 // 0.00001 HOPR
 export const TICKET_WIN_PROB = 1 // 100%
 export const PACKET_SIZE = 500
 export const MARSHALLED_PUBLIC_KEY_SIZE = 37
@@ -33,9 +33,11 @@ export const MAX_HOPS = 2
 export const PATH_RANDOMNESS = 0.1
 export const MAX_PATH_ITERATIONS = 100
 export const NETWORK_QUALITY_THRESHOLD = 0.5
-export const MINIMUM_REASONABLE_CHANNEL_STAKE = new BN(TICKET_AMOUNT).muln(10)
+export const MINIMUM_REASONABLE_CHANNEL_STAKE = new BN(TICKET_AMOUNT).muln(10000)
 export const MAX_NEW_CHANNELS_PER_TICK = 10
+export const MAX_AUTO_CHANNELS = 5
 
-export const MIN_NATIVE_BALANCE = 1000
+export const MIN_NATIVE_BALANCE = new BN(0.0001)
+export const SUGGESTED_NATIVE_BALANCE = MINIMUM_REASONABLE_CHANNEL_STAKE.muln(MAX_AUTO_CHANNELS * 2)
 
 export const CHECK_TIMEOUT = 30000
