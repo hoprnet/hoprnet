@@ -26,7 +26,7 @@ jobs:
         run: |
           yarn
           node_modules/.bin/lerna bootstrap
-          yarn autoclean --force
+          #yarn autoclean --force
 
       - name: Link & Build
         run: |

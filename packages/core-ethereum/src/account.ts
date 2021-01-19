@@ -2,8 +2,9 @@ import type HoprEthereum from '.'
 import type { TransactionObject } from './tsc/web3/types'
 import type { TransactionConfig } from 'web3-core'
 import { getRpcOptions } from '@hoprnet/hopr-ethereum'
-import { Intermediate, stringToU8a, u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
-import NonceTracker, { Transaction } from './nonce-tracker'
+import { durations, Intermediate, stringToU8a, u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
+import NonceTracker from './nonce-tracker'
+import TransactionManager from './transaction-manager'
 import { AccountId, AcknowledgedTicket, Balance, Hash, NativeBalance, TicketEpoch } from './types'
 import { isWinningTicket, pubKeyToAccountId } from './utils'
 import { ContractEventEmitter } from './tsc/web3/types'
@@ -22,8 +23,7 @@ class Account {
   private _ticketEpochListener?: ContractEventEmitter<any>
   private _onChainSecret?: Hash
   private _nonceTracker: NonceTracker
-  private _confirmed_transactions = new Map<string, Transaction>()
-  private _pending_transactions = new Map<string, Transaction>()
+  private _transactions = new TransactionManager()
 
   /**
    * The accounts keys:
@@ -55,8 +55,9 @@ class Account {
       getLatestBlockNumber: () => coreConnector.web3.eth.getBlockNumber(),
       getTransactionCount: async (address: string, blockNumber?: number) =>
         coreConnector.web3.eth.getTransactionCount(address, blockNumber),
-      getConfirmedTransactions: () => Array.from(this._confirmed_transactions.values()),
-      getPendingTransactions: () => Array.from(this._pending_transactions.values())
+      getConfirmedTransactions: () => Array.from(this._transactions.confirmed.values()),
+      getPendingTransactions: () => Array.from(this._transactions.pending.values()),
+      minPending: durations.minutes(15)
     })
 
     this._preImageIterator = async function* (this: Account) {
@@ -104,6 +105,10 @@ class Account {
     }
   }
 
+  /**
+   * @deprecated Nonces are automatically assigned when signing a transaction
+   * @return next nonce
+   */
   get nonce(): Promise<number> {
     return this._nonceTracker
       .getNonceLock(this._address.toHex())
@@ -257,31 +262,29 @@ class Account {
       })
 
       const event = web3.eth.sendSignedTransaction(signedTransaction.rawTransaction)
-      this._pending_transactions.set(signedTransaction.transactionHash, {
-        hash: signedTransaction.transactionHash,
-        nonce: options.nonce
-      })
-      log('Added pending transaction %s %i', signedTransaction.transactionHash, options.nonce)
+      this._transactions.addToPending(signedTransaction.transactionHash, { nonce: options.nonce })
       nonceLock.releaseLock()
 
       // @TODO: cleanup old txs
       event.once('receipt', () => {
-        log('Moving transaction to confirmed %s %i', signedTransaction.transactionHash, options.nonce)
-        this._pending_transactions.delete(signedTransaction.transactionHash)
-        this._confirmed_transactions.set(signedTransaction.transactionHash, {
-          hash: signedTransaction.transactionHash,
-          nonce: options.nonce
-        })
+        this._transactions.moveToConfirmed(signedTransaction.transactionHash)
       })
       event.once('error', (error) => {
+        const receipt = error['receipt']
         log(
-          'Removing failed transaction %s %i with error %s',
+          'Transaction failed %s %i with error %s',
           signedTransaction.transactionHash,
           options.nonce,
-          error.message
+          error.message,
+          receipt ? receipt : undefined
         )
-        this._pending_transactions.delete(signedTransaction.transactionHash)
-        this._confirmed_transactions.delete(signedTransaction.transactionHash)
+
+        // mean tx was confirmed & reverted
+        if (receipt) {
+          this._transactions.moveToConfirmed(signedTransaction.transactionHash)
+        } else {
+          this._transactions.remove(signedTransaction.transactionHash)
+        }
       })
 
       return event
