@@ -1,4 +1,4 @@
-# Using AVADO Node
+# Using An AVADO Node
 
 ## Installing Your AVADO Node
 
