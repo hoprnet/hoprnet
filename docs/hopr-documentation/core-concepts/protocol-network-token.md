@@ -1,9 +1,9 @@
----
+<!-- ---
 description: >-
   An introduction to the motivations behind the HOPR Protocol, Network and
   Token, alongside the ideology behind incentivised communication protocols
   using decentralised technologies.
----
+--- -->
 
 # Protocol, Network and Token
 

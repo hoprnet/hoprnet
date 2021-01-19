@@ -1,6 +1,0 @@
-{
-  "plugins": ["head-append"],
-  "head-append": {
-    "code": ["<script src=\"https://panther.hoprnet.org/script.js\" site=\"WMCAULEA\" defer></script>"]
-  }
-}
