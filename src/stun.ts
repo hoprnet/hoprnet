@@ -30,7 +30,6 @@ export const PUBLIC_STUN_SERVERS = [
 export function handleStunRequest(socket: Socket, data: Buffer, rinfo: RemoteInfo): void {
   const req = stun.createBlank()
 
-  console.log(`here`)
   // Overwrite console.log because 'webrtc-stun' package
   // pollutes console output
   const backup = console.log

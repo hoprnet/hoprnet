@@ -175,6 +175,8 @@ class RelayConnection implements MultiaddrConnection {
         closePromise
       ])
 
+      console.log([streamPromise, closePromise])
+
       if (streamClosed) {
         if (!this._destroyed) {
           console.log(`sunk`)
@@ -326,6 +328,8 @@ class RelayConnection implements MultiaddrConnection {
 
     const onSignal = (msg: Object) => {
       if (done) {
+        ;(this.webRTC as WebRTC).channel.removeListener('signal', onSignal)
+
         return
       }
 
@@ -365,10 +369,6 @@ class RelayConnection implements MultiaddrConnection {
       waiting = true
 
       await defer.promise
-
-      if (done) {
-        break
-      }
     }
   }
 
@@ -475,8 +475,6 @@ class RelayConnection implements MultiaddrConnection {
         this._webRTCresolved = false
 
         const received = result as IteratorResult<Uint8Array, void>
-
-        console.log(`webrtc message`, received)
 
         if (received == undefined || received.done) {
           this.verbose(`Stop sinking WebRTC signaling messages`)
