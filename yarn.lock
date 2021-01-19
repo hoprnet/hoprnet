@@ -1645,9 +1645,9 @@
     super-split "^1.1.0"
 
 "@typechain/truffle-v5@^4.0.0":
-  version "4.0.0"
-  resolved "https://registry.yarnpkg.com/@typechain/truffle-v5/-/truffle-v5-4.0.0.tgz#a20747f9a64eba66723b82112e96e85239ac35cd"
-  integrity sha512-J1/ZXzyWIxQF+vEhTD4qPN3IJKmIuLDtYSgIVqbX4OyEpwcXPqa9+SYEpTRlvlURuAlf8nFFjPr6MdllpPvBbQ==
+  version "4.0.1"
+  resolved "https://registry.yarnpkg.com/@typechain/truffle-v5/-/truffle-v5-4.0.1.tgz#44f08a982da5f23f1e73babf9b2c74442c7b17d2"
+  integrity sha512-i8z1gvs45tbAE+cvzivspZOSwJhEVug+ST5SW2RB4XB8hGtvTurpdgZ5XdQSGPQPrOPhDoeUorb+ViEJfmP23Q==
 
 "@types/abstract-leveldown@*":
   version "5.0.1"
