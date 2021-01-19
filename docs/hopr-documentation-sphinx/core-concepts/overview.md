@@ -6,6 +6,7 @@ description: A general introduction to the HOPR ecosystem.
 .. ATTENTION::
    These docs are currently being updated to reflect major changes to our software since our last release. Our Titlis testnet is currently running. To get started, visit the Installing HOPRD section from the sidebar, or visit our `Telegram Channel <https://t.me/hoprnet>`_.
 ```
+
 # Overview
 
 HOPR is a two-layer network with communication and incentivization mechanisms.

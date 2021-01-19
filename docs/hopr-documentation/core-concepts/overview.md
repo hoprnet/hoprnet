@@ -1,6 +1,7 @@
 ---
 description: A general introduction to the HOPR ecosystem.
 ---
+
 # Overview
 
 HOPR is a two-layer network with communication and incentivization mechanisms.
