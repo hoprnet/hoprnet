@@ -324,8 +324,6 @@ class RelayContext {
         // 3. Handle payload messages
         result = await Promise.race(promises)
 
-        this.log(`promises`, promises)
-
         if (this._sinkSourceAttached) {
           this._sinkSourceAttached = false
           currentSource = result as Stream['source']

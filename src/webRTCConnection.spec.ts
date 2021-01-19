@@ -2,13 +2,14 @@
 /// <reference path="./@types/libp2p.ts" />
 /// <reference path="./@types/stream-to-it.ts" />
 
+// @ts-nocheck
 import { WebRTCConnection, WEBRTC_UPGRADE_TIMEOUT } from './webRTCConnection'
 import Peer from 'simple-peer'
 
 const wrtc = require('wrtc')
 
-import { durations } from '@hoprnet/hopr-utils'
-import { RELAY_PAYLOAD_PREFIX } from './constants'
+import { durations, u8aEquals } from '@hoprnet/hopr-utils'
+import { RELAY_PAYLOAD_PREFIX, RELAY_STATUS_PREFIX } from './constants'
 import { RelayContext } from './relayContext'
 import { RelayConnection } from './relayConnection'
 import type { Stream } from 'libp2p'
@@ -76,7 +77,6 @@ describe('test overwritable connection', function () {
             }
 
             let decoded = JSON.parse(new TextDecoder().decode(msg)) as DebugMessage
-
             assert(decoded.messageId == lastId + 1)
 
             if (receiver == null) {
@@ -119,7 +119,97 @@ describe('test overwritable connection', function () {
     return peer as Peer.Instance
   }
 
-  it('should simulate a reconnect after a WebRTC upgrade', async function () {
+  it('establish a WebRTC connection', async function () {
+    // Sample two parties
+    const [partyA, partyB] = await Promise.all(
+      Array.from({ length: 2 }).map(() => PeerId.create({ keyType: 'secp256k1' }))
+    )
+
+    const connectionA = Pair()
+    const connectionB = Pair()
+
+    // Get WebRTC instances
+    const PeerA = new Peer({ wrtc, initiator: true, trickle: true })
+    const PeerB = new Peer({ wrtc, trickle: true })
+
+    let cutConnection = false
+    // Simulated partyA
+    const ctxA = new WebRTCConnection({
+      conn: new RelayConnection({
+        stream: {
+          sink: connectionA.sink,
+          source: (async function* () {
+            for await (const msg of connectionB.source) {
+              if (cutConnection && !u8aEquals(RELAY_PAYLOAD_PREFIX, msg.slice())) {
+                console.log(msg)
+                throw Error(`Connection must not be used`)
+              }
+
+              yield msg
+            }
+          })()
+        },
+        self: partyA,
+        counterparty: partyB,
+        webRTC: {
+          channel: PeerA,
+          upgradeInbound: () => new Peer({ wrtc, trickle: true })
+        },
+        onReconnect: async () => {}
+      }),
+      self: partyA,
+      counterparty: partyB,
+      channel: PeerA
+    })
+
+    const ctxB = new WebRTCConnection({
+      conn: new RelayConnection({
+        stream: {
+          sink: connectionB.sink,
+          source: (async function* () {
+            for await (const msg of connectionA.source) {
+              if (cutConnection && !u8aEquals(RELAY_PAYLOAD_PREFIX, msg.slice())) {
+                console.log(msg)
+                throw Error(`Connection must not be used`)
+              }
+
+              yield msg
+            }
+          })()
+        },
+        self: partyB,
+        counterparty: partyB,
+        webRTC: {
+          channel: PeerB,
+          upgradeInbound: () => new Peer({ wrtc, trickle: true })
+        },
+        onReconnect: async () => {}
+      }),
+      self: partyB,
+      counterparty: partyA,
+      channel: PeerB
+    })
+
+    await new Promise((resolve) => setTimeout(resolve, 1000))
+
+    const TEST_MESSAGES = ['first', 'second', 'third'].map((x) => new TextEncoder().encode(x))
+
+    ctxA.sink(
+      (async function* () {
+        yield* TEST_MESSAGES
+      })()
+    )
+
+    cutConnection = true
+
+    for await (const msg of ctxB.source) {
+      console.log(`msg`, msg)
+    }
+
+    await ctxA.close()
+  })
+
+  it.skip('should simulate a reconnect after a WebRTC upgrade', async function () {
     // Sample two parties
     const [partyA, partyB] = await Promise.all(
       Array.from({ length: 2 }).map(() => PeerId.create({ keyType: 'secp256k1' }))
@@ -270,7 +360,7 @@ describe('test overwritable connection', function () {
     await new Promise<void>((resolve) => setTimeout(resolve, 4000))
   })
 
-  it('should simulate a fallback to a relayed connection', async function () {
+  it.skip('should simulate a fallback to a relayed connection', async function () {
     this.timeout(durations.seconds(10))
 
     // Sample two parties

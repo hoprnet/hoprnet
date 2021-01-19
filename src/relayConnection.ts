@@ -170,8 +170,6 @@ class RelayConnection implements MultiaddrConnection {
         closePromise
       ])
 
-      console.log([streamPromise, closePromise])
-
       if (streamClosed) {
         if (!this._destroyed) {
           console.log(`sunk`)
@@ -188,15 +186,14 @@ class RelayConnection implements MultiaddrConnection {
         }
         this._msgs.unshift({ done: true, value: undefined, iteration: this._iteration })
         this._msgPromise.resolve()
-        this.log(`streamClosed`, this._msgs)
 
         break
       }
 
       const received = result as IteratorResult<Uint8Array, void>
+
       if (received == undefined || received.done) {
         this._msgs.push({ done: true, value: undefined, iteration: this._iteration })
-        this.log(`ending stream because 'streamDone' was set to 'true'.`)
         break
       }
 
@@ -403,14 +400,14 @@ class RelayConnection implements MultiaddrConnection {
       promises.push(statusPromise)
 
       if ((result == undefined || !(result as IteratorResult<Uint8Array, void>).done) && currentSource != undefined) {
-        console.log(`adding streamPromise`)
+        //console.log(`adding streamPromise`)
         streamPromise = streamPromise ?? currentSource.next()
 
         promises.push(streamPromise)
       }
 
       if (!this._webRTCdone) {
-        console.log(`adding webRTCPromise`, this._webRTCdone)
+        //console.log(`adding webRTCPromise`, this._webRTCdone)
 
         this._webRTCstream = this._webRTCstream ?? this._getWebRTCStream()
         this._webRTCPromise =
@@ -437,11 +434,13 @@ class RelayConnection implements MultiaddrConnection {
 
       if (statusMessageAvailable) {
         if (this._statusMessages.length > 0) {
-          this.log(`this._statusMessages`, this._statusMessages)
+          // this._destroyed should be true
+          this.log(`this._statusMessages`, this._statusMessages, this._destroyed)
           if (u8aEquals(Uint8Array.from([...RELAY_STATUS_PREFIX, ...STOP]), this._statusMessages[0])) {
             this._destroyedPromise.resolve()
             this._destroyed = true
             yield this._statusMessages[0]
+
             break
           } else {
             yield this._statusMessages.shift() as Uint8Array
