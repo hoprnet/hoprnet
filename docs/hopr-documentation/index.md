@@ -16,7 +16,6 @@ Although the first instantiation of the **HOPR network** is on the Ethereum bloc
 
 At the time of writing, HOPR is also able to implement a [Polkadot-enabled payment gateway.](https://github.com/hoprnet/hopr-polkadot)
 
-
 ## Contents
 
 ```eval_rst
