@@ -2,14 +2,13 @@
 /// <reference path="./@types/libp2p.ts" />
 /// <reference path="./@types/stream-to-it.ts" />
 
-// @ts-nocheck
 import { WebRTCConnection, WEBRTC_UPGRADE_TIMEOUT } from './webRTCConnection'
 import Peer from 'simple-peer'
 
 const wrtc = require('wrtc')
 
 import { durations, u8aEquals } from '@hoprnet/hopr-utils'
-import { RELAY_PAYLOAD_PREFIX, RELAY_STATUS_PREFIX } from './constants'
+import { RELAY_PAYLOAD_PREFIX } from './constants'
 import { RelayContext } from './relayContext'
 import { RelayConnection } from './relayConnection'
 import type { Stream } from 'libp2p'
@@ -257,8 +256,7 @@ describe('test overwritable connection', function () {
       }),
       self: partyA,
       counterparty: partyB,
-      channel: PeerA,
-      iteration: 0
+      channel: PeerA
     })
 
     const ctx = new RelayConnection({
@@ -281,8 +279,7 @@ describe('test overwritable connection', function () {
           conn: newStream,
           self: partyA,
           counterparty,
-          channel: newStream.webRTC!.channel,
-          iteration: newStream._iteration
+          channel: newStream.webRTC!.channel
         })
 
         newConn.sink(demoStream.source)
@@ -298,8 +295,7 @@ describe('test overwritable connection', function () {
       conn: ctx,
       self: partyB,
       counterparty: partyA,
-      channel: PeerB,
-      iteration: 0
+      channel: PeerB
     })
 
     // Start duplex streams in both directions
@@ -342,8 +338,7 @@ describe('test overwritable connection', function () {
         }),
         self: partyA,
         counterparty: partyB,
-        channel: newPeerA,
-        iteration: 0
+        channel: newPeerA
       })
 
       relaySideA.update({
@@ -409,8 +404,7 @@ describe('test overwritable connection', function () {
       }),
       self: partyA,
       counterparty: partyB,
-      channel: PeerA,
-      iteration: 0
+      channel: PeerA
     })
 
     const ctx = new RelayConnection({
@@ -432,8 +426,7 @@ describe('test overwritable connection', function () {
           conn: newStream,
           self: partyA,
           counterparty,
-          channel: newStream.webRTC!.channel,
-          iteration: newStream._iteration
+          channel: newStream.webRTC!.channel
         })
 
         newConn.sink(demoStream.source)
@@ -448,8 +441,7 @@ describe('test overwritable connection', function () {
       conn: ctx,
       self: partyB,
       counterparty: partyA,
-      channel: PeerB,
-      iteration: 0
+      channel: PeerB
     })
 
     const streamA = getStream({ usePrefix: false })
@@ -488,8 +480,7 @@ describe('test overwritable connection', function () {
         }),
         self: partyA,
         counterparty: partyB,
-        channel: newPeerA,
-        iteration: 0
+        channel: newPeerA
       })
 
       relaySideA.update({
