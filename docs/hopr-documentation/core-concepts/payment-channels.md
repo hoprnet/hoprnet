@@ -25,6 +25,7 @@ To view your currently opened payment channels, type:
 ```text
 channels
 ```
+
 You will then be shown a list of open channels, along with their status. The two status options are:
 
 - **OPEN -** The channel is currently open and funded, so data can be relayed between your node and the target node.
