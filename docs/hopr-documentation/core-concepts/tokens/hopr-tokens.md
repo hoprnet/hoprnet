@@ -1,6 +1,6 @@
----
+<!-- ---
 description: 'The rundown on testnet HOPR, the token used for our testnets'
----
+--- -->
 
 # Testnet HOPR Tokens
 
