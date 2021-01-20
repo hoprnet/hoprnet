@@ -213,7 +213,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
         relay: {
           enabled: false
         }
-      }, 
+      },
       dialer: {
         maxParallelDials: options.bootstrapNode ? 1000 : 100
       }
