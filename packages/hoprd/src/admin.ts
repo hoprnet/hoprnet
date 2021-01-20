@@ -1,4 +1,4 @@
-import Hopr, { MIN_NATIVE_BALANCE } from '@hoprnet/hopr-core'
+import Hopr, { SUGGESTED_NATIVE_BALANCE } from '@hoprnet/hopr-core'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import { Commands } from './commands'
 import http from 'http'
@@ -86,18 +86,28 @@ export class AdminServer {
       this.logs.log('Crawled network')
     })
 
+    this.node.on('hopr:channel:opened', (channel) => {
+      this.logs.log(`Opened channel to ${channel[0].toB58String()}`)
+    })
+
+    this.node.on('hopr:channel:closed', (peer) => {
+      this.logs.log(`Closed channel to ${peer.toB58String()}`)
+    })
+
     this.node.on('hopr:warning:unfunded', (addr) => {
+      const min = new node.paymentChannels.types.Balance(0).toFormattedString.apply(SUGGESTED_NATIVE_BALANCE)
       this.logs.log(
-        `- The account associated with this node has no HOPR,\n` +
-          `  in order to send messages, or open channels, you will need to send some to ${addr}`
+        `- The account associated with this node has no funds,\n` +
+          `  in order to send messages, or open channels, you will need to send` +
+          `  at least ${min} to ${addr}`
       )
     })
 
     this.node.on('hopr:warning:unfundedNative', (addr) => {
       this.logs.log(
-        `- The account associated with this node has no funds,\n` +
+        `- The account associated with this node has no BNB,\n` +
           `  in order to fund gas for protocol overhead you will need to send\n` +
-          `  at least ${new node.paymentChannels.types.Balance(MIN_NATIVE_BALANCE).toFormattedString()} to ${addr}`
+          `  0.025 BNB to ${addr}`
       )
     })
 

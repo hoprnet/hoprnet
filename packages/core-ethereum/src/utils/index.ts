@@ -240,6 +240,20 @@ export function convertUnit(amount: Balance, sourceUnit: 'eth' | 'wei', targetUn
 }
 
 /**
+ * @param error from web3
+ * @returns a known error, if we don't know it we return 'UNKNOWN'
+ */
+export function getWeb3ErrorType(error: string): 'OOF_NATIVE' | 'OOF_HOPR' | 'UNKNOWN' {
+  if (error.includes(`enough funds`)) {
+    return 'OOF_NATIVE'
+  } else if (error.includes(`SafeERC20:`)) {
+    return 'OOF_HOPR'
+  } else {
+    return 'UNKNOWN'
+  }
+}
+
+/**
  * Wait until transaction has been mined.
  *
  * @typeparam T Our PromiEvent
@@ -249,19 +263,16 @@ export function convertUnit(amount: Balance, sourceUnit: 'eth' | 'wei', targetUn
 export async function waitForConfirmation<T extends PromiEvent<any>>(event: T) {
   return new Promise<TransactionReceipt>((resolve, reject) => {
     return event
-      .on('receipt', (receipt) => {
-        resolve(receipt)
-      })
-      .on('error', (err) => {
-        const outOfEth = err.message.includes(`enough funds`)
-        const outOfHopr = err.message.includes(`SafeERC20:`)
+      .on('receipt', (receipt) => resolve(receipt))
+      .on('error', (error) => {
+        const errorType = getWeb3ErrorType(error.message)
 
-        if (outOfEth) {
-          return reject(Error(constants.ERRORS.OOF_ETH))
-        } else if (outOfHopr) {
-          return reject(Error(constants.ERRORS.OOF_HOPR))
+        if (errorType === 'OOF_NATIVE') {
+          reject(constants.ERRORS.OOF_NATIVE)
+        } else if (errorType === 'OOF_HOPR') {
+          reject(constants.ERRORS.OOF_HOPR)
         } else {
-          return reject(err)
+          reject(error)
         }
       })
   })

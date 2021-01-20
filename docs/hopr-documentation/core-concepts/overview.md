@@ -1,8 +1,11 @@
----
+<!-- ---
 description: A general introduction to the HOPR ecosystem.
----
+--- -->
 
-{% hint style="danger" %} These docs are currently being updated to reflect major changes to our software since our last release. In the meantime, you can visit our [github](https://github.com/hoprnet/hoprnet) for basic instructions on how to install and run a node. {% endhint %}
+```eval_rst
+.. ATTENTION::
+   These docs are currently being updated to reflect major changes to our software since our last release. Our Titlis testnet is currently running. To get started, visit the Installing HOPRD section from the sidebar, or visit our `Telegram Channel <https://t.me/hoprnet>`_.
+```
 
 # Overview
 
@@ -16,7 +19,7 @@ In its first implementation, HOPR relies on the **Ethereum blockchain** as its p
 
 To achieve this, a **HOPR node** implements a connector interface that communicates to the Ethereum Blockchain using its popular web library, _web3js_**.** These interfaces allow **HOPR nodes** to monitor, approve, sign and verify when a message is transferred, and thus close a state channel and receive their earned HOPR Tokens. Each **HOPR node** verifies each other, avoiding foul play and rewarding only honest relayers.
 
-![HOPR Protocol Ethereum Blockchain connector architecture](../.gitbook/assets/image%20%2821%29%20%282%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29%20%281%29.png)
+![HOPR Protocol Ethereum Blockchain connector architecture](../images/image.png)
 
 Although the first instantiation of the **HOPR network** is on the Ethereum blockchain, HOPR is _chain agnostic_**,** which means that **HOPR nodes** can eventually implement different payment channels in different blockchains.
 

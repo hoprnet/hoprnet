@@ -2,6 +2,9 @@ import { encode, decode } from 'rlp'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 import { AbstractCommand } from './abstractCommand'
+import debug from 'debug'
+
+const log = debug('hoprd:covertraffic')
 
 const INTERVAL = 1000
 
@@ -45,20 +48,23 @@ export class CoverTraffic extends AbstractCommand {
   }
 
   private async tick() {
+    log('attempting cover packet')
+    this.messagesSent++
+    this.timeout = setTimeout(this.tick.bind(this), INTERVAL) // tick again after interval
     try {
       const payload = encode([this.identifier, this.seq++, Date.now()])
       await this.node.sendMessage(payload, this.node.getId())
-      this.messagesSent++
+      log('cover packet sent')
     } catch (e) {
-      console.log('Error', e)
+      log('error sending', e)
       // No-op
     }
-    this.timeout = setTimeout(this.tick.bind(this), INTERVAL) // tick again after interval
   }
 
   private handleMessage(msg: Uint8Array) {
     const decoded = decode(msg)
     if (decoded[0].toString() === this.identifier) {
+      log('cover packet received')
       const ts = parseInt(decoded[2].toString('hex'), 16)
       this.totalLatency += Date.now() - ts
       this.messagesReceived++
@@ -86,6 +92,7 @@ export class CoverTraffic extends AbstractCommand {
     }
     if (query === 'stop' && this.timeout) {
       clearTimeout(this.timeout)
+      delete this.timeout
       return 'stopped'
     }
     if (query === 'stats') {

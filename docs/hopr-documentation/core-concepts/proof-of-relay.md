@@ -1,0 +1,3 @@
+# Proof of Relay
+
+Messages sent through the HOPR network take a certain number of "hops" before reaching their destination. These hops via nodes like yours are what obscures the data and metadata from outside observers. Each hop costs a small fee. These fees are charged in HOPR, and a paid by the previous node in the chain to the next node. However, this fee cannot be claimed until the data has been successfully passed to the _next_ node in the chain. This is called **proof-of-relay**, and it's how HOPR ensures data reaches its destination without revealing information about the sender, recipient, or the route the data takes.

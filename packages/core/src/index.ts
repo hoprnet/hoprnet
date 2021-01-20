@@ -2,12 +2,10 @@
 
 import LibP2P from 'libp2p'
 import type { Connection } from 'libp2p'
-// @ts-ignore
-import MPLEX = require('libp2p-mplex')
-// @ts-ignore
-import KadDHT = require('libp2p-kad-dht')
-// @ts-ignore
-import SECIO = require('libp2p-secio')
+
+const MPLEX = require('libp2p-mplex')
+const KadDHT = require('libp2p-kad-dht')
+const SECIO = require('libp2p-secio')
 
 import HoprConnect from '@hoprnet/hopr-connect'
 
@@ -264,13 +262,20 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     }
     const currentChannels = await this.getOpenChannels()
     const balance = await this.getBalance()
-    const nextChannels = await this.strategy.tick(
+    const [nextChannels, closeChannels] = await this.strategy.tick(
       balance,
       newChannels,
       currentChannels,
       this.network.networkPeers,
       this.paymentChannels.indexer
     )
+    verbose(`strategy wants to close ${closeChannels.length} channels`)
+    for (let toClose of closeChannels) {
+      verbose(`closing ${toClose}`)
+      await this.closeChannel(toClose)
+      verbose(`closed channel to ${toClose.toB58String()}`)
+      this.emit('hopr:channel:closed', toClose)
+    }
     verbose(`strategy wants to open`, nextChannels.length, 'new channels')
     for (let channelToOpen of nextChannels) {
       this.network.networkPeers.register(channelToOpen[0])
@@ -278,6 +283,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
         // Opening channels can fail if we can't establish a connection.
         const hash = await this.openChannel(...channelToOpen)
         verbose('- opened', channelToOpen, hash)
+        this.emit('hopr:channel:opened', channelToOpen)
       } catch (e) {
         log('error when trying to open strategy channels', e)
       }
@@ -403,7 +409,6 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
           const path: PeerId[] = [].concat(intermediatePath, [destination])
 
           let packet: Packet<Chain>
-          verbose('creating packet with path', path.map((pId: PeerId) => pId.toB58String()).join(', \n'))
           try {
             packet = await Packet.create(
               this,
@@ -473,7 +478,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       unfunded = true
     }
     const nativeBalance = await this.getNativeBalance()
-    if (nativeBalance.lten(MIN_NATIVE_BALANCE)) {
+    if (nativeBalance.lte(MIN_NATIVE_BALANCE)) {
       const address = await this.paymentChannels.hexAccountAddress()
       log('unfunded node', address)
       this.emit('hopr:warning:unfundedNative', address)
@@ -616,7 +621,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     return await findPath(
       this.getId(),
       destination,
-      MAX_HOPS - 1,
+      MAX_HOPS,
       this.network.networkPeers,
       this.paymentChannels.indexer,
       PATH_RANDOMNESS
@@ -646,7 +651,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
         throw new Error('Database does not exist: ' + dbPath)
       }
     }
-    // @ts-ignore
+
     return levelup(leveldown(dbPath))
   }
 }
