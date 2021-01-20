@@ -17,9 +17,7 @@ Hopr-ethereum contains the on-chain logic that is used to process payments for [
 - [Testing](#testing)
 - [Coverage](#coverage)
 - [Migrating](#migrating)
-- [Contracts](#contracts)
-  - [HoprChannel](#hoprchannel)
-  - [HoprToken](#hoprtoken)
+- [Audit](#audit)
   - [Linting](#linting)
 - [Future Improvements](#future-improvements)
 
@@ -76,20 +74,9 @@ yarn migrate
 yarn migrate --network matic
 ```
 
-# Contracts
+# Audit
 
-## HoprChannel
-
-## HoprToken
-
-A standard ERC777 token with snapshot functionality.
-
-```
-Name: HOPR Token
-Symbol: HOPR
-Decimals: 18
-Total Supply: 100,000,000
-```
+Read about the audit [here](./AUDIT.md)
 
 ## Linting
 

@@ -18,6 +18,7 @@
     "migrate": "hardhat migrate",
     "network": "hardhat node --network hardhat",
     "test": "hardhat test --no-compile --network hardhat",
+    "coverage": "hardhat coverage --network hardhat",
     "prepublishOnly": "yarn build"
   },
   "dependencies": {
@@ -34,6 +35,7 @@
     "hardhat-typechain": "^0.3.3",
     "lodash": "^4.17.20",
     "secp256k1": "^4.0.2",
+    "solidity-coverage": "^0.7.13",
     "ts-generator": "^0.1.1",
     "ts-node": "^9.0.0",
     "type-fest": "^0.20.2",

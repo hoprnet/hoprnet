@@ -68,10 +68,12 @@ describe('test connector', function () {
 
           await Promise.all([
             once(),
-            hoprToken.methods.transfer(receiver.address.toHex(), 1).send({ from: owner.address.toHex() }),
-            hoprToken.methods.transfer(receiver.address.toHex(), 1).send({ from: owner.address.toHex() })
+            hoprToken.methods.transfer(receiver.address.toHex(), 1).send({ from: owner.address.toHex(), gas: 200e3 }),
+            hoprToken.methods.transfer(receiver.address.toHex(), 1).send({ from: owner.address.toHex(), gas: 200e3 })
           ])
-          await hoprToken.methods.transfer(receiver.address.toHex(), 1).send({ from: owner.address.toHex() })
+          await hoprToken.methods
+            .transfer(receiver.address.toHex(), 1)
+            .send({ from: owner.address.toHex(), gas: 200e3 })
 
           assert.equal(numberOfEvents, 1, 'check cleanupPromiEvent')
           return resolve()
@@ -121,7 +123,8 @@ describe('test withdraw', function () {
     connector = await createNode(alice.privKey)
 
     await hoprToken.methods.mint(alice.address.toHex(), 100, '0x0', '0x0').send({
-      from: alice.address.toHex()
+      from: alice.address.toHex(),
+      gas: 200e3
     })
 
     await connector.start()
