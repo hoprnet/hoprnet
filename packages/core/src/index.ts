@@ -215,7 +215,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
         }
       }, 
       dialer: {
-        maxParallelDials: 1000
+        maxParallelDials: options.bootstrapNode ? 1000 : 100
       }
     })
 
