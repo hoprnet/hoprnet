@@ -6,10 +6,11 @@ import { migrationOptions as allMigrationOptions, MigrationOptions } from '../ut
 import updateAddresses from '../utils/updateAddresses'
 
 const SECS_CLOSURE = Math.floor(durations.minutes(1) / 1e3)
+const SECS_DISTRIBUTOR = Math.floor(durations.days(1) / 1e3)
 const MAX_MINT_AMOUNT = Web3.utils.toWei('100000000', 'ether')
-const MAX_MINT_DURATION = Math.floor(durations.days(365) / 1e3)
-const SINGLE_FAUCET_MINTER = true
-const EXTERNAL_FAUCET_MINTER = '0x1A387b5103f28bc6601d085A3dDC878dEE631A56'
+// const MAX_MINT_DURATION = Math.floor(durations.days(365) / 1e3)
+// const SINGLE_FAUCET_MINTER = true
+// const EXTERNAL_FAUCET_MINTER = '0x1A387b5103f28bc6601d085A3dDC878dEE631A56'
 
 async function main(
   providedMigrationOptions: Partial<MigrationOptions>,
@@ -62,47 +63,54 @@ async function main(
   console.log(`Deployed hoprChannels: ${hoprChannels.address}`)
   addresses['HoprChannels'] = hoprChannels.address
 
-  // deploy HoprMinter
-  if (migrationOptions.mintUsing === 'minter') {
-    const HoprMinter = artifacts.require('HoprMinter')
-    console.log('Deploying hoprMinter')
-    const hoprMinter = await HoprMinter.new(hoprToken.address, MAX_MINT_AMOUNT, MAX_MINT_DURATION)
-    console.log(`Deployed hoprMinter: ${hoprMinter.address}`)
-    addresses['HoprMinter'] = hoprMinter.address
+  // deploy HoprDistributor
+  const HoprDistributor = artifacts.require('HoprDistributor')
+  console.log('Deploying hoprDistributor')
+  const hoprDistributor = await HoprDistributor.new(hoprToken.address, SECS_DISTRIBUTOR, MAX_MINT_AMOUNT)
+  console.log(`Deployed hoprDistributor: ${hoprDistributor.address}`)
+  addresses['HoprDistributor'] = hoprDistributor.address
 
-    if (migrationOptions.revokeRoles) {
-      await hoprToken.grantRole(minterRole, hoprMinter.address)
-      await hoprToken.renounceRole(await hoprToken.MINTER_ROLE(), deployer)
-      await hoprToken.renounceRole(await hoprToken.DEFAULT_ADMIN_ROLE(), deployer)
-    }
-  }
+  // // deploy HoprMinter
+  // if (migrationOptions.mintUsing === 'minter') {
+  //   const HoprMinter = artifacts.require('HoprMinter')
+  //   console.log('Deploying hoprMinter')
+  //   const hoprMinter = await HoprMinter.new(hoprToken.address, MAX_MINT_AMOUNT, MAX_MINT_DURATION)
+  //   console.log(`Deployed hoprMinter: ${hoprMinter.address}`)
+  //   addresses['HoprMinter'] = hoprMinter.address
 
-  // deploy HoprFaucet
-  if (migrationOptions.mintUsing === 'faucet') {
-    const HoprFaucet = artifacts.require('HoprFaucet')
-    console.log('Deploying hoprFaucet')
-    const hoprFaucet = await HoprFaucet.new(hoprToken.address, SINGLE_FAUCET_MINTER)
-    console.log(`Deployed hoprFaucet: ${hoprFaucet.address}`)
-    addresses['HoprFaucet'] = hoprFaucet.address
-    const pauserRole = await hoprFaucet.PAUSER_ROLE()
-    const minterRole = await hoprFaucet.MINTER_ROLE()
+  //   if (migrationOptions.revokeRoles) {
+  //     await hoprToken.grantRole(minterRole, hoprMinter.address)
+  //     await hoprToken.renounceRole(await hoprToken.MINTER_ROLE(), deployer)
+  //     await hoprToken.renounceRole(await hoprToken.DEFAULT_ADMIN_ROLE(), deployer)
+  //   }
+  // }
 
-    if (!migrationOptions.revokeRoles) {
-      await hoprFaucet.grantRole(pauserRole, deployer)
-      await hoprFaucet.grantRole(minterRole, hoprFaucet.address)
-    }
-    // give 'owner' OR 'XDAI_FAUCET_ADDRESS' MINTER_ROLE and PAUSER_ROLE
-    else {
-      if (SINGLE_FAUCET_MINTER) {
-        await hoprFaucet.grantRole(pauserRole, deployer)
-        await hoprFaucet.grantRole(minterRole, EXTERNAL_FAUCET_MINTER)
-      } else {
-        await hoprFaucet.grantRole(pauserRole, deployer)
-        await hoprFaucet.grantRole(minterRole, hoprFaucet.address)
-      }
-      await hoprToken.grantRole(minterRole, hoprFaucet.address)
-    }
-  }
+  // // deploy HoprFaucet
+  // if (migrationOptions.mintUsing === 'faucet') {
+  //   const HoprFaucet = artifacts.require('HoprFaucet')
+  //   console.log('Deploying hoprFaucet')
+  //   const hoprFaucet = await HoprFaucet.new(hoprToken.address, SINGLE_FAUCET_MINTER)
+  //   console.log(`Deployed hoprFaucet: ${hoprFaucet.address}`)
+  //   addresses['HoprFaucet'] = hoprFaucet.address
+  //   const pauserRole = await hoprFaucet.PAUSER_ROLE()
+  //   const minterRole = await hoprFaucet.MINTER_ROLE()
+
+  //   if (!migrationOptions.revokeRoles) {
+  //     await hoprFaucet.grantRole(pauserRole, deployer)
+  //     await hoprFaucet.grantRole(minterRole, hoprFaucet.address)
+  //   }
+  //   // give 'owner' OR 'XDAI_FAUCET_ADDRESS' MINTER_ROLE and PAUSER_ROLE
+  //   else {
+  //     if (SINGLE_FAUCET_MINTER) {
+  //       await hoprFaucet.grantRole(pauserRole, deployer)
+  //       await hoprFaucet.grantRole(minterRole, EXTERNAL_FAUCET_MINTER)
+  //     } else {
+  //       await hoprFaucet.grantRole(pauserRole, deployer)
+  //       await hoprFaucet.grantRole(minterRole, hoprFaucet.address)
+  //     }
+  //     await hoprToken.grantRole(minterRole, hoprFaucet.address)
+  //   }
+  // }
 
   console.log('Updating addresses.json')
   await updateAddresses(network.name, addresses)

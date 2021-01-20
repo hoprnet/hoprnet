@@ -960,7 +960,7 @@ describe('HoprChannels', function () {
       )
     })
 
-    it("should fail 'fundChannel' when token balance too low'", async function () {
+    it("should fail 'fundChannel' when token balance too low", async function () {
       await hoprToken.burn(await hoprToken.balanceOf(partyA), '0x00', {
         from: partyA
       })
@@ -974,7 +974,7 @@ describe('HoprChannels', function () {
             from: partyA
           }
         ),
-        vmErrorMessage('ERC777: transfer amount exceeds balance')
+        vmErrorMessage('SafeMath: subtraction overflow')
       )
     })
 
