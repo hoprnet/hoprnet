@@ -241,8 +241,7 @@ class HoprConnect implements Transport {
             conn: newStream,
             self: this._peerId,
             counterparty,
-            channel: newStream.webRTC!.channel,
-            iteration: newStream._iteration
+            channel: newStream.webRTC!.channel
           })
         )
       }

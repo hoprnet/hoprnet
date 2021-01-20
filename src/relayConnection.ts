@@ -32,11 +32,6 @@ class RelayConnection implements MultiaddrConnection {
   private _msgPromise: DeferredPromise<void>
   private _msgs: (IteratorResult<Uint8Array, void> & { iteration: number })[]
 
-  private _webRTCdone?: boolean
-  private _webRTCresolved?: boolean
-  private _webRTCstream?: Stream['source']
-  private _webRTCPromise?: Promise<IteratorResult<Uint8Array, void>>
-
   private _destroyedPromise: DeferredPromise<void>
 
   private _closePromise: DeferredPromise<void>
@@ -107,8 +102,6 @@ class RelayConnection implements MultiaddrConnection {
 
     this.webRTC = opts.webRTC
 
-    this._webRTCdone = opts.webRTC == undefined
-
     this._iteration = 0
 
     this.source = this._createSource.call(this, this._iteration)
@@ -117,15 +110,11 @@ class RelayConnection implements MultiaddrConnection {
     this._sinkSourceAttachedPromise = Defer<Stream['source']>()
     this._switchPromise = Defer<void>()
 
+    this.attachWebRTCListeners()
+
     this._stream.sink(this.sinkFunction())
 
     this._drainSource()
-  }
-
-  private _webRTCSourceFunction(arg: IteratorResult<Uint8Array, void>): IteratorResult<Uint8Array, void> {
-    this._webRTCresolved = true
-
-    return arg
   }
 
   public close(_err?: Error): Promise<void> {
@@ -200,11 +189,12 @@ class RelayConnection implements MultiaddrConnection {
       const [PREFIX, SUFFIX] = [received.value.slice(0, 1), received.value.slice(1)]
 
       if (u8aEquals(PREFIX, RELAY_PAYLOAD_PREFIX)) {
-        if (SUFFIX.length > 0) {
-          this._msgs.push({ done: false, value: SUFFIX, iteration: this._iteration })
-        } else {
-          this._msgs.push({ done: true, value: undefined, iteration: this._iteration })
-        }
+        this._msgs.push(
+          SUFFIX.length > 0
+            ? { done: false, value: SUFFIX, iteration: this._iteration }
+            : { done: true, value: undefined, iteration: this._iteration }
+        )
+
         this._msgPromise?.resolve()
       } else if (u8aEquals(PREFIX, RELAY_STATUS_PREFIX)) {
         if (u8aEquals(SUFFIX, STOP)) {
@@ -224,8 +214,7 @@ class RelayConnection implements MultiaddrConnection {
             this.webRTC.channel = this.webRTC.upgradeInbound()
 
             this.log(`resetting WebRTC stream`)
-            this._webRTCstream = this._getWebRTCStream()
-            this._webRTCPromise = undefined
+            // @TODO reset WebRTC
             this.log(`resetting WebRTC stream done`)
           }
 
@@ -235,8 +224,7 @@ class RelayConnection implements MultiaddrConnection {
           this.verbose(`PING received`)
           this._statusMessages.push(Uint8Array.from([...RELAY_STATUS_PREFIX, ...PONG]))
 
-          let tmpPromise = this._statusMessagePromise
-          tmpPromise.resolve()
+          this._statusMessagePromise.resolve()
 
           // Don't forward ping to receiver
         } else {
@@ -304,64 +292,26 @@ class RelayConnection implements MultiaddrConnection {
     return Promise.resolve()
   }
 
-  private async *_getWebRTCStream(this: RelayConnection): Stream['source'] {
-    this._webRTCdone = false
-    this._webRTCresolved = false
-
-    if (this.webRTC == undefined) {
-      throw Error(`Cannot listen to a WebRTC instance because there was none given.`)
-    }
-
-    const webRTCmessages: Uint8Array[] = []
-
-    let defer = Defer<void>()
-    let waiting = false
-    let done = false
-
-    const onSignal = (msg: Object) => {
-      if (done) {
-        ;(this.webRTC as WebRTC).channel.removeListener('signal', onSignal)
-
+  private attachWebRTCListeners() {
+    const onSignal = (data: Object) => {
+      if (this._statusMessages.length == 0) {
+        this._statusMessages.push(
+          Uint8Array.from([...RELAY_WEBRTC_PREFIX, ...new TextEncoder().encode(JSON.stringify(data))])
+        )
+        this._statusMessagePromise.resolve()
+        return
+      } else if (u8aEquals(Uint8Array.from([...RELAY_STATUS_PREFIX, ...STOP]), this._statusMessages[0])) {
+        this.log(`Detected Stream close. Ending WebRTC upgrade`)
+        this.webRTC?.channel.removeListener('signal', onSignal)
         return
       }
 
-      webRTCmessages.push(new TextEncoder().encode(JSON.stringify(msg)))
-
-      if (waiting) {
-        waiting = false
-        let tmpPromise = defer
-        defer = Defer<void>()
-        tmpPromise.resolve()
-      }
+      this._statusMessages.unshift(
+        Uint8Array.from([...RELAY_WEBRTC_PREFIX, ...new TextEncoder().encode(JSON.stringify(data))])
+      )
+      this._statusMessagePromise.resolve()
     }
-
-    const endStream = () => {
-      done = true
-      ;(this.webRTC as WebRTC).channel.removeListener('signal', onSignal)
-      ;(this.webRTC as WebRTC).channel.removeListener('error', endStream)
-      ;(this.webRTC as WebRTC).channel.removeListener('connect', endStream)
-
-      defer.resolve()
-    }
-
-    this.webRTC.channel.on('signal', onSignal)
-
-    this.webRTC.channel.once('error', endStream)
-    this.webRTC.channel.once('connect', endStream)
-
-    while (!done) {
-      while (webRTCmessages.length > 0) {
-        yield webRTCmessages.shift() as Uint8Array
-      }
-
-      if (done) {
-        break
-      }
-
-      waiting = true
-
-      await defer.promise
-    }
+    this.webRTC?.channel.on('signal', onSignal.bind(this))
   }
 
   private async *sinkFunction(this: RelayConnection): Stream['source'] {
@@ -406,21 +356,10 @@ class RelayConnection implements MultiaddrConnection {
         promises.push(streamPromise)
       }
 
-      if (!this._webRTCdone) {
-        //console.log(`adding webRTCPromise`, this._webRTCdone)
-
-        this._webRTCstream = this._webRTCstream ?? this._getWebRTCStream()
-        this._webRTCPromise =
-          this._webRTCPromise ?? this._webRTCstream.next().then(this._webRTCSourceFunction.bind(this))
-
-        promises.push(this._webRTCPromise)
-      }
-
       // (0. Handle source attach)
       // 1. Handle stream switch
       // 2. Handle status messages
       // 3. Handle payload messages
-      // 4. Handle WebRTC signalling messages
       result = await Promise.race(promises)
 
       if (this._sinkSourceAttached) {
@@ -435,7 +374,6 @@ class RelayConnection implements MultiaddrConnection {
       if (statusMessageAvailable) {
         if (this._statusMessages.length > 0) {
           // this._destroyed should be true
-          this.log(`this._statusMessages`, this._statusMessages, this._destroyed)
           if (u8aEquals(Uint8Array.from([...RELAY_STATUS_PREFIX, ...STOP]), this._statusMessages[0])) {
             this._destroyedPromise.resolve()
             this._destroyed = true
@@ -459,25 +397,6 @@ class RelayConnection implements MultiaddrConnection {
           statusPromise = this._statusMessagePromise.promise.then(statusSourceFunction)
         }
 
-        continue
-      }
-
-      if (this._webRTCresolved) {
-        this._webRTCresolved = false
-
-        const received = result as IteratorResult<Uint8Array, void>
-
-        if (received == undefined || received.done) {
-          this.verbose(`Stop sinking WebRTC signaling messages`)
-          this._webRTCdone = true
-          this._webRTCPromise = undefined
-          continue
-        }
-
-        yield new BL([RELAY_WEBRTC_PREFIX, received.value])
-
-        result = undefined
-        this._webRTCPromise = this._webRTCstream!.next().then(this._webRTCSourceFunction.bind(this))
         continue
       }
 

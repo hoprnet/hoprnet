@@ -205,7 +205,7 @@ class RelayContext {
           continue
         }
 
-        const [PREFIX, SUFFIX] = [received.value.slice().subarray(0, 1), received.value.slice().subarray(1)]
+        const [PREFIX, SUFFIX] = [received.value.slice(0, 1), received.value.slice(1)]
 
         if (!VALID_PREFIXES.includes(PREFIX[0])) {
           this.error(`Invalid prefix: Got <${u8aToHex(PREFIX ?? new Uint8Array())}>. Dropping message in relayContext.`)
@@ -370,8 +370,6 @@ class RelayContext {
         if (received.done) {
           continue
         }
-
-        this.log(`result after special event handling`, received.value?.slice?.())
 
         try {
           let [PREFIX, SUFFIX] = [received.value.slice(0, 1), received.value.slice(1)]

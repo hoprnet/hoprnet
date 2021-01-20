@@ -147,8 +147,7 @@ class Relay {
         conn: newConn,
         self: this._peerId,
         counterparty: destination,
-        channel,
-        iteration: newConn._iteration
+        channel
       })
     } else {
       return new RelayConnection({
@@ -192,8 +191,7 @@ class Relay {
         conn: newConn,
         self: this._peerId,
         counterparty: handShakeResult.counterparty,
-        channel,
-        iteration: newConn._iteration
+        channel
       })
     } else {
       return new RelayConnection({

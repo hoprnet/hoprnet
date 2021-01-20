@@ -12,7 +12,7 @@ import { randomBytes } from 'crypto'
 
 const _log = Debug('hopr-connect')
 const _error = Debug('hopr-connect:error')
-const _verbose = Debug('hopr-connect:verbose')
+// const _verbose = Debug('hopr-connect:verbose')
 
 export const WEBRTC_UPGRADE_TIMEOUT = durations.seconds(2)
 
@@ -23,6 +23,9 @@ class WebRTCConnection implements MultiaddrConnection {
   private _destroyed: boolean
   private _webRTCTimeout?: NodeJS.Timeout
 
+  private _sourceMigrated: boolean
+  private _sinkMigrated: boolean
+
   private _counterparty: PeerId
 
   public source: Stream['source']
@@ -32,7 +35,7 @@ class WebRTCConnection implements MultiaddrConnection {
 
   private channel: SimplePeer
 
-  public conn: RelayConnection
+  public conn: RelayConnection | SimplePeer
 
   private _id: string
 
@@ -48,6 +51,9 @@ class WebRTCConnection implements MultiaddrConnection {
     this._switchPromise = Defer<void>()
     this._webRTCStateKnown = false
     this._webRTCAvailable = false
+
+    this._sourceMigrated = false
+    this._sinkMigrated = false
 
     this._counterparty = opts.counterparty
 
@@ -65,8 +71,6 @@ class WebRTCConnection implements MultiaddrConnection {
         clearTimeout(this._webRTCTimeout)
       }
 
-      console.log(`CONNNNNECTED`, this._webRTCTimeout)
-
       this._webRTCStateKnown = true
       this._webRTCAvailable = true
       this._switchPromise.resolve()
@@ -75,7 +79,15 @@ class WebRTCConnection implements MultiaddrConnection {
     this.channel.once('error', this.endWebRTCUpgrade.bind(this))
 
     this.source = async function* (this: WebRTCConnection): Stream['source'] {
-      yield* this.conn.source
+      yield* (this.conn as RelayConnection).source
+      this.log(`this._sinkMigrated`, this._sinkMigrated)
+
+      this._sourceMigrated = true
+      if (this._sinkMigrated) {
+        this.conn = this.channel
+      }
+
+      console.log(`after stream ended`)
 
       if (!this._webRTCStateKnown || this._webRTCAvailable) {
         await this._switchPromise.promise
@@ -95,9 +107,9 @@ class WebRTCConnection implements MultiaddrConnection {
     _log(`RX [${this._id}]`, ...arguments)
   }
 
-  private verbose(..._: any[]) {
-    _verbose(`RX [${this._id}]`, ...arguments)
-  }
+  // private verbose(..._: any[]) {
+  //   _verbose(`RX [${this._id}]`, ...arguments)
+  // }
 
   private error(..._: any[]) {
     _error(`RX [${this._id}]`, ...arguments)
@@ -134,7 +146,7 @@ class WebRTCConnection implements MultiaddrConnection {
       streamSwitched = true
     })
 
-    this.conn.sink(
+    ;(this.conn as RelayConnection).sink(
       async function* (this: WebRTCConnection): Stream['source'] {
         let result: SinkType
 
@@ -184,6 +196,12 @@ class WebRTCConnection implements MultiaddrConnection {
 
     await defer.promise
 
+    this.log(`this._sourceMigrated`, this._sourceMigrated)
+    this._sinkMigrated = true
+    if (this._sourceMigrated) {
+      this.conn = this.channel
+    }
+
     if (this._webRTCAvailable) {
       toIterable.sink(this.channel)(
         async function* (this: WebRTCConnection): Stream['source'] {
@@ -197,7 +215,9 @@ class WebRTCConnection implements MultiaddrConnection {
 
           yield result.value.slice()
 
-          yield* source
+          for await (const msg of source) {
+            yield msg.slice()
+          }
         }.call(this)
       )
     }
@@ -210,17 +230,15 @@ class WebRTCConnection implements MultiaddrConnection {
 
     this.timeline.closed = Date.now()
 
+    console.log(this._sinkMigrated, this._sourceMigrated)
     try {
-      this.channel.destroy()
+      if (this._sinkMigrated || this._sourceMigrated) {
+        ;(this.channel as SimplePeer).destroy()
+      } else {
+        await (this.conn as RelayConnection).close()
+      }
     } catch (err) {
-      err(`WebRTC error while destroying connection to peer ${this.remoteAddr.getPeerId()}. Error: ${err}`)
-    }
-
-    try {
-      this.conn.close()
-    } catch (err) {
-      this.error(`Error while trying to close relayed connection. Increase log level to display error.`)
-      this.verbose(err)
+      this.error(err)
     }
 
     this._destroyed = true

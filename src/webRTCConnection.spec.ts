@@ -208,7 +208,7 @@ describe('test overwritable connection', function () {
     await ctxA.close()
   })
 
-  it.skip('should simulate a reconnect after a WebRTC upgrade', async function () {
+  it('should simulate a reconnect after a WebRTC upgrade', async function () {
     // Sample two parties
     const [partyA, partyB] = await Promise.all(
       Array.from({ length: 2 }).map(() => PeerId.create({ keyType: 'secp256k1' }))
