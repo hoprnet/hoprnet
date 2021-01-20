@@ -77,6 +77,14 @@ const argv = yargs
     descripe: 'Settings, same as in the repl (JSON)',
     default: '{}'
   })
+  .option('adminHost', {
+    describe: 'Host to listen to for admin console',
+    default: 'localhost'
+  })
+  .option('adminPort', {
+    describe: 'Port to listen to for admin console',
+    default: 3000
+  })
   .wrap(Math.min(120, yargs.terminalWidth())).argv
 
 function parseHosts(): HoprOptions['hosts'] {
@@ -142,7 +150,7 @@ async function main() {
   if (argv.admin) {
     // We need to setup the admin server before the HOPR node
     // as if the HOPR node fails, we need to put an error message up.
-    adminServer = new AdminServer(logs)
+    adminServer = new AdminServer(logs, argv.adminHost, argv.adminPort)
     await adminServer.setup()
   }
 

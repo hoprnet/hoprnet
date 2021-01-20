@@ -19,12 +19,10 @@ export class AdminServer {
   private app: any
   private server: Server | undefined
   private node: Hopr<HoprCoreConnector> | undefined
-  private port: number
   private wsServer: any
   private cmds: any
 
-  constructor(private logs: LogStream) {
-    this.port = process.env.HOPR_ADMIN_PORT ? parseInt(process.env.HOPR_ADMIN_PORT) : 3000
+  constructor(private logs: LogStream, private host: string, private port: number) {
   }
 
   async setup() {
@@ -47,7 +45,7 @@ export class AdminServer {
       handle(req, res, parsedUrl)
     })
 
-    this.server.listen(this.port)
+    this.server.listen(this.port, this.host)
     this.logs.log('Admin server listening on port ' + this.port)
   }
 
