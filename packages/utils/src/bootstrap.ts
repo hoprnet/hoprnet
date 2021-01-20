@@ -1,7 +1,7 @@
 import Multiaddr from 'multiaddr'
 import dns from 'dns'
 
-const BOOTSTRAP_ADDRESS = process.env.HOPR_BOOTSTRAP_ADDRESS || '_dnsaddr.bnb.nyc.bootstrap.hoprnet.org'
+const BOOTSTRAP_ADDRESS = process.env.HOPR_BOOTSTRAP_ADDRESS || '_dnsaddr.ropsten.titlis.bootstrap.hoprnet.org'
 
 /** Load Bootstrap node addresses.
  *   - If a string of comma separated multiaddrs is passed, use this first
