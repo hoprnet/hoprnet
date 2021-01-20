@@ -23,7 +23,7 @@ At the time of writing, HOPR is also able to implement a [Polkadot-enabled payme
    :maxdepth: 1
    :caption: Core HOPR Concepts
 
-   src/core-concepts/overview.md
+   src/core-concepts/index.md
    src/core-concepts/protocol-network-token.md
    src/core-concepts/proof-of-relay.md
    src/core-concepts/payment-channels.md
@@ -35,7 +35,7 @@ At the time of writing, HOPR is also able to implement a [Polkadot-enabled payme
    :maxdepth: 1
    :caption: Installing HOPRd
 
-   src/install-hoprd/start-here.md
+   src/install-hoprd/index.md
    src/install-hoprd/using-script.md
    src/install-hoprd/using-avado.md
    src/install-hoprd/using-npm.md
@@ -43,8 +43,10 @@ At the time of writing, HOPR is also able to implement a [Polkadot-enabled payme
 
 .. toctree::
    :maxdepth: 1
-   :caption: Using HOPRd
+   :caption: Running HOPRd
 
-   src/core-concepts/getting-started.md
-   src/core-concepts/commands.md
+   src/running-hoprd/index.md
+   src/running-hoprd/funding/native-tokens.md
+   src/running-hoprd/funding/hopr-tokens.md
+   src/running-hoprd/commands.md
 ```
