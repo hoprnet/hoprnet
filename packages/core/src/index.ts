@@ -261,6 +261,9 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       this.network.networkPeers.register(channel[0]) // Listen to nodes with outgoing stake
     }
     const currentChannels = await this.getOpenChannels()
+    for (const channel of currentChannels) {
+      this.network.networkPeers.register(channel[1]) // Make sure current channels are 'interesting'
+    }
     const balance = await this.getBalance()
     const [nextChannels, closeChannels] = await this.strategy.tick(
       balance,
