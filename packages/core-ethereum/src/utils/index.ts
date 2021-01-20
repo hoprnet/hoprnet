@@ -375,8 +375,8 @@ export function getNetworkName(chainId: number): Network {
       return 'mainnet'
     // case 2:
     //   return 'morden'
-    // case 3:
-    //   return 'ropsten'
+    case 3:
+      return 'ropsten'
     // case 4:
     //   return 'rinkeby'
     // case 5:
