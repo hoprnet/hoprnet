@@ -18,6 +18,6 @@ services:
     dns:
       - 172.33.1.2
       - 8.8.8.8
-    image: 'hopr.avado.dnp.dappnode.eth:1.62.4'
+    image: 'hopr.avado.dnp.dappnode.eth:1.62.6'
 volumes:
   db: {}
