@@ -22,8 +22,7 @@ export class AdminServer {
   private wsServer: any
   private cmds: any
 
-  constructor(private logs: LogStream, private host: string, private port: number) {
-  }
+  constructor(private logs: LogStream, private host: string, private port: number) {}
 
   async setup() {
     let adminPath = path.resolve(__dirname, '../hopr-admin/')
