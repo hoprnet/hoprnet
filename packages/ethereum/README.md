@@ -76,7 +76,11 @@ yarn migrate --network matic
 
 # Audit
 
-Read about the audit [here](./AUDIT.md)
+The `HoprToken` and `HoprDistributor` contracts are currently being audited.
+
+You can find some _early_ feedback over at [bokkypoobah/HoprTokenAudit](https://github.com/bokkypoobah/HoprTokenAudit).
+
+See audit scope [here](./AUDIT.md).
 
 ## Linting
 
