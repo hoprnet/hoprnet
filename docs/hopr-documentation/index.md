@@ -10,7 +10,7 @@ In its first implementation, HOPR relies on the **Ethereum blockchain** as its p
 
 To achieve this, a **HOPR node** implements a connector interface that communicates to the Ethereum Blockchain using its popular web library, _web3js_**.** These interfaces allow **HOPR nodes** to monitor, approve, sign and verify when a message is transferred, and thus close a state channel and receive their earned HOPR Tokens. Each **HOPR node** verifies each other, avoiding foul play and rewarding only honest relayers.
 
-![HOPR Protocol Ethereum Blockchain connector architecture](../images/image.png)
+![HOPR Protocol Ethereum Blockchain connector architecture](./images/image.png)
 
 Although the first instantiation of the **HOPR network** is on the Ethereum blockchain, HOPR is _chain agnostic_**,** which means that **HOPR nodes** can eventually implement different payment channels in different blockchains.
 
@@ -23,13 +23,13 @@ At the time of writing, HOPR is also able to implement a [Polkadot-enabled payme
    :maxdepth: 1
    :caption: Core HOPR Concepts
 
-   core-concepts/overview.md
-   core-concepts/protocol-network-token.md
-   core-concepts/proof-of-relay.md
-   core-concepts/payment-channels.md
-   core-concepts/tickets.md
-   core-concepts/cover-traffic.md
-   core-concepts/bootstrap-nodes.md
+   src/core-concepts/overview.md
+   src/core-concepts/protocol-network-token.md
+   src/core-concepts/proof-of-relay.md
+   src/core-concepts/payment-channels.md
+   src/core-concepts/tickets.md
+   src/core-concepts/cover-traffic.md
+   src/core-concepts/bootstrap-nodes.md
 
 .. toctree::
    :maxdepth: 1
@@ -45,6 +45,6 @@ At the time of writing, HOPR is also able to implement a [Polkadot-enabled payme
    :maxdepth: 1
    :caption: Using HOPRd
 
-   core-concepts/getting-started.md
-   core-concepts/commands.md
+   src/core-concepts/getting-started.md
+   src/core-concepts/commands.md
 ```

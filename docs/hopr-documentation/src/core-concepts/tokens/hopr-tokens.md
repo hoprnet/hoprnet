@@ -12,8 +12,9 @@ Just like in the HOPR mainnet, you'll receive testnet HOPR when you relay data t
 
 Testnet HOPR works like the HOPR token will: you receive it for relaying and mixing data in the HOPR mixnet, and you spend it to send data.
 
-You can check your testnet HOPR balance at any time by typing `balance` in HOPR Chat or in your HOPR AVADO Node. This will also show you your MATIC balance, under `native`.
+You can check your testnet HOPR balance at any time by typing `balance` in HOPRd or in your HOPR AVADO Node. This will also show you your MATIC balance, under `native`.
 
-{% hint style="danger" %}
-**IMPORTANT:** The testnet HOPR token will only work on our HOPR testnets. It is not the final HOPR token that will run on mainnet and for legal reasons testnet HOPR tokens cannot be transferred to HOPR tokens. Prizes for our testnets will be solely determined by your final score on the testnet leaderboard, not the number of testnet HOPR tokens you control.
-{% endhint %}
+```eval_rst
+.. DANGER::
+   The testnet HOPR token will only work on our HOPR testnets. It is not the final HOPR token that will run on mainnet and for legal reasons testnet HOPR tokens cannot be transferred to HOPR tokens. Prizes for our testnets will be solely determined by your final score on the testnet leaderboard, not the number of testnet HOPR tokens you control.
+```

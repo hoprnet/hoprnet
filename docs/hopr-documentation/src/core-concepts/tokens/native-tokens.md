@@ -6,11 +6,12 @@ description: 'Learn about why HOPR needs two kinds of tokens to run, and how to 
 
 In order to participate in the testnet, you'll need to fund your node with at least 0.02 MATIC.
 
-{% hint style="warning" %}
-You'll spend a \(very\) small amount of MATIC when you perform actions which interact with the HOPR smart contracts, such as opening and closing payment channels and redeeming tickets after relaying data.
+```eval_rst
+.. WARNING::
+   You'll spend a \(very\) small amount of MATIC when you perform actions which interact with the HOPR smart contracts, such as opening and closing payment channels and redeeming tickets after relaying data.
 
-Currently, HOPR Chat doesn't always notify you if an action has failed due to lack of funds. So if things aren't behaving as expected use `balance` to check you aren't low on MATIC. More notifications will be added in future versions.
-{% endhint %}
+   Currently, HOPRd doesn't always notify you if an action has failed due to lack of funds. So if things aren't behaving as expected use `balance` to check you aren't low on MATIC. More notifications will be added in future versions.
+```
 
 ## Getting MATIC
 
