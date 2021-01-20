@@ -7,7 +7,7 @@ version: 2
 
 # Build documentation in the docs/ directory with Sphinx
 sphinx:
-  configuration: ./docs/hopr-documentation-sphinx/conf.py
+  configuration: ./docs/hopr-documentation/conf.py
 #
 # Build documentation with MkDocs
 # mkdocs:
@@ -21,4 +21,4 @@ sphinx:
 python:
   version: 3.7
   install:
-    - requirements: docs/hopr-documentation-sphinx/requirements.txt
+    - requirements: docs/hopr-documentation/requirements.txt
