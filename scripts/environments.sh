@@ -33,7 +33,11 @@ get_environment() {
 
   case "$BRANCH" in release/*)
     VERSION_MAJ_MIN=$(get_version_maj_min $RELEASE) 
-
+    
+    if [ "$VERSION_MAJ_MIN" == '1.62' ]; then
+      RELEASE_NAME='titlis'
+      return
+    fi
     if [ "$VERSION_MAJ_MIN" == '1.61' ]; then
       RELEASE_NAME='nyc'
       return
