@@ -2,11 +2,12 @@
   "localhost": {
     "HoprToken": "0x66DB78F4ADD912a6Cb92b672Dfa09028ecc3085E",
     "HoprChannels": "0x0a67180CF519aDF27f1FD32F7255bBa00B536FC6",
-    "HoprMinter": "0x6c97048D67c39ADCe38bbB228fc1bA415fc8f096"
+    "HoprDistributor": "0x6c97048D67c39ADCe38bbB228fc1bA415fc8f096"
   },
   "ropsten": {
-    "HoprToken": "0x566a5c774bb8abe1a88b4f187e24d4cd55c207a5",
-    "HoprChannels": "0xbb6de194eb4547993ce53eee0226638fc9ae0c60"
+    "HoprToken": "0xcD1049D51adB3187FB9cc9f786cab99F57eCa4D1",
+    "HoprChannels": "0x25E2e5D8EcC4fE46a9505079Ed29266779dC7D6f",
+    "HoprDistributor": "0x83c3Df21FeDFF9f92669953ac12686Cf144e375C"
   },
   "kovan": {
     "HoprToken": "0xDD78859E6714D045a31Caa0075C1523f6E08fFe1",

@@ -29,7 +29,7 @@ export const migrationOptions: { [key in Network]: MigrationOptions } = {
   ropsten: {
     shouldVerify: true,
     mintUsing: 'minter',
-    revokeRoles: true
+    revokeRoles: false
   },
   kovan: {
     shouldVerify: true,

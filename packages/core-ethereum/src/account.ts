@@ -1,7 +1,7 @@
 import type HoprEthereum from '.'
 import type { TransactionObject } from './tsc/web3/types'
 import type { TransactionConfig } from 'web3-core'
-import { getRpcOptions } from '@hoprnet/hopr-ethereum'
+import { getRpcOptions, Network } from '@hoprnet/hopr-ethereum'
 import { durations, Intermediate, stringToU8a, u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
 import NonceTracker from './nonce-tracker'
 import TransactionManager from './transaction-manager'
@@ -233,7 +233,7 @@ class Account {
     // specified in network settings
     if (rpcOps[network]?.gasPrice) gasPrice = rpcOps[network]?.gasPrice
     // let's web3 pick gas price
-    if (network === 'mainnet') return undefined
+    if ((['mainnet', 'ropsten'] as Network[]).includes(network)) gasPrice = undefined
 
     // @TODO: potential deadlock, needs to be improved
     const nonceLock = await this._nonceTracker.getNonceLock(this._address.toHex())
