@@ -9,10 +9,10 @@
   dependencies:
     encoding "^0.1.13"
 
-"@hoprnet/hopr-utils@^1.61":
-  version "1.61.1"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-1.61.1.tgz#a71fd08cf3621f25e3db07af5f125a10fe82fe70"
-  integrity sha512-6KAn3K74eIaDPDoQi0n2a6iwe/J17LSs11EJY8lsD7Wwc4eKodXP10hNgXLHR9L4DJ6BeNVSe8Rb4CoOtL4FrQ==
+"@hoprnet/hopr-utils@^1.62":
+  version "1.62.11"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-1.62.11.tgz#941b3cadd283d408d23ecad916a845f94fbd8795"
+  integrity sha512-PfZ4YBjDcCZes8gOE/5tc+UEM3rdPhlBjP83mgnFUso1ZI0nxG2HH04Ed8vSz3eKHzBbMH1pyQy9m24WpihLyQ==
   dependencies:
     bignumber.js "^9.0.0"
     libp2p-crypto "0.18.0"
@@ -1429,10 +1429,10 @@ mafmt@^8.0.0:
   dependencies:
     multiaddr "^8.0.0"
 
-mafmt@^8.0.1:
-  version "8.0.1"
-  resolved "https://registry.yarnpkg.com/mafmt/-/mafmt-8.0.1.tgz#2c2ba61a84a66e58552100f163caef1a1267b276"
-  integrity sha512-A2z9CQp8C9koExHLdYs2tGzwYgCWuEfp+M+QNKe+qQif+YwYRq0+wJ9019SP7Go9TLx0I6+ylx01RqIxZ8RuHw==
+mafmt@^8.0.4:
+  version "8.0.4"
+  resolved "https://registry.yarnpkg.com/mafmt/-/mafmt-8.0.4.tgz#5b158a28bd800fb8d0e5c28bd9ee15120bed2a61"
+  integrity sha512-wwZ5+PU0vQw10kwQRyZin1Z0dqVOp0BnYlX1xvXHS2fmLwrrQCfU1+3tlW5MRcihUwGz1virnVhbRAU1biKfiw==
   dependencies:
     multiaddr "^8.0.0"
 
@@ -2427,10 +2427,10 @@ wrappy@1:
   resolved "https://registry.yarnpkg.com/wrappy/-/wrappy-1.0.2.tgz#b5243d8f3ec1aa35f1364605bc0d1036e30ab69f"
   integrity sha1-tSQ9jz7BqjXxNkYFvA0QNuMKtp8=
 
-wrtc@0.4.6:
-  version "0.4.6"
-  resolved "https://registry.yarnpkg.com/wrtc/-/wrtc-0.4.6.tgz#909ace2cffd34e11633d4e1c20527510a12e7b5b"
-  integrity sha512-4uD+oFoY2yuo3AV9fum3cXUXR6v8YQHZlqBrKkCRGjW1BvKrVHtLNH4UaNLBLiJu9DL89WqUWmbzsQ9RxMzANw==
+wrtc@0.4.7:
+  version "0.4.7"
+  resolved "https://registry.yarnpkg.com/wrtc/-/wrtc-0.4.7.tgz#c61530cd662713e50bffe64b7a78673ce070426c"
+  integrity sha512-P6Hn7VT4lfSH49HxLHcHhDq+aFf/jd9dPY7lDHeFhZ22N3858EKuwm2jmnlPzpsRGEPaoF6XwkcxY5SYnt4f/g==
   dependencies:
     node-pre-gyp "^0.13.0"
   optionalDependencies:
