@@ -49,7 +49,7 @@ class HoprConnect implements Transport {
     libp2p: libp2p
     bootstrapServers?: Multiaddr[] | Multiaddr
     interface?: string
-    __noDirectConnections: boolean
+    __noDirectConnections?: boolean
   }) {
     if (!opts.upgrader) {
       throw new Error('An upgrader must be provided. See https://github.com/libp2p/interface-transport#upgrader.')
@@ -67,32 +67,33 @@ class HoprConnect implements Transport {
       for (const bs of opts.bootstrapServers) {
         const bsPeerId = bs.getPeerId()
 
-        if (bsPeerId != undefined)
-          if (opts.libp2p.peerId.equals(PeerId.createFromCID(bs.getPeerId()))) {
+        if (bsPeerId != undefined) {
+          if (opts.libp2p.peerId.equals(PeerId.createFromCID(bsPeerId))) {
             continue
           }
 
-        const cOpts = bs.toOptions()
+          const cOpts = bs.toOptions()
 
-        if (this.relays == undefined) {
-          this.relays = [bs]
-        } else {
-          this.relays.push(bs)
-        }
+          if (this.relays == undefined) {
+            this.relays = [bs]
+          } else {
+            this.relays.push(bs)
+          }
 
-        switch (cOpts.family) {
-          case 'ipv6':
-            // We do not use STUN for IPv6 for the moment
-            break
-          case 'ipv4':
-            if (this.stunServers == undefined) {
-              this.stunServers = [bs]
-            } else {
-              this.stunServers.push(bs)
-            }
-            break
-          default:
-            throw Error(`Invalid address family as STUN server. Got ${cOpts.family}`)
+          switch (cOpts.family) {
+            case 'ipv6':
+              // We do not use STUN for IPv6 for the moment
+              break
+            case 'ipv4':
+              if (this.stunServers == undefined) {
+                this.stunServers = [bs]
+              } else {
+                this.stunServers.push(bs)
+              }
+              break
+            default:
+              throw Error(`Invalid address family as STUN server. Got ${cOpts.family}`)
+          }
         }
       }
     }
@@ -135,9 +136,10 @@ class HoprConnect implements Transport {
    * @returns An upgraded Connection
    */
   async dial(ma: Multiaddr, options: DialOptions = {}): Promise<Connection> {
-    if (ma.getPeerId() === this._peerId.toB58String()) {
-      throw Error(`Cannot dial ourself`)
-    }
+    // @TODO check if we should allow loopbacks
+    // if (ma.getPeerId() === this._peerId.toB58String()) {
+    //   throw Error(`Cannot dial ourself`)
+    // }
 
     if (this.shouldAttemptDirectDial(ma)) {
       try {
@@ -294,7 +296,6 @@ class HoprConnect implements Transport {
     // Forces node to only use relayed connection and
     // don't try a direct dial attempt.
     // Used for testing
-    console.log(this.relays?.some((mAddr: Multiaddr) => ma.getPeerId() === mAddr.getPeerId()))
     if (
       this.__noDirectConnections &&
       (this.relays == undefined || !this.relays.some((mAddr: Multiaddr) => ma.getPeerId() === mAddr.getPeerId()))

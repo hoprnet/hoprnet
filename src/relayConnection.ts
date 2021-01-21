@@ -57,6 +57,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
   private _counterparty: PeerId
 
   public source: Stream['source']
+  public sink: Stream['sink']
 
   public conn: Stream
 
@@ -116,6 +117,8 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
     this._stream.sink(this.sinkFunction())
 
     this._drainSource()
+
+    this.sink = this._sink.bind(this)
   }
 
   public close(_err?: Error): Promise<void> {
@@ -283,7 +286,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
     }
   }
 
-  public sink(source: Stream['source']): Promise<void> {
+  public _sink(source: Stream['source']): Promise<void> {
     // @TODO add support for Iterables such as arrays
     this._sinkTriggered = true
 

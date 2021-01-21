@@ -23,7 +23,7 @@ import {
   FAIL,
   FAIL_COULD_NOT_REACH_COUNTERPARTY,
   FAIL_COULD_NOT_IDENTIFY_PEER,
-  FAIL_LOOPBACKS_ARE_NOT_ALLOWED,
+  //FAIL_LOOPBACKS_ARE_NOT_ALLOWED,
   FAIL_INVALID_PUBLIC_KEY
 } from './constants'
 
@@ -354,12 +354,13 @@ class Relay {
 
     log(`counterparty identified as ${counterparty.toB58String()}`)
 
-    if (connection.remotePeer != null && counterparty.equals(connection.remotePeer)) {
-      error(`Peer ${connection.remotePeer} is trying to loopback to itself. Dropping connection.`)
-      shaker.write(FAIL_LOOPBACKS_ARE_NOT_ALLOWED)
-      shaker.rest()
-      return
-    }
+    // @TODO check if we should allow loopbacks
+    // if (connection.remotePeer != null && counterparty.equals(connection.remotePeer)) {
+    //   error(`Peer ${connection.remotePeer} is trying to loopback to itself. Dropping connection.`)
+    //   shaker.write(FAIL_LOOPBACKS_ARE_NOT_ALLOWED)
+    //   shaker.rest()
+    //   return
+    // }
 
     const channelId = getId(connection.remotePeer, counterparty)
 
@@ -494,11 +495,12 @@ function getId(a: PeerId, b: PeerId) {
   switch (cmpResult) {
     case 1:
       return `${a.toB58String()}${b.toB58String()}`
-    case -1:
+    default:
       return `${b.toB58String()}${a.toB58String()}`
 
-    default:
-      throw Error(`Invalid compare result`)
+    // @TODO check if we should allow loopbacks
+    // default:
+    //   throw Error(`Invalid compare result`)
   }
 }
 

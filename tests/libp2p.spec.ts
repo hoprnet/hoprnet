@@ -128,7 +128,11 @@ describe('libp2p compliance', () => {
           dialer: {
             async connectToPeer(_pId: PeerId) {
               return transport.dial(Multiaddr(`/ip4/127.0.0.1/tcp/9092/p2p/${await PeerId.createFromPrivKey(Alice)}`))
-            }
+            },
+            _pendingDials: []
+          },
+          connectionManager: {
+            connections: new Map()
           },
           multiaddrs: []
         } as any,
