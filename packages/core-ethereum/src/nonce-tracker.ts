@@ -1,6 +1,9 @@
 import type { Transaction as ITransaction } from './transaction-manager'
+import debug from 'debug'
 import assert from 'assert'
 import { Mutex } from 'async-mutex'
+
+const log = debug('hopr-core-ethereum:nonce-tracker')
 
 /**
  *  @property opts.web3 - An ethereum provider
@@ -134,8 +137,13 @@ export default class NonceTracker {
       const highestSuggested = Math.max(nextNetworkNonce, highestLocallyConfirmed)
 
       const allPendingTxs = this.getPendingTransactions(address)
+      const hasStuckTx = this._containsStuckTx(allPendingTxs)
+      if (hasStuckTx) {
+        log('Found stuck txs')
+      }
+
       // if a struck tx is found, we overwrite pending txs
-      const pendingTxs = this._containsStuckTx(allPendingTxs) ? [] : allPendingTxs
+      const pendingTxs = hasStuckTx ? [] : allPendingTxs
       const localNonceResult = this._getHighestContinuousFrom(pendingTxs, highestSuggested)
 
       const nonceDetails: NonceDetails = {
