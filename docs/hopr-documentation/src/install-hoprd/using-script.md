@@ -43,7 +43,7 @@ Visit http://localhost:3000.
 ### Accessing HOPRd on a VPS
 
 ```bash
-$ ssh -L 3000:0.0.0.0:3000 root@`<VPS ip address>`
+$ ssh -L 3000:127.0.0.1:3000 root@`<VPS ip address>`
 # you'll then be prompted to enter your password
 ```
 
