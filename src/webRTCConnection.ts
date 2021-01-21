@@ -50,7 +50,6 @@ class WebRTCConnection implements MultiaddrConnection {
 
     this.conn.once('restart', () => {
       this._destroyed = true
-      console.log(`setting destoyued to true ------------------------------------`, this._id)
       try {
         this.channel.destroy()
       } catch {}
@@ -97,8 +96,6 @@ class WebRTCConnection implements MultiaddrConnection {
         this.conn = this.channel
       }
 
-      console.log(`after stream ended`)
-
       if (!this._webRTCStateKnown || this._webRTCAvailable) {
         await this._switchPromise.promise
       }
@@ -130,7 +127,6 @@ class WebRTCConnection implements MultiaddrConnection {
   }
 
   private endWebRTCUpgrade(err?: any) {
-    console.log(`END WEBRTC UPGRADE called`)
     if (this._webRTCTimeout != undefined) {
       clearTimeout(this._webRTCTimeout)
     }
@@ -145,7 +141,6 @@ class WebRTCConnection implements MultiaddrConnection {
   }
 
   public async sink(source: Stream['source']): Promise<void> {
-    console.log(`SINK CALLED $$$$$$$$$$$$$$$$$$$$$$$$$`)
     type SinkType = IteratorResult<Uint8Array, void> | void
     let sourcePromise = source.next()
 
@@ -157,7 +152,6 @@ class WebRTCConnection implements MultiaddrConnection {
       streamSwitched = true
     })
 
-    console.log(`before sinking into sink.conn`)
     ;(this.conn as RelayConnection).sink(
       async function* (this: WebRTCConnection): Stream['source'] {
         let result: SinkType
@@ -212,7 +206,6 @@ class WebRTCConnection implements MultiaddrConnection {
         }
 
         defer.resolve()
-        console.log(`defer resolved`)
       }.call(this)
     )
 
@@ -221,9 +214,7 @@ class WebRTCConnection implements MultiaddrConnection {
     await defer.promise
 
     this.log(`webrtc sinkMigrated but this._sourceMigrated`, this._sourceMigrated)
-    // if (!this._sourceMigrated) {
-    //   console.log(this.channel[Symbol.asyncIterator]().next())
-    // }
+
     this._sinkMigrated = true
     if (this._sourceMigrated) {
       this.conn = this.channel
@@ -270,7 +261,6 @@ class WebRTCConnection implements MultiaddrConnection {
 
     this.timeline.closed = Date.now()
 
-    console.log(this._sinkMigrated, this._sourceMigrated)
     try {
       if (this._sinkMigrated || this._sourceMigrated) {
         ;(this.channel as SimplePeer).destroy()

@@ -359,7 +359,6 @@ class RelayContext {
           this._sinkSwitched = false
 
           tmpPromise.resolve()
-          console.log(`sinkSwitched`)
           break
         }
 
