@@ -29,7 +29,7 @@ export const HEARTBEAT_TIMEOUT = durations.seconds(3)
 
 export const MAX_PACKET_DELAY = 200
 
-export const MAX_HOPS = 1
+export const MAX_HOPS = 2
 export const PATH_RANDOMNESS = 0.1
 export const MAX_PATH_ITERATIONS = 100
 export const NETWORK_QUALITY_THRESHOLD = 0.5
