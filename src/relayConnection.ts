@@ -14,6 +14,7 @@ import type { Instance as SimplePeer } from 'simple-peer'
 import type PeerId from 'peer-id'
 
 import Debug from 'debug'
+import { EventEmitter } from 'events'
 
 const _log = Debug('hopr-connect')
 const _verbose = Debug('hopr-connect:verbose')
@@ -24,7 +25,7 @@ type WebRTC = {
   upgradeInbound: () => SimplePeer
 }
 
-class RelayConnection implements MultiaddrConnection {
+class RelayConnection extends EventEmitter implements MultiaddrConnection {
   private _stream: Stream
   private _destroyed: boolean
   private _sinkTriggered: boolean
@@ -43,7 +44,6 @@ class RelayConnection implements MultiaddrConnection {
 
   public _id: string
 
-  private _sinkSourceAttached: boolean
   private _sinkSourceAttachedPromise: DeferredPromise<Stream['source']>
   private _switchPromise: DeferredPromise<void>
 
@@ -69,6 +69,8 @@ class RelayConnection implements MultiaddrConnection {
     onReconnect: (newStream: RelayConnection, counterparty: PeerId) => Promise<void>
     webRTC?: WebRTC
   }) {
+    super()
+
     this.timeline = {
       open: Date.now()
     }
@@ -106,7 +108,6 @@ class RelayConnection implements MultiaddrConnection {
 
     this.source = this._createSource.call(this, this._iteration)
 
-    this._sinkSourceAttached = false
     this._sinkSourceAttachedPromise = Defer<Stream['source']>()
     this._switchPromise = Defer<void>()
 
@@ -207,6 +208,8 @@ class RelayConnection implements MultiaddrConnection {
           this.log(`RESTART received. Ending stream ...`)
 
           if (this.webRTC != undefined) {
+            this.webRTC?.channel.removeAllListeners('signal')
+            this.emit(`restart`)
             try {
               this.webRTC.channel.destroy()
             } catch {}
@@ -214,7 +217,7 @@ class RelayConnection implements MultiaddrConnection {
             this.webRTC.channel = this.webRTC.upgradeInbound()
 
             this.log(`resetting WebRTC stream`)
-            // @TODO reset WebRTC
+            this.attachWebRTCListeners()
             this.log(`resetting WebRTC stream done`)
           }
 
@@ -284,7 +287,6 @@ class RelayConnection implements MultiaddrConnection {
 
   public sink(source: Stream['source']): Promise<void> {
     // @TODO add support for Iterables such as arrays
-    this._sinkSourceAttached = true
     this._sinkTriggered = true
 
     this._sinkSourceAttachedPromise.resolve(source)
@@ -293,6 +295,17 @@ class RelayConnection implements MultiaddrConnection {
   }
 
   private attachWebRTCListeners() {
+    // Cleanup potential previous signalling messages
+    for (const [index, msg] of this._statusMessages.entries()) {
+      if (msg[0] == RELAY_WEBRTC_PREFIX[0]) {
+        let lastElement = this._statusMessages.pop() as Uint8Array
+
+        if (index != this._statusMessages.length - 1) {
+          this._statusMessages[index] = lastElement
+        }
+      }
+    }
+
     const onSignal = (data: Object) => {
       if (this._statusMessages.length == 0) {
         this._statusMessages.push(
@@ -326,6 +339,15 @@ class RelayConnection implements MultiaddrConnection {
       statusMessageAvailable = true
     }
 
+    let sinkSourceAttached = false
+    const sinkSourceFunction = (source: Stream['source']): Stream['source'] => {
+      sinkSourceAttached = true
+
+      return source
+    }
+
+    let sinkSourcePromise: Promise<Stream['source']> | undefined
+
     let statusPromise: Promise<void> | undefined
 
     let streamSwitched = false
@@ -341,7 +363,8 @@ class RelayConnection implements MultiaddrConnection {
       let promises: Promise<SinkType>[] = []
 
       if (currentSource == undefined) {
-        promises.push(this._sinkSourceAttachedPromise.promise)
+        sinkSourcePromise = sinkSourcePromise ?? this._sinkSourceAttachedPromise.promise.then(sinkSourceFunction)
+        promises.push(sinkSourcePromise)
       }
 
       promises.push(switchPromise)
@@ -362,11 +385,14 @@ class RelayConnection implements MultiaddrConnection {
       // 3. Handle payload messages
       result = await Promise.race(promises)
 
-      if (this._sinkSourceAttached) {
-        this._sinkSourceAttached = false
+      if (sinkSourceAttached) {
+        console.log(`sinkSourceReceived`, result)
+        sinkSourceAttached = false
         this._sinkSourceAttachedPromise = Defer<Stream['source']>()
 
+        sinkSourcePromise = undefined
         currentSource = result as Stream['source']
+        streamPromise = undefined
         result = undefined
         continue
       }

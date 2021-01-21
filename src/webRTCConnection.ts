@@ -14,7 +14,7 @@ const _log = Debug('hopr-connect')
 const _error = Debug('hopr-connect:error')
 // const _verbose = Debug('hopr-connect:verbose')
 
-export const WEBRTC_UPGRADE_TIMEOUT = durations.seconds(2)
+export const WEBRTC_UPGRADE_TIMEOUT = durations.seconds(3)
 
 class WebRTCConnection implements MultiaddrConnection {
   private _switchPromise: DeferredPromise<void>
@@ -47,6 +47,14 @@ class WebRTCConnection implements MultiaddrConnection {
   constructor(opts: { conn: RelayConnection; channel: SimplePeer; self: PeerId; counterparty: PeerId }) {
     this.channel = opts.channel
     this.conn = opts.conn
+
+    this.conn.once('restart', () => {
+      this._destroyed = true
+      console.log(`setting destoyued to true ------------------------------------`, this._id)
+      try {
+        this.channel.destroy()
+      } catch {}
+    })
     this._destroyed = false
     this._switchPromise = Defer<void>()
     this._webRTCStateKnown = false
@@ -66,7 +74,8 @@ class WebRTCConnection implements MultiaddrConnection {
 
     this._id = u8aToHex(randomBytes(4), false)
 
-    this.channel.once('connect', () => {
+    this.channel.once('connect', async () => {
+      console.log(`inside connect listner!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!`)
       if (this._webRTCTimeout != undefined) {
         clearTimeout(this._webRTCTimeout)
       }
@@ -79,8 +88,11 @@ class WebRTCConnection implements MultiaddrConnection {
     this.channel.once('error', this.endWebRTCUpgrade.bind(this))
 
     this.source = async function* (this: WebRTCConnection): Stream['source'] {
-      yield* (this.conn as RelayConnection).source
-      this.log(`this._sinkMigrated`, this._sinkMigrated)
+      for await (const msg of (this.conn as RelayConnection).source) {
+        console.log(`getting from relayed connection`, new TextDecoder().decode(msg.slice()))
+        yield msg.slice()
+      }
+      this.log(`webrtc source migrated but this._sinkMigrated`, this._sinkMigrated)
 
       this._sourceMigrated = true
       if (this._sinkMigrated) {
@@ -94,7 +106,7 @@ class WebRTCConnection implements MultiaddrConnection {
       }
 
       if (this._webRTCAvailable || !this._webRTCStateKnown) {
-        this.log(`webRTC handover done. Using direct connection to peer ${this.remoteAddr.getPeerId()}`)
+        this.log(`webRTC source handover done. Using direct connection to peer ${this.remoteAddr.getPeerId()}`)
 
         yield* this.channel[Symbol.asyncIterator]() as Stream['source']
       }
@@ -135,6 +147,7 @@ class WebRTCConnection implements MultiaddrConnection {
   }
 
   public async sink(source: Stream['source']): Promise<void> {
+    console.log(`SINK CALLED $$$$$$$$$$$$$$$$$$$$$$$$$`)
     type SinkType = IteratorResult<Uint8Array, void> | void
     let sourcePromise = source.next()
 
@@ -146,6 +159,7 @@ class WebRTCConnection implements MultiaddrConnection {
       streamSwitched = true
     })
 
+    console.log(`before sinking into sink.conn`)
     ;(this.conn as RelayConnection).sink(
       async function* (this: WebRTCConnection): Stream['source'] {
         let result: SinkType
@@ -156,6 +170,15 @@ class WebRTCConnection implements MultiaddrConnection {
             switchPromise,
             sourcePromise
           ])
+
+          console.log(
+            [
+              // prettier-ignore
+              switchPromise,
+              sourcePromise
+            ],
+            streamSwitched
+          )
 
           if (streamSwitched) {
             streamSwitched = false
@@ -168,6 +191,7 @@ class WebRTCConnection implements MultiaddrConnection {
             break
           }
 
+          console.log(`sinking into relayed connection`, new TextDecoder().decode(received.value.slice()))
           yield received.value.slice()
 
           sourcePromise = source.next()
@@ -194,15 +218,21 @@ class WebRTCConnection implements MultiaddrConnection {
       }.call(this)
     )
 
+    console.log(`before defer.promise`)
+
     await defer.promise
 
-    this.log(`this._sourceMigrated`, this._sourceMigrated)
+    this.log(`webrtc sinkMigrated but this._sourceMigrated`, this._sourceMigrated)
+    // if (!this._sourceMigrated) {
+    //   console.log(this.channel[Symbol.asyncIterator]().next())
+    // }
     this._sinkMigrated = true
     if (this._sourceMigrated) {
       this.conn = this.channel
     }
 
     if (this._webRTCAvailable) {
+      await new Promise((resolve) => setTimeout(resolve, 100))
       toIterable.sink(this.channel)(
         async function* (this: WebRTCConnection): Stream['source'] {
           let result: SinkType
@@ -213,9 +243,21 @@ class WebRTCConnection implements MultiaddrConnection {
             return
           }
 
+          if (this._destroyed || this.channel.destroyed) {
+            return
+          }
+
+          // @ts-ignore
+          this.log(`yielding into webrtc ${this._id}`, new TextDecoder().decode(result.value.slice()))
           yield result.value.slice()
 
           for await (const msg of source) {
+            // @ts-ignore
+            if (this._destroyed || this.channel.destroyed) {
+              break
+            }
+            // @ts-ignore
+            this.log(`yielding into webrtc ${this._id}`, new TextDecoder().decode(msg.slice()))
             yield msg.slice()
           }
         }.call(this)
