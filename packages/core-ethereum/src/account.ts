@@ -53,7 +53,7 @@ class Account {
     }
 
     this._nonceTracker = new NonceTracker({
-      getLatestBlockNumber: () => coreConnector.web3.eth.getBlockNumber(),
+      getLatestBlockNumber: async () => coreConnector.indexer.latestBlock,
       getTransactionCount: async (address: string, blockNumber?: number) =>
         coreConnector.web3.eth.getTransactionCount(address, blockNumber),
       getConfirmedTransactions: () => Array.from(this._transactions.confirmed.values()),

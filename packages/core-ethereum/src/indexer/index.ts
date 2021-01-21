@@ -65,6 +65,9 @@ class Indexer implements IIndexer {
   private closedChannelEvent?: Subscription<OnChainLog>
   private newChannelHandler: (newChannels: IndexerChannel[]) => void
 
+  // latest known on-chain block number
+  public latestBlock: number = 0
+
   constructor(private connector: HoprEthereum) {
     this.newChannelHandler = () => {}
   }
@@ -299,6 +302,10 @@ class Indexer implements IIndexer {
   }
 
   private async onNewBlock(block: BlockHeader) {
+    if (this.latestBlock < block.number) {
+      this.latestBlock = block.number
+    }
+
     while (
       this.unconfirmedEvents.length > 0 &&
       isConfirmedBlock(
