@@ -66,7 +66,7 @@ export class CoverTraffic extends AbstractCommand {
     if (decoded[0].toString() === this.identifier) {
       log('cover packet received')
       const ts = parseInt(decoded[2].toString('hex'), 16)
-      this.totalLatency += Date.now() - ts
+      this.totalLatency += Math.round(Date.now() - ts)
       this.messagesReceived++
     }
   }
@@ -77,7 +77,7 @@ export class CoverTraffic extends AbstractCommand {
     }
     const reliability = ((this.messagesReceived / this.messagesSent) * 100).toFixed(2)
     const latency = this.totalLatency / this.messagesReceived
-    return `${this.messagesSent} messages sent, ` + `reliability = ${reliability}%, average latency is ${latency}`
+    return `${this.messagesSent} messages sent, ${this.messagesReceived} received, reliability = ${reliability}%, average latency is ${latency}`
   }
 
   public async execute(query: string): Promise<string> {

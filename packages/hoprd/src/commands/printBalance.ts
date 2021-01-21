@@ -24,7 +24,7 @@ export default class PrintBalance extends AbstractCommand {
     const hoprPrefix = 'HOPR Balance:'
     const hoprBalance = (await this.node.getBalance()).toFormattedString()
 
-    const nativePrefix = 'BNB Balance:'
+    const nativePrefix = 'ETH Balance:'
     const nativeBalance = (await this.node.getNativeBalance()).toFormattedString()
 
     const prefixLength = Math.max(hoprPrefix.length, nativePrefix.length) + 2

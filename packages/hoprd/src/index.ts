@@ -19,7 +19,7 @@ const argv = yargs
   })
   .option('provider', {
     describe: 'A provider url for the Network you specified',
-    default: 'wss://bsc-ws-node.nariox.org:443'
+    default: 'wss://ropsten.infura.io/ws/v3/21ceb5486c454b2cb8e6ec54d1432de1'
   })
   .option('host', {
     describe: 'The network host to run the HOPR node on.',
@@ -76,6 +76,14 @@ const argv = yargs
   .option('settings', {
     descripe: 'Settings, same as in the repl (JSON)',
     default: '{}'
+  })
+  .option('adminHost', {
+    describe: 'Host to listen to for admin console',
+    default: 'localhost'
+  })
+  .option('adminPort', {
+    describe: 'Port to listen to for admin console',
+    default: 3000
   })
   .wrap(Math.min(120, yargs.terminalWidth())).argv
 
@@ -142,7 +150,7 @@ async function main() {
   if (argv.admin) {
     // We need to setup the admin server before the HOPR node
     // as if the HOPR node fails, we need to put an error message up.
-    adminServer = new AdminServer(logs)
+    adminServer = new AdminServer(logs, argv.adminHost, argv.adminPort)
     await adminServer.setup()
   }
 

@@ -19,13 +19,10 @@ export class AdminServer {
   private app: any
   private server: Server | undefined
   private node: Hopr<HoprCoreConnector> | undefined
-  private port: number
   private wsServer: any
   private cmds: any
 
-  constructor(private logs: LogStream) {
-    this.port = process.env.HOPR_ADMIN_PORT ? parseInt(process.env.HOPR_ADMIN_PORT) : 3000
-  }
+  constructor(private logs: LogStream, private host: string, private port: number) {}
 
   async setup() {
     let adminPath = path.resolve(__dirname, '../hopr-admin/')
@@ -47,7 +44,7 @@ export class AdminServer {
       handle(req, res, parsedUrl)
     })
 
-    this.server.listen(this.port)
+    this.server.listen(this.port, this.host)
     this.logs.log('Admin server listening on port ' + this.port)
   }
 
@@ -105,9 +102,9 @@ export class AdminServer {
 
     this.node.on('hopr:warning:unfundedNative', (addr) => {
       this.logs.log(
-        `- The account associated with this node has no BNB,\n` +
+        `- The account associated with this node has no ETH,\n` +
           `  in order to fund gas for protocol overhead you will need to send\n` +
-          `  0.025 BNB to ${addr}`
+          `  0.025 ETH to ${addr}`
       )
     })
 

@@ -52,6 +52,7 @@ RUN dpkg -i dumb-init_*.deb
 ENV NODE_ENV 'production'
 ENV NEXT_TELEMETRY_DISABLED 1
 ENV DEBUG 'hopr*'
+ENV NODE_OPTIONS=--max_old_space_size=4096
 
 WORKDIR /app
 
