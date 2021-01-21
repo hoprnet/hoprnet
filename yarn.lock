@@ -423,6 +423,18 @@
     webrtc-stun "~3.0.0"
     wrtc "0.4.6"
 
+"@hoprnet/hopr-utils@^1.57.6":
+  version "1.62.10"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-1.62.10.tgz#b18de5d2dafeb1094ddba915c1cf5879a7eca21a"
+  integrity sha512-EW/+yZGV+2AgFs6rHAjDaPZ6AEI2hkKZrkC6FMs4MWqkyk0eTqcPz9+4SzoDFMVNKsHKuWoAFnUhdbGK2ZC4Zw==
+  dependencies:
+    bignumber.js "^9.0.0"
+    libp2p-crypto "0.18.0"
+    multiaddr "8.1.2"
+    multihashes "~3.1.0"
+    peer-id "0.14.2"
+    strip-ansi "^6.0.0"
+
 "@lerna/add@3.21.0":
   version "3.21.0"
   resolved "https://registry.yarnpkg.com/@lerna/add/-/add-3.21.0.tgz#27007bde71cc7b0a2969ab3c2f0ae41578b4577b"
@@ -8505,6 +8517,25 @@ libp2p-crypto@0.18.0, libp2p-crypto@^0.18.0:
     uint8arrays "^1.1.0"
     ursa-optional "^0.10.1"
 
+libp2p-crypto@0.19.0:
+  version "0.19.0"
+  resolved "https://registry.yarnpkg.com/libp2p-crypto/-/libp2p-crypto-0.19.0.tgz#321a5901e2a559edf3a3dbf848b13778ec69ed2d"
+  integrity sha512-w4tduG32px1i6TwekYZBSvizZTvDdMReZkE4DhUkf9IQ8WSqSo98K+6IZaYYM6PzWd5arbcAQQcFCRalJu9Ytw==
+  dependencies:
+    err-code "^2.0.0"
+    is-typedarray "^1.0.0"
+    iso-random-stream "^1.1.0"
+    keypair "^1.0.1"
+    multibase "^3.0.0"
+    multicodec "^2.0.0"
+    multihashing-async "^2.0.1"
+    node-forge "^0.10.0"
+    pem-jwk "^2.0.0"
+    protons "^2.0.0"
+    secp256k1 "^4.0.0"
+    uint8arrays "^1.1.0"
+    ursa-optional "^0.10.1"
+
 libp2p-interfaces@^0.4.0:
   version "0.4.1"
   resolved "https://registry.yarnpkg.com/libp2p-interfaces/-/libp2p-interfaces-0.4.1.tgz#1610034845e7ceb7cf93b5309945cf5ea698c9ee"
@@ -9964,6 +9995,11 @@ node-fetch@~1.7.1:
   dependencies:
     encoding "^0.1.11"
     is-stream "^1.0.1"
+
+node-forge@^0.10.0:
+  version "0.10.0"
+  resolved "https://registry.yarnpkg.com/node-forge/-/node-forge-0.10.0.tgz#32dea2afb3e9926f02ee5ce8794902691a676bf3"
+  integrity sha512-PPmu8eEeG9saEUvI97fm4OYxXVB6bFvyNTyiUOBichBpFG8A1Ljw3bY62+5oOjDEMHRnd0Y7HQ+x7uzxOzC6JA==
 
 node-forge@^0.9.1:
   version "0.9.2"
