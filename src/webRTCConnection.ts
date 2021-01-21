@@ -75,23 +75,21 @@ class WebRTCConnection implements MultiaddrConnection {
     this._id = u8aToHex(randomBytes(4), false)
 
     this.channel.once('connect', async () => {
-      console.log(`inside connect listner!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!`)
       if (this._webRTCTimeout != undefined) {
         clearTimeout(this._webRTCTimeout)
       }
 
       this._webRTCStateKnown = true
       this._webRTCAvailable = true
+      // @TODO could be mixed up
       this._switchPromise.resolve()
     })
 
     this.channel.once('error', this.endWebRTCUpgrade.bind(this))
 
     this.source = async function* (this: WebRTCConnection): Stream['source'] {
-      for await (const msg of (this.conn as RelayConnection).source) {
-        console.log(`getting from relayed connection`, new TextDecoder().decode(msg.slice()))
-        yield msg.slice()
-      }
+      yield* (this.conn as RelayConnection).source
+
       this.log(`webrtc source migrated but this._sinkMigrated`, this._sinkMigrated)
 
       this._sourceMigrated = true

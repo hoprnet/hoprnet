@@ -31,7 +31,7 @@ class TCPConnection implements MultiaddrConnection {
   constructor(public remoteAddr: Multiaddr, public conn: Socket) {
     this.localAddr = Multiaddr.fromNodeAddress(this.conn.address() as any, 'tcp')
 
-    console.log(`localAddr`, this.localAddr, `remoteAddr`, this.remoteAddr)
+    // console.log(`localAddr`, this.localAddr, `remoteAddr`, this.remoteAddr)
 
     this.timeline = {
       open: Date.now()

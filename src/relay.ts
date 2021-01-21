@@ -204,7 +204,6 @@ class Relay {
   }
 
   private async connectToRelay(relay: Multiaddr, options?: DialOptions): Promise<Connection> {
-    console.log(relay)
     let relayConnection = this._registrar.getConnection(PeerId.createFromCID(relay.getPeerId()))
 
     if (relayConnection == undefined || relayConnection == null) {

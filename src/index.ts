@@ -116,7 +116,10 @@ class HoprConnect implements Transport {
 
     // Used for testing
     this.__noDirectConnections = opts.__noDirectConnections
-    console.log(this.__noDirectConnections)
+
+    if (this.__noDirectConnections) {
+      verbose(`DEBUG mode: always using relayed / WebRTC connections.`)
+    }
 
     verbose(
       `Created ${this[Symbol.toStringTag]} stack (Stun: ${this.stunServers

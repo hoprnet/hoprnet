@@ -162,8 +162,6 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
 
       if (streamClosed) {
         if (!this._destroyed) {
-          console.log(`sunk`)
-
           if (!this._sinkTriggered) {
             this._stream.sink(
               (async function* () {
@@ -373,7 +371,6 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
       promises.push(statusPromise)
 
       if ((result == undefined || !(result as IteratorResult<Uint8Array, void>).done) && currentSource != undefined) {
-        //console.log(`adding streamPromise`)
         streamPromise = streamPromise ?? currentSource.next()
 
         promises.push(streamPromise)

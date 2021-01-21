@@ -176,7 +176,6 @@ class RelayContext {
         }
 
         if (this._sourceSwitched) {
-          console.log(`sourceSwitched`)
           this._sourceSwitched = false
 
           this._stream.source = result as Stream['source']
@@ -184,7 +183,6 @@ class RelayContext {
           result = undefined
 
           this._streamSourceSwitchPromise = Defer<Stream['source']>()
-          console.log(`sinking restart`)
           yield Uint8Array.from([...RELAY_STATUS_PREFIX, ...RESTART])
 
           this._sourcePromise = this._stream.source.next()
