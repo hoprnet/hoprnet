@@ -35,6 +35,8 @@ class WebRTCConnection implements MultiaddrConnection {
 
   private channel: SimplePeer
 
+  public sink: Stream['sink']
+
   public conn: RelayConnection | SimplePeer
 
   private _id: string
@@ -108,6 +110,8 @@ class WebRTCConnection implements MultiaddrConnection {
     }.call(this)
 
     this._webRTCTimeout = setTimeout(this.endWebRTCUpgrade.bind(this), WEBRTC_UPGRADE_TIMEOUT)
+
+    this.sink = this._sink.bind(this)
   }
 
   private log(..._: any[]) {
@@ -140,7 +144,7 @@ class WebRTCConnection implements MultiaddrConnection {
     })
   }
 
-  public async sink(source: Stream['source']): Promise<void> {
+  private async _sink(source: Stream['source']): Promise<void> {
     type SinkType = IteratorResult<Uint8Array, void> | void
     let sourcePromise = source.next()
 
@@ -176,7 +180,7 @@ class WebRTCConnection implements MultiaddrConnection {
             break
           }
 
-          console.log(`sinking into relayed connection`, new TextDecoder().decode(received.value.slice()))
+          //console.log(`sinking into relayed connection`, new TextDecoder().decode(received.value.slice()))
           yield received.value.slice()
 
           sourcePromise = source.next()
