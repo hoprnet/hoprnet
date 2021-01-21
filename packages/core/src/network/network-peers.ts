@@ -45,15 +45,13 @@ class NetworkPeers {
       /*
       return entry.heartbeatsSuccess / entry.heartbeatsSent
       */
-     return entry.lastTen
+      return entry.lastTen
     }
     return UNKNOWN_Q
   }
 
-  public pingSince(thresholdTime: number): PeerId[]{
-    return this.peers
-               .filter(entry => this.nextPing(entry) < thresholdTime)
-               .map(x => x.id) 
+  public pingSince(thresholdTime: number): PeerId[] {
+    return this.peers.filter((entry) => this.nextPing(entry) < thresholdTime).map((x) => x.id)
   }
 
   public async ping(peer: PeerId, interaction: (peerID: PeerId) => Promise<boolean>): Promise<void> {
@@ -84,13 +82,14 @@ class NetworkPeers {
 
   public register(id: PeerId) {
     if (!this.find(id)) {
-        this.peers.push({ id,
-          heartbeatsSent: 0,
-          heartbeatsSuccess: 0,
-          lastSeen: Date.now(),
-          backoff: 2,
-          lastTen: UNKNOWN_Q, 
-        })
+      this.peers.push({
+        id,
+        heartbeatsSent: 0,
+        heartbeatsSuccess: 0,
+        lastSeen: Date.now(),
+        backoff: 2,
+        lastTen: UNKNOWN_Q
+      })
     }
   }
 
@@ -112,12 +111,17 @@ class NetworkPeers {
     }
     let out = ''
     out += `current nodes:\n`
-    this.peers.sort((a, b) => {
-      return this.qualityOf(b.id) - this.qualityOf(a.id)
-    }).forEach((e: Entry) => {
-      const success = e.heartbeatsSent > 0 ? (e.heartbeatsSuccess / e.heartbeatsSent * 100).toFixed() + '%' : '<new>'
-      out += `- id: ${e.id.toB58String()}, quality: ${this.qualityOf(e.id).toFixed(2)} (backoff ${e.backoff.toFixed()}, ${success} of ${e.heartbeatsSent}) \n`
-    })
+    this.peers
+      .sort((a, b) => {
+        return this.qualityOf(b.id) - this.qualityOf(a.id)
+      })
+      .forEach((e: Entry) => {
+        const success =
+          e.heartbeatsSent > 0 ? ((e.heartbeatsSuccess / e.heartbeatsSent) * 100).toFixed() + '%' : '<new>'
+        out += `- id: ${e.id.toB58String()}, quality: ${this.qualityOf(e.id).toFixed(
+          2
+        )} (backoff ${e.backoff.toFixed()}, ${success} of ${e.heartbeatsSent}) \n`
+      })
     return out
   }
 }
