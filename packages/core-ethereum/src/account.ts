@@ -1,6 +1,7 @@
 import type HoprEthereum from '.'
 import type { TransactionObject } from './tsc/web3/types'
 import type { TransactionConfig } from 'web3-core'
+import Web3 from 'web3'
 import { getRpcOptions, Network } from '@hoprnet/hopr-ethereum'
 import { durations, Intermediate, stringToU8a, u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
 import NonceTracker from './nonce-tracker'
@@ -237,6 +238,7 @@ class Account {
 
     // @TODO: potential deadlock, needs to be improved
     const nonceLock = await this._nonceTracker.getNonceLock(this._address.toHex())
+    log('Picked nonce', nonceLock.nextNonce)
 
     // @TODO: provide some of the values to avoid multiple calls
     const options = {
@@ -256,7 +258,10 @@ class Account {
 
       log('Sending transaction %o', {
         gas: options.gas,
-        gasPrice: options.gasPrice,
+        gasPrice:
+          typeof options.gasPrice === 'string' && options.gasPrice.startsWith('0x')
+            ? Web3.utils.hexToNumber(options.gasPrice)
+            : options.gasPrice,
         nonce: options.nonce,
         hash: signedTransaction.transactionHash
       })
@@ -276,8 +281,11 @@ class Account {
           signedTransaction.transactionHash,
           options.nonce,
           error.message,
-          receipt ? receipt : undefined
+          receipt ? receipt : 'no receipt'
         )
+
+        // same tx was submitted twice
+        if (error.message.includes('already known')) return
 
         // mean tx was confirmed & reverted
         if (receipt) {
