@@ -1,4 +1,3 @@
-// @ts-nocheck
 const Alice = Uint8Array.from([
   8,
   2,
@@ -194,4 +193,4 @@ const Ed = Uint8Array.from([
   132
 ])
 
-export { Alice, Bob, Charly }
+export { Alice, Bob, Charly, Dave, Ed }

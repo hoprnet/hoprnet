@@ -71,6 +71,7 @@ declare module 'libp2p' {
   export interface Upgrader {
     upgradeOutbound(multiaddrConnection: MultiaddrConnection): Promise<Connection>
     upgradeInbound(multiaddrConnection: MultiaddrConnection): Promise<Connection>
+    protocols: Map<string, Handler>
   }
 
   export interface Registrar {

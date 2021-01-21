@@ -54,6 +54,7 @@
     "it-pair": "^1.0.0",
     "it-pipe": "^1.1.0",
     "libp2p": "0.29",
+    "libp2p-interfaces": "^0.8.2",
     "libp2p-mplex": "0.10",
     "libp2p-secio": "0.13",
     "mocha": "^8.0.1",
@@ -65,7 +66,7 @@
     "extension": [
       "ts"
     ],
-    "spec": "src/webRTCConnection.spec.ts",
+    "spec": "tests/libp2p.spec.ts",
     "require": [
       "ts-node/register"
     ]
