@@ -627,7 +627,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     return await findPath(
       this.getId(),
       destination,
-      MAX_HOPS - 1,
+      MAX_HOPS,
       this.network.networkPeers,
       this.paymentChannels.indexer,
       PATH_RANDOMNESS
