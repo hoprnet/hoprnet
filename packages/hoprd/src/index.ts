@@ -19,7 +19,8 @@ const argv = yargs
   })
   .option('provider', {
     describe: 'A provider url for the Network you specified',
-    default: 'wss://ropsten.infura.io/ws/v3/21ceb5486c454b2cb8e6ec54d1432de1'
+    default: 'wss://eth-ropsten.ws.alchemyapi.io/v2/oRYdfTnfKN4jKLzqTB-WiKKVkW7yw43Z'
+    // default: 'wss://ropsten.infura.io/ws/v3/21ceb5486c454b2cb8e6ec54d1432de1'
   })
   .option('host', {
     describe: 'The network host to run the HOPR node on.',
