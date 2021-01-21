@@ -157,20 +157,13 @@ class WebRTCConnection implements MultiaddrConnection {
         let result: SinkType
 
         while (!(this._webRTCAvailable || this._webRTCStateKnown)) {
+          // 1. Handle stream handover
+          // 2. Handle stream messages
           result = await Promise.race([
             // prettier-ignore
             switchPromise,
             sourcePromise
           ])
-
-          console.log(
-            [
-              // prettier-ignore
-              switchPromise,
-              sourcePromise
-            ],
-            streamSwitched
-          )
 
           if (streamSwitched) {
             streamSwitched = false
@@ -221,7 +214,6 @@ class WebRTCConnection implements MultiaddrConnection {
     }
 
     if (this._webRTCAvailable) {
-      await new Promise((resolve) => setTimeout(resolve, 100))
       toIterable.sink(this.channel)(
         async function* (this: WebRTCConnection): Stream['source'] {
           let result: SinkType

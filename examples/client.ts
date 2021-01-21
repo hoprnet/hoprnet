@@ -61,7 +61,7 @@ async function main() {
       (source: Stream['source']) => {
         return (async function* () {
           for await (const msg of source) {
-            const decoded = new TextDecoder().decode(msg)
+            const decoded = new TextDecoder().decode(msg.slice())
 
             console.log(`Received message <${decoded}>`)
 
@@ -92,12 +92,12 @@ async function main() {
 
       await pipe(
         // prettier-ignore
-        new TextEncoder().encode('test'),
+        [new TextEncoder().encode('test')],
         conn.stream,
         async (source: Stream['source']) => {
           for await (const msg of source) {
-            const decoded = new TextDecoder().decode(msg)
-    
+            const decoded = new TextDecoder().decode(msg.slice())
+
             console.log(`Received <${decoded}>`)
           }
         }
