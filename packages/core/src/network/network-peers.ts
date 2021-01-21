@@ -31,10 +31,10 @@ class NetworkPeers {
     }
   }
 
-  private nextPing(e: Entry): number{
+  private nextPing(e: Entry): number {
     // Exponential backoff
     const delay = Math.min(MAX_DELAY, Math.pow(e.backoff, BACKOFF_EXPONENT) * MIN_DELAY)
-    return e.lastSeen + delay 
+    return e.lastSeen + delay
   }
 
   // @returns a float between 0 (completely unreliable) and 1 (completely
@@ -56,11 +56,9 @@ class NetworkPeers {
                .map(x => x.id) 
   }
 
-
   public async ping(peer: PeerId, interaction: (peerID: PeerId) => Promise<boolean>): Promise<void> {
-
     const entry = this.find(peer)
-    if (!entry) throw new Error('Cannot ping ' + peer.toB58String());
+    if (!entry) throw new Error('Cannot ping ' + peer.toB58String())
 
     entry.heartbeatsSent++
     entry.lastSeen = Date.now()
