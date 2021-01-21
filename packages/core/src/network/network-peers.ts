@@ -29,10 +29,10 @@ class NetworkPeers {
     }
   }
 
-  private nextPing(e: Entry): number{
+  private nextPing(e: Entry): number {
     // Exponential backoff
     const delay = Math.min(MAX_DELAY, Math.pow(e.backoff, BACKOFF_EXPONENT) * MIN_DELAY)
-    return e.lastSeen + delay 
+    return e.lastSeen + delay
   }
 
   // @returns a float between 0 (completely unreliable) and 1 (completely
@@ -46,17 +46,13 @@ class NetworkPeers {
     return 0.2 // Unknown // TBD
   }
 
-  public pingSince(thresholdTime: number): PeerId[]{
-    return this.peers
-               .filter(entry => this.nextPing(entry) > thresholdTime)
-               .map(x => x.id) 
+  public pingSince(thresholdTime: number): PeerId[] {
+    return this.peers.filter((entry) => this.nextPing(entry) > thresholdTime).map((x) => x.id)
   }
 
-
   public async ping(peer: PeerId, interaction: (peerID: PeerId) => Promise<boolean>): Promise<void> {
-
     const entry = this.find(peer)
-    if (!entry) throw new Error('Cannot ping ' + peer.toB58String());
+    if (!entry) throw new Error('Cannot ping ' + peer.toB58String())
 
     entry.heartbeatsSent++
     entry.lastSeen = Date.now()
@@ -65,7 +61,6 @@ class NetworkPeers {
       entry.heartbeatsSuccess++
       entry.backoff = 1 // RESET - to back down: Math.pow(entry.backoff, 1/BACKOFF_EXPONENT)
     } else {
-
       entry.backoff = Math.pow(entry.backoff, BACKOFF_EXPONENT)
     }
   }
@@ -81,12 +76,7 @@ class NetworkPeers {
 
   public register(id: PeerId) {
     if (!this.find(id)) {
-        this.peers.push({ id,
-          heartbeatsSent: 0,
-          heartbeatsSuccess: 0,
-          lastSeen: Date.now(),
-          backoff: 1,
-        })
+      this.peers.push({ id, heartbeatsSent: 0, heartbeatsSuccess: 0, lastSeen: Date.now(), backoff: 1 })
     }
   }
 

@@ -24,7 +24,6 @@ export const HEARTBEAT_TIMEOUT = 3000
 
 export const MAX_PARALLEL_CONNECTIONS = 5
 
-
 export const MAX_PACKET_DELAY = 200
 
 export const MAX_HOPS = 2
