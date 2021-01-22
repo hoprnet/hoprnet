@@ -83,40 +83,38 @@ export function getAddrs(
 
   const multiaddrs: Multiaddr[] = []
 
-  for (let i = 0; i < interfaces.length; i++) {
-    const addresses = interfaces[i]
-
-    for (let j = 0; j < addresses.length; j++) {
-      if (isLinkLocaleAddress(addresses[j].address, addresses[j].family)) {
-        if (addresses[j].family === 'IPv4' && (options == undefined || options.includeLocalIPv4 != true)) {
+  for (const iface of interfaces) {
+    for (const address of iface) {
+      if (isLinkLocaleAddress(address.address, address.family)) {
+        if (address.family === 'IPv4' && (options == undefined || options.includeLocalIPv4 != true)) {
           continue
         }
-        if (addresses[j].family === 'IPv6' && (options == undefined || options.includeLocalIPv6 != true)) {
-          continue
-        }
-      }
-
-      if (isLocalhostAddress(addresses[j].address, addresses[j].family)) {
-        if (addresses[j].family === 'IPv4' && (options == undefined || options.includeLocalhostIPv4 != true)) {
-          continue
-        }
-        if (addresses[j].family === 'IPv6' && (options == undefined || options.includeLocalhostIPv6 != true)) {
+        if (address.family === 'IPv6' && (options == undefined || options.includeLocalIPv6 != true)) {
           continue
         }
       }
 
-      if (addresses[j].family === 'IPv4' && options != undefined && options.useIPv4 == false) {
+      if (isLocalhostAddress(address.address, address.family)) {
+        if (address.family === 'IPv4' && (options == undefined || options.includeLocalhostIPv4 != true)) {
+          continue
+        }
+        if (address.family === 'IPv6' && (options == undefined || options.includeLocalhostIPv6 != true)) {
+          continue
+        }
+      }
+
+      if (address.family === 'IPv4' && options != undefined && options.useIPv4 == false) {
         continue
       }
 
-      if (addresses[j].family === 'IPv6' && options != undefined && options.useIPv6 == false) {
+      if (address.family === 'IPv6' && options != undefined && options.useIPv6 == false) {
         continue
       }
 
       multiaddrs.push(
         Multiaddr.fromNodeAddress(
           {
-            ...addresses[j],
+            ...address,
             port: port.toString()
           },
           'tcp'
