@@ -41,7 +41,6 @@ declare module 'libp2p' {
   }
   export interface DialOptions {
     signal?: AbortSignal
-    relay?: PeerId
   }
 
   export type StreamType = BL | Uint8Array

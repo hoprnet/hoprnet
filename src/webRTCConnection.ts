@@ -1,4 +1,4 @@
-import { MultiaddrConnection, Stream, StreamResult } from 'libp2p'
+import { DialOptions, MultiaddrConnection, Stream, StreamResult } from 'libp2p'
 import Defer, { DeferredPromise } from 'p-defer'
 
 import type { Instance as SimplePeer } from 'simple-peer'
@@ -10,6 +10,7 @@ import Debug from 'debug'
 import { RelayConnection } from './relayConnection'
 import { randomBytes } from 'crypto'
 import { toU8aStream } from './utils'
+import abortable from 'abortable-iterator'
 
 const _log = Debug('hopr-connect')
 const _error = Debug('hopr-connect:error')
@@ -43,10 +44,14 @@ class WebRTCConnection implements MultiaddrConnection {
   public conn: RelayConnection | SimplePeer
 
   private _id: string
+  private _signal?: AbortSignal
 
   public timeline: MultiaddrConnection['timeline']
 
-  constructor(opts: { conn: RelayConnection; channel: SimplePeer; self: PeerId; counterparty: PeerId }) {
+  constructor(
+    opts: { conn: RelayConnection; channel: SimplePeer; self: PeerId; counterparty: PeerId },
+    options?: DialOptions
+  ) {
     this.channel = opts.channel
     this.conn = opts.conn
 
@@ -69,6 +74,8 @@ class WebRTCConnection implements MultiaddrConnection {
     this.remoteAddr = Multiaddr(`/p2p/${opts.counterparty.toB58String()}`)
     this.localAddr = Multiaddr(`/p2p/${opts.self.toB58String()}`)
 
+    this._signal = options?.signal
+
     this.timeline = {
       open: Date.now()
     }
@@ -88,40 +95,44 @@ class WebRTCConnection implements MultiaddrConnection {
 
     this.channel.once('error', this.endWebRTCUpgrade.bind(this))
 
-    this.source = async function* (this: WebRTCConnection): Stream['source'] {
-      for await (const msg of (this.conn as RelayConnection).source) {
-        const [finished, payload] = [msg.slice(0, 1), msg.slice(1)]
-
-        if (finished[0] == DONE[0]) {
-          return
-        } else {
-          this.log(`getting from relayed connecton`, JSON.stringify(payload))
-          yield payload
-        }
-      }
-      //yield* (this.conn as RelayConnection).source
-
-      this.log(`webrtc source migrated but this._sinkMigrated`, this._sinkMigrated)
-
-      this._sourceMigrated = true
-      if (this._sinkMigrated) {
-        this.conn = this.channel
-      }
-
-      if (!this._webRTCStateKnown || this._webRTCAvailable) {
-        await this._switchPromise.promise
-      }
-
-      if (this._webRTCAvailable || !this._webRTCStateKnown) {
-        this.log(`webRTC source handover done. Using direct connection to peer ${this.remoteAddr.getPeerId()}`)
-
-        yield* this.channel[Symbol.asyncIterator]() as Stream['source']
-      }
-    }.call(this)
+    this.source =
+      this._signal != undefined
+        ? (abortable(this.createSource(), this._signal) as Stream['source'])
+        : this.createSource()
 
     this._webRTCTimeout = setTimeout(this.endWebRTCUpgrade.bind(this), WEBRTC_UPGRADE_TIMEOUT)
 
     this.sink = this._sink.bind(this)
+  }
+
+  private async *createSource(this: WebRTCConnection): Stream['source'] {
+    for await (const msg of (this.conn as RelayConnection).source) {
+      const [finished, payload] = [msg.slice(0, 1), msg.slice(1)]
+
+      if (finished[0] == DONE[0]) {
+        return
+      } else {
+        this.log(`getting from relayed connecton`, JSON.stringify(payload))
+        yield payload
+      }
+    }
+
+    this.log(`webrtc source migrated but this._sinkMigrated`, this._sinkMigrated)
+
+    this._sourceMigrated = true
+    if (this._sinkMigrated) {
+      this.conn = this.channel
+    }
+
+    if (!this._webRTCStateKnown || this._webRTCAvailable) {
+      await this._switchPromise.promise
+    }
+
+    if (this._webRTCAvailable || !this._webRTCStateKnown) {
+      this.log(`webRTC source handover done. Using direct connection to peer ${this.remoteAddr.getPeerId()}`)
+
+      yield* this.channel[Symbol.asyncIterator]() as Stream['source']
+    }
   }
 
   private log(..._: any[]) {
@@ -156,7 +167,11 @@ class WebRTCConnection implements MultiaddrConnection {
 
   private async _sink(_source: Stream['source']): Promise<void> {
     type SinkType = StreamResult | void
-    let source = toU8aStream(_source)
+    let source =
+      this._signal != undefined
+        ? (abortable(toU8aStream(_source), this._signal) as Stream['source'])
+        : toU8aStream(_source)
+
     let sourcePromise = source.next()
 
     let defer = Defer<void>()

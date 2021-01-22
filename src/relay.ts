@@ -130,6 +130,10 @@ class Relay {
       return
     }
 
+    if (options?.signal?.aborted) {
+      throw new AbortError()
+    }
+
     if (this._webRTCUpgrader != undefined) {
       let channel = this._webRTCUpgrader.upgradeOutbound()
 
@@ -149,7 +153,7 @@ class Relay {
         self: this._peerId,
         counterparty: destination,
         channel
-      })
+      }, options)
     } else {
       return new RelayConnection({
         stream,
