@@ -38,7 +38,7 @@ describe('test overwritable connection', function () {
     let _iteration = iteration
 
     // let lastId = -1
-    let receiver = arg.designatedReceiverId
+    // let receiver = arg.designatedReceiverId
 
     return {
       source: (async function* () {
@@ -75,14 +75,20 @@ describe('test overwritable connection', function () {
               msg = _msg.slice()
             }
 
-            let decoded = JSON.parse(new TextDecoder().decode(msg)) as DebugMessage
+            // let decoded: DebugMessage
+            try {
+              JSON.parse(new TextDecoder().decode(msg)) as DebugMessage
+            } catch {
+              console.log(msg)
+            }
+
             // assert(decoded.messageId == lastId + 1)
 
-            if (receiver == null) {
-              receiver = decoded.iteration
-            } else {
-              // assert(receiver == decoded.iteration)
-            }
+            // if (receiver == null) {
+            //   receiver = decoded.iteration
+            // } else {
+            //   // assert(receiver == decoded.iteration)
+            // }
 
             // lastId = decoded.messageId
           } else {
