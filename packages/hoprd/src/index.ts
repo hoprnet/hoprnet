@@ -182,7 +182,7 @@ async function main() {
         .on('error', (err: any) => {
           console.log(`Failed to start REST API.`)
           console.log(err)
-          process.exit()
+          process.exit(1)
         })
     }
 
