@@ -44,6 +44,12 @@ export class AdminServer {
       handle(req, res, parsedUrl)
     })
 
+    this.server.once('error', (err: any) => {
+      console.log(`Failed to start Admin interface`)
+      console.log(err)
+      process.exit()
+    })
+
     this.server.listen(this.port, this.host)
     this.logs.log('Admin server listening on port ' + this.port)
   }

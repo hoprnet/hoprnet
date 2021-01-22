@@ -174,9 +174,16 @@ async function main() {
       service.get('/api/v1/address/hopr', async (_, res) => res.send(await node.getId().toB58String()))
       const hostname = argv.restHost
       const port = argv.restPort
-      http.createServer(service).listen(port, hostname, () => {
-        logs.log(`Rest server on ${hostname} listening on port ${port}`)
-      })
+      http
+        .createServer(service)
+        .listen(port, hostname, () => {
+          logs.log(`Rest server on ${hostname} listening on port ${port}`)
+        })
+        .on('error', (err: any) => {
+          console.log(`Failed to start REST API.`)
+          console.log(err)
+          process.exit()
+        })
     }
 
     node.on('hopr:message', logMessageToNode)
