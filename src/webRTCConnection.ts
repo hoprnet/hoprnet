@@ -9,6 +9,7 @@ import toIterable from 'stream-to-it'
 import Debug from 'debug'
 import { RelayConnection } from './relayConnection'
 import { randomBytes } from 'crypto'
+import { toU8aStream } from './utils'
 
 const _log = Debug('hopr-connect')
 const _error = Debug('hopr-connect:error')
@@ -153,8 +154,9 @@ class WebRTCConnection implements MultiaddrConnection {
     })
   }
 
-  private async _sink(source: Stream['source']): Promise<void> {
+  private async _sink(_source: Stream['source']): Promise<void> {
     type SinkType = IteratorResult<Uint8Array, void> | void
+    let source = toU8aStream(_source)
     let sourcePromise = source.next()
 
     let defer = Defer<void>()
@@ -190,16 +192,7 @@ class WebRTCConnection implements MultiaddrConnection {
             break
           }
 
-          let toSink: Uint8Array
-
-          if (typeof received.value === 'string') {
-            this.log(`yielding string into relayed connection`, received.value)
-            toSink = new TextEncoder().encode((received.value as unknown) as string)
-          } else {
-            this.log(`yielding into relayed connection`, new TextDecoder().decode(received.value.slice()))
-            toSink = received.value.slice()
-          }
-          yield Uint8Array.from([...NOT_DONE, ...toSink])
+          yield Uint8Array.from([...NOT_DONE, ...received.value.slice()])
 
           sourcePromise = source.next()
         }
@@ -253,28 +246,16 @@ class WebRTCConnection implements MultiaddrConnection {
             return
           }
 
-          if (typeof result.value === 'string') {
-            this.log(`yielding into webrtc ${this._id}`, JSON.stringify(result))
-            yield new TextEncoder().encode((result.value as unknown) as string)
-          } else {
-            // @ts-ignore
-            this.log(`yielding into webrtc ${this._id}`, new TextDecoder().decode(result.value.slice()))
-            yield result.value.slice()
-          }
+          this.log(`yielding into webrtc ${this._id}`, new TextDecoder().decode(result.value.slice()))
+          yield result.value.slice()
 
           for await (const msg of source) {
-            // @ts-ignore
             if (this._destroyed || this.channel.destroyed) {
               break
             }
 
-            if (typeof msg === 'string') {
-              yield new TextEncoder().encode(msg)
-            } else {
-              // @ts-ignore
-              this.log(`yielding into webrtc ${this._id}`, new TextDecoder().decode(msg.slice()))
-              yield msg.slice()
-            }
+            this.log(`yielding into webrtc ${this._id}`, new TextDecoder().decode(msg.slice()))
+            yield msg.slice()
           }
         }.call(this)
       )

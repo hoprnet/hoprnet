@@ -15,6 +15,7 @@ import type PeerId from 'peer-id'
 
 import Debug from 'debug'
 import { EventEmitter } from 'events'
+import { toU8aStream } from './utils'
 
 const _log = Debug('hopr-connect')
 const _verbose = Debug('hopr-connect:verbose')
@@ -286,11 +287,11 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
     }
   }
 
-  public _sink(source: Stream['source']): Promise<void> {
+  public _sink(_source: Stream['source']): Promise<void> {
     // @TODO add support for Iterables such as arrays
     this._sinkTriggered = true
 
-    this._sinkSourceAttachedPromise.resolve(source)
+    this._sinkSourceAttachedPromise.resolve(toU8aStream(_source))
 
     return Promise.resolve()
   }

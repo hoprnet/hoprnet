@@ -16,12 +16,14 @@ const SOCKET_CLOSE_TIMEOUT = 2000
 import type { MultiaddrConnection, Stream, DialOptions } from 'libp2p'
 import Multiaddr from 'multiaddr'
 import toIterable from 'stream-to-it'
+import { toU8aStream } from './utils'
 
 class TCPConnection implements MultiaddrConnection {
   public localAddr: Multiaddr
   public sink: Stream['sink']
   public source: Stream['source']
-  public close: () => Promise<void>
+
+  private _stream: Stream
 
   public timeline: {
     open: number
@@ -44,71 +46,66 @@ class TCPConnection implements MultiaddrConnection {
       this.timeline.close ??= Date.now()
     })
 
-    const { sink, source } = toIterable.duplex<Uint8Array>(this.conn)
+    this._stream = toIterable.duplex<Uint8Array>(this.conn)
 
-    this.sink = async (source: Stream['source']): Promise<void> => {
-      try {
-        await sink(
-          (async function* () {
-            for await (const chunk of source) {
-              // Convert BufferList to Buffer
-              yield Buffer.isBuffer(chunk) ? chunk : chunk.slice()
-            }
-          })()
+    this.sink = this._sink.bind(this)
+
+    this.source = this._stream.source
+  }
+
+  public async close(): Promise<void> {
+    if (this.conn.destroyed) {
+      return Promise.resolve()
+    }
+
+    return new Promise<void>((resolve, reject) => {
+      const start = Date.now()
+
+      // Attempt to end the socket. If it takes longer to close than the
+      // timeout, destroy it manually.
+      const timeout = setTimeout(() => {
+        const cOptions = this.remoteAddr.toOptions()
+        log(
+          'timeout closing socket to %s:%s after %dms, destroying it manually',
+          cOptions.host,
+          cOptions.port,
+          Date.now() - start
         )
-      } catch (err) {
-        // If aborted we can safely ignore
-        if (err.type !== 'aborted') {
-          // If the source errored the socket will already have been destroyed by
-          // toIterable.duplex(). If the socket errored it will already be
-          // destroyed. There's nothing to do here except log the error & return.
-          error(err)
+
+        if (this.conn.destroyed) {
+          log('%s:%s is already destroyed', cOptions.host, cOptions.port)
+        } else {
+          this.conn.destroy()
         }
-      }
-    }
 
-    this.close = (): Promise<void> => {
-      if (this.conn.destroyed) {
-        return Promise.resolve()
-      }
+        resolve()
+      }, SOCKET_CLOSE_TIMEOUT)
 
-      return new Promise<void>((resolve, reject) => {
-        const start = Date.now()
+      this.conn.once('close', () => clearTimeout(timeout))
+      this.conn.end((err?: Error) => {
+        this.timeline.close = Date.now()
+        if (err) {
+          error(err)
+          return reject(err)
+        }
 
-        // Attempt to end the socket. If it takes longer to close than the
-        // timeout, destroy it manually.
-        const timeout = setTimeout(() => {
-          const cOptions = this.remoteAddr.toOptions()
-          log(
-            'timeout closing socket to %s:%s after %dms, destroying it manually',
-            cOptions.host,
-            cOptions.port,
-            Date.now() - start
-          )
-
-          if (this.conn.destroyed) {
-            log('%s:%s is already destroyed', cOptions.host, cOptions.port)
-          } else {
-            this.conn.destroy()
-          }
-
-          resolve()
-        }, SOCKET_CLOSE_TIMEOUT)
-
-        this.conn.once('close', () => clearTimeout(timeout))
-        this.conn.end((err?: Error) => {
-          this.timeline.close = Date.now()
-          if (err) {
-            error(err)
-            return reject(err)
-          }
-
-          resolve()
-        })
+        resolve()
       })
-    }
+    })
+  }
 
-    this.source = source
+  private async _sink(source: Stream['source']): Promise<void> {
+    try {
+      await this._stream.sink(toU8aStream(source))
+    } catch (err) {
+      // If aborted we can safely ignore
+      if (err.type !== 'aborted') {
+        // If the source errored the socket will already have been destroyed by
+        // toIterable.duplex(). If the socket errored it will already be
+        // destroyed. There's nothing to do here except log the error & return.
+        error(err)
+      }
+    }
   }
 
   /**
