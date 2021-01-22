@@ -67,7 +67,7 @@
     "extension": [
       "ts"
     ],
-    "spec": "tests/libp2p.spec.ts",
+    "spec": "src/webRTCConnection.spec.ts",
     "require": [
       "ts-node/register"
     ]
