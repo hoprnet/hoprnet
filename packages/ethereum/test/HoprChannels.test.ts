@@ -911,10 +911,7 @@ describe.only('HoprChannels', function () {
       expect(logEntry).to.exist
       expect(logEntry.topics[1]).to.be.equal(u8aToHex(compressedPubKeyB.slice(1)), 'wrong first public key')
       expect(logEntry.topics[2]).to.be.equal(u8aToHex(compressedPubKeyA.slice(1)), 'wrong second public key')
-      expect(web3.eth.abi.decodeParameter('uint256', logEntry.data)).to.be.equal(
-        ticket.amount,
-        'wrong ticket amount'
-      )
+      expect(web3.eth.abi.decodeParameter('uint256', logEntry.data)).to.be.equal(ticket.amount, 'wrong ticket amount')
 
       await expectRevert(
         hoprChannels.redeemTicket(
