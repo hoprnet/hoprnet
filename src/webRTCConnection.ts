@@ -1,18 +1,25 @@
-import { MultiaddrConnection, Stream } from 'libp2p'
+import { DialOptions, MultiaddrConnection, Stream, StreamResult } from 'libp2p'
 import Defer, { DeferredPromise } from 'p-defer'
 
 import type { Instance as SimplePeer } from 'simple-peer'
 import Multiaddr from 'multiaddr'
 import type PeerId from 'peer-id'
-import { durations } from '@hoprnet/hopr-utils'
+import { durations, u8aToHex } from '@hoprnet/hopr-utils'
 import toIterable from 'stream-to-it'
 import Debug from 'debug'
 import { RelayConnection } from './relayConnection'
+import { randomBytes } from 'crypto'
+import { toU8aStream } from './utils'
+import abortable from 'abortable-iterator'
 
-const log = Debug('hopr-connect')
-const verbose = Debug('hopr-connect:verbose')
+const _log = Debug('hopr-connect')
+const _error = Debug('hopr-connect:error')
+// const _verbose = Debug('hopr-connect:verbose')
 
-export const WEBRTC_UPGRADE_TIMEOUT = durations.seconds(1)
+export const WEBRTC_UPGRADE_TIMEOUT = durations.seconds(3)
+
+const DONE = Uint8Array.from([1])
+const NOT_DONE = Uint8Array.from([0])
 
 class WebRTCConnection implements MultiaddrConnection {
   private _switchPromise: DeferredPromise<void>
@@ -21,211 +28,253 @@ class WebRTCConnection implements MultiaddrConnection {
   private _destroyed: boolean
   private _webRTCTimeout?: NodeJS.Timeout
 
-  private _iteration: number
+  private _sourceMigrated: boolean
+  private _sinkMigrated: boolean
 
-  public source: Stream['source']
+  private _counterparty: PeerId
 
-  public remoteAddr: Multiaddr
-  public localAddr: Multiaddr
-
-  public sink: Stream['sink']
+  public remoteAddr: MultiaddrConnection['remoteAddr']
+  public localAddr: MultiaddrConnection['remoteAddr']
 
   private channel: SimplePeer
 
-  public conn: MultiaddrConnection
+  public sink: Stream['sink']
+  public source: Stream['source']
 
-  public timeline: {
-    open: number
-    closed?: number
-  }
+  public conn: RelayConnection | SimplePeer
 
-  constructor(opts: {
-    conn: MultiaddrConnection
-    channel: SimplePeer
-    self: PeerId
-    counterparty: PeerId
-    iteration: number
-  }) {
+  private _id: string
+  private _signal?: AbortSignal
+
+  public timeline: MultiaddrConnection['timeline']
+
+  constructor(
+    opts: { conn: RelayConnection; channel: SimplePeer; self: PeerId; counterparty: PeerId },
+    options?: DialOptions
+  ) {
     this.channel = opts.channel
     this.conn = opts.conn
+
+    this.conn.once('restart', () => {
+      this._destroyed = true
+      try {
+        this.channel.destroy()
+      } catch {}
+    })
     this._destroyed = false
     this._switchPromise = Defer<void>()
     this._webRTCStateKnown = false
     this._webRTCAvailable = false
-    this._iteration = opts.iteration
+
+    this._sourceMigrated = false
+    this._sinkMigrated = false
+
+    this._counterparty = opts.counterparty
 
     this.remoteAddr = Multiaddr(`/p2p/${opts.counterparty.toB58String()}`)
     this.localAddr = Multiaddr(`/p2p/${opts.self.toB58String()}`)
+
+    this._signal = options?.signal
 
     this.timeline = {
       open: Date.now()
     }
 
-    this.channel.once('connect', () => {
+    this._id = u8aToHex(randomBytes(4), false)
+
+    this.channel.once('connect', async () => {
       if (this._webRTCTimeout != undefined) {
         clearTimeout(this._webRTCTimeout)
       }
 
       this._webRTCStateKnown = true
       this._webRTCAvailable = true
+      // @TODO could be mixed up
       this._switchPromise.resolve()
     })
 
-    const endWebRTCUpgrade = (err?: any) => {
-      if (this._webRTCTimeout != undefined) {
-        clearTimeout(this._webRTCTimeout)
-      }
+    this.channel.once('error', this.endWebRTCUpgrade.bind(this))
 
-      log(`ending WebRTC upgrade due error: ${err}`)
-      this._webRTCStateKnown = true
-      this._webRTCAvailable = false
-      this._switchPromise.resolve()
-      setImmediate(() => {
-        this.channel.destroy()
-      })
-    }
+    this.source =
+      this._signal != undefined
+        ? (abortable(this.createSource(), this._signal) as Stream['source'])
+        : this.createSource()
 
-    this.channel.once('error', endWebRTCUpgrade)
+    this._webRTCTimeout = setTimeout(this.endWebRTCUpgrade.bind(this), WEBRTC_UPGRADE_TIMEOUT)
 
-    this.sink = async (source: Stream['source']): Promise<void> => {
-      let sourceReceived = false
-      let sourceMsg: Uint8Array
-      let sourceDone = false
+    this.sink = this._sink.bind(this)
+  }
 
-      function sourceFunction(arg: IteratorResult<Uint8Array, void>) {
-        sourceReceived = true
-        sourceDone = arg.done || false
+  private async *createSource(this: WebRTCConnection): Stream['source'] {
+    for await (const msg of (this.conn as RelayConnection).source) {
+      const [finished, payload] = [msg.slice(0, 1), msg.slice(1)]
 
-        if (!arg.done) {
-          sourceMsg = arg.value
-        }
-      }
-
-      let sourcePromise = source.next().then(sourceFunction)
-
-      let defer = Defer<void>()
-
-      let promiseTriggered = true
-
-      let streamSwitched = false
-      let switchPromise = this._switchPromise.promise.then(() => {
-        streamSwitched = false
-      })
-
-      this.conn.sink(
-        async function* (this: WebRTCConnection): Stream['source'] {
-          if (this._webRTCTimeout == null) {
-            this._webRTCTimeout = setTimeout(endWebRTCUpgrade, WEBRTC_UPGRADE_TIMEOUT)
-          }
-
-          while (!this._webRTCAvailable && !this._webRTCStateKnown) {
-            await Promise.race([
-              // prettier-ignore
-              sourcePromise,
-              switchPromise
-            ])
-
-            if (streamSwitched) {
-              break
-            } else if (sourceReceived) {
-              promiseTriggered = false
-              sourceReceived = false
-
-              if (sourceDone) {
-                break
-              }
-
-              yield sourceMsg.slice()
-
-              if (!this._webRTCAvailable) {
-                sourcePromise = source.next().then(sourceFunction)
-                promiseTriggered = true
-              }
-            }
-          }
-
-          if (this._webRTCStateKnown && !this._webRTCAvailable) {
-            log(
-              `WebRTC upgrade failed. Falling back to a relayed connection with peer ${opts.counterparty.toB58String()}.`
-            )
-
-            await sourcePromise
-
-            if (sourceDone) {
-              return
-            }
-
-            yield sourceMsg.slice()
-
-            yield* source
-          }
-          defer.resolve()
-        }.call(this)
-      )
-
-      await defer.promise
-
-      if (this._webRTCAvailable) {
-        if (this._webRTCTimeout != undefined) {
-          clearTimeout(this._webRTCTimeout)
-        }
-
-        if (this._webRTCAvailable) {
-          toIterable.sink(this.channel)(
-            async function* (this: WebRTCConnection): Stream['source'] {
-              if (promiseTriggered && !sourceReceived) {
-                if (!sourceReceived) {
-                  await sourcePromise
-                }
-
-                yield sourceMsg.slice()
-              }
-
-              log(`switching to direct WebRTC connection with peer ${this.remoteAddr.getPeerId()}`)
-
-              // @ts-ignore
-              while (this.channel.connected && this._iteration == (this.conn as RelayConnection)._iteration) {
-                const result = await source.next()
-
-                if (result.done) {
-                  break
-                }
-
-                // @ts-ignore
-                if (this.channel.connected && this._iteration == (this.conn as RelayConnection)._iteration) {
-                  yield result.value.slice()
-                } else {
-                  break
-                }
-              }
-            }.call(this)
-          )
-        }
+      if (finished[0] == DONE[0]) {
+        return
+      } else {
+        this.log(`getting from relayed connecton`, JSON.stringify(payload))
+        yield payload
       }
     }
 
-    this.source = async function* (this: WebRTCConnection): Stream['source'] {
-      if (this._webRTCTimeout == null) {
-        this._webRTCTimeout = setTimeout(endWebRTCUpgrade, WEBRTC_UPGRADE_TIMEOUT)
-      }
+    this.log(`webrtc source migrated but this._sinkMigrated`, this._sinkMigrated)
 
-      yield* this.conn.source
+    this._sourceMigrated = true
+    if (this._sinkMigrated) {
+      this.conn = this.channel
+    }
 
-      if (!this._webRTCStateKnown || this._webRTCAvailable) {
-        await this._switchPromise.promise
-      }
+    if (!this._webRTCStateKnown || this._webRTCAvailable) {
+      await this._switchPromise.promise
+    }
 
-      if (this._webRTCAvailable || !this._webRTCStateKnown) {
-        clearTimeout(this._webRTCTimeout)
-        log(`webRTC handover done. Using direct connection to peer ${this.remoteAddr.getPeerId()}`)
+    if (this._webRTCAvailable || !this._webRTCStateKnown) {
+      this.log(`webRTC source handover done. Using direct connection to peer ${this.remoteAddr.getPeerId()}`)
 
-        yield* this.channel[Symbol.asyncIterator]() as Stream['source']
-      }
-    }.call(this)
+      yield* this.channel[Symbol.asyncIterator]() as Stream['source']
+    }
+  }
+
+  private log(..._: any[]) {
+    _log(`WRTC [${this._id}]`, ...arguments)
+  }
+
+  // private verbose(..._: any[]) {
+  //   _verbose(`RX [${this._id}]`, ...arguments)
+  // }
+
+  private error(..._: any[]) {
+    _error(`WRTC [${this._id}]`, ...arguments)
   }
 
   get destroyed(): boolean {
     return this._destroyed
+  }
+
+  private endWebRTCUpgrade(err?: any) {
+    if (this._webRTCTimeout != undefined) {
+      clearTimeout(this._webRTCTimeout)
+    }
+
+    this.error(`ending WebRTC upgrade due error: ${err}`)
+    this._webRTCStateKnown = true
+    this._webRTCAvailable = false
+    this._switchPromise.resolve()
+    setImmediate(() => {
+      this.channel.destroy()
+    })
+  }
+
+  private async _sink(_source: Stream['source']): Promise<void> {
+    type SinkType = StreamResult | void
+    let source =
+      this._signal != undefined
+        ? (abortable(toU8aStream(_source), this._signal) as Stream['source'])
+        : toU8aStream(_source)
+
+    let sourcePromise = source.next()
+
+    let defer = Defer<void>()
+
+    let streamSwitched = false
+
+    let switchPromise = this._switchPromise.promise.then(() => {
+      streamSwitched = true
+    })
+
+    ;(this.conn as RelayConnection).sink(
+      async function* (this: WebRTCConnection): Stream['source'] {
+        let result: SinkType
+
+        while (!(this._webRTCAvailable || this._webRTCStateKnown)) {
+          // 1. Handle stream handover
+          // 2. Handle stream messages
+          result = await Promise.race([
+            // prettier-ignore
+            switchPromise,
+            sourcePromise
+          ])
+
+          if (streamSwitched) {
+            streamSwitched = false
+            break
+          }
+
+          const received = result as StreamResult
+
+          if (received == undefined || received.done) {
+            yield DONE
+            break
+          }
+
+          yield Uint8Array.from([...NOT_DONE, ...received.value.slice()])
+
+          sourcePromise = source.next()
+        }
+
+        if (this._webRTCStateKnown && !this._webRTCAvailable) {
+          this.log(
+            `WebRTC connection upgrade failed. Continue using relayed connection with peer ${this._counterparty.toB58String()}.`
+          )
+
+          result = await sourcePromise
+
+          if (result == undefined || result.done) {
+            return
+          }
+
+          // @TODO check for strings and DONE / NOT_DONE prefix
+          yield result.value.slice()
+
+          yield* source
+        }
+
+        defer.resolve()
+      }.call(this)
+    )
+
+    console.log(`before defer.promise`)
+
+    await defer.promise
+
+    this.log(`webrtc sinkMigrated but this._sourceMigrated`, this._sourceMigrated)
+
+    this._sinkMigrated = true
+    if (this._sourceMigrated) {
+      this.conn = this.channel
+    }
+
+    this.log(`sourcePromise`, sourcePromise)
+
+    if (this._webRTCAvailable) {
+      toIterable.sink(this.channel)(
+        async function* (this: WebRTCConnection): Stream['source'] {
+          let result: SinkType
+
+          result = await sourcePromise
+
+          if (result == undefined || result.done) {
+            return
+          }
+
+          if (this._destroyed || this.channel.destroyed) {
+            return
+          }
+
+          this.log(`yielding into webrtc ${this._id}`, new TextDecoder().decode(result.value.slice()))
+          yield result.value.slice()
+
+          for await (const msg of source) {
+            if (this._destroyed || this.channel.destroyed) {
+              break
+            }
+
+            this.log(`yielding into webrtc ${this._id}`, new TextDecoder().decode(msg.slice()))
+            yield msg.slice()
+          }
+        }.call(this)
+      )
+    }
   }
 
   async close(_err?: Error): Promise<void> {
@@ -233,19 +282,16 @@ class WebRTCConnection implements MultiaddrConnection {
       return Promise.resolve()
     }
 
-    this.timeline.closed = Date.now()
+    this.timeline.close = Date.now()
 
     try {
-      this.channel.destroy()
+      if (this._sinkMigrated || this._sourceMigrated) {
+        ;(this.channel as SimplePeer).destroy()
+      } else {
+        await (this.conn as RelayConnection).close()
+      }
     } catch (err) {
-      err(`WebRTC error while destroying connection to peer ${this.remoteAddr.getPeerId()}. Error: ${err}`)
-    }
-
-    try {
-      this.conn.close()
-    } catch (err) {
-      err(`Error while trying to close relayed connection. Increase log level to display error.`)
-      verbose(err)
+      this.error(err)
     }
 
     this._destroyed = true

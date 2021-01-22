@@ -1,9 +1,12 @@
+/// <reference path="./bl.ts" />
+
 declare module 'libp2p' {
   type PeerId = import('peer-id')
   type Multiaddr = import('multiaddr')
   type EventEmitter = import('events').EventEmitter
   type AbortSignal = import('abort-controller').AbortSignal
   type Connection = import('libp2p-interfaces').Connection
+  type BL = import('bl').BLInterface
 
   export type PeerRoute = {
     id: PeerId
@@ -38,12 +41,15 @@ declare module 'libp2p' {
   }
   export interface DialOptions {
     signal?: AbortSignal
-    relay?: PeerId
   }
+
+  export type StreamType = BL | Uint8Array
+
+  export type StreamResult = IteratorResult<StreamType, void>
 
   export type Stream = {
     sink: (source: Stream['source']) => Promise<void>
-    source: AsyncGenerator<Uint8Array, void>
+    source: AsyncGenerator<StreamType, void>
   }
 
   export type Handler = {
@@ -71,6 +77,7 @@ declare module 'libp2p' {
   export interface Upgrader {
     upgradeOutbound(multiaddrConnection: MultiaddrConnection): Promise<Connection>
     upgradeInbound(multiaddrConnection: MultiaddrConnection): Promise<Connection>
+    protocols: Map<string, Handler>
   }
 
   export interface Registrar {
@@ -118,7 +125,7 @@ declare module 'libp2p' {
 
   export default class LibP2P {
     constructor(options: any) //: LibP2P
-    static create(options: any): any
+    static create(options: any): Promise<LibP2P>
     // @TODO add libp2p types
     emit: (event: string, ...args: any[]) => void
     dial: (addr: Multiaddr | PeerId, options?: { signal: AbortSignal }) => Promise<Handler>
@@ -127,8 +134,8 @@ declare module 'libp2p' {
     hangUp: (addr: PeerId | Multiaddr | string) => Promise<void>
     peerStore: PeerStore
     peerRouting: PeerRouting
-    handle: (protocol: string | string[], handler: (struct: { connection: any; stream: any }) => void) => void
-    start(): Promise<any>
+    handle: (protocol: string | string[], handler: (struct: Handler) => void) => void
+    start(): Promise<void>
     stop(): Promise<void>
 
     multiaddrs: Multiaddr[]

@@ -16,7 +16,8 @@
 
 # hopr-connect
 
-<!--
+**Disclaimer**: support for libp2p test suite WIP, see [KNOWN ISSUES](#known-issues)
+
 [![](https://github.com/libp2p/js-libp2p-interfaces/raw/master/src/transport/img/badge.png)](https://github.com/libp2p/js-libp2p-interfaces/tree/master/src/transport)
 [![](https://github.com/libp2p/js-libp2p-interfaces/raw/master/src/connection/img/badge.png)](https://github.com/libp2p/js-libp2p-interfaces/tree/master/src/connection)
 [![](https://github.com/libp2p/js-libp2p-interfaces/raw/master/src/peer-discovery/img/badge.png)](https://github.com/libp2p/js-libp2p-interfaces/tree/master/src/peer-discovery)
@@ -29,7 +30,7 @@ A [transport module](https://github.com/libp2p/js-libp2p-interfaces/tree/master/
 
 ## Main features
 
-- fully compatible with js-libp2p
+- fully compatible with js-libp2p, see [KNOWN ISSUES](#known-issues)
 - automatic usage of WebRTC:
   - try direct TCP connection, if not succesful
   - use any other available peer in the network as signalling server
@@ -95,11 +96,16 @@ const node = await libp2p.create({
 })
 ```
 
+## Known issues
+
+- IPv6 support disabled for the moment
+- [WIP] libp2p test suite
+
 ## Contributors [in alphabetical order]
 
-- [Jose Perez Aguinaga](https://github.com/jjperezaguinaga)
+- [José Perez Aguinaga](https://github.com/jjperezaguinaga)
 - [Peter Braden](https://github.com/peterbraden)
 - [Sebastian Bürgel](https://github.com/scbuergel)
 - [Robert Kiel](https://github.com/robertkiel)
 
-and the rest of the HOPR team!
+and the rest of the [HOPR](https://hoprnet.org) team!

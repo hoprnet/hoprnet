@@ -1,11 +1,15 @@
 declare module 'bl' {
-  interface BL extends Uint8Array {}
+  interface BLInterface {
+    slice(): Uint8Array
+  }
 
+  type BLArg = BLInterface | Uint8Array | Buffer
   interface BLConstructor {
-    new (arg: BL | Uint8Array | (BL | Uint8Array)[]): BL
+    new (arg: BLArg | BLArg[]): BLInterface
   }
 
   var BL: BLConstructor
 
+  export type { BLInterface }
   export default BL
 }

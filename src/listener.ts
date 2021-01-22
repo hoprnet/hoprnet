@@ -20,7 +20,7 @@ import { TCPConnection } from './tcp'
 
 const log = debug('hopr-connect:listener')
 const error = debug('hopr-connect:listener:error')
-const verbose = debug('hopr-connect:verbose:listener:error')
+const verbose = debug('hopr-connect:verbose:listener')
 
 const SOCKET_CLOSE_TIMEOUT = 400
 
@@ -147,8 +147,7 @@ class Listener extends EventEmitter implements InterfaceListener {
 
       if (!isAnyAddress(ma) && index < 0) {
         throw Error(
-          `Could not bind to interface ${this._interface} on address ${
-            options.host
+          `Could not bind to interface ${this._interface} on address ${options.host
           } because it was configured with a different addresses: ${osInterface
             .map((iface) => iface.address)
             .join(`, `)}`
@@ -170,12 +169,10 @@ class Listener extends EventEmitter implements InterfaceListener {
       new Promise<number>((resolve, reject) => {
         try {
           this.tcpSocket.listen(
-            port != undefined
-              ? {
-                  ...options,
-                  port
-                }
-              : options,
+            {
+              host: options.host,
+              port: port ?? options.port
+            },
             (err?: Error) => {
               if (err) {
                 return reject(err)
@@ -195,16 +192,21 @@ class Listener extends EventEmitter implements InterfaceListener {
       new Promise<number>((resolve, reject) => {
         this.udpSocket.once('error', reject)
         try {
-          this.udpSocket.bind(port ?? options.port, async () => {
-            this.udpSocket.removeListener('error', reject)
-            try {
-              this.externalAddress = await getExternalIp(this.stunServers, this.udpSocket)
-            } catch (err) {
-              error(`Unable to fetch external address using STUN. Error was: ${err}`)
-            }
+          this.udpSocket.bind(
+            {
+              port: port ?? options.port
+            },
+            async () => {
+              this.udpSocket.removeListener('error', reject)
+              try {
+                this.externalAddress = await getExternalIp(this.stunServers, this.udpSocket)
+              } catch (err) {
+                error(`Unable to fetch external address using STUN. Error was: ${err}`)
+              }
 
-            resolve(this.udpSocket.address().port)
-          })
+              resolve(this.udpSocket.address().port)
+            }
+          )
         } catch (err) {
           error(`Could bind UDP socket. Error was: ${err.message}`)
           reject()
@@ -228,10 +230,10 @@ class Listener extends EventEmitter implements InterfaceListener {
       }),
       this.tcpSocket.listening
         ? new Promise((resolve) => {
-            this.__connections.forEach(attemptClose)
-            this.tcpSocket.once('close', resolve)
-            this.tcpSocket.close()
-          })
+          this.__connections.forEach(attemptClose)
+          this.tcpSocket.once('close', resolve)
+          this.tcpSocket.close()
+        })
         : Promise.resolve()
     ])
 

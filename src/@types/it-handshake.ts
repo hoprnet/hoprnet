@@ -14,5 +14,5 @@ declare module 'it-handshake' {
     write(msg: T): void
     read(): Promise<T>
   }
-  export default function<T> (stream: Stream): Handshake<T>
+  export default function <T>(stream: Stream): Handshake<T>
 }

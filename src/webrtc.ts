@@ -1,9 +1,9 @@
 import SimplePeer from 'simple-peer'
 import debug from 'debug'
 
-// @ts-ignore
-import wrtc = require('wrtc')
 import type Multiaddr from 'multiaddr'
+
+const wrtc = require('wrtc')
 
 const error = debug('hopr-connect:error')
 const verbose = debug('hopr-connect:verbose:webrtc')
@@ -14,9 +14,9 @@ class WebRTCUpgrader {
       urls: string
     }[]
   }
-  constructor({ stunServers }: { stunServers?: Multiaddr[] }) {
+  constructor(opts: { stunServers?: Multiaddr[] }) {
     this._stunServers = {
-      iceServers: stunServers?.map((ma: Multiaddr) => {
+      iceServers: opts.stunServers?.map((ma: Multiaddr) => {
         const options = ma.toOptions()
 
         return { urls: `stun:${options.host}:${options.port}` }
