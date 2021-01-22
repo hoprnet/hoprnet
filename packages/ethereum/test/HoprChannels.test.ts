@@ -23,7 +23,7 @@ const formatChannel = (res: AsyncReturnType<HoprChannelsInstance['channels']>) =
   closureByPartyA: res[4]
 })
 
-describe('HoprChannels', function () {
+describe.only('HoprChannels', function () {
   const partyAPrivKey = NODE_SEEDS[1]
   const partyBPrivKey = NODE_SEEDS[0]
   const depositAmount = web3.utils.toWei('1', 'ether')
@@ -883,7 +883,7 @@ describe('HoprChannels', function () {
         winProbPercent: '100'
       })
 
-      await hoprChannels.redeemTicket(
+      const receipt = await hoprChannels.redeemTicket(
         preImageB,
         ticket.porSecret,
         ticket.amount,
@@ -892,6 +892,28 @@ describe('HoprChannels', function () {
         u8aToHex(ticket.r),
         u8aToHex(ticket.s),
         ticket.v + 27
+      )
+
+      const compressedPubKeyA = secp256k1.publicKeyCreate(stringToU8a(partyBPrivKey), true)
+      const compressedPubKeyB = secp256k1.publicKeyCreate(stringToU8a(partyAPrivKey), true)
+
+      expect(
+        checkEvent(receipt.receipt, 'RedeemedTicket(uint,uint,uint)', compressedPubKeyA, compressedPubKeyB)
+      ).to.be.equal(true, 'wrong event')
+
+      const logEntry = receipt.receipt.rawLogs.find((rawLog) => {
+        return (
+          rawLog.topics[1] === u8aToHex(compressedPubKeyB.slice(1)) &&
+          rawLog.topics[2] === u8aToHex(compressedPubKeyA.slice(1))
+        )
+      })
+
+      expect(logEntry).to.exist
+      expect(logEntry.topics[1]).to.be.equal(u8aToHex(compressedPubKeyB.slice(1)), 'wrong first public key')
+      expect(logEntry.topics[2]).to.be.equal(u8aToHex(compressedPubKeyA.slice(1)), 'wrong second public key')
+      expect(web3.eth.abi.decodeParameter('uint256', logEntry.data)).to.be.equal(
+        ticket.amount,
+        'wrong ticket amount'
       )
 
       await expectRevert(
