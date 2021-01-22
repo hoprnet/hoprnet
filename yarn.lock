@@ -423,6 +423,18 @@
     webrtc-stun "~3.0.0"
     wrtc "0.4.6"
 
+"@hoprnet/hopr-utils@^1.57.6":
+  version "1.62.14"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-1.62.14.tgz#bf9be83fab5469924ac3652fa718f04283df659e"
+  integrity sha512-ySNAdsNs5L0KniGjIdq6g6Dzcg7uMVt51NeOwLaKPNjbWY+OhjvOe/H5HkXB8k5C2mM/esyLPgxhziv5X61qHg==
+  dependencies:
+    bignumber.js "^9.0.0"
+    libp2p-crypto "0.18.0"
+    multiaddr "8.1.2"
+    multihashes "~3.1.0"
+    peer-id "0.14.2"
+    strip-ansi "^6.0.0"
+
 "@lerna/add@3.21.0":
   version "3.21.0"
   resolved "https://registry.yarnpkg.com/@lerna/add/-/add-3.21.0.tgz#27007bde71cc7b0a2969ab3c2f0ae41578b4577b"
@@ -8565,10 +8577,10 @@ libp2p-interfaces@^0.5.1:
     streaming-iterables "^5.0.2"
     uint8arrays "^1.1.0"
 
-libp2p-kad-dht@0.20.4:
-  version "0.20.4"
-  resolved "https://registry.yarnpkg.com/libp2p-kad-dht/-/libp2p-kad-dht-0.20.4.tgz#2a1f61e86a10942ef16a7553a91ff96e598c55a0"
-  integrity sha512-7v4+3bdcoGUyR/8Y5G/Ok9UyhuqghpXFZq5VpW3oph5WtR348snTaBTPkI/8xkQmBxvLIAMxuomp7cMrQaTUyw==
+libp2p-kad-dht@0.20.5:
+  version "0.20.5"
+  resolved "https://registry.yarnpkg.com/libp2p-kad-dht/-/libp2p-kad-dht-0.20.5.tgz#452c305400375d48fbb0ef990ac8351b6dd7fc82"
+  integrity sha512-qyTKvlaQThmCsVi8fSodRoh/FsAUzACPM6SPcRuCGRZX0RePY9JNd5LvPvuC03j2g1IKPLl0W4JkUNXW8ejhbA==
   dependencies:
     abort-controller "^3.0.0"
     async "^2.6.2"
