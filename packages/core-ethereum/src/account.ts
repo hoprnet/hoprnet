@@ -40,7 +40,7 @@ class Account {
     }
   }
 
-  constructor(public coreConnector: HoprEthereum, privKey: Uint8Array, pubKey: Uint8Array) {
+  constructor(public coreConnector: HoprEthereum, privKey: Uint8Array, pubKey: Uint8Array, private chainId: number) {
     this.keys = {
       onChain: {
         privKey,
@@ -245,6 +245,7 @@ class Account {
       gas,
       gasPrice,
       ...txConfig,
+      chainId: this.chainId,
       nonce: nonceLock.nextNonce,
       data: abi
     }

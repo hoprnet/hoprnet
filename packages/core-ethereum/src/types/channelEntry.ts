@@ -3,6 +3,7 @@ import { UINT256 } from '../types/solidity'
 import { BNE, Uint8ArrayE } from '../types/extended'
 
 // @TODO: we should optimize this since it will use more storage than needed
+// @TODO: redesign how we build classes like this
 class ChannelEntry extends Uint8ArrayE {
   constructor(
     arr?: {
@@ -13,6 +14,11 @@ class ChannelEntry extends Uint8ArrayE {
       blockNumber: BN
       transactionIndex: BN
       logIndex: BN
+      deposit: BN
+      partyABalance: BN
+      closureTime: BN
+      stateCounter: BN
+      closureByPartyA: BN
     }
   ) {
     if (!arr) {
@@ -22,15 +28,14 @@ class ChannelEntry extends Uint8ArrayE {
     }
 
     if (struct) {
-      // we convert values to string because of this issue
-      // https://github.com/indutny/bn.js/issues/206
-      const blockNumber = new BNE(struct.blockNumber.toString())
-      const transactionIndex = new BNE(struct.transactionIndex.toString())
-      const logIndex = new BNE(struct.logIndex.toString())
-
-      this.set(blockNumber.toU8a(UINT256.SIZE), this.blockNumberOffset - this.byteOffset)
-      this.set(transactionIndex.toU8a(UINT256.SIZE), this.transactionIndexOffset - this.byteOffset)
-      this.set(logIndex.toU8a(UINT256.SIZE), this.logIndexOffset - this.byteOffset)
+      this.set(new BNE(struct.blockNumber).toU8a(UINT256.SIZE), this.byteOffset * 1 - this.byteOffset)
+      this.set(new BNE(struct.transactionIndex).toU8a(UINT256.SIZE), this.byteOffset * 2 - this.byteOffset)
+      this.set(new BNE(struct.logIndex).toU8a(UINT256.SIZE), this.byteOffset * 3 - this.byteOffset)
+      this.set(new BNE(struct.deposit).toU8a(UINT256.SIZE), this.byteOffset * 4 - this.byteOffset)
+      this.set(new BNE(struct.partyABalance).toU8a(UINT256.SIZE), this.byteOffset * 5 - this.byteOffset)
+      this.set(new BNE(struct.closureTime).toU8a(UINT256.SIZE), this.byteOffset * 6 - this.byteOffset)
+      this.set(new BNE(struct.stateCounter).toU8a(UINT256.SIZE), this.byteOffset * 7 - this.byteOffset)
+      this.set(new BNE(struct.closureByPartyA).toU8a(UINT256.SIZE), this.byteOffset * 8 - this.byteOffset)
     }
   }
 
@@ -42,32 +47,40 @@ class ChannelEntry extends Uint8ArrayE {
     return new Uint8Array(this.buffer, begin + this.byteOffset, end - begin)
   }
 
-  get blockNumberOffset() {
-    return this.byteOffset
-  }
-
   get blockNumber() {
-    return new BNE(new Uint8Array(this.buffer, this.blockNumberOffset, UINT256.SIZE))
-  }
-
-  get transactionIndexOffset() {
-    return this.byteOffset + UINT256.SIZE
+    return new BNE(new Uint8Array(this.buffer, this.byteOffset * 1, UINT256.SIZE))
   }
 
   get transactionIndex() {
-    return new BNE(new Uint8Array(this.buffer, this.transactionIndexOffset, UINT256.SIZE))
-  }
-
-  get logIndexOffset() {
-    return this.byteOffset + UINT256.SIZE + UINT256.SIZE
+    return new BNE(new Uint8Array(this.buffer, this.byteOffset * 2, UINT256.SIZE))
   }
 
   get logIndex() {
-    return new BNE(new Uint8Array(this.buffer, this.logIndexOffset, UINT256.SIZE))
+    return new BNE(new Uint8Array(this.buffer, this.byteOffset * 3, UINT256.SIZE))
+  }
+
+  get deposit() {
+    return new BNE(new Uint8Array(this.buffer, this.byteOffset * 4, UINT256.SIZE))
+  }
+
+  get partyABalance() {
+    return new BNE(new Uint8Array(this.buffer, this.byteOffset * 5, UINT256.SIZE))
+  }
+
+  get closureTime() {
+    return new BNE(new Uint8Array(this.buffer, this.byteOffset * 6, UINT256.SIZE))
+  }
+
+  get stateCounter() {
+    return new BNE(new Uint8Array(this.buffer, this.byteOffset * 7, UINT256.SIZE))
+  }
+
+  get closureByPartyA() {
+    return new BNE(new Uint8Array(this.buffer, this.byteOffset * 8, UINT256.SIZE))
   }
 
   static get SIZE(): number {
-    return UINT256.SIZE * 3
+    return UINT256.SIZE * 8
   }
 }
 
