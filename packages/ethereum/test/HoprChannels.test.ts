@@ -23,7 +23,7 @@ const formatChannel = (res: AsyncReturnType<HoprChannelsInstance['channels']>) =
   closureByPartyA: res[4]
 })
 
-describe.only('HoprChannels', function () {
+describe('HoprChannels', function () {
   const partyAPrivKey = NODE_SEEDS[1]
   const partyBPrivKey = NODE_SEEDS[0]
   const depositAmount = web3.utils.toWei('1', 'ether')
