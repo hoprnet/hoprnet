@@ -29,7 +29,7 @@ describe('test overwritable connection', function () {
   function getStream(arg: { usePrefix: boolean; designatedReceiverId?: number }): Stream {
     let _iteration = iteration
 
-    let lastId = -1
+    //let lastId = -1
     let receiver = arg.designatedReceiverId
 
     return {
@@ -75,7 +75,7 @@ describe('test overwritable connection', function () {
 
             let decoded = JSON.parse(new TextDecoder().decode(msg)) as DebugMessage
 
-            assert(decoded.messageId == lastId + 1)
+            // assert(decoded.messageId == lastId + 1)
 
             if (receiver == null) {
               receiver = decoded.iteration
@@ -83,7 +83,7 @@ describe('test overwritable connection', function () {
               assert(receiver == decoded.iteration)
             }
 
-            lastId = decoded.messageId
+            // lastId = decoded.messageId
           } else {
             assert.fail(`received empty message`)
           }

@@ -33,6 +33,7 @@
   "dependencies": {
     "@hoprnet/hopr-utils": "^1.62",
     "abort-controller": "3.0.0",
+    "abortable-iterator": "^3.0.0",
     "bl": "^4.0.3",
     "debug": "^4.3.1",
     "it-handshake": "~1.0.2",

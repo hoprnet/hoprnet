@@ -35,6 +35,7 @@ import { RelayConnection } from './relayConnection'
 import { WebRTCConnection } from './webRTCConnection'
 
 import type { Connection, DialOptions, Handler, Stream } from 'libp2p'
+import { AbortError } from 'abortable-iterator'
 
 type Libp2pStream = {
   protocol: string
@@ -69,19 +70,19 @@ class Relay {
   ): Promise<RelayConnection> {
     const destination = PeerId.createFromCID(ma.getPeerId())
 
-    if (options?.signal?.aborted) {
-      throw new Error()
-    }
-
     const invalidPeerIds = [ma.getPeerId(), this._peerId.toB58String()]
 
     for (const potentialRelay of relays) {
+      if (options?.signal?.aborted) {
+        throw new AbortError()
+      }
+
       if (invalidPeerIds.includes(potentialRelay.getPeerId())) {
         log(`Skipping ${potentialRelay.getPeerId()} because we cannot use destination as relay node.`)
         continue
       }
 
-      let relayConnection = await this._tryPotentialRelay(potentialRelay, destination, onReconnect)
+      let relayConnection = await this._tryPotentialRelay(potentialRelay, destination, onReconnect, options)
 
       if (relayConnection != undefined) {
         return relayConnection as RelayConnection

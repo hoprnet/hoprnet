@@ -2,7 +2,7 @@
 /// <reference path="./@types/libp2p.ts" />
 
 import net from 'net'
-import { AbortError } from 'abortable-iterator'
+import abortable, { AbortError } from 'abortable-iterator'
 import type { Socket } from 'net'
 import errCode from 'err-code'
 import Debug from 'debug'
@@ -25,12 +25,14 @@ class TCPConnection implements MultiaddrConnection {
 
   private _stream: Stream
 
+  private _signal?: AbortSignal
+
   public timeline: {
     open: number
     close?: number
   }
 
-  constructor(public remoteAddr: Multiaddr, public conn: Socket) {
+  constructor(public remoteAddr: Multiaddr, public conn: Socket, options?: DialOptions) {
     this.localAddr = Multiaddr.fromNodeAddress(this.conn.address() as any, 'tcp')
 
     // console.log(`localAddr`, this.localAddr, `remoteAddr`, this.remoteAddr)
@@ -46,11 +48,16 @@ class TCPConnection implements MultiaddrConnection {
       this.timeline.close ??= Date.now()
     })
 
+    this._signal = options?.signal
+
     this._stream = toIterable.duplex<StreamType>(this.conn)
 
     this.sink = this._sink.bind(this)
 
-    this.source = this._stream.source
+    this.source =
+      this._signal != undefined
+        ? (abortable(this._stream.source, this._signal) as Stream['source'])
+        : this._stream.source
   }
 
   public async close(): Promise<void> {
@@ -96,7 +103,11 @@ class TCPConnection implements MultiaddrConnection {
 
   private async _sink(source: Stream['source']): Promise<void> {
     try {
-      await this._stream.sink(toU8aStream(source))
+      await this._stream.sink(
+        this._signal != undefined
+          ? (abortable(toU8aStream(source), this._signal) as Stream['source'])
+          : toU8aStream(source)
+      )
     } catch (err) {
       // If aborted we can safely ignore
       if (err.type !== 'aborted') {

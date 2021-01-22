@@ -2,6 +2,7 @@ import mafmt from 'mafmt'
 import debug from 'debug'
 import Listener from './listener'
 import { CODE_P2P, DELIVERY, USE_WEBRTC } from './constants'
+import { AbortError } from 'abortable-iterator'
 import type Multiaddr from 'multiaddr'
 import PeerId from 'peer-id'
 import type libp2p from 'libp2p'
@@ -67,33 +68,35 @@ class HoprConnect implements Transport {
       for (const bs of opts.bootstrapServers) {
         const bsPeerId = bs.getPeerId()
 
-        if (bsPeerId != undefined) {
-          if (opts.libp2p.peerId.equals(PeerId.createFromCID(bsPeerId))) {
-            continue
-          }
+        if (bsPeerId == undefined) {
+          continue
+        }
 
-          const cOpts = bs.toOptions()
+        if (opts.libp2p.peerId.equals(PeerId.createFromCID(bsPeerId))) {
+          continue
+        }
 
-          if (this.relays == undefined) {
-            this.relays = [bs]
-          } else {
-            this.relays.push(bs)
-          }
+        const cOpts = bs.toOptions()
 
-          switch (cOpts.family) {
-            case 'ipv6':
-              // We do not use STUN for IPv6 for the moment
-              break
-            case 'ipv4':
-              if (this.stunServers == undefined) {
-                this.stunServers = [bs]
-              } else {
-                this.stunServers.push(bs)
-              }
-              break
-            default:
-              throw Error(`Invalid address family as STUN server. Got ${cOpts.family}`)
-          }
+        if (this.relays == undefined) {
+          this.relays = [bs]
+        } else {
+          this.relays.push(bs)
+        }
+
+        switch (cOpts.family) {
+          case 'ipv6':
+            // We do not use STUN for IPv6 for the moment
+            break
+          case 'ipv4':
+            if (this.stunServers == undefined) {
+              this.stunServers = [bs]
+            } else {
+              this.stunServers.push(bs)
+            }
+            break
+          default:
+            throw Error(`Invalid address family as STUN server. Got ${cOpts.family}`)
         }
       }
     }
@@ -136,6 +139,9 @@ class HoprConnect implements Transport {
    * @returns An upgraded Connection
    */
   async dial(ma: Multiaddr, options: DialOptions = {}): Promise<Connection> {
+    if (options.signal?.aborted) {
+      throw new AbortError()
+    }
     // @TODO check if we should allow loopbacks
     // if (ma.getPeerId() === this._peerId.toB58String()) {
     //   throw Error(`Cannot dial ourself`)
