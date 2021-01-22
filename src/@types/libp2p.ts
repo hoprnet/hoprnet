@@ -1,9 +1,12 @@
+/// <reference path="./bl.ts" />
+
 declare module 'libp2p' {
   type PeerId = import('peer-id')
   type Multiaddr = import('multiaddr')
   type EventEmitter = import('events').EventEmitter
   type AbortSignal = import('abort-controller').AbortSignal
   type Connection = import('libp2p-interfaces').Connection
+  type BL = import('bl').BLInterface
 
   export type PeerRoute = {
     id: PeerId
@@ -41,9 +44,13 @@ declare module 'libp2p' {
     relay?: PeerId
   }
 
+  export type StreamType = BL | Uint8Array
+
+  export type StreamResult = IteratorResult<StreamType, void>
+
   export type Stream = {
     sink: (source: Stream['source']) => Promise<void>
-    source: AsyncGenerator<Uint8Array, void>
+    source: AsyncGenerator<StreamType, void>
   }
 
   export type Handler = {

@@ -13,7 +13,7 @@ const verbose = Debug('hopr-connect:verbose:tcp')
 
 const SOCKET_CLOSE_TIMEOUT = 2000
 
-import type { MultiaddrConnection, Stream, DialOptions } from 'libp2p'
+import type { MultiaddrConnection, Stream, DialOptions, StreamType } from 'libp2p'
 import Multiaddr from 'multiaddr'
 import toIterable from 'stream-to-it'
 import { toU8aStream } from './utils'
@@ -46,7 +46,7 @@ class TCPConnection implements MultiaddrConnection {
       this.timeline.close ??= Date.now()
     })
 
-    this._stream = toIterable.duplex<Uint8Array>(this.conn)
+    this._stream = toIterable.duplex<StreamType>(this.conn)
 
     this.sink = this._sink.bind(this)
 

@@ -1,8 +1,9 @@
 /// <reference path="./@types/libp2p.ts" />
+/// <reference path="./@types/bl.ts" />
 
-import type { Stream } from 'libp2p'
+import type { Stream, StreamType } from 'libp2p'
 
-type MyStream = AsyncGenerator<Uint8Array | Buffer | string, void>
+type MyStream = AsyncGenerator<StreamType | Buffer | string, void>
 
 export function toU8aStream(source: MyStream): Stream['source'] {
   return (async function* () {

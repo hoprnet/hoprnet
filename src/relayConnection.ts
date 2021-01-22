@@ -2,12 +2,12 @@
 /// <reference path="./@types/libp2p.ts" />
 
 import Multiaddr from 'multiaddr'
-import BL from 'bl'
-import type { MultiaddrConnection, Stream } from 'libp2p'
+import type { MultiaddrConnection, Stream, StreamResult } from 'libp2p'
 import { randomBytes } from 'crypto'
 import Defer, { DeferredPromise } from 'p-defer'
 import { RELAY_PAYLOAD_PREFIX, RELAY_STATUS_PREFIX, RELAY_WEBRTC_PREFIX, RESTART, STOP, PING, PONG } from './constants'
 import { u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
+import BL from 'bl'
 
 import type { Instance as SimplePeer } from 'simple-peer'
 
@@ -32,7 +32,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
   private _sinkTriggered: boolean
 
   private _msgPromise: DeferredPromise<void>
-  private _msgs: (IteratorResult<Uint8Array, void> & { iteration: number })[]
+  private _msgs: (StreamResult & { iteration: number })[]
 
   private _destroyedPromise: DeferredPromise<void>
 
@@ -146,7 +146,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
   }
 
   private async _drainSource() {
-    type SourceType = IteratorResult<Uint8Array, void> | void
+    type SourceType = StreamResult | void
 
     let result: SourceType
     let streamClosed = false
@@ -182,7 +182,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
         break
       }
 
-      const received = result as IteratorResult<Uint8Array, void>
+      const received = result as StreamResult
 
       if (received == undefined || received.done) {
         this._msgs.push({ done: true, value: undefined, iteration: this._iteration })
@@ -263,7 +263,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
         while (current != undefined && current.iteration < i) {
           this.log(
             `dropping message <${new TextDecoder().decode(
-              current.value || new Uint8Array()
+              (current.value || new Uint8Array()).slice()
             )}> from peer ${this.remoteAddr.getPeerId()}`
           )
 
@@ -330,10 +330,10 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
   }
 
   private async *sinkFunction(this: RelayConnection): Stream['source'] {
-    type SinkType = Stream['source'] | IteratorResult<Uint8Array, void> | undefined | void
+    type SinkType = Stream['source'] | StreamResult | undefined | void
     this.log(`sinkFunction`)
     let currentSource: Stream['source'] | undefined
-    let streamPromise: Promise<IteratorResult<Uint8Array, void>> | undefined
+    let streamPromise: Promise<StreamResult> | undefined
 
     let statusMessageAvailable = this._statusMessages.length > 0
 
@@ -374,7 +374,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
       statusPromise = statusPromise ?? this._statusMessagePromise.promise.then(statusSourceFunction)
       promises.push(statusPromise)
 
-      if ((result == undefined || !(result as IteratorResult<Uint8Array, void>).done) && currentSource != undefined) {
+      if ((result == undefined || !(result as StreamResult).done) && currentSource != undefined) {
         streamPromise = streamPromise ?? currentSource.next()
 
         promises.push(streamPromise)
@@ -413,10 +413,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
         }
 
         // @TODO fix condition
-        if (
-          this._statusMessages.length == 0 ||
-          (result != undefined && (result as IteratorResult<Uint8Array, void>).done != true)
-        ) {
+        if (this._statusMessages.length == 0 || (result != undefined && (result as StreamResult).done != true)) {
           statusMessageAvailable = false
 
           this._statusMessagePromise = Defer<void>()
@@ -437,7 +434,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
         continue
       }
 
-      const received = result as IteratorResult<Uint8Array, void>
+      const received = result as StreamResult
 
       if (received == undefined || received.done) {
         console.log(`##### EMPTY message #####`, received)

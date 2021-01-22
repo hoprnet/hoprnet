@@ -1,4 +1,4 @@
-import { MultiaddrConnection, Stream } from 'libp2p'
+import { MultiaddrConnection, Stream, StreamResult } from 'libp2p'
 import Defer, { DeferredPromise } from 'p-defer'
 
 import type { Instance as SimplePeer } from 'simple-peer'
@@ -155,7 +155,7 @@ class WebRTCConnection implements MultiaddrConnection {
   }
 
   private async _sink(_source: Stream['source']): Promise<void> {
-    type SinkType = IteratorResult<Uint8Array, void> | void
+    type SinkType = StreamResult | void
     let source = toU8aStream(_source)
     let sourcePromise = source.next()
 
@@ -185,7 +185,7 @@ class WebRTCConnection implements MultiaddrConnection {
             break
           }
 
-          const received = result as IteratorResult<Uint8Array, void>
+          const received = result as StreamResult
 
           if (received == undefined || received.done) {
             yield DONE

@@ -1,7 +1,7 @@
 /// <reference path="./@types/it-pair.ts" />
 
 import { RelayConnection } from './relayConnection'
-import type { Stream } from 'libp2p'
+import type { Stream, StreamResult } from 'libp2p'
 import assert from 'assert'
 import { randomInteger, u8aEquals } from '@hoprnet/hopr-utils'
 import pipe from 'it-pipe'
@@ -229,7 +229,7 @@ describe('test relay connection', function () {
     let aDone = false
     let bDone = false
 
-    function aFunction(arg: IteratorResult<Uint8Array, void>) {
+    function aFunction(arg: StreamResult) {
       msgAReceived = true
       if (arg.done) {
         aDone = true
@@ -237,7 +237,7 @@ describe('test relay connection', function () {
       return arg
     }
 
-    function bFunction(arg: IteratorResult<Uint8Array, void>) {
+    function bFunction(arg: StreamResult) {
       msgBReceived = true
       if (arg.done) {
         bDone = true
@@ -281,7 +281,7 @@ describe('test relay connection', function () {
         if (aDone && bDone) {
           break
         } else {
-          console.log(new TextDecoder().decode((await msgB).value || new Uint8Array()))
+          console.log(new TextDecoder().decode(((await msgB).value || new Uint8Array()).slice()))
         }
         msgB = b.source.next().then(bFunction)
       }

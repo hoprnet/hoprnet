@@ -3,7 +3,7 @@ import { randomBytes } from 'crypto'
 
 import Defer, { DeferredPromise } from 'p-defer'
 
-import type { Stream } from 'libp2p'
+import type { Stream, StreamResult } from 'libp2p'
 
 import Debug from 'debug'
 const _log = Debug(`hopr-connect`)
@@ -37,7 +37,7 @@ class RelayContext {
   private _pingResponsePromise?: DeferredPromise<void>
   private _stream: Stream
 
-  private _sourcePromise: Promise<IteratorResult<Uint8Array, void>> | undefined
+  private _sourcePromise: Promise<StreamResult> | undefined
   private _sourceSwitched: boolean
   private _sinkSwitched: boolean
 
@@ -147,7 +147,7 @@ class RelayContext {
   private _createSource(): Stream['source'] {
     const iterator: Stream['source'] = async function* (this: RelayContext) {
       this.log(`source called`)
-      let result: Stream['source'] | IteratorResult<Uint8Array, void> | undefined
+      let result: Stream['source'] | StreamResult | undefined
 
       const next = () => {
         result = undefined
@@ -156,11 +156,9 @@ class RelayContext {
       }
 
       while (true) {
-        const promises: Promise<Stream['source'] | IteratorResult<Uint8Array, void>>[] = [
-          this._streamSourceSwitchPromise.promise
-        ]
+        const promises: Promise<Stream['source'] | StreamResult>[] = [this._streamSourceSwitchPromise.promise]
 
-        if (result == undefined || (result as IteratorResult<Uint8Array, void>).done != true) {
+        if (result == undefined || (result as StreamResult).done != true) {
           this._sourcePromise = this._sourcePromise ?? this._stream.source.next()
 
           promises.push(this._sourcePromise)
@@ -279,7 +277,7 @@ class RelayContext {
     this.log(`createSink called`)
     let currentSink = this._stream.sink
 
-    let sourcePromise: Promise<IteratorResult<Uint8Array, void>> | undefined
+    let sourcePromise: Promise<StreamResult> | undefined
 
     let currentSource: Stream['source'] | undefined
 
@@ -294,7 +292,7 @@ class RelayContext {
     let switchPromise = Defer<void>()
 
     async function* drain(this: RelayContext): Stream['source'] {
-      type SinkResult = Stream['sink'] | Stream['source'] | IteratorResult<Uint8Array, void> | void
+      type SinkResult = Stream['sink'] | Stream['source'] | StreamResult | void
 
       let result: SinkResult
 
@@ -307,10 +305,7 @@ class RelayContext {
 
         promises.push(this._streamSinkSwitchPromise.promise, statusPromise)
 
-        if (
-          currentSource != undefined &&
-          (result == undefined || (result as IteratorResult<Uint8Array, void>).done != true)
-        ) {
+        if (currentSource != undefined && (result == undefined || (result as StreamResult).done != true)) {
           sourcePromise = sourcePromise ?? currentSource.next()
 
           promises.push(sourcePromise)
@@ -335,10 +330,7 @@ class RelayContext {
             yield this._statusMessages.shift() as Uint8Array
           }
 
-          if (
-            this._statusMessages.length == 0 ||
-            (result != undefined && (result as IteratorResult<Uint8Array, void>).done != true)
-          ) {
+          if (this._statusMessages.length == 0 || (result != undefined && (result as StreamResult).done != true)) {
             statusMessageAvailable = false
 
             this._statusMessagePromise = Defer<void>()
@@ -362,7 +354,7 @@ class RelayContext {
           break
         }
 
-        let received = result as IteratorResult<Uint8Array>
+        let received = result as StreamResult
 
         if (received.done) {
           continue
