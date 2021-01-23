@@ -121,6 +121,12 @@ class HoprConnect implements Transport {
     // Used for testing
     this.__noDirectConnections = opts.__noDirectConnections
 
+    try {
+      const { version } = require('../package.json')
+
+      log(`HoprConnect:`, version)
+    } catch {}
+
     if (this.__noDirectConnections) {
       verbose(`DEBUG mode: always using relayed / WebRTC connections.`)
     }
@@ -255,9 +261,9 @@ class HoprConnect implements Transport {
             channel: newStream.webRTC!.channel
           })
         )
+      } else {
+        newConn = await this._upgrader.upgradeInbound(newStream)
       }
-
-      newConn = await this._upgrader.upgradeInbound(newStream)
     } catch (err) {
       error(err)
       return
