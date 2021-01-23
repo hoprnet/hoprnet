@@ -1,10 +1,12 @@
+import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import BN from 'bn.js'
 import { UINT256 } from '../types/solidity'
 import { BNE, Uint8ArrayE } from '../types/extended'
+import { ChannelStatus } from '../types/channel'
 
 // @TODO: we should optimize this since it will use more storage than needed
 // @TODO: redesign how we build classes like this
-class ChannelEntry extends Uint8ArrayE {
+class ChannelEntry extends Uint8ArrayE implements Types.ChannelEntry {
   constructor(
     arr?: {
       bytes: ArrayBuffer
@@ -18,7 +20,7 @@ class ChannelEntry extends Uint8ArrayE {
       partyABalance: BN
       closureTime: BN
       stateCounter: BN
-      closureByPartyA: BN
+      closureByPartyA: boolean
     }
   ) {
     if (!arr) {
@@ -35,7 +37,7 @@ class ChannelEntry extends Uint8ArrayE {
       this.set(new BNE(struct.partyABalance).toU8a(UINT256.SIZE), this.byteOffset * 5 - this.byteOffset)
       this.set(new BNE(struct.closureTime).toU8a(UINT256.SIZE), this.byteOffset * 6 - this.byteOffset)
       this.set(new BNE(struct.stateCounter).toU8a(UINT256.SIZE), this.byteOffset * 7 - this.byteOffset)
-      this.set(new BNE(struct.closureByPartyA).toU8a(UINT256.SIZE), this.byteOffset * 8 - this.byteOffset)
+      this.set([Number(struct.closureByPartyA)], this.byteOffset * 8 - this.byteOffset)
     }
   }
 
@@ -76,11 +78,25 @@ class ChannelEntry extends Uint8ArrayE {
   }
 
   get closureByPartyA() {
-    return new BNE(new Uint8Array(this.buffer, this.byteOffset * 8, UINT256.SIZE))
+    return Boolean(new Uint8Array(this.buffer, this.byteOffset * 7 + 1, 1)[0])
+  }
+
+  get status() {
+    const stateCounter = this.stateCounter
+    const status = stateCounter.modn(10)
+
+    if (status >= Object.keys(ChannelStatus).length) {
+      throw Error("status like this doesn't exist")
+    }
+
+    if (status === ChannelStatus.UNINITIALISED) return 'UNINITIALISED'
+    else if (status === ChannelStatus.FUNDING) return 'FUNDING'
+    else if (status === ChannelStatus.OPEN) return 'OPEN'
+    return 'PENDING'
   }
 
   static get SIZE(): number {
-    return UINT256.SIZE * 8
+    return UINT256.SIZE * 7 + 1
   }
 }
 

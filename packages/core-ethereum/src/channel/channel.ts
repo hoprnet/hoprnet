@@ -1,7 +1,16 @@
 import type { Channel as IChannel } from '@hoprnet/hopr-core-connector-interface'
 import BN from 'bn.js'
 import { u8aToHex, toU8a } from '@hoprnet/hopr-utils'
-import { Balance, Channel as ChannelType, Hash, Moment, Public, SignedChannel, TicketEpoch } from '../types'
+import {
+  Balance,
+  Channel as ChannelType,
+  Hash,
+  Moment,
+  Public,
+  SignedChannel,
+  TicketEpoch,
+  ChannelEntry
+} from '../types'
 import TicketFactory from './ticket'
 import { ChannelStatus } from '../types/channel'
 import { hash } from '../utils'
@@ -37,17 +46,12 @@ class Channel implements IChannel {
     this.ticket = new TicketFactory(this)
   }
 
-  private get onChainChannel(): Promise<{
-    deposit: string
-    partyABalance: string
-    closureTime: string
-    stateCounter: string
-    closureByPartyA: boolean
-  }> {
+  private get onChainChannel(): Promise<ChannelEntry> {
     return new Promise(async (resolve, reject) => {
       try {
-        const channelId = await this.channelId
-        return resolve(this.coreConnector.channel.getOnChainState(channelId))
+        return resolve(
+          this.coreConnector.channel.getOnChainState(new Public(this.coreConnector.account.keys.onChain.pubKey))
+        )
       } catch (error) {
         return reject(error)
       }

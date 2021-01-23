@@ -1,18 +1,19 @@
 import type { Log } from 'web3-core'
 import type { Event, EventData } from './types'
-import { AbiCoder } from 'web3-eth-abi'
+import _abiCoder, { AbiCoder } from 'web3-eth-abi'
 import BN from 'bn.js'
 import { decodePublicKeysFromTopics } from './utils'
 
-const abiCoder = new AbiCoder()
+// HACK: wrong types provided by library ¯\_(ツ)_/¯
+const abiCoder = (_abiCoder as unknown) as AbiCoder
 
 const logToEvent = <N extends keyof EventData>(log: Log, name: N, data: EventData[N]): Event<N> => {
   return {
     name,
-    blockNumber: log.blockNumber,
+    blockNumber: new BN(log.blockNumber),
     transactionHash: log.transactionHash,
-    transactionIndex: log.transactionIndex,
-    logIndex: log.logIndex,
+    transactionIndex: new BN(log.transactionIndex),
+    logIndex: new BN(log.logIndex),
     data
   }
 }

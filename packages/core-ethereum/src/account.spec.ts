@@ -14,7 +14,7 @@ import { wait } from './utils'
 const HoprTokenAbi = abis.HoprToken
 const HoprChannelsAbi = abis.HoprChannels
 
-describe('test Account class', function () {
+describe.only('test Account class', function () {
   this.timeout(durations.minutes(5))
 
   const ganache = new Ganache()

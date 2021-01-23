@@ -1,11 +1,12 @@
 import type BN from 'bn.js'
-import type { Public } from '../types'
+import type { Public } from '../../types'
 
 /**
- * known events we will subscribe and reduce
- * this data ideally should be taken from
- * the web3 types genereted but at this time
- * we use non-standard events
+ * known event return values that we will subscribe and reduce
+ * data from, ideally this should be taken from
+ * the web3 types genereted but at this time we can't
+ * since we use non-standard events that typechain doesn't
+ * recognise
  */
 export type EventData = {
   FundedChannel: {
@@ -43,8 +44,8 @@ export type EventData = {
 export type Event<N extends keyof EventData> = {
   name: N
   transactionHash: string
-  blockNumber: number
-  transactionIndex: number
-  logIndex: number
+  blockNumber: BN
+  transactionIndex: BN
+  logIndex: BN
   data?: EventData[N]
 }

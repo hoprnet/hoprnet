@@ -1,34 +1,28 @@
-import { Public } from '../types'
-import { u8aToHex, u8aConcat, stringToU8a } from '@hoprnet/hopr-utils'
-import createKeccakHash from 'keccak'
-import type { Log } from 'web3-core'
-import BN from 'bn.js'
+/**
+ * This folder includes the encoders / decoders required to translate
+ * our SC logs to events.
+ */
 
-const rawOpenedChannelTopic = createKeccakHash('keccak256').update('OpenedChannel(uint,uint)').digest()
-const rawClosedChannelTopic = createKeccakHash('keccak256').update('ClosedChannel(uint,uint,uint,uint)').digest()
+import { u8aToHex } from '@hoprnet/hopr-utils'
+import { Public } from '../../types'
+import { getTopic0 } from './utils'
+export * from './logs'
+export * from './utils'
+export * from './types'
 
-export function OpenedChannelTopics(
-  opener?: Public,
-  counterparty?: Public,
-  bidirectional?: boolean
-): (undefined | string | string[])[] {
-  return getTopics(rawOpenedChannelTopic, opener, counterparty, bidirectional)
-}
-
-export function ClosedChannelTopics(
-  closer?: Public,
-  counterparty?: Public,
-  bidirectional?: boolean
-): (undefined | string | string[])[] {
-  return getTopics(rawClosedChannelTopic, closer, counterparty, bidirectional)
-}
-
-function getTopics(
+/**
+ * @TODO: requires documentantion
+ * @param rawTopic
+ * @param first
+ * @param second
+ * @param bidirectional
+ */
+export const generateTopics = (
   rawTopic: Uint8Array,
   first?: Public,
   second?: Public,
   bidirectional?: boolean
-): (undefined | string | string[])[] {
+): (undefined | string | string[])[] => {
   if (bidirectional && (first == null || second == null)) {
     throw Error(`Bidirectional property can only be used if 'first' and 'second' are set`)
   }
@@ -64,10 +58,4 @@ function getTopics(
       second != null ? u8aToHex(second.slice(1, 33)) : undefined
     ]
   }
-}
-
-function getTopic0(rawTopic: Uint8Array, first: number, second: number) {
-  return u8aToHex(
-    u8aConcat(rawTopic.slice(0, 31), new Uint8Array([((rawTopic[31] >> 2) << 2) | (first % 2 << 1) | second % 2]))
-  )
 }

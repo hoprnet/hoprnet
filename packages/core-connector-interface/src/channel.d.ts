@@ -9,7 +9,8 @@ import type {
   Public,
   Signature,
   SignedChannel,
-  SignedTicket
+  SignedTicket,
+  ChannelEntry
 } from './types'
 
 declare interface ChannelStatic {
@@ -72,14 +73,7 @@ declare interface ChannelStatic {
    * @param counterPartyPubKey the public key of the counterparty in which we have a channel with
    * @returns a promise tha resolves into on chain channel data
    */
-  getOnChainState(
-    channelId: Hash
-  ): Promise<{
-    deposit: string
-    partyABalance: string
-    closureTime: string
-    stateCounter: string
-  }>
+  getOnChainState(channelId: Hash): Promise<ChannelEntry>
 
   /**
    * Fetches all channel instances from the database and initiates a settlement on

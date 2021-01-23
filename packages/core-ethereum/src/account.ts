@@ -229,12 +229,14 @@ class Account {
     const abi = txObject ? txObject.encodeABI() : undefined
     const gas = 200e3
 
-    // set gasPrice
-    let gasPrice: number = 1e9
-    // specified in network settings
-    if (rpcOps[network]?.gasPrice) gasPrice = rpcOps[network]?.gasPrice
-    // let's web3 pick gas price
-    if ((['mainnet', 'ropsten'] as Network[]).includes(network)) gasPrice = undefined
+    // let web3 pick gas price
+    // should be used when the gas price fluctuates
+    // as it allows the provider to pick a gas price
+    let gasPrice: number
+    // if its a known network with constant gas price
+    if (rpcOps[network] && !(['mainnet', 'ropsten'] as Network[]).includes(network)) {
+      gasPrice = rpcOps[network]?.gasPrice ?? 1e9
+    }
 
     // @TODO: potential deadlock, needs to be improved
     const nonceLock = await this._nonceTracker.getNonceLock(this._address.toHex())
@@ -245,10 +247,13 @@ class Account {
       gas,
       gasPrice,
       ...txConfig,
-      chainId: this.chainId,
+      // required for test networks
+      chainId: rpcOps[network] ? this.chainId : undefined,
       nonce: nonceLock.nextNonce,
       data: abi
     }
+
+    // console.log('sending tx', options)
 
     const signedTransaction = await web3.eth.accounts.signTransaction(options, u8aToHex(this.keys.onChain.privKey))
 
