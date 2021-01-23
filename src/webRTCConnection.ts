@@ -106,8 +106,14 @@ class WebRTCConnection implements MultiaddrConnection {
   }
 
   private async *createSource(this: WebRTCConnection): Stream['source'] {
-    for await (const msg of (this.conn as RelayConnection).source) {
-      const [finished, payload] = [msg.slice(0, 1), msg.slice(1)]
+    while (true) {
+      const result = await (this.conn as RelayConnection).source.next()
+
+      if (result.done) {
+        break
+      }
+
+      const [finished, payload] = [result.value.slice(0, 1), result.value.slice(1)]
 
       if (finished[0] == DONE[0]) {
         return
@@ -261,7 +267,7 @@ class WebRTCConnection implements MultiaddrConnection {
             return
           }
 
-          this.log(`yielding into webrtc ${this._id}`, new TextDecoder().decode(result.value.slice()))
+          this.log(`yielding into webrtc ${this._id}`, result.value.slice().length)
           yield result.value.slice()
 
           for await (const msg of source) {
@@ -269,7 +275,7 @@ class WebRTCConnection implements MultiaddrConnection {
               break
             }
 
-            this.log(`yielding into webrtc ${this._id}`, new TextDecoder().decode(msg.slice()))
+            this.log(`yielding into webrtc ${this._id}`, msg.slice().length)
             yield msg.slice()
           }
         }.call(this)
