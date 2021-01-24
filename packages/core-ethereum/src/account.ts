@@ -53,7 +53,13 @@ class Account {
     }
 
     this._nonceTracker = new NonceTracker({
-      getLatestBlockNumber: async () => coreConnector.indexer.latestBlock,
+      getLatestBlockNumber: async () => {
+        // tests fail if we don't query the block number
+        // when running on ganache
+        return !coreConnector.network || coreConnector.network === 'localhost'
+          ? coreConnector.web3.eth.getBlockNumber()
+          : coreConnector.indexer.latestBlock
+      },
       getTransactionCount: async (address: string, blockNumber?: number) =>
         coreConnector.web3.eth.getTransactionCount(address, blockNumber),
       getConfirmedTransactions: () => Array.from(this._transactions.confirmed.values()),
@@ -247,13 +253,10 @@ class Account {
       gas,
       gasPrice,
       ...txConfig,
-      // required for test networks
-      chainId: rpcOps[network] ? this.chainId : undefined,
+      chainId: this.chainId,
       nonce: nonceLock.nextNonce,
       data: abi
     }
-
-    // console.log('sending tx', options)
 
     const signedTransaction = await web3.eth.accounts.signTransaction(options, u8aToHex(this.keys.onChain.privKey))
 

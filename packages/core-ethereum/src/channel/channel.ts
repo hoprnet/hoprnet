@@ -12,7 +12,6 @@ import {
   ChannelEntry
 } from '../types'
 import TicketFactory from './ticket'
-import { ChannelStatus } from '../types/channel'
 import { hash } from '../utils'
 import debug from 'debug'
 
@@ -49,9 +48,10 @@ class Channel implements IChannel {
   private get onChainChannel(): Promise<ChannelEntry> {
     return new Promise(async (resolve, reject) => {
       try {
-        return resolve(
-          this.coreConnector.channel.getOnChainState(new Public(this.coreConnector.account.keys.onChain.pubKey))
-        )
+        const self = new Public(this.coreConnector.account.keys.onChain.pubKey)
+        const channel = await this.coreConnector.channel.getOnChainState(self)
+
+        return resolve(channel)
       } catch (error) {
         return reject(error)
       }
@@ -72,17 +72,8 @@ class Channel implements IChannel {
   get status() {
     return new Promise<'UNINITIALISED' | 'FUNDING' | 'OPEN' | 'PENDING'>(async (resolve, reject) => {
       try {
-        const stateCounter = await this.stateCounter
-        const status = Number(stateCounter.toNumber()) % 10
-
-        if (status >= Object.keys(ChannelStatus).length) {
-          throw Error("status like this doesn't exist")
-        }
-
-        if (status === ChannelStatus.UNINITIALISED) return resolve('UNINITIALISED')
-        else if (status === ChannelStatus.FUNDING) return resolve('FUNDING')
-        else if (status === ChannelStatus.OPEN) return resolve('OPEN')
-        return resolve('PENDING')
+        const channel = await this.onChainChannel
+        return resolve(channel.status)
       } catch (error) {
         return reject(error)
       }
@@ -264,10 +255,6 @@ class Channel implements IChannel {
       new Public(this.counterparty)
     )
   }
-
-  // private async onOpen(): Promise<void> {
-  //   return onOpen(this.coreConnector, this.counterparty, this._signedChannel)
-  // }
 
   private async onClose(): Promise<void> {
     return this.coreConnector.channel.deleteOffChainState(this.counterparty)

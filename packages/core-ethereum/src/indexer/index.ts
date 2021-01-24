@@ -56,8 +56,10 @@ class Indexer extends EventEmitter implements IIndexer {
 
     const { web3, hoprChannels } = this.connector
 
-    // go back 'MAX_CONFIRMATIONS' blocks in case of a re-org at time of stopping
     let fromBlock = await getLatestBlockNumber(this.connector)
+    this.latestBlock = fromBlock
+
+    // go back 'MAX_CONFIRMATIONS' blocks in case of a re-org at time of stopping
     if (fromBlock - MAX_CONFIRMATIONS > 0) {
       fromBlock = fromBlock - MAX_CONFIRMATIONS
     }

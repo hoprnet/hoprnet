@@ -14,18 +14,14 @@ import {
   TicketEpoch,
   ChannelEntry
 } from '../types'
-import { ChannelStatus } from '../types/channel'
 import { waitForConfirmation, getId, pubKeyToAccountId, sign, isPartyA } from '../utils'
 import { ERRORS } from '../constants'
-
 import type HoprEthereum from '..'
 import Channel from './channel'
-
 import { Uint8ArrayE } from '../types/extended'
-
-import { CHANNEL_STATES } from './constants'
 import { TicketStatic } from './ticket'
 import debug from 'debug'
+
 const log = debug('hopr-core-ethereum:channel')
 
 const EMPTY_SIGNATURE = new Uint8Array(Signature.SIZE).fill(0x00)
@@ -76,8 +72,7 @@ class ChannelFactory {
 
     const [onChain, offChain]: [boolean, boolean] = await Promise.all([
       this.coreConnector.channel.getOnChainState(new Public(counterpartyPubKey)).then((channel) => {
-        const state = Number(channel.stateCounter) % CHANNEL_STATES
-        return state === ChannelStatus.OPEN || state === ChannelStatus.PENDING
+        return channel.status === 'OPEN' || channel.status === 'PENDING'
       }),
       this.coreConnector.db.get(Buffer.from(this.coreConnector.dbKeys.Channel(counterpartyPubKey))).then(
         () => true,
@@ -332,10 +327,47 @@ class ChannelFactory {
   }
 
   async getOnChainState(counterpartyPubKey: Public): Promise<ChannelEntry> {
-    return this.coreConnector.indexer.getChannelEntry(
-      new Public(this.coreConnector.account.keys.onChain.pubKey),
-      counterpartyPubKey
-    )
+    const inGanache = !this.coreConnector.network || this.coreConnector.network === 'localhost'
+    const self = new Public(this.coreConnector.account.keys.onChain.pubKey)
+
+    // HACK: when running our unit/intergration tests using ganache, the indexer doesn't have enough
+    // time to pick up the events and reduce the data - here we are doing 2 things wrong:
+    // 1. all our unit tests are actually intergration tests, nothing is mocked
+    // 2. our actual intergration tests do not have any block mining time
+    // this will be tackled in the upcoming refactor
+    if (inGanache) {
+      const channelId = await getId(await self.toAccountId(), await new Public(counterpartyPubKey).toAccountId())
+      const response = await this.coreConnector.hoprChannels.methods.channels(channelId.toHex()).call()
+
+      return new ChannelEntry(undefined, {
+        blockNumber: new BN(0),
+        transactionIndex: new BN(0),
+        logIndex: new BN(0),
+        deposit: new BN(response.deposit),
+        partyABalance: new BN(response.partyABalance),
+        closureTime: new BN(response.closureTime),
+        stateCounter: new BN(response.stateCounter),
+        closureByPartyA: response.closureByPartyA
+      })
+    } else {
+      let channelEntry = this.coreConnector.indexer.getChannelEntry(
+        new Public(this.coreConnector.account.keys.onChain.pubKey),
+        counterpartyPubKey
+      )
+      if (channelEntry) return channelEntry
+
+      // when channelEntry is not found, the onchain data is all 0
+      return new ChannelEntry(undefined, {
+        blockNumber: new BN(0),
+        transactionIndex: new BN(0),
+        logIndex: new BN(0),
+        deposit: new BN(0),
+        partyABalance: new BN(0),
+        closureTime: new BN(0),
+        stateCounter: new BN(0),
+        closureByPartyA: false
+      })
+    }
   }
 
   async onceOpen(self: Public, counterparty: Public): Promise<void> {

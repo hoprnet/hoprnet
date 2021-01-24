@@ -21,7 +21,7 @@ import * as configs from '../config'
 const HoprTokenAbi = abis.HoprToken
 const DEFAULT_WIN_PROB = 1
 
-describe('test Channel class', function () {
+describe.only('test Channel class', function () {
   const ganache = new Ganache()
 
   let web3: Web3
