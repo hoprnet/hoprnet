@@ -49,7 +49,10 @@ class Relay {
   private _streams: Map<string, { [index: string]: RelayContext }>
   private _webRTCUpgrader?: WebRTCUpgrader
 
-  constructor(libp2p: libp2p, webRTCUpgrader?: WebRTCUpgrader) {
+  // used for testing
+  private __noWebRTCUpgrade?: boolean
+
+  constructor(libp2p: libp2p, webRTCUpgrader?: WebRTCUpgrader, __noWebRTCUpgrade?: boolean) {
     this._dialer = libp2p.dialer
     this._registrar = libp2p.registrar
     this._dht = libp2p._dht
@@ -58,6 +61,9 @@ class Relay {
     this._streams = new Map<string, { [index: string]: RelayContext }>()
 
     this._webRTCUpgrader = webRTCUpgrader
+
+    // used for testing
+    this.__noWebRTCUpgrade = __noWebRTCUpgrade
 
     libp2p.handle(RELAY, this.handleRelay.bind(this))
   }
@@ -155,7 +161,10 @@ class Relay {
           counterparty: destination,
           channel
         },
-        options
+        {
+          __noWebRTCUpgrade: this.__noWebRTCUpgrade,
+          ...options
+        }
       )
     } else {
       return new RelayConnection({
@@ -195,12 +204,15 @@ class Relay {
         }
       })
 
-      return new WebRTCConnection({
-        conn: newConn,
-        self: this._peerId,
-        counterparty: handShakeResult.counterparty,
-        channel
-      })
+      return new WebRTCConnection(
+        {
+          conn: newConn,
+          self: this._peerId,
+          counterparty: handShakeResult.counterparty,
+          channel
+        },
+        { __noWebRTCUpgrade: this.__noWebRTCUpgrade }
+      )
     } else {
       return new RelayConnection({
         stream: handShakeResult.stream,

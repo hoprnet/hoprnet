@@ -33,6 +33,7 @@ class HoprConnect implements Transport {
   public discovery: Discovery
 
   private __noDirectConnections?: boolean
+  private __noWebRTCUpgrade?: boolean
   private _upgrader: Upgrader
   private _peerId: PeerId
   private _multiaddrs: Multiaddr[]
@@ -51,6 +52,7 @@ class HoprConnect implements Transport {
     bootstrapServers?: Multiaddr[] | Multiaddr
     interface?: string
     __noDirectConnections?: boolean
+    __noWebRTCUpgrade?: boolean
   }) {
     if (!opts.upgrader) {
       throw new Error('An upgrader must be provided. See https://github.com/libp2p/interface-transport#upgrader.')
@@ -116,10 +118,11 @@ class HoprConnect implements Transport {
 
     opts.libp2p.handle(DELIVERY, this.handleIncoming.bind(this))
 
-    this._relay = new Relay(opts.libp2p, this._webRTCUpgrader)
+    this._relay = new Relay(opts.libp2p, this._webRTCUpgrader, opts.__noWebRTCUpgrade)
 
     // Used for testing
     this.__noDirectConnections = opts.__noDirectConnections
+    this.__noWebRTCUpgrade = opts.__noWebRTCUpgrade
 
     try {
       const { version } = require('../package.json')
@@ -129,6 +132,10 @@ class HoprConnect implements Transport {
 
     if (this.__noDirectConnections) {
       verbose(`DEBUG mode: always using relayed / WebRTC connections.`)
+    }
+
+    if (this.__noWebRTCUpgrade) {
+      verbose(`DEBUG mode: no WebRTC upgrade`)
     }
 
     verbose(
@@ -254,12 +261,17 @@ class HoprConnect implements Transport {
     try {
       if (this._webRTCUpgrader != undefined) {
         newConn = await this._upgrader.upgradeInbound(
-          new WebRTCConnection({
-            conn: newStream,
-            self: this._peerId,
-            counterparty,
-            channel: newStream.webRTC!.channel
-          })
+          new WebRTCConnection(
+            {
+              conn: newStream,
+              self: this._peerId,
+              counterparty,
+              channel: newStream.webRTC!.channel
+            },
+            {
+              __noWebRTCUpgrade: this.__noWebRTCUpgrade
+            }
+          )
         )
       } else {
         newConn = await this._upgrader.upgradeInbound(newStream)

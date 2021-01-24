@@ -47,7 +47,8 @@ async function main() {
         HoprConnect: {
           bootstrapServers: [RELAY_ADDRESS],
           // simulates a NAT
-          __noDirectConnections: true
+          __noDirectConnections: true,
+          __noWebRTCUpgrade: true
         }
       }
     }

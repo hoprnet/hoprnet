@@ -48,9 +48,12 @@ class WebRTCConnection implements MultiaddrConnection {
 
   public timeline: MultiaddrConnection['timeline']
 
+  // used for testing
+  private __noWebRTCUpgrade?: boolean
+
   constructor(
     opts: { conn: RelayConnection; channel: SimplePeer; self: PeerId; counterparty: PeerId },
-    options?: DialOptions
+    options?: DialOptions & { __noWebRTCUpgrade?: boolean }
   ) {
     this.channel = opts.channel
     this.conn = opts.conn
@@ -82,13 +85,23 @@ class WebRTCConnection implements MultiaddrConnection {
 
     this._id = u8aToHex(randomBytes(4), false)
 
+    // used for testing
+    this.__noWebRTCUpgrade = options?.__noWebRTCUpgrade
+
+    if (this.__noWebRTCUpgrade == undefined) {
+      console.trace()
+    }
+
+    console.log(`noWebRTCUpgrade`, this.__noWebRTCUpgrade)
+
     this.channel.once('connect', async () => {
       if (this._webRTCTimeout != undefined) {
         clearTimeout(this._webRTCTimeout)
       }
 
       this._webRTCStateKnown = true
-      this._webRTCAvailable = true
+      this._webRTCAvailable = !this.__noWebRTCUpgrade
+
       // @TODO could be mixed up
       this._switchPromise.resolve()
     })
@@ -130,11 +143,11 @@ class WebRTCConnection implements MultiaddrConnection {
       this.conn = this.channel
     }
 
-    if (!this._webRTCStateKnown || this._webRTCAvailable) {
+    if (!this._webRTCStateKnown) {
       await this._switchPromise.promise
     }
 
-    if (this._webRTCAvailable || !this._webRTCStateKnown) {
+    if (this._webRTCAvailable) {
       this.log(`webRTC source handover done. Using direct connection to peer ${this.remoteAddr.getPeerId()}`)
 
       yield* this.channel[Symbol.asyncIterator]() as Stream['source']
@@ -230,9 +243,13 @@ class WebRTCConnection implements MultiaddrConnection {
           }
 
           // @TODO check for strings and DONE / NOT_DONE prefix
-          yield result.value.slice()
+          yield Uint8Array.from([...NOT_DONE, ...result.value.slice()])
 
-          yield* source
+          for await (const msg of source) {
+            yield Uint8Array.from([...NOT_DONE, ...msg.slice()])
+          }
+
+          yield DONE
         }
 
         defer.resolve()
