@@ -387,7 +387,6 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
       result = await Promise.race(promises)
 
       if (sinkSourceAttached) {
-        console.log(`sinkSourceReceived`, result)
         sinkSourceAttached = false
         this._sinkSourceAttachedPromise = Defer<Stream['source']>()
 
@@ -437,7 +436,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
       const received = result as StreamResult
 
       if (received == undefined || received.done) {
-        console.log(`##### EMPTY message #####`, received)
+        this.verbose(`##### EMPTY message #####`, received)
         yield new BL([RELAY_PAYLOAD_PREFIX])
 
         streamPromise = undefined

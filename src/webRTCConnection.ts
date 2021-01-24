@@ -88,12 +88,6 @@ class WebRTCConnection implements MultiaddrConnection {
     // used for testing
     this.__noWebRTCUpgrade = options?.__noWebRTCUpgrade
 
-    if (this.__noWebRTCUpgrade == undefined) {
-      console.trace()
-    }
-
-    console.log(`noWebRTCUpgrade`, this.__noWebRTCUpgrade)
-
     this.channel.once('connect', async () => {
       if (this._webRTCTimeout != undefined) {
         clearTimeout(this._webRTCTimeout)
@@ -242,7 +236,6 @@ class WebRTCConnection implements MultiaddrConnection {
             return
           }
 
-          // @TODO check for strings and DONE / NOT_DONE prefix
           yield Uint8Array.from([...NOT_DONE, ...result.value.slice()])
 
           for await (const msg of source) {

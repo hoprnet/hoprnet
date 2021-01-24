@@ -23,7 +23,6 @@
 [![](https://github.com/libp2p/js-libp2p-interfaces/raw/master/src/peer-discovery/img/badge.png)](https://github.com/libp2p/js-libp2p-interfaces/tree/master/src/peer-discovery)
 -->
 
-
 ## Description
 
 A [transport module](https://github.com/libp2p/js-libp2p-interfaces/tree/master/src/transport) for [js-libp2p](https://github.com/libp2p/js-libp2p) that handles NAT traversal automatically by using peers in the network and without requiring external resources such as public STUN or TURN servers.
@@ -90,7 +89,10 @@ const node = await libp2p.create({
   },
   config: {
     HoprConnect: {
-      bootstrapServers: [Multiaddr('/ip4/127.0.0.1/tcp/9091')]
+      bootstrapServers: [Multiaddr('/ip4/127.0.0.1/tcp/9091')],
+      // Testing:
+      __noDirectConnections: false // set to true to simulate NAT
+      __noWebRTCUpgrade: false // set to true to simulate bidirectional NAT
     }
   }
 })
