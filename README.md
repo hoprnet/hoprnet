@@ -91,7 +91,7 @@ const node = await libp2p.create({
     HoprConnect: {
       bootstrapServers: [Multiaddr('/ip4/127.0.0.1/tcp/9091')],
       // Testing:
-      __noDirectConnections: false // set to true to simulate NAT
+      __noDirectConnections: false, // set to true to simulate NAT
       __noWebRTCUpgrade: false // set to true to simulate bidirectional NAT
     }
   }
