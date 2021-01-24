@@ -233,8 +233,6 @@ class WebRTCConnection implements MultiaddrConnection {
       }.call(this)
     )
 
-    console.log(`before defer.promise`)
-
     await defer.promise
 
     this.log(`webrtc sinkMigrated but this._sourceMigrated`, this._sourceMigrated)

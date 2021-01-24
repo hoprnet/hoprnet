@@ -69,7 +69,6 @@ describe('test TCP connection', function () {
 
     await listener.listen(Multiaddr('/ip4/127.0.0.1/tcp/9091'))
 
-    console.log(listener.getAddrs())
     const tcpConn = await TCPConnection.create(Multiaddr('/ip4/127.0.0.1/tcp/9091'))
 
     tcpConn.sink(

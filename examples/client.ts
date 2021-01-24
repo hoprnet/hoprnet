@@ -88,7 +88,6 @@ async function main() {
         Multiaddr(`/ip4/127.0.0.1/tcp/9091/p2p/${await PeerId.createFromPrivKey(Bob)}`),
         TEST_PROTOCOL
       )
-      console.log(`heeeere`)
 
       await pipe(
         // prettier-ignore
@@ -109,7 +108,6 @@ async function main() {
     //     Multiaddr(`/ip4/127.0.0.1/tcp/9090/p2p/${await PeerId.createFromPrivKey(Alice)}`),
     //     TEST_PROTOCOL
     //   )
-    //   console.log(`heeeere`)
 
     //   break
     // default:
