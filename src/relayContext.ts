@@ -44,7 +44,6 @@ class RelayContext {
   public source: Stream['source']
   public sink: Stream['sink']
   public ping: (ms?: number) => Promise<number>
-  public update: (newStream: Stream) => void
 
   constructor(stream: Stream) {
     this._switchPromise = Defer<Stream>()
@@ -110,14 +109,14 @@ class RelayContext {
       return Date.now() - start
     }
 
-    this.update = (newStream: Stream) => {
-      this.log(`updating`)
-      let tmpPromise = this._switchPromise
-      this._switchPromise = Defer<Stream>()
-      tmpPromise.resolve(newStream)
-    }
-
     this._createSink()
+  }
+
+  public update(newStream: Stream) {
+    this.log(`updating`)
+    let tmpPromise = this._switchPromise
+    this._switchPromise = Defer<Stream>()
+    tmpPromise.resolve(newStream)
   }
 
   private log(..._: any[]) {

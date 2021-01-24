@@ -148,12 +148,15 @@ class Relay {
         }
       })
 
-      return new WebRTCConnection({
-        conn: newConn,
-        self: this._peerId,
-        counterparty: destination,
-        channel
-      }, options)
+      return new WebRTCConnection(
+        {
+          conn: newConn,
+          self: this._peerId,
+          counterparty: destination,
+          channel
+        },
+        options
+      )
     } else {
       return new RelayConnection({
         stream,
@@ -376,6 +379,7 @@ class Relay {
 
       const latency = await contextEntry[counterparty.toB58String()].ping()
 
+      verbose(`Latency to ${connection.remotePeer.toB58String()}: ${latency}ms`)
       if (latency >= 0) {
         verbose(`stream to ${counterparty.toB58String()} is alive (latency: ${latency} ms). Using existing stream`)
 
