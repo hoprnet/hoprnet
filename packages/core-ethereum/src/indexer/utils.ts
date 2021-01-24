@@ -1,28 +1,34 @@
 import type BN from 'bn.js'
 import type HoprEthereum from '..'
-import type { Event } from './topics'
 import { u8aConcat, u8aToNumber } from '@hoprnet/hopr-utils'
-import { Public, ChannelEntry } from '../types'
-import { MAX_CONFIRMATIONS } from '../config'
-import { LatestBlockNumber } from '../dbKeys'
+import { Public, ChannelEntry, Snapshot } from '../types'
+import { LatestBlockNumber, LatestConfirmedSnapshot } from '../dbKeys'
 
-export const SMALLEST_PUBLIC_KEY = new Public(u8aConcat(new Uint8Array([0x02]), new Uint8Array(32).fill(0x00)))
-export const BIGGEST_PUBLIC_KEY = new Public(u8aConcat(new Uint8Array([0x03]), new Uint8Array(32).fill(0xff)))
-export const LATEST_BLOCK_KEY = LatestBlockNumber()
+const SMALLEST_PUBLIC_KEY = new Public(u8aConcat(new Uint8Array([0x02]), new Uint8Array(32).fill(0x00)))
+const BIGGEST_PUBLIC_KEY = new Public(u8aConcat(new Uint8Array([0x03]), new Uint8Array(32).fill(0xff)))
+const LATEST_BLOCK_KEY = LatestBlockNumber()
+const LATEST_CONFIRMED_SNAPSHOT = LatestConfirmedSnapshot()
 
 /**
- * Compares the two events provided.
- * @param eventA
- * @param eventB
- * @returns number
+ * Compares the two snapshots provided.
+ * @param snapA
+ * @param snapB
+ * @returns 0 if they're equal, negative if `a` goes up, positive if `b` goes up
  */
-export const eventComparator = (eventA: Event<any>, eventB: Event<any>): number => {
-  if (!eventA.blockNumber.eq(eventB.blockNumber)) {
-    return eventA.blockNumber.sub(eventB.blockNumber).toNumber()
-  } else if (!eventA.transactionIndex.eq(eventB.transactionIndex)) {
-    return eventA.transactionIndex.sub(eventB.transactionIndex).toNumber()
+export const snapshotComparator = (
+  snapA: { blockNumber: BN; transactionIndex: BN; logIndex: BN },
+  snapB: {
+    blockNumber: BN
+    transactionIndex: BN
+    logIndex: BN
+  }
+): number => {
+  if (!snapA.blockNumber.eq(snapB.blockNumber)) {
+    return snapA.blockNumber.sub(snapB.blockNumber).toNumber()
+  } else if (!snapA.transactionIndex.eq(snapB.transactionIndex)) {
+    return snapA.transactionIndex.sub(snapB.transactionIndex).toNumber()
   } else {
-    return eventA.logIndex.sub(eventB.logIndex).toNumber()
+    return snapA.logIndex.sub(snapB.logIndex).toNumber()
   }
 }
 
@@ -31,8 +37,12 @@ export const eventComparator = (eventA: Event<any>, eventB: Event<any>): number 
  * if blockNumber is considered confirmed.
  * @returns boolean
  */
-export const isConfirmedBlock = (blockNumber: number, onChainBlockNumber: number): boolean => {
-  return blockNumber + MAX_CONFIRMATIONS <= onChainBlockNumber
+export const isConfirmedBlock = (
+  blockNumber: number,
+  onChainBlockNumber: number,
+  maxConfirmations: number
+): boolean => {
+  return blockNumber + maxConfirmations <= onChainBlockNumber
 }
 
 /**
@@ -63,6 +73,29 @@ export const updateLatestBlockNumber = async (connector: HoprEthereum, blockNumb
   const { db } = connector
 
   await db.put(Buffer.from(LATEST_BLOCK_KEY), blockNumber.toBuffer())
+}
+
+/**
+ * Queries the database to find the latest confirmed snapshot.
+ * @param connector
+ * @returns promise that resolves to a snapshot
+ */
+export const getLatestConfirmedSnapshot = async (connector: HoprEthereum): Promise<Snapshot | undefined> => {
+  const { db } = connector
+
+  try {
+    const result = (await db.get(Buffer.from(LATEST_CONFIRMED_SNAPSHOT))) as Uint8Array
+    return new Snapshot({
+      bytes: result,
+      offset: result.byteOffset
+    })
+  } catch (err) {
+    if (err.notFound) {
+      return undefined
+    }
+
+    throw err
+  }
 }
 
 /**
@@ -160,6 +193,7 @@ export const getChannelEntries = async (
 
 /**
  * Adds or updates the channel entry in the database.
+ * Adds or updates latest confirmed snapshot.
  * @param connector
  * @param partyA
  * @param partyB
@@ -173,5 +207,22 @@ export const updateChannelEntry = async (
 ): Promise<void> => {
   const { dbKeys, db } = connector
 
-  await db.put(Buffer.from(dbKeys.ChannelEntry(partyA, partyB)), Buffer.from(channelEntry))
+  const snapshot = new Snapshot(undefined, {
+    blockNumber: channelEntry.blockNumber,
+    transactionIndex: channelEntry.transactionIndex,
+    logIndex: channelEntry.logIndex
+  })
+
+  await db.batch([
+    {
+      type: 'put',
+      key: Buffer.from(dbKeys.ChannelEntry(partyA, partyB)),
+      value: Buffer.from(channelEntry)
+    },
+    {
+      type: 'put',
+      key: Buffer.from(LATEST_CONFIRMED_SNAPSHOT),
+      value: Buffer.from(snapshot)
+    }
+  ])
 }

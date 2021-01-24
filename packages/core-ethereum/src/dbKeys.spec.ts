@@ -100,6 +100,13 @@ describe('test dbKeys', function () {
     assert(u8aEquals(result, expected), 'check latestBlockNumber key creation')
   })
 
+  it("should create 'LatestConfirmedSnapshot' key", function () {
+    const result = dbKeys.LatestConfirmedSnapshot()
+    const expected = encoder.encode('payments-latestConfirmedSnapshot')
+
+    assert(u8aEquals(result, expected), 'check latestConfirmedSnapshot key creation')
+  })
+
   it("should create 'ChannelEntry' key", function () {
     const result = dbKeys.ChannelEntry(userA.pubKey, userB.pubKey)
     const expected = u8aConcat(

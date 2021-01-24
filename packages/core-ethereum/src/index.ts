@@ -45,11 +45,12 @@ export default class HoprEthereum implements HoprCoreConnector {
     public hoprToken: HoprToken,
     debug: boolean,
     privateKey: Uint8Array,
-    publicKey: Uint8Array
+    publicKey: Uint8Array,
+    maxConfirmations: number
   ) {
     this.hashedSecret = new HashedSecret(this)
     this.account = new Account(this, privateKey, publicKey, chainId)
-    this.indexer = new Indexer(this)
+    this.indexer = new Indexer(this, maxConfirmations)
     this.types = new types()
     this.channel = new ChannelFactory(this)
     this._debug = debug
@@ -198,7 +199,7 @@ export default class HoprEthereum implements HoprCoreConnector {
   public static async create(
     db: LevelUp,
     seed: Uint8Array,
-    options?: { id?: number; provider?: string; debug?: boolean }
+    options?: { id?: number; provider?: string; debug?: boolean; maxConfirmations?: number }
   ): Promise<HoprEthereum> {
     const providerUri = options?.provider || config.DEFAULT_URI
 
@@ -257,7 +258,8 @@ export default class HoprEthereum implements HoprCoreConnector {
       hoprToken,
       options?.debug || false,
       seed,
-      publicKey
+      publicKey,
+      options.maxConfirmations ?? config.MAX_CONFIRMATIONS
     )
     log(`using blockchain address ${await coreConnector.hexAccountAddress()}`)
     return coreConnector

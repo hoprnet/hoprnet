@@ -17,6 +17,7 @@ const ticketSubPrefix = encoder.encode('tickets-')
 const acknowledgedSubPrefix = encoder.encode('acknowledged-')
 const onChainSecretIntermediary = encoder.encode('onChainSecretIntermediary-')
 const latestBlockNumber = encoder.encode('latestBlockNumber')
+const latestConfirmedSnapshot = encoder.encode('latestConfirmedSnapshot')
 
 const ON_CHAIN_SECRET_ITERATION_WIDTH = 4 // bytes
 
@@ -47,6 +48,16 @@ export function LatestBlockNumber(): Uint8Array {
   return allocationHelper([
     [PREFIX.length, PREFIX],
     [latestBlockNumber.length, latestBlockNumber]
+  ])
+}
+
+/**
+ * Returns the db-key under which the latest confirmed snapshot is saved in the database.
+ */
+export function LatestConfirmedSnapshot(): Uint8Array {
+  return allocationHelper([
+    [PREFIX.length, PREFIX],
+    [latestConfirmedSnapshot.length, latestConfirmedSnapshot]
   ])
 }
 

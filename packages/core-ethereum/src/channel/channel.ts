@@ -30,8 +30,10 @@ class Channel implements IChannel {
     this._signedChannel = signedChannel
 
     // check if channel still exists
-    this.status.then((status: string) => {
-      if (status === 'UNINITIALISED') {
+    this.onChainChannel.then((state) => {
+      if (state.stateCounter.isZero()) return
+
+      if (state.status === 'UNINITIALISED') {
         log('found channel off-chain but its closed on-chain')
         this.onClose()
       }

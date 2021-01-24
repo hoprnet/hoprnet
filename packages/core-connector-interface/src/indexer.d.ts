@@ -1,15 +1,14 @@
-import type EventEmitter from 'events'
 import type { Balance, Public, ChannelEntry } from './types'
 
 export type RoutingChannel = [source: PeerId, destination: PeerId, stake: Balance]
 export type ChannelUpdate = { partyA: Public; partyB: Public; channelEntry: ChannelEntry }
 
-declare interface Indexer extends EventEmitter {
+declare interface Indexer {
   start(): Promise<void>
   stop(): Promise<void>
 
   getChannelEntry(partyA: Public, partyB: Public): Promise<ChannelEntry | undefined>
-  getChannelEntries(party: Public): Promise<ChannelUpdate[]>
+  getChannelEntries(party?: Public, filter?: (node: Public) => boolean): Promise<ChannelUpdate[]>
 
   // routing
   getRandomChannel(): Promise<RoutingChannel | undefined>

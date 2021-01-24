@@ -21,7 +21,7 @@ import * as configs from '../config'
 const HoprTokenAbi = abis.HoprToken
 const DEFAULT_WIN_PROB = 1
 
-describe.only('test Channel class', function () {
+describe.skip('test Channel class', function () {
   const ganache = new Ganache()
 
   let web3: Web3
@@ -170,6 +170,7 @@ describe.only('test Channel class', function () {
       await coreConnector.channel.isOpen(counterpartysCoreConnector.account.keys.onChain.pubKey),
       `Checks that party A considers the channel open.`
     )
+
     assert(
       await counterpartysCoreConnector.channel.isOpen(coreConnector.account.keys.onChain.pubKey),
       `Checks that party B considers the channel open.`

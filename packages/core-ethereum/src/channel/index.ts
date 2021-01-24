@@ -1,3 +1,4 @@
+import type { Log } from 'web3-core'
 import { u8aToHex, u8aEquals } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 import {
@@ -21,6 +22,7 @@ import Channel from './channel'
 import { Uint8ArrayE } from '../types/extended'
 import { TicketStatic } from './ticket'
 import debug from 'debug'
+import * as topics from '../indexer/topics'
 
 const log = debug('hopr-core-ethereum:channel')
 
@@ -74,7 +76,7 @@ class ChannelFactory {
       this.coreConnector.channel.getOnChainState(new Public(counterpartyPubKey)).then((channel) => {
         return channel.status === 'OPEN' || channel.status === 'PENDING'
       }),
-      this.coreConnector.db.get(Buffer.from(this.coreConnector.dbKeys.Channel(counterpartyPubKey))).then(
+      this.getOffChainState(counterpartyPubKey).then(
         () => true,
         (err) => {
           if (err.notFound) {
@@ -173,9 +175,7 @@ class ChannelFactory {
     await this.coreConnector.initOnchainValues()
 
     if (await this.isOpen(counterpartyPubKey)) {
-      const record = (await this.coreConnector.db.get(
-        Buffer.from(this.coreConnector.dbKeys.Channel(counterpartyPubKey))
-      )) as Uint8Array
+      const record = await this.getOffChainState(counterpartyPubKey)
       signedChannel = new SignedChannel({
         bytes: record.buffer,
         offset: record.byteOffset
@@ -223,6 +223,7 @@ class ChannelFactory {
 
       return channel
     }
+
     throw Error('Cannot open channel. Channel is not open and no sign function was given.')
   }
 
@@ -371,31 +372,85 @@ class ChannelFactory {
   }
 
   async onceOpen(self: Public, counterparty: Public): Promise<void> {
-    const { indexer } = this.coreConnector
     const channelId = await getId(await self.toAccountId(), await counterparty.toAccountId())
 
-    return new Promise((resolve) => {
-      indexer.on('channelOpened', async ({ partyA, partyB }) => {
-        const _channelId = await getId(await partyA.toAccountId(), await partyB.toAccountId())
-        if (!u8aEquals(channelId, _channelId)) return
-
-        return resolve()
+    return new Promise((resolve, reject) => {
+      const subscription = this.coreConnector.web3.eth.subscribe('logs', {
+        address: this.coreConnector.hoprChannels.options.address,
+        topics: topics.generateTopics(topics.EventSignatures.OpenedChannel, self, counterparty, true)
       })
+
+      subscription
+        .on('data', async (log: Log) => {
+          const event = topics.decodeOpenedChannel(log)
+
+          const _channelId = await getId(
+            await event.data.opener.toAccountId(),
+            await event.data.counterparty.toAccountId()
+          )
+
+          if (!u8aEquals(_channelId, channelId)) {
+            return
+          }
+
+          await subscription.unsubscribe()
+          return resolve()
+        })
+        .on('error', reject)
     })
+
+    // const { indexer } = this.coreConnector
+    // const channelId = await getId(await self.toAccountId(), await counterparty.toAccountId())
+
+    // return new Promise((resolve) => {
+    //   indexer.on('channelOpened', async ({ partyA, partyB }) => {
+    //     const _channelId = await getId(await partyA.toAccountId(), await partyB.toAccountId())
+    //     if (!u8aEquals(channelId, _channelId)) return
+
+    //     return resolve()
+    //   })
+    // })
   }
 
   async onceClosed(self: Public, counterparty: Public): Promise<void> {
-    const { indexer } = this.coreConnector
     const channelId = await getId(await self.toAccountId(), await counterparty.toAccountId())
 
-    return new Promise((resolve) => {
-      indexer.on('channelClosed', async ({ partyA, partyB }) => {
-        const _channelId = await getId(await partyA.toAccountId(), await partyB.toAccountId())
-        if (!u8aEquals(channelId, _channelId)) return
-
-        return resolve()
+    return new Promise((resolve, reject) => {
+      const subscription = this.coreConnector.web3.eth.subscribe('logs', {
+        address: this.coreConnector.hoprChannels.options.address,
+        topics: topics.generateTopics(topics.EventSignatures.ClosedChannel, self, counterparty, true)
       })
+
+      subscription
+        .on('data', async (log: Log) => {
+          const event = topics.decodeClosedChannel(log)
+
+          const _channelId = await getId(
+            await event.data.closer.toAccountId(),
+            await event.data.counterparty.toAccountId()
+          )
+
+          if (!u8aEquals(_channelId, channelId)) {
+            return
+          }
+
+          await subscription.unsubscribe()
+          return resolve()
+        })
+        .on('error', reject)
     })
+
+    // const { indexer } = this.coreConnector
+    // const channelId = await getId(await self.toAccountId(), await counterparty.toAccountId())
+
+    // return new Promise((resolve) => {
+    //   indexer.on('channelClosed', async ({ partyA, partyB }) => {
+    //     const _channelId = await getId(await partyA.toAccountId(), await partyB.toAccountId())
+    //     if (!u8aEquals(channelId, _channelId)) return
+
+    //     return resolve()
+    //   })
+    // })
   }
 }
 
