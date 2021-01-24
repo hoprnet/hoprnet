@@ -72,7 +72,10 @@ class Heartbeat implements AbstractInteraction {
       try {
         struct = await this.node
           .dialProtocol(counterparty, this.protocols[0], { signal: abort.signal })
-          .catch(async (err: Error) => {
+          .catch(async (err: any) => {
+            if (err.type === 'aborted') {
+              throw err
+            }
             verbose(`heartbeat connection error ${err.name} while dialing ${counterparty.toB58String()} (initial)`)
             const { id } = await this.node.peerRouting.findPeer(counterparty)
             //verbose('trying with peer info', peerInfo)
