@@ -1,3 +1,22 @@
+<a name="0.2.1"></a>
+
+## [0.2.1](https://github.com/hoprnet/hopr-connect/compare/0.2.0...0.2.1) (2021-01-24)
+
+### Fixes
+
+- Control flow bug that lead to unintended connection closes
+
+<a name="0.2.0"></a>
+
+## [0.2.0](https://github.com/hoprnet/hopr-connect/compare/0.1.2...0.2.0) (2020-01-22)
+
+### Enhancements
+
+- Strong typing & less code
+- Flexible upgrade handover sequence
+- Priorisation of signalling messages over payload messages
+- First integration of libp2p test suite
+
 <a name="0.1.2"></a>
 
 ## [0.1.2](https://github.com/hoprnet/hopr-connect/compare/0.1.1...0.1.2) (2020-12-15)
