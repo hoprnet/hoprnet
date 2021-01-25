@@ -58,12 +58,10 @@ class Heartbeat implements AbstractInteraction {
       // NB. This is a false assumption for 'ping' and we therefore trigger
       // errors.
       let struct: Handler
-      let aborted = false
 
       const abort = new AbortController()
 
       const timeout = setTimeout(() => {
-        aborted = true
         abort.abort()
         verbose(`heartbeat timeout while querying ${counterparty.toB58String()}`)
         reject(Error(`Timeout while querying ${counterparty.toB58String()}.`))
