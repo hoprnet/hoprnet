@@ -424,9 +424,9 @@
     wrtc "0.4.6"
 
 "@hoprnet/hopr-utils@^1.57.6":
-  version "1.62.15"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-1.62.15.tgz#67fc83f18fe6bccce3f25dc5fb3f0e9deee9c819"
-  integrity sha512-q1zdv2D4JdrxnGpWt70tKXkqsmlM/11amrZfIA9F1kHmK1oNmJ440S+oKeUjjdCXjE3jZk4mM6BIk4etL4kINg==
+  version "1.62.14"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-1.62.14.tgz#bf9be83fab5469924ac3652fa718f04283df659e"
+  integrity sha512-ySNAdsNs5L0KniGjIdq6g6Dzcg7uMVt51NeOwLaKPNjbWY+OhjvOe/H5HkXB8k5C2mM/esyLPgxhziv5X61qHg==
   dependencies:
     bignumber.js "^9.0.0"
     libp2p-crypto "0.18.0"
