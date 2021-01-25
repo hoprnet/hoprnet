@@ -25,7 +25,7 @@ export const HEARTBEAT_INTERVAL_VARIANCE = 5000
 
 export const MAX_PARALLEL_CONNECTIONS = 5
 
-export const HEARTBEAT_TIMEOUT = durations.seconds(3)
+export const HEARTBEAT_TIMEOUT = durations.seconds(4)
 
 export const MAX_PACKET_DELAY = 200
 

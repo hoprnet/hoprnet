@@ -8,6 +8,7 @@ import { PROTOCOL_HEARTBEAT, HEARTBEAT_TIMEOUT } from '../../constants'
 import type { Stream, Connection, Handler } from 'libp2p'
 import type PeerId from 'peer-id'
 import { LibP2P } from '../../'
+import Multiaddr from 'multiaddr'
 
 const error = debug('hopr-core:heartbeat:error')
 const verbose = debug('hopr-core:verbose:heartbeat')
@@ -67,8 +68,9 @@ class Heartbeat implements AbstractInteraction {
         reject(Error(`Timeout while querying ${counterparty.toB58String()}.`))
       }, HEARTBEAT_TIMEOUT)
 
+      console.log(`before dialProtocol`)
       try {
-        struct = await this.node.dialProtocol(counterparty, this.protocols[0], { signal: abort.signal })
+        struct = await this.node.dialProtocol(Multiaddr(`/p2p/${counterparty.toB58String()}`), this.protocols[0], { signal: abort.signal })
       } catch (err) {
         if (err.type === 'aborted') {
           return reject()
@@ -76,12 +78,14 @@ class Heartbeat implements AbstractInteraction {
         error(`heartbeat connection error ${err.name} while dialing ${counterparty.toB58String()} (initial)`)
       }
 
+      console.log(`struct`, struct)
+
       if (abort.signal.aborted) {
         return
       }
 
       if (struct == null) {
-        const { id } = await this.node.peerRouting.findPeer(counterparty)
+        const { id, multiaddrs } = await this.node.peerRouting.findPeer(counterparty)
 
         try {
           struct = await this.node.dialProtocol(id, this.protocols[0], { signal: abort.signal })
@@ -91,6 +95,8 @@ class Heartbeat implements AbstractInteraction {
           }
           error(`heartbeat connection error ${err.name} while dialing ${counterparty.toB58String()} (subsequent)`)
         }
+
+        console.log(`struct after findPeer`, struct, multiaddrs)
       }
 
       const challenge = randomBytes(16)
