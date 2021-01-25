@@ -47,7 +47,7 @@ class Heartbeat implements AbstractInteraction {
     )
   }
 
-  async interact(counterparty: PeerId): Promise<number | void> {
+  async interact(counterparty: PeerId): Promise<number> {
     const start = Date.now()
 
     return new Promise<number>(async (resolve, reject) => {
@@ -73,9 +73,9 @@ class Heartbeat implements AbstractInteraction {
         struct = await this.node.dialProtocol(counterparty, this.protocols[0], { signal: abort.signal })
       } catch (err) {
         if (err.type === 'aborted') {
-          return
+          return reject()
         }
-        verbose(`heartbeat connection error ${err.name} while dialing ${counterparty.toB58String()} (initial)`)
+        error(`heartbeat connection error ${err.name} while dialing ${counterparty.toB58String()} (initial)`)
       }
 
       if (abort.signal.aborted) {
@@ -89,28 +89,33 @@ class Heartbeat implements AbstractInteraction {
           struct = await this.node.dialProtocol(id, this.protocols[0], { signal: abort.signal })
         } catch (err) {
           if (err.type === 'aborted') {
-            return
+            return reject()
           }
-          verbose(`heartbeat connection error ${err.name} while dialing ${counterparty.toB58String()} (subsequent)`)
+          error(`heartbeat connection error ${err.name} while dialing ${counterparty.toB58String()} (subsequent)`)
         }
       }
 
       const challenge = randomBytes(16)
       const expectedResponse = createHash(HASH_FUNCTION).update(challenge).digest()
 
-      await pipe([challenge], struct.stream, async (source: AsyncIterable<Uint8Array>) => {
-        for await (const msg of source) {
-          if (u8aEquals(msg, expectedResponse)) {
-            break
+      const response = await pipe(
+        // prettier-ignore
+        [challenge],
+        struct.stream,
+        async (source: AsyncIterable<Uint8Array>): Promise<Uint8Array | void> => {
+          for await (const msg of source) {
+            return msg
           }
         }
-      })
+      )
 
       clearTimeout(timeout)
 
-      if (!aborted) {
+      if (response != null && u8aEquals(expectedResponse, response.slice())) {
         resolve(Date.now() - start)
       }
+
+      reject()
     })
   }
 }
