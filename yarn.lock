@@ -403,10 +403,10 @@
   resolved "https://registry.yarnpkg.com/@hapi/hoek/-/hoek-9.1.1.tgz#9daf5745156fd84b8e9889a2dc721f0c58e894aa"
   integrity sha512-CAEbWH7OIur6jEOzaai83jq3FmKmv4PmX1JYfs9IrYcGEVI/lyL1EXJGCj7eFVJ0bg5QR8LMxBlEtA+xKiLpFw==
 
-"@hoprnet/hopr-connect@0.2.1":
-  version "0.2.1"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-connect/-/hopr-connect-0.2.1.tgz#82f43296f917bdc9eeabaa04c1579be85009ddf3"
-  integrity sha512-S64sylN5QjoygwiQzCSSNNxorf71eeCLwfNZqkdIf6jLhXUSW1fWL5rC0sid7gYQHbQHXL17Bksro6eEmaL4Sw==
+"@hoprnet/hopr-connect@0.2.2":
+  version "0.2.2"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-connect/-/hopr-connect-0.2.2.tgz#6b3eb6ac8c22f6cc148c37625bd2c62af9e303ed"
+  integrity sha512-S3dupXIqW6x3c0cXzsLEi6OJ/seUMtIIlfpX105ya09VvLX60qBP5e2p6ut++quElNx/zbQZycqCZRc5jPupeA==
   dependencies:
     "@hoprnet/hopr-utils" "^1.62"
     abort-controller "3.0.0"
