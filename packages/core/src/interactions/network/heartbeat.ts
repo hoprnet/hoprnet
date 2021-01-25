@@ -70,7 +70,9 @@ class Heartbeat implements AbstractInteraction {
 
       console.log(`before dialProtocol`)
       try {
-        struct = await this.node.dialProtocol(Multiaddr(`/p2p/${counterparty.toB58String()}`), this.protocols[0], { signal: abort.signal })
+        struct = await this.node.dialProtocol(Multiaddr(`/p2p/${counterparty.toB58String()}`), this.protocols[0], {
+          signal: abort.signal
+        })
       } catch (err) {
         if (err.type === 'aborted') {
           return reject()
