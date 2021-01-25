@@ -69,6 +69,9 @@ class Heartbeat implements AbstractInteraction {
       }, HEARTBEAT_TIMEOUT)
 
       console.log(`before dialProtocol`)
+
+      console.log(`previous connection`, this.node.connectionManager.connections.get(counterparty.toB58String()))
+
       try {
         struct = await this.node.dialProtocol(Multiaddr(`/p2p/${counterparty.toB58String()}`), this.protocols[0], {
           signal: abort.signal
