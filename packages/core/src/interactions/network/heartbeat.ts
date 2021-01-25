@@ -83,7 +83,7 @@ class Heartbeat implements AbstractInteraction {
       console.log(`struct`, struct)
 
       if (abort.signal.aborted) {
-        return
+        return reject()
       }
 
       if (struct == null) {
@@ -99,6 +99,10 @@ class Heartbeat implements AbstractInteraction {
         }
 
         console.log(`struct after findPeer`, struct, multiaddrs)
+      }
+
+      if (struct == null) {
+        return reject()
       }
 
       const challenge = randomBytes(16)
