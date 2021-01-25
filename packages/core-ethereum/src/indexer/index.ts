@@ -385,14 +385,14 @@ class Indexer implements IIndexer {
   private async getPastLogs(
     fromBlock: number,
     toBlock: number,
-    topics: (string | string[])[]
+    topics: (string | string[])[],
+    blockRange: number
   ): Promise<[OnChainLog[], number]> {
-    const BLOCKS = 2000
     let result: OnChainLog[] = []
 
     let failedCount = 0
-    while (fromBlock + BLOCKS < toBlock) {
-      const toBlock = fromBlock + (failedCount > 0 ? 25 : BLOCKS)
+    while (fromBlock + blockRange < toBlock) {
+      const toBlock = fromBlock + (failedCount > 0 ? 25 : blockRange)
 
       log(
         `${failedCount > 0 ? 'Re-quering' : 'Quering'} past logs from %d to %d: %d`,
@@ -421,7 +421,7 @@ class Indexer implements IIndexer {
       }
 
       failedCount = 0
-      fromBlock += BLOCKS
+      fromBlock += blockRange
     }
 
     return [result, fromBlock]
@@ -449,7 +449,8 @@ class Indexer implements IIndexer {
       let rejected = false
       try {
         // HACK
-        const HoprChannelsGenesisBN = 9503420
+        const HoprChannelsGenesisBN = this.connector.chainId === 4 ? 9503420 : 0
+        const BLOCK_RANGE = 2000
         const onChainBlockNumber = await this.connector.web3.eth.getBlockNumber()
 
         // go back 8 blocks in case of a re-org at time of stopping
@@ -463,23 +464,40 @@ class Indexer implements IIndexer {
 
         log(`starting to query events from block ${fromBlock}..`)
 
-        const [[pastOpenedLogs, pastOpenedBN], [pastClosedLogs, pastClosedBN]] = await Promise.all([
-          this.getPastLogs(fromBlock, onChainBlockNumber, events.OpenedChannelTopics(undefined, undefined)),
-          this.getPastLogs(fromBlock, onChainBlockNumber, events.ClosedChannelTopics(undefined, undefined))
-        ])
+        let fromBlockOpened = fromBlock
+        let fromBlockClosed = fromBlock
+        if (fromBlock + BLOCK_RANGE < onChainBlockNumber) {
+          const [[pastOpenedLogs, lastOpenedBlock], [pastClosedLogs, lastClosedBlock]] = await Promise.all([
+            this.getPastLogs(
+              fromBlock,
+              onChainBlockNumber,
+              events.OpenedChannelTopics(undefined, undefined),
+              BLOCK_RANGE
+            ),
+            this.getPastLogs(
+              fromBlock,
+              onChainBlockNumber,
+              events.ClosedChannelTopics(undefined, undefined),
+              BLOCK_RANGE
+            )
+          ])
 
-        for (const log of pastOpenedLogs) {
-          this.processOpenedChannelEvent(log, 0)
+          for (const log of pastOpenedLogs) {
+            this.processOpenedChannelEvent(log, 0)
+          }
+
+          for (const log of pastClosedLogs) {
+            this.processClosedChannelEvent(log, 0)
+          }
+
+          // trigger new block so we process past events
+          await this.onNewBlock({ number: onChainBlockNumber })
+
+          fromBlockOpened = lastOpenedBlock
+          fromBlockClosed = lastClosedBlock
         }
 
-        for (const log of pastClosedLogs) {
-          this.processClosedChannelEvent(log, 0)
-        }
-
-        // trigger new block so we process past events
-        await this.onNewBlock({ number: onChainBlockNumber })
-
-        log(`subscribed to events from blocks ${pastOpenedBN} and ${pastClosedBN}..`)
+        log(`subscribed to events from blocks ${fromBlockOpened} and ${fromBlockClosed}..`)
 
         this.newBlockEvent = this.connector.web3.eth
           .subscribe('newBlockHeaders')
@@ -495,7 +513,7 @@ class Indexer implements IIndexer {
         this.openedChannelEvent = this.connector.web3.eth
           .subscribe('logs', {
             address: this.connector.hoprChannels.options.address,
-            fromBlock: pastOpenedBN,
+            fromBlock: fromBlockOpened,
             topics: events.OpenedChannelTopics(undefined, undefined)
           })
           .on('error', (err) => {
@@ -510,7 +528,7 @@ class Indexer implements IIndexer {
         this.closedChannelEvent = this.connector.web3.eth
           .subscribe('logs', {
             address: this.connector.hoprChannels.options.address,
-            fromBlock: pastClosedBN,
+            fromBlock: fromBlockClosed,
             topics: events.ClosedChannelTopics(undefined, undefined)
           })
           .on('error', (err) => {
