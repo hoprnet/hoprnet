@@ -77,7 +77,7 @@ class Heartbeat implements AbstractInteraction {
         if (err.type === 'aborted') {
           return reject()
         }
-        error(`heartbeat connection error ${err.name} while dialing ${counterparty.toB58String()} (initial)`)
+        error(`heartbeat connection error ${err.name} while dialing ${counterparty.toB58String()} (initial)`, err)
       }
 
       console.log(`struct`, struct)
