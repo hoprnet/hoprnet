@@ -47,7 +47,7 @@ class Heartbeat implements AbstractInteraction {
     )
   }
 
-  async interact(counterparty: PeerId): Promise<number> {
+  async interact(counterparty: PeerId): Promise<number | void> {
     const start = Date.now()
 
     return new Promise<number>(async (resolve, reject) => {
@@ -70,32 +70,29 @@ class Heartbeat implements AbstractInteraction {
       }, HEARTBEAT_TIMEOUT)
 
       try {
-        struct = await this.node
-          .dialProtocol(counterparty, this.protocols[0], { signal: abort.signal })
-          .catch(async (err: any) => {
-            if (err.type === 'aborted') {
-              throw err
-            }
-            verbose(`heartbeat connection error ${err.name} while dialing ${counterparty.toB58String()} (initial)`)
-            const { id } = await this.node.peerRouting.findPeer(counterparty)
-            //verbose('trying with peer info', peerInfo)
-            return await this.node.dialProtocol(id, this.protocols[0], { signal: abort.signal })
-          })
+        struct = await this.node.dialProtocol(counterparty, this.protocols[0], { signal: abort.signal })
       } catch (err) {
-        verbose(
-          `heartbeat connection error ${err.name} while dialing ${counterparty.toB58String()} (subsequent)`,
-          aborted
-        )
-        clearTimeout(timeout)
-        if (!aborted) {
-          error(err)
+        if (err.type === 'aborted') {
+          return
         }
-        return reject()
+        verbose(`heartbeat connection error ${err.name} while dialing ${counterparty.toB58String()} (initial)`)
       }
 
-      if (aborted) {
-        verbose('aborted but no error')
+      if (abort.signal.aborted) {
         return
+      }
+
+      if (struct == null) {
+        const { id } = await this.node.peerRouting.findPeer(counterparty)
+
+        try {
+          struct = await this.node.dialProtocol(id, this.protocols[0], { signal: abort.signal })
+        } catch (err) {
+          if (err.type === 'aborted') {
+            return
+          }
+          verbose(`heartbeat connection error ${err.name} while dialing ${counterparty.toB58String()} (subsequent)`)
+        }
       }
 
       const challenge = randomBytes(16)
