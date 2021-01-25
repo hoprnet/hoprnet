@@ -58,27 +58,27 @@ describe('test isConfirmedBlock', function () {
     expect(isConfirmedBlock(0, 0, 0)).to.be.true
   })
 
-  it('should be false when blockNumber=5 onChainBlockNumber=0 MaxConf=0', function () {
+  it('should be false when blockNumber=5 onChainBlockNumber=0 maxConf=0', function () {
     expect(isConfirmedBlock(5, 0, 0)).to.be.false
   })
 
-  it('should be true when blockNumber=5 onChainBlockNumber=5 MaxConf=0', function () {
+  it('should be true when blockNumber=5 onChainBlockNumber=5 maxConf=0', function () {
     expect(isConfirmedBlock(5, 5, 0)).to.be.true
   })
 
-  it('should be true when blockNumber=5 onChainBlockNumber=10 MaxConf=0', function () {
+  it('should be true when blockNumber=5 onChainBlockNumber=10 maxConf=0', function () {
     expect(isConfirmedBlock(5, 10, 0)).to.be.true
   })
 
-  it('should be false when blockNumber=5 onChainBlockNumber=0 MaxConf=5', function () {
+  it('should be false when blockNumber=5 onChainBlockNumber=0 maxConf=5', function () {
     expect(isConfirmedBlock(5, 0, 5)).to.be.false
   })
 
-  it('should be false when blockNumber=5 onChainBlockNumber=5 MaxConf=5', function () {
+  it('should be false when blockNumber=5 onChainBlockNumber=5 maxConf=5', function () {
     expect(isConfirmedBlock(5, 5, 5)).to.be.false
   })
 
-  it('should be true when blockNumber=5 onChainBlockNumber=10 MaxConf=5', function () {
+  it('should be true when blockNumber=5 onChainBlockNumber=10 maxConf=5', function () {
     expect(isConfirmedBlock(5, 10, 5)).to.be.true
   })
 })

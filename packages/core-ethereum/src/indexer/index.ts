@@ -26,8 +26,6 @@ import type { Event, EventData } from './topics'
 
 const log = DebugLog(['indexer'])
 
-type Subscriptions = 'NewBlock' | keyof EventData
-
 /**
  * Simple indexer to keep track of all open payment channels.
  */
@@ -35,7 +33,7 @@ class Indexer extends EventEmitter implements IIndexer {
   public status: 'started' | 'stopped' = 'stopped'
   private unconfirmedEvents = new Heap<Event<any>>(snapshotComparator)
   private subscriptions: {
-    [K in Subscriptions]?: Subscription<any>
+    [K in 'NewBlock' | 'NewEvent']?: Subscription<any>
   } = {}
 
   // latest known on-chain block number
@@ -56,79 +54,79 @@ class Indexer extends EventEmitter implements IIndexer {
 
     const { web3, hoprChannels } = this.connector
 
-    let fromBlock = await getLatestBlockNumber(this.connector)
-    this.latestBlock = fromBlock
+    const [latestKnownBN, latestOnChainBN] = await Promise.all([
+      await getLatestBlockNumber(this.connector),
+      web3.eth.getBlockNumber()
+    ])
+
+    log('Latest known block %d', latestKnownBN)
+    log('Latest on-chain block %d', latestOnChainBN)
+
+    this.latestBlock = latestKnownBN
+
+    // @TODO: get this from somewhere else
+    const HoprChannelsGenesisBN = 9503420
+    // @TODO: add to constants
+    const BLOCKS = 1000
+
+    const getPastLogs = async (fromBlock: number, toBlock: number): Promise<Log[]> => {
+      return web3.eth.getPastLogs({
+        address: hoprChannels.options.address,
+        fromBlock,
+        toBlock
+      })
+    }
 
     // go back 'MAX_CONFIRMATIONS' blocks in case of a re-org at time of stopping
+    let fromBlock = latestKnownBN
     if (fromBlock - this.maxConfirmations > 0) {
       fromBlock = fromBlock - this.maxConfirmations
+    }
+    if (fromBlock < HoprChannelsGenesisBN) {
+      fromBlock = HoprChannelsGenesisBN
     }
 
     log('Starting to index from block %d', fromBlock)
 
+    let failed = false
+    console.time('sync')
+    while (fromBlock + BLOCKS < latestOnChainBN) {
+      const toBlock = fromBlock + (failed ? 25 : BLOCKS)
+
+      log(`${failed ? 'Re-quering' : 'Quering'} past logs from %d to %d: %d`, fromBlock, toBlock, toBlock - fromBlock)
+      try {
+        await getPastLogs(fromBlock, toBlock)
+      } catch (error) {
+        failed = true
+        // console.error(error)
+        continue
+      }
+
+      failed = false
+      fromBlock += BLOCKS
+    }
+    console.timeEnd('sync')
+
+    log('Subscribing to events from block %d', fromBlock)
+
     // subscribe to events
     // @TODO: when we refactor this needs to be more generic
+    this.subscriptions['NewBlock'] = web3.eth
+      .subscribe('newBlockHeaders')
+      .on('error', console.error)
+      .on('data', (block) => this.onNewBlock(block))
 
-    this.subscriptions['NewBlock'] = web3.eth.subscribe('newBlockHeaders').on('data', (block) => this.onNewBlock(block))
-
-    this.subscriptions['FundedChannel'] = web3.eth
+    this.subscriptions['NewEvent'] = web3.eth
       .subscribe('logs', {
         address: hoprChannels.options.address,
-        fromBlock,
-        topics: topics.generateTopics(topics.EventSignatures.FundedChannel, undefined, undefined)
+        fromBlock
       })
+      .on('error', console.error)
       .on('data', (onChainLog: Log) => {
-        const event = topics.decodeFundedChannel(onChainLog)
-        log('New event %s', event.name)
-        this.onFundedChannel(event).catch(console.error)
-      })
-
-    this.subscriptions['OpenedChannel'] = web3.eth
-      .subscribe('logs', {
-        address: hoprChannels.options.address,
-        fromBlock,
-        topics: topics.generateTopics(topics.EventSignatures.OpenedChannel, undefined, undefined)
-      })
-      .on('data', (onChainLog: Log) => {
-        const event = topics.decodeOpenedChannel(onChainLog)
-        log('New event %s', event.name)
-        this.onOpenedChannel(event).catch(console.error)
-      })
-
-    this.subscriptions['RedeemedTicket'] = web3.eth
-      .subscribe('logs', {
-        address: hoprChannels.options.address,
-        fromBlock,
-        topics: topics.generateTopics(topics.EventSignatures.RedeemedTicket, undefined, undefined)
-      })
-      .on('data', (onChainLog: Log) => {
-        const event = topics.decodeRedeemedTicket(onChainLog)
-        log('New event %s', event.name)
-        this.onRedeemedTicket(event).catch(console.error)
-      })
-
-    this.subscriptions['InitiatedChannelClosure'] = web3.eth
-      .subscribe('logs', {
-        address: hoprChannels.options.address,
-        fromBlock,
-        topics: topics.generateTopics(topics.EventSignatures.InitiatedChannelClosure, undefined, undefined)
-      })
-      .on('data', (onChainLog: Log) => {
-        const event = topics.decodeInitiatedChannelClosure(onChainLog)
-        log('New event %s', event.name)
-        this.onInitiatedChannelClosure(event).catch(console.error)
-      })
-
-    this.subscriptions['ClosedChannel'] = web3.eth
-      .subscribe('logs', {
-        address: hoprChannels.options.address,
-        fromBlock,
-        topics: topics.generateTopics(topics.EventSignatures.ClosedChannel, undefined, undefined)
-      })
-      .on('data', (onChainLog: Log) => {
-        const event = topics.decodeClosedChannel(onChainLog)
-        log('New event %s', event.name)
-        this.onClosedChannel(event).catch(console.error)
+        console.count('onChainLog')
+        // const event = topics.decodeFundedChannel(onChainLog)
+        // log('New event %s', event.name)
+        // this.onFundedChannel(event).catch(console.error)
       })
 
     this.status = 'started'
