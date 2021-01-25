@@ -295,10 +295,12 @@ class Indexer implements IIndexer {
     a: OpenedChannelEvent | ClosedChannelEvent,
     b: OpenedChannelEvent | ClosedChannelEvent
   ): number {
-    return a.blockNumber - b.blockNumber
+    if (a.blockNumber !== b.blockNumber) return a.blockNumber - b.blockNumber
+    else if (a.transactionIndex !== b.transactionIndex) return a.transactionIndex - b.transactionIndex
+    return a.logIndex - b.logIndex
   }
 
-  private async onNewBlock(block: BlockHeader) {
+  private async onNewBlock(block: { number: number }) {
     while (
       this.unconfirmedEvents.length > 0 &&
       isConfirmedBlock(
@@ -379,6 +381,52 @@ class Indexer implements IIndexer {
     await this.delete(partyA, partyB)
   }
 
+  // TODO: this is a quick fix, needs improvements
+  private async getPastLogs(
+    fromBlock: number,
+    toBlock: number,
+    topics: (string | string[])[]
+  ): Promise<[OnChainLog[], number]> {
+    const BLOCKS = 2000
+    let result: OnChainLog[] = []
+
+    let failedCount = 0
+    while (fromBlock + BLOCKS < toBlock) {
+      const toBlock = fromBlock + (failedCount > 0 ? 25 : BLOCKS)
+
+      log(
+        `${failedCount > 0 ? 'Re-quering' : 'Quering'} past logs from %d to %d: %d`,
+        fromBlock,
+        toBlock,
+        toBlock - fromBlock
+      )
+      try {
+        const logs = await this.connector.web3.eth.getPastLogs({
+          address: this.connector.hoprChannels.options.address,
+          fromBlock,
+          toBlock,
+          topics
+        })
+
+        result = result.concat(logs)
+      } catch (error) {
+        failedCount++
+
+        if (failedCount > 1) {
+          console.error(error)
+          throw error
+        }
+
+        continue
+      }
+
+      failedCount = 0
+      fromBlock += BLOCKS
+    }
+
+    return [result, fromBlock]
+  }
+
   /**
    * Start indexing,
    * listen to all open / close events,
@@ -400,19 +448,43 @@ class Indexer implements IIndexer {
     this.starting = new Promise<boolean>(async (resolve, reject) => {
       let rejected = false
       try {
+        // HACK
+        const HoprChannelsGenesisBN = 9503420
         const onChainBlockNumber = await this.connector.web3.eth.getBlockNumber()
-        let fromBlock = await this.getLatestConfirmedBlockNumber()
 
         // go back 8 blocks in case of a re-org at time of stopping
+        let fromBlock = await this.getLatestConfirmedBlockNumber()
         if (fromBlock - MAX_CONFIRMATIONS > 0) {
           fromBlock = fromBlock - MAX_CONFIRMATIONS
         }
+        if (fromBlock < HoprChannelsGenesisBN) {
+          fromBlock = HoprChannelsGenesisBN
+        }
 
-        log(`starting to pull events from block ${fromBlock}..`)
+        log(`starting to query events from block ${fromBlock}..`)
+
+        const [[pastOpenedLogs, pastOpenedBN], [pastClosedLogs, pastClosedBN]] = await Promise.all([
+          this.getPastLogs(fromBlock, onChainBlockNumber, events.OpenedChannelTopics(undefined, undefined)),
+          this.getPastLogs(fromBlock, onChainBlockNumber, events.ClosedChannelTopics(undefined, undefined))
+        ])
+
+        for (const log of pastOpenedLogs) {
+          this.processOpenedChannelEvent(log, 0)
+        }
+
+        for (const log of pastClosedLogs) {
+          this.processClosedChannelEvent(log, 0)
+        }
+
+        // trigger new block so we process past events
+        await this.onNewBlock({ number: onChainBlockNumber })
+
+        log(`subscribed to events from blocks ${pastOpenedBN} and ${pastClosedBN}..`)
 
         this.newBlockEvent = this.connector.web3.eth
           .subscribe('newBlockHeaders')
           .on('error', (err) => {
+            console.log(err)
             if (!rejected) {
               rejected = true
               reject(err)
@@ -423,10 +495,11 @@ class Indexer implements IIndexer {
         this.openedChannelEvent = this.connector.web3.eth
           .subscribe('logs', {
             address: this.connector.hoprChannels.options.address,
-            fromBlock,
+            fromBlock: pastOpenedBN,
             topics: events.OpenedChannelTopics(undefined, undefined)
           })
           .on('error', (err) => {
+            console.log(err)
             if (!rejected) {
               rejected = true
               reject(err)
@@ -437,10 +510,11 @@ class Indexer implements IIndexer {
         this.closedChannelEvent = this.connector.web3.eth
           .subscribe('logs', {
             address: this.connector.hoprChannels.options.address,
-            fromBlock,
+            fromBlock: pastClosedBN,
             topics: events.ClosedChannelTopics(undefined, undefined)
           })
           .on('error', (err) => {
+            console.log(err)
             if (!rejected) {
               rejected = true
               reject(err)
