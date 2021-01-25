@@ -214,6 +214,9 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
         },
         relay: {
           enabled: false
+        },
+        dialer: {
+          maxDialsPerPeer: 1
         }
       },
       dialer: {
