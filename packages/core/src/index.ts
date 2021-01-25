@@ -203,7 +203,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
           HoprConnect: {
             bootstrapServers: options.bootstrapServers,
             __noDirectConnections: true,
-            __noWebRTCUpgrade: true
+            __noWebRTCUpgrade: false
           }
         },
         peerDiscovery: {
@@ -214,13 +214,11 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
         },
         relay: {
           enabled: false
-        },
-        dialer: {
-          maxDialsPerPeer: 1
         }
       },
       dialer: {
-        maxParallelDials: options.bootstrapNode ? 1000 : 100
+        maxParallelDials: options.bootstrapNode ? 1000 : 100,
+        maxDialsPerPeer: 1
       }
     })
 
