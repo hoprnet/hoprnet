@@ -20,8 +20,6 @@ const log = debug('hopr-connect')
 const error = debug('hopr-connect:error')
 const verbose = debug('hopr-connect:verbose')
 
-const EXPECTED_DIAL_ERRORS = ['ECONNREFUSED', 'ECONNRESET', 'EPIPE', 'EHOSTUNREACH', 'ETIMEOUT']
-
 /**
  * @class HoprConnect
  */
@@ -155,38 +153,29 @@ class HoprConnect implements Transport {
     if (options.signal?.aborted) {
       throw new AbortError()
     }
-    // @TODO check if we should allow loopbacks
-    // if (ma.getPeerId() === this._peerId.toB58String()) {
-    //   throw Error(`Cannot dial ourself`)
-    // }
 
-    if (this.shouldAttemptDirectDial(ma)) {
-      try {
-        verbose('attempting to dial directly', ma.toString())
-        return await this._dialDirectly(ma, options)
-      } catch (err) {
-        if ((err != null && EXPECTED_DIAL_ERRORS.includes(err.code)) || err.type === 'aborted') {
-          // expected case, continue
-          verbose(err)
-        } else {
-          // Unexpected error, ie:
-          // type === aborted
-          error(`Dial directly unexpected error ${err}`)
-          throw err
+    switch (ma.protoNames()[0]) {
+      case 'ip4':
+      case 'ip6':
+        if (!this.shouldAttemptDirectDial(ma)) {
+          throw new AbortError()
         }
-      }
-    }
 
-    if (this.relays == undefined || this.relays.length == 0) {
-      throw Error(
-        `Could not connect to ${chalk.yellow(ma.toString())}: Direct connection failed and there are no relays known.`
-      )
-    }
+        return await this.dialDirectly(ma, options)
+      case 'p2p':
+        if (this.relays == undefined || this.relays.length == 0) {
+          throw Error(
+            `Could not connect to ${chalk.yellow(
+              ma.toString()
+            )}: Direct connection failed and there are no relays known.`
+          )
+        }
 
-    verbose('dialing with relay ', ma.toString())
-    const conn = await this._dialWithRelay(ma, this.relays, options)
-    log(`relayed connection established`)
-    return conn
+        verbose('dialing with relay ', ma.toString())
+        return await this.dialWithRelay(ma, this.relays, options)
+      default:
+        throw new AbortError(`Protocol not supported`)
+    }
   }
 
   /**
@@ -225,7 +214,7 @@ class HoprConnect implements Transport {
    * @param relays potential relays that we can use
    * @param options optional dial options
    */
-  private async _dialWithRelay(ma: Multiaddr, relays: Multiaddr[], options?: DialOptions): Promise<Connection> {
+  private async dialWithRelay(ma: Multiaddr, relays: Multiaddr[], options?: DialOptions): Promise<Connection> {
     let conn = await this._relay.establishRelayedConnection(ma, relays, this.onReconnect.bind(this), options)
 
     return await this._upgrader.upgradeOutbound(conn)
@@ -236,7 +225,7 @@ class HoprConnect implements Transport {
    * @param ma destination
    * @param options optional dial options
    */
-  private async _dialDirectly(ma: Multiaddr, options?: DialOptions): Promise<Connection> {
+  private async dialDirectly(ma: Multiaddr, options?: DialOptions): Promise<Connection> {
     log(`Attempting to dial ${chalk.yellow(ma.toString())} directly`)
     const maConn = await TCPConnection.create(ma, options)
 

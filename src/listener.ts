@@ -147,7 +147,8 @@ class Listener extends EventEmitter implements InterfaceListener {
 
       if (!isAnyAddress(ma) && index < 0) {
         throw Error(
-          `Could not bind to interface ${this._interface} on address ${options.host
+          `Could not bind to interface ${this._interface} on address ${
+            options.host
           } because it was configured with a different addresses: ${osInterface
             .map((iface) => iface.address)
             .join(`, `)}`
@@ -230,10 +231,10 @@ class Listener extends EventEmitter implements InterfaceListener {
       }),
       this.tcpSocket.listening
         ? new Promise((resolve) => {
-          this.__connections.forEach(attemptClose)
-          this.tcpSocket.once('close', resolve)
-          this.tcpSocket.close()
-        })
+            this.__connections.forEach(attemptClose)
+            this.tcpSocket.once('close', resolve)
+            this.tcpSocket.close()
+          })
         : Promise.resolve()
     ])
 
@@ -253,16 +254,6 @@ class Listener extends EventEmitter implements InterfaceListener {
 
     if (this.externalAddress == undefined) {
       log(`Attention: Bidirectional NAT detected. Publishing no public IPv4 address to the DHT`)
-
-      addrs.push(Multiaddr(`/p2p/${this.peerId}`))
-
-      addrs.push(
-        ...getAddrs(address.port, this.peerId.toB58String(), {
-          includeLocalIPv4: true,
-          includeLocalhostIPv4: true,
-          useIPv6: false
-        })
-      )
     } else {
       addrs.push(
         Multiaddr.fromNodeAddress(
@@ -274,15 +265,17 @@ class Listener extends EventEmitter implements InterfaceListener {
           'tcp'
         ).encapsulate(`/p2p/${this.peerId}`)
       )
-
-      addrs.push(
-        ...getAddrs(address.port, this.peerId.toB58String(), {
-          includeLocalIPv4: true,
-          includeLocalhostIPv4: true,
-          useIPv6: false
-        })
-      )
     }
+
+    addrs.push(Multiaddr(`/p2p/${this.peerId}`))
+
+    addrs.push(
+      ...getAddrs(address.port, this.peerId.toB58String(), {
+        includeLocalIPv4: true,
+        includeLocalhostIPv4: true,
+        useIPv6: false
+      })
+    )
 
     return addrs
   }

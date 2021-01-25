@@ -48,7 +48,7 @@ async function main() {
           bootstrapServers: [RELAY_ADDRESS],
           // simulates a NAT
           __noDirectConnections: true,
-          __noWebRTCUpgrade: true
+          __noWebRTCUpgrade: false
         }
       }
     }
@@ -85,10 +85,7 @@ async function main() {
 
   switch (process.argv[2]) {
     case '0':
-      conn = await node.dialProtocol(
-        Multiaddr(`/ip4/127.0.0.1/tcp/9091/p2p/${await PeerId.createFromPrivKey(Bob)}`),
-        TEST_PROTOCOL
-      )
+      conn = await node.dialProtocol(Multiaddr(`/p2p/${await PeerId.createFromPrivKey(Bob)}`), TEST_PROTOCOL)
 
       await pipe(
         // prettier-ignore
