@@ -88,17 +88,7 @@ class WebRTCConnection implements MultiaddrConnection {
     // used for testing
     this.__noWebRTCUpgrade = options?.__noWebRTCUpgrade
 
-    this.channel.once('connect', async () => {
-      if (this._webRTCTimeout != undefined) {
-        clearTimeout(this._webRTCTimeout)
-      }
-
-      this._webRTCStateKnown = true
-      this._webRTCAvailable = !this.__noWebRTCUpgrade
-
-      // @TODO could be mixed up
-      this._switchPromise.resolve()
-    })
+    this.channel.once('connect', this.onConnect.bind(this))
 
     this.channel.once('error', this.endWebRTCUpgrade.bind(this))
 
@@ -176,6 +166,18 @@ class WebRTCConnection implements MultiaddrConnection {
     setImmediate(() => {
       this.channel.destroy()
     })
+  }
+
+  private async onConnect() {
+    if (this._webRTCTimeout != undefined) {
+      clearTimeout(this._webRTCTimeout)
+    }
+
+    this._webRTCStateKnown = true
+    this._webRTCAvailable = !this.__noWebRTCUpgrade
+
+    // @TODO could be mixed up
+    this._switchPromise.resolve()
   }
 
   private async _sink(_source: Stream['source']): Promise<void> {
