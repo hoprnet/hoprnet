@@ -384,15 +384,16 @@ class Indexer implements IIndexer {
   // TODO: this is a quick fix, needs improvements
   private async getPastLogs(
     fromBlock: number,
-    toBlock: number,
+    maxToBlock: number,
     topics: (string | string[])[],
-    blockRange: number
+    maxBlockRange: number
   ): Promise<[OnChainLog[], number]> {
     let result: OnChainLog[] = []
-
     let failedCount = 0
-    while (fromBlock + blockRange < toBlock) {
-      const toBlock = fromBlock + (failedCount > 0 ? 25 : blockRange)
+
+    while (fromBlock < maxToBlock) {
+      const blockRange = failedCount > 0 ? Math.floor(maxBlockRange / 4 ** failedCount) : maxBlockRange
+      const toBlock = fromBlock + blockRange
 
       log(
         `${failedCount > 0 ? 'Re-quering' : 'Quering'} past logs from %d to %d: %d`,
@@ -412,7 +413,7 @@ class Indexer implements IIndexer {
       } catch (error) {
         failedCount++
 
-        if (failedCount > 1) {
+        if (failedCount > 5) {
           console.error(error)
           throw error
         }
@@ -421,7 +422,7 @@ class Indexer implements IIndexer {
       }
 
       failedCount = 0
-      fromBlock += blockRange
+      fromBlock = toBlock
     }
 
     return [result, fromBlock]
