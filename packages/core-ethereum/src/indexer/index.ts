@@ -105,9 +105,9 @@ class Indexer implements IIndexer {
   }
 
   public async getRandomChannel(): Promise<IndexerChannel | undefined> {
-    const HACK = 9514000 // Arbitrarily chosen block for our testnet. Total hack.
+    // const HACK = 9514000 // Arbitrarily chosen block for our testnet. Total hack.
     const all = await this.getAll(undefined)
-    const filtered = all.filter((x) => x.channelEntry.blockNumber.gtn(HACK))
+    const filtered = all //.filter((x) => x.channelEntry.blockNumber.gtn(HACK))
 
     if (filtered.length === 0) {
       log('no channels exist in indexer > hack')
