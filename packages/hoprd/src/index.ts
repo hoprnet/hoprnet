@@ -174,6 +174,7 @@ async function main() {
       let toRun = argv.run.split(';')
 
       for (let c of toRun) {
+        console.error('$', c)
         if (c === 'daemonize') {
           return
         }
