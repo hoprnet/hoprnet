@@ -6,7 +6,7 @@ import bodyParser from 'body-parser'
 export default function setupAPI(node: Hopr<HoprCoreConnector>, logs: any, options: any) {
   const http = require('http')
   const service = require('restana')()
-  service.use(bodyParser.text({type: '*/*'}))
+  service.use(bodyParser.text({ type: '*/*' }))
 
   service.get('/api/v1/version', (_, res) => res.send(FULL_VERSION))
   service.get('/api/v1/address/eth', async (_, res) => res.send(await node.paymentChannels.hexAccountAddress()))
@@ -14,7 +14,7 @@ export default function setupAPI(node: Hopr<HoprCoreConnector>, logs: any, optio
 
   const cmds = new Commands(node)
   service.post('/api/v1/command', async (req, res) => {
-    console.log("!!", req.body)
+    console.log('!!', req.body)
     cmds.execute(req.body).then((resp: any) => {
       res.send(resp)
     })
