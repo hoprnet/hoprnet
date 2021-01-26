@@ -335,9 +335,9 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       this.paymentChannels.start()
     ])
 
-    this.paymentChannels.indexer.on('channelOpened', (routingChannel) => {
-      this.tickChannelStrategy([routingChannel])
-    })
+    // this.paymentChannels.indexer.on('channelOpened', (routingChannel) => {
+    //   this.tickChannelStrategy([routingChannel])
+    // })
 
     log(`Available under the following addresses:`)
 

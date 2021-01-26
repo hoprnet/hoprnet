@@ -26,7 +26,9 @@ import type { Event } from './topics'
 const log = DebugLog(['indexer'])
 
 /**
- * Simple indexer to keep track of all open payment channels.
+ * Indexes HoprChannels smart contract and stores to the DB,
+ * all channels in the network.
+ * Also keeps track of the latest block number.
  */
 class Indexer extends EventEmitter implements IIndexer {
   public status: 'started' | 'stopped' = 'stopped'
@@ -88,6 +90,7 @@ class Indexer extends EventEmitter implements IIndexer {
     log('Subscribing to events from block %d', fromBlock)
 
     // subscribe to events
+    // @TODO: handle errors
     this.subscriptions['NewBlocks'] = web3.eth
       .subscribe('newBlockHeaders')
       .on('error', console.error)
@@ -153,7 +156,7 @@ class Indexer extends EventEmitter implements IIndexer {
       } catch (error) {
         failedCount++
 
-        if (failedCount > 1) {
+        if (failedCount > 5) {
           console.error(error)
           throw error
         }
@@ -185,6 +188,8 @@ class Indexer extends EventEmitter implements IIndexer {
       this.latestBlock = block.number
     }
 
+    const lastSnapshot = await getLatestConfirmedSnapshot(this.connector.db)
+
     // check unconfirmed events and process them if found
     // to be within a confirmed block
     while (
@@ -192,7 +197,13 @@ class Indexer extends EventEmitter implements IIndexer {
       isConfirmedBlock(this.unconfirmedEvents.top(1)[0].blockNumber.toNumber(), block.number, this.maxConfirmations)
     ) {
       const event = this.unconfirmedEvents.pop()
-      log('Found unconfirmed event %s', event.name)
+      // log('Found unconfirmed event %s', event.name)
+
+      // check if this is an already processed event
+      if (lastSnapshot && snapshotComparator(event, lastSnapshot) < 0) {
+        log(chalk.yellow('Found event which is older than last confirmed event!'))
+        continue
+      }
 
       if (event.name === 'FundedChannel') {
         await this.onFundedChannel(event as Event<'FundedChannel'>).catch(console.error)
@@ -226,29 +237,6 @@ class Indexer extends EventEmitter implements IIndexer {
     this.unconfirmedEvents.addAll(events)
   }
 
-  private async preProcess(event: Event<any>): Promise<boolean> {
-    log('Pre-processing event %s', event.name)
-
-    // check if this event has already been processed
-    const latestSnapshot = await getLatestConfirmedSnapshot(this.connector.db)
-    if (latestSnapshot && snapshotComparator(event, latestSnapshot) < 0) {
-      log(chalk.red('Found event which is older than last confirmed event!'))
-      return true
-    }
-
-    // if 'maxConfirmations' is 0, we disable ignoring
-    if (this.maxConfirmations === 0) return false
-
-    // event block must be confirmed, else we store it
-    if (!isConfirmedBlock(event.blockNumber.toNumber(), this.latestBlock, this.maxConfirmations)) {
-      log('Adding event %s to unconfirmed', event.name)
-      this.unconfirmedEvents.push(event)
-      return true
-    }
-
-    return false
-  }
-
   // reducers
   private async onFundedChannel(event: Event<'FundedChannel'>): Promise<void> {
     // if (await this.preProcess(event)) return
@@ -261,8 +249,8 @@ class Indexer extends EventEmitter implements IIndexer {
     const partyA = isRecipientPartyA ? event.data.recipient : event.data.counterparty
     const partyB = isRecipientPartyA ? event.data.counterparty : event.data.recipient
 
-    const channelId = await getId(recipientAccountId, counterpartyAccountId)
-    log('Processing event %s with channelId %s', event.name, channelId.toHex())
+    // const channelId = await getId(recipientAccountId, counterpartyAccountId)
+    // log('Processing event %s with channelId %s', event.name, channelId.toHex())
 
     let channelEntry: ChannelEntry
 
@@ -294,7 +282,7 @@ class Indexer extends EventEmitter implements IIndexer {
 
     await updateChannelEntry(this.connector.db, partyA, partyB, channelEntry)
 
-    log('Channel %s got funded by %s', chalk.green(channelId.toHex()), chalk.green(event.data.funder))
+    // log('Channel %s got funded by %s', chalk.green(channelId.toHex()), chalk.green(event.data.funder))
   }
 
   private async onOpenedChannel(event: Event<'OpenedChannel'>): Promise<void> {
@@ -307,7 +295,7 @@ class Indexer extends EventEmitter implements IIndexer {
     const partyB = isOpenerPartyA ? event.data.counterparty : event.data.opener
 
     const channelId = await getId(openerAccountId, counterpartyAccountId)
-    log('Processing event %s with channelId %s', event.name, channelId.toHex())
+    // log('Processing event %s with channelId %s', event.name, channelId.toHex())
 
     const storedChannel = await getChannelEntry(this.connector.db, partyA, partyB)
     if (!storedChannel) {
@@ -334,7 +322,7 @@ class Indexer extends EventEmitter implements IIndexer {
       channelEntry
     })
 
-    log('Channel %s got opened by %s', chalk.green(channelId.toHex()), chalk.green(openerAccountId.toHex()))
+    // log('Channel %s got opened by %s', chalk.green(channelId.toHex()), chalk.green(openerAccountId.toHex()))
   }
 
   private async onRedeemedTicket(event: Event<'RedeemedTicket'>): Promise<void> {
@@ -347,7 +335,7 @@ class Indexer extends EventEmitter implements IIndexer {
     const partyB = isRedeemerPartyA ? event.data.counterparty : event.data.redeemer
 
     const channelId = await getId(redeemerAccountId, counterpartyAccountId)
-    log('Processing event %s with channelId %s', event.name, channelId.toHex())
+    // log('Processing event %s with channelId %s', event.name, channelId.toHex())
 
     const storedChannel = await getChannelEntry(this.connector.db, partyA, partyB)
     if (!storedChannel) {
@@ -370,7 +358,7 @@ class Indexer extends EventEmitter implements IIndexer {
 
     await updateChannelEntry(this.connector.db, partyA, partyB, channelEntry)
 
-    log('Ticket redeemd in channel %s by %s', chalk.green(channelId.toHex()), chalk.green(redeemerAccountId.toHex()))
+    // log('Ticket redeemd in channel %s by %s', chalk.green(channelId.toHex()), chalk.green(redeemerAccountId.toHex()))
   }
 
   private async onInitiatedChannelClosure(event: Event<'InitiatedChannelClosure'>): Promise<void> {
@@ -383,7 +371,7 @@ class Indexer extends EventEmitter implements IIndexer {
     const partyB = isInitiatorPartyA ? event.data.counterparty : event.data.initiator
 
     const channelId = await getId(initiatorAccountId, counterpartyAccountId)
-    log('Processing event %s with channelId %s', event.name, channelId.toHex())
+    // log('Processing event %s with channelId %s', event.name, channelId.toHex())
 
     const storedChannel = await getChannelEntry(this.connector.db, partyA, partyB)
     if (!storedChannel) {
@@ -404,11 +392,11 @@ class Indexer extends EventEmitter implements IIndexer {
 
     await updateChannelEntry(this.connector.db, partyA, partyB, channelEntry)
 
-    log(
-      'Channel closure initiated for %s by %s',
-      chalk.green(channelId.toHex()),
-      chalk.green(initiatorAccountId.toHex())
-    )
+    // log(
+    //   'Channel closure initiated for %s by %s',
+    //   chalk.green(channelId.toHex()),
+    //   chalk.green(initiatorAccountId.toHex())
+    // )
   }
 
   private async onClosedChannel(event: Event<'ClosedChannel'>): Promise<void> {
@@ -421,7 +409,7 @@ class Indexer extends EventEmitter implements IIndexer {
     const partyB = isCloserPartyA ? event.data.counterparty : event.data.closer
 
     const channelId = await getId(closerAccountId, counterpartyAccountId)
-    log('Processing event %s with channelId %s', event.name, channelId.toHex())
+    // log('Processing event %s with channelId %s', event.name, channelId.toHex())
 
     const storedChannel = await getChannelEntry(this.connector.db, partyA, partyB)
     if (!storedChannel) {
@@ -448,7 +436,7 @@ class Indexer extends EventEmitter implements IIndexer {
       channelEntry
     })
 
-    log('Channel %s got closed by %s', chalk.green(channelId.toHex()), chalk.green(closerAccountId.toHex()))
+    // log('Channel %s got closed by %s', chalk.green(channelId.toHex()), chalk.green(closerAccountId.toHex()))
   }
 
   // DB related
