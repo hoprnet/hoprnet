@@ -202,6 +202,8 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
         transport: {
           HoprConnect: {
             bootstrapServers: options.bootstrapServers
+            // Testing
+            //__noDirectConnections: !options.bootstrapNode && true
           }
         },
         peerDiscovery: {
