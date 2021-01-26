@@ -19,7 +19,14 @@ export default function setupAPI(node: Hopr<HoprCoreConnector>, logs: any, optio
 
   const hostname = options.restHost
   const port = options.restPort
-  http.createServer(service).listen(port, hostname, () => {
-    logs.log(`Rest server on ${hostname} listening on port ${port}`)
-  })
+  http
+    .createServer(service)
+    .listen(port, hostname, () => {
+      logs.log(`Rest server on ${hostname} listening on port ${port}`)
+    })
+    .on('error', (err: any) => {
+      console.log(`Failed to start REST API.`)
+      console.log(err)
+      process.exit(1)
+    })
 }
