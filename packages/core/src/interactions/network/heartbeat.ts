@@ -68,10 +68,6 @@ class Heartbeat implements AbstractInteraction {
         reject(Error(`Timeout while querying ${counterparty.toB58String()}.`))
       }, HEARTBEAT_TIMEOUT)
 
-      console.log(`before dialProtocol`)
-
-      console.log(`previous connection`, this.node.connectionManager.connections.get(counterparty.toB58String()))
-
       try {
         struct = await this.node.dialProtocol(Multiaddr(`/p2p/${counterparty.toB58String()}`), this.protocols[0], {
           signal: abort.signal
@@ -83,14 +79,12 @@ class Heartbeat implements AbstractInteraction {
         error(`heartbeat connection error ${err.name} while dialing ${counterparty.toB58String()} (initial)`, err)
       }
 
-      console.log(`struct`, struct)
-
       if (abort.signal.aborted) {
         return reject()
       }
 
       if (struct == null) {
-        const { id, multiaddrs } = await this.node.peerRouting.findPeer(counterparty)
+        const { id } = await this.node.peerRouting.findPeer(counterparty)
 
         try {
           struct = await this.node.dialProtocol(id, this.protocols[0], { signal: abort.signal })
@@ -100,8 +94,6 @@ class Heartbeat implements AbstractInteraction {
           }
           error(`heartbeat connection error ${err.name} while dialing ${counterparty.toB58String()} (subsequent)`)
         }
-
-        console.log(`struct after findPeer`, struct, multiaddrs)
       }
 
       if (struct == null) {
