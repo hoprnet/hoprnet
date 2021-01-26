@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hoprd",
-  "version": "1.62.15",
+  "version": "1.64.0-next.8",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -16,11 +16,12 @@
     "!*.spec.ts",
     "!*.spec.d.ts",
     "!*.spec.js",
-    "!*.spec.js.map"
+    "!*.spec.js.map",
+    "hoprd-default.sh"
   ],
   "scripts": {
     "clean": "rimraf ./lib",
-    "build": "yarn clean && tsc --project ./tsconfig.json && yarn buildAdmin",
+    "build": "yarn clean && tsc --project ./tsconfig.json && yarn buildAdmin && chmod u+x lib/*.js",
     "buildAdmin": "next build hopr-admin",
     "test": "mocha",
     "prepublishOnly": "yarn build",
@@ -28,8 +29,8 @@
     "dev": "yarn build && NODE_ENV=development yarn start"
   },
   "dependencies": {
-    "@hoprnet/hopr-core": "1.62.15",
-    "@hoprnet/hopr-utils": "1.62.15",
+    "@hoprnet/hopr-core": "1.64.0-next.8",
+    "@hoprnet/hopr-utils": "1.64.0-next.8",
     "bs58": "^4.0.1",
     "jazzicon": "^1.5.0",
     "multihashes": "^3.0.1",
@@ -43,7 +44,7 @@
     "yargs": "^16.0.3"
   },
   "devDependencies": {
-    "@hoprnet/hopr-core-connector-interface": "1.62.15",
+    "@hoprnet/hopr-core-connector-interface": "1.64.0-next.8",
     "@types/bs58": "^4.0.1",
     "@types/debug": "^4.1.5",
     "@types/mocha": "^8.2.0",
