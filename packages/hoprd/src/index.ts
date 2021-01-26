@@ -184,7 +184,7 @@ async function main() {
       const hostname = argv.healthCheckHost
       const port = argv.healthCheckPort
       http.createServer(service).listen(port, hostname, (err) => {
-        if (err) throw err;
+        if (err) throw err
         logs.log(`Healthcheck server on ${hostname} listening on port ${port}`)
       })
     }
