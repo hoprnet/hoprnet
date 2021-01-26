@@ -261,14 +261,10 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     }
   }
 
-<<<<<<< HEAD
   private async tickChannelStrategy(newChannels: RoutingChannel[]) {
-=======
-  private async tickChannelStrategy(newChannels: IndexerChannel[]) {
     if (!this.running) {
       return
     }
->>>>>>> master
     verbose('new payment channels, auto opening tick')
     for (const channel of newChannels) {
       this.network.networkPeers.register(channel[0]) // Listen to nodes with outgoing stake
