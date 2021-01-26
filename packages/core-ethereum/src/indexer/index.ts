@@ -43,8 +43,6 @@ class Indexer extends EventEmitter implements IIndexer {
 
   /**
    * Starts indexing.
-   *
-   * @returns true if start was succesful
    */
   public async start(): Promise<void> {
     if (this.status === 'started') return
@@ -123,18 +121,18 @@ class Indexer extends EventEmitter implements IIndexer {
     log(chalk.green('Indexer stopped!'))
   }
 
-  public async getChannelEntry(partyA: Public, partyB: Public): Promise<ChannelEntry | undefined> {
-    return getChannelEntry(this.connector, partyA, partyB)
-  }
-
-  public async getChannelEntries(party?: Public, filter?: (node: Public) => boolean): Promise<ChannelUpdate[]> {
-    return getChannelEntries(this.connector, party, filter)
-  }
-
+  /**
+   * Query past logs, this will loop until it gets all blocks from {toBlock} to {fromBlock}.
+   * If we exceed response log limit, we switch into quering smaller chunks.
+   * @param fromBlock
+   * @param toBlock
+   * @param blockRange
+   * @return past logs and last queried block
+   */
   private async getPastLogs(fromBlock: number, toBlock: number, blockRange: number): Promise<[Log[], number]> {
     let result: Log[] = []
-
     let failedCount = 0
+
     while (fromBlock + blockRange < toBlock) {
       const toBlock = fromBlock + (failedCount > 0 ? 25 : blockRange)
 
@@ -170,7 +168,14 @@ class Indexer extends EventEmitter implements IIndexer {
     return [result, fromBlock]
   }
 
-  private async onNewBlock(block: BlockHeader): Promise<void> {
+  /**
+   * Called whenever a new block found.
+   * This will update {this.latestBlock},
+   * and processes events which are within
+   * confirmed blocks.
+   * @param block
+   */
+  private async onNewBlock(block: { number: number }): Promise<void> {
     log('New block %d', block.number)
 
     // update latest block
@@ -203,6 +208,12 @@ class Indexer extends EventEmitter implements IIndexer {
     await updateLatestBlockNumber(this.connector, new BN(block.number))
   }
 
+  /**
+   * Called whenever we receive new blocks.
+   * Converts logs to events and adds them into a heap
+   * of unconfirmed events.
+   * @param logs
+   */
   private onNewLogs(logs: Log[]): void {
     const events = logs.map(topics.logToEvent)
     this.unconfirmedEvents.addAll(events)
@@ -431,6 +442,15 @@ class Indexer extends EventEmitter implements IIndexer {
     })
 
     log('Channel %s got closed by %s', chalk.green(channelId.toHex()), chalk.green(closerAccountId.toHex()))
+  }
+
+  // DB related
+  public async getChannelEntry(partyA: Public, partyB: Public): Promise<ChannelEntry | undefined> {
+    return getChannelEntry(this.connector, partyA, partyB)
+  }
+
+  public async getChannelEntries(party?: Public, filter?: (node: Public) => boolean): Promise<ChannelUpdate[]> {
+    return getChannelEntries(this.connector, party, filter)
   }
 
   // routing related
