@@ -12,6 +12,8 @@ cmd() {
 HOST=localhost:3001
 
 # Info
+cmd 'version' $HOST
+cmd 'settings' $HOST
 cmd 'info' $HOST
 cmd 'balance' $HOST
 cmd 'address' $HOST
