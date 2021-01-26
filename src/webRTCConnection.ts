@@ -11,6 +11,7 @@ import { RelayConnection } from './relayConnection'
 import { randomBytes } from 'crypto'
 import { toU8aStream } from './utils'
 import abortable from 'abortable-iterator'
+import LibP2P from 'libp2p'
 
 const _log = Debug('hopr-connect')
 const _error = Debug('hopr-connect:error')
@@ -46,13 +47,15 @@ class WebRTCConnection implements MultiaddrConnection {
   private _id: string
   private _signal?: AbortSignal
 
+  private _libp2p: LibP2P
+
   public timeline: MultiaddrConnection['timeline']
 
   // used for testing
   private __noWebRTCUpgrade?: boolean
 
   constructor(
-    opts: { conn: RelayConnection; channel: SimplePeer; self: PeerId; counterparty: PeerId },
+    opts: { conn: RelayConnection; channel: SimplePeer; self: PeerId; counterparty: PeerId; libp2p: LibP2P },
     options?: DialOptions & { __noWebRTCUpgrade?: boolean }
   ) {
     this.channel = opts.channel
@@ -71,6 +74,8 @@ class WebRTCConnection implements MultiaddrConnection {
 
     this._sourceMigrated = false
     this._sinkMigrated = false
+
+    this._libp2p = opts.libp2p
 
     this._counterparty = opts.counterparty
 
@@ -93,10 +98,12 @@ class WebRTCConnection implements MultiaddrConnection {
     this.channel.once('error', this.endWebRTCUpgrade.bind(this))
 
     this.channel.on('iceStateChange', (iceConnectionState: string, iceGatheringState: string) => {
-      console.log(`inside iceStateChange handler`)
+      console.log(`inside iceStateChange handler`, iceConnectionState, iceGatheringState)
       if (iceConnectionState === 'disconnected' && iceGatheringState === 'completed') {
         this.timeline.close = Date.now()
         this._destroyed = true
+        // HACK, @TODO remove this
+        this._libp2p.connectionManager.connections.delete(this._counterparty.toB58String())
       }
     })
 

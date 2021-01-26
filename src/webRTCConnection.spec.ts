@@ -162,6 +162,11 @@ describe('test overwritable connection', function () {
         },
         onReconnect: async () => {}
       }),
+      libp2p: {
+        connectionManager: {
+          connections: new Map()
+        }
+      } as any,
       self: partyA,
       counterparty: partyB,
       channel: PeerA
@@ -190,6 +195,11 @@ describe('test overwritable connection', function () {
         },
         onReconnect: async () => {}
       }),
+      libp2p: {
+        connectionManager: {
+          connections: new Map()
+        }
+      } as any,
       self: partyB,
       counterparty: partyA,
       channel: PeerB
@@ -260,6 +270,11 @@ describe('test overwritable connection', function () {
         },
         onReconnect: async () => {}
       }),
+      libp2p: {
+        connectionManager: {
+          connections: new Map()
+        }
+      } as any,
       self: partyA,
       counterparty: partyB,
       channel: PeerA
@@ -285,7 +300,12 @@ describe('test overwritable connection', function () {
           conn: newStream,
           self: partyA,
           counterparty,
-          channel: newStream.webRTC!.channel
+          channel: newStream.webRTC!.channel,
+          libp2p: {
+            connectionManager: {
+              connections: new Map()
+            }
+          } as any
         })
 
         newConn.sink(demoStream.source)
@@ -298,7 +318,12 @@ describe('test overwritable connection', function () {
       conn: ctx,
       self: partyB,
       counterparty: partyA,
-      channel: PeerB
+      channel: PeerB,
+      libp2p: {
+        connectionManager: {
+          connections: new Map()
+        }
+      } as any
     })
 
     // Start duplex streams in both directions
@@ -340,6 +365,11 @@ describe('test overwritable connection', function () {
           },
           onReconnect: async () => {}
         }),
+        libp2p: {
+          connectionManager: {
+            connections: new Map()
+          }
+        } as any,
         self: partyA,
         counterparty: partyB,
         channel: newPeerA
@@ -406,6 +436,11 @@ describe('test overwritable connection', function () {
         },
         onReconnect: async () => {}
       }),
+      libp2p: {
+        connectionManager: {
+          connections: new Map()
+        }
+      } as any,
       self: partyA,
       counterparty: partyB,
       channel: PeerA
@@ -430,7 +465,12 @@ describe('test overwritable connection', function () {
           conn: newStream,
           self: partyA,
           counterparty,
-          channel: newStream.webRTC!.channel
+          channel: newStream.webRTC!.channel,
+          libp2p: {
+            connectionManager: {
+              connections: new Map()
+            }
+          } as any
         })
 
         newConn.sink(demoStream.source)
@@ -445,7 +485,12 @@ describe('test overwritable connection', function () {
       conn: ctx,
       self: partyB,
       counterparty: partyA,
-      channel: PeerB
+      channel: PeerB,
+      libp2p: {
+        connectionManager: {
+          connections: new Map()
+        }
+      } as any
     })
 
     const streamA = getStream({ usePrefix: false })
@@ -482,6 +527,11 @@ describe('test overwritable connection', function () {
           },
           onReconnect: async () => {}
         }),
+        libp2p: {
+          connectionManager: {
+            connections: new Map()
+          }
+        } as any,
         self: partyA,
         counterparty: partyB,
         channel: newPeerA

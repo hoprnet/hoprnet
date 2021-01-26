@@ -7,7 +7,7 @@ const verbose = debug('hopr-connect:verbose:error')
 
 import AbortController from 'abort-controller'
 import chalk from 'chalk'
-import libp2p from 'libp2p'
+import libp2p, { ConnectionManager } from 'libp2p'
 import { WebRTCUpgrader } from './webrtc'
 
 import handshake from 'it-handshake'
@@ -48,12 +48,14 @@ class Relay {
   private _peerId: PeerId
   private _streams: Map<string, { [index: string]: RelayContext }>
   private _webRTCUpgrader?: WebRTCUpgrader
+  private _connectionManager: ConnectionManager
 
   // used for testing
   private __noWebRTCUpgrade?: boolean
 
   constructor(libp2p: libp2p, webRTCUpgrader?: WebRTCUpgrader, __noWebRTCUpgrade?: boolean) {
     this._dialer = libp2p.dialer
+    this._connectionManager = libp2p.connectionManager
     this._registrar = libp2p.registrar
     this._dht = libp2p._dht
     this._peerId = libp2p.peerId
@@ -159,7 +161,10 @@ class Relay {
           conn: newConn,
           self: this._peerId,
           counterparty: destination,
-          channel
+          channel,
+          libp2p: {
+            connectionManager: this._connectionManager
+          } as any
         },
         {
           __noWebRTCUpgrade: this.__noWebRTCUpgrade,
@@ -209,7 +214,10 @@ class Relay {
           conn: newConn,
           self: this._peerId,
           counterparty: handShakeResult.counterparty,
-          channel
+          channel,
+          libp2p: {
+            connectionManager: this._connectionManager
+          } as any
         },
         { __noWebRTCUpgrade: this.__noWebRTCUpgrade }
       )
