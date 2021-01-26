@@ -69,6 +69,7 @@ update_if_existing() {
 
 # $1 = vm name
 # $2 = docker image
+# NB: --run needs to be at the end or it will ignore the other arguments.
 update_or_create_bootstrap_vm() {
   if [ "$(update_if_existing $1 $2)" = "no container" ]; then
     echo "No container found, creating $1"
@@ -83,11 +84,11 @@ update_or_create_bootstrap_vm() {
       --container-arg="--init" --container-arg="true" \
       --container-arg="--runAsBootstrap" --container-arg="true" \
       --container-arg="--rest" --container-arg="true" \
-      --container-arg="--run" --container-arg="\"settings strategy passive;daemonize\""
       --container-arg="--restHost" --container-arg="0.0.0.0" \
       --container-arg="--healthCheck" --container-arg="true" \
       --container-arg="--healthCheckHost" --container-arg="0.0.0.0" \
       --container-arg="--admin" \
+      --container-arg="--run" --container-arg="\"settings strategy passive;daemonize\""
       --container-restart-policy=always
     sleep 120
   fi
@@ -96,6 +97,7 @@ update_or_create_bootstrap_vm() {
 # $1 = vm name
 # $2 = docker image
 # $3 = BS multiaddr
+# NB: --run needs to be at the end or it will ignore the other arguments.
 start_testnode_vm() {
   if [ "$(update_if_existing $1 $2)" = "no container" ]; then
     gcloud compute instances create-with-container $1 $GCLOUD_DEFAULTS \
@@ -110,8 +112,8 @@ start_testnode_vm() {
       --container-arg="--healthCheck" --container-arg="true" \
       --container-arg="--healthCheckHost" --container-arg="0.0.0.0" \
       --container-arg="--bootstrapServers" --container-arg="$3" \
-      --container-arg="--run" --container-arg="\"cover-traffic start;daemonize\"" \
       --container-arg="--admin" \
+      --container-arg="--run" --container-arg="\"cover-traffic start;daemonize\"" \
       --container-restart-policy=always
   fi
 }
