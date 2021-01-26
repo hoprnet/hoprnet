@@ -34,7 +34,7 @@ get_environment() {
   case "$BRANCH" in release/*)
     VERSION_MAJ_MIN=$(get_version_maj_min $RELEASE) 
     
-    if [ "$VERSION_MAJ_MIN" == '1.63' ]; then
+    if [ "$VERSION_MAJ_MIN" == '1.64' ]; then
       RELEASE_NAME='morat'
       return
     fi
