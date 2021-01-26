@@ -254,6 +254,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     verbose('bootstrap status', results)
 
     if (!results.some((online: boolean) => online)) {
+      console.error('Tried', potentialBootstrapServers.map(x => x.toString()).join(','))
       throw Error('Unable to connect to any known bootstrap server.')
     }
   }
