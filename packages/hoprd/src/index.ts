@@ -183,7 +183,8 @@ async function main() {
       service.get('/healthcheck/v1/version', (_, res) => res.send(FULL_VERSION))
       const hostname = argv.healthCheckHost
       const port = argv.healthCheckPort
-      http.createServer(service).listen(port, hostname, () => {
+      http.createServer(service).listen(port, hostname, (err) => {
+        if (err) throw err;
         logs.log(`Healthcheck server on ${hostname} listening on port ${port}`)
       })
     }
