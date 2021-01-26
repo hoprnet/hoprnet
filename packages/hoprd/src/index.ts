@@ -127,6 +127,7 @@ async function main() {
   let node: Hopr<HoprCoreConnector>
   let logs = new LogStream()
   let adminServer = undefined
+  let cmds
 
   function logMessageToNode(msg: Uint8Array) {
     logs.log(`#### NODE RECEIVED MESSAGE [${new Date().toISOString()}] ####`)
@@ -158,18 +159,18 @@ async function main() {
     node = await Hopr.create(options)
     logs.log('Created HOPR Node')
     node.on('hopr:message', logMessageToNode)
+    cmds = new Commands(node)
 
     if (argv.rest) {
       setupAPI(node, logs, argv)
     }
 
     if (adminServer) {
-      adminServer.registerNode(node)
+      adminServer.registerNode(node, cmds)
     }
 
     if (argv.run && argv.run !== '') {
       // Run a single command and then exit.
-      let cmds = new Commands(node)
       // We support multiple semicolon separated commands
       let toRun = argv.run.split(';')
 
