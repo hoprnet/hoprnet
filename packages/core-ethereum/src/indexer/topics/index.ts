@@ -3,59 +3,42 @@
  * our SC logs to events.
  */
 
-import { u8aToHex } from '@hoprnet/hopr-utils'
-import { Public } from '../../types'
-import { getTopic0 } from './utils'
+import type { Log } from 'web3-core'
+import * as logs from './logs'
+import type { Event, EventData, Topics } from './types'
+import { generateTopics, EventSignatures } from './utils'
 export * from './logs'
 export * from './utils'
 export * from './types'
 
 /**
- * @TODO: requires documentantion
- * @param rawTopic
- * @param first
- * @param second
- * @param bidirectional
+ * known event topics0 that will be used to distinguish
+ * which event type we are looking at
  */
-export const generateTopics = (
-  rawTopic: Uint8Array,
-  first?: Public,
-  second?: Public,
-  bidirectional?: boolean
-): (undefined | string | string[])[] => {
-  if (bidirectional && (first == null || second == null)) {
-    throw Error(`Bidirectional property can only be used if 'first' and 'second' are set`)
-  }
+export const EventTopics0: {
+  [K in keyof EventData]: Topics
+} = {
+  FundedChannel: generateTopics(EventSignatures.FundedChannel, undefined, undefined),
+  OpenedChannel: generateTopics(EventSignatures.OpenedChannel, undefined, undefined),
+  RedeemedTicket: generateTopics(EventSignatures.RedeemedTicket, undefined, undefined),
+  InitiatedChannelClosure: generateTopics(EventSignatures.InitiatedChannelClosure, undefined, undefined),
+  ClosedChannel: generateTopics(EventSignatures.ClosedChannel, undefined, undefined)
+}
 
-  const topic0 = []
+export const logToEvent = (log: Log): Event<any> => {
+  const [topic0] = log.topics
 
-  if ((first == null && second == null) || (bidirectional && first[0] % 4 != second[0] % 4)) {
-    for (let i = 0; i < 4; i++) {
-      topic0.push(getTopic0(rawTopic, (i >> 1) % 2, i % 2))
-    }
-  } else if (first != null) {
-    for (let i = 0; i < 2; i++) {
-      topic0.push(getTopic0(rawTopic, first[0], i % 2))
-    }
-  } else if (second != null) {
-    for (let i = 0; i < 2; i++) {
-      topic0.push(getTopic0(rawTopic, (i >> 1) % 2, second[0]))
-    }
+  if (EventTopics0.FundedChannel.includes(topic0)) {
+    return logs.decodeFundedChannel(log)
+  } else if (EventTopics0.OpenedChannel.includes(topic0)) {
+    return logs.decodeOpenedChannel(log)
+  } else if (EventTopics0.RedeemedTicket.includes(topic0)) {
+    return logs.decodeRedeemedTicket(log)
+  } else if (EventTopics0.InitiatedChannelClosure.includes(topic0)) {
+    return logs.decodeInitiatedChannelClosure(log)
+  } else if (EventTopics0.ClosedChannel.includes(topic0)) {
+    return logs.decodeClosedChannel(log)
   } else {
-    topic0.push(getTopic0(rawTopic, first[0], second[0]))
-  }
-
-  if (bidirectional) {
-    return [
-      topic0,
-      [u8aToHex(first.slice(1, 33)), u8aToHex(second.slice(1, 33))],
-      [u8aToHex(first.slice(1, 33)), u8aToHex(second.slice(1, 33))]
-    ]
-  } else {
-    return [
-      topic0,
-      first != null ? u8aToHex(first.slice(1, 33)) : undefined,
-      second != null ? u8aToHex(second.slice(1, 33)) : undefined
-    ]
+    throw Error('Could not convert log to event')
   }
 }

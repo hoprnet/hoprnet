@@ -1,6 +1,8 @@
 import type BN from 'bn.js'
 import type { Public } from '../../types'
 
+export type Topics = (string | string[])[]
+
 /**
  * known event return values that we will subscribe and reduce
  * data from, ideally this should be taken from

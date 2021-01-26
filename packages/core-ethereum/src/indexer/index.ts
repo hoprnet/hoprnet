@@ -22,7 +22,7 @@ import {
   getLatestConfirmedSnapshot
 } from './utils'
 import * as topics from './topics'
-import type { Event, EventData } from './topics'
+import type { Event } from './topics'
 
 const log = DebugLog(['indexer'])
 
@@ -31,13 +31,11 @@ const log = DebugLog(['indexer'])
  */
 class Indexer extends EventEmitter implements IIndexer {
   public status: 'started' | 'stopped' = 'stopped'
-  private unconfirmedEvents = new Heap<Event<any>>(snapshotComparator)
+  public latestBlock: number = 0 // latest known on-chain block number
   private subscriptions: {
-    [K in 'NewBlock' | 'NewEvent']?: Subscription<any>
+    [K in 'NewBlocks' | 'NewEvents']?: Subscription<any>
   } = {}
-
-  // latest known on-chain block number
-  public latestBlock: number = 0
+  private unconfirmedEvents = new Heap<Event<any>>(snapshotComparator)
 
   constructor(private connector: HoprEthereum, private maxConfirmations: number) {
     super()
@@ -54,80 +52,57 @@ class Indexer extends EventEmitter implements IIndexer {
 
     const { web3, hoprChannels } = this.connector
 
-    const [latestKnownBN, latestOnChainBN] = await Promise.all([
+    const [latestSavedBlock, latestOnChainBlock] = await Promise.all([
       await getLatestBlockNumber(this.connector),
       web3.eth.getBlockNumber()
     ])
 
-    log('Latest known block %d', latestKnownBN)
-    log('Latest on-chain block %d', latestOnChainBN)
-
-    this.latestBlock = latestKnownBN
+    log('Latest saved block %d', latestSavedBlock)
+    log('Latest on-chain block %d', latestOnChainBlock)
 
     // @TODO: get this from somewhere else
     const HoprChannelsGenesisBN = 9503420
     // @TODO: add to constants
-    const BLOCKS = 1000
-
-    const getPastLogs = async (fromBlock: number, toBlock: number): Promise<Log[]> => {
-      return web3.eth.getPastLogs({
-        address: hoprChannels.options.address,
-        fromBlock,
-        toBlock
-      })
-    }
+    const BLOCK_RANGE = 2000
 
     // go back 'MAX_CONFIRMATIONS' blocks in case of a re-org at time of stopping
-    let fromBlock = latestKnownBN
+    let fromBlock = latestSavedBlock
     if (fromBlock - this.maxConfirmations > 0) {
       fromBlock = fromBlock - this.maxConfirmations
     }
+    // no need to query before HoprChannels existed
     if (fromBlock < HoprChannelsGenesisBN) {
       fromBlock = HoprChannelsGenesisBN
     }
 
     log('Starting to index from block %d', fromBlock)
 
-    let failed = false
-    console.time('sync')
-    while (fromBlock + BLOCKS < latestOnChainBN) {
-      const toBlock = fromBlock + (failed ? 25 : BLOCKS)
+    // if the difference between on-chain block and {fromBlock}
+    // is larger than {BLOCK_RANGE}, we will query using `getLogs` rpc
+    if (fromBlock + BLOCK_RANGE <= latestOnChainBlock) {
+      const toBlock = latestOnChainBlock - this.maxConfirmations
+      log('Quering past blocks from %d to %d', fromBlock, toBlock)
 
-      log(`${failed ? 'Re-quering' : 'Quering'} past logs from %d to %d: %d`, fromBlock, toBlock, toBlock - fromBlock)
-      try {
-        await getPastLogs(fromBlock, toBlock)
-      } catch (error) {
-        failed = true
-        // console.error(error)
-        continue
-      }
-
-      failed = false
-      fromBlock += BLOCKS
+      const [pastLogs, lastBlock] = await this.getPastLogs(fromBlock, toBlock, BLOCK_RANGE)
+      this.onNewLogs(pastLogs)
+      fromBlock = lastBlock
     }
-    console.timeEnd('sync')
 
     log('Subscribing to events from block %d', fromBlock)
 
     // subscribe to events
-    // @TODO: when we refactor this needs to be more generic
-    this.subscriptions['NewBlock'] = web3.eth
+    this.subscriptions['NewBlocks'] = web3.eth
       .subscribe('newBlockHeaders')
       .on('error', console.error)
       .on('data', (block) => this.onNewBlock(block))
 
-    this.subscriptions['NewEvent'] = web3.eth
+    this.subscriptions['NewEvents'] = web3.eth
       .subscribe('logs', {
         address: hoprChannels.options.address,
         fromBlock
       })
       .on('error', console.error)
-      .on('data', (onChainLog: Log) => {
-        console.count('onChainLog')
-        // const event = topics.decodeFundedChannel(onChainLog)
-        // log('New event %s', event.name)
-        // this.onFundedChannel(event).catch(console.error)
-      })
+      .on('data', (onChainLog: Log) => this.onNewLogs([onChainLog]))
 
     this.status = 'started'
     log(chalk.green('Indexer started!'))
@@ -156,7 +131,46 @@ class Indexer extends EventEmitter implements IIndexer {
     return getChannelEntries(this.connector, party, filter)
   }
 
-  private async onNewBlock(block: BlockHeader) {
+  private async getPastLogs(fromBlock: number, toBlock: number, blockRange: number): Promise<[Log[], number]> {
+    let result: Log[] = []
+
+    let failedCount = 0
+    while (fromBlock + blockRange < toBlock) {
+      const toBlock = fromBlock + (failedCount > 0 ? 25 : blockRange)
+
+      log(
+        `${failedCount > 0 ? 'Re-quering' : 'Quering'} past logs from %d to %d: %d`,
+        fromBlock,
+        toBlock,
+        toBlock - fromBlock
+      )
+      try {
+        const logs = await this.connector.web3.eth.getPastLogs({
+          address: this.connector.hoprChannels.options.address,
+          fromBlock,
+          toBlock
+        })
+
+        result = result.concat(logs)
+      } catch (error) {
+        failedCount++
+
+        if (failedCount > 1) {
+          console.error(error)
+          throw error
+        }
+
+        continue
+      }
+
+      failedCount = 0
+      fromBlock += blockRange
+    }
+
+    return [result, fromBlock]
+  }
+
+  private async onNewBlock(block: BlockHeader): Promise<void> {
     log('New block %d', block.number)
 
     // update latest block
@@ -187,6 +201,11 @@ class Indexer extends EventEmitter implements IIndexer {
     }
 
     await updateLatestBlockNumber(this.connector, new BN(block.number))
+  }
+
+  private onNewLogs(logs: Log[]): void {
+    const events = logs.map(topics.logToEvent)
+    this.unconfirmedEvents.addAll(events)
   }
 
   private async preProcess(event: Event<any>): Promise<boolean> {
