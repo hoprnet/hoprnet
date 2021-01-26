@@ -134,7 +134,29 @@ class WebRTCConnection implements MultiaddrConnection {
     if (this._webRTCAvailable) {
       this.log(`webRTC source handover done. Using direct connection to peer ${this.remoteAddr.getPeerId()}`)
 
-      yield* this.channel[Symbol.asyncIterator]() as Stream['source']
+      const iterator = this.channel[Symbol.asyncIterator]() as Stream['source']
+
+      // @TODO `for await` does NOT work here -
+      // even if it SHOULD be the SAME functionality
+      // @dev `for await` produces a hanging promise
+      while (true) {
+        const result = await iterator.next()
+
+        if (result.done) {
+          break
+        }
+
+        const [finished, payload] = [result.value.slice(0, 1), result.value.slice(1)]
+
+        if (finished[0] == DONE[0]) {
+          this.log(`received DONE from WebRTC - ending stream`)
+          break
+        }
+
+        this.log(`Getting NOT_DONE from WebRTC - ${result.value.slice().length} bytes`)
+
+        yield payload
+      }
     }
   }
 
@@ -238,12 +260,15 @@ class WebRTCConnection implements MultiaddrConnection {
             return
           }
 
+          this.log(`sinking NOT_DONE into WebRTC - ${result.value.slice().length} bytes`)
           yield Uint8Array.from([...NOT_DONE, ...result.value.slice()])
 
           for await (const msg of source) {
+            this.log(`sinking NOT_DONE into WebRTC - ${msg.slice().length} bytes`)
             yield Uint8Array.from([...NOT_DONE, ...msg.slice()])
           }
 
+          this.log(`sinking DONE into WebRTC`)
           yield DONE
         }
 
@@ -270,15 +295,17 @@ class WebRTCConnection implements MultiaddrConnection {
           result = await sourcePromise
 
           if (result == undefined || result.done) {
+            yield DONE
             return
           }
 
           if (this._destroyed || this.channel.destroyed) {
+            yield DONE
             return
           }
 
           this.log(`yielding into webrtc ${this._id}`, result.value.slice().length)
-          yield result.value.slice()
+          yield Uint8Array.from([...NOT_DONE, ...result.value.slice()])
 
           for await (const msg of source) {
             if (this._destroyed || this.channel.destroyed) {
@@ -286,8 +313,10 @@ class WebRTCConnection implements MultiaddrConnection {
             }
 
             this.log(`yielding into webrtc ${this._id}`, msg.slice().length)
-            yield msg.slice()
+            yield Uint8Array.from([...NOT_DONE, ...msg.slice()])
           }
+
+          yield DONE
         }.call(this)
       )
     }

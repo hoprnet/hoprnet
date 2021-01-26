@@ -208,13 +208,13 @@ describe('test overwritable connection', function () {
     cutConnection = true
 
     for await (const msg of ctxB.source) {
-      console.log(`msg`, msg)
+      console.log(`msg received throug WebRTC`, msg)
     }
 
     await ctxA.close()
   })
 
-  it('should simulate a reconnect after a WebRTC upgrade', async function () {
+  it.skip('should simulate a reconnect after a WebRTC upgrade', async function () {
     // Sample two parties
     const [partyA, partyB] = await Promise.all(
       Array.from({ length: 2 }).map(() => PeerId.create({ keyType: 'secp256k1' }))
@@ -359,7 +359,7 @@ describe('test overwritable connection', function () {
     await new Promise<void>((resolve) => setTimeout(resolve, 4000))
   })
 
-  it('should simulate a fallback to a relayed connection', async function () {
+  it.skip('should simulate a fallback to a relayed connection', async function () {
     this.timeout(durations.seconds(10))
 
     // Sample two parties

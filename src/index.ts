@@ -232,9 +232,7 @@ class HoprConnect implements Transport {
     verbose(
       `Establishing a direct connection to ${maConn.remoteAddr.toString()} was successful. Continuing with the handshake.`
     )
-    const conn = await this._upgrader.upgradeOutbound(maConn)
-    verbose('outbound direct connection %s upgraded', maConn.remoteAddr)
-    return conn
+    return await this._upgrader.upgradeOutbound(maConn)
   }
 
   /**
