@@ -1,6 +1,14 @@
-<a name="0.2.1"></a>
+<a name="0.2.4"></a>
 
-## [0.2.2](https://github.com/hoprnet/hopr-connect/compare/0.2.1...0.2.2) (2021-01-24)
+## [0.2.4](https://github.com/hoprnet/hopr-connect/compare/0.2.4...0.2.2) (2021-01-26)
+
+### Fixes
+
+- Prefix WebRTC stream to make sure it gets closed
+
+<a name="0.2.2"></a>
+
+## [0.2.2](https://github.com/hoprnet/hopr-connect/compare/0.2.1...0.2.2) (2021-01-25)
 
 ### Fixes
 
