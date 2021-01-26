@@ -151,7 +151,7 @@ declare interface Channel {
   readonly stateCounter: Promise<TicketEpoch>
 
   // Current status of the channel
-  readonly status: Promise<'UNINITIALISED' | 'FUNDING' | 'OPEN' | 'PENDING'>
+  readonly status: Promise<'UNINITIALISED' | 'FUNDED' | 'OPEN' | 'PENDING'>
 
   // Current state of the channel, i.e. `FUNDED` with `1 HOPR / 3 HOPR`
   readonly state: Promise<ChannelType>

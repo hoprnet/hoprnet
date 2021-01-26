@@ -1,4 +1,5 @@
 import type { Event } from './topics'
+import assert from 'assert'
 import BN from 'bn.js'
 import { ChannelEntry } from '../types'
 import { isPartyA } from '../utils'
@@ -12,6 +13,8 @@ export const onFundedChannel = async (
   const isRecipientPartyA = isPartyA(recipientAccountId, counterpartyAccountId)
 
   if (channelEntry) {
+    assert(channelEntry.status === 'FUNDED', "'onFundedChannel' failed because channel is not in 'FUNDED' status")
+
     return new ChannelEntry(undefined, {
       blockNumber: event.blockNumber,
       transactionIndex: event.transactionIndex,
@@ -21,7 +24,7 @@ export const onFundedChannel = async (
         isRecipientPartyA ? event.data.recipientAmount : event.data.counterpartyAmount
       ),
       closureTime: new BN(0),
-      stateCounter: channelEntry.stateCounter.addn(1),
+      stateCounter: channelEntry.status === 'FUNDED' ? channelEntry.stateCounter : channelEntry.stateCounter.addn(1),
       closureByPartyA: false
     })
   } else {
@@ -42,6 +45,8 @@ export const onOpenedChannel = async (
   event: Event<'OpenedChannel'>,
   channelEntry: ChannelEntry
 ): Promise<ChannelEntry> => {
+  assert(channelEntry.status === 'FUNDED', "'onOpenedChannel' failed because channel is not in 'FUNDED' status")
+
   return new ChannelEntry(undefined, {
     blockNumber: event.blockNumber,
     transactionIndex: event.transactionIndex,
@@ -58,6 +63,11 @@ export const onRedeemedTicket = async (
   event: Event<'RedeemedTicket'>,
   channelEntry: ChannelEntry
 ): Promise<ChannelEntry> => {
+  assert(
+    channelEntry.status === 'OPEN' || channelEntry.status === 'PENDING',
+    "'onRedeemedTicket' failed because channel is not in 'OPEN' or 'PENDING' status"
+  )
+
   const redeemerAccountId = await event.data.redeemer.toAccountId()
   const counterpartyAccountId = await event.data.counterparty.toAccountId()
   const isRedeemerPartyA = isPartyA(redeemerAccountId, counterpartyAccountId)
@@ -80,6 +90,8 @@ export const onInitiatedChannelClosure = async (
   event: Event<'InitiatedChannelClosure'>,
   channelEntry: ChannelEntry
 ): Promise<ChannelEntry> => {
+  assert(channelEntry.status === 'OPEN', "'onInitiatedChannelClosure' failed because channel is not in 'OPEN' status")
+
   const initiatorAccountId = await event.data.initiator.toAccountId()
   const counterpartyAccountId = await event.data.counterparty.toAccountId()
   const isInitiatorPartyA = isPartyA(initiatorAccountId, counterpartyAccountId)
@@ -100,6 +112,8 @@ export const onClosedChannel = async (
   event: Event<'ClosedChannel'>,
   channelEntry: ChannelEntry
 ): Promise<ChannelEntry> => {
+  assert(channelEntry.status === 'PENDING', "'onClosedChannel' failed because channel is not in 'PENDING' status")
+
   return new ChannelEntry(undefined, {
     blockNumber: event.blockNumber,
     transactionIndex: event.transactionIndex,

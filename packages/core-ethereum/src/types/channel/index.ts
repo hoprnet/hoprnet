@@ -7,7 +7,7 @@ import ChannelBalance from './channelBalance'
 
 enum ChannelStatus {
   UNINITIALISED,
-  FUNDING,
+  FUNDED,
   OPEN,
   PENDING
 }
@@ -98,7 +98,7 @@ class Channel extends Uint8ArrayE implements Types.Channel {
   }
 
   get isFunded(): boolean {
-    return this._status == ChannelStatus.FUNDING
+    return this._status == ChannelStatus.FUNDED
   }
 
   get isActive(): boolean {
@@ -126,7 +126,7 @@ class Channel extends Uint8ArrayE implements Types.Channel {
   static createFunded(balance: ChannelBalance): Channel {
     return new Channel(undefined, {
       balance,
-      state: new ChannelState(undefined, { state: ChannelStatus.FUNDING })
+      state: new ChannelState(undefined, { state: ChannelStatus.FUNDED })
     })
   }
 

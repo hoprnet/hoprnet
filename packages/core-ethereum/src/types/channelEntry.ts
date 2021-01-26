@@ -122,7 +122,7 @@ class ChannelEntry extends Uint8ArrayE implements Types.ChannelEntry {
     }
 
     if (status === ChannelStatus.UNINITIALISED) return 'UNINITIALISED'
-    else if (status === ChannelStatus.FUNDING) return 'FUNDING'
+    else if (status === ChannelStatus.FUNDED) return 'FUNDED'
     else if (status === ChannelStatus.OPEN) return 'OPEN'
     return 'PENDING'
   }

@@ -21,7 +21,7 @@ import * as configs from '../config'
 const HoprTokenAbi = abis.HoprToken
 const DEFAULT_WIN_PROB = 1
 
-describe.skip('test Channel class', function () {
+describe.only('test Channel class', function () {
   const ganache = new Ganache()
 
   let web3: Web3
@@ -104,7 +104,7 @@ describe.skip('test Channel class', function () {
               await coreConnector.channel.createSignedChannel(undefined, {
                 channel: new ChannelType(undefined, {
                   balance: channelBalance,
-                  state: new ChannelState(undefined, { state: ChannelStatus.FUNDING })
+                  state: new ChannelState(undefined, { state: ChannelStatus.FUNDED })
                 })
               })
             ).subarray()

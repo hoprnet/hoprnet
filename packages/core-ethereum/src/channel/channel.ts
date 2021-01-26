@@ -72,7 +72,7 @@ class Channel implements IChannel {
   }
 
   get status() {
-    return new Promise<'UNINITIALISED' | 'FUNDING' | 'OPEN' | 'PENDING'>(async (resolve, reject) => {
+    return new Promise<'UNINITIALISED' | 'FUNDED' | 'OPEN' | 'PENDING'>(async (resolve, reject) => {
       try {
         const channel = await this.onChainChannel
         return resolve(channel.status)
