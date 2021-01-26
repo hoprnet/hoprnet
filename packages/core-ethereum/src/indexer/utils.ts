@@ -1,13 +1,14 @@
 import type BN from 'bn.js'
-import type HoprEthereum from '..'
+import type { LevelUp } from 'levelup'
 import { u8aConcat, u8aToNumber } from '@hoprnet/hopr-utils'
 import { Public, ChannelEntry, Snapshot } from '../types'
-import { LatestBlockNumber, LatestConfirmedSnapshot } from '../dbKeys'
+import * as dbKeys from '../dbKeys'
 
+// various keys used by the DB
 const SMALLEST_PUBLIC_KEY = new Public(u8aConcat(new Uint8Array([0x02]), new Uint8Array(32).fill(0x00)))
 const BIGGEST_PUBLIC_KEY = new Public(u8aConcat(new Uint8Array([0x03]), new Uint8Array(32).fill(0xff)))
-const LATEST_BLOCK_KEY = LatestBlockNumber()
-const LATEST_CONFIRMED_SNAPSHOT = LatestConfirmedSnapshot()
+const LATEST_BLOCK_KEY = dbKeys.LatestBlockNumber()
+const LATEST_CONFIRMED_SNAPSHOT = dbKeys.LatestConfirmedSnapshot()
 
 /**
  * Compares the two snapshots provided.
@@ -50,9 +51,7 @@ export const isConfirmedBlock = (
  * @param connector
  * @returns promise that resolves to a number
  */
-export const getLatestBlockNumber = async (connector: HoprEthereum): Promise<number> => {
-  const { db } = connector
-
+export const getLatestBlockNumber = async (db: LevelUp): Promise<number> => {
   try {
     return u8aToNumber(await db.get(Buffer.from(LATEST_BLOCK_KEY))) as number
   } catch (err) {
@@ -69,9 +68,7 @@ export const getLatestBlockNumber = async (connector: HoprEthereum): Promise<num
  * @param connector
  * @param blockNumber
  */
-export const updateLatestBlockNumber = async (connector: HoprEthereum, blockNumber: BN): Promise<void> => {
-  const { db } = connector
-
+export const updateLatestBlockNumber = async (db: LevelUp, blockNumber: BN): Promise<void> => {
   await db.put(Buffer.from(LATEST_BLOCK_KEY), blockNumber.toBuffer())
 }
 
@@ -80,9 +77,7 @@ export const updateLatestBlockNumber = async (connector: HoprEthereum, blockNumb
  * @param connector
  * @returns promise that resolves to a snapshot
  */
-export const getLatestConfirmedSnapshot = async (connector: HoprEthereum): Promise<Snapshot | undefined> => {
-  const { db } = connector
-
+export const getLatestConfirmedSnapshot = async (db: LevelUp): Promise<Snapshot | undefined> => {
   try {
     const result = (await db.get(Buffer.from(LATEST_CONFIRMED_SNAPSHOT))) as Uint8Array
     return new Snapshot({
@@ -105,12 +100,10 @@ export const getLatestConfirmedSnapshot = async (connector: HoprEthereum): Promi
  * @param partyB
  */
 export const getChannelEntry = async (
-  connector: HoprEthereum,
+  db: LevelUp,
   partyA: Public,
   partyB: Public
 ): Promise<ChannelEntry | undefined> => {
-  const { db, dbKeys } = connector
-
   let channel: Uint8Array | undefined
   try {
     channel = (await db.get(Buffer.from(dbKeys.ChannelEntry(partyA, partyB)))) as Uint8Array
@@ -143,7 +136,7 @@ export const getChannelEntry = async (
  * @returns promise that resolves to a list of channel entries
  */
 export const getChannelEntries = async (
-  connector: HoprEthereum,
+  db: LevelUp,
   party?: Public,
   filter?: (node: Public) => boolean
 ): Promise<
@@ -153,7 +146,6 @@ export const getChannelEntries = async (
     channelEntry: ChannelEntry
   }[]
 > => {
-  const { dbKeys, db } = connector
   const results: {
     partyA: Public
     partyB: Public
@@ -200,13 +192,11 @@ export const getChannelEntries = async (
  * @param channelEntry
  */
 export const updateChannelEntry = async (
-  connector: HoprEthereum,
+  db: LevelUp,
   partyA: Public,
   partyB: Public,
   channelEntry: ChannelEntry
 ): Promise<void> => {
-  const { dbKeys, db } = connector
-
   const snapshot = new Snapshot(undefined, {
     blockNumber: channelEntry.blockNumber,
     transactionIndex: channelEntry.transactionIndex,

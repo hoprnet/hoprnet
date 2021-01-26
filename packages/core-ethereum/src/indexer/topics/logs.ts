@@ -7,6 +7,13 @@ import { decodePublicKeysFromTopics } from './utils'
 // HACK: wrong types provided by library ¯\_(ツ)_/¯
 const abiCoder = (_abiCoder as unknown) as AbiCoder
 
+/**
+ * Convert a log data and decoded data to an event.
+ * @param log
+ * @param name
+ * @param data
+ * @returns event
+ */
 const logToEvent = <N extends keyof EventData>(log: Log, name: N, data: EventData[N]): Event<N> => {
   return {
     name,
@@ -18,7 +25,7 @@ const logToEvent = <N extends keyof EventData>(log: Log, name: N, data: EventDat
   }
 }
 
-export const decodeFundedChannel = (log: Log): Event<'FundedChannel'> => {
+export const toFundedChannelEvent = (log: Log): Event<'FundedChannel'> => {
   const { funder, recipientAmount, counterpartyAmount } = abiCoder.decodeLog(
     [
       {
@@ -59,7 +66,7 @@ export const decodeFundedChannel = (log: Log): Event<'FundedChannel'> => {
   })
 }
 
-export const decodeOpenedChannel = (log: Log): Event<'OpenedChannel'> => {
+export const toOpenedChannelEvent = (log: Log): Event<'OpenedChannel'> => {
   const [opener, counterparty] = decodePublicKeysFromTopics(log.topics)
 
   return logToEvent(log, 'OpenedChannel', {
@@ -68,7 +75,7 @@ export const decodeOpenedChannel = (log: Log): Event<'OpenedChannel'> => {
   })
 }
 
-export const decodeRedeemedTicket = (log: Log): Event<'RedeemedTicket'> => {
+export const toRedeemedTicketEvent = (log: Log): Event<'RedeemedTicket'> => {
   const { amount } = abiCoder.decodeLog(
     [
       {
@@ -99,7 +106,7 @@ export const decodeRedeemedTicket = (log: Log): Event<'RedeemedTicket'> => {
   })
 }
 
-export const decodeInitiatedChannelClosure = (log: Log): Event<'InitiatedChannelClosure'> => {
+export const toInitiatedChannelClosureEvent = (log: Log): Event<'InitiatedChannelClosure'> => {
   const { closureTime } = abiCoder.decodeLog(
     [
       {
@@ -130,7 +137,7 @@ export const decodeInitiatedChannelClosure = (log: Log): Event<'InitiatedChannel
   })
 }
 
-export const decodeClosedChannel = (log: Log): Event<'ClosedChannel'> => {
+export const toClosedChannelEvent = (log: Log): Event<'ClosedChannel'> => {
   const { partyAAmount, partyBAmount } = abiCoder.decodeLog(
     [
       {

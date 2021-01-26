@@ -22,7 +22,7 @@ export const EventSignatures: {
 }
 
 /**
- * Assumed the first indexed event parameters are the public keys,
+ * Assumes that the first indexed event parameters are the public keys,
  * it then reconstructs them by looking into topic 0.
  * @TODO: requires documentantion
  * @param topics

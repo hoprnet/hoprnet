@@ -382,7 +382,7 @@ class ChannelFactory {
 
       subscription
         .on('data', async (log: Log) => {
-          const event = topics.decodeOpenedChannel(log)
+          const event = topics.toOpenedChannelEvent(log)
 
           const _channelId = await getId(
             await event.data.opener.toAccountId(),
@@ -423,7 +423,7 @@ class ChannelFactory {
 
       subscription
         .on('data', async (log: Log) => {
-          const event = topics.decodeClosedChannel(log)
+          const event = topics.toClosedChannelEvent(log)
 
           const _channelId = await getId(
             await event.data.closer.toAccountId(),

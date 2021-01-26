@@ -50,7 +50,7 @@ class Indexer extends EventEmitter implements IIndexer {
     const { web3, hoprChannels } = this.connector
 
     const [latestSavedBlock, latestOnChainBlock] = await Promise.all([
-      await getLatestBlockNumber(this.connector),
+      await getLatestBlockNumber(this.connector.db),
       web3.eth.getBlockNumber()
     ])
     this.latestBlock = latestSavedBlock
@@ -207,7 +207,7 @@ class Indexer extends EventEmitter implements IIndexer {
       }
     }
 
-    await updateLatestBlockNumber(this.connector, new BN(block.number))
+    await updateLatestBlockNumber(this.connector.db, new BN(block.number))
   }
 
   /**
@@ -217,9 +217,9 @@ class Indexer extends EventEmitter implements IIndexer {
    * @param logs
    */
   private onNewLogs(logs: Log[]): void {
+    // we dont track all events, we ignore those who return undefined
     const events = logs.reduce<Event<any>[]>((result, log) => {
       const event = topics.logToEvent(log)
-      // we dont track all events
       if (event) result.push(event)
       return result
     }, [])
@@ -230,7 +230,7 @@ class Indexer extends EventEmitter implements IIndexer {
     log('Pre-processing event %s', event.name)
 
     // check if this event has already been processed
-    const latestSnapshot = await getLatestConfirmedSnapshot(this.connector)
+    const latestSnapshot = await getLatestConfirmedSnapshot(this.connector.db)
     if (latestSnapshot && snapshotComparator(event, latestSnapshot) < 0) {
       log(chalk.red('Found event which is older than last confirmed event!'))
       return true
@@ -254,7 +254,7 @@ class Indexer extends EventEmitter implements IIndexer {
     // if (await this.preProcess(event)) return
 
     const { isPartyA } = this.connector.utils
-    const storedChannel = await getChannelEntry(this.connector, event.data.recipient, event.data.counterparty)
+    const storedChannel = await getChannelEntry(this.connector.db, event.data.recipient, event.data.counterparty)
     const recipientAccountId = await event.data.recipient.toAccountId()
     const counterpartyAccountId = await event.data.counterparty.toAccountId()
     const isRecipientPartyA = isPartyA(recipientAccountId, counterpartyAccountId)
@@ -292,7 +292,7 @@ class Indexer extends EventEmitter implements IIndexer {
       })
     }
 
-    await updateChannelEntry(this.connector, partyA, partyB, channelEntry)
+    await updateChannelEntry(this.connector.db, partyA, partyB, channelEntry)
 
     log('Channel %s got funded by %s', chalk.green(channelId.toHex()), chalk.green(event.data.funder))
   }
@@ -309,7 +309,7 @@ class Indexer extends EventEmitter implements IIndexer {
     const channelId = await getId(openerAccountId, counterpartyAccountId)
     log('Processing event %s with channelId %s', event.name, channelId.toHex())
 
-    const storedChannel = await getChannelEntry(this.connector, partyA, partyB)
+    const storedChannel = await getChannelEntry(this.connector.db, partyA, partyB)
     if (!storedChannel) {
       log(chalk.red('Could not find stored channel %s !'), channelId.toHex())
       return
@@ -326,7 +326,7 @@ class Indexer extends EventEmitter implements IIndexer {
       closureByPartyA: false
     })
 
-    await updateChannelEntry(this.connector, partyA, partyB, channelEntry)
+    await updateChannelEntry(this.connector.db, partyA, partyB, channelEntry)
 
     this.emit('channelOpened', {
       partyA,
@@ -349,7 +349,7 @@ class Indexer extends EventEmitter implements IIndexer {
     const channelId = await getId(redeemerAccountId, counterpartyAccountId)
     log('Processing event %s with channelId %s', event.name, channelId.toHex())
 
-    const storedChannel = await getChannelEntry(this.connector, partyA, partyB)
+    const storedChannel = await getChannelEntry(this.connector.db, partyA, partyB)
     if (!storedChannel) {
       log(chalk.red('Could not find stored channel %s !'), channelId.toHex())
       return
@@ -368,7 +368,7 @@ class Indexer extends EventEmitter implements IIndexer {
       closureByPartyA: false
     })
 
-    await updateChannelEntry(this.connector, partyA, partyB, channelEntry)
+    await updateChannelEntry(this.connector.db, partyA, partyB, channelEntry)
 
     log('Ticket redeemd in channel %s by %s', chalk.green(channelId.toHex()), chalk.green(redeemerAccountId.toHex()))
   }
@@ -385,7 +385,7 @@ class Indexer extends EventEmitter implements IIndexer {
     const channelId = await getId(initiatorAccountId, counterpartyAccountId)
     log('Processing event %s with channelId %s', event.name, channelId.toHex())
 
-    const storedChannel = await getChannelEntry(this.connector, partyA, partyB)
+    const storedChannel = await getChannelEntry(this.connector.db, partyA, partyB)
     if (!storedChannel) {
       log(chalk.red('Could not find stored channel %s !'), channelId.toHex())
       return
@@ -402,7 +402,7 @@ class Indexer extends EventEmitter implements IIndexer {
       closureByPartyA: isInitiatorPartyA
     })
 
-    await updateChannelEntry(this.connector, partyA, partyB, channelEntry)
+    await updateChannelEntry(this.connector.db, partyA, partyB, channelEntry)
 
     log(
       'Channel closure initiated for %s by %s',
@@ -423,7 +423,7 @@ class Indexer extends EventEmitter implements IIndexer {
     const channelId = await getId(closerAccountId, counterpartyAccountId)
     log('Processing event %s with channelId %s', event.name, channelId.toHex())
 
-    const storedChannel = await getChannelEntry(this.connector, partyA, partyB)
+    const storedChannel = await getChannelEntry(this.connector.db, partyA, partyB)
     if (!storedChannel) {
       log(chalk.red('Could not find stored channel %s !'), channelId.toHex())
       return
@@ -440,7 +440,7 @@ class Indexer extends EventEmitter implements IIndexer {
       closureByPartyA: false
     })
 
-    await updateChannelEntry(this.connector, partyA, partyB, channelEntry)
+    await updateChannelEntry(this.connector.db, partyA, partyB, channelEntry)
 
     this.emit('channelClosed', {
       partyA,
@@ -453,11 +453,11 @@ class Indexer extends EventEmitter implements IIndexer {
 
   // DB related
   public async getChannelEntry(partyA: Public, partyB: Public): Promise<ChannelEntry | undefined> {
-    return getChannelEntry(this.connector, partyA, partyB)
+    return getChannelEntry(this.connector.db, partyA, partyB)
   }
 
   public async getChannelEntries(party?: Public, filter?: (node: Public) => boolean): Promise<ChannelUpdate[]> {
-    return getChannelEntries(this.connector, party, filter)
+    return getChannelEntries(this.connector.db, party, filter)
   }
 
   // routing related
@@ -476,7 +476,7 @@ class Indexer extends EventEmitter implements IIndexer {
 
   public async getRandomChannel(): Promise<RoutingChannel | undefined> {
     const HACK = 9514000 // Arbitrarily chosen block for our testnet. Total hack.
-    const results = await getChannelEntries(this.connector)
+    const results = await getChannelEntries(this.connector.db)
     const filtered = results.filter((x) => x.channelEntry.blockNumber.gtn(HACK))
     if (filtered.length === 0) {
       log('no channels exist in indexer > hack')
@@ -490,7 +490,7 @@ class Indexer extends EventEmitter implements IIndexer {
 
   public async getChannelsFromPeer(source: PeerId): Promise<RoutingChannel[]> {
     const sourcePubKey = new Public(source.pubKey.marshal())
-    const channels = await getChannelEntries(this.connector, sourcePubKey)
+    const channels = await getChannelEntries(this.connector.db, sourcePubKey)
     let cout: RoutingChannel[] = []
     for (let channel of channels) {
       let directed = await this.toIndexerChannel(source, channel)

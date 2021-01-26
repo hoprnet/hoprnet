@@ -4,9 +4,9 @@
  */
 
 import type { Log } from 'web3-core'
-import * as logs from './logs'
 import type { Event, EventData, Topics } from './types'
 import { generateTopics, EventSignatures } from './utils'
+import * as logs from './logs'
 export * from './logs'
 export * from './utils'
 export * from './types'
@@ -29,15 +29,15 @@ export const logToEvent = (log: Log): Event<any> | undefined => {
   const [topic0] = log.topics
 
   if (EventTopics0.FundedChannel[0].includes(topic0)) {
-    return logs.decodeFundedChannel(log)
+    return logs.toFundedChannelEvent(log)
   } else if (EventTopics0.OpenedChannel[0].includes(topic0)) {
-    return logs.decodeOpenedChannel(log)
+    return logs.toOpenedChannelEvent(log)
   } else if (EventTopics0.RedeemedTicket[0].includes(topic0)) {
-    return logs.decodeRedeemedTicket(log)
+    return logs.toRedeemedTicketEvent(log)
   } else if (EventTopics0.InitiatedChannelClosure[0].includes(topic0)) {
-    return logs.decodeInitiatedChannelClosure(log)
+    return logs.toInitiatedChannelClosureEvent(log)
   } else if (EventTopics0.ClosedChannel[0].includes(topic0)) {
-    return logs.decodeClosedChannel(log)
+    return logs.toClosedChannelEvent(log)
   }
   // else {
   //   console.log(JSON.stringify({ log, EventTopics0 }, null, 2))
