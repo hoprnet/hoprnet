@@ -92,6 +92,14 @@ class WebRTCConnection implements MultiaddrConnection {
 
     this.channel.once('error', this.endWebRTCUpgrade.bind(this))
 
+    this.channel.on('iceStateChange', (iceConnectionState: string, iceGatheringState: string) => {
+      console.log(`inside iceStateChange handler`)
+      if (iceConnectionState === 'disconnected' && iceGatheringState === 'completed') {
+        this.timeline.close = Date.now()
+        this._destroyed = true
+      }
+    })
+
     this.source =
       this._signal != undefined
         ? (abortable(this.createSource(), this._signal) as Stream['source'])
