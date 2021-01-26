@@ -448,8 +448,7 @@ class Indexer implements IIndexer {
     this.starting = new Promise<boolean>(async (resolve, reject) => {
       let rejected = false
       try {
-        // HACK
-        const HoprChannelsGenesisBN = this.connector.chainId === 4 ? 9503420 : 0
+        const HoprChannelsGenesisBN = getBlockNumber(this.connector.chainId)
         const BLOCK_RANGE = 2000
         const onChainBlockNumber = await this.connector.web3.eth.getBlockNumber()
 
@@ -616,3 +615,17 @@ class Indexer implements IIndexer {
 }
 
 export default Indexer
+
+// HACK
+const getBlockNumber = (chainId: number): number => {
+  switch (chainId) {
+    case 3:
+      return 9503420
+    case 56:
+      return 2713229
+    case 137:
+      return 7452411
+    default:
+      return 0
+  }
+}
