@@ -1,5 +1,4 @@
 import type { Subscription } from 'web3-core-subscriptions'
-import type { BlockHeader } from 'web3-eth'
 import type { Log } from 'web3-core'
 import type PeerId from 'peer-id'
 import type { Indexer as IIndexer, RoutingChannel, ChannelUpdate } from '@hoprnet/hopr-core-connector-interface'
@@ -59,7 +58,7 @@ class Indexer extends EventEmitter implements IIndexer {
     log('Latest on-chain block %d', latestOnChainBlock)
 
     // @TODO: get this from somewhere else
-    const HoprChannelsGenesisBN = 9503420
+    const HoprChannelsGenesisBN = getBlockNumber(this.connector.chainId)
     // @TODO: add to constants
     const BLOCK_RANGE = 2000
 
@@ -497,3 +496,17 @@ class Indexer extends EventEmitter implements IIndexer {
 }
 
 export default Indexer
+
+// HACK
+const getBlockNumber = (chainId: number): number => {
+  switch (chainId) {
+    case 3:
+      return 9503420
+    case 56:
+      return 2713229
+    case 137:
+      return 7452411
+    default:
+      return 0
+  }
+}
