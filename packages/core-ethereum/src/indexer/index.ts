@@ -313,9 +313,9 @@ class Indexer implements IIndexer {
         | ClosedChannelEvent
 
       if (event.event === 'OpenedChannel') {
-        this.onOpenedChannel(event as OpenedChannelEvent)
+        await this.onOpenedChannel(event as OpenedChannelEvent)
       } else {
-        this.onClosedChannel(event as ClosedChannelEvent)
+        await this.onClosedChannel(event as ClosedChannelEvent)
       }
     }
   }
