@@ -110,7 +110,7 @@ start_testnode_vm() {
       --container-arg="--healthCheck" --container-arg="true" \
       --container-arg="--healthCheckHost" --container-arg="0.0.0.0" \
       --container-arg="--bootstrapServers" --container-arg="$3" \
-      --container-arg="--run" --container-arg="cover-traffic start;daemonize" \
+      --container-arg="--run" --container-arg="\"cover-traffic start;daemonize\"" \
       --container-arg="--admin" \
       --container-restart-policy=always
   fi
