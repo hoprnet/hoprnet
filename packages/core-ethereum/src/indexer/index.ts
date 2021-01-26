@@ -3,6 +3,7 @@ import type { Log } from 'web3-core'
 import type PeerId from 'peer-id'
 import type { Indexer as IIndexer, RoutingChannel, ChannelUpdate } from '@hoprnet/hopr-core-connector-interface'
 import type HoprEthereum from '..'
+import type { Event } from './topics'
 import EventEmitter from 'events'
 import chalk from 'chalk'
 import BN from 'bn.js'
@@ -10,6 +11,8 @@ import Heap from 'heap-js'
 import { pubKeyToPeerId, randomChoice } from '@hoprnet/hopr-utils'
 import { ChannelEntry, Public, Balance } from '../types'
 import { isPartyA, getId, Log as DebugLog } from '../utils'
+import * as topics from './topics'
+import * as reducers from './reducers'
 import {
   isConfirmedBlock,
   getLatestBlockNumber,
@@ -20,8 +23,6 @@ import {
   snapshotComparator,
   getLatestConfirmedSnapshot
 } from './utils'
-import * as topics from './topics'
-import type { Event } from './topics'
 
 const log = DebugLog(['indexer'])
 
@@ -237,46 +238,19 @@ class Indexer extends EventEmitter implements IIndexer {
     this.unconfirmedEvents.addAll(events)
   }
 
-  // reducers
+  // on new events
   private async onFundedChannel(event: Event<'FundedChannel'>): Promise<void> {
-    const { isPartyA } = this.connector.utils
-    const storedChannel = await getChannelEntry(this.connector.db, event.data.recipient, event.data.counterparty)
     const recipientAccountId = await event.data.recipient.toAccountId()
     const counterpartyAccountId = await event.data.counterparty.toAccountId()
     const isRecipientPartyA = isPartyA(recipientAccountId, counterpartyAccountId)
     const partyA = isRecipientPartyA ? event.data.recipient : event.data.counterparty
     const partyB = isRecipientPartyA ? event.data.counterparty : event.data.recipient
 
+    const storedChannel = await getChannelEntry(this.connector.db, partyA, partyB)
+    const channelEntry = await reducers.onFundedChannel(event, storedChannel)
+
     // const channelId = await getId(recipientAccountId, counterpartyAccountId)
     // log('Processing event %s with channelId %s', event.name, channelId.toHex())
-
-    let channelEntry: ChannelEntry
-
-    if (storedChannel) {
-      channelEntry = new ChannelEntry(undefined, {
-        blockNumber: event.blockNumber,
-        transactionIndex: event.transactionIndex,
-        logIndex: event.logIndex,
-        deposit: storedChannel.deposit.add(event.data.recipientAmount.add(event.data.counterpartyAmount)),
-        partyABalance: storedChannel.partyABalance.add(
-          isRecipientPartyA ? event.data.recipientAmount : event.data.counterpartyAmount
-        ),
-        closureTime: new BN(0),
-        stateCounter: storedChannel.stateCounter.addn(1),
-        closureByPartyA: false
-      })
-    } else {
-      channelEntry = new ChannelEntry(undefined, {
-        blockNumber: event.blockNumber,
-        transactionIndex: event.transactionIndex,
-        logIndex: event.logIndex,
-        deposit: event.data.recipientAmount.add(event.data.counterpartyAmount),
-        partyABalance: isRecipientPartyA ? event.data.recipientAmount : event.data.counterpartyAmount,
-        closureTime: new BN(0),
-        stateCounter: new BN(1),
-        closureByPartyA: false
-      })
-    }
 
     await updateChannelEntry(this.connector.db, partyA, partyB, channelEntry)
 
@@ -299,16 +273,7 @@ class Indexer extends EventEmitter implements IIndexer {
       return
     }
 
-    const channelEntry = new ChannelEntry(undefined, {
-      blockNumber: event.blockNumber,
-      transactionIndex: event.transactionIndex,
-      logIndex: event.logIndex,
-      deposit: storedChannel.deposit,
-      partyABalance: storedChannel.partyABalance,
-      closureTime: storedChannel.closureTime,
-      stateCounter: storedChannel.stateCounter.addn(1),
-      closureByPartyA: false
-    })
+    const channelEntry = await reducers.onOpenedChannel(event, storedChannel)
 
     await updateChannelEntry(this.connector.db, partyA, partyB, channelEntry)
 
@@ -337,18 +302,7 @@ class Indexer extends EventEmitter implements IIndexer {
       return
     }
 
-    const channelEntry = new ChannelEntry(undefined, {
-      blockNumber: event.blockNumber,
-      transactionIndex: event.transactionIndex,
-      logIndex: event.logIndex,
-      deposit: storedChannel.deposit,
-      partyABalance: isRedeemerPartyA
-        ? storedChannel.partyABalance.add(event.data.amount)
-        : storedChannel.partyABalance.sub(event.data.amount),
-      closureTime: storedChannel.closureTime,
-      stateCounter: storedChannel.stateCounter,
-      closureByPartyA: false
-    })
+    const channelEntry = await reducers.onRedeemedTicket(event, storedChannel)
 
     await updateChannelEntry(this.connector.db, partyA, partyB, channelEntry)
 
@@ -371,16 +325,7 @@ class Indexer extends EventEmitter implements IIndexer {
       return
     }
 
-    const channelEntry = new ChannelEntry(undefined, {
-      blockNumber: event.blockNumber,
-      transactionIndex: event.transactionIndex,
-      logIndex: event.logIndex,
-      deposit: storedChannel.deposit,
-      partyABalance: storedChannel.partyABalance,
-      closureTime: event.data.closureTime,
-      stateCounter: storedChannel.stateCounter.addn(1),
-      closureByPartyA: isInitiatorPartyA
-    })
+    const channelEntry = await reducers.onInitiatedChannelClosure(event, storedChannel)
 
     await updateChannelEntry(this.connector.db, partyA, partyB, channelEntry)
 
@@ -407,16 +352,7 @@ class Indexer extends EventEmitter implements IIndexer {
       return
     }
 
-    const channelEntry = new ChannelEntry(undefined, {
-      blockNumber: event.blockNumber,
-      transactionIndex: event.transactionIndex,
-      logIndex: event.logIndex,
-      deposit: new BN(0),
-      partyABalance: new BN(0),
-      closureTime: new BN(0),
-      stateCounter: storedChannel.stateCounter.addn(1),
-      closureByPartyA: false
-    })
+    const channelEntry = await reducers.onClosedChannel(event, storedChannel)
 
     await updateChannelEntry(this.connector.db, partyA, partyB, channelEntry)
 
