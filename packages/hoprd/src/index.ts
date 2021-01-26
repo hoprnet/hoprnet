@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 import Hopr from '@hoprnet/hopr-core'
 import type { HoprOptions } from '@hoprnet/hopr-core'
+import { FULL_VERSION } from '@hoprnet/hopr-core/lib/constants'
+
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import { decode } from 'rlp'
 // @ts-ignore
@@ -180,8 +182,7 @@ async function main() {
     if (argv.healthCheck) {
       const http = require('http')
       const service = require('restana')()
-      const version = require('../package.json')
-      service.get('/healthcheck/v1/version', (_, res) => res.send(`hoprd@${version}`))
+      service.get('/healthcheck/v1/version', (_, res) => res.send(FULL_VERSION))
       const hostname = argv.healthCheckHost
       const port = argv.healthCheckPort
       const server = http.createServer(service).on('error', (err) => {
