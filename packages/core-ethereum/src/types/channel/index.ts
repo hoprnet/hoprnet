@@ -111,16 +111,7 @@ class Channel extends Uint8ArrayE implements Types.Channel {
 
   // @TODO fix size
   static get SIZE(): number {
-    // const state = stateCounterToStatus(_state.toNumber())
-    // if ([ChannelStatus.FUNDING, ChannelStatus.OPEN].includes(state)) {
     return ChannelBalance.SIZE + ChannelState.SIZE
-    // }
-
-    // if (state == ChannelStatus.PENDING) {
-    //   return ChannelBalance.SIZE + ChannelState.SIZE + Moment.SIZE
-    // }
-
-    // throw Error(`Invalid state. Got <${state}>`)
   }
 
   static createFunded(balance: ChannelBalance): Channel {

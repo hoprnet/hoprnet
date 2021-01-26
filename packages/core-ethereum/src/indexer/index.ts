@@ -199,6 +199,7 @@ class Indexer extends EventEmitter implements IIndexer {
     ) {
       const event = this.unconfirmedEvents.pop()
       // log('Found unconfirmed event %s', event.name)
+      // log(chalk.blue(event.blockNumber.toString(), event.transactionIndex.toString(), event.logIndex.toString()))
 
       // check if this is an already processed event
       if (lastSnapshot && snapshotComparator(event, lastSnapshot) < 0) {
@@ -207,15 +208,15 @@ class Indexer extends EventEmitter implements IIndexer {
       }
 
       if (event.name === 'FundedChannel') {
-        await this.onFundedChannel(event as Event<'FundedChannel'>).catch(console.error)
+        await this.onFundedChannel(event as Event<'FundedChannel'>)
       } else if (event.name === 'OpenedChannel') {
-        await this.onOpenedChannel(event as Event<'OpenedChannel'>).catch(console.error)
+        await this.onOpenedChannel(event as Event<'OpenedChannel'>)
       } else if (event.name === 'RedeemedTicket') {
-        await this.onRedeemedTicket(event as Event<'RedeemedTicket'>).catch(console.error)
+        await this.onRedeemedTicket(event as Event<'RedeemedTicket'>)
       } else if (event.name === 'InitiatedChannelClosure') {
-        await this.onInitiatedChannelClosure(event as Event<'InitiatedChannelClosure'>).catch(console.error)
+        await this.onInitiatedChannelClosure(event as Event<'InitiatedChannelClosure'>)
       } else if (event.name === 'ClosedChannel') {
-        await this.onClosedChannel(event as Event<'ClosedChannel'>).catch(console.error)
+        await this.onClosedChannel(event as Event<'ClosedChannel'>)
       }
     }
 

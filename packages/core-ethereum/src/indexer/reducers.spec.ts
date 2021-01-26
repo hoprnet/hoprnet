@@ -17,7 +17,7 @@ const compareChannelEntries = (actual: ChannelEntry, expected: ChannelEntry) => 
   expect(actual.closureByPartyA).to.equal(actual.closureByPartyA, 'closureByPartyA')
 }
 
-describe('test indexer reducers', function () {
+describe.only('test indexer reducers', function () {
   it("should create FUNDED channel entry when it's a new channel", async function () {
     const channelEntry = await reducers.onFundedChannel(fixtures.FUNDED_EVENT)
     compareChannelEntries(channelEntry, fixtures.FUNDED_CHANNEL)
@@ -53,6 +53,7 @@ describe('test indexer reducers', function () {
     compareChannelEntries(channelEntry, fixtures.CLOSED_CHANNEL)
   })
 
+  // @TODO: add more
   it('should fail to reduce UNINITIALIZED -> OPEN', async function () {
     expect(reducers.onOpenedChannel(fixtures.OPENED_EVENT, fixtures.EMPTY_CHANNEL)).rejectedWith(
       "'onOpenedChannel' failed because channel is not in 'FUNDED' status"

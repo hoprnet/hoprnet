@@ -185,6 +185,6 @@ export const CLOSED_CHANNEL = new ChannelEntry(undefined, {
   deposit: new BN(0),
   partyABalance: new BN(0),
   closureTime: new BN(0),
-  stateCounter: new BN(4),
+  stateCounter: new BN(10),
   closureByPartyA: false
 })

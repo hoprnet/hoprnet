@@ -13,7 +13,10 @@ export const onFundedChannel = async (
   const isRecipientPartyA = isPartyA(recipientAccountId, counterpartyAccountId)
 
   if (channelEntry) {
-    assert(channelEntry.status === 'FUNDED', "'onFundedChannel' failed because channel is not in 'FUNDED' status")
+    assert(
+      channelEntry.status === 'UNINITIALISED' || channelEntry.status === 'FUNDED',
+      "'onFundedChannel' failed because channel is not in 'UNINITIALISED' or 'FUNDED' status"
+    )
 
     return new ChannelEntry(undefined, {
       blockNumber: event.blockNumber,
@@ -121,7 +124,7 @@ export const onClosedChannel = async (
     deposit: new BN(0),
     partyABalance: new BN(0),
     closureTime: new BN(0),
-    stateCounter: channelEntry.stateCounter.addn(1),
+    stateCounter: channelEntry.stateCounter.addn(7),
     closureByPartyA: false
   })
 }

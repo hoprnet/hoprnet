@@ -3,6 +3,7 @@ import BN from 'bn.js'
 import { UINT256 } from '../types/solidity'
 import { Uint8ArrayE } from '../types/extended'
 import { ChannelStatus } from '../types/channel'
+import { stateCounterToStatus } from '../utils'
 
 // @TODO: we should optimize this since it will use more storage than needed
 // @TODO: redesign how we build classes like this
@@ -114,8 +115,7 @@ class ChannelEntry extends Uint8ArrayE implements Types.ChannelEntry {
   }
 
   get status() {
-    const stateCounter = this.stateCounter
-    const status = stateCounter.modn(10)
+    const status = stateCounterToStatus(this.stateCounter.toNumber())
 
     if (status >= Object.keys(ChannelStatus).length) {
       throw Error("status like this doesn't exist")
