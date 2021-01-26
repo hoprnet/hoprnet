@@ -83,7 +83,7 @@ update_or_create_bootstrap_vm() {
       --container-arg="--init" --container-arg="true" \
       --container-arg="--runAsBootstrap" --container-arg="true" \
       --container-arg="--rest" --container-arg="true" \
-      --container-arg="--run" --container-arg"'settings strategy passive;daemonize'"
+      --container-arg="--run" --container-arg="settings strategy passive;daemonize"
       --container-arg="--restHost" --container-arg="0.0.0.0" \
       --container-arg="--healthCheck" --container-arg="true" \
       --container-arg="--healthCheckHost" --container-arg="0.0.0.0" \
