@@ -189,7 +189,7 @@ async function main() {
     }
 
     node.on('hopr:message', logMessageToNode)
-    
+
     if (adminServer) {
       adminServer.registerNode(node, cmds)
     }
