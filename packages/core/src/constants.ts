@@ -20,9 +20,10 @@ export const DEFAULT_STUN_PORT = 3478
 
 export const HEARTBEAT_INTERVAL = 3000
 export const HEARTBEAT_INTERVAL_VARIANCE = 2000
-export const HEARTBEAT_TIMEOUT = 3000
 
 export const MAX_PARALLEL_CONNECTIONS = 5
+
+export const HEARTBEAT_TIMEOUT = 4000
 
 export const MAX_PACKET_DELAY = 200
 

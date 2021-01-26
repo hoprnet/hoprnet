@@ -105,7 +105,7 @@ class Indexer implements IIndexer {
   }
 
   public async getRandomChannel(): Promise<IndexerChannel | undefined> {
-    //const HACK = 3970950 // Arbitrarily chosen block for our testnet. Total hack.
+    // const HACK = 9514000 // Arbitrarily chosen block for our testnet. Total hack.
     const all = await this.getAll(undefined)
     const filtered = all //.filter((x) => x.channelEntry.blockNumber.gtn(HACK))
 
@@ -295,10 +295,12 @@ class Indexer implements IIndexer {
     a: OpenedChannelEvent | ClosedChannelEvent,
     b: OpenedChannelEvent | ClosedChannelEvent
   ): number {
-    return a.blockNumber - b.blockNumber
+    if (a.blockNumber !== b.blockNumber) return a.blockNumber - b.blockNumber
+    else if (a.transactionIndex !== b.transactionIndex) return a.transactionIndex - b.transactionIndex
+    return a.logIndex - b.logIndex
   }
 
-  private async onNewBlock(block: BlockHeader) {
+  private async onNewBlock(block: { number: number }) {
     while (
       this.unconfirmedEvents.length > 0 &&
       isConfirmedBlock(
@@ -311,9 +313,9 @@ class Indexer implements IIndexer {
         | ClosedChannelEvent
 
       if (event.event === 'OpenedChannel') {
-        this.onOpenedChannel(event as OpenedChannelEvent)
+        await this.onOpenedChannel(event as OpenedChannelEvent)
       } else {
-        this.onClosedChannel(event as ClosedChannelEvent)
+        await this.onClosedChannel(event as ClosedChannelEvent)
       }
     }
   }
@@ -379,6 +381,52 @@ class Indexer implements IIndexer {
     await this.delete(partyA, partyB)
   }
 
+  // TODO: this is a quick fix, needs improvements
+  private async getPastLogs(
+    fromBlock: number,
+    toBlock: number,
+    topics: (string | string[])[],
+    blockRange: number
+  ): Promise<[OnChainLog[], number]> {
+    let result: OnChainLog[] = []
+
+    let failedCount = 0
+    while (fromBlock + blockRange < toBlock) {
+      const toBlock = fromBlock + (failedCount > 0 ? 25 : blockRange)
+
+      log(
+        `${failedCount > 0 ? 'Re-quering' : 'Quering'} past logs from %d to %d: %d`,
+        fromBlock,
+        toBlock,
+        toBlock - fromBlock
+      )
+      try {
+        const logs = await this.connector.web3.eth.getPastLogs({
+          address: this.connector.hoprChannels.options.address,
+          fromBlock,
+          toBlock,
+          topics
+        })
+
+        result = result.concat(logs)
+      } catch (error) {
+        failedCount++
+
+        if (failedCount > 1) {
+          console.error(error)
+          throw error
+        }
+
+        continue
+      }
+
+      failedCount = 0
+      fromBlock += blockRange
+    }
+
+    return [result, fromBlock]
+  }
+
   /**
    * Start indexing,
    * listen to all open / close events,
@@ -400,19 +448,60 @@ class Indexer implements IIndexer {
     this.starting = new Promise<boolean>(async (resolve, reject) => {
       let rejected = false
       try {
+        const HoprChannelsGenesisBN = getBlockNumber(this.connector.chainId)
+        const BLOCK_RANGE = 2000
         const onChainBlockNumber = await this.connector.web3.eth.getBlockNumber()
-        let fromBlock = await this.getLatestConfirmedBlockNumber()
 
         // go back 8 blocks in case of a re-org at time of stopping
+        let fromBlock = await this.getLatestConfirmedBlockNumber()
         if (fromBlock - MAX_CONFIRMATIONS > 0) {
           fromBlock = fromBlock - MAX_CONFIRMATIONS
         }
+        if (fromBlock < HoprChannelsGenesisBN) {
+          fromBlock = HoprChannelsGenesisBN
+        }
 
-        log(`starting to pull events from block ${fromBlock}..`)
+        log(`starting to query events from block ${fromBlock}..`)
+
+        let fromBlockOpened = fromBlock
+        let fromBlockClosed = fromBlock
+        if (fromBlock + BLOCK_RANGE < onChainBlockNumber) {
+          const [[pastOpenedLogs, lastOpenedBlock], [pastClosedLogs, lastClosedBlock]] = await Promise.all([
+            this.getPastLogs(
+              fromBlock,
+              onChainBlockNumber,
+              events.OpenedChannelTopics(undefined, undefined),
+              BLOCK_RANGE
+            ),
+            this.getPastLogs(
+              fromBlock,
+              onChainBlockNumber,
+              events.ClosedChannelTopics(undefined, undefined),
+              BLOCK_RANGE
+            )
+          ])
+
+          for (const log of pastOpenedLogs) {
+            this.processOpenedChannelEvent(log, 0)
+          }
+
+          for (const log of pastClosedLogs) {
+            this.processClosedChannelEvent(log, 0)
+          }
+
+          // trigger new block so we process past events
+          await this.onNewBlock({ number: onChainBlockNumber })
+
+          fromBlockOpened = lastOpenedBlock
+          fromBlockClosed = lastClosedBlock
+        }
+
+        log(`subscribed to events from blocks ${fromBlockOpened} and ${fromBlockClosed}..`)
 
         this.newBlockEvent = this.connector.web3.eth
           .subscribe('newBlockHeaders')
           .on('error', (err) => {
+            console.log(err)
             if (!rejected) {
               rejected = true
               reject(err)
@@ -423,10 +512,11 @@ class Indexer implements IIndexer {
         this.openedChannelEvent = this.connector.web3.eth
           .subscribe('logs', {
             address: this.connector.hoprChannels.options.address,
-            fromBlock,
+            fromBlock: fromBlockOpened,
             topics: events.OpenedChannelTopics(undefined, undefined)
           })
           .on('error', (err) => {
+            console.log(err)
             if (!rejected) {
               rejected = true
               reject(err)
@@ -437,10 +527,11 @@ class Indexer implements IIndexer {
         this.closedChannelEvent = this.connector.web3.eth
           .subscribe('logs', {
             address: this.connector.hoprChannels.options.address,
-            fromBlock,
+            fromBlock: fromBlockClosed,
             topics: events.ClosedChannelTopics(undefined, undefined)
           })
           .on('error', (err) => {
+            console.log(err)
             if (!rejected) {
               rejected = true
               reject(err)
@@ -524,3 +615,17 @@ class Indexer implements IIndexer {
 }
 
 export default Indexer
+
+// HACK
+const getBlockNumber = (chainId: number): number => {
+  switch (chainId) {
+    case 3:
+      return 9503420
+    case 56:
+      return 2713229
+    case 137:
+      return 7452411
+    default:
+      return 0
+  }
+}
