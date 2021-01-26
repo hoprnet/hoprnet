@@ -403,30 +403,30 @@
   resolved "https://registry.yarnpkg.com/@hapi/hoek/-/hoek-9.1.1.tgz#9daf5745156fd84b8e9889a2dc721f0c58e894aa"
   integrity sha512-CAEbWH7OIur6jEOzaai83jq3FmKmv4PmX1JYfs9IrYcGEVI/lyL1EXJGCj7eFVJ0bg5QR8LMxBlEtA+xKiLpFw==
 
-"@hoprnet/hopr-connect@0.1.1":
-  version "0.1.1"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-connect/-/hopr-connect-0.1.1.tgz#5dbb9815a2a02f65634d343dbc8b7e2d7434e59c"
-  integrity sha512-WkLd92AuXWLfVJAdc8fMY8rG3T/PJVL2Ns+dAB14CUwXdf7ltzcSOv+Igmej+jEVywTMB+9DCjyANMoUp+05gQ==
+"@hoprnet/hopr-connect@0.2.5":
+  version "0.2.5"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-connect/-/hopr-connect-0.2.5.tgz#5f3a6219bb9046fbe4718abf61564877480a6d32"
+  integrity sha512-N603yZ9a+GV6J+oLLATHOBHkxdeJvU2TK9YBJkjW7nFpH/I4+tZRmiF/8L2PDdC49NPeRlmJ2fNvGdglZLlqTg==
   dependencies:
-    "@hoprnet/hopr-utils" "^1.57.6"
+    "@hoprnet/hopr-utils" "^1.62"
     abort-controller "3.0.0"
+    abortable-iterator "^3.0.0"
     bl "^4.0.3"
     debug "^4.3.1"
     it-handshake "~1.0.2"
-    libp2p-utils "^0.2.3"
-    mafmt "^8.0.1"
-    multiaddr "~8.1.1"
+    mafmt "^8.0.4"
+    multiaddr "~8.1.2"
     p-defer "~3.0.0"
     peer-id "~0.14.2"
     simple-peer "9.9.3"
     stream-to-it "^0.2.2"
     webrtc-stun "~3.0.0"
-    wrtc "0.4.6"
+    wrtc "0.4.7"
 
-"@hoprnet/hopr-utils@^1.57.6":
-  version "1.62.14"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-1.62.14.tgz#bf9be83fab5469924ac3652fa718f04283df659e"
-  integrity sha512-ySNAdsNs5L0KniGjIdq6g6Dzcg7uMVt51NeOwLaKPNjbWY+OhjvOe/H5HkXB8k5C2mM/esyLPgxhziv5X61qHg==
+"@hoprnet/hopr-utils@^1.62":
+  version "1.62.15"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-1.62.15.tgz#67fc83f18fe6bccce3f25dc5fb3f0e9deee9c819"
+  integrity sha512-q1zdv2D4JdrxnGpWt70tKXkqsmlM/11amrZfIA9F1kHmK1oNmJ440S+oKeUjjdCXjE3jZk4mM6BIk4etL4kINg==
   dependencies:
     bignumber.js "^9.0.0"
     libp2p-crypto "0.18.0"
@@ -8670,7 +8670,7 @@ libp2p-tcp@0.15.2, libp2p-tcp@^0.15.0:
     multiaddr "^8.0.0"
     stream-to-it "^0.2.2"
 
-libp2p-utils@^0.2.0, libp2p-utils@^0.2.3:
+libp2p-utils@^0.2.0:
   version "0.2.3"
   resolved "https://registry.yarnpkg.com/libp2p-utils/-/libp2p-utils-0.2.3.tgz#4eb2a59a9eda342bed73cb94553c87a63c95848a"
   integrity sha512-9BoMCgvJF7LJ+JVMaHtqfCqhZN4i/sx0DrY6lf9U0Rq9uUgQ9qTai2O9LXcfr1LOS3OMMeRLsKk25MMgsf7W3w==
@@ -9030,7 +9030,7 @@ macos-release@^2.2.0:
   resolved "https://registry.yarnpkg.com/macos-release/-/macos-release-2.4.1.tgz#64033d0ec6a5e6375155a74b1a1eba8e509820ac"
   integrity sha512-H/QHeBIN1fIGJX517pvK8IEK53yQOW7YcEI55oYtgjDdoCQQz7eJS94qt5kNrscReEyuD/JcdFCm2XBEcGOITg==
 
-mafmt@^8.0.0, mafmt@^8.0.1:
+mafmt@^8.0.0, mafmt@^8.0.4:
   version "8.0.4"
   resolved "https://registry.yarnpkg.com/mafmt/-/mafmt-8.0.4.tgz#5b158a28bd800fb8d0e5c28bd9ee15120bed2a61"
   integrity sha512-wwZ5+PU0vQw10kwQRyZin1Z0dqVOp0BnYlX1xvXHS2fmLwrrQCfU1+3tlW5MRcihUwGz1virnVhbRAU1biKfiw==
@@ -9601,7 +9601,7 @@ ms@^2.0.0, ms@^2.1.1:
   resolved "https://registry.yarnpkg.com/ms/-/ms-2.1.3.tgz#574c8138ce1d2b5861f0b44579dbadd60c6615b2"
   integrity sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==
 
-multiaddr@8.1.2, multiaddr@^8.0.0, multiaddr@^8.1.0, multiaddr@~8.1.1:
+multiaddr@8.1.2, multiaddr@^8.0.0, multiaddr@^8.1.0, multiaddr@~8.1.2:
   version "8.1.2"
   resolved "https://registry.yarnpkg.com/multiaddr/-/multiaddr-8.1.2.tgz#74060ff8636ba1c01b2cf0ffd53950b852fa9b1f"
   integrity sha512-r13IzW8+Sv9zab9Gt8RPMIN2WkptIPq99EpAzg4IbJ/zTELhiEwXWr9bAmEatSCI4j/LSA6ESJzvz95JZ+ZYXQ==
@@ -14946,10 +14946,10 @@ write@1.0.3:
   dependencies:
     mkdirp "^0.5.1"
 
-wrtc@0.4.6:
-  version "0.4.6"
-  resolved "https://registry.yarnpkg.com/wrtc/-/wrtc-0.4.6.tgz#909ace2cffd34e11633d4e1c20527510a12e7b5b"
-  integrity sha512-4uD+oFoY2yuo3AV9fum3cXUXR6v8YQHZlqBrKkCRGjW1BvKrVHtLNH4UaNLBLiJu9DL89WqUWmbzsQ9RxMzANw==
+wrtc@0.4.7:
+  version "0.4.7"
+  resolved "https://registry.yarnpkg.com/wrtc/-/wrtc-0.4.7.tgz#c61530cd662713e50bffe64b7a78673ce070426c"
+  integrity sha512-P6Hn7VT4lfSH49HxLHcHhDq+aFf/jd9dPY7lDHeFhZ22N3858EKuwm2jmnlPzpsRGEPaoF6XwkcxY5SYnt4f/g==
   dependencies:
     node-pre-gyp "^0.13.0"
   optionalDependencies:
