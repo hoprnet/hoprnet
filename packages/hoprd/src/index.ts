@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import Hopr, { FULL_VERSION } from '@hoprnet/hopr-core'
+import Hopr from '@hoprnet/hopr-core'
 import type { HoprOptions } from '@hoprnet/hopr-core'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import { decode } from 'rlp'
@@ -10,6 +10,7 @@ import { Commands } from './commands'
 import { LogStream } from './logs'
 import { AdminServer } from './admin'
 import * as yargs from 'yargs'
+import setupAPI from './api'
 
 const argv = yargs
   .option('network', {
@@ -74,10 +75,6 @@ const argv = yargs
     describe: "initialize a database if it doesn't already exist",
     default: false
   })
-  .option('settings', {
-    descripe: 'Settings, same as in the repl (JSON)',
-    default: '{}'
-  })
   .option('adminHost', {
     describe: 'Host to listen to for admin console',
     default: 'localhost'
@@ -130,7 +127,7 @@ async function main() {
   let node: Hopr<HoprCoreConnector>
   let logs = new LogStream()
   let adminServer = undefined
-  let settings: any = {}
+  let cmds
 
   function logMessageToNode(msg: Uint8Array) {
     logs.log(`#### NODE RECEIVED MESSAGE [${new Date().toISOString()}] ####`)
@@ -142,10 +139,6 @@ async function main() {
       logs.log('Could not decode message', err)
       logs.log(msg.toString())
     }
-  }
-
-  if (argv.settings) {
-    settings = JSON.parse(argv.settings)
   }
 
   if (argv.admin) {
@@ -165,37 +158,24 @@ async function main() {
   try {
     node = await Hopr.create(options)
     logs.log('Created HOPR Node')
+    node.on('hopr:message', logMessageToNode)
+    cmds = new Commands(node)
 
     if (argv.rest) {
-      const http = require('http')
-      const service = require('restana')()
-
-      service.get('/api/v1/version', (_, res) => res.send(FULL_VERSION))
-      service.get('/api/v1/address/eth', async (_, res) => res.send(await node.paymentChannels.hexAccountAddress()))
-      service.get('/api/v1/address/hopr', async (_, res) => res.send(await node.getId().toB58String()))
-      const hostname = argv.restHost
-      const port = argv.restPort
-      http.createServer(service).listen(port, hostname, () => {
-        logs.log(`Rest server on ${hostname} listening on port ${port}`)
-      })
+      setupAPI(node, logs, argv)
     }
 
-    node.on('hopr:message', logMessageToNode)
-
     if (adminServer) {
-      adminServer.registerNode(node)
+      adminServer.registerNode(node, cmds)
     }
 
     if (argv.run && argv.run !== '') {
       // Run a single command and then exit.
-      let cmds = new Commands(node)
-      if (argv.settings) {
-        cmds.setState(settings)
-      }
       // We support multiple semicolon separated commands
       let toRun = argv.run.split(';')
 
       for (let c of toRun) {
+        console.error('$', c)
         if (c === 'daemonize') {
           return
         }

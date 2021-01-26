@@ -20,7 +20,7 @@
   ],
   "scripts": {
     "clean": "rimraf ./lib",
-    "build": "yarn clean && tsc --project ./tsconfig.json && yarn buildAdmin",
+    "build": "yarn clean && tsc --project ./tsconfig.json && yarn buildAdmin && chmod u+x lib/*.js",
     "buildAdmin": "next build hopr-admin",
     "test": "mocha",
     "prepublishOnly": "yarn build",

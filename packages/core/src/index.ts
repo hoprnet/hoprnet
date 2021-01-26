@@ -254,11 +254,15 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     verbose('bootstrap status', results)
 
     if (!results.some((online: boolean) => online)) {
+      console.error('Tried', potentialBootstrapServers.map((x) => x.toString()).join(','))
       throw Error('Unable to connect to any known bootstrap server.')
     }
   }
 
   private async tickChannelStrategy(newChannels: IndexerChannel[]) {
+    if (!this.running) {
+      return
+    }
     verbose('new payment channels, auto opening tick')
     for (const channel of newChannels) {
       this.network.networkPeers.register(channel[0]) // Listen to nodes with outgoing stake
@@ -336,8 +340,8 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     log(`Available under the following addresses:`)
 
     this._libp2p.multiaddrs.forEach((ma: Multiaddr) => log(ma.toString()))
-    this.periodicCheck()
     this.running = true
+    this.periodicCheck()
     return this
   }
 
@@ -498,6 +502,9 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
   }
 
   private async periodicCheck() {
+    if (!this.running) {
+      return
+    }
     log('periodic check')
     try {
       await this.checkBalances()
