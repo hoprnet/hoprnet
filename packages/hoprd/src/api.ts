@@ -3,7 +3,6 @@ import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import { Commands } from './commands'
 
 export default function setupAPI(node: Hopr<HoprCoreConnector>, logs: any, options: any) {
-
   const http = require('http')
   const service = require('restana')()
 
@@ -17,7 +16,6 @@ export default function setupAPI(node: Hopr<HoprCoreConnector>, logs: any, optio
       res.send(resp)
     })
   })
-
 
   const hostname = options.restHost
   const port = options.restPort
