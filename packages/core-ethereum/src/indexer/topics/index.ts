@@ -25,20 +25,22 @@ export const EventTopics0: {
   ClosedChannel: generateTopics(EventSignatures.ClosedChannel, undefined, undefined)
 }
 
-export const logToEvent = (log: Log): Event<any> => {
+export const logToEvent = (log: Log): Event<any> | undefined => {
   const [topic0] = log.topics
 
-  if (EventTopics0.FundedChannel.includes(topic0)) {
+  if (EventTopics0.FundedChannel[0].includes(topic0)) {
     return logs.decodeFundedChannel(log)
-  } else if (EventTopics0.OpenedChannel.includes(topic0)) {
+  } else if (EventTopics0.OpenedChannel[0].includes(topic0)) {
     return logs.decodeOpenedChannel(log)
-  } else if (EventTopics0.RedeemedTicket.includes(topic0)) {
+  } else if (EventTopics0.RedeemedTicket[0].includes(topic0)) {
     return logs.decodeRedeemedTicket(log)
-  } else if (EventTopics0.InitiatedChannelClosure.includes(topic0)) {
+  } else if (EventTopics0.InitiatedChannelClosure[0].includes(topic0)) {
     return logs.decodeInitiatedChannelClosure(log)
-  } else if (EventTopics0.ClosedChannel.includes(topic0)) {
+  } else if (EventTopics0.ClosedChannel[0].includes(topic0)) {
     return logs.decodeClosedChannel(log)
-  } else {
-    throw Error('Could not convert log to event')
   }
+  // else {
+  //   console.log(JSON.stringify({ log, EventTopics0 }, null, 2))
+  //   throw Error('Could not convert log to event')
+  // }
 }

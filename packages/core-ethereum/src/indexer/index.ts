@@ -53,12 +53,13 @@ class Indexer extends EventEmitter implements IIndexer {
       await getLatestBlockNumber(this.connector),
       web3.eth.getBlockNumber()
     ])
+    this.latestBlock = latestSavedBlock
 
     log('Latest saved block %d', latestSavedBlock)
     log('Latest on-chain block %d', latestOnChainBlock)
 
     // @TODO: get this from somewhere else
-    const HoprChannelsGenesisBN = getBlockNumber(this.connector.chainId)
+    const HoprChannelsGenesisBlock = getBlockNumber(this.connector.chainId)
     // @TODO: add to constants
     const BLOCK_RANGE = 2000
 
@@ -68,8 +69,8 @@ class Indexer extends EventEmitter implements IIndexer {
       fromBlock = fromBlock - this.maxConfirmations
     }
     // no need to query before HoprChannels existed
-    if (fromBlock < HoprChannelsGenesisBN) {
-      fromBlock = HoprChannelsGenesisBN
+    if (fromBlock < HoprChannelsGenesisBlock) {
+      fromBlock = HoprChannelsGenesisBlock
     }
 
     log('Starting to index from block %d', fromBlock)
@@ -78,10 +79,9 @@ class Indexer extends EventEmitter implements IIndexer {
     // is larger than {BLOCK_RANGE}, we will query using `getLogs` rpc
     if (fromBlock + BLOCK_RANGE <= latestOnChainBlock) {
       const toBlock = latestOnChainBlock - this.maxConfirmations
-      log('Quering past blocks from %d to %d', fromBlock, toBlock)
+      log('Starting to query past logs from %d to %d', fromBlock, toBlock)
 
-      const [pastLogs, lastBlock] = await this.getPastLogs(fromBlock, toBlock, BLOCK_RANGE)
-      this.onNewLogs(pastLogs)
+      const lastBlock = await this.processPastLogs(fromBlock, toBlock, BLOCK_RANGE)
       fromBlock = lastBlock
     }
 
@@ -128,12 +128,12 @@ class Indexer extends EventEmitter implements IIndexer {
    * @param blockRange
    * @return past logs and last queried block
    */
-  private async getPastLogs(fromBlock: number, toBlock: number, blockRange: number): Promise<[Log[], number]> {
-    let result: Log[] = []
+  private async processPastLogs(fromBlock: number, maxToBlock: number, maxBlockRange: number): Promise<number> {
     let failedCount = 0
 
-    while (fromBlock + blockRange < toBlock) {
-      const toBlock = fromBlock + (failedCount > 0 ? 25 : blockRange)
+    while (fromBlock < maxToBlock) {
+      const blockRange = failedCount > 0 ? 25 : maxBlockRange
+      const toBlock = fromBlock + blockRange
 
       log(
         `${failedCount > 0 ? 'Re-quering' : 'Quering'} past logs from %d to %d: %d`,
@@ -141,14 +141,15 @@ class Indexer extends EventEmitter implements IIndexer {
         toBlock,
         toBlock - fromBlock
       )
+
+      let logs: Log[]
+
       try {
-        const logs = await this.connector.web3.eth.getPastLogs({
+        logs = await this.connector.web3.eth.getPastLogs({
           address: this.connector.hoprChannels.options.address,
           fromBlock,
           toBlock
         })
-
-        result = result.concat(logs)
       } catch (error) {
         failedCount++
 
@@ -160,11 +161,13 @@ class Indexer extends EventEmitter implements IIndexer {
         continue
       }
 
+      this.onNewLogs(logs)
+      await this.onNewBlock({ number: toBlock })
       failedCount = 0
-      fromBlock += blockRange
+      fromBlock = toBlock
     }
 
-    return [result, fromBlock]
+    return fromBlock
   }
 
   /**
@@ -214,7 +217,12 @@ class Indexer extends EventEmitter implements IIndexer {
    * @param logs
    */
   private onNewLogs(logs: Log[]): void {
-    const events = logs.map(topics.logToEvent)
+    const events = logs.reduce<Event<any>[]>((result, log) => {
+      const event = topics.logToEvent(log)
+      // we dont track all events
+      if (event) result.push(event)
+      return result
+    }, [])
     this.unconfirmedEvents.addAll(events)
   }
 
@@ -243,7 +251,7 @@ class Indexer extends EventEmitter implements IIndexer {
 
   // reducers
   private async onFundedChannel(event: Event<'FundedChannel'>): Promise<void> {
-    if (await this.preProcess(event)) return
+    // if (await this.preProcess(event)) return
 
     const { isPartyA } = this.connector.utils
     const storedChannel = await getChannelEntry(this.connector, event.data.recipient, event.data.counterparty)
@@ -290,7 +298,7 @@ class Indexer extends EventEmitter implements IIndexer {
   }
 
   private async onOpenedChannel(event: Event<'OpenedChannel'>): Promise<void> {
-    if (await this.preProcess(event)) return
+    // if (await this.preProcess(event)) return
 
     const openerAccountId = await event.data.opener.toAccountId()
     const counterpartyAccountId = await event.data.counterparty.toAccountId()
@@ -303,7 +311,7 @@ class Indexer extends EventEmitter implements IIndexer {
 
     const storedChannel = await getChannelEntry(this.connector, partyA, partyB)
     if (!storedChannel) {
-      log(chalk.red('Could not find stored channel!'))
+      log(chalk.red('Could not find stored channel %s !'), channelId.toHex())
       return
     }
 
@@ -330,7 +338,7 @@ class Indexer extends EventEmitter implements IIndexer {
   }
 
   private async onRedeemedTicket(event: Event<'RedeemedTicket'>): Promise<void> {
-    if (await this.preProcess(event)) return
+    // if (await this.preProcess(event)) return
 
     const redeemerAccountId = await event.data.redeemer.toAccountId()
     const counterpartyAccountId = await event.data.counterparty.toAccountId()
@@ -343,7 +351,7 @@ class Indexer extends EventEmitter implements IIndexer {
 
     const storedChannel = await getChannelEntry(this.connector, partyA, partyB)
     if (!storedChannel) {
-      log(chalk.red('Could not find stored channel!'))
+      log(chalk.red('Could not find stored channel %s !'), channelId.toHex())
       return
     }
 
@@ -366,7 +374,7 @@ class Indexer extends EventEmitter implements IIndexer {
   }
 
   private async onInitiatedChannelClosure(event: Event<'InitiatedChannelClosure'>): Promise<void> {
-    if (await this.preProcess(event)) return
+    // if (await this.preProcess(event)) return
 
     const initiatorAccountId = await event.data.initiator.toAccountId()
     const counterpartyAccountId = await event.data.counterparty.toAccountId()
@@ -379,7 +387,7 @@ class Indexer extends EventEmitter implements IIndexer {
 
     const storedChannel = await getChannelEntry(this.connector, partyA, partyB)
     if (!storedChannel) {
-      log(chalk.red('Could not find stored channel!'))
+      log(chalk.red('Could not find stored channel %s !'), channelId.toHex())
       return
     }
 
@@ -404,7 +412,7 @@ class Indexer extends EventEmitter implements IIndexer {
   }
 
   private async onClosedChannel(event: Event<'ClosedChannel'>): Promise<void> {
-    if (await this.preProcess(event)) return
+    // if (await this.preProcess(event)) return
 
     const closerAccountId = await event.data.closer.toAccountId()
     const counterpartyAccountId = await event.data.counterparty.toAccountId()
@@ -417,7 +425,7 @@ class Indexer extends EventEmitter implements IIndexer {
 
     const storedChannel = await getChannelEntry(this.connector, partyA, partyB)
     if (!storedChannel) {
-      log(chalk.red('Could not find stored channel!'))
+      log(chalk.red('Could not find stored channel %s !'), channelId.toHex())
       return
     }
 
