@@ -239,8 +239,6 @@ class Indexer extends EventEmitter implements IIndexer {
 
   // reducers
   private async onFundedChannel(event: Event<'FundedChannel'>): Promise<void> {
-    // if (await this.preProcess(event)) return
-
     const { isPartyA } = this.connector.utils
     const storedChannel = await getChannelEntry(this.connector.db, event.data.recipient, event.data.counterparty)
     const recipientAccountId = await event.data.recipient.toAccountId()
@@ -286,8 +284,6 @@ class Indexer extends EventEmitter implements IIndexer {
   }
 
   private async onOpenedChannel(event: Event<'OpenedChannel'>): Promise<void> {
-    // if (await this.preProcess(event)) return
-
     const openerAccountId = await event.data.opener.toAccountId()
     const counterpartyAccountId = await event.data.counterparty.toAccountId()
     const isOpenerPartyA = isPartyA(openerAccountId, counterpartyAccountId)
@@ -326,8 +322,6 @@ class Indexer extends EventEmitter implements IIndexer {
   }
 
   private async onRedeemedTicket(event: Event<'RedeemedTicket'>): Promise<void> {
-    // if (await this.preProcess(event)) return
-
     const redeemerAccountId = await event.data.redeemer.toAccountId()
     const counterpartyAccountId = await event.data.counterparty.toAccountId()
     const isRedeemerPartyA = isPartyA(redeemerAccountId, counterpartyAccountId)
@@ -362,8 +356,6 @@ class Indexer extends EventEmitter implements IIndexer {
   }
 
   private async onInitiatedChannelClosure(event: Event<'InitiatedChannelClosure'>): Promise<void> {
-    // if (await this.preProcess(event)) return
-
     const initiatorAccountId = await event.data.initiator.toAccountId()
     const counterpartyAccountId = await event.data.counterparty.toAccountId()
     const isInitiatorPartyA = isPartyA(initiatorAccountId, counterpartyAccountId)
@@ -400,8 +392,6 @@ class Indexer extends EventEmitter implements IIndexer {
   }
 
   private async onClosedChannel(event: Event<'ClosedChannel'>): Promise<void> {
-    // if (await this.preProcess(event)) return
-
     const closerAccountId = await event.data.closer.toAccountId()
     const counterpartyAccountId = await event.data.counterparty.toAccountId()
     const isCloserPartyA = isPartyA(closerAccountId, counterpartyAccountId)
