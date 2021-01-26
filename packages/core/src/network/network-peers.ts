@@ -1,4 +1,3 @@
-import heap from 'heap-js'
 import { randomSubset } from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'
 
@@ -7,15 +6,18 @@ type Entry = {
   heartbeatsSent: number
   heartbeatsSuccess: number
   lastSeen: number
-  lastPingSuccess: boolean
+  backoff: number // between 2 and MAX_BACKOFF
+  lastTen: number
 }
+
+const MIN_DELAY = 1000 // 1 sec (because this is multiplied by backoff, it will be half the actual minimum value.
+const MAX_DELAY = 5 * 60 * 1000 // 5mins
+const BACKOFF_EXPONENT = 1.5
+const MAX_BACKOFF = MAX_DELAY / MIN_DELAY
+const UNKNOWN_Q = 0.2 // Default quality for nodes we don't know about.
 
 class NetworkPeers {
   private peers: Entry[]
-
-  private compareLastPing(a: Entry, b: Entry) {
-    return a.lastSeen - b.lastSeen
-  }
 
   private find(peer: PeerId): Entry | undefined {
     return this.peers.find((x) => x.id.toB58String() === peer.toB58String())
@@ -27,20 +29,45 @@ class NetworkPeers {
     for (const peer of existingPeers) {
       this.register(peer)
     }
-    heap.heapify(this.peers, this.compareLastPing)
   }
 
-  public async pingOldest(interaction: (PeerID: PeerId) => Promise<boolean>): Promise<void> {
-    const entry = heap.heappop(this.peers, this.compareLastPing)
-    if (!entry) {
-      return Promise.resolve()
+  private nextPing(e: Entry): number {
+    // Exponential backoff
+    const delay = Math.min(MAX_DELAY, Math.pow(e.backoff, BACKOFF_EXPONENT) * MIN_DELAY)
+    return e.lastSeen + delay
+  }
+
+  // @returns a float between 0 (completely unreliable) and 1 (completely
+  // reliable) estimating the quality of service of a peer's network connection
+  public qualityOf(peer: PeerId): number {
+    let entry = this.find(peer)
+    if (entry && entry.heartbeatsSent > 0) {
+      /*
+      return entry.heartbeatsSuccess / entry.heartbeatsSent
+      */
+      return entry.lastTen
     }
+    return UNKNOWN_Q
+  }
+
+  public pingSince(thresholdTime: number): PeerId[] {
+    return this.peers.filter((entry) => this.nextPing(entry) < thresholdTime).map((x) => x.id)
+  }
+
+  public async ping(peer: PeerId, interaction: (peerID: PeerId) => Promise<boolean>): Promise<void> {
+    const entry = this.find(peer)
+    if (!entry) throw new Error('Cannot ping ' + peer.toB58String())
+
     entry.heartbeatsSent++
     entry.lastSeen = Date.now()
-    heap.heappush(this.peers, entry, this.compareLastPing)
-    entry.lastPingSuccess = await interaction(entry.id)
-    if (entry.lastPingSuccess) {
+    const result = await interaction(entry.id)
+    if (result) {
       entry.heartbeatsSuccess++
+      entry.backoff = 2 // RESET - to back down: Math.pow(entry.backoff, 1/BACKOFF_EXPONENT)
+      entry.lastTen = Math.min(1, entry.lastTen + 0.1)
+    } else {
+      entry.lastTen = Math.max(0, entry.lastTen - 0.1)
+      entry.backoff = Math.min(MAX_BACKOFF, Math.pow(entry.backoff, BACKOFF_EXPONENT))
     }
   }
 
@@ -55,11 +82,14 @@ class NetworkPeers {
 
   public register(id: PeerId) {
     if (!this.find(id)) {
-      heap.heappush(
-        this.peers,
-        { id, heartbeatsSent: 0, heartbeatsSuccess: 0, lastSeen: Date.now(), lastPingSuccess: true },
-        this.compareLastPing
-      )
+      this.peers.push({
+        id,
+        heartbeatsSent: 0,
+        heartbeatsSuccess: 0,
+        lastSeen: Date.now(),
+        backoff: 2,
+        lastTen: UNKNOWN_Q
+      })
     }
   }
 
@@ -81,27 +111,18 @@ class NetworkPeers {
     }
     let out = ''
     out += `current nodes:\n`
-    this.peers.forEach((e: Entry) => (out += `- id: ${e.id.toB58String()}, quality: ${this.qualityOf(e.id)}\n`))
+    this.peers
+      .sort((a, b) => {
+        return this.qualityOf(b.id) - this.qualityOf(a.id)
+      })
+      .forEach((e: Entry) => {
+        const success =
+          e.heartbeatsSent > 0 ? ((e.heartbeatsSuccess / e.heartbeatsSent) * 100).toFixed() + '%' : '<new>'
+        out += `- id: ${e.id.toB58String()}, quality: ${this.qualityOf(e.id).toFixed(
+          2
+        )} (backoff ${e.backoff.toFixed()}, ${success} of ${e.heartbeatsSent}) \n`
+      })
     return out
-  }
-
-  public containsOlderThan(timestamp: Number): boolean {
-    return this.peers.length > 0 && heap.heaptop(this.peers, 1, this.compareLastPing)[0].lastSeen < timestamp
-  }
-
-  public lastSeen(peer: PeerId): number {
-    return this.find(peer).lastSeen
-  }
-
-  // @returns a float between 0 (completely unreliable) and 1 (completely
-  // reliable) estimating the quality of service of a peer's network connection
-  public qualityOf(peer: PeerId): number {
-    let entry = this.find(peer)
-    if (entry && entry.heartbeatsSent > 0) {
-      return entry.heartbeatsSuccess / entry.heartbeatsSent
-    }
-    // @TODO
-    return 0.2 // Unknown // TBD
   }
 }
 

@@ -1,4 +1,3 @@
-import { durations } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 
 export const TICKET_AMOUNT = 10000000000000 // 0.00001 HOPR
@@ -19,13 +18,12 @@ export const PROTOCOL_ONCHAIN_KEY = `/${PROTOCOL_NAME}/onChainKey/${VERSION}`
 export const PROTOCOL_HEARTBEAT = `/${PROTOCOL_NAME}/heartbeat/${VERSION}`
 export const DEFAULT_STUN_PORT = 3478
 
-export const HEARTBEAT_REFRESH = 103000
-export const HEARTBEAT_INTERVAL = 50000
-export const HEARTBEAT_INTERVAL_VARIANCE = 5000
+export const HEARTBEAT_INTERVAL = 3000
+export const HEARTBEAT_INTERVAL_VARIANCE = 2000
 
 export const MAX_PARALLEL_CONNECTIONS = 5
 
-export const HEARTBEAT_TIMEOUT = durations.seconds(4)
+export const HEARTBEAT_TIMEOUT = 4000
 
 export const MAX_PACKET_DELAY = 200
 

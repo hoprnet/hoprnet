@@ -423,6 +423,18 @@
     webrtc-stun "~3.0.0"
     wrtc "0.4.7"
 
+"@hoprnet/hopr-utils@^1.62":
+  version "1.62.15"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-1.62.15.tgz#67fc83f18fe6bccce3f25dc5fb3f0e9deee9c819"
+  integrity sha512-q1zdv2D4JdrxnGpWt70tKXkqsmlM/11amrZfIA9F1kHmK1oNmJ440S+oKeUjjdCXjE3jZk4mM6BIk4etL4kINg==
+  dependencies:
+    bignumber.js "^9.0.0"
+    libp2p-crypto "0.18.0"
+    multiaddr "8.1.2"
+    multihashes "~3.1.0"
+    peer-id "0.14.2"
+    strip-ansi "^6.0.0"
+
 "@lerna/add@3.21.0":
   version "3.21.0"
   resolved "https://registry.yarnpkg.com/@lerna/add/-/add-3.21.0.tgz#27007bde71cc7b0a2969ab3c2f0ae41578b4577b"
@@ -1495,7 +1507,7 @@
   dependencies:
     "@sinonjs/commons" "^1.7.0"
 
-"@sinonjs/samsam@^5.3.0":
+"@sinonjs/samsam@^5.3.1":
   version "5.3.1"
   resolved "https://registry.yarnpkg.com/@sinonjs/samsam/-/samsam-5.3.1.tgz#375a45fe6ed4e92fca2fb920e007c48232a6507f"
   integrity sha512-1Hc0b1TtyfBu8ixF/tpfSHTVWKwCBLY4QJbkgnE7HcwyvT2xArDxb4K7dMgqRm3szI+LJbzmW/s4xxEhv6hwDg==
@@ -12353,13 +12365,13 @@ simple-swizzle@^0.2.2:
     is-arrayish "^0.3.1"
 
 sinon@^9.0.2, sinon@^9.0.8:
-  version "9.2.3"
-  resolved "https://registry.yarnpkg.com/sinon/-/sinon-9.2.3.tgz#f68ce414e843e2fd638703043c97f260697caa52"
-  integrity sha512-m+DyAWvqVHZtjnjX/nuShasykFeiZ+nPuEfD4G3gpvKGkXRhkF/6NSt2qN2FjZhfrcHXFzUzI+NLnk+42fnLEw==
+  version "9.2.4"
+  resolved "https://registry.yarnpkg.com/sinon/-/sinon-9.2.4.tgz#e55af4d3b174a4443a8762fa8421c2976683752b"
+  integrity sha512-zljcULZQsJxVra28qIAL6ow1Z9tpattkCTEJR4RBP3TGc00FcttsP5pK284Nas5WjMZU5Yzy3kAIp3B3KRf5Yg==
   dependencies:
     "@sinonjs/commons" "^1.8.1"
     "@sinonjs/fake-timers" "^6.0.1"
-    "@sinonjs/samsam" "^5.3.0"
+    "@sinonjs/samsam" "^5.3.1"
     diff "^4.0.2"
     nise "^4.0.4"
     supports-color "^7.1.0"
@@ -13975,7 +13987,7 @@ web3-core-helpers@1.2.9:
     web3-eth-iban "1.2.9"
     web3-utils "1.2.9"
 
-web3-core-helpers@1.3.1, web3-core-helpers@^1.3.0:
+web3-core-helpers@1.3.1:
   version "1.3.1"
   resolved "https://registry.yarnpkg.com/web3-core-helpers/-/web3-core-helpers-1.3.1.tgz#ffd6f47c1b54a8523f00760a8d713f44d0f97e97"
   integrity sha512-tMVU0ScyQUJd/HFWfZrvGf+QmPCodPyKQw1gQ+n9We/H3vPPbUxDjNeYnd4BbYy5O9ox+0XG6i3+JlwiSkgDkA==
@@ -13983,6 +13995,15 @@ web3-core-helpers@1.3.1, web3-core-helpers@^1.3.0:
     underscore "1.9.1"
     web3-eth-iban "1.3.1"
     web3-utils "1.3.1"
+
+web3-core-helpers@^1.3.0:
+  version "1.3.3"
+  resolved "https://registry.yarnpkg.com/web3-core-helpers/-/web3-core-helpers-1.3.3.tgz#58a7a34278e4b338dde9520012679d5952701a69"
+  integrity sha512-rUTC9sgn1Wvw2KGBtc9/bsQKUd+yjzIm14mlaqqiO0vpFueTmmagwiGRE2CWzEfYg+r2jnYIIgh9qnsCykgVkQ==
+  dependencies:
+    underscore "1.9.1"
+    web3-eth-iban "1.3.3"
+    web3-utils "1.3.3"
 
 web3-core-method@1.2.11:
   version "1.2.11"
@@ -14333,6 +14354,14 @@ web3-eth-iban@1.3.1:
     bn.js "^4.11.9"
     web3-utils "1.3.1"
 
+web3-eth-iban@1.3.3:
+  version "1.3.3"
+  resolved "https://registry.yarnpkg.com/web3-eth-iban/-/web3-eth-iban-1.3.3.tgz#ad3e4e30a2a101febfeed0248a107889a13372ec"
+  integrity sha512-+9a+bZHAKQ4oBcRxiGbC1MC8S2cOgDlXo8qcw0XpMhLJZ3c/brZM7ZbPdiuU8Z7AMYf3PknaGFQyVmedZhrauA==
+  dependencies:
+    bn.js "^4.11.9"
+    web3-utils "1.3.3"
+
 web3-eth-personal@1.2.11:
   version "1.2.11"
   resolved "https://registry.yarnpkg.com/web3-eth-personal/-/web3-eth-personal-1.2.11.tgz#a38b3942a1d87a62070ce0622a941553c3d5aa70"
@@ -14618,10 +14647,24 @@ web3-utils@1.2.9:
     underscore "1.9.1"
     utf8 "3.0.0"
 
-web3-utils@1.3.1, web3-utils@^1.2.5, web3-utils@^1.3.0:
+web3-utils@1.3.1:
   version "1.3.1"
   resolved "https://registry.yarnpkg.com/web3-utils/-/web3-utils-1.3.1.tgz#9aa880dd8c9463fe5c099107889f86a085370c2e"
   integrity sha512-9gPwFm8SXtIJuzdrZ37PRlalu40fufXxo+H2PiCwaO6RpKGAvlUlWU0qQbyToFNXg7W2H8djEgoAVac8NLMCKQ==
+  dependencies:
+    bn.js "^4.11.9"
+    eth-lib "0.2.8"
+    ethereum-bloom-filters "^1.0.6"
+    ethjs-unit "0.1.6"
+    number-to-bn "1.7.0"
+    randombytes "^2.1.0"
+    underscore "1.9.1"
+    utf8 "3.0.0"
+
+web3-utils@1.3.3, web3-utils@^1.2.5, web3-utils@^1.3.0:
+  version "1.3.3"
+  resolved "https://registry.yarnpkg.com/web3-utils/-/web3-utils-1.3.3.tgz#71b837958f1fcc970223eb14a1d0110233348305"
+  integrity sha512-ZwpdqEcBBzqRgXUbCj+kyu1jFnsDauURSQ79yVqgnTKSI4C3s0Qjpp4WLThV+LKhCKR5GZtBTkgGHeiq0FT88A==
   dependencies:
     bn.js "^4.11.9"
     eth-lib "0.2.8"
