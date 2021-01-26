@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import Hopr, { FULL_VERSION } from '@hoprnet/hopr-core'
+import Hopr from '@hoprnet/hopr-core'
 import type { HoprOptions } from '@hoprnet/hopr-core'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import { decode } from 'rlp'
@@ -10,6 +10,7 @@ import { Commands } from './commands'
 import { LogStream } from './logs'
 import { AdminServer } from './admin'
 import * as yargs from 'yargs'
+import setupAPI from './api'
 
 const argv = yargs
   .option('network', {
@@ -165,22 +166,11 @@ async function main() {
   try {
     node = await Hopr.create(options)
     logs.log('Created HOPR Node')
+    node.on('hopr:message', logMessageToNode)
 
     if (argv.rest) {
-      const http = require('http')
-      const service = require('restana')()
-
-      service.get('/api/v1/version', (_, res) => res.send(FULL_VERSION))
-      service.get('/api/v1/address/eth', async (_, res) => res.send(await node.paymentChannels.hexAccountAddress()))
-      service.get('/api/v1/address/hopr', async (_, res) => res.send(await node.getId().toB58String()))
-      const hostname = argv.restHost
-      const port = argv.restPort
-      http.createServer(service).listen(port, hostname, () => {
-        logs.log(`Rest server on ${hostname} listening on port ${port}`)
-      })
+      setupAPI(node, logs, argv)
     }
-
-    node.on('hopr:message', logMessageToNode)
 
     if (adminServer) {
       adminServer.registerNode(node)
