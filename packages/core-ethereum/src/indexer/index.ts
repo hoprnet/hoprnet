@@ -132,7 +132,7 @@ class Indexer extends EventEmitter implements IIndexer {
     let failedCount = 0
 
     while (fromBlock < maxToBlock) {
-      const blockRange = failedCount > 0 ? 25 : maxBlockRange
+      const blockRange = failedCount > 0 ? Math.floor(maxBlockRange / 4 ** failedCount) : maxBlockRange
       const toBlock = fromBlock + blockRange
 
       log(
