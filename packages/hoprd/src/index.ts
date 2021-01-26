@@ -75,10 +75,6 @@ const argv = yargs
     describe: "initialize a database if it doesn't already exist",
     default: false
   })
-  .option('settings', {
-    descripe: 'Settings, same as in the repl (JSON)',
-    default: '{}'
-  })
   .option('adminHost', {
     describe: 'Host to listen to for admin console',
     default: 'localhost'
@@ -131,7 +127,6 @@ async function main() {
   let node: Hopr<HoprCoreConnector>
   let logs = new LogStream()
   let adminServer = undefined
-  let settings: any = {}
 
   function logMessageToNode(msg: Uint8Array) {
     logs.log(`#### NODE RECEIVED MESSAGE [${new Date().toISOString()}] ####`)
@@ -143,10 +138,6 @@ async function main() {
       logs.log('Could not decode message', err)
       logs.log(msg.toString())
     }
-  }
-
-  if (argv.settings) {
-    settings = JSON.parse(argv.settings)
   }
 
   if (argv.admin) {
@@ -179,9 +170,6 @@ async function main() {
     if (argv.run && argv.run !== '') {
       // Run a single command and then exit.
       let cmds = new Commands(node)
-      if (argv.settings) {
-        cmds.setState(settings)
-      }
       // We support multiple semicolon separated commands
       let toRun = argv.run.split(';')
 
