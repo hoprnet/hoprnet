@@ -14,7 +14,6 @@ export default function setupAPI(node: Hopr<HoprCoreConnector>, logs: any, optio
 
   const cmds = new Commands(node)
   service.post('/api/v1/command', async (req, res) => {
-    console.log('!!', req.body)
     cmds.execute(req.body).then((resp: any) => {
       res.send(resp)
     })
