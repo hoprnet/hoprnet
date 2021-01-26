@@ -68,5 +68,7 @@ VOLUME ["/app/db"]
 EXPOSE 3000
 # REST API
 EXPOSE 3001
+# Healthcheck server
+EXPOSE 8080
 
 ENTRYPOINT ["dumb-init", "node", "/app/index.js"]

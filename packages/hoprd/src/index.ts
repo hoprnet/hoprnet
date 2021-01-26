@@ -44,6 +44,19 @@ const argv = yargs
     describe: 'Updates the port for the rest server',
     default: 3001
   })
+  .option('healthCheck', {
+    boolean: true,
+    describe: 'Run a health check end point on localhost:8080',
+    default: false
+  })
+  .option('healthCheckHost', {
+    describe: 'Updates the host for the healthcheck server',
+    default: 'localhost'
+  })
+  .option('healthCheckPort', {
+    describe: 'Updates the port for the healthcheck server',
+    default: 8080
+  })
   .option('password', {
     describe: 'A password to encrypt your keys'
   })
@@ -163,6 +176,23 @@ async function main() {
     if (argv.rest) {
       setupAPI(node, logs, argv)
     }
+
+    if (argv.healthCheck) {
+      const http = require('http')
+      const service = require('restana')()
+      service.get('/healthcheck/v1/version', (_, res) => res.send(FULL_VERSION))
+      const hostname = argv.healthCheckHost
+      const port = argv.healthCheckPort
+      const server = http.createServer(service).on('error', (err) => {
+        throw err
+      })
+      server.listen(port, hostname, (err) => {
+        if (err) throw err
+        logs.log(`Healthcheck server on ${hostname} listening on port ${port}`)
+      })
+    }
+
+    node.on('hopr:message', logMessageToNode)
 
     if (adminServer) {
       adminServer.registerNode(node, cmds)
