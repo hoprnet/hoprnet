@@ -2,12 +2,7 @@ import type NetworkPeerStore from './network-peers'
 import type PeerId from 'peer-id'
 import debug from 'debug'
 import { randomInteger, limitConcurrency } from '@hoprnet/hopr-utils'
-import {
-  HEARTBEAT_REFRESH,
-  HEARTBEAT_INTERVAL,
-  HEARTBEAT_INTERVAL_VARIANCE,
-  MAX_PARALLEL_CONNECTIONS
-} from '../constants'
+import { HEARTBEAT_INTERVAL, HEARTBEAT_INTERVAL_VARIANCE, MAX_PARALLEL_CONNECTIONS } from '../constants'
 import { Heartbeat as HeartbeatInteraction } from '../interactions/network/heartbeat'
 
 const log = debug('hopr-core:heartbeat')
@@ -22,11 +17,13 @@ export default class Heartbeat {
   ) {}
 
   private async checkNodes(): Promise<void> {
-    const thresholdTime = Date.now() - HEARTBEAT_REFRESH
-    log(`Checking nodes older than ${thresholdTime} (${new Date(thresholdTime).toLocaleString()})`)
+    const thresholdTime = Date.now() - HEARTBEAT_INTERVAL
+    log(`Checking nodes since ${thresholdTime} (${new Date(thresholdTime).toLocaleString()})`)
 
-    const queryOldest = async (): Promise<void> => {
-      await this.networkPeers.pingOldest(async (id: PeerId) => {
+    const toPing = this.networkPeers.pingSince(thresholdTime)
+
+    const doPing = async (): Promise<void> => {
+      await this.networkPeers.ping(toPing.pop(), async (id: PeerId) => {
         log('ping', id.toB58String())
         try {
           await this.interaction.interact(id)
@@ -40,11 +37,7 @@ export default class Heartbeat {
       })
     }
 
-    await limitConcurrency<void>(
-      MAX_PARALLEL_CONNECTIONS,
-      () => !this.networkPeers.containsOlderThan(thresholdTime),
-      queryOldest
-    )
+    await limitConcurrency<void>(MAX_PARALLEL_CONNECTIONS, () => toPing.length <= 0, doPing)
     log(this.networkPeers.debugLog())
   }
 
