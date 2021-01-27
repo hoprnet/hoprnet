@@ -690,7 +690,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
 
     let struct: Handler
 
-    let addresses = (this._libp2p.peerStore.get(counterparty)?.addresses || []).map((addr) => addr.toString())
+    let addresses = (this._libp2p.peerStore.get(counterparty)?.addresses ?? []).map((addr) => addr.toString())
 
     // Try to use known addresses
     if (addresses.length > 0) {
