@@ -9,7 +9,7 @@ import chalk from 'chalk'
 import BN from 'bn.js'
 import Heap from 'heap-js'
 import { pubKeyToPeerId, randomChoice } from '@hoprnet/hopr-utils'
-import { ChannelEntry, Public, Balance } from '../types'
+import { ChannelEntry, Public, Balance, Snapshot } from '../types'
 import { isPartyA, getId, Log as DebugLog } from '../utils'
 import * as topics from './topics'
 import * as reducers from './reducers'
@@ -25,6 +25,12 @@ import {
 } from './utils'
 
 const log = DebugLog(['indexer'])
+const getSyncPercentage = (n: number, max: number) => ((n * 100) / max).toFixed(2)
+
+// @TODO: add to constants
+const BLOCK_RANGE = 2000
+// @TODO: get this from somewhere else
+let genesisBlock: number
 
 /**
  * Indexes HoprChannels smart contract and stores to the DB,
@@ -35,12 +41,13 @@ class Indexer extends EventEmitter implements IIndexer {
   public status: 'started' | 'stopped' = 'stopped'
   public latestBlock: number = 0 // latest known on-chain block number
   private subscriptions: {
-    [K in 'NewBlocks' | 'NewEvents']?: Subscription<any>
+    [K in 'NewBlocks' | 'NewLogs']?: Subscription<any>
   } = {}
   private unconfirmedEvents = new Heap<Event<any>>(snapshotComparator)
 
   constructor(private connector: HoprEthereum, private maxConfirmations: number) {
     super()
+    genesisBlock = getHoprChannelsBlockNumber(this.connector.chainId)
   }
 
   /**
@@ -61,29 +68,26 @@ class Indexer extends EventEmitter implements IIndexer {
     log('Latest saved block %d', latestSavedBlock)
     log('Latest on-chain block %d', latestOnChainBlock)
 
-    // @TODO: get this from somewhere else
-    const HoprChannelsGenesisBlock = getBlockNumber(this.connector.chainId)
-    // @TODO: add to constants
-    const BLOCK_RANGE = 2000
-
     // go back 'MAX_CONFIRMATIONS' blocks in case of a re-org at time of stopping
     let fromBlock = latestSavedBlock
     if (fromBlock - this.maxConfirmations > 0) {
       fromBlock = fromBlock - this.maxConfirmations
     }
     // no need to query before HoprChannels existed
-    if (fromBlock < HoprChannelsGenesisBlock) {
-      fromBlock = HoprChannelsGenesisBlock
+    if (fromBlock < genesisBlock) {
+      fromBlock = genesisBlock
     }
 
-    log('Starting to index from block %d', fromBlock)
+    log(
+      'Starting to index from block %d, sync progress %d%',
+      fromBlock,
+      getSyncPercentage(fromBlock - genesisBlock, latestOnChainBlock - genesisBlock)
+    )
 
     // if the difference between on-chain block and {fromBlock}
     // is larger than {BLOCK_RANGE}, we will query using `getLogs` rpc
     if (fromBlock + BLOCK_RANGE <= latestOnChainBlock) {
       const toBlock = latestOnChainBlock - this.maxConfirmations
-      log('Starting to query past logs from %d to %d', fromBlock, toBlock)
-
       const lastBlock = await this.processPastLogs(fromBlock, toBlock, BLOCK_RANGE)
       fromBlock = lastBlock
     }
@@ -95,15 +99,19 @@ class Indexer extends EventEmitter implements IIndexer {
     this.subscriptions['NewBlocks'] = web3.eth
       .subscribe('newBlockHeaders')
       .on('error', console.error)
-      .on('data', (block) => this.onNewBlock(block))
+      .on('data', (block) => {
+        log('New block %d', block.number)
+        this.onNewBlock(block)
+      })
 
-    this.subscriptions['NewEvents'] = web3.eth
+    this.subscriptions['NewLogs'] = web3.eth
       .subscribe('logs', {
         address: hoprChannels.options.address,
         fromBlock
       })
       .on('error', console.error)
-      .on('data', (onChainLog: Log) => this.onNewLogs([onChainLog]))
+      .on('changed', (onChainLog) => this.onChangedLogs([onChainLog]))
+      .on('data', (onChainLog) => this.onNewLogs([onChainLog]))
 
     this.status = 'started'
     log(chalk.green('Indexer started!'))
@@ -137,16 +145,18 @@ class Indexer extends EventEmitter implements IIndexer {
 
     while (fromBlock < maxToBlock) {
       const blockRange = failedCount > 0 ? Math.floor(maxBlockRange / 4 ** failedCount) : maxBlockRange
-      const toBlock = fromBlock + blockRange
+      // should never be above maxToBlock
+      let toBlock = fromBlock + blockRange
+      if (toBlock > maxToBlock) toBlock = maxToBlock
 
-      log(
-        `${failedCount > 0 ? 'Re-quering' : 'Quering'} past logs from %d to %d: %d`,
-        fromBlock,
-        toBlock,
-        toBlock - fromBlock
-      )
+      // log(
+      //   `${failedCount > 0 ? 'Re-quering' : 'Quering'} past logs from %d to %d: %d`,
+      //   fromBlock,
+      //   toBlock,
+      //   toBlock - fromBlock
+      // )
 
-      let logs: Log[]
+      let logs: Log[] = []
 
       try {
         logs = await this.connector.web3.eth.getPastLogs({
@@ -169,6 +179,12 @@ class Indexer extends EventEmitter implements IIndexer {
       await this.onNewBlock({ number: toBlock })
       failedCount = 0
       fromBlock = toBlock
+
+      log(
+        'Sync progress %d% @ block %d',
+        getSyncPercentage(fromBlock - genesisBlock, maxToBlock - genesisBlock),
+        toBlock
+      )
     }
 
     return fromBlock
@@ -182,14 +198,12 @@ class Indexer extends EventEmitter implements IIndexer {
    * @param block
    */
   private async onNewBlock(block: { number: number }): Promise<void> {
-    log('New block %d', block.number)
-
     // update latest block
     if (this.latestBlock < block.number) {
       this.latestBlock = block.number
     }
 
-    const lastSnapshot = await getLatestConfirmedSnapshot(this.connector.db)
+    let lastSnapshot = await getLatestConfirmedSnapshot(this.connector.db)
 
     // check unconfirmed events and process them if found
     // to be within a confirmed block
@@ -201,10 +215,17 @@ class Indexer extends EventEmitter implements IIndexer {
       // log('Found unconfirmed event %s', event.name)
       // log(chalk.blue(event.blockNumber.toString(), event.transactionIndex.toString(), event.logIndex.toString()))
 
-      // check if this is an already processed event
-      if (lastSnapshot && snapshotComparator(event, lastSnapshot) < 0) {
-        log(chalk.yellow('Found event which is older than last confirmed event!'))
+      const lastSnapshotComparison = snapshotComparator(event, lastSnapshot)
+
+      // check if this is a duplicate, this is ok
+      if (lastSnapshotComparison === 0) {
+        // log(chalk.gray('Found event which is a duplicate of the last confirmed event'))
         continue
+      }
+      // check if event found is older, this is not ok
+      else if (lastSnapshotComparison < 0) {
+        log(chalk.red('Found event which is older than last confirmed event!'))
+        throw new Error('Found event which is older than last confirmed event!')
       }
 
       if (event.name === 'FundedChannel') {
@@ -218,13 +239,19 @@ class Indexer extends EventEmitter implements IIndexer {
       } else if (event.name === 'ClosedChannel') {
         await this.onClosedChannel(event as Event<'ClosedChannel'>)
       }
+
+      lastSnapshot = new Snapshot(undefined, {
+        blockNumber: event.blockNumber,
+        transactionIndex: event.transactionIndex,
+        logIndex: event.logIndex
+      })
     }
 
     await updateLatestBlockNumber(this.connector.db, new BN(block.number))
   }
 
   /**
-   * Called whenever we receive new blocks.
+   * Called whenever we receive new logs.
    * Converts logs to events and adds them into a heap
    * of unconfirmed events.
    * @param logs
@@ -237,6 +264,27 @@ class Indexer extends EventEmitter implements IIndexer {
       return result
     }, [])
     this.unconfirmedEvents.addAll(events)
+  }
+
+  /**
+   * Called whenever we receive changed logs.
+   * It removes the event generated by the log from
+   * the HEAP.
+   * This may happen when a log is removed due to
+   * chain re-org. This is a rare case.
+   * @param logs
+   */
+  private onChangedLogs(logs: Log[]): void {
+    for (const log of logs) {
+      if (!log['removed']) continue
+
+      const event = topics.logToEvent(log)
+      if (!event) continue
+
+      this.unconfirmedEvents.remove(event, (a, b) => {
+        return a.logIndex.eq(b.logIndex)
+      })
+    }
   }
 
   // on new events
@@ -421,7 +469,7 @@ class Indexer extends EventEmitter implements IIndexer {
 export default Indexer
 
 // HACK
-const getBlockNumber = (chainId: number): number => {
+const getHoprChannelsBlockNumber = (chainId: number): number => {
   switch (chainId) {
     case 3:
       return 9503420

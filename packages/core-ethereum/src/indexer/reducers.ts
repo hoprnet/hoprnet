@@ -93,7 +93,30 @@ export const onInitiatedChannelClosure = async (
   event: Event<'InitiatedChannelClosure'>,
   channelEntry: ChannelEntry
 ): Promise<ChannelEntry> => {
-  assert(channelEntry.status === 'OPEN', "'onInitiatedChannelClosure' failed because channel is not in 'OPEN' status")
+  try {
+    assert(channelEntry.status === 'OPEN', "'onInitiatedChannelClosure' failed because channel is not in 'OPEN' status")
+  } catch (err) {
+    console.log({
+      transactionHash: event.transactionHash,
+      blockNumber: event.blockNumber.toString(),
+      transactionIndex: event.transactionIndex.toString(),
+      logIndex: event.logIndex.toString(),
+      initiator: event.data.initiator.toHex(),
+      counterparty: event.data.counterparty.toHex()
+    })
+    console.log({
+      blockNumber: channelEntry.blockNumber.toString(),
+      transactionIndex: channelEntry.transactionIndex.toString(),
+      logIndex: channelEntry.logIndex.toString(),
+      deposit: channelEntry.deposit.toString(),
+      partyABalance: channelEntry.partyABalance.toString(),
+      closureTime: channelEntry.closureTime.toString(),
+      stateCounter: channelEntry.stateCounter.toString(),
+      closureByPartyA: channelEntry.closureByPartyA
+    })
+    console.error(err)
+    throw err
+  }
 
   const initiatorAccountId = await event.data.initiator.toAccountId()
   const counterpartyAccountId = await event.data.counterparty.toAccountId()

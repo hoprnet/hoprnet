@@ -14,7 +14,7 @@ const abiCoder = (_abiCoder as unknown) as AbiCoder
  * @param data
  * @returns event
  */
-const logToEvent = <N extends keyof EventData>(log: Log, name: N, data: EventData[N]): Event<N> => {
+export const logToEvent = <N extends keyof EventData>(log: Log, name: N, data: EventData[N]): Event<N> => {
   return {
     name,
     blockNumber: new BN(log.blockNumber),
@@ -28,10 +28,6 @@ const logToEvent = <N extends keyof EventData>(log: Log, name: N, data: EventDat
 export const toFundedChannelEvent = (log: Log): Event<'FundedChannel'> => {
   const { funder, recipientAmount, counterpartyAmount } = abiCoder.decodeLog(
     [
-      {
-        type: 'address',
-        name: 'funder'
-      },
       {
         type: 'uint256',
         name: 'recipient',
@@ -49,6 +45,10 @@ export const toFundedChannelEvent = (log: Log): Event<'FundedChannel'> => {
       {
         type: 'uint256',
         name: 'counterpartyAmount'
+      },
+      {
+        type: 'address',
+        name: 'funder'
       }
     ],
     log.data,

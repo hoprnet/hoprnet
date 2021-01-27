@@ -1,5 +1,5 @@
-import type BN from 'bn.js'
 import type { LevelUp } from 'levelup'
+import BN from 'bn.js'
 import { u8aConcat, u8aToNumber } from '@hoprnet/hopr-utils'
 import { Public, ChannelEntry, Snapshot } from '../types'
 import * as dbKeys from '../dbKeys'
@@ -77,7 +77,7 @@ export const updateLatestBlockNumber = async (db: LevelUp, blockNumber: BN): Pro
  * @param connector
  * @returns promise that resolves to a snapshot
  */
-export const getLatestConfirmedSnapshot = async (db: LevelUp): Promise<Snapshot | undefined> => {
+export const getLatestConfirmedSnapshot = async (db: LevelUp): Promise<Snapshot> => {
   try {
     const result = (await db.get(Buffer.from(LATEST_CONFIRMED_SNAPSHOT))) as Uint8Array
     return new Snapshot({
@@ -86,7 +86,11 @@ export const getLatestConfirmedSnapshot = async (db: LevelUp): Promise<Snapshot 
     })
   } catch (err) {
     if (err.notFound) {
-      return undefined
+      return new Snapshot(undefined, {
+        blockNumber: new BN(0),
+        transactionIndex: new BN(0),
+        logIndex: new BN(0)
+      })
     }
 
     throw err

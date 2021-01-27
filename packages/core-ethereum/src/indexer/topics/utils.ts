@@ -24,7 +24,7 @@ export const EventSignatures: {
 /**
  * Assumes that the first indexed event parameters are the public keys,
  * it then reconstructs them by looking into topic 0.
- * @TODO: requires documentantion
+ * @TODO: requires documentantion and tests
  * @param topics
  */
 export const decodePublicKeysFromTopics = (topics: Log['topics']): [Public, Public] => {
@@ -37,7 +37,7 @@ export const decodePublicKeysFromTopics = (topics: Log['topics']): [Public, Publ
 }
 
 /**
- * @TODO: requires documentantion
+ * @TODO: requires documentantion and tests
  * @param rawTopic
  * @param first
  * @param second
@@ -49,7 +49,7 @@ export const getTopic0 = (rawTopic: Uint8Array, first: number, second: number): 
 }
 
 /**
- * @TODO: requires documentantion
+ * @TODO: requires documentantion and tests
  * @param rawTopic
  * @param first
  * @param second
