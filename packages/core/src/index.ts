@@ -262,10 +262,10 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
   }
 
   private async tickChannelStrategy(newChannels: IndexerChannel[]) {
+    verbose('new payment channels, auto opening tick', this.running)
     if (!this.running) {
       return
     }
-    verbose('new payment channels, auto opening tick')
     for (const channel of newChannels) {
       this.network.networkPeers.register(channel[0]) // Listen to nodes with outgoing stake
     }
@@ -504,10 +504,10 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
   }
 
   private async periodicCheck() {
+    log('periodic check', this.running)
     if (!this.running) {
       return
     }
-    log('periodic check')
     try {
       await this.checkBalances()
       await this.tickChannelStrategy([])
