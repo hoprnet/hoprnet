@@ -71,7 +71,7 @@ class Heartbeat implements AbstractInteraction {
       }
     }
 
-    return -1
+    throw Error()
   }
 }
 

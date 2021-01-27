@@ -10,6 +10,7 @@ import assert from 'assert'
 import { EventEmitter } from 'events'
 import * as constants from '../../constants'
 import { generateLibP2PMock } from '../../test-utils'
+import AbortController from 'abort-controller'
 
 // @ts-ignore
 constants.HEARTBEAT_TIMEOUT = 300
@@ -28,7 +29,20 @@ describe('check heartbeat mechanism', function () {
 
     const interactions = {
       network: {
-        heartbeat: new Heartbeat(node, (remotePeer) => network.heartbeat.emit('beat', remotePeer), options)
+        heartbeat: new Heartbeat(
+          node,
+          (remotePeer) => network.heartbeat.emit('beat', remotePeer),
+          async (counterParty: PeerId, protocols: string[], ms: number) => {
+            const abort = new AbortController()
+
+            const timeout = setTimeout(() => abort.abort(), ms)
+            const struct = await node.dialProtocol(counterParty, protocols[0], { signal: abort.signal })
+
+            clearTimeout(timeout)
+            return struct
+          },
+          options
+        )
       }
     }
 
@@ -48,7 +62,7 @@ describe('check heartbeat mechanism', function () {
     await Promise.all([
       new Promise<void>((resolve) => {
         Bob.network.heartbeat.once('beat', (peerId: PeerId) => {
-          assert(peerId.isEqual(Alice.node.peerId), 'connection must come from Alice')
+          assert(peerId.equals(Alice.node.peerId), 'connection must come from Alice')
           resolve()
         })
       }),
