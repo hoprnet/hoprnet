@@ -129,7 +129,7 @@ class WebRTCConnection implements MultiaddrConnection {
       if (finished[0] == DONE[0]) {
         return
       } else {
-        this.log(`getting from relayed connecton`, JSON.stringify(payload))
+        this.log(`getting ${result.value.slice().length} bytes from relayed connecton`)
         yield payload
       }
     }
@@ -257,6 +257,8 @@ class WebRTCConnection implements MultiaddrConnection {
             yield DONE
             break
           }
+
+          this.log(`sinking ${received.value.slice().length} bytes into relayed connecton`)
 
           yield Uint8Array.from([...NOT_DONE, ...received.value.slice()])
 
