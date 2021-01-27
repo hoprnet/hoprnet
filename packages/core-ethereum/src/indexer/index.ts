@@ -439,7 +439,7 @@ class Indexer extends EventEmitter implements IIndexer {
   }
 
   public async getRandomChannel(): Promise<RoutingChannel | undefined> {
-    const HACK = 9545000 // Arbitrarily chosen block for our testnet. Total hack.
+    const HACK = 9547931 // Arbitrarily chosen block for our testnet. Total hack.
     const all = await this.getChannelEntries()
     const filtered = all.filter((x) => x.channelEntry.blockNumber.gtn(HACK))
     if (filtered.length === 0) {
@@ -473,7 +473,7 @@ export default Indexer
 const getHoprChannelsBlockNumber = (chainId: number): number => {
   switch (chainId) {
     case 3:
-      return 9503420
+      return 9547931
     case 56:
       return 2713229
     case 137:

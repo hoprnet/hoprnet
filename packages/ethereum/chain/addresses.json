@@ -5,9 +5,9 @@
     "HoprDistributor": "0x6c97048D67c39ADCe38bbB228fc1bA415fc8f096"
   },
   "ropsten": {
-    "HoprToken": "0xcD1049D51adB3187FB9cc9f786cab99F57eCa4D1",
-    "HoprChannels": "0x25E2e5D8EcC4fE46a9505079Ed29266779dC7D6f",
-    "HoprDistributor": "0x83c3Df21FeDFF9f92669953ac12686Cf144e375C"
+    "HoprToken": "0xAE9083fC7FAa0e35F8c5b94A33B86eD6F587Ea51",
+    "HoprChannels": "0x225468f44A9E8cfe7DaA49d504475E21c4bEfD13",
+    "HoprDistributor": "0xfb7A68692b27839ee82c711cf79Bd19BE698B011"
   },
   "kovan": {
     "HoprToken": "0xDD78859E6714D045a31Caa0075C1523f6E08fFe1",
