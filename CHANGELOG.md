@@ -1,7 +1,7 @@
 
 <a name="0.2.8"></a>
 
-## [0.2.8](https://github.com/hoprnet/hopr-connect/compare/0.2.8...0.2.4) (2021-01-27)
+## [0.2.8](https://github.com/hoprnet/hopr-connect/compare/0.2.4...0.2.8) (2021-01-27)
 
 ### Fixes
 
@@ -10,7 +10,7 @@
 
 <a name="0.2.4"></a>
 
-## [0.2.4](https://github.com/hoprnet/hopr-connect/compare/0.2.4...0.2.2) (2021-01-26)
+## [0.2.4](https://github.com/hoprnet/hopr-connect/compare/0.2.2...0.2.4) (2021-01-26)
 
 ### Fixes
 
