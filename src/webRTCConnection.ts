@@ -276,11 +276,11 @@ class WebRTCConnection implements MultiaddrConnection {
             return
           }
 
-          this.log(`sinking NOT_DONE into WebRTC - ${result.value.slice().length} bytes`)
+          this.log(`sinking ${result.value.slice().length} bytes into fallback connection]`)
           yield Uint8Array.from([...NOT_DONE, ...result.value.slice()])
 
           for await (const msg of source) {
-            this.log(`sinking NOT_DONE into WebRTC - ${msg.slice().length} bytes`)
+            this.log(`sinking ${msg.slice().length} bytes into fallback connection]`)
             yield Uint8Array.from([...NOT_DONE, ...msg.slice()])
           }
 
@@ -301,8 +301,6 @@ class WebRTCConnection implements MultiaddrConnection {
       this.conn = this.channel
     }
 
-    this.log(`sourcePromise`, sourcePromise)
-
     if (this._webRTCAvailable) {
       toIterable.sink(this.channel)(
         async function* (this: WebRTCConnection): Stream['source'] {
@@ -320,7 +318,7 @@ class WebRTCConnection implements MultiaddrConnection {
             return
           }
 
-          this.log(`yielding ${result.value.slice().length} bytes into webrtc ${this._id}`)
+          this.log(`sinking ${result.value.slice().length} bytes into webrtc[${(this.channel as any)._id}]`)
           yield Uint8Array.from([...NOT_DONE, ...result.value.slice()])
 
           for await (const msg of source) {
@@ -328,7 +326,7 @@ class WebRTCConnection implements MultiaddrConnection {
               break
             }
 
-            this.log(`yielding ${msg.slice().length} bytes into webrtc ${this._id}`)
+            this.log(`sinking ${msg.slice().length} bytes into webrtc[${(this.channel as any)._id}]`)
             yield Uint8Array.from([...NOT_DONE, ...msg.slice()])
           }
 
