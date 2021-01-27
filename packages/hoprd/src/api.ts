@@ -1,10 +1,12 @@
 import Hopr, { FULL_VERSION } from '@hoprnet/hopr-core'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import { Commands } from './commands'
+import bodyParser from 'body-parser'
 
 export default function setupAPI(node: Hopr<HoprCoreConnector>, logs: any, options: any) {
   const http = require('http')
   const service = require('restana')()
+  service.use(bodyParser.text({ type: '*/*' }))
 
   service.get('/api/v1/version', (_, res) => res.send(FULL_VERSION))
   service.get('/api/v1/address/eth', async (_, res) => res.send(await node.paymentChannels.hexAccountAddress()))
