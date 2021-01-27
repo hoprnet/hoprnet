@@ -154,6 +154,12 @@ class HoprConnect implements Transport {
       throw new AbortError()
     }
 
+    const destPeerId = ma.getPeerId()
+
+    if (destPeerId != null && this._peerId.toB58String() === destPeerId) {
+      throw new AbortError(`Cannot dial ourself`)
+    }
+
     switch (ma.protoNames()[0]) {
       case 'ip4':
       case 'ip6':

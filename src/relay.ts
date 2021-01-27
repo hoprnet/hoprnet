@@ -23,7 +23,7 @@ import {
   FAIL,
   FAIL_COULD_NOT_REACH_COUNTERPARTY,
   FAIL_COULD_NOT_IDENTIFY_PEER,
-  //FAIL_LOOPBACKS_ARE_NOT_ALLOWED,
+  FAIL_LOOPBACKS_ARE_NOT_ALLOWED,
   FAIL_INVALID_PUBLIC_KEY
 } from './constants'
 
@@ -115,7 +115,7 @@ class Relay {
   ): Promise<RelayConnection | WebRTCConnection | undefined> {
     let relayConnection: Connection
     try {
-      relayConnection = await this.connectToRelay(potentialRelay, options)
+      relayConnection = await this.connectToPeer(PeerId.createFromCID(potentialRelay), options)
     } catch (err) {
       error(err)
       return
@@ -231,42 +231,62 @@ class Relay {
     }
   }
 
-  private async connectToRelay(relay: Multiaddr, options?: DialOptions): Promise<Connection> {
-    let relayConnection = this._registrar.getConnection(PeerId.createFromCID(relay.getPeerId()))
+  private async connectToPeer(peer: PeerId, options?: DialOptions): Promise<Connection> {
+    let relayConnection = this._registrar.getConnection(peer)
 
-    if (relayConnection == undefined || relayConnection == null) {
+    if (relayConnection != null) {
+      return relayConnection
+    }
+
+    try {
+      relayConnection = await this._dialer.connectToPeer(peer, { signal: options?.signal })
+    } catch (err) {
+      if (err.type === 'aborted') {
+        throw err
+      }
+      log(`Could not reach potential relay ${peer.toB58String()}. Error was: ${err.message}`)
+    }
+
+    if (relayConnection != null) {
+      return relayConnection
+    }
+
+    if (options?.signal?.aborted) {
+      throw new AbortError()
+    }
+
+    if (this._dht != null && (options == null || options.signal == null || !options.signal.aborted)) {
+      let dhtQuerySuccessful = false
       try {
-        relayConnection = await this._dialer.connectToPeer(relay, { signal: options?.signal })
+        // populate libp2p peerStore with DHT result
+        await this._dht.peerRouting.findPeer(peer)
+        dhtQuerySuccessful = true
       } catch (err) {
-        log(`Could not reach potential relay ${relay.getPeerId()}. Error was: ${err}`)
-        if (this._dht != null && (options == null || options.signal == null || !options.signal.aborted)) {
-          let newAddress = await this._dht.peerRouting.findPeer(PeerId.createFromCID(relay.getPeerId()))
-
-          try {
-            relayConnection = await this._dialer.connectToPeer(newAddress.multiaddrs[0], { signal: options?.signal })
-          } catch (err) {
-            throw new Error(`Dialling potential relay ${relay.getPeerId()} after querying DHT failed. Error was ${err}`)
-          }
-        } else {
-          throw Error(
-            `Could not reach relay ${relay.toString()} and we have no opportunity to find out a more recent address.`
-          )
-        }
+        error(`Could not query DHT for ${peer}. Our peerId: ${this._peerId.toB58String()}. ${err.message}`)
       }
 
       if (options?.signal?.aborted) {
-        if (relayConnection != null) {
-          try {
-            await relayConnection.close()
-          } catch (err) {
-            error(err)
-          }
+        throw new AbortError()
+      }
+
+      if (dhtQuerySuccessful) {
+        try {
+          relayConnection = await this._dialer.connectToPeer(peer, { signal: options?.signal })
+        } catch (err) {
+          throw new Error(
+            `Dialling potential relay ${peer.toB58String()} after querying DHT failed. Error was ${err.message}`
+          )
         }
-        throw new Error()
+
+        if (relayConnection != null) {
+          return relayConnection
+        }
       }
     }
 
-    return relayConnection
+    throw Error(
+      `Could not reach peer ${peer.toB58String()} and we have no opportunity to find out a more recent address.`
+    )
   }
 
   private async performHandshake(relayConnection: Connection, relay: PeerId, destination: PeerId): Promise<Stream> {
@@ -382,13 +402,12 @@ class Relay {
 
     log(`counterparty identified as ${counterparty.toB58String()}`)
 
-    // @TODO check if we should allow loopbacks
-    // if (connection.remotePeer != null && counterparty.equals(connection.remotePeer)) {
-    //   error(`Peer ${connection.remotePeer} is trying to loopback to itself. Dropping connection.`)
-    //   shaker.write(FAIL_LOOPBACKS_ARE_NOT_ALLOWED)
-    //   shaker.rest()
-    //   return
-    // }
+    if (connection.remotePeer != null && counterparty.equals(connection.remotePeer)) {
+      error(`Peer ${connection.remotePeer} is trying to loopback to itself. Dropping connection.`)
+      shaker.write(FAIL_LOOPBACKS_ARE_NOT_ALLOWED)
+      shaker.rest()
+      return
+    }
 
     const channelId = getId(connection.remotePeer, counterparty)
 
@@ -456,37 +475,24 @@ class Relay {
   }
 
   private async establishForwarding(initiator: PeerId, counterparty: PeerId): Promise<Stream> {
-    let timeout: NodeJS.Timeout | undefined
+    const abort = new AbortController()
 
-    let newConn = this._registrar.getConnection(counterparty)
+    const timeout = setTimeout(() => abort.abort(), RELAY_CIRCUIT_TIMEOUT)
 
-    if (newConn == undefined || newConn == null) {
-      const abort = new AbortController()
+    let newConn: Connection | undefined
+    let connError: any
+    try {
+      newConn = await this.connectToPeer(counterparty, { signal: abort.signal })
+    } catch (err) {
+      connError = err
+    }
 
-      timeout = setTimeout(() => abort.abort(), RELAY_CIRCUIT_TIMEOUT)
+    clearTimeout(timeout)
 
-      try {
-        newConn = await this._dialer.connectToPeer(counterparty, { signal: abort.signal })
-      } catch (err) {
-        error(err)
-        if (this._dht != null && !abort.signal.aborted) {
-          try {
-            let newAddress = await this._dht.peerRouting.findPeer(counterparty)
-
-            newConn = await this._dialer.connectToPeer(newAddress.multiaddrs[0], { signal: abort.signal })
-          } catch (err) {
-            clearTimeout(timeout)
-
-            throw Error(
-              `Could not establish forwarding connection to ${counterparty.toB58String()} after querying the DHT. Error was: ${err}`
-            )
-          }
-        }
-
-        clearTimeout(timeout)
-
-        throw Error(`Could not establish forwarding connection to ${counterparty.toB58String()}. Error was: ${err}`)
-      }
+    if (newConn == null) {
+      throw Error(
+        `Could not establish forwarding connection to ${counterparty.toB58String()}. Error was: ${connError.message}`
+      )
     }
 
     const { stream: newStream } = await newConn.newStream([DELIVERY])
@@ -524,12 +530,10 @@ function getId(a: PeerId, b: PeerId) {
   switch (cmpResult) {
     case 1:
       return `${a.toB58String()}${b.toB58String()}`
-    default:
+    case -1:
       return `${b.toB58String()}${a.toB58String()}`
-
-    // @TODO check if we should allow loopbacks
-    // default:
-    //   throw Error(`Invalid compare result`)
+    default:
+      throw Error(`Invalid compare result. Loopbacks are not allowed.`)
   }
 }
 
