@@ -232,6 +232,12 @@ class Relay {
   }
 
   private async connectToPeer(peer: PeerId, options?: DialOptions): Promise<Connection> {
+    if (peer.equals(this._peerId)) {
+      console.log(`trace self-dial`)
+      // Prevents from using ourself as relay
+      throw Error(`Cannot dial ourself`)
+    }
+
     let relayConnection = this._registrar.getConnection(peer)
 
     if (relayConnection != null) {
