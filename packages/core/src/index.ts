@@ -740,7 +740,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     let dhtAddresses: Multiaddr[]
     try {
       // Let libp2p populate its internal peerStore with fresh addresses
-      dhtAddresses = (await this._libp2p.peerRouting?.findPeer(counterparty))?.multiaddrs || []
+      dhtAddresses = (await this._libp2p.peerRouting?.findPeer(counterparty))?.multiaddrs ?? []
     } catch (err) {
       error(`Querying the DHT as peer ${this.getId().toB58String()} for ${counterparty.toB58String()} failed. ${err}`)
       return
