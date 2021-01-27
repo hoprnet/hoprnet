@@ -681,8 +681,10 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
 
     let struct: Handler
 
+    let addresses = (this._libp2p.peerStore.get(counterparty)?.addresses || []).map((addr) => addr.toString())
+
     // Try to use known addresses
-    if (this._libp2p.peerStore.get(counterparty)?.addresses.length > 0) {
+    if (addresses.length > 0) {
       try {
         struct = await this._libp2p.dialProtocol(counterparty, protocols[0], { signal: abort.signal })
       } catch (err) {
@@ -702,14 +704,17 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       return
     }
 
-    // Try to bypass any existing NATs
-    try {
-      struct = await this._libp2p.dialProtocol(Multiaddr(`/p2p/${counterparty.toB58String()}`), protocols[0], {
-        signal: abort.signal
-      })
-    } catch (err) {
-      if (err.type === 'aborted') {
-        return
+    // Only use relayed connection / WebRTC upgrade if we haven't tried this before
+    if (!addresses.includes(`/p2p/${counterparty.toB58String()}`)) {
+      // Try to bypass any existing NATs
+      try {
+        struct = await this._libp2p.dialProtocol(Multiaddr(`/p2p/${counterparty.toB58String()}`), protocols[0], {
+          signal: abort.signal
+        })
+      } catch (err) {
+        if (err.type === 'aborted') {
+          return
+        }
       }
     }
 
@@ -722,11 +727,10 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       return
     }
 
-    let addresses = new Set((this._libp2p.peerStore.get(counterparty)?.addresses || []).map((addr) => addr.toString()))
     // Try to get some fresh addresses from the DHT
-
     let dhtAddresses: Multiaddr[]
     try {
+      // Let libp2p populate its internal peerStore with fresh addresses
       dhtAddresses = (await this._libp2p.peerRouting?.findPeer(counterparty))?.multiaddrs || []
     } catch (err) {
       error(`Querying the DHT as peer ${this.getId().toB58String()} for ${counterparty.toB58String()} failed. ${err}`)
@@ -737,12 +741,16 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       return
     }
 
-    const newAddresses: Multiaddr[] = dhtAddresses.filter((addr) => addresses.has(addr.toString()))
+    const newAddresses: Multiaddr[] = dhtAddresses.filter((addr) => addresses.includes(addr.toString()))
 
+    // Only start a dial attempt if we have received new addresses
     if (newAddresses.length > 0) {
-      struct = await Promise.race(
-        newAddresses.map((addr) => this._libp2p.dialProtocol(addr, protocols[0], { signal: abort.signal }))
-      )
+      try {
+        struct = await this._libp2p.dialProtocol(counterparty, protocols[0], { signal: abort.signal })
+      } catch (err) {
+        error(`Using new addresses after querying the DHT did not lead to a connection. Cannot connect. ${err}`)
+        return
+      }
     }
 
     if (struct != null) {
