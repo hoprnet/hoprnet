@@ -48,7 +48,8 @@ describe('test hashedSecret', function () {
     connector.account = new Account(
       connector,
       stringToU8a(testconfigs.DEMO_ACCOUNTS[0]),
-      await Utils.privKeyToPubKey(stringToU8a(testconfigs.DEMO_ACCOUNTS[0]))
+      await Utils.privKeyToPubKey(stringToU8a(testconfigs.DEMO_ACCOUNTS[0])),
+      chainId
     )
 
     connector.hashedSecret = new PreImage(connector)

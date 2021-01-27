@@ -20,10 +20,9 @@ import { ContractEventEmitter } from '../tsc/web3/types'
 import { ChannelStatus } from '../types/channel'
 import * as constants from '../constants'
 import * as time from './time'
-import * as events from './events'
 import BN from 'bn.js'
 
-export { time, events }
+export { time }
 
 /**
  * @param self our node's accountId
@@ -418,7 +417,7 @@ export function stateCounterToStatus(stateCounter: number): ChannelStatus {
  * @returns ChannelStatus
  */
 export function stateCounterToIteration(stateCounter: number): number {
-  return Math.ceil(Number(stateCounter) / 10)
+  return Math.ceil(Number(stateCounter) / 10) + 1
 }
 
 /**
