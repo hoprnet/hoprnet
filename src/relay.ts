@@ -115,7 +115,7 @@ class Relay {
   ): Promise<RelayConnection | WebRTCConnection | undefined> {
     let relayConnection: Connection
     try {
-      relayConnection = await this.connectToPeer(PeerId.createFromCID(potentialRelay), options)
+      relayConnection = await this.connectToPeer(PeerId.createFromCID(potentialRelay.getPeerId()), options)
     } catch (err) {
       error(err)
       return

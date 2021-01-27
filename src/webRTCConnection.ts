@@ -320,7 +320,7 @@ class WebRTCConnection implements MultiaddrConnection {
             return
           }
 
-          this.log(`yielding into webrtc ${this._id}`, result.value.slice().length)
+          this.log(`yielding ${result.value.slice().length} bytes into webrtc ${this._id}`)
           yield Uint8Array.from([...NOT_DONE, ...result.value.slice()])
 
           for await (const msg of source) {
@@ -328,7 +328,7 @@ class WebRTCConnection implements MultiaddrConnection {
               break
             }
 
-            this.log(`yielding into webrtc ${this._id}`, msg.slice().length)
+            this.log(`yielding ${msg.slice().length} bytes into webrtc ${this._id}`)
             yield Uint8Array.from([...NOT_DONE, ...msg.slice()])
           }
 
