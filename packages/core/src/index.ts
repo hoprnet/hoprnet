@@ -2,6 +2,7 @@
 
 import LibP2P from 'libp2p'
 import type { Connection, Handler } from 'libp2p'
+import AbortController from 'abort-controller'
 
 const MPLEX = require('libp2p-mplex')
 const KadDHT = require('libp2p-kad-dht')
@@ -255,7 +256,10 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       potentialBootstrapServers.map((addr: Multiaddr) =>
         this._libp2p.dial(addr).then(
           () => true,
-          () => false
+          (err) => {
+            error(err)
+            return false
+          }
         )
       )
     )

@@ -6,7 +6,7 @@ import { durations } from '../time'
  * @param msg message to display
  */
 export function startDelayedInterval(msg: string): () => void {
-  let interval: NodeJS.Timeout | number
+  let interval: NodeJS.Timeout
   let timeout = setTimeout(() => {
     process.stdout.write(`<${msg}>\n`)
     interval = setInterval(() => {
@@ -16,6 +16,6 @@ export function startDelayedInterval(msg: string): () => void {
 
   return function dispose() {
     clearTimeout(timeout)
-    clearInterval(interval as number)
+    clearInterval(interval)
   }
 }
