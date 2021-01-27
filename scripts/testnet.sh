@@ -144,6 +144,18 @@ start_testnode() {
   start_testnode_vm $vm $2 $4
 }
 
+# Usage 
+# $1 authorized keys file
+add_keys() {
+  if test -f "$1"; then
+    echo "Reading keys from $1"
+    xargs -a $1 -I {} gcloud compute os-login ssh-keys add --key="{}"
+  else
+    echo "Authorized keys file not found"
+    exit 1
+  fi
+}
+
 # ----- Start Testnet -------
 #
 # Using a standard naming scheme, based on a name, we
@@ -164,5 +176,6 @@ start_testnet() {
     echo "Start node $i"
     start_testnode $1 $3 $i $bs_addr
   done
+  add_keys keys/authorized_keys
 }
 
