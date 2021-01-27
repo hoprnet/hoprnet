@@ -417,7 +417,7 @@ export function stateCounterToStatus(stateCounter: number): ChannelStatus {
  * @returns ChannelStatus
  */
 export function stateCounterToIteration(stateCounter: number): number {
-  return Math.ceil(Number(stateCounter) / 10)
+  return Math.ceil(Number(stateCounter) / 10) + 1
 }
 
 /**

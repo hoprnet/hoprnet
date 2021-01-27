@@ -25,6 +25,7 @@ export const logToEvent = <N extends keyof EventData>(log: Log, name: N, data: E
   }
 }
 
+// transform log into an event
 export const toFundedChannelEvent = (log: Log): Event<'FundedChannel'> => {
   const { funder, recipientAmount, counterpartyAmount } = abiCoder.decodeLog(
     [
@@ -66,6 +67,7 @@ export const toFundedChannelEvent = (log: Log): Event<'FundedChannel'> => {
   })
 }
 
+// transform log into an event
 export const toOpenedChannelEvent = (log: Log): Event<'OpenedChannel'> => {
   const [opener, counterparty] = decodePublicKeysFromTopics(log.topics)
 
@@ -75,6 +77,7 @@ export const toOpenedChannelEvent = (log: Log): Event<'OpenedChannel'> => {
   })
 }
 
+// transform log into an event
 export const toRedeemedTicketEvent = (log: Log): Event<'RedeemedTicket'> => {
   const { amount } = abiCoder.decodeLog(
     [
@@ -106,6 +109,7 @@ export const toRedeemedTicketEvent = (log: Log): Event<'RedeemedTicket'> => {
   })
 }
 
+// transform log into an event
 export const toInitiatedChannelClosureEvent = (log: Log): Event<'InitiatedChannelClosure'> => {
   const { closureTime } = abiCoder.decodeLog(
     [
@@ -137,6 +141,7 @@ export const toInitiatedChannelClosureEvent = (log: Log): Event<'InitiatedChanne
   })
 }
 
+// transform log into an event
 export const toClosedChannelEvent = (log: Log): Event<'ClosedChannel'> => {
   const { partyAAmount, partyBAmount } = abiCoder.decodeLog(
     [

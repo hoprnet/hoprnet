@@ -135,6 +135,7 @@ class Indexer extends EventEmitter implements IIndexer {
   /**
    * Query past logs, this will loop until it gets all blocks from {toBlock} to {fromBlock}.
    * If we exceed response log limit, we switch into quering smaller chunks.
+   * TODO: optimize DB and fetch requests
    * @param fromBlock
    * @param toBlock
    * @param blockRange
