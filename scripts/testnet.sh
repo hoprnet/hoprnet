@@ -1,8 +1,6 @@
 #!/bin/bash
 set -e #u
 
-source key
-
 if [ -z "$GCLOUD_INCLUDED" ]; then
   source scripts/gcloud.sh 
 fi
