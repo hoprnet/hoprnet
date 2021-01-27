@@ -1,3 +1,4 @@
+import type { Log } from 'web3-core'
 import { u8aToHex, u8aEquals } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 import {
@@ -11,21 +12,18 @@ import {
   SignedChannel,
   SignedTicket,
   Ticket,
-  TicketEpoch
+  TicketEpoch,
+  ChannelEntry
 } from '../types'
-import { ChannelStatus } from '../types/channel'
-import { waitForConfirmation, getId, events, pubKeyToAccountId, sign, isPartyA } from '../utils'
+import { waitForConfirmation, getId, pubKeyToAccountId, sign, isPartyA } from '../utils'
 import { ERRORS } from '../constants'
-
 import type HoprEthereum from '..'
 import Channel from './channel'
-
 import { Uint8ArrayE } from '../types/extended'
-
-import { CHANNEL_STATES } from './constants'
-import { Log } from 'web3-core'
 import { TicketStatic } from './ticket'
 import debug from 'debug'
+import * as topics from '../indexer/topics'
+
 const log = debug('hopr-core-ethereum:channel')
 
 const EMPTY_SIGNATURE = new Uint8Array(Signature.SIZE).fill(0x00)
@@ -75,11 +73,10 @@ class ChannelFactory {
     const channelId = new Hash(await getId(await this.coreConnector.account.address, counterparty))
 
     const [onChain, offChain]: [boolean, boolean] = await Promise.all([
-      this.coreConnector.channel.getOnChainState(channelId).then((channel) => {
-        const state = Number(channel.stateCounter) % CHANNEL_STATES
-        return state === ChannelStatus.OPEN || state === ChannelStatus.PENDING
+      this.coreConnector.channel.getOnChainState(new Public(counterpartyPubKey)).then((channel) => {
+        return channel.status === 'OPEN' || channel.status === 'PENDING'
       }),
-      this.coreConnector.db.get(Buffer.from(this.coreConnector.dbKeys.Channel(counterpartyPubKey))).then(
+      this.getOffChainState(counterpartyPubKey).then(
         () => true,
         (err) => {
           if (err.notFound) {
@@ -178,9 +175,7 @@ class ChannelFactory {
     await this.coreConnector.initOnchainValues()
 
     if (await this.isOpen(counterpartyPubKey)) {
-      const record = (await this.coreConnector.db.get(
-        Buffer.from(this.coreConnector.dbKeys.Channel(counterpartyPubKey))
-      )) as Uint8Array
+      const record = await this.getOffChainState(counterpartyPubKey)
       signedChannel = new SignedChannel({
         bytes: record.buffer,
         offset: record.byteOffset
@@ -228,6 +223,7 @@ class ChannelFactory {
 
       return channel
     }
+
     throw Error('Cannot open channel. Channel is not open and no sign function was given.')
   }
 
@@ -331,62 +327,130 @@ class ChannelFactory {
     return this.coreConnector.db.del(Buffer.from(this.coreConnector.dbKeys.Channel(counterparty)))
   }
 
-  getOnChainState(channelId: Hash) {
-    return this.coreConnector.hoprChannels.methods.channels(channelId.toHex()).call()
+  async getOnChainState(counterpartyPubKey: Public): Promise<ChannelEntry> {
+    const inGanache = !this.coreConnector.network || this.coreConnector.network === 'localhost'
+    const self = new Public(this.coreConnector.account.keys.onChain.pubKey)
+
+    // HACK: when running our unit/intergration tests using ganache, the indexer doesn't have enough
+    // time to pick up the events and reduce the data - here we are doing 2 things wrong:
+    // 1. all our unit tests are actually intergration tests, nothing is mocked
+    // 2. our actual intergration tests do not have any block mining time
+    // this will be tackled in the upcoming refactor
+    if (inGanache) {
+      const channelId = await getId(await self.toAccountId(), await new Public(counterpartyPubKey).toAccountId())
+      const response = await this.coreConnector.hoprChannels.methods.channels(channelId.toHex()).call()
+
+      return new ChannelEntry(undefined, {
+        blockNumber: new BN(0),
+        transactionIndex: new BN(0),
+        logIndex: new BN(0),
+        deposit: new BN(response.deposit),
+        partyABalance: new BN(response.partyABalance),
+        closureTime: new BN(response.closureTime),
+        stateCounter: new BN(response.stateCounter),
+        closureByPartyA: response.closureByPartyA
+      })
+    } else {
+      let channelEntry = this.coreConnector.indexer.getChannelEntry(
+        new Public(this.coreConnector.account.keys.onChain.pubKey),
+        counterpartyPubKey
+      )
+      if (channelEntry) return channelEntry
+
+      // when channelEntry is not found, the onchain data is all 0
+      return new ChannelEntry(undefined, {
+        blockNumber: new BN(0),
+        transactionIndex: new BN(0),
+        logIndex: new BN(0),
+        deposit: new BN(0),
+        partyABalance: new BN(0),
+        closureTime: new BN(0),
+        stateCounter: new BN(0),
+        closureByPartyA: false
+      })
+    }
   }
 
-  async onceOpen(self: Public, counterparty: Public) {
+  async onceOpen(self: Public, counterparty: Public): Promise<void> {
     const channelId = await getId(await self.toAccountId(), await counterparty.toAccountId())
 
     return new Promise((resolve, reject) => {
       const subscription = this.coreConnector.web3.eth.subscribe('logs', {
         address: this.coreConnector.hoprChannels.options.address,
-        topics: events.OpenedChannelTopics(self, counterparty, true)
+        topics: topics.generateTopics(topics.EventSignatures.OpenedChannel, self, counterparty, true)
       })
 
       subscription
-        .on('data', async (data: Log) => {
-          const event = events.decodeOpenedChannelEvent(data)
+        .on('data', async (log: Log) => {
+          const event = topics.toOpenedChannelEvent(log)
 
-          const { opener, counterparty } = event.returnValues
-          const _channelId = await getId(await opener.toAccountId(), await counterparty.toAccountId())
+          const _channelId = await getId(
+            await event.data.opener.toAccountId(),
+            await event.data.counterparty.toAccountId()
+          )
 
           if (!u8aEquals(_channelId, channelId)) {
             return
           }
 
           await subscription.unsubscribe()
-          return resolve(event.returnValues)
+          return resolve()
         })
         .on('error', reject)
     })
+
+    // const { indexer } = this.coreConnector
+    // const channelId = await getId(await self.toAccountId(), await counterparty.toAccountId())
+
+    // return new Promise((resolve) => {
+    //   indexer.on('channelOpened', async ({ partyA, partyB }) => {
+    //     const _channelId = await getId(await partyA.toAccountId(), await partyB.toAccountId())
+    //     if (!u8aEquals(channelId, _channelId)) return
+
+    //     return resolve()
+    //   })
+    // })
   }
 
-  async onceClosed(self: Public, counterparty: Public) {
+  async onceClosed(self: Public, counterparty: Public): Promise<void> {
     const channelId = await getId(await self.toAccountId(), await counterparty.toAccountId())
 
     return new Promise((resolve, reject) => {
       const subscription = this.coreConnector.web3.eth.subscribe('logs', {
         address: this.coreConnector.hoprChannels.options.address,
-        topics: events.ClosedChannelTopics(self, counterparty, true)
+        topics: topics.generateTopics(topics.EventSignatures.ClosedChannel, self, counterparty, true)
       })
 
       subscription
-        .on('data', async (data: Log) => {
-          const event = events.decodeClosedChannelEvent(data)
+        .on('data', async (log: Log) => {
+          const event = topics.toClosedChannelEvent(log)
 
-          const { closer, counterparty } = event.returnValues
-          const _channelId = await getId(await closer.toAccountId(), await counterparty.toAccountId())
+          const _channelId = await getId(
+            await event.data.closer.toAccountId(),
+            await event.data.counterparty.toAccountId()
+          )
 
           if (!u8aEquals(_channelId, channelId)) {
             return
           }
 
           await subscription.unsubscribe()
-          return resolve(event.returnValues)
+          return resolve()
         })
         .on('error', reject)
     })
+
+    // const { indexer } = this.coreConnector
+    // const channelId = await getId(await self.toAccountId(), await counterparty.toAccountId())
+
+    // return new Promise((resolve) => {
+    //   indexer.on('channelClosed', async ({ partyA, partyB }) => {
+    //     const _channelId = await getId(await partyA.toAccountId(), await partyB.toAccountId())
+    //     if (!u8aEquals(channelId, _channelId)) return
+
+    //     return resolve()
+    //   })
+    // })
   }
 }
 

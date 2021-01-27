@@ -3,7 +3,7 @@ set -e
 shopt -s expand_aliases
 
 # Variables
-PROVIDER=wss://ws-mainnet.matic.network
+PROVIDER=wss://ropsten.infura.io/ws/v3/21ceb5486c454b2cb8e6ec54d1432de1
 BOB_ADDR=127.0.0.1
 BOB_PORT=9876
 CHARLIE_ADDR=127.0.0.1

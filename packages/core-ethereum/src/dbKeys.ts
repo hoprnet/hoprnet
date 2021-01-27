@@ -16,7 +16,8 @@ const nonceSubPrefix = encoder.encode('nonce-')
 const ticketSubPrefix = encoder.encode('tickets-')
 const acknowledgedSubPrefix = encoder.encode('acknowledged-')
 const onChainSecretIntermediary = encoder.encode('onChainSecretIntermediary-')
-const confirmedBlockNumber = encoder.encode('confirmedBlockNumber')
+const latestBlockNumber = encoder.encode('latestBlockNumber')
+const latestConfirmedSnapshot = encoder.encode('latestConfirmedSnapshot')
 
 const ON_CHAIN_SECRET_ITERATION_WIDTH = 4 // bytes
 
@@ -41,12 +42,22 @@ export function ChannelKeyParse(arr: Uint8Array): Uint8Array {
 }
 
 /**
- * Returns the db-key under which the latest confirmed block number is saved in the database.
+ * Returns the db-key under which the latest known block number is saved in the database.
  */
-export function ConfirmedBlockNumber(): Uint8Array {
+export function LatestBlockNumber(): Uint8Array {
   return allocationHelper([
     [PREFIX.length, PREFIX],
-    [confirmedBlockNumber.length, confirmedBlockNumber]
+    [latestBlockNumber.length, latestBlockNumber]
+  ])
+}
+
+/**
+ * Returns the db-key under which the latest confirmed snapshot is saved in the database.
+ */
+export function LatestConfirmedSnapshot(): Uint8Array {
+  return allocationHelper([
+    [PREFIX.length, PREFIX],
+    [latestConfirmedSnapshot.length, latestConfirmedSnapshot]
   ])
 }
 

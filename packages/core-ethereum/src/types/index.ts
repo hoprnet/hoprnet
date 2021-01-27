@@ -10,6 +10,7 @@ import Public from './public'
 import Signature from './signature'
 import SignedChannel from './signedChannel'
 import SignedTicket from './signedTicket'
+import Snapshot from './snapshot'
 import Ticket from './ticket'
 import TicketEpoch from './ticketEpoch'
 
@@ -28,6 +29,7 @@ class Types {
   public Signature = Signature
   public SignedChannel = SignedChannel
   public SignedTicket = SignedTicket
+  public Snapshot = Snapshot
   public Ticket = Ticket
   public TicketEpoch = TicketEpoch
 }
@@ -47,6 +49,7 @@ export {
   Signature,
   SignedChannel,
   SignedTicket,
+  Snapshot,
   Ticket,
   TicketEpoch
 }
