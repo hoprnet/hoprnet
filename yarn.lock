@@ -423,6 +423,18 @@
     webrtc-stun "~3.0.0"
     wrtc "0.4.7"
 
+"@hoprnet/hopr-utils@^1.62":
+  version "1.64.11"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-1.64.11.tgz#aaa7bbf34796d40e5509eae8a9fc030543f23bd4"
+  integrity sha512-jiHBh/V3D6uLNX41m+KmVxsecPg3YIQ4pDpD0dBL/BhAYdmivDjTKPgtT3DWX3iz192vyqR88Qwg2/bI/bf3jQ==
+  dependencies:
+    bignumber.js "^9.0.0"
+    libp2p-crypto "0.18.0"
+    multiaddr "8.1.2"
+    multihashes "~3.1.0"
+    peer-id "0.14.2"
+    strip-ansi "^6.0.0"
+
 "@lerna/add@3.21.0":
   version "3.21.0"
   resolved "https://registry.yarnpkg.com/@lerna/add/-/add-3.21.0.tgz#27007bde71cc7b0a2969ab3c2f0ae41578b4577b"
@@ -9752,10 +9764,10 @@ multicodec@^2.0.0, multicodec@^2.1.0:
     uint8arrays "1.1.0"
     varint "^6.0.0"
 
-multihashes@3.1.1, multihashes@^3.0.1, multihashes@^3.1.0, multihashes@~3.1.0:
-  version "3.1.1"
-  resolved "https://registry.yarnpkg.com/multihashes/-/multihashes-3.1.1.tgz#4e0bbf1e4f3d5118f3621ec8d4404aee47a7d32b"
-  integrity sha512-oF4BesRWbr5BbcRr1/QCDlZK+An8LWBPHVPYKt/foDpqNtXX/l0lm/rmAjI8dDYruPO90OaGcAWI3KS5vNJdNw==
+multihashes@3.1.2, multihashes@^3.0.1, multihashes@^3.1.0, multihashes@^3.1.1, multihashes@~3.1.0:
+  version "3.1.2"
+  resolved "https://registry.yarnpkg.com/multihashes/-/multihashes-3.1.2.tgz#ffa5e50497aceb7911f7b4a3b6cada9b9730edfc"
+  integrity sha512-AP4IoV/YzkNrfbQKZE3OMPibrmy350OmCd6cJkwyM8oExaXIlOY4UnOOVSQtAEuq/LR01XfXKCESidzZvSwHCQ==
   dependencies:
     multibase "^3.1.0"
     uint8arrays "^2.0.5"
@@ -9769,15 +9781,6 @@ multihashes@^0.4.15, multihashes@~0.4.15:
     buffer "^5.5.0"
     multibase "^0.7.0"
     varint "^5.0.0"
-
-multihashes@^3.1.1:
-  version "3.1.2"
-  resolved "https://registry.yarnpkg.com/multihashes/-/multihashes-3.1.2.tgz#ffa5e50497aceb7911f7b4a3b6cada9b9730edfc"
-  integrity sha512-AP4IoV/YzkNrfbQKZE3OMPibrmy350OmCd6cJkwyM8oExaXIlOY4UnOOVSQtAEuq/LR01XfXKCESidzZvSwHCQ==
-  dependencies:
-    multibase "^3.1.0"
-    uint8arrays "^2.0.5"
-    varint "^6.0.0"
 
 multihashing-async@^2.0.1:
   version "2.0.1"
