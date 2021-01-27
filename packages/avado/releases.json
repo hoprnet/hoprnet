@@ -908,10 +908,87 @@
     }
   },
   "0.100.0": {
-    "hash": "/ipfs/QmYFDSeETGGFmTjYe7njXg4479LQ4tFAE5VMUhthafYYdN",
+    "hash": "/ipfs/QmSgr67w9csEi5Y3qqLBL9sAxTjseCNxfZBEowVDBv6cQA",
     "type": "manifest",
     "uploadedTo": {
-      "http://80.208.229.228:5001": "Tue, 26 Jan 2021 10:39:08 GMT"
+      "http://80.208.229.228:5001": "Wed, 27 Jan 2021 14:05:11 GMT"
+    }
+  },
+  "1.64.0": {
+    "hash": "/ipfs/QmYDjWiNcRwi6tZ4SJuTRqwuQMi1hAXMsuLmDpNbsTXLSG",
+    "type": "manifest",
+    "uploadedTo": {
+      "http://80.208.229.228:5001": "Tue, 26 Jan 2021 15:17:25 GMT"
+    }
+  },
+  "1.64.2": {
+    "hash": "/ipfs/QmUEDdX1UMe3CHJiKM5cxkgVAn6RtQv1z5z3o4F2aemyyZ",
+    "type": "manifest",
+    "uploadedTo": {
+      "http://80.208.229.228:5001": "Tue, 26 Jan 2021 16:17:34 GMT"
+    }
+  },
+  "1.64.3": {
+    "hash": "/ipfs/QmNvf2g4BwMjm8iSpAdKCpWXdbeLzqYkjMohG1f2ZAhEQJ",
+    "type": "manifest",
+    "uploadedTo": {
+      "http://80.208.229.228:5001": "Tue, 26 Jan 2021 18:07:24 GMT"
+    }
+  },
+  "1.64.4": {
+    "hash": "/ipfs/QmeM8UP2uRccxqzJxxjSXZvwyS8ox3UNvSxxgfDJXf8J3A",
+    "type": "manifest",
+    "uploadedTo": {
+      "http://80.208.229.228:5001": "Tue, 26 Jan 2021 19:45:47 GMT"
+    }
+  },
+  "1.64.5": {
+    "hash": "/ipfs/QmPDYjdBq88pmwXPieGsuQWALnFy65MFuChf6SPLNFSddT",
+    "type": "manifest",
+    "uploadedTo": {
+      "http://80.208.229.228:5001": "Tue, 26 Jan 2021 20:06:10 GMT"
+    }
+  },
+  "1.64.6": {
+    "hash": "/ipfs/QmfHPUQ1nPmtAq24PhAdSYggAP8KXvmz4iSTjHfRe6rMhd",
+    "type": "manifest",
+    "uploadedTo": {
+      "http://80.208.229.228:5001": "Tue, 26 Jan 2021 20:39:55 GMT"
+    }
+  },
+  "1.64.7": {
+    "hash": "/ipfs/QmPES2nWj3oPwPZPYQWiaLNyAwG5DmfNQRsNSrRL6WDXbP",
+    "type": "manifest",
+    "uploadedTo": {
+      "http://80.208.229.228:5001": "Tue, 26 Jan 2021 21:21:49 GMT"
+    }
+  },
+  "1.64.8": {
+    "hash": "/ipfs/QmXnHvk9sVpChTHHTNX4UW6UM32grLHpHMHm3TTxmmVwun",
+    "type": "manifest",
+    "uploadedTo": {
+      "http://80.208.229.228:5001": "Wed, 27 Jan 2021 03:46:29 GMT"
+    }
+  },
+  "1.64.9": {
+    "hash": "/ipfs/QmYgQS2HJZXNGqeTNLnNMec6P7T4LJYzgKE4Tw1xGJGPNA",
+    "type": "manifest",
+    "uploadedTo": {
+      "http://80.208.229.228:5001": "Wed, 27 Jan 2021 04:26:49 GMT"
+    }
+  },
+  "1.64.10": {
+    "hash": "/ipfs/QmUpKgQynpifXHfP3aikbLZD3az8Bdm56P7F9rF8fyrUKf",
+    "type": "manifest",
+    "uploadedTo": {
+      "http://80.208.229.228:5001": "Wed, 27 Jan 2021 10:17:23 GMT"
+    }
+  },
+  "1.64.11": {
+    "hash": "/ipfs/Qmc8L23oHzAZQfhrATqyKGGFLvzDR3hHivgfLGrywgsYMq",
+    "type": "manifest",
+    "uploadedTo": {
+      "http://80.208.229.228:5001": "Wed, 27 Jan 2021 10:41:17 GMT"
     }
   }
 }

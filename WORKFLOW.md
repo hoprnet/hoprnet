@@ -55,16 +55,18 @@ by branching out a specific release, which we then deploy on every change.
    by creating a `release/**` branch tracking `master`. Release specific changes
    will be done in this branch to trigger this particular release.
 
-1.1 The IP for the bootstrap node currently needs to be manually assigned.
-
-1.2 Insert name and IP of the new bootstrap server machine into
+1.1 Insert name and release version of the new bootstrap server machine into
 `scripts/environment.sh`
 
-1.3 Update DNS entry for
+1.2 Create a new DNS entry for
 `_dnsaddr.<releaseNativeCurrency>.<releaseName>.bootstrap.hoprnet.org/`
 such that it points to e.g.
 `dnsaddr=/ip4/34.65.207.39/tcp/9091/p2p/16Uiu2HAm42d5mgfFWhKwrRajV6Qa5u92Z9wdPTY36WPYh3J5MfHz`.
 Verify this with `dig -t TXT _dnsaddr.<releaseNativeCurrency>.<releaseName>.bootstrap.hoprnet.org`.
+
+1.3. Update `packages/utils/src/bootstrap.ts` const `BOOTSTRAP_ADDRESS` with the previously generated DNS entry.
+
+1.4. Create changelog (@TODO, see #1117).
 
 2. The `CHANGELOG.md` file is updated with the GitHub pull requests merged
    during that milestone.

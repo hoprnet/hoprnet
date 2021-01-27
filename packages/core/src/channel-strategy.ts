@@ -78,6 +78,21 @@ export class PromiscuousStrategy implements ChannelStrategy {
       .filter((x: RoutingChannel) => peers.qualityOf(indexerDest(x)) < 0.1)
       .map((x) => indexerDest(x))
 
+    // First let's open channels to any interesting peers we have
+    peers.all().forEach((peerId) => {
+      if (
+        balance.gtn(0) &&
+        currentChannels.length + toOpen.length < MAX_AUTO_CHANNELS &&
+        !toOpen.find((x) => dest(x).equals(peerId)) &&
+        !currentChannels.find((x) => indexerDest(x).equals(peerId)) &&
+        peers.qualityOf(peerId) > NETWORK_QUALITY_THRESHOLD
+      ) {
+        toOpen.push([peerId, MINIMUM_REASONABLE_CHANNEL_STAKE])
+        balance.isub(MINIMUM_REASONABLE_CHANNEL_STAKE)
+      }
+    })
+
+    // Now let's evaluate new channels
     while (
       balance.gtn(0) &&
       i++ < MAX_NEW_CHANNELS_PER_TICK &&

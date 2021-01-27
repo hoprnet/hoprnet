@@ -69,6 +69,7 @@ update_if_existing() {
 
 # $1 = vm name
 # $2 = docker image
+# NB: --run needs to be at the end or it will ignore the other arguments.
 update_or_create_bootstrap_vm() {
   if [ "$(update_if_existing $1 $2)" = "no container" ]; then
     echo "No container found, creating $1"
@@ -83,9 +84,11 @@ update_or_create_bootstrap_vm() {
       --container-arg="--init" --container-arg="true" \
       --container-arg="--runAsBootstrap" --container-arg="true" \
       --container-arg="--rest" --container-arg="true" \
-      --container-arg="--run" --container-arg"'settings strategy passive;daemonize'"
       --container-arg="--restHost" --container-arg="0.0.0.0" \
+      --container-arg="--healthCheck" --container-arg="true" \
+      --container-arg="--healthCheckHost" --container-arg="0.0.0.0" \
       --container-arg="--admin" \
+      --container-arg="--run" --container-arg="\"settings strategy passive;daemonize\""
       --container-restart-policy=always
     sleep 120
   fi
@@ -94,6 +97,7 @@ update_or_create_bootstrap_vm() {
 # $1 = vm name
 # $2 = docker image
 # $3 = BS multiaddr
+# NB: --run needs to be at the end or it will ignore the other arguments.
 start_testnode_vm() {
   if [ "$(update_if_existing $1 $2)" = "no container" ]; then
     gcloud compute instances create-with-container $1 $GCLOUD_DEFAULTS \
@@ -105,9 +109,11 @@ start_testnode_vm() {
       --container-arg="--init" --container-arg="true" \
       --container-arg="--rest" --container-arg="true" \
       --container-arg="--restHost" --container-arg="0.0.0.0" \
+      --container-arg="--healthCheck" --container-arg="true" \
+      --container-arg="--healthCheckHost" --container-arg="0.0.0.0" \
       --container-arg="--bootstrapServers" --container-arg="$3" \
-      --container-arg="--run" --container-arg="cover-traffic start;daemonize" \
       --container-arg="--admin" \
+      --container-arg="--run" --container-arg="\"cover-traffic start;daemonize\"" \
       --container-restart-policy=always
   fi
 }
@@ -138,6 +144,18 @@ start_testnode() {
   start_testnode_vm $vm $2 $4
 }
 
+# Usage 
+# $1 authorized keys file
+add_keys() {
+  if test -f "$1"; then
+    echo "Reading keys from $1"
+    xargs -a $1 -I {} gcloud compute os-login ssh-keys add --key="{}"
+  else
+    echo "Authorized keys file not found"
+    exit 1
+  fi
+}
+
 # ----- Start Testnet -------
 #
 # Using a standard naming scheme, based on a name, we
@@ -158,5 +176,6 @@ start_testnet() {
     echo "Start node $i"
     start_testnode $1 $3 $i $bs_addr
   done
+  add_keys keys/authorized_keys
 }
 

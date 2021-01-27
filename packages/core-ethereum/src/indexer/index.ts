@@ -439,9 +439,9 @@ class Indexer extends EventEmitter implements IIndexer {
   }
 
   public async getRandomChannel(): Promise<RoutingChannel | undefined> {
-    const HACK = 9514000 // Arbitrarily chosen block for our testnet. Total hack.
-    const results = await getChannelEntries(this.connector.db)
-    const filtered = results.filter((x) => x.channelEntry.blockNumber.gtn(HACK))
+    const HACK = 9545000 // Arbitrarily chosen block for our testnet. Total hack.
+    const all = await this.getChannelEntries()
+    const filtered = all.filter((x) => x.channelEntry.blockNumber.gtn(HACK))
     if (filtered.length === 0) {
       log('no channels exist in indexer > hack')
       return undefined
