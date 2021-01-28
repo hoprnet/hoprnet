@@ -40,7 +40,7 @@ class Account {
     }
   }
 
-  constructor(public coreConnector: HoprEthereum, privKey: Uint8Array, pubKey: Uint8Array) {
+  constructor(public coreConnector: HoprEthereum, privKey: Uint8Array, pubKey: Uint8Array, private chainId: number) {
     this.keys = {
       onChain: {
         privKey,
@@ -53,7 +53,13 @@ class Account {
     }
 
     this._nonceTracker = new NonceTracker({
-      getLatestBlockNumber: () => coreConnector.web3.eth.getBlockNumber(),
+      getLatestBlockNumber: async () => {
+        // tests fail if we don't query the block number
+        // when running on ganache
+        return !coreConnector.network || coreConnector.network === 'localhost'
+          ? coreConnector.web3.eth.getBlockNumber()
+          : coreConnector.indexer.latestBlock
+      },
       getTransactionCount: async (address: string, blockNumber?: number) =>
         coreConnector.web3.eth.getTransactionCount(address, blockNumber),
       getConfirmedTransactions: () => Array.from(this._transactions.confirmed.values()),
@@ -229,12 +235,14 @@ class Account {
     const abi = txObject ? txObject.encodeABI() : undefined
     const gas = 200e3
 
-    // set gasPrice
-    let gasPrice: number = 1e9
-    // specified in network settings
-    if (rpcOps[network]?.gasPrice) gasPrice = rpcOps[network]?.gasPrice
-    // let's web3 pick gas price
-    if ((['mainnet', 'ropsten'] as Network[]).includes(network)) gasPrice = undefined
+    // let web3 pick gas price
+    // should be used when the gas price fluctuates
+    // as it allows the provider to pick a gas price
+    let gasPrice: number
+    // if its a known network with constant gas price
+    if (rpcOps[network] && !(['mainnet', 'ropsten'] as Network[]).includes(network)) {
+      gasPrice = rpcOps[network]?.gasPrice ?? 1e9
+    }
 
     // @TODO: potential deadlock, needs to be improved
     const nonceLock = await this._nonceTracker.getNonceLock(this._address.toHex())
@@ -245,6 +253,7 @@ class Account {
       gas,
       gasPrice,
       ...txConfig,
+      chainId: this.chainId,
       nonce: nonceLock.nextNonce,
       data: abi
     }

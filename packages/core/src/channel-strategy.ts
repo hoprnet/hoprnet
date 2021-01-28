@@ -1,4 +1,4 @@
-import type { Indexer, IndexerChannel } from '@hoprnet/hopr-core-connector-interface'
+import type { Indexer, RoutingChannel } from '@hoprnet/hopr-core-connector-interface'
 import PeerId from 'peer-id'
 import BN from 'bn.js'
 import {
@@ -14,8 +14,8 @@ const log = debug('hopr-core:channel-strategy')
 export type ChannelsToOpen = [PeerId, BN]
 export type ChannelsToClose = PeerId
 const dest = (c: ChannelsToOpen): PeerId => c[0]
-const outgoingPeer = (c: IndexerChannel): PeerId => c[0]
-const indexerDest = (c: IndexerChannel): PeerId => c[1]
+const outgoingPeer = (c: RoutingChannel): PeerId => c[0]
+const indexerDest = (c: RoutingChannel): PeerId => c[1]
 
 /**
  * Staked nodes will likely want to automate opening and closing of channels. By
@@ -32,8 +32,8 @@ export interface ChannelStrategy {
 
   tick(
     balance: BN,
-    newChannels: IndexerChannel[],
-    currentChannels: IndexerChannel[],
+    newChannels: RoutingChannel[],
+    currentChannels: RoutingChannel[],
     networkPeers: NetworkPeers,
     indexer: Indexer
   ): Promise<[ChannelsToOpen[], ChannelsToClose[]]>
@@ -41,7 +41,7 @@ export interface ChannelStrategy {
 }
 
 const logChannels = (c: ChannelsToOpen[]): string => c.map((x) => x[0].toB58String() + ':' + x[1].toString()).join(', ')
-const logIndexerChannels = (c: IndexerChannel[]): string =>
+const logIndexerChannels = (c: RoutingChannel[]): string =>
   c.map((x) => x[1].toB58String() + ':' + x[2].toString()).join(', ')
 
 // Don't auto open any channels
@@ -50,8 +50,8 @@ export class PassiveStrategy implements ChannelStrategy {
 
   async tick(
     _balance: BN,
-    _n: IndexerChannel[],
-    _c: IndexerChannel[],
+    _n: RoutingChannel[],
+    _c: RoutingChannel[],
     _p: NetworkPeers,
     _indexer: Indexer
   ): Promise<[ChannelsToOpen[], ChannelsToClose[]]> {
@@ -65,8 +65,8 @@ export class PromiscuousStrategy implements ChannelStrategy {
 
   async tick(
     balance: BN,
-    _n: IndexerChannel[],
-    currentChannels: IndexerChannel[],
+    _n: RoutingChannel[],
+    currentChannels: RoutingChannel[],
     peers: NetworkPeers,
     indexer: Indexer
   ): Promise<[ChannelsToOpen[], ChannelsToClose[]]> {
@@ -75,7 +75,7 @@ export class PromiscuousStrategy implements ChannelStrategy {
 
     let i = 0
     let toClose = currentChannels
-      .filter((x: IndexerChannel) => peers.qualityOf(indexerDest(x)) < 0.1)
+      .filter((x: RoutingChannel) => peers.qualityOf(indexerDest(x)) < 0.1)
       .map((x) => indexerDest(x))
 
     // First let's open channels to any interesting peers we have

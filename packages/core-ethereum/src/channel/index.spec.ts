@@ -21,6 +21,7 @@ import * as configs from '../config'
 const HoprTokenAbi = abis.HoprToken
 const DEFAULT_WIN_PROB = 1
 
+// @TODO: rewrite legacy tests
 describe('test Channel class', function () {
   const ganache = new Ganache()
 
@@ -104,7 +105,7 @@ describe('test Channel class', function () {
               await coreConnector.channel.createSignedChannel(undefined, {
                 channel: new ChannelType(undefined, {
                   balance: channelBalance,
-                  state: new ChannelState(undefined, { state: ChannelStatus.FUNDING })
+                  state: new ChannelState(undefined, { state: ChannelStatus.FUNDED })
                 })
               })
             ).subarray()
@@ -170,6 +171,7 @@ describe('test Channel class', function () {
       await coreConnector.channel.isOpen(counterpartysCoreConnector.account.keys.onChain.pubKey),
       `Checks that party A considers the channel open.`
     )
+
     assert(
       await counterpartysCoreConnector.channel.isOpen(coreConnector.account.keys.onChain.pubKey),
       `Checks that party B considers the channel open.`

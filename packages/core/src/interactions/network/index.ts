@@ -1,5 +1,5 @@
 import { Heartbeat } from './heartbeat'
-import { LibP2P } from '../../'
+import LibP2P from 'libp2p'
 import PeerId from 'peer-id'
 
 class NetworkInteractions {

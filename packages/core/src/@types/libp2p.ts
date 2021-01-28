@@ -87,7 +87,7 @@ declare module 'libp2p' {
 
   //https://github.com/libp2p/js-libp2p-interfaces/tree/master/src/peer-routing
   export interface PeerRouting {
-    findPeer(peerId: PeerId): Promise<{ id: PeerId; multiaddrs: Multiaddr[] }>
+    findPeer(peerId: PeerId, options?: { timeout: number }): Promise<{ id: PeerId; multiaddrs: Multiaddr[] }>
   }
 
   export interface Upgrader {
