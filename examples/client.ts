@@ -35,7 +35,7 @@ async function main() {
   const node = await libp2p.create({
     peerId,
     addresses: {
-      listen: [Multiaddr(`/ip4/0.0.0.0/tcp/${port}`)]
+      listen: [Multiaddr(`/ip4/0.0.0.0/tcp/${port}/p2p/${peerId.toB58String()}`)]
     },
     modules: {
       transport: [HoprConnect],
@@ -85,7 +85,12 @@ async function main() {
 
   switch (process.argv[2]) {
     case '0':
-      conn = await node.dialProtocol(Multiaddr(`/p2p/${await PeerId.createFromPrivKey(Bob)}`), TEST_PROTOCOL)
+      try {
+        conn = await node.dialProtocol(Multiaddr(`/p2p/${await PeerId.createFromPrivKey(Bob)}`), TEST_PROTOCOL)
+      } catch (err) {
+        console.log(err)
+        return
+      }
 
       await pipe(
         // prettier-ignore

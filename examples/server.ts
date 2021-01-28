@@ -12,7 +12,7 @@ async function main() {
   const node = await libp2p.create({
     peerId: await PeerId.createFromPrivKey(Charly),
     addresses: {
-      listen: [Multiaddr(`/ip4/0.0.0.0/tcp/9092`)]
+      listen: [Multiaddr(`/ip4/0.0.0.0/tcp/9092/p2p/${(await PeerId.createFromPrivKey(Charly)).toB58String()}`)]
     },
     modules: {
       transport: [HoprConnect],

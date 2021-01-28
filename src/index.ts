@@ -1,7 +1,7 @@
 import mafmt from 'mafmt'
 import debug from 'debug'
 import Listener from './listener'
-import { CODE_P2P, DELIVERY, USE_WEBRTC } from './constants'
+import { CODE_IP4, CODE_IP6, CODE_P2P, DELIVERY, USE_WEBRTC } from './constants'
 import { AbortError } from 'abortable-iterator'
 import type Multiaddr from 'multiaddr'
 import PeerId from 'peer-id'
@@ -154,21 +154,30 @@ class HoprConnect implements Transport {
       throw new AbortError()
     }
 
-    const destPeerId = ma.getPeerId()
+    const maTuples = ma.stringTuples()
 
-    if (destPeerId != null && this._peerId.toB58String() === destPeerId) {
+    let destPeerId: string
+    if (maTuples[0][0] == CODE_P2P) {
+      destPeerId = maTuples[0][1] as string
+    } else if (maTuples.length >= 3 && maTuples[2][0] == CODE_P2P) {
+      destPeerId = maTuples[2][1] as string
+    } else {
+      throw Error(`Invalid Multiaddr. Got ${ma.toString()}`)
+    }
+
+    if (this._peerId.toB58String() === destPeerId) {
       throw new AbortError(`Cannot dial ourself`)
     }
 
-    switch (ma.protoNames()[0]) {
-      case 'ip4':
-      case 'ip6':
+    switch (maTuples[0][0]) {
+      case CODE_IP4:
+      case CODE_IP6:
         if (!this.shouldAttemptDirectDial(ma)) {
           throw new AbortError()
         }
 
         return await this.dialDirectly(ma, options)
-      case 'p2p':
+      case CODE_P2P:
         if (this.relays == undefined || this.relays.length == 0) {
           throw Error(
             `Could not connect to ${chalk.yellow(
@@ -203,14 +212,15 @@ class HoprConnect implements Transport {
   /**
    * Takes a list of Multiaddrs and returns those addrs that we can use.
    * @example
-   * Multiaddr(`/ip4/127.0.0.1/tcp/0`) // working
+   * Multiaddr(`/ip4/127.0.0.1/tcp/0/p2p/16Uiu2HAmCPgzWWQWNAn2E3UXx1G3CMzxbPfLr1SFzKqnFjDcbdwg`) // working
    * Multiaddr(`/p2p/16Uiu2HAmCPgzWWQWNAn2E3UXx1G3CMzxbPfLr1SFzKqnFjDcbdwg`) // working
    * @param multiaddrs
    * @returns applicable Multiaddrs
    */
   filter(multiaddrs: Multiaddr[]): Multiaddr[] {
     return (Array.isArray(multiaddrs) ? multiaddrs : [multiaddrs]).filter(
-      (ma: Multiaddr) => mafmt.TCP.matches(ma.decapsulateCode(CODE_P2P)) || mafmt.P2P.matches(ma)
+      (ma: Multiaddr) =>
+        (mafmt.TCP.matches(ma.decapsulateCode(CODE_P2P)) && mafmt.P2P.matches(ma)) || mafmt.P2P.matches(ma)
     )
   }
 

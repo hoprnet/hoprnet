@@ -7,6 +7,8 @@ export const NAME = name.replace(/@[a-zA-z0-9\-]+\//, '')
 
 // p2p multi-address code
 export const CODE_P2P = Multiaddr.protocols.names['p2p'].code
+export const CODE_IP4 = Multiaddr.protocols.names['ip4'].code
+export const CODE_IP6 = Multiaddr.protocols.names['ip6'].code
 
 // Time to wait for a connection to close gracefully before destroying it manually
 export const CLOSE_TIMEOUT = 6000
@@ -34,7 +36,12 @@ export const RELAY_PAYLOAD_PREFIX = new Uint8Array([0])
 export const RELAY_STATUS_PREFIX = new Uint8Array([1])
 export const RELAY_WEBRTC_PREFIX = new Uint8Array([2])
 export const RELAY_CONNECTION_STATUS_PREFIX = new Uint8Array([3])
-export const VALID_PREFIXES = [...RELAY_PAYLOAD_PREFIX, ...RELAY_STATUS_PREFIX, ...RELAY_WEBRTC_PREFIX, ...RELAY_CONNECTION_STATUS_PREFIX]
+export const VALID_PREFIXES = [
+  ...RELAY_PAYLOAD_PREFIX,
+  ...RELAY_STATUS_PREFIX,
+  ...RELAY_WEBRTC_PREFIX,
+  ...RELAY_CONNECTION_STATUS_PREFIX
+]
 
 export const RELAY = `/hopr/relay-register/${version}`
 export const DELIVERY = `/hopr/delivery-register/${version}`
