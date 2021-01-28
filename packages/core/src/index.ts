@@ -139,11 +139,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     }
     this.bootstrapServers = options.bootstrapServers || []
     this.isBootstrapNode = options.bootstrapNode || false
-    this._interactions = new Interactions(
-      this,
-      this.mixer,
-      (peer: PeerId) => this.network.networkPeers.register(peer)
-    )
+    this._interactions = new Interactions(this, this.mixer, (peer: PeerId) => this.network.networkPeers.register(peer))
     this.network = new Network(this._libp2p, this._interactions, options)
 
     if (options.ticketAmount) this.ticketAmount = options.ticketAmount

@@ -9,13 +9,12 @@ import Debug from 'debug'
 const verbose = Debug('hopr-core:libp2p:verbose')
 const error = Debug(`hopr-core:libp2p:error`)
 
-
 export async function dialProtocol(
-  libp2p:  LibP2P,
+  libp2p: LibP2P,
   counterparty: PeerId,
   protocols: string[],
-  ms: number): Promise<Handler | void> {
-
+  ms: number
+): Promise<Handler | void> {
   const abort = new AbortController()
 
   const timeout = setTimeout(() => {
