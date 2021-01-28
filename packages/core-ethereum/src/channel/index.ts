@@ -15,7 +15,7 @@ import {
   TicketEpoch,
   ChannelEntry
 } from '../types'
-import { waitForConfirmation, getId, pubKeyToAccountId, sign, isPartyA } from '../utils'
+import { waitForConfirmation, getId, pubKeyToAccountId, sign, isPartyA, getParties } from '../utils'
 import { ERRORS } from '../constants'
 import type HoprEthereum from '..'
 import Channel from './channel'
@@ -327,9 +327,12 @@ class ChannelFactory {
     return this.coreConnector.db.del(Buffer.from(this.coreConnector.dbKeys.Channel(counterparty)))
   }
 
-  async getOnChainState(counterpartyPubKey: Public): Promise<ChannelEntry> {
+  async getOnChainState(counterparty: Public): Promise<ChannelEntry> {
     const inGanache = !this.coreConnector.network || this.coreConnector.network === 'localhost'
     const self = new Public(this.coreConnector.account.keys.onChain.pubKey)
+    const selfAccountId = await self.toAccountId()
+    const counterpartyAccountId = await counterparty.toAccountId()
+    const [partyA] = getParties(selfAccountId, counterpartyAccountId)
 
     // HACK: when running our unit/intergration tests using ganache, the indexer doesn't have enough
     // time to pick up the events and reduce the data - here we are doing 2 things wrong:
@@ -337,7 +340,7 @@ class ChannelFactory {
     // 2. our actual intergration tests do not have any block mining time
     // this will be tackled in the upcoming refactor
     if (inGanache) {
-      const channelId = await getId(await self.toAccountId(), await new Public(counterpartyPubKey).toAccountId())
+      const channelId = await getId(selfAccountId, counterpartyAccountId)
       const response = await this.coreConnector.hoprChannels.methods.channels(channelId.toHex()).call()
 
       return new ChannelEntry(undefined, {
@@ -351,9 +354,9 @@ class ChannelFactory {
         closureByPartyA: response.closureByPartyA
       })
     } else {
-      let channelEntry = this.coreConnector.indexer.getChannelEntry(
-        new Public(this.coreConnector.account.keys.onChain.pubKey),
-        counterpartyPubKey
+      let channelEntry = await this.coreConnector.indexer.getChannelEntry(
+        partyA.eq(self) ? self : counterparty,
+        partyA.eq(self) ? counterparty : self
       )
       if (channelEntry) return channelEntry
 
