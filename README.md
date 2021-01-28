@@ -52,11 +52,15 @@ Start a bootstrapServer
 const libp2p = require('libp2p')
 const MPLEX = require('libp2p-mplex')
 const SECIO = require('libp2p-secio')
+const PeerId = require('peer-id')
 
 import HoprConnect from 'hopr-connect'
 import Multiaddr from 'multiaddr'
 
+const peerId = await PeerId.create({ keyType: 'secp256k1' })
+
 const node = await libp2p.create({
+  peerId,
   modules: {
     transport: [HoprConnect],
     streamMuxer: [MPLEX],
@@ -64,7 +68,7 @@ const node = await libp2p.create({
     peerDiscovery: [HoprConnect.discovery]
   },
   addresses: {
-    listen: Multiaddr(`/ip4/127.0.0.1/tcp/9091`)
+    listen: Multiaddr(`/ip4/127.0.0.1/tcp/9091/p2p/${peerId.toB58String()}`)
   }
 })
 ```
@@ -75,11 +79,16 @@ Start another client
 const libp2p = require('libp2p')
 const MPLEX = require('libp2p-mplex')
 const SECIO = require('libp2p-secio')
+const PeerId = require('peer-id')
 
 import HoprConnect from 'hopr-connect'
 import Multiaddr from 'multiaddr'
 
+const bootstrapId = '16Uiu2HAmCPgzWWQWNAn2E3UXx1G3CMzxbPfLr1SFzKqnFjDcbdwg' // Change this
+const peerId = await PeerId.create({ keyType: 'secp256k1' })
+
 const node = await libp2p.create({
+  peerId
   modules: {
     transport: [HoprConnect],
     streamMuxer: [MPLEX],
@@ -87,11 +96,11 @@ const node = await libp2p.create({
     peerDiscovery: [HoprConnect.discovery]
   },
   addresses: {
-    listen: Multiaddr(`/ip4/127.0.0.1/tcp/9092`)
+    listen: Multiaddr(`/ip4/127.0.0.1/tcp/9092/p2p/${peerId.toB58String()}`)
   },
   config: {
     HoprConnect: {
-      bootstrapServers: [Multiaddr('/ip4/127.0.0.1/tcp/9091')],
+      bootstrapServers: [Multiaddr(`/ip4/127.0.0.1/tcp/9091/p2p/${bootstrapId.toB58String()}`)],
       // Testing:
       __noDirectConnections: false, // set to true to simulate NAT
       __noWebRTCUpgrade: false // set to true to simulate bidirectional NAT

@@ -1,3 +1,25 @@
+<a name="0.2.10"></a>
+
+## [0.2.10](https://github.com/hoprnet/hopr-connect/compare/0.2.8...0.2.10) (2021-01-28)
+
+### Breaking changes
+
+#### Addressing
+
+Before `hopr-connect@0.2.10`, the following addresses were valid:
+
+- `Multiaddr("/ip4/127.0.0.1/tcp/0")`
+- `Multiaddr("/ip4/127.0.0.1/tcp/0/p2p/16Uiu2HAmCPgzWWQWNAn2E3UXx1G3CMzxbPfLr1SFzKqnFjDcbdwg")`
+- `Multiaddr("/p2p/16Uiu2HAmCPgzWWQWNAn2E3UXx1G3CMzxbPfLr1SFzKqnFjDcbdwg")`
+
+Since `hopr-connect@0.2.10`, only addresses that include a PeerId are considered valid, namely:
+
+- `Multiaddr("/ip4/127.0.0.1/tcp/0/p2p/16Uiu2HAmCPgzWWQWNAn2E3UXx1G3CMzxbPfLr1SFzKqnFjDcbdwg")`
+- `Multiaddr("/p2p/16Uiu2HAmCPgzWWQWNAn2E3UXx1G3CMzxbPfLr1SFzKqnFjDcbdwg")`
+
+### Fixes
+
+- Always detect self-dial attempts
 
 <a name="0.2.8"></a>
 
