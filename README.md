@@ -41,7 +41,7 @@ A [transport module](https://github.com/libp2p/js-libp2p-interfaces/tree/master/
 
 ### Dependencies
 
-- Node.js 12.x
+- Node.js 12.x, seems to work with Node.JS 14.x as well
 - yarn
 
 ### Startup
