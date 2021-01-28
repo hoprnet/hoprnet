@@ -93,11 +93,18 @@ describe('test dbKeys', function () {
     assert(u8aEquals(result2, expected2), 'check AcknowledgedTicket key parsing')
   })
 
-  it("should create 'ConfirmedBlockNumber' key", function () {
-    const result = dbKeys.ConfirmedBlockNumber()
-    const expected = encoder.encode('payments-confirmedBlockNumber')
+  it("should create 'LatestBlockNumber' key", function () {
+    const result = dbKeys.LatestBlockNumber()
+    const expected = encoder.encode('payments-latestBlockNumber')
 
-    assert(u8aEquals(result, expected), 'check confirmedBlockNumber key creation')
+    assert(u8aEquals(result, expected), 'check latestBlockNumber key creation')
+  })
+
+  it("should create 'LatestConfirmedSnapshot' key", function () {
+    const result = dbKeys.LatestConfirmedSnapshot()
+    const expected = encoder.encode('payments-latestConfirmedSnapshot')
+
+    assert(u8aEquals(result, expected), 'check latestConfirmedSnapshot key creation')
   })
 
   it("should create 'ChannelEntry' key", function () {

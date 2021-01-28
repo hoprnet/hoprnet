@@ -1,8 +1,7 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
-import { moveDecimalPoint, u8aToHex, pubKeyToPeerId } from '@hoprnet/hopr-utils'
+import { moveDecimalPoint, u8aToHex, pubKeyToPeerId, u8aEquals } from '@hoprnet/hopr-utils'
 import chalk from 'chalk'
-import { getMyOpenChannelInstances } from './utils/openChannels'
 import { AbstractCommand } from './abstractCommand'
 import { getPaddingLength, styleValue } from './utils'
 
@@ -69,63 +68,40 @@ export default class ListOpenChannels extends AbstractCommand {
   async execute(): Promise<string | void> {
     try {
       const { utils, types } = this.node.paymentChannels
-      const self = await this.node.paymentChannels.account.address
-      const channels = await getMyOpenChannelInstances(this.node)
+      const self = new types.Public(this.node.getId().marshalPubKey())
+      const channels = await this.node.paymentChannels.indexer.getChannelEntries(self)
       const result: string[] = []
 
       if (channels.length === 0) {
         return `\nNo open channels found.`
       }
 
-      for (const channel of channels) {
-        const id = u8aToHex(await channel.channelId)
+      for (const { partyA, partyB, channelEntry } of channels) {
+        const id = u8aToHex(await utils.getId(partyA, partyB))
+        const selfIsPartyA = u8aEquals(self, partyA)
+        const counterparty = selfIsPartyA ? partyB : partyA
 
-        if (!channel.counterparty) {
-          result.push(
-            this.generateOutput({
-              id,
-              totalBalance: '0',
-              myBalance: '0'
-            })
-          )
-        } else {
-          const counterParty = await utils.pubKeyToAccountId(channel.counterparty)
+        // do not print UNINITIALISED channels
+        if (channelEntry.status === 'UNINITIALISED') continue
 
-          // @TODO: batch query
-          const channelData = await Promise.all([
-            channel.offChainCounterparty,
-            channel.status,
-            channel.balance,
-            channel.balance_a
-          ]).then(([offChainCounterparty, status, balance, balance_a]) => ({
-            offChainCounterparty,
-            status,
-            balance,
-            balance_a
-          }))
+        const totalBalance = moveDecimalPoint(channelEntry.deposit.toString(), types.Balance.DECIMALS * -1)
+        const myBalance = moveDecimalPoint(
+          selfIsPartyA
+            ? channelEntry.partyABalance.toString()
+            : channelEntry.deposit.sub(channelEntry.partyABalance).toString(),
+          types.Balance.DECIMALS * -1
+        )
+        const peerId = (await pubKeyToPeerId(counterparty)).toB58String()
 
-          const status = channelData.status
-          // do not print UNINITIALISED channels
-          if (status === 'UNINITIALISED') continue
-
-          const selfIsPartyA = utils.isPartyA(self, counterParty)
-          const totalBalance = moveDecimalPoint(channelData.balance.toString(), types.Balance.DECIMALS * -1)
-          const myBalance = moveDecimalPoint(
-            selfIsPartyA ? channelData.balance_a.toString() : channelData.balance.sub(channelData.balance_a).toString(),
-            types.Balance.DECIMALS * -1
-          )
-          const peerId = (await pubKeyToPeerId(channelData.offChainCounterparty)).toB58String()
-
-          result.push(
-            this.generateOutput({
-              id,
-              totalBalance,
-              myBalance,
-              peerId,
-              status
-            })
-          )
-        }
+        result.push(
+          this.generateOutput({
+            id,
+            totalBalance,
+            myBalance,
+            peerId,
+            status
+          })
+        )
       }
 
       return result.join('\n\n')
