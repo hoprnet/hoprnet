@@ -423,6 +423,18 @@
     webrtc-stun "~3.0.0"
     wrtc "0.4.7"
 
+"@hoprnet/hopr-utils@^1.62":
+  version "1.67.3"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-1.67.3.tgz#fdbb7ecb39cbe198451a0521b4c77d1e32029d43"
+  integrity sha512-+lsLJGqOzeyGvSYEEswC3VcVz1LIRBFCbkV2++DK7ki+lDZAGo2x3kYxycNXVQo6pFA88HgwoZ9amjPB0JMBJQ==
+  dependencies:
+    bignumber.js "^9.0.0"
+    libp2p-crypto "0.18.0"
+    multiaddr "8.1.2"
+    multihashes "~3.1.0"
+    peer-id "0.14.3"
+    strip-ansi "^6.0.0"
+
 "@lerna/add@3.21.0":
   version "3.21.0"
   resolved "https://registry.yarnpkg.com/@lerna/add/-/add-3.21.0.tgz#27007bde71cc7b0a2969ab3c2f0ae41578b4577b"

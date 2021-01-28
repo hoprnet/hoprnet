@@ -285,6 +285,10 @@ class Account {
       })
       event.once('error', (error) => {
         const receipt = error['receipt']
+
+        // same tx was submitted twice
+        if (error.message.includes('already known')) return
+
         log(
           'Transaction failed %s %i with error %s',
           signedTransaction.transactionHash,
@@ -292,9 +296,6 @@ class Account {
           error.message,
           receipt ? receipt : 'no receipt'
         )
-
-        // same tx was submitted twice
-        if (error.message.includes('already known')) return
 
         // mean tx was confirmed & reverted
         if (receipt) {
