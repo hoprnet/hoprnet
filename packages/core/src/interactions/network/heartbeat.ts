@@ -7,6 +7,7 @@ import { PROTOCOL_HEARTBEAT, HEARTBEAT_TIMEOUT } from '../../constants'
 import type { Stream, Connection, Handler } from 'libp2p'
 import type PeerId from 'peer-id'
 import { LibP2P } from '../../'
+import { dialProtocol } from '../../libp2p'
 
 const verbose = debug('hopr-core:verbose:heartbeat')
 const HASH_FUNCTION = 'blake2s256'
@@ -17,7 +18,6 @@ class Heartbeat implements AbstractInteraction {
   constructor(
     private node: LibP2P,
     private heartbeat: (remotePeer: PeerId) => void,
-    private dialProtocol: (counterparty: PeerId, protocols: string[], seconds: number) => Promise<Handler | void>,
     private options?: {
       timeoutIntentionally?: boolean
     }
@@ -49,7 +49,7 @@ class Heartbeat implements AbstractInteraction {
   async interact(counterparty: PeerId): Promise<number> {
     const start = Date.now()
 
-    const struct = await this.dialProtocol(counterparty, this.protocols, HEARTBEAT_TIMEOUT)
+    const struct = await dialProtocol(this.node, counterparty, this.protocols, HEARTBEAT_TIMEOUT)
 
     if (struct != null) {
       const challenge = randomBytes(16)

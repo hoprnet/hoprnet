@@ -1,8 +1,7 @@
 /// <reference path="./@types/libp2p.ts" />
 
 import LibP2P from 'libp2p'
-import type { Connection, Handler } from 'libp2p'
-import AbortController from 'abort-controller'
+import type { Connection } from 'libp2p'
 
 const MPLEX = require('libp2p-mplex')
 const KadDHT = require('libp2p-kad-dht')
@@ -143,8 +142,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     this._interactions = new Interactions(
       this,
       this.mixer,
-      (peer: PeerId) => this.network.networkPeers.register(peer),
-      this.dialProtocol.bind(this)
+      (peer: PeerId) => this.network.networkPeers.register(peer)
     )
     this.network = new Network(this._libp2p, this._interactions, options)
 
@@ -678,96 +676,6 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     }
 
     return levelup(leveldown(dbPath))
-  }
-
-  public async dialProtocol(counterparty: PeerId, protocols: string[], ms: number): Promise<Handler | void> {
-    const abort = new AbortController()
-
-    const timeout = setTimeout(() => {
-      abort.abort()
-      verbose(`heartbeat timeout while querying ${counterparty.toB58String()}`)
-    }, ms)
-
-    let struct: Handler
-
-    let addresses = (this._libp2p.peerStore.get(counterparty)?.addresses ?? []).map((addr) => addr.toString())
-
-    // Try to use known addresses
-    if (addresses.length > 0) {
-      try {
-        struct = await this._libp2p.dialProtocol(counterparty, protocols[0], { signal: abort.signal })
-      } catch (err) {
-        if (err.type === 'aborted') {
-          return
-        }
-        error(`Error while trying to connect with known addresses. ${err}`)
-      }
-    }
-
-    if (struct != null) {
-      clearTimeout(timeout)
-      return struct
-    }
-
-    if (abort.signal.aborted) {
-      return
-    }
-
-    // Only use relayed connection / WebRTC upgrade if we haven't tried this before
-    if (!addresses.includes(`/p2p/${counterparty.toB58String()}`)) {
-      // Try to bypass any existing NATs
-      try {
-        struct = await this._libp2p.dialProtocol(Multiaddr(`/p2p/${counterparty.toB58String()}`), protocols[0], {
-          signal: abort.signal
-        })
-      } catch (err) {
-        if (err.type === 'aborted') {
-          return
-        }
-      }
-    }
-
-    if (struct != null) {
-      clearTimeout(timeout)
-      return struct
-    }
-
-    if (abort.signal.aborted) {
-      return
-    }
-
-    // Try to get some fresh addresses from the DHT
-    let dhtAddresses: Multiaddr[]
-    try {
-      // Let libp2p populate its internal peerStore with fresh addresses
-      dhtAddresses = (await this._libp2p.peerRouting?.findPeer(counterparty))?.multiaddrs ?? []
-    } catch (err) {
-      error(`Querying the DHT as peer ${this.getId().toB58String()} for ${counterparty.toB58String()} failed. ${err}`)
-      return
-    }
-
-    if (abort.signal.aborted) {
-      return
-    }
-
-    const newAddresses: Multiaddr[] = dhtAddresses.filter((addr) => addresses.includes(addr.toString()))
-
-    // Only start a dial attempt if we have received new addresses
-    if (newAddresses.length > 0) {
-      try {
-        struct = await this._libp2p.dialProtocol(counterparty, protocols[0], { signal: abort.signal })
-      } catch (err) {
-        error(`Using new addresses after querying the DHT did not lead to a connection. Cannot connect. ${err}`)
-        return
-      }
-    }
-
-    if (struct != null) {
-      clearTimeout(timeout)
-      return struct
-    }
-
-    return
   }
 }
 

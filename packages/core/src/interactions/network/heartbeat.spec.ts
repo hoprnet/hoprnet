@@ -10,7 +10,6 @@ import assert from 'assert'
 import { EventEmitter } from 'events'
 import * as constants from '../../constants'
 import { generateLibP2PMock } from '../../test-utils'
-import AbortController from 'abort-controller'
 
 // @ts-ignore
 constants.HEARTBEAT_TIMEOUT = 300
@@ -32,15 +31,6 @@ describe('check heartbeat mechanism', function () {
         heartbeat: new Heartbeat(
           node,
           (remotePeer) => network.heartbeat.emit('beat', remotePeer),
-          async (counterParty: PeerId, protocols: string[], ms: number) => {
-            const abort = new AbortController()
-
-            const timeout = setTimeout(() => abort.abort(), ms)
-            const struct = await node.dialProtocol(counterParty, protocols[0], { signal: abort.signal })
-
-            clearTimeout(timeout)
-            return struct
-          },
           options
         )
       }
