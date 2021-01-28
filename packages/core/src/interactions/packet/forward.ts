@@ -119,7 +119,7 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector> implements Abstr
             await this.node._interactions.packet.acknowledgment.interact(sender, await ack.sign(this.node.getId()))
           })
 
-          if (this.node.getId().isEqual(target)) {
+          if (this.node.getId().equals(target)) {
             this.node.output(packet.message.plaintext)
           } else {
             await this.interact(target, packet)

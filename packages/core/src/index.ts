@@ -49,6 +49,7 @@ import { Mixer } from './mixer'
 
 import Debug from 'debug'
 const log = Debug(`hopr-core`)
+const logError = Debug(`hopr-core:error`)
 const verbose = Debug('hopr-core:verbose')
 
 interface NetOptions {
@@ -249,7 +250,10 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       potentialBootstrapServers.map((addr: Multiaddr) =>
         this._libp2p.dial(addr).then(
           () => true,
-          () => false
+          (err) => {
+            logError(err)
+            return false
+          }
         )
       )
     )
