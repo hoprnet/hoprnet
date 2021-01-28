@@ -75,7 +75,7 @@ class Relay {
     relays: Multiaddr[],
     onReconnect: (newStream: RelayConnection, counterparty: PeerId) => Promise<void>,
     options?: DialOptions
-  ): Promise<RelayConnection> {
+  ): Promise<RelayConnection | undefined> {
     const destination = PeerId.createFromCID(ma.getPeerId())
 
     const invalidPeerIds = [ma.getPeerId(), this._peerId.toB58String()]
@@ -97,14 +97,16 @@ class Relay {
       }
     }
 
-    throw Error(
-      `Unable to establish a connection to any known relay node. Tried ${yellow(
+    log(
+      `Unable to establish a connection to any known relay node. Tried "${yellow(
         relays
           .filter((ma) => invalidPeerIds.includes(ma.getPeerId()))
           .map((potentialRelay: Multiaddr) => potentialRelay.toString())
           .join(`, `)
-      )}`
+      )}". Excluded relays: "${invalidPeerIds.join(`, `)}"`
     )
+
+    return undefined
   }
 
   private async _tryPotentialRelay(
