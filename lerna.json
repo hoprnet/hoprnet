@@ -4,9 +4,5 @@
   ],
   "npmClient": "yarn",
   "useWorkspaces": true,
-<<<<<<< HEAD
   "version": "1.67.2"
-=======
-  "version": "1.67.0-next.6"
->>>>>>> 4b930dfa6a4b0dbddeb970f451238c5899ca8607
 }
