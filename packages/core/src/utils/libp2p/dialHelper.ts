@@ -25,10 +25,12 @@ export async function dialHelper(
   protocols: string[],
   options:
     | {
+        timeout?: number
         signal: AbortSignal
       }
     | {
         timeout: number
+        signal?: AbortSignal
       }
 ): Promise<Handler | void> {
   // Prevent us from dialing ourself
