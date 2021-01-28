@@ -36,7 +36,7 @@ import chalk from 'chalk'
 
 import PeerId from 'peer-id'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-import type { HoprCoreConnectorStatic, Types, Channel, IndexerChannel } from '@hoprnet/hopr-core-connector-interface'
+import type { HoprCoreConnectorStatic, Types, Channel, RoutingChannel } from '@hoprnet/hopr-core-connector-interface'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 import BN from 'bn.js'
 
@@ -49,6 +49,7 @@ import { Mixer } from './mixer'
 
 import Debug from 'debug'
 const log = Debug(`hopr-core`)
+const logError = Debug(`hopr-core:error`)
 const verbose = Debug('hopr-core:verbose')
 
 interface NetOptions {
@@ -249,7 +250,10 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       potentialBootstrapServers.map((addr: Multiaddr) =>
         this._libp2p.dial(addr).then(
           () => true,
-          () => false
+          (err) => {
+            logError(err)
+            return false
+          }
         )
       )
     )
@@ -261,7 +265,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     }
   }
 
-  private async tickChannelStrategy(newChannels: IndexerChannel[]) {
+  private async tickChannelStrategy(newChannels: RoutingChannel[]) {
     verbose('new payment channels, auto opening tick', this.running)
     if (!this.running) {
       return
@@ -302,8 +306,8 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     }
   }
 
-  private async getOpenChannels(): Promise<IndexerChannel[]> {
-    let channels: IndexerChannel[] = []
+  private async getOpenChannels(): Promise<RoutingChannel[]> {
+    let channels: RoutingChannel[] = []
     await this.paymentChannels.channel.getAll(
       async (channel: Channel) => {
         const pubKey = await channel.offChainCounterparty
@@ -335,9 +339,9 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       this.paymentChannels.start()
     ])
 
-    this.paymentChannels.indexer.onNewChannels((newChannels) => {
-      this.tickChannelStrategy(newChannels)
-    })
+    // this.paymentChannels.indexer.on('channelOpened', (routingChannel) => {
+    //   this.tickChannelStrategy([routingChannel])
+    // })
 
     log(`Available under the following addresses:`)
 

@@ -2,15 +2,13 @@ import type { AbstractInteraction } from '../abstractInteraction'
 import { randomBytes, createHash } from 'crypto'
 import { u8aEquals } from '@hoprnet/hopr-utils'
 import debug from 'debug'
-import AbortController from 'abort-controller'
 import pipe from 'it-pipe'
 import { PROTOCOL_HEARTBEAT, HEARTBEAT_TIMEOUT } from '../../constants'
-import type { Stream, Connection, Handler } from 'libp2p'
+import type { Handler } from 'libp2p'
 import type PeerId from 'peer-id'
 import { LibP2P } from '../../'
-import Multiaddr from 'multiaddr'
+import { dialHelper } from '../../utils'
 
-const error = debug('hopr-core:heartbeat:error')
 const verbose = debug('hopr-core:verbose:heartbeat')
 const HASH_FUNCTION = 'blake2s256'
 
@@ -27,7 +25,7 @@ class Heartbeat implements AbstractInteraction {
     this.node.handle(this.protocols, this.handler.bind(this))
   }
 
-  handler(struct: { connection: Connection; stream: Stream }) {
+  handler(struct: Handler) {
     const self = this
     pipe(
       struct.stream,
@@ -51,62 +49,16 @@ class Heartbeat implements AbstractInteraction {
   async interact(counterparty: PeerId): Promise<number> {
     const start = Date.now()
 
-    return new Promise<number>(async (resolve, reject) => {
-      // There is an assumption here that we 'know' how to contact this peer
-      // and therefore we are immediately trying to dial, rather than checking
-      // our peerRouting info first.
-      //
-      // NB. This is a false assumption for 'ping' and we therefore trigger
-      // errors.
-      let struct: Handler
+    const struct = await dialHelper(this.node, counterparty, this.protocols, { timeout: HEARTBEAT_TIMEOUT })
 
-      const abort = new AbortController()
-
-      const timeout = setTimeout(() => {
-        abort.abort()
-        verbose(`heartbeat timeout while querying ${counterparty.toB58String()}`)
-        reject(Error(`Timeout while querying ${counterparty.toB58String()}.`))
-      }, HEARTBEAT_TIMEOUT)
-
-      try {
-        struct = await this.node.dialProtocol(Multiaddr(`/p2p/${counterparty.toB58String()}`), this.protocols[0], {
-          signal: abort.signal
-        })
-      } catch (err) {
-        if (err.type === 'aborted') {
-          return reject()
-        }
-        error(`heartbeat connection error ${err.name} while dialing ${counterparty.toB58String()} (initial)`, err)
-      }
-
-      if (abort.signal.aborted) {
-        return reject()
-      }
-
-      if (struct == null) {
-        const { id } = await this.node.peerRouting.findPeer(counterparty)
-
-        try {
-          struct = await this.node.dialProtocol(id, this.protocols[0], { signal: abort.signal })
-        } catch (err) {
-          if (err.type === 'aborted') {
-            return reject()
-          }
-          error(`heartbeat connection error ${err.name} while dialing ${counterparty.toB58String()} (subsequent)`)
-        }
-      }
-
-      if (struct == null) {
-        return reject()
-      }
-
+    if (struct != null) {
       const challenge = randomBytes(16)
       const expectedResponse = createHash(HASH_FUNCTION).update(challenge).digest()
 
       const response = await pipe(
         // prettier-ignore
         [challenge],
-        struct.stream,
+        (struct as Handler).stream,
         async (source: AsyncIterable<Uint8Array>): Promise<Uint8Array | void> => {
           for await (const msg of source) {
             return msg
@@ -114,14 +66,12 @@ class Heartbeat implements AbstractInteraction {
         }
       )
 
-      clearTimeout(timeout)
-
       if (response != null && u8aEquals(expectedResponse, response.slice())) {
-        resolve(Date.now() - start)
+        return Date.now() - start
       }
+    }
 
-      reject()
-    })
+    throw Error()
   }
 }
 

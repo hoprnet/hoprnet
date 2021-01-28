@@ -296,6 +296,8 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
             channel.partyABalance <= channel.deposit,
             "HoprChannels: partyABalance must be strictly smaller than deposit balance"
         );
+
+        emitRedeemedTicket(msg.sender, counterparty, amount);
     }
 
     /**
@@ -597,6 +599,39 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
             let topic0 := or(or(shl(2, shr(2, OpenedChannel)), shl(1, openerOddY)), counterpartyOddY)
 
             log3(0x00, 0x00, topic0, openerX, counterpartyX)
+        }
+    }
+
+    /**
+     * @dev Emits a TicketRedeemed event that contains the public keys of opener
+     * and counterparty as compressed EC-points.
+     */
+    function emitRedeemedTicket(address redeemer, address counterparty, uint256 amount) private {
+        /* TicketRedeemed(
+         *   uint256 indexed redeemer,
+         *   uint256 indexed counterparty,
+         *   uint256 amount
+         * )
+         */
+        bytes32 RedeemedTicket = keccak256("RedeemedTicket(uint,uint,uint)");
+
+        Account storage redeemerAccount = accounts[redeemer];
+        Account storage counterpartyAccount = accounts[counterparty];
+
+        uint256 redeemerX = redeemerAccount.accountX;
+        uint8 redeemerOddY = redeemerAccount.oddY;
+
+        uint256 counterpartyX = counterpartyAccount.accountX;
+        uint8 counterpartyOddY = counterpartyAccount.oddY;
+
+        assembly {
+            let topic0 := or(or(shl(2, shr(2, RedeemedTicket)), shl(1, redeemerOddY)), counterpartyOddY)
+
+            let memPtr := mload(0x40)
+
+            mstore(memPtr, amount)
+
+            log3(memPtr, 0x20, topic0, redeemerX, counterpartyX)
         }
     }
 
