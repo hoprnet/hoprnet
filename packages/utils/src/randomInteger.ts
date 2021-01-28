@@ -5,13 +5,13 @@
  * Returns a random value between `start` and `end`.
  * @example
  * ```
- * randomInteger(3) // result in { 0, 1, 2 }
- * randomInteger(0, 3) // result in { 0, 1, 2 }
- * randomInteger(7, 9) // result in { 7, 8 }
- * randomInteger(8, 9) == 8
+ * randomInteger(3) // result in { 0, 1, 2, 3 }
+ * randomInteger(0, 3) // result in { 0, 1, 2, 3 }
+ * randomInteger(7, 9) // result in { 7, 8, 9 }
+ * randomInteger(8, 8) == 8
  * ```
  * @param start start of the interval
- * @param end end of the interval
+ * @param end end of the interval inclusive
  * @param seed [optional] DO NOT USE THIS set seed manually
  * @returns random number between @param start and @param end
  */
