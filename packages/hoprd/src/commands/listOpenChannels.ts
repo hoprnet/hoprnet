@@ -99,7 +99,7 @@ export default class ListOpenChannels extends AbstractCommand {
             totalBalance,
             myBalance,
             peerId,
-            status
+            status: channelEntry.status
           })
         )
       }
