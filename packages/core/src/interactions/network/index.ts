@@ -5,10 +5,7 @@ import PeerId from 'peer-id'
 class NetworkInteractions {
   heartbeat: Heartbeat
 
-  constructor(
-    node: LibP2P,
-    heartbeat: (remotePeer: PeerId) => void
-  ) {
+  constructor(node: LibP2P, heartbeat: (remotePeer: PeerId) => void) {
     this.heartbeat = new Heartbeat(node, heartbeat)
   }
 }
