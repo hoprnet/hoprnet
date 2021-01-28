@@ -4,7 +4,7 @@ import { u8aEquals } from '@hoprnet/hopr-utils'
 import debug from 'debug'
 import pipe from 'it-pipe'
 import { PROTOCOL_HEARTBEAT, HEARTBEAT_TIMEOUT } from '../../constants'
-import type { Stream, Connection, Handler } from 'libp2p'
+import type { Handler } from 'libp2p'
 import type PeerId from 'peer-id'
 import { LibP2P } from '../../'
 import { dialHelper } from '../../utils'
@@ -25,7 +25,7 @@ class Heartbeat implements AbstractInteraction {
     this.node.handle(this.protocols, this.handler.bind(this))
   }
 
-  handler(struct: { connection: Connection; stream: Stream }) {
+  handler(struct: Handler) {
     const self = this
     pipe(
       struct.stream,
@@ -49,7 +49,7 @@ class Heartbeat implements AbstractInteraction {
   async interact(counterparty: PeerId): Promise<number> {
     const start = Date.now()
 
-    const struct = await dialHelper(this.node, counterparty, this.protocols, HEARTBEAT_TIMEOUT)
+    const struct = await dialHelper(this.node, counterparty, this.protocols, { timeout: HEARTBEAT_TIMEOUT })
 
     if (struct != null) {
       const challenge = randomBytes(16)
