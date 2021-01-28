@@ -31,7 +31,7 @@
     "prepublishOnly": "yarn build"
   },
   "dependencies": {
-    "@hoprnet/hopr-utils": "^1.62",
+    "@hoprnet/hopr-utils": "^1.67.0-next.5",
     "abort-controller": "3.0.0",
     "abortable-iterator": "^3.0.0",
     "bl": "^4.0.3",
@@ -40,7 +40,7 @@
     "mafmt": "^8.0.4",
     "multiaddr": "~8.1.2",
     "p-defer": "~3.0.0",
-    "peer-id": "~0.14.2",
+    "peer-id": "~0.14.3",
     "simple-peer": "9.9.3",
     "stream-to-it": "^0.2.2",
     "webrtc-stun": "~3.0.0",
