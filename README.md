@@ -16,7 +16,7 @@
 
 # hopr-connect
 
-**Disclaimer**: support for libp2p test suite WIP, see [KNOWN ISSUES](#known-issues)
+**Disclaimer**: support for libp2p test suite is still WIP, see [KNOWN ISSUES](#known-issues)
 
 [![](https://github.com/libp2p/js-libp2p-interfaces/raw/master/src/transport/img/badge.png)](https://github.com/libp2p/js-libp2p-interfaces/tree/master/src/transport)
 [![](https://github.com/libp2p/js-libp2p-interfaces/raw/master/src/connection/img/badge.png)](https://github.com/libp2p/js-libp2p-interfaces/tree/master/src/connection)
