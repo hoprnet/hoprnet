@@ -38,16 +38,14 @@ describe('test acknowledgement generation', function () {
       assert(await ack.verify(receiver), `Previously generated acknowledgement should be valid.`)
       assert(u8aEquals(await ack.responseSigningParty, receiver.pubKey.marshal()), `recovered pubKey should be equal.`)
 
-      let exponent = randomInteger(0, 8)
-      let index = randomInteger(0, ack.length)
+      let exponent = randomInteger(0, 7)
+      let index = randomInteger(0, ack.length - 1)
 
       ack[index] = ack[index] ^ (1 << exponent)
 
       if (await ack.verify(receiver)) {
-        console.log(
-          `found invalid signature, <${u8aToHex(ack)}>, byte #${index}, bit #${exponent}`,
-          await ack.verify(receiver)
-        )
+        // @TODO change to assert.fail
+        console.log(`found invalid signature, <${u8aToHex(ack)}>, byte #${index}, bit #${exponent}`)
       }
     }
   })

@@ -94,16 +94,14 @@ describe('test utils', function () {
       const signature = await utils.sign(message, privKey)
       assert(await utils.verify(message, signature, pubKey), `check that signature is verifiable`)
 
-      let exponent = randomInteger(0, 8)
-      let index = randomInteger(0, message.length)
+      let exponent = randomInteger(0, 7)
+      let index = randomInteger(0, message.length - 1)
 
       message[index] = message[index] ^ (1 << exponent)
 
       if (await utils.verify(message, signature, pubKey)) {
-        console.log(
-          `found invalid signature, <${u8aToHex(signature)}>, byte #${index}, bit #${exponent}`,
-          await utils.verify(message, signature, pubKey)
-        )
+        // @TODO change to assert.fail
+        console.log(`found invalid signature <${u8aToHex(signature)}>, byte #${index}, bit #${exponent}`)
       }
     }
   })
