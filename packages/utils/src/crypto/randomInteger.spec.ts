@@ -1,6 +1,6 @@
 import assert from 'assert'
 import { randomInteger } from './randomInteger'
-import { u8aAdd } from './u8a'
+import { u8aAdd } from '../u8a'
 
 describe('testing random-number generator', function () {
   let ATTEMPTS = 10000
