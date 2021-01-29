@@ -403,12 +403,12 @@
   resolved "https://registry.yarnpkg.com/@hapi/hoek/-/hoek-9.1.1.tgz#9daf5745156fd84b8e9889a2dc721f0c58e894aa"
   integrity sha512-CAEbWH7OIur6jEOzaai83jq3FmKmv4PmX1JYfs9IrYcGEVI/lyL1EXJGCj7eFVJ0bg5QR8LMxBlEtA+xKiLpFw==
 
-"@hoprnet/hopr-connect@0.2.9":
-  version "0.2.9"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-connect/-/hopr-connect-0.2.9.tgz#d88dc450dcc86ee982acbda32741d33348180413"
-  integrity sha512-JLg/8hv4OHvAYevOEU1DtKt9Fy28D/ogkIVzsw41wBscs+416FLkHv0o/r6LxdxlM7IzwAZ1TucRCDRGMZtfZA==
+"@hoprnet/hopr-connect@0.2.10":
+  version "0.2.10"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-connect/-/hopr-connect-0.2.10.tgz#010c371799f43944e19fc257f766f0c501103ed7"
+  integrity sha512-4SpVS1w5v0SxJkr1l9tjugMOxz24Ga9LcKm1RVdPe9oFNchSJZ7uB9tq8MQtvuwiHJw5+TzOfGiBQJ/ItsI3WQ==
   dependencies:
-    "@hoprnet/hopr-utils" "^1.62"
+    "@hoprnet/hopr-utils" "^1.67.0-next.5"
     abort-controller "3.0.0"
     abortable-iterator "^3.0.0"
     bl "^4.0.3"
@@ -417,13 +417,13 @@
     mafmt "^8.0.4"
     multiaddr "~8.1.2"
     p-defer "~3.0.0"
-    peer-id "~0.14.2"
+    peer-id "~0.14.3"
     simple-peer "9.9.3"
     stream-to-it "^0.2.2"
     webrtc-stun "~3.0.0"
     wrtc "0.4.7"
 
-"@hoprnet/hopr-utils@^1.62":
+"@hoprnet/hopr-utils@^1.67.0-next.5":
   version "1.67.3"
   resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-1.67.3.tgz#fdbb7ecb39cbe198451a0521b4c77d1e32029d43"
   integrity sha512-+lsLJGqOzeyGvSYEEswC3VcVz1LIRBFCbkV2++DK7ki+lDZAGo2x3kYxycNXVQo6pFA88HgwoZ9amjPB0JMBJQ==
@@ -10969,7 +10969,7 @@ pbkdf2@^3.0.17, pbkdf2@^3.0.3, pbkdf2@^3.0.9:
     safe-buffer "^5.0.1"
     sha.js "^2.4.8"
 
-peer-id@0, peer-id@0.14.3, peer-id@^0.14.0, peer-id@^0.14.2, peer-id@~0.14.2:
+peer-id@0, peer-id@0.14.3, peer-id@^0.14.0, peer-id@^0.14.2, peer-id@~0.14.3:
   version "0.14.3"
   resolved "https://registry.yarnpkg.com/peer-id/-/peer-id-0.14.3.tgz#e8fe27fa345e59e9afb41be6bf4aee25146adf0a"
   integrity sha512-3ug6gDFWPuzihjjhMC0G/EEyaJaM9JCKPZqvPhwnsbhIUbutbS/MMF8Mb+TdDE1IksOXgCKNmohSZBJ/gFijOg==
