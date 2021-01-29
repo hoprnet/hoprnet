@@ -59,6 +59,22 @@ class Indexer extends EventEmitter implements IIndexer {
 
     const { web3, hoprChannels } = this.connector
 
+    // wipe indexer, for testing, will be removed
+    // const channelEntries = await getChannelEntries(this.connector.db)
+    // await this.connector.db.batch(
+    //   channelEntries.map(({ partyA, partyB }) => ({
+    //     type: 'del',
+    //     key: Buffer.from(this.connector.dbKeys.ChannelEntry(partyA, partyB))
+    //   }))
+    // )
+    // await this.connector.db.del(Buffer.from(this.connector.dbKeys.LatestConfirmedSnapshot()))
+    // await this.connector.db.del(Buffer.from(this.connector.dbKeys.LatestBlockNumber()))
+    // log(
+    //   'deleted %d channels, remaining: %d',
+    //   channelEntries.length,
+    //   (await getChannelEntries(this.connector.db)).length
+    // )
+
     const [latestSavedBlock, latestOnChainBlock] = await Promise.all([
       await getLatestBlockNumber(this.connector.db),
       web3.eth.getBlockNumber()
@@ -214,6 +230,18 @@ class Indexer extends EventEmitter implements IIndexer {
     ) {
       const event = this.unconfirmedEvents.pop()
       // log('Found unconfirmed event %s', event.name)
+      // if (event.name === 'OpenedChannel') {
+      //   log('event %s data %O', event.name, {
+      //     opener: event.data['opener'].toHex(),
+      //     counterparty: event.data['counterparty'].toHex()
+      //   })
+      // } else if (event.name === 'ClosedChannel') {
+      //   log('event %s data %O', event.name, {
+      //     closer: event.data['closer'].toHex(),
+      //     counterparty: event.data['counterparty'].toHex()
+      //   })
+      // }
+
       // log(chalk.blue(event.blockNumber.toString(), event.transactionIndex.toString(), event.logIndex.toString()))
 
       const lastSnapshotComparison = snapshotComparator(event, lastSnapshot)
@@ -259,8 +287,10 @@ class Indexer extends EventEmitter implements IIndexer {
    */
   private onNewLogs(logs: Log[]): void {
     // we dont track all events, we ignore those who return undefined
-    const events = logs.reduce<Event<any>[]>((result, log) => {
-      const event = topics.logToEvent(log)
+    const events = logs.reduce<Event<any>[]>((result, _log) => {
+      const event = topics.logToEvent(_log)
+      // log('log received %s %s', _log.topics[0], event?.name)
+
       if (event) result.push(event)
       return result
     }, [])
@@ -276,10 +306,10 @@ class Indexer extends EventEmitter implements IIndexer {
    * @param logs
    */
   private onChangedLogs(logs: Log[]): void {
-    for (const log of logs) {
-      if (!log['removed']) continue
+    for (const _log of logs) {
+      if (!_log['removed']) continue
 
-      const event = topics.logToEvent(log)
+      const event = topics.logToEvent(_log)
       if (!event) continue
 
       this.unconfirmedEvents.remove(event, (a, b) => {

@@ -50,9 +50,7 @@ class Channel implements IChannel {
   private get onChainChannel(): Promise<ChannelEntry> {
     return new Promise(async (resolve, reject) => {
       try {
-        const self = new Public(this.coreConnector.account.keys.onChain.pubKey)
-        const channel = await this.coreConnector.channel.getOnChainState(self)
-
+        const channel = await this.coreConnector.channel.getOnChainState(new Public(this.counterparty))
         return resolve(channel)
       } catch (error) {
         return reject(error)
