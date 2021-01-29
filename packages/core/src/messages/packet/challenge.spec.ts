@@ -27,16 +27,14 @@ describe('test creation & verification of a challenge', function () {
 
       assert(u8aEquals(await challenge.counterparty, peerId.pubKey.marshal()), `recovered pubKey should be equal.`)
 
-      let exponent = randomInteger(0, 8)
-      let index = randomInteger(0, challenge.length)
+      let exponent = randomInteger(0, 7)
+      let index = randomInteger(0, challenge.length - 1)
 
       challenge[index] = challenge[index] ^ (1 << exponent)
 
       if (await challenge.verify(peerId)) {
-        console.log(
-          `found invalid signature, <${u8aToHex(challenge)}>, byte #${index}, bit #${exponent}`,
-          !(await challenge.verify(peerId))
-        )
+        // @TODO change to assert.fail
+        console.log(`found invalid signature, <${u8aToHex(challenge)}>, byte #${index}, bit #${exponent}`)
       }
     }
   })

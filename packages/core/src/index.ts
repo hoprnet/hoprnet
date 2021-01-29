@@ -545,6 +545,10 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     return await this.paymentChannels.account.nativeBalance
   }
 
+  public smartContractInfo(): string {
+    return this.paymentChannels.smartContractInfo()
+  }
+
   /**
    * Open a payment channel
    *

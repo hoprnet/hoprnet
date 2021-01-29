@@ -104,6 +104,8 @@ declare interface HoprCoreConnector {
 
   hexAccountAddress(): Promise<string>
 
+  smartContractInfo(): string
+
   /**
    * (Static) utils to use in the connector module
    */
