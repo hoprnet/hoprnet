@@ -37,6 +37,7 @@
     "@types/mocha": "^8.2.0",
     "@types/node": "^12",
     "mocha": "^8.2.0",
+    "rewiremock": "^3.14.3",
     "rimraf": "^3.0.2",
     "ts-node": "^9.0.0",
     "typescript": "^4.1"

@@ -3,6 +3,7 @@ set -e #u
 
 if [ -z "$GCLOUD_INCLUDED" ]; then
   source scripts/gcloud.sh 
+  source scripts/dns.sh
 fi
 
 MIN_FUNDS=0.01291
@@ -131,7 +132,11 @@ start_bootstrap() {
   echo "- Bootstrap Server ETH Address: $BOOTSTRAP_ETH_ADDRESS" 1>&2
   echo "- Bootstrap Server HOPR Address: $BOOTSTRAP_HOPR_ADDRESS" 1>&2
   fund_if_empty $BOOTSTRAP_ETH_ADDRESS 1>&2
-  echo "/ip4/$ip/tcp/9091/p2p/$BOOTSTRAP_HOPR_ADDRESS"
+  local multiaddr="/ip4/$ip/tcp/9091/p2p/$BOOTSTRAP_HOPR_ADDRESS"
+  local release=$(echo $2 | cut -f2 -d:)
+  local txt_record=$(gcloud_txt_record $release bootstrap $multiaddr)
+  echo "- DNS entry: $(gcloud_dns_entry $release bootstrap)"
+  echo "- TXT record: $txt_record"
 }
 
 # $1 network name
