@@ -356,7 +356,7 @@ class Relay {
       `${connection.remotePeer.toB58String()} to ${counterparty.toB58String()} had no connection. Establishing a new one`
     )
 
-    let deliveryStream = await this.establishForwarding(connection.remotePeer, counterparty)
+    const deliveryStream = await this.establishForwarding(connection.remotePeer, counterparty)
 
     if (deliveryStream == undefined) {
       shaker.write(FAIL_COULD_NOT_REACH_COUNTERPARTY)
