@@ -1,6 +1,14 @@
 #!/bin/bash
 set -e #u
 
+# Get dns entry for a release and node
+# e.g. gcloud_dns_entry master bootstrap
+# $1 = release name
+# $2 = role (eg. bootstrap, node)
+gcloud_dns_entry() {
+  echo "$1-$2.hoprnet.link"
+}
+
 # Get or create a TXT record within a release
 # $1 = release name
 # $2 = role (eg. bootstrap, node)
@@ -8,7 +16,7 @@ set -e #u
 gcloud_dns_txt_record() {
   # Multiple runs in the same machine will fail w/an existing transaction.yml file
   rm -f transaction.yaml
-  local dns_entry="$1-$2.hoprnet.link"
+  local dns_entry=$(gcloud_dns_entry $1 $2)
   local txt_record=$(dig TXT +short $dns_entry)
   if [ -z "$txt_record" ]; then
     # echo "log | Dns Entry: $dns_entry"
