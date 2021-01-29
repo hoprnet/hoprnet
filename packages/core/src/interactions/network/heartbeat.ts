@@ -7,7 +7,7 @@ import { PROTOCOL_HEARTBEAT, HEARTBEAT_TIMEOUT } from '../../constants'
 import type { Handler } from 'libp2p'
 import type PeerId from 'peer-id'
 import { LibP2P } from '../../'
-import { dialHelper } from '../../utils'
+import { dialHelper } from '@hoprnet/hopr-utils'
 
 const verbose = debug('hopr-core:verbose:heartbeat')
 const HASH_FUNCTION = 'blake2s256'
