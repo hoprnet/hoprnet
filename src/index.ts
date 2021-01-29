@@ -15,6 +15,7 @@ import Relay from './relay'
 import { WebRTCConnection } from './webRTCConnection'
 import type { RelayConnection } from './relayConnection'
 import { Discovery } from './discovery'
+import { extractPeerIdFromMultiaddr } from './utils'
 
 const log = debug('hopr-connect')
 const error = debug('hopr-connect:error')
@@ -156,16 +157,7 @@ class HoprConnect implements Transport {
 
     const maTuples = ma.stringTuples()
 
-    let destPeerId: string
-    if (maTuples[0][0] == CODE_P2P) {
-      destPeerId = maTuples[0][1] as string
-    } else if (maTuples.length >= 3 && maTuples[2][0] == CODE_P2P) {
-      destPeerId = maTuples[2][1] as string
-    } else {
-      throw Error(`Invalid Multiaddr. Got ${ma.toString()}`)
-    }
-
-    if (this._peerId.toB58String() === destPeerId) {
+    if (this._peerId.equals(extractPeerIdFromMultiaddr(ma))) {
       throw new AbortError(`Cannot dial ourself`)
     }
 
@@ -232,6 +224,10 @@ class HoprConnect implements Transport {
    */
   private async dialWithRelay(ma: Multiaddr, relays: Multiaddr[], options?: DialOptions): Promise<Connection> {
     let conn = await this._relay.establishRelayedConnection(ma, relays, this.onReconnect.bind(this), options)
+
+    if (conn == undefined) {
+      throw Error(`Could not establish relayed connection.`)
+    }
 
     return await this._upgrader.upgradeOutbound(conn)
   }

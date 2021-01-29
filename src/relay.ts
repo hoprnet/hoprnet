@@ -5,8 +5,7 @@ const log = debug('hopr-connect')
 const error = debug('hopr-connect:error')
 const verbose = debug('hopr-connect:verbose:error')
 
-import AbortController from 'abort-controller'
-import chalk from 'chalk'
+import { blue, yellow } from 'chalk'
 import libp2p, { ConnectionManager } from 'libp2p'
 import { WebRTCUpgrader } from './webrtc'
 
@@ -27,45 +26,25 @@ import {
   FAIL_INVALID_PUBLIC_KEY
 } from './constants'
 
-import { u8aCompare, u8aEquals, pubKeyToPeerId } from '@hoprnet/hopr-utils'
+import { dialHelper, u8aCompare, u8aEquals, pubKeyToPeerId } from '@hoprnet/hopr-utils'
 
 import { RelayContext } from './relayContext'
 
 import { RelayConnection } from './relayConnection'
 import { WebRTCConnection } from './webRTCConnection'
 
-import type { Connection, DialOptions, Handler, Stream } from 'libp2p'
+import type { DialOptions, Handler, Stream } from 'libp2p'
 import { AbortError } from 'abortable-iterator'
+import { extractPeerIdFromMultiaddr } from './utils'
 
-type Libp2pStream = {
-  protocol: string
-  stream: Stream
-}
 class Relay {
-  private _dialer: libp2p['dialer']
-  private _registrar: libp2p['registrar']
-  private _dht: libp2p['_dht']
-  private _peerId: PeerId
   private _streams: Map<string, { [index: string]: RelayContext }>
-  private _webRTCUpgrader?: WebRTCUpgrader
   private _connectionManager: ConnectionManager
 
-  // used for testing
-  private __noWebRTCUpgrade?: boolean
-
-  constructor(libp2p: libp2p, webRTCUpgrader?: WebRTCUpgrader, __noWebRTCUpgrade?: boolean) {
-    this._dialer = libp2p.dialer
+  constructor(private libp2p: libp2p, private webRTCUpgrader?: WebRTCUpgrader, private __noWebRTCUpgrade?: boolean) {
     this._connectionManager = libp2p.connectionManager
-    this._registrar = libp2p.registrar
-    this._dht = libp2p._dht
-    this._peerId = libp2p.peerId
 
     this._streams = new Map<string, { [index: string]: RelayContext }>()
-
-    this._webRTCUpgrader = webRTCUpgrader
-
-    // used for testing
-    this.__noWebRTCUpgrade = __noWebRTCUpgrade
 
     libp2p.handle(RELAY, this.handleRelay.bind(this))
   }
@@ -75,10 +54,10 @@ class Relay {
     relays: Multiaddr[],
     onReconnect: (newStream: RelayConnection, counterparty: PeerId) => Promise<void>,
     options?: DialOptions
-  ): Promise<RelayConnection> {
+  ): Promise<RelayConnection | undefined> {
     const destination = PeerId.createFromCID(ma.getPeerId())
 
-    const invalidPeerIds = [ma.getPeerId(), this._peerId.toB58String()]
+    const invalidPeerIds = [ma.getPeerId(), this.libp2p.peerId.toB58String()]
 
     for (const potentialRelay of relays) {
       if (options?.signal?.aborted) {
@@ -90,48 +69,49 @@ class Relay {
         continue
       }
 
-      let relayConnection = await this._tryPotentialRelay(potentialRelay, destination, onReconnect, options)
+      let relayConnection = await this._tryPotentialRelay(
+        extractPeerIdFromMultiaddr(potentialRelay),
+        destination,
+        onReconnect,
+        options
+      )
 
       if (relayConnection != undefined) {
         return relayConnection as RelayConnection
       }
     }
 
-    throw Error(
-      `Unable to establish a connection to any known relay node. Tried ${chalk.yellow(
+    log(
+      `Unable to establish a connection to any known relay node. Tried "${yellow(
         relays
           .filter((ma) => invalidPeerIds.includes(ma.getPeerId()))
           .map((potentialRelay: Multiaddr) => potentialRelay.toString())
           .join(`, `)
-      )}`
+      )}". Excluded relays: "${invalidPeerIds.join(`, `)}"`
     )
+
+    return undefined
   }
 
   private async _tryPotentialRelay(
-    potentialRelay: Multiaddr,
+    potentialRelay: PeerId,
     destination: PeerId,
     onReconnect: (newStream: RelayConnection, counterparty: PeerId) => Promise<void>,
     options?: DialOptions
   ): Promise<RelayConnection | WebRTCConnection | undefined> {
-    let relayConnection: Connection
-    try {
-      relayConnection = await this.connectToPeer(PeerId.createFromCID(potentialRelay.getPeerId()), options)
-    } catch (err) {
-      error(err)
+    const opts =
+      options != undefined && options.signal != undefined
+        ? { signal: options.signal }
+        : { timeout: RELAY_CIRCUIT_TIMEOUT }
+
+    const relayConnection = await dialHelper(this.libp2p, potentialRelay, [RELAY], opts)
+
+    if (relayConnection == undefined) {
+      error(`Could not establish relayed conntection over ${potentialRelay} to ${destination.toB58String()}`)
       return
     }
 
-    let stream: Stream
-    try {
-      stream = await this.performHandshake(
-        relayConnection,
-        PeerId.createFromCID(potentialRelay.getPeerId()),
-        destination
-      )
-    } catch (err) {
-      error(err)
-      return
-    }
+    const stream = await this.performHandshake(relayConnection.stream, potentialRelay, destination)
 
     if (stream == null) {
       error(`Handshake led to empty stream. Giving up.`)
@@ -142,24 +122,24 @@ class Relay {
       throw new AbortError()
     }
 
-    if (this._webRTCUpgrader != undefined) {
-      let channel = this._webRTCUpgrader.upgradeOutbound()
+    if (this.webRTCUpgrader != undefined) {
+      let channel = this.webRTCUpgrader.upgradeOutbound()
 
       let newConn = new RelayConnection({
         stream,
-        self: this._peerId,
+        self: this.libp2p.peerId,
         counterparty: destination,
         onReconnect,
         webRTC: {
           channel,
-          upgradeInbound: this._webRTCUpgrader.upgradeInbound.bind(this._webRTCUpgrader)
+          upgradeInbound: this.webRTCUpgrader.upgradeInbound.bind(this.webRTCUpgrader)
         }
       })
 
       return new WebRTCConnection(
         {
           conn: newConn,
-          self: this._peerId,
+          self: this.libp2p.peerId,
           counterparty: destination,
           channel,
           libp2p: {
@@ -174,7 +154,7 @@ class Relay {
     } else {
       return new RelayConnection({
         stream,
-        self: this._peerId,
+        self: this.libp2p.peerId,
         counterparty: destination,
         onReconnect
       })
@@ -195,24 +175,24 @@ class Relay {
 
     log(`counterparty relayed connection established`)
 
-    if (this._webRTCUpgrader != undefined) {
-      let channel = this._webRTCUpgrader.upgradeInbound()
+    if (this.webRTCUpgrader != undefined) {
+      let channel = this.webRTCUpgrader.upgradeInbound()
 
       let newConn = new RelayConnection({
         stream: handShakeResult.stream,
-        self: this._peerId,
+        self: this.libp2p.peerId,
         counterparty: handShakeResult.counterparty,
         onReconnect,
         webRTC: {
           channel,
-          upgradeInbound: this._webRTCUpgrader.upgradeInbound.bind(this._webRTCUpgrader)
+          upgradeInbound: this.webRTCUpgrader.upgradeInbound.bind(this.webRTCUpgrader)
         }
       })
 
       return new WebRTCConnection(
         {
           conn: newConn,
-          self: this._peerId,
+          self: this.libp2p.peerId,
           counterparty: handShakeResult.counterparty,
           channel,
           libp2p: {
@@ -224,106 +204,40 @@ class Relay {
     } else {
       return new RelayConnection({
         stream: handShakeResult.stream,
-        self: this._peerId,
+        self: this.libp2p.peerId,
         counterparty: handShakeResult.counterparty,
         onReconnect
       })
     }
   }
 
-  private async connectToPeer(peer: PeerId, options?: DialOptions): Promise<Connection> {
-    if (peer.equals(this._peerId)) {
-      console.log(`trace self-dial`)
-      // Prevents from using ourself as relay
-      throw Error(`Cannot dial ourself`)
-    }
-
-    let relayConnection = this._registrar.getConnection(peer)
-
-    if (relayConnection != null) {
-      return relayConnection
-    }
-
-    try {
-      relayConnection = await this._dialer.connectToPeer(peer, { signal: options?.signal })
-    } catch (err) {
-      if (err.type === 'aborted') {
-        throw err
-      }
-      log(`Could not reach potential relay ${peer.toB58String()}. Error was: ${err.message}`)
-    }
-
-    if (relayConnection != null) {
-      return relayConnection
-    }
-
-    if (options?.signal?.aborted) {
-      throw new AbortError()
-    }
-
-    if (this._dht != null && (options == null || options.signal == null || !options.signal.aborted)) {
-      let dhtQuerySuccessful = false
-      try {
-        // populate libp2p peerStore with DHT result
-        await this._dht.peerRouting.findPeer(peer)
-        dhtQuerySuccessful = true
-      } catch (err) {
-        error(`Could not query DHT for ${peer}. Our peerId: ${this._peerId.toB58String()}. ${err.message}`)
-      }
-
-      if (options?.signal?.aborted) {
-        throw new AbortError()
-      }
-
-      if (dhtQuerySuccessful) {
-        try {
-          relayConnection = await this._dialer.connectToPeer(peer, { signal: options?.signal })
-        } catch (err) {
-          throw new Error(
-            `Dialling potential relay ${peer.toB58String()} after querying DHT failed. Error was ${err.message}`
-          )
-        }
-
-        if (relayConnection != null) {
-          return relayConnection
-        }
-      }
-    }
-
-    throw Error(
-      `Could not reach peer ${peer.toB58String()} and we have no opportunity to find out a more recent address.`
-    )
-  }
-
-  private async performHandshake(relayConnection: Connection, relay: PeerId, destination: PeerId): Promise<Stream> {
-    let stream: Libp2pStream
-
-    try {
-      stream = await relayConnection.newStream([RELAY])
-    } catch (err) {
-      throw Error(`Failed to establish new stream on protocol ${RELAY} with ${relay.toB58String()}. Error was: ${err}`)
-    }
-
-    let shaker = handshake<Uint8Array>(stream.stream)
+  private async performHandshake(stream: Stream, relay: PeerId, destination: PeerId): Promise<Stream | undefined> {
+    let shaker = handshake<Uint8Array>(stream)
 
     shaker.write(destination.pubKey.marshal())
 
     let answer: Uint8Array | undefined
     try {
       answer = (await shaker.read())?.slice()
-      log(`received answer ${new TextDecoder().decode(answer)}`)
+      log(
+        `Received ${yellow(new TextDecoder().decode(answer))} from relay ${blue(
+          relay.toB58String()
+        )} for relaying to ${blue(destination.toB58String())}`
+      )
     } catch (err) {
-      throw Error(`Error while reading answer. Error was ${err}`)
+      error(`Error while reading answer ${blue(relay.toB58String())}. ${err.message}`)
+      return
     }
 
     shaker.rest()
 
     if (answer == undefined || answer == null || !u8aEquals(answer, OK)) {
-      throw Error(
-        `Could not establish relayed connection to ${chalk.blue(
+      error(
+        `Could not establish relayed connection to ${blue(
           destination.toB58String()
-        )} over relay ${relay.toB58String()}. Answer was: <${new TextDecoder().decode(answer)}>`
+        )} over relay ${relay.toB58String()}. Answer was: ${yellow(new TextDecoder().decode(answer))}>`
       )
+      return
     }
 
     return shaker.stream
@@ -383,7 +297,7 @@ class Relay {
 
     if (pubKeySender == undefined || pubKeySender == null) {
       error(
-        `Received empty message from peer ${chalk.yellow(
+        `Received empty message from peer ${yellow(
           connection.remotePeer.toB58String()
         )}. Ending stream because we cannot identify counterparty.`
       )
@@ -397,7 +311,7 @@ class Relay {
       counterparty = await pubKeyToPeerId(pubKeySender)
     } catch (err) {
       error(
-        `Peer ${chalk.yellow(
+        `Peer ${yellow(
           connection.remotePeer.toB58String()
         )} asked to establish relayed connection to invalid counterparty. Error was ${err}. Received message ${pubKeySender}`
       )
@@ -442,11 +356,9 @@ class Relay {
       `${connection.remotePeer.toB58String()} to ${counterparty.toB58String()} had no connection. Establishing a new one`
     )
 
-    let deliveryStream: Stream
+    const deliveryStream = await this.establishForwarding(connection.remotePeer, counterparty)
 
-    try {
-      deliveryStream = await this.establishForwarding(connection.remotePeer, counterparty)
-    } catch (err) {
+    if (deliveryStream == undefined) {
       shaker.write(FAIL_COULD_NOT_REACH_COUNTERPARTY)
       shaker.rest()
 
@@ -455,11 +367,6 @@ class Relay {
         this._streams.delete(channelId)
       }
 
-      error(
-        `Could not establish relayed connection because contacting ${counterparty.toB58String()} was not successful. Error was: ${err}`
-      )
-
-      // Break up connection attempt
       return
     }
 
@@ -480,34 +387,15 @@ class Relay {
     this._streams.set(channelId, contextEntry)
   }
 
-  private async establishForwarding(initiator: PeerId, counterparty: PeerId): Promise<Stream> {
-    const abort = new AbortController()
+  private async establishForwarding(initiator: PeerId, counterparty: PeerId): Promise<Stream | undefined> {
+    let newConn = await dialHelper(this.libp2p, counterparty, [DELIVERY], { timeout: RELAY_CIRCUIT_TIMEOUT })
 
-    const timeout = setTimeout(() => abort.abort(), RELAY_CIRCUIT_TIMEOUT)
-
-    let newConn: Connection | undefined
-    let connError: any
-    try {
-      newConn = await this.connectToPeer(counterparty, { signal: abort.signal })
-    } catch (err) {
-      connError = err
+    if (newConn == undefined) {
+      error(`Could not establish forwarding connection to ${blue(counterparty.toB58String())}`)
+      return
     }
 
-    clearTimeout(timeout)
-
-    if (newConn == null) {
-      throw Error(
-        `Could not establish forwarding connection to ${counterparty.toB58String()}. Error was: ${connError.message}`
-      )
-    }
-
-    const { stream: newStream } = await newConn.newStream([DELIVERY])
-
-    if (timeout != undefined) {
-      clearTimeout(timeout)
-    }
-
-    const toCounterparty = handshake<Uint8Array>(newStream)
+    const toCounterparty = handshake<Uint8Array>(newConn.stream)
 
     toCounterparty.write(initiator.pubKey.marshal())
 
@@ -515,15 +403,21 @@ class Relay {
     try {
       answer = (await toCounterparty.read())?.slice()
     } catch (err) {
-      newConn.close()
-      throw Error(`Error while trying to decode answer. Error was: ${err}`)
+      // Don't catch close errors
+      newConn.connection
+        ?.close()
+        .catch((err) => error(`Failed to close connection to ${blue(counterparty.toB58String())}. ${err.message}`))
+      error(`Error while trying to decode answer from ${blue(counterparty.toB58String())}. Error was: ${err}`)
     }
 
     toCounterparty.rest()
 
     if (answer == undefined || answer == null || !u8aEquals(answer, OK)) {
-      newConn.close()
-      throw Error(`Could not relay to peer ${counterparty.toB58String()} because we are unable to deliver packets.`)
+      // Don't catch close errors
+      newConn.connection
+        ?.close()
+        .catch((err) => error(`Failed to close connection to ${blue(counterparty.toB58String())}. ${err.message}`))
+      error(`Could not relay to ${blue(counterparty.toB58String())} because we are unable to deliver packets.`)
     }
 
     return toCounterparty.stream
