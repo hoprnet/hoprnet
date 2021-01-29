@@ -1,7 +1,9 @@
 import Multiaddr from 'multiaddr'
 import dns from 'dns'
 
-const BOOTSTRAP_ADDRESS = process.env.HOPR_BOOTSTRAP_ADDRESS || '_dnsaddr.ropsten.master.bootstrap.hoprnet.org'
+const FULL_VERSION = require('../package.json').version
+
+const BOOTSTRAP_ADDRESS = process.env.HOPR_BOOTSTRAP_ADDRESS || `${FULL_VERSION}-bootstrap.hoprnet.link`
 
 /** Load Bootstrap node addresses.
  *   - If a string of comma separated multiaddrs is passed, use this first

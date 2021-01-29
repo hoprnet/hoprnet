@@ -1,7 +1,7 @@
 {
   "name": "@hoprnet/hopr-utils",
   "description": "HOPR-based utilities to process multiple data structures",
-  "version": "1.68.0-next.9",
+  "version": "1.68.0-next.10",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
   "license": "LGPL-3.0-only",
@@ -37,6 +37,7 @@
     "@types/mocha": "^8.2.0",
     "@types/node": "^12",
     "mocha": "^8.2.0",
+    "rewiremock": "^3.14.3",
     "rimraf": "^3.0.2",
     "ts-node": "^9.0.0",
     "typescript": "^4.1"

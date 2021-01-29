@@ -11,7 +11,7 @@ ZONE="--zone=europe-west6-a"
 REGION="--region=europe-west6"
 
 GCLOUD_MACHINE="--machine-type=e2-medium"
-GCLOUD_META="--metadata=google-logging-enabled=true --maintenance-policy=MIGRATE"
+GCLOUD_META="--metadata=google-logging-enabled=true,enable-oslogin=true --maintenance-policy=MIGRATE"
 GCLOUD_TAGS="--tags=hopr-node,web-client,rest-client,portainer,healthcheck"
 GCLOUD_BOOTDISK="--boot-disk-size=20GB --boot-disk-type=pd-standard"
 
