@@ -35,6 +35,7 @@ import { WebRTCConnection } from './webRTCConnection'
 
 import type { DialOptions, Handler, Stream } from 'libp2p'
 import { AbortError } from 'abortable-iterator'
+import { extractPeerIdFromMultiaddr } from './utils'
 
 class Relay {
   private _streams: Map<string, { [index: string]: RelayContext }>
@@ -68,7 +69,12 @@ class Relay {
         continue
       }
 
-      let relayConnection = await this._tryPotentialRelay(potentialRelay, destination, onReconnect, options)
+      let relayConnection = await this._tryPotentialRelay(
+        extractPeerIdFromMultiaddr(potentialRelay),
+        destination,
+        onReconnect,
+        options
+      )
 
       if (relayConnection != undefined) {
         return relayConnection as RelayConnection
@@ -88,7 +94,7 @@ class Relay {
   }
 
   private async _tryPotentialRelay(
-    potentialRelay: Multiaddr,
+    potentialRelay: PeerId,
     destination: PeerId,
     onReconnect: (newStream: RelayConnection, counterparty: PeerId) => Promise<void>,
     options?: DialOptions
@@ -98,18 +104,14 @@ class Relay {
         ? { signal: options.signal }
         : { timeout: RELAY_CIRCUIT_TIMEOUT }
 
-    const relayConnection = await dialHelper(this.libp2p, PeerId.createFromCID(potentialRelay), [RELAY], opts)
+    const relayConnection = await dialHelper(this.libp2p, potentialRelay, [RELAY], opts)
 
     if (relayConnection == undefined) {
       error(`Could not establish relayed conntection over ${potentialRelay} to ${destination.toB58String()}`)
       return
     }
 
-    const stream = await this.performHandshake(
-      relayConnection?.stream,
-      PeerId.createFromCID(potentialRelay.getPeerId()),
-      destination
-    )
+    const stream = await this.performHandshake(relayConnection.stream, potentialRelay, destination)
 
     if (stream == null) {
       error(`Handshake led to empty stream. Giving up.`)
