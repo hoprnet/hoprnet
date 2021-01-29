@@ -129,8 +129,7 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
             signedTicket: await unacknowledgedTicket.signedTicket,
             response: await this.node.paymentChannels.utils.hash(
               u8aConcat(unacknowledgedTicket.secretA, await acknowledgement.hashedKey)
-            ),
-            redeemed: false
+            )
           }
         )
 

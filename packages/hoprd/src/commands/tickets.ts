@@ -14,17 +14,14 @@ export default class Tickets extends AbstractCommand {
   }
 
   public help() {
-    return 'Displays information about your redeemed and unredeemed tickets'
+    return 'Displays information about your unredeemed tickets'
   }
 
   public async execute(): Promise<string | void> {
     try {
       const { Balance } = this.node.paymentChannels.types
 
-      const results = await this.node.getAcknowledgedTickets().then((tickets) => {
-        return tickets.filter((ticket) => !ticket.ackTicket.redeemed)
-      })
-
+      const results = await this.node.getAcknowledgedTickets()
       if (results.length === 0) {
         return 'No tickets found.'
       }

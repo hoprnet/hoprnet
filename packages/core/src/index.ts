@@ -24,7 +24,7 @@ import {
 import { Network } from './network'
 import { findPath } from './path'
 
-import { addPubKey, getAcknowledgedTickets, submitAcknowledgedTicket } from './utils'
+import { addPubKey, getAcknowledgedTickets, redeemTicket } from './utils'
 import { u8aToHex, pubKeyToPeerId } from '@hoprnet/hopr-utils'
 import { existsSync, mkdirSync } from 'fs'
 import getIdentity from './identity'
@@ -605,7 +605,19 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     }
   }
 
-  public async closeChannel(peerId: PeerId): Promise<{ receipt: string; status: string }> {
+  public async redeemTicketsInChannel(_channelRecipient: PeerId) {
+    /*const tickets = this.getAcknowledgedTickets().filter(t => {
+
+    })
+    */
+  }
+
+  public async closeChannel(peerId: PeerId, forceRedeemTickets=false): Promise<{ receipt: string; status: string }> {
+    let redeemTickets = forceRedeemTickets || this.strategy.shouldRedeemOnChannelClosure(peerId)
+    if (redeemTickets) {
+      this.redeemTicketsInChannel(peerId)
+    }
+
     const channel = await this.paymentChannels.channel.create(
       peerId.pubKey.marshal(),
       async (counterparty: Uint8Array) =>
@@ -626,8 +638,8 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     return getAcknowledgedTickets(this)
   }
 
-  public async submitAcknowledgedTicket(ackTicket: Types.AcknowledgedTicket, index: Uint8Array) {
-    return submitAcknowledgedTicket(this, ackTicket, index)
+  public async redeemTicket(ackTicket: Types.AcknowledgedTicket, index: Uint8Array) {
+    return redeemTicket(this, ackTicket, index)
   }
 
   /**

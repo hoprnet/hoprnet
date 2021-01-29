@@ -21,7 +21,6 @@ class AcknowledgedTicket extends Uint8Array {
       signedTicket?: SignedTicket
       response?: Hash
       preImage?: Hash
-      redeemed?: boolean
     }
   ) {
     if (!arr) {
@@ -46,10 +45,6 @@ class AcknowledgedTicket extends Uint8Array {
       if (struct.preImage) {
         this.set(struct.preImage, this.preImageOffset - this.byteOffset)
         this._preImage = struct.preImage
-      }
-
-      if (struct.redeemed) {
-        this.set([struct.redeemed ? 1 : 0], this.redeemedOffset - this.byteOffset)
       }
     }
   }
@@ -111,23 +106,6 @@ class AcknowledgedTicket extends Uint8Array {
     this._preImage = new this.paymentChannels.types.Hash(
       new Uint8Array(this.buffer, this.preImageOffset, HASHED_SECRET_WIDTH)
     )
-  }
-
-  get redeemedOffset(): number {
-    return (
-      this.byteOffset +
-      this.paymentChannels.types.SignedTicket.SIZE +
-      this.paymentChannels.types.Hash.SIZE +
-      HASHED_SECRET_WIDTH
-    )
-  }
-
-  get redeemed(): boolean {
-    return this[this.redeemedOffset - this.byteOffset] == 0 ? false : true
-  }
-
-  set redeemed(_redeemed: boolean) {
-    this.set([_redeemed ? 1 : 0], this.redeemedOffset - this.byteOffset)
   }
 
   static SIZE(hoprCoreConnector: HoprEthereum): number {

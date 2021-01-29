@@ -243,7 +243,6 @@ describe('test Channel class', function () {
 
       if (await counterpartysCoreConnector.account.reservePreImageIfIsWinning(ackedTicket)) {
         await counterpartysCoreConnector.channel.tickets.submit(ackedTicket, new Uint8Array())
-        assert(ackedTicket.redeemed, 'ticket should get marked as redeemed')
       }
     }
   })
