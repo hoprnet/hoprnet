@@ -51,27 +51,29 @@ class Heartbeat implements AbstractInteraction {
 
     const struct = await dialHelper(this.node, counterparty, this.protocols, { timeout: HEARTBEAT_TIMEOUT })
 
-    if (struct != null) {
-      const challenge = randomBytes(16)
-      const expectedResponse = createHash(HASH_FUNCTION).update(challenge).digest()
-
-      const response = await pipe(
-        // prettier-ignore
-        [challenge],
-        (struct as Handler).stream,
-        async (source: AsyncIterable<Uint8Array>): Promise<Uint8Array | void> => {
-          for await (const msg of source) {
-            return msg
-          }
-        }
-      )
-
-      if (response != null && u8aEquals(expectedResponse, response.slice())) {
-        return Date.now() - start
-      }
+    if (struct == undefined) {
+      throw Error()
     }
 
-    throw Error()
+    const challenge = randomBytes(16)
+    const expectedResponse = createHash(HASH_FUNCTION).update(challenge).digest()
+
+    const response = await pipe(
+      // prettier-ignore
+      [challenge],
+      (struct as Handler).stream,
+      async (source: AsyncIterable<Uint8Array>): Promise<Uint8Array | void> => {
+        for await (const msg of source) {
+          return msg
+        }
+      }
+    )
+
+    if (response != null && u8aEquals(expectedResponse, response.slice())) {
+      return Date.now() - start
+    } else {
+      throw Error(`Invalid response. Got ${JSON.stringify(response)}`)
+    }
   }
 }
 

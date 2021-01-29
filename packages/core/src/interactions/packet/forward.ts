@@ -7,9 +7,6 @@ const log = Debug('hopr-core:forward')
 const verbose = Debug('hopr-core:verbose:forward')
 
 import type PeerId from 'peer-id'
-import chalk from 'chalk'
-
-import AbortController from 'abort-controller'
 
 import type { AbstractInteraction } from '../abstractInteraction'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
@@ -18,7 +15,7 @@ import pipe from 'it-pipe'
 
 import type { Handler } from 'libp2p'
 
-import { durations } from '@hoprnet/hopr-utils'
+import { dialHelper, durations } from '@hoprnet/hopr-utils'
 import { getTokens, Token } from '../../utils'
 import { Mixer } from '../../mixer'
 
@@ -36,41 +33,15 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector> implements Abstr
   }
 
   async interact(counterparty: PeerId, packet: Packet<Chain>): Promise<void> {
-    return new Promise(async (resolve, reject) => {
-      let aborted = false
-      let struct: Handler
-
-      const abort = new AbortController()
-
-      const timeout = setTimeout(() => {
-        aborted = true
-        abort.abort()
-        reject(Error(`Timeout while establishing a connection to ${counterparty.toB58String()}.`))
-      }, FORWARD_TIMEOUT)
-
-      try {
-        struct = await this.node._libp2p
-          .dialProtocol(counterparty, this.protocols[0], { signal: abort.signal })
-          .catch(async () => {
-            const { id } = await this.node._libp2p.peerRouting.findPeer(counterparty)
-            return await this.node._libp2p.dialProtocol(id, this.protocols[0], { signal: abort.signal })
-          })
-      } catch (err) {
-        log(`Could not transfer packet to ${counterparty.toB58String()}. Error was: ${chalk.red(err.message)}.`)
-
-        clearTimeout(timeout)
-
-        return reject(Error(`Failed to send packet to ${counterparty.toB58String()}. ${err.message}`))
-      }
-
-      clearTimeout(timeout)
-
-      pipe([packet], struct.stream)
-
-      if (!aborted) {
-        resolve()
-      }
+    const struct = await dialHelper(this.node._libp2p, counterparty, this.protocols, {
+      timeout: FORWARD_TIMEOUT
     })
+
+    if (struct == undefined) {
+      throw Error(`Failed to send packet to ${counterparty.toB58String()}.`)
+    }
+
+    pipe([packet], struct.stream)
   }
 
   handler(struct: Handler): void {

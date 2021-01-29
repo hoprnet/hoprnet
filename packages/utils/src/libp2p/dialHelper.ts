@@ -33,7 +33,7 @@ export async function dialHelper(
         timeout: number
         signal?: AbortSignal
       }
-): Promise<Handler | void> {
+): Promise<Handler | undefined> {
   // Prevent us from dialing ourself
   if (counterparty.equals(libp2p.peerId)) {
     console.trace(`Preventing self dial.`)
@@ -58,7 +58,7 @@ export async function dialHelper(
 
   let struct: Handler
 
-  let addresses = (libp2p.peerStore.get(counterparty)?.addresses ?? []).map((addr) => addr.toString())
+  let addresses = (libp2p.peerStore.get(counterparty)?.addresses ?? []).map((addr: Multiaddr) => addr.toString())
 
   // Try to use known addresses
   if (addresses.length > 0) {
