@@ -403,13 +403,12 @@
   resolved "https://registry.yarnpkg.com/@hapi/hoek/-/hoek-9.1.1.tgz#9daf5745156fd84b8e9889a2dc721f0c58e894aa"
   integrity sha512-CAEbWH7OIur6jEOzaai83jq3FmKmv4PmX1JYfs9IrYcGEVI/lyL1EXJGCj7eFVJ0bg5QR8LMxBlEtA+xKiLpFw==
 
-"@hoprnet/hopr-connect@0.2.10":
-  version "0.2.10"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-connect/-/hopr-connect-0.2.10.tgz#010c371799f43944e19fc257f766f0c501103ed7"
-  integrity sha512-4SpVS1w5v0SxJkr1l9tjugMOxz24Ga9LcKm1RVdPe9oFNchSJZ7uB9tq8MQtvuwiHJw5+TzOfGiBQJ/ItsI3WQ==
+"@hoprnet/hopr-connect@0.2.11":
+  version "0.2.11"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-connect/-/hopr-connect-0.2.11.tgz#c002906aa9d68991935639bb60d5c2ba00f7691a"
+  integrity sha512-6IcWcgNOLD/B421uCgB0TrDTyjxwsShqSOUcxX1qG3qm+UXn5ZyaXvNZp6xI+7oWoLfTc6ponmrCPiufOdwLzQ==
   dependencies:
-    "@hoprnet/hopr-utils" "^1.67.0-next.5"
-    abort-controller "3.0.0"
+    "@hoprnet/hopr-utils" "1.68.0-next.9"
     abortable-iterator "^3.0.0"
     bl "^4.0.3"
     debug "^4.3.1"
@@ -420,20 +419,8 @@
     peer-id "~0.14.3"
     simple-peer "9.9.3"
     stream-to-it "^0.2.2"
-    webrtc-stun "~3.0.0"
+    webrtc-stun "3.0.0"
     wrtc "0.4.7"
-
-"@hoprnet/hopr-utils@^1.67.0-next.5":
-  version "1.67.3"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-1.67.3.tgz#fdbb7ecb39cbe198451a0521b4c77d1e32029d43"
-  integrity sha512-+lsLJGqOzeyGvSYEEswC3VcVz1LIRBFCbkV2++DK7ki+lDZAGo2x3kYxycNXVQo6pFA88HgwoZ9amjPB0JMBJQ==
-  dependencies:
-    bignumber.js "^9.0.0"
-    libp2p-crypto "0.18.0"
-    multiaddr "8.1.2"
-    multihashes "~3.1.0"
-    peer-id "0.14.3"
-    strip-ansi "^6.0.0"
 
 "@lerna/add@3.21.0":
   version "3.21.0"
@@ -14843,7 +14830,7 @@ webpack@4.44.1:
     watchpack "^1.7.4"
     webpack-sources "^1.4.1"
 
-webrtc-stun@~3.0.0:
+webrtc-stun@3.0.0:
   version "3.0.0"
   resolved "https://registry.yarnpkg.com/webrtc-stun/-/webrtc-stun-3.0.0.tgz#2c06bbd5dbf5ef4a0ec6bafbc1d51ea350a30306"
   integrity sha512-9nthdoT9mKbNq7ZqOHAglPDkFcboxPgLHycyjCp53xcNAMYqZE89tskxjSFH1MJX8JC8gLxHSI/XnAvDiWXhAA==
