@@ -8,9 +8,10 @@ import type PeerId from 'peer-id'
 
 import type { Handler } from 'libp2p'
 
-import chalk from 'chalk'
-
 import pipe from 'it-pipe'
+import { dialHelper, durations } from '@hoprnet/hopr-utils'
+
+const ONCHAIN_KEY_TIMEOUT = durations.seconds(4)
 
 class OnChainKey<Chain extends HoprCoreConnector> implements AbstractInteraction {
   protocols: string[] = [PROTOCOL_ONCHAIN_KEY]
@@ -24,19 +25,13 @@ class OnChainKey<Chain extends HoprCoreConnector> implements AbstractInteraction
   }
 
   async interact(counterparty: PeerId): Promise<Types.Public> {
-    let struct: Handler
+    const struct = await dialHelper(this.node._libp2p, counterparty, this.protocols, {
+      timeout: ONCHAIN_KEY_TIMEOUT
+    })
 
-    try {
-      struct = await this.node._libp2p.dialProtocol(counterparty, this.protocols[0]).catch(async (_: Error) => {
-        return this.node._libp2p.peerRouting
-          .findPeer(counterparty)
-          .then((peerRoute) => this.node._libp2p.dialProtocol(peerRoute.id, this.protocols[0]))
-      })
-    } catch (err) {
+    if (struct == undefined) {
       throw Error(
-        `Tried to get onChain key from party ${counterparty.toB58String()} but failed while trying to connect to that node. Error was: ${chalk.red(
-          err.message
-        )}`
+        `Tried to get onChain key from party ${counterparty.toB58String()} but failed while trying to connect to that node.`
       )
     }
 
