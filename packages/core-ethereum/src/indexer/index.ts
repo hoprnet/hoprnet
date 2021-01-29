@@ -230,18 +230,6 @@ class Indexer extends EventEmitter implements IIndexer {
     ) {
       const event = this.unconfirmedEvents.pop()
       // log('Found unconfirmed event %s', event.name)
-      // if (event.name === 'OpenedChannel') {
-      //   log('event %s data %O', event.name, {
-      //     opener: event.data['opener'].toHex(),
-      //     counterparty: event.data['counterparty'].toHex()
-      //   })
-      // } else if (event.name === 'ClosedChannel') {
-      //   log('event %s data %O', event.name, {
-      //     closer: event.data['closer'].toHex(),
-      //     counterparty: event.data['counterparty'].toHex()
-      //   })
-      // }
-
       // log(chalk.blue(event.blockNumber.toString(), event.transactionIndex.toString(), event.logIndex.toString()))
 
       const lastSnapshotComparison = snapshotComparator(event, lastSnapshot)
