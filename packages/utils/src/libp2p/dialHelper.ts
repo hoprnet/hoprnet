@@ -68,7 +68,7 @@ export async function dialHelper(
       if (err.type === 'aborted') {
         return
       }
-      error(`Error while trying to connect with known addresses. ${err}`)
+      error(`Error while trying to connect with known addresses. ${err.message}`)
     }
   }
 
@@ -111,7 +111,11 @@ export async function dialHelper(
       dhtAddresses =
         (await libp2p._dht.findPeer(counterparty, { timeout: DEFAULT_DHT_QUERY_TIMEOUT }))?.multiaddrs ?? []
     } catch (err) {
-      error(`Querying the DHT as peer ${libp2p.peerId.toB58String()} for ${counterparty.toB58String()} failed. ${err}`)
+      error(
+        `Querying the DHT as peer ${libp2p.peerId.toB58String()} for ${counterparty.toB58String()} failed. ${
+          err.message
+        }`
+      )
       return
     }
 
@@ -126,7 +130,7 @@ export async function dialHelper(
       try {
         struct = await libp2p.dialProtocol(counterparty, protocols[0], { signal })
       } catch (err) {
-        error(`Using new addresses after querying the DHT did not lead to a connection. Cannot connect. ${err}`)
+        error(`Using new addresses after querying the DHT did not lead to a connection. Cannot connect. ${err.message}`)
         return
       }
     }
