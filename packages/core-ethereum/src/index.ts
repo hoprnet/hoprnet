@@ -187,6 +187,17 @@ export default class HoprEthereum implements HoprCoreConnector {
     return (await this.account.address).toHex()
   }
 
+  public smartContractInfo(): string {
+    const network = utils.getNetworkName(this.chainId)
+    const addr = addresses[network]
+    return [
+      `Running on: ${network}`,
+      `HOPR Token: ${addr.HoprToken}`,
+      `HOPR Channels: ${addr.HoprChannels}` 
+    ].join('\n')
+
+  }
+
   /**
    * Creates an uninitialised instance.
    *
