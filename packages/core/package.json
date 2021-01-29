@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-core",
-  "version": "1.68.0-next.9",
+  "version": "1.68.0-next.10",
   "description": "Privacy-preserving messaging protocol with incentivations for relay operators",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -32,8 +32,8 @@
   },
   "dependencies": {
     "@hoprnet/hopr-connect": "0.2.10",
-    "@hoprnet/hopr-core-ethereum": "1.68.0-next.9",
-    "@hoprnet/hopr-utils": "1.68.0-next.9",
+    "@hoprnet/hopr-core-ethereum": "1.68.0-next.10",
+    "@hoprnet/hopr-utils": "1.68.0-next.10",
     "abort-controller": "^3.0.0",
     "bn.js": "5.1.2",
     "chalk": "~4.1.0",
@@ -56,10 +56,10 @@
     "secp256k1": "~4.0.2"
   },
   "devDependencies": {
-    "@hoprnet/hopr-core-connector-interface": "1.68.0-next.9",
-    "@hoprnet/hopr-demo-seeds": "1.68.0-next.9",
-    "@hoprnet/hopr-ethereum": "1.68.0-next.9",
-    "@hoprnet/hopr-testing": "1.68.0-next.9",
+    "@hoprnet/hopr-core-connector-interface": "1.68.0-next.10",
+    "@hoprnet/hopr-demo-seeds": "1.68.0-next.10",
+    "@hoprnet/hopr-ethereum": "1.68.0-next.10",
+    "@hoprnet/hopr-testing": "1.68.0-next.10",
     "@types/chai-as-promised": "^7.1.3",
     "@types/debug": "^4.1.5",
     "@types/err-code": "^2.0.0",
