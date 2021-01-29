@@ -111,7 +111,11 @@ export async function dialHelper(
       dhtAddresses =
         (await libp2p._dht.findPeer(counterparty, { timeout: DEFAULT_DHT_QUERY_TIMEOUT }))?.multiaddrs ?? []
     } catch (err) {
-      error(`Querying the DHT as peer ${libp2p.peerId.toB58String()} for ${counterparty.toB58String()} failed. ${err.message}`)
+      error(
+        `Querying the DHT as peer ${libp2p.peerId.toB58String()} for ${counterparty.toB58String()} failed. ${
+          err.message
+        }`
+      )
       return
     }
 
