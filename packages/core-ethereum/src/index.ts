@@ -190,12 +190,7 @@ export default class HoprEthereum implements HoprCoreConnector {
   public smartContractInfo(): string {
     const network = utils.getNetworkName(this.chainId)
     const addr = addresses[network]
-    return [
-      `Running on: ${network}`,
-      `HOPR Token: ${addr.HoprToken}`,
-      `HOPR Channels: ${addr.HoprChannels}` 
-    ].join('\n')
-
+    return [`Running on: ${network}`, `HOPR Token: ${addr.HoprToken}`, `HOPR Channels: ${addr.HoprChannels}`].join('\n')
   }
 
   /**
