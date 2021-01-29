@@ -12,3 +12,4 @@ test/local-fixtures
 
 # logs
 *.log
+logs.txt
