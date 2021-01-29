@@ -134,6 +134,8 @@ start_bootstrap() {
   fund_if_empty $BOOTSTRAP_ETH_ADDRESS 1>&2
   local multiaddr="/ip4/$ip/tcp/9091/p2p/$BOOTSTRAP_HOPR_ADDRESS"
   local release=$(echo $2 | cut -f2 -d:)
+  echo "- Bootstrap Release: $release"
+  echo "- Bootstrap Multiaddr value: $multiaddr"
   local txt_record=$(gcloud_txt_record $release bootstrap $multiaddr)
   echo "- DNS entry: $(gcloud_dns_entry $release bootstrap)"
   echo "- TXT record: $txt_record"
