@@ -1,7 +1,7 @@
 import Signature from './signature'
 import Ticket from './ticket'
 
-declare interface SignedTicket{
+declare interface SignedTicket {
   ticket: Ticket
   signature: Signature
   signer: Promise<Uint8Array>

@@ -1,6 +1,6 @@
 import type HoprEthereum from '../'
 import { Hash } from '.'
-import SignedTicket, { SIGNED_TICKET_SIZE } from './signedTicket' 
+import SignedTicket, { SIGNED_TICKET_SIZE } from './signedTicket'
 
 import { HASHED_SECRET_WIDTH } from '../hashedSecret'
 
@@ -74,7 +74,7 @@ class AcknowledgedTicket extends Uint8Array {
   }
 
   get responseOffset(): number {
-    return this.byteOffset + SIGNED_TICKET_SIZE 
+    return this.byteOffset + SIGNED_TICKET_SIZE
   }
 
   get response(): Hash {

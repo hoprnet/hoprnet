@@ -7,7 +7,7 @@ declare interface AcknowledgedTicketStatic {
   create(
     coreConnector: HoprCoreConnector,
     arr?: { bytes: ArrayBuffer; offset: number },
-    struct?: { signedTicket?: SignedTicket; response?: Hash; preImage?: Hash;}
+    struct?: { signedTicket?: SignedTicket; response?: Hash; preImage?: Hash }
   ): AcknowledgedTicket
 }
 

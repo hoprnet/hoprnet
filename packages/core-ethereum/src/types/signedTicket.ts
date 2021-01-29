@@ -40,7 +40,10 @@ class SignedTicket implements Types.SignedTicket {
         if (ticket.length == Ticket.SIZE) {
           this._serialized.set(ticket, this.ticketOffset - this._serialized.byteOffset)
         } else if (ticket.length < Ticket.SIZE) {
-          this._serialized.set(u8aConcat(ticket, new Uint8Array(Ticket.SIZE - ticket.length)), this.ticketOffset - this._serialized.byteOffset)
+          this._serialized.set(
+            u8aConcat(ticket, new Uint8Array(Ticket.SIZE - ticket.length)),
+            this.ticketOffset - this._serialized.byteOffset
+          )
         } else {
           throw Error(`Ticket is too big by ${ticket.length - Ticket.SIZE} elements.`)
         }
@@ -107,9 +110,7 @@ class SignedTicket implements Types.SignedTicket {
 
   serialize() {
     return this._serialized
-
   }
-
 }
 
 export default SignedTicket
