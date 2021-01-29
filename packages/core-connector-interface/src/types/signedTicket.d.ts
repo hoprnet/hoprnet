@@ -1,32 +1,12 @@
 import Signature from './signature'
 import Ticket from './ticket'
 
-declare interface SignedTicketStatic {
-  readonly SIZE: number
-
-  create(
-    arr?: {
-      bytes: ArrayBuffer
-      offset: number
-    },
-    struct?: {
-      ticket?: Ticket
-      signature?: Signature
-    }
-  ): Promise<SignedTicket>
-}
-
-declare interface SignedTicket extends Uint8Array {
+declare interface SignedTicket{
   ticket: Ticket
   signature: Signature
   signer: Promise<Uint8Array>
-
-  ticketOffset: number
-  signatureOffset: number
-
   verify(pubKey: Uint8Array): Promise<boolean>
+  serialize(): Uint8Array
 }
-
-declare var SignedTicket: SignedTicketStatic
-
+declare var SignedTicket
 export default SignedTicket

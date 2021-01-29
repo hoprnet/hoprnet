@@ -26,9 +26,7 @@ export default class RedeemTickets extends AbstractCommand {
     const { Balance } = paymentChannels.types
 
     try {
-      // get only unredeemed tickets
       const results = await this.node.getAcknowledgedTickets()
-
       if (results.length === 0) {
         return 'No unredeemed tickets found.'
       }

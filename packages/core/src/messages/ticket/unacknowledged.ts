@@ -29,7 +29,7 @@ class UnacknowledgedTicket<Chain extends HoprCoreConnector> extends Uint8Array {
     this.paymentChannels = paymentChannels
 
     if (struct != null) {
-      this.set(struct.signedTicket, this.signedTicketOffset - this.byteOffset)
+      this.set(struct.signedTicket.serialize(), this.signedTicketOffset - this.byteOffset)
       this.set(struct.secretA, this.secretAOffset - this.byteOffset)
 
       this._signedTicket = struct.signedTicket
@@ -55,7 +55,7 @@ class UnacknowledgedTicket<Chain extends HoprCoreConnector> extends Uint8Array {
     }
 
     return new Promise<Types.SignedTicket>(async (resolve) => {
-      this._signedTicket = await this.paymentChannels.types.SignedTicket.create({
+      this._signedTicket = new this.paymentChannels.types.SignedTicket({
         bytes: this.buffer,
         offset: this.signedTicketOffset
       })

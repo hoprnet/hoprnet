@@ -5,6 +5,7 @@ import BN from 'bn.js'
 import { AccountId, Ticket, Hash, TicketEpoch, Balance, Signature, SignedTicket } from '.'
 import { pubKeyToAccountId, privKeyToPubKey } from '../utils'
 import * as testconfigs from '../config.spec'
+import { SIGNED_TICKET_SIZE } from './signedTicket'
 
 const WIN_PROB = new BN(1)
 
@@ -66,13 +67,13 @@ describe('test signedTicket construction', async function () {
     assert(signedTicket.ticket.winProb.eq(ticketData.winProb), 'wrong winProb')
 
     let exponent = randomInteger(0, 8)
-    let index = randomInteger(0, signedTicket.length)
+    let index = randomInteger(0, signedTicket.serialize().length)
 
     signedTicket[index] = signedTicket[index] ^ (1 << exponent)
 
     if (await signedTicket.verify(userAPubKey)) {
       console.log(
-        `found invalid signature, <${u8aToHex(signedTicket)}>, byte #${index}, bit #${exponent}`,
+        `found invalid signature, <${u8aToHex(signedTicket.serialize())}>, byte #${index}, bit #${exponent}`,
         await signedTicket.verify(userAPubKey)
       )
     }
@@ -88,15 +89,15 @@ describe('test signedTicket construction', async function () {
     })
 
     ticket.sign(userAPrivKey, undefined, {
-      bytes: signedTicketA.buffer,
+      bytes: signedTicketA.serialize().buffer,
       offset: signedTicketA.signatureOffset
     })
 
     assert(await signedTicketA.verify(userAPubKey))
 
     const signedTicketB = new SignedTicket({
-      bytes: signedTicketA.buffer,
-      offset: signedTicketA.byteOffset
+      bytes: signedTicketA.serialize().buffer,
+      offset: signedTicketA.serialize().byteOffset
     })
 
     assert(await signedTicketB.verify(userAPubKey))
@@ -111,25 +112,25 @@ describe('test signedTicket construction', async function () {
     assert(signedTicketB.ticket.winProb.eq(ticketData.winProb), 'wrong winProb')
 
     let exponentA = randomInteger(0, 8)
-    let indexA = randomInteger(0, signedTicketA.length)
+    let indexA = randomInteger(0, signedTicketA.serialize().length)
 
     signedTicketA[indexA] = signedTicketA[indexA] ^ (1 << exponentA)
 
     if (await signedTicketA.verify(userAPubKey)) {
       console.log(
-        `found invalid signature, <${u8aToHex(signedTicketA)}>, byte #${indexA}, bit #${exponentA}`,
+        `found invalid signature, <${u8aToHex(signedTicketA.serialize())}>, byte #${indexA}, bit #${exponentA}`,
         await signedTicketA.verify(userAPubKey)
       )
     }
 
     let exponentB = randomInteger(0, 8)
-    let indexB = randomInteger(0, signedTicketB.length)
+    let indexB = randomInteger(0, signedTicketB.serialize().length)
 
     signedTicketB[indexB] = signedTicketB[indexB] ^ (1 << exponentB)
 
     if (await signedTicketB.verify(userAPubKey)) {
       console.log(
-        `found invalid signature, <${u8aToHex(signedTicketB)}>, byte #${indexB}, bit #${exponentB}`,
+        `found invalid signature, <${u8aToHex(signedTicketB.serialize())}>, byte #${indexB}, bit #${exponentB}`,
         await signedTicketB.verify(userAPubKey)
       )
     }
@@ -149,7 +150,7 @@ describe('test signedTicket construction', async function () {
 
     const offset = randomInteger(1, 31)
 
-    const array = new Uint8Array(SignedTicket.SIZE + offset).fill(0x00)
+    const array = new Uint8Array(SIGNED_TICKET_SIZE + offset).fill(0x00)
 
     const signedTicket = new SignedTicket(
       {
@@ -173,13 +174,13 @@ describe('test signedTicket construction', async function () {
     assert(signedTicket.ticket.winProb.eq(ticketData.winProb), 'wrong winProb')
 
     let exponent = randomInteger(0, 8)
-    let index = randomInteger(0, signedTicket.length)
+    let index = randomInteger(0, signedTicket.serialize().length)
 
     signedTicket[index] = signedTicket[index] ^ (1 << exponent)
 
     if (await signedTicket.verify(userAPubKey)) {
       console.log(
-        `found invalid signature, <${u8aToHex(signedTicket)}>, byte #${index}, bit #${exponent}`,
+        `found invalid signature, <${u8aToHex(signedTicket.serialize())}>, byte #${index}, bit #${exponent}`,
         await signedTicket.verify(userAPubKey)
       )
     }

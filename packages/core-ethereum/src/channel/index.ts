@@ -118,7 +118,7 @@ class ChannelFactory {
 
     const ticket = new Ticket(
       {
-        bytes: signedTicket.buffer,
+        bytes: signedTicket.serialize().buffer,
         offset: signedTicket.ticketOffset
       },
       {
@@ -132,7 +132,7 @@ class ChannelFactory {
     )
 
     await sign(await ticket.hash, this.coreConnector.account.keys.onChain.privKey, undefined, {
-      bytes: signedTicket.buffer,
+      bytes: signedTicket.serialize().buffer,
       offset: signedTicket.signatureOffset
     })
 

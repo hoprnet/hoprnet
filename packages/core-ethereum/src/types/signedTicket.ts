@@ -5,10 +5,13 @@ import { Signature, Ticket } from '../types'
 import { Uint8ArrayE } from '../types/extended'
 import { verify } from '../utils'
 
-class SignedTicket extends Uint8ArrayE implements Types.SignedTicket {
+export const SIGNED_TICKET_SIZE = Signature.SIZE + Ticket.SIZE
+
+class SignedTicket implements Types.SignedTicket {
   private _ticket?: Ticket
   private _signature?: Signature
   private _signer?: Uint8Array
+  private _serialized: Uint8ArrayE
 
   constructor(
     arr?: {
@@ -21,23 +24,23 @@ class SignedTicket extends Uint8ArrayE implements Types.SignedTicket {
     }
   ) {
     if (!arr) {
-      super(SignedTicket.SIZE)
+      this._serialized = new Uint8ArrayE(SIGNED_TICKET_SIZE)
     } else {
-      super(arr.bytes, arr.offset, SignedTicket.SIZE)
+      this._serialized = new Uint8ArrayE(arr.bytes, arr.offset, SIGNED_TICKET_SIZE)
     }
 
     if (struct) {
       if (struct.signature) {
-        this.set(struct.signature, this.signatureOffset - this.byteOffset)
+        this._serialized.set(struct.signature, this.signatureOffset - this._serialized.byteOffset)
       }
 
       if (struct.ticket) {
         const ticket = struct.ticket.toU8a()
 
         if (ticket.length == Ticket.SIZE) {
-          this.set(ticket, this.ticketOffset - this.byteOffset)
+          this._serialized.set(ticket, this.ticketOffset - this._serialized.byteOffset)
         } else if (ticket.length < Ticket.SIZE) {
-          this.set(u8aConcat(ticket, new Uint8Array(Ticket.SIZE - ticket.length)), this.ticketOffset - this.byteOffset)
+          this._serialized.set(u8aConcat(ticket, new Uint8Array(Ticket.SIZE - ticket.length)), this.ticketOffset - this._serialized.byteOffset)
         } else {
           throw Error(`Ticket is too big by ${ticket.length - Ticket.SIZE} elements.`)
         }
@@ -45,22 +48,22 @@ class SignedTicket extends Uint8ArrayE implements Types.SignedTicket {
     }
   }
 
-  slice(begin = 0, end = SignedTicket.SIZE) {
-    return this.subarray(begin, end)
+  slice(begin = 0, end = SIGNED_TICKET_SIZE) {
+    return this._serialized.subarray(begin, end)
   }
 
-  subarray(begin = 0, end = SignedTicket.SIZE) {
-    return new Uint8Array(this.buffer, begin + this.byteOffset, end - begin)
+  subarray(begin = 0, end = SIGNED_TICKET_SIZE) {
+    return new Uint8Array(this._serialized.buffer, begin + this._serialized.byteOffset, end - begin)
   }
 
   get ticketOffset(): number {
-    return this.byteOffset + Signature.SIZE
+    return this._serialized.byteOffset + Signature.SIZE
   }
 
   get ticket(): Ticket {
     if (!this._ticket) {
       this._ticket = new Ticket({
-        bytes: this.buffer,
+        bytes: this._serialized.buffer,
         offset: this.ticketOffset
       })
     }
@@ -69,13 +72,13 @@ class SignedTicket extends Uint8ArrayE implements Types.SignedTicket {
   }
 
   get signatureOffset(): number {
-    return this.byteOffset
+    return this._serialized.byteOffset
   }
 
   get signature(): Signature {
     if (!this._signature) {
       this._signature = new Signature({
-        bytes: this.buffer,
+        bytes: this._serialized.buffer,
         offset: this.signatureOffset
       })
     }
@@ -102,22 +105,11 @@ class SignedTicket extends Uint8ArrayE implements Types.SignedTicket {
     return verify(await this.ticket.hash, this.signature, pubKey)
   }
 
-  static get SIZE() {
-    return Signature.SIZE + Ticket.SIZE
+  serialize() {
+    return this._serialized
+
   }
 
-  static create(
-    arr?: {
-      bytes: ArrayBuffer
-      offset: number
-    },
-    struct?: {
-      signature?: Signature
-      ticket?: Ticket
-    }
-  ): Promise<SignedTicket> {
-    return Promise.resolve(new SignedTicket(arr, struct))
-  }
 }
 
 export default SignedTicket

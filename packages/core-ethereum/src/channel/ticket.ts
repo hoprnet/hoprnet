@@ -144,7 +144,7 @@ class TicketFactory {
 
     const ticket = new Ticket(
       {
-        bytes: signedTicket.buffer,
+        bytes: signedTicket.serialize().buffer,
         offset: signedTicket.ticketOffset
       },
       {
@@ -158,7 +158,7 @@ class TicketFactory {
     )
 
     await ticket.sign(this.channel.coreConnector.account.keys.onChain.privKey, undefined, {
-      bytes: signedTicket.buffer,
+      bytes: signedTicket.serialize().buffer,
       offset: signedTicket.signatureOffset
     })
 
@@ -172,7 +172,7 @@ class TicketFactory {
     // }
 
     try {
-      await this.channel.testAndSetNonce(signedTicket)
+      await this.channel.testAndSetNonce(signedTicket.serialize())
     } catch {
       return false
     }
