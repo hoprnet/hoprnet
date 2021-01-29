@@ -11,7 +11,7 @@ import BN from 'bn.js'
 import { ACKNOWLEDGED_TICKET_INDEX_LENGTH } from '../../dbKeys'
 import { connectionHelper } from '../../test-utils'
 import type { AcknowledgedTicket } from '@hoprnet/hopr-core-connector-interface/src/types'
-import { privKeyToPeerId } from '../../utils'
+import { privKeyToPeerId } from '@hoprnet/hopr-utils'
 import { NODE_SEEDS } from '@hoprnet/hopr-demo-seeds'
 import type Multiaddr from 'multiaddr'
 

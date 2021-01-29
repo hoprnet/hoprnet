@@ -2,7 +2,8 @@ import type { HoprOptions } from '.'
 
 import { LevelUp } from 'levelup'
 import { blue } from 'chalk'
-import { deserializeKeyPair, serializeKeyPair, askForPassword, privKeyToPeerId } from './utils'
+import { deserializeKeyPair, serializeKeyPair, askForPassword } from './utils'
+import { privKeyToPeerId } from '@hoprnet/hopr-utils'
 import debug from 'debug'
 
 const log = debug('hopr-core:identity')

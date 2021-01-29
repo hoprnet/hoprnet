@@ -25,6 +25,7 @@
     "node": ">=12.9.1"
   },
   "dependencies": {
+    "abort-controller": "~3.0.0",
     "bignumber.js": "^9.0.0",
     "libp2p-crypto": "0.18.0",
     "multiaddr": "8.1.2",

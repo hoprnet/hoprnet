@@ -2,7 +2,7 @@ import { getNewPort } from '@hoprnet/hopr-testing'
 import Hopr from '.'
 import assert from 'assert'
 
-import { privKeyToPeerId } from './utils'
+import { privKeyToPeerId } from '@hoprnet/hopr-utils'
 import { NODE_SEEDS } from '@hoprnet/hopr-demo-seeds'
 import Multiaddr from 'multiaddr'
 
