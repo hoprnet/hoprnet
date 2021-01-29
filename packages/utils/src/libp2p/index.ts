@@ -2,6 +2,11 @@ import PeerId from 'peer-id'
 import { keys, PublicKey } from 'libp2p-crypto'
 import multihashes from 'multihashes'
 
+export * from './dialHelper'
+export * from './privKeyToPeerId'
+export * from './peerIdToPubKey'
+export * from './pubKeyFromPeerId'
+
 /**
  * Regular expresion used to match b58Strings
  *
