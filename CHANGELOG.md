@@ -1,3 +1,12 @@
+<a name="0.2.11"></a>
+
+## [0.2.11](https://github.com/hoprnet/hopr-connect/compare/0.2.10...0.2.11) (2021-01-29)
+
+### Fixes
+
+- refactored internal communication
+- less verbose debug output
+
 <a name="0.2.10"></a>
 
 ## [0.2.10](https://github.com/hoprnet/hopr-connect/compare/0.2.8...0.2.10) (2021-01-28)
