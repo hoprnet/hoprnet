@@ -233,6 +233,10 @@ class HoprConnect implements Transport {
   private async dialWithRelay(ma: Multiaddr, relays: Multiaddr[], options?: DialOptions): Promise<Connection> {
     let conn = await this._relay.establishRelayedConnection(ma, relays, this.onReconnect.bind(this), options)
 
+    if (conn == undefined) {
+      throw Error(`Could not establish relayed connection.`)
+    }
+
     return await this._upgrader.upgradeOutbound(conn)
   }
 
