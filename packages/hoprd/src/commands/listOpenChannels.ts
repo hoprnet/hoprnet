@@ -68,7 +68,7 @@ export default class ListOpenChannels extends AbstractCommand {
   async execute(): Promise<string | void> {
     try {
       const { utils, types } = this.node.paymentChannels
-      const self = new types.Public(this.node.getId().marshalPubKey())
+      const self = new types.Public(this.node.getId().pubKey.marshal())
       const channels = await this.node.paymentChannels.indexer.getChannelEntries(self)
       const result: string[] = []
 
@@ -99,7 +99,7 @@ export default class ListOpenChannels extends AbstractCommand {
             totalBalance,
             myBalance,
             peerId,
-            status
+            status: channelEntry.status
           })
         )
       }
