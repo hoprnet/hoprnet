@@ -88,7 +88,8 @@ update_or_create_bootstrap_vm() {
       --container-arg="--restHost" --container-arg="0.0.0.0" \
       --container-arg="--healthCheck" --container-arg="true" \
       --container-arg="--healthCheckHost" --container-arg="0.0.0.0" \
-      --container-arg="--admin" \
+      --container-arg="--admin" --container-arg="true" \
+      --container-arg="--adminHost" --container-arg="0.0.0.0" \
       --container-arg="--run" --container-arg="\"settings strategy passive;daemonize\""
       --container-restart-policy=always
     sleep 120
@@ -113,7 +114,8 @@ start_testnode_vm() {
       --container-arg="--healthCheck" --container-arg="true" \
       --container-arg="--healthCheckHost" --container-arg="0.0.0.0" \
       --container-arg="--bootstrapServers" --container-arg="$3" \
-      --container-arg="--admin" \
+      --container-arg="--admin" --container-arg="true" \
+      --container-arg="--adminHost" --container-arg="0.0.0.0" \
       --container-arg="--run" --container-arg="\"cover-traffic start;daemonize\"" \
       --container-restart-policy=always
   fi
