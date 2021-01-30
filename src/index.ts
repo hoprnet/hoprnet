@@ -319,16 +319,16 @@ class HoprConnect implements Transport {
    * @param ma Multiaddr to check
    */
   private shouldAttemptDirectDial(ma: Multiaddr): boolean {
-    // Forces node to only use relayed connection and
-    // don't try a direct dial attempt.
-    // Used for testing
     if (
+      // Forces the node to only use relayed connections and
+      // don't try a direct dial attempts.
+      // @dev Used for testing
       this.__noDirectConnections &&
       (this.relays == undefined || !this.relays.some((mAddr: Multiaddr) => ma.getPeerId() === mAddr.getPeerId()))
     ) {
       return false
     }
-    // uncommenting next line forces our node to use a relayed connection to any node execpt for the bootstrap server
+
     let protoNames = ma.protoNames()
     if (!['ip4', 'ip6', 'dns4', 'dns6'].includes(protoNames[0])) {
       // We cannot call other protocols directly

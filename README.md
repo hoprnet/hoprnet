@@ -16,7 +16,7 @@
 
 # hopr-connect
 
-**Disclaimer**: support for libp2p test suite WIP, see [KNOWN ISSUES](#known-issues)
+**Disclaimer**: support for libp2p test suite is still WIP, see [KNOWN ISSUES](#known-issues)
 
 [![](https://github.com/libp2p/js-libp2p-interfaces/raw/master/src/transport/img/badge.png)](https://github.com/libp2p/js-libp2p-interfaces/tree/master/src/transport)
 [![](https://github.com/libp2p/js-libp2p-interfaces/raw/master/src/connection/img/badge.png)](https://github.com/libp2p/js-libp2p-interfaces/tree/master/src/connection)
@@ -41,7 +41,7 @@ A [transport module](https://github.com/libp2p/js-libp2p-interfaces/tree/master/
 
 ### Dependencies
 
-- Node.js 12.x
+- Node.js 12.x, seems to work with Node.JS 14.x as well
 - yarn
 
 ### Startup
@@ -114,7 +114,7 @@ const node = await libp2p.create({
 - IPv6 support disabled for the moment
 - [WIP] libp2p test suite
 
-## Contributors [in alphabetical order]
+## Contributors (in alphabetical order)
 
 - [José Perez Aguinaga](https://github.com/jjperezaguinaga)
 - [Peter Braden](https://github.com/peterbraden)
