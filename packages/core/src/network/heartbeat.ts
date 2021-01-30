@@ -26,8 +26,7 @@ export default class Heartbeat {
       await this.networkPeers.ping(toPing.pop(), async (id: PeerId) => {
         log('ping', id.toB58String())
 
-        const pingResult = await this.interaction.interact(id)
-          .catch(err => log('ping', err))
+        const pingResult = await this.interaction.interact(id).catch((err) => log('ping', err))
 
         if (pingResult >= 0) {
           log('ping success to', id.toB58String())
