@@ -25,12 +25,14 @@ export default class Heartbeat {
     const doPing = async (): Promise<void> => {
       await this.networkPeers.ping(toPing.pop(), async (id: PeerId) => {
         log('ping', id.toB58String())
-        try {
-          await this.interaction.interact(id)
+
+        const pingResult = await this.interaction.interact(id)
+
+        if (pingResult >= 0) {
           log('ping success to', id.toB58String())
           return true
-        } catch (err) {
-          log('ping failed to', id.toB58String(), err)
+        } else {
+          log('ping failed to', id.toB58String())
           await this.hangUp(id)
           return false
         }
