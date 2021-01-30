@@ -55,6 +55,8 @@ export default class Ping extends AbstractCommand {
     if (error && error.message) {
       return `${out}Could not ping node. Error was: ${styleValue(error.message, 'failure')}`
     }
+    return `${out}Could not ping node. Timeout.`
+
   }
 
   public async autocomplete(query: string = '', line: string = '', state: GlobalState): Promise<AutoCompleteResult> {
