@@ -67,7 +67,7 @@ class Indexer extends EventEmitter implements IIndexer {
       await getLatestBlockNumber(this.connector.db),
       web3.eth.getBlockNumber()
     ])
-    this.latestBlock = latestSavedBlock
+    this.latestBlock = latestOnChainBlock
 
     log('Latest saved block %d', latestSavedBlock)
     log('Latest on-chain block %d', latestOnChainBlock)
@@ -136,7 +136,12 @@ class Indexer extends EventEmitter implements IIndexer {
    * @returns returns true if it's syncing
    */
   public async isSyncing(): Promise<boolean> {
-    return isSyncing(await this.connector.web3.eth.getBlockNumber(), this.latestBlock)
+    const [onChainBlock, lastKnownBlock] = await Promise.all([
+      this.connector.web3.eth.getBlockNumber(),
+      getLatestBlockNumber(this.connector.db)
+    ])
+
+    return isSyncing(onChainBlock, lastKnownBlock)
   }
 
   // /**
