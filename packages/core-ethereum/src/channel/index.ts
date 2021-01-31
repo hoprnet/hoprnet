@@ -72,7 +72,10 @@ class ChannelFactory {
     this.signedChannels.delete(counterparty.toHex())
 
     // we did not receive the signed channel
-    if (!signedChannel) return
+    if (!signedChannel) {
+      log('signedChannel with %s not found', counterparty.toHex())
+      return
+    }
     log('Found signedChannel with %s', counterparty.toHex())
 
     // we store it, if we have an previous signed channel
@@ -336,6 +339,9 @@ class ChannelFactory {
         // legacy requirement, to be fixed in refactor
         this.signedChannels.set(counterparty.toHex(), signedChannel)
         log('Received signedChannel from %s', counterparty.toHex())
+        // trigger onOpen in case we have received the opening event
+        // but not the signed channel
+        await this.onOpen(counterparty)
 
         /*
         // Fund both ways
