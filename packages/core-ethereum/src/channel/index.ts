@@ -73,6 +73,7 @@ class ChannelFactory {
 
     // we did not receive the signed channel
     if (!signedChannel) return
+    log('Found signedChannel with %s', counterparty.toHex())
 
     // we store it, if we have an previous signed channel
     // under this counterparty, we replace it
@@ -140,8 +141,8 @@ class ChannelFactory {
 
     if (onChain != offChain) {
       if (!onChain && offChain) {
-        log(`Channel ${channelId.toHex()} exists off-chain but not on-chain, deleting data.`)
-        await this.coreConnector.channel.deleteOffChainState(counterpartyPubKey)
+        log(`Channel ${channelId.toHex()} exists off-chain but not on-chain.`)
+        // await this.coreConnector.channel.deleteOffChainState(counterpartyPubKey)
       } else {
         throw Error(`Channel ${channelId.toHex()} exists on-chain but not off-chain.`)
       }
@@ -364,8 +365,6 @@ class ChannelFactory {
   }
 
   saveOffChainState(counterparty: Uint8Array, signedChannel: SignedChannel) {
-    log('saveOffChainState %d', new Public(counterparty).toHex())
-
     return this.coreConnector.db.put(
       Buffer.from(this.coreConnector.dbKeys.Channel(counterparty)),
       Buffer.from(signedChannel)
@@ -373,8 +372,6 @@ class ChannelFactory {
   }
 
   deleteOffChainState(counterparty: Uint8Array) {
-    log('deleteOffChainState %d', new Public(counterparty).toHex())
-
     return this.coreConnector.db.del(Buffer.from(this.coreConnector.dbKeys.Channel(counterparty)))
   }
 
