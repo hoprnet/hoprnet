@@ -85,8 +85,8 @@ class ChannelFactory {
 
   async onClose(counterparty: Public): Promise<void> {
     log('Received close event for channel with %s', counterparty.toHex())
-    // we never delete since we don't know which
-    // channel iteration this signed channel if from
+    // we don't know which channel iteration this
+    // this signed channel is from so we do nothing
     // this.signedChannels.delete(counterparty.toHex())
     // this.deleteOffChainState(counterparty)
   }
