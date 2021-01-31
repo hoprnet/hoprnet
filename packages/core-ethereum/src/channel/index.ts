@@ -78,11 +78,15 @@ class ChannelFactory {
     // we store it, if we have an previous signed channel
     // under this counterparty, we replace it
     await this.saveOffChainState(counterparty, signedChannel)
+
+    // only delete signedChannel once we store it
+    this.signedChannels.delete(counterparty.toHex())
   }
 
   async onClose(counterparty: Public): Promise<void> {
     log('Received close event for channel with %s', counterparty.toHex())
-    // we never delete
+    // we never delete since we don't know which
+    // channel iteration this signed channel if from
     // this.signedChannels.delete(counterparty.toHex())
     // this.deleteOffChainState(counterparty)
   }
@@ -327,12 +331,14 @@ class ChannelFactory {
           offset: msg.byteOffset
         })
 
+        const counterparty = new Public(await signedChannel.signer)
+
         // legacy requirement, to be fixed in refactor
-        this.signedChannels.set(new Public(await signedChannel.signer).toHex(), signedChannel)
+        this.signedChannels.set(counterparty.toHex(), signedChannel)
+        log('Received signedChannel from %s', counterparty.toHex())
 
         /*
         // Fund both ways
-        const counterpartyPubKey = await signedChannel.signer
         const counterparty = await pubKeyToAccountId(counterpartyPubKey)
         const channelBalance = signedChannel.channel.balance
 
