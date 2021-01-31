@@ -338,9 +338,6 @@ class ChannelFactory {
         // legacy requirement, to be fixed in refactor
         this.signedChannels.set(counterparty.toHex(), signedChannel)
         log('Received signedChannel from %s', counterparty.toHex())
-        // trigger onOpen in case we have received the opening event
-        // but not the signed channel
-        await this.onOpen(counterparty)
 
         /*
         // Fund both ways
