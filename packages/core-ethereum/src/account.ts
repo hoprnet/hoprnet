@@ -246,7 +246,6 @@ class Account {
 
     // @TODO: potential deadlock, needs to be improved
     const nonceLock = await this._nonceTracker.getNonceLock(this._address.toHex())
-    log('Picked nonce', nonceLock.nextNonce)
 
     // @TODO: provide some of the values to avoid multiple calls
     const options = {

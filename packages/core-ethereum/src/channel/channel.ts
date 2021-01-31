@@ -13,37 +13,20 @@ import {
 } from '../types'
 import TicketFactory from './ticket'
 import { hash } from '../utils'
-import debug from 'debug'
-
-const log = debug('hopr-ethereum:channel')
 
 import type HoprEthereum from '..'
 
 class Channel implements IChannel {
-  private _signedChannel: SignedChannel
   private _settlementWindow?: Moment
   private _channelId?: Hash
 
   public ticket: TicketFactory
 
-  constructor(public coreConnector: HoprEthereum, public counterparty: Uint8Array, signedChannel: SignedChannel) {
-    this._signedChannel = signedChannel
-
-    // check if channel still exists
-    this.onChainChannel.then((state) => {
-      if (state.stateCounter.isZero()) return
-
-      if (state.status === 'UNINITIALISED') {
-        log('found channel off-chain but its closed on-chain')
-        this.onClose()
-      }
-    })
-
-    // if channel is closed
-    this.onceClosed().then(async () => {
-      return this.onClose()
-    })
-
+  constructor(
+    public coreConnector: HoprEthereum,
+    public counterparty: Uint8Array,
+    private signedChannel: SignedChannel
+  ) {
     this.ticket = new TicketFactory(this)
   }
 
@@ -122,7 +105,7 @@ class Channel implements IChannel {
   }
 
   get state(): Promise<ChannelType> {
-    return Promise.resolve(this._signedChannel.channel)
+    return Promise.resolve(this.signedChannel.channel)
   }
 
   get balance(): Promise<Balance> {
@@ -247,17 +230,6 @@ class Channel implements IChannel {
     }
 
     throw Error('Nonces must not be used twice.')
-  }
-
-  private async onceClosed() {
-    return this.coreConnector.channel.onceClosed(
-      new Public(this.coreConnector.account.keys.onChain.pubKey),
-      new Public(this.counterparty)
-    )
-  }
-
-  private async onClose(): Promise<void> {
-    return this.coreConnector.channel.deleteOffChainState(this.counterparty)
   }
 }
 

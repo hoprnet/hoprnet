@@ -201,7 +201,8 @@ declare interface Channel {
     // aggregate(channel: any, tickets: Ticket[], ...props: any[]): Promise<Ticket>
   }
 
-  readonly counterparty: AccountId
+  // public key
+  readonly counterparty: Uint8Array
 
   readonly offChainCounterparty: Promise<Uint8Array>
 

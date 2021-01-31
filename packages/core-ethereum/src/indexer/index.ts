@@ -17,6 +17,7 @@ import {
   isConfirmedBlock,
   getLatestBlockNumber,
   getChannelEntry,
+  isSyncing,
   updateChannelEntry,
   getChannelEntries,
   updateLatestBlockNumber,
@@ -60,26 +61,13 @@ class Indexer extends EventEmitter implements IIndexer {
     const { web3, hoprChannels } = this.connector
 
     // wipe indexer, for testing, will be removed
-    // const channelEntries = await getChannelEntries(this.connector.db)
-    // await this.connector.db.batch(
-    //   channelEntries.map(({ partyA, partyB }) => ({
-    //     type: 'del',
-    //     key: Buffer.from(this.connector.dbKeys.ChannelEntry(partyA, partyB))
-    //   }))
-    // )
-    // await this.connector.db.del(Buffer.from(this.connector.dbKeys.LatestConfirmedSnapshot()))
-    // await this.connector.db.del(Buffer.from(this.connector.dbKeys.LatestBlockNumber()))
-    // log(
-    //   'deleted %d channels, remaining: %d',
-    //   channelEntries.length,
-    //   (await getChannelEntries(this.connector.db)).length
-    // )
+    // await this.wipe()
 
     const [latestSavedBlock, latestOnChainBlock] = await Promise.all([
       await getLatestBlockNumber(this.connector.db),
       web3.eth.getBlockNumber()
     ])
-    this.latestBlock = latestSavedBlock
+    this.latestBlock = latestOnChainBlock
 
     log('Latest saved block %d', latestSavedBlock)
     log('Latest on-chain block %d', latestOnChainBlock)
@@ -147,6 +135,30 @@ class Indexer extends EventEmitter implements IIndexer {
     this.status = 'stopped'
     log(chalk.green('Indexer stopped!'))
   }
+
+  /**
+   * @returns returns true if it's syncing
+   */
+  public async isSyncing(): Promise<boolean> {
+    return isSyncing(await this.connector.web3.eth.getBlockNumber(), this.latestBlock)
+  }
+
+  /**
+   * Wipes all indexer related stored data in the DB.
+   * @deprecated do not use this in production
+   */
+  // private async wipe(): Promise<void> {
+  //   await this.connector.db.batch(
+  //     (await getChannelEntries(this.connector.db)).map(({ partyA, partyB }) => ({
+  //       type: 'del',
+  //       key: Buffer.from(this.connector.dbKeys.ChannelEntry(partyA, partyB))
+  //     }))
+  //   )
+  //   await this.connector.db.del(Buffer.from(this.connector.dbKeys.LatestConfirmedSnapshot()))
+  //   await this.connector.db.del(Buffer.from(this.connector.dbKeys.LatestBlockNumber()))
+
+  //   log('wiped indexer data')
+  // }
 
   /**
    * Query past logs, this will loop until it gets all blocks from {toBlock} to {fromBlock}.
@@ -229,7 +241,7 @@ class Indexer extends EventEmitter implements IIndexer {
       isConfirmedBlock(this.unconfirmedEvents.top(1)[0].blockNumber.toNumber(), block.number, this.maxConfirmations)
     ) {
       const event = this.unconfirmedEvents.pop()
-      // log('Found unconfirmed event %s', event.name)
+      log('Processing event %s', event.name)
       // log(chalk.blue(event.blockNumber.toString(), event.transactionIndex.toString(), event.logIndex.toString()))
 
       const lastSnapshotComparison = snapshotComparator(event, lastSnapshot)
@@ -465,7 +477,7 @@ class Indexer extends EventEmitter implements IIndexer {
       return undefined
     }
 
-    log('picking random from ', filtered.length, ' channels')
+    log('picking random from %d channels', filtered.length)
     const random = randomChoice(filtered)
     return this.toIndexerChannel(await pubKeyToPeerId(random.partyA), random)
   }
@@ -487,7 +499,8 @@ class Indexer extends EventEmitter implements IIndexer {
 
 export default Indexer
 
-// HACK
+// HACK, get the genesis block number
+// of HoprChannels for each chain
 const getHoprChannelsBlockNumber = (chainId: number): number => {
   switch (chainId) {
     case 3:
