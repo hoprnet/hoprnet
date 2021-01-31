@@ -1,6 +1,6 @@
 import { expect } from 'chai'
 import BN from 'bn.js'
-import { snapshotComparator, isConfirmedBlock } from './utils'
+import { snapshotComparator, isConfirmedBlock, isSyncing } from './utils'
 
 describe('test snapshotComparator', function () {
   const EVENT_1_0_0 = {
@@ -80,5 +80,16 @@ describe('test isConfirmedBlock', function () {
 
   it('should be true when blockNumber=5 onChainBlockNumber=10 maxConf=5', function () {
     expect(isConfirmedBlock(5, 10, 5)).to.be.true
+  })
+})
+
+describe('test isSyncing', function () {
+  it('should be syncing', function () {
+    expect(isSyncing(100, 100)).to.be.true
+    expect(isSyncing(100, 96)).to.be.true
+  })
+
+  it('should not be syncing', function () {
+    expect(isSyncing(100, 95)).to.be.false
   })
 })
