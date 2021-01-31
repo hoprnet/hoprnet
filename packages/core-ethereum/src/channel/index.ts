@@ -69,7 +69,6 @@ class ChannelFactory {
   async onOpen(counterparty: Public): Promise<void> {
     log('Received open event for channel with %s', counterparty.toHex())
     const signedChannel = this.signedChannels.get(counterparty.toHex())
-    this.signedChannels.delete(counterparty.toHex())
 
     // we did not receive the signed channel
     if (!signedChannel) {
@@ -83,7 +82,7 @@ class ChannelFactory {
     await this.saveOffChainState(counterparty, signedChannel)
 
     // only delete signedChannel once we store it
-    this.signedChannels.delete(counterparty.toHex())
+    // this.signedChannels.delete(counterparty.toHex())
   }
 
   async onClose(counterparty: Public): Promise<void> {
