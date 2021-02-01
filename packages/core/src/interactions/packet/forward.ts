@@ -4,6 +4,8 @@ import { Acknowledgement } from '../../messages/acknowledgement'
 
 import Debug from 'debug'
 const log = Debug('hopr-core:forward')
+const verbose = Debug('hopr-core:forward')
+
 
 import type PeerId from 'peer-id'
 
@@ -46,6 +48,7 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector> implements Abstr
       })
 
       if (this.node.getId().equals(target)) {
+        verbose(`outputting message - ${packet.message.plaintext.length} bytes`)
         this.node.output(packet.message.plaintext)
       } else {
         await this.interact(target, packet)
