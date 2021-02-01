@@ -82,7 +82,7 @@ class ChannelFactory {
     await this.saveOffChainState(counterparty, signedChannel)
 
     // only delete signedChannel once we store it
-    this.signedChannels.delete(counterparty.toHex())
+    // this.signedChannels.delete(counterparty.toHex())
   }
 
   async onClose(counterparty: Public): Promise<void> {
