@@ -207,7 +207,7 @@ contract HoprDistributor is Ownable {
 
         uint128 newClaimed = _addUint128(allocation.claimed, claimable);
         // Trying to claim more than allocated
-        assert(claimable <= newClaimed);
+        assert(newClaimed <= allocation.amount);
 
         uint128 newTotalMinted = _addUint128(totalMinted, claimable);
         // Total amount minted should be less or equal than specified
@@ -263,7 +263,7 @@ contract HoprDistributor is Ownable {
 
     function _currentBlockTimestamp() internal view returns (uint128) {
         // solhint-disable-next-line
-        return uint128(block.timestamp % 2 ** 128);
+        return uint128(block.timestamp);
     }
 
     // SafeMath variations
