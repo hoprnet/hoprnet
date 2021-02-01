@@ -115,9 +115,9 @@ export class Mixer<Chain extends HoprCoreConnector> {
    * @example
    * const mix = new Mixer()
    * mix.push(someMsg)
-   * 
+   *
    * for await (const msg of mix) {
-   *   console.log(msg) // msg === someMsg 
+   *   console.log(msg) // msg === someMsg
    * }
    */
   async *[Symbol.asyncIterator](): AsyncGenerator<Packet<Chain>> {
