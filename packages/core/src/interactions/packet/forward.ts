@@ -6,7 +6,6 @@ import Debug from 'debug'
 const log = Debug('hopr-core:forward')
 const verbose = Debug('hopr-core:forward')
 
-
 import type PeerId from 'peer-id'
 
 import type { AbstractInteraction } from '../abstractInteraction'
@@ -32,26 +31,30 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector> implements Abstr
 
   async drainMixer() {
     for await (const packet of this.mixer[Symbol.asyncIterator]()) {
-      // @TODO add try / catch block
       log(`Got packet from mixer. Mixer has another ${this.mixer.length} packets.`)
-      const { receivedChallenge, ticketKey } = await packet.forwardTransform()
+      try {
+        const { receivedChallenge, ticketKey } = await packet.forwardTransform()
 
-      const [sender, target] = await Promise.all([packet.getSenderPeerId(), packet.getTargetPeerId()])
+        const [sender, target] = await Promise.all([packet.getSenderPeerId(), packet.getTargetPeerId()])
 
-      setImmediate(async () => {
-        const ack = new Acknowledgement(this.node.paymentChannels, undefined, {
-          key: ticketKey,
-          challenge: receivedChallenge
+        setImmediate(async () => {
+          const ack = new Acknowledgement(this.node.paymentChannels, undefined, {
+            key: ticketKey,
+            challenge: receivedChallenge
+          })
+
+          await this.node._interactions.packet.acknowledgment.interact(sender, await ack.sign(this.node.getId()))
         })
 
-        await this.node._interactions.packet.acknowledgment.interact(sender, await ack.sign(this.node.getId()))
-      })
-
-      if (this.node.getId().equals(target)) {
-        verbose(`outputting message - ${packet.message.plaintext.length} bytes`)
-        this.node.output(packet.message.plaintext)
-      } else {
-        await this.interact(target, packet)
+        if (this.node.getId().equals(target)) {
+          verbose(`outputting message - ${packet.message.plaintext.length} bytes`)
+          this.node.output(packet.message.plaintext)
+        } else {
+          await this.interact(target, packet)
+        }
+      } catch (error) {
+        log('Error while handling packet')
+        verbose('Error while handling packet', error)
       }
     }
   }
