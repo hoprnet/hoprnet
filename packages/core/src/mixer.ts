@@ -104,9 +104,22 @@ export class Mixer<Chain extends HoprCoreConnector> {
   }
 
   private getPriority(): number {
+    // @TODO implement fancy distribution sampling
     return this.incrementer() + randomInteger(1, MAX_PACKET_DELAY)
   }
 
+  /**
+   * Implementation of the async iterator protocol.
+   * Packets in mixer can be accessed by using the `for await ... of` construct.
+   * See https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/for-await...of
+   * @example
+   * const mix = new Mixer()
+   * mix.push(someMsg)
+   * 
+   * for await (const msg of mix) {
+   *   console.log(msg) // msg === someMsg 
+   * }
+   */
   async *[Symbol.asyncIterator](): AsyncGenerator<Packet<Chain>> {
     while (true) {
       await Promise.race([
