@@ -153,14 +153,19 @@ contract HoprDistributor is Ownable {
         require(schedules[scheduleName].durations.length != 0, "Schedule must exist");
         require(accounts.length == amounts.length, "Accounts and amounts must have equal length");
 
+        // gas optimization
+        uint128 _totalToBeMinted = totalToBeMinted;
+
         for (uint256 i = 0; i < accounts.length; i++) {
             require(allocations[accounts[i]][scheduleName].amount == 0, "Allocation must not exist");
             allocations[accounts[i]][scheduleName].amount = amounts[i];
-            totalToBeMinted = _addUint128(totalToBeMinted, amounts[i]);
-            assert(totalToBeMinted <= maxMintAmount);
+            _totalToBeMinted = _addUint128(_totalToBeMinted, amounts[i]);
+            assert(_totalToBeMinted <= maxMintAmount);
 
             emit AllocationAdded(accounts[i], amounts[i], scheduleName);
         }
+
+        totalToBeMinted = _totalToBeMinted;
     }
 
     /**
