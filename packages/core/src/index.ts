@@ -459,6 +459,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
 
   /**
    * Ping a node.
+   * @dev returns latency >= 0 or -1 if unreachable
    *
    * @param destination PeerId of the node
    * @returns latency

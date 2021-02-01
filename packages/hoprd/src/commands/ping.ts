@@ -35,15 +35,27 @@ export default class Ping extends AbstractCommand {
       out += styleValue(`Pinging the bootstrap node ...`, 'highlight') + '\n'
     }
 
-    try {
-      const { info, latency } = await this.node.ping(peerId)
-      return `${out}Pong received in: ${styleValue(latency)} ms ${info}`
-    } catch (err) {
-      if (err && err.message) {
-        return `${out}Could not ping node. Error was: ${styleValue(err.message, 'failure')}`
-      }
-      return `${out}Could not ping node. Unknown error.`
+    let pingResult: {
+      info: string
+      latency: number
     }
+
+    let error: any
+
+    try {
+      pingResult = await this.node.ping(peerId)
+    } catch (err) {
+      error = err
+    }
+
+    if (pingResult.latency >= 0) {
+      return `${out}Pong received in: ${styleValue(pingResult.latency)} ms ${pingResult.info}`
+    }
+
+    if (error && error.message) {
+      return `${out}Could not ping node. Error was: ${styleValue(error.message, 'failure')}`
+    }
+    return `${out}Could not ping node. Timeout.`
   }
 
   public async autocomplete(query: string = '', line: string = '', state: GlobalState): Promise<AutoCompleteResult> {

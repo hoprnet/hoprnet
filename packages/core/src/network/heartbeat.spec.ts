@@ -87,9 +87,9 @@ describe('unit test heartbeat', async () => {
     // Chris dies, alice heartbeats again
     alice.interaction.interact = sinon.fake((id: PeerId) => {
       if (id.equals(chris.id)) {
-        throw new Error('FAIL')
+        return Promise.resolve(-1)
       }
-      return Promise.resolve()
+      return Promise.resolve(0)
     })
 
     clock.tick(HEARTBEAT_INTERVAL * 2)

@@ -52,7 +52,8 @@ class Heartbeat implements AbstractInteraction {
     const struct = await dialHelper(this.node, counterparty, this.protocols, { timeout: HEARTBEAT_TIMEOUT })
 
     if (struct == undefined) {
-      throw Error()
+      verbose(`Connection to ${counterparty.toB58String()} failed`)
+      return -1
     }
 
     const challenge = randomBytes(16)
@@ -70,9 +71,11 @@ class Heartbeat implements AbstractInteraction {
     )
 
     if (response != null && u8aEquals(expectedResponse, response.slice())) {
-      return Date.now() - start
+      const elapsedTime = Date.now() - start
+      return elapsedTime < 0 ? 0 : elapsedTime
     } else {
-      throw Error(`Invalid response. Got ${JSON.stringify(response)}`)
+      verbose(`Invalid response. Got ${JSON.stringify(response)}`)
+      return -1
     }
   }
 }
