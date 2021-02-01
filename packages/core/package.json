@@ -50,6 +50,7 @@
     "libp2p-secio": "0.13.1",
     "multiaddr": "8.1.2",
     "multihashes": "3.1.2",
+    "p-defer": "^3.0.0",
     "peer-id": "0.14.3",
     "read": "~1.0.7",
     "rlp": "~2.2.6",
@@ -84,10 +85,9 @@
     "extension": [
       "ts"
     ],
-    "spec": "**/*.spec.ts",
+    "spec": "src/mixer.spec.ts",
     "require": [
-      "ts-node/register",
-      "test.mocha.ts"
+      "ts-node/register"
     ]
   },
   "publishConfig": {

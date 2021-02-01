@@ -3,18 +3,15 @@ import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import Heap from 'heap-js'
 import { randomInteger } from '@hoprnet/hopr-utils'
 import { MAX_PACKET_DELAY } from './constants'
-import debug from 'debug'
-const log = debug('hopr-core:mixer')
+import Defer from 'p-defer'
+import type { DeferredPromise } from 'p-defer'
+
+// @TODO add logging
 
 type HeapElement = [number, Packet<any>]
 
 const comparator = (a: HeapElement, b: HeapElement): number => {
-  if (b[0] < a[0]) {
-    return 1
-  } else if (b[0] > a[0]) {
-    return -1
-  }
-  return 0
+  return a[0] - b[0]
 }
 
 /**
@@ -25,42 +22,85 @@ const comparator = (a: HeapElement, b: HeapElement): number => {
  */
 export class Mixer<Chain extends HoprCoreConnector> {
   private queue: Heap<HeapElement>
+  private timeout?: NodeJS.Timeout
+  private defer: DeferredPromise<void>
+  private deferEnd: DeferredPromise<void>
+  private endPromise: Promise<void>
+  private _done: boolean
 
   public WAIT_TIME = MAX_PACKET_DELAY
 
   constructor(private incrementer = Date.now) {
     this.queue = new Heap(comparator)
+
+    this.defer = Defer<void>()
+    this.deferEnd = Defer<void>()
+
+    this._done = false
+
+    this.endPromise = this.deferEnd.promise.then(() => {
+      this._done = true
+    })
   }
 
-  push(p: Packet<Chain>) {
-    this.queue.push([this.getPriority(), p])
-  }
+  public push(p: Packet<Chain>) {
+    const newPriority = this.getPriority()
+    const topPriority = this.queue.length > 0 ? this.queue.peek()[0] : Number.MAX_SAFE_INTEGER
 
-  // Can we pop an element?.
-  poppable(): boolean {
-    log(`Mixer has ${this.queue.length} elements`)
-    if (!this.queue.length) {
-      return false
+    if (newPriority < topPriority) {
+      this.resetTimeout(newPriority)
     }
-    return this.queue.peek()[0] < this.due()
+
+    this.queue.push([newPriority, p])
   }
 
-  pop(): Packet<Chain> {
-    if (!this.poppable()) {
-      throw new Error('No packet is ready to be popped from mixer')
-    }
-    return this.queue.pop()[1]
+  public get length() {
+    return this.queue.length
+  }
+
+  private resetTimeout(newPriority: number) {
+    clearTimeout(this.timeout)
+    this.timeout = setTimeout(() => {
+      this.defer.resolve()
+    }, newPriority - Date.now())
   }
 
   notEmpty(): boolean {
     return this.queue.length > 0
   }
 
-  private due(): number {
-    return this.incrementer()
+  public end(): void {
+    this.deferEnd.resolve()
+  }
+
+  public get done() {
+    return this._done
   }
 
   private getPriority(): number {
     return this.incrementer() + randomInteger(1, MAX_PACKET_DELAY)
+  }
+
+  async *[Symbol.asyncIterator](): AsyncGenerator<Packet<Chain>> {
+    while (true) {
+      await Promise.race([
+        // prettier-ignore
+        this.endPromise,
+        this.defer.promise
+      ])
+
+      if (this._done) {
+        break
+      }
+      this.defer = Defer<void>()
+
+      const result = this.queue.pop()[1]
+
+      if (!this.queue.isEmpty()) {
+        this.resetTimeout(this.queue.peek()[0])
+      }
+
+      yield result
+    }
   }
 }
