@@ -88,13 +88,9 @@ class Indexer extends EventEmitter implements IIndexer {
       getSyncPercentage(fromBlock - genesisBlock, latestOnChainBlock - genesisBlock)
     )
 
-    // if the difference between on-chain block and {fromBlock}
-    // is larger than {BLOCK_RANGE}, we will query using `getLogs` rpc
-    if (fromBlock + BLOCK_RANGE <= latestOnChainBlock) {
-      const toBlock = latestOnChainBlock - this.maxConfirmations
-      const lastBlock = await this.processPastLogs(fromBlock, toBlock, BLOCK_RANGE)
-      fromBlock = lastBlock
-    }
+    // get past logs
+    const lastBlock = await this.processPastLogs(fromBlock, latestOnChainBlock, BLOCK_RANGE)
+    fromBlock = lastBlock
 
     log('Subscribing to events from block %d', fromBlock)
 
@@ -140,13 +136,18 @@ class Indexer extends EventEmitter implements IIndexer {
    * @returns returns true if it's syncing
    */
   public async isSyncing(): Promise<boolean> {
-    return isSyncing(await this.connector.web3.eth.getBlockNumber(), this.latestBlock)
+    const [onChainBlock, lastKnownBlock] = await Promise.all([
+      this.connector.web3.eth.getBlockNumber(),
+      getLatestBlockNumber(this.connector.db)
+    ])
+
+    return isSyncing(onChainBlock, lastKnownBlock)
   }
 
-  /**
-   * Wipes all indexer related stored data in the DB.
-   * @deprecated do not use this in production
-   */
+  // /**
+  //  * Wipes all indexer related stored data in the DB.
+  //  * @deprecated do not use this in production
+  //  */
   // private async wipe(): Promise<void> {
   //   await this.connector.db.batch(
   //     (await getChannelEntries(this.connector.db)).map(({ partyA, partyB }) => ({

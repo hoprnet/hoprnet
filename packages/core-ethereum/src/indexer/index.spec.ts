@@ -8,7 +8,7 @@ import { durations, u8aToHex, u8aEquals } from '@hoprnet/hopr-utils'
 import { stringToU8a } from '@hoprnet/hopr-utils'
 import * as testconfigs from '../config.spec'
 import * as configs from '../config'
-import { time, wait, isPartyA } from '../utils'
+import { time, isPartyA } from '../utils'
 import { Account, getPrivKeyData, createAccountAndFund, createNode } from '../utils/testing.spec'
 import { HoprToken } from '../tsc/web3/HoprToken'
 import { HoprChannels } from '../tsc/web3/HoprChannels'
@@ -302,19 +302,10 @@ describe('test indexer', function () {
       assert.equal(channels.length, 2, 'check Channels.store')
     })
 
-    it('should start indexer', async function () {
+    it('should start indexer and index new channel', async function () {
       this.timeout(durations.seconds(5))
       await connector.indexer.start()
       assert(connector.indexer.status === 'started', 'could not start indexer')
-      await wait(1e3)
-      const channels = await connector.indexer.getChannelEntries()
-      assert.equal(channels.length, 2, 'check Channels.store')
-    })
-
-    it('should index new channel', async function () {
-      this.timeout(durations.seconds(5))
-      const currentBlockNumber = await web3.eth.getBlockNumber()
-      await time.advanceBlockTo(web3, currentBlockNumber + configs.MAX_CONFIRMATIONS)
       const channels = await connector.indexer.getChannelEntries()
       assert.equal(channels.length, 3, 'check Channels.store')
     })
