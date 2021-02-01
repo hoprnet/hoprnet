@@ -51,14 +51,7 @@ abstract contract ERC777Snapshot is ERC777 {
      * @return The balance at `_blockNumber`
      */
     function balanceOfAt(address _owner, uint128 _blockNumber) external view returns (uint256) {
-        if (
-            (accountSnapshots[_owner].length == 0) ||
-            (accountSnapshots[_owner][0].fromBlock > _blockNumber)
-        ) {
-            return 0;
-        } else {
-            return _valueAt(accountSnapshots[_owner], _blockNumber);
-        }
+        return _valueAt(accountSnapshots[_owner], _blockNumber);
     }
 
     /**
@@ -67,14 +60,7 @@ abstract contract ERC777Snapshot is ERC777 {
      * @return The total amount of tokens at `_blockNumber`
      */
     function totalSupplyAt(uint128 _blockNumber) external view returns(uint256) {
-        if (
-            (totalSupplySnapshots.length == 0) ||
-            (totalSupplySnapshots[0].fromBlock > _blockNumber)
-        ) {
-            return 0;
-        } else {
-            return _valueAt(totalSupplySnapshots, _blockNumber);
-        }
+        return _valueAt(totalSupplySnapshots, _blockNumber);
     }
 
     // Update balance and/or total supply snapshots before the values are modified. This is implemented
