@@ -12,6 +12,8 @@ export type GlobalState = {
 
 // REPL Command
 export abstract class AbstractCommand {
+  public hidden = false
+
   // The command, for example 'ping' or 'foo'
   abstract name(): string
 
