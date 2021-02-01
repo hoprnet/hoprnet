@@ -46,7 +46,6 @@ describe('test mixer ', function () {
     const receivedPackets: Packet<any>[] = []
 
     for (let i = 0; i < AMOUNT_OF_PACKETS; i++) {
-      // @ts-ignore
       receivedPackets.push((await it.next()).value)
     }
 
