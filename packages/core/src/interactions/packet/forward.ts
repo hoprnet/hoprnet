@@ -4,7 +4,7 @@ import { Acknowledgement } from '../../messages/acknowledgement'
 
 import Debug from 'debug'
 const log = Debug('hopr-core:forward')
-const verbose = Debug('hopr-core:forward')
+const verbose = Debug('hopr-core:verbose:forward')
 
 import type PeerId from 'peer-id'
 
