@@ -85,9 +85,10 @@
     "extension": [
       "ts"
     ],
-    "spec": "src/mixer.spec.ts",
+    "spec": "**/*.spec.ts",
     "require": [
-      "ts-node/register"
+      "ts-node/register",
+      "test.mocha.ts"
     ]
   },
   "publishConfig": {
