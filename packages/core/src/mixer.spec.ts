@@ -53,11 +53,10 @@ describe('test mixer ', function () {
     receivedPackets.sort()
 
     for (const [index, packet] of packets.entries()) {
-      assert(receivedPackets[index] == packet)
+      assert(receivedPackets[index] == packet, `Mixer must return all packages`)
     }
 
     assert(!m.notEmpty(), 'Mixer must be empty')
-    console.log(receivedPackets)
   })
 
   it('should push elements, drain the mixer, push new elemnts and pop elements', async function () {
@@ -88,7 +87,7 @@ describe('test mixer ', function () {
 
     const waitPromise = it.next()
 
-    assert(!m.notEmpty(), 'Queue must not be empty')
+    assert(!m.notEmpty(), 'Queue must be empty')
 
     const nextPacket = (await waitPromise).value
 
