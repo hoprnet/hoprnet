@@ -30,7 +30,7 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector> implements Abstr
   }
 
   async drainMixer() {
-    for await (const packet of this.mixer[Symbol.asyncIterator]()) {
+    for await (const packet of this.mixer) {
       log(`Got packet from mixer. Mixer has another ${this.mixer.length} packets.`)
       try {
         const { receivedChallenge, ticketKey } = await packet.forwardTransform()
