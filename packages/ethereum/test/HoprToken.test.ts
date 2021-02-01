@@ -6,7 +6,7 @@ import { vmErrorMessage } from './utils'
 
 const HoprToken = artifacts.require('HoprToken')
 
-describe.only('HoprToken', function () {
+describe('HoprToken', function () {
   let owner: string
   let userA: string
   let hoprToken: HoprTokenInstance

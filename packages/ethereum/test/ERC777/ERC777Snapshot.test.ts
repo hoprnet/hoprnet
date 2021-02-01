@@ -4,7 +4,7 @@ import { vmErrorMessage } from '../utils'
 
 const ERC777SnapshotMock: ERC777SnapshotMockContract = artifacts.require('ERC777SnapshotMock')
 
-describe.only('ERC777Snapshot', function () {
+describe('ERC777Snapshot', function () {
   const name = 'My Token'
   const symbol = 'MTKN'
   const initialSupply = '100'
