@@ -253,7 +253,7 @@ contract HoprDistributor is Ownable {
             // schedule deadline not passed, exiting
             if (scheduleDeadline > _currentBlockTimestamp()) break;
             // already claimed during this period, skipping
-            if (allocation.lastClaim > scheduleDeadline) continue;
+            if (allocation.lastClaim >= scheduleDeadline) continue;
 
             claimable = _addUint128(claimable, _divUint128(_mulUint128(allocation.amount, schedule.percents[i]), MULTIPLIER));
         }
