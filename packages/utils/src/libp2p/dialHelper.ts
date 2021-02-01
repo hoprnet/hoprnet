@@ -1,7 +1,7 @@
 // @TODO include libp2p types
 // import LibP2P from 'libp2p'
+
 import AbortController from 'abort-controller'
-import type { Handler } from 'libp2p'
 import PeerId from 'peer-id'
 import Multiaddr from 'multiaddr'
 
@@ -33,7 +33,7 @@ export async function dialHelper(
         timeout: number
         signal?: AbortSignal
       }
-): Promise<Handler | undefined> {
+): Promise<any | undefined> {
   // Prevent us from dialing ourself
   if (counterparty.equals(libp2p.peerId)) {
     console.trace(`Preventing self dial.`)
