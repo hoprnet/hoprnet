@@ -189,7 +189,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       addresses: { listen: addresses },
       // libp2p modules
       modules: {
-        transport: [HoprConnect],
+        transport: [HoprConnect.prototype[Symbol.toStringTag]],
         streamMuxer: [MPLEX],
         connEncryption: [NOISE],
         dht: KadDHT
