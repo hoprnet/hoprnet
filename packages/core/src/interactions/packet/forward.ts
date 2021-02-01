@@ -6,7 +6,6 @@ import Debug from 'debug'
 const log = Debug('hopr-core:forward')
 const verbose = Debug('hopr-core:forward')
 
-
 import type PeerId from 'peer-id'
 
 import type { AbstractInteraction } from '../abstractInteraction'
