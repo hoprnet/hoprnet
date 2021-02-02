@@ -75,8 +75,8 @@ class ChannelFactory {
     log('Received open event for channel with %s', counterparty.toHex())
 
     const balance = new ChannelBalance(undefined, {
-      balance: new BN(10),
-      balance_a: new BN(2)
+      balance: new BN(channelEntry.deposit),
+      balance_a: new BN(channelEntry.partyABalance)
     })
     const state = new ChannelState(undefined, { state: stateCounterToStatus(channelEntry.stateCounter.toNumber()) })
     const newChannel = new ChannelType(undefined, {
