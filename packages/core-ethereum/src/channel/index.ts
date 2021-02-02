@@ -5,6 +5,7 @@ import {
   Balance,
   ChannelBalance,
   Channel as ChannelType,
+  ChannelState,
   Hash,
   Public,
   Signature,
@@ -14,7 +15,16 @@ import {
   TicketEpoch,
   ChannelEntry
 } from '../types'
-import { waitForConfirmation, getId, pubKeyToAccountId, sign, isPartyA, getParties, Log } from '../utils'
+import {
+  waitForConfirmation,
+  getId,
+  pubKeyToAccountId,
+  sign,
+  isPartyA,
+  getParties,
+  Log,
+  stateCounterToStatus
+} from '../utils'
 import { ERRORS } from '../constants'
 import type HoprEthereum from '..'
 import Channel from './channel'
@@ -28,11 +38,6 @@ const WIN_PROB = new BN(1)
 
 class ChannelFactory {
   public tickets: TicketStatic
-  // currently we are expecting the counterparty to send us
-  // the signed channel, this is legacy behaviour that will be
-  // refactored out.
-  // keyed by counterparty's public key
-  private signedChannels = new Map<string, SignedChannel>()
 
   constructor(private coreConnector: HoprEthereum) {
     this.tickets = new TicketStatic(coreConnector)
@@ -43,7 +48,7 @@ class ChannelFactory {
     const { indexer } = this.coreConnector
     const self = new Public(this.coreConnector.account.keys.onChain.pubKey)
 
-    indexer.on('channelOpened', ({ partyA: _partyA, partyB: _partyB }: ChannelUpdate) => {
+    indexer.on('channelOpened', ({ partyA: _partyA, partyB: _partyB, channelEntry }: ChannelUpdate) => {
       const partyA = new Public(_partyA)
       const partyB = new Public(_partyB)
 
@@ -51,7 +56,7 @@ class ChannelFactory {
       const isOurs = partyA.eq(self) || partyB.eq(self)
       if (!isOurs) return
 
-      this.onOpen(isPartyA(self, partyA) ? partyB : partyA)
+      this.onOpen(isPartyA(self, partyA) ? partyB : partyA, channelEntry as ChannelEntry)
     })
 
     indexer.on('channelClosed', ({ partyA: _partyA, partyB: _partyB }: ChannelUpdate) => {
@@ -66,31 +71,35 @@ class ChannelFactory {
     })
   }
 
-  async onOpen(counterparty: Public): Promise<void> {
+  async onOpen(counterparty: Public, channelEntry: ChannelEntry): Promise<void> {
     log('Received open event for channel with %s', counterparty.toHex())
-    const signedChannel = this.signedChannels.get(counterparty.toHex())
 
-    // we did not receive the signed channel
-    if (!signedChannel) {
-      log('signedChannel with %s not found', counterparty.toHex())
-      return
-    }
-    log('Found signedChannel with %s', counterparty.toHex())
+    const balance = new ChannelBalance(undefined, {
+      balance: new BN(channelEntry.deposit),
+      balance_a: new BN(channelEntry.partyABalance)
+    })
+    const state = new ChannelState(undefined, { state: stateCounterToStatus(channelEntry.stateCounter.toNumber()) })
+    const newChannel = new ChannelType(undefined, {
+      state,
+      balance
+    })
 
     // we store it, if we have an previous signed channel
     // under this counterparty, we replace it
-    await this.saveOffChainState(counterparty, signedChannel)
-
-    // only delete signedChannel once we store it
-    // this.signedChannels.delete(counterparty.toHex())
+    await this.saveOffChainState(
+      counterparty,
+      new SignedChannel(undefined, {
+        channel: newChannel,
+        counterparty
+      })
+    )
   }
 
   async onClose(counterparty: Public): Promise<void> {
     log('Received close event for channel with %s', counterparty.toHex())
     // we don't know which channel iteration this
     // this signed channel is from so we do nothing
-    // this.signedChannels.delete(counterparty.toHex())
-    // this.deleteOffChainState(counterparty)
+    // await this.deleteOffChainState(counterparty)
   }
 
   async increaseFunds(counterparty: AccountId, amount: Balance): Promise<void> {
@@ -148,6 +157,8 @@ class ChannelFactory {
     if (onChain != offChain) {
       if (!onChain && offChain) {
         log(`Channel ${channelId.toHex()} exists off-chain but not on-chain.`)
+        // we don't know which channel iteration this
+        // this signed channel is from so we do nothing
         // await this.coreConnector.channel.deleteOffChainState(counterpartyPubKey)
       } else {
         throw Error(`Channel ${channelId.toHex()} exists on-chain but not off-chain.`)
@@ -252,7 +263,16 @@ class ChannelFactory {
         await this.increaseFunds(counterparty, new Balance(amountToFund.sub(amountFunded)))
       }
 
-      signedChannel = await sign(channelBalance)
+      const state = new ChannelState(undefined, { state: stateCounterToStatus(0) })
+
+      // signedChannel = await sign(channelBalance)
+      signedChannel = new SignedChannel(undefined, {
+        channel: new ChannelType(undefined, {
+          state,
+          balance: channelBalance
+        }),
+        counterparty: new Public(counterpartyPubKey)
+      })
 
       try {
         await waitForConfirmation(
@@ -332,12 +352,6 @@ class ChannelFactory {
           bytes: msg.buffer,
           offset: msg.byteOffset
         })
-
-        const counterparty = new Public(await signedChannel.signer)
-
-        // legacy requirement, to be fixed in refactor
-        this.signedChannels.set(counterparty.toHex(), signedChannel)
-        log('Received signedChannel from %s', counterparty.toHex())
 
         /*
         // Fund both ways
