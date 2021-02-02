@@ -88,7 +88,6 @@ class ChannelFactory {
     // under this counterparty, we replace it
     await this.saveOffChainState(
       counterparty,
-      // @ts-ignore
       new SignedChannel(undefined, {
         channel: newChannel,
         counterparty
