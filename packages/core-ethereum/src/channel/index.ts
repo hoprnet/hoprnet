@@ -93,17 +93,13 @@ class ChannelFactory {
         counterparty
       })
     )
-
-    // only delete signedChannel once we store it
-    // this.signedChannels.delete(counterparty.toHex())
   }
 
   async onClose(counterparty: Public): Promise<void> {
     log('Received close event for channel with %s', counterparty.toHex())
     // we don't know which channel iteration this
     // this signed channel is from so we do nothing
-    // this.signedChannels.delete(counterparty.toHex())
-    // this.deleteOffChainState(counterparty)
+    // await this.deleteOffChainState(counterparty)
   }
 
   async increaseFunds(counterparty: AccountId, amount: Balance): Promise<void> {
@@ -161,6 +157,8 @@ class ChannelFactory {
     if (onChain != offChain) {
       if (!onChain && offChain) {
         log(`Channel ${channelId.toHex()} exists off-chain but not on-chain.`)
+        // we don't know which channel iteration this
+        // this signed channel is from so we do nothing
         // await this.coreConnector.channel.deleteOffChainState(counterpartyPubKey)
       } else {
         throw Error(`Channel ${channelId.toHex()} exists on-chain but not off-chain.`)
