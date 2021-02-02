@@ -11,6 +11,6 @@
     "sourceMap": true,
     "forceConsistentCasingInFileNames": true
   },
-  "exclude": ["lib"],
+  "exclude": ["lib, node_modules"],
   "include": ["src/**/*.ts"]
 }

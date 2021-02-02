@@ -29,5 +29,8 @@
     "singleQuote": true,
     "printWidth": 120,
     "trailingComma": "none"
+  },
+  "resolutions": {
+    "**/interface-datastore": "https://github.com/hoprnet/interface-datastore.git"
   }
 }

@@ -1,3 +1,5 @@
+/// <reference path="../../@types/libp2p.ts" />
+
 import { PROTOCOL_STRING } from '../../constants'
 import { Packet } from '../../messages/packet'
 import { Acknowledgement } from '../../messages/acknowledgement'

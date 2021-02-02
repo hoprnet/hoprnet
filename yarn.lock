@@ -7195,10 +7195,9 @@ inquirer@^6.2.0, inquirer@^6.2.2:
     strip-ansi "^5.1.0"
     through "^2.3.6"
 
-interface-datastore@^3.0.3:
+interface-datastore@^3.0.3, "interface-datastore@https://github.com/hoprnet/interface-datastore.git":
   version "3.0.3"
-  resolved "https://registry.yarnpkg.com/interface-datastore/-/interface-datastore-3.0.3.tgz#a994f22b5a74e91dc4575d20f32b71dcecf282ff"
-  integrity sha512-T7CFAoJptmFgBuVYjDAHiSlFjZRlabLBL1n/zp8bG7Xq7K3uicbHIRvKaWE2bR74IqtECdjWovdeKtZccCmV6w==
+  resolved "https://github.com/hoprnet/interface-datastore.git#6e8eb3a7d185915eefc3e4126cf311a45a0b6792"
   dependencies:
     err-code "^2.0.1"
     ipfs-utils "^6.0.0"

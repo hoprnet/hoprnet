@@ -1,3 +1,5 @@
+/// <reference path="../../@types/libp2p.ts" />
+
 import { AbstractInteraction } from '../abstractInteraction'
 
 import pipe from 'it-pipe'

@@ -1,3 +1,5 @@
+/// <reference path="../../@types/libp2p.ts" />
+
 import BN from 'bn.js'
 import LibP2P from 'libp2p'
 import { blue, green } from 'chalk'

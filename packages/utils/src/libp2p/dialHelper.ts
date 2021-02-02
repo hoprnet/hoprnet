@@ -56,7 +56,7 @@ export async function dialHelper(
     signal = options.signal
   }
 
-  let struct: Handler
+  let struct: any
 
   let addresses = (libp2p.peerStore.get(counterparty)?.addresses ?? []).map((addr: Multiaddr) => addr.toString())
 

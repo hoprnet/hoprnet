@@ -1,3 +1,5 @@
+/// <reference path="../../@types/libp2p.ts" />
+
 import type { AbstractInteraction } from '../abstractInteraction'
 import { randomBytes, createHash } from 'crypto'
 import { u8aEquals } from '@hoprnet/hopr-utils'

@@ -1,3 +1,5 @@
+/// <reference path="../../@types/libp2p.ts" />
+
 import { Heartbeat } from './heartbeat'
 import LibP2P from 'libp2p'
 import PeerId from 'peer-id'
