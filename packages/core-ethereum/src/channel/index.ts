@@ -47,27 +47,30 @@ class ChannelFactory {
   async listenForChannels(): Promise<void> {
     const { indexer } = this.coreConnector
     const self = new Public(this.coreConnector.account.keys.onChain.pubKey)
+    const selfAccountId = await self.toAccountId()
 
-    indexer.on('channelOpened', ({ partyA: _partyA, partyB: _partyB, channelEntry }: ChannelUpdate) => {
+    indexer.on('channelOpened', async ({ partyA: _partyA, partyB: _partyB, channelEntry }: ChannelUpdate) => {
       const partyA = new Public(_partyA)
+      const partyAAccountId = await partyA.toAccountId()
       const partyB = new Public(_partyB)
 
       log('channelOpened', partyA.toHex(), partyB.toHex())
       const isOurs = partyA.eq(self) || partyB.eq(self)
       if (!isOurs) return
 
-      this.onOpen(isPartyA(self, partyA) ? partyB : partyA, channelEntry as ChannelEntry)
+      await this.onOpen(isPartyA(selfAccountId, partyAAccountId) ? partyB : partyA, channelEntry as ChannelEntry)
     })
 
-    indexer.on('channelClosed', ({ partyA: _partyA, partyB: _partyB }: ChannelUpdate) => {
+    indexer.on('channelClosed', async ({ partyA: _partyA, partyB: _partyB }: ChannelUpdate) => {
       const partyA = new Public(_partyA)
+      const partyAAccountId = await partyA.toAccountId()
       const partyB = new Public(_partyB)
 
       log('channelClosed', partyA.toHex(), partyB.toHex())
       const isOurs = partyA.eq(self) || partyB.eq(self)
       if (!isOurs) return
 
-      this.onClose(isPartyA(self, partyA) ? partyB : partyA)
+      await this.onClose(isPartyA(selfAccountId, partyAAccountId) ? partyB : partyA)
     })
   }
 
