@@ -4,7 +4,7 @@ import Public from './public'
 import { Channel } from './channel'
 import { Uint8ArrayE } from '../types/extended'
 
-class SignedChannelHack extends Uint8ArrayE implements Types.SignedChannel {
+class SignedChannel extends Uint8ArrayE implements Types.SignedChannel {
   private _channel?: Channel
 
   constructor(
@@ -18,9 +18,9 @@ class SignedChannelHack extends Uint8ArrayE implements Types.SignedChannel {
     }
   ) {
     if (!arr) {
-      super(SignedChannelHack.SIZE)
+      super(SignedChannel.SIZE)
     } else {
-      super(arr.bytes, arr.offset, SignedChannelHack.SIZE)
+      super(arr.bytes, arr.offset, SignedChannel.SIZE)
     }
 
     if (struct) {
@@ -34,11 +34,11 @@ class SignedChannelHack extends Uint8ArrayE implements Types.SignedChannel {
     }
   }
 
-  slice(begin = 0, end = SignedChannelHack.SIZE) {
+  slice(begin = 0, end = SignedChannel.SIZE) {
     return this.subarray(begin, end)
   }
 
-  subarray(begin = 0, end = SignedChannelHack.SIZE): Uint8Array {
+  subarray(begin = 0, end = SignedChannel.SIZE): Uint8Array {
     return new Uint8Array(this.buffer, begin + this.byteOffset, end - begin)
   }
 
@@ -73,7 +73,7 @@ class SignedChannelHack extends Uint8ArrayE implements Types.SignedChannel {
   }
 
   async verify(_publicKey: Uint8Array): Promise<boolean> {
-    throw Error('SignedChannelHack does not implement verify')
+    throw Error('SignedChannel does not implement verify')
   }
 
   static get SIZE(): number {
@@ -89,9 +89,9 @@ class SignedChannelHack extends Uint8ArrayE implements Types.SignedChannel {
       signature?: Signature
       channel?: Channel
     }
-  ): Promise<SignedChannelHack> {
-    return Promise.resolve(new SignedChannelHack(arr, struct))
+  ): Promise<SignedChannel> {
+    return Promise.resolve(new SignedChannel(arr, struct))
   }
 }
 
-export default SignedChannelHack
+export default SignedChannel
