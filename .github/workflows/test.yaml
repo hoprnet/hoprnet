@@ -37,11 +37,9 @@ jobs:
       - name: Install dependencies
         run: |
           pwd
-          chmod 0777 yarn.lock
           yarn config list
           ls -l
-          yarn import
-          yarn --verbose --cwd . check --integrity
+          yarn check --integrity
           yarn --verbose 
           node_modules/.bin/lerna bootstrap
 
