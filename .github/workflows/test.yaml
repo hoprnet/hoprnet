@@ -38,7 +38,7 @@ jobs:
         run: |
           pwd
           ls
-          yarn --prefer-offline --verbose 
+          yarn --verbose 
           node_modules/.bin/lerna bootstrap
 
       - name: Build (all)
