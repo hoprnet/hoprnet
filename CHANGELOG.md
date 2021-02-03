@@ -1,3 +1,17 @@
+<a name="0.2.12"></a>
+
+## [0.2.12](https://github.com/hoprnet/hopr-connect/compare/0.2.11...0.2.12) (2021-02-03)
+
+### Fixes
+
+- properly expose own TCP address as e.g. `/ip4/127.0.0.1/tcp/12345/p2p/<MyPeerId>`
+
+### Changes
+
+- Node.JS 12 -> Node.JS 14
+- libp2p 0.29 -> Node.JS 0.30 (only for testing)
+- libp2p-secio -> libp2p-noise (only for testing)
+
 <a name="0.2.11"></a>
 
 ## [0.2.11](https://github.com/hoprnet/hopr-connect/compare/0.2.10...0.2.11) (2021-01-29)
