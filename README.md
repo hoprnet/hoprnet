@@ -34,8 +34,13 @@ A [transport module](https://github.com/libp2p/js-libp2p-interfaces/tree/master/
   - use any other available peer in the network as signalling server
   - perform WebRTC handshake(s)
   - upgrade to direct connection if possible
+  - otherwise fallback to existing relayed connection
 - use nodes in the network as STUN and TURN servers
 - reconnect handling
+
+### Information for VPS / docker / firewalls
+
+HoprConnect binds to a TCP socket as given by the configuration. **It also bind to a UDP socket** on the same port to perform and answer STUN requests from WebRTC and at startup to publish its own public IPv4 address. 
 
 ## Usage
 
