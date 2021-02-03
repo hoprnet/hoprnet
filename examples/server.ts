@@ -18,6 +18,10 @@ async function main() {
       transport: [HoprConnect],
       streamMuxer: [MPLEX],
       connEncryption: [NOISE]
+    },
+    dialer: {
+      // Temporary fix
+      addressSorter: (ma: Multiaddr) => ma
     }
   })
 

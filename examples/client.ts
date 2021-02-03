@@ -2,7 +2,7 @@ import libp2p from 'libp2p'
 import type { Handler, Stream } from 'libp2p'
 import { durations } from '@hoprnet/hopr-utils'
 
-import { NOISE} from 'libp2p-noise'
+import { NOISE } from 'libp2p-noise'
 
 const MPLEX = require('libp2p-mplex')
 
@@ -52,6 +52,10 @@ async function main() {
           __noWebRTCUpgrade: false
         }
       }
+    },
+    dialer: {
+      // Temporary fix
+      addressSorter: (ma: Multiaddr) => ma
     }
   })
 
