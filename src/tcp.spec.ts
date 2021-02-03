@@ -19,6 +19,8 @@ describe('test TCP connection', function () {
 
     const test = new TextEncoder().encode('test')
 
+    const peerId = await PeerId.create({ keyType: 'secp256k1' })
+
     const server = createServer((socket: Socket) => {
       socket.on('data', (data: Uint8Array) => {
         assert(u8aEquals(data, test))
@@ -32,7 +34,7 @@ describe('test TCP connection', function () {
 
     await bound.promise
 
-    const conn = await TCPConnection.create(Multiaddr('/ip4/127.0.0.1/tcp/9091'))
+    const conn = await TCPConnection.create(Multiaddr('/ip4/127.0.0.1/tcp/9091'), peerId)
 
     conn.sink(
       (async function* () {
@@ -57,19 +59,20 @@ describe('test TCP connection', function () {
       upgradeOutbound: (arg: any) => Promise.resolve(arg)
     } as unknown) as Upgrader
 
+    const peerId = await PeerId.create({ keyType: 'secp256k1' })
     const listener = new Listener(
       (_conn: Connection) => {
         console.log('new connection')
       },
       upgrader,
       undefined,
-      await PeerId.create({ keyType: 'secp256k1' }),
+      peerId,
       undefined
     )
 
     await listener.listen(Multiaddr('/ip4/127.0.0.1/tcp/9091'))
 
-    const tcpConn = await TCPConnection.create(Multiaddr('/ip4/127.0.0.1/tcp/9091'))
+    const tcpConn = await TCPConnection.create(Multiaddr('/ip4/127.0.0.1/tcp/9091'), peerId)
 
     tcpConn.sink(
       (async function* () {
