@@ -74,6 +74,10 @@ const node = await libp2p.create({
   },
   addresses: {
     listen: Multiaddr(`/ip4/127.0.0.1/tcp/9091/p2p/${peerId.toB58String()}`)
+  },
+  dialer: {
+    // Temporary fix
+    addressSorter: (ma: Multiaddr) => ma,
   }
 })
 ```
@@ -110,6 +114,10 @@ const node = await libp2p.create({
       __noDirectConnections: false, // set to true to simulate NAT
       __noWebRTCUpgrade: false // set to true to simulate bidirectional NAT
     }
+  },
+  dialer: {
+    // Temporary fix
+    addressSorter: (ma: Multiaddr) => ma,
   }
 })
 ```
