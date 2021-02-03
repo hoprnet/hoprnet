@@ -37,7 +37,8 @@ jobs:
       - name: Install dependencies
         run: |
           pwd
-          ls
+          ls -l
+          npm install -g yarn
           yarn --verbose 
           node_modules/.bin/lerna bootstrap
 
