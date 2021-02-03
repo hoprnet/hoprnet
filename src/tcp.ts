@@ -17,6 +17,7 @@ import type { MultiaddrConnection, Stream, DialOptions, StreamType } from 'libp2
 import Multiaddr from 'multiaddr'
 import toIterable from 'stream-to-it'
 import { toU8aStream } from './utils'
+import { PeerId } from 'libp2p-interfaces'
 
 class TCPConnection implements MultiaddrConnection {
   public localAddr: Multiaddr
@@ -32,8 +33,10 @@ class TCPConnection implements MultiaddrConnection {
     close?: number
   }
 
-  constructor(public remoteAddr: Multiaddr, public conn: Socket, options?: DialOptions) {
-    this.localAddr = Multiaddr.fromNodeAddress(this.conn.address() as any, 'tcp')
+  constructor(public remoteAddr: Multiaddr, self: PeerId, public conn: Socket, options?: DialOptions) {
+    this.localAddr = Multiaddr.fromNodeAddress(this.conn.address() as any, 'tcp').encapsulate(
+      `/p2p/${self.toB58String()}`
+    )
 
     this.timeline = {
       open: Date.now()
@@ -123,7 +126,7 @@ class TCPConnection implements MultiaddrConnection {
    * @param options.signal Used to abort dial requests
    * @returns Resolves a TCP Socket
    */
-  public static create(ma: Multiaddr, options?: DialOptions): Promise<MultiaddrConnection> {
+  public static create(ma: Multiaddr, self: PeerId, options?: DialOptions): Promise<MultiaddrConnection> {
     if (options?.signal?.aborted) {
       throw new AbortError()
     }
@@ -175,7 +178,7 @@ class TCPConnection implements MultiaddrConnection {
           return reject(err)
         }
 
-        resolve(new TCPConnection(ma, rawSocket))
+        resolve(new TCPConnection(ma, self, rawSocket))
       }
 
       rawSocket.on('error', onError)
@@ -185,7 +188,7 @@ class TCPConnection implements MultiaddrConnection {
     })
   }
 
-  public static fromSocket(socket: Socket) {
+  public static fromSocket(socket: Socket, self: PeerId) {
     if (socket.remoteAddress == undefined || socket.remoteFamily == undefined || socket.remotePort == undefined) {
       throw Error(`Could not determine remote address`)
     }
@@ -199,7 +202,7 @@ class TCPConnection implements MultiaddrConnection {
       'tcp'
     )
 
-    return new TCPConnection(remoteAddr, socket)
+    return new TCPConnection(remoteAddr, self, socket)
   }
 }
 

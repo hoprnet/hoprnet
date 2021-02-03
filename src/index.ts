@@ -239,7 +239,7 @@ class HoprConnect implements Transport {
    */
   private async dialDirectly(ma: Multiaddr, options?: DialOptions): Promise<Connection> {
     log(`Attempting to dial ${chalk.yellow(ma.toString())} directly`)
-    const maConn = await TCPConnection.create(ma, options)
+    const maConn = await TCPConnection.create(ma, this._peerId, options)
 
     verbose(
       `Establishing a direct connection to ${maConn.remoteAddr.toString()} was successful. Continuing with the handshake.`

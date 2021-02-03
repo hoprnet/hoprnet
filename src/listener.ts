@@ -135,7 +135,8 @@ class Listener extends EventEmitter implements InterfaceListener {
     const options = this.listeningAddr.toOptions()
 
     if (this._interface != undefined) {
-      const osInterface = networkInterfaces()[this._interface].filter(
+      // @TODO check what happens when networkInterfaces() returns undefined
+      const osInterface = networkInterfaces()[this._interface]?.filter(
         (iface: NetworkInterfaceInfo) => iface.family.toLowerCase() == options.family && !iface.internal
       )
 
@@ -305,7 +306,7 @@ class Listener extends EventEmitter implements InterfaceListener {
     let maConn: MultiaddrConnection | undefined
     let conn: Connection
     try {
-      maConn = TCPConnection.fromSocket(socket)
+      maConn = TCPConnection.fromSocket(socket, this.peerId)
       log('new inbound connection %s', maConn.remoteAddr)
       conn = await this.upgrader.upgradeInbound(maConn)
     } catch (err) {

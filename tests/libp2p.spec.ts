@@ -92,7 +92,7 @@ describe('libp2p compliance', () => {
 
       const addrs = [
         Multiaddr(`/ip4/127.0.0.1/tcp/9093/p2p/${await PeerId.createFromPrivKey(Bob)}`),
-        Multiaddr(`/ip4/127.0.0.1/tcp/9095/p2p/${await PeerId.createFromPrivKey(Dave)}`)
+        Multiaddr(`/p2p/${await PeerId.createFromPrivKey(Dave)}`)
       ]
 
       const upgrader = await myUpgrader(await PeerId.createFromPrivKey(Bob))

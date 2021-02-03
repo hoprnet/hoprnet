@@ -63,7 +63,7 @@ export function getAddrs(
     includeLocalhostIPv6?: boolean
   }
 ) {
-  let interfaces: NetworkInterfaceInfo[][]
+  let interfaces: (NetworkInterfaceInfo[] | undefined)[]
 
   if (options?.interface != undefined) {
     let _tmp = networkInterfaces()[options.interface]
@@ -84,6 +84,10 @@ export function getAddrs(
   const multiaddrs: Multiaddr[] = []
 
   for (const iface of interfaces) {
+    if (iface == undefined) {
+      continue
+    }
+
     for (const address of iface) {
       if (isLinkLocaleAddress(address.address, address.family)) {
         if (address.family === 'IPv4' && (options == undefined || options.includeLocalIPv4 != true)) {

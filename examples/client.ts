@@ -2,7 +2,8 @@ import libp2p from 'libp2p'
 import type { Handler, Stream } from 'libp2p'
 import { durations } from '@hoprnet/hopr-utils'
 
-const SECIO = require('libp2p-secio')
+import { NOISE} from 'libp2p-noise'
+
 const MPLEX = require('libp2p-mplex')
 
 import HoprConnect from '../src'
@@ -40,7 +41,7 @@ async function main() {
     modules: {
       transport: [HoprConnect],
       streamMuxer: [MPLEX],
-      connEncryption: [SECIO]
+      connEncryption: [NOISE]
     },
     config: {
       transport: {

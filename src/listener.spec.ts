@@ -160,7 +160,7 @@ describe('transport/listener.spec check listening to sockets', function () {
 
   it('should bind to specific interfaces', async function () {
     const validInterfaces = Object.keys(networkInterfaces()).filter((iface) =>
-      networkInterfaces()[iface].some((x) => !x.internal)
+      networkInterfaces()[iface]?.some((x) => !x.internal)
     )
 
     if (validInterfaces.length == 0) {
