@@ -40,7 +40,7 @@ jobs:
           chmod 0777 yarn.lock
           yarn config list
           ls -l
-          yarn --verbose --cwd /home/runner/work/hoprnet/hoprnet check --integrity
+          yarn --verbose check --integrity
           yarn --verbose 
           node_modules/.bin/lerna bootstrap
 
