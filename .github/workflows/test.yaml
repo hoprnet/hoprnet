@@ -38,7 +38,7 @@ jobs:
         run: |
           pwd
           ls -l
-          yarn check --integrity
+          yarn --cwd /home/runner/work/hoprnet/hoprnet check --integrity
           yarn --verbose 
           node_modules/.bin/lerna bootstrap
 
