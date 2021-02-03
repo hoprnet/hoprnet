@@ -20,7 +20,7 @@ jobs:
           registry-url: https://registry.npmjs.org/
 
       - name: Install dependencies 
-        run: yarn
+        run: yarn --verbose
 
       - name: Lint & Fix
         run: |

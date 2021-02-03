@@ -24,7 +24,7 @@ jobs:
 
       - name: Install dependencies 
         run: |
-          yarn
+          yarn --verbose
           node_modules/.bin/lerna bootstrap
           #yarn autoclean --force
 

@@ -36,7 +36,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          yarn --prefer-offline --verbose
+          yarn --prefer-offline --verbose 
           node_modules/.bin/lerna bootstrap
 
       - name: Build (all)
