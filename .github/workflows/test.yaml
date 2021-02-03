@@ -39,7 +39,6 @@ jobs:
           pwd
           yarn config list
           ls -l
-          yarn check --integrity
           yarn --verbose 
           node_modules/.bin/lerna bootstrap
 
