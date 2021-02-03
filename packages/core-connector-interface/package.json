@@ -13,7 +13,7 @@
     "!*.spec.js.map"
   ],
   "engines": {
-    "node": "12",
+    "node": "14",
     "yarn": "1"
   },
   "types": "src/index.d.ts",

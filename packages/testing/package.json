@@ -15,7 +15,7 @@
     "yarn.lock"
   ],
   "engines": {
-    "node": "12"
+    "node": "14"
   },
   "scripts": {
     "clean": "rimraf ./lib",
@@ -28,7 +28,7 @@
     "ganache-core": "2.13.2"
   },
   "devDependencies": {
-    "@types/node": "^12",
+    "@types/node": "14",
     "rimraf": "^3.0.2",
     "typescript": "^4.1"
   }
