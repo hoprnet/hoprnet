@@ -41,7 +41,7 @@ A [transport module](https://github.com/libp2p/js-libp2p-interfaces/tree/master/
 
 ### Dependencies
 
-- Node.js 12.x, seems to work with Node.JS 14.x as well
+- Node.js 14.x, also tested with Node.js 12.x
 - yarn
 
 ### Startup
@@ -51,7 +51,7 @@ Start a bootstrapServer
 ```ts
 const libp2p = require('libp2p')
 const MPLEX = require('libp2p-mplex')
-const SECIO = require('libp2p-secio')
+import { NOISE } from 'libp2p-noise'
 const PeerId = require('peer-id')
 
 import HoprConnect from 'hopr-connect'
@@ -64,7 +64,7 @@ const node = await libp2p.create({
   modules: {
     transport: [HoprConnect],
     streamMuxer: [MPLEX],
-    connEncryption: [SECIO],
+    connEncryption: [NOISE],
     peerDiscovery: [HoprConnect.discovery]
   },
   addresses: {
@@ -78,7 +78,7 @@ Start another client
 ```ts
 const libp2p = require('libp2p')
 const MPLEX = require('libp2p-mplex')
-const SECIO = require('libp2p-secio')
+import { NOISE } from 'libp2p-noise'
 const PeerId = require('peer-id')
 
 import HoprConnect from 'hopr-connect'
@@ -92,7 +92,7 @@ const node = await libp2p.create({
   modules: {
     transport: [HoprConnect],
     streamMuxer: [MPLEX],
-    connEncryption: [SECIO],
+    connEncryption: [NOISE],
     peerDiscovery: [HoprConnect.discovery]
   },
   addresses: {
