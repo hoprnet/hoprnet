@@ -38,7 +38,7 @@ jobs:
         run: |
           pwd
           ls -l
-          npm install -g yarn
+          yarn check --integrity
           yarn --verbose 
           node_modules/.bin/lerna bootstrap
 
