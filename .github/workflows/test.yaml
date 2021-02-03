@@ -22,6 +22,7 @@ jobs:
         uses: actions/setup-node@v2
         with:
           node-version: ${{ matrix.node-version }}
+          registry-url: 'https://registry.npmjs.org'
 
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
