@@ -46,6 +46,7 @@ HoprConnect binds to a TCP socket as given by the configuration. **It also bind 
 
 ### Dependencies
 
+- libp2p >= 0.30
 - Node.js 14.x, also tested with Node.js 12.x
 - yarn
 
