@@ -58,7 +58,9 @@ export async function dialHelper(
 
   let struct: any
 
-  let addresses = (libp2p.peerStore.get(counterparty)?.addresses ?? []).map((addr: Multiaddr) => addr.toString())
+  let addresses = (
+    libp2p.peerStore.get(counterparty)?.addresses ?? []
+  ).map((addr: { isCertified: boolean; multiaddr: Multiaddr }) => addr.multiaddr.toString())
 
   // Try to use known addresses
   if (addresses.length > 0) {
