@@ -31,7 +31,7 @@ jobs:
               ${{ runner.os }}-yarn-
 
       - name: Install dependencies 
-        run: yarn
+        run: yarn --prefer-offline
 
       - name: Lint & Fix
         run: |
