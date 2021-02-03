@@ -90,6 +90,7 @@ export async function dialHelper(
       if (err.type === 'aborted') {
         return
       }
+      error(`Error while trying to bypass NATs. ${err.message}`)
     }
   }
 
