@@ -403,12 +403,12 @@
   resolved "https://registry.yarnpkg.com/@hapi/hoek/-/hoek-9.1.1.tgz#9daf5745156fd84b8e9889a2dc721f0c58e894aa"
   integrity sha512-CAEbWH7OIur6jEOzaai83jq3FmKmv4PmX1JYfs9IrYcGEVI/lyL1EXJGCj7eFVJ0bg5QR8LMxBlEtA+xKiLpFw==
 
-"@hoprnet/hopr-connect@0.2.11":
-  version "0.2.11"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-connect/-/hopr-connect-0.2.11.tgz#c002906aa9d68991935639bb60d5c2ba00f7691a"
-  integrity sha512-6IcWcgNOLD/B421uCgB0TrDTyjxwsShqSOUcxX1qG3qm+UXn5ZyaXvNZp6xI+7oWoLfTc6ponmrCPiufOdwLzQ==
+"@hoprnet/hopr-connect@0.2.13":
+  version "0.2.13"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-connect/-/hopr-connect-0.2.13.tgz#7a729c9e73a637c27ad769e2d68a9e80166ee0af"
+  integrity sha512-WUHmJPxGLS81WyThUG1yW7hqrPc7UBesy3iUiw8eXBSwNX8l+OGv9gjy3EsMX5C7+olfRM+7hE0cfltGlLZ7Tw==
   dependencies:
-    "@hoprnet/hopr-utils" "1.68.0-next.9"
+    "@hoprnet/hopr-utils" "1.68.5"
     abortable-iterator "^3.0.0"
     bl "^4.0.3"
     debug "^4.3.1"
@@ -421,19 +421,6 @@
     stream-to-it "^0.2.2"
     webrtc-stun "3.0.0"
     wrtc "0.4.7"
-
-"@hoprnet/hopr-utils@1.68.0-next.9":
-  version "1.68.0-next.9"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-1.68.0-next.9.tgz#aaff888a69eff372a34eee11f2a857279894e1c9"
-  integrity sha512-R3jvqZplrda6QyYHi8oP82WdMNBU1cWTkYScMKGRBWEGVn/2n5sirgWI+S+QnKG6/QxI5o6+eJelJ5EPmCkBAA==
-  dependencies:
-    abort-controller "~3.0.0"
-    bignumber.js "^9.0.0"
-    libp2p-crypto "0.18.0"
-    multiaddr "8.1.2"
-    multihashes "~3.1.0"
-    peer-id "0.14.3"
-    strip-ansi "^6.0.0"
 
 "@lerna/add@3.21.0":
   version "3.21.0"
