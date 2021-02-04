@@ -48,4 +48,4 @@ jobs:
 
       - name: Test
         run: |
-        node_modules/.bin/lerna run test
+          node_modules/.bin/lerna run test
