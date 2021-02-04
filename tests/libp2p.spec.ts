@@ -58,7 +58,7 @@ async function startClient(privKey: Uint8Array, port: number, bootstrapAddress: 
           bootstrapServers: [bootstrapAddress],
           // simulates a NAT
           // do NOT use this in production
-          __noDirectConnections: true
+          //__noDirectConnections: true
         }
       }
     }
