@@ -14,7 +14,6 @@ jobs:
     strategy:
       matrix:
         node-version: [14]
-        package: ['core', 'ethereum', 'all', 'core-ethereum']
 
     steps:
       - uses: actions/checkout@v2
@@ -43,22 +42,10 @@ jobs:
           node_modules/.bin/lerna link 
 
 
-      - name: Build (all)
-        if: matrix.package == 'all' 
+      - name: Build 
         run: |
-          yarn workspaces foreach --exclude={@hoprnet/hopr-core,@hoprnet/hopr-ethereum,@hoprnet/hopr-core-ethereum} --parallel --topological-dev run build
+          yarn workspaces foreach --parallel --topological-dev run build
 
-      - name: Test (all)
-        if: matrix.package == 'all'
+      - name: Test
         run: |
-          yarn workspaces foreach --exclude={@hoprnet/hopr-core,@hoprnet/hopr-ethereum,@hoprnet/hopr-core-ethereum} --parallel run test
-
-      - name: Build ${{ matrix.package }}
-        if: matrix.package != 'all' 
-        run: |
-          yarn workspaces foreach --include=@hoprnet/hopr-${{ matrix.package }} --recursive run build
-
-      - name: Test ${{ matrix.package }}
-        if: matrix.package != 'all' 
-        run: |
-          yarn workspace @hoprnet/hopr-${{ matrix.package }} run test
+          yarn workspaces foreach run test
