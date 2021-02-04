@@ -56,7 +56,7 @@ jobs:
       - name: Build ${{ matrix.package }}
         if: matrix.package != 'all' 
         run: |
-          yarn workspaces foreach run build
+          yarn workspaces foreach --include=@hoprnet/hopr-${{ matrix.package }} --recursive run build
 
       - name: Test ${{ matrix.package }}
         if: matrix.package != 'all' 
