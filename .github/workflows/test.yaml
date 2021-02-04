@@ -40,22 +40,25 @@ jobs:
       - name: Install dependencies
         run: |
           yarn install
+          node_modules/.bin/lerna link 
+
 
       - name: Build (all)
-        id: build-step
         if: matrix.package == 'all' 
         run: |
-          node_modules/.bin/lerna link 
-          yarn workspaces foreach --parallel --topological-dev run build
+          yarn workspaces foreach --exclude={@hoprnet/hopr-core,@hoprnet/hopr-ethereum,@hoprnet/hopr-core-ethereum} --parallel --topological-dev run build
 
       - name: Test (all)
-        needs: [build-step]
         if: matrix.package == 'all'
         run: |
           yarn workspaces foreach --exclude={@hoprnet/hopr-core,@hoprnet/hopr-ethereum,@hoprnet/hopr-core-ethereum} --parallel run test
 
+      - name: Build ${{ matrix.package }}
+        if: matrix.package != 'all' 
+        run: |
+          yarn workspace @hoprnet/hopr-${{ matrix.package }} run build
+
       - name: Test ${{ matrix.package }}
-        needs: [build-step]
         if: matrix.package != 'all' 
         run: |
           yarn workspace @hoprnet/hopr-${{ matrix.package }} run test
