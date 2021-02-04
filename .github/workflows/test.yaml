@@ -14,7 +14,7 @@ jobs:
     strategy:
       matrix:
         node-version: [14]
-        package: ['core', 'ethereum', 'rest', 'core-ethereum']
+        package: ['core', 'ethereum', 'all', 'core-ethereum']
 
     steps:
       - uses: actions/checkout@v2
