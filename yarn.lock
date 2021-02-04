@@ -596,7 +596,7 @@ __metadata:
     libp2p-noise: ^2.0.4
     libp2p-tcp: 0.15
     memdown: ^5.1.0
-    mocha: ^8.2.0
+    mocha: ^8.2.1
     multiaddr: 8.1.2
     multihashes: 3.1.2
     peer-id: 0.14.3
@@ -12658,7 +12658,7 @@ fsevents@~2.3.1:
   languageName: node
   linkType: hard
 
-"mocha@npm:^8.2.0":
+"mocha@npm:^8.2.0, mocha@npm:^8.2.1":
   version: 8.2.1
   resolution: "mocha@npm:8.2.1"
   dependencies:
