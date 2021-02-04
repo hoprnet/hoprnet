@@ -48,4 +48,4 @@ jobs:
 
       - name: Test
         run: |
-          yarn workspaces foreach run test
+        node_modules/.bin/lerna run test
