@@ -1,12 +1,10 @@
-import secp256k1 from 'secp256k1'
 import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import Signature from './signature'
+import Public from './public'
 import { Channel } from './channel'
 import { Uint8ArrayE } from '../types/extended'
-import { verify } from '../utils'
 
 class SignedChannel extends Uint8ArrayE implements Types.SignedChannel {
-  private _signature?: Signature
   private _channel?: Channel
 
   constructor(
@@ -15,7 +13,7 @@ class SignedChannel extends Uint8ArrayE implements Types.SignedChannel {
       offset: number
     },
     struct?: {
-      signature?: Signature
+      counterparty?: Public
       channel?: Channel
     }
   ) {
@@ -30,8 +28,8 @@ class SignedChannel extends Uint8ArrayE implements Types.SignedChannel {
         this.set(struct.channel.toU8a(), this.channelOffset - this.byteOffset)
       }
 
-      if (struct.signature) {
-        this.set(struct.signature, this.signatureOffset - this.byteOffset)
+      if (struct.counterparty) {
+        this.set(struct.counterparty, this.signatureOffset - this.byteOffset)
       }
     }
   }
@@ -49,14 +47,14 @@ class SignedChannel extends Uint8ArrayE implements Types.SignedChannel {
   }
 
   get signature(): Signature {
-    if (!this._signature) {
-      this._signature = new Signature({
-        bytes: this.buffer,
-        offset: this.signatureOffset
-      })
-    }
+    return new Signature(undefined, {
+      signature: new Uint8Array(),
+      recovery: 0
+    })
+  }
 
-    return this._signature
+  get signer(): Promise<Uint8Array> {
+    return Promise.resolve(new Uint8Array(this.buffer, this.signatureOffset, Public.SIZE))
   }
 
   get channelOffset(): number {
@@ -74,18 +72,8 @@ class SignedChannel extends Uint8ArrayE implements Types.SignedChannel {
     return this._channel
   }
 
-  get signer(): Promise<Uint8Array> {
-    return new Promise<Uint8Array>(async (resolve, reject) => {
-      try {
-        resolve(secp256k1.ecdsaRecover(this.signature.signature, this.signature.recovery, await this.channel.hash))
-      } catch (err) {
-        reject(err)
-      }
-    })
-  }
-
-  async verify(publicKey: Uint8Array): Promise<boolean> {
-    return await verify(await this.channel.hash, this.signature, publicKey)
+  async verify(_publicKey: Uint8Array): Promise<boolean> {
+    throw Error('SignedChannel does not implement verify')
   }
 
   static get SIZE(): number {
