@@ -1,12 +1,8 @@
 #!/usr/bin/env node
 import Hopr from '@hoprnet/hopr-core'
 import type { HoprOptions } from '@hoprnet/hopr-core'
-import { FULL_VERSION } from '@hoprnet/hopr-core/lib/constants'
-
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import { decode } from 'rlp'
-// @ts-ignore
-import Multihash from 'multihashes'
 import { getBootstrapAddresses } from '@hoprnet/hopr-utils'
 import { Commands } from './commands'
 import { LogStream } from './logs'
