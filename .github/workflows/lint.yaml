@@ -18,6 +18,9 @@ jobs:
         with:
           node-version: 14 
 
+      - name: Install dependencies 
+        run: yarn --verbose
+
       - name: Lint & Fix
         run: |
           git config --global user.email "noreply@hoprnet.org"
