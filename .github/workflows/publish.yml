@@ -40,7 +40,6 @@ jobs:
 
     - name: Publish to NPM
       run: |
-        echo $FOO
         yarn config set npmAuthToken ${{ secrets.NPM_TOKEN }}
         yarn npm publish
 
