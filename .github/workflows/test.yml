@@ -37,4 +37,5 @@ jobs:
           yarn install
 
       - name: Test
+        run: |
           yarn test
