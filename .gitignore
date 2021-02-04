@@ -13,3 +13,11 @@ test/local-fixtures
 # logs
 *.log
 logs.txt
+
+# Yarn 2
+.yarn/*
+!.yarn/releases
+!.yarn/plugins
+!.yarn/sdks
+!.yarn/versions
+.pnp.*

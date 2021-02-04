@@ -31,6 +31,6 @@
     "trailingComma": "none"
   },
   "resolutions": {
-    "**/interface-datastore": "https://github.com/hoprnet/interface-datastore.git"
+    "interface-datastore": "https://github.com/hoprnet/interface-datastore.git"
   }
 }

@@ -7,9 +7,7 @@
   "license": "LGPL-3.0-only",
   "main": "lib/index.js",
   "author": "Peter Braden (HOPR) <peter.braden@hoprnet.org>",
-  "bin": {
-    "hoprd": "lib/index.js"
-  },
+  "bin": "lib/index.js",
   "files": [
     "lib",
     "hopr-admin/.next",
