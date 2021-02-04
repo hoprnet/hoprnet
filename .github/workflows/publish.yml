@@ -8,7 +8,7 @@ on:
     types: [created]
 
 jobs:
-  build:
+  publish=npm:
     runs-on: ubuntu-latest
 
     steps:
@@ -38,13 +38,22 @@ jobs:
       run: |
         yarn build
 
-  publish-npm:
-    runs-on: ubuntu-latest
-    needs: build
-    steps:    
-    - run: yarn npm publish
-      env:
+    - name: Publish to NPM
+      run: |
+        yarn npm publish
+      env: 
         NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+
+  # publish-npm:
+  #   runs-on: ubuntu-latest
+  #   needs: build
+  #   steps:    
+  #   - run: |
+  #       yarn install
+  #       yarn build
+  #     env:
+  #       NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
   # publish-gpr:
   #   needs: build
   #   steps:
