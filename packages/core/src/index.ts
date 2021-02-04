@@ -5,7 +5,7 @@ import type { Connection } from 'libp2p'
 
 const MPLEX = require('libp2p-mplex')
 const KadDHT = require('libp2p-kad-dht')
-const SECIO = require('libp2p-secio')
+import { NOISE } from 'libp2p-noise'
 
 import HoprConnect from '@hoprnet/hopr-connect'
 
@@ -188,16 +188,11 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     const libp2p = await LibP2P.create({
       peerId: id,
       addresses: { listen: addresses },
-      // Disable libp2p-switch protections for the moment
-      switch: {
-        denyTTL: 1,
-        denyAttempts: Infinity
-      },
       // libp2p modules
       modules: {
         transport: [HoprConnect],
         streamMuxer: [MPLEX],
-        connEncryption: [SECIO],
+        connEncryption: [NOISE],
         dht: KadDHT
       },
       config: {
