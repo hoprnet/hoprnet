@@ -56,10 +56,9 @@ contract('ERC777', function (accounts) {
       })
     })
 
-    // @TODO this produces a hanging promise in Hardhat
-    // it.skip('does not emit AuthorizedOperator events for default operators', async function () {
-    //   expectEvent.not.inConstructor(this.token, 'AuthorizedOperator') // This helper needs to be implemented
-    // })
+    it.skip('does not emit AuthorizedOperator events for default operators', async function () {
+      expectEvent.not.inConstructor(this.token, 'AuthorizedOperator') // This helper needs to be implemented
+    })
 
     describe('basic information', function () {
       it('returns the name', async function () {

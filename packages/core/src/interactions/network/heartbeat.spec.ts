@@ -1,5 +1,10 @@
 import PeerId from 'peer-id'
-
+// @ts-ignore
+import TCP = require('libp2p-tcp')
+// @ts-ignore
+import MPLEX = require('libp2p-mplex')
+// @ts-ignore
+import SECIO = require('libp2p-secio')
 import { Heartbeat } from './heartbeat'
 import assert from 'assert'
 import { EventEmitter } from 'events'
