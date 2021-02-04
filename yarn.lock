@@ -403,12 +403,12 @@
   resolved "https://registry.yarnpkg.com/@hapi/hoek/-/hoek-9.1.1.tgz#9daf5745156fd84b8e9889a2dc721f0c58e894aa"
   integrity sha512-CAEbWH7OIur6jEOzaai83jq3FmKmv4PmX1JYfs9IrYcGEVI/lyL1EXJGCj7eFVJ0bg5QR8LMxBlEtA+xKiLpFw==
 
-"@hoprnet/hopr-connect@0.2.11":
-  version "0.2.11"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-connect/-/hopr-connect-0.2.11.tgz#c002906aa9d68991935639bb60d5c2ba00f7691a"
-  integrity sha512-6IcWcgNOLD/B421uCgB0TrDTyjxwsShqSOUcxX1qG3qm+UXn5ZyaXvNZp6xI+7oWoLfTc6ponmrCPiufOdwLzQ==
+"@hoprnet/hopr-connect@0.2.12":
+  version "0.2.12"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-connect/-/hopr-connect-0.2.12.tgz#1a61f66f11acc32afc737b7505db922cda24d905"
+  integrity sha512-Jy4TCOAhTUZHSCdAtg9XpFlExFLE318yOBFso8QBSwfmzN4c7hIQ+dpXWBo5s96QtXjv6oqMeTfmV4fxL5+48Q==
   dependencies:
-    "@hoprnet/hopr-utils" "1.68.0-next.9"
+    "@hoprnet/hopr-utils" "1.68.5"
     abortable-iterator "^3.0.0"
     bl "^4.0.3"
     debug "^4.3.1"
@@ -422,10 +422,10 @@
     webrtc-stun "3.0.0"
     wrtc "0.4.7"
 
-"@hoprnet/hopr-utils@1.68.0-next.9":
-  version "1.68.0-next.9"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-1.68.0-next.9.tgz#aaff888a69eff372a34eee11f2a857279894e1c9"
-  integrity sha512-R3jvqZplrda6QyYHi8oP82WdMNBU1cWTkYScMKGRBWEGVn/2n5sirgWI+S+QnKG6/QxI5o6+eJelJ5EPmCkBAA==
+"@hoprnet/hopr-utils@1.68.5":
+  version "1.68.5"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-1.68.5.tgz#e098fc1a684048028082bbb5ac0e815b6808df2d"
+  integrity sha512-NsXVwkowani0pOfm0OQG3JkoWJgFm+dABsXjWGgmWYJteBBLCn+hBVaY48/rjlDEo43xJ7N7kxUx5zZ34kqMsw==
   dependencies:
     abort-controller "~3.0.0"
     bignumber.js "^9.0.0"
