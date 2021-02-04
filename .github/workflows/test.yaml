@@ -45,18 +45,14 @@ jobs:
         if: matrix.package == 'all' 
         run: |
           node_modules/.bin/lerna link 
-          node_modules/.bin/lerna run build --include-dependencies --ignore @hoprnet/hopr-core --ignore @hoprnet/hopr-ethereum --ignore @hoprnet/hopr-core-ethereum
+          yarn workspaces foreach --parallel --topological-dev run build
 
       - name: Test (all)
         if: matrix.package == 'all'
         run: |
-          node_modules/.bin/lerna run test --ignore @hoprnet/hopr-core --ignore @hoprnet/hopr-ethereum --ignore @hoprnet/hopr-core-ethereum
+          yarn workspaces foreach --exclude={@hoprnet/hopr-core,@hoprnet/hopr-ethereum,@hoprnet/hopr-core-ethereum} --parallel run test
 
-      - name: Build ${{ matrix.package }}
-        if: matrix.package != 'all'
+      - name: Test ${{ matrix.package }}
+        if: matrix.package != 'all' 
         run: |
-          node_modules/.bin/lerna run build --include-dependencies --scope @hoprnet/hopr-${{ matrix.package }}
-      # - name: Test ${{ matrix.package }}
-      #   if: matrix.package != 'all' 
-      #   run: |
-      #     node_modules/.bin/lerna run test --scope @hoprnet/hopr-${{ matrix.package }}
+          yarn workspace @hoprnet/hopr-${{ matrix.package }} run test
