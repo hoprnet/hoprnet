@@ -14,13 +14,6 @@
     "build": "yarn clean && tsc -p . --noEmit false",
     "prepublishOnly": "yarn build"
   },
-  "files": [
-    "lib/",
-    "!lib/**/*.spec.*",
-    "README.md",
-    "package.json",
-    "yarn.lock"
-  ],
   "engines": {
     "node": "14"
   },

@@ -11,10 +11,6 @@
   "files": [
     "lib",
     "hopr-admin/.next",
-    "!*.spec.ts",
-    "!*.spec.d.ts",
-    "!*.spec.js",
-    "!*.spec.js.map",
     "hoprd-default.sh"
   ],
   "scripts": {

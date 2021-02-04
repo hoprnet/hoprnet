@@ -1,0 +1,12 @@
+testdb
+db
+tsconfig.json
+src
+architecture.md
+
+# Ignore tests
+test.mocha.ts
+**/*.spec.ts
+**/*.spec.d.ts
+**/*.spec.js
+**/*.spec.js.map

@@ -1,0 +1,8 @@
+tsconfig.json
+src
+
+# Ignore tests
+**/*.spec.ts
+**/*.spec.d.ts
+**/*.spec.js
+**/*.spec.js.map

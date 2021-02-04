@@ -9,10 +9,8 @@
   "types": "lib/index.d.ts",
   "files": [
     "lib/",
-    "!lib/*.spec**",
     "README.md",
-    "package.json",
-    "yarn.lock"
+    "package.json"
   ],
   "engines": {
     "node": "14"

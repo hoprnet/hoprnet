@@ -15,13 +15,6 @@
     "build": "yarn clean && yarn build:types && mkdir -p ./lib/tsc/web3 && cp -R ./src/tsc/web3 ./lib/tsc/web3 && tsc",
     "prepublishOnly": "yarn build"
   },
-  "files": [
-    "lib/",
-    "!*.spec.ts",
-    "!*.spec.d.ts",
-    "!*.spec.js",
-    "!*.spec.js.map"
-  ],
   "engines": {
     "node": "14",
     "yarn": "1"

@@ -3,13 +3,9 @@
   "version": "1.68.0-next.19",
   "description": "On-chain logic for hoprnet.org",
   "repository": "https://github.com/hoprnet/hoprnet.git",
+  "homepage": "https://hoprnet.org",
   "license": "LGPL-3.0-only",
   "main": "./lib/index.js",
-  "files": [
-    "contracts/",
-    "lib/",
-    "!*.test.ts"
-  ],
   "scripts": {
     "clean": "rimraf ./lib && rimraf ./types",
     "build": "yarn clean && yarn build:sol && tsc && cp -R ./chain/abis ./lib/chain/abis",
