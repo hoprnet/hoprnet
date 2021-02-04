@@ -8,7 +8,7 @@ on:
     types: [created]
 
 jobs:
-  publish=npm:
+  publish-npm:
     runs-on: ubuntu-latest
 
     steps:
