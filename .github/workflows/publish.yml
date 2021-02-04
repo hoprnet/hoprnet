@@ -40,8 +40,10 @@ jobs:
 
     - name: Publish to NPM
       run: |
+        echo $FOO
         yarn npm publish
       env: 
+        FOO: '123'
         NPM_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
 
