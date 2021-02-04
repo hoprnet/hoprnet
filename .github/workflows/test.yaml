@@ -40,7 +40,7 @@ jobs:
       - name: Install dependencies
         run: |
           yarn install
-
+          node_modules/.bin/lerna link
       # - name: Build
       #   run: |
       #     node_modules/.bin/lerna bootstrap
