@@ -20,7 +20,7 @@
     "clean": "rimraf ./lib",
     "build": "yarn clean && tsc -p .",
     "test": "yarn testOnce",
-    "testOnce": "yarn node --trace-warnings --unhandled-rejections=strict ../../node_modules/.bin/mocha --reporter=tap --full-trace --exit",
+    "testOnce": "node --trace-warnings --unhandled-rejections=strict ../../node_modules/.bin/mocha --reporter=tap --full-trace --exit",
     "prepublishOnly": "yarn build"
   },
   "dependencies": {
