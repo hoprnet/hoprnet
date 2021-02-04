@@ -42,7 +42,7 @@ jobs:
       - name: Build (all)
         run: |
           node_modules/.bin/lerna link 
-          yarn workspaces foreach --parallel --topological-dev run build
+          node_modules/.bin/lerna run build
 
           #- name: Install hoprd
           #shell: bash

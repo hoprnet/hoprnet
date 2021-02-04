@@ -44,7 +44,7 @@ jobs:
 
       - name: Build 
         run: |
-          yarn workspaces foreach run build
+          node_modules/.bin/lerna run build
 
       - name: Test
         run: |

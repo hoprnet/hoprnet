@@ -37,7 +37,7 @@ jobs:
 
       - name: Build 
         run: |
-          yarn workspaces foreach run build
+          node_modules/.bin/lerna run build
 
       - name: Get version from package.json
         run: echo "PREVIOUS_RELEASE=$(node -p -e "require('./packages/hoprd/package.json').version")" >> $GITHUB_ENV
