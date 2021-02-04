@@ -17,6 +17,7 @@ export default class ListCommands extends AbstractCommand {
   public execute(): string {
     return getOptions(
       this.getCommands()
+        .filter((command) => !command.hidden)
         .map((command) => ({
           value: command.name(),
           description: command.help()
