@@ -7,17 +7,11 @@
   "license": "GPL-3.0-only",
   "keywords": [
     "nat-traversal",
-    "libp2p"
+    "libp2p",
+    "webrtc"
   ],
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
-  "files": [
-    "lib/",
-    "!*.spec.ts",
-    "!*.spec.d.ts",
-    "!*.spec.js",
-    "!*.spec.js.map"
-  ],
   "engines": {
     "node": "12 || 14",
     "yarn": "1"

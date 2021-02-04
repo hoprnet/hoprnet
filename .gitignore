@@ -6,3 +6,11 @@ lib
 
 # npm packets
 *.tgz
+
+# yarn 2
+.yarn/*
+!.yarn/releases
+!.yarn/plugins
+!.yarn/sdks
+!.yarn/versions
+.pnp.*
