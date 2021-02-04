@@ -1,0 +1,13 @@
+.nvmrc
+.prettierignore
+.yarn
+tsconfig.json
+examples
+src
+TESTING.md
+
+# Ignore tests
+**/*.spec.ts
+**/*.spec.d.ts
+**/*.spec.js
+**/*.spec.js.map
