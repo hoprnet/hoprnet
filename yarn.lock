@@ -8475,10 +8475,10 @@ libp2p-record@^0.9.0:
     protons "^2.0.0"
     uint8arrays "^1.1.0"
 
-libp2p-tcp@0.15.2, libp2p-tcp@^0.15.0:
-  version "0.15.2"
-  resolved "https://registry.yarnpkg.com/libp2p-tcp/-/libp2p-tcp-0.15.2.tgz#308a845a9462d89f638d669b916ebddfdad7dea9"
-  integrity sha512-sJwzP6+iWj2QYwo3ab8DycWWGbjxHFm6Cv0mDj8nzkiebLnm36wMs5wXVDiSgerPITAOHE9SPTOOqaST8Y1rnw==
+libp2p-tcp@0.15.3, libp2p-tcp@^0.15.0:
+  version "0.15.3"
+  resolved "https://registry.yarnpkg.com/libp2p-tcp/-/libp2p-tcp-0.15.3.tgz#dbcca2be5ff22ef5f7ebd1a403081d0360834c8c"
+  integrity sha512-j9efQ0aAbcCmVnnF0UqWH1r+qjNc0TpC3bV+QJDxBIe6v92a8l3kZ04G/QkP3vmzDT5Z4ayzMGjrOAas8hJIBA==
   dependencies:
     abortable-iterator "^3.0.0"
     class-is "^1.1.0"
