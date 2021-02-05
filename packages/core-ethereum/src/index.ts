@@ -208,7 +208,6 @@ export default class HoprEthereum implements HoprCoreConnector {
     options?: { id?: number; provider?: string; debug?: boolean; maxConfirmations?: number }
   ): Promise<HoprEthereum> {
     const providerUri = options?.provider || config.DEFAULT_URI
-    console.log(provider)
 
     provider = new Web3.providers.WebsocketProvider(providerUri, {
       reconnect: {
