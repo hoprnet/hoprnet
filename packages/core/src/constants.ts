@@ -1,18 +1,14 @@
 import BN from 'bn.js'
 
-const pkg = require('../package.json')
-
 export const TICKET_AMOUNT = 10000000000000 // 0.00001 HOPR
 export const TICKET_WIN_PROB = 1 // 100%
 export const PACKET_SIZE = 500
 export const MARSHALLED_PUBLIC_KEY_SIZE = 37
 export const NAME = 'ipfs' // 'hopr'
 
-export const FULL_VERSION = pkg.version
-
-const packageVersion = pkg.version.split('.')
+export const FULL_VERSION = require('../package.json').version
+const packageVersion = FULL_VERSION.split('.')
 export const VERSION = packageVersion[0] + '.' + packageVersion[1] + '.0' // Version on major versions only
-
 const PROTOCOL_NAME = 'hopr'
 
 export const PROTOCOL_STRING = `/${PROTOCOL_NAME}/msg/${VERSION}`

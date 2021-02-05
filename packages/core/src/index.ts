@@ -18,8 +18,7 @@ import {
   TICKET_AMOUNT,
   TICKET_WIN_PROB,
   PATH_RANDOMNESS,
-  MIN_NATIVE_BALANCE,
-  FULL_VERSION
+  MIN_NATIVE_BALANCE
 } from './constants'
 
 import { Network } from './network'
@@ -317,12 +316,6 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     return channels
   }
 
-  /**
-   * Returns the version of hopr-core.
-   */
-  public getVersion() {
-    return FULL_VERSION
-  }
   /**
    * This method starts the node and registers all necessary handlers. It will
    * also open the database and creates one if it doesn't exists.

@@ -48,7 +48,7 @@ export class Commands {
       new PrintAddress(node),
       new PrintBalance(node),
       new StopNode(node),
-      new Version(node),
+      new Version(),
       new Tickets(node),
       new RedeemTickets(node),
       new Settings(node),
