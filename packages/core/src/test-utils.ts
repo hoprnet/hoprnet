@@ -4,7 +4,7 @@ import PeerId from 'peer-id'
 
 const TCP = require('libp2p-tcp')
 const MPLEX = require('libp2p-mplex')
-import { SECIO } from 'libp2p-noise'
+import { NOISE } from 'libp2p-noise'
 
 /**
  * Informs each node about the others existence.
@@ -39,7 +39,7 @@ export async function generateLibP2PMock(addr = '/ip4/0.0.0.0/tcp/0'): Promise<L
     modules: {
       transport: [TCP],
       streamMuxer: [MPLEX],
-      connEncryption: [SECIO]
+      connEncryption: [NOISE]
     }
   })
 
