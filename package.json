@@ -16,6 +16,13 @@
     "node": "12 || 14",
     "yarn": "1"
   },
+  "files": [
+    "lib",
+    "!**/*.spec.ts",
+    "!**/*.spec.d.ts",
+    "!**/*.spec.js",
+    "!**/*.spec.js.map"
+  ],
   "scripts": {
     "lint": "prettier --check .",
     "lint:fix": "prettier --write .",
