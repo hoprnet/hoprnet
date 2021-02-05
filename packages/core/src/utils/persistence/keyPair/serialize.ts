@@ -1,5 +1,4 @@
 import PeerId from 'peer-id'
-import { encode } from 'rlp'
 import { randomBytes, createCipheriv, scryptSync, createHmac } from 'crypto'
 
 import {
@@ -23,13 +22,12 @@ export async function serializeKeyPair(peerId: PeerId, password: Uint8Array) {
 
   const iv = randomBytes(KEYPAIR_IV_LENGTH)
 
-  const ciphertext = createCipheriv(KEYPAIR_CIPHER_ALGORITHM, key, iv).update(peerId.marshal())
+  const ciphertext = createCipheriv(KEYPAIR_CIPHER_ALGORITHM, key, iv).update(peerId.privKey.marshal())
 
-  const encodedCipherText = encode([iv, ciphertext])
-
-  return encode([
-    salt,
-    createHmac(KEYPAIR_MESSAGE_DIGEST_ALGORITHM, key).update(encodedCipherText).digest(),
-    encodedCipherText
+  return Uint8Array.from([
+    ...salt,
+    ...createHmac(KEYPAIR_MESSAGE_DIGEST_ALGORITHM, key).update(Uint8Array.from([...iv, ...ciphertext])).digest(),
+    ...iv,
+    ...ciphertext
   ])
 }
