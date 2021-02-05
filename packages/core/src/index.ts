@@ -5,7 +5,7 @@ import type { Connection } from 'libp2p'
 
 const MPLEX = require('libp2p-mplex')
 const KadDHT = require('libp2p-kad-dht')
-const SECIO = require('libp2p-secio')
+import { NOISE } from 'libp2p-noise'
 
 import HoprConnect from '@hoprnet/hopr-connect'
 
@@ -197,7 +197,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       modules: {
         transport: [HoprConnect],
         streamMuxer: [MPLEX],
-        connEncryption: [SECIO],
+        connEncryption: [NOISE],
         dht: KadDHT
       },
       config: {

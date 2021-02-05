@@ -1,12 +1,10 @@
 import LibP2P from 'libp2p'
 import Multiaddr from 'multiaddr'
 import PeerId from 'peer-id'
-// @ts-ignore
-import TCP = require('libp2p-tcp')
-// @ts-ignore
-import MPLEX = require('libp2p-mplex')
-// @ts-ignore
-import SECIO = require('libp2p-secio')
+
+const TCP = require('libp2p-tcp')
+const MPLEX = require('libp2p-mplex')
+import { SECIO } from 'libp2p-noise'
 
 /**
  * Informs each node about the others existence.
