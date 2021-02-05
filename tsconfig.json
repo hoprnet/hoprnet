@@ -1,8 +1,8 @@
 {
   "compilerOptions": {
-    "lib": ["es2019", "dom", "es2020.promise", "es2020.bigint", "es2020.string"],
+    "lib": ["es2020", "dom"],
     "module": "commonjs",
-    "target": "es2019",
+    "target": "es2020",
     "declaration": true,
     "skipLibCheck": true,
     "noUnusedLocals": true,
