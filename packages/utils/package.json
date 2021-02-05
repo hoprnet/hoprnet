@@ -17,6 +17,13 @@
   "engines": {
     "node": "14"
   },
+  "files": [
+    "lib",
+    "!*.spec.ts",
+    "!*.spec.d.ts",
+    "!*.spec.js",
+    "!*.spec.js.map"
+  ],
   "dependencies": {
     "abort-controller": "~3.0.0",
     "bignumber.js": "^9.0.0",

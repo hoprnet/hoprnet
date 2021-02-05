@@ -17,6 +17,15 @@
     "coverage": "hardhat coverage --network hardhat",
     "prepublishOnly": "yarn build"
   },
+  "files": [
+    "contracts",
+    "lib",
+    "!lib/test",
+    "!**/*.test.ts",
+    "!**/*.test.d.ts",
+    "!**/*.test.js",
+    "!**/*.test.js.map"
+  ],
   "dependencies": {
     "@hoprnet/hopr-demo-seeds": "1.69.0-next.3",
     "@hoprnet/hopr-utils": "1.69.0-next.3",
