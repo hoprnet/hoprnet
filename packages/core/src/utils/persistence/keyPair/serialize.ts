@@ -26,7 +26,9 @@ export async function serializeKeyPair(peerId: PeerId, password: Uint8Array) {
 
   return Uint8Array.from([
     ...salt,
-    ...createHmac(KEYPAIR_MESSAGE_DIGEST_ALGORITHM, key).update(Uint8Array.from([...iv, ...ciphertext])).digest(),
+    ...createHmac(KEYPAIR_MESSAGE_DIGEST_ALGORITHM, key)
+      .update(Uint8Array.from([...iv, ...ciphertext]))
+      .digest(),
     ...iv,
     ...ciphertext
   ])
