@@ -1,4 +1,5 @@
 export const HASH_LENGTH = 32
+export const BYTES27_LENGTH = 27
 
 export const SIGNATURE_LENGTH = 64
 

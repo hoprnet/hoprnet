@@ -1,3 +1,4 @@
+import AccountEntry from './accountEntry'
 import AccountId from './accountId'
 import AcknowledgedTicket from './acknowledgedTicket'
 import Balance from './balance'
@@ -14,6 +15,7 @@ import Ticket from './ticket'
 import TicketEpoch from './ticketEpoch'
 
 export {
+  AccountEntry,
   AccountId,
   AcknowledgedTicket,
   Balance,

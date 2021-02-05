@@ -1,5 +1,5 @@
 import type BN from 'bn.js'
-import type { Public } from '../../types'
+import type { Public, AccountId } from '../../types'
 
 export type Topics = (string | string[])[]
 
@@ -11,8 +11,13 @@ export type Topics = (string | string[])[]
  * recognise
  */
 export type EventData = {
+  SecretHashSet: {
+    account: AccountId
+    secretHash: Uint8Array
+    counter: BN
+  }
   FundedChannel: {
-    funder: string
+    funder: AccountId
     recipient: Public
     counterparty: Public
     recipientAmount: BN

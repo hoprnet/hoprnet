@@ -14,6 +14,7 @@ import { Public } from '../../types'
 export const EventSignatures: {
   [K in keyof EventData]: Buffer
 } = {
+  SecretHashSet: createKeccakHash('keccak256').update('SecretHashSet(address,bytes27,uint32)').digest(),
   FundedChannel: createKeccakHash('keccak256').update('FundedChannel(address,uint,uint,uint,uint)').digest(),
   OpenedChannel: createKeccakHash('keccak256').update('OpenedChannel(uint,uint)').digest(),
   RedeemedTicket: createKeccakHash('keccak256').update('RedeemedTicket(uint,uint,uint)').digest(),

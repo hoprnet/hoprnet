@@ -1,15 +1,17 @@
 /*
   Helper functions which generate database keys
 */
-import { toU8a } from '@hoprnet/hopr-utils'
-import { Hash, Public } from './types'
 import type { Types } from '@hoprnet/hopr-core-connector-interface'
+import { toU8a } from '@hoprnet/hopr-utils'
+import { Hash, Public, AccountId } from './types'
 
 const encoder = new TextEncoder()
 const PREFIX = encoder.encode('payments-')
+const INDEXER_PREFIX = encoder.encode('indexer-')
 const SEPERATOR = encoder.encode('-')
 const channelSubPrefix = encoder.encode('channel-')
 const channelEntrySubPrefix = encoder.encode('channelEntry-')
+const accountEntrySubPrefix = encoder.encode('accountEntry-')
 const challengeSubPrefix = encoder.encode('challenge-')
 const channelIdSubPrefix = encoder.encode('channelId-')
 const nonceSubPrefix = encoder.encode('nonce-')
@@ -46,7 +48,7 @@ export function ChannelKeyParse(arr: Uint8Array): Uint8Array {
  */
 export function LatestBlockNumber(): Uint8Array {
   return allocationHelper([
-    [PREFIX.length, PREFIX],
+    [INDEXER_PREFIX.length, INDEXER_PREFIX],
     [latestBlockNumber.length, latestBlockNumber]
   ])
 }
@@ -56,19 +58,19 @@ export function LatestBlockNumber(): Uint8Array {
  */
 export function LatestConfirmedSnapshot(): Uint8Array {
   return allocationHelper([
-    [PREFIX.length, PREFIX],
+    [INDEXER_PREFIX.length, INDEXER_PREFIX],
     [latestConfirmedSnapshot.length, latestConfirmedSnapshot]
   ])
 }
 
 /**
  * Returns the db-key under which channel entries are saved.
- * @param partyA the accountId of partyA
- * @param partyB the accountId of partyB
+ * @param partyA the public key of partyA
+ * @param partyB the public key of partyB
  */
 export function ChannelEntry(partyA: Types.Public, partyB: Types.Public): Uint8Array {
   return allocationHelper([
-    [PREFIX.length, PREFIX],
+    [INDEXER_PREFIX.length, INDEXER_PREFIX],
     [channelEntrySubPrefix.length, channelEntrySubPrefix],
     [Public.SIZE, partyA],
     [SEPERATOR.length, SEPERATOR],
@@ -79,15 +81,27 @@ export function ChannelEntry(partyA: Types.Public, partyB: Types.Public): Uint8A
 /**
  * Reconstructs parties from a channel entry db-key.
  * @param arr a challenge db-key
- * @returns an array containing partyA's and partyB's accountIds
+ * @returns an array containing partyA's and partyB's public keys
  */
 export function ChannelEntryParse(arr: Uint8Array): [Public, Public] {
-  const partyAStart = PREFIX.length + channelEntrySubPrefix.length
+  const partyAStart = INDEXER_PREFIX.length + channelEntrySubPrefix.length
   const partyAEnd = partyAStart + Public.SIZE
   const partyBStart = partyAEnd + SEPERATOR.length
   const partyBEnd = partyBStart + Public.SIZE
 
   return [new Public(arr.slice(partyAStart, partyAEnd)), new Public(arr.slice(partyBStart, partyBEnd))]
+}
+
+/**
+ * Returns the db-key under which channel entries are saved.
+ * @param account the accountId of party
+ */
+export function AccountEntry(account: AccountId): Uint8Array {
+  return allocationHelper([
+    [INDEXER_PREFIX.length, INDEXER_PREFIX],
+    [accountEntrySubPrefix.length, accountEntrySubPrefix],
+    [AccountId.SIZE, account]
+  ])
 }
 
 /**

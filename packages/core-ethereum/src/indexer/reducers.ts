@@ -1,8 +1,18 @@
 import type { Event } from './topics'
 import assert from 'assert'
 import BN from 'bn.js'
-import { ChannelEntry } from '../types'
+import { ChannelEntry, AccountEntry } from '../types'
 import { isPartyA } from '../utils'
+
+export const onSecretHashSet = async (event: Event<'SecretHashSet'>): Promise<AccountEntry> => {
+  return new AccountEntry(undefined, {
+    blockNumber: event.blockNumber,
+    transactionIndex: event.transactionIndex,
+    logIndex: event.logIndex,
+    hashedSecret: event.data.secretHash,
+    counter: event.data.counter
+  })
+}
 
 export const onFundedChannel = async (
   event: Event<'FundedChannel'>,
@@ -93,30 +103,7 @@ export const onInitiatedChannelClosure = async (
   event: Event<'InitiatedChannelClosure'>,
   channelEntry: ChannelEntry
 ): Promise<ChannelEntry> => {
-  try {
-    assert(channelEntry.status === 'OPEN', "'onInitiatedChannelClosure' failed because channel is not in 'OPEN' status")
-  } catch (err) {
-    console.log({
-      transactionHash: event.transactionHash,
-      blockNumber: event.blockNumber.toString(),
-      transactionIndex: event.transactionIndex.toString(),
-      logIndex: event.logIndex.toString(),
-      initiator: event.data.initiator.toHex(),
-      counterparty: event.data.counterparty.toHex()
-    })
-    console.log({
-      blockNumber: channelEntry.blockNumber.toString(),
-      transactionIndex: channelEntry.transactionIndex.toString(),
-      logIndex: channelEntry.logIndex.toString(),
-      deposit: channelEntry.deposit.toString(),
-      partyABalance: channelEntry.partyABalance.toString(),
-      closureTime: channelEntry.closureTime.toString(),
-      stateCounter: channelEntry.stateCounter.toString(),
-      closureByPartyA: channelEntry.closureByPartyA
-    })
-    console.error(err)
-    throw err
-  }
+  assert(channelEntry.status === 'OPEN', "'onInitiatedChannelClosure' failed because channel is not in 'OPEN' status")
 
   const initiatorAccountId = await event.data.initiator.toAccountId()
   const counterpartyAccountId = await event.data.counterparty.toAccountId()

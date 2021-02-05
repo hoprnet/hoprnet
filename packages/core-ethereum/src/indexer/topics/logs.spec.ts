@@ -1,16 +1,33 @@
 import type { Event } from './types'
 import { expect } from 'chai'
+import { u8aToHex } from '@hoprnet/hopr-utils'
 import { pubKeyToAccountId } from '../../utils'
 import * as logs from './logs'
 import * as fixtures from './logs.fixtures.spec'
 
 // @TODO: add more tests
-describe('test topic utils', function () {
+describe.only('test topic utils', function () {
+  it.only('should convert SECRET_HASHED_SET log to SECRET_HASHED_SET event', async function () {
+    const actual = logs.toSecretHashSetEvent(fixtures.SECRET_HASHED_SET_LOG)
+    const expected = fixtures.SECRET_HASHED_SET_EVENT
+
+    expectBaseEventsToBeEqual(actual, expected)
+    expect(actual.data.account.toHex()).to.equal(expected.data.account.toHex(), 'account')
+    expect(u8aToHex(actual.data.secretHash)).to.equal(u8aToHex(expected.data.secretHash), 'secretHash')
+    expect(actual.data.counter.toString()).to.equal(expected.data.counter.toString(), 'counter')
+  })
+
   it('should convert FUNDED log to FUNDED event', async function () {
     const actual = logs.toFundedChannelEvent(fixtures.FUNDED_LOG)
     const expected = fixtures.FUNDED_EVENT
 
+    console.log({
+      actual: actual.data.funder.toHex(),
+      expected: expected.data.funder.toHex()
+    })
+
     expectBaseEventsToBeEqual(actual, expected)
+    expect(actual.data.funder.toHex()).to.equal(expected.data.funder.toHex(), 'funder')
     expect(actual.data.recipient.toHex()).to.equal(expected.data.recipient.toHex(), 'recipient')
     expect(actual.data.counterparty.toHex()).to.equal(expected.data.counterparty.toHex(), 'counterparty')
     expect(actual.data.recipientAmount.toString()).to.equal(expected.data.recipientAmount.toString(), 'recipientAmount')

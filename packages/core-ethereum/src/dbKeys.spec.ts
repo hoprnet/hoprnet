@@ -95,37 +95,39 @@ describe('test dbKeys', function () {
 
   it("should create 'LatestBlockNumber' key", function () {
     const result = dbKeys.LatestBlockNumber()
-    const expected = encoder.encode('payments-latestBlockNumber')
+    const expected = encoder.encode('indexer-latestBlockNumber')
 
     assert(u8aEquals(result, expected), 'check latestBlockNumber key creation')
   })
 
   it("should create 'LatestConfirmedSnapshot' key", function () {
     const result = dbKeys.LatestConfirmedSnapshot()
-    const expected = encoder.encode('payments-latestConfirmedSnapshot')
+    const expected = encoder.encode('indexer-latestConfirmedSnapshot')
 
     assert(u8aEquals(result, expected), 'check latestConfirmedSnapshot key creation')
   })
 
   it("should create 'ChannelEntry' key", function () {
     const result = dbKeys.ChannelEntry(userA.pubKey, userB.pubKey)
-    const expected = u8aConcat(
-      encoder.encode('payments-channelEntry-'),
-      userA.pubKey,
-      encoder.encode('-'),
-      userB.pubKey
-    )
+    const expected = u8aConcat(encoder.encode('indexer-channelEntry-'), userA.pubKey, encoder.encode('-'), userB.pubKey)
 
     assert(u8aEquals(result, expected), 'check channelEntry key creation')
   })
 
   it("should parse 'ChannelEntry' key", function () {
-    const key = u8aConcat(encoder.encode('payments-channelEntry-'), userA.pubKey, encoder.encode('-'), userB.pubKey)
+    const key = u8aConcat(encoder.encode('indexer-channelEntry-'), userA.pubKey, encoder.encode('-'), userB.pubKey)
     const [result1, result2] = dbKeys.ChannelEntryParse(key)
     const expected1 = userA.pubKey
     const expected2 = userB.pubKey
 
     assert(u8aEquals(result1, expected1), 'check channelEntry key parsing')
     assert(u8aEquals(result2, expected2), 'check channelEntry key parsing')
+  })
+
+  it("should create 'AccountEntry' key", async function () {
+    const result = dbKeys.AccountEntry(await userA.pubKey.toAccountId())
+    const expected = u8aConcat(encoder.encode('indexer-accountEntry-'), await userA.pubKey.toAccountId())
+
+    assert(u8aEquals(result, expected), 'check accountEntry key creation')
   })
 })

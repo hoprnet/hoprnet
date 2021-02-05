@@ -5,6 +5,7 @@
 
 import type { Log } from 'web3-core'
 import type { Event, EventData, Topics } from './types'
+import { u8aToHex } from '@hoprnet/hopr-utils'
 import { generateTopics, EventSignatures } from './utils'
 import * as logs from './logs'
 export * from './logs'
@@ -18,6 +19,7 @@ export * from './types'
 export const EventTopics0: {
   [K in keyof EventData]: Topics
 } = {
+  SecretHashSet: [u8aToHex(EventSignatures.SecretHashSet)],
   FundedChannel: generateTopics(EventSignatures.FundedChannel, undefined, undefined),
   OpenedChannel: generateTopics(EventSignatures.OpenedChannel, undefined, undefined),
   RedeemedTicket: generateTopics(EventSignatures.RedeemedTicket, undefined, undefined),
@@ -28,7 +30,9 @@ export const EventTopics0: {
 export const logToEvent = (log: Log): Event<any> | undefined => {
   const [topic0] = log.topics
 
-  if (EventTopics0.FundedChannel[0].includes(topic0)) {
+  if (EventTopics0.SecretHashSet[0].includes(topic0)) {
+    return logs.toSecretHashSetEvent(log)
+  } else if (EventTopics0.FundedChannel[0].includes(topic0)) {
     return logs.toFundedChannelEvent(log)
   } else if (EventTopics0.OpenedChannel[0].includes(topic0)) {
     return logs.toOpenedChannelEvent(log)
@@ -39,8 +43,4 @@ export const logToEvent = (log: Log): Event<any> | undefined => {
   } else if (EventTopics0.ClosedChannel[0].includes(topic0)) {
     return logs.toClosedChannelEvent(log)
   }
-  // else {
-  //   console.log(JSON.stringify({ log, EventTopics0 }, null, 2))
-  //   throw Error('Could not convert log to event')
-  // }
 }

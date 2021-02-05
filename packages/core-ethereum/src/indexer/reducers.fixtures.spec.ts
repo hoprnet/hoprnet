@@ -1,11 +1,14 @@
 import type { Event } from './topics'
 import BN from 'bn.js'
 import { stringToU8a } from '@hoprnet/hopr-utils'
-import { Public, ChannelEntry } from '../types'
+import { Public, ChannelEntry, AccountEntry, AccountId } from '../types'
+import { BYTES27_LENGTH } from '../constants'
 
 const partyA = new Public(stringToU8a('0x03767782fdb4564f0a2dee849d9fc356207dd89f195fcfd69ce0b02c6f03dfda40'))
 const partyB = new Public(stringToU8a('0x024890561acbe7d1b8832621488a887291eedec2b4bc07a464fef7a9b4c7857cf8'))
+const accountId = new AccountId([1])
 
+// channels
 export const FUNDED_EVENT: Event<'FundedChannel'> = {
   name: 'FundedChannel',
   transactionHash: '',
@@ -13,7 +16,7 @@ export const FUNDED_EVENT: Event<'FundedChannel'> = {
   transactionIndex: new BN(0),
   logIndex: new BN(0),
   data: {
-    funder: 'funder',
+    funder: accountId,
     recipient: partyA,
     counterparty: partyB,
     recipientAmount: new BN(3),
@@ -28,7 +31,7 @@ export const FUNDED_EVENT_2: Event<'FundedChannel'> = {
   transactionIndex: new BN(0),
   logIndex: new BN(0),
   data: {
-    funder: 'funder',
+    funder: accountId,
     recipient: partyB,
     counterparty: partyA,
     recipientAmount: new BN(7),
@@ -187,4 +190,26 @@ export const CLOSED_CHANNEL = new ChannelEntry(undefined, {
   closureTime: new BN(0),
   stateCounter: new BN(10),
   closureByPartyA: false
+})
+
+// accounts
+export const SECRET_SET_EVENT: Event<'SecretHashSet'> = {
+  name: 'SecretHashSet',
+  transactionHash: '',
+  blockNumber: new BN(0),
+  transactionIndex: new BN(0),
+  logIndex: new BN(0),
+  data: {
+    account: accountId,
+    secretHash: new Uint8Array(Buffer.from([1, 2, 3]), undefined, BYTES27_LENGTH),
+    counter: new BN(1)
+  }
+}
+
+export const INITIALIZED_ACCOUNT = new AccountEntry(undefined, {
+  blockNumber: new BN(0),
+  transactionIndex: new BN(0),
+  logIndex: new BN(0),
+  hashedSecret: new Uint8Array(Buffer.from([1, 2, 3]), undefined, BYTES27_LENGTH),
+  counter: new BN(1)
 })

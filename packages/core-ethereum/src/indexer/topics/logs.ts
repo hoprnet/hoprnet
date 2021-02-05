@@ -2,6 +2,8 @@ import type { Log } from 'web3-core'
 import type { Event, EventData } from './types'
 import _abiCoder, { AbiCoder } from 'web3-eth-abi'
 import BN from 'bn.js'
+import { stringToU8a } from '@hoprnet/hopr-utils'
+import { AccountId } from '../../types'
 import { decodePublicKeysFromTopics } from './utils'
 
 // HACK: wrong types provided by library ¯\_(ツ)_/¯
@@ -23,6 +25,37 @@ export const logToEvent = <N extends keyof EventData>(log: Log, name: N, data: E
     logIndex: new BN(log.logIndex),
     data
   }
+}
+
+// transform log into an event
+export const toSecretHashSetEvent = (log: Log): Event<'SecretHashSet'> => {
+  console.log(log)
+
+  const { account, secretHash, counter } = abiCoder.decodeLog(
+    [
+      {
+        type: 'address',
+        name: 'account',
+        indexed: true
+      },
+      {
+        type: 'bytes32',
+        name: 'secretHash'
+      },
+      {
+        type: 'uint',
+        name: 'counter'
+      }
+    ],
+    log.data,
+    log.topics
+  )
+
+  return logToEvent(log, 'SecretHashSet', {
+    account: new AccountId(stringToU8a(account)),
+    secretHash: stringToU8a(secretHash),
+    counter: new BN(counter)
+  })
 }
 
 // transform log into an event
@@ -59,7 +92,7 @@ export const toFundedChannelEvent = (log: Log): Event<'FundedChannel'> => {
   const [recipient, counterparty] = decodePublicKeysFromTopics(log.topics)
 
   return logToEvent(log, 'FundedChannel', {
-    funder,
+    funder: new AccountId(stringToU8a(funder)),
     recipient,
     counterparty,
     recipientAmount: new BN(recipientAmount),

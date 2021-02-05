@@ -1,7 +1,7 @@
 import type { LevelUp } from 'levelup'
 import BN from 'bn.js'
 import { u8aConcat, u8aToNumber } from '@hoprnet/hopr-utils'
-import { Public, ChannelEntry, Snapshot } from '../types'
+import { AccountId, Public, ChannelEntry, AccountEntry, Snapshot } from '../types'
 import * as dbKeys from '../dbKeys'
 
 // various keys used by the DB
@@ -229,4 +229,47 @@ export const updateChannelEntry = async (
       value: Buffer.from(snapshot)
     }
   ])
+}
+
+/**
+ * Queries the database to find the account entry
+ * @param connector
+ * @param account
+ */
+export const getAccountEntry = async (db: LevelUp, account: AccountId): Promise<AccountEntry | undefined> => {
+  let arr: Uint8Array | undefined
+  try {
+    arr = (await db.get(Buffer.from(dbKeys.AccountEntry(account)))) as Uint8Array
+  } catch (err) {
+    if (err.notFound) {
+      return undefined
+    }
+
+    throw err
+  }
+
+  if (arr == null || arr.length == 0) {
+    return undefined
+  }
+
+  const accountEntry = new AccountEntry({
+    bytes: arr,
+    offset: arr.byteOffset
+  })
+
+  return accountEntry
+}
+
+/**
+ * Adds or updates the account entry in the database.
+ * @param connector
+ * @param account
+ * @param accountEntry
+ */
+export const updateAccountEntry = async (
+  db: LevelUp,
+  account: AccountId,
+  accountEntry: AccountEntry
+): Promise<void> => {
+  await db.put(Buffer.from(dbKeys.AccountEntry(account)), Buffer.from(accountEntry))
 }

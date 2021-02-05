@@ -9,7 +9,7 @@ import chalk from 'chalk'
 import BN from 'bn.js'
 import Heap from 'heap-js'
 import { pubKeyToPeerId, randomChoice } from '@hoprnet/hopr-utils'
-import { ChannelEntry, Public, Balance, Snapshot } from '../types'
+import { AccountId, AccountEntry, ChannelEntry, Public, Balance, Snapshot } from '../types'
 import { isPartyA, getId, Log as DebugLog } from '../utils'
 import * as topics from './topics'
 import * as reducers from './reducers'
@@ -22,7 +22,8 @@ import {
   getChannelEntries,
   updateLatestBlockNumber,
   snapshotComparator,
-  getLatestConfirmedSnapshot
+  getLatestConfirmedSnapshot,
+  getAccountEntry
 } from './utils'
 
 const log = DebugLog(['indexer'])
@@ -42,7 +43,7 @@ class Indexer extends EventEmitter implements IIndexer {
   public status: 'started' | 'stopped' = 'stopped'
   public latestBlock: number = 0 // latest known on-chain block number
   private subscriptions: {
-    [K in 'NewBlocks' | 'NewLogs']?: Subscription<any>
+    [K in 'newBlocks' | 'newHoprChannelsLogs']?: Subscription<any>
   } = {}
   private unconfirmedEvents = new Heap<Event<any>>(snapshotComparator)
 
@@ -59,9 +60,6 @@ class Indexer extends EventEmitter implements IIndexer {
     log(`Starting indexer...`)
 
     const { web3, hoprChannels } = this.connector
-
-    // wipe indexer, for testing, will be removed
-    // await this.wipe()
 
     const [latestSavedBlock, latestOnChainBlock] = await Promise.all([
       await getLatestBlockNumber(this.connector.db),
@@ -96,7 +94,7 @@ class Indexer extends EventEmitter implements IIndexer {
 
     // subscribe to events
     // @TODO: handle errors
-    this.subscriptions['NewBlocks'] = web3.eth
+    this.subscriptions.newBlocks = web3.eth
       .subscribe('newBlockHeaders')
       .on('error', console.error)
       .on('data', (block) => {
@@ -104,7 +102,7 @@ class Indexer extends EventEmitter implements IIndexer {
         this.onNewBlock(block)
       })
 
-    this.subscriptions['NewLogs'] = web3.eth
+    this.subscriptions.newHoprChannelsLogs = web3.eth
       .subscribe('logs', {
         address: hoprChannels.options.address,
         fromBlock
@@ -143,23 +141,6 @@ class Indexer extends EventEmitter implements IIndexer {
 
     return isSyncing(onChainBlock, lastKnownBlock)
   }
-
-  // /**
-  //  * Wipes all indexer related stored data in the DB.
-  //  * @deprecated do not use this in production
-  //  */
-  // private async wipe(): Promise<void> {
-  //   await this.connector.db.batch(
-  //     (await getChannelEntries(this.connector.db)).map(({ partyA, partyB }) => ({
-  //       type: 'del',
-  //       key: Buffer.from(this.connector.dbKeys.ChannelEntry(partyA, partyB))
-  //     }))
-  //   )
-  //   await this.connector.db.del(Buffer.from(this.connector.dbKeys.LatestConfirmedSnapshot()))
-  //   await this.connector.db.del(Buffer.from(this.connector.dbKeys.LatestBlockNumber()))
-
-  //   log('wiped indexer data')
-  // }
 
   /**
    * Query past logs, this will loop until it gets all blocks from {toBlock} to {fromBlock}.
@@ -453,6 +434,10 @@ class Indexer extends EventEmitter implements IIndexer {
 
   public async getChannelEntries(party?: Public, filter?: (node: Public) => boolean): Promise<ChannelUpdate[]> {
     return getChannelEntries(this.connector.db, party, filter)
+  }
+
+  public async getAccountEntry(account: AccountId): Promise<AccountEntry | undefined> {
+    return getAccountEntry(this.connector.db, account)
   }
 
   // routing related
