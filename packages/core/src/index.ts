@@ -188,11 +188,6 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     const libp2p = await LibP2P.create({
       peerId: id,
       addresses: { listen: addresses },
-      // Disable libp2p-switch protections for the moment
-      switch: {
-        denyTTL: 1,
-        denyAttempts: Infinity
-      },
       // libp2p modules
       modules: {
         transport: [HoprConnect],
@@ -219,8 +214,6 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
         }
       },
       dialer: {
-        // Temporary fix
-        addressSorter: (ma: Multiaddr) => ma,
         maxParallelDials: options.bootstrapNode ? 1000 : 100
       }
     })
