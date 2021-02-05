@@ -170,6 +170,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       db
     })
 
+
     if (
       !options.debug &&
       !options.bootstrapNode &&
