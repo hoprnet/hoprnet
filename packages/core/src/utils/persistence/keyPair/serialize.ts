@@ -15,7 +15,7 @@ import {
  *
  * @param peerId the peerId that should be serialized
  */
-export async function serializeKeyPair(peerId: PeerId, password: Uint8Array) {
+export function serializeKeyPair(peerId: PeerId, password: Uint8Array) {
   const salt: Buffer = randomBytes(KEYPAIR_SALT_LENGTH)
 
   const key = scryptSync(password, salt, KEYPAIR_CIPHER_KEY_LENGTH, KEYPAIR_SCRYPT_PARAMS)

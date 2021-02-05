@@ -15,15 +15,15 @@ describe('keypair/index.spec.ts test serialisation and deserialisation of encryp
 
     const peerId = await PeerId.create({ keyType: 'secp256k1' })
 
-    const firstEncoding = await serializeKeyPair(peerId, password)
-    const secondEncoding = await serializeKeyPair(peerId, password)
+    const firstEncoding = serializeKeyPair(peerId, password)
+    const secondEncoding = serializeKeyPair(peerId, password)
 
     assert(
       !u8aEquals(firstEncoding, secondEncoding),
       'Serialization of same peerId should lead to different ciphertexts'
     )
 
-    const serializedKeyPair = await serializeKeyPair(peerId, password)
+    const serializedKeyPair = serializeKeyPair(peerId, password)
     assert(
       u8aEquals((await deserializeKeyPair(serializedKeyPair, password)).marshal(), peerId.marshal()),
       'PeerId must be recoverable from serialized peerId'
