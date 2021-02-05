@@ -11,7 +11,7 @@ declare interface AcknowledgedTicketStatic {
   ): AcknowledgedTicket
 }
 
-declare interface AcknowledgedTicket extends Uint8Array {
+declare interface AcknowledgedTicket {
   signedTicket: Promise<SignedTicket>
   signedTicketOffset: number
 
