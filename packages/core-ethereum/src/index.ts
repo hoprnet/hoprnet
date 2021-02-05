@@ -218,7 +218,6 @@ export default class HoprEthereum implements HoprCoreConnector {
       }
     })
 
-
     const web3 = new Web3(provider)
 
     const [chainId, publicKey] = await Promise.all([utils.getChainId(web3), utils.privKeyToPubKey(seed)])
