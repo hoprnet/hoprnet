@@ -106,12 +106,16 @@ abstract contract ERC777Snapshot is ERC777 {
         uint256 max = snapshots.length - 1;
         while (max > min) {
             uint256 mid = (max + min + 1) / 2;
-            if (snapshots[mid].fromBlock <= _block) {
+
+            if (snapshots[mid].fromBlock == _block) {
+                return snapshots[mid].value;
+            } else if (snapshots[mid].fromBlock < _block) {
                 min = mid;
             } else {
                 max = mid - 1;
             }
         }
+
         return snapshots[min].value;
     }
 
