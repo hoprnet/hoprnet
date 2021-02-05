@@ -205,7 +205,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
           HoprConnect: {
             bootstrapServers: options.bootstrapServers
             // Testing
-            // __noDirectConnections: !options.bootstrapNode && true
+            //__noDirectConnections: !options.bootstrapNode && true
           }
         },
         peerDiscovery: {
@@ -219,6 +219,8 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
         }
       },
       dialer: {
+        // Temporary fix
+        addressSorter: (ma: Multiaddr) => ma,
         maxParallelDials: options.bootstrapNode ? 1000 : 100
       }
     })

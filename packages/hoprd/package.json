@@ -1,36 +1,30 @@
 {
   "name": "@hoprnet/hoprd",
-  "version": "1.69.0-next.3",
+  "version": "1.69.0-next.4",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
   "license": "LGPL-3.0-only",
   "main": "lib/index.js",
   "author": "Peter Braden (HOPR) <peter.braden@hoprnet.org>",
-  "bin": {
-    "hoprd": "lib/index.js"
-  },
+  "bin": "lib/index.js",
   "files": [
     "lib",
     "hopr-admin/.next",
-    "!*.spec.ts",
-    "!*.spec.d.ts",
-    "!*.spec.js",
-    "!*.spec.js.map",
     "hoprd-default.sh"
   ],
   "scripts": {
     "clean": "rimraf ./lib",
     "build": "yarn clean && tsc --project ./tsconfig.json && yarn buildAdmin && chmod u+x lib/*.js",
     "buildAdmin": "next build hopr-admin",
-    "test": "mocha",
+    "test": "node --trace-warnings --unhandled-rejections=strict ../../node_modules/.bin/mocha --reporter=tap --full-trace --exit",
     "prepublishOnly": "yarn build",
     "start": "node lib/index.js --admin --init --rest",
     "dev": "yarn build && NODE_ENV=development yarn start"
   },
   "dependencies": {
-    "@hoprnet/hopr-core": "1.69.0-next.3",
-    "@hoprnet/hopr-utils": "1.69.0-next.3",
+    "@hoprnet/hopr-core": "1.69.0-next.4",
+    "@hoprnet/hopr-utils": "1.69.0-next.4",
     "body-parser": "^1.19.0",
     "bs58": "^4.0.1",
     "jazzicon": "^1.5.0",
@@ -45,11 +39,11 @@
     "yargs": "^16.0.3"
   },
   "devDependencies": {
-    "@hoprnet/hopr-core-connector-interface": "1.69.0-next.3",
+    "@hoprnet/hopr-core-connector-interface": "1.69.0-next.4",
     "@types/bs58": "^4.0.1",
     "@types/debug": "^4.1.5",
     "@types/mocha": "^8.2.0",
-    "@types/node": "^12",
+    "@types/node": "14",
     "@types/yargs": "^16.0.0",
     "mocha": "^8.2.0",
     "rimraf": "^3.0.2",
