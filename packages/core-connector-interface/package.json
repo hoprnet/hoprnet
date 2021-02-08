@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-core-connector-interface",
-  "version": "1.69.0-next.5",
+  "version": "1.69.0-next.7",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -13,7 +13,7 @@
     "!*.spec.js.map"
   ],
   "engines": {
-    "node": "12",
+    "node": "14",
     "yarn": "1"
   },
   "types": "src/index.d.ts",

@@ -1,15 +1,11 @@
 {
   "name": "@hoprnet/hopr-ethereum",
-  "version": "1.69.0-next.5",
+  "version": "1.69.0-next.7",
   "description": "On-chain logic for hoprnet.org",
   "repository": "https://github.com/hoprnet/hoprnet.git",
+  "homepage": "https://hoprnet.org",
   "license": "LGPL-3.0-only",
   "main": "./lib/index.js",
-  "files": [
-    "contracts/",
-    "lib/",
-    "!*.test.ts"
-  ],
   "scripts": {
     "clean": "rimraf ./lib && rimraf ./types",
     "build": "yarn clean && yarn build:sol && tsc && cp -R ./chain/abis ./lib/chain/abis",
@@ -21,9 +17,18 @@
     "coverage": "hardhat coverage --network hardhat",
     "prepublishOnly": "yarn build"
   },
+  "files": [
+    "contracts",
+    "lib",
+    "!lib/test",
+    "!**/*.test.ts",
+    "!**/*.test.d.ts",
+    "!**/*.test.js",
+    "!**/*.test.js.map"
+  ],
   "dependencies": {
-    "@hoprnet/hopr-demo-seeds": "1.69.0-next.5",
-    "@hoprnet/hopr-utils": "1.69.0-next.5",
+    "@hoprnet/hopr-demo-seeds": "1.69.0-next.7",
+    "@hoprnet/hopr-utils": "1.69.0-next.7",
     "@nomiclabs/hardhat-etherscan": "^2.0.0",
     "@nomiclabs/hardhat-solhint": "^2.0.0",
     "@nomiclabs/hardhat-truffle5": "^2.0.0",
@@ -43,19 +48,19 @@
     "web3": "^1.3.0"
   },
   "devDependencies": {
-    "@hoprnet/hopr-testing": "1.69.0-next.5",
+    "@hoprnet/hopr-testing": "1.69.0-next.7",
     "@openzeppelin/test-helpers": "^0.5.9",
     "@types/chai": "^4.2.14",
     "@types/lodash": "^4.14.162",
     "@types/mocha": "^8.0.3",
-    "@types/node": "^12",
+    "@types/node": "14",
     "@types/secp256k1": "^4.0.1",
     "chai": "^4.2.0",
     "rimraf": "^3.0.2",
     "typescript": "^4.1"
   },
   "engines": {
-    "node": "12",
+    "node": "14",
     "yarn": "1"
   }
 }
