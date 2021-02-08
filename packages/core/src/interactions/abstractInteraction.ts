@@ -1,5 +1,3 @@
-/// <reference path="../@types/libp2p.ts" />
-
 import type { Handler } from 'libp2p'
 
 interface AbstractInteraction {

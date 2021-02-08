@@ -473,7 +473,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       throw Error(`Expecting a non-empty destination.`)
     }
     let info = ''
-    let latency = await this._interactions.network.heartbeat.interact(destination)
+    let latency = await this._interactions.heartbeat.interact(destination)
     return { latency, info }
   }
 

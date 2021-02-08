@@ -12,7 +12,7 @@ class Network {
       Array.from(node.peerStore.peers.values()).map((x) => x.id),
       node.peerId
     )
-    this.heartbeat = new Heartbeat(this.networkPeers, interactions.network.heartbeat, node.hangUp.bind(node))
+    this.heartbeat = new Heartbeat(this.networkPeers, interactions.heartbeat, node.hangUp.bind(node))
   }
 
   async start() {
