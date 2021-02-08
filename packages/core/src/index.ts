@@ -185,7 +185,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
 
     const libp2p = await LibP2P.create({
       peerId: id,
-      addresses: { listen: addresses.map(x => x.toString()) },
+      addresses: { listen: addresses.map((x) => x.toString()) },
       // libp2p modules
       modules: {
         transport: [HoprConnect as any],

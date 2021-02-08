@@ -6,7 +6,7 @@ import { PROTOCOL_ONCHAIN_KEY } from '../../constants'
 import type { AbstractInteraction } from '../abstractInteraction'
 import type PeerId from 'peer-id'
 
-import type { Connection, MuxedStream} from 'libp2p'
+import type { Connection, MuxedStream } from 'libp2p'
 import pipe from 'it-pipe'
 import { dialHelper, durations } from '@hoprnet/hopr-utils'
 
@@ -19,7 +19,7 @@ class OnChainKey<Chain extends HoprCoreConnector> implements AbstractInteraction
     this.node._libp2p.handle(this.protocols, this.handler.bind(this))
   }
 
-  handler(struct: { connection: Connection, stream: MuxedStream, protocol: string }) {
+  handler(struct: { connection: Connection; stream: MuxedStream; protocol: string }) {
     pipe([this.node.paymentChannels.account.keys.onChain.pubKey], struct.stream)
   }
 

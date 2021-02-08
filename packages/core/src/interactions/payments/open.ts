@@ -3,7 +3,7 @@ import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type { Types } from '@hoprnet/hopr-core-connector-interface'
 
 import pipe from 'it-pipe'
-import type { Connection, MuxedStream} from 'libp2p'
+import type { Connection, MuxedStream } from 'libp2p'
 import type { AbstractInteraction } from '../abstractInteraction'
 import { PROTOCOL_PAYMENT_CHANNEL } from '../../constants'
 import type PeerId from 'peer-id'
@@ -17,7 +17,7 @@ class Opening<Chain extends HoprCoreConnector> implements AbstractInteraction {
     this.node._libp2p.handle(this.protocols, this.handler.bind(this))
   }
 
-  handler(struct: { connection: Connection, stream: MuxedStream, protocol: string }) {
+  handler(struct: { connection: Connection; stream: MuxedStream; protocol: string }) {
     pipe(
       struct.stream,
       this.node.paymentChannels.channel.handleOpeningRequest.bind(this.node.paymentChannels.channel),
