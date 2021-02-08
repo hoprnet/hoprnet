@@ -8,7 +8,10 @@ class Network {
   public networkPeers: NetworkPeers
 
   constructor(node: LibP2P, interactions: Interactions<any>) {
-    this.networkPeers = new NetworkPeers(Array.from(node.peerStore.peers.values()).map((x) => x.id))
+    this.networkPeers = new NetworkPeers(
+      Array.from(node.peerStore.peers.values()).map((x) => x.id),
+      node.peerId
+    )
     this.heartbeat = new Heartbeat(this.networkPeers, interactions.network.heartbeat, node.hangUp.bind(node))
   }
 
