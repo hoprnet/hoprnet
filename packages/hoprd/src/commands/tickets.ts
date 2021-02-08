@@ -7,6 +7,7 @@ import { countSignedTickets, toSignedTickets, styleValue } from './utils'
 export default class Tickets extends AbstractCommand {
   constructor(public node: Hopr<HoprCoreConnector>) {
     super()
+    this.hidden = true
   }
 
   public name() {

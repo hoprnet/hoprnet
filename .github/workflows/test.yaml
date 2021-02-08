@@ -13,7 +13,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [12]
+        node-version: [14]
         package: ['core', 'ethereum', 'all', 'core-ethereum']
 
     steps:
