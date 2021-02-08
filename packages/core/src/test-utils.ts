@@ -1,6 +1,7 @@
 import LibP2P from 'libp2p'
 import Multiaddr from 'multiaddr'
 import PeerId from 'peer-id'
+
 const TCP = require('libp2p-tcp')
 const MPLEX = require('libp2p-mplex')
 import { NOISE } from 'libp2p-noise'
