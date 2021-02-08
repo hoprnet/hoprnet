@@ -166,9 +166,9 @@ async function createIdentity(db: LevelUp, pw?: string): Promise<PeerId> {
 
   const peerId = await PeerId.create({ keyType: 'secp256k1' })
 
-  const serializedKeyPair = await serializeKeyPair(peerId, new TextEncoder().encode(pw))
+  const serializedKeyPair = serializeKeyPair(peerId, new TextEncoder().encode(pw))
 
-  await db.put(Buffer.from(KeyPair), serializedKeyPair)
+  await db.put(Buffer.from(KeyPair), Buffer.from(serializedKeyPair))
 
   return peerId
 }
