@@ -1,5 +1,3 @@
-/// <reference path="./@types/libp2p.ts" />
-
 import LibP2P from 'libp2p'
 import Multiaddr from 'multiaddr'
 import PeerId from 'peer-id'

@@ -1,5 +1,3 @@
-/// <reference path="../../@types/libp2p.ts" />
-
 import type Hopr from '../../'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type { Types } from '@hoprnet/hopr-core-connector-interface'
