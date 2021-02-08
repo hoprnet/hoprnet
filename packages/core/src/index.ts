@@ -115,7 +115,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
   private mixer: Mixer<Chain>
   private strategy: ChannelStrategy
   private networkPeers: NetworkPeers
-  public heartbeat: Heartbeat
+  private heartbeat: Heartbeat
 
   /**
    * @constructor
