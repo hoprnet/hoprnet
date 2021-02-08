@@ -5030,12 +5030,12 @@ err-code@^1.0.0:
   resolved "https://registry.yarnpkg.com/err-code/-/err-code-1.1.2.tgz#06e0116d3028f6aef4806849eb0ea6a748ae6960"
   integrity sha1-BuARbTAo9q70gGhJ6w6mp0iuaWA=
 
-err-code@^2.0.0, err-code@^2.0.1, err-code@^2.0.3:
+err-code@^2.0.0, err-code@^2.0.3:
   version "2.0.3"
   resolved "https://registry.yarnpkg.com/err-code/-/err-code-2.0.3.tgz#23c2f3b756ffdfc608d30e27c9a941024807e7f9"
   integrity sha512-2bmlRpNKBxT/CRmPOlyISQpNj+qSeYvcym/uT0Jx2bMOlKLtSy1ZmLuVxSEKKyor/N5yhvp/ZiG1oE3DEYMSFA==
 
-err-code@^3.0.0:
+err-code@^3.0.0, err-code@^3.0.1:
   version "3.0.1"
   resolved "https://registry.yarnpkg.com/err-code/-/err-code-3.0.1.tgz#a444c7b992705f2b120ee320b09972eef331c920"
   integrity sha512-GiaH0KJUewYok+eeY05IIgjtAe4Yltygk9Wqp1V5yVWLdhf0hYZchRjNIT9bb0mSwRcIusT3cx7PJUf3zEIfUA==
@@ -7218,11 +7218,12 @@ inquirer@^6.2.0, inquirer@^6.2.2:
     strip-ansi "^5.1.0"
     through "^2.3.6"
 
-interface-datastore@^3.0.3, "interface-datastore@https://github.com/hoprnet/interface-datastore.git":
-  version "3.0.3"
-  resolved "https://github.com/hoprnet/interface-datastore.git#6e8eb3a7d185915eefc3e4126cf311a45a0b6792"
+interface-datastore@^3.0.3:
+  version "3.0.4"
+  resolved "https://registry.yarnpkg.com/interface-datastore/-/interface-datastore-3.0.4.tgz#7c02d393fb0372bc86c03de1095e15ae70912771"
+  integrity sha512-WEO09j/VRF866je3UXfk64GTWi0ag5mH+jbTbOYX7rkhcNnvAvYvvtysOu2vzUXaM1nBmtI9SjMpp4dqXOE+LA==
   dependencies:
-    err-code "^2.0.1"
+    err-code "^3.0.1"
     ipfs-utils "^6.0.0"
     iso-random-stream "^1.1.1"
     it-all "^1.0.2"
