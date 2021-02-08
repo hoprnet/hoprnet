@@ -23,7 +23,7 @@ class NetworkPeers {
     return this.peers.find((x) => x.id.toB58String() === peer.toB58String())
   }
 
-  constructor(existingPeers: Array<PeerId>) {
+  constructor(existingPeers: Array<PeerId>, private self: PeerId) {
     this.peers = []
 
     for (const peer of existingPeers) {
@@ -81,7 +81,7 @@ class NetworkPeers {
   }
 
   public register(id: PeerId) {
-    if (!this.find(id)) {
+    if (!this.find(id) && !id.equals(this.self)) {
       this.peers.push({
         id,
         heartbeatsSent: 0,
