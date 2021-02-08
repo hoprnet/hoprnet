@@ -290,6 +290,18 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     }
     verbose(`strategy wants to open`, nextChannels.length, 'new channels')
     for (let channelToOpen of nextChannels) {
+
+      // Skip bootstrap node. See #1204
+      let isBootstrap = false
+      this.bootstrapServers.forEach(bs => {
+        if (channelToOpen[0].toB58String() != bs.getPeerId()) {
+          isBootstrap = true
+        }
+      })
+      if (isBootstrap) { 
+        continue 
+      }
+
       this.network.networkPeers.register(channelToOpen[0])
       try {
         // Opening channels can fail if we can't establish a connection.
