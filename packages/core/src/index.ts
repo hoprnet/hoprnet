@@ -214,7 +214,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
         }
       },
       dialer: {
-        // Temporary fix
+        // Temporary fix, see https://github.com/hoprnet/hopr-connect/issues/77
         addressSorter: (ma: Multiaddr) => ma,
         maxParallelDials: options.bootstrapNode ? 1000 : 100
       }
