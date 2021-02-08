@@ -1,15 +1,13 @@
-/// <reference path="../../@types/libp2p.ts" />
-
 import type { AbstractInteraction } from '../abstractInteraction'
 import { randomBytes, createHash } from 'crypto'
 import { u8aEquals } from '@hoprnet/hopr-utils'
 import debug from 'debug'
 import pipe from 'it-pipe'
 import { PROTOCOL_HEARTBEAT, HEARTBEAT_TIMEOUT } from '../../constants'
-import type { Handler } from 'libp2p'
 import type PeerId from 'peer-id'
 import { LibP2P } from '../../'
 import { dialHelper } from '@hoprnet/hopr-utils'
+import type { Connection, MuxedStream} from 'libp2p'
 
 const verbose = debug('hopr-core:verbose:heartbeat')
 const HASH_FUNCTION = 'blake2s256'
@@ -27,7 +25,7 @@ class Heartbeat implements AbstractInteraction {
     this.node.handle(this.protocols, this.handler.bind(this))
   }
 
-  handler(struct: Handler) {
+  handler(struct: { connection: Connection, stream: MuxedStream, protocol: string }) {
     const self = this
     pipe(
       struct.stream,
@@ -64,7 +62,7 @@ class Heartbeat implements AbstractInteraction {
     const response = await pipe(
       // prettier-ignore
       [challenge],
-      (struct as Handler).stream,
+      (struct).stream,
       async (source: AsyncIterable<Uint8Array>): Promise<Uint8Array | void> => {
         for await (const msg of source) {
           return msg

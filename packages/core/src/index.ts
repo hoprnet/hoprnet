@@ -1,5 +1,3 @@
-/// <reference path="./@types/libp2p.ts" />
-
 import LibP2P from 'libp2p'
 import type { Connection } from 'libp2p'
 
@@ -187,14 +185,14 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
 
     const libp2p = await LibP2P.create({
       peerId: id,
-      addresses: { listen: addresses },
+      addresses: { listen: addresses.map(x => x.toString()) },
       // libp2p modules
       modules: {
-        transport: [HoprConnect],
+        transport: [HoprConnect as any],
         streamMuxer: [MPLEX],
         connEncryption: [NOISE],
-        dht: KadDHT
-      },
+        dht: KadDHT as any
+      } as any,
       config: {
         transport: {
           HoprConnect: {
@@ -211,13 +209,13 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
         },
         relay: {
           enabled: false
-        }
+        } as any
       },
       dialer: {
         // Temporary fix, see https://github.com/hoprnet/hopr-connect/issues/77
         addressSorter: (ma: Multiaddr) => ma,
         maxParallelDials: options.bootstrapNode ? 1000 : 100
-      }
+      } as any
     })
 
     return await new Hopr<CoreConnector>(options, libp2p, db, connector).start()
