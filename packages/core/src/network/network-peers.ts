@@ -81,7 +81,7 @@ class NetworkPeers {
   }
 
   public register(id: PeerId) {
-    if (!this.find(id) && !this.exclude.find(x => id.equals(x))) {
+    if (!this.find(id) && !this.exclude.find((x) => id.equals(x))) {
       this.peers.push({
         id,
         heartbeatsSent: 0,
