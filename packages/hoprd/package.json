@@ -13,17 +13,13 @@
   "files": [
     "lib",
     "hopr-admin/.next",
-    "!*.spec.ts",
-    "!*.spec.d.ts",
-    "!*.spec.js",
-    "!*.spec.js.map",
     "hoprd-default.sh"
   ],
   "scripts": {
     "clean": "rimraf ./lib",
     "build": "yarn clean && tsc --project ./tsconfig.json && yarn buildAdmin && chmod u+x lib/*.js",
     "buildAdmin": "next build hopr-admin",
-    "test": "mocha",
+    "test": "node --trace-warnings --unhandled-rejections=strict ../../node_modules/.bin/mocha --reporter=tap --full-trace --exit",
     "prepublishOnly": "yarn build",
     "start": "node lib/index.js --admin --init --rest",
     "dev": "yarn build && NODE_ENV=development yarn start"
@@ -49,7 +45,7 @@
     "@types/bs58": "^4.0.1",
     "@types/debug": "^4.1.5",
     "@types/mocha": "^8.2.0",
-    "@types/node": "^12",
+    "@types/node": "14",
     "@types/yargs": "^16.0.0",
     "mocha": "^8.2.0",
     "rimraf": "^3.0.2",
