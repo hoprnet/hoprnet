@@ -144,7 +144,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     this._interactions = new Interactions(this, this.mixer, (peer: PeerId) => this.networkPeers.register(peer))
     this.heartbeat = new Heartbeat(
       this.networkPeers,
-      this._interactions.network.heartbeat,
+      this._interactions.heartbeat,
       this._libp2p.hangUp.bind(this._libp2p)
     )
     this.networkPeers = new NetworkPeers(
