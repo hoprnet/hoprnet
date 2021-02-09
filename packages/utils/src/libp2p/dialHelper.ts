@@ -1,7 +1,7 @@
 // @TODO include libp2p types
 // import LibP2P from 'libp2p'
+
 import AbortController from 'abort-controller'
-import type { Handler } from 'libp2p'
 import PeerId from 'peer-id'
 import Multiaddr from 'multiaddr'
 
@@ -33,7 +33,7 @@ export async function dialHelper(
         timeout: number
         signal?: AbortSignal
       }
-): Promise<Handler | undefined> {
+): Promise<any | undefined> {
   // Prevent us from dialing ourself
   if (counterparty.equals(libp2p.peerId)) {
     console.trace(`Preventing self dial.`)
@@ -56,9 +56,11 @@ export async function dialHelper(
     signal = options.signal
   }
 
-  let struct: Handler
+  let struct: any
 
-  let addresses = (libp2p.peerStore.get(counterparty)?.addresses ?? []).map((addr: Multiaddr) => addr.toString())
+  let addresses = (
+    libp2p.peerStore.get(counterparty)?.addresses ?? []
+  ).map((addr: { isCertified: boolean; multiaddr: Multiaddr }) => addr.multiaddr.toString())
 
   // Try to use known addresses
   if (addresses.length > 0) {
@@ -90,6 +92,7 @@ export async function dialHelper(
       if (err.type === 'aborted') {
         return
       }
+      error(`Error while trying to bypass NATs. ${err.message}`)
     }
   }
 
