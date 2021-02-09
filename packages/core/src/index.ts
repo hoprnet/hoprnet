@@ -212,9 +212,9 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       },
       dialer: {
         // Temporary fix, see https://github.com/hoprnet/hopr-connect/issues/77
-        addressSorter: (ma: Multiaddr) => ma,
-        maxParallelDials: options.bootstrapNode ? 1000 : 100
-      } as any
+        addressSorter: a => a,
+        concurrency: options.bootstrapNode ? 1000 : 100
+      }
     })
 
     return await new Hopr<CoreConnector>(options, libp2p, db, connector).start()
