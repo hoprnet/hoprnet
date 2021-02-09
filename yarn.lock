@@ -18,7 +18,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@hoprnet/hopr-connect@workspace:."
   dependencies:
-    "@hoprnet/hopr-utils": 1.68.5
+    "@hoprnet/hopr-utils": 1.69.0-next.15
     "@types/debug": ^4.1.5
     "@types/err-code": ^2.0.0
     "@types/mocha": ~8.2.0
@@ -26,7 +26,7 @@ __metadata:
     "@types/simple-peer": 9
     abort-controller: 3.0.0
     abortable-iterator: ^3.0.0
-    bl: ^4.0.3
+    bl: ^4.0.4
     debug: ^4.3.1
     it-handshake: ~1.0.2
     it-pair: ^1.0.0
@@ -50,9 +50,9 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@hoprnet/hopr-utils@npm:1.68.5":
-  version: 1.68.5
-  resolution: "@hoprnet/hopr-utils@npm:1.68.5"
+"@hoprnet/hopr-utils@npm:1.69.0-next.15":
+  version: 1.69.0-next.15
+  resolution: "@hoprnet/hopr-utils@npm:1.69.0-next.15"
   dependencies:
     abort-controller: ~3.0.0
     bignumber.js: ^9.0.0
@@ -61,7 +61,7 @@ __metadata:
     multihashes: ~3.1.0
     peer-id: 0.14.3
     strip-ansi: ^6.0.0
-  checksum: 8895021617813907f57981395c79a50dfa31a54e8d5afda4e58e234a5a02eeb825852adceff93348c933a76e1c10411b01f9d7d85c73c6044ba85c9084b2e0a5
+  checksum: c1c86121c84aacfa21da6e2e533e8cb9f892688d1ac386a4bba84cb481456f7c6a4f34d421593cb9f91492bd6cf37ae6cca074e80b9ce432015cf15d2aebd6c6
   languageName: node
   linkType: hard
 
@@ -530,7 +530,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"bl@npm:^4.0.0, bl@npm:^4.0.2, bl@npm:^4.0.3":
+"bl@npm:^4.0.0, bl@npm:^4.0.2":
   version: 4.0.3
   resolution: "bl@npm:4.0.3"
   dependencies:
@@ -538,6 +538,17 @@ __metadata:
     inherits: ^2.0.4
     readable-stream: ^3.4.0
   checksum: 1f33c5a3da08a87260a7f11acadf088ef331ebb4b86db1160ec332be9326afdf9f73dca1fd5cc431dba7cc9d5574b508192f9fd7c37a9a11c9e4a50025917690
+  languageName: node
+  linkType: hard
+
+"bl@npm:^4.0.4":
+  version: 4.1.0
+  resolution: "bl@npm:4.1.0"
+  dependencies:
+    buffer: ^5.5.0
+    inherits: ^2.0.4
+    readable-stream: ^3.4.0
+  checksum: 15d009339c2eeaedb9dab39c48f910a2fd6a9ba11400e61990917ebf3b25fa32cd9b80c7531a95467078258f6a59bd3f5d93323565423a7843855a16a1794261
   languageName: node
   linkType: hard
 
