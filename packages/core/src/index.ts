@@ -188,7 +188,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       addresses: { listen: addresses.map((x) => x.toString()) },
       // libp2p modules
       modules: {
-        transport: [HoprConnect as any],
+        transport: [HoprConnect as any], // TODO re https://github.com/hoprnet/hopr-connect/issues/78
         streamMuxer: [MPLEX],
         connEncryption: [NOISE],
         // @ts-ignore //TODO 'Libp2pModules' does not contain types for DHT as ov v0.30 see js-libp2p/659
