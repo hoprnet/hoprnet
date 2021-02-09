@@ -1,5 +1,3 @@
-/// <reference path="./@types/libp2p.ts" />
-
 import LibP2P from 'libp2p'
 import type { Connection } from 'libp2p'
 
@@ -22,7 +20,8 @@ import {
   FULL_VERSION
 } from './constants'
 
-import { Network } from './network'
+import NetworkPeers from './network/network-peers'
+import Heartbeat from './network/heartbeat'
 import { findPath } from './path'
 
 import { addPubKey, getAcknowledgedTickets, submitAcknowledgedTicket } from './utils'
@@ -113,7 +112,8 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
   private checkTimeout: NodeJS.Timeout
   private mixer: Mixer<Chain>
   private strategy: ChannelStrategy
-  private network: Network
+  private networkPeers: NetworkPeers
+  private heartbeat: Heartbeat
 
   /**
    * @constructor
@@ -123,9 +123,10 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
    */
   private constructor(options: HoprOptions, public _libp2p: LibP2P, public db: LevelUp, public paymentChannels: Chain) {
     super()
+
     this._libp2p.connectionManager.on('peer:connect', (conn: Connection) => {
       this.emit('hopr:peer:connection', conn.remotePeer)
-      this.network.networkPeers.register(conn.remotePeer)
+      this.networkPeers.register(conn.remotePeer)
     })
 
     this.mixer = new Mixer()
@@ -140,8 +141,18 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     }
     this.bootstrapServers = options.bootstrapServers || []
     this.isBootstrapNode = options.bootstrapNode || false
-    this._interactions = new Interactions(this, this.mixer, (peer: PeerId) => this.network.networkPeers.register(peer))
-    this.network = new Network(this._libp2p, this._interactions)
+    this._interactions = new Interactions(this, this.mixer, (peer: PeerId) => this.networkPeers.register(peer))
+
+    this.networkPeers = new NetworkPeers(
+      Array.from(this._libp2p.peerStore.peers.values()).map((x) => x.id),
+      [this.getId()].concat(this.bootstrapServers.map((bs) => PeerId.createFromB58String(bs.getPeerId())))
+    )
+
+    this.heartbeat = new Heartbeat(
+      this.networkPeers,
+      this._interactions.heartbeat,
+      this._libp2p.hangUp.bind(this._libp2p)
+    )
 
     if (options.ticketAmount) this.ticketAmount = options.ticketAmount
     if (options.ticketWinProb) this.ticketWinProb = options.ticketWinProb
@@ -187,20 +198,19 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
 
     const libp2p = await LibP2P.create({
       peerId: id,
-      addresses: { listen: addresses },
+      addresses: { listen: addresses.map((x) => x.toString()) },
       // libp2p modules
       modules: {
-        transport: [HoprConnect],
+        transport: [HoprConnect as any], // TODO re https://github.com/hoprnet/hopr-connect/issues/78
         streamMuxer: [MPLEX],
         connEncryption: [NOISE],
+        // @ts-ignore //TODO 'Libp2pModules' does not contain types for DHT as ov v0.30 see js-libp2p/659
         dht: KadDHT
       },
       config: {
         transport: {
           HoprConnect: {
             bootstrapServers: options.bootstrapServers
-            // Testing
-            // __noDirectConnections: !options.bootstrapNode && true
           }
         },
         peerDiscovery: {
@@ -209,12 +219,15 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
         dht: {
           enabled: true
         },
+        //@ts-ignore - bug in libp2p options
         relay: {
           enabled: false
         }
       },
       dialer: {
-        maxParallelDials: options.bootstrapNode ? 1000 : 100
+        // Temporary fix, see https://github.com/hoprnet/hopr-connect/issues/77
+        addressSorter: (a) => a,
+        concurrency: options.bootstrapNode ? 1000 : 100
       }
     })
 
@@ -267,18 +280,18 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       return
     }
     for (const channel of newChannels) {
-      this.network.networkPeers.register(channel[0]) // Listen to nodes with outgoing stake
+      this.networkPeers.register(channel[0]) // Listen to nodes with outgoing stake
     }
     const currentChannels = await this.getOpenChannels()
     for (const channel of currentChannels) {
-      this.network.networkPeers.register(channel[1]) // Make sure current channels are 'interesting'
+      this.networkPeers.register(channel[1]) // Make sure current channels are 'interesting'
     }
     const balance = await this.getBalance()
     const [nextChannels, closeChannels] = await this.strategy.tick(
       balance,
       newChannels,
       currentChannels,
-      this.network.networkPeers,
+      this.networkPeers,
       this.paymentChannels.indexer
     )
     verbose(`strategy wants to close ${closeChannels.length} channels`)
@@ -290,7 +303,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     }
     verbose(`strategy wants to open`, nextChannels.length, 'new channels')
     for (let channelToOpen of nextChannels) {
-      this.network.networkPeers.register(channelToOpen[0])
+      this.networkPeers.register(channelToOpen[0])
       try {
         // Opening channels can fail if we can't establish a connection.
         const hash = await this.openChannel(...channelToOpen)
@@ -335,7 +348,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
         Promise.all([
           // prettier-ignore
           this.connectToBootstrapServers(),
-          this.network.start()
+          this.heartbeat.start()
         ])
       ),
       this.paymentChannels.start()
@@ -358,7 +371,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     }
     clearTimeout(this.checkTimeout)
     this.running = false
-    await Promise.all([this.network.stop(), this.paymentChannels.stop()])
+    await Promise.all([this.heartbeat.stop(), this.paymentChannels.stop()])
 
     await Promise.all([this.db?.close().then(() => log(`Database closed.`)), this._libp2p.stop()])
 
@@ -471,16 +484,16 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       throw Error(`Expecting a non-empty destination.`)
     }
     let info = ''
-    let latency = await this._interactions.network.heartbeat.interact(destination)
+    let latency = await this._interactions.heartbeat.interact(destination)
     return { latency, info }
   }
 
   public getConnectedPeers(): PeerId[] {
-    return this.network.networkPeers.all()
+    return this.networkPeers.all()
   }
 
   public connectionReport(): string {
-    return this.network.networkPeers.debugLog()
+    return this.networkPeers.debugLog()
   }
 
   private async checkBalances() {
@@ -644,7 +657,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       this.getId(),
       destination,
       MAX_HOPS - 1,
-      this.network.networkPeers,
+      this.networkPeers,
       this.paymentChannels.indexer,
       PATH_RANDOMNESS
     )

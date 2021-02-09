@@ -8,7 +8,7 @@ describe('test PeerStore', async function () {
 
   const SELF = fakePeerId(6)
   it('should register new peers', async function () {
-    const networkPeers = new PeerStore([], SELF)
+    const networkPeers = new PeerStore([], [SELF])
     assert(networkPeers.length() == 0, 'networkPeers must be empty')
 
     networkPeers.register(SELF)
@@ -22,13 +22,13 @@ describe('test PeerStore', async function () {
   })
 
   it('should allow randomSubset to be taken of peer ids', function () {
-    const networkPeers = new PeerStore(IDS, SELF)
+    const networkPeers = new PeerStore(IDS, [SELF])
     assert(networkPeers.randomSubset(3).length == 3)
   })
 
   it('should _ping_ peers', async function () {
     const id = fakePeerId(5)
-    const networkPeers = new PeerStore([], SELF)
+    const networkPeers = new PeerStore([], [SELF])
     assert(networkPeers.length() == 0, 'networkPeers must be empty')
     assert(networkPeers.pingSince(123).length === 0, 'no peers yet')
 
