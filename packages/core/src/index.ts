@@ -142,14 +142,16 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     this.bootstrapServers = options.bootstrapServers || []
     this.isBootstrapNode = options.bootstrapNode || false
     this._interactions = new Interactions(this, this.mixer, (peer: PeerId) => this.networkPeers.register(peer))
+
+    this.networkPeers = new NetworkPeers(
+      Array.from(this._libp2p.peerStore.peers.values()).map((x) => x.id),
+      [this.getId()].concat(this.bootstrapServers.map((bs) => PeerId.createFromB58String(bs.getPeerId())))
+    )
+
     this.heartbeat = new Heartbeat(
       this.networkPeers,
       this._interactions.heartbeat,
       this._libp2p.hangUp.bind(this._libp2p)
-    )
-    this.networkPeers = new NetworkPeers(
-      Array.from(this._libp2p.peerStore.peers.values()).map((x) => x.id),
-      [this.getId()].concat(this.bootstrapServers.map((bs) => PeerId.createFromB58String(bs.getPeerId())))
     )
 
     if (options.ticketAmount) this.ticketAmount = options.ticketAmount
