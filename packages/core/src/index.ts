@@ -191,8 +191,9 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
         transport: [HoprConnect as any],
         streamMuxer: [MPLEX],
         connEncryption: [NOISE],
-        dht: KadDHT as any
-      } as any,
+        // @ts-ignore //TODO 'Libp2pModules' does not contain types for DHT as ov v0.30 see js-libp2p/659
+        dht: KadDHT
+      }, 
       config: {
         transport: {
           HoprConnect: {
