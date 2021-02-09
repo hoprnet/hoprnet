@@ -218,7 +218,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
           enabled: true
         },
         //@ts-ignore - bug in libp2p options
-        relay: { 
+        relay: {
           enabled: false
         }
       },
