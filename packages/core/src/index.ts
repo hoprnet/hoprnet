@@ -208,9 +208,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
         dht: {
           enabled: true
         },
-        relay: {
-          enabled: false
-        } as any
+        relay: undefined // Disabled for now
       },
       dialer: {
         // Temporary fix, see https://github.com/hoprnet/hopr-connect/issues/77
