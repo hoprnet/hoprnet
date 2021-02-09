@@ -37,7 +37,7 @@ export interface ChannelStrategy {
     networkPeers: NetworkPeers,
     indexer: Indexer
   ): Promise<[ChannelsToOpen[], ChannelsToClose[]]>
-  
+
   shouldRedeemOnChannelClosure(peerId: PeerId): boolean
 }
 

@@ -626,7 +626,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     */
   }
 
-  public async closeChannel(peerId: PeerId, forceRedeemTickets=false): Promise<{ receipt: string; status: string }> {
+  public async closeChannel(peerId: PeerId, forceRedeemTickets = false): Promise<{ receipt: string; status: string }> {
     let redeemTickets = forceRedeemTickets || this.strategy.shouldRedeemOnChannelClosure(peerId)
     if (redeemTickets) {
       this.redeemTicketsInChannel(peerId)
