@@ -13,8 +13,7 @@ import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '../../'
 import pipe from 'it-pipe'
 
-import type { Handler } from 'libp2p'
-
+import type { Connection, MuxedStream } from 'libp2p'
 import { dialHelper, durations } from '@hoprnet/hopr-utils'
 import { getTokens, Token } from '../../utils'
 import { Mixer } from '../../mixer'
@@ -44,7 +43,7 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector> implements Abstr
     pipe([packet], struct.stream)
   }
 
-  handler(struct: Handler): void {
+  handler(struct: { connection: Connection; stream: MuxedStream; protocol: string }) {
     pipe(
       /* pretttier-ignore */
       struct.stream,
