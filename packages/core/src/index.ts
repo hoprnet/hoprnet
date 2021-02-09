@@ -1,5 +1,3 @@
-/// <reference path="./@types/libp2p.ts" />
-
 import LibP2P from 'libp2p'
 import type { Connection } from 'libp2p'
 
@@ -146,7 +144,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     this._interactions = new Interactions(this, this.mixer, (peer: PeerId) => this.networkPeers.register(peer))
     this.heartbeat = new Heartbeat(
       this.networkPeers,
-      this._interactions.network.heartbeat,
+      this._interactions.heartbeat,
       this._libp2p.hangUp.bind(this._libp2p)
     )
     this.networkPeers = new NetworkPeers(
@@ -198,20 +196,19 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
 
     const libp2p = await LibP2P.create({
       peerId: id,
-      addresses: { listen: addresses },
+      addresses: { listen: addresses.map((x) => x.toString()) },
       // libp2p modules
       modules: {
-        transport: [HoprConnect],
+        transport: [HoprConnect as any], // TODO re https://github.com/hoprnet/hopr-connect/issues/78
         streamMuxer: [MPLEX],
         connEncryption: [NOISE],
+        // @ts-ignore //TODO 'Libp2pModules' does not contain types for DHT as ov v0.30 see js-libp2p/659
         dht: KadDHT
       },
       config: {
         transport: {
           HoprConnect: {
             bootstrapServers: options.bootstrapServers
-            // Testing
-            // __noDirectConnections: !options.bootstrapNode && true
           }
         },
         peerDiscovery: {
@@ -220,12 +217,15 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
         dht: {
           enabled: true
         },
+        //@ts-ignore - bug in libp2p options
         relay: {
           enabled: false
         }
       },
       dialer: {
-        maxParallelDials: options.bootstrapNode ? 1000 : 100
+        // Temporary fix, see https://github.com/hoprnet/hopr-connect/issues/77
+        addressSorter: (a) => a,
+        concurrency: options.bootstrapNode ? 1000 : 100
       }
     })
 
@@ -482,7 +482,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       throw Error(`Expecting a non-empty destination.`)
     }
     let info = ''
-    let latency = await this._interactions.network.heartbeat.interact(destination)
+    let latency = await this._interactions.heartbeat.interact(destination)
     return { latency, info }
   }
 
