@@ -1,5 +1,5 @@
 import { u8aAllocate } from './allocate'
-import { randomInteger } from '../randomInteger'
+import { randomInteger } from '../crypto/randomInteger'
 
 describe('test u8aAllocate spec', function () {
   const BUFFER_LENGTH = 10

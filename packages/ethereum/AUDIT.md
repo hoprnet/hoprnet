@@ -52,7 +52,6 @@ The HoprDistributor smart contract should:
   - allow the owner should to add allocations
   - not allow for allocations to be added to schedules that do not exist
   - not accept invalid allocations with different array lengths
-  - not allow the owner to
   - not allow the owner to add allocations that exceed the total amount of mintable tokens
   - allow any user to claim tokens if they are eligible for the specified schedule at that time
   - allow users to claim tokens that were lost due to rounding errors in their last duration in the schedule

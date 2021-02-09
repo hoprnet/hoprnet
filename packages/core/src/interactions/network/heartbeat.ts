@@ -4,10 +4,10 @@ import { u8aEquals } from '@hoprnet/hopr-utils'
 import debug from 'debug'
 import pipe from 'it-pipe'
 import { PROTOCOL_HEARTBEAT, HEARTBEAT_TIMEOUT } from '../../constants'
-import type { Handler } from 'libp2p'
 import type PeerId from 'peer-id'
 import { LibP2P } from '../../'
-import { dialHelper } from '../../utils'
+import { dialHelper } from '@hoprnet/hopr-utils'
+import type { Connection, MuxedStream } from 'libp2p'
 
 const verbose = debug('hopr-core:verbose:heartbeat')
 const HASH_FUNCTION = 'blake2s256'
@@ -25,7 +25,7 @@ class Heartbeat implements AbstractInteraction {
     this.node.handle(this.protocols, this.handler.bind(this))
   }
 
-  handler(struct: Handler) {
+  handler(struct: { connection: Connection; stream: MuxedStream; protocol: string }) {
     const self = this
     pipe(
       struct.stream,
@@ -51,27 +51,32 @@ class Heartbeat implements AbstractInteraction {
 
     const struct = await dialHelper(this.node, counterparty, this.protocols, { timeout: HEARTBEAT_TIMEOUT })
 
-    if (struct != null) {
-      const challenge = randomBytes(16)
-      const expectedResponse = createHash(HASH_FUNCTION).update(challenge).digest()
-
-      const response = await pipe(
-        // prettier-ignore
-        [challenge],
-        (struct as Handler).stream,
-        async (source: AsyncIterable<Uint8Array>): Promise<Uint8Array | void> => {
-          for await (const msg of source) {
-            return msg
-          }
-        }
-      )
-
-      if (response != null && u8aEquals(expectedResponse, response.slice())) {
-        return Date.now() - start
-      }
+    if (struct == undefined) {
+      verbose(`Connection to ${counterparty.toB58String()} failed`)
+      return -1
     }
 
-    throw Error()
+    const challenge = randomBytes(16)
+    const expectedResponse = createHash(HASH_FUNCTION).update(challenge).digest()
+
+    const response = await pipe(
+      // prettier-ignore
+      [challenge],
+      struct.stream,
+      async (source: AsyncIterable<Uint8Array>): Promise<Uint8Array | void> => {
+        for await (const msg of source) {
+          return msg
+        }
+      }
+    )
+
+    if (response != null && u8aEquals(expectedResponse, response.slice())) {
+      const elapsedTime = Date.now() - start
+      return elapsedTime < 0 ? 0 : elapsedTime
+    } else {
+      verbose(`Invalid response. Got ${JSON.stringify(response)}`)
+      return -1
+    }
   }
 }
 

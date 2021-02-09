@@ -235,10 +235,8 @@ class HashedSecret {
    */
   public async initialize(debug?: boolean): Promise<void> {
     const { initialized, onChainSecret, offChainSecret } = await this.check()
-    if (initialized) {
-      log(`Secret is initialized.`)
-      return
-    }
+    if (initialized) return
+    log(`Secret is not initialized.`)
 
     const bothEmpty = typeof onChainSecret === 'undefined' && typeof offChainSecret === 'undefined'
     const bothExist = !bothEmpty && typeof onChainSecret !== 'undefined' && typeof offChainSecret !== 'undefined'

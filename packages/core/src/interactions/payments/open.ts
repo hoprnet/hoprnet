@@ -3,14 +3,13 @@ import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type { Types } from '@hoprnet/hopr-core-connector-interface'
 
 import pipe from 'it-pipe'
-
+import type { Connection, MuxedStream } from 'libp2p'
 import type { AbstractInteraction } from '../abstractInteraction'
-
-import type { Handler } from 'libp2p'
-
 import { PROTOCOL_PAYMENT_CHANNEL } from '../../constants'
 import type PeerId from 'peer-id'
+import { dialHelper, durations } from '@hoprnet/hopr-utils'
 
+const CHANNEL_OPEN_TIMEOUT = durations.seconds(4)
 class Opening<Chain extends HoprCoreConnector> implements AbstractInteraction {
   protocols: string[] = [PROTOCOL_PAYMENT_CHANNEL]
 
@@ -18,7 +17,7 @@ class Opening<Chain extends HoprCoreConnector> implements AbstractInteraction {
     this.node._libp2p.handle(this.protocols, this.handler.bind(this))
   }
 
-  async handler(struct: Handler) {
+  handler(struct: { connection: Connection; stream: MuxedStream; protocol: string }) {
     pipe(
       struct.stream,
       this.node.paymentChannels.channel.handleOpeningRequest.bind(this.node.paymentChannels.channel),
@@ -27,20 +26,12 @@ class Opening<Chain extends HoprCoreConnector> implements AbstractInteraction {
   }
 
   async interact(counterparty: PeerId, channelBalance: Types.ChannelBalance): Promise<Types.SignedChannel> {
-    let struct: Handler
+    const struct = await dialHelper(this.node._libp2p, counterparty, this.protocols, {
+      timeout: CHANNEL_OPEN_TIMEOUT
+    })
 
-    try {
-      struct = await this.node._libp2p.dialProtocol(counterparty, this.protocols[0]).catch(async (_: Error) => {
-        return this.node._libp2p.peerRouting
-          .findPeer(counterparty)
-          .then((peerRoute) => this.node._libp2p.dialProtocol(peerRoute.id, this.protocols[0]))
-      })
-    } catch (err) {
-      throw Error(
-        `Tried to open a payment channel but could not connect to ${counterparty.toB58String()}. Error was: ${
-          err.message
-        }`
-      )
+    if (struct == undefined) {
+      throw Error(`Tried to open a payment channel but could not connect to ${counterparty.toB58String()}.`)
     }
 
     const channel = this.node.paymentChannels.types.Channel.createFunded(channelBalance)

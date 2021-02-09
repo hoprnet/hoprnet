@@ -186,8 +186,7 @@ export default class NonceTracker {
 
     // checks if one of the txs is stuck
     return txs.some((tx) => {
-      const deadline = tx.createdAt + this.minPending
-      return now - deadline < 0
+      return tx.createdAt + this.minPending < now
     })
   }
 

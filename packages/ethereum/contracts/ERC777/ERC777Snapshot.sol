@@ -2,7 +2,7 @@
 pragma solidity ^0.6.0;
 
 import "@openzeppelin/contracts/math/SafeMath.sol";
-import "@openzeppelin/contracts/token/ERC777/ERC777.sol";
+import "../openzeppelin-contracts/ERC777.sol";
 
 /**
  * @dev This contract extends an ERC777 token with a snapshot mechanism. When a snapshot is created, the balances and
@@ -51,14 +51,7 @@ abstract contract ERC777Snapshot is ERC777 {
      * @return The balance at `_blockNumber`
      */
     function balanceOfAt(address _owner, uint128 _blockNumber) external view returns (uint256) {
-        if (
-            (accountSnapshots[_owner].length == 0) ||
-            (accountSnapshots[_owner][0].fromBlock > _blockNumber)
-        ) {
-            return 0;
-        } else {
-            return _valueAt(accountSnapshots[_owner], _blockNumber);
-        }
+        return _valueAt(accountSnapshots[_owner], _blockNumber);
     }
 
     /**
@@ -67,21 +60,12 @@ abstract contract ERC777Snapshot is ERC777 {
      * @return The total amount of tokens at `_blockNumber`
      */
     function totalSupplyAt(uint128 _blockNumber) external view returns(uint256) {
-        if (
-            (totalSupplySnapshots.length == 0) ||
-            (totalSupplySnapshots[0].fromBlock > _blockNumber)
-        ) {
-            return 0;
-        } else {
-            return _valueAt(totalSupplySnapshots, _blockNumber);
-        }
+        return _valueAt(totalSupplySnapshots, _blockNumber);
     }
 
     // Update balance and/or total supply snapshots before the values are modified. This is implemented
     // in the _beforeTokenTransfer hook, which is executed for _mint, _burn, and _transfer operations.
     function _beforeTokenTransfer(address operator, address from, address to, uint256 amount) internal virtual override {
-        super._beforeTokenTransfer(operator, from, to, amount);
-
         if (from == address(0)) {
             // mint
             updateValueAtNow(accountSnapshots[to], balanceOf(to).add(amount));
@@ -107,11 +91,12 @@ abstract contract ERC777Snapshot is ERC777 {
         Snapshot[] storage snapshots,
         uint128 _block
     ) view internal returns (uint256) {
-        if (snapshots.length == 0) return 0;
+        uint256 lenSnapshots = snapshots.length;
+        if (lenSnapshots == 0) return 0;
 
         // Shortcut for the actual value
-        if (_block >= snapshots[snapshots.length - 1].fromBlock) {
-            return snapshots[snapshots.length - 1].value;
+        if (_block >= snapshots[lenSnapshots - 1].fromBlock) {
+            return snapshots[lenSnapshots - 1].value;
         }
         if (_block < snapshots[0].fromBlock) {
             return 0;
@@ -119,15 +104,20 @@ abstract contract ERC777Snapshot is ERC777 {
 
         // Binary search of the value in the array
         uint256 min = 0;
-        uint256 max = snapshots.length - 1;
+        uint256 max = lenSnapshots - 1;
         while (max > min) {
             uint256 mid = (max + min + 1) / 2;
-            if (snapshots[mid].fromBlock <= _block) {
+
+            uint256 midSnapshotFrom = snapshots[mid].fromBlock;
+            if (midSnapshotFrom == _block) {
+                return snapshots[mid].value;
+            } else if (midSnapshotFrom < _block) {
                 min = mid;
             } else {
                 max = mid - 1;
             }
         }
+
         return snapshots[min].value;
     }
 
@@ -139,10 +129,11 @@ abstract contract ERC777Snapshot is ERC777 {
      */
     function updateValueAtNow(Snapshot[] storage snapshots, uint256 _value) internal {
         require(_value <= uint128(-1), "casting overflow");
+        uint256 lenSnapshots = snapshots.length;
 
         if (
-            (snapshots.length == 0) ||
-            (snapshots[snapshots.length - 1].fromBlock < block.number)
+            (lenSnapshots == 0) ||
+            (snapshots[lenSnapshots - 1].fromBlock < block.number)
         ) {
             snapshots.push(
                 Snapshot(
@@ -151,7 +142,7 @@ abstract contract ERC777Snapshot is ERC777 {
                 )
             );
         } else {
-            snapshots[snapshots.length - 1].value = uint128(_value);
+            snapshots[lenSnapshots - 1].value = uint128(_value);
         }
     }
 }

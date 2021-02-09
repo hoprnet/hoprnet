@@ -6,9 +6,14 @@ import PeerStore from './network-peers'
 describe('test PeerStore', async function () {
   const IDS = [fakePeerId(1), fakePeerId(2), fakePeerId(3), fakePeerId(4)]
 
-  it('should register new peers', function () {
-    const networkPeers = new PeerStore([])
+  const SELF = fakePeerId(6)
+  it('should register new peers', async function () {
+    const networkPeers = new PeerStore([], [SELF])
     assert(networkPeers.length() == 0, 'networkPeers must be empty')
+
+    networkPeers.register(SELF)
+    assert(networkPeers.length() == 0, 'networkPeers must be empty after inserting self')
+
     networkPeers.register(IDS[0])
     networkPeers.register(IDS[1])
     assert(networkPeers.length() == 2, 'now has 2 peers')
@@ -17,13 +22,13 @@ describe('test PeerStore', async function () {
   })
 
   it('should allow randomSubset to be taken of peer ids', function () {
-    const networkPeers = new PeerStore(IDS)
+    const networkPeers = new PeerStore(IDS, [SELF])
     assert(networkPeers.randomSubset(3).length == 3)
   })
 
   it('should _ping_ peers', async function () {
     const id = fakePeerId(5)
-    const networkPeers = new PeerStore([])
+    const networkPeers = new PeerStore([], [SELF])
     assert(networkPeers.length() == 0, 'networkPeers must be empty')
     assert(networkPeers.pingSince(123).length === 0, 'no peers yet')
 

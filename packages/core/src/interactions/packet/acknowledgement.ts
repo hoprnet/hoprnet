@@ -1,9 +1,8 @@
 import { AbstractInteraction } from '../abstractInteraction'
+import type { Connection, MuxedStream } from 'libp2p'
 
 import pipe from 'it-pipe'
 import PeerId from 'peer-id'
-
-import AbortController from 'abort-controller'
 
 import debug from 'debug'
 const log = debug('hopr-core:acknowledgement')
@@ -15,12 +14,19 @@ import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '../../'
 import { Acknowledgement } from '../../messages/acknowledgement'
 
-import type { Handler } from 'libp2p'
-
 import EventEmitter from 'events'
 
 import { PROTOCOL_ACKNOWLEDGEMENT } from '../../constants'
-import { u8aToHex, durations, u8aConcat, toU8a, u8aToNumber, pubKeyToPeerId, u8aAdd } from '@hoprnet/hopr-utils'
+import {
+  dialHelper,
+  u8aToHex,
+  durations,
+  u8aConcat,
+  toU8a,
+  u8aToNumber,
+  pubKeyToPeerId,
+  u8aAdd
+} from '@hoprnet/hopr-utils'
 import { UnacknowledgedTicket } from '../../messages/ticket'
 
 import { ACKNOWLEDGED_TICKET_INDEX_LENGTH } from '../../dbKeys'
@@ -39,42 +45,20 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
     this.node._libp2p.handle(this.protocols, this.handler.bind(this))
   }
 
-  handler(struct: Handler) {
+  handler(struct: { connection: Connection; stream: MuxedStream; protocol: string }) {
     pipe(struct.stream, this.handleHelper.bind(this))
   }
 
   async interact(counterparty: PeerId, acknowledgement: Acknowledgement<Chain>): Promise<void> {
-    return new Promise<void>(async (resolve) => {
-      let struct: Handler
-      let aborted = false
-      const abort = new AbortController()
-
-      const timeout = setTimeout(() => {
-        aborted = true
-        abort.abort()
-        error(`Timeout while trying to send acknowledgement to ${counterparty.toB58String()}.`)
-        resolve()
-      }, ACKNOWLEDGEMENT_TIMEOUT)
-
-      try {
-        struct = await this.node._libp2p.dialProtocol(counterparty, this.protocols[0]).catch(async () => {
-          const { id } = await this.node._libp2p.peerRouting.findPeer(counterparty)
-          return await this.node._libp2p.dialProtocol(id, this.protocols[0])
-        })
-      } catch (err) {
-        clearTimeout(timeout)
-        error(`Could not transfer acknowledgement to ${counterparty.toB58String()}. Error was: ${red(err.message)}.`)
-        return
-      }
-
-      clearTimeout(timeout)
-
-      pipe([acknowledgement], struct.stream)
-
-      if (!aborted) {
-        resolve()
-      }
+    const struct = await dialHelper(this.node._libp2p, counterparty, this.protocols, {
+      timeout: ACKNOWLEDGEMENT_TIMEOUT
     })
+
+    if (struct == undefined) {
+      error(`Could not send acknowledgement to party ${counterparty.toB58String()}.`)
+    }
+
+    pipe([acknowledgement], struct.stream)
   }
 
   async handleHelper(source: AsyncIterable<Uint8Array>): Promise<void> {

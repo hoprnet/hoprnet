@@ -3,7 +3,7 @@ import BN from 'bn.js'
 import { UINT256 } from '../types/solidity'
 import { Uint8ArrayE } from '../types/extended'
 import { ChannelStatus } from '../types/channel'
-import { stateCounterToStatus } from '../utils'
+import { stateCounterToStatus, stateCounterToIteration } from '../utils'
 
 // @TODO: we should optimize this since it will use more storage than needed
 // @TODO: redesign how we build classes like this
@@ -125,6 +125,10 @@ class ChannelEntry extends Uint8ArrayE implements Types.ChannelEntry {
     else if (status === ChannelStatus.FUNDED) return 'FUNDED'
     else if (status === ChannelStatus.OPEN) return 'OPEN'
     return 'PENDING'
+  }
+
+  get iteration() {
+    return stateCounterToIteration(this.stateCounter.toNumber())
   }
 
   static get SIZE(): number {

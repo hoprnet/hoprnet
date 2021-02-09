@@ -153,14 +153,19 @@ contract HoprDistributor is Ownable {
         require(schedules[scheduleName].durations.length != 0, "Schedule must exist");
         require(accounts.length == amounts.length, "Accounts and amounts must have equal length");
 
+        // gas optimization
+        uint128 _totalToBeMinted = totalToBeMinted;
+
         for (uint256 i = 0; i < accounts.length; i++) {
             require(allocations[accounts[i]][scheduleName].amount == 0, "Allocation must not exist");
             allocations[accounts[i]][scheduleName].amount = amounts[i];
-            totalToBeMinted = _addUint128(totalToBeMinted, amounts[i]);
-            assert(totalToBeMinted <= maxMintAmount);
+            _totalToBeMinted = _addUint128(_totalToBeMinted, amounts[i]);
+            assert(_totalToBeMinted <= maxMintAmount);
 
             emit AllocationAdded(accounts[i], amounts[i], scheduleName);
         }
+
+        totalToBeMinted = _totalToBeMinted;
     }
 
     /**
@@ -207,7 +212,7 @@ contract HoprDistributor is Ownable {
 
         uint128 newClaimed = _addUint128(allocation.claimed, claimable);
         // Trying to claim more than allocated
-        assert(claimable <= newClaimed);
+        assert(newClaimed <= allocation.amount);
 
         uint128 newTotalMinted = _addUint128(totalMinted, claimable);
         // Total amount minted should be less or equal than specified
@@ -253,7 +258,7 @@ contract HoprDistributor is Ownable {
             // schedule deadline not passed, exiting
             if (scheduleDeadline > _currentBlockTimestamp()) break;
             // already claimed during this period, skipping
-            if (allocation.lastClaim > scheduleDeadline) continue;
+            if (allocation.lastClaim >= scheduleDeadline) continue;
 
             claimable = _addUint128(claimable, _divUint128(_mulUint128(allocation.amount, schedule.percents[i]), MULTIPLIER));
         }
@@ -263,7 +268,7 @@ contract HoprDistributor is Ownable {
 
     function _currentBlockTimestamp() internal view returns (uint128) {
         // solhint-disable-next-line
-        return uint128(block.timestamp % 2 ** 128);
+        return uint128(block.timestamp);
     }
 
     // SafeMath variations

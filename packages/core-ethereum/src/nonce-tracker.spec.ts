@@ -260,7 +260,7 @@ describe('nonce-tracker', function () {
       minPending
     })
 
-    let createdAt = new Date().getTime() - minPending
+    let createdAt = new Date().getTime() - minPending - 1
 
     pendingTxs = [
       genTx({ nonce: 0, createdAt }),
