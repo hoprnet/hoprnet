@@ -55,7 +55,6 @@ describe('test hashedSecret', function () {
     connector.hashedSecret = new PreImage(connector)
 
     connector.stop = async () => {
-      await connector.account.stop()
       ;(web3.eth.currentProvider as WebsocketProvider).disconnect(1000, 'Stopping HOPR node.')
     }
 
