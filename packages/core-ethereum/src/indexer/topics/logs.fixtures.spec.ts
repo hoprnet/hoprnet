@@ -116,8 +116,8 @@ export const CLOSING_EVENT: Event<'InitiatedChannelClosure'> = {
   transactionIndex: new BN(2),
   logIndex: new BN(3),
   data: {
-    initiator: new Public(stringToU8a('0x855970bfb7ad20c709835b7d8a41b9168939d5ed434ade6a44da4ee612630d87')),
-    counterparty: new Public(stringToU8a('0xba562689e2010afe6594ad84e0f2c677312b0b21a1d35e8d36fc905662e30ec2')),
+    initiator: new Public(stringToU8a('0x02855970bfb7ad20c709835b7d8a41b9168939d5ed434ade6a44da4ee612630d87')),
+    counterparty: new Public(stringToU8a('0x02ba562689e2010afe6594ad84e0f2c677312b0b21a1d35e8d36fc905662e30ec2')),
     closureTime: new BN('1612519171')
   }
 }

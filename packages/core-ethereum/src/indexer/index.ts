@@ -23,7 +23,8 @@ import {
   updateLatestBlockNumber,
   snapshotComparator,
   getLatestConfirmedSnapshot,
-  getAccountEntry
+  getAccountEntry,
+  updateAccountEntry
 } from './utils'
 
 const log = DebugLog(['indexer'])
@@ -239,7 +240,9 @@ class Indexer extends EventEmitter implements IIndexer {
         throw new Error('Found event which is older than last confirmed event!')
       }
 
-      if (event.name === 'FundedChannel') {
+      if (event.name === 'SecretHashSet') {
+        await this.onSecretHashSet(event as Event<'SecretHashSet'>)
+      } else if (event.name === 'FundedChannel') {
         await this.onFundedChannel(event as Event<'FundedChannel'>)
       } else if (event.name === 'OpenedChannel') {
         await this.onOpenedChannel(event as Event<'OpenedChannel'>)
@@ -301,6 +304,17 @@ class Indexer extends EventEmitter implements IIndexer {
   }
 
   // on new events
+  private async onSecretHashSet(event: Event<'SecretHashSet'>): Promise<void> {
+    const account = event.data.account
+    const accountEntry = await reducers.onSecretHashSet(event)
+
+    log('Processing event %s with account %s', event.name, account.toHex())
+
+    await updateAccountEntry(this.connector.db, account, accountEntry)
+
+    log('Account %s set hashed secret', chalk.green(account.toHex()))
+  }
+
   private async onFundedChannel(event: Event<'FundedChannel'>): Promise<void> {
     const recipientAccountId = await event.data.recipient.toAccountId()
     const counterpartyAccountId = await event.data.counterparty.toAccountId()

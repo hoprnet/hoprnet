@@ -29,8 +29,6 @@ export const logToEvent = <N extends keyof EventData>(log: Log, name: N, data: E
 
 // transform log into an event
 export const toSecretHashSetEvent = (log: Log): Event<'SecretHashSet'> => {
-  console.log(log)
-
   const { account, secretHash, counter } = abiCoder.decodeLog(
     [
       {
@@ -39,16 +37,16 @@ export const toSecretHashSetEvent = (log: Log): Event<'SecretHashSet'> => {
         indexed: true
       },
       {
-        type: 'bytes32',
+        type: 'bytes27',
         name: 'secretHash'
       },
       {
-        type: 'uint',
+        type: 'uint32',
         name: 'counter'
       }
     ],
     log.data,
-    log.topics
+    [log.topics[1]]
   )
 
   return logToEvent(log, 'SecretHashSet', {

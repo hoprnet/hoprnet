@@ -5,9 +5,8 @@ import { pubKeyToAccountId } from '../../utils'
 import * as logs from './logs'
 import * as fixtures from './logs.fixtures.spec'
 
-// @TODO: add more tests
-describe.only('test topic utils', function () {
-  it.only('should convert SECRET_HASHED_SET log to SECRET_HASHED_SET event', async function () {
+describe('test topic utils', function () {
+  it('should convert SECRET_HASHED_SET log to SECRET_HASHED_SET event', async function () {
     const actual = logs.toSecretHashSetEvent(fixtures.SECRET_HASHED_SET_LOG)
     const expected = fixtures.SECRET_HASHED_SET_EVENT
 
@@ -21,11 +20,6 @@ describe.only('test topic utils', function () {
     const actual = logs.toFundedChannelEvent(fixtures.FUNDED_LOG)
     const expected = fixtures.FUNDED_EVENT
 
-    console.log({
-      actual: actual.data.funder.toHex(),
-      expected: expected.data.funder.toHex()
-    })
-
     expectBaseEventsToBeEqual(actual, expected)
     expect(actual.data.funder.toHex()).to.equal(expected.data.funder.toHex(), 'funder')
     expect(actual.data.recipient.toHex()).to.equal(expected.data.recipient.toHex(), 'recipient')
@@ -35,7 +29,6 @@ describe.only('test topic utils', function () {
       expected.data.counterpartyAmount.toString(),
       'counterpartyAmount'
     )
-    expect(actual.data.funder).to.equal(expected.data.funder, 'funder')
 
     const actualRecipientAccountId = await pubKeyToAccountId(actual.data.recipient)
     const actualCounterpartyAccountId = await pubKeyToAccountId(actual.data.counterparty)
@@ -58,6 +51,23 @@ describe.only('test topic utils', function () {
     expect(actualOpenerAccountId.toHex()).to.equal('0xf73A34405D1349476B5500Ea0381A1fcc87e8AEb')
     expect(actualCounterpartyAccountId.toHex()).to.equal('0x20516d47c46Bcd67D19898FDA6aE8A68B3022429')
   })
+
+  it('should convert CLOSING log to InitiatedChannelClosure event', async function () {
+    const actual = logs.toInitiatedChannelClosureEvent(fixtures.CLOSING_LOG)
+    const expected = fixtures.CLOSING_EVENT
+
+    expectBaseEventsToBeEqual(actual, expected)
+    expect(actual.data.initiator.toHex()).to.equal(expected.data.initiator.toHex(), 'initiator')
+    expect(actual.data.counterparty.toHex()).to.equal(expected.data.counterparty.toHex(), 'counterparty')
+
+    const actualInitiatorAccountId = await pubKeyToAccountId(actual.data.initiator)
+    const actualCounterpartyAccountId = await pubKeyToAccountId(actual.data.counterparty)
+
+    expect(actualInitiatorAccountId.toHex()).to.equal('0x9c62B096e229bD6B929212728beD7996498a66e8')
+    expect(actualCounterpartyAccountId.toHex()).to.equal('0x9AC4c344608CD61Af8dDC9ecab9077E3Fab87bEa')
+  })
+
+  // @TODO: add CLOSED test
 })
 
 const expectBaseEventsToBeEqual = (actual: Event<any>, expected: Event<any>) => {

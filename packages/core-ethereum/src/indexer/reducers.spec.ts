@@ -8,7 +8,6 @@ import * as fixtures from './reducers.fixtures.spec'
 
 chai.use(chaiAsPromised)
 
-// @TODO: add more tests
 describe('test indexer reducers', function () {
   context('channels', function () {
     it("should create FUNDED channel entry when it's a new channel", async function () {
