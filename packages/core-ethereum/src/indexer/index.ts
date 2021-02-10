@@ -62,6 +62,9 @@ class Indexer extends EventEmitter implements IIndexer {
 
     const { web3, hoprChannels } = this.connector
 
+    // wipe indexer, do not use in production
+    // await this.wipe()
+
     const [latestSavedBlock, latestOnChainBlock] = await Promise.all([
       await getLatestBlockNumber(this.connector.db),
       web3.eth.getBlockNumber()
@@ -142,6 +145,27 @@ class Indexer extends EventEmitter implements IIndexer {
 
     return isSyncing(onChainBlock, lastKnownBlock)
   }
+
+  // /**
+  //  * Wipes all indexer related stored data in the DB.
+  //  * @deprecated do not use this in production
+  //  */
+  // // @ts-ignore
+  // private async wipe(): Promise<void> {
+  //   // delete latest confirmed snapshot
+  //   await this.connector.db.del(Buffer.from(this.connector.dbKeys.LatestConfirmedSnapshot()))
+  //   // delete latest block
+  //   await this.connector.db.del(Buffer.from(this.connector.dbKeys.LatestBlockNumber()))
+  //   // delete all channel entries
+  //   await this.connector.db.batch(
+  //     (await getChannelEntries(this.connector.db)).map(({ partyA, partyB }) => ({
+  //       type: 'del',
+  //       key: Buffer.from(this.connector.dbKeys.ChannelEntry(partyA, partyB))
+  //     }))
+  //   )
+
+  //   log('wiped indexer data')
+  // }
 
   /**
    * Query past logs, this will loop until it gets all blocks from {toBlock} to {fromBlock}.
