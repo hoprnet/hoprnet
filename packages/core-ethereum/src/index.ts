@@ -108,7 +108,6 @@ export default class HoprEthereum implements HoprCoreConnector {
         }
 
         await this.indexer.stop()
-        await this.account.stop()
         provider.disconnect(1000, 'Stopping HOPR node.')
         this._status = 'dead'
         log(chalk.green('Connector stopped'))

@@ -474,8 +474,24 @@ class Indexer extends EventEmitter implements IIndexer {
     return getChannelEntries(this.connector.db, party, filter)
   }
 
-  public async getAccountEntry(account: AccountId): Promise<AccountEntry | undefined> {
-    return getAccountEntry(this.connector.db, account)
+  public async getAccountEntry(
+    account: AccountId,
+    includeUnconfirmed: boolean = false
+  ): Promise<AccountEntry | undefined> {
+    if (!includeUnconfirmed) return getAccountEntry(this.connector.db, account)
+
+    const unconfirmedEvents = this.unconfirmedEvents.clone()
+    let accountEntry = await getAccountEntry(this.connector.db, account)
+
+    while (unconfirmedEvents.length > 0) {
+      const event = unconfirmedEvents.pop() as Event<'SecretHashSet'>
+      if (event.name !== 'SecretHashSet') continue
+      if (!event.data.account.eq(account)) continue
+
+      accountEntry = await reducers.onSecretHashSet(event)
+    }
+
+    return accountEntry
   }
 
   // routing related

@@ -1,5 +1,5 @@
 import type Chain from '@hoprnet/hopr-core-connector-interface'
-import type { Types, Channel } from '@hoprnet/hopr-core-connector-interface'
+import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import type PeerId from 'peer-id'
 import type Hopr from '..'
 import { u8aEquals } from '@hoprnet/hopr-utils'
@@ -254,14 +254,17 @@ export async function validateUnacknowledgedTicket({
   signedTicket: Types.SignedTicket
   getTickets: () => Promise<Types.SignedTicket[]>
 }): Promise<void> {
-  const ticket = signedTicket.ticket
-  const chain = node.paymentChannels
-  const selfPubKey = node.getId().pubKey.marshal()
-  const selfAccountId = await chain.utils.pubKeyToAccountId(selfPubKey)
+  const connector = node.paymentChannels
+  const { utils, types } = connector
+
+  const selfPubKey = new types.Public(node.getId().pubKey.marshal())
+  const selfAccountId = await utils.pubKeyToAccountId(selfPubKey)
   const senderB58 = senderPeerId.toB58String()
-  const senderPubKey = senderPeerId.pubKey.marshal()
-  const senderAccountId = await chain.utils.pubKeyToAccountId(senderPubKey)
-  const amPartyA = chain.utils.isPartyA(selfAccountId, senderAccountId)
+  const senderPubKey = new types.Public(senderPeerId.pubKey.marshal())
+  const senderAccountId = await utils.pubKeyToAccountId(senderPubKey)
+  const amPartyA = utils.isPartyA(selfAccountId, senderAccountId)
+
+  const ticket = signedTicket.ticket
 
   // ticket signer MUST be the sender
   if (!u8aEquals(await signedTicket.signer, senderPubKey)) {
@@ -274,52 +277,42 @@ export async function validateUnacknowledgedTicket({
   }
 
   // ticket MUST have at least X winning probability
-  const winProb = chain.utils.getWinProbabilityAsFloat(ticket.winProb)
+  const winProb = utils.getWinProbabilityAsFloat(ticket.winProb)
   if (new BN(winProb).lt(new BN(String(node.ticketWinProb)))) {
     throw Error(`Ticket winning probability '${winProb}' is lower than '${node.ticketWinProb}'`)
   }
 
   // channel MUST be open
-  // (performance) we are making a request to blockchain
-  const channelIsOpen = await chain.channel.isOpen(senderPubKey)
+  const channelIsOpen = await connector.channel.isOpen(senderPubKey)
   if (!channelIsOpen) {
     throw Error(`Payment channel with '${senderB58}' is not open`)
   }
 
   // channel MUST exist in our DB
-  // (performance) we are making a request to blockchain
-  let channel: Channel
-  try {
-    channel = await chain.channel.create(
-      senderPubKey,
-      async () => new chain.types.Public(senderPubKey),
-      undefined,
-      undefined
-    )
-  } catch (err) {
+  let channel = await connector.indexer.getChannelEntry(
+    amPartyA ? selfPubKey : senderPubKey,
+    amPartyA ? senderPubKey : selfPubKey
+  )
+  if (!channel) {
     throw Error(`Stored payment channel with '${senderB58}' not found`)
   }
 
   // ticket's epoch MUST match our account nonce
-  // (performance) we are making a request to blockchain
-  const epoch = await chain.account.ticketEpoch
+  const epoch = await connector.account.ticketEpoch
   if (!ticket.epoch.eq(epoch)) {
     throw Error(`Ticket epoch '${ticket.epoch.toString()}' does not match our account counter ${epoch.toString()}`)
   }
 
   // ticket's channelIteration MUST match the current channelIteration
-  // (performance) we are making a request to blockchain
-  const currentChannelIteration = chain.utils.stateCounterToIteration((await channel.stateCounter).toNumber())
   const ticketChannelIteration = ticket.channelIteration.toNumber()
-  if (ticketChannelIteration != currentChannelIteration) {
+  if (ticketChannelIteration != channel.iteration) {
     throw Error(
-      `Ticket was created for a different channel iteration ${ticketChannelIteration} != ${currentChannelIteration}`
+      `Ticket was created for a different channel iteration ${ticketChannelIteration} != ${channel.iteration}`
     )
   }
 
   // channel MUST have enough funds
-  // (performance) we are making a request to blockchain
-  const senderBalance = await (amPartyA ? channel.balance_b : channel.balance_a)
+  const senderBalance = amPartyA ? channel.deposit.sub(channel.partyABalance) : channel.partyABalance
   if (senderBalance.lt(ticket.amount)) {
     throw Error(`Payment channel does not have enough funds`)
   }
@@ -332,7 +325,7 @@ export async function validateUnacknowledgedTicket({
       return (
         u8aEquals(signedTicket.ticket.counterparty, selfAccountId) &&
         signedTicket.ticket.epoch.eq(epoch) &&
-        ticket.channelIteration.toNumber() === currentChannelIteration
+        ticket.channelIteration.toNumber() === channel.iteration
       )
     })
   })

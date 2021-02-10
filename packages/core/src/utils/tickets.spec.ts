@@ -92,6 +92,10 @@ const createMockNode = ({
   pubKeyToAccountId.withArgs(sender.pubKey.marshal()).returns(Promise.resolve(senderAddress))
   pubKeyToAccountId.withArgs(target.pubKey.marshal()).returns(Promise.resolve(targetAddress))
 
+  const Public = sinon.stub()
+  Public.withArgs(sender.pubKey.marshal()).returns(sender.pubKey.marshal())
+  Public.withArgs(target.pubKey.marshal()).returns(target.pubKey.marshal())
+
   const isPartyA = sinon.stub()
   isPartyA.withArgs(targetAddress, senderAddress).returns(true)
   isPartyA.withArgs(senderAddress, targetAddress).returns(false)
@@ -105,15 +109,29 @@ const createMockNode = ({
     ticketAmount: ticketAmount,
     ticketWinProb: ticketWinProb,
     paymentChannels: {
+      types: {
+        Public
+      },
       account: {
         address: targetAddress,
         ticketEpoch: Promise.resolve(ticketEpoch)
       },
       utils: {
-        isPartyA: isPartyA,
+        isPartyA,
         pubKeyToAccountId,
         getWinProbabilityAsFloat: sinon.stub().returns(getWinProbabilityAsFloat),
         stateCounterToIteration
+      },
+      indexer: {
+        getChannelEntry: isChannelStored
+          ? sinon.stub().returns(
+              Promise.resolve({
+                iteration: 1,
+                partyABalance: balance_a,
+                deposit: balance_a.add(balance_b)
+              })
+            )
+          : sinon.stub().returns(Promise.resolve(undefined))
       },
       channel: {
         isOpen: sinon.stub().returns(Promise.resolve(isChannelOpen)),

@@ -1,16 +1,11 @@
 import type IChannel from '.'
 import { u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
-import { Hash, TicketEpoch, Balance, SignedTicket, Ticket, AcknowledgedTicket } from '../types'
-import {
-  pubKeyToAccountId,
-  computeWinningProbability,
-  isWinningTicket,
-  checkChallenge,
-  stateCounterToIteration
-} from '../utils'
+import { Hash, TicketEpoch, Balance, SignedTicket, Ticket, AcknowledgedTicket, AccountId } from '../types'
+import { computeWinningProbability, isWinningTicket, checkChallenge, stateCounterToIteration, isPartyA } from '../utils'
 import type HoprEthereum from '..'
 import { HASHED_SECRET_WIDTH } from '../hashedSecret'
 import debug from 'debug'
+import { Public } from '@hoprnet/hopr-core-connector-interface/src/types'
 const log = debug('hopr-core-ethereum:ticket')
 
 const DEFAULT_WIN_PROB = 1
@@ -129,17 +124,17 @@ class TicketFactory {
       offset: number
     }
   ): Promise<SignedTicket> {
+    const { getAccountEntry } = this.channel.coreConnector.indexer
+
     const ticketWinProb = new Hash(computeWinningProbability(winProb))
+    const counterparty = new Public(this.channel.counterparty)
+    const counterpartyAccountId = new AccountId(await counterparty.toAccountId())
 
-    const counterparty = await pubKeyToAccountId(this.channel.counterparty)
+    const accountEntry = await getAccountEntry(counterpartyAccountId)
+    const channelEntry = await this.channel.onChainChannel
 
-    const epoch = await this.channel.coreConnector.hoprChannels.methods
-      .accounts(counterparty.toHex())
-      .call()
-      .then((res) => new TicketEpoch(Number(res.counter)))
-
-    const channelIteration = new TicketEpoch(stateCounterToIteration((await this.channel.stateCounter).toNumber()))
-
+    const epoch = new TicketEpoch(accountEntry.counter)
+    const channelIteration = new TicketEpoch(channelEntry.iteration)
     const signedTicket = new SignedTicket(arr)
 
     const ticket = new Ticket(
@@ -148,7 +143,7 @@ class TicketFactory {
         offset: signedTicket.ticketOffset
       },
       {
-        counterparty,
+        counterparty: counterpartyAccountId,
         challenge,
         epoch,
         amount,

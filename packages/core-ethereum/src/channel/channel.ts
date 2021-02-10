@@ -30,7 +30,7 @@ class Channel implements IChannel {
     this.ticket = new TicketFactory(this)
   }
 
-  private get onChainChannel(): Promise<ChannelEntry> {
+  get onChainChannel(): Promise<ChannelEntry> {
     return new Promise(async (resolve, reject) => {
       try {
         const channel = await this.coreConnector.channel.getOnChainState(new Public(this.counterparty))
