@@ -6,7 +6,7 @@ description: 'The rundown on testnet HOPR, the token used for our testnets'
 
 The HOPR mainnet will run on the Ethereum chain, and HOPR will be an ERC-20 compatible token.
 
-The testnet runs on Ropsten Network, so requires a ROPSTEN-compatible token. That's why the testnet will use testnet HOPR.
+The testnet runs on Goerli Network, so requires a GOERLI-compatible token. That's why the testnet will use testnet HOPR.
 
 Just like in the HOPR mainnet, you'll receive testnet HOPR when you relay data to other users in the network.
 
