@@ -143,12 +143,12 @@ class Account {
 
   get ticketEpoch(): Promise<TicketEpoch> {
     return new Promise(async (resolve) => {
-      const { getAccountEntry } = this.coreConnector.indexer
+      const { indexer } = this.coreConnector
       const pubKey = new Public(this.keys.onChain.pubKey)
       const accountId = await pubKey.toAccountId()
 
       // check indexer first
-      const entry = await getAccountEntry(accountId, true)
+      const entry = await indexer.getAccountEntry(accountId, true)
       if (entry) return resolve(new TicketEpoch(entry.counter))
       return resolve(new TicketEpoch(0))
     })
@@ -161,14 +161,14 @@ class Account {
     return new Promise(async (resolve) => {
       if (this._onChainSecret) return resolve(this._onChainSecret)
 
-      const { getAccountEntry } = this.coreConnector.indexer
+      const { indexer } = this.coreConnector
       const pubKey = new Public(this.keys.onChain.pubKey)
       const accountId = await pubKey.toAccountId()
 
       let hash = new Hash()
 
       // check indexer first
-      const entry = await getAccountEntry(accountId, true)
+      const entry = await indexer.getAccountEntry(accountId, true)
       if (entry) {
         hash = new Hash(entry.hashedSecret)
         this._onChainSecret = hash
