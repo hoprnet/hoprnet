@@ -3,8 +3,7 @@ import dns from 'dns'
 import semver from 'semver'
 
 const FULL_VERSION = require('../package.json').version
-const cleanVersion = (version) =>
-  `${semver.major(version)}.${semver.minor(version)}.${semver.patch(version)}`
+const cleanVersion = (version) => `${semver.major(version)}.${semver.minor(version)}.${semver.patch(version)}`
 
 const BOOTSTRAP_ADDRESS = process.env.HOPR_BOOTSTRAP_ADDRESS || `${cleanVersion(FULL_VERSION)}-bootstrap.hoprnet.link`
 
