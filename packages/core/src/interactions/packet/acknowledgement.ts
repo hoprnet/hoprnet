@@ -1,4 +1,5 @@
 import { AbstractInteraction } from '../abstractInteraction'
+import type { Connection, MuxedStream } from 'libp2p'
 
 import pipe from 'it-pipe'
 import PeerId from 'peer-id'
@@ -12,8 +13,6 @@ import { green, red, blue, yellow } from 'chalk'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '../../'
 import { Acknowledgement } from '../../messages/acknowledgement'
-
-import type { Handler } from 'libp2p'
 
 import EventEmitter from 'events'
 
@@ -46,7 +45,7 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
     this.node._libp2p.handle(this.protocols, this.handler.bind(this))
   }
 
-  handler(struct: Handler) {
+  handler(struct: { connection: Connection; stream: MuxedStream; protocol: string }) {
     pipe(struct.stream, this.handleHelper.bind(this))
   }
 
