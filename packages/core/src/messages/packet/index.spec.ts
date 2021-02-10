@@ -10,7 +10,7 @@ import BN from 'bn.js'
 
 import { ACKNOWLEDGED_TICKET_INDEX_LENGTH } from '../../dbKeys'
 import { connectionHelper } from '../../test-utils'
-import type { AcknowledgedTicket } from '@hoprnet/hopr-core-connector-interface/src/types'
+import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import { privKeyToPeerId } from '@hoprnet/hopr-utils'
 import { NODE_SEEDS } from '@hoprnet/hopr-demo-seeds'
 import type Multiaddr from 'multiaddr'
@@ -55,8 +55,8 @@ async function generateNode(
  * Fetches all tickets from the database of a node
  * @param node the HOPR instance
  */
-async function getTicketsFromDatabase(node: Hopr<any>): Promise<AcknowledgedTicket[]> {
-  let tickets: AcknowledgedTicket[] = []
+async function getTicketsFromDatabase(node: Hopr<any>): Promise<Types.AcknowledgedTicket[]> {
+  let tickets: Types.AcknowledgedTicket[] = []
 
   return new Promise((resolve, reject) =>
     node.db
@@ -188,7 +188,7 @@ describe('test packet composition and decomposition', function () {
     await new Promise((resolve) => setTimeout(resolve, 700))
 
     for (let node of nodes) {
-      const tickets: AcknowledgedTicket[] = await getTicketsFromDatabase(node)
+      const tickets: Types.AcknowledgedTicket[] = await getTicketsFromDatabase(node)
 
       if (tickets.length == 0) {
         continue

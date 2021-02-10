@@ -1,11 +1,10 @@
 import type IChannel from '.'
-import { u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
-import { Hash, TicketEpoch, Balance, SignedTicket, Ticket, AcknowledgedTicket, AccountId } from '../types'
-import { computeWinningProbability, isWinningTicket, checkChallenge } from '../utils'
 import type HoprEthereum from '..'
+import { u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
+import { Hash, TicketEpoch, Balance, SignedTicket, Ticket, AcknowledgedTicket, AccountId, Public } from '../types'
+import { computeWinningProbability, isWinningTicket, checkChallenge } from '../utils'
 import { HASHED_SECRET_WIDTH } from '../hashedSecret'
 import debug from 'debug'
-import { Public } from '@hoprnet/hopr-core-connector-interface/src/types'
 const log = debug('hopr-core-ethereum:ticket')
 
 const DEFAULT_WIN_PROB = 1
