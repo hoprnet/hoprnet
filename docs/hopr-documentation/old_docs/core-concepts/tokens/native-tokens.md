@@ -34,7 +34,7 @@ A form will appear. Fill in the fields with the following information:
 - **Symbol:** MATIC
 - **Block Explorer URL:** [https://explorer.matic.network](https://explorer.matic.network)
 
-To get MATIC, you can use the MATIC bridge at [https://wallet.matic.network/](https://wallet.matic.network/) to convert them from ETH. You can also use a tool such as [Uniswap](https://app.uniswap.org).
+To get MATIC, you can use the MATIC bridge at [https://wallet.matic.network/](https://wallet.matic.network/) to convert them from gETH. You can also use a tool such as [Uniswap](https://app.uniswap.org).
 
 Once you have MATIC in your Metamask wallet, send some to your node wallet, at the address shown when your node starts up.
 

@@ -12,7 +12,7 @@ Just like in the HOPR mainnet, you'll receive testnet HOPR when you relay data t
 
 Testnet HOPR works like the HOPR token will: you receive it for relaying and mixing data in the HOPR mixnet, and you spend it to send data.
 
-You can check your testnet HOPR balance at any time by typing `balance` in HOPRd or in your HOPR AVADO Node. This will also show you your ETH balance, under `native`.
+You can check your testnet HOPR balance at any time by typing `balance` in HOPRd or in your HOPR AVADO Node. This will also show you your gETH balance, under `native`.
 
 ```eval_rst
 .. DANGER::
