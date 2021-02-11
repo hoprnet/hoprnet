@@ -16,6 +16,7 @@ import * as testconfigs from './config.spec'
 import * as configs from './config'
 import Account from './account'
 import { randomBytes } from 'crypto'
+import { hash as hashFunction } from './utils'
 
 const HoprChannelsAbi = abis.HoprChannels
 
@@ -119,7 +120,7 @@ describe('test hashedSecret', function () {
 
       assert(
         u8aEquals(
-          (await connector.hashedSecret.hashFunction(preImage.preImage)).slice(0, HASHED_SECRET_WIDTH),
+          (await hashFunction(preImage.preImage)).slice(0, HASHED_SECRET_WIDTH),
           onChainHash
         )
       )
@@ -149,7 +150,7 @@ describe('test hashedSecret', function () {
 
       assert(
         u8aEquals(
-          (await connector.hashedSecret.hashFunction(updatedPreImage.preImage)).slice(0, HASHED_SECRET_WIDTH),
+          (await hashFunction(updatedPreImage.preImage)).slice(0, HASHED_SECRET_WIDTH),
           updatedOnChainHash
         )
       )
@@ -211,7 +212,7 @@ describe('test hashedSecret', function () {
 
       assert(
         u8aEquals(
-          (await connector.hashedSecret.hashFunction(preImage.preImage)).slice(0, HASHED_SECRET_WIDTH),
+          (await hashFunction(preImage.preImage)).slice(0, HASHED_SECRET_WIDTH),
           onChainHash
         )
       )
@@ -242,7 +243,7 @@ describe('test hashedSecret', function () {
 
       assert(
         u8aEquals(
-          (await connector.hashedSecret.hashFunction(updatedPreImage.preImage)).slice(0, HASHED_SECRET_WIDTH),
+          (await hashFunction(updatedPreImage.preImage)).slice(0, HASHED_SECRET_WIDTH),
           updatedOnChainHash
         )
       )
@@ -280,7 +281,7 @@ describe('test hashedSecret', function () {
           secondPreImage != null &&
           !firstPreImage.eq(secondPreImage) &&
           u8aEquals(
-            (await connector.hashedSecret.hashFunction(secondPreImage)).slice(0, HASHED_SECRET_WIDTH),
+            (await hashFunction(secondPreImage)).slice(0, HASHED_SECRET_WIDTH),
             firstPreImage
           )
       )
@@ -309,7 +310,7 @@ describe('test hashedSecret', function () {
         fourthPreImage != null &&
           !fourthPreImage.eq(secondPreImage) &&
           u8aEquals(
-            (await connector.hashedSecret.hashFunction(fourthPreImage)).slice(0, HASHED_SECRET_WIDTH),
+            (await hashFunction(fourthPreImage)).slice(0, HASHED_SECRET_WIDTH),
             secondPreImage
           )
       )
@@ -344,59 +345,6 @@ describe('test hashedSecret', function () {
           )
         }
       }
-    })
-  })
-
-  describe('integration', function () {
-    this.timeout(durations.minutes(2))
-
-    before(async function () {
-      this.timeout(durations.minutes(1))
-      await ganache.start()
-      await migrate()
-      await fund(FUND_ARGS)
-
-      connector = await generateConnector()
-    })
-
-    after(async function () {
-      await connector.stop()
-      await ganache.stop()
-    })
-
-    it('should initialize hashedSecret', async function () {
-      assert(!(await connector.hashedSecret.check()).initialized, "hashedSecret shouldn't be initialized")
-
-      await connector.hashedSecret.initialize()
-      assert((await connector.hashedSecret.check()).initialized, 'hashedSecret should be initialized')
-    })
-
-    it('should already be initialized', async function () {
-      await connector.hashedSecret.initialize()
-      assert((await connector.hashedSecret.check()).initialized, 'hashedSecret should be initialized')
-    })
-
-    it('should reinitialize hashedSecret when off-chain secret is missing', async function () {
-      connector.db = LevelUp(Memdown())
-
-      await connector.hashedSecret.initialize()
-      assert((await connector.hashedSecret.check()).initialized, 'hashedSecret should be initialized')
-    })
-
-    it('should submit hashedSecret when on-chain secret is missing', async function () {
-      this.timeout(durations.minutes(2))
-      const db = connector.db
-
-      await ganache.stop()
-      await ganache.start()
-      await migrate()
-      await fund(FUND_ARGS)
-
-      connector = await generateConnector()
-      connector.db = db
-
-      await connector.hashedSecret.initialize()
-      assert((await connector.hashedSecret.check()).initialized, 'hashedSecret should be initialized')
     })
   })
 })
