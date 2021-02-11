@@ -25,6 +25,7 @@
     "dev": "yarn build && NODE_ENV=development yarn start"
   },
   "dependencies": {
+    "@google-cloud/profiler": "^4.1.0",
     "@hoprnet/hopr-core": "1.69.1",
     "@hoprnet/hopr-utils": "1.69.1",
     "body-parser": "^1.19.0",
