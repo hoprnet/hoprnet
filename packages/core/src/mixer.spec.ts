@@ -13,7 +13,7 @@ describe('test mixer ', function () {
     const m = new Mixer()
 
     const p1 = fakePacket()
-    assert(m.length == 0, `mixer must be empty before pushing`)
+    assert(!m.notEmpty(), `mixer must be empty before pushing`)
     m.push(p1)
 
     const before = Date.now()
@@ -24,7 +24,7 @@ describe('test mixer ', function () {
     const PROPAGATION_OFFSET = 10
     assert(Date.now() - before < MAX_PACKET_DELAY + PROPAGATION_OFFSET, `Delay must not be longer than max delay`)
 
-    assert(m.length == 0)
+    assert(!m.notEmpty())
   })
 
   it('should push and pop multiple elements', async function () {
@@ -38,8 +38,6 @@ describe('test mixer ', function () {
     assert(!m.notEmpty(), 'Mixer must be empty')
 
     packets.forEach((p) => m.push(p))
-
-    assert(m.length == AMOUNT_OF_PACKETS)
 
     for (let i = 0; i < AMOUNT_OF_PACKETS; i++) {
       receivedPackets.push(await m.pop())
@@ -91,8 +89,6 @@ describe('test mixer ', function () {
   it('should come to an end', async function () {
     const m = new Mixer()
 
-    assert(!m.done)
-
     const beforeEnding = Date.now()
     const END_TIMEOUT = 200
     setTimeout(() => {
@@ -109,8 +105,6 @@ describe('test mixer ', function () {
   it('should come to an end even if packets are waiting', async function () {
     const m = new Mixer()
 
-    assert(!m.done)
-
     const beforeEnding = Date.now()
 
     const END_TIMEOUT = 1
@@ -120,9 +114,9 @@ describe('test mixer ', function () {
 
     // Drain the iterator
     while (true) {
-      await m.pop()
+      const result = await m.pop()
 
-      if (m.done) {
+      if (result == undefined) {
         break
       }
     }

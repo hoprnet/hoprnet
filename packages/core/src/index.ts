@@ -241,11 +241,11 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
 
   startForwarding(): void {
     setImmediate(async () => {
-      while (!this.mixer.done) {
+      while (true) {
         const packet = await this.mixer.pop()
 
         if (packet == undefined) {
-          continue
+          break
         }
 
         try {

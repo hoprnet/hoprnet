@@ -32,7 +32,7 @@ export class Mixer<Chain extends HoprCoreConnector> {
   private poppable: DeferredPromise<void>
   private deferEnd: DeferredPromise<void>
   private endPromise: Promise<void>
-  private _done: boolean
+  private done: boolean
 
   public WAIT_TIME = MAX_PACKET_DELAY
 
@@ -42,10 +42,8 @@ export class Mixer<Chain extends HoprCoreConnector> {
     this.poppable = Defer<void>()
     this.deferEnd = Defer<void>()
 
-    this._done = false
-
     this.endPromise = this.deferEnd.promise.then(() => {
-      this._done = true
+      this.done = true
     })
   }
 
@@ -54,7 +52,7 @@ export class Mixer<Chain extends HoprCoreConnector> {
    * @param p
    */
   public push(p: Packet<Chain>) {
-    if (this._done) {
+    if (this.done) {
       throw Error(`Mixer has ended. Could not accept any further messages.`)
     }
     const newPriority = this.getPriority()
@@ -66,14 +64,6 @@ export class Mixer<Chain extends HoprCoreConnector> {
 
     log(`Added 1 packet to the mixer`)
     this.queue.push([newPriority, p])
-  }
-
-  /**
-   * Get the number of packets that are currently
-   * in the mixer
-   */
-  public get length() {
-    return this.queue.length
   }
 
   /**
@@ -97,15 +87,11 @@ export class Mixer<Chain extends HoprCoreConnector> {
   public stop(): void {
     log(`Ending mixer. Mixer will not accept any further messages`)
 
-    if (this._done) {
+    if (this.done) {
       return
     }
 
     this.deferEnd.resolve()
-  }
-
-  public get done() {
-    return this._done
   }
 
   private getPriority(): number {
@@ -121,7 +107,7 @@ export class Mixer<Chain extends HoprCoreConnector> {
     ])
 
     // return once done
-    if (this._done) {
+    if (this.done) {
       return undefined
     }
 
