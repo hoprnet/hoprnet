@@ -247,7 +247,7 @@ describe('test hashedSecret', function () {
     })
   })
 
-  describe('integration', function () {
+  describe.skip('integration', function () {
     this.timeout(durations.minutes(2))
 
     it('should initialize hashedSecret', async function () {
