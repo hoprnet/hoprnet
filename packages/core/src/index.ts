@@ -151,7 +151,8 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
             version: FULL_VERSION
           }
         })
-      } catch (e) { // Only works on GCP
+      } catch (e) {
+        // Only works on GCP
         console.log('could not profile', e)
       }
     }
