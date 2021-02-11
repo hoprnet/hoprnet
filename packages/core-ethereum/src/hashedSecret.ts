@@ -22,7 +22,7 @@ class HashedSecret {
    */
   private async getOffChainSecret(): Promise<Hash | undefined> {
     try {
-      return await this.coreConnector.db.get(Buffer.from(this.coreConnector.dbKeys.OnChainSecret()))
+      return new Hash(await this.coreConnector.db.get(Buffer.from(this.coreConnector.dbKeys.OnChainSecret())))
     } catch (err) {
       if (!err.notFound) {
         throw err

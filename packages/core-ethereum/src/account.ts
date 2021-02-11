@@ -3,7 +3,7 @@ import type { TransactionObject } from './tsc/web3/types'
 import type { TransactionConfig } from 'web3-core'
 import Web3 from 'web3'
 import { getRpcOptions, Network } from '@hoprnet/hopr-ethereum'
-import { durations, Intermediate, u8aToHex } from '@hoprnet/hopr-utils'
+import { durations, Intermediate, u8aToHex, u8aEquals } from '@hoprnet/hopr-utils'
 import NonceTracker from './nonce-tracker'
 import TransactionManager from './transaction-manager'
 import { AccountId, AcknowledgedTicket, Balance, Hash, NativeBalance, TicketEpoch, Public } from './types'
@@ -157,7 +157,7 @@ class Account {
   /**
    * Returns the current value of the onChainSecret
    */
-  get onChainSecret(): Promise<Hash> {
+  get onChainSecret(): Promise<Hash | undefined> {
     return new Promise(async (resolve) => {
       if (this._onChainSecret) return resolve(this._onChainSecret)
 
@@ -165,16 +165,12 @@ class Account {
       const pubKey = new Public(this.keys.onChain.pubKey)
       const accountId = await pubKey.toAccountId()
 
-      let hash = new Hash()
-
       // check indexer first
       const entry = await indexer.getAccountEntry(accountId, true)
-      if (entry) {
-        hash = new Hash(entry.hashedSecret)
-        this._onChainSecret = hash
-      }
+      if (!entry || u8aEquals(entry.hashedSecret, EMPTY_HASHED_SECRET)) return resolve(undefined)
 
-      return resolve(hash)
+      this._onChainSecret = new Hash(entry.hashedSecret)
+      return resolve(this._onChainSecret)
     })
   }
 
