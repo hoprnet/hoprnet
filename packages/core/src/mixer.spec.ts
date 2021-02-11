@@ -18,7 +18,8 @@ describe('test mixer ', function () {
 
     const before = Date.now()
 
-    assert((await m.pop()) == p1, 'First packet must be packet number 1')
+    const it = m[Symbol.asyncIterator]()
+    assert((await it.next()).value == p1, 'First packet must be packet number 1')
 
     // 10 ms propagation timeout
     const PROPAGATION_OFFSET = 10
@@ -39,8 +40,9 @@ describe('test mixer ', function () {
 
     packets.forEach((p) => m.push(p))
 
+    const it = m[Symbol.asyncIterator]()
     for (let i = 0; i < AMOUNT_OF_PACKETS; i++) {
-      receivedPackets.push(await m.pop())
+      receivedPackets.push((await it.next()).value as Packet<any>)
     }
 
     receivedPackets.sort()
@@ -62,8 +64,10 @@ describe('test mixer ', function () {
 
     packets.forEach((p) => m.push(p))
 
+    const it = m[Symbol.asyncIterator]()
+
     for (let i = 0; i < AMOUNT_OF_PACKETS; i++) {
-      receivedPackets.push(await m.pop())
+      receivedPackets.push((await it.next()).value as Packet<any>)
     }
 
     const newPacket = fakePacket()
@@ -76,11 +80,11 @@ describe('test mixer ', function () {
       m.push(newPacket)
     }, REFUND_TIMEOUT)
 
-    const waitPromise = m.pop()
+    const waitPromise = it.next()
 
     assert(!m.notEmpty(), 'Queue must be empty')
 
-    const nextPacket = await waitPromise
+    const nextPacket = (await waitPromise).value
 
     assert(nextPacket == newPacket)
     assert(Date.now() - beforeRunningEmpty >= REFUND_TIMEOUT, 'Should not return a packet before it got new packets')
@@ -89,21 +93,25 @@ describe('test mixer ', function () {
   it('should come to an end', async function () {
     const m = new Mixer()
 
+    const it = m[Symbol.asyncIterator]()
+
     const beforeEnding = Date.now()
     const END_TIMEOUT = 200
     setTimeout(() => {
       m.stop()
     }, END_TIMEOUT)
 
-    const returnValue = await m.pop()
+    const returnValue = await it.next()
 
-    assert(returnValue == undefined, `Last message should be undefined`)
+    assert(returnValue.value == undefined, `Last message should be undefined`)
 
     assert(Date.now() - beforeEnding >= END_TIMEOUT)
   })
 
   it('should come to an end even if packets are waiting', async function () {
     const m = new Mixer()
+
+    let it = m[Symbol.asyncIterator]()
 
     const beforeEnding = Date.now()
 
@@ -114,9 +122,9 @@ describe('test mixer ', function () {
 
     // Drain the iterator
     while (true) {
-      const result = await m.pop()
+      const result = await it.next()
 
-      if (result == undefined) {
+      if (result.done) {
         break
       }
     }

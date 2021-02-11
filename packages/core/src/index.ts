@@ -241,13 +241,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
 
   startForwarding(): void {
     setImmediate(async () => {
-      while (true) {
-        const packet = await this.mixer.pop()
-
-        if (packet == undefined) {
-          break
-        }
-
+      for await (const packet of this.mixer) {
         try {
           const { receivedChallenge, ticketKey } = await packet.forwardTransform()
 
@@ -412,6 +406,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       return Promise.resolve()
     }
     clearTimeout(this.checkTimeout)
+    this.mixer.stop()
     this.running = false
     await Promise.all([this.heartbeat.stop(), this.paymentChannels.stop()])
 

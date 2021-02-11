@@ -93,6 +93,8 @@ export class Mixer<Chain extends HoprCoreConnector> {
       return
     }
 
+    clearTimeout(this.timeout)
+
     this.ended.resolve()
   }
 
@@ -101,36 +103,35 @@ export class Mixer<Chain extends HoprCoreConnector> {
     return this.incrementer() + randomInteger(1, MAX_PACKET_DELAY)
   }
 
-  /**
-   * Waits for the next packet to get ready and removes it from the queue.
-   * @dev does not drop any packet intentionally
-   * @returns the packet or 'undefined' if the mixer has ended meanwhile
-   */
-  async pop(): Promise<undefined | Packet<Chain>> {
-    await Promise.race([
-      // prettier-ignore
-      this.endPromise,
-      this.poppable.promise
-    ])
+  async *[Symbol.asyncIterator]() {
+    while (true) {
+      await Promise.race([
+        // prettier-ignore
+        this.endPromise,
+        this.poppable.promise
+      ])
 
-    // return once done
-    if (this.done) {
-      return undefined
+      // return once done
+      if (this.done) {
+        return
+      }
+
+      const result = this.queue.pop()[1]
+
+      // reset promise to wait for next message
+      this.poppable = Defer<void>()
+
+      log(
+        `Removed 1 packet from mixer. ${this.queue.length} packet${this.queue.length == 1 ? ' is' : 's are'} waiting.`
+      )
+
+      // reset timeout only if there is another
+      // message, otherwise wait for the next .push() call
+      if (this.notEmpty()) {
+        this.resetTimeout(this.queue.peek()[0])
+      }
+
+      yield result
     }
-
-    const result = this.queue.pop()[1]
-
-    // reset promise to wait for next message
-    this.poppable = Defer<void>()
-
-    log(`Removed 1 packet from mixer. ${this.queue.length} packet${this.queue.length == 1 ? ' is' : 's are'} waiting.`)
-
-    // reset timeout only if there is another
-    // message, otherwise wait for the next .push()
-    if (this.notEmpty()) {
-      this.resetTimeout(this.queue.peek()[0])
-    }
-
-    return result
   }
 }
