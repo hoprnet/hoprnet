@@ -6,9 +6,9 @@ description: Funding your node with xDAI
 
 HOPR testnets run on Binance Chain, a sidechain of Ethereum. In order to participate in the testnet, you'll need to fund your node with 0.02 BNB.
 
-First, you'll need to load some ETH into your Ethereum wallet. [MetaMask](https://metamask.io/) is one of the most widely supported wallets, but there are other options.
+First, you'll need to load some gETH into your Ethereum wallet. [MetaMask](https://metamask.io/) is one of the most widely supported wallets, but there are other options.
 
-Next, you'll need to convert some ETH into BNB. There are several tools you can use to do this. The simplest is to connect your wallet to the tool at [binance.org](https://www.binance.org/ru/bridge), where you can swap ETH to BNB.
+Next, you'll need to convert some gETH into BNB. There are several tools you can use to do this. The simplest is to connect your wallet to the tool at [binance.org](https://www.binance.org/ru/bridge), where you can swap gETH to BNB.
 
 <!-- @TODO: update image -->
 
@@ -28,10 +28,10 @@ To withdraw funds from your node, use the `withdraw` command. test
     .. tab-container:: tab1
         :title: Withdrawing BNB
 
-        To withdraw xDAI, simply specify the amount and the destination address. Because HOPR is designed to run on Ethereum, you need to type ETH as the currency parameter.
+        To withdraw xDAI, simply specify the amount and the destination address. Because HOPR is designed to run on Ethereum, you need to type gETH as the currency parameter.
 
         ```text
-        withdraw [amount] ETH [ETH address]
+        withdraw [amount] gETH [ETH address]
         ```
 
     .. tab-container:: tab2

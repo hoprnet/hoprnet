@@ -10,7 +10,7 @@ To withdraw funds from your node, use the `withdraw` command.
 
 {% tabs %}
 {% tab title="Withdrawing xDAI" %}
-To withdraw xDAI, simply specify the amount and the destination address. Because HOPR is designed to run on Ethereum, you need to type ETH as the currency parameter.
+To withdraw xDAI, simply specify the amount and the destination address. Because HOPR is designed to run on Ethereum, you need to type gETH as the currency parameter.
 
 ```text
 withdraw [amount] native [ETH address]

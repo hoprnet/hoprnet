@@ -107,9 +107,9 @@ export class AdminServer {
 
     this.node.on('hopr:warning:unfundedNative', (addr) => {
       this.logs.log(
-        `- The account associated with this node has no ETH,\n` +
+        `- The account associated with this node has no gETH,\n` +
           `  in order to fund gas for protocol overhead you will need to send\n` +
-          `  0.025 ETH to ${addr}`
+          `  0.025 gETH to ${addr}`
       )
     })
 
