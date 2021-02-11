@@ -145,13 +145,15 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
 
     if (this.isBootstrapNode) {
       try {
-        require('@google-cloud/profiler').start({
-          serviceContext: {
-            service: 'hopr_bootstrap_' + this.getId().toB58String().slice(-5).toLowerCase(),
-            projectId: 'hoprassociation',
-            version: FULL_VERSION
-          }
-        }).catch((e: any) => console.log(e))
+        require('@google-cloud/profiler')
+          .start({
+            serviceContext: {
+              service: 'hopr_bootstrap_' + this.getId().toB58String().slice(-5).toLowerCase(),
+              projectId: 'hoprassociation',
+              version: FULL_VERSION
+            }
+          })
+          .catch((e: any) => console.log(e))
       } catch (e) {
         console.log(e)
       }
