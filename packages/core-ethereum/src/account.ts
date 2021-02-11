@@ -249,7 +249,7 @@ class Account {
     const { web3, network } = this.coreConnector
 
     const abi = txObject ? txObject.encodeABI() : undefined
-    const gas = 200e3
+    const gas = 300e3
 
     // let web3 pick gas price
     // should be used when the gas price fluctuates
