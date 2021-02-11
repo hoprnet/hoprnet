@@ -123,13 +123,13 @@ class TicketFactory {
       offset: number
     }
   ): Promise<SignedTicket> {
-    const { getAccountEntry } = this.channel.coreConnector.indexer
+    const { indexer } = this.channel.coreConnector
 
     const ticketWinProb = new Hash(computeWinningProbability(winProb))
     const counterparty = new Public(this.channel.counterparty)
     const counterpartyAccountId = new AccountId(await counterparty.toAccountId())
 
-    const accountEntry = await getAccountEntry(counterpartyAccountId)
+    const accountEntry = await indexer.getAccountEntry(counterpartyAccountId)
     const channelEntry = await this.channel.onChainChannel
 
     const epoch = new TicketEpoch(accountEntry.counter)

@@ -147,7 +147,7 @@ class Account {
    */
   get balance(): Promise<Balance> {
     const cache = this._cache.get('balance')
-    if (cache && isExpired(cache.updatedAt, CACHE_TTL)) {
+    if (cache && !isExpired(cache.updatedAt, CACHE_TTL)) {
       return Promise.resolve(new Balance(cache.value))
     }
 
@@ -161,7 +161,7 @@ class Account {
    */
   get nativeBalance(): Promise<NativeBalance> {
     const cache = this._cache.get('nativeBalance')
-    if (cache && isExpired(cache.updatedAt, CACHE_TTL)) {
+    if (cache && !isExpired(cache.updatedAt, CACHE_TTL)) {
       return Promise.resolve(new NativeBalance(cache.value))
     }
 
@@ -197,7 +197,7 @@ class Account {
       const { hoprChannels, indexer } = this.coreConnector
       const pubKey = new Public(this.keys.onChain.pubKey)
       const accountId = await pubKey.toAccountId()
-      let hashedSecret: Hash = new Hash()
+      let hashedSecret: Hash
 
       if (isGanache(this.coreConnector.network)) {
         const account = await hoprChannels.methods.accounts((await this.address).toHex()).call()
@@ -207,7 +207,7 @@ class Account {
         if (entry) hashedSecret = new Hash(entry.hashedSecret)
       }
 
-      if (u8aEquals(hashedSecret, EMPTY_HASHED_SECRET)) return resolve(undefined)
+      if (!hashedSecret || u8aEquals(hashedSecret, EMPTY_HASHED_SECRET)) return resolve(undefined)
 
       this._onChainSecret = new Hash(hashedSecret)
       return resolve(hashedSecret)

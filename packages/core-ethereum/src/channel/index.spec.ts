@@ -22,7 +22,7 @@ const HoprTokenAbi = abis.HoprToken
 const DEFAULT_WIN_PROB = 1
 
 // @TODO: rewrite legacy tests
-describe.skip('test Channel class', function () {
+describe('test Channel class', function () {
   const ganache = new Ganache()
 
   let web3: Web3

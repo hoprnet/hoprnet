@@ -247,7 +247,7 @@ describe('test hashedSecret', function () {
     })
   })
 
-  describe.skip('integration', function () {
+  describe('integration', function () {
     this.timeout(durations.minutes(2))
 
     it('should initialize hashedSecret', async function () {
@@ -262,7 +262,7 @@ describe('test hashedSecret', function () {
       assert((await connector.hashedSecret.check()).initialized, 'hashedSecret should be initialized')
     })
 
-    it('should reinitialize hashedSecret when off-chain secret is missing', async function () {
+    it.skip('should reinitialize hashedSecret when off-chain secret is missing', async function () {
       connector.db = LevelUp(Memdown())
 
       await connector.hashedSecret.initialize()
