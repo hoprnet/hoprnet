@@ -239,7 +239,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     return await new Hopr<CoreConnector>(options, libp2p, db, connector).start()
   }
 
-  async startForwarding() {
+  startForwarding(): void {
     setImmediate(async () => {
       log(`Got packet from mixer. Mixer has another ${this.mixer.length} packets.`)
 
