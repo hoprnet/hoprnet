@@ -241,8 +241,6 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
 
   startForwarding(): void {
     setImmediate(async () => {
-      log(`Got packet from mixer. Mixer has another ${this.mixer.length} packets.`)
-
       while (!this.mixer.done) {
         const packet = await this.mixer.pop()
 
