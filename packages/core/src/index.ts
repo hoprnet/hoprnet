@@ -146,7 +146,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     if (this.isBootstrapNode) {
       require('@google-cloud/profiler').start({
         serviceContext: {
-          service: 'hopr-bootstrap-' + this.getId().toB58String(),
+          service: 'hopr_bootstrap_' + this.getId().toB58String(),
           version: FULL_VERSION,
         },
       })
