@@ -56,9 +56,8 @@ export class Mixer<Chain extends HoprCoreConnector> {
       throw Error(`Mixer has ended. Could not accept any further messages.`)
     }
     const newPriority = this.getPriority()
-    const topPriority = this.queue.length > 0 ? this.queue.peek()[0] : Number.MAX_SAFE_INTEGER
 
-    if (newPriority < topPriority) {
+    if (this.queue.isEmpty() || newPriority < this.queue.peek()[0]) {
       this.resetTimeout(newPriority)
     }
 
