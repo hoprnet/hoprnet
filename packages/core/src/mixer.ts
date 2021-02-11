@@ -23,14 +23,17 @@ const comparator = (a: HeapElement, b: HeapElement): number => {
 /**
  * Mix packets.
  *
- * Currently an MVP version, that simply adds a random interval to their
- * priority.
+ * Samples an artificial delay and returns packets not before
+ * the end of the delay.
+ *
+ * @dev Does not drop packets intentionally. This slightly reduces privacy
+ * but increases usability.
  */
 export class Mixer<Chain extends HoprCoreConnector> {
   private queue: Heap<HeapElement>
   private timeout?: NodeJS.Timeout
   private poppable: DeferredPromise<void>
-  private deferEnd: DeferredPromise<void>
+  private ended: DeferredPromise<void>
   private endPromise: Promise<void>
   private done: boolean
 
@@ -40,9 +43,9 @@ export class Mixer<Chain extends HoprCoreConnector> {
     this.queue = new Heap(comparator)
 
     this.poppable = Defer<void>()
-    this.deferEnd = Defer<void>()
+    this.ended = Defer<void>()
 
-    this.endPromise = this.deferEnd.promise.then(() => {
+    this.endPromise = this.ended.promise.then(() => {
       this.done = true
     })
   }
@@ -73,11 +76,11 @@ export class Mixer<Chain extends HoprCoreConnector> {
     clearTimeout(this.timeout)
     this.timeout = setTimeout(() => {
       this.poppable.resolve()
-    }, newPriority - Date.now())
+    }, Math.max(0, newPriority - Date.now()))
   }
 
   notEmpty(): boolean {
-    return this.queue.length > 0
+    return !this.queue.isEmpty()
   }
 
   /**
@@ -90,7 +93,7 @@ export class Mixer<Chain extends HoprCoreConnector> {
       return
     }
 
-    this.deferEnd.resolve()
+    this.ended.resolve()
   }
 
   private getPriority(): number {
@@ -98,6 +101,11 @@ export class Mixer<Chain extends HoprCoreConnector> {
     return this.incrementer() + randomInteger(1, MAX_PACKET_DELAY)
   }
 
+  /**
+   * Waits for the next packet to get ready and removes it from the queue.
+   * @dev does not drop any packet intentionally
+   * @returns the packet or 'undefined' if the mixer has ended meanwhile
+   */
   async pop(): Promise<undefined | Packet<Chain>> {
     await Promise.race([
       // prettier-ignore
@@ -115,11 +123,11 @@ export class Mixer<Chain extends HoprCoreConnector> {
     // reset promise to wait for next message
     this.poppable = Defer<void>()
 
-    log(`Removed 1 packet from mixer. ${this.queue.length} packet are waiting.`)
+    log(`Removed 1 packet from mixer. ${this.queue.length} packet${this.queue.length == 1 ? ' is' : 's are'} waiting.`)
 
     // reset timeout only if there is another
     // message, otherwise wait for the next .push()
-    if (!this.queue.isEmpty()) {
+    if (this.notEmpty()) {
       this.resetTimeout(this.queue.peek()[0])
     }
 
