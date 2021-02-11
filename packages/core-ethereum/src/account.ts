@@ -220,7 +220,7 @@ class Account {
     // as it allows the provider to pick a gas price
     let gasPrice: number
     // if its a known network with constant gas price
-    if (rpcOps[network] && !(['mainnet', 'ropsten'] as Network[]).includes(network)) {
+    if (rpcOps[network] && !(['mainnet', 'ropsten', 'goerli'] as Network[]).includes(network)) {
       gasPrice = rpcOps[network]?.gasPrice ?? 1e9
     }
 

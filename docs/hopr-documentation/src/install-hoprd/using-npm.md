@@ -26,13 +26,13 @@ _Please bear in mind you might need to restart your terminal after running these
 
 After you have downloaded and setup nvm in your machine \(run `nvm ls` to ensure everything is in place\), now you need to install a specific version of Nodejs before running **HOPRd**.
 
-At the time of writing, **HOPRd** runs on Nodejs `>v12`. Specifically, **HOPRd** has been developed and tested in `v12.9.1`, so in case you run on any issues with **HOPRd,** try switch to `v12.9.1` to see if those issues disappear.
+At the time of writing, **HOPRd** runs on Nodejs `v14`. Specifically, **HOPRd** has been developed and tested in `v14`, so in case you run on any issues with **HOPRd,** try switch to `v14` to see if those issues disappear.
 
 To install Nodejs with nvm, run the following
 
 ```bash
-$ nvm install v12.9.1
-$ nvm use v12.9.1
+$ nvm install v14
+$ nvm use v14
 ```
 
 If everything was done properly, you can run `node --version` to see your current `node` version, alongside running basic commands as shown when running simply `node` in your terminal.
@@ -42,5 +42,5 @@ If everything was done properly, you can run `node --version` to see your curren
 ## Installing HOPRd using NPM
 
 ```bash
-$ npm install --unsafe-perm=true -g @hoprnet/hoprd@1.62.13
+$ npm install --unsafe-perm=true -g @hoprnet/hoprd@wildhorn
 ```

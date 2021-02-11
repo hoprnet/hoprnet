@@ -9,6 +9,11 @@
     "HoprChannels": "0x225468f44A9E8cfe7DaA49d504475E21c4bEfD13",
     "HoprDistributor": "0xfb7A68692b27839ee82c711cf79Bd19BE698B011"
   },
+  "goerli": {
+    "HoprToken": "0x566a5c774bb8ABE1A88B4f187e24d4cD55C207A5",
+    "HoprChannels": "0xbb6de194eb4547993ce53eeE0226638fc9aE0C60",
+    "HoprDistributor": "0xf4Ff7E5bf2cC7eF89196c8086982F6f5Ec502685"
+  },
   "kovan": {
     "HoprToken": "0xDD78859E6714D045a31Caa0075C1523f6E08fFe1",
     "HoprChannels": "0x6eCe0EC9E5F408e664ACc397A8Ac7241841c6658",
