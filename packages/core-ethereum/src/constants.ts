@@ -19,3 +19,5 @@ export const ERRORS = {
   OOF_HOPR: 'Insufficient HOPR tokens.',
   OOF_NATIVE: 'Insufficient NATIVE funds.'
 }
+
+export const CACHE_TTL = 30e3 // 30 seconds

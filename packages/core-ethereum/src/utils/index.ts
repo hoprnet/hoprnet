@@ -471,3 +471,7 @@ export function getSignatureParameters(
 export async function createChallenge(secretA: Uint8Array, secretB: Uint8Array): Promise<Hash> {
   return await hash(await hash(u8aConcat(secretA, secretB)))
 }
+
+export function isExpired(updatedAt: number, ttl: number): boolean {
+  return updatedAt + ttl < new Date().getTime()
+}

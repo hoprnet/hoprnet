@@ -1,4 +1,5 @@
 import assert from 'assert'
+import { expect } from 'chai'
 import { randomBytes } from 'crypto'
 import secp256k1 from 'secp256k1'
 import { randomInteger, stringToU8a, u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
@@ -133,5 +134,14 @@ describe('test utils', function () {
 
       assert(Math.abs(prob - utils.getWinProbabilityAsFloat(winProb)) <= 0.0001)
     }
+  })
+
+  it('should be expired', function () {
+    const now = new Date().getTime()
+    const TTL = 10e3
+
+    expect(utils.isExpired(now, TTL)).to.be.false
+    expect(utils.isExpired(now + TTL, TTL)).to.be.false
+    expect(utils.isExpired(now - TTL * 2, TTL)).to.be.true
   })
 })
