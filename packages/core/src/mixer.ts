@@ -11,7 +11,14 @@ const log = Debug('hopr-core:mixer')
 
 type HeapElement = [number, Packet<any>]
 
-const comparator = (a: HeapElement, b: HeapElement): number => a[0] - b[0]
+const comparator = (a: HeapElement, b: HeapElement): number => {
+  if (b[0] < a[0]) {
+    return 1
+  } else if (b[0] > a[0]) {
+    return -1
+  }
+  return 0
+}
 
 /**
  * Mix packets.
