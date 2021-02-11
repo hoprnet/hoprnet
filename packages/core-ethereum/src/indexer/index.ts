@@ -480,6 +480,7 @@ class Indexer extends EventEmitter implements IIndexer {
   ): Promise<AccountEntry | undefined> {
     if (!includeUnconfirmed) return getAccountEntry(this.connector.db, account)
 
+    // @TODO: add tests
     const unconfirmedEvents = this.unconfirmedEvents.clone()
     let accountEntry = await getAccountEntry(this.connector.db, account)
 
