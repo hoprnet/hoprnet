@@ -148,7 +148,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
         serviceContext: {
           service: 'hopr_bootstrap_' + this.getId().toB58String(),
           version: FULL_VERSION,
-        },
+        }
       })
     }
 
