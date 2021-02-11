@@ -16,11 +16,9 @@ describe('test mixer ', function () {
     assert(m.length == 0, `mixer must be empty before pushing`)
     m.push(p1)
 
-    const it = m[Symbol.asyncIterator]()
-
     const before = Date.now()
 
-    assert((await it.next()).value == p1, 'First packet must be packet number 1')
+    assert((await m.pop()) == p1, 'First packet must be packet number 1')
 
     // 10 ms propagation timeout
     const PROPAGATION_OFFSET = 10
@@ -30,6 +28,8 @@ describe('test mixer ', function () {
   })
 
   it('should push and pop multiple elements', async function () {
+    const receivedPackets: Packet<any>[] = []
+
     const m = new Mixer()
 
     const AMOUNT_OF_PACKETS = 4
@@ -41,12 +41,8 @@ describe('test mixer ', function () {
 
     assert(m.length == AMOUNT_OF_PACKETS)
 
-    const it = m[Symbol.asyncIterator]()
-
-    const receivedPackets: Packet<any>[] = []
-
     for (let i = 0; i < AMOUNT_OF_PACKETS; i++) {
-      receivedPackets.push((await it.next()).value)
+      receivedPackets.push(await m.pop())
     }
 
     receivedPackets.sort()
@@ -59,6 +55,8 @@ describe('test mixer ', function () {
   })
 
   it('should push elements, drain the mixer, push new elemnts and pop elements', async function () {
+    const receivedPackets: Packet<any>[] = []
+
     const m = new Mixer()
 
     const AMOUNT_OF_PACKETS = 4
@@ -66,12 +64,8 @@ describe('test mixer ', function () {
 
     packets.forEach((p) => m.push(p))
 
-    const it = m[Symbol.asyncIterator]()
-
-    const receivedPackets: Packet<any>[] = []
-
     for (let i = 0; i < AMOUNT_OF_PACKETS; i++) {
-      receivedPackets.push((await it.next()).value)
+      receivedPackets.push(await m.pop())
     }
 
     const newPacket = fakePacket()
@@ -84,11 +78,11 @@ describe('test mixer ', function () {
       m.push(newPacket)
     }, REFUND_TIMEOUT)
 
-    const waitPromise = it.next()
+    const waitPromise = m.pop()
 
     assert(!m.notEmpty(), 'Queue must be empty')
 
-    const nextPacket = (await waitPromise).value
+    const nextPacket = await waitPromise
 
     assert(nextPacket == newPacket)
     assert(Date.now() - beforeRunningEmpty >= REFUND_TIMEOUT, 'Should not return a packet before it got new packets')
@@ -99,17 +93,15 @@ describe('test mixer ', function () {
 
     assert(!m.done)
 
-    const it = m[Symbol.asyncIterator]()
-
     const beforeEnding = Date.now()
     const END_TIMEOUT = 200
     setTimeout(() => {
-      m.end()
+      m.stop()
     }, END_TIMEOUT)
 
-    const returnValue = await it.next()
+    const returnValue = await m.pop()
 
-    assert(returnValue.value == undefined, `Last message should be undefined`)
+    assert(returnValue == undefined, `Last message should be undefined`)
 
     assert(Date.now() - beforeEnding >= END_TIMEOUT)
   })
@@ -119,20 +111,18 @@ describe('test mixer ', function () {
 
     assert(!m.done)
 
-    const it = m[Symbol.asyncIterator]()
-
     const beforeEnding = Date.now()
 
     const END_TIMEOUT = 1
     setTimeout(() => {
-      m.end()
+      m.stop()
     }, END_TIMEOUT)
 
     // Drain the iterator
     while (true) {
-      const result = await it.next()
+      await m.pop()
 
-      if (result.done) {
+      if (m.done) {
         break
       }
     }

@@ -8,6 +8,8 @@ import { NOISE } from 'libp2p-noise'
 import HoprConnect from '@hoprnet/hopr-connect'
 
 import { Packet } from './messages/packet'
+import { Acknowledgement } from './messages/acknowledgement'
+
 import {
   PACKET_SIZE,
   MAX_HOPS,
@@ -130,6 +132,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     })
 
     this.mixer = new Mixer()
+
     this.setChannelStrategy(options.strategy || 'promiscuous')
     this.initializedWithOptions = options
     this.output = (arr: Uint8Array) => {
@@ -161,6 +164,8 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     verbose('ID', this.getId().toB58String())
     verbose('Protocol version', VERSION)
     this._debug = options.debug
+
+    this.startForwarding()
   }
 
   /**
@@ -232,6 +237,45 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     })
 
     return await new Hopr<CoreConnector>(options, libp2p, db, connector).start()
+  }
+
+  async startForwarding() {
+    setImmediate(async () => {
+      log(`Got packet from mixer. Mixer has another ${this.mixer.length} packets.`)
+
+      while (!this.mixer.done) {
+        const packet = await this.mixer.pop()
+
+        if (packet == undefined) {
+          continue
+        }
+
+        try {
+          const { receivedChallenge, ticketKey } = await packet.forwardTransform()
+
+          const [sender, target] = await Promise.all([packet.getSenderPeerId(), packet.getTargetPeerId()])
+
+          setImmediate(async () => {
+            const ack = new Acknowledgement(this.paymentChannels, undefined, {
+              key: ticketKey,
+              challenge: receivedChallenge
+            })
+
+            await this._interactions.packet.acknowledgment.interact(sender, await ack.sign(this.getId()))
+          })
+
+          if (this.getId().equals(target)) {
+            verbose(`outputting message - ${packet.message.plaintext.length} bytes`)
+            this.output(packet.message.plaintext)
+          } else {
+            await this._interactions.packet.forward.interact(target, packet)
+          }
+        } catch (error) {
+          log('Error while handling packet')
+          verbose('Error while handling packet', error)
+        }
+      }
+    })
   }
 
   /**

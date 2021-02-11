@@ -11,9 +11,7 @@ const log = Debug('hopr-core:mixer')
 
 type HeapElement = [number, Packet<any>]
 
-const comparator = (a: HeapElement, b: HeapElement): number => {
-  return a[0] - b[0]
-}
+const comparator = (a: HeapElement, b: HeapElement): number => a[0] - b[0]
 
 /**
  * Mix packets.
@@ -24,7 +22,7 @@ const comparator = (a: HeapElement, b: HeapElement): number => {
 export class Mixer<Chain extends HoprCoreConnector> {
   private queue: Heap<HeapElement>
   private timeout?: NodeJS.Timeout
-  private defer: DeferredPromise<void>
+  private poppable: DeferredPromise<void>
   private deferEnd: DeferredPromise<void>
   private endPromise: Promise<void>
   private _done: boolean
@@ -34,7 +32,7 @@ export class Mixer<Chain extends HoprCoreConnector> {
   constructor(private incrementer = Date.now) {
     this.queue = new Heap(comparator)
 
-    this.defer = Defer<void>()
+    this.poppable = Defer<void>()
     this.deferEnd = Defer<void>()
 
     this._done = false
@@ -78,7 +76,7 @@ export class Mixer<Chain extends HoprCoreConnector> {
   private resetTimeout(newPriority: number) {
     clearTimeout(this.timeout)
     this.timeout = setTimeout(() => {
-      this.defer.resolve()
+      this.poppable.resolve()
     }, newPriority - Date.now())
   }
 
@@ -87,9 +85,9 @@ export class Mixer<Chain extends HoprCoreConnector> {
   }
 
   /**
-   * Ends the mixer.
+   * Stops the mixer.
    */
-  public end(): void {
+  public stop(): void {
     log(`Ending mixer. Mixer will not accept any further messages`)
 
     if (this._done) {
@@ -108,44 +106,31 @@ export class Mixer<Chain extends HoprCoreConnector> {
     return this.incrementer() + randomInteger(1, MAX_PACKET_DELAY)
   }
 
-  /**
-   * Implementation of the async iterator protocol.
-   * Packets in mixer can be accessed by using the `for await ... of` construct.
-   * See https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/for-await...of
-   * @example
-   * const mix = new Mixer()
-   * mix.push(someMsg)
-   *
-   * for await (const msg of mix) {
-   *   console.log(msg) // msg === someMsg
-   * }
-   */
-  async *[Symbol.asyncIterator](): AsyncGenerator<Packet<Chain>> {
-    while (true) {
-      await Promise.race([
-        // prettier-ignore
-        this.endPromise,
-        this.defer.promise
-      ])
+  async pop(): Promise<undefined | Packet<Chain>> {
+    await Promise.race([
+      // prettier-ignore
+      this.endPromise,
+      this.poppable.promise
+    ])
 
-      // escape from loop once done
-      if (this._done) {
-        break
-      }
-
-      // reset promise to wait for next message
-      this.defer = Defer<void>()
-
-      const result = this.queue.pop()[1]
-      log(`Removed 1 packet from mixer. ${this.queue.length} packet are waiting.`)
-
-      // reset timeout only if there is another
-      // message, otherwise wait for the next .push()
-      if (!this.queue.isEmpty()) {
-        this.resetTimeout(this.queue.peek()[0])
-      }
-
-      yield result
+    // return once done
+    if (this._done) {
+      return undefined
     }
+
+    const result = this.queue.pop()[1]
+
+    // reset promise to wait for next message
+    this.poppable = Defer<void>()
+
+    log(`Removed 1 packet from mixer. ${this.queue.length} packet are waiting.`)
+
+    // reset timeout only if there is another
+    // message, otherwise wait for the next .push()
+    if (!this.queue.isEmpty()) {
+      this.resetTimeout(this.queue.peek()[0])
+    }
+
+    return result
   }
 }

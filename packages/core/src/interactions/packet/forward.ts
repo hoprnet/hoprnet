@@ -1,10 +1,5 @@
 import { PROTOCOL_STRING } from '../../constants'
 import { Packet } from '../../messages/packet'
-import { Acknowledgement } from '../../messages/acknowledgement'
-
-import Debug from 'debug'
-const log = Debug('hopr-core:forward')
-const verbose = Debug('hopr-core:verbose:forward')
 
 import type PeerId from 'peer-id'
 
@@ -24,38 +19,6 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector> implements Abstr
 
   constructor(public node: Hopr<Chain>, private mixer: Mixer<Chain>) {
     this.node._libp2p.handle(this.protocols, this.handler.bind(this))
-
-    this.drainMixer()
-  }
-
-  async drainMixer() {
-    for await (const packet of this.mixer) {
-      log(`Got packet from mixer. Mixer has another ${this.mixer.length} packets.`)
-      try {
-        const { receivedChallenge, ticketKey } = await packet.forwardTransform()
-
-        const [sender, target] = await Promise.all([packet.getSenderPeerId(), packet.getTargetPeerId()])
-
-        setImmediate(async () => {
-          const ack = new Acknowledgement(this.node.paymentChannels, undefined, {
-            key: ticketKey,
-            challenge: receivedChallenge
-          })
-
-          await this.node._interactions.packet.acknowledgment.interact(sender, await ack.sign(this.node.getId()))
-        })
-
-        if (this.node.getId().equals(target)) {
-          verbose(`outputting message - ${packet.message.plaintext.length} bytes`)
-          this.node.output(packet.message.plaintext)
-        } else {
-          await this.interact(target, packet)
-        }
-      } catch (error) {
-        log('Error while handling packet')
-        verbose('Error while handling packet', error)
-      }
-    }
   }
 
   async interact(counterparty: PeerId, packet: Packet<Chain>): Promise<void> {
