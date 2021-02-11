@@ -148,11 +148,12 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
         require('@google-cloud/profiler').start({
           serviceContext: {
             service: 'hopr_bootstrap_' + this.getId().toB58String().slice(-5).toLowerCase(),
+            projectId: 'hoprassociation',
             version: FULL_VERSION
           }
-        })
-      } catch (e) { // Only works on GCP
-        console.log('could not profile', e)
+        }).catch((e: any) => console.log(e))
+      } catch (e) {
+        console.log(e)
       }
     }
 
