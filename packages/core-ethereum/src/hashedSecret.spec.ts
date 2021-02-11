@@ -1,121 +1,49 @@
-import assert from 'assert'
 import type HoprEthereum from '.'
-import * as DbKeys from './dbKeys'
+import assert from 'assert'
+import { randomBytes } from 'crypto'
+import { u8aEquals, durations, stringToU8a } from '@hoprnet/hopr-utils'
 import * as Utils from './utils'
 import * as Types from './types'
-import PreImage, { HASHED_SECRET_WIDTH } from './hashedSecret'
-import { u8aEquals, durations, stringToU8a } from '@hoprnet/hopr-utils'
+import { HASHED_SECRET_WIDTH } from './hashedSecret'
 import Memdown from 'memdown'
 import LevelUp from 'levelup'
 import { Ganache } from '@hoprnet/hopr-testing'
-import { Network, addresses, abis } from '@hoprnet/hopr-ethereum'
-import { migrate, fund } from '@hoprnet/hopr-ethereum'
-import Web3 from 'web3'
-import type { WebsocketProvider } from 'web3-core'
+import { addresses, migrate, fund } from '@hoprnet/hopr-ethereum'
+import { getPrivKeyData, createNode } from './utils/testing.spec'
 import * as testconfigs from './config.spec'
-import * as configs from './config'
-import Account from './account'
-import { randomBytes } from 'crypto'
-
-const HoprChannelsAbi = abis.HoprChannels
 
 const EMPTY_HASHED_SECRET = new Uint8Array(HASHED_SECRET_WIDTH).fill(0x00)
-const FUND_ARGS = `--address ${addresses?.localhost?.HoprToken} --accounts-to-fund 1`
 
 describe('test hashedSecret', function () {
   this.timeout(durations.minutes(10))
   const ganache = new Ganache()
   let connector: HoprEthereum
 
-  async function generateConnector(debug?: boolean): Promise<HoprEthereum> {
-    let web3 = new Web3(configs.DEFAULT_URI)
-    const chainId = await Utils.getChainId(web3)
-    const network = Utils.getNetworkName(chainId) as Network
-    const hoprChannels = new web3.eth.Contract(HoprChannelsAbi as any, addresses[network].HoprChannels)
+  const reset = async () => {
+    await ganache.stop()
 
-    const connector = ({
-      hoprChannels: new web3.eth.Contract(HoprChannelsAbi as any, addresses[network].HoprChannels),
-      web3,
-      db: LevelUp(Memdown()),
-      dbKeys: DbKeys,
-      utils: Utils,
-      types: Types,
-      indexer: {
-        // only way to get this to work with these pseudo mocks
-        // we need to implement proper mocks
-        getAccountEntry: async () => {
-          const account = await hoprChannels.methods.accounts((await connector.account.address).toHex()).call()
-          const hashedSecret = stringToU8a(account.hashedSecret)
+    await ganache.start()
+    await migrate()
+    await fund(`--address ${addresses?.localhost?.HoprToken} --accounts-to-fund 1`)
 
-          if (u8aEquals(hashedSecret, EMPTY_HASHED_SECRET)) return undefined
-          return { hashedSecret }
-        }
-      },
-      options: {
-        debug
-      },
-      log: () => {}
-    } as unknown) as HoprEthereum
+    const user = await getPrivKeyData(stringToU8a(testconfigs.FUND_ACCOUNT_PRIVATE_KEY))
+    connector = await createNode(user.privKey)
 
-    connector.account = new Account(
-      connector,
-      stringToU8a(testconfigs.DEMO_ACCOUNTS[0]),
-      await Utils.privKeyToPubKey(stringToU8a(testconfigs.DEMO_ACCOUNTS[0])),
-      chainId
-    )
-
-    connector.hashedSecret = new PreImage(connector)
-
-    connector.stop = async () => {
-      ;(web3.eth.currentProvider as WebsocketProvider).disconnect(1000, 'Stopping HOPR node.')
-    }
-
-    return connector
+    await connector.start()
   }
 
-  // const checkIndex = async (index: number, masterSecret: Uint8Array, shouldThrow: boolean) => {
-  //   let hash = masterSecret
-  //   for (let i = 0; i < index; i++) {
-  //     hash = (await connector.utils.hash(hash)).slice(0, HASHED_SECRET_WIDTH)
-  //   }
+  before(async function () {
+    this.timeout(durations.minutes(1))
+    await reset()
+  })
 
-  //   let result,
-  //     errThrown = false
-  //   try {
-  //     result = await connector.hashedSecret.findPreImage(hash)
-  //   } catch (err) {
-  //     errThrown = true
-  //   }
-
-  //   assert(errThrown == shouldThrow, `Must throw an error if, and only if, it is expected.`)
-
-  //   if (shouldThrow) {
-  //     assert(errThrown, `Must throw an error`)
-  //   } else {
-  //     assert(result != null, `Pre-image must have been derivable from the database.`)
-  //     assert(
-  //       u8aEquals((await connector.utils.hash(result.preImage)).slice(0, HASHED_SECRET_WIDTH), hash) &&
-  //         index == result.index + 1
-  //     )
-  //   }
-  // }
+  after(async function () {
+    await connector.stop()
+    await ganache.stop()
+  })
 
   describe('random pre-image', function () {
     this.timeout(durations.minutes(2))
-
-    before(async function () {
-      this.timeout(durations.minutes(1))
-      await ganache.start()
-      await migrate()
-      await fund(FUND_ARGS)
-
-      connector = await generateConnector()
-    })
-
-    after(async function () {
-      await connector.stop()
-      await ganache.stop()
-    })
 
     it('should publish a hashed secret', async function () {
       await connector.hashedSecret.initialize()
@@ -165,49 +93,10 @@ describe('test hashedSecret', function () {
         )
       )
     })
-
-    // // Commented due expensive operations
-    // it('should generate a hashed secret and recover a pre-Image', async function () {
-    //   this.timeout(durations.seconds(22))
-    //   await connector.hashedSecret.initialize()
-
-    //   for (let i = 0; i < TOTAL_ITERATIONS / DB_ITERATION_BLOCK_SIZE; i++) {
-    //     assert(
-    //       (await connector.db.get(Buffer.from(connector.dbKeys.OnChainSecretIntermediary(i * DB_ITERATION_BLOCK_SIZE)))) !=
-    //         null
-    //     )
-    //   }
-
-    //   const masterSecret = await connector.db.get(Buffer.from(connector.dbKeys.OnChainSecretIntermediary(0)))
-
-    //   await checkIndex(1, masterSecret, false)
-
-    //   await checkIndex(randomInteger(1, TOTAL_ITERATIONS), masterSecret, false)
-
-    //   await checkIndex(TOTAL_ITERATIONS, masterSecret, false)
-
-    //   await checkIndex(0, masterSecret, true)
-
-    //   await checkIndex(TOTAL_ITERATIONS + 1, masterSecret, true)
-    // })
   })
 
   describe('deterministic debug pre-image', function () {
     this.timeout(durations.minutes(2))
-
-    before(async function () {
-      this.timeout(durations.minutes(1))
-      await ganache.start()
-      await migrate()
-      await fund(FUND_ARGS)
-
-      connector = await generateConnector(true)
-    })
-
-    after(async function () {
-      await connector.stop()
-      await ganache.stop()
-    })
 
     it('should publish a hashed secret', async function () {
       await connector.hashedSecret.initialize()
@@ -361,20 +250,6 @@ describe('test hashedSecret', function () {
   describe('integration', function () {
     this.timeout(durations.minutes(2))
 
-    before(async function () {
-      this.timeout(durations.minutes(1))
-      await ganache.start()
-      await migrate()
-      await fund(FUND_ARGS)
-
-      connector = await generateConnector()
-    })
-
-    after(async function () {
-      await connector.stop()
-      await ganache.stop()
-    })
-
     it('should initialize hashedSecret', async function () {
       assert(!(await connector.hashedSecret.check()).initialized, "hashedSecret shouldn't be initialized")
 
@@ -387,7 +262,7 @@ describe('test hashedSecret', function () {
       assert((await connector.hashedSecret.check()).initialized, 'hashedSecret should be initialized')
     })
 
-    it.skip('should reinitialize hashedSecret when off-chain secret is missing', async function () {
+    it('should reinitialize hashedSecret when off-chain secret is missing', async function () {
       connector.db = LevelUp(Memdown())
 
       await connector.hashedSecret.initialize()
@@ -397,13 +272,7 @@ describe('test hashedSecret', function () {
     it.skip('should submit hashedSecret when on-chain secret is missing', async function () {
       this.timeout(durations.minutes(2))
       const db = connector.db
-
-      await ganache.stop()
-      await ganache.start()
-      await migrate()
-      await fund(FUND_ARGS)
-
-      connector = await generateConnector()
+      await reset()
       connector.db = db
 
       await connector.hashedSecret.initialize()

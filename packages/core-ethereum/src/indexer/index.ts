@@ -332,11 +332,11 @@ class Indexer extends EventEmitter implements IIndexer {
     const account = event.data.account
     const accountEntry = await reducers.onSecretHashSet(event)
 
-    log('Processing event %s with account %s', event.name, account.toHex())
+    // log('Processing event %s with account %s', event.name, account.toHex())
 
     await updateAccountEntry(this.connector.db, account, accountEntry)
 
-    log('Account %s set hashed secret', chalk.green(account.toHex()))
+    // log('Account %s set hashed secret', chalk.green(account.toHex()))
   }
 
   private async onFundedChannel(event: Event<'FundedChannel'>): Promise<void> {

@@ -3,11 +3,11 @@ import type { TransactionObject } from './tsc/web3/types'
 import type { TransactionConfig } from 'web3-core'
 import Web3 from 'web3'
 import { getRpcOptions, Network } from '@hoprnet/hopr-ethereum'
-import { durations, Intermediate, u8aToHex, u8aEquals } from '@hoprnet/hopr-utils'
+import { durations, Intermediate, u8aToHex, u8aEquals, stringToU8a } from '@hoprnet/hopr-utils'
 import NonceTracker from './nonce-tracker'
 import TransactionManager from './transaction-manager'
 import { AccountId, AcknowledgedTicket, Balance, Hash, NativeBalance, TicketEpoch, Public } from './types'
-import { isWinningTicket, pubKeyToAccountId, isExpired } from './utils'
+import { isWinningTicket, pubKeyToAccountId, isExpired, isGanache } from './utils'
 import { HASHED_SECRET_WIDTH } from './hashedSecret'
 import { CACHE_TTL } from './constants'
 
@@ -53,9 +53,9 @@ class Account {
 
     this._nonceTracker = new NonceTracker({
       getLatestBlockNumber: async () => {
-        // tests fail if we don't query the block number
-        // when running on ganache
-        return !coreConnector.network || coreConnector.network === 'localhost'
+        // when running our unit/intergration tests using ganache,
+        // the indexer doesn't have enough time to pick up the events and reduce the data
+        return isGanache(coreConnector.network)
           ? coreConnector.web3.eth.getBlockNumber()
           : coreConnector.indexer.latestBlock
       },
@@ -170,14 +170,20 @@ class Account {
 
   get ticketEpoch(): Promise<TicketEpoch> {
     return new Promise(async (resolve) => {
-      const { indexer } = this.coreConnector
+      const { hoprChannels, indexer } = this.coreConnector
       const pubKey = new Public(this.keys.onChain.pubKey)
       const accountId = await pubKey.toAccountId()
+      let ticketEpoch = new TicketEpoch(0)
 
-      // check indexer first
-      const entry = await indexer.getAccountEntry(accountId, true)
-      if (entry) return resolve(new TicketEpoch(entry.counter))
-      return resolve(new TicketEpoch(0))
+      if (isGanache(this.coreConnector.network)) {
+        const account = await hoprChannels.methods.accounts((await this.address).toHex()).call()
+        ticketEpoch = new TicketEpoch(account.counter)
+      } else {
+        const entry = await indexer.getAccountEntry(accountId, true)
+        if (entry) ticketEpoch = new TicketEpoch(entry.counter)
+      }
+
+      return resolve(ticketEpoch)
     })
   }
 
@@ -188,16 +194,23 @@ class Account {
     return new Promise(async (resolve) => {
       if (this._onChainSecret) return resolve(this._onChainSecret)
 
-      const { indexer } = this.coreConnector
+      const { hoprChannels, indexer } = this.coreConnector
       const pubKey = new Public(this.keys.onChain.pubKey)
       const accountId = await pubKey.toAccountId()
+      let hashedSecret: Hash = new Hash()
 
-      // check indexer first
-      const entry = await indexer.getAccountEntry(accountId, true)
-      if (!entry || u8aEquals(entry.hashedSecret, EMPTY_HASHED_SECRET)) return resolve(undefined)
+      if (isGanache(this.coreConnector.network)) {
+        const account = await hoprChannels.methods.accounts((await this.address).toHex()).call()
+        hashedSecret = new Hash(stringToU8a(account.hashedSecret))
+      } else {
+        const entry = await indexer.getAccountEntry(accountId, true)
+        if (entry) hashedSecret = new Hash(entry.hashedSecret)
+      }
 
-      this._onChainSecret = new Hash(entry.hashedSecret)
-      return resolve(this._onChainSecret)
+      if (u8aEquals(hashedSecret, EMPTY_HASHED_SECRET)) return resolve(undefined)
+
+      this._onChainSecret = new Hash(hashedSecret)
+      return resolve(hashedSecret)
     })
   }
 
