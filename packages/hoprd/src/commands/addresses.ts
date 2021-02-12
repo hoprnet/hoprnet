@@ -31,6 +31,8 @@ export default class Addresses extends AbstractCommand {
       return styleValue(err.message, 'failure')
     }
 
-    return `DHT record for ${query}:\n- ${(await this.node._libp2p.peerRouting.findPeer(peerId)).multiaddrs.map((ma) => ma.toString()).join('\n- ')}`
+    return `DHT record for ${query}:\n- ${(await this.node._libp2p.peerRouting.findPeer(peerId)).multiaddrs
+      .map((ma) => ma.toString())
+      .join('\n- ')}`
   }
 }
