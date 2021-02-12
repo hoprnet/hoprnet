@@ -1,7 +1,7 @@
 import Web3 from 'web3'
 
 export type PrivateNetwork = 'localhost'
-export type PublicNetwork = 'mainnet' | 'kovan' | 'xdai' | 'matic' | 'binance' | 'ropsten'
+export type PublicNetwork = 'mainnet' | 'kovan' | 'xdai' | 'matic' | 'binance' | 'ropsten' | 'goerli'
 export type Network = PublicNetwork | PrivateNetwork
 export type MigrationOptions = {
   shouldVerify: boolean
@@ -27,6 +27,11 @@ export const migrationOptions: { [key in Network]: MigrationOptions } = {
     revokeRoles: true
   },
   ropsten: {
+    shouldVerify: true,
+    mintUsing: 'minter',
+    revokeRoles: false
+  },
+  goerli: {
     shouldVerify: true,
     mintUsing: 'minter',
     revokeRoles: false
@@ -67,6 +72,11 @@ export function getRpcOptions(ops?: { infura?: string; maticvigil?: string }): {
       chainId: 3,
       httpUrl: `https://ropsten.infura.io/v3/${infura}`,
       wsUrl: `wss://ropsten.infura.io/ws/v3/${infura}`
+    },
+    goerli: {
+      chainId: 5,
+      httpUrl: `https://goerli.infura.io/v3/${infura}`,
+      wsUrl: `wss://goerli.infura.io/ws/v3/${infura}`
     },
     kovan: {
       chainId: 42,
