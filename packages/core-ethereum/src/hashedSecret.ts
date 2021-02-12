@@ -21,6 +21,18 @@ export async function hashFunction(msg: Uint8Array): Promise<Uint8Array> {
   return (await hashFunctionUtils(msg)).slice(0, HASHED_SECRET_WIDTH)
 }
 
+
+async function getFromDB<T>(db: LevelUp, key): Promise<T | undefined> {
+  try {
+    return await db.get(Buffer.from(key))
+  } catch (err) {
+    if (!err.notFound) {
+      throw err
+    }
+    return
+  }
+}
+
 class HashedSecret {
   private initialized: boolean
   private onChainSecret: Hash
@@ -28,20 +40,6 @@ class HashedSecret {
 
   constructor(private db: LevelUp, private account: Account, private channels: HoprChannels) {
     this.initialized = false
-  }
-
-  /**
-   * @returns a promise that resolves to a Hash if secret is found
-   */
-  private async getOffChainSecret(): Promise<Hash | undefined> {
-    try {
-      return await this.db.get(Buffer.from(OnChainSecret()))
-    } catch (err) {
-      if (!err.notFound) {
-        throw err
-      }
-      return
-    }
   }
 
   /**
@@ -57,16 +55,6 @@ class HashedSecret {
     )
   }
 
-  private async hint(index: number): Promise<Uint8Array | undefined> {
-    try {
-      return await this.db.get(Buffer.from(OnChainSecretIntermediary(index)))
-    } catch (err) {
-      if (err.notFound) {
-        return
-      }
-      throw err
-    }
-  }
   /**
    * Creates a random secret OR a deterministic one if running in debug mode,
    * it will then loop X amount of times, on each loop we hash the previous result.
@@ -157,7 +145,7 @@ class HashedSecret {
       hashFunction,
       TOTAL_ITERATIONS,
       DB_ITERATION_BLOCK_SIZE,
-      this.hint.bind(this)
+      (index) => getFromDB(this.db, OnChainSecretIntermediary(index)),
     )
 
     if (result == undefined) {
@@ -182,7 +170,7 @@ class HashedSecret {
     let result = await recoverIteratedHash(
       hash,
       hashFunction,
-      this.hint.bind(this),
+      (index) => getFromDB(this.db, OnChainSecretIntermediary(index)),
       TOTAL_ITERATIONS,
       DB_ITERATION_BLOCK_SIZE
     )
@@ -194,7 +182,7 @@ class HashedSecret {
 
   public async initialize(debug?: boolean): Promise<void> {
     if (this.initialized) return
-    this.offChainSecret = await this.getOffChainSecret()
+    this.offChainSecret = await getFromDB(this.db, OnChainSecret())
     this.onChainSecret = await this.account.onChainSecret
     if (this.onChainSecret != undefined && this.offChainSecret != undefined) {
       try {
