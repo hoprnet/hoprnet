@@ -387,6 +387,14 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     return this._libp2p.peerId // Not a documented API, but in the sourceu
   }
 
+  /**
+   * Queries the DHT for the given PeerId.
+   * @param peer peer to query for
+   */
+  public async getDHTRecord(peer: PeerId): Promise<Multiaddr[]> {
+    return (await this._libp2p.peerRouting.findPeer(peer))?.multiaddrs || []
+  }
+
   /*
    * List the addresses the node is available on
    */

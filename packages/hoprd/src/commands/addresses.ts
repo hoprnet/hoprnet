@@ -21,7 +21,7 @@ export default class Addresses extends AbstractCommand {
 
   public async execute(query: string, state: GlobalState): Promise<string | void> {
     if (!query) {
-      return `Invalid arguments. Expected 'ping <peerId>'. Received '${query}'`
+      return `Invalid arguments. Expected 'addresses <peerId>'. Received '${query}'`
     }
 
     let peerId: PeerId
@@ -31,7 +31,7 @@ export default class Addresses extends AbstractCommand {
       return styleValue(err.message, 'failure')
     }
 
-    return `DHT record for ${query}:\n- ${(await this.node._libp2p.peerRouting.findPeer(peerId)).multiaddrs
+    return `DHT record for ${query}:\n- ${(await this.node.getDHTRecord(peerId))
       .map((ma) => ma.toString())
       .join('\n- ')}`
   }
