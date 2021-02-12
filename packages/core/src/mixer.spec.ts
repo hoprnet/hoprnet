@@ -2,70 +2,74 @@ import type { Packet } from './messages/packet'
 import { Mixer } from './mixer'
 import assert from 'assert'
 import { MAX_PACKET_DELAY } from './constants'
+import sinon from 'sinon'
 
 let i = 0
 let fakePacket = () => {
   return (i++ as unknown) as Packet<any>
 }
 
-let time = 0
-let fakeIncrementer = () => {
-  return time
-}
 
-describe('test mixer ', function () {
+describe('test mixer ', async function () {
+  let clock: any
+
+  beforeEach(async () => {
+    clock = sinon.useFakeTimers(Date.now())
+  })
+
+  afterEach(() =>{
+    clock.restore();
+  })
+
   it('should push and pop a single element', async function () {
-    const m = new Mixer(fakeIncrementer)
+    let calls = 0
+    let lastCall = null
+    const m = new Mixer((p) => { calls ++; lastCall = p})
     const p1 = fakePacket()
-    assert(m.poppable() === false, 'empty mixer is not poppable')
+    assert.equal(calls, 0, 'empty mixer not delivered')
     m.push(p1)
-    assert(m.poppable() === false, 'packets are not immediately poppable')
-    time += MAX_PACKET_DELAY + 1
-    assert(m.poppable() === true, 'packets are poppable after max delay')
-    let pOut = m.pop()
-    assert(p1 === pOut)
+    assert.equal(calls,  0, 'empty mixer not delivered immediately')
+    await clock.tickAsync(MAX_PACKET_DELAY + 1)
+    assert.equal(calls, 1, 'packets pop after max delay')
+    assert(p1 === lastCall)
   })
 
   it('should push and pop multiple element', async function () {
-    const m = new Mixer(fakeIncrementer)
+    var calls = 0
+    let lastCall = null
+    const m = new Mixer((p) => { calls ++; lastCall = p})
     const p1 = fakePacket()
     const p2 = fakePacket()
     const p3 = fakePacket()
     const p4 = fakePacket()
 
-    assert(m.poppable() === false, 'empty mixer is not poppable')
+    assert(calls === 0, 'empty mixer not delivered')
     m.push(p1)
     m.push(p2)
     m.push(p3)
-    assert(m.poppable() === false, 'packets are not immediately poppable')
-    time += MAX_PACKET_DELAY + 1
+    assert(calls === 0, 'empty mixer not delivered immediately')
+    await clock.tickAsync(MAX_PACKET_DELAY + 1)
     m.push(p4)
-    assert(m.poppable() === true, 'packets are poppable after max delay')
-    m.pop()
-    assert(m.poppable() === true, 'packets are poppable after popped')
-    m.pop()
-    assert(m.poppable() === true, 'packets are poppable after popped 2')
-    m.pop()
-    assert(m.poppable() === false, 'all due packets popped')
-    time += MAX_PACKET_DELAY + 1
-    assert(m.poppable() === true, 'final packet poppable')
-    m.pop()
-    assert(m.poppable() === false, 'all due packets popped 2')
+    assert.equal(calls,  3, 'packets pop after max delay')
+    await clock.tickAsync(MAX_PACKET_DELAY + 1)
+    assert.equal(calls,  4, 'final packet poppable')
+    assert(lastCall === p4, 'final packet is p4')
   })
 
   it('probabilistic test, packet ordering', async function () {
-    const m = new Mixer(fakeIncrementer)
+    var calls = 0
+    let out: any[] = []
+    const m = new Mixer((p) => { calls = calls + 1; out.push(p)})
     for (let x = 0; x < 1000; x++) {
       m.push(fakePacket())
     }
-    assert(m.poppable() === false, 'packets are not immediately poppable')
-    time += MAX_PACKET_DELAY + 1
-    assert(m.poppable() === true, 'packets are poppable after max delay')
+    assert(calls === 0, 'empty mixer not delivered')
+    await clock.tickAsync(MAX_PACKET_DELAY + 1)
+    assert.equal(calls, 1000, '1000 messages delivered')
     let ordered = true
     let prev = 0
     for (let x = 0; x < 1000; x++) {
-      assert(m.poppable(), 'should be poppable after ' + x)
-      let next = (m.pop() as unknown) as number // cast back to fake
+      let next = (out.pop() as unknown) as number // cast back to fake
       if (next <= prev) {
         ordered = false
       }
