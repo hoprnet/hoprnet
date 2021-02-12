@@ -206,10 +206,6 @@ class Listener extends EventEmitter implements InterfaceListener {
 
               this.externalAddress = await getExternalIp(this.stunServers, this.udpSocket)
 
-              // } catch (err) {
-              //   error(`Unable to fetch external address using STUN. ${err}`)
-              // }
-
               resolve(this.udpSocket.address().port)
             }
           )
