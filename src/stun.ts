@@ -36,6 +36,12 @@ export const PUBLIC_STUN_SERVERS = [
 
 export const DEFAULT_PARALLEL_STUN_CALLS = 4
 
+/**
+ * Handle STUN requests
+ * @param socket Node.JS socket to use
+ * @param data received packet
+ * @param rinfo Addr+Port of the incoming connection
+ */
 export function handleStunRequest(socket: Socket, data: Buffer, rinfo: RemoteInfo): void {
   const req = stun.createBlank()
 
@@ -61,6 +67,13 @@ export function handleStunRequest(socket: Socket, data: Buffer, rinfo: RemoteInf
   console.log = backup
 }
 
+/**
+ * Tries to determine the external IPv4 address
+ * @returns Addrs+Port or undefined if the STUN response are ambigous (e.g. bidirectional NAT)
+ *
+ * @param multiAddrs Multiaddrs to use as STUN servers
+ * @param socket Node.JS socket to use for the STUN request
+ */
 export function getExternalIp(
   multiAddrs: Multiaddr[] | undefined,
   socket: Socket
@@ -75,8 +88,6 @@ export function getExternalIp(
 
     const results: ConnectionInfo[] = []
 
-    // @TODO add assert call
-    // let _finished = false
     let timeout: NodeJS.Timeout
 
     const msgHandler = (msg: Buffer) => {
@@ -126,7 +137,7 @@ export function getExternalIp(
     socket.on('message', msgHandler)
     socket.on('error', errHandler)
 
-    multiAddrs.forEach((ma: Multiaddr, index: number) => {
+    for (const [index, ma] of multiAddrs.entries()) {
       if (!['ip4', 'ip6', 'dns4', 'dns6'].includes(ma.protoNames()[0])) {
         error(`Cannot contact STUN server ${ma.toString()} due invalid address.`)
         return
@@ -139,7 +150,7 @@ export function getExternalIp(
       verbose(`STUN request sent to ${nodeAddress.address}:${nodeAddress.port}`)
 
       socket.send(res.toBuffer(), nodeAddress.port as any, nodeAddress.address)
-    })
+    }
 
     const done = () => {
       socket.removeListener('message', msgHandler)
