@@ -33,25 +33,18 @@ async function getFromDB<T>(db: LevelUp, key): Promise<T | undefined> {
 }
 
 class HashedSecret {
-  private initialized: boolean
+  private initialized: boolean = false
   private onChainSecret: Hash
   private offChainSecret: Hash
 
-  constructor(private db: LevelUp, private account: Account, private channels: HoprChannels) {
-    this.initialized = false
-  }
+  constructor(private db: LevelUp, private account: Account, private channels: HoprChannels) {}
 
   /**
    * @returns a deterministic secret that is used in debug mode
    */
   private async getDebugAccountSecret(): Promise<Hash> {
     const account = await this.channels.methods.accounts((await this.account.address).toHex()).call()
-
-    return new Hash(
-      (
-        await hashFunction(u8aConcat(new Uint8Array([parseInt(account.counter)]), this.account.keys.onChain.pubKey))
-      ).slice(0, HASHED_SECRET_WIDTH)
-    )
+    return new Hash(await hashFunction(u8aConcat(new Uint8Array([parseInt(account.counter)]), this.account.keys.onChain.pubKey)))
   }
 
   /**
@@ -192,7 +185,6 @@ class HashedSecret {
         log(`Secret is found but failed to find preimage, reinitializing..`)
       }
     }
-    log(`Secret is not initialized.`)
     if (this.offChainSecret && !this.onChainSecret) {
       log('secret exists offchain but not on chain')
       const onChainSecret = await this.calcOnChainSecretFromDb(debug)
@@ -200,9 +192,7 @@ class HashedSecret {
     } else {
       log('reinitializing')
       const onChainSecret = await this.createAndStoreSecretOffChainAndReturnOnChainSecret(debug)
-      log('... secret generated, storing')
       await this.storeSecretOnChain(onChainSecret)
-      log('... initialized')
     }
     this.initialized = true
   }
