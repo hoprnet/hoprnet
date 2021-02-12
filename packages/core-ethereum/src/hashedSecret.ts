@@ -44,7 +44,9 @@ class HashedSecret {
    */
   private async getDebugAccountSecret(): Promise<Hash> {
     const account = await this.channels.methods.accounts((await this.account.address).toHex()).call()
-    return new Hash(await hashFunction(u8aConcat(new Uint8Array([parseInt(account.counter)]), this.account.keys.onChain.pubKey)))
+    return new Hash(
+      await hashFunction(u8aConcat(new Uint8Array([parseInt(account.counter)]), this.account.keys.onChain.pubKey))
+    )
   }
 
   /**
