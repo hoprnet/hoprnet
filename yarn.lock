@@ -8501,9 +8501,9 @@ libp2p-utils@^0.2.0, libp2p-utils@^0.2.2:
     private-ip "^2.1.1"
 
 libp2p@0.30:
-  version "0.30.7"
-  resolved "https://registry.yarnpkg.com/libp2p/-/libp2p-0.30.7.tgz#965fe05a9045b7614d268c4050918182d8ca81f3"
-  integrity sha512-W+uaMY7K9KJh9L9LFw/D2NjH63TS6skjlNRqzhG99b//IJqdNQoVWeGNGsjgMPqKu+BMngtMn+iH3+Jjz2Bk2w==
+  version "0.30.8"
+  resolved "https://registry.yarnpkg.com/libp2p/-/libp2p-0.30.8.tgz#a06719f9dade3d886678a3cda4446f894dc3e24f"
+  integrity sha512-czvp/0Pyvo2tJ3n9RFdyyE05oqQEtg/etZLFjlzqYtzNn79h1UZH2cTM87F3Rm3wGUWqhEnjFZJkgHfhNE5Xdw==
   dependencies:
     "@motrix/nat-api" "^0.3.1"
     abort-controller "^3.0.0"
