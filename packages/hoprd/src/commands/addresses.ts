@@ -6,10 +6,9 @@ import { checkPeerIdInput, styleValue } from './utils'
 import type { GlobalState } from './abstractCommand'
 
 export default class Addresses extends AbstractCommand {
-  public hidden = true
-
   constructor(public node: Hopr<HoprCoreConnector>) {
     super()
+    this.hidden = true
   }
 
   public name() {
@@ -17,7 +16,7 @@ export default class Addresses extends AbstractCommand {
   }
 
   public help() {
-    return 'List addresses of other nodes'
+    return 'Get the announced addresses from other nodes'
   }
 
   public async execute(query: string, state: GlobalState): Promise<string | void> {
@@ -32,6 +31,6 @@ export default class Addresses extends AbstractCommand {
       return styleValue(err.message, 'failure')
     }
 
-    return (await this.node._libp2p.peerRouting.findPeer(peerId)).multiaddrs.map((ma) => ma.toString()).join(', ')
+    return `DHT record for ${query}:\n- ${(await this.node._libp2p.peerRouting.findPeer(peerId)).multiaddrs.map((ma) => ma.toString()).join('\n- ')}`
   }
 }

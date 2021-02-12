@@ -20,7 +20,8 @@ export class Info extends AbstractCommand {
     // @TODO Add connector info etc.
     return [
       `Bootstrap Servers: ${this.node.bootstrapServers.map((p) => styleValue(p.getPeerId(), 'peerId'))}`,
-      `Available at: ${this.node.getAddresses().map((ma) => ma.toString())}`,
+      `Announcing to other nodes as: ${this.node.getAddresses().map((ma) => ma.toString())}`,
+      `Listening on: ${this.node.getListeningAddresses().map((ma) => ma.toString())}`,
       `${this.node.smartContractInfo()}`
     ].join('\n')
   }

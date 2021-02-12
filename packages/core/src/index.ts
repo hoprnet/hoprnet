@@ -394,6 +394,13 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     return this._libp2p.multiaddrs
   }
 
+  /*
+   * List the addresses on which the node is listening
+   */
+  public getListeningAddresses(): Multiaddr[] {
+    return this._libp2p.addressManager.getListenAddrs()
+  }
+
   /**
    * Sends a message.
    *
