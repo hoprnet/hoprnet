@@ -71,13 +71,12 @@ class HashedSecret {
    * Creates a random secret OR a deterministic one if running in debug mode,
    * it will then loop X amount of times, on each loop we hash the previous result.
    * We store the last result.
-   * @returns a promise that resolves to a Hash if secret is found
+   * @returns a promise that resolves to the onChainSecret
    */
-  private async createAndStoreSecretOffChain(debug: boolean): Promise<Hash> {
+  private async createAndStoreSecretOffChainAndReturnOnChainSecret(debug: boolean): Promise<Hash> {
     let onChainSecret = debug ? await this.getDebugAccountSecret() : new Hash(randomBytes(HASHED_SECRET_WIDTH))
 
     let dbBatch = this.db.batch()
-
     const result = await iterateHash(onChainSecret, hashFunction, TOTAL_ITERATIONS, DB_ITERATION_BLOCK_SIZE)
 
     for (const intermediate of result.intermediates) {
@@ -86,9 +85,7 @@ class HashedSecret {
         Buffer.from(intermediate.preImage)
       )
     }
-
     await dbBatch.write()
-
     return new Hash(result.hash)
   }
 
@@ -215,9 +212,9 @@ class HashedSecret {
       await this.storeSecretOnChain(onChainSecret)
     } else {
       log('reinitializing')
-      const offChainSecret = await this.createAndStoreSecretOffChain(debug)
+      const onChainSecret = await this.createAndStoreSecretOffChainAndReturnOnChainSecret(debug)
       log('... secret generated, storing')
-      await this.storeSecretOnChain(offChainSecret)
+      await this.storeSecretOnChain(onChainSecret)
       log('... initialized')
     }
     this.initialized = true
