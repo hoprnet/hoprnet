@@ -1,18 +1,20 @@
-import type HoprEthereum from '.'
 import { Hash } from './types'
 import Debug from 'debug'
-const log = Debug('hopr-core-ethereum:hashedSecret')
 import { randomBytes } from 'crypto'
 import { u8aToHex, u8aConcat, iterateHash, recoverIteratedHash } from '@hoprnet/hopr-utils'
 import type { Intermediate } from '@hoprnet/hopr-utils'
-
 import { publicKeyConvert } from 'secp256k1'
-import { hash as hashFunction } from './utils'
+import { hash as hashFunction, waitForConfirmation } from './utils'
+import { OnChainSecret, OnChainSecretIntermediary } from './dbKeys'
+import type { LevelUp } from 'levelup'
+import type { HoprChannels } from './tsc/web3/HoprChannels'
+import type Account from './account'
 
 export const DB_ITERATION_BLOCK_SIZE = 10000
 export const TOTAL_ITERATIONS = 100000
 export const HASHED_SECRET_WIDTH = 27
 
+const log = Debug('hopr-core-ethereum:hashedSecret')
 
 const isNullAccount = (a: string) => a == null || ['0', '0x', '0x'.padEnd(66, '0')].includes(a)
 
@@ -21,7 +23,7 @@ class HashedSecret {
   private onChainSecret: Hash
   private offChainSecret: Hash
 
-  constructor(private coreConnector: HoprEthereum) {
+  constructor(private db: LevelUp, private account: Account, private channels: HoprChannels) {
     this.initialized = false
   }
 
@@ -30,7 +32,7 @@ class HashedSecret {
    */
   private async getOffChainSecret(): Promise<Hash | undefined> {
     try {
-      return await this.coreConnector.db.get(Buffer.from(this.coreConnector.dbKeys.OnChainSecret()))
+      return await this.db.get(Buffer.from(OnChainSecret()))
     } catch (err) {
       if (!err.notFound) {
         throw err
@@ -43,14 +45,14 @@ class HashedSecret {
    * @returns a deterministic secret that is used in debug mode
    */
   private async getDebugAccountSecret(): Promise<Hash> {
-    const account = await this.coreConnector.hoprChannels.methods
-      .accounts((await this.coreConnector.account.address).toHex())
+    const account = await this.channels.methods
+      .accounts((await this.account.address).toHex())
       .call()
 
     return new Hash(
       (
-        await this.coreConnector.utils.hash(
-          u8aConcat(new Uint8Array([parseInt(account.counter)]), this.coreConnector.account.keys.onChain.pubKey)
+        await hashFunction(
+          u8aConcat(new Uint8Array([parseInt(account.counter)]), this.account.keys.onChain.pubKey)
         )
       ).slice(0, HASHED_SECRET_WIDTH)
     )
@@ -58,7 +60,7 @@ class HashedSecret {
 
   private async hint(index: number): Promise<Uint8Array | undefined> {
     try {
-      return await this.coreConnector.db.get(Buffer.from(this.coreConnector.dbKeys.OnChainSecretIntermediary(index)))
+      return await this.db.get(Buffer.from(OnChainSecretIntermediary(index)))
     } catch (err) {
       if (err.notFound) {
         return
@@ -75,7 +77,7 @@ class HashedSecret {
   private async createAndStoreSecretOffChain(debug: boolean): Promise<Hash> {
     let onChainSecret = debug ? await this.getDebugAccountSecret() : new Hash(randomBytes(HASHED_SECRET_WIDTH))
 
-    let dbBatch = this.coreConnector.db.batch()
+    let dbBatch = this.db.batch()
 
     const result = await iterateHash(
       onChainSecret,
@@ -86,7 +88,7 @@ class HashedSecret {
 
     for (const intermediate of result.intermediates) {
       dbBatch = dbBatch.put(
-        Buffer.from(this.coreConnector.dbKeys.OnChainSecretIntermediary(intermediate.iteration)),
+        Buffer.from(OnChainSecretIntermediary(intermediate.iteration)),
         Buffer.from(intermediate.preImage)
       )
     }
@@ -98,22 +100,22 @@ class HashedSecret {
 
   private async storeSecretOnChain(secret: Hash): Promise<void> {
     log(`storing secret on chain, setting secret to ${u8aToHex(secret)}`)
-    const account = await this.coreConnector.hoprChannels.methods
-      .accounts((await this.coreConnector.account.address).toHex())
+    const account = await this.channels.methods
+      .accounts((await this.account.address).toHex())
       .call()
 
     if (isNullAccount(account.accountX)) {
-      const uncompressedPubKey = publicKeyConvert(this.coreConnector.account.keys.onChain.pubKey, false).slice(1)
+      const uncompressedPubKey = publicKeyConvert(this.account.keys.onChain.pubKey, false).slice(1)
       log('account is also null, calling channel.init')
       try {
-        await this.coreConnector.utils.waitForConfirmation(
+        await waitForConfirmation(
           (
-            await this.coreConnector.account.signTransaction(
+            await this.account.signTransaction(
               {
-                from: (await this.coreConnector.account.address).toHex(),
-                to: this.coreConnector.hoprChannels.options.address
+                from: (await this.account.address).toHex(),
+                to: this.channels.options.address
               },
-              this.coreConnector.hoprChannels.methods.init(
+              this.channels.methods.init(
                 u8aToHex(uncompressedPubKey.slice(0, 32)),
                 u8aToHex(uncompressedPubKey.slice(32, 64)),
                 u8aToHex(secret)
@@ -136,14 +138,14 @@ class HashedSecret {
       // @TODO this is potentially dangerous because it increases the account counter
       log('account is already on chain, storing secret.')
       try {
-        await this.coreConnector.utils.waitForConfirmation(
+        await waitForConfirmation(
           (
-            await this.coreConnector.account.signTransaction(
+            await this.account.signTransaction(
               {
-                from: (await this.coreConnector.account.address).toHex(),
-                to: this.coreConnector.hoprChannels.options.address
+                from: (await this.account.address).toHex(),
+                to: this.channels.options.address
               },
-              this.coreConnector.hoprChannels.methods.setHashedSecret(u8aToHex(secret))
+              this.channels.methods.setHashedSecret(u8aToHex(secret))
             )
           ).send()
         )
@@ -194,11 +196,9 @@ class HashedSecret {
       TOTAL_ITERATIONS,
       DB_ITERATION_BLOCK_SIZE
     )
-
     if (result == undefined) {
       throw Error(`Could not find preImage.`)
     }
-
     return result
   }
 
@@ -209,7 +209,7 @@ class HashedSecret {
     if (this.initialized) return
 
     this.offChainSecret = await this.getOffChainSecret()
-    this.onChainSecret = await this.coreConnector.account.onChainSecret
+    this.onChainSecret = await this.account.onChainSecret
     if (this.onChainSecret != undefined && this.offChainSecret != undefined) {
       try {
         await this.findPreImage(this.onChainSecret) // throws if not found
