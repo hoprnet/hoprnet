@@ -4,7 +4,7 @@ import { randomBytes } from 'crypto'
 import { u8aToHex, u8aConcat, iterateHash, recoverIteratedHash } from '@hoprnet/hopr-utils'
 import type { Intermediate } from '@hoprnet/hopr-utils'
 import { publicKeyConvert } from 'secp256k1'
-import { hash as hashFunction, waitForConfirmation } from './utils'
+import { hash as hashFunctionUtils, waitForConfirmation } from './utils'
 import { OnChainSecret, OnChainSecretIntermediary } from './dbKeys'
 import type { LevelUp } from 'levelup'
 import type { HoprChannels } from './tsc/web3/HoprChannels'
@@ -16,6 +16,10 @@ export const HASHED_SECRET_WIDTH = 27
 
 const log = Debug('hopr-core-ethereum:hashedSecret')
 const isNullAccount = (a: string) => a == null || ['0', '0x', '0x'.padEnd(66, '0')].includes(a)
+
+export async function hashFunction(msg: Uint8Array): Promise<Uint8Array> {
+  return (await hashFunctionUtils(msg)).slice(0, HASHED_SECRET_WIDTH)
+}
 
 class HashedSecret {
   private initialized: boolean
@@ -94,9 +98,8 @@ class HashedSecret {
 
   private async storeSecretOnChain(secret: Hash): Promise<void> {
     log(`storing secret on chain, setting secret to ${u8aToHex(secret)}`)
-    const account = await this.channels.methods
-      .accounts((await this.account.address).toHex())
-      .call()
+    const address = (await this.account.address).toHex() 
+    const account = await this.channels.methods.accounts(address).call()
 
     if (isNullAccount(account.accountX)) {
       const uncompressedPubKey = publicKeyConvert(this.account.keys.onChain.pubKey, false).slice(1)
@@ -106,7 +109,7 @@ class HashedSecret {
           (
             await this.account.signTransaction(
               {
-                from: (await this.account.address).toHex(),
+                from: address,
                 to: this.channels.options.address
               },
               this.channels.methods.init(
@@ -136,7 +139,7 @@ class HashedSecret {
           (
             await this.account.signTransaction(
               {
-                from: (await this.account.address).toHex(),
+                from: address,
                 to: this.channels.options.address
               },
               this.channels.methods.setHashedSecret(u8aToHex(secret))
@@ -211,7 +214,7 @@ class HashedSecret {
     }
     log(`Secret is not initialized.`)
     if (this.offChainSecret && !this.onChainSecret) {
-      log('initializing for the first time')
+      log('secret exists offchain but not on chain')
       const onChainSecret = await this.calcOnChainSecretFromDb(debug)
       await this.storeSecretOnChain(onChainSecret)
     } else {
