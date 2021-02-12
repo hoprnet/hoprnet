@@ -15,11 +15,11 @@ The clients will use the bootstrap server to determine their own "public" IPv4 a
 
 ```sh
 # server
-DEBUG=hopr-connect*,simple-peer ts-node testing/server.ts
+DEBUG=hopr-connect*,simple-peer ts-node examples/server.ts
 
 # clients
-DEBUG=hopr-connect*,simple-peer ts-node testing/client.ts 1
-DEBUG=hopr-connect*,simple-peer ts-node testing/client.ts 0
+DEBUG=hopr-connect*,simple-peer ts-node examples/client.ts 1
+DEBUG=hopr-connect*,simple-peer ts-node examples/client.ts 0
 ```
 
 Client 0 will attach to a network socket and wait ~ 15 seconds to give client 1 time to attach to its network socket. Afterwards, client 0 will establish a relayed connection to client 1 and will try to upgrade to a direct WebRTC connection. Both clients are started with a debug flag that prevents from direct connection - even if they were possible.

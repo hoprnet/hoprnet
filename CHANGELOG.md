@@ -1,5 +1,14 @@
 <a name="0.2.12"></a>
 
+## [0.2.20](https://github.com/hoprnet/hopr-connect/compare/0.2.12...0.2.20) (2021-02-03)
+
+### Fixes
+
+- don't detect STUN timeouts as bidirectional NAT
+- package upgrades
+
+<a name="0.2.12"></a>
+
 ## [0.2.12](https://github.com/hoprnet/hopr-connect/compare/0.2.11...0.2.12) (2021-02-03)
 
 ### Fixes
