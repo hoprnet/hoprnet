@@ -118,12 +118,7 @@ describe('test hashedSecret', function () {
 
       let preImage = await connector.hashedSecret.findPreImage(onChainHash)
 
-      assert(
-        u8aEquals(
-          (await hashFunction(preImage.preImage)).slice(0, HASHED_SECRET_WIDTH),
-          onChainHash
-        )
-      )
+      assert(u8aEquals((await hashFunction(preImage.preImage)).slice(0, HASHED_SECRET_WIDTH), onChainHash))
 
       await connector.utils.waitForConfirmation(
         (
@@ -149,10 +144,7 @@ describe('test hashedSecret', function () {
       assert(!u8aEquals(preImage.preImage, updatedPreImage.preImage), `new and old pre-image must not be the same`)
 
       assert(
-        u8aEquals(
-          (await hashFunction(updatedPreImage.preImage)).slice(0, HASHED_SECRET_WIDTH),
-          updatedOnChainHash
-        )
+        u8aEquals((await hashFunction(updatedPreImage.preImage)).slice(0, HASHED_SECRET_WIDTH), updatedOnChainHash)
       )
     })
 
@@ -210,12 +202,7 @@ describe('test hashedSecret', function () {
 
       let preImage = await connector.hashedSecret.findPreImage(onChainHash)
 
-      assert(
-        u8aEquals(
-          (await hashFunction(preImage.preImage)).slice(0, HASHED_SECRET_WIDTH),
-          onChainHash
-        )
-      )
+      assert(u8aEquals((await hashFunction(preImage.preImage)).slice(0, HASHED_SECRET_WIDTH), onChainHash))
 
       await connector.utils.waitForConfirmation(
         (
@@ -242,10 +229,7 @@ describe('test hashedSecret', function () {
       assert(!u8aEquals(preImage.preImage, updatedPreImage.preImage), `new and old pre-image must not be the same`)
 
       assert(
-        u8aEquals(
-          (await hashFunction(updatedPreImage.preImage)).slice(0, HASHED_SECRET_WIDTH),
-          updatedOnChainHash
-        )
+        u8aEquals((await hashFunction(updatedPreImage.preImage)).slice(0, HASHED_SECRET_WIDTH), updatedOnChainHash)
       )
     })
 
@@ -280,10 +264,7 @@ describe('test hashedSecret', function () {
         firstPreImage != null &&
           secondPreImage != null &&
           !firstPreImage.eq(secondPreImage) &&
-          u8aEquals(
-            (await hashFunction(secondPreImage)).slice(0, HASHED_SECRET_WIDTH),
-            firstPreImage
-          )
+          u8aEquals((await hashFunction(secondPreImage)).slice(0, HASHED_SECRET_WIDTH), firstPreImage)
       )
 
       const notWinnigTicket = new Types.AcknowledgedTicket(connector, undefined, {
@@ -309,10 +290,7 @@ describe('test hashedSecret', function () {
       assert(
         fourthPreImage != null &&
           !fourthPreImage.eq(secondPreImage) &&
-          u8aEquals(
-            (await hashFunction(fourthPreImage)).slice(0, HASHED_SECRET_WIDTH),
-            secondPreImage
-          )
+          u8aEquals((await hashFunction(fourthPreImage)).slice(0, HASHED_SECRET_WIDTH), secondPreImage)
       )
     })
 

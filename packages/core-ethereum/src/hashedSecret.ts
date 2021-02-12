@@ -15,7 +15,6 @@ export const TOTAL_ITERATIONS = 100000
 export const HASHED_SECRET_WIDTH = 27
 
 const log = Debug('hopr-core-ethereum:hashedSecret')
-
 const isNullAccount = (a: string) => a == null || ['0', '0x', '0x'.padEnd(66, '0')].includes(a)
 
 class HashedSecret {
@@ -79,12 +78,7 @@ class HashedSecret {
 
     let dbBatch = this.db.batch()
 
-    const result = await iterateHash(
-      onChainSecret,
-      hashFunction,
-      TOTAL_ITERATIONS,
-      DB_ITERATION_BLOCK_SIZE
-    )
+    const result = await iterateHash(onChainSecret, hashFunction, TOTAL_ITERATIONS, DB_ITERATION_BLOCK_SIZE)
 
     for (const intermediate of result.intermediates) {
       dbBatch = dbBatch.put(
@@ -210,13 +204,13 @@ class HashedSecret {
       try {
         await this.findPreImage(this.onChainSecret) // throws if not found
         this.initialized = true
-        return 
+        return
       } catch (_e) {
         log(`Secret is found but failed to find preimage, reinitializing..`)
-      } 
+      }
     }
     log(`Secret is not initialized.`)
-    if (this.offChainSecret && !this.onChainSecret){
+    if (this.offChainSecret && !this.onChainSecret) {
       log('initializing for the first time')
       const onChainSecret = await this.calcOnChainSecretFromDb(debug)
       await this.storeSecretOnChain(onChainSecret)
