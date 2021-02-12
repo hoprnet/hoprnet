@@ -13,7 +13,7 @@
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
   "engines": {
-    "node": "12 || 14",
+    "node": "14",
     "yarn": "1"
   },
   "files": [
@@ -68,7 +68,10 @@
     "extension": [
       "ts"
     ],
-    "spec": "src/webRTCConnection.spec.ts",
+    "spec": [
+      "src/webRTCConnection.spec.ts",
+      "src/stun.spec.ts"
+    ],
     "require": [
       "ts-node/register"
     ]

@@ -406,7 +406,7 @@ class Relay {
       // Don't catch close errors
       newConn.connection
         ?.close()
-        .catch((err) => error(`Failed to close connection to ${blue(counterparty.toB58String())}. ${err.message}`))
+        .catch((err: any) => error(`Failed to close connection to ${blue(counterparty.toB58String())}. ${err.message}`))
       error(`Error while trying to decode answer from ${blue(counterparty.toB58String())}. Error was: ${err}`)
     }
 
@@ -416,7 +416,7 @@ class Relay {
       // Don't catch close errors
       newConn.connection
         ?.close()
-        .catch((err) => error(`Failed to close connection to ${blue(counterparty.toB58String())}. ${err.message}`))
+        .catch((err: any) => error(`Failed to close connection to ${blue(counterparty.toB58String())}. ${err.message}`))
       error(`Could not relay to ${blue(counterparty.toB58String())} because we are unable to deliver packets.`)
     }
 
