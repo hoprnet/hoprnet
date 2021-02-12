@@ -161,7 +161,7 @@ class HashedSecret {
     )
 
     if (result == undefined) {
-      return await this.createAndStoreSecretOffChain(debug)
+      return await this.createAndStoreSecretOffChainAndReturnOnChainSecret(debug)
     }
 
     return new Hash(result.hash)
