@@ -21,7 +21,6 @@ export async function hashFunction(msg: Uint8Array): Promise<Uint8Array> {
   return (await hashFunctionUtils(msg)).slice(0, HASHED_SECRET_WIDTH)
 }
 
-
 async function getFromDB<T>(db: LevelUp, key): Promise<T | undefined> {
   try {
     return await db.get(Buffer.from(key))
@@ -145,7 +144,7 @@ class HashedSecret {
       hashFunction,
       TOTAL_ITERATIONS,
       DB_ITERATION_BLOCK_SIZE,
-      (index) => getFromDB(this.db, OnChainSecretIntermediary(index)),
+      (index) => getFromDB(this.db, OnChainSecretIntermediary(index))
     )
 
     if (result == undefined) {
