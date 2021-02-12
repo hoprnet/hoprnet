@@ -53,7 +53,7 @@ describe('test hashedSecret', function () {
       chainId
     )
 
-    connector.hashedSecret = new PreImage(connector)
+    connector.hashedSecret = new PreImage(connector.db, connector.account, connector.hoprChannels)
 
     connector.stop = async () => {
       await connector.account.stop()
