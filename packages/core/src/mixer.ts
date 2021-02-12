@@ -39,14 +39,14 @@ export class Mixer<Chain extends HoprCoreConnector> {
   }
 
   private addTimeout() {
-    if (!this.next && this.queue.length > 0){
+    if (!this.next && this.queue.length > 0) {
       this.next = setTimeout(this.tick.bind(this), this.intervalUntilNextMessage())
     }
   }
 
-  private tick(){
+  private tick() {
     log(`Mixer has ${this.queue.length} elements`)
-    while (this.queue.length > 0 && this.queue.peek()[0] < this.clock()){
+    while (this.queue.length > 0 && this.queue.peek()[0] < this.clock()) {
       this.onMessage(this.queue.pop()[1])
     }
     this.next = null
