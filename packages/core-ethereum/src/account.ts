@@ -70,9 +70,7 @@ class Account {
     this._preImageIterator = async function* (this: Account) {
       let ticket: AcknowledgedTicket = yield
 
-      let tmp = await this.coreConnector.hashedSecret.findPreImage(
-        await this.onChainSecret
-      )
+      let tmp = await this.coreConnector.hashedSecret.findPreImage(await this.onChainSecret)
 
       while (true) {
         if (
@@ -91,7 +89,7 @@ class Account {
             yield true
           }
 
-          tmp = await this.coreConnector.hashedSecret.findPreImage(tmp.preImage) 
+          tmp = await this.coreConnector.hashedSecret.findPreImage(tmp.preImage)
         } else {
           yield false
         }
