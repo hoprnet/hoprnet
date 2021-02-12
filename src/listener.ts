@@ -17,6 +17,7 @@ import Multiaddr from 'multiaddr'
 import { handleStunRequest, getExternalIp } from './stun'
 import { getAddrs, isAnyAddress } from './addrs'
 import { TCPConnection } from './tcp'
+import { once } from 'events'
 
 const log = debug('hopr-connect:listener')
 const error = debug('hopr-connect:listener:error')
@@ -86,16 +87,18 @@ class Listener extends EventEmitter implements InterfaceListener {
     this.state = State.UNINITIALIZED
 
     Promise.all([
-      new Promise((resolve) => this.udpSocket.once('listening', resolve)),
-      new Promise((resolve) => this.tcpSocket.once('listening', resolve))
+      // prettier-ignore
+      once(this.udpSocket, 'listening'),
+      once(this.tcpSocket, 'listening')
     ]).then(() => {
       this.state = State.LISTENING
       this.emit('listening')
     })
 
     Promise.all([
-      new Promise((resolve) => this.udpSocket.once('close', resolve)),
-      new Promise((resolve) => this.tcpSocket.once('close', resolve))
+      // prettier-ignore
+      once(this.udpSocket, 'close'),
+      once(this.tcpSocket, 'close')
     ]).then(() => this.emit('close'))
 
     this.udpSocket.on('message', (msg: Buffer, rinfo: RemoteInfo) => handleStunRequest(this.udpSocket, msg, rinfo))
@@ -185,7 +188,7 @@ class Listener extends EventEmitter implements InterfaceListener {
             }
           )
         } catch (err) {
-          error(`Could bind to TCP socket. Error was: ${err.message}`)
+          error(`Could not bind to TCP socket. ${err.message}`)
           reject()
         }
       })
@@ -200,25 +203,27 @@ class Listener extends EventEmitter implements InterfaceListener {
             },
             async () => {
               this.udpSocket.removeListener('error', reject)
-              try {
-                this.externalAddress = await getExternalIp(this.stunServers, this.udpSocket)
-              } catch (err) {
-                error(`Unable to fetch external address using STUN. Error was: ${err}`)
-              }
+
+              this.externalAddress = await getExternalIp(this.stunServers, this.udpSocket)
 
               resolve(this.udpSocket.address().port)
             }
           )
         } catch (err) {
-          error(`Could bind UDP socket. Error was: ${err.message}`)
+          error(`Could not bind to UDP socket. ${err.message}`)
           reject()
         }
       })
 
     if (options.port == 0 || options.port == null) {
-      await listenTCP().then((port) => listenUDP(port))
+      const tcpPort = await listenTCP()
+      listenUDP(tcpPort)
     } else {
-      await Promise.all([listenTCP(), listenUDP()])
+      await Promise.all([
+        // prettier-ignore
+        listenTCP(),
+        listenUDP()
+      ])
     }
 
     this.state = State.LISTENING
