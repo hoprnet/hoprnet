@@ -11,7 +11,7 @@ import { HardhatUserConfig, task, types } from 'hardhat/config'
 import { NODE_SEEDS, BOOTSTRAP_SEEDS } from '@hoprnet/hopr-demo-seeds'
 import Web3 from 'web3'
 import { mapValues } from 'lodash'
-import { MigrationOptions, getRpcOptions } from './utils/networks'
+import { getRpcOptions } from './utils/networks'
 
 const { PRIVATE_KEY, INFURA, MATIC_VIGIL, ETHERSCAN } = process.env
 
@@ -70,29 +70,11 @@ const hardhatConfig: HardhatUserConfig = {
 
 // create our own migration task since there isn't one implemented
 // see https://github.com/nomiclabs/hardhat/issues/381
-task('migrate', 'Migrate contracts', async (...args: any[]) => {
+task('migrate', 'Migrate contracts with default values', async (...args: any[]) => {
   // lazy load this as it breaks hardhat due to '@openzeppelin/test-helpers'
   // also required because we need to build typechain first
   return (await import('./tasks/migrate')).default(args[0], args[1], args[2])
 })
-  .addOptionalParam<MigrationOptions['shouldVerify']>(
-    'shouldVerify',
-    'Try to verify contracts using etherscan',
-    false,
-    types.boolean
-  )
-  .addOptionalParam<MigrationOptions['mintUsing']>(
-    'mintUsing',
-    'Mint using "minter" or "faucet"',
-    'minter',
-    types.string
-  )
-  .addOptionalParam<MigrationOptions['revokeRoles']>(
-    'revokeRoles',
-    'Revoke admin roles from deployer',
-    false,
-    types.boolean
-  )
 
 task('fund', 'Fund demo accounts', async (...args: any[]) => {
   return (await import('./tasks/fund')).default(args[0], args[1], args[2])
@@ -104,5 +86,12 @@ task('fund', 'Fund demo accounts', async (...args: any[]) => {
 task('extract', 'Extract ABIs to specified folder', async (...args: any[]) => {
   return (await import('./tasks/extract')).default(args[0], args[1], args[2])
 }).addFlag('target', 'Folder to output contents to')
+
+task('migrate-mainnet', 'Mainnet tasks', async (...args: any[]) => {
+  return (await import('./tasks/migrate-mainnet/index')).default(args[0], args[1], args[2])
+})
+  .addParam('task', 'Required, the task to run')
+  .addOptionalParam('schedule', 'Optional, the schedule to use')
+  .addOptionalParam('allocation', 'Optional, the allocation to use')
 
 export default hardhatConfig

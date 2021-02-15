@@ -3,59 +3,11 @@ import Web3 from 'web3'
 export type PrivateNetwork = 'localhost'
 export type PublicNetwork = 'mainnet' | 'kovan' | 'xdai' | 'matic' | 'binance' | 'ropsten' | 'goerli'
 export type Network = PublicNetwork | PrivateNetwork
-export type MigrationOptions = {
-  shouldVerify: boolean
-  mintUsing: 'minter' | 'faucet'
-  revokeRoles: boolean
-}
 export type RpcOptions = {
   chainId: number
   httpUrl: string
   wsUrl: string
   gasPrice?: number
-}
-
-export const migrationOptions: { [key in Network]: MigrationOptions } = {
-  localhost: {
-    shouldVerify: false,
-    mintUsing: 'minter',
-    revokeRoles: false
-  },
-  mainnet: {
-    shouldVerify: true,
-    mintUsing: 'faucet',
-    revokeRoles: true
-  },
-  ropsten: {
-    shouldVerify: true,
-    mintUsing: 'minter',
-    revokeRoles: false
-  },
-  goerli: {
-    shouldVerify: true,
-    mintUsing: 'minter',
-    revokeRoles: false
-  },
-  kovan: {
-    shouldVerify: true,
-    mintUsing: 'minter',
-    revokeRoles: false
-  },
-  xdai: {
-    shouldVerify: false,
-    mintUsing: 'minter',
-    revokeRoles: false
-  },
-  matic: {
-    shouldVerify: false,
-    mintUsing: 'minter',
-    revokeRoles: false
-  },
-  binance: {
-    shouldVerify: false,
-    mintUsing: 'minter',
-    revokeRoles: false
-  }
 }
 
 export function getRpcOptions(ops?: { infura?: string; maticvigil?: string }): { [key in PublicNetwork]: RpcOptions } {

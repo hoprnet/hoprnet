@@ -4,6 +4,7 @@ import { durations } from '@hoprnet/hopr-utils'
 import { web3 } from 'hardhat'
 import { HoprTokenInstance, HoprDistributorInstance } from '../types'
 import { vmErrorMessage } from './utils'
+import { toMultiplier } from '../utils'
 
 const HoprToken = artifacts.require('HoprToken')
 const HoprDistributor = artifacts.require('HoprDistributor')
@@ -22,8 +23,8 @@ describe('HoprDistributor', function () {
     return web3.eth.getBlock(await web3.eth.getBlockNumber()).then((res) => String(res.timestamp))
   }
 
-  const toSolPercent = (percent: number): string => {
-    return String(Math.floor(percent * multiplier))
+  const toSolPercent = (percent: number) => {
+    return toMultiplier(String(percent), String(multiplier))
   }
 
   before(async function () {

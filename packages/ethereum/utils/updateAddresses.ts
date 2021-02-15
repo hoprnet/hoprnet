@@ -23,7 +23,10 @@ async function main(
     json = {}
   }
 
-  json[network] = addresses
+  for (const [key, val] of Object.entries(addresses)) {
+    if (!json[network]) json[network] = {}
+    json[network][key] = val
+  }
 
   return writeFile(FILE_DIR, JSON.stringify(json, null, 2))
 }
