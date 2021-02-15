@@ -16,7 +16,7 @@ export default class Addresses extends AbstractCommand {
   }
 
   public help() {
-    return 'Get the announced addresses from other nodes'
+    return 'Get the known addresses of other nodes'
   }
 
   public async execute(query: string, state: GlobalState): Promise<string | void> {
@@ -31,8 +31,14 @@ export default class Addresses extends AbstractCommand {
       return styleValue(err.message, 'failure')
     }
 
-    return `DHT record for ${query}:\n- ${(await this.node.getDHTRecord(peerId))
-      .map((ma) => ma.toString())
-      .join('\n- ')}`
+    return (
+      `Announced addresses for ${query}:\n- ${(await this.node.getAnnouncedAddresses(peerId))
+        .map((ma) => ma.toString())
+        .join('\n- ')}` +
+      `\nObserved addresses for ${query}:\n- ${this.node
+        .getObservedAddresses(peerId)
+        .map((addr) => `${addr.multiaddr.toString()}, certified: ${addr.isCertified}`)
+        .join(`\n- `)}`
+    )
   }
 }

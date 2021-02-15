@@ -132,9 +132,10 @@ describe('test packet composition and decomposition', function () {
   it.skip('should create packets and decompose them', async function () {
     const bs = await generateNode(0, true)
 
+    const bsAddresses = await bs.getAnnouncedAddresses()
     const nodes = await Promise.all(
       Array.from({ length: MAX_HOPS + 1 }).map((_value, index) =>
-        generateNode(index + 1, false, bs.getAddresses().slice(1))
+        generateNode(index + 1, false, bsAddresses.slice(1))
       )
     )
 
