@@ -1,12 +1,7 @@
 import type IChannel from '.'
 import { u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
 import { Hash, TicketEpoch, Balance, SignedTicket, Ticket, AcknowledgedTicket } from '../types'
-import {
-  pubKeyToAccountId,
-  computeWinningProbability,
-  checkChallenge,
-  stateCounterToIteration
-} from '../utils'
+import { pubKeyToAccountId, computeWinningProbability, checkChallenge, stateCounterToIteration } from '../utils'
 import type HoprEthereum from '..'
 import { HASHED_SECRET_WIDTH } from '../hashedSecret'
 import debug from 'debug'
