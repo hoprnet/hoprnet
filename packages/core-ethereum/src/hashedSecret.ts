@@ -32,7 +32,6 @@ async function isWinningTicket(ticketHash: Hash, challengeResponse: Hash, preIma
   return u8aLessThanOrEqual(await hash(u8aConcat(ticketHash, preImage, challengeResponse)), winProb)
 }
 
-
 export async function hashFunction(msg: Uint8Array): Promise<Uint8Array> {
   return (await hash(msg)).slice(0, HASHED_SECRET_WIDTH)
 }
@@ -236,14 +235,7 @@ class HashedSecret {
 
   public async validateTicket(ticket: AcknowledgedTicket): Promise<boolean> {
     const s = await ticket.signedTicket
-    if (
-      await isWinningTicket(
-        await s.ticket.hash,
-        ticket.response,
-        ticket.preImage,
-        s.ticket.winProb
-      )
-    ) {
+    if (await isWinningTicket(await s.ticket.hash, ticket.response, ticket.preImage, s.ticket.winProb)) {
       ticket.preImage = new Hash(this.currentPreImage.preImage)
       this.currentPreImage = await this.findPreImage(this.currentPreImage.preImage)
       return true
