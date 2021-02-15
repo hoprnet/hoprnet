@@ -9,7 +9,6 @@ import TransactionManager from './transaction-manager'
 import { AccountId, Balance, Hash, NativeBalance, TicketEpoch } from './types'
 import { pubKeyToAccountId } from './utils'
 import { ContractEventEmitter } from './tsc/web3/types'
-import HashedSecret from './hashedSecret'
 
 import debug from 'debug'
 const log = debug('hopr-core-ethereum:account')
@@ -39,7 +38,6 @@ class Account {
 
   constructor(
     public coreConnector: HoprEthereum,
-    private hashedSecret: HashedSecret,
     privKey: Uint8Array,
     pubKey: Uint8Array,
     private chainId: number
@@ -69,6 +67,8 @@ class Account {
       getPendingTransactions: () => Array.from(this._transactions.pending.values()),
       minPending: durations.minutes(15)
     })
+
+    this.attachAccountDataListener()
   }
 
   async stop() {
@@ -132,13 +132,6 @@ class Account {
           return this._ticketEpoch
         })
     })
-  }
-
-  /**
-   * Returns the current value of the onChainSecret
-   */
-  get onChainSecret(): Hash {
-    return this.hashedSecret.getOnChainSecret()
   }
 
   get address(): Promise<AccountId> {
@@ -258,7 +251,7 @@ class Account {
             log('new ticketEpoch', event.returnValues.counter)
 
             this._ticketEpoch = new TicketEpoch(event.returnValues.counter)
-            this.hashedSecret.updateOnChainSecret(new Hash(stringToU8a(event.returnValues.secretHash), Hash.SIZE))
+            this.coreConnector.hashedSecret.updateOnChainSecret(new Hash(stringToU8a(event.returnValues.secretHash), Hash.SIZE))
           })
           .on('error', (error) => {
             log('error listening to SecretHashSet events', error.message)

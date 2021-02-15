@@ -3,6 +3,7 @@ import Debug from 'debug'
 import { randomBytes } from 'crypto'
 import { u8aToHex, u8aConcat, iterateHash, recoverIteratedHash } from '@hoprnet/hopr-utils'
 import type { Intermediate } from '@hoprnet/hopr-utils'
+import { stringToU8a, u8aIsEmpty } from '@hoprnet/hopr-utils'
 import { publicKeyConvert } from 'secp256k1'
 import { hash as hashFunctionUtils, waitForConfirmation, isWinningTicket } from './utils'
 import { OnChainSecret, OnChainSecretIntermediary } from './dbKeys'
@@ -174,10 +175,23 @@ class HashedSecret {
     return result
   }
 
+  private async findOnChainSecret(){
+    const res = await this.channels.methods.accounts((await this.account.address).toHex()).call()
+    const hashedSecret = stringToU8a(res.hashedSecret)
+
+    // true if this string is an empty bytes32
+    if (u8aIsEmpty(hashedSecret, HASHED_SECRET_WIDTH)) {
+      return undefined
+    }
+
+    return new Hash(hashedSecret)
+  }
+
+
   public async initialize(debug?: boolean): Promise<void> {
     if (this.initialized) return
     this.offChainSecret = await getFromDB(this.db, OnChainSecret())
-    this.onChainSecret = await this.account.onChainSecret
+    this.onChainSecret = await this.findOnChainSecret()
     if (this.onChainSecret != undefined && this.offChainSecret != undefined) {
       try {
         await this.findPreImage(this.onChainSecret) // throws if not found
@@ -199,12 +213,12 @@ class HashedSecret {
     this.initialized = true
   }
 
-  public getOnChainSecret(): Hash {
-    return this.onChainSecret
-  }
-
   public updateOnChainSecret(secret: Hash) {
     this.onChainSecret = secret
+  }
+
+  public getOnChainSecret(){
+    return this.onChainSecret
   }
 
   public async validateTicket(ticket: AcknowledgedTicket): Promise<boolean> {

@@ -48,7 +48,6 @@ describe('test hashedSecret', function () {
 
     connector.account = new Account(
       connector,
-      connector.hashedSecret,
       stringToU8a(testconfigs.DEMO_ACCOUNTS[0]),
       await Utils.privKeyToPubKey(stringToU8a(testconfigs.DEMO_ACCOUNTS[0])),
       chainId

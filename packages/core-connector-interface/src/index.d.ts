@@ -39,10 +39,6 @@ declare interface HoprCoreConnector {
      */
     ticketEpoch: Promise<Types.TicketEpoch>
     /**
-     * Returns the current value of the onChainSecret
-     */
-    onChainSecret: Types.Hash
-    /**
      * Returns the accounts address
      */
     address: Promise<Types.AccountId>

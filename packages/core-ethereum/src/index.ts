@@ -48,7 +48,7 @@ export default class HoprEthereum implements HoprCoreConnector {
     publicKey: Uint8Array,
     maxConfirmations: number
   ) {
-    this.account = new Account(this, this.hashedSecret, privateKey, publicKey, chainId)
+    this.account = new Account(this, privateKey, publicKey, chainId)
     this.indexer = new Indexer(this, maxConfirmations)
     this.types = new types()
     this.channel = new ChannelFactory(this)
