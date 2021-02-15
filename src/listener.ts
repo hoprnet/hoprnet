@@ -17,7 +17,6 @@ import Multiaddr from 'multiaddr'
 import { handleStunRequest, getExternalIp } from './stun'
 import { getAddrs, isAnyAddress } from './addrs'
 import { TCPConnection } from './tcp'
-import { once } from 'events'
 
 const log = debug('hopr-connect:listener')
 const error = debug('hopr-connect:listener:error')
@@ -45,6 +44,7 @@ async function attemptClose(maConn: MultiaddrConnection) {
 enum State {
   UNINITIALIZED,
   LISTENING,
+  CLOSING,
   CLOSED
 }
 
@@ -86,11 +86,17 @@ class Listener extends EventEmitter implements InterfaceListener {
 
     this.state = State.UNINITIALIZED
 
-    Promise.all([
-      // prettier-ignore
-      once(this.udpSocket, 'close'),
-      once(this.tcpSocket, 'close')
-    ]).then(() => this.emit('close'))
+    this.udpSocket.once('close', () => {
+      if (![State.CLOSING, State.CLOSED].includes(this.state)) {
+        console.trace(`UDP socket was closed earlier than expected. Please report this!`)
+      }
+    })
+
+    this.tcpSocket.once('close', () => {
+      if (![State.CLOSING, State.CLOSED].includes(this.state)) {
+        console.trace(`TCP socket was closed earlier than expected. Please report this!`)
+      }
+    })
 
     this.udpSocket.on('message', (msg: Buffer, rinfo: RemoteInfo) => handleStunRequest(this.udpSocket, msg, rinfo))
 
@@ -222,6 +228,8 @@ class Listener extends EventEmitter implements InterfaceListener {
   }
 
   async close(): Promise<void> {
+    this.state = State.CLOSING
+
     await Promise.all([
       new Promise((resolve) => {
         this.udpSocket.once('close', resolve)
@@ -236,10 +244,11 @@ class Listener extends EventEmitter implements InterfaceListener {
         : Promise.resolve()
     ])
 
-    this.state = State.CLOSED
-
     // Give the operating system some time to release the sockets
     await new Promise((resolve) => setTimeout(resolve, SOCKET_CLOSE_TIMEOUT))
+    this.state = State.CLOSED
+
+    this.emit('closed')
   }
 
   getAddrs() {

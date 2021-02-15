@@ -70,7 +70,8 @@
     ],
     "spec": [
       "src/webRTCConnection.spec.ts",
-      "src/stun.spec.ts"
+      "src/stun.spec.ts",
+      "src/listener.spec.ts"
     ],
     "require": [
       "ts-node/register"
