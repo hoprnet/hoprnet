@@ -1,9 +1,5 @@
 {
   "name": "testnet",
-  "accounts": [
-    "0xB3Aa2138DE698597e2e3F84f60eF415d13731b6f"
-  ],
-  "amounts": [
-    "3000000000000000000"
-  ]
+  "accounts": ["0xB3Aa2138DE698597e2e3F84f60eF415d13731b6f"],
+  "amounts": ["3000000000000000000"]
 }
