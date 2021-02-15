@@ -310,16 +310,10 @@ describe('test hashedSecret', function () {
           response: new Types.Hash(randomBytes(Types.Hash.SIZE))
         })
 
-        await connector.hashedSecret.validateTicket(ticket)
 
         if (!u8aEquals(ticket.preImage, EMPTY_HASHED_SECRET)) {
           assert(
-            await Utils.isWinningTicket(
-              await (await ticket.signedTicket).ticket.hash,
-              ticket.response,
-              ticket.preImage,
-              (await ticket.signedTicket).ticket.winProb
-            )
+            await connector.hashedSecret.validateTicket(ticket)
           )
         }
       }

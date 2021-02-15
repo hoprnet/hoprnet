@@ -1,11 +1,11 @@
 import { Hash, AcknowledgedTicket } from './types'
 import Debug from 'debug'
 import { randomBytes } from 'crypto'
-import { u8aToHex, u8aConcat, iterateHash, recoverIteratedHash } from '@hoprnet/hopr-utils'
+import { u8aToHex, u8aConcat, iterateHash, recoverIteratedHash, u8aLessThanOrEqual } from '@hoprnet/hopr-utils'
 import type { Intermediate } from '@hoprnet/hopr-utils'
 import { stringToU8a, u8aIsEmpty } from '@hoprnet/hopr-utils'
 import { publicKeyConvert } from 'secp256k1'
-import { hash as hashFunctionUtils, waitForConfirmation, isWinningTicket } from './utils'
+import { hash, waitForConfirmation } from './utils'
 import { OnChainSecret, OnChainSecretIntermediary } from './dbKeys'
 import type { LevelUp } from 'levelup'
 import type { HoprChannels } from './tsc/web3/HoprChannels'
@@ -18,8 +18,23 @@ export const HASHED_SECRET_WIDTH = 27
 const log = Debug('hopr-core-ethereum:hashedSecret')
 const isNullAccount = (a: string) => a == null || ['0', '0x', '0x'.padEnd(66, '0')].includes(a)
 
+/**
+ * Decides whether a ticket is a win or not.
+ * Note that this mimics the on-chain logic.
+ * @dev Purpose of the function is to check the validity of
+ * a ticket before we submit it to the blockchain.
+ * @param ticketHash hash value of the ticket to check
+ * @param challengeResponse response that solves the signed challenge
+ * @param preImage preImage of the current onChainSecret
+ * @param winProb winning probability of the ticket
+ */
+async function isWinningTicket(ticketHash: Hash, challengeResponse: Hash, preImage: Hash, winProb: Hash) {
+  return u8aLessThanOrEqual(await hash(u8aConcat(ticketHash, preImage, challengeResponse)), winProb)
+}
+
+
 export async function hashFunction(msg: Uint8Array): Promise<Uint8Array> {
-  return (await hashFunctionUtils(msg)).slice(0, HASHED_SECRET_WIDTH)
+  return (await hash(msg)).slice(0, HASHED_SECRET_WIDTH)
 }
 
 async function getFromDB<T>(db: LevelUp, key): Promise<T | undefined> {
@@ -220,12 +235,13 @@ class HashedSecret {
   }
 
   public async validateTicket(ticket: AcknowledgedTicket): Promise<boolean> {
+    const s = await ticket.signedTicket
     if (
       await isWinningTicket(
-        await (await ticket.signedTicket).ticket.hash,
+        await s.ticket.hash,
         ticket.response,
-        new Hash(this.currentPreImage.preImage),
-        (await ticket.signedTicket).ticket.winProb
+        ticket.preImage,
+        s.ticket.winProb
       )
     ) {
       ticket.preImage = new Hash(this.currentPreImage.preImage)

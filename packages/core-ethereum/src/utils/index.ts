@@ -6,7 +6,7 @@ import { PromiEvent, TransactionReceipt } from 'web3-core'
 import { BlockTransactionString } from 'web3-eth'
 import Web3 from 'web3'
 import Debug from 'debug'
-import { u8aLessThanOrEqual, u8aConcat, u8aEquals, durations, u8aToNumber } from '@hoprnet/hopr-utils'
+import { u8aConcat, u8aEquals, durations, u8aToNumber } from '@hoprnet/hopr-utils'
 import { AccountId, Balance, Hash, Signature } from '../types'
 import { ContractEventEmitter } from '../tsc/web3/types'
 import { ChannelStatus } from '../types/channel'
@@ -140,20 +140,6 @@ export async function signer(msg: Uint8Array, signature: Signature): Promise<Uin
  */
 export async function verify(msg: Uint8Array, signature: Signature, pubKey: Uint8Array): Promise<boolean> {
   return ecdsaVerify(signature.signature, msg, pubKey)
-}
-
-/**
- * Decides whether a ticket is a win or not.
- * Note that this mimics the on-chain logic.
- * @dev Purpose of the function is to check the validity of
- * a ticket before we submit it to the blockchain.
- * @param ticketHash hash value of the ticket to check
- * @param challengeResponse response that solves the signed challenge
- * @param preImage preImage of the current onChainSecret
- * @param winProb winning probability of the ticket
- */
-export async function isWinningTicket(ticketHash: Hash, challengeResponse: Hash, preImage: Hash, winProb: Hash) {
-  return u8aLessThanOrEqual(await hash(u8aConcat(ticketHash, preImage, challengeResponse)), winProb)
 }
 
 /**
