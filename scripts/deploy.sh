@@ -18,7 +18,7 @@ source scripts/cleanup.sh
 # - BS_PASSWORD: database password
 
 if [ -z "$RPC" ]; then
-  RPC=https://bsc-dataseed.binance.org/
+  RPC=https://eth-goerli.alchemyapi.io/v2/DH3xYijhPOku0DtWajKUhY3XLljOSsGO
 fi
 
 source scripts/dependencies.sh
