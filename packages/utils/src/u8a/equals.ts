@@ -83,7 +83,7 @@ function u8aEquals(a: Uint8Array, b: Uint8Array, ...arrays: Uint8Array[]) {
 }
 
 export function u8aIsEmpty(a: Uint8Array, size): boolean {
-  return (u8aEquals(a, new Uint8Array(size).fill(0x00)))
+  return u8aEquals(a, new Uint8Array(size).fill(0x00))
 }
 
 export { u8aEquals }

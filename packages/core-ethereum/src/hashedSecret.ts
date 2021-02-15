@@ -175,7 +175,7 @@ class HashedSecret {
     return result
   }
 
-  private async findOnChainSecret(){
+  private async findOnChainSecret() {
     const res = await this.channels.methods.accounts((await this.account.address).toHex()).call()
     const hashedSecret = stringToU8a(res.hashedSecret)
 
@@ -186,7 +186,6 @@ class HashedSecret {
 
     return new Hash(hashedSecret)
   }
-
 
   public async initialize(debug?: boolean): Promise<void> {
     if (this.initialized) return
@@ -217,7 +216,7 @@ class HashedSecret {
     this.onChainSecret = secret
   }
 
-  public getOnChainSecret(){
+  public getOnChainSecret() {
     return this.onChainSecret
   }
 

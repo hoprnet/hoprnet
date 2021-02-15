@@ -36,12 +36,7 @@ class Account {
     }
   }
 
-  constructor(
-    public coreConnector: HoprEthereum,
-    privKey: Uint8Array,
-    pubKey: Uint8Array,
-    private chainId: number
-  ) {
+  constructor(public coreConnector: HoprEthereum, privKey: Uint8Array, pubKey: Uint8Array, private chainId: number) {
     this.keys = {
       onChain: {
         privKey,
@@ -251,7 +246,9 @@ class Account {
             log('new ticketEpoch', event.returnValues.counter)
 
             this._ticketEpoch = new TicketEpoch(event.returnValues.counter)
-            this.coreConnector.hashedSecret.updateOnChainSecret(new Hash(stringToU8a(event.returnValues.secretHash), Hash.SIZE))
+            this.coreConnector.hashedSecret.updateOnChainSecret(
+              new Hash(stringToU8a(event.returnValues.secretHash), Hash.SIZE)
+            )
           })
           .on('error', (error) => {
             log('error listening to SecretHashSet events', error.message)
