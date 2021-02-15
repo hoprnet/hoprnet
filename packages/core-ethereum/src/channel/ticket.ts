@@ -4,7 +4,6 @@ import { Hash, TicketEpoch, Balance, SignedTicket, Ticket, AcknowledgedTicket } 
 import {
   pubKeyToAccountId,
   computeWinningProbability,
-  isWinningTicket,
   checkChallenge,
   stateCounterToIteration
 } from '../utils'
@@ -70,7 +69,7 @@ class TicketStatic {
         }
       }
 
-      const isWinning = await isWinningTicket(await ticket.hash, ackTicket.response, ackTicket.preImage, ticket.winProb)
+      const isWinning = await this.coreConnector.hashedSecret.validateTicket(ackTicket)
       if (!isWinning) {
         log(`Failed to submit ticket ${u8aToHex(ticketChallenge)}: ${this.INVALID_MESSAGES.NOT_WINNING}`)
         return {
@@ -100,7 +99,6 @@ class TicketStatic {
 
       await transaction.send()
       ackTicket.redeemed = true
-      this.coreConnector.hashedSecret.updateOnChainSecret(ackTicket.preImage)
 
       log('Successfully submitted ticket', u8aToHex(ticketChallenge))
       return {
