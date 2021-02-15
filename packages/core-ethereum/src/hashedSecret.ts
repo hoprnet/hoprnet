@@ -37,6 +37,7 @@ class HashedSecret {
   private initialized: boolean = false
   private onChainSecret: Hash
   private offChainSecret: Hash
+  private currentPreImage: Intermediate
 
   constructor(private db: LevelUp, private account: Account, private channels: HoprChannels) {}
 
@@ -178,12 +179,9 @@ class HashedSecret {
   private async findOnChainSecret() {
     const res = await this.channels.methods.accounts((await this.account.address).toHex()).call()
     const hashedSecret = stringToU8a(res.hashedSecret)
-
-    // true if this string is an empty bytes32
     if (u8aIsEmpty(hashedSecret, HASHED_SECRET_WIDTH)) {
       return undefined
     }
-
     return new Hash(hashedSecret)
   }
 
@@ -209,6 +207,7 @@ class HashedSecret {
       const onChainSecret = await this.createAndStoreSecretOffChainAndReturnOnChainSecret(debug)
       await this.storeSecretOnChain(onChainSecret)
     }
+    this.currentPreImage = await this.findPreImage(this.onChainSecret)
     this.initialized = true
   }
 
@@ -221,17 +220,16 @@ class HashedSecret {
   }
 
   public async validateTicket(ticket: AcknowledgedTicket): Promise<boolean> {
-    let tmp = await this.findPreImage(this.onChainSecret)
     if (
       await isWinningTicket(
         await (await ticket.signedTicket).ticket.hash,
         ticket.response,
-        new Hash(tmp.preImage),
+        new Hash(this.currentPreImage.preImage),
         (await ticket.signedTicket).ticket.winProb
       )
     ) {
-      ticket.preImage = new Hash(tmp.preImage)
-      tmp = await this.findPreImage(tmp.preImage)
+      ticket.preImage = new Hash(this.currentPreImage.preImage)
+      this.currentPreImage = await this.findPreImage(this.currentPreImage.preImage)
       return true
     }
     return false
