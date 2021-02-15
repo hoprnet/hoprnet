@@ -25,6 +25,7 @@ import readline from 'readline'
 import { Alias } from './alias'
 import { Info } from './info'
 import { CoverTraffic } from './cover-traffic'
+import Addresses from './addresses'
 
 export class Commands {
   readonly commands: AbstractCommand[]
@@ -38,25 +39,26 @@ export class Commands {
     }
 
     this.commands = [
+      new Addresses(node),
+      new Alias(node),
       new CloseChannel(node),
+      new CoverTraffic(node),
       new Info(node),
-      new ListCommands(() => this.commands),
-      // new ListConnectors(),
       new ListConnectedPeers(node),
+      new ListCommands(() => this.commands),
       new ListOpenChannels(node),
+      // new ListConnectors(),
       new Ping(node),
       new PrintAddress(node),
       new PrintBalance(node),
+      new RedeemTickets(node),
       new StopNode(node),
       new Version(node),
       new Tickets(node),
-      new RedeemTickets(node),
+      new SendMessage(node),
       new Settings(node),
-      new Alias(node),
       new TraverseChannels(node),
-      new Withdraw(node),
-      new CoverTraffic(node),
-      new SendMessage(node)
+      new Withdraw(node)
     ]
 
     if (rl) {
