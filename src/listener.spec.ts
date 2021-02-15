@@ -194,7 +194,7 @@ describe('transport/listener.spec check listening to sockets', function () {
     await listener.close()
   })
 
-  it('should do a STUN request', async function () {
+  it('should perform a STUN request', async function () {
     const defer = Defer<void>()
     const listener = new Listener(
       (conn: Connection) => {

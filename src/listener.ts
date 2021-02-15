@@ -88,15 +88,6 @@ class Listener extends EventEmitter implements InterfaceListener {
 
     Promise.all([
       // prettier-ignore
-      once(this.udpSocket, 'listening'),
-      once(this.tcpSocket, 'listening')
-    ]).then(() => {
-      this.state = State.LISTENING
-      this.emit('listening')
-    })
-
-    Promise.all([
-      // prettier-ignore
       once(this.udpSocket, 'close'),
       once(this.tcpSocket, 'close')
     ]).then(() => this.emit('close'))
@@ -217,7 +208,7 @@ class Listener extends EventEmitter implements InterfaceListener {
 
     if (options.port == 0 || options.port == null) {
       const tcpPort = await listenTCP()
-      listenUDP(tcpPort)
+      await listenUDP(tcpPort)
     } else {
       await Promise.all([
         // prettier-ignore
@@ -227,6 +218,7 @@ class Listener extends EventEmitter implements InterfaceListener {
     }
 
     this.state = State.LISTENING
+    this.emit('listening')
   }
 
   async close(): Promise<void> {
