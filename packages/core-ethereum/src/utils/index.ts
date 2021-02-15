@@ -6,13 +6,7 @@ import { PromiEvent, TransactionReceipt } from 'web3-core'
 import { BlockTransactionString } from 'web3-eth'
 import Web3 from 'web3'
 import Debug from 'debug'
-import {
-  u8aLessThanOrEqual,
-  u8aConcat,
-  u8aEquals,
-  durations,
-  u8aToNumber
-} from '@hoprnet/hopr-utils'
+import { u8aLessThanOrEqual, u8aConcat, u8aEquals, durations, u8aToNumber } from '@hoprnet/hopr-utils'
 import { AccountId, Balance, Hash, Signature } from '../types'
 import { ContractEventEmitter } from '../tsc/web3/types'
 import { ChannelStatus } from '../types/channel'

@@ -177,10 +177,7 @@ describe('test Channel class', function () {
       `Checks that party B considers the channel open.`
     )
 
-    assert(
-      await counterpartysCoreConnector.validateTicket(firstAckedTicket),
-      `ticket must be winning`
-    )
+    assert(await counterpartysCoreConnector.validateTicket(firstAckedTicket), `ticket must be winning`)
 
     await channel.testAndSetNonce(new Uint8Array(1).fill(0xff)), `Should be able to set nonce.`
 

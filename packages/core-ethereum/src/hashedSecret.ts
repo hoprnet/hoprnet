@@ -207,14 +207,16 @@ class HashedSecret {
     this.onChainSecret = secret
   }
 
-  public async validateTicket(ticket: AcknowledgedTicket): Promise<boolean>{
+  public async validateTicket(ticket: AcknowledgedTicket): Promise<boolean> {
     let tmp = await this.findPreImage(this.onChainSecret)
-    if (await isWinningTicket(
-      await (await ticket.signedTicket).ticket.hash,
-      ticket.response,
-      new Hash(tmp.preImage),
-      (await ticket.signedTicket).ticket.winProb
-    )) {
+    if (
+      await isWinningTicket(
+        await (await ticket.signedTicket).ticket.hash,
+        ticket.response,
+        new Hash(tmp.preImage),
+        (await ticket.signedTicket).ticket.winProb
+      )
+    ) {
       ticket.preImage = new Hash(tmp.preImage)
       tmp = await this.findPreImage(tmp.preImage)
       return true
