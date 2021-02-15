@@ -134,9 +134,7 @@ describe('test packet composition and decomposition', function () {
 
     const bsAddresses = await bs.getAnnouncedAddresses()
     const nodes = await Promise.all(
-      Array.from({ length: MAX_HOPS + 1 }).map((_value, index) =>
-        generateNode(index + 1, false, bsAddresses.slice(1))
-      )
+      Array.from({ length: MAX_HOPS + 1 }).map((_value, index) => generateNode(index + 1, false, bsAddresses.slice(1)))
     )
 
     connectionHelper(nodes.map((n: Hopr<HoprEthereum>) => n._libp2p))
