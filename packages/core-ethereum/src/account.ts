@@ -37,7 +37,13 @@ class Account {
     }
   }
 
-  constructor(public coreConnector: HoprEthereum, private hashedSecret: HashedSecret, privKey: Uint8Array, pubKey: Uint8Array, private chainId: number) {
+  constructor(
+    public coreConnector: HoprEthereum,
+    private hashedSecret: HashedSecret,
+    privKey: Uint8Array,
+    pubKey: Uint8Array,
+    private chainId: number
+  ) {
     this.keys = {
       onChain: {
         privKey,
@@ -138,7 +144,6 @@ class Account {
   get onChainSecret(): Hash {
     return this.hashedSecret.getOnChainSecret()
   }
-
 
   get address(): Promise<AccountId> {
     if (this._address) {
