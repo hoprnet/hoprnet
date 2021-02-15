@@ -1,10 +1,10 @@
-import { Hash } from './types'
+import { Hash, AcknowledgedTicket } from './types'
 import Debug from 'debug'
 import { randomBytes } from 'crypto'
 import { u8aToHex, u8aConcat, iterateHash, recoverIteratedHash } from '@hoprnet/hopr-utils'
 import type { Intermediate } from '@hoprnet/hopr-utils'
 import { publicKeyConvert } from 'secp256k1'
-import { hash as hashFunctionUtils, waitForConfirmation } from './utils'
+import { hash as hashFunctionUtils, waitForConfirmation, isWinningTicket } from './utils'
 import { OnChainSecret, OnChainSecretIntermediary } from './dbKeys'
 import type { LevelUp } from 'levelup'
 import type { HoprChannels } from './tsc/web3/HoprChannels'
@@ -197,6 +197,29 @@ class HashedSecret {
       await this.storeSecretOnChain(onChainSecret)
     }
     this.initialized = true
+  }
+
+  public getOnChainSecret(): Hash {
+    return this.onChainSecret
+  }
+
+  public updateOnChainSecret(secret: Hash) {
+    this.onChainSecret = secret
+  }
+
+  public async validateTicket(ticket: AcknowledgedTicket): Promise<boolean>{
+    let tmp = await this.findPreImage(this.onChainSecret)
+    if (await isWinningTicket(
+      await (await ticket.signedTicket).ticket.hash,
+      ticket.response,
+      new Hash(tmp.preImage),
+      (await ticket.signedTicket).ticket.winProb
+    )) {
+      ticket.preImage = new Hash(tmp.preImage)
+      tmp = await this.findPreImage(tmp.preImage)
+      return true
+    }
+    return false
   }
 }
 

@@ -7,11 +7,9 @@ import { BlockTransactionString } from 'web3-eth'
 import Web3 from 'web3'
 import Debug from 'debug'
 import {
-  u8aCompare,
+  u8aLessThanOrEqual,
   u8aConcat,
   u8aEquals,
-  A_STRICLY_LESS_THAN_B,
-  A_EQUALS_B,
   durations,
   u8aToNumber
 } from '@hoprnet/hopr-utils'
@@ -161,9 +159,7 @@ export async function verify(msg: Uint8Array, signature: Signature, pubKey: Uint
  * @param winProb winning probability of the ticket
  */
 export async function isWinningTicket(ticketHash: Hash, challengeResponse: Hash, preImage: Hash, winProb: Hash) {
-  return [A_STRICLY_LESS_THAN_B, A_EQUALS_B].includes(
-    u8aCompare(await hash(u8aConcat(ticketHash, preImage, challengeResponse)), winProb)
-  )
+  return u8aLessThanOrEqual(await hash(u8aConcat(ticketHash, preImage, challengeResponse)), winProb)
 }
 
 /**

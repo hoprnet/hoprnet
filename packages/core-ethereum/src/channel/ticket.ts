@@ -100,7 +100,7 @@ class TicketStatic {
 
       await transaction.send()
       ackTicket.redeemed = true
-      this.coreConnector.account.updateLocalState(ackTicket.preImage)
+      this.coreConnector.hashedSecret.updateOnChainSecret(ackTicket.preImage)
 
       log('Successfully submitted ticket', u8aToHex(ticketChallenge))
       return {

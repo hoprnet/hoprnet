@@ -41,7 +41,7 @@ declare interface HoprCoreConnector {
     /**
      * Returns the current value of the onChainSecret
      */
-    onChainSecret: Promise<Types.Hash>
+    onChainSecret: Types.Hash
     /**
      * Returns the accounts address
      */
@@ -65,14 +65,10 @@ declare interface HoprCoreConnector {
     }
 
     /**
-     * Check whether the given ticket is winning with the current preImage.
-     *
-     * If the ticket is a win, the preImage is stored into the given acknowledged
-     * ticket and its preImage will be used to check whether the next ticket is a
-     * win.
+     * Check whether the given ticket is winning
      * @param ticket the acknowledged ticket to check
      */
-    reservePreImageIfIsWinning(ticket: Types.AcknowledgedTicket): Promise<boolean>
+    validateTicket(ticket: Types.AcknowledgedTicket): Promise<boolean>
   }
 
   readonly db: LevelUp

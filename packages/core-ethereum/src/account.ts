@@ -3,26 +3,23 @@ import type { TransactionObject } from './tsc/web3/types'
 import type { TransactionConfig } from 'web3-core'
 import Web3 from 'web3'
 import { getRpcOptions, Network } from '@hoprnet/hopr-ethereum'
-import { durations, stringToU8a, u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
+import { durations, stringToU8a, u8aToHex } from '@hoprnet/hopr-utils'
 import NonceTracker from './nonce-tracker'
 import TransactionManager from './transaction-manager'
 import { AccountId, AcknowledgedTicket, Balance, Hash, NativeBalance, TicketEpoch } from './types'
-import { isWinningTicket, pubKeyToAccountId } from './utils'
+import { pubKeyToAccountId } from './utils'
 import { ContractEventEmitter } from './tsc/web3/types'
-import { HASHED_SECRET_WIDTH } from './hashedSecret'
+import HashedSecret from './hashedSecret'
 
 import debug from 'debug'
 const log = debug('hopr-core-ethereum:account')
 
-export const EMPTY_HASHED_SECRET = new Uint8Array(HASHED_SECRET_WIDTH).fill(0x00)
 const rpcOps = getRpcOptions()
 
 class Account {
   private _address?: AccountId
-  private _preImageIterator: AsyncGenerator<boolean, boolean, AcknowledgedTicket>
   private _ticketEpoch?: TicketEpoch
   private _ticketEpochListener?: ContractEventEmitter<any>
-  private _onChainSecret?: Hash
   private _nonceTracker: NonceTracker
   private _transactions = new TransactionManager()
 
@@ -40,7 +37,7 @@ class Account {
     }
   }
 
-  constructor(public coreConnector: HoprEthereum, privKey: Uint8Array, pubKey: Uint8Array, private chainId: number) {
+  constructor(public coreConnector: HoprEthereum, private hashedSecret: HashedSecret, privKey: Uint8Array, pubKey: Uint8Array, private chainId: number) {
     this.keys = {
       onChain: {
         privKey,
@@ -66,37 +63,10 @@ class Account {
       getPendingTransactions: () => Array.from(this._transactions.pending.values()),
       minPending: durations.minutes(15)
     })
+  }
 
-    this._preImageIterator = async function* (this: Account) {
-      let ticket: AcknowledgedTicket = yield
-
-      let tmp = await this.coreConnector.hashedSecret.findPreImage(await this.onChainSecret)
-
-      while (true) {
-        if (
-          await isWinningTicket(
-            await (await ticket.signedTicket).ticket.hash,
-            ticket.response,
-            new Hash(tmp.preImage),
-            (await ticket.signedTicket).ticket.winProb
-          )
-        ) {
-          ticket.preImage = new Hash(tmp.preImage)
-          if (tmp.iteration == 0) {
-            // @TODO dispatch call of next hashedSecret submit
-            return true
-          } else {
-            yield true
-          }
-
-          tmp = await this.coreConnector.hashedSecret.findPreImage(tmp.preImage)
-        } else {
-          yield false
-        }
-
-        ticket = yield
-      }
-    }.call(this)
+  async validateTicket(ticket: AcknowledgedTicket): Promise<boolean> {
+    return this.hashedSecret.validateTicket(ticket)
   }
 
   async stop() {
@@ -165,41 +135,10 @@ class Account {
   /**
    * Returns the current value of the onChainSecret
    */
-  get onChainSecret(): Promise<Hash> {
-    if (this._onChainSecret != null) {
-      return Promise.resolve(this._onChainSecret)
-    }
-
-    this.attachAccountDataListener()
-
-    return this.address.then((address) => {
-      return this.coreConnector.hoprChannels.methods
-        .accounts(address.toHex())
-        .call()
-        .then((res) => {
-          const hashedSecret = stringToU8a(res.hashedSecret)
-
-          // true if this string is an empty bytes32
-          if (u8aEquals(hashedSecret, EMPTY_HASHED_SECRET)) {
-            return undefined
-          }
-
-          this._onChainSecret = new Hash(hashedSecret)
-
-          return this._onChainSecret
-        })
-    })
+  get onChainSecret(): Hash {
+    return this.hashedSecret.getOnChainSecret()
   }
 
-  /**
-   * Reserve a preImage for the given ticket if it is a winning ticket.
-   * @param ticket the acknowledged ticket
-   */
-  async reservePreImageIfIsWinning(ticket: AcknowledgedTicket) {
-    await this._preImageIterator.next()
-
-    return (await this._preImageIterator.next(ticket)).value
-  }
 
   get address(): Promise<AccountId> {
     if (this._address) {
@@ -210,10 +149,6 @@ class Account {
       this._address = accountId
       return this._address
     })
-  }
-
-  updateLocalState(onChainSecret: Hash) {
-    this._onChainSecret = onChainSecret
   }
 
   // @TODO: switch to web3js-accounts
@@ -322,7 +257,7 @@ class Account {
             log('new ticketEpoch', event.returnValues.counter)
 
             this._ticketEpoch = new TicketEpoch(event.returnValues.counter)
-            this._onChainSecret = new Hash(stringToU8a(event.returnValues.secretHash), Hash.SIZE)
+            this.hashedSecret.updateOnChainSecret(new Hash(stringToU8a(event.returnValues.secretHash), Hash.SIZE))
           })
           .on('error', (error) => {
             log('error listening to SecretHashSet events', error.message)

@@ -118,7 +118,7 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
           }
         )
 
-        const isWinningTicket = await this.node.paymentChannels.account.reservePreImageIfIsWinning(acknowledgedTicket)
+        const isWinningTicket = await this.node.paymentChannels.account.validateTicket(acknowledgedTicket)
 
         if (!isWinningTicket) {
           log(`Got a ticket that is not a win. Dropping ticket.`)
