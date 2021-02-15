@@ -38,6 +38,10 @@ async function main(
   console.log(`Deployed hoprToken: ${hoprToken.address}`)
   addresses['HoprToken'] = hoprToken.address
 
+  // deployer becomes minter
+  const minterRole = await hoprToken.MINTER_ROLE()
+  await hoprToken.grantRole(minterRole, deployer)
+
   // deploy HoprChannels
   const HoprChannels = artifacts.require('HoprChannels')
   console.log('Deploying hoprChannels')
