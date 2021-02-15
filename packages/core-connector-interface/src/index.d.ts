@@ -63,12 +63,6 @@ declare interface HoprCoreConnector {
         pubKey: Uint8Array
       }
     }
-
-    /**
-     * Check whether the given ticket is winning
-     * @param ticket the acknowledged ticket to check
-     */
-    validateTicket(ticket: Types.AcknowledgedTicket): Promise<boolean>
   }
 
   readonly db: LevelUp
@@ -101,6 +95,12 @@ declare interface HoprCoreConnector {
   hexAccountAddress(): Promise<string>
 
   smartContractInfo(): string
+
+  /**
+   * Check whether the given ticket is winning
+   * @param ticket the acknowledged ticket to check
+   */
+  validateTicket(ticket: Types.AcknowledgedTicket): Promise<boolean>
 
   /**
    * (Static) utils to use in the connector module

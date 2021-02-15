@@ -178,7 +178,7 @@ describe('test Channel class', function () {
     )
 
     assert(
-      await counterpartysCoreConnector.account.validateTicket(firstAckedTicket),
+      await counterpartysCoreConnector.validateTicket(firstAckedTicket),
       `ticket must be winning`
     )
 
@@ -241,7 +241,7 @@ describe('test Channel class', function () {
 
       assert(await counterpartysChannel.ticket.verify(nextSignedTicket), `Ticket signature must be valid.`)
 
-      if (await counterpartysCoreConnector.account.validateTicket(ackedTicket)) {
+      if (await counterpartysCoreConnector.validateTicket(ackedTicket)) {
         await counterpartysCoreConnector.channel.tickets.submit(ackedTicket, new Uint8Array())
         assert(ackedTicket.redeemed, 'ticket should get marked as redeemed')
       }

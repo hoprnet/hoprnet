@@ -8,7 +8,7 @@ import Web3 from 'web3'
 import chalk from 'chalk'
 import { Network, addresses, abis } from '@hoprnet/hopr-ethereum'
 import { ChannelFactory } from './channel'
-import types from './types'
+import types, {AcknowledgedTicket} from './types'
 import Indexer from './indexer'
 import * as dbkeys from './dbKeys'
 import * as utils from './utils'
@@ -274,6 +274,10 @@ export default class HoprEthereum implements HoprCoreConnector {
 
   static get constants() {
     return constants
+  }
+
+  async validateTicket(ticket: AcknowledgedTicket): Promise<boolean> {
+    return this.hashedSecret.validateTicket(ticket)
   }
 }
 

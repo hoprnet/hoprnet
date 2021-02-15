@@ -6,7 +6,7 @@ import { getRpcOptions, Network } from '@hoprnet/hopr-ethereum'
 import { durations, stringToU8a, u8aToHex } from '@hoprnet/hopr-utils'
 import NonceTracker from './nonce-tracker'
 import TransactionManager from './transaction-manager'
-import { AccountId, AcknowledgedTicket, Balance, Hash, NativeBalance, TicketEpoch } from './types'
+import { AccountId, Balance, Hash, NativeBalance, TicketEpoch } from './types'
 import { pubKeyToAccountId } from './utils'
 import { ContractEventEmitter } from './tsc/web3/types'
 import HashedSecret from './hashedSecret'
@@ -63,10 +63,6 @@ class Account {
       getPendingTransactions: () => Array.from(this._transactions.pending.values()),
       minPending: durations.minutes(15)
     })
-  }
-
-  async validateTicket(ticket: AcknowledgedTicket): Promise<boolean> {
-    return this.hashedSecret.validateTicket(ticket)
   }
 
   async stop() {
