@@ -244,12 +244,12 @@ describe('test hashedSecret', function () {
         response: new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff))
       })
 
-      assert(await connector.validateTicket(firstTicket), 'ticket with 100% winning probability must always be a win')
+      assert(await connector.hashedSecret.validateTicket(firstTicket), 'ticket with 100% winning probability must always be a win')
 
       const firstPreImage = new Types.Hash(new Uint8Array(HASHED_SECRET_WIDTH))
       firstPreImage.set(firstTicket.preImage)
 
-      assert(await connector.validateTicket(firstTicket), 'ticket with 100% winning probability must always be a win')
+      assert(await connector.hashedSecret.validateTicket(firstTicket), 'ticket with 100% winning probability must always be a win')
 
       const secondPreImage = new Types.Hash(new Uint8Array(HASHED_SECRET_WIDTH))
       secondPreImage.set(firstTicket.preImage)
@@ -271,9 +271,9 @@ describe('test hashedSecret', function () {
         response: new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff))
       })
 
-      assert(!(await connector.validateTicket(notWinnigTicket)), 'falsy ticket should not be a win')
+      assert(!(await connector.hashedSecret.validateTicket(notWinnigTicket)), 'falsy ticket should not be a win')
 
-      assert(await connector.validateTicket(firstTicket), 'ticket with 100% winning probability must always be a win')
+      assert(await connector.hashedSecret.validateTicket(firstTicket), 'ticket with 100% winning probability must always be a win')
 
       const fourthPreImage = new Types.Hash(new Uint8Array(HASHED_SECRET_WIDTH))
       fourthPreImage.set(firstTicket.preImage)
@@ -301,7 +301,7 @@ describe('test hashedSecret', function () {
           response: new Types.Hash(randomBytes(Types.Hash.SIZE))
         })
 
-        await connector.validateTicket(ticket)
+        await connector.hashedSecret.validateTicket(ticket)
 
         if (!u8aEquals(ticket.preImage, EMPTY_HASHED_SECRET)) {
           assert(

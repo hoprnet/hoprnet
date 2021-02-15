@@ -200,12 +200,12 @@ class HashedSecret {
     }
     if (this.offChainSecret && !this.onChainSecret) {
       log('secret exists offchain but not on chain')
-      const onChainSecret = await this.calcOnChainSecretFromDb(debug)
-      await this.storeSecretOnChain(onChainSecret)
+      this.onChainSecret = await this.calcOnChainSecretFromDb(debug)
+      await this.storeSecretOnChain(this.onChainSecret)
     } else {
       log('reinitializing')
-      const onChainSecret = await this.createAndStoreSecretOffChainAndReturnOnChainSecret(debug)
-      await this.storeSecretOnChain(onChainSecret)
+      this.onChainSecret = await this.createAndStoreSecretOffChainAndReturnOnChainSecret(debug)
+      await this.storeSecretOnChain(this.onChainSecret)
     }
     this.currentPreImage = await this.findPreImage(this.onChainSecret)
     this.initialized = true
