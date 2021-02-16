@@ -18,15 +18,12 @@ source scripts/dependencies.sh
 echo "Cleaning up devops before running internal testnet"
 cleanup
 echo "Starting internal testnet"
-start_testnet internal 5 $IMG
+start_testnet internal 2 $IMG
 echo "Testnet up and running. Leaving it for 20 mins"
 sleep 72000 # 20mins
 echo "Testnet has run for 20m, time to kill it."
 gcloud_get_logs internal-bootstrap $IMG > bootstrap-logs.txt
 gcloud_get_logs internal-node-2 $IMG > node-2.txt
-gcloud_get_logs internal-node-3 $IMG > node-3.txt
-gcloud_get_logs internal-node-4 $IMG > node-4.txt
-gcloud_get_logs internal-node-5 $IMG > node-5.txt
 cat bootstrap-logs.txt
 cleanup
 

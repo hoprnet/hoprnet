@@ -77,6 +77,7 @@ update_or_create_bootstrap_vm() {
     local ip=$(gcloud_get_address $1)
     gcloud compute instances create-with-container $1 $GCLOUD_DEFAULTS \
       --network-interface=address=$ip,network-tier=PREMIUM,subnet=default \
+      --container-restart-policy=always \
       --create-disk name=$(disk_name $1),size=10GB,type=pd-balanced,mode=rw \
       --container-mount-disk mount-path="/app/db" \
       --container-env=^,@^DEBUG=hopr\*,@NODE_OPTIONS=--max-old-space-size=4096 \
@@ -91,7 +92,6 @@ update_or_create_bootstrap_vm() {
       --container-arg="--admin" --container-arg="true" \
       --container-arg="--adminHost" --container-arg="0.0.0.0" \
       --container-arg="--run" --container-arg="\"settings strategy passive;daemonize\""
-      --container-restart-policy=always
     sleep 120
   fi
 }
@@ -123,6 +123,7 @@ start_testnode_vm() {
 
 # $1 network name
 # $2 docker image
+# NB: Needs to output the bs multiaddrss at the end for the testnet.
 start_bootstrap() {
   local vm=$(vm_name bootstrap $1)
   echo "- Starting bootstrap server for $1 at ($vm) with $2" 1>&2
@@ -136,11 +137,11 @@ start_bootstrap() {
   fund_if_empty $BOOTSTRAP_ETH_ADDRESS 1>&2
   local multiaddr="/ip4/$ip/tcp/9091/p2p/$BOOTSTRAP_HOPR_ADDRESS"
   local release=$(echo $2 | cut -f2 -d:)
-  echo "- Bootstrap Release: $release"
-  echo "- Bootstrap Multiaddr value: $multiaddr"
+  echo "- Bootstrap Release: $release" 1>&2
+  echo "- Bootstrap Multiaddr value: $multiaddr" 1>&2
   local txt_record=$(gcloud_txt_record $release bootstrap $multiaddr)
-  echo "- DNS entry: $(gcloud_dns_entry $release bootstrap)"
-  echo "- TXT record: $txt_record"
+  echo "- DNS entry: $(gcloud_dns_entry $release bootstrap)" 1>&2
+  echo $multiaddr
 }
 
 # $1 network name
