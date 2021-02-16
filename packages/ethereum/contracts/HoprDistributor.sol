@@ -96,6 +96,7 @@ contract HoprDistributor is Ownable {
     ) external onlyOwner {
         Allocation storage allocation = allocations[account][scheduleName];
         require(allocation.amount != 0, "Allocation must exist");
+        require(!allocation.revoked, "Allocation must not be already revoked");
 
         allocation.revoked = true;
         totalToBeMinted = _subUint128(totalToBeMinted, _subUint128(allocation.amount, allocation.claimed));
