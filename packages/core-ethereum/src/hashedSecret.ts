@@ -50,7 +50,7 @@ class HashedSecret {
   private initialized: boolean = false
   private onChainSecret: Hash
   private offChainSecret: Hash
-  private currentPreImage: Uint8Array 
+  private currentPreImage: Uint8Array
 
   constructor(private db: LevelUp, private account: Account, private channels: HoprChannels) {}
 
@@ -169,7 +169,8 @@ class HashedSecret {
    * values from the database.
    * @param hash the hash to find a preImage for
    */
-  public async findPreImage(hash: Uint8Array): Promise<Uint8Array> { // TODO only public for test, make private
+  public async findPreImage(hash: Uint8Array): Promise<Uint8Array> {
+    // TODO only public for test, make private
     if (hash.length != HASHED_SECRET_WIDTH) {
       throw Error(
         `Invalid length. Expected a Uint8Array with ${HASHED_SECRET_WIDTH} elements but got one with ${hash.length}`
@@ -232,14 +233,7 @@ class HashedSecret {
 
   public async validateTicket(ticket: AcknowledgedTicket): Promise<boolean> {
     const s = await ticket.signedTicket
-    if (
-      await isWinningTicket(
-        await s.ticket.hash,
-        ticket.response,
-        ticket.preImage,
-        s.ticket.winProb
-      )
-    ) {
+    if (await isWinningTicket(await s.ticket.hash, ticket.response, ticket.preImage, s.ticket.winProb)) {
       ticket.preImage = new Hash(this.currentPreImage)
       this.currentPreImage = await this.findPreImage(this.currentPreImage)
       return true

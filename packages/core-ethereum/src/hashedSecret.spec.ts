@@ -143,9 +143,7 @@ describe('test hashedSecret', function () {
 
       assert(!u8aEquals(preImage, updatedPreImage), `new and old pre-image must not be the same`)
 
-      assert(
-        u8aEquals((await hashFunction(updatedPreImage)).slice(0, HASHED_SECRET_WIDTH), updatedOnChainHash)
-      )
+      assert(u8aEquals((await hashFunction(updatedPreImage)).slice(0, HASHED_SECRET_WIDTH), updatedOnChainHash))
     })
 
     // // Commented due expensive operations
@@ -228,9 +226,7 @@ describe('test hashedSecret', function () {
 
       assert(!u8aEquals(preImage, updatedPreImage), `new and old pre-image must not be the same`)
 
-      assert(
-        u8aEquals((await hashFunction(updatedPreImage)).slice(0, HASHED_SECRET_WIDTH), updatedOnChainHash)
-      )
+      assert(u8aEquals((await hashFunction(updatedPreImage)).slice(0, HASHED_SECRET_WIDTH), updatedOnChainHash))
     })
 
     it('should reserve a preImage for tickets with 100% winning probabilty resp. should not reserve for 0% winning probability', async function () {
