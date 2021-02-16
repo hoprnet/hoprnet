@@ -141,6 +141,26 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     this.isBootstrapNode = options.bootstrapNode || false
     this._interactions = new Interactions(this, (peer: PeerId) => this.networkPeers.register(peer))
 
+    if (process.env.GCLOUD) {
+      try {
+        var name = 'hopr_node_' + this.getId().toB58String().slice(-5).toLowerCase()
+        if (this.isBootstrapNode) {
+          name = 'hopr_bootstrap_' + this.getId().toB58String().slice(-5).toLowerCase()
+        }
+        require('@google-cloud/profiler')
+          .start({
+            projectId: 'hoprassociation',
+            serviceContext: {
+              service: name,
+              version: FULL_VERSION
+            }
+          })
+          .catch((e: any) => console.log(e))
+      } catch (e) {
+        console.log(e)
+      }
+    }
+
     this.networkPeers = new NetworkPeers(
       Array.from(this._libp2p.peerStore.peers.values()).map((x) => x.id),
       [this.getId()].concat(this.bootstrapServers.map((bs) => PeerId.createFromB58String(bs.getPeerId())))
