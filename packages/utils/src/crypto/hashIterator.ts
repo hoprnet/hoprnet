@@ -22,12 +22,14 @@ export async function recoverIteratedHash(
   hashFunc: (preImage: Uint8Array) => Promise<Uint8Array>,
   lookup: (index: number) => Promise<Uint8Array | undefined>,
   maxIterations: number,
-  stepSize: number,
+  stepSize: number
 ): Promise<Uint8Array> {
   let intermediate: Uint8Array
-  for (let closestIntermediate = maxIterations - (maxIterations % stepSize);
-       closestIntermediate >= 0;
-       closestIntermediate -= stepSize) {
+  for (
+    let closestIntermediate = maxIterations - (maxIterations % stepSize);
+    closestIntermediate >= 0;
+    closestIntermediate -= stepSize
+  ) {
     intermediate = await lookup(closestIntermediate)
     try {
       return reverseHash(hashValue, hashFunc, intermediate, stepSize)
@@ -35,7 +37,6 @@ export async function recoverIteratedHash(
   }
   throw new Error('Could not find source in any block')
 }
-
 
 // Given a hash that is a multiple hashed result of a specified source,
 // try and find it's immediate source.
