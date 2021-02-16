@@ -572,16 +572,33 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     try {
       await this.checkBalances()
       await this.tickChannelStrategy([])
-      console.log(
-        this._libp2p.metrics
-          .forPeer(PeerId.createFromB58String(`16Uiu2HAm87R25XZ9CsqvF3KcKfz3BgzqbkqFkoHRBXM3QW3yCnjw`))
-          .toJSON()
-      )
-      console.log(
-        this._libp2p.metrics
-          .forPeer(PeerId.createFromB58String(`16Uiu2HAmVCdjMZt9yuSFpcRPzWZRXJxjem4v1dRwdczUeBEUAYg6`))
-          .toJSON()
-      )
+
+      const connReport = {}
+      this._libp2p.metrics.peers.forEach(peer => {
+        console.log(peer)
+        Object.assign(connReport, {
+          [peer]: this._libp2p.metrics.forPeer(PeerId.createFromB58String(peer)).movingAverages
+        })
+      })
+      console.log(connReport)
+      // console.log(this._libp2p.metrics.peers)
+      // console.log(
+      //   this._libp2p.metrics.peers.map(
+      //     (peer) =>
+      //       `${peer} ${JSON.stringify(this._libp2p.metrics.forPeer(PeerId.createFromB58String(peer)).movingAverages)}`
+      //   )
+      // )
+
+      // console.log(
+      //   this._libp2p.metrics
+      //     .forPeer(PeerId.createFromB58String(`16Uiu2HAm87R25XZ9CsqvF3KcKfz3BgzqbkqFkoHRBXM3QW3yCnjw`))
+      //     .toJSON()
+      // )
+      // console.log(
+      //   this._libp2p.metrics
+      //     .forPeer(PeerId.createFromB58String(`16Uiu2HAmVCdjMZt9yuSFpcRPzWZRXJxjem4v1dRwdczUeBEUAYg6`))
+      //     .toJSON()
+      // )
     } catch (e) {
       log('error in periodic check', e)
     }
