@@ -2,7 +2,6 @@ import { Hash, AcknowledgedTicket } from './types'
 import Debug from 'debug'
 import { randomBytes } from 'crypto'
 import { u8aToHex, u8aConcat, iterateHash, recoverIteratedHash, u8aLessThanOrEqual } from '@hoprnet/hopr-utils'
-import type { Item } from '@hoprnet/hopr-utils'
 import { stringToU8a, u8aIsEmpty } from '@hoprnet/hopr-utils'
 import { publicKeyConvert } from 'secp256k1'
 import { hash, waitForConfirmation } from './utils'
@@ -52,7 +51,7 @@ class HashedSecret {
   private initialized: boolean = false
   private onChainSecret: Hash
   private offChainSecret: Hash
-  private currentPreImage: Item 
+  private currentPreImage: Uint8Array 
 
   constructor(private db: LevelUp, private account: Account, private channels: HoprChannels) {}
 
@@ -171,24 +170,20 @@ class HashedSecret {
    * values from the database.
    * @param hash the hash to find a preImage for
    */
-  public async findPreImage(hash: Uint8Array): Promise<Item> { // TODO only public for test, make private
+  public async findPreImage(hash: Uint8Array): Promise<Uint8Array> { // TODO only public for test, make private
     if (hash.length != HASHED_SECRET_WIDTH) {
       throw Error(
         `Invalid length. Expected a Uint8Array with ${HASHED_SECRET_WIDTH} elements but got one with ${hash.length}`
       )
     }
 
-    let result = await recoverIteratedHash(
+    return await recoverIteratedHash(
       hash,
       hashFunction,
       (index) => getFromDB(this.db, OnChainSecretIntermediary(index)),
       TOTAL_ITERATIONS,
       DB_ITERATION_BLOCK_SIZE
     )
-    if (result == undefined) {
-      throw Error(`Could not find preImage.`)
-    }
-    return result
   }
 
   private async findOnChainSecret() {
@@ -246,8 +241,8 @@ class HashedSecret {
         s.ticket.winProb
       )
     ) {
-      ticket.preImage = new Hash(this.currentPreImage.source)
-      this.currentPreImage = await this.findPreImage(this.currentPreImage.source)
+      ticket.preImage = new Hash(this.currentPreImage)
+      this.currentPreImage = await this.findPreImage(this.currentPreImage)
       return true
     }
     return false

@@ -59,43 +59,39 @@ export async function iterateHash(
 
 export async function recoverIteratedHash(
   hashValue: Uint8Array,
-  hashFunc: (preImage: Uint8Array) => Promise<Uint8Array> | Uint8Array,
-  hint: (index: number) => Uint8Array | undefined | Promise<Uint8Array | undefined>,
+  hashFunc: (preImage: Uint8Array) => Promise<Uint8Array>,
+  lookup: (index: number) => Promise<Uint8Array | undefined>,
   maxIterations: number,
-  stepSize?: number,
-  indexHint?: number
-): Promise<Item | undefined> {
-  let closestIntermediate: number
-  if (indexHint != undefined) {
-    closestIntermediate = indexHint
-  } else if (stepSize != undefined && stepSize > 0) {
-    closestIntermediate = maxIterations - (maxIterations % stepSize)
-  } else {
-    closestIntermediate = 0
-  }
-
+  stepSize: number,
+): Promise<Uint8Array> {
   let intermediate: Uint8Array
-  for (; closestIntermediate >= 0; closestIntermediate -= stepSize) {
-    intermediate = await hint(closestIntermediate)
-
-    if (intermediate == undefined) {
-      if (closestIntermediate == 0) {
-        return
-      }
-
-      continue
-    }
-
-    for (let i = 0; i < stepSize; i++) {
-      let _tmp = await hashFunc(intermediate)
-
-      if (u8aEquals(_tmp, hashValue)) {
-        return {
-          source: intermediate,
-          iteration: closestIntermediate + i
-        }
-      }
-      intermediate = _tmp
-    }
+  for (let closestIntermediate = maxIterations - (maxIterations % stepSize);
+       closestIntermediate >= 0;
+       closestIntermediate -= stepSize) {
+    intermediate = await lookup(closestIntermediate)
+    try {
+      return reverseHash(hashValue, hashFunc, intermediate, stepSize)
+    } catch (e) {}
   }
+  throw new Error('Could not find source in any block')
+}
+
+
+// Given a hash that is a multiple hashed result of a specified source,
+// try and find it's immediate source.
+export async function reverseHash(
+  hashValue: Uint8Array,
+  hashFunc: (source: Uint8Array) => Promise<Uint8Array>,
+  startValue: Uint8Array,
+  maxIterations: number
+): Promise<Uint8Array> {
+  let val = startValue
+  for (let i = 0; i < maxIterations; i++) {
+    let _tmp = await hashFunc(val)
+    if (u8aEquals(_tmp, hashValue)) {
+      return val
+    }
+    val = _tmp
+  }
+  throw Error(`Could not find source in givent block.`)
 }

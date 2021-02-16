@@ -6,17 +6,14 @@ describe('test hash iterator', function () {
   const HASH_LENGTH = 4
   const ONE = new Uint8Array(HASH_LENGTH)
   ONE[HASH_LENGTH - 1] = 1
-  const hashFunc = (arr: Uint8Array): Uint8Array => u8aAdd(false, arr, ONE)
+  const hashFunc = (arr: Uint8Array) => Promise.resolve(u8aAdd(false, arr, ONE))
 
   const STEPSIZE = 5
   const MAX_ITERATIONS = 4 * STEPSIZE + 2
   const LENGTH = 4
 
-  const hint = (i: number): Uint8Array => {
-    if (i % STEPSIZE == 0) {
-      return toU8a(i, LENGTH)
-    }
-  }
+  const hint = (i: number) => Promise.resolve(toU8a(i, LENGTH))
+
   it('should iterate', async function () {
     const expected = {
       hash: toU8a(MAX_ITERATIONS, LENGTH),
