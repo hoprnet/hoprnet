@@ -77,13 +77,10 @@ class HashedSecret {
     const hashes = await iterateHash(onChainSecret, hashFunction, TOTAL_ITERATIONS)
 
     for (let i = 0; i < TOTAL_ITERATIONS; i += DB_ITERATION_BLOCK_SIZE) {
-      dbBatch = dbBatch.put(
-        Buffer.from(OnChainSecretIntermediary(i)),
-        Buffer.from(hashes[i])
-      )
+      dbBatch = dbBatch.put(Buffer.from(OnChainSecretIntermediary(i)), Buffer.from(hashes[i]))
     }
     await dbBatch.write()
-    return new Hash(hashes[hashes.length -1])
+    return new Hash(hashes[hashes.length - 1])
   }
 
   private async storeSecretOnChain(secret: Hash): Promise<void> {
@@ -150,11 +147,7 @@ class HashedSecret {
 
   private async calcOnChainSecretFromDb(debug?: boolean): Promise<Hash | never> {
     const start = debug ? await this.getDebugAccountSecret() : this.offChainSecret
-    let hashes = await iterateHash(
-      start,
-      hashFunction,
-      TOTAL_ITERATIONS,
-    )
+    let hashes = await iterateHash(start, hashFunction, TOTAL_ITERATIONS)
     return new Hash(hashes[hashes.length - 1])
   }
 

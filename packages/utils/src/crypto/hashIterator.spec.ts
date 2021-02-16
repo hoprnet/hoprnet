@@ -1,4 +1,4 @@
-import { toU8a, u8aAdd} from '../u8a'
+import { toU8a, u8aAdd } from '../u8a'
 import { iterateHash, recoverIteratedHash } from './hashIterator'
 import assert from 'assert'
 
@@ -17,10 +17,7 @@ describe('test hash iterator', function () {
   it('should iterate', async function () {
     const hashes = await iterateHash(new Uint8Array(HASH_LENGTH).fill(0x00), hashFunc, MAX_ITERATIONS)
     assert.equal(hashes.length, MAX_ITERATIONS)
-    assert.deepStrictEqual(
-      hashes[hashes.length - 1],
-      toU8a(MAX_ITERATIONS, HASH_LENGTH),
-    )
+    assert.deepStrictEqual(hashes[hashes.length - 1], toU8a(MAX_ITERATIONS, HASH_LENGTH))
 
     for (let i = 1; i <= MAX_ITERATIONS; i++) {
       assert.deepStrictEqual(
