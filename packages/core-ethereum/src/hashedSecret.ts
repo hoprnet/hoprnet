@@ -72,10 +72,8 @@ class HashedSecret {
    */
   private async createAndStoreSecretOffChainAndReturnOnChainSecret(debug: boolean): Promise<Hash> {
     let onChainSecret = debug ? await this.getDebugAccountSecret() : new Hash(randomBytes(HASHED_SECRET_WIDTH))
-
     let dbBatch = this.db.batch()
     const hashes = await iterateHash(onChainSecret, hashFunction, TOTAL_ITERATIONS)
-
     for (let i = 0; i < TOTAL_ITERATIONS; i += DB_ITERATION_BLOCK_SIZE) {
       dbBatch = dbBatch.put(Buffer.from(OnChainSecretIntermediary(i)), Buffer.from(hashes[i]))
     }

@@ -6,7 +6,7 @@ import { u8aEquals } from '../u8a'
 export async function iterateHash(
   seed: Uint8Array | undefined,
   hashFunc: (preImage: Uint8Array) => Promise<Uint8Array>,
-  iterations: number
+  iterations: number,
 ): Promise<Uint8Array[]> {
   const result: Uint8Array[] = [seed]
   let intermediate = seed
@@ -31,9 +31,14 @@ export async function recoverIteratedHash(
     closestIntermediate -= stepSize
   ) {
     intermediate = await lookup(closestIntermediate)
+    if (!intermediate) {
+      throw new Error('Couldnt find intermediate: ' + closestIntermediate)
+    }
     try {
-      return reverseHash(hashValue, hashFunc, intermediate, stepSize)
-    } catch (e) {}
+      return await reverseHash(hashValue, hashFunc, intermediate, stepSize)
+    } catch (e) {
+      continue
+    }
   }
   throw new Error('Could not find source in any block')
 }
@@ -54,5 +59,5 @@ export async function reverseHash(
     }
     val = _tmp
   }
-  throw Error(`Could not find source in givent block.`)
+  throw Error(`Could not find source in given block.`)
 }
