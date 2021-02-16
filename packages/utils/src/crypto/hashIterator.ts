@@ -6,7 +6,7 @@ import { u8aEquals } from '../u8a'
 export async function iterateHash(
   seed: Uint8Array | undefined,
   hashFunc: (preImage: Uint8Array) => Promise<Uint8Array>,
-  iterations: number,
+  iterations: number
 ): Promise<Uint8Array[]> {
   const result: Uint8Array[] = [seed]
   let intermediate = seed
