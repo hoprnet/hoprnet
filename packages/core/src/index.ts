@@ -48,6 +48,7 @@ import { ChannelStrategy, PassiveStrategy, PromiscuousStrategy } from './channel
 import { Mixer } from './mixer'
 
 import Debug from 'debug'
+import { Address } from 'libp2p/src/peer-store'
 const log = Debug(`hopr-core`)
 const logError = Debug(`hopr-core:error`)
 const verbose = Debug('hopr-core:verbose')
@@ -142,6 +143,26 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     this.bootstrapServers = options.bootstrapServers || []
     this.isBootstrapNode = options.bootstrapNode || false
     this._interactions = new Interactions(this, this.mixer, (peer: PeerId) => this.networkPeers.register(peer))
+
+    if (process.env.GCLOUD) {
+      try {
+        var name = 'hopr_node_' + this.getId().toB58String().slice(-5).toLowerCase()
+        if (this.isBootstrapNode) {
+          name = 'hopr_bootstrap_' + this.getId().toB58String().slice(-5).toLowerCase()
+        }
+        require('@google-cloud/profiler')
+          .start({
+            projectId: 'hoprassociation',
+            serviceContext: {
+              service: name,
+              version: FULL_VERSION
+            }
+          })
+          .catch((e: any) => console.log(e))
+      } catch (e) {
+        console.log(e)
+      }
+    }
 
     this.networkPeers = new NetworkPeers(
       Array.from(this._libp2p.peerStore.peers.values()).map((x) => x.id),
@@ -387,11 +408,31 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     return this._libp2p.peerId // Not a documented API, but in the sourceu
   }
 
-  /*
-   * List the addresses the node is available on
+  /**
+   * Lists the addresses which the given node announces to other nodes
+   * @param peer peer to query for, default self
    */
-  public getAddresses(): Multiaddr[] {
-    return this._libp2p.multiaddrs
+  public async getAnnouncedAddresses(peer: PeerId = this.getId()): Promise<Multiaddr[]> {
+    if (peer.equals(this.getId())) {
+      return this._libp2p.multiaddrs
+    }
+
+    return (await this._libp2p.peerRouting.findPeer(peer))?.multiaddrs || []
+  }
+
+  /**
+   * List the addresses on which the node is listening
+   */
+  public getListeningAddresses(): Multiaddr[] {
+    return this._libp2p.addressManager.getListenAddrs()
+  }
+
+  /**
+   * Gets the observed addresses of a given peer.
+   * @param peer peer to query for
+   */
+  public getObservedAddresses(peer: PeerId): Address[] {
+    return this._libp2p.peerStore.get(peer)?.addresses ?? []
   }
 
   /**
