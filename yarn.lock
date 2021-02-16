@@ -352,14 +352,14 @@
   resolved "https://registry.yarnpkg.com/@hapi/hoek/-/hoek-9.1.1.tgz#9daf5745156fd84b8e9889a2dc721f0c58e894aa"
   integrity sha512-CAEbWH7OIur6jEOzaai83jq3FmKmv4PmX1JYfs9IrYcGEVI/lyL1EXJGCj7eFVJ0bg5QR8LMxBlEtA+xKiLpFw==
 
-"@hoprnet/hopr-connect@0.2.12":
-  version "0.2.12"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-connect/-/hopr-connect-0.2.12.tgz#1a61f66f11acc32afc737b7505db922cda24d905"
-  integrity sha512-Jy4TCOAhTUZHSCdAtg9XpFlExFLE318yOBFso8QBSwfmzN4c7hIQ+dpXWBo5s96QtXjv6oqMeTfmV4fxL5+48Q==
+"@hoprnet/hopr-connect@0.2.21":
+  version "0.2.21"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-connect/-/hopr-connect-0.2.21.tgz#120979b79472eec7dd1ccf3192204278c092c6c1"
+  integrity sha512-7pucduO+z+/VC0e/AYzMQXeUKTGrgd52iZ0LWsKiI7evRoFo7c6xRcb6+HvT0koCzoi6ORZz4M6RukI3iGpatQ==
   dependencies:
-    "@hoprnet/hopr-utils" "1.68.5"
+    "@hoprnet/hopr-utils" "1.69.3"
     abortable-iterator "^3.0.0"
-    bl "^4.0.3"
+    bl "^4.1"
     debug "^4.3.1"
     it-handshake "~1.0.2"
     mafmt "^8.0.4"
@@ -371,10 +371,10 @@
     webrtc-stun "3.0.0"
     wrtc "0.4.7"
 
-"@hoprnet/hopr-utils@1.68.5":
-  version "1.68.5"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-1.68.5.tgz#e098fc1a684048028082bbb5ac0e815b6808df2d"
-  integrity sha512-NsXVwkowani0pOfm0OQG3JkoWJgFm+dABsXjWGgmWYJteBBLCn+hBVaY48/rjlDEo43xJ7N7kxUx5zZ34kqMsw==
+"@hoprnet/hopr-utils@1.69.3":
+  version "1.69.3"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-1.69.3.tgz#6824fb6e5ec49b1b703ed9acf0d6b6e9331f9ae5"
+  integrity sha512-6ww2qLbStdCx3vCm1xwMw0jDFvYfrb56yUIeE1E7E47A/11ShxdprwCq/5P0NBXxcLmK6IFDU0S04q7BBKII7w==
   dependencies:
     abort-controller "~3.0.0"
     bignumber.js "^9.0.0"
@@ -3080,6 +3080,15 @@ bl@^4.0.0, bl@^4.0.2, bl@^4.0.3:
   version "4.0.4"
   resolved "https://registry.yarnpkg.com/bl/-/bl-4.0.4.tgz#f4fda39f81a811d0df6368c1ed91dae499d1c900"
   integrity sha512-7tdr4EpSd7jJ6tuQ21vu2ke8w7pNEstzj1O8wwq6sNNzO3UDi5MA8Gny/gquCj7r2C6fHudg8tKRGyjRgmvNxQ==
+  dependencies:
+    buffer "^5.5.0"
+    inherits "^2.0.4"
+    readable-stream "^3.4.0"
+
+bl@^4.1:
+  version "4.1.0"
+  resolved "https://registry.yarnpkg.com/bl/-/bl-4.1.0.tgz#451535264182bec2fbbc83a62ab98cf11d9f7b3a"
+  integrity sha512-1W07cM9gS6DcLperZfFSj+bWLtaPGSOHWhPiGzXmvVJbRLdG82sH/Kn8EtW1VqWVA54AKf2h5k5BbnIbwF3h6w==
   dependencies:
     buffer "^5.5.0"
     inherits "^2.0.4"
