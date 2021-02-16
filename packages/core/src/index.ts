@@ -553,14 +553,14 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       await this.checkBalances()
       await this.tickChannelStrategy([])
       console.log(
-        this._libp2p.metrics.forPeer(
-          PeerId.createFromB58String(`16Uiu2HAm87R25XZ9CsqvF3KcKfz3BgzqbkqFkoHRBXM3QW3yCnjw`)
-        ).toJSON()
+        this._libp2p.metrics
+          .forPeer(PeerId.createFromB58String(`16Uiu2HAm87R25XZ9CsqvF3KcKfz3BgzqbkqFkoHRBXM3QW3yCnjw`))
+          .toJSON()
       )
       console.log(
-        this._libp2p.metrics.forPeer(
-          PeerId.createFromB58String(`16Uiu2HAmVCdjMZt9yuSFpcRPzWZRXJxjem4v1dRwdczUeBEUAYg6`)
-        ).toJSON()
+        this._libp2p.metrics
+          .forPeer(PeerId.createFromB58String(`16Uiu2HAmVCdjMZt9yuSFpcRPzWZRXJxjem4v1dRwdczUeBEUAYg6`))
+          .toJSON()
       )
     } catch (e) {
       log('error in periodic check', e)
