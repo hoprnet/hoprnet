@@ -8,13 +8,13 @@ export async function iterateHash(
   hashFunc: (preImage: Uint8Array) => Promise<Uint8Array>,
   iterations: number,
 ): Promise<Uint8Array[]> {
-  const intermediates: Uint8Array[] = [seed]
+  const result: Uint8Array[] = [seed]
   let intermediate = seed
   for (let i = 0; i < iterations; i++) {
     intermediate = await hashFunc(intermediate)
-    intermediates.push(intermediate)
+    result.push(intermediate)
   }
-  return intermediates
+  return result
 }
 
 export async function recoverIteratedHash(

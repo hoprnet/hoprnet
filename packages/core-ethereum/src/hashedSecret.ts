@@ -74,16 +74,16 @@ class HashedSecret {
     let onChainSecret = debug ? await this.getDebugAccountSecret() : new Hash(randomBytes(HASHED_SECRET_WIDTH))
 
     let dbBatch = this.db.batch()
-    const result = await iterateHash(onChainSecret, hashFunction, TOTAL_ITERATIONS, DB_ITERATION_BLOCK_SIZE)
+    const hashes = await iterateHash(onChainSecret, hashFunction, TOTAL_ITERATIONS)
 
-    for (const intermediate of result.intermediates) {
+    for (let i = 0; i < TOTAL_ITERATIONS; i += DB_ITERATION_BLOCK_SIZE) {
       dbBatch = dbBatch.put(
-        Buffer.from(OnChainSecretIntermediary(intermediate.iteration)),
-        Buffer.from(intermediate.source)
+        Buffer.from(OnChainSecretIntermediary(i)),
+        Buffer.from(hashes[i])
       )
     }
     await dbBatch.write()
-    return new Hash(result.hash)
+    return new Hash(hashes[hashes.length -1])
   }
 
   private async storeSecretOnChain(secret: Hash): Promise<void> {
@@ -149,19 +149,13 @@ class HashedSecret {
   }
 
   private async calcOnChainSecretFromDb(debug?: boolean): Promise<Hash | never> {
-    let result = await iterateHash(
-      debug == true ? await this.getDebugAccountSecret() : undefined,
+    const start = debug ? await this.getDebugAccountSecret() : this.offChainSecret
+    let hashes = await iterateHash(
+      start,
       hashFunction,
       TOTAL_ITERATIONS,
-      DB_ITERATION_BLOCK_SIZE,
-      (index) => getFromDB(this.db, OnChainSecretIntermediary(index))
     )
-
-    if (result == undefined) {
-      return await this.createAndStoreSecretOffChainAndReturnOnChainSecret(debug)
-    }
-
-    return new Hash(result.hash)
+    return new Hash(hashes[hashes.length - 1])
   }
 
   /**
