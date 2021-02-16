@@ -118,7 +118,7 @@ describe('test hashedSecret', function () {
 
       let preImage = await connector.hashedSecret.findPreImage(onChainHash)
 
-      assert(u8aEquals((await hashFunction(preImage.preImage)).slice(0, HASHED_SECRET_WIDTH), onChainHash))
+      assert(u8aEquals((await hashFunction(preImage.source)).slice(0, HASHED_SECRET_WIDTH), onChainHash))
 
       await connector.utils.waitForConfirmation(
         (
@@ -127,7 +127,7 @@ describe('test hashedSecret', function () {
               from: (await connector.account.address).toHex(),
               to: connector.hoprChannels.options.address
             },
-            connector.hoprChannels.methods.setHashedSecret(new Types.Hash(preImage.preImage).toHex())
+            connector.hoprChannels.methods.setHashedSecret(new Types.Hash(preImage.source).toHex())
           )
         ).send()
       )
@@ -141,10 +141,10 @@ describe('test hashedSecret', function () {
 
       let updatedPreImage = await connector.hashedSecret.findPreImage(updatedOnChainHash)
 
-      assert(!u8aEquals(preImage.preImage, updatedPreImage.preImage), `new and old pre-image must not be the same`)
+      assert(!u8aEquals(preImage.source, updatedPreImage.source), `new and old pre-image must not be the same`)
 
       assert(
-        u8aEquals((await hashFunction(updatedPreImage.preImage)).slice(0, HASHED_SECRET_WIDTH), updatedOnChainHash)
+        u8aEquals((await hashFunction(updatedPreImage.source)).slice(0, HASHED_SECRET_WIDTH), updatedOnChainHash)
       )
     })
 
@@ -202,7 +202,7 @@ describe('test hashedSecret', function () {
 
       let preImage = await connector.hashedSecret.findPreImage(onChainHash)
 
-      assert(u8aEquals((await hashFunction(preImage.preImage)).slice(0, HASHED_SECRET_WIDTH), onChainHash))
+      assert(u8aEquals((await hashFunction(preImage.source)).slice(0, HASHED_SECRET_WIDTH), onChainHash))
 
       await connector.utils.waitForConfirmation(
         (
@@ -211,7 +211,7 @@ describe('test hashedSecret', function () {
               from: (await connector.account.address).toHex(),
               to: connector.hoprChannels.options.address
             },
-            connector.hoprChannels.methods.setHashedSecret(new Types.Hash(preImage.preImage).toHex())
+            connector.hoprChannels.methods.setHashedSecret(new Types.Hash(preImage.source).toHex())
           )
         ).send()
       )
@@ -226,10 +226,10 @@ describe('test hashedSecret', function () {
 
       let updatedPreImage = await connector.hashedSecret.findPreImage(updatedOnChainHash)
 
-      assert(!u8aEquals(preImage.preImage, updatedPreImage.preImage), `new and old pre-image must not be the same`)
+      assert(!u8aEquals(preImage.source, updatedPreImage.source), `new and old pre-image must not be the same`)
 
       assert(
-        u8aEquals((await hashFunction(updatedPreImage.preImage)).slice(0, HASHED_SECRET_WIDTH), updatedOnChainHash)
+        u8aEquals((await hashFunction(updatedPreImage.source)).slice(0, HASHED_SECRET_WIDTH), updatedOnChainHash)
       )
     })
 

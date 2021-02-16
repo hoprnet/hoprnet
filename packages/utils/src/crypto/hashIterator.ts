@@ -1,9 +1,14 @@
 import { u8aEquals } from '../u8a'
 
-export interface Intermediate {
+export interface Item {
   iteration: number
-  preImage: Uint8Array
+  source: Uint8Array
 }
+
+/**
+ * Iteratively generate a chain of hashes of the previous value.
+ * This is returned as a map of hashes to 'blocks'
+ */
 export async function iterateHash(
   seed: Uint8Array | undefined,
   hashFunc: (preImage: Uint8Array) => Promise<Uint8Array> | Uint8Array,
@@ -12,12 +17,12 @@ export async function iterateHash(
   hint?: (index: number) => Uint8Array | undefined | Promise<Uint8Array | undefined>
 ): Promise<{
   hash: Uint8Array
-  intermediates: Intermediate[]
+  intermediates: Item[]
 }> {
-  const intermediates: Intermediate[] = []
-
+  const intermediates: Item[] = []
   let intermediate = seed
   let i = 0
+
   if (hint != undefined) {
     let closest = iterations - (iterations % stepSize)
 
@@ -40,7 +45,7 @@ export async function iterateHash(
     if (stepSize != undefined && i % stepSize == 0) {
       intermediates.push({
         iteration: i,
-        preImage: intermediate
+        source: intermediate
       })
     }
     intermediate = await hashFunc(intermediate)
@@ -59,7 +64,7 @@ export async function recoverIteratedHash(
   maxIterations: number,
   stepSize?: number,
   indexHint?: number
-): Promise<Intermediate | undefined> {
+): Promise<Item | undefined> {
   let closestIntermediate: number
   if (indexHint != undefined) {
     closestIntermediate = indexHint
@@ -86,7 +91,7 @@ export async function recoverIteratedHash(
 
       if (u8aEquals(_tmp, hashValue)) {
         return {
-          preImage: intermediate,
+          source: intermediate,
           iteration: closestIntermediate + i
         }
       }

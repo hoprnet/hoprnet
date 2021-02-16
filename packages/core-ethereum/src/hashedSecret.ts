@@ -2,7 +2,7 @@ import { Hash, AcknowledgedTicket } from './types'
 import Debug from 'debug'
 import { randomBytes } from 'crypto'
 import { u8aToHex, u8aConcat, iterateHash, recoverIteratedHash, u8aLessThanOrEqual } from '@hoprnet/hopr-utils'
-import type { Intermediate } from '@hoprnet/hopr-utils'
+import type { Item } from '@hoprnet/hopr-utils'
 import { stringToU8a, u8aIsEmpty } from '@hoprnet/hopr-utils'
 import { publicKeyConvert } from 'secp256k1'
 import { hash, waitForConfirmation } from './utils'
@@ -52,7 +52,7 @@ class HashedSecret {
   private initialized: boolean = false
   private onChainSecret: Hash
   private offChainSecret: Hash
-  private currentPreImage: Intermediate
+  private currentPreImage: Item 
 
   constructor(private db: LevelUp, private account: Account, private channels: HoprChannels) {}
 
@@ -81,7 +81,7 @@ class HashedSecret {
     for (const intermediate of result.intermediates) {
       dbBatch = dbBatch.put(
         Buffer.from(OnChainSecretIntermediary(intermediate.iteration)),
-        Buffer.from(intermediate.preImage)
+        Buffer.from(intermediate.source)
       )
     }
     await dbBatch.write()
@@ -171,7 +171,7 @@ class HashedSecret {
    * values from the database.
    * @param hash the hash to find a preImage for
    */
-  public async findPreImage(hash: Uint8Array): Promise<Intermediate> {
+  public async findPreImage(hash: Uint8Array): Promise<Item> { // TODO only public for test, make private
     if (hash.length != HASHED_SECRET_WIDTH) {
       throw Error(
         `Invalid length. Expected a Uint8Array with ${HASHED_SECRET_WIDTH} elements but got one with ${hash.length}`
@@ -222,12 +222,14 @@ class HashedSecret {
       this.onChainSecret = await this.createAndStoreSecretOffChainAndReturnOnChainSecret(debug)
       await this.storeSecretOnChain(this.onChainSecret)
     }
-    this.currentPreImage = await this.findPreImage(this.onChainSecret)
+    this.currentPreImage = await this.findPreImage(this.onChainSecret) //TODO
     this.initialized = true
   }
 
+  // When the secret changes on chain, we need to update
   public updateOnChainSecret(secret: Hash) {
     this.onChainSecret = secret
+    // TODO update db
   }
 
   public getOnChainSecret() {
@@ -244,8 +246,8 @@ class HashedSecret {
         s.ticket.winProb
       )
     ) {
-      ticket.preImage = new Hash(this.currentPreImage.preImage)
-      this.currentPreImage = await this.findPreImage(this.currentPreImage.preImage)
+      ticket.preImage = new Hash(this.currentPreImage.source)
+      this.currentPreImage = await this.findPreImage(this.currentPreImage.source)
       return true
     }
     return false
