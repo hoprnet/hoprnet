@@ -1,3 +1,11 @@
+<a name="0.2.21"></a>
+
+## [0.2.21](https://github.com/hoprnet/hopr-connect/compare/0.2.20...0.2.21) (2021-02-16)
+
+### Fixes
+
+- Fix STUN issues that prevent bootstap node from publishing public IPv4 addresses (#86)
+
 <a name="0.2.20"></a>
 
 ## [0.2.20](https://github.com/hoprnet/hopr-connect/compare/0.2.12...0.2.20) (2021-02-12)
