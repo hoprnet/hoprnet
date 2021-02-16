@@ -225,6 +225,10 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
           enabled: false
         }
       },
+      metrics: {
+        // @ts-ignore
+        enabled: true
+      },
       dialer: {
         // Temporary fix, see https://github.com/hoprnet/hopr-connect/issues/77
         addressSorter: (a) => a,
@@ -548,6 +552,16 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     try {
       await this.checkBalances()
       await this.tickChannelStrategy([])
+      console.log(
+        this._libp2p.metrics.forPeer(
+          PeerId.createFromB58String(`16Uiu2HAm87R25XZ9CsqvF3KcKfz3BgzqbkqFkoHRBXM3QW3yCnjw`)
+        ).toJSON()
+      )
+      console.log(
+        this._libp2p.metrics.forPeer(
+          PeerId.createFromB58String(`16Uiu2HAmVCdjMZt9yuSFpcRPzWZRXJxjem4v1dRwdczUeBEUAYg6`)
+        ).toJSON()
+      )
     } catch (e) {
       log('error in periodic check', e)
     }

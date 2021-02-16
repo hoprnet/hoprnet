@@ -7,6 +7,7 @@
   "scripts": {
     "setup": "lerna bootstrap",
     "build": "yarn util:build",
+    "build:core": "lerna exec --scope @hoprnet/hopr-core yarn build",
     "lint": "npx prettier --check .",
     "lint:fix": "npx prettier --write .",
     "test": "lerna run test --stream",
