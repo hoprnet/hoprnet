@@ -57,7 +57,7 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector> implements Abstr
   async handleMixedPacket(packet: Packet<Chain>) {
     const node = this.node
     const interact = this.interact.bind(this)
-    this.concurrencyLimiter(async function(){
+    this.concurrencyLimiter(async function () {
       // See discussion in #1256 - apparently packet.forwardTransform cannot be
       // called concurrently
       try {
