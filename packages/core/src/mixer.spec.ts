@@ -9,7 +9,6 @@ let fakePacket = () => {
   return (i++ as unknown) as Packet<any>
 }
 
-
 describe('test mixer ', async function () {
   let clock: any
 
@@ -17,18 +16,21 @@ describe('test mixer ', async function () {
     clock = sinon.useFakeTimers(Date.now())
   })
 
-  afterEach(() =>{
-    clock.restore();
+  afterEach(() => {
+    clock.restore()
   })
 
   it('should push and pop a single element', async function () {
     let calls = 0
     let lastCall = null
-    const m = new Mixer((p) => { calls ++; lastCall = p})
+    const m = new Mixer((p) => {
+      calls++
+      lastCall = p
+    })
     const p1 = fakePacket()
     assert.equal(calls, 0, 'empty mixer not delivered')
     m.push(p1)
-    assert.equal(calls,  0, 'empty mixer not delivered immediately')
+    assert.equal(calls, 0, 'empty mixer not delivered immediately')
     await clock.tickAsync(MAX_PACKET_DELAY + 1)
     assert.equal(calls, 1, 'packets pop after max delay')
     assert(p1 === lastCall)
@@ -37,7 +39,10 @@ describe('test mixer ', async function () {
   it('should push and pop multiple element', async function () {
     var calls = 0
     let lastCall = null
-    const m = new Mixer((p) => { calls ++; lastCall = p})
+    const m = new Mixer((p) => {
+      calls++
+      lastCall = p
+    })
     const p1 = fakePacket()
     const p2 = fakePacket()
     const p3 = fakePacket()
@@ -50,16 +55,19 @@ describe('test mixer ', async function () {
     assert(calls === 0, 'empty mixer not delivered immediately')
     await clock.tickAsync(MAX_PACKET_DELAY + 1)
     m.push(p4)
-    assert.equal(calls,  3, 'packets pop after max delay')
+    assert.equal(calls, 3, 'packets pop after max delay')
     await clock.tickAsync(MAX_PACKET_DELAY + 1)
-    assert.equal(calls,  4, 'final packet poppable')
+    assert.equal(calls, 4, 'final packet poppable')
     assert(lastCall === p4, 'final packet is p4')
   })
 
   it('probabilistic test, packet ordering', async function () {
     var calls = 0
     let out: any[] = []
-    const m = new Mixer((p) => { calls = calls + 1; out.push(p)})
+    const m = new Mixer((p) => {
+      calls = calls + 1
+      out.push(p)
+    })
     for (let x = 0; x < 1000; x++) {
       m.push(fakePacket())
     }
