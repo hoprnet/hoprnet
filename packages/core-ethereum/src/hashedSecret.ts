@@ -31,7 +31,6 @@ async function isWinningTicket(ticketHash: Hash, challengeResponse: Hash, preIma
   return u8aLessThanOrEqual(await hash(u8aConcat(ticketHash, preImage, challengeResponse)), winProb)
 }
 
-
 export async function hashFunction(msg: Uint8Array): Promise<Uint8Array> {
   return (await hash(msg)).slice(0, HASHED_SECRET_WIDTH)
 }

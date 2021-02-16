@@ -310,11 +310,8 @@ describe('test hashedSecret', function () {
           response: new Types.Hash(randomBytes(Types.Hash.SIZE))
         })
 
-
         if (!u8aEquals(ticket.preImage, EMPTY_HASHED_SECRET)) {
-          assert(
-            await connector.hashedSecret.validateTicket(ticket)
-          )
+          assert(await connector.hashedSecret.validateTicket(ticket))
         }
       }
     })
