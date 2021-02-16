@@ -16,7 +16,7 @@ import * as stun from 'webrtc-stun'
 
 import { networkInterfaces } from 'os'
 
-describe('transport/listener.spec check listening to sockets', function () {
+describe('check listening to sockets', function () {
   this.timeout(5000)
   async function startStunServer(port: number, state: { msgReceived: DeferredPromise<void> }): Promise<Socket> {
     const promises: Promise<void>[] = []
@@ -194,7 +194,7 @@ describe('transport/listener.spec check listening to sockets', function () {
     await listener.close()
   })
 
-  it('should do a STUN request', async function () {
+  it('should perform a STUN request', async function () {
     const defer = Defer<void>()
     const listener = new Listener(
       (conn: Connection) => {
@@ -236,14 +236,14 @@ describe('transport/listener.spec check listening to sockets', function () {
 
     const addrs = listener.getAddrs()
 
-    const cOpts = addrs[1].toOptions()
+    const localAddress = addrs.find((ma: Multiaddr) => ma.toString().match(/127.0.0.1/))
 
-    socket.send(req.toBuffer(), cOpts.port, `localhost`)
+    assert(localAddress != null, `Listener must be available on localhost`)
 
-    await new Promise((resolve) => setTimeout(resolve, 100))
-
-    await listener.close()
+    socket.send(req.toBuffer(), localAddress.toOptions().port, `localhost`)
 
     await defer.promise
+
+    await listener.close()
   })
 })
