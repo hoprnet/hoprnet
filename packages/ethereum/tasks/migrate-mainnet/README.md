@@ -2,6 +2,19 @@
 
 A step by step guide on how to deploy [HoprToken](../contracts/HoprToken.sol) and [HoprDistributor](../contracts/HoprDistributor.sol) on mainnet and then afterwards transferring all admin roles to a multisig.
 
+## High-level transactions
+
+deployer = private key within `.env`
+
+1. deploy `HoprToken` using `deployer`
+2. deploy `HoprDistributor` using `deployer`
+3. addSchedule using `HoprDistributor` called `testnet`
+4. addAllocations using `HoprDistributor` called `testnet`
+5. grantMinterRole using `HoprToken` to `HoprDistributor`
+6. grantAdminRole using `HoprToken` to `multisig`
+7. renounceAdmin of `deployer` using `HoprToken`
+8. transferOwner of `HoprDistributor` to `multisig`
+
 ## Setting up repository
 
 Install & Setup our monorepo, in project root directory, run the following commands in this order:
