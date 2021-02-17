@@ -74,7 +74,8 @@ export class ProbabilisticPayments {
     let onChainSecret = debug ? await this.getDebugAccountSecret() : new Hash(randomBytes(HASHED_SECRET_WIDTH))
     let dbBatch = this.db.batch()
     const hashes = await iterateHash(onChainSecret, hashFunction, TOTAL_ITERATIONS)
-    for (let i = 0; i < TOTAL_ITERATIONS; i += DB_ITERATION_BLOCK_SIZE) {
+    for (let i = 0; i <= TOTAL_ITERATIONS; i += DB_ITERATION_BLOCK_SIZE) {
+      log('storing intermediate', i)
       dbBatch = dbBatch.put(Buffer.from(OnChainSecretIntermediary(i)), Buffer.from(hashes[i]))
     }
     await dbBatch.write()
@@ -174,7 +175,7 @@ export class ProbabilisticPayments {
   private async findOnChainSecret() {
     const res = await this.channels.methods.accounts((await this.account.address).toHex()).call()
     const hashedSecret = stringToU8a(res.hashedSecret)
-    if (u8aIsEmpty(hashedSecret, HASHED_SECRET_WIDTH)) {
+    if (u8aIsEmpty(hashedSecret)) {
       return undefined
     }
     return new Hash(hashedSecret)
@@ -184,7 +185,7 @@ export class ProbabilisticPayments {
     if (this.initialized) return
     this.offChainSecret = await getFromDB(this.db, OnChainSecret())
     this.onChainSecret = await this.findOnChainSecret()
-    if (this.onChainSecret != undefined && this.offChainSecret != undefined) {
+    if (this.onChainSecret && this.offChainSecret) {
       try {
         await this.findPreImage(this.onChainSecret) // throws if not found
         this.initialized = true
@@ -201,6 +202,7 @@ export class ProbabilisticPayments {
       log('reinitializing')
       this.onChainSecret = await this.createAndStoreSecretOffChainAndReturnOnChainSecret(debug)
       await this.storeSecretOnChain(this.onChainSecret)
+      this.offChainSecret = await getFromDB(this.db, OnChainSecret())
     }
     this.currentPreImage = await this.findPreImage(this.onChainSecret) //TODO
     this.initialized = true

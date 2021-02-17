@@ -25,14 +25,10 @@ export async function recoverIteratedHash(
   stepSize: number
 ): Promise<Uint8Array> {
   let intermediate: Uint8Array
-  for (
-    let closestIntermediate = maxIterations - (maxIterations % stepSize);
-    closestIntermediate >= 0;
-    closestIntermediate -= stepSize
-  ) {
-    intermediate = await lookup(closestIntermediate)
+  for (let i = maxIterations - (maxIterations % stepSize); i >= 0; i -= stepSize) {
+    intermediate = await lookup(i)
     if (!intermediate) {
-      throw new Error('Couldnt find intermediate: ' + closestIntermediate)
+      throw new Error('Couldnt find intermediate: ' + i)
     }
     try {
       return await reverseHash(hashValue, hashFunc, intermediate, stepSize)

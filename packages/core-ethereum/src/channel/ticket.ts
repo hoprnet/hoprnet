@@ -1,14 +1,12 @@
 import type IChannel from '.'
-import { u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
+import { u8aIsEmpty, u8aToHex } from '@hoprnet/hopr-utils'
 import { Hash, TicketEpoch, Balance, SignedTicket, Ticket, AcknowledgedTicket } from '../types'
 import { pubKeyToAccountId, computeWinningProbability, checkChallenge, stateCounterToIteration } from '../utils'
 import type HoprEthereum from '..'
-import { HASHED_SECRET_WIDTH } from '../hashedSecret'
 import debug from 'debug'
 const log = debug('hopr-core-ethereum:ticket')
 
 const DEFAULT_WIN_PROB = 1
-const EMPTY_PRE_IMAGE = new Uint8Array(HASHED_SECRET_WIDTH).fill(0x00)
 
 class TicketStatic {
   private readonly INVALID_MESSAGES = {
@@ -46,8 +44,7 @@ class TicketStatic {
       const { hoprChannels, account, utils } = this.coreConnector
       const { r, s, v } = utils.getSignatureParameters(signedTicket.signature)
 
-      const hasPreImage = !u8aEquals(ackTicket.preImage, EMPTY_PRE_IMAGE)
-      if (!hasPreImage) {
+      if (u8aIsEmpty(ackTicket.preImage)) {
         log(`Failed to submit ticket ${u8aToHex(ticketChallenge)}: ${this.INVALID_MESSAGES.NO_PRE_IMAGE}`)
         return {
           status: 'FAILURE',

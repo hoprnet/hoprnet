@@ -57,25 +57,20 @@ describe('test Account class', function () {
   describe('ticketEpoch', function () {
     it('should be 1 initially', async function () {
       const ticketEpoch = await coreConnector.account.ticketEpoch
-
       assert.equal(ticketEpoch.toString(), '1', 'initial ticketEpoch is wrong')
     })
 
     it('should be 2 after setting new secret', async function () {
       const ticketEpoch = await coreConnector.account.ticketEpoch
-
       assert.equal(ticketEpoch.toString(), '2', 'ticketEpoch is wrong')
     })
 
     it('should be 3 after reconnecting to web3', async function () {
       this.timeout(durations.seconds(10))
       await disconnectWeb3(coreConnector.web3)
-
       // wait for reconnection
       await wait(durations.seconds(2))
-
       const ticketEpoch = await coreConnector.account.ticketEpoch
-
       assert.equal(ticketEpoch.toString(), '3', 'ticketEpoch is wrong')
     })
   })

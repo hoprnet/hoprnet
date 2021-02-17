@@ -31,13 +31,10 @@ describe('test Channel class', function () {
   let counterpartysCoreConnector: CoreConnector
   let funder: Await<ReturnType<typeof getPrivKeyData>>
 
-  async function getTicketData({
-    counterparty,
-    winProb = DEFAULT_WIN_PROB
-  }: {
-    counterparty: AccountId
-    winProb?: number
-  }) {
+  async function getTicketData(
+    counterparty: AccountId,
+    winProb: number = DEFAULT_WIN_PROB
+  ) {
     const secretA = randomBytes(32)
     const secretB = randomBytes(32)
     const challenge = await createChallenge(secretA, secretB)
@@ -136,9 +133,7 @@ describe('test Channel class', function () {
       counterpartysCoreConnector.account.keys.onChain.pubKey
     )
 
-    const firstTicket = await getTicketData({
-      counterparty: myAddress
-    })
+    const firstTicket = await getTicketData(myAddress)
     const firstAckedTicket = new AcknowledgedTicket(coreConnector, undefined, {
       response: firstTicket.response
     })
@@ -189,6 +184,7 @@ describe('test Channel class', function () {
     assert(await counterpartysChannel.ticket.verify(signedTicket), `Ticket signature must be valid.`)
 
     const hashedSecretBefore = await counterpartysChannel.coreConnector.probabilisticPayments.getOnChainSecret()
+    console.log('>>>>', hashedSecretBefore)
 
     try {
       const result = await counterpartysCoreConnector.channel.tickets.submit(firstAckedTicket, new Uint8Array())
@@ -223,10 +219,7 @@ describe('test Channel class', function () {
     let nextSignedTicket: SignedTicket
 
     for (let i = 0; i < ATTEMPTS; i++) {
-      ticketData = await getTicketData({
-        counterparty: counterpartyAddress,
-        winProb: 0.5
-      })
+      ticketData = await getTicketData(counterpartyAddress, 0.5)
       let ackedTicket = new AcknowledgedTicket(counterpartysCoreConnector, undefined, {
         response: ticketData.response
       })
