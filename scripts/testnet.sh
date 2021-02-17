@@ -6,6 +6,8 @@ if [ -z "$GCLOUD_INCLUDED" ]; then
   source scripts/dns.sh
 fi
 
+source scripts/utils.sh
+
 MIN_FUNDS=0.01291
 HOPRD_ARGS="--data='/app/db/ethereum/testnet/bootstrap' --password='$BS_PASSWORD'"
 ZONE="--zone=europe-west6-a"
@@ -138,8 +140,9 @@ start_bootstrap() {
   local release=$(echo $2 | cut -f2 -d:)
   echo "- Bootstrap Release: $release"
   echo "- Bootstrap Multiaddr value: $multiaddr"
-  local txt_record=$(gcloud_txt_record $release bootstrap $multiaddr)
-  echo "- DNS entry: $(gcloud_dns_entry $release bootstrap)"
+  local clean_release=$(get_version_maj_min_pat $release)
+  local txt_record=$(gcloud_txt_record $clean_release bootstrap $multiaddr)
+  echo "- DNS entry: $(gcloud_dns_entry $clean_release bootstrap)"
   echo "- TXT record: $txt_record"
 }
 
