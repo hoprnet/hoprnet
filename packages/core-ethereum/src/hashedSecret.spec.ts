@@ -3,7 +3,7 @@ import type HoprEthereum from '.'
 import * as DbKeys from './dbKeys'
 import * as Utils from './utils'
 import * as Types from './types'
-import { ProbabilisticPayments,  HASHED_SECRET_WIDTH } from './hashedSecret'
+import { ProbabilisticPayments, HASHED_SECRET_WIDTH } from './hashedSecret'
 import { u8aEquals, durations, stringToU8a } from '@hoprnet/hopr-utils'
 import Memdown from 'memdown'
 import LevelUp from 'levelup'
@@ -273,7 +273,10 @@ describe('test probabilisticPayments', function () {
         response: new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff))
       })
 
-      assert(!(await connector.probabilisticPayments.validateTicket(notWinnigTicket)), 'falsy ticket should not be a win')
+      assert(
+        !(await connector.probabilisticPayments.validateTicket(notWinnigTicket)),
+        'falsy ticket should not be a win'
+      )
 
       assert(
         await connector.probabilisticPayments.validateTicket(firstTicket),

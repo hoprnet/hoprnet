@@ -228,4 +228,3 @@ export class ProbabilisticPayments {
     return false
   }
 }
-

@@ -34,7 +34,7 @@ export default class HoprEthereum implements HoprCoreConnector {
   public types: types
   public indexer: Indexer
   public account: Account
-  public probabilisticPayments: ProbabilisticPayments 
+  public probabilisticPayments: ProbabilisticPayments
 
   constructor(
     public db: LevelUp,
