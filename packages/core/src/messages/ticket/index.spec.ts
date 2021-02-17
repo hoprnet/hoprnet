@@ -89,8 +89,7 @@ describe(`check serialization and deserialization of ticket objects`, function (
     const acknowledgedDbEntry = node.paymentChannels.types.AcknowledgedTicket.create(node.paymentChannels, undefined, {
       signedTicket,
       response: await node.paymentChannels.utils.hash(u8aConcat(secretA, secretB)),
-      preImage: randomBytes(27),
-      redeemed: false
+      preImage: randomBytes(27)
     })
 
     const FIRST_TICKET = 1

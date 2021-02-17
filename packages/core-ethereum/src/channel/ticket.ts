@@ -87,7 +87,7 @@ class TicketStatic {
       )
 
       await transaction.send()
-      ackTicket.redeemed = true
+      //ackTicket.redeemed = true
 
       log('Successfully submitted ticket', u8aToHex(ticketChallenge))
       return {

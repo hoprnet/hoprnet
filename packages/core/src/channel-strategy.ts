@@ -37,7 +37,8 @@ export interface ChannelStrategy {
     networkPeers: NetworkPeers,
     indexer: Indexer
   ): Promise<[ChannelsToOpen[], ChannelsToClose[]]>
-  // TBD: Include ChannelsToClose as well.
+
+  shouldRedeemOnChannelClosure(peerId: PeerId): boolean
 }
 
 const logChannels = (c: ChannelsToOpen[]): string => c.map((x) => x[0].toB58String() + ':' + x[1].toString()).join(', ')
@@ -56,6 +57,10 @@ export class PassiveStrategy implements ChannelStrategy {
     _indexer: Indexer
   ): Promise<[ChannelsToOpen[], ChannelsToClose[]]> {
     return [[], []]
+  }
+
+  shouldRedeemOnChannelClosure(): boolean {
+    return false
   }
 }
 
@@ -116,5 +121,12 @@ export class PromiscuousStrategy implements ChannelStrategy {
     }
     log('Promiscuous toOpen: ', logChannels(toOpen))
     return [toOpen, toClose]
+  }
+
+  shouldRedeemOnChannelClosure(): boolean {
+    // NB: This is incredible naive and will lose money on gas, but it's
+    // the right behaviour for this stage of testnet.
+    // Later we will implement a smarter, sane, default.
+    return true
   }
 }

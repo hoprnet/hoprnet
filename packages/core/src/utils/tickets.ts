@@ -151,19 +151,6 @@ export async function deleteAcknowledgedTickets(
 }
 
 /**
- * Update acknowledged ticket in database
- * @param ackTicket Uint8Array
- * @param index Uint8Array
- */
-export async function updateAcknowledgedTicket(
-  node: Hopr<Chain>,
-  ackTicket: Types.AcknowledgedTicket,
-  index: Uint8Array
-): Promise<void> {
-  await node.db.put(Buffer.from(node._dbKeys.AcknowledgedTickets(index)), Buffer.from(ackTicket))
-}
-
-/**
  * Delete acknowledged ticket in database
  * @param index Uint8Array
  */
@@ -172,28 +159,21 @@ export async function deleteAcknowledgedTicket(node: Hopr<Chain>, index: Uint8Ar
 }
 
 /**
- * Submit acknowledged ticket and update database
+ * Redeem acknowledged ticket and update database
  * @param ackTicket Uint8Array
  * @param index Uint8Array
  */
-export async function submitAcknowledgedTicket(
+export async function redeemTicket(
   node: Hopr<Chain>,
   ackTicket: Types.AcknowledgedTicket,
   index: Uint8Array
 ): Promise<OperationStatus> {
   try {
     const result = await node.paymentChannels.channel.tickets.submit(ackTicket, index)
-
+    await deleteAcknowledgedTicket(node, index)
     if (result.status === 'SUCCESS') {
-      ackTicket.redeemed = true
-      await updateAcknowledgedTicket(node, ackTicket, index)
-    } else if (result.status === 'FAILURE') {
-      await deleteAcknowledgedTicket(node, index)
-    } else if (result.status === 'ERROR') {
-      await deleteAcknowledgedTicket(node, index)
-      // @TODO: better handle this
+      // TODO Store stats.
     }
-
     return result
   } catch (err) {
     return {
