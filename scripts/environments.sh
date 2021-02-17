@@ -3,7 +3,7 @@
 source scripts/utils.sh
 
 # These will be cleaned up and machines stopped
-OLD_RELEASES='zurich zug luzern larnaca queretaro basodino saentis debug-dbg nightly'
+OLD_RELEASES='zurich zug luzern larnaca queretaro basodino saentis debug-dbg nightly internal'
 
 # ===== Load env variables for the current github ref =====
 # Takes:
