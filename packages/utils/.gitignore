@@ -1,5 +1,5 @@
 # Exclude node.js stuff
-**/node_modules
+node_modules
 
 # Exclude yarn stuff
 .packages-cache
@@ -8,7 +8,7 @@ yarn-error.log
 # Exclude OSX files
 **/.DS_Store
 
-# Exclude built files
+# Exclude built Typescript files
 lib
 
 # Exclude built npm packages

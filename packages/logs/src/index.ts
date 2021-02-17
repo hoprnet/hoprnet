@@ -2,6 +2,6 @@
  * Logs debug data
  * @param data debug data in JSON
  */
-export function log(data: JSON) {
-  console.log(JSON.stringify(data))
+export function logDebugData(data: Object) {
+  console.log(JSON.stringify(data, undefined, 2).replace(/\"/g, ``))
 }

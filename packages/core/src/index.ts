@@ -49,6 +49,8 @@ import { Mixer } from './mixer'
 
 import Debug from 'debug'
 import { Address } from 'libp2p/src/peer-store'
+import { Logger } from './logger'
+
 const log = Debug(`hopr-core`)
 const logError = Debug(`hopr-core:error`)
 const verbose = Debug('hopr-core:verbose')
@@ -115,6 +117,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
   private strategy: ChannelStrategy
   private networkPeers: NetworkPeers
   private heartbeat: Heartbeat
+  private logger: Logger
 
   /**
    * @constructor
@@ -175,6 +178,8 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       this._libp2p.hangUp.bind(this._libp2p)
     )
 
+    this.logger = new Logger(this._libp2p.metrics)
+
     if (options.ticketAmount) this.ticketAmount = options.ticketAmount
     if (options.ticketWinProb) this.ticketWinProb = options.ticketWinProb
 
@@ -185,9 +190,8 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
   }
 
   /**
-   * Creates a new node
-   * This is necessary as some of the constructor for the node needs to be
-   * asynchronous..
+   * Creates a new node, fetches the keys from the database and
+   * initializes the blockchain connector module.
    *
    * @param options the parameters
    */
@@ -384,6 +388,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     this._libp2p.multiaddrs.forEach((ma: Multiaddr) => log(ma.toString()))
     this.running = true
     this.periodicCheck()
+    this.logger.start()
     return this
   }
 
@@ -394,11 +399,22 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     if (!this.running) {
       return Promise.resolve()
     }
+
     clearTimeout(this.checkTimeout)
     this.running = false
-    await Promise.all([this.heartbeat.stop(), this.paymentChannels.stop()])
+    await Promise.all([
+      // prettier-ignore
+      this.heartbeat.stop(),
+      this.paymentChannels.stop()
+    ])
 
-    await Promise.all([this.db?.close().then(() => log(`Database closed.`)), this._libp2p.stop()])
+    this.logger.stop()
+
+    await Promise.all([
+      // prettier-ignore
+      this.db?.close().then(() => log(`Database closed.`)),
+      this._libp2p.stop()
+    ])
 
     // Give the operating system some extra time to close the sockets
     await new Promise((resolve) => setTimeout(resolve, 100))
@@ -572,33 +588,6 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     try {
       await this.checkBalances()
       await this.tickChannelStrategy([])
-
-      const connReport = {}
-      this._libp2p.metrics.peers.forEach((peer) => {
-        console.log(peer)
-        Object.assign(connReport, {
-          [peer]: this._libp2p.metrics.forPeer(PeerId.createFromB58String(peer)).movingAverages
-        })
-      })
-      console.log(connReport)
-      // console.log(this._libp2p.metrics.peers)
-      // console.log(
-      //   this._libp2p.metrics.peers.map(
-      //     (peer) =>
-      //       `${peer} ${JSON.stringify(this._libp2p.metrics.forPeer(PeerId.createFromB58String(peer)).movingAverages)}`
-      //   )
-      // )
-
-      // console.log(
-      //   this._libp2p.metrics
-      //     .forPeer(PeerId.createFromB58String(`16Uiu2HAm87R25XZ9CsqvF3KcKfz3BgzqbkqFkoHRBXM3QW3yCnjw`))
-      //     .toJSON()
-      // )
-      // console.log(
-      //   this._libp2p.metrics
-      //     .forPeer(PeerId.createFromB58String(`16Uiu2HAmVCdjMZt9yuSFpcRPzWZRXJxjem4v1dRwdczUeBEUAYg6`))
-      //     .toJSON()
-      // )
     } catch (e) {
       log('error in periodic check', e)
     }
