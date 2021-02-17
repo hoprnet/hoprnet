@@ -1,6 +1,6 @@
 {
-  "name": "@hoprnet/hopr-utils",
-  "description": "HOPR-based utilities to process multiple data structures",
+  "name": "@hoprnet/hopr-logs",
+  "description": "Logging debug data",
   "version": "1.69.0-next.29",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -9,8 +9,6 @@
   "main": "lib/index.js",
   "scripts": {
     "clean": "rimraf ./lib",
-    "test": "mocha --parallel",
-    "dev": "yarn clean && tsc -w",
     "build": "yarn clean && tsc -p .",
     "prepublishOnly": "yarn build"
   },
@@ -24,23 +22,8 @@
     "!*.spec.js",
     "!*.spec.js.map"
   ],
-  "dependencies": {
-    "abort-controller": "~3.0.0",
-    "bignumber.js": "^9.0.0",
-    "libp2p-crypto": "0.19.0",
-    "multiaddr": "8.1.2",
-    "multihashes": "~3.1.0",
-    "peer-id": "0.14.3",
-    "strip-ansi": "^6.0.0"
-  },
   "devDependencies": {
-    "@types/mocha": "^8.2.0",
-    "@types/node": "14",
-    "mocha": "^8.2.0",
-    "rewiremock": "^3.14.3",
-    "rimraf": "^3.0.2",
-    "ts-node": "^9.0.0",
-    "typescript": "^4.1"
+    "@types/node": "14"
   },
   "mocha": {
     "extension": [
