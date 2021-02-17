@@ -27,4 +27,3 @@ export function u8aCompare(a: Uint8Array, b: Uint8Array): number {
 export function u8aLessThanOrEqual(a: Uint8Array, b: Uint8Array): boolean {
   return [A_STRICLY_LESS_THAN_B, A_EQUALS_B].includes(u8aCompare(a, b))
 }
-
