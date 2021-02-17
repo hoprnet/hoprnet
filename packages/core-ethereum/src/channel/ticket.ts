@@ -88,6 +88,7 @@ class TicketStatic {
 
       await transaction.send()
       //ackTicket.redeemed = true
+      this.coreConnector.probabilisticPayments.updateOnChainSecret(ackTicket.preImage) // redemption contract updates on chain
 
       log('Successfully submitted ticket', u8aToHex(ticketChallenge))
       return {
