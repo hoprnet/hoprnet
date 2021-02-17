@@ -15,7 +15,7 @@ import * as utils from './utils'
 import * as constants from './constants'
 import * as config from './config'
 import Account from './account'
-import HashedSecret from './hashedSecret'
+import { ProbabilisticPayments } from './hashedSecret'
 import debug from 'debug'
 
 const HoprChannelsAbi = abis.HoprChannels
@@ -34,7 +34,7 @@ export default class HoprEthereum implements HoprCoreConnector {
   public types: types
   public indexer: Indexer
   public account: Account
-  public hashedSecret: HashedSecret
+  public probabilisticPayments: ProbabilisticPayments 
 
   constructor(
     public db: LevelUp,
@@ -53,7 +53,7 @@ export default class HoprEthereum implements HoprCoreConnector {
     this.types = new types()
     this.channel = new ChannelFactory(this)
     this._debug = debug
-    this.hashedSecret = new HashedSecret(this.db, this.account, this.hoprChannels)
+    this.probabilisticPayments = new ProbabilisticPayments(this.db, this.account, this.hoprChannels)
   }
 
   readonly dbKeys = dbkeys
@@ -127,7 +127,7 @@ export default class HoprEthereum implements HoprCoreConnector {
    * Initializes the on-chain values of our account.
    */
   public async initOnchainValues(): Promise<void> {
-    await this.hashedSecret.initialize(this._debug) // no-op if already initialized
+    await this.probabilisticPayments.initialize(this._debug) // no-op if already initialized
   }
 
   /**
@@ -277,7 +277,7 @@ export default class HoprEthereum implements HoprCoreConnector {
   }
 
   async validateTicket(ticket: AcknowledgedTicket): Promise<boolean> {
-    return this.hashedSecret.validateTicket(ticket)
+    return this.probabilisticPayments.validateTicket(ticket)
   }
 }
 

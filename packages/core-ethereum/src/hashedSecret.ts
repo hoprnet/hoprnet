@@ -46,7 +46,7 @@ async function getFromDB<T>(db: LevelUp, key): Promise<T | undefined> {
   }
 }
 
-class HashedSecret {
+export class ProbabilisticPayments {
   private initialized: boolean = false
   private onChainSecret: Hash
   private offChainSecret: Hash
@@ -227,4 +227,3 @@ class HashedSecret {
   }
 }
 
-export default HashedSecret

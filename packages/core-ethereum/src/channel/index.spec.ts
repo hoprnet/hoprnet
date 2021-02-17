@@ -188,7 +188,7 @@ describe('test Channel class', function () {
 
     assert(await counterpartysChannel.ticket.verify(signedTicket), `Ticket signature must be valid.`)
 
-    const hashedSecretBefore = await counterpartysChannel.coreConnector.hashedSecret.getOnChainSecret()
+    const hashedSecretBefore = await counterpartysChannel.coreConnector.probabilisticPayments.getOnChainSecret()
 
     try {
       const result = await counterpartysCoreConnector.channel.tickets.submit(firstAckedTicket, new Uint8Array())
@@ -201,7 +201,7 @@ describe('test Channel class', function () {
       throw error
     }
 
-    const hashedSecretAfter = await counterpartysChannel.coreConnector.hashedSecret.getOnChainSecret()
+    const hashedSecretAfter = await counterpartysChannel.coreConnector.probabilisticPayments.getOnChainSecret()
 
     assert(!hashedSecretBefore.eq(hashedSecretAfter), 'Ticket redemption must alter on-chain secret.')
 

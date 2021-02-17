@@ -246,7 +246,7 @@ class Account {
             log('new ticketEpoch', event.returnValues.counter)
 
             this._ticketEpoch = new TicketEpoch(event.returnValues.counter)
-            this.coreConnector.hashedSecret.updateOnChainSecret(
+            this.coreConnector.probabilisticPayments.updateOnChainSecret(
               new Hash(stringToU8a(event.returnValues.secretHash), Hash.SIZE)
             )
           })

@@ -3,7 +3,7 @@ import type HoprEthereum from '.'
 import * as DbKeys from './dbKeys'
 import * as Utils from './utils'
 import * as Types from './types'
-import PreImage, { HASHED_SECRET_WIDTH } from './hashedSecret'
+import { ProbabilisticPayments,  HASHED_SECRET_WIDTH } from './hashedSecret'
 import { u8aEquals, durations, stringToU8a } from '@hoprnet/hopr-utils'
 import Memdown from 'memdown'
 import LevelUp from 'levelup'
@@ -23,7 +23,7 @@ const HoprChannelsAbi = abis.HoprChannels
 const EMPTY_HASHED_SECRET = new Uint8Array(HASHED_SECRET_WIDTH).fill(0x00)
 const FUND_ARGS = `--address ${addresses?.localhost?.HoprToken} --accounts-to-fund 1`
 
-describe('test hashedSecret', function () {
+describe('test probabilisticPayments', function () {
   this.timeout(durations.minutes(10))
   const ganache = new Ganache()
   let connector: HoprEthereum
@@ -53,7 +53,7 @@ describe('test hashedSecret', function () {
       chainId
     )
 
-    connector.hashedSecret = new PreImage(connector.db, connector.account, connector.hoprChannels)
+    connector.probabilisticPayments = new ProbabilisticPayments(connector.db, connector.account, connector.hoprChannels)
 
     connector.stop = async () => {
       await connector.account.stop()
@@ -72,7 +72,7 @@ describe('test hashedSecret', function () {
   //   let result,
   //     errThrown = false
   //   try {
-  //     result = await connector.hashedSecret.findPreImage(hash)
+  //     result = await connector.probabilisticPayments.findPreImage(hash)
   //   } catch (err) {
   //     errThrown = true
   //   }
@@ -108,7 +108,7 @@ describe('test hashedSecret', function () {
     })
 
     it('should publish a hashed secret', async function () {
-      await connector.hashedSecret.initialize()
+      await connector.probabilisticPayments.initialize()
 
       let onChainHash = new Types.Hash(
         stringToU8a(
@@ -116,7 +116,7 @@ describe('test hashedSecret', function () {
         )
       )
 
-      let preImage = await connector.hashedSecret.findPreImage(onChainHash)
+      let preImage = await connector.probabilisticPayments.findPreImage(onChainHash)
 
       assert(u8aEquals((await hashFunction(preImage)).slice(0, HASHED_SECRET_WIDTH), onChainHash))
 
@@ -139,7 +139,7 @@ describe('test hashedSecret', function () {
 
       assert(!u8aEquals(onChainHash, updatedOnChainHash), `new and old onChainSecret must not be the same`)
 
-      let updatedPreImage = await connector.hashedSecret.findPreImage(updatedOnChainHash)
+      let updatedPreImage = await connector.probabilisticPayments.findPreImage(updatedOnChainHash)
 
       assert(!u8aEquals(preImage, updatedPreImage), `new and old pre-image must not be the same`)
 
@@ -149,7 +149,7 @@ describe('test hashedSecret', function () {
     // // Commented due expensive operations
     // it('should generate a hashed secret and recover a pre-Image', async function () {
     //   this.timeout(durations.seconds(22))
-    //   await connector.hashedSecret.initialize()
+    //   await connector.probabilisticPayments.initialize()
 
     //   for (let i = 0; i < TOTAL_ITERATIONS / DB_ITERATION_BLOCK_SIZE; i++) {
     //     assert(
@@ -190,7 +190,7 @@ describe('test hashedSecret', function () {
     })
 
     it('should publish a hashed secret', async function () {
-      await connector.hashedSecret.initialize()
+      await connector.probabilisticPayments.initialize()
 
       let onChainHash = new Types.Hash(
         stringToU8a(
@@ -198,7 +198,7 @@ describe('test hashedSecret', function () {
         )
       )
 
-      let preImage = await connector.hashedSecret.findPreImage(onChainHash)
+      let preImage = await connector.probabilisticPayments.findPreImage(onChainHash)
 
       assert(u8aEquals((await hashFunction(preImage)).slice(0, HASHED_SECRET_WIDTH), onChainHash))
 
@@ -222,7 +222,7 @@ describe('test hashedSecret', function () {
 
       assert(!u8aEquals(onChainHash, updatedOnChainHash), `new and old onChainSecret must not be the same`)
 
-      let updatedPreImage = await connector.hashedSecret.findPreImage(updatedOnChainHash)
+      let updatedPreImage = await connector.probabilisticPayments.findPreImage(updatedOnChainHash)
 
       assert(!u8aEquals(preImage, updatedPreImage), `new and old pre-image must not be the same`)
 
@@ -241,7 +241,7 @@ describe('test hashedSecret', function () {
       })
 
       assert(
-        await connector.hashedSecret.validateTicket(firstTicket),
+        await connector.probabilisticPayments.validateTicket(firstTicket),
         'ticket with 100% winning probability must always be a win'
       )
 
@@ -249,7 +249,7 @@ describe('test hashedSecret', function () {
       firstPreImage.set(firstTicket.preImage)
 
       assert(
-        await connector.hashedSecret.validateTicket(firstTicket),
+        await connector.probabilisticPayments.validateTicket(firstTicket),
         'ticket with 100% winning probability must always be a win'
       )
 
@@ -273,10 +273,10 @@ describe('test hashedSecret', function () {
         response: new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff))
       })
 
-      assert(!(await connector.hashedSecret.validateTicket(notWinnigTicket)), 'falsy ticket should not be a win')
+      assert(!(await connector.probabilisticPayments.validateTicket(notWinnigTicket)), 'falsy ticket should not be a win')
 
       assert(
-        await connector.hashedSecret.validateTicket(firstTicket),
+        await connector.probabilisticPayments.validateTicket(firstTicket),
         'ticket with 100% winning probability must always be a win'
       )
 
@@ -307,7 +307,7 @@ describe('test hashedSecret', function () {
         })
 
         if (!u8aEquals(ticket.preImage, EMPTY_HASHED_SECRET)) {
-          assert(await connector.hashedSecret.validateTicket(ticket))
+          assert(await connector.probabilisticPayments.validateTicket(ticket))
         }
       }
     })

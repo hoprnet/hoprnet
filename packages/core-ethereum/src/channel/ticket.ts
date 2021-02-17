@@ -64,7 +64,7 @@ class TicketStatic {
         }
       }
 
-      const isWinning = await this.coreConnector.hashedSecret.validateTicket(ackTicket)
+      const isWinning = await this.coreConnector.probabilisticPayments.validateTicket(ackTicket)
       if (!isWinning) {
         log(`Failed to submit ticket ${u8aToHex(ticketChallenge)}: ${this.INVALID_MESSAGES.NOT_WINNING}`)
         return {
