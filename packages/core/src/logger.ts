@@ -2,7 +2,7 @@ import Metrics from 'libp2p/src/metrics'
 import PeerId from 'peer-id'
 
 import { durations } from '@hoprnet/hopr-utils'
-import { logDebugData } from '@hoprnet/hopr-logs'
+// import { logDebugData } from '@hoprnet/hopr-logs'
 
 const DEFAULT_DEBUG_INTERVAL = durations.seconds(20)
 
@@ -11,7 +11,7 @@ const DEFAULT_DEBUG_INTERVAL = durations.seconds(20)
  */
 export class Logger {
   private interval: NodeJS.Timeout
-  constructor(private metrics: Metrics, private debugLogger = logDebugData) {}
+  constructor(private metrics: Metrics, private debugLogger = console.log) {}
 
   public start() {
     this.interval = setInterval(this.createConnectivityLog.bind(this), DEFAULT_DEBUG_INTERVAL)
