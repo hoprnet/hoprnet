@@ -163,11 +163,8 @@ export function computeWinningProbability(prob: number): Uint8Array {
 
 /**
  * Transforms Uint256 encoded probabilities into floats.
- *
  * @notice mostly used to check a ticket's winning probability.
- *
  * @notice the precision is very limited
- *
  * @param winProb Uint256-encoded version of winning probability
  */
 export function getWinProbabilityAsFloat(winProb: Uint8Array): number {

@@ -1,10 +1,10 @@
-import { Hash, AcknowledgedTicket } from './types'
+import { Hash, AcknowledgedTicket, Ticket, Balance, SignedTicket, AccountId, TicketEpoch } from './types'
 import Debug from 'debug'
 import { randomBytes } from 'crypto'
 import { u8aToHex, u8aConcat, iterateHash, recoverIteratedHash, u8aLessThanOrEqual } from '@hoprnet/hopr-utils'
 import { stringToU8a, u8aIsEmpty } from '@hoprnet/hopr-utils'
 import { publicKeyConvert } from 'secp256k1'
-import { hash, waitForConfirmation } from './utils'
+import { hash, waitForConfirmation, computeWinningProbability } from './utils'
 import { OnChainSecret, OnChainSecretIntermediary } from './dbKeys'
 import type { LevelUp } from 'levelup'
 import type { HoprChannels } from './tsc/web3/HoprChannels'
@@ -16,6 +16,7 @@ export const HASHED_SECRET_WIDTH = 27
 
 const log = Debug('hopr-core-ethereum:probabilisticPayments')
 const isNullAccount = (a: string) => a == null || ['0', '0x', '0x'.padEnd(66, '0')].includes(a)
+const DEFAULT_WIN_PROB = 1
 
 /**
  * Decides whether a ticket is a win or not.
@@ -71,9 +72,9 @@ export class ProbabilisticPayments {
    * @returns a promise that resolves to the onChainSecret
    */
   private async createAndStoreSecretOffChainAndReturnOnChainSecret(debug: boolean): Promise<Hash> {
-    let onChainSecret = debug ? await this.getDebugAccountSecret() : new Hash(randomBytes(HASHED_SECRET_WIDTH))
+    this.offChainSecret = debug ? await this.getDebugAccountSecret() : new Hash(randomBytes(HASHED_SECRET_WIDTH))
     let dbBatch = this.db.batch()
-    const hashes = await iterateHash(onChainSecret, hashFunction, TOTAL_ITERATIONS)
+    const hashes = await iterateHash(this.offChainSecret, hashFunction, TOTAL_ITERATIONS)
     for (let i = 0; i <= TOTAL_ITERATIONS; i += DB_ITERATION_BLOCK_SIZE) {
       log('storing intermediate', i)
       dbBatch = dbBatch.put(Buffer.from(OnChainSecretIntermediary(i)), Buffer.from(hashes[i]))
@@ -202,7 +203,6 @@ export class ProbabilisticPayments {
       log('reinitializing')
       this.onChainSecret = await this.createAndStoreSecretOffChainAndReturnOnChainSecret(debug)
       await this.storeSecretOnChain(this.onChainSecret)
-      this.offChainSecret = await getFromDB(this.db, OnChainSecret())
     }
     this.currentPreImage = await this.findPreImage(this.onChainSecret) //TODO
     this.initialized = true
@@ -226,5 +226,39 @@ export class ProbabilisticPayments {
       return true
     }
     return false
+  }
+
+  public async issueTicket(
+    amount: Balance,
+    counterparty: AccountId,
+    challenge: Hash,
+    epoch: TicketEpoch,
+    channelIteration: TicketEpoch,
+    winProb: number = DEFAULT_WIN_PROB,
+  ): Promise<SignedTicket> {
+    const ticketWinProb = new Hash(computeWinningProbability(winProb))
+    const signedTicket = new SignedTicket()
+    const ticket = new Ticket(
+      {
+        bytes: signedTicket.buffer,
+        offset: signedTicket.ticketOffset
+      },
+      {
+        counterparty,
+        challenge,
+        epoch,
+        amount,
+        winProb: ticketWinProb,
+        channelIteration
+      }
+    )
+
+    await ticket.sign(this.account.keys.onChain.privKey, undefined, {
+      bytes: signedTicket.buffer,
+      offset: signedTicket.signatureOffset
+    })
+
+    return signedTicket
+
   }
 }

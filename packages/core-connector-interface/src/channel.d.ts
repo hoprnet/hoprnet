@@ -168,38 +168,10 @@ declare interface Channel {
 
   readonly currentBalanceOfCounterparty: Promise<Balance>
 
-  readonly ticket: {
-    /**
-     * Constructs a ticket to use in a probabilistic payment channel.
-     * @param amount amount of funds to include
-     * @param challenge a challenge that has to be solved be the redeemer
-     * @param winProb probability for the generated ticket to be a win
-     */
-    create(
+  readonly createTicket: (
       amount: Balance,
-      challenge: Hash,
-      winProb: number | undefined,
-      arr?: {
-        bytes: ArrayBuffer
-        offset: number
-      }
-    ): Promise<SignedTicket>
-
-    /**
-     * Checks a previously issued ticket for its validity.
-     * @param signedTicket a previously issued ticket to check
-     * @param props additional arguments
-     */
-    verify(signedTicket: SignedTicket): Promise<boolean>
-
-    /**
-     * BIG TODO
-     * Aggregate previously issued tickets. Still under active development!
-     * @param tickets array of tickets to aggregate
-     * @param props additional arguments
-     */
-    // aggregate(channel: any, tickets: Ticket[], ...props: any[]): Promise<Ticket>
-  }
+      challenge: Hash
+  ) => Promise<SignedTicket>
 
   // public key
   readonly counterparty: Uint8Array

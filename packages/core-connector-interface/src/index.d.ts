@@ -93,7 +93,7 @@ declare interface HoprCoreConnector {
   smartContractInfo(): string
 
   /**
-   * Check whether the given ticket is winning
+   * Check whether the given ticket is valid and winning
    * @param ticket the acknowledged ticket to check
    */
   validateTicket(ticket: Types.AcknowledgedTicket): Promise<boolean>
