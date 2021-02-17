@@ -25,42 +25,39 @@ const comparator = (a: HeapElement, b: HeapElement): number => {
  */
 export class Mixer<Chain extends HoprCoreConnector> {
   private queue: Heap<HeapElement>
+  private next: NodeJS.Timeout
 
   public WAIT_TIME = MAX_PACKET_DELAY
 
-  constructor(private incrementer = Date.now) {
+  constructor(private onMessage: (m: Packet<Chain>) => void, private clock = Date.now) {
     this.queue = new Heap(comparator)
   }
 
-  push(p: Packet<Chain>) {
+  public push(p: Packet<Chain>) {
     this.queue.push([this.getPriority(), p])
+    this.addTimeout()
   }
 
-  // Can we pop an element?.
-  poppable(): boolean {
+  private addTimeout() {
+    if (!this.next && this.queue.length > 0) {
+      this.next = setTimeout(this.tick.bind(this), this.intervalUntilNextMessage())
+    }
+  }
+
+  private tick() {
     log(`Mixer has ${this.queue.length} elements`)
-    if (!this.queue.length) {
-      return false
+    while (this.queue.length > 0 && this.queue.peek()[0] < this.clock()) {
+      this.onMessage(this.queue.pop()[1])
     }
-    return this.queue.peek()[0] < this.due()
+    this.next = null
+    this.addTimeout()
   }
 
-  pop(): Packet<Chain> {
-    if (!this.poppable()) {
-      throw new Error('No packet is ready to be popped from mixer')
-    }
-    return this.queue.pop()[1]
-  }
-
-  notEmpty(): boolean {
-    return this.queue.length > 0
-  }
-
-  private due(): number {
-    return this.incrementer()
+  private intervalUntilNextMessage(): number {
+    return Math.max(this.queue.peek()[0] - this.clock(), 1)
   }
 
   private getPriority(): number {
-    return this.incrementer() + randomInteger(1, MAX_PACKET_DELAY)
+    return this.clock() + randomInteger(1, MAX_PACKET_DELAY)
   }
 }

@@ -2403,7 +2403,7 @@ async@2.6.2:
   dependencies:
     lodash "^4.17.11"
 
-async@^2.0.1, async@^2.1.2, async@^2.4.0, async@^2.5.0, async@^2.6.1, async@^2.6.2:
+async@^2.0.1, async@^2.1.2, async@^2.4.0, async@^2.5.0, async@^2.6.1:
   version "2.6.3"
   resolved "https://registry.yarnpkg.com/async/-/async-2.6.3.tgz#d72625e2344a3656e3a3ad4fa749fa83299d82ff"
   integrity sha512-zflvls11DCy+dQWzTW2dzuilv8Z5X/pjfmZOWba6TNIVDm+2UDaJmXSOXlasHKfNBs8oo3M0aT50fDEWfKZjXg==
@@ -2994,11 +2994,6 @@ base-x@^3.0.2, base-x@^3.0.6, base-x@^3.0.8:
   integrity sha512-Rl/1AWP4J/zRrk54hhlxH4drNxPJXYUaKffODVI53/dAsV4t9fBxyxYKAVPU1XBHxYwOWP9h9H0hM2MVw4YfJA==
   dependencies:
     safe-buffer "^5.0.1"
-
-base32.js@~0.1.0:
-  version "0.1.0"
-  resolved "https://registry.yarnpkg.com/base32.js/-/base32.js-0.1.0.tgz#b582dec693c2f11e893cf064ee6ac5b6131a2202"
-  integrity sha1-tYLexpPC8R6JPPBk7mrFthMaIgI=
 
 base64-js@^1.0.2, base64-js@^1.3.1:
   version "1.5.1"
@@ -7106,7 +7101,7 @@ inquirer@^6.2.0, inquirer@^6.2.2:
     strip-ansi "^5.1.0"
     through "^2.3.6"
 
-interface-datastore@^3.0.3:
+interface-datastore@^3.0.3, interface-datastore@^3.0.4:
   version "3.0.4"
   resolved "https://registry.yarnpkg.com/interface-datastore/-/interface-datastore-3.0.4.tgz#7c02d393fb0372bc86c03de1095e15ae70912771"
   integrity sha512-WEO09j/VRF866je3UXfk64GTWi0ag5mH+jbTbOYX7rkhcNnvAvYvvtysOu2vzUXaM1nBmtI9SjMpp4dqXOE+LA==
@@ -8295,28 +8290,27 @@ libp2p-interfaces@^0.8.1, libp2p-interfaces@^0.8.2:
     streaming-iterables "^5.0.4"
     uint8arrays "^2.0.5"
 
-libp2p-kad-dht@0.20.6:
-  version "0.20.6"
-  resolved "https://registry.yarnpkg.com/libp2p-kad-dht/-/libp2p-kad-dht-0.20.6.tgz#18bcc903f614d3397f523a2ab8d122ef5ba3d5e0"
-  integrity sha512-hRClzJP+NK3zBU0/pYkoDUhZcviqmPu4czFaftcl3cCGasjxSaWNEZNKsf65QwoINZD9jFrYkQuXW9/gWQwuOA==
+libp2p-kad-dht@0.21.0:
+  version "0.21.0"
+  resolved "https://registry.yarnpkg.com/libp2p-kad-dht/-/libp2p-kad-dht-0.21.0.tgz#3415381b62a158a0ec50c6c1ffb14c04c118c3c0"
+  integrity sha512-xluAQlVnsdpswE8lLtma+BTOkbvUsS0E9AbpwMioS+X6vY+SlLNgPnRPA8jvnyEC8YDA7U14ndHzFULPCPJcMw==
   dependencies:
     abort-controller "^3.0.0"
-    async "^2.6.2"
-    base32.js "~0.1.0"
     cids "^1.1.5"
     debug "^4.3.1"
-    err-code "^2.0.3"
+    err-code "^3.0.0"
     hashlru "^2.3.0"
     heap "~0.2.6"
-    interface-datastore "^3.0.3"
+    interface-datastore "^3.0.4"
+    it-first "^1.0.4"
     it-length-prefixed "^3.1.0"
     it-pipe "^1.1.0"
     k-bucket "^5.0.0"
     libp2p-crypto "^0.19.0"
     libp2p-interfaces "^0.8.2"
-    libp2p-record "^0.9.0"
+    libp2p-record "^0.10.0"
     multiaddr "^8.1.2"
-    multihashing-async "^2.0.1"
+    multihashing-async "^2.1.0"
     p-filter "^2.1.0"
     p-map "^4.0.0"
     p-queue "^6.6.2"
@@ -8327,7 +8321,7 @@ libp2p-kad-dht@0.20.6:
     protons "^2.0.0"
     streaming-iterables "^5.0.4"
     uint8arrays "^2.0.5"
-    varint "^5.0.0"
+    varint "^6.0.0"
     xor-distance "^2.0.0"
 
 libp2p-mplex@0.10.2:
@@ -8362,16 +8356,16 @@ libp2p-noise@^2.0.4:
     protobufjs "^6.10.1"
     uint8arrays "^2.0.5"
 
-libp2p-record@^0.9.0:
-  version "0.9.0"
-  resolved "https://registry.yarnpkg.com/libp2p-record/-/libp2p-record-0.9.0.tgz#6c8775b77660ec5b5ce143fac20bd9e67e66e0fe"
-  integrity sha512-8FlhzP+UlXTYOR+9D8nYoGOIJ6S8XogKD625bqzHJbXJQyJNCNaW3tZPHqrQrvUW7o6GsAeyQAfCp5WLEH0FZg==
+libp2p-record@^0.10.0:
+  version "0.10.0"
+  resolved "https://registry.yarnpkg.com/libp2p-record/-/libp2p-record-0.10.0.tgz#176519fea533d79485fd82d7f47b2b4094f86877"
+  integrity sha512-IxnEaLSdKNAtLLEUw5chI7osRoI1YmCEIw5yHOItYC2Px1+S8N1izxN2tRKqRJoXoz7CkDWREnUClPa4jyaJwA==
   dependencies:
-    err-code "^2.0.0"
+    err-code "^3.0.0"
     multihashes "^3.0.1"
-    multihashing-async "^2.0.1"
+    multihashing-async "^2.1.0"
     protons "^2.0.0"
-    uint8arrays "^1.1.0"
+    uint8arrays "^2.0.5"
 
 libp2p-tcp@0.15, libp2p-tcp@^0.15.0:
   version "0.15.3"
@@ -9386,7 +9380,7 @@ multihashes@^0.4.15, multihashes@~0.4.15:
     multibase "^0.7.0"
     varint "^5.0.0"
 
-multihashing-async@^2.0.1:
+multihashing-async@^2.0.1, multihashing-async@^2.1.0:
   version "2.1.0"
   resolved "https://registry.yarnpkg.com/multihashing-async/-/multihashing-async-2.1.0.tgz#0d58de96e7b679140a5cfb9dd474bd7b00189814"
   integrity sha512-FMzLEQEu+y4AgFoboe6peXLDeIZzsjvbBhI/wufLEfNf/Ev917sB4GCjMLO7CP2D9CXT5sjxjoloEODJ/jgyKw==
@@ -12107,9 +12101,9 @@ solhint@^2.0.0:
     prettier "^1.14.3"
 
 solidity-coverage@^0.7.13:
-  version "0.7.14"
-  resolved "https://registry.yarnpkg.com/solidity-coverage/-/solidity-coverage-0.7.14.tgz#88aa9d663dc82e9927275835703542a5e7931a03"
-  integrity sha512-2X9oNtu4yBbtDXtVe2tc9vYHtwON6QRqNvVylKdkhcJgAdCzP/OkJy9fWcWH/g3fnNCIOFssHoe0LPGZ2ppMZg==
+  version "0.7.15"
+  resolved "https://registry.yarnpkg.com/solidity-coverage/-/solidity-coverage-0.7.15.tgz#c5974e92b665d5be6bee11c24bbf7f6ff7529fa2"
+  integrity sha512-MVcpEUyMjf+ITew3BS7fI/NRxpYJUg9wPrSLS7y/F7BwXpYVRgAK4WsjbMzVkRdmezta1Kon0XqYHZMLgEt9XA==
   dependencies:
     "@solidity-parser/parser" "^0.11.0"
     "@truffle/provider" "^0.2.24"
