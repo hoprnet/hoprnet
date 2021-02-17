@@ -234,7 +234,7 @@ export class ProbabilisticPayments {
     challenge: Hash,
     epoch: TicketEpoch,
     channelIteration: TicketEpoch,
-    winProb: number = DEFAULT_WIN_PROB,
+    winProb: number = DEFAULT_WIN_PROB
   ): Promise<SignedTicket> {
     const ticketWinProb = new Hash(computeWinningProbability(winProb))
     const signedTicket = new SignedTicket()
@@ -259,6 +259,5 @@ export class ProbabilisticPayments {
     })
 
     return signedTicket
-
   }
 }

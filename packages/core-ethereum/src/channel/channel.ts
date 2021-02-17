@@ -26,10 +26,7 @@ class Channel implements IChannel {
     private signedChannel: SignedChannel
   ) {}
 
-  public async createTicket(
-    amount: Balance,
-    challenge: Hash
-  ): Promise<SignedTicket> {
+  public async createTicket(amount: Balance, challenge: Hash): Promise<SignedTicket> {
     const counterparty = await pubKeyToAccountId(this.counterparty)
     const epoch = await this.coreConnector.hoprChannels.methods
       .accounts(counterparty.toHex())
@@ -37,8 +34,13 @@ class Channel implements IChannel {
       .then((res) => new TicketEpoch(Number(res.counter)))
     const channelIteration = new TicketEpoch(stateCounterToIteration((await this.stateCounter).toNumber()))
 
-    return this.coreConnector.probabilisticPayments.issueTicket(amount, counterparty, challenge, epoch, channelIteration)
-
+    return this.coreConnector.probabilisticPayments.issueTicket(
+      amount,
+      counterparty,
+      challenge,
+      epoch,
+      channelIteration
+    )
   }
 
   private get onChainChannel(): Promise<ChannelEntry> {

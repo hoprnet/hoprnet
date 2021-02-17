@@ -30,7 +30,7 @@ describe('test Channel class', function () {
   let counterpartysCoreConnector: CoreConnector
   let funder: Await<ReturnType<typeof getPrivKeyData>>
 
-  async function getTicketData(counterparty: AccountId){
+  async function getTicketData(counterparty: AccountId) {
     const secretA = randomBytes(32)
     const secretB = randomBytes(32)
     const challenge = await createChallenge(secretA, secretB)
