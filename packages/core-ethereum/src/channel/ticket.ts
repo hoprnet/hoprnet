@@ -1,7 +1,6 @@
-import type IChannel from '.'
 import { u8aIsEmpty, u8aToHex } from '@hoprnet/hopr-utils'
-import { Hash, TicketEpoch, Balance, SignedTicket, AcknowledgedTicket } from '../types'
-import { pubKeyToAccountId, checkChallenge, stateCounterToIteration } from '../utils'
+import { AcknowledgedTicket } from '../types'
+import { checkChallenge } from '../utils'
 import type HoprEthereum from '..'
 import debug from 'debug'
 const log = debug('hopr-core-ethereum:ticket')
@@ -105,23 +104,4 @@ class TicketStatic {
   }
 }
 
-class TicketFactory {
-  constructor(public channel: IChannel) {}
-
-  async create(
-    amount: Balance,
-    challenge: Hash,
-  ): Promise<SignedTicket> {
-    const counterparty = await pubKeyToAccountId(this.channel.counterparty)
-    const epoch = await this.channel.coreConnector.hoprChannels.methods
-      .accounts(counterparty.toHex())
-      .call()
-      .then((res) => new TicketEpoch(Number(res.counter)))
-    const channelIteration = new TicketEpoch(stateCounterToIteration((await this.channel.stateCounter).toNumber()))
-
-    return this.channel.coreConnector.probabilisticPayments.issueTicket(amount, counterparty, challenge, epoch, channelIteration)
-  }
-}
-
 export { TicketStatic }
-export default TicketFactory

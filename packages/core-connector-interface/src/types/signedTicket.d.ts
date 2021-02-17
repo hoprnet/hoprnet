@@ -20,9 +20,10 @@ declare interface SignedTicket extends Uint8Array {
   ticket: Ticket
   signature: Signature
   signer: Promise<Uint8Array>
-
   ticketOffset: number
   signatureOffset: number
+
+  verifySignature(pubKey: Uint8Array): Promise<boolean>
 }
 
 declare var SignedTicket: SignedTicketStatic

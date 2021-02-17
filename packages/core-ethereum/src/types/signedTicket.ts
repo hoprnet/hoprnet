@@ -98,7 +98,7 @@ class SignedTicket extends Uint8ArrayE implements Types.SignedTicket {
     })
   }
 
-  async verify(pubKey: Uint8Array): Promise<boolean> {
+  async verifySignature(pubKey: Uint8Array): Promise<boolean> {
     return verify(await this.ticket.hash, this.signature, pubKey)
   }
 

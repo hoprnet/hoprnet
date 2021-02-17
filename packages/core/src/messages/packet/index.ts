@@ -215,10 +215,12 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
         node._interactions.payments.onChainKey.interact(path[0])
       )
 
-      packet._ticket = await channel.ticket.create(new Balance(fee), ticketChallenge, node.ticketWinProb, {
+      packet._ticket = await channel.createTicket(new Balance(fee), ticketChallenge)
+      /*, node.ticketWinProb, {
         bytes: packet.buffer,
         offset: packet.ticketOffset
       })
+      */
 
       const myAccountId = await chain.utils.pubKeyToAccountId(node.getId().pubKey.marshal())
       const counterpartyAccountId = await chain.utils.pubKeyToAccountId(channel.counterparty)
@@ -372,10 +374,12 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
           this.node._interactions.payments.open.interact(target, channelBalance)
       )
 
-      this._ticket = await channel.ticket.create(fee, this.header.encryptionKey, this.node.ticketWinProb, {
+      this._ticket = await channel.createTicket(fee, this.header.encryptionKey)
+      /*, this.node.ticketWinProb, {
         bytes: this.buffer,
         offset: this.ticketOffset
       })
+      */
 
       await validateCreatedTicket({
         myBalance: await (amPartyA ? channel.balance_a : channel.balance_b),

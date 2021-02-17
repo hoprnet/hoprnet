@@ -8,11 +8,11 @@ import {
   Moment,
   Public,
   SignedChannel,
+  SignedTicket,
   TicketEpoch,
   ChannelEntry
 } from '../types'
-import TicketFactory from './ticket'
-import { hash } from '../utils'
+import { hash, pubKeyToAccountId, stateCounterToIteration } from '../utils'
 
 import type HoprEthereum from '..'
 
@@ -20,14 +20,25 @@ class Channel implements IChannel {
   private _settlementWindow?: Moment
   private _channelId?: Hash
 
-  public ticket: TicketFactory
-
   constructor(
     public coreConnector: HoprEthereum,
     public counterparty: Uint8Array,
     private signedChannel: SignedChannel
-  ) {
-    this.ticket = new TicketFactory(this)
+  ) {}
+
+  public async createTicket(
+    amount: Balance,
+    challenge: Hash
+  ): Promise<SignedTicket> {
+    const counterparty = await pubKeyToAccountId(this.counterparty)
+    const epoch = await this.coreConnector.hoprChannels.methods
+      .accounts(counterparty.toHex())
+      .call()
+      .then((res) => new TicketEpoch(Number(res.counter)))
+    const channelIteration = new TicketEpoch(stateCounterToIteration((await this.stateCounter).toNumber()))
+
+    return this.coreConnector.probabilisticPayments.issueTicket(amount, counterparty, challenge, epoch, channelIteration)
+
   }
 
   private get onChainChannel(): Promise<ChannelEntry> {

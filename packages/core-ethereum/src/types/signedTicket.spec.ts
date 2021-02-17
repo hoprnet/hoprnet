@@ -55,7 +55,7 @@ describe('test signedTicket construction', async function () {
       ticket
     })
 
-    assert(await signedTicket.verify(userAPubKey))
+    assert(await signedTicket.verifySignature(userAPubKey))
 
     assert(new Hash(await signedTicket.signer).eq(userAPubKey), 'signer incorrect')
 
@@ -70,7 +70,7 @@ describe('test signedTicket construction', async function () {
 
     signedTicket[index] = signedTicket[index] ^ (1 << exponent)
 
-    if (await signedTicket.verify(userAPubKey)) {
+    if (await signedTicket.verifySignature(userAPubKey)) {
       // @TODO change to assert.fail
       console.log(`found invalid signature, <${u8aToHex(signedTicket)}>, byte #${index}, bit #${exponent}`)
     }
@@ -90,14 +90,14 @@ describe('test signedTicket construction', async function () {
       offset: signedTicketA.signatureOffset
     })
 
-    assert(await signedTicketA.verify(userAPubKey))
+    assert(await signedTicketA.verifySignature(userAPubKey))
 
     const signedTicketB = new SignedTicket({
       bytes: signedTicketA.buffer,
       offset: signedTicketA.byteOffset
     })
 
-    assert(await signedTicketB.verify(userAPubKey))
+    assert(await signedTicketB.verifySignature(userAPubKey))
 
     assert(new Hash(await signedTicketA.signer).eq(userAPubKey), 'signer incorrect')
     assert(new Hash(await signedTicketB.signer).eq(userAPubKey), 'signer incorrect')
@@ -113,7 +113,7 @@ describe('test signedTicket construction', async function () {
 
     signedTicketA[indexA] = signedTicketA[indexA] ^ (1 << exponentA)
 
-    if (await signedTicketA.verify(userAPubKey)) {
+    if (await signedTicketA.verifySignature(userAPubKey)) {
       // @TODO change to assert.fail
       console.log(`found invalid signature, <${u8aToHex(signedTicketA)}>, byte #${indexA}, bit #${exponentA}`)
     }
@@ -123,7 +123,7 @@ describe('test signedTicket construction', async function () {
 
     signedTicketB[indexB] = signedTicketB[indexB] ^ (1 << exponentB)
 
-    if (await signedTicketB.verify(userAPubKey)) {
+    if (await signedTicketB.verifySignature(userAPubKey)) {
       // @TODO change to assert.fail
       console.log(`found invalid signature, <${u8aToHex(signedTicketB)}>, byte #${indexB}, bit #${exponentB}`)
     }
@@ -156,7 +156,7 @@ describe('test signedTicket construction', async function () {
       }
     )
 
-    assert(await signedTicket.verify(userAPubKey))
+    assert(await signedTicket.verifySignature(userAPubKey))
 
     assert(new Hash(await signedTicket.signer).eq(userAPubKey), 'signer incorrect')
 
@@ -171,7 +171,7 @@ describe('test signedTicket construction', async function () {
 
     signedTicket[index] = signedTicket[index] ^ (1 << exponent)
 
-    if (await signedTicket.verify(userAPubKey)) {
+    if (await signedTicket.verifySignature(userAPubKey)) {
       // @TODO change to assert.fail
       console.log(`found invalid signature, <${u8aToHex(signedTicket)}>, byte #${index}, bit #${exponent}`)
     }

@@ -88,7 +88,7 @@ class UnacknowledgedTicket<Chain extends HoprCoreConnector> extends Uint8Array {
   }
 
   async verifySignature(peerId: PeerId) {
-    return (await this.signedTicket).verify(peerId.pubKey.marshal())
+    return (await this.signedTicket).verifySignature(peerId.pubKey.marshal())
   }
 
   async verify(peerId: PeerId, hashedKeyHalf: Uint8Array): Promise<boolean> {
