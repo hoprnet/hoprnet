@@ -574,7 +574,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       await this.tickChannelStrategy([])
 
       const connReport = {}
-      this._libp2p.metrics.peers.forEach(peer => {
+      this._libp2p.metrics.peers.forEach((peer) => {
         console.log(peer)
         Object.assign(connReport, {
           [peer]: this._libp2p.metrics.forPeer(PeerId.createFromB58String(peer)).movingAverages
