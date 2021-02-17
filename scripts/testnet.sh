@@ -6,6 +6,8 @@ if [ -z "$GCLOUD_INCLUDED" ]; then
   source scripts/dns.sh
 fi
 
+source scripts/utils.sh
+
 MIN_FUNDS=0.01291
 HOPRD_ARGS="--data='/app/db/ethereum/testnet/bootstrap' --password='$BS_PASSWORD'"
 ZONE="--zone=europe-west6-a"
@@ -80,7 +82,7 @@ update_or_create_bootstrap_vm() {
       --container-restart-policy=always \
       --create-disk name=$(disk_name $1),size=10GB,type=pd-balanced,mode=rw \
       --container-mount-disk mount-path="/app/db" \
-      --container-env=^,@^DEBUG=hopr\*,@NODE_OPTIONS=--max-old-space-size=4096 \
+      --container-env=^,@^DEBUG=hopr\*,@NODE_OPTIONS=--max-old-space-size=4096,GCLOUD=1 \
       --container-image=$2 \
       --container-arg="--password" --container-arg="$BS_PASSWORD" \
       --container-arg="--init" --container-arg="true" \
@@ -105,7 +107,7 @@ start_testnode_vm() {
     gcloud compute instances create-with-container $1 $GCLOUD_DEFAULTS \
       --create-disk name=$(disk_name $1),size=10GB,type=pd-standard,mode=rw \
       --container-mount-disk mount-path="/app/db" \
-      --container-env=^,@^DEBUG=hopr\*,@NODE_OPTIONS=--max-old-space-size=4096 \
+      --container-env=^,@^DEBUG=hopr\*,@NODE_OPTIONS=--max-old-space-size=4096,GCLOUD=1 \
       --container-image=$2 \
       --container-arg="--password" --container-arg="$BS_PASSWORD" \
       --container-arg="--init" --container-arg="true" \
@@ -139,8 +141,9 @@ start_bootstrap() {
   local release=$(echo $2 | cut -f2 -d:)
   echo "- Bootstrap Release: $release" 1>&2
   echo "- Bootstrap Multiaddr value: $multiaddr" 1>&2
-  local txt_record=$(gcloud_txt_record $release bootstrap $multiaddr)
-  echo "- DNS entry: $(gcloud_dns_entry $release bootstrap)" 1>&2
+  local clean_release=$(get_version_maj_min_pat $release)
+  local txt_record=$(gcloud_txt_record $clean_release bootstrap $multiaddr)
+  echo "- DNS entry: $(gcloud_dns_entry $clean_release bootstrap)" 1>&2
   echo $multiaddr
 }
 
