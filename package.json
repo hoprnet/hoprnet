@@ -11,7 +11,7 @@
     "lint": "npx prettier --check .",
     "lint:fix": "npx prettier --write .",
     "test": "lerna run test --stream",
-    "test:core": "lerna exec --scope @hoprnet/hopr-core yarn build && lerna exec --scope @hoprnet/hopr-core yarn test",
+    "test:core": "yarn build:core && lerna exec --scope @hoprnet/hopr-core yarn test",
     "run:hoprd": "lerna exec --scope @hoprnet/hoprd -- yarn start",
     "util:clean": "lerna exec --stream -- rimraf node_modules/@hoprnet",
     "util:reset": "lerna clean --yes",
