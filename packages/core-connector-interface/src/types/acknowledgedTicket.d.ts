@@ -5,7 +5,7 @@ declare interface AcknowledgedTicketStatic {
   deserialize(Uint8Array): Promise<AcknowledgedTicket>
 }
 
-/* 
+/*
  * An acknowledged ticket encapsulates the knowledge we have about a ticket
  * that has been successfully acknowledged by a counterparty, and is waiting
  * for us to redeem it.

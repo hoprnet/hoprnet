@@ -228,25 +228,26 @@ describe('test probabilisticPayments', function () {
 
     it('should reserve a preImage for tickets with 100% winning probabilty resp. should not reserve for 0% winning probability', async function () {
       const firstTicket = {
-          ticket: {
-            hash: Promise.resolve(new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff))),
-            winProb: Utils.computeWinningProbability(1)
-          }
-        } as Types.SignedTicket
+        ticket: {
+          hash: Promise.resolve(new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff))),
+          winProb: Utils.computeWinningProbability(1)
+        }
+      } as Types.SignedTicket
 
       assert(
         await connector.probabilisticPayments.validateTicket(
-          firstTicket, 
-          new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff))),
+          firstTicket,
+          new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff))
+        ),
         'ticket with 100% winning probability must always be a win'
       )
 
       const notWinningTicket = {
-          ticket: {
-            hash: Promise.resolve(new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff))),
-            winProb: Utils.computeWinningProbability(0)
-          }
-        } as Types.SignedTicket
+        ticket: {
+          hash: Promise.resolve(new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff))),
+          winProb: Utils.computeWinningProbability(0)
+        }
+      } as Types.SignedTicket
 
       assert(
         !(await connector.probabilisticPayments.validateTicket(

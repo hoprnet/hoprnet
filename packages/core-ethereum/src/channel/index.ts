@@ -447,7 +447,6 @@ class ChannelFactory {
       })
     }
   }
-
 }
 
 export { ChannelFactory }

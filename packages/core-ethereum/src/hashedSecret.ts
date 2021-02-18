@@ -4,7 +4,13 @@ import { randomBytes } from 'crypto'
 import { u8aToHex, u8aConcat, iterateHash, recoverIteratedHash, u8aLessThanOrEqual } from '@hoprnet/hopr-utils'
 import { stringToU8a, u8aIsEmpty, u8aCompare } from '@hoprnet/hopr-utils'
 import { publicKeyConvert } from 'secp256k1'
-import { hash, waitForConfirmation, computeWinningProbability, getSignatureParameters, pubKeyToAccountId } from './utils'
+import {
+  hash,
+  waitForConfirmation,
+  computeWinningProbability,
+  getSignatureParameters,
+  pubKeyToAccountId
+} from './utils'
 import { OnChainSecret, OnChainSecretIntermediary } from './dbKeys'
 import type { LevelUp } from 'levelup'
 import type { HoprChannels } from './tsc/web3/HoprChannels'
@@ -29,7 +35,6 @@ export enum RedeemStatus {
   E_TICKET_FAILED,
   E_NO_PREIMAGE
 }
-
 
 /**
  * Decides whether a ticket is a win or not.
@@ -236,7 +241,6 @@ export class ProbabilisticPayments {
     return this.onChainSecret
   }
 
-
   /*
    * Take a signed ticket and transform it into an acknowledged ticket if it's a
    * winning ticket, or undefined if it's not.
@@ -324,10 +328,10 @@ export class ProbabilisticPayments {
       this.updateOnChainSecret(ackTicket.getPreImage()) // redemption contract updates on chain
 
       log('Successfully submitted ticket', u8aToHex(ticketChallenge))
-      return RedeemStatus.SUCCESS 
+      return RedeemStatus.SUCCESS
     } catch (err) {
       // TODO - check if it's E_NO_GAS
-      
+
       log('Unexpected error when submitting ticket', u8aToHex(ticketChallenge), err)
       throw err
     }
