@@ -1,17 +1,15 @@
-import type HoprCoreConnector from '..'
 import { Hash, SignedTicket } from '.'
 
 declare interface AcknowledgedTicketStatic {
-  SIZE(coreConnector: HoprCoreConnector): number
-
-  create(
-    coreConnector: HoprCoreConnector,
-    arr?: { bytes: ArrayBuffer; offset: number },
-    struct?: { signedTicket?: SignedTicket; response?: Hash; preImage?: Hash }
-  ): AcknowledgedTicket
+  SIZE(): number
 }
+declare interface AcknowledgedTicket {
+  constructor(
+    signedTicket: SignedTicket,
+    response: Hash,
+    preImage?: Hash
+  )
 
-declare interface AcknowledgedTicket extends Uint8Array {
   signedTicket: Promise<SignedTicket>
   signedTicketOffset: number
 
@@ -20,8 +18,10 @@ declare interface AcknowledgedTicket extends Uint8Array {
 
   preImage: Hash
   preImageOffset: number
+
+  serialized(): Uint8Array
+
 }
 
 declare var AcknowledgedTicket: AcknowledgedTicketStatic
-
 export default AcknowledgedTicket

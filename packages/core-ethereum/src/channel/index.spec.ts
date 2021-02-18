@@ -129,10 +129,11 @@ describe('test Channel class', function () {
     )
 
     const firstTicket = await getTicketData(myAddress)
-    const firstAckedTicket = new AcknowledgedTicket(coreConnector, undefined, {
-      response: firstTicket.response
-    })
     const signedTicket = await channel.createTicket(new Balance(1), firstTicket.challenge, 1)
+    const firstAckedTicket = new AcknowledgedTicket(
+      signedTicket,
+      firstTicket.response
+    )
 
     assert(
       u8aEquals(await signedTicket.signer, coreConnector.account.keys.onChain.pubKey),
@@ -179,7 +180,7 @@ describe('test Channel class', function () {
     console.log('>>>>', hashedSecretBefore)
 
     try {
-      const result = await counterpartysCoreConnector.channel.tickets.submit(firstAckedTicket, new Uint8Array())
+      const result = await counterpartysCoreConnector.channel.redeemTicket(firstAckedTicket)
       if (result.status === 'ERROR') {
         throw result.error
       } else if (result.status === 'FAILURE') {
@@ -195,7 +196,7 @@ describe('test Channel class', function () {
 
     let errThrown = false
     try {
-      const result = await counterpartysCoreConnector.channel.tickets.submit(firstAckedTicket, new Uint8Array())
+      const result = await counterpartysCoreConnector.channel.redeemTicket(firstAckedTicket)
       if (result.status === 'ERROR' || result.status === 'FAILURE') {
         errThrown = true
       }
@@ -212,16 +213,17 @@ describe('test Channel class', function () {
 
     for (let i = 0; i < ATTEMPTS; i++) {
       ticketData = await getTicketData(counterpartyAddress)
-      let ackedTicket = new AcknowledgedTicket(counterpartysCoreConnector, undefined, {
-        response: ticketData.response
-      })
+      const nextSignedTicket = await channel.createTicket(new Balance(1), ticketData.challenge, 1)
+      let ackedTicket = new AcknowledgedTicket(
+        nextSignedTicket,
+        ticketData.response
+      )
 
-      //nextSignedTicket = await channel.ticket.create(new Balance(1), ticketData.challenge)
 
       //assert(await counterpartysChannel.ticket.verify(nextSignedTicket), `Ticket signature must be valid.`)
 
       if (await counterpartysCoreConnector.validateTicket(ackedTicket)) {
-        await counterpartysCoreConnector.channel.tickets.submit(ackedTicket, new Uint8Array())
+        await counterpartysCoreConnector.channel.redeemTicket(ackedTicket)
       }
     }
   })

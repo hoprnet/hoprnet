@@ -230,15 +230,14 @@ describe('test probabilisticPayments', function () {
     })
 
     it('should reserve a preImage for tickets with 100% winning probabilty resp. should not reserve for 0% winning probability', async function () {
-      const firstTicket = new Types.AcknowledgedTicket(connector, undefined, {
-        signedTicket: {
+      const firstTicket = new Types.AcknowledgedTicket({
           ticket: {
             hash: Promise.resolve(new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff))),
             winProb: Utils.computeWinningProbability(1)
           }
         } as Types.SignedTicket,
-        response: new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff))
-      })
+        new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff))
+      )
 
       assert(
         await connector.probabilisticPayments.validateTicket(firstTicket),
@@ -263,15 +262,14 @@ describe('test probabilisticPayments', function () {
           u8aEquals((await hashFunction(secondPreImage)).slice(0, HASHED_SECRET_WIDTH), firstPreImage)
       )
 
-      const notWinnigTicket = new Types.AcknowledgedTicket(connector, undefined, {
-        signedTicket: {
+      const notWinnigTicket = new Types.AcknowledgedTicket({
           ticket: {
             hash: Promise.resolve(new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff))),
             winProb: Utils.computeWinningProbability(0)
           }
         } as Types.SignedTicket,
-        response: new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff))
-      })
+        new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff))
+      )
 
       assert(
         !(await connector.probabilisticPayments.validateTicket(notWinnigTicket)),
@@ -299,15 +297,14 @@ describe('test probabilisticPayments', function () {
       let ticket: Types.AcknowledgedTicket
 
       for (let i = 0; i < ATTEMPTS; i++) {
-        ticket = new Types.AcknowledgedTicket(connector, undefined, {
-          signedTicket: {
+        ticket = new Types.AcknowledgedTicket({
             ticket: {
               hash: Promise.resolve(new Types.Hash(randomBytes(Types.Hash.SIZE))),
               winProb: Utils.computeWinningProbability(Math.random())
             }
           } as Types.SignedTicket,
-          response: new Types.Hash(randomBytes(Types.Hash.SIZE))
-        })
+          new Types.Hash(randomBytes(Types.Hash.SIZE))
+        )
 
         if (!u8aEquals(ticket.preImage, EMPTY_HASHED_SECRET)) {
           assert(await connector.probabilisticPayments.validateTicket(ticket))

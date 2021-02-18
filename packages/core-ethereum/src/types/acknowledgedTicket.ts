@@ -1,59 +1,40 @@
-import type HoprEthereum from '../'
 import { Hash, SignedTicket } from '.'
-
 import { HASHED_SECRET_WIDTH } from '../hashedSecret'
 
-class AcknowledgedTicket extends Uint8Array {
+class AcknowledgedTicket{
   private _signedTicket: SignedTicket
   private _response: Hash
   private _preImage: Hash
-
-  private paymentChannels: HoprEthereum
+  private _serialized: Uint8Array
 
   constructor(
-    paymentChannels: HoprEthereum,
-    arr?: {
-      bytes: ArrayBuffer
-      offset: number
-    },
-    struct?: {
-      signedTicket?: SignedTicket
-      response?: Hash
-      preImage?: Hash
-    }
+    signedTicket: SignedTicket,
+    response: Hash,
+    preImage?: Hash
   ) {
-    if (!arr) {
-      super(AcknowledgedTicket.SIZE(paymentChannels))
-    } else {
-      super(arr.bytes, arr.offset, AcknowledgedTicket.SIZE(paymentChannels))
-    }
 
-    this.paymentChannels = paymentChannels
+    this._serialized = new Uint8Array(AcknowledgedTicket.SIZE())
 
-    if (struct) {
-      if (struct.signedTicket) {
-        this.set(struct.signedTicket, this.signedTicketOffset - this.byteOffset)
-        this._signedTicket = struct.signedTicket
-      }
+    this._serialized.set(signedTicket, this.signedTicketOffset - this._serialized.byteOffset)
+    this._signedTicket = signedTicket
 
-      if (struct.response) {
-        this.set(struct.response, this.responseOffset - this.byteOffset)
-        this._response = struct.response
-      }
+    this._serialized.set(response, this.responseOffset - this._serialized.byteOffset)
+    this._response = response
 
-      if (struct.preImage) {
-        this.set(struct.preImage, this.preImageOffset - this.byteOffset)
-        this._preImage = struct.preImage
-      }
+    if (preImage) {
+      this._serialized.set(preImage, this.preImageOffset - this._serialized.byteOffset)
+      this._preImage = preImage
     }
   }
 
+  /*
   subarray(begin: number = 0, end: number = AcknowledgedTicket.SIZE(this.paymentChannels)): Uint8Array {
     return new Uint8Array(this.buffer, begin + this.byteOffset, end - begin)
   }
+  */
 
   get signedTicketOffset(): number {
-    return this.byteOffset
+    return this._serialized.byteOffset
   }
 
   get signedTicket(): Promise<SignedTicket> {
@@ -62,8 +43,8 @@ class AcknowledgedTicket extends Uint8Array {
     }
 
     return new Promise<SignedTicket>(async (resolve) => {
-      this._signedTicket = await this.paymentChannels.types.SignedTicket.create({
-        bytes: this.buffer,
+      this._signedTicket = await SignedTicket.create({
+        bytes: this._serialized.buffer,
         offset: this.signedTicketOffset
       })
 
@@ -72,13 +53,13 @@ class AcknowledgedTicket extends Uint8Array {
   }
 
   get responseOffset(): number {
-    return this.byteOffset + this.paymentChannels.types.SignedTicket.SIZE
+    return this._serialized.byteOffset + SignedTicket.SIZE
   }
 
   get response(): Hash {
     if (!this._response) {
-      this._response = new this.paymentChannels.types.Hash(
-        new Uint8Array(this.buffer, this.responseOffset, this.paymentChannels.types.Hash.SIZE)
+      this._response = new Hash(
+        new Uint8Array(this._serialized.buffer, this.responseOffset, Hash.SIZE)
       )
     }
 
@@ -86,37 +67,33 @@ class AcknowledgedTicket extends Uint8Array {
   }
 
   get preImageOffset(): number {
-    return this.byteOffset + this.paymentChannels.types.SignedTicket.SIZE + this.paymentChannels.types.Hash.SIZE
+    return this._serialized.byteOffset + SignedTicket.SIZE + Hash.SIZE
   }
 
   get preImage(): Hash {
     if (!this._preImage) {
-      this._preImage = new this.paymentChannels.types.Hash(
-        new Uint8Array(this.buffer, this.preImageOffset, HASHED_SECRET_WIDTH)
+      this._preImage = new Hash(
+        new Uint8Array(this._serialized.buffer, this.preImageOffset, HASHED_SECRET_WIDTH)
       )
     }
 
     return this._preImage
   }
 
-  set preImage(_preImage: Hash) {
-    this.set(_preImage, this.preImageOffset)
+  set preImage(preImage: Hash) {
+    this._serialized.set(preImage, this.preImageOffset)
 
-    this._preImage = new this.paymentChannels.types.Hash(
-      new Uint8Array(this.buffer, this.preImageOffset, HASHED_SECRET_WIDTH)
+    this._preImage = new Hash(
+      new Uint8Array(this._serialized.buffer, this.preImageOffset, HASHED_SECRET_WIDTH)
     )
   }
 
-  static SIZE(hoprCoreConnector: HoprEthereum): number {
-    return hoprCoreConnector.types.SignedTicket.SIZE + hoprCoreConnector.types.Hash.SIZE + HASHED_SECRET_WIDTH + 1
+  static SIZE(): number {
+    return SignedTicket.SIZE + Hash.SIZE + HASHED_SECRET_WIDTH + 1
   }
 
-  static create(
-    coreConnector: HoprEthereum,
-    arr?: { bytes: ArrayBuffer; offset: number },
-    struct?: { signedTicket?: SignedTicket; response?: Hash; preImage?: Hash; redeemed?: boolean }
-  ) {
-    return new AcknowledgedTicket(coreConnector, arr, struct)
+  public serialized(): Uint8Array {
+    return this._serialized
   }
 }
 
