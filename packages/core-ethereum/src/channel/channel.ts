@@ -26,7 +26,7 @@ class Channel implements IChannel {
     private signedChannel: SignedChannel
   ) {}
 
-  public async createTicket(amount: Balance, challenge: Hash): Promise<SignedTicket> {
+  public async createTicket(amount: Balance, challenge: Hash, winProb: number): Promise<SignedTicket> {
     const counterparty = await pubKeyToAccountId(this.counterparty)
     const epoch = await this.coreConnector.hoprChannels.methods
       .accounts(counterparty.toHex())
@@ -39,7 +39,8 @@ class Channel implements IChannel {
       counterparty,
       challenge,
       epoch,
-      channelIteration
+      channelIteration,
+      winProb
     )
   }
 

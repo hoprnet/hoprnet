@@ -3,7 +3,6 @@ import { Hash, SignedTicket } from '.'
 
 import { HASHED_SECRET_WIDTH } from '../hashedSecret'
 
-// @TODO this is a duplicate of the same class in hopr-core
 class AcknowledgedTicket extends Uint8Array {
   private _signedTicket: SignedTicket
   private _response: Hash

@@ -168,7 +168,7 @@ declare interface Channel {
 
   readonly currentBalanceOfCounterparty: Promise<Balance>
 
-  readonly createTicket: (amount: Balance, challenge: Hash) => Promise<SignedTicket>
+  readonly createTicket: (amount: Balance, challenge: Hash, winProb: number) => Promise<SignedTicket>
 
   // public key
   readonly counterparty: Uint8Array

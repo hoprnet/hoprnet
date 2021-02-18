@@ -2,7 +2,7 @@ import { Hash, AcknowledgedTicket, Ticket, Balance, SignedTicket, AccountId, Tic
 import Debug from 'debug'
 import { randomBytes } from 'crypto'
 import { u8aToHex, u8aConcat, iterateHash, recoverIteratedHash, u8aLessThanOrEqual } from '@hoprnet/hopr-utils'
-import { stringToU8a, u8aIsEmpty } from '@hoprnet/hopr-utils'
+import { stringToU8a, u8aIsEmpty, u8aCompare } from '@hoprnet/hopr-utils'
 import { publicKeyConvert } from 'secp256k1'
 import { hash, waitForConfirmation, computeWinningProbability } from './utils'
 import { OnChainSecret, OnChainSecretIntermediary } from './dbKeys'
@@ -16,7 +16,6 @@ export const HASHED_SECRET_WIDTH = 27
 
 const log = Debug('hopr-core-ethereum:probabilisticPayments')
 const isNullAccount = (a: string) => a == null || ['0', '0x', '0x'.padEnd(66, '0')].includes(a)
-const DEFAULT_WIN_PROB = 1
 
 /**
  * Decides whether a ticket is a win or not.
@@ -28,7 +27,8 @@ const DEFAULT_WIN_PROB = 1
  * @param preImage preImage of the current onChainSecret
  * @param winProb winning probability of the ticket
  */
-async function isWinningTicket(ticketHash: Hash, challengeResponse: Hash, preImage: Hash, winProb: Hash) {
+async function isWinningTicket(ticketHash: Hash, challengeResponse: Hash, preImage: Hash, winProb: Uint8Array) {
+  console.log(await hash(u8aConcat(ticketHash, preImage, challengeResponse)), winProb, u8aCompare(await hash(u8aConcat(ticketHash, preImage, challengeResponse)), winProb))
   return u8aLessThanOrEqual(await hash(u8aConcat(ticketHash, preImage, challengeResponse)), winProb)
 }
 
@@ -220,11 +220,13 @@ export class ProbabilisticPayments {
 
   public async validateTicket(ticket: AcknowledgedTicket): Promise<boolean> {
     const s = await ticket.signedTicket
+    log('validate')
     if (await isWinningTicket(await s.ticket.hash, ticket.response, ticket.preImage, s.ticket.winProb)) {
       ticket.preImage = new Hash(this.currentPreImage)
       this.currentPreImage = await this.findPreImage(this.currentPreImage)
       return true
     }
+    log('>> invalid')
     return false
   }
 
@@ -234,7 +236,7 @@ export class ProbabilisticPayments {
     challenge: Hash,
     epoch: TicketEpoch,
     channelIteration: TicketEpoch,
-    winProb: number = DEFAULT_WIN_PROB
+    winProb: number
   ): Promise<SignedTicket> {
     const ticketWinProb = new Hash(computeWinningProbability(winProb))
     const signedTicket = new SignedTicket()

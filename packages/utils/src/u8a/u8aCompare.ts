@@ -6,14 +6,10 @@ export function u8aCompare(a: Uint8Array, b: Uint8Array): number {
   if (a.length != b.length) {
     throw Error(`Cannot compare arrays that have different size.`)
   }
-
-  const length = a.length
-
-  for (let i = 0; i < length; i++) {
+  for (let i = 0; i < a.length; i++) {
     if (a[i] == b[i]) {
       continue
     }
-
     if (a[i] < b[i]) {
       return A_STRICLY_LESS_THAN_B
     } else {
