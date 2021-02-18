@@ -17,10 +17,10 @@
   },
   "files": [
     "lib",
-    "!*.spec.ts",
-    "!*.spec.d.ts",
-    "!*.spec.js",
-    "!*.spec.js.map"
+    "!**/*.spec.ts",
+    "!**/*.spec.d.ts",
+    "!**/*.spec.js",
+    "!**/*.spec.js.map"
   ],
   "devDependencies": {
     "@types/node": "14"

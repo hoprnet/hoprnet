@@ -19,10 +19,10 @@
   },
   "files": [
     "lib",
-    "!*.spec.ts",
-    "!*.spec.d.ts",
-    "!*.spec.js",
-    "!*.spec.js.map"
+    "!**/*.spec.ts",
+    "!**/*.spec.d.ts",
+    "!**/*.spec.js",
+    "!**/*.spec.js.map"
   ],
   "dependencies": {
     "abort-controller": "~3.0.0",
