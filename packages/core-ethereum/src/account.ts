@@ -3,7 +3,7 @@ import type { TransactionObject } from './tsc/web3/types'
 import type { TransactionConfig } from 'web3-core'
 import Web3 from 'web3'
 import { getRpcOptions, Network } from '@hoprnet/hopr-ethereum'
-import { durations, Intermediate, u8aToHex, u8aEquals, stringToU8a } from '@hoprnet/hopr-utils'
+import { durations, stringToU8a, u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
 import NonceTracker from './nonce-tracker'
 import TransactionManager from './transaction-manager'
 import { AccountId, AcknowledgedTicket, Balance, Hash, NativeBalance, TicketEpoch, Public } from './types'
@@ -69,11 +69,7 @@ class Account {
     this._preImageIterator = async function* (this: Account) {
       let ticket: AcknowledgedTicket = yield
 
-      let currentPreImage: Promise<Intermediate> = this.coreConnector.hashedSecret.findPreImage(
-        await this.onChainSecret
-      )
-
-      let tmp: Intermediate = await currentPreImage
+      let tmp = await this.coreConnector.hashedSecret.findPreImage(await this.onChainSecret)
 
       while (true) {
         if (
@@ -84,10 +80,7 @@ class Account {
             (await ticket.signedTicket).ticket.winProb
           )
         ) {
-          currentPreImage = this.coreConnector.hashedSecret.findPreImage(tmp.preImage)
-
           ticket.preImage = new Hash(tmp.preImage)
-
           if (tmp.iteration == 0) {
             // @TODO dispatch call of next hashedSecret submit
             return true
@@ -95,7 +88,7 @@ class Account {
             yield true
           }
 
-          tmp = await currentPreImage
+          tmp = await this.coreConnector.hashedSecret.findPreImage(tmp.preImage)
         } else {
           yield false
         }
