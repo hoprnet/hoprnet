@@ -103,13 +103,10 @@ export async function getAcknowledgedTickets(
       .on('error', (err) => reject(err))
       .on('data', async ({ key, value }: { key: Buffer; value: Buffer }) => {
         const index = node._dbKeys.AcknowledgedTicketsParse(key)
-        const ackTicket = node.paymentChannels.createAcknowledgedTicketFromBuffer({
-          bytes: value.buffer,
-          offset: value.byteOffset
-        })
+        const ackTicket = await node.paymentChannels.types.AcknowledgedTicket.deserialize(value)
 
         // if signer provided doesn't match our ticket's signer dont add it to the list
-        if (filter?.signer && !u8aEquals(await (await ackTicket.signedTicket).signer, filter.signer)) {
+        if (filter?.signer && !u8aEquals(await ackTicket.getSignedTicket().signer, filter.signer)) {
           return
         }
 
@@ -139,7 +136,7 @@ export async function deleteAcknowledgedTickets(
       tickets.map<any>(async (ticket) => {
         return {
           type: 'del',
-          key: Buffer.from(node._dbKeys.AcknowledgedTickets((await ticket.ackTicket.signedTicket).ticket.challenge))
+          key: Buffer.from(node._dbKeys.AcknowledgedTickets(ticket.ackTicket.getSignedTicket().ticket.challenge))
         }
       })
     )
@@ -194,7 +191,7 @@ export async function getTickets(
   return Promise.all([getUnacknowledgedTickets(node, filter), getAcknowledgedTickets(node, filter)]).then(
     async ([unAcks, acks]) => {
       const unAckTickets = await Promise.all(unAcks.map((o) => o.signedTicket))
-      const ackTickets = await Promise.all(acks.map((o) => o.ackTicket.signedTicket))
+      const ackTickets = acks.map((o) => o.ackTicket.getSignedTicket())
 
       return [...unAckTickets, ...ackTickets]
     }

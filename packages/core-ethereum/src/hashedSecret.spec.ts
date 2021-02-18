@@ -245,7 +245,7 @@ describe('test probabilisticPayments', function () {
       )
 
       const firstPreImage = new Types.Hash(new Uint8Array(HASHED_SECRET_WIDTH))
-      firstPreImage.set(firstTicket.preImage)
+      firstPreImage.set(firstTicket.getPreImage())
 
       assert(
         await connector.probabilisticPayments.validateTicket(firstTicket),
@@ -253,7 +253,7 @@ describe('test probabilisticPayments', function () {
       )
 
       const secondPreImage = new Types.Hash(new Uint8Array(HASHED_SECRET_WIDTH))
-      secondPreImage.set(firstTicket.preImage)
+      secondPreImage.set(firstTicket.getPreImage())
 
       assert(
         firstPreImage != null &&
@@ -282,7 +282,7 @@ describe('test probabilisticPayments', function () {
       )
 
       const fourthPreImage = new Types.Hash(new Uint8Array(HASHED_SECRET_WIDTH))
-      fourthPreImage.set(firstTicket.preImage)
+      fourthPreImage.set(firstTicket.getPreImage())
 
       assert(
         fourthPreImage != null &&
@@ -306,7 +306,7 @@ describe('test probabilisticPayments', function () {
           new Types.Hash(randomBytes(Types.Hash.SIZE))
         )
 
-        if (!u8aEquals(ticket.preImage, EMPTY_HASHED_SECRET)) {
+        if (!u8aEquals(ticket.getPreImage(), EMPTY_HASHED_SECRET)) {
           assert(await connector.probabilisticPayments.validateTicket(ticket))
         }
       }

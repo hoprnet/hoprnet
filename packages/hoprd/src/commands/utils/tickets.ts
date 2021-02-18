@@ -9,7 +9,7 @@ import { u8aToHex } from '@hoprnet/hopr-utils'
  * @returns a promise that resolves into an array of signed tickets
  */
 export async function toSignedTickets(ackTickets: Types.AcknowledgedTicket[]): Promise<Types.SignedTicket[]> {
-  return Promise.all(ackTickets.map((ackTicket) => ackTicket.signedTicket))
+  return ackTickets.map((ackTicket) => ackTicket.getSignedTicket())
 }
 
 /**

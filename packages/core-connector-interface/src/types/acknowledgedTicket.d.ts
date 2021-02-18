@@ -1,23 +1,22 @@
 import { Hash, SignedTicket } from '.'
 
+declare interface AcknowledgedTicketStatic {
+  SIZE(): number
+  deserialize(Uint8Array): Promise<AcknowledgedTicket>
+}
+
 declare interface AcknowledgedTicket {
   constructor(
     signedTicket: SignedTicket,
     response: Hash,
     preImage?: Hash
   )
-
-  signedTicket: Promise<SignedTicket>
-  signedTicketOffset: number
-
-  response: Hash
-  responseOffset: number
-
-  preImage: Hash
-  preImageOffset: number
-
-  serialized(): Uint8Array
-  SIZE(): number
+  getSignedTicket(): SignedTicket
+  getResponse(): Hash
+  getPreImage(): Hash
+  setPreImage(Hash)
+  serialize(): Uint8Array
 }
 
+declare var AcknowledgedTicket: AcknowledgedTicketStatic
 export default AcknowledgedTicket

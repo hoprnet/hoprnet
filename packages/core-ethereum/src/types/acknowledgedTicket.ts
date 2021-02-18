@@ -3,27 +3,14 @@ import { HASHED_SECRET_WIDTH } from '../hashedSecret'
 import type { AcknowledgedTicket as IAcknowledgedTicket } from '@hoprnet/hopr-core-connector-interface'
 
 class AcknowledgedTicket implements IAcknowledgedTicket{
-  private _signedTicket: SignedTicket
-  private _response: Hash
   private _preImage: Hash
-  private _serialized: Uint8Array
 
   constructor(
-    signedTicket: SignedTicket,
-    response: Hash,
+    private signedTicket: SignedTicket,
+    private response: Hash,
     preImage?: Hash
   ) {
-
-    this._serialized = new Uint8Array(AcknowledgedTicket.SIZE())
-
-    this._serialized.set(signedTicket, this.signedTicketOffset - this._serialized.byteOffset)
-    this._signedTicket = signedTicket
-
-    this._serialized.set(response, this.responseOffset - this._serialized.byteOffset)
-    this._response = response
-
     if (preImage) {
-      this._serialized.set(preImage, this.preImageOffset - this._serialized.byteOffset)
       this._preImage = preImage
     }
   }
@@ -34,68 +21,59 @@ class AcknowledgedTicket implements IAcknowledgedTicket{
   }
   */
 
-  get signedTicketOffset(): number {
-    return this._serialized.byteOffset
+  getSignedTicket(): SignedTicket {
+    return this.signedTicket
   }
 
-  get signedTicket(): Promise<SignedTicket> {
-    if (this._signedTicket) {
-      return Promise.resolve(this._signedTicket)
-    }
-
-    return new Promise<SignedTicket>(async (resolve) => {
-      this._signedTicket = await SignedTicket.create({
-        bytes: this._serialized.buffer,
-        offset: this.signedTicketOffset
-      })
-
-      resolve(this._signedTicket)
-    })
+  getResponse(): Hash {
+    return this.response
   }
 
-  get responseOffset(): number {
-    return this._serialized.byteOffset + SignedTicket.SIZE
-  }
 
-  get response(): Hash {
-    if (!this._response) {
-      this._response = new Hash(
-        new Uint8Array(this._serialized.buffer, this.responseOffset, Hash.SIZE)
-      )
-    }
-
-    return this._response
-  }
-
-  get preImageOffset(): number {
-    return this._serialized.byteOffset + SignedTicket.SIZE + Hash.SIZE
-  }
-
-  get preImage(): Hash {
-    if (!this._preImage) {
-      this._preImage = new Hash(
-        new Uint8Array(this._serialized.buffer, this.preImageOffset, HASHED_SECRET_WIDTH)
-      )
-    }
-
+  getPreImage(): Hash {
     return this._preImage
   }
 
-  set preImage(preImage: Hash) {
-    this._serialized.set(preImage, this.preImageOffset)
-
-    this._preImage = new Hash(
-      new Uint8Array(this._serialized.buffer, this.preImageOffset, HASHED_SECRET_WIDTH)
-    )
+  setPreImage(preImage: Hash) {
+    this._preImage = preImage 
   }
 
   static SIZE(): number {
     return SignedTicket.SIZE + Hash.SIZE + HASHED_SECRET_WIDTH + 1
   }
 
-  public serialized(): Uint8Array {
-    return this._serialized
+  public serialize(): Uint8Array {
+    const serialized = new Uint8Array(AcknowledgedTicket.SIZE())
+    serialized.set(this.signedTicket, 0)
+    serialized.set(this.response, SignedTicket.SIZE)
+    if (this._preImage) {
+      serialized.set(this._preImage, SignedTicket.SIZE + Hash.SIZE)
+    }
+    return serialized
   }
+
+  static async deserialize(arr: Uint8Array): Promise<IAcknowledgedTicket> {
+    if (arr.length != AcknowledgedTicket.SIZE()){
+      throw new Error('Cannot deserialize, bad length')
+    }
+
+    const signedTicket = await SignedTicket.create({
+        bytes: arr.buffer,
+        offset: arr.byteOffset 
+      })
+
+    const response = new Hash(
+      new Uint8Array(arr.buffer, arr.byteOffset + SignedTicket.SIZE, Hash.SIZE)
+    )
+
+    const preImage = new Hash(
+      new Uint8Array(arr.buffer, arr.byteOffset + SignedTicket.SIZE + Hash.SIZE, HASHED_SECRET_WIDTH)
+    )
+
+    return new AcknowledgedTicket(signedTicket, response, preImage)
+  }
+
+
 }
 
 export default AcknowledgedTicket

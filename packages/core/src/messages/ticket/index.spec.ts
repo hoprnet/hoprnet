@@ -86,11 +86,11 @@ describe(`check serialization and deserialization of ticket objects`, function (
       'signature must be valid'
     )
 
-    const acknowledgedDbEntry = node.paymentChannels.types.AcknowledgedTicket.create(node.paymentChannels, undefined, {
+    const acknowledgedDbEntry = node.paymentChannels.createAcknowledgedTicket(
       signedTicket,
-      response: await node.paymentChannels.utils.hash(u8aConcat(secretA, secretB)),
-      preImage: randomBytes(27)
-    })
+      await node.paymentChannels.utils.hash(u8aConcat(secretA, secretB)),
+      randomBytes(27)
+    )
 
     const FIRST_TICKET = 1
     await node.db.put(

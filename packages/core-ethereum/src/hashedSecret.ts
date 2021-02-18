@@ -223,10 +223,10 @@ export class ProbabilisticPayments {
   }
 
   public async validateTicket(ticket: AcknowledgedTicket): Promise<boolean> {
-    const s = await ticket.signedTicket
+    const s = ticket.getSignedTicket()
     log('validate')
-    if (await isWinningTicket(await s.ticket.hash, ticket.response, ticket.preImage, s.ticket.winProb)) {
-      ticket.preImage = new Hash(this.currentPreImage)
+    if (await isWinningTicket(await s.ticket.hash, ticket.getResponse(), ticket.getPreImage(), s.ticket.winProb)) {
+      ticket.setPreImage(new Hash(this.currentPreImage))
       this.currentPreImage = await this.findPreImage(this.currentPreImage)
       return true
     }
