@@ -90,8 +90,6 @@ export async function getAcknowledgedTickets(
     index: Uint8Array
   }[]
 > {
-  const { AcknowledgedTicket } = node.paymentChannels.types
-  const acknowledgedTicketSize = AcknowledgedTicket.SIZE(node.paymentChannels)
   const results: {
     ackTicket: Types.AcknowledgedTicket
     index: Uint8Array
@@ -104,10 +102,8 @@ export async function getAcknowledgedTickets(
       })
       .on('error', (err) => reject(err))
       .on('data', async ({ key, value }: { key: Buffer; value: Buffer }) => {
-        if (value.buffer.byteLength !== acknowledgedTicketSize) return
-
         const index = node._dbKeys.AcknowledgedTicketsParse(key)
-        const ackTicket = AcknowledgedTicket.create(node.paymentChannels, {
+        const ackTicket = node.paymentChannels.createAcknowledgedTicketFromBuffer({
           bytes: value.buffer,
           offset: value.byteOffset
         })
@@ -169,7 +165,7 @@ export async function redeemTicket(
   index: Uint8Array
 ): Promise<OperationStatus> {
   try {
-    const result = await node.paymentChannels.channel.tickets.submit(ackTicket, index)
+    const result = await node.paymentChannels.channel.redeemTicket(ackTicket)
     await deleteAcknowledgedTicket(node, index)
     if (result.status === 'SUCCESS') {
       // TODO Store stats.

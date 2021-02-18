@@ -106,7 +106,7 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
           ticketCounter = toU8a(0, ACKNOWLEDGED_TICKET_INDEX_LENGTH)
         }
 
-        let acknowledgedTicket = new this.node.paymentChannels.types.AcknowledgedTicket(
+        let acknowledgedTicket = this.node.paymentChannels.createAcknowledgedTicket(
           await unacknowledgedTicket.signedTicket,
           await this.node.paymentChannels.utils.hash(
               u8aConcat(unacknowledgedTicket.secretA, await acknowledgement.hashedKey)

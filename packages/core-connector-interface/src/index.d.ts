@@ -93,10 +93,16 @@ declare interface HoprCoreConnector {
   smartContractInfo(): string
 
   /**
-   * Check whether the given ticket is valid and winning
+   * Check whether the given ticket is winning
    * @param ticket the acknowledged ticket to check
    */
   validateTicket(ticket: Types.AcknowledgedTicket): Promise<boolean>
+
+  createAcknowledgedTicket(
+    signedTicket: SignedTicket,
+    response: Hash,
+    preImage?: Hash
+  ): AcknowledgedTicket
 
   /**
    * (Static) utils to use in the connector module
@@ -136,6 +142,6 @@ declare interface HoprCoreConnector {
 
 declare var HoprCoreConnector: HoprCoreConnectorStatic
 
-export { Utils, Types, DbKeys, Constants, Channel, Indexer, RoutingChannel, ChannelUpdate, HoprCoreConnectorStatic }
+export { Utils, Types, DbKeys, Constants, Channel, Indexer, RoutingChannel, ChannelUpdate, HoprCoreConnectorStatic, AcknowledgedTicket, SignedTicket, Hash }
 
 export default HoprCoreConnector

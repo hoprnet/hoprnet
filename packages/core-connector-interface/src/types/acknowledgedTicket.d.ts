@@ -1,8 +1,5 @@
 import { Hash, SignedTicket } from '.'
 
-declare interface AcknowledgedTicketStatic {
-  SIZE(): number
-}
 declare interface AcknowledgedTicket {
   constructor(
     signedTicket: SignedTicket,
@@ -20,8 +17,7 @@ declare interface AcknowledgedTicket {
   preImageOffset: number
 
   serialized(): Uint8Array
-
+  SIZE(): number
 }
 
-declare var AcknowledgedTicket: AcknowledgedTicketStatic
 export default AcknowledgedTicket

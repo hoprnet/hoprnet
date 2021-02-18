@@ -1,7 +1,8 @@
 import { Hash, SignedTicket } from '.'
 import { HASHED_SECRET_WIDTH } from '../hashedSecret'
+import type { AcknowledgedTicket as IAcknowledgedTicket } from '@hoprnet/hopr-core-connector-interface'
 
-class AcknowledgedTicket{
+class AcknowledgedTicket implements IAcknowledgedTicket{
   private _signedTicket: SignedTicket
   private _response: Hash
   private _preImage: Hash

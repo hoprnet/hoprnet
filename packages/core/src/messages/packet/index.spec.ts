@@ -194,7 +194,7 @@ describe('test packet composition and decomposition', function () {
       }
 
       for (let k = 0; k < tickets.length; k++) {
-        await node.paymentChannels.channel.tickets.submit(tickets[k] as any, undefined as any)
+        await node.paymentChannels.channel.redeemTicket(tickets[k] as any)
         log(`ticket submitted`)
       }
     }

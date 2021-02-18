@@ -1,6 +1,6 @@
 import type { LevelUp } from 'levelup'
 import type { WebsocketProvider } from 'web3-core'
-import type { Currencies, AcknowledgedTicket } from '@hoprnet/hopr-core-connector-interface'
+import type { Currencies, AcknowledgedTicket as IAcknowledgedTicket, SignedTicket, Hash } from '@hoprnet/hopr-core-connector-interface'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type { HoprChannels } from './tsc/web3/HoprChannels'
 import type { HoprToken } from './tsc/web3/HoprToken'
@@ -17,6 +17,7 @@ import * as config from './config'
 import Account from './account'
 import { ProbabilisticPayments } from './hashedSecret'
 import debug from 'debug'
+import AcknowledgedTicket from './types/acknowledgedTicket'
 
 const HoprChannelsAbi = abis.HoprChannels
 const HoprTokenAbi = abis.HoprToken
@@ -249,8 +250,20 @@ export default class HoprEthereum implements HoprCoreConnector {
     return constants
   }
 
-  async validateTicket(ticket: AcknowledgedTicket): Promise<boolean> {
+  async validateTicket(ticket: IAcknowledgedTicket): Promise<boolean> {
     return this.probabilisticPayments.validateTicket(ticket)
+  }
+
+  createAcknowledgedTicket(
+    signedTicket: SignedTicket,
+    response: Hash,
+    preImage?: Hash
+  ): IAcknowledgedTicket {
+    return new AcknowledgedTicket(
+      signedTicket,
+      response,
+      preImage
+    )
   }
 }
 
