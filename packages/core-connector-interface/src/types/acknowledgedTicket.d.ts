@@ -6,11 +6,7 @@ declare interface AcknowledgedTicketStatic {
 }
 
 declare interface AcknowledgedTicket {
-  constructor(
-    signedTicket: SignedTicket,
-    response: Hash,
-    preImage?: Hash
-  )
+  constructor(signedTicket: SignedTicket, response: Hash, preImage?: Hash)
   getSignedTicket(): SignedTicket
   getResponse(): Hash
   getPreImage(): Hash

@@ -2,14 +2,10 @@ import { Hash, SignedTicket } from '.'
 import { HASHED_SECRET_WIDTH } from '../hashedSecret'
 import type { AcknowledgedTicket as IAcknowledgedTicket } from '@hoprnet/hopr-core-connector-interface'
 
-class AcknowledgedTicket implements IAcknowledgedTicket{
+class AcknowledgedTicket implements IAcknowledgedTicket {
   private _preImage: Hash
 
-  constructor(
-    private signedTicket: SignedTicket,
-    private response: Hash,
-    preImage?: Hash
-  ) {
+  constructor(private signedTicket: SignedTicket, private response: Hash, preImage?: Hash) {
     if (preImage) {
       this._preImage = preImage
     }
@@ -29,13 +25,12 @@ class AcknowledgedTicket implements IAcknowledgedTicket{
     return this.response
   }
 
-
   getPreImage(): Hash {
     return this._preImage
   }
 
   setPreImage(preImage: Hash) {
-    this._preImage = preImage 
+    this._preImage = preImage
   }
 
   static SIZE(): number {
@@ -53,25 +48,21 @@ class AcknowledgedTicket implements IAcknowledgedTicket{
   }
 
   static async deserialize(arr: Uint8Array): Promise<IAcknowledgedTicket> {
-    if (arr.length != AcknowledgedTicket.SIZE()){
+    if (arr.length != AcknowledgedTicket.SIZE()) {
       throw new Error('Cannot deserialize, bad length')
     }
 
     const signedTicket = await SignedTicket.create({
-        bytes: arr.buffer,
-        offset: arr.byteOffset 
-      })
-    const response = new Hash(
-      new Uint8Array(arr.buffer, arr.byteOffset + SignedTicket.SIZE, Hash.SIZE)
-    )
+      bytes: arr.buffer,
+      offset: arr.byteOffset
+    })
+    const response = new Hash(new Uint8Array(arr.buffer, arr.byteOffset + SignedTicket.SIZE, Hash.SIZE))
     const preImage = new Hash(
       new Uint8Array(arr.buffer, arr.byteOffset + SignedTicket.SIZE + Hash.SIZE, HASHED_SECRET_WIDTH)
     )
 
     return new AcknowledgedTicket(signedTicket, response, preImage)
   }
-
-
 }
 
 export default AcknowledgedTicket

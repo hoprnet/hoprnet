@@ -98,11 +98,7 @@ declare interface HoprCoreConnector {
    */
   validateTicket(ticket: Types.AcknowledgedTicket): Promise<boolean>
 
-  createAcknowledgedTicket(
-    signedTicket: SignedTicket,
-    response: Hash,
-    preImage?: Hash
-  ): AcknowledgedTicket
+  createAcknowledgedTicket(signedTicket: SignedTicket, response: Hash, preImage?: Hash): AcknowledgedTicket
 
   /**
    * (Static) utils to use in the connector module
@@ -142,6 +138,19 @@ declare interface HoprCoreConnector {
 
 declare var HoprCoreConnector: HoprCoreConnectorStatic
 
-export { Utils, Types, DbKeys, Constants, Channel, Indexer, RoutingChannel, ChannelUpdate, HoprCoreConnectorStatic, AcknowledgedTicket, SignedTicket, Hash }
+export {
+  Utils,
+  Types,
+  DbKeys,
+  Constants,
+  Channel,
+  Indexer,
+  RoutingChannel,
+  ChannelUpdate,
+  HoprCoreConnectorStatic,
+  AcknowledgedTicket,
+  SignedTicket,
+  Hash
+}
 
 export default HoprCoreConnector
