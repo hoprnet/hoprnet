@@ -374,7 +374,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
           this.node._interactions.payments.open.interact(target, channelBalance)
       )
 
-      this._ticket = await channel.createTicket(fee, this.header.encryptionKey, this.node.ticketWinProb,)
+      this._ticket = await channel.createTicket(fee, this.header.encryptionKey, this.node.ticketWinProb)
       /*{
         bytes: this.buffer,
         offset: this.ticketOffset

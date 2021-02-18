@@ -28,7 +28,11 @@ const isNullAccount = (a: string) => a == null || ['0', '0x', '0x'.padEnd(66, '0
  * @param winProb winning probability of the ticket
  */
 async function isWinningTicket(ticketHash: Hash, challengeResponse: Hash, preImage: Hash, winProb: Uint8Array) {
-  console.log(await hash(u8aConcat(ticketHash, preImage, challengeResponse)), winProb, u8aCompare(await hash(u8aConcat(ticketHash, preImage, challengeResponse)), winProb))
+  console.log(
+    await hash(u8aConcat(ticketHash, preImage, challengeResponse)),
+    winProb,
+    u8aCompare(await hash(u8aConcat(ticketHash, preImage, challengeResponse)), winProb)
+  )
   return u8aLessThanOrEqual(await hash(u8aConcat(ticketHash, preImage, challengeResponse)), winProb)
 }
 
