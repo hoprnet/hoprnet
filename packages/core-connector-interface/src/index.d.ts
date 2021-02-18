@@ -29,11 +29,11 @@ declare interface HoprCoreConnector {
     /**
      * Returns the current (token) balance of the account associated with this node.
      */
-    balance: Promise<Types.Balance>
+    getBalance: (useCache?: boolean) => Promise<Types.Balance>
     /**
      * Returns the current native balance (ex: ETH) of the account associated with this node.
      */
-    nativeBalance: Promise<Types.NativeBalance>
+    getNativeBalance: (useCache?: boolean) => Promise<Types.NativeBalance>
     /**
      * Returns the current value of the reset counter
      */

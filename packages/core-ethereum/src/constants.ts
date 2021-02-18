@@ -18,3 +18,9 @@ export const ERRORS = {
   OOF_HOPR: 'Insufficient HOPR tokens.',
   OOF_NATIVE: 'Insufficient NATIVE funds.'
 }
+
+/**
+ * specifies in milliseconds for how long various
+ * web3 requests like `eth_getBalance` should be cached for
+ */
+export const WEB3_CACHE_TTL = 30e3 // 30 seconds

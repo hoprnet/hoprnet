@@ -588,11 +588,11 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
   }
 
   public async getBalance(): Promise<Types.Balance> {
-    return await this.paymentChannels.account.balance
+    return await this.paymentChannels.account.getBalance(true)
   }
 
   public async getNativeBalance(): Promise<Types.NativeBalance> {
-    return await this.paymentChannels.account.nativeBalance
+    return await this.paymentChannels.account.getNativeBalance(true)
   }
 
   public smartContractInfo(): string {
@@ -619,7 +619,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       await utils.pubKeyToAccountId(counterParty.pubKey.marshal())
     )
 
-    const myAvailableTokens = await account.balance
+    const myAvailableTokens = await account.getBalance(true)
 
     // validate 'amountToFund'
     if (amountToFund.lten(0)) {
