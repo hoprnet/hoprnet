@@ -126,7 +126,8 @@ class Account {
     if (useCache) {
       const cache = this._cache.get('balance')
       const expired = cache && isExpired(cache.updatedAt, new Date().getTime(), WEB3_CACHE_TTL)
-      if (expired) return new Balance(cache.value)
+
+      if (!expired) return new Balance(cache.value)
     }
 
     const value = await this.coreConnector.hoprToken.methods.balanceOf((await this.address).toHex()).call()
@@ -143,7 +144,8 @@ class Account {
     if (useCache) {
       const cache = this._cache.get('nativeBalance')
       const expired = cache && isExpired(cache.updatedAt, new Date().getTime(), WEB3_CACHE_TTL)
-      if (expired) return new NativeBalance(cache.value)
+
+      if (!expired) return new NativeBalance(cache.value)
     }
 
     const value = await this.coreConnector.web3.eth.getBalance((await this.address).toHex())
