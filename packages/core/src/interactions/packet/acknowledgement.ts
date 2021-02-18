@@ -109,8 +109,8 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
         let acknowledgedTicket = this.node.paymentChannels.createAcknowledgedTicket(
           await unacknowledgedTicket.signedTicket,
           await this.node.paymentChannels.utils.hash(
-              u8aConcat(unacknowledgedTicket.secretA, await acknowledgement.hashedKey)
-            )
+            u8aConcat(unacknowledgedTicket.secretA, await acknowledgement.hashedKey)
+          )
         )
 
         const isWinningTicket = await this.node.paymentChannels.validateTicket(acknowledgedTicket)

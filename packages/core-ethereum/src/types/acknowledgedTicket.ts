@@ -61,11 +61,9 @@ class AcknowledgedTicket implements IAcknowledgedTicket{
         bytes: arr.buffer,
         offset: arr.byteOffset 
       })
-
     const response = new Hash(
       new Uint8Array(arr.buffer, arr.byteOffset + SignedTicket.SIZE, Hash.SIZE)
     )
-
     const preImage = new Hash(
       new Uint8Array(arr.buffer, arr.byteOffset + SignedTicket.SIZE + Hash.SIZE, HASHED_SECRET_WIDTH)
     )
