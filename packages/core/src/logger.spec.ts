@@ -1,36 +1,11 @@
-import PeerId from 'peer-id'
 import { Logger } from './logger'
-import Metrics from 'libp2p/src/metrics'
 import assert from 'assert'
 
 /**
  * @dev this code won't work in the browser
  */
 describe('test logger', function () {
-  let pId: PeerId
   const recordedEvents: any[] = []
-
-  function fakeMetrics() {
-    return {
-      forPeer(peer: PeerId) {
-        if (peer.equals(pId)) {
-          return undefined
-        }
-
-        return {
-          toJSON() {
-            return {
-              movingAverages: { '12345': 12345 }
-            }
-          }
-        }
-      }
-    } as Metrics
-  }
-
-  before(async function () {
-    pId = await PeerId.create({ keyType: 'secp256k1' })
-  })
 
   beforeEach(function () {
     recordedEvents.splice(0)
@@ -41,7 +16,7 @@ describe('test logger', function () {
 
     process.removeAllListeners('uncaughtException')
 
-    const logger = new Logger(fakeMetrics(), recordedEvents.push.bind(recordedEvents))
+    const logger = new Logger(recordedEvents.push.bind(recordedEvents))
 
     logger.start()
 
@@ -73,7 +48,7 @@ describe('test logger', function () {
     const originalExceptionHandlers = process.listeners('uncaughtException')
     process.removeAllListeners('uncaughtException')
 
-    const logger = new Logger(fakeMetrics(), recordedEvents.push.bind(recordedEvents))
+    const logger = new Logger(recordedEvents.push.bind(recordedEvents))
 
     logger.start()
 
@@ -107,7 +82,7 @@ describe('test logger', function () {
     const originalWarningHandlers = process.listeners('warning')
     process.removeAllListeners('warning')
 
-    const logger = new Logger(fakeMetrics(), recordedEvents.push.bind(recordedEvents))
+    const logger = new Logger(recordedEvents.push.bind(recordedEvents))
 
     logger.start()
 

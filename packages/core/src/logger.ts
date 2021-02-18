@@ -17,21 +17,28 @@ export class Logger {
   private unhandledRejectionListener: (reason: any, promise: Promise<any>) => void
   private warningListener: (err: any) => void
 
-  constructor(private metrics: Metrics, private debugLogger = console.log) {
+  private metrics?: Metrics
+
+  constructor(private debugLogger = console.log) {
     this.uncaughtExceptionListener = this.logUncaughtException.bind(this)
     this.unhandledRejectionListener = this.logUnhandledPromiseRejection.bind(this)
     this.warningListener = this.logWarning.bind(this)
   }
 
-  public start() {
+  public attachLibp2pMetrics(metrics: Metrics) {
+    this.metrics = metrics
+  }
+  public start(): Logger {
     this.interval = setInterval(this.createReport.bind(this), DEFAULT_DEBUG_INTERVAL)
 
     process.prependListener('warning', this.warningListener)
     process.prependListener('uncaughtException', this.uncaughtExceptionListener)
     process.prependListener('unhandledRejection', this.unhandledRejectionListener)
+
+    return this
   }
 
-  public stop() {
+  public stop(): void {
     clearInterval(this.interval)
 
     process.off('warning', this.warningListener)
@@ -76,7 +83,7 @@ export class Logger {
   private createReport() {
     const report = { connectionReport: {}, performanceReport: loadavg() }
 
-    for (const peer of this.metrics.peers) {
+    for (const peer of this.metrics?.peers) {
       try {
         let peerId = PeerId.createFromB58String(peer)
         try {

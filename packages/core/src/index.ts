@@ -125,10 +125,15 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
    * @param _options
    * @param provider
    */
-  private constructor(options: HoprOptions, public _libp2p: LibP2P, public db: LevelUp, public paymentChannels: Chain) {
+  private constructor(
+    options: HoprOptions & { logger: Logger },
+    public _libp2p: LibP2P,
+    public db: LevelUp,
+    public paymentChannels: Chain
+  ) {
     super()
 
-    this.logger = new Logger(this._libp2p.metrics)
+    this.logger = options.logger
 
     this._libp2p.connectionManager.on('peer:connect', (conn: Connection) => {
       this.emit('hopr:peer:connection', conn.remotePeer)
@@ -198,6 +203,9 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
   public static async create<CoreConnector extends HoprCoreConnector>(
     options: HoprOptions
   ): Promise<Hopr<CoreConnector>> {
+    const logger = new Logger()
+    logger.start()
+
     const Connector = options.connector ?? HoprCoreEthereum
     const db = Hopr.openDatabase(options)
 
@@ -260,7 +268,17 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       }
     })
 
-    return await new Hopr<CoreConnector>(options, libp2p, db, connector).start()
+    logger.attachLibp2pMetrics(libp2p.metrics)
+
+    return await new Hopr<CoreConnector>(
+      {
+        logger,
+        ...options
+      },
+      libp2p,
+      db,
+      connector
+    ).start()
   }
 
   /**
@@ -388,7 +406,6 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     this._libp2p.multiaddrs.forEach((ma: Multiaddr) => log(ma.toString()))
     this.running = true
     this.periodicCheck()
-    this.logger.start()
     return this
   }
 
@@ -408,8 +425,6 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       this.paymentChannels.stop()
     ])
 
-    this.logger.stop()
-
     await Promise.all([
       // prettier-ignore
       this.db?.close().then(() => log(`Database closed.`)),
@@ -418,6 +433,8 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
 
     // Give the operating system some extra time to close the sockets
     await new Promise((resolve) => setTimeout(resolve, 100))
+
+    this.logger.stop()
   }
 
   public isRunning(): boolean {
