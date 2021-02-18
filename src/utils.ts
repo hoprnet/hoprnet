@@ -41,6 +41,7 @@ export function extractPeerIdFromMultiaddr(ma: Multiaddr): PeerId {
 }
 
 type AddressFamily = 'IPv4' | 'IPv6' | 'ipv4' | 'ipv6'
+
 export function isAnyAddress(address: string, family: AddressFamily): boolean {
   switch (family.toLowerCase()) {
     case 'ipv4':
@@ -85,12 +86,21 @@ export function ipToU8a(address: string, family: AddressFamily) {
     case 'ipv4':
       return Uint8Array.from(address.split('.').map((x: string) => parseInt(x)))
     case 'ipv6':
-      const splitted = address.split(':').filter((x: string) => x.length > 0)
+      const splitted = address.split(':')
       if (address.endsWith(':')) {
-        splitted.push('0')
+        splitted[splitted.length - 1] = '0'
       }
-      if (splitted.length < 8) {
-        splitted.splice(splitted.length - 1, 0, ...Array.from({ length: 8 - splitted.length }, () => '0'))
+
+      if (address.startsWith(':')) {
+        splitted[0] = '0'
+      }
+
+      if (splitted.some((x) => x.length == 0)) {
+        splitted.splice(
+          splitted.findIndex((x) => x.length == 0),
+          1,
+          ...Array.from({ length: 8 - splitted.length + 1 }, () => '0')
+        )
       }
 
       const result = new Uint8Array(16)
