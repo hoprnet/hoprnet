@@ -229,7 +229,7 @@ export default class HoprEthereum implements HoprCoreConnector {
     const hoprChannels = new web3.eth.Contract(HoprChannelsAbi as any, addresses?.[network]?.HoprChannels)
     const hoprToken = new web3.eth.Contract(HoprTokenAbi as any, addresses?.[network]?.HoprToken)
 
-    // @TODO: maybe use this later? for emmerbucker
+    // @TODO: maybe use this later? for emmenbruecke
     // const methods = [...Object.keys(hoprChannels.methods), ...Object.keys(hoprToken.methods)]
     // const methodsMapped = methods.reduce((result, func) => {
     //   result.set(web3.eth.abi.encodeFunctionSignature(func), func)

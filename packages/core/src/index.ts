@@ -128,6 +128,8 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
   private constructor(options: HoprOptions, public _libp2p: LibP2P, public db: LevelUp, public paymentChannels: Chain) {
     super()
 
+    this.logger = new Logger(this._libp2p.metrics)
+
     this._libp2p.connectionManager.on('peer:connect', (conn: Connection) => {
       this.emit('hopr:peer:connection', conn.remotePeer)
       this.networkPeers.register(conn.remotePeer)
@@ -177,8 +179,6 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       this._interactions.heartbeat,
       this._libp2p.hangUp.bind(this._libp2p)
     )
-
-    this.logger = new Logger(this._libp2p.metrics)
 
     if (options.ticketAmount) this.ticketAmount = options.ticketAmount
     if (options.ticketWinProb) this.ticketWinProb = options.ticketWinProb

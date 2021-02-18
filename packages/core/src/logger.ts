@@ -1,5 +1,6 @@
 import Metrics from 'libp2p/src/metrics'
 import PeerId from 'peer-id'
+import { loadavg } from 'os'
 
 import { durations } from '@hoprnet/hopr-utils'
 // import { logDebugData } from '@hoprnet/hopr-logs'
@@ -23,7 +24,7 @@ export class Logger {
   }
 
   public start() {
-    this.interval = setInterval(this.createConnectivityLog.bind(this), DEFAULT_DEBUG_INTERVAL)
+    this.interval = setInterval(this.createReport.bind(this), DEFAULT_DEBUG_INTERVAL)
 
     process.prependListener('warning', this.warningListener)
     process.prependListener('uncaughtException', this.uncaughtExceptionListener)
@@ -72,8 +73,8 @@ export class Logger {
     })
   }
 
-  private createConnectivityLog() {
-    const report = { connectionReport: {} }
+  private createReport() {
+    const report = { connectionReport: {}, performanceReport: loadavg() }
 
     for (const peer of this.metrics.peers) {
       try {
