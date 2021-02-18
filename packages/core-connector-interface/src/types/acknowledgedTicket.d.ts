@@ -4,11 +4,7 @@ declare interface AcknowledgedTicketStatic {
   SIZE(): number
 }
 declare interface AcknowledgedTicket {
-  constructor(
-    signedTicket: SignedTicket,
-    response: Hash,
-    preImage?: Hash
-  )
+  constructor(signedTicket: SignedTicket, response: Hash, preImage?: Hash)
 
   signedTicket: Promise<SignedTicket>
   signedTicketOffset: number
@@ -20,7 +16,6 @@ declare interface AcknowledgedTicket {
   preImageOffset: number
 
   serialized(): Uint8Array
-
 }
 
 declare var AcknowledgedTicket: AcknowledgedTicketStatic

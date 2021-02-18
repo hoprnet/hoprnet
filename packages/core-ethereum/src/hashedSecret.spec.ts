@@ -230,7 +230,8 @@ describe('test probabilisticPayments', function () {
     })
 
     it('should reserve a preImage for tickets with 100% winning probabilty resp. should not reserve for 0% winning probability', async function () {
-      const firstTicket = new Types.AcknowledgedTicket({
+      const firstTicket = new Types.AcknowledgedTicket(
+        {
           ticket: {
             hash: Promise.resolve(new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff))),
             winProb: Utils.computeWinningProbability(1)
@@ -262,7 +263,8 @@ describe('test probabilisticPayments', function () {
           u8aEquals((await hashFunction(secondPreImage)).slice(0, HASHED_SECRET_WIDTH), firstPreImage)
       )
 
-      const notWinnigTicket = new Types.AcknowledgedTicket({
+      const notWinnigTicket = new Types.AcknowledgedTicket(
+        {
           ticket: {
             hash: Promise.resolve(new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff))),
             winProb: Utils.computeWinningProbability(0)
@@ -297,7 +299,8 @@ describe('test probabilisticPayments', function () {
       let ticket: Types.AcknowledgedTicket
 
       for (let i = 0; i < ATTEMPTS; i++) {
-        ticket = new Types.AcknowledgedTicket({
+        ticket = new Types.AcknowledgedTicket(
+          {
             ticket: {
               hash: Promise.resolve(new Types.Hash(randomBytes(Types.Hash.SIZE))),
               winProb: Utils.computeWinningProbability(Math.random())

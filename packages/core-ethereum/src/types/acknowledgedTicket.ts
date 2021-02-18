@@ -1,18 +1,13 @@
 import { Hash, SignedTicket } from '.'
 import { HASHED_SECRET_WIDTH } from '../hashedSecret'
 
-class AcknowledgedTicket{
+class AcknowledgedTicket {
   private _signedTicket: SignedTicket
   private _response: Hash
   private _preImage: Hash
   private _serialized: Uint8Array
 
-  constructor(
-    signedTicket: SignedTicket,
-    response: Hash,
-    preImage?: Hash
-  ) {
-
+  constructor(signedTicket: SignedTicket, response: Hash, preImage?: Hash) {
     this._serialized = new Uint8Array(AcknowledgedTicket.SIZE())
 
     this._serialized.set(signedTicket, this.signedTicketOffset - this._serialized.byteOffset)
@@ -58,9 +53,7 @@ class AcknowledgedTicket{
 
   get response(): Hash {
     if (!this._response) {
-      this._response = new Hash(
-        new Uint8Array(this._serialized.buffer, this.responseOffset, Hash.SIZE)
-      )
+      this._response = new Hash(new Uint8Array(this._serialized.buffer, this.responseOffset, Hash.SIZE))
     }
 
     return this._response
@@ -72,9 +65,7 @@ class AcknowledgedTicket{
 
   get preImage(): Hash {
     if (!this._preImage) {
-      this._preImage = new Hash(
-        new Uint8Array(this._serialized.buffer, this.preImageOffset, HASHED_SECRET_WIDTH)
-      )
+      this._preImage = new Hash(new Uint8Array(this._serialized.buffer, this.preImageOffset, HASHED_SECRET_WIDTH))
     }
 
     return this._preImage
@@ -83,9 +74,7 @@ class AcknowledgedTicket{
   set preImage(preImage: Hash) {
     this._serialized.set(preImage, this.preImageOffset)
 
-    this._preImage = new Hash(
-      new Uint8Array(this._serialized.buffer, this.preImageOffset, HASHED_SECRET_WIDTH)
-    )
+    this._preImage = new Hash(new Uint8Array(this._serialized.buffer, this.preImageOffset, HASHED_SECRET_WIDTH))
   }
 
   static SIZE(): number {

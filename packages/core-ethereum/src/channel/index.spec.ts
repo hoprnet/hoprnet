@@ -130,10 +130,7 @@ describe('test Channel class', function () {
 
     const firstTicket = await getTicketData(myAddress)
     const signedTicket = await channel.createTicket(new Balance(1), firstTicket.challenge, 1)
-    const firstAckedTicket = new AcknowledgedTicket(
-      signedTicket,
-      firstTicket.response
-    )
+    const firstAckedTicket = new AcknowledgedTicket(signedTicket, firstTicket.response)
 
     assert(
       u8aEquals(await signedTicket.signer, coreConnector.account.keys.onChain.pubKey),
@@ -214,11 +211,7 @@ describe('test Channel class', function () {
     for (let i = 0; i < ATTEMPTS; i++) {
       ticketData = await getTicketData(counterpartyAddress)
       const nextSignedTicket = await channel.createTicket(new Balance(1), ticketData.challenge, 1)
-      let ackedTicket = new AcknowledgedTicket(
-        nextSignedTicket,
-        ticketData.response
-      )
-
+      let ackedTicket = new AcknowledgedTicket(nextSignedTicket, ticketData.response)
 
       //assert(await counterpartysChannel.ticket.verify(nextSignedTicket), `Ticket signature must be valid.`)
 

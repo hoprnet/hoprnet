@@ -451,7 +451,7 @@ class ChannelFactory {
   }
 
   public async redeemTicket(
-    ackTicket: AcknowledgedTicket,
+    ackTicket: AcknowledgedTicket
   ): Promise<
     | {
         status: 'SUCCESS'
@@ -538,7 +538,6 @@ class ChannelFactory {
       }
     }
   }
-  
 }
 
 export { ChannelFactory }
