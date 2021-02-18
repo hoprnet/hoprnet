@@ -4,11 +4,12 @@ import { randomBytes } from 'crypto'
 import { u8aToHex, u8aConcat, iterateHash, recoverIteratedHash, u8aLessThanOrEqual } from '@hoprnet/hopr-utils'
 import { stringToU8a, u8aIsEmpty, u8aCompare } from '@hoprnet/hopr-utils'
 import { publicKeyConvert } from 'secp256k1'
-import { hash, waitForConfirmation, computeWinningProbability } from './utils'
+import { hash, waitForConfirmation, computeWinningProbability, getSignatureParameters, pubKeyToAccountId } from './utils'
 import { OnChainSecret, OnChainSecretIntermediary } from './dbKeys'
 import type { LevelUp } from 'levelup'
 import type { HoprChannels } from './tsc/web3/HoprChannels'
 import type Account from './account'
+import { checkChallenge } from './utils'
 
 export const DB_ITERATION_BLOCK_SIZE = 10000
 export const TOTAL_ITERATIONS = 100000
@@ -16,6 +17,19 @@ export const HASHED_SECRET_WIDTH = 27
 
 const log = Debug('hopr-core-ethereum:probabilisticPayments')
 const isNullAccount = (a: string) => a == null || ['0', '0x', '0x'.padEnd(66, '0')].includes(a)
+
+export enum ValidateFailure {
+  E_TICKET_FAILED,
+  E_CHALLENGE
+}
+
+export enum RedeemStatus {
+  SUCCESS,
+  E_NO_GAS,
+  E_TICKET_FAILED,
+  E_NO_PREIMAGE
+}
+
 
 /**
  * Decides whether a ticket is a win or not.
@@ -27,7 +41,7 @@ const isNullAccount = (a: string) => a == null || ['0', '0x', '0x'.padEnd(66, '0
  * @param preImage preImage of the current onChainSecret
  * @param winProb winning probability of the ticket
  */
-async function isWinningTicket(ticketHash: Hash, challengeResponse: Hash, preImage: Hash, winProb: Uint8Array) {
+async function isWinningTicket(ticketHash: Hash, challengeResponse: Hash, preImage: Uint8Array, winProb: Uint8Array) {
   console.log(
     await hash(u8aConcat(ticketHash, preImage, challengeResponse)),
     winProb,
@@ -227,9 +241,16 @@ export class ProbabilisticPayments {
    * Take a signed ticket and transform it into an acknowledged ticket if it's a
    * winning ticket, or undefined if it's not.
    */
-  public async validateTicket(ticket: SignedTicket, response: Hash, preImage: Hash): Promise<AcknowledgedTicket | undefined> {
+  public async validateTicket(ticket: SignedTicket, response: Hash): Promise<AcknowledgedTicket | ValidateFailure> {
     log('validate')
-    if (await isWinningTicket(await ticket.ticket.hash, response, preImage, ticket.ticket.winProb)) {
+
+    const validChallenge = await checkChallenge(ticket.ticket.challenge, response)
+    if (!validChallenge) {
+      log(`Failed to submit ticket ${u8aToHex(ticket.ticket.challenge)}: E_CHALLENGE`)
+      return ValidateFailure.E_CHALLENGE
+    }
+
+    if (await isWinningTicket(await ticket.ticket.hash, response, this.currentPreImage, ticket.ticket.winProb)) {
       this.currentPreImage = await this.findPreImage(this.currentPreImage)
       return new AcknowledgedTicket(ticket, response, new Hash(this.currentPreImage))
     }
@@ -268,5 +289,47 @@ export class ProbabilisticPayments {
     })
 
     return signedTicket
+  }
+
+  public async redeemTicket(ackTicket: AcknowledgedTicket): Promise<RedeemStatus> {
+    const ticketChallenge = ackTicket.getResponse()
+
+    try {
+      const signedTicket = ackTicket.getSignedTicket()
+      const ticket = signedTicket.ticket
+
+      log('Submitting ticket', u8aToHex(ticketChallenge))
+      const { r, s, v } = getSignatureParameters(signedTicket.signature)
+
+      const counterparty = await pubKeyToAccountId(await signedTicket.signer)
+
+      const transaction = await this.account.signTransaction(
+        {
+          from: (await this.account.address).toHex(),
+          to: this.channels.options.address
+        },
+        this.channels.methods.redeemTicket(
+          u8aToHex(ackTicket.getPreImage()),
+          u8aToHex(ackTicket.getResponse()),
+          ticket.amount.toString(),
+          u8aToHex(ticket.winProb),
+          u8aToHex(counterparty),
+          u8aToHex(r),
+          u8aToHex(s),
+          v + 27
+        )
+      )
+
+      await transaction.send()
+      this.updateOnChainSecret(ackTicket.getPreImage()) // redemption contract updates on chain
+
+      log('Successfully submitted ticket', u8aToHex(ticketChallenge))
+      return RedeemStatus.SUCCESS 
+    } catch (err) {
+      // TODO - check if it's E_NO_GAS
+      
+      log('Unexpected error when submitting ticket', u8aToHex(ticketChallenge), err)
+      throw err
+    }
   }
 }

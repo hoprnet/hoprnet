@@ -15,12 +15,9 @@ import type { WebsocketProvider } from 'web3-core'
 import * as testconfigs from './config.spec'
 import * as configs from './config'
 import Account from './account'
-import { randomBytes } from 'crypto'
 import { hash as hashFunction } from './utils'
 
 const HoprChannelsAbi = abis.HoprChannels
-
-const EMPTY_HASHED_SECRET = new Uint8Array(HASHED_SECRET_WIDTH).fill(0x00)
 const FUND_ARGS = `--address ${addresses?.localhost?.HoprToken} --accounts-to-fund 1`
 
 describe('test probabilisticPayments', function () {
@@ -230,89 +227,34 @@ describe('test probabilisticPayments', function () {
     })
 
     it('should reserve a preImage for tickets with 100% winning probabilty resp. should not reserve for 0% winning probability', async function () {
-      const firstTicket = new Types.AcknowledgedTicket(
-        {
+      const firstTicket = {
           ticket: {
             hash: Promise.resolve(new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff))),
             winProb: Utils.computeWinningProbability(1)
           }
-        } as Types.SignedTicket,
-        new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff))
-      )
+        } as Types.SignedTicket
 
       assert(
-        await connector.probabilisticPayments.validateTicket(firstTicket),
+        await connector.probabilisticPayments.validateTicket(
+          firstTicket, 
+          new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff))),
         'ticket with 100% winning probability must always be a win'
       )
 
-      const firstPreImage = new Types.Hash(new Uint8Array(HASHED_SECRET_WIDTH))
-      firstPreImage.set(firstTicket.getPreImage())
-
-      assert(
-        await connector.probabilisticPayments.validateTicket(firstTicket),
-        'ticket with 100% winning probability must always be a win'
-      )
-
-      const secondPreImage = new Types.Hash(new Uint8Array(HASHED_SECRET_WIDTH))
-      secondPreImage.set(firstTicket.getPreImage())
-
-      assert(
-        firstPreImage != null &&
-          secondPreImage != null &&
-          !firstPreImage.eq(secondPreImage) &&
-          u8aEquals((await hashFunction(secondPreImage)).slice(0, HASHED_SECRET_WIDTH), firstPreImage)
-      )
-
-      const notWinnigTicket = new Types.AcknowledgedTicket(
-        {
+      const notWinningTicket = {
           ticket: {
             hash: Promise.resolve(new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff))),
             winProb: Utils.computeWinningProbability(0)
           }
-        } as Types.SignedTicket,
-        new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff))
-      )
+        } as Types.SignedTicket
 
       assert(
-        !(await connector.probabilisticPayments.validateTicket(notWinnigTicket)),
+        !(await connector.probabilisticPayments.validateTicket(
+          notWinningTicket,
+          new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff))
+        )),
         'falsy ticket should not be a win'
       )
-
-      assert(
-        await connector.probabilisticPayments.validateTicket(firstTicket),
-        'ticket with 100% winning probability must always be a win'
-      )
-
-      const fourthPreImage = new Types.Hash(new Uint8Array(HASHED_SECRET_WIDTH))
-      fourthPreImage.set(firstTicket.getPreImage())
-
-      assert(
-        fourthPreImage != null &&
-          !fourthPreImage.eq(secondPreImage) &&
-          u8aEquals((await hashFunction(fourthPreImage)).slice(0, HASHED_SECRET_WIDTH), secondPreImage)
-      )
-    })
-
-    it('should reserve a preImage for tickets with arbitrary winning probability', async function () {
-      const ATTEMPTS = 40
-
-      let ticket: Types.AcknowledgedTicket
-
-      for (let i = 0; i < ATTEMPTS; i++) {
-        ticket = new Types.AcknowledgedTicket(
-          {
-            ticket: {
-              hash: Promise.resolve(new Types.Hash(randomBytes(Types.Hash.SIZE))),
-              winProb: Utils.computeWinningProbability(Math.random())
-            }
-          } as Types.SignedTicket,
-          new Types.Hash(randomBytes(Types.Hash.SIZE))
-        )
-
-        if (!u8aEquals(ticket.getPreImage(), EMPTY_HASHED_SECRET)) {
-          assert(await connector.probabilisticPayments.validateTicket(ticket))
-        }
-      }
     })
   })
 })

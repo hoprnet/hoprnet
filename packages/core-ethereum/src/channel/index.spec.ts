@@ -130,7 +130,8 @@ describe('test Channel class', function () {
 
     const firstTicket = await getTicketData(myAddress)
     const signedTicket = await channel.createTicket(new Balance(1), firstTicket.challenge, 1)
-    const firstAckedTicket = new AcknowledgedTicket(signedTicket, firstTicket.response)
+
+    const firstAckedTicket = new AcknowledgedTicket(signedTicket, firstTicket.response, preImage)
 
     assert(
       u8aEquals(await signedTicket.signer, coreConnector.account.keys.onChain.pubKey),
@@ -177,7 +178,7 @@ describe('test Channel class', function () {
     console.log('>>>>', hashedSecretBefore)
 
     try {
-      const result = await counterpartysCoreConnector.channel.redeemTicket(firstAckedTicket)
+      const result = await counterpartysCoreConnector.probabilisticPayments.redeemTicket(firstAckedTicket)
       if (result.status === 'ERROR') {
         throw result.error
       } else if (result.status === 'FAILURE') {
@@ -193,7 +194,7 @@ describe('test Channel class', function () {
 
     let errThrown = false
     try {
-      const result = await counterpartysCoreConnector.channel.redeemTicket(firstAckedTicket)
+      const result = await counterpartysCoreConnector.probabilisticPayments.redeemTicket(firstAckedTicket)
       if (result.status === 'ERROR' || result.status === 'FAILURE') {
         errThrown = true
       }
@@ -216,7 +217,7 @@ describe('test Channel class', function () {
       //assert(await counterpartysChannel.ticket.verify(nextSignedTicket), `Ticket signature must be valid.`)
 
       if (await counterpartysCoreConnector.validateTicket(ackedTicket)) {
-        await counterpartysCoreConnector.channel.redeemTicket(ackedTicket)
+        await counterpartysCoreConnector.probabilisticPayments.redeemTicket(ackedTicket)
       }
     }
   })

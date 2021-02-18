@@ -3,30 +3,18 @@ import { HASHED_SECRET_WIDTH } from '../hashedSecret'
 import type { AcknowledgedTicket as IAcknowledgedTicket } from '@hoprnet/hopr-core-connector-interface'
 
 class AcknowledgedTicket implements IAcknowledgedTicket {
-  private _preImage: Hash
-
-  constructor(private signedTicket: SignedTicket, private response: Hash, preImage?: Hash) {
-    if (preImage) {
-      this._preImage = preImage
-    }
-  }
-
-  /*
-  subarray(begin: number = 0, end: number = AcknowledgedTicket.SIZE(this.paymentChannels)): Uint8Array {
-    return new Uint8Array(this.buffer, begin + this.byteOffset, end - begin)
-  }
-  */
+  constructor(private signedTicket: SignedTicket, private response: Hash, private preImage: Hash) {}
 
   getSignedTicket(): SignedTicket {
     return this.signedTicket
   }
 
   getPreImage(): Hash {
-    return this._preImage
+    return this.preImage
   }
 
-  setPreImage(preImage: Hash) {
-    this._preImage = preImage
+  getResponse(): Hash {
+    return this.response
   }
 
   static SIZE(): number {
@@ -37,9 +25,7 @@ class AcknowledgedTicket implements IAcknowledgedTicket {
     const serialized = new Uint8Array(AcknowledgedTicket.SIZE())
     serialized.set(this.signedTicket, 0)
     serialized.set(this.response, SignedTicket.SIZE)
-    if (this._preImage) {
-      serialized.set(this._preImage, SignedTicket.SIZE + Hash.SIZE)
-    }
+    serialized.set(this.preImage, SignedTicket.SIZE + Hash.SIZE)
     return serialized
   }
 

@@ -16,6 +16,7 @@ declare interface AcknowledgedTicketStatic {
 declare interface AcknowledgedTicket {
   constructor(signedTicket: SignedTicket, response: Hash, preImage?: Hash)
   getSignedTicket(): SignedTicket
+  getResponse(): Hash
   getPreImage(): Hash
   setPreImage(Hash)
   serialize(): Uint8Array

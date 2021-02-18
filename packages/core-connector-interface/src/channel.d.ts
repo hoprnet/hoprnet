@@ -112,27 +112,6 @@ declare interface ChannelStatic {
       signature?: Signature
     }
   ): Promise<SignedChannel>
-
-  /**
-   * Submits a signed ticket to the blockchain.
-   * @param signedTicket a signed ticket
-   */
-  redeemTicket(
-    ticket: AcknowledgedTicket
-  ): Promise<
-    | {
-        status: 'SUCCESS'
-        receipt: string
-      }
-    | {
-        status: 'FAILURE'
-        message: string
-      }
-    | {
-        status: 'ERROR'
-        error: Error | string
-      }
-  >
 }
 
 declare interface Channel {
