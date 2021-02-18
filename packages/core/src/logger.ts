@@ -11,22 +11,31 @@ const DEFAULT_DEBUG_INTERVAL = durations.seconds(20)
  */
 export class Logger {
   private interval: NodeJS.Timeout
-  constructor(private metrics: Metrics, private debugLogger = console.log) {}
+
+  private uncaughtExceptionListener: (err: any) => void
+  private unhandledRejectionListener: (reason: any, promise: Promise<any>) => void
+  private warningListener: (err: any) => void
+
+  constructor(private metrics: Metrics, private debugLogger = console.log) {
+    this.uncaughtExceptionListener = this.logUncaughtException.bind(this)
+    this.unhandledRejectionListener = this.logUnhandledPromiseRejection.bind(this)
+    this.warningListener = this.logWarning.bind(this)
+  }
 
   public start() {
     this.interval = setInterval(this.createConnectivityLog.bind(this), DEFAULT_DEBUG_INTERVAL)
 
-    process.on('warning', this.logWarning.bind(this))
-    process.on('uncaughtException', this.logUncaughtException.bind(this))
-    process.on('unhandledRejection', this.logUnhandledPromiseRejection.bind(this))
+    process.prependListener('warning', this.warningListener)
+    process.prependListener('uncaughtException', this.uncaughtExceptionListener)
+    process.prependListener('unhandledRejection', this.unhandledRejectionListener)
   }
 
   public stop() {
     clearInterval(this.interval)
 
-    process.off('warning', this.logWarning.bind(this))
-    process.off('uncaughtException', this.logUncaughtException.bind(this))
-    process.off('unhandledRejection', this.logUnhandledPromiseRejection.bind(this))
+    process.off('warning', this.warningListener)
+    process.off('uncaughtException', this.uncaughtExceptionListener)
+    process.off('unhandledRejection', this.unhandledRejectionListener)
   }
 
   private logWarning(warning: any): void {
@@ -39,6 +48,11 @@ export class Logger {
   }
 
   private logUncaughtException(err: any): void {
+    if (err.stack?.match(/UnhandledPromiseRejection/)) {
+      // already caught be rejection handler
+      return
+    }
+
     this.debugLogger({
       error: {
         message: err.message ?? 'no message provided',
@@ -51,6 +65,7 @@ export class Logger {
     this.debugLogger({
       rejectedPromise: {
         rawPromise: promise?.toString() ?? '',
+        reason,
         message: reason.message ?? 'no message provided',
         stackTrace: reason.stack ?? 'no stacktrace provided'
       }
