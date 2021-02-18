@@ -222,16 +222,19 @@ export class ProbabilisticPayments {
     return this.onChainSecret
   }
 
-  public async validateTicket(ticket: AcknowledgedTicket): Promise<boolean> {
-    const s = ticket.getSignedTicket()
+
+  /*
+   * Take a signed ticket and transform it into an acknowledged ticket if it's a
+   * winning ticket, or undefined if it's not.
+   */
+  public async validateTicket(ticket: SignedTicket, response: Hash, preImage: Hash): Promise<AcknowledgedTicket | undefined> {
     log('validate')
-    if (await isWinningTicket(await s.ticket.hash, ticket.getResponse(), ticket.getPreImage(), s.ticket.winProb)) {
-      ticket.setPreImage(new Hash(this.currentPreImage))
+    if (await isWinningTicket(await ticket.ticket.hash, response, preImage, ticket.ticket.winProb)) {
       this.currentPreImage = await this.findPreImage(this.currentPreImage)
-      return true
+      return new AcknowledgedTicket(ticket, response, new Hash(this.currentPreImage))
     }
     log('>> invalid')
-    return false
+    return undefined
   }
 
   public async issueTicket(

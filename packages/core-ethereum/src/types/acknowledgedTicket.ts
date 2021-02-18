@@ -21,10 +21,6 @@ class AcknowledgedTicket implements IAcknowledgedTicket {
     return this.signedTicket
   }
 
-  getResponse(): Hash {
-    return this.response
-  }
-
   getPreImage(): Hash {
     return this._preImage
   }
