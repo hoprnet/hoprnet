@@ -18,7 +18,7 @@ const argv = yargs
   })
   .option('provider', {
     describe: 'A provider url for the Network you specified',
-    default: 'wss://eth-goerli.ws.alchemyapi.io/v2/alq-cMKyMqdnSkputwtTJMfFcL2Lkh1g'
+    default: 'wss://goerli.infura.io/ws/v3/21ceb5486c454b2cb8e6ec54d1432de1'
   })
   .option('host', {
     describe: 'The network host to run the HOPR node on.',
