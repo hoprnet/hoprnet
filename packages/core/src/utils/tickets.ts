@@ -6,11 +6,6 @@ import { u8aEquals } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 import { UnacknowledgedTicket } from '../messages/ticket/unacknowledged'
 
-type OperationSuccess = { status: 'SUCCESS'; receipt: string }
-type OperationFailure = { status: 'FAILURE'; message: string }
-type OperationError = { status: 'ERROR'; error: Error | string }
-export type OperationStatus = OperationSuccess | OperationFailure | OperationError
-
 /**
  * Get all unacknowledged tickets
  * @param filter optionally filter by signer
