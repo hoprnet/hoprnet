@@ -18,7 +18,7 @@ source scripts/cleanup.sh
 # - BS_PASSWORD: database password
 
 if [ -z "$RPC" ]; then
-  RPC=https://bsc-dataseed.binance.org/
+  RPC=https://goerli.infura.io/v3/21ceb5486c454b2cb8e6ec54d1432de1
 fi
 
 source scripts/dependencies.sh
