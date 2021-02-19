@@ -16,3 +16,7 @@ export type Allocations = {
   accounts: string[] // address
   amounts: string[] // HOPRli
 }
+
+export type HoprDistributorParamsRaw = Omit<HoprDistributorParams, 'network'>
+export type ScheduleRaw = Omit<Schedule, 'name'>
+export type AllocationsRaw = Omit<Allocations, 'name'>

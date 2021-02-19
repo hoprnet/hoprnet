@@ -18,7 +18,8 @@ async function main(
     deployer,
     network: network.name,
     task: options.task,
-    schedule: options.schedule
+    schedule: options.schedule,
+    allocation: options.allocation
   })
 
   if (options.task === 'deployToken') {
