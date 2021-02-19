@@ -2,19 +2,25 @@ import type { HoprToken } from './tsc/web3/HoprToken'
 import type { Await } from './tsc/utils'
 import type CoreConnector from '.'
 import assert from 'assert'
+import chai, { expect } from 'chai'
+import chaiAsPromised from 'chai-as-promised'
 import Web3 from 'web3'
 import { Ganache } from '@hoprnet/hopr-testing'
 import { migrate, addresses, abis } from '@hoprnet/hopr-ethereum'
 import { stringToU8a, durations } from '@hoprnet/hopr-utils'
+import Account from './account'
 import { getPrivKeyData, createAccountAndFund, createNode, disconnectWeb3 } from './utils/testing.spec'
 import * as testconfigs from './config.spec'
 import * as configs from './config'
 import { wait } from './utils'
+import sinon from 'sinon'
+
+chai.use(chaiAsPromised)
 
 const HoprTokenAbi = abis.HoprToken
 const HoprChannelsAbi = abis.HoprChannels
 
-describe('test Account class', function () {
+describe('test Account legacy', function () {
   this.timeout(durations.minutes(5))
 
   const ganache = new Ganache()
@@ -78,5 +84,29 @@ describe('test Account class', function () {
 
       assert.equal(ticketEpoch.toString(), '3', 'ticketEpoch is wrong')
     })
+  })
+})
+
+describe.only('test Account', function () {
+  const connector = sinon.stub({
+    hoprToken: {
+      methods: {
+        balanceOf: () =>
+          sinon.stub({
+            call: () => Promise.resolve('10')
+          })
+      }
+    },
+    web3: {
+      eth: {
+        getBalance: () => Promise.resolve('20')
+      }
+    }
+  })
+
+  const account = new Account((connector as unknown) as CoreConnector, new Uint8Array(), new Uint8Array(), 0)
+
+  it('should getBalance', async function () {
+    expect(account.getBalance(false)).eventually.to.equal('10')
   })
 })

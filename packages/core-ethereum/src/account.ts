@@ -11,6 +11,7 @@ import { AccountId, AcknowledgedTicket, Balance, Hash, NativeBalance, TicketEpoc
 import { isWinningTicket, pubKeyToAccountId } from './utils'
 import { HASHED_SECRET_WIDTH } from './hashedSecret'
 import { WEB3_CACHE_TTL } from './constants'
+import * as ethereum from './ethereum'
 
 import debug from 'debug'
 const log = debug('hopr-core-ethereum:account')
@@ -125,15 +126,14 @@ class Account {
   public async getBalance(useCache: boolean = false): Promise<Balance> {
     if (useCache) {
       const cache = this._cache.get('balance')
-      const expired = cache && isExpired(cache.updatedAt, new Date().getTime(), WEB3_CACHE_TTL)
-
-      if (!expired) return new Balance(cache.value)
+      const notExpired = cache && !isExpired(cache.updatedAt, new Date().getTime(), WEB3_CACHE_TTL)
+      if (!notExpired) return new Balance(cache.value)
     }
 
-    const value = await this.coreConnector.hoprToken.methods.balanceOf((await this.address).toHex()).call()
-    this._cache.set('balance', { value, updatedAt: new Date().getTime() })
+    const value = await ethereum.getBalance(this.coreConnector.hoprToken, await this.address)
+    this._cache.set('balance', { value: value.toString(), updatedAt: new Date().getTime() })
 
-    return new Balance(value)
+    return value
   }
 
   /**
@@ -143,13 +143,12 @@ class Account {
   public async getNativeBalance(useCache: boolean = false): Promise<NativeBalance> {
     if (useCache) {
       const cache = this._cache.get('nativeBalance')
-      const expired = cache && isExpired(cache.updatedAt, new Date().getTime(), WEB3_CACHE_TTL)
-
-      if (!expired) return new NativeBalance(cache.value)
+      const notExpired = cache && !isExpired(cache.updatedAt, new Date().getTime(), WEB3_CACHE_TTL)
+      if (!notExpired) return new NativeBalance(cache.value)
     }
 
-    const value = await this.coreConnector.web3.eth.getBalance((await this.address).toHex())
-    this._cache.set('nativeBalance', { value, updatedAt: new Date().getTime() })
+    const value = await ethereum.getNativeBalance(this.coreConnector.web3, await this.address)
+    this._cache.set('nativeBalance', { value: value.toString(), updatedAt: new Date().getTime() })
 
     return new NativeBalance(value)
   }
