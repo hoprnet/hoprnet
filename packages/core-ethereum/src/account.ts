@@ -363,10 +363,6 @@ export const getNativeBalance = async (
 ): Promise<NativeBalance> => {
   if (useCache) {
     const cached = cache.get('nativeBalance')
-    console.log({
-      updatedAt: cached && cached.updatedAt,
-      now: new Date().getTime()
-    })
     const notExpired = cached && !isExpired(cached.updatedAt, new Date().getTime(), WEB3_CACHE_TTL)
     if (notExpired) return new NativeBalance(cached.value)
   }
