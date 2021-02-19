@@ -33,7 +33,7 @@ export const transformSchedule = (name: string, input: ScheduleRaw): Schedule =>
 
   return {
     name,
-    durations: input.durations.map((days) => String(durations.days(Number(days)))),
+    durations: input.durations.map((days) => String(durations.days(Number(days)) / 1e3)),
     percents: input.percents.map((percent) => {
       const result = toMultiplier(percent, MULTIPLIER)
       if (toBN(result).gt(toBN(MULTIPLIER))) {
