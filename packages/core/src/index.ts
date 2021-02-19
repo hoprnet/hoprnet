@@ -79,6 +79,7 @@ export type HoprOptions = {
   bootstrapServers?: Multiaddr[]
   output?: (encoded: Uint8Array) => void
   strategy?: ChannelStrategyNames
+  logger?: Logger
   hosts?: {
     ip4?: NetOptions
     ip6?: NetOptions
@@ -117,7 +118,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
   private strategy: ChannelStrategy
   private networkPeers: NetworkPeers
   private heartbeat: Heartbeat
-  private logger: Logger
+  private logger?: Logger
 
   /**
    * @constructor
@@ -125,12 +126,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
    * @param _options
    * @param provider
    */
-  private constructor(
-    options: HoprOptions & { logger: Logger },
-    public _libp2p: LibP2P,
-    public db: LevelUp,
-    public paymentChannels: Chain
-  ) {
+  private constructor(options: HoprOptions, public _libp2p: LibP2P, public db: LevelUp, public paymentChannels: Chain) {
     super()
 
     this.logger = options.logger
@@ -203,8 +199,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
   public static async create<CoreConnector extends HoprCoreConnector>(
     options: HoprOptions
   ): Promise<Hopr<CoreConnector>> {
-    const logger = new Logger()
-    logger.start()
+    options.logger = new Logger().start()
 
     const Connector = options.connector ?? HoprCoreEthereum
     const db = Hopr.openDatabase(options)
@@ -268,17 +263,9 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       }
     })
 
-    logger.attachLibp2pMetrics(libp2p.metrics)
+    options.logger.attachLibp2pMetrics(libp2p.metrics)
 
-    return await new Hopr<CoreConnector>(
-      {
-        logger,
-        ...options
-      },
-      libp2p,
-      db,
-      connector
-    ).start()
+    return await new Hopr<CoreConnector>(options, libp2p, db, connector).start()
   }
 
   /**
@@ -434,7 +421,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     // Give the operating system some extra time to close the sockets
     await new Promise((resolve) => setTimeout(resolve, 100))
 
-    this.logger.stop()
+    this.logger?.stop()
   }
 
   public isRunning(): boolean {
