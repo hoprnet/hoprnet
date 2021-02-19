@@ -1,6 +1,6 @@
 {
   "network": "mainnet",
-  "startTime": "1615204800000",
+  "startTime": "1615204800",
   "maxMintAmount": "310000000000000000000000000",
   "multisig": "0xB3Aa2138DE698597e2e3F84f60eF415d13731b6f"
 }

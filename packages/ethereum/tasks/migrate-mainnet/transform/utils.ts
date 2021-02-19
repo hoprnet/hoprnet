@@ -20,7 +20,7 @@ export const transformHoprDistributorParams = (
 ): HoprDistributorParams => {
   return {
     network,
-    startTime: String(new Date(input.startTime).getTime()),
+    startTime: String(Math.floor(new Date(input.startTime).getTime() / 1e3)),
     maxMintAmount: toWei(input.maxMintAmount, 'ether'),
     multisig: toChecksumAddress(input.multisig)
   }
