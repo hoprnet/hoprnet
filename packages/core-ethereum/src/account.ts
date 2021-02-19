@@ -2,6 +2,7 @@ import type { TransactionConfig } from 'web3-core'
 import type HoprEthereum from '.'
 import type { ContractEventEmitter } from './tsc/web3/types'
 import type { TransactionObject } from './tsc/web3/types'
+import type { HoprToken } from './tsc/web3/HoprToken'
 import Web3 from 'web3'
 import { getRpcOptions, Network } from '@hoprnet/hopr-ethereum'
 import { durations, stringToU8a, u8aEquals, u8aToHex, isExpired } from '@hoprnet/hopr-utils'
@@ -18,6 +19,7 @@ const log = debug('hopr-core-ethereum:account')
 
 export const EMPTY_HASHED_SECRET = new Uint8Array(HASHED_SECRET_WIDTH).fill(0x00)
 const rpcOps = getRpcOptions()
+const cache = new Map<'balance' | 'nativeBalance', { value: string; updatedAt: number }>()
 
 class Account {
   private _address?: AccountId
@@ -27,7 +29,6 @@ class Account {
   private _onChainSecret?: Hash
   private _nonceTracker: NonceTracker
   private _transactions = new TransactionManager()
-  private _cache = new Map<'balance' | 'nativeBalance', { value: string; updatedAt: number }>()
 
   /**
    * The accounts keys:
@@ -120,20 +121,10 @@ class Account {
 
   /**
    * Retrieves HOPR balance, optionally uses the cache.
-   * TODO: use indexer to track HOPR balance
    * @returns HOPR balance
    */
   public async getBalance(useCache: boolean = false): Promise<Balance> {
-    if (useCache) {
-      const cache = this._cache.get('balance')
-      const notExpired = cache && !isExpired(cache.updatedAt, new Date().getTime(), WEB3_CACHE_TTL)
-      if (!notExpired) return new Balance(cache.value)
-    }
-
-    const value = await ethereum.getBalance(this.coreConnector.hoprToken, await this.address)
-    this._cache.set('balance', { value: value.toString(), updatedAt: new Date().getTime() })
-
-    return value
+    return getBalance(this.coreConnector.hoprToken, await this.address, useCache)
   }
 
   /**
@@ -141,16 +132,7 @@ class Account {
    * @returns ETH balance
    */
   public async getNativeBalance(useCache: boolean = false): Promise<NativeBalance> {
-    if (useCache) {
-      const cache = this._cache.get('nativeBalance')
-      const notExpired = cache && !isExpired(cache.updatedAt, new Date().getTime(), WEB3_CACHE_TTL)
-      if (!notExpired) return new NativeBalance(cache.value)
-    }
-
-    const value = await ethereum.getNativeBalance(this.coreConnector.web3, await this.address)
-    this._cache.set('nativeBalance', { value: value.toString(), updatedAt: new Date().getTime() })
-
-    return new NativeBalance(value)
+    return getNativeBalance(this.coreConnector.web3, await this.address, useCache)
   }
 
   get ticketEpoch(): Promise<TicketEpoch> {
@@ -346,6 +328,53 @@ class Account {
       }
     }
   }
+}
+
+/**
+ * Retrieves HOPR balance, optionally uses the cache.
+ * TODO: use indexer to track HOPR balance
+ * @returns HOPR balance
+ */
+export const getBalance = async (
+  hoprToken: HoprToken,
+  account: AccountId,
+  useCache: boolean = false
+): Promise<Balance> => {
+  if (useCache) {
+    const cached = cache.get('balance')
+    const notExpired = cached && !isExpired(cached.updatedAt, new Date().getTime(), WEB3_CACHE_TTL)
+    if (notExpired) return new Balance(cached.value)
+  }
+
+  const value = await ethereum.getBalance(hoprToken, account)
+  cache.set('balance', { value: value.toString(), updatedAt: new Date().getTime() })
+
+  return value
+}
+
+/**
+ * Retrieves ETH balance, optionally uses the cache.
+ * @returns ETH balance
+ */
+export const getNativeBalance = async (
+  web3: Web3,
+  account: AccountId,
+  useCache: boolean = false
+): Promise<NativeBalance> => {
+  if (useCache) {
+    const cached = cache.get('nativeBalance')
+    console.log({
+      updatedAt: cached && cached.updatedAt,
+      now: new Date().getTime()
+    })
+    const notExpired = cached && !isExpired(cached.updatedAt, new Date().getTime(), WEB3_CACHE_TTL)
+    if (notExpired) return new NativeBalance(cached.value)
+  }
+
+  const value = await ethereum.getNativeBalance(web3, account)
+  cache.set('nativeBalance', { value: value.toString(), updatedAt: new Date().getTime() })
+
+  return new NativeBalance(value)
 }
 
 export default Account
