@@ -7,7 +7,7 @@ source scripts/cleanup.sh
 # ----- Internal integration / network test. --------
 
 if [ -z "$RPC" ]; then
-  RPC=https://goerli.infura.io/v3/21ceb5486c454b2cb8e6ec54d1432de1
+  RPC=https://eth-goerli.alchemyapi.io/v2/YroT1kGIcP4vrNdi2nJFsK1zeyhPXK8_
 fi
 
 # Get version from package.json
