@@ -4,7 +4,7 @@ import type {
   Currencies,
   AcknowledgedTicket as IAcknowledgedTicket,
   SignedTicket,
-  Hash, 
+  Hash,
   ValidateResponse,
   RedeemStatus
 } from '@hoprnet/hopr-core-connector-interface'

@@ -245,7 +245,7 @@ export class ProbabilisticPayments {
 
     if (await isWinningTicket(await ticket.ticket.hash, response, this.currentPreImage, ticket.ticket.winProb)) {
       this.currentPreImage = await this.findPreImage(this.currentPreImage)
-      return { status: 'SUCCESS', ticket:  new AcknowledgedTicket(ticket, response, new Hash(this.currentPreImage)) }
+      return { status: 'SUCCESS', ticket: new AcknowledgedTicket(ticket, response, new Hash(this.currentPreImage)) }
     }
     log('>> invalid')
     return { status: 'E_TICKET_FAILED' }

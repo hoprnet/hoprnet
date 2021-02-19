@@ -8,17 +8,12 @@ import type Indexer, { RoutingChannel, ChannelUpdate } from './indexer'
 
 export type Currencies = 'NATIVE' | 'HOPR'
 
-export type ValidateResponse = 
-  { status: 'SUCCESS', ticket: AcknowledgedTicket } |
-  { status: 'E_TICKET_FAILED' } |
-  { status: 'E_CHALLENGE' }
+export type ValidateResponse =
+  | { status: 'SUCCESS'; ticket: AcknowledgedTicket }
+  | { status: 'E_TICKET_FAILED' }
+  | { status: 'E_CHALLENGE' }
 
-export type RedeemStatus = 
-  { status: 'SUCCESS' } |
-  { status: 'E_NO_GAS' } |
-  { status: 'E_ALREADY_SUBMITTED' }
-
-
+export type RedeemStatus = { status: 'SUCCESS' } | { status: 'E_NO_GAS' } | { status: 'E_ALREADY_SUBMITTED' }
 
 declare interface HoprCoreConnectorStatic {
   /**
@@ -108,8 +103,8 @@ declare interface HoprCoreConnector {
    * Check whether the given ticket is winning
    * @param ticket the acknowledged ticket to check
    */
-  validateTicket(ticket: SignedTicket, response: Hash): Promise<AcknowledgedTicket | ValidateFailure> 
-  
+  validateTicket(ticket: SignedTicket, response: Hash): Promise<AcknowledgedTicket | ValidateFailure>
+
   redeemTicket(ticket: AcknowledgedTicket): Promise<RedeemStatus>
 
   /**

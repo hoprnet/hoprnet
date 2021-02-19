@@ -137,7 +137,6 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
         }
 
         this.emit(u8aToHex(unAcknowledgedDbKey))
-      
       }
     }
   }
