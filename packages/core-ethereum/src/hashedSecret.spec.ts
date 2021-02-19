@@ -5,7 +5,7 @@ import { ProbabilisticPayments } from './hashedSecret'
 import type { LevelUp } from 'levelup'
 import sinon from 'sinon'
 
-async function generateMocks(){
+async function generateMocks() {
   let data = {}
   var mockDBBatch = {
     put: (k, v) => {
@@ -15,10 +15,10 @@ async function generateMocks(){
     write: sinon.fake()
   }
 
-  const mockDb = {
+  const mockDb = ({
     get: (k) => data[k],
     batch: sinon.fake.returns(mockDBBatch)
-  } as unknown as LevelUp
+  } as unknown) as LevelUp
 
   const mockPrivKey = new Uint8Array()
   const mockStore = sinon.fake()
@@ -28,8 +28,7 @@ async function generateMocks(){
 }
 
 describe('test probabilistic payments', function () {
-
-  it('initialize with no secret on chain or off', async function() {
+  it('initialize with no secret on chain or off', async function () {
     let { mockDb, mockPrivKey, mockStore, mockFind, mockRedeem } = await generateMocks()
     let probabilisticPayments = new ProbabilisticPayments(mockDb, mockPrivKey, mockStore, mockFind, mockRedeem)
 

@@ -1,10 +1,6 @@
 import { publicKeyConvert } from 'secp256k1'
 import { Hash, AcknowledgedTicket } from './types'
-import {
-  waitForConfirmation,
-  getSignatureParameters,
-  pubKeyToAccountId
-} from './utils'
+import { waitForConfirmation, getSignatureParameters, pubKeyToAccountId } from './utils'
 import Debug from 'debug'
 import { u8aToHex } from '@hoprnet/hopr-utils'
 import type Account from './account'
@@ -84,16 +80,15 @@ export async function findOnChainSecret(channels: HoprChannels, account: Account
   return new Hash(hashedSecret)
 }
 
-export async function submitTicketRedemption(ackTicket: AcknowledgedTicket, channels: HoprChannels, account: Account){
-    const ticketChallenge = ackTicket.getResponse()
-    const signedTicket = ackTicket.getSignedTicket()
-    const ticket = signedTicket.ticket
+export async function submitTicketRedemption(ackTicket: AcknowledgedTicket, channels: HoprChannels, account: Account) {
+  const ticketChallenge = ackTicket.getResponse()
+  const signedTicket = ackTicket.getSignedTicket()
+  const ticket = signedTicket.ticket
 
-    log('Submitting ticket', u8aToHex(ticketChallenge))
-    const { r, s, v } = getSignatureParameters(signedTicket.signature)
+  log('Submitting ticket', u8aToHex(ticketChallenge))
+  const { r, s, v } = getSignatureParameters(signedTicket.signature)
 
-    const counterparty = await pubKeyToAccountId(await signedTicket.signer)
-
+  const counterparty = await pubKeyToAccountId(await signedTicket.signer)
 
   const transaction = await account.signTransaction(
     {

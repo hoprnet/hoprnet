@@ -31,7 +31,7 @@ const HoprTokenAbi = abis.HoprToken
 
 const log = debug('hopr-core-ethereum')
 let provider: WebsocketProvider
-import { storeSecretOnChain, findOnChainSecret, submitTicketRedemption} from './chainInteractions'
+import { storeSecretOnChain, findOnChainSecret, submitTicketRedemption } from './chainInteractions'
 
 export default class HoprEthereum implements HoprCoreConnector {
   private _status: 'dead' | 'alive' = 'dead'
@@ -62,7 +62,6 @@ export default class HoprEthereum implements HoprCoreConnector {
     this.types = new types()
     this.channel = new ChannelFactory(this)
     this._debug = debug
-
 
     this.probabilisticPayments = new ProbabilisticPayments(
       this.db,

@@ -2,10 +2,7 @@ import { Hash, AcknowledgedTicket, Ticket, Balance, SignedTicket, AccountId, Tic
 import Debug from 'debug'
 import { randomBytes } from 'crypto'
 import { u8aToHex, u8aConcat, iterateHash, recoverIteratedHash, u8aLessThanOrEqual } from '@hoprnet/hopr-utils'
-import {
-  hash,
-  computeWinningProbability
-} from './utils'
+import { hash, computeWinningProbability } from './utils'
 import { OnChainSecret, OnChainSecretIntermediary } from './dbKeys'
 import type { LevelUp } from 'levelup'
 import type { ValidateResponse, RedeemStatus } from '@hoprnet/hopr-core-connector-interface'
@@ -95,7 +92,6 @@ export class ProbabilisticPayments {
     return new Hash(hashes[hashes.length - 1])
   }
 
-
   private async calcOnChainSecretFromDb(_debug?: boolean): Promise<Hash | never> {
     const start = /*debug ? await this.getDebugAccountSecret() :*/ this.offChainSecret
     let hashes = await iterateHash(start, hashFunction, TOTAL_ITERATIONS)
@@ -123,7 +119,6 @@ export class ProbabilisticPayments {
       DB_ITERATION_BLOCK_SIZE
     )
   }
-
 
   public async initialize(debug?: boolean): Promise<void> {
     if (this.initialized) return
