@@ -28,6 +28,8 @@ A [transport module](https://github.com/libp2p/js-libp2p-interfaces/tree/master/
 
 ## Main features
 
+See detailed [architecture description](https://github.com/hoprnet/hopr-connect/tree/main/docs) for more information.
+
 - fully compatible with js-libp2p, see [KNOWN ISSUES](#known-issues)
 - automatic usage of WebRTC:
   - try direct TCP connection, if not succesful
