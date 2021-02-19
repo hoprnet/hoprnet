@@ -2,28 +2,21 @@ import { Hash, AcknowledgedTicket, Ticket, Balance, SignedTicket, AccountId, Tic
 import Debug from 'debug'
 import { randomBytes } from 'crypto'
 import { u8aToHex, u8aConcat, iterateHash, recoverIteratedHash, u8aLessThanOrEqual } from '@hoprnet/hopr-utils'
-import { stringToU8a, u8aIsEmpty, u8aCompare } from '@hoprnet/hopr-utils'
-import { publicKeyConvert } from 'secp256k1'
 import {
   hash,
-  waitForConfirmation,
-  computeWinningProbability,
-  getSignatureParameters,
-  pubKeyToAccountId
+  computeWinningProbability
 } from './utils'
 import { OnChainSecret, OnChainSecretIntermediary } from './dbKeys'
 import type { LevelUp } from 'levelup'
-import type { HoprChannels } from './tsc/web3/HoprChannels'
-import type Account from './account'
 import type { ValidateResponse, RedeemStatus } from '@hoprnet/hopr-core-connector-interface'
 import { checkChallenge } from './utils'
+import { u8aCompare } from '@hoprnet/hopr-utils'
 
 export const DB_ITERATION_BLOCK_SIZE = 10000
 export const TOTAL_ITERATIONS = 100000
 export const HASHED_SECRET_WIDTH = 27
 
 const log = Debug('hopr-core-ethereum:probabilisticPayments')
-const isNullAccount = (a: string) => a == null || ['0', '0x', '0x'.padEnd(66, '0')].includes(a)
 
 /**
  * Decides whether a ticket is a win or not.
@@ -65,26 +58,33 @@ export class ProbabilisticPayments {
   private offChainSecret: Hash
   private currentPreImage: Uint8Array
 
-  constructor(private db: LevelUp, private account: Account, private channels: HoprChannels) {}
+  constructor(
+    private db: LevelUp,
+    private privKey: Uint8Array,
+    private storeSecretOnChain: (hash: Hash) => Promise<void>,
+    private findOnChainSecret: () => Promise<Hash | undefined>,
+    private submitTicketRedemption: (ackTicket: AcknowledgedTicket) => Promise<void>
+  ) {}
 
   /**
    * @returns a deterministic secret that is used in debug mode
    */
+  /*
   private async getDebugAccountSecret(): Promise<Hash> {
     const account = await this.channels.methods.accounts((await this.account.address).toHex()).call()
     return new Hash(
       await hashFunction(u8aConcat(new Uint8Array([parseInt(account.counter)]), this.account.keys.onChain.pubKey))
     )
   }
-
+*/
   /**
    * Creates a random secret OR a deterministic one if running in debug mode,
    * it will then loop X amount of times, on each loop we hash the previous result.
    * We store the last result.
    * @returns a promise that resolves to the onChainSecret
    */
-  private async createAndStoreSecretOffChainAndReturnOnChainSecret(debug: boolean): Promise<Hash> {
-    this.offChainSecret = debug ? await this.getDebugAccountSecret() : new Hash(randomBytes(HASHED_SECRET_WIDTH))
+  private async createAndStoreSecretOffChainAndReturnOnChainSecret(_debug: boolean): Promise<Hash> {
+    this.offChainSecret = /*debug ? await this.getDebugAccountSecret() :*/ new Hash(randomBytes(HASHED_SECRET_WIDTH))
     let dbBatch = this.db.batch()
     const hashes = await iterateHash(this.offChainSecret, hashFunction, TOTAL_ITERATIONS)
     for (let i = 0; i <= TOTAL_ITERATIONS; i += DB_ITERATION_BLOCK_SIZE) {
@@ -95,70 +95,9 @@ export class ProbabilisticPayments {
     return new Hash(hashes[hashes.length - 1])
   }
 
-  private async storeSecretOnChain(secret: Hash): Promise<void> {
-    log(`storing secret on chain, setting secret to ${u8aToHex(secret)}`)
-    const address = (await this.account.address).toHex()
-    const account = await this.channels.methods.accounts(address).call()
 
-    if (isNullAccount(account.accountX)) {
-      const uncompressedPubKey = publicKeyConvert(this.account.keys.onChain.pubKey, false).slice(1)
-      log('account is also null, calling channel.init')
-      try {
-        await waitForConfirmation(
-          (
-            await this.account.signTransaction(
-              {
-                from: address,
-                to: this.channels.options.address
-              },
-              this.channels.methods.init(
-                u8aToHex(uncompressedPubKey.slice(0, 32)),
-                u8aToHex(uncompressedPubKey.slice(32, 64)),
-                u8aToHex(secret)
-              )
-            )
-          ).send()
-        )
-      } catch (e) {
-        if (e.message.match(/Account must not be set/)) {
-          // There is a potential race condition due to the fact that 2 init
-          // calls may be in flight at once, and therefore we may have init
-          // called on an initialized account. If so, trying again should solve
-          // the problem.
-          log('race condition encountered in HoprChannel.init - retrying')
-          return this.storeSecretOnChain(secret)
-        }
-        throw e
-      }
-    } else {
-      // @TODO this is potentially dangerous because it increases the account counter
-      log('account is already on chain, storing secret.')
-      try {
-        await waitForConfirmation(
-          (
-            await this.account.signTransaction(
-              {
-                from: address,
-                to: this.channels.options.address
-              },
-              this.channels.methods.setHashedSecret(u8aToHex(secret))
-            )
-          ).send()
-        )
-      } catch (e) {
-        if (e.message.match(/new and old hashedSecrets are the same/)) {
-          // NBD. no-op
-          return
-        }
-        throw e
-      }
-    }
-
-    log('stored on chain')
-  }
-
-  private async calcOnChainSecretFromDb(debug?: boolean): Promise<Hash | never> {
-    const start = debug ? await this.getDebugAccountSecret() : this.offChainSecret
+  private async calcOnChainSecretFromDb(_debug?: boolean): Promise<Hash | never> {
+    const start = /*debug ? await this.getDebugAccountSecret() :*/ this.offChainSecret
     let hashes = await iterateHash(start, hashFunction, TOTAL_ITERATIONS)
     return new Hash(hashes[hashes.length - 1])
   }
@@ -185,14 +124,6 @@ export class ProbabilisticPayments {
     )
   }
 
-  private async findOnChainSecret() {
-    const res = await this.channels.methods.accounts((await this.account.address).toHex()).call()
-    const hashedSecret = stringToU8a(res.hashedSecret)
-    if (u8aIsEmpty(hashedSecret)) {
-      return undefined
-    }
-    return new Hash(hashedSecret)
-  }
 
   public async initialize(debug?: boolean): Promise<void> {
     if (this.initialized) return
@@ -276,7 +207,7 @@ export class ProbabilisticPayments {
       }
     )
 
-    await ticket.sign(this.account.keys.onChain.privKey, undefined, {
+    await ticket.sign(this.privKey, undefined, {
       bytes: signedTicket.buffer,
       offset: signedTicket.signatureOffset
     })
@@ -285,43 +216,14 @@ export class ProbabilisticPayments {
   }
 
   public async redeemTicket(ackTicket: AcknowledgedTicket): Promise<RedeemStatus> {
-    const ticketChallenge = ackTicket.getResponse()
-
     try {
-      const signedTicket = ackTicket.getSignedTicket()
-      const ticket = signedTicket.ticket
-
-      log('Submitting ticket', u8aToHex(ticketChallenge))
-      const { r, s, v } = getSignatureParameters(signedTicket.signature)
-
-      const counterparty = await pubKeyToAccountId(await signedTicket.signer)
-
-      const transaction = await this.account.signTransaction(
-        {
-          from: (await this.account.address).toHex(),
-          to: this.channels.options.address
-        },
-        this.channels.methods.redeemTicket(
-          u8aToHex(ackTicket.getPreImage()),
-          u8aToHex(ackTicket.getResponse()),
-          ticket.amount.toString(),
-          u8aToHex(ticket.winProb),
-          u8aToHex(counterparty),
-          u8aToHex(r),
-          u8aToHex(s),
-          v + 27
-        )
-      )
-
-      await transaction.send()
+      await this.submitTicketRedemption(ackTicket)
       this.updateOnChainSecret(ackTicket.getPreImage()) // redemption contract updates on chain
-
-      log('Successfully submitted ticket', u8aToHex(ticketChallenge))
+      log('Successfully submitted ticket')
       return { status: 'SUCCESS' }
     } catch (err) {
       // TODO - check if it's E_NO_GAS
-
-      log('Unexpected error when submitting ticket', u8aToHex(ticketChallenge), err)
+      log('Unexpected error when submitting ticket', err)
       throw err
     }
   }

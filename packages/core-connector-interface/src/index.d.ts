@@ -99,10 +99,6 @@ declare interface HoprCoreConnector {
 
   smartContractInfo(): string
 
-  /**
-   * Check whether the given ticket is winning
-   * @param ticket the acknowledged ticket to check
-   */
   validateTicket(ticket: SignedTicket, response: Hash): Promise<AcknowledgedTicket | ValidateFailure>
 
   redeemTicket(ticket: AcknowledgedTicket): Promise<RedeemStatus>

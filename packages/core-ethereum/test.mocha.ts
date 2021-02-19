@@ -1,3 +1,4 @@
+/*
 import { compile } from '@hoprnet/hopr-ethereum'
 
 export const mochaGlobalSetup = async () => {
@@ -5,3 +6,4 @@ export const mochaGlobalSetup = async () => {
 }
 
 export const mochaGlobalTeardown = async () => {}
+*/

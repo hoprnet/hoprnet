@@ -1,190 +1,63 @@
 import assert from 'assert'
-import type HoprEthereum from '.'
-import * as DbKeys from './dbKeys'
-import * as Utils from './utils'
-import * as Types from './types'
-import { ProbabilisticPayments, HASHED_SECRET_WIDTH } from './hashedSecret'
-import { u8aEquals, durations, stringToU8a } from '@hoprnet/hopr-utils'
-import Memdown from 'memdown'
-import LevelUp from 'levelup'
-import { Ganache } from '@hoprnet/hopr-testing'
-import { Network, addresses, abis } from '@hoprnet/hopr-ethereum'
-import { migrate, fund } from '@hoprnet/hopr-ethereum'
-import Web3 from 'web3'
-import type { WebsocketProvider } from 'web3-core'
-import * as testconfigs from './config.spec'
-import * as configs from './config'
-import Account from './account'
-import { hash as hashFunction } from './utils'
+import { ProbabilisticPayments } from './hashedSecret'
+//import { u8aEquals, stringToU8a } from '@hoprnet/hopr-utils'
+//import { hash as hashFunction } from './utils'
+import type { LevelUp } from 'levelup'
+import sinon from 'sinon'
 
-const HoprChannelsAbi = abis.HoprChannels
-const FUND_ARGS = `--address ${addresses?.localhost?.HoprToken} --accounts-to-fund 1`
-
-describe('test probabilisticPayments', function () {
-  this.timeout(durations.minutes(10))
-  const ganache = new Ganache()
-  let connector: HoprEthereum
-
-  async function generateConnector(debug?: boolean): Promise<HoprEthereum> {
-    let web3 = new Web3(configs.DEFAULT_URI)
-    const chainId = await Utils.getChainId(web3)
-    const network = Utils.getNetworkName(chainId) as Network
-
-    const connector = ({
-      hoprChannels: new web3.eth.Contract(HoprChannelsAbi as any, addresses[network].HoprChannels),
-      web3,
-      db: LevelUp(Memdown()),
-      dbKeys: DbKeys,
-      utils: Utils,
-      types: Types,
-      options: {
-        debug
-      },
-      log: () => {}
-    } as unknown) as HoprEthereum
-
-    connector.account = new Account(
-      connector,
-      stringToU8a(testconfigs.DEMO_ACCOUNTS[0]),
-      await Utils.privKeyToPubKey(stringToU8a(testconfigs.DEMO_ACCOUNTS[0])),
-      chainId
-    )
-
-    connector.probabilisticPayments = new ProbabilisticPayments(connector.db, connector.account, connector.hoprChannels)
-
-    connector.stop = async () => {
-      await connector.account.stop()
-      ;(web3.eth.currentProvider as WebsocketProvider).disconnect(1000, 'Stopping HOPR node.')
-    }
-
-    return connector
+async function generateMocks(){
+  let data = {}
+  var mockDBBatch = {
+    put: (k, v) => {
+      data[k] = v
+      return mockDBBatch
+    },
+    write: sinon.fake()
   }
 
-  // const checkIndex = async (index: number, masterSecret: Uint8Array, shouldThrow: boolean) => {
-  //   let hash = masterSecret
-  //   for (let i = 0; i < index; i++) {
-  //     hash = (await connector.utils.hash(hash)).slice(0, HASHED_SECRET_WIDTH)
-  //   }
+  const mockDb = {
+    get: (k) => data[k],
+    batch: sinon.fake.returns(mockDBBatch)
+  } as unknown as LevelUp
 
-  //   let result,
-  //     errThrown = false
-  //   try {
-  //     result = await connector.probabilisticPayments.findPreImage(hash)
-  //   } catch (err) {
-  //     errThrown = true
-  //   }
+  const mockPrivKey = new Uint8Array()
+  const mockStore = sinon.fake()
+  const mockFind = sinon.fake()
+  const mockRedeem = sinon.fake()
+  return { mockDb, mockPrivKey, mockStore, mockFind, mockRedeem }
+}
 
-  //   assert(errThrown == shouldThrow, `Must throw an error if, and only if, it is expected.`)
+describe('test probabilistic payments', function () {
 
-  //   if (shouldThrow) {
-  //     assert(errThrown, `Must throw an error`)
-  //   } else {
-  //     assert(result != null, `Pre-image must have been derivable from the database.`)
-  //     assert(
-  //       u8aEquals((await connector.utils.hash(result.preImage)).slice(0, HASHED_SECRET_WIDTH), hash) &&
-  //         index == result.index + 1
-  //     )
-  //   }
-  // }
+  it('initialize with no secret on chain or off', async function() {
+    let { mockDb, mockPrivKey, mockStore, mockFind, mockRedeem } = await generateMocks()
+    let probabilisticPayments = new ProbabilisticPayments(mockDb, mockPrivKey, mockStore, mockFind, mockRedeem)
 
-  describe('random pre-image', function () {
-    this.timeout(durations.minutes(2))
+    await probabilisticPayments.initialize()
 
-    before(async function () {
-      this.timeout(durations.minutes(1))
-      await ganache.start()
-      await migrate()
-      await fund(FUND_ARGS)
+    assert(probabilisticPayments.getOnChainSecret(), 'on chain secret is set')
+  })
+  /*
 
-      connector = await generateConnector()
-    })
-
-    after(async function () {
-      await connector.stop()
-      await ganache.stop()
-    })
-
-    it('should publish a hashed secret', async function () {
-      await connector.probabilisticPayments.initialize()
-
-      let onChainHash = new Types.Hash(
-        stringToU8a(
-          (await connector.hoprChannels.methods.accounts((await connector.account.address).toHex()).call()).hashedSecret
-        )
-      )
-
-      let preImage = await connector.probabilisticPayments.findPreImage(onChainHash)
-
-      assert(u8aEquals((await hashFunction(preImage)).slice(0, HASHED_SECRET_WIDTH), onChainHash))
-
-      await connector.utils.waitForConfirmation(
-        (
-          await connector.account.signTransaction(
-            {
-              from: (await connector.account.address).toHex(),
-              to: connector.hoprChannels.options.address
-            },
-            connector.hoprChannels.methods.setHashedSecret(new Types.Hash(preImage).toHex())
-          )
-        ).send()
-      )
-      let updatedOnChainHash = new Types.Hash(
-        stringToU8a(
-          (await connector.hoprChannels.methods.accounts((await connector.account.address).toHex()).call()).hashedSecret
-        )
-      )
-
-      assert(!u8aEquals(onChainHash, updatedOnChainHash), `new and old onChainSecret must not be the same`)
-
-      let updatedPreImage = await connector.probabilisticPayments.findPreImage(updatedOnChainHash)
-
-      assert(!u8aEquals(preImage, updatedPreImage), `new and old pre-image must not be the same`)
-
-      assert(u8aEquals((await hashFunction(updatedPreImage)).slice(0, HASHED_SECRET_WIDTH), updatedOnChainHash))
-    })
-
-    // // Commented due expensive operations
-    // it('should generate a hashed secret and recover a pre-Image', async function () {
-    //   this.timeout(durations.seconds(22))
-    //   await connector.probabilisticPayments.initialize()
-
-    //   for (let i = 0; i < TOTAL_ITERATIONS / DB_ITERATION_BLOCK_SIZE; i++) {
-    //     assert(
-    //       (await connector.db.get(Buffer.from(connector.dbKeys.OnChainSecretIntermediary(i * DB_ITERATION_BLOCK_SIZE)))) !=
-    //         null
-    //     )
-    //   }
-
-    //   const masterSecret = await connector.db.get(Buffer.from(connector.dbKeys.OnChainSecretIntermediary(0)))
-
-    //   await checkIndex(1, masterSecret, false)
-
-    //   await checkIndex(randomInteger(1, TOTAL_ITERATIONS), masterSecret, false)
-
-    //   await checkIndex(TOTAL_ITERATIONS, masterSecret, false)
-
-    //   await checkIndex(0, masterSecret, true)
-
-    //   await checkIndex(TOTAL_ITERATIONS + 1, masterSecret, true)
-    // })
+  it('initialize with secret on chain, but no offchain secret', function(){
+    let probabilisticPayments = new ProbabilisticPayments(mockDb, mockAccount, mockChannels)
+    probabilisticPayments.initialize()
+    assert(probabilisticPayments.getOnChainSecret(), 'on chain secret is set')
   })
 
+  it('initialize with secret on chain, but does not match offChain', function(){
+    let probabilisticPayments = new ProbabilisticPayments(mockDb, mockAccount, mockChannels)
+    probabilisticPayments.initialize()
+    assert(probabilisticPayments.getOnChainSecret(), 'on chain secret is set')
+  })
+*/
+
+  /*
+      assert(!u8aEquals(onChainHash, updatedOnChainHash), `new and old onChainSecret must not be the same`)
+      assert(!u8aEquals(preImage, updatedPreImage), `new and old pre-image must not be the same`)
+    })
+  })
   describe('deterministic debug pre-image', function () {
-    this.timeout(durations.minutes(2))
-
-    before(async function () {
-      this.timeout(durations.minutes(1))
-      await ganache.start()
-      await migrate()
-      await fund(FUND_ARGS)
-
-      connector = await generateConnector(true)
-    })
-
-    after(async function () {
-      await connector.stop()
-      await ganache.stop()
-    })
 
     it('should publish a hashed secret', async function () {
       await connector.probabilisticPayments.initialize()
@@ -226,36 +99,36 @@ describe('test probabilisticPayments', function () {
       assert(u8aEquals((await hashFunction(updatedPreImage)).slice(0, HASHED_SECRET_WIDTH), updatedOnChainHash))
     })
 
-    it('should reserve a preImage for tickets with 100% winning probabilty resp. should not reserve for 0% winning probability', async function () {
-      const firstTicket = {
-        ticket: {
-          hash: Promise.resolve(new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff))),
-          winProb: Utils.computeWinningProbability(1)
-        }
-      } as Types.SignedTicket
+    it('should reserve a preImage for tickets with 100% winning probabilty but should not reserve for 0% winning probability', async function () {
 
       assert(
-        await connector.probabilisticPayments.validateTicket(
-          firstTicket,
+        (await connector.probabilisticPayments.validateTicket(
+          {
+            ticket: {
+              hash: Promise.resolve(new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff))),
+              challenge: new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff)),
+              winProb: Utils.computeWinningProbability(1)
+            }
+          } as Types.SignedTicket,
           new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff))
-        ),
+        )).status === 'SUCCESS',
         'ticket with 100% winning probability must always be a win'
       )
 
-      const notWinningTicket = {
-        ticket: {
-          hash: Promise.resolve(new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff))),
-          winProb: Utils.computeWinningProbability(0)
-        }
-      } as Types.SignedTicket
-
       assert(
-        !(await connector.probabilisticPayments.validateTicket(
-          notWinningTicket,
+        (await connector.probabilisticPayments.validateTicket(
+          {
+            ticket: {
+              hash: Promise.resolve(new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff))),
+              challenge: new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff)),
+              winProb: Utils.computeWinningProbability(0)
+            }
+          } as Types.SignedTicket,
           new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff))
-        )),
+        )).status === 'E_TICKET_FAILED',
         'falsy ticket should not be a win'
       )
     })
   })
+*/
 })
