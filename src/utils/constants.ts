@@ -6,6 +6,11 @@ export type Network = {
   family: NetworkInterfaceInfo['family']
 }
 
+export type Address = {
+  address: Uint8Array
+  family: NetworkInterfaceInfo['family']
+}
+
 // Only useful if in same network
 export const PRIVATE_NETWORK: Network[] = [
   {
@@ -41,6 +46,18 @@ export const LINK_LOCAL_NETWORKS: Network[] = [
   {
     subnet: Uint8Array.from([254, 192, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
     networkPrefix: Uint8Array.from([254, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+    family: 'IPv6'
+  }
+]
+
+// Only useful when running > 1 instances on the same host
+export const LOCALHOST_ADDRS: Address[] = [
+  {
+    address: Uint8Array.from([127, 0, 0, 1]),
+    family: 'IPv4'
+  },
+  {
+    address: Uint8Array.from([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
     family: 'IPv6'
   }
 ]
