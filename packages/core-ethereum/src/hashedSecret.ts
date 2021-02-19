@@ -15,6 +15,7 @@ import { OnChainSecret, OnChainSecretIntermediary } from './dbKeys'
 import type { LevelUp } from 'levelup'
 import type { HoprChannels } from './tsc/web3/HoprChannels'
 import type Account from './account'
+import type { ValidateResponse, RedeemStatus } from '@hoprnet/hopr-core-connector-interface'
 import { checkChallenge } from './utils'
 
 export const DB_ITERATION_BLOCK_SIZE = 10000
@@ -23,18 +24,6 @@ export const HASHED_SECRET_WIDTH = 27
 
 const log = Debug('hopr-core-ethereum:probabilisticPayments')
 const isNullAccount = (a: string) => a == null || ['0', '0x', '0x'.padEnd(66, '0')].includes(a)
-
-export enum ValidateFailure {
-  E_TICKET_FAILED,
-  E_CHALLENGE
-}
-
-export enum RedeemStatus {
-  SUCCESS,
-  E_NO_GAS,
-  E_TICKET_FAILED,
-  E_NO_PREIMAGE
-}
 
 /**
  * Decides whether a ticket is a win or not.
@@ -245,21 +234,21 @@ export class ProbabilisticPayments {
    * Take a signed ticket and transform it into an acknowledged ticket if it's a
    * winning ticket, or undefined if it's not.
    */
-  public async validateTicket(ticket: SignedTicket, response: Hash): Promise<AcknowledgedTicket | ValidateFailure> {
+  public async validateTicket(ticket: SignedTicket, response: Hash): Promise<ValidateResponse> {
     log('validate')
 
     const validChallenge = await checkChallenge(ticket.ticket.challenge, response)
     if (!validChallenge) {
       log(`Failed to submit ticket ${u8aToHex(ticket.ticket.challenge)}: E_CHALLENGE`)
-      return ValidateFailure.E_CHALLENGE
+      return { status: 'E_CHALLENGE' }
     }
 
     if (await isWinningTicket(await ticket.ticket.hash, response, this.currentPreImage, ticket.ticket.winProb)) {
       this.currentPreImage = await this.findPreImage(this.currentPreImage)
-      return new AcknowledgedTicket(ticket, response, new Hash(this.currentPreImage))
+      return { status: 'SUCCESS', ticket:  new AcknowledgedTicket(ticket, response, new Hash(this.currentPreImage)) }
     }
     log('>> invalid')
-    return undefined
+    return { status: 'E_TICKET_FAILED' }
   }
 
   public async issueTicket(
@@ -328,7 +317,7 @@ export class ProbabilisticPayments {
       this.updateOnChainSecret(ackTicket.getPreImage()) // redemption contract updates on chain
 
       log('Successfully submitted ticket', u8aToHex(ticketChallenge))
-      return RedeemStatus.SUCCESS
+      return { status: 'SUCCESS' }
     } catch (err) {
       // TODO - check if it's E_NO_GAS
 

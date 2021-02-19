@@ -4,7 +4,9 @@ import type {
   Currencies,
   AcknowledgedTicket as IAcknowledgedTicket,
   SignedTicket,
-  Hash
+  Hash, 
+  ValidateResponse,
+  RedeemStatus
 } from '@hoprnet/hopr-core-connector-interface'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type { HoprChannels } from './tsc/web3/HoprChannels'
@@ -255,8 +257,11 @@ export default class HoprEthereum implements HoprCoreConnector {
     return constants
   }
 
-  async validateTicket(ticket: IAcknowledgedTicket): Promise<boolean> {
-    return this.probabilisticPayments.validateTicket(ticket)
+  public async validateTicket(ticket: SignedTicket, response: Hash): Promise<ValidateResponse> {
+    return this.probabilisticPayments.validateTicket(ticket, response)
+  }
+  public async redeemTicket(ticket: AcknowledgedTicket): Promise<RedeemStatus> {
+    return this.probabilisticPayments.redeemTicket(ticket)
   }
 
   createAcknowledgedTicket(signedTicket: SignedTicket, response: Hash, preImage?: Hash): IAcknowledgedTicket {

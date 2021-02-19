@@ -106,44 +106,39 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
           ticketCounter = toU8a(0, ACKNOWLEDGED_TICKET_INDEX_LENGTH)
         }
 
-        let acknowledgedTicket = this.node.paymentChannels.createAcknowledgedTicket(
+        const resp = await this.node.paymentChannels.validateTicket(
           await unacknowledgedTicket.signedTicket,
           await this.node.paymentChannels.utils.hash(
             u8aConcat(unacknowledgedTicket.secretA, await acknowledgement.hashedKey)
           )
         )
+        if (resp.status === 'SUCCESS') {
+          const acknowledgedDbKey = this.node._dbKeys.AcknowledgedTickets(ticketCounter)
 
-        const isWinningTicket = await this.node.paymentChannels.validateTicket(acknowledgedTicket)
+          log(
+            `Storing ticket #${u8aToNumber(ticketCounter)} from ${blue(
+              (await pubKeyToPeerId(await acknowledgement.responseSigningParty)).toB58String()
+            )}. Ticket contains preImage for ${green(u8aToHex(await acknowledgement.hashedKey))}`
+          )
 
-        if (!isWinningTicket) {
-          log(`Got a ticket that is not a win. Dropping ticket.`)
+          try {
+            await this.node.db
+              .batch()
+              .del(Buffer.from(unAcknowledgedDbKey))
+              .put(Buffer.from(acknowledgedDbKey), Buffer.from(resp.ticket.serialize()))
+              .put(Buffer.from(this.node._dbKeys.AcknowledgedTicketCounter()), Buffer.from(ticketCounter))
+              .write()
+          } catch (err) {
+            error(`Error while writing to database. Error was ${red(err.message)}.`)
+          }
+        } else {
+          log('Bad ticket:' + resp.status)
           await this.node.db.del(Buffer.from(unAcknowledgedDbKey))
         }
 
-        const acknowledgedDbKey = this.node._dbKeys.AcknowledgedTickets(ticketCounter)
-
-        log(
-          `Storing ticket #${u8aToNumber(ticketCounter)} from ${blue(
-            (await pubKeyToPeerId(await acknowledgement.responseSigningParty)).toB58String()
-          )}. Ticket contains preImage for ${green(u8aToHex(await acknowledgement.hashedKey))}`
-        )
-
-        try {
-          await this.node.db
-            .batch()
-            .del(Buffer.from(unAcknowledgedDbKey))
-            .put(Buffer.from(acknowledgedDbKey), Buffer.from(acknowledgedTicket))
-            .put(Buffer.from(this.node._dbKeys.AcknowledgedTicketCounter()), Buffer.from(ticketCounter))
-            .write()
-        } catch (err) {
-          error(`Error while writing to database. Error was ${red(err.message)}.`)
-        }
-      } else {
-        // Deleting dummy DB entry
-        await this.node.db.del(Buffer.from(unAcknowledgedDbKey))
+        this.emit(u8aToHex(unAcknowledgedDbKey))
+      
       }
-
-      this.emit(u8aToHex(unAcknowledgedDbKey))
     }
   }
 }

@@ -1,5 +1,5 @@
 import type Chain from '@hoprnet/hopr-core-connector-interface'
-import type { Types, Channel } from '@hoprnet/hopr-core-connector-interface'
+import type { Types, Channel, RedeemStatus } from '@hoprnet/hopr-core-connector-interface'
 import type PeerId from 'peer-id'
 import type Hopr from '..'
 import { u8aEquals } from '@hoprnet/hopr-utils'
@@ -160,20 +160,13 @@ export async function redeemTicket(
   node: Hopr<Chain>,
   ackTicket: Types.AcknowledgedTicket,
   index: Uint8Array
-): Promise<OperationStatus> {
-  try {
-    const result = await node.paymentChannels.channel.redeemTicket(ackTicket)
-    await deleteAcknowledgedTicket(node, index)
-    if (result.status === 'SUCCESS') {
-      // TODO Store stats.
-    }
-    return result
-  } catch (err) {
-    return {
-      status: 'ERROR',
-      error: err
-    }
+): Promise<RedeemStatus> {
+  const result = await node.paymentChannels.redeemTicket(ackTicket)
+  await deleteAcknowledgedTicket(node, index)
+  if (result.status === 'SUCCESS') {
+    // TODO Store stats.
   }
+  return result
 }
 
 /**

@@ -12,7 +12,7 @@ import Web3 from 'web3'
 import { HoprToken } from '../tsc/web3/HoprToken'
 import { Await } from '../tsc/utils'
 import { Channel as ChannelType, ChannelStatus, ChannelBalance, ChannelState } from '../types/channel'
-import { AcknowledgedTicket, Balance, SignedChannel, AccountId } from '../types'
+import { Balance, SignedChannel, AccountId } from '../types'
 import CoreConnector from '..'
 import Channel from '.'
 import * as testconfigs from '../config.spec'
@@ -124,17 +124,11 @@ describe('test Channel class', function () {
     )
 
     const myAddress = await coreConnector.utils.pubKeyToAccountId(coreConnector.account.keys.onChain.pubKey)
-    const counterpartyAddress = await coreConnector.utils.pubKeyToAccountId(
-      counterpartysCoreConnector.account.keys.onChain.pubKey
-    )
-
-    const firstTicket = await getTicketData(myAddress)
-    const signedTicket = await channel.createTicket(new Balance(1), firstTicket.challenge, 1)
-
-    const firstAckedTicket = new AcknowledgedTicket(signedTicket, firstTicket.response, preImage)
+    const { challenge, response } = await getTicketData(myAddress)
+    const firstTicket = await channel.createTicket(new Balance(1), challenge, 1)
 
     assert(
-      u8aEquals(await signedTicket.signer, coreConnector.account.keys.onChain.pubKey),
+      u8aEquals(await firstTicket.signer, coreConnector.account.keys.onChain.pubKey),
       `Check that signer is recoverable`
     )
 
@@ -163,7 +157,8 @@ describe('test Channel class', function () {
       `Checks that party B considers the channel open.`
     )
 
-    assert(await counterpartysCoreConnector.validateTicket(firstAckedTicket), `ticket must be winning`)
+    const ackTicket = await counterpartysCoreConnector.validateTicket(firstTicket, response)
+    assert(ackTicket.status === 'SUCCESS', `ticket must be winning`)
 
     await channel.testAndSetNonce(new Uint8Array(1).fill(0xff)), `Should be able to set nonce.`
 
@@ -175,50 +170,16 @@ describe('test Channel class', function () {
     //assert(await counterpartysChannel.ticket.verify(signedTicket), `Ticket signature must be valid.`)
 
     const hashedSecretBefore = await counterpartysChannel.coreConnector.probabilisticPayments.getOnChainSecret()
-    console.log('>>>>', hashedSecretBefore)
-
-    try {
-      const result = await counterpartysCoreConnector.probabilisticPayments.redeemTicket(firstAckedTicket)
-      if (result.status === 'ERROR') {
-        throw result.error
-      } else if (result.status === 'FAILURE') {
-        throw Error(result.message)
-      }
-    } catch (error) {
-      throw error
-    }
+    let result = await counterpartysCoreConnector.probabilisticPayments.redeemTicket(ackTicket.ticket)
+    if (result.status != 'SUCCESS') {
+      throw Error(result.status)
+    } 
 
     const hashedSecretAfter = await counterpartysChannel.coreConnector.probabilisticPayments.getOnChainSecret()
 
     assert(!hashedSecretBefore.eq(hashedSecretAfter), 'Ticket redemption must alter on-chain secret.')
 
-    let errThrown = false
-    try {
-      const result = await counterpartysCoreConnector.probabilisticPayments.redeemTicket(firstAckedTicket)
-      if (result.status === 'ERROR' || result.status === 'FAILURE') {
-        errThrown = true
-      }
-    } catch (err) {
-      errThrown = true
-    }
-
-    assert(errThrown, 'Ticket must lose its validity after being submitted')
-
-    const ATTEMPTS = 20
-
-    let ticketData
-    //let nextSignedTicket: SignedTicket
-
-    for (let i = 0; i < ATTEMPTS; i++) {
-      ticketData = await getTicketData(counterpartyAddress)
-      const nextSignedTicket = await channel.createTicket(new Balance(1), ticketData.challenge, 1)
-      let ackedTicket = new AcknowledgedTicket(nextSignedTicket, ticketData.response)
-
-      //assert(await counterpartysChannel.ticket.verify(nextSignedTicket), `Ticket signature must be valid.`)
-
-      if (await counterpartysCoreConnector.validateTicket(ackedTicket)) {
-        await counterpartysCoreConnector.probabilisticPayments.redeemTicket(ackedTicket)
-      }
-    }
+    result = await counterpartysCoreConnector.probabilisticPayments.redeemTicket(ackTicket.ticket)
+    assert(result.status == 'E_ALREADY_SUBMITTED', 'Ticket must lose its validity after being submitted')
   })
 })

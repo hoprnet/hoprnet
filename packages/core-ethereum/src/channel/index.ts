@@ -34,11 +34,6 @@ const log = Log(['channel-factory'])
 
 const EMPTY_SIGNATURE = new Uint8Array(Signature.SIZE).fill(0x00)
 const WIN_PROB = new BN(1)
-const INVALID_MESSAGES = {
-  NO_PRE_IMAGE: 'PreImage is empty.',
-  INVALID_CHALLENGE: 'Invalid challenge.',
-  NOT_WINNING: 'Not a winning ticket.'
-}
 
 class ChannelFactory {
   constructor(private coreConnector: HoprEthereum) {
