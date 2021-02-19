@@ -101,7 +101,10 @@ describe(`check serialization and deserialization of ticket objects`, function (
 
     assert(u8aToNumber(counter) == FIRST_TICKET)
 
-    await node.db.put(Buffer.from(node._dbKeys.AcknowledgedTickets(counter)), Buffer.from(acknowledgedDbEntry.ticket.serialize()))
+    await node.db.put(
+      Buffer.from(node._dbKeys.AcknowledgedTickets(counter)),
+      Buffer.from(acknowledgedDbEntry.ticket.serialize())
+    )
 
     //const fromDbtmp = await node.db.get(Buffer.from(node.dbKeys.AcknowledgedTickets(counter)))
   })

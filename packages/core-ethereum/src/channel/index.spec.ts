@@ -173,7 +173,7 @@ describe('test Channel class', function () {
     let result = await counterpartysCoreConnector.probabilisticPayments.redeemTicket(ackTicket.ticket)
     if (result.status != 'SUCCESS') {
       throw Error(result.status)
-    } 
+    }
 
     const hashedSecretAfter = await counterpartysChannel.coreConnector.probabilisticPayments.getOnChainSecret()
 
