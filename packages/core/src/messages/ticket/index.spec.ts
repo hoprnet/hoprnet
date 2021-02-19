@@ -11,7 +11,7 @@ import { NODE_SEEDS } from '@hoprnet/hopr-demo-seeds'
 
 import { Types, Utils } from '@hoprnet/hopr-core-ethereum'
 import { privKeyToPeerId } from '@hoprnet/hopr-utils'
-import { toU8a, u8aConcat, u8aToNumber } from '@hoprnet/hopr-utils'
+import { u8aConcat } from '@hoprnet/hopr-utils'
 
 import LevelUp from 'levelup'
 import Memdown from 'memdown'
@@ -85,27 +85,5 @@ describe(`check serialization and deserialization of ticket objects`, function (
       }).verifySignature(peerA),
       'signature must be valid'
     )
-
-    const acknowledgedDbEntry = await node.paymentChannels.validateTicket(
-      signedTicket,
-      await node.paymentChannels.utils.hash(u8aConcat(secretA, secretB))
-    )
-
-    const FIRST_TICKET = 1
-    await node.db.put(
-      Buffer.from(node._dbKeys.AcknowledgedTicketCounter()),
-      Buffer.from(toU8a(FIRST_TICKET, DbKeys.ACKNOWLEDGED_TICKET_INDEX_LENGTH))
-    )
-
-    const counter = (await node.db.get(Buffer.from(node._dbKeys.AcknowledgedTicketCounter()))) as Uint8Array
-
-    assert(u8aToNumber(counter) == FIRST_TICKET)
-
-    await node.db.put(
-      Buffer.from(node._dbKeys.AcknowledgedTickets(counter)),
-      Buffer.from(acknowledgedDbEntry.ticket.serialize())
-    )
-
-    //const fromDbtmp = await node.db.get(Buffer.from(node.dbKeys.AcknowledgedTickets(counter)))
   })
 })
