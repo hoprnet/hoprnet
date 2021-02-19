@@ -1,45 +1,7 @@
-/// <reference path="./@types/libp2p.ts" />
-/// <reference path="./@types/bl.ts" />
-
 import { stringToU8a } from '@hoprnet/hopr-utils'
-import type { Stream, StreamType } from 'libp2p'
-import type Multiaddr from 'multiaddr'
-import PeerId from 'peer-id'
+import type { Network } from './constants'
+
 import { NetworkInterfaceInfo, networkInterfaces } from 'os'
-
-import { CODE_P2P } from './constants'
-
-type MyStream = AsyncGenerator<StreamType | Buffer | string, void>
-
-export function toU8aStream(source: MyStream): Stream['source'] {
-  return (async function* () {
-    for await (const msg of source) {
-      if (typeof msg === 'string') {
-        yield new TextEncoder().encode(msg)
-      } else if (Buffer.isBuffer(msg)) {
-        yield msg
-      } else {
-        yield msg.slice()
-      }
-    }
-  })()
-}
-
-export function extractPeerIdFromMultiaddr(ma: Multiaddr): PeerId {
-  const tuples = ma.stringTuples()
-
-  let destPeerId: string
-  if (tuples[0][0] == CODE_P2P) {
-    destPeerId = tuples[0][1] as string
-  } else if (tuples.length >= 3 && tuples[2][0] == CODE_P2P) {
-    destPeerId = tuples[2][1] as string
-  } else {
-    throw Error(`Invalid Multiaddr. Got ${ma.toString()}`)
-  }
-
-  return PeerId.createFromB58String(destPeerId)
-}
-
 type AddressFamily = 'IPv4' | 'IPv6' | 'ipv4' | 'ipv6'
 
 export function isAnyAddress(address: string, family: AddressFamily): boolean {
@@ -161,18 +123,14 @@ export function inSameNetwork(
   return true
 }
 
-export type Network = {
-  subnet: Uint8Array
-  networkPrefix: Uint8Array
-}
-
 function toNetworkPrefix(addr: NetworkInterfaceInfo): Network {
   const subnet = ipToU8a(addr.netmask, addr.family)
   const address = ipToU8a(addr.address, addr.family)
 
   return {
     subnet,
-    networkPrefix: getNetworkPrefix(address, subnet, addr.family)
+    networkPrefix: getNetworkPrefix(address, subnet, addr.family),
+    family: addr.family
   }
 }
 
