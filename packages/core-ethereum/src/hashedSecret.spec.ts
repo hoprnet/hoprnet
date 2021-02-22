@@ -14,12 +14,12 @@ async function generateMocks() {
     write: sinon.fake()
   }
 
-  const mockDb = {
+  const mockDb = ({
     get: sinon.fake((k) => Promise.resolve(data[k])),
-    put: sinon.fake((k, v) => data[k] = v),
+    put: sinon.fake((k, v) => (data[k] = v)),
     batch: sinon.fake.returns(mockDBBatch),
     __data: data
-  } as unknown as LevelUp
+  } as unknown) as LevelUp
 
   const mockPrivKey = new Uint8Array()
   const mockStore = sinon.fake()
@@ -39,8 +39,10 @@ describe('test probabilistic payments', function () {
     assert(mockStore.called, 'store on chain secret was called')
     assert(pp.getOnChainSecret(), 'on chain secret is set')
     assert(mockStore.firstCall.firstArg === pp.getOnChainSecret(), 'onchain secret matches')
-    assert(await pp.__test_isValidIteratedHash(pp.getOnChainSecret()),
-           'on chain secret is a valid iterated hash of the offChainSecret')
+    assert(
+      await pp.__test_isValidIteratedHash(pp.getOnChainSecret()),
+      'on chain secret is a valid iterated hash of the offChainSecret'
+    )
     // @ts-ignore
     assert(Object.keys(mockDb.__data).length > 10, 'store multiple pre images')
   })
@@ -58,11 +60,13 @@ describe('test probabilistic payments', function () {
     assert(mockStore.called, 'store on chain secret was called, as it needs to reinitialize')
     assert(pp.getOnChainSecret(), 'on chain secret is set')
     assert(mockStore.firstCall.firstArg === pp.getOnChainSecret(), 'onchain secret matches')
-    assert(await pp.__test_isValidIteratedHash(pp.getOnChainSecret()),
-           'on chain secret is a valid iterated hash of the offChainSecret')
+    assert(
+      await pp.__test_isValidIteratedHash(pp.getOnChainSecret()),
+      'on chain secret is a valid iterated hash of the offChainSecret'
+    )
   })
 
-  it('initialize with secret on chain, but does not match offChain', async function(){
+  it('initialize with secret on chain, but does not match offChain', async function () {
     let { mockDb, mockPrivKey, mockStore, mockFind, mockRedeem } = await generateMocks()
     mockFind = sinon.fake.returns(Promise.resolve(new Uint8Array(10).fill(1)))
     await mockDb.put(Buffer.from(OffChainSecret()), Buffer.from(new Uint8Array(10).fill(2)))
@@ -78,11 +82,13 @@ describe('test probabilistic payments', function () {
     assert(mockStore.called, 'store on chain secret was called, as it needs to reinitialize')
     assert(pp.getOnChainSecret(), 'on chain secret is set')
     assert(mockStore.firstCall.firstArg === pp.getOnChainSecret(), 'onchain secret matches')
-    assert(await pp.__test_isValidIteratedHash(pp.getOnChainSecret()),
-           'on chain secret is now a valid iterated hash of the offChainSecret')
+    assert(
+      await pp.__test_isValidIteratedHash(pp.getOnChainSecret()),
+      'on chain secret is now a valid iterated hash of the offChainSecret'
+    )
   })
 
-  it('initialize with secret on chain and offchain', async function(){
+  it('initialize with secret on chain and offchain', async function () {
     let { mockDb, mockPrivKey, mockStore, mockFind, mockRedeem } = await generateMocks()
     // First let's get valid onchain and offchain values, by initializing a
     // temporary ProbabilisticPayments
