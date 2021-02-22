@@ -100,52 +100,18 @@ describe('test probabilistic payments', function () {
     assert(mockStore.notCalled, 'store on chain secret was not called - no reinit')
   })
 
-  /*
-      assert(!u8aEquals(onChainHash, updatedOnChainHash), `new and old onChainSecret must not be the same`)
-      assert(!u8aEquals(preImage, updatedPreImage), `new and old pre-image must not be the same`)
-    })
+  it('issue valid 100% tickets', async function(){
+    let { mockDb, mockPrivKey, mockStore, mockFind, mockRedeem } = await generateMocks()
+    let pp = new ProbabilisticPayments(mockDb, mockPrivKey, mockStore, mockFind, mockRedeem, 100, 10)
+
+    let ticket = await pp.issueTicket(
+      amount, counterparty, challenge, epoch, channelIteration, 1)
+    assert(ticket, 'ticket created')
   })
-  describe('deterministic debug pre-image', function () {
 
-    it('should publish a hashed secret', async function () {
-      await connector.probabilisticPayments.initialize()
 
-      let onChainHash = new Types.Hash(
-        stringToU8a(
-          (await connector.hoprChannels.methods.accounts((await connector.account.address).toHex()).call()).hashedSecret
-        )
-      )
 
-      let preImage = await connector.probabilisticPayments.findPreImage(onChainHash)
-
-      assert(u8aEquals((await hashFunction(preImage)).slice(0, HASHED_SECRET_WIDTH), onChainHash))
-
-      await connector.utils.waitForConfirmation(
-        (
-          await connector.account.signTransaction(
-            {
-              from: (await connector.account.address).toHex(),
-              to: connector.hoprChannels.options.address
-            },
-            connector.hoprChannels.methods.setHashedSecret(new Types.Hash(preImage).toHex())
-          )
-        ).send()
-      )
-
-      let updatedOnChainHash = new Types.Hash(
-        stringToU8a(
-          (await connector.hoprChannels.methods.accounts((await connector.account.address).toHex()).call()).hashedSecret
-        )
-      )
-
-      assert(!u8aEquals(onChainHash, updatedOnChainHash), `new and old onChainSecret must not be the same`)
-
-      let updatedPreImage = await connector.probabilisticPayments.findPreImage(updatedOnChainHash)
-
-      assert(!u8aEquals(preImage, updatedPreImage), `new and old pre-image must not be the same`)
-
-      assert(u8aEquals((await hashFunction(updatedPreImage)).slice(0, HASHED_SECRET_WIDTH), updatedOnChainHash))
-    })
+  /*
 
     it('should reserve a preImage for tickets with 100% winning probabilty but should not reserve for 0% winning probability', async function () {
 
