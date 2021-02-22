@@ -45,7 +45,7 @@ describe('test probabilistic payments', function () {
     assert(Object.keys(mockDb.__data).length > 10, 'store multiple pre images')
   })
 
-  it('initialize with secret on chain, but no offchain secret', async function(){
+  it('initialize with secret on chain, but no offchain secret', async function () {
     let { mockDb, mockPrivKey, mockStore, mockFind, mockRedeem } = await generateMocks()
     mockFind = sinon.fake.returns(Promise.resolve(new Uint8Array(10).fill(1)))
 

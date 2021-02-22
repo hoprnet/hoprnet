@@ -114,7 +114,7 @@ export class ProbabilisticPayments {
       await this.findPreImage(hash)
       log('found pre image')
       return true
-    } catch (e) { 
+    } catch (e) {
       log('preimage not found', e)
       return false
     }
