@@ -37,7 +37,6 @@ export default class HoprEthereum implements HoprCoreConnector {
   private _status: 'dead' | 'alive' = 'dead'
   private _starting?: Promise<HoprEthereum>
   private _stopping?: Promise<void>
-  private _debug: boolean
 
   public channel: ChannelFactory
   public types: types
@@ -52,7 +51,6 @@ export default class HoprEthereum implements HoprCoreConnector {
     public network: Network,
     public hoprChannels: HoprChannels,
     public hoprToken: HoprToken,
-    debug: boolean,
     privateKey: Uint8Array,
     publicKey: Uint8Array,
     maxConfirmations: number
@@ -61,7 +59,6 @@ export default class HoprEthereum implements HoprCoreConnector {
     this.indexer = new Indexer(this, maxConfirmations)
     this.types = new types()
     this.channel = new ChannelFactory(this)
-    this._debug = debug
 
     this.probabilisticPayments = new ProbabilisticPayments(
       this.db,
@@ -143,7 +140,7 @@ export default class HoprEthereum implements HoprCoreConnector {
    * Initializes the on-chain values of our account.
    */
   public async initOnchainValues(): Promise<void> {
-    await this.probabilisticPayments.initialize(this._debug) // no-op if already initialized
+    await this.probabilisticPayments.initialize() // no-op if already initialized
   }
 
   /**
@@ -252,7 +249,6 @@ export default class HoprEthereum implements HoprCoreConnector {
       network,
       hoprChannels,
       hoprToken,
-      options?.debug || false,
       seed,
       publicKey,
       options.maxConfirmations ?? config.MAX_CONFIRMATIONS

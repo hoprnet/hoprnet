@@ -69,13 +69,6 @@ describe('test dbKeys', function () {
     assert(u8aEquals(result, expected), 'check nonce key creation')
   })
 
-  it("should create 'OnChainSecret' key", function () {
-    const result = dbKeys.OnChainSecret()
-    const expected = 'payments-onChainSecretIntermediary'
-
-    assert(new TextDecoder().decode(result).startsWith(expected), 'check onChainSecret key creation')
-  })
-
   it("should create 'AcknowledgedTicket' key", function () {
     const result = dbKeys.AcknowledgedTicket(userA.pubKey, challenge)
     const expected = u8aConcat(encoder.encode('tickets-acknowledged-'), userA.pubKey, encoder.encode('-'), challenge)

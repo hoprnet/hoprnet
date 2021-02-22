@@ -3,14 +3,12 @@ import Debug from 'debug'
 import { randomBytes } from 'crypto'
 import { u8aToHex, u8aConcat, iterateHash, recoverIteratedHash, u8aLessThanOrEqual } from '@hoprnet/hopr-utils'
 import { hash, computeWinningProbability } from './utils'
-import { OnChainSecret, OnChainSecretIntermediary } from './dbKeys'
+import { OffChainSecret, OnChainSecretIntermediary } from './dbKeys'
 import type { LevelUp } from 'levelup'
 import type { ValidateResponse, RedeemStatus } from '@hoprnet/hopr-core-connector-interface'
 import { checkChallenge } from './utils'
 import { u8aCompare } from '@hoprnet/hopr-utils'
 
-export const DB_ITERATION_BLOCK_SIZE = 10000
-export const TOTAL_ITERATIONS = 100000
 export const HASHED_SECRET_WIDTH = 27
 
 const log = Debug('hopr-core-ethereum:probabilisticPayments')
@@ -60,31 +58,23 @@ export class ProbabilisticPayments {
     private privKey: Uint8Array,
     private storeSecretOnChain: (hash: Hash) => Promise<void>,
     private findOnChainSecret: () => Promise<Hash | undefined>,
-    private submitTicketRedemption: (ackTicket: AcknowledgedTicket) => Promise<void>
+    private submitTicketRedemption: (ackTicket: AcknowledgedTicket) => Promise<void>,
+    private TOTAL_ITERATIONS = 100000,
+    private DB_ITERATION_BLOCK_SIZE = 10000
   ) {}
 
   /**
-   * @returns a deterministic secret that is used in debug mode
-   */
-  /*
-  private async getDebugAccountSecret(): Promise<Hash> {
-    const account = await this.channels.methods.accounts((await this.account.address).toHex()).call()
-    return new Hash(
-      await hashFunction(u8aConcat(new Uint8Array([parseInt(account.counter)]), this.account.keys.onChain.pubKey))
-    )
-  }
-*/
-  /**
-   * Creates a random secret OR a deterministic one if running in debug mode,
+   * Creates a random secret,
    * it will then loop X amount of times, on each loop we hash the previous result.
    * We store the last result.
    * @returns a promise that resolves to the onChainSecret
    */
-  private async createAndStoreSecretOffChainAndReturnOnChainSecret(_debug: boolean): Promise<Hash> {
-    this.offChainSecret = /*debug ? await this.getDebugAccountSecret() :*/ new Hash(randomBytes(HASHED_SECRET_WIDTH))
+  private async createAndStoreSecretOffChainAndReturnOnChainSecret(): Promise<Hash> {
+    this.offChainSecret = new Hash(randomBytes(HASHED_SECRET_WIDTH))
     let dbBatch = this.db.batch()
-    const hashes = await iterateHash(this.offChainSecret, hashFunction, TOTAL_ITERATIONS)
-    for (let i = 0; i <= TOTAL_ITERATIONS; i += DB_ITERATION_BLOCK_SIZE) {
+    const hashes = await iterateHash(this.offChainSecret, hashFunction, this.TOTAL_ITERATIONS)
+    dbBatch.put(OffChainSecret, Buffer.from(hashes[0])) 
+    for (let i = 0; i <= this.TOTAL_ITERATIONS; i += this.DB_ITERATION_BLOCK_SIZE) {
       log('storing intermediate', i)
       dbBatch = dbBatch.put(Buffer.from(OnChainSecretIntermediary(i)), Buffer.from(hashes[i]))
     }
@@ -92,9 +82,8 @@ export class ProbabilisticPayments {
     return new Hash(hashes[hashes.length - 1])
   }
 
-  private async calcOnChainSecretFromDb(_debug?: boolean): Promise<Hash | never> {
-    const start = /*debug ? await this.getDebugAccountSecret() :*/ this.offChainSecret
-    let hashes = await iterateHash(start, hashFunction, TOTAL_ITERATIONS)
+  private async calcOnChainSecretFromDb(): Promise<Hash | never> {
+    let hashes = await iterateHash(this.offChainSecret, hashFunction, this.TOTAL_ITERATIONS)
     return new Hash(hashes[hashes.length - 1])
   }
 
@@ -115,8 +104,8 @@ export class ProbabilisticPayments {
       hash,
       hashFunction,
       (index) => getFromDB(this.db, OnChainSecretIntermediary(index)),
-      TOTAL_ITERATIONS,
-      DB_ITERATION_BLOCK_SIZE
+      this.TOTAL_ITERATIONS,
+      this.DB_ITERATION_BLOCK_SIZE
     )
   }
 
@@ -131,13 +120,15 @@ export class ProbabilisticPayments {
     }
   }
 
-  public async initialize(debug?: boolean): Promise<void> {
+  public async initialize(): Promise<void> {
     if (this.initialized) return
-    this.offChainSecret = await getFromDB(this.db, OnChainSecret())
+    this.offChainSecret = await getFromDB(this.db, OffChainSecret())
     this.onChainSecret = await this.findOnChainSecret()
     if (this.onChainSecret && this.offChainSecret) {
       try {
+        log('found on and offchain secrets, validating')
         await this.findPreImage(this.onChainSecret) // throws if not found
+        log('> valid')
         this.initialized = true
         return
       } catch (_e) {
@@ -146,14 +137,14 @@ export class ProbabilisticPayments {
     }
     if (this.offChainSecret && !this.onChainSecret) {
       log('secret exists offchain but not on chain')
-      this.onChainSecret = await this.calcOnChainSecretFromDb(debug)
+      this.onChainSecret = await this.calcOnChainSecretFromDb()
       await this.storeSecretOnChain(this.onChainSecret)
     } else {
       log('reinitializing')
-      this.onChainSecret = await this.createAndStoreSecretOffChainAndReturnOnChainSecret(debug)
+      this.onChainSecret = await this.createAndStoreSecretOffChainAndReturnOnChainSecret()
       await this.storeSecretOnChain(this.onChainSecret)
     }
-    this.currentPreImage = await this.findPreImage(this.onChainSecret) //TODO
+    this.currentPreImage = await this.findPreImage(this.onChainSecret) // Assuming reinit
     this.initialized = true
   }
 

@@ -39,8 +39,3 @@ export function ChannelId(signatureHash: Hash): Uint8Array
  * @param nonce the nonce
  */
 export function Nonce(channelId: Hash, nonce: Hash): Uint8Array
-
-/**
- * Returns the db-key under which the on-chain secret is saved.
- */
-export function OnChainSecret(): Uint8Array

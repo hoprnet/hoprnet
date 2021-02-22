@@ -145,7 +145,7 @@ export function Nonce(channelId: Types.Hash, nonce: Types.Hash): Uint8Array {
   ])
 }
 
-export function OnChainSecret(): Uint8Array {
+export function OffChainSecret(): Uint8Array {
   return OnChainSecretIntermediary(0)
 }
 
