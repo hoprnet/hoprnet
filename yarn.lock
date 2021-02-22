@@ -1885,7 +1885,7 @@
   dependencies:
     "@types/node" "*"
 
-"@types/sinon@^9.0.8":
+"@types/sinon@^9.0.10", "@types/sinon@^9.0.8":
   version "9.0.10"
   resolved "https://registry.yarnpkg.com/@types/sinon/-/sinon-9.0.10.tgz#7fb9bcb6794262482859cab66d59132fca18fcf7"
   integrity sha512-/faDC0erR06wMdybwI/uR8wEKV/E83T0k4sepIpB7gXuy2gzx2xiOjmztq6a2Y6rIGJ04D+6UU0VBmWy+4HEMA==
@@ -3587,7 +3587,7 @@ chai-checkmark@^1.0.1:
   resolved "https://registry.yarnpkg.com/chai-checkmark/-/chai-checkmark-1.0.1.tgz#9fbb3c9ad9101f097ef288328d30f4227d74fffb"
   integrity sha1-n7s8mtkQHwl+8ogyjTD0In10//s=
 
-chai@^4.2.0:
+chai@^4.2.0, chai@^4.3.0:
   version "4.3.0"
   resolved "https://registry.yarnpkg.com/chai/-/chai-4.3.0.tgz#5523a5faf7f819c8a92480d70a8cccbadacfc25f"
   integrity sha512-/BFd2J30EcOwmdOgXvVsmM48l0Br0nmZPlO0uOW4XKh6kpsUumRXBgPV+IlaqFaqr9cYbeoZAM1Npx0i4A+aiA==
