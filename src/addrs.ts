@@ -4,6 +4,8 @@ import Multiaddr from 'multiaddr'
 import Debug from 'debug'
 const log = Debug('hopr-connect')
 
+import { isLocalhost, ipToU8aAddress, isPrivateAddress} from './utils'
+
 export function getAddrs(
   port: number,
   peerId: string,
@@ -43,7 +45,8 @@ export function getAddrs(
     }
 
     for (const address of iface) {
-      if (isLinkLocaleAddress(address.address, address.family)) {
+      const u8aAddr = ipToU8aAddress(address.address, address.family)
+      if (isPrivateAddress(u8aAddr, address.family)) {
         if (address.family === 'IPv4' && (options == undefined || options.includeLocalIPv4 != true)) {
           continue
         }
@@ -52,7 +55,7 @@ export function getAddrs(
         }
       }
 
-      if (isLocalhostAddress(address.address, address.family)) {
+      if (isLocalhost(u8aAddr, address.family)) {
         if (address.family === 'IPv4' && (options == undefined || options.includeLocalhostIPv4 != true)) {
           continue
         }

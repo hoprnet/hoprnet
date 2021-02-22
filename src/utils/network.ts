@@ -1,10 +1,10 @@
-import { stringToU8a } from '@hoprnet/hopr-utils'
+import { stringToU8a, u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
 import type { Network } from './constants'
+import { PRIVATE_NETWORK, LINK_LOCAL_NETWORKS, LOCALHOST_ADDRS } from './constants'
 
 import { NetworkInterfaceInfo, networkInterfaces } from 'os'
-type AddressFamily = 'IPv4' | 'IPv6' | 'ipv4' | 'ipv6'
 
-export function isAnyAddress(address: string, family: AddressFamily): boolean {
+export function isAnyAddress(address: string, family: NetworkInterfaceInfo['family']): boolean {
   switch (family.toLowerCase()) {
     case 'ipv4':
       return address === '0.0.0.0'
@@ -15,35 +15,36 @@ export function isAnyAddress(address: string, family: AddressFamily): boolean {
   }
 }
 
-export function isLinkLocaleAddress(address: string, family: AddressFamily): boolean {
-  switch (family.toLowerCase()) {
-    case 'ipv4':
-      return (
-        address.startsWith('192.168.') ||
-        address.startsWith('10.') ||
-        address.startsWith('172.16.') ||
-        address.startsWith('169.254.') ||
-        address.startsWith('100.64')
-      )
-    case 'ipv6':
-      return address.startsWith('fe80:')
-    default:
-      throw Error(`Invalid address family`)
+export function isLocalhost(address: Uint8Array, family: NetworkInterfaceInfo['family']) {
+  for (const addr of LOCALHOST_ADDRS) {
+    if (addr.family === family && u8aEquals(address, addr.address)) {
+      return true
+    }
   }
+  return false
 }
 
-export function isLocalhost(address: string, family: AddressFamily): boolean {
-  switch (family.toLowerCase()) {
-    case 'ipv4':
-      return address === '127.0.0.1'
-    case 'ipv6':
-      return address === '::1'
-    default:
-      throw Error(`Invalid address family`)
-  }
+export function isPrivateAddress(address: Uint8Array, family: NetworkInterfaceInfo['family']) {
+  return checkNetworks(PRIVATE_NETWORK, address, family)
 }
 
-export function ipToU8a(address: string, family: AddressFamily) {
+export function isLinkLocaleAddress(address: Uint8Array, family: NetworkInterfaceInfo['family']) {
+  return checkNetworks(LINK_LOCAL_NETWORKS, address, family)
+}
+
+export function checkNetworks(networks: Network[], address: Uint8Array, family: NetworkInterfaceInfo['family']) {
+  for (const networkAddress of networks) {
+    if (
+      networkAddress.family === family &&
+      inSameNetwork(address, networkAddress.networkPrefix, networkAddress.subnet, family)
+    ) {
+      return true
+    }
+  }
+  return false
+}
+
+export function ipToU8aAddress(address: string, family: NetworkInterfaceInfo['family']) {
   switch (family.toLowerCase()) {
     case 'ipv4':
       return Uint8Array.from(address.split('.').map((x: string) => parseInt(x)))
@@ -77,7 +78,27 @@ export function ipToU8a(address: string, family: AddressFamily) {
   }
 }
 
-export function getNetworkPrefix(address: Uint8Array, subnet: Uint8Array, family: AddressFamily) {
+export function u8aAddrToString(address: Uint8Array, family: NetworkInterfaceInfo['family']) {
+  switch (family.toLowerCase()) {
+    case 'ipv4':
+      return address.join('.')
+    case 'ipv6':
+      let result = ''
+      for (let i = 0; i < 8; i++) {
+        result += u8aToHex(address.subarray(i * 2, i * 2 +2), false)
+
+        if (i != 7) {
+          result += ':'
+        }
+      }
+      return result
+    default:
+      throw Error('Invalid address family.')
+  }
+
+}
+
+export function getNetworkPrefix(address: Uint8Array, subnet: Uint8Array, family: NetworkInterfaceInfo['family']) {
   const filler = (_: any, index: number) => subnet[index] & address[index]
 
   switch (family.toLowerCase()) {
@@ -94,7 +115,7 @@ export function inSameNetwork(
   address: Uint8Array,
   networkPrefix: Uint8Array,
   subnetMask: Uint8Array,
-  family: AddressFamily
+  family: NetworkInterfaceInfo['family']
 ): boolean {
   const checkLength = (length: number) =>
     address.length == length && networkPrefix.length == length && subnetMask.length == length
@@ -124,8 +145,8 @@ export function inSameNetwork(
 }
 
 function toNetworkPrefix(addr: NetworkInterfaceInfo): Network {
-  const subnet = ipToU8a(addr.netmask, addr.family)
-  const address = ipToU8a(addr.address, addr.family)
+  const subnet = ipToU8aAddress(addr.netmask, addr.family)
+  const address = ipToU8aAddress(addr.address, addr.family)
 
   return {
     subnet,
@@ -134,18 +155,19 @@ function toNetworkPrefix(addr: NetworkInterfaceInfo): Network {
   }
 }
 
-function getAddresses(cond: (address: string, family: 'IPv4' | 'IPv6') => boolean) {
+function getAddresses(cond: (address: Uint8Array, family: 'IPv4' | 'IPv6') => boolean): Network[] {
   let result = []
 
   for (const iface of Object.values(networkInterfaces())) {
     for (const addr of iface ?? []) {
-      if (cond(addr.address, addr.family)) {
-        result.push(addr)
+      const networkPrefix = toNetworkPrefix(addr)
+      if (cond(ipToU8aAddress(addr.address, addr.family), addr.family)) {
+        result.push(networkPrefix)
       }
     }
   }
 
-  return result.map(toNetworkPrefix)
+  return result
 }
 
 export function getLocalAddresses(_iface?: string): Network[] {
@@ -154,7 +176,7 @@ export function getLocalAddresses(_iface?: string): Network[] {
 
 export function getPublicAddresses(_iface?: string): Network[] {
   return getAddresses(
-    (address: string, family: 'IPv4' | 'IPv6') => !isLinkLocaleAddress(address, family) && !isLocalhost(address, family)
+    (address: Uint8Array, family: 'IPv4' | 'IPv6') => !isLinkLocaleAddress(address, family) && !isLocalhost(address, family)
   )
 }
 

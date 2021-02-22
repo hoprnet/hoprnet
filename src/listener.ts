@@ -15,7 +15,8 @@ import { MultiaddrConnection, Upgrader } from 'libp2p'
 import Multiaddr from 'multiaddr'
 
 import { handleStunRequest, getExternalIp } from './stun'
-import { getAddrs, isAnyAddress } from './addrs'
+import { getAddrs } from './addrs'
+import { isAnyAddress } from './utils'
 import { TCPConnection } from './tcp'
 
 const log = debug('hopr-connect:listener')
@@ -110,8 +111,17 @@ class Listener extends EventEmitter implements InterfaceListener {
     }
 
     const protos = ma.protoNames()
-    if (!['ip4', 'ip6'].includes(protos[0])) {
-      throw Error(`Can only bind to IPv4 or IPv6 addresses`)
+    let family: NetworkInterfaceInfo['family']
+
+    switch (protos[0]) {
+      case 'ip4':
+        family = 'IPv4'
+        break
+      case 'ip6':
+        family = 'IPv6'
+        break
+      default:
+        throw Error(`Can only bind to IPv4 or IPv6 addresses`)
     }
 
     if (protos.length > 1 && protos[1] !== 'tcp') {
@@ -146,7 +156,7 @@ class Listener extends EventEmitter implements InterfaceListener {
 
       const index = osInterface.findIndex((iface) => options.host == iface.address)
 
-      if (!isAnyAddress(ma) && index < 0) {
+      if (!isAnyAddress(protos[1], family) && index < 0) {
         throw Error(
           `Could not bind to interface ${this._interface} on address ${
             options.host
