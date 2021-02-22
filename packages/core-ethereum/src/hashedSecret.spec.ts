@@ -5,7 +5,7 @@ import { ProbabilisticPayments } from './hashedSecret'
 import type { LevelUp } from 'levelup'
 import sinon from 'sinon'
 
-async function generateMocks(){
+async function generateMocks() {
   let data = {}
   var mockDBBatch = {
     put: (k, v) => {
@@ -29,8 +29,7 @@ async function generateMocks(){
 }
 
 describe('test probabilistic payments', function () {
-
-  it('initialize with no secret on chain or off', async function() {
+  it('initialize with no secret on chain or off', async function () {
     let { mockDb, mockPrivKey, mockStore, mockFind, mockRedeem } = await generateMocks()
 
     let pp = new ProbabilisticPayments(mockDb, mockPrivKey, mockStore, mockFind, mockRedeem)
