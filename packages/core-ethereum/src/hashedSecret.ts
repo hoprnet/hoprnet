@@ -107,7 +107,7 @@ export class ProbabilisticPayments {
    * values from the database.
    * @param hash the hash to find a preImage for
    */
-  public async findPreImage(hash: Uint8Array): Promise<Uint8Array> {
+  private async findPreImage(hash: Uint8Array): Promise<Uint8Array> {
     // TODO only public for test, make private
     if (hash.length != HASHED_SECRET_WIDTH) {
       throw Error(
@@ -122,6 +122,17 @@ export class ProbabilisticPayments {
       TOTAL_ITERATIONS,
       DB_ITERATION_BLOCK_SIZE
     )
+  }
+
+  public async __test_isValidIteratedHash(hash: Uint8Array): Promise<boolean> {
+    try {
+      await this.findPreImage(hash)
+      log('found pre image')
+      return true
+    } catch (e) { 
+      log('preimage not found', e)
+      return false
+    }
   }
 
 
