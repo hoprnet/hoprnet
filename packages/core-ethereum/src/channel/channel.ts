@@ -154,19 +154,7 @@ class Channel implements IChannel {
   }
 
   get currentBalance(): Promise<Balance> {
-    return new Promise<Balance>(async (resolve, reject) => {
-      try {
-        return resolve(
-          new Balance(
-            await this.coreConnector.hoprToken.methods
-              .balanceOf(u8aToHex(await this.coreConnector.account.address))
-              .call()
-          )
-        )
-      } catch (error) {
-        return reject(error)
-      }
-    })
+    return this.coreConnector.account.getBalance()
   }
 
   get currentBalanceOfCounterparty(): Promise<Balance> {

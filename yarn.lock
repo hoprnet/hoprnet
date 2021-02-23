@@ -1361,10 +1361,10 @@
     find-up "^4.1.0"
     fs-extra "^8.1.0"
 
-"@openzeppelin/contracts@^3.0.1":
-  version "3.4.0"
-  resolved "https://registry.yarnpkg.com/@openzeppelin/contracts/-/contracts-3.4.0.tgz#9a1669ad5f9fdfb6e273bb5a4fed10cb4cc35eb0"
-  integrity sha512-qh+EiHWzfY/9CORr+eRUkeEUP1WiFUcq3974bLHwyYzLBUtK6HPaMkIUHi74S1rDTZ0sNz42DwPc5A4IJvN3rg==
+"@openzeppelin/contracts@3.0.1":
+  version "3.0.1"
+  resolved "https://registry.yarnpkg.com/@openzeppelin/contracts/-/contracts-3.0.1.tgz#2f327f77d16b43f14674086b2b634bda38cb0838"
+  integrity sha512-uSrD7hZ0ViuHGqHZbeHawZBi/uy7aBiNramXAt2dFFuSuoU4u9insS3V3zdVfOnYSPreUo636xSOuQIFN4//HA==
 
 "@openzeppelin/test-helpers@^0.5.9":
   version "0.5.10"
@@ -1820,9 +1820,9 @@
     "@types/node" "*"
 
 "@types/mocha@^8.0.3", "@types/mocha@^8.2.0":
-  version "8.2.0"
-  resolved "https://registry.yarnpkg.com/@types/mocha/-/mocha-8.2.0.tgz#3eb56d13a1de1d347ecb1957c6860c911704bc44"
-  integrity sha512-/Sge3BymXo4lKc31C8OINJgXLaw+7vL1/L1pGiBNpGrBiT8FQiaFpSYV0uhTaG4y78vcMBTMFsWaHDvuD+xGzQ==
+  version "8.2.1"
+  resolved "https://registry.yarnpkg.com/@types/mocha/-/mocha-8.2.1.tgz#f3f3ae4590c5386fc7c543aae9b78d4cf30ffee9"
+  integrity sha512-NysN+bNqj6E0Hv4CTGWSlPzMW6vTKjDpOteycDkV4IWBsO+PU48JonrPzV9ODjiI2XrjmA05KInLgF5ivZ/YGQ==
 
 "@types/node@*", "@types/node@14", "@types/node@>= 8":
   version "14.14.25"
@@ -1885,7 +1885,7 @@
   dependencies:
     "@types/node" "*"
 
-"@types/sinon@^9.0.8":
+"@types/sinon@^9.0.10", "@types/sinon@^9.0.8":
   version "9.0.10"
   resolved "https://registry.yarnpkg.com/@types/sinon/-/sinon-9.0.10.tgz#7fb9bcb6794262482859cab66d59132fca18fcf7"
   integrity sha512-/faDC0erR06wMdybwI/uR8wEKV/E83T0k4sepIpB7gXuy2gzx2xiOjmztq6a2Y6rIGJ04D+6UU0VBmWy+4HEMA==
@@ -3587,7 +3587,7 @@ chai-checkmark@^1.0.1:
   resolved "https://registry.yarnpkg.com/chai-checkmark/-/chai-checkmark-1.0.1.tgz#9fbb3c9ad9101f097ef288328d30f4227d74fffb"
   integrity sha1-n7s8mtkQHwl+8ogyjTD0In10//s=
 
-chai@^4.2.0:
+chai@^4.2.0, chai@^4.3.0:
   version "4.3.0"
   resolved "https://registry.yarnpkg.com/chai/-/chai-4.3.0.tgz#5523a5faf7f819c8a92480d70a8cccbadacfc25f"
   integrity sha512-/BFd2J30EcOwmdOgXvVsmM48l0Br0nmZPlO0uOW4XKh6kpsUumRXBgPV+IlaqFaqr9cYbeoZAM1Npx0i4A+aiA==
@@ -6604,9 +6604,9 @@ hard-rejection@^2.1.0:
   integrity sha512-VIZB+ibDhx7ObhAe7OVtoEbuP4h/MuOTHJ+J8h/eBXotJYl0fBgR72xDFCKgIh22OJZIOVNxBMWuhAr10r8HdA==
 
 hardhat-typechain@^0.3.3:
-  version "0.3.4"
-  resolved "https://registry.yarnpkg.com/hardhat-typechain/-/hardhat-typechain-0.3.4.tgz#6d7d86184152b5a3c83bde0fbbb26224b6fbfd70"
-  integrity sha512-oI9YSutDfZnRlAV1bYTpLkBHw4rkhz9JDWAEXz2PR34ylpgLWxPFbPiHT5QXadGTlBqJUAT6JSTxCK1kADMkjA==
+  version "0.3.5"
+  resolved "https://registry.yarnpkg.com/hardhat-typechain/-/hardhat-typechain-0.3.5.tgz#8e50616a9da348b33bd001168c8fda9c66b7b4af"
+  integrity sha512-w9lm8sxqTJACY+V7vijiH+NkPExnmtiQEjsV9JKD1KgMdVk2q8y+RhvU/c4B7+7b1+HylRUCxpOIvFuB3rE4+w==
 
 hardhat@^2.0.2:
   version "2.0.10"

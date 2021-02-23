@@ -1,19 +1,23 @@
-import type HoprEthereum from '.'
-import type { TransactionObject } from './tsc/web3/types'
 import type { TransactionConfig } from 'web3-core'
+import type HoprEthereum from '.'
+import type { ContractEventEmitter } from './tsc/web3/types'
+import type { TransactionObject } from './tsc/web3/types'
+import type { HoprToken } from './tsc/web3/HoprToken'
 import Web3 from 'web3'
 import { getRpcOptions, Network } from '@hoprnet/hopr-ethereum'
-import { durations, stringToU8a, u8aToHex } from '@hoprnet/hopr-utils'
+import { durations, stringToU8a, u8aToHex, isExpired } from '@hoprnet/hopr-utils'
 import NonceTracker from './nonce-tracker'
 import TransactionManager from './transaction-manager'
 import { AccountId, Balance, Hash, NativeBalance, TicketEpoch } from './types'
 import { pubKeyToAccountId } from './utils'
-import { ContractEventEmitter } from './tsc/web3/types'
+import { WEB3_CACHE_TTL } from './constants'
+import * as ethereum from './ethereum'
 
 import debug from 'debug'
 const log = debug('hopr-core-ethereum:account')
 
 const rpcOps = getRpcOptions()
+const cache = new Map<'balance' | 'nativeBalance', { value: string; updatedAt: number }>()
 
 class Account {
   private _address?: AccountId
@@ -83,31 +87,19 @@ class Account {
   }
 
   /**
-   * Returns the current balances of the account associated with this node (HOPR)
-   * @returns a promise resolved to Balance
+   * Retrieves HOPR balance, optionally uses the cache.
+   * @returns HOPR balance
    */
-  get balance(): Promise<Balance> {
-    return new Promise<Balance>(async (resolve, reject) => {
-      try {
-        resolve(new Balance(await this.coreConnector.hoprToken.methods.balanceOf((await this.address).toHex()).call()))
-      } catch (err) {
-        reject(err)
-      }
-    })
+  public async getBalance(useCache: boolean = false): Promise<Balance> {
+    return getBalance(this.coreConnector.hoprToken, await this.address, useCache)
   }
 
   /**
-   * Returns the current native balance (ETH)
-   * @returns a promise resolved to Balance
+   * Retrieves ETH balance, optionally uses the cache.
+   * @returns ETH balance
    */
-  get nativeBalance(): Promise<NativeBalance> {
-    return new Promise(async (resolve, reject) => {
-      try {
-        resolve(new NativeBalance(await this.coreConnector.web3.eth.getBalance((await this.address).toHex())))
-      } catch (err) {
-        reject(err)
-      }
-    })
+  public async getNativeBalance(useCache: boolean = false): Promise<NativeBalance> {
+    return getNativeBalance(this.coreConnector.web3, await this.address, useCache)
   }
 
   get ticketEpoch(): Promise<TicketEpoch> {
@@ -262,6 +254,49 @@ class Account {
       }
     }
   }
+}
+
+/**
+ * Retrieves HOPR balance, optionally uses the cache.
+ * TODO: use indexer to track HOPR balance
+ * @returns HOPR balance
+ */
+export const getBalance = async (
+  hoprToken: HoprToken,
+  account: AccountId,
+  useCache: boolean = false
+): Promise<Balance> => {
+  if (useCache) {
+    const cached = cache.get('balance')
+    const notExpired = cached && !isExpired(cached.updatedAt, new Date().getTime(), WEB3_CACHE_TTL)
+    if (notExpired) return new Balance(cached.value)
+  }
+
+  const value = await ethereum.getBalance(hoprToken, account)
+  cache.set('balance', { value: value.toString(), updatedAt: new Date().getTime() })
+
+  return value
+}
+
+/**
+ * Retrieves ETH balance, optionally uses the cache.
+ * @returns ETH balance
+ */
+export const getNativeBalance = async (
+  web3: Web3,
+  account: AccountId,
+  useCache: boolean = false
+): Promise<NativeBalance> => {
+  if (useCache) {
+    const cached = cache.get('nativeBalance')
+    const notExpired = cached && !isExpired(cached.updatedAt, new Date().getTime(), WEB3_CACHE_TTL)
+    if (notExpired) return new NativeBalance(cached.value)
+  }
+
+  const value = await ethereum.getNativeBalance(web3, account)
+  cache.set('nativeBalance', { value: value.toString(), updatedAt: new Date().getTime() })
+
+  return new NativeBalance(value)
 }
 
 export default Account

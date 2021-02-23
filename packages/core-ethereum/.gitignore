@@ -17,8 +17,5 @@ src/tsc/web3
 lib
 test.mocha.js
 
-# Ethereum artifacts
-src/ethereum
-
 # Exclude any built npm packages
 *.tgz

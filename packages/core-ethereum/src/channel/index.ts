@@ -104,7 +104,7 @@ class ChannelFactory {
     try {
       const { account } = this.coreConnector
 
-      const balance = await account.balance
+      const balance = await account.getBalance()
       if (balance.isZero()) {
         throw Error(ERRORS.OOF_HOPR)
       }
