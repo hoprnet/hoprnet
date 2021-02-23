@@ -34,8 +34,8 @@ class SignedTicket implements ISignedTicket {
     return Signature.SIZE + Ticket.SIZE()
   }
 
-  toUnacknowledged(secretA: Hash): UnacknowledgedTicket{
-    return new UnacknowledgedTicket(this, secretA) 
+  toUnacknowledged(secretA: Hash): UnacknowledgedTicket {
+    return new UnacknowledgedTicket(this, secretA)
   }
 }
 
