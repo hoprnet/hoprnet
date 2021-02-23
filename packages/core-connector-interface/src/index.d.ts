@@ -153,6 +153,7 @@ export {
   HoprCoreConnectorStatic,
   AcknowledgedTicket,
   SignedTicket,
+  Ticket,
   Hash
 }
 

@@ -87,9 +87,7 @@ export async function submitTicketRedemption(ackTicket: AcknowledgedTicket, chan
 
   log('Submitting ticket', u8aToHex(ticketChallenge))
   const { r, s, v } = getSignatureParameters(signedTicket.signature)
-
-  const counterparty = await pubKeyToAccountId(await signedTicket.signer)
-
+  const counterparty = await pubKeyToAccountId(await signedTicket.getSigner())
   const transaction = await account.signTransaction(
     {
       from: (await account.address).toHex(),

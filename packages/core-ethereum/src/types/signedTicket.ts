@@ -1,101 +1,32 @@
-import type { Types } from '@hoprnet/hopr-core-connector-interface'
-import { u8aConcat } from '@hoprnet/hopr-utils'
+import type { SignedTicket as ISignedTicket} from '@hoprnet/hopr-core-connector-interface'
 import secp256k1 from 'secp256k1'
 import { Signature, Ticket } from '../types'
-import { Uint8ArrayE } from '../types/extended'
 import { verify } from '../utils'
 
-class SignedTicket extends Uint8ArrayE implements Types.SignedTicket {
-  private _ticket?: Ticket
-  private _signature?: Signature
-  private _signer?: Uint8Array
-
+class SignedTicket implements ISignedTicket {
   constructor(
-    arr?: {
-      bytes: ArrayBuffer
-      offset: number
-    },
-    struct?: {
-      signature?: Signature
-      ticket?: Ticket
-    }
-  ) {
-    if (!arr) {
-      super(SignedTicket.SIZE)
-    } else {
-      super(arr.bytes, arr.offset, SignedTicket.SIZE)
-    }
+    readonly ticket: Ticket,
+    readonly signature: Signature
+  ) {}
 
-    if (struct) {
-      if (struct.signature) {
-        this.set(struct.signature, this.signatureOffset - this.byteOffset)
-      }
-
-      if (struct.ticket) {
-        const ticket = struct.ticket.toU8a()
-
-        if (ticket.length == Ticket.SIZE) {
-          this.set(ticket, this.ticketOffset - this.byteOffset)
-        } else if (ticket.length < Ticket.SIZE) {
-          this.set(u8aConcat(ticket, new Uint8Array(Ticket.SIZE - ticket.length)), this.ticketOffset - this.byteOffset)
-        } else {
-          throw Error(`Ticket is too big by ${ticket.length - Ticket.SIZE} elements.`)
-        }
-      }
-    }
+  public serialize(): Uint8Array {
+    const serialized = new Uint8Array(SignedTicket.SIZE)
+    serialized.set(this.signature, 0)
+    serialized.set(this.ticket.serialize(), Signature.SIZE)
+    return serialized
   }
 
-  slice(begin = 0, end = SignedTicket.SIZE) {
-    return this.subarray(begin, end)
+  static deserialize(arr: Uint8Array): SignedTicket {
+    const buffer = arr.buffer
+    let i = arr.byteOffset
+    const signature = new Signature({bytes: buffer, offset: i })
+    i += Signature.SIZE
+    const ticket = Ticket.deserialize(new Uint8Array(buffer, i, Ticket.SIZE()))
+    return new SignedTicket(ticket, signature)
   }
 
-  subarray(begin = 0, end = SignedTicket.SIZE) {
-    return new Uint8Array(this.buffer, begin + this.byteOffset, end - begin)
-  }
-
-  get ticketOffset(): number {
-    return this.byteOffset + Signature.SIZE
-  }
-
-  get ticket(): Ticket {
-    if (!this._ticket) {
-      this._ticket = new Ticket({
-        bytes: this.buffer,
-        offset: this.ticketOffset
-      })
-    }
-
-    return this._ticket
-  }
-
-  get signatureOffset(): number {
-    return this.byteOffset
-  }
-
-  get signature(): Signature {
-    if (!this._signature) {
-      this._signature = new Signature({
-        bytes: this.buffer,
-        offset: this.signatureOffset
-      })
-    }
-
-    return this._signature
-  }
-
-  get signer(): Promise<Uint8Array> {
-    if (this._signer) {
-      return Promise.resolve(this._signer)
-    }
-
-    return new Promise(async (resolve, reject) => {
-      try {
-        this._signer = secp256k1.ecdsaRecover(this.signature.signature, this.signature.recovery, await this.ticket.hash)
-        return resolve(this._signer)
-      } catch (err) {
-        return reject(err)
-      }
-    })
+  async getSigner(): Promise<Uint8Array> {
+    return secp256k1.ecdsaRecover(this.signature.signature, this.signature.recovery, await this.ticket.hash)
   }
 
   async verifySignature(pubKey: Uint8Array): Promise<boolean> {
@@ -103,20 +34,7 @@ class SignedTicket extends Uint8ArrayE implements Types.SignedTicket {
   }
 
   static get SIZE() {
-    return Signature.SIZE + Ticket.SIZE
-  }
-
-  static create(
-    arr?: {
-      bytes: ArrayBuffer
-      offset: number
-    },
-    struct?: {
-      signature?: Signature
-      ticket?: Ticket
-    }
-  ): Promise<SignedTicket> {
-    return Promise.resolve(new SignedTicket(arr, struct))
+    return Signature.SIZE + Ticket.SIZE()
   }
 }
 

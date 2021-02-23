@@ -184,18 +184,12 @@ class ChannelFactory {
     const signedTicket = new SignedTicket(arr)
 
     const ticket = new Ticket(
-      {
-        bytes: signedTicket.buffer,
-        offset: signedTicket.ticketOffset
-      },
-      {
         counterparty,
         challenge,
-        epoch: new TicketEpoch(0),
-        amount: new Balance(0),
+        new TicketEpoch(0),
+        new Balance(0),
         winProb,
-        channelIteration: new TicketEpoch(0)
-      }
+        new TicketEpoch(0)
     )
 
     await sign(await ticket.hash, this.coreConnector.account.keys.onChain.privKey, undefined, {

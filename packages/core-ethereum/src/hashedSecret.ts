@@ -188,28 +188,15 @@ export class ProbabilisticPayments {
     winProb: number
   ): Promise<SignedTicket> {
     const ticketWinProb = new Hash(computeWinningProbability(winProb))
-    const signedTicket = new SignedTicket()
     const ticket = new Ticket(
-      {
-        bytes: signedTicket.buffer,
-        offset: signedTicket.ticketOffset
-      },
-      {
         counterparty,
         challenge,
         epoch,
         amount,
-        winProb: ticketWinProb,
+        ticketWinProb,
         channelIteration
-      }
     )
-
-    await ticket.sign(this.privKey, undefined, {
-      bytes: signedTicket.buffer,
-      offset: signedTicket.signatureOffset
-    })
-
-    return signedTicket
+    return ticket.sign(this.privKey)
   }
 
   public async redeemTicket(ackTicket: AcknowledgedTicket): Promise<RedeemStatus> {
