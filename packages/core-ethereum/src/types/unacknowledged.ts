@@ -4,10 +4,7 @@ import { Hash, AcknowledgedTicket, SignedTicket } from '.'
 import { hash } from '../utils'
 
 class UnacknowledgedTicket implements IUnacknowledgedTicket {
-  constructor(
-    public signedTicket: SignedTicket,
-    public secretA: Hash
-  ) {}
+  constructor(public signedTicket: SignedTicket, public secretA: Hash) {}
 
   serialize(): Uint8Array {
     const serialized = new Uint8Array(UnacknowledgedTicket.SIZE())
@@ -17,20 +14,14 @@ class UnacknowledgedTicket implements IUnacknowledgedTicket {
   }
 
   static deserialize(arr: Uint8Array): UnacknowledgedTicket {
-    const signedTicket = SignedTicket.deserialize(
-      new Uint8Array(arr.buffer, 0, SignedTicket.SIZE)
-    )
-    const secretA = new Hash(
-      new Uint8Array(arr.buffer, SignedTicket.SIZE, Hash.SIZE)
-    )
+    const signedTicket = SignedTicket.deserialize(new Uint8Array(arr.buffer, 0, SignedTicket.SIZE))
+    const secretA = new Hash(new Uint8Array(arr.buffer, SignedTicket.SIZE, Hash.SIZE))
     return new UnacknowledgedTicket(signedTicket, secretA)
   }
 
   async verifyChallenge(hashedKeyHalf: Uint8Array) {
     return u8aEquals(
-      await hash(
-        await hash(u8aConcat(this.secretA, hashedKeyHalf))
-      ),
+      await hash(await hash(u8aConcat(this.secretA, hashedKeyHalf))),
       (await this.signedTicket).ticket.challenge
     )
   }
