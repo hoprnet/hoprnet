@@ -106,7 +106,7 @@ describe('test probabilistic payments', function () {
     assert(mockStore.notCalled, 'store on chain secret was not called - no reinit')
   })
 
-  it('issue valid 100% tickets', async function(){
+  it('issue valid 100% tickets', async function () {
     /*
     let { mockDb, mockPrivKey, mockStore, mockFind, mockRedeem } = await generateMocks()
     let pp = new ProbabilisticPayments(mockDb, mockPrivKey, mockStore, mockFind, mockRedeem, 100, 10)
@@ -116,8 +116,6 @@ describe('test probabilistic payments', function () {
     assert(ticket, 'ticket created')
       */
   })
-
-
 
   /*
 

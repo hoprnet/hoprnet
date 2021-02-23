@@ -35,7 +35,7 @@ class Ticket implements ITicket {
     let i = 0
     serialized.set(this.counterparty, i)
     i += AccountId.SIZE
-    serialized.set(this.challenge, i) 
+    serialized.set(this.challenge, i)
     i += Hash.SIZE
     serialized.set(epochBuffer, i)
     i += EPOCH_SIZE
@@ -78,6 +78,7 @@ class Ticket implements ITicket {
 
 
   async sign(privKey: Uint8Array): Promise<SignedTicket> {
+    // TODO
     return new SignedTicket(this, await sign(await this.hash, privKey, null, null))
   }
 }
