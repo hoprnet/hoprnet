@@ -128,7 +128,7 @@ describe('test Channel class', function () {
     const firstTicket = await channel.createTicket(new Balance(1), challenge, 1)
 
     assert(
-      u8aEquals(await firstTicket.signer, coreConnector.account.keys.onChain.pubKey),
+      u8aEquals(await firstTicket.getSigner(), coreConnector.account.keys.onChain.pubKey),
       `Check that signer is recoverable`
     )
 

@@ -14,7 +14,6 @@ declare interface AcknowledgedTicketStatic {
  * redeemed.
  */
 declare interface AcknowledgedTicket {
-  constructor(signedTicket: SignedTicket, response: Hash, preImage?: Hash)
   getSignedTicket(): SignedTicket
   getResponse(): Hash
   getPreImage(): Hash

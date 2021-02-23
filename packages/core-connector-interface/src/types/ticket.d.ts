@@ -5,20 +5,11 @@ import Signature from './signature'
 import TicketEpoch from './ticketEpoch'
 
 declare interface TicketStatic {
-  readonly SIZE: number
-  deserialize(Uint8Array): Promise<Ticket>
+  SIZE(): number
+  deserialize(Uint8Array): Ticket
 }
 
 declare interface Ticket {
-  constructor(
-    counterparty: AccountId,
-    challenge: Hash,
-    epoch: TicketEpoch,
-    amount: Balance,
-    winProb: Hash,
-    channelIteration: TicketEpoch
-  )
-
   counterparty: AccountId
   challenge: Hash
   epoch: TicketEpoch

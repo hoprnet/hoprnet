@@ -34,7 +34,7 @@ class Channel implements IChannel {
       .then((res) => new TicketEpoch(Number(res.counter)))
     const channelIteration = new TicketEpoch(stateCounterToIteration((await this.stateCounter).toNumber()))
 
-    return this.coreConnector.probabilisticPayments.issueTicket(
+    return await this.coreConnector.probabilisticPayments.issueTicket(
       amount,
       counterparty,
       challenge,

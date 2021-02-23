@@ -19,7 +19,6 @@ import {
   waitForConfirmation,
   getId,
   pubKeyToAccountId,
-  sign,
   isPartyA,
   getParties,
   Log,
@@ -169,27 +168,15 @@ class ChannelFactory {
 
   async createDummyChannelTicket(
     counterparty: AccountId,
-    challenge: Hash,
-    arr?: {
-      bytes: ArrayBuffer
-      offset: number
-    }
+    challenge: Hash
   ): Promise<SignedTicket> {
     if (!challenge) {
       throw Error(`Challenge is not set`)
     }
 
     const winProb = new Uint8ArrayE(new BN(new Uint8Array(Hash.SIZE).fill(0xff)).div(WIN_PROB).toArray('le', Hash.SIZE))
-
-    const signedTicket = new SignedTicket(arr)
-
     const ticket = new Ticket(counterparty, challenge, new TicketEpoch(0), new Balance(0), winProb, new TicketEpoch(0))
-
-    await sign(await ticket.hash, this.coreConnector.account.keys.onChain.privKey, undefined, {
-      bytes: signedTicket.buffer,
-      offset: signedTicket.signatureOffset
-    })
-
+    const signedTicket = await ticket.sign(this.coreConnector.account.keys.onChain.privKey)
     return signedTicket
   }
 

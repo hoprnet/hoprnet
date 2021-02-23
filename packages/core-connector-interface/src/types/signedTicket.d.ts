@@ -3,11 +3,11 @@ import Ticket from './ticket'
 
 declare interface SignedTicketStatic {
   readonly SIZE: number
-  deserialize(Uint8Array): Promise<SignedTicket>
+  deserialize(Uint8Array): SignedTicket
 }
 
-declare interface SignedTicket extends Uint8Array {
-  constructor(ticket: Ticket, signature: Signature)
+declare interface SignedTicket {
+  //constructor(ticket: Ticket, signature: Signature): SignedTicket
   ticket: Ticket
   signature: Signature
   getSigner(): Promise<Uint8Array>

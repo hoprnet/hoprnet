@@ -54,7 +54,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
 
     if (struct != null) {
       this.set(struct.header, this.headerOffset - this.byteOffset)
-      this.set(struct.ticket, this.ticketOffset - this.byteOffset)
+      this.set(struct.ticket.serialize(), this.ticketOffset - this.byteOffset)
       this.set(struct.challenge, this.challengeOffset - this.byteOffset)
       this.set(struct.message, this.messageOffset - this.byteOffset)
 
@@ -98,11 +98,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     }
 
     return new Promise<Types.SignedTicket>(async (resolve) => {
-      this._ticket = await this.node.paymentChannels.types.SignedTicket.create({
-        bytes: this.buffer,
-        offset: this.ticketOffset
-      })
-
+      this._ticket = await this.node.paymentChannels.types.SignedTicket.deserialize( new Uint8Array(this.buffer, this.ticketOffset))
       resolve(this._ticket)
     })
   }
@@ -427,7 +423,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
       return this._senderPeerId
     }
 
-    this._senderPeerId = await pubKeyToPeerId(await (await this.ticket).signer)
+    this._senderPeerId = await pubKeyToPeerId(await (await this.ticket).getSigner())
 
     return this._senderPeerId
   }

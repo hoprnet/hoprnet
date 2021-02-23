@@ -35,7 +35,7 @@ export async function getUnacknowledgedTickets(
         })
 
         // if signer provided doesn't match our ticket's signer dont add it to the list
-        if (filter?.signer && !u8aEquals(await (await unAckTicket.signedTicket).signer, filter.signer)) {
+        if (filter?.signer && !u8aEquals(await (await unAckTicket.signedTicket).getSigner(), filter.signer)) {
           return
         }
 
@@ -101,7 +101,7 @@ export async function getAcknowledgedTickets(
         const ackTicket = await node.paymentChannels.types.AcknowledgedTicket.deserialize(value)
 
         // if signer provided doesn't match our ticket's signer dont add it to the list
-        if (filter?.signer && !u8aEquals(await ackTicket.getSignedTicket().signer, filter.signer)) {
+        if (filter?.signer && !u8aEquals(await ackTicket.getSignedTicket().getSigner(), filter.signer)) {
           return
         }
 
@@ -225,7 +225,7 @@ export async function validateUnacknowledgedTicket({
   const amPartyA = chain.utils.isPartyA(selfAccountId, senderAccountId)
 
   // ticket signer MUST be the sender
-  if (!u8aEquals(await signedTicket.signer, senderPubKey)) {
+  if (!u8aEquals(await signedTicket.getSigner(), senderPubKey)) {
     throw Error(`The signer of the ticket does not match the sender`)
   }
 

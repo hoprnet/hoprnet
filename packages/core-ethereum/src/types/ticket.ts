@@ -1,4 +1,4 @@
-import type { Ticket as ITicket } from '@hoprnet/hopr-core-connector-interface'
+import type { Ticket as ITicket, SignedTicket as ISignedTicket } from '@hoprnet/hopr-core-connector-interface'
 import BN from 'bn.js'
 import { stringToU8a, u8aToHex, u8aConcat } from '@hoprnet/hopr-utils'
 import { AccountId, Balance, Hash, SignedTicket, TicketEpoch } from '.'
@@ -76,7 +76,7 @@ class Ticket implements ITicket {
     return new Balance(this.amount.mul(new BN(this.winProb)).div(new BN(new Uint8Array(Hash.SIZE).fill(0xff))))
   }
 
-  async sign(privKey: Uint8Array): Promise<SignedTicket> {
+  async sign(privKey: Uint8Array): Promise<ISignedTicket> {
     // TODO
     return new SignedTicket(this, await sign(await this.hash, privKey, null, null))
   }

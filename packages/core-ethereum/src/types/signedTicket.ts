@@ -4,7 +4,7 @@ import { Signature, Ticket } from '../types'
 import { verify } from '../utils'
 
 class SignedTicket implements ISignedTicket {
-  constructor(readonly ticket: Ticket, readonly signature: Signature) {}
+  constructor(public ticket: Ticket, public signature: Signature) {}
 
   public serialize(): Uint8Array {
     const serialized = new Uint8Array(SignedTicket.SIZE)
