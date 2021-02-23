@@ -1,5 +1,5 @@
 import assert from 'assert'
-import { stringToU8a, randomInteger } from '@hoprnet/hopr-utils'
+import { stringToU8a } from '@hoprnet/hopr-utils'
 import { AccountId, Ticket, Hash, TicketEpoch, Balance } from '.'
 import { privKeyToPubKey, pubKeyToAccountId, computeWinningProbability } from '../utils'
 import * as testconfigs from '../config.spec'
@@ -28,49 +28,24 @@ describe('test ticket construction', function () {
     }
   }
 
-  it('should create new ticket using struct', async function () {
-    const ticketData = await generateTicketData()
-
-    const ticket = new Ticket(undefined, ticketData)
+  it('should create new ticket', async function () {
+    const { counterparty, challenge, epoch, amount, winProb, channelIteration } = await generateTicketData()
+    const ticket = new Ticket(counterparty, challenge, epoch, amount, winProb, channelIteration)
 
     assert(ticket.counterparty.eq(userA), 'wrong counterparty')
-    assert(ticket.challenge.eq(ticketData.challenge), 'wrong challenge')
-    assert(ticket.epoch.eq(ticketData.epoch), 'wrong epoch')
-    assert(ticket.amount.eq(ticketData.amount), 'wrong amount')
-    assert(ticket.winProb.eq(ticketData.winProb), 'wrong winProb')
-    assert(ticket.channelIteration.eq(ticketData.channelIteration), 'wrong channelIteration')
+    assert(ticket.challenge.eq(challenge), 'wrong challenge')
+    assert(ticket.epoch.eq(epoch), 'wrong epoch')
+    assert(ticket.amount.eq(amount), 'wrong amount')
+    assert(ticket.winProb.eq(winProb), 'wrong winProb')
+    assert(ticket.channelIteration.eq(channelIteration), 'wrong channelIteration')
   })
 
-  it('should create new ticket using array', async function () {
+  it('should deserialize / serialize', async function () {
     const ticketData = await generateTicketData()
-
-    const ticketA = new Ticket(undefined, ticketData)
-    const ticketB = new Ticket({
-      bytes: ticketA.buffer,
-      offset: ticketA.byteOffset
-    })
-
-    assert(ticketB.counterparty.eq(userA), 'wrong counterparty')
-    assert(ticketB.challenge.eq(ticketData.challenge), 'wrong challenge')
-    assert(ticketB.epoch.eq(ticketData.epoch), 'wrong epoch')
-    assert(ticketB.amount.eq(ticketData.amount), 'wrong amount')
-    assert(ticketB.winProb.eq(ticketData.winProb), 'wrong winProb')
-    assert(ticketB.channelIteration.eq(ticketData.channelIteration), 'wrong channelIteration')
-  })
-
-  it('should create new ticket out of continous memory', async function () {
-    const ticketData = await generateTicketData()
-
-    const offset = randomInteger(1, 31)
-    const array = new Uint8Array(Ticket.SIZE + offset)
-
-    const ticket = new Ticket(
-      {
-        bytes: array.buffer,
-        offset: array.byteOffset + offset
-      },
-      ticketData
-    )
+    const { counterparty, challenge, epoch, amount, winProb, channelIteration } = await generateTicketData()
+    const temp = new Ticket(counterparty, challenge, epoch, amount, winProb, channelIteration)
+    const serialized = temp.serialize()
+    const ticket = Ticket.deserialize(serialized)
 
     assert(ticket.counterparty.eq(ticketData.counterparty), 'wrong counterparty')
     assert(ticket.challenge.eq(ticketData.challenge), 'wrong challenge')
@@ -89,31 +64,24 @@ describe('test ticket construction', function () {
     const winProb = new Hash(stringToU8a('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'))
     const channelIteration = new TicketEpoch(1)
 
-    const ticketA = new Ticket(undefined, {
+    const ticketA = new Ticket(
       counterparty,
       challenge,
       epoch,
       amount,
       winProb,
       channelIteration
-    })
-
-    const ticketB = new Ticket({
-      bytes: ticketA.buffer,
-      offset: ticketA.byteOffset
-    })
+    )
 
     assert(expectedHash.eq(await ticketA.hash), 'ticket hash does not match the expected value')
-    assert(expectedHash.eq(await ticketB.hash), 'ticket hash does not match the expected value')
-
-    const wrongTicket = new Ticket(undefined, {
+    const wrongTicket = new Ticket(
       counterparty,
       challenge,
-      epoch: new TicketEpoch(2),
+      new TicketEpoch(2),
       amount,
       winProb,
       channelIteration
-    })
+    )
 
     assert(!expectedHash.eq(await wrongTicket.hash), 'ticket hash must be different')
   })
@@ -127,31 +95,25 @@ describe('test ticket construction', function () {
     const winProb = new Hash(stringToU8a('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'))
     const channelIteration = new TicketEpoch(1)
 
-    const ticketA = new Ticket(undefined, {
+    const ticketA = new Ticket(
       counterparty,
       challenge,
       epoch,
       amount,
       winProb,
       channelIteration
-    })
-
-    const ticketB = new Ticket({
-      bytes: ticketA.buffer,
-      offset: ticketA.byteOffset
-    })
+    )
 
     assert(expectedHash.eq(await ticketA.hash), 'ticket hash does not match the expected value')
-    assert(expectedHash.eq(await ticketB.hash), 'ticket hash does not match the expected value')
 
-    const wrongTicket = new Ticket(undefined, {
+    const wrongTicket = new Ticket(
       counterparty,
       challenge,
-      epoch: new TicketEpoch(1),
+      new TicketEpoch(1),
       amount,
       winProb,
       channelIteration
-    })
+    )
 
     assert(!expectedHash.eq(await wrongTicket.hash), 'ticket hash must be different')
   })

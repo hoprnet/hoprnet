@@ -2,7 +2,7 @@ import assert from 'assert'
 import { randomBytes } from 'crypto'
 import { stringToU8a, randomInteger, u8aToHex } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
-import { AccountId, Ticket, Hash, TicketEpoch, Balance, Signature, SignedTicket } from '.'
+import { AccountId, Ticket, Hash, TicketEpoch, Balance, SignedTicket } from '.'
 import { pubKeyToAccountId, privKeyToPubKey } from '../utils'
 import * as testconfigs from '../config.spec'
 
@@ -41,138 +41,49 @@ describe('test signedTicket construction', async function () {
   it('should create new signedTicket using struct', async function () {
     const { counterparty, challenge, epoch, amount, winProb, channelIteration }= await generateTicketData(userB)
     const ticket = new Ticket(counterparty, challenge, epoch, amount, winProb, channelIteration)
-
-    const signature = new Signature()
-
-    await ticket.sign(userAPrivKey, undefined, {
-      bytes: signature.buffer,
-      offset: signature.byteOffset
-    })
-
-    const signedTicket = new SignedTicket(undefined, {
-      signature,
-      ticket
-    })
+    const signedTicket = await ticket.sign(userAPrivKey) 
 
     assert(await signedTicket.verifySignature(userAPubKey))
-
-    assert(new Hash(await signedTicket.signer).eq(userAPubKey), 'signer incorrect')
-
+    assert(new Hash(await signedTicket.getSigner()).eq(userAPubKey), 'signer incorrect')
     assert(signedTicket.ticket.counterparty.eq(userB), 'wrong counterparty')
-    assert(signedTicket.ticket.challenge.eq(ticketData.challenge), 'wrong challenge')
-    assert(signedTicket.ticket.epoch.eq(ticketData.epoch), 'wrong epoch')
-    assert(signedTicket.ticket.amount.eq(ticketData.amount), 'wrong amount')
-    assert(signedTicket.ticket.winProb.eq(ticketData.winProb), 'wrong winProb')
+    assert(signedTicket.ticket.challenge.eq(challenge), 'wrong challenge')
+    assert(signedTicket.ticket.epoch.eq(epoch), 'wrong epoch')
+    assert(signedTicket.ticket.amount.eq(amount), 'wrong amount')
+    assert(signedTicket.ticket.winProb.eq(winProb), 'wrong winProb')
 
     let exponent = randomInteger(0, 7)
-    let index = randomInteger(0, signedTicket.length - 1)
+    let index = randomInteger(0, signedTicket.serialize().length - 1)
 
     signedTicket[index] = signedTicket[index] ^ (1 << exponent)
 
     if (await signedTicket.verifySignature(userAPubKey)) {
       // @TODO change to assert.fail
-      console.log(`found invalid signature, <${u8aToHex(signedTicket)}>, byte #${index}, bit #${exponent}`)
+      console.log(`found invalid signature, <${u8aToHex(signedTicket.serialize())}>, byte #${index}, bit #${exponent}`)
     }
   })
 
-  it('should create new signedTicket using array', async function () {
-    const ticketData = await generateTicketData(userB)
 
-    const ticket = new Ticket(undefined, ticketData)
-
-    const signedTicketA = new SignedTicket(undefined, {
-      ticket
-    })
-
-    ticket.sign(userAPrivKey, undefined, {
-      bytes: signedTicketA.buffer,
-      offset: signedTicketA.signatureOffset
-    })
-
-    assert(await signedTicketA.verifySignature(userAPubKey))
-
-    const signedTicketB = new SignedTicket({
-      bytes: signedTicketA.buffer,
-      offset: signedTicketA.byteOffset
-    })
-
-    assert(await signedTicketB.verifySignature(userAPubKey))
-
-    assert(new Hash(await signedTicketA.signer).eq(userAPubKey), 'signer incorrect')
-    assert(new Hash(await signedTicketB.signer).eq(userAPubKey), 'signer incorrect')
-
-    assert(signedTicketB.ticket.counterparty.eq(userB), 'wrong counterparty')
-    assert(signedTicketB.ticket.challenge.eq(ticketData.challenge), 'wrong challenge')
-    assert(signedTicketB.ticket.epoch.eq(ticketData.epoch), 'wrong epoch')
-    assert(signedTicketB.ticket.amount.eq(ticketData.amount), 'wrong amount')
-    assert(signedTicketB.ticket.winProb.eq(ticketData.winProb), 'wrong winProb')
-
-    let exponentA = randomInteger(0, 7)
-    let indexA = randomInteger(0, signedTicketA.length - 1)
-
-    signedTicketA[indexA] = signedTicketA[indexA] ^ (1 << exponentA)
-
-    if (await signedTicketA.verifySignature(userAPubKey)) {
-      // @TODO change to assert.fail
-      console.log(`found invalid signature, <${u8aToHex(signedTicketA)}>, byte #${indexA}, bit #${exponentA}`)
-    }
-
-    let exponentB = randomInteger(0, 7)
-    let indexB = randomInteger(0, signedTicketB.length - 1)
-
-    signedTicketB[indexB] = signedTicketB[indexB] ^ (1 << exponentB)
-
-    if (await signedTicketB.verifySignature(userAPubKey)) {
-      // @TODO change to assert.fail
-      console.log(`found invalid signature, <${u8aToHex(signedTicketB)}>, byte #${indexB}, bit #${exponentB}`)
-    }
-  })
-
-  it('should create new signedTicket out of continous memory', async function () {
-    const ticketData = await generateTicketData(userB)
-
-    const ticket = new Ticket(undefined, ticketData)
-
-    const signature = new Signature()
-
-    await ticket.sign(userAPrivKey, undefined, {
-      bytes: signature.buffer,
-      offset: signature.byteOffset
-    })
-
-    const offset = randomInteger(1, 31)
-
-    const array = new Uint8Array(SignedTicket.SIZE + offset).fill(0x00)
-
-    const signedTicket = new SignedTicket(
-      {
-        bytes: array.buffer,
-        offset: array.byteOffset + offset
-      },
-      {
-        ticket,
-        signature
-      }
-    )
-
+  it('serialize / deserialize', async function () {
+    const { counterparty, challenge, epoch, amount, winProb, channelIteration }= await generateTicketData(userB)
+    const temp = await (new Ticket(counterparty, challenge, epoch, amount, winProb, channelIteration).sign(userAPrivKey))
+    const serialized = temp.serialize()
+    const signedTicket = SignedTicket.deserialize(serialized)
     assert(await signedTicket.verifySignature(userAPubKey))
-
-    assert(new Hash(await signedTicket.signer).eq(userAPubKey), 'signer incorrect')
-
+    assert(new Hash(await signedTicket.getSigner()).eq(userAPubKey), 'signer incorrect')
     assert(signedTicket.ticket.counterparty.eq(userB), 'wrong counterparty')
-    assert(signedTicket.ticket.challenge.eq(ticketData.challenge), 'wrong challenge')
-    assert(signedTicket.ticket.epoch.eq(ticketData.epoch), 'wrong epoch')
-    assert(signedTicket.ticket.amount.eq(ticketData.amount), 'wrong amount')
-    assert(signedTicket.ticket.winProb.eq(ticketData.winProb), 'wrong winProb')
+    assert(signedTicket.ticket.challenge.eq(challenge), 'wrong challenge')
+    assert(signedTicket.ticket.epoch.eq(epoch), 'wrong epoch')
+    assert(signedTicket.ticket.amount.eq(amount), 'wrong amount')
+    assert(signedTicket.ticket.winProb.eq(winProb), 'wrong winProb')
 
     let exponent = randomInteger(0, 7)
-    let index = randomInteger(0, signedTicket.length - 1)
+    let index = randomInteger(0, signedTicket.serialize().length - 1)
 
     signedTicket[index] = signedTicket[index] ^ (1 << exponent)
 
     if (await signedTicket.verifySignature(userAPubKey)) {
       // @TODO change to assert.fail
-      console.log(`found invalid signature, <${u8aToHex(signedTicket)}>, byte #${index}, bit #${exponent}`)
+      console.log(`found invalid signature, <${u8aToHex(signedTicket.serialize())}>, byte #${index}, bit #${exponent}`)
     }
   })
 })

@@ -23,7 +23,7 @@ class AcknowledgedTicket implements IAcknowledgedTicket {
 
   public serialize(): Uint8Array {
     const serialized = new Uint8Array(AcknowledgedTicket.SIZE())
-    serialized.set(this.signedTicket, 0)
+    serialized.set(this.signedTicket.serialize(), 0)
     serialized.set(this.response, SignedTicket.SIZE)
     serialized.set(this.preImage, SignedTicket.SIZE + Hash.SIZE)
     return serialized
@@ -34,10 +34,7 @@ class AcknowledgedTicket implements IAcknowledgedTicket {
       throw new Error('Cannot deserialize, bad length')
     }
 
-    const signedTicket = await SignedTicket.create({
-      bytes: arr.buffer,
-      offset: arr.byteOffset
-    })
+    const signedTicket = SignedTicket.deserialize(new Uint8Array(arr.buffer, arr.byteOffset, SignedTicket.SIZE))
     const response = new Hash(new Uint8Array(arr.buffer, arr.byteOffset + SignedTicket.SIZE, Hash.SIZE))
     const preImage = new Hash(
       new Uint8Array(arr.buffer, arr.byteOffset + SignedTicket.SIZE + Hash.SIZE, HASHED_SECRET_WIDTH)

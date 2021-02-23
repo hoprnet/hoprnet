@@ -2,7 +2,7 @@ import type { Ticket as ITicket } from '@hoprnet/hopr-core-connector-interface'
 import BN from 'bn.js'
 import { stringToU8a, u8aToHex, u8aConcat } from '@hoprnet/hopr-utils'
 import { AccountId, Balance, Hash, SignedTicket, TicketEpoch } from '.'
-//import { sign } from '../utils'
+import { sign } from '../utils'
 
 import Web3 from 'web3'
 const web3 = new Web3()
@@ -21,12 +21,12 @@ function toEthSignedMessageHash(msg: string): Hash {
 
 class Ticket implements ITicket {
   constructor(
-    private counterparty: AccountId,
+    public counterparty: AccountId,
     public challenge: Hash,
-    private epoch: TicketEpoch,
+    public epoch: TicketEpoch,
     public readonly amount: Balance,
     public readonly winProb: Hash,
-    private channelIteration: TicketEpoch
+    public channelIteration: TicketEpoch
   ) {}
 
   serialize(): Uint8Array {
@@ -77,11 +77,8 @@ class Ticket implements ITicket {
   }
 
 
-  async sign(
-    _privKey: Uint8Array,
-  ): Promise<SignedTicket> {
-    //return sign(await this.hash, privKey, undefined, arr)
-    return new SignedTicket()
+  async sign(privKey: Uint8Array): Promise<SignedTicket> {
+    return new SignedTicket(this, await sign(await this.hash, privKey, null, null))
   }
 }
 
