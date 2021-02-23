@@ -188,14 +188,7 @@ export class ProbabilisticPayments {
     winProb: number
   ): Promise<SignedTicket> {
     const ticketWinProb = new Hash(computeWinningProbability(winProb))
-    const ticket = new Ticket(
-        counterparty,
-        challenge,
-        epoch,
-        amount,
-        ticketWinProb,
-        channelIteration
-    )
+    const ticket = new Ticket(counterparty, challenge, epoch, amount, ticketWinProb, channelIteration)
     return ticket.sign(this.privKey)
   }
 

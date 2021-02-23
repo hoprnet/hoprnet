@@ -39,7 +39,7 @@ describe('test signedTicket construction', async function () {
   const userAPubKey = await privKeyToPubKey(stringToU8a(testconfigs.DEMO_ACCOUNTS[0]))
 
   it('should create new signedTicket using struct', async function () {
-    const { counterparty, challenge, epoch, amount, winProb, channelIteration }= await generateTicketData(userB)
+    const { counterparty, challenge, epoch, amount, winProb, channelIteration } = await generateTicketData(userB)
     const ticket = new Ticket(counterparty, challenge, epoch, amount, winProb, channelIteration)
 
     const signature = new Signature()
