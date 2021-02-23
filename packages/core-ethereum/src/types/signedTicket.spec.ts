@@ -41,7 +41,7 @@ describe('test signedTicket construction', async function () {
   it('should create new signedTicket using struct', async function () {
     const { counterparty, challenge, epoch, amount, winProb, channelIteration } = await generateTicketData(userB)
     const ticket = new Ticket(counterparty, challenge, epoch, amount, winProb, channelIteration)
-    const signedTicket = await ticket.sign(userAPrivKey) 
+    const signedTicket = await ticket.sign(userAPrivKey)
 
     assert(await signedTicket.verifySignature(userAPubKey))
     assert(new Hash(await signedTicket.getSigner()).eq(userAPubKey), 'signer incorrect')
@@ -62,10 +62,9 @@ describe('test signedTicket construction', async function () {
     }
   })
 
-
   it('serialize / deserialize', async function () {
-    const { counterparty, challenge, epoch, amount, winProb, channelIteration }= await generateTicketData(userB)
-    const temp = await (new Ticket(counterparty, challenge, epoch, amount, winProb, channelIteration).sign(userAPrivKey))
+    const { counterparty, challenge, epoch, amount, winProb, channelIteration } = await generateTicketData(userB)
+    const temp = await new Ticket(counterparty, challenge, epoch, amount, winProb, channelIteration).sign(userAPrivKey)
     const serialized = temp.serialize()
     const signedTicket = SignedTicket.deserialize(serialized)
     assert(await signedTicket.verifySignature(userAPubKey))

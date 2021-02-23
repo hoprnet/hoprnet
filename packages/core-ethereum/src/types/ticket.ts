@@ -76,7 +76,6 @@ class Ticket implements ITicket {
     return new Balance(this.amount.mul(new BN(this.winProb)).div(new BN(new Uint8Array(Hash.SIZE).fill(0xff))))
   }
 
-
   async sign(privKey: Uint8Array): Promise<SignedTicket> {
     // TODO
     return new SignedTicket(this, await sign(await this.hash, privKey, null, null))

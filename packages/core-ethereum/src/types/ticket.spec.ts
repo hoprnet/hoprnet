@@ -64,24 +64,10 @@ describe('test ticket construction', function () {
     const winProb = new Hash(stringToU8a('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'))
     const channelIteration = new TicketEpoch(1)
 
-    const ticketA = new Ticket(
-      counterparty,
-      challenge,
-      epoch,
-      amount,
-      winProb,
-      channelIteration
-    )
+    const ticketA = new Ticket(counterparty, challenge, epoch, amount, winProb, channelIteration)
 
     assert(expectedHash.eq(await ticketA.hash), 'ticket hash does not match the expected value')
-    const wrongTicket = new Ticket(
-      counterparty,
-      challenge,
-      new TicketEpoch(2),
-      amount,
-      winProb,
-      channelIteration
-    )
+    const wrongTicket = new Ticket(counterparty, challenge, new TicketEpoch(2), amount, winProb, channelIteration)
 
     assert(!expectedHash.eq(await wrongTicket.hash), 'ticket hash must be different')
   })
@@ -95,25 +81,11 @@ describe('test ticket construction', function () {
     const winProb = new Hash(stringToU8a('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'))
     const channelIteration = new TicketEpoch(1)
 
-    const ticketA = new Ticket(
-      counterparty,
-      challenge,
-      epoch,
-      amount,
-      winProb,
-      channelIteration
-    )
+    const ticketA = new Ticket(counterparty, challenge, epoch, amount, winProb, channelIteration)
 
     assert(expectedHash.eq(await ticketA.hash), 'ticket hash does not match the expected value')
 
-    const wrongTicket = new Ticket(
-      counterparty,
-      challenge,
-      new TicketEpoch(1),
-      amount,
-      winProb,
-      channelIteration
-    )
+    const wrongTicket = new Ticket(counterparty, challenge, new TicketEpoch(1), amount, winProb, channelIteration)
 
     assert(!expectedHash.eq(await wrongTicket.hash), 'ticket hash must be different')
   })
