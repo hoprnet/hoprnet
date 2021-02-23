@@ -1,6 +1,6 @@
 import type { SignedTicket as ISignedTicket } from '@hoprnet/hopr-core-connector-interface'
 import secp256k1 from 'secp256k1'
-import { Signature, Ticket } from '../types'
+import { Signature, Ticket, UnacknowledgedTicket, Hash } from '../types'
 import { verify } from '../utils'
 
 class SignedTicket implements ISignedTicket {
@@ -32,6 +32,10 @@ class SignedTicket implements ISignedTicket {
 
   static get SIZE() {
     return Signature.SIZE + Ticket.SIZE()
+  }
+
+  toUnacknowledged(secretA: Hash): UnacknowledgedTicket{
+    return new UnacknowledgedTicket(this, secretA) 
   }
 }
 

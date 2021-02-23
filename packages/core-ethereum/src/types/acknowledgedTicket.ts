@@ -29,17 +29,12 @@ class AcknowledgedTicket implements IAcknowledgedTicket {
     return serialized
   }
 
-  static async deserialize(arr: Uint8Array): Promise<IAcknowledgedTicket> {
-    if (arr.length != AcknowledgedTicket.SIZE()) {
-      throw new Error('Cannot deserialize, bad length')
-    }
-
+  static deserialize(arr: Uint8Array): AcknowledgedTicket {
     const signedTicket = SignedTicket.deserialize(new Uint8Array(arr.buffer, arr.byteOffset, SignedTicket.SIZE))
     const response = new Hash(new Uint8Array(arr.buffer, arr.byteOffset + SignedTicket.SIZE, Hash.SIZE))
     const preImage = new Hash(
       new Uint8Array(arr.buffer, arr.byteOffset + SignedTicket.SIZE + Hash.SIZE, HASHED_SECRET_WIDTH)
     )
-
     return new AcknowledgedTicket(signedTicket, response, preImage)
   }
 }

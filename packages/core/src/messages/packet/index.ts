@@ -12,7 +12,6 @@ import { LevelUp } from 'levelup'
 import Debug from 'debug'
 import Hopr from '../../'
 import HoprCoreConnector, { Types } from '@hoprnet/hopr-core-connector-interface'
-import { UnacknowledgedTicket } from '../ticket'
 
 const log = Debug('hopr-core:message:packet')
 const verbose = Debug('hopr-core:verbose:message:packet')
@@ -338,10 +337,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
       throw Error('Error preparing forward')
     }
 
-    const unacknowledged = new UnacknowledgedTicket(chain, undefined, {
-      signedTicket,
-      secretA: deriveTicketKey(this.header.derivedSecret)
-    })
+    const unacknowledged = signedTicket.toUnacknowledged(deriveTicketKey(this.header.derivedSecret))
 
     log(
       `Storing unacknowledged ticket. Expecting to receive a preImage for ${green(
@@ -350,7 +346,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     )
     await this.node.db.put(
       Buffer.from(this.node._dbKeys.UnAcknowledgedTickets(this.header.hashedKeyHalf)),
-      Buffer.from(unacknowledged)
+      Buffer.from(unacknowledged.serialize())
     )
 
     // get new ticket amount

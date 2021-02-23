@@ -1,10 +1,9 @@
 import type Chain from '@hoprnet/hopr-core-connector-interface'
-import type { Types, Channel, RedeemStatus } from '@hoprnet/hopr-core-connector-interface'
+import type { Types, Channel, RedeemStatus, UnacknowledgedTicket } from '@hoprnet/hopr-core-connector-interface'
 import type PeerId from 'peer-id'
 import type Hopr from '..'
 import { u8aEquals } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
-import { UnacknowledgedTicket } from '../messages/ticket/unacknowledged'
 
 /**
  * Get all unacknowledged tickets
@@ -18,7 +17,7 @@ export async function getUnacknowledgedTickets(
   }
 ): Promise<UnacknowledgedTicket<Chain>[]> {
   const tickets: UnacknowledgedTicket<Chain>[] = []
-  const unAcknowledgedTicketSize = UnacknowledgedTicket.SIZE(node.paymentChannels)
+  const unAcknowledgedTicketSize = node.paymentChannels.types.UnacknowledgedTicket.SIZE()
 
   return new Promise((resolve, reject) => {
     node.db
@@ -27,12 +26,8 @@ export async function getUnacknowledgedTickets(
       })
       .on('error', (err) => reject(err))
       .on('data', async ({ value }: { value: Buffer }) => {
-        if (value.buffer.byteLength !== unAcknowledgedTicketSize) return
-
-        const unAckTicket = new UnacknowledgedTicket(node.paymentChannels, {
-          bytes: value.buffer,
-          offset: value.byteOffset
-        })
+        if (value.buffer.byteLength !== unAcknowledgedTicketSize) throw new Error('bad length')
+        const unAckTicket = node.paymentChannels.types.UnacknowledgedTicket.deserialize(value)
 
         // if signer provided doesn't match our ticket's signer dont add it to the list
         if (filter?.signer && !u8aEquals(await (await unAckTicket.signedTicket).getSigner(), filter.signer)) {

@@ -27,7 +27,6 @@ import {
   pubKeyToPeerId,
   u8aAdd
 } from '@hoprnet/hopr-utils'
-import { UnacknowledgedTicket } from '../../messages/ticket'
 
 import { ACKNOWLEDGED_TICKET_INDEX_LENGTH } from '../../dbKeys'
 
@@ -91,11 +90,7 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
       }
 
       if (tmp.length > 0) {
-        const unacknowledgedTicket = new UnacknowledgedTicket(this.node.paymentChannels, {
-          bytes: tmp.buffer,
-          offset: tmp.byteOffset
-        })
-
+        const unacknowledgedTicket = this.node.paymentChannels.types.UnacknowledgedTicket.deserialize(tmp)
         let ticketCounter: Uint8Array
         try {
           let tmpTicketCounter = await this.node.db.get(Buffer.from(this.node._dbKeys.AcknowledgedTicketCounter()))
@@ -106,6 +101,7 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
           ticketCounter = toU8a(0, ACKNOWLEDGED_TICKET_INDEX_LENGTH)
         }
 
+        // TODO
         const resp = await this.node.paymentChannels.validateTicket(
           await unacknowledgedTicket.signedTicket,
           await this.node.paymentChannels.utils.hash(

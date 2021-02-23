@@ -13,6 +13,7 @@ import SignedTicket from './signedTicket'
 import Snapshot from './snapshot'
 import Ticket from './ticket'
 import TicketEpoch from './ticketEpoch'
+import UnacknowledgedTicket from './unacknowledged'
 
 class Types {
   public AccountId = AccountId
@@ -32,6 +33,7 @@ class Types {
   public Snapshot = Snapshot
   public Ticket = Ticket
   public TicketEpoch = TicketEpoch
+  public UnacknowledgedTicket = UnacknowledgedTicket
 }
 
 export {
@@ -51,7 +53,8 @@ export {
   SignedTicket,
   Snapshot,
   Ticket,
-  TicketEpoch
+  TicketEpoch,
+  UnacknowledgedTicket
 }
 
 export default Types

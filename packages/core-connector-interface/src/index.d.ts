@@ -152,6 +152,7 @@ export {
   ChannelUpdate,
   HoprCoreConnectorStatic,
   AcknowledgedTicket,
+  UnacknowledgedTicket,
   SignedTicket,
   Ticket,
   Hash
