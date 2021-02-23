@@ -39,15 +39,15 @@ contract HoprWrapper is IERC777Recipient, ERC1820Implementer, ReentrancyGuard {
     }
 
     /**
-        * A hook triggered when xHOPR or wxHOPR tokens are send to this contract.
-        *
-        * @param operator address operator requesting the transfer
-        * @param from address token holder address
-        * @param to address recipient address
-        * @param amount uint256 amount of tokens to transfer
-        * @param userData bytes extra information provided by the token holder (if any)
-        * @param operatorData bytes extra information provided by the operator (if any)
-        */
+     * A hook triggered when xHOPR or wxHOPR tokens are send to this contract.
+     *
+     * @param operator address operator requesting the transfer
+     * @param from address token holder address
+     * @param to address recipient address
+     * @param amount uint256 amount of tokens to transfer
+     * @param userData bytes extra information provided by the token holder (if any)
+     * @param operatorData bytes extra information provided by the operator (if any)
+     */
     function tokensReceived(
         address operator,
         address from,
