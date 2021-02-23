@@ -1,4 +1,13 @@
-import { Hash, AcknowledgedTicket, Ticket, Balance, SignedTicket, AccountId, TicketEpoch, UnacknowledgedTicket } from './types'
+import {
+  Hash,
+  AcknowledgedTicket,
+  Ticket,
+  Balance,
+  SignedTicket,
+  AccountId,
+  TicketEpoch,
+  UnacknowledgedTicket
+} from './types'
 import Debug from 'debug'
 import { randomBytes } from 'crypto'
 import { u8aToHex, u8aConcat, iterateHash, recoverIteratedHash, u8aLessThanOrEqual } from '@hoprnet/hopr-utils'
@@ -175,9 +184,14 @@ export class ProbabilisticPayments {
       return { status: 'E_CHALLENGE' }
     }
 
-    if (await isWinningTicket(await signedTicket.ticket.hash, response, this.currentPreImage, signedTicket.ticket.winProb)) {
+    if (
+      await isWinningTicket(await signedTicket.ticket.hash, response, this.currentPreImage, signedTicket.ticket.winProb)
+    ) {
       this.currentPreImage = await this.findPreImage(this.currentPreImage)
-      return { status: 'SUCCESS', ticket: new AcknowledgedTicket(signedTicket, response, new Hash(this.currentPreImage)) }
+      return {
+        status: 'SUCCESS',
+        ticket: new AcknowledgedTicket(signedTicket, response, new Hash(this.currentPreImage))
+      }
     }
     log('>> invalid')
     return { status: 'E_TICKET_FAILED' }
