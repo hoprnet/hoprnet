@@ -5,7 +5,9 @@ import { CODE_IP4, CODE_IP6, CODE_P2P, CODE_CIRCUIT, CODE_TCP } from './constant
 import Multihash from 'multihashes'
 import { NetworkInterfaceInfo } from 'os'
 import PeerId from 'peer-id'
-import { u8aEquals } from '@hoprnet/hopr-utils'
+import { u8aEquals, u8aToNumber } from '@hoprnet/hopr-utils'
+
+const INVALID_PORTS = [0]
 
 function checkCircuitAddress(maTuples: [code: number, addr: Uint8Array][], peerId: PeerId): boolean {
   if (
@@ -17,13 +19,15 @@ function checkCircuitAddress(maTuples: [code: number, addr: Uint8Array][], peerI
     return false
   }
 
-  const [firstAddress, secondAddress] = [maTuples[0][1], maTuples[2][1]]
+  // first address and second address WITHOUT length prefix
+  const [firstAddress, secondAddress] = [maTuples[0][1].slice(1), maTuples[2][1].slice(1)]
 
   try {
     // Try to decode first node address
     Multihash.validate(firstAddress) // throws if invalid
   } catch (err) {
     // Could not decode address
+    console.log(`first address not valid`, err)
     return false
   }
 
@@ -58,12 +62,21 @@ export class Filter {
   }
 
   /**
+   * THIS METHOD IS USED FOR TESTING
+   * @dev Used to set falsy local network
+   * @param mAddrs new local addresses
+   */
+  _setLocalAddressesForTesting(networks: Network[]): void {
+    this.myLocalAddresses = networks
+  }
+
+  /**
    * Used to attach addresses once libp2p is initialized and
    * sockets are bound to network interfaces
    * @param announcedAddrs Addresses that are announced to other nodes
    * @param listeningAddrs Addresses to which we are listening
    */
-  setAddrs(announcedAddrs: Multiaddr[], listeningAddrs: Multiaddr[]) {
+  setAddrs(announcedAddrs: Multiaddr[], listeningAddrs: Multiaddr[]): void {
     this.announcedAddrs = announcedAddrs
     this.listenFamilies = []
 
@@ -96,19 +109,9 @@ export class Filter {
 
     switch (tuples[0][0]) {
       case CODE_IP4:
-        if (tuples[1][0] != CODE_TCP) {
-          // We are not listening to anything else than TCP
-          return false
-        }
-
         family = 'IPv4'
         break
       case CODE_IP6:
-        if (tuples[1][0] != CODE_TCP) {
-          // We are not listening to anything else than TCP
-          return false
-        }
-
         family = 'IPv6'
         break
       case CODE_P2P:
@@ -117,7 +120,12 @@ export class Filter {
         return false
     }
 
-    const [ipFamily, ipAddr] = tuples[0]
+    if (tuples[1][0] != CODE_TCP) {
+      // We are not listening to anything else than TCP
+      return false
+    }
+
+    const [ipFamily, ipAddr, tcpPort] = [...tuples[0], tuples[1][1]]
 
     if (isLinkLocaleAddress(ipAddr, family)) {
       // Cannot bind or listen to link-locale addresses
@@ -127,6 +135,11 @@ export class Filter {
     if (this.listenFamilies == undefined || this.announcedAddrs == undefined) {
       // Libp2p has not been initialized
       return true
+    }
+
+    // Only check for invalid Ports if libp2p is initialized
+    if (INVALID_PORTS.includes(u8aToNumber(tcpPort) as number)) {
+      return false
     }
 
     if (!this.listenFamilies.includes(ipFamily)) {
