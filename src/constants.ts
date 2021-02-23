@@ -14,13 +14,13 @@ export const CODE_CIRCUIT = Multiaddr.protocols.names['p2p-circuit'].code
 export const CODE_TCP = Multiaddr.protocols.names['tcp'].code
 
 // Time to wait for a connection to close gracefully before destroying it manually
-export const CLOSE_TIMEOUT = 6000
-export const RELAY_CIRCUIT_TIMEOUT = 6000
+export const CLOSE_TIMEOUT = 6000 // ms
+export const RELAY_CIRCUIT_TIMEOUT = 6000 // ms
 
+// Either set on ALL nodes to true or NONE
+// @dev mixed operation is neither tested nor implemented
 export const USE_WEBRTC = true
-export const WEBRTC_TRAFFIC_PREFIX = 1
-export const REMAINING_TRAFFIC_PREFIX = 0
-export const WEBRTC_TIMEOUT = 2400
+export const WEBRTC_TIMEOUT = 2400 // ms
 
 // Use default UTF-8 text encoding
 const encoder = new TextEncoder()
@@ -32,7 +32,6 @@ export const FAIL_COULD_NOT_IDENTIFY_PEER = encoder.encode('FAIL_COULD_NOT_IDENT
 export const FAIL_LOOPBACKS_ARE_NOT_ALLOWED = encoder.encode('FAIL_LOOPBACKS_ARE_NOT_ALLOWED')
 export const FAIL_INVALID_PUBLIC_KEY = encoder.encode('FAIL_INVALID_PUBLIC_KEY')
 
-export const MIGRATE = encoder.encode('MIGRATE')
 export const STOP = encoder.encode('STOP')
 export const RESTART = encoder.encode('RESTART')
 export const PING = encoder.encode('PING')
