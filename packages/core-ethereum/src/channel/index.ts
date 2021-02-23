@@ -166,10 +166,7 @@ class ChannelFactory {
     return onChain && offChain
   }
 
-  async createDummyChannelTicket(
-    counterparty: AccountId,
-    challenge: Hash
-  ): Promise<SignedTicket> {
+  async createDummyChannelTicket(counterparty: AccountId, challenge: Hash): Promise<SignedTicket> {
     if (!challenge) {
       throw Error(`Challenge is not set`)
     }

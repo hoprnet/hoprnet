@@ -98,7 +98,9 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     }
 
     return new Promise<Types.SignedTicket>(async (resolve) => {
-      this._ticket = await this.node.paymentChannels.types.SignedTicket.deserialize( new Uint8Array(this.buffer, this.ticketOffset))
+      this._ticket = await this.node.paymentChannels.types.SignedTicket.deserialize(
+        new Uint8Array(this.buffer, this.ticketOffset)
+      )
       resolve(this._ticket)
     })
   }
