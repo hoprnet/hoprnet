@@ -5,6 +5,7 @@ import type {
   AcknowledgedTicket as IAcknowledgedTicket,
   SignedTicket,
   Hash,
+  UnacknowledgedTicket,
   ValidateResponse,
   RedeemStatus
 } from '@hoprnet/hopr-core-connector-interface'
@@ -261,7 +262,7 @@ export default class HoprEthereum implements HoprCoreConnector {
     return constants
   }
 
-  public async validateTicket(ticket: SignedTicket, response: Hash): Promise<ValidateResponse> {
+  public async validateTicket(ticket: UnacknowledgedTicket, response: Hash): Promise<ValidateResponse> {
     return this.probabilisticPayments.validateTicket(ticket, response)
   }
   public async redeemTicket(ticket: AcknowledgedTicket): Promise<RedeemStatus> {

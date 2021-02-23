@@ -1,7 +1,5 @@
-import { u8aConcat, u8aEquals } from '@hoprnet/hopr-utils'
 import type { UnacknowledgedTicket as IUnacknowledgedTicket } from '@hoprnet/hopr-core-connector-interface'
-import { Hash, AcknowledgedTicket, SignedTicket } from '.'
-import { hash } from '../utils'
+import { Hash, SignedTicket } from '.'
 
 class UnacknowledgedTicket implements IUnacknowledgedTicket {
   constructor(
@@ -24,28 +22,6 @@ class UnacknowledgedTicket implements IUnacknowledgedTicket {
       new Uint8Array(arr.buffer, SignedTicket.SIZE, Hash.SIZE)
     )
     return new UnacknowledgedTicket(signedTicket, secretA)
-  }
-
-  async verifyChallenge(hashedKeyHalf: Uint8Array) {
-    return u8aEquals(
-      await hash(
-        await hash(u8aConcat(this.secretA, hashedKeyHalf))
-      ),
-      (await this.signedTicket).ticket.challenge
-    )
-  }
-
-  async verifySignature(pubKey: Uint8Array) {
-    return await this.signedTicket.verifySignature(pubKey)
-  }
-
-  async verify(pubKey: Uint8Array, hashedKeyHalf: Uint8Array): Promise<AcknowledgedTicket> {
-    const valid = (await this.verifyChallenge(hashedKeyHalf)) && (await this.verifySignature(pubKey))
-
-    if (!valid) {
-      throw new Error('Failure to validate')
-    }
-    return undefined
   }
 
   static SIZE(): number {

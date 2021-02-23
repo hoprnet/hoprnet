@@ -99,7 +99,7 @@ declare interface HoprCoreConnector {
 
   smartContractInfo(): string
 
-  validateTicket(ticket: SignedTicket, response: Hash): Promise<AcknowledgedTicket | ValidateFailure>
+  validateTicket(ticket: UnacknowledgedTicket, response: Hash): Promise<AcknowledgedTicket | ValidateFailure>
 
   redeemTicket(ticket: AcknowledgedTicket): Promise<RedeemStatus>
 

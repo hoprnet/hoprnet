@@ -1,4 +1,4 @@
-import { Hash, AcknowledgedTicket, Ticket, Balance, SignedTicket, AccountId, TicketEpoch } from './types'
+import { Hash, AcknowledgedTicket, Ticket, Balance, SignedTicket, AccountId, TicketEpoch, UnacknowledgedTicket } from './types'
 import Debug from 'debug'
 import { randomBytes } from 'crypto'
 import { u8aToHex, u8aConcat, iterateHash, recoverIteratedHash, u8aLessThanOrEqual } from '@hoprnet/hopr-utils'
@@ -159,21 +159,25 @@ export class ProbabilisticPayments {
   }
 
   /*
-   * Take a signed ticket and transform it into an acknowledged ticket if it's a
+   * Take an unacknowledged ticket and a response, and transform it into an acknowledged ticket if it's a
    * winning ticket, or undefined if it's not.
    */
-  public async validateTicket(ticket: SignedTicket, response: Hash): Promise<ValidateResponse> {
+  public async validateTicket(ticket: UnacknowledgedTicket, response: Hash): Promise<ValidateResponse> {
     log('validate')
 
-    const validChallenge = await checkChallenge(ticket.ticket.challenge, response)
+    // TODO verify signature
+    // signedTicket.verifySignature(pubKey)
+
+    const signedTicket = ticket.signedTicket
+    const validChallenge = await checkChallenge(signedTicket.ticket.challenge, response)
     if (!validChallenge) {
-      log(`Failed to submit ticket ${u8aToHex(ticket.ticket.challenge)}: E_CHALLENGE`)
+      log(`Failed to submit ticket ${u8aToHex(signedTicket.ticket.challenge)}: E_CHALLENGE`)
       return { status: 'E_CHALLENGE' }
     }
 
-    if (await isWinningTicket(await ticket.ticket.hash, response, this.currentPreImage, ticket.ticket.winProb)) {
+    if (await isWinningTicket(await signedTicket.ticket.hash, response, this.currentPreImage, signedTicket.ticket.winProb)) {
       this.currentPreImage = await this.findPreImage(this.currentPreImage)
-      return { status: 'SUCCESS', ticket: new AcknowledgedTicket(ticket, response, new Hash(this.currentPreImage)) }
+      return { status: 'SUCCESS', ticket: new AcknowledgedTicket(signedTicket, response, new Hash(this.currentPreImage)) }
     }
     log('>> invalid')
     return { status: 'E_TICKET_FAILED' }
