@@ -73,7 +73,7 @@ export class ProbabilisticPayments {
     this.offChainSecret = new Hash(randomBytes(HASHED_SECRET_WIDTH))
     let dbBatch = this.db.batch()
     const hashes = await iterateHash(this.offChainSecret, hashFunction, this.TOTAL_ITERATIONS)
-    dbBatch.put(OffChainSecret, Buffer.from(hashes[0])) 
+    dbBatch.put(OffChainSecret, Buffer.from(hashes[0]))
     for (let i = 0; i <= this.TOTAL_ITERATIONS; i += this.DB_ITERATION_BLOCK_SIZE) {
       log('storing intermediate', i)
       dbBatch = dbBatch.put(Buffer.from(OnChainSecretIntermediary(i)), Buffer.from(hashes[i]))
