@@ -15,7 +15,7 @@ jobs:
         with:
           working_directory: docs/whitepaper
           root_file: main.tex
-          post_compile: mv *.pdf whitepaper.pdf
+          post_compile: "latexmk -c && ls && mv *.pdf whitepaper.pdf"
       - name: Commit latest version
         run: |
           git config --global user.email "noreply@hoprnet.org"
