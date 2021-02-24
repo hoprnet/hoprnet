@@ -2,7 +2,7 @@ name: Build LaTeX document
 on: 
   push:
     paths:
-      'docs/whitepaper/**/*.tex'
+      'docs/whitepaper'
 
 jobs:
   build_latex:
