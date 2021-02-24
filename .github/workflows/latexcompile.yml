@@ -15,6 +15,7 @@ jobs:
         with:
           run: |
             apk add make
+            tlmgr update --self
             tlmgr install blindtext
             cd docs/whitepaper
             latexmk -pdf
