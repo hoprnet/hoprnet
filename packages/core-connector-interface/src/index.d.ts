@@ -117,11 +117,6 @@ declare interface HoprCoreConnector {
   readonly types: typeof Types
 
   /**
-   * Export keys under which our data gets stored in the database.
-   */
-  readonly dbKeys: typeof DbKeys
-
-  /**
    * Export chain-specific constants.
    */
   readonly constants: typeof Constants
