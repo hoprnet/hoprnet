@@ -3,6 +3,7 @@ on:
   push:
     paths:
       'docs/whitepaper**/*'
+      '.github/workflows/latexcompile.yml'
 
 jobs:
   build_latex:
@@ -11,11 +12,16 @@ jobs:
       - name: Set up Git repository
         uses: actions/checkout@v2
       - name: Compile LaTeX document
-        uses: dante-ev/latex-action@master
+       uses: dante-ev/latex-action@master
         with:
-          working_directory: docs/whitepaper
-          root_file: main.tex
-          post_compile: "latexmk -c && ls && mv *.pdf whitepaper.pdf"
+          run: |
+            apk add make
+            tlmgr update --self
+            tlmgr install preprint
+            tlmgr install blindtext
+            cd docs/whitepaper
+            latexmk -pdf
+            latexmk -c
       - name: Commit latest version
         run: |
           git config --global user.email "noreply@hoprnet.org"
