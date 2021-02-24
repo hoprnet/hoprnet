@@ -2,8 +2,8 @@ name: Build LaTeX document
 on: 
   push:
     paths:
-      'docs/whitepaper**/*'
-      
+      'docs/whitepaper/**/*'
+
 jobs:
   build_latex:
     runs-on: ubuntu-latest
