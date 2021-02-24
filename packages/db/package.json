@@ -24,8 +24,7 @@
     "!*.spec.js",
     "!*.spec.js.map"
   ],
-  "dependencies": {
-  },
+  "dependencies": {},
   "devDependencies": {
     "@types/mocha": "^8.2.0",
     "@types/node": "14",

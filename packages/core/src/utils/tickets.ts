@@ -26,7 +26,8 @@ export async function getUnacknowledgedTickets(
   const unAcknowledgedTicketSize = UnacknowledgedTicket.SIZE(node.paymentChannels)
 
   return new Promise((resolve, reject) => {
-    node.db.getUnacknowledgedTicketsStream()
+    node.db
+      .getUnacknowledgedTicketsStream()
       .on('error', (err: Error) => reject(err))
       .on('data', async ({ value }: { value: Buffer }) => {
         if (value.buffer.byteLength !== unAcknowledgedTicketSize) return
@@ -60,7 +61,6 @@ export async function deleteUnacknowledgedTickets(
   const tickets = await getUnacknowledgedTickets(node, filter)
   const ids = Promise.all(tickets.map(async (ticket) => (await ticket.signedTicket).ticket.challenge))
   return await node.db.deleteUnacknowledgedTickets(ids)
-
 }
 
 /**
@@ -87,7 +87,8 @@ export async function getAcknowledgedTickets(
   }[] = []
 
   return new Promise((resolve, reject) => {
-    node.db.getAcknowledgedTicketsStream()
+    node.db
+      .getAcknowledgedTicketsStream()
       .on('error', (err: Error) => reject(err))
       .on('data', async ({ key, value }: { key: Buffer; value: Buffer }) => {
         if (value.buffer.byteLength !== acknowledgedTicketSize) return

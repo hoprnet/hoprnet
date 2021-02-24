@@ -68,7 +68,6 @@ export function PacketTag(tag: Uint8Array): Uint8Array {
   ])
 }
 
-
 type Config = [number, Uint8Array]
 
 function allocationHelper(arr: Config[]) {
@@ -86,7 +85,6 @@ function allocationHelper(arr: Config[]) {
 }
 const KeyPair = encoder.encode('keyPair')
 
-
 const defaultDBPath = (id: string | number, isBootstrap: boolean): string => {
   let folder: string
   if (isBootstrap) {
@@ -103,13 +101,12 @@ export default class HoprDB {
   private db: LevelUp
 
   constructor(options: {
-      id? : string,
-      bootstrapNode?: boolean,
-      createDbIfNotExist?: boolean,
-      dbPath?: string,
-      db?: LevelUp
-    }
-  ){
+    id?: string
+    bootstrapNode?: boolean
+    createDbIfNotExist?: boolean
+    dbPath?: string
+    db?: LevelUp
+  }) {
     if (options.db) {
       this.db = options.db
       return
@@ -137,23 +134,22 @@ export default class HoprDB {
     this.db = levelup(leveldown(dbPath))
   }
 
-  public async close(){
+  public async close() {
     return this.db.close()
   }
 
-  public async getIdentity(){
+  public async getIdentity() {
     return await this.db.get(Buffer.from(KeyPair))
   }
 
-  public async storeIdentity(id: Buffer){
+  public async storeIdentity(id: Buffer) {
     await this.db.put(Buffer.from(KeyPair), id)
   }
 
-  public async getUnacknowledgedTicketsStream(){
-    return this.db
-      .createReadStream({
-        gte: Buffer.from(UnAcknowledgedTickets(new Uint8Array(0x00)))
-      })
+  public async getUnacknowledgedTicketsStream() {
+    return this.db.createReadStream({
+      gte: Buffer.from(UnAcknowledgedTickets(new Uint8Array(0x00)))
+    })
   }
 
   public async deleteUnacknowledgedTickets(ids) {
@@ -183,4 +179,3 @@ export default class HoprDB {
     await this.db.del(Buffer.from(AcknowledgedTickets(index)))
   }
 }
-

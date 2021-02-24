@@ -62,7 +62,7 @@ export type HoprOptions = {
   provider: string
   ticketAmount?: number
   ticketWinProb?: number
-  db?: LevelUp 
+  db?: LevelUp
   dbPath?: string
   createDbIfNotExist?: boolean
   peerId?: PeerId
@@ -104,7 +104,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
    * @param _options
    * @param provider
    */
-  private constructor(options: HoprOptions, public _libp2p: LibP2P, public db: HoprDB,  public paymentChannels: Chain) {
+  private constructor(options: HoprOptions, public _libp2p: LibP2P, public db: HoprDB, public paymentChannels: Chain) {
     super()
 
     this._libp2p.connectionManager.on('peer:connect', (conn: Connection) => {
@@ -676,7 +676,6 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     )
   }
 }
-
 
 export { Hopr as default, LibP2P }
 export * from './constants'
