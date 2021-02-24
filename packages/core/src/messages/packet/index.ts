@@ -6,9 +6,7 @@ import { u8aConcat, u8aEquals, u8aToHex, pubKeyToPeerId } from '@hoprnet/hopr-ut
 import { getTickets, validateUnacknowledgedTicket, validateCreatedTicket } from '../../utils/tickets'
 import { Header, deriveTicketKey, deriveTicketKeyBlinding, deriveTagParameters, deriveTicketLastKey } from './header'
 import { Challenge } from './challenge'
-import { PacketTag } from '../../dbKeys'
 import Message from './message'
-import { LevelUp } from 'levelup'
 import Debug from 'debug'
 import Hopr from '../../'
 import HoprCoreConnector, { Types } from '@hoprnet/hopr-core-connector-interface'
@@ -252,7 +250,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
   }> {
     this.header.deriveSecret(this.libp2p.peerId.privKey.marshal())
 
-    if (await this.testAndSetTag(this.node.db)) {
+    if (await this.testAndSetTag()) {
       verbose('Error setting tag')
       throw Error('Error setting tag')
     }
@@ -350,10 +348,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
         u8aToHex(this.header.hashedKeyHalf)
       )} from ${blue(target.toB58String())}`
     )
-    await this.node.db.put(
-      Buffer.from(this.node._dbKeys.UnAcknowledgedTickets(this.header.hashedKeyHalf)),
-      Buffer.from(unacknowledged)
-    )
+    await this.node.db.storeUnacknowledgedTicket(this.header.hashedKeyHalf, unacknowledged)
 
     // get new ticket amount
     const fee = new Balance(ticket.amount.isub(new BN(this.node.ticketAmount)))
@@ -431,20 +426,8 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
   /**
    * Checks whether the packet has already been seen.
    */
-  async testAndSetTag(db: LevelUp): Promise<boolean> {
-    const key = PacketTag(deriveTagParameters(this.header.derivedSecret))
-
-    try {
-      await db.get(key)
-    } catch (err) {
-      if (err.type === 'NotFoundError' || err.notFound === undefined || !err.notFound) {
-        await db.put(Buffer.from(key), Buffer.from(''))
-        return false
-      } else {
-        throw err
-      }
-    }
-
-    throw Error('Key is already present. Cannot accept packet because it might be a duplicate.')
+  async testAndSetTag(): Promise<boolean> {
+    return await this.node.db.checkPacketSeen(deriveTagParameters(this.header.derivedSecret))
   }
+
 }

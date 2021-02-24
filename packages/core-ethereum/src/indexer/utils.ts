@@ -1,13 +1,11 @@
-import type { LevelUp } from 'levelup'
 import BN from 'bn.js'
-import { u8aConcat, u8aToNumber } from '@hoprnet/hopr-utils'
+import { u8aConcat } from '@hoprnet/hopr-utils'
 import { Public, ChannelEntry, Snapshot } from '../types'
-import * as dbKeys from '../dbKeys'
+import HoprDB from '@hoprnet/db'
 
 // various keys used by the DB
 const SMALLEST_PUBLIC_KEY = new Public(u8aConcat(new Uint8Array([0x02]), new Uint8Array(32).fill(0x00)))
 const BIGGEST_PUBLIC_KEY = new Public(u8aConcat(new Uint8Array([0x03]), new Uint8Array(32).fill(0xff)))
-const LATEST_BLOCK_KEY = dbKeys.LatestBlockNumber()
 const LATEST_CONFIRMED_SNAPSHOT = dbKeys.LatestConfirmedSnapshot()
 
 /**
@@ -56,38 +54,13 @@ export const isSyncing = (onChainBlock: number, lastKnownBlock: number): boolean
   return lastKnownBlock + 4 >= onChainBlock
 }
 
-/**
- * Queries the database to find the latest known block number.
- * @param connector
- * @returns promise that resolves to a number
- */
-export const getLatestBlockNumber = async (db: LevelUp): Promise<number> => {
-  try {
-    return u8aToNumber(await db.get(Buffer.from(LATEST_BLOCK_KEY))) as number
-  } catch (err) {
-    if (err.notFound) {
-      return 0
-    }
-
-    throw err
-  }
-}
-
-/**
- * Updates the database with the latest known block number.
- * @param connector
- * @param blockNumber
- */
-export const updateLatestBlockNumber = async (db: LevelUp, blockNumber: BN): Promise<void> => {
-  await db.put(Buffer.from(LATEST_BLOCK_KEY), blockNumber.toBuffer())
-}
 
 /**
  * Queries the database to find the latest confirmed snapshot.
  * @param connector
  * @returns promise that resolves to a snapshot
  */
-export const getLatestConfirmedSnapshot = async (db: LevelUp): Promise<Snapshot> => {
+export const getLatestConfirmedSnapshot = async (db: HoprDB): Promise<Snapshot> => {
   try {
     const result = (await db.get(Buffer.from(LATEST_CONFIRMED_SNAPSHOT))) as Uint8Array
     return new Snapshot({
@@ -114,7 +87,7 @@ export const getLatestConfirmedSnapshot = async (db: LevelUp): Promise<Snapshot>
  * @param partyB
  */
 export const getChannelEntry = async (
-  db: LevelUp,
+  db: HoprDB,
   partyA: Public,
   partyB: Public
 ): Promise<ChannelEntry | undefined> => {
@@ -150,7 +123,7 @@ export const getChannelEntry = async (
  * @returns promise that resolves to a list of channel entries
  */
 export const getChannelEntries = async (
-  db: LevelUp,
+  db: HoprDB,
   party?: Public,
   filter?: (node: Public) => boolean
 ): Promise<
@@ -206,7 +179,7 @@ export const getChannelEntries = async (
  * @param channelEntry
  */
 export const updateChannelEntry = async (
-  db: LevelUp,
+  db: HoprDB,
   partyA: Public,
   partyB: Public,
   channelEntry: ChannelEntry

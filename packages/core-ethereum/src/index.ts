@@ -1,7 +1,7 @@
-import type { LevelUp } from 'levelup'
 import type { WebsocketProvider } from 'web3-core'
 import type { Currencies } from '@hoprnet/hopr-core-connector-interface'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
+import type HoprDB from '@hoprnet/db'
 import type { HoprChannels } from './tsc/web3/HoprChannels'
 import type { HoprToken } from './tsc/web3/HoprToken'
 import Web3 from 'web3'
@@ -10,7 +10,6 @@ import { Network, addresses, abis } from '@hoprnet/hopr-ethereum'
 import { ChannelFactory } from './channel'
 import types from './types'
 import Indexer from './indexer'
-import * as dbkeys from './dbKeys'
 import * as utils from './utils'
 import * as constants from './constants'
 import * as config from './config'
@@ -37,7 +36,7 @@ export default class HoprEthereum implements HoprCoreConnector {
   public hashedSecret: HashedSecret
 
   constructor(
-    public db: LevelUp,
+    public db: HoprDB,
     public web3: Web3,
     public chainId: number,
     public network: Network,
@@ -56,7 +55,6 @@ export default class HoprEthereum implements HoprCoreConnector {
     this.hashedSecret = new HashedSecret(this.db, this.account, this.hoprChannels)
   }
 
-  readonly dbKeys = dbkeys
   readonly utils = utils
   readonly constants = constants
   readonly CHAIN_NAME = 'HOPR on Ethereum'
@@ -203,7 +201,7 @@ export default class HoprEthereum implements HoprCoreConnector {
    * @returns a promise resolved to the connector
    */
   public static async create(
-    db: LevelUp,
+    db: HoprDB,
     seed: Uint8Array,
     options?: { id?: number; provider?: string; debug?: boolean; maxConfirmations?: number }
   ): Promise<HoprEthereum> {
