@@ -23,7 +23,7 @@ export abstract class OpenChannelBase extends AbstractCommand {
 
   protected async validateAmountToFund(amountToFund: BN): Promise<void> {
     const { account } = this.node.paymentChannels
-    const myAvailableTokens = await account.balance
+    const myAvailableTokens = await account.getBalance(true)
 
     if (amountToFund.lten(0)) {
       throw Error(`Invalid 'amountToFund' provided: ${amountToFund.toString(10)}`)
@@ -108,7 +108,7 @@ export class OpenChannelFancy extends OpenChannelBase {
 
   private async selectFundAmount(): Promise<string> {
     const { types, account } = this.node.paymentChannels
-    const myAvailableTokens = await account.balance
+    const myAvailableTokens = await account.getBalance(true)
     const myAvailableTokensDisplay = moveDecimalPoint(myAvailableTokens.toString(), types.Balance.DECIMALS * -1)
 
     const tokenQuestion = `How many ${types.Balance.SYMBOL} (${styleValue(`${myAvailableTokensDisplay}`, 'number')} ${

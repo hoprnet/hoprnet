@@ -473,15 +473,6 @@ export async function createChallenge(secretA: Uint8Array, secretB: Uint8Array):
 }
 
 /**
- * @param updatedAt
- * @param ttl in milliseconds
- * @returns true if it's expired
- */
-export function isExpired(updatedAt: number, ttl: number): boolean {
-  return updatedAt + ttl < new Date().getTime()
-}
-
-/**
  * @param network
  * @returns true if network is private or ganache
  */
