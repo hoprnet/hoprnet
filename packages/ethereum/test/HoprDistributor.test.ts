@@ -477,6 +477,10 @@ describe('HoprDistributor', function () {
       await expectRevert(distributor.claim(SCHEDULE_TEAM), 'Account is revoked')
     })
 
+    it('should fail to revoke twice', async function () {
+      await expectRevert(distributor.revokeAccount(owner, SCHEDULE_TEAM), 'Allocation must not be already revoked')
+    })
+
     it('should fail to revoke if allocation does not exist', async function () {
       await expectRevert(distributor.revokeAccount(owner, SCHEDULE_UNSET), 'Allocation must exist')
     })

@@ -57,7 +57,7 @@ jobs:
           shopt -s expand_aliases
 
           # Variables
-          PROVIDER=wss://ropsten.infura.io/ws/v3/21ceb5486c454b2cb8e6ec54d1432de1
+          PROVIDER=$PROVIDER_DEVELOPMENT_ROPSTEN_WSS
 
           alias hoprd="node packages/hoprd/lib/index.js --provider $PROVIDER"
 
@@ -74,6 +74,7 @@ jobs:
           hoprd --data='./test/fixtures/charlie' --password="$DBPASS" --runAsBootstrap --run "balance"
         env:
           DBPASS: ${{ secrets.SMOKETESTPASSWORD }}
+          PROVIDER_DEVELOPMENT_ROPSTEN_WSS: ${{ secrets.PROVIDER_DEVELOPMENT_ROPSTEN_WSS }}
 
       - name: Smoke tests
         shell: bash {0}
@@ -81,6 +82,7 @@ jobs:
         env:
           DBPASS: ${{ secrets.SMOKETESTPASSWORD }}
           FIXTURES: ./test/fixtures
+          PROVIDER_DEVELOPMENT_ROPSTEN_WSS: ${{ secrets.PROVIDER_DEVELOPMENT_ROPSTEN_WSS }}
 
       - name: Commit database changes back to repo
         shell: bash {0}

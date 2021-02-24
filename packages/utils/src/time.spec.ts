@@ -1,34 +1,52 @@
-import assert from 'assert'
-import { durations } from './time'
+import { expect } from 'chai'
+import { durations, isExpired } from './time'
 
 describe('test time', function () {
   context('durations', function () {
     it('should be 1 second', function () {
-      assert(durations.seconds(1) === 1e3, 'check durations.seconds')
+      expect(durations.seconds(1)).to.equal(1e3)
     })
+
     it('should be 2 seconds', function () {
-      assert(durations.seconds(2) === 2e3, 'check durations.seconds')
+      expect(durations.seconds(2)).to.equal(2e3)
     })
 
     it('should be 1 minute', function () {
-      assert(durations.minutes(1) === 1e3 * 60, 'check durations.minutes')
+      expect(durations.minutes(1)).to.equal(1e3 * 60)
     })
+
     it('should be 2 minutes', function () {
-      assert(durations.minutes(2) === 2e3 * 60, 'check durations.minutes')
+      expect(durations.minutes(2)).to.equal(2e3 * 60)
     })
 
     it('should be 1 hour', function () {
-      assert(durations.hours(1) === 1e3 * 60 * 60, 'check durations.hours')
+      expect(durations.hours(1)).to.equal(1e3 * 60 * 60)
     })
+
     it('should be 2 hours', function () {
-      assert(durations.hours(2) === 2e3 * 60 * 60, 'check durations.hours')
+      expect(durations.hours(2)).to.equal(2e3 * 60 * 60)
     })
 
     it('should be 1 day', function () {
-      assert(durations.days(1) === 1e3 * 60 * 60 * 24, 'check durations.days')
+      expect(durations.days(1)).to.equal(1e3 * 60 * 60 * 24)
     })
+
     it('should be 2 days', function () {
-      assert(durations.days(2) === 2e3 * 60 * 60 * 24, 'check durations.days')
+      expect(durations.days(2)).to.equal(2e3 * 60 * 60 * 24)
+    })
+  })
+
+  context('isExpired', function () {
+    const now = 10
+    const TTL = 1
+
+    it('should not be expired', function () {
+      expect(isExpired(now, now, TTL)).to.be.false
+      expect(isExpired(now + 2, now, TTL)).to.be.false
+    })
+
+    it('should be expired', function () {
+      expect(isExpired(now - 2, now, TTL)).to.be.true
     })
   })
 })
