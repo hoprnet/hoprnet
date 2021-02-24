@@ -26,11 +26,8 @@ export async function getUnacknowledgedTickets(
   const unAcknowledgedTicketSize = UnacknowledgedTicket.SIZE(node.paymentChannels)
 
   return new Promise((resolve, reject) => {
-    node.db
-      .createReadStream({
-        gte: Buffer.from(node._dbKeys.UnAcknowledgedTickets(new Uint8Array(0x00)))
-      })
-      .on('error', (err) => reject(err))
+    node.db.getUnacknowledgedTicketsStream()
+      .on('error', (err: Error) => reject(err))
       .on('data', async ({ value }: { value: Buffer }) => {
         if (value.buffer.byteLength !== unAcknowledgedTicketSize) return
 
@@ -61,17 +58,9 @@ export async function deleteUnacknowledgedTickets(
   }
 ): Promise<void> {
   const tickets = await getUnacknowledgedTickets(node, filter)
+  const ids = Promise.all(tickets.map(async (ticket) => (await ticket.signedTicket).ticket.challenge))
+  return await node.db.deleteUnacknowledgedTickets(ids)
 
-  await node.db.batch(
-    await Promise.all(
-      tickets.map<any>(async (ticket) => {
-        return {
-          type: 'del',
-          key: Buffer.from(node._dbKeys.UnAcknowledgedTickets((await ticket.signedTicket).ticket.challenge))
-        }
-      })
-    )
-  )
 }
 
 /**
@@ -98,15 +87,12 @@ export async function getAcknowledgedTickets(
   }[] = []
 
   return new Promise((resolve, reject) => {
-    node.db
-      .createReadStream({
-        gte: Buffer.from(node._dbKeys.AcknowledgedTickets(new Uint8Array(0x00)))
-      })
-      .on('error', (err) => reject(err))
+    node.db.getAcknowledgedTicketsStream()
+      .on('error', (err: Error) => reject(err))
       .on('data', async ({ key, value }: { key: Buffer; value: Buffer }) => {
         if (value.buffer.byteLength !== acknowledgedTicketSize) return
 
-        const index = node._dbKeys.AcknowledgedTicketsParse(key)
+        const index = node.db.AcknowledgedTicketsParse(key)
         const ackTicket = AcknowledgedTicket.create(node.paymentChannels, {
           bytes: value.buffer,
           offset: value.byteOffset
@@ -164,14 +150,6 @@ export async function updateAcknowledgedTicket(
 }
 
 /**
- * Delete acknowledged ticket in database
- * @param index Uint8Array
- */
-export async function deleteAcknowledgedTicket(node: Hopr<Chain>, index: Uint8Array): Promise<void> {
-  await node.db.del(Buffer.from(node._dbKeys.AcknowledgedTickets(index)))
-}
-
-/**
  * Submit acknowledged ticket and update database
  * @param ackTicket Uint8Array
  * @param index Uint8Array
@@ -188,9 +166,9 @@ export async function submitAcknowledgedTicket(
       ackTicket.redeemed = true
       await updateAcknowledgedTicket(node, ackTicket, index)
     } else if (result.status === 'FAILURE') {
-      await deleteAcknowledgedTicket(node, index)
+      await node.db.deleteAcknowledgedTicket(index)
     } else if (result.status === 'ERROR') {
-      await deleteAcknowledgedTicket(node, index)
+      await node.db.deleteAcknowledgedTicket(index)
       // @TODO: better handle this
     }
 

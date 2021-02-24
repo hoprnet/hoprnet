@@ -148,4 +148,39 @@ export default class HoprDB {
   public async storeIdentity(id: Buffer){
     await this.db.put(Buffer.from(KeyPair), id)
   }
+
+  public async getUnacknowledgedTicketsStream(){
+    return this.db
+      .createReadStream({
+        gte: Buffer.from(UnAcknowledgedTickets(new Uint8Array(0x00)))
+      })
+  }
+
+  public async deleteUnacknowledgedTickets(ids) {
+    await this.db.batch(
+      await Promise.all(
+        ids.map(async (id) => {
+          return {
+            type: 'del',
+            key: Buffer.from(UnAcknowledgedTickets(id))
+          }
+        })
+      )
+    )
+  }
+
+  public async getAcknowledgedTicketsStream() {
+    return this.db.createReadStream({
+      gte: Buffer.from(AcknowledgedTickets(new Uint8Array(0x00)))
+    })
+  }
+
+  /**
+   * Delete acknowledged ticket in database
+   * @param index Uint8Array
+   */
+  public async deleteAcknowledgedTicket(index: Uint8Array): Promise<void> {
+    await this.db.del(Buffer.from(AcknowledgedTickets(index)))
+  }
 }
+
