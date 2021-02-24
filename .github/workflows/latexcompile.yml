@@ -2,7 +2,7 @@ name: Build LaTeX document
 on: 
   push:
     paths:
-      'docs/whitepaper/**/*'
+      'docs/whitepaper/**/*.tex'
 
 jobs:
   build_latex:
@@ -11,7 +11,7 @@ jobs:
       - name: Set up Git repository
         uses: actions/checkout@v2
       - name: Compile LaTeX document
-       uses: dante-ev/latex-action@master
+        uses: dante-ev/latex-action@master
         with:
           run: |
             apk add make
