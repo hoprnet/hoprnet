@@ -11,16 +11,11 @@ jobs:
       - name: Set up Git repository
         uses: actions/checkout@v2
       - name: Compile LaTeX document
-        uses: xu-cheng/texlive-action/small@v1
+        uses: dante-ev/latex-action@master
         with:
-          run: |
-            apk add make
-            tlmgr update --self
-            tlmgr install authblk
-            tlmgr install blindtext
-            cd docs/whitepaper
-            latexmk -pdf
-            latexmk -c
+          working_directory: docs/whitepaper
+          root_file: main.tex
+          post_compile: "latexmk -c && ls && mv *.pdf whitepaper.pdf"
       - name: Commit latest version
         run: |
           git config --global user.email "noreply@hoprnet.org"
