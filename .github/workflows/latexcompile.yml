@@ -20,6 +20,7 @@ jobs:
             cd docs/whitepaper
             latexmk -pdf
             latexmk -c
+            mv main.pdf whitepaper.pdf
       - name: Commit latest version
         run: |
           git config --global user.email "noreply@hoprnet.org"
