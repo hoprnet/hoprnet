@@ -23,15 +23,12 @@ import {
 import NetworkPeers from './network/network-peers'
 import Heartbeat from './network/heartbeat'
 import { findPath } from './path'
-import type HoprDB from '@hoprnet/db'
+import HoprDB from '@hoprnet/db'
 
 import { addPubKey, getAcknowledgedTickets, submitAcknowledgedTicket } from './utils'
 import { u8aToHex, pubKeyToPeerId } from '@hoprnet/hopr-utils'
-import { existsSync, mkdirSync } from 'fs'
 import getIdentity from './identity'
 
-import levelup, { LevelUp } from 'levelup'
-import leveldown from 'leveldown'
 import Multiaddr from 'multiaddr'
 import chalk from 'chalk'
 
@@ -43,8 +40,8 @@ import BN from 'bn.js'
 
 import { Interactions } from './interactions'
 import EventEmitter from 'events'
-import path from 'path'
 import { ChannelStrategy, PassiveStrategy, PromiscuousStrategy } from './channel-strategy'
+import type { LevelUp } from 'levelup'
 
 import Debug from 'debug'
 import { Address } from 'libp2p/src/peer-store'
@@ -65,7 +62,7 @@ export type HoprOptions = {
   provider: string
   ticketAmount?: number
   ticketWinProb?: number
-  db: HoprDB
+  db?: LevelUp 
   dbPath?: string
   createDbIfNotExist?: boolean
   peerId?: PeerId
@@ -80,18 +77,6 @@ export type HoprOptions = {
     ip4?: NetOptions
     ip6?: NetOptions
   }
-}
-
-const defaultDBPath = (id: string | number, isBootstrap: boolean): string => {
-  let folder: string
-  if (isBootstrap) {
-    folder = `bootstrap`
-  } else if (id) {
-    folder = `node_${id}`
-  } else {
-    folder = `node`
-  }
-  return path.join(process.cwd(), 'db', VERSION, folder)
 }
 
 class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
@@ -119,7 +104,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
    * @param _options
    * @param provider
    */
-  private constructor(options: HoprOptions, public _libp2p: LibP2P, public db: LevelUp, public paymentChannels: Chain) {
+  private constructor(options: HoprOptions, public _libp2p: LibP2P, public db: HoprDB,  public paymentChannels: Chain) {
     super()
 
     this._libp2p.connectionManager.on('peer:connect', (conn: Connection) => {
@@ -191,12 +176,8 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     options: HoprOptions
   ): Promise<Hopr<CoreConnector>> {
     const Connector = options.connector ?? HoprCoreEthereum
-    const db = Hopr.openDatabase(options)
-
-    const { id, addresses } = await getIdentity({
-      ...options,
-      db
-    })
+    const db = new HoprDB({ ...options } as any)
+    const { id, addresses } = await getIdentity(db, options)
 
     if (
       !options.debug &&
@@ -694,34 +675,8 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       PATH_RANDOMNESS
     )
   }
-
-  private static openDatabase(options: HoprOptions): LevelUp {
-    if (options.db) {
-      return options.db
-    }
-
-    let dbPath: string
-    if (options.dbPath) {
-      dbPath = options.dbPath
-    } else {
-      dbPath = defaultDBPath(options.id, options.bootstrapNode)
-    }
-
-    dbPath = path.resolve(dbPath)
-
-    verbose('using db at ', dbPath)
-    if (!existsSync(dbPath)) {
-      verbose('db does not exist, creating?:', options.createDbIfNotExist)
-      if (options.createDbIfNotExist) {
-        mkdirSync(dbPath, { recursive: true })
-      } else {
-        throw new Error('Database does not exist: ' + dbPath)
-      }
-    }
-
-    return levelup(leveldown(dbPath))
-  }
 }
+
 
 export { Hopr as default, LibP2P }
 export * from './constants'

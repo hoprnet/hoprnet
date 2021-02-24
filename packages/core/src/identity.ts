@@ -1,17 +1,14 @@
 import type { HoprOptions } from '.'
-
-import { LevelUp } from 'levelup'
 import { blue } from 'chalk'
 import { deserializeKeyPair, serializeKeyPair, askForPassword } from './utils'
 import { privKeyToPeerId } from '@hoprnet/hopr-utils'
+import type HoprDB from '@hoprnet/db'
 import debug from 'debug'
 
 const log = debug('hopr-core:identity')
 
 import PeerId from 'peer-id'
 import Multiaddr from 'multiaddr'
-
-import { KeyPair } from './dbKeys'
 
 const DEFAULT_PORT = 9091
 /**
@@ -87,7 +84,7 @@ async function getDebugId(options: HoprOptions): Promise<string> {
   return privKey
 }
 
-async function getPeerId(options: HoprOptions): Promise<PeerId> {
+async function getPeerId(db: HoprDB, options: HoprOptions): Promise<PeerId> {
   if (options.peerId != null && PeerId.isPeerId(options.peerId)) {
     return options.peerId
   }
@@ -107,12 +104,7 @@ async function getPeerId(options: HoprOptions): Promise<PeerId> {
 
     log(`Warning: Running in debug mode with keypair stored in database.`)
   }
-
-  if (options.db == null) {
-    throw Error('Cannot get/store any peerId without a database handle.')
-  }
-
-  return getFromDatabase(options.db, options.password)
+  return getFromDatabase(db, options.password)
 }
 
 /**
@@ -120,11 +112,11 @@ async function getPeerId(options: HoprOptions): Promise<PeerId> {
  * @param db database handle
  * @param pw password to keypair decrypt
  */
-async function getFromDatabase(db: LevelUp, pw?: string): Promise<PeerId> {
+async function getFromDatabase(db: HoprDB, pw?: string): Promise<PeerId> {
   let serializedKeyPair: Uint8Array
 
   try {
-    serializedKeyPair = await db.get(Buffer.from(KeyPair))
+    return recoverIdentity(await db.getIdentity(), pw)
   } catch (err) {
     log('Error loading keys from db', err)
     // No identity in database
@@ -161,20 +153,16 @@ async function recoverIdentity(serializedKeyPair: Uint8Array, pw?: string): Prom
   return peerId
 }
 
-async function createIdentity(db: LevelUp, pw?: string): Promise<PeerId> {
+async function createIdentity(db: HoprDB, pw?: string): Promise<PeerId> {
   pw = pw !== undefined ? pw : await askForPassword('Please type in a password to encrypt the secret key.')
-
   const peerId = await PeerId.create({ keyType: 'secp256k1' })
-
   const serializedKeyPair = serializeKeyPair(peerId, new TextEncoder().encode(pw))
-
-  await db.put(Buffer.from(KeyPair), Buffer.from(serializedKeyPair))
-
+  await db.storeIdentity(Buffer.from(serializedKeyPair))
   return peerId
 }
 
-export default async function getIdentity(options: HoprOptions) {
-  let id = await getPeerId(options)
+export default async function getIdentity(db: HoprDB, options: HoprOptions) {
+  let id = await getPeerId(db, options)
 
   return {
     id,
