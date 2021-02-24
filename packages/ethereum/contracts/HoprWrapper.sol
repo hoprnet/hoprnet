@@ -12,6 +12,10 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "./HoprToken.sol";
 
 
+/**
+ * HoprWrapper is a smart contract that may receive xHOPR (ERC-677)
+ * and it will send back wxHOPR (ERC-777) and vice versa.
+ */
 contract HoprWrapper is IERC777Recipient, ERC1820Implementer, ReentrancyGuard {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
