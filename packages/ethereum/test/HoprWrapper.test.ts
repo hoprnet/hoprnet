@@ -6,7 +6,7 @@ import { vmErrorMessage } from './utils'
 const HoprToken = artifacts.require('HoprToken')
 const HoprWrapper = artifacts.require('HoprWrapper')
 
-describe.only('HoprWrapper', function () {
+describe('HoprWrapper', function () {
   let xHOPR: HoprTokenInstance
   let wxHOPR: HoprTokenInstance
   let wrapper: HoprWrapperInstance
