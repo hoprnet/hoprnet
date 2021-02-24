@@ -11,7 +11,7 @@ jobs:
       - name: Set up Git repository
         uses: actions/checkout@v2
       - name: Compile LaTeX document
-        uses: xu-cheng/texlive-action/small@v2
+        uses: xu-cheng/texlive-action/small@v1
         with:
           run: |
             apk add make
