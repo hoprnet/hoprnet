@@ -7,7 +7,7 @@ import PeerId from 'peer-id'
 import chaiAsPromised from 'chai-as-promised'
 import chai, { expect } from 'chai'
 import sinon from 'sinon'
-import { validateUnacknowledgedTicket} from './tickets'
+import { validateUnacknowledgedTicket } from './tickets'
 
 chai.use(chaiAsPromised)
 
