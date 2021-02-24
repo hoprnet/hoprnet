@@ -3,7 +3,7 @@ import LibP2P from 'libp2p'
 import { blue, green } from 'chalk'
 import PeerId from 'peer-id'
 import { u8aConcat, u8aEquals, u8aToHex, pubKeyToPeerId } from '@hoprnet/hopr-utils'
-import { getTickets, validateUnacknowledgedTicket, validateCreatedTicket } from '../../utils/tickets'
+import { getTickets, validateUnacknowledgedTicket } from '../../utils/tickets'
 import { Header, deriveTicketKey, deriveTicketKeyBlinding, deriveTagParameters, deriveTicketLastKey } from './header'
 import { Challenge } from './challenge'
 import { PacketTag } from '../../dbKeys'
@@ -222,10 +222,10 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
       const myAccountId = await chain.utils.pubKeyToAccountId(node.getId().pubKey.marshal())
       const counterpartyAccountId = await chain.utils.pubKeyToAccountId(channel.counterparty)
       const amPartyA = chain.utils.isPartyA(myAccountId, counterpartyAccountId)
-      await validateCreatedTicket({
-        myBalance: await (amPartyA ? channel.balance_a : channel.balance_b),
-        signedTicket: packet._ticket
-      })
+      const balance = await (amPartyA ? channel.balance_a : channel.balance_b)
+      if (balance < packet._ticket.ticket.amount) {
+        throw Error(`Channel does not have enough funds ${balance.toString()} < ${packet._ticket.ticket.amount.toString()}`)
+      }
     } else if (secrets.length == 1) {
       packet._ticket = await chain.channel.createDummyChannelTicket(
         await chain.utils.pubKeyToAccountId(path[0].pubKey.marshal()),
@@ -369,16 +369,12 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
       )
 
       this._ticket = await channel.createTicket(fee, this.header.encryptionKey, this.node.ticketWinProb)
-      /*{
-        bytes: this.buffer,
-        offset: this.ticketOffset
-      })
-      */
 
-      await validateCreatedTicket({
-        myBalance: await (amPartyA ? channel.balance_a : channel.balance_b),
-        signedTicket: this._ticket
-      })
+      const balance = await (amPartyA ? channel.balance_a : channel.balance_b)
+      if (balance < this._ticket.ticket.amount) {
+        throw Error(`Payment channel does not have enough funds ${balance.toString()} < ${ticket.amount.toString()}`)
+      }
+
     } else if (fee.isZero()) {
       this._ticket = await chain.channel.createDummyChannelTicket(
         await chain.utils.pubKeyToAccountId(target.pubKey.marshal()),
