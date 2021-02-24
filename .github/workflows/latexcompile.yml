@@ -16,7 +16,7 @@ jobs:
           run: |
             apk add make
             tlmgr update --self
-            tlmgr install preprint blindtext multirow
+            tlmgr install preprint blindtext makecell
             cd docs/whitepaper
             latexmk -pdf
             latexmk -c
