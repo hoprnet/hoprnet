@@ -1,7 +1,7 @@
 name: Build LaTeX document
 on: 
   push:
-    paths:
+    paths: |
       'docs/whitepaper**/*'
       '.github/workflows/latexcompile.yml'
 
