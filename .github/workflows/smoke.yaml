@@ -3,8 +3,8 @@ name: Smoke test
 on:
   push:
     branches: ['**']
-    paths-ignore:
-      - 'docs/**'
+    paths:
+      - '!docs/**'
 
 jobs:
   build:
