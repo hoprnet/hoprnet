@@ -23,6 +23,7 @@ import {
 import NetworkPeers from './network/network-peers'
 import Heartbeat from './network/heartbeat'
 import { findPath } from './path'
+import type HoprDB from '@hoprnet/db'
 
 import { addPubKey, getAcknowledgedTickets, submitAcknowledgedTicket } from './utils'
 import { u8aToHex, pubKeyToPeerId } from '@hoprnet/hopr-utils'
@@ -41,7 +42,6 @@ import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 import BN from 'bn.js'
 
 import { Interactions } from './interactions'
-import * as DbKeys from './dbKeys'
 import EventEmitter from 'events'
 import path from 'path'
 import { ChannelStrategy, PassiveStrategy, PromiscuousStrategy } from './channel-strategy'
@@ -65,7 +65,7 @@ export type HoprOptions = {
   provider: string
   ticketAmount?: number
   ticketWinProb?: number
-  db?: LevelUp
+  db: HoprDB
   dbPath?: string
   createDbIfNotExist?: boolean
   peerId?: PeerId
@@ -99,7 +99,6 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
   public _interactions: Interactions<Chain>
   // Allows us to construct HOPR with falsy options
   public _debug: boolean
-  public _dbKeys = DbKeys
 
   public output: (arr: Uint8Array) => void
   public isBootstrapNode: boolean
@@ -485,13 +484,8 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
             return reject(err)
           }
 
-          const unAcknowledgedDBKey = this._dbKeys.UnAcknowledgedTickets(packet.challenge.hash)
-
-          await this.db.put(Buffer.from(unAcknowledgedDBKey), Buffer.from(''))
-
-          this._interactions.packet.acknowledgment.once(u8aToHex(unAcknowledgedDBKey), () => {
-            resolve()
-          })
+          const key = await this.db.putUnacknowledgedTickets(packet.challenge.hash, Buffer.from(''))
+          this._interactions.packet.acknowledgment.once(u8aToHex(key), () => resolve())
 
           try {
             await this._interactions.packet.forward.interact(path[0], packet)
