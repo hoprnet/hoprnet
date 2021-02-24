@@ -2385,9 +2385,9 @@ async-limiter@~1.0.0:
   integrity sha512-csOlWGAcRFJaI6m+F2WKdnMKr4HhdhFVBk0H/QbJFMCr+uO2kwohwXQPxw/9OCxp05r5ghVBFSyioixx3gfkNQ==
 
 async-mutex@^0.3.0:
-  version "0.3.0"
-  resolved "https://registry.yarnpkg.com/async-mutex/-/async-mutex-0.3.0.tgz#5bc765c271dfc05c48040c12032a92f1dbef2dc3"
-  integrity sha512-6VIpUM7s37EMXvnO3TvujgaS6gx4yJby13BhxovMYSap7nrbS0gJ1UzGcjD+HElNSdTz/+IlAIqj7H48N0ZlyQ==
+  version "0.3.1"
+  resolved "https://registry.yarnpkg.com/async-mutex/-/async-mutex-0.3.1.tgz#7033af665f1c7cebed8b878267a43ba9e77c5f67"
+  integrity sha512-vRfQwcqBnJTLzVQo72Sf7KIUbcSUP5hNchx6udI1U6LuPQpfePgdjJzlCe76yFZ8pxlLjn9lwcl/Ya0TSOv0Tw==
   dependencies:
     tslib "^2.1.0"
 
