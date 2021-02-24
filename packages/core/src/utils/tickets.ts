@@ -15,8 +15,8 @@ export async function getUnacknowledgedTickets(
   filter?: {
     signer: Uint8Array
   }
-): Promise<UnacknowledgedTicket<Chain>[]> {
-  const tickets: UnacknowledgedTicket<Chain>[] = []
+): Promise<UnacknowledgedTicket[]> {
+  const tickets: UnacknowledgedTicket[] = []
   const unAcknowledgedTicketSize = node.paymentChannels.types.UnacknowledgedTicket.SIZE()
 
   return new Promise((resolve, reject) => {
@@ -69,21 +69,17 @@ export async function deleteUnacknowledgedTickets(
  * @param filter optionally filter by signer
  * @returns an array of all acknowledged tickets
  */
+export type TicketAndIndex = {
+  ackTicket: Types.AcknowledgedTicket
+  index: Uint8Array
+}
 export async function getAcknowledgedTickets(
   node: Hopr<Chain>,
   filter?: {
     signer: Uint8Array
   }
-): Promise<
-  {
-    ackTicket: Types.AcknowledgedTicket
-    index: Uint8Array
-  }[]
-> {
-  const results: {
-    ackTicket: Types.AcknowledgedTicket
-    index: Uint8Array
-  }[] = []
+): Promise<TicketAndIndex[]> {
+  const results: TicketAndIndex[] = []
 
   return new Promise((resolve, reject) => {
     node.db
