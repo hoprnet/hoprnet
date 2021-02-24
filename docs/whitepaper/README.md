@@ -11,7 +11,7 @@ Contains the source code of the whitepaper of [hoprnet.io](https://hoprnet.io).
 [**Download compiled whitepaper**](./HOPR___a_Decentralized_and_Metadata_Private_Messaging_Protocol_with_Incentives.pdf)
 
 <object data="http://yoursite.com/the.pdf" type="application/pdf" width="700px" height="700px">
-    <embed src="http://yoursite.com/the.pdf">
-        <p>This browser does not support PDFs. Please download the PDF to view it: <a href="http://yoursite.com/the.pdf">Download PDF</a>.</p>
+    <embed src="./whitepaper.pdf">
+        <p>This browser does not support PDFs. Please download the PDF to view it: <a href="./whitepaper.pdf">Download PDF</a>.</p>
     </embed>
 </object>
