@@ -3,7 +3,7 @@ on:
   push:
     branches: ['master', 'release/**', 'avado']
     paths-ignore:
-      - 'docs/**'
+      - '**/docs/**/*'
 
 jobs:
   build:
