@@ -55,7 +55,7 @@ const createMockSignedTicket = ({
 }) => {
   return ({
     ticket: createMockTicket({ targetAddress, amount, winProb, channelIteration }),
-    signer: Promise.resolve(sender.pubKey.marshal())
+    getSigner: () => Promise.resolve(sender.pubKey.marshal())
   } as unknown) as Types.SignedTicket
 }
 
