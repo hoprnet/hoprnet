@@ -45,7 +45,6 @@ import * as DbKeys from './dbKeys'
 import EventEmitter from 'events'
 import path from 'path'
 import { ChannelStrategy, PassiveStrategy, PromiscuousStrategy } from './channel-strategy'
-import { Mixer } from './mixer'
 
 import Debug from 'debug'
 import { Address } from 'libp2p/src/peer-store'
@@ -111,7 +110,6 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
 
   private running: boolean
   private checkTimeout: NodeJS.Timeout
-  private mixer: Mixer<Chain>
   private strategy: ChannelStrategy
   private networkPeers: NetworkPeers
   private heartbeat: Heartbeat
@@ -130,7 +128,6 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       this.networkPeers.register(conn.remotePeer)
     })
 
-    this.mixer = new Mixer()
     this.setChannelStrategy(options.strategy || 'promiscuous')
     this.initializedWithOptions = options
     this.output = (arr: Uint8Array) => {
@@ -142,7 +139,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     }
     this.bootstrapServers = options.bootstrapServers || []
     this.isBootstrapNode = options.bootstrapNode || false
-    this._interactions = new Interactions(this, this.mixer, (peer: PeerId) => this.networkPeers.register(peer))
+    this._interactions = new Interactions(this, (peer: PeerId) => this.networkPeers.register(peer))
 
     if (process.env.GCLOUD) {
       try {
@@ -591,11 +588,11 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
   }
 
   public async getBalance(): Promise<Types.Balance> {
-    return await this.paymentChannels.account.balance
+    return await this.paymentChannels.account.getBalance(true)
   }
 
   public async getNativeBalance(): Promise<Types.NativeBalance> {
-    return await this.paymentChannels.account.nativeBalance
+    return await this.paymentChannels.account.getNativeBalance(true)
   }
 
   public smartContractInfo(): string {
@@ -622,7 +619,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       await utils.pubKeyToAccountId(counterParty.pubKey.marshal())
     )
 
-    const myAvailableTokens = await account.balance
+    const myAvailableTokens = await account.getBalance(true)
 
     // validate 'amountToFund'
     if (amountToFund.lten(0)) {

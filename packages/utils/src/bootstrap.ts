@@ -2,8 +2,10 @@ import Multiaddr from 'multiaddr'
 import dns from 'dns'
 
 const FULL_VERSION = require('../package.json').version
+const packageVersion = FULL_VERSION.split('.')
+const cleanVersion = packageVersion[0] + '.' + packageVersion[1] + '.' + packageVersion[2].split('-')[0] // Handle `-next` on patch.
 
-const BOOTSTRAP_ADDRESS = process.env.HOPR_BOOTSTRAP_ADDRESS || `${FULL_VERSION}-bootstrap.hoprnet.link`
+const BOOTSTRAP_ADDRESS = process.env.HOPR_BOOTSTRAP_ADDRESS || `${cleanVersion}-bootstrap.hoprnet.link`
 
 /** Load Bootstrap node addresses.
  *   - If a string of comma separated multiaddrs is passed, use this first
