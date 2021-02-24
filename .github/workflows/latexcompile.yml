@@ -29,6 +29,7 @@ jobs:
           git commit -a -m "Update whitepaper" || true
           git pull origin ${{ github.ref }}
           git push origin ${{ github.ref }}
+      # This should go into a release workflow
       # - name: Get the version
       #   id: get_version
       #   if: startsWith(github.ref, 'refs/tags/')
