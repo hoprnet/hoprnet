@@ -7,3 +7,4 @@
 
 # Built PDF files
 *.pdf
+!whitepaper.pdf

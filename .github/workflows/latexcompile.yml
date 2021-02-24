@@ -15,6 +15,14 @@ jobs:
         with:
           working_directory: docs/whitepaper
           root_file: main.tex
+          post_compile: mv *.pdf whitepaper.pdf
+      - name: Commit latest version
+        run: |
+          git config --global user.email "noreply@hoprnet.org"
+          git config --global user.name "HOPR LaTeX build robot"
+          git commit -a -m "Update whitepaper" || true
+          git pull origin ${{ github.ref }}
+          git push origin ${{ github.ref }}
       # - name: Get the version
       #   id: get_version
       #   if: startsWith(github.ref, 'refs/tags/')
