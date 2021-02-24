@@ -224,7 +224,9 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
       const amPartyA = chain.utils.isPartyA(myAccountId, counterpartyAccountId)
       const balance = await (amPartyA ? channel.balance_a : channel.balance_b)
       if (balance < packet._ticket.ticket.amount) {
-        throw Error(`Channel does not have enough funds ${balance.toString()} < ${packet._ticket.ticket.amount.toString()}`)
+        throw Error(
+          `Channel does not have enough funds ${balance.toString()} < ${packet._ticket.ticket.amount.toString()}`
+        )
       }
     } else if (secrets.length == 1) {
       packet._ticket = await chain.channel.createDummyChannelTicket(
@@ -374,7 +376,6 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
       if (balance < this._ticket.ticket.amount) {
         throw Error(`Payment channel does not have enough funds ${balance.toString()} < ${ticket.amount.toString()}`)
       }
-
     } else if (fee.isZero()) {
       this._ticket = await chain.channel.createDummyChannelTicket(
         await chain.utils.pubKeyToAccountId(target.pubKey.marshal()),
