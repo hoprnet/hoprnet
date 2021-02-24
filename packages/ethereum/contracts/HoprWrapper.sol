@@ -60,6 +60,8 @@ contract HoprWrapper is IERC777Recipient, ERC1820Implementer, ReentrancyGuard {
     ) external override nonReentrant {
         // must be xHOPR or wxHOPR
         require(msg.sender == address(xHOPR) || msg.sender == address(wxHOPR), "Invalid token");
+        // must not be triggered by self
+        if (operator == address(this)) return;
 
         if (msg.sender == address(xHOPR)) {
             total_xHOPR = total_xHOPR.add(amount);
