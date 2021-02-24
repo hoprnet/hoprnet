@@ -3,8 +3,8 @@ name: HOPR Lint and fix
 on:
   push:
     branches: ['**']
-    paths-ignore:
-      - '**/docs/**'
+    paths:
+      - '!docs'
 
 jobs:
   build:
