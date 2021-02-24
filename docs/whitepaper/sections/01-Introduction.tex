@@ -3,7 +3,7 @@
 Test The \MYhref{http://gavwood.com/web3lt.html}{Web3} comprises a range of technologies that enable truly decentralized applications (dApps) featuring increased privacy and resilience for the next wave of web applications. dApps on the Web3 do not rely on central infrastructure with central points of failure but instead support self-custody of wealth and data. Beyond technical innovation, the Web3 ecosystems strives to innovate the business and organizational status quo of today's web2.0. Are rent-seeking for-profit corporations with shareholder meetings and CEOs the only possible way to generate value for users? Are shareholders necessarily the only financial beneficiaries of a project while most work and value might be community-created? The \MYhref{https://www.forbes.com/sites/chancebarnett/2017/09/23/inside-the-meteoric-rise-of-icos/\#76ac96d15670}{ICO wave of 2017} has not just created an alternative funding scheme for high risk early investments via tokens but also led to an increasing number of projects that aspire to the Web3 vision and build its infrastructure. HOPR believes in that privacy-first, decentralized and self-empowering Web3 vision and delivers a privacy foundation for the Web3.
 
 \subsection{Pillars of the web3}
-Test While several components of the web3 are still heavily in the making, some projects are already today giving a glimpse of that future web architecture. Early examples working towards dApps are decentralized organizations (DAOs, e.g. by \MYhref{https://aragon.org}{Aragon}), social media platforms such as \MYhref{https://akasha.world}{Akasha} or financial products like \MYhref{https://makerdao.com/en/dai}{Maker's DAI} or non-custodial trading venues like \MYhref{https://uniswap.exchange}{Uniswap}. Currently, we see technological pillars emerging that enable developers to build true dApps which do not rely on central infrastructure anymore:
+While several components of the web3 are still heavily in the making, some projects are already today giving a glimpse of that future web architecture. Early examples working towards dApps are decentralized organizations (DAOs, e.g. by \MYhref{https://aragon.org}{Aragon}), social media platforms such as \MYhref{https://akasha.world}{Akasha} or financial products like \MYhref{https://makerdao.com/en/dai}{Maker's DAI} or non-custodial trading venues like \MYhref{https://uniswap.exchange}{Uniswap}. Currently, we see technological pillars emerging that enable developers to build true dApps which do not rely on central infrastructure anymore:
 \begin{itemize}
     \item Financial asset management systems enabled by blockchains such as \MYhref{https://ethereum.org/}{Ethe\-reum} or \MYhref{https://z.cash/}{ZCash}
     \item Data storage solutions like \MYhref{https://filecoin.io/}{Filecoin} or \MYhref{https://www.nucypher.com/}{NuCypher}
@@ -15,17 +15,17 @@ In this new ecosystem, multiple decentralized applications (dApps) interact with
 
 \setlength{\tabcolsep}{1em} % for the horizontal padding
 {\renewcommand{\arraystretch}{2}% for the vertical padding
-\begin{center}
-    \begin{tabular}{|c|c|c|}
-        \hline
-        \multicolumn{3}{|c|}{\textbf{dApps}} \\
-        \hline
-        \makecell{\textbf{Assets}\\Bitcoin, ZCash, tokens} & \makecell{\textbf{Storage}\\IPFS, NuCypher} & \makecell{\textbf{Computation}\\Golem, Enigma}\\
-        \hline
-        \multicolumn{3}{|c|}{\makecell{\textbf{Messaging}\\\textbf{HOPR}}} \\
-        \hline
-    \end{tabular}
-\end{center}
+    \begin{center}
+        \begin{tabular}{|c|c|c|}
+            \hline
+            \multicolumn{3}{|c|}{\textbf{dApps}}              \\
+            \hline
+            \makecell{\textbf{Assets}                         \\Bitcoin, ZCash, tokens} & \makecell{\textbf{Storage}\\IPFS, NuCypher} & \makecell{\textbf{Computation}\\Golem, Enigma}\\
+            \hline
+            \multicolumn{3}{|c|}{\makecell{\textbf{Messaging} \\\textbf{HOPR}}} \\
+            \hline
+        \end{tabular}
+    \end{center}
 }
 
 \subsection{Protocol layers of the web3}
@@ -33,22 +33,22 @@ HOPR fills the gap between peer-to-peer (P2P) networks and dApps that exchange s
 
 \setlength{\tabcolsep}{1em} % for the horizontal padding
 {\renewcommand{\arraystretch}{2}% for the vertical padding
-\begin{center}
-    \begin{tabular}{|l|l|l|}
-        \hline
-        \textbf{Layer} & \textbf{Purpose} & \textbf{Example}\\
-        \hline 
-        Application & Application logic & \makecell[l]{Chat app,\\M2M comms}\\
-        \hline
-        Storage / sync & \makecell[l]{Synchronization of data,\\version management,\\medium-term message caching} & Matrix\\
-        \hline
-        \textbf{Privacy} & \textbf{\makecell[l]{Scalable \& decentralized\\metadata protection,\\incentivization for\\packet relayers,\\short-term caching}} & \textbf{HOPR}\\
-        \hline
-        P2P & \makecell[l]{Overlay routing,\\NAT traversal} & libp2p, WebRTC\\
-        \hline
-        Network & \makecell[l]{Underlay routing,\\congestion control} & TCP/IP, QUIC\\
-        \hline
-    \end{tabular}
-\end{center}
+    \begin{center}
+        \begin{tabular}{|l|l|l|}
+            \hline
+            \textbf{Layer}   & \textbf{Purpose}                               & \textbf{Example}       \\
+            \hline
+            Application      & Application logic                              & \makecell[l]{Chat app, \\M2M comms}\\
+            \hline
+            Storage / sync   & \makecell[l]{Synchronization of data,                                   \\version management,\\medium-term message caching} & Matrix\\
+            \hline
+            \textbf{Privacy} & \textbf{\makecell[l]{Scalable \& decentralized                          \\metadata protection,\\incentivization for\\packet relayers,\\short-term caching}} & \textbf{HOPR}\\
+            \hline
+            P2P              & \makecell[l]{Overlay routing,                                           \\NAT traversal} & libp2p, WebRTC\\
+            \hline
+            Network          & \makecell[l]{Underlay routing,                                          \\congestion control} & TCP/IP, QUIC\\
+            \hline
+        \end{tabular}
+    \end{center}
 }
 In the blockchain world, HOPR complements technologies that provide on-chain privacy. Data packets produced by dApps may not just contain valuable data but may also reveal metadata that can be linked to real-world identities. On-chain privacy, for example, is of limited impact if a network observer can link metadata to a social media account in order to attack the person because of the fact \textit{that} they used privacy-preserving financial networks - without knowing \textit{what} exactly they used them for.
