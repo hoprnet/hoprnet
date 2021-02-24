@@ -1,10 +1,9 @@
 name: Build LaTeX document
 on: 
   push:
-    paths: |
+    paths:
       'docs/whitepaper**/*'
-      '.github/workflows/latexcompile.yml'
-
+      
 jobs:
   build_latex:
     runs-on: ubuntu-latest
