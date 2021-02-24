@@ -1,0 +1,38 @@
+{
+  "name": "@hoprnet/db",
+  "description": "Database for HOPR",
+  "version": "1.69.0-next.40",
+  "repository": "https://github.com/hoprnet/hoprnet.git",
+  "homepage": "https://hoprnet.org",
+  "license": "LGPL-3.0-only",
+  "types": "lib/index.d.ts",
+  "main": "lib/index.js",
+  "scripts": {
+    "clean": "rimraf ./lib",
+    "test": "mocha --parallel",
+    "dev": "yarn clean && tsc -w",
+    "build": "yarn clean && tsc -p . --noEmit false",
+    "prepublishOnly": "yarn build"
+  },
+  "engines": {
+    "node": "14"
+  },
+  "files": [
+    "lib",
+    "!*.spec.ts",
+    "!*.spec.d.ts",
+    "!*.spec.js",
+    "!*.spec.js.map"
+  ],
+  "dependencies": {
+  },
+  "devDependencies": {
+  },
+  "mocha": {
+    "extension": [
+      "ts"
+    ],
+    "spec": "src/**/*.spec.ts",
+    "require": "ts-node/register"
+  }
+}
