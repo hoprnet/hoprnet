@@ -3,8 +3,8 @@ name: HOPR Test
 on:
   push:
     branches: ['**']
-    paths:
-      - '!docs'
+    paths-ignore:
+      - 'docs/**'
 
 jobs:
   build:
