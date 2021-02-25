@@ -172,7 +172,7 @@ export class ProbabilisticPayments {
    * winning ticket, or undefined if it's not.
    */
   public async validateTicket(ticket: UnacknowledgedTicket, response: Hash): Promise<ValidateResponse> {
-    log('validate')
+    log('validate', ticket)
 
     // TODO verify signature
     // signedTicket.verifySignature(pubKey)

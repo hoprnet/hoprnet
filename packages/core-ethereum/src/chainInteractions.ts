@@ -53,9 +53,9 @@ export async function storeSecretOnChain(secret: Hash, account: Account, channel
           await account.signTransaction(
             {
               from: address,
-              to: this.channels.options.address
+              to: channels.options.address
             },
-            this.channels.methods.setHashedSecret(u8aToHex(secret))
+            channels.methods.setHashedSecret(u8aToHex(secret))
           )
         ).send()
       )

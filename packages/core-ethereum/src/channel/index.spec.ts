@@ -156,8 +156,9 @@ describe('test Channel class', function () {
       await counterpartysCoreConnector.channel.isOpen(coreConnector.account.keys.onChain.pubKey),
       `Checks that party B considers the channel open.`
     )
+    const unacknowledged = firstTicket.toUnacknowledged(undefined)
 
-    const ackTicket = await counterpartysCoreConnector.validateTicket(firstTicket, response)
+    const ackTicket = await counterpartysCoreConnector.validateTicket(unacknowledged, response)
     assert(ackTicket.status === 'SUCCESS', `ticket must be winning`)
 
     await channel.testAndSetNonce(new Uint8Array(1).fill(0xff)), `Should be able to set nonce.`

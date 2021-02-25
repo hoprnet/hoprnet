@@ -3,6 +3,13 @@ import { ProbabilisticPayments } from './hashedSecret'
 import { OffChainSecret } from './dbKeys'
 import type { LevelUp } from 'levelup'
 import sinon from 'sinon'
+import { DEMO_ACCOUNTS } from './config.spec'
+import { stringToU8a } from '@hoprnet/hopr-utils'
+import { randomBytes } from 'crypto'
+import { createChallenge } from './utils'
+import { Balance } from './types'
+import BN from 'bn.js'
+import { getPrivKeyData } from './utils/testing.spec'
 
 async function generateMocks() {
   let data = {}
@@ -106,15 +113,42 @@ describe('test probabilistic payments', function () {
     assert(mockStore.notCalled, 'store on chain secret was not called - no reinit')
   })
 
-  it('issue valid 100% tickets', async function () {
-    /*
-    let { mockDb, mockPrivKey, mockStore, mockFind, mockRedeem } = await generateMocks()
-    let pp = new ProbabilisticPayments(mockDb, mockPrivKey, mockStore, mockFind, mockRedeem, 100, 10)
+  it('ticket lifecycle with 100% tickets', async function () {
+    // Create mocks for 3 nodes
+    // Alice has a channel open to Bob, and wants to send a message A-B-C
+    let { mockDb, mockStore, mockFind, mockRedeem } = await generateMocks()
+    let alice = stringToU8a(DEMO_ACCOUNTS[0])
+    let alicePP = new ProbabilisticPayments(mockDb, alice, mockStore, mockFind, mockRedeem, 100, 10)
 
-    let ticket = await pp.issueTicket(
-      amount, counterparty, challenge, epoch, channelIteration, 1)
+    ;({ mockDb, mockStore, mockFind, mockRedeem } = await generateMocks())
+    let bob = stringToU8a(DEMO_ACCOUNTS[1])
+    let bobPP = new ProbabilisticPayments(mockDb, bob, mockStore, mockFind, mockRedeem, 100, 10)
+
+    ;({ mockDb, mockStore, mockFind, mockRedeem } = await generateMocks())
+    let charlie = stringToU8a(DEMO_ACCOUNTS[2])
+    let charliePP = new ProbabilisticPayments(mockDb, charlie, mockStore, mockFind, mockRedeem, 100, 10)
+
+    const mockChannelIteration = new Uint8Array() as any
+    const mockEpoch = new Uint8Array() as any
+
+    // Alice issues a ticket
+    const secretA = randomBytes(32)
+    const secretB = randomBytes(32)
+    const challenge = await createChallenge(secretA, secretB)
+
+    let ticket = await alicePP.issueTicket(
+      new Balance(new BN(1)),
+      (await getPrivKeyData(bob)).address,
+      challenge,
+      mockEpoch,
+      mockChannelIteration, 1)
     assert(ticket, 'ticket created')
-      */
+    
+
+    // Alice sends to Bob
+    let unacknowledged = ticket.toUnacknowledged(secretA)
+    
+    
   })
 
   /*
