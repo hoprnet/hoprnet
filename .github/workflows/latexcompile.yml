@@ -2,7 +2,9 @@ name: Build LaTeX document
 on: 
   push:
     paths:
-      'docs/whitepaper/**/*.tex'
+    - 'docs/whitepaper/**/*.tex'
+    paths-ignore:
+    - '**/yarn.lock'
 
 jobs:
   build_latex:
