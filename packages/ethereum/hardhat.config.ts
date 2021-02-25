@@ -45,7 +45,14 @@ const hardhatConfig: HardhatUserConfig = {
     ...publicNetworks
   },
   solidity: {
-    version: '0.6.6',
+    compilers: [
+      {
+        version: '0.6.6'
+      },
+      {
+        version: '0.4.24'
+      }
+    ],
     settings: {
       optimizer: {
         enabled: true,
