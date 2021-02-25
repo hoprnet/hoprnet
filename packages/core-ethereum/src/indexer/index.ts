@@ -247,15 +247,12 @@ class Indexer extends EventEmitter implements IIndexer {
 
       const lastSnapshotComparison = snapshotComparator(event, lastSnapshot)
 
-      // check if this is a duplicate, this is ok
-      if (lastSnapshotComparison === 0) {
-        // log(chalk.gray('Found event which is a duplicate of the last confirmed event'))
+      // check if this is a duplicate or older than last snapshot
+      // ideally we would have detected if this snapshot was indeed processed
+      // at the moment we don't keep all events stored as we intend to keep
+      // this indexer very simple
+      if (lastSnapshotComparison === 0 || lastSnapshotComparison < 0) {
         continue
-      }
-      // check if event found is older, this is not ok
-      else if (lastSnapshotComparison < 0) {
-        log(chalk.red('Found event which is older than last confirmed event!'))
-        throw new Error('Found event which is older than last confirmed event!')
       }
 
       if (event.name === 'FundedChannel') {
