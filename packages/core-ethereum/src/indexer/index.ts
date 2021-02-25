@@ -42,7 +42,7 @@ class Indexer extends EventEmitter implements IIndexer {
   public status: 'started' | 'stopped' = 'stopped'
   public latestBlock: number = 0 // latest known on-chain block number
   private subscriptions: {
-    [K in 'NewBlocks' | 'NewLogs']?: Subscription<any>
+    [K in 'newBlocks' | 'newHoprChannelsLogs']?: Subscription<any>
   } = {}
   private unconfirmedEvents = new Heap<Event<any>>(snapshotComparator)
 
@@ -60,7 +60,7 @@ class Indexer extends EventEmitter implements IIndexer {
 
     const { web3, hoprChannels } = this.connector
 
-    // wipe indexer, for testing, will be removed
+    // wipe indexer, do not use in production
     // await this.wipe()
 
     const [latestSavedBlock, latestOnChainBlock] = await Promise.all([
@@ -96,7 +96,7 @@ class Indexer extends EventEmitter implements IIndexer {
 
     // subscribe to events
     // @TODO: handle errors
-    this.subscriptions['NewBlocks'] = web3.eth
+    this.subscriptions.newBlocks = web3.eth
       .subscribe('newBlockHeaders')
       .on('error', console.error)
       .on('data', (block) => {
@@ -104,7 +104,7 @@ class Indexer extends EventEmitter implements IIndexer {
         this.onNewBlock(block)
       })
 
-    this.subscriptions['NewLogs'] = web3.eth
+    this.subscriptions.newHoprChannelsLogs = web3.eth
       .subscribe('logs', {
         address: hoprChannels.options.address,
         fromBlock
