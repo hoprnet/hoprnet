@@ -1,5 +1,5 @@
-import type { Subscription } from 'web3-core-subscriptions'
 import type { Log } from 'web3-core'
+import type { Subscription } from 'web3-core-subscriptions'
 import type PeerId from 'peer-id'
 import type { Indexer as IIndexer, RoutingChannel, ChannelUpdate } from '@hoprnet/hopr-core-connector-interface'
 import type HoprEthereum from '..'
@@ -95,10 +95,12 @@ class Indexer extends EventEmitter implements IIndexer {
     log('Subscribing to events from block %d', fromBlock)
 
     // subscribe to events
-    // @TODO: handle errors
     this.subscriptions.newBlocks = web3.eth
       .subscribe('newBlockHeaders')
-      .on('error', console.error)
+      .on('error', (error) => {
+        console.log(error)
+        log(chalk.red(`web3 error: ${error.message}`))
+      })
       .on('data', (block) => {
         log('New block %d', block.number)
         this.onNewBlock(block)
@@ -109,7 +111,10 @@ class Indexer extends EventEmitter implements IIndexer {
         address: hoprChannels.options.address,
         fromBlock
       })
-      .on('error', console.error)
+      .on('error', (error) => {
+        console.log(error)
+        log(chalk.red(`web3 error: ${error.message}`))
+      })
       .on('changed', (onChainLog) => this.onChangedLogs([onChainLog]))
       .on('data', (onChainLog) => this.onNewLogs([onChainLog]))
 
