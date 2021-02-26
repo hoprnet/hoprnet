@@ -9,7 +9,7 @@ import { durations, stringToU8a, u8aEquals, u8aToHex, isExpired } from '@hoprnet
 import NonceTracker from './nonce-tracker'
 import TransactionManager from './transaction-manager'
 import { AccountId, AcknowledgedTicket, Balance, Hash, NativeBalance, TicketEpoch } from './types'
-import { isWinningTicket, pubKeyToAccountId } from './utils'
+import { isWinningTicket, pubKeyToAccountId, isGanache } from './utils'
 import { HASHED_SECRET_WIDTH } from './hashedSecret'
 import { WEB3_CACHE_TTL } from './constants'
 import * as ethereum from './ethereum'
@@ -58,9 +58,9 @@ class Account {
 
     this._nonceTracker = new NonceTracker({
       getLatestBlockNumber: async () => {
-        // tests fail if we don't query the block number
-        // when running on ganache
-        return !coreConnector.network || coreConnector.network === 'localhost'
+        // when running our unit/intergration tests using ganache,
+        // the indexer doesn't have enough time to pick up the events and reduce the data
+        return isGanache(coreConnector.network)
           ? coreConnector.web3.eth.getBlockNumber()
           : coreConnector.indexer.latestBlock
       },
