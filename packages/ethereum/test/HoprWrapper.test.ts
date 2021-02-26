@@ -51,6 +51,7 @@ describe('HoprWrapper', function () {
 
     expect((await xHOPR.balanceOf(userA)).toString()).to.equal('90')
     expect((await xHOPR.balanceOf(wrapper.address)).toString()).to.equal('10')
+    expect((await wrapper.xHoprAmount()).toString()).to.equal('10')
     expect((await wxHOPR.balanceOf(userA)).toString()).to.equal('10')
     expect((await wxHOPR.totalSupply()).toString()).to.equal('10')
   })
@@ -67,7 +68,31 @@ describe('HoprWrapper', function () {
 
     expect((await xHOPR.balanceOf(userA)).toString()).to.equal('100')
     expect((await xHOPR.balanceOf(wrapper.address)).toString()).to.equal('0')
+    expect((await wrapper.xHoprAmount()).toString()).to.equal('0')
     expect((await wxHOPR.balanceOf(userA)).toString()).to.equal('0')
+    expect((await wxHOPR.totalSupply()).toString()).to.equal('0')
+  })
+
+  it('should not wrap 5 xHOPR when using "transfer"', async function () {
+    const response = await xHOPR.transfer(wrapper.address, 5, {
+      from: userA
+    })
+
+    await expectEvent.notEmitted.inTransaction(response.tx, wrapper, 'Wrapped')
+
+    expect((await xHOPR.balanceOf(userA)).toString()).to.equal('95')
+    expect((await xHOPR.balanceOf(wrapper.address)).toString()).to.equal('5')
+    expect((await wrapper.xHoprAmount()).toString()).to.equal('0')
+    expect((await wxHOPR.balanceOf(userA)).toString()).to.equal('0')
+    expect((await wxHOPR.totalSupply()).toString()).to.equal('0')
+  })
+
+  it('should recover 5 xHOPR', async function () {
+    await wrapper.recoverTokens()
+
+    expect((await xHOPR.balanceOf(deployer)).toString()).to.equal('5')
+    expect((await xHOPR.balanceOf(wrapper.address)).toString()).to.equal('0')
+    expect((await wrapper.xHoprAmount()).toString()).to.equal('0')
     expect((await wxHOPR.totalSupply()).toString()).to.equal('0')
   })
 
