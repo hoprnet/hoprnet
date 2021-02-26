@@ -6,7 +6,7 @@ import transformSchedules from './input-allocations'
 import transformAllocations from './input-schedules'
 
 const readFile = promisify(_readFile)
-const DATA_DIR = join(__dirname, 'data')
+const DATA_DIR = join(__dirname, 'output')
 
 export const getHoprDistributorParams = async (network: string): Promise<HoprDistributorParams> => {
   return JSON.parse(await readFile(join(DATA_DIR, `${network}-params.json`), { encoding: 'utf-8' }))

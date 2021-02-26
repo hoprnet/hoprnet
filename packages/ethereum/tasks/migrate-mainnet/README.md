@@ -8,8 +8,8 @@ deployer = private key within `.env`
 
 1. deploy `HoprToken` using `deployer`
 2. deploy `HoprDistributor` using `deployer`
-3. addSchedule using `HoprDistributor` called `testnet`
-4. addAllocations using `HoprDistributor` called `testnet`
+3. addSchedule using `HoprDistributor`
+4. addAllocations using `HoprDistributor`
 5. grantMinterRole using `HoprToken` to `HoprDistributor`
 6. grantAdminRole using `HoprToken` to `multisig`
 7. renounceAdmin of `deployer` using `HoprToken`
@@ -46,8 +46,8 @@ in the [data folder](./data).
 
 ## Setting up HoprDistributor
 
-1. `npx hardhat migrate-mainnet --task addSchedule --schedule testnet --network mainnet`
-2. `npx hardhat migrate-mainnet --task addAllocations --allocation testnet --network mainnet`
+1. `npx hardhat migrate-mainnet --task addSchedule --schedule bounties --network mainnet`
+2. `npx hardhat migrate-mainnet --task addAllocations --allocation bounties --network mainnet`
 3. `npx hardhat migrate-mainnet --task grantMinter --network mainnet`
 
 ## Transfering administrative roles to the multisig

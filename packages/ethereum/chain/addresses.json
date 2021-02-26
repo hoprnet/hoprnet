@@ -7,7 +7,7 @@
   "ropsten": {
     "HoprToken": "0xAE9083fC7FAa0e35F8c5b94A33B86eD6F587Ea51",
     "HoprChannels": "0x225468f44A9E8cfe7DaA49d504475E21c4bEfD13",
-    "HoprDistributor": "0xfb7A68692b27839ee82c711cf79Bd19BE698B011"
+    "HoprDistributor": "0xa1e1E79eA9F39a7Cc82894629C49D6FDF70F0061"
   },
   "goerli": {
     "HoprToken": "0x566a5c774bb8ABE1A88B4f187e24d4cD55C207A5",

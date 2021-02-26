@@ -32,7 +32,7 @@ export default async () => {
     rawAllocations.amounts = rawAllocations.amounts.concat(allocation.amounts)
   }
 
-  const allocations = transformAllocations('testnet', rawAllocations)
+  const allocations = transformAllocations('bounties', rawAllocations)
 
   await writeFile(join(OUTPUT_DIR, `${allocations.name}-allocations.json`), JSON.stringify(allocations, null, 2))
 }
