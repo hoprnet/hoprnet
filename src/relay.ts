@@ -11,7 +11,6 @@ import { WebRTCUpgrader } from './webrtc'
 
 import handshake from 'it-handshake'
 
-import Multiaddr from 'multiaddr'
 import PeerId from 'peer-id'
 
 import {
@@ -35,7 +34,6 @@ import { WebRTCConnection } from './webRTCConnection'
 
 import type { DialOptions, Handler, Stream } from 'libp2p'
 import { AbortError } from 'abortable-iterator'
-import { extractPeerIdFromMultiaddr } from './utils'
 
 class Relay {
   private _streams: Map<string, { [index: string]: RelayContext }>
@@ -50,51 +48,7 @@ class Relay {
   }
 
   async establishRelayedConnection(
-    ma: Multiaddr,
-    relays: Multiaddr[],
-    onReconnect: (newStream: RelayConnection, counterparty: PeerId) => Promise<void>,
-    options?: DialOptions
-  ): Promise<RelayConnection | undefined> {
-    const destination = PeerId.createFromCID(ma.getPeerId())
-
-    const invalidPeerIds = [ma.getPeerId(), this.libp2p.peerId.toB58String()]
-
-    for (const potentialRelay of relays) {
-      if (options?.signal?.aborted) {
-        throw new AbortError()
-      }
-
-      if (invalidPeerIds.includes(potentialRelay.getPeerId())) {
-        log(`Skipping ${potentialRelay.getPeerId()} because we cannot use destination as relay node.`)
-        continue
-      }
-
-      let relayConnection = await this._tryPotentialRelay(
-        extractPeerIdFromMultiaddr(potentialRelay),
-        destination,
-        onReconnect,
-        options
-      )
-
-      if (relayConnection != undefined) {
-        return relayConnection as RelayConnection
-      }
-    }
-
-    log(
-      `Unable to establish a connection to any known relay node. Tried "${yellow(
-        relays
-          .filter((ma) => invalidPeerIds.includes(ma.getPeerId()))
-          .map((potentialRelay: Multiaddr) => potentialRelay.toString())
-          .join(`, `)
-      )}". Excluded relays: "${invalidPeerIds.join(`, `)}"`
-    )
-
-    return undefined
-  }
-
-  private async _tryPotentialRelay(
-    potentialRelay: PeerId,
+    relay: PeerId,
     destination: PeerId,
     onReconnect: (newStream: RelayConnection, counterparty: PeerId) => Promise<void>,
     options?: DialOptions
@@ -104,14 +58,14 @@ class Relay {
         ? { signal: options.signal }
         : { timeout: RELAY_CIRCUIT_TIMEOUT }
 
-    const relayConnection = await dialHelper(this.libp2p, potentialRelay, [RELAY], opts)
+    const relayConnection = await dialHelper(this.libp2p, relay, [RELAY], opts)
 
     if (relayConnection == undefined) {
-      error(`Could not establish relayed conntection over ${potentialRelay} to ${destination.toB58String()}`)
+      error(`Could not establish relayed conntection over ${relay.toB58String()} to ${destination.toB58String()}`)
       return
     }
 
-    const stream = await this.performHandshake(relayConnection.stream, potentialRelay, destination)
+    const stream = await this.performHandshake(relayConnection.stream, relay, destination)
 
     if (stream == null) {
       error(`Handshake led to empty stream. Giving up.`)

@@ -158,7 +158,7 @@ class HoprConnect implements Transport {
       throw new AbortError()
     }
 
-    const maTuples = ma.stringTuples()
+    const maTuples = ma.tuples()
 
     if (this._peerId.equals(extractPeerIdFromMultiaddr(ma))) {
       throw new AbortError(`Cannot dial ourself`)
@@ -173,16 +173,10 @@ class HoprConnect implements Transport {
 
         return await this.dialDirectly(ma, options)
       case CODE_P2P:
-        if (this.relays == undefined || this.relays.length == 0) {
-          throw Error(
-            `Could not connect to ${chalk.yellow(
-              ma.toString()
-            )}: Direct connection failed and there are no relays known.`
-          )
-        }
+        const relay = PeerId.createFromBytes(((maTuples[0][1] as unknown) as Uint8Array).slice(1))
+        const destination = PeerId.createFromBytes(((maTuples[2][1] as unknown) as Uint8Array).slice(1))
 
-        verbose('dialing with relay ', ma.toString())
-        return await this.dialWithRelay(ma, this.relays, options)
+        return await this.dialWithRelay(relay, destination, options)
       default:
         throw new AbortError(`Protocol not supported`)
     }
@@ -231,8 +225,8 @@ class HoprConnect implements Transport {
    * @param relays potential relays that we can use
    * @param options optional dial options
    */
-  private async dialWithRelay(ma: Multiaddr, relays: Multiaddr[], options?: DialOptions): Promise<Connection> {
-    let conn = await this._relay.establishRelayedConnection(ma, relays, this.onReconnect.bind(this), options)
+  private async dialWithRelay(relay: PeerId, destination: PeerId, options?: DialOptions): Promise<Connection> {
+    let conn = await this._relay.establishRelayedConnection(relay, destination, this.onReconnect.bind(this), options)
 
     if (conn == undefined) {
       throw Error(`Could not establish relayed connection.`)

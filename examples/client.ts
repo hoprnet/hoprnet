@@ -92,7 +92,12 @@ async function main() {
   switch (process.argv[2]) {
     case '0':
       try {
-        conn = await node.dialProtocol(Multiaddr(`/p2p/${await PeerId.createFromPrivKey(Bob)}`), TEST_PROTOCOL)
+        conn = await node.dialProtocol(
+          Multiaddr(
+            `/p2p/${await PeerId.createFromPrivKey(Charly)}/p2p-circuit/p2p/${await PeerId.createFromPrivKey(Bob)}`
+          ),
+          TEST_PROTOCOL
+        )
       } catch (err) {
         console.log(err)
         return
