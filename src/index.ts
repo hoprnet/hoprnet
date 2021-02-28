@@ -1,4 +1,3 @@
-import mafmt from 'mafmt'
 import debug from 'debug'
 import Listener from './listener'
 import { CODE_IP4, CODE_IP6, CODE_P2P, DELIVERY, USE_WEBRTC } from './constants'
@@ -16,6 +15,7 @@ import { WebRTCConnection } from './webRTCConnection'
 import type { RelayConnection } from './relayConnection'
 import { Discovery } from './discovery'
 import { extractPeerIdFromMultiaddr } from './utils'
+import { Filter } from './filter'
 
 const log = debug('hopr-connect')
 const error = debug('hopr-connect:error')
@@ -35,7 +35,6 @@ class HoprConnect implements Transport {
   private __noWebRTCUpgrade?: boolean
   private _upgrader: Upgrader
   private _peerId: PeerId
-  private _multiaddrs: Multiaddr[]
   private relays?: Multiaddr[]
   private stunServers?: Multiaddr[]
   private _relay: Relay
@@ -43,6 +42,8 @@ class HoprConnect implements Transport {
   private _dialer: Dialer
   private _webRTCUpgrader?: WebRTCUpgrader
   private _interface?: string
+  private _addressFilter: Filter
+
   private connHandler?: ConnHandler
 
   constructor(opts: {
@@ -103,7 +104,9 @@ class HoprConnect implements Transport {
     }
 
     this._peerId = opts.libp2p.peerId
-    this._multiaddrs = opts.libp2p.multiaddrs
+
+    this._addressFilter = new Filter(this._peerId)
+
     this._upgrader = opts.upgrader
     this._connectionManager = opts.libp2p.connectionManager
     this._dialer = opts.libp2p.dialer
@@ -198,21 +201,27 @@ class HoprConnect implements Transport {
     } else {
       this.connHandler = handler
     }
-    return new Listener(this.connHandler, this._upgrader, this.stunServers, this._peerId, this._interface)
+    return new Listener(
+      this.connHandler,
+      this._upgrader,
+      this.stunServers,
+      this.stunServers, // use STUN servers as relays
+      this._peerId,
+      this._interface
+    )
   }
 
   /**
    * Takes a list of Multiaddrs and returns those addrs that we can use.
    * @example
    * Multiaddr(`/ip4/127.0.0.1/tcp/0/p2p/16Uiu2HAmCPgzWWQWNAn2E3UXx1G3CMzxbPfLr1SFzKqnFjDcbdwg`) // working
-   * Multiaddr(`/p2p/16Uiu2HAmCPgzWWQWNAn2E3UXx1G3CMzxbPfLr1SFzKqnFjDcbdwg`) // working
+   * Multiaddr(`/p2p/16Uiu2HAmCPgzWWQWNAn2E3UXx1G3CMzxbPfLr1SFzKqnFjDcbdwg/p2p-circuit/p2p/16Uiu2HAkyvdVZtG8btak5SLrxP31npfJo6maopj8xwx5XQhKfspb`) // working
    * @param multiaddrs
    * @returns applicable Multiaddrs
    */
   filter(multiaddrs: Multiaddr[]): Multiaddr[] {
     return (Array.isArray(multiaddrs) ? multiaddrs : [multiaddrs]).filter(
-      (ma: Multiaddr) =>
-        (mafmt.TCP.matches(ma.decapsulateCode(CODE_P2P)) && mafmt.P2P.matches(ma)) || mafmt.P2P.matches(ma)
+      this._addressFilter.filter.bind(this._addressFilter)
     )
   }
 
@@ -333,16 +342,6 @@ class HoprConnect implements Transport {
     if (!['ip4', 'ip6', 'dns4', 'dns6'].includes(protoNames[0])) {
       // We cannot call other protocols directly
       return false
-    }
-
-    let cOpts = ma.toOptions()
-
-    for (const mAddr of this._multiaddrs) {
-      const ownOpts = mAddr.toOptions()
-
-      if (ownOpts.host === cOpts.host && ownOpts.port == cOpts.port) {
-        return false
-      }
     }
 
     return true

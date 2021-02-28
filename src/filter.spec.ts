@@ -16,7 +16,7 @@ describe('test addr filtering', function () {
     filter = new Filter(firstPeer)
   })
 
-  it.skip('should accept valid circuit addresses', function () {
+  it('should accept valid circuit addresses', function () {
     assert(
       filter.filter(Multiaddr(`/p2p/${firstPeer.toB58String()}`)) == false,
       'Should not accept relay addrs without recipient'
@@ -38,7 +38,7 @@ describe('test addr filtering', function () {
     )
   })
 
-  it.skip('should accept valid ip addresses', function () {
+  it('should accept valid ip addresses', function () {
     assert(filter.filter(Multiaddr(`/ip4/1.1.1.1/udp/123`)) == false, 'Should not accept udp addresses')
 
     assert(filter.filter(Multiaddr(`/ip6/::1/udp/123`)) == false, 'Should not accept udp addresses')
@@ -61,7 +61,7 @@ describe('test addr filtering', function () {
     assert(filter.filter(Multiaddr(`/ip6/::1/tcp/0`)) == false, 'Should not accept invalid ports')
   })
 
-  it.skip('should understand to which address families the node is listening', function () {
+  it('should understand to which address families the node is listening', function () {
     filter.setAddrs([], [Multiaddr(`/ip4/1.1.1.1/tcp/1`)])
 
     assert(filter.filter(Multiaddr(`/ip4/1.1.1.1/tcp/1`)) == true, 'Should accept IPv4 when listening to IPv4')
@@ -81,7 +81,7 @@ describe('test addr filtering', function () {
     assert(filter.filter(Multiaddr(`/ip6/::1/tcp/1`)) == true, 'Should accept IPv6 when listening to IPv6')
   })
 
-  it.skip('should detect attempts dial ourself', function () {
+  it('should detect attempts dial ourself', function () {
     filter._setLocalAddressesForTesting([
       {
         subnet: Uint8Array.from([255, 240, 0, 0]),
