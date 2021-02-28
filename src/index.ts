@@ -14,7 +14,6 @@ import Relay from './relay'
 import { WebRTCConnection } from './webRTCConnection'
 import type { RelayConnection } from './relayConnection'
 import { Discovery } from './discovery'
-import { extractPeerIdFromMultiaddr } from './utils'
 import { Filter } from './filter'
 
 const log = debug('hopr-connect')
@@ -160,7 +159,9 @@ class HoprConnect implements Transport {
 
     const maTuples = ma.tuples()
 
-    if (this._peerId.equals(extractPeerIdFromMultiaddr(ma))) {
+    const destination = PeerId.createFromBytes(((maTuples[2][1] as unknown) as Uint8Array).slice(1))
+
+    if (destination.equals(this._peerId)) {
       throw new AbortError(`Cannot dial ourself`)
     }
 
@@ -174,7 +175,6 @@ class HoprConnect implements Transport {
         return await this.dialDirectly(ma, options)
       case CODE_P2P:
         const relay = PeerId.createFromBytes(((maTuples[0][1] as unknown) as Uint8Array).slice(1))
-        const destination = PeerId.createFromBytes(((maTuples[2][1] as unknown) as Uint8Array).slice(1))
 
         return await this.dialWithRelay(relay, destination, options)
       default:

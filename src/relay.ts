@@ -25,7 +25,7 @@ import {
   FAIL_INVALID_PUBLIC_KEY
 } from './constants'
 
-import { dialHelper, u8aCompare, u8aEquals, pubKeyToPeerId } from '@hoprnet/hopr-utils'
+import { u8aCompare, u8aEquals, pubKeyToPeerId } from '@hoprnet/hopr-utils'
 
 import { RelayContext } from './relayContext'
 
@@ -34,6 +34,7 @@ import { WebRTCConnection } from './webRTCConnection'
 
 import type { DialOptions, Handler, Stream } from 'libp2p'
 import { AbortError } from 'abortable-iterator'
+import { dialHelper } from './utils'
 
 class Relay {
   private _streams: Map<string, { [index: string]: RelayContext }>
@@ -58,7 +59,7 @@ class Relay {
         ? { signal: options.signal }
         : { timeout: RELAY_CIRCUIT_TIMEOUT }
 
-    const relayConnection = await dialHelper(this.libp2p, relay, [RELAY], opts)
+    const relayConnection = await dialHelper(this.libp2p, relay, RELAY, opts)
 
     if (relayConnection == undefined) {
       error(`Could not establish relayed conntection over ${relay.toB58String()} to ${destination.toB58String()}`)
@@ -342,7 +343,7 @@ class Relay {
   }
 
   private async establishForwarding(initiator: PeerId, counterparty: PeerId): Promise<Stream | undefined> {
-    let newConn = await dialHelper(this.libp2p, counterparty, [DELIVERY], { timeout: RELAY_CIRCUIT_TIMEOUT })
+    let newConn = await this.libp2p.dialProtocol(counterparty, DELIVERY/*, { timeout: RELAY_CIRCUIT_TIMEOUT }*/)
 
     if (newConn == undefined) {
       error(`Could not establish forwarding connection to ${blue(counterparty.toB58String())}`)
