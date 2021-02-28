@@ -16,6 +16,7 @@ export const CODE_TCP = Multiaddr.protocols.names['tcp'].code
 // Time to wait for a connection to close gracefully before destroying it manually
 export const CLOSE_TIMEOUT = 6000 // ms
 export const RELAY_CIRCUIT_TIMEOUT = 6000 // ms
+export const RELAY_CONTACT_TIMEOUT = 3000 // ms
 
 // Either set on ALL nodes to true or NONE
 // @dev mixed operation is neither tested nor implemented
