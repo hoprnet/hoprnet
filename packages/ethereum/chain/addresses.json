@@ -15,13 +15,13 @@
     "HoprDistributor": "0xf4Ff7E5bf2cC7eF89196c8086982F6f5Ec502685"
   },
   "kovan": {
-    "HoprToken": "0xDD78859E6714D045a31Caa0075C1523f6E08fFe1",
+    "HoprToken": "0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1",
     "HoprChannels": "0x6eCe0EC9E5F408e664ACc397A8Ac7241841c6658",
     "HoprFaucet": "0x034869aaF67F09296303D2d42dceEc53F4F04533"
   },
   "xdai": {
     "HoprToken": "0x12481c3Ed97b32D94E71C2039DBC44432ADD39a0",
-    "HoprChannels": "0x75E35d2Db3193670C8a55308180C2c3aD63A6ab5",
+    "HoprChannels": "0x11FA44A5d1C30A4B7B5B5dC5394BD4bF77fc733D",
     "HoprMinter": "0x522de7D16aF21A255D2bC6EB24e6F9d93bD307a1"
   },
   "matic": {
