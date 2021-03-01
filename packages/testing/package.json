@@ -17,7 +17,7 @@
   },
   "scripts": {
     "clean": "rimraf ./lib",
-    "build": "yarn clean && tsc -p . --noEmit false",
+    "build": "yarn clean && tsc -p .",
     "prepublishOnly": "yarn build"
   },
   "dependencies": {

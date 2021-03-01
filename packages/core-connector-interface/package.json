@@ -7,10 +7,10 @@
   "license": "GPL-3.0-only",
   "files": [
     "src/",
-    "!*.spec.ts",
-    "!*.spec.d.ts",
-    "!*.spec.js",
-    "!*.spec.js.map"
+    "!**/*.spec.ts",
+    "!**/*.spec.d.ts",
+    "!**/*.spec.js",
+    "!**/*.spec.js.map"
   ],
   "engines": {
     "node": "14",

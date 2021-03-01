@@ -1,14 +1,7 @@
 {
+  "extends": "../../tsconfig.json",
   "compilerOptions": {
-    "esModuleInterop": true,
-    "outDir": "./lib",
-    "lib": ["es2020", "dom"],
-    "module": "commonjs",
-    "target": "es2019",
-    "declaration": true,
-    "sourceMap": true,
-    "skipLibCheck": true,
-    "noEmit": true
+    "outDir": "./lib"
   },
   "include": ["src/**/*.ts"]
 }
