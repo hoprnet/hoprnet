@@ -31,11 +31,11 @@
     "!**/*.spec.js.map"
   ],
   "dependencies": {
-    "@hoprnet/hopr-connect": "0.2.12",
+    "@hoprnet/hopr-connect": "0.2.21",
     "@hoprnet/hopr-core-ethereum": "1.69.0",
     "@hoprnet/hopr-utils": "1.69.0",
     "abort-controller": "^3.0.0",
-    "bn.js": "5.1.2",
+    "bn.js": "5.2.0",
     "chalk": "~4.1.0",
     "debug": "^4.3.1",
     "futoin-hkdf": "~1.3.2",
@@ -45,7 +45,7 @@
     "levelup": "~4.4.0",
     "libp2p": "0.30",
     "libp2p-crypto": "0.19.0",
-    "libp2p-kad-dht": "0.20.6",
+    "libp2p-kad-dht": "0.21.0",
     "libp2p-mplex": "0.10.2",
     "libp2p-noise": "^2.0.4",
     "multiaddr": "8.1.2",

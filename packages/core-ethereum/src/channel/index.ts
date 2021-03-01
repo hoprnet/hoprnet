@@ -23,7 +23,8 @@ import {
   isPartyA,
   getParties,
   Log,
-  stateCounterToStatus
+  stateCounterToStatus,
+  isGanache
 } from '../utils'
 import { ERRORS } from '../constants'
 import type HoprEthereum from '..'
@@ -109,7 +110,7 @@ class ChannelFactory {
     try {
       const { account } = this.coreConnector
 
-      const balance = await account.balance
+      const balance = await account.getBalance()
       if (balance.isZero()) {
         throw Error(ERRORS.OOF_HOPR)
       }
@@ -401,7 +402,6 @@ class ChannelFactory {
   }
 
   async getOnChainState(counterparty: Public): Promise<ChannelEntry> {
-    const inGanache = !this.coreConnector.network || this.coreConnector.network === 'localhost'
     const self = new Public(this.coreConnector.account.keys.onChain.pubKey)
     const selfAccountId = await self.toAccountId()
     const counterpartyAccountId = await counterparty.toAccountId()
@@ -412,7 +412,7 @@ class ChannelFactory {
     // 1. all our unit tests are actually intergration tests, nothing is mocked
     // 2. our actual intergration tests do not have any block mining time
     // this will be tackled in the upcoming refactor
-    if (inGanache) {
+    if (isGanache(this.coreConnector.network)) {
       const channelId = await getId(selfAccountId, counterpartyAccountId)
       const response = await this.coreConnector.hoprChannels.methods.channels(channelId.toHex()).call()
 
