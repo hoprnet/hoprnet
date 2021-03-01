@@ -50,7 +50,6 @@ import Debug from 'debug'
 import { Address } from 'libp2p/src/peer-store'
 
 const log = Debug(`hopr-core`)
-const logError = Debug(`hopr-core:error`)
 const verbose = Debug('hopr-core:verbose')
 
 interface NetOptions {
@@ -273,46 +272,6 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     return await new Hopr<CoreConnector>(options, libp2p, db, connector).start()
   }
 
-  /**
-   * Parses the bootstrap servers given in options` and tries to connect to each of them.
-   *
-   * @throws an error if none of the bootstrapservers is online
-   */
-  private async connectToBootstrapServers(): Promise<void> {
-    const potentialBootstrapServers = this.bootstrapServers.filter(
-      (addr) => addr.getPeerId() != this.getId().toB58String()
-    )
-    verbose('bootstrap', potentialBootstrapServers)
-
-    if (potentialBootstrapServers.length == 0) {
-      if (this._debug != true && !this.isBootstrapNode) {
-        throw Error(
-          `Can't start HOPR without any known bootstrap server. You might want to start this node as a bootstrap server.`
-        )
-      }
-
-      return
-    }
-
-    const results = await Promise.all(
-      potentialBootstrapServers.map((addr: Multiaddr) =>
-        this._libp2p.dial(addr).then(
-          () => true,
-          (err) => {
-            logError(err)
-            return false
-          }
-        )
-      )
-    )
-    verbose('bootstrap status', results)
-
-    if (!results.some((online: boolean) => online)) {
-      console.error('Tried', potentialBootstrapServers.map((x) => x.toString()).join(','))
-      throw Error('Unable to connect to any known bootstrap server.')
-    }
-  }
-
   private async tickChannelStrategy(newChannels: RoutingChannel[]) {
     verbose('new payment channels, auto opening tick', this.running)
     if (!this.running) {
@@ -382,16 +341,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
    * @param options
    */
   public async start(): Promise<Hopr<Chain>> {
-    await Promise.all([
-      this._libp2p.start().then(() =>
-        Promise.all([
-          // prettier-ignore
-          this.connectToBootstrapServers(),
-          this.heartbeat.start()
-        ])
-      ),
-      this.paymentChannels.start()
-    ])
+    await Promise.all([this._libp2p.start().then(() => this.heartbeat.start()), this.paymentChannels.start()])
 
     log(`Available under the following addresses:`)
 
