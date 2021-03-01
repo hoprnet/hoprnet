@@ -62,8 +62,6 @@ export async function dialHelper(
   let struct: Handler | undefined
   try {
     struct = await libp2p.dialProtocol(destination, protocol, { signal })
-    verbose(`Direct dial successful`, struct)
-    console.trace()
   } catch (_err) {
     err = _err
   }

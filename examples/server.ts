@@ -17,7 +17,12 @@ async function main() {
     modules: {
       transport: [HoprConnect],
       streamMuxer: [MPLEX],
-      connEncryption: [NOISE]
+      connEncryption: [NOISE],
+    },
+    config: {
+      peerDiscovery: {
+        autoDial: false
+      }
     },
     dialer: {
       // Temporary fix
