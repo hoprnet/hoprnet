@@ -16,15 +16,15 @@ const DEFAULT_DHT_QUERY_TIMEOUT = 10000
  * to establish a connection.
  * Contains a baseline protection against dailing same addresses twice.
  * @param libp2p a libp2p instance
- * @param counterparty PeerId of the destination
+ * @param destination PeerId of the destination
  * @param protocols protocols to use
- * @param options
+ * @param opts
  */
 export async function dialHelper(
   libp2p: any,
-  counterparty: PeerId,
-  protocols: string[],
-  options:
+  destination: PeerId,
+  protocol: string,
+  opts:
     | {
         timeout?: number
         signal: AbortSignal
@@ -34,115 +34,77 @@ export async function dialHelper(
         signal?: AbortSignal
       }
 ): Promise<any | undefined> {
-  // Prevent us from dialing ourself
-  if (counterparty.equals(libp2p.peerId)) {
-    console.trace(`Preventing self dial.`)
-    return
-  }
-
   let signal: AbortSignal
-
   let timeout: NodeJS.Timeout | undefined
 
-  if (options.signal == undefined) {
+  if (opts.signal == undefined) {
     const abort = new AbortController()
     signal = abort.signal
-
     timeout = setTimeout(() => {
       abort.abort()
-      verbose(`heartbeat timeout while querying ${counterparty.toB58String()}`)
-    }, options.timeout)
+      verbose(`timeout while querying ${destination.toB58String()}`)
+    }, opts.timeout)
   } else {
-    signal = options.signal
+    signal = opts.signal
   }
 
+  let err: any
   let struct: any
 
-  let addresses = (
-    libp2p.peerStore.get(counterparty)?.addresses ?? []
-  ).map((addr: { isCertified: boolean; multiaddr: Multiaddr }) => addr.multiaddr.toString())
+  let addresses = (libp2p.peerStore.get(destination)?.addresses ?? []).map((addr: any) => addr.multiaddr.toString())
 
   // Try to use known addresses
   if (addresses.length > 0) {
     try {
-      struct = await libp2p.dialProtocol(counterparty, protocols[0], { signal })
-    } catch (err) {
-      if (err.type === 'aborted') {
-        return
-      }
-      error(`Error while trying to connect with known addresses. ${err.message}`)
+      struct = await libp2p.dialProtocol(destination, protocol, { signal })
+    } catch (_err) {
+      err = _err
     }
   }
 
   if (struct != null) {
-    clearTimeout(timeout)
+    clearTimeout(timeout as NodeJS.Timeout)
     return struct
   }
 
-  if (signal.aborted) {
-    return
+  if (signal.aborted || ((err != null || struct == null) && libp2p._dht == undefined)) {
+    error(`Could not dial ${destination.toB58String()} directly and libp2p was started without a DHT.`)
+    return undefined
   }
 
-  // Only use relayed connection / WebRTC upgrade if we haven't tried this before
-  if (!addresses.includes(`/p2p/${counterparty.toB58String()}`)) {
-    // Try to bypass any existing NATs
-    try {
-      struct = await libp2p.dialProtocol(Multiaddr(`/p2p/${counterparty.toB58String()}`), protocols[0], { signal })
-    } catch (err) {
-      if (err.type === 'aborted') {
-        return
-      }
-      error(`Error while trying to bypass NATs. ${err.message}`)
-    }
+  // Try to get some fresh addresses from the DHT
+  let dhtAddresses: Multiaddr[]
+
+  try {
+    // Let libp2p populate its internal peerStore with fresh addresses
+    dhtAddresses =
+      (await (libp2p._dht as any)?.findPeer(destination, { timeout: DEFAULT_DHT_QUERY_TIMEOUT })?.multiaddrs) ?? []
+  } catch (err) {
+    error(
+      `Querying the DHT as peer ${libp2p.peerId.toB58String()} for ${destination.toB58String()} failed. ${err.message}`
+    )
+    return undefined
+  }
+
+  const newAddresses = dhtAddresses.filter((addr) => addresses.includes(addr.toString()))
+
+  // Only start a dial attempt if we have received new addresses
+  if (signal.aborted || newAddresses.length > 0) {
+    return undefined
+  }
+
+  try {
+    struct = await libp2p.dialProtocol(destination, protocol, { signal })
+    verbose(`Dial after DHT request successful`, struct)
+  } catch (err) {
+    error(`Using new addresses after querying the DHT did not lead to a connection. Cannot connect. ${err.message}`)
+    return undefined
   }
 
   if (struct != null) {
-    clearTimeout(timeout)
+    clearTimeout(timeout as NodeJS.Timeout)
     return struct
   }
 
-  // Only try a DHT query if our libp2p instance comes with a DHT
-  if (libp2p._dht != undefined) {
-    if (signal.aborted) {
-      return
-    }
-
-    // Try to get some fresh addresses from the DHT
-    let dhtAddresses: Multiaddr[]
-    try {
-      // Let libp2p populate its internal peerStore with fresh addresses
-      dhtAddresses =
-        (await libp2p._dht.findPeer(counterparty, { timeout: DEFAULT_DHT_QUERY_TIMEOUT }))?.multiaddrs ?? []
-    } catch (err) {
-      error(
-        `Querying the DHT as peer ${libp2p.peerId.toB58String()} for ${counterparty.toB58String()} failed. ${
-          err.message
-        }`
-      )
-      return
-    }
-
-    if (signal.aborted) {
-      return
-    }
-
-    const newAddresses: Multiaddr[] = dhtAddresses.filter((addr) => addresses.includes(addr.toString()))
-
-    // Only start a dial attempt if we have received new addresses
-    if (newAddresses.length > 0) {
-      try {
-        struct = await libp2p.dialProtocol(counterparty, protocols[0], { signal })
-      } catch (err) {
-        error(`Using new addresses after querying the DHT did not lead to a connection. Cannot connect. ${err.message}`)
-        return
-      }
-    }
-
-    if (struct != null) {
-      clearTimeout(timeout)
-      return struct
-    }
-  }
-
-  return
+  return undefined
 }
