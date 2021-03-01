@@ -5,7 +5,7 @@ const MPLEX = require('libp2p-mplex')
 const KadDHT = require('libp2p-kad-dht')
 import { NOISE } from 'libp2p-noise'
 
-import HoprConnect from '@hoprnet/hopr-connect'
+const HoprConnect = require('@hoprnet/hopr-connect')
 
 import { Packet } from './messages/packet'
 import {
@@ -48,6 +48,7 @@ import { ChannelStrategy, PassiveStrategy, PromiscuousStrategy } from './channel
 
 import Debug from 'debug'
 import { Address } from 'libp2p/src/peer-store'
+
 const log = Debug(`hopr-core`)
 const logError = Debug(`hopr-core:error`)
 const verbose = Debug('hopr-core:verbose')
