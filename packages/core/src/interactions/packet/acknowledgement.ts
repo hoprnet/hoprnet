@@ -50,7 +50,7 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
   }
 
   async interact(counterparty: PeerId, acknowledgement: Acknowledgement<Chain>): Promise<void> {
-    const struct = await dialHelper(this.node._libp2p, counterparty, this.protocols, {
+    const struct = await dialHelper(this.node._libp2p, counterparty, this.protocols[0], {
       timeout: ACKNOWLEDGEMENT_TIMEOUT
     })
 
