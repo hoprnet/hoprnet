@@ -201,6 +201,10 @@ class Relay {
     shaker.rest()
 
     if (answer == null || !u8aEquals(answer, OK)) {
+      if (u8aEquals(answer, FAIL_COULD_NOT_REACH_COUNTERPARTY)) {
+        await this.libp2p.hangUp(destination)
+        return
+      }
       error(
         `Could not establish relayed connection to ${blue(
           destination.toB58String()
