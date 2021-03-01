@@ -24,6 +24,10 @@ interface DebugMessage {
   iteration: number
 }
 
+function createPeers(amount: number): Promise<PeerId[]> {
+  return Promise.all(Array.from({ length: amount }, (_) => PeerId.create({ keyType: 'secp256k1' })))
+}
+
 describe('test overwritable connection', function () {
   this.timeout(10000)
   let iteration = 0
@@ -126,9 +130,7 @@ describe('test overwritable connection', function () {
 
   it('establish a WebRTC connection', async function () {
     // Sample two parties
-    const [partyA, partyB] = await Promise.all(
-      Array.from({ length: 2 }).map(() => PeerId.create({ keyType: 'secp256k1' }))
-    )
+    const [partyA, relay, partyB] = await createPeers(3)
 
     const connectionA = Pair()
     const connectionB = Pair()
@@ -155,6 +157,7 @@ describe('test overwritable connection', function () {
           })()
         },
         self: partyA,
+        relay,
         counterparty: partyB,
         webRTC: {
           channel: PeerA,
@@ -188,6 +191,7 @@ describe('test overwritable connection', function () {
           })()
         },
         self: partyB,
+        relay,
         counterparty: partyB,
         webRTC: {
           channel: PeerB,
@@ -226,9 +230,7 @@ describe('test overwritable connection', function () {
 
   it.skip('should simulate a reconnect after a WebRTC upgrade', async function () {
     // Sample two parties
-    const [partyA, partyB] = await Promise.all(
-      Array.from({ length: 2 }).map(() => PeerId.create({ keyType: 'secp256k1' }))
-    )
+    const [partyA, relay, partyB] = await createPeers(3)
 
     const connectionA = [Pair(), Pair()]
     const connectionB = [Pair(), Pair()]
@@ -263,6 +265,7 @@ describe('test overwritable connection', function () {
           source: connectionA[0].source
         },
         self: partyA,
+        relay,
         counterparty: partyB,
         webRTC: {
           channel: PeerA,
@@ -286,6 +289,7 @@ describe('test overwritable connection', function () {
         source: connectionB[0].source
       },
       self: partyB,
+      relay,
       counterparty: partyB,
       webRTC: {
         channel: PeerB,
@@ -358,6 +362,7 @@ describe('test overwritable connection', function () {
             source: newConnectionA[0].source
           },
           self: partyA,
+          relay,
           counterparty: partyB,
           webRTC: {
             channel: newPeerA,
@@ -393,9 +398,7 @@ describe('test overwritable connection', function () {
     this.timeout(durations.seconds(10))
 
     // Sample two parties
-    const [partyA, partyB] = await Promise.all(
-      Array.from({ length: 2 }).map(() => PeerId.create({ keyType: 'secp256k1' }))
-    )
+    const [partyA, relay, partyB] = await createPeers(3)
 
     const connectionA = [Pair(), Pair()]
     const connectionB = [Pair(), Pair()]
@@ -429,6 +432,7 @@ describe('test overwritable connection', function () {
           source: connectionA[0].source
         },
         self: partyA,
+        relay,
         counterparty: partyB,
         webRTC: {
           channel: PeerA,
@@ -452,6 +456,7 @@ describe('test overwritable connection', function () {
         source: connectionB[0].source
       },
       self: partyB,
+      relay,
       counterparty: partyB,
       webRTC: {
         channel: PeerB,
@@ -520,6 +525,7 @@ describe('test overwritable connection', function () {
             source: newConnectionA[0].source
           },
           self: partyA,
+          relay,
           counterparty: partyB,
           webRTC: {
             channel: newPeerA,

@@ -16,18 +16,24 @@ import Defer from 'p-defer'
 const TIMEOUT_LOWER_BOUND = 450
 const TIMEOUT_UPPER_BOUND = 650
 
+function createPeers(amount: number): Promise<PeerId[]> {
+  return Promise.all(Array.from({ length: amount }, (_) => PeerId.create({ keyType: 'secp256k1' })))
+}
+
 describe('test relay connection', function () {
   it('should initiate a relayConnection and let the receiver close the connection prematurely', async function () {
     const AliceBob = Pair()
     const BobAlice = Pair()
-    const Alice = await PeerId.create({ keyType: 'secp256k1' })
-    const Bob = await PeerId.create({ keyType: 'secp256k1' })
+
+    const [Alice, DummyRelay, Bob] = await createPeers(3)
+
     const a = new RelayConnection({
       stream: {
         sink: AliceBob.sink,
         source: BobAlice.source
       },
       self: Alice,
+      relay: DummyRelay,
       counterparty: Bob,
       onReconnect: async () => {}
     })
@@ -38,6 +44,7 @@ describe('test relay connection', function () {
         source: AliceBob.source
       },
       self: Bob,
+      relay: DummyRelay,
       counterparty: Alice,
       onReconnect: async () => {}
     })
@@ -85,14 +92,15 @@ describe('test relay connection', function () {
   it('should initiate a relayConnection and close the connection by the sender prematurely', async function () {
     const AliceBob = Pair()
     const BobAlice = Pair()
-    const Alice = await PeerId.create({ keyType: 'secp256k1' })
-    const Bob = await PeerId.create({ keyType: 'secp256k1' })
+    const [Alice, DummyRelay, Bob] = await createPeers(3)
+
     const a = new RelayConnection({
       stream: {
         sink: AliceBob.sink,
         source: BobAlice.source
       },
       self: Alice,
+      relay: DummyRelay,
       onReconnect: async () => {},
       counterparty: Bob
     })
@@ -103,8 +111,9 @@ describe('test relay connection', function () {
         source: AliceBob.source
       },
       self: Bob,
-      onReconnect: async () => {},
-      counterparty: Alice
+      relay: DummyRelay,
+      counterparty: Alice,
+      onReconnect: async () => {}
     })
 
     a.sink(
@@ -146,8 +155,7 @@ describe('test relay connection', function () {
     const AliceBob = Pair()
     const BobAlice = Pair()
 
-    const Alice = await PeerId.create({ keyType: 'secp256k1' })
-    const Bob = await PeerId.create({ keyType: 'secp256k1' })
+    const [Alice, DummyRelay, Bob] = await createPeers(3)
 
     const FakeWebRTCAlice = new EventEmitter() as SimplePeer
     FakeWebRTCAlice.signal = (msg: string) => console.log(`received fancy WebRTC message`, msg)
@@ -167,6 +175,7 @@ describe('test relay connection', function () {
         source: BobAlice.source
       },
       self: Alice,
+      relay: DummyRelay,
       counterparty: Bob,
       onReconnect: async () => {},
       webRTC: {
@@ -181,6 +190,7 @@ describe('test relay connection', function () {
         source: AliceBob.source
       },
       self: Bob,
+      relay: DummyRelay,
       counterparty: Alice,
       onReconnect: async () => {},
       webRTC: {
@@ -303,9 +313,7 @@ describe('test relay connection', function () {
 
   it('should trigger a reconnect before sending messages', async function () {
     // Sample two IDs
-    const [self, counterparty] = await Promise.all(
-      Array.from({ length: 2 }).map(() => PeerId.create({ keyType: 'secp256k1' }))
-    )
+    const [self, relay, counterparty] = await createPeers(3)
 
     let cutConnection = true
 
@@ -357,6 +365,7 @@ describe('test relay connection', function () {
         sink: sideSelf.sink
       },
       self,
+      relay,
       counterparty,
       onReconnect: async (newStream: RelayConnection, newCounterparty: PeerId) => {
         assert(counterparty.equals(newCounterparty), `counterparty of new stream must match previous counterparty`)
@@ -380,6 +389,7 @@ describe('test relay connection', function () {
         sink: sideCounterparty.sink
       },
       self: counterparty,
+      relay,
       counterparty: self,
       onReconnect: async (newStream: RelayConnection, newCounterparty: PeerId) => {
         console.log(`in reconnect`)

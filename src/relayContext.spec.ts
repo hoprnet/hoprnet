@@ -17,6 +17,10 @@ interface DebugMessage {
   iteration: number
 }
 
+function createPeers(amount: number): Promise<PeerId[]> {
+  return Promise.all(Array.from({ length: amount }, (_) => PeerId.create({ keyType: 'secp256k1' })))
+}
+
 describe('test overwritable connection', function () {
   let iteration = 0
 
@@ -96,9 +100,7 @@ describe('test overwritable connection', function () {
     this.timeout(durations.seconds(3))
 
     // Sample two IDs
-    const [self, counterparty] = await Promise.all(
-      Array.from({ length: 2 }).map(() => PeerId.create({ keyType: 'secp256k1' }))
-    )
+    const [self, relay, counterparty] = await createPeers(3)
 
     // Get low-level connections between A, B
     const connectionA = Pair()
@@ -129,6 +131,7 @@ describe('test overwritable connection', function () {
         source: connectionA.source
       },
       self,
+      relay,
       counterparty,
       onReconnect: async (newStream: RelayConnection) => {
         iteration++
@@ -165,9 +168,7 @@ describe('test overwritable connection', function () {
   })
 
   it('should perform a low-level ping', async function () {
-    const [self, counterparty] = await Promise.all(
-      Array.from({ length: 2 }).map(() => PeerId.create({ keyType: 'secp256k1' }))
-    )
+    const [self, relay, counterparty] = await createPeers(3)
 
     // Get low-level connections between A, B
     const connectionA = Pair()
@@ -178,6 +179,7 @@ describe('test overwritable connection', function () {
         source: connectionA.source
       },
       self,
+      relay,
       counterparty,
       onReconnect: async () => {}
     })
@@ -197,9 +199,7 @@ describe('test overwritable connection', function () {
   })
 
   it('should echo messages', async function () {
-    const [self, counterparty] = await Promise.all(
-      Array.from({ length: 2 }).map(() => PeerId.create({ keyType: 'secp256k1' }))
-    )
+    const [self, relay, counterparty] = await createPeers(3)
 
     // Get low-level connections between A, B
     const connectionA = Pair()
@@ -210,6 +210,7 @@ describe('test overwritable connection', function () {
         source: connectionA.source
       },
       self,
+      relay,
       counterparty,
       onReconnect: async () => {}
     })
@@ -249,9 +250,7 @@ describe('test overwritable connection', function () {
   })
 
   it('should exchange messages over a relay', async function () {
-    const [self, counterparty] = await Promise.all(
-      Array.from({ length: 2 }).map(() => PeerId.create({ keyType: 'secp256k1' }))
-    )
+    const [self, relay, counterparty] = await createPeers(3)
 
     const connectionSelf = [Pair(), Pair()]
     const connectionCounterparty = [Pair(), Pair()]
@@ -262,6 +261,7 @@ describe('test overwritable connection', function () {
         sink: connectionSelf[1].sink
       },
       self,
+      relay,
       counterparty,
       onReconnect: async () => {}
     })
@@ -272,6 +272,7 @@ describe('test overwritable connection', function () {
         sink: connectionCounterparty[1].sink
       },
       self: counterparty,
+      relay,
       counterparty: self,
       onReconnect: async () => {}
     })
