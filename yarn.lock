@@ -352,18 +352,18 @@
   resolved "https://registry.yarnpkg.com/@hapi/hoek/-/hoek-9.1.1.tgz#9daf5745156fd84b8e9889a2dc721f0c58e894aa"
   integrity sha512-CAEbWH7OIur6jEOzaai83jq3FmKmv4PmX1JYfs9IrYcGEVI/lyL1EXJGCj7eFVJ0bg5QR8LMxBlEtA+xKiLpFw==
 
-"@hoprnet/hopr-connect@0.2.21":
-  version "0.2.21"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-connect/-/hopr-connect-0.2.21.tgz#120979b79472eec7dd1ccf3192204278c092c6c1"
-  integrity sha512-7pucduO+z+/VC0e/AYzMQXeUKTGrgd52iZ0LWsKiI7evRoFo7c6xRcb6+HvT0koCzoi6ORZz4M6RukI3iGpatQ==
+"@hoprnet/hopr-connect@0.2.22":
+  version "0.2.22"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-connect/-/hopr-connect-0.2.22.tgz#93226b2be26c7d44ba07d9892564a86ece830b44"
+  integrity sha512-cxqPjqQ3we5Z96yVJauVzu2GmXjKf5E4PUZVPvOWVCXz5hxg1SmKddWrj79XyllxNxh3PAcZ8vfahnUqquB5Ww==
   dependencies:
     "@hoprnet/hopr-utils" "1.69.3"
     abortable-iterator "^3.0.0"
     bl "^4.1"
     debug "^4.3.1"
     it-handshake "~1.0.2"
-    mafmt "^8.0.4"
     multiaddr "~8.1.2"
+    multihashes "^3.1.2"
     p-defer "~3.0.0"
     peer-id "~0.14.3"
     simple-peer "9.9.3"
@@ -8745,7 +8745,7 @@ macos-release@^2.2.0:
   resolved "https://registry.yarnpkg.com/macos-release/-/macos-release-2.4.1.tgz#64033d0ec6a5e6375155a74b1a1eba8e509820ac"
   integrity sha512-H/QHeBIN1fIGJX517pvK8IEK53yQOW7YcEI55oYtgjDdoCQQz7eJS94qt5kNrscReEyuD/JcdFCm2XBEcGOITg==
 
-mafmt@^8.0.0, mafmt@^8.0.4:
+mafmt@^8.0.0:
   version "8.0.4"
   resolved "https://registry.yarnpkg.com/mafmt/-/mafmt-8.0.4.tgz#5b158a28bd800fb8d0e5c28bd9ee15120bed2a61"
   integrity sha512-wwZ5+PU0vQw10kwQRyZin1Z0dqVOp0BnYlX1xvXHS2fmLwrrQCfU1+3tlW5MRcihUwGz1virnVhbRAU1biKfiw==
