@@ -17,7 +17,7 @@ async function main() {
     modules: {
       transport: [HoprConnect],
       streamMuxer: [MPLEX],
-      connEncryption: [NOISE],
+      connEncryption: [NOISE]
     },
     config: {
       peerDiscovery: {

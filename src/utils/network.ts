@@ -85,7 +85,7 @@ export function u8aAddrToString(address: Uint8Array, family: NetworkInterfaceInf
     case 'ipv6':
       let result = ''
       for (let i = 0; i < 8; i++) {
-        result += u8aToHex(address.subarray(i * 2, i * 2 +2), false)
+        result += u8aToHex(address.subarray(i * 2, i * 2 + 2), false)
 
         if (i != 7) {
           result += ':'
@@ -95,7 +95,6 @@ export function u8aAddrToString(address: Uint8Array, family: NetworkInterfaceInf
     default:
       throw Error('Invalid address family.')
   }
-
 }
 
 export function getNetworkPrefix(address: Uint8Array, subnet: Uint8Array, family: NetworkInterfaceInfo['family']) {
@@ -176,7 +175,8 @@ export function getLocalAddresses(_iface?: string): Network[] {
 
 export function getPublicAddresses(_iface?: string): Network[] {
   return getAddresses(
-    (address: Uint8Array, family: 'IPv4' | 'IPv6') => !isLinkLocaleAddress(address, family) && !isLocalhost(address, family)
+    (address: Uint8Array, family: 'IPv4' | 'IPv6') =>
+      !isLinkLocaleAddress(address, family) && !isLocalhost(address, family)
   )
 }
 

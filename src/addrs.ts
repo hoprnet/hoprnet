@@ -4,7 +4,7 @@ import Multiaddr from 'multiaddr'
 import Debug from 'debug'
 const log = Debug('hopr-connect')
 
-import { isLocalhost, ipToU8aAddress, isPrivateAddress} from './utils'
+import { isLocalhost, ipToU8aAddress, isPrivateAddress } from './utils'
 
 export function getAddrs(
   port: number,

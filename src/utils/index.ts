@@ -102,7 +102,6 @@ export async function dialHelper(
   try {
     struct = await libp2p.dialProtocol(destination, protocol, { signal })
     verbose(`Dial after DHT request successful`, struct)
-
   } catch (err) {
     error(`Using new addresses after querying the DHT did not lead to a connection. Cannot connect. ${err.message}`)
     return undefined
