@@ -360,4 +360,4 @@ class HoprConnect implements Transport {
   }
 }
 
-export default HoprConnect
+export { HoprConnect }
