@@ -513,6 +513,8 @@ class Listener extends EventEmitter implements InterfaceListener {
 
     this.handler?.(conn)
 
+    this.emit('connection', conn)
+
     return {
       id: relayPeerId,
       latency

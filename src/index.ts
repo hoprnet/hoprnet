@@ -163,6 +163,8 @@ class HoprConnect implements Transport {
       throw new AbortError()
     }
 
+    log(`Attempting to dial ${chalk.yellow(ma.toString())}`)
+
     const maTuples = ma.tuples()
 
     // This works because destination peerId is for both address
@@ -225,10 +227,11 @@ class HoprConnect implements Transport {
   filter(multiaddrs: Multiaddr[]): Multiaddr[] {
     if (this._libp2p.isStarted() && !this._addressFilter.addrsSet) {
       // Attaches addresses to AddressFilter
-      this._addressFilter.setAddrs(
-        this._libp2p.transportManager.getAddrs(),
-        this._libp2p.addressManager.getListenAddrs()
-      )
+      // @TODO implement this in a cleaner way
+      try {
+        const addrs = this._libp2p.transportManager.getAddrs()
+        this._addressFilter.setAddrs(addrs, this._libp2p.addressManager.getListenAddrs())
+      } catch {}
     }
     return (Array.isArray(multiaddrs) ? multiaddrs : [multiaddrs]).filter(
       this._addressFilter.filter.bind(this._addressFilter)
@@ -257,7 +260,6 @@ class HoprConnect implements Transport {
    * @param options optional dial options
    */
   private async dialDirectly(ma: Multiaddr, options?: DialOptions): Promise<Connection> {
-    log(`Attempting to dial ${chalk.yellow(ma.toString())} directly`)
     const maConn = await TCPConnection.create(ma, this._peerId, options)
 
     verbose(

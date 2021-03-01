@@ -69,7 +69,7 @@ export class Filter {
    * Used to check whether addresses have already been attached
    */
   get addrsSet(): boolean {
-    return this.announcedAddrs == undefined || this.listenFamilies == undefined
+    return this.announcedAddrs != undefined && this.listenFamilies != undefined
   }
 
   /**

@@ -8,8 +8,8 @@ import AbortController, { AbortSignal } from 'abort-controller'
 import PeerId from 'peer-id'
 import { Multiaddr } from 'libp2p/src/peer-store/address-book'
 
-const verbose = Debug('hopr-connect:verbose')
-const error = Debug('hopr-connect:error')
+const verbose = Debug('hopr-connect:dialer:verbose')
+const error = Debug('hopr-connect:dialer:error')
 
 export * from './network'
 
@@ -62,6 +62,8 @@ export async function dialHelper(
   let struct: Handler | undefined
   try {
     struct = await libp2p.dialProtocol(destination, protocol, { signal })
+    verbose(`Direct dial successful`, struct)
+    console.trace()
   } catch (_err) {
     err = _err
   }
@@ -101,6 +103,8 @@ export async function dialHelper(
 
   try {
     struct = await libp2p.dialProtocol(destination, protocol, { signal })
+    verbose(`Dial after DHT request successful`, struct)
+
   } catch (err) {
     error(`Using new addresses after querying the DHT did not lead to a connection. Cannot connect. ${err.message}`)
     return undefined

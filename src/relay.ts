@@ -359,12 +359,14 @@ class Relay {
   }
 
   private async establishForwarding(initiator: PeerId, counterparty: PeerId): Promise<Stream | undefined> {
+    // @TODO this produces struct with unset connection property
     let newConn = await dialHelper(this.libp2p, counterparty, DELIVERY, { timeout: RELAY_CIRCUIT_TIMEOUT })
 
-    if (newConn == undefined || newConn.connection == undefined || newConn.stream == undefined) {
-      if (newConn != undefined && newConn.connection == undefined) {
-        verbose(`Received empty connection. Connection object:`, newConn)
-      }
+    if (newConn != undefined && newConn.connection == undefined) {
+      verbose(`Received empty connection. Connection object:`, newConn)
+    }
+
+    if (newConn == undefined) {
       error(`Could not establish forwarding connection to ${blue(counterparty.toB58String())}`)
       return
     }
@@ -379,7 +381,7 @@ class Relay {
     } catch (err) {
       // Don't catch close errors
       newConn.connection
-        .close()
+        ?.close()
         .catch((err: any) => error(`Failed to close connection to ${blue(counterparty.toB58String())}. ${err.message}`))
       error(`Error while trying to decode answer from ${blue(counterparty.toB58String())}. Error was: ${err}`)
     }
