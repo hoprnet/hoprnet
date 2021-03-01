@@ -7,7 +7,7 @@ source scripts/cleanup.sh
 # ----- Internal integration / network test. --------
 
 if [ -z "$RPC" ]; then
-  RPC=https://still-patient-forest.xdai.quiknode.pro/f0cdbd6455c0b3aea8512fc9e7d161c1c0abf66a
+ RPC=https://eth-goerli.gateway.pokt.network/v1/6021a2b6928ff9002e6c7f2f
 fi
 
 # Get version from package.json
