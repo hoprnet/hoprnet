@@ -18,13 +18,23 @@ import { networkInterfaces } from 'os'
 
 describe('check listening to sockets', function () {
   this.timeout(5000)
-  async function startStunServer(port: number, state: { msgReceived: DeferredPromise<void> }): Promise<Socket> {
-    const promises: Promise<void>[] = []
+
+  /**
+   * Encapsulates the logic that is necessary to lauch a test
+   * STUN server instance and track whether it receives requests
+   * @param port port to listen to
+   * @param state used to track incoming messages
+   */
+  async function startStunServer(
+    port: number | undefined,
+    state: { msgReceived: DeferredPromise<void> }
+  ): Promise<Socket> {
     const socket = dgram.createSocket('udp4')
 
-    promises.push(new Promise((resolve) => socket.once('listening', resolve)))
-
-    promises.push(new Promise((resolve) => socket.bind(port, resolve)))
+    const promises: Promise<void>[] = [
+      new Promise((resolve) => socket.once('listening', resolve)),
+      new Promise((resolve) => socket.bind(port, resolve))
+    ]
 
     socket.on('message', (msg: Buffer, rinfo: RemoteInfo) => {
       state.msgReceived.resolve()
@@ -32,9 +42,63 @@ describe('check listening to sockets', function () {
     })
 
     await Promise.all(promises)
+
     return socket
   }
-  it('should successfully recreate the socket', async function () {
+
+  async function stopStunServer(socket: Socket) {
+    const promises: Promise<void>[] = [
+      new Promise<void>((resolve) => socket.once('close', resolve)),
+      new Promise<void>((resolve) => socket.close(resolve))
+    ]
+
+    await Promise.all(promises)
+  }
+
+  async function startBootstrap(state: { msgReceived: DeferredPromise<void> }) {
+    const peerId = await PeerId.create({ keyType: 'secp256k1' })
+    const listener = new Listener(
+      undefined,
+      ({
+        upgradeInbound: async (conn: MultiaddrConnection) => {
+          state.msgReceived.resolve()
+          return conn
+        },
+        upgradeOutbound: async (conn: MultiaddrConnection) => conn
+      } as unknown) as Upgrader,
+      undefined,
+      undefined,
+      peerId,
+      undefined
+    )
+
+    await listener.listen(Multiaddr(`/ip4/127.0.0.1/tcp/0`))
+
+    return {
+      peerId,
+      listener
+    }
+  }
+
+  async function stopListener(socket: Listener) {
+    const promises: Promise<void>[] = [
+      // prettier-ignore
+      new Promise<void>((resolve) => socket.once('close', resolve)),
+      socket.close()
+    ]
+
+    await Promise.all(promises)
+  }
+
+  async function waitUntilListening(socket: Listener, ma: Multiaddr) {
+    const promises: Promise<void>[] = [
+      new Promise<void>((resolve) => socket.once('listening', resolve)),
+      socket.listen(ma)
+    ]
+    await Promise.all(promises)
+  }
+
+  it('recreate the socket and perform STUN request', async function () {
     let listener: Listener
     const peerId = await PeerId.create({ keyType: 'secp256k1' })
     // Create objects to pass boolean by reference and NOT by value
@@ -57,26 +121,70 @@ describe('check listening to sockets', function () {
           Multiaddr(`/ip4/127.0.0.1/udp/${stunServers[0].address().port}`),
           Multiaddr(`/ip4/127.0.0.1/udp/${stunServers[1].address().port}`)
         ],
+        undefined,
         await PeerId.create({ keyType: 'secp256k1' }),
         undefined
       )
-      await listener.listen(Multiaddr(`/ip4/127.0.0.1/tcp/9390/p2p/${peerId.toB58String()}`))
-      await listener.close()
+
+      await waitUntilListening(listener, Multiaddr(`/ip4/127.0.0.1/tcp/9390/p2p/${peerId.toB58String()}`))
+      await stopListener(listener)
     }
 
     await Promise.all(msgReceived.map((received) => received.msgReceived.promise))
 
-    await Promise.all(
-      stunServers.map(
-        (s) => new Promise<void>((resolve) => s.close(resolve))
-      )
-    )
+    await Promise.all(stunServers.map((s) => stopStunServer(s)))
 
-    await new Promise((resolve) => setTimeout(resolve, 200))
+    // await new Promise((resolve) => setTimeout(resolve, 200))
     assert(
       msgReceived[0].msgReceived && msgReceived[1].msgReceived,
       `Stun Server must have received messages from both Listener instances.`
     )
+  })
+
+  it('use relays and expose addrs', async function () {
+    const peerId = await PeerId.create({ keyType: 'secp256k1' })
+
+    const relayContacted = {
+      msgReceived: Defer<void>()
+    }
+
+    const bootstrap = await startBootstrap(relayContacted)
+
+    const stunContacted = {
+      msgReceived: Defer<void>()
+    }
+
+    const stunServer = await startStunServer(undefined, stunContacted)
+
+    const listener = new Listener(
+      () => {},
+      ({
+        upgradeOutbound: async (maConn: MultiaddrConnection) => maConn
+      } as unknown) as Upgrader,
+      [Multiaddr(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)],
+      [Multiaddr(`/ip4/127.0.0.1/tcp/${bootstrap.listener.getPort()}/p2p/${bootstrap.peerId.toB58String()}`)],
+      peerId,
+      undefined
+    )
+
+    await waitUntilListening(listener, Multiaddr(`/ip4/127.0.0.1/tcp/9390/p2p/${peerId.toB58String()}`))
+
+    // Checks that relay and STUN got contacted, otherwise timeout
+    await Promise.all([stunContacted.msgReceived.promise, relayContacted.msgReceived.promise])
+
+    const listeningAddrs = listener.getAddrs().map((ma: Multiaddr) => ma.toString())
+
+    assert(
+      listeningAddrs.includes(`/p2p/${bootstrap.peerId.toB58String()}/p2p-circuit/p2p/${peerId.toB58String()}`),
+      `Listener must expose circuit address`
+    )
+
+    await Promise.all([
+      // prettier-ignore
+      stopListener(listener),
+      stopListener(bootstrap.listener),
+      stopStunServer(stunServer)
+    ])
   })
 
   it('should create two TCP sockets and exchange messages', async function () {
@@ -105,11 +213,12 @@ describe('check listening to sockets', function () {
             upgradeInbound: async (conn: MultiaddrConnection) => conn
           } as unknown) as Upgrader,
           stunServers,
+          undefined,
           await PeerId.create({ keyType: 'secp256k1' }),
           undefined
         )
 
-        await listener.listen(Multiaddr(`/ip6/::/tcp/${9390 + index}/p2p/${peerId.toB58String()}`))
+        await waitUntilListening(listener, Multiaddr(`/ip6/::/tcp/${9390 + index}/p2p/${peerId.toB58String()}`))
 
         return listener
       })
@@ -149,13 +258,11 @@ describe('check listening to sockets', function () {
             }
           )
         }),
-        Promise.all(msgReceived.map((received) => received.received.promise))
+        ...msgReceived.map((received) => received.received.promise)
       ])
     }
 
-    await Promise.all(listeners.map((listener) => listener.close()))
-
-    await new Promise((resolve) => setTimeout(resolve, 200))
+    await Promise.all(listeners.map(stopListener))
   })
 
   it('should bind to specific interfaces', async function () {
@@ -178,20 +285,21 @@ describe('check listening to sockets', function () {
         upgradeInbound: async (conn: MultiaddrConnection) => conn
       } as unknown) as Upgrader,
       undefined,
-      await PeerId.create({ keyType: 'secp256k1' }),
+      undefined,
+      peerId,
       validInterfaces[0]
     )
 
     let errThrown = false
     try {
-      await listener.listen(Multiaddr(`/ip4/192.168.1.4/tcp/0/p2p/${peerId.toB58String()}`))
+      await waitUntilListening(listener, Multiaddr(`/ip4/0.0.0.1/tcp/0/p2p/${peerId.toB58String()}`))
     } catch {
       errThrown = true
     }
 
     assert(errThrown)
 
-    await listener.close()
+    await stopListener(listener)
   })
 
   it('should perform a STUN request', async function () {
@@ -205,11 +313,12 @@ describe('check listening to sockets', function () {
         upgradeInbound: async (conn: MultiaddrConnection) => conn
       } as unknown) as Upgrader,
       undefined,
+      undefined,
       await PeerId.create({ keyType: 'secp256k1' }),
       undefined
     )
 
-    await listener.listen(Multiaddr(`/ip4/0.0.0.0/tcp/0`))
+    await waitUntilListening(listener, Multiaddr(`/ip4/0.0.0.0/tcp/0`))
 
     const socket = dgram.createSocket({ type: 'udp4' })
     const tid = stun.generateTransactionId()
@@ -244,6 +353,8 @@ describe('check listening to sockets', function () {
 
     await defer.promise
 
-    await listener.close()
+    await stopListener(listener)
   })
+
+  // @TODO add test for connection tracking
 })

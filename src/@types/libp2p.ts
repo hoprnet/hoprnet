@@ -127,6 +127,13 @@ declare module 'libp2p' {
     constructor(options: any) //: LibP2P
     static create(options: any): Promise<LibP2P>
     // @TODO add libp2p types
+    addressManager: {
+      getListenAddrs(): Multiaddr[]
+    }
+    transportManager: {
+      getAddrs(): Multiaddr[]
+    }
+    isStarted(): boolean
     emit: (event: string, ...args: any[]) => void
     dial: (addr: Multiaddr | PeerId, options?: { signal: AbortSignal }) => Promise<Handler>
     dialer: Dialer

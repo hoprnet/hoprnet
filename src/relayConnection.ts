@@ -67,6 +67,7 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
   constructor(opts: {
     stream: Stream
     self: PeerId
+    relay: PeerId
     counterparty: PeerId
     onReconnect: (newStream: RelayConnection, counterparty: PeerId) => Promise<void>
     webRTC?: WebRTC
@@ -101,8 +102,8 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
 
     this._id = u8aToHex(randomBytes(4), false)
 
-    this.localAddr = Multiaddr(`/p2p/${opts.self.toB58String()}`)
-    this.remoteAddr = Multiaddr(`/p2p/${opts.counterparty.toB58String()}`)
+    this.localAddr = Multiaddr(`/p2p/${opts.relay.toB58String()}/p2p-circuit/p2p/${opts.self.toB58String()}`)
+    this.remoteAddr = Multiaddr(`/p2p/${opts.relay.toB58String()}/p2p-circuit/p2p/${opts.counterparty.toB58String()}`)
 
     this.webRTC = opts.webRTC
 

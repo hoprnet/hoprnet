@@ -4,7 +4,6 @@
 import net from 'net'
 import abortable, { AbortError } from 'abortable-iterator'
 import type { Socket } from 'net'
-import errCode from 'err-code'
 import Debug from 'debug'
 
 const log = Debug('hopr-connect:tcp')
@@ -152,7 +151,7 @@ class TCPConnection implements MultiaddrConnection {
 
       const onTimeout = () => {
         log('connnection timeout %s:%s', cOpts.host, cOpts.port)
-        const err = errCode(new Error(`connection timeout after ${Date.now() - start}ms`), 'ERR_CONNECT_TIMEOUT')
+        const err = new Error(`connection timeout after ${Date.now() - start}ms`)
         // Note: this will result in onError() being called
         rawSocket.emit('error', err)
       }

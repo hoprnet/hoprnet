@@ -66,6 +66,7 @@ describe('test TCP connection', function () {
       },
       upgrader,
       undefined,
+      undefined,
       peerId,
       undefined
     )

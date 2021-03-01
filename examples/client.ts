@@ -48,9 +48,13 @@ async function main() {
         HoprConnect: {
           bootstrapServers: [RELAY_ADDRESS],
           // simulates a NAT
+          // DO NOT use this in production
           __noDirectConnections: true,
           __noWebRTCUpgrade: false
         }
+      },
+      peerDiscovery: {
+        autoDial: false
       }
     },
     dialer: {
@@ -91,7 +95,12 @@ async function main() {
   switch (process.argv[2]) {
     case '0':
       try {
-        conn = await node.dialProtocol(Multiaddr(`/p2p/${await PeerId.createFromPrivKey(Bob)}`), TEST_PROTOCOL)
+        conn = await node.dialProtocol(
+          Multiaddr(
+            `/p2p/${await PeerId.createFromPrivKey(Charly)}/p2p-circuit/p2p/${await PeerId.createFromPrivKey(Bob)}`
+          ),
+          TEST_PROTOCOL
+        )
       } catch (err) {
         console.log(err)
         return
@@ -99,7 +108,16 @@ async function main() {
 
       await pipe(
         // prettier-ignore
-        [new TextEncoder().encode('test')],
+        // async function * () {
+        //   let i = 0
+        //   while(true) {
+        //     yield new TextEncoder().encode(`test ${i}`)
+
+        //     await new Promise(resolve => setTimeout(resolve, 100))
+        //     i++
+        //   }
+        // }(),
+        [new TextEncoder().encode(`test`)],
         conn.stream,
         async (source: Stream['source']) => {
           for await (const msg of source) {

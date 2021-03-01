@@ -42,7 +42,7 @@ See detailed [architecture description](./docs/ARCHITECTURE.md) for more informa
 
 ### Information for VPS / docker / firewalls
 
-HoprConnect binds to a TCP socket as given by the configuration. **It also bind to a UDP socket** on the same port to perform and answer STUN requests from WebRTC and at startup to publish its own public IPv4 address. 
+HoprConnect binds to a TCP socket as given by the configuration. **It also bind to a UDP socket** on the same port to perform and answer STUN requests from WebRTC and at startup to publish its own public IPv4 address.
 
 ## Usage
 
@@ -80,7 +80,7 @@ const node = await libp2p.create({
   },
   dialer: {
     // Temporary fix
-    addressSorter: (ma: Multiaddr) => ma,
+    addressSorter: (ma: Multiaddr) => ma
   }
 })
 ```

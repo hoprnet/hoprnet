@@ -2,7 +2,6 @@ import { DialOptions, MultiaddrConnection, Stream, StreamResult } from 'libp2p'
 import Defer, { DeferredPromise } from 'p-defer'
 
 import type { Instance as SimplePeer } from 'simple-peer'
-import Multiaddr from 'multiaddr'
 import type PeerId from 'peer-id'
 import { durations, u8aToHex } from '@hoprnet/hopr-utils'
 import toIterable from 'stream-to-it'
@@ -67,6 +66,7 @@ class WebRTCConnection implements MultiaddrConnection {
         this.channel.destroy()
       } catch {}
     })
+
     this._destroyed = false
     this._switchPromise = Defer<void>()
     this._webRTCStateKnown = false
@@ -79,8 +79,8 @@ class WebRTCConnection implements MultiaddrConnection {
 
     this._counterparty = opts.counterparty
 
-    this.remoteAddr = Multiaddr(`/p2p/${opts.counterparty.toB58String()}`)
-    this.localAddr = Multiaddr(`/p2p/${opts.self.toB58String()}`)
+    this.remoteAddr = opts.conn.remoteAddr
+    this.localAddr = opts.conn.localAddr
 
     this._signal = options?.signal
 

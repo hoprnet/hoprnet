@@ -19,6 +19,11 @@ async function main() {
       streamMuxer: [MPLEX],
       connEncryption: [NOISE]
     },
+    config: {
+      peerDiscovery: {
+        autoDial: false
+      }
+    },
     dialer: {
       // Temporary fix
       addressSorter: (ma: Multiaddr) => ma

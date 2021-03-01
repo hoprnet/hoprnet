@@ -37,8 +37,8 @@
     "bl": "^4.1",
     "debug": "^4.3.1",
     "it-handshake": "~1.0.2",
-    "mafmt": "^8.0.4",
     "multiaddr": "~8.1.2",
+    "multihashes": "^3.1.2",
     "p-defer": "~3.0.0",
     "peer-id": "~0.14.3",
     "simple-peer": "9.9.3",
@@ -48,27 +48,27 @@
   },
   "devDependencies": {
     "@types/debug": "^4.1.5",
-    "@types/err-code": "^2.0.0",
-    "@types/mocha": "~8.2.0",
+    "@types/mocha": "^8.2.1",
     "@types/node": "14",
-    "@types/simple-peer": "9",
+    "@types/simple-peer": "^9.6.2",
     "abort-controller": "3.0.0",
     "it-pair": "^1.0.0",
     "it-pipe": "^1.1.0",
-    "libp2p": "0.30",
+    "libp2p": "^0.30.9",
     "libp2p-interfaces": "^0.8.3",
     "libp2p-mplex": "0.10",
-    "libp2p-noise": "^2.0.4",
+    "libp2p-noise": "^2.0.5",
     "mocha": "^8.3.0",
     "prettier": "~2.2.1",
     "ts-node": "~9.1.1",
-    "typescript": "^4.1.5"
+    "typescript": "4.1.5"
   },
   "mocha": {
     "extension": [
       "ts"
     ],
     "spec": [
+      "src/filter.spec.ts",
       "src/webRTCConnection.spec.ts",
       "src/stun.spec.ts",
       "src/listener.spec.ts"

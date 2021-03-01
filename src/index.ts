@@ -1,4 +1,5 @@
-import mafmt from 'mafmt'
+/// <reference path="./@types/libp2p.ts" />
+
 import debug from 'debug'
 import Listener from './listener'
 import { CODE_IP4, CODE_IP6, CODE_P2P, DELIVERY, USE_WEBRTC } from './constants'
@@ -15,7 +16,7 @@ import Relay from './relay'
 import { WebRTCConnection } from './webRTCConnection'
 import type { RelayConnection } from './relayConnection'
 import { Discovery } from './discovery'
-import { extractPeerIdFromMultiaddr } from './utils'
+import { Filter } from './filter'
 
 const log = debug('hopr-connect')
 const error = debug('hopr-connect:error')
@@ -35,7 +36,6 @@ class HoprConnect implements Transport {
   private __noWebRTCUpgrade?: boolean
   private _upgrader: Upgrader
   private _peerId: PeerId
-  private _multiaddrs: Multiaddr[]
   private relays?: Multiaddr[]
   private stunServers?: Multiaddr[]
   private _relay: Relay
@@ -43,6 +43,9 @@ class HoprConnect implements Transport {
   private _dialer: Dialer
   private _webRTCUpgrader?: WebRTCUpgrader
   private _interface?: string
+  private _addressFilter: Filter
+  private _libp2p: libp2p
+
   private connHandler?: ConnHandler
 
   constructor(opts: {
@@ -103,7 +106,12 @@ class HoprConnect implements Transport {
     }
 
     this._peerId = opts.libp2p.peerId
-    this._multiaddrs = opts.libp2p.multiaddrs
+
+    // @TODO only store references to needed parts of libp2p
+    this._libp2p = opts.libp2p
+
+    this._addressFilter = new Filter(this._peerId)
+
     this._upgrader = opts.upgrader
     this._connectionManager = opts.libp2p.connectionManager
     this._dialer = opts.libp2p.dialer
@@ -155,9 +163,16 @@ class HoprConnect implements Transport {
       throw new AbortError()
     }
 
-    const maTuples = ma.stringTuples()
+    log(`Attempting to dial ${chalk.yellow(ma.toString())}`)
 
-    if (this._peerId.equals(extractPeerIdFromMultiaddr(ma))) {
+    const maTuples = ma.tuples()
+
+    // This works because destination peerId is for both address
+    // types at the third place.
+    // Other addresses are not supported.
+    const destination = PeerId.createFromBytes(((maTuples[2][1] as unknown) as Uint8Array).slice(1))
+
+    if (destination.equals(this._peerId)) {
       throw new AbortError(`Cannot dial ourself`)
     }
 
@@ -170,16 +185,9 @@ class HoprConnect implements Transport {
 
         return await this.dialDirectly(ma, options)
       case CODE_P2P:
-        if (this.relays == undefined || this.relays.length == 0) {
-          throw Error(
-            `Could not connect to ${chalk.yellow(
-              ma.toString()
-            )}: Direct connection failed and there are no relays known.`
-          )
-        }
+        const relay = PeerId.createFromBytes(((maTuples[0][1] as unknown) as Uint8Array).slice(1))
 
-        verbose('dialing with relay ', ma.toString())
-        return await this.dialWithRelay(ma, this.relays, options)
+        return await this.dialWithRelay(relay, destination, options)
       default:
         throw new AbortError(`Protocol not supported`)
     }
@@ -198,21 +206,35 @@ class HoprConnect implements Transport {
     } else {
       this.connHandler = handler
     }
-    return new Listener(this.connHandler, this._upgrader, this.stunServers, this._peerId, this._interface)
+    return new Listener(
+      this.connHandler,
+      this._upgrader,
+      this.stunServers,
+      this.stunServers, // use STUN servers as relays
+      this._peerId,
+      this._interface
+    )
   }
 
   /**
    * Takes a list of Multiaddrs and returns those addrs that we can use.
    * @example
    * Multiaddr(`/ip4/127.0.0.1/tcp/0/p2p/16Uiu2HAmCPgzWWQWNAn2E3UXx1G3CMzxbPfLr1SFzKqnFjDcbdwg`) // working
-   * Multiaddr(`/p2p/16Uiu2HAmCPgzWWQWNAn2E3UXx1G3CMzxbPfLr1SFzKqnFjDcbdwg`) // working
+   * Multiaddr(`/p2p/16Uiu2HAmCPgzWWQWNAn2E3UXx1G3CMzxbPfLr1SFzKqnFjDcbdwg/p2p-circuit/p2p/16Uiu2HAkyvdVZtG8btak5SLrxP31npfJo6maopj8xwx5XQhKfspb`) // working
    * @param multiaddrs
    * @returns applicable Multiaddrs
    */
   filter(multiaddrs: Multiaddr[]): Multiaddr[] {
+    if (this._libp2p.isStarted() && !this._addressFilter.addrsSet) {
+      // Attaches addresses to AddressFilter
+      // @TODO implement this in a cleaner way
+      try {
+        const addrs = this._libp2p.transportManager.getAddrs()
+        this._addressFilter.setAddrs(addrs, this._libp2p.addressManager.getListenAddrs())
+      } catch {}
+    }
     return (Array.isArray(multiaddrs) ? multiaddrs : [multiaddrs]).filter(
-      (ma: Multiaddr) =>
-        (mafmt.TCP.matches(ma.decapsulateCode(CODE_P2P)) && mafmt.P2P.matches(ma)) || mafmt.P2P.matches(ma)
+      this._addressFilter.filter.bind(this._addressFilter)
     )
   }
 
@@ -222,8 +244,8 @@ class HoprConnect implements Transport {
    * @param relays potential relays that we can use
    * @param options optional dial options
    */
-  private async dialWithRelay(ma: Multiaddr, relays: Multiaddr[], options?: DialOptions): Promise<Connection> {
-    let conn = await this._relay.establishRelayedConnection(ma, relays, this.onReconnect.bind(this), options)
+  private async dialWithRelay(relay: PeerId, destination: PeerId, options?: DialOptions): Promise<Connection> {
+    let conn = await this._relay.connect(relay, destination, this.onReconnect.bind(this), options)
 
     if (conn == undefined) {
       throw Error(`Could not establish relayed connection.`)
@@ -238,7 +260,6 @@ class HoprConnect implements Transport {
    * @param options optional dial options
    */
   private async dialDirectly(ma: Multiaddr, options?: DialOptions): Promise<Connection> {
-    log(`Attempting to dial ${chalk.yellow(ma.toString())} directly`)
     const maConn = await TCPConnection.create(ma, this._peerId, options)
 
     verbose(
@@ -333,16 +354,6 @@ class HoprConnect implements Transport {
     if (!['ip4', 'ip6', 'dns4', 'dns6'].includes(protoNames[0])) {
       // We cannot call other protocols directly
       return false
-    }
-
-    let cOpts = ma.toOptions()
-
-    for (const mAddr of this._multiaddrs) {
-      const ownOpts = mAddr.toOptions()
-
-      if (ownOpts.host === cOpts.host && ownOpts.port == cOpts.port) {
-        return false
-      }
     }
 
     return true
