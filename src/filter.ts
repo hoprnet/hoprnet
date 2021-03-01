@@ -6,6 +6,10 @@ import Multihash from 'multihashes'
 import { NetworkInterfaceInfo } from 'os'
 import PeerId from 'peer-id'
 import { u8aEquals, u8aToNumber } from '@hoprnet/hopr-utils'
+import Debug from 'debug'
+import { green } from 'chalk'
+
+const log = Debug('hopr-connect:filter')
 
 const INVALID_PORTS = [0]
 
@@ -62,6 +66,13 @@ export class Filter {
   }
 
   /**
+   * Used to check whether addresses have already been attached
+   */
+  get addrsSet(): boolean {
+    return this.announcedAddrs == undefined || this.listenFamilies == undefined
+  }
+
+  /**
    * THIS METHOD IS USED FOR TESTING
    * @dev Used to set falsy local network
    * @param mAddrs new local addresses
@@ -77,6 +88,12 @@ export class Filter {
    * @param listeningAddrs Addresses to which we are listening
    */
   setAddrs(announcedAddrs: Multiaddr[], listeningAddrs: Multiaddr[]): void {
+    log(
+      `announcedAddrs`,
+      announcedAddrs.map((ma: Multiaddr) => green(ma.toString())).join(','),
+      `listeningAddrs`,
+      listeningAddrs.map((ma: Multiaddr) => green(ma.toString())).join(',')
+    )
     this.announcedAddrs = announcedAddrs
     this.listenFamilies = []
 

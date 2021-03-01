@@ -1,3 +1,5 @@
+/// <reference path="./@types/libp2p.ts" />
+
 import debug from 'debug'
 import Listener from './listener'
 import { CODE_IP4, CODE_IP6, CODE_P2P, DELIVERY, USE_WEBRTC } from './constants'
@@ -42,6 +44,7 @@ class HoprConnect implements Transport {
   private _webRTCUpgrader?: WebRTCUpgrader
   private _interface?: string
   private _addressFilter: Filter
+  private _libp2p: libp2p
 
   private connHandler?: ConnHandler
 
@@ -104,6 +107,9 @@ class HoprConnect implements Transport {
 
     this._peerId = opts.libp2p.peerId
 
+    // @TODO only store references to needed parts of libp2p
+    this._libp2p = opts.libp2p
+
     this._addressFilter = new Filter(this._peerId)
 
     this._upgrader = opts.upgrader
@@ -159,6 +165,9 @@ class HoprConnect implements Transport {
 
     const maTuples = ma.tuples()
 
+    // This works because destination peerId is for both address
+    // types at the third place.
+    // Other addresses are not supported.
     const destination = PeerId.createFromBytes(((maTuples[2][1] as unknown) as Uint8Array).slice(1))
 
     if (destination.equals(this._peerId)) {
@@ -214,6 +223,13 @@ class HoprConnect implements Transport {
    * @returns applicable Multiaddrs
    */
   filter(multiaddrs: Multiaddr[]): Multiaddr[] {
+    if (this._libp2p.isStarted() && !this._addressFilter.addrsSet) {
+      // Attaches addresses to AddressFilter
+      this._addressFilter.setAddrs(
+        this._libp2p.transportManager.getAddrs(),
+        this._libp2p.addressManager.getListenAddrs()
+      )
+    }
     return (Array.isArray(multiaddrs) ? multiaddrs : [multiaddrs]).filter(
       this._addressFilter.filter.bind(this._addressFilter)
     )
@@ -226,7 +242,7 @@ class HoprConnect implements Transport {
    * @param options optional dial options
    */
   private async dialWithRelay(relay: PeerId, destination: PeerId, options?: DialOptions): Promise<Connection> {
-    let conn = await this._relay.establishRelayedConnection(relay, destination, this.onReconnect.bind(this), options)
+    let conn = await this._relay.connect(relay, destination, this.onReconnect.bind(this), options)
 
     if (conn == undefined) {
       throw Error(`Could not establish relayed connection.`)

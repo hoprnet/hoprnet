@@ -68,6 +68,7 @@
       "ts"
     ],
     "spec": [
+      "src/filter.spec.ts",
       "src/webRTCConnection.spec.ts",
       "src/stun.spec.ts",
       "src/listener.spec.ts"
