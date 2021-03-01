@@ -11,9 +11,9 @@ __metadata:
   dependencies:
     "@hoprnet/hopr-utils": 1.69.3
     "@types/debug": ^4.1.5
-    "@types/mocha": ~8.2.0
+    "@types/mocha": ^8.2.1
     "@types/node": 14
-    "@types/simple-peer": 9
+    "@types/simple-peer": ^9.6.2
     abort-controller: 3.0.0
     abortable-iterator: ^3.0.0
     bl: ^4.1
@@ -21,10 +21,10 @@ __metadata:
     it-handshake: ~1.0.2
     it-pair: ^1.0.0
     it-pipe: ^1.1.0
-    libp2p: 0.30
+    libp2p: ^0.30.9
     libp2p-interfaces: ^0.8.3
     libp2p-mplex: 0.10
-    libp2p-noise: ^2.0.4
+    libp2p-noise: ^2.0.5
     mocha: ^8.3.0
     multiaddr: ~8.1.2
     multihashes: ^3.1.2
@@ -208,7 +208,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/mocha@npm:~8.2.0":
+"@types/mocha@npm:^8.2.1":
   version: 8.2.1
   resolution: "@types/mocha@npm:8.2.1"
   checksum: 43585ae2a1034e8f868db181439caf49d1f17b524b3dfdb767a69966965046249f6929f807c1c94e87b21c17abdee5298134053e059a9c08aaac04bff93707e0
@@ -236,7 +236,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/simple-peer@npm:9":
+"@types/simple-peer@npm:^9.6.2":
   version: 9.6.2
   resolution: "@types/simple-peer@npm:9.6.2"
   dependencies:
@@ -2076,7 +2076,7 @@ fsevents@~2.3.1:
   languageName: node
   linkType: hard
 
-"libp2p-noise@npm:^2.0.4":
+"libp2p-noise@npm:^2.0.5":
   version: 2.0.5
   resolution: "libp2p-noise@npm:2.0.5"
   dependencies:
@@ -2126,7 +2126,7 @@ fsevents@~2.3.1:
   languageName: node
   linkType: hard
 
-"libp2p@npm:0.30":
+"libp2p@npm:^0.30.9":
   version: 0.30.9
   resolution: "libp2p@npm:0.30.9"
   dependencies:
