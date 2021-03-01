@@ -1,3 +1,34 @@
+<a name="0.2.23"></a>
+
+## [0.2.23](https://github.com/hoprnet/hopr-connect/compare/v0.2.21...v0.2.23) (2021-03-01)
+
+### Fixes
+
+- close relayed connections if counterparty is not reachable
+
+### Breaking changes
+
+- Subnet detection: Nodes are able to detect whether the dialed address is a private address which is not in their reachable subnets.
+- Nodes do not consider link-locale IP addresses as dialable
+
+#### Addressing
+
+Before `hopr-connect@0.2.22` the follwoing addresses were valid
+
+- `Multiaddr("/ip4/127.0.0.1/tcp/0/p2p/16Uiu2HAmCPgzWWQWNAn2E3UXx1G3CMzxbPfLr1SFzKqnFjDcbdwg")`
+- `Multiaddr("/p2p/16Uiu2HAmCPgzWWQWNAn2E3UXx1G3CMzxbPfLr1SFzKqnFjDcbdwg")`
+
+Since `hopr-connect@0.2.22`, nodes need to explicitly name the relay behind which they are accessible
+
+- `Multiaddr("/ip4/127.0.0.1/tcp/0/p2p/16Uiu2HAmCPgzWWQWNAn2E3UXx1G3CMzxbPfLr1SFzKqnFjDcbdwg")`
+- `Multiaddr("/p2p/16Uiu2HAkyvdVZtG8btak5SLrxP31npfJo6maopj8xwx5XQhKfspb/p2p-circuit/p2p/16Uiu2HAmCPgzWWQWNAn2E3UXx1G3CMzxbPfLr1SFzKqnFjDcbdwg")`
+
+Nodes will automatically dial given bootstrap addresses and check whether they can reach them and announce them ordered by latency to other nodes.
+
+#### Default export to named export
+
+Before `hopr-connect@0.2.23`, the main class HoprConnect was a default export, since `hopr-connect@0.2.23` it is a named export.
+
 <a name="0.2.21"></a>
 
 ## [0.2.21](https://github.com/hoprnet/hopr-connect/compare/v0.2.20...v0.2.21) (2021-02-16)
