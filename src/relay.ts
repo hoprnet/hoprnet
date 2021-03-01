@@ -367,7 +367,7 @@ class Relay {
     let newConn = await dialHelper(this.libp2p, counterparty, DELIVERY, { timeout: RELAY_CIRCUIT_TIMEOUT })
 
     if (newConn != undefined && newConn.connection == undefined) {
-      verbose(`Received empty connection. Connection object:`, newConn)
+      verbose(`DEBUG: Received incomplete connection object. Connection object:`, newConn)
     }
 
     if (newConn == undefined) {
