@@ -35,7 +35,7 @@ export const MAX_HOPS = 2
 export const PATH_RANDOMNESS = 0.1
 export const MAX_PATH_ITERATIONS = 100
 export const NETWORK_QUALITY_THRESHOLD = 0.5
-export const MINIMUM_REASONABLE_CHANNEL_STAKE = new BN(TICKET_AMOUNT).muln(1000)
+export const MINIMUM_REASONABLE_CHANNEL_STAKE = new BN(TICKET_AMOUNT).mul(new BN('1000'))
 export const MAX_NEW_CHANNELS_PER_TICK = 5
 export const MAX_AUTO_CHANNELS = 5
 
