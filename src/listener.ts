@@ -103,7 +103,7 @@ class Listener extends EventEmitter implements InterfaceListener {
         return true
       }
 
-      // Do not self as STUN server
+      // Do not use self as STUN server
       return maPeerId !== this.peerId.toB58String()
     })
 
