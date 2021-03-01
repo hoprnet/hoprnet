@@ -3020,7 +3020,7 @@ bcrypt-pbkdf@^1.0.0:
   dependencies:
     tweetnacl "^0.14.3"
 
-bcrypto@^5.3.0:
+bcrypto@^5.4.0:
   version "5.4.0"
   resolved "https://registry.yarnpkg.com/bcrypto/-/bcrypto-5.4.0.tgz#4046f0c44a4b301eff84de593b4f86fce8d91db2"
   integrity sha512-KDX2CR29o6ZoqpQndcCxFZAtYA1jDMnXU3jmCfzP44g++Cu7AHHtZN/JbrN/MXAg9SLvtQ8XISG+eVD9zH1+Jg==
@@ -8334,12 +8334,11 @@ libp2p-mplex@0.10.2:
     varint "^6.0.0"
 
 libp2p-noise@^2.0.4:
-  version "2.0.4"
-  resolved "https://registry.yarnpkg.com/libp2p-noise/-/libp2p-noise-2.0.4.tgz#dc915dd80a5158848ababdc6ad650a86537dd887"
-  integrity sha512-BE+bf4cXii1kcJQ50ZcoVSmqt2ab76p5EyL3praDGkQznjQ6+VKUMR8yNPCbxkQ7CxM1wpUA3Jj5m6FKM9nPZA==
+  version "2.0.5"
+  resolved "https://registry.yarnpkg.com/libp2p-noise/-/libp2p-noise-2.0.5.tgz#470b3d19af68176b4835b5722e1c68dfa0040860"
+  integrity sha512-hmR1Y4bJ6hxEO+1aIF1HeJrUNh9NHUbH8gUTtMqpIe7zfdggGau9XKMY0InbafBPFF/WxeIOJDKZiQV4qy2fFg==
   dependencies:
-    bcrypto "^5.3.0"
-    buffer "^5.4.3"
+    bcrypto "^5.4.0"
     debug "^4.3.1"
     it-buffer "^0.1.1"
     it-length-prefixed "^3.0.0"
