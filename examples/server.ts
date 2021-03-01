@@ -3,7 +3,7 @@ import libp2p from 'libp2p'
 import { NOISE } from 'libp2p-noise'
 const MPLEX = require('libp2p-mplex')
 
-import HoprConnect from '../src'
+import { HoprConnect } from '../src'
 import { Charly } from './identities'
 import PeerId from 'peer-id'
 import Multiaddr from 'multiaddr'
