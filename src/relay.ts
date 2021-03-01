@@ -83,6 +83,7 @@ class Relay {
       let newConn = new RelayConnection({
         stream,
         self: this.libp2p.peerId,
+        relay,
         counterparty: destination,
         onReconnect,
         webRTC: {
@@ -110,6 +111,7 @@ class Relay {
       return new RelayConnection({
         stream,
         self: this.libp2p.peerId,
+        relay,
         counterparty: destination,
         onReconnect
       })
@@ -120,6 +122,15 @@ class Relay {
     conn: Handler,
     onReconnect: (newStream: RelayConnection, counterparty: PeerId) => Promise<void>
   ): Promise<RelayConnection | WebRTCConnection | undefined> {
+    if (conn.stream == undefined || conn.connection == undefined) {
+      error(
+        `Dropping stream because ${conn.connection == undefined ? 'cannot determine relay address ' : ''}${
+          conn.stream == undefined ? 'no stream was given' : ''
+        }`
+      )
+      return
+    }
+
     const handShakeResult = await this.handleHandshake(conn.stream)
 
     if (handShakeResult == undefined) {
@@ -136,6 +147,7 @@ class Relay {
       let newConn = new RelayConnection({
         stream: handShakeResult.stream,
         self: this.libp2p.peerId,
+        relay: conn.connection.remotePeer,
         counterparty: handShakeResult.counterparty,
         onReconnect,
         webRTC: {
@@ -160,6 +172,7 @@ class Relay {
       return new RelayConnection({
         stream: handShakeResult.stream,
         self: this.libp2p.peerId,
+        relay: conn.connection.remotePeer,
         counterparty: handShakeResult.counterparty,
         onReconnect
       })
@@ -343,7 +356,7 @@ class Relay {
   }
 
   private async establishForwarding(initiator: PeerId, counterparty: PeerId): Promise<Stream | undefined> {
-    let newConn = await this.libp2p.dialProtocol(counterparty, DELIVERY/*, { timeout: RELAY_CIRCUIT_TIMEOUT }*/)
+    let newConn = await dialHelper(this.libp2p, counterparty, DELIVERY, { timeout: RELAY_CIRCUIT_TIMEOUT })
 
     if (newConn == undefined) {
       error(`Could not establish forwarding connection to ${blue(counterparty.toB58String())}`)
