@@ -84,10 +84,6 @@ export class AdminServer {
       this.logs.subscribe(socket)
     })
 
-    this.node.on('hopr:crawl:completed', () => {
-      this.logs.log('Crawled network')
-    })
-
     this.node.on('hopr:channel:opened', (channel) => {
       this.logs.log(`Opened channel to ${channel[0].toB58String()}`)
     })
@@ -107,15 +103,17 @@ export class AdminServer {
 
     this.node.on('hopr:warning:unfundedNative', (addr) => {
       this.logs.log(
-        `- The account associated with this node has no gETH,\n` +
+        `- The account associated with this node has no ${node.paymentChannels.types.NativeBalance.SYMBOL},\n` +
           `  in order to fund gas for protocol overhead you will need to send\n` +
-          `  0.025 gETH to ${addr}`
+          `  0.025 ${node.paymentChannels.types.NativeBalance.SYMBOL} to ${addr}`
       )
     })
 
     // Setup some noise
     connectionReport(this.node, this.logs)
     reportMemoryUsage(this.logs)
+
+    showDisclaimer(this.logs)
 
     this.cmds.execute(`alias ${node.getId().toB58String()} me`)
     if (node.bootstrapServers.length == 1) {
@@ -126,6 +124,15 @@ export class AdminServer {
       })
     }
   }
+}
+
+const DISCLAIMER = `-- This software is still under development --\n\tDo NOT add assets to the node that you can't lose`
+
+export function showDisclaimer(logs: LogStream) {
+  logs.warn(DISCLAIMER)
+  setInterval(() => {
+    logs.warn(DISCLAIMER)
+  }, 60 * 1000)
 }
 
 export async function reportMemoryUsage(logs: LogStream) {

@@ -249,8 +249,9 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
         transport: {
           HoprConnect: {
             bootstrapServers: options.bootstrapServers,
-            __noDirectConnections: true,
-            __noWebRTCUpgrade: false
+            // @dev Use these settings to simulate NAT behavior
+            // __noDirectConnections: true,
+            // __noWebRTCUpgrade: false
           }
         },
         peerDiscovery: {
