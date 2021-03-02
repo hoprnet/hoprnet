@@ -8,7 +8,6 @@ import { AbstractCommand } from './abstractCommand'
 export default class RedeemTickets extends AbstractCommand {
   constructor(public node: Hopr<HoprCoreConnector>) {
     super()
-    this.hidden = true
   }
 
   public name() {
