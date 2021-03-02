@@ -24,9 +24,6 @@
   "devDependencies": {
     "rimraf": "^3.0.2"
   },
-  "resolutions": {
-    "multicodec": "2.1.0"
-  },
   "prettier": {
     "tabWidth": 2,
     "semi": false,
