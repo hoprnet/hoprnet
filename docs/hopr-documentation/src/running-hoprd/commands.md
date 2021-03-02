@@ -19,9 +19,14 @@ Type `version` to see the version of hoprd that you're running.
 
 ## address
 
-Type `address` to see the two addresses associated with your node. The top address is your HOPR address, which is used for receiving messages. By default, this only shows the last five characters. Click them to expand and see the full address.
+Type `address` to see the two addresses associated with your node. The top address is your HOPR address, which is used for interacting with other nodes in the HOPR network which includes sending and receiving messages. By default, this only shows the last five characters. Click them to expand and see the full address.
 
 The bottom address is your native address, used for funding with native and HOPR tokens.
+
+```eval_rst
+.. ATTENTION::
+   The HOPR client is still under development. Please do NOT add funds to the HOPR node that you can't lose.
+```
 
 ## settings
 
@@ -33,7 +38,7 @@ Type `ping [HOPR address]` to attempt to pings another node. You should receive 
 
 ## peers
 
-Type `peers` to see a list of nodes your node has discovered and made a connection to. Your node will use this list of peers when it attempts to send and route messages and automatically open payment channels.
+Type `peers` to see a list of nodes your node has discovered and established a connection to. Your node will use this list of peers when it attempts to send and route messages and automatically open payment channels.
 
 ## send
 
