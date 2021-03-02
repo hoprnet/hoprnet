@@ -11,6 +11,9 @@ Since the Ethereum blockchain is still expensive to use due to high gas fees, th
 
 The HOPR client is using by default the xDAI side-chain and will show the associated xDAI balance as well as the wxHOPR balance when typing `balance`.
 
+![](../../images/wxHOPR.png)
+
+
 <!-- # Testnet HOPR Tokens
 
 The HOPR mainnet will run on the Ethereum chain, and HOPR will be an ERC-20 compatible token.
