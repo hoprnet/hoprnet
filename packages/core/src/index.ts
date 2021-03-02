@@ -105,7 +105,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
   public isBootstrapNode: boolean
   public bootstrapServers: Multiaddr[]
   public initializedWithOptions: HoprOptions
-  public ticketAmount: number = TICKET_AMOUNT
+  public ticketAmount: string = TICKET_AMOUNT
   public ticketWinProb: number = TICKET_WIN_PROB
 
   private running: boolean
@@ -192,7 +192,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       this._libp2p.hangUp.bind(this._libp2p)
     )
 
-    if (options.ticketAmount) this.ticketAmount = options.ticketAmount
+    if (options.ticketAmount) this.ticketAmount = String(options.ticketAmount)
     if (options.ticketWinProb) this.ticketWinProb = options.ticketWinProb
 
     verbose('# STARTED NODE')

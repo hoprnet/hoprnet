@@ -4,7 +4,7 @@ import { moveDecimalPoint } from '@hoprnet/hopr-utils'
 
 class NativeBalance extends UINT256 implements Types.NativeBalance {
   static get SYMBOL(): string {
-    return `gETH`
+    return `xDAI`
   }
 
   static get DECIMALS(): number {

@@ -4,7 +4,7 @@ import { moveDecimalPoint } from '@hoprnet/hopr-utils'
 
 class Balance extends UINT256 implements Types.Balance {
   static get SYMBOL(): string {
-    return `HOPR`
+    return `wxHOPR`
   }
 
   static get DECIMALS(): number {
