@@ -52,6 +52,11 @@ You can use the alias command to give an address a more memorable name. Type `al
 
 Type `balance` to display your current HOPR and native balances.
 
+```eval_rst
+.. ATTENTION::
+   The HOPR client is running by default on xDAI, so `balance` will show the *xDAI* balance as well as the *wxHOPR* balance. For more information see `here <./funding/hopr-tokens.html#xhopr-on-xdai>`_
+```
+
 ## withdraw
 
 Type `withdraw [amount] [native / hopr] [address]` to withdraw the specified amount of native or HOPR tokens to the target address. Ensure you have sufficient native tokens in your balance to pay for the gas fees.

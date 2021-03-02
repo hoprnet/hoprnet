@@ -18,10 +18,15 @@ You can get xDAI by using one of these [methods](https://www.xdaichain.com/for-u
 You will need to make sure that metamask is running with xDAI. See [here](https://www.xdaichain.com/for-users/wallets/metamask) for more instructions on how to switch Metamask to xDAI.
 
 ```eval_rst
-.. ATTENTION::
+.. WARNING::
    Metamask will not show your xDAI as long as you haven't switched to xDAI.
 ```
 
 When you have xDAI in your Metamask wallet, send some to your node wallet, at the address shown when your node starts up.
+
+```eval_rst
+.. ATTENTION::
+   The HOPR client is still under development and not all issues are fixed. We recommend to not add more than 10 wxHOPR and 1 xDAI to it.
+```
 
 Once you've sent xDAI to your node, restart it. When your node restarts, your balance will be automatically detected and you can proceed.
