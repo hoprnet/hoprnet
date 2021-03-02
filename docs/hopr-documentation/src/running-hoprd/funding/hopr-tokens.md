@@ -1,20 +1,20 @@
-<!-- ---
-description: 'The rundown on testnet HOPR, the token used for our testnets'
---- -->
+# HOPR on Ethereum mainnet
 
-# Testnet HOPR Tokens
+The HOPR mainnet token, "HOPR Token", is deployed on Ethereum mainnet on [0xF5581dFeFD8Fb0e4aeC526bE659CFaB1f8c781dA](https://etherscan.io/address/0xF5581dFeFD8Fb0e4aeC526bE659CFaB1f8c781dA), denoted as "HOPR".
 
-The HOPR mainnet will run on the Ethereum chain, and HOPR will be an ERC-20 compatible token.
+Since the Ethereum blockchain is still expensive to use due to high gas fees, the HOPR token can be also used on xDAI, a side-chain of Ethereum, by converting them to xHOPR. The "xHOPR Token" is deployed in address [0x12481c3Ed97b32D94E71C2039DBC44432ADD39a0](https://blockscout.com/poa/xdai/address/0x12481c3Ed97b32D94E71C2039DBC44432ADD39a0/transactions) on xDAI.
 
-The testnet runs on Goerli Network, so requires a GOERLI-compatible token. That's why the testnet will use testnet HOPR.
+# xHOPR on xDAI
 
-Just like in the HOPR mainnet, you'll receive testnet HOPR when you relay data to other users in the network.
-
-Testnet HOPR works like the HOPR token will: you receive it for relaying and mixing data in the HOPR mixnet, and you spend it to send data.
-
-You can check your testnet HOPR balance at any time by typing `balance` in HOPRd or in your HOPR AVADO Node. This will also show you your gETH balance, under `native`.
+When sending "mainnet" HOPR through a bridge between Ethereum and xDAI, the mainnet "HOPR token", initially a ERC777 token and fully compatible with ERC20 becomes a ERC677 token on xDAI.
 
 ```eval_rst
-.. DANGER::
-   The testnet HOPR token will only work on our HOPR testnets. It is not the final HOPR token that will run on mainnet and for legal reasons testnet HOPR tokens cannot be transferred to HOPR tokens. Prizes for our testnets will be solely determined by your final score on the testnet leaderboard, not the number of testnet HOPR tokens you control.
+.. ATTENTION::
+   The HOPR client is still under development and not all issues are fixed. We recommend to not add more than 10 wxHOPR and 1 xDAI to it.
 ```
+
+In order to use it with HOPR and the payment channel logic on xDAI, xHOPR needs to be wrapped into an ERC777 compatible token on xDAI, we call this "wxHOPR" - "wrapped xHOPR". This can be done using the wrapper website at [wrapper.hoprnet.org](https://wrapper.hoprnet.org).
+
+[![](../../../images/wxhopr.png)](https://wrapper.hoprnet.org)
+
+After wrapping the tokens from _xHOPR_ to _wxHOPR_ they can be used within the HOPR client and will appear in the client when typing `balance`.
