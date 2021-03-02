@@ -84,10 +84,6 @@ export class AdminServer {
       this.logs.subscribe(socket)
     })
 
-    this.node.on('hopr:crawl:completed', () => {
-      this.logs.log('Crawled network')
-    })
-
     this.node.on('hopr:channel:opened', (channel) => {
       this.logs.log(`Opened channel to ${channel[0].toB58String()}`)
     })
@@ -122,6 +118,8 @@ export class AdminServer {
     connectionReport(this.node, this.logs)
     reportMemoryUsage(this.logs)
 
+    showDisclaimer(this.logs)
+
     this.cmds.execute(`alias ${node.getId().toB58String()} me`)
     if (node.bootstrapServers.length == 1) {
       this.cmds.execute(`alias ${node.bootstrapServers[0].getPeerId()} bootstrap`)
@@ -131,6 +129,15 @@ export class AdminServer {
       })
     }
   }
+}
+
+const DISCLAIMER = `-- This software is still under development --\n\tDo NOT add assets to the node that you can't lose`
+
+export function showDisclaimer(logs: LogStream) {
+  logs.warn(DISCLAIMER)
+  setInterval(() => {
+    logs.warn(DISCLAIMER)
+  }, 60 * 1000)
 }
 
 export async function reportMemoryUsage(logs: LogStream) {
