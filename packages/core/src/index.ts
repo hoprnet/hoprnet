@@ -128,7 +128,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       this.networkPeers.register(conn.remotePeer)
     })
 
-    this.setChannelStrategy(options.strategy || 'promiscuous')
+    this.setChannelStrategy(options.strategy || 'passive')
     this.initializedWithOptions = options
     this.output = (arr: Uint8Array) => {
       this.emit('hopr:message', arr)
