@@ -40,7 +40,7 @@ export const MAX_NEW_CHANNELS_PER_TICK = 5
 export const MAX_AUTO_CHANNELS = 5
 export const MIN_NATIVE_BALANCE = new BN('100000000000000') // 0.0001 ETH
 
-// enough to open and close 5 channels
+// enough to fund 10 channels
 export const SUGGESTED_BALANCE = MINIMUM_REASONABLE_CHANNEL_STAKE.muln(MAX_AUTO_CHANNELS * 2)
 export const SUGGESTED_NATIVE_BALANCE = MIN_NATIVE_BALANCE.muln(250) // 0.025 ETH
 
