@@ -20,7 +20,7 @@ jobs:
       - name: Remove old NPM lockfile
         run: |
           cd packages/hoprd
-          rm packages/hoprd/package-lock.json
+          rm -f package-lock.json
       - name: Install dependencies and create new NPM lockfile
         run: |
           cd packages/hoprd
