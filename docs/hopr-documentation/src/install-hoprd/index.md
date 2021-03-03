@@ -2,7 +2,7 @@
 
 ```eval_rst
 .. ATTENTION::
-   The HOPR client software is still under development. Please do *not* add funds to the node that you cannot lose. 
+   The HOPR client software is still under development. Please do *not* add funds to the node that you cannot lose.
 
    For further questions, please visit our `Telegram channel <https://t.me/hoprnet>`_.
 ```
