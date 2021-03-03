@@ -17,7 +17,11 @@ jobs:
           node-version: 14
           registry-url: https://registry.npmjs.org/
 
-      - name: Install dependencies
+      - name: Remove old NPM lockfile
+        run: |
+          cd packages/hoprd
+          rm packages/hoprd/package-lock.json
+      - name: Install dependencies and create new NPM lockfile
         run: |
           cd packages/hoprd
           npm install
