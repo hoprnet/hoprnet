@@ -1,33 +1,33 @@
-name: HOPR Lint and fix
+# name: HOPR Lint and fix
 
-on:
-  push:
-    branches: ['**']
-    paths-ignore:
-      - '**/docs/**/*'
+# on:
+#   push:
+#     branches: ['**']
+#     paths-ignore:
+#       - '**/docs/**/*'
 
 
-jobs:
-  build:
-    name: Lint 
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
+# jobs:
+#   build:
+#     name: Lint 
+#     runs-on: ubuntu-latest
+#     steps:
+#       - uses: actions/checkout@v2
 
-      - name: Use Node.js 
-        uses: actions/setup-node@v1
-        with:
-          node-version: 14
-          registry-url: https://registry.npmjs.org/
+#       - name: Use Node.js 
+#         uses: actions/setup-node@v1
+#         with:
+#           node-version: 14
+#           registry-url: https://registry.npmjs.org/
 
-      - name: Install dependencies 
-        run: yarn
+#       - name: Install dependencies 
+#         run: yarn
 
-      - name: Lint & Fix
-        run: |
-          git config --global user.email "noreply@hoprnet.org"
-          git config --global user.name "HOPR Linting robot"
-          yarn lint:fix
-          git commit -a -m "Fix linting" || true
-          git pull origin ${{ github.ref }}
-          git push origin ${{ github.ref }}
+#       - name: Lint & Fix
+#         run: |
+#           git config --global user.email "noreply@hoprnet.org"
+#           git config --global user.name "HOPR Linting robot"
+#           yarn lint:fix
+#           git commit -a -m "Fix linting" || true
+#           git pull origin ${{ github.ref }}
+#           git push origin ${{ github.ref }}
