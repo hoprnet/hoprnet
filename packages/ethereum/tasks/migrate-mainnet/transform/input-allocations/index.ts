@@ -49,10 +49,10 @@ export default async () => {
 
     const chunk = 100
     for (let i = 0; i < formatted.accounts.length; i += chunk) {
-      const allocations: Allocations = {
+      const allocations: any = {
         name: `${name}-allocations-${i}.json`,
         accounts: formatted.accounts.slice(i, i + chunk),
-        amounts: formatted.amounts.slice(i, i + chunk)
+        amounts: formatted.amounts.slice(i, i + chunk),
       }
 
       await writeFile(join(OUTPUT_DIR, allocations.name), JSON.stringify(allocations, null, 2))
