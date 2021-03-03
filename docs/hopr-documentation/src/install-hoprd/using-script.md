@@ -78,7 +78,7 @@ working directory where it will store the encrypted key to your node and your of
 private data.
 
 ```bash
-DEBUG=hopr* hoprd --init --rest --admin --password='' 2>&1 | tee ~/hoprd-logs.txt
+script -aeqc "DEBUG=hopr* hoprd --init --rest --admin --password=''" ~/hoprd-logs.txt
 ```
 
 ### Accessing HOPRd on a local machine
