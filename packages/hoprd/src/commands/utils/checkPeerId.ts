@@ -2,10 +2,6 @@ import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 import type { GlobalState } from '../abstractCommand'
 import PeerId from 'peer-id'
-// @ts-ignore
-import Multihash from 'multihashes'
-import bs58 from 'bs58'
-import { addPubKey } from '@hoprnet/hopr-core/lib/utils'
 import { getPeersIdsAsString } from './openChannels'
 
 /**
@@ -21,10 +17,7 @@ export async function checkPeerIdInput(peerIdString: string, state?: GlobalState
       return state.aliases.get(peerIdString)!
     }
 
-    // Throws an error if the Id is invalid
-    Multihash.decode(bs58.decode(peerIdString))
-
-    return await addPubKey(PeerId.createFromB58String(peerIdString))
+    return PeerId.createFromB58String(peerIdString)
   } catch (err) {
     throw Error(`Invalid peerId. ${err.message}`)
   }
