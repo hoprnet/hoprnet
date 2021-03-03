@@ -51,11 +51,13 @@
     "@hoprnet/hopr-testing": "1.69.0-next.52",
     "@openzeppelin/test-helpers": "^0.5.9",
     "@types/chai": "^4.2.14",
+    "@types/csvtojson": "^1.1.5",
     "@types/lodash": "^4.14.162",
     "@types/mocha": "^8.0.3",
     "@types/node": "14",
     "@types/secp256k1": "^4.0.1",
     "chai": "^4.2.0",
+    "csvtojson": "^2.0.10",
     "rimraf": "^3.0.2",
     "typescript": "^4.1"
   },

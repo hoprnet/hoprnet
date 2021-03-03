@@ -1,54 +1,45 @@
-import type { AllocationsRaw } from '../types'
+import type { Allocations } from '../types'
 import { promisify } from 'util'
 import { readdir as _readdir, readFile as _readFile, writeFile as _writeFile } from 'fs'
 import { join } from 'path'
+import csvtojson from 'csvtojson'
 import { transformAllocations } from '../utils'
 
 const readdir = promisify(_readdir)
-const readFile = promisify(_readFile)
 const writeFile = promisify(_writeFile)
 const INPUT_DIR = __dirname
 const OUTPUT_DIR = join(__dirname, '..', 'output')
 
 export default async () => {
   const files = await readdir(INPUT_DIR).then((res) => res.filter((name) => name.includes('.csv')))
-  const contents = await Promise.all(
-    files.map(async (name) => {
-      return {
-        name: name.replace('.csv', ''),
-        content: await readFile(join(INPUT_DIR, name), { encoding: 'utf-8' })
+
+  const allocations: {
+    [name: string]: Allocations
+  } = {}
+
+  for (const fileName of files) {
+    const name = fileName.replace('.csv', '')
+    const [allocationName] = name.split('-')
+
+    const json: {
+      account: string
+      amount: string
+      total: string
+    }[] = await csvtojson({ headers: ['account', 'amount', 'total'] }).fromFile(join(INPUT_DIR, fileName))
+
+    if (!allocations[allocationName])
+      allocations[allocationName] = {
+        name: allocationName,
+        accounts: [],
+        amounts: []
       }
-    })
-  )
 
-  const rawAllocations: AllocationsRaw = {
-    accounts: [],
-    amounts: []
+    allocations[allocationName].accounts = allocations[allocationName].accounts.concat(json.map((o) => o.account))
+    allocations[allocationName].amounts = allocations[allocationName].amounts.concat(json.map((o) => o.amount))
   }
 
-  for (const content of contents) {
-    const allocation = csvToAllocations(content.content)
-    rawAllocations.accounts = rawAllocations.accounts.concat(allocation.accounts)
-    rawAllocations.amounts = rawAllocations.amounts.concat(allocation.amounts)
+  for (const [name, data] of Object.entries(allocations)) {
+    const formatted = transformAllocations(name, data)
+    await writeFile(join(OUTPUT_DIR, `${name}-allocations.json`), JSON.stringify(formatted, null, 2))
   }
-
-  const allocations = transformAllocations('bounties', rawAllocations)
-
-  await writeFile(join(OUTPUT_DIR, `${allocations.name}-allocations.json`), JSON.stringify(allocations, null, 2))
-}
-
-const csvToAllocations = (csv: string): AllocationsRaw => {
-  const result: AllocationsRaw = {
-    accounts: [],
-    amounts: []
-  }
-  const rows = csv.split('\n')
-
-  for (const row of rows) {
-    const [address, , total] = row.split(',')
-    result.accounts.push(address)
-    result.amounts.push(total)
-  }
-
-  return result
 }
