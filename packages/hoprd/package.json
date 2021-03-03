@@ -23,6 +23,7 @@
     "test": "node --trace-warnings --unhandled-rejections=strict ../../node_modules/.bin/mocha --reporter=tap --full-trace --exit",
     "prepublishOnly": "yarn build",
     "start": "node lib/index.js --admin --init --rest",
+    "start:dryRun": "node lib/index.js --dryRun",
     "dev": "yarn build && NODE_ENV=development yarn start"
   },
   "dependencies": {

@@ -26,7 +26,7 @@ jobs:
         timeout-minutes: 1
         run: |
           cd packages/hoprd
-          npm start
+          npm start:dryRun
       - name: Commit latest version of NPM lockfile
         run: |
           git config --global user.email "noreply@hoprnet.org"
