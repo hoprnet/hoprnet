@@ -21,6 +21,7 @@ jobs:
         run: |
           cd packages/hoprd
           npm install
+          npm run-script build
       - name: Start with npm and check if it fails
         timeout-minutes: 1
         run: |
