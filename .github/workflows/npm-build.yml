@@ -21,4 +21,5 @@ jobs:
         run: |
           cd packages/hoprd
           npm install
+      - name: Start with npm
           npm start
