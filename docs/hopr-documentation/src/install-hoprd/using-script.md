@@ -41,7 +41,7 @@ when running this command the first time, it will create folder `db` in which
 it will store your private data.
 
 ```bash
-DEBUG=hopr* hoprd --init --rest --admin --provider "wss://xdai.poanetwork.dev/wss" 2>&1 | tee ~/hoprd-logs.txt
+DEBUG=hopr* hoprd --init --rest --admin 2>&1 | tee ~/hoprd-logs.txt
 ```
 
 ### Accessing HOPRd on a local machine
