@@ -10,6 +10,8 @@ import { AdminServer } from './admin'
 import * as yargs from 'yargs'
 import setupAPI from './api'
 
+require('multicodec/src/basetable.js')
+
 const argv = yargs
   .option('network', {
     describe: 'Which network to run the HOPR node on',
