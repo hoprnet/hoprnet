@@ -1,9 +1,5 @@
 {
   "name": "marketing",
-  "durations": [
-    "86400"
-  ],
-  "percents": [
-    "1000000"
-  ]
+  "durations": ["86400"],
+  "percents": ["1000000"]
 }
