@@ -57,7 +57,10 @@ export const transformAllocations = (name: string, input: AllocationsRaw): Alloc
   const balances = new Map<string, string>()
   for (let i = 0; i < input.accounts.length; i++) {
     const account = toChecksumAddress(input.accounts[i])
-    const amount = toWei(input.amounts[i], 'ether')
+
+    let amount = toWei(input.amounts[i], 'ether')
+    if (name === 'bounties') amount = toBN(amount).muln(2).toString()
+
     const balance = toBN(balances.get(account) ?? 0).add(toBN(amount))
 
     // TEMPORARY CHECK

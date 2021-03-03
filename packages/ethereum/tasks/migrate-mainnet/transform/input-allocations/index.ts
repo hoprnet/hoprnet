@@ -3,6 +3,7 @@ import { promisify } from 'util'
 import { readdir as _readdir, readFile as _readFile, writeFile as _writeFile } from 'fs'
 import { join } from 'path'
 import csvtojson from 'csvtojson'
+import BN from 'bn.js'
 import { transformAllocations } from '../utils'
 
 const readdir = promisify(_readdir)
@@ -13,7 +14,7 @@ const OUTPUT_DIR = join(__dirname, '..', 'output')
 export default async () => {
   const files = await readdir(INPUT_DIR).then((res) => res.filter((name) => name.includes('.csv')))
 
-  const allocations: {
+  const dir: {
     [name: string]: Allocations
   } = {}
 
@@ -25,21 +26,36 @@ export default async () => {
       account: string
       amount: string
       total: string
-    }[] = await csvtojson({ headers: ['account', 'amount', 'total'] }).fromFile(join(INPUT_DIR, fileName))
+    }[] = await csvtojson({ noheader: true, headers: ['account', 'amount', 'total'] }).fromFile(
+      join(INPUT_DIR, fileName)
+    )
 
-    if (!allocations[allocationName])
-      allocations[allocationName] = {
+    if (!dir[allocationName])
+      dir[allocationName] = {
         name: allocationName,
         accounts: [],
         amounts: []
       }
 
-    allocations[allocationName].accounts = allocations[allocationName].accounts.concat(json.map((o) => o.account))
-    allocations[allocationName].amounts = allocations[allocationName].amounts.concat(json.map((o) => o.amount))
+    dir[allocationName].accounts = dir[allocationName].accounts.concat(json.map((o) => o.account))
+    dir[allocationName].amounts = dir[allocationName].amounts.concat(json.map((o) => o.amount))
   }
 
-  for (const [name, data] of Object.entries(allocations)) {
+  for (const [name, data] of Object.entries(dir)) {
     const formatted = transformAllocations(name, data)
-    await writeFile(join(OUTPUT_DIR, `${name}-allocations.json`), JSON.stringify(formatted, null, 2))
+
+    const sum = formatted.amounts.reduce((result, a) => result.add(new BN(String(a))), new BN(0))
+    console.log(`SUM ${name}: %s`, sum.toString())
+
+    const chunk = 100
+    for (let i = 0; i < formatted.accounts.length; i += chunk) {
+      const allocations: Allocations = {
+        name: `${name}-allocations-${i}.json`,
+        accounts: formatted.accounts.slice(i, i + chunk),
+        amounts: formatted.amounts.slice(i, i + chunk)
+      }
+
+      await writeFile(join(OUTPUT_DIR, allocations.name), JSON.stringify(allocations, null, 2))
+    }
   }
 }
