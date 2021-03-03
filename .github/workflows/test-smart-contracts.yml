@@ -3,6 +3,9 @@ name: HOPR Test
 on:
   push:
     branches: ['**']
+    paths:
+      - '!packages/ethereum/**/*'
+
     paths-ignore:
       - '**/docs/**/*'
 
@@ -14,7 +17,7 @@ jobs:
     strategy:
       matrix:
         node-version: [14]
-        package: ['core', 'ethereum', 'all', 'core-ethereum']
+        package: ['core', 'all', 'core-ethereum']
 
     steps:
       - uses: actions/checkout@v2
