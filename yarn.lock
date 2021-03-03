@@ -9374,7 +9374,7 @@ multicodec@^2.0.0, multicodec@^2.1.0:
     uint8arrays "1.1.0"
     varint "^6.0.0"
 
-multihashes@4.0.1, multihashes@^4.0.1, multihashes@~4.0.1:
+multihashes@4.0.1, multihashes@~4.0.1:
   version "4.0.1"
   resolved "https://registry.yarnpkg.com/multihashes/-/multihashes-4.0.1.tgz#b93debf7b4ca6e77664088cb0932cd0bfcac5d6b"
   integrity sha512-8S6EMaQ4K8l+AerbCDQ+9jfEs+tkk8shvV7REA00VX56v+WNIKp5m4OriLlVaVkkbLZj1eEM5Q0LsYNHAcKB+g==
