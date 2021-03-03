@@ -47,7 +47,7 @@ export default async () => {
     const sum = formatted.amounts.reduce((result, a) => result.add(new BN(String(a))), new BN(0))
     console.log(`SUM ${name}: %s`, sum.toString())
 
-    const chunk = 100
+    const chunk = 450
     for (let i = 0; i < formatted.accounts.length; i += chunk) {
       const allocations: any = {
         name: `${name}-allocations-${i}.json`,
