@@ -21,8 +21,10 @@ jobs:
         run: |
           cd packages/hoprd
           npm install
-      - name: Start with npm
+      - name: Start with npm and check if it fails
+        timeout-minutes: 1
         run:
+          cd packages/hoprd
           npm start
       - name: Commit latest version of NPM lockfile
         run: |
