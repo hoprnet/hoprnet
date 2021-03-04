@@ -9374,10 +9374,10 @@ multicodec@^2.0.0, multicodec@^2.1.0:
     uint8arrays "1.1.0"
     varint "^6.0.0"
 
-multihashes@4.0.1, multihashes@^4.0.1, multihashes@~4.0.1:
-  version "4.0.1"
-  resolved "https://registry.yarnpkg.com/multihashes/-/multihashes-4.0.1.tgz#b93debf7b4ca6e77664088cb0932cd0bfcac5d6b"
-  integrity sha512-8S6EMaQ4K8l+AerbCDQ+9jfEs+tkk8shvV7REA00VX56v+WNIKp5m4OriLlVaVkkbLZj1eEM5Q0LsYNHAcKB+g==
+multihashes@4.0.2, multihashes@^4.0.1, multihashes@~4.0.1:
+  version "4.0.2"
+  resolved "https://registry.yarnpkg.com/multihashes/-/multihashes-4.0.2.tgz#d76aeac3a302a1bed9fe1ec964fb7a22fa662283"
+  integrity sha512-xpx++1iZr4ZQHjN1mcrXS6904R36LWLxX/CBifczjtmrtCXEX623DMWOF1eiNSg+pFpiZDFVBgou/4v6ayCHSQ==
   dependencies:
     multibase "^4.0.1"
     uint8arrays "^2.1.3"
