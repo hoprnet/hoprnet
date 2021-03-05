@@ -6614,9 +6614,9 @@ hardhat-typechain@^0.3.3:
   integrity sha512-w9lm8sxqTJACY+V7vijiH+NkPExnmtiQEjsV9JKD1KgMdVk2q8y+RhvU/c4B7+7b1+HylRUCxpOIvFuB3rE4+w==
 
 hardhat@^2.0.2:
-  version "2.0.11"
-  resolved "https://registry.yarnpkg.com/hardhat/-/hardhat-2.0.11.tgz#f7bc9d38045ecda58665dcf1ffae9ff940712f06"
-  integrity sha512-K3cyXV/F0reT0Lu7fHHBAgVOVenUaYa6uCNvzYbFnjKH+s8O4CEdrsFQ/yIbmLgMpC2EQeuBSwb+8ZhWVj8AGQ==
+  version "2.1.1"
+  resolved "https://registry.yarnpkg.com/hardhat/-/hardhat-2.1.1.tgz#bcfed980019672b57011845a1678f714728d6ee7"
+  integrity sha512-55XMqB5QoeRg3m56rBg0NQgU//GPqOC9t4RbRSU3pdBJGHGXFTUh8fjTPxnWJNu9r72Zju++syGcCkPGwftyvw==
   dependencies:
     "@nomiclabs/ethereumjs-vm" "4.2.2"
     "@sentry/node" "^5.18.1"
@@ -6648,6 +6648,7 @@ hardhat@^2.0.2:
     io-ts "1.10.4"
     lodash "^4.17.11"
     merkle-patricia-tree "3.0.0"
+    mnemonist "^0.38.0"
     mocha "^7.1.2"
     node-fetch "^2.6.0"
     qs "^6.7.0"
@@ -9202,6 +9203,13 @@ mkdirp@0.5.5, mkdirp@0.5.x, mkdirp@^0.5.0, mkdirp@^0.5.1:
   dependencies:
     minimist "^1.2.5"
 
+mnemonist@^0.38.0:
+  version "0.38.3"
+  resolved "https://registry.yarnpkg.com/mnemonist/-/mnemonist-0.38.3.tgz#35ec79c1c1f4357cfda2fe264659c2775ccd7d9d"
+  integrity sha512-2K9QYubXx/NAjv4VLq1d1Ly8pWNC5L3BrixtdkyTegXWJIqY+zLNDhhX/A+ZwWt70tB1S8H4BE8FLYEFyNoOBw==
+  dependencies:
+    obliterator "^1.6.1"
+
 mocha@^7.1.2:
   version "7.2.0"
   resolved "https://registry.yarnpkg.com/mocha/-/mocha-7.2.0.tgz#01cc227b00d875ab1eed03a75106689cfed5a604"
@@ -10034,6 +10042,11 @@ object.pick@^1.3.0:
   integrity sha1-h6EKxMFpS9Lhy/U1kaZhQftd10c=
   dependencies:
     isobject "^3.0.1"
+
+obliterator@^1.6.1:
+  version "1.6.1"
+  resolved "https://registry.yarnpkg.com/obliterator/-/obliterator-1.6.1.tgz#dea03e8ab821f6c4d96a299e17aef6a3af994ef3"
+  integrity sha512-9WXswnqINnnhOG/5SLimUlzuU1hFJUc8zkwyD59Sd+dPOMf05PmnYG/d6Q7HZ+KmgkZJa1PxRso6QdM3sTNHig==
 
 oboe@2.1.4:
   version "2.1.4"
