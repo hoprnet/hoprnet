@@ -24,7 +24,7 @@ class OnChainKey<Chain extends HoprCoreConnector> implements AbstractInteraction
   }
 
   async interact(counterparty: PeerId): Promise<Types.Public> {
-    const struct = await dialHelper(this.node._libp2p, counterparty, this.protocols, {
+    const struct = await dialHelper(this.node._libp2p, counterparty, this.protocols[0], {
       timeout: ONCHAIN_KEY_TIMEOUT
     })
 

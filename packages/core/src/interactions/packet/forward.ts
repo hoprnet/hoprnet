@@ -26,7 +26,7 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector> implements Abstr
   }
 
   async interact(counterparty: PeerId, packet: Packet<Chain>): Promise<void> {
-    const struct = await dialHelper(this.node._libp2p, counterparty, this.protocols, {
+    const struct = await dialHelper(this.node._libp2p, counterparty, this.protocols[0], {
       timeout: FORWARD_TIMEOUT
     })
 

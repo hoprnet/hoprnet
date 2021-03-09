@@ -5,7 +5,7 @@ const MPLEX = require('libp2p-mplex')
 const KadDHT = require('libp2p-kad-dht')
 import { NOISE } from 'libp2p-noise'
 
-import HoprConnect from '@hoprnet/hopr-connect'
+const { HoprConnect } = require('@hoprnet/hopr-connect')
 
 import { Packet } from './messages/packet'
 import {
@@ -48,8 +48,8 @@ import { ChannelStrategy, PassiveStrategy, PromiscuousStrategy } from './channel
 
 import Debug from 'debug'
 import { Address } from 'libp2p/src/peer-store'
+
 const log = Debug(`hopr-core`)
-const logError = Debug(`hopr-core:error`)
 const verbose = Debug('hopr-core:verbose')
 
 interface NetOptions {
@@ -161,6 +161,26 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       }
     }
 
+    if (process.env.GCLOUD) {
+      try {
+        var name = 'hopr_node_' + this.getId().toB58String().slice(-5).toLowerCase()
+        if (this.isBootstrapNode) {
+          name = 'hopr_bootstrap_' + this.getId().toB58String().slice(-5).toLowerCase()
+        }
+        require('@google-cloud/profiler')
+          .start({
+            projectId: 'hoprassociation',
+            serviceContext: {
+              service: name,
+              version: FULL_VERSION
+            }
+          })
+          .catch((e: any) => console.log(e))
+      } catch (e) {
+        console.log(e)
+      }
+    }
+
     this.networkPeers = new NetworkPeers(
       Array.from(this._libp2p.peerStore.peers.values()).map((x) => x.id),
       [this.getId()].concat(this.bootstrapServers.map((bs) => PeerId.createFromB58String(bs.getPeerId())))
@@ -228,7 +248,9 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       config: {
         transport: {
           HoprConnect: {
-            bootstrapServers: options.bootstrapServers
+            bootstrapServers: options.bootstrapServers,
+            __noDirectConnections: true,
+            __noWebRTCUpgrade: false
           }
         },
         peerDiscovery: {
@@ -250,46 +272,6 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     })
 
     return await new Hopr<CoreConnector>(options, libp2p, db, connector).start()
-  }
-
-  /**
-   * Parses the bootstrap servers given in options` and tries to connect to each of them.
-   *
-   * @throws an error if none of the bootstrapservers is online
-   */
-  private async connectToBootstrapServers(): Promise<void> {
-    const potentialBootstrapServers = this.bootstrapServers.filter(
-      (addr) => addr.getPeerId() != this.getId().toB58String()
-    )
-    verbose('bootstrap', potentialBootstrapServers)
-
-    if (potentialBootstrapServers.length == 0) {
-      if (this._debug != true && !this.isBootstrapNode) {
-        throw Error(
-          `Can't start HOPR without any known bootstrap server. You might want to start this node as a bootstrap server.`
-        )
-      }
-
-      return
-    }
-
-    const results = await Promise.all(
-      potentialBootstrapServers.map((addr: Multiaddr) =>
-        this._libp2p.dial(addr).then(
-          () => true,
-          (err) => {
-            logError(err)
-            return false
-          }
-        )
-      )
-    )
-    verbose('bootstrap status', results)
-
-    if (!results.some((online: boolean) => online)) {
-      console.error('Tried', potentialBootstrapServers.map((x) => x.toString()).join(','))
-      throw Error('Unable to connect to any known bootstrap server.')
-    }
   }
 
   private async tickChannelStrategy(newChannels: RoutingChannel[]) {
@@ -361,16 +343,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
    * @param options
    */
   public async start(): Promise<Hopr<Chain>> {
-    await Promise.all([
-      this._libp2p.start().then(() =>
-        Promise.all([
-          // prettier-ignore
-          this.connectToBootstrapServers(),
-          this.heartbeat.start()
-        ])
-      ),
-      this.paymentChannels.start()
-    ])
+    await Promise.all([this._libp2p.start().then(() => this.heartbeat.start()), this.paymentChannels.start()])
 
     log(`Available under the following addresses:`)
 
