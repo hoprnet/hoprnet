@@ -54,16 +54,6 @@ export default class HoprEthereum implements HoprCoreConnector {
     this.channel = new ChannelFactory(this)
     this._debug = debug
     this.hashedSecret = new HashedSecret(this.db, this.account, this.hoprChannels)
-
-    // @ts-ignore-next-line
-    provider.on('error', (error: string) => {
-      log(`WEB3 provider error: ${error}`)
-      // restart indexer if there is an error with the provider
-      this.indexer.stop().then(() => this.indexer.start())
-    })
-    provider.on('end', () => {
-      log('WEB3 provider stopping')
-    })
   }
 
   readonly dbKeys = dbkeys
