@@ -177,9 +177,7 @@ describe('test Channel class', function () {
     }
 
     const hashedSecretAfter = await counterpartysChannel.coreConnector.probabilisticPayments.getOnChainSecret()
-
     assert(!hashedSecretBefore.eq(hashedSecretAfter), 'Ticket redemption must alter on-chain secret.')
-
     result = await counterpartysCoreConnector.probabilisticPayments.redeemTicket(ackTicket.ticket)
     assert(result.status == 'E_ALREADY_SUBMITTED', 'Ticket must lose its validity after being submitted')
   })
