@@ -141,14 +141,13 @@ describe('test probabilistic payments', function () {
       (await getPrivKeyData(bob)).address,
       challenge,
       mockEpoch,
-      mockChannelIteration, 1)
+      mockChannelIteration,
+      1
+    )
     assert(ticket, 'ticket created')
-    
 
     // Alice sends to Bob
     let unacknowledged = ticket.toUnacknowledged(secretA)
-    
-    
   })
 
   /*
