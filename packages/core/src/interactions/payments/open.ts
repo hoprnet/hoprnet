@@ -26,7 +26,7 @@ class Opening<Chain extends HoprCoreConnector> implements AbstractInteraction {
   }
 
   async interact(counterparty: PeerId, channelBalance: Types.ChannelBalance): Promise<Types.SignedChannel> {
-    const struct = await dialHelper(this.node._libp2p, counterparty, this.protocols, {
+    const struct = await dialHelper(this.node._libp2p, counterparty, this.protocols[0], {
       timeout: CHANNEL_OPEN_TIMEOUT
     })
 

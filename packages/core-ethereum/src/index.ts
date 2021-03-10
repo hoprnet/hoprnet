@@ -242,7 +242,6 @@ export default class HoprEthereum implements HoprCoreConnector {
 
     const hoprChannels = new web3.eth.Contract(HoprChannelsAbi as any, addresses?.[network]?.HoprChannels)
     const hoprToken = new web3.eth.Contract(HoprTokenAbi as any, addresses?.[network]?.HoprToken)
-
     const coreConnector = new HoprEthereum(
       db,
       web3,

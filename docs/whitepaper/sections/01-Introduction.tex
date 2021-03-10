@@ -15,17 +15,17 @@ In this new ecosystem, multiple decentralized applications (dApps) interact with
 
 \setlength{\tabcolsep}{1em} % for the horizontal padding
 {\renewcommand{\arraystretch}{2}% for the vertical padding
-\begin{center}
-    \begin{tabular}{|c|c|c|}
-        \hline
-        \multicolumn{3}{|c|}{\textbf{dApps}} \\
-        \hline
-        \makecell{\textbf{Assets}\\Bitcoin, ZCash, tokens} & \makecell{\textbf{Storage}\\IPFS, NuCypher} & \makecell{\textbf{Computation}\\Golem, Enigma}\\
-        \hline
-        \multicolumn{3}{|c|}{\makecell{\textbf{Messaging}\\\textbf{HOPR}}} \\
-        \hline
-    \end{tabular}
-\end{center}
+    \begin{center}
+        \begin{tabular}{|c|c|c|}
+            \hline
+            \multicolumn{3}{|c|}{\textbf{dApps}}              \\
+            \hline
+            \makecell{\textbf{Assets}                         \\Bitcoin, ZCash, tokens} & \makecell{\textbf{Storage}\\IPFS, NuCypher} & \makecell{\textbf{Computation}\\Golem, Enigma}\\
+            \hline
+            \multicolumn{3}{|c|}{\makecell{\textbf{Messaging} \\\textbf{HOPR}}} \\
+            \hline
+        \end{tabular}
+    \end{center}
 }
 
 \subsection{Protocol layers of the web3}
@@ -33,22 +33,23 @@ HOPR fills the gap between peer-to-peer (P2P) networks and dApps that exchange s
 
 \setlength{\tabcolsep}{1em} % for the horizontal padding
 {\renewcommand{\arraystretch}{2}% for the vertical padding
-\begin{center}
-    \begin{tabular}{|l|l|l|}
-        \hline
-        \textbf{Layer} & \textbf{Purpose} & \textbf{Example}\\
-        \hline 
-        Application & Application logic & \makecell[l]{Chat app,\\M2M comms}\\
-        \hline
-        Storage / sync & \makecell[l]{Synchronization of data,\\version management,\\medium-term message caching} & Matrix\\
-        \hline
-        \textbf{Privacy} & \textbf{\makecell[l]{Scalable \& decentralized\\metadata protection,\\incentivization for\\packet relayers,\\short-term caching}} & \textbf{HOPR}\\
-        \hline
-        P2P & \makecell[l]{Overlay routing,\\NAT traversal} & libp2p, WebRTC\\
-        \hline
-        Network & \makecell[l]{Underlay routing,\\congestion control} & TCP/IP, QUIC\\
-        \hline
-    \end{tabular}
-\end{center}
+    \begin{center}
+        \begin{tabular}{|l|l|l|}
+            \hline
+            \textbf{Layer}   & \textbf{Purpose}                               & \textbf{Example}       \\
+            \hline
+            Application      & Application logic                              & \makecell[l]{Chat app, \\M2M comms}\\
+            \hline
+            Storage / sync   & \makecell[l]{Synchronization of data,                                   \\version management,\\medium-term message caching} & Matrix\\
+            \hline
+            \textbf{Privacy} & \textbf{\makecell[l]{Scalable \& decentralized                          \\metadata protection,\\incentivization for\\packet relayers,\\short-term caching}} & \textbf{HOPR}\\
+            \hline
+            P2P              & \makecell[l]{Overlay routing,                                           \\NAT traversal} & libp2p, WebRTC\\
+            \hline
+            Network          & \makecell[l]{Underlay routing,                                          \\congestion control} & TCP/IP, QUIC\\
+            \hline
+        \end{tabular}
+    \end{center}
 }
+
 In the blockchain world, HOPR complements technologies that provide on-chain privacy. Data packets produced by dApps may not just contain valuable data but may also reveal metadata that can be linked to real-world identities. On-chain privacy, for example, is of limited impact if a network observer can link metadata to a social media account in order to attack the person because of the fact \textit{that} they used privacy-preserving financial networks - without knowing \textit{what} exactly they used them for.

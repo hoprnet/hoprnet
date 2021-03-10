@@ -311,7 +311,7 @@ export async function waitFor({
 
   const diff = now - timestamp || 60
 
-  if (network === 'localhost') {
+  if (isGanache(network)) {
     await time.increase(web3, diff)
   } else {
     await wait(diff * 1e3)
@@ -443,4 +443,12 @@ export function getSignatureParameters(
  */
 export async function createChallenge(secretA: Uint8Array, secretB: Uint8Array): Promise<Hash> {
   return await hash(await hash(u8aConcat(secretA, secretB)))
+}
+
+/**
+ * @param network
+ * @returns true if network is private or ganache
+ */
+export function isGanache(network?: Network): boolean {
+  return !network || network === 'localhost'
 }

@@ -49,7 +49,7 @@ class Heartbeat implements AbstractInteraction {
   async interact(counterparty: PeerId): Promise<number> {
     const start = Date.now()
 
-    const struct = await dialHelper(this.node, counterparty, this.protocols, { timeout: HEARTBEAT_TIMEOUT })
+    const struct = await dialHelper(this.node, counterparty, this.protocols[0], { timeout: HEARTBEAT_TIMEOUT })
 
     if (struct == undefined) {
       verbose(`Connection to ${counterparty.toB58String()} failed`)
