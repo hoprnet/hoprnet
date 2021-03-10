@@ -1,5 +1,5 @@
-import type { Subscription } from 'web3-core-subscriptions'
 import type { Log } from 'web3-core'
+import type { Subscription } from 'web3-core-subscriptions'
 import type PeerId from 'peer-id'
 import type { Indexer as IIndexer, RoutingChannel, ChannelUpdate } from '@hoprnet/hopr-core-connector-interface'
 import type HoprEthereum from '..'
@@ -39,10 +39,10 @@ let genesisBlock: number
  * Also keeps track of the latest block number.
  */
 class Indexer extends EventEmitter implements IIndexer {
-  public status: 'started' | 'stopped' = 'stopped'
+  public status: 'started' | 'restarting' | 'stopped' = 'stopped'
   public latestBlock: number = 0 // latest known on-chain block number
   private subscriptions: {
-    [K in 'NewBlocks' | 'NewLogs']?: Subscription<any>
+    [K in 'newBlocks' | 'newHoprChannelsLogs']?: Subscription<any>
   } = {}
   private unconfirmedEvents = new Heap<Event<any>>(snapshotComparator)
 
@@ -60,7 +60,7 @@ class Indexer extends EventEmitter implements IIndexer {
 
     const { web3, hoprChannels } = this.connector
 
-    // wipe indexer, for testing, will be removed
+    // wipe indexer, do not use in production
     // await this.wipe()
 
     const [latestSavedBlock, latestOnChainBlock] = await Promise.all([
@@ -95,21 +95,26 @@ class Indexer extends EventEmitter implements IIndexer {
     log('Subscribing to events from block %d', fromBlock)
 
     // subscribe to events
-    // @TODO: handle errors
-    this.subscriptions['NewBlocks'] = web3.eth
+    this.subscriptions.newBlocks = web3.eth
       .subscribe('newBlockHeaders')
-      .on('error', console.error)
+      .on('error', (error) => {
+        log(chalk.red(`web3 error: ${error.message}`))
+        this.restart()
+      })
       .on('data', (block) => {
         log('New block %d', block.number)
         this.onNewBlock(block)
       })
 
-    this.subscriptions['NewLogs'] = web3.eth
+    this.subscriptions.newHoprChannelsLogs = web3.eth
       .subscribe('logs', {
         address: hoprChannels.options.address,
         fromBlock
       })
-      .on('error', console.error)
+      .on('error', (error) => {
+        log(chalk.red(`web3 error: ${error.message}`))
+        this.restart()
+      })
       .on('changed', (onChainLog) => this.onChangedLogs([onChainLog]))
       .on('data', (onChainLog) => this.onNewLogs([onChainLog]))
 
@@ -142,6 +147,22 @@ class Indexer extends EventEmitter implements IIndexer {
     ])
 
     return isSyncing(onChainBlock, lastKnownBlock)
+  }
+
+  private async restart(): Promise<void> {
+    if (this.status === 'restarting') return
+    log('Indexer restaring')
+
+    try {
+      this.status = 'restarting'
+
+      await this.stop()
+      await this.start()
+    } catch (err) {
+      this.status = 'stopped'
+
+      log(chalk.red('Failed to restart: %s', err.message))
+    }
   }
 
   // /**
@@ -247,15 +268,12 @@ class Indexer extends EventEmitter implements IIndexer {
 
       const lastSnapshotComparison = snapshotComparator(event, lastSnapshot)
 
-      // check if this is a duplicate, this is ok
-      if (lastSnapshotComparison === 0) {
-        // log(chalk.gray('Found event which is a duplicate of the last confirmed event'))
+      // check if this is a duplicate or older than last snapshot
+      // ideally we would have detected if this snapshot was indeed processed,
+      // at the moment we don't keep all events stored as we intend to keep
+      // this indexer very simple
+      if (lastSnapshotComparison === 0 || lastSnapshotComparison < 0) {
         continue
-      }
-      // check if event found is older, this is not ok
-      else if (lastSnapshotComparison < 0) {
-        log(chalk.red('Found event which is older than last confirmed event!'))
-        throw new Error('Found event which is older than last confirmed event!')
       }
 
       if (event.name === 'FundedChannel') {

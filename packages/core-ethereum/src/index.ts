@@ -229,33 +229,6 @@ export default class HoprEthereum implements HoprCoreConnector {
     const hoprChannels = new web3.eth.Contract(HoprChannelsAbi as any, addresses?.[network]?.HoprChannels)
     const hoprToken = new web3.eth.Contract(HoprTokenAbi as any, addresses?.[network]?.HoprToken)
 
-    // @TODO: maybe use this later? for emmenbruecke
-    // const methods = [...Object.keys(hoprChannels.methods), ...Object.keys(hoprToken.methods)]
-    // const methodsMapped = methods.reduce((result, func) => {
-    //   result.set(web3.eth.abi.encodeFunctionSignature(func), func)
-    //   return result
-    // }, new Map())
-
-    // const oldSend = provider.send
-    // function wrapSend(...args: any): any {
-    //   const rpcMethod = args?.[0]?.method
-    //   let method: string
-
-    //   if (rpcMethod === 'eth_call') {
-    //     const param = args?.[0]?.params?.[0]
-    //     const funcSignature = param.data.slice(0, 10)
-    //     method = methodsMapped.get(funcSignature)
-    //   } else {
-    //     method = rpcMethod
-    //   }
-
-    //   console.count(method)
-
-    //   // @ts-ignore
-    //   return oldSend.bind(provider)(...args)
-    // }
-    // provider.send = wrapSend.bind(provider)
-
     const coreConnector = new HoprEthereum(
       db,
       web3,
