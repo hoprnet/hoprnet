@@ -11,7 +11,7 @@ Contains the source code for the [whitepaper](./whitepaper.pdf) of [hoprnet.org]
 ### Ubuntu & Debian
 
 - [VSCode](https://code.visualstudio.com/docs/setup/linux#_debian-and-ubuntu-based-distributions)
-- Latex:
+- LaTeX
 
 ```sh
 apt install -y git
