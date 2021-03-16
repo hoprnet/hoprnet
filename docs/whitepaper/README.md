@@ -30,6 +30,8 @@ apt install -y texlive texlive-latex-extra
 brew install git
 ```
 
+- "LaTeX Workshop" in VSCode
+
 ## Workspace
 
 ```sh
