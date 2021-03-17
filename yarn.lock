@@ -8111,10 +8111,10 @@ libp2p-crypto@0.18.0:
     uint8arrays "^1.1.0"
     ursa-optional "^0.10.1"
 
-libp2p-crypto@0.19.0, libp2p-crypto@^0.19.0:
-  version "0.19.0"
-  resolved "https://registry.yarnpkg.com/libp2p-crypto/-/libp2p-crypto-0.19.0.tgz#321a5901e2a559edf3a3dbf848b13778ec69ed2d"
-  integrity sha512-w4tduG32px1i6TwekYZBSvizZTvDdMReZkE4DhUkf9IQ8WSqSo98K+6IZaYYM6PzWd5arbcAQQcFCRalJu9Ytw==
+libp2p-crypto@0.19.1, libp2p-crypto@^0.19.0:
+  version "0.19.1"
+  resolved "https://registry.yarnpkg.com/libp2p-crypto/-/libp2p-crypto-0.19.1.tgz#ffdcd0a3fc7023b3f68dcb6563d20922bc293e26"
+  integrity sha512-qrTxxvvDcnS/24Kcc5ngHxB8g4qexvVArE/k546+4mQwWUZvqw+JSEqlzWfdts5EMc2/Zzaq9CYl/t1fEyVL9g==
   dependencies:
     err-code "^2.0.0"
     is-typedarray "^1.0.0"
