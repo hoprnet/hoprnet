@@ -1,229 +1,229 @@
-# name: HOPR Deploy
-# on:
-#   push:
-#     branches: ['master', 'release/**', 'avado']
-#     paths-ignore:
-#       - '**/docs/**/*'
+name: HOPR Deploy
+on:
+  push:
+    branches: ['master', 'release/**', 'avado']
+    paths-ignore:
+      - '**/docs/**/*'
 
-# jobs:
-#   build:
-#     name: Build, Publish etc
-#     runs-on: ubuntu-latest
-#     steps:
-#       - uses: actions/checkout@v2
-#       - name: Use Node.js
-#         uses: actions/setup-node@v1
-#         with:
-#           node-version: 14
-#           registry-url: https://registry.npmjs.org/
-#             #      - uses: actions/cache@v2
-#             #        id: cache
-#             #        with:
-#             #          path: 'node_modules'
-#             #          key: ${{ runner.os }}-modules-${{ hashFiles('yarn.lock') }}
+jobs:
+  build:
+    name: Build, Publish etc
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Use Node.js
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14
+          registry-url: https://registry.npmjs.org/
+            #      - uses: actions/cache@v2
+            #        id: cache
+            #        with:
+            #          path: 'node_modules'
+            #          key: ${{ runner.os }}-modules-${{ hashFiles('yarn.lock') }}
 
-#       - name: Install dependencies 
-#         run: |
-#           yarn
-#           node_modules/.bin/lerna bootstrap
-#           #yarn autoclean --force
+      - name: Install dependencies 
+        run: |
+          yarn
+          node_modules/.bin/lerna bootstrap
+          #yarn autoclean --force
 
-#       - name: Link & Build
-#         run: |
-#           yarn util:link && yarn build
+      - name: Link & Build
+        run: |
+          yarn util:link && yarn build
 
-#       - name: Get version from package.json
-#         run: echo "PREVIOUS_RELEASE=$(node -p -e "require('./packages/hoprd/package.json').version")" >> $GITHUB_ENV
+      - name: Get version from package.json
+        run: echo "PREVIOUS_RELEASE=$(node -p -e "require('./packages/hoprd/package.json').version")" >> $GITHUB_ENV
 
-#       # Goal is, every push to master increments c from a.b.0-prerelease-c to
-#       # a.b.0-prerelease-(c+1)
-#       # Of course this begs the question, how do we ever increment b?
-#       # If there is a released branch with a.b.c, then we know we also have to
-#       # increment b.
-#       - name: Is there a published version of this?
-#         if: github.ref == 'refs/heads/master'
-#         run: |
-#           PREVIOUS_RELEASE_MAJ_MIN=$(echo ${{ env.PREVIOUS_RELEASE }} | sed 's/\(\.[0-9]*\-alpha\)*\.[0-9]*$//')
-#           FIND_NPM=$(npm view @hoprnet/hopr-core@$PREVIOUS_RELEASE_MAJ_MIN --json)
-#           # preminor Goes a.b.0-next.0 to a.(b+1).0-next.0
-#           # prerelease Goes a.b.0-next.c to a.b.0-next.(c+1)
-#           VERSION_TYPE=$([ ${#FIND_NPM} -ge 1 ] && echo "preminor" || echo "prerelease")
-#           echo "VERSION_TYPE=${VERSION_TYPE}" >> $GITHUB_ENV
-#           echo "RELEASE TYPE: ${VERSION_TYPE} (${PREVIOUS_RELEASE_MAJ_MIN})"
-#       - name: Publish prerelease version (On pushes to master)
-#         if: github.ref == 'refs/heads/master'
-#         run: |
-#           git config --global user.email "noreply@hoprnet.org"
-#           git config --global user.name "HOPR Versioning robot"
-#           git config pull.rebase false
-#           git pull origin master
-#           node_modules/.bin/lerna version ${{ env.VERSION_TYPE }} --yes --exact --no-push --no-changelog --preid next 
-#           git push origin master
-#           node_modules/.bin/lerna publish from-package --yes
-#         env:
-#           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      # Goal is, every push to master increments c from a.b.0-prerelease-c to
+      # a.b.0-prerelease-(c+1)
+      # Of course this begs the question, how do we ever increment b?
+      # If there is a released branch with a.b.c, then we know we also have to
+      # increment b.
+      - name: Is there a published version of this?
+        if: github.ref == 'refs/heads/master'
+        run: |
+          PREVIOUS_RELEASE_MAJ_MIN=$(echo ${{ env.PREVIOUS_RELEASE }} | sed 's/\(\.[0-9]*\-alpha\)*\.[0-9]*$//')
+          FIND_NPM=$(npm view @hoprnet/hopr-core@$PREVIOUS_RELEASE_MAJ_MIN --json)
+          # preminor Goes a.b.0-next.0 to a.(b+1).0-next.0
+          # prerelease Goes a.b.0-next.c to a.b.0-next.(c+1)
+          VERSION_TYPE=$([ ${#FIND_NPM} -ge 1 ] && echo "preminor" || echo "prerelease")
+          echo "VERSION_TYPE=${VERSION_TYPE}" >> $GITHUB_ENV
+          echo "RELEASE TYPE: ${VERSION_TYPE} (${PREVIOUS_RELEASE_MAJ_MIN})"
+      - name: Publish prerelease version (On pushes to master)
+        if: github.ref == 'refs/heads/master'
+        run: |
+          git config --global user.email "noreply@hoprnet.org"
+          git config --global user.name "HOPR Versioning robot"
+          git config pull.rebase false
+          git pull origin master
+          node_modules/.bin/lerna version ${{ env.VERSION_TYPE }} --yes --exact --no-push --no-changelog --preid next 
+          git push origin master
+          node_modules/.bin/lerna publish from-package --yes
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-#       # Pushing a PR to a release branch should increment the patch version in
-#       # accordance with semver.
-#       - name: Publish patch version (On pushes to release branches)
-#         if: |
-#           startsWith(github.ref, 'refs/heads/release/')
-#         run: |
-#           git config --global user.email "noreply@hoprnet.org"
-#           git config --global user.name "HOPR Versioning robot"
-#           git config pull.rebase false
-#           git pull origin ${{ github.ref }}
-#           node_modules/.bin/lerna version patch --yes --exact --no-push --no-changelog 
-#           git push origin ${{ github.ref }} 
-#           node_modules/.bin/lerna publish from-package --yes
-#         env:
-#           NODE_AUTH_TOKEN:
-#             ${{ secrets.NPM_TOKEN }}
+      # Pushing a PR to a release branch should increment the patch version in
+      # accordance with semver.
+      - name: Publish patch version (On pushes to release branches)
+        if: |
+          startsWith(github.ref, 'refs/heads/release/')
+        run: |
+          git config --global user.email "noreply@hoprnet.org"
+          git config --global user.name "HOPR Versioning robot"
+          git config pull.rebase false
+          git pull origin ${{ github.ref }}
+          node_modules/.bin/lerna version patch --yes --exact --no-push --no-changelog 
+          git push origin ${{ github.ref }} 
+          node_modules/.bin/lerna publish from-package --yes
+        env:
+          NODE_AUTH_TOKEN:
+            ${{ secrets.NPM_TOKEN }}
 
-#       - name: Get version from package.json
-#         run: echo "RELEASE=$(node -p -e "require('./packages/hoprd/package.json').version")" >> $GITHUB_ENV 
+      - name: Get version from package.json
+        run: echo "RELEASE=$(node -p -e "require('./packages/hoprd/package.json').version")" >> $GITHUB_ENV 
 
-#       - name: Debug release number
-#         run: echo ${{ env.RELEASE }}
+      - name: Debug release number
+        run: echo ${{ env.RELEASE }}
 
-#       - name: Wait for NPM
-#         run: |
-#           sleep 5m # Allow NPM registry to catch uo
+      - name: Wait for NPM
+        run: |
+          sleep 5m # Allow NPM registry to catch uo
 
-#           #      - name: Publish to GPR
-#           #        if: |
-#           #          startsWith(github.ref, 'refs/heads/release/')
-#           #        run: |
-#           #          echo //npm.pkg.github.com/:_authToken=${{ secrets.GITHUB_TOKEN }} > .npmrc
-#           #          node_modules/.bin/lerna publish from-package --yes --registry https://npm.pkg.github.com/
-#           #        env:
-#           #          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-#           #          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          #      - name: Publish to GPR
+          #        if: |
+          #          startsWith(github.ref, 'refs/heads/release/')
+          #        run: |
+          #          echo //npm.pkg.github.com/:_authToken=${{ secrets.GITHUB_TOKEN }} > .npmrc
+          #          node_modules/.bin/lerna publish from-package --yes --registry https://npm.pkg.github.com/
+          #        env:
+          #          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          #          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-#   release:
-#     name: Create Github Release
-#     runs-on: ubuntu-latest
-#     needs: [build]
-#     if: startsWith(github.ref, 'refs/heads/release/')
-#     steps:
-#       - uses: actions/checkout@v2
-#       - name: Update repo from latest pushes.
-#         run: |
-#           git config --global user.email "noreply@hoprnet.org"
-#           git config --global user.name "HOPR Versioning robot"
-#           git config pull.rebase false
-#           git pull origin ${{ github.ref }} # This should pull new packages with versions etc.
-#       - name: Get version from package.json
-#         run: echo "RELEASE_NAME=v$(node -p -e "require('./packages/hoprd/package.json').version")" >> $GITHUB_ENV 
-#       - uses: softprops/action-gh-release@v1
-#         env:
-#           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-#         with:
-#           tag_name: ${{ env.RELEASE_NAME }}
-#           name: HOPR - ${{ env.RELEASE_NAME }}
-#           draft: false
-#           prerelease: false
+  release:
+    name: Create Github Release
+    runs-on: ubuntu-latest
+    needs: [build]
+    if: startsWith(github.ref, 'refs/heads/release/')
+    steps:
+      - uses: actions/checkout@v2
+      - name: Update repo from latest pushes.
+        run: |
+          git config --global user.email "noreply@hoprnet.org"
+          git config --global user.name "HOPR Versioning robot"
+          git config pull.rebase false
+          git pull origin ${{ github.ref }} # This should pull new packages with versions etc.
+      - name: Get version from package.json
+        run: echo "RELEASE_NAME=v$(node -p -e "require('./packages/hoprd/package.json').version")" >> $GITHUB_ENV 
+      - uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ env.RELEASE_NAME }}
+          name: HOPR - ${{ env.RELEASE_NAME }}
+          draft: false
+          prerelease: false
 
 
-#   build_hoprd_docker:
-#     name: Build HOPRD Docker
-#     runs-on: ubuntu-latest
-#     needs: [build]
-#     steps:
-#       - uses: actions/checkout@v2
-#       - name: Update repo from latest pushes.
-#         run: |
-#           git config --global user.email "noreply@hoprnet.org"
-#           git config --global user.name "HOPR Versioning robot"
-#           git config pull.rebase false
-#           git pull origin ${{ github.ref }} # This should pull new packages with versions etc.
-#       - name: Setup Google Cloud Credentials
-#         uses: GoogleCloudPlatform/github-actions/setup-gcloud@master
-#         with:
-#           version: '290.0.1'
-#           service_account_key: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
-#           export_default_credentials: true
-#       - name: Get version from package.json
-#         run: echo "RELEASE=$(node -p -e "require('./packages/hoprd/package.json').version")" >> $GITHUB_ENV 
-#       - name: Set Project for Google Cloud HOPR Association
-#         working-directory: packages/hoprd
-#         run: gcloud config set project ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
-#       - name: Building Docker image using Google Cloud Build
-#         working-directory: packages/hoprd
-#         run: | # TODO - actually parse semver to tag v1
-#           gcloud builds submit --tag gcr.io/hoprassociation/hoprd:${{ env.RELEASE }}
-#           gcloud container images add-tag gcr.io/hoprassociation/hoprd:${{ env.RELEASE }} gcr.io/hoprassociation/hoprd:1
-#           gcloud container images add-tag gcr.io/hoprassociation/hoprd:${{ env.RELEASE }} gcr.io/hoprassociation/hoprd:latest 
+  build_hoprd_docker:
+    name: Build HOPRD Docker
+    runs-on: ubuntu-latest
+    needs: [build]
+    steps:
+      - uses: actions/checkout@v2
+      - name: Update repo from latest pushes.
+        run: |
+          git config --global user.email "noreply@hoprnet.org"
+          git config --global user.name "HOPR Versioning robot"
+          git config pull.rebase false
+          git pull origin ${{ github.ref }} # This should pull new packages with versions etc.
+      - name: Setup Google Cloud Credentials
+        uses: GoogleCloudPlatform/github-actions/setup-gcloud@master
+        with:
+          version: '290.0.1'
+          service_account_key: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+          export_default_credentials: true
+      - name: Get version from package.json
+        run: echo "RELEASE=$(node -p -e "require('./packages/hoprd/package.json').version")" >> $GITHUB_ENV 
+      - name: Set Project for Google Cloud HOPR Association
+        working-directory: packages/hoprd
+        run: gcloud config set project ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
+      - name: Building Docker image using Google Cloud Build
+        working-directory: packages/hoprd
+        run: | # TODO - actually parse semver to tag v1
+          gcloud builds submit --tag gcr.io/hoprassociation/hoprd:${{ env.RELEASE }}
+          gcloud container images add-tag gcr.io/hoprassociation/hoprd:${{ env.RELEASE }} gcr.io/hoprassociation/hoprd:1
+          gcloud container images add-tag gcr.io/hoprassociation/hoprd:${{ env.RELEASE }} gcr.io/hoprassociation/hoprd:latest 
 
-#   avado:
-#     name: Build Avado (master or release pushes)
-#     runs-on: ubuntu-latest
-#     needs: [build_hoprd_docker]
-#     steps:
-#       - uses: actions/checkout@v2
-#       - name: Update repo from latest pushes.
-#         run: |
-#           git config --global user.email "noreply@hoprnet.org"
-#           git config --global user.name "HOPR Versioning robot"
-#           git config pull.rebase false
-#           git pull origin ${{ github.ref }} # This should pull new packages with versions etc.
+  avado:
+    name: Build Avado (master or release pushes)
+    runs-on: ubuntu-latest
+    needs: [build_hoprd_docker]
+    steps:
+      - uses: actions/checkout@v2
+      - name: Update repo from latest pushes.
+        run: |
+          git config --global user.email "noreply@hoprnet.org"
+          git config --global user.name "HOPR Versioning robot"
+          git config pull.rebase false
+          git pull origin ${{ github.ref }} # This should pull new packages with versions etc.
 
-#       - name: Get version from package.json
-#         run: |
-#           echo "RELEASE=$(node -p -e "require('./packages/hoprd/package.json').version")" >> $GITHUB_ENV 
+      - name: Get version from package.json
+        run: |
+          echo "RELEASE=$(node -p -e "require('./packages/hoprd/package.json').version")" >> $GITHUB_ENV 
 
-#       - name: Avado hack version if we are in master (they don't support prerelease versions)
-#         if: github.ref == 'refs/heads/master'
-#         run: |
-#           echo "RELEASE=0.100.0" >> $GITHUB_ENV # Set this to an arbitrary number less than 1 
+      - name: Avado hack version if we are in master (they don't support prerelease versions)
+        if: github.ref == 'refs/heads/master'
+        run: |
+          echo "RELEASE=0.100.0" >> $GITHUB_ENV # Set this to an arbitrary number less than 1 
 
-#       - name: Build Avado
-#         working-directory: packages/avado
-#         run: |
-#           docker-compose build
-#           sudo npm install -g git+https://github.com/AvadoDServer/AVADOSDK.git#c11c4bd
-#           avadosdk increase minor
-#           sed -i 's/version"[ ]*:[ ]*"[0-9]*\.[0-9]*\.[0-9]*"/version": "${{ env.RELEASE }}"/' ./dappnode_package.json
-#           cat ./dappnode_package.json | grep 'version'
-#           sudo avadosdk build --provider http://80.208.229.228:5001
-#           git add dappnode_package.json docker-compose.yml releases.json
-#           git commit -m "Avado CI: new release"
-#           git pull origin ${{ github.ref }}
-#           git push origin ${{ github.ref }}
+      - name: Build Avado
+        working-directory: packages/avado
+        run: |
+          docker-compose build
+          sudo npm install -g git+https://github.com/AvadoDServer/AVADOSDK.git#c11c4bd
+          avadosdk increase minor
+          sed -i 's/version"[ ]*:[ ]*"[0-9]*\.[0-9]*\.[0-9]*"/version": "${{ env.RELEASE }}"/' ./dappnode_package.json
+          cat ./dappnode_package.json | grep 'version'
+          sudo avadosdk build --provider http://80.208.229.228:5001
+          git add dappnode_package.json docker-compose.yml releases.json
+          git commit -m "Avado CI: new release"
+          git pull origin ${{ github.ref }}
+          git push origin ${{ github.ref }}
 
-#           # http://go.ava.do/install/<IPFS HASH>
+          # http://go.ava.do/install/<IPFS HASH>
 
-#   deploy_instances:
-#     name: 'Continuous Deployment: Deploy instances'
-#     runs-on: ubuntu-latest
-#     needs: [build_hoprd_docker]
-#     steps:
-#       - uses: actions/checkout@v2
-#       - name: Use Node.js 14
-#         uses: actions/setup-node@v1
-#         with:
-#           node-version: 14
-#           registry-url: https://registry.npmjs.org/
-#       - name: Update repo from latest pushes.
-#         run: |
-#           git config --global user.email "noreply@hoprnet.org"
-#           git config --global user.name "HOPR Versioning robot"
-#           git config pull.rebase false
-#           git pull origin ${{ github.ref }} # This should pull new packages with versions etc.
-#       - name: Setup Google Cloud Credentials
-#         uses: GoogleCloudPlatform/github-actions/setup-gcloud@master
-#         with:
-#           version: '290.0.1'
-#           service_account_key: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
-#           export_default_credentials: true
-#       - name: Set Project for Google Cloud HOPR Association
-#         run: gcloud config set project ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
-#       - name: Run start script
-#         run: |
-#           bash scripts/deploy.sh
-#         env:
-#           FUNDING_PRIV_KEY: ${{ secrets.FUNDING_WALLET_PRIVATE_KEY }}
-#           GITHUB_REF: ${{ github.ref }}
-#           BS_PASSWORD: ${{ secrets.BS_PASSWORD }}
+  deploy_instances:
+    name: 'Continuous Deployment: Deploy instances'
+    runs-on: ubuntu-latest
+    needs: [build_hoprd_docker]
+    steps:
+      - uses: actions/checkout@v2
+      - name: Use Node.js 14
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14
+          registry-url: https://registry.npmjs.org/
+      - name: Update repo from latest pushes.
+        run: |
+          git config --global user.email "noreply@hoprnet.org"
+          git config --global user.name "HOPR Versioning robot"
+          git config pull.rebase false
+          git pull origin ${{ github.ref }} # This should pull new packages with versions etc.
+      - name: Setup Google Cloud Credentials
+        uses: GoogleCloudPlatform/github-actions/setup-gcloud@master
+        with:
+          version: '290.0.1'
+          service_account_key: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+          export_default_credentials: true
+      - name: Set Project for Google Cloud HOPR Association
+        run: gcloud config set project ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
+      - name: Run start script
+        run: |
+          bash scripts/deploy.sh
+        env:
+          FUNDING_PRIV_KEY: ${{ secrets.FUNDING_WALLET_PRIVATE_KEY }}
+          GITHUB_REF: ${{ github.ref }}
+          BS_PASSWORD: ${{ secrets.BS_PASSWORD }}
 
 
