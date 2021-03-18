@@ -20,7 +20,6 @@ const verbose = Debug('hopr-core:verbose:message:packet')
  * Encapsulates the internal representation of a packet
  */
 export class Packet<Chain extends HoprCoreConnector> {
-
   private node: Hopr<Chain>
 
   constructor(
@@ -38,15 +37,18 @@ export class Packet<Chain extends HoprCoreConnector> {
     arr.set(this.header, 0)
     arr.set(this.ticket, Header.SIZE)
     arr.set(this.challenge, Header.SIZE + this.sizeofSizedTicket)
-    arr.set(this.message, 
-      Header.SIZE +
-      this.node.paymentChannels.types.SignedTicket.SIZE +
-      Challenge.SIZE(this.node.paymentChannels)
-           )
+    arr.set(
+      this.message,
+      Header.SIZE + this.node.paymentChannels.types.SignedTicket.SIZE + Challenge.SIZE(this.node.paymentChannels)
+    )
     return arr
   }
 
-  public static async deserialize<Chain extends HoprCoreConnector>(peerId: PeerId, arr: Uint8Array, sizeofSizedTicket): Promise<Packet<Chain>> {
+  public static async deserialize<Chain extends HoprCoreConnector>(
+    peerId: PeerId,
+    arr: Uint8Array,
+    sizeofSizedTicket
+  ): Promise<Packet<Chain>> {
     let i = arr.byteOffset
     const header = new Header<Chain>({ bytes: arr.buffer, offset: i })
     i += Header.SIZE
