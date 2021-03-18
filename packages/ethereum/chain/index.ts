@@ -1,6 +1,6 @@
 import allAddresses from './addresses.json'
 
-export type ContractNames = 'HoprToken' | 'HoprChannels'
+export type ContractNames = 'HoprToken' | 'HoprChannels' | 'HoprDistributor'
 export type Networks = 'localhost' | 'mainnet' | 'kovan' | 'xdai' | 'matic' | 'binance'
 
 export const addresses: {
@@ -13,5 +13,6 @@ export const abis: {
   [name in ContractNames]: any[]
 } = {
   HoprToken: require('./abis/HoprToken.json'),
-  HoprChannels: require('./abis/HoprChannels.json')
+  HoprChannels: require('./abis/HoprChannels.json'),
+  HoprDistributor: require('./abis/HoprDistributor.json')
 }
