@@ -1,3 +1,7 @@
+/*
+  Primarely used by `core-ethereum` tests
+  @TODO: remove this once `core-ethereum` is refactored
+*/
 import runner from './tasks/utils/runner'
 
 export async function compile(args: string = '') {

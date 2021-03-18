@@ -19,7 +19,7 @@ const GAS_MULTIPLIER = 1.1
 // set 'ETHERSCAN_API_KEY' so 'hardhat-deploy' can read it
 process.env.ETHERSCAN_API_KEY = ETHERSCAN
 
-// legacy: use hopr-demo-seeds
+// @TODO: fix legacy: use hopr-demo-seeds
 const localhostPrivKeys = NODE_SEEDS.concat(BOOTSTRAP_SEEDS)
 
 // private keys used by tests
@@ -38,7 +38,7 @@ const hardhatConfig: HardhatUserConfig = {
       live: false,
       tags: ['local', 'test'],
       accounts: hardhatPrivKeys,
-      allowUnlimitedContractSize: true // TODO: investigate
+      allowUnlimitedContractSize: true // TODO: investigate why this is needed
     },
     localhost: {
       live: false,
