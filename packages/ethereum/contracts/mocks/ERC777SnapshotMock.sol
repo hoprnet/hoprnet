@@ -9,7 +9,7 @@ contract ERC777SnapshotMock is ERC777Snapshot {
         string memory symbol,
         address initialAccount,
         uint256 initialBalance
-    ) ERC777(name, symbol, new address[](0)) {
+    ) ERC777(name, symbol, new address[](0)) public {
         _mint(initialAccount, initialBalance, "", "");
     }
 

@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.6.0;
 
-import "@openzeppelin/contracts/GSN/Context.sol";
-import "@openzeppelin/contracts/token/ERC777/IERC777.sol";
-import "@openzeppelin/contracts/token/ERC777/IERC777Sender.sol";
-import "@openzeppelin/contracts/token/ERC777/IERC777Recipient.sol";
-import "@openzeppelin/contracts/introspection/IERC1820Registry.sol";
-import "@openzeppelin/contracts/introspection/ERC1820Implementer.sol";
+import "@openzeppelin/contracts-v3-0-1/GSN/Context.sol";
+import "@openzeppelin/contracts-v3-0-1/token/ERC777/IERC777.sol";
+import "@openzeppelin/contracts-v3-0-1/token/ERC777/IERC777Sender.sol";
+import "@openzeppelin/contracts-v3-0-1/token/ERC777/IERC777Recipient.sol";
+import "@openzeppelin/contracts-v3-0-1/introspection/IERC1820Registry.sol";
+import "@openzeppelin/contracts-v3-0-1/introspection/ERC1820Implementer.sol";
 
 contract ERC777SenderRecipientMock is Context, IERC777Sender, IERC777Recipient, ERC1820Implementer {
     event TokensToSendCalled(

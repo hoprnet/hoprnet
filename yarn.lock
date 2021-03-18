@@ -1465,10 +1465,15 @@
     find-up "^4.1.0"
     fs-extra "^8.1.0"
 
-"@openzeppelin/contracts@3.0.1":
+"@openzeppelin/contracts-v3-0-1@npm:@openzeppelin/contracts@3.0.1":
   version "3.0.1"
   resolved "https://registry.yarnpkg.com/@openzeppelin/contracts/-/contracts-3.0.1.tgz#2f327f77d16b43f14674086b2b634bda38cb0838"
   integrity sha512-uSrD7hZ0ViuHGqHZbeHawZBi/uy7aBiNramXAt2dFFuSuoU4u9insS3V3zdVfOnYSPreUo636xSOuQIFN4//HA==
+
+"@openzeppelin/contracts@3.3.0-solc-0.7":
+  version "3.3.0-solc-0.7"
+  resolved "https://registry.yarnpkg.com/@openzeppelin/contracts/-/contracts-3.3.0-solc-0.7.tgz#8e9d51445016d1366d8ea585e4beab7ede72644f"
+  integrity sha512-ewfLD9WpXQXQHhhaXKweECNDafWRKV3wmFp8FlXpkqG5cVtAvuwLJ5n/O3ziBsUWt6W64u5Dyy8mGnrffs5Qhw==
 
 "@openzeppelin/test-helpers@^0.5.9":
   version "0.5.10"

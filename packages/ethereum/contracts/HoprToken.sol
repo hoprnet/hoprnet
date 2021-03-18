@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.6.0;
 
-import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts-v3-0-1/access/AccessControl.sol";
 import "./openzeppelin-contracts/ERC777.sol";
 import "./ERC777/ERC777Snapshot.sol";
 
 contract HoprToken is AccessControl, ERC777Snapshot {
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
 
-    constructor() ERC777("HOPR Token", "HOPR", new address[](0)) {
+    constructor() ERC777("HOPR Token", "HOPR", new address[](0)) public {
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
     }
 
