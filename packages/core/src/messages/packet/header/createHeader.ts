@@ -14,7 +14,6 @@ import {
   createMAC
 } from './index'
 
-import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import PeerId from 'peer-id'
 import Debug from 'debug'
@@ -31,11 +30,7 @@ import {
   KEY_LENGTH
 } from './parameters'
 
-export async function createHeader<Chain extends HoprCoreConnector>(
-  hash: (msg: Uint8Array) => Promise<Types.Hash>,
-  header: Header<Chain>,
-  peerIds: PeerId[]
-) {
+export async function createHeader(hash: (msg: Uint8Array) => Promise<Types.Hash>, header: Header, peerIds: PeerId[]) {
   function checkPeerIds() {
     if (peerIds.length > MAX_HOPS) {
       log('Exceeded max hops')
