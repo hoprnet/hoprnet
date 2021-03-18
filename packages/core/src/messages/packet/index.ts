@@ -1,7 +1,7 @@
 import BN from 'bn.js'
 import { blue, green } from 'chalk'
 import PeerId from 'peer-id'
-import { u8aConcat, u8aEquals, u8aToHex, pubKeyToPeerId } from '@hoprnet/hopr-utils'
+import { u8aConcat, u8aEquals, u8aToHex, pubKeyToPeerId, serializeToU8a } from '@hoprnet/hopr-utils'
 import { getTickets, validateUnacknowledgedTicket, validateCreatedTicket } from '../../utils/tickets'
 import { Header, deriveTicketKey, deriveTicketKeyBlinding, deriveTagParameters, deriveTicketLastKey } from './header'
 import { Challenge } from './challenge'
@@ -24,33 +24,31 @@ export class Packet<Chain extends HoprCoreConnector> {
 
   constructor(
     private peerId: PeerId, // of this node
-    private header: Header<Chain>,
+    private header: Header,
 
     private ticket: Types.SignedTicket,
-    private challenge: Challenge<Chain>,
+    private challenge: Challenge,
     private message: Message,
-    private sizeofSizedTicket: number
+    private sizeofSignedTicket: number,
+    private sizeofChallenge: number
   ) {}
 
   public serialize(): Uint8Array {
-    let arr = new Uint8Array(this.SIZE)
-    arr.set(this.header, 0)
-    arr.set(this.ticket, Header.SIZE)
-    arr.set(this.challenge, Header.SIZE + this.sizeofSizedTicket)
-    arr.set(
-      this.message,
-      Header.SIZE + this.node.paymentChannels.types.SignedTicket.SIZE + Challenge.SIZE(this.node.paymentChannels)
-    )
-    return arr
+    return serializeToU8a([
+      [this.header, Header.SIZE],
+      [this.ticket, this.sizeofSignedTicket],
+      [this.challenge, this.sizeofChallenge],
+      [this.message, Message.SIZE] 
+    ])
   }
 
   public static async deserialize<Chain extends HoprCoreConnector>(
     peerId: PeerId,
     arr: Uint8Array,
-    sizeofSizedTicket
+    sizeofSignedTicket: number,
   ): Promise<Packet<Chain>> {
     let i = arr.byteOffset
-    const header = new Header<Chain>({ bytes: arr.buffer, offset: i })
+    const header = new Header({ bytes: arr.buffer, offset: i })
     i += Header.SIZE
     const ticket = await this.node.paymentChannels.types.SignedTicket.create({
       bytes: arr.buffer,
