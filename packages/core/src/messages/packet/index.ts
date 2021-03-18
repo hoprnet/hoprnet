@@ -24,7 +24,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
   private _targetPeerId?: PeerId
   private _senderPeerId?: PeerId
 
-  private _header?: Header<Chain>
+  private _header?: Header
   private _ticket?: Types.SignedTicket
   private _challenge?: Challenge<Chain>
   private _message?: Message
@@ -40,7 +40,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
       offset: number
     },
     struct?: {
-      header: Header<Chain>
+      header: Header
       ticket: Types.SignedTicket
       challenge: Challenge<Chain>
       message: Message
@@ -80,9 +80,9 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     return this.byteOffset
   }
 
-  get header(): Header<Chain> {
+  get header(): Header {
     if (this._header == null) {
-      this._header = new Header<Chain>({ bytes: this.buffer, offset: this.headerOffset })
+      this._header = new Header({ bytes: this.buffer, offset: this.headerOffset })
     }
 
     return this._header
