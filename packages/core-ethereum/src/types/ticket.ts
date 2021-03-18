@@ -1,6 +1,6 @@
 import type { Ticket as ITicket, SignedTicket as ISignedTicket } from '@hoprnet/hopr-core-connector-interface'
 import BN from 'bn.js'
-import { stringToU8a, u8aToHex, u8aConcat, serializeToU8a} from '@hoprnet/hopr-utils'
+import { stringToU8a, u8aToHex, u8aConcat, serializeToU8a } from '@hoprnet/hopr-utils'
 import { AccountId, Balance, Hash, SignedTicket, TicketEpoch } from '.'
 import { sign } from '../utils'
 
