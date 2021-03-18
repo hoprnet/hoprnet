@@ -53,7 +53,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     }
 
     if (struct != null) {
-      this.set(struct.header, this.headerOffset - this.byteOffset)
+      this.set(struct.header.serialize(), this.headerOffset - this.byteOffset)
       this.set(struct.ticket, this.ticketOffset - this.byteOffset)
       this.set(struct.challenge, this.challengeOffset - this.byteOffset)
       this.set(struct.message, this.messageOffset - this.byteOffset)
@@ -82,7 +82,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
 
   get header(): Header{
     if (this._header == null) {
-      this._header = new Header({ bytes: this.buffer, offset: this.headerOffset })
+      this._header = Header.deserialize(new Uint8Array(this.buffer, this.headerOffset))
     }
 
     return this._header
@@ -169,10 +169,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
       offset: arr.byteOffset
     })
 
-    const { header, secrets } = await Header.create(node, path, {
-      bytes: packet.buffer,
-      offset: packet.headerOffset
-    })
+    const { header, secrets } = await Header.create(node.paymentChannels.utils.hash, path)
 
     packet._header = header
 

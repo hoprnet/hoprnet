@@ -140,10 +140,16 @@ function generateFiller(secrets: Uint8Array[]) {
   return filler
 }
 
-async function createBetaAndGamma(secrets: Uint8Array[], filler: Uint8Array, identifier: Uint8Array): { beta: Uint8Array, gamma: Uint8Array } {
+async function createBetaAndGamma(
+  hash: (msg: Uint8Array) => Promise<Types.Hash>,
+  peerIds: PeerId[],
+  secrets: Uint8Array[],
+  filler: Uint8Array,
+  identifier: Uint8Array
+): Promise<{ beta: Uint8Array, gamma: Uint8Array }> {
   const tmp = new Uint8Array(BETA_LENGTH - PER_HOP_SIZE)
   let beta = new Uint8Array(BETA_LENGTH)
-  let gamma = new Uint8Array()
+  let gamma = new Uint8Array(MAC_SIZE)
 
   for (let i = secrets.length; i > 0; i--) {
     const { key, iv } = derivePRGParameters(secrets[i - 1])
@@ -156,28 +162,28 @@ async function createBetaAndGamma(secrets: Uint8Array[], filler: Uint8Array, ide
 
       // @TODO filling the array might not be necessary
       if (paddingLength > 0) {
-        header.beta.set(randomBytes(paddingLength), LAST_HOP_SIZE)
+        beta.set(randomBytes(paddingLength), LAST_HOP_SIZE)
       }
 
       u8aXOR(
         true,
-        header.beta.subarray(0, LAST_HOP_SIZE + paddingLength),
+        beta.subarray(0, LAST_HOP_SIZE + paddingLength),
         PRG.createPRG(key, iv).digest(0, LAST_HOP_SIZE + paddingLength)
       )
 
-      header.beta.set(filler, LAST_HOP_SIZE + paddingLength)
+      beta.set(filler, LAST_HOP_SIZE + paddingLength)
     } else {
-      tmp.set(header.beta.subarray(0, BETA_LENGTH - PER_HOP_SIZE), 0)
+      tmp.set(beta.subarray(0, BETA_LENGTH - PER_HOP_SIZE), 0)
 
-      header.beta.set(peerIds[i].pubKey.marshal(), 0)
-      header.beta.set(header.gamma, ADDRESS_SIZE)
+      beta.set(peerIds[i].pubKey.marshal(), 0)
+      beta.set(gamma, ADDRESS_SIZE)
 
       // Used for the challenge that is created for the next node
-      header.beta.set(
+      beta.set(
         await hash(deriveTicketKeyBlinding(secrets[i])),
         ADDRESS_SIZE + MAC_SIZE
       )
-      header.beta.set(tmp, PER_HOP_SIZE)
+      beta.set(tmp, PER_HOP_SIZE)
 
       if (i < secrets.length - 1) {
         /**
@@ -188,7 +194,7 @@ async function createBetaAndGamma(secrets: Uint8Array[], filler: Uint8Array, ide
          *     the secret
          *   - the relay node can verify the key derivation path
          */
-        header.beta.set(
+        beta.set(
           await hash(
             await hash(
               u8aConcat(
@@ -200,35 +206,18 @@ async function createBetaAndGamma(secrets: Uint8Array[], filler: Uint8Array, ide
           ADDRESS_SIZE + MAC_SIZE + KEY_LENGTH
         )
       } else if (i == secrets.length - 1) {
-        header.beta.set(
+        beta.set(
           await hash(deriveTicketLastKey(secrets[i])),
           ADDRESS_SIZE + MAC_SIZE + KEY_LENGTH
         )
       }
 
-      u8aXOR(true, header.beta, PRG.createPRG(key, iv).digest(0, BETA_LENGTH))
+      u8aXOR(true, beta, PRG.createPRG(key, iv).digest(0, BETA_LENGTH))
     }
 
-    header.gamma.set(createMAC(secrets[i - 1], header.beta), 0)
+    gamma.set(createMAC(secrets[i - 1], beta), 0)
   }
-}
-
-export async function createHeader(
-  hash: (msg: Uint8Array) => Promise<Types.Hash>,
-  peerIds: PeerId[]
-): Promise<Header> {
-
-  const header = new Uint8Array(Header.SIZE)
-  checkPeerIds(peerIds)
-  const { secrets, alpha } = generateKeyShares()
-  const identifier = randomBytes(IDENTIFIER_SIZE)
-  const filler = generateFiller(secrets)
-  const { beta, gamma } = await createBetaAndGamma(secrets, filler, identifier)
-  return {
-    header: header,
-    secrets: secrets,
-    identifier: identifier
-  }
+  return { beta, gamma }
 }
 
 export class Header {
@@ -236,8 +225,8 @@ export class Header {
   derivedSecretLastNode?: Uint8Array
 
   constructor(
-    readonly alpha: Uint8Array, 
-    readonly beta: Uint8Array, 
+    readonly alpha: Uint8Array,
+    readonly beta: Uint8Array,
     readonly gamma: Uint8Array) {
   }
 
@@ -247,6 +236,10 @@ export class Header {
       [this.beta, BETA_LENGTH],
       [this.gamma, MAC_SIZE]
     ])
+  }
+
+  static deserialize(arr: Uint8Array): Header {
+
   }
 
   get address(): this['tmpData'] {
@@ -306,8 +299,8 @@ export class Header {
       this.tmpData.set(
         u8aXOR(
           false,
-          this.beta.subarray(0, DESINATION_SIZE + IDENTIFIER_SIZE),
-          PRG.createPRG(key, iv).digest(0, DESINATION_SIZE + IDENTIFIER_SIZE)
+          this.beta.subarray(0, DESTINATION_SIZE + IDENTIFIER_SIZE),
+          PRG.createPRG(key, iv).digest(0, DESTINATION_SIZE + IDENTIFIER_SIZE)
         ),
         0
       )
@@ -364,27 +357,22 @@ export class Header {
   static async create(
     hash: (msg: Uint8Array) => Promise<Types.Hash>,
     peerIds: PeerId[],
-    arr?: {
-      bytes: ArrayBuffer
-      offset: number
-    }
   ): Promise<{
     header: Header
     secrets: Uint8Array[]
     identifier: Uint8Array
   }> {
-    if (arr == null) {
-      let tmpArray = new Uint8Array(Header.SIZE)
-      arr = {
-        bytes: tmpArray.buffer,
-        offset: tmpArray.byteOffset
-      }
+    //header.tmpData = header.beta.subarray(ADDRESS_SIZE + MAC_SIZE, PER_HOP_SIZE)
+    checkPeerIds(peerIds)
+    const { secrets, alpha } = generateKeyShares(peerIds)
+    const identifier = randomBytes(IDENTIFIER_SIZE)
+    const filler = generateFiller(secrets)
+    const { beta, gamma } = await createBetaAndGamma(hash, peerIds, secrets, filler, identifier)
+    return {
+      header: new Header(alpha, beta, gamma),
+      secrets,
+      identifier
     }
-
-    const header = new Header(arr)
-    header.tmpData = header.beta.subarray(ADDRESS_SIZE + MAC_SIZE, PER_HOP_SIZE)
-
-    return createHeaderHelper(hash, header, peerIds)
   }
 }
 

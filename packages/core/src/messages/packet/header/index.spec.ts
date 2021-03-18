@@ -23,7 +23,7 @@ if (MAX_HOPS > 1) {
       node: Hopr<HoprCoreConnector>,
       peerIds: PeerId[]
     ): Promise<{ header: Header; identifier: Uint8Array; secrets: Uint8Array[] }> {
-      const { header, identifier, secrets } = await Header.create<HoprCoreConnector>(node, peerIds)
+      const { header, identifier, secrets } = await Header.create(node.paymentChannels.utils.hash, peerIds)
 
       for (let i = 0; i < peerIds.length - 1; i++) {
         header.deriveSecret(peerIds[i].privKey.marshal())
