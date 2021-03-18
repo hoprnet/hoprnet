@@ -1,10 +1,10 @@
 import secp256k1 from 'secp256k1'
 import hkdf from 'futoin-hkdf'
 import crypto from 'crypto'
+import { randomBytes } from 'crypto'
 
-import { createHeader as createHeaderHelper } from './createHeader'
-import Hopr from '../../..'
-import { u8aXOR, u8aConcat, u8aEquals, u8aToHex, PRP, PRG } from '@hoprnet/hopr-utils'
+import { u8aXOR, u8aConcat, u8aEquals, u8aToHex, PRP, PRG, serializeToU8a } from '@hoprnet/hopr-utils'
+import type { Types } from '@hoprnet/hopr-core-connector-interface'
 
 import { MAX_HOPS } from '../../../constants'
 
@@ -18,9 +18,12 @@ import {
   PRIVATE_KEY_LENGTH,
   KEY_LENGTH,
   IDENTIFIER_SIZE,
-  DESINATION_SIZE
+  DESTINATION_SIZE
 } from './parameters'
 import PeerId from 'peer-id'
+import Debug from 'debug'
+
+const log = Debug('hopr-core:packet:header')
 
 const MAC_KEY_LENGTH = 16
 const HASH_KEY_PRG = 'P'
@@ -35,8 +38,6 @@ const HASH_KEY_TX_LAST_BLINDED = 'Tx_Last_'
 
 const TAG_SIZE = 16
 
-import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-
 export type CipherParameters = {
   key: Uint8Array
   iv: Uint8Array
@@ -47,35 +48,205 @@ export type PRGParameters = {
   iv: Uint8Array
 }
 
-export class Header extends Uint8Array {
+function checkPeerIds(peerIds: PeerId[]) {
+  if (peerIds.length > MAX_HOPS) {
+    log('Exceeded max hops')
+    throw Error(`Expected at most ${MAX_HOPS} but got ${peerIds.length}`)
+  }
+  peerIds.forEach((peerId, index) => {
+    if (peerId.pubKey == null) {
+      throw Error(`Invalid peerId at index ${index}.`)
+    }
+  })
+}
+
+function generateKeyShares(peerIds: PeerId[]): { secrets: Uint8Array[], alpha: Uint8Array } {
+  let done = false
+  let secrets: Uint8Array[]
+  let privKey: Uint8Array
+  let alpha
+
+  // Generate the Diffie-Hellman key shares and
+  // the respective blinding factors for the
+  // relays.
+  // There exists a negligible, but NON-ZERO,
+  // probability that the key share is chosen
+  // such that it yields non-group elements.
+  do {
+    // initialize values
+    let mul = new Uint8Array(PRIVATE_KEY_LENGTH)
+
+    mul[PRIVATE_KEY_LENGTH - 1] = 1
+    const G = secp256k1.publicKeyCreate(mul)
+
+    secrets = []
+
+    do {
+      privKey = randomBytes(PRIVATE_KEY_LENGTH)
+    } while (!secp256k1.privateKeyVerify(privKey))
+
+    alpha = secp256k1.publicKeyCreate(privKey)
+
+    mul.set(privKey, 0)
+
+    peerIds.forEach((peerId: PeerId, index: number) => {
+      // parallel
+      // thread 1
+      const alpha = secp256k1.publicKeyTweakMul(G, mul)
+      // secp256k1.publicKeyVerify(alpha)
+
+      // thread 2
+      const secret = secp256k1.publicKeyTweakMul(peerId.pubKey.marshal(), mul)
+      // secp256k1.publicKeyVerify(secret)
+      // end parallel
+
+      if (!secp256k1.publicKeyVerify(alpha) || !secp256k1.publicKeyVerify(secret)) {
+        return
+      }
+
+      mul = secp256k1.privateKeyTweakMul(mul, deriveBlinding(alpha, secret))
+
+      if (!secp256k1.privateKeyVerify(mul)) {
+        return
+      }
+
+      secrets.push(secret)
+
+      if (index == peerIds.length - 1) {
+        done = true
+      }
+    })
+  } while (!done)
+
+  return { secrets, alpha }
+}
+
+function generateFiller(secrets: Uint8Array[]) {
+  const filler = new Uint8Array(PER_HOP_SIZE * (secrets.length - 1))
+
+  let length: number = 0
+  let start: number = LAST_HOP_SIZE + MAX_HOPS * PER_HOP_SIZE
+  let end: number = LAST_HOP_SIZE + MAX_HOPS * PER_HOP_SIZE
+
+  for (let index = 0; index < secrets.length - 1; index++) {
+    let { key, iv } = derivePRGParameters(secrets[index])
+
+    start -= PER_HOP_SIZE
+    length += PER_HOP_SIZE
+
+    u8aXOR(true, filler.subarray(0, length), PRG.createPRG(key, iv).digest(start, end))
+  }
+
+  return filler
+}
+
+async function createBetaAndGamma(secrets: Uint8Array[], filler: Uint8Array, identifier: Uint8Array): { beta: Uint8Array, gamma: Uint8Array } {
+  const tmp = new Uint8Array(BETA_LENGTH - PER_HOP_SIZE)
+  let beta = new Uint8Array(BETA_LENGTH)
+  let gamma = new Uint8Array()
+
+  for (let i = secrets.length; i > 0; i--) {
+    const { key, iv } = derivePRGParameters(secrets[i - 1])
+
+    let paddingLength = (MAX_HOPS - secrets.length) * PER_HOP_SIZE
+
+    if (i == secrets.length) {
+      beta.set(peerIds[i - 1].pubKey.marshal(), 0)
+      beta.set(identifier, DESTINATION_SIZE)
+
+      // @TODO filling the array might not be necessary
+      if (paddingLength > 0) {
+        header.beta.set(randomBytes(paddingLength), LAST_HOP_SIZE)
+      }
+
+      u8aXOR(
+        true,
+        header.beta.subarray(0, LAST_HOP_SIZE + paddingLength),
+        PRG.createPRG(key, iv).digest(0, LAST_HOP_SIZE + paddingLength)
+      )
+
+      header.beta.set(filler, LAST_HOP_SIZE + paddingLength)
+    } else {
+      tmp.set(header.beta.subarray(0, BETA_LENGTH - PER_HOP_SIZE), 0)
+
+      header.beta.set(peerIds[i].pubKey.marshal(), 0)
+      header.beta.set(header.gamma, ADDRESS_SIZE)
+
+      // Used for the challenge that is created for the next node
+      header.beta.set(
+        await hash(deriveTicketKeyBlinding(secrets[i])),
+        ADDRESS_SIZE + MAC_SIZE
+      )
+      header.beta.set(tmp, PER_HOP_SIZE)
+
+      if (i < secrets.length - 1) {
+        /**
+         * Tells the relay node which challenge it should for the issued ticket.
+         * The challenge should be done in a way such that:
+         *   - the relay node does not know how to solve it
+         *   - having one secret share is not sufficient to reconstruct
+         *     the secret
+         *   - the relay node can verify the key derivation path
+         */
+        header.beta.set(
+          await hash(
+            await hash(
+              u8aConcat(
+                deriveTicketKey(secrets[i]),
+                await hash(deriveTicketKeyBlinding(secrets[i + 1]))
+              )
+            )
+          ),
+          ADDRESS_SIZE + MAC_SIZE + KEY_LENGTH
+        )
+      } else if (i == secrets.length - 1) {
+        header.beta.set(
+          await hash(deriveTicketLastKey(secrets[i])),
+          ADDRESS_SIZE + MAC_SIZE + KEY_LENGTH
+        )
+      }
+
+      u8aXOR(true, header.beta, PRG.createPRG(key, iv).digest(0, BETA_LENGTH))
+    }
+
+    header.gamma.set(createMAC(secrets[i - 1], header.beta), 0)
+  }
+}
+
+export async function createHeader(
+  hash: (msg: Uint8Array) => Promise<Types.Hash>,
+  peerIds: PeerId[]
+): Promise<Header> {
+
+  const header = new Uint8Array(Header.SIZE)
+  checkPeerIds(peerIds)
+  const { secrets, alpha } = generateKeyShares()
+  const identifier = randomBytes(IDENTIFIER_SIZE)
+  const filler = generateFiller(secrets)
+  const { beta, gamma } = await createBetaAndGamma(secrets, filler, identifier)
+  return {
+    header: header,
+    secrets: secrets,
+    identifier: identifier
+  }
+}
+
+export class Header {
   tmpData?: Uint8Array
   derivedSecretLastNode?: Uint8Array
 
-  constructor(arr: { bytes: ArrayBuffer; offset: number }) {
-    super(arr.bytes, arr.offset, Header.SIZE)
+  constructor(
+    readonly alpha: Uint8Array, 
+    readonly beta: Uint8Array, 
+    readonly gamma: Uint8Array) {
   }
 
-  slice(begin: number = 0, end: number = Header.SIZE) {
-    return this.subarray(begin, end)
-  }
-
-  subarray(begin: number = 0, end: number = Header.SIZE): Uint8Array {
-    return new Uint8Array(this.buffer, begin + this.byteOffset, end - begin)
-  }
-
-  get alpha(): Uint8Array {
-    return this.subarray(0, COMPRESSED_PUBLIC_KEY_LENGTH)
-  }
-
-  get beta(): Uint8Array {
-    return this.subarray(COMPRESSED_PUBLIC_KEY_LENGTH, COMPRESSED_PUBLIC_KEY_LENGTH + BETA_LENGTH)
-  }
-
-  get gamma(): Uint8Array {
-    return this.subarray(
-      COMPRESSED_PUBLIC_KEY_LENGTH + BETA_LENGTH,
-      COMPRESSED_PUBLIC_KEY_LENGTH + BETA_LENGTH + MAC_SIZE
-    )
+  serialize(): Uint8Array {
+    return serializeToU8a([
+      [this.alpha, COMPRESSED_PUBLIC_KEY_LENGTH],
+      [this.beta, BETA_LENGTH],
+      [this.gamma, MAC_SIZE]
+    ])
   }
 
   get address(): this['tmpData'] {
@@ -190,8 +361,8 @@ export class Header extends Uint8Array {
     return COMPRESSED_PUBLIC_KEY_LENGTH + BETA_LENGTH + MAC_SIZE
   }
 
-  static async create<Chain extends HoprCoreConnector>(
-    node: Hopr<Chain>,
+  static async create(
+    hash: (msg: Uint8Array) => Promise<Types.Hash>,
     peerIds: PeerId[],
     arr?: {
       bytes: ArrayBuffer
@@ -213,7 +384,7 @@ export class Header extends Uint8Array {
     const header = new Header(arr)
     header.tmpData = header.beta.subarray(ADDRESS_SIZE + MAC_SIZE, PER_HOP_SIZE)
 
-    return createHeaderHelper(node.paymentChannels.utils.hash, header, peerIds)
+    return createHeaderHelper(hash, header, peerIds)
   }
 }
 
