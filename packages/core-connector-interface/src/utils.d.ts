@@ -32,7 +32,6 @@ export declare function hash(msg: Uint8Array): Promise<Hash>
  * Uses the native on-chain signature scheme to create an on-chain verifiable signature.
  * @param msg message to sign
  * @param privKey private key of the signer
- * @param pubKey public key of the signer
  */
 export declare function sign(msg: Uint8Array, privKey: Uint8Array): Promise<Signature>
 
