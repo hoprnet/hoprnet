@@ -146,11 +146,8 @@ class Acknowledgement<Chain extends HoprCoreConnector> extends Uint8Array {
   }
 
   async sign(peerId: PeerId): Promise<Acknowledgement<Chain>> {
-    await this.paymentChannels.utils.sign(await this.hash, peerId.privKey.marshal(), peerId.pubKey.marshal(), {
-      bytes: this.buffer,
-      offset: this.responseSignatureOffset
-    })
-
+    const signature = await this.paymentChannels.utils.sign(await this.hash, peerId.privKey.marshal())
+    this.set(signature, this.responseSignatureOffset - this.byteOffset)
     return this
   }
 

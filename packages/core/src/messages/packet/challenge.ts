@@ -78,12 +78,9 @@ class Challenge {
    *
    * @param peerId that contains private key and public key of the node
    */
-  async sign(peerId: PeerId): Promise<Challenge> {
-    await this._sign(this.hash, peerId.privKey.marshal(), peerId.pubKey.marshal(), {
-      bytes: this.buffer,
-      offset: this.challengeSignatureOffset
-    })
-
+  async sign(peerId: PeerId): Promise<Challenge<Chain>> {
+    const signature = await this._sign(this.hash, peerId.privKey.marshal())
+    this.set(signature, this.challengeSignatureOffset - this.byteOffset)
     return this
   }
 

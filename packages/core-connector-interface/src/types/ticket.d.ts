@@ -37,14 +37,7 @@ declare interface Ticket {
 
   toU8a(): Uint8Array
 
-  sign(
-    privKey: Uint8Array,
-    pubKey: Uint8Array | undefined,
-    arr?: {
-      bytes: ArrayBuffer
-      offset: number
-    }
-  ): Promise<Signature>
+  sign(privKey: Uint8Array): Promise<Signature>
 }
 
 declare var Ticket: TicketStatic

@@ -203,11 +203,8 @@ class ChannelFactory {
       }
     )
 
-    await sign(await ticket.hash, this.coreConnector.account.keys.onChain.privKey, undefined, {
-      bytes: signedTicket.buffer,
-      offset: signedTicket.signatureOffset
-    })
-
+    const signature = await sign(await ticket.hash, this.coreConnector.account.keys.onChain.privKey)
+    signedTicket.set(signature, signedTicket.signatureOffset - signedTicket.byteOffset)
     return signedTicket
   }
 
@@ -224,10 +221,8 @@ class ChannelFactory {
     const signedChannel = new SignedChannel(arr, struct)
 
     if (signedChannel.signature.eq(EMPTY_SIGNATURE)) {
-      await signedChannel.channel.sign(this.coreConnector.account.keys.onChain.privKey, undefined, {
-        bytes: signedChannel.buffer,
-        offset: signedChannel.signatureOffset
-      })
+      const signature = await signedChannel.channel.sign(this.coreConnector.account.keys.onChain.privKey)
+      signedChannel.set(signature, signedChannel.signatureOffset - signedChannel.byteOffset)
     }
 
     return signedChannel
