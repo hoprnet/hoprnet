@@ -68,7 +68,7 @@ describe(`check serialization and deserialization of ticket objects`, function (
     )
 
     const signature = await ticket.sign(peerA.privKey.marshal())
-    signedTicket.set(signature, signedTicket.signatureOffset - signedTicket.byteOffset )
+    signedTicket.set(signature, signedTicket.signatureOffset - signedTicket.byteOffset)
 
     assert(await unAcknowledgedTicket.verifySignature(peerA), 'signature must be valid')
 
