@@ -38,14 +38,14 @@ export class Packet<Chain extends HoprCoreConnector> {
       [this.header, Header.SIZE],
       [this.ticket, this.sizeofSignedTicket],
       [this.challenge, this.sizeofChallenge],
-      [this.message, Message.SIZE] 
+      [this.message, Message.SIZE]
     ])
   }
 
   public static async deserialize<Chain extends HoprCoreConnector>(
     peerId: PeerId,
     arr: Uint8Array,
-    sizeofSignedTicket: number,
+    sizeofSignedTicket: number
   ): Promise<Packet<Chain>> {
     let i = arr.byteOffset
     const header = new Header({ bytes: arr.buffer, offset: i })
