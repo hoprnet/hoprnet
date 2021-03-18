@@ -128,15 +128,8 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
     return new Balance(this.amount.mul(new BN(this.winProb)).div(new BN(new Uint8Array(Hash.SIZE).fill(0xff))))
   }
 
-  async sign(
-    privKey: Uint8Array,
-    _pubKey: Uint8Array | undefined,
-    arr?: {
-      bytes: ArrayBuffer
-      offset: number
-    }
-  ): Promise<Signature> {
-    return sign(await this.hash, privKey, undefined, arr)
+  async sign(privKey: Uint8Array): Promise<Signature> {
+    return sign(await this.hash, privKey)
   }
 
   static create(
