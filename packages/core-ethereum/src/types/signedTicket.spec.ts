@@ -2,7 +2,7 @@ import assert from 'assert'
 import { randomBytes } from 'crypto'
 import { stringToU8a, randomInteger, u8aToHex } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
-import { AccountId, Ticket, Hash, TicketEpoch, Balance, Signature, SignedTicket } from '.'
+import { AccountId, Ticket, Hash, TicketEpoch, Balance, SignedTicket } from '.'
 import { pubKeyToAccountId, privKeyToPubKey } from '../utils'
 import * as testconfigs from '../config.spec'
 
@@ -43,9 +43,7 @@ describe('test signedTicket construction', async function () {
 
     const ticket = new Ticket(undefined, ticketData)
 
-    const signature = new Signature()
-
-    await ticket.sign(userAPrivKey)
+    const signature = await ticket.sign(userAPrivKey)
 
     const signedTicket = new SignedTicket(undefined, {
       signature,
@@ -82,7 +80,8 @@ describe('test signedTicket construction', async function () {
       ticket
     })
 
-    ticket.sign(userAPrivKey)
+    const signature = await ticket.sign(userAPrivKey)
+    signedTicketA.set(signature, signedTicketA.signatureOffset - signedTicketA.byteOffset)
 
     assert(await signedTicketA.verify(userAPubKey))
 
@@ -128,9 +127,7 @@ describe('test signedTicket construction', async function () {
 
     const ticket = new Ticket(undefined, ticketData)
 
-    const signature = new Signature()
-
-    await ticket.sign(userAPrivKey)
+    const signature = await ticket.sign(userAPrivKey)
 
     const offset = randomInteger(1, 31)
 
