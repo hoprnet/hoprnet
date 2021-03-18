@@ -105,10 +105,7 @@ export async function hash(msg: Uint8Array): Promise<Hash> {
  * @param arr
  * @returns a promise resolved to Hash
  */
-export async function sign(
-  msg: Uint8Array,
-  privKey: Uint8Array,
-): Promise<Signature> {
+export async function sign(msg: Uint8Array, privKey: Uint8Array): Promise<Signature> {
   if (privKey.length != constants.PRIVATE_KEY_LENGTH) {
     throw Error(
       `Invalid privKey argument. Expected a Uint8Array with ${constants.PRIVATE_KEY_LENGTH} elements but got one with ${privKey.length}.`
