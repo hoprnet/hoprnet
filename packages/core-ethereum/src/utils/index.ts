@@ -108,11 +108,6 @@ export async function hash(msg: Uint8Array): Promise<Hash> {
 export async function sign(
   msg: Uint8Array,
   privKey: Uint8Array,
-  _pubKey?: Uint8Array,
-  arr?: {
-    bytes: ArrayBuffer
-    offset: number
-  }
 ): Promise<Signature> {
   if (privKey.length != constants.PRIVATE_KEY_LENGTH) {
     throw Error(
@@ -120,13 +115,10 @@ export async function sign(
     )
   }
   const result = ecdsaSign(msg, privKey)
-
-  const response = new Signature(arr, {
+  return new Signature(null, {
     signature: result.signature,
     recovery: result.recid
   })
-
-  return response
 }
 
 /**

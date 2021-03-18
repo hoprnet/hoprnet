@@ -129,14 +129,9 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
   }
 
   async sign(
-    privKey: Uint8Array,
-    _pubKey: Uint8Array | undefined,
-    arr?: {
-      bytes: ArrayBuffer
-      offset: number
-    }
+    privKey: Uint8Array
   ): Promise<Signature> {
-    return sign(await this.hash, privKey, undefined, arr)
+    return sign(await this.hash, privKey)
   }
 
   static create(

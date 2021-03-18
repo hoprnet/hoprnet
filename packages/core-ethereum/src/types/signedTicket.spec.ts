@@ -45,10 +45,7 @@ describe('test signedTicket construction', async function () {
 
     const signature = new Signature()
 
-    await ticket.sign(userAPrivKey, undefined, {
-      bytes: signature.buffer,
-      offset: signature.byteOffset
-    })
+    await ticket.sign(userAPrivKey)
 
     const signedTicket = new SignedTicket(undefined, {
       signature,
@@ -85,10 +82,7 @@ describe('test signedTicket construction', async function () {
       ticket
     })
 
-    ticket.sign(userAPrivKey, undefined, {
-      bytes: signedTicketA.buffer,
-      offset: signedTicketA.signatureOffset
-    })
+    ticket.sign(userAPrivKey)
 
     assert(await signedTicketA.verify(userAPubKey))
 
@@ -136,10 +130,7 @@ describe('test signedTicket construction', async function () {
 
     const signature = new Signature()
 
-    await ticket.sign(userAPrivKey, undefined, {
-      bytes: signature.buffer,
-      offset: signature.byteOffset
-    })
+    await ticket.sign(userAPrivKey)
 
     const offset = randomInteger(1, 31)
 
