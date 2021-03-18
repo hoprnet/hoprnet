@@ -47,7 +47,7 @@ export type PRGParameters = {
   iv: Uint8Array
 }
 
-export class Header<_Chain extends HoprCoreConnector> extends Uint8Array {
+export class Header extends Uint8Array {
   tmpData?: Uint8Array
   derivedSecretLastNode?: Uint8Array
 
@@ -198,7 +198,7 @@ export class Header<_Chain extends HoprCoreConnector> extends Uint8Array {
       offset: number
     }
   ): Promise<{
-    header: Header<Chain>
+    header: Header
     secrets: Uint8Array[]
     identifier: Uint8Array
   }> {
@@ -210,10 +210,10 @@ export class Header<_Chain extends HoprCoreConnector> extends Uint8Array {
       }
     }
 
-    const header = new Header<Chain>(arr)
+    const header = new Header(arr)
     header.tmpData = header.beta.subarray(ADDRESS_SIZE + MAC_SIZE, PER_HOP_SIZE)
 
-    return createHeaderHelper(node, header, peerIds)
+    return createHeaderHelper(node.paymentChannels.utils.hash, header, peerIds)
   }
 }
 

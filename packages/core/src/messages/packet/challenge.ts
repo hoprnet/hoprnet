@@ -101,7 +101,7 @@ class Challenge {
       )
     }
 
-    const createSignature = (arr: Uint8Array) => hoprCoreConnector.types.Signature.create({arr.buffer, arr.byteOffset })
+    const createSignature = (arr: Uint8Array) => hoprCoreConnector.types.Signature.create(arr.buffer, arr.byteOffset)
     const signatureSize = hoprCoreConnector.types.Signature.SIZE
     return new Challenge(createSignature, signatureSize, hashedKey, fee)
   }
