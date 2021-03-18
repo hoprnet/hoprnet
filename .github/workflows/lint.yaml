@@ -24,7 +24,7 @@ jobs:
         id: yarn-cache-dir-path
         run: |
           echo "::set-output name=dir::$(yarn cache dir)"
-          echo yarn cache dir
+          yarn cache dir
 
 #             #      - name: Get yarn cache directory path
 #             #      - id: yarn-cache-dir-path
