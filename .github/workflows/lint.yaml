@@ -36,9 +36,8 @@ jobs:
       - name: Install dependencies
         # if: steps.yarn-cache.outputs.cache-hit != 'true'
         run: |
-          ls node_modules
-          # yarn
-          # node_modules/.bin/lerna bootstrap
+          yarn
+          node_modules/.bin/lerna bootstrap
 
       - name: Lint & Fix
         run: |
