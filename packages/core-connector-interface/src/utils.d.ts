@@ -38,11 +38,7 @@ export declare function hash(msg: Uint8Array): Promise<Hash>
 export declare function sign(
   msg: Uint8Array,
   privKey: Uint8Array,
-  pubKey: Uint8Array | undefined,
-  arr?: {
-    bytes: ArrayBuffer
-    offset: number
-  }
+  pubKey: Uint8Array | undefined
 ): Promise<Signature>
 
 /**
