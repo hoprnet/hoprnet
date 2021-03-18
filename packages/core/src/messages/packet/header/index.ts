@@ -60,7 +60,7 @@ function checkPeerIds(peerIds: PeerId[]) {
   })
 }
 
-function generateKeyShares(peerIds: PeerId[]): { secrets: Uint8Array[], alpha: Uint8Array } {
+function generateKeyShares(peerIds: PeerId[]): { secrets: Uint8Array[]; alpha: Uint8Array } {
   let done = false
   let secrets: Uint8Array[]
   let privKey: Uint8Array
@@ -146,7 +146,7 @@ async function createBetaAndGamma(
   secrets: Uint8Array[],
   filler: Uint8Array,
   identifier: Uint8Array
-): Promise<{ beta: Uint8Array, gamma: Uint8Array }> {
+): Promise<{ beta: Uint8Array; gamma: Uint8Array }> {
   const tmp = new Uint8Array(BETA_LENGTH - PER_HOP_SIZE)
   let beta = new Uint8Array(BETA_LENGTH)
   let gamma = new Uint8Array(MAC_SIZE)
@@ -179,10 +179,7 @@ async function createBetaAndGamma(
       beta.set(gamma, ADDRESS_SIZE)
 
       // Used for the challenge that is created for the next node
-      beta.set(
-        await hash(deriveTicketKeyBlinding(secrets[i])),
-        ADDRESS_SIZE + MAC_SIZE
-      )
+      beta.set(await hash(deriveTicketKeyBlinding(secrets[i])), ADDRESS_SIZE + MAC_SIZE)
       beta.set(tmp, PER_HOP_SIZE)
 
       if (i < secrets.length - 1) {
@@ -196,20 +193,12 @@ async function createBetaAndGamma(
          */
         beta.set(
           await hash(
-            await hash(
-              u8aConcat(
-                deriveTicketKey(secrets[i]),
-                await hash(deriveTicketKeyBlinding(secrets[i + 1]))
-              )
-            )
+            await hash(u8aConcat(deriveTicketKey(secrets[i]), await hash(deriveTicketKeyBlinding(secrets[i + 1]))))
           ),
           ADDRESS_SIZE + MAC_SIZE + KEY_LENGTH
         )
       } else if (i == secrets.length - 1) {
-        beta.set(
-          await hash(deriveTicketLastKey(secrets[i])),
-          ADDRESS_SIZE + MAC_SIZE + KEY_LENGTH
-        )
+        beta.set(await hash(deriveTicketLastKey(secrets[i])), ADDRESS_SIZE + MAC_SIZE + KEY_LENGTH)
       }
 
       u8aXOR(true, beta, PRG.createPRG(key, iv).digest(0, BETA_LENGTH))
@@ -224,11 +213,7 @@ export class Header {
   tmpData?: Uint8Array
   derivedSecretLastNode?: Uint8Array
 
-  constructor(
-    readonly alpha: Uint8Array,
-    readonly beta: Uint8Array,
-    readonly gamma: Uint8Array) {
-  }
+  constructor(readonly alpha: Uint8Array, readonly beta: Uint8Array, readonly gamma: Uint8Array) {}
 
   serialize(): Uint8Array {
     return serializeToU8a([
@@ -238,9 +223,7 @@ export class Header {
     ])
   }
 
-  static deserialize(arr: Uint8Array): Header {
-
-  }
+  static deserialize(arr: Uint8Array): Header {}
 
   get address(): this['tmpData'] {
     return this.tmpData != null ? this.tmpData.subarray(0, ADDRESS_SIZE) : undefined
@@ -356,7 +339,7 @@ export class Header {
 
   static async create(
     hash: (msg: Uint8Array) => Promise<Types.Hash>,
-    peerIds: PeerId[],
+    peerIds: PeerId[]
   ): Promise<{
     header: Header
     secrets: Uint8Array[]

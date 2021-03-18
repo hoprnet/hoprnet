@@ -80,7 +80,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     return this.byteOffset
   }
 
-  get header(): Header{
+  get header(): Header {
     if (this._header == null) {
       this._header = Header.deserialize(new Uint8Array(this.buffer, this.headerOffset))
     }
