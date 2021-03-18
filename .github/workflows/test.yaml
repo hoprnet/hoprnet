@@ -1,63 +1,58 @@
-# name: HOPR Test
+name: HOPR Test
 
-# on:
-#   push:
-#     branches: ['**']
-#     paths-ignore:
-#       - '**/docs/**/*'
+on:
+  push:
+    branches: ['**']
+    paths-ignore:
+      - '**/docs/**/*'
 
-# jobs:
-#   build:
-#     name: Build & Test
-#     runs-on: ubuntu-latest
+jobs:
+  build:
+    name: Build & Test
+    runs-on: ubuntu-latest
 
-#     strategy:
-#       matrix:
-#         node-version: [14]
-#         package: ['core', 'ethereum', 'all', 'core-ethereum']
+    strategy:
+      matrix:
+        node-version: [14]
+        package: ['core', 'ethereum', 'all', 'core-ethereum']
 
-#     steps:
-#       - uses: actions/checkout@v2
-#       - name: Use Node.js ${{ matrix.node-version }}
-#         uses: actions/setup-node@v2
-#         with:
-#           node-version: ${{ matrix.node-version }}
-#           registry-url: https://registry.npmjs.org/
+    steps:
+      - uses: actions/checkout@v2
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v2
+        with:
+          node-version: ${{ matrix.node-version }}
+          registry-url: https://registry.npmjs.org/
 
-#       - name: Get yarn cache directory path
-#         id: yarn-cache-dir-path
-#         run: |
-#           echo "::set-output name=dir::$(yarn cache dir)"
+      - name: Restore lerna
+        uses: actions/cache@v2
+        with:
+          path: |
+            node_modules
+            */*/node_modules
+          key: ${{ runner.os }}-lerna-${{ hashFiles('**/yarn.lock') }}
 
-#       - uses: actions/cache@v2
-#         id: yarn-cache
-#         with:
-#           path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
-#           key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
-#           restore-keys: |
-#             ${{ runner.os }}-yarn-
+      - name: Install dependencies
+        run: |
+          yarn --prefer-offline
+          node_modules/.bin/lerna bootstrap
 
-#       - name: Install dependencies
-#         run: |
-#           yarn --prefer-offline
-#           node_modules/.bin/lerna bootstrap
+      - name: Build (all)
+        if: matrix.package == 'all' 
+        run: |
+          node_modules/.bin/lerna link 
+          node_modules/.bin/lerna run build --include-dependencies --ignore @hoprnet/hopr-core --ignore @hoprnet/hopr-ethereum --ignore @hoprnet/hopr-core-ethereum
 
-#       - name: Build (all)
-#         if: matrix.package == 'all' 
-#         run: |
-#           node_modules/.bin/lerna link 
-#           node_modules/.bin/lerna run build --include-dependencies --ignore @hoprnet/hopr-core --ignore @hoprnet/hopr-ethereum --ignore @hoprnet/hopr-core-ethereum
+      - name: Test (all)
+        if: matrix.package == 'all'
+        run: |
+          node_modules/.bin/lerna run test --ignore @hoprnet/hopr-core --ignore @hoprnet/hopr-ethereum --ignore @hoprnet/hopr-core-ethereum
 
-#       - name: Test (all)
-#         if: matrix.package == 'all'
-#         run: |
-#           node_modules/.bin/lerna run test --ignore @hoprnet/hopr-core --ignore @hoprnet/hopr-ethereum --ignore @hoprnet/hopr-core-ethereum
-
-#       - name: Build ${{ matrix.package }}
-#         if: matrix.package != 'all'
-#         run: |
-#           node_modules/.bin/lerna run build --include-dependencies --scope @hoprnet/hopr-${{ matrix.package }}
-#       - name: Test ${{ matrix.package }}
-#         if: matrix.package != 'all' 
-#         run: |
-#           node_modules/.bin/lerna run test --scope @hoprnet/hopr-${{ matrix.package }}
+      - name: Build ${{ matrix.package }}
+        if: matrix.package != 'all'
+        run: |
+          node_modules/.bin/lerna run build --include-dependencies --scope @hoprnet/hopr-${{ matrix.package }}
+      - name: Test ${{ matrix.package }}
+        if: matrix.package != 'all' 
+        run: |
+          node_modules/.bin/lerna run test --scope @hoprnet/hopr-${{ matrix.package }}

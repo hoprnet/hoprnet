@@ -20,12 +20,7 @@ jobs:
           node-version: 14
           registry-url: https://registry.npmjs.org/
 
-      - name: Get yarn cache directory path
-        id: yarn-cache-dir-path
-        run: |
-          echo "::set-output name=dir::$(yarn cache dir)"
-
-      - name: restore lerna
+      - name: Restore lerna
         uses: actions/cache@v2
         with:
           path: |

@@ -1,96 +1,91 @@
-# name: Smoke test
+name: Smoke test
 
-# on:
-#   push:
-#     branches: ['**']
-#     paths-ignore:
-#       - '**/docs/**/*'
+on:
+  push:
+    branches: ['**']
+    paths-ignore:
+      - '**/docs/**/*'
 
-# jobs:
-#   build:
-#     name: Smoke testing
-#     runs-on: ubuntu-latest
+jobs:
+  build:
+    name: Smoke testing
+    runs-on: ubuntu-latest
 
-#     steps:
-#       - name: Turnstyle
-#         uses: softprops/turnstyle@v1
-#         env:
-#           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-#       - uses: actions/checkout@v2
-#       - name: Use Node.js 14
-#         uses: actions/setup-node@v2
-#         with:
-#           node-version: 14
-#           registry-url: https://registry.npmjs.org/
+    steps:
+      - name: Turnstyle
+        uses: softprops/turnstyle@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/checkout@v2
+      - name: Use Node.js 14
+        uses: actions/setup-node@v2
+        with:
+          node-version: 14
+          registry-url: https://registry.npmjs.org/
 
-#       - name: Get yarn cache directory path
-#         id: yarn-cache-dir-path
-#         run: |
-#           echo "::set-output name=dir::$(yarn cache dir)"
+      - name: Restore lerna
+        uses: actions/cache@v2
+        with:
+          path: |
+            node_modules
+            */*/node_modules
+          key: ${{ runner.os }}-lerna-${{ hashFiles('**/yarn.lock') }}
 
-#       - uses: actions/cache@v2
-#         id: yarn-cache
-#         with:
-#           path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
-#           key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
-#           restore-keys: |
-#             ${{ runner.os }}-yarn-
+      - name: Install dependencies
+        run: |
+          yarn --prefer-offline
+          node_modules/.bin/lerna bootstrap
 
-#       - name: Install dependencies
-#         run: |
-#           yarn --prefer-offline
-#           node_modules/.bin/lerna bootstrap
-
-#       - name: Build (all)
-#         run: |
-#           node_modules/.bin/lerna link 
-#           node_modules/.bin/lerna run build 
+      - name: Build (all)
+        run: |
+          node_modules/.bin/lerna link 
+          node_modules/.bin/lerna run build 
 
 
-#           #- name: Install hoprd
-#           #shell: bash
-#           #run: |
-#           #NODE_ENV=production npm install -g @hoprnet/hoprd
-#           #working-directory: packages/hoprd
+          #- name: Install hoprd
+          #shell: bash
+          #run: |
+          #NODE_ENV=production npm install -g @hoprnet/hoprd
+          #working-directory: packages/hoprd
 
-#       - name: Check databases
-#         shell: bash {0}
-#         run: |
-#           shopt -s expand_aliases
+      - name: Check databases
+        shell: bash {0}
+        run: |
+          shopt -s expand_aliases
 
-#           # Variables
-#           PROVIDER=$PROVIDER_DEVELOPMENT_ROPSTEN_WSS
+          # Variables
+          PROVIDER=$PROVIDER_DEVELOPMENT_ROPSTEN_WSS
 
-#           alias hoprd="node packages/hoprd/lib/index.js --provider $PROVIDER"
+          alias hoprd="node packages/hoprd/lib/index.js --provider $PROVIDER"
 
-#           echo "alice"
-#           hoprd --data='./test/fixtures/alice' --password="$DBPASS" --runAsBootstrap --run "address" 
-#           hoprd --data='./test/fixtures/alice' --password="$DBPASS" --runAsBootstrap --run "balance" 
+          echo "alice"
+          hoprd --data='./test/fixtures/alice' --password="$DBPASS" --runAsBootstrap --run "address" 
+          hoprd --data='./test/fixtures/alice' --password="$DBPASS" --runAsBootstrap --run "balance" 
 
-#           echo "bob"
-#           hoprd --data='./test/fixtures/bob' --password="$DBPASS" --runAsBootstrap --run "address"
-#           hoprd --data='./test/fixtures/bob' --password="$DBPASS" --runAsBootstrap --run "balance"
+          echo "bob"
+          hoprd --data='./test/fixtures/bob' --password="$DBPASS" --runAsBootstrap --run "address"
+          hoprd --data='./test/fixtures/bob' --password="$DBPASS" --runAsBootstrap --run "balance"
 
-#           echo "charlie"
-#           hoprd --data='./test/fixtures/charlie' --password="$DBPASS" --runAsBootstrap --run "address"
-#           hoprd --data='./test/fixtures/charlie' --password="$DBPASS" --runAsBootstrap --run "balance"
-#         env:
-#           DBPASS: ${{ secrets.SMOKETESTPASSWORD }}
-#           PROVIDER_DEVELOPMENT_ROPSTEN_WSS: ${{ secrets.PROVIDER_DEVELOPMENT_ROPSTEN_WSS }}
+          echo "charlie"
+          hoprd --data='./test/fixtures/charlie' --password="$DBPASS" --runAsBootstrap --run "address"
+          hoprd --data='./test/fixtures/charlie' --password="$DBPASS" --runAsBootstrap --run "balance"
+        env:
+          DBPASS: ${{ secrets.SMOKETESTPASSWORD }}
+          PROVIDER_DEVELOPMENT_ROPSTEN_WSS: ${{ secrets.PROVIDER_DEVELOPMENT_ROPSTEN_WSS }}
 
-#       - name: Smoke tests
-#         shell: bash {0}
-#         run: ./test/smoke.sh
-#         env:
-#           DBPASS: ${{ secrets.SMOKETESTPASSWORD }}
-#           FIXTURES: ./test/fixtures
-#           PROVIDER_DEVELOPMENT_ROPSTEN_WSS: ${{ secrets.PROVIDER_DEVELOPMENT_ROPSTEN_WSS }}
+      - name: Smoke tests
+        shell: bash {0}
+        run: ./test/smoke.sh
+        env:
+          DBPASS: ${{ secrets.SMOKETESTPASSWORD }}
+          FIXTURES: ./test/fixtures
+          PROVIDER_DEVELOPMENT_ROPSTEN_WSS: ${{ secrets.PROVIDER_DEVELOPMENT_ROPSTEN_WSS }}
 
-#       - name: Commit database changes back to repo
-#         shell: bash {0}
-#         run: |
-#           git config --global user.email "noreply@hoprnet.org" && git config --global user.name "HOPR Testing robot"
-#           git add ./test || true
-#           git commit -a -m "update databases" || true
-#           git pull origin ${{ github.ref }}
-#           #git push origin ${{ github.ref }} || true
+      - name: Commit database changes back to repo
+        shell: bash {0}
+        run: |
+          git config --global user.email "noreply@hoprnet.org" && git config --global user.name "HOPR Testing robot"
+          git add ./test || true
+          git commit -a -m "update databases" || true
+          git pull origin ${{ github.ref }}
+          #git push origin ${{ github.ref }} || true
