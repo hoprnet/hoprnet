@@ -157,10 +157,8 @@ class TicketFactory {
       }
     )
 
-    await ticket.sign(this.channel.coreConnector.account.keys.onChain.privKey, undefined, {
-      bytes: signedTicket.buffer,
-      offset: signedTicket.signatureOffset
-    })
+    const signature = await ticket.sign(this.channel.coreConnector.account.keys.onChain.privKey)
+    signedTicket.set(signature, signedTicket.signatureOffset - signedTicket.byteOffset)
 
     return signedTicket
   }

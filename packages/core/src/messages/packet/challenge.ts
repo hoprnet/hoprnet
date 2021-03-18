@@ -131,12 +131,8 @@ class Challenge<Chain extends HoprCoreConnector> extends Uint8Array {
    * @param peerId that contains private key and public key of the node
    */
   async sign(peerId: PeerId): Promise<Challenge<Chain>> {
-    // const hashedChallenge = hash(Buffer.concat([this._hashedKey, this._fee.toBuffer('be', VALUE_LENGTH)], HASH_LENGTH + VALUE_LENGTH))
-    await this.paymentChannels.utils.sign(this.hash, peerId.privKey.marshal(), peerId.pubKey.marshal(), {
-      bytes: this.buffer,
-      offset: this.challengeSignatureOffset
-    })
-
+    const signature = await this.paymentChannels.utils.sign(this.hash, peerId.privKey.marshal())
+    this.set(signature, this.challengeSignatureOffset - this.byteOffset)
     return this
   }
 
