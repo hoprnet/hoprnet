@@ -14,8 +14,7 @@ import {
   createMAC
 } from './index'
 
-import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-import Hopr from '../../../'
+import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import PeerId from 'peer-id'
 import Debug from 'debug'
 const log = Debug('hopr-core:packet:header')
@@ -31,9 +30,9 @@ import {
   KEY_LENGTH
 } from './parameters'
 
-export async function createHeader<Chain extends HoprCoreConnector>(
-  node: Hopr<Chain>,
-  header: Header<Chain>,
+export async function createHeader(
+  hash: (msg: Uint8Array) => Promise<Types.Hash>,
+  header: Header,
   peerIds: PeerId[]
 ) {
   function checkPeerIds() {
@@ -160,7 +159,7 @@ export async function createHeader<Chain extends HoprCoreConnector>(
 
         // Used for the challenge that is created for the next node
         header.beta.set(
-          await node.paymentChannels.utils.hash(deriveTicketKeyBlinding(secrets[i])),
+          await hash(deriveTicketKeyBlinding(secrets[i])),
           ADDRESS_SIZE + MAC_SIZE
         )
         header.beta.set(tmp, PER_HOP_SIZE)
@@ -175,11 +174,11 @@ export async function createHeader<Chain extends HoprCoreConnector>(
            *   - the relay node can verify the key derivation path
            */
           header.beta.set(
-            await node.paymentChannels.utils.hash(
-              await node.paymentChannels.utils.hash(
+            await hash(
+              await hash(
                 u8aConcat(
                   deriveTicketKey(secrets[i]),
-                  await node.paymentChannels.utils.hash(deriveTicketKeyBlinding(secrets[i + 1]))
+                  await hash(deriveTicketKeyBlinding(secrets[i + 1]))
                 )
               )
             ),
@@ -187,7 +186,7 @@ export async function createHeader<Chain extends HoprCoreConnector>(
           )
         } else if (i == secrets.length - 1) {
           header.beta.set(
-            await node.paymentChannels.utils.hash(deriveTicketLastKey(secrets[i])),
+            await hash(deriveTicketLastKey(secrets[i])),
             ADDRESS_SIZE + MAC_SIZE + KEY_LENGTH
           )
         }
