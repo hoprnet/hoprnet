@@ -2,7 +2,19 @@
 
 # -- BASE STAGE --------------------------------
 
-FROM node:12.9.1-buster AS base
+# Based on https://snyk.io/blog/10-best-practices-to-containerize-nodejs-web-applications-with-docker/
+# From the #1 recommendation “Use explicit and deterministic Docker base image tags”
+
+# Docker image builds are inconsistent. Just like we’re using lockfiles to get a deterministic
+# npm install behavior every time we install npm packages, we’d also like to get deterministic
+# docker image builds. If we build the image from node—which effectively means the node:latest
+# tag—then every build will pull a newly built Docker image of node.
+
+# Originally node:12.9.1-buster, obtained by
+# $ docker pull node:12.9.1-buster
+# $ docker images --digests
+# and added the sha to the image.
+FROM node:14.15-buster@sha256:74a322375cbf1bfca73e3d41f39d4a04e4869c7defdf83f9663166989d1b553c AS base
 WORKDIR /hoprd
 
 RUN apt-get update && \
@@ -32,10 +44,15 @@ RUN yarn buildAdmin
 
 # -- RUNTIME STAGE ------------------------------\
 
-FROM node:12.9.1-buster AS runtime
+FROM node:14.15-buster@sha256:74a322375cbf1bfca73e3d41f39d4a04e4869c7defdf83f9663166989d1b553c AS runtime
+
+RUN wget https://github.com/Yelp/dumb-init/releases/download/v1.2.4/dumb-init_1.2.4_amd64.deb
+RUN dpkg -i dumb-init_*.deb
 
 ENV NODE_ENV 'production'
 ENV NEXT_TELEMETRY_DISABLED 1
+ENV DEBUG 'hopr*'
+ENV NODE_OPTIONS=--max_old_space_size=4096
 
 WORKDIR /app
 
@@ -51,5 +68,7 @@ VOLUME ["/app/db"]
 EXPOSE 3000
 # REST API
 EXPOSE 3001
+# Healthcheck server
+EXPOSE 8080
 
-ENTRYPOINT ["node", "/app/index.js"]
+ENTRYPOINT ["dumb-init", "node", "/app/index.js"]

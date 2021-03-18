@@ -1,15 +1,14 @@
 #!/usr/bin/env node
-import Hopr, { FULL_VERSION } from '@hoprnet/hopr-core'
+import Hopr from '@hoprnet/hopr-core'
 import type { HoprOptions } from '@hoprnet/hopr-core'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import { decode } from 'rlp'
-// @ts-ignore
-import Multihash from 'multihashes'
 import { getBootstrapAddresses } from '@hoprnet/hopr-utils'
 import { Commands } from './commands'
 import { LogStream } from './logs'
 import { AdminServer } from './admin'
 import * as yargs from 'yargs'
+import setupAPI from './api'
 
 const argv = yargs
   .option('network', {
@@ -19,7 +18,7 @@ const argv = yargs
   })
   .option('provider', {
     describe: 'A provider url for the Network you specified',
-    default: 'wss://bsc-ws-node.nariox.org:443'
+    default: 'wss://eth-goerli.ws.alchemyapi.io/v2/alq-cMKyMqdnSkputwtTJMfFcL2Lkh1g'
   })
   .option('host', {
     describe: 'The network host to run the HOPR node on.',
@@ -42,6 +41,19 @@ const argv = yargs
   .option('restPort', {
     describe: 'Updates the port for the rest server',
     default: 3001
+  })
+  .option('healthCheck', {
+    boolean: true,
+    describe: 'Run a health check end point on localhost:8080',
+    default: false
+  })
+  .option('healthCheckHost', {
+    describe: 'Updates the host for the healthcheck server',
+    default: 'localhost'
+  })
+  .option('healthCheckPort', {
+    describe: 'Updates the port for the healthcheck server',
+    default: 8080
   })
   .option('password', {
     describe: 'A password to encrypt your keys'
@@ -73,9 +85,13 @@ const argv = yargs
     describe: "initialize a database if it doesn't already exist",
     default: false
   })
-  .option('settings', {
-    descripe: 'Settings, same as in the repl (JSON)',
-    default: '{}'
+  .option('adminHost', {
+    describe: 'Host to listen to for admin console',
+    default: 'localhost'
+  })
+  .option('adminPort', {
+    describe: 'Port to listen to for admin console',
+    default: 3000
   })
   .wrap(Math.min(120, yargs.terminalWidth())).argv
 
@@ -121,7 +137,7 @@ async function main() {
   let node: Hopr<HoprCoreConnector>
   let logs = new LogStream()
   let adminServer = undefined
-  let settings: any = {}
+  let cmds
 
   function logMessageToNode(msg: Uint8Array) {
     logs.log(`#### NODE RECEIVED MESSAGE [${new Date().toISOString()}] ####`)
@@ -135,14 +151,10 @@ async function main() {
     }
   }
 
-  if (argv.settings) {
-    settings = JSON.parse(argv.settings)
-  }
-
   if (argv.admin) {
     // We need to setup the admin server before the HOPR node
     // as if the HOPR node fails, we need to put an error message up.
-    adminServer = new AdminServer(logs)
+    adminServer = new AdminServer(logs, argv.adminHost, argv.adminPort)
     await adminServer.setup()
   }
 
@@ -156,43 +168,39 @@ async function main() {
   try {
     node = await Hopr.create(options)
     logs.log('Created HOPR Node')
+    node.on('hopr:message', logMessageToNode)
+    cmds = new Commands(node)
 
     if (argv.rest) {
+      setupAPI(node, logs, argv)
+    }
+
+    if (argv.healthCheck) {
       const http = require('http')
       const service = require('restana')()
-
-      service.get('/api/v1/version', (_, res) => res.send(FULL_VERSION))
-      service.get('/api/v1/address/eth', async (_, res) => res.send(await node.paymentChannels.hexAccountAddress()))
-      service.get('/api/v1/address/hopr', async (_, res) => res.send(await node.getId().toB58String()))
-      const hostname = argv.restHost
-      const port = argv.restPort
-      http.createServer(service).listen(port, hostname, () => {
-        logs.log(`Rest server on ${hostname} listening on port ${port}`)
+      service.get('/healthcheck/v1/version', (_, res) => res.send(node.getVersion()))
+      const hostname = argv.healthCheckHost
+      const port = argv.healthCheckPort
+      const server = http.createServer(service).on('error', (err) => {
+        throw err
+      })
+      server.listen(port, hostname, (err) => {
+        if (err) throw err
+        logs.log(`Healthcheck server on ${hostname} listening on port ${port}`)
       })
     }
 
-    node.on('hopr:message', logMessageToNode)
-
-    process.once('exit', async () => {
-      await node.stop()
-      logs.log('Process exiting')
-      return
-    })
-
     if (adminServer) {
-      adminServer.registerNode(node)
+      adminServer.registerNode(node, cmds)
     }
 
     if (argv.run && argv.run !== '') {
       // Run a single command and then exit.
-      let cmds = new Commands(node)
-      if (argv.settings) {
-        cmds.setState(settings)
-      }
       // We support multiple semicolon separated commands
       let toRun = argv.run.split(';')
 
       for (let c of toRun) {
+        console.error('$', c)
         if (c === 'daemonize') {
           return
         }
@@ -211,6 +219,15 @@ async function main() {
       process.exit(1)
     }
   }
+
+  function stopGracefully(signal) {
+    logs.log(`Process exiting with signal ${signal}`)
+    process.exit()
+  }
+
+  process.once('exit', stopGracefully)
+  process.on('SIGINT', stopGracefully)
+  process.on('SIGTERM', stopGracefully)
 }
 
 main()

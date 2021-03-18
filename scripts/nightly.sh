@@ -7,7 +7,7 @@ source scripts/cleanup.sh
 # ----- Nightly integration / network test. --------
 
 if [ -z "$RPC" ]; then
-  RPC=https://bsc-dataseed.binance.org/
+  RPC=https://eth-goerli.alchemyapi.io/v2/DH3xYijhPOku0DtWajKUhY3XLljOSsGO
 fi
 
 # Get version from package.json

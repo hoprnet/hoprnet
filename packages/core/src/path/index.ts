@@ -1,7 +1,7 @@
 import Heap from 'heap-js'
 import PeerId from 'peer-id'
 import type NetworkPeers from '../network/network-peers'
-import type { Indexer, IndexerChannel as Edge } from '@hoprnet/hopr-core-connector-interface'
+import type { Indexer, RoutingChannel as Edge } from '@hoprnet/hopr-core-connector-interface'
 import { NETWORK_QUALITY_THRESHOLD, MAX_PATH_ITERATIONS } from '../constants'
 import Debug from 'debug'
 import BN from 'bn.js'
@@ -62,19 +62,21 @@ export async function findPath(
   while (queue.length > 0 && iterations++ < MAX_PATH_ITERATIONS) {
     const currentPath = queue.peek()
     if (pathFrom(currentPath).length == hops) {
-      log('Path of correct length found', debugPath(currentPath), ':', pathWeight(currentPath))
+      log('Path of correct length found', debugPath(currentPath), ':', pathWeight(currentPath).toString())
       return pathFrom(currentPath)
     }
 
     const lastPeer = next(currentPath[currentPath.length - 1])
     const newChannels = (await indexer.getChannelsFromPeer(lastPeer))
-      .filter(
-        (c) =>
+      .filter((c) => {
+        networkPeers.register(next(c))
+        return (
           !destination.equals(next(c)) &&
           networkPeers.qualityOf(next(c)) > NETWORK_QUALITY_THRESHOLD &&
           filterCycles(c, currentPath) &&
           !deadEnds.has(next(c).toB58String())
-      )
+        )
+      })
       .sort(compareWeight)
 
     if (newChannels.length == 0) {

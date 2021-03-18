@@ -1,14 +1,21 @@
-import type { Indexer, IndexerChannel } from '@hoprnet/hopr-core-connector-interface'
+import type { Indexer, RoutingChannel } from '@hoprnet/hopr-core-connector-interface'
 import PeerId from 'peer-id'
 import BN from 'bn.js'
-import { MINIMUM_REASONABLE_CHANNEL_STAKE, MAX_NEW_CHANNELS_PER_TICK, NETWORK_QUALITY_THRESHOLD } from './constants'
+import {
+  MINIMUM_REASONABLE_CHANNEL_STAKE,
+  MAX_NEW_CHANNELS_PER_TICK,
+  NETWORK_QUALITY_THRESHOLD,
+  MAX_AUTO_CHANNELS
+} from './constants'
 import debug from 'debug'
+import type NetworkPeers from './network/network-peers'
 const log = debug('hopr-core:channel-strategy')
 
 export type ChannelsToOpen = [PeerId, BN]
+export type ChannelsToClose = PeerId
 const dest = (c: ChannelsToOpen): PeerId => c[0]
-const outgoingPeer = (c: IndexerChannel): PeerId => c[0]
-const indexerDest = (c: IndexerChannel): PeerId => c[1]
+const outgoingPeer = (c: RoutingChannel): PeerId => c[0]
+const indexerDest = (c: RoutingChannel): PeerId => c[1]
 
 /**
  * Staked nodes will likely want to automate opening and closing of channels. By
@@ -21,62 +28,93 @@ const indexerDest = (c: IndexerChannel): PeerId => c[1]
  *
  */
 export interface ChannelStrategy {
+  name: string
+
   tick(
     balance: BN,
-    newChannels: IndexerChannel[],
-    currentChannels: IndexerChannel[],
-    qualityOf: (p: PeerId) => Number,
+    newChannels: RoutingChannel[],
+    currentChannels: RoutingChannel[],
+    networkPeers: NetworkPeers,
     indexer: Indexer
-  ): Promise<ChannelsToOpen[]>
+  ): Promise<[ChannelsToOpen[], ChannelsToClose[]]>
   // TBD: Include ChannelsToClose as well.
 }
 
 const logChannels = (c: ChannelsToOpen[]): string => c.map((x) => x[0].toB58String() + ':' + x[1].toString()).join(', ')
-const logIndexerChannels = (c: IndexerChannel[]): string =>
+const logIndexerChannels = (c: RoutingChannel[]): string =>
   c.map((x) => x[1].toB58String() + ':' + x[2].toString()).join(', ')
 
 // Don't auto open any channels
 export class PassiveStrategy implements ChannelStrategy {
+  name = 'passive'
+
   async tick(
     _balance: BN,
-    _n: IndexerChannel[],
-    _c: IndexerChannel[],
-    _q: (p: PeerId) => Number,
+    _n: RoutingChannel[],
+    _c: RoutingChannel[],
+    _p: NetworkPeers,
     _indexer: Indexer
-  ): Promise<ChannelsToOpen[]> {
-    return []
+  ): Promise<[ChannelsToOpen[], ChannelsToClose[]]> {
+    return [[], []]
   }
 }
 
 // Open channel to as many peers as possible
 export class PromiscuousStrategy implements ChannelStrategy {
+  name = 'promiscuous'
+
   async tick(
     balance: BN,
-    _n: IndexerChannel[],
-    currentChannels: IndexerChannel[],
-    qualityOf: (p: PeerId) => Number,
+    _n: RoutingChannel[],
+    currentChannels: RoutingChannel[],
+    peers: NetworkPeers,
     indexer: Indexer
-  ): Promise<ChannelsToOpen[]> {
+  ): Promise<[ChannelsToOpen[], ChannelsToClose[]]> {
     log('currently open', logIndexerChannels(currentChannels))
     let toOpen: ChannelsToOpen[] = []
 
     let i = 0
+    let toClose = currentChannels
+      .filter((x: RoutingChannel) => peers.qualityOf(indexerDest(x)) < 0.1)
+      .map((x) => indexerDest(x))
 
-    while (balance.gtn(0) && i++ < MAX_NEW_CHANNELS_PER_TICK) {
+    // First let's open channels to any interesting peers we have
+    peers.all().forEach((peerId) => {
+      if (
+        balance.gtn(0) &&
+        currentChannels.length + toOpen.length < MAX_AUTO_CHANNELS &&
+        !toOpen.find((x) => dest(x).equals(peerId)) &&
+        !currentChannels.find((x) => indexerDest(x).equals(peerId)) &&
+        peers.qualityOf(peerId) > NETWORK_QUALITY_THRESHOLD
+      ) {
+        toOpen.push([peerId, MINIMUM_REASONABLE_CHANNEL_STAKE])
+        balance.isub(MINIMUM_REASONABLE_CHANNEL_STAKE)
+      }
+    })
+
+    // Now let's evaluate new channels
+    while (
+      balance.gtn(0) &&
+      i++ < MAX_NEW_CHANNELS_PER_TICK &&
+      currentChannels.length + toOpen.length < MAX_AUTO_CHANNELS
+    ) {
       let randomChannel = await indexer.getRandomChannel()
       if (randomChannel === undefined) {
+        log('no channel available')
         break
       }
+      log('evaluating', outgoingPeer(randomChannel).toB58String())
+      peers.register(outgoingPeer(randomChannel))
       if (
         !toOpen.find((x) => dest(x).equals(outgoingPeer(randomChannel))) &&
         !currentChannels.find((x) => indexerDest(x).equals(outgoingPeer(randomChannel))) &&
-        qualityOf(outgoingPeer(randomChannel)) > NETWORK_QUALITY_THRESHOLD
+        peers.qualityOf(outgoingPeer(randomChannel)) > NETWORK_QUALITY_THRESHOLD
       ) {
         toOpen.push([outgoingPeer(randomChannel), MINIMUM_REASONABLE_CHANNEL_STAKE])
         balance.isub(MINIMUM_REASONABLE_CHANNEL_STAKE)
       }
     }
     log('Promiscuous toOpen: ', logChannels(toOpen))
-    return toOpen
+    return [toOpen, toClose]
   }
 }

@@ -1,12 +1,29 @@
-import { Balance } from './types'
+import type { Balance, Public, ChannelEntry } from './types'
 
-type Channel = [source: PeerId, destination: PeerId, stake: Balance]
+export type RoutingChannel = [source: PeerId, destination: PeerId, stake: Balance]
+export type ChannelUpdate = { partyA: Public; partyB: Public; channelEntry: ChannelEntry }
 
-declare interface Indexer {
-  getRandomChannel(): Promise<Channel | undefined>
-  getChannelsFromPeer(source: PeerId): Promise<Channel[]>
-  onNewChannels(handler: (newChannels: Channel[]) => void): void
+export interface IndexerEvents {
+  channelOpened: (update: ChannelUpdate) => void
+  channelClosed: (update: ChannelUpdate) => void
 }
 
-export { Channel }
+declare interface Indexer {
+  start(): Promise<void>
+  stop(): Promise<void>
+
+  // events
+  on<U extends keyof IndexerEvents>(event: U, listener: IndexerEvents[U]): this
+  once<U extends keyof IndexerEvents>(event: U, listener: IndexerEvents[U]): this
+  emit<U extends keyof IndexerEvents>(event: U, ...args: Parameters<IndexerEvents[U]>): boolean
+
+  // get saved channel entries
+  getChannelEntry(partyA: Public, partyB: Public): Promise<ChannelEntry | undefined>
+  getChannelEntries(party?: Public, filter?: (node: Public) => boolean): Promise<ChannelUpdate[]>
+
+  // routing
+  getRandomChannel(): Promise<RoutingChannel | undefined>
+  getChannelsFromPeer(source: PeerId): Promise<RoutingChannel[]>
+}
+
 export default Indexer

@@ -33,7 +33,7 @@ export class Connection {
 
         // Let's elaborate on certain error messages:
         if (msg.msg.indexOf('account has no funds') > -1) {
-          this.logs.push({ msg: '- Please send 0.1 BNB to the account', ts: new Date().toISOString() })
+          this.logs.push({ msg: '- Please send 0.1 gETH to the account', ts: new Date().toISOString() })
           this.logs.push({ msg: '- Then restart the node', ts: new Date().toISOString() })
         }
 
@@ -84,9 +84,10 @@ export class Connection {
       console.log('Web socket closed')
       this.setConnecting(true)
       this.appendMessage(' --- < Lost Connection, attempting to reconnect... > ---')
+      var self = this
       setTimeout(function () {
         try {
-          connect()
+          self.connect()
           console.log('connection')
         } catch (e) {
           console.log('Error connecting', e)

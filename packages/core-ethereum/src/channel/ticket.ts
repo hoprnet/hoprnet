@@ -49,7 +49,7 @@ class TicketStatic {
       const ticket = signedTicket.ticket
 
       log('Submitting ticket', u8aToHex(ticketChallenge))
-      const { hoprChannels, signTransaction, account, utils } = this.coreConnector
+      const { hoprChannels, account, utils } = this.coreConnector
       const { r, s, v } = utils.getSignatureParameters(signedTicket.signature)
 
       const hasPreImage = !u8aEquals(ackTicket.preImage, EMPTY_PRE_IMAGE)
@@ -81,11 +81,10 @@ class TicketStatic {
 
       const counterparty = await this.coreConnector.utils.pubKeyToAccountId(await signedTicket.signer)
 
-      const transaction = await signTransaction(
+      const transaction = await account.signTransaction(
         {
           from: (await account.address).toHex(),
-          to: hoprChannels.options.address,
-          nonce: (await account.nonce).valueOf()
+          to: hoprChannels.options.address
         },
         hoprChannels.methods.redeemTicket(
           u8aToHex(ackTicket.preImage),

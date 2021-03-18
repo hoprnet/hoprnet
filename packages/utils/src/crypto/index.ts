@@ -1,3 +1,5 @@
+export * from './hashIterator'
 export * from './prg'
 export * from './prp'
-export * from './hashIterator'
+export * from './randomFloat'
+export * from './randomInteger'

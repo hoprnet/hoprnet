@@ -44,32 +44,6 @@ describe('test connector', function () {
     await ganache.stop()
   })
 
-  describe('nonces', function () {
-    const parallel = 5
-
-    it('should generate nonces in parallel', async function () {
-      const latestNonce = await web3.eth.getTransactionCount(owner.address.toHex())
-      const results = await Promise.all(
-        Array.from({ length: parallel }).map(async (_, expectedNonce) => {
-          const nonce = await connector.account.nonce
-          return nonce === latestNonce + expectedNonce
-        })
-      )
-
-      assert(
-        results.every((r) => r),
-        'incorrect nonces'
-      )
-    })
-
-    it('should generate next nonce', async function () {
-      const latestNonce = await web3.eth.getTransactionCount(owner.address.toHex())
-      const nonce = await connector.account.nonce
-
-      assert.equal(nonce, latestNonce + parallel, 'incorrect next nonce')
-    })
-  })
-
   // @TODO: move this test to utils
   describe('events', function () {
     it('should clear events once resolved', function () {
@@ -94,10 +68,12 @@ describe('test connector', function () {
 
           await Promise.all([
             once(),
-            hoprToken.methods.transfer(receiver.address.toHex(), 1).send({ from: owner.address.toHex() }),
-            hoprToken.methods.transfer(receiver.address.toHex(), 1).send({ from: owner.address.toHex() })
+            hoprToken.methods.transfer(receiver.address.toHex(), 1).send({ from: owner.address.toHex(), gas: 200e3 }),
+            hoprToken.methods.transfer(receiver.address.toHex(), 1).send({ from: owner.address.toHex(), gas: 200e3 })
           ])
-          await hoprToken.methods.transfer(receiver.address.toHex(), 1).send({ from: owner.address.toHex() })
+          await hoprToken.methods
+            .transfer(receiver.address.toHex(), 1)
+            .send({ from: owner.address.toHex(), gas: 200e3 })
 
           assert.equal(numberOfEvents, 1, 'check cleanupPromiEvent')
           return resolve()
@@ -147,7 +123,8 @@ describe('test withdraw', function () {
     connector = await createNode(alice.privKey)
 
     await hoprToken.methods.mint(alice.address.toHex(), 100, '0x0', '0x0').send({
-      from: alice.address.toHex()
+      from: alice.address.toHex(),
+      gas: 200e3
     })
 
     await connector.start()

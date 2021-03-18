@@ -1,53 +1,40 @@
 import type { Channel as IChannel } from '@hoprnet/hopr-core-connector-interface'
 import BN from 'bn.js'
 import { u8aToHex, toU8a } from '@hoprnet/hopr-utils'
-import { Balance, Channel as ChannelType, Hash, Moment, Public, SignedChannel, TicketEpoch } from '../types'
+import {
+  Balance,
+  Channel as ChannelType,
+  Hash,
+  Moment,
+  Public,
+  SignedChannel,
+  TicketEpoch,
+  ChannelEntry
+} from '../types'
 import TicketFactory from './ticket'
-import { ChannelStatus } from '../types/channel'
 import { hash } from '../utils'
-import debug from 'debug'
-
-const log = debug('hopr-ethereum:channel')
 
 import type HoprEthereum from '..'
 
 class Channel implements IChannel {
-  private _signedChannel: SignedChannel
   private _settlementWindow?: Moment
   private _channelId?: Hash
 
   public ticket: TicketFactory
 
-  constructor(public coreConnector: HoprEthereum, public counterparty: Uint8Array, signedChannel: SignedChannel) {
-    this._signedChannel = signedChannel
-
-    // check if channel still exists
-    this.status.then((status: string) => {
-      if (status === 'UNINITIALISED') {
-        log('found channel off-chain but its closed on-chain')
-        this.onClose()
-      }
-    })
-
-    // if channel is closed
-    this.onceClosed().then(async () => {
-      return this.onClose()
-    })
-
+  constructor(
+    public coreConnector: HoprEthereum,
+    public counterparty: Uint8Array,
+    private signedChannel: SignedChannel
+  ) {
     this.ticket = new TicketFactory(this)
   }
 
-  private get onChainChannel(): Promise<{
-    deposit: string
-    partyABalance: string
-    closureTime: string
-    stateCounter: string
-    closureByPartyA: boolean
-  }> {
+  private get onChainChannel(): Promise<ChannelEntry> {
     return new Promise(async (resolve, reject) => {
       try {
-        const channelId = await this.channelId
-        return resolve(this.coreConnector.channel.getOnChainState(channelId))
+        const channel = await this.coreConnector.channel.getOnChainState(new Public(this.counterparty))
+        return resolve(channel)
       } catch (error) {
         return reject(error)
       }
@@ -66,19 +53,10 @@ class Channel implements IChannel {
   }
 
   get status() {
-    return new Promise<'UNINITIALISED' | 'FUNDING' | 'OPEN' | 'PENDING'>(async (resolve, reject) => {
+    return new Promise<'UNINITIALISED' | 'FUNDED' | 'OPEN' | 'PENDING'>(async (resolve, reject) => {
       try {
-        const stateCounter = await this.stateCounter
-        const status = Number(stateCounter.toNumber()) % 10
-
-        if (status >= Object.keys(ChannelStatus).length) {
-          throw Error("status like this doesn't exist")
-        }
-
-        if (status === ChannelStatus.UNINITIALISED) return resolve('UNINITIALISED')
-        else if (status === ChannelStatus.FUNDING) return resolve('FUNDING')
-        else if (status === ChannelStatus.OPEN) return resolve('OPEN')
-        return resolve('PENDING')
+        const channel = await this.onChainChannel
+        return resolve(channel.status)
       } catch (error) {
         return reject(error)
       }
@@ -127,7 +105,7 @@ class Channel implements IChannel {
   }
 
   get state(): Promise<ChannelType> {
-    return Promise.resolve(this._signedChannel.channel)
+    return Promise.resolve(this.signedChannel.channel)
   }
 
   get balance(): Promise<Balance> {
@@ -162,19 +140,7 @@ class Channel implements IChannel {
   }
 
   get currentBalance(): Promise<Balance> {
-    return new Promise<Balance>(async (resolve, reject) => {
-      try {
-        return resolve(
-          new Balance(
-            await this.coreConnector.hoprToken.methods
-              .balanceOf(u8aToHex(await this.coreConnector.account.address))
-              .call()
-          )
-        )
-      } catch (error) {
-        return reject(error)
-      }
-    })
+    return this.coreConnector.account.getBalance()
   }
 
   get currentBalanceOfCounterparty(): Promise<Balance> {
@@ -194,6 +160,7 @@ class Channel implements IChannel {
   }
 
   async initiateSettlement(): Promise<string> {
+    const { account } = this.coreConnector
     const status = await this.status
     let receipt: string
 
@@ -203,11 +170,10 @@ class Channel implements IChannel {
       }
 
       if (status === 'OPEN') {
-        const tx = await this.coreConnector.signTransaction(
+        const tx = await account.signTransaction(
           {
-            from: (await this.coreConnector.account.address).toHex(),
-            to: this.coreConnector.hoprChannels.options.address,
-            nonce: await this.coreConnector.account.nonce
+            from: (await account.address).toHex(),
+            to: this.coreConnector.hoprChannels.options.address
           },
           this.coreConnector.hoprChannels.methods.initiateChannelClosure(
             u8aToHex(await this.coreConnector.utils.pubKeyToAccountId(this.counterparty))
@@ -217,11 +183,10 @@ class Channel implements IChannel {
         receipt = tx.transactionHash
         tx.send()
       } else if (status === 'PENDING') {
-        const tx = await this.coreConnector.signTransaction(
+        const tx = await account.signTransaction(
           {
-            from: (await this.coreConnector.account.address).toHex(),
-            to: this.coreConnector.hoprChannels.options.address,
-            nonce: await this.coreConnector.account.nonce
+            from: (await account.address).toHex(),
+            to: this.coreConnector.hoprChannels.options.address
           },
           this.coreConnector.hoprChannels.methods.claimChannelClosure(
             u8aToHex(await this.coreConnector.utils.pubKeyToAccountId(this.counterparty))
@@ -253,21 +218,6 @@ class Channel implements IChannel {
     }
 
     throw Error('Nonces must not be used twice.')
-  }
-
-  private async onceClosed() {
-    return this.coreConnector.channel.onceClosed(
-      new Public(this.coreConnector.account.keys.onChain.pubKey),
-      new Public(this.counterparty)
-    )
-  }
-
-  // private async onOpen(): Promise<void> {
-  //   return onOpen(this.coreConnector, this.counterparty, this._signedChannel)
-  // }
-
-  private async onClose(): Promise<void> {
-    return this.coreConnector.channel.deleteOffChainState(this.counterparty)
   }
 }
 

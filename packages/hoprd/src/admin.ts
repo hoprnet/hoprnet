@@ -1,6 +1,5 @@
-import Hopr, { MIN_NATIVE_BALANCE } from '@hoprnet/hopr-core'
+import Hopr, { SUGGESTED_NATIVE_BALANCE } from '@hoprnet/hopr-core'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-import { Commands } from './commands'
 import http from 'http'
 import fs from 'fs'
 import ws from 'ws'
@@ -19,13 +18,10 @@ export class AdminServer {
   private app: any
   private server: Server | undefined
   private node: Hopr<HoprCoreConnector> | undefined
-  private port: number
   private wsServer: any
   private cmds: any
 
-  constructor(private logs: LogStream) {
-    this.port = process.env.HOPR_ADMIN_PORT ? parseInt(process.env.HOPR_ADMIN_PORT) : 3000
-  }
+  constructor(private logs: LogStream, private host: string, private port: number) {}
 
   async setup() {
     let adminPath = path.resolve(__dirname, '../hopr-admin/')
@@ -37,12 +33,7 @@ export class AdminServer {
 
     this.app = next({
       dev: NODE_ENV === 'development',
-      dir: adminPath,
-      conf: {
-        devIndicators: {
-          autoPrerender: false
-        }
-      }
+      dir: adminPath
     })
     const handle = this.app.getRequestHandler()
     await this.app.prepare()
@@ -51,6 +42,23 @@ export class AdminServer {
       const parsedUrl = parse(req.url || '', true)
       handle(req, res, parsedUrl)
     })
+
+    this.server.once('error', (err: any) => {
+      console.log(`Failed to start Admin interface`)
+      console.log(err)
+      process.exit(1)
+    })
+
+    this.server.listen(this.port, this.host)
+    this.logs.log('Admin server listening on port ' + this.port)
+  }
+
+  registerNode(node: Hopr<HoprCoreConnector>, cmds: any, settings?: any) {
+    this.node = node
+    this.cmds = cmds
+    if (settings) {
+      this.cmds.setState(settings)
+    }
 
     this.wsServer = new ws.Server({ server: this.server })
 
@@ -76,33 +84,32 @@ export class AdminServer {
       this.logs.subscribe(socket)
     })
 
-    this.server.listen(this.port)
-    this.logs.log('Admin server listening on port ' + this.port)
-  }
-
-  registerNode(node: Hopr<HoprCoreConnector>, settings?: any) {
-    this.node = node
-    this.cmds = new Commands(node)
-    if (settings) {
-      this.cmds.setState(settings)
-    }
-
     this.node.on('hopr:crawl:completed', () => {
       this.logs.log('Crawled network')
     })
 
+    this.node.on('hopr:channel:opened', (channel) => {
+      this.logs.log(`Opened channel to ${channel[0].toB58String()}`)
+    })
+
+    this.node.on('hopr:channel:closed', (peer) => {
+      this.logs.log(`Closed channel to ${peer.toB58String()}`)
+    })
+
     this.node.on('hopr:warning:unfunded', (addr) => {
+      const min = new node.paymentChannels.types.Balance(0).toFormattedString.apply(SUGGESTED_NATIVE_BALANCE)
       this.logs.log(
-        `- The account associated with this node has no HOPR,\n` +
-          `  in order to send messages, or open channels, you will need to send some to ${addr}`
+        `- The account associated with this node has no funds,\n` +
+          `  in order to send messages, or open channels, you will need to send` +
+          `  at least ${min} to ${addr}`
       )
     })
 
     this.node.on('hopr:warning:unfundedNative', (addr) => {
       this.logs.log(
-        `- The account associated with this node has no funds,\n` +
+        `- The account associated with this node has no gETH,\n` +
           `  in order to fund gas for protocol overhead you will need to send\n` +
-          `  at least ${new node.paymentChannels.types.Balance(MIN_NATIVE_BALANCE).toFormattedString()} to ${addr}`
+          `  0.025 gETH to ${addr}`
       )
     })
 

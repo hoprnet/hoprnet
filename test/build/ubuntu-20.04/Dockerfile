@@ -5,7 +5,7 @@ RUN apt-get install -y sudo
 RUN sudo apt install -y curl git
 
 # nvm environment variables
-ENV NODE_VERSION 12.19.0
+ENV NODE_VERSION 14.15.5
 ENV NVM_DIR /usr/local/nvm
 RUN mkdir $NVM_DIR
 

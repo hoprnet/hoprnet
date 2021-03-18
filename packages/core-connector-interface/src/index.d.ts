@@ -4,7 +4,8 @@ import type Channel from './channel'
 import type * as Types from './types'
 import type * as DbKeys from './dbKeys'
 import type * as Constants from './constants'
-import type Indexer from './indexer'
+import type Indexer, { RoutingChannel, ChannelUpdate } from './indexer'
+
 export type Currencies = 'NATIVE' | 'HOPR'
 
 declare interface HoprCoreConnectorStatic {
@@ -28,11 +29,11 @@ declare interface HoprCoreConnector {
     /**
      * Returns the current (token) balance of the account associated with this node.
      */
-    balance: Promise<Types.Balance>
+    getBalance: (useCache?: boolean) => Promise<Types.Balance>
     /**
      * Returns the current native balance (ex: ETH) of the account associated with this node.
      */
-    nativeBalance: Promise<Types.NativeBalance>
+    getNativeBalance: (useCache?: boolean) => Promise<Types.NativeBalance>
     /**
      * Returns the current value of the reset counter
      */
@@ -103,6 +104,8 @@ declare interface HoprCoreConnector {
 
   hexAccountAddress(): Promise<string>
 
+  smartContractInfo(): string
+
   /**
    * (Static) utils to use in the connector module
    */
@@ -141,6 +144,6 @@ declare interface HoprCoreConnector {
 
 declare var HoprCoreConnector: HoprCoreConnectorStatic
 
-export { Utils, Types, DbKeys, Constants, Channel, Indexer, IndexerChannel, HoprCoreConnectorStatic }
+export { Utils, Types, DbKeys, Constants, Channel, Indexer, RoutingChannel, ChannelUpdate, HoprCoreConnectorStatic }
 
 export default HoprCoreConnector

@@ -17,10 +17,10 @@ Hopr-ethereum contains the on-chain logic that is used to process payments for [
 - [Testing](#testing)
 - [Coverage](#coverage)
 - [Migrating](#migrating)
-- [Contracts](#contracts)
-  - [HoprToken](#hoprtoken)
-  - [HoprChannel](#hoprchannel)
-  - [Linting](#linting)
+- [Audit status](#audit-status)
+- [HoprToken](#hoprtoken)
+- [HoprChannel](#hoprchannel)
+- [Linting](#linting)
 
 # Requirements
 
@@ -72,21 +72,16 @@ yarn network --network localhost
 yarn migrate --network matic
 ```
 
-# Contracts
+# Audit status
 
-## HoprToken
+- ✅ [HoprToken](./contracts/HoprToken.sol)
+- ✅ [HoprDistributor](./contracts/HoprDistributor.sol)
+- [HoprChannels](./contracts/HoprChannels.sol)
 
-A standard ERC777 token with snapshot functionality.
+# HoprToken
 
-```
-Name: HOPR Token
-Symbol: HOPR
-Decimals: 18
-Total Supply: 100,000,000
-```
+# HoprChannel
 
-## HoprChannel
-
-## Linting
+# Linting
 
 We use solhint's recommended preset to perform linting onto our smart contracts.

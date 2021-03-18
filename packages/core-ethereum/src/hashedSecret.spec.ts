@@ -10,13 +10,13 @@ import LevelUp from 'levelup'
 import { Ganache } from '@hoprnet/hopr-testing'
 import { Network, addresses, abis } from '@hoprnet/hopr-ethereum'
 import { migrate, fund } from '@hoprnet/hopr-ethereum'
-import { NODE_SEEDS } from '@hoprnet/hopr-demo-seeds'
 import Web3 from 'web3'
 import type { WebsocketProvider } from 'web3-core'
 import * as testconfigs from './config.spec'
 import * as configs from './config'
 import Account from './account'
 import { randomBytes } from 'crypto'
+import { hash as hashFunction } from './utils'
 
 const HoprChannelsAbi = abis.HoprChannels
 
@@ -34,7 +34,6 @@ describe('test hashedSecret', function () {
     const network = Utils.getNetworkName(chainId) as Network
 
     const connector = ({
-      signTransaction: Utils.TransactionSigner(web3, network, stringToU8a(NODE_SEEDS[0])),
       hoprChannels: new web3.eth.Contract(HoprChannelsAbi as any, addresses[network].HoprChannels),
       web3,
       db: LevelUp(Memdown()),
@@ -50,10 +49,11 @@ describe('test hashedSecret', function () {
     connector.account = new Account(
       connector,
       stringToU8a(testconfigs.DEMO_ACCOUNTS[0]),
-      await Utils.privKeyToPubKey(stringToU8a(testconfigs.DEMO_ACCOUNTS[0]))
+      await Utils.privKeyToPubKey(stringToU8a(testconfigs.DEMO_ACCOUNTS[0])),
+      chainId
     )
 
-    connector.hashedSecret = new PreImage(connector)
+    connector.hashedSecret = new PreImage(connector.db, connector.account, connector.hoprChannels)
 
     connector.stop = async () => {
       await connector.account.stop()
@@ -118,20 +118,14 @@ describe('test hashedSecret', function () {
 
       let preImage = await connector.hashedSecret.findPreImage(onChainHash)
 
-      assert(
-        u8aEquals(
-          (await connector.hashedSecret.hashFunction(preImage.preImage)).slice(0, HASHED_SECRET_WIDTH),
-          onChainHash
-        )
-      )
+      assert(u8aEquals((await hashFunction(preImage.preImage)).slice(0, HASHED_SECRET_WIDTH), onChainHash))
 
       await connector.utils.waitForConfirmation(
         (
-          await connector.signTransaction(
+          await connector.account.signTransaction(
             {
               from: (await connector.account.address).toHex(),
-              to: connector.hoprChannels.options.address,
-              nonce: await connector.account.nonce
+              to: connector.hoprChannels.options.address
             },
             connector.hoprChannels.methods.setHashedSecret(new Types.Hash(preImage.preImage).toHex())
           )
@@ -150,10 +144,7 @@ describe('test hashedSecret', function () {
       assert(!u8aEquals(preImage.preImage, updatedPreImage.preImage), `new and old pre-image must not be the same`)
 
       assert(
-        u8aEquals(
-          (await connector.hashedSecret.hashFunction(updatedPreImage.preImage)).slice(0, HASHED_SECRET_WIDTH),
-          updatedOnChainHash
-        )
+        u8aEquals((await hashFunction(updatedPreImage.preImage)).slice(0, HASHED_SECRET_WIDTH), updatedOnChainHash)
       )
     })
 
@@ -211,20 +202,14 @@ describe('test hashedSecret', function () {
 
       let preImage = await connector.hashedSecret.findPreImage(onChainHash)
 
-      assert(
-        u8aEquals(
-          (await connector.hashedSecret.hashFunction(preImage.preImage)).slice(0, HASHED_SECRET_WIDTH),
-          onChainHash
-        )
-      )
+      assert(u8aEquals((await hashFunction(preImage.preImage)).slice(0, HASHED_SECRET_WIDTH), onChainHash))
 
       await connector.utils.waitForConfirmation(
         (
-          await connector.signTransaction(
+          await connector.account.signTransaction(
             {
               from: (await connector.account.address).toHex(),
-              to: connector.hoprChannels.options.address,
-              nonce: await connector.account.nonce
+              to: connector.hoprChannels.options.address
             },
             connector.hoprChannels.methods.setHashedSecret(new Types.Hash(preImage.preImage).toHex())
           )
@@ -244,10 +229,7 @@ describe('test hashedSecret', function () {
       assert(!u8aEquals(preImage.preImage, updatedPreImage.preImage), `new and old pre-image must not be the same`)
 
       assert(
-        u8aEquals(
-          (await connector.hashedSecret.hashFunction(updatedPreImage.preImage)).slice(0, HASHED_SECRET_WIDTH),
-          updatedOnChainHash
-        )
+        u8aEquals((await hashFunction(updatedPreImage.preImage)).slice(0, HASHED_SECRET_WIDTH), updatedOnChainHash)
       )
     })
 
@@ -282,10 +264,7 @@ describe('test hashedSecret', function () {
         firstPreImage != null &&
           secondPreImage != null &&
           !firstPreImage.eq(secondPreImage) &&
-          u8aEquals(
-            (await connector.hashedSecret.hashFunction(secondPreImage)).slice(0, HASHED_SECRET_WIDTH),
-            firstPreImage
-          )
+          u8aEquals((await hashFunction(secondPreImage)).slice(0, HASHED_SECRET_WIDTH), firstPreImage)
       )
 
       const notWinnigTicket = new Types.AcknowledgedTicket(connector, undefined, {
@@ -311,10 +290,7 @@ describe('test hashedSecret', function () {
       assert(
         fourthPreImage != null &&
           !fourthPreImage.eq(secondPreImage) &&
-          u8aEquals(
-            (await connector.hashedSecret.hashFunction(fourthPreImage)).slice(0, HASHED_SECRET_WIDTH),
-            secondPreImage
-          )
+          u8aEquals((await hashFunction(fourthPreImage)).slice(0, HASHED_SECRET_WIDTH), secondPreImage)
       )
     })
 
@@ -347,59 +323,6 @@ describe('test hashedSecret', function () {
           )
         }
       }
-    })
-  })
-
-  describe('integration', function () {
-    this.timeout(durations.minutes(2))
-
-    before(async function () {
-      this.timeout(durations.minutes(1))
-      await ganache.start()
-      await migrate()
-      await fund(FUND_ARGS)
-
-      connector = await generateConnector()
-    })
-
-    after(async function () {
-      await connector.stop()
-      await ganache.stop()
-    })
-
-    it('should initialize hashedSecret', async function () {
-      assert(!(await connector.hashedSecret.check()).initialized, "hashedSecret shouldn't be initialized")
-
-      await connector.hashedSecret.initialize()
-      assert((await connector.hashedSecret.check()).initialized, 'hashedSecret should be initialized')
-    })
-
-    it('should already be initialized', async function () {
-      await connector.hashedSecret.initialize()
-      assert((await connector.hashedSecret.check()).initialized, 'hashedSecret should be initialized')
-    })
-
-    it('should reinitialize hashedSecret when off-chain secret is missing', async function () {
-      connector.db = LevelUp(Memdown())
-
-      await connector.hashedSecret.initialize()
-      assert((await connector.hashedSecret.check()).initialized, 'hashedSecret should be initialized')
-    })
-
-    it('should submit hashedSecret when on-chain secret is missing', async function () {
-      this.timeout(durations.minutes(2))
-      const db = connector.db
-
-      await ganache.stop()
-      await ganache.start()
-      await migrate()
-      await fund(FUND_ARGS)
-
-      connector = await generateConnector()
-      connector.db = db
-
-      await connector.hashedSecret.initialize()
-      assert((await connector.hashedSecret.check()).initialized, 'hashedSecret should be initialized')
     })
   })
 })

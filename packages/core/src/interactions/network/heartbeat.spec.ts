@@ -1,10 +1,5 @@
 import PeerId from 'peer-id'
-// @ts-ignore
-import TCP = require('libp2p-tcp')
-// @ts-ignore
-import MPLEX = require('libp2p-mplex')
-// @ts-ignore
-import SECIO = require('libp2p-secio')
+
 import { Heartbeat } from './heartbeat'
 import assert from 'assert'
 import { EventEmitter } from 'events'
@@ -48,7 +43,7 @@ describe('check heartbeat mechanism', function () {
     await Promise.all([
       new Promise<void>((resolve) => {
         Bob.network.heartbeat.once('beat', (peerId: PeerId) => {
-          assert(peerId.isEqual(Alice.node.peerId), 'connection must come from Alice')
+          assert(peerId.equals(Alice.node.peerId), 'connection must come from Alice')
           resolve()
         })
       }),
@@ -62,15 +57,10 @@ describe('check heartbeat mechanism', function () {
     const [Alice, Bob] = await Promise.all([generateNode(), generateNode({ timeoutIntentionally: true })])
 
     await Alice.node.dial(Bob.address)
-    let errorThrown = false
     let before = Date.now()
-    try {
-      await Alice.interactions.network.heartbeat.interact(Bob.node.peerId)
-    } catch (err) {
-      errorThrown = true
-    }
 
-    assert(errorThrown, 'Should throw an error')
+    assert((await Alice.interactions.network.heartbeat.interact(Bob.node.peerId)) < 0, 'Ping must fail')
+
     assert(
       Date.now() - before >= constants.HEARTBEAT_TIMEOUT,
       `Should reach a timeout, ${Date.now() - before} ${constants.HEARTBEAT_TIMEOUT}`

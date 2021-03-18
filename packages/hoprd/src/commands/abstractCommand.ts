@@ -8,12 +8,12 @@ export type CommandResponse = string | void
 export type GlobalState = {
   aliases: Map<string, PeerId>
   includeRecipient: boolean
-  routing: 'direct' | 'manual' | 'auto'
-  routingPath: PeerId[]
 }
 
 // REPL Command
 export abstract class AbstractCommand {
+  public hidden = false
+
   // The command, for example 'ping' or 'foo'
   abstract name(): string
 

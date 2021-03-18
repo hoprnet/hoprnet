@@ -11,9 +11,13 @@ import BN from 'bn.js'
 import { ACKNOWLEDGED_TICKET_INDEX_LENGTH } from '../../dbKeys'
 import { connectionHelper } from '../../test-utils'
 import type { AcknowledgedTicket } from '@hoprnet/hopr-core-connector-interface/src/types'
-import { privKeyToPeerId } from '../../utils'
+import { privKeyToPeerId } from '@hoprnet/hopr-utils'
 import { NODE_SEEDS } from '@hoprnet/hopr-demo-seeds'
 import type Multiaddr from 'multiaddr'
+
+import Debug from 'debug'
+
+const log = Debug(`hopr-core:test`)
 
 const TWO_SECONDS = durations.seconds(2)
 const CHANNEL_DEPOSIT = new BN(200) // HOPRli
@@ -121,13 +125,16 @@ function receiveChecker<Chain extends HoprCoreConnector>(msgs: Uint8Array[], nod
 describe('test packet composition and decomposition', function () {
   this.timeout(60000)
 
-  it('should create packets and decompose them', async function () {
+  // @TODO: this needs to be reworked
+  // * more documentantion
+  // * ideally split this into unit tests
+  // * support MAX_HOPS != 3
+  it.skip('should create packets and decompose them', async function () {
     const bs = await generateNode(0, true)
 
+    const bsAddresses = await bs.getAnnouncedAddresses()
     const nodes = await Promise.all(
-      Array.from({ length: MAX_HOPS + 1 }).map((_value, index) =>
-        generateNode(index + 1, false, bs.getAddresses().slice(1))
-      )
+      Array.from({ length: MAX_HOPS + 1 }).map((_value, index) => generateNode(index + 1, false, bsAddresses.slice(1)))
     )
 
     connectionHelper(nodes.map((n: Hopr<HoprEthereum>) => n._libp2p))
@@ -188,6 +195,7 @@ describe('test packet composition and decomposition', function () {
 
       for (let k = 0; k < tickets.length; k++) {
         await node.paymentChannels.channel.tickets.submit(tickets[k] as any, undefined as any)
+        log(`ticket submitted`)
       }
     }
 

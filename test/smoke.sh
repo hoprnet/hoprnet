@@ -3,7 +3,7 @@ set -e
 shopt -s expand_aliases
 
 # Variables
-PROVIDER=wss://ws-mainnet.matic.network
+PROVIDER=$PROVIDER_DEVELOPMENT_ROPSTEN_WSS
 BOB_ADDR=127.0.0.1
 BOB_PORT=9876
 CHARLIE_ADDR=127.0.0.1
@@ -13,21 +13,21 @@ alias hoprd="node packages/hoprd/lib/index.js --provider $PROVIDER"
 
 # Check Databases
 echo "alice"
-hoprd --data="$FIXTURES/alice" --password="$DBPASS" --init --runAsBootstrap --run "myAddress" 
+hoprd --data="$FIXTURES/alice" --password="$DBPASS" --init --runAsBootstrap --run "address" 
 hoprd --data="$FIXTURES/alice" --password="$DBPASS" --runAsBootstrap --run "balance" 
 
 echo "bob"
-hoprd --data="$FIXTURES/bob" --password="$DBPASS" --init --runAsBootstrap --run "myAddress"
+hoprd --data="$FIXTURES/bob" --password="$DBPASS" --init --runAsBootstrap --run "address"
 hoprd --data="$FIXTURES/bob" --password="$DBPASS" --runAsBootstrap --run "balance"
 
 echo "charlie"
-hoprd --data="$FIXTURES/charlie" --password="$DBPASS" --init --runAsBootstrap --run "myAddress"
+hoprd --data="$FIXTURES/charlie" --password="$DBPASS" --init --runAsBootstrap --run "address"
 hoprd --data="$FIXTURES/charlie" --password="$DBPASS" --runAsBootstrap --run "balance"
 
 # Store addresses
-ALICE=$(hoprd --data="$FIXTURES/alice" --password="$DBPASS" --runAsBootstrap --run "myAddress hopr")
-BOB=$(hoprd --data="$FIXTURES/bob" --password="$DBPASS" --runAsBootstrap --run="myAddress hopr")
-CHARLIE=$(hoprd --data="$FIXTURES/charlie" --password="$DBPASS" --runAsBootstrap --run "myAddress hopr")
+ALICE=$(hoprd --data="$FIXTURES/alice" --password="$DBPASS" --runAsBootstrap --run "address hopr")
+BOB=$(hoprd --data="$FIXTURES/bob" --password="$DBPASS" --runAsBootstrap --run="address hopr")
+CHARLIE=$(hoprd --data="$FIXTURES/charlie" --password="$DBPASS" --runAsBootstrap --run "address hopr")
 
 function finish {
   # Cleanup

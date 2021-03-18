@@ -1,9 +1,8 @@
-import type { TransactionObject } from '../tsc/web3/types'
-import { Network, getRpcOptions } from '@hoprnet/hopr-ethereum'
+import { Network } from '@hoprnet/hopr-ethereum'
 import assert from 'assert'
 import { publicKeyConvert, publicKeyCreate, ecdsaSign, ecdsaRecover, ecdsaVerify } from 'secp256k1'
 import createKeccakHash from 'keccak'
-import { PromiEvent, TransactionReceipt, TransactionConfig } from 'web3-core'
+import { PromiEvent, TransactionReceipt } from 'web3-core'
 import { BlockTransactionString } from 'web3-eth'
 import Web3 from 'web3'
 import Debug from 'debug'
@@ -21,13 +20,9 @@ import { ContractEventEmitter } from '../tsc/web3/types'
 import { ChannelStatus } from '../types/channel'
 import * as constants from '../constants'
 import * as time from './time'
-import * as events from './events'
 import BN from 'bn.js'
 
-export { time, events }
-
-const rpcOps = getRpcOptions()
-const log = Log(['transaction'])
+export { time }
 
 /**
  * @param self our node's accountId
@@ -244,6 +239,20 @@ export function convertUnit(amount: Balance, sourceUnit: 'eth' | 'wei', targetUn
 }
 
 /**
+ * @param error from web3
+ * @returns a known error, if we don't know it we return 'UNKNOWN'
+ */
+export function getWeb3ErrorType(error: string): 'OOF_NATIVE' | 'OOF_HOPR' | 'UNKNOWN' {
+  if (error.includes(`enough funds`)) {
+    return 'OOF_NATIVE'
+  } else if (error.includes(`SafeERC20:`)) {
+    return 'OOF_HOPR'
+  } else {
+    return 'UNKNOWN'
+  }
+}
+
+/**
  * Wait until transaction has been mined.
  *
  * @typeparam T Our PromiEvent
@@ -253,19 +262,16 @@ export function convertUnit(amount: Balance, sourceUnit: 'eth' | 'wei', targetUn
 export async function waitForConfirmation<T extends PromiEvent<any>>(event: T) {
   return new Promise<TransactionReceipt>((resolve, reject) => {
     return event
-      .on('receipt', (receipt) => {
-        resolve(receipt)
-      })
-      .on('error', (err) => {
-        const outOfEth = err.message.includes(`enough funds`)
-        const outOfHopr = err.message.includes(`SafeERC20:`)
+      .on('receipt', (receipt) => resolve(receipt))
+      .on('error', (error) => {
+        const errorType = getWeb3ErrorType(error.message)
 
-        if (outOfEth) {
-          return reject(Error(constants.ERRORS.OOF_ETH))
-        } else if (outOfHopr) {
-          return reject(Error(constants.ERRORS.OOF_HOPR))
+        if (errorType === 'OOF_NATIVE') {
+          reject(constants.ERRORS.OOF_NATIVE)
+        } else if (errorType === 'OOF_HOPR') {
+          reject(constants.ERRORS.OOF_HOPR)
         } else {
-          return reject(err)
+          reject(error)
         }
       })
   })
@@ -332,7 +338,7 @@ export async function waitFor({
 
   const diff = now - timestamp || 60
 
-  if (network === 'localhost') {
+  if (isGanache(network)) {
     await time.increase(web3, diff)
   } else {
     await wait(diff * 1e3)
@@ -368,12 +374,12 @@ export function getNetworkName(chainId: number): Network {
       return 'mainnet'
     // case 2:
     //   return 'morden'
-    // case 3:
-    //   return 'ropsten'
+    case 3:
+      return 'ropsten'
     // case 4:
     //   return 'rinkeby'
-    // case 5:
-    //   return 'goerli'
+    case 5:
+      return 'goerli'
     case 42:
       return 'kovan'
     case 56:
@@ -411,58 +417,7 @@ export function stateCounterToStatus(stateCounter: number): ChannelStatus {
  * @returns ChannelStatus
  */
 export function stateCounterToIteration(stateCounter: number): number {
-  return Math.ceil(Number(stateCounter) / 10)
-}
-
-/**
- * A signer factory that signs transactions using the given private key.
- *
- * @param web3 a web3 instance
- * @param privKey the private key to sign transactions with
- * @returns signer
- */
-// @TODO: switch to web3js-accounts wallet if it's safe
-export function TransactionSigner(web3: Web3, network: Network, privKey: Uint8Array) {
-  const privKeyStr = new Hash(privKey).toHex()
-
-  return async function signTransaction<T>(
-    // config put in .send
-    txConfig: TransactionConfig,
-    // return of our contract method in web3.Contract instance
-    txObject?: TransactionObject<T>
-  ) {
-    const abi = txObject ? txObject.encodeABI() : undefined
-    const gas = 200e3
-    const gasPrice = rpcOps[network]?.gasPrice ?? 1e9
-    const options = {
-      gas,
-      gasPrice,
-      ...txConfig,
-      data: abi
-    }
-
-    // @TODO: provide some of the values to avoid multiple calls
-    const signedTransaction = await web3.eth.accounts.signTransaction(options, privKeyStr)
-
-    function send() {
-      if (signedTransaction.rawTransaction == null) {
-        throw Error(`Cannot process transaction because Web3.js did not give us the raw transaction.`)
-      }
-
-      log('Sending transaction %o', {
-        gas: options.gas,
-        gasPrice: options.gasPrice,
-        nonce: options.nonce,
-        hash: signedTransaction.transactionHash
-      })
-      return web3.eth.sendSignedTransaction(signedTransaction.rawTransaction)
-    }
-
-    return {
-      send,
-      transactionHash: signedTransaction.transactionHash
-    }
-  }
+  return Math.ceil(Number(stateCounter + 1) / 10)
 }
 
 /**
@@ -515,4 +470,12 @@ export function getSignatureParameters(
  */
 export async function createChallenge(secretA: Uint8Array, secretB: Uint8Array): Promise<Hash> {
   return await hash(await hash(u8aConcat(secretA, secretB)))
+}
+
+/**
+ * @param network
+ * @returns true if network is private or ganache
+ */
+export function isGanache(network?: Network): boolean {
+  return !network || network === 'localhost'
 }

@@ -65,16 +65,14 @@ describe('test signedTicket construction', async function () {
     assert(signedTicket.ticket.amount.eq(ticketData.amount), 'wrong amount')
     assert(signedTicket.ticket.winProb.eq(ticketData.winProb), 'wrong winProb')
 
-    let exponent = randomInteger(0, 8)
-    let index = randomInteger(0, signedTicket.length)
+    let exponent = randomInteger(0, 7)
+    let index = randomInteger(0, signedTicket.length - 1)
 
     signedTicket[index] = signedTicket[index] ^ (1 << exponent)
 
     if (await signedTicket.verify(userAPubKey)) {
-      console.log(
-        `found invalid signature, <${u8aToHex(signedTicket)}>, byte #${index}, bit #${exponent}`,
-        await signedTicket.verify(userAPubKey)
-      )
+      // @TODO change to assert.fail
+      console.log(`found invalid signature, <${u8aToHex(signedTicket)}>, byte #${index}, bit #${exponent}`)
     }
   })
 
@@ -110,28 +108,24 @@ describe('test signedTicket construction', async function () {
     assert(signedTicketB.ticket.amount.eq(ticketData.amount), 'wrong amount')
     assert(signedTicketB.ticket.winProb.eq(ticketData.winProb), 'wrong winProb')
 
-    let exponentA = randomInteger(0, 8)
-    let indexA = randomInteger(0, signedTicketA.length)
+    let exponentA = randomInteger(0, 7)
+    let indexA = randomInteger(0, signedTicketA.length - 1)
 
     signedTicketA[indexA] = signedTicketA[indexA] ^ (1 << exponentA)
 
     if (await signedTicketA.verify(userAPubKey)) {
-      console.log(
-        `found invalid signature, <${u8aToHex(signedTicketA)}>, byte #${indexA}, bit #${exponentA}`,
-        await signedTicketA.verify(userAPubKey)
-      )
+      // @TODO change to assert.fail
+      console.log(`found invalid signature, <${u8aToHex(signedTicketA)}>, byte #${indexA}, bit #${exponentA}`)
     }
 
-    let exponentB = randomInteger(0, 8)
-    let indexB = randomInteger(0, signedTicketB.length)
+    let exponentB = randomInteger(0, 7)
+    let indexB = randomInteger(0, signedTicketB.length - 1)
 
     signedTicketB[indexB] = signedTicketB[indexB] ^ (1 << exponentB)
 
     if (await signedTicketB.verify(userAPubKey)) {
-      console.log(
-        `found invalid signature, <${u8aToHex(signedTicketB)}>, byte #${indexB}, bit #${exponentB}`,
-        await signedTicketB.verify(userAPubKey)
-      )
+      // @TODO change to assert.fail
+      console.log(`found invalid signature, <${u8aToHex(signedTicketB)}>, byte #${indexB}, bit #${exponentB}`)
     }
   })
 
@@ -172,16 +166,14 @@ describe('test signedTicket construction', async function () {
     assert(signedTicket.ticket.amount.eq(ticketData.amount), 'wrong amount')
     assert(signedTicket.ticket.winProb.eq(ticketData.winProb), 'wrong winProb')
 
-    let exponent = randomInteger(0, 8)
-    let index = randomInteger(0, signedTicket.length)
+    let exponent = randomInteger(0, 7)
+    let index = randomInteger(0, signedTicket.length - 1)
 
     signedTicket[index] = signedTicket[index] ^ (1 << exponent)
 
     if (await signedTicket.verify(userAPubKey)) {
-      console.log(
-        `found invalid signature, <${u8aToHex(signedTicket)}>, byte #${index}, bit #${exponent}`,
-        await signedTicket.verify(userAPubKey)
-      )
+      // @TODO change to assert.fail
+      console.log(`found invalid signature, <${u8aToHex(signedTicket)}>, byte #${index}, bit #${exponent}`)
     }
   })
 })

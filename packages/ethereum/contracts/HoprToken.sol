@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.7.5;
+pragma solidity ^0.6.0;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@openzeppelin/contracts/token/ERC777/ERC777.sol";
+import "./openzeppelin-contracts/ERC777.sol";
 import "./ERC777/ERC777Snapshot.sol";
 
 contract HoprToken is AccessControl, ERC777Snapshot {

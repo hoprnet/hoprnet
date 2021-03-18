@@ -12,7 +12,7 @@ import { OpenChannelFancy, OpenChannel } from './openChannel'
 import Ping from './ping'
 import PrintAddress from './printAddress'
 import PrintBalance from './printBalance'
-import { SendMessageFancy, SendMessage } from './sendMessage'
+import { SendMessage } from './sendMessage'
 import { MultiSendMessage } from './multisend'
 import StopNode from './stopNode'
 import Version from './version'
@@ -24,8 +24,8 @@ import TraverseChannels from './traverseChannels'
 import readline from 'readline'
 import { Alias } from './alias'
 import { Info } from './info'
-import { SetStrategy } from './strategy'
 import { CoverTraffic } from './cover-traffic'
+import Addresses from './addresses'
 
 export class Commands {
   readonly commands: AbstractCommand[]
@@ -35,40 +35,37 @@ export class Commands {
   constructor(public node: Hopr<HoprCoreConnector>, rl?: readline.Interface) {
     this.state = {
       aliases: new Map<string, PeerId>(),
-      includeRecipient: false,
-      routing: 'direct',
-      routingPath: []
+      includeRecipient: false
     }
 
     this.commands = [
+      new Addresses(node),
+      new Alias(node),
       new CloseChannel(node),
+      new CoverTraffic(node),
       new Info(node),
-      new ListCommands(() => this.commands),
-      // new ListConnectors(),
       new ListConnectedPeers(node),
+      new ListCommands(() => this.commands),
       new ListOpenChannels(node),
+      // new ListConnectors(),
       new Ping(node),
       new PrintAddress(node),
       new PrintBalance(node),
-      new StopNode(node),
-      new Version(),
-      new Tickets(node),
       new RedeemTickets(node),
-      new Settings(),
-      new Alias(node),
+      new StopNode(node),
+      new Version(node),
+      new Tickets(node),
+      new SendMessage(node),
+      new Settings(node),
       new TraverseChannels(node),
-      new Withdraw(node),
-      new SetStrategy(node),
-      new CoverTraffic(node)
+      new Withdraw(node)
     ]
 
     if (rl) {
       this.commands.push(new OpenChannelFancy(node, rl))
-      this.commands.push(new SendMessageFancy(node, rl))
       this.commands.push(new MultiSendMessage(node, rl))
     } else {
       this.commands.push(new OpenChannel(node))
-      this.commands.push(new SendMessage(node))
     }
 
     this.commandMap = new Map()

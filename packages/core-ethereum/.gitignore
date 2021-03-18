@@ -4,11 +4,7 @@
 # Exclude keys
 .env
 
-# Exclude IDE stuff
-.vscode
-
 # Exclude yarn stuff
-**/.packages-cache
 yarn-error.log
 
 # Exclude OSX stuff
@@ -19,9 +15,7 @@ src/tsc/web3
 
 # Typescript builds
 lib
-
-# Ethereum artifacts
-src/ethereum
+test.mocha.js
 
 # Exclude any built npm packages
 *.tgz

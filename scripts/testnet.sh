@@ -3,7 +3,10 @@ set -e #u
 
 if [ -z "$GCLOUD_INCLUDED" ]; then
   source scripts/gcloud.sh 
+  source scripts/dns.sh
 fi
+
+source scripts/utils.sh
 
 MIN_FUNDS=0.01291
 HOPRD_ARGS="--data='/app/db/ethereum/testnet/bootstrap' --password='$BS_PASSWORD'"
@@ -69,23 +72,28 @@ update_if_existing() {
 
 # $1 = vm name
 # $2 = docker image
+# NB: --run needs to be at the end or it will ignore the other arguments.
 update_or_create_bootstrap_vm() {
   if [ "$(update_if_existing $1 $2)" = "no container" ]; then
     echo "No container found, creating $1"
     local ip=$(gcloud_get_address $1)
     gcloud compute instances create-with-container $1 $GCLOUD_DEFAULTS \
       --network-interface=address=$ip,network-tier=PREMIUM,subnet=default \
+      --container-restart-policy=always \
       --create-disk name=$(disk_name $1),size=10GB,type=pd-balanced,mode=rw \
       --container-mount-disk mount-path="/app/db" \
-      --container-env=^,@^DEBUG=hopr\*,@NODE_OPTIONS=--max-old-space-size=4096 \
+      --container-env=^,@^DEBUG=hopr\*,@NODE_OPTIONS=--max-old-space-size=4096,GCLOUD=1 \
       --container-image=$2 \
       --container-arg="--password" --container-arg="$BS_PASSWORD" \
       --container-arg="--init" --container-arg="true" \
       --container-arg="--runAsBootstrap" --container-arg="true" \
       --container-arg="--rest" --container-arg="true" \
       --container-arg="--restHost" --container-arg="0.0.0.0" \
-      --container-arg="--admin" \
-      --container-restart-policy=always
+      --container-arg="--healthCheck" --container-arg="true" \
+      --container-arg="--healthCheckHost" --container-arg="0.0.0.0" \
+      --container-arg="--admin" --container-arg="true" \
+      --container-arg="--adminHost" --container-arg="0.0.0.0" \
+      --container-arg="--run" --container-arg="\"settings strategy passive;daemonize\""
     sleep 120
   fi
 }
@@ -93,26 +101,31 @@ update_or_create_bootstrap_vm() {
 # $1 = vm name
 # $2 = docker image
 # $3 = BS multiaddr
+# NB: --run needs to be at the end or it will ignore the other arguments.
 start_testnode_vm() {
   if [ "$(update_if_existing $1 $2)" = "no container" ]; then
     gcloud compute instances create-with-container $1 $GCLOUD_DEFAULTS \
       --create-disk name=$(disk_name $1),size=10GB,type=pd-standard,mode=rw \
       --container-mount-disk mount-path="/app/db" \
-      --container-env=^,@^DEBUG=hopr\*,@NODE_OPTIONS=--max-old-space-size=4096 \
+      --container-env=^,@^DEBUG=hopr\*,@NODE_OPTIONS=--max-old-space-size=4096,GCLOUD=1 \
       --container-image=$2 \
       --container-arg="--password" --container-arg="$BS_PASSWORD" \
       --container-arg="--init" --container-arg="true" \
       --container-arg="--rest" --container-arg="true" \
       --container-arg="--restHost" --container-arg="0.0.0.0" \
+      --container-arg="--healthCheck" --container-arg="true" \
+      --container-arg="--healthCheckHost" --container-arg="0.0.0.0" \
       --container-arg="--bootstrapServers" --container-arg="$3" \
-      --container-arg="--run" --container-arg="cover-traffic start;daemonize" \
-      --container-arg="--admin" \
+      --container-arg="--admin" --container-arg="true" \
+      --container-arg="--adminHost" --container-arg="0.0.0.0" \
+      --container-arg="--run" --container-arg="\"cover-traffic start;daemonize\"" \
       --container-restart-policy=always
   fi
 }
 
 # $1 network name
 # $2 docker image
+# NB: Needs to output the bs multiaddrss at the end for the testnet.
 start_bootstrap() {
   local vm=$(vm_name bootstrap $1)
   echo "- Starting bootstrap server for $1 at ($vm) with $2" 1>&2
@@ -124,7 +137,14 @@ start_bootstrap() {
   echo "- Bootstrap Server ETH Address: $BOOTSTRAP_ETH_ADDRESS" 1>&2
   echo "- Bootstrap Server HOPR Address: $BOOTSTRAP_HOPR_ADDRESS" 1>&2
   fund_if_empty $BOOTSTRAP_ETH_ADDRESS 1>&2
-  echo "/ip4/$ip/tcp/9091/p2p/$BOOTSTRAP_HOPR_ADDRESS"
+  local multiaddr="/ip4/$ip/tcp/9091/p2p/$BOOTSTRAP_HOPR_ADDRESS"
+  local release=$(echo $2 | cut -f2 -d:)
+  echo "- Bootstrap Release: $release" 1>&2
+  echo "- Bootstrap Multiaddr value: $multiaddr" 1>&2
+  local clean_release=$(get_version_maj_min_pat $release)
+  local txt_record=$(gcloud_txt_record $clean_release bootstrap $multiaddr)
+  echo "- DNS entry: $(gcloud_dns_entry $clean_release bootstrap)" 1>&2
+  echo $multiaddr
 }
 
 # $1 network name
@@ -133,8 +153,20 @@ start_bootstrap() {
 # $4 bootstrap multiaddr
 start_testnode() {
   local vm=$(vm_name "node-$3" $1)
-  echo "- Starting test node $vm with $2"
+  echo "- Starting test node $vm with $2, bs: $4"
   start_testnode_vm $vm $2 $4
+}
+
+# Usage 
+# $1 authorized keys file
+add_keys() {
+  if test -f "$1"; then
+    echo "Reading keys from $1"
+    xargs -a $1 -I {} gcloud compute os-login ssh-keys add --key="{}"
+  else
+    echo "Authorized keys file not found"
+    exit 1
+  fi
 }
 
 # ----- Start Testnet -------
@@ -157,5 +189,6 @@ start_testnet() {
     echo "Start node $i"
     start_testnode $1 $3 $i $bs_addr
   done
+  add_keys scripts/keys/authorized_keys
 }
 

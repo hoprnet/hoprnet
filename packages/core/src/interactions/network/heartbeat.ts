@@ -2,14 +2,13 @@ import type { AbstractInteraction } from '../abstractInteraction'
 import { randomBytes, createHash } from 'crypto'
 import { u8aEquals } from '@hoprnet/hopr-utils'
 import debug from 'debug'
-import AbortController from 'abort-controller'
 import pipe from 'it-pipe'
 import { PROTOCOL_HEARTBEAT, HEARTBEAT_TIMEOUT } from '../../constants'
-import type { Stream, Connection, Handler } from 'libp2p'
 import type PeerId from 'peer-id'
 import { LibP2P } from '../../'
+import { dialHelper } from '@hoprnet/hopr-utils'
+import type { Connection, MuxedStream } from 'libp2p'
 
-const error = debug('hopr-core:heartbeat:error')
 const verbose = debug('hopr-core:verbose:heartbeat')
 const HASH_FUNCTION = 'blake2s256'
 
@@ -26,7 +25,7 @@ class Heartbeat implements AbstractInteraction {
     this.node.handle(this.protocols, this.handler.bind(this))
   }
 
-  handler(struct: { connection: Connection; stream: Stream }) {
+  handler(struct: { connection: Connection; stream: MuxedStream; protocol: string }) {
     const self = this
     pipe(
       struct.stream,
@@ -50,68 +49,34 @@ class Heartbeat implements AbstractInteraction {
   async interact(counterparty: PeerId): Promise<number> {
     const start = Date.now()
 
-    return new Promise<number>(async (resolve, reject) => {
-      // There is an assumption here that we 'know' how to contact this peer
-      // and therefore we are immediately trying to dial, rather than checking
-      // our peerRouting info first.
-      //
-      // NB. This is a false assumption for 'ping' and we therefore trigger
-      // errors.
-      let struct: Handler
-      let aborted = false
+    const struct = await dialHelper(this.node, counterparty, this.protocols[0], { timeout: HEARTBEAT_TIMEOUT })
 
-      const abort = new AbortController()
+    if (struct == undefined) {
+      verbose(`Connection to ${counterparty.toB58String()} failed`)
+      return -1
+    }
 
-      const timeout = setTimeout(() => {
-        aborted = true
-        abort.abort()
-        verbose(`heartbeat timeout while querying ${counterparty.toB58String()}`)
-        reject(Error(`Timeout while querying ${counterparty.toB58String()}.`))
-      }, HEARTBEAT_TIMEOUT)
+    const challenge = randomBytes(16)
+    const expectedResponse = createHash(HASH_FUNCTION).update(challenge).digest()
 
-      try {
-        struct = await this.node
-          .dialProtocol(counterparty, this.protocols[0], { signal: abort.signal })
-          .catch(async (err: Error) => {
-            verbose(`heartbeat connection error ${err.name} while dialing ${counterparty.toB58String()} (initial)`)
-            const { id } = await this.node.peerRouting.findPeer(counterparty)
-            //verbose('trying with peer info', peerInfo)
-            return await this.node.dialProtocol(id, this.protocols[0], { signal: abort.signal })
-          })
-      } catch (err) {
-        verbose(
-          `heartbeat connection error ${err.name} while dialing ${counterparty.toB58String()} (subsequent)`,
-          aborted
-        )
-        clearTimeout(timeout)
-        if (!aborted) {
-          error(err)
-        }
-        return reject()
-      }
-
-      if (aborted) {
-        verbose('aborted but no error')
-        return
-      }
-
-      const challenge = randomBytes(16)
-      const expectedResponse = createHash(HASH_FUNCTION).update(challenge).digest()
-
-      await pipe([challenge], struct.stream, async (source: AsyncIterable<Uint8Array>) => {
+    const response = await pipe(
+      // prettier-ignore
+      [challenge],
+      struct.stream,
+      async (source: AsyncIterable<Uint8Array>): Promise<Uint8Array | void> => {
         for await (const msg of source) {
-          if (u8aEquals(msg, expectedResponse)) {
-            break
-          }
+          return msg
         }
-      })
-
-      clearTimeout(timeout)
-
-      if (!aborted) {
-        resolve(Date.now() - start)
       }
-    })
+    )
+
+    if (response != null && u8aEquals(expectedResponse, response.slice())) {
+      const elapsedTime = Date.now() - start
+      return elapsedTime < 0 ? 0 : elapsedTime
+    } else {
+      verbose(`Invalid response. Got ${JSON.stringify(response)}`)
+      return -1
+    }
   }
 }
 

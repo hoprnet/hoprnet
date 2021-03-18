@@ -1,26 +1,15 @@
 # Exclude node.js stuff
-**/node_modules
-
-# Exclude keys
-.env
-
-# Exclude IDE stuff
-.vscode
+node_modules
 
 # Exclude yarn stuff
 .packages-cache
 yarn-error.log
 
+# Exclude OSX files
 **/.DS_Store
 
-# Exclude built files
+# Exclude built Typescript files
 lib
-
-# Exclude filesystem test
-src/fs/filesystem_test
-
-# Exclude vim swap files
-.*
 
 # Exclude built npm packages
 *.tgz

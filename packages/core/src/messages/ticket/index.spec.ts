@@ -10,7 +10,7 @@ import { UnacknowledgedTicket } from '.'
 import { NODE_SEEDS } from '@hoprnet/hopr-demo-seeds'
 
 import { Types, Utils } from '@hoprnet/hopr-core-ethereum'
-import { privKeyToPeerId } from '../../utils'
+import { privKeyToPeerId } from '@hoprnet/hopr-utils'
 import { toU8a, u8aConcat, u8aToNumber } from '@hoprnet/hopr-utils'
 
 import LevelUp from 'levelup'
@@ -36,7 +36,7 @@ describe(`check serialization and deserialization of ticket objects`, function (
     const peerA = await privKeyToPeerId(NODE_SEEDS[0])
     const peerB = await privKeyToPeerId(NODE_SEEDS[1])
 
-    //const accountA = await node.paymentChannels.utils.pubKeyToAccountId(peerA.pubKey.marshal())
+    // const accountA = await node.paymentChannels.utils.pubKeyToAccountId(peerA.pubKey.marshal())
     const accountB = await node.paymentChannels.utils.pubKeyToAccountId(peerB.pubKey.marshal())
 
     const secretA = randomBytes(32)

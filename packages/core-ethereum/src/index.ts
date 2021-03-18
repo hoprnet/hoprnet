@@ -5,8 +5,8 @@ import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type { HoprChannels } from './tsc/web3/HoprChannels'
 import type { HoprToken } from './tsc/web3/HoprToken'
 import Web3 from 'web3'
-import { Network, addresses, abis } from '@hoprnet/hopr-ethereum'
 import chalk from 'chalk'
+import { Network, addresses, abis } from '@hoprnet/hopr-ethereum'
 import { ChannelFactory } from './channel'
 import types from './types'
 import Indexer from './indexer'
@@ -30,7 +30,6 @@ export default class HoprEthereum implements HoprCoreConnector {
   private _stopping?: Promise<void>
   private _debug: boolean
 
-  public signTransaction: ReturnType<typeof utils.TransactionSigner>
   public channel: ChannelFactory
   public types: types
   public indexer: Indexer
@@ -46,15 +45,15 @@ export default class HoprEthereum implements HoprCoreConnector {
     public hoprToken: HoprToken,
     debug: boolean,
     privateKey: Uint8Array,
-    publicKey: Uint8Array
+    publicKey: Uint8Array,
+    maxConfirmations: number
   ) {
-    this.hashedSecret = new HashedSecret(this)
-    this.account = new Account(this, privateKey, publicKey)
-    this.indexer = new Indexer(this)
+    this.account = new Account(this, privateKey, publicKey, chainId)
+    this.indexer = new Indexer(this, maxConfirmations)
     this.types = new types()
     this.channel = new ChannelFactory(this)
     this._debug = debug
-    this.signTransaction = utils.TransactionSigner(web3, this.network, privateKey)
+    this.hashedSecret = new HashedSecret(this.db, this.account, this.hoprChannels)
   }
 
   readonly dbKeys = dbkeys
@@ -160,20 +159,18 @@ export default class HoprEthereum implements HoprCoreConnector {
     return new Promise<string>(async (resolve, reject) => {
       try {
         if (currency === 'NATIVE') {
-          const tx = await this.signTransaction({
+          const tx = await this.account.signTransaction({
             from: (await this.account.address).toHex(),
             to: recipient,
-            nonce: await this.account.nonce,
             value: amount
           })
 
           tx.send().once('transactionHash', (hash) => resolve(hash))
         } else {
-          const tx = await this.signTransaction(
+          const tx = await this.account.signTransaction(
             {
               from: (await this.account.address).toHex(),
-              to: this.hoprToken.options.address,
-              nonce: await this.account.nonce
+              to: this.hoprToken.options.address
             },
             this.hoprToken.methods.transfer(recipient, amount)
           )
@@ -190,6 +187,12 @@ export default class HoprEthereum implements HoprCoreConnector {
     return (await this.account.address).toHex()
   }
 
+  public smartContractInfo(): string {
+    const network = utils.getNetworkName(this.chainId)
+    const addr = addresses[network]
+    return [`Running on: ${network}`, `HOPR Token: ${addr.HoprToken}`, `HOPR Channels: ${addr.HoprChannels}`].join('\n')
+  }
+
   /**
    * Creates an uninitialised instance.
    *
@@ -202,7 +205,7 @@ export default class HoprEthereum implements HoprCoreConnector {
   public static async create(
     db: LevelUp,
     seed: Uint8Array,
-    options?: { id?: number; provider?: string; debug?: boolean }
+    options?: { id?: number; provider?: string; debug?: boolean; maxConfirmations?: number }
   ): Promise<HoprEthereum> {
     const providerUri = options?.provider || config.DEFAULT_URI
 
@@ -235,7 +238,8 @@ export default class HoprEthereum implements HoprCoreConnector {
       hoprToken,
       options?.debug || false,
       seed,
-      publicKey
+      publicKey,
+      options.maxConfirmations ?? config.MAX_CONFIRMATIONS
     )
     log(`using blockchain address ${await coreConnector.hexAccountAddress()}`)
     return coreConnector

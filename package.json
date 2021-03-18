@@ -7,18 +7,19 @@
   "scripts": {
     "setup": "lerna bootstrap",
     "build": "yarn util:build",
+    "build:core": "lerna exec --scope @hoprnet/hopr-core yarn build",
     "lint": "npx prettier --check .",
     "lint:fix": "npx prettier --write .",
     "test": "lerna run test --stream",
-    "test:core": "cd packages/core && yarn build && yarn test",
-    "run:hoprd": "lerna exec --scope @hoprnet/hoprd -- yarn start --host 0.0.0.0:9092",
+    "test:core": "yarn build:core && lerna exec --scope @hoprnet/hopr-core yarn test",
+    "run:hoprd": "lerna exec --scope @hoprnet/hoprd -- yarn start",
     "util:clean": "lerna exec --stream -- rimraf node_modules/@hoprnet",
     "util:reset": "lerna clean --yes",
     "util:build": "lerna exec --stream -- yarn build",
     "util:link": "lerna link"
   },
   "dependencies": {
-    "lerna": "^3.22.1"
+    "lerna": "^4.0.0"
   },
   "devDependencies": {
     "rimraf": "^3.0.2"

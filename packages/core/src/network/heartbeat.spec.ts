@@ -1,10 +1,10 @@
 import Heartbeat from './heartbeat'
 import NetworkPeerStore from './network-peers'
 import assert from 'assert'
-import { HEARTBEAT_REFRESH, NETWORK_QUALITY_THRESHOLD } from '../constants'
+import { HEARTBEAT_INTERVAL, NETWORK_QUALITY_THRESHOLD } from '../constants'
 import sinon from 'sinon'
 import { fakePeerId } from '../test-utils'
-import type PeerId from 'peer-id'
+import PeerId from 'peer-id'
 
 describe('unit test heartbeat', async () => {
   let heartbeat: Heartbeat
@@ -16,9 +16,9 @@ describe('unit test heartbeat', async () => {
     interact: sinon.fake.resolves(true)
   } as any
 
-  beforeEach(() => {
+  beforeEach(async () => {
     clock = sinon.useFakeTimers(Date.now())
-    peers = new NetworkPeerStore([])
+    peers = new NetworkPeerStore([], [await PeerId.create({ keyType: 'secp256k1' })])
     heartbeat = new Heartbeat(peers, interaction, hangUp)
   })
 
@@ -41,7 +41,7 @@ describe('unit test heartbeat', async () => {
 
   it('check nodes interacts with an old peer', async () => {
     peers.register(fakePeerId(2))
-    clock.tick(HEARTBEAT_REFRESH * 2)
+    clock.tick(HEARTBEAT_INTERVAL * 2)
     await heartbeat.__forTestOnly_checkNodes()
     assert(hangUp.notCalled, 'shouldnt call hangup')
     assert(interaction.interact.calledOnce, 'should call interact')
@@ -50,10 +50,11 @@ describe('unit test heartbeat', async () => {
   it('test heartbeat flow', async () => {
     let generateMock = (i: string | number) => {
       let id = fakePeerId(i)
-      let peers = new NetworkPeerStore([])
+      let peers = new NetworkPeerStore([], [id])
       let heartbeat = new Heartbeat(peers, interaction, hangUp)
       return { peers, interaction, id, heartbeat }
     }
+
     let alice = generateMock(1)
     let bob = generateMock(2)
     let chris = generateMock(3)
@@ -72,7 +73,13 @@ describe('unit test heartbeat', async () => {
     assert(bob.peers.has(alice.id), `Bob should know about Alice now.`)
 
     // Alice heartbeat, all available
-    clock.tick(HEARTBEAT_REFRESH * 2)
+    clock.tick(HEARTBEAT_INTERVAL * 2)
+    await alice.heartbeat.__forTestOnly_checkNodes()
+    clock.tick(HEARTBEAT_INTERVAL * 2)
+    await alice.heartbeat.__forTestOnly_checkNodes()
+    clock.tick(HEARTBEAT_INTERVAL * 2)
+    await alice.heartbeat.__forTestOnly_checkNodes()
+    clock.tick(HEARTBEAT_INTERVAL * 2)
     await alice.heartbeat.__forTestOnly_checkNodes()
 
     assert(alice.peers.qualityOf(bob.id) > NETWORK_QUALITY_THRESHOLD, 'bob is high q')
@@ -81,12 +88,12 @@ describe('unit test heartbeat', async () => {
     // Chris dies, alice heartbeats again
     alice.interaction.interact = sinon.fake((id: PeerId) => {
       if (id.equals(chris.id)) {
-        throw new Error('FAIL')
+        return Promise.resolve(-1)
       }
-      return Promise.resolve()
+      return Promise.resolve(0)
     })
 
-    clock.tick(HEARTBEAT_REFRESH * 2)
+    clock.tick(HEARTBEAT_INTERVAL * 2)
     await alice.heartbeat.__forTestOnly_checkNodes()
     assert(alice.peers.qualityOf(bob.id) > NETWORK_QUALITY_THRESHOLD, 'bob is still high q')
     assert(alice.peers.qualityOf(chris.id) <= NETWORK_QUALITY_THRESHOLD, 'chris is now low q')
