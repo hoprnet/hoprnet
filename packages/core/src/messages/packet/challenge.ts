@@ -12,7 +12,6 @@ const KEY_LENGTH = 32
  * inappropriate acknowledgement.
  */
 class Challenge {
-
   constructor(
     private createSignature: (arr: Uint8Array) => Types.Signature,
     private signatureSize: number, // Signature.SIZE
@@ -22,9 +21,8 @@ class Challenge {
     private hash: Uint8Array,
     private fee: BN,
     private counterparty: Uint8Array,
-    private challengeSignature: Types.Signature,
-  ) {
-  }
+    private challengeSignature: Types.Signature
+  ) {}
 
   public serialize(): Uint8Array {
     let arr = new Uint8Array(this.signatureSize)
@@ -33,14 +31,14 @@ class Challenge {
   }
 
   public static deserialize(arr: Uint8Array, createSignature: (arr: Uint8Array) => Types.Signature): Challenge {
-    const challengeSignature = createSignature(arr) 
+    const challengeSignature = createSignature(arr)
     const challenge = secp256k1.ecdsaRecover(
-          challengeSignature.signature,
-          challengeSignature.recovery,
-          challengeSignature.msgPrefix != null && challengeSignature.msgPrefix.length > 0
-            ? await this._hash(u8aConcat(challengeSignature.msgPrefix, await this.hash))
-            : this.hash
-        )
+      challengeSignature.signature,
+      challengeSignature.recovery,
+      challengeSignature.msgPrefix != null && challengeSignature.msgPrefix.length > 0
+        ? await this._hash(u8aConcat(challengeSignature.msgPrefix, await this.hash))
+        : this.hash
+    )
 
     return new Challenge(challenge)
   }
@@ -53,7 +51,7 @@ class Challenge {
     return signatureSize
   }
 
-  getCopy(): Challenge{
+  getCopy(): Challenge {
     return Challenge.deserialize(this.serialize())
   }
 
@@ -90,11 +88,7 @@ class Challenge {
    * @param hashedKey that is used to generate the key half
    * @param fee
    */
-  static create(
-    hoprCoreConnector: HoprCoreConnector,
-    hashedKey: Uint8Array,
-    fee: BN,
-  ): Challenge {
+  static create(hoprCoreConnector: HoprCoreConnector, hashedKey: Uint8Array, fee: BN): Challenge {
     if (hashedKey.length != KEY_LENGTH) {
       throw Error(
         `Invalid secret format. Expected a ${Uint8Array.name} of ${KEY_LENGTH} elements but got one with ${hashedKey.length}`
