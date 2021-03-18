@@ -1,6 +1,6 @@
 import type { Ticket as ITicket, SignedTicket as ISignedTicket } from '@hoprnet/hopr-core-connector-interface'
 import BN from 'bn.js'
-import { stringToU8a, u8aToHex, u8aConcat } from '@hoprnet/hopr-utils'
+import { stringToU8a, u8aToHex, u8aConcat, serializeToU8a} from '@hoprnet/hopr-utils'
 import { AccountId, Balance, Hash, SignedTicket, TicketEpoch } from '.'
 import { sign } from '../utils'
 
@@ -30,21 +30,15 @@ class Ticket implements ITicket {
   ) {}
 
   serialize(): Uint8Array {
-    const serialized = new Uint8Array(Ticket.SIZE())
     const epochBuffer = new Uint8Array(this.epoch.toBuffer('be', EPOCH_SIZE))
-    let i = 0
-    serialized.set(this.counterparty, i)
-    i += AccountId.SIZE
-    serialized.set(this.challenge, i)
-    i += Hash.SIZE
-    serialized.set(epochBuffer, i)
-    i += EPOCH_SIZE
-    serialized.set(new Uint8Array(this.amount.toBuffer('be', AMOUNT_SIZE)), i)
-    i += AMOUNT_SIZE
-    serialized.set(this.winProb, i)
-    i += Hash.SIZE
-    serialized.set(new Uint8Array(this.channelIteration.toBuffer('be', EPOCH_SIZE)), i)
-    return serialized
+    return serializeToU8a([
+      [this.counterparty, AccountId.SIZE],
+      [this.challenge, Hash.SIZE],
+      [epochBuffer, EPOCH_SIZE],
+      [new Uint8Array(this.amount.toBuffer('be', AMOUNT_SIZE)), AMOUNT_SIZE],
+      [this.winProb, Hash.SIZE],
+      [new Uint8Array(this.channelIteration.toBuffer('be', EPOCH_SIZE)), EPOCH_SIZE]
+    ])
   }
 
   static deserialize(arr: Uint8Array): Ticket {
