@@ -102,12 +102,12 @@ describe('test Channel class', function () {
         const result = await pipe(
           [
             (
-              await coreConnector.channel.createSignedChannel(undefined, {
-                channel: new ChannelType(undefined, {
-                  balance: channelBalance,
-                  state: new ChannelState(undefined, { state: ChannelStatus.FUNDED })
-                })
-              })
+              await coreConnector.channel.createSignedChannel(
+                new ChannelType(
+                  channelBalance,
+                  new ChannelState(ChannelStatus.FUNDED)
+                )
+              )
             ).subarray()
           ],
           counterpartysCoreConnector.channel.handleOpeningRequest.bind(counterpartysCoreConnector.channel),

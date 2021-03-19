@@ -8,30 +8,12 @@ class SignedChannel extends Uint8ArrayE implements Types.SignedChannel {
   private _channel?: Channel
 
   constructor(
-    arr?: {
-      bytes: ArrayBuffer
-      offset: number
-    },
-    struct?: {
-      counterparty?: Public
-      channel?: Channel
-    }
+    counterparty: Public,
+    channel: Channel
   ) {
-    if (!arr) {
-      super(SignedChannel.SIZE)
-    } else {
-      super(arr.bytes, arr.offset, SignedChannel.SIZE)
-    }
-
-    if (struct) {
-      if (struct.channel) {
-        this.set(struct.channel.toU8a(), this.channelOffset - this.byteOffset)
-      }
-
-      if (struct.counterparty) {
-        this.set(struct.counterparty, this.signatureOffset - this.byteOffset)
-      }
-    }
+    super(SignedChannel.SIZE)
+    this.set(channel.toU8a(), this.channelOffset - this.byteOffset)
+    this.set(counterparty, this.signatureOffset - this.byteOffset)
   }
 
   slice(begin = 0, end = SignedChannel.SIZE) {
@@ -63,7 +45,7 @@ class SignedChannel extends Uint8ArrayE implements Types.SignedChannel {
 
   get channel(): Channel {
     if (!this._channel) {
-      this._channel = new Channel({
+      this._channel = new Channel.deserialize({
         bytes: this.buffer,
         offset: this.channelOffset
       })
@@ -81,16 +63,10 @@ class SignedChannel extends Uint8ArrayE implements Types.SignedChannel {
   }
 
   static create(
-    arr?: {
-      bytes: ArrayBuffer
-      offset: number
-    },
-    struct?: {
-      signature?: Signature
-      channel?: Channel
-    }
-  ): Promise<SignedChannel> {
-    return Promise.resolve(new SignedChannel(arr, struct))
+    signature: Signature,
+    channel: Channel
+  ): SignedChannel {
+    return new SignedChannel(signature, channel)
   }
 }
 

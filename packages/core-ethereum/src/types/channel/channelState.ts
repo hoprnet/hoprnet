@@ -5,23 +5,10 @@ import { u8aToNumber, toU8a } from '@hoprnet/hopr-utils'
 
 class ChannelState extends Uint8Array implements Types.ChannelState {
   constructor(
-    arr?: {
-      bytes: ArrayBuffer
-      offset: number
-    },
-    struct?: {
       state: number
-    }
   ) {
-    if (!arr) {
-      super(ChannelState.SIZE)
-    } else {
-      super(arr.bytes, arr.offset, ChannelState.SIZE)
-    }
-
-    if (struct) {
-      this.set(toU8a(struct.state, 1))
-    }
+    super(ChannelState.SIZE)
+    this.set(toU8a(state, 1))
   }
 
   toBN(): BN {

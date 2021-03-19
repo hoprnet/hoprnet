@@ -3,30 +3,23 @@ import Signature from './signature'
 
 declare interface SignedChannelStatic {
   readonly SIZE: number
+  deserialize(arr: Uint8Array): SignedChannel;
 
   create(
-    arr?: {
-      bytes: ArrayBuffer
-      offset: number
-    },
-    struct?: {
-      channel?: Channel
-      signature?: Signature
-    }
-  ): Promise<SignedChannel>
+    channel: Channel,
+    signature: Signature
+  ): SignedChannel
 }
 
-declare interface SignedChannel extends Uint8Array {
+declare interface SignedChannel {
   channel: Channel
   signature: Signature
   signer: Promise<Uint8Array>
-
   signatureOffset: number
   channelOffset: number
-
+  serialize(): Uint8Array;
   verify(pubKey: Uint8Array): Promise<boolean>
 }
 
 declare var SignedChannel: SignedChannelStatic
-
 export default SignedChannel

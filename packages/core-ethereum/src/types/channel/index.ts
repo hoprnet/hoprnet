@@ -1,9 +1,9 @@
 import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import { Moment } from '..'
-import { Uint8ArrayE } from '../extended'
 import { hash, stateCounterToStatus, sign } from '../../utils'
 import ChannelState from './channelState'
 import ChannelBalance from './channelBalance'
+import { serializeToU8a } from '@hoprnet/hopr-utils'
 
 enum ChannelStatus {
   UNINITIALISED,
@@ -12,121 +12,67 @@ enum ChannelStatus {
   PENDING
 }
 
-class Channel extends Uint8ArrayE implements Types.Channel {
-  private _rawState?: ChannelState
-
+class Channel implements Types.Channel {
   constructor(
-    arr?: {
-      bytes: ArrayBuffer
-      offset: number
-    },
-    struct?: {
-      state: ChannelState
-      balance?: ChannelBalance
-      moment?: Moment
-    }
-  ) {
-    if (!arr) {
-      super(Channel.SIZE)
-    } else {
-      super(arr.bytes, arr.offset, Channel.SIZE)
-    }
+    readonly balance: ChannelBalance,
+    readonly state: ChannelState,
+    readonly moment?: Moment
+  ) {}
 
-    if (struct) {
-      this.set(struct.state, ChannelBalance.SIZE)
+  static deserialize(){}
 
-      if (struct.balance) {
-        this.set(struct.balance.toU8a(), 0)
-      }
-    }
+  serialize(): Uint8Array {
+    return serializeToU8a([
+      [this.balance.toU8a(), ChannelBalance.SIZE],
+      [this.state, ChannelState.SIZE]
+    ])
+
   }
 
-  // @TODO fix SIZE
-  slice(begin = 0, end = Channel.SIZE) {
-    return this.subarray(begin, end)
-  }
-
-  // @TODO fix SIZE
-  subarray(begin = 0, end = Channel.SIZE) {
-    return new Uint8Array(this.buffer, begin + this.byteOffset, end - begin)
-  }
-
-  get balance(): ChannelBalance {
-    const balance = this.subarray(0, ChannelBalance.SIZE)
-    return new ChannelBalance({
-      bytes: balance.buffer,
-      offset: balance.byteOffset
-    })
-  }
-
-  get rawState(): ChannelState {
-    if (!this._rawState) {
-      this._rawState = new ChannelState({
-        bytes: this.buffer,
-        offset: this.byteOffset + ChannelBalance.SIZE
-      })
-    }
-
-    return this._rawState
-  }
-
-  get moment(): Moment | void {
-    if (this._status != ChannelStatus.PENDING) {
-      return
-    }
-
-    return new Moment(this.subarray(ChannelBalance.SIZE + 1, ChannelBalance.SIZE + 1 + Moment.SIZE))
-  }
-
-  get _status(): ChannelStatus {
-    return stateCounterToStatus(this.rawState.toNumber())
-  }
-
-  get hash() {
-    return hash(this)
+  async hash() {
+    return hash(this.serialize())
   }
 
   async sign(privKey: Uint8Array): Promise<Types.Signature> {
-    return await sign(await this.hash, privKey)
+    return await sign(await this.hash(), privKey)
   }
 
   get isFunded(): boolean {
-    return this._status == ChannelStatus.FUNDED
+    return stateCounterToStatus(this.state.toNumber()) == ChannelStatus.FUNDED
   }
 
   get isActive(): boolean {
-    return this._status == ChannelStatus.OPEN
+    return stateCounterToStatus(this.state.toNumber()) == ChannelStatus.OPEN
   }
 
   get isPending(): boolean {
-    return this._status == ChannelStatus.PENDING
+    return stateCounterToStatus(this.state.toNumber()) == ChannelStatus.PENDING
   }
 
-  // @TODO fix size
   static get SIZE(): number {
     return ChannelBalance.SIZE + ChannelState.SIZE
   }
 
   static createFunded(balance: ChannelBalance): Channel {
-    return new Channel(undefined, {
+    return new Channel(
       balance,
-      state: new ChannelState(undefined, { state: ChannelStatus.FUNDED })
-    })
+      new ChannelState(ChannelStatus.FUNDED)
+    )
   }
 
   static createActive(balance: ChannelBalance): Channel {
-    return new Channel(undefined, {
+    return new Channel(
       balance,
-      state: new ChannelState(undefined, { state: ChannelStatus.OPEN })
-    })
+      new ChannelState(ChannelStatus.OPEN)
+    )
   }
 
   static createPending(moment: Moment, balance: ChannelBalance): Channel {
-    return new Channel(undefined, {
+    return new Channel(
       balance,
-      state: new ChannelState(undefined, { state: ChannelStatus.PENDING }),
+      new ChannelState(ChannelStatus.PENDING),
       moment
-    })
+    )
   }
 }
 
