@@ -41,7 +41,7 @@
     "rewiremock": "^3.14.3",
     "rimraf": "^3.0.2",
     "ts-node": "^9.0.0",
-    "typescript": "^4.1"
+    "typescript": "^4.2"
   },
   "mocha": {
     "extension": [
