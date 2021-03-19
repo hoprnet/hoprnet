@@ -33,11 +33,7 @@ describe('Accounts', function () {
     expectEvent(response, 'AccountInitialized', {
       account: ACCOUNT_A.address,
       pubKeyFirstHalf: ACCOUNT_A.pubKeyFirstHalf,
-      pubKeySecondHalf: ACCOUNT_A.pubKeySecondHalf
-    })
-
-    expectEvent(response, 'AccountSecretUpdated', {
-      account: ACCOUNT_A.address,
+      pubKeySecondHalf: ACCOUNT_A.pubKeySecondHalf,
       secret: SECRET_2
     })
 
@@ -71,7 +67,7 @@ describe('Accounts', function () {
       SECRET_2
     )
 
-    const response = await accounts.updateAccountInternal(ACCOUNT_A.address, SECRET_1)
+    const response = await accounts.updateAccountSecretInternal(ACCOUNT_A.address, SECRET_1)
 
     expectEvent(response, 'AccountSecretUpdated', {
       account: ACCOUNT_A.address,
@@ -95,7 +91,7 @@ describe('Accounts', function () {
 
     // give empty SECRET
     await expectRevert(
-      accounts.updateAccountInternal(ACCOUNT_A.address, constants.ZERO_BYTES32),
+      accounts.updateAccountSecretInternal(ACCOUNT_A.address, constants.ZERO_BYTES32),
       vmErrorMessage('secret must not be empty')
     )
   })
@@ -112,7 +108,7 @@ describe('Accounts', function () {
 
     // give same SECRET
     await expectRevert(
-      accounts.updateAccountInternal(ACCOUNT_A.address, SECRET_1),
+      accounts.updateAccountSecretInternal(ACCOUNT_A.address, SECRET_1),
       vmErrorMessage('secret must not be the same as before')
     )
   })

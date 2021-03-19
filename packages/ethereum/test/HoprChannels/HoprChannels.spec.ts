@@ -322,9 +322,9 @@ describe('HoprChannels intergration tests', function () {
   context('on a fresh channel', function () {
     it('should initialize accountA', async function () {
       const response = await hoprChannels.initializeAccount(
-        SECRET_2,
         ACCOUNT_A.pubKeyFirstHalf,
         ACCOUNT_A.pubKeySecondHalf,
+        SECRET_2,
         {
           from: ACCOUNT_A.address
         }
@@ -333,11 +333,7 @@ describe('HoprChannels intergration tests', function () {
       expectEvent(response, 'AccountInitialized', {
         account: ACCOUNT_A.address,
         pubKeyFirstHalf: ACCOUNT_A.pubKeyFirstHalf,
-        pubKeySecondHalf: ACCOUNT_A.pubKeySecondHalf
-      })
-
-      expectEvent(response, 'AccountSecretUpdated', {
-        account: ACCOUNT_A.address,
+        pubKeySecondHalf: ACCOUNT_A.pubKeySecondHalf,
         secret: SECRET_2
       })
 
@@ -348,9 +344,9 @@ describe('HoprChannels intergration tests', function () {
 
     it('should initialize accountB', async function () {
       const response = await hoprChannels.initializeAccount(
-        SECRET_2,
         ACCOUNT_B.pubKeyFirstHalf,
         ACCOUNT_B.pubKeySecondHalf,
+        SECRET_2,
         {
           from: ACCOUNT_B.address
         }
@@ -359,11 +355,7 @@ describe('HoprChannels intergration tests', function () {
       expectEvent(response, 'AccountInitialized', {
         account: ACCOUNT_B.address,
         pubKeyFirstHalf: ACCOUNT_B.pubKeyFirstHalf,
-        pubKeySecondHalf: ACCOUNT_B.pubKeySecondHalf
-      })
-
-      expectEvent(response, 'AccountSecretUpdated', {
-        account: ACCOUNT_B.address,
+        pubKeySecondHalf: ACCOUNT_B.pubKeySecondHalf,
         secret: SECRET_2
       })
 
@@ -619,7 +611,7 @@ describe('HoprChannels intergration tests', function () {
     )
 
     it('should update accountA', async function () {
-      const response = await hoprChannels.updateAccount(SECRET_2, {
+      const response = await hoprChannels.updateAccountSecret(SECRET_2, {
         from: ACCOUNT_A.address
       })
 
@@ -634,7 +626,7 @@ describe('HoprChannels intergration tests', function () {
     })
 
     it('should update accountB', async function () {
-      const response = await hoprChannels.updateAccount(SECRET_2, {
+      const response = await hoprChannels.updateAccountSecret(SECRET_2, {
         from: ACCOUNT_B.address
       })
 

@@ -21,11 +21,11 @@ contract TicketsMock is HoprChannels {
         );
     }
 
-    function updateAccountInternal(
+    function updateAccountSecretInternal(
         address sender,
         bytes32 secret
     ) external {
-        _updateAccount(sender, secret);
+        _updateAccountSecret(sender, secret);
     }
 
     function fundChannelInternal(

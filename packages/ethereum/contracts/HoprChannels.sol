@@ -90,7 +90,8 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         // @TODO: remove this and rely on `msg.sender`
         address indexed account,
         uint256 pubKeyFirstHalf,
-        uint256 pubKeySecondHalf
+        uint256 pubKeySecondHalf,
+        bytes32 secret
     );
 
     event AccountSecretUpdated(
@@ -148,9 +149,9 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
      * @param pubKeySecondHalf second half of the public key
      */
     function initializeAccount(
-        bytes32 secret,
         uint256 pubKeyFirstHalf,
-        uint256 pubKeySecondHalf
+        uint256 pubKeySecondHalf,
+        bytes32 secret
     ) external {
         _initializeAccount(
             msg.sender,
@@ -165,10 +166,10 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
      * then emits {AccountSecretUpdated} event.
      * @param secret account's secret
      */
-    function updateAccount(
+    function updateAccountSecret(
         bytes32 secret
     ) external {
-        _updateAccount(msg.sender, secret);
+        _updateAccountSecret(msg.sender, secret);
     }
 
     /**
@@ -390,19 +391,23 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         uint256 pubKeySecondHalf,
         bytes32 secret
     ) internal {
+        Account storage accountData = accounts[account];
+
         require(account != address(0), "account must not be empty");
+        require(accountData.counter == 0, "account already initialized");
         require(pubKeyFirstHalf != uint256(0), "pubKeyFirstHalf must not be empty");
         require(pubKeySecondHalf != uint256(0), "pubKeySecondHalf must not be empty");
-        // require(secret != bytes32(0), "secret must not be empty");
+        require(secret != bytes32(0), "secret must not be empty");
 
         require(
             ECDSA.pubKeyToEthereumAddress(pubKeyFirstHalf, pubKeySecondHalf) == account,
             "public key does not match account"
         );
 
-        _updateAccount(account, secret);
+        accountData.secret = secret;
+        accountData.counter = 1;
 
-        emit AccountInitialized(account, pubKeyFirstHalf, pubKeySecondHalf);
+        emit AccountInitialized(account, pubKeyFirstHalf, pubKeySecondHalf, secret);
     }
 
     /**
@@ -411,13 +416,14 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
      * @param account the address of the account
      * @param secret account's secret
      */
-    function _updateAccount(
+    function _updateAccountSecret(
         address account,
         bytes32 secret
     ) internal {
         require(secret != bytes32(0), "secret must not be empty");
 
         Account storage accountData = accounts[account];
+        // @TODO: do we need this?
         require(secret != accountData.secret, "secret must not be the same as before");
 
         accountData.secret = secret;
