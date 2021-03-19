@@ -2,7 +2,7 @@ import AcknowledgedTicket from './types/acknowledgedTicket'
 import type {
   AccountId,
   Balance,
-  Channel as ChannelType,
+  ChannelState,
   ChannelBalance,
   Hash,
   Moment,
@@ -137,7 +137,7 @@ declare interface Channel {
   readonly status: Promise<'UNINITIALISED' | 'FUNDED' | 'OPEN' | 'PENDING'>
 
   // Current state of the channel, i.e. `FUNDED` with `1 HOPR / 3 HOPR`
-  readonly state: ChannelType
+  readonly state: ChannelState
 
   // Current balance of partyA
   readonly balance_a: Promise<Balance>

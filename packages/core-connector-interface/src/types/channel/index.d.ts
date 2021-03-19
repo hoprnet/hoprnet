@@ -1,27 +1,26 @@
 import { Moment, Hash, Signature } from '..'
-
-import ChannelBalance from './balance'
-import ChannelState from './state'
+import Balance from '../balance'
 
 declare interface ChannelStatic {
-  createFunded(channelBalance: ChannelBalance): Channel
-  createActive(channelBalance: ChannelBalance): Channel
-  createPending(pending: Moment, balance: ChannelBalance): Channel
+  createFunded(balance: Balance, balance_a: Balance): Channel
+  createActive(balance: Balance, balance_a: Balance): Channel
+  createPending(pending: Moment, balance: Balance, balance_a: Balance): Channel
   deserialize(arr: Uint8Array): Channel
   SIZE: number
 }
 
-declare interface Channel {
+declare interface ChannelState {
   sign(privKey: Uint8Array, pubKey: Uint8Array | undefined): Promise<Signature>
 
-  balance: ChannelBalance
+  balance: Balance
+  balance_a: Balance
 
   pending?: Moment
 
   isFunded: boolean
   isActive: boolean
   isPending: boolean
-  state: ChannelState
+  status: number 
 
   hash(): Promise<Hash>
 
