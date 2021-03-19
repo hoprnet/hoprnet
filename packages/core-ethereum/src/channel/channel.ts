@@ -1,15 +1,7 @@
 import type { Channel as IChannel } from '@hoprnet/hopr-core-connector-interface'
 import BN from 'bn.js'
 import { u8aToHex, toU8a } from '@hoprnet/hopr-utils'
-import {
-  Balance,
-  Channel as ChannelType,
-  Hash,
-  Moment,
-  Public,
-  TicketEpoch,
-  ChannelEntry
-} from '../types'
+import { Balance, Channel as ChannelType, Hash, Moment, Public, TicketEpoch, ChannelEntry } from '../types'
 import TicketFactory from './ticket'
 import { hash } from '../utils'
 
@@ -21,11 +13,7 @@ class Channel implements IChannel {
 
   public ticket: TicketFactory
 
-  constructor(
-    public coreConnector: HoprEthereum,
-    public counterparty: Uint8Array,
-    public state: ChannelType,
-  ) {
+  constructor(public coreConnector: HoprEthereum, public counterparty: Uint8Array, public state: ChannelType) {
     this.ticket = new TicketFactory(this)
   }
 

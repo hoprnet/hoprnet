@@ -17,7 +17,7 @@ declare interface ChannelState {
   isFunded: boolean
   isActive: boolean
   isPending: boolean
-  status: number 
+  status: number
   hash(): Promise<Hash>
   serialize(): Uint8Array
 }
