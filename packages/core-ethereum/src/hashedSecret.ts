@@ -15,7 +15,6 @@ export const TOTAL_ITERATIONS = 100000
 export const HASHED_SECRET_WIDTH = 27
 
 const log = Debug('hopr-core-ethereum:hashedSecret')
-const isNullAccount = (a: string) => a == null || ['0', '0x', '0x'.padEnd(66, '0')].includes(a)
 
 export async function hashFunction(msg: Uint8Array): Promise<Uint8Array> {
   return (await hashFunctionUtils(msg)).slice(0, HASHED_SECRET_WIDTH)
@@ -76,7 +75,8 @@ class HashedSecret {
     const address = (await this.account.address).toHex()
     const account = await this.channels.methods.accounts(address).call()
 
-    if (isNullAccount(account.accountX)) {
+    // has no secret stored onchain
+    if (Number(account.counter) === 0) {
       const uncompressedPubKey = publicKeyConvert(this.account.keys.onChain.pubKey, false).slice(1)
       log('account is also null, calling channel.init')
       try {
@@ -87,7 +87,7 @@ class HashedSecret {
                 from: address,
                 to: this.channels.options.address
               },
-              this.channels.methods.init(
+              this.channels.methods.initializeAccount(
                 u8aToHex(uncompressedPubKey.slice(0, 32)),
                 u8aToHex(uncompressedPubKey.slice(32, 64)),
                 u8aToHex(secret)
@@ -117,7 +117,7 @@ class HashedSecret {
                 from: address,
                 to: this.channels.options.address
               },
-              this.channels.methods.setHashedSecret(u8aToHex(secret))
+              this.channels.methods.updateAccountSecret(u8aToHex(secret))
             )
           ).send()
         )

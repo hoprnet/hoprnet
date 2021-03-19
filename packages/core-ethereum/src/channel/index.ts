@@ -423,7 +423,7 @@ class ChannelFactory {
         deposit: new BN(response.deposit),
         partyABalance: new BN(response.partyABalance),
         closureTime: new BN(response.closureTime),
-        stateCounter: new BN(response.stateCounter),
+        stateCounter: new BN(response.status),
         closureByPartyA: response.closureByPartyA
       })
     } else {

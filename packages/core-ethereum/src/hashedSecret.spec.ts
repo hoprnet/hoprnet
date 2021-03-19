@@ -8,7 +8,7 @@ import { u8aEquals, durations, stringToU8a } from '@hoprnet/hopr-utils'
 import Memdown from 'memdown'
 import LevelUp from 'levelup'
 import { Ganache } from '@hoprnet/hopr-testing'
-import { Network, addresses, abis } from '@hoprnet/hopr-ethereum'
+import { addresses, abis } from '@hoprnet/hopr-ethereum'
 import { migrate, fund } from '@hoprnet/hopr-ethereum'
 import Web3 from 'web3'
 import type { WebsocketProvider } from 'web3-core'
@@ -31,7 +31,7 @@ describe('test hashedSecret', function () {
   async function generateConnector(debug?: boolean): Promise<HoprEthereum> {
     let web3 = new Web3(configs.DEFAULT_URI)
     const chainId = await Utils.getChainId(web3)
-    const network = Utils.getNetworkName(chainId) as Network
+    const network = Utils.getNetworkName(chainId)
 
     const connector = ({
       hoprChannels: new web3.eth.Contract(HoprChannelsAbi as any, addresses[network].HoprChannels),
@@ -112,7 +112,7 @@ describe('test hashedSecret', function () {
 
       let onChainHash = new Types.Hash(
         stringToU8a(
-          (await connector.hoprChannels.methods.accounts((await connector.account.address).toHex()).call()).hashedSecret
+          (await connector.hoprChannels.methods.accounts((await connector.account.address).toHex()).call()).secret
         )
       )
 
@@ -127,13 +127,13 @@ describe('test hashedSecret', function () {
               from: (await connector.account.address).toHex(),
               to: connector.hoprChannels.options.address
             },
-            connector.hoprChannels.methods.setHashedSecret(new Types.Hash(preImage.preImage).toHex())
+            connector.hoprChannels.methods.updateAccountSecret(new Types.Hash(preImage.preImage).toHex())
           )
         ).send()
       )
       let updatedOnChainHash = new Types.Hash(
         stringToU8a(
-          (await connector.hoprChannels.methods.accounts((await connector.account.address).toHex()).call()).hashedSecret
+          (await connector.hoprChannels.methods.accounts((await connector.account.address).toHex()).call()).secret
         )
       )
 
@@ -196,7 +196,7 @@ describe('test hashedSecret', function () {
 
       let onChainHash = new Types.Hash(
         stringToU8a(
-          (await connector.hoprChannels.methods.accounts((await connector.account.address).toHex()).call()).hashedSecret
+          (await connector.hoprChannels.methods.accounts((await connector.account.address).toHex()).call()).secret
         )
       )
 
@@ -211,14 +211,14 @@ describe('test hashedSecret', function () {
               from: (await connector.account.address).toHex(),
               to: connector.hoprChannels.options.address
             },
-            connector.hoprChannels.methods.setHashedSecret(new Types.Hash(preImage.preImage).toHex())
+            connector.hoprChannels.methods.updateAccountSecret(new Types.Hash(preImage.preImage).toHex())
           )
         ).send()
       )
 
       let updatedOnChainHash = new Types.Hash(
         stringToU8a(
-          (await connector.hoprChannels.methods.accounts((await connector.account.address).toHex()).call()).hashedSecret
+          (await connector.hoprChannels.methods.accounts((await connector.account.address).toHex()).call()).secret
         )
       )
 

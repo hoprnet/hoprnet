@@ -97,7 +97,9 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     event AccountSecretUpdated(
         // @TODO: remove this and rely on `msg.sender`
         address indexed account,
-        bytes32 secret
+        bytes32 secret,
+        // @TODO: remove counter?
+        uint256 counter
     );
 
     event ChannelFunded(
@@ -429,7 +431,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         accountData.secret = secret;
         accountData.counter += 1;
 
-        emit AccountSecretUpdated(account, secret);
+        emit AccountSecretUpdated(account, secret, accountData.counter);
     }
 
     /**

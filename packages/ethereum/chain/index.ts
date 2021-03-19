@@ -1,8 +1,9 @@
 import allAddresses from './addresses.json'
+import { Networks } from './networks'
+
+export * from './networks'
 
 export type ContractNames = 'HoprToken' | 'HoprChannels' | 'HoprDistributor'
-export type Networks = 'localhost' | 'mainnet' | 'kovan' | 'xdai' | 'matic' | 'binance'
-export type DeploymentTypes = 'local' | 'staging' | 'production'
 
 export const addresses: {
   [network in Networks]?: {

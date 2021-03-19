@@ -45,11 +45,6 @@ async function main(_params, { run, config, network }: HardhatRuntimeEnvironment
 
   // store addresses.json file
   await writeFile(ADDRESSES_FILE, JSON.stringify(prevAddresses, null, 2))
-
-  // try to verify
-  if (network.tags.etherscan) {
-    await run('etherscan-verify')
-  }
 }
 
 export default main

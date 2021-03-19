@@ -188,7 +188,7 @@ class Channel implements IChannel {
             from: (await account.address).toHex(),
             to: this.coreConnector.hoprChannels.options.address
           },
-          this.coreConnector.hoprChannels.methods.claimChannelClosure(
+          this.coreConnector.hoprChannels.methods.finalizeChannelClosure(
             u8aToHex(await this.coreConnector.utils.pubKeyToAccountId(this.counterparty))
           )
         )

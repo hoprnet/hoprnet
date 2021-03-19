@@ -11,6 +11,7 @@ import 'hardhat-gas-reporter'
 import { HardhatUserConfig, task, types } from 'hardhat/config'
 import { NODE_SEEDS, BOOTSTRAP_SEEDS } from '@hoprnet/hopr-demo-seeds'
 import Web3 from 'web3'
+import { networks } from './chain'
 import { ACCOUNT_DEPLOYER_PRIVKEY, ACCOUNT_A_PRIVKEY, ACCOUNT_B_PRIVKEY } from './test/constants'
 
 const { PRIVATE_KEY, INFURA, MATIC_VIGIL, ETHERSCAN } = process.env
@@ -47,44 +48,32 @@ const hardhatConfig: HardhatUserConfig = {
       accounts: localhostPrivKeys
     },
     mainnet: {
-      live: true,
-      tags: ['production', 'etherscan'],
-      chainId: 1,
+      ...networks.mainnet,
       gasMultiplier: GAS_MULTIPLIER,
       url: `https://mainnet.infura.io/v3/${INFURA}`,
       accounts: PRIVATE_KEY ? [PRIVATE_KEY] : []
     },
     kovan: {
-      live: true,
-      tags: ['staging', 'etherscan'],
-      chainId: 42,
+      ...networks.kovan,
       gasMultiplier: GAS_MULTIPLIER,
-      gas: Number(Web3.utils.toWei('1', 'gwei')),
       url: `https://kovan.infura.io/v3/${INFURA}`,
       accounts: PRIVATE_KEY ? [PRIVATE_KEY] : []
     },
     xdai: {
-      live: true,
-      tags: ['staging'],
-      chainId: 100,
+      ...networks.xdai,
       gasMultiplier: GAS_MULTIPLIER,
       url: `https://xdai.poanetwork.dev`,
       accounts: PRIVATE_KEY ? [PRIVATE_KEY] : []
     },
     matic: {
-      live: true,
-      tags: ['staging'],
-      chainId: 137,
+      ...networks.matic,
       gasMultiplier: GAS_MULTIPLIER,
       url: `https://rpc-mainnet.maticvigil.com/v1/${MATIC_VIGIL}`,
       accounts: PRIVATE_KEY ? [PRIVATE_KEY] : []
     },
     binance: {
-      live: true,
-      tags: ['staging'],
-      chainId: 56,
+      ...networks.binance,
       gasMultiplier: GAS_MULTIPLIER,
-      gas: Number(Web3.utils.toWei('20', 'gwei')), // binance chain requires >= 20gwei
       url: 'https://bsc-dataseed.binance.org',
       accounts: PRIVATE_KEY ? [PRIVATE_KEY] : []
     }

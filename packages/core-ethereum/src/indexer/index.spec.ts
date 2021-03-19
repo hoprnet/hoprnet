@@ -83,7 +83,7 @@ describe('test indexer', function () {
       //   })
 
       await connector.hoprChannels.methods
-        .init(
+        .initializeAccount(
           u8aToHex(uncompressedPubKeyB.slice(0, 32)),
           u8aToHex(uncompressedPubKeyB.slice(32, 64)),
           u8aToHex(randomBytes(27))
@@ -190,7 +190,7 @@ describe('test indexer', function () {
       const uncompressedPubKeyC = publicKeyConvert(userC.pubKey, false).slice(1)
 
       await connector.hoprChannels.methods
-        .init(
+        .initializeAccount(
           u8aToHex(uncompressedPubKeyC.slice(0, 32)),
           u8aToHex(uncompressedPubKeyC.slice(32, 64)),
           u8aToHex(randomBytes(27))
@@ -230,7 +230,7 @@ describe('test indexer', function () {
         gas: 200e3
       })
       await time.increase(web3, Math.floor(CLOSURE_DURATION / 1e3))
-      await hoprChannels.methods.claimChannelClosure(userB.address.toHex()).send({
+      await hoprChannels.methods.finalizeChannelClosure(userB.address.toHex()).send({
         from: userA.address.toHex(),
         gas: 200e3
       })
@@ -268,7 +268,7 @@ describe('test indexer', function () {
       const uncompressedPubKeyD = publicKeyConvert(userD.pubKey, false).slice(1)
 
       await connector.hoprChannels.methods
-        .init(
+        .initializeAccount(
           u8aToHex(uncompressedPubKeyD.slice(0, 32)),
           u8aToHex(uncompressedPubKeyD.slice(32, 64)),
           u8aToHex(randomBytes(27))
