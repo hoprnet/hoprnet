@@ -96,22 +96,6 @@ declare interface ChannelStatic {
    */
   handleOpeningRequest(source: AsyncIterable<Uint8Array>): AsyncIterable<Uint8Array>
 
-  /**
-   * Create a signedChannel instance.
-   * @param arr array containing a signedChannel
-   * @param struct desired content of the signedChannel
-   */
-  createSignedChannel(
-    arr?: {
-      bytes: ArrayBuffer
-      offset: number
-    },
-    struct?: {
-      channel: ChannelType
-      signature?: Signature
-    }
-  ): Promise<SignedChannel>
-
   tickets: {
     /**
      * Submits a signed ticket to the blockchain.
@@ -153,7 +137,7 @@ declare interface Channel {
   readonly status: Promise<'UNINITIALISED' | 'FUNDED' | 'OPEN' | 'PENDING'>
 
   // Current state of the channel, i.e. `FUNDED` with `1 HOPR / 3 HOPR`
-  readonly state: Promise<ChannelType>
+  readonly state: ChannelType
 
   // Current balance of partyA
   readonly balance_a: Promise<Balance>

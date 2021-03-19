@@ -8,7 +8,6 @@ import Moment from './moment'
 import NativeBalance from './nativeBalance'
 import Public from './public'
 import Signature from './signature'
-import SignedChannel from './signedChannel'
 import SignedTicket from './signedTicket'
 import Snapshot from './snapshot'
 import Ticket from './ticket'
@@ -27,7 +26,6 @@ class Types {
   public NativeBalance = NativeBalance
   public Public = Public
   public Signature = Signature
-  public SignedChannel = SignedChannel
   public SignedTicket = SignedTicket
   public Snapshot = Snapshot
   public Ticket = Ticket
@@ -47,7 +45,6 @@ export {
   NativeBalance,
   Public,
   Signature,
-  SignedChannel,
   SignedTicket,
   Snapshot,
   Ticket,

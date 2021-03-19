@@ -8,8 +8,6 @@ import {
   ChannelState,
   Hash,
   Public,
-  Signature,
-  SignedChannel,
   SignedTicket,
   Ticket,
   TicketEpoch,
@@ -34,7 +32,6 @@ import { TicketStatic } from './ticket'
 
 const log = Log(['channel-factory'])
 
-const EMPTY_SIGNATURE = new Uint8Array(Signature.SIZE).fill(0x00)
 const WIN_PROB = new BN(1)
 
 class ChannelFactory {
@@ -92,10 +89,7 @@ class ChannelFactory {
     // under this counterparty, we replace it
     await this.saveOffChainState(
       counterparty,
-      new SignedChannel(
-        counterparty,
-        newChannel
-      )
+      newChannel
     )
   }
 
@@ -208,38 +202,21 @@ class ChannelFactory {
     return signedTicket
   }
 
-  async createSignedChannel(
-    channel: ChannelType,
-    signature: Signature
-  ): Promise<SignedChannel> {
-    const signedChannel = new SignedChannel(signature, channel)
-
-    if (signedChannel.signature.eq(EMPTY_SIGNATURE)) {
-      const signature = await signedChannel.channel.sign(this.coreConnector.account.keys.onChain.privKey)
-      signedChannel.set(signature, signedChannel.signatureOffset - signedChannel.byteOffset)
-    }
-
-    return signedChannel
-  }
-
   async create(
     counterpartyPubKey: Uint8Array,
     _getOnChainPublicKey: (counterparty: Uint8Array) => Promise<Uint8Array>,
     channelBalance?: ChannelBalance,
-    sign?: (channelBalance: ChannelBalance) => Promise<SignedChannel>
+    sign?: (channelBalance: ChannelBalance) => Promise<Channel>
   ): Promise<Channel> {
     const { account } = this.coreConnector
     const counterparty = await pubKeyToAccountId(counterpartyPubKey)
     const amPartyA = isPartyA(await account.address, counterparty)
-    let signedChannel: SignedChannel
 
     await this.coreConnector.initOnchainValues()
 
     if (await this.isOpen(counterpartyPubKey)) {
       const record = await this.getOffChainState(counterpartyPubKey)
-      signedChannel = SignedChannel.deserialize(record)
-      // TODO
-      return new Channel(this.coreConnector, counterpartyPubKey, signedChannel)
+      return Channel.deserialize(record)
     }
 
     if (sign != null && channelBalance != null) {
@@ -260,8 +237,8 @@ class ChannelFactory {
       signedChannel = new SignedChannel(
         new Public(counterpartyPubKey),
         new ChannelType(
-          state,
-          channelBalance
+          channelBalance,
+          state
         ),
       )
 
@@ -369,7 +346,7 @@ class ChannelFactory {
     return this.coreConnector.db.get(Buffer.from(this.coreConnector.dbKeys.Channel(counterparty))) as any
   }
 
-  saveOffChainState(counterparty: Uint8Array, signedChannel: SignedChannel) {
+  saveOffChainState(counterparty: Uint8Array, channel: Channel) {
     return this.coreConnector.db.put(
       Buffer.from(this.coreConnector.dbKeys.Channel(counterparty)),
       Buffer.from(signedChannel)

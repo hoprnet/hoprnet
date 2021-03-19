@@ -7,7 +7,6 @@ import {
   Hash,
   Moment,
   Public,
-  SignedChannel,
   TicketEpoch,
   ChannelEntry
 } from '../types'
@@ -25,7 +24,7 @@ class Channel implements IChannel {
   constructor(
     public coreConnector: HoprEthereum,
     public counterparty: Uint8Array,
-    private signedChannel: SignedChannel
+    public state: ChannelType,
   ) {
     this.ticket = new TicketFactory(this)
   }
@@ -102,10 +101,6 @@ class Channel implements IChannel {
 
       return resolve(this._settlementWindow)
     })
-  }
-
-  get state(): Promise<ChannelType> {
-    return Promise.resolve(this.signedChannel.channel)
   }
 
   get balance(): Promise<Balance> {
