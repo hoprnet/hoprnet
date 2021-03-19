@@ -20,7 +20,7 @@ jobs:
           node-version: 14
           registry-url: https://registry.npmjs.org/
 
-      - name: Restore lerna
+      - name: Restore cache of node modules.
         uses: actions/cache@v2
         with:
           path: |
