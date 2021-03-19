@@ -11,19 +11,14 @@ declare interface ChannelStatic {
 
 declare interface ChannelState {
   sign(privKey: Uint8Array, pubKey: Uint8Array | undefined): Promise<Signature>
-
   balance: Balance
   balance_a: Balance
-
   pending?: Moment
-
   isFunded: boolean
   isActive: boolean
   isPending: boolean
   status: number 
-
   hash(): Promise<Hash>
-
   serialize(): Uint8Array
 }
 

@@ -1,9 +1,9 @@
 import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import { Moment } from '..'
 import { hash, stateCounterToStatus, sign } from '../../utils'
-import ChannelState from './channelState'
-import ChannelBalance from './channelBalance'
 import { serializeToU8a } from '@hoprnet/hopr-utils'
+import { u8aToNumber, toU8a } from '@hoprnet/hopr-utils'
+import Balance from '../balance'
 
 enum ChannelStatus {
   UNINITIALISED,
@@ -13,14 +13,21 @@ enum ChannelStatus {
 }
 
 class Channel implements Types.Channel {
-  constructor(readonly balance: ChannelBalance, readonly state: ChannelState, readonly moment?: Moment) {}
+  constructor(
+    readonly balance: Balance,
+    readonly balance_a: Balance,
+    readonly state: number,
+    readonly moment?: Moment) {}
 
-  static deserialize() {}
+  static deserialize() {
+    const state = u8aToNumber(state)
+  }
 
   serialize(): Uint8Array {
     return serializeToU8a([
-      [this.balance.toU8a(), ChannelBalance.SIZE],
-      [this.state, ChannelState.SIZE]
+      [this.balance.toU8a(), Balance.SIZE],
+      [this.balance_a.toU8a(), Balance.SIZE],
+      [toU8a(this.state, 1), 1]
     ])
   }
 
