@@ -15,8 +15,6 @@ declare interface SignedChannel {
   channel: Channel
   signature: Signature
   signer: Promise<Uint8Array>
-  signatureOffset: number
-  channelOffset: number
   serialize(): Uint8Array;
   verify(pubKey: Uint8Array): Promise<boolean>
 }

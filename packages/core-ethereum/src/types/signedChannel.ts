@@ -2,26 +2,23 @@ import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import Signature from './signature'
 import Public from './public'
 import { Channel } from './channel'
-import { Uint8ArrayE } from '../types/extended'
 
-class SignedChannel extends Uint8ArrayE implements Types.SignedChannel {
-  private _channel?: Channel
-
+class SignedChannel implements Types.SignedChannel {
   constructor(
-    counterparty: Public,
-    channel: Channel
-  ) {
-    super(SignedChannel.SIZE)
-    this.set(channel.toU8a(), this.channelOffset - this.byteOffset)
-    this.set(counterparty, this.signatureOffset - this.byteOffset)
+    readonly counterparty: Public,
+    readonly channel: Channel
+  ) {}
+
+  static deserialize(arr: Uint8Array): SignedChannel {
+    const channel = Channel.deserialize()
+    return new SignedChannel(signature, channel)
   }
 
-  slice(begin = 0, end = SignedChannel.SIZE) {
-    return this.subarray(begin, end)
-  }
-
-  subarray(begin = 0, end = SignedChannel.SIZE): Uint8Array {
-    return new Uint8Array(this.buffer, begin + this.byteOffset, end - begin)
+  serialize(): Uint8Array {
+    serializeToU8a([
+      [this.counterparty, Signature.SIZE]
+      [this.channel.toU8a(), Channel.SIZE],
+    ])
   }
 
   get signatureOffset(): number {
@@ -37,21 +34,6 @@ class SignedChannel extends Uint8ArrayE implements Types.SignedChannel {
 
   get signer(): Promise<Uint8Array> {
     return Promise.resolve(new Uint8Array(this.buffer, this.signatureOffset, Public.SIZE))
-  }
-
-  get channelOffset(): number {
-    return this.byteOffset + Signature.SIZE
-  }
-
-  get channel(): Channel {
-    if (!this._channel) {
-      this._channel = new Channel.deserialize({
-        bytes: this.buffer,
-        offset: this.channelOffset
-      })
-    }
-
-    return this._channel
   }
 
   async verify(_publicKey: Uint8Array): Promise<boolean> {

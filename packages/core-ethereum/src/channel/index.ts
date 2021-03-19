@@ -82,20 +82,20 @@ class ChannelFactory {
       balance: new BN(channelEntry.deposit),
       balance_a: new BN(channelEntry.partyABalance)
     })
-    const state = new ChannelState(undefined, { state: stateCounterToStatus(channelEntry.stateCounter.toNumber()) })
-    const newChannel = new ChannelType(undefined, {
-      state,
-      balance
-    })
+    const state = new ChannelState(stateCounterToStatus(channelEntry.stateCounter.toNumber()))
+    const newChannel = new ChannelType(
+      balance,
+      state
+    )
 
     // we store it, if we have an previous signed channel
     // under this counterparty, we replace it
     await this.saveOffChainState(
       counterparty,
-      new SignedChannel(undefined, {
-        channel: newChannel,
-        counterparty
-      })
+      new SignedChannel(
+        counterparty,
+        newChannel
+      )
     )
   }
 
@@ -209,16 +209,10 @@ class ChannelFactory {
   }
 
   async createSignedChannel(
-    arr?: {
-      bytes: ArrayBuffer
-      offset: number
-    },
-    struct?: {
-      channel: ChannelType
-      signature?: Signature
-    }
+    channel: ChannelType,
+    signature: Signature
   ): Promise<SignedChannel> {
-    const signedChannel = new SignedChannel(arr, struct)
+    const signedChannel = new SignedChannel(signature, channel)
 
     if (signedChannel.signature.eq(EMPTY_SIGNATURE)) {
       const signature = await signedChannel.channel.sign(this.coreConnector.account.keys.onChain.privKey)
@@ -243,10 +237,8 @@ class ChannelFactory {
 
     if (await this.isOpen(counterpartyPubKey)) {
       const record = await this.getOffChainState(counterpartyPubKey)
-      signedChannel = new SignedChannel({
-        bytes: record.buffer,
-        offset: record.byteOffset
-      })
+      signedChannel = SignedChannel.deserialize(record)
+      // TODO
       return new Channel(this.coreConnector, counterpartyPubKey, signedChannel)
     }
 
@@ -262,16 +254,16 @@ class ChannelFactory {
         await this.increaseFunds(counterparty, new Balance(amountToFund.sub(amountFunded)))
       }
 
-      const state = new ChannelState(undefined, { state: stateCounterToStatus(0) })
+      const state = new ChannelState(stateCounterToStatus(0))
 
       // signedChannel = await sign(channelBalance)
-      signedChannel = new SignedChannel(undefined, {
-        channel: new ChannelType(undefined, {
+      signedChannel = new SignedChannel(
+        new Public(counterpartyPubKey),
+        new ChannelType(
           state,
-          balance: channelBalance
-        }),
-        counterparty: new Public(counterpartyPubKey)
-      })
+          channelBalance
+        ),
+      )
 
       try {
         await waitForConfirmation(
@@ -313,11 +305,7 @@ class ChannelFactory {
         })
         .on('error', (err) => reject(err))
         .on('data', ({ key, value }: { key: Buffer; value: Buffer }) => {
-          const signedChannel = new SignedChannel({
-            bytes: value.buffer,
-            offset: value.byteOffset
-          })
-
+          const signedChannel = SignedChannel.deserialize(value)
           promises.push(
             onData(new Channel(this.coreConnector, this.coreConnector.dbKeys.ChannelKeyParse(key), signedChannel))
           )
@@ -347,11 +335,7 @@ class ChannelFactory {
     return async function* (this: ChannelFactory) {
       for await (const _msg of source) {
         const msg = _msg.slice()
-        const signedChannel = new SignedChannel({
-          bytes: msg.buffer,
-          offset: msg.byteOffset
-        })
-
+        const signedChannel = SignedChannel.deserialize(msg) 
         /*
         // Fund both ways
         const counterparty = await pubKeyToAccountId(counterpartyPubKey)
