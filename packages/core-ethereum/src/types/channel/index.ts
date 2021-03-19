@@ -1,33 +1,36 @@
 import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import { Moment } from '..'
-import { hash, stateCounterToStatus, sign } from '../../utils'
-import { serializeToU8a } from '@hoprnet/hopr-utils'
-import { u8aToNumber, toU8a } from '@hoprnet/hopr-utils'
+import { hash,  sign } from '../../utils'
+import { u8aToNumber, toU8a, u8aSlice, serializeToU8a } from '@hoprnet/hopr-utils'
 import Balance from '../balance'
 
 enum ChannelStatus {
-  UNINITIALISED,
-  FUNDED,
-  OPEN,
-  PENDING
+  UNINITIALISED = 1,
+  FUNDED = 2,
+  OPEN = 3,
+  PENDING = 4
 }
 
-class Channel implements Types.Channel {
+class ChannelState implements Types.ChannelState {
   constructor(
     readonly balance: Balance,
     readonly balance_a: Balance,
-    readonly state: number,
+    readonly status: ChannelStatus,
     readonly moment?: Moment) {}
 
-  static deserialize() {
-    const state = u8aToNumber(state)
+  static deserialize(arr: Uint8Array) {
+    const [a, b, c] = u8aSlice(arr, [Balance.SIZE, Balance.SIZE, 1])
+    const balance = new Balance(a)
+    const balance_a = new Balance(b)
+    const state = u8aToNumber(c)
+    return new ChannelState(balance, balance_a, state)
   }
 
   serialize(): Uint8Array {
     return serializeToU8a([
       [this.balance.toU8a(), Balance.SIZE],
       [this.balance_a.toU8a(), Balance.SIZE],
-      [toU8a(this.state, 1), 1]
+      [toU8a(this.status, 1), 1]
     ])
   }
 
@@ -40,32 +43,32 @@ class Channel implements Types.Channel {
   }
 
   get isFunded(): boolean {
-    return stateCounterToStatus(this.state.toNumber()) == ChannelStatus.FUNDED
+    return this.status == ChannelStatus.FUNDED
   }
 
   get isActive(): boolean {
-    return stateCounterToStatus(this.state.toNumber()) == ChannelStatus.OPEN
+    return this.status == ChannelStatus.OPEN
   }
 
   get isPending(): boolean {
-    return stateCounterToStatus(this.state.toNumber()) == ChannelStatus.PENDING
+    return this.status == ChannelStatus.PENDING
   }
 
   static get SIZE(): number {
-    return ChannelBalance.SIZE + ChannelState.SIZE
+    return Balance.SIZE + Balance.SIZE + 1 
   }
 
-  static createFunded(balance: ChannelBalance): Channel {
-    return new Channel(balance, new ChannelState(ChannelStatus.FUNDED))
+  static createFunded(balance: Balance, balance_a: Balance): ChannelState {
+    return new ChannelState(balance, balance_a, ChannelStatus.FUNDED)
   }
 
-  static createActive(balance: ChannelBalance): Channel {
-    return new Channel(balance, new ChannelState(ChannelStatus.OPEN))
+  static createActive(balance: Balance, balance_a: Balance): ChannelState {
+    return new ChannelState(balance, balance_a, ChannelStatus.OPEN)
   }
 
-  static createPending(moment: Moment, balance: ChannelBalance): Channel {
-    return new Channel(balance, new ChannelState(ChannelStatus.PENDING), moment)
+  static createPending(moment: Moment, balance: Balance, balance_a: Balance): ChannelState {
+    return new ChannelState(balance, balance_a, ChannelStatus.PENDING, moment)
   }
 }
 
-export { Channel, ChannelBalance, ChannelState, ChannelStatus }
+export { ChannelState, ChannelStatus }

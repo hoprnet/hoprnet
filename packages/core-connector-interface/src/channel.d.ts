@@ -3,7 +3,6 @@ import type {
   AccountId,
   Balance,
   ChannelState,
-  ChannelBalance,
   Hash,
   Moment,
   Public,
@@ -22,7 +21,8 @@ declare interface ChannelStatic {
   create(
     offChainCounterparty: Uint8Array,
     getOnChainPublicKey: (counterparty: Uint8Array) => Promise<Public>,
-    channelBalance?: ChannelBalance
+    balance: Balance,
+    balance_a: Balance
   ): Promise<Channel>
 
   /**

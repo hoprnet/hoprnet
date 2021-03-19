@@ -17,7 +17,6 @@ import {
 } from '@hoprnet/hopr-utils'
 import { AccountId, Balance, Hash, Signature } from '../types'
 import { ContractEventEmitter } from '../tsc/web3/types'
-import { ChannelStatus } from '../types/channel'
 import * as constants from '../constants'
 import * as time from './time'
 import BN from 'bn.js'
@@ -382,32 +381,6 @@ export function getNetworkName(chainId: number): Network {
   }
 }
 
-/**
- * Convert a channel state counter, to an enumarated status.
- *
- * @param stateCounter the state counter
- * @returns ChannelStatus
- */
-export function stateCounterToStatus(stateCounter: number): ChannelStatus {
-  const status = Number(stateCounter) % 10
-
-  if (status >= Object.keys(ChannelStatus).length) {
-    throw Error("status like this doesn't exist")
-  }
-
-  return status
-}
-
-/**
- * Convert a state counter, to a number represeting the channels iteration.
- * Iteration stands for the amount of times a channel has been opened and closed.
- *
- * @param stateCount the state count
- * @returns ChannelStatus
- */
-export function stateCounterToIteration(stateCounter: number): number {
-  return Math.ceil(Number(stateCounter + 1) / 10)
-}
 
 /**
  * Create a prefixed Debug instance.

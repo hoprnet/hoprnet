@@ -75,16 +75,15 @@ class ChannelFactory {
   async onOpen(counterparty: Public, channelEntry: ChannelEntry): Promise<void> {
     log('Received open event for channel with %s', counterparty.toHex())
 
-    const balance = new ChannelBalance(undefined, {
-      balance: new BN(channelEntry.deposit),
-      balance_a: new BN(channelEntry.partyABalance)
-    })
-    const state = new ChannelState(stateCounterToStatus(channelEntry.stateCounter.toNumber()))
-    const newChannel = new ChannelType(balance, state)
+    const state = new ChannelState(
+      new Balance(new BN(channelEntry.deposit)),
+      new Balance(new BN(channelEntry.partyABalance)),
+      stateCounterToStatus(channelEntry.stateCounter.toNumber())
+    )
 
     // we store it, if we have an previous signed channel
     // under this counterparty, we replace it
-    await this.saveOffChainState(counterparty, newChannel)
+    await this.saveOffChainState(counterparty, state)
   }
 
   async onClose(counterparty: Public): Promise<void> {
@@ -201,7 +200,7 @@ class ChannelFactory {
     _getOnChainPublicKey: (counterparty: Uint8Array) => Promise<Uint8Array>,
     channelBalance?: ChannelBalance,
     sign?: (channelBalance: ChannelBalance) => Promise<Channel>
-  ): Promise<Channel> {
+  ): Promise<ChannelState> {
     const { account } = this.coreConnector
     const counterparty = await pubKeyToAccountId(counterpartyPubKey)
     const amPartyA = isPartyA(await account.address, counterparty)
@@ -209,12 +208,11 @@ class ChannelFactory {
     await this.coreConnector.initOnchainValues()
 
     if (await this.isOpen(counterpartyPubKey)) {
-      const record = await this.getOffChainState(counterpartyPubKey)
-      return Channel.deserialize(record)
+      return await this.getOffChainState(counterpartyPubKey)
     }
 
     if (sign != null && channelBalance != null) {
-      const channel = new Channel(this.coreConnector, counterpartyPubKey, signedChannel)
+      const channel = new Channel(this.coreConnector, counterpartyPubKey)
 
       const amountToFund = new Balance(
         amPartyA ? channelBalance.balance_a : channelBalance.balance.sub(channelBalance.balance_a)
@@ -270,7 +268,7 @@ class ChannelFactory {
         })
         .on('error', (err) => reject(err))
         .on('data', ({ key, value }: { key: Buffer; value: Buffer }) => {
-          const signedChannel = SignedChannel.deserialize(value)
+          const signedChannel = ChannelState.deserialize(value)
           promises.push(
             onData(new Channel(this.coreConnector, this.coreConnector.dbKeys.ChannelKeyParse(key), signedChannel))
           )
@@ -300,44 +298,20 @@ class ChannelFactory {
     return async function* (this: ChannelFactory) {
       for await (const _msg of source) {
         const msg = _msg.slice()
-        const signedChannel = SignedChannel.deserialize(msg)
-        /*
-        // Fund both ways
-        const counterparty = await pubKeyToAccountId(counterpartyPubKey)
-        const channelBalance = signedChannel.channel.balance
-
-        if (isPartyA(await this.coreConnector.account.address, counterparty)) {
-          if (channelBalance.balance.sub(channelBalance.balance_a).gtn(0)) {
-            if (
-              !(await this.coreConnector.account.balance).lt(
-                new Balance(channelBalance.balance.sub(channelBalance.balance_a))
-              )
-            ) {
-              await this.increaseFunds(counterparty, new Balance(channelBalance.balance.sub(channelBalance.balance_a)))
-            }
-          }
-        } else {
-          if (channelBalance.balance_a.gtn(0)) {
-            if (!(await this.coreConnector.account.balance).lt(channelBalance.balance_a)) {
-              await this.increaseFunds(counterparty, channelBalance.balance_a)
-            }
-          }
-        }
-        */
-
-        yield signedChannel.toU8a()
+        const signedChannel = ChannelState.deserialize(msg)
+        yield signedChannel.serialize()
       }
     }.call(this)
   }
 
-  getOffChainState(counterparty: Uint8Array): Promise<SignedChannel> {
-    return this.coreConnector.db.get(Buffer.from(this.coreConnector.dbKeys.Channel(counterparty))) as any
+  getOffChainState(counterparty: Uint8Array): Promise<ChannelState> {
+    return this.coreConnector.db.get(Buffer.from(this.coreConnector.dbKeys.Channel(counterparty)))
   }
 
-  saveOffChainState(counterparty: Uint8Array, channel: Channel) {
+  saveOffChainState(counterparty: Uint8Array, state: ChannelState) {
     return this.coreConnector.db.put(
       Buffer.from(this.coreConnector.dbKeys.Channel(counterparty)),
-      Buffer.from(signedChannel)
+      Buffer.from(state.serialize())
     )
   }
 

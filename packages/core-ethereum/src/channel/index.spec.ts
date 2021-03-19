@@ -10,7 +10,6 @@ import BN from 'bn.js'
 import Web3 from 'web3'
 import { HoprToken } from '../tsc/web3/HoprToken'
 import { Await } from '../tsc/utils'
-import { ChannelBalance } from '../types/channel'
 import { AcknowledgedTicket, Balance, SignedTicket, AccountId } from '../types'
 import CoreConnector from '..'
 import Channel from '.'
@@ -88,15 +87,11 @@ describe('test Channel class', function () {
   it('should create a channel and submit tickets', async function () {
     this.timeout(durations.minutes(1))
 
-    const channelBalance = new ChannelBalance(undefined, {
-      balance: new BN(123),
-      balance_a: new BN(122)
-    })
-
     const channel = await coreConnector.channel.create(
       counterpartysCoreConnector.account.keys.onChain.pubKey,
       async () => counterpartysCoreConnector.account.keys.onChain.pubKey,
-      channelBalance
+      new Balance(new BN(123)),
+      new Balance(new BN(122))
     )
 
     const myAddress = await coreConnector.utils.pubKeyToAccountId(coreConnector.account.keys.onChain.pubKey)
