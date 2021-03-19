@@ -23,7 +23,6 @@ declare interface ChannelStatic {
     offChainCounterparty: Uint8Array,
     getOnChainPublicKey: (counterparty: Uint8Array) => Promise<Public>,
     channelBalance?: ChannelBalance,
-    sign?: (channelBalance: ChannelBalance) => Promise<SignedChannel>
   ): Promise<Channel>
 
   /**

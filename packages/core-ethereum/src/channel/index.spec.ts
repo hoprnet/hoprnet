@@ -7,12 +7,11 @@ import { addresses, abis } from '@hoprnet/hopr-ethereum'
 import { getPrivKeyData, createAccountAndFund, createNode } from '../utils/testing.spec'
 import { createChallenge, hash } from '../utils'
 import BN from 'bn.js'
-import pipe from 'it-pipe'
 import Web3 from 'web3'
 import { HoprToken } from '../tsc/web3/HoprToken'
 import { Await } from '../tsc/utils'
-import { Channel as ChannelType, ChannelStatus, ChannelBalance, ChannelState } from '../types/channel'
-import { AcknowledgedTicket, Balance, SignedChannel, SignedTicket, AccountId } from '../types'
+import { ChannelBalance } from '../types/channel'
+import { AcknowledgedTicket, Balance,SignedTicket, AccountId } from '../types'
 import CoreConnector from '..'
 import Channel from '.'
 import * as testconfigs from '../config.spec'
@@ -97,38 +96,7 @@ describe('test Channel class', function () {
     const channel = await coreConnector.channel.create(
       counterpartysCoreConnector.account.keys.onChain.pubKey,
       async () => counterpartysCoreConnector.account.keys.onChain.pubKey,
-      channelBalance,
-      async (channelBalance: ChannelBalance) => {
-        const result = await pipe(
-          [
-            (
-              await coreConnector.channel.createSignedChannel(
-                new ChannelType(
-                  channelBalance,
-                  new ChannelState(ChannelStatus.FUNDED)
-                )
-              )
-            ).subarray()
-          ],
-          counterpartysCoreConnector.channel.handleOpeningRequest.bind(counterpartysCoreConnector.channel),
-          async (source: AsyncIterable<Uint8Array>) => {
-            let result: Uint8Array
-            for await (const msg of source) {
-              if (result! == null) {
-                result = msg.slice()
-                return result
-              } else {
-                continue
-              }
-            }
-          }
-        )
-
-        return new SignedChannel({
-          bytes: result.buffer,
-          offset: result.byteOffset
-        })
-      }
+      channelBalance
     )
 
     const myAddress = await coreConnector.utils.pubKeyToAccountId(coreConnector.account.keys.onChain.pubKey)
