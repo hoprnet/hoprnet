@@ -13,20 +13,15 @@ enum ChannelStatus {
 }
 
 class Channel implements Types.Channel {
-  constructor(
-    readonly balance: ChannelBalance,
-    readonly state: ChannelState,
-    readonly moment?: Moment
-  ) {}
+  constructor(readonly balance: ChannelBalance, readonly state: ChannelState, readonly moment?: Moment) {}
 
-  static deserialize(){}
+  static deserialize() {}
 
   serialize(): Uint8Array {
     return serializeToU8a([
       [this.balance.toU8a(), ChannelBalance.SIZE],
       [this.state, ChannelState.SIZE]
     ])
-
   }
 
   async hash() {
@@ -54,25 +49,15 @@ class Channel implements Types.Channel {
   }
 
   static createFunded(balance: ChannelBalance): Channel {
-    return new Channel(
-      balance,
-      new ChannelState(ChannelStatus.FUNDED)
-    )
+    return new Channel(balance, new ChannelState(ChannelStatus.FUNDED))
   }
 
   static createActive(balance: ChannelBalance): Channel {
-    return new Channel(
-      balance,
-      new ChannelState(ChannelStatus.OPEN)
-    )
+    return new Channel(balance, new ChannelState(ChannelStatus.OPEN))
   }
 
   static createPending(moment: Moment, balance: ChannelBalance): Channel {
-    return new Channel(
-      balance,
-      new ChannelState(ChannelStatus.PENDING),
-      moment
-    )
+    return new Channel(balance, new ChannelState(ChannelStatus.PENDING), moment)
   }
 }
 

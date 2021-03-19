@@ -80,17 +80,11 @@ class ChannelFactory {
       balance_a: new BN(channelEntry.partyABalance)
     })
     const state = new ChannelState(stateCounterToStatus(channelEntry.stateCounter.toNumber()))
-    const newChannel = new ChannelType(
-      balance,
-      state
-    )
+    const newChannel = new ChannelType(balance, state)
 
     // we store it, if we have an previous signed channel
     // under this counterparty, we replace it
-    await this.saveOffChainState(
-      counterparty,
-      newChannel
-    )
+    await this.saveOffChainState(counterparty, newChannel)
   }
 
   async onClose(counterparty: Public): Promise<void> {
@@ -234,13 +228,7 @@ class ChannelFactory {
       const state = new ChannelState(stateCounterToStatus(0))
 
       // signedChannel = await sign(channelBalance)
-      signedChannel = new SignedChannel(
-        new Public(counterpartyPubKey),
-        new ChannelType(
-          channelBalance,
-          state
-        ),
-      )
+      signedChannel = new SignedChannel(new Public(counterpartyPubKey), new ChannelType(state, channelBalance))
 
       try {
         await waitForConfirmation(
@@ -312,7 +300,7 @@ class ChannelFactory {
     return async function* (this: ChannelFactory) {
       for await (const _msg of source) {
         const msg = _msg.slice()
-        const signedChannel = SignedChannel.deserialize(msg) 
+        const signedChannel = SignedChannel.deserialize(msg)
         /*
         // Fund both ways
         const counterparty = await pubKeyToAccountId(counterpartyPubKey)

@@ -4,9 +4,7 @@ import BN from 'bn.js'
 import { u8aToNumber, toU8a } from '@hoprnet/hopr-utils'
 
 class ChannelState extends Uint8Array implements Types.ChannelState {
-  constructor(
-      state: number
-  ) {
+  constructor(state: number) {
     super(ChannelState.SIZE)
     this.set(toU8a(state, 1))
   }
