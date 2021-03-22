@@ -183,7 +183,8 @@ export default class HoprEthereum implements HoprCoreConnector {
       `Running on: ${network}`,
       `HOPR Token: ${address.HoprToken}`,
       `HOPR Channels: ${address.HoprChannels}`
-    ].join('\n')}
+    ].join('\n')
+  }
 
   /**
    * Creates an uninitialised instance.
