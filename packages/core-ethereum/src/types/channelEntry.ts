@@ -1,9 +1,7 @@
-import type { Types } from '@hoprnet/hopr-core-connector-interface'
+import { Types, ChannelStatus } from '@hoprnet/hopr-core-connector-interface'
 import BN from 'bn.js'
 import { UINT256 } from '../types/solidity'
 import { Uint8ArrayE } from '../types/extended'
-import { ChannelStatus } from '../types/channel'
-import { stateCounterToStatus, stateCounterToIteration } from '../utils'
 
 // @TODO: we should optimize this since it will use more storage than needed
 // @TODO: redesign how we build classes like this
@@ -114,21 +112,12 @@ class ChannelEntry extends Uint8ArrayE implements Types.ChannelEntry {
     return Boolean(new Uint8Array(this.buffer, this.closureByPartyAOffset, 1)[0])
   }
 
-  get status() {
-    const status = stateCounterToStatus(this.stateCounter.toNumber())
-
-    if (status >= Object.keys(ChannelStatus).length) {
+  get status(): ChannelStatus {
+    const status = Object.keys(ChannelStatus).find(k => ChannelStatus[k] == this.stateCounter.toNumber())
+    if (!status) {
       throw Error("status like this doesn't exist")
     }
-
-    if (status === ChannelStatus.UNINITIALISED) return 'UNINITIALISED'
-    else if (status === ChannelStatus.FUNDED) return 'FUNDED'
-    else if (status === ChannelStatus.OPEN) return 'OPEN'
-    return 'PENDING'
-  }
-
-  get iteration() {
-    return stateCounterToIteration(this.stateCounter.toNumber())
+    return status
   }
 
   static get SIZE(): number {
