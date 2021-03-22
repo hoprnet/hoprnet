@@ -1,4 +1,4 @@
-import type { ChannelUpdate } from '@hoprnet/hopr-core-connector-interface'
+import { ChannelUpdate, ChannelStatus } from '@hoprnet/hopr-core-connector-interface'
 import BN from 'bn.js'
 import {
   AccountId,
@@ -6,14 +6,14 @@ import {
   ChannelState,
   Hash,
   Public,
-  SignedTicket,
-  Ticket,
+  //SignedTicket,
+  //Ticket,
   TicketEpoch,
   Moment,
   ChannelEntry
 } from '../types'
 //import TicketFactory from './ticket'
-import { waitForConfirmation, getId, pubKeyToAccountId, sign, isPartyA, Log, hash } from '../utils'
+import { getId, pubKeyToAccountId, isPartyA, Log, hash } from '../utils'
 import type { Channel as IChannel } from '@hoprnet/hopr-core-connector-interface'
 import { Uint8ArrayE } from '../types/extended'
 import { toU8a } from '@hoprnet/hopr-utils'
@@ -21,7 +21,7 @@ import { getChannel as getOnChainState, initiateChannelSettlement } from '../cha
 
 const log = Log(['channel-factory'])
 
-const WIN_PROB = new BN(1)
+//const WIN_PROB = new BN(1)
 
 class Channel implements IChannel {
   private _settlementWindow?: Moment
@@ -149,7 +149,7 @@ async function onOpen(counterparty: Public, channelEntry: ChannelEntry): Promise
   const state = new ChannelState(
     new Balance(new BN(channelEntry.deposit)),
     new Balance(new BN(channelEntry.partyABalance)),
-    stateCounterToStatus(channelEntry.stateCounter.toNumber())
+    (n) => Object.keys(ChannelStatus).find(k => ChannelStatus[k] == n)  
   )
 
   // we store it, if we have an previous signed channel
@@ -169,7 +169,6 @@ export async function getOffChainState(db, dbKeys, counterparty: Uint8Array): Pr
   return db.get(Buffer.from(dbKeys.Channel(counterparty)))
 }
 
-class ChannelFactory {
   /*
   async increaseFunds(counterparty: AccountId, amount: Balance): Promise<void> {
     try {
@@ -204,177 +203,147 @@ class ChannelFactory {
   }
 */
 
-  async isOpen(address, counterpartyPubKey: Uint8Array) {
-    const counterparty = await pubKeyToAccountId(counterpartyPubKey)
-    const channelId = new Hash(await getId(address, counterparty))
+export async function isOpen(address, counterpartyPubKey: Uint8Array) {
+  const counterparty = await pubKeyToAccountId(counterpartyPubKey)
+  const channelId = new Hash(await getId(address, counterparty))
 
-    const [onChain, offChain]: [boolean, boolean] = await Promise.all([
-      getOnChainState(new Public(counterpartyPubKey)).then((channel) => {
-        return channel.status === 'OPEN' || channel.status === 'PENDING'
-      }),
-      getOffChainState(counterpartyPubKey).then(
-        () => true,
-        (err) => {
-          if (err.notFound) {
-            return false
-          } else {
-            throw err
-          }
+  const [onChain, offChain]: [boolean, boolean] = await Promise.all([
+    getOnChainState(new Public(counterpartyPubKey)).then((channel) => {
+      return channel.status === 'OPEN' || channel.status === 'PENDING'
+    }),
+    getOffChainState(counterpartyPubKey).then(
+      () => true,
+      (err) => {
+        if (err.notFound) {
+          return false
+        } else {
+          throw err
         }
-      )
-    ])
-
-    if (onChain != offChain) {
-      if (!onChain && offChain) {
-        log(`Channel ${channelId.toHex()} exists off-chain but not on-chain.`)
-        // we don't know which channel iteration this
-        // this signed channel is from so we do nothing
-        // await this.coreConnector.channel.deleteOffChainState(counterpartyPubKey)
-      } else {
-        throw Error(`Channel ${channelId.toHex()} exists on-chain but not off-chain.`)
-      }
-    }
-
-    return onChain && offChain
-  }
-
-  async createDummyChannelTicket(
-    counterparty: AccountId,
-    challenge: Hash,
-    arr?: {
-      bytes: ArrayBuffer
-      offset: number
-    }
-  ): Promise<SignedTicket> {
-    if (!challenge) {
-      throw Error(`Challenge is not set`)
-    }
-
-    const winProb = new Uint8ArrayE(new BN(new Uint8Array(Hash.SIZE).fill(0xff)).div(WIN_PROB).toArray('le', Hash.SIZE))
-
-    const signedTicket = new SignedTicket(arr)
-
-    const ticket = new Ticket(
-      {
-        bytes: signedTicket.buffer,
-        offset: signedTicket.ticketOffset
-      },
-      {
-        counterparty,
-        challenge,
-        epoch: new TicketEpoch(0),
-        amount: new Balance(0),
-        winProb,
-        channelIteration: new TicketEpoch(0)
       }
     )
+  ])
 
-    const signature = await sign(await ticket.hash, account.keys.onChain.privKey)
-    signedTicket.set(signature, signedTicket.signatureOffset - signedTicket.byteOffset)
-    return signedTicket
+  if (onChain != offChain) {
+    if (!onChain && offChain) {
+      log(`Channel ${channelId.toHex()} exists off-chain but not on-chain.`)
+      // we don't know which channel iteration this
+      // this signed channel is from so we do nothing
+      // await this.coreConnector.channel.deleteOffChainState(counterpartyPubKey)
+    } else {
+      throw Error(`Channel ${channelId.toHex()} exists on-chain but not off-chain.`)
+    }
   }
 
-  async create(counterpartyPubKey: Uint8Array, balance: Balance, balance_a: Balance): Promise<ChannelState> {
-    const { account } = this.coreConnector
-    const counterparty = await pubKeyToAccountId(counterpartyPubKey)
+  return onChain && offChain
+}
 
-    await this.coreConnector.initOnchainValues()
+/*
+async function createDummyChannelTicket(
+  counterparty: AccountId,
+  challenge: Hash,
+  arr?: {
+    bytes: ArrayBuffer
+    offset: number
+  }
+): Promise<SignedTicket> {
+  if (!challenge) {
+    throw Error(`Challenge is not set`)
+  }
 
-    if (await this.isOpen(counterpartyPubKey)) {
-      const channelState = await this.getOffChainState(counterpartyPubKey)
-      return // TODO
+  const winProb = new Uint8ArrayE(new BN(new Uint8Array(Hash.SIZE).fill(0xff)).div(WIN_PROB).toArray('le', Hash.SIZE))
+
+  const signedTicket = new SignedTicket(arr)
+
+  const ticket = new Ticket(
+    {
+      bytes: signedTicket.buffer,
+      offset: signedTicket.ticketOffset
+    },
+    {
+      counterparty,
+      challenge,
+      epoch: new TicketEpoch(0),
+      amount: new Balance(0),
+      winProb,
+      channelIteration: new TicketEpoch(0)
     }
+  )
 
-    if (sign != null) {
-      /*
-      if (amountFunded.lt(amountToFund)) {
-        await this.increaseFunds(counterparty, new Balance(amountToFund.sub(amountFunded)))
-      }
-      */
+  const signature = await sign(await ticket.hash, account.keys.onChain.privKey)
+  signedTicket.set(signature, signedTicket.signatureOffset - signedTicket.byteOffset)
+  return signedTicket
+}
+*/
 
-      const state = new ChannelState(balance, balance_a, stateCounterToStatus(0))
+async function create(counterpartyPubKey: Uint8Array, balance: Balance, balance_a: Balance): Promise<ChannelState> {
+  const { account } = this.coreConnector
+  const counterparty = await pubKeyToAccountId(counterpartyPubKey)
 
-      try {
-        await waitForConfirmation(
-          (
-            await account.signTransaction(
-              {
-                from: (await account.address).toHex(),
-                to: hoprChannels.options.address
-              },
-              hoprChannels.methods.openChannel(counterparty.toHex())
-            )
-          ).send()
+  await this.coreConnector.initOnchainValues()
+
+  if (await this.isOpen(counterpartyPubKey)) {
+    const channelState = await this.getOffChainState(counterpartyPubKey)
+    return // TODO
+  }
+  const state = new ChannelState(balance, balance_a, ChannelStatus.UNINITIALISED)
+  await db.put(Buffer.from(dbKeys.Channel(counterpartyPubKey)), Buffer.from(state.serialize()))
+}
+
+/*
+function getAll<T, R>(onData: (channel: Channel) => Promise<T>, onEnd: (promises: Promise<T>[]) => R): Promise<R> {
+  const promises: Promise<T>[] = []
+  return new Promise<R>((resolve, reject) => {
+    db.createReadStream({
+        gte: Buffer.from(dbKeys.Channel(new Uint8Array(Hash.SIZE).fill(0x00))),
+        lte: Buffer.from(dbKeys.Channel(new Uint8Array(Hash.SIZE).fill(0xff)))
+      })
+      .on('error', (err) => reject(err))
+      .on('data', ({ key, value }: { key: Buffer; value: Buffer }) => {
+        const signedChannel = ChannelState.deserialize(value)
+        promises.push(
+          onData(new Channel(dbKeys.ChannelKeyParse(key), signedChannel))
         )
+      })
+      .on('end', () => resolve(onEnd(promises)))
+  })
+}
+*/
 
-        await db.put(Buffer.from(dbKeys.Channel(counterpartyPubKey)), Buffer.from(state.serialize()))
-      } catch (e) {
-        if (e.message.match(/counterparty must have called init/)) {
-          throw new Error('Cannot open channel to an uninitialized counterparty')
-        }
-        throw e
-      }
+async function closeChannels(): Promise<Balance> {
+  const result = new BN(0)
 
-      return state
+  return this.getAll(
+    (channel: Channel) =>
+      channel.initiateSettlement().then(() => {
+        // @TODO: add balance
+        result.iaddn(0)
+      }),
+    async (promises: Promise<void>[]) => {
+      await Promise.all(promises)
+
+      return new Balance(result)
     }
+  )
+}
 
-    throw Error('Cannot open channel. Channel is not open and no sign function was given.')
-  }
+/*
+handleOpeningRequest(source: AsyncIterable<Uint8Array>) {
+  return async function* (this: ChannelFactory) {
+    for await (const _msg of source) {
+      const msg = _msg.slice()
+      const signedChannel = ChannelState.deserialize(msg)
+      yield signedChannel.serialize()
+    }
+  }.call(this)
+}
+*/
 
-  getAll<T, R>(onData: (channel: Channel) => Promise<T>, onEnd: (promises: Promise<T>[]) => R): Promise<R> {
-    const promises: Promise<T>[] = []
-    return new Promise<R>((resolve, reject) => {
-      db.createReadStream({
-          gte: Buffer.from(dbKeys.Channel(new Uint8Array(Hash.SIZE).fill(0x00))),
-          lte: Buffer.from(dbKeys.Channel(new Uint8Array(Hash.SIZE).fill(0xff)))
-        })
-        .on('error', (err) => reject(err))
-        .on('data', ({ key, value }: { key: Buffer; value: Buffer }) => {
-          const signedChannel = ChannelState.deserialize(value)
-          promises.push(
-            onData(new Channel(dbKeys.ChannelKeyParse(key), signedChannel))
-          )
-        })
-        .on('end', () => resolve(onEnd(promises)))
-    })
-  }
+export function saveOffChainState(counterparty: Uint8Array, state: ChannelState) {
+  return db.put(Buffer.from(dbKeys.Channel(counterparty)), Buffer.from(state.serialize()))
+}
 
-  async closeChannels(): Promise<Balance> {
-    const result = new BN(0)
-
-    return this.getAll(
-      (channel: Channel) =>
-        channel.initiateSettlement().then(() => {
-          // @TODO: add balance
-          result.iaddn(0)
-        }),
-      async (promises: Promise<void>[]) => {
-        await Promise.all(promises)
-
-        return new Balance(result)
-      }
-    )
-  }
-
-  /*
-  handleOpeningRequest(source: AsyncIterable<Uint8Array>) {
-    return async function* (this: ChannelFactory) {
-      for await (const _msg of source) {
-        const msg = _msg.slice()
-        const signedChannel = ChannelState.deserialize(msg)
-        yield signedChannel.serialize()
-      }
-    }.call(this)
-  }
-  */
-
-  saveOffChainState(counterparty: Uint8Array, state: ChannelState) {
-    return db.put(Buffer.from(dbKeys.Channel(counterparty)), Buffer.from(state.serialize()))
-  }
-
-  deleteOffChainState(db, dbKeys, counterparty: Uint8Array) {
-    return db.del(Buffer.from(dbKeys.Channel(counterparty)))
-  }
+export function deleteOffChainState(db, dbKeys, counterparty: Uint8Array) {
+  return db.del(Buffer.from(dbKeys.Channel(counterparty)))
 }
 
 export { Channel }
