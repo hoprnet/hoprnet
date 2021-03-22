@@ -16,8 +16,8 @@ import {
 import { waitForConfirmation, getId, pubKeyToAccountId, sign, isPartyA, Log, hash } from '../utils'
 import type { Channel as IChannel } from '@hoprnet/hopr-core-connector-interface'
 import { Uint8ArrayE } from '../types/extended'
-import { u8aToHex, toU8a } from '@hoprnet/hopr-utils'
-import { getChannel as getOnChainState } from '../chainInteractions'
+import { toU8a } from '@hoprnet/hopr-utils'
+import { getChannel as getOnChainState, initiateChannelSettlement } from '../chainInteractions'
 
 const log = Log(['channel-factory'])
 
@@ -88,43 +88,11 @@ class Channel implements IChannel {
   }
   */
 
-  async initiateSettlement(account, hoprChannels): Promise<string> {
-    const status = await this.state.status
-    let receipt: string
-
-    try {
-      if (!(status === 'OPEN' || status === 'PENDING')) {
-        throw Error("channel must be 'OPEN' or 'PENDING'")
-      }
-
-      if (status === 'OPEN') {
-        const tx = await account.signTransaction(
-          {
-            from: (await account.address).toHex(),
-            to: hoprChannels.options.address
-          },
-          hoprChannels.methods.initiateChannelClosure(u8aToHex(await pubKeyToAccountId(this.counterparty)))
-        )
-
-        receipt = tx.transactionHash
-        tx.send()
-      } else if (status === 'PENDING') {
-        const tx = await account.signTransaction(
-          {
-            from: (await account.address).toHex(),
-            to: hoprChannels.options.address
-          },
-          hoprChannels.methods.claimChannelClosure(u8aToHex(await pubKeyToAccountId(this.counterparty)))
-        )
-
-        receipt = tx.transactionHash
-        tx.send()
-      }
-
-      return receipt
-    } catch (error) {
-      throw error
+  async initiateSettlement(): Promise<string> {
+    if (!(this.state.status === 'OPEN' || this.state.status === 'PENDING')) {
+      throw Error("channel must be 'OPEN' or 'PENDING'")
     }
+    return await initiateChannelSettlement()
   }
 
   async testAndSetNonce(db, dbKeys, signature: Uint8Array): Promise<void> {
@@ -334,7 +302,7 @@ class ChannelFactory {
                 from: (await account.address).toHex(),
                 to: hoprChannels.options.address
               },
-              thoprChannels.methods.openChannel(counterparty.toHex())
+              hoprChannels.methods.openChannel(counterparty.toHex())
             )
           ).send()
         )
@@ -356,8 +324,7 @@ class ChannelFactory {
   getAll<T, R>(onData: (channel: Channel) => Promise<T>, onEnd: (promises: Promise<T>[]) => R): Promise<R> {
     const promises: Promise<T>[] = []
     return new Promise<R>((resolve, reject) => {
-      this.coreConnector.db
-        .createReadStream({
+      db.createReadStream({
           gte: Buffer.from(dbKeys.Channel(new Uint8Array(Hash.SIZE).fill(0x00))),
           lte: Buffer.from(dbKeys.Channel(new Uint8Array(Hash.SIZE).fill(0xff)))
         })
@@ -365,7 +332,7 @@ class ChannelFactory {
         .on('data', ({ key, value }: { key: Buffer; value: Buffer }) => {
           const signedChannel = ChannelState.deserialize(value)
           promises.push(
-            onData(new Channel(this.coreConnector, this.coreConnector.dbKeys.ChannelKeyParse(key), signedChannel))
+            onData(new Channel(dbKeys.ChannelKeyParse(key), signedChannel))
           )
         })
         .on('end', () => resolve(onEnd(promises)))
