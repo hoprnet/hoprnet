@@ -179,7 +179,11 @@ export default class HoprEthereum implements HoprCoreConnector {
 
   public smartContractInfo(): string {
     const { network, address } = getWeb3()
-    return [`Running on: ${network}`, `HOPR Token: ${address.HoprToken}`, `HOPR Channels: ${address.HoprChannels}`].join('\n')
+    return [
+      `Running on: ${network}`,
+      `HOPR Token: ${address.HoprToken}`,
+      `HOPR Channels: ${address.HoprChannels}`
+    ].join('\n')
   }
 
   /**

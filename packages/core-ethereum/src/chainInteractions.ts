@@ -1,7 +1,4 @@
-import {
-  Public,
-  ChannelEntry
-} from './types'
+import { Public, ChannelEntry } from './types'
 import BN from 'bn.js'
 import {
   waitForConfirmation,

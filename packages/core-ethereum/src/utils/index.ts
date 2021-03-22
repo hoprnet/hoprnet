@@ -340,7 +340,6 @@ export async function waitFor({
   })
 }
 
-
 /**
  * Create a prefixed Debug instance.
  *

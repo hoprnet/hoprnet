@@ -60,7 +60,7 @@ class Indexer extends EventEmitter implements IIndexer {
     if (this.status === 'started') return
     log(`Starting indexer...`)
 
-    const { web3, hoprChannels } = getWeb3() 
+    const { web3, hoprChannels } = getWeb3()
 
     // wipe indexer, do not use in production
     // await this.wipe()
@@ -212,7 +212,7 @@ class Indexer extends EventEmitter implements IIndexer {
 
       let logs: Log[] = []
 
-      const {web3, hoprChannels } = getWeb3()
+      const { web3, hoprChannels } = getWeb3()
       try {
         logs = await web3.eth.getPastLogs({
           address: hoprChannels.options.address,

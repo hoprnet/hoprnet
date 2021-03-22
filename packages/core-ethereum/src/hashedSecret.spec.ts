@@ -53,7 +53,7 @@ describe('test hashedSecret', function () {
       chainId
     )
 
-    const { hoprChannels } = getWeb3() 
+    const { hoprChannels } = getWeb3()
     connector.hashedSecret = new PreImage(connector.db, connector.account, hoprChannels)
 
     connector.stop = async () => {
@@ -111,7 +111,7 @@ describe('test hashedSecret', function () {
     it('should publish a hashed secret', async function () {
       await connector.hashedSecret.initialize()
 
-      const { hoprChannels } = getWeb3() 
+      const { hoprChannels } = getWeb3()
 
       let onChainHash = new Types.Hash(
         stringToU8a(
@@ -197,7 +197,7 @@ describe('test hashedSecret', function () {
     it('should publish a hashed secret', async function () {
       await connector.hashedSecret.initialize()
 
-      const { hoprChannels } = getWeb3() 
+      const { hoprChannels } = getWeb3()
       let onChainHash = new Types.Hash(
         stringToU8a(
           (await hoprChannels.methods.accounts((await connector.account.address).toHex()).call()).hashedSecret

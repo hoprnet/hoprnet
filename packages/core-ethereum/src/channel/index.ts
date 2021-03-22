@@ -13,15 +13,7 @@ import {
   ChannelEntry
 } from '../types'
 //import TicketFactory from './ticket'
-import {
-  waitForConfirmation,
-  getId,
-  pubKeyToAccountId,
-  sign,
-  isPartyA,
-  Log,
-  hash,
-} from '../utils'
+import { waitForConfirmation, getId, pubKeyToAccountId, sign, isPartyA, Log, hash } from '../utils'
 import type { Channel as IChannel } from '@hoprnet/hopr-core-connector-interface'
 import { Uint8ArrayE } from '../types/extended'
 import { u8aToHex, toU8a } from '@hoprnet/hopr-utils'
@@ -39,7 +31,8 @@ class Channel implements IChannel {
     //public coreConnector: HoprEthereum,
     readonly self: Public,
     readonly counterparty: Public,
-    readonly state: ChannelState) {
+    readonly state: ChannelState
+  ) {
     //this.ticket = new TicketFactory(this)
   }
 
@@ -49,12 +42,7 @@ class Channel implements IChannel {
   }
 
   async channelId(): Promise<Hash> {
-    return new Hash(
-          await getId(
-            await this.self,
-            await pubKeyToAccountId(this.counterparty)
-          )
-        )
+    return new Hash(await getId(await this.self, await pubKeyToAccountId(this.counterparty)))
   }
 
   get settlementWindow(): Promise<Moment> {
@@ -82,7 +70,7 @@ class Channel implements IChannel {
   }
 
   async balance_b(): Promise<Balance> {
-    const { deposit, partyABalance } = await getOnChainState(this.self, this.counterparty) 
+    const { deposit, partyABalance } = await getOnChainState(this.self, this.counterparty)
     return new Balance(new BN(deposit).sub(new BN(partyABalance)))
   }
 
@@ -115,9 +103,7 @@ class Channel implements IChannel {
             from: (await account.address).toHex(),
             to: hoprChannels.options.address
           },
-          hoprChannels.methods.initiateChannelClosure(
-            u8aToHex(await pubKeyToAccountId(this.counterparty))
-          )
+          hoprChannels.methods.initiateChannelClosure(u8aToHex(await pubKeyToAccountId(this.counterparty)))
         )
 
         receipt = tx.transactionHash
@@ -128,9 +114,7 @@ class Channel implements IChannel {
             from: (await account.address).toHex(),
             to: hoprChannels.options.address
           },
-          hoprChannels.methods.claimChannelClosure(
-            u8aToHex(await pubKeyToAccountId(this.counterparty))
-          )
+          hoprChannels.methods.claimChannelClosure(u8aToHex(await pubKeyToAccountId(this.counterparty)))
         )
 
         receipt = tx.transactionHash
@@ -162,7 +146,7 @@ class Channel implements IChannel {
 }
 
 // TODO listenForChannels
-export async function subscribeToChannels(indexer){
+export async function subscribeToChannels(indexer) {
   const self = new Public(this.coreConnector.account.keys.onChain.pubKey)
   const selfAccountId = await self.toAccountId()
 
@@ -217,12 +201,7 @@ export async function getOffChainState(db, dbKeys, counterparty: Uint8Array): Pr
   return db.get(Buffer.from(dbKeys.Channel(counterparty)))
 }
 
-
-
-
 class ChannelFactory {
-
-
   /*
   async increaseFunds(counterparty: AccountId, amount: Balance): Promise<void> {
     try {
@@ -360,10 +339,7 @@ class ChannelFactory {
           ).send()
         )
 
-        await db.put(
-          Buffer.from(dbKeys.Channel(counterpartyPubKey)),
-          Buffer.from(state.serialize())
-        )
+        await db.put(Buffer.from(dbKeys.Channel(counterpartyPubKey)), Buffer.from(state.serialize()))
       } catch (e) {
         if (e.message.match(/counterparty must have called init/)) {
           throw new Error('Cannot open channel to an uninitialized counterparty')
@@ -425,18 +401,13 @@ class ChannelFactory {
   }
   */
 
-
   saveOffChainState(counterparty: Uint8Array, state: ChannelState) {
-    return db.put(
-      Buffer.from(dbKeys.Channel(counterparty)),
-      Buffer.from(state.serialize())
-    )
+    return db.put(Buffer.from(dbKeys.Channel(counterparty)), Buffer.from(state.serialize()))
   }
 
   deleteOffChainState(db, dbKeys, counterparty: Uint8Array) {
     return db.del(Buffer.from(dbKeys.Channel(counterparty)))
   }
-
 }
 
 export { Channel }

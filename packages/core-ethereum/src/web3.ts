@@ -35,7 +35,6 @@ export function getNetworkName(chainId: number): Network {
   }
 }
 
-
 /**
  * Get chain ID.
  *
@@ -75,13 +74,18 @@ export async function initialize(providerUri: string) {
   initialized = true
 }
 
-
 export function getWeb3() {
   if (!initialized) {
     throw new Error('Cannot access web3 before it is initialized')
   }
-  
+
   return {
-    provider, hoprChannels, hoprToken, web3, network, chainId, address
+    provider,
+    hoprChannels,
+    hoprToken,
+    web3,
+    network,
+    chainId,
+    address
   }
 }
