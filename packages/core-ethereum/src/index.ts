@@ -1,5 +1,4 @@
 import type { LevelUp } from 'levelup'
-import type { WebsocketProvider } from 'web3-core'
 import type { Currencies } from '@hoprnet/hopr-core-connector-interface'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import chalk from 'chalk'
@@ -16,7 +15,6 @@ import debug from 'debug'
 import { initialize as initializeWeb3, getWeb3 } from './web3'
 
 const log = debug('hopr-core-ethereum')
-let provider: WebsocketProvider
 
 export default class HoprEthereum implements HoprCoreConnector {
   private _status: 'dead' | 'alive' = 'dead'
@@ -55,7 +53,7 @@ export default class HoprEthereum implements HoprCoreConnector {
     await this.waitForWeb3()
     // await this.initOnchainValues()
     await this.indexer.start()
-    await provider.connect()
+    await getWeb3().provider.connect()
     this._status = 'alive'
     log(chalk.green('Connector started'))
     return this
@@ -99,7 +97,7 @@ export default class HoprEthereum implements HoprCoreConnector {
 
         await this.indexer.stop()
         await this.account.stop()
-        provider.disconnect(1000, 'Stopping HOPR node.')
+        getWeb3().provider.disconnect(1000, 'Stopping HOPR node.')
         this._status = 'dead'
         log(chalk.green('Connector stopped'))
       })
