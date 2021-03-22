@@ -327,12 +327,8 @@ class ChannelFactory {
     return signedTicket
   }
 
-  async create(
-    counterpartyPubKey: Uint8Array,
-    balance: Balance,
-    balance_a: Balance
-  ): Promise<Channel> {
-    //const { account } = this.coreConnector
+  async create(counterpartyPubKey: Uint8Array, balance: Balance, balance_a: Balance): Promise<ChannelState> {
+    const { account } = this.coreConnector
     const counterparty = await pubKeyToAccountId(counterpartyPubKey)
 
     await this.coreConnector.initOnchainValues()
