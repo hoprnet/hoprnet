@@ -89,7 +89,6 @@ describe('test Channel class', function () {
 
     const channel = await coreConnector.channel.create(
       counterpartysCoreConnector.account.keys.onChain.pubKey,
-      async () => counterpartysCoreConnector.account.keys.onChain.pubKey,
       new Balance(new BN(123)),
       new Balance(new BN(122))
     )

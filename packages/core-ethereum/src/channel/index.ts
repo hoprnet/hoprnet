@@ -3,7 +3,6 @@ import BN from 'bn.js'
 import {
   AccountId,
   Balance,
-  ChannelBalance,
   ChannelState,
   Hash,
   Public,
@@ -196,13 +195,11 @@ class ChannelFactory {
 
   async create(
     counterpartyPubKey: Uint8Array,
-    _getOnChainPublicKey: (counterparty: Uint8Array) => Promise<Uint8Array>,
-    channelBalance?: ChannelBalance,
-    sign?: (channelBalance: ChannelBalance) => Promise<Channel>
+    balance: Balance,
+    balance_a: Balance
   ): Promise<ChannelState> {
     const { account } = this.coreConnector
     const counterparty = await pubKeyToAccountId(counterpartyPubKey)
-    const amPartyA = isPartyA(await account.address, counterparty)
 
     await this.coreConnector.initOnchainValues()
 
@@ -210,19 +207,14 @@ class ChannelFactory {
       return await this.getOffChainState(counterpartyPubKey)
     }
 
-    if (sign != null && channelBalance != null) {
-      const channel = new Channel(this.coreConnector, counterpartyPubKey)
-      const balance = amPartyA ? channelBalance.balance_a : channelBalance.balance.sub(channelBalance.balance_a)
-
-      const amountFunded = await (amPartyA ? channel.balance_a : channel.balance_b)
-
+    if (sign != null) {
       /*
       if (amountFunded.lt(amountToFund)) {
         await this.increaseFunds(counterparty, new Balance(amountToFund.sub(amountFunded)))
       }
       */
 
-      const state = new ChannelState(balance, amountFunded, stateCounterToStatus(0))
+      const state = new ChannelState(balance, balance_a, stateCounterToStatus(0))
 
       try {
         await waitForConfirmation(

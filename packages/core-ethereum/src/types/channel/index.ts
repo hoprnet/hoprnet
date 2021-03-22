@@ -1,7 +1,7 @@
 import { Types } from '@hoprnet/hopr-core-connector-interface'
 import { Moment } from '..'
 import { hash, sign } from '../../utils'
-import { u8aToNumber, toU8a, u8aSlice, serializeToU8a } from '@hoprnet/hopr-utils'
+import { u8aToNumber, toU8a, u8aSplit, serializeToU8a } from '@hoprnet/hopr-utils'
 import Balance from '../balance'
 
 class ChannelState implements Types.ChannelState {
@@ -12,10 +12,10 @@ class ChannelState implements Types.ChannelState {
     readonly moment?: Moment) {}
 
   static deserialize(arr: Uint8Array) {
-    const [a, b, c] = u8aSlice(arr, [Balance.SIZE, Balance.SIZE, 1])
+    const [a, b, c] = u8aSplit(arr, [Balance.SIZE, Balance.SIZE, 1])
     const balance = new Balance(a)
     const balance_a = new Balance(b)
-    const state = u8aToNumber(c)
+    const state = u8aToNumber(c) as number
     return new ChannelState(balance, balance_a, state)
   }
 
@@ -56,11 +56,11 @@ class ChannelState implements Types.ChannelState {
   }
 
   static createActive(balance: Balance, balance_a: Balance): ChannelState {
-    return new ChannelState(balance, balance_a, ChannelStatus.OPEN)
+    return new ChannelState(balance, balance_a, Types.ChannelStatus.OPEN)
   }
 
   static createPending(moment: Moment, balance: Balance, balance_a: Balance): ChannelState {
-    return new ChannelState(balance, balance_a, ChannelStatus.PENDING, moment)
+    return new ChannelState(balance, balance_a, Types.ChannelStatus.PENDING, moment)
   }
 }
 

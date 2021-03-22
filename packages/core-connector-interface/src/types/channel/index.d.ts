@@ -1,12 +1,12 @@
 import { Moment, Hash, Signature } from '..'
 import Balance from '../balance'
 
-enum ChannelStatus {
-  UNINITIALISED = 1,
-  FUNDED = 2,
-  OPEN = 3,
-  PENDING = 4
-}
+const ChannelStatus = {
+  UNINITIALISED: 1,
+  FUNDED: 2,
+  OPEN: 3,
+  PENDING: 4
+} as const
 
 declare interface ChannelStatic {
   createFunded(balance: Balance, balance_a: Balance): Channel

@@ -1,7 +1,7 @@
 import type { LevelUp } from 'levelup'
 import type * as Utils from './utils'
 import type Channel from './channel'
-import type * as Types from './types'
+import * as Types from './types'
 import type * as DbKeys from './dbKeys'
 import type * as Constants from './constants'
 import type Indexer, { RoutingChannel, ChannelUpdate } from './indexer'
