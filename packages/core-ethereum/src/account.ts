@@ -46,7 +46,6 @@ class Account {
   }
 
   constructor(public coreConnector: HoprEthereum, privKey: Uint8Array, pubKey: Uint8Array) {
-
     const { web3, network } = getWeb3()
     this.keys = {
       onChain: {
@@ -63,9 +62,7 @@ class Account {
       getLatestBlockNumber: async () => {
         // when running our unit/intergration tests using ganache,
         // the indexer doesn't have enough time to pick up the events and reduce the data
-        return isGanache(network)
-          ? web3.eth.getBlockNumber()
-          : coreConnector.indexer.latestBlock
+        return isGanache(network) ? web3.eth.getBlockNumber() : coreConnector.indexer.latestBlock
       },
       getTransactionCount: async (address: string, blockNumber?: number) =>
         web3.eth.getTransactionCount(address, blockNumber),
@@ -222,7 +219,7 @@ class Account {
     // return of our contract method in web3.Contract instance
     txObject?: TransactionObject<T>
   ) {
-    const { network } = getWeb3() 
+    const { network } = getWeb3()
     const abi = txObject ? txObject.encodeABI() : undefined
     const gas = 300e3
 
@@ -236,7 +233,7 @@ class Account {
     }
 
     // @TODO: potential deadlock, needs to be improved
-    const { web3, chainId} = getWeb3()
+    const { web3, chainId } = getWeb3()
     const nonceLock = await this._nonceTracker.getNonceLock(this._address.toHex())
 
     // @TODO: provide some of the values to avoid multiple calls

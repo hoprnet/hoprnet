@@ -25,9 +25,8 @@ describe('test hashedSecret', async function () {
   this.timeout(durations.minutes(10))
   const ganache = new Ganache()
   let connector: HoprEthereum
-  
 
-  await initializeWeb3(configs.DEFAULT_URI) 
+  await initializeWeb3(configs.DEFAULT_URI)
   let { web3, hoprChannels } = getWeb3()
 
   async function generateConnector(debug?: boolean): Promise<HoprEthereum> {
