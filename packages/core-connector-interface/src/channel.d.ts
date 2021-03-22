@@ -18,11 +18,7 @@ declare interface ChannelStatic {
    * @param counterparty AccountId of the counterparty
    * @param props additional arguments
    */
-  create(
-    offChainCounterparty: Uint8Array,
-    balance: Balance,
-    balance_a: Balance
-  ): Promise<Channel>
+  create(offChainCounterparty: Uint8Array, balance: Balance, balance_a: Balance): Promise<Channel>
 
   /**
    * Creates a dummy ticket that is sent to the final recipient.
