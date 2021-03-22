@@ -12,7 +12,7 @@ import { HoprToken } from '../tsc/web3/HoprToken'
 import { Await } from '../tsc/utils'
 import { AcknowledgedTicket, Balance, SignedTicket, AccountId } from '../types'
 import CoreConnector from '..'
-import Channel from '.'
+import { ChannelFactory } from '.'
 import * as testconfigs from '../config.spec'
 import * as configs from '../config'
 
@@ -117,7 +117,7 @@ describe('test Channel class', function () {
     const dbChannels = (await counterpartysCoreConnector.channel.getAll(
       async (arg: any) => arg,
       async (arg: any) => Promise.all(arg)
-    )) as Channel[]
+    )) as ChannelFactory[]
 
     assert(
       u8aEquals(dbChannels[0].counterparty, coreConnector.account.keys.onChain.pubKey),

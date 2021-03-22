@@ -129,7 +129,8 @@ declare interface HoprCoreConnector {
   /**
    * Encapsulates payment channel between nodes.
    */
-  readonly channel: typeof Channel
+  //readonly channel: typeof Channel
+  // TODO createChannel
 
   /**
    * Returns an instance of Indexer.

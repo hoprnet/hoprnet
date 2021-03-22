@@ -123,28 +123,20 @@ declare interface ChannelStatic {
 }
 
 declare interface Channel {
-  // Id of the channel
-  readonly channelId: Promise<Hash>
+  channelId(): Promise<Hash>
+  stateCounter(): Promise<TicketEpoch>
 
   // Timestamp once the channel can be settled
   readonly settlementWindow: Promise<Moment>
 
-  // Current state counter of the channel
-  readonly stateCounter: Promise<TicketEpoch>
-
-  // Current status of the channel
-  readonly status: Promise<'UNINITIALISED' | 'FUNDED' | 'OPEN' | 'PENDING'>
-
   // Current state of the channel, i.e. `FUNDED` with `1 HOPR / 3 HOPR`
   readonly state: ChannelState
 
-  // Current balance of partyA
-  readonly balance_a: Promise<Balance>
-  // Current balance of partyB
-  readonly balance_b: Promise<Balance>
+  balance_a(): Promise<Balance>
+  balance_b(): Promise<Balance>
 
   // Current total balance (sum of balance_a and balance_b)
-  readonly balance: Promise<Balance>
+  balance(): Promise<Balance>
 
   readonly currentBalance: Promise<Balance>
 
@@ -185,8 +177,6 @@ declare interface Channel {
 
   // public key
   readonly counterparty: Uint8Array
-
-  readonly offChainCounterparty: Promise<Uint8Array>
 
   /**
    * Initiates a settlement for this channel.
