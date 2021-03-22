@@ -13,9 +13,14 @@ Each node shares a secret with the sender of the packet si as this is part of th
 The challenges are given by the sender of the packet $0$ and are embedded next to the routing information within the mixnet packet, hence $O$ samples $challenge_0$ and issues $ticket_0$ including $challenge_0$ for $A$, $A$ extracts $challenge_1$ from $packet_1$ and issues $ticket_1$ including $challenge_1$ for $B$ etc.
 \newline Since “Proof-Of-Relay” is used to make the relay services of nodes verifiable, it is the duty of each node to check that given challenges are derivable from the given and the expected information. 
 Packets with inappropriate challenges should be dropped as they might not lead to winning tickets.
-\newline Therefore, the sender of the packet $0$ also provides a hint of the expected value that a node is supposed to get from the next downstream node. The hint for party $P_i$ is given as $hint_i=s_{i+1}^{(1)}*G$ such that $P_i$ can check that the returned value $s'^{(1)}_{i+1}$ matches the promised value by checking whether $hint_i$ equals $s_{i+1}'^{(1)}*G$. 
+\newline Therefore, the sender of the packet $0$ also provides a hint of the expected value that a node is supposed to get from the next downstream node. 
+The hint for party $P_i$ is given as $hint_i=s_{i+1}^{(1)}*G$ such that $P_i$ can check that the returned value $s'^{(1)}_{i+1}$ matches the promised value by checking whether $hint_i$ equals $s_{i+1}'^{(1)}*G$. 
 This furthermore allows $P_i$ to check whether the promises value $s_{i+1}^{(1)}$ will be sufficient to derive a solution to the given challenge by checking that $$s_i^{(0)}*G+hint_i$$ is equals to $challenge_i$ where $G$ is the base-point of the utilized curve.
-\newline $O$ sends $packet_0$ to $A$ and attaches $ticket_0$. $A$ verifies $packet_0$ and $ticket_0$ and derives $s_A^{(0)}$ as well as $s_A^{(1)}$, A transforms the $packet_0$ into $packet_1$ and issues $ticket_1$ for $B$. Once $A$ receives $s_B^{(1)}$ from $B$, it can compute $$response_0:=s_A^{(0)}+s_B^{(1)}$$ such that $$response_0*G=ticket_0.challenge$$ $B$ does the same as $A$ such that $C$ receives $packet_2$ and $ticket_2$. $C$ then issues a dummy ticket to $E$ and transforms $packet_2$ into $packet_3$ and sends it to $Z$. $Z$ receives the packet, verifies it and acknowledges it and thereby sends $s_Z^{(1)}$ to $D$ such that $D$ is able to compute $response_2:=s_C{(0)}+s_Z^{(1)}$ such that: $$response_2*G=ticket_2.challenge$$
+\newline $O$ sends $packet_0$ to $A$ and attaches $ticket_0$. $A$ verifies $packet_0$ and $ticket_0$ and derives $s_A^{(0)}$ as well as $s_A^{(1)}$, A transforms the $packet_0$ into $packet_1$ and issues $ticket_1$ for $B$. 
+Once $A$ receives $s_B^{(1)}$ from $B$, it can compute $$response_0:=s_A^{(0)}+s_B^{(1)}$$ such that $$response_0*G=ticket_0.challenge$$ $B$ does the same as $A$ such that $C$ receives $packet_2$ and $ticket_2$. 
+$C$ then issues a dummy ticket to $E$ and transforms $packet_2$ into $packet_3$ and sends it to $Z$. 
+$Z$ receives the packet, verifies it and acknowledges it and thereby sends $s_Z^{(1)}$ to $D$ such that $D$ is able to compute 
+$response_2:=s_C{(0)}+s_Z^{(1)}$ such that: $$response_2*G=ticket_2.challenge$$
 
 
 
