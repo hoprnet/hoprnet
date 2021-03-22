@@ -20,20 +20,19 @@ import { initialize as initializeWeb3, getWeb3 } from './web3'
 
 const EMPTY_HASHED_SECRET = new Uint8Array(HASHED_SECRET_WIDTH).fill(0x00)
 const FUND_ARGS = `--address ${addresses?.localhost?.HoprToken} --accounts-to-fund 1`
+let hoprChannels
 
 describe('test hashedSecret', async function () {
   this.timeout(durations.minutes(10))
   const ganache = new Ganache()
   let connector: HoprEthereum
 
-  await initializeWeb3(configs.DEFAULT_URI)
-  let { web3, hoprChannels } = getWeb3()
-  await getWeb3().provider.connect()
 
   async function generateConnector(debug?: boolean): Promise<HoprEthereum> {
+    await initializeWeb3(configs.DEFAULT_URI)
+    await getWeb3().provider.connect()
+    hoprChannels = getWeb3().hoprChannels
     const connector = ({
-      hoprChannels,
-      web3,
       db: LevelUp(Memdown()),
       dbKeys: DbKeys,
       utils: Utils,
@@ -54,7 +53,7 @@ describe('test hashedSecret', async function () {
 
     connector.stop = async () => {
       await connector.account.stop()
-      ;(web3.eth.currentProvider as WebsocketProvider).disconnect(1000, 'Stopping HOPR node.')
+      ;(getWeb3().web3.eth.currentProvider as WebsocketProvider).disconnect(1000, 'Stopping HOPR node.')
     }
 
     return connector
