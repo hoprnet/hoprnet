@@ -27,7 +27,6 @@ describe('test hashedSecret', async function () {
   const ganache = new Ganache()
   let connector: HoprEthereum
 
-
   async function generateConnector(debug?: boolean): Promise<HoprEthereum> {
     await initializeWeb3(configs.DEFAULT_URI)
     await getWeb3().provider.connect()
