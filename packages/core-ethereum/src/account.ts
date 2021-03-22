@@ -13,6 +13,7 @@ import { isWinningTicket, pubKeyToAccountId, isGanache } from './utils'
 import { HASHED_SECRET_WIDTH } from './hashedSecret'
 import { WEB3_CACHE_TTL } from './constants'
 import * as ethereum from './ethereum'
+import { getWeb3 } from './web3'
 
 import debug from 'debug'
 const log = debug('hopr-core-ethereum:account')
@@ -44,7 +45,9 @@ class Account {
     }
   }
 
-  constructor(public coreConnector: HoprEthereum, privKey: Uint8Array, pubKey: Uint8Array, private chainId: number) {
+  constructor(public coreConnector: HoprEthereum, privKey: Uint8Array, pubKey: Uint8Array) {
+
+    const { web3, network } = getWeb3()
     this.keys = {
       onChain: {
         privKey,
@@ -60,12 +63,12 @@ class Account {
       getLatestBlockNumber: async () => {
         // when running our unit/intergration tests using ganache,
         // the indexer doesn't have enough time to pick up the events and reduce the data
-        return isGanache(coreConnector.network)
-          ? coreConnector.web3.eth.getBlockNumber()
+        return isGanache(network)
+          ? web3.eth.getBlockNumber()
           : coreConnector.indexer.latestBlock
       },
       getTransactionCount: async (address: string, blockNumber?: number) =>
-        coreConnector.web3.eth.getTransactionCount(address, blockNumber),
+        web3.eth.getTransactionCount(address, blockNumber),
       getConfirmedTransactions: () => Array.from(this._transactions.confirmed.values()),
       getPendingTransactions: () => Array.from(this._transactions.pending.values()),
       minPending: durations.minutes(15)
@@ -124,7 +127,8 @@ class Account {
    * @returns HOPR balance
    */
   public async getBalance(useCache: boolean = false): Promise<Balance> {
-    return getBalance(this.coreConnector.hoprToken, await this.address, useCache)
+    const { hoprToken } = getWeb3()
+    return getBalance(hoprToken, await this.address, useCache)
   }
 
   /**
@@ -132,7 +136,8 @@ class Account {
    * @returns ETH balance
    */
   public async getNativeBalance(useCache: boolean = false): Promise<NativeBalance> {
-    return getNativeBalance(this.coreConnector.web3, await this.address, useCache)
+    const { web3 } = getWeb3()
+    return getNativeBalance(web3, await this.address, useCache)
   }
 
   get ticketEpoch(): Promise<TicketEpoch> {
@@ -141,9 +146,10 @@ class Account {
     }
 
     this.attachAccountDataListener()
+    const { hoprChannels } = getWeb3()
 
     return this.address.then((address) => {
-      return this.coreConnector.hoprChannels.methods
+      return hoprChannels.methods
         .accounts(address.toHex())
         .call()
         .then((res) => {
@@ -163,9 +169,10 @@ class Account {
     }
 
     this.attachAccountDataListener()
+    const { hoprChannels } = getWeb3()
 
     return this.address.then((address) => {
-      return this.coreConnector.hoprChannels.methods
+      return hoprChannels.methods
         .accounts(address.toHex())
         .call()
         .then((res) => {
@@ -215,8 +222,7 @@ class Account {
     // return of our contract method in web3.Contract instance
     txObject?: TransactionObject<T>
   ) {
-    const { web3, network } = this.coreConnector
-
+    const { network } = getWeb3() 
     const abi = txObject ? txObject.encodeABI() : undefined
     const gas = 300e3
 
@@ -230,6 +236,7 @@ class Account {
     }
 
     // @TODO: potential deadlock, needs to be improved
+    const { web3, chainId} = getWeb3()
     const nonceLock = await this._nonceTracker.getNonceLock(this._address.toHex())
 
     // @TODO: provide some of the values to avoid multiple calls
@@ -237,7 +244,7 @@ class Account {
       gas,
       gasPrice,
       ...txConfig,
-      chainId: this.chainId,
+      chainId: chainId,
       nonce: nonceLock.nextNonce,
       data: abi
     }
@@ -302,8 +309,9 @@ class Account {
     if (this._ticketEpochListener == null) {
       // listen for 'SecretHashSet' events and update 'ticketEpoch'
       // on error, safely reset 'ticketEpoch' & event listener
+      const { hoprChannels } = getWeb3()
       try {
-        this._ticketEpochListener = this.coreConnector.hoprChannels.events
+        this._ticketEpochListener = hoprChannels.events
           .SecretHashSet({
             fromBlock: 'latest',
             filter: {

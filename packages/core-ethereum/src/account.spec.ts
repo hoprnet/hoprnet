@@ -73,7 +73,7 @@ describe('test Account', function () {
 
     it('should be 3 after reconnecting to web3', async function () {
       this.timeout(durations.seconds(10))
-      await disconnectWeb3(coreConnector.web3)
+      await disconnectWeb3(web3)
 
       // wait for reconnection
       await wait(durations.seconds(2))

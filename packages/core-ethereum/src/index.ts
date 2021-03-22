@@ -2,11 +2,7 @@ import type { LevelUp } from 'levelup'
 import type { WebsocketProvider } from 'web3-core'
 import type { Currencies } from '@hoprnet/hopr-core-connector-interface'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-import type { HoprChannels } from './tsc/web3/HoprChannels'
-import type { HoprToken } from './tsc/web3/HoprToken'
-import Web3 from 'web3'
 import chalk from 'chalk'
-import { Network, addresses, abis } from '@hoprnet/hopr-ethereum'
 import { ChannelFactory } from './channel'
 import types from './types'
 import Indexer from './indexer'
@@ -17,9 +13,7 @@ import * as config from './config'
 import Account from './account'
 import HashedSecret from './hashedSecret'
 import debug from 'debug'
-
-const HoprChannelsAbi = abis.HoprChannels
-const HoprTokenAbi = abis.HoprToken
+import { initialize as initializeWeb3, getWeb3 } from './web3'
 
 const log = debug('hopr-core-ethereum')
 let provider: WebsocketProvider
@@ -38,22 +32,18 @@ export default class HoprEthereum implements HoprCoreConnector {
 
   constructor(
     public db: LevelUp,
-    public web3: Web3,
-    public chainId: number,
-    public network: Network,
-    public hoprChannels: HoprChannels,
-    public hoprToken: HoprToken,
     debug: boolean,
     privateKey: Uint8Array,
     publicKey: Uint8Array,
     maxConfirmations: number
   ) {
-    this.account = new Account(this, privateKey, publicKey, chainId)
+    const { hoprChannels } = getWeb3()
+    this.account = new Account(this, privateKey, publicKey)
     this.indexer = new Indexer(this, maxConfirmations)
     this.types = new types()
     this.channel = new ChannelFactory(this)
     this._debug = debug
-    this.hashedSecret = new HashedSecret(this.db, this.account, this.hoprChannels)
+    this.hashedSecret = new HashedSecret(this.db, this.account, hoprChannels)
   }
 
   readonly dbKeys = dbkeys
@@ -135,7 +125,8 @@ export default class HoprEthereum implements HoprCoreConnector {
    * @returns a promise resolved true if web3 connection is alive
    */
   private async checkWeb3(): Promise<void> {
-    if (!(await this.web3.eth.net.isListening())) {
+    const { web3 } = getWeb3()
+    if (!(await web3.eth.net.isListening())) {
       throw Error('web3 is not connected')
     }
   }
@@ -156,6 +147,7 @@ export default class HoprEthereum implements HoprCoreConnector {
   }
 
   withdraw(currency: Currencies, recipient: string, amount: string): Promise<string> {
+    const { hoprToken } = getWeb3()
     return new Promise<string>(async (resolve, reject) => {
       try {
         if (currency === 'NATIVE') {
@@ -170,9 +162,9 @@ export default class HoprEthereum implements HoprCoreConnector {
           const tx = await this.account.signTransaction(
             {
               from: (await this.account.address).toHex(),
-              to: this.hoprToken.options.address
+              to: hoprToken.options.address
             },
-            this.hoprToken.methods.transfer(recipient, amount)
+            hoprToken.methods.transfer(recipient, amount)
           )
 
           tx.send().once('transactionHash', (hash) => resolve(hash))
@@ -188,10 +180,12 @@ export default class HoprEthereum implements HoprCoreConnector {
   }
 
   public smartContractInfo(): string {
-    const network = utils.getNetworkName(this.chainId)
-    const addr = addresses[network]
-    return [`Running on: ${network}`, `HOPR Token: ${addr.HoprToken}`, `HOPR Channels: ${addr.HoprChannels}`].join('\n')
-  }
+    const { network, address } = getWeb3()
+    return [
+      `Running on: ${network}`,
+      `HOPR Token: ${address.HoprToken}`,
+      `HOPR Channels: ${address.HoprChannels}`
+    ].join('\n')}
 
   /**
    * Creates an uninitialised instance.
@@ -207,38 +201,12 @@ export default class HoprEthereum implements HoprCoreConnector {
     seed: Uint8Array,
     options?: { id?: number; provider?: string; debug?: boolean; maxConfirmations?: number }
   ): Promise<HoprEthereum> {
-    const providerUri = options?.provider || config.DEFAULT_URI
-
-    provider = new Web3.providers.WebsocketProvider(providerUri, {
-      reconnect: {
-        auto: true,
-        delay: 1000, // ms
-        maxAttempts: 30
-      }
-    })
-
-    const web3 = new Web3(provider)
-
-    const [chainId, publicKey] = await Promise.all([utils.getChainId(web3), utils.privKeyToPubKey(seed)])
-    const network = utils.getNetworkName(chainId) as Network
-
-    if (typeof addresses?.[network]?.HoprChannels === 'undefined') {
-      throw Error(`token contract address from network ${network} not found`)
-    }
-
-    const hoprChannels = new web3.eth.Contract(HoprChannelsAbi as any, addresses?.[network]?.HoprChannels)
-    const hoprToken = new web3.eth.Contract(HoprTokenAbi as any, addresses?.[network]?.HoprToken)
-
+    await initializeWeb3(options?.provider || config.DEFAULT_URI)
     const coreConnector = new HoprEthereum(
       db,
-      web3,
-      chainId,
-      network,
-      hoprChannels,
-      hoprToken,
       options?.debug || false,
       seed,
-      publicKey,
+      await utils.privKeyToPubKey(seed),
       options.maxConfirmations ?? config.MAX_CONFIRMATIONS
     )
     log(`using blockchain address ${await coreConnector.hexAccountAddress()}`)

@@ -31,6 +31,7 @@ import type HoprEthereum from '..'
 import Channel from './channel'
 import { Uint8ArrayE } from '../types/extended'
 import { TicketStatic } from './ticket'
+import { getWeb3 } from '../web3'
 
 const log = Log(['channel-factory'])
 
@@ -114,18 +115,19 @@ class ChannelFactory {
       if (balance.isZero()) {
         throw Error(ERRORS.OOF_HOPR)
       }
+      const { web3, hoprChannels, hoprToken } = getWeb3()
 
       await waitForConfirmation(
         (
           await account.signTransaction(
             {
               from: (await account.address).toHex(),
-              to: this.coreConnector.hoprToken.options.address
+              to: hoprToken.options.address
             },
-            this.coreConnector.hoprToken.methods.send(
-              this.coreConnector.hoprChannels.options.address,
+            hoprToken.methods.send(
+              hoprChannels.options.address,
               amount.toString(),
-              this.coreConnector.web3.eth.abi.encodeParameters(
+              web3.eth.abi.encodeParameters(
                 ['address', 'address'],
                 [(await account.address).toHex(), counterparty.toHex()]
               )
@@ -272,6 +274,7 @@ class ChannelFactory {
         }),
         counterparty: new Public(counterpartyPubKey)
       })
+      const { hoprChannels } = getWeb3()
 
       try {
         await waitForConfirmation(
@@ -279,9 +282,9 @@ class ChannelFactory {
             await account.signTransaction(
               {
                 from: (await account.address).toHex(),
-                to: this.coreConnector.hoprChannels.options.address
+                to: hoprChannels.options.address
               },
-              this.coreConnector.hoprChannels.methods.openChannel(counterparty.toHex())
+              hoprChannels.methods.openChannel(counterparty.toHex())
             )
           ).send()
         )
@@ -407,9 +410,10 @@ class ChannelFactory {
     // 1. all our unit tests are actually intergration tests, nothing is mocked
     // 2. our actual intergration tests do not have any block mining time
     // this will be tackled in the upcoming refactor
-    if (isGanache(this.coreConnector.network)) {
+    if (isGanache(getWeb3().network)) {
+      const { hoprChannels } = getWeb3()
       const channelId = await getId(selfAccountId, counterpartyAccountId)
-      const response = await this.coreConnector.hoprChannels.methods.channels(channelId.toHex()).call()
+      const response = await hoprChannels.methods.channels(channelId.toHex()).call()
 
       return new ChannelEntry(undefined, {
         blockNumber: new BN(0),

@@ -13,6 +13,7 @@ import {
 } from '../types'
 import TicketFactory from './ticket'
 import { hash } from '../utils'
+import { getWeb3 } from '../web3'
 
 import type HoprEthereum from '..'
 
@@ -144,11 +145,12 @@ class Channel implements IChannel {
   }
 
   get currentBalanceOfCounterparty(): Promise<Balance> {
+    const { hoprToken } = getWeb3()
     return new Promise<Balance>(async (resolve, reject) => {
       try {
         return resolve(
           new Balance(
-            await this.coreConnector.hoprToken.methods
+            await hoprToken.methods
               .balanceOf(u8aToHex(await this.coreConnector.utils.pubKeyToAccountId(this.counterparty)))
               .call()
           )
@@ -163,6 +165,7 @@ class Channel implements IChannel {
     const { account } = this.coreConnector
     const status = await this.status
     let receipt: string
+    const { hoprChannels } = getWeb3()
 
     try {
       if (!(status === 'OPEN' || status === 'PENDING')) {
@@ -173,9 +176,9 @@ class Channel implements IChannel {
         const tx = await account.signTransaction(
           {
             from: (await account.address).toHex(),
-            to: this.coreConnector.hoprChannels.options.address
+            to: hoprChannels.options.address
           },
-          this.coreConnector.hoprChannels.methods.initiateChannelClosure(
+          hoprChannels.methods.initiateChannelClosure(
             u8aToHex(await this.coreConnector.utils.pubKeyToAccountId(this.counterparty))
           )
         )
@@ -186,9 +189,9 @@ class Channel implements IChannel {
         const tx = await account.signTransaction(
           {
             from: (await account.address).toHex(),
-            to: this.coreConnector.hoprChannels.options.address
+            to: hoprChannels.options.address
           },
-          this.coreConnector.hoprChannels.methods.claimChannelClosure(
+          hoprChannels.methods.claimChannelClosure(
             u8aToHex(await this.coreConnector.utils.pubKeyToAccountId(this.counterparty))
           )
         )

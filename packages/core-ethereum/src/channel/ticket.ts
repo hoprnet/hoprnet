@@ -11,6 +11,7 @@ import {
 import type HoprEthereum from '..'
 import { HASHED_SECRET_WIDTH } from '../hashedSecret'
 import debug from 'debug'
+import { getWeb3 } from '../web3'
 const log = debug('hopr-core-ethereum:ticket')
 
 const DEFAULT_WIN_PROB = 1
@@ -49,7 +50,8 @@ class TicketStatic {
       const ticket = signedTicket.ticket
 
       log('Submitting ticket', u8aToHex(ticketChallenge))
-      const { hoprChannels, account, utils } = this.coreConnector
+      const { hoprChannels } = getWeb3()
+      const { account, utils } = this.coreConnector
       const { r, s, v } = utils.getSignatureParameters(signedTicket.signature)
 
       const hasPreImage = !u8aEquals(ackTicket.preImage, EMPTY_PRE_IMAGE)
@@ -132,8 +134,9 @@ class TicketFactory {
     const ticketWinProb = new Hash(computeWinningProbability(winProb))
 
     const counterparty = await pubKeyToAccountId(this.channel.counterparty)
+    const { hoprChannels } = getWeb3()
 
-    const epoch = await this.channel.coreConnector.hoprChannels.methods
+    const epoch = await hoprChannels.methods
       .accounts(counterparty.toHex())
       .call()
       .then((res) => new TicketEpoch(Number(res.counter)))
