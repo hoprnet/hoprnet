@@ -9,7 +9,8 @@ class ChannelState implements Types.ChannelState {
     readonly balance: Balance,
     readonly balance_a: Balance,
     readonly status: Types.ChannelStatus,
-    readonly moment?: Moment) {}
+    readonly moment?: Moment
+  ) {}
 
   static deserialize(arr: Uint8Array) {
     const [a, b, c] = u8aSlice(arr, [Balance.SIZE, Balance.SIZE, 1])
