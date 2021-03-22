@@ -28,6 +28,7 @@ describe('test hashedSecret', async function () {
 
   await initializeWeb3(configs.DEFAULT_URI)
   let { web3, hoprChannels } = getWeb3()
+  await getWeb3().provider.connect()
 
   async function generateConnector(debug?: boolean): Promise<HoprEthereum> {
     const connector = ({
