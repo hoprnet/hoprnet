@@ -1,21 +1,14 @@
-import type { Types } from '@hoprnet/hopr-core-connector-interface'
+import { Types } from '@hoprnet/hopr-core-connector-interface'
 import { Moment } from '..'
 import { hash,  sign } from '../../utils'
 import { u8aToNumber, toU8a, u8aSlice, serializeToU8a } from '@hoprnet/hopr-utils'
 import Balance from '../balance'
 
-enum ChannelStatus {
-  UNINITIALISED = 1,
-  FUNDED = 2,
-  OPEN = 3,
-  PENDING = 4
-}
-
 class ChannelState implements Types.ChannelState {
   constructor(
     readonly balance: Balance,
     readonly balance_a: Balance,
-    readonly status: ChannelStatus,
+    readonly status: Types.ChannelStatus,
     readonly moment?: Moment) {}
 
   static deserialize(arr: Uint8Array) {
@@ -43,15 +36,15 @@ class ChannelState implements Types.ChannelState {
   }
 
   get isFunded(): boolean {
-    return this.status == ChannelStatus.FUNDED
+    return this.status == Types.ChannelStatus.FUNDED
   }
 
   get isActive(): boolean {
-    return this.status == ChannelStatus.OPEN
+    return this.status == Types.ChannelStatus.OPEN
   }
 
   get isPending(): boolean {
-    return this.status == ChannelStatus.PENDING
+    return this.status == Types.ChannelStatus.PENDING
   }
 
   static get SIZE(): number {
@@ -59,7 +52,7 @@ class ChannelState implements Types.ChannelState {
   }
 
   static createFunded(balance: Balance, balance_a: Balance): ChannelState {
-    return new ChannelState(balance, balance_a, ChannelStatus.FUNDED)
+    return new ChannelState(balance, balance_a, Types.ChannelStatus.FUNDED)
   }
 
   static createActive(balance: Balance, balance_a: Balance): ChannelState {

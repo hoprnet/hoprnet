@@ -4,7 +4,6 @@ import {
   AccountId,
   Balance,
   ChannelBalance,
-  Channel as ChannelType,
   ChannelState,
   Hash,
   Public,
@@ -213,20 +212,17 @@ class ChannelFactory {
 
     if (sign != null && channelBalance != null) {
       const channel = new Channel(this.coreConnector, counterpartyPubKey)
+      const balance = amPartyA ? channelBalance.balance_a : channelBalance.balance.sub(channelBalance.balance_a)
 
-      const amountToFund = new Balance(
-        amPartyA ? channelBalance.balance_a : channelBalance.balance.sub(channelBalance.balance_a)
-      )
       const amountFunded = await (amPartyA ? channel.balance_a : channel.balance_b)
 
+      /*
       if (amountFunded.lt(amountToFund)) {
         await this.increaseFunds(counterparty, new Balance(amountToFund.sub(amountFunded)))
       }
+      */
 
-      const state = new ChannelState(stateCounterToStatus(0))
-
-      // signedChannel = await sign(channelBalance)
-      signedChannel = new SignedChannel(new Public(counterpartyPubKey), new ChannelType(state, channelBalance))
+      const state = new ChannelState(balance, amountFunded, stateCounterToStatus(0))
 
       try {
         await waitForConfirmation(
@@ -243,7 +239,7 @@ class ChannelFactory {
 
         await this.coreConnector.db.put(
           Buffer.from(this.coreConnector.dbKeys.Channel(counterpartyPubKey)),
-          Buffer.from(signedChannel)
+          Buffer.from(state.serialize())
         )
       } catch (e) {
         if (e.message.match(/counterparty must have called init/)) {
@@ -252,7 +248,7 @@ class ChannelFactory {
         throw e
       }
 
-      return channel
+      return state
     }
 
     throw Error('Cannot open channel. Channel is not open and no sign function was given.')

@@ -1,7 +1,7 @@
 import AccountId from './accountId'
 import AcknowledgedTicket from './acknowledgedTicket'
 import Balance from './balance'
-import { ChannelState } from './channel'
+import { ChannelState, ChannelStatus } from './channel'
 import ChannelEntry from './channelEntry'
 import Hash from './hash'
 import Moment from './moment'
@@ -17,6 +17,7 @@ export {
   AcknowledgedTicket,
   Balance,
   ChannelState,
+  ChannelStatus,
   ChannelEntry,
   Hash,
   Moment,
