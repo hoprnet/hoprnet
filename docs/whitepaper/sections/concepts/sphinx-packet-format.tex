@@ -19,6 +19,26 @@ Let $r$ be the maximum number of nodes that a Sphinx mix message will traverse b
 $G$ is a prime order cyclic group satisfying the Decisional Diffie-Hellman Assumption. The element $g$ is a generator of $G$ and $q$ is the (prime) order of $G$, with $q\approx 2^k$.
 $G^*$ is the set of non-identity elements of $G$.
 $h_b$ is a hash function which we model by random oracles such that:
+$h:G^*\times G^*\rightarrow \mathbb{Z}^*_q$ where $\mathbb{Z}^*_q$ is the field of non-identity elements of $\mathbb{Z}_q$ (field of integers).
+Each node $n\in \mathbb{N}$ has a private key $x_n\in \mathbb{Z}^*_q$ and a public key $y_n=g^{x_n}\in G^*$ where $\mathbb{N} \subset \{0,1\}^k$is a set of mix nodes identifiers.
+
+\paragraph{Key derivation}
+The sender (A) picks a random $x\in \mathbb{Z}^*_q$ that is used to derive new keys for every packet. 
+\newline (A) randomly picks a path consisting of intermediate nodes (B), (C),(D) [see section path-finding] and the final destination of the packet (E) 
+\newline (A) performs an offline Diffie-Hellman key exchange with each of these nodes and derives shared keys with each of these nodes.
+\newline (A) computes a sequence of $r$ tuples (in our case r=4)  $$(a_0,s_0,b_0),.................,(a_{r-1},s_{r-1},b_{r-1})$$ as follows:
+\begin{itemize}
+\item $a_0=g^x,s_0=y^x_B,b_0=h(a_0,s_0)$
+\item $a_1=g^{xb_0},s_1=y^{xb_0}_C,b_1=h(a_1,s_1)$
+\item $a_2=g^{xb_0b_1},s_2=y^{xb_0b_1}_D,b_2=h(a_2,s_2)$
+\end{itemize}
+
+Where $y_B,y_C,y_D,y_E$ are the public keys of the nodes $B,C, D$  which we assume are available to $A$ . The $a_i$ are the group elements which, when combined with the nodes’ public keys, allows computing a shared key for each via Diffie-Hellman key exchange, and so the first node in the user-chosen route can forward the packet to the next, and only that mix-node can decrypt it.
+The $s_i$ are the Diffie Hellman shared secrets, and the $b_i$ are the blinding factors.
+
+
+
+
 
 
 
