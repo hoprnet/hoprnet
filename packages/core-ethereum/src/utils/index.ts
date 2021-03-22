@@ -381,7 +381,6 @@ export function getNetworkName(chainId: number): Network {
   }
 }
 
-
 /**
  * Create a prefixed Debug instance.
  *

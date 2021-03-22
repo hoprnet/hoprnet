@@ -1,6 +1,6 @@
 import { Types } from '@hoprnet/hopr-core-connector-interface'
 import { Moment } from '..'
-import { hash,  sign } from '../../utils'
+import { hash, sign } from '../../utils'
 import { u8aToNumber, toU8a, u8aSlice, serializeToU8a } from '@hoprnet/hopr-utils'
 import Balance from '../balance'
 
@@ -48,7 +48,7 @@ class ChannelState implements Types.ChannelState {
   }
 
   static get SIZE(): number {
-    return Balance.SIZE + Balance.SIZE + 1 
+    return Balance.SIZE + Balance.SIZE + 1
   }
 
   static createFunded(balance: Balance, balance_a: Balance): ChannelState {
@@ -64,4 +64,4 @@ class ChannelState implements Types.ChannelState {
   }
 }
 
-export { ChannelState, ChannelStatus }
+export { ChannelState }

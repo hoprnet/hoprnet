@@ -36,12 +36,11 @@ export function serializeToU8a(items: U8aAndSize[]): Uint8Array {
 export function u8aSplit(u8a: Uint8Array, sizes: number[]): Uint8Array[] {
   let totalSize = sizes.reduce((x, y) => x + y, 0)
   if (u8a.length !== totalSize) {
-    throw new Error("U8a cannot be split: length != sum(sizes)")
-
+    throw new Error('U8a cannot be split: length != sum(sizes)')
   }
-  let i = 0;
-  return sizes.map(s => {
-    i += s;
-    return u8a.slice(i - s, i) 
+  let i = 0
+  return sizes.map((s) => {
+    i += s
+    return u8a.slice(i - s, i)
   })
 }
