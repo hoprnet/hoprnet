@@ -83,3 +83,11 @@ export async function initiateChannelSettlement(): Promise<string> {
     throw error
   }
 }
+
+export async function getTicketEpoch(counterparty){
+  const { hoprChannels } = getWeb3()
+  return await hoprChannels.methods
+    .accounts(counterparty.toHex())
+    .call()
+    .then((res) => new TicketEpoch(Number(res.counter)))
+}
