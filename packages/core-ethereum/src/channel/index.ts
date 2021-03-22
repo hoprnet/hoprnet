@@ -111,6 +111,65 @@ class Channel implements IChannel {
 
     throw Error('Nonces must not be used twice.')
   }
+
+  async createTicket(
+    amount: Balance,
+    challenge: Hash,
+    winProb: number = DEFAULT_WIN_PROB,
+    arr?: {
+      bytes: ArrayBuffer
+      offset: number
+    }
+  ): Promise<SignedTicket> {
+    const ticketWinProb = new Hash(computeWinningProbability(winProb))
+
+    const counterparty = await pubKeyToAccountId(this.channel.counterparty)
+
+    const epoch = await this.channel.coreConnector.hoprChannels.methods
+      .accounts(counterparty.toHex())
+      .call()
+      .then((res) => new TicketEpoch(Number(res.counter)))
+
+    const channelIteration = new TicketEpoch(await this.channel.channelEpoch)
+
+    const signedTicket = new SignedTicket(arr)
+
+    const ticket = new Ticket(
+      {
+        bytes: signedTicket.buffer,
+        offset: signedTicket.ticketOffset
+      },
+      {
+        counterparty,
+        challenge,
+        epoch,
+        amount,
+        winProb: ticketWinProb,
+        channelIteration
+      }
+    )
+
+    const signature = await ticket.sign(this.channel.coreConnector.account.keys.onChain.privKey)
+    signedTicket.set(signature, signedTicket.signatureOffset - signedTicket.byteOffset)
+
+    return signedTicket
+  }
+
+    async verifyTicket(signedTicket: SignedTicket): Promise<boolean> {
+      // @TODO: check if this is needed
+      // if ((await channel.currentBalanceOfCounterparty).add(signedTicket.ticket.amount).lt(await channel.balance)) {
+      //   return false
+      // }
+
+      try {
+        await this.channel.testAndSetNonce(signedTicket)
+      } catch {
+        return false
+      }
+
+      return await signedTicket.verify(await this.channel.offChainCounterparty)
+    }
+  }
 }
 
 // TODO listenForChannels

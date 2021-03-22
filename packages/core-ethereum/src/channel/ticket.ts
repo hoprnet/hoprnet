@@ -1,22 +1,18 @@
-import type IChannel from '.'
 import { u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
-import { Hash, TicketEpoch, Balance, SignedTicket, Ticket, AcknowledgedTicket } from '../types'
+import { AcknowledgedTicket } from '../types'
 import {
-  pubKeyToAccountId,
-  computeWinningProbability,
   isWinningTicket,
   checkChallenge,
-  stateCounterToIteration
 } from '../utils'
 import type HoprEthereum from '..'
 import { HASHED_SECRET_WIDTH } from '../hashedSecret'
+import { getWeb3 } from '../web3'
 import debug from 'debug'
 const log = debug('hopr-core-ethereum:ticket')
 
-const DEFAULT_WIN_PROB = 1
 const EMPTY_PRE_IMAGE = new Uint8Array(HASHED_SECRET_WIDTH).fill(0x00)
 
-class TicketStatic {
+export class TicketStatic {
   private readonly INVALID_MESSAGES = {
     NO_PRE_IMAGE: 'PreImage is empty.',
     INVALID_CHALLENGE: 'Invalid challenge.',
@@ -49,7 +45,8 @@ class TicketStatic {
       const ticket = signedTicket.ticket
 
       log('Submitting ticket', u8aToHex(ticketChallenge))
-      const { hoprChannels, account, utils } = this.coreConnector
+      const { hoprChannels } = getWeb3()
+      const { account, utils } = this.coreConnector
       const { r, s, v } = utils.getSignatureParameters(signedTicket.signature)
 
       const hasPreImage = !u8aEquals(ackTicket.preImage, EMPTY_PRE_IMAGE)
@@ -116,68 +113,3 @@ class TicketStatic {
     }
   }
 }
-
-class TicketFactory {
-  constructor(public channel: IChannel) {}
-
-  async create(
-    amount: Balance,
-    challenge: Hash,
-    winProb: number = DEFAULT_WIN_PROB,
-    arr?: {
-      bytes: ArrayBuffer
-      offset: number
-    }
-  ): Promise<SignedTicket> {
-    const ticketWinProb = new Hash(computeWinningProbability(winProb))
-
-    const counterparty = await pubKeyToAccountId(this.channel.counterparty)
-
-    const epoch = await this.channel.coreConnector.hoprChannels.methods
-      .accounts(counterparty.toHex())
-      .call()
-      .then((res) => new TicketEpoch(Number(res.counter)))
-
-    const channelIteration = new TicketEpoch(stateCounterToIteration((await this.channel.stateCounter).toNumber()))
-
-    const signedTicket = new SignedTicket(arr)
-
-    const ticket = new Ticket(
-      {
-        bytes: signedTicket.buffer,
-        offset: signedTicket.ticketOffset
-      },
-      {
-        counterparty,
-        challenge,
-        epoch,
-        amount,
-        winProb: ticketWinProb,
-        channelIteration
-      }
-    )
-
-    const signature = await ticket.sign(this.channel.coreConnector.account.keys.onChain.privKey)
-    signedTicket.set(signature, signedTicket.signatureOffset - signedTicket.byteOffset)
-
-    return signedTicket
-  }
-
-  async verify(signedTicket: SignedTicket): Promise<boolean> {
-    // @TODO: check if this is needed
-    // if ((await channel.currentBalanceOfCounterparty).add(signedTicket.ticket.amount).lt(await channel.balance)) {
-    //   return false
-    // }
-
-    try {
-      await this.channel.testAndSetNonce(signedTicket)
-    } catch {
-      return false
-    }
-
-    return await signedTicket.verify(await this.channel.offChainCounterparty)
-  }
-}
-
-export { TicketStatic }
-export default TicketFactory

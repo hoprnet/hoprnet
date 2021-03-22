@@ -14,6 +14,7 @@ declare interface ChannelEntry {
   stateCounter: BN
   closureByPartyA: boolean
   readonly status: 'UNINITIALISED' | 'FUNDED' | 'OPEN' | 'PENDING'
+  readonly channelEpoch: number
 }
 
 declare var ChannelEntry: ChannelEntryStatic
