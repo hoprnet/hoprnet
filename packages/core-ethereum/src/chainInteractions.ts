@@ -1,11 +1,6 @@
 import { Public, ChannelEntry } from './types'
 import BN from 'bn.js'
-import {
-  getId,
-  getParties,
-  isGanache,
-  pubKeyToAccountId,
-} from './utils'
+import { getId, getParties, isGanache, pubKeyToAccountId } from './utils'
 import { getWeb3 } from './web3'
 import { u8aToHex } from '@hoprnet/hopr-utils'
 
@@ -57,34 +52,34 @@ export async function getChannel(self: Public, counterparty: Public): Promise<Ch
 
 export async function initiateChannelSettlement(): Promise<string> {
   const { hoprChannels } = getWeb3()
-    let receipt: string
-    try {
-      if (status === 'OPEN') {
-        const tx = await account.signTransaction(
-          {
-            from: (await account.address).toHex(),
-            to: hoprChannels.options.address
-          },
-          hoprChannels.methods.initiateChannelClosure(u8aToHex(await pubKeyToAccountId(this.counterparty)))
-        )
+  let receipt: string
+  try {
+    if (status === 'OPEN') {
+      const tx = await account.signTransaction(
+        {
+          from: (await account.address).toHex(),
+          to: hoprChannels.options.address
+        },
+        hoprChannels.methods.initiateChannelClosure(u8aToHex(await pubKeyToAccountId(this.counterparty)))
+      )
 
-        receipt = tx.transactionHash
-        tx.send()
-      } else if (status === 'PENDING') {
-        const tx = await account.signTransaction(
-          {
-            from: (await account.address).toHex(),
-            to: hoprChannels.options.address
-          },
-          hoprChannels.methods.claimChannelClosure(u8aToHex(await pubKeyToAccountId(this.counterparty)))
-        )
+      receipt = tx.transactionHash
+      tx.send()
+    } else if (status === 'PENDING') {
+      const tx = await account.signTransaction(
+        {
+          from: (await account.address).toHex(),
+          to: hoprChannels.options.address
+        },
+        hoprChannels.methods.claimChannelClosure(u8aToHex(await pubKeyToAccountId(this.counterparty)))
+      )
 
-        receipt = tx.transactionHash
-        tx.send()
-      }
-
-      return receipt
-    } catch (error) {
-      throw error
+      receipt = tx.transactionHash
+      tx.send()
     }
+
+    return receipt
+  } catch (error) {
+    throw error
   }
+}
