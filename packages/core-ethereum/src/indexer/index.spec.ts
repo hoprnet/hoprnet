@@ -15,6 +15,7 @@ import { HoprChannels } from '../tsc/web3/HoprChannels'
 import { Public } from '../types'
 import { publicKeyConvert } from 'secp256k1'
 import { randomBytes } from 'crypto'
+import { getWeb3 } from '../web3'
 
 const HoprTokenAbi = abis.HoprToken
 const HoprChannelsAbi = abis.HoprChannels
@@ -82,7 +83,8 @@ describe('test indexer', function () {
       //     from: userA.address.toHex(),
       //   })
 
-      await connector.hoprChannels.methods
+      const { hoprChannels } = getWeb3()
+      await hoprChannels.methods
         .init(
           u8aToHex(uncompressedPubKeyB.slice(0, 32)),
           u8aToHex(uncompressedPubKeyB.slice(32, 64)),
@@ -189,7 +191,8 @@ describe('test indexer', function () {
       this.timeout(durations.seconds(5))
       const uncompressedPubKeyC = publicKeyConvert(userC.pubKey, false).slice(1)
 
-      await connector.hoprChannels.methods
+      const { hoprChannels } = getWeb3()
+      await hoprChannels.methods
         .init(
           u8aToHex(uncompressedPubKeyC.slice(0, 32)),
           u8aToHex(uncompressedPubKeyC.slice(32, 64)),
@@ -267,7 +270,8 @@ describe('test indexer', function () {
       assert(connector.indexer.status === 'stopped', 'could not stop indexer')
       const uncompressedPubKeyD = publicKeyConvert(userD.pubKey, false).slice(1)
 
-      await connector.hoprChannels.methods
+      const { hoprChannels } = getWeb3()
+      await hoprChannels.methods
         .init(
           u8aToHex(uncompressedPubKeyD.slice(0, 32)),
           u8aToHex(uncompressedPubKeyD.slice(32, 64)),

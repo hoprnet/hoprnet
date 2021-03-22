@@ -340,46 +340,6 @@ export async function waitFor({
   })
 }
 
-/**
- * Get chain ID.
- *
- * @param web3 a web3 instance
- * @returns the chain ID
- */
-export async function getChainId(web3: Web3): Promise<number> {
-  return web3.eth.getChainId()
-}
-
-/**
- * Get current network's name.
- *
- * @param web3 a web3 instance
- * @returns the network's name
- */
-export function getNetworkName(chainId: number): Network {
-  switch (chainId) {
-    case 1:
-      return 'mainnet'
-    // case 2:
-    //   return 'morden'
-    case 3:
-      return 'ropsten'
-    // case 4:
-    //   return 'rinkeby'
-    case 5:
-      return 'goerli'
-    case 42:
-      return 'kovan'
-    case 56:
-      return 'binance'
-    case 100:
-      return 'xdai'
-    case 137:
-      return 'matic'
-    default:
-      return 'localhost'
-  }
-}
 
 /**
  * Create a prefixed Debug instance.

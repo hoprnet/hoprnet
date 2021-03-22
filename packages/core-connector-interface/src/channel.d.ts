@@ -86,22 +86,23 @@ declare interface ChannelStatic {
    * @param counterParty the counterparty of the channel
    * @param amount the amount of tokens to put into the payment channel
    */
-  increaseFunds(counterParty: AccountId, amount: Balance): Promise<void>
+  //increaseFunds(counterParty: AccountId, amount: Balance): Promise<void>
 
   /**
    * Handles a channel opening request.
    * @notice Takes the `coreConnector` instance and returns an async iterable duplex stream.
    * @param coreConnector coreConnector instance
    */
-  handleOpeningRequest(source: AsyncIterable<Uint8Array>): AsyncIterable<Uint8Array>
+  //handleOpeningRequest(source: AsyncIterable<Uint8Array>): AsyncIterable<Uint8Array>
 
+  /*
   tickets: {
-    /**
+     //
      * Submits a signed ticket to the blockchain.
      * @param signedTicket a signed ticket
      * @param secretA a signed ticket
      * @param secretB a signed ticket
-     */
+     //
     submit(
       ticket: AcknowledgedTicket,
       ticketIndex: Uint8Array
@@ -120,6 +121,7 @@ declare interface ChannelStatic {
         }
     >
   }
+  */
 }
 
 declare interface Channel {

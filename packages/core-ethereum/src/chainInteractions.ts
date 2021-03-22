@@ -2,7 +2,7 @@ import {
   Public,
   ChannelEntry
 } from './types'
-
+import BN from 'bn.js'
 import {
   waitForConfirmation,
   getId,
@@ -13,7 +13,7 @@ import {
   Log,
   hash,
   isGanache
-} from '../utils'
+} from './utils'
 
 export async function getChannel(self: Public, counterparty: Public): Promise<ChannelEntry> {
   //const self = new Public(this.coreConnector.account.keys.onChain.pubKey)

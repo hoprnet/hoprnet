@@ -13,6 +13,7 @@ import { ChannelEntry, Public, Balance, Snapshot } from '../types'
 import { isPartyA, getId, Log as DebugLog } from '../utils'
 import * as topics from './topics'
 import * as reducers from './reducers'
+import { getWeb3 } from '../web3'
 import {
   isConfirmedBlock,
   getLatestBlockNumber,
@@ -48,7 +49,8 @@ class Indexer extends EventEmitter implements IIndexer {
 
   constructor(private connector: HoprEthereum, private maxConfirmations: number) {
     super()
-    genesisBlock = getHoprChannelsBlockNumber(this.connector.chainId)
+    const { chainId } = getWeb3()
+    genesisBlock = getHoprChannelsBlockNumber(chainId)
   }
 
   /**
@@ -58,7 +60,7 @@ class Indexer extends EventEmitter implements IIndexer {
     if (this.status === 'started') return
     log(`Starting indexer...`)
 
-    const { web3, hoprChannels } = this.connector
+    const { web3, hoprChannels } = getWeb3() 
 
     // wipe indexer, do not use in production
     // await this.wipe()
@@ -141,8 +143,9 @@ class Indexer extends EventEmitter implements IIndexer {
    * @returns returns true if it's syncing
    */
   public async isSyncing(): Promise<boolean> {
+    const { web3 } = getWeb3()
     const [onChainBlock, lastKnownBlock] = await Promise.all([
-      this.connector.web3.eth.getBlockNumber(),
+      web3.eth.getBlockNumber(),
       getLatestBlockNumber(this.connector.db)
     ])
 
@@ -209,9 +212,10 @@ class Indexer extends EventEmitter implements IIndexer {
 
       let logs: Log[] = []
 
+      const {web3, hoprChannels } = getWeb3()
       try {
-        logs = await this.connector.web3.eth.getPastLogs({
-          address: this.connector.hoprChannels.options.address,
+        logs = await web3.eth.getPastLogs({
+          address: hoprChannels.options.address,
           fromBlock,
           toBlock
         })
