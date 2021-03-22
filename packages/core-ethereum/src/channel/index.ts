@@ -325,15 +325,13 @@ class ChannelFactory {
     const promises: Promise<T>[] = []
     return new Promise<R>((resolve, reject) => {
       db.createReadStream({
-          gte: Buffer.from(dbKeys.Channel(new Uint8Array(Hash.SIZE).fill(0x00))),
-          lte: Buffer.from(dbKeys.Channel(new Uint8Array(Hash.SIZE).fill(0xff)))
-        })
+        gte: Buffer.from(dbKeys.Channel(new Uint8Array(Hash.SIZE).fill(0x00))),
+        lte: Buffer.from(dbKeys.Channel(new Uint8Array(Hash.SIZE).fill(0xff)))
+      })
         .on('error', (err) => reject(err))
         .on('data', ({ key, value }: { key: Buffer; value: Buffer }) => {
           const signedChannel = ChannelState.deserialize(value)
-          promises.push(
-            onData(new Channel(dbKeys.ChannelKeyParse(key), signedChannel))
-          )
+          promises.push(onData(new Channel(dbKeys.ChannelKeyParse(key), signedChannel)))
         })
         .on('end', () => resolve(onEnd(promises)))
     })
