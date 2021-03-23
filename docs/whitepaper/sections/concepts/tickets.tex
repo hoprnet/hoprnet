@@ -27,7 +27,7 @@ The channel iteration counter is used to give each reincarnation of the payment 
 \end{itemize}
 If the issuer is also the sender of the packet, it can set the challenge arbitrarily. 
 If the issuer receives the packet from another node and attempts to issue a ticket for the next downstream node, the challenge is given together with the routing information by the packet.
-The content of a ticket is given as the tuple:$$(recipient, challenge, account.counter, amount, winProb, channel.teration, index)$$ 
+The content of a ticket is given as the tuple:$(recipient, challenge, account.counter, amount, winProb, channel.teration, index)$ 
 Let $t$ be the content of a ticket. The issuer then signs the ticket with its private key and sends $ticket:= (t, Sig_{Issuer}(t))$ to the recipient.
 
 \subsubsection{Ticket validation}
