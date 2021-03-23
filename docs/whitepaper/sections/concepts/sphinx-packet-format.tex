@@ -54,6 +54,14 @@ The payload $\delta_0$ in the Sphinx packet is computed using a wide-block ciphe
 \newline Same happens at $(D)$: key derivation, unblinding, deleting, shifting, decryption and blinding.
 \newline Last but not least, the packet arrives at $(E)$, the final destination of the packet. Like the other nodes, $(E)$ first derives its shared key $s_E$ and removes the blinding. In contrast to the previous nodes, namely $(B)$, then $(C)$, then $(D)$, it finds a message that symbolizes the end of path and tells $(E)$ that it’s the recipient.
 
+\paragraph{Integrity}
+In addition to the routing information that is necessary to determine to which the transformed packet should be sent, each node along the path receives an authentication tag $\delta_i$ in the form of a message authentication code (MAC).
+\newline By using the derived shared secret, e.g. $s_b$, each node is able to recompute the authentication tag and check the integrity of the received packet as follows:
+                                                              $$\delta_0=HMAC(s_0,\beta_0)$$
+The integrity tag  encoded in the header allows checks only on whether the packet header was not also modified. 
+The authentication tags are computed by the sender of the packet and cover also the blindings that nodes add to the packet after transforming it for the next downstream node. This is possible as the sender knows all shared secrets and the blindings are generated pseudo-randomly by using the shared secrets.
+
+
 
 
 
