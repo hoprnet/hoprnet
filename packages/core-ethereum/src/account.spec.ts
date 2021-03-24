@@ -6,17 +6,15 @@ import Web3 from 'web3'
 import sinon from 'sinon'
 import { getBalance, getNativeBalance } from './account'
 import { Ganache } from '@hoprnet/hopr-testing'
-import { migrate, addresses, abis } from '@hoprnet/hopr-ethereum'
+import { migrate }from '@hoprnet/hopr-ethereum'
 import { stringToU8a, durations } from '@hoprnet/hopr-utils'
 import { getPrivKeyData, createAccountAndFund, createNode, disconnectWeb3 } from './utils/testing.spec'
 import * as testconfigs from './config.spec'
-import * as configs from './config'
 import { wait } from './utils'
 import { WEB3_CACHE_TTL } from './constants'
 import Sinon from 'sinon'
-
-const HoprTokenAbi = abis.HoprToken
-const HoprChannelsAbi = abis.HoprChannels
+import { getWeb3, initialize as initializeWeb3 } from './web3'
+import * as configs from './config'
 
 describe('test Account', function () {
   this.timeout(durations.minutes(5))
@@ -31,12 +29,14 @@ describe('test Account', function () {
   before(async function () {
     this.timeout(durations.minutes(1))
 
+    await initializeWeb3(configs.DEFAULT_URI)
+    web3 = getWeb3().web3
+    hoprToken = getWeb3().hoprToken
+    funder = await getPrivKeyData(stringToU8a(testconfigs.FUND_ACCOUNT_PRIVATE_KEY))
+    user = await createAccountAndFund(web3, hoprToken, funder, testconfigs.DEMO_ACCOUNTS[1])
+
     await ganache.start()
     await migrate()
-
-    web3 = new Web3(configs.DEFAULT_URI)
-    hoprToken = new web3.eth.Contract(HoprTokenAbi as any, addresses.localhost?.HoprToken)
-    new web3.eth.Contract(HoprChannelsAbi as any, addresses.localhost?.HoprChannels)
   })
 
   after(async function () {
@@ -45,10 +45,7 @@ describe('test Account', function () {
 
   beforeEach(async function () {
     this.timeout(durations.minutes(1))
-    funder = await getPrivKeyData(stringToU8a(testconfigs.FUND_ACCOUNT_PRIVATE_KEY))
-    user = await createAccountAndFund(web3, hoprToken, funder, testconfigs.DEMO_ACCOUNTS[1])
     coreConnector = await createNode(user.privKey, false)
-
     // wait until it starts
     await coreConnector.start()
     await coreConnector.initOnchainValues()

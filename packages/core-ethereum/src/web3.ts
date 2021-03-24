@@ -54,6 +54,7 @@ let network
 let chainId
 let address
 export async function initialize(providerUri: string) {
+  if (initialized) { return }
   provider = new Web3.providers.WebsocketProvider(providerUri, {
     reconnect: {
       auto: true,
