@@ -57,7 +57,7 @@ export async function initialize(providerUri: string) {
     }
   })
 
-  provider.on('error', e => {
+  provider.on('error', (e) => {
     log('web3 conn issue: ', e)
   })
   web3 = new Web3(provider)
