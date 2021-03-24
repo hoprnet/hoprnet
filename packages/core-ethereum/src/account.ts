@@ -219,7 +219,7 @@ class Account {
     // return of our contract method in web3.Contract instance
     txObject?: TransactionObject<T>
   ) {
-    const { network } = getWeb3()
+    const { network, web3, chainId } = getWeb3()
     const abi = txObject ? txObject.encodeABI() : undefined
     const gas = 300e3
 
@@ -233,7 +233,6 @@ class Account {
     }
 
     // @TODO: potential deadlock, needs to be improved
-    const { web3, chainId } = getWeb3()
     const nonceLock = await this._nonceTracker.getNonceLock(this._address.toHex())
 
     // @TODO: provide some of the values to avoid multiple calls

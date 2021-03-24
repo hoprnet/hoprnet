@@ -27,16 +27,17 @@ describe('test Account', function () {
   let user: Await<ReturnType<typeof getPrivKeyData>>
 
   before(async function () {
-    this.timeout(durations.minutes(1))
+    //this.timeout(durations.minutes(1))
+    await ganache.start()
+    await migrate()
+    console.log("!!")
 
     await initializeWeb3(configs.DEFAULT_URI)
+    console.log("!!2")
     web3 = getWeb3().web3
     hoprToken = getWeb3().hoprToken
     funder = await getPrivKeyData(stringToU8a(testconfigs.FUND_ACCOUNT_PRIVATE_KEY))
-    user = await createAccountAndFund(web3, hoprToken, funder, testconfigs.DEMO_ACCOUNTS[1])
-
-    await ganache.start()
-    await migrate()
+    console.log("!!3")
   })
 
   after(async function () {
@@ -44,15 +45,21 @@ describe('test Account', function () {
   })
 
   beforeEach(async function () {
-    this.timeout(durations.minutes(1))
+    //this.timeout(durations.minutes(1))
+
+    user = await createAccountAndFund(web3, hoprToken, funder, testconfigs.DEMO_ACCOUNTS[1])
+    console.log("3.1")
     coreConnector = await createNode(user.privKey, false)
-    // wait until it starts
+    console.log("3.2")
     await coreConnector.start()
+    console.log("3.3")
     await coreConnector.initOnchainValues()
+    console.log("4")
   })
 
   afterEach(async function () {
     await coreConnector.stop()
+    await getWeb3().provider.disconnect()
   })
 
   describe('ticketEpoch', function () {

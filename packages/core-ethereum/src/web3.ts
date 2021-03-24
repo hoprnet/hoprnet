@@ -35,16 +35,6 @@ export function getNetworkName(chainId: number): Network {
   }
 }
 
-/**
- * Get chain ID.
- *
- * @param web3 a web3 instance
- * @returns the chain ID
- */
-export async function getChainId(web3: Web3): Promise<number> {
-  return web3.eth.getChainId()
-}
-
 let initialized = false
 let provider
 let hoprChannels
@@ -62,8 +52,11 @@ export async function initialize(providerUri: string) {
       maxAttempts: 30
     }
   })
+  await provider.connect()
   web3 = new Web3(provider)
-  chainId = getChainId(web3)
+  console.log(">>", providerUri)
+  chainId = await web3.eth.getChainId()
+  console.log(">>>", chainId)
   network = getNetworkName(chainId) as Network
   if (typeof addresses?.[network]?.HoprChannels === 'undefined') {
     throw Error(`token contract address from network ${network} not found`)
@@ -72,6 +65,7 @@ export async function initialize(providerUri: string) {
   hoprChannels = new web3.eth.Contract(HoprChannelsAbi as any, addresses?.[network]?.HoprChannels)
   hoprToken = new web3.eth.Contract(HoprTokenAbi as any, addresses?.[network]?.HoprToken)
   address = addresses[network]
+
   initialized = true
 }
 
