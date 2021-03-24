@@ -33,9 +33,9 @@ jobs:
           yarn
       - name: Lint & Fix
         run: |
-          git config --global user.email "noreply@hoprnet.org"
-          git config --global user.name "HOPR Linting robot"
+          git config user.name github-actions
+          git config user.email github-actions@github.com
           yarn lint:fix
           git commit -a -m "Fix linting" || true
-          git pull origin ${{ github.ref }}
-          git push origin ${{ github.ref }}
+          git pull
+          git push
