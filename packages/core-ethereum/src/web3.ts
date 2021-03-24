@@ -54,7 +54,6 @@ export async function initialize(providerUri: string) {
       maxAttempts: 30
     }
   })
-  await provider.connect()
   web3 = new Web3(provider)
   console.log('>>', providerUri)
   chainId = await web3.eth.getChainId()
@@ -67,7 +66,6 @@ export async function initialize(providerUri: string) {
   hoprChannels = new web3.eth.Contract(HoprChannelsAbi as any, addresses?.[network]?.HoprChannels)
   hoprToken = new web3.eth.Contract(HoprTokenAbi as any, addresses?.[network]?.HoprToken)
   address = addresses[network]
-
   initialized = true
 }
 
