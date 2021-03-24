@@ -40,5 +40,5 @@ jobs:
           git config user.email github-actions@github.com
           yarn lint:fix
           git commit -a -m "Fix linting" || true
-          git pull origin ${{ github.ref }}
+          git pull --quiet origin ${{ github.ref }}
           git push origin ${{ github.ref }}
