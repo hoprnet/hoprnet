@@ -3,33 +3,26 @@ import { Ganache } from '@hoprnet/hopr-testing'
 import { migrate } from '@hoprnet/hopr-ethereum'
 import assert from 'assert'
 import { stringToU8a, u8aEquals, u8aConcat, durations } from '@hoprnet/hopr-utils'
-import { addresses, abis } from '@hoprnet/hopr-ethereum'
 import { getPrivKeyData, createAccountAndFund, createNode } from '../utils/testing.spec'
 import { createChallenge, hash } from '../utils'
 import BN from 'bn.js'
 import pipe from 'it-pipe'
-import Web3 from 'web3'
-import { HoprToken } from '../tsc/web3/HoprToken'
-import { Await } from '../tsc/utils'
 import { Channel as ChannelType, ChannelStatus, ChannelBalance, ChannelState } from '../types/channel'
 import { AcknowledgedTicket, Balance, SignedChannel, SignedTicket, AccountId } from '../types'
 import CoreConnector from '..'
 import Channel from '.'
 import * as testconfigs from '../config.spec'
 import * as configs from '../config'
+import { getWeb3, initialize as initializeWeb3 } from  '../web3'
 
-const HoprTokenAbi = abis.HoprToken
 const DEFAULT_WIN_PROB = 1
 
 // @TODO: rewrite legacy tests
 describe('test Channel class', function () {
   const ganache = new Ganache()
 
-  let web3: Web3
-  let hoprToken: HoprToken
   let coreConnector: CoreConnector
   let counterpartysCoreConnector: CoreConnector
-  let funder: Await<ReturnType<typeof getPrivKeyData>>
 
   async function getTicketData({
     counterparty,
@@ -54,12 +47,9 @@ describe('test Channel class', function () {
 
   before(async function () {
     this.timeout(durations.minutes(1))
-
     await ganache.start()
     await migrate()
-
-    web3 = new Web3(configs.DEFAULT_URI)
-    hoprToken = new web3.eth.Contract(HoprTokenAbi as any, addresses?.localhost?.HoprToken)
+    await initializeWeb3(configs.DEFAULT_URI)
   })
 
   after(async function () {
@@ -67,9 +57,9 @@ describe('test Channel class', function () {
   })
 
   beforeEach(async function () {
-    this.timeout(durations.seconds(10))
+    const funder = await getPrivKeyData(stringToU8a(testconfigs.FUND_ACCOUNT_PRIVATE_KEY))
+    const { web3, hoprToken } = getWeb3()
 
-    funder = await getPrivKeyData(stringToU8a(testconfigs.FUND_ACCOUNT_PRIVATE_KEY))
     const userA = await createAccountAndFund(web3, hoprToken, funder, testconfigs.DEMO_ACCOUNTS[1])
     const userB = await createAccountAndFund(web3, hoprToken, funder, testconfigs.DEMO_ACCOUNTS[2])
 
