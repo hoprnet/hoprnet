@@ -329,6 +329,7 @@ export async function validateUnacknowledgedTicket({
   // we retrieve all signed tickets and filter the ones between sender and target
   const signedTickets = await getTickets().then(async (signedTickets) => {
     return signedTickets.filter((signedTicket) => {
+      console.log(signedTicket)
       return (
         signedTicket.ticket.counterparty.eq(selfAddress) &&
         signedTicket.ticket.epoch.eq(epoch) &&

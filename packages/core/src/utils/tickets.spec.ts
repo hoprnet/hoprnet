@@ -8,6 +8,7 @@ import chaiAsPromised from 'chai-as-promised'
 import chai, { expect } from 'chai'
 import sinon from 'sinon'
 import { validateUnacknowledgedTicket, validateCreatedTicket } from './tickets'
+import { Address } from '@hoprnet/hopr-core-ethereum/src/types'
 
 chai.use(chaiAsPromised)
 
@@ -18,13 +19,13 @@ const SENDER = PeerId.createFromB58String('16Uiu2HAmM9KAPaXA4eAz58Q7Eb3LEkDvLarU
 const SENDER_ADDRESS = stringToU8a('0x65e78d07acf7b654e5ae6777a93ebbf30f639356')
 
 const createMockTicket = ({
-  targetAddress = TARGET_ADDRESS,
+  targetAddress = new Address(TARGET_ADDRESS),
   amount = new BN(1),
   winProb = new Uint8Array(1),
   epoch = new BN(1),
   channelIteration = new BN(1)
 }: {
-  targetAddress?: Uint8Array
+  targetAddress?: Address
   amount?: BN
   winProb?: Uint8Array
   epoch?: BN
@@ -42,13 +43,13 @@ const createMockTicket = ({
 
 const createMockSignedTicket = ({
   sender = SENDER,
-  targetAddress = TARGET_ADDRESS,
+  targetAddress = new Address(TARGET_ADDRESS),
   amount = new BN(1),
   winProb = new Uint8Array(1),
   channelIteration = new BN(1)
 }: {
   sender?: PeerId
-  targetAddress?: Uint8Array
+  targetAddress?: Address, 
   amount?: BN
   winProb?: Uint8Array
   channelIteration?: BN

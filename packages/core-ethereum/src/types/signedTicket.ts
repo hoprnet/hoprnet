@@ -6,7 +6,6 @@ import { Uint8ArrayE } from '../types/extended'
 import { verify } from '../utils'
 
 class SignedTicket extends Uint8ArrayE implements Types.SignedTicket {
-  private _ticket?: Ticket
   private _signature?: Signature
   private _signer?: Uint8Array
 
@@ -58,14 +57,10 @@ class SignedTicket extends Uint8ArrayE implements Types.SignedTicket {
   }
 
   get ticket(): Ticket {
-    if (!this._ticket) {
-      this._ticket = new Ticket({
-        bytes: this.buffer,
-        offset: this.ticketOffset
-      })
-    }
-
-    return this._ticket
+    return new Ticket({
+      bytes: this.buffer,
+      offset: this.ticketOffset
+    })
   }
 
   get signatureOffset(): number {
