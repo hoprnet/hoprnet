@@ -12,12 +12,13 @@ declare interface BalanceStatic {
    * Decimals of the currency, e.g. 18
    */
   readonly DECIMALS: number
-
-  new (balance: BN | number, ...props: any[]): Balance
+  new (balance: BN): Balance
 }
 
-declare interface Balance extends BN {
-  toU8a(): Uint8Array
+declare interface Balance {
+
+  toBN(): BN
+  serialize(): Uint8Array
 
   // Readable version of the balance
   toFormattedString(): string
