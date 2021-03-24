@@ -13,7 +13,7 @@ import CoreConnector from '..'
 import Channel from '.'
 import * as testconfigs from '../config.spec'
 import * as configs from '../config'
-import { getWeb3, initialize as initializeWeb3 } from  '../web3'
+import { getWeb3, initialize as initializeWeb3 } from '../web3'
 
 const DEFAULT_WIN_PROB = 1
 
