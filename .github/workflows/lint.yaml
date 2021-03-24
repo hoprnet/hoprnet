@@ -29,13 +29,15 @@ jobs:
           key: ${{ runner.os }}-lerna-${{ hashFiles('**/yarn.lock') }}
 
       - name: Install dependencies
+        if: steps.yarn-cache.outputs.cache-hit != 'true'
         run: |
-          yarn
+          yarn --prefer-offline
+          node_modules/.bin/lerna bootstrap
       - name: Lint & Fix
         run: |
           git config user.name github-actions
           git config user.email github-actions@github.com
           yarn lint:fix
           git commit -a -m "Fix linting" || true
-          git pull
-          git push
+          git pull origin ${{ github.ref }}
+          git push origin ${{ github.ref }}
