@@ -24,6 +24,7 @@ jobs:
           registry-url: https://registry.npmjs.org/
 
       - name: Restore cache of node modules
+        id: node-modules-cache
         uses: actions/cache@v2
         with:
           path: |
@@ -32,7 +33,7 @@ jobs:
           key: ${{ runner.os }}-lerna-${{ hashFiles('**/yarn.lock') }}
 
       - name: Install dependencies
-        if: steps.yarn-cache.outputs.cache-hit != 'true'
+        if: steps.node-modules-cache.outputs.cache-hit != 'true'
         run: |
           yarn --prefer-offline
           node_modules/.bin/lerna bootstrap
@@ -86,8 +87,7 @@ jobs:
         shell: bash {0}
         run: |
           git config user.email github-actions@github.com
-                    git config user.name github-actions
-          git config --global user.email "noreply@hoprnet.org" && git config --global user.name "HOPR Testing robot"
+          git config user.name github-actions
           git add ./test || true
           git commit -a -m "update databases" || true
           git pull origin ${{ github.ref }}

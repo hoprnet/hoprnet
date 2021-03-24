@@ -21,6 +21,7 @@ jobs:
           registry-url: https://registry.npmjs.org/
 
       - name: Restore cache of node modules.
+        id: node-modules-cache
         uses: actions/cache@v2
         with:
           path: |
@@ -29,7 +30,7 @@ jobs:
           key: ${{ runner.os }}-lerna-${{ hashFiles('**/yarn.lock') }}
 
       - name: Install dependencies
-        if: steps.yarn-cache.outputs.cache-hit != 'true'
+        if: steps.node-modules-cache.outputs.cache-hit != 'true'
         run: |
           yarn --prefer-offline
           node_modules/.bin/lerna bootstrap
