@@ -1,14 +1,14 @@
-declare interface AccountIdStatic {
+declare interface AddressStatic {
   readonly SIZE: number
-  new (accountId: Uint8Array): AccountId
+  new (accountId: Uint8Array): Address
 }
 
-declare interface AccountId {
+declare interface Address {
   serialize(): Uint8Array
-  eq(b: AccountId): boolean
+  eq(b: Address): boolean
   toHex(): string
 }
 
-declare var AccountId: AccountIdStatic
+declare var Address: AddressStatic
 
-export default AccountId
+export default Address

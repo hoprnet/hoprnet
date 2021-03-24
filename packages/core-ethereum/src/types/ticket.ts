@@ -1,7 +1,7 @@
 import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import BN from 'bn.js'
 import { stringToU8a, u8aToHex, u8aConcat } from '@hoprnet/hopr-utils'
-import { AccountId, Balance, Hash, Signature, TicketEpoch } from '.'
+import { Address, Balance, Hash, Signature, TicketEpoch } from '.'
 import { Uint8ArrayE } from '../types/extended'
 import { sign } from '../utils'
 
@@ -29,7 +29,7 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
       offset: number
     },
     struct?: {
-      counterparty: AccountId
+      counterparty: Address
       challenge: Hash
       epoch: TicketEpoch
       amount: Balance
@@ -72,12 +72,12 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
     return this.byteOffset
   }
 
-  get counterparty(): AccountId {
-    return new AccountId(new Uint8Array(this.buffer, this.counterpartyOffset, AccountId.SIZE))
+  get counterparty(): Address {
+    return new Address(new Uint8Array(this.buffer, this.counterpartyOffset, Address.SIZE))
   }
 
   get challengeOffset(): number {
-    return this.byteOffset + AccountId.SIZE
+    return this.byteOffset + Address.SIZE
   }
 
   get challenge(): Hash {
@@ -85,7 +85,7 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
   }
 
   get epochOffset(): number {
-    return this.byteOffset + AccountId.SIZE + Hash.SIZE
+    return this.byteOffset + Address.SIZE + Hash.SIZE
   }
 
   get epoch(): TicketEpoch {
@@ -93,7 +93,7 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
   }
 
   get amountOffset(): number {
-    return this.byteOffset + AccountId.SIZE + Hash.SIZE + EPOCH_SIZE
+    return this.byteOffset + Address.SIZE + Hash.SIZE + EPOCH_SIZE
   }
 
   get amount(): Balance {
@@ -101,7 +101,7 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
   }
 
   get winProbOffset(): number {
-    return this.byteOffset + AccountId.SIZE + Hash.SIZE + EPOCH_SIZE + AMOUNT_SIZE
+    return this.byteOffset + Address.SIZE + Hash.SIZE + EPOCH_SIZE + AMOUNT_SIZE
   }
 
   get winProb(): Hash {
@@ -109,7 +109,7 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
   }
 
   get channelIterationOffset(): number {
-    return this.byteOffset + AccountId.SIZE + Hash.SIZE + EPOCH_SIZE + AMOUNT_SIZE + Hash.SIZE
+    return this.byteOffset + Address.SIZE + Hash.SIZE + EPOCH_SIZE + AMOUNT_SIZE + Hash.SIZE
   }
 
   get channelIteration(): TicketEpoch {
@@ -121,7 +121,7 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
   }
 
   static get SIZE(): number {
-    return AccountId.SIZE + Hash.SIZE + EPOCH_SIZE + AMOUNT_SIZE + Hash.SIZE + EPOCH_SIZE
+    return Address.SIZE + Hash.SIZE + EPOCH_SIZE + AMOUNT_SIZE + Hash.SIZE + EPOCH_SIZE
   }
 
   getEmbeddedFunds(): Balance {
@@ -138,7 +138,7 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
       offset: number
     },
     struct?: {
-      counterparty: AccountId
+      counterparty: Address
       challenge: Hash
       epoch: TicketEpoch
       amount: Balance

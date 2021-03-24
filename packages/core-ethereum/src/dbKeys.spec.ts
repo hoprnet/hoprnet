@@ -1,7 +1,7 @@
 import assert from 'assert'
 import { randomBytes } from 'crypto'
 import { u8aConcat, u8aEquals } from '@hoprnet/hopr-utils'
-import { Hash, AccountId } from './types'
+import { Hash, Address } from './types'
 import * as dbKeys from './dbKeys'
 import { getId } from './utils'
 import { getPrivKeyData } from './utils/testing.spec'
@@ -22,7 +22,7 @@ describe('test dbKeys', function () {
   })
 
   it("should create 'Channel' key", function () {
-    const result = dbKeys.Channel(new AccountId(userB.pubKey))
+    const result = dbKeys.Channel(new Address(userB.pubKey))
     const expected = u8aConcat(encoder.encode(`payments-channel-`), userB.pubKey)
 
     assert(u8aEquals(result, expected), 'check channel key creation')

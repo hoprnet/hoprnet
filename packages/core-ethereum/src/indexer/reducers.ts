@@ -8,9 +8,9 @@ export const onFundedChannel = async (
   event: Event<'FundedChannel'>,
   channelEntry?: ChannelEntry
 ): Promise<ChannelEntry> => {
-  const recipientAccountId = await event.data.recipient.toAccountId()
-  const counterpartyAccountId = await event.data.counterparty.toAccountId()
-  const isRecipientPartyA = isPartyA(recipientAccountId, counterpartyAccountId)
+  const recipientAddress = await event.data.recipient.toAddress()
+  const counterpartyAddress = await event.data.counterparty.toAddress()
+  const isRecipientPartyA = isPartyA(recipientAddress, counterpartyAddress)
 
   if (channelEntry) {
     assert(
@@ -71,9 +71,9 @@ export const onRedeemedTicket = async (
     "'onRedeemedTicket' failed because channel is not in 'OPEN' or 'PENDING' status"
   )
 
-  const redeemerAccountId = await event.data.redeemer.toAccountId()
-  const counterpartyAccountId = await event.data.counterparty.toAccountId()
-  const isRedeemerPartyA = isPartyA(redeemerAccountId, counterpartyAccountId)
+  const redeemerAddress = await event.data.redeemer.toAddress()
+  const counterpartyAddress = await event.data.counterparty.toAddress()
+  const isRedeemerPartyA = isPartyA(redeemerAddress, counterpartyAddress)
 
   return new ChannelEntry(undefined, {
     blockNumber: event.blockNumber,
@@ -118,9 +118,9 @@ export const onInitiatedChannelClosure = async (
     throw err
   }
 
-  const initiatorAccountId = await event.data.initiator.toAccountId()
-  const counterpartyAccountId = await event.data.counterparty.toAccountId()
-  const isInitiatorPartyA = isPartyA(initiatorAccountId, counterpartyAccountId)
+  const initiatorAddress = await event.data.initiator.toAddress()
+  const counterpartyAddress = await event.data.counterparty.toAddress()
+  const isInitiatorPartyA = isPartyA(initiatorAddress, counterpartyAddress)
 
   return new ChannelEntry(undefined, {
     blockNumber: event.blockNumber,

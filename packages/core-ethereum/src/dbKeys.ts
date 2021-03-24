@@ -2,7 +2,7 @@
   Helper functions which generate database keys
 */
 import { toU8a } from '@hoprnet/hopr-utils'
-import { Hash, Public, AccountId } from './types'
+import { Hash, Public, Address } from './types'
 import type { Types } from '@hoprnet/hopr-core-connector-interface'
 
 const encoder = new TextEncoder()
@@ -25,7 +25,7 @@ const ON_CHAIN_SECRET_ITERATION_WIDTH = 4 // bytes
  * Returns the db-key under which the channel is saved.
  * @param counterparty counterparty of the channel
  */
-export function Channel(counterparty: Types.AccountId): Uint8Array {
+export function Channel(counterparty: Types.Address): Uint8Array {
   return allocationHelper([
     [PREFIX.length, PREFIX],
     [channelSubPrefix.length, channelSubPrefix],
@@ -37,8 +37,8 @@ export function Channel(counterparty: Types.AccountId): Uint8Array {
  * Reconstructs the channelId from a db-key.
  * @param arr a channel db-key
  */
-export function ChannelKeyParse(arr: Uint8Array): Types.AccountId {
-  return new AccountId(arr.slice(PREFIX.length + channelSubPrefix.length))
+export function ChannelKeyParse(arr: Uint8Array): Types.Address {
+  return new Address(arr.slice(PREFIX.length + channelSubPrefix.length))
 }
 
 /**

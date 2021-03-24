@@ -1,4 +1,4 @@
-import AccountId from './accountId'
+import Address from './accountId'
 import AcknowledgedTicket from './acknowledgedTicket'
 import Balance from './balance'
 import { Channel, ChannelBalance, ChannelState } from './channel'
@@ -14,7 +14,7 @@ import Ticket from './ticket'
 import TicketEpoch from './ticketEpoch'
 
 export {
-  AccountId,
+  Address,
   AcknowledgedTicket,
   Balance,
   Channel,

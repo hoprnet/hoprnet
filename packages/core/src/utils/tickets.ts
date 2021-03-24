@@ -257,11 +257,11 @@ export async function validateUnacknowledgedTicket({
   const ticket = signedTicket.ticket
   const chain = node.paymentChannels
   const selfPubKey = node.getId().pubKey.marshal()
-  const selfAccountId = await chain.utils.pubKeyToAccountId(selfPubKey)
+  const selfAddress = await chain.utils.pubKeyToAddress(selfPubKey)
   const senderB58 = senderPeerId.toB58String()
   const senderPubKey = senderPeerId.pubKey.marshal()
-  const senderAccountId = await chain.utils.pubKeyToAccountId(senderPubKey)
-  const amPartyA = chain.utils.isPartyA(selfAccountId, senderAccountId)
+  const senderAddress = await chain.utils.pubKeyToAddress(senderPubKey)
+  const amPartyA = chain.utils.isPartyA(selfAddress, senderAddress)
 
   // ticket signer MUST be the sender
   if (!u8aEquals(await signedTicket.signer, senderPubKey)) {
@@ -330,7 +330,7 @@ export async function validateUnacknowledgedTicket({
   const signedTickets = await getTickets().then(async (signedTickets) => {
     return signedTickets.filter((signedTicket) => {
       return (
-        signedTicket.ticket.counterparty.eq(selfAccountId) &&
+        signedTicket.ticket.counterparty.eq(selfAddress) &&
         signedTicket.ticket.epoch.eq(epoch) &&
         ticket.channelIteration.toNumber() === currentChannelIteration
       )

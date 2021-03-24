@@ -77,7 +77,7 @@ export default class ListOpenChannels extends AbstractCommand {
       }
 
       for (const { partyA, partyB, channelEntry } of channels) {
-        const id = u8aToHex(await utils.getId(await partyA.toAccountId(), await partyB.toAccountId()))
+        const id = u8aToHex(await utils.getId(await partyA.toAddress(), await partyB.toAddress()))
         const selfIsPartyA = u8aEquals(self, partyA)
         const counterparty = selfIsPartyA ? partyB : partyA
 

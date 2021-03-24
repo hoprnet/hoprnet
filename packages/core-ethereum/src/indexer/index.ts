@@ -339,16 +339,16 @@ class Indexer extends EventEmitter implements IIndexer {
 
   // on new events
   private async onFundedChannel(event: Event<'FundedChannel'>): Promise<void> {
-    const recipientAccountId = await event.data.recipient.toAccountId()
-    const counterpartyAccountId = await event.data.counterparty.toAccountId()
-    const isRecipientPartyA = isPartyA(recipientAccountId, counterpartyAccountId)
+    const recipientAddress = await event.data.recipient.toAddress()
+    const counterpartyAddress = await event.data.counterparty.toAddress()
+    const isRecipientPartyA = isPartyA(recipientAddress, counterpartyAddress)
     const partyA = isRecipientPartyA ? event.data.recipient : event.data.counterparty
     const partyB = isRecipientPartyA ? event.data.counterparty : event.data.recipient
 
     const storedChannel = await getChannelEntry(this.connector.db, partyA, partyB)
     const channelEntry = await reducers.onFundedChannel(event, storedChannel)
 
-    // const channelId = await getId(recipientAccountId, counterpartyAccountId)
+    // const channelId = await getId(recipientAddress, counterpartyAddress)
     // log('Processing event %s with channelId %s', event.name, channelId.toHex())
 
     await updateChannelEntry(this.connector.db, partyA, partyB, channelEntry)
@@ -357,13 +357,13 @@ class Indexer extends EventEmitter implements IIndexer {
   }
 
   private async onOpenedChannel(event: Event<'OpenedChannel'>): Promise<void> {
-    const openerAccountId = await event.data.opener.toAccountId()
-    const counterpartyAccountId = await event.data.counterparty.toAccountId()
-    const isOpenerPartyA = isPartyA(openerAccountId, counterpartyAccountId)
+    const openerAddress = await event.data.opener.toAddress()
+    const counterpartyAddress = await event.data.counterparty.toAddress()
+    const isOpenerPartyA = isPartyA(openerAddress, counterpartyAddress)
     const partyA = isOpenerPartyA ? event.data.opener : event.data.counterparty
     const partyB = isOpenerPartyA ? event.data.counterparty : event.data.opener
 
-    const channelId = await getId(openerAccountId, counterpartyAccountId)
+    const channelId = await getId(openerAddress, counterpartyAddress)
     // log('Processing event %s with channelId %s', event.name, channelId.toHex())
 
     const storedChannel = await getChannelEntry(this.connector.db, partyA, partyB)
@@ -382,17 +382,17 @@ class Indexer extends EventEmitter implements IIndexer {
       channelEntry
     })
 
-    // log('Channel %s got opened by %s', chalk.green(channelId.toHex()), chalk.green(openerAccountId.toHex()))
+    // log('Channel %s got opened by %s', chalk.green(channelId.toHex()), chalk.green(openerAddress.toHex()))
   }
 
   private async onRedeemedTicket(event: Event<'RedeemedTicket'>): Promise<void> {
-    const redeemerAccountId = await event.data.redeemer.toAccountId()
-    const counterpartyAccountId = await event.data.counterparty.toAccountId()
-    const isRedeemerPartyA = isPartyA(redeemerAccountId, counterpartyAccountId)
+    const redeemerAddress = await event.data.redeemer.toAddress()
+    const counterpartyAddress = await event.data.counterparty.toAddress()
+    const isRedeemerPartyA = isPartyA(redeemerAddress, counterpartyAddress)
     const partyA = isRedeemerPartyA ? event.data.redeemer : event.data.counterparty
     const partyB = isRedeemerPartyA ? event.data.counterparty : event.data.redeemer
 
-    const channelId = await getId(redeemerAccountId, counterpartyAccountId)
+    const channelId = await getId(redeemerAddress, counterpartyAddress)
     // log('Processing event %s with channelId %s', event.name, channelId.toHex())
 
     const storedChannel = await getChannelEntry(this.connector.db, partyA, partyB)
@@ -405,17 +405,17 @@ class Indexer extends EventEmitter implements IIndexer {
 
     await updateChannelEntry(this.connector.db, partyA, partyB, channelEntry)
 
-    // log('Ticket redeemd in channel %s by %s', chalk.green(channelId.toHex()), chalk.green(redeemerAccountId.toHex()))
+    // log('Ticket redeemd in channel %s by %s', chalk.green(channelId.toHex()), chalk.green(redeemerAddress.toHex()))
   }
 
   private async onInitiatedChannelClosure(event: Event<'InitiatedChannelClosure'>): Promise<void> {
-    const initiatorAccountId = await event.data.initiator.toAccountId()
-    const counterpartyAccountId = await event.data.counterparty.toAccountId()
-    const isInitiatorPartyA = isPartyA(initiatorAccountId, counterpartyAccountId)
+    const initiatorAddress = await event.data.initiator.toAddress()
+    const counterpartyAddress = await event.data.counterparty.toAddress()
+    const isInitiatorPartyA = isPartyA(initiatorAddress, counterpartyAddress)
     const partyA = isInitiatorPartyA ? event.data.initiator : event.data.counterparty
     const partyB = isInitiatorPartyA ? event.data.counterparty : event.data.initiator
 
-    const channelId = await getId(initiatorAccountId, counterpartyAccountId)
+    const channelId = await getId(initiatorAddress, counterpartyAddress)
     // log('Processing event %s with channelId %s', event.name, channelId.toHex())
 
     const storedChannel = await getChannelEntry(this.connector.db, partyA, partyB)
@@ -431,18 +431,18 @@ class Indexer extends EventEmitter implements IIndexer {
     // log(
     //   'Channel closure initiated for %s by %s',
     //   chalk.green(channelId.toHex()),
-    //   chalk.green(initiatorAccountId.toHex())
+    //   chalk.green(initiatorAddress.toHex())
     // )
   }
 
   private async onClosedChannel(event: Event<'ClosedChannel'>): Promise<void> {
-    const closerAccountId = await event.data.closer.toAccountId()
-    const counterpartyAccountId = await event.data.counterparty.toAccountId()
-    const isCloserPartyA = isPartyA(closerAccountId, counterpartyAccountId)
+    const closerAddress = await event.data.closer.toAddress()
+    const counterpartyAddress = await event.data.counterparty.toAddress()
+    const isCloserPartyA = isPartyA(closerAddress, counterpartyAddress)
     const partyA = isCloserPartyA ? event.data.closer : event.data.counterparty
     const partyB = isCloserPartyA ? event.data.counterparty : event.data.closer
 
-    const channelId = await getId(closerAccountId, counterpartyAccountId)
+    const channelId = await getId(closerAddress, counterpartyAddress)
     // log('Processing event %s with channelId %s', event.name, channelId.toHex())
 
     const storedChannel = await getChannelEntry(this.connector.db, partyA, partyB)
@@ -461,7 +461,7 @@ class Indexer extends EventEmitter implements IIndexer {
       channelEntry
     })
 
-    // log('Channel %s got closed by %s', chalk.green(channelId.toHex()), chalk.green(closerAccountId.toHex()))
+    // log('Channel %s got closed by %s', chalk.green(channelId.toHex()), chalk.green(closerAddress.toHex()))
   }
 
   // DB related

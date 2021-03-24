@@ -15,7 +15,7 @@ import {
   durations,
   u8aToNumber
 } from '@hoprnet/hopr-utils'
-import { AccountId, Balance, Hash, Signature } from '../types'
+import { Address, Balance, Hash, Signature } from '../types'
 import { ContractEventEmitter } from '../tsc/web3/types'
 import { ChannelStatus } from '../types/channel'
 import * as constants from '../constants'
@@ -29,7 +29,7 @@ export { time }
  * @param counterparty counterparty's accountId
  * @returns true if self is partyA
  */
-export function isPartyA(self: AccountId, counterparty: AccountId): boolean {
+export function isPartyA(self: Address, counterparty: Address): boolean {
   return Buffer.compare(self.serialize(), counterparty.serialize()) < 0
 }
 
@@ -38,7 +38,7 @@ export function isPartyA(self: AccountId, counterparty: AccountId): boolean {
  * @param counterparty counterparty's accountId
  * @returns an array of partyA's and partyB's accountIds
  */
-export function getParties(self: AccountId, counterparty: AccountId): [AccountId, AccountId] {
+export function getParties(self: Address, counterparty: Address): [Address, Address] {
   if (isPartyA(self, counterparty)) {
     return [self, counterparty]
   } else {
@@ -52,7 +52,7 @@ export function getParties(self: AccountId, counterparty: AccountId): [AccountId
  * @param counterparty counterparty's accountId
  * @returns a promise resolved to Hash
  */
-export function getId(self: AccountId, counterparty: AccountId): Promise<Hash> {
+export function getId(self: Address, counterparty: Address): Promise<Hash> {
   return hash(Buffer.concat(getParties(self, counterparty).map(x => x.serialize()), 2 * constants.ADDRESS_LENGTH))
 }
 
@@ -73,11 +73,11 @@ export async function privKeyToPubKey(privKey: Uint8Array): Promise<Uint8Array> 
 }
 
 /**
- * Given a public key, derive the AccountId.
- * @param pubKey the public key to derive the AccountId from
- * @returns a promise resolved to AccountId
+ * Given a public key, derive the Address.
+ * @param pubKey the public key to derive the Address from
+ * @returns a promise resolved to Address
  */
-export async function pubKeyToAccountId(pubKey: Uint8Array): Promise<AccountId> {
+export async function pubKeyToAddress(pubKey: Uint8Array): Promise<Address> {
   if (pubKey.length != constants.COMPRESSED_PUBLIC_KEY_LENGTH)
     throw Error(
       `Invalid input parameter. Expected a Uint8Array of size ${
@@ -85,7 +85,7 @@ export async function pubKeyToAccountId(pubKey: Uint8Array): Promise<AccountId> 
       }. Got '${typeof pubKey}'${pubKey.length ? ` of length ${pubKey.length}` : ''}.`
     )
 
-  return new AccountId((await hash(publicKeyConvert(pubKey, false).slice(1))).slice(12))
+  return new Address((await hash(publicKeyConvert(pubKey, false).slice(1))).slice(12))
 }
 
 /**

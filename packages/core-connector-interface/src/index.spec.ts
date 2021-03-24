@@ -16,7 +16,7 @@ async function main() {
 
   coreConnector.constants.CHAIN_NAME
 
-  coreConnector.types.AccountId.SIZE
+  coreConnector.types.Address.SIZE
 
   await coreConnector.start()
 

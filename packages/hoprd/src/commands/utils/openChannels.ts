@@ -101,7 +101,7 @@ export async function getPartyOpenChannels(node: Hopr<HoprCoreConnector>, party:
     }).map(async (peer) => {
       return {
         peer,
-        accountId: await utils.pubKeyToAccountId(peer.pubKey.marshal())
+        accountId: await utils.pubKeyToAddress(peer.pubKey.marshal())
       }
     })
   )

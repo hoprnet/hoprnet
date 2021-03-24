@@ -77,7 +77,7 @@ class Channel implements IChannel {
         this._channelId = new Hash(
           await this.coreConnector.utils.getId(
             await this.coreConnector.account.address,
-            await this.coreConnector.utils.pubKeyToAccountId(this.counterparty)
+            await this.coreConnector.utils.pubKeyToAddress(this.counterparty)
           )
         )
       } catch (error) {
@@ -149,7 +149,7 @@ class Channel implements IChannel {
         return resolve(
           new Balance(
             await this.coreConnector.hoprToken.methods
-              .balanceOf((await this.coreConnector.utils.pubKeyToAccountId(this.counterparty)).toHex())
+              .balanceOf((await this.coreConnector.utils.pubKeyToAddress(this.counterparty)).toHex())
               .call()
           )
         )
@@ -176,7 +176,7 @@ class Channel implements IChannel {
             to: this.coreConnector.hoprChannels.options.address
           },
           this.coreConnector.hoprChannels.methods.initiateChannelClosure(
-            (await this.coreConnector.utils.pubKeyToAccountId(this.counterparty)).toHex()
+            (await this.coreConnector.utils.pubKeyToAddress(this.counterparty)).toHex()
           )
         )
 
@@ -189,7 +189,7 @@ class Channel implements IChannel {
             to: this.coreConnector.hoprChannels.options.address
           },
           this.coreConnector.hoprChannels.methods.claimChannelClosure(
-            (await this.coreConnector.utils.pubKeyToAccountId(this.counterparty)).toHex()
+            (await this.coreConnector.utils.pubKeyToAddress(this.counterparty)).toHex()
           )
         )
 

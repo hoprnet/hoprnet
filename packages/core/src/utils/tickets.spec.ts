@@ -88,9 +88,9 @@ const createMockNode = ({
   stateCounter?: BN
   getWinProbabilityAsFloat?: number
 }) => {
-  const pubKeyToAccountId = sinon.stub()
-  pubKeyToAccountId.withArgs(sender.pubKey.marshal()).returns(Promise.resolve(senderAddress))
-  pubKeyToAccountId.withArgs(target.pubKey.marshal()).returns(Promise.resolve(targetAddress))
+  const pubKeyToAddress = sinon.stub()
+  pubKeyToAddress.withArgs(sender.pubKey.marshal()).returns(Promise.resolve(senderAddress))
+  pubKeyToAddress.withArgs(target.pubKey.marshal()).returns(Promise.resolve(targetAddress))
 
   const isPartyA = sinon.stub()
   isPartyA.withArgs(targetAddress, senderAddress).returns(true)
@@ -111,7 +111,7 @@ const createMockNode = ({
       },
       utils: {
         isPartyA: isPartyA,
-        pubKeyToAccountId,
+        pubKeyToAddress,
         getWinProbabilityAsFloat: sinon.stub().returns(getWinProbabilityAsFloat),
         stateCounterToIteration
       },

@@ -3,7 +3,7 @@ import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import { ADDRESS_LENGTH } from '../constants'
 import { u8aToHex, u8aEquals } from '@hoprnet/hopr-utils'
 
-class AccountId implements Types.AccountId {
+class Address implements Types.Address {
   constructor(private id: Uint8Array){}
 
   static get SIZE(): number {
@@ -18,9 +18,9 @@ class AccountId implements Types.AccountId {
     return Web3.utils.toChecksumAddress(u8aToHex(this.id, false))
   }
 
-  eq(b: AccountId) {
+  eq(b: Address) {
     return u8aEquals(this.id, b.serialize())
   }
 }
 
-export default AccountId
+export default Address

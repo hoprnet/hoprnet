@@ -1,4 +1,4 @@
-import AccountId from './accountId'
+import Address from './accountId'
 
 declare interface PublicStatic {
   SIZE: number
@@ -7,7 +7,7 @@ declare interface PublicStatic {
 }
 
 declare interface Public extends Uint8Array {
-  toAccountId(): Promise<AccountId>
+  toAddress(): Promise<Address>
 }
 
 declare var Public: PublicStatic
