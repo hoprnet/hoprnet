@@ -4,7 +4,7 @@ import { ADDRESS_LENGTH } from '../constants'
 import { u8aToHex, u8aEquals } from '@hoprnet/hopr-utils'
 
 class Address implements Types.Address {
-  constructor(private id: Uint8Array){}
+  constructor(private id: Uint8Array) {}
 
   static get SIZE(): number {
     return ADDRESS_LENGTH
