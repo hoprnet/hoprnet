@@ -92,8 +92,8 @@ const createMockNode = ({
   isPartyAVal?: boolean
 }) => {
   const pubKeyToAddress = sinon.stub()
-  pubKeyToAddress.withArgs(sender.pubKey.marshal()).returns(Promise.resolve({serialize: () => senderAddress}))
-  pubKeyToAddress.withArgs(target.pubKey.marshal()).returns(Promise.resolve({serialize: () => targetAddress}))
+  pubKeyToAddress.withArgs(sender.pubKey.marshal()).returns(Promise.resolve({ serialize: () => senderAddress }))
+  pubKeyToAddress.withArgs(target.pubKey.marshal()).returns(Promise.resolve({ serialize: () => targetAddress }))
 
   const isPartyA = sinon.stub().returns(isPartyAVal)
 
@@ -148,7 +148,7 @@ describe('unit test validateUnacknowledgedTicket', function () {
   })
 
   it('should throw when signer is not sender', async function () {
-    const node = createMockNode({isPartyAVal: false})
+    const node = createMockNode({ isPartyAVal: false })
     const signedTicket = createMockSignedTicket({})
 
     return expect(
