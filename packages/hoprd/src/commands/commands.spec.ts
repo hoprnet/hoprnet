@@ -58,7 +58,7 @@ describe('Commands', () => {
     mockNode.paymentChannels = sinon.fake()
     mockNode.paymentChannels.constants = sinon.fake()
     mockNode.paymentChannels.utils = sinon.fake()
-    mockNode.paymentChannels.utils.pubKeyToAddress = sinon.fake.returns({toHex: () => ''})
+    mockNode.paymentChannels.utils.pubKeyToAddress = sinon.fake.returns({ toHex: () => '' })
     mockNode.paymentChannels.constants.CHAIN_NAME = '2CHAINZ'
     mockNode.getId = sinon.fake.returns({
       toB58String: sinon.fake(),
