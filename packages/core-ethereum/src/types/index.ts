@@ -14,7 +14,6 @@ import Snapshot from './snapshot'
 import Ticket from './ticket'
 import TicketEpoch from './ticketEpoch'
 
-
 class Types {
   public Address = Address
   public AcknowledgedTicket = AcknowledgedTicket
