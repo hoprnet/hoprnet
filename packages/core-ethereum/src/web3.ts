@@ -1,5 +1,7 @@
 import { Network, addresses, abis } from '@hoprnet/hopr-ethereum'
 import Web3 from 'web3'
+import Debug from 'debug'
+const log = Debug('hopr-core-ethereum:web3')
 
 const HoprChannelsAbi = abis.HoprChannels
 const HoprTokenAbi = abis.HoprToken
@@ -53,6 +55,10 @@ export async function initialize(providerUri: string) {
       delay: 1000, // ms
       maxAttempts: 30
     }
+  })
+
+  provider.on('error', e => {
+    log('web3 conn issue: ', e)
   })
   web3 = new Web3(provider)
   console.log('>>', providerUri)
