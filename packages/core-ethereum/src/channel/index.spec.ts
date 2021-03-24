@@ -12,7 +12,7 @@ import Web3 from 'web3'
 import { HoprToken } from '../tsc/web3/HoprToken'
 import { Await } from '../tsc/utils'
 import { Channel as ChannelType, ChannelStatus, ChannelBalance, ChannelState } from '../types/channel'
-import { AcknowledgedTicket, Balance, SignedChannel, SignedTicket, AccountId } from '../types'
+import { AcknowledgedTicket, Balance, SignedChannel, SignedTicket, Address } from '../types'
 import CoreConnector from '..'
 import Channel from '.'
 import * as testconfigs from '../config.spec'
@@ -35,7 +35,7 @@ describe('test Channel class', function () {
     counterparty,
     winProb = DEFAULT_WIN_PROB
   }: {
-    counterparty: AccountId
+    counterparty: Address
     winProb?: number
   }) {
     const secretA = randomBytes(32)
@@ -131,8 +131,8 @@ describe('test Channel class', function () {
       }
     )
 
-    const myAddress = await coreConnector.utils.pubKeyToAccountId(coreConnector.account.keys.onChain.pubKey)
-    const counterpartyAddress = await coreConnector.utils.pubKeyToAccountId(
+    const myAddress = await coreConnector.utils.pubKeyToAddress(coreConnector.account.keys.onChain.pubKey)
+    const counterpartyAddress = await coreConnector.utils.pubKeyToAddress(
       counterpartysCoreConnector.account.keys.onChain.pubKey
     )
 
@@ -159,7 +159,7 @@ describe('test Channel class', function () {
 
     assert(
       u8aEquals(dbChannels[0].counterparty, coreConnector.account.keys.onChain.pubKey),
-      `Channel record should make it into the database and its db-key should lead to the AccountId of the counterparty.`
+      `Channel record should make it into the database and its db-key should lead to the Address of the counterparty.`
     )
 
     const counterpartysChannel = await counterpartysCoreConnector.channel.create(

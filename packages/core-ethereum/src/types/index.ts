@@ -1,4 +1,4 @@
-import AccountId from './accountId'
+import Address from './accountId'
 import AcknowledgedTicket from './acknowledgedTicket'
 import Balance from './balance'
 import { Channel, ChannelBalance, ChannelState } from './channel'
@@ -15,7 +15,7 @@ import Ticket from './ticket'
 import TicketEpoch from './ticketEpoch'
 
 class Types {
-  public AccountId = AccountId
+  public Address = Address
   public AcknowledgedTicket = AcknowledgedTicket
   public Balance = Balance
   public Channel = Channel
@@ -35,7 +35,7 @@ class Types {
 }
 
 export {
-  AccountId,
+  Address,
   AcknowledgedTicket,
   Balance,
   Channel,

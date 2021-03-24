@@ -589,8 +589,8 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     const self = this.getId()
 
     const channelId = await utils.getId(
-      await utils.pubKeyToAccountId(self.pubKey.marshal()),
-      await utils.pubKeyToAccountId(counterParty.pubKey.marshal())
+      await utils.pubKeyToAddress(self.pubKey.marshal()),
+      await utils.pubKeyToAddress(counterParty.pubKey.marshal())
     )
 
     const myAvailableTokens = await account.getBalance(true)
@@ -603,8 +603,8 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     }
 
     const amPartyA = utils.isPartyA(
-      await utils.pubKeyToAccountId(self.pubKey.marshal()),
-      await utils.pubKeyToAccountId(counterParty.pubKey.marshal())
+      await utils.pubKeyToAddress(self.pubKey.marshal()),
+      await utils.pubKeyToAddress(counterParty.pubKey.marshal())
     )
 
     const channelBalance = types.ChannelBalance.create(
