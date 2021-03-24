@@ -287,7 +287,7 @@ class ChannelFactory {
         )
 
         await this.coreConnector.db.put(
-          Buffer.from(this.coreConnector.dbKeys.Channel(counterpartyPubKey)),
+          Buffer.from(this.coreConnector.dbKeys.Channel(new AccountId(counterpartyPubKey))),
           Buffer.from(signedChannel)
         )
       } catch (e) {
@@ -308,8 +308,8 @@ class ChannelFactory {
     return new Promise<R>((resolve, reject) => {
       this.coreConnector.db
         .createReadStream({
-          gte: Buffer.from(this.coreConnector.dbKeys.Channel(new Uint8Array(Hash.SIZE).fill(0x00))),
-          lte: Buffer.from(this.coreConnector.dbKeys.Channel(new Uint8Array(Hash.SIZE).fill(0xff)))
+          gte: Buffer.from(this.coreConnector.dbKeys.Channel(new AccountId(new Uint8Array(Hash.SIZE).fill(0x00)))),
+          lte: Buffer.from(this.coreConnector.dbKeys.Channel(new AccountId(new Uint8Array(Hash.SIZE).fill(0xff))))
         })
         .on('error', (err) => reject(err))
         .on('data', ({ key, value }: { key: Buffer; value: Buffer }) => {
@@ -319,7 +319,7 @@ class ChannelFactory {
           })
 
           promises.push(
-            onData(new Channel(this.coreConnector, this.coreConnector.dbKeys.ChannelKeyParse(key), signedChannel))
+            onData(new Channel(this.coreConnector, this.coreConnector.dbKeys.ChannelKeyParse(key).serialize(), signedChannel))
           )
         })
         .on('end', () => resolve(onEnd(promises)))
@@ -382,18 +382,18 @@ class ChannelFactory {
   }
 
   getOffChainState(counterparty: Uint8Array): Promise<SignedChannel> {
-    return this.coreConnector.db.get(Buffer.from(this.coreConnector.dbKeys.Channel(counterparty))) as any
+    return this.coreConnector.db.get(Buffer.from(this.coreConnector.dbKeys.Channel(new AccountId(counterparty)))) as any
   }
 
   saveOffChainState(counterparty: Uint8Array, signedChannel: SignedChannel) {
     return this.coreConnector.db.put(
-      Buffer.from(this.coreConnector.dbKeys.Channel(counterparty)),
+      Buffer.from(this.coreConnector.dbKeys.Channel(new AccountId(counterparty))),
       Buffer.from(signedChannel)
     )
   }
 
   deleteOffChainState(counterparty: Uint8Array) {
-    return this.coreConnector.db.del(Buffer.from(this.coreConnector.dbKeys.Channel(counterparty)))
+    return this.coreConnector.db.del(Buffer.from(this.coreConnector.dbKeys.Channel(new AccountId(counterparty))))
   }
 
   async getOnChainState(counterparty: Public): Promise<ChannelEntry> {

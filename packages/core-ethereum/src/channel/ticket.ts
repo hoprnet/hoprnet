@@ -91,7 +91,7 @@ class TicketStatic {
           u8aToHex(ackTicket.response),
           ticket.amount.toString(),
           u8aToHex(ticket.winProb),
-          u8aToHex(counterparty),
+          counterparty.toHex(),
           u8aToHex(r),
           u8aToHex(s),
           v + 27

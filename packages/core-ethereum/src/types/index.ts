@@ -14,6 +14,7 @@ import Snapshot from './snapshot'
 import Ticket from './ticket'
 import TicketEpoch from './ticketEpoch'
 
+
 class Types {
   public AccountId = AccountId
   public AcknowledgedTicket = AcknowledgedTicket

@@ -330,7 +330,7 @@ export async function validateUnacknowledgedTicket({
   const signedTickets = await getTickets().then(async (signedTickets) => {
     return signedTickets.filter((signedTicket) => {
       return (
-        u8aEquals(signedTicket.ticket.counterparty, selfAccountId) &&
+        signedTicket.ticket.counterparty.eq(selfAccountId) &&
         signedTicket.ticket.epoch.eq(epoch) &&
         ticket.channelIteration.toNumber() === currentChannelIteration
       )

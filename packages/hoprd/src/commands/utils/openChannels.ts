@@ -1,7 +1,7 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type { Channel as ChannelInstance } from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
-import { u8aEquals, pubKeyToPeerId } from '@hoprnet/hopr-utils'
+import { pubKeyToPeerId } from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'
 import { isBootstrapNode } from './isBootstrapNode'
 
@@ -110,7 +110,7 @@ export async function getPartyOpenChannels(node: Hopr<HoprCoreConnector>, party:
     if (
       channels.find((channel) => {
         const counterparty = channel[1]
-        return u8aEquals(accountId, counterparty)
+        return accountId.eq(counterparty)
       })
     ) {
       acc.push(peer)

@@ -48,7 +48,7 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
     }
 
     if (struct) {
-      this.set(struct.counterparty, this.counterpartyOffset - this.byteOffset)
+      this.set(struct.counterparty.serialize(), this.counterpartyOffset - this.byteOffset)
       this.set(struct.challenge, this.challengeOffset - this.byteOffset)
       this.set(new Uint8Array(struct.epoch.toBuffer('be', EPOCH_SIZE)), this.epochOffset - this.byteOffset)
       this.set(new Uint8Array(struct.amount.toBuffer('be', AMOUNT_SIZE)), this.amountOffset - this.byteOffset)

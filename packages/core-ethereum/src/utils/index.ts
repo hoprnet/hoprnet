@@ -30,7 +30,7 @@ export { time }
  * @returns true if self is partyA
  */
 export function isPartyA(self: AccountId, counterparty: AccountId): boolean {
-  return Buffer.compare(self, counterparty) < 0
+  return Buffer.compare(self.serialize(), counterparty.serialize()) < 0
 }
 
 /**
@@ -53,7 +53,7 @@ export function getParties(self: AccountId, counterparty: AccountId): [AccountId
  * @returns a promise resolved to Hash
  */
 export function getId(self: AccountId, counterparty: AccountId): Promise<Hash> {
-  return hash(Buffer.concat(getParties(self, counterparty), 2 * constants.ADDRESS_LENGTH))
+  return hash(Buffer.concat(getParties(self, counterparty).map(x => x.serialize()), 2 * constants.ADDRESS_LENGTH))
 }
 
 /**

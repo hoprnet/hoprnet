@@ -1,6 +1,6 @@
 import type { Channel as IChannel } from '@hoprnet/hopr-core-connector-interface'
 import BN from 'bn.js'
-import { u8aToHex, toU8a } from '@hoprnet/hopr-utils'
+import { toU8a } from '@hoprnet/hopr-utils'
 import {
   Balance,
   Channel as ChannelType,
@@ -149,7 +149,7 @@ class Channel implements IChannel {
         return resolve(
           new Balance(
             await this.coreConnector.hoprToken.methods
-              .balanceOf(u8aToHex(await this.coreConnector.utils.pubKeyToAccountId(this.counterparty)))
+              .balanceOf((await this.coreConnector.utils.pubKeyToAccountId(this.counterparty)).toHex())
               .call()
           )
         )
@@ -176,7 +176,7 @@ class Channel implements IChannel {
             to: this.coreConnector.hoprChannels.options.address
           },
           this.coreConnector.hoprChannels.methods.initiateChannelClosure(
-            u8aToHex(await this.coreConnector.utils.pubKeyToAccountId(this.counterparty))
+            (await this.coreConnector.utils.pubKeyToAccountId(this.counterparty)).toHex()
           )
         )
 
@@ -189,7 +189,7 @@ class Channel implements IChannel {
             to: this.coreConnector.hoprChannels.options.address
           },
           this.coreConnector.hoprChannels.methods.claimChannelClosure(
-            u8aToHex(await this.coreConnector.utils.pubKeyToAccountId(this.counterparty))
+            (await this.coreConnector.utils.pubKeyToAccountId(this.counterparty)).toHex()
           )
         )
 
