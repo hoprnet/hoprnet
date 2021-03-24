@@ -8,7 +8,7 @@ import chaiAsPromised from 'chai-as-promised'
 import chai, { expect } from 'chai'
 import sinon from 'sinon'
 import { validateUnacknowledgedTicket, validateCreatedTicket } from './tickets'
-import { Address } from '@hoprnet/hopr-core-ethereum/src/types'
+import { Address } from '@hoprnet/hopr-core-ethereum'
 
 chai.use(chaiAsPromised)
 
