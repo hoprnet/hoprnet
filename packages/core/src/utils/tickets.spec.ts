@@ -73,7 +73,8 @@ const createMockNode = ({
   balance_a = new BN(0),
   balance_b = new BN(100),
   stateCounter = new BN(1),
-  getWinProbabilityAsFloat = 1
+  getWinProbabilityAsFloat = 1,
+  isPartyAVal = true
 }: {
   sender?: PeerId
   senderAddress?: Uint8Array
@@ -88,14 +89,13 @@ const createMockNode = ({
   balance_b?: BN
   stateCounter?: BN
   getWinProbabilityAsFloat?: number
+  isPartyAVal?: boolean
 }) => {
   const pubKeyToAddress = sinon.stub()
-  pubKeyToAddress.withArgs(sender.pubKey.marshal()).returns(Promise.resolve(senderAddress))
-  pubKeyToAddress.withArgs(target.pubKey.marshal()).returns(Promise.resolve(targetAddress))
+  pubKeyToAddress.withArgs(sender.pubKey.marshal()).returns(Promise.resolve({serialize: () => senderAddress}))
+  pubKeyToAddress.withArgs(target.pubKey.marshal()).returns(Promise.resolve({serialize: () => targetAddress}))
 
-  const isPartyA = sinon.stub()
-  isPartyA.withArgs(targetAddress, senderAddress).returns(true)
-  isPartyA.withArgs(senderAddress, targetAddress).returns(false)
+  const isPartyA = sinon.stub().returns(isPartyAVal)
 
   const stateCounterToIteration = sinon.stub()
   stateCounterToIteration.withArgs(1).returns(1)
@@ -148,7 +148,7 @@ describe('unit test validateUnacknowledgedTicket', function () {
   })
 
   it('should throw when signer is not sender', async function () {
-    const node = createMockNode({})
+    const node = createMockNode({isPartyAVal: false})
     const signedTicket = createMockSignedTicket({})
 
     return expect(

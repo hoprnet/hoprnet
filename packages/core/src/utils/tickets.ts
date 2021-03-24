@@ -327,16 +327,11 @@ export async function validateUnacknowledgedTicket({
   // channel MUST have enough funds
   // (performance) tickets are stored by key, we can't query sender's tickets efficiently
   // we retrieve all signed tickets and filter the ones between sender and target
-  const signedTickets = await getTickets().then(async (signedTickets) => {
-    return signedTickets.filter((signedTicket) => {
-      console.log(signedTicket)
-      return (
-        signedTicket.ticket.counterparty.eq(selfAddress) &&
-        signedTicket.ticket.epoch.eq(epoch) &&
-        ticket.channelIteration.toNumber() === currentChannelIteration
-      )
-    })
-  })
+  let signedTickets = (await getTickets()).filter((signedTicket) => (
+      signedTicket.ticket.counterparty.eq(selfAddress) &&
+      signedTicket.ticket.epoch.eq(epoch) &&
+      ticket.channelIteration.toNumber() === currentChannelIteration
+  ))
 
   // calculate total unredeemed balance
   const unredeemedBalance = signedTickets.reduce((total, signedTicket) => {
