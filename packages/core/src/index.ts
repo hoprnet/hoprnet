@@ -5,7 +5,6 @@ const MPLEX = require('libp2p-mplex')
 const KadDHT = require('libp2p-kad-dht')
 import { NOISE } from 'libp2p-noise'
 
-
 const { HoprConnect } = require('@hoprnet/hopr-connect')
 
 import { Packet } from './messages/packet'
