@@ -56,9 +56,9 @@ export async function initialize(providerUri: string) {
   })
   await provider.connect()
   web3 = new Web3(provider)
-  console.log(">>", providerUri)
+  console.log('>>', providerUri)
   chainId = await web3.eth.getChainId()
-  console.log(">>>", chainId)
+  console.log('>>>', chainId)
   network = getNetworkName(chainId) as Network
   if (typeof addresses?.[network]?.HoprChannels === 'undefined') {
     throw Error(`token contract address from network ${network} not found`)
