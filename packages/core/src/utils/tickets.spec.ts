@@ -49,7 +49,7 @@ const createMockSignedTicket = ({
   channelIteration = new BN(1)
 }: {
   sender?: PeerId
-  targetAddress?: Address, 
+  targetAddress?: Address
   amount?: BN
   winProb?: Uint8Array
   channelIteration?: BN
