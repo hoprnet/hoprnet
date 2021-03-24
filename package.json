@@ -19,7 +19,7 @@
     "util:link": "lerna link"
   },
   "dependencies": {
-    "lerna": "^3.22.1"
+    "lerna": "^4.0.0"
   },
   "devDependencies": {
     "rimraf": "^3.0.2"

@@ -86,15 +86,8 @@ class Channel extends Uint8ArrayE implements Types.Channel {
     return hash(this)
   }
 
-  async sign(
-    privKey: Uint8Array,
-    _pubKey: Uint8Array | undefined,
-    arr?: {
-      bytes: ArrayBuffer
-      offset: number
-    }
-  ): Promise<Types.Signature> {
-    return await sign(await this.hash, privKey, undefined, arr)
+  async sign(privKey: Uint8Array): Promise<Types.Signature> {
+    return await sign(await this.hash, privKey)
   }
 
   get isFunded(): boolean {

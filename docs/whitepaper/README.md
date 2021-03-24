@@ -5,3 +5,35 @@ HOPR is a privacy-preserving messaging protocol that incentivizes users to parti
 ## hopr-whitepaper
 
 Contains the source code for the [whitepaper](./whitepaper.pdf) of [hoprnet.org](https://hoprnet.org).
+
+## Developer setup
+
+### Ubuntu & Debian
+
+- [VSCode](https://code.visualstudio.com/docs/setup/linux#_debian-and-ubuntu-based-distributions)
+- LaTeX
+
+```sh
+apt install -y git
+apt install -y texlive texlive-latex-extra
+```
+
+- "LaTeX Workshop" in VSCode
+
+### Mac OSX
+
+- [VSCode](https://code.visualstudio.com/docs/setup/mac)
+- [LaTeX for Mac](https://www.tug.org/mactex/)
+- [Homebrew](https://brew.sh)
+
+```sh
+brew install git
+```
+
+- "LaTeX Workshop" in VSCode
+
+## Workspace
+
+```sh
+git clone git@github.com:hoprnet/hoprnet.git
+```
