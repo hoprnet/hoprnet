@@ -11,4 +11,3 @@ class UINT256 extends BNE {
 }
 
 export { UINT256 }
-
