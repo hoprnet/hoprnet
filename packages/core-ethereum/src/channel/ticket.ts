@@ -89,7 +89,7 @@ class TicketStatic {
         hoprChannels.methods.redeemTicket(
           u8aToHex(ackTicket.preImage),
           u8aToHex(ackTicket.response),
-          ticket.amount.toString(),
+          ticket.amount.toBN().toString(),
           u8aToHex(ticket.winProb),
           counterparty.toHex(),
           u8aToHex(r),
