@@ -253,7 +253,9 @@ class ChannelFactory {
     if (sign != null && channelBalance != null) {
       const channel = new Channel(this.coreConnector, counterpartyPubKey, signedChannel)
 
-      const amountToFund = amPartyA ? channelBalance.balance_a : new Balance(channelBalance.balance.toBN().sub(channelBalance.balance_a.toBN()))
+      const amountToFund = amPartyA
+        ? channelBalance.balance_a
+        : new Balance(channelBalance.balance.toBN().sub(channelBalance.balance_a.toBN()))
       const amountFunded = await (amPartyA ? channel.balance_a : channel.balance_b)
 
       if (amountFunded.toBN().lt(amountToFund.toBN())) {
