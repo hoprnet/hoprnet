@@ -22,7 +22,6 @@ declare interface Address {
 }
 declare var Address: AddressStatic
 
-
 declare interface BalanceStatic {
   readonly SIZE: number
   readonly SYMBOL: string // Abbreviation of the currency, e.g. `HOPR`
@@ -35,7 +34,6 @@ declare interface Balance {
   toFormattedString(): string // Readable version of the balance
 }
 declare var Balance: BalanceStatic
-
 
 export {
   Address,
