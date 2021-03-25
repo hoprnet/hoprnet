@@ -1,4 +1,4 @@
-import { BNE } from '../../types/extended'
+import { BNE } from '../types/extended'
 
 class UINT256 extends BNE {
   toU8a(): Uint8Array {
@@ -11,4 +11,3 @@ class UINT256 extends BNE {
 }
 
 export { UINT256 }
-
