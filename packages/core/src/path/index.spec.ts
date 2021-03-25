@@ -5,6 +5,7 @@ import type NetworkPeers from '../network/network-peers'
 import type { Indexer } from '@hoprnet/hopr-core-connector-interface'
 import BN from 'bn.js'
 import { fakePeerId } from '../test-utils'
+import { Balance} from '@hoprnet/hopr-core-ethereum'
 
 function checkPath(path: PeerId[], edges: Map<PeerId, PeerId[]>) {
   for (let i = 0; i < path.length - 1; i++) {
@@ -28,8 +29,8 @@ describe('test pathfinder with some simple topologies', function () {
     qualityOf: (p: any) => ((p.id as any) % 3 == 0 ? 0 : 1),
     register: () => {}
   } as unknown) as NetworkPeers // Node 3 is down
-  const STAKE_1 = () => new BN(1)
-  const STAKE_N = (x: PeerId) => new BN(((x.id as unknown) as number) + 0.1)
+  const STAKE_1 = () => new Balance(new BN(1))
+  const STAKE_N = (x: PeerId) => new Balance(new BN(((x.id as unknown) as number) + 0.1))
 
   // Bidirectional star, all pass through node 0
   const STAR = new Map<PeerId, PeerId[]>()
@@ -45,7 +46,7 @@ describe('test pathfinder with some simple topologies', function () {
   ARROW.set(TEST_NODES[2], [TEST_NODES[3]])
   ARROW.set(TEST_NODES[3], [TEST_NODES[4]])
 
-  function fakeIndexer(edges: Map<PeerId, PeerId[]>, stakes: (i: PeerId) => BN): Indexer {
+  function fakeIndexer(edges: Map<PeerId, PeerId[]>, stakes: (i: PeerId) => Balance): Indexer {
     return {
       getChannelsFromPeer: (a: PeerId) => Promise.resolve((edges.get(a) || []).map((b) => [a, b, stakes(b) as any]))
     } as Indexer

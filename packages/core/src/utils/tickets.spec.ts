@@ -8,7 +8,7 @@ import chaiAsPromised from 'chai-as-promised'
 import chai, { expect } from 'chai'
 import sinon from 'sinon'
 import { validateUnacknowledgedTicket, validateCreatedTicket } from './tickets'
-import { Address } from '@hoprnet/hopr-core-ethereum'
+import { Address, Balance} from '@hoprnet/hopr-core-ethereum'
 
 chai.use(chaiAsPromised)
 
@@ -20,13 +20,13 @@ const SENDER_ADDRESS = stringToU8a('0x65e78d07acf7b654e5ae6777a93ebbf30f639356')
 
 const createMockTicket = ({
   targetAddress = new Address(TARGET_ADDRESS),
-  amount = new BN(1),
+  amount = new Balance(new BN(1)),
   winProb = new Uint8Array(1),
   epoch = new BN(1),
   channelIteration = new BN(1)
 }: {
   targetAddress?: Address
-  amount?: BN
+  amount?: Balance
   winProb?: Uint8Array
   epoch?: BN
   channelIteration?: BN
@@ -44,13 +44,13 @@ const createMockTicket = ({
 const createMockSignedTicket = ({
   sender = SENDER,
   targetAddress = new Address(TARGET_ADDRESS),
-  amount = new BN(1),
+  amount = new Balance(new BN(1)),
   winProb = new Uint8Array(1),
   channelIteration = new BN(1)
 }: {
   sender?: PeerId
   targetAddress?: Address
-  amount?: BN
+  amount?: Balance
   winProb?: Uint8Array
   channelIteration?: BN
 }) => {
@@ -70,8 +70,8 @@ const createMockNode = ({
   ticketWinProb = 1,
   isChannelOpen = true,
   isChannelStored = true,
-  balance_a = new BN(0),
-  balance_b = new BN(100),
+  balance_a = new Balance(new BN(0)),
+  balance_b = new Balance(new BN(100)),
   stateCounter = new BN(1),
   getWinProbabilityAsFloat = 1,
   isPartyAVal = true
@@ -85,8 +85,8 @@ const createMockNode = ({
   ticketWinProb?: number
   isChannelOpen?: boolean
   isChannelStored?: boolean
-  balance_a?: BN
-  balance_b?: BN
+  balance_a?: Balance
+  balance_b?: Balance
   stateCounter?: BN
   getWinProbabilityAsFloat?: number
   isPartyAVal?: boolean
@@ -261,8 +261,8 @@ describe('unit test validateUnacknowledgedTicket', function () {
 
   it('should throw if channel does not have enough funds', async function () {
     const node = createMockNode({
-      balance_a: new BN(100),
-      balance_b: new BN(0)
+      balance_a: new Balance(new BN(100)),
+      balance_b: new Balance(new BN(0))
     })
     const signedTicket = createMockSignedTicket({})
 
@@ -281,7 +281,7 @@ describe('unit test validateUnacknowledgedTicket', function () {
     const signedTicket = createMockSignedTicket({})
     const ticketsInDb = [
       createMockSignedTicket({
-        amount: new BN(100)
+        amount: new Balance(new BN(100))
       })
     ]
 
