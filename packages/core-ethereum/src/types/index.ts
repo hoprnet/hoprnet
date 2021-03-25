@@ -1,4 +1,3 @@
-import Address from './accountId'
 import AcknowledgedTicket from './acknowledgedTicket'
 import Balance from './balance'
 import { Channel, ChannelBalance, ChannelState } from './channel'
@@ -13,6 +12,31 @@ import SignedTicket from './signedTicket'
 import Snapshot from './snapshot'
 import Ticket from './ticket'
 import TicketEpoch from './ticketEpoch'
+
+import { ADDRESS_LENGTH } from '../constants'
+import { u8aToHex, u8aEquals } from '@hoprnet/hopr-utils'
+import type { Types as Interfaces } from '@hoprnet/hopr-core-connector-interface'
+import Web3 from 'web3'
+
+class Address implements Interfaces.Address {
+  constructor(private id: Uint8Array) {}
+
+  static get SIZE(): number {
+    return ADDRESS_LENGTH
+  }
+
+  serialize() {
+    return this.id
+  }
+
+  toHex(): string {
+    return Web3.utils.toChecksumAddress(u8aToHex(this.id, false))
+  }
+
+  eq(b: Address) {
+    return u8aEquals(this.id, b.serialize())
+  }
+}
 
 class Types {
   public Address = Address
