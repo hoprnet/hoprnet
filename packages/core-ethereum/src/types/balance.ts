@@ -3,7 +3,7 @@ import { moveDecimalPoint } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 
 class Balance implements Types.Balance {
-  constructor(private bn: BN){}
+  constructor(private bn: BN) {}
 
   static get SYMBOL(): string {
     return `HOPR`

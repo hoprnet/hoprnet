@@ -16,7 +16,6 @@ declare interface BalanceStatic {
 }
 
 declare interface Balance {
-
   toBN(): BN
   serialize(): Uint8Array
 
