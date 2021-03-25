@@ -91,6 +91,7 @@ class Types {
   public SignedTicket = SignedTicket
   public Snapshot = Snapshot
   public Ticket = Ticket
+  public UINT256 = UINT256
 }
 
 export {
