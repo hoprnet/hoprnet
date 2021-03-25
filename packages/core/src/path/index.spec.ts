@@ -5,7 +5,7 @@ import type NetworkPeers from '../network/network-peers'
 import type { Indexer } from '@hoprnet/hopr-core-connector-interface'
 import BN from 'bn.js'
 import { fakePeerId } from '../test-utils'
-import { Balance} from '@hoprnet/hopr-core-ethereum'
+import { Balance } from '@hoprnet/hopr-core-ethereum'
 
 function checkPath(path: PeerId[], edges: Map<PeerId, PeerId[]>) {
   for (let i = 0; i < path.length - 1; i++) {
