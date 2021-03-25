@@ -10,6 +10,8 @@ jobs:
     steps:
       - name: Set up Git repository
         uses: actions/checkout@v2
+        with:
+          ssh-key: ${{ secrets.COMMIT_BOT_SSH }}
       - name: Compile LaTeX document
         uses: xu-cheng/texlive-action/small@v1
         with:
@@ -23,8 +25,8 @@ jobs:
             mv main.pdf whitepaper.pdf
       - name: Commit latest version
         run: |
-          git config user.name github-actions
-          git config user.email github-actions@github.com
+          git config user.email "noreply@hoprnet.org"
+          git config user.name "HOPR LaTeX robot"
           git add docs/whitepaper/whitepaper.pdf
           git commit -a -m "Update whitepaper" || true
           git pull origin ${{ github.ref }}
