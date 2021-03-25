@@ -147,11 +147,13 @@ class Channel implements IChannel {
     return new Promise<Balance>(async (resolve, reject) => {
       try {
         return resolve(
-          new Balance(new BN(
-            await this.coreConnector.hoprToken.methods
-              .balanceOf((await this.coreConnector.utils.pubKeyToAddress(this.counterparty)).toHex())
-              .call()
-          ))
+          new Balance(
+            new BN(
+              await this.coreConnector.hoprToken.methods
+                .balanceOf((await this.coreConnector.utils.pubKeyToAddress(this.counterparty)).toHex())
+                .call()
+            )
+          )
         )
       } catch (error) {
         return reject(error)

@@ -215,7 +215,7 @@ export async function checkChallenge(challenge: Hash, response: Hash) {
 
 /**
  * Convert between units'
- * @param amount 
+ * @param amount
  * @param sourceUnit
  * @param targetUnit
  */

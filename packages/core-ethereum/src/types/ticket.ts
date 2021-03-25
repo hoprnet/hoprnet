@@ -125,7 +125,12 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
   }
 
   getEmbeddedFunds(): Balance {
-    return new Balance(this.amount.toBN().mul(new BN(this.winProb)).div(new BN(new Uint8Array(Hash.SIZE).fill(0xff))))
+    return new Balance(
+      this.amount
+        .toBN()
+        .mul(new BN(this.winProb))
+        .div(new BN(new Uint8Array(Hash.SIZE).fill(0xff)))
+    )
   }
 
   async sign(privKey: Uint8Array): Promise<Signature> {
