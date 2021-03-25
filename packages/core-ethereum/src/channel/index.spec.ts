@@ -90,8 +90,8 @@ describe('test Channel class', function () {
     this.timeout(durations.minutes(1))
 
     const channelBalance = new ChannelBalance(undefined, {
-      balance: new BN(123),
-      balance_a: new BN(122)
+      balance: new Balance(new BN(123)),
+      balance_a: new Balance(new BN(122))
     })
 
     const channel = await coreConnector.channel.create(

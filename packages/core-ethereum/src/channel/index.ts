@@ -79,8 +79,8 @@ class ChannelFactory {
     log('Received open event for channel with %s', counterparty.toHex())
 
     const balance = new ChannelBalance(undefined, {
-      balance: new BN(channelEntry.deposit),
-      balance_a: new BN(channelEntry.partyABalance)
+      balance: new Balance(new BN(channelEntry.deposit)),
+      balance_a: new Balance(new BN(channelEntry.partyABalance))
     })
     const state = new ChannelState(undefined, { state: stateCounterToStatus(channelEntry.stateCounter.toNumber()) })
     const newChannel = new ChannelType(undefined, {
@@ -124,7 +124,7 @@ class ChannelFactory {
             },
             this.coreConnector.hoprToken.methods.send(
               this.coreConnector.hoprChannels.options.address,
-              amount.toString(),
+              amount.toBN().toString(),
               this.coreConnector.web3.eth.abi.encodeParameters(
                 ['address', 'address'],
                 [(await account.address).toHex(), counterparty.toHex()]

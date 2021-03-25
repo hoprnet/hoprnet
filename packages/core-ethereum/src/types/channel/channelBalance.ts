@@ -10,8 +10,8 @@ class ChannelBalance extends Uint8ArrayE implements Types.ChannelBalance {
       offset: number
     },
     struct?: {
-      balance: BN | Balance
-      balance_a: BN | Balance
+      balance: Balance
+      balance_a: Balance
     }
   ) {
     if (arr) {
@@ -22,11 +22,11 @@ class ChannelBalance extends Uint8ArrayE implements Types.ChannelBalance {
 
     if (struct) {
       if (struct.balance_a) {
-        this.set(new Balance(new BN(struct.balance_a.toString())).serialize(), this.balanceAOffset - this.byteOffset)
+        this.set(struct.balance_a.serialize(), this.balanceAOffset - this.byteOffset)
       }
 
       if (struct.balance) {
-        this.set(new Balance(new BN(struct.balance.toString())).serialize(), this.balanceOffset - this.byteOffset)
+        this.set(struct.balance.serialize(), this.balanceOffset - this.byteOffset)
       }
     }
   }

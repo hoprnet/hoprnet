@@ -31,7 +31,6 @@ describe('test ticket construction', function () {
 
   it('should create new ticket using struct', async function () {
     const ticketData = await generateTicketData()
-
     const ticket = new Ticket(undefined, ticketData)
 
     assert(ticket.counterparty.eq(userA), 'wrong counterparty')

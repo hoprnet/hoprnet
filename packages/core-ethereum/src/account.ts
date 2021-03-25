@@ -348,7 +348,7 @@ export const getBalance = async (
   }
 
   const value = await ethereum.getBalance(hoprToken, account)
-  cache.set('balance', { value: value.toString(), updatedAt: new Date().getTime() })
+  cache.set('balance', { value: value.toBN().toString(), updatedAt: new Date().getTime() })
 
   return value
 }
