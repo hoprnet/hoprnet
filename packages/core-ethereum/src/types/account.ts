@@ -1,4 +1,4 @@
-import type { Types } from '@hoprnet/hopr-core-connector-interface'
+import type { Types as Interfaces } from '@hoprnet/hopr-core-connector-interface'
 import BN from 'bn.js'
 import { u8aSplit, serializeToU8a } from '@hoprnet/hopr-utils'
 import Address from './accountId'
@@ -6,7 +6,7 @@ import Public from './public'
 import Hash from './hash'
 import { UINT256 } from './solidity'
 
-class Account implements Types.Account {
+class AccountEntry implements Interfaces.AccountEntry {
   constructor(
     public readonly address: Address,
     public readonly publicKey?: Public,
@@ -24,7 +24,7 @@ class Account implements Types.Account {
     const publicKey = new Public(b)
     const secret = new Hash(c)
     const counter = new BN(d)
-    return new Account(address, publicKey, secret, counter)
+    return new AccountEntry(address, publicKey, secret, counter)
   }
 
   public serialize(): Uint8Array {
@@ -40,4 +40,4 @@ class Account implements Types.Account {
   }
 }
 
-export { Account }
+export default AccountEntry

@@ -90,8 +90,8 @@ describe('test Channel class', function () {
     this.timeout(durations.minutes(1))
 
     const channelBalance = new ChannelBalance(undefined, {
-      balance: new BN(123),
-      balance_a: new BN(122)
+      balance: new Balance(new BN(123)),
+      balance_a: new Balance(new BN(122))
     })
 
     const channel = await coreConnector.channel.create(
@@ -142,10 +142,15 @@ describe('test Channel class', function () {
     const firstAckedTicket = new AcknowledgedTicket(coreConnector, undefined, {
       response: firstTicket.response
     })
-    const signedTicket = await channel.ticket.create(new Balance(1), firstTicket.challenge, firstTicket.winProb, {
-      bytes: firstAckedTicket.buffer,
-      offset: firstAckedTicket.signedTicketOffset
-    })
+    const signedTicket = await channel.ticket.create(
+      new Balance(new BN(1)),
+      firstTicket.challenge,
+      firstTicket.winProb,
+      {
+        bytes: firstAckedTicket.buffer,
+        offset: firstAckedTicket.signedTicketOffset
+      }
+    )
 
     assert(
       u8aEquals(await signedTicket.signer, coreConnector.account.keys.onChain.pubKey),
@@ -234,7 +239,7 @@ describe('test Channel class', function () {
         response: ticketData.response
       })
 
-      nextSignedTicket = await channel.ticket.create(new Balance(1), ticketData.challenge, ticketData.winProb, {
+      nextSignedTicket = await channel.ticket.create(new Balance(new BN(1)), ticketData.challenge, ticketData.winProb, {
         bytes: ackedTicket.buffer,
         offset: ackedTicket.signedTicketOffset
       })

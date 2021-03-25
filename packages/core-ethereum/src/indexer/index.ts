@@ -9,7 +9,7 @@ import chalk from 'chalk'
 import BN from 'bn.js'
 import Heap from 'heap-js'
 import { pubKeyToPeerId, randomChoice } from '@hoprnet/hopr-utils'
-import { Address, ChannelEntry, Hash, Public, Balance, Snapshot } from '../types'
+import { AccountEntry, Address, ChannelEntry, Hash, Public, Balance, Snapshot } from '../types'
 import { getId, Log as DebugLog } from '../utils'
 import * as reducers from './reducers'
 import * as db from './db'
@@ -442,7 +442,7 @@ class Indexer extends EventEmitter implements IIndexer {
     // log('Channel %s got closed by %s', chalk.green(channelId.toHex()), chalk.green(closerAddress.toHex()))
   }
 
-  public async getAccount(address: Address): Promise<Account | undefined> {
+  public async getAccount(address: Address): Promise<AccountEntry | undefined> {
     return db.getAccount(this.connector.db, address)
   }
 
@@ -485,7 +485,9 @@ class Indexer extends EventEmitter implements IIndexer {
     if (sourcePubKey.eq(accountAPubKey)) {
       return [source, await pubKeyToPeerId(accountBPubKey), new Balance(channel.partyABalance)]
     } else {
-      const partyBBalance = new Balance(new Balance(channel.deposit).sub(new Balance(channel.partyABalance)))
+      const partyBBalance = new Balance(
+        new Balance(channel.deposit).toBN().sub(new Balance(channel.partyABalance).toBN())
+      )
       return [source, await pubKeyToPeerId(accountAPubKey), partyBBalance]
     }
   }
@@ -519,7 +521,7 @@ class Indexer extends EventEmitter implements IIndexer {
     let cout: RoutingChannel[] = []
     for (let channel of channels) {
       let directed = await this.toIndexerChannel(source, channel)
-      if (directed[2].gtn(0)) {
+      if (directed[2].toBN().gtn(0)) {
         cout.push(directed)
       }
     }

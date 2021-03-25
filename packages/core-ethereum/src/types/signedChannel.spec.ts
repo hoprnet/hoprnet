@@ -7,15 +7,16 @@ import { Channel, ChannelBalance, ChannelStatus, ChannelState } from './channel'
 // import { Signature, Hash } from '.'
 import Public from './public'
 import SignedChannel from './signedChannel'
+import { Balance } from '.'
 
 chai.use(chaiAsPromised)
 
 const generateChannelData = async () => {
   const balance = new ChannelBalance(undefined, {
-    balance: new BN(10),
-    balance_a: new BN(2)
+    balance: new Balance(new BN(10)),
+    balance_a: new Balance(new BN(2))
   })
-  const state = new ChannelState(undefined, { state: ChannelStatus.UNINITIALISED })
+  const state = new ChannelState(undefined, { state: ChannelStatus.CLOSED })
 
   return new Channel(undefined, {
     state,

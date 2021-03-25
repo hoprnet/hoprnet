@@ -148,9 +148,11 @@ class Channel implements IChannel {
       try {
         return resolve(
           new Balance(
-            await this.coreConnector.hoprToken.methods
-              .balanceOf((await this.coreConnector.utils.pubKeyToAddress(this.counterparty)).toHex())
-              .call()
+            new BN(
+              await this.coreConnector.hoprToken.methods
+                .balanceOf((await this.coreConnector.utils.pubKeyToAddress(this.counterparty)).toHex())
+                .call()
+            )
           )
         )
       } catch (error) {

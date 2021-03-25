@@ -215,10 +215,9 @@ export async function checkChallenge(challenge: Hash, response: Hash) {
 
 /**
  * Convert between units'
- * @param amount a BN instance of the amount to be converted
+ * @param amount
  * @param sourceUnit
  * @param targetUnit
- * @returns a BN instance of the resulted conversion
  */
 export function convertUnit(amount: Balance, sourceUnit: 'eth', targetUnit: 'wei'): Balance
 export function convertUnit(amount: Balance, sourceUnit: 'wei', targetUnit: 'eth'): Balance
@@ -226,9 +225,9 @@ export function convertUnit(amount: Balance, sourceUnit: 'eth' | 'wei', targetUn
   assert(['eth', 'wei'].includes(sourceUnit), 'not implemented')
 
   if (sourceUnit === 'eth') {
-    return Web3.utils.toWei(amount, targetUnit as any) as any
+    return Web3.utils.toWei(amount.toBN(), targetUnit as any) as any
   } else {
-    return Web3.utils.fromWei(amount, targetUnit as any) as any
+    return Web3.utils.fromWei(amount.toBN(), targetUnit as any) as any
   }
 }
 

@@ -269,7 +269,7 @@ export async function validateUnacknowledgedTicket({
   }
 
   // ticket MUST have at least X amount
-  if (ticket.amount.lt(new BN(String(node.ticketAmount)))) {
+  if (ticket.amount.toBN().lt(new BN(String(node.ticketAmount)))) {
     throw Error(`Ticket amount '${ticket.amount.toString()}' is lower than '${node.ticketAmount}'`)
   }
 
@@ -320,7 +320,7 @@ export async function validateUnacknowledgedTicket({
   // channel MUST have enough funds
   // (performance) we are making a request to blockchain
   const senderBalance = await (amPartyA ? channel.balance_b : channel.balance_a)
-  if (senderBalance.lt(ticket.amount)) {
+  if (senderBalance.toBN().lt(ticket.amount.toBN())) {
     throw Error(`Payment channel does not have enough funds`)
   }
 
@@ -336,11 +336,11 @@ export async function validateUnacknowledgedTicket({
 
   // calculate total unredeemed balance
   const unredeemedBalance = signedTickets.reduce((total, signedTicket) => {
-    return new BN(total.add(signedTicket.ticket.amount))
+    return new BN(total.add(signedTicket.ticket.amount.toBN()))
   }, new BN(0))
 
   // ensure sender has enough funds
-  if (unredeemedBalance.add(new BN(ticket.amount)).gt(senderBalance)) {
+  if (unredeemedBalance.add(ticket.amount.toBN()).gt(senderBalance.toBN())) {
     throw Error(`Payment channel does not have enough funds when you include unredeemed tickets`)
   }
 }
@@ -358,7 +358,7 @@ export async function validateCreatedTicket({
 }) {
   const { ticket } = signedTicket
 
-  if (myBalance.lt(ticket.amount)) {
+  if (myBalance.lt(ticket.amount.toBN())) {
     throw Error(`Payment channel does not have enough funds ${myBalance.toString()} < ${ticket.amount.toString()}`)
   }
 }

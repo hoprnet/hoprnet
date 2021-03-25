@@ -2,32 +2,32 @@ import type { Event } from './types'
 import assert from 'assert'
 import BN from 'bn.js'
 import Web3 from 'web3'
-import { Account, Address, Public, Hash, ChannelEntry } from '../types'
+import { AccountEntry, Address, Public, Hash, ChannelEntry } from '../types'
 import { isPartyA } from '../utils'
 
 const { hexToBytes, hexToNumberString } = Web3.utils
 
-export const onAccountInitialized = async (event: Event<'AccountInitialized'>): Promise<Account> => {
+export const onAccountInitialized = async (event: Event<'AccountInitialized'>): Promise<AccountEntry> => {
   const data = event.returnValues
   const address = Address.fromString(data.account)
   const pubKey = new Public([...hexToBytes(data.pubKeyFirstHalf), ...hexToBytes(data.pubKeySecondHalf)])
   const secret = new Hash(hexToBytes(data.secret))
   const counter = new BN(0)
 
-  return new Account(address, pubKey, secret, counter)
+  return new AccountEntry(address, pubKey, secret, counter)
 }
 
 export const onAccountSecretUpdated = async (
   event: Event<'AccountSecretUpdated'>,
-  storedAccount: Account
-): Promise<Account> => {
+  storedAccount: AccountEntry
+): Promise<AccountEntry> => {
   assert(storedAccount.isInitialized(), "'onAccountSecretUpdated' failed because account is not initialized")
 
   const data = event.returnValues
   const secret = new Hash(hexToBytes(data.secret))
   const counter = new BN(hexToNumberString(data.secret)) // TODO: depend on indexer to increment this
 
-  return new Account(storedAccount.address, storedAccount.publicKey, secret, counter)
+  return new AccountEntry(storedAccount.address, storedAccount.publicKey, secret, counter)
 }
 
 export const onChannelFunded = async (

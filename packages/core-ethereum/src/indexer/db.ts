@@ -1,7 +1,7 @@
 import type { LevelUp } from 'levelup'
 import BN from 'bn.js'
 import { u8aToNumber } from '@hoprnet/hopr-utils'
-import { Hash, Address, Account, ChannelEntry, Snapshot } from '../types'
+import { Hash, Address, AccountEntry, ChannelEntry, Snapshot } from '../types'
 
 const encoder = new TextEncoder()
 const LATEST_BLOCK_NUMBER_KEY = encoder.encode('indexer-latestBlockNumber')
@@ -126,7 +126,7 @@ export const updateChannel = async (db: LevelUp, channelId: Hash, channel: Chann
  * @param address
  * @returns Account
  */
-export const getAccount = async (db: LevelUp, address: Address): Promise<Account | undefined> => {
+export const getAccount = async (db: LevelUp, address: Address): Promise<AccountEntry | undefined> => {
   let account: Uint8Array | undefined
   try {
     account = (await db.get(Buffer.from(createAccountKey(address)))) as Uint8Array
@@ -142,7 +142,7 @@ export const getAccount = async (db: LevelUp, address: Address): Promise<Account
     return undefined
   }
 
-  return Account.deserialize(account)
+  return AccountEntry.deserialize(account)
 }
 
 /**
@@ -153,6 +153,6 @@ export const getAccount = async (db: LevelUp, address: Address): Promise<Account
  * @param partyB
  * @param channelEntry
  */
-export const updateAccount = async (db: LevelUp, address: Address, account: Account): Promise<void> => {
+export const updateAccount = async (db: LevelUp, address: Address, account: AccountEntry): Promise<void> => {
   await db.put(Buffer.from(createAccountKey(address)), Buffer.from(account.serialize()))
 }

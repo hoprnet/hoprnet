@@ -69,7 +69,9 @@ export default class ListOpenChannels extends AbstractCommand {
     try {
       const { utils, types } = this.node.paymentChannels
       const self = new types.Public(this.node.getId().pubKey.marshal())
-      const channels = await this.node.paymentChannels.indexer.getChannelEntries(self)
+      const channels = (await this.node.paymentChannels.indexer.getChannelEntries(self))
+        // do not print UNINITIALISED channels
+        .filter((channel) => channel.channelEntry.status !== 'UNINITIALISED')
       const result: string[] = []
 
       if (channels.length === 0) {
@@ -80,9 +82,6 @@ export default class ListOpenChannels extends AbstractCommand {
         const id = u8aToHex(await utils.getId(await partyA.toAddress(), await partyB.toAddress()))
         const selfIsPartyA = u8aEquals(self, partyA)
         const counterparty = selfIsPartyA ? partyB : partyA
-
-        // do not print UNINITIALISED channels
-        if (channelEntry.status === 'UNINITIALISED') continue
 
         const totalBalance = moveDecimalPoint(channelEntry.deposit.toString(), types.Balance.DECIMALS * -1)
         const myBalance = moveDecimalPoint(
