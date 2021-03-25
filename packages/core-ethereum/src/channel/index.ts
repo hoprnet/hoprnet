@@ -79,8 +79,8 @@ class ChannelFactory {
     log('Received open event for channel with %s', counterparty.toHex())
 
     const balance = new ChannelBalance(undefined, {
-      balance: new BN(channelEntry.deposit),
-      balance_a: new BN(channelEntry.partyABalance)
+      balance: new Balance(new BN(channelEntry.deposit)),
+      balance_a: new Balance(new BN(channelEntry.partyABalance))
     })
     const state = new ChannelState(undefined, { state: stateCounterToStatus(channelEntry.stateCounter.toNumber()) })
     const newChannel = new ChannelType(undefined, {
@@ -111,7 +111,7 @@ class ChannelFactory {
       const { account } = this.coreConnector
 
       const balance = await account.getBalance()
-      if (balance.isZero()) {
+      if (balance.toBN().isZero()) {
         throw Error(ERRORS.OOF_HOPR)
       }
 
@@ -124,7 +124,7 @@ class ChannelFactory {
             },
             this.coreConnector.hoprToken.methods.send(
               this.coreConnector.hoprChannels.options.address,
-              amount.toString(),
+              amount.toBN().toString(),
               this.coreConnector.web3.eth.abi.encodeParameters(
                 ['address', 'address'],
                 [(await account.address).toHex(), counterparty.toHex()]
@@ -197,7 +197,7 @@ class ChannelFactory {
         counterparty,
         challenge,
         epoch: new TicketEpoch(0),
-        amount: new Balance(0),
+        amount: new Balance(new BN(0)),
         winProb,
         channelIteration: new TicketEpoch(0)
       }
@@ -253,13 +253,13 @@ class ChannelFactory {
     if (sign != null && channelBalance != null) {
       const channel = new Channel(this.coreConnector, counterpartyPubKey, signedChannel)
 
-      const amountToFund = new Balance(
-        amPartyA ? channelBalance.balance_a : channelBalance.balance.sub(channelBalance.balance_a)
-      )
+      const amountToFund = amPartyA
+        ? channelBalance.balance_a
+        : new Balance(channelBalance.balance.toBN().sub(channelBalance.balance_a.toBN()))
       const amountFunded = await (amPartyA ? channel.balance_a : channel.balance_b)
 
-      if (amountFunded.lt(amountToFund)) {
-        await this.increaseFunds(counterparty, new Balance(amountToFund.sub(amountFunded)))
+      if (amountFunded.toBN().lt(amountToFund.toBN())) {
+        await this.increaseFunds(counterparty, new Balance(amountToFund.toBN().sub(amountFunded.toBN())))
       }
 
       const state = new ChannelState(undefined, { state: stateCounterToStatus(0) })

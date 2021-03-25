@@ -1,7 +1,7 @@
 import BN from 'bn.js'
 import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import { Uint8ArrayE } from '../extended'
-import Balance from '../balance'
+import { Balance } from '..'
 
 class ChannelBalance extends Uint8ArrayE implements Types.ChannelBalance {
   constructor(
@@ -10,8 +10,8 @@ class ChannelBalance extends Uint8ArrayE implements Types.ChannelBalance {
       offset: number
     },
     struct?: {
-      balance: BN | Balance
-      balance_a: BN | Balance
+      balance: Balance
+      balance_a: Balance
     }
   ) {
     if (arr) {
@@ -22,11 +22,11 @@ class ChannelBalance extends Uint8ArrayE implements Types.ChannelBalance {
 
     if (struct) {
       if (struct.balance_a) {
-        this.set(new Balance(struct.balance_a.toString()).toU8a(), this.balanceAOffset - this.byteOffset)
+        this.set(struct.balance_a.serialize(), this.balanceAOffset - this.byteOffset)
       }
 
       if (struct.balance) {
-        this.set(new Balance(struct.balance.toString()).toU8a(), this.balanceOffset - this.byteOffset)
+        this.set(struct.balance.serialize(), this.balanceOffset - this.byteOffset)
       }
     }
   }
@@ -43,7 +43,7 @@ class ChannelBalance extends Uint8ArrayE implements Types.ChannelBalance {
     return this.byteOffset
   }
   get balance(): Balance {
-    return new Balance(new Uint8Array(this.buffer, this.balanceOffset, Balance.SIZE))
+    return new Balance(new BN(new Uint8Array(this.buffer, this.balanceOffset, Balance.SIZE)))
   }
 
   get balanceAOffset(): number {
@@ -51,7 +51,7 @@ class ChannelBalance extends Uint8ArrayE implements Types.ChannelBalance {
   }
 
   get balance_a(): Balance {
-    return new Balance(new Uint8Array(this.buffer, this.balanceAOffset, Balance.SIZE))
+    return new Balance(new BN(new Uint8Array(this.buffer, this.balanceAOffset, Balance.SIZE)))
   }
 
   static get SIZE(): number {

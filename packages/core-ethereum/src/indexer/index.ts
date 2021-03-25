@@ -482,7 +482,7 @@ class Indexer extends EventEmitter implements IIndexer {
     if (sourcePubKey.eq(partyA)) {
       return [source, await pubKeyToPeerId(partyB), new Balance(channelEntry.partyABalance)]
     } else {
-      const partyBBalance = new Balance(new Balance(channelEntry.deposit).sub(new Balance(channelEntry.partyABalance)))
+      const partyBBalance = new Balance(new Balance(channelEntry.deposit).toBN().sub(channelEntry.partyABalance))
       return [source, await pubKeyToPeerId(partyA), partyBBalance]
     }
   }
@@ -507,7 +507,7 @@ class Indexer extends EventEmitter implements IIndexer {
     let cout: RoutingChannel[] = []
     for (let channel of channels) {
       let directed = await this.toIndexerChannel(source, channel)
-      if (directed[2].gtn(0)) {
+      if (directed[2].toBN().gtn(0)) {
         cout.push(directed)
       }
     }
