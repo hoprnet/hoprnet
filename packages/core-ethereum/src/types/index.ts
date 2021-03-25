@@ -1,5 +1,4 @@
 import AcknowledgedTicket from './acknowledgedTicket'
-import Balance from './balance'
 import { Channel, ChannelBalance, ChannelState } from './channel'
 import ChannelEntry from './channelEntry'
 import Hash from './hash'
@@ -14,9 +13,10 @@ import Ticket from './ticket'
 import TicketEpoch from './ticketEpoch'
 
 import { ADDRESS_LENGTH } from '../constants'
-import { u8aToHex, u8aEquals } from '@hoprnet/hopr-utils'
+import { u8aToHex, u8aEquals, moveDecimalPoint } from '@hoprnet/hopr-utils'
 import type { Types as Interfaces } from '@hoprnet/hopr-core-connector-interface'
 import Web3 from 'web3'
+import BN from 'bn.js'
 
 class Address implements Interfaces.Address {
   constructor(private id: Uint8Array) {}
@@ -35,6 +35,35 @@ class Address implements Interfaces.Address {
 
   eq(b: Address) {
     return u8aEquals(this.id, b.serialize())
+  }
+}
+
+class Balance implements Interfaces.Balance {
+  constructor(private bn: BN) {}
+
+  static get SYMBOL(): string {
+    return `HOPR`
+  }
+
+  static get DECIMALS(): number {
+    return 18
+  }
+
+  public toBN(): BN {
+    return this.bn
+  }
+
+  public serialize(): Uint8Array {
+    return new Uint8Array(this.bn.toBuffer('be', 32))
+  }
+
+  public toFormattedString(): string {
+    return moveDecimalPoint(this.bn.toString(), Balance.DECIMALS * -1) + ' ' + Balance.SYMBOL
+  }
+
+  static get SIZE(): number {
+    // Uint256
+    return 32
   }
 }
 
