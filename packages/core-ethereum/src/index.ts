@@ -216,3 +216,4 @@ export default class HoprEthereum implements HoprCoreConnector {
 
 export const Types = types
 export const Utils = utils
+export * from './types'

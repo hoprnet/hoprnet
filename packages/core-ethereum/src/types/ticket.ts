@@ -1,7 +1,7 @@
 import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import BN from 'bn.js'
 import { stringToU8a, u8aToHex, u8aConcat } from '@hoprnet/hopr-utils'
-import { AccountId, Balance, Hash, Signature, TicketEpoch } from '.'
+import { Address, Balance, Hash, Signature, TicketEpoch } from '.'
 import { Uint8ArrayE } from '../types/extended'
 import { sign } from '../utils'
 
@@ -9,7 +9,7 @@ import Web3 from 'web3'
 const web3 = new Web3()
 
 const EPOCH_SIZE = 3
-const AMOUNT_SIZE = 12
+const UINT96_SIZE = 12
 
 /**
  * Given a message, prefix it with "\x19Ethereum Signed Message:\n" and return it's hash
@@ -29,7 +29,7 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
       offset: number
     },
     struct?: {
-      counterparty: AccountId
+      counterparty: Address
       challenge: Hash
       epoch: TicketEpoch
       amount: Balance
@@ -48,10 +48,10 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
     }
 
     if (struct) {
-      this.set(struct.counterparty, this.counterpartyOffset - this.byteOffset)
+      this.set(struct.counterparty.serialize(), this.counterpartyOffset - this.byteOffset)
       this.set(struct.challenge, this.challengeOffset - this.byteOffset)
       this.set(new Uint8Array(struct.epoch.toBuffer('be', EPOCH_SIZE)), this.epochOffset - this.byteOffset)
-      this.set(new Uint8Array(struct.amount.toBuffer('be', AMOUNT_SIZE)), this.amountOffset - this.byteOffset)
+      this.set(struct.amount.toUint96(), this.amountOffset - this.byteOffset)
       this.set(struct.winProb, this.winProbOffset - this.byteOffset)
       this.set(
         new Uint8Array(struct.channelIteration.toBuffer('be', EPOCH_SIZE)),
@@ -72,12 +72,12 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
     return this.byteOffset
   }
 
-  get counterparty(): AccountId {
-    return new AccountId(new Uint8Array(this.buffer, this.counterpartyOffset, AccountId.SIZE))
+  get counterparty(): Address {
+    return new Address(new Uint8Array(this.buffer, this.counterpartyOffset, Address.SIZE))
   }
 
   get challengeOffset(): number {
-    return this.byteOffset + AccountId.SIZE
+    return this.byteOffset + Address.SIZE
   }
 
   get challenge(): Hash {
@@ -85,7 +85,7 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
   }
 
   get epochOffset(): number {
-    return this.byteOffset + AccountId.SIZE + Hash.SIZE
+    return this.byteOffset + Address.SIZE + Hash.SIZE
   }
 
   get epoch(): TicketEpoch {
@@ -93,15 +93,15 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
   }
 
   get amountOffset(): number {
-    return this.byteOffset + AccountId.SIZE + Hash.SIZE + EPOCH_SIZE
+    return this.byteOffset + Address.SIZE + Hash.SIZE + EPOCH_SIZE
   }
 
   get amount(): Balance {
-    return new Balance(new Uint8Array(this.buffer, this.amountOffset, AMOUNT_SIZE))
+    return Balance.fromUint96(new Uint8Array(this.buffer, this.amountOffset, 12))
   }
 
   get winProbOffset(): number {
-    return this.byteOffset + AccountId.SIZE + Hash.SIZE + EPOCH_SIZE + AMOUNT_SIZE
+    return this.byteOffset + Address.SIZE + Hash.SIZE + EPOCH_SIZE + UINT96_SIZE
   }
 
   get winProb(): Hash {
@@ -109,7 +109,7 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
   }
 
   get channelIterationOffset(): number {
-    return this.byteOffset + AccountId.SIZE + Hash.SIZE + EPOCH_SIZE + AMOUNT_SIZE + Hash.SIZE
+    return this.byteOffset + Address.SIZE + Hash.SIZE + EPOCH_SIZE + UINT96_SIZE + Hash.SIZE
   }
 
   get channelIteration(): TicketEpoch {
@@ -121,11 +121,16 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
   }
 
   static get SIZE(): number {
-    return AccountId.SIZE + Hash.SIZE + EPOCH_SIZE + AMOUNT_SIZE + Hash.SIZE + EPOCH_SIZE
+    return Address.SIZE + Hash.SIZE + EPOCH_SIZE + UINT96_SIZE + Hash.SIZE + EPOCH_SIZE
   }
 
   getEmbeddedFunds(): Balance {
-    return new Balance(this.amount.mul(new BN(this.winProb)).div(new BN(new Uint8Array(Hash.SIZE).fill(0xff))))
+    return new Balance(
+      this.amount
+        .toBN()
+        .mul(new BN(this.winProb))
+        .div(new BN(new Uint8Array(Hash.SIZE).fill(0xff)))
+    )
   }
 
   async sign(privKey: Uint8Array): Promise<Signature> {
@@ -138,7 +143,7 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
       offset: number
     },
     struct?: {
-      counterparty: AccountId
+      counterparty: Address
       challenge: Hash
       epoch: TicketEpoch
       amount: Balance

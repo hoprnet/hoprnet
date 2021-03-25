@@ -1,21 +1,15 @@
 import type Hopr from '../..'
+import BN from 'bn.js'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-
 import assert from 'assert'
-
 import { randomBytes } from 'crypto'
-
 import { UnacknowledgedTicket } from '.'
-
 import { NODE_SEEDS } from '@hoprnet/hopr-demo-seeds'
-
 import { Types, Utils } from '@hoprnet/hopr-core-ethereum'
 import { privKeyToPeerId } from '@hoprnet/hopr-utils'
 import { toU8a, u8aConcat, u8aToNumber } from '@hoprnet/hopr-utils'
-
 import LevelUp from 'levelup'
 import Memdown from 'memdown'
-
 import * as DbKeys from '../../dbKeys'
 
 describe(`check serialization and deserialization of ticket objects`, function () {
@@ -36,8 +30,8 @@ describe(`check serialization and deserialization of ticket objects`, function (
     const peerA = await privKeyToPeerId(NODE_SEEDS[0])
     const peerB = await privKeyToPeerId(NODE_SEEDS[1])
 
-    // const accountA = await node.paymentChannels.utils.pubKeyToAccountId(peerA.pubKey.marshal())
-    const accountB = await node.paymentChannels.utils.pubKeyToAccountId(peerB.pubKey.marshal())
+    // const accountA = await node.paymentChannels.utils.pubKeyToAddress(peerA.pubKey.marshal())
+    const accountB = await node.paymentChannels.utils.pubKeyToAddress(peerB.pubKey.marshal())
 
     const secretA = randomBytes(32)
     const secretB = randomBytes(32)
@@ -58,7 +52,7 @@ describe(`check serialization and deserialization of ticket objects`, function (
         offset: signedTicket.ticketOffset
       },
       {
-        amount: new node.paymentChannels.types.Balance(1),
+        amount: new node.paymentChannels.types.Balance(new BN(1)),
         counterparty: accountB,
         challenge,
         epoch: new node.paymentChannels.types.TicketEpoch(0),

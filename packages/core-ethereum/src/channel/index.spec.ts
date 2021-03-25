@@ -8,7 +8,7 @@ import { createChallenge, hash } from '../utils'
 import BN from 'bn.js'
 import pipe from 'it-pipe'
 import { Channel as ChannelType, ChannelStatus, ChannelBalance, ChannelState } from '../types/channel'
-import { AcknowledgedTicket, Balance, SignedChannel, SignedTicket, AccountId } from '../types'
+import { AcknowledgedTicket, Balance, SignedChannel, SignedTicket, Address } from '../types'
 import CoreConnector from '..'
 import Channel from '.'
 import * as testconfigs from '../config.spec'
@@ -28,7 +28,7 @@ describe('test Channel class', function () {
     counterparty,
     winProb = DEFAULT_WIN_PROB
   }: {
-    counterparty: AccountId
+    counterparty: Address
     winProb?: number
   }) {
     const secretA = randomBytes(32)
@@ -80,8 +80,8 @@ describe('test Channel class', function () {
     this.timeout(durations.minutes(1))
 
     const channelBalance = new ChannelBalance(undefined, {
-      balance: new BN(123),
-      balance_a: new BN(122)
+      balance: new Balance(new BN(123)),
+      balance_a: new Balance(new BN(122))
     })
 
     const channel = await coreConnector.channel.create(
@@ -121,8 +121,8 @@ describe('test Channel class', function () {
       }
     )
 
-    const myAddress = await coreConnector.utils.pubKeyToAccountId(coreConnector.account.keys.onChain.pubKey)
-    const counterpartyAddress = await coreConnector.utils.pubKeyToAccountId(
+    const myAddress = await coreConnector.utils.pubKeyToAddress(coreConnector.account.keys.onChain.pubKey)
+    const counterpartyAddress = await coreConnector.utils.pubKeyToAddress(
       counterpartysCoreConnector.account.keys.onChain.pubKey
     )
 
@@ -132,10 +132,15 @@ describe('test Channel class', function () {
     const firstAckedTicket = new AcknowledgedTicket(coreConnector, undefined, {
       response: firstTicket.response
     })
-    const signedTicket = await channel.ticket.create(new Balance(1), firstTicket.challenge, firstTicket.winProb, {
-      bytes: firstAckedTicket.buffer,
-      offset: firstAckedTicket.signedTicketOffset
-    })
+    const signedTicket = await channel.ticket.create(
+      new Balance(new BN(1)),
+      firstTicket.challenge,
+      firstTicket.winProb,
+      {
+        bytes: firstAckedTicket.buffer,
+        offset: firstAckedTicket.signedTicketOffset
+      }
+    )
 
     assert(
       u8aEquals(await signedTicket.signer, coreConnector.account.keys.onChain.pubKey),
@@ -149,7 +154,7 @@ describe('test Channel class', function () {
 
     assert(
       u8aEquals(dbChannels[0].counterparty, coreConnector.account.keys.onChain.pubKey),
-      `Channel record should make it into the database and its db-key should lead to the AccountId of the counterparty.`
+      `Channel record should make it into the database and its db-key should lead to the Address of the counterparty.`
     )
 
     const counterpartysChannel = await counterpartysCoreConnector.channel.create(
@@ -224,7 +229,7 @@ describe('test Channel class', function () {
         response: ticketData.response
       })
 
-      nextSignedTicket = await channel.ticket.create(new Balance(1), ticketData.challenge, ticketData.winProb, {
+      nextSignedTicket = await channel.ticket.create(new Balance(new BN(1)), ticketData.challenge, ticketData.winProb, {
         bytes: ackedTicket.buffer,
         offset: ackedTicket.signedTicketOffset
       })

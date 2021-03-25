@@ -105,7 +105,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
   public isBootstrapNode: boolean
   public bootstrapServers: Multiaddr[]
   public initializedWithOptions: HoprOptions
-  public ticketAmount: number = TICKET_AMOUNT
+  public ticketAmount: string = TICKET_AMOUNT
   public ticketWinProb: number = TICKET_WIN_PROB
 
   private running: boolean
@@ -128,7 +128,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       this.networkPeers.register(conn.remotePeer)
     })
 
-    this.setChannelStrategy(options.strategy || 'promiscuous')
+    this.setChannelStrategy(options.strategy || 'passive')
     this.initializedWithOptions = options
     this.output = (arr: Uint8Array) => {
       this.emit('hopr:message', arr)
@@ -192,7 +192,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       this._libp2p.hangUp.bind(this._libp2p)
     )
 
-    if (options.ticketAmount) this.ticketAmount = options.ticketAmount
+    if (options.ticketAmount) this.ticketAmount = String(options.ticketAmount)
     if (options.ticketWinProb) this.ticketWinProb = options.ticketWinProb
 
     verbose('# STARTED NODE')
@@ -248,9 +248,10 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       config: {
         transport: {
           HoprConnect: {
-            bootstrapServers: options.bootstrapServers,
-            __noDirectConnections: true,
-            __noWebRTCUpgrade: false
+            bootstrapServers: options.bootstrapServers
+            // @dev Use these settings to simulate NAT behavior
+            // __noDirectConnections: true,
+            // __noWebRTCUpgrade: false
           }
         },
         peerDiscovery: {
@@ -288,7 +289,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     }
     const balance = await this.getBalance()
     const [nextChannels, closeChannels] = await this.strategy.tick(
-      balance,
+      balance.toBN(),
       newChannels,
       currentChannels,
       this.networkPeers,
@@ -510,7 +511,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
   private async checkBalances() {
     const balance = await this.getBalance()
     let unfunded = false
-    if (balance.lten(0)) {
+    if (balance.toBN().lten(0)) {
       const address = await this.paymentChannels.hexAccountAddress()
       log('unfunded node', address)
       this.emit('hopr:warning:unfunded', address)
@@ -588,8 +589,8 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     const self = this.getId()
 
     const channelId = await utils.getId(
-      await utils.pubKeyToAccountId(self.pubKey.marshal()),
-      await utils.pubKeyToAccountId(counterParty.pubKey.marshal())
+      await utils.pubKeyToAddress(self.pubKey.marshal()),
+      await utils.pubKeyToAddress(counterParty.pubKey.marshal())
     )
 
     const myAvailableTokens = await account.getBalance(true)
@@ -597,13 +598,13 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     // validate 'amountToFund'
     if (amountToFund.lten(0)) {
       throw Error(`Invalid 'amountToFund' provided: ${amountToFund.toString(10)}`)
-    } else if (amountToFund.gt(myAvailableTokens)) {
-      throw Error(`You don't have enough tokens: ${amountToFund.toString(10)}<${myAvailableTokens.toString(10)}`)
+    } else if (amountToFund.gt(myAvailableTokens.toBN())) {
+      throw Error(`You don't have enough tokens: ${amountToFund.toString(10)}<${myAvailableTokens.toBN().toString(10)}`)
     }
 
     const amPartyA = utils.isPartyA(
-      await utils.pubKeyToAccountId(self.pubKey.marshal()),
-      await utils.pubKeyToAccountId(counterParty.pubKey.marshal())
+      await utils.pubKeyToAddress(self.pubKey.marshal()),
+      await utils.pubKeyToAddress(counterParty.pubKey.marshal())
     )
 
     const channelBalance = types.ChannelBalance.create(

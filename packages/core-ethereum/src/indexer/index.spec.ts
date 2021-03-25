@@ -119,7 +119,7 @@ describe('test indexer', function () {
 
     it('should find all channels', async function () {
       let partyA: Public, partyB: Public
-      if (isPartyA(await userA.pubKey.toAccountId(), await userB.pubKey.toAccountId())) {
+      if (isPartyA(await userA.pubKey.toAddress(), await userB.pubKey.toAddress())) {
         partyA = userA.pubKey
         partyB = userB.pubKey
       } else {
@@ -141,7 +141,7 @@ describe('test indexer', function () {
 
     it('should find channel using partyA', async function () {
       let partyA: Public, partyB: Public
-      if (isPartyA(await userA.pubKey.toAccountId(), await userB.pubKey.toAccountId())) {
+      if (isPartyA(await userA.pubKey.toAddress(), await userB.pubKey.toAddress())) {
         partyA = userA.pubKey
         partyB = userB.pubKey
       } else {
@@ -157,7 +157,7 @@ describe('test indexer', function () {
     })
     it('should find channel using partyB', async function () {
       let partyA: Public, partyB: Public
-      if (isPartyA(await userA.pubKey.toAccountId(), await userB.pubKey.toAccountId())) {
+      if (isPartyA(await userA.pubKey.toAddress(), await userB.pubKey.toAddress())) {
         partyA = userA.pubKey
         partyB = userB.pubKey
       } else {
@@ -174,7 +174,7 @@ describe('test indexer', function () {
 
     it('should find channel using partyA & partyB', async function () {
       let partyA: Public, partyB: Public
-      if (isPartyA(await userA.pubKey.toAccountId(), await userB.pubKey.toAccountId())) {
+      if (isPartyA(await userA.pubKey.toAddress(), await userB.pubKey.toAddress())) {
         partyA = userA.pubKey
         partyB = userB.pubKey
       } else {
@@ -245,7 +245,7 @@ describe('test indexer', function () {
       assert.equal(channels.length, 2, 'check Channels.store')
 
       let partyA: Public, partyB: Public
-      if (isPartyA(await userA.pubKey.toAccountId(), await userB.pubKey.toAccountId())) {
+      if (isPartyA(await userA.pubKey.toAddress(), await userB.pubKey.toAddress())) {
         partyA = userA.pubKey
         partyB = userB.pubKey
       } else {

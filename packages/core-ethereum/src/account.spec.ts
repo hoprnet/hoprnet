@@ -106,29 +106,29 @@ describe('test getBalance', function () {
 
   it('should get balance but nothing is cached', async function () {
     const result = await getBalance(createHoprTokenMock('10'), accountId, true)
-    expect(result.toString()).to.equal('10')
+    expect(result.toBN().toString()).to.equal('10')
   })
 
   it('should get balance', async function () {
     const result = await getBalance(createHoprTokenMock('10'), accountId, false)
-    expect(result.toString()).to.equal('10')
+    expect(result.toBN().toString()).to.equal('10')
   })
 
   it('should get cached balance', async function () {
     const result = await getBalance(createHoprTokenMock('20'), accountId, true)
-    expect(result.toString()).to.equal('10')
+    expect(result.toBN().toString()).to.equal('10')
   })
 
   it('should not get cached balance', async function () {
     const result = await getBalance(createHoprTokenMock('20'), accountId, false)
-    expect(result.toString()).to.equal('20')
+    expect(result.toBN().toString()).to.equal('20')
   })
 
   it('should reset cache', async function () {
     clock.tick(WEB3_CACHE_TTL + 1)
 
     const result = await getBalance(createHoprTokenMock('30'), accountId, true)
-    expect(result.toString()).to.equal('30')
+    expect(result.toBN().toString()).to.equal('30')
   })
 })
 

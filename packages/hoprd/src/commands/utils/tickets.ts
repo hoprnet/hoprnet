@@ -31,9 +31,9 @@ export function countSignedTickets(
     (result, signedTicket) => {
       result.tickets.push({
         challange: u8aToHex(signedTicket.ticket.challenge),
-        amount: signedTicket.ticket.amount.toString(10)
+        amount: signedTicket.ticket.amount.toBN().toString(10)
       })
-      result.total = result.total.add(signedTicket.ticket.amount)
+      result.total = result.total.add(signedTicket.ticket.amount.toBN())
 
       return result
     },

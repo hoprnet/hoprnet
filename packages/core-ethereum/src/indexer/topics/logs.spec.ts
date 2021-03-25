@@ -1,6 +1,6 @@
 import type { Event } from './types'
 import { expect } from 'chai'
-import { pubKeyToAccountId } from '../../utils'
+import { pubKeyToAddress } from '../../utils'
 import * as logs from './logs'
 import * as fixtures from './logs.fixtures.spec'
 
@@ -20,11 +20,11 @@ describe('test topic utils', function () {
     )
     expect(actual.data.funder).to.equal(expected.data.funder, 'funder')
 
-    const actualRecipientAccountId = await pubKeyToAccountId(actual.data.recipient)
-    const actualCounterpartyAccountId = await pubKeyToAccountId(actual.data.counterparty)
+    const actualRecipientAddress = await pubKeyToAddress(actual.data.recipient)
+    const actualCounterpartyAddress = await pubKeyToAddress(actual.data.counterparty)
 
-    expect(actualRecipientAccountId.toHex()).to.equal('0x74cdeAb5AE6efFDC70699731EC3ab55f35fb41eA')
-    expect(actualCounterpartyAccountId.toHex()).to.equal('0x044aEf65B5A3f18ab9aD3A09012747C0397b9089')
+    expect(actualRecipientAddress.toHex()).to.equal('0x74cdeAb5AE6efFDC70699731EC3ab55f35fb41eA')
+    expect(actualCounterpartyAddress.toHex()).to.equal('0x044aEf65B5A3f18ab9aD3A09012747C0397b9089')
   })
 
   it('should convert OPENED log to OPENED event', async function () {
@@ -35,11 +35,11 @@ describe('test topic utils', function () {
     expect(actual.data.opener.toHex()).to.equal(expected.data.opener.toHex(), 'opener')
     expect(actual.data.counterparty.toHex()).to.equal(expected.data.counterparty.toHex(), 'counterparty')
 
-    const actualOpenerAccountId = await pubKeyToAccountId(actual.data.opener)
-    const actualCounterpartyAccountId = await pubKeyToAccountId(actual.data.counterparty)
+    const actualOpenerAddress = await pubKeyToAddress(actual.data.opener)
+    const actualCounterpartyAddress = await pubKeyToAddress(actual.data.counterparty)
 
-    expect(actualOpenerAccountId.toHex()).to.equal('0xf73A34405D1349476B5500Ea0381A1fcc87e8AEb')
-    expect(actualCounterpartyAccountId.toHex()).to.equal('0x20516d47c46Bcd67D19898FDA6aE8A68B3022429')
+    expect(actualOpenerAddress.toHex()).to.equal('0xf73A34405D1349476B5500Ea0381A1fcc87e8AEb')
+    expect(actualCounterpartyAddress.toHex()).to.equal('0x20516d47c46Bcd67D19898FDA6aE8A68B3022429')
   })
 })
 

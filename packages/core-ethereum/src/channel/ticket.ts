@@ -2,7 +2,7 @@ import type IChannel from '.'
 import { u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
 import { Hash, TicketEpoch, Balance, SignedTicket, Ticket, AcknowledgedTicket } from '../types'
 import {
-  pubKeyToAccountId,
+  pubKeyToAddress,
   computeWinningProbability,
   isWinningTicket,
   checkChallenge,
@@ -81,7 +81,7 @@ class TicketStatic {
         }
       }
 
-      const counterparty = await this.coreConnector.utils.pubKeyToAccountId(await signedTicket.signer)
+      const counterparty = await this.coreConnector.utils.pubKeyToAddress(await signedTicket.signer)
 
       const transaction = await account.signTransaction(
         {
@@ -91,9 +91,9 @@ class TicketStatic {
         hoprChannels.methods.redeemTicket(
           u8aToHex(ackTicket.preImage),
           u8aToHex(ackTicket.response),
-          ticket.amount.toString(),
+          ticket.amount.toBN().toString(),
           u8aToHex(ticket.winProb),
-          u8aToHex(counterparty),
+          counterparty.toHex(),
           u8aToHex(r),
           u8aToHex(s),
           v + 27
@@ -132,8 +132,7 @@ class TicketFactory {
     }
   ): Promise<SignedTicket> {
     const ticketWinProb = new Hash(computeWinningProbability(winProb))
-
-    const counterparty = await pubKeyToAccountId(this.channel.counterparty)
+    const counterparty = await pubKeyToAddress(this.channel.counterparty)
     const { hoprChannels } = getWeb3()
 
     const epoch = await hoprChannels.methods

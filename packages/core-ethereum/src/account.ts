@@ -8,12 +8,13 @@ import { getRpcOptions, Network } from '@hoprnet/hopr-ethereum'
 import { durations, stringToU8a, u8aEquals, u8aToHex, isExpired } from '@hoprnet/hopr-utils'
 import NonceTracker from './nonce-tracker'
 import TransactionManager from './transaction-manager'
-import { AccountId, AcknowledgedTicket, Balance, Hash, NativeBalance, TicketEpoch } from './types'
-import { isWinningTicket, pubKeyToAccountId, isGanache } from './utils'
+import { Address, AcknowledgedTicket, Balance, Hash, NativeBalance, TicketEpoch } from './types'
+import { isWinningTicket, pubKeyToAddress, isGanache } from './utils'
 import { HASHED_SECRET_WIDTH } from './hashedSecret'
 import { WEB3_CACHE_TTL } from './constants'
 import * as ethereum from './ethereum'
 import { getWeb3 } from './web3'
+import BN from 'bn.js'
 
 import debug from 'debug'
 const log = debug('hopr-core-ethereum:account')
@@ -23,7 +24,7 @@ const rpcOps = getRpcOptions()
 const cache = new Map<'balance' | 'nativeBalance', { value: string; updatedAt: number }>()
 
 class Account {
-  private _address?: AccountId
+  private _address?: Address
   private _preImageIterator: AsyncGenerator<boolean, boolean, AcknowledgedTicket>
   private _ticketEpoch?: TicketEpoch
   private _ticketEpochListener?: ContractEventEmitter<any>
@@ -197,12 +198,12 @@ class Account {
     return (await this._preImageIterator.next(ticket)).value
   }
 
-  get address(): Promise<AccountId> {
+  get address(): Promise<Address> {
     if (this._address) {
       return Promise.resolve(this._address)
     }
 
-    return pubKeyToAccountId(this.keys.onChain.pubKey).then((accountId: AccountId) => {
+    return pubKeyToAddress(this.keys.onChain.pubKey).then((accountId: Address) => {
       this._address = accountId
       return this._address
     })
@@ -341,17 +342,17 @@ class Account {
  */
 export const getBalance = async (
   hoprToken: HoprToken,
-  account: AccountId,
+  account: Address,
   useCache: boolean = false
 ): Promise<Balance> => {
   if (useCache) {
     const cached = cache.get('balance')
     const notExpired = cached && !isExpired(cached.updatedAt, new Date().getTime(), WEB3_CACHE_TTL)
-    if (notExpired) return new Balance(cached.value)
+    if (notExpired) return new Balance(new BN(cached.value))
   }
 
   const value = await ethereum.getBalance(hoprToken, account)
-  cache.set('balance', { value: value.toString(), updatedAt: new Date().getTime() })
+  cache.set('balance', { value: value.toBN().toString(), updatedAt: new Date().getTime() })
 
   return value
 }
@@ -362,7 +363,7 @@ export const getBalance = async (
  */
 export const getNativeBalance = async (
   web3: Web3,
-  account: AccountId,
+  account: Address,
   useCache: boolean = false
 ): Promise<NativeBalance> => {
   if (useCache) {

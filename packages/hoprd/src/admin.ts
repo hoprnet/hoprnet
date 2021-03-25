@@ -1,4 +1,5 @@
 import Hopr, { SUGGESTED_NATIVE_BALANCE } from '@hoprnet/hopr-core'
+import BN from 'bn.js'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import http from 'http'
 import fs from 'fs'
@@ -84,10 +85,6 @@ export class AdminServer {
       this.logs.subscribe(socket)
     })
 
-    this.node.on('hopr:crawl:completed', () => {
-      this.logs.log('Crawled network')
-    })
-
     this.node.on('hopr:channel:opened', (channel) => {
       this.logs.log(`Opened channel to ${channel[0].toB58String()}`)
     })
@@ -97,25 +94,32 @@ export class AdminServer {
     })
 
     this.node.on('hopr:warning:unfunded', (addr) => {
-      const min = new node.paymentChannels.types.Balance(0).toFormattedString.apply(SUGGESTED_NATIVE_BALANCE)
+      const min = new node.paymentChannels.types.Balance(new BN(0)).toFormattedString.apply(SUGGESTED_NATIVE_BALANCE)
+      const Balance = node.paymentChannels.types.Balance
+
       this.logs.log(
-        `- The account associated with this node has no funds,\n` +
+        `- The account associated with this node has no ${Balance.SYMBOL},\n` +
           `  in order to send messages, or open channels, you will need to send` +
           `  at least ${min} to ${addr}`
       )
     })
 
     this.node.on('hopr:warning:unfundedNative', (addr) => {
+      const NativeBalance = node.paymentChannels.types.NativeBalance
+      const min = new NativeBalance(0).toFormattedString.apply(SUGGESTED_NATIVE_BALANCE)
+
       this.logs.log(
-        `- The account associated with this node has no gETH,\n` +
+        `- The account associated with this node has no ${NativeBalance.SYMBOL},\n` +
           `  in order to fund gas for protocol overhead you will need to send\n` +
-          `  0.025 gETH to ${addr}`
+          `  ${min} to ${addr}`
       )
     })
 
     // Setup some noise
     connectionReport(this.node, this.logs)
     reportMemoryUsage(this.logs)
+
+    showDisclaimer(this.logs)
 
     this.cmds.execute(`alias ${node.getId().toB58String()} me`)
     if (node.bootstrapServers.length == 1) {
@@ -126,6 +130,15 @@ export class AdminServer {
       })
     }
   }
+}
+
+const DISCLAIMER = `-- This software is still under development --\n\tDo NOT add assets to the node that you can't lose`
+
+export function showDisclaimer(logs: LogStream) {
+  logs.warn(DISCLAIMER)
+  setInterval(() => {
+    logs.warn(DISCLAIMER)
+  }, 60 * 1000)
 }
 
 export async function reportMemoryUsage(logs: LogStream) {
