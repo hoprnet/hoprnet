@@ -46,7 +46,7 @@ describe('test Channel class', function () {
   }
 
   before(async function () {
-    this.timeout(durations.minutes(1))
+    this.timeout(durations.minutes(3))
     await ganache.start()
     await migrate()
     await initializeWeb3(configs.DEFAULT_URI)
@@ -57,6 +57,7 @@ describe('test Channel class', function () {
   })
 
   beforeEach(async function () {
+    this.timeout(durations.minutes(3))
     const funder = await getPrivKeyData(stringToU8a(testconfigs.FUND_ACCOUNT_PRIVATE_KEY))
     const { web3, hoprToken } = getWeb3()
 
