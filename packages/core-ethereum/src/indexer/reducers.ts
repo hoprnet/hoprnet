@@ -1,153 +1,147 @@
-import type { Event } from './topics'
+import type { Event } from './types'
 import assert from 'assert'
 import BN from 'bn.js'
-import { ChannelEntry } from '../types'
+import Web3 from 'web3'
+import { Account, AccountId, Public, Hash, ChannelEntry } from '../types'
 import { isPartyA } from '../utils'
 
-export const onFundedChannel = async (
-  event: Event<'FundedChannel'>,
+const { hexToBytes, hexToNumberString } = Web3.utils
+
+export const onAccountInitialized = async (event: Event<'AccountInitialized'>): Promise<Account> => {
+  const data = event.returnValues
+  const pubKey = new Public([...hexToBytes(data.pubKeyFirstHalf), ...hexToBytes(data.pubKeySecondHalf)])
+  const secret = new Hash(hexToBytes(data.secret))
+  const counter = new BN(0)
+
+  return new Account(pubKey, secret, counter)
+}
+
+export const onAccountSecretUpdated = async (
+  event: Event<'AccountSecretUpdated'>,
+  storedAccount: Account
+): Promise<Account> => {
+  const data = event.returnValues
+  const secret = new Hash(hexToBytes(data.secret))
+  const counter = new BN(hexToNumberString(data.secret)) // TODO: depend on indexer to increment this
+
+  return new Account(storedAccount.publicKey, secret, counter)
+}
+
+export const onChannelFunded = async (
+  event: Event<'ChannelFunded'>,
   channelEntry?: ChannelEntry
 ): Promise<ChannelEntry> => {
-  const recipientAccountId = await event.data.recipient.toAccountId()
-  const counterpartyAccountId = await event.data.counterparty.toAccountId()
-  const isRecipientPartyA = isPartyA(recipientAccountId, counterpartyAccountId)
+  const data = event.returnValues
+
+  const accountA = new AccountId(hexToBytes(data.accountA))
+  const accountB = new AccountId(hexToBytes(data.accountB))
+  const parties: [AccountId, AccountId] = [accountA, accountB]
 
   if (channelEntry) {
+    const status = channelEntry.getStatus()
     assert(
-      channelEntry.status === 'UNINITIALISED' || channelEntry.status === 'FUNDED',
+      status === 'UNINITIALISED' || status === 'FUNDED',
       "'onFundedChannel' failed because channel is not in 'UNINITIALISED' or 'FUNDED' status"
     )
 
-    return new ChannelEntry(undefined, {
-      blockNumber: event.blockNumber,
-      transactionIndex: event.transactionIndex,
-      logIndex: event.logIndex,
-      deposit: channelEntry.deposit.add(event.data.recipientAmount.add(event.data.counterpartyAmount)),
-      partyABalance: channelEntry.partyABalance.add(
-        isRecipientPartyA ? event.data.recipientAmount : event.data.counterpartyAmount
-      ),
-      closureTime: new BN(0),
-      stateCounter: channelEntry.status === 'FUNDED' ? channelEntry.stateCounter : channelEntry.stateCounter.addn(1),
-      closureByPartyA: false
-    })
+    const deposit = channelEntry.deposit.add(new BN(data.deposit))
+    const partyABalance = channelEntry.partyABalance.add(new BN(data.partyABalance))
+    const closureTime = new BN(0)
+    const stateCounter = status === 'FUNDED' ? channelEntry.stateCounter : channelEntry.stateCounter.addn(1)
+    const closureByPartyA = false
+
+    return new ChannelEntry(parties, deposit, partyABalance, closureTime, stateCounter, closureByPartyA)
   } else {
-    return new ChannelEntry(undefined, {
-      blockNumber: event.blockNumber,
-      transactionIndex: event.transactionIndex,
-      logIndex: event.logIndex,
-      deposit: event.data.recipientAmount.add(event.data.counterpartyAmount),
-      partyABalance: isRecipientPartyA ? event.data.recipientAmount : event.data.counterpartyAmount,
-      closureTime: new BN(0),
-      stateCounter: new BN(1),
-      closureByPartyA: false
-    })
+    const deposit = new BN(data.deposit)
+    const partyABalance = new BN(data.partyABalance)
+    const closureTime = new BN(0)
+    const stateCounter = new BN(1)
+    const closureByPartyA = false
+
+    return new ChannelEntry(parties, deposit, partyABalance, closureTime, stateCounter, closureByPartyA)
   }
 }
 
-export const onOpenedChannel = async (
-  event: Event<'OpenedChannel'>,
+export const onChannelOpened = async (
+  _event: Event<'ChannelOpened'>,
   channelEntry: ChannelEntry
 ): Promise<ChannelEntry> => {
-  assert(channelEntry.status === 'FUNDED', "'onOpenedChannel' failed because channel is not in 'FUNDED' status")
+  assert(channelEntry.getStatus() === 'FUNDED', "'onOpenedChannel' failed because channel is not in 'FUNDED' status")
 
-  return new ChannelEntry(undefined, {
-    blockNumber: event.blockNumber,
-    transactionIndex: event.transactionIndex,
-    logIndex: event.logIndex,
-    deposit: channelEntry.deposit,
-    partyABalance: channelEntry.partyABalance,
-    closureTime: channelEntry.closureTime,
-    stateCounter: channelEntry.stateCounter.addn(1),
-    closureByPartyA: false
-  })
+  return new ChannelEntry(
+    channelEntry.parties,
+    channelEntry.deposit,
+    channelEntry.partyABalance,
+    channelEntry.closureTime,
+    channelEntry.stateCounter.addn(1),
+    false
+  )
 }
 
-export const onRedeemedTicket = async (
-  event: Event<'RedeemedTicket'>,
+export const onTicketRedeemed = async (
+  event: Event<'TicketRedeemed'>,
   channelEntry: ChannelEntry
 ): Promise<ChannelEntry> => {
+  const status = channelEntry.getStatus()
+
   assert(
-    channelEntry.status === 'OPEN' || channelEntry.status === 'PENDING',
+    status === 'OPEN' || status === 'PENDING',
     "'onRedeemedTicket' failed because channel is not in 'OPEN' or 'PENDING' status"
   )
 
-  const redeemerAccountId = await event.data.redeemer.toAccountId()
-  const counterpartyAccountId = await event.data.counterparty.toAccountId()
+  const data = event.returnValues
+  const redeemerAccountId = new AccountId(hexToBytes(data.redeemer))
+  const counterpartyAccountId = new AccountId(hexToBytes(data.counterparty))
   const isRedeemerPartyA = isPartyA(redeemerAccountId, counterpartyAccountId)
 
-  return new ChannelEntry(undefined, {
-    blockNumber: event.blockNumber,
-    transactionIndex: event.transactionIndex,
-    logIndex: event.logIndex,
-    deposit: channelEntry.deposit,
-    partyABalance: isRedeemerPartyA
-      ? channelEntry.partyABalance.add(event.data.amount)
-      : channelEntry.partyABalance.sub(event.data.amount),
-    closureTime: channelEntry.closureTime,
-    stateCounter: channelEntry.stateCounter,
-    closureByPartyA: false
-  })
+  return new ChannelEntry(
+    channelEntry.parties,
+    channelEntry.deposit,
+    isRedeemerPartyA
+      ? channelEntry.partyABalance.add(new BN(data.amount))
+      : channelEntry.partyABalance.sub(new BN(data.amount)),
+    channelEntry.closureTime,
+    channelEntry.stateCounter,
+    false
+  )
 }
 
-export const onInitiatedChannelClosure = async (
-  event: Event<'InitiatedChannelClosure'>,
+export const onChannelPendingToClose = async (
+  event: Event<'ChannelPendingToClose'>,
   channelEntry: ChannelEntry
 ): Promise<ChannelEntry> => {
-  try {
-    assert(channelEntry.status === 'OPEN', "'onInitiatedChannelClosure' failed because channel is not in 'OPEN' status")
-  } catch (err) {
-    console.log({
-      transactionHash: event.transactionHash,
-      blockNumber: event.blockNumber.toString(),
-      transactionIndex: event.transactionIndex.toString(),
-      logIndex: event.logIndex.toString(),
-      initiator: event.data.initiator.toHex(),
-      counterparty: event.data.counterparty.toHex()
-    })
-    console.log({
-      blockNumber: channelEntry.blockNumber.toString(),
-      transactionIndex: channelEntry.transactionIndex.toString(),
-      logIndex: channelEntry.logIndex.toString(),
-      deposit: channelEntry.deposit.toString(),
-      partyABalance: channelEntry.partyABalance.toString(),
-      closureTime: channelEntry.closureTime.toString(),
-      stateCounter: channelEntry.stateCounter.toString(),
-      closureByPartyA: channelEntry.closureByPartyA
-    })
-    console.error(err)
-    throw err
-  }
+  assert(
+    channelEntry.getStatus() === 'OPEN',
+    "'onInitiatedChannelClosure' failed because channel is not in 'OPEN' status"
+  )
 
-  const initiatorAccountId = await event.data.initiator.toAccountId()
-  const counterpartyAccountId = await event.data.counterparty.toAccountId()
+  const data = event.returnValues
+  const initiatorAccountId = new AccountId(hexToBytes(data.initiator))
+  const counterpartyAccountId = new AccountId(hexToBytes(data.counterparty))
   const isInitiatorPartyA = isPartyA(initiatorAccountId, counterpartyAccountId)
 
-  return new ChannelEntry(undefined, {
-    blockNumber: event.blockNumber,
-    transactionIndex: event.transactionIndex,
-    logIndex: event.logIndex,
-    deposit: channelEntry.deposit,
-    partyABalance: channelEntry.partyABalance,
-    closureTime: event.data.closureTime,
-    stateCounter: channelEntry.stateCounter.addn(1),
-    closureByPartyA: isInitiatorPartyA
-  })
+  return new ChannelEntry(
+    channelEntry.parties,
+    channelEntry.deposit,
+    channelEntry.partyABalance,
+    new BN(hexToNumberString(data.closureTime)),
+    channelEntry.stateCounter.addn(1),
+    isInitiatorPartyA
+  )
 }
 
-export const onClosedChannel = async (
-  event: Event<'ClosedChannel'>,
+export const onChannelClosed = async (
+  _event: Event<'ChannelClosed'>,
   channelEntry: ChannelEntry
 ): Promise<ChannelEntry> => {
-  assert(channelEntry.status === 'PENDING', "'onClosedChannel' failed because channel is not in 'PENDING' status")
+  assert(channelEntry.getStatus() === 'PENDING', "'onClosedChannel' failed because channel is not in 'PENDING' status")
 
-  return new ChannelEntry(undefined, {
-    blockNumber: event.blockNumber,
-    transactionIndex: event.transactionIndex,
-    logIndex: event.logIndex,
-    deposit: new BN(0),
-    partyABalance: new BN(0),
-    closureTime: new BN(0),
-    stateCounter: channelEntry.stateCounter.addn(7),
-    closureByPartyA: false
-  })
+  return new ChannelEntry(
+    channelEntry.parties,
+    new BN(0),
+    new BN(0),
+    new BN(0),
+    channelEntry.stateCounter.addn(7),
+    false
+  )
 }

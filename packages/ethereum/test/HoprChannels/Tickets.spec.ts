@@ -47,6 +47,7 @@ describe('Tickets', function () {
     await tickets.fundChannelInternal(deployer, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
     await tickets.openChannelInternal(ACCOUNT_A.address, ACCOUNT_B.address)
 
+    // TODO: add event check
     await tickets.redeemTicketInternal(
       TICKET_AB_WIN.recipient,
       TICKET_AB_WIN.counterparty,

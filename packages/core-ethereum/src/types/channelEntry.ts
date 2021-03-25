@@ -1,120 +1,54 @@
-import type { Types } from '@hoprnet/hopr-core-connector-interface'
+import { Types } from '@hoprnet/hopr-core-connector-interface'
 import BN from 'bn.js'
+import AccountId from './accountId'
 import { UINT256 } from '../types/solidity'
-import { Uint8ArrayE } from '../types/extended'
 import { ChannelStatus } from '../types/channel'
 import { stateCounterToStatus, stateCounterToIteration } from '../utils'
 
-// @TODO: we should optimize this since it will use more storage than needed
-// @TODO: redesign how we build classes like this
-class ChannelEntry extends Uint8ArrayE implements Types.ChannelEntry {
+// TODO: optimize storage
+class ChannelEntry implements Types.ChannelEntry {
   constructor(
-    arr?: {
-      bytes: ArrayBuffer
-      offset: number
-    },
-    struct?: {
-      blockNumber: BN
-      transactionIndex: BN
-      logIndex: BN
-      deposit: BN
-      partyABalance: BN
-      closureTime: BN
-      stateCounter: BN
-      closureByPartyA: boolean
-    }
-  ) {
-    if (!arr) {
-      super(ChannelEntry.SIZE)
-    } else {
-      super(arr.bytes, arr.offset, ChannelEntry.SIZE)
-    }
+    public readonly parties: [AccountId, AccountId],
+    public readonly deposit: BN,
+    public readonly partyABalance: BN,
+    public readonly closureTime: BN,
+    public readonly stateCounter: BN,
+    public readonly closureByPartyA: boolean
+  ) {}
 
-    if (struct) {
-      this.set(struct.blockNumber.toBuffer('be', UINT256.SIZE), this.blockNumberOffset - this.byteOffset)
-      this.set(struct.transactionIndex.toBuffer('be', UINT256.SIZE), this.transactionIndexOffset - this.byteOffset)
-      this.set(struct.logIndex.toBuffer('be', UINT256.SIZE), this.logIndexOffset - this.byteOffset)
-      this.set(struct.deposit.toBuffer('be', UINT256.SIZE), this.depositOffset - this.byteOffset)
-      this.set(struct.partyABalance.toBuffer('be', UINT256.SIZE), this.partyABalanceOffset - this.byteOffset)
-      this.set(struct.closureTime.toBuffer('be', UINT256.SIZE), this.closureTimeOffset - this.byteOffset)
-      this.set(struct.stateCounter.toBuffer('be', UINT256.SIZE), this.stateCounterOffset - this.byteOffset)
-      this.set(new Uint8Array([Number(struct.closureByPartyA)]), this.closureByPartyAOffset - this.byteOffset)
-    }
+  static deserialize(arr: Uint8Array) {
+    const items = u8aSplit(arr, [
+      AccountId.SIZE,
+      AccountId.SIZE,
+      UINT256.SIZE,
+      UINT256.SIZE,
+      UINT256.SIZE,
+      UINT256.SIZE,
+      1
+    ])
+    const parties: [AccountId, AccountId] = [new AccountId(items[0]), new AccountId(items[1])]
+    const deposit = new BN(items[2])
+    const partyABalance = new BN(items[3])
+    const closureTime = new BN(items[4])
+    const stateCounter = new BN(items[5])
+    const closureByPartyA = Boolean(items[6][0])
+
+    return new ChannelEntry(parties, deposit, partyABalance, closureTime, stateCounter, closureByPartyA)
   }
 
-  slice(begin = 0, end = ChannelEntry.SIZE): Uint8Array {
-    return this.subarray(begin, end)
+  public serialize(): Uint8Array {
+    return serializeToU8a([
+      [this.parties[0], AccountId.SIZE],
+      [this.parties[1], AccountId.SIZE],
+      [this.deposit.toBuffer(), UINT256.SIZE],
+      [this.partyABalance.toBuffer(), UINT256.SIZE],
+      [this.closureTime.toBuffer(), UINT256.SIZE],
+      [this.stateCounter.toBuffer(), UINT256.SIZE],
+      [[Number(this.closureByPartyA)], 1]
+    ])
   }
 
-  subarray(begin = 0, end = ChannelEntry.SIZE): Uint8Array {
-    return new Uint8Array(this.buffer, begin + this.byteOffset, end - begin)
-  }
-
-  get blockNumberOffset(): number {
-    return this.byteOffset
-  }
-
-  get blockNumber() {
-    return new BN(new Uint8Array(this.buffer, this.blockNumberOffset, UINT256.SIZE))
-  }
-
-  get transactionIndexOffset(): number {
-    return this.blockNumberOffset + UINT256.SIZE
-  }
-
-  get transactionIndex() {
-    return new BN(new Uint8Array(this.buffer, this.transactionIndexOffset, UINT256.SIZE))
-  }
-
-  get logIndexOffset(): number {
-    return this.transactionIndexOffset + UINT256.SIZE
-  }
-
-  get logIndex() {
-    return new BN(new Uint8Array(this.buffer, this.logIndexOffset, UINT256.SIZE))
-  }
-
-  get depositOffset(): number {
-    return this.logIndexOffset + UINT256.SIZE
-  }
-
-  get deposit() {
-    return new BN(new Uint8Array(this.buffer, this.depositOffset, UINT256.SIZE))
-  }
-
-  get partyABalanceOffset(): number {
-    return this.depositOffset + UINT256.SIZE
-  }
-
-  get partyABalance() {
-    return new BN(new Uint8Array(this.buffer, this.partyABalanceOffset, UINT256.SIZE))
-  }
-
-  get closureTimeOffset(): number {
-    return this.partyABalanceOffset + UINT256.SIZE
-  }
-
-  get closureTime() {
-    return new BN(new Uint8Array(this.buffer, this.closureTimeOffset, UINT256.SIZE))
-  }
-
-  get stateCounterOffset(): number {
-    return this.closureTimeOffset + UINT256.SIZE
-  }
-
-  get stateCounter() {
-    return new BN(new Uint8Array(this.buffer, this.stateCounterOffset, UINT256.SIZE))
-  }
-
-  get closureByPartyAOffset(): number {
-    return this.stateCounterOffset + UINT256.SIZE
-  }
-
-  get closureByPartyA() {
-    return Boolean(new Uint8Array(this.buffer, this.closureByPartyAOffset, 1)[0])
-  }
-
-  get status() {
+  public getStatus() {
     const status = stateCounterToStatus(this.stateCounter.toNumber())
 
     if (status >= Object.keys(ChannelStatus).length) {
@@ -127,12 +61,8 @@ class ChannelEntry extends Uint8ArrayE implements Types.ChannelEntry {
     return 'PENDING'
   }
 
-  get iteration() {
+  public getIteration() {
     return stateCounterToIteration(this.stateCounter.toNumber())
-  }
-
-  static get SIZE(): number {
-    return UINT256.SIZE * 7 + 1
   }
 }
 

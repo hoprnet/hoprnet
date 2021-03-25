@@ -1,3 +1,4 @@
+import { Account } from './account'
 import AccountId from './accountId'
 import AcknowledgedTicket from './acknowledgedTicket'
 import Balance from './balance'
@@ -15,6 +16,7 @@ import Ticket from './ticket'
 import TicketEpoch from './ticketEpoch'
 
 class Types {
+  public Account = Account
   public AccountId = AccountId
   public AcknowledgedTicket = AcknowledgedTicket
   public Balance = Balance
@@ -35,6 +37,7 @@ class Types {
 }
 
 export {
+  Account,
   AccountId,
   AcknowledgedTicket,
   Balance,

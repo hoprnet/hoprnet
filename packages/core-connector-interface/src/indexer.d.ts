@@ -1,7 +1,7 @@
-import type { Balance, Public, ChannelEntry } from './types'
+import type { Balance, Public, ChannelEntry, Hash } from './types'
 
 export type RoutingChannel = [source: PeerId, destination: PeerId, stake: Balance]
-export type ChannelUpdate = { partyA: Public; partyB: Public; channelEntry: ChannelEntry }
+export type ChannelUpdate = { channelId: Hash; channelEntry: ChannelEntry }
 
 export interface IndexerEvents {
   channelOpened: (update: ChannelUpdate) => void
@@ -18,8 +18,8 @@ declare interface Indexer {
   emit<U extends keyof IndexerEvents>(event: U, ...args: Parameters<IndexerEvents[U]>): boolean
 
   // get saved channel entries
-  getChannelEntry(partyA: Public, partyB: Public): Promise<ChannelEntry | undefined>
-  getChannelEntries(party?: Public, filter?: (node: Public) => boolean): Promise<ChannelUpdate[]>
+  getChannel(channelId: Hash): Promise<ChannelEntry | undefined>
+  getChannelsOf(accountId: AccountId): Promise<ChannelEntry[]>
 
   // routing
   getRandomChannel(): Promise<RoutingChannel | undefined>

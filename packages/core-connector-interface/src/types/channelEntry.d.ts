@@ -1,20 +1,19 @@
 import type BN from 'bn.js'
+import type AccountId from './accountId'
 
 declare interface ChannelEntryStatic {
   readonly SIZE: number
 }
 
 declare interface ChannelEntry {
-  blockNumber: BN
-  transactionIndex: BN
-  logIndex: BN
+  parties: [AccountId, AccountId]
   deposit: BN
   partyABalance: BN
   closureTime: BN
   stateCounter: BN
   closureByPartyA: boolean
-  readonly status: 'UNINITIALISED' | 'FUNDED' | 'OPEN' | 'PENDING'
-  readonly iteration: number
+  getStatus(): 'UNINITIALISED' | 'FUNDED' | 'OPEN' | 'PENDING'
+  getIteration(): number
 }
 
 declare var ChannelEntry: ChannelEntryStatic
