@@ -8,7 +8,6 @@ import Signature from './signature'
 import SignedChannel from './signedChannel'
 import SignedTicket from './signedTicket'
 import Ticket from './ticket'
-import TicketEpoch from './ticketEpoch'
 
 declare interface AddressStatic {
   readonly SIZE: number
@@ -49,5 +48,4 @@ export {
   SignedChannel,
   SignedTicket,
   Ticket,
-  TicketEpoch
 }

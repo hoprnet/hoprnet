@@ -8,7 +8,7 @@ import { getRpcOptions, Network } from '@hoprnet/hopr-ethereum'
 import { durations, stringToU8a, u8aEquals, u8aToHex, isExpired } from '@hoprnet/hopr-utils'
 import NonceTracker from './nonce-tracker'
 import TransactionManager from './transaction-manager'
-import { Address, AcknowledgedTicket, Balance, Hash, NativeBalance, TicketEpoch } from './types'
+import { Address, AcknowledgedTicket, Balance, Hash, NativeBalance, UINT256 } from './types'
 import { isWinningTicket, pubKeyToAddress, isGanache } from './utils'
 import { HASHED_SECRET_WIDTH } from './hashedSecret'
 import { WEB3_CACHE_TTL } from './constants'
@@ -25,7 +25,7 @@ const cache = new Map<'balance' | 'nativeBalance', { value: string; updatedAt: n
 class Account {
   private _address?: Address
   private _preImageIterator: AsyncGenerator<boolean, boolean, AcknowledgedTicket>
-  private _ticketEpoch?: TicketEpoch
+  private _ticketEpoch?: UINT256 
   private _ticketEpochListener?: ContractEventEmitter<any>
   private _onChainSecret?: Hash
   private _nonceTracker: NonceTracker
@@ -136,7 +136,7 @@ class Account {
     return getNativeBalance(this.coreConnector.web3, await this.address, useCache)
   }
 
-  get ticketEpoch(): Promise<TicketEpoch> {
+  get ticketEpoch(): Promise<UINT256> {
     if (this._ticketEpoch != null) {
       return Promise.resolve(this._ticketEpoch)
     }
@@ -148,7 +148,7 @@ class Account {
         .accounts(address.toHex())
         .call()
         .then((res) => {
-          this._ticketEpoch = new TicketEpoch(res.counter)
+          this._ticketEpoch = new UINT256(res.counter)
 
           return this._ticketEpoch
         })
@@ -314,7 +314,7 @@ class Account {
           .on('data', (event) => {
             log('new ticketEpoch', event.returnValues.counter)
 
-            this._ticketEpoch = new TicketEpoch(event.returnValues.counter)
+            this._ticketEpoch = new UINT256(event.returnValues.counter)
             this._onChainSecret = new Hash(stringToU8a(event.returnValues.secretHash), Hash.SIZE)
           })
           .on('error', (error) => {

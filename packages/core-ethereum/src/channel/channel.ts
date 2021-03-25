@@ -7,7 +7,6 @@ import {
   Hash,
   Public,
   SignedChannel,
-  TicketEpoch,
   ChannelEntry,
   UINT256
 } from '../types'
@@ -41,11 +40,11 @@ class Channel implements IChannel {
     })
   }
 
-  get stateCounter(): Promise<TicketEpoch> {
-    return new Promise<TicketEpoch>(async (resolve, reject) => {
+  get stateCounter(): Promise<UINT256> {
+    return new Promise<UINT256>(async (resolve, reject) => {
       try {
         const channel = await this.onChainChannel
-        return resolve(new TicketEpoch(toU8a(Number(channel.stateCounter))))
+        return resolve(new UINT256(toU8a(Number(channel.stateCounter))))
       } catch (error) {
         return reject(error)
       }
