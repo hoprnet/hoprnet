@@ -45,7 +45,7 @@ declare interface HoprCoreConnector {
     /**
      * Returns the accounts address
      */
-    address: Promise<Types.AccountId>
+    address: Promise<Types.Address>
     /**
      * The accounts nonce.
      */

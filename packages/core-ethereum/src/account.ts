@@ -7,8 +7,8 @@ import Web3 from 'web3'
 import { durations, stringToU8a, u8aEquals, u8aToHex, isExpired } from '@hoprnet/hopr-utils'
 import NonceTracker from './nonce-tracker'
 import TransactionManager from './transaction-manager'
-import { AccountId, AcknowledgedTicket, Balance, Hash, NativeBalance, TicketEpoch } from './types'
-import { isWinningTicket, pubKeyToAccountId, isGanache, getNetworkGasPrice } from './utils'
+import { Address, AcknowledgedTicket, Balance, Hash, NativeBalance, TicketEpoch } from './types'
+import { isWinningTicket, pubKeyToAddress, isGanache, getNetworkGasPrice } from './utils'
 import { HASHED_SECRET_WIDTH } from './hashedSecret'
 import { WEB3_CACHE_TTL } from './constants'
 import * as ethereum from './ethereum'
@@ -20,7 +20,7 @@ export const EMPTY_HASHED_SECRET = new Uint8Array(HASHED_SECRET_WIDTH).fill(0x00
 const cache = new Map<'balance' | 'nativeBalance', { value: string; updatedAt: number }>()
 
 class Account {
-  private _address?: AccountId
+  private _address?: Address
   private _preImageIterator: AsyncGenerator<boolean, boolean, AcknowledgedTicket>
   private _ticketEpoch?: TicketEpoch
   private _ticketEpochListener?: ContractEventEmitter<any>
@@ -191,13 +191,13 @@ class Account {
     return (await this._preImageIterator.next(ticket)).value
   }
 
-  get address(): Promise<AccountId> {
+  get address(): Promise<Address> {
     if (this._address) {
       return Promise.resolve(this._address)
     }
 
-    return pubKeyToAccountId(this.keys.onChain.pubKey).then((accountId: AccountId) => {
-      this._address = accountId
+    return pubKeyToAddress(this.keys.onChain.pubKey).then((address: Address) => {
+      this._address = address
       return this._address
     })
   }
@@ -329,7 +329,7 @@ class Account {
  */
 export const getBalance = async (
   hoprToken: HoprToken,
-  account: AccountId,
+  account: Address,
   useCache: boolean = false
 ): Promise<Balance> => {
   if (useCache) {
@@ -350,7 +350,7 @@ export const getBalance = async (
  */
 export const getNativeBalance = async (
   web3: Web3,
-  account: AccountId,
+  account: Address,
   useCache: boolean = false
 ): Promise<NativeBalance> => {
   if (useCache) {

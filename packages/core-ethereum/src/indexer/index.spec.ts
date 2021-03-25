@@ -106,20 +106,20 @@ describe('test indexer', function () {
         from: userA.address.toHex(),
         gas: 200e3
       })
-      const channels = await connector.indexer.getChannelEntries()
+      const channels = await connector.indexer.getChannels()
       assert.equal(channels.length, 0, 'check Channels.store')
     })
 
     it('should store channel & blockNumber correctly', async function () {
       const currentBlockNumber = await web3.eth.getBlockNumber()
       await time.advanceBlockTo(web3, currentBlockNumber + configs.MAX_CONFIRMATIONS)
-      const channels = await connector.indexer.getChannelEntries()
+      const channels = await connector.indexer.getChannels()
       assert.equal(channels.length, 1, 'check Channels.store')
     })
 
     it('should find all channels', async function () {
       let partyA: Public, partyB: Public
-      if (isPartyA(await userA.pubKey.toAccountId(), await userB.pubKey.toAccountId())) {
+      if (isPartyA(await userA.pubKey.toAddress(), await userB.pubKey.toAddress())) {
         partyA = userA.pubKey
         partyB = userB.pubKey
       } else {
@@ -128,7 +128,7 @@ describe('test indexer', function () {
       }
 
       const blockNumber = await web3.eth.getBlockNumber()
-      const channels = await connector.indexer.getChannelEntries()
+      const channels = await connector.indexer.getChannels()
       assert.equal(channels.length, 1, 'check Channels.store')
       // @ts-ignore
       // const latestConfirmedBlockNumber = await connector.indexer.getLatestConfirmedBlockNumber()
@@ -141,7 +141,7 @@ describe('test indexer', function () {
 
     it('should find channel using partyA', async function () {
       let partyA: Public, partyB: Public
-      if (isPartyA(await userA.pubKey.toAccountId(), await userB.pubKey.toAccountId())) {
+      if (isPartyA(await userA.pubKey.toAddress(), await userB.pubKey.toAddress())) {
         partyA = userA.pubKey
         partyB = userB.pubKey
       } else {
@@ -149,7 +149,7 @@ describe('test indexer', function () {
         partyB = userA.pubKey
       }
 
-      const channels = await connector.indexer.getChannelEntries(partyA)
+      const channels = await connector.indexer.getChannelsOf(partyA)
       assert.equal(channels.length, 1, 'check Channels.get')
       const [channel] = channels
       assert(u8aEquals(channel.partyA, partyA), 'check Channels.get')
@@ -157,7 +157,7 @@ describe('test indexer', function () {
     })
     it('should find channel using partyB', async function () {
       let partyA: Public, partyB: Public
-      if (isPartyA(await userA.pubKey.toAccountId(), await userB.pubKey.toAccountId())) {
+      if (isPartyA(await userA.pubKey.toAddress(), await userB.pubKey.toAddress())) {
         partyA = userA.pubKey
         partyB = userB.pubKey
       } else {
@@ -174,7 +174,7 @@ describe('test indexer', function () {
 
     it('should find channel using partyA & partyB', async function () {
       let partyA: Public, partyB: Public
-      if (isPartyA(await userA.pubKey.toAccountId(), await userB.pubKey.toAccountId())) {
+      if (isPartyA(await userA.pubKey.toAddress(), await userB.pubKey.toAddress())) {
         partyA = userA.pubKey
         partyB = userB.pubKey
       } else {
@@ -245,7 +245,7 @@ describe('test indexer', function () {
       assert.equal(channels.length, 2, 'check Channels.store')
 
       let partyA: Public, partyB: Public
-      if (isPartyA(await userA.pubKey.toAccountId(), await userB.pubKey.toAccountId())) {
+      if (isPartyA(await userA.pubKey.toAddress(), await userB.pubKey.toAddress())) {
         partyA = userA.pubKey
         partyB = userB.pubKey
       } else {

@@ -1,6 +1,7 @@
-import { Types } from '@hoprnet/hopr-core-connector-interface'
+import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import BN from 'bn.js'
-import AccountId from './accountId'
+import { u8aSplit, serializeToU8a, toU8a } from '@hoprnet/hopr-utils'
+import Address from './accountId'
 import { UINT256 } from '../types/solidity'
 import { ChannelStatus } from '../types/channel'
 import { stateCounterToStatus, stateCounterToIteration } from '../utils'
@@ -8,43 +9,58 @@ import { stateCounterToStatus, stateCounterToIteration } from '../utils'
 // TODO: optimize storage
 class ChannelEntry implements Types.ChannelEntry {
   constructor(
-    public readonly parties: [AccountId, AccountId],
+    public readonly parties: [Address, Address],
     public readonly deposit: BN,
     public readonly partyABalance: BN,
     public readonly closureTime: BN,
     public readonly stateCounter: BN,
-    public readonly closureByPartyA: boolean
+    public readonly closureByPartyA: boolean,
+    public readonly openedAt: BN,
+    public readonly closedAt: BN
   ) {}
 
   static deserialize(arr: Uint8Array) {
     const items = u8aSplit(arr, [
-      AccountId.SIZE,
-      AccountId.SIZE,
+      Address.SIZE,
+      Address.SIZE,
       UINT256.SIZE,
       UINT256.SIZE,
       UINT256.SIZE,
       UINT256.SIZE,
-      1
+      1,
+      UINT256.SIZE,
+      UINT256.SIZE
     ])
-    const parties: [AccountId, AccountId] = [new AccountId(items[0]), new AccountId(items[1])]
+    const parties: [Address, Address] = [new Address(items[0]), new Address(items[1])]
     const deposit = new BN(items[2])
     const partyABalance = new BN(items[3])
     const closureTime = new BN(items[4])
     const stateCounter = new BN(items[5])
     const closureByPartyA = Boolean(items[6][0])
+    const openedAt = new BN(items[7])
+    const closedAt = new BN(items[8])
 
-    return new ChannelEntry(parties, deposit, partyABalance, closureTime, stateCounter, closureByPartyA)
+    return new ChannelEntry(
+      parties,
+      deposit,
+      partyABalance,
+      closureTime,
+      stateCounter,
+      closureByPartyA,
+      openedAt,
+      closedAt
+    )
   }
 
   public serialize(): Uint8Array {
     return serializeToU8a([
-      [this.parties[0], AccountId.SIZE],
-      [this.parties[1], AccountId.SIZE],
+      [this.parties[0].serialize(), Address.SIZE],
+      [this.parties[1].serialize(), Address.SIZE],
       [this.deposit.toBuffer(), UINT256.SIZE],
       [this.partyABalance.toBuffer(), UINT256.SIZE],
       [this.closureTime.toBuffer(), UINT256.SIZE],
       [this.stateCounter.toBuffer(), UINT256.SIZE],
-      [[Number(this.closureByPartyA)], 1]
+      [toU8a(Number(this.closureByPartyA)), 1]
     ])
   }
 
@@ -55,10 +71,9 @@ class ChannelEntry implements Types.ChannelEntry {
       throw Error("status like this doesn't exist")
     }
 
-    if (status === ChannelStatus.UNINITIALISED) return 'UNINITIALISED'
-    else if (status === ChannelStatus.FUNDED) return 'FUNDED'
-    else if (status === ChannelStatus.OPEN) return 'OPEN'
-    return 'PENDING'
+    if (status === ChannelStatus.CLOSED) return 'CLOSED'
+    else if (status === ChannelStatus.PENDING_TO_CLOSE) return 'PENDING_TO_CLOSE'
+    return 'OPEN'
   }
 
   public getIteration() {

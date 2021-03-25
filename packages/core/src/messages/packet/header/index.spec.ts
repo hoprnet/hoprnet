@@ -22,7 +22,7 @@ if (MAX_HOPS > 1) {
     async function createAndDecomposeHeader(
       node: Hopr<HoprCoreConnector>,
       peerIds: PeerId[]
-    ): Promise<{ header: Header<HoprCoreConnector>; identifier: Uint8Array; secrets: Uint8Array[] }> {
+    ): Promise<{ header: Header; identifier: Uint8Array; secrets: Uint8Array[] }> {
       const { header, identifier, secrets } = await Header.create<HoprCoreConnector>(node, peerIds)
 
       for (let i = 0; i < peerIds.length - 1; i++) {

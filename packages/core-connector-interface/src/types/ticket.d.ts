@@ -1,4 +1,4 @@
-import AccountId from './accountId'
+import Address from './accountId'
 import Balance from './balance'
 import Hash from './hash'
 import Signature from './signature'
@@ -13,7 +13,7 @@ declare interface TicketStatic {
       offset: number
     },
     struct?: {
-      counterparty: AccountId
+      counterparty: Address
       challenge: Hash
       epoch: TicketEpoch
       amount: Balance
@@ -23,7 +23,7 @@ declare interface TicketStatic {
   ): Ticket
 }
 declare interface Ticket {
-  counterparty: AccountId
+  counterparty: Address
   challenge: Hash
   epoch: TicketEpoch
   amount: Balance
@@ -37,14 +37,7 @@ declare interface Ticket {
 
   toU8a(): Uint8Array
 
-  sign(
-    privKey: Uint8Array,
-    pubKey: Uint8Array | undefined,
-    arr?: {
-      bytes: ArrayBuffer
-      offset: number
-    }
-  ): Promise<Signature>
+  sign(privKey: Uint8Array): Promise<Signature>
 }
 
 declare var Ticket: TicketStatic

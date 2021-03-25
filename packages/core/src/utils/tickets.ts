@@ -257,11 +257,11 @@ export async function validateUnacknowledgedTicket({
   const ticket = signedTicket.ticket
   const chain = node.paymentChannels
   const selfPubKey = node.getId().pubKey.marshal()
-  const selfAccountId = await chain.utils.pubKeyToAccountId(selfPubKey)
+  const selfAddress = await chain.utils.pubKeyToAddress(selfPubKey)
   const senderB58 = senderPeerId.toB58String()
   const senderPubKey = senderPeerId.pubKey.marshal()
-  const senderAccountId = await chain.utils.pubKeyToAccountId(senderPubKey)
-  const amPartyA = chain.utils.isPartyA(selfAccountId, senderAccountId)
+  const senderAddress = await chain.utils.pubKeyToAddress(senderPubKey)
+  const amPartyA = chain.utils.isPartyA(selfAddress, senderAddress)
 
   // ticket signer MUST be the sender
   if (!u8aEquals(await signedTicket.signer, senderPubKey)) {
@@ -327,15 +327,12 @@ export async function validateUnacknowledgedTicket({
   // channel MUST have enough funds
   // (performance) tickets are stored by key, we can't query sender's tickets efficiently
   // we retrieve all signed tickets and filter the ones between sender and target
-  const signedTickets = await getTickets().then(async (signedTickets) => {
-    return signedTickets.filter((signedTicket) => {
-      return (
-        u8aEquals(signedTicket.ticket.counterparty, selfAccountId) &&
-        signedTicket.ticket.epoch.eq(epoch) &&
-        ticket.channelIteration.toNumber() === currentChannelIteration
-      )
-    })
-  })
+  let signedTickets = (await getTickets()).filter(
+    (signedTicket) =>
+      signedTicket.ticket.counterparty.eq(selfAddress) &&
+      signedTicket.ticket.epoch.eq(epoch) &&
+      ticket.channelIteration.toNumber() === currentChannelIteration
+  )
 
   // calculate total unredeemed balance
   const unredeemedBalance = signedTickets.reduce((total, signedTicket) => {

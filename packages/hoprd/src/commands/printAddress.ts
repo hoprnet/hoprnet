@@ -1,6 +1,5 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
-import { u8aToHex } from '@hoprnet/hopr-utils'
 import { AbstractCommand } from './abstractCommand'
 import { styleValue } from './utils'
 
@@ -34,7 +33,7 @@ export default class PrintAddress extends AbstractCommand {
 
     // @TODO: use 'NativeBalance' and 'Balance' to display currencies
     const nativePrefix = 'ETH Address:'
-    const nativeAddress = u8aToHex(await utils.pubKeyToAccountId(this.node.getId().pubKey.marshal()))
+    const nativeAddress = (await utils.pubKeyToAddress(this.node.getId().pubKey.marshal())).toHex()
 
     if (query.trim() === 'native') {
       return nativeAddress

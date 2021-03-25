@@ -1,13 +1,13 @@
 import type { LevelUp } from 'levelup'
 import BN from 'bn.js'
 import { u8aToNumber } from '@hoprnet/hopr-utils'
-import { Hash, AccountId, Account, ChannelEntry, Snapshot } from '../types'
+import { Hash, Address, Account, ChannelEntry, Snapshot } from '../types'
 
 const encoder = new TextEncoder()
 const LATEST_BLOCK_NUMBER_KEY = encoder.encode('indexer-latestBlockNumber')
 const LATEST_CONFIRMED_SNAPSHOT_KEY = encoder.encode('indexer-latestConfirmedSnapshot')
 const createChannelKey = (channelId: Hash): Uint8Array => encoder.encode(`indexer-channel-${channelId.toHex()}`)
-const createAccountKey = (accountId: AccountId): Uint8Array => encoder.encode(`indexer-account-${accountId.toHex()}`)
+const createAccountKey = (address: Address): Uint8Array => encoder.encode(`indexer-account-${address.toHex()}`)
 
 /**
  * Queries the database to find the latest known block number.
@@ -63,7 +63,7 @@ export const getLatestConfirmedSnapshot = async (db: LevelUp): Promise<Snapshot>
 /**
  * Queries the database to find the channel entry
  * @param connector
- * @param accountId
+ * @param address
  */
 export const getChannel = async (db: LevelUp, channelId: Hash): Promise<ChannelEntry | undefined> => {
   let channel: Uint8Array | undefined
@@ -88,7 +88,7 @@ export const getChannel = async (db: LevelUp, channelId: Hash): Promise<ChannelE
 
 export const getChannels = async (
   db: LevelUp,
-  filter?: (channel: ChannelEntry) => boolean
+  filter?: (channel: ChannelEntry) => Promise<boolean>
 ): Promise<ChannelEntry[]> => {
   const channels: ChannelEntry[] = []
 
@@ -97,10 +97,10 @@ export const getChannels = async (
       keys: false,
       values: true
     })
-      .on('data', (data) => {
+      .on('data', async (data) => {
         const channel = ChannelEntry.deserialize(data)
 
-        if (!filter || filter(channel)) {
+        if (!filter || (await filter(channel))) {
           channels.push(channel)
         }
       })
@@ -113,7 +113,7 @@ export const getChannels = async (
  * Adds or updates the channel entry in the database.
  * Adds or updates latest confirmed snapshot.
  * @param connector
- * @param accountId
+ * @param address
  * @param channelEntry
  */
 export const updateChannel = async (db: LevelUp, channelId: Hash, channel: ChannelEntry): Promise<void> => {
@@ -123,13 +123,13 @@ export const updateChannel = async (db: LevelUp, channelId: Hash, channel: Chann
 /**
  * Queries the database to find an account
  * @param connector
- * @param accountId
+ * @param address
  * @returns Account
  */
-export const getAccount = async (db: LevelUp, accountId: AccountId): Promise<Account | undefined> => {
+export const getAccount = async (db: LevelUp, address: Address): Promise<Account | undefined> => {
   let account: Uint8Array | undefined
   try {
-    account = (await db.get(Buffer.from(createAccountKey(accountId)))) as Uint8Array
+    account = (await db.get(Buffer.from(createAccountKey(address)))) as Uint8Array
   } catch (err) {
     if (err.notFound) {
       return undefined
@@ -153,6 +153,6 @@ export const getAccount = async (db: LevelUp, accountId: AccountId): Promise<Acc
  * @param partyB
  * @param channelEntry
  */
-export const updateAccount = async (db: LevelUp, accountId: AccountId, account: Account): Promise<void> => {
-  await db.put(Buffer.from(createAccountKey(accountId)), Buffer.from(account.serialize()))
+export const updateAccount = async (db: LevelUp, address: Address, account: Account): Promise<void> => {
+  await db.put(Buffer.from(createAccountKey(address)), Buffer.from(account.serialize()))
 }

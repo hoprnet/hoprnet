@@ -113,9 +113,9 @@ describe('test utils', function () {
   })
 
   it('should get address using public key', async function () {
-    const address = await utils.pubKeyToAccountId(pair.pubKey)
+    const address = await utils.pubKeyToAddress(pair.pubKey)
 
-    assert(u8aEquals(address, pair.address))
+    assert(u8aEquals(address.serialize(), pair.address))
   })
 
   it('should compute the winning probability properly', function () {

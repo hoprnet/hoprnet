@@ -1,20 +1,30 @@
-import type AccountId from './accountId'
+import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import BN from 'bn.js'
-import {} from '@hoprnet/hopr-utils'
+import { u8aSplit, serializeToU8a } from '@hoprnet/hopr-utils'
+import Address from './accountId'
 import Public from './public'
 import Hash from './hash'
 import { UINT256 } from './solidity'
-import { pubKeyToAccountId } from '../utils'
 
-class Account {
-  constructor(public readonly publicKey?: Public, public readonly secret?: Hash, public readonly counter?: BN) {}
+class Account implements Types.Account {
+  constructor(
+    public readonly address: Address,
+    public readonly publicKey?: Public,
+    public readonly secret?: Hash,
+    public readonly counter?: BN
+  ) {}
+
+  static get SIZE(): number {
+    return Address.SIZE + Public.SIZE + Hash.SIZE + UINT256.SIZE
+  }
 
   static deserialize(arr: Uint8Array) {
-    const [a, b, c] = u8aSplit(arr, [Public.SIZE, Hash.SIZE, UINT256.SIZE])
-    const publicKey = new Public(a)
-    const secret = new Hash(b)
-    const counter = new BN(c)
-    return new Account(publicKey, secret, counter)
+    const [a, b, c, d] = u8aSplit(arr, [Address.SIZE, Public.SIZE, Hash.SIZE, UINT256.SIZE])
+    const address = new Address(a)
+    const publicKey = new Public(b)
+    const secret = new Hash(c)
+    const counter = new BN(d)
+    return new Account(address, publicKey, secret, counter)
   }
 
   public serialize(): Uint8Array {
@@ -25,8 +35,8 @@ class Account {
     ])
   }
 
-  public async getAccountId(): Promise<AccountId> {
-    return pubKeyToAccountId(this.publicKey)
+  public isInitialized(): boolean {
+    return typeof this.publicKey !== 'undefined'
   }
 }
 

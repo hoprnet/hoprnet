@@ -2,13 +2,13 @@ import assert from 'assert'
 import { randomBytes } from 'crypto'
 import { stringToU8a, randomInteger, u8aToHex } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
-import { AccountId, Ticket, Hash, TicketEpoch, Balance, Signature, SignedTicket } from '.'
-import { pubKeyToAccountId, privKeyToPubKey } from '../utils'
+import { Address, Ticket, Hash, TicketEpoch, Balance, SignedTicket } from '.'
+import { pubKeyToAddress, privKeyToPubKey } from '../utils'
 import * as testconfigs from '../config.spec'
 
 const WIN_PROB = new BN(1)
 
-const generateTicketData = async (receiver: AccountId) => {
+const generateTicketData = async (receiver: Address) => {
   const challenge = new Hash(randomBytes(32))
   const epoch = new TicketEpoch(0)
   const amount = new Balance(15)
@@ -30,7 +30,7 @@ const generateTicketData = async (receiver: AccountId) => {
 describe('test signedTicket construction', async function () {
   const [, userB] = await Promise.all(
     testconfigs.DEMO_ACCOUNTS.slice(0, 2).map(
-      async (str: string) => await pubKeyToAccountId(await privKeyToPubKey(stringToU8a(str)))
+      async (str: string) => await pubKeyToAddress(await privKeyToPubKey(stringToU8a(str)))
     )
   )
 
@@ -43,12 +43,7 @@ describe('test signedTicket construction', async function () {
 
     const ticket = new Ticket(undefined, ticketData)
 
-    const signature = new Signature()
-
-    await ticket.sign(userAPrivKey, undefined, {
-      bytes: signature.buffer,
-      offset: signature.byteOffset
-    })
+    const signature = await ticket.sign(userAPrivKey)
 
     const signedTicket = new SignedTicket(undefined, {
       signature,
@@ -85,10 +80,8 @@ describe('test signedTicket construction', async function () {
       ticket
     })
 
-    ticket.sign(userAPrivKey, undefined, {
-      bytes: signedTicketA.buffer,
-      offset: signedTicketA.signatureOffset
-    })
+    const signature = await ticket.sign(userAPrivKey)
+    signedTicketA.set(signature, signedTicketA.signatureOffset - signedTicketA.byteOffset)
 
     assert(await signedTicketA.verify(userAPubKey))
 
@@ -134,12 +127,7 @@ describe('test signedTicket construction', async function () {
 
     const ticket = new Ticket(undefined, ticketData)
 
-    const signature = new Signature()
-
-    await ticket.sign(userAPrivKey, undefined, {
-      bytes: signature.buffer,
-      offset: signature.byteOffset
-    })
+    const signature = await ticket.sign(userAPrivKey)
 
     const offset = randomInteger(1, 31)
 

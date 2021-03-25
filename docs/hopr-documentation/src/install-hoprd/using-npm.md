@@ -42,5 +42,5 @@ If everything was done properly, you can run `node --version` to see your curren
 ## Installing HOPRd using NPM
 
 ```bash
-$ npm install --unsafe-perm=true -g @hoprnet/hoprd@wildhorn
+$ npm install --unsafe-perm=true -g @hoprnet/hoprd
 ```

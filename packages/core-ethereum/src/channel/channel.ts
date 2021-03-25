@@ -1,6 +1,6 @@
 import type { Channel as IChannel } from '@hoprnet/hopr-core-connector-interface'
 import BN from 'bn.js'
-import { u8aToHex, toU8a } from '@hoprnet/hopr-utils'
+import { toU8a } from '@hoprnet/hopr-utils'
 import {
   Balance,
   Channel as ChannelType,
@@ -53,10 +53,10 @@ class Channel implements IChannel {
   }
 
   get status() {
-    return new Promise<'UNINITIALISED' | 'FUNDED' | 'OPEN' | 'PENDING'>(async (resolve, reject) => {
+    return new Promise<'CLOSED' | 'PENDING_TO_CLOSE' | 'OPEN'>(async (resolve, reject) => {
       try {
         const channel = await this.onChainChannel
-        return resolve(channel.status)
+        return resolve(channel.getStatus())
       } catch (error) {
         return reject(error)
       }
@@ -77,7 +77,7 @@ class Channel implements IChannel {
         this._channelId = new Hash(
           await this.coreConnector.utils.getId(
             await this.coreConnector.account.address,
-            await this.coreConnector.utils.pubKeyToAccountId(this.counterparty)
+            await this.coreConnector.utils.pubKeyToAddress(this.counterparty)
           )
         )
       } catch (error) {
@@ -149,7 +149,7 @@ class Channel implements IChannel {
         return resolve(
           new Balance(
             await this.coreConnector.hoprToken.methods
-              .balanceOf(u8aToHex(await this.coreConnector.utils.pubKeyToAccountId(this.counterparty)))
+              .balanceOf((await this.coreConnector.utils.pubKeyToAddress(this.counterparty)).toHex())
               .call()
           )
         )
@@ -165,8 +165,8 @@ class Channel implements IChannel {
     let receipt: string
 
     try {
-      if (!(status === 'OPEN' || status === 'PENDING')) {
-        throw Error("channel must be 'OPEN' or 'PENDING'")
+      if (!(status === 'OPEN' || status === 'PENDING_TO_CLOSE')) {
+        throw Error("channel must be 'OPEN' or 'PENDING_TO_CLOSE'")
       }
 
       if (status === 'OPEN') {
@@ -176,20 +176,20 @@ class Channel implements IChannel {
             to: this.coreConnector.hoprChannels.options.address
           },
           this.coreConnector.hoprChannels.methods.initiateChannelClosure(
-            u8aToHex(await this.coreConnector.utils.pubKeyToAccountId(this.counterparty))
+            (await this.coreConnector.utils.pubKeyToAddress(this.counterparty)).toHex()
           )
         )
 
         receipt = tx.transactionHash
         tx.send()
-      } else if (status === 'PENDING') {
+      } else if (status === 'PENDING_TO_CLOSE') {
         const tx = await account.signTransaction(
           {
             from: (await account.address).toHex(),
             to: this.coreConnector.hoprChannels.options.address
           },
           this.coreConnector.hoprChannels.methods.finalizeChannelClosure(
-            u8aToHex(await this.coreConnector.utils.pubKeyToAccountId(this.counterparty))
+            (await this.coreConnector.utils.pubKeyToAddress(this.counterparty)).toHex()
           )
         )
 

@@ -12,7 +12,9 @@ declare interface ChannelEntry {
   closureTime: BN
   stateCounter: BN
   closureByPartyA: boolean
-  getStatus(): 'UNINITIALISED' | 'FUNDED' | 'OPEN' | 'PENDING'
+  openedAt: BN
+  closedAt: BN
+  getStatus(): 'CLOSED' | 'OPEN' | 'PENDING_TO_CLOSE'
   getIteration(): number
 }
 

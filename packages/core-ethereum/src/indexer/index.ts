@@ -1,24 +1,22 @@
 import type { Subscription } from 'web3-core-subscriptions'
 import type PeerId from 'peer-id'
-import type { Indexer as IIndexer, RoutingChannel, ChannelUpdate } from '@hoprnet/hopr-core-connector-interface'
+import type { Indexer as IIndexer, RoutingChannel } from '@hoprnet/hopr-core-connector-interface'
 import type { ContractEventEmitter } from '../tsc/web3/types'
 import type HoprEthereum from '..'
-import type { Event } from './types'
+import type { Event, EventNames } from './types'
 import EventEmitter from 'events'
 import chalk from 'chalk'
-import Web3 from 'web3'
 import BN from 'bn.js'
 import Heap from 'heap-js'
 import { pubKeyToPeerId, randomChoice } from '@hoprnet/hopr-utils'
-import { AccountId, ChannelEntry, Hash, Public, Balance, Snapshot } from '../types'
-import { pubKeyToAccountId, getId, Log as DebugLog } from '../utils'
+import { Address, ChannelEntry, Hash, Public, Balance, Snapshot } from '../types'
+import { getId, Log as DebugLog } from '../utils'
 import * as reducers from './reducers'
 import * as db from './db'
 import { isConfirmedBlock, isSyncing, snapshotComparator } from './utils'
 
 const log = DebugLog(['indexer'])
 const getSyncPercentage = (n: number, max: number) => ((n * 100) / max).toFixed(2)
-const { hexToBytes, hexToNumberString } = Web3.utils
 
 // @TODO: add to constants
 const BLOCK_RANGE = 2000
@@ -33,6 +31,7 @@ let genesisBlock: number
 class Indexer extends EventEmitter implements IIndexer {
   public status: 'started' | 'restarting' | 'stopped' = 'stopped'
   public latestBlock: number = 0 // latest known on-chain block number
+  private publicKeys = new Map<string, Public>() // TODO: maybe we dont need this
   private newBlocksSubscription: Subscription<any>
   private newHoprChannelsEvents: ContractEventEmitter<any>
   private unconfirmedEvents = new Heap<Event<any>>(snapshotComparator)
@@ -80,7 +79,7 @@ class Indexer extends EventEmitter implements IIndexer {
     )
 
     // get past logs
-    const lastBlock = await this.processPastLogs(fromBlock, latestOnChainBlock, BLOCK_RANGE)
+    const lastBlock = await this.processPastEvents(fromBlock, latestOnChainBlock, BLOCK_RANGE)
     fromBlock = lastBlock
 
     log('Subscribing to events from block %d', fromBlock)
@@ -131,7 +130,7 @@ class Indexer extends EventEmitter implements IIndexer {
   public async isSyncing(): Promise<boolean> {
     const [onChainBlock, lastKnownBlock] = await Promise.all([
       this.connector.web3.eth.getBlockNumber(),
-      getLatestBlockNumber(this.connector.db)
+      db.getLatestBlockNumber(this.connector.db)
     ])
 
     return isSyncing(onChainBlock, lastKnownBlock)
@@ -171,15 +170,15 @@ class Indexer extends EventEmitter implements IIndexer {
   // }
 
   /**
-   * Query past logs, this will loop until it gets all blocks from {toBlock} to {fromBlock}.
-   * If we exceed response log limit, we switch into quering smaller chunks.
+   * Query past events, this will loop until it gets all blocks from {toBlock} to {fromBlock}.
+   * If we exceed response pull limit, we switch into quering smaller chunks.
    * TODO: optimize DB and fetch requests
    * @param fromBlock
    * @param toBlock
    * @param blockRange
-   * @return past logs and last queried block
+   * @return past events and last queried block
    */
-  private async processPastLogs(fromBlock: number, maxToBlock: number, maxBlockRange: number): Promise<number> {
+  private async processPastEvents(fromBlock: number, maxToBlock: number, maxBlockRange: number): Promise<number> {
     let failedCount = 0
 
     while (fromBlock < maxToBlock) {
@@ -189,16 +188,16 @@ class Indexer extends EventEmitter implements IIndexer {
       if (toBlock > maxToBlock) toBlock = maxToBlock
 
       // log(
-      //   `${failedCount > 0 ? 'Re-quering' : 'Quering'} past logs from %d to %d: %d`,
+      //   `${failedCount > 0 ? 'Re-quering' : 'Quering'} past events from %d to %d: %d`,
       //   fromBlock,
       //   toBlock,
       //   toBlock - fromBlock
       // )
 
-      let logs: Event<any>[] = []
+      let events: Event<any>[] = []
 
       try {
-        logs = await this.connector.hoprChannels.getPastEvents('allEvents', {
+        events = await this.connector.hoprChannels.getPastEvents('allEvents', {
           fromBlock,
           toBlock
         })
@@ -213,7 +212,7 @@ class Indexer extends EventEmitter implements IIndexer {
         continue
       }
 
-      this.onNewEvents(logs)
+      this.onNewEvents(events)
       await this.onNewBlock({ number: toBlock })
       failedCount = 0
       fromBlock = toBlock
@@ -267,15 +266,21 @@ class Indexer extends EventEmitter implements IIndexer {
         continue
       }
 
-      if (event.event === 'FundedChannel') {
+      const eventName = event.event as EventNames
+
+      if (eventName === 'AccountInitialized') {
+        await this.onAccountInitialized(event as Event<'AccountInitialized'>)
+      } else if (eventName === 'AccountSecretUpdated') {
+        await this.onAccountSecretUpdated(event as Event<'AccountSecretUpdated'>)
+      } else if (eventName === 'ChannelFunded') {
         await this.onChannelFunded(event as Event<'ChannelFunded'>)
-      } else if (event.event === 'OpenedChannel') {
+      } else if (eventName === 'ChannelOpened') {
         await this.onChannelOpened(event as Event<'ChannelOpened'>)
-      } else if (event.event === 'RedeemedTicket') {
+      } else if (eventName === 'TicketRedeemed') {
         await this.onTicketRedeemed(event as Event<'TicketRedeemed'>)
-      } else if (event.event === 'InitiatedChannelClosure') {
+      } else if (eventName === 'ChannelPendingToClose') {
         await this.onChannelPendingToClose(event as Event<'ChannelPendingToClose'>)
-      } else if (event.event === 'ClosedChannel') {
+      } else if (eventName === 'ChannelClosed') {
         await this.onChannelClosed(event as Event<'ChannelClosed'>)
       }
 
@@ -299,7 +304,7 @@ class Indexer extends EventEmitter implements IIndexer {
 
   // on new events
   private async onAccountInitialized(event: Event<'AccountInitialized'>): Promise<void> {
-    const accountId = new AccountId(hexToBytes(event.returnValues.account))
+    const accountId = Address.fromString(event.returnValues.account)
     const account = await reducers.onAccountInitialized(event)
 
     await db.updateAccount(this.connector.db, accountId, account)
@@ -308,7 +313,7 @@ class Indexer extends EventEmitter implements IIndexer {
   private async onAccountSecretUpdated(event: Event<'AccountSecretUpdated'>): Promise<void> {
     const data = event.returnValues
 
-    const accountId = new AccountId(hexToBytes(data.account))
+    const accountId = Address.fromString(data.account)
 
     const storedAccount = await db.getAccount(this.connector.db, accountId)
     if (!storedAccount) {
@@ -324,14 +329,14 @@ class Indexer extends EventEmitter implements IIndexer {
   private async onChannelFunded(event: Event<'ChannelFunded'>): Promise<void> {
     const data = event.returnValues
 
-    const accountIdA = new AccountId(hexToBytes(data.accountA))
-    const accountIdB = new AccountId(hexToBytes(data.accountB))
+    const accountIdA = Address.fromString(data.accountA)
+    const accountIdB = Address.fromString(data.accountB)
     const channelId = await getId(accountIdA, accountIdB)
 
     let storedChannel = await db.getChannel(this.connector.db, channelId)
     const channel = await reducers.onChannelFunded(event, storedChannel)
 
-    // const channelId = await getId(recipientAccountId, counterpartyAccountId)
+    // const channelId = await getId(recipientAddress, counterpartyAddress)
     // log('Processing event %s with channelId %s', event.name, channelId.toHex())
 
     await db.updateChannel(this.connector.db, channelId, channel)
@@ -342,8 +347,8 @@ class Indexer extends EventEmitter implements IIndexer {
   private async onChannelOpened(event: Event<'ChannelOpened'>): Promise<void> {
     const data = event.returnValues
 
-    const openerAccountId = new AccountId(hexToBytes(data.opener))
-    const counterpartyAccountId = new AccountId(hexToBytes(data.counterparty))
+    const openerAccountId = Address.fromString(data.opener)
+    const counterpartyAccountId = Address.fromString(data.counterparty)
     const channelId = await getId(openerAccountId, counterpartyAccountId)
     // log('Processing event %s with channelId %s', event.name, channelId.toHex())
 
@@ -362,14 +367,14 @@ class Indexer extends EventEmitter implements IIndexer {
       channel
     })
 
-    // log('Channel %s got opened by %s', chalk.green(channelId.toHex()), chalk.green(openerAccountId.toHex()))
+    // log('Channel %s got opened by %s', chalk.green(channelId.toHex()), chalk.green(openerAddress.toHex()))
   }
 
   private async onTicketRedeemed(event: Event<'TicketRedeemed'>): Promise<void> {
     const data = event.returnValues
 
-    const redeemerAccountId = new AccountId(hexToBytes(data.redeemer))
-    const counterpartyAccountId = new AccountId(hexToBytes(data.counterparty))
+    const redeemerAccountId = Address.fromString(data.redeemer)
+    const counterpartyAccountId = Address.fromString(data.counterparty)
     const channelId = await getId(redeemerAccountId, counterpartyAccountId)
     // log('Processing event %s with channelId %s', event.name, channelId.toHex())
 
@@ -383,14 +388,14 @@ class Indexer extends EventEmitter implements IIndexer {
 
     await db.updateChannel(this.connector.db, channelId, channel)
 
-    // log('Ticket redeemd in channel %s by %s', chalk.green(channelId.toHex()), chalk.green(redeemerAccountId.toHex()))
+    // log('Ticket redeemd in channel %s by %s', chalk.green(channelId.toHex()), chalk.green(redeemerAddress.toHex()))
   }
 
   private async onChannelPendingToClose(event: Event<'ChannelPendingToClose'>): Promise<void> {
     const data = event.returnValues
 
-    const initiatorAccountId = new AccountId(hexToBytes(data.initiator))
-    const counterpartyAccountId = new AccountId(hexToBytes(data.counterparty))
+    const initiatorAccountId = Address.fromString(data.initiator)
+    const counterpartyAccountId = Address.fromString(data.counterparty)
     const channelId = await getId(initiatorAccountId, counterpartyAccountId)
     // log('Processing event %s with channelId %s', event.name, channelId.toHex())
 
@@ -407,15 +412,15 @@ class Indexer extends EventEmitter implements IIndexer {
     // log(
     //   'Channel closure initiated for %s by %s',
     //   chalk.green(channelId.toHex()),
-    //   chalk.green(initiatorAccountId.toHex())
+    //   chalk.green(initiatorAddress.toHex())
     // )
   }
 
   private async onChannelClosed(event: Event<'ChannelClosed'>): Promise<void> {
     const data = event.returnValues
 
-    const closerAccountId = new AccountId(hexToBytes(data.initiator))
-    const counterpartyAccountId = new AccountId(hexToBytes(data.counterparty))
+    const closerAccountId = Address.fromString(data.initiator)
+    const counterpartyAccountId = Address.fromString(data.counterparty)
     const channelId = await getId(closerAccountId, counterpartyAccountId)
     // log('Processing event %s with channelId %s', event.name, channelId.toHex())
 
@@ -434,41 +439,66 @@ class Indexer extends EventEmitter implements IIndexer {
       channel
     })
 
-    // log('Channel %s got closed by %s', chalk.green(channelId.toHex()), chalk.green(closerAccountId.toHex()))
+    // log('Channel %s got closed by %s', chalk.green(channelId.toHex()), chalk.green(closerAddress.toHex()))
+  }
+
+  public async getAccount(address: Address): Promise<Account | undefined> {
+    return db.getAccount(this.connector.db, address)
   }
 
   public async getChannel(channelId: Hash): Promise<ChannelEntry | undefined> {
     return db.getChannel(this.connector.db, channelId)
   }
 
-  public async getChannels(filter?: (channel: ChannelEntry) => boolean): Promise<ChannelEntry[]> {
+  public async getChannels(filter?: (channel: ChannelEntry) => Promise<boolean>): Promise<ChannelEntry[]> {
     return db.getChannels(this.connector.db, filter)
   }
 
-  public async getChannelsOf(accountId: AccountId): Promise<ChannelEntry[]> {
-    return db.getChannels(this.connector.db, (channel) => {
+  public async getChannelsOf(address: Address): Promise<ChannelEntry[]> {
+    return db.getChannels(this.connector.db, async (channel) => {
       const [accountA, accountB] = channel.parties
-      return accountId.eq(accountA) || accountId.eq(accountB)
+      return address.eq(accountA) || address.eq(accountB)
     })
   }
 
-  // routing related
-  private async toIndexerChannel(source: PeerId, channelEntry: ChannelEntry): Promise<RoutingChannel> {
-    const sourcePubKey = new Public(source.pubKey.marshal())
-    const sourceAddress = await sourcePubKey.toAccountId()
+  // routing
+  public async getPublicKeyOf(address: Address): Promise<Public | undefined> {
+    if (this.publicKeys.has(address.toHex())) {
+      return this.publicKeys.get(address.toHex())
+    }
 
-    if (sourceAddress.eq(channelEntry.parties[0])) {
-      return [source, await pubKeyToPeerId(partyB), new Balance(channelEntry.partyABalance)]
+    const account = await db.getAccount(this.connector.db, address)
+    if (account && account.publicKey) {
+      this.publicKeys.set(address.toHex(), account.publicKey)
+      return account.publicKey
+    }
+
+    return undefined
+  }
+
+  private async toIndexerChannel(source: PeerId, channel: ChannelEntry): Promise<RoutingChannel> {
+    const sourcePubKey = new Public(source.pubKey.marshal())
+    const [accountAPubKey, accountBPubKey] = await Promise.all(
+      channel.parties.map((address) => this.getPublicKeyOf(address))
+    )
+
+    if (sourcePubKey.eq(accountAPubKey)) {
+      return [source, await pubKeyToPeerId(accountBPubKey), new Balance(channel.partyABalance)]
     } else {
-      const partyBBalance = new Balance(new Balance(channelEntry.deposit).sub(new Balance(channelEntry.partyABalance)))
-      return [source, await pubKeyToPeerId(partyA), partyBBalance]
+      const partyBBalance = new Balance(new Balance(channel.deposit).sub(new Balance(channel.partyABalance)))
+      return [source, await pubKeyToPeerId(accountAPubKey), partyBBalance]
     }
   }
 
   public async getRandomChannel(): Promise<RoutingChannel | undefined> {
     const HACK = 14744510 // Arbitrarily chosen block for our testnet. Total hack.
-    const channels = await this.getChannels((channel) => {
-      return channel.blockNumber.gtn(HACK)
+
+    const channels = await this.getChannels(async (channel) => {
+      // filter out channels older than hack
+      if (!channel.openedAt.gtn(HACK)) return false
+      // filter out channels with uninitialized parties
+      const pubKeys = await Promise.all(channel.parties.map((address) => this.getPublicKeyOf(address)))
+      return pubKeys.every((pubKeys) => pubKeys)
     })
 
     if (channels.length === 0) {
@@ -478,12 +508,14 @@ class Indexer extends EventEmitter implements IIndexer {
 
     log('picking random from %d channels', channels.length)
     const random = randomChoice(channels)
-    return this.toIndexerChannel(await pubKeyToPeerId(random.partyA), random)
+    const accountA = await this.getPublicKeyOf(random.parties[0])
+    return this.toIndexerChannel(await pubKeyToPeerId(accountA), random) // TODO: find why we do this
   }
 
   public async getChannelsFromPeer(source: PeerId): Promise<RoutingChannel[]> {
     const sourcePubKey = new Public(source.pubKey.marshal())
-    const channels = await getChannelEntries(this.connector.db, sourcePubKey)
+    const channels = await this.getChannelsOf(await sourcePubKey.toAddress())
+
     let cout: RoutingChannel[] = []
     for (let channel of channels) {
       let directed = await this.toIndexerChannel(source, channel)

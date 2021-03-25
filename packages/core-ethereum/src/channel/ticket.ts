@@ -2,7 +2,7 @@ import type IChannel from '.'
 import { u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
 import { Hash, TicketEpoch, Balance, SignedTicket, Ticket, AcknowledgedTicket } from '../types'
 import {
-  pubKeyToAccountId,
+  pubKeyToAddress,
   computeWinningProbability,
   isWinningTicket,
   checkChallenge,
@@ -79,7 +79,7 @@ class TicketStatic {
         }
       }
 
-      const counterparty = await this.coreConnector.utils.pubKeyToAccountId(await signedTicket.signer)
+      const counterparty = await this.coreConnector.utils.pubKeyToAddress(await signedTicket.signer)
 
       const transaction = await account.signTransaction(
         {
@@ -91,7 +91,7 @@ class TicketStatic {
           u8aToHex(ackTicket.response),
           ticket.amount.toString(),
           u8aToHex(ticket.winProb),
-          u8aToHex(counterparty),
+          counterparty.toHex(),
           u8aToHex(r),
           u8aToHex(s),
           v + 27
@@ -131,7 +131,7 @@ class TicketFactory {
   ): Promise<SignedTicket> {
     const ticketWinProb = new Hash(computeWinningProbability(winProb))
 
-    const counterparty = await pubKeyToAccountId(this.channel.counterparty)
+    const counterparty = await pubKeyToAddress(this.channel.counterparty)
 
     const epoch = await this.channel.coreConnector.hoprChannels.methods
       .accounts(counterparty.toHex())
@@ -157,10 +157,8 @@ class TicketFactory {
       }
     )
 
-    await ticket.sign(this.channel.coreConnector.account.keys.onChain.privKey, undefined, {
-      bytes: signedTicket.buffer,
-      offset: signedTicket.signatureOffset
-    })
+    const signature = await ticket.sign(this.channel.coreConnector.account.keys.onChain.privKey)
+    signedTicket.set(signature, signedTicket.signatureOffset - signedTicket.byteOffset)
 
     return signedTicket
   }

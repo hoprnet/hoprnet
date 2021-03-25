@@ -1,28 +1,31 @@
 import Web3 from 'web3'
 import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import { ADDRESS_LENGTH } from '../constants'
-import { Uint8ArrayE } from './extended'
+import { u8aToHex, u8aEquals, stringToU8a } from '@hoprnet/hopr-utils'
 
-class AccountId extends Uint8ArrayE implements Types.AccountId {
-  slice(begin = 0, end = AccountId.SIZE): Uint8Array {
-    return this.subarray(begin, end)
-  }
-
-  subarray(begin = 0, end = AccountId.SIZE): Uint8Array {
-    return new Uint8Array(this.buffer, begin + this.byteOffset, end - begin)
-  }
+class Address implements Types.Address {
+  constructor(private id: Uint8Array) {}
 
   static get SIZE(): number {
     return ADDRESS_LENGTH
   }
 
-  get NAME(): string {
-    return 'AccountId'
+  static fromString(str: string): Address {
+    if (!Web3.utils.isAddress(str)) throw Error(`String ${str} is not an address`)
+    return new Address(stringToU8a(str))
+  }
+
+  serialize() {
+    return this.id
   }
 
   toHex(): string {
-    return Web3.utils.toChecksumAddress(super.toHex())
+    return Web3.utils.toChecksumAddress(u8aToHex(this.id, false))
+  }
+
+  eq(b: Address) {
+    return u8aEquals(this.id, b.serialize())
   }
 }
 
-export default AccountId
+export default Address

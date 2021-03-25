@@ -88,7 +88,7 @@ describe('test Account', function () {
 describe('test getBalance', function () {
   let clock: Sinon.SinonFakeTimers
 
-  const accountId: any = {
+  const address: any = {
     toHex: sinon.stub('')
   }
   const createHoprTokenMock = (value: string): any => {
@@ -110,29 +110,29 @@ describe('test getBalance', function () {
   })
 
   it('should get balance but nothing is cached', async function () {
-    const result = await getBalance(createHoprTokenMock('10'), accountId, true)
+    const result = await getBalance(createHoprTokenMock('10'), address, true)
     expect(result.toString()).to.equal('10')
   })
 
   it('should get balance', async function () {
-    const result = await getBalance(createHoprTokenMock('10'), accountId, false)
+    const result = await getBalance(createHoprTokenMock('10'), address, false)
     expect(result.toString()).to.equal('10')
   })
 
   it('should get cached balance', async function () {
-    const result = await getBalance(createHoprTokenMock('20'), accountId, true)
+    const result = await getBalance(createHoprTokenMock('20'), address, true)
     expect(result.toString()).to.equal('10')
   })
 
   it('should not get cached balance', async function () {
-    const result = await getBalance(createHoprTokenMock('20'), accountId, false)
+    const result = await getBalance(createHoprTokenMock('20'), address, false)
     expect(result.toString()).to.equal('20')
   })
 
   it('should reset cache', async function () {
     clock.tick(WEB3_CACHE_TTL + 1)
 
-    const result = await getBalance(createHoprTokenMock('30'), accountId, true)
+    const result = await getBalance(createHoprTokenMock('30'), address, true)
     expect(result.toString()).to.equal('30')
   })
 })
@@ -140,7 +140,7 @@ describe('test getBalance', function () {
 describe('test getNativeBalance', function () {
   let clock: Sinon.SinonFakeTimers
 
-  const accountId: any = {
+  const address: any = {
     toHex: sinon.stub('')
   }
   const createWeb3 = (value: string): any => {
@@ -160,29 +160,29 @@ describe('test getNativeBalance', function () {
   })
 
   it('should get balance but nothing is cached', async function () {
-    const result = await getNativeBalance(createWeb3('10'), accountId, true)
+    const result = await getNativeBalance(createWeb3('10'), address, true)
     expect(result.toString()).to.equal('10')
   })
 
   it('should get balance', async function () {
-    const result = await getNativeBalance(createWeb3('10'), accountId, false)
+    const result = await getNativeBalance(createWeb3('10'), address, false)
     expect(result.toString()).to.equal('10')
   })
 
   it('should get cached balance', async function () {
-    const result = await getNativeBalance(createWeb3('20'), accountId, true)
+    const result = await getNativeBalance(createWeb3('20'), address, true)
     expect(result.toString()).to.equal('10')
   })
 
   it('should not get cached balance', async function () {
-    const result = await getNativeBalance(createWeb3('20'), accountId, false)
+    const result = await getNativeBalance(createWeb3('20'), address, false)
     expect(result.toString()).to.equal('20')
   })
 
   it('should reset cache', async function () {
     clock.tick(WEB3_CACHE_TTL + 1)
 
-    const result = await getNativeBalance(createWeb3('30'), accountId, true)
+    const result = await getNativeBalance(createWeb3('30'), address, true)
     expect(result.toString()).to.equal('30')
   })
 })

@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hoprd",
-  "version": "1.70.0-next.15",
+  "version": "1.71.0-next.1",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -25,12 +25,12 @@
     "dev": "yarn build && NODE_ENV=development yarn start"
   },
   "dependencies": {
-    "@hoprnet/hopr-core": "1.70.0-next.15",
-    "@hoprnet/hopr-utils": "1.70.0-next.15",
+    "@hoprnet/hopr-core": "1.71.0-next.1",
+    "@hoprnet/hopr-utils": "1.71.0-next.1",
     "body-parser": "^1.19.0",
     "bs58": "^4.0.1",
     "jazzicon": "^1.5.0",
-    "next": "^10.0.1",
+    "next": "^10.0.9",
     "peer-id": "0",
     "react": "17.0.1",
     "react-dom": "17.0.1",
@@ -40,15 +40,15 @@
     "yargs": "^16.0.3"
   },
   "devDependencies": {
-    "@hoprnet/hopr-core-connector-interface": "1.70.0-next.15",
+    "@hoprnet/hopr-core-connector-interface": "1.71.0-next.1",
     "@types/bs58": "^4.0.1",
     "@types/debug": "^4.1.5",
     "@types/mocha": "^8.2.0",
-    "@types/node": "14",
+    "@types/node": "14.14.35",
     "@types/yargs": "^16.0.0",
-    "mocha": "^8.2.0",
+    "mocha": "^8.3.2",
     "rimraf": "^3.0.2",
-    "typescript": "^4.1"
+    "typescript": "^4.2"
   },
   "mocha": {
     "extension": [

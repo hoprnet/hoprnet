@@ -12,17 +12,20 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Use Node.js
-        uses: actions/setup-node@v1
+        uses: actions/setup-node@v2
         with:
           node-version: 14
           registry-url: https://registry.npmjs.org/
-            #      - uses: actions/cache@v2
-            #        id: cache
-            #        with:
-            #          path: 'node_modules'
-            #          key: ${{ runner.os }}-modules-${{ hashFiles('yarn.lock') }}
 
-      - name: Install dependencies 
+      - name: Restore cache of node modules
+        uses: actions/cache@v2
+        with:
+          path: |
+            node_modules
+            */*/node_modules
+          key: ${{ runner.os }}-lerna-${{ hashFiles('**/yarn.lock') }}
+
+      - name: Install dependencies
         run: |
           yarn
           node_modules/.bin/lerna bootstrap
@@ -200,7 +203,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Use Node.js 14
-        uses: actions/setup-node@v1
+        uses: actions/setup-node@v2
         with:
           node-version: 14
           registry-url: https://registry.npmjs.org/
@@ -225,5 +228,4 @@ jobs:
           FUNDING_PRIV_KEY: ${{ secrets.FUNDING_WALLET_PRIVATE_KEY }}
           GITHUB_REF: ${{ github.ref }}
           BS_PASSWORD: ${{ secrets.BS_PASSWORD }}
-
 

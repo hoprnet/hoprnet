@@ -6,10 +6,9 @@ import ChannelState from './channelState'
 import ChannelBalance from './channelBalance'
 
 enum ChannelStatus {
-  UNINITIALISED,
-  FUNDED,
-  OPEN,
-  PENDING
+  CLOSED,
+  PENDING_TO_CLOSE,
+  OPEN
 }
 
 class Channel extends Uint8ArrayE implements Types.Channel {
@@ -71,7 +70,7 @@ class Channel extends Uint8ArrayE implements Types.Channel {
   }
 
   get moment(): Moment | void {
-    if (this._status != ChannelStatus.PENDING) {
+    if (this._status != ChannelStatus.PENDING_TO_CLOSE) {
       return
     }
 
@@ -86,19 +85,8 @@ class Channel extends Uint8ArrayE implements Types.Channel {
     return hash(this)
   }
 
-  async sign(
-    privKey: Uint8Array,
-    _pubKey: Uint8Array | undefined,
-    arr?: {
-      bytes: ArrayBuffer
-      offset: number
-    }
-  ): Promise<Types.Signature> {
-    return await sign(await this.hash, privKey, undefined, arr)
-  }
-
-  get isFunded(): boolean {
-    return this._status == ChannelStatus.FUNDED
+  async sign(privKey: Uint8Array): Promise<Types.Signature> {
+    return await sign(await this.hash, privKey)
   }
 
   get isActive(): boolean {
@@ -106,19 +94,12 @@ class Channel extends Uint8ArrayE implements Types.Channel {
   }
 
   get isPending(): boolean {
-    return this._status == ChannelStatus.PENDING
+    return this._status == ChannelStatus.PENDING_TO_CLOSE
   }
 
   // @TODO fix size
   static get SIZE(): number {
     return ChannelBalance.SIZE + ChannelState.SIZE
-  }
-
-  static createFunded(balance: ChannelBalance): Channel {
-    return new Channel(undefined, {
-      balance,
-      state: new ChannelState(undefined, { state: ChannelStatus.FUNDED })
-    })
   }
 
   static createActive(balance: ChannelBalance): Channel {
@@ -131,7 +112,7 @@ class Channel extends Uint8ArrayE implements Types.Channel {
   static createPending(moment: Moment, balance: ChannelBalance): Channel {
     return new Channel(undefined, {
       balance,
-      state: new ChannelState(undefined, { state: ChannelStatus.PENDING }),
+      state: new ChannelState(undefined, { state: ChannelStatus.PENDING_TO_CLOSE }),
       moment
     })
   }

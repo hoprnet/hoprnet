@@ -1,7 +1,7 @@
 {
   "name": "@hoprnet/hopr-utils",
   "description": "HOPR-based utilities to process multiple data structures",
-  "version": "1.70.0-next.15",
+  "version": "1.71.0-next.1",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
   "license": "GPL-3.0",
@@ -27,7 +27,7 @@
   "dependencies": {
     "abort-controller": "~3.0.0",
     "bignumber.js": "^9.0.0",
-    "libp2p-crypto": "0.19.0",
+    "libp2p-crypto": "0.19.2",
     "multiaddr": "8.1.2",
     "multihashes": "~4.0.1",
     "peer-id": "0.14.3",
@@ -41,7 +41,7 @@
     "rewiremock": "^3.14.3",
     "rimraf": "^3.0.2",
     "ts-node": "^9.0.0",
-    "typescript": "^4.1"
+    "typescript": "^4.2"
   },
   "mocha": {
     "extension": [

@@ -36,8 +36,8 @@ describe(`check serialization and deserialization of ticket objects`, function (
     const peerA = await privKeyToPeerId(NODE_SEEDS[0])
     const peerB = await privKeyToPeerId(NODE_SEEDS[1])
 
-    // const accountA = await node.paymentChannels.utils.pubKeyToAccountId(peerA.pubKey.marshal())
-    const accountB = await node.paymentChannels.utils.pubKeyToAccountId(peerB.pubKey.marshal())
+    // const accountA = await node.paymentChannels.utils.pubKeyToAddress(peerA.pubKey.marshal())
+    const accountB = await node.paymentChannels.utils.pubKeyToAddress(peerB.pubKey.marshal())
 
     const secretA = randomBytes(32)
     const secretB = randomBytes(32)
@@ -67,10 +67,8 @@ describe(`check serialization and deserialization of ticket objects`, function (
       }
     )
 
-    await ticket.sign(peerA.privKey.marshal(), undefined, {
-      bytes: signedTicket.buffer,
-      offset: signedTicket.signatureOffset
-    })
+    const signature = await ticket.sign(peerA.privKey.marshal())
+    signedTicket.set(signature, signedTicket.signatureOffset - signedTicket.byteOffset)
 
     assert(await unAcknowledgedTicket.verifySignature(peerA), 'signature must be valid')
 
