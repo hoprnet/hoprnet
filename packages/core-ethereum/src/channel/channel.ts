@@ -1,15 +1,7 @@
 import type { Channel as IChannel } from '@hoprnet/hopr-core-connector-interface'
 import BN from 'bn.js'
 import { toU8a } from '@hoprnet/hopr-utils'
-import {
-  Balance,
-  Channel as ChannelType,
-  Hash,
-  Public,
-  SignedChannel,
-  ChannelEntry,
-  UINT256
-} from '../types'
+import { Balance, Channel as ChannelType, Hash, Public, SignedChannel, ChannelEntry, UINT256 } from '../types'
 import TicketFactory from './ticket'
 import { hash } from '../utils'
 
