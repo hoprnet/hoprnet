@@ -224,7 +224,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
       const counterpartyAddress = await chain.utils.pubKeyToAddress(channel.counterparty)
       const amPartyA = chain.utils.isPartyA(myAddress, counterpartyAddress)
       await validateCreatedTicket({
-        myBalance: await (amPartyA ? channel.balance_a : channel.balance_b),
+        myBalance: (await (amPartyA ? channel.balance_a : channel.balance_b)).toBN(),
         signedTicket: packet._ticket
       })
     } else if (secrets.length == 1) {
@@ -356,9 +356,9 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     )
 
     // get new ticket amount
-    const fee = new Balance(ticket.amount.isub(new BN(this.node.ticketAmount)))
+    const fee = new Balance(ticket.amount.toBN().isub(new BN(this.node.ticketAmount)))
 
-    if (fee.gtn(0)) {
+    if (fee.toBN().gtn(0)) {
       const channelBalance = ChannelBalance.create(undefined, {
         balance: fee,
         balance_a: amPartyA ? fee : new BN(0)
@@ -378,10 +378,10 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
       })
 
       await validateCreatedTicket({
-        myBalance: await (amPartyA ? channel.balance_a : channel.balance_b),
+        myBalance: (await (amPartyA ? channel.balance_a : channel.balance_b)).toBN(),
         signedTicket: this._ticket
       })
-    } else if (fee.isZero()) {
+    } else if (fee.toBN().isZero()) {
       this._ticket = await chain.channel.createDummyChannelTicket(
         await chain.utils.pubKeyToAddress(target.pubKey.marshal()),
         this.header.encryptionKey,
@@ -396,7 +396,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
 
     this.header.transformForNextNode()
 
-    this._challenge = await Challenge.create<Chain>(chain, this.header.hashedKeyHalf, fee, {
+    this._challenge = await Challenge.create<Chain>(chain, this.header.hashedKeyHalf, fee.toBN(), {
       bytes: this.buffer,
       offset: this.challengeOffset
     }).sign(sender)

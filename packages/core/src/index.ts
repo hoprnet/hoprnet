@@ -288,7 +288,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     }
     const balance = await this.getBalance()
     const [nextChannels, closeChannels] = await this.strategy.tick(
-      balance,
+      balance.toBN(),
       newChannels,
       currentChannels,
       this.networkPeers,
@@ -510,7 +510,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
   private async checkBalances() {
     const balance = await this.getBalance()
     let unfunded = false
-    if (balance.lten(0)) {
+    if (balance.toBN().lten(0)) {
       const address = await this.paymentChannels.hexAccountAddress()
       log('unfunded node', address)
       this.emit('hopr:warning:unfunded', address)
@@ -597,8 +597,8 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     // validate 'amountToFund'
     if (amountToFund.lten(0)) {
       throw Error(`Invalid 'amountToFund' provided: ${amountToFund.toString(10)}`)
-    } else if (amountToFund.gt(myAvailableTokens)) {
-      throw Error(`You don't have enough tokens: ${amountToFund.toString(10)}<${myAvailableTokens.toString(10)}`)
+    } else if (amountToFund.gt(myAvailableTokens.toBN())) {
+      throw Error(`You don't have enough tokens: ${amountToFund.toString(10)}<${myAvailableTokens.toBN().toString(10)}`)
     }
 
     const amPartyA = utils.isPartyA(

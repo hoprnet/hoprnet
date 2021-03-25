@@ -1,7 +1,7 @@
 import { COMPRESSED_PUBLIC_KEY_LENGTH } from '../constants'
 import { Types } from '@hoprnet/hopr-core-connector-interface'
 import { privKeyToPubKey, pubKeyToAddress } from '../utils'
-import Address from './accountId'
+import { Address } from '..'
 import { Uint8ArrayE } from './extended'
 
 class Public extends Uint8ArrayE implements Types.Public {

@@ -13,6 +13,7 @@ import { isWinningTicket, pubKeyToAddress, isGanache } from './utils'
 import { HASHED_SECRET_WIDTH } from './hashedSecret'
 import { WEB3_CACHE_TTL } from './constants'
 import * as ethereum from './ethereum'
+import BN from 'bn.js'
 
 import debug from 'debug'
 const log = debug('hopr-core-ethereum:account')
@@ -343,7 +344,7 @@ export const getBalance = async (
   if (useCache) {
     const cached = cache.get('balance')
     const notExpired = cached && !isExpired(cached.updatedAt, new Date().getTime(), WEB3_CACHE_TTL)
-    if (notExpired) return new Balance(cached.value)
+    if (notExpired) return new Balance(new BN(cached.value))
   }
 
   const value = await ethereum.getBalance(hoprToken, account)

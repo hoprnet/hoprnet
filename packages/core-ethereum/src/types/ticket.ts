@@ -51,7 +51,7 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
       this.set(struct.counterparty.serialize(), this.counterpartyOffset - this.byteOffset)
       this.set(struct.challenge, this.challengeOffset - this.byteOffset)
       this.set(new Uint8Array(struct.epoch.toBuffer('be', EPOCH_SIZE)), this.epochOffset - this.byteOffset)
-      this.set(new Uint8Array(struct.amount.toBuffer('be', AMOUNT_SIZE)), this.amountOffset - this.byteOffset)
+      this.set(struct.amount.serialize(), this.amountOffset - this.byteOffset)
       this.set(struct.winProb, this.winProbOffset - this.byteOffset)
       this.set(
         new Uint8Array(struct.channelIteration.toBuffer('be', EPOCH_SIZE)),
@@ -97,7 +97,7 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
   }
 
   get amount(): Balance {
-    return new Balance(new Uint8Array(this.buffer, this.amountOffset, AMOUNT_SIZE))
+    return new Balance(new BN(new Uint8Array(this.buffer, this.amountOffset, AMOUNT_SIZE)))
   }
 
   get winProbOffset(): number {
@@ -125,7 +125,7 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
   }
 
   getEmbeddedFunds(): Balance {
-    return new Balance(this.amount.mul(new BN(this.winProb)).div(new BN(new Uint8Array(Hash.SIZE).fill(0xff))))
+    return new Balance(this.amount.toBN().mul(new BN(this.winProb)).div(new BN(new Uint8Array(Hash.SIZE).fill(0xff))))
   }
 
   async sign(privKey: Uint8Array): Promise<Signature> {

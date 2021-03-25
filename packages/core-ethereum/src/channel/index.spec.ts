@@ -142,7 +142,7 @@ describe('test Channel class', function () {
     const firstAckedTicket = new AcknowledgedTicket(coreConnector, undefined, {
       response: firstTicket.response
     })
-    const signedTicket = await channel.ticket.create(new Balance(1), firstTicket.challenge, firstTicket.winProb, {
+    const signedTicket = await channel.ticket.create(new Balance(new BN(1)), firstTicket.challenge, firstTicket.winProb, {
       bytes: firstAckedTicket.buffer,
       offset: firstAckedTicket.signedTicketOffset
     })
@@ -234,7 +234,7 @@ describe('test Channel class', function () {
         response: ticketData.response
       })
 
-      nextSignedTicket = await channel.ticket.create(new Balance(1), ticketData.challenge, ticketData.winProb, {
+      nextSignedTicket = await channel.ticket.create(new Balance(new BN(1)), ticketData.challenge, ticketData.winProb, {
         bytes: ackedTicket.buffer,
         offset: ackedTicket.signedTicketOffset
       })
