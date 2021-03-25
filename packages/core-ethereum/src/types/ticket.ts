@@ -97,11 +97,11 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
   }
 
   get amount(): Balance {
-    return Balance.fromUint96(new Uint8Array(this.buffer, this.amountOffset, 12)) 
+    return Balance.fromUint96(new Uint8Array(this.buffer, this.amountOffset, 12))
   }
 
   get winProbOffset(): number {
-    return this.byteOffset + Address.SIZE + Hash.SIZE + EPOCH_SIZE + UINT96_SIZE 
+    return this.byteOffset + Address.SIZE + Hash.SIZE + EPOCH_SIZE + UINT96_SIZE
   }
 
   get winProb(): Hash {
