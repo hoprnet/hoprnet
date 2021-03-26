@@ -1,2 +1,33 @@
-\subsection{OnChain Commitment}
+\subsection{On-chain Commitment}
+
+\subsubsection*{Commitment schemes}
+A commitment scheme is a protocol between usually two parties $A$ and $B$ and fulfills two properties (hiding and biding).
+\\~\\\textbf{Hiding:} The ability to commit a value only known by the sender.
+\\~\textbf{Binding:} The committed value must be the only one that the sender can compute and that validates during the reveal phase. 
+
+
+\subsection{Setup phase}
+Once a node joins the HOPR network, it creates an iterated commitment and stores the opening key in the database. 
+Iterated commitment scheme means openn opens $cm_n$ whereas $open_{n-1}$ opens $cm_{n-1}=open_n$ and so on. 
+\newline The final commitment is computed as $cm_n:= hash_n(r)$ where hash is a preimage-resistant hash function and 
+$r$ is chosen uniformly at random by the node in order to prevent the issuer from knowing whether the ticket will be a win or not. 
+\\~\\ Furthermore, it will prevent it from tweaking the given challenge such that the ticket cannot be a win.
+The number of iterations $n$ can be chosen as a constant and should reflect the number of tickets a node intends to redeem.
+
+\subsection{Opening phase}
+In order to redeem a ticket, a node has to reveal the opening to the current commitment $cm_n$ that is stored in the smart contract. 
+\\~The opening shouldn’t be revealed otherwise since it discloses whether a ticket is a win or not.
+The ticket is a win if: $$hash( ticketHash, response, open ) <ticket.winProb$$ where $$ticketHash:=hash( ticketData )$$
+The opening is computed as $open_{n-1} = hash_{n-1}(r)$ such that $cm_n=hash( open_{n-1})$. 
+\\~\\The on-chain logic verifies whether the latest opening $open_n$ indeed opens the current on-chain commitment $cm_n$. 
+If this is the case, the current on-chain commitment is replaced by the given opening. 
+\\~The on-chain keeps track of updates to the on-chain commitments to prevent double-spending. 
+So whenever a node resets a commitment, a counter, namely $account.counter$ is increased and a call to $updateCommitment$ invalidates all previously unredeemed tickets.
+
+
+
+
+
+
+
 
