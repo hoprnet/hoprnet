@@ -12,8 +12,8 @@ import {
   SignedChannel,
   SignedTicket,
   Ticket,
-  TicketEpoch,
-  ChannelEntry
+  ChannelEntry,
+  UINT256
 } from '../types'
 import {
   waitForConfirmation,
@@ -196,10 +196,10 @@ class ChannelFactory {
       {
         counterparty,
         challenge,
-        epoch: new TicketEpoch(0),
+        epoch: UINT256.fromString('0'),
         amount: new Balance(new BN(0)),
         winProb,
-        channelIteration: new TicketEpoch(0)
+        channelIteration: UINT256.fromString('0')
       }
     )
 

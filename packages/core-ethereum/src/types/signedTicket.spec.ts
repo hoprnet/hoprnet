@@ -2,7 +2,7 @@ import assert from 'assert'
 import { randomBytes } from 'crypto'
 import { stringToU8a, randomInteger, u8aToHex } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
-import { Address, Ticket, Hash, TicketEpoch, Balance, SignedTicket } from '.'
+import { Address, Ticket, Hash, Balance, SignedTicket, UINT256 } from '.'
 import { pubKeyToAddress, privKeyToPubKey } from '../utils'
 import * as testconfigs from '../config.spec'
 
@@ -10,11 +10,11 @@ const WIN_PROB = new BN(1)
 
 const generateTicketData = async (receiver: Address) => {
   const challenge = new Hash(randomBytes(32))
-  const epoch = new TicketEpoch(0)
+  const epoch = UINT256.fromString('0')
   const amount = new Balance(new BN(15))
   const winProb = new Hash(new BN(new Uint8Array(Hash.SIZE).fill(0xff)).div(WIN_PROB).toArray('le', Hash.SIZE))
-  const onChainSecret = new Hash(randomBytes(Hash.SIZE))
-  const channelIteration = new TicketEpoch(0)
+  const onChainSecret = new Hash(randomBytes(27))
+  const channelIteration = UINT256.fromString('0')
 
   return {
     counterparty: receiver,
@@ -56,7 +56,7 @@ describe('test signedTicket construction', async function () {
 
     assert(signedTicket.ticket.counterparty.eq(userB as Address), 'wrong counterparty')
     assert(signedTicket.ticket.challenge.eq(ticketData.challenge), 'wrong challenge')
-    assert(signedTicket.ticket.epoch.eq(ticketData.epoch), 'wrong epoch')
+    assert(signedTicket.ticket.epoch.toBN().eq(ticketData.epoch.toBN()), 'wrong epoch')
     assert(signedTicket.ticket.amount.toBN().eq(ticketData.amount.toBN()), 'wrong amount')
     assert(signedTicket.ticket.winProb.eq(ticketData.winProb), 'wrong winProb')
 
@@ -97,7 +97,7 @@ describe('test signedTicket construction', async function () {
 
     assert(signedTicketB.ticket.counterparty.eq(userB as Address), 'wrong counterparty')
     assert(signedTicketB.ticket.challenge.eq(ticketData.challenge), 'wrong challenge')
-    assert(signedTicketB.ticket.epoch.eq(ticketData.epoch), 'wrong epoch')
+    assert(signedTicketB.ticket.epoch.toBN().eq(ticketData.epoch.toBN()), 'wrong epoch')
     assert(signedTicketB.ticket.amount.toBN().eq(ticketData.amount.toBN()), 'wrong amount')
     assert(signedTicketB.ticket.winProb.eq(ticketData.winProb), 'wrong winProb')
 
@@ -150,7 +150,7 @@ describe('test signedTicket construction', async function () {
 
     assert(signedTicket.ticket.counterparty.eq(userB as Address), 'wrong counterparty')
     assert(signedTicket.ticket.challenge.eq(ticketData.challenge), 'wrong challenge')
-    assert(signedTicket.ticket.epoch.eq(ticketData.epoch), 'wrong epoch')
+    assert(signedTicket.ticket.epoch.toBN().eq(ticketData.epoch.toBN()), 'wrong epoch')
     assert(signedTicket.ticket.amount.toBN().eq(ticketData.amount.toBN()), 'wrong amount')
     assert(signedTicket.ticket.winProb.eq(ticketData.winProb), 'wrong winProb')
 

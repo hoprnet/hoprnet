@@ -72,13 +72,13 @@ class ChannelEntry implements Types.ChannelEntry {
     return serializeToU8a([
       [this.parties[0].serialize(), Address.SIZE],
       [this.parties[1].serialize(), Address.SIZE],
-      [new UINT256(this.deposit.toString()).toU8a(), UINT256.SIZE],
-      [new UINT256(this.partyABalance.toString()).toU8a(), UINT256.SIZE],
-      [new UINT256(this.closureTime.toString()).toU8a(), UINT256.SIZE],
-      [new UINT256(this.stateCounter.toString()).toU8a(), UINT256.SIZE],
+      [new UINT256(this.deposit).serialize(), UINT256.SIZE],
+      [new UINT256(this.partyABalance).serialize(), UINT256.SIZE],
+      [new UINT256(this.closureTime).serialize(), UINT256.SIZE],
+      [new UINT256(this.stateCounter).serialize(), UINT256.SIZE],
       [toU8a(Number(this.closureByPartyA)), 1],
-      [new UINT256(this.openedAt.toString()).toU8a(), UINT256.SIZE],
-      [new UINT256(this.closedAt.toString()).toU8a(), UINT256.SIZE]
+      [new UINT256(this.openedAt).serialize(), UINT256.SIZE],
+      [new UINT256(this.closedAt).serialize(), UINT256.SIZE]
     ])
   }
 

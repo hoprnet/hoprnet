@@ -7,7 +7,7 @@ import Web3 from 'web3'
 import { durations, stringToU8a, u8aEquals, u8aToHex, isExpired } from '@hoprnet/hopr-utils'
 import NonceTracker from './nonce-tracker'
 import TransactionManager from './transaction-manager'
-import { Address, AcknowledgedTicket, Balance, Hash, NativeBalance, TicketEpoch } from './types'
+import { Address, AcknowledgedTicket, Balance, Hash, NativeBalance, UINT256 } from './types'
 import { isWinningTicket, pubKeyToAddress, isGanache, getNetworkGasPrice } from './utils'
 import { WEB3_CACHE_TTL } from './constants'
 import * as ethereum from './ethereum'
@@ -22,7 +22,7 @@ const cache = new Map<'balance' | 'nativeBalance', { value: string; updatedAt: n
 class Account {
   private _address?: Address
   private _preImageIterator: AsyncGenerator<boolean, boolean, AcknowledgedTicket>
-  private _ticketEpoch?: TicketEpoch
+  private _ticketEpoch?: UINT256
   private _ticketEpochListener?: ContractEventEmitter<any>
   private _onChainSecret?: Hash
   private _nonceTracker: NonceTracker
@@ -133,7 +133,7 @@ class Account {
     return getNativeBalance(this.coreConnector.web3, await this.address, useCache)
   }
 
-  get ticketEpoch(): Promise<TicketEpoch> {
+  get ticketEpoch(): Promise<UINT256> {
     if (this._ticketEpoch != null) {
       return Promise.resolve(this._ticketEpoch)
     }
@@ -145,7 +145,7 @@ class Account {
         .accounts(address.toHex())
         .call()
         .then((res) => {
-          this._ticketEpoch = new TicketEpoch(res.counter)
+          this._ticketEpoch = UINT256.fromString(res.counter)
 
           return this._ticketEpoch
         })
@@ -305,7 +305,7 @@ class Account {
           .on('data', (event) => {
             log('new ticketEpoch', event.returnValues.counter)
 
-            this._ticketEpoch = new TicketEpoch(event.returnValues.counter)
+            this._ticketEpoch = UINT256.fromString(event.returnValues.counter)
             this._onChainSecret = new Hash(stringToU8a(event.returnValues.secret), Hash.SIZE)
           })
           .on('error', (error) => {
@@ -356,13 +356,13 @@ export const getNativeBalance = async (
   if (useCache) {
     const cached = cache.get('nativeBalance')
     const notExpired = cached && !isExpired(cached.updatedAt, new Date().getTime(), WEB3_CACHE_TTL)
-    if (notExpired) return new NativeBalance(cached.value)
+    if (notExpired) return new NativeBalance(new BN(cached.value))
   }
 
   const value = await ethereum.getNativeBalance(web3, account)
   cache.set('nativeBalance', { value: value.toString(), updatedAt: new Date().getTime() })
 
-  return new NativeBalance(value)
+  return value
 }
 
 export default Account

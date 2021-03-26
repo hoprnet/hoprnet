@@ -19,9 +19,9 @@ class Snapshot {
 
   public serialize(): Uint8Array {
     return serializeToU8a([
-      [new UINT256(this.blockNumber.toString()).toU8a(), UINT256.SIZE],
-      [new UINT256(this.transactionIndex.toString()).toU8a(), UINT256.SIZE],
-      [new UINT256(this.logIndex.toString()).toU8a(), UINT256.SIZE]
+      [new UINT256(this.blockNumber).serialize(), UINT256.SIZE],
+      [new UINT256(this.transactionIndex).serialize(), UINT256.SIZE],
+      [new UINT256(this.logIndex).serialize(), UINT256.SIZE]
     ])
   }
 

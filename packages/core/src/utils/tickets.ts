@@ -91,7 +91,6 @@ export async function getAcknowledgedTickets(
   }[]
 > {
   const { AcknowledgedTicket } = node.paymentChannels.types
-  const acknowledgedTicketSize = AcknowledgedTicket.SIZE(node.paymentChannels)
   const results: {
     ackTicket: Types.AcknowledgedTicket
     index: Uint8Array
@@ -104,10 +103,10 @@ export async function getAcknowledgedTickets(
       })
       .on('error', (err) => reject(err))
       .on('data', async ({ key, value }: { key: Buffer; value: Buffer }) => {
-        if (value.buffer.byteLength !== acknowledgedTicketSize) return
+        if (value.buffer.byteLength !== AcknowledgedTicket.SIZE) return
 
         const index = node._dbKeys.AcknowledgedTicketsParse(key)
-        const ackTicket = AcknowledgedTicket.create(node.paymentChannels, {
+        const ackTicket = AcknowledgedTicket.create({
           bytes: value.buffer,
           offset: value.byteOffset
         })

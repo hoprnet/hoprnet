@@ -1,6 +1,6 @@
 import type IChannel from '.'
 import { u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
-import { Hash, TicketEpoch, Balance, SignedTicket, Ticket, AcknowledgedTicket } from '../types'
+import { Hash, Balance, SignedTicket, Ticket, AcknowledgedTicket, UINT256 } from '../types'
 import {
   pubKeyToAddress,
   computeWinningProbability,
@@ -135,9 +135,12 @@ class TicketFactory {
     const epoch = await this.channel.coreConnector.hoprChannels.methods
       .accounts(counterparty.toHex())
       .call()
-      .then((res) => new TicketEpoch(Number(res.counter)))
+      .then((res) => UINT256.fromString(res.counter))
 
-    const channelIteration = new TicketEpoch(stateCounterToIteration((await this.channel.stateCounter).toNumber()))
+    // TODO: wtf, make stateCounterToIteration accept BN
+    const channelIteration = UINT256.fromString(
+      String(stateCounterToIteration((await this.channel.stateCounter).toBN().toNumber()))
+    )
 
     const signedTicket = new SignedTicket(arr)
 

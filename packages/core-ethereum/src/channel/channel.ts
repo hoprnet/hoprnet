@@ -1,23 +1,13 @@
 import type { Channel as IChannel } from '@hoprnet/hopr-core-connector-interface'
 import BN from 'bn.js'
-import { toU8a } from '@hoprnet/hopr-utils'
-import {
-  Balance,
-  Channel as ChannelType,
-  Hash,
-  Moment,
-  Public,
-  SignedChannel,
-  TicketEpoch,
-  ChannelEntry
-} from '../types'
+import { Balance, Channel as ChannelType, Hash, Public, SignedChannel, ChannelEntry, UINT256 } from '../types'
 import TicketFactory from './ticket'
 import { hash } from '../utils'
 
 import type HoprEthereum from '..'
 
 class Channel implements IChannel {
-  private _settlementWindow?: Moment
+  private _settlementWindow?: UINT256
   private _channelId?: Hash
 
   public ticket: TicketFactory
@@ -41,11 +31,11 @@ class Channel implements IChannel {
     })
   }
 
-  get stateCounter(): Promise<TicketEpoch> {
-    return new Promise<TicketEpoch>(async (resolve, reject) => {
+  get stateCounter(): Promise<UINT256> {
+    return new Promise<UINT256>(async (resolve, reject) => {
       try {
         const channel = await this.onChainChannel
-        return resolve(new TicketEpoch(toU8a(Number(channel.stateCounter))))
+        return resolve(new UINT256(channel.stateCounter))
       } catch (error) {
         return reject(error)
       }
@@ -88,14 +78,14 @@ class Channel implements IChannel {
     })
   }
 
-  get settlementWindow(): Promise<Moment> {
+  get settlementWindow(): Promise<UINT256> {
     if (this._settlementWindow != null) {
       return Promise.resolve(this._settlementWindow)
     }
 
-    return new Promise<Moment>(async (resolve, reject) => {
+    return new Promise<UINT256>(async (resolve, reject) => {
       try {
-        this._settlementWindow = new Moment((await this.onChainChannel).closureTime)
+        this._settlementWindow = new UINT256((await this.onChainChannel).closureTime)
       } catch (error) {
         return reject(error)
       }

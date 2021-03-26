@@ -1,14 +1,12 @@
 import AcknowledgedTicket from './acknowledgedTicket'
 import { Channel, ChannelBalance, ChannelState } from './channel'
 import Hash from './hash'
-import Moment from './moment'
-import NativeBalance from './nativeBalance'
 import Public from './public'
 import Signature from './signature'
 import SignedChannel from './signedChannel'
 import SignedTicket from './signedTicket'
 import Ticket from './ticket'
-import TicketEpoch from './ticketEpoch'
+import BN from 'bn.js'
 
 declare interface AddressStatic {
   readonly SIZE: number
@@ -34,6 +32,19 @@ declare interface Balance {
   toFormattedString(): string // Readable version of the balance
 }
 declare var Balance: BalanceStatic
+
+declare interface NativeBalanceStatic {
+  readonly SIZE: number
+  readonly SYMBOL: string // Abbreviation of the currency, e.g. `ETH`
+  readonly DECIMALS: number
+  new (balance: BN): Balance
+}
+declare interface NativeBalance {
+  toBN(): BN
+  serialize(): Uint8Array
+  toFormattedString(): string // Readable version of the balance
+}
+declare var NativeBalance: NativeBalanceStatic
 
 declare interface AccountEntryStatic {
   readonly SIZE: number
@@ -65,6 +76,17 @@ declare interface ChannelEntry {
 }
 declare var ChannelEntry: ChannelEntryStatic
 
+declare interface UINT256Static {
+  readonly SIZE: number
+  new (amount: BN): UINT256
+  fromString(str: string): UINT256
+}
+declare interface UINT256 {
+  toBN(): BN
+  serialize(): Uint8Array
+}
+declare var UINT256: UINT256Static
+
 export {
   AccountEntry,
   Address,
@@ -75,12 +97,11 @@ export {
   ChannelState,
   ChannelEntry,
   Hash,
-  Moment,
   NativeBalance,
   Public,
   Signature,
   SignedChannel,
   SignedTicket,
   Ticket,
-  TicketEpoch
+  UINT256
 }
