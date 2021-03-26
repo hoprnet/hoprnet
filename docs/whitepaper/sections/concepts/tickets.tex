@@ -1,109 +1,57 @@
 \subsection{Tickets}
-\paragraph{Desired properties}
-\begin{itemize}
-    \item Tickets must be bound to specific payment channels, i.e. they cannot be spent in foreign payment channels
-    \item Tickets must be redeemable at most once
-    \item Ticket must lose its value once the payment channel is closed and must remain invalid if the channel is reopened
-    \item The validity of tickets must be verifiable at ticket reception
-    \item Ticket win must not be determinable at ticket issuance
-    \item Ticket win must not be determinable before the response to the given challenge is known
-    \item Tickets must lose its value once the on-chain commitment is reset
-    \item The winning probability must rely on entropy that is only known by the issuer but not by the recipient and on entropy that is known by the recipient but not by the issuer
-    \item Ticket issuance and ticket redemption must be independent of each other
-    \item Ticket issuance must be non-interactive
-    \item Ticket issuance and ticket redemption must be efficiently computable and the required cryptographic building blocks must be built-in functions of Ethereum.
-
-\end{itemize}
-Nodes that have staked funds within a payment channel can issue tickets that are used for payment to other nodes.
+In the HOPR protocol, nodes that have staked funds within a payment channel can issue tickets that are used for payment to other nodes. 
+Tickets are used for probabilistic payments; every ticket is bound to a specific payment channel and cannot be spent elsewhere. 
+They are redeemable at most once and they lose their value when the channel is closed. 
 \subsubsection{Ticket issuance}
-The issuer selects the recipient of the payment and retrieves the current epoch counter of the recipient from the blockchain. 
-In addition, the issuer determines the channel identifier $channelId$ of the channel between the issuer and the recipient and retrieves the corresponding channel iteration counter from the blockchain. 
-The channel iteration counter is used to give each reincarnation of the payment channel a new identifier such that tickets issued for previous instances of the channel lose their validity once a channel is reopened.
-\newline Afterwards the issuer sets:
+A ticket can be issued once two nodes have established a payment channel with each other which means that at least one of them has locked HOPR tokens.
+\newline The ticket issuer A (A could also be the packet creator) selects the winning probability of the ticket and the relay fee to use and sets amount to:
+$$amount:=\dfrac{pathLength*relayFee}{winProb}$$
+If the issuer $(A)$ receives the packet from another node $(O)$ (packet creator) and attempts to issue a ticket for the next downstream node, 
+the challenge is given together with the routing information by the packet. We assume $(A)$ and $(O)$ are not the same.
 \begin{itemize}
-    \item Value of the ticket
-    \item Winning probability
-    \item Challenge
-\end{itemize}
-If the issuer is also the sender of the packet, it can set the challenge arbitrarily. 
-If the issuer receives the packet from another node and attempts to issue a ticket for the next downstream node, the challenge is given together with the routing information by the packet.
-The content of a ticket is given as the tuple:$(recipient, challenge, account.counter, amount, winProb, channel.teration, index)$ 
-Let $t$ be the content of a ticket. The issuer then signs the ticket with its private key and sends $ticket:= (t, Sig_{Issuer}(t))$ to the recipient.
+    \item[] $(A)$ does not know whether the ticket is a win or not.
+    \item[] $(A)$ sets content of a ticket to: $$t=(recipient, challenge, account.counter, amount, winProb, channel.teration, index)$$ 
+    \item[] $(A)$ then signs the ticket with its private key and sends $ticket:= (t, Sig_Issuer(t))$ to the recipient together with a mixnet packet.
+    \item[] The data for a ticket is signed by the issuer, and a ticket is the data followed by the signature: $$ticket:=(ticketData,Sig_Issuer(ticketData))$$ where 
+    $$ticketData:=(amount,winProb,recipient,index,challenge,iteration,chainId,tag,version)$$
+ \end{itemize}
+
+\subsubsection*{Challenge}
+$(O)$ creates a shared secret $s_i$ with all the relay nodes in the channel (A-B-C-Z) by using an offline version of the Diffie-Hellman key exchange.
+\newline The shared secret $s_i$ is used as a seed for a PRG (Pseudo Random Generator) to create secret shares $s_i,s_i'$ for each node along the route. 
+Relayers compute $s_i$ and get $s_i+1'$ from the next downstream node. 
+\newline The sender $(A)$ creates $challenge_i:=(s_i+s_i+1')*G$ and a hint for B,C,D,Z (let’s suppose these are the relay nodes and $Z$ will be the final destination) a “hint” how the promised value $s_C',s_D',s_Z'$ is going to look like. 
+The value “hint” is computed as $hint_i:=s_i+1'*G$ 
+
 
 \subsubsection{Ticket validation}
-Once a node receives a ticket, the ticket gets validated:
-\begin{itemize}
-    \item \textbf{Economically: }
-    \begin{itemize}
-        \item Does the ticket value fit to the currently staked money and the previously redeemed tickets?
-        \item Is the winning probability set reasonably?
-        \item Has the ticket already been processed?
-    \end{itemize}
-    
-
-
- 
-    \item \textbf{Cryptographically:}
-    \begin{itemize}
-        \item Is the signature valid?
-        \item Is the given challenge derivable?
-    \end{itemize}
- 
-\end{itemize}
-Tickets are received together with packets which means that the recipient and the next downstream node share a secret $s$ whose key shares $s_a$ and $s_b$ are derivable by the recipient and the next downstream node. 
-The secret sharing between the issuer is “2-out-of-2” secret sharing, meaning that the reconstruction of the key requires both key shares, $s_a$ and $s_b$.
-\newline Once the recipient transforms the packet, namely applying the elliptic curve math to extract the shared secret with the sender from Diffie-Hellman key exchange, it is able to compute $s_a$. The recipient is now also able to extract the routing information from the packet. 
-This includes a hint to the value $s_b$ given as $hint:=s_b*G$ where $G$ is the base-point of the utilized curve. 
-Together with $s_a$, the node can verify that $$ticket.challenge=s_a*G+hint$$ with $$s_a*G+hint=s_a*G+s_b*G=(s_a+s_b)*G$$ 
-This allows the recipient to verify that the promised value $s_b$ indeed leads to a solution of the challenge given in the ticket. 
+Tickets are received together with packets which means that the recipient and the next downstream node share a secret $s$ whose key shares $s_i$ and $s_i+1$ are derivable by those nodes.
+\newline Once the recipient $(A)$ receives $s_{i+1}^{(1)}$ from (B) by the secret sharing, it can compute $response:=s_i^{(0)}+s_{i+1}^{(1)}$ such that it verifies  
+$$response*G=ticket.challenge$$
+Once the recipient transforms the packet, it is able to compute $s_i$. The recipient is now also able to extract the routing information from the packet. 
+This includes a hint to the value $s_{i+1}$ given as $hint_i:=s_{i+1}*G$ 
+\newline Together with $s_i$, the node can verify that $$ticket.challenge=s_i*G+hint_i$$ with $$s_i*G+hint=si*G+s_{i+1}*G=(s_i+s_{i+1})*G$$ 
+This allows the recipient to verify that the promised value $s_{i+1}$ indeed leads to a solution of the challenge given in the ticket. 
 If this is not the case, then the node should drop the packet.
-Without this check, the sender is able to intentionally create falsy challenges that lead to unredeemable tickets.
-The node then takes the ticket and stores it within the database until it receives an acknowledgement containing sb from the next downstream node. 
-The unacknowledged ticket is stored in the database under the hint to the promised value, namely $hint=s_b*G$, to make sure that the acknowledgement can be afterwards linked to the unacknowledged ticket.
+\newline Without this check, the sender is able to intentionally create falsy challenges that lead to unredeemable tickets.
 
 
 \subsubsection{Ticket redemption}
-Once a node receives an acknowledgement from another party, it checks whether it stores an unacknowledged ticket for the received acknowledgement. 
-If this is not the case, the node should drop the acknowledgement. The node can store the value but keeping it will most likely not bring any value. 
-\newline Acknowledgements are sent on every packet, even if the ticket issuer is the sender of the packet and therefore does not need any acknowledgement to unlock a ticket.
-The node then computes the response to the challenge given in the ticket. Therefore, it fetches its part of the PoR secret sharing as computed from the corresponding relayed packet from the database. 
-\newline Let $sa$ be the value from the database and $s_b$ be the value extracted from the acknowledgement. The response is then computed as $response:=(s_a+s_b)*G$.
+In order to unlock the ticket, the node stores it within its database until it receives an acknowledgement containing $s_{i+1}$ from the next downstream node. 
+The challenge can be computed from acknowledgement as $challenge:=ack*G$.
+\newline Once it receives an acknowledgement, it checks whether it stores an unacknowledged ticket for the received acknowledgement. 
+If this is not the case, the node should drop the acknowledgement.  
+\newline The node then computes the response to the challenge given in the ticket as $$response:=(s_i+s_{i+1})*G$$
 Additionally, the node retrieves the opening value open to the current on-chain commitment and checks whether response, open leads to a winning ticket. 
-This is the case if $$hash( ticketHash, response, open ) <ticket.winProb$$ where $ticketHash:=hash( ticketData )$.
-If this is not the case, the node should drop the ticket as it does not give any additional value.
-\newline If none of the aforementioned checks have failed, the node submits the ticket to the on-chain logic by calling $redeemTicket()$. 
-The on-chain logic repeats the previously done checks and additionally checks whether the:
-\begin{itemize}
-    \item signature of the ticket issuer is valid
-    \item ticket has been already spent (replay protection)
-    \item Channel exists
-    \item Channel balance towards the ticket recipient is sufficient to cover the costs for the ticket
-    \item Ticket index is strictly greater than the current value in the smart contract (reorder protection)
-\end{itemize}
-The replay protection is done by storing a fingerprint of the ticket in the storage of the on-chain logic. 
-The fingerprint is given as $fingerprint:=hash( ticketData )$. If $fingerprint$ exists, the on-chain logic must reject the ticket because the ticket could be a double-spend attempt.
-\newline The reorder protection is necessary to enforce a total order in which ticket can be redeemed. 
-This means that not every ticket must be redeemed but if a ticket is redeemed, then it invalidates all tickets between the index of the ticket and the index of the previously redeemed ticket. 
-If the on-chain were not doing the check, nodes are able to check their opening value open against multiple tickets which increases the winning probability and allows nodes to increase their payout.
-If none of the previous checks have failed, the on-chain logic performs the following state changes:
-\begin{itemize}
-    \item Update channel balance
-    \item Set $channel.counter[issuer]$ to $ticket.index$
-    \item Write ticket fingerprint in storage
-    \item Update on-chain commitment
-\end{itemize}
+This is the case if $$hash( ticketHash, response, open ) <ticket.winProb$$ where $$ticketHash:=hash( ticketData )$$
+If this is not the case, the node should drop the ticket. 
+The final recipient of the packet does not receive a ticket because message reception is not incentivized by the HOPR protocol.
+\newline The node checks whether the information gained from the packet transformation is sufficient to fulfill the given challenge sent along with the ticket. It then replies with an acknowledgement that includes a response to the challenge.
 
 
-\subsubsection{Ticket issuance vs Ticket redemption}
-The values that are used to sign the ticket and the ones that are needed to redeem the ticket are slightly different, 
-more precisely: $channel.iteration$ and $account.counter$ are already stored within the on-chain logic, hence they don’t need to be part of the redeem transaction. 
-Analogously $response$ and $challenge$. 
-The signature is computed over $challenge$ but the redeemer provides response from which the smart contract computes challenge.
-\newline This means that $ticketHash$ is computed from given values by the redeem transaction, 
-the storage of the on-chain logic as well as computed values.
-The validity of the signature is then checked against $ticketHash$, hence $channel.iteration$, $account.counter$ as well as $challenge$ are checked implicitly. 
-This does not reduce the security of the signature verification since the probability that an adversary is able to find values for $channel.iteration$ or $account.counter$ or $response$ that result in a valid signature can be assumed to be negligible.
- 
+
+
+
 
 
 
