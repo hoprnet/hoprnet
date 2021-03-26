@@ -3,8 +3,6 @@ import type { Account, Address, Public, Balance, ChannelEntry, Hash } from './ty
 export type RoutingChannel = [source: PeerId, destination: PeerId, stake: Balance]
 
 export interface IndexerEvents {
-  accountInitialized: (update: Account) => void
-  accountSecretUpdated: (update: Account) => void
   channelOpened: (update: ChannelEntry) => void
   channelClosed: (update: ChannelEntry) => void
 }
