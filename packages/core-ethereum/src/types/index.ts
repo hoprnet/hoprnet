@@ -9,7 +9,6 @@ import SignedChannel from './signedChannel'
 import SignedTicket from './signedTicket'
 import Snapshot from './snapshot'
 import Ticket from './ticket'
-import TicketEpoch from './ticketEpoch'
 import { UINT256 } from './solidity'
 
 import { ADDRESS_LENGTH } from '../constants'
@@ -92,7 +91,7 @@ class Types {
   public SignedTicket = SignedTicket
   public Snapshot = Snapshot
   public Ticket = Ticket
-  public TicketEpoch = TicketEpoch
+  public UINT256 = UINT256
 }
 
 export {
@@ -111,7 +110,6 @@ export {
   SignedTicket,
   Snapshot,
   Ticket,
-  TicketEpoch,
   UINT256
 }
 

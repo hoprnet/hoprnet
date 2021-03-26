@@ -2,7 +2,7 @@ import assert from 'assert'
 import { randomBytes } from 'crypto'
 import { stringToU8a, randomInteger, u8aToHex } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
-import { Address, Ticket, Hash, TicketEpoch, Balance, SignedTicket } from '.'
+import { Address, Ticket, Hash, Balance, SignedTicket, UINT256 } from '.'
 import { pubKeyToAddress, privKeyToPubKey } from '../utils'
 import * as testconfigs from '../config.spec'
 
@@ -10,11 +10,11 @@ const WIN_PROB = new BN(1)
 
 const generateTicketData = async (receiver: Address) => {
   const challenge = new Hash(randomBytes(32))
-  const epoch = new TicketEpoch(0)
+  const epoch = new UINT256(0)
   const amount = new Balance(new BN(15))
   const winProb = new Hash(new BN(new Uint8Array(Hash.SIZE).fill(0xff)).div(WIN_PROB).toArray('le', Hash.SIZE))
   const onChainSecret = new Hash(randomBytes(27))
-  const channelIteration = new TicketEpoch(0)
+  const channelIteration = new UINT256(0)
 
   return {
     counterparty: receiver,

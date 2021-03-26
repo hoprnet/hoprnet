@@ -1,16 +1,7 @@
 import type { Channel as IChannel } from '@hoprnet/hopr-core-connector-interface'
 import BN from 'bn.js'
 import { toU8a } from '@hoprnet/hopr-utils'
-import {
-  Balance,
-  Channel as ChannelType,
-  Hash,
-  Public,
-  SignedChannel,
-  TicketEpoch,
-  ChannelEntry,
-  UINT256
-} from '../types'
+import { Balance, Channel as ChannelType, Hash, Public, SignedChannel, ChannelEntry, UINT256 } from '../types'
 import TicketFactory from './ticket'
 import { hash } from '../utils'
 
@@ -41,11 +32,11 @@ class Channel implements IChannel {
     })
   }
 
-  get stateCounter(): Promise<TicketEpoch> {
-    return new Promise<TicketEpoch>(async (resolve, reject) => {
+  get stateCounter(): Promise<UINT256> {
+    return new Promise<UINT256>(async (resolve, reject) => {
       try {
         const channel = await this.onChainChannel
-        return resolve(new TicketEpoch(toU8a(Number(channel.stateCounter))))
+        return resolve(new UINT256(toU8a(Number(channel.stateCounter))))
       } catch (error) {
         return reject(error)
       }

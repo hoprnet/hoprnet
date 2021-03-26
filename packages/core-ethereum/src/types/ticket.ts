@@ -1,7 +1,7 @@
 import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import BN from 'bn.js'
 import { stringToU8a, u8aToHex, u8aConcat } from '@hoprnet/hopr-utils'
-import { Address, Balance, Hash, Signature, TicketEpoch } from '.'
+import { Address, Balance, Hash, Signature, UINT256 } from '.'
 import { Uint8ArrayE } from '../types/extended'
 import { sign } from '../utils'
 
@@ -31,10 +31,10 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
     struct?: {
       counterparty: Address
       challenge: Hash
-      epoch: TicketEpoch
+      epoch: UINT256
       amount: Balance
       winProb: Hash
-      channelIteration: TicketEpoch
+      channelIteration: UINT256
     }
   ) {
     if (!arr && !struct) {
@@ -88,8 +88,8 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
     return this.byteOffset + Address.SIZE + Hash.SIZE
   }
 
-  get epoch(): TicketEpoch {
-    return new TicketEpoch(new Uint8Array(this.buffer, this.epochOffset, EPOCH_SIZE))
+  get epoch(): UINT256 {
+    return new UINT256(new Uint8Array(this.buffer, this.epochOffset, EPOCH_SIZE))
   }
 
   get amountOffset(): number {
@@ -112,8 +112,8 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
     return this.byteOffset + Address.SIZE + Hash.SIZE + EPOCH_SIZE + UINT96_SIZE + Hash.SIZE
   }
 
-  get channelIteration(): TicketEpoch {
-    return new TicketEpoch(new Uint8Array(this.buffer, this.channelIterationOffset, EPOCH_SIZE))
+  get channelIteration(): UINT256 {
+    return new UINT256(new Uint8Array(this.buffer, this.channelIterationOffset, EPOCH_SIZE))
   }
 
   get hash(): Promise<Hash> {
@@ -145,10 +145,10 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
     struct?: {
       counterparty: Address
       challenge: Hash
-      epoch: TicketEpoch
+      epoch: UINT256
       amount: Balance
       winProb: Hash
-      channelIteration: TicketEpoch
+      channelIteration: UINT256
     }
   ): Ticket {
     return new Ticket(arr, struct)
