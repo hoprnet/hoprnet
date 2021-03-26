@@ -18,7 +18,7 @@ source scripts/cleanup.sh
 # - BS_PASSWORD: database password
 
 if [ -z "$RPC" ]; then
-  RPC=https://eth-goerli.alchemyapi.io/v2/DH3xYijhPOku0DtWajKUhY3XLljOSsGO
+  RPC=https://eth-goerli.gateway.pokt.network/v1/6021a2b6928ff9002e6c7f2f
 fi
 
 source scripts/dependencies.sh
