@@ -1,5 +1,5 @@
 import type { Types } from '@hoprnet/hopr-core-connector-interface'
-import { Moment } from '..'
+import { UINT256 } from '..'
 import { Uint8ArrayE } from '../extended'
 import { hash, stateCounterToStatus, sign } from '../../utils'
 import ChannelState from './channelState'
@@ -23,7 +23,7 @@ class Channel extends Uint8ArrayE implements Types.Channel {
     struct?: {
       state: ChannelState
       balance?: ChannelBalance
-      moment?: Moment
+      moment?: UINT256
     }
   ) {
     if (!arr) {
@@ -70,12 +70,12 @@ class Channel extends Uint8ArrayE implements Types.Channel {
     return this._rawState
   }
 
-  get moment(): Moment | void {
+  get moment(): UINT256 | void {
     if (this._status != ChannelStatus.PENDING) {
       return
     }
 
-    return new Moment(this.subarray(ChannelBalance.SIZE + 1, ChannelBalance.SIZE + 1 + Moment.SIZE))
+    return new UINT256(this.subarray(ChannelBalance.SIZE + 1, ChannelBalance.SIZE + 1 + UINT256.SIZE))
   }
 
   get _status(): ChannelStatus {
@@ -121,7 +121,7 @@ class Channel extends Uint8ArrayE implements Types.Channel {
     })
   }
 
-  static createPending(moment: Moment, balance: ChannelBalance): Channel {
+  static createPending(moment: UINT256, balance: ChannelBalance): Channel {
     return new Channel(undefined, {
       balance,
       state: new ChannelState(undefined, { state: ChannelStatus.PENDING }),

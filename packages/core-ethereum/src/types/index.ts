@@ -2,7 +2,6 @@ import AcknowledgedTicket from './acknowledgedTicket'
 import { Channel, ChannelBalance, ChannelState } from './channel'
 import ChannelEntry from './channelEntry'
 import Hash from './hash'
-import Moment from './moment'
 import NativeBalance from './nativeBalance'
 import Public from './public'
 import Signature from './signature'
@@ -11,6 +10,7 @@ import SignedTicket from './signedTicket'
 import Snapshot from './snapshot'
 import Ticket from './ticket'
 import TicketEpoch from './ticketEpoch'
+import { UINT256 } from './solidity'
 
 import { ADDRESS_LENGTH } from '../constants'
 import { u8aToHex, u8aEquals, moveDecimalPoint } from '@hoprnet/hopr-utils'
@@ -85,7 +85,6 @@ class Types {
   public ChannelState = ChannelState
   public ChannelEntry = ChannelEntry
   public Hash = Hash
-  public Moment = Moment
   public NativeBalance = NativeBalance
   public Public = Public
   public Signature = Signature
@@ -105,7 +104,6 @@ export {
   ChannelEntry,
   ChannelState,
   Hash,
-  Moment,
   NativeBalance,
   Public,
   Signature,
@@ -113,7 +111,8 @@ export {
   SignedTicket,
   Snapshot,
   Ticket,
-  TicketEpoch
+  TicketEpoch,
+  UINT256
 }
 
 export default Types
