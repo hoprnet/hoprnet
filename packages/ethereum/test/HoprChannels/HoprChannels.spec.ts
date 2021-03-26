@@ -321,13 +321,9 @@ describe('HoprChannels intergration tests', function () {
 
   context('on a fresh channel', function () {
     it('should initialize accountA', async function () {
-      const response = await hoprChannels.initializeAccount(
-        ACCOUNT_A.uncompressedPubKey,
-        SECRET_2,
-        {
-          from: ACCOUNT_A.address
-        }
-      )
+      const response = await hoprChannels.initializeAccount(ACCOUNT_A.uncompressedPubKey, SECRET_2, {
+        from: ACCOUNT_A.address
+      })
 
       expectEvent(response, 'AccountInitialized', {
         account: ACCOUNT_A.address,
@@ -341,13 +337,9 @@ describe('HoprChannels intergration tests', function () {
     })
 
     it('should initialize accountB', async function () {
-      const response = await hoprChannels.initializeAccount(
-        ACCOUNT_B.uncompressedPubKey,
-        SECRET_2,
-        {
-          from: ACCOUNT_B.address
-        }
-      )
+      const response = await hoprChannels.initializeAccount(ACCOUNT_B.uncompressedPubKey, SECRET_2, {
+        from: ACCOUNT_B.address
+      })
 
       expectEvent(response, 'AccountInitialized', {
         account: ACCOUNT_B.address,
