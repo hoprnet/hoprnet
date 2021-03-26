@@ -11,7 +11,7 @@ import 'hardhat-gas-reporter'
 import { HardhatUserConfig, task, types } from 'hardhat/config'
 import { NODE_SEEDS, BOOTSTRAP_SEEDS } from '@hoprnet/hopr-demo-seeds'
 import Web3 from 'web3'
-import { networks } from './chain'
+import { networks } from './chain/networks'
 import { ACCOUNT_DEPLOYER_PRIVKEY, ACCOUNT_A_PRIVKEY, ACCOUNT_B_PRIVKEY } from './test/constants'
 
 const { PRIVATE_KEY, INFURA, MATIC_VIGIL, ETHERSCAN } = process.env
