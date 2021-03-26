@@ -1,6 +1,6 @@
 import Web3 from 'web3'
 
-export type PublicNetworks = 'mainnet' | 'kovan' | 'xdai' | 'matic' | 'binance'
+export type PublicNetworks = 'mainnet' | 'ropsten' | 'kovan' | 'xdai' | 'matic' | 'binance'
 export type Networks = 'hardhat' | 'localhost' | PublicNetworks
 export type DeploymentTypes = 'local' | 'staging' | 'production'
 
@@ -17,11 +17,15 @@ export const networks: {
     tags: ['production', 'etherscan'],
     chainId: 1
   },
+  ropsten: {
+    live: true,
+    tags: ['staging', 'etherscan'],
+    chainId: 3
+  },
   kovan: {
     live: true,
     tags: ['staging', 'etherscan'],
-    chainId: 42,
-    gas: Number(Web3.utils.toWei('1', 'gwei'))
+    chainId: 42
   },
   xdai: {
     live: true,
