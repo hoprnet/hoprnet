@@ -1,6 +1,8 @@
 \subsection{Sphinx Packet Format}
 
-A sphinx packet consists of two parts:
+HOPR uses the SPHINX packet format to encapsulate and route data packets in order to provide privacy features such as sender and receiver unlinkability.
+Sphinx is a cryptographic message format used to relay anonymized messages within a mix network. A sphinx packet consists of two parts:
+
 \begin{enumerate}
 \item Header:
 \begin{itemize}
@@ -13,14 +15,6 @@ A sphinx packet consists of two parts:
 \item Onion-Encrypted payload
 \end{itemize}
 \end{enumerate}
-\paragraph{Notation}
-Let $k$ be a security parameter. An adversary will have to do about $2^k$ work to break the security of Sphinx with non negligible probability. We suggest using $k=128$.
-Let $r$ be the maximum number of nodes that a Sphinx mix message will traverse before being delivered to its destination.
-$G$ is a prime order cyclic group satisfying the Decisional Diffie-Hellman Assumption. The element $g$ is a generator of $G$ and $q$ is the (prime) order of $G$, with $q\approx 2^k$.
-$G^*$ is the set of non-identity elements of $G$.
-$h_b$ is a hash function which we model by random oracles such that:
-$h:G^*\times G^*\rightarrow \mathbb{Z}^*_q$ where $\mathbb{Z}^*_q$ is the field of non-identity elements of $\mathbb{Z}_q$ (field of integers).
-Each node $n\in \mathbb{N}$ has a private key $x_n\in \mathbb{Z}^*_q$ and a public key $y_n=g^{x_n}\in G^*$ where $\mathbb{N} \subset \{0,1\}^k$is a set of mix nodes identifiers.
 
 \paragraph{Key derivation}
 The sender (A) picks a random $x\in \mathbb{Z}^*_q$ that is used to derive new keys for every packet. 
@@ -32,7 +26,8 @@ The sender (A) picks a random $x\in \mathbb{Z}^*_q$ that is used to derive new k
 \item $a_1=g^{xb_0},s_1=y^{xb_0}_C,b_1=h(a_1,s_1)$
 \item $a_2=g^{xb_0b_1},s_2=y^{xb_0b_1}_D,b_2=h(a_2,s_2)$
 \end{itemize}
- Where $y_B,y_C,y_D,y_E$ are the public keys of the nodes $B,C, D$  which we assume are available to $A$ . The $a_i$ are the group elements which, when combined with the nodes’ public keys, allows computing a shared key for each via Diffie-Hellman key exchange, and so the first node in the user-chosen route can forward the packet to the next, and only that mix-node can decrypt it.
+ Where $y_B,y_C,y_D,y_E$ are the public keys of the nodes $B,C, D$  which we assume are available to $A$ . The $a_i$ are the group elements which, when combined with the nodes’ public keys, allows computing a shared key for each via Diffie-Hellman key exchange, 
+ and so the first node in the user-chosen route can forward the packet to the next, and only that mix-node can decrypt it.
 The $s_i$ are the Diffie Hellman shared secrets, and the $b_i$ are the blinding factors.
 
 
@@ -41,25 +36,14 @@ Each node on the path needs to know the next downstream node. Therefore, the sen
 \newline As $(A)$ has a shared secret with each of the nodes along the path, it is able to derive blindings for each of them which is symbolised as different hatchings.
 \newline Once $(B)$ receives the packet, it derives the shared key $s_0$(for simplicity we call it $s_B$ as it is the shared key with $B$) by computing
 $$s_0=(a_0)^b=(g^x)^b=(g^b)^x=y^x_B$$ and removes its blindings. This allows $(B)$ to unblind the routing info that tells $(B)$ the public key of the next downstream node $(C)$.
-The unblinding works as follow:
-\begin{enumerate}
-    \item $B$ computes the keyed-hash of the encrypted routing information $\beta_0$ as $HMAC(s_0,\beta_0)$ and compares with the integrity tag $\gamma_0$ attached in the packet header. If the integrity check fails because the header has been tampered with, the packet is dropped. Otherwise, the mix-node proceeds to step 2.
-    \item $B$ is now ready to decrypt the attached $\beta_0$. In order to extract the routing instructions, the mix-node $B$ first appends a zero-byte padding at the end of $\beta_0$ and decrypts the padded block of routing information $B$ by XORing it with $(h(s_0))$. Where $\varrho :\{0,1\}^k\rightarrow \{0,1\}^{(2r+3)k}$ is a pseudo-random generator (PRG) and $h_\varrho:G^*\rightarrow \{0,1\}^k$ is a hash function used to key $\varrho$ . 
-    \item $(B)$ parses the routing instructions from $(A)$ in order to obtain the address of the next mix-node $(C)$, as well the new integrity tag $\gamma_1$ and $\beta_1$, which should be forwarded to the next hop.
-    \item $(B)$ blinds the key share $a_0=g^x$ by setting it to $a1=g^{xb_0}$.
-\end{enumerate}
+
 $(B)$ also removes one layer of encryption from the payload.
-The payload $\delta_0$ in the Sphinx packet is computed using a wide-block cipher to ensure that, if an adversary modifies the payload at any point, the message content is irrecoverably lost.
-\newline Once $(C)$ receives the packet, it derives the shared key $s_c$ and removes the blinding, extracts the public key of $(D)$ and deletes the routing information from the packet. Afterwards, it fills the empty space with its own blinding which is different from the one of $(B)$. 
-\newline Same happens at $(D)$: key derivation, unblinding, deleting, shifting, decryption and blinding.
-\newline Last but not least, the packet arrives at $(E)$, the final destination of the packet. Like the other nodes, $(E)$ first derives its shared key $s_E$ and removes the blinding. In contrast to the previous nodes, namely $(B)$, then $(C)$, then $(D)$, it finds a message that symbolizes the end of path and tells $(E)$ that it’s the recipient.
+Same happens at $(C)$ and $(D)$: key derivation, unblinding, deleting, shifting, decryption and blinding. 
+In addition to all these steps, $(E)$ finds a message that symbolizes the end of the path and tells that it’s the recipient.
 
 \paragraph{Integrity}
-In addition to the routing information that is necessary to determine to which the transformed packet should be sent, each node along the path receives an authentication tag $\delta_i$ in the form of a message authentication code (MAC).
-\newline By using the derived shared secret, e.g. $s_b$, each node is able to recompute the authentication tag and check the integrity of the received packet as follows:
-                                                              $$\delta_0=HMAC(s_0,\beta_0)$$
-The integrity tag  encoded in the header allows checks only on whether the packet header was not also modified. 
-The authentication tags are computed by the sender of the packet and cover also the blindings that nodes add to the packet after transforming it for the next downstream node. This is possible as the sender knows all shared secrets and the blindings are generated pseudo-randomly by using the shared secrets.
+Each node along the path receives an authentication tag $\gamma_i$ in the form of a message authentication code (MAC)
+ which is encoded in the header and allows to check whether or not the header was modified which guarantees integrity.
 
 
 
