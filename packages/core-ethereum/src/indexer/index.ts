@@ -360,10 +360,7 @@ class Indexer extends EventEmitter implements IIndexer {
 
     await db.updateChannel(this.connector.db, channelId, channel)
 
-    this.emit('channelOpened', {
-      channelId,
-      channel
-    })
+    this.emit('channelOpened', channel)
 
     // log('Channel %s got opened by %s', chalk.green(channelId.toHex()), chalk.green(openerAddress.toHex()))
   }
@@ -423,10 +420,7 @@ class Indexer extends EventEmitter implements IIndexer {
 
     await db.updateChannel(this.connector.db, channelId, channel)
 
-    this.emit('channelClosed', {
-      channelId,
-      channel
-    })
+    this.emit('channelClosed', channel)
 
     // log('Channel %s got closed by %s', chalk.green(channelId.toHex()), chalk.green(closerAddress.toHex()))
   }

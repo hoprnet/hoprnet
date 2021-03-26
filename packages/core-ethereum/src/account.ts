@@ -360,7 +360,7 @@ export const getNativeBalance = async (
   }
 
   const value = await ethereum.getNativeBalance(web3, account)
-  cache.set('nativeBalance', { value: value.toString(), updatedAt: new Date().getTime() })
+  cache.set('nativeBalance', { value: value.toBN().toString(), updatedAt: new Date().getTime() })
 
   return value
 }

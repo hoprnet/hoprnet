@@ -1,5 +1,5 @@
-import type { ChannelUpdate } from '@hoprnet/hopr-core-connector-interface'
 import BN from 'bn.js'
+import chalk from 'chalk'
 import {
   Address,
   Balance,
@@ -49,28 +49,42 @@ class ChannelFactory {
     const self = new Public(this.coreConnector.account.keys.onChain.pubKey)
     const selfAddress = await self.toAddress()
 
-    indexer.on('channelOpened', async ({ partyA: _partyA, partyB: _partyB, channelEntry }: ChannelUpdate) => {
-      const partyA = new Public(_partyA)
-      const partyAAddress = await partyA.toAddress()
-      const partyB = new Public(_partyB)
+    indexer.on('channelOpened', async (channel: ChannelEntry) => {
+      const accountAPubKey = await this.coreConnector.indexer.getPublicKeyOf(channel.parties[0])
+      const accountBPubKey = await this.coreConnector.indexer.getPublicKeyOf(channel.parties[1])
+      if (!accountAPubKey || !accountBPubKey) {
+        log(chalk.red('Currently opening a channel with an unintialized account is not supported'))
+        return
+      }
+
+      const [partyA, partyB] = this.coreConnector.utils.isPartyA(channel.parties[0], channel.parties[1])
+        ? [accountAPubKey, accountBPubKey]
+        : [accountBPubKey, accountAPubKey]
 
       log('channelOpened', partyA.toHex(), partyB.toHex())
-      const isOurs = partyA.eq(self) || partyB.eq(self)
+      const isOurs = channel.parties[0].eq(selfAddress) || channel.parties[1].eq(selfAddress)
       if (!isOurs) return
 
-      await this.onOpen(isPartyA(selfAddress, partyAAddress) ? partyB : partyA, channelEntry as ChannelEntry)
+      await this.onOpen(isPartyA(selfAddress, await partyA.toAddress()) ? partyB : partyA, channel)
     })
 
-    indexer.on('channelClosed', async ({ partyA: _partyA, partyB: _partyB }: ChannelUpdate) => {
-      const partyA = new Public(_partyA)
-      const partyAAddress = await partyA.toAddress()
-      const partyB = new Public(_partyB)
+    indexer.on('channelClosed', async (channel: ChannelEntry) => {
+      const accountAPubKey = await this.coreConnector.indexer.getPublicKeyOf(channel.parties[0])
+      const accountBPubKey = await this.coreConnector.indexer.getPublicKeyOf(channel.parties[1])
+      if (!accountAPubKey || !accountBPubKey) {
+        log(chalk.red('Currently closing a channel with an unintialized account is not supported'))
+        return
+      }
+
+      const [partyA, partyB] = this.coreConnector.utils.isPartyA(channel.parties[0], channel.parties[1])
+        ? [accountAPubKey, accountBPubKey]
+        : [accountBPubKey, accountAPubKey]
 
       log('channelClosed', partyA.toHex(), partyB.toHex())
-      const isOurs = partyA.eq(self) || partyB.eq(self)
+      const isOurs = channel.parties[0].eq(selfAddress) || channel.parties[1].eq(selfAddress)
       if (!isOurs) return
 
-      await this.onClose(isPartyA(selfAddress, partyAAddress) ? partyB : partyA)
+      await this.onClose(isPartyA(selfAddress, await partyA.toAddress()) ? partyB : partyA)
     })
   }
 

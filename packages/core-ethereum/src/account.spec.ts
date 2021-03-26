@@ -4,6 +4,7 @@ import type CoreConnector from '.'
 import { expect } from 'chai'
 import Web3 from 'web3'
 import sinon from 'sinon'
+import BN from 'bn.js'
 import { getBalance, getNativeBalance } from './account'
 import { Ganache } from '@hoprnet/hopr-testing'
 import { migrate, getAddresses, abis } from '@hoprnet/hopr-ethereum'
@@ -62,13 +63,13 @@ describe('test Account', function () {
     it('should be 1 initially', async function () {
       const ticketEpoch = await coreConnector.account.ticketEpoch
 
-      expect(ticketEpoch.toString()).to.equal('1', 'initial ticketEpoch is wrong')
+      expect(ticketEpoch.toBN().toString()).to.equal('1', 'initial ticketEpoch is wrong')
     })
 
     it('should be 2 after setting new secret', async function () {
       const ticketEpoch = await coreConnector.account.ticketEpoch
 
-      expect(ticketEpoch.toString()).to.equal('2', 'ticketEpoch is wrong')
+      expect(ticketEpoch.toBN().toString()).to.equal('2', 'ticketEpoch is wrong')
     })
 
     it('should be 3 after reconnecting to web3', async function () {
@@ -80,7 +81,7 @@ describe('test Account', function () {
 
       const ticketEpoch = await coreConnector.account.ticketEpoch
 
-      expect(ticketEpoch.toString()).to.equal('3', 'ticketEpoch is wrong')
+      expect(ticketEpoch.toBN().toString()).to.equal('3', 'ticketEpoch is wrong')
     })
   })
 })
@@ -146,7 +147,7 @@ describe('test getNativeBalance', function () {
   const createWeb3 = (value: string): any => {
     return {
       eth: {
-        getBalance: async () => value
+        getBalance: async () => new BN(value)
       }
     }
   }
@@ -161,28 +162,28 @@ describe('test getNativeBalance', function () {
 
   it('should get balance but nothing is cached', async function () {
     const result = await getNativeBalance(createWeb3('10'), address, true)
-    expect(result.toString()).to.equal('10')
+    expect(result.toBN().toString()).to.equal('10')
   })
 
   it('should get balance', async function () {
     const result = await getNativeBalance(createWeb3('10'), address, false)
-    expect(result.toString()).to.equal('10')
+    expect(result.toBN().toString()).to.equal('10')
   })
 
   it('should get cached balance', async function () {
     const result = await getNativeBalance(createWeb3('20'), address, true)
-    expect(result.toString()).to.equal('10')
+    expect(result.toBN().toString()).to.equal('10')
   })
 
   it('should not get cached balance', async function () {
     const result = await getNativeBalance(createWeb3('20'), address, false)
-    expect(result.toString()).to.equal('20')
+    expect(result.toBN().toString()).to.equal('20')
   })
 
   it('should reset cache', async function () {
     clock.tick(WEB3_CACHE_TTL + 1)
 
     const result = await getNativeBalance(createWeb3('30'), address, true)
-    expect(result.toString()).to.equal('30')
+    expect(result.toBN().toString()).to.equal('30')
   })
 })

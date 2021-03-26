@@ -8,9 +8,6 @@ import { sign } from '../utils'
 import Web3 from 'web3'
 const web3 = new Web3()
 
-const EPOCH_SIZE = 3
-const UINT96_SIZE = 12
-
 /**
  * Given a message, prefix it with "\x19Ethereum Signed Message:\n" and return it's hash
  * @param msg the message to hash
@@ -50,13 +47,10 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
     if (struct) {
       this.set(struct.counterparty.serialize(), this.counterpartyOffset - this.byteOffset)
       this.set(struct.challenge, this.challengeOffset - this.byteOffset)
-      this.set(new Uint8Array(struct.epoch.toBN().toBuffer('be', EPOCH_SIZE)), this.epochOffset - this.byteOffset)
-      this.set(struct.amount.toUint96(), this.amountOffset - this.byteOffset)
+      this.set(struct.epoch.serialize(), this.epochOffset - this.byteOffset)
+      this.set(struct.amount.serialize(), this.amountOffset - this.byteOffset)
       this.set(struct.winProb, this.winProbOffset - this.byteOffset)
-      this.set(
-        new Uint8Array(struct.channelIteration.toBN().toBuffer('be', EPOCH_SIZE)),
-        this.channelIterationOffset - this.byteOffset
-      )
+      this.set(struct.channelIteration.serialize(), this.channelIterationOffset - this.byteOffset)
     }
   }
 
@@ -89,19 +83,19 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
   }
 
   get epoch(): UINT256 {
-    return new UINT256(new BN(new Uint8Array(this.buffer, this.epochOffset, EPOCH_SIZE)))
+    return new UINT256(new BN(new Uint8Array(this.buffer, this.epochOffset, UINT256.SIZE)))
   }
 
   get amountOffset(): number {
-    return this.byteOffset + Address.SIZE + Hash.SIZE + EPOCH_SIZE
+    return this.byteOffset + Address.SIZE + Hash.SIZE + UINT256.SIZE
   }
 
   get amount(): Balance {
-    return Balance.fromUint96(new Uint8Array(this.buffer, this.amountOffset, 12))
+    return new Balance(new BN(new Uint8Array(this.buffer, this.amountOffset, Balance.SIZE)))
   }
 
   get winProbOffset(): number {
-    return this.byteOffset + Address.SIZE + Hash.SIZE + EPOCH_SIZE + UINT96_SIZE
+    return this.byteOffset + Address.SIZE + Hash.SIZE + UINT256.SIZE + UINT256.SIZE
   }
 
   get winProb(): Hash {
@@ -109,19 +103,32 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
   }
 
   get channelIterationOffset(): number {
-    return this.byteOffset + Address.SIZE + Hash.SIZE + EPOCH_SIZE + UINT96_SIZE + Hash.SIZE
+    return this.byteOffset + Address.SIZE + Hash.SIZE + UINT256.SIZE + UINT256.SIZE + Hash.SIZE
   }
 
   get channelIteration(): UINT256 {
-    return new UINT256(new BN(new Uint8Array(this.buffer, this.channelIterationOffset, EPOCH_SIZE)))
+    return new UINT256(new BN(new Uint8Array(this.buffer, this.channelIterationOffset, UINT256.SIZE)))
   }
 
   get hash(): Promise<Hash> {
-    return Promise.resolve(toEthSignedMessageHash(u8aToHex(this)))
+    return Promise.resolve(
+      toEthSignedMessageHash(
+        u8aToHex(
+          u8aConcat(
+            this.counterparty.serialize(),
+            this.challenge.toU8a(),
+            this.epoch.serialize(),
+            this.amount.serialize(),
+            this.winProb.toU8a(),
+            this.channelIteration.serialize()
+          )
+        )
+      )
+    )
   }
 
   static get SIZE(): number {
-    return Address.SIZE + Hash.SIZE + EPOCH_SIZE + UINT96_SIZE + Hash.SIZE + EPOCH_SIZE
+    return Address.SIZE + Hash.SIZE + UINT256.SIZE + UINT256.SIZE + Hash.SIZE + UINT256.SIZE
   }
 
   getEmbeddedFunds(): Balance {

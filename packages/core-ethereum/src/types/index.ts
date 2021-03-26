@@ -52,17 +52,8 @@ class Balance implements Interfaces.Balance {
     return 18
   }
 
-  static fromUint96(arr: Uint8Array): Balance {
-    return new Balance(new BN(arr))
-  }
-
   public toBN(): BN {
     return this.bn
-  }
-
-  public toUint96() {
-    // Temp hack
-    return this.bn.toBuffer('be', 12)
   }
 
   public serialize(): Uint8Array {
@@ -90,17 +81,8 @@ class NativeBalance implements Interfaces.Balance {
     return 18
   }
 
-  static fromUint96(arr: Uint8Array): NativeBalance {
-    return new NativeBalance(new BN(arr))
-  }
-
   public toBN(): BN {
     return this.bn
-  }
-
-  public toUint96() {
-    // Temp hack
-    return this.bn.toBuffer('be', 12)
   }
 
   public serialize(): Uint8Array {
