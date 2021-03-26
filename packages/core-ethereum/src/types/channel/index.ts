@@ -7,8 +7,8 @@ import ChannelBalance from './channelBalance'
 
 enum ChannelStatus {
   CLOSED,
-  PENDING_TO_CLOSE,
-  OPEN
+  OPEN,
+  PENDING_TO_CLOSE
 }
 
 class Channel extends Uint8ArrayE implements Types.Channel {

@@ -1,7 +1,6 @@
 export type Account = {
   privKey: string
+  uncompressedPubKey: string
   pubKey: string
-  pubKeyFirstHalf: BN
-  pubKeySecondHalf: BN
   address: string
 }

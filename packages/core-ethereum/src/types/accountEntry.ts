@@ -1,7 +1,7 @@
 import type { Types as Interfaces } from '@hoprnet/hopr-core-connector-interface'
 import BN from 'bn.js'
 import { u8aSplit, serializeToU8a } from '@hoprnet/hopr-utils'
-import Address from './accountId'
+import { Address } from '.' // TODO: cyclic dep
 import Public from './public'
 import Hash from './hash'
 import { UINT256 } from './solidity'
@@ -28,10 +28,15 @@ class AccountEntry implements Interfaces.AccountEntry {
   }
 
   public serialize(): Uint8Array {
+    const publicKey = this.publicKey || new Public({ length: Public.SIZE })
+    const secret = this.secret || new Hash({ length: Hash.SIZE })
+    const counter = this.counter ? new UINT256(this.counter.toString()).toU8a() : new UINT256('0').toU8a()
+
     return serializeToU8a([
-      [this.publicKey, Public.SIZE],
-      [this.secret, Hash.SIZE],
-      [this.counter.toBuffer(), 1]
+      [this.address.serialize(), Address.SIZE],
+      [publicKey, Public.SIZE],
+      [secret, Hash.SIZE],
+      [counter, UINT256.SIZE]
     ])
   }
 

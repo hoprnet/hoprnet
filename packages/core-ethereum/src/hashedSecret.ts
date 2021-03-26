@@ -12,12 +12,11 @@ import type Account from './account'
 
 export const DB_ITERATION_BLOCK_SIZE = 10000
 export const TOTAL_ITERATIONS = 100000
-export const HASHED_SECRET_WIDTH = 27
 
 const log = Debug('hopr-core-ethereum:hashedSecret')
 
 export async function hashFunction(msg: Uint8Array): Promise<Uint8Array> {
-  return (await hashFunctionUtils(msg)).slice(0, HASHED_SECRET_WIDTH)
+  return await hashFunctionUtils(msg)
 }
 
 async function getFromDB<T>(db: LevelUp, key): Promise<T | undefined> {
@@ -55,7 +54,7 @@ class HashedSecret {
    * @returns a promise that resolves to the onChainSecret
    */
   private async createAndStoreSecretOffChainAndReturnOnChainSecret(debug: boolean): Promise<Hash> {
-    let onChainSecret = debug ? await this.getDebugAccountSecret() : new Hash(randomBytes(HASHED_SECRET_WIDTH))
+    let onChainSecret = debug ? await this.getDebugAccountSecret() : new Hash(randomBytes(Hash.SIZE))
 
     let dbBatch = this.db.batch()
     const result = await iterateHash(onChainSecret, hashFunction, TOTAL_ITERATIONS, DB_ITERATION_BLOCK_SIZE)
@@ -87,11 +86,7 @@ class HashedSecret {
                 from: address,
                 to: this.channels.options.address
               },
-              this.channels.methods.initializeAccount(
-                u8aToHex(uncompressedPubKey.slice(0, 32)),
-                u8aToHex(uncompressedPubKey.slice(32, 64)),
-                u8aToHex(secret)
-              )
+              this.channels.methods.initializeAccount(u8aToHex(uncompressedPubKey), u8aToHex(secret))
             )
           ).send()
         )
@@ -155,10 +150,8 @@ class HashedSecret {
    * @param hash the hash to find a preImage for
    */
   public async findPreImage(hash: Uint8Array): Promise<Intermediate> {
-    if (hash.length != HASHED_SECRET_WIDTH) {
-      throw Error(
-        `Invalid length. Expected a Uint8Array with ${HASHED_SECRET_WIDTH} elements but got one with ${hash.length}`
-      )
+    if (hash.length != Hash.SIZE) {
+      throw Error(`Invalid length. Expected a Uint8Array with ${Hash.SIZE} elements but got one with ${hash.length}`)
     }
 
     let result = await recoverIteratedHash(

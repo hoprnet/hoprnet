@@ -37,7 +37,7 @@ declare var Balance: BalanceStatic
 
 declare interface AccountEntryStatic {
   readonly SIZE: number
-  new (address: Address, publicKey?: Public, secret?: Hash, counter?: BN): Account
+  new (address: Address, publicKey?: Public, secret?: Hash, counter?: BN): AccountEntry
 }
 declare interface AccountEntry {
   address: Address

@@ -322,8 +322,7 @@ describe('HoprChannels intergration tests', function () {
   context('on a fresh channel', function () {
     it('should initialize accountA', async function () {
       const response = await hoprChannels.initializeAccount(
-        ACCOUNT_A.pubKeyFirstHalf,
-        ACCOUNT_A.pubKeySecondHalf,
+        ACCOUNT_A.uncompressedPubKey,
         SECRET_2,
         {
           from: ACCOUNT_A.address
@@ -332,8 +331,7 @@ describe('HoprChannels intergration tests', function () {
 
       expectEvent(response, 'AccountInitialized', {
         account: ACCOUNT_A.address,
-        pubKeyFirstHalf: ACCOUNT_A.pubKeyFirstHalf,
-        pubKeySecondHalf: ACCOUNT_A.pubKeySecondHalf,
+        uncompressedPubKey: ACCOUNT_A.uncompressedPubKey,
         secret: SECRET_2
       })
 
@@ -344,8 +342,7 @@ describe('HoprChannels intergration tests', function () {
 
     it('should initialize accountB', async function () {
       const response = await hoprChannels.initializeAccount(
-        ACCOUNT_B.pubKeyFirstHalf,
-        ACCOUNT_B.pubKeySecondHalf,
+        ACCOUNT_B.uncompressedPubKey,
         SECRET_2,
         {
           from: ACCOUNT_B.address
@@ -354,8 +351,7 @@ describe('HoprChannels intergration tests', function () {
 
       expectEvent(response, 'AccountInitialized', {
         account: ACCOUNT_B.address,
-        pubKeyFirstHalf: ACCOUNT_B.pubKeyFirstHalf,
-        pubKeySecondHalf: ACCOUNT_B.pubKeySecondHalf,
+        uncompressedPubKey: ACCOUNT_B.uncompressedPubKey,
         secret: SECRET_2
       })
 

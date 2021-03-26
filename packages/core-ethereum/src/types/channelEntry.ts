@@ -1,7 +1,7 @@
 import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import BN from 'bn.js'
 import { u8aSplit, serializeToU8a, toU8a } from '@hoprnet/hopr-utils'
-import Address from './accountId'
+import { Address } from '.' // TODO: cyclic
 import { UINT256 } from '../types/solidity'
 import { ChannelStatus } from '../types/channel'
 import { stateCounterToStatus, stateCounterToIteration } from '../utils'
@@ -18,6 +18,22 @@ class ChannelEntry implements Types.ChannelEntry {
     public readonly openedAt: BN,
     public readonly closedAt: BN
   ) {}
+
+  // TODO: implement .fromObject function
+
+  static get SIZE(): number {
+    return (
+      Address.SIZE +
+      Address.SIZE +
+      UINT256.SIZE +
+      UINT256.SIZE +
+      UINT256.SIZE +
+      UINT256.SIZE +
+      1 +
+      UINT256.SIZE +
+      UINT256.SIZE
+    )
+  }
 
   static deserialize(arr: Uint8Array) {
     const items = u8aSplit(arr, [
@@ -56,11 +72,13 @@ class ChannelEntry implements Types.ChannelEntry {
     return serializeToU8a([
       [this.parties[0].serialize(), Address.SIZE],
       [this.parties[1].serialize(), Address.SIZE],
-      [this.deposit.toBuffer(), UINT256.SIZE],
-      [this.partyABalance.toBuffer(), UINT256.SIZE],
-      [this.closureTime.toBuffer(), UINT256.SIZE],
-      [this.stateCounter.toBuffer(), UINT256.SIZE],
-      [toU8a(Number(this.closureByPartyA)), 1]
+      [new UINT256(this.deposit.toString()).toU8a(), UINT256.SIZE],
+      [new UINT256(this.partyABalance.toString()).toU8a(), UINT256.SIZE],
+      [new UINT256(this.closureTime.toString()).toU8a(), UINT256.SIZE],
+      [new UINT256(this.stateCounter.toString()).toU8a(), UINT256.SIZE],
+      [toU8a(Number(this.closureByPartyA)), 1],
+      [new UINT256(this.openedAt.toString()).toU8a(), UINT256.SIZE],
+      [new UINT256(this.closedAt.toString()).toU8a(), UINT256.SIZE]
     ])
   }
 

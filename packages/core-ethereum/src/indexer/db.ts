@@ -11,7 +11,7 @@ const createAccountKey = (address: Address): Uint8Array => encoder.encode(`index
 
 /**
  * Queries the database to find the latest known block number.
- * @param connector
+ * @param db
  * @returns promise that resolves to a number
  */
 export const getLatestBlockNumber = async (db: LevelUp): Promise<number> => {
@@ -28,7 +28,7 @@ export const getLatestBlockNumber = async (db: LevelUp): Promise<number> => {
 
 /**
  * Updates the database with the latest known block number.
- * @param connector
+ * @param db
  * @param blockNumber
  */
 export const updateLatestBlockNumber = async (db: LevelUp, blockNumber: BN): Promise<void> => {
@@ -37,23 +37,16 @@ export const updateLatestBlockNumber = async (db: LevelUp, blockNumber: BN): Pro
 
 /**
  * Queries the database to find the latest confirmed snapshot.
- * @param connector
+ * @param db
  * @returns promise that resolves to a snapshot
  */
-export const getLatestConfirmedSnapshot = async (db: LevelUp): Promise<Snapshot> => {
+export const getLatestConfirmedSnapshot = async (db: LevelUp): Promise<Snapshot | undefined> => {
   try {
     const result = (await db.get(Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY))) as Uint8Array
-    return new Snapshot({
-      bytes: result,
-      offset: result.byteOffset
-    })
+    return Snapshot.deserialize(result)
   } catch (err) {
     if (err.notFound) {
-      return new Snapshot(undefined, {
-        blockNumber: new BN(0),
-        transactionIndex: new BN(0),
-        logIndex: new BN(0)
-      })
+      return undefined
     }
 
     throw err
@@ -61,8 +54,17 @@ export const getLatestConfirmedSnapshot = async (db: LevelUp): Promise<Snapshot>
 }
 
 /**
+ * Update latest confirmed snapshot.
+ * @param db
+ * @param snapshot
+ */
+export const updateLatestConfirmedSnapshot = async (db: LevelUp, snapshot: Snapshot): Promise<void> => {
+  await db.put(Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY), Buffer.from(snapshot.serialize()))
+}
+
+/**
  * Queries the database to find the channel entry
- * @param connector
+ * @param db
  * @param address
  */
 export const getChannel = async (db: LevelUp, channelId: Hash): Promise<ChannelEntry | undefined> => {
@@ -112,7 +114,7 @@ export const getChannels = async (
 /**
  * Adds or updates the channel entry in the database.
  * Adds or updates latest confirmed snapshot.
- * @param connector
+ * @param db
  * @param address
  * @param channelEntry
  */
@@ -122,7 +124,7 @@ export const updateChannel = async (db: LevelUp, channelId: Hash, channel: Chann
 
 /**
  * Queries the database to find an account
- * @param connector
+ * @param db
  * @param address
  * @returns Account
  */
@@ -148,7 +150,7 @@ export const getAccount = async (db: LevelUp, address: Address): Promise<Account
 /**
  * Adds or updates the channel entry in the database.
  * Adds or updates latest confirmed snapshot.
- * @param connector
+ * @param db
  * @param partyA
  * @param partyB
  * @param channelEntry

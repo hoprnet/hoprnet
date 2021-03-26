@@ -14,7 +14,7 @@
     "migrate": "hardhat deploy",
     "network": "hardhat node",
     "test": "hardhat test",
-    "coverage": "hardhat coverage --network hardhat",
+    "coverage": "hardhat coverage",
     "prepublishOnly": "yarn build"
   },
   "files": [

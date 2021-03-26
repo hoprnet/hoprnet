@@ -9,14 +9,12 @@ contract TicketsMock is HoprChannels {
 
     function initializeAccountInternal(
         address sender,
-        uint256 pubKeyFirstHalf,
-        uint256 pubKeySecondHalf,
+        bytes calldata uncompressedPubKey,
         bytes32 secret
     ) external {
         _initializeAccount(
             sender,
-            pubKeyFirstHalf,
-            pubKeySecondHalf,
+            uncompressedPubKey,
             secret
         );
     }

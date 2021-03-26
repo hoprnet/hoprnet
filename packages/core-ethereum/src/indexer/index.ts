@@ -31,7 +31,6 @@ let genesisBlock: number
 class Indexer extends EventEmitter implements IIndexer {
   public status: 'started' | 'restarting' | 'stopped' = 'stopped'
   public latestBlock: number = 0 // latest known on-chain block number
-  private publicKeys = new Map<string, Public>() // TODO: maybe we dont need this
   private newBlocksSubscription: Subscription<any>
   private newHoprChannelsEvents: ContractEventEmitter<any>
   private unconfirmedEvents = new Heap<Event<any>>(snapshotComparator)
@@ -78,7 +77,7 @@ class Indexer extends EventEmitter implements IIndexer {
       getSyncPercentage(fromBlock - genesisBlock, latestOnChainBlock - genesisBlock)
     )
 
-    // get past logs
+    // get past events
     const lastBlock = await this.processPastEvents(fromBlock, latestOnChainBlock, BLOCK_RANGE)
     fromBlock = lastBlock
 
@@ -252,43 +251,48 @@ class Indexer extends EventEmitter implements IIndexer {
       log('Processing event %s', event.event)
       // log(chalk.blue(event.blockNumber.toString(), event.transactionIndex.toString(), event.logIndex.toString()))
 
-      const lastSnapshotComparison = snapshotComparator(event, {
-        blockNumber: lastSnapshot.blockNumber.toNumber(),
-        logIndex: lastSnapshot.logIndex.toNumber(),
-        transactionIndex: lastSnapshot.transactionIndex.toNumber()
-      })
+      // if we find a previous snapshot, compare event's snapshot with last processed
+      if (lastSnapshot) {
+        const lastSnapshotComparison = snapshotComparator(event, {
+          blockNumber: lastSnapshot.blockNumber.toNumber(),
+          logIndex: lastSnapshot.logIndex.toNumber(),
+          transactionIndex: lastSnapshot.transactionIndex.toNumber()
+        })
 
-      // check if this is a duplicate or older than last snapshot
-      // ideally we would have detected if this snapshot was indeed processed,
-      // at the moment we don't keep all events stored as we intend to keep
-      // this indexer very simple
-      if (lastSnapshotComparison === 0 || lastSnapshotComparison < 0) {
-        continue
+        // check if this is a duplicate or older than last snapshot
+        // ideally we would have detected if this snapshot was indeed processed,
+        // at the moment we don't keep all events stored as we intend to keep
+        // this indexer very simple
+        if (lastSnapshotComparison === 0 || lastSnapshotComparison < 0) {
+          continue
+        }
       }
 
       const eventName = event.event as EventNames
 
-      if (eventName === 'AccountInitialized') {
-        await this.onAccountInitialized(event as Event<'AccountInitialized'>)
-      } else if (eventName === 'AccountSecretUpdated') {
-        await this.onAccountSecretUpdated(event as Event<'AccountSecretUpdated'>)
-      } else if (eventName === 'ChannelFunded') {
-        await this.onChannelFunded(event as Event<'ChannelFunded'>)
-      } else if (eventName === 'ChannelOpened') {
-        await this.onChannelOpened(event as Event<'ChannelOpened'>)
-      } else if (eventName === 'TicketRedeemed') {
-        await this.onTicketRedeemed(event as Event<'TicketRedeemed'>)
-      } else if (eventName === 'ChannelPendingToClose') {
-        await this.onChannelPendingToClose(event as Event<'ChannelPendingToClose'>)
-      } else if (eventName === 'ChannelClosed') {
-        await this.onChannelClosed(event as Event<'ChannelClosed'>)
+      try {
+        if (eventName === 'AccountInitialized') {
+          await this.onAccountInitialized(event as Event<'AccountInitialized'>)
+        } else if (eventName === 'AccountSecretUpdated') {
+          await this.onAccountSecretUpdated(event as Event<'AccountSecretUpdated'>)
+        } else if (eventName === 'ChannelFunded') {
+          await this.onChannelFunded(event as Event<'ChannelFunded'>)
+        } else if (eventName === 'ChannelOpened') {
+          await this.onChannelOpened(event as Event<'ChannelOpened'>)
+        } else if (eventName === 'TicketRedeemed') {
+          await this.onTicketRedeemed(event as Event<'TicketRedeemed'>)
+        } else if (eventName === 'ChannelPendingToClose') {
+          await this.onChannelPendingToClose(event as Event<'ChannelPendingToClose'>)
+        } else if (eventName === 'ChannelClosed') {
+          await this.onChannelClosed(event as Event<'ChannelClosed'>)
+        }
+      } catch (err) {
+        log(chalk.red('Error while reducing event'))
+        throw err
       }
 
-      lastSnapshot = new Snapshot(undefined, {
-        blockNumber: new BN(event.blockNumber),
-        transactionIndex: new BN(event.transactionIndex),
-        logIndex: new BN(event.logIndex)
-      })
+      lastSnapshot = new Snapshot(new BN(event.blockNumber), new BN(event.transactionIndex), new BN(event.logIndex))
+      await db.updateLatestConfirmedSnapshot(this.connector.db, lastSnapshot)
     }
 
     await db.updateLatestBlockNumber(this.connector.db, new BN(block.number))
@@ -316,10 +320,7 @@ class Indexer extends EventEmitter implements IIndexer {
     const accountId = Address.fromString(data.account)
 
     const storedAccount = await db.getAccount(this.connector.db, accountId)
-    if (!storedAccount) {
-      log(chalk.red('Could not find stored account %s !'), accountId.toHex())
-      return
-    }
+    if (!storedAccount) throw Error(`Could not find stored account ${accountId.toHex()} !`)
 
     const account = await reducers.onAccountSecretUpdated(event, storedAccount)
 
@@ -353,10 +354,7 @@ class Indexer extends EventEmitter implements IIndexer {
     // log('Processing event %s with channelId %s', event.name, channelId.toHex())
 
     let storedChannel = await db.getChannel(this.connector.db, channelId)
-    if (!storedChannel) {
-      log(chalk.red('Could not find stored channel %s !'), channelId.toHex())
-      return
-    }
+    if (!storedChannel) throw Error(`Could not find stored channel ${channelId.toHex()}`)
 
     const channel = await reducers.onChannelOpened(event, storedChannel)
 
@@ -379,10 +377,7 @@ class Indexer extends EventEmitter implements IIndexer {
     // log('Processing event %s with channelId %s', event.name, channelId.toHex())
 
     const storedChannel = await db.getChannel(this.connector.db, channelId)
-    if (!storedChannel) {
-      log(chalk.red('Could not find stored channel %s !'), channelId.toHex())
-      return
-    }
+    if (!storedChannel) throw Error(`Could not find stored channel ${channelId.toHex()}`)
 
     const channel = await reducers.onTicketRedeemed(event, storedChannel)
 
@@ -400,10 +395,7 @@ class Indexer extends EventEmitter implements IIndexer {
     // log('Processing event %s with channelId %s', event.name, channelId.toHex())
 
     const storedChannel = await db.getChannel(this.connector.db, channelId)
-    if (!storedChannel) {
-      log(chalk.red('Could not find stored channel %s !'), channelId.toHex())
-      return
-    }
+    if (!storedChannel) throw Error(`Could not find stored channel ${channelId.toHex()}`)
 
     const channel = await reducers.onChannelPendingToClose(event, storedChannel)
 
@@ -425,10 +417,7 @@ class Indexer extends EventEmitter implements IIndexer {
     // log('Processing event %s with channelId %s', event.name, channelId.toHex())
 
     const storedChannel = await db.getChannel(this.connector.db, channelId)
-    if (!storedChannel) {
-      log(chalk.red('Could not find stored channel %s !'), channelId.toHex())
-      return
-    }
+    if (!storedChannel) throw Error(`Could not find stored channel ${channelId.toHex()}`)
 
     const channel = await reducers.onChannelClosed(event, storedChannel)
 
@@ -463,13 +452,8 @@ class Indexer extends EventEmitter implements IIndexer {
 
   // routing
   public async getPublicKeyOf(address: Address): Promise<Public | undefined> {
-    if (this.publicKeys.has(address.toHex())) {
-      return this.publicKeys.get(address.toHex())
-    }
-
     const account = await db.getAccount(this.connector.db, address)
     if (account && account.publicKey) {
-      this.publicKeys.set(address.toHex(), account.publicKey)
       return account.publicKey
     }
 

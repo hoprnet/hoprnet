@@ -1,18 +1,18 @@
 import type { Event } from './types'
 import assert from 'assert'
 import BN from 'bn.js'
-import Web3 from 'web3'
+import { publicKeyConvert } from 'secp256k1'
+import { stringToU8a } from '@hoprnet/hopr-utils'
 import { AccountEntry, Address, Public, Hash, ChannelEntry } from '../types'
 import { isPartyA } from '../utils'
-
-const { hexToBytes, hexToNumberString } = Web3.utils
 
 export const onAccountInitialized = async (event: Event<'AccountInitialized'>): Promise<AccountEntry> => {
   const data = event.returnValues
   const address = Address.fromString(data.account)
-  const pubKey = new Public([...hexToBytes(data.pubKeyFirstHalf), ...hexToBytes(data.pubKeySecondHalf)])
-  const secret = new Hash(hexToBytes(data.secret))
-  const counter = new BN(0)
+  // library requires identifier TODO: investigate why
+  const pubKey = new Public(publicKeyConvert(stringToU8a('0x04' + data.uncompressedPubKey.slice(2)), true))
+  const secret = new Hash(stringToU8a(data.secret))
+  const counter = new BN(1)
 
   return new AccountEntry(address, pubKey, secret, counter)
 }
@@ -24,8 +24,8 @@ export const onAccountSecretUpdated = async (
   assert(storedAccount.isInitialized(), "'onAccountSecretUpdated' failed because account is not initialized")
 
   const data = event.returnValues
-  const secret = new Hash(hexToBytes(data.secret))
-  const counter = new BN(hexToNumberString(data.secret)) // TODO: depend on indexer to increment this
+  const secret = new Hash(stringToU8a(data.secret))
+  const counter = new BN(data.counter) // TODO: depend on indexer to increment this
 
   return new AccountEntry(storedAccount.address, storedAccount.publicKey, secret, counter)
 }
@@ -44,7 +44,7 @@ export const onChannelFunded = async (
     const deposit = channelEntry.deposit.add(new BN(data.deposit))
     const partyABalance = channelEntry.partyABalance.add(new BN(data.partyABalance))
     const closureTime = new BN(0)
-    const stateCounter = status === 'FUNDED' ? channelEntry.stateCounter : channelEntry.stateCounter.addn(1)
+    const stateCounter = channelEntry.stateCounter
     const closureByPartyA = false
 
     return new ChannelEntry(
@@ -61,7 +61,7 @@ export const onChannelFunded = async (
     const deposit = new BN(data.deposit)
     const partyABalance = new BN(data.partyABalance)
     const closureTime = new BN(0)
-    const stateCounter = new BN(1)
+    const stateCounter = new BN(0)
     const closureByPartyA = false
     const openedAt = new BN(0)
     const closedAt = new BN(0)
@@ -112,13 +112,12 @@ export const onTicketRedeemed = async (
   const redeemer = Address.fromString(data.redeemer)
   const counterparty = Address.fromString(data.counterparty)
   const isRedeemerPartyA = isPartyA(redeemer, counterparty)
+  const amount = new BN(data.amount)
 
   return new ChannelEntry(
     channelEntry.parties,
     channelEntry.deposit,
-    isRedeemerPartyA
-      ? channelEntry.partyABalance.add(new BN(data.amount))
-      : channelEntry.partyABalance.sub(new BN(data.amount)),
+    isRedeemerPartyA ? channelEntry.partyABalance.add(amount) : channelEntry.partyABalance.sub(amount),
     channelEntry.closureTime,
     channelEntry.stateCounter,
     false,
@@ -145,7 +144,7 @@ export const onChannelPendingToClose = async (
     channelEntry.parties,
     channelEntry.deposit,
     channelEntry.partyABalance,
-    new BN(hexToNumberString(data.closureTime)),
+    new BN(data.closureTime),
     channelEntry.stateCounter.addn(1),
     isInitiatorPartyA,
     channelEntry.openedAt,
@@ -167,7 +166,7 @@ export const onChannelClosed = async (
     new BN(0),
     new BN(0),
     new BN(0),
-    channelEntry.stateCounter.addn(7),
+    channelEntry.stateCounter.addn(8),
     false,
     channelEntry.openedAt,
     new BN(String(event.blockNumber))

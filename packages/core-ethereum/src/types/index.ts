@@ -1,4 +1,4 @@
-import AccountEntry from './account'
+import AccountEntry from './accountEntry'
 import AcknowledgedTicket from './acknowledgedTicket'
 import { Channel, ChannelBalance, ChannelState } from './channel'
 import ChannelEntry from './channelEntry'

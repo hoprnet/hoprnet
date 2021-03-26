@@ -23,17 +23,11 @@ describe('Accounts', function () {
   it('should initialize account', async function () {
     const { accounts } = await useFixtures()
 
-    const response = await accounts.initializeAccountInternal(
-      ACCOUNT_A.address,
-      ACCOUNT_A.pubKeyFirstHalf,
-      ACCOUNT_A.pubKeySecondHalf,
-      SECRET_2
-    )
+    const response = await accounts.initializeAccountInternal(ACCOUNT_A.address, ACCOUNT_A.uncompressedPubKey, SECRET_2)
 
     expectEvent(response, 'AccountInitialized', {
       account: ACCOUNT_A.address,
-      pubKeyFirstHalf: ACCOUNT_A.pubKeyFirstHalf,
-      pubKeySecondHalf: ACCOUNT_A.pubKeySecondHalf,
+      uncompressedPubKey: ACCOUNT_A.uncompressedPubKey,
       secret: SECRET_2
     })
 
@@ -47,12 +41,7 @@ describe('Accounts', function () {
 
     // give wrong public key
     await expectRevert(
-      accounts.initializeAccountInternal(
-        ACCOUNT_A.address,
-        ACCOUNT_B.pubKeyFirstHalf,
-        ACCOUNT_B.pubKeySecondHalf,
-        SECRET_1
-      ),
+      accounts.initializeAccountInternal(ACCOUNT_A.address, ACCOUNT_B.uncompressedPubKey, SECRET_1),
       vmErrorMessage('public key does not match account')
     )
   })
@@ -60,12 +49,7 @@ describe('Accounts', function () {
   it("should update account's secret", async function () {
     const { accounts } = await useFixtures()
 
-    await accounts.initializeAccountInternal(
-      ACCOUNT_A.address,
-      ACCOUNT_A.pubKeyFirstHalf,
-      ACCOUNT_A.pubKeySecondHalf,
-      SECRET_2
-    )
+    await accounts.initializeAccountInternal(ACCOUNT_A.address, ACCOUNT_A.uncompressedPubKey, SECRET_2)
 
     const response = await accounts.updateAccountSecretInternal(ACCOUNT_A.address, SECRET_1)
 
@@ -82,12 +66,7 @@ describe('Accounts', function () {
   it("should fail to update account's secret when secret is empty", async function () {
     const { accounts } = await useFixtures()
 
-    await accounts.initializeAccountInternal(
-      ACCOUNT_A.address,
-      ACCOUNT_A.pubKeyFirstHalf,
-      ACCOUNT_A.pubKeySecondHalf,
-      SECRET_1
-    )
+    await accounts.initializeAccountInternal(ACCOUNT_A.address, ACCOUNT_A.uncompressedPubKey, SECRET_1)
 
     // give empty SECRET
     await expectRevert(
@@ -99,12 +78,7 @@ describe('Accounts', function () {
   it("should fail to update account's secret when secret is the same as before", async function () {
     const { accounts } = await useFixtures()
 
-    await accounts.initializeAccountInternal(
-      ACCOUNT_A.address,
-      ACCOUNT_A.pubKeyFirstHalf,
-      ACCOUNT_A.pubKeySecondHalf,
-      SECRET_1
-    )
+    await accounts.initializeAccountInternal(ACCOUNT_A.address, ACCOUNT_A.uncompressedPubKey, SECRET_1)
 
     // give same SECRET
     await expectRevert(

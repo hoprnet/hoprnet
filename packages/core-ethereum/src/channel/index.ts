@@ -125,8 +125,8 @@ class ChannelFactory {
               this.coreConnector.hoprChannels.options.address,
               amount.toBN().toString(),
               this.coreConnector.web3.eth.abi.encodeParameters(
-                ['address', 'address'],
-                [(await account.address).toHex(), counterparty.toHex()]
+                ['bool', 'address', 'address'],
+                [false, (await account.address).toHex(), counterparty.toHex()]
               )
             )
           )

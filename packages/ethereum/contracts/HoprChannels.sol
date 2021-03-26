@@ -89,8 +89,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     event AccountInitialized(
         // @TODO: remove this and rely on `msg.sender`
         address indexed account,
-        uint256 pubKeyFirstHalf,
-        uint256 pubKeySecondHalf,
+        bytes uncompressedPubKey,
         bytes32 secret
     );
 
@@ -154,18 +153,15 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
      * stores it's public key, secret and counter,
      * then emits {AccountInitialized} and {AccountSecretUpdated} events.
      * @param secret account's secret
-     * @param pubKeyFirstHalf first half of the public key
-     * @param pubKeySecondHalf second half of the public key
+     * @param uncompressedPubKey account's uncompressedPubKey
      */
     function initializeAccount(
-        uint256 pubKeyFirstHalf,
-        uint256 pubKeySecondHalf,
+        bytes calldata uncompressedPubKey,
         bytes32 secret
     ) external {
         _initializeAccount(
             msg.sender,
-            pubKeyFirstHalf,
-            pubKeySecondHalf,
+            uncompressedPubKey,
             secret
         );
     }
@@ -390,33 +386,25 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
      * stores it's public key, secret and counter,
      * then emits {AccountInitialized} and {AccountSecretUpdated} events.
      * @param account the address of the account
-     * @param pubKeyFirstHalf first half of the public key
-     * @param pubKeySecondHalf second half of the public key
+     * @param uncompressedPubKey the public key of the account
      * @param secret account's secret
      */
     function _initializeAccount(
         address account,
-        uint256 pubKeyFirstHalf,
-        uint256 pubKeySecondHalf,
+        bytes memory uncompressedPubKey,
         bytes32 secret
     ) internal {
         Account storage accountData = accounts[account];
 
         require(account != address(0), "account must not be empty");
+        require(ECDSA.uncompressedPubKeyToAddress(uncompressedPubKey) == account, "public key does not match account");
         require(accountData.counter == 0, "account already initialized");
-        require(pubKeyFirstHalf != uint256(0), "pubKeyFirstHalf must not be empty");
-        require(pubKeySecondHalf != uint256(0), "pubKeySecondHalf must not be empty");
         require(secret != bytes32(0), "secret must not be empty");
-
-        require(
-            ECDSA.pubKeyToEthereumAddress(pubKeyFirstHalf, pubKeySecondHalf) == account,
-            "public key does not match account"
-        );
 
         accountData.secret = secret;
         accountData.counter = 1;
 
-        emit AccountInitialized(account, pubKeyFirstHalf, pubKeySecondHalf, secret);
+        emit AccountInitialized(account, uncompressedPubKey, secret);
     }
 
     /**

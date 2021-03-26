@@ -9,5 +9,11 @@ import type { HoprChannels } from '../tsc/web3/HoprChannels'
 type ContractEventEmitters<T extends EventNames> = ReturnType<HoprChannels['events'][T]>
 type extractGeneric<Type> = Type extends ContractEventEmitter<infer X> ? X : null
 
+/**
+ * HoprChannel's event names
+ */
 export type EventNames = Exclude<keyof HoprChannels['events'], 'allEvents'>
+/**
+ * HoprChannel's event interface
+ */
 export type Event<N extends EventNames> = ContractEventLog<extractGeneric<ContractEventEmitters<N>>>

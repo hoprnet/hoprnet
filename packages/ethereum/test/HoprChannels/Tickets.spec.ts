@@ -38,12 +38,7 @@ describe('Tickets', function () {
   it('should redeem ticket', async function () {
     const { tickets, deployer } = await useFixtures()
 
-    await tickets.initializeAccountInternal(
-      ACCOUNT_B.address,
-      ACCOUNT_B.pubKeyFirstHalf,
-      ACCOUNT_B.pubKeySecondHalf,
-      SECRET_2
-    )
+    await tickets.initializeAccountInternal(ACCOUNT_B.address, ACCOUNT_B.uncompressedPubKey, SECRET_2)
     await tickets.fundChannelInternal(deployer, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
     await tickets.openChannelInternal(ACCOUNT_A.address, ACCOUNT_B.address)
 
@@ -77,12 +72,7 @@ describe('Tickets', function () {
   it('should fail to redeem ticket when channel in closed', async function () {
     const { tickets } = await useFixtures()
 
-    await tickets.initializeAccountInternal(
-      ACCOUNT_B.address,
-      ACCOUNT_B.pubKeyFirstHalf,
-      ACCOUNT_B.pubKeySecondHalf,
-      SECRET_2
-    )
+    await tickets.initializeAccountInternal(ACCOUNT_B.address, ACCOUNT_B.uncompressedPubKey, SECRET_2)
 
     await expectRevert(
       tickets.redeemTicketInternal(
@@ -103,12 +93,7 @@ describe('Tickets', function () {
   it('should fail to redeem ticket when channel in in different iteration', async function () {
     const { token, tickets, deployer } = await useFixtures()
 
-    await tickets.initializeAccountInternal(
-      ACCOUNT_B.address,
-      ACCOUNT_B.pubKeyFirstHalf,
-      ACCOUNT_B.pubKeySecondHalf,
-      SECRET_2
-    )
+    await tickets.initializeAccountInternal(ACCOUNT_B.address, ACCOUNT_B.uncompressedPubKey, SECRET_2)
 
     // transfer tokens to contract
     await token.send(
@@ -149,12 +134,7 @@ describe('Tickets', function () {
   it('should fail to redeem ticket when ticket has been already redeemed', async function () {
     const { tickets, deployer } = await useFixtures()
 
-    await tickets.initializeAccountInternal(
-      ACCOUNT_B.address,
-      ACCOUNT_B.pubKeyFirstHalf,
-      ACCOUNT_B.pubKeySecondHalf,
-      SECRET_2
-    )
+    await tickets.initializeAccountInternal(ACCOUNT_B.address, ACCOUNT_B.uncompressedPubKey, SECRET_2)
     await tickets.fundChannelInternal(deployer, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
     await tickets.openChannelInternal(ACCOUNT_A.address, ACCOUNT_B.address)
 
@@ -189,12 +169,7 @@ describe('Tickets', function () {
   it('should fail to redeem ticket when signer is not the issuer', async function () {
     const { tickets, deployer } = await useFixtures()
 
-    await tickets.initializeAccountInternal(
-      ACCOUNT_B.address,
-      ACCOUNT_B.pubKeyFirstHalf,
-      ACCOUNT_B.pubKeySecondHalf,
-      SECRET_2
-    )
+    await tickets.initializeAccountInternal(ACCOUNT_B.address, ACCOUNT_B.uncompressedPubKey, SECRET_2)
     await tickets.fundChannelInternal(deployer, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
     await tickets.openChannelInternal(ACCOUNT_A.address, ACCOUNT_B.address)
 
@@ -217,12 +192,7 @@ describe('Tickets', function () {
   it("should fail to redeem ticket if it's a loss", async function () {
     const { tickets, deployer } = await useFixtures()
 
-    await tickets.initializeAccountInternal(
-      ACCOUNT_B.address,
-      ACCOUNT_B.pubKeyFirstHalf,
-      ACCOUNT_B.pubKeySecondHalf,
-      SECRET_2
-    )
+    await tickets.initializeAccountInternal(ACCOUNT_B.address, ACCOUNT_B.uncompressedPubKey, SECRET_2)
     await tickets.fundChannelInternal(deployer, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
     await tickets.openChannelInternal(ACCOUNT_A.address, ACCOUNT_B.address)
 

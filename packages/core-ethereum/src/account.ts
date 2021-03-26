@@ -9,7 +9,6 @@ import NonceTracker from './nonce-tracker'
 import TransactionManager from './transaction-manager'
 import { Address, AcknowledgedTicket, Balance, Hash, NativeBalance, TicketEpoch } from './types'
 import { isWinningTicket, pubKeyToAddress, isGanache, getNetworkGasPrice } from './utils'
-import { HASHED_SECRET_WIDTH } from './hashedSecret'
 import { WEB3_CACHE_TTL } from './constants'
 import * as ethereum from './ethereum'
 import BN from 'bn.js'
@@ -17,7 +16,7 @@ import BN from 'bn.js'
 import debug from 'debug'
 const log = debug('hopr-core-ethereum:account')
 
-export const EMPTY_HASHED_SECRET = new Uint8Array(HASHED_SECRET_WIDTH).fill(0x00)
+export const EMPTY_HASHED_SECRET = new Uint8Array(Hash.SIZE).fill(0x00)
 const cache = new Map<'balance' | 'nativeBalance', { value: string; updatedAt: number }>()
 
 class Account {

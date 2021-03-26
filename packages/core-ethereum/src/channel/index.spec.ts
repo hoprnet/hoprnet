@@ -3,7 +3,7 @@ import { Ganache } from '@hoprnet/hopr-testing'
 import { migrate } from '@hoprnet/hopr-ethereum'
 import assert from 'assert'
 import { stringToU8a, u8aEquals, u8aConcat, durations } from '@hoprnet/hopr-utils'
-import { addresses, abis } from '@hoprnet/hopr-ethereum'
+import { getAddresses, abis } from '@hoprnet/hopr-ethereum'
 import { getPrivKeyData, createAccountAndFund, createNode } from '../utils/testing.spec'
 import { createChallenge, hash } from '../utils'
 import BN from 'bn.js'
@@ -22,7 +22,7 @@ const HoprTokenAbi = abis.HoprToken
 const DEFAULT_WIN_PROB = 1
 
 // @TODO: rewrite legacy tests
-describe('test Channel class', function () {
+describe.only('test Channel class', function () {
   const ganache = new Ganache()
 
   let web3: Web3
@@ -59,7 +59,7 @@ describe('test Channel class', function () {
     await migrate()
 
     web3 = new Web3(configs.DEFAULT_URI)
-    hoprToken = new web3.eth.Contract(HoprTokenAbi as any, addresses?.localhost?.HoprToken)
+    hoprToken = new web3.eth.Contract(HoprTokenAbi as any, getAddresses()?.localhost?.HoprToken)
   })
 
   after(async function () {
@@ -139,7 +139,7 @@ describe('test Channel class', function () {
     const firstTicket = await getTicketData({
       counterparty: myAddress
     })
-    const firstAckedTicket = new AcknowledgedTicket(coreConnector, undefined, {
+    const firstAckedTicket = new AcknowledgedTicket(undefined, {
       response: firstTicket.response
     })
     const signedTicket = await channel.ticket.create(
@@ -235,7 +235,7 @@ describe('test Channel class', function () {
         counterparty: counterpartyAddress,
         winProb: 0.5
       })
-      let ackedTicket = new AcknowledgedTicket(counterpartysCoreConnector, undefined, {
+      let ackedTicket = new AcknowledgedTicket(undefined, {
         response: ticketData.response
       })
 

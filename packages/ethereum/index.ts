@@ -9,11 +9,11 @@ export async function compile(args: string = '') {
 }
 
 export async function migrate(args: string = '') {
-  await runner(`yarn migrate${args ? ' ' + args : ''}`)
+  await runner(`yarn migrate${args ? ' ' + args : ''} --network localhost`)
 }
 
 export async function fund(args: string = '') {
-  await runner(`yarn fund${args ? ' ' + args : ''}`)
+  await runner(`yarn fund${args ? ' ' + args : ''} --network localhost`)
 }
 
 export * from './chain'

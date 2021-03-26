@@ -39,13 +39,15 @@ const hardhatConfig: HardhatUserConfig = {
       live: false,
       tags: ['local', 'test'],
       accounts: hardhatPrivKeys,
+      saveDeployments: false,
       allowUnlimitedContractSize: true // TODO: investigate why this is needed
     },
     localhost: {
       live: false,
       tags: ['local'],
       url: 'http://localhost:8545',
-      accounts: localhostPrivKeys
+      accounts: localhostPrivKeys,
+      saveDeployments: false
     },
     mainnet: {
       ...networks.mainnet,
@@ -120,6 +122,7 @@ const hardhatConfig: HardhatUserConfig = {
 task('fund', "Fund node's accounts by specifying HoprToken address", async (...args: any[]) => {
   return (await import('./tasks/fund')).default(args[0], args[1], args[2])
 })
+  .addParam<string>('address', 'HoprToken address', undefined, types.string)
   .addOptionalParam<string>('amount', 'Amount of HOPR to fund', Web3.utils.toWei('1000000', 'ether'), types.string)
   .addOptionalParam<number>('accountsToFund', 'Amount of accounts to fund from demo seeds', 0, types.int)
 

@@ -6,7 +6,7 @@ import Web3 from 'web3'
 import sinon from 'sinon'
 import { getBalance, getNativeBalance } from './account'
 import { Ganache } from '@hoprnet/hopr-testing'
-import { migrate, addresses, abis } from '@hoprnet/hopr-ethereum'
+import { migrate, getAddresses, abis } from '@hoprnet/hopr-ethereum'
 import { stringToU8a, durations } from '@hoprnet/hopr-utils'
 import { getPrivKeyData, createAccountAndFund, createNode, disconnectWeb3 } from './utils/testing.spec'
 import * as testconfigs from './config.spec'
@@ -35,8 +35,8 @@ describe('test Account', function () {
     await migrate()
 
     web3 = new Web3(configs.DEFAULT_URI)
-    hoprToken = new web3.eth.Contract(HoprTokenAbi as any, addresses.localhost?.HoprToken)
-    new web3.eth.Contract(HoprChannelsAbi as any, addresses.localhost?.HoprChannels)
+    hoprToken = new web3.eth.Contract(HoprTokenAbi as any, getAddresses().localhost?.HoprToken)
+    new web3.eth.Contract(HoprChannelsAbi as any, getAddresses().localhost?.HoprChannels)
   })
 
   after(async function () {

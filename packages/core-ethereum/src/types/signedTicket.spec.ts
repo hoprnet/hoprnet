@@ -13,7 +13,7 @@ const generateTicketData = async (receiver: Address) => {
   const epoch = new TicketEpoch(0)
   const amount = new Balance(new BN(15))
   const winProb = new Hash(new BN(new Uint8Array(Hash.SIZE).fill(0xff)).div(WIN_PROB).toArray('le', Hash.SIZE))
-  const onChainSecret = new Hash(randomBytes(27))
+  const onChainSecret = new Hash(randomBytes(Hash.SIZE))
   const channelIteration = new TicketEpoch(0)
 
   return {

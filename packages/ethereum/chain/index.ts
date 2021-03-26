@@ -5,11 +5,13 @@ export * from './networks'
 
 export type ContractNames = 'HoprToken' | 'HoprChannels' | 'HoprDistributor'
 
-export const addresses: {
+// TODO: this doesn't have to be a funciton
+// change once 'core-ethereum' is refactored
+export const getAddresses = (): {
   [network in Networks]?: {
     [name in ContractNames]?: string
   }
-} = allAddresses
+} => allAddresses
 
 export const abis: {
   [name in ContractNames]: any[]

@@ -6,7 +6,7 @@ import type { HoprChannels } from './tsc/web3/HoprChannels'
 import type { HoprToken } from './tsc/web3/HoprToken'
 import Web3 from 'web3'
 import chalk from 'chalk'
-import { Networks, addresses, abis } from '@hoprnet/hopr-ethereum'
+import { Networks, getAddresses, abis } from '@hoprnet/hopr-ethereum'
 import { ChannelFactory } from './channel'
 import types from './types'
 import Indexer from './indexer'
@@ -20,6 +20,7 @@ import debug from 'debug'
 
 const HoprChannelsAbi = abis.HoprChannels
 const HoprTokenAbi = abis.HoprToken
+const addresses = getAddresses()
 
 const log = debug('hopr-core-ethereum')
 let provider: WebsocketProvider

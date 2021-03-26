@@ -1,5 +1,4 @@
 import { deployments } from 'hardhat'
-import { constants } from '@openzeppelin/test-helpers'
 import Web3 from 'web3'
 import { signMessage, prefixMessage } from '../utils'
 import { ACCOUNT_A } from '../constants'
@@ -18,28 +17,12 @@ const useFixtures = deployments.createFixture(async () => {
 })
 
 describe('ECDSA', function () {
-  it('should convert public key to address', async function () {
+  it('should convert uncompressed public key to address', async function () {
     const { ECDSA } = await useFixtures()
 
-    const address = await ECDSA.pubKeyToEthereumAddress(ACCOUNT_A.pubKeyFirstHalf, ACCOUNT_A.pubKeySecondHalf)
+    const address = await ECDSA.uncompressedPubKeyToAddress(ACCOUNT_A.uncompressedPubKey)
 
     expect(address).to.equal(ACCOUNT_A.address)
-  })
-
-  it('should validate public key', async function () {
-    const { ECDSA } = await useFixtures()
-
-    const valid = await ECDSA.validate(ACCOUNT_A.pubKeyFirstHalf, ACCOUNT_A.pubKeySecondHalf)
-
-    expect(valid).to.be.true
-  })
-
-  it('should fail to validate public key', async function () {
-    const { ECDSA } = await useFixtures()
-
-    const valid = await ECDSA.validate(ACCOUNT_A.pubKeyFirstHalf, constants.ZERO_BYTES32)
-
-    expect(valid).to.be.false
   })
 
   // @TODO: add more recover tests

@@ -1,5 +1,4 @@
 import type { HardhatRuntimeEnvironment, RunSuperFunction } from 'hardhat/types'
-import { addresses } from '../chain'
 
 const HoprToken = artifacts.require('HoprToken')
 
@@ -11,9 +10,11 @@ async function main(
   { web3, network }: HardhatRuntimeEnvironment,
   _runSuper: RunSuperFunction<any>
 ) {
-  if (!addresses[network.name]) throw Error(`cannot find HoprToken address for network ${network.name}`)
-  const hoprToken = await HoprToken.at(addresses[network.name].HoprToken)
-
+  console.log({
+    address,
+    network: network.name
+  })
+  const hoprToken = await HoprToken.at(address)
   const accounts = (await web3.eth.getAccounts()).slice(0, accountsToFund)
   const owner = accounts[0]
 

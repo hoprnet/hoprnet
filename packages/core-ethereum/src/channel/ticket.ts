@@ -9,12 +9,11 @@ import {
   stateCounterToIteration
 } from '../utils'
 import type HoprEthereum from '..'
-import { HASHED_SECRET_WIDTH } from '../hashedSecret'
 import debug from 'debug'
 const log = debug('hopr-core-ethereum:ticket')
 
 const DEFAULT_WIN_PROB = 1
-const EMPTY_PRE_IMAGE = new Uint8Array(HASHED_SECRET_WIDTH).fill(0x00)
+const EMPTY_PRE_IMAGE = new Uint8Array(Hash.SIZE).fill(0x00)
 
 class TicketStatic {
   private readonly INVALID_MESSAGES = {

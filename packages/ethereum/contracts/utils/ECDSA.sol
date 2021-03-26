@@ -5,28 +5,14 @@ pragma solidity 0.7.5;
  * @dev Elliptic Curve Digital Signature Algorithm (ECDSA) operations.
  */
 library ECDSA {
-    // y^2 = x^3 + 7 mod p, where p is FIELD_ORDER
-    uint256 constant FIELD_ORDER = 0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f;
     uint256 constant CURVE_ORDER = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141;
     uint256 constant HALF_CURVE_ORDER = (CURVE_ORDER - 1) / 2;
 
     /**
-     * @dev Computes the Ethereum address from a public key given as an
-     * uncompressed EC-point.
+     * @dev Computes the Ethereum address from an uncomporessed public key.
      */
-    function pubKeyToEthereumAddress(uint256 x, uint256 y) internal pure returns (address) {
-        require(validate(x, y), "Point must be on the curve.");
-        return address(bytes20(bytes32(keccak256(abi.encodePacked(x, y)) << 96)));
-    }
-
-    /**
-     * @dev @TODO: update
-     */
-    function validate(uint256 x, uint256 y) internal pure returns (bool) {
-        uint256 rightHandSide = addmod(7, mulmod(mulmod(x, x, FIELD_ORDER), x, FIELD_ORDER), FIELD_ORDER);
-        uint256 leftHandSide = mulmod(y, y, FIELD_ORDER);
-
-        return leftHandSide == rightHandSide;
+    function uncompressedPubKeyToAddress(bytes memory uncompressedPubKey) internal pure returns (address) {
+        return address(bytes20(bytes32(keccak256(abi.encodePacked(uncompressedPubKey)) << 96)));
     }
 
     /**

@@ -2,7 +2,6 @@ import type { Account } from './types'
 import { publicKeyConvert, publicKeyCreate, ecdsaSign } from 'secp256k1'
 import { stringToU8a, u8aToHex, u8aConcat } from '@hoprnet/hopr-utils'
 import Web3 from 'web3'
-import BN from 'bn.js'
 
 const { soliditySha3, toChecksumAddress, toHex } = Web3.utils
 
@@ -24,15 +23,13 @@ export const vmErrorMessage = (error: string) => {
  */
 export const createAccount = (privKey: string): Account => {
   const pubKey = publicKeyCreate(stringToU8a(privKey), true)
-  const pubKeyUncompressed = publicKeyConvert(pubKey, false).slice(1)
-  const firstHalf = new BN(pubKeyUncompressed.slice(0, 32))
-  const secondHalf = new BN(pubKeyUncompressed.slice(32, 64))
+  const uncompressedPubKey = publicKeyConvert(pubKey, false).slice(1)
   const address = toChecksumAddress(
     u8aToHex(
       stringToU8a(
         soliditySha3({
           type: 'bytes',
-          value: u8aToHex(pubKeyUncompressed)
+          value: u8aToHex(uncompressedPubKey)
         })
       ).slice(12)
     )
@@ -40,9 +37,8 @@ export const createAccount = (privKey: string): Account => {
 
   return {
     privKey,
+    uncompressedPubKey: u8aToHex(uncompressedPubKey),
     pubKey: u8aToHex(pubKey),
-    pubKeyFirstHalf: firstHalf,
-    pubKeySecondHalf: secondHalf,
     address
   }
 }

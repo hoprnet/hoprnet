@@ -4,12 +4,10 @@ pragma solidity 0.7.5;
 import "../utils/ECDSA.sol";
 
 contract ECDSAMock {
-    function pubKeyToEthereumAddress(uint256 x, uint256 y) external pure returns (address) {
-        return ECDSA.pubKeyToEthereumAddress(x, y);
-    }
-
-    function validate(uint256 x, uint256 y) external pure returns (bool) {
-        return ECDSA.validate(x, y);
+    function uncompressedPubKeyToAddress(
+        bytes calldata uncompressedPubKey
+    ) external pure returns (address) {
+        return ECDSA.uncompressedPubKeyToAddress(uncompressedPubKey);
     }
 
     function recover(
