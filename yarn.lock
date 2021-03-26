@@ -8261,10 +8261,10 @@ libp2p-utils@^0.2.0, libp2p-utils@^0.2.2:
     multiaddr "^8.0.0"
     private-ip "^2.1.1"
 
-libp2p@0.30.10:
-  version "0.30.10"
-  resolved "https://registry.yarnpkg.com/libp2p/-/libp2p-0.30.10.tgz#a1a2b5954a831594f8eae12b2541dd4885c05553"
-  integrity sha512-TdFLG4CF7/tLF1ypwNM8+q1YshW3+hYWDWYo6IA5Zyhg2MFDPdsUqaX4JLG0EiYHQvVcrUQF8B7rL49YbDHE7Q==
+libp2p@0.30.11:
+  version "0.30.11"
+  resolved "https://registry.yarnpkg.com/libp2p/-/libp2p-0.30.11.tgz#aa3f77e68c4c7433c07e418f9c87c11307916879"
+  integrity sha512-b36hw54Xsgds28Pr28A1VrcLgok8/oqpbSsejUM9F03M+eYETcFUeswTnUfgCZDLGpDYW0nSPKj4C6YrQ4Jdew==
   dependencies:
     "@motrix/nat-api" "^0.3.1"
     abort-controller "^3.0.0"
