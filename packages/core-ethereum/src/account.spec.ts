@@ -47,7 +47,7 @@ describe('test Account', function () {
     this.timeout(durations.minutes(1))
     funder = await getPrivKeyData(stringToU8a(testconfigs.FUND_ACCOUNT_PRIVATE_KEY))
     user = await createAccountAndFund(web3, hoprToken, funder, testconfigs.DEMO_ACCOUNTS[1])
-    coreConnector = await createNode(user.privKey, false)
+    coreConnector = await createNode(user.privKey.serialize(), false)
 
     // wait until it starts
     await coreConnector.start()

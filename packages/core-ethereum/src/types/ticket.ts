@@ -49,10 +49,10 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
 
     if (struct) {
       this.set(struct.counterparty.serialize(), this.counterpartyOffset - this.byteOffset)
-      this.set(struct.challenge, this.challengeOffset - this.byteOffset)
+      this.set(struct.challenge.serialize(), this.challengeOffset - this.byteOffset)
       this.set(new Uint8Array(struct.epoch.toBuffer('be', EPOCH_SIZE)), this.epochOffset - this.byteOffset)
       this.set(struct.amount.toUint96(), this.amountOffset - this.byteOffset)
-      this.set(struct.winProb, this.winProbOffset - this.byteOffset)
+      this.set(struct.winProb.serialize(), this.winProbOffset - this.byteOffset)
       this.set(
         new Uint8Array(struct.channelIteration.toBuffer('be', EPOCH_SIZE)),
         this.channelIterationOffset - this.byteOffset
@@ -128,13 +128,13 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
     return new Balance(
       this.amount
         .toBN()
-        .mul(new BN(this.winProb))
+        .mul(new BN(this.winProb.serialize()))
         .div(new BN(new Uint8Array(Hash.SIZE).fill(0xff)))
     )
   }
 
   async sign(privKey: Uint8Array): Promise<Signature> {
-    return sign(await this.hash, privKey)
+    return sign((await this.hash).serialize(), privKey)
   }
 
   static create(

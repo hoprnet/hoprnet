@@ -459,7 +459,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
             return reject(err)
           }
 
-          const unAcknowledgedDBKey = this._dbKeys.UnAcknowledgedTickets(packet.challenge.hash)
+          const unAcknowledgedDBKey = this._dbKeys.UnAcknowledgedTickets(packet.challenge.hash.serialize())
 
           await this.db.put(Buffer.from(unAcknowledgedDBKey), Buffer.from(''))
 

@@ -12,7 +12,7 @@ const generateTicketData = async (receiver: Address) => {
   const challenge = new Hash(randomBytes(32))
   const epoch = new UINT256(0)
   const amount = new Balance(new BN(15))
-  const winProb = new Hash(new BN(new Uint8Array(Hash.SIZE).fill(0xff)).div(WIN_PROB).toArray('le', Hash.SIZE))
+  const winProb = new Hash(new Uint8Array(new BN(new Uint8Array(Hash.SIZE).fill(0xff)).div(WIN_PROB).toArray('le', Hash.SIZE)))
   const onChainSecret = new Hash(randomBytes(27))
   const channelIteration = new UINT256(0)
 
@@ -52,7 +52,7 @@ describe('test signedTicket construction', async function () {
 
     assert(await signedTicket.verify(userAPubKey))
 
-    assert(new Hash(await signedTicket.signer).eq(userAPubKey), 'signer incorrect')
+    assert(new Hash(await signedTicket.signer).eq(new Hash(userAPubKey)), 'signer incorrect')
 
     assert(signedTicket.ticket.counterparty.eq(userB as Address), 'wrong counterparty')
     assert(signedTicket.ticket.challenge.eq(ticketData.challenge), 'wrong challenge')
@@ -92,8 +92,8 @@ describe('test signedTicket construction', async function () {
 
     assert(await signedTicketB.verify(userAPubKey))
 
-    assert(new Hash(await signedTicketA.signer).eq(userAPubKey), 'signer incorrect')
-    assert(new Hash(await signedTicketB.signer).eq(userAPubKey), 'signer incorrect')
+    assert(new Hash(await signedTicketA.signer).eq(new Hash(userAPubKey)), 'signer incorrect')
+    assert(new Hash(await signedTicketB.signer).eq(new Hash(userAPubKey)), 'signer incorrect')
 
     assert(signedTicketB.ticket.counterparty.eq(userB as Address), 'wrong counterparty')
     assert(signedTicketB.ticket.challenge.eq(ticketData.challenge), 'wrong challenge')
@@ -146,7 +146,7 @@ describe('test signedTicket construction', async function () {
 
     assert(await signedTicket.verify(userAPubKey))
 
-    assert(new Hash(await signedTicket.signer).eq(userAPubKey), 'signer incorrect')
+    assert(new Hash(await signedTicket.signer).eq(new Hash(userAPubKey)), 'signer incorrect')
 
     assert(signedTicket.ticket.counterparty.eq(userB as Address), 'wrong counterparty')
     assert(signedTicket.ticket.challenge.eq(ticketData.challenge), 'wrong challenge')

@@ -85,7 +85,7 @@ class SignedTicket extends Uint8ArrayE implements Types.SignedTicket {
 
     return new Promise(async (resolve, reject) => {
       try {
-        this._signer = secp256k1.ecdsaRecover(this.signature.signature, this.signature.recovery, await this.ticket.hash)
+        this._signer = secp256k1.ecdsaRecover(this.signature.signature, this.signature.recovery, (await this.ticket.hash).serialize())
         return resolve(this._signer)
       } catch (err) {
         return reject(err)
@@ -94,7 +94,7 @@ class SignedTicket extends Uint8ArrayE implements Types.SignedTicket {
   }
 
   async verify(pubKey: Uint8Array): Promise<boolean> {
-    return verify(await this.ticket.hash, this.signature, pubKey)
+    return verify((await this.ticket.hash).serialize(), this.signature, pubKey)
   }
 
   static get SIZE() {

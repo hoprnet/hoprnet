@@ -1,6 +1,6 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
-import { moveDecimalPoint, u8aToHex, pubKeyToPeerId, u8aEquals } from '@hoprnet/hopr-utils'
+import { moveDecimalPoint, pubKeyToPeerId, u8aEquals } from '@hoprnet/hopr-utils'
 import chalk from 'chalk'
 import { AbstractCommand } from './abstractCommand'
 import { getPaddingLength, styleValue } from './utils'
@@ -79,7 +79,7 @@ export default class ListOpenChannels extends AbstractCommand {
       }
 
       for (const { partyA, partyB, channelEntry } of channels) {
-        const id = u8aToHex(await utils.getId(await partyA.toAddress(), await partyB.toAddress()))
+        const id = (await utils.getId(await partyA.toAddress(), await partyB.toAddress())).toHex()
         const selfIsPartyA = u8aEquals(self, partyA)
         const counterparty = selfIsPartyA ? partyB : partyA
 

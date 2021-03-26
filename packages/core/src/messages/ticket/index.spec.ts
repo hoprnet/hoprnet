@@ -5,7 +5,7 @@ import assert from 'assert'
 import { randomBytes } from 'crypto'
 import { UnacknowledgedTicket } from '.'
 import { NODE_SEEDS } from '@hoprnet/hopr-demo-seeds'
-import { Types, Utils } from '@hoprnet/hopr-core-ethereum'
+import { Types, Utils, Hash } from '@hoprnet/hopr-core-ethereum'
 import { privKeyToPeerId } from '@hoprnet/hopr-utils'
 import { toU8a, u8aConcat, u8aToNumber } from '@hoprnet/hopr-utils'
 import LevelUp from 'levelup'
@@ -37,7 +37,7 @@ describe(`check serialization and deserialization of ticket objects`, function (
     const secretB = randomBytes(32)
 
     const response = await node.paymentChannels.utils.hash(u8aConcat(secretA, secretB))
-    const challenge = await node.paymentChannels.utils.hash(response)
+    const challenge = response.hash()
 
     const unAcknowledgedTicket = new UnacknowledgedTicket(node.paymentChannels)
 
@@ -66,9 +66,9 @@ describe(`check serialization and deserialization of ticket objects`, function (
 
     assert(await unAcknowledgedTicket.verifySignature(peerA), 'signature must be valid')
 
-    await node.db.put(node._dbKeys.UnAcknowledgedTickets(challenge), Buffer.from(unAcknowledgedTicket))
+    await node.db.put(node._dbKeys.UnAcknowledgedTickets(challenge.serialize()), Buffer.from(unAcknowledgedTicket))
 
-    const fromDbUnacknowledgedTicket = (await node.db.get(node._dbKeys.UnAcknowledgedTickets(challenge))) as Uint8Array
+    const fromDbUnacknowledgedTicket = (await node.db.get(node._dbKeys.UnAcknowledgedTickets(challenge.serialize()))) as Uint8Array
 
     assert(
       await new UnacknowledgedTicket(node.paymentChannels, {
@@ -78,10 +78,10 @@ describe(`check serialization and deserialization of ticket objects`, function (
       'signature must be valid'
     )
 
-    const acknowledgedDbEntry = node.paymentChannels.types.AcknowledgedTicket.create(node.paymentChannels, undefined, {
+    const acknowledgedDbEntry = node.paymentChannels.types.AcknowledgedTicket.create(undefined, {
       signedTicket,
       response: await node.paymentChannels.utils.hash(u8aConcat(secretA, secretB)),
-      preImage: randomBytes(27),
+      preImage: new Hash(randomBytes(27)),
       redeemed: false
     })
 

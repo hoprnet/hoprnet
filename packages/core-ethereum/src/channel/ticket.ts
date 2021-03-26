@@ -1,5 +1,5 @@
 import type IChannel from '.'
-import { u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
+import { u8aToHex } from '@hoprnet/hopr-utils'
 import { Hash, Balance, SignedTicket, Ticket, AcknowledgedTicket, UINT256 } from '../types'
 import {
   pubKeyToAddress,
@@ -14,7 +14,7 @@ import debug from 'debug'
 const log = debug('hopr-core-ethereum:ticket')
 
 const DEFAULT_WIN_PROB = 1
-const EMPTY_PRE_IMAGE = new Uint8Array(HASHED_SECRET_WIDTH).fill(0x00)
+const EMPTY_PRE_IMAGE = new Hash(new Uint8Array(HASHED_SECRET_WIDTH).fill(0x00))
 
 class TicketStatic {
   private readonly INVALID_MESSAGES = {
@@ -48,13 +48,13 @@ class TicketStatic {
       const signedTicket = await ackTicket.signedTicket
       const ticket = signedTicket.ticket
 
-      log('Submitting ticket', u8aToHex(ticketChallenge))
+      log('Submitting ticket', ticketChallenge.toHex())
       const { hoprChannels, account, utils } = this.coreConnector
       const { r, s, v } = utils.getSignatureParameters(signedTicket.signature)
 
-      const hasPreImage = !u8aEquals(ackTicket.preImage, EMPTY_PRE_IMAGE)
+      const hasPreImage = !ackTicket.preImage.eq(EMPTY_PRE_IMAGE)
       if (!hasPreImage) {
-        log(`Failed to submit ticket ${u8aToHex(ticketChallenge)}: ${this.INVALID_MESSAGES.NO_PRE_IMAGE}`)
+        log(`Failed to submit ticket ${ticketChallenge.toHex()}: ${this.INVALID_MESSAGES.NO_PRE_IMAGE}`)
         return {
           status: 'FAILURE',
           message: this.INVALID_MESSAGES.NO_PRE_IMAGE
@@ -63,7 +63,7 @@ class TicketStatic {
 
       const validChallenge = await checkChallenge(ticket.challenge, ackTicket.response)
       if (!validChallenge) {
-        log(`Failed to submit ticket ${u8aToHex(ticketChallenge)}: ${this.INVALID_MESSAGES.INVALID_CHALLENGE}`)
+        log(`Failed to submit ticket ${ticketChallenge.toHex()}: ${this.INVALID_MESSAGES.INVALID_CHALLENGE}`)
         return {
           status: 'FAILURE',
           message: this.INVALID_MESSAGES.INVALID_CHALLENGE
@@ -72,7 +72,7 @@ class TicketStatic {
 
       const isWinning = await isWinningTicket(await ticket.hash, ackTicket.response, ackTicket.preImage, ticket.winProb)
       if (!isWinning) {
-        log(`Failed to submit ticket ${u8aToHex(ticketChallenge)}: ${this.INVALID_MESSAGES.NOT_WINNING}`)
+        log(`Failed to submit ticket ${ticketChallenge.toHex()}: ${this.INVALID_MESSAGES.NOT_WINNING}`)
         return {
           status: 'FAILURE',
           message: this.INVALID_MESSAGES.NOT_WINNING
@@ -87,10 +87,10 @@ class TicketStatic {
           to: hoprChannels.options.address
         },
         hoprChannels.methods.redeemTicket(
-          u8aToHex(ackTicket.preImage),
-          u8aToHex(ackTicket.response),
+          ackTicket.preImage.toHex(),
+          ackTicket.response.toHex(),
           ticket.amount.toBN().toString(),
-          u8aToHex(ticket.winProb),
+          ticket.winProb.toHex(),
           counterparty.toHex(),
           u8aToHex(r),
           u8aToHex(s),
@@ -102,13 +102,13 @@ class TicketStatic {
       ackTicket.redeemed = true
       this.coreConnector.account.updateLocalState(ackTicket.preImage)
 
-      log('Successfully submitted ticket', u8aToHex(ticketChallenge))
+      log('Successfully submitted ticket', ticketChallenge.toHex())
       return {
         status: 'SUCCESS',
         receipt: transaction.transactionHash
       }
     } catch (err) {
-      log('Unexpected error when submitting ticket', u8aToHex(ticketChallenge), err)
+      log('Unexpected error when submitting ticket', ticketChallenge.toHex(), err)
       return {
         status: 'ERROR',
         error: err

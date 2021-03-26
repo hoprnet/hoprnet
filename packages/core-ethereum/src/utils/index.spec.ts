@@ -37,7 +37,7 @@ describe('test utils', function () {
 
     assert(
       u8aEquals(
-        await utils.hash(testMsg),
+        (await utils.hash(testMsg)).serialize(),
         new Uint8Array([
           232,
           231,

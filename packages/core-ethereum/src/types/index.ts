@@ -1,7 +1,8 @@
 import AcknowledgedTicket from './acknowledgedTicket'
 import { Channel, ChannelBalance, ChannelState } from './channel'
 import ChannelEntry from './channelEntry'
-import Hash from './hash'
+import { HASH_LENGTH } from '../constants'
+import createKeccakHash from 'keccak'
 import NativeBalance from './nativeBalance'
 import Public from './public'
 import Signature from './signature'
@@ -72,6 +73,42 @@ class Balance implements Interfaces.Balance {
   static get SIZE(): number {
     // Uint256
     return 32
+  }
+}
+
+class Hash implements Interfaces.Hash {
+  constructor(private arr: Uint8Array) {}
+
+  static get SIZE() {
+    return HASH_LENGTH
+  }
+
+  static create(msg: Uint8Array){
+    return new Hash(createKeccakHash('keccak256').update(Buffer.from(msg)).digest())
+  }
+
+  serialize(): Uint8Array {
+    return this.arr
+  }
+
+  eq(b: Hash) {
+    return u8aEquals(this.arr, b.serialize())
+  }
+
+  toHex(): string {
+    return u8aToHex(this.arr)
+  }
+
+  clone(): Hash {
+    return new Hash(this.arr.slice())
+  }
+
+  hash(): Hash { // Sometimes we double hash.
+    return Hash.create(this.serialize())
+  }
+
+  get length() {
+    return this.arr.length
   }
 }
 

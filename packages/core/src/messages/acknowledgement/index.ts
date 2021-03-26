@@ -15,7 +15,7 @@ import PeerId from 'peer-id'
 class Acknowledgement<Chain extends HoprCoreConnector> extends Uint8Array {
   private _responseSigningParty?: Uint8Array
   private _responseSignature?: Types.Signature
-  private _hashedKey?: Uint8Array
+  private _hashedKey?: Types.Hash 
 
   private paymentChannels: Chain
 
@@ -70,12 +70,12 @@ class Acknowledgement<Chain extends HoprCoreConnector> extends Uint8Array {
     return new Uint8Array(this.buffer, this.keyOffset, KEY_LENGTH)
   }
 
-  get hashedKey(): Promise<Uint8Array> {
+  get hashedKey(): Promise<Types.Hash> {
     if (this._hashedKey != null) {
       return Promise.resolve(this._hashedKey)
     }
 
-    return this.paymentChannels.utils.hash(this.key).then((hashedKey: Uint8Array) => {
+    return this.paymentChannels.utils.hash(this.key).then((hashedKey: Types.Hash) => {
       this._hashedKey = hashedKey
 
       return hashedKey
@@ -93,13 +93,13 @@ class Acknowledgement<Chain extends HoprCoreConnector> extends Uint8Array {
     })
   }
 
-  get hash(): Promise<Uint8Array> {
+  get hash(): Promise<Types.Hash> {
     return this.paymentChannels.utils.hash(
       new Uint8Array(this.buffer, this.byteOffset, KEY_LENGTH + Challenge.SIZE(this.paymentChannels))
     )
   }
 
-  get challengeSignatureHash(): Promise<Uint8Array> {
+  get challengeSignatureHash(): Promise<Types.Hash> {
     return this.paymentChannels.utils.hash(this.challenge)
   }
 
@@ -137,8 +137,8 @@ class Acknowledgement<Chain extends HoprCoreConnector> extends Uint8Array {
         responseSignature.signature,
         responseSignature.recovery,
         responseSignature.msgPrefix != null && responseSignature.msgPrefix.length > 0
-          ? await this.paymentChannels.utils.hash(u8aConcat(responseSignature.msgPrefix, await this.hash))
-          : await this.hash
+          ? (await this.paymentChannels.utils.hash(u8aConcat(responseSignature.msgPrefix, (await this.hash).serialize()))).serialize()
+          : (await this.hash).serialize()
       )
 
       resolve(this._responseSigningParty)
@@ -146,13 +146,13 @@ class Acknowledgement<Chain extends HoprCoreConnector> extends Uint8Array {
   }
 
   async sign(peerId: PeerId): Promise<Acknowledgement<Chain>> {
-    const signature = await this.paymentChannels.utils.sign(await this.hash, peerId.privKey.marshal())
+    const signature = await this.paymentChannels.utils.sign((await this.hash).serialize(), peerId.privKey.marshal())
     this.set(signature, this.responseSignatureOffset - this.byteOffset)
     return this
   }
 
   async verify(peerId: PeerId): Promise<boolean> {
-    return this.paymentChannels.utils.verify(await this.hash, await this.responseSignature, peerId.pubKey.marshal())
+    return this.paymentChannels.utils.verify((await this.hash).serialize(), await this.responseSignature, peerId.pubKey.marshal())
   }
 
   /**

@@ -13,7 +13,7 @@ describe('test ticket construction', function () {
   })
 
   const generateTicketData = async () => {
-    const challenge = new Hash(Hash.SIZE)
+    const challenge = new Hash(new Uint8Array(Hash.SIZE))
     const epoch = new UINT256(1)
     const amount = new Balance(new BN(1))
     const winProb = new Hash(computeWinningProbability(1))

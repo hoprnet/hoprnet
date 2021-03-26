@@ -67,7 +67,7 @@ export async function deleteUnacknowledgedTickets(
       tickets.map<any>(async (ticket) => {
         return {
           type: 'del',
-          key: Buffer.from(node._dbKeys.UnAcknowledgedTickets((await ticket.signedTicket).ticket.challenge))
+          key: Buffer.from(node._dbKeys.UnAcknowledgedTickets((await ticket.signedTicket).ticket.challenge.serialize()))
         }
       })
     )
@@ -91,7 +91,7 @@ export async function getAcknowledgedTickets(
   }[]
 > {
   const { AcknowledgedTicket } = node.paymentChannels.types
-  const acknowledgedTicketSize = AcknowledgedTicket.SIZE(node.paymentChannels)
+  const acknowledgedTicketSize = AcknowledgedTicket.SIZE()
   const results: {
     ackTicket: Types.AcknowledgedTicket
     index: Uint8Array
@@ -107,7 +107,7 @@ export async function getAcknowledgedTickets(
         if (value.buffer.byteLength !== acknowledgedTicketSize) return
 
         const index = node._dbKeys.AcknowledgedTicketsParse(key)
-        const ackTicket = AcknowledgedTicket.create(node.paymentChannels, {
+        const ackTicket = AcknowledgedTicket.create({
           bytes: value.buffer,
           offset: value.byteOffset
         })
@@ -143,7 +143,7 @@ export async function deleteAcknowledgedTickets(
       tickets.map<any>(async (ticket) => {
         return {
           type: 'del',
-          key: Buffer.from(node._dbKeys.AcknowledgedTickets((await ticket.ackTicket.signedTicket).ticket.challenge))
+          key: Buffer.from(node._dbKeys.AcknowledgedTickets((await ticket.ackTicket.signedTicket).ticket.challenge.serialize()))
         }
       })
     )
@@ -274,7 +274,7 @@ export async function validateUnacknowledgedTicket({
   }
 
   // ticket MUST have at least X winning probability
-  const winProb = chain.utils.getWinProbabilityAsFloat(ticket.winProb)
+  const winProb = chain.utils.getWinProbabilityAsFloat(ticket.winProb.serialize())
   if (new BN(winProb).lt(new BN(String(node.ticketWinProb)))) {
     throw Error(`Ticket winning probability '${winProb}' is lower than '${node.ticketWinProb}'`)
   }

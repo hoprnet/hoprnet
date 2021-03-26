@@ -34,7 +34,7 @@ describe('test connector', function () {
     owner = await getPrivKeyData(stringToU8a(testconfigs.FUND_ACCOUNT_PRIVATE_KEY))
     web3 = new Web3(configs.DEFAULT_URI)
     hoprToken = new web3.eth.Contract(HoprTokenAbi as any, addresses?.localhost?.HoprToken)
-    connector = await createNode(owner.privKey)
+    connector = await createNode(owner.privKey.serialize())
 
     await connector.start()
   })
@@ -120,7 +120,7 @@ describe('test withdraw', function () {
 
     web3 = new Web3(configs.DEFAULT_URI)
     hoprToken = new web3.eth.Contract(HoprTokenAbi as any, addresses?.localhost?.HoprToken)
-    connector = await createNode(alice.privKey)
+    connector = await createNode(alice.privKey.serialize())
 
     await hoprToken.methods.mint(alice.address.toHex(), 100, '0x0', '0x0').send({
       from: alice.address.toHex(),

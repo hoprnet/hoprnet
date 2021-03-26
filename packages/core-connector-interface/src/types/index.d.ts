@@ -1,7 +1,6 @@
 import AcknowledgedTicket from './acknowledgedTicket'
 import { Channel, ChannelBalance, ChannelState } from './channel'
 import ChannelEntry from './channelEntry'
-import Hash from './hash'
 import NativeBalance from './nativeBalance'
 import Public from './public'
 import Signature from './signature'
@@ -32,6 +31,18 @@ declare interface Balance {
   toFormattedString(): string // Readable version of the balance
 }
 declare var Balance: BalanceStatic
+
+declare interface HashStatic {
+  readonly SIZE: number
+  new (hash: Uint8Array): Hash
+}
+declare interface Hash {
+  serialize(): Uint8Array
+  toHex(): string
+  eq(b: Hash): boolean
+  hash(): Hash
+}
+declare var Hash: HashStatic
 
 export {
   Address,

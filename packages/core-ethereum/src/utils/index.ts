@@ -1,7 +1,6 @@
 import { Network } from '@hoprnet/hopr-ethereum'
 import assert from 'assert'
 import { publicKeyConvert, publicKeyCreate, ecdsaSign, ecdsaRecover, ecdsaVerify } from 'secp256k1'
-import createKeccakHash from 'keccak'
 import { PromiEvent, TransactionReceipt } from 'web3-core'
 import { BlockTransactionString } from 'web3-eth'
 import Web3 from 'web3'
@@ -90,7 +89,7 @@ export async function pubKeyToAddress(pubKey: Uint8Array): Promise<Address> {
       }. Got '${typeof pubKey}'${pubKey.length ? ` of length ${pubKey.length}` : ''}.`
     )
 
-  return new Address((await hash(publicKeyConvert(pubKey, false).slice(1))).slice(12))
+  return new Address((await hash(publicKeyConvert(pubKey, false).slice(1))).serialize().slice(12))
 }
 
 /**
@@ -99,7 +98,7 @@ export async function pubKeyToAddress(pubKey: Uint8Array): Promise<Address> {
  * @returns a promise resolved to Hash
  */
 export async function hash(msg: Uint8Array): Promise<Hash> {
-  return Promise.resolve(new Hash(createKeccakHash('keccak256').update(Buffer.from(msg)).digest()))
+  return Hash.create(msg)
 }
 
 /**
@@ -156,7 +155,7 @@ export async function verify(msg: Uint8Array, signature: Signature, pubKey: Uint
  */
 export async function isWinningTicket(ticketHash: Hash, challengeResponse: Hash, preImage: Hash, winProb: Hash) {
   return [A_STRICLY_LESS_THAN_B, A_EQUALS_B].includes(
-    u8aCompare(await hash(u8aConcat(ticketHash, preImage, challengeResponse)), winProb)
+    u8aCompare(Hash.create(u8aConcat(ticketHash.serialize(), preImage.serialize(), challengeResponse.serialize())).serialize(), winProb.serialize())
   )
 }
 
@@ -210,7 +209,7 @@ export function getWinProbabilityAsFloat(winProb: Uint8Array): number {
  * @param response response to verify
  */
 export async function checkChallenge(challenge: Hash, response: Hash) {
-  return u8aEquals(challenge, await hash(response))
+  return u8aEquals(challenge.serialize(), Hash.create(response.serialize()).serialize())
 }
 
 /**
@@ -462,7 +461,7 @@ export function getSignatureParameters(
  * @returns a promise that resolves to a hash
  */
 export async function createChallenge(secretA: Uint8Array, secretB: Uint8Array): Promise<Hash> {
-  return await hash(await hash(u8aConcat(secretA, secretB)))
+  return Hash.create(u8aConcat(secretA, secretB))
 }
 
 /**

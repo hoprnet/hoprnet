@@ -82,19 +82,13 @@ class Account {
           await isWinningTicket(
             await (await ticket.signedTicket).ticket.hash,
             ticket.response,
-            new Hash(tmp.preImage),
+            tmp.hash(),
             (await ticket.signedTicket).ticket.winProb
           )
         ) {
-          ticket.preImage = new Hash(tmp.preImage)
-          if (tmp.iteration == 0) {
-            // @TODO dispatch call of next hashedSecret submit
-            return true
-          } else {
-            yield true
-          }
-
-          tmp = await this.coreConnector.hashedSecret.findPreImage(tmp.preImage)
+          ticket.preImage = tmp.hash() 
+          yield true
+          tmp = await this.coreConnector.hashedSecret.findPreImage(tmp)
         } else {
           yield false
         }
@@ -315,7 +309,7 @@ class Account {
             log('new ticketEpoch', event.returnValues.counter)
 
             this._ticketEpoch = new UINT256(event.returnValues.counter)
-            this._onChainSecret = new Hash(stringToU8a(event.returnValues.secretHash), Hash.SIZE)
+            this._onChainSecret = new Hash(stringToU8a(event.returnValues.secretHash))
           })
           .on('error', (error) => {
             log('error listening to SecretHashSet events', error.message)

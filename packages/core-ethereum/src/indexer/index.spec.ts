@@ -53,7 +53,7 @@ describe('test indexer', function () {
     userC = await createAccountAndFund(web3, hoprToken, userA, testconfigs.DEMO_ACCOUNTS[2])
     //
     userD = await createAccountAndFund(web3, hoprToken, userA, testconfigs.DEMO_ACCOUNTS[3])
-    connector = await createNode(userA.privKey, undefined, 8)
+    connector = await createNode(userA.privKey.serialize(), undefined, 8)
 
     await connector.start()
     await connector.initOnchainValues()

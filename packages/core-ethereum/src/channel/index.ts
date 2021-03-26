@@ -140,7 +140,7 @@ class ChannelFactory {
 
   async isOpen(counterpartyPubKey: Uint8Array) {
     const counterparty = await pubKeyToAddress(counterpartyPubKey)
-    const channelId = new Hash(await getId(await this.coreConnector.account.address, counterparty))
+    const channelId = await getId(await this.coreConnector.account.address, counterparty)
 
     const [onChain, offChain]: [boolean, boolean] = await Promise.all([
       this.coreConnector.channel.getOnChainState(new Public(counterpartyPubKey)).then((channel) => {
@@ -184,7 +184,7 @@ class ChannelFactory {
       throw Error(`Challenge is not set`)
     }
 
-    const winProb = new Uint8ArrayE(new BN(new Uint8Array(Hash.SIZE).fill(0xff)).div(WIN_PROB).toArray('le', Hash.SIZE))
+    const winProb = new Hash(new Uint8ArrayE(new BN(new Uint8Array(Hash.SIZE).fill(0xff)).div(WIN_PROB).toArray('le', Hash.SIZE)))
 
     const signedTicket = new SignedTicket(arr)
 
@@ -203,7 +203,7 @@ class ChannelFactory {
       }
     )
 
-    const signature = await sign(await ticket.hash, this.coreConnector.account.keys.onChain.privKey)
+    const signature = await sign((await ticket.hash).serialize(), this.coreConnector.account.keys.onChain.privKey)
     signedTicket.set(signature, signedTicket.signatureOffset - signedTicket.byteOffset)
     return signedTicket
   }

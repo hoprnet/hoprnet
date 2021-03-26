@@ -1,7 +1,7 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 import type PeerId from 'peer-id'
-import { startDelayedInterval, u8aToHex, moveDecimalPoint } from '@hoprnet/hopr-utils'
+import { startDelayedInterval, moveDecimalPoint } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 import chalk from 'chalk'
 import readline from 'readline'
@@ -76,7 +76,7 @@ export abstract class OpenChannelBase extends AbstractCommand {
     try {
       const { channelId } = await this.node.openChannel(counterparty, amountToFund)
       unsubscribe()
-      return `${chalk.green(`Successfully opened channel`)} ${styleValue(u8aToHex(channelId), 'hash')}`
+      return `${chalk.green(`Successfully opened channel`)} ${styleValue(channelId.toHex(), 'hash')}`
     } catch (err) {
       unsubscribe()
       return styleValue(err.message, 'failure')

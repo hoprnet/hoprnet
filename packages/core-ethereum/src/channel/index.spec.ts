@@ -73,11 +73,11 @@ describe('test Channel class', function () {
     const userA = await createAccountAndFund(web3, hoprToken, funder, testconfigs.DEMO_ACCOUNTS[1])
     const userB = await createAccountAndFund(web3, hoprToken, funder, testconfigs.DEMO_ACCOUNTS[2])
 
-    coreConnector = await createNode(userA.privKey)
+    coreConnector = await createNode(userA.privKey.serialize())
     await coreConnector.initOnchainValues()
     await coreConnector.start()
 
-    counterpartysCoreConnector = await createNode(userB.privKey)
+    counterpartysCoreConnector = await createNode(userB.privKey.serialize())
     await counterpartysCoreConnector.initOnchainValues()
     await counterpartysCoreConnector.start()
   })
@@ -139,7 +139,7 @@ describe('test Channel class', function () {
     const firstTicket = await getTicketData({
       counterparty: myAddress
     })
-    const firstAckedTicket = new AcknowledgedTicket(coreConnector, undefined, {
+    const firstAckedTicket = new AcknowledgedTicket(undefined, {
       response: firstTicket.response
     })
     const signedTicket = await channel.ticket.create(
@@ -235,7 +235,7 @@ describe('test Channel class', function () {
         counterparty: counterpartyAddress,
         winProb: 0.5
       })
-      let ackedTicket = new AcknowledgedTicket(counterpartysCoreConnector, undefined, {
+      let ackedTicket = new AcknowledgedTicket(undefined, {
         response: ticketData.response
       })
 

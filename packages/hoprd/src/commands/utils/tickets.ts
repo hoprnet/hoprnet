@@ -1,6 +1,5 @@
 import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import BN from 'bn.js'
-import { u8aToHex } from '@hoprnet/hopr-utils'
 
 /**
  * Retrieves all signed tickets from the given acknowledged tickets.
@@ -30,7 +29,7 @@ export function countSignedTickets(
   const { tickets, total } = signedTickets.reduce(
     (result, signedTicket) => {
       result.tickets.push({
-        challange: u8aToHex(signedTicket.ticket.challenge),
+        challange: signedTicket.ticket.challenge.toHex(),
         amount: signedTicket.ticket.amount.toBN().toString(10)
       })
       result.total = result.total.add(signedTicket.ticket.amount.toBN())
