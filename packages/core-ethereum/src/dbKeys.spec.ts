@@ -38,13 +38,23 @@ describe('test dbKeys', function () {
 
   it("should create 'Challenge' key", function () {
     const result = dbKeys.Challenge(channelId, challenge)
-    const expected = u8aConcat(encoder.encode('payments-challenge-'), channelId.serialize(), encoder.encode('-'), challenge.serialize())
+    const expected = u8aConcat(
+      encoder.encode('payments-challenge-'),
+      channelId.serialize(),
+      encoder.encode('-'),
+      challenge.serialize()
+    )
 
     assert(u8aEquals(result, expected), 'check challenge key creation')
   })
 
   it("should parse 'Challenge' key", function () {
-    const key = u8aConcat(encoder.encode('payments-challenge-'), channelId.serialize(), encoder.encode('-'), challenge.serialize())
+    const key = u8aConcat(
+      encoder.encode('payments-challenge-'),
+      channelId.serialize(),
+      encoder.encode('-'),
+      challenge.serialize()
+    )
     const [result1, result2] = dbKeys.ChallengeKeyParse(key)
     const expected1 = channelId
     const expected2 = challenge
@@ -64,7 +74,12 @@ describe('test dbKeys', function () {
   it("should create 'Nonce' key", function () {
     const nonce = new Hash(randomBytes(32))
     const result = dbKeys.Nonce(channelId, nonce)
-    const expected = u8aConcat(encoder.encode('payments-nonce-'), channelId.serialize(), encoder.encode('-'), nonce.serialize())
+    const expected = u8aConcat(
+      encoder.encode('payments-nonce-'),
+      channelId.serialize(),
+      encoder.encode('-'),
+      nonce.serialize()
+    )
 
     assert(u8aEquals(result, expected), 'check nonce key creation')
   })
@@ -78,13 +93,23 @@ describe('test dbKeys', function () {
 
   it("should create 'AcknowledgedTicket' key", function () {
     const result = dbKeys.AcknowledgedTicket(userA.pubKey, challenge)
-    const expected = u8aConcat(encoder.encode('tickets-acknowledged-'), userA.pubKey, encoder.encode('-'), challenge.serialize())
+    const expected = u8aConcat(
+      encoder.encode('tickets-acknowledged-'),
+      userA.pubKey,
+      encoder.encode('-'),
+      challenge.serialize()
+    )
 
     assert(u8aEquals(result, expected), 'check AcknowledgedTicket key creation')
   })
 
   it("should parse 'AcknowledgedTicket' key", function () {
-    const key = u8aConcat(encoder.encode('tickets-acknowledged-'), userA.pubKey, encoder.encode('-'), challenge.serialize())
+    const key = u8aConcat(
+      encoder.encode('tickets-acknowledged-'),
+      userA.pubKey,
+      encoder.encode('-'),
+      challenge.serialize()
+    )
     const [result1, result2] = dbKeys.AcknowledgedTicketParse(key)
     const expected1 = userA.pubKey
     const expected2 = challenge

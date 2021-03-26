@@ -119,7 +119,6 @@ describe('test hashedSecret', function () {
 
       assert(preImage.hash().eq(onChainHash))
 
-
       await connector.utils.waitForConfirmation(
         (
           await connector.account.signTransaction(
@@ -231,12 +230,12 @@ describe('test hashedSecret', function () {
 
     it('should reserve a preImage for tickets with 100% winning probabilty resp. should not reserve for 0% winning probability', async function () {
       const firstTicket = new Types.AcknowledgedTicket(undefined, {
-        signedTicket: {
+        signedTicket: ({
           ticket: {
             hash: Promise.resolve(new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff))),
             winProb: Utils.computeWinningProbability(1)
           }
-        } as unknown as Types.SignedTicket,
+        } as unknown) as Types.SignedTicket,
         response: new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff))
       })
 
@@ -262,12 +261,12 @@ describe('test hashedSecret', function () {
       )
 
       const notWinnigTicket = new Types.AcknowledgedTicket(undefined, {
-        signedTicket: {
+        signedTicket: ({
           ticket: {
             hash: Promise.resolve(new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff))),
             winProb: Utils.computeWinningProbability(0)
           }
-        } as unknown as Types.SignedTicket,
+        } as unknown) as Types.SignedTicket,
         response: new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff))
       })
 
@@ -280,11 +279,7 @@ describe('test hashedSecret', function () {
 
       const fourthPreImage = firstTicket.preImage.clone()
 
-      assert(
-        fourthPreImage != null &&
-          !fourthPreImage.eq(secondPreImage) &&
-          fourthPreImage.hash().eq(secondPreImage)
-      )
+      assert(fourthPreImage != null && !fourthPreImage.eq(secondPreImage) && fourthPreImage.hash().eq(secondPreImage))
     })
 
     it('should reserve a preImage for tickets with arbitrary winning probability', async function () {
@@ -294,12 +289,12 @@ describe('test hashedSecret', function () {
 
       for (let i = 0; i < ATTEMPTS; i++) {
         ticket = new Types.AcknowledgedTicket(undefined, {
-          signedTicket: {
+          signedTicket: ({
             ticket: {
               hash: Promise.resolve(new Types.Hash(randomBytes(Types.Hash.SIZE))),
               winProb: Utils.computeWinningProbability(Math.random())
             }
-          } as unknown as Types.SignedTicket,
+          } as unknown) as Types.SignedTicket,
           response: new Types.Hash(randomBytes(Types.Hash.SIZE))
         })
 

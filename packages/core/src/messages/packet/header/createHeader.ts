@@ -167,13 +167,25 @@ export async function createHeader(hash: (msg: Uint8Array) => Promise<Types.Hash
            *   - the relay node can verify the key derivation path
            */
           header.beta.set(
-            (await hash(
-              (await hash(u8aConcat(deriveTicketKey(secrets[i]), (await hash(deriveTicketKeyBlinding(secrets[i + 1]))).serialize()))).serialize()
-            )).serialize(),
+            (
+              await hash(
+                (
+                  await hash(
+                    u8aConcat(
+                      deriveTicketKey(secrets[i]),
+                      (await hash(deriveTicketKeyBlinding(secrets[i + 1]))).serialize()
+                    )
+                  )
+                ).serialize()
+              )
+            ).serialize(),
             ADDRESS_SIZE + MAC_SIZE + KEY_LENGTH
           )
         } else if (i == secrets.length - 1) {
-          header.beta.set((await hash(deriveTicketLastKey(secrets[i]))).serialize(), ADDRESS_SIZE + MAC_SIZE + KEY_LENGTH)
+          header.beta.set(
+            (await hash(deriveTicketLastKey(secrets[i]))).serialize(),
+            ADDRESS_SIZE + MAC_SIZE + KEY_LENGTH
+          )
         }
 
         u8aXOR(true, header.beta, PRG.createPRG(key, iv).digest(0, BETA_LENGTH))

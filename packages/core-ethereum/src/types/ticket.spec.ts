@@ -1,6 +1,6 @@
 import assert from 'assert'
 import { stringToU8a, randomInteger } from '@hoprnet/hopr-utils'
-import { Address, Ticket, Hash, Balance, UINT256} from '.'
+import { Address, Ticket, Hash, Balance, UINT256 } from '.'
 import { privKeyToPubKey, pubKeyToAddress, computeWinningProbability } from '../utils'
 import * as testconfigs from '../config.spec'
 import BN from 'bn.js'

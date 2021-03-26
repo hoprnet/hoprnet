@@ -12,7 +12,9 @@ const generateTicketData = async (receiver: Address) => {
   const challenge = new Hash(randomBytes(32))
   const epoch = new UINT256(0)
   const amount = new Balance(new BN(15))
-  const winProb = new Hash(new Uint8Array(new BN(new Uint8Array(Hash.SIZE).fill(0xff)).div(WIN_PROB).toArray('le', Hash.SIZE)))
+  const winProb = new Hash(
+    new Uint8Array(new BN(new Uint8Array(Hash.SIZE).fill(0xff)).div(WIN_PROB).toArray('le', Hash.SIZE))
+  )
   const onChainSecret = new Hash(randomBytes(27))
   const channelIteration = new UINT256(0)
 

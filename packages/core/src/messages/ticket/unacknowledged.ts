@@ -1,4 +1,4 @@
-import { u8aConcat }from '@hoprnet/hopr-utils'
+import { u8aConcat } from '@hoprnet/hopr-utils'
 
 import { Hash } from '@hoprnet/hopr-core-ethereum'
 import HoprCoreConnector, { Types } from '@hoprnet/hopr-core-connector-interface'
@@ -80,7 +80,9 @@ class UnacknowledgedTicket<Chain extends HoprCoreConnector> extends Uint8Array {
   }
 
   async verifyChallenge(hashedKeyHalf: Uint8Array) {
-    return Hash.create(u8aConcat(this.secretA.serialize(), hashedKeyHalf)).hash().eq((await this.signedTicket).ticket.challenge as Hash)
+    return Hash.create(u8aConcat(this.secretA.serialize(), hashedKeyHalf))
+      .hash()
+      .eq((await this.signedTicket).ticket.challenge as Hash)
   }
 
   async verifySignature(peerId: PeerId) {

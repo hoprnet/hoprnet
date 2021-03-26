@@ -25,7 +25,7 @@ const cache = new Map<'balance' | 'nativeBalance', { value: string; updatedAt: n
 class Account {
   private _address?: Address
   private _preImageIterator: AsyncGenerator<boolean, boolean, AcknowledgedTicket>
-  private _ticketEpoch?: UINT256 
+  private _ticketEpoch?: UINT256
   private _ticketEpochListener?: ContractEventEmitter<any>
   private _onChainSecret?: Hash
   private _nonceTracker: NonceTracker
@@ -86,7 +86,7 @@ class Account {
             (await ticket.signedTicket).ticket.winProb
           )
         ) {
-          ticket.preImage = tmp.hash() 
+          ticket.preImage = tmp.hash()
           yield true
           tmp = await this.coreConnector.hashedSecret.findPreImage(tmp)
         } else {

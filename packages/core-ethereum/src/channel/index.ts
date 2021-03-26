@@ -184,7 +184,9 @@ class ChannelFactory {
       throw Error(`Challenge is not set`)
     }
 
-    const winProb = new Hash(new Uint8ArrayE(new BN(new Uint8Array(Hash.SIZE).fill(0xff)).div(WIN_PROB).toArray('le', Hash.SIZE)))
+    const winProb = new Hash(
+      new Uint8ArrayE(new BN(new Uint8Array(Hash.SIZE).fill(0xff)).div(WIN_PROB).toArray('le', Hash.SIZE))
+    )
 
     const signedTicket = new SignedTicket(arr)
 

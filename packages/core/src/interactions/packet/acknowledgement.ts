@@ -106,16 +106,13 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
           ticketCounter = toU8a(0, ACKNOWLEDGED_TICKET_INDEX_LENGTH)
         }
 
-        let acknowledgedTicket = this.node.paymentChannels.types.AcknowledgedTicket.create(
-          undefined,
-          {
-            signedTicket: await unacknowledgedTicket.signedTicket,
-            response: await this.node.paymentChannels.utils.hash(
-              u8aConcat(unacknowledgedTicket.secretA.serialize(), (await acknowledgement.hashedKey).serialize())
-            ),
-            redeemed: false
-          }
-        )
+        let acknowledgedTicket = this.node.paymentChannels.types.AcknowledgedTicket.create(undefined, {
+          signedTicket: await unacknowledgedTicket.signedTicket,
+          response: await this.node.paymentChannels.utils.hash(
+            u8aConcat(unacknowledgedTicket.secretA.serialize(), (await acknowledgement.hashedKey).serialize())
+          ),
+          redeemed: false
+        })
 
         const isWinningTicket = await this.node.paymentChannels.account.reservePreImageIfIsWinning(acknowledgedTicket)
 

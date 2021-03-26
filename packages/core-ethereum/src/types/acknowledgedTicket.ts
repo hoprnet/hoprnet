@@ -77,9 +77,7 @@ class AcknowledgedTicket extends Uint8Array {
 
   get response(): Hash {
     if (!this._response) {
-      this._response = new Hash(
-        new Uint8Array(this.buffer, this.responseOffset, Hash.SIZE)
-      )
+      this._response = new Hash(new Uint8Array(this.buffer, this.responseOffset, Hash.SIZE))
     }
 
     return this._response
@@ -91,9 +89,7 @@ class AcknowledgedTicket extends Uint8Array {
 
   get preImage(): Hash {
     if (!this._preImage) {
-      this._preImage = new Hash(
-        new Uint8Array(this.buffer, this.preImageOffset, HASHED_SECRET_WIDTH)
-      )
+      this._preImage = new Hash(new Uint8Array(this.buffer, this.preImageOffset, HASHED_SECRET_WIDTH))
     }
 
     return this._preImage
@@ -102,18 +98,11 @@ class AcknowledgedTicket extends Uint8Array {
   set preImage(_preImage: Hash) {
     this.set(_preImage.serialize(), this.preImageOffset)
 
-    this._preImage = new Hash(
-      new Uint8Array(this.buffer, this.preImageOffset, HASHED_SECRET_WIDTH)
-    )
+    this._preImage = new Hash(new Uint8Array(this.buffer, this.preImageOffset, HASHED_SECRET_WIDTH))
   }
 
   get redeemedOffset(): number {
-    return (
-      this.byteOffset +
-      SignedTicket.SIZE +
-      Hash.SIZE +
-      HASHED_SECRET_WIDTH
-    )
+    return this.byteOffset + SignedTicket.SIZE + Hash.SIZE + HASHED_SECRET_WIDTH
   }
 
   get redeemed(): boolean {

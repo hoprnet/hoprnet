@@ -68,7 +68,9 @@ describe(`check serialization and deserialization of ticket objects`, function (
 
     await node.db.put(node._dbKeys.UnAcknowledgedTickets(challenge.serialize()), Buffer.from(unAcknowledgedTicket))
 
-    const fromDbUnacknowledgedTicket = (await node.db.get(node._dbKeys.UnAcknowledgedTickets(challenge.serialize()))) as Uint8Array
+    const fromDbUnacknowledgedTicket = (await node.db.get(
+      node._dbKeys.UnAcknowledgedTickets(challenge.serialize())
+    )) as Uint8Array
 
     assert(
       await new UnacknowledgedTicket(node.paymentChannels, {

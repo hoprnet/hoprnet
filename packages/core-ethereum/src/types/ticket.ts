@@ -31,10 +31,10 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
     struct?: {
       counterparty: Address
       challenge: Hash
-      epoch: UINT256 
+      epoch: UINT256
       amount: Balance
       winProb: Hash
-      channelIteration: UINT256 
+      channelIteration: UINT256
     }
   ) {
     if (!arr && !struct) {
@@ -88,7 +88,7 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
     return this.byteOffset + Address.SIZE + Hash.SIZE
   }
 
-  get epoch(): UINT256{
+  get epoch(): UINT256 {
     return new UINT256(new Uint8Array(this.buffer, this.epochOffset, EPOCH_SIZE))
   }
 
@@ -112,7 +112,7 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
     return this.byteOffset + Address.SIZE + Hash.SIZE + EPOCH_SIZE + UINT96_SIZE + Hash.SIZE
   }
 
-  get channelIteration(): UINT256{
+  get channelIteration(): UINT256 {
     return new UINT256(new Uint8Array(this.buffer, this.channelIterationOffset, EPOCH_SIZE))
   }
 
@@ -145,10 +145,10 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
     struct?: {
       counterparty: Address
       challenge: Hash
-      epoch: UINT256 
+      epoch: UINT256
       amount: Balance
       winProb: Hash
-      channelIteration: UINT256 
+      channelIteration: UINT256
     }
   ): Ticket {
     return new Ticket(arr, struct)

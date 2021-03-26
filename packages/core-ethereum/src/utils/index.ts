@@ -155,7 +155,10 @@ export async function verify(msg: Uint8Array, signature: Signature, pubKey: Uint
  */
 export async function isWinningTicket(ticketHash: Hash, challengeResponse: Hash, preImage: Hash, winProb: Hash) {
   return [A_STRICLY_LESS_THAN_B, A_EQUALS_B].includes(
-    u8aCompare(Hash.create(u8aConcat(ticketHash.serialize(), preImage.serialize(), challengeResponse.serialize())).serialize(), winProb.serialize())
+    u8aCompare(
+      Hash.create(u8aConcat(ticketHash.serialize(), preImage.serialize(), challengeResponse.serialize())).serialize(),
+      winProb.serialize()
+    )
   )
 }
 

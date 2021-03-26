@@ -83,7 +83,7 @@ class Hash implements Interfaces.Hash {
     return HASH_LENGTH
   }
 
-  static create(msg: Uint8Array){
+  static create(msg: Uint8Array) {
     return new Hash(createKeccakHash('keccak256').update(Buffer.from(msg)).digest())
   }
 
@@ -103,7 +103,8 @@ class Hash implements Interfaces.Hash {
     return new Hash(this.arr.slice())
   }
 
-  hash(): Hash { // Sometimes we double hash.
+  hash(): Hash {
+    // Sometimes we double hash.
     return Hash.create(this.serialize())
   }
 

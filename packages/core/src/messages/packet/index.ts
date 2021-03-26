@@ -204,9 +204,14 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     const ticketChallenge = await chain.utils.hash(
       secrets.length == 1
         ? deriveTicketLastKey(secrets[0])
-        : (await chain.utils.hash(
-            u8aConcat(deriveTicketKey(secrets[0]), (await chain.utils.hash(deriveTicketKeyBlinding(secrets[1]))).serialize())
-          )).serialize()
+        : (
+            await chain.utils.hash(
+              u8aConcat(
+                deriveTicketKey(secrets[0]),
+                (await chain.utils.hash(deriveTicketKeyBlinding(secrets[1]))).serialize()
+              )
+            )
+          ).serialize()
     )
 
     if (secrets.length > 1) {

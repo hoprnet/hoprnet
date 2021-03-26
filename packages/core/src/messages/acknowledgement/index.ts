@@ -15,7 +15,7 @@ import PeerId from 'peer-id'
 class Acknowledgement<Chain extends HoprCoreConnector> extends Uint8Array {
   private _responseSigningParty?: Uint8Array
   private _responseSignature?: Types.Signature
-  private _hashedKey?: Types.Hash 
+  private _hashedKey?: Types.Hash
 
   private paymentChannels: Chain
 
@@ -137,7 +137,11 @@ class Acknowledgement<Chain extends HoprCoreConnector> extends Uint8Array {
         responseSignature.signature,
         responseSignature.recovery,
         responseSignature.msgPrefix != null && responseSignature.msgPrefix.length > 0
-          ? (await this.paymentChannels.utils.hash(u8aConcat(responseSignature.msgPrefix, (await this.hash).serialize()))).serialize()
+          ? (
+              await this.paymentChannels.utils.hash(
+                u8aConcat(responseSignature.msgPrefix, (await this.hash).serialize())
+              )
+            ).serialize()
           : (await this.hash).serialize()
       )
 
@@ -152,7 +156,11 @@ class Acknowledgement<Chain extends HoprCoreConnector> extends Uint8Array {
   }
 
   async verify(peerId: PeerId): Promise<boolean> {
-    return this.paymentChannels.utils.verify((await this.hash).serialize(), await this.responseSignature, peerId.pubKey.marshal())
+    return this.paymentChannels.utils.verify(
+      (await this.hash).serialize(),
+      await this.responseSignature,
+      peerId.pubKey.marshal()
+    )
   }
 
   /**

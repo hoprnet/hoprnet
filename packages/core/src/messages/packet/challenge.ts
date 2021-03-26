@@ -14,7 +14,7 @@ import { u8aConcat } from '@hoprnet/hopr-utils'
 class Challenge<Chain extends HoprCoreConnector> extends Uint8Array {
   // private : Uint8Array
   private paymentChannels: Chain
-  private _hashedKey: Types.Hash 
+  private _hashedKey: Types.Hash
   private _fee: BN
   private _counterparty: Uint8Array
   private _challengeSignature: Types.Signature
@@ -115,7 +115,11 @@ class Challenge<Chain extends HoprCoreConnector> extends Uint8Array {
           challengeSignature.signature,
           challengeSignature.recovery,
           challengeSignature.msgPrefix != null && challengeSignature.msgPrefix.length > 0
-            ? (await this.paymentChannels.utils.hash(u8aConcat(challengeSignature.msgPrefix, (await this.hash).serialize()))).serialize()
+            ? (
+                await this.paymentChannels.utils.hash(
+                  u8aConcat(challengeSignature.msgPrefix, (await this.hash).serialize())
+                )
+              ).serialize()
             : this.hash.serialize()
         )
       )
@@ -179,7 +183,11 @@ class Challenge<Chain extends HoprCoreConnector> extends Uint8Array {
       throw Error('Unable to verify challenge without a public key.')
     }
 
-    return this.paymentChannels.utils.verify(this.hash.serialize(), await this.challengeSignature, peerId.pubKey.marshal())
+    return this.paymentChannels.utils.verify(
+      this.hash.serialize(),
+      await this.challengeSignature,
+      peerId.pubKey.marshal()
+    )
   }
 }
 

@@ -143,7 +143,9 @@ export async function deleteAcknowledgedTickets(
       tickets.map<any>(async (ticket) => {
         return {
           type: 'del',
-          key: Buffer.from(node._dbKeys.AcknowledgedTickets((await ticket.ackTicket.signedTicket).ticket.challenge.serialize()))
+          key: Buffer.from(
+            node._dbKeys.AcknowledgedTickets((await ticket.ackTicket.signedTicket).ticket.challenge.serialize())
+          )
         }
       })
     )
