@@ -6608,9 +6608,9 @@ he@1.2.0, he@^1.1.1:
   integrity sha512-F/1DnUGPopORZi0ni+CvrCgHQ5FyEAHRLSApuYWMmrbSwoN2Mn/7k+Gl38gJnR7yyDZk6WLXwiGod1JOWNDKGw==
 
 heap-js@^2.1.2:
-  version "2.1.4"
-  resolved "https://registry.yarnpkg.com/heap-js/-/heap-js-2.1.4.tgz#5bbee30fcc0a4a9319a0f07bb1fb56fd6396feaa"
-  integrity sha512-BTqPQI5dN24wC+wiAEC3VWtHnGNH2fh64TGzlVr1a7Smp6bNdzezpybYUBw8/ZRvlh+qUylPE1YJbnWEx3Ge/g==
+  version "2.1.5"
+  resolved "https://registry.yarnpkg.com/heap-js/-/heap-js-2.1.5.tgz#43251ecdd23c632653fe783bc8bdc2b7da4baf4c"
+  integrity sha512-zJeFH1ZxUHuYG6x9+a8Dy+5kjqbKk1K8yPI1KZEdsi18VCd0UjTyJ2u9PfuIoj7t3+saMmI132rJGV33tP52VQ==
 
 heap@0.2.6, heap@~0.2.6:
   version "0.2.6"
