@@ -1,5 +1,5 @@
-import type { ChannelUpdate } from '@hoprnet/hopr-core-connector-interface'
 import BN from 'bn.js'
+import chalk from 'chalk'
 import {
   Address,
   Balance,
@@ -21,7 +21,6 @@ import {
   pubKeyToAddress,
   sign,
   isPartyA,
-  getParties,
   Log,
   stateCounterToStatus,
   isGanache
@@ -50,28 +49,42 @@ class ChannelFactory {
     const self = new Public(this.coreConnector.account.keys.onChain.pubKey)
     const selfAddress = await self.toAddress()
 
-    indexer.on('channelOpened', async ({ partyA: _partyA, partyB: _partyB, channelEntry }: ChannelUpdate) => {
-      const partyA = new Public(_partyA)
-      const partyAAddress = await partyA.toAddress()
-      const partyB = new Public(_partyB)
+    indexer.on('channelOpened', async (channel: ChannelEntry) => {
+      const accountAPubKey = await this.coreConnector.indexer.getPublicKeyOf(channel.parties[0])
+      const accountBPubKey = await this.coreConnector.indexer.getPublicKeyOf(channel.parties[1])
+      if (!accountAPubKey || !accountBPubKey) {
+        log(chalk.red('Currently opening a channel with an unintialized account is not supported'))
+        return
+      }
+
+      const [partyA, partyB] = this.coreConnector.utils.isPartyA(channel.parties[0], channel.parties[1])
+        ? [accountAPubKey, accountBPubKey]
+        : [accountBPubKey, accountAPubKey]
 
       log('channelOpened', partyA.toHex(), partyB.toHex())
-      const isOurs = partyA.eq(self) || partyB.eq(self)
+      const isOurs = channel.parties[0].eq(selfAddress) || channel.parties[1].eq(selfAddress)
       if (!isOurs) return
 
-      await this.onOpen(isPartyA(selfAddress, partyAAddress) ? partyB : partyA, channelEntry as ChannelEntry)
+      await this.onOpen(isPartyA(selfAddress, await partyA.toAddress()) ? partyB : partyA, channel)
     })
 
-    indexer.on('channelClosed', async ({ partyA: _partyA, partyB: _partyB }: ChannelUpdate) => {
-      const partyA = new Public(_partyA)
-      const partyAAddress = await partyA.toAddress()
-      const partyB = new Public(_partyB)
+    indexer.on('channelClosed', async (channel: ChannelEntry) => {
+      const accountAPubKey = await this.coreConnector.indexer.getPublicKeyOf(channel.parties[0])
+      const accountBPubKey = await this.coreConnector.indexer.getPublicKeyOf(channel.parties[1])
+      if (!accountAPubKey || !accountBPubKey) {
+        log(chalk.red('Currently closing a channel with an unintialized account is not supported'))
+        return
+      }
+
+      const [partyA, partyB] = this.coreConnector.utils.isPartyA(channel.parties[0], channel.parties[1])
+        ? [accountAPubKey, accountBPubKey]
+        : [accountBPubKey, accountAPubKey]
 
       log('channelClosed', partyA.toHex(), partyB.toHex())
-      const isOurs = partyA.eq(self) || partyB.eq(self)
+      const isOurs = channel.parties[0].eq(selfAddress) || channel.parties[1].eq(selfAddress)
       if (!isOurs) return
 
-      await this.onClose(isPartyA(selfAddress, partyAAddress) ? partyB : partyA)
+      await this.onClose(isPartyA(selfAddress, await partyA.toAddress()) ? partyB : partyA)
     })
   }
 
@@ -126,8 +139,8 @@ class ChannelFactory {
               this.coreConnector.hoprChannels.options.address,
               amount.toBN().toString(),
               this.coreConnector.web3.eth.abi.encodeParameters(
-                ['address', 'address'],
-                [(await account.address).toHex(), counterparty.toHex()]
+                ['bool', 'address', 'address'],
+                [false, (await account.address).toHex(), counterparty.toHex()]
               )
             )
           )
@@ -144,7 +157,8 @@ class ChannelFactory {
 
     const [onChain, offChain]: [boolean, boolean] = await Promise.all([
       this.coreConnector.channel.getOnChainState(new Public(counterpartyPubKey)).then((channel) => {
-        return channel.status === 'OPEN' || channel.status === 'PENDING'
+        const status = channel.getStatus()
+        return status === 'OPEN' || status === 'PENDING_TO_CLOSE'
       }),
       this.getOffChainState(counterpartyPubKey).then(
         () => true,
@@ -196,10 +210,10 @@ class ChannelFactory {
       {
         counterparty,
         challenge,
-        epoch: new UINT256(0),
+        epoch: UINT256.fromString('0'),
         amount: new Balance(new BN(0)),
         winProb,
-        channelIteration: new UINT256(0)
+        channelIteration: UINT256.fromString('0')
       }
     )
 
@@ -402,7 +416,8 @@ class ChannelFactory {
     const self = new Public(this.coreConnector.account.keys.onChain.pubKey)
     const selfAddress = await self.toAddress()
     const counterpartyAddress = await counterparty.toAddress()
-    const [partyAAddress] = getParties(selfAddress, counterpartyAddress)
+    const channelId = await getId(selfAddress, counterpartyAddress)
+    const parties: [Address, Address] = [selfAddress, counterpartyAddress]
 
     // HACK: when running our unit/intergration tests using ganache, the indexer doesn't have enough
     // time to pick up the events and reduce the data - here we are doing 2 things wrong:
@@ -413,34 +428,22 @@ class ChannelFactory {
       const channelId = await getId(selfAddress, counterpartyAddress)
       const response = await this.coreConnector.hoprChannels.methods.channels(channelId.toHex()).call()
 
-      return new ChannelEntry(undefined, {
-        blockNumber: new BN(0),
-        transactionIndex: new BN(0),
-        logIndex: new BN(0),
-        deposit: new BN(response.deposit),
-        partyABalance: new BN(response.partyABalance),
-        closureTime: new BN(response.closureTime),
-        stateCounter: new BN(response.stateCounter),
-        closureByPartyA: response.closureByPartyA
-      })
-    } else {
-      let channelEntry = await this.coreConnector.indexer.getChannelEntry(
-        partyAAddress.eq(selfAddress) ? self : counterparty,
-        partyAAddress.eq(selfAddress) ? counterparty : self
+      return new ChannelEntry(
+        parties,
+        new BN(response.deposit),
+        new BN(response.partyABalance),
+        new BN(response.closureTime),
+        new BN(response.status),
+        response.closureByPartyA,
+        new BN(0),
+        new BN(0)
       )
+    } else {
+      const channelEntry = await this.coreConnector.indexer.getChannel(channelId)
       if (channelEntry) return channelEntry
 
       // when channelEntry is not found, the onchain data is all 0
-      return new ChannelEntry(undefined, {
-        blockNumber: new BN(0),
-        transactionIndex: new BN(0),
-        logIndex: new BN(0),
-        deposit: new BN(0),
-        partyABalance: new BN(0),
-        closureTime: new BN(0),
-        stateCounter: new BN(0),
-        closureByPartyA: false
-      })
+      return new ChannelEntry(parties, new BN(0), new BN(0), new BN(0), new BN(0), false, new BN(0), new BN(0))
     }
   }
 }

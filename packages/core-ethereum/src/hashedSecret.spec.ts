@@ -1,27 +1,27 @@
-import assert from 'assert'
 import type HoprEthereum from '.'
+import assert from 'assert'
+import { randomBytes } from 'crypto'
 import * as DbKeys from './dbKeys'
 import * as Utils from './utils'
 import * as Types from './types'
-import PreImage, { HASHED_SECRET_WIDTH } from './hashedSecret'
+import PreImage from './hashedSecret'
 import { u8aEquals, durations, stringToU8a } from '@hoprnet/hopr-utils'
 import Memdown from 'memdown'
 import LevelUp from 'levelup'
 import { Ganache } from '@hoprnet/hopr-testing'
-import { Network, addresses, abis } from '@hoprnet/hopr-ethereum'
+import { getAddresses, abis } from '@hoprnet/hopr-ethereum'
 import { migrate, fund } from '@hoprnet/hopr-ethereum'
 import Web3 from 'web3'
 import type { WebsocketProvider } from 'web3-core'
 import * as testconfigs from './config.spec'
 import * as configs from './config'
 import Account from './account'
-import { randomBytes } from 'crypto'
+import { Hash } from './types'
 import { hash as hashFunction } from './utils'
 
 const HoprChannelsAbi = abis.HoprChannels
-
-const EMPTY_HASHED_SECRET = new Uint8Array(HASHED_SECRET_WIDTH).fill(0x00)
-const FUND_ARGS = `--address ${addresses?.localhost?.HoprToken} --accounts-to-fund 1`
+const EMPTY_HASHED_SECRET = new Uint8Array(Hash.SIZE).fill(0x00)
+const FUND_ARGS = `--address ${getAddresses()?.localhost?.HoprToken} --accounts-to-fund 1`
 
 describe('test hashedSecret', function () {
   this.timeout(durations.minutes(10))
@@ -31,10 +31,10 @@ describe('test hashedSecret', function () {
   async function generateConnector(debug?: boolean): Promise<HoprEthereum> {
     let web3 = new Web3(configs.DEFAULT_URI)
     const chainId = await Utils.getChainId(web3)
-    const network = Utils.getNetworkName(chainId) as Network
+    const network = Utils.getNetworkName(chainId)
 
     const connector = ({
-      hoprChannels: new web3.eth.Contract(HoprChannelsAbi as any, addresses[network].HoprChannels),
+      hoprChannels: new web3.eth.Contract(HoprChannelsAbi as any, getAddresses()[network].HoprChannels),
       web3,
       db: LevelUp(Memdown()),
       dbKeys: DbKeys,
@@ -66,7 +66,7 @@ describe('test hashedSecret', function () {
   // const checkIndex = async (index: number, masterSecret: Uint8Array, shouldThrow: boolean) => {
   //   let hash = masterSecret
   //   for (let i = 0; i < index; i++) {
-  //     hash = (await connector.utils.hash(hash)).slice(0, HASHED_SECRET_WIDTH)
+  //     hash = (await connector.utils.hash(hash))
   //   }
 
   //   let result,
@@ -84,7 +84,7 @@ describe('test hashedSecret', function () {
   //   } else {
   //     assert(result != null, `Pre-image must have been derivable from the database.`)
   //     assert(
-  //       u8aEquals((await connector.utils.hash(result.preImage)).slice(0, HASHED_SECRET_WIDTH), hash) &&
+  //       u8aEquals((await connector.utils.hash(result.preImage)), hash) &&
   //         index == result.index + 1
   //     )
   //   }
@@ -112,13 +112,13 @@ describe('test hashedSecret', function () {
 
       let onChainHash = new Types.Hash(
         stringToU8a(
-          (await connector.hoprChannels.methods.accounts((await connector.account.address).toHex()).call()).hashedSecret
+          (await connector.hoprChannels.methods.accounts((await connector.account.address).toHex()).call()).secret
         )
       )
 
       let preImage = await connector.hashedSecret.findPreImage(onChainHash)
 
-      assert(u8aEquals((await hashFunction(preImage.preImage)).slice(0, HASHED_SECRET_WIDTH), onChainHash))
+      assert(u8aEquals(await hashFunction(preImage.preImage), onChainHash))
 
       await connector.utils.waitForConfirmation(
         (
@@ -127,13 +127,13 @@ describe('test hashedSecret', function () {
               from: (await connector.account.address).toHex(),
               to: connector.hoprChannels.options.address
             },
-            connector.hoprChannels.methods.setHashedSecret(new Types.Hash(preImage.preImage).toHex())
+            connector.hoprChannels.methods.updateAccountSecret(new Types.Hash(preImage.preImage).toHex())
           )
         ).send()
       )
       let updatedOnChainHash = new Types.Hash(
         stringToU8a(
-          (await connector.hoprChannels.methods.accounts((await connector.account.address).toHex()).call()).hashedSecret
+          (await connector.hoprChannels.methods.accounts((await connector.account.address).toHex()).call()).secret
         )
       )
 
@@ -143,9 +143,7 @@ describe('test hashedSecret', function () {
 
       assert(!u8aEquals(preImage.preImage, updatedPreImage.preImage), `new and old pre-image must not be the same`)
 
-      assert(
-        u8aEquals((await hashFunction(updatedPreImage.preImage)).slice(0, HASHED_SECRET_WIDTH), updatedOnChainHash)
-      )
+      assert(u8aEquals(await hashFunction(updatedPreImage.preImage), updatedOnChainHash))
     })
 
     // // Commented due expensive operations
@@ -196,13 +194,13 @@ describe('test hashedSecret', function () {
 
       let onChainHash = new Types.Hash(
         stringToU8a(
-          (await connector.hoprChannels.methods.accounts((await connector.account.address).toHex()).call()).hashedSecret
+          (await connector.hoprChannels.methods.accounts((await connector.account.address).toHex()).call()).secret
         )
       )
 
       let preImage = await connector.hashedSecret.findPreImage(onChainHash)
 
-      assert(u8aEquals((await hashFunction(preImage.preImage)).slice(0, HASHED_SECRET_WIDTH), onChainHash))
+      assert(u8aEquals(await hashFunction(preImage.preImage), onChainHash))
 
       await connector.utils.waitForConfirmation(
         (
@@ -211,14 +209,14 @@ describe('test hashedSecret', function () {
               from: (await connector.account.address).toHex(),
               to: connector.hoprChannels.options.address
             },
-            connector.hoprChannels.methods.setHashedSecret(new Types.Hash(preImage.preImage).toHex())
+            connector.hoprChannels.methods.updateAccountSecret(new Types.Hash(preImage.preImage).toHex())
           )
         ).send()
       )
 
       let updatedOnChainHash = new Types.Hash(
         stringToU8a(
-          (await connector.hoprChannels.methods.accounts((await connector.account.address).toHex()).call()).hashedSecret
+          (await connector.hoprChannels.methods.accounts((await connector.account.address).toHex()).call()).secret
         )
       )
 
@@ -228,13 +226,11 @@ describe('test hashedSecret', function () {
 
       assert(!u8aEquals(preImage.preImage, updatedPreImage.preImage), `new and old pre-image must not be the same`)
 
-      assert(
-        u8aEquals((await hashFunction(updatedPreImage.preImage)).slice(0, HASHED_SECRET_WIDTH), updatedOnChainHash)
-      )
+      assert(u8aEquals(await hashFunction(updatedPreImage.preImage), updatedOnChainHash))
     })
 
     it('should reserve a preImage for tickets with 100% winning probabilty resp. should not reserve for 0% winning probability', async function () {
-      const firstTicket = new Types.AcknowledgedTicket(connector, undefined, {
+      const firstTicket = new Types.AcknowledgedTicket(undefined, {
         signedTicket: {
           ticket: {
             hash: Promise.resolve(new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff))),
@@ -249,7 +245,7 @@ describe('test hashedSecret', function () {
         'ticket with 100% winning probability must always be a win'
       )
 
-      const firstPreImage = new Types.Hash(new Uint8Array(HASHED_SECRET_WIDTH))
+      const firstPreImage = new Types.Hash(new Uint8Array(Hash.SIZE))
       firstPreImage.set(firstTicket.preImage)
 
       assert(
@@ -257,17 +253,17 @@ describe('test hashedSecret', function () {
         'ticket with 100% winning probability must always be a win'
       )
 
-      const secondPreImage = new Types.Hash(new Uint8Array(HASHED_SECRET_WIDTH))
+      const secondPreImage = new Types.Hash(new Uint8Array(Hash.SIZE))
       secondPreImage.set(firstTicket.preImage)
 
       assert(
         firstPreImage != null &&
           secondPreImage != null &&
           !firstPreImage.eq(secondPreImage) &&
-          u8aEquals((await hashFunction(secondPreImage)).slice(0, HASHED_SECRET_WIDTH), firstPreImage)
+          u8aEquals(await hashFunction(secondPreImage), firstPreImage)
       )
 
-      const notWinnigTicket = new Types.AcknowledgedTicket(connector, undefined, {
+      const notWinnigTicket = new Types.AcknowledgedTicket(undefined, {
         signedTicket: {
           ticket: {
             hash: Promise.resolve(new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff))),
@@ -284,13 +280,13 @@ describe('test hashedSecret', function () {
         'ticket with 100% winning probability must always be a win'
       )
 
-      const fourthPreImage = new Types.Hash(new Uint8Array(HASHED_SECRET_WIDTH))
+      const fourthPreImage = new Types.Hash(new Uint8Array(Hash.SIZE))
       fourthPreImage.set(firstTicket.preImage)
 
       assert(
         fourthPreImage != null &&
           !fourthPreImage.eq(secondPreImage) &&
-          u8aEquals((await hashFunction(fourthPreImage)).slice(0, HASHED_SECRET_WIDTH), secondPreImage)
+          u8aEquals(await hashFunction(fourthPreImage), secondPreImage)
       )
     })
 
@@ -300,7 +296,7 @@ describe('test hashedSecret', function () {
       let ticket: Types.AcknowledgedTicket
 
       for (let i = 0; i < ATTEMPTS; i++) {
-        ticket = new Types.AcknowledgedTicket(connector, undefined, {
+        ticket = new Types.AcknowledgedTicket(undefined, {
           signedTicket: {
             ticket: {
               hash: Promise.resolve(new Types.Hash(randomBytes(Types.Hash.SIZE))),

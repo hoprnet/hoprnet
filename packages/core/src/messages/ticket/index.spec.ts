@@ -55,9 +55,9 @@ describe(`check serialization and deserialization of ticket objects`, function (
         amount: new node.paymentChannels.types.Balance(new BN(1)),
         counterparty: accountB,
         challenge,
-        epoch: new node.paymentChannels.types.UINT256(0),
+        epoch: node.paymentChannels.types.UINT256.fromString('0'),
         winProb: new node.paymentChannels.types.Hash(new Uint8Array(32).fill(0xff)),
-        channelIteration: new node.paymentChannels.types.UINT256(0)
+        channelIteration: node.paymentChannels.types.UINT256.fromString('0')
       }
     )
 
@@ -78,7 +78,7 @@ describe(`check serialization and deserialization of ticket objects`, function (
       'signature must be valid'
     )
 
-    const acknowledgedDbEntry = node.paymentChannels.types.AcknowledgedTicket.create(node.paymentChannels, undefined, {
+    const acknowledgedDbEntry = node.paymentChannels.types.AcknowledgedTicket.create(undefined, {
       signedTicket,
       response: await node.paymentChannels.utils.hash(u8aConcat(secretA, secretB)),
       preImage: randomBytes(27),

@@ -4,8 +4,6 @@ import ChannelBalance from './balance'
 import ChannelState from './state'
 
 declare interface ChannelStatic {
-  createFunded(channelBalance: ChannelBalance): Channel
-
   createActive(channelBalance: ChannelBalance): Channel
 
   createPending(pending: Moment, balance: ChannelBalance): Channel
@@ -29,7 +27,6 @@ declare interface Channel {
 
   pending?: Moment
 
-  isFunded: boolean
   isActive: boolean
   isPending: boolean
 

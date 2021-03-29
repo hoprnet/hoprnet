@@ -106,7 +106,7 @@ export class AdminServer {
 
     this.node.on('hopr:warning:unfundedNative', (addr) => {
       const NativeBalance = node.paymentChannels.types.NativeBalance
-      const min = new NativeBalance(0).toFormattedString.apply(SUGGESTED_NATIVE_BALANCE)
+      const min = new NativeBalance(new BN(0)).toFormattedString.apply(SUGGESTED_NATIVE_BALANCE)
 
       this.logs.log(
         `- The account associated with this node has no ${NativeBalance.SYMBOL},\n` +

@@ -16,7 +16,7 @@ const generateChannelData = async () => {
     balance: new Balance(new BN(10)),
     balance_a: new Balance(new BN(2))
   })
-  const state = new ChannelState(undefined, { state: ChannelStatus.UNINITIALISED })
+  const state = new ChannelState(undefined, { state: ChannelStatus.CLOSED })
 
   return new Channel(undefined, {
     state,

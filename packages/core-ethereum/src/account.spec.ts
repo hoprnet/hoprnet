@@ -4,9 +4,10 @@ import type CoreConnector from '.'
 import { expect } from 'chai'
 import Web3 from 'web3'
 import sinon from 'sinon'
+import BN from 'bn.js'
 import { getBalance, getNativeBalance } from './account'
 import { Ganache } from '@hoprnet/hopr-testing'
-import { migrate, addresses, abis } from '@hoprnet/hopr-ethereum'
+import { migrate, getAddresses, abis } from '@hoprnet/hopr-ethereum'
 import { stringToU8a, durations } from '@hoprnet/hopr-utils'
 import { getPrivKeyData, createAccountAndFund, createNode, disconnectWeb3 } from './utils/testing.spec'
 import * as testconfigs from './config.spec'
@@ -35,8 +36,8 @@ describe('test Account', function () {
     await migrate()
 
     web3 = new Web3(configs.DEFAULT_URI)
-    hoprToken = new web3.eth.Contract(HoprTokenAbi as any, addresses.localhost?.HoprToken)
-    new web3.eth.Contract(HoprChannelsAbi as any, addresses.localhost?.HoprChannels)
+    hoprToken = new web3.eth.Contract(HoprTokenAbi as any, getAddresses().localhost?.HoprToken)
+    new web3.eth.Contract(HoprChannelsAbi as any, getAddresses().localhost?.HoprChannels)
   })
 
   after(async function () {
@@ -62,13 +63,13 @@ describe('test Account', function () {
     it('should be 1 initially', async function () {
       const ticketEpoch = await coreConnector.account.ticketEpoch
 
-      expect(ticketEpoch.toString()).to.equal('1', 'initial ticketEpoch is wrong')
+      expect(ticketEpoch.toBN().toString()).to.equal('1', 'initial ticketEpoch is wrong')
     })
 
     it('should be 2 after setting new secret', async function () {
       const ticketEpoch = await coreConnector.account.ticketEpoch
 
-      expect(ticketEpoch.toString()).to.equal('2', 'ticketEpoch is wrong')
+      expect(ticketEpoch.toBN().toString()).to.equal('2', 'ticketEpoch is wrong')
     })
 
     it('should be 3 after reconnecting to web3', async function () {
@@ -80,7 +81,7 @@ describe('test Account', function () {
 
       const ticketEpoch = await coreConnector.account.ticketEpoch
 
-      expect(ticketEpoch.toString()).to.equal('3', 'ticketEpoch is wrong')
+      expect(ticketEpoch.toBN().toString()).to.equal('3', 'ticketEpoch is wrong')
     })
   })
 })
@@ -88,7 +89,7 @@ describe('test Account', function () {
 describe('test getBalance', function () {
   let clock: Sinon.SinonFakeTimers
 
-  const accountId: any = {
+  const address: any = {
     toHex: sinon.stub('')
   }
   const createHoprTokenMock = (value: string): any => {
@@ -110,29 +111,29 @@ describe('test getBalance', function () {
   })
 
   it('should get balance but nothing is cached', async function () {
-    const result = await getBalance(createHoprTokenMock('10'), accountId, true)
+    const result = await getBalance(createHoprTokenMock('10'), address, true)
     expect(result.toBN().toString()).to.equal('10')
   })
 
   it('should get balance', async function () {
-    const result = await getBalance(createHoprTokenMock('10'), accountId, false)
+    const result = await getBalance(createHoprTokenMock('10'), address, false)
     expect(result.toBN().toString()).to.equal('10')
   })
 
   it('should get cached balance', async function () {
-    const result = await getBalance(createHoprTokenMock('20'), accountId, true)
+    const result = await getBalance(createHoprTokenMock('20'), address, true)
     expect(result.toBN().toString()).to.equal('10')
   })
 
   it('should not get cached balance', async function () {
-    const result = await getBalance(createHoprTokenMock('20'), accountId, false)
+    const result = await getBalance(createHoprTokenMock('20'), address, false)
     expect(result.toBN().toString()).to.equal('20')
   })
 
   it('should reset cache', async function () {
     clock.tick(WEB3_CACHE_TTL + 1)
 
-    const result = await getBalance(createHoprTokenMock('30'), accountId, true)
+    const result = await getBalance(createHoprTokenMock('30'), address, true)
     expect(result.toBN().toString()).to.equal('30')
   })
 })
@@ -140,13 +141,13 @@ describe('test getBalance', function () {
 describe('test getNativeBalance', function () {
   let clock: Sinon.SinonFakeTimers
 
-  const accountId: any = {
+  const address: any = {
     toHex: sinon.stub('')
   }
   const createWeb3 = (value: string): any => {
     return {
       eth: {
-        getBalance: async () => value
+        getBalance: async () => new BN(value)
       }
     }
   }
@@ -160,29 +161,29 @@ describe('test getNativeBalance', function () {
   })
 
   it('should get balance but nothing is cached', async function () {
-    const result = await getNativeBalance(createWeb3('10'), accountId, true)
-    expect(result.toString()).to.equal('10')
+    const result = await getNativeBalance(createWeb3('10'), address, true)
+    expect(result.toBN().toString()).to.equal('10')
   })
 
   it('should get balance', async function () {
-    const result = await getNativeBalance(createWeb3('10'), accountId, false)
-    expect(result.toString()).to.equal('10')
+    const result = await getNativeBalance(createWeb3('10'), address, false)
+    expect(result.toBN().toString()).to.equal('10')
   })
 
   it('should get cached balance', async function () {
-    const result = await getNativeBalance(createWeb3('20'), accountId, true)
-    expect(result.toString()).to.equal('10')
+    const result = await getNativeBalance(createWeb3('20'), address, true)
+    expect(result.toBN().toString()).to.equal('10')
   })
 
   it('should not get cached balance', async function () {
-    const result = await getNativeBalance(createWeb3('20'), accountId, false)
-    expect(result.toString()).to.equal('20')
+    const result = await getNativeBalance(createWeb3('20'), address, false)
+    expect(result.toBN().toString()).to.equal('20')
   })
 
   it('should reset cache', async function () {
     clock.tick(WEB3_CACHE_TTL + 1)
 
-    const result = await getNativeBalance(createWeb3('30'), accountId, true)
-    expect(result.toString()).to.equal('30')
+    const result = await getNativeBalance(createWeb3('30'), address, true)
+    expect(result.toBN().toString()).to.equal('30')
   })
 })

@@ -1,20 +1,19 @@
 import type CoreConnector from '..'
 import assert from 'assert'
-import BN from 'bn.js'
 import Web3 from 'web3'
 import { Ganache } from '@hoprnet/hopr-testing'
-import { migrate, fund, addresses, abis } from '@hoprnet/hopr-ethereum'
+import { migrate, fund, getAddresses, abis } from '@hoprnet/hopr-ethereum'
 import { durations, u8aToHex, u8aEquals } from '@hoprnet/hopr-utils'
 import { stringToU8a } from '@hoprnet/hopr-utils'
 import * as testconfigs from '../config.spec'
 import * as configs from '../config'
-import { time, isPartyA } from '../utils'
+import { time, getId } from '../utils'
 import { Account, getPrivKeyData, createAccountAndFund, createNode } from '../utils/testing.spec'
 import { HoprToken } from '../tsc/web3/HoprToken'
 import { HoprChannels } from '../tsc/web3/HoprChannels'
-import { Public } from '../types'
 import { publicKeyConvert } from 'secp256k1'
 import { randomBytes } from 'crypto'
+import { Hash } from '../types'
 
 const HoprTokenAbi = abis.HoprToken
 const HoprChannelsAbi = abis.HoprChannels
@@ -40,11 +39,11 @@ describe('test indexer', function () {
 
     await ganache.start()
     await migrate()
-    await fund(`--address ${addresses?.localhost?.HoprToken} --accounts-to-fund 4`)
+    await fund(`--address ${getAddresses()?.localhost?.HoprToken} --accounts-to-fund 4`)
 
     web3 = new Web3(configs.DEFAULT_URI)
-    hoprToken = new web3.eth.Contract(HoprTokenAbi as any, addresses?.localhost?.HoprToken)
-    hoprChannels = new web3.eth.Contract(HoprChannelsAbi as any, addresses?.localhost?.HoprChannels)
+    hoprToken = new web3.eth.Contract(HoprTokenAbi as any, getAddresses()?.localhost?.HoprToken)
+    hoprChannels = new web3.eth.Contract(HoprChannelsAbi as any, getAddresses()?.localhost?.HoprChannels)
 
     userA = await getPrivKeyData(stringToU8a(testconfigs.FUND_ACCOUNT_PRIVATE_KEY))
     // userA < userB
@@ -69,25 +68,10 @@ describe('test indexer', function () {
     it('should not store channel before confirmations', async function () {
       this.timeout(durations.seconds(5))
 
-      //const uncompressedPubKeyA = publicKeyConvert(userA.pubKey, false).slice(1)
       const uncompressedPubKeyB = publicKeyConvert(userB.pubKey, false).slice(1)
 
-      // await connector.hoprChannels.methods
-      //   .init(
-      //     u8aToHex(uncompressedPubKeyA.slice(0, 32)),
-      //     u8aToHex(uncompressedPubKeyA.slice(32, 64)),
-      //     u8aToHex(randomBytes(27))
-      //   )
-      //   .send({
-      //     from: userA.address.toHex(),
-      //   })
-
       await connector.hoprChannels.methods
-        .init(
-          u8aToHex(uncompressedPubKeyB.slice(0, 32)),
-          u8aToHex(uncompressedPubKeyB.slice(32, 64)),
-          u8aToHex(randomBytes(27))
-        )
+        .initializeAccount(u8aToHex(uncompressedPubKeyB), u8aToHex(randomBytes(Hash.SIZE)))
         .send({
           from: userB.address.toHex()
         })
@@ -96,93 +80,66 @@ describe('test indexer', function () {
         .send(
           hoprChannels.options.address,
           1,
-          web3.eth.abi.encodeParameters(['address', 'address'], [userA.address.toHex(), userB.address.toHex()])
+          web3.eth.abi.encodeParameters(
+            ['bool', 'address', 'address'],
+            [true, userA.address.toHex(), userB.address.toHex()]
+          )
         )
         .send({
           from: userA.address.toHex(),
-          gas: 200e3
+          gas: 300e3
         })
-      await hoprChannels.methods.openChannel(userB.address.toHex()).send({
-        from: userA.address.toHex(),
-        gas: 200e3
-      })
-      const channels = await connector.indexer.getChannelEntries()
+
+      const channels = await connector.indexer.getChannels()
       assert.equal(channels.length, 0, 'check Channels.store')
     })
 
     it('should store channel & blockNumber correctly', async function () {
       const currentBlockNumber = await web3.eth.getBlockNumber()
       await time.advanceBlockTo(web3, currentBlockNumber + configs.MAX_CONFIRMATIONS)
-      const channels = await connector.indexer.getChannelEntries()
+      const channels = await connector.indexer.getChannels()
       assert.equal(channels.length, 1, 'check Channels.store')
     })
 
     it('should find all channels', async function () {
-      let partyA: Public, partyB: Public
-      if (isPartyA(await userA.pubKey.toAddress(), await userB.pubKey.toAddress())) {
-        partyA = userA.pubKey
-        partyB = userB.pubKey
-      } else {
-        partyA = userB.pubKey
-        partyB = userA.pubKey
-      }
-
-      const blockNumber = await web3.eth.getBlockNumber()
-      const channels = await connector.indexer.getChannelEntries()
+      const channels = await connector.indexer.getChannels()
       assert.equal(channels.length, 1, 'check Channels.store')
-      // @ts-ignore
-      // const latestConfirmedBlockNumber = await connector.indexer.getLatestConfirmedBlockNumber()
+
       const [channel] = channels
-      assert(u8aEquals(channel.partyA, partyA), 'check Channels.store')
-      assert(u8aEquals(channel.partyB, partyB), 'check Channels.store')
-      assert(channel.channelEntry.blockNumber.lt(new BN(blockNumber)), 'check Channels.store')
-      // assert(latestConfirmedBlockNumber < blockNumber, 'check Channels.store')
+      assert(
+        u8aEquals(channel.parties[0].serialize(), userA.address.serialize()) ||
+          u8aEquals(channel.parties[0].serialize(), userB.address.serialize()),
+        'check Channels.store'
+      )
+      assert(
+        u8aEquals(channel.parties[1].serialize(), userA.address.serialize()) ||
+          u8aEquals(channel.parties[1].serialize(), userB.address.serialize()),
+        'check Channels.store'
+      )
     })
 
     it('should find channel using partyA', async function () {
-      let partyA: Public, partyB: Public
-      if (isPartyA(await userA.pubKey.toAddress(), await userB.pubKey.toAddress())) {
-        partyA = userA.pubKey
-        partyB = userB.pubKey
-      } else {
-        partyA = userB.pubKey
-        partyB = userA.pubKey
-      }
-
-      const channels = await connector.indexer.getChannelEntries(partyA)
+      const expectedChannelId = await getId(userA.address, userB.address)
+      const channels = await connector.indexer.getChannelsOf(userA.address)
       assert.equal(channels.length, 1, 'check Channels.get')
+
       const [channel] = channels
-      assert(u8aEquals(channel.partyA, partyA), 'check Channels.get')
-      assert(u8aEquals(channel.partyB, partyB), 'check Channels.get')
+      const storedChannelId = await getId(...channel.parties)
+      assert(u8aEquals(expectedChannelId, storedChannelId), 'check Channels.get')
     })
-    it('should find channel using partyB', async function () {
-      let partyA: Public, partyB: Public
-      if (isPartyA(await userA.pubKey.toAddress(), await userB.pubKey.toAddress())) {
-        partyA = userA.pubKey
-        partyB = userB.pubKey
-      } else {
-        partyA = userB.pubKey
-        partyB = userA.pubKey
-      }
 
-      const channels = await connector.indexer.getChannelEntries(partyB)
-      const [channel] = channels
+    it('should find channel using partyB', async function () {
+      const expectedChannelId = await getId(userA.address, userB.address)
+      const channels = await connector.indexer.getChannelsOf(userB.address)
       assert.equal(channels.length, 1, 'check Channels.get')
-      assert(u8aEquals(channel.partyA, partyA), 'check Channels.get')
-      assert(u8aEquals(channel.partyB, partyB), 'check Channels.get')
+
+      const [channel] = channels
+      const storedChannelId = await getId(...channel.parties)
+      assert(u8aEquals(expectedChannelId, storedChannelId), 'check Channels.get')
     })
 
     it('should find channel using partyA & partyB', async function () {
-      let partyA: Public, partyB: Public
-      if (isPartyA(await userA.pubKey.toAddress(), await userB.pubKey.toAddress())) {
-        partyA = userA.pubKey
-        partyB = userB.pubKey
-      } else {
-        partyA = userB.pubKey
-        partyB = userA.pubKey
-      }
-
-      const channel = await connector.indexer.getChannelEntry(partyA, partyB)
+      const channel = await connector.indexer.getChannel(await getId(userA.address, userB.address))
       assert(!!channel, 'check Channels.getChannelEntry')
     })
     it('should store another channel', async function () {
@@ -190,11 +147,7 @@ describe('test indexer', function () {
       const uncompressedPubKeyC = publicKeyConvert(userC.pubKey, false).slice(1)
 
       await connector.hoprChannels.methods
-        .init(
-          u8aToHex(uncompressedPubKeyC.slice(0, 32)),
-          u8aToHex(uncompressedPubKeyC.slice(32, 64)),
-          u8aToHex(randomBytes(27))
-        )
+        .initializeAccount(u8aToHex(uncompressedPubKeyC), u8aToHex(randomBytes(Hash.SIZE)))
         .send({
           from: userC.address.toHex()
         })
@@ -203,57 +156,47 @@ describe('test indexer', function () {
         .send(
           hoprChannels.options.address,
           1,
-          web3.eth.abi.encodeParameters(['address', 'address'], [userA.address.toHex(), userC.address.toHex()])
+          web3.eth.abi.encodeParameters(
+            ['bool', 'address', 'address'],
+            [true, userA.address.toHex(), userC.address.toHex()]
+          )
         )
         .send({
           from: userA.address.toHex(),
-          gas: 200e3
+          gas: 300e3
         })
 
-      await hoprChannels.methods.openChannel(userC.address.toHex()).send({
-        from: userA.address.toHex(),
-        gas: 200e3
-      })
       const currentBlockNumber = await web3.eth.getBlockNumber()
       await time.advanceBlockTo(web3, currentBlockNumber + configs.MAX_CONFIRMATIONS)
-      const channels = await connector.indexer.getChannelEntries()
+      const channels = await connector.indexer.getChannels()
       assert.equal(channels.length, 2, 'check Channels.store')
-      const channelsUsingPartyA = await connector.indexer.getChannelEntries(userA.pubKey)
+      const channelsUsingPartyA = await connector.indexer.getChannelsOf(userA.address)
       assert.equal(channelsUsingPartyA.length, 2, 'check Channels.get')
-      const channelsUsingPartyB = await connector.indexer.getChannelEntries(userB.pubKey)
+      const channelsUsingPartyB = await connector.indexer.getChannelsOf(userB.address)
       assert.equal(channelsUsingPartyB.length, 1, 'check Channels.get')
     })
 
     it('should not delete channel before confirmations', async function () {
       await hoprChannels.methods.initiateChannelClosure(userB.address.toHex()).send({
         from: userA.address.toHex(),
-        gas: 200e3
+        gas: 300e3
       })
       await time.increase(web3, Math.floor(CLOSURE_DURATION / 1e3))
-      await hoprChannels.methods.claimChannelClosure(userB.address.toHex()).send({
+      await hoprChannels.methods.finalizeChannelClosure(userB.address.toHex()).send({
         from: userA.address.toHex(),
-        gas: 200e3
+        gas: 300e3
       })
-      const channels = await connector.indexer.getChannelEntries()
+      const channels = await connector.indexer.getChannels()
       assert.equal(channels.length, 2, 'check Channels.store')
     })
 
     it('should "ZERO" channel', async function () {
       const currentBlockNumber = await web3.eth.getBlockNumber()
       await time.advanceBlockTo(web3, currentBlockNumber + configs.MAX_CONFIRMATIONS)
-      const channels = await connector.indexer.getChannelEntries()
+      const channels = await connector.indexer.getChannels()
       assert.equal(channels.length, 2, 'check Channels.store')
 
-      let partyA: Public, partyB: Public
-      if (isPartyA(await userA.pubKey.toAddress(), await userB.pubKey.toAddress())) {
-        partyA = userA.pubKey
-        partyB = userB.pubKey
-      } else {
-        partyA = userB.pubKey
-        partyB = userA.pubKey
-      }
-
-      const channel = await connector.indexer.getChannelEntry(partyA, partyB)
+      const channel = await connector.indexer.getChannel(await getId(userA.address, userB.address))
       assert(!!channel, 'check Channels.getChannelEntry')
       assert(channel.deposit.isZero())
       assert(channel.partyABalance.isZero())
@@ -268,11 +211,7 @@ describe('test indexer', function () {
       const uncompressedPubKeyD = publicKeyConvert(userD.pubKey, false).slice(1)
 
       await connector.hoprChannels.methods
-        .init(
-          u8aToHex(uncompressedPubKeyD.slice(0, 32)),
-          u8aToHex(uncompressedPubKeyD.slice(32, 64)),
-          u8aToHex(randomBytes(27))
-        )
+        .initializeAccount(u8aToHex(uncompressedPubKeyD), u8aToHex(randomBytes(Hash.SIZE)))
         .send({
           from: userD.address.toHex()
         })
@@ -281,24 +220,24 @@ describe('test indexer', function () {
         .send(
           hoprChannels.options.address,
           1,
-          web3.eth.abi.encodeParameters(['address', 'address'], [userA.address.toHex(), userD.address.toHex()])
+          web3.eth.abi.encodeParameters(
+            ['bool', 'address', 'address'],
+            [true, userA.address.toHex(), userD.address.toHex()]
+          )
         )
         .send({
           from: userA.address.toHex(),
-          gas: 200e3
+          gas: 300e3
         })
-      await hoprChannels.methods.openChannel(userD.address.toHex()).send({
-        from: userA.address.toHex(),
-        gas: 200e3
-      })
-      const channels = await connector.indexer.getChannelEntries()
+
+      const channels = await connector.indexer.getChannels()
       assert.equal(channels.length, 2, 'check Channels.store')
     })
 
     it('should not index new channel', async function () {
       const currentBlockNumber = await web3.eth.getBlockNumber()
       await time.advanceBlockTo(web3, currentBlockNumber + configs.MAX_CONFIRMATIONS)
-      const channels = await connector.indexer.getChannelEntries()
+      const channels = await connector.indexer.getChannels()
       assert.equal(channels.length, 2, 'check Channels.store')
     })
 
@@ -306,7 +245,7 @@ describe('test indexer', function () {
       this.timeout(durations.seconds(5))
       await connector.indexer.start()
       assert(connector.indexer.status === 'started', 'could not start indexer')
-      const channels = await connector.indexer.getChannelEntries()
+      const channels = await connector.indexer.getChannels()
       assert.equal(channels.length, 3, 'check Channels.store')
     })
   })

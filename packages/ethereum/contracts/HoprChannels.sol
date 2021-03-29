@@ -1,380 +1,326 @@
-pragma solidity ^0.6.0;
+// SPDX-License-Identifier: GPL-3.0
+pragma solidity 0.7.5;
 
-// SPDX-License-Identifier: LGPL-3.0-only
-
+import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/introspection/IERC1820Registry.sol";
 import "@openzeppelin/contracts/introspection/ERC1820Implementer.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC777/IERC777Recipient.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
-import "@openzeppelin/contracts/math/SafeMath.sol";
 import "./utils/ECDSA.sol";
+import "./utils/SafeUint24.sol";
 
 contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     using SafeMath for uint256;
+    using SafeUint24 for uint24;
+    using SafeERC20 for IERC20;
 
-    // an account has set a new secret hash
-    event SecretHashSet(address indexed account, bytes27 secretHash, uint32 counter);
-
-    struct Account {
-        uint256 accountX; // second part of account's public key
-        bytes27 hashedSecret; // account's hashedSecret
-        uint32 counter; // increases everytime 'setHashedSecret' is called by the account
-        uint8 oddY;
-    }
-
-    enum ChannelStatus {UNINITIALISED, FUNDED, OPEN, PENDING}
-
-    struct Channel {
-        uint96 deposit; // tokens in the deposit
-        uint96 partyABalance; // tokens that are claimable by party 'A'
-        uint40 closureTime; // the time when the channel can be closed by either party
-        uint24 stateCounter;
-        /* stateCounter mod 10 == 0: uninitialised
-         * stateCounter mod 10 == 1: funding
-         * stateCounter mod 10 == 2: open
-         * stateCounter mod 10 == 3: pending
-         */
-        bool closureByPartyA; // channel closure was initiated by party A
-    }
-
-    // setup ERC1820
+    // required by ERC1820 spec
     IERC1820Registry internal constant _ERC1820_REGISTRY = IERC1820Registry(0x1820a4B7618BdE71Dce8cdc73aAB6C95905faD24);
+    // required by ERC777 spec
     bytes32 public constant TOKENS_RECIPIENT_INTERFACE_HASH = keccak256("ERC777TokensRecipient");
+    // used by {tokensReceived} to distinguish which function to call after tokens are sent
+    uint256 public FUND_CHANNEL_SIZE = abi.encode(false, address(0), address(0)).length;
+    // used by {tokensReceived} to distinguish which function to call after tokens are sent
+    uint256 public FUND_CHANNEL_MULTI_SIZE = abi.encode(false, address(0), address(0), uint256(0), uint256(0)).length;
 
-    // @TODO: update this whenever adding / removing states.
-    uint8 constant NUMBER_OF_STATES = 4;
+    /**
+     * @dev An account struct, used to represent an account's state
+     */
+    struct Account {
+        // @TODO: optimize struct
+        bytes32 secret; // account's hashed secret
+        uint256 counter; // increases everytime 'secret' is changed
+    }
 
-    IERC20 public token; // the token that will be used to settle payments
-    uint256 public secsClosure; // seconds it takes to allow closing of channel after channel's -
-    // initiated channel closure, in case counter-party does not act -
-    // within this time period
+    /**
+     * @dev Possible channel statuses.
+     * We find out the channel's status by
+     * using {_getChannelStatus}.
+     */
+    enum ChannelStatus { CLOSED, OPEN, PENDING_TO_CLOSE }
 
-    // store accounts' state
+    /**
+     * @dev A channel struct, used to represent a channel's state
+     */
+    struct Channel {
+        // @TODO: optimize struct
+        // total tokens in deposit
+        uint256 deposit;
+        // tokens that are claimable by partyA
+        uint256 partyABalance;
+        // the time when the channel can be closed by either party
+        // overloads at year >2105
+        uint32 closureTime;
+        // status of the channel
+        // overloads at >16777215
+        uint24 status;
+        // channel closure was initiated by party A
+        bool closureByPartyA;
+    }
+
+    /**
+     * @dev Stored accounts keyed by their address
+     */
     mapping(address => Account) public accounts;
 
-    // store channels' state e.g: channels[hash(party_a, party_b)]
+    /**
+     * @dev Stored channels keyed by their channel ids
+     */
     mapping(bytes32 => Channel) public channels;
 
-    mapping(bytes32 => bool) public redeemedTickets;
+    /**
+     * @dev Stored hashes of tickets keyed by their challenge,
+     * true if ticket has been redeemed.
+     */
+    mapping(bytes32 => bool) public tickets;
 
-    constructor(IERC20 _token, uint256 _secsClosure) public {
-        token = _token;
+    /**
+     * @dev HoprToken, the token that will be used to settle payments
+     */
+    IERC20 public token;
 
-        require(_secsClosure < (1 << 40), "HoprChannels: Closure timeout must be strictly smaller than 2**40");
+    /**
+     * @dev Seconds it takes until we can finalize channel closure once,
+     * channel closure has been initialized.
+     */
+    uint32 public secsClosure;
 
+    event AccountInitialized(
+        // @TODO: remove this and rely on `msg.sender`
+        address indexed account,
+        bytes uncompressedPubKey,
+        bytes32 secret
+    );
+
+    event AccountSecretUpdated(
+        // @TODO: remove this and rely on `msg.sender`
+        address indexed account,
+        bytes32 secret,
+        // @TODO: remove counter?
+        uint256 counter
+    );
+
+    event ChannelFunded(
+        address indexed accountA,
+        address indexed accountB,
+        // @TODO: remove this and rely on `msg.sender`
+        address funder,
+        uint256 deposit,
+        uint256 partyABalance
+    );
+
+    event ChannelOpened(
+        // @TODO: remove this and rely on `msg.sender`
+        address indexed opener,
+        address indexed counterparty
+    );
+
+    event ChannelPendingToClose(
+        // @TODO: remove this and rely on `msg.sender`
+        address indexed initiator,
+        address indexed counterparty,
+        uint256 closureTime
+    );
+
+    event ChannelClosed(
+        // @TODO: remove this and rely on `msg.sender`
+        address indexed initiator,
+        address indexed counterparty,
+        uint256 partyAAmount,
+        uint256 partyBAmount
+    );
+
+    event TicketRedeemed(
+        // @TODO: remove this and rely on `msg.sender`
+        address indexed redeemer,
+        address indexed counterparty,
+        uint256 amount
+    );
+
+    /**
+     * @param _token HoprToken address
+     * @param _secsClosure seconds until a channel can be closed
+     */
+    constructor(address _token, uint32 _secsClosure) {
+        token = IERC20(_token);
         secsClosure = _secsClosure;
-
         _ERC1820_REGISTRY.setInterfaceImplementer(address(this), TOKENS_RECIPIENT_INTERFACE_HASH, address(this));
     }
 
     /**
-     * @notice sets caller's hashedSecret
-     * @param hashedSecret bytes27 hashedSecret to store
+     * @dev Initializes an account,
+     * stores it's public key, secret and counter,
+     * then emits {AccountInitialized} and {AccountSecretUpdated} events.
+     * @param secret account's secret
+     * @param uncompressedPubKey account's uncompressedPubKey
      */
-    function setHashedSecret(bytes27 hashedSecret) external {
-        require(hashedSecret != bytes27(0), "HoprChannels: hashedSecret is empty");
-
-        Account storage account = accounts[msg.sender];
-        require(account.accountX != uint256(0), "HoprChannels: msg.sender must have called init() before");
-        require(account.hashedSecret != hashedSecret, "HoprChannels: new and old hashedSecrets are the same");
-        require(account.counter + 1 < (1 << 32), "HoprChannels: Preventing account counter overflow");
-
-        account.hashedSecret = hashedSecret;
-        account.counter += 1;
-
-        emit SecretHashSet(msg.sender, hashedSecret, account.counter);
-    }
-
-    /**
-     * Initialize the account's on-chain variables.
-     *
-     * @param senderX uint256 first component of msg.sender's public key
-     * @param senderY uint256 second component of msg.sender's public key
-     * @param hashedSecret initial value for hashedSecret
-     */
-    function init(
-        uint256 senderX,
-        uint256 senderY,
-        bytes27 hashedSecret
+    function initializeAccount(
+        bytes calldata uncompressedPubKey,
+        bytes32 secret
     ) external {
-        require(senderX != uint256(0), "HoprChannels: first component of public key must not be zero.");
-        require(hashedSecret != bytes27(0), "HoprChannels: HashedSecret must not be empty.");
-
-        require(
-            ECDSA.pubKeyToEthereumAddress(senderX, senderY) == msg.sender,
-            "HoprChannels: Given public key must match 'msg.sender'"
+        _initializeAccount(
+            msg.sender,
+            uncompressedPubKey,
+            secret
         );
-
-        (, uint8 oddY) = ECDSA.compress(senderX, senderY);
-
-        Account storage account = accounts[msg.sender];
-
-        require(account.accountX == uint256(0), "HoprChannels: Account must not be set");
-
-        accounts[msg.sender] = Account(senderX, hashedSecret, uint32(1), oddY);
-
-        emit SecretHashSet(msg.sender, hashedSecret, uint32(1));
     }
 
     /**
-     * Fund a channel between 'initiator' and 'counterParty' using a signature,
-     * specified tokens must be approved beforehand.
-     *
-     * @notice fund a channel
-     * @param additionalDeposit uint256
-     * @param partyAAmount uint256
-     * @param notAfter uint256
-     * @param r bytes32
-     * @param s bytes32
-     * @param v uint8
-     * @param stateCounter uint128
+     * @dev Updates account's secret and counter,
+     * then emits {AccountSecretUpdated} event.
+     * @param secret account's secret
      */
-    function fundChannelWithSig(
-        uint256 additionalDeposit,
-        uint256 partyAAmount,
-        uint256 notAfter,
-        uint256 stateCounter,
-        bytes32 r,
-        bytes32 s,
-        uint8 v
+    function updateAccountSecret(
+        bytes32 secret
     ) external {
-        address initiator = msg.sender;
-
-        // verification
-        require(additionalDeposit > 0, "HoprChannels: 'additionalDeposit' must be strictly greater than zero");
-        require(additionalDeposit < (1 << 96), "HoprChannels: Invalid amount");
-        require(
-            partyAAmount <= additionalDeposit,
-            "HoprChannels: 'partyAAmount' must be strictly smaller than 'additionalDeposit'"
-        );
-        // require(partyAAmount < (1 << 96), "Invalid amount");
-        require(notAfter >= now, "HoprChannels: signature must not be expired");
-
-        address counterparty = ECDSA.recover(
-            ECDSA.toEthSignedMessageHash(
-                "167",
-                abi.encode(stateCounter, initiator, additionalDeposit, partyAAmount, notAfter)
-            ),
-            r,
-            s,
-            uint8(v)
-        );
-
-        require(accounts[msg.sender].accountX != uint256(0), "HoprChannels: initiator must have called init before");
-        require(
-            accounts[counterparty].accountX != uint256(0),
-            "HoprChannels: counterparty must have called init before"
-        );
-        require(initiator != counterparty, "HoprChannels: initiator and counterparty must not be the same");
-
-        (address partyA, , Channel storage channel, ChannelStatus status) = getChannel(initiator, counterparty);
-
-        require(
-            channel.stateCounter == stateCounter,
-            "HoprChannels: stored stateCounter and signed stateCounter must be the same"
-        );
-
-        require(
-            status == ChannelStatus.UNINITIALISED || status == ChannelStatus.FUNDED,
-            "HoprChannels: channel must be 'UNINITIALISED' or 'FUNDED'"
-        );
-
-        uint256 partyBAmount = additionalDeposit - partyAAmount;
-
-        if (initiator == partyA) {
-            token.transferFrom(initiator, address(this), partyAAmount);
-            token.transferFrom(counterparty, address(this), partyBAmount);
-        } else {
-            token.transferFrom(initiator, address(this), partyBAmount);
-            token.transferFrom(counterparty, address(this), partyAAmount);
-        }
-
-        channel.deposit = uint96(additionalDeposit);
-        channel.partyABalance = uint96(partyAAmount);
-
-        if (status == ChannelStatus.UNINITIALISED) {
-            // The state counter indicates the recycling generation and ensures that both parties are using the correct generation.
-            channel.stateCounter += 1;
-        }
-
-        if (initiator == partyA) {
-            emitFundedChannel(address(0), initiator, counterparty, partyAAmount, partyBAmount);
-        } else {
-            emitFundedChannel(address(0), counterparty, initiator, partyAAmount, partyBAmount);
-        }
+        _updateAccountSecret(msg.sender, secret);
     }
 
     /**
-     * @notice open a channel
-     * @param counterparty address the counterParty of 'msg.sender'
+     * @dev Funds a channel in one direction,
+     * then emits {ChannelFunded} event.
+     * @param account the address of the recipient
+     * @param counterparty the address of the counterparty
+     * @param amount amount to fund
      */
-    function openChannel(address counterparty) public {
+    function fundChannel(
+        address account,
+        address counterparty,
+        uint256 amount
+    ) external {
+        token.safeTransferFrom(msg.sender, address(this), amount);
+
+        _fundChannel(
+            msg.sender,
+            account,
+            counterparty,
+            amount,
+            0
+        );
+    }
+
+    /**
+     * @dev Funds a channel, in both directions,
+     * then emits {ChannelFunded} event.
+     * @param accountA the address of accountA
+     * @param accountB the address of accountB
+     * @param amountA amount to fund accountA
+     * @param amountB amount to fund accountB
+     */
+    function fundChannelMulti(
+        address accountA,
+        address accountB,
+        uint256 amountA,
+        uint256 amountB
+    ) external {
+        token.safeTransferFrom(msg.sender, address(this), amountA.add(amountB));
+
+        _fundChannel(
+            msg.sender,
+            accountA,
+            accountB,
+            amountA,
+            amountB
+        );
+    }
+
+    /**
+     * @dev Opens a channel, then emits
+     * {ChannelOpened} event.
+     * @param counterparty the address of the counterparty
+     */
+    function openChannel(address counterparty) external {
+        _openChannel(msg.sender, counterparty);
+    }
+
+    /**
+     * @dev Fund channel and then open it, then emits
+     * {ChannelFunded} and {ChannelOpened} events.
+     * @param accountA the address of accountA
+     * @param accountB the address of accountB
+     * @param amountA amount to fund accountA
+     * @param amountB amount to fund accountB
+     */
+    function fundAndOpenChannel(
+        address accountA,
+        address accountB,
+        uint256 amountA,
+        uint256 amountB
+    ) external {
         address opener = msg.sender;
+        require(
+            opener == accountA || opener == accountB,
+            "opener must be accountA or accountB"
+        );
 
-        require(opener != counterparty, "HoprChannels: 'opener' and 'counterParty' must not be the same");
-        require(counterparty != address(0), "HoprChannels: 'counterParty' address is empty");
+        token.safeTransferFrom(msg.sender, address(this), amountA.add(amountB));
 
-        (, , Channel storage channel, ChannelStatus status) = getChannel(opener, counterparty);
+        address counterparty;
+        if (opener == accountA) {
+            counterparty = accountB;
+        } else {
+            counterparty = accountA;
+        }
 
-        require(status == ChannelStatus.FUNDED, "HoprChannels: channel must be in 'FUNDED' state");
-
-        // The state counter indicates the recycling generation and ensures that both parties are using the correct generation.
-        channel.stateCounter += 1;
-
-        emitOpenedChannel(opener, counterparty);
+        _fundChannel(opener, accountA, accountB, amountA, amountB);
+        _openChannel(opener, counterparty);
     }
 
-    /**
-     * @notice redeem ticket
-     * @param preImage bytes32 the value that once hashed produces recipients hashedSecret
-     * @param hashedSecretASecretB bytes32 hash of secretA concatenated with secretB
-     * @param amount uint256 amount 'msg.sender' will receive
-     * @param winProb bytes32 win probability
-     * @param r bytes32
-     * @param s bytes32
-     * @param v uint8
-     */
     function redeemTicket(
-        bytes32 preImage,
-        bytes32 hashedSecretASecretB,
+        address counterparty,
+        bytes32 secretPreImage,
+        bytes32 proofOfRelaySecret,
         uint256 amount,
         bytes32 winProb,
-        address counterparty,
         bytes32 r,
         bytes32 s,
         uint8 v
     ) external {
-        require(amount > 0, "HoprChannels: amount must be strictly greater than zero");
-        require(amount < (1 << 96), "HoprChannels: Invalid amount");
-        require(
-            accounts[msg.sender].hashedSecret == bytes27(keccak256(abi.encodePacked(bytes27(preImage)))),
-            // @TODO Uncomment next line to enable salted hash
-            // accounts[msg.sender].hashedSecret == bytes27(keccak256(abi.encodePacked("HOPRnet", msg.sender, bytes27(preImage)))),
-            "HoprChannels: Given value is not a pre-image of the stored on-chain secret"
+        _redeemTicket(
+            msg.sender,
+            counterparty,
+            secretPreImage,
+            proofOfRelaySecret,
+            amount,
+            winProb,
+            r,
+            s,
+            v
         );
+    }
 
-        (address partyA, , Channel storage channel, ChannelStatus status) = getChannel(
+    /**
+     * @dev Initialize channel closure, updates channel's
+     * closure time, when the cool-off period is over,
+     * user may finalize closure, then emits
+     * {ChannelPendingToClose} event.
+     * @param counterparty the address of the counterparty
+     */
+    function initiateChannelClosure(
+        address counterparty
+    ) external {
+        _initiateChannelClosure(msg.sender, counterparty);
+    }
+
+    /**
+     * @dev Finalize channel closure, if cool-off period
+     * is over it will close the channel and transfer funds
+     * to the parties involved, then emits
+     * {ChannelClosed} event.
+     * @param counterparty the address of the counterparty
+     */
+    function finalizeChannelClosure(
+        address counterparty
+    ) external {
+        _finalizeChannelClosure(
             msg.sender,
             counterparty
         );
-        bytes32 challenge = keccak256(abi.encodePacked(hashedSecretASecretB));
-        bytes32 hashedTicket = ECDSA.toEthSignedMessageHash(
-            "109",
-            abi.encodePacked(
-                msg.sender,
-                challenge,
-                uint24(accounts[msg.sender].counter),
-                uint96(amount),
-                winProb,
-                uint24(getChannelIteration(channel))
-            )
-        );
-        require(ECDSA.recover(hashedTicket, r, s, v) == counterparty, "HashedTicket signer does not match our counterparty");
-        require(channel.stateCounter != uint24(0), "HoprChannels: Channel does not exist");
-        require(!redeemedTickets[hashedTicket], "Ticket must not be used twice");
-
-        bytes32 luck = keccak256(abi.encodePacked(hashedTicket, bytes27(preImage), hashedSecretASecretB));
-        require(uint256(luck) <= uint256(winProb), "HoprChannels: ticket must be a win");
-        require(
-            status == ChannelStatus.OPEN || status == ChannelStatus.PENDING,
-            "HoprChannels: channel must be 'OPEN' or 'PENDING'"
-        );
-
-        accounts[msg.sender].hashedSecret = bytes27(preImage);
-        redeemedTickets[hashedTicket] = true;
-
-        if (msg.sender == partyA) {
-            require(channel.partyABalance + amount < (1 << 96), "HoprChannels: Invalid amount");
-            channel.partyABalance += uint96(amount);
-        } else {
-            require(channel.partyABalance >= amount, "HoprChannels: Invalid amount");
-            channel.partyABalance -= uint96(amount);
-        }
-
-        require(
-            channel.partyABalance <= channel.deposit,
-            "HoprChannels: partyABalance must be strictly smaller than deposit balance"
-        );
-
-        emitRedeemedTicket(msg.sender, counterparty, amount);
     }
 
-    /**
-     * A channel's party can initiate channel closure at any time,
-     * it starts a timeout.
-     *
-     * @notice initiate channel's closure
-     * @param counterparty address counter party of 'msg.sender'
-     */
-    function initiateChannelClosure(address counterparty) external {
-        address initiator = msg.sender;
-
-        (address partyA, , Channel storage channel, ChannelStatus status) = getChannel(initiator, counterparty);
-
-        require(status == ChannelStatus.OPEN, "HoprChannels: channel must be 'OPEN'");
-
-        require(now + secsClosure < (1 << 40), "HoprChannels: Preventing timestamp overflow");
-        channel.closureTime = uint40(now + secsClosure);
-        // The state counter indicates the recycling generation and ensures that both parties are using the correct generation.
-
-        require(channel.stateCounter + 1 < (1 << 24), "HoprChannels: Preventing stateCounter overflow");
-        channel.stateCounter += 1;
-
-        if (initiator == partyA) {
-            channel.closureByPartyA = true;
-        }
-
-        emitInitiatedChannelClosure(initiator, counterparty, channel.closureTime);
-    }
-
-    /**
-     * If the timeout is reached without the 'counterParty' reedeming a ticket,
-     * then the tokens can be claimed by 'msg.sender'.
-     *
-     * @notice claim channel's closure
-     * @param counterparty address counter party of 'msg.sender'
-     */
-    function claimChannelClosure(address counterparty) external {
-        address initiator = msg.sender;
-
-        (address partyA, address partyB, Channel storage channel, ChannelStatus status) = getChannel(
-            initiator,
-            counterparty
-        );
-
-        require(channel.stateCounter + 7 < (1 << 24), "Preventing stateCounter overflow");
-        require(status == ChannelStatus.PENDING, "HoprChannels: channel must be 'PENDING'");
-
-        if (
-            channel.closureByPartyA && (initiator == partyA) ||
-            !channel.closureByPartyA && (initiator == partyB)
-        ) {
-            require(now >= uint256(channel.closureTime), "HoprChannels: 'closureTime' has not passed");
-        }
-
-        // settle balances
-        if (channel.partyABalance > 0) {
-            token.transfer(partyA, channel.partyABalance);
-            channel.deposit -= channel.partyABalance;
-        }
-
-        if (channel.deposit > 0) {
-            token.transfer(partyB, channel.deposit);
-        }
-
-        emitClosedChannel(initiator, counterparty, channel.partyABalance, channel.deposit);
-
-        delete channel.deposit; // channel.deposit = 0
-        delete channel.partyABalance; // channel.partyABalance = 0
-        delete channel.closureTime; // channel.closureTime = 0
-        delete channel.closureByPartyA; // channel.closureByPartyA = false
-
-        // The state counter indicates the recycling generation and ensures that both parties are using the correct generation.
-        // Increase state counter so that we can re-use the same channel after it has been closed.
-        channel.stateCounter += 7;
-    }
-
+    // @TODO: check with team, is this function too complex?
+    // @TODO: should we support account init?
     /**
      * A hook triggered when HOPR tokens are send to this contract.
      *
@@ -395,112 +341,308 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         // solhint-disable-next-line no-unused-vars
         bytes calldata operatorData
     ) external override {
-        require(msg.sender == address(token), "HoprChannels: Invalid token");
+        require(msg.sender == address(token), "caller must be HoprToken");
 
-        // only call 'fundChannel' when the operator is not self
-        if (operator != address(this)) {
-            (address recipient, address counterParty) = abi.decode(userData, (address, address));
+        if (
+            operator == address(this) || // must not be triggered by HoprChannels
+            from == address(0) // ignore 'mint'
+        ) {
+            return;
+        }
 
-            fundChannel(amount, from, recipient, counterParty);
+        // must be one of our supported functions
+        require(
+            userData.length == FUND_CHANNEL_SIZE ||
+            userData.length == FUND_CHANNEL_MULTI_SIZE,
+            "userData must match one of our supported functions"
+        );
+
+        bool shouldOpen;
+        address accountA;
+        address accountB;
+        uint256 amountA;
+        uint256 amountB;
+
+        if (userData.length == FUND_CHANNEL_SIZE) {
+            (shouldOpen, accountA, accountB) = abi.decode(userData, (bool, address, address));
+            amountA = amount;
+        } else {
+            (shouldOpen, accountA, accountB, amountA, amountB) = abi.decode(userData, (bool, address, address, uint256, uint256));
+            require(amount == amountA.add(amountB), "amount sent must be equal to amount specified");
+        }
+
+        _fundChannel(from, accountA, accountB, amountA, amountB);
+
+        if (shouldOpen) {
+            require(from == accountA || from == accountB, "funder must be either accountA or accountB");
+            _openChannel(accountA, accountB);
         }
     }
 
+    // internal code
+
     /**
-     * Fund a channel between 'accountA' and 'accountB',
-     * specified tokens must be approved beforehand.
-     * Called when HOPR tokens are send to this contract.
-     *
-     * @notice fund a channel
-     * @param additionalDeposit uint256 amount to fund the channel
-     * @param funder address account which the funds are for
-     * @param recipient address account of first participant of the payment channel
-     * @param counterparty address account of the second participant of the payment channel
+     * @dev Initializes an account,
+     * stores it's public key, secret and counter,
+     * then emits {AccountInitialized} and {AccountSecretUpdated} events.
+     * @param account the address of the account
+     * @param uncompressedPubKey the public key of the account
+     * @param secret account's secret
      */
-    function fundChannel(
-        uint256 additionalDeposit,
+    function _initializeAccount(
+        address account,
+        bytes memory uncompressedPubKey,
+        bytes32 secret
+    ) internal {
+        Account storage accountData = accounts[account];
+
+        require(account != address(0), "account must not be empty");
+        require(ECDSA.uncompressedPubKeyToAddress(uncompressedPubKey) == account, "public key does not match account");
+        require(accountData.counter == 0, "account already initialized");
+        require(secret != bytes32(0), "secret must not be empty");
+
+        accountData.secret = secret;
+        accountData.counter = 1;
+
+        emit AccountInitialized(account, uncompressedPubKey, secret);
+    }
+
+    /**
+     * @dev Updates account's secret and counter,
+     * then emits {AccountSecretUpdated} event.
+     * @param account the address of the account
+     * @param secret account's secret
+     */
+    function _updateAccountSecret(
+        address account,
+        bytes32 secret
+    ) internal {
+        require(secret != bytes32(0), "secret must not be empty");
+
+        Account storage accountData = accounts[account];
+        // @TODO: do we need this?
+        require(secret != accountData.secret, "secret must not be the same as before");
+
+        accountData.secret = secret;
+        accountData.counter += 1;
+
+        emit AccountSecretUpdated(account, secret, accountData.counter);
+    }
+
+    /**
+     * @dev Funds a channel, then emits
+     * {ChannelFunded} event.
+     * @param funder the address of the funder
+     * @param accountA the address of accountA
+     * @param accountB the address of accountB
+     * @param amountA amount to fund accountA
+     * @param amountB amount to fund accountB
+     */
+    function _fundChannel(
         address funder,
-        address recipient,
+        address accountA,
+        address accountB,
+        uint256 amountA,
+        uint256 amountB
+    ) internal {
+        require(funder != address(0), "funder must not be empty");
+        require(accountA != accountB, "accountA and accountB must not be the same");
+        require(accountA != address(0), "accountA must not be empty");
+        require(accountB != address(0), "accountB must not be empty");
+        require(amountA > 0 || amountB > 0, "amountA or amountB must be greater than 0");
+
+        (,,, Channel storage channel) = _getChannel(accountA, accountB);
+
+        channel.deposit = channel.deposit.add(amountA).add(amountB);
+        if (_isPartyA(accountA, accountB)) {
+            channel.partyABalance = channel.partyABalance.add(amountA);
+        }
+
+        emit ChannelFunded(
+            accountA,
+            accountB,
+            funder,
+            channel.deposit,
+            channel.partyABalance
+        );
+    }
+
+    /**
+     * @dev Opens a channel, then emits
+     * {ChannelOpened} event.
+     * @param opener the address of the opener
+     * @param counterparty the address of the counterparty
+     */
+    function _openChannel(
+        address opener,
         address counterparty
     ) internal {
-        require(recipient != counterparty, "HoprChannels: 'recipient' and 'counterParty' must not be the same");
-        require(recipient != address(0), "HoprChannels: 'recipient' address is empty");
-        require(counterparty != address(0), "HoprChannels: 'counterParty' address is empty");
-        require(additionalDeposit > 0, "HoprChannels: 'additionalDeposit' must be greater than 0");
-        require(additionalDeposit < (1 << 96), "HoprChannels: preventing 'amount' overflow");
+        require(opener != counterparty, "opener and counterparty must not be the same");
+        require(opener != address(0), "opener must not be empty");
+        require(counterparty != address(0), "counterparty must not be empty");
 
-        require(accounts[recipient].accountX != uint256(0), "HoprChannels: initiator must have called init() before");
-        require(
-            accounts[counterparty].accountX != uint256(0),
-            "HoprChannels: counterparty must have called init() before"
-        );
+        (,,, Channel storage channel) = _getChannel(opener, counterparty);
+        require(channel.deposit > 0, "channel must be funded");
 
-        (address partyA, , Channel storage channel, ChannelStatus status) = getChannel(recipient, counterparty);
+        ChannelStatus channelStatus = _getChannelStatus(channel.status);
+        require(channelStatus == ChannelStatus.CLOSED, "channel must be closed in order to open");
 
-        require(
-            status == ChannelStatus.UNINITIALISED || status == ChannelStatus.FUNDED,
-            "HoprChannels: channel must be 'UNINITIALISED' or 'FUNDED'"
-        );
-        require(
-            recipient != partyA || channel.partyABalance + additionalDeposit < (1 << 96),
-            "HoprChannels: Invalid amount"
-        );
-        require(channel.deposit + additionalDeposit < (1 << 96), "HoprChannels: Invalid amount");
-        require(channel.stateCounter + 1 < (1 << 24), "HoprChannels: Preventing stateCounter overflow");
+        channel.status = channel.status.add(1);
 
-        channel.deposit += uint96(additionalDeposit);
-
-        if (recipient == partyA) {
-            channel.partyABalance += uint96(additionalDeposit);
-        }
-
-        if (status == ChannelStatus.UNINITIALISED) {
-            // The state counter indicates the recycling generation and ensures that both parties are using the correct generation.
-            channel.stateCounter += 1;
-        }
-
-        emitFundedChannel(funder, recipient, counterparty, additionalDeposit, 0);
+        emit ChannelOpened(opener, counterparty);
     }
 
     /**
-     * @notice returns channel data
-     * @param accountA address of account 'A'
-     * @param accountB address of account 'B'
+     * @dev Initialize channel closure, updates channel's
+     * closure time, when the cool-off period is over,
+     * user may finalize closure, then emits
+     * {ChannelPendingToClose} event.
+     * @param initiator the address of the initiator
+     * @param counterparty the address of the counterparty
      */
-    function getChannel(address accountA, address accountB)
+    function _initiateChannelClosure(
+        address initiator,
+        address counterparty
+    ) internal {
+        require(initiator != counterparty, "initiator and counterparty must not be the same");
+        require(initiator != address(0), "initiator must not be empty");
+        require(counterparty != address(0), "counterparty must not be empty");
+
+        (,,, Channel storage channel) = _getChannel(initiator, counterparty);
+        ChannelStatus channelStatus = _getChannelStatus(channel.status);
+        require(
+            channelStatus == ChannelStatus.OPEN,
+            "channel must be open"
+        );
+
+        // @TODO: check with team, do we need SafeMath check here?
+        channel.closureTime = _currentBlockTimestamp() + secsClosure;
+        channel.status = channel.status.add(1);
+
+        bool isPartyA = _isPartyA(initiator, counterparty);
+        if (isPartyA) {
+            channel.closureByPartyA = true;
+        }
+
+        emit ChannelPendingToClose(initiator, counterparty, channel.closureTime);
+    }
+
+    /**
+     * @dev Finalize channel closure, if cool-off period
+     * is over it will close the channel and transfer funds
+     * to the parties involved, then emits
+     * {ChannelClosed} event.
+     * @param initiator the address of the initiator
+     * @param counterparty the address of the counterparty
+     */
+    function _finalizeChannelClosure(
+        address initiator,
+        address counterparty
+    ) internal {
+        require(address(token) != address(0), "token must not be empty");
+        require(initiator != counterparty, "initiator and counterparty must not be the same");
+        require(initiator != address(0), "initiator must not be empty");
+        require(counterparty != address(0), "counterparty must not be empty");
+
+        (address partyA, address partyB,, Channel storage channel) = _getChannel(initiator, counterparty);
+        ChannelStatus channelStatus = _getChannelStatus(channel.status);
+        require(
+            channelStatus == ChannelStatus.PENDING_TO_CLOSE,
+            "channel must be pending to close"
+        );
+
+        if (
+            channel.closureByPartyA && (initiator == partyA) ||
+            !channel.closureByPartyA && (initiator == partyB)
+        ) {
+            require(channel.closureTime < _currentBlockTimestamp(), "closureTime must be before now");
+        }
+
+        uint256 partyAAmount = channel.partyABalance;
+        uint256 partyBAmount = channel.deposit.sub(channel.partyABalance);
+
+        // settle balances
+        if (partyAAmount > 0) {
+            token.transfer(partyA, partyAAmount);
+        }
+        if (partyBAmount > 0) {
+            token.transfer(partyB, partyBAmount);
+        }
+
+        // The state counter indicates the recycling generation and ensures that both parties are using the correct generation.
+        // Increase state counter so that we can re-use the same channel after it has been closed.
+        channel.status = channel.status.add(8);
+        delete channel.deposit; // channel.deposit = 0
+        delete channel.partyABalance; // channel.partyABalance = 0
+        delete channel.closureTime; // channel.closureTime = 0
+        delete channel.closureByPartyA; // channel.closureByPartyA = false
+
+        emit ChannelClosed(initiator, counterparty, partyAAmount, partyBAmount);
+    }
+
+    /**
+     * @param accountA the address of accountA
+     * @param accountB the address of accountB
+     * @return a tuple of partyA, partyB, channelId, channel
+     */
+    function _getChannel(address accountA, address accountB)
         internal
         view
         returns (
             address,
             address,
-            Channel storage,
-            ChannelStatus
+            bytes32,
+            Channel storage
         )
     {
-        (address partyA, address partyB) = getParties(accountA, accountB);
-        bytes32 channelId = getChannelId(partyA, partyB);
+        (address partyA, address partyB) = _getParties(accountA, accountB);
+        bytes32 channelId = _getChannelId(partyA, partyB);
         Channel storage channel = channels[channelId];
 
-        ChannelStatus status = getChannelStatus(channel);
-
-        return (partyA, partyB, channel, status);
+        return (partyA, partyB, channelId, channel);
     }
 
     /**
-     * @notice return true if accountA is party_a
-     * @param accountA address of account 'A'
-     * @param accountB address of account 'B'
+     * @param partyA the address of partyA
+     * @param partyB the address of partyB
+     * @return the channel id by hashing partyA and partyB
      */
-    function isPartyA(address accountA, address accountB) internal pure returns (bool) {
+    function _getChannelId(address partyA, address partyB) internal pure returns (bytes32) {
+        return keccak256(abi.encodePacked(partyA, partyB));
+    }
+
+    /**
+     * @param status channel's status
+     * @return the channel's status in 'ChannelStatus'
+     */
+    function _getChannelStatus(uint24 status) internal pure returns (ChannelStatus) {
+        return ChannelStatus(status.mod(10));
+    }
+
+    /**
+     * @param status channel's status
+     * @return the channel's iteration
+     */
+    function _getChannelIteration(uint24 status) internal pure returns (uint256) {
+        return status.div(10).add(1);
+    }
+
+    /**
+     * @param accountA the address of accountA
+     * @param accountB the address of accountB
+     * @return true if accountA is partyA
+     */
+    function _isPartyA(address accountA, address accountB) internal pure returns (bool) {
         return uint160(accountA) < uint160(accountB);
     }
 
     /**
-     * @notice return party_a and party_b
-     * @param accountA address of account 'A'
-     * @param accountB address of account 'B'
+     * @param accountA the address of accountA
+     * @param accountB the address of accountB
+     * @return a tuple representing partyA and partyB
      */
-    function getParties(address accountA, address accountB) internal pure returns (address, address) {
-        if (isPartyA(accountA, accountB)) {
+    function _getParties(address accountA, address accountB) internal pure returns (address, address) {
+        if (_isPartyA(accountA, accountB)) {
             return (accountA, accountB);
         } else {
             return (accountB, accountA);
@@ -508,207 +650,147 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     }
 
     /**
-     * @notice return channel id
-     * @param party_a address of party 'A'
-     * @param party_b address of party 'B'
+     * @return the current timestamp
      */
-    function getChannelId(address party_a, address party_b) internal pure returns (bytes32) {
-        return keccak256(abi.encodePacked(party_a, party_b));
+    function _currentBlockTimestamp() internal view returns (uint32) {
+        // solhint-disable-next-line
+        return uint32(block.timestamp % 2 ** 32);
     }
 
     /**
-     * @notice returns 'ChannelStatus'
-     * @param channel a channel
+     * @dev Redeem a ticket
+     * @param redeemer the redeemer address
+     * @param counterparty the counterparty address
+     * @param secretPreImage the secretPreImage that results to the redeemers account secret
+     * @param proofOfRelaySecret the proof of relay secret
+     * @param winProb the winning probability of the ticket
+     * @param amount the amount in the ticket
+     * @param r part of the signature
+     * @param s part of the signature
+     * @param v part of the signature
      */
-    function getChannelStatus(Channel memory channel) internal pure returns (ChannelStatus) {
-        return ChannelStatus(channel.stateCounter % 10);
+    function _redeemTicket(
+        address redeemer,
+        address counterparty,
+        bytes32 secretPreImage,
+        bytes32 proofOfRelaySecret,
+        uint256 amount,
+        bytes32 winProb,
+        bytes32 r,
+        bytes32 s,
+        uint8 v
+    ) internal {
+        require(redeemer != address(0), "redeemer must not be empty");
+        require(counterparty != address(0), "counterparty must not be empty");
+        require(secretPreImage != bytes32(0), "secretPreImage must not be empty");
+        require(proofOfRelaySecret != bytes32(0), "proofOfRelaySecret must not be empty");
+        require(amount != uint256(0), "amount must not be empty");
+        // require(winProb != bytes32(0), "winProb must not be empty");
+        require(r != bytes32(0), "r must not be empty");
+        require(s != bytes32(0), "s must not be empty");
+        require(v != uint8(0), "v must not be empty");
+
+        Account storage account = accounts[redeemer];
+        require(
+            account.secret == keccak256(abi.encodePacked(secretPreImage)),
+            // @TODO: add salt
+            // accounts[msg.sender].hashedSecret == bytes27(keccak256(abi.encodePacked("HOPRnet", msg.sender, bytes27(preImage)))),
+            "secretPreImage must be the hash of redeemer's secret"
+        );
+
+        (,,, Channel storage channel) = _getChannel(
+            redeemer,
+            counterparty
+        );
+        require(
+            _getChannelStatus(channel.status) != ChannelStatus.CLOSED,
+            "channel must be open or pending to close"
+        );
+
+        bytes32 ticketHash = _getTicketHash(
+            _getEncodedTicket(
+                redeemer,
+                account.counter,
+                proofOfRelaySecret,
+                _getChannelIteration(channel.status),
+                amount,
+                winProb
+            )
+        );
+        require(!tickets[ticketHash], "ticket must not be used twice");
+        require(ECDSA.recover(ticketHash, r, s, v) == counterparty, "signer must match the counterparty");
+        require(
+            uint256(_getTicketLuck(
+                ticketHash,
+                secretPreImage,
+                proofOfRelaySecret,
+                winProb
+            )) <= uint256(winProb),
+            "ticket must be a win"
+        );
+
+        account.secret = secretPreImage;
+        tickets[ticketHash] = true;
+
+        if (_isPartyA(redeemer, counterparty)) {
+            channel.partyABalance = channel.partyABalance.add(amount);
+        } else {
+            channel.partyABalance = channel.partyABalance.sub(amount);
+        }
+
+        emit TicketRedeemed(redeemer, counterparty, amount);
     }
 
     /**
-     * @param channel a channel
-     * @return channel's iteration
+     * @dev Encode ticket data
+     * @return bytes
      */
-    function getChannelIteration(Channel memory channel) internal pure returns (uint24) {
-        return (channel.stateCounter / 10) + 1;
-    }
-
-    /**
-     * @dev Emits a FundedChannel event that contains the public keys of recipient
-     * and counterparty as compressed EC-points.
-     */
-    function emitFundedChannel(
-        address funder,
+    function _getEncodedTicket(
         address recipient,
-        address counterparty,
-        uint256 recipientAmount,
-        uint256 counterpartyAmount
-    ) private {
-        /* FundedChannel(
-         *   address funder,
-         *   uint256 indexed recipient,
-         *   uint256 indexed counterParty,
-         *   uint256 recipientAmount,
-         *   uint256 counterPartyAmount
-         * )
-         */
-        bytes32 FundedChannel = keccak256("FundedChannel(address,uint,uint,uint,uint)");
+        uint256 recipientCounter,
+        bytes32 proofOfRelaySecret,
+        uint256 channelIteration,
+        uint256 amount,
+        bytes32 winProb
+    ) internal pure returns (bytes memory) {
+        bytes32 challenge = keccak256(abi.encodePacked(proofOfRelaySecret));
 
-        Account storage recipientAccount = accounts[recipient];
-        Account storage counterpartyAccount = accounts[counterparty];
-
-        uint256 recipientX = recipientAccount.accountX;
-        uint8 recipientOddY = recipientAccount.oddY;
-
-        uint256 counterpartyX = counterpartyAccount.accountX;
-        uint8 counterpartyOddY = counterpartyAccount.oddY;
-
-        assembly {
-            let topic0 := or(or(shl(2, shr(2, FundedChannel)), shl(1, recipientOddY)), counterpartyOddY)
-
-            let memPtr := mload(0x40)
-
-            mstore(memPtr, recipientAmount)
-            mstore(add(memPtr, 0x20), counterpartyAmount)
-            mstore(add(memPtr, 0x40), funder)
-
-            log3(memPtr, 0x60, topic0, recipientX, counterpartyX)
-        }
+        return abi.encodePacked(
+            recipient,
+            challenge,
+            recipientCounter,
+            amount,
+            winProb,
+            channelIteration
+        );
     }
 
     /**
-     * @dev Emits a OpenedChannel event that contains the public keys of opener
-     * and counterparty as compressed EC-points.
+     * @dev Prefix the ticket message and return
+     * the actual hash that was used to sign
+     * the ticket with.
+     * @return prefixed ticket hash
      */
-    function emitOpenedChannel(address opener, address counterparty) private {
-        /* OpenedChannel(
-         *   uint256 indexed opener,
-         *   uint256 indexed counterParty
-         * )
-         */
-        bytes32 OpenedChannel = keccak256("OpenedChannel(uint,uint)");
-
-        Account storage openerAccount = accounts[opener];
-        Account storage counterpartyAccount = accounts[counterparty];
-
-        uint256 openerX = openerAccount.accountX;
-        uint8 openerOddY = openerAccount.oddY;
-
-        uint256 counterpartyX = counterpartyAccount.accountX;
-        uint8 counterpartyOddY = counterpartyAccount.oddY;
-        assembly {
-            let topic0 := or(or(shl(2, shr(2, OpenedChannel)), shl(1, openerOddY)), counterpartyOddY)
-
-            log3(0x00, 0x00, topic0, openerX, counterpartyX)
-        }
+    function _getTicketHash(
+        bytes memory packedTicket
+    ) internal pure returns (bytes32) {
+        return ECDSA.toEthSignedMessageHash(
+            "187",
+            packedTicket
+        );
     }
 
     /**
-     * @dev Emits a TicketRedeemed event that contains the public keys of opener
-     * and counterparty as compressed EC-points.
+     * @dev Get the ticket's "luck" by
+     * hashing provided values.
+     * @return luck
      */
-    function emitRedeemedTicket(address redeemer, address counterparty, uint256 amount) private {
-        /* TicketRedeemed(
-         *   uint256 indexed redeemer,
-         *   uint256 indexed counterparty,
-         *   uint256 amount
-         * )
-         */
-        bytes32 RedeemedTicket = keccak256("RedeemedTicket(uint,uint,uint)");
-
-        Account storage redeemerAccount = accounts[redeemer];
-        Account storage counterpartyAccount = accounts[counterparty];
-
-        uint256 redeemerX = redeemerAccount.accountX;
-        uint8 redeemerOddY = redeemerAccount.oddY;
-
-        uint256 counterpartyX = counterpartyAccount.accountX;
-        uint8 counterpartyOddY = counterpartyAccount.oddY;
-
-        assembly {
-            let topic0 := or(or(shl(2, shr(2, RedeemedTicket)), shl(1, redeemerOddY)), counterpartyOddY)
-
-            let memPtr := mload(0x40)
-
-            mstore(memPtr, amount)
-
-            log3(memPtr, 0x20, topic0, redeemerX, counterpartyX)
-        }
-    }
-
-    /**
-     * @dev Emits a InitiatedChannelClosure event that contains the public keys of initiator
-     * and counterparty as compressed EC-points.
-     */
-    function emitInitiatedChannelClosure(
-        address initiator,
-        address counterparty,
-        uint256 closureTime
-    ) private {
-        /* InitiatedChannelClosure(
-         *   uint256 indexed initiator,
-         *   uint256 indexed counterParty,
-         *   uint256 closureTime
-         * )
-         */
-        bytes32 InitiatedChannelClosure = keccak256("InitiatedChannelClosure(uint,uint,uint)");
-
-        Account storage initiatorAccount = accounts[initiator];
-        Account storage counterpartyAccount = accounts[counterparty];
-
-        uint256 initiatorX = initiatorAccount.accountX;
-        uint8 initiatorOddY = initiatorAccount.oddY;
-
-        uint256 counterpartyX = counterpartyAccount.accountX;
-        uint8 counterpartyOddY = counterpartyAccount.oddY;
-
-        assembly {
-            let topic0 := or(or(shl(2, shr(2, InitiatedChannelClosure)), shl(1, initiatorOddY)), counterpartyOddY)
-
-            let memPtr := mload(0x40)
-
-            mstore(memPtr, closureTime)
-
-            log3(memPtr, 0x20, topic0, initiatorX, counterpartyX)
-        }
-    }
-
-    /**
-     * @dev Emits a ClosedChannel event that contains the public keys of initiator
-     * and counterparty as compressed EC-points.
-     */
-    function emitClosedChannel(
-        address initiator,
-        address counterparty,
-        uint256 partyAAmount,
-        uint256 partyBAmount
-    ) private {
-        /*
-         * ClosedChannel(
-         *   uint256 indexed initiator,
-         *   uint256 indexed counterParty,
-         *   uint256 partyAAmount,
-         *   uint256 partyBAmount
-         */
-        bytes32 ClosedChannel = keccak256("ClosedChannel(uint,uint,uint,uint)");
-
-        Account storage initiatorAccount = accounts[initiator];
-        Account storage counterpartyAccount = accounts[counterparty];
-
-        uint256 initiatorX = initiatorAccount.accountX;
-        uint8 initiatorOddY = initiatorAccount.oddY;
-
-        uint256 counterpartyX = counterpartyAccount.accountX;
-        uint8 counterpartyOddY = counterpartyAccount.oddY;
-
-        assembly {
-            let topic0 := or(or(shl(2, shr(2, ClosedChannel)), shl(1, initiatorOddY)), counterpartyOddY)
-
-            let memPtr := mload(0x40)
-
-            mstore(memPtr, partyAAmount)
-            mstore(add(0x20, memPtr), partyBAmount)
-
-            log3(memPtr, 0x40, topic0, initiatorX, counterpartyX)
-        }
+    function _getTicketLuck(
+        bytes32 ticketHash,
+        bytes32 secretPreImage,
+        bytes32 proofOfRelaySecret,
+        bytes32 winProb
+    ) internal pure returns (bytes32) {
+        return keccak256(abi.encodePacked(ticketHash, secretPreImage, proofOfRelaySecret, winProb));
     }
 }

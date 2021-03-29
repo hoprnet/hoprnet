@@ -1,6 +1,5 @@
-import type { Channel as IChannel } from '@hoprnet/hopr-core-connector-interface'
+import type { Channel as IChannel, Types as Interfaces } from '@hoprnet/hopr-core-connector-interface'
 import BN from 'bn.js'
-import { toU8a } from '@hoprnet/hopr-utils'
 import { Balance, Channel as ChannelType, Hash, Public, SignedChannel, ChannelEntry, UINT256 } from '../types'
 import TicketFactory from './ticket'
 import { hash } from '../utils'
@@ -36,7 +35,7 @@ class Channel implements IChannel {
     return new Promise<UINT256>(async (resolve, reject) => {
       try {
         const channel = await this.onChainChannel
-        return resolve(new UINT256(toU8a(Number(channel.stateCounter))))
+        return resolve(new UINT256(channel.stateCounter))
       } catch (error) {
         return reject(error)
       }
@@ -44,10 +43,10 @@ class Channel implements IChannel {
   }
 
   get status() {
-    return new Promise<'UNINITIALISED' | 'FUNDED' | 'OPEN' | 'PENDING'>(async (resolve, reject) => {
+    return new Promise<ReturnType<Interfaces.ChannelEntry['getStatus']>>(async (resolve, reject) => {
       try {
         const channel = await this.onChainChannel
-        return resolve(channel.status)
+        return resolve(channel.getStatus())
       } catch (error) {
         return reject(error)
       }
@@ -158,8 +157,8 @@ class Channel implements IChannel {
     let receipt: string
 
     try {
-      if (!(status === 'OPEN' || status === 'PENDING')) {
-        throw Error("channel must be 'OPEN' or 'PENDING'")
+      if (!(status === 'OPEN' || status === 'PENDING_TO_CLOSE')) {
+        throw Error("channel must be 'OPEN' or 'PENDING_TO_CLOSE'")
       }
 
       if (status === 'OPEN') {
@@ -175,13 +174,13 @@ class Channel implements IChannel {
 
         receipt = tx.transactionHash
         tx.send()
-      } else if (status === 'PENDING') {
+      } else if (status === 'PENDING_TO_CLOSE') {
         const tx = await account.signTransaction(
           {
             from: (await account.address).toHex(),
             to: this.coreConnector.hoprChannels.options.address
           },
-          this.coreConnector.hoprChannels.methods.claimChannelClosure(
+          this.coreConnector.hoprChannels.methods.finalizeChannelClosure(
             (await this.coreConnector.utils.pubKeyToAddress(this.counterparty)).toHex()
           )
         )

@@ -3,7 +3,7 @@ import { Ganache } from '@hoprnet/hopr-testing'
 import { migrate } from '@hoprnet/hopr-ethereum'
 import assert from 'assert'
 import { stringToU8a, u8aEquals, u8aConcat, durations } from '@hoprnet/hopr-utils'
-import { addresses, abis } from '@hoprnet/hopr-ethereum'
+import { getAddresses, abis } from '@hoprnet/hopr-ethereum'
 import { getPrivKeyData, createAccountAndFund, createNode } from '../utils/testing.spec'
 import { createChallenge, hash } from '../utils'
 import BN from 'bn.js'
@@ -59,7 +59,7 @@ describe('test Channel class', function () {
     await migrate()
 
     web3 = new Web3(configs.DEFAULT_URI)
-    hoprToken = new web3.eth.Contract(HoprTokenAbi as any, addresses?.localhost?.HoprToken)
+    hoprToken = new web3.eth.Contract(HoprTokenAbi as any, getAddresses()?.localhost?.HoprToken)
   })
 
   after(async function () {
@@ -105,7 +105,7 @@ describe('test Channel class', function () {
               await coreConnector.channel.createSignedChannel(undefined, {
                 channel: new ChannelType(undefined, {
                   balance: channelBalance,
-                  state: new ChannelState(undefined, { state: ChannelStatus.FUNDED })
+                  state: new ChannelState(undefined, { state: ChannelStatus.CLOSED })
                 })
               })
             ).subarray()
@@ -139,7 +139,7 @@ describe('test Channel class', function () {
     const firstTicket = await getTicketData({
       counterparty: myAddress
     })
-    const firstAckedTicket = new AcknowledgedTicket(coreConnector, undefined, {
+    const firstAckedTicket = new AcknowledgedTicket(undefined, {
       response: firstTicket.response
     })
     const signedTicket = await channel.ticket.create(
@@ -233,9 +233,9 @@ describe('test Channel class', function () {
     for (let i = 0; i < ATTEMPTS; i++) {
       ticketData = await getTicketData({
         counterparty: counterpartyAddress,
-        winProb: 0.5
+        winProb: 1
       })
-      let ackedTicket = new AcknowledgedTicket(counterpartysCoreConnector, undefined, {
+      let ackedTicket = new AcknowledgedTicket(undefined, {
         response: ticketData.response
       })
 
@@ -247,8 +247,9 @@ describe('test Channel class', function () {
       assert(await counterpartysChannel.ticket.verify(nextSignedTicket), `Ticket signature must be valid.`)
 
       if (await counterpartysCoreConnector.account.reservePreImageIfIsWinning(ackedTicket)) {
-        await counterpartysCoreConnector.channel.tickets.submit(ackedTicket, new Uint8Array())
-        assert(ackedTicket.redeemed, 'ticket should get marked as redeemed')
+        const result = await counterpartysCoreConnector.channel.tickets.submit(ackedTicket, new Uint8Array())
+        assert(result.status === 'SUCCESS', 'ticket redeemption was not a success')
+        assert(result?.ackTicket?.redeemed, 'ticket should get marked as redeemed')
       }
     }
   })
