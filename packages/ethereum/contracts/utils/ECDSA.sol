@@ -12,6 +12,7 @@ library ECDSA {
      * @dev Computes the Ethereum address from an uncomporessed public key.
      */
     function uncompressedPubKeyToAddress(bytes memory uncompressedPubKey) internal pure returns (address) {
+        require(uncompressedPubKey.length == 64, "uncompressed public key length is invalid");
         return address(bytes20(bytes32(keccak256(abi.encodePacked(uncompressedPubKey)) << 96)));
     }
 
