@@ -14,13 +14,8 @@ describe('test ticket construction', function () {
   })
 
   const generateTicketData = async () => {
-<<<<<<< HEAD
     const challenge = new Hash(new Uint8Array(Hash.SIZE))
-    const epoch = new UINT256(1)
-=======
-    const challenge = new Hash(Hash.SIZE)
     const epoch = UINT256.fromString('1')
->>>>>>> 6b0fce304a7530c541e600131ec79f96b2b75aab
     const amount = new Balance(new BN(1))
     const winProb = new Hash(computeWinningProbability(1))
     const channelIteration = UINT256.fromString('1')

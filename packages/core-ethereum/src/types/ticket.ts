@@ -46,22 +46,11 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
 
     if (struct) {
       this.set(struct.counterparty.serialize(), this.counterpartyOffset - this.byteOffset)
-<<<<<<< HEAD
       this.set(struct.challenge.serialize(), this.challengeOffset - this.byteOffset)
-      this.set(new Uint8Array(struct.epoch.toBuffer('be', EPOCH_SIZE)), this.epochOffset - this.byteOffset)
-      this.set(struct.amount.toUint96(), this.amountOffset - this.byteOffset)
-      this.set(struct.winProb.serialize(), this.winProbOffset - this.byteOffset)
-      this.set(
-        new Uint8Array(struct.channelIteration.toBuffer('be', EPOCH_SIZE)),
-        this.channelIterationOffset - this.byteOffset
-      )
-=======
-      this.set(struct.challenge, this.challengeOffset - this.byteOffset)
       this.set(struct.epoch.serialize(), this.epochOffset - this.byteOffset)
       this.set(struct.amount.serialize(), this.amountOffset - this.byteOffset)
-      this.set(struct.winProb, this.winProbOffset - this.byteOffset)
+      this.set(struct.winProb.serialize(), this.winProbOffset - this.byteOffset)
       this.set(struct.channelIteration.serialize(), this.channelIterationOffset - this.byteOffset)
->>>>>>> 6b0fce304a7530c541e600131ec79f96b2b75aab
     }
   }
 
@@ -94,11 +83,7 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
   }
 
   get epoch(): UINT256 {
-<<<<<<< HEAD
-    return new UINT256(new Uint8Array(this.buffer, this.epochOffset, EPOCH_SIZE))
-=======
     return new UINT256(new BN(new Uint8Array(this.buffer, this.epochOffset, UINT256.SIZE)))
->>>>>>> 6b0fce304a7530c541e600131ec79f96b2b75aab
   }
 
   get amountOffset(): number {
@@ -122,11 +107,7 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
   }
 
   get channelIteration(): UINT256 {
-<<<<<<< HEAD
-    return new UINT256(new Uint8Array(this.buffer, this.channelIterationOffset, EPOCH_SIZE))
-=======
     return new UINT256(new BN(new Uint8Array(this.buffer, this.channelIterationOffset, UINT256.SIZE)))
->>>>>>> 6b0fce304a7530c541e600131ec79f96b2b75aab
   }
 
   get hash(): Promise<Hash> {
@@ -136,10 +117,10 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
           // the order of the items needs to be the same as the one used in the SC
           u8aConcat(
             this.counterparty.serialize(),
-            this.challenge.toU8a(),
+            this.challenge.serialize(),
             this.epoch.serialize(),
             this.amount.serialize(),
-            this.winProb.toU8a(),
+            this.winProb.serialize(),
             this.channelIteration.serialize()
           )
         )
