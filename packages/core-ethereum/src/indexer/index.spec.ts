@@ -107,13 +107,13 @@ describe('test indexer', function () {
 
       const [channel] = channels
       assert(
-        u8aEquals(channel.parties[0].serialize(), userA.address.serialize()) ||
-          u8aEquals(channel.parties[0].serialize(), userB.address.serialize()),
+        u8aEquals(channel.partyA.serialize(), userA.address.serialize()) ||
+          u8aEquals(channel.partyA.serialize(), userB.address.serialize()),
         'check Channels.store'
       )
       assert(
-        u8aEquals(channel.parties[1].serialize(), userA.address.serialize()) ||
-          u8aEquals(channel.parties[1].serialize(), userB.address.serialize()),
+        u8aEquals(channel.partyB.serialize(), userA.address.serialize()) ||
+          u8aEquals(channel.partyB.serialize(), userB.address.serialize()),
         'check Channels.store'
       )
     })
@@ -124,8 +124,7 @@ describe('test indexer', function () {
       assert.equal(channels.length, 1, 'check Channels.get')
 
       const [channel] = channels
-      const storedChannelId = await getId(...channel.parties)
-      assert(u8aEquals(expectedChannelId, storedChannelId), 'check Channels.get')
+      assert(u8aEquals(expectedChannelId, await channel.getChannelId()), 'check Channels.get')
     })
 
     it('should find channel using partyB', async function () {
@@ -134,8 +133,7 @@ describe('test indexer', function () {
       assert.equal(channels.length, 1, 'check Channels.get')
 
       const [channel] = channels
-      const storedChannelId = await getId(...channel.parties)
-      assert(u8aEquals(expectedChannelId, storedChannelId), 'check Channels.get')
+      assert(u8aEquals(expectedChannelId, await channel.getChannelId()), 'check Channels.get')
     })
 
     it('should find channel using partyA & partyB', async function () {
