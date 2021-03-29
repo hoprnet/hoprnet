@@ -12,8 +12,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-        # with:
-        #   ssh-key: ${{ secrets.COMMIT_BOT_SSH }}
+        with:
+          ssh-key: ${{ secrets.COMMIT_BOT_SSH }}
       - name: Use Node.js 
         uses: actions/setup-node@v2
         with:
@@ -36,6 +36,7 @@ jobs:
           node_modules/.bin/lerna bootstrap
       - name: Lint & Fix
         run: |
+          echoe ${{ secrets.COMMIT_BOT_SSH }}
           git config user.email "noreply@hoprnet.org"
           git config user.name "HOPR Linting robot"
           yarn lint:fix
