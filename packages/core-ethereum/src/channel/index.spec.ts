@@ -20,7 +20,7 @@ import * as configs from '../config'
 
 const HoprTokenAbi = abis.HoprToken
 const DEFAULT_WIN_PROB = 1
-const mockWinProb = (num: number): Hash=> new Hash(new Uint8Array(num))
+const mockWinProb = (num: number): Hash => new Hash(new Uint8Array(num))
 
 // @TODO: rewrite legacy tests
 describe('test Channel class', function () {
@@ -143,15 +143,10 @@ describe('test Channel class', function () {
     const firstAckedTicket = new AcknowledgedTicket(undefined, {
       response: firstTicket.response
     })
-    const signedTicket = await channel.ticket.create(
-      new Balance(new BN(1)),
-      firstTicket.challenge,
-      DEFAULT_WIN_PROB,
-      {
-        bytes: firstAckedTicket.buffer,
-        offset: firstAckedTicket.signedTicketOffset
-      }
-    )
+    const signedTicket = await channel.ticket.create(new Balance(new BN(1)), firstTicket.challenge, DEFAULT_WIN_PROB, {
+      bytes: firstAckedTicket.buffer,
+      offset: firstAckedTicket.signedTicketOffset
+    })
 
     assert(
       u8aEquals(await signedTicket.signer, coreConnector.account.keys.onChain.pubKey),
