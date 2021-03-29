@@ -9,7 +9,6 @@ const partyAPubKey = Public.fromString('0x03362b7b26bddb151a03056422d37119eab3a7
 const partyA = Address.fromString('0x55CfF15a5159239002D57C591eF4ACA7f2ACAfE6')
 // const partyBPubKey = Public.fromString('0x03217f3cd4d0b4b82997b25d1b6b68a933929fed724531cb30bbfd4729dc6b44e0')
 const partyB = Address.fromString('0xbbCFC0fA0EBaa540e741dCA297368B2000089E2E')
-const parties: [Address, Address] = [partyA, partyB]
 
 const secret1 = new Hash(stringToU8a('0xb8b37f62ec82443e5b5557c5a187fe3686790620cc04c06187c48f8636caac89')) // secret1
 const secret2 = new Hash(stringToU8a('0x294549f8629f0eeb2b8e01aca491f701f5386a9662403b485c4efe7d447dfba3')) // secret2
@@ -142,7 +141,8 @@ export const INITIALIZED_ACCOUNT = new AccountEntry(partyA, partyAPubKey, secret
 export const SECRET_UPDATED_ACCOUNT = new AccountEntry(partyA, partyAPubKey, secret2, new BN(2))
 
 export const EMPTY_CHANNEL = new ChannelEntry(
-  parties,
+  partyA,
+  partyB,
   new BN(0),
   new BN(0),
   new BN(0),
@@ -153,7 +153,8 @@ export const EMPTY_CHANNEL = new ChannelEntry(
 )
 
 export const FUNDED_CHANNEL = new ChannelEntry(
-  parties,
+  partyA,
+  partyB,
   new BN(3),
   new BN(3),
   new BN(0),
@@ -164,7 +165,8 @@ export const FUNDED_CHANNEL = new ChannelEntry(
 )
 
 export const FUNDED_CHANNEL_2 = new ChannelEntry(
-  parties,
+  partyA,
+  partyB,
   new BN(10),
   new BN(3),
   new BN(0),
@@ -175,7 +177,8 @@ export const FUNDED_CHANNEL_2 = new ChannelEntry(
 )
 
 export const OPENED_CHANNEL = new ChannelEntry(
-  parties,
+  partyA,
+  partyB,
   new BN(10),
   new BN(3),
   new BN(0),
@@ -186,7 +189,8 @@ export const OPENED_CHANNEL = new ChannelEntry(
 )
 
 export const REDEEMED_CHANNEL = new ChannelEntry(
-  parties,
+  partyA,
+  partyB,
   new BN(10),
   new BN(4),
   new BN(0),
@@ -197,7 +201,8 @@ export const REDEEMED_CHANNEL = new ChannelEntry(
 )
 
 export const CLOSING_CHANNEL = new ChannelEntry(
-  parties,
+  partyA,
+  partyB,
   new BN(10),
   new BN(4),
   new BN(1611671775),
@@ -208,7 +213,8 @@ export const CLOSING_CHANNEL = new ChannelEntry(
 )
 
 export const REDEEMED_CHANNEL_2 = new ChannelEntry(
-  parties,
+  partyA,
+  partyB,
   new BN(10),
   new BN(2),
   new BN(1611671775),
@@ -219,7 +225,8 @@ export const REDEEMED_CHANNEL_2 = new ChannelEntry(
 )
 
 export const CLOSED_CHANNEL = new ChannelEntry(
-  parties,
+  partyA,
+  partyB,
   new BN(0),
   new BN(0),
   new BN(0),

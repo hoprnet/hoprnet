@@ -21,6 +21,7 @@ import {
   pubKeyToAddress,
   sign,
   isPartyA,
+  getParties,
   Log,
   stateCounterToStatus,
   isGanache
@@ -50,41 +51,33 @@ class ChannelFactory {
     const selfAddress = await self.toAddress()
 
     indexer.on('channelOpened', async (channel: ChannelEntry) => {
-      const accountAPubKey = await this.coreConnector.indexer.getPublicKeyOf(channel.parties[0])
-      const accountBPubKey = await this.coreConnector.indexer.getPublicKeyOf(channel.parties[1])
-      if (!accountAPubKey || !accountBPubKey) {
+      const partyAPubKey = await this.coreConnector.indexer.getPublicKeyOf(channel.partyA)
+      const partyBPubKey = await this.coreConnector.indexer.getPublicKeyOf(channel.partyB)
+      if (!partyAPubKey || !partyBPubKey) {
         log(chalk.red('Currently opening a channel with an unintialized account is not supported'))
         return
       }
 
-      const [partyA, partyB] = this.coreConnector.utils.isPartyA(channel.parties[0], channel.parties[1])
-        ? [accountAPubKey, accountBPubKey]
-        : [accountBPubKey, accountAPubKey]
-
-      log('channelOpened', partyA.toHex(), partyB.toHex())
-      const isOurs = channel.parties[0].eq(selfAddress) || channel.parties[1].eq(selfAddress)
+      log('channelOpened', channel.partyA.toHex(), channel.partyB.toHex())
+      const isOurs = channel.partyA.eq(selfAddress) || channel.partyB.eq(selfAddress)
       if (!isOurs) return
 
-      await this.onOpen(isPartyA(selfAddress, await partyA.toAddress()) ? partyB : partyA, channel)
+      await this.onOpen(isPartyA(selfAddress, channel.partyA) ? partyBPubKey : partyAPubKey, channel)
     })
 
     indexer.on('channelClosed', async (channel: ChannelEntry) => {
-      const accountAPubKey = await this.coreConnector.indexer.getPublicKeyOf(channel.parties[0])
-      const accountBPubKey = await this.coreConnector.indexer.getPublicKeyOf(channel.parties[1])
-      if (!accountAPubKey || !accountBPubKey) {
+      const partyAPubKey = await this.coreConnector.indexer.getPublicKeyOf(channel.partyA)
+      const partyBPubKey = await this.coreConnector.indexer.getPublicKeyOf(channel.partyB)
+      if (!partyAPubKey || !partyBPubKey) {
         log(chalk.red('Currently closing a channel with an unintialized account is not supported'))
         return
       }
 
-      const [partyA, partyB] = this.coreConnector.utils.isPartyA(channel.parties[0], channel.parties[1])
-        ? [accountAPubKey, accountBPubKey]
-        : [accountBPubKey, accountAPubKey]
-
-      log('channelClosed', partyA.toHex(), partyB.toHex())
-      const isOurs = channel.parties[0].eq(selfAddress) || channel.parties[1].eq(selfAddress)
+      log('channelClosed', channel.partyA.toHex(), channel.partyB.toHex())
+      const isOurs = channel.partyA.eq(selfAddress) || channel.partyB.eq(selfAddress)
       if (!isOurs) return
 
-      await this.onClose(isPartyA(selfAddress, await partyA.toAddress()) ? partyB : partyA)
+      await this.onClose(isPartyA(selfAddress, channel.partyA) ? partyBPubKey : partyAPubKey)
     })
   }
 
@@ -417,7 +410,7 @@ class ChannelFactory {
     const selfAddress = await self.toAddress()
     const counterpartyAddress = await counterparty.toAddress()
     const channelId = await getId(selfAddress, counterpartyAddress)
-    const parties: [Address, Address] = [selfAddress, counterpartyAddress]
+    const [partyA, partyB] = getParties(selfAddress, counterpartyAddress)
 
     // HACK: when running our unit/intergration tests using ganache, the indexer doesn't have enough
     // time to pick up the events and reduce the data - here we are doing 2 things wrong:
@@ -425,11 +418,11 @@ class ChannelFactory {
     // 2. our actual intergration tests do not have any block mining time
     // this will be tackled in the upcoming refactor
     if (isGanache(this.coreConnector.network)) {
-      const channelId = await getId(selfAddress, counterpartyAddress)
       const response = await this.coreConnector.hoprChannels.methods.channels(channelId.toHex()).call()
 
       return new ChannelEntry(
-        parties,
+        partyA,
+        partyB,
         new BN(response.deposit),
         new BN(response.partyABalance),
         new BN(response.closureTime),
@@ -443,7 +436,7 @@ class ChannelFactory {
       if (channelEntry) return channelEntry
 
       // when channelEntry is not found, the onchain data is all 0
-      return new ChannelEntry(parties, new BN(0), new BN(0), new BN(0), new BN(0), false, new BN(0), new BN(0))
+      return new ChannelEntry(partyA, partyB, new BN(0), new BN(0), new BN(0), new BN(0), false, new BN(0), new BN(0))
     }
   }
 }

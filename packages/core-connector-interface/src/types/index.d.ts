@@ -63,7 +63,8 @@ declare interface ChannelEntryStatic {
   readonly SIZE: number
 }
 declare interface ChannelEntry {
-  parties: [Address, Address]
+  partyA: Address
+  partyB: Address
   deposit: BN
   partyABalance: BN
   closureTime: BN
@@ -73,6 +74,7 @@ declare interface ChannelEntry {
   closedAt: BN
   getStatus(): 'CLOSED' | 'OPEN' | 'PENDING_TO_CLOSE'
   getIteration(): number
+  getChannelId(): Promise<Hash>
 }
 declare var ChannelEntry: ChannelEntryStatic
 

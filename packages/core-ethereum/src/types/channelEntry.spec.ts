@@ -11,8 +11,8 @@ describe('ChannelEntry', function () {
   it('should be empty', function () {
     const channelEntry = ChannelEntry.deserialize(new Uint8Array({ length: ChannelEntry.SIZE }))
 
-    expect(channelEntry.parties[0].toHex()).to.equal(EMPTY_ADDRESS.toHex())
-    expect(channelEntry.parties[1].toHex()).to.equal(EMPTY_ADDRESS.toHex())
+    expect(channelEntry.partyA.toHex()).to.equal(EMPTY_ADDRESS.toHex())
+    expect(channelEntry.partyB.toHex()).to.equal(EMPTY_ADDRESS.toHex())
     expect(channelEntry.deposit.toString()).to.equal('0')
     expect(channelEntry.partyABalance.toString()).to.equal('0')
     expect(channelEntry.closureTime.toString()).to.equal('0')
@@ -23,14 +23,22 @@ describe('ChannelEntry', function () {
   })
 
   it('should contain the right values', function () {
-    const parties: [Address, Address] = [partyA, partyB]
-
     const channelEntry = ChannelEntry.deserialize(
-      new ChannelEntry(parties, new BN(10), new BN(3), new BN(10), new BN(50), true, new BN(1), new BN(2)).serialize()
+      new ChannelEntry(
+        partyA,
+        partyB,
+        new BN(10),
+        new BN(3),
+        new BN(10),
+        new BN(50),
+        true,
+        new BN(1),
+        new BN(2)
+      ).serialize()
     )
 
-    expect(channelEntry.parties[0].toHex()).to.equal(partyA.toHex())
-    expect(channelEntry.parties[1].toHex()).to.equal(partyB.toHex())
+    expect(channelEntry.partyA.toHex()).to.equal(partyA.toHex())
+    expect(channelEntry.partyB.toHex()).to.equal(partyB.toHex())
     expect(channelEntry.deposit.toString()).to.equal('10')
     expect(channelEntry.partyABalance.toString()).to.equal('3')
     expect(channelEntry.closureTime.toString()).to.equal('10')
