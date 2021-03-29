@@ -31,6 +31,7 @@ class TicketStatic {
     | {
         status: 'SUCCESS'
         receipt: string
+        ackTicket: AcknowledgedTicket
       }
     | {
         status: 'FAILURE'
@@ -101,10 +102,13 @@ class TicketStatic {
       ackTicket.redeemed = true
       this.coreConnector.account.updateLocalState(ackTicket.preImage)
 
+      console.log('ackTicket.redeemed', ackTicket.redeemed)
+
       log('Successfully submitted ticket', u8aToHex(ticketChallenge))
       return {
         status: 'SUCCESS',
-        receipt: transaction.transactionHash
+        receipt: transaction.transactionHash,
+        ackTicket
       }
     } catch (err) {
       log('Unexpected error when submitting ticket', u8aToHex(ticketChallenge), err)

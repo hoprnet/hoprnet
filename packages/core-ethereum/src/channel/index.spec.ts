@@ -233,7 +233,7 @@ describe('test Channel class', function () {
     for (let i = 0; i < ATTEMPTS; i++) {
       ticketData = await getTicketData({
         counterparty: counterpartyAddress,
-        winProb: 0.5
+        winProb: 1
       })
       let ackedTicket = new AcknowledgedTicket(undefined, {
         response: ticketData.response
@@ -246,10 +246,11 @@ describe('test Channel class', function () {
 
       assert(await counterpartysChannel.ticket.verify(nextSignedTicket), `Ticket signature must be valid.`)
 
-      // if (await counterpartysCoreConnector.account.reservePreImageIfIsWinning(ackedTicket)) {
-      //   await counterpartysCoreConnector.channel.tickets.submit(ackedTicket, new Uint8Array())
-      //   assert(ackedTicket.redeemed, 'ticket should get marked as redeemed')
-      // }
+      if (await counterpartysCoreConnector.account.reservePreImageIfIsWinning(ackedTicket)) {
+        const result = await counterpartysCoreConnector.channel.tickets.submit(ackedTicket, new Uint8Array())
+        assert(result.status === 'SUCCESS', 'ticket redeemption was not a success')
+        assert(result?.ackTicket?.redeemed, 'ticket should get marked as redeemed')
+      }
     }
   })
 })

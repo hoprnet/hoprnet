@@ -127,6 +127,7 @@ declare interface ChannelStatic {
       | {
           status: 'SUCCESS'
           receipt: string
+          ackTicket: AcknowledgedTicket
         }
       | {
           status: 'FAILURE'
