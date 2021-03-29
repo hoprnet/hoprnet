@@ -102,8 +102,6 @@ class TicketStatic {
       ackTicket.redeemed = true
       this.coreConnector.account.updateLocalState(ackTicket.preImage)
 
-      console.log('ackTicket.redeemed', ackTicket.redeemed)
-
       log('Successfully submitted ticket', u8aToHex(ticketChallenge))
       return {
         status: 'SUCCESS',
