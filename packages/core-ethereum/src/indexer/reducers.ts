@@ -9,7 +9,7 @@ import { isPartyA } from '../utils'
 export const onAccountInitialized = async (event: Event<'AccountInitialized'>): Promise<AccountEntry> => {
   const data = event.returnValues
   const address = Address.fromString(data.account)
-  // library requires identifier TODO: investigate why
+  // library requires identifier TODO: insert identifier bytes
   const pubKey = new Public(publicKeyConvert(stringToU8a('0x04' + data.uncompressedPubKey.slice(2)), true))
   const secret = new Hash(stringToU8a(data.secret))
   const counter = new BN(1)

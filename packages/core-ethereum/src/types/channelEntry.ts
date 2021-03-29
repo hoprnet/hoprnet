@@ -20,6 +20,7 @@ class ChannelEntry implements Types.ChannelEntry {
   ) {}
 
   // TODO: implement .fromObject function
+  // TODO: flatten .parties
 
   static get SIZE(): number {
     return (

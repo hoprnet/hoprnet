@@ -1,4 +1,4 @@
-import type { Channel as IChannel } from '@hoprnet/hopr-core-connector-interface'
+import type { Channel as IChannel, Types as Interfaces } from '@hoprnet/hopr-core-connector-interface'
 import BN from 'bn.js'
 import { Balance, Channel as ChannelType, Hash, Public, SignedChannel, ChannelEntry, UINT256 } from '../types'
 import TicketFactory from './ticket'
@@ -43,7 +43,7 @@ class Channel implements IChannel {
   }
 
   get status() {
-    return new Promise<'CLOSED' | 'PENDING_TO_CLOSE' | 'OPEN'>(async (resolve, reject) => {
+    return new Promise<ReturnType<Interfaces.ChannelEntry['getStatus']>>(async (resolve, reject) => {
       try {
         const channel = await this.onChainChannel
         return resolve(channel.getStatus())

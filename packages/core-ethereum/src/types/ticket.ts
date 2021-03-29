@@ -114,6 +114,7 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
     return Promise.resolve(
       toEthSignedMessageHash(
         u8aToHex(
+          // the order of the items needs to be the same as the one used in the SC
           u8aConcat(
             this.counterparty.serialize(),
             this.challenge.toU8a(),

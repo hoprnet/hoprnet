@@ -6,6 +6,7 @@ import AccountEntry from './accountEntry'
 import Hash from './hash'
 import { stringToU8a } from '@hoprnet/hopr-utils'
 
+// TODO: move these & similar into constants file
 const EMPTY_ADDRESS = new Address(new Uint8Array({ length: Address.SIZE }))
 const EMPTY_PUBKEY = new Public(new Uint8Array({ length: Public.SIZE }))
 const EMPTY_SECRET = new Hash(new Uint8Array({ length: Hash.SIZE }))
