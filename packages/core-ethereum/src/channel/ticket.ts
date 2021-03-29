@@ -9,12 +9,11 @@ import {
   stateCounterToIteration
 } from '../utils'
 import type HoprEthereum from '..'
-import { HASHED_SECRET_WIDTH } from '../hashedSecret'
 import debug from 'debug'
 const log = debug('hopr-core-ethereum:ticket')
 
 const DEFAULT_WIN_PROB = 1
-const EMPTY_PRE_IMAGE = new Hash(new Uint8Array(HASHED_SECRET_WIDTH).fill(0x00))
+const EMPTY_PRE_IMAGE = new Hash(new Uint8Array(Hash.SIZE).fill(0x00))
 
 class TicketStatic {
   private readonly INVALID_MESSAGES = {
@@ -32,6 +31,7 @@ class TicketStatic {
     | {
         status: 'SUCCESS'
         receipt: string
+        ackTicket: AcknowledgedTicket
       }
     | {
         status: 'FAILURE'
@@ -87,11 +87,11 @@ class TicketStatic {
           to: hoprChannels.options.address
         },
         hoprChannels.methods.redeemTicket(
+          counterparty.toHex(),
           ackTicket.preImage.toHex(),
           ackTicket.response.toHex(),
           ticket.amount.toBN().toString(),
           ticket.winProb.toHex(),
-          counterparty.toHex(),
           u8aToHex(r),
           u8aToHex(s),
           v + 27
@@ -105,7 +105,8 @@ class TicketStatic {
       log('Successfully submitted ticket', ticketChallenge.toHex())
       return {
         status: 'SUCCESS',
-        receipt: transaction.transactionHash
+        receipt: transaction.transactionHash,
+        ackTicket
       }
     } catch (err) {
       log('Unexpected error when submitting ticket', ticketChallenge.toHex(), err)
@@ -136,9 +137,12 @@ class TicketFactory {
     const epoch = await this.channel.coreConnector.hoprChannels.methods
       .accounts(counterparty.toHex())
       .call()
-      .then((res) => new UINT256(Number(res.counter)))
+      .then((res) => UINT256.fromString(res.counter))
 
-    const channelIteration = new UINT256(stateCounterToIteration((await this.channel.stateCounter).toNumber()))
+    // TODO: wtf, make stateCounterToIteration accept BN
+    const channelIteration = UINT256.fromString(
+      String(stateCounterToIteration((await this.channel.stateCounter).toBN().toNumber()))
+    )
 
     const signedTicket = new SignedTicket(arr)
 

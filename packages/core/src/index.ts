@@ -518,7 +518,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       unfunded = true
     }
     const nativeBalance = await this.getNativeBalance()
-    if (nativeBalance.lte(MIN_NATIVE_BALANCE)) {
+    if (nativeBalance.toBN().lte(MIN_NATIVE_BALANCE)) {
       const address = await this.paymentChannels.hexAccountAddress()
       log('unfunded node', address)
       this.emit('hopr:warning:unfundedNative', address)
@@ -642,7 +642,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
 
     const status = await channel.status
 
-    if (!(status === 'OPEN' || status === 'PENDING')) {
+    if (!(status === 'OPEN' || status === 'PENDING_TO_CLOSE')) {
       throw new Error('To close a channel, it must be open or pending for closure')
     }
 

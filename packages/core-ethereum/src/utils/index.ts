@@ -1,4 +1,4 @@
-import { Network } from '@hoprnet/hopr-ethereum'
+import { Networks, networks } from '@hoprnet/hopr-ethereum'
 import assert from 'assert'
 import { publicKeyConvert, publicKeyCreate, ecdsaSign, ecdsaRecover, ecdsaVerify } from 'secp256k1'
 import { PromiEvent, TransactionReceipt } from 'web3-core'
@@ -321,7 +321,7 @@ export async function waitFor({
   timestamp
 }: {
   web3: Web3
-  network: Network
+  network: Networks
   getCurrentBlock: () => Promise<BlockTransactionString>
   timestamp?: number
 }): Promise<void> {
@@ -363,29 +363,24 @@ export async function getChainId(web3: Web3): Promise<number> {
  * @param web3 a web3 instance
  * @returns the network's name
  */
-export function getNetworkName(chainId: number): Network {
-  switch (chainId) {
-    case 1:
-      return 'mainnet'
-    // case 2:
-    //   return 'morden'
-    case 3:
-      return 'ropsten'
-    // case 4:
-    //   return 'rinkeby'
-    case 5:
-      return 'goerli'
-    case 42:
-      return 'kovan'
-    case 56:
-      return 'binance'
-    case 100:
-      return 'xdai'
-    case 137:
-      return 'matic'
-    default:
-      return 'localhost'
-  }
+export function getNetworkName(chainId: number): Networks {
+  const entry = Object.entries(networks).find(([_, options]) => options.chainId === chainId)
+
+  if (entry) return entry[0] as Networks
+  return 'localhost'
+}
+
+/**
+ * Get current network's name.
+ *
+ * @param web3 a web3 instance
+ * @returns the network's name
+ */
+export function getNetworkGasPrice(network: Networks): number | undefined {
+  const entry = Object.entries(networks).find((entry) => entry[0] === network)
+
+  if (entry && entry[1].gas) return entry[1].gas
+  return undefined
 }
 
 /**
@@ -471,6 +466,6 @@ export async function createChallenge(secretA: Uint8Array, secretB: Uint8Array):
  * @param network
  * @returns true if network is private or ganache
  */
-export function isGanache(network?: Network): boolean {
+export function isGanache(network?: Networks): boolean {
   return !network || network === 'localhost'
 }

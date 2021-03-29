@@ -26,14 +26,13 @@ scTopics
 # distribution files
 lib
 
-# @TODO: remove this once refactor is complete
-temp
-
 # Hardhat
 hardhat
-
-# typechain
-types
+# temporary ignored
+deployments
 
 # exclude generated ABIs
 chain/abis
+
+# typechain
+types

@@ -9,15 +9,12 @@ const encoder = new TextEncoder()
 const PREFIX = encoder.encode('payments-')
 const SEPERATOR = encoder.encode('-')
 const channelSubPrefix = encoder.encode('channel-')
-const channelEntrySubPrefix = encoder.encode('channelEntry-')
 const challengeSubPrefix = encoder.encode('challenge-')
 const channelIdSubPrefix = encoder.encode('channelId-')
 const nonceSubPrefix = encoder.encode('nonce-')
 const ticketSubPrefix = encoder.encode('tickets-')
 const acknowledgedSubPrefix = encoder.encode('acknowledged-')
 const onChainSecretIntermediary = encoder.encode('onChainSecretIntermediary-')
-const latestBlockNumber = encoder.encode('latestBlockNumber')
-const latestConfirmedSnapshot = encoder.encode('latestConfirmedSnapshot')
 
 const ON_CHAIN_SECRET_ITERATION_WIDTH = 4 // bytes
 
@@ -39,55 +36,6 @@ export function Channel(counterparty: Types.Address): Uint8Array {
  */
 export function ChannelKeyParse(arr: Uint8Array): Types.Address {
   return new Address(arr.slice(PREFIX.length + channelSubPrefix.length))
-}
-
-/**
- * Returns the db-key under which the latest known block number is saved in the database.
- */
-export function LatestBlockNumber(): Uint8Array {
-  return allocationHelper([
-    [PREFIX.length, PREFIX],
-    [latestBlockNumber.length, latestBlockNumber]
-  ])
-}
-
-/**
- * Returns the db-key under which the latest confirmed snapshot is saved in the database.
- */
-export function LatestConfirmedSnapshot(): Uint8Array {
-  return allocationHelper([
-    [PREFIX.length, PREFIX],
-    [latestConfirmedSnapshot.length, latestConfirmedSnapshot]
-  ])
-}
-
-/**
- * Returns the db-key under which channel entries are saved.
- * @param partyA the accountId of partyA
- * @param partyB the accountId of partyB
- */
-export function ChannelEntry(partyA: Types.Public, partyB: Types.Public): Uint8Array {
-  return allocationHelper([
-    [PREFIX.length, PREFIX],
-    [channelEntrySubPrefix.length, channelEntrySubPrefix],
-    [Public.SIZE, partyA],
-    [SEPERATOR.length, SEPERATOR],
-    [Public.SIZE, partyB]
-  ])
-}
-
-/**
- * Reconstructs parties from a channel entry db-key.
- * @param arr a challenge db-key
- * @returns an array containing partyA's and partyB's accountIds
- */
-export function ChannelEntryParse(arr: Uint8Array): [Public, Public] {
-  const partyAStart = PREFIX.length + channelEntrySubPrefix.length
-  const partyAEnd = partyAStart + Public.SIZE
-  const partyBStart = partyAEnd + SEPERATOR.length
-  const partyBEnd = partyBStart + Public.SIZE
-
-  return [new Public(arr.slice(partyAStart, partyAEnd)), new Public(arr.slice(partyBStart, partyBEnd))]
 }
 
 /**

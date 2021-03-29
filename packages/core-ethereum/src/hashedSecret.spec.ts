@@ -1,26 +1,25 @@
-import assert from 'assert'
 import type HoprEthereum from '.'
+import assert from 'assert'
+import { randomBytes } from 'crypto'
 import * as DbKeys from './dbKeys'
 import * as Utils from './utils'
 import * as Types from './types'
-import PreImage, { HASHED_SECRET_WIDTH } from './hashedSecret'
+import PreImage from './hashedSecret'
 import { durations, stringToU8a } from '@hoprnet/hopr-utils'
 import Memdown from 'memdown'
 import LevelUp from 'levelup'
 import { Ganache } from '@hoprnet/hopr-testing'
-import { Network, addresses, abis } from '@hoprnet/hopr-ethereum'
+import { getAddresses, abis } from '@hoprnet/hopr-ethereum'
 import { migrate, fund } from '@hoprnet/hopr-ethereum'
 import Web3 from 'web3'
 import type { WebsocketProvider } from 'web3-core'
 import * as testconfigs from './config.spec'
 import * as configs from './config'
 import Account from './account'
-import { randomBytes } from 'crypto'
 
 const HoprChannelsAbi = abis.HoprChannels
-
-const EMPTY_HASHED_SECRET = new Types.Hash(new Uint8Array(HASHED_SECRET_WIDTH).fill(0x00))
-const FUND_ARGS = `--address ${addresses?.localhost?.HoprToken} --accounts-to-fund 1`
+const EMPTY_HASHED_SECRET = new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0x00))
+const FUND_ARGS = `--address ${getAddresses()?.localhost?.HoprToken} --accounts-to-fund 1`
 
 describe('test hashedSecret', function () {
   this.timeout(durations.minutes(10))
@@ -30,10 +29,10 @@ describe('test hashedSecret', function () {
   async function generateConnector(debug?: boolean): Promise<HoprEthereum> {
     let web3 = new Web3(configs.DEFAULT_URI)
     const chainId = await Utils.getChainId(web3)
-    const network = Utils.getNetworkName(chainId) as Network
+    const network = Utils.getNetworkName(chainId)
 
     const connector = ({
-      hoprChannels: new web3.eth.Contract(HoprChannelsAbi as any, addresses[network].HoprChannels),
+      hoprChannels: new web3.eth.Contract(HoprChannelsAbi as any, getAddresses()[network].HoprChannels),
       web3,
       db: LevelUp(Memdown()),
       dbKeys: DbKeys,
@@ -65,7 +64,7 @@ describe('test hashedSecret', function () {
   // const checkIndex = async (index: number, masterSecret: Uint8Array, shouldThrow: boolean) => {
   //   let hash = masterSecret
   //   for (let i = 0; i < index; i++) {
-  //     hash = (await connector.utils.hash(hash)).slice(0, HASHED_SECRET_WIDTH)
+  //     hash = (await connector.utils.hash(hash))
   //   }
 
   //   let result,
@@ -83,7 +82,7 @@ describe('test hashedSecret', function () {
   //   } else {
   //     assert(result != null, `Pre-image must have been derivable from the database.`)
   //     assert(
-  //       u8aEquals((await connector.utils.hash(result.preImage)).slice(0, HASHED_SECRET_WIDTH), hash) &&
+  //       u8aEquals((await connector.utils.hash(result.preImage)), hash) &&
   //         index == result.index + 1
   //     )
   //   }
@@ -111,7 +110,7 @@ describe('test hashedSecret', function () {
 
       let onChainHash = new Types.Hash(
         stringToU8a(
-          (await connector.hoprChannels.methods.accounts((await connector.account.address).toHex()).call()).hashedSecret
+          (await connector.hoprChannels.methods.accounts((await connector.account.address).toHex()).call()).secret
         )
       )
 
@@ -126,13 +125,13 @@ describe('test hashedSecret', function () {
               from: (await connector.account.address).toHex(),
               to: connector.hoprChannels.options.address
             },
-            connector.hoprChannels.methods.setHashedSecret(preImage.toHex())
+            connector.hoprChannels.methods.updateAccountSecret(new Types.Hash(preImage.preImage).toHex())
           )
         ).send()
       )
       let updatedOnChainHash = new Types.Hash(
         stringToU8a(
-          (await connector.hoprChannels.methods.accounts((await connector.account.address).toHex()).call()).hashedSecret
+          (await connector.hoprChannels.methods.accounts((await connector.account.address).toHex()).call()).secret
         )
       )
 
@@ -193,14 +192,13 @@ describe('test hashedSecret', function () {
 
       let onChainHash = new Types.Hash(
         stringToU8a(
-          (await connector.hoprChannels.methods.accounts((await connector.account.address).toHex()).call()).hashedSecret
+          (await connector.hoprChannels.methods.accounts((await connector.account.address).toHex()).call()).secret
         )
       )
 
       let preImage = await connector.hashedSecret.findPreImage(onChainHash)
 
       assert(preImage.hash().eq(onChainHash))
-
       await connector.utils.waitForConfirmation(
         (
           await connector.account.signTransaction(
@@ -215,7 +213,7 @@ describe('test hashedSecret', function () {
 
       let updatedOnChainHash = new Types.Hash(
         stringToU8a(
-          (await connector.hoprChannels.methods.accounts((await connector.account.address).toHex()).call()).hashedSecret
+          (await connector.hoprChannels.methods.accounts((await connector.account.address).toHex()).call()).secret
         )
       )
 
@@ -245,7 +243,6 @@ describe('test hashedSecret', function () {
       )
 
       const firstPreImage = firstTicket.preImage.clone()
-
       assert(
         await connector.account.reservePreImageIfIsWinning(firstTicket),
         'ticket with 100% winning probability must always be a win'

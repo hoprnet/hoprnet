@@ -4,13 +4,11 @@ import type { ContractEventEmitter } from './tsc/web3/types'
 import type { TransactionObject } from './tsc/web3/types'
 import type { HoprToken } from './tsc/web3/HoprToken'
 import Web3 from 'web3'
-import { getRpcOptions, Network } from '@hoprnet/hopr-ethereum'
 import { durations, stringToU8a, u8aEquals, u8aToHex, isExpired } from '@hoprnet/hopr-utils'
 import NonceTracker from './nonce-tracker'
 import TransactionManager from './transaction-manager'
 import { Address, AcknowledgedTicket, Balance, Hash, NativeBalance, UINT256 } from './types'
-import { isWinningTicket, pubKeyToAddress, isGanache } from './utils'
-import { HASHED_SECRET_WIDTH } from './hashedSecret'
+import { isWinningTicket, pubKeyToAddress, isGanache, getNetworkGasPrice } from './utils'
 import { WEB3_CACHE_TTL } from './constants'
 import * as ethereum from './ethereum'
 import BN from 'bn.js'
@@ -18,8 +16,7 @@ import BN from 'bn.js'
 import debug from 'debug'
 const log = debug('hopr-core-ethereum:account')
 
-export const EMPTY_HASHED_SECRET = new Uint8Array(HASHED_SECRET_WIDTH).fill(0x00)
-const rpcOps = getRpcOptions()
+export const EMPTY_HASHED_SECRET = new Uint8Array(Hash.SIZE).fill(0x00)
 const cache = new Map<'balance' | 'nativeBalance', { value: string; updatedAt: number }>()
 
 class Account {
@@ -142,7 +139,7 @@ class Account {
         .accounts(address.toHex())
         .call()
         .then((res) => {
-          this._ticketEpoch = new UINT256(res.counter)
+          this._ticketEpoch = UINT256.fromString(res.counter)
 
           return this._ticketEpoch
         })
@@ -164,7 +161,7 @@ class Account {
         .accounts(address.toHex())
         .call()
         .then((res) => {
-          const hashedSecret = stringToU8a(res.hashedSecret)
+          const hashedSecret = stringToU8a(res.secret)
 
           // true if this string is an empty bytes32
           if (u8aEquals(hashedSecret, EMPTY_HASHED_SECRET)) {
@@ -193,8 +190,8 @@ class Account {
       return Promise.resolve(this._address)
     }
 
-    return pubKeyToAddress(this.keys.onChain.pubKey).then((accountId: Address) => {
-      this._address = accountId
+    return pubKeyToAddress(this.keys.onChain.pubKey).then((address: Address) => {
+      this._address = address
       return this._address
     })
   }
@@ -215,14 +212,8 @@ class Account {
     const abi = txObject ? txObject.encodeABI() : undefined
     const gas = 300e3
 
-    // let web3 pick gas price
-    // should be used when the gas price fluctuates
-    // as it allows the provider to pick a gas price
-    let gasPrice: number
-    // if its a known network with constant gas price
-    if (rpcOps[network] && !(['mainnet', 'ropsten', 'goerli'] as Network[]).includes(network)) {
-      gasPrice = rpcOps[network]?.gasPrice ?? 1e9
-    }
+    // if it returns undefined, let web3 pick gas price
+    const gasPrice = getNetworkGasPrice(network)
 
     // @TODO: potential deadlock, needs to be improved
     const nonceLock = await this._nonceTracker.getNonceLock(this._address.toHex())
@@ -299,7 +290,7 @@ class Account {
       // on error, safely reset 'ticketEpoch' & event listener
       try {
         this._ticketEpochListener = this.coreConnector.hoprChannels.events
-          .SecretHashSet({
+          .AccountSecretUpdated({
             fromBlock: 'latest',
             filter: {
               account: (await this.address).toHex()
@@ -308,8 +299,8 @@ class Account {
           .on('data', (event) => {
             log('new ticketEpoch', event.returnValues.counter)
 
-            this._ticketEpoch = new UINT256(event.returnValues.counter)
             this._onChainSecret = new Hash(stringToU8a(event.returnValues.secretHash))
+            this._ticketEpoch = UINT256.fromString(event.returnValues.counter)
           })
           .on('error', (error) => {
             log('error listening to SecretHashSet events', error.message)
@@ -359,13 +350,13 @@ export const getNativeBalance = async (
   if (useCache) {
     const cached = cache.get('nativeBalance')
     const notExpired = cached && !isExpired(cached.updatedAt, new Date().getTime(), WEB3_CACHE_TTL)
-    if (notExpired) return new NativeBalance(cached.value)
+    if (notExpired) return new NativeBalance(new BN(cached.value))
   }
 
   const value = await ethereum.getNativeBalance(web3, account)
-  cache.set('nativeBalance', { value: value.toString(), updatedAt: new Date().getTime() })
+  cache.set('nativeBalance', { value: value.toBN().toString(), updatedAt: new Date().getTime() })
 
-  return new NativeBalance(value)
+  return value
 }
 
 export default Account

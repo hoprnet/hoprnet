@@ -1,27 +1,26 @@
 import { expect } from 'chai'
-import BN from 'bn.js'
 import { snapshotComparator, isConfirmedBlock, isSyncing } from './utils'
 
 describe('test snapshotComparator', function () {
   const EVENT_1_0_0 = {
-    blockNumber: new BN(1),
-    transactionIndex: new BN(0),
-    logIndex: new BN(0)
+    blockNumber: 1,
+    transactionIndex: 0,
+    logIndex: 0
   }
   const EVENT_1_1_0 = {
-    blockNumber: new BN(1),
-    transactionIndex: new BN(1),
-    logIndex: new BN(0)
+    blockNumber: 1,
+    transactionIndex: 1,
+    logIndex: 0
   }
   const EVENT_1_1_1 = {
-    blockNumber: new BN(1),
-    transactionIndex: new BN(1),
-    logIndex: new BN(1)
+    blockNumber: 1,
+    transactionIndex: 1,
+    logIndex: 1
   }
   const EVENT_2_0_0 = {
-    blockNumber: new BN(2),
-    transactionIndex: new BN(0),
-    logIndex: new BN(0)
+    blockNumber: 2,
+    transactionIndex: 0,
+    logIndex: 0
   }
 
   it('should return zero when event is the same', function () {

@@ -11,13 +11,11 @@ import type Account from './account'
 
 export const DB_ITERATION_BLOCK_SIZE = 10000
 export const TOTAL_ITERATIONS = 100000
-export const HASHED_SECRET_WIDTH = 32
 
 const log = Debug('hopr-core-ethereum:hashedSecret')
-const isNullAccount = (a: string) => a == null || ['0', '0x', '0x'.padEnd(66, '0')].includes(a)
 
 export async function hashFunction(msg: Uint8Array): Promise<Uint8Array> {
-  return Hash.create(msg).serialize().slice(0, HASHED_SECRET_WIDTH)
+  return Hash.create(msg).serialize().slice(0, Hash.SIZE)
 }
 
 async function getFromDB<T>(db: LevelUp, key): Promise<T | undefined> {
@@ -55,7 +53,7 @@ class HashedSecret {
    * @returns a promise that resolves to the onChainSecret
    */
   private async createAndStoreSecretOffChainAndReturnOnChainSecret(debug: boolean): Promise<Hash> {
-    let onChainSecret = debug ? await this.getDebugAccountSecret() : new Hash(randomBytes(HASHED_SECRET_WIDTH))
+    let onChainSecret = debug ? await this.getDebugAccountSecret() : new Hash(randomBytes(Hash.SIZE))
 
     let dbBatch = this.db.batch()
     const result = await iterateHash(onChainSecret.serialize(), hashFunction, TOTAL_ITERATIONS, DB_ITERATION_BLOCK_SIZE)
@@ -75,7 +73,8 @@ class HashedSecret {
     const address = (await this.account.address).toHex()
     const account = await this.channels.methods.accounts(address).call()
 
-    if (isNullAccount(account.accountX)) {
+    // has no secret stored onchain
+    if (Number(account.counter) === 0) {
       const uncompressedPubKey = publicKeyConvert(this.account.keys.onChain.pubKey, false).slice(1)
       log('account is also null, calling channel.init')
       try {
@@ -86,11 +85,7 @@ class HashedSecret {
                 from: address,
                 to: this.channels.options.address
               },
-              this.channels.methods.init(
-                u8aToHex(uncompressedPubKey.slice(0, 32)),
-                u8aToHex(uncompressedPubKey.slice(32, 64)),
-                secret.toHex()
-              )
+              this.channels.methods.initializeAccount(u8aToHex(uncompressedPubKey), u8aToHex(secret))
             )
           ).send()
         )
@@ -116,7 +111,7 @@ class HashedSecret {
                 from: address,
                 to: this.channels.options.address
               },
-              this.channels.methods.setHashedSecret(secret.toHex())
+              this.channels.methods.updateAccountSecret(u8aToHex(secret))
             )
           ).send()
         )
@@ -153,11 +148,9 @@ class HashedSecret {
    * values from the database.
    * @param hash the hash to find a preImage for
    */
-  public async findPreImage(hash: Hash): Promise<Hash> {
-    if (hash.length != HASHED_SECRET_WIDTH) {
-      throw Error(
-        `Invalid length. Expected a Uint8Array with ${HASHED_SECRET_WIDTH} elements but got one with ${hash.length}`
-      )
+  public async findPreImage(hash: Uint8Array): Promise<Intermediate> {
+    if (hash.length != Hash.SIZE) {
+      throw Error(`Invalid length. Expected a Uint8Array with ${Hash.SIZE} elements but got one with ${hash.length}`)
     }
 
     let result = await recoverIteratedHash(

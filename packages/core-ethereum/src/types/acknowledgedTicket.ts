@@ -1,7 +1,5 @@
 import { Hash, SignedTicket } from '.'
 
-import { HASHED_SECRET_WIDTH } from '../hashedSecret'
-
 // @TODO this is a duplicate of the same class in hopr-core
 class AcknowledgedTicket extends Uint8Array {
   private _signedTicket: SignedTicket
@@ -21,9 +19,9 @@ class AcknowledgedTicket extends Uint8Array {
     }
   ) {
     if (!arr) {
-      super(AcknowledgedTicket.SIZE())
+      super(AcknowledgedTicket.SIZE)
     } else {
-      super(arr.bytes, arr.offset, AcknowledgedTicket.SIZE())
+      super(arr.bytes, arr.offset, AcknowledgedTicket.SIZE)
     }
 
     if (struct) {
@@ -48,7 +46,7 @@ class AcknowledgedTicket extends Uint8Array {
     }
   }
 
-  subarray(begin: number = 0, end: number = AcknowledgedTicket.SIZE()): Uint8Array {
+  subarray(begin: number = 0, end: number = AcknowledgedTicket.SIZE): Uint8Array {
     return new Uint8Array(this.buffer, begin + this.byteOffset, end - begin)
   }
 
@@ -89,7 +87,7 @@ class AcknowledgedTicket extends Uint8Array {
 
   get preImage(): Hash {
     if (!this._preImage) {
-      this._preImage = new Hash(new Uint8Array(this.buffer, this.preImageOffset, HASHED_SECRET_WIDTH))
+      this._preImage = new Hash(new Uint8Array(this.buffer, this.preImageOffset, Hash.SIZE))
     }
 
     return this._preImage
@@ -98,11 +96,11 @@ class AcknowledgedTicket extends Uint8Array {
   set preImage(_preImage: Hash) {
     this.set(_preImage.serialize(), this.preImageOffset - this.byteOffset)
 
-    this._preImage = new Hash(new Uint8Array(this.buffer, this.preImageOffset, HASHED_SECRET_WIDTH))
+    this._preImage = new Hash(new Uint8Array(this.buffer, this.preImageOffset, Hash.SIZE))
   }
 
   get redeemedOffset(): number {
-    return this.byteOffset + SignedTicket.SIZE + Hash.SIZE + HASHED_SECRET_WIDTH
+    return this.byteOffset + SignedTicket.SIZE + Hash.SIZE + Hash.SIZE
   }
 
   get redeemed(): boolean {
@@ -113,8 +111,8 @@ class AcknowledgedTicket extends Uint8Array {
     this.set([_redeemed ? 1 : 0], this.redeemedOffset - this.byteOffset)
   }
 
-  static SIZE(): number {
-    return SignedTicket.SIZE + Hash.SIZE + HASHED_SECRET_WIDTH + 1
+  static get SIZE(): number {
+    return SignedTicket.SIZE + Hash.SIZE + Hash.SIZE + 1
   }
 
   static create(

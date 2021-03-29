@@ -127,6 +127,7 @@ declare interface ChannelStatic {
       | {
           status: 'SUCCESS'
           receipt: string
+          ackTicket: AcknowledgedTicket
         }
       | {
           status: 'FAILURE'
@@ -151,7 +152,7 @@ declare interface Channel {
   readonly stateCounter: Promise<TicketEpoch>
 
   // Current status of the channel
-  readonly status: Promise<'UNINITIALISED' | 'FUNDED' | 'OPEN' | 'PENDING'>
+  readonly status: Promise<'CLOSED' | 'PENDING_TO_CLOSE' | 'OPEN'>
 
   // Current state of the channel, i.e. `FUNDED` with `1 HOPR / 3 HOPR`
   readonly state: Promise<ChannelType>

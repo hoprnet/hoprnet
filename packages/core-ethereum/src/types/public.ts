@@ -1,5 +1,6 @@
 import { COMPRESSED_PUBLIC_KEY_LENGTH } from '../constants'
 import { Types } from '@hoprnet/hopr-core-connector-interface'
+import { stringToU8a } from '@hoprnet/hopr-utils'
 import { privKeyToPubKey, pubKeyToAddress } from '../utils'
 import { Address } from '..'
 import { Uint8ArrayE } from './extended'
@@ -19,6 +20,10 @@ class Public extends Uint8ArrayE implements Types.Public {
 
   toAddress(): Promise<Address> {
     return pubKeyToAddress(this)
+  }
+
+  static fromString(str: string): Public {
+    return new Public(stringToU8a(str))
   }
 
   static get SIZE(): number {

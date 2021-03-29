@@ -109,7 +109,11 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
         let acknowledgedTicket = this.node.paymentChannels.types.AcknowledgedTicket.create(undefined, {
           signedTicket: await unacknowledgedTicket.signedTicket,
           response: await this.node.paymentChannels.utils.hash(
+<<<<<<< HEAD
             u8aConcat(unacknowledgedTicket.secretA.serialize(), (await acknowledgement.hashedKey).serialize())
+=======
+            u8aConcat(unacknowledgedTicket.secretA, await acknowledgement.hashedKey)
+>>>>>>> 6b0fce304a7530c541e600131ec79f96b2b75aab
           ),
           redeemed: false
         })

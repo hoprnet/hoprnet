@@ -67,38 +67,47 @@ export default class ListOpenChannels extends AbstractCommand {
    */
   async execute(): Promise<string | void> {
     try {
-      const { utils, types } = this.node.paymentChannels
-      const self = new types.Public(this.node.getId().pubKey.marshal())
-      const channels = (await this.node.paymentChannels.indexer.getChannelEntries(self))
-        // do not print UNINITIALISED channels
-        .filter((channel) => channel.channelEntry.status !== 'UNINITIALISED')
+      const { utils, types, indexer } = this.node.paymentChannels
+      const selfPubKey = new types.Public(this.node.getId().pubKey.marshal())
+      const selfAddress = await selfPubKey.toAddress()
+      const channels = (await this.node.paymentChannels.indexer.getChannelsOf(selfAddress))
+        // do not print CLOSED channels
+        .filter((channel) => channel.getStatus() !== 'CLOSED')
       const result: string[] = []
 
       if (channels.length === 0) {
         return `\nNo open channels found.`
       }
 
+<<<<<<< HEAD
       for (const { partyA, partyB, channelEntry } of channels) {
         const id = (await utils.getId(await partyA.toAddress(), await partyB.toAddress())).toHex()
         const selfIsPartyA = u8aEquals(self, partyA)
         const counterparty = selfIsPartyA ? partyB : partyA
+=======
+      for (const channel of channels) {
+        const id = await utils.getId(channel.parties[0], channel.parties[1])
+        const [partyA, partyB] = utils.isPartyA(channel.parties[0], channel.parties[1])
+          ? [channel.parties[0], channel.parties[1]]
+          : [channel.parties[1], channel.parties[0]]
+        const selfIsPartyA = u8aEquals(selfAddress.serialize(), partyA.serialize())
+        const counterpartyPubKey = await indexer.getPublicKeyOf(selfIsPartyA ? partyB : partyA)
+>>>>>>> 6b0fce304a7530c541e600131ec79f96b2b75aab
 
-        const totalBalance = moveDecimalPoint(channelEntry.deposit.toString(), types.Balance.DECIMALS * -1)
+        const totalBalance = moveDecimalPoint(channel.deposit.toString(), types.Balance.DECIMALS * -1)
         const myBalance = moveDecimalPoint(
-          selfIsPartyA
-            ? channelEntry.partyABalance.toString()
-            : channelEntry.deposit.sub(channelEntry.partyABalance).toString(),
+          selfIsPartyA ? channel.partyABalance.toString() : channel.deposit.sub(channel.partyABalance).toString(),
           types.Balance.DECIMALS * -1
         )
-        const peerId = (await pubKeyToPeerId(counterparty)).toB58String()
+        const peerId = (await pubKeyToPeerId(counterpartyPubKey)).toB58String()
 
         result.push(
           this.generateOutput({
-            id,
+            id: u8aToHex(id),
             totalBalance,
             myBalance,
             peerId,
-            status: channelEntry.status
+            status: channel.getStatus()
           })
         )
       }

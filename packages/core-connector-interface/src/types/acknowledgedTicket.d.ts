@@ -2,7 +2,7 @@ import type HoprCoreConnector from '..'
 import { Hash, SignedTicket } from '.'
 
 declare interface AcknowledgedTicketStatic {
-  SIZE(): number
+  SIZE: number
 
   create(
     arr?: { bytes: ArrayBuffer; offset: number },

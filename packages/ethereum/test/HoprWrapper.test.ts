@@ -1,4 +1,5 @@
 import { expect } from 'chai'
+import { deployments } from 'hardhat'
 import { singletons, expectRevert, expectEvent } from '@openzeppelin/test-helpers'
 import { PermittableTokenInstance, HoprTokenInstance, HoprWrapperInstance } from '../types'
 import { vmErrorMessage } from './utils'
@@ -7,9 +8,33 @@ const PermittableToken = artifacts.require('PermittableToken')
 const HoprToken = artifacts.require('HoprToken')
 const HoprWrapper = artifacts.require('HoprWrapper')
 
-const deploy_xHOPR = async () => {
-  return PermittableToken.new('xHOPR Token', 'xHOPR', 18, await web3.eth.getChainId())
-}
+const useFixtures = deployments.createFixture(async () => {
+  const [deployer, userA] = await web3.eth.getAccounts()
+
+  // deploy ERC1820Registry required by ERC777 tokens
+  await singletons.ERC1820Registry(deployer)
+
+  // deploy xHOPR
+  const xHOPR = await PermittableToken.new('xHOPR Token', 'xHOPR', 18, await web3.eth.getChainId())
+  // deploy wxHOPR
+  const wxHOPR = await HoprToken.new()
+  // deploy wrapper
+  const wrapper = await HoprWrapper.new(xHOPR.address, wxHOPR.address)
+
+  // allow wrapper to mint wxHOPR required for swapping
+  await wxHOPR.grantRole(await wxHOPR.MINTER_ROLE(), wrapper.address)
+
+  // mint some initial xHOPR for userA
+  await xHOPR.mint(userA, 100)
+
+  return {
+    deployer,
+    userA,
+    xHOPR,
+    wxHOPR,
+    wrapper
+  }
+})
 
 describe('HoprWrapper', function () {
   let xHOPR: PermittableTokenInstance
@@ -20,23 +45,13 @@ describe('HoprWrapper', function () {
 
   // @TODO: use fixtures when we merge with upcoming refactor
   before(async function () {
-    ;[deployer, userA] = await web3.eth.getAccounts()
+    const fixtures = await useFixtures()
 
-    // deploy ERC1820Registry required by ERC777 tokens
-    await singletons.ERC1820Registry(deployer)
-
-    // deploy xHOPR
-    xHOPR = await deploy_xHOPR()
-    // deploy wxHOPR
-    wxHOPR = await HoprToken.new()
-    // deploy wrapper
-    wrapper = await HoprWrapper.new(xHOPR.address, wxHOPR.address)
-
-    // allow wrapper to mint wxHOPR required for swapping
-    await wxHOPR.grantRole(await wxHOPR.MINTER_ROLE(), wrapper.address)
-
-    // mint some initial xHOPR for userA
-    await xHOPR.mint(userA, 100)
+    xHOPR = fixtures.xHOPR
+    wxHOPR = fixtures.wxHOPR
+    wrapper = fixtures.wrapper
+    deployer = fixtures.deployer
+    userA = fixtures.userA
   })
 
   it('should wrap 10 xHOPR', async function () {
@@ -97,7 +112,7 @@ describe('HoprWrapper', function () {
   })
 
   it('should fail when sending an unknown "xHOPR" token', async function () {
-    const token = await deploy_xHOPR()
+    const token = await PermittableToken.new('Unknown Token', '?', 18, await web3.eth.getChainId())
     await token.mint(userA, 100)
 
     await expectRevert.unspecified(
