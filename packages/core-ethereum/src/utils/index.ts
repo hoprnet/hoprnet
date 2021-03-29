@@ -387,8 +387,8 @@ export function getNetworkGasPrice(network: Networks): number | undefined {
  * @param stateCounter the state counter
  * @returns ChannelStatus
  */
-export function stateCounterToStatus(stateCounter: number): ChannelStatus {
-  const status = Number(stateCounter) % 10
+export function stateCounterToStatus(stateCounter: BN): ChannelStatus {
+  const status = stateCounter.modn(10)
 
   if (status >= Object.keys(ChannelStatus).length) {
     throw Error("status like this doesn't exist")
@@ -404,8 +404,8 @@ export function stateCounterToStatus(stateCounter: number): ChannelStatus {
  * @param stateCount the state count
  * @returns ChannelStatus
  */
-export function stateCounterToIteration(stateCounter: number): number {
-  return Math.ceil(Number(stateCounter + 1) / 10)
+export function stateCounterToIteration(stateCounter: BN): BN {
+  return new BN(String(Math.ceil((stateCounter.toNumber() + 1) / 10)))
 }
 
 /**

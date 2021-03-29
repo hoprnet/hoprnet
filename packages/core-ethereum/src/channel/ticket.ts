@@ -139,10 +139,7 @@ class TicketFactory {
       .call()
       .then((res) => UINT256.fromString(res.counter))
 
-    // TODO: wtf, make stateCounterToIteration accept BN
-    const channelIteration = UINT256.fromString(
-      String(stateCounterToIteration((await this.channel.stateCounter).toBN().toNumber()))
-    )
+    const channelIteration = new UINT256(stateCounterToIteration((await this.channel.stateCounter).toBN()))
 
     const signedTicket = new SignedTicket(arr)
 

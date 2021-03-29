@@ -86,7 +86,7 @@ class ChannelEntry implements Types.ChannelEntry {
   }
 
   public getStatus() {
-    const status = stateCounterToStatus(this.stateCounter.toNumber())
+    const status = stateCounterToStatus(this.stateCounter)
 
     if (status >= Object.keys(ChannelStatus).length) {
       throw Error("status like this doesn't exist")
@@ -98,7 +98,7 @@ class ChannelEntry implements Types.ChannelEntry {
   }
 
   public getIteration() {
-    return stateCounterToIteration(this.stateCounter.toNumber())
+    return stateCounterToIteration(this.stateCounter)
   }
 
   public getChannelId() {

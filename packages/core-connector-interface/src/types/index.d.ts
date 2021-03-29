@@ -73,7 +73,7 @@ declare interface ChannelEntry {
   openedAt: BN
   closedAt: BN
   getStatus(): 'CLOSED' | 'OPEN' | 'PENDING_TO_CLOSE'
-  getIteration(): number
+  getIteration(): BN
   getChannelId(): Promise<Hash>
 }
 declare var ChannelEntry: ChannelEntryStatic

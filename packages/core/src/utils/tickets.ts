@@ -253,14 +253,21 @@ export async function validateUnacknowledgedTicket({
   signedTicket: Types.SignedTicket
   getTickets: () => Promise<Types.SignedTicket[]>
 }): Promise<void> {
-  const ticket = signedTicket.ticket
-  const chain = node.paymentChannels
-  const selfPubKey = node.getId().pubKey.marshal()
-  const selfAddress = await chain.utils.pubKeyToAddress(selfPubKey)
+  const ethereum = node.paymentChannels
+  // self
+  const selfPubKey = new ethereum.types.Public(node.getId().pubKey.marshal())
+  const selfAddress = await selfPubKey.toAddress()
+  // sender
   const senderB58 = senderPeerId.toB58String()
-  const senderPubKey = senderPeerId.pubKey.marshal()
-  const senderAddress = await chain.utils.pubKeyToAddress(senderPubKey)
-  const amPartyA = chain.utils.isPartyA(selfAddress, senderAddress)
+  const senderPubKey = new ethereum.types.Public(senderPeerId.pubKey.marshal())
+  const senderAddress = await senderPubKey.toAddress()
+  const amPartyA = ethereum.utils.isPartyA(selfAddress, senderAddress)
+  // ticket
+  const ticket = signedTicket.ticket
+  const ticketAmount = ticket.amount.toBN()
+  const ticketCounter = ticket.epoch.toBN()
+  const accountCounter = (await ethereum.account.ticketEpoch).toBN()
+  const ticketWinProb = ethereum.utils.getWinProbabilityAsFloat(ticket.winProb)
 
   // ticket signer MUST be the sender
   if (!u8aEquals(await signedTicket.signer, senderPubKey)) {
@@ -268,20 +275,18 @@ export async function validateUnacknowledgedTicket({
   }
 
   // ticket MUST have at least X amount
-  if (ticket.amount.toBN().lt(new BN(String(node.ticketAmount)))) {
-    throw Error(`Ticket amount '${ticket.amount.toString()}' is lower than '${node.ticketAmount}'`)
+  if (ticketAmount.lt(new BN(node.ticketAmount))) {
+    throw Error(`Ticket amount '${ticketAmount.toString()}' is lower than '${node.ticketAmount}'`)
   }
 
   // ticket MUST have at least X winning probability
-  const winProb = chain.utils.getWinProbabilityAsFloat(ticket.winProb)
-  if (new BN(winProb).lt(new BN(String(node.ticketWinProb)))) {
-    throw Error(`Ticket winning probability '${winProb}' is lower than '${node.ticketWinProb}'`)
+  if (ticketWinProb < node.ticketWinProb) {
+    throw Error(`Ticket winning probability '${ticketWinProb}' is lower than '${node.ticketWinProb}'`)
   }
 
   // channel MUST be open
   // (performance) we are making a request to blockchain
-  const channelIsOpen = await chain.channel.isOpen(senderPubKey)
-  if (!channelIsOpen) {
+  if (!(await ethereum.channel.isOpen(senderPubKey))) {
     throw Error(`Payment channel with '${senderB58}' is not open`)
   }
 
@@ -289,9 +294,9 @@ export async function validateUnacknowledgedTicket({
   // (performance) we are making a request to blockchain
   let channel: Channel
   try {
-    channel = await chain.channel.create(
+    channel = await ethereum.channel.create(
       senderPubKey,
-      async () => new chain.types.Public(senderPubKey),
+      async () => new ethereum.types.Public(senderPubKey),
       undefined,
       undefined
     )
@@ -301,18 +306,19 @@ export async function validateUnacknowledgedTicket({
 
   // ticket's epoch MUST match our account nonce
   // (performance) we are making a request to blockchain
-  const epoch = await chain.account.ticketEpoch
-  if (!ticket.epoch.eq(epoch)) {
-    throw Error(`Ticket epoch '${ticket.epoch.toString()}' does not match our account counter ${epoch.toString()}`)
+  if (!ticketCounter.eq(accountCounter)) {
+    throw Error(
+      `Ticket epoch '${ticketCounter.toString()}' does not match our account counter ${accountCounter.toString()}`
+    )
   }
 
   // ticket's channelIteration MUST match the current channelIteration
   // (performance) we are making a request to blockchain
-  const currentChannelIteration = chain.utils.stateCounterToIteration((await channel.stateCounter).toNumber())
-  const ticketChannelIteration = ticket.channelIteration.toNumber()
-  if (ticketChannelIteration != currentChannelIteration) {
+  const currentChannelIteration = ethereum.utils.stateCounterToIteration(await channel.stateCounter)
+  const ticketChannelIteration = ticket.channelIteration.toBN()
+  if (!ticketChannelIteration.eq(currentChannelIteration)) {
     throw Error(
-      `Ticket was created for a different channel iteration ${ticketChannelIteration} != ${currentChannelIteration}`
+      `Ticket was created for a different channel iteration ${ticketChannelIteration.toString()} != ${currentChannelIteration.toString()}`
     )
   }
 
@@ -329,8 +335,8 @@ export async function validateUnacknowledgedTicket({
   let signedTickets = (await getTickets()).filter(
     (signedTicket) =>
       signedTicket.ticket.counterparty.eq(selfAddress) &&
-      signedTicket.ticket.epoch.eq(epoch) &&
-      ticket.channelIteration.toNumber() === currentChannelIteration
+      signedTicket.ticket.epoch.toBN().eq(accountCounter) &&
+      ticket.channelIteration.toBN().eq(currentChannelIteration)
   )
 
   // calculate total unredeemed balance

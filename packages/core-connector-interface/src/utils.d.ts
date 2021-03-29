@@ -1,3 +1,4 @@
+import type BN from 'bn.js'
 import type { Address, Hash, Signature, Balance } from './types'
 
 /**
@@ -77,7 +78,7 @@ export declare function getWinProbabilityAsFloat(winProb: Uint8Array): number
  * Convert a state counter, to a number represeting the channels iteration.
  * Iteration stands for the amount of times a channel has been opened and closed.
  *
- * @param stateCount the state count
- * @returns ChannelStatus
+ * @param stateCounter the state count
+ * @returns channel's iteration
  */
-export declare function stateCounterToIteration(stateCounter: number): number
+export declare function stateCounterToIteration(stateCounter: BN): BN

@@ -88,7 +88,7 @@ class ChannelFactory {
       balance: new Balance(new BN(channelEntry.deposit)),
       balance_a: new Balance(new BN(channelEntry.partyABalance))
     })
-    const state = new ChannelState(undefined, { state: stateCounterToStatus(channelEntry.stateCounter.toNumber()) })
+    const state = new ChannelState(undefined, { state: stateCounterToStatus(channelEntry.stateCounter) })
     const newChannel = new ChannelType(undefined, {
       state,
       balance
@@ -269,7 +269,7 @@ class ChannelFactory {
         await this.increaseFunds(counterparty, new Balance(amountToFund.toBN().sub(amountFunded.toBN())))
       }
 
-      const state = new ChannelState(undefined, { state: stateCounterToStatus(0) })
+      const state = new ChannelState(undefined, { state: stateCounterToStatus(new BN(0)) })
 
       // signedChannel = await sign(channelBalance)
       signedChannel = new SignedChannel(undefined, {

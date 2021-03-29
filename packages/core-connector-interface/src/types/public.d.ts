@@ -1,4 +1,4 @@
-import Address from './accountId'
+import { Address } from '.' // TODO: cyclic
 
 declare interface PublicStatic {
   SIZE: number

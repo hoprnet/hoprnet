@@ -79,7 +79,7 @@ class Channel extends Uint8ArrayE implements Types.Channel {
   }
 
   get _status(): ChannelStatus {
-    return stateCounterToStatus(this.rawState.toNumber())
+    return stateCounterToStatus(this.rawState.toBN())
   }
 
   get hash() {
