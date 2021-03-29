@@ -11,7 +11,7 @@ import type Account from './account'
 
 export const DB_ITERATION_BLOCK_SIZE = 10000
 export const TOTAL_ITERATIONS = 100000
-export const HASHED_SECRET_WIDTH = 27
+export const HASHED_SECRET_WIDTH = 32
 
 const log = Debug('hopr-core-ethereum:hashedSecret')
 const isNullAccount = (a: string) => a == null || ['0', '0x', '0x'.padEnd(66, '0')].includes(a)

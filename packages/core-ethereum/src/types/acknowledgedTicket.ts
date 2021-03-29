@@ -96,7 +96,7 @@ class AcknowledgedTicket extends Uint8Array {
   }
 
   set preImage(_preImage: Hash) {
-    this.set(_preImage.serialize(), this.preImageOffset)
+    this.set(_preImage.serialize(), this.preImageOffset - this.byteOffset)
 
     this._preImage = new Hash(new Uint8Array(this.buffer, this.preImageOffset, HASHED_SECRET_WIDTH))
   }
