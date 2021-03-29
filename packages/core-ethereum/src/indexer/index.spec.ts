@@ -125,7 +125,7 @@ describe('test indexer', function () {
 
       const [channel] = channels
       const storedChannelId = await getId(...channel.parties)
-      assert(u8aEquals(expectedChannelId, storedChannelId), 'check Channels.get')
+      assert(expectedChannelId.eq(storedChannelId), 'check Channels.get')
     })
 
     it('should find channel using partyB', async function () {
@@ -135,7 +135,7 @@ describe('test indexer', function () {
 
       const [channel] = channels
       const storedChannelId = await getId(...channel.parties)
-      assert(u8aEquals(expectedChannelId, storedChannelId), 'check Channels.get')
+      assert(expectedChannelId.eq(storedChannelId), 'check Channels.get')
     })
 
     it('should find channel using partyA & partyB', async function () {

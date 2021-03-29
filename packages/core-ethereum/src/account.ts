@@ -299,7 +299,7 @@ class Account {
           .on('data', (event) => {
             log('new ticketEpoch', event.returnValues.counter)
 
-            this._onChainSecret = new Hash(stringToU8a(event.returnValues.secretHash))
+            this._onChainSecret = new Hash(stringToU8a(event.returnValues.secret))
             this._ticketEpoch = UINT256.fromString(event.returnValues.counter)
           })
           .on('error', (error) => {

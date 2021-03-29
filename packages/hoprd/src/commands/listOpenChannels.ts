@@ -79,12 +79,6 @@ export default class ListOpenChannels extends AbstractCommand {
         return `\nNo open channels found.`
       }
 
-<<<<<<< HEAD
-      for (const { partyA, partyB, channelEntry } of channels) {
-        const id = (await utils.getId(await partyA.toAddress(), await partyB.toAddress())).toHex()
-        const selfIsPartyA = u8aEquals(self, partyA)
-        const counterparty = selfIsPartyA ? partyB : partyA
-=======
       for (const channel of channels) {
         const id = await utils.getId(channel.parties[0], channel.parties[1])
         const [partyA, partyB] = utils.isPartyA(channel.parties[0], channel.parties[1])
@@ -92,7 +86,6 @@ export default class ListOpenChannels extends AbstractCommand {
           : [channel.parties[1], channel.parties[0]]
         const selfIsPartyA = u8aEquals(selfAddress.serialize(), partyA.serialize())
         const counterpartyPubKey = await indexer.getPublicKeyOf(selfIsPartyA ? partyB : partyA)
->>>>>>> 6b0fce304a7530c541e600131ec79f96b2b75aab
 
         const totalBalance = moveDecimalPoint(channel.deposit.toString(), types.Balance.DECIMALS * -1)
         const myBalance = moveDecimalPoint(
@@ -103,7 +96,7 @@ export default class ListOpenChannels extends AbstractCommand {
 
         result.push(
           this.generateOutput({
-            id: u8aToHex(id),
+            id: id.toHex(),
             totalBalance,
             myBalance,
             peerId,

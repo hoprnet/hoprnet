@@ -85,7 +85,7 @@ class HashedSecret {
                 from: address,
                 to: this.channels.options.address
               },
-              this.channels.methods.initializeAccount(u8aToHex(uncompressedPubKey), u8aToHex(secret))
+              this.channels.methods.initializeAccount(u8aToHex(uncompressedPubKey), secret.toHex()) 
             )
           ).send()
         )
@@ -111,7 +111,7 @@ class HashedSecret {
                 from: address,
                 to: this.channels.options.address
               },
-              this.channels.methods.updateAccountSecret(u8aToHex(secret))
+              this.channels.methods.updateAccountSecret(secret.toHex())
             )
           ).send()
         )
@@ -148,11 +148,7 @@ class HashedSecret {
    * values from the database.
    * @param hash the hash to find a preImage for
    */
-  public async findPreImage(hash: Uint8Array): Promise<Intermediate> {
-    if (hash.length != Hash.SIZE) {
-      throw Error(`Invalid length. Expected a Uint8Array with ${Hash.SIZE} elements but got one with ${hash.length}`)
-    }
-
+  public async findPreImage(hash: Hash): Promise<Hash> {
     let result = await recoverIteratedHash(
       hash.serialize(),
       hashFunction,

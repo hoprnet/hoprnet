@@ -91,10 +91,6 @@ export async function getAcknowledgedTickets(
   }[]
 > {
   const { AcknowledgedTicket } = node.paymentChannels.types
-<<<<<<< HEAD
-  const acknowledgedTicketSize = AcknowledgedTicket.SIZE()
-=======
->>>>>>> 6b0fce304a7530c541e600131ec79f96b2b75aab
   const results: {
     ackTicket: Types.AcknowledgedTicket
     index: Uint8Array

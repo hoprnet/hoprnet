@@ -3,7 +3,7 @@ import BN from 'bn.js'
 import { Address } from '.'
 import Public from './public'
 import AccountEntry from './accountEntry'
-import Hash from './hash'
+import { Hash } from '.'
 import { stringToU8a } from '@hoprnet/hopr-utils'
 
 // TODO: move these & similar into constants file
