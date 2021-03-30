@@ -197,7 +197,7 @@ class ChannelFactory {
       throw Error(`Challenge is not set`)
     }
 
-    const winProb = computeWinningProbability(1) // Value is unimportant here.  
+    const winProb = computeWinningProbability(1) // Value is unimportant here.
     const signedTicket = new SignedTicket(arr)
 
     const ticket = new Ticket(
