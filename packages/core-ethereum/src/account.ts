@@ -21,12 +21,12 @@ const cache = new Map<'balance' | 'nativeBalance', { value: string; updatedAt: n
 
 class Account {
   private _address?: Address
-  private _preImageIterator: AsyncGenerator<boolean, boolean, AcknowledgedTicket>
   private _ticketEpoch?: UINT256
   private _ticketEpochListener?: ContractEventEmitter<any>
   private _onChainSecret?: Hash
   private _nonceTracker: NonceTracker
   private _transactions = new TransactionManager()
+  private preimage: Hash
 
   /**
    * The accounts keys:
@@ -54,6 +54,7 @@ class Account {
       }
     }
 
+
     this._nonceTracker = new NonceTracker({
       getLatestBlockNumber: async () => {
         // when running our unit/intergration tests using ganache,
@@ -68,32 +69,8 @@ class Account {
       getPendingTransactions: () => Array.from(this._transactions.pending.values()),
       minPending: durations.minutes(15)
     })
-
-    this._preImageIterator = async function* (this: Account) {
-      let ticket: AcknowledgedTicket = yield
-
-      let tmp = await this.coreConnector.hashedSecret.findPreImage(await this.onChainSecret)
-
-      while (true) {
-        if (
-          await isWinningTicket(
-            await (await ticket.signedTicket).ticket.hash,
-            ticket.response,
-            tmp,
-            (await ticket.signedTicket).ticket.winProb
-          )
-        ) {
-          ticket.preImage = tmp.hash()
-          yield true
-          tmp = await this.coreConnector.hashedSecret.findPreImage(tmp)
-        } else {
-          yield false
-        }
-
-        ticket = yield
-      }
-    }.call(this)
   }
+
 
   async stop() {
     if (this._ticketEpochListener) {
@@ -178,11 +155,27 @@ class Account {
   /**
    * Reserve a preImage for the given ticket if it is a winning ticket.
    * @param ticket the acknowledged ticket
+   * DANGER mutates ticket.
    */
   async reservePreImageIfIsWinning(ticket: AcknowledgedTicket) {
-    await this._preImageIterator.next()
-
-    return (await this._preImageIterator.next(ticket)).value
+    // TODO replace this whole clusterf***
+    if (! this.preimage) {
+      this.preimage = await this.coreConnector.hashedSecret.findPreImage(await this.onChainSecret)
+    }
+    if (
+      await isWinningTicket(
+        await (await ticket.signedTicket).ticket.hash,
+        ticket.response,
+        this.preimage,
+        (await ticket.signedTicket).ticket.winProb
+      )
+    ) {
+      ticket.preImage = this.preimage
+      this.preimage = await this.coreConnector.hashedSecret.findPreImage(this.preimage)
+      return true
+    } else {
+      return false
+    }
   }
 
   get address(): Promise<Address> {
