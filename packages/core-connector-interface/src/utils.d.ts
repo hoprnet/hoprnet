@@ -60,7 +60,7 @@ export declare function convertUnit(amount: Balance, sourceUnit: string, targetU
  * Compute the winning probability that is set for a ticket
  * @param prob Desired winning probability of a ticket, e.g. 0.6 resp. 60%
  */
-export declare function computeWinningProbability(prob: number): Hash 
+export declare function computeWinningProbability(prob: number): Hash
 
 /**
  * Transforms Uint256 encoded probabilities into floats.
