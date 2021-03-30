@@ -322,9 +322,7 @@ class ChannelFactory {
           })
 
           promises.push(
-            onData(
-              new Channel(this.coreConnector, this.coreConnector.dbKeys.ChannelKeyParse(key), signedChannel)
-            )
+            onData(new Channel(this.coreConnector, this.coreConnector.dbKeys.ChannelKeyParse(key), signedChannel))
           )
         })
         .on('end', () => resolve(onEnd(promises)))

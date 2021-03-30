@@ -1,12 +1,7 @@
 import type IChannel from '.'
 import { u8aToHex } from '@hoprnet/hopr-utils'
 import { Hash, Balance, SignedTicket, Ticket, AcknowledgedTicket, UINT256 } from '../types'
-import {
-  computeWinningProbability,
-  isWinningTicket,
-  checkChallenge,
-  stateCounterToIteration
-} from '../utils'
+import { computeWinningProbability, isWinningTicket, checkChallenge, stateCounterToIteration } from '../utils'
 import type HoprEthereum from '..'
 import debug from 'debug'
 const log = debug('hopr-core-ethereum:ticket')

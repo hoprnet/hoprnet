@@ -602,10 +602,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       throw Error(`You don't have enough tokens: ${amountToFund.toString(10)}<${myAvailableTokens.toBN().toString(10)}`)
     }
 
-    const amPartyA = utils.isPartyA(
-      new PublicKey(self.pubKey.marshal()),
-      new PublicKey(counterParty.pubKey.marshal())
-    )
+    const amPartyA = utils.isPartyA(new PublicKey(self.pubKey.marshal()), new PublicKey(counterParty.pubKey.marshal()))
 
     const channelBalance = types.ChannelBalance.create(
       undefined,
@@ -633,9 +630,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
   }
 
   public async closeChannel(peerId: PeerId): Promise<{ receipt: string; status: string }> {
-    const channel = await this.paymentChannels.channel.create(
-      new PublicKey(peerId.pubKey.marshal()),
-    )
+    const channel = await this.paymentChannels.channel.create(new PublicKey(peerId.pubKey.marshal()))
 
     const status = await channel.status
 
