@@ -71,7 +71,7 @@ class TicketStatic {
       }
 
       const counterparty = await this.coreConnector.utils.pubKeyToAddress(await signedTicket.signer)
-      console.log(">>>>", ackTicket.preImage.toHex(), ackTicket.response.toHex())
+      console.log('>>>>', ackTicket.preImage.toHex(), ackTicket.response.toHex())
 
       const transaction = await account.signTransaction(
         {

@@ -54,7 +54,6 @@ class Account {
       }
     }
 
-
     this._nonceTracker = new NonceTracker({
       getLatestBlockNumber: async () => {
         // when running our unit/intergration tests using ganache,
@@ -70,7 +69,6 @@ class Account {
       minPending: durations.minutes(15)
     })
   }
-
 
   async stop() {
     if (this._ticketEpochListener) {
@@ -159,7 +157,7 @@ class Account {
    */
   async reservePreImageIfIsWinning(ticket: AcknowledgedTicket) {
     // TODO replace this whole clusterf***
-    if (! this.preimage) {
+    if (!this.preimage) {
       this.preimage = await this.coreConnector.hashedSecret.findPreImage(await this.onChainSecret)
     }
     if (
