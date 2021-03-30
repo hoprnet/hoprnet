@@ -1,6 +1,6 @@
 import type { Channel as IChannel, Types as Interfaces } from '@hoprnet/hopr-core-connector-interface'
 import BN from 'bn.js'
-import { Balance, Channel as ChannelType, Hash, Public, SignedChannel, ChannelEntry, UINT256 } from '../types'
+import { Balance, Channel as ChannelType, Hash, PublicKey, SignedChannel, ChannelEntry, UINT256 } from '../types'
 import TicketFactory from './ticket'
 import { hash } from '../utils'
 
@@ -14,7 +14,7 @@ class Channel implements IChannel {
 
   constructor(
     public coreConnector: HoprEthereum,
-    public counterparty: Uint8Array,
+    public counterparty: PublicKey,
     private signedChannel: SignedChannel
   ) {
     this.ticket = new TicketFactory(this)
@@ -23,7 +23,7 @@ class Channel implements IChannel {
   private get onChainChannel(): Promise<ChannelEntry> {
     return new Promise(async (resolve, reject) => {
       try {
-        const channel = await this.coreConnector.channel.getOnChainState(new Public(this.counterparty))
+        const channel = await this.coreConnector.channel.getOnChainState(this.counterparty)
         return resolve(channel)
       } catch (error) {
         return reject(error)
@@ -53,8 +53,8 @@ class Channel implements IChannel {
     })
   }
 
-  get offChainCounterparty(): Promise<Uint8Array> {
-    return Promise.resolve(this.counterparty)
+  get offChainCounterparty(): PublicKey {
+    return this.counterparty
   }
 
   get channelId(): Promise<Hash> {
@@ -66,7 +66,7 @@ class Channel implements IChannel {
       try {
         this._channelId = await this.coreConnector.utils.getId(
           await this.coreConnector.account.address,
-          await this.coreConnector.utils.pubKeyToAddress(this.counterparty)
+          this.counterparty.toAddress()
         )
       } catch (error) {
         return reject(error)
@@ -138,7 +138,7 @@ class Channel implements IChannel {
           new Balance(
             new BN(
               await this.coreConnector.hoprToken.methods
-                .balanceOf((await this.coreConnector.utils.pubKeyToAddress(this.counterparty)).toHex())
+                .balanceOf(this.counterparty.toAddress().toHex())
                 .call()
             )
           )
@@ -166,7 +166,7 @@ class Channel implements IChannel {
             to: this.coreConnector.hoprChannels.options.address
           },
           this.coreConnector.hoprChannels.methods.initiateChannelClosure(
-            (await this.coreConnector.utils.pubKeyToAddress(this.counterparty)).toHex()
+            this.counterparty.toAddress().toHex()
           )
         )
 
@@ -179,7 +179,7 @@ class Channel implements IChannel {
             to: this.coreConnector.hoprChannels.options.address
           },
           this.coreConnector.hoprChannels.methods.finalizeChannelClosure(
-            (await this.coreConnector.utils.pubKeyToAddress(this.counterparty)).toHex()
+            this.counterparty.toAddress().toHex()
           )
         )
 

@@ -202,10 +202,8 @@ declare interface Channel {
     // aggregate(channel: any, tickets: Ticket[], ...props: any[]): Promise<Ticket>
   }
 
-  // public key
-  readonly counterparty: Uint8Array
-
-  readonly offChainCounterparty: Promise<Uint8Array>
+  readonly counterparty: PublicKey 
+  readonly offChainCounterparty: PublicKey
 
   /**
    * Initiates a settlement for this channel.

@@ -1,6 +1,6 @@
 import { Networks, networks } from '@hoprnet/hopr-ethereum'
 import assert from 'assert'
-import { publicKeyConvert, publicKeyCreate, ecdsaSign, ecdsaRecover, ecdsaVerify } from 'secp256k1'
+import {  ecdsaSign, ecdsaRecover, ecdsaVerify } from 'secp256k1'
 import { PromiEvent, TransactionReceipt } from 'web3-core'
 import { BlockTransactionString } from 'web3-eth'
 import Web3 from 'web3'
@@ -58,38 +58,6 @@ export function getId(self: Address, counterparty: Address): Promise<Hash> {
       2 * constants.ADDRESS_LENGTH
     )
   )
-}
-
-/**
- * Given a private key, derive public key.
- * @param privKey the private key to derive the public key from
- * @returns a promise resolved to Uint8Array
- */
-export async function privKeyToPubKey(privKey: Uint8Array): Promise<Uint8Array> {
-  if (privKey.length != constants.PRIVATE_KEY_LENGTH)
-    throw Error(
-      `Invalid input parameter. Expected a Uint8Array of size ${constants.PRIVATE_KEY_LENGTH}. Got '${typeof privKey}'${
-        privKey.length ? ` of length ${privKey.length}` : ''
-      }.`
-    )
-
-  return publicKeyCreate(privKey, true)
-}
-
-/**
- * Given a public key, derive the Address.
- * @param pubKey the public key to derive the Address from
- * @returns a promise resolved to Address
- */
-export async function pubKeyToAddress(pubKey: Uint8Array): Promise<Address> {
-  if (pubKey.length != constants.COMPRESSED_PUBLIC_KEY_LENGTH)
-    throw Error(
-      `Invalid input parameter. Expected a Uint8Array of size ${
-        constants.COMPRESSED_PUBLIC_KEY_LENGTH
-      }. Got '${typeof pubKey}'${pubKey.length ? ` of length ${pubKey.length}` : ''}.`
-    )
-
-  return new Address((await hash(publicKeyConvert(pubKey, false).slice(1))).serialize().slice(12))
 }
 
 /**

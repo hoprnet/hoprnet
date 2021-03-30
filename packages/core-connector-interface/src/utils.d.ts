@@ -16,13 +16,6 @@ export declare function isPartyA(self: Address, counterparty: Address): boolean
 export declare function getId(self: Address, counterparty: Address, ...props: any[]): Promise<Hash>
 
 /**
- * Converts a public key into an on-chain Address (e.g. an Ethereum address).
- * @param pubkey a public key
- * @param args additional arguments
- */
-export declare function pubKeyToAddress(pubkey: Uint8Array, ...args: any[]): Promise<Address>
-
-/**
  * Uses the native on-chain hash function to compute a hash value of `msg`.
  * @param msg message to hash
  */

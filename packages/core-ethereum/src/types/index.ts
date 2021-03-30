@@ -3,7 +3,6 @@ import AcknowledgedTicket from './acknowledgedTicket'
 import { Channel, ChannelBalance, ChannelState } from './channel'
 import ChannelEntry from './channelEntry'
 import createKeccakHash from 'keccak'
-import Public from './public'
 import Signature from './signature'
 import SignedChannel from './signedChannel'
 import SignedTicket from './signedTicket'
@@ -15,6 +14,7 @@ import { u8aToHex, u8aEquals, stringToU8a, moveDecimalPoint } from '@hoprnet/hop
 import type { Types as Interfaces } from '@hoprnet/hopr-core-connector-interface'
 import Web3 from 'web3'
 import BN from 'bn.js'
+import { publicKeyConvert, publicKeyCreate } from 'secp256k1'
 
 class Address implements Interfaces.Address {
   constructor(private id: Uint8Array) {}
@@ -134,6 +134,40 @@ class NativeBalance implements Interfaces.Balance {
     // Uint256
     return 32
   }
+
+}
+
+class PublicKey implements Interfaces.PublicKey {
+  constructor(private arr: Uint8Array) {
+    // TODO check length
+  }
+
+  static fromPrivKey(privKey: Uint8Array): PublicKey {
+    let arr = publicKeyCreate(privKey, true)
+    return new PublicKey(arr)
+  }
+
+  toAddress(): Address {
+    return new Address(
+      Hash.create(publicKeyConvert(this.arr, false).slice(1)).serialize().slice(12)
+    )
+  }
+
+  static fromString(str: string): PublicKey {
+    return new PublicKey(stringToU8a(str))
+  }
+
+  static get SIZE(): number {
+    return 33 
+  }
+
+  serialize() {
+    return this.arr
+  }
+
+  toHex(): string {
+    return u8aToHex(this.arr) 
+  }
 }
 
 class Types {
@@ -147,7 +181,7 @@ class Types {
   public ChannelEntry = ChannelEntry
   public Hash = Hash
   public NativeBalance = NativeBalance
-  public Public = Public
+  public PublicKey = PublicKey
   public Signature = Signature
   public SignedChannel = SignedChannel
   public SignedTicket = SignedTicket
@@ -167,7 +201,7 @@ export {
   ChannelState,
   Hash,
   NativeBalance,
-  Public,
+  PublicKey,
   Signature,
   SignedChannel,
   SignedTicket,

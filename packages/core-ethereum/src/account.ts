@@ -7,8 +7,8 @@ import Web3 from 'web3'
 import { durations, stringToU8a, u8aEquals, u8aToHex, isExpired } from '@hoprnet/hopr-utils'
 import NonceTracker from './nonce-tracker'
 import TransactionManager from './transaction-manager'
-import { Address, AcknowledgedTicket, Balance, Hash, NativeBalance, UINT256 } from './types'
-import { isWinningTicket, pubKeyToAddress, isGanache, getNetworkGasPrice } from './utils'
+import { Address, AcknowledgedTicket, Balance, Hash, NativeBalance, UINT256, PublicKey} from './types'
+import { isWinningTicket, isGanache, getNetworkGasPrice } from './utils'
 import { WEB3_CACHE_TTL } from './constants'
 import * as ethereum from './ethereum'
 import BN from 'bn.js'
@@ -34,15 +34,15 @@ class Account {
   public keys: {
     onChain: {
       privKey: Uint8Array
-      pubKey: Uint8Array
+      pubKey: PublicKey 
     }
     offChain: {
       privKey: Uint8Array
-      pubKey: Uint8Array
+      pubKey: PublicKey
     }
   }
 
-  constructor(public coreConnector: HoprEthereum, privKey: Uint8Array, pubKey: Uint8Array, private chainId: number) {
+  constructor(public coreConnector: HoprEthereum, privKey: Uint8Array, pubKey: PublicKey, private chainId: number) {
     this.keys = {
       onChain: {
         privKey,
@@ -109,16 +109,13 @@ class Account {
 
     this.attachAccountDataListener()
 
-    return this.address.then((address) => {
-      return this.coreConnector.hoprChannels.methods
-        .accounts(address.toHex())
-        .call()
-        .then((res) => {
-          this._ticketEpoch = UINT256.fromString(res.counter)
-
-          return this._ticketEpoch
-        })
-    })
+    return this.coreConnector.hoprChannels.methods
+      .accounts(this.address.toHex())
+      .call()
+      .then((res) => {
+        this._ticketEpoch = UINT256.fromString(res.counter)
+        return this._ticketEpoch
+      })
   }
 
   /**
@@ -131,23 +128,21 @@ class Account {
 
     this.attachAccountDataListener()
 
-    return this.address.then((address) => {
-      return this.coreConnector.hoprChannels.methods
-        .accounts(address.toHex())
-        .call()
-        .then((res) => {
-          const hashedSecret = stringToU8a(res.secret)
+    return this.coreConnector.hoprChannels.methods
+      .accounts(this.address.toHex())
+      .call()
+      .then((res) => {
+        const hashedSecret = stringToU8a(res.secret)
 
-          // true if this string is an empty bytes32
-          if (u8aEquals(hashedSecret, EMPTY_HASHED_SECRET)) {
-            return undefined
-          }
+        // true if this string is an empty bytes32
+        if (u8aEquals(hashedSecret, EMPTY_HASHED_SECRET)) {
+          return undefined
+        }
 
-          this._onChainSecret = new Hash(hashedSecret)
+        this._onChainSecret = new Hash(hashedSecret)
 
-          return this._onChainSecret
-        })
-    })
+        return this._onChainSecret
+      })
   }
 
   /**
@@ -176,15 +171,8 @@ class Account {
     }
   }
 
-  get address(): Promise<Address> {
-    if (this._address) {
-      return Promise.resolve(this._address)
-    }
-
-    return pubKeyToAddress(this.keys.onChain.pubKey).then((address: Address) => {
-      this._address = address
-      return this._address
-    })
+  get address(): Address {
+    return this.keys.onChain.pubKey.toAddress()
   }
 
   updateLocalState(onChainSecret: Hash) {
