@@ -5,12 +5,12 @@ import type {
   Channel as ChannelType,
   ChannelBalance,
   Hash,
-  Moment,
   Public,
   Signature,
   SignedChannel,
   SignedTicket,
-  ChannelEntry
+  ChannelEntry,
+  UINT256
 } from './types'
 
 declare interface ChannelStatic {
@@ -146,10 +146,10 @@ declare interface Channel {
   readonly channelId: Promise<Hash>
 
   // Timestamp once the channel can be settled
-  readonly settlementWindow: Promise<Moment>
+  readonly settlementWindow: Promise<UINT256>
 
   // Current state counter of the channel
-  readonly stateCounter: Promise<TicketEpoch>
+  readonly stateCounter: Promise<UINT256>
 
   // Current status of the channel
   readonly status: Promise<'CLOSED' | 'PENDING_TO_CLOSE' | 'OPEN'>
