@@ -45,7 +45,7 @@ class ChannelFactory {
 
   async listenForChannels(): Promise<void> {
     const { indexer } = this.coreConnector
-    const self = new PublicKey(this.coreConnector.account.keys.onChain.pubKey)
+    const self = this.coreConnector.account.keys.onChain.pubKey
     const selfAddress = await self.toAddress()
 
     indexer.on('channelOpened', async (channel: ChannelEntry) => {
@@ -234,7 +234,6 @@ class ChannelFactory {
 
   async create(
     counterpartyPubKey: PublicKey,
-    _getOnChainPublicKey: (counterparty: Uint8Array) => Promise<Uint8Array>,
     channelBalance?: ChannelBalance,
     sign?: (channelBalance: ChannelBalance) => Promise<SignedChannel>
   ): Promise<Channel> {
@@ -324,7 +323,7 @@ class ChannelFactory {
 
           promises.push(
             onData(
-              new Channel(this.coreConnector, this.coreConnector.dbKeys.ChannelKeyParse(key).serialize(), signedChannel)
+              new Channel(this.coreConnector, this.coreConnector.dbKeys.ChannelKeyParse(key), signedChannel)
             )
           )
         })

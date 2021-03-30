@@ -45,7 +45,7 @@ declare interface HoprCoreConnector {
     /**
      * Returns the accounts address
      */
-    address: Promise<Types.Address>
+    address: Types.Address
     /**
      * The accounts nonce.
      */
@@ -56,11 +56,11 @@ declare interface HoprCoreConnector {
     keys: {
       onChain: {
         privKey: Uint8Array
-        pubKey: Uint8Array
+        pubKey: PublicKey 
       }
       offChain: {
         privKey: Uint8Array
-        pubKey: Uint8Array
+        pubKey: PublicKey
       }
     }
 

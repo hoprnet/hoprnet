@@ -2,7 +2,6 @@ import type IChannel from '.'
 import { u8aToHex } from '@hoprnet/hopr-utils'
 import { Hash, Balance, SignedTicket, Ticket, AcknowledgedTicket, UINT256 } from '../types'
 import {
-  pubKeyToAddress,
   computeWinningProbability,
   isWinningTicket,
   checkChallenge,
@@ -70,8 +69,7 @@ class TicketStatic {
         }
       }
 
-      const counterparty = await this.coreConnector.utils.pubKeyToAddress(await signedTicket.signer)
-      console.log('>>>>', ackTicket.preImage.toHex(), ackTicket.response.toHex())
+      const counterparty = (await signedTicket.signer).toAddress()
 
       const transaction = await account.signTransaction(
         {
@@ -124,7 +122,7 @@ class TicketFactory {
   ): Promise<SignedTicket> {
     const ticketWinProb = computeWinningProbability(winProb)
 
-    const counterparty = await pubKeyToAddress(this.channel.counterparty)
+    const counterparty = this.channel.counterparty.toAddress()
 
     const epoch = await this.channel.coreConnector.hoprChannels.methods
       .accounts(counterparty.toHex())

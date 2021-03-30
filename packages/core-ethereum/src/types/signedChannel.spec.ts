@@ -2,10 +2,10 @@
 import BN from 'bn.js'
 import chai, { expect } from 'chai'
 import chaiAsPromised from 'chai-as-promised'
-import { stringToU8a, u8aToHex } from '@hoprnet/hopr-utils'
+import { stringToU8a } from '@hoprnet/hopr-utils'
 import { Channel, ChannelBalance, ChannelStatus, ChannelState } from './channel'
 // import { Signature, Hash } from '.'
-import Public from './public'
+import { PublicKey } from '.'
 import SignedChannel from './signedChannel'
 import { Balance } from '.'
 
@@ -33,13 +33,13 @@ describe('test signedChannel', function () {
     })
     const withCounterparty = new SignedChannel(undefined, {
       channel,
-      counterparty: new Public(stringToU8a('0x03767782fdb4564f0a2dee849d9fc356207dd89f195fcfd69ce0b02c6f03dfda40'))
+      counterparty: new PublicKey(stringToU8a('0x03767782fdb4564f0a2dee849d9fc356207dd89f195fcfd69ce0b02c6f03dfda40'))
     })
 
-    expect(u8aToHex(await noCounterparty.signer)).to.equal(
+    expect((await noCounterparty.signer).toHex()).to.equal(
       '0x000000000000000000000000000000000000000000000000000000000000000000'
     )
-    expect(u8aToHex(await withCounterparty.signer)).to.equal(
+    expect((await withCounterparty.signer).toHex()).to.equal(
       '0x03767782fdb4564f0a2dee849d9fc356207dd89f195fcfd69ce0b02c6f03dfda40'
     )
   })
@@ -49,7 +49,7 @@ describe('test signedChannel', function () {
 
     const signedChannel = new SignedChannel(undefined, {
       channel,
-      counterparty: new Public(stringToU8a('0x03767782fdb4564f0a2dee849d9fc356207dd89f195fcfd69ce0b02c6f03dfda40'))
+      counterparty: new PublicKey(stringToU8a('0x03767782fdb4564f0a2dee849d9fc356207dd89f195fcfd69ce0b02c6f03dfda40'))
     })
 
     expect(signedChannel.verify(new Uint8Array())).to.eventually.throw

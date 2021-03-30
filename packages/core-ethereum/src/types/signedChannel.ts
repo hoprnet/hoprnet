@@ -1,6 +1,6 @@
 import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import Signature from './signature'
-import Public from './public'
+import { PublicKey } from '.'
 import { Channel } from './channel'
 import { Uint8ArrayE } from '../types/extended'
 
@@ -13,7 +13,7 @@ class SignedChannel extends Uint8ArrayE implements Types.SignedChannel {
       offset: number
     },
     struct?: {
-      counterparty?: Public
+      counterparty?: PublicKey
       channel?: Channel
     }
   ) {
@@ -29,7 +29,7 @@ class SignedChannel extends Uint8ArrayE implements Types.SignedChannel {
       }
 
       if (struct.counterparty) {
-        this.set(struct.counterparty, this.signatureOffset - this.byteOffset)
+        this.set(struct.counterparty.serialize(), this.signatureOffset - this.byteOffset)
       }
     }
   }
@@ -53,8 +53,8 @@ class SignedChannel extends Uint8ArrayE implements Types.SignedChannel {
     })
   }
 
-  get signer(): Promise<Uint8Array> {
-    return Promise.resolve(new Uint8Array(this.buffer, this.signatureOffset, Public.SIZE))
+  get signer(): Promise<PublicKey> {
+    return Promise.resolve(new PublicKey(new Uint8Array(this.buffer, this.signatureOffset, PublicKey.SIZE)))
   }
 
   get channelOffset(): number {

@@ -9,6 +9,7 @@ import chalk from 'chalk'
 import { Networks, getAddresses, abis } from '@hoprnet/hopr-ethereum'
 import { ChannelFactory } from './channel'
 import types from './types'
+import { PublicKey } from './types'
 import Indexer from './indexer'
 import * as dbkeys from './dbKeys'
 import * as utils from './utils'
@@ -46,7 +47,7 @@ export default class HoprEthereum implements HoprCoreConnector {
     public hoprToken: HoprToken,
     debug: boolean,
     privateKey: Uint8Array,
-    publicKey: Uint8Array,
+    publicKey: PublicKey,
     maxConfirmations: number
   ) {
     this.account = new Account(this, privateKey, publicKey, chainId)
@@ -220,7 +221,7 @@ export default class HoprEthereum implements HoprCoreConnector {
 
     const web3 = new Web3(provider)
 
-    const [chainId, publicKey] = await Promise.all([utils.getChainId(web3), utils.privKeyToPubKey(seed)])
+    const [chainId, publicKey] = await Promise.all([utils.getChainId(web3), PublicKey.fromPrivKey(seed)])
     const network = utils.getNetworkName(chainId) as Networks
 
     if (typeof addresses?.[network]?.HoprChannels === 'undefined') {

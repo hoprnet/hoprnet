@@ -2,7 +2,7 @@
   Helper functions which generate database keys
 */
 import { toU8a } from '@hoprnet/hopr-utils'
-import { Hash, Public, Address } from './types'
+import { Hash, PublicKey } from './types'
 import type { Types } from '@hoprnet/hopr-core-connector-interface'
 
 const encoder = new TextEncoder()
@@ -34,8 +34,8 @@ export function Channel(counterparty: Types.Address): Uint8Array {
  * Reconstructs the channelId from a db-key.
  * @param arr a channel db-key
  */
-export function ChannelKeyParse(arr: Uint8Array): Types.Address {
-  return new Address(arr.slice(PREFIX.length + channelSubPrefix.length))
+export function ChannelKeyParse(arr: Uint8Array): PublicKey {
+  return new PublicKey(arr.slice(PREFIX.length + channelSubPrefix.length))
 }
 
 /**
@@ -109,11 +109,11 @@ export function OnChainSecretIntermediary(iteration: number): Uint8Array {
 /**
  * Returns the db-key under which the tickets are saved in the database.
  */
-export function AcknowledgedTicket(counterPartyPubKey: Types.Public, challenge: Types.Hash): Uint8Array {
+export function AcknowledgedTicket(counterPartyPubKey: Types.PublicKey, challenge: Types.Hash): Uint8Array {
   return allocationHelper([
     [ticketSubPrefix.length, ticketSubPrefix],
     [acknowledgedSubPrefix.length, acknowledgedSubPrefix],
-    [counterPartyPubKey.length, counterPartyPubKey],
+    [PublicKey.SIZE, counterPartyPubKey.serialize()],
     [SEPERATOR.length, SEPERATOR],
     [Hash.SIZE, challenge.serialize()]
   ])
@@ -124,14 +124,14 @@ export function AcknowledgedTicket(counterPartyPubKey: Types.Public, challenge: 
  * @param arr a AcknowledgedTicket db-key
  * @param props additional arguments
  */
-export function AcknowledgedTicketParse(arr: Uint8Array): [Public, Hash] {
+export function AcknowledgedTicketParse(arr: Uint8Array): [PublicKey, Hash] {
   const counterPartyPubKeyStart = ticketSubPrefix.length + acknowledgedSubPrefix.length
-  const counterPartyPubKeyEnd = counterPartyPubKeyStart + Public.SIZE
+  const counterPartyPubKeyEnd = counterPartyPubKeyStart + PublicKey.SIZE
   const challengeStart = counterPartyPubKeyEnd + SEPERATOR.length
   const challengeEnd = challengeStart + Hash.SIZE
 
   return [
-    new Public(arr.slice(counterPartyPubKeyStart, counterPartyPubKeyEnd)),
+    new PublicKey(arr.slice(counterPartyPubKeyStart, counterPartyPubKeyEnd)),
     new Hash(arr.slice(challengeStart, challengeEnd))
   ]
 }

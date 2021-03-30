@@ -1,8 +1,7 @@
 import { Hash } from './types'
 import Debug from 'debug'
 import { randomBytes } from 'crypto'
-import { u8aToHex, u8aConcat, iterateHash, recoverIteratedHash } from '@hoprnet/hopr-utils'
-import { publicKeyConvert } from 'secp256k1'
+import { u8aConcat, iterateHash, recoverIteratedHash } from '@hoprnet/hopr-utils'
 import { waitForConfirmation } from './utils'
 import { OnChainSecret, OnChainSecretIntermediary } from './dbKeys'
 import type { LevelUp } from 'levelup'
@@ -42,7 +41,7 @@ class HashedSecret {
   private async getDebugAccountSecret(): Promise<Hash> {
     const account = await this.channels.methods.accounts((await this.account.address).toHex()).call()
     return new Hash(
-      await hashFunction(u8aConcat(new Uint8Array([parseInt(account.counter)]), this.account.keys.onChain.pubKey))
+      await hashFunction(u8aConcat(new Uint8Array([parseInt(account.counter)]), this.account.keys.onChain.pubKey.serialize()))
     )
   }
 
@@ -75,7 +74,6 @@ class HashedSecret {
 
     // has no secret stored onchain
     if (Number(account.counter) === 0) {
-      const uncompressedPubKey = publicKeyConvert(this.account.keys.onChain.pubKey, false).slice(1)
       log('account is also null, calling channel.init')
       try {
         await waitForConfirmation(
@@ -85,7 +83,7 @@ class HashedSecret {
                 from: address,
                 to: this.channels.options.address
               },
-              this.channels.methods.initializeAccount(u8aToHex(uncompressedPubKey), secret.toHex())
+              this.channels.methods.initializeAccount(this.account.keys.onChain.pubKey.toHex(), secret.toHex())
             )
           ).send()
         )

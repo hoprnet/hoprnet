@@ -4,6 +4,7 @@ import { randomBytes } from 'crypto'
 import * as DbKeys from './dbKeys'
 import * as Utils from './utils'
 import * as Types from './types'
+import { PublicKey } from './types'
 import PreImage from './hashedSecret'
 import { durations, stringToU8a } from '@hoprnet/hopr-utils'
 import Memdown from 'memdown'
@@ -47,7 +48,7 @@ describe('test hashedSecret', function () {
     connector.account = new Account(
       connector,
       stringToU8a(testconfigs.DEMO_ACCOUNTS[0]),
-      await Utils.privKeyToPubKey(stringToU8a(testconfigs.DEMO_ACCOUNTS[0])),
+      PublicKey.fromPrivKey(stringToU8a(testconfigs.DEMO_ACCOUNTS[0])),
       chainId
     )
 

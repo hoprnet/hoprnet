@@ -165,6 +165,10 @@ class PublicKey implements Interfaces.PublicKey {
   toHex(): string {
     return u8aToHex(this.arr)
   }
+
+  eq(b: PublicKey) {
+    return u8aEquals(this.arr, b.serialize())
+  }
 }
 
 class Types {

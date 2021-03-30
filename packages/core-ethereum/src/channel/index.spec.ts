@@ -2,7 +2,7 @@ import { randomBytes } from 'crypto'
 import { Ganache } from '@hoprnet/hopr-testing'
 import { migrate } from '@hoprnet/hopr-ethereum'
 import assert from 'assert'
-import { stringToU8a, u8aEquals, u8aConcat, durations } from '@hoprnet/hopr-utils'
+import { stringToU8a, u8aConcat, durations } from '@hoprnet/hopr-utils'
 import { getAddresses, abis } from '@hoprnet/hopr-ethereum'
 import { getPrivKeyData, createAccountAndFund, createNode } from '../utils/testing.spec'
 import { createChallenge, hash } from '../utils'
@@ -96,7 +96,6 @@ describe('test Channel class', function () {
 
     const channel = await coreConnector.channel.create(
       counterpartysCoreConnector.account.keys.onChain.pubKey,
-      async () => counterpartysCoreConnector.account.keys.onChain.pubKey,
       channelBalance,
       async (channelBalance: ChannelBalance) => {
         const result = await pipe(
@@ -131,10 +130,8 @@ describe('test Channel class', function () {
       }
     )
 
-    const myAddress = await coreConnector.utils.pubKeyToAddress(coreConnector.account.keys.onChain.pubKey)
-    const counterpartyAddress = await coreConnector.utils.pubKeyToAddress(
-      counterpartysCoreConnector.account.keys.onChain.pubKey
-    )
+    const myAddress = coreConnector.account.keys.onChain.pubKey.toAddress()
+    const counterpartyAddress = counterpartysCoreConnector.account.keys.onChain.pubKey.toAddress()
 
     const firstTicket = await getTicketData({
       counterparty: myAddress
@@ -153,7 +150,7 @@ describe('test Channel class', function () {
     )
 
     assert(
-      u8aEquals(await signedTicket.signer, coreConnector.account.keys.onChain.pubKey),
+      (await signedTicket.signer).eq(coreConnector.account.keys.onChain.pubKey),
       `Check that signer is recoverable`
     )
 
@@ -163,13 +160,12 @@ describe('test Channel class', function () {
     )) as Channel[]
 
     assert(
-      u8aEquals(dbChannels[0].counterparty, coreConnector.account.keys.onChain.pubKey),
+      dbChannels[0].counterparty.eq(coreConnector.account.keys.onChain.pubKey),
       `Channel record should make it into the database and its db-key should lead to the Address of the counterparty.`
     )
 
     const counterpartysChannel = await counterpartysCoreConnector.channel.create(
-      coreConnector.account.keys.onChain.pubKey,
-      () => Promise.resolve(coreConnector.account.keys.onChain.pubKey)
+      coreConnector.account.keys.onChain.pubKey
     )
 
     assert(

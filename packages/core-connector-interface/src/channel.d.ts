@@ -20,8 +20,7 @@ declare interface ChannelStatic {
    * @param props additional arguments
    */
   create(
-    offChainCounterparty: Uint8Array,
-    getOnChainPublicKey: (counterparty: Uint8Array) => Promise<Public>,
+    offChainCounterparty: PublicKey,
     channelBalance?: ChannelBalance,
     sign?: (channelBalance: ChannelBalance) => Promise<SignedChannel>
   ): Promise<Channel>
@@ -40,7 +39,7 @@ declare interface ChannelStatic {
    * Returns `true` if the channel exists on-chain AND off-chain.
    * @param counterparty public key of the counterparty
    */
-  isOpen(counterparty: Uint8Array): Promise<boolean>
+  isOpen(counterparty: PublicKey): Promise<boolean>
 
   /**
    * Opens a new payment channel and initializes the on-chain data.
@@ -66,7 +65,7 @@ declare interface ChannelStatic {
    * @param counterPartyPubKey the public key of the counterparty in which we have a stored channel with
    * @returns a promise tha resolves into a 'SignedChannel'
    */
-  getOffChainState(counterparty: Uint8Array): Promise<SignedChannel>
+  getOffChainState(counterparty: PublicKey): Promise<SignedChannel>
 
   /**
    * Get on-chain channel data

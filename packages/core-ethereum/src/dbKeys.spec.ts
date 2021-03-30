@@ -1,7 +1,7 @@
 import assert from 'assert'
 import { randomBytes } from 'crypto'
 import { u8aConcat, u8aEquals } from '@hoprnet/hopr-utils'
-import { Hash, Address } from './types'
+import { Hash } from './types'
 import * as dbKeys from './dbKeys'
 import { getId } from './utils'
 import { getPrivKeyData } from './utils/testing.spec'
@@ -22,18 +22,16 @@ describe('test dbKeys', function () {
   })
 
   it("should create 'Channel' key", function () {
-    const result = dbKeys.Channel(new Address(userB.pubKey))
-    const expected = u8aConcat(encoder.encode(`payments-channel-`), userB.pubKey)
-
+    const result = dbKeys.Channel(userB.pubKey.toAddress())
+    const expected = u8aConcat(encoder.encode(`payments-channel-`), userB.pubKey.serialize())
     assert(u8aEquals(result, expected), 'check channel key creation')
   })
 
   it("should parse 'Channel' key", function () {
-    const key = u8aConcat(encoder.encode(`payments-channel-`), userA.pubKey)
+    const key = u8aConcat(encoder.encode(`payments-channel-`), userA.pubKey.serialize())
     const result = dbKeys.ChannelKeyParse(key)
     const expected = userA.pubKey
-
-    assert(u8aEquals(result.serialize(), expected), 'check channel key parsing')
+    assert(result.eq(expected), 'check channel key parsing')
   })
 
   it("should create 'Challenge' key", function () {
@@ -95,7 +93,7 @@ describe('test dbKeys', function () {
     const result = dbKeys.AcknowledgedTicket(userA.pubKey, challenge)
     const expected = u8aConcat(
       encoder.encode('tickets-acknowledged-'),
-      userA.pubKey,
+      userA.pubKey.serialize(),
       encoder.encode('-'),
       challenge.serialize()
     )
@@ -106,15 +104,15 @@ describe('test dbKeys', function () {
   it("should parse 'AcknowledgedTicket' key", function () {
     const key = u8aConcat(
       encoder.encode('tickets-acknowledged-'),
-      userA.pubKey,
+      userA.pubKey.serialize(),
       encoder.encode('-'),
       challenge.serialize()
     )
     const [result1, result2] = dbKeys.AcknowledgedTicketParse(key)
-    const expected1 = userA.pubKey
+    const expected1 = userA.pubKey.serialize()
     const expected2 = challenge
 
-    assert(u8aEquals(result1, expected1), 'check AcknowledgedTicket key parsing')
+    assert(u8aEquals(result1.serialize(), expected1), 'check AcknowledgedTicket key parsing')
     assert(result2.eq(expected2), 'check AcknowledgedTicket key parsing')
   })
 })
