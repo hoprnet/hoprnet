@@ -1,6 +1,6 @@
 import Address from './accountId'
 import Balance from './balance'
-import Hash from './hash'
+import { Hash } from '.'
 import Signature from './signature'
 import TicketEpoch from './ticketEpoch'
 

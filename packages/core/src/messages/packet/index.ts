@@ -12,6 +12,7 @@ import { LevelUp } from 'levelup'
 import Debug from 'debug'
 import Hopr from '../../'
 import HoprCoreConnector, { Types } from '@hoprnet/hopr-core-connector-interface'
+import { Hash } from '@hoprnet/hopr-core-ethereum'
 import { UnacknowledgedTicket } from '../ticket'
 
 const log = Debug('hopr-core:message:packet')
@@ -203,9 +204,14 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     const ticketChallenge = await chain.utils.hash(
       secrets.length == 1
         ? deriveTicketLastKey(secrets[0])
-        : await chain.utils.hash(
-            u8aConcat(deriveTicketKey(secrets[0]), await chain.utils.hash(deriveTicketKeyBlinding(secrets[1])))
-          )
+        : (
+            await chain.utils.hash(
+              u8aConcat(
+                deriveTicketKey(secrets[0]),
+                (await chain.utils.hash(deriveTicketKeyBlinding(secrets[1]))).serialize()
+              )
+            )
+          ).serialize()
     )
 
     if (secrets.length > 1) {
@@ -304,12 +310,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
    * Prepares the delivery of the packet.
    */
   async prepareDelivery(): Promise<void> {
-    if (
-      !u8aEquals(
-        await this.node.paymentChannels.utils.hash(deriveTicketLastKey(this.header.derivedSecret)),
-        (await this.ticket).ticket.challenge
-      )
-    ) {
+    if (!Hash.create(deriveTicketLastKey(this.header.derivedSecret)).eq((await this.ticket).ticket.challenge as Hash)) {
       verbose('Error preparing delivery')
       throw Error('Error preparing delivery')
     }
@@ -335,14 +336,14 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     const amPartyA = chain.utils.isPartyA(senderAddress, targetAddress)
     const challenge = u8aConcat(deriveTicketKey(this.header.derivedSecret), this.header.hashedKeyHalf)
 
-    if (!u8aEquals(await chain.utils.hash(await chain.utils.hash(challenge)), ticket.challenge)) {
+    if (!(await chain.utils.hash(challenge)).hash().eq(ticket.challenge)) {
       verbose('Error preparing to forward')
       throw Error('Error preparing forward')
     }
 
     const unacknowledged = new UnacknowledgedTicket(chain, undefined, {
       signedTicket,
-      secretA: deriveTicketKey(this.header.derivedSecret)
+      secretA: new Hash(deriveTicketKey(this.header.derivedSecret))
     })
 
     log(
@@ -372,7 +373,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
           this.node._interactions.payments.open.interact(target, channelBalance)
       )
 
-      this._ticket = await channel.ticket.create(fee, this.header.encryptionKey, this.node.ticketWinProb, {
+      this._ticket = await channel.ticket.create(fee, new Hash(this.header.encryptionKey), this.node.ticketWinProb, {
         bytes: this.buffer,
         offset: this.ticketOffset
       })
@@ -384,7 +385,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     } else if (fee.toBN().isZero()) {
       this._ticket = await chain.channel.createDummyChannelTicket(
         await chain.utils.pubKeyToAddress(target.pubKey.marshal()),
-        this.header.encryptionKey,
+        new Hash(this.header.encryptionKey),
         {
           bytes: this.buffer,
           offset: this.ticketOffset
@@ -396,7 +397,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
 
     this.header.transformForNextNode()
 
-    this._challenge = await Challenge.create<Chain>(chain, this.header.hashedKeyHalf, fee.toBN(), {
+    this._challenge = await Challenge.create<Chain>(chain, new Hash(this.header.hashedKeyHalf), fee.toBN(), {
       bytes: this.buffer,
       offset: this.challengeOffset
     }).sign(sender)

@@ -18,13 +18,12 @@ export type Account = {
  * Return private key data like public key and address.
  * @param _privKey private key to derive data from
  */
-export async function getPrivKeyData(_privKey: Uint8Array): Promise<Account> {
-  const privKey = new Hash(_privKey)
+export async function getPrivKeyData(privKey: Uint8Array): Promise<Account> {
   const pubKey = new Public(await privKeyToPubKey(privKey))
   const address = await pubKey.toAddress()
 
   return {
-    privKey,
+    privKey: new Hash(privKey),
     pubKey,
     address
   }

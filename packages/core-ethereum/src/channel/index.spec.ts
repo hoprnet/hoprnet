@@ -73,11 +73,11 @@ describe('test Channel class', function () {
     const userA = await createAccountAndFund(web3, hoprToken, funder, testconfigs.DEMO_ACCOUNTS[1])
     const userB = await createAccountAndFund(web3, hoprToken, funder, testconfigs.DEMO_ACCOUNTS[2])
 
-    coreConnector = await createNode(userA.privKey)
+    coreConnector = await createNode(userA.privKey.serialize())
     await coreConnector.initOnchainValues()
     await coreConnector.start()
 
-    counterpartysCoreConnector = await createNode(userB.privKey)
+    counterpartysCoreConnector = await createNode(userB.privKey.serialize())
     await counterpartysCoreConnector.initOnchainValues()
     await counterpartysCoreConnector.start()
   })
@@ -197,9 +197,10 @@ describe('test Channel class', function () {
     assert(await counterpartysChannel.ticket.verify(signedTicket), `Ticket signature must be valid.`)
 
     const hashedSecretBefore = await counterpartysChannel.coreConnector.account.onChainSecret
+    console.log(hashedSecretBefore, firstAckedTicket.preImage)
 
     try {
-      const result = await counterpartysCoreConnector.channel.tickets.submit(firstAckedTicket, new Uint8Array())
+      const result = await counterpartysCoreConnector.channel.tickets.submit(firstAckedTicket)
       if (result.status === 'ERROR') {
         throw result.error
       } else if (result.status === 'FAILURE') {
@@ -215,7 +216,7 @@ describe('test Channel class', function () {
 
     let errThrown = false
     try {
-      const result = await counterpartysCoreConnector.channel.tickets.submit(firstAckedTicket, new Uint8Array())
+      const result = await counterpartysCoreConnector.channel.tickets.submit(firstAckedTicket)
       if (result.status === 'ERROR' || result.status === 'FAILURE') {
         errThrown = true
       }
@@ -247,7 +248,7 @@ describe('test Channel class', function () {
       assert(await counterpartysChannel.ticket.verify(nextSignedTicket), `Ticket signature must be valid.`)
 
       if (await counterpartysCoreConnector.account.reservePreImageIfIsWinning(ackedTicket)) {
-        const result = await counterpartysCoreConnector.channel.tickets.submit(ackedTicket, new Uint8Array())
+        const result = await counterpartysCoreConnector.channel.tickets.submit(ackedTicket)
         assert(result.status === 'SUCCESS', 'ticket redeemption was not a success')
         assert(result?.ackTicket?.redeemed, 'ticket should get marked as redeemed')
       }

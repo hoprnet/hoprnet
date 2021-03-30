@@ -8,7 +8,7 @@ import chaiAsPromised from 'chai-as-promised'
 import chai, { expect } from 'chai'
 import sinon from 'sinon'
 import { validateUnacknowledgedTicket, validateCreatedTicket } from './tickets'
-import { Address, Balance } from '@hoprnet/hopr-core-ethereum'
+import { Address, Balance, Hash } from '@hoprnet/hopr-core-ethereum'
 
 chai.use(chaiAsPromised)
 
@@ -18,16 +18,18 @@ const TARGET_ADDRESS = stringToU8a('0xf3a509473be4bcd8af0d1961d75a5a3dc9e47ba0')
 const SENDER = PeerId.createFromB58String('16Uiu2HAmM9KAPaXA4eAz58Q7Eb3LEkDvLarU4utkyLwDeEK6vM5m')
 const SENDER_ADDRESS = stringToU8a('0x65e78d07acf7b654e5ae6777a93ebbf30f639356')
 
+const mockWinProb = (num: number): Hash => new Hash(new Uint8Array(num))
+
 const createMockTicket = ({
   targetAddress = new Address(TARGET_ADDRESS),
   amount = new Balance(new BN(1)),
-  winProb = new Uint8Array(1),
+  winProb = mockWinProb(1),
   epoch = new BN(1),
   channelIteration = new BN(1)
 }: {
   targetAddress?: Address
   amount?: Balance
-  winProb?: Uint8Array
+  winProb?: Hash
   epoch?: BN
   channelIteration?: BN
 }) => {
@@ -45,13 +47,13 @@ const createMockSignedTicket = ({
   sender = SENDER,
   targetAddress = new Address(TARGET_ADDRESS),
   amount = new Balance(new BN(1)),
-  winProb = new Uint8Array(1),
+  winProb = mockWinProb(1),
   channelIteration = new BN(1)
 }: {
   sender?: PeerId
   targetAddress?: Address
   amount?: Balance
-  winProb?: Uint8Array
+  winProb?: Hash
   channelIteration?: BN
 }) => {
   return ({
@@ -182,7 +184,7 @@ describe('unit test validateUnacknowledgedTicket', function () {
       getWinProbabilityAsFloat: 0.5
     })
     const signedTicket = createMockSignedTicket({
-      winProb: new Uint8Array(0.5)
+      winProb: mockWinProb(0.5)
     })
 
     return expect(

@@ -87,7 +87,7 @@ class Channel extends Uint8ArrayE implements Types.Channel {
   }
 
   async sign(privKey: Uint8Array): Promise<Types.Signature> {
-    return await sign(await this.hash, privKey)
+    return await sign((await this.hash).serialize(), privKey)
   }
 
   get isActive(): boolean {

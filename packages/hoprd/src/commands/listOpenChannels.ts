@@ -1,6 +1,6 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
-import { moveDecimalPoint, u8aToHex, pubKeyToPeerId, u8aEquals } from '@hoprnet/hopr-utils'
+import { moveDecimalPoint, pubKeyToPeerId, u8aEquals } from '@hoprnet/hopr-utils'
 import chalk from 'chalk'
 import { AbstractCommand } from './abstractCommand'
 import { getPaddingLength, styleValue } from './utils'
@@ -92,7 +92,7 @@ export default class ListOpenChannels extends AbstractCommand {
 
         result.push(
           this.generateOutput({
-            id: u8aToHex(id),
+            id: id.toHex(),
             totalBalance,
             myBalance,
             peerId,
