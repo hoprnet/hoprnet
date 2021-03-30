@@ -8,6 +8,7 @@ on:
 
 jobs:
   build:
+    if: github.actor!= 'hopr-version-bot'
     name: Build & Test
     runs-on: ubuntu-latest
 
