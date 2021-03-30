@@ -1,25 +1,31 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.6.0;
 
-import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts-v3-0-1/access/AccessControl.sol";
 import "./openzeppelin-contracts/ERC777.sol";
 import "./ERC777/ERC777Snapshot.sol";
 
 contract HoprToken is AccessControl, ERC777Snapshot {
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
 
-    constructor() public ERC777("HOPR Token", "HOPR", new address[](0)) {
+    constructor() ERC777("HOPR Token", "HOPR", new address[](0)) public {
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
     }
 
     /**
-     * @dev Creates `amount` new tokens for `to`.
+     * @dev Creates `amount` tokens and assigns them to `account`, increasing
+     * the total supply.
      *
-     * See {ERC20-_mint}.
+     * If a send hook is registered for `account`, the corresponding function
+     * will be called with `operator`, `data` and `operatorData`.
+     * Emits {Minted} and {IERC20-Transfer} events.
      *
-     * Requirements:
+     * Requirements
      *
-     * - the caller must have the `MINTER_ROLE`.
+     * - `account` cannot be the zero address.
+     * - if `account` is a contract, it must implement the {IERC777Recipient}
+     * interface.
+     * - `account` must have minter role
      */
     function mint(
         address account,
@@ -27,7 +33,7 @@ contract HoprToken is AccessControl, ERC777Snapshot {
         bytes memory userData,
         bytes memory operatorData
     ) public {
-        require(hasRole(MINTER_ROLE, msg.sender), "HoprToken: caller does not have minter role");
+        require(hasRole(MINTER_ROLE, msg.sender), "caller does not have minter role");
         _mint(account, amount, userData, operatorData);
     }
 }

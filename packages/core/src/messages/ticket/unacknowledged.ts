@@ -1,5 +1,6 @@
-import { u8aConcat, u8aEquals } from '@hoprnet/hopr-utils'
+import { u8aConcat } from '@hoprnet/hopr-utils'
 
+import { Hash } from '@hoprnet/hopr-core-ethereum'
 import HoprCoreConnector, { Types } from '@hoprnet/hopr-core-connector-interface'
 import PeerId from 'peer-id'
 
@@ -30,7 +31,7 @@ class UnacknowledgedTicket<Chain extends HoprCoreConnector> extends Uint8Array {
 
     if (struct != null) {
       this.set(struct.signedTicket, this.signedTicketOffset - this.byteOffset)
-      this.set(struct.secretA, this.secretAOffset - this.byteOffset)
+      this.set(struct.secretA.serialize(), this.secretAOffset - this.byteOffset)
 
       this._signedTicket = struct.signedTicket
       this._secretA = struct.secretA
@@ -79,12 +80,9 @@ class UnacknowledgedTicket<Chain extends HoprCoreConnector> extends Uint8Array {
   }
 
   async verifyChallenge(hashedKeyHalf: Uint8Array) {
-    return u8aEquals(
-      await this.paymentChannels.utils.hash(
-        await this.paymentChannels.utils.hash(u8aConcat(this.secretA, hashedKeyHalf))
-      ),
-      (await this.signedTicket).ticket.challenge
-    )
+    return Hash.create(u8aConcat(this.secretA.serialize(), hashedKeyHalf))
+      .hash()
+      .eq((await this.signedTicket).ticket.challenge as Hash)
   }
 
   async verifySignature(peerId: PeerId) {

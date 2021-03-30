@@ -1,20 +1,22 @@
-import type { Network } from '../utils/networks'
 import allAddresses from './addresses.json'
+import { Networks } from './networks'
 
-// @TODO: dynamically type this
-export type ContractNames = 'HoprToken' | 'HoprChannels' | 'HoprMinter' | 'HoprFaucet'
+export * from './networks'
 
-export const addresses: {
-  [network in Network]?: {
+export type ContractNames = 'HoprToken' | 'HoprChannels' | 'HoprDistributor'
+
+// TODO: this doesn't have to be a funciton
+// change once 'core-ethereum' is refactored
+export const getAddresses = (): {
+  [network in Networks]?: {
     [name in ContractNames]?: string
   }
-} = allAddresses
+} => allAddresses
 
 export const abis: {
   [name in ContractNames]: any[]
 } = {
   HoprToken: require('./abis/HoprToken.json'),
   HoprChannels: require('./abis/HoprChannels.json'),
-  HoprMinter: require('./abis/HoprMinter.json'),
-  HoprFaucet: require('./abis/HoprFaucet.json')
+  HoprDistributor: require('./abis/HoprDistributor.json')
 }

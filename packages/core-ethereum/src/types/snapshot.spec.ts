@@ -4,11 +4,7 @@ import Snapshot from './snapshot'
 
 describe('Snapshot', function () {
   it('should be empty', function () {
-    const snap = new Snapshot(undefined, {
-      blockNumber: new BN(0),
-      transactionIndex: new BN(0),
-      logIndex: new BN(0)
-    })
+    const snap = Snapshot.deserialize(new Snapshot(new BN(0), new BN(0), new BN(0)).serialize())
 
     expect(snap.blockNumber.toString()).to.equal('0')
     expect(snap.transactionIndex.toString()).to.equal('0')
@@ -16,11 +12,7 @@ describe('Snapshot', function () {
   })
 
   it('should contain the right values', function () {
-    const snap = new Snapshot(undefined, {
-      blockNumber: new BN(1),
-      transactionIndex: new BN(2),
-      logIndex: new BN(3)
-    })
+    const snap = Snapshot.deserialize(new Snapshot(new BN(1), new BN(2), new BN(3)).serialize())
 
     expect(snap.blockNumber.toString()).to.equal('1')
     expect(snap.transactionIndex.toString()).to.equal('2')

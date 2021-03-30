@@ -69,7 +69,7 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
         offset: arr.byteOffset
       })
 
-      const unAcknowledgedDbKey = this.node._dbKeys.UnAcknowledgedTickets(await acknowledgement.hashedKey)
+      const unAcknowledgedDbKey = this.node._dbKeys.UnAcknowledgedTickets((await acknowledgement.hashedKey).serialize())
 
       let tmp: Uint8Array
       try {
@@ -79,8 +79,8 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
           error(
             `received unknown acknowledgement from party ${blue(
               (await pubKeyToPeerId(await acknowledgement.responseSigningParty)).toB58String()
-            )} for challenge ${yellow(u8aToHex(await acknowledgement.hashedKey))} - response was ${green(
-              u8aToHex(await acknowledgement.hashedKey)
+            )} for challenge ${yellow((await acknowledgement.hashedKey).toHex())} - response was ${green(
+              (await acknowledgement.hashedKey).toHex()
             )}. ${red('Dropping acknowledgement')}.`
           )
 
@@ -106,17 +106,13 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
           ticketCounter = toU8a(0, ACKNOWLEDGED_TICKET_INDEX_LENGTH)
         }
 
-        let acknowledgedTicket = this.node.paymentChannels.types.AcknowledgedTicket.create(
-          this.node.paymentChannels,
-          undefined,
-          {
-            signedTicket: await unacknowledgedTicket.signedTicket,
-            response: await this.node.paymentChannels.utils.hash(
-              u8aConcat(unacknowledgedTicket.secretA, await acknowledgement.hashedKey)
-            ),
-            redeemed: false
-          }
-        )
+        let acknowledgedTicket = this.node.paymentChannels.types.AcknowledgedTicket.create(undefined, {
+          signedTicket: await unacknowledgedTicket.signedTicket,
+          response: await this.node.paymentChannels.utils.hash(
+            u8aConcat(unacknowledgedTicket.secretA.serialize(), (await acknowledgement.hashedKey).serialize())
+          ),
+          redeemed: false
+        })
 
         const isWinningTicket = await this.node.paymentChannels.account.reservePreImageIfIsWinning(acknowledgedTicket)
 
@@ -130,7 +126,7 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
         log(
           `Storing ticket #${u8aToNumber(ticketCounter)} from ${blue(
             (await pubKeyToPeerId(await acknowledgement.responseSigningParty)).toB58String()
-          )}. Ticket contains preImage for ${green(u8aToHex(await acknowledgement.hashedKey))}`
+          )}. Ticket contains preImage for ${green((await acknowledgement.hashedKey).toHex())}`
         )
 
         try {

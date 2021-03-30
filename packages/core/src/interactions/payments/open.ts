@@ -34,7 +34,7 @@ class Opening<Chain extends HoprCoreConnector> implements AbstractInteraction {
       throw Error(`Tried to open a payment channel but could not connect to ${counterparty.toB58String()}.`)
     }
 
-    const channel = this.node.paymentChannels.types.Channel.createFunded(channelBalance)
+    const channel = this.node.paymentChannels.types.Channel.createActive(channelBalance)
     const signedChannel = await this.node.paymentChannels.types.SignedChannel.create(undefined, { channel })
 
     await channel.sign(this.node.paymentChannels.account.keys.onChain.privKey, undefined, {

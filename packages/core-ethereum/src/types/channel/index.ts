@@ -1,15 +1,15 @@
 import type { Types } from '@hoprnet/hopr-core-connector-interface'
-import { Moment } from '..'
+import { UINT256 } from '..'
 import { Uint8ArrayE } from '../extended'
 import { hash, stateCounterToStatus, sign } from '../../utils'
 import ChannelState from './channelState'
 import ChannelBalance from './channelBalance'
+import BN from 'bn.js'
 
 enum ChannelStatus {
-  UNINITIALISED,
-  FUNDED,
+  CLOSED,
   OPEN,
-  PENDING
+  PENDING_TO_CLOSE
 }
 
 class Channel extends Uint8ArrayE implements Types.Channel {
@@ -23,7 +23,7 @@ class Channel extends Uint8ArrayE implements Types.Channel {
     struct?: {
       state: ChannelState
       balance?: ChannelBalance
-      moment?: Moment
+      moment?: UINT256
     }
   ) {
     if (!arr) {
@@ -70,12 +70,12 @@ class Channel extends Uint8ArrayE implements Types.Channel {
     return this._rawState
   }
 
-  get moment(): Moment | void {
-    if (this._status != ChannelStatus.PENDING) {
+  get moment(): UINT256 | void {
+    if (this._status != ChannelStatus.PENDING_TO_CLOSE) {
       return
     }
 
-    return new Moment(this.subarray(ChannelBalance.SIZE + 1, ChannelBalance.SIZE + 1 + Moment.SIZE))
+    return new UINT256(new BN(this.subarray(ChannelBalance.SIZE + 1, ChannelBalance.SIZE + 1 + UINT256.SIZE)))
   }
 
   get _status(): ChannelStatus {
@@ -87,11 +87,7 @@ class Channel extends Uint8ArrayE implements Types.Channel {
   }
 
   async sign(privKey: Uint8Array): Promise<Types.Signature> {
-    return await sign(await this.hash, privKey)
-  }
-
-  get isFunded(): boolean {
-    return this._status == ChannelStatus.FUNDED
+    return await sign((await this.hash).serialize(), privKey)
   }
 
   get isActive(): boolean {
@@ -99,19 +95,12 @@ class Channel extends Uint8ArrayE implements Types.Channel {
   }
 
   get isPending(): boolean {
-    return this._status == ChannelStatus.PENDING
+    return this._status == ChannelStatus.PENDING_TO_CLOSE
   }
 
   // @TODO fix size
   static get SIZE(): number {
     return ChannelBalance.SIZE + ChannelState.SIZE
-  }
-
-  static createFunded(balance: ChannelBalance): Channel {
-    return new Channel(undefined, {
-      balance,
-      state: new ChannelState(undefined, { state: ChannelStatus.FUNDED })
-    })
   }
 
   static createActive(balance: ChannelBalance): Channel {
@@ -121,10 +110,10 @@ class Channel extends Uint8ArrayE implements Types.Channel {
     })
   }
 
-  static createPending(moment: Moment, balance: ChannelBalance): Channel {
+  static createPending(moment: UINT256, balance: ChannelBalance): Channel {
     return new Channel(undefined, {
       balance,
-      state: new ChannelState(undefined, { state: ChannelStatus.PENDING }),
+      state: new ChannelState(undefined, { state: ChannelStatus.PENDING_TO_CLOSE }),
       moment
     })
   }

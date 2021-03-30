@@ -1,6 +1,6 @@
-import AccountId from './accountId'
+import Address from './accountId'
 import Balance from './balance'
-import Hash from './hash'
+import { Hash } from '.'
 import Signature from './signature'
 import TicketEpoch from './ticketEpoch'
 
@@ -13,7 +13,7 @@ declare interface TicketStatic {
       offset: number
     },
     struct?: {
-      counterparty: AccountId
+      counterparty: Address
       challenge: Hash
       epoch: TicketEpoch
       amount: Balance
@@ -23,7 +23,7 @@ declare interface TicketStatic {
   ): Ticket
 }
 declare interface Ticket {
-  counterparty: AccountId
+  counterparty: Address
   challenge: Hash
   epoch: TicketEpoch
   amount: Balance

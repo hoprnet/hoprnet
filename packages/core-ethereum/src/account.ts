@@ -4,31 +4,29 @@ import type { ContractEventEmitter } from './tsc/web3/types'
 import type { TransactionObject } from './tsc/web3/types'
 import type { HoprToken } from './tsc/web3/HoprToken'
 import Web3 from 'web3'
-import { getRpcOptions, Network } from '@hoprnet/hopr-ethereum'
 import { durations, stringToU8a, u8aEquals, u8aToHex, isExpired } from '@hoprnet/hopr-utils'
 import NonceTracker from './nonce-tracker'
 import TransactionManager from './transaction-manager'
-import { AccountId, AcknowledgedTicket, Balance, Hash, NativeBalance, TicketEpoch } from './types'
-import { isWinningTicket, pubKeyToAccountId, isGanache } from './utils'
-import { HASHED_SECRET_WIDTH } from './hashedSecret'
+import { Address, AcknowledgedTicket, Balance, Hash, NativeBalance, UINT256 } from './types'
+import { isWinningTicket, pubKeyToAddress, isGanache, getNetworkGasPrice } from './utils'
 import { WEB3_CACHE_TTL } from './constants'
 import * as ethereum from './ethereum'
+import BN from 'bn.js'
 
 import debug from 'debug'
 const log = debug('hopr-core-ethereum:account')
 
-export const EMPTY_HASHED_SECRET = new Uint8Array(HASHED_SECRET_WIDTH).fill(0x00)
-const rpcOps = getRpcOptions()
+export const EMPTY_HASHED_SECRET = new Uint8Array(Hash.SIZE).fill(0x00)
 const cache = new Map<'balance' | 'nativeBalance', { value: string; updatedAt: number }>()
 
 class Account {
-  private _address?: AccountId
-  private _preImageIterator: AsyncGenerator<boolean, boolean, AcknowledgedTicket>
-  private _ticketEpoch?: TicketEpoch
+  private _address?: Address
+  private _ticketEpoch?: UINT256
   private _ticketEpochListener?: ContractEventEmitter<any>
   private _onChainSecret?: Hash
   private _nonceTracker: NonceTracker
   private _transactions = new TransactionManager()
+  private preimage: Hash
 
   /**
    * The accounts keys:
@@ -70,37 +68,6 @@ class Account {
       getPendingTransactions: () => Array.from(this._transactions.pending.values()),
       minPending: durations.minutes(15)
     })
-
-    this._preImageIterator = async function* (this: Account) {
-      let ticket: AcknowledgedTicket = yield
-
-      let tmp = await this.coreConnector.hashedSecret.findPreImage(await this.onChainSecret)
-
-      while (true) {
-        if (
-          await isWinningTicket(
-            await (await ticket.signedTicket).ticket.hash,
-            ticket.response,
-            new Hash(tmp.preImage),
-            (await ticket.signedTicket).ticket.winProb
-          )
-        ) {
-          ticket.preImage = new Hash(tmp.preImage)
-          if (tmp.iteration == 0) {
-            // @TODO dispatch call of next hashedSecret submit
-            return true
-          } else {
-            yield true
-          }
-
-          tmp = await this.coreConnector.hashedSecret.findPreImage(tmp.preImage)
-        } else {
-          yield false
-        }
-
-        ticket = yield
-      }
-    }.call(this)
   }
 
   async stop() {
@@ -135,7 +102,7 @@ class Account {
     return getNativeBalance(this.coreConnector.web3, await this.address, useCache)
   }
 
-  get ticketEpoch(): Promise<TicketEpoch> {
+  get ticketEpoch(): Promise<UINT256> {
     if (this._ticketEpoch != null) {
       return Promise.resolve(this._ticketEpoch)
     }
@@ -147,7 +114,7 @@ class Account {
         .accounts(address.toHex())
         .call()
         .then((res) => {
-          this._ticketEpoch = new TicketEpoch(res.counter)
+          this._ticketEpoch = UINT256.fromString(res.counter)
 
           return this._ticketEpoch
         })
@@ -169,7 +136,7 @@ class Account {
         .accounts(address.toHex())
         .call()
         .then((res) => {
-          const hashedSecret = stringToU8a(res.hashedSecret)
+          const hashedSecret = stringToU8a(res.secret)
 
           // true if this string is an empty bytes32
           if (u8aEquals(hashedSecret, EMPTY_HASHED_SECRET)) {
@@ -186,20 +153,36 @@ class Account {
   /**
    * Reserve a preImage for the given ticket if it is a winning ticket.
    * @param ticket the acknowledged ticket
+   * DANGER mutates ticket.
    */
   async reservePreImageIfIsWinning(ticket: AcknowledgedTicket) {
-    await this._preImageIterator.next()
-
-    return (await this._preImageIterator.next(ticket)).value
+    // TODO replace this whole clusterf***
+    if (!this.preimage) {
+      this.preimage = await this.coreConnector.hashedSecret.findPreImage(await this.onChainSecret)
+    }
+    if (
+      await isWinningTicket(
+        await (await ticket.signedTicket).ticket.hash,
+        ticket.response,
+        this.preimage,
+        (await ticket.signedTicket).ticket.winProb
+      )
+    ) {
+      ticket.preImage = this.preimage
+      this.preimage = await this.coreConnector.hashedSecret.findPreImage(this.preimage)
+      return true
+    } else {
+      return false
+    }
   }
 
-  get address(): Promise<AccountId> {
+  get address(): Promise<Address> {
     if (this._address) {
       return Promise.resolve(this._address)
     }
 
-    return pubKeyToAccountId(this.keys.onChain.pubKey).then((accountId: AccountId) => {
-      this._address = accountId
+    return pubKeyToAddress(this.keys.onChain.pubKey).then((address: Address) => {
+      this._address = address
       return this._address
     })
   }
@@ -220,14 +203,8 @@ class Account {
     const abi = txObject ? txObject.encodeABI() : undefined
     const gas = 300e3
 
-    // let web3 pick gas price
-    // should be used when the gas price fluctuates
-    // as it allows the provider to pick a gas price
-    let gasPrice: number
-    // if its a known network with constant gas price
-    if (rpcOps[network] && !(['mainnet', 'ropsten', 'goerli'] as Network[]).includes(network)) {
-      gasPrice = rpcOps[network]?.gasPrice ?? 1e9
-    }
+    // if it returns undefined, let web3 pick gas price
+    const gasPrice = getNetworkGasPrice(network)
 
     // @TODO: potential deadlock, needs to be improved
     const nonceLock = await this._nonceTracker.getNonceLock(this._address.toHex())
@@ -304,7 +281,7 @@ class Account {
       // on error, safely reset 'ticketEpoch' & event listener
       try {
         this._ticketEpochListener = this.coreConnector.hoprChannels.events
-          .SecretHashSet({
+          .AccountSecretUpdated({
             fromBlock: 'latest',
             filter: {
               account: (await this.address).toHex()
@@ -313,8 +290,8 @@ class Account {
           .on('data', (event) => {
             log('new ticketEpoch', event.returnValues.counter)
 
-            this._ticketEpoch = new TicketEpoch(event.returnValues.counter)
-            this._onChainSecret = new Hash(stringToU8a(event.returnValues.secretHash), Hash.SIZE)
+            this._onChainSecret = new Hash(stringToU8a(event.returnValues.secret))
+            this._ticketEpoch = UINT256.fromString(event.returnValues.counter)
           })
           .on('error', (error) => {
             log('error listening to SecretHashSet events', error.message)
@@ -337,17 +314,17 @@ class Account {
  */
 export const getBalance = async (
   hoprToken: HoprToken,
-  account: AccountId,
+  account: Address,
   useCache: boolean = false
 ): Promise<Balance> => {
   if (useCache) {
     const cached = cache.get('balance')
     const notExpired = cached && !isExpired(cached.updatedAt, new Date().getTime(), WEB3_CACHE_TTL)
-    if (notExpired) return new Balance(cached.value)
+    if (notExpired) return new Balance(new BN(cached.value))
   }
 
   const value = await ethereum.getBalance(hoprToken, account)
-  cache.set('balance', { value: value.toString(), updatedAt: new Date().getTime() })
+  cache.set('balance', { value: value.toBN().toString(), updatedAt: new Date().getTime() })
 
   return value
 }
@@ -358,19 +335,19 @@ export const getBalance = async (
  */
 export const getNativeBalance = async (
   web3: Web3,
-  account: AccountId,
+  account: Address,
   useCache: boolean = false
 ): Promise<NativeBalance> => {
   if (useCache) {
     const cached = cache.get('nativeBalance')
     const notExpired = cached && !isExpired(cached.updatedAt, new Date().getTime(), WEB3_CACHE_TTL)
-    if (notExpired) return new NativeBalance(cached.value)
+    if (notExpired) return new NativeBalance(new BN(cached.value))
   }
 
   const value = await ethereum.getNativeBalance(web3, account)
-  cache.set('nativeBalance', { value: value.toString(), updatedAt: new Date().getTime() })
+  cache.set('nativeBalance', { value: value.toBN().toString(), updatedAt: new Date().getTime() })
 
-  return new NativeBalance(value)
+  return value
 }
 
 export default Account

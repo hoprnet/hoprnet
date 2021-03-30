@@ -289,7 +289,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     }
     const balance = await this.getBalance()
     const [nextChannels, closeChannels] = await this.strategy.tick(
-      balance,
+      balance.toBN(),
       newChannels,
       currentChannels,
       this.networkPeers,
@@ -459,7 +459,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
             return reject(err)
           }
 
-          const unAcknowledgedDBKey = this._dbKeys.UnAcknowledgedTickets(packet.challenge.hash)
+          const unAcknowledgedDBKey = this._dbKeys.UnAcknowledgedTickets(packet.challenge.hash.serialize())
 
           await this.db.put(Buffer.from(unAcknowledgedDBKey), Buffer.from(''))
 
@@ -511,14 +511,14 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
   private async checkBalances() {
     const balance = await this.getBalance()
     let unfunded = false
-    if (balance.lten(0)) {
+    if (balance.toBN().lten(0)) {
       const address = await this.paymentChannels.hexAccountAddress()
       log('unfunded node', address)
       this.emit('hopr:warning:unfunded', address)
       unfunded = true
     }
     const nativeBalance = await this.getNativeBalance()
-    if (nativeBalance.lte(MIN_NATIVE_BALANCE)) {
+    if (nativeBalance.toBN().lte(MIN_NATIVE_BALANCE)) {
       const address = await this.paymentChannels.hexAccountAddress()
       log('unfunded node', address)
       this.emit('hopr:warning:unfundedNative', address)
@@ -589,8 +589,8 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     const self = this.getId()
 
     const channelId = await utils.getId(
-      await utils.pubKeyToAccountId(self.pubKey.marshal()),
-      await utils.pubKeyToAccountId(counterParty.pubKey.marshal())
+      await utils.pubKeyToAddress(self.pubKey.marshal()),
+      await utils.pubKeyToAddress(counterParty.pubKey.marshal())
     )
 
     const myAvailableTokens = await account.getBalance(true)
@@ -598,13 +598,13 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     // validate 'amountToFund'
     if (amountToFund.lten(0)) {
       throw Error(`Invalid 'amountToFund' provided: ${amountToFund.toString(10)}`)
-    } else if (amountToFund.gt(myAvailableTokens)) {
-      throw Error(`You don't have enough tokens: ${amountToFund.toString(10)}<${myAvailableTokens.toString(10)}`)
+    } else if (amountToFund.gt(myAvailableTokens.toBN())) {
+      throw Error(`You don't have enough tokens: ${amountToFund.toString(10)}<${myAvailableTokens.toBN().toString(10)}`)
     }
 
     const amPartyA = utils.isPartyA(
-      await utils.pubKeyToAccountId(self.pubKey.marshal()),
-      await utils.pubKeyToAccountId(counterParty.pubKey.marshal())
+      await utils.pubKeyToAddress(self.pubKey.marshal()),
+      await utils.pubKeyToAddress(counterParty.pubKey.marshal())
     )
 
     const channelBalance = types.ChannelBalance.create(
@@ -642,7 +642,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
 
     const status = await channel.status
 
-    if (!(status === 'OPEN' || status === 'PENDING')) {
+    if (!(status === 'OPEN' || status === 'PENDING_TO_CLOSE')) {
       throw new Error('To close a channel, it must be open or pending for closure')
     }
 

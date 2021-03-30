@@ -1,7 +1,6 @@
-import { Network } from '@hoprnet/hopr-ethereum'
+import { Networks, networks } from '@hoprnet/hopr-ethereum'
 import assert from 'assert'
 import { publicKeyConvert, publicKeyCreate, ecdsaSign, ecdsaRecover, ecdsaVerify } from 'secp256k1'
-import createKeccakHash from 'keccak'
 import { PromiEvent, TransactionReceipt } from 'web3-core'
 import { BlockTransactionString } from 'web3-eth'
 import Web3 from 'web3'
@@ -15,7 +14,7 @@ import {
   durations,
   u8aToNumber
 } from '@hoprnet/hopr-utils'
-import { AccountId, Balance, Hash, Signature } from '../types'
+import { Address, Balance, Hash, Signature } from '../types'
 import { ContractEventEmitter } from '../tsc/web3/types'
 import { ChannelStatus } from '../types/channel'
 import * as constants from '../constants'
@@ -29,8 +28,8 @@ export { time }
  * @param counterparty counterparty's accountId
  * @returns true if self is partyA
  */
-export function isPartyA(self: AccountId, counterparty: AccountId): boolean {
-  return Buffer.compare(self, counterparty) < 0
+export function isPartyA(self: Address, counterparty: Address): boolean {
+  return Buffer.compare(self.serialize(), counterparty.serialize()) < 0
 }
 
 /**
@@ -38,7 +37,7 @@ export function isPartyA(self: AccountId, counterparty: AccountId): boolean {
  * @param counterparty counterparty's accountId
  * @returns an array of partyA's and partyB's accountIds
  */
-export function getParties(self: AccountId, counterparty: AccountId): [AccountId, AccountId] {
+export function getParties(self: Address, counterparty: Address): [Address, Address] {
   if (isPartyA(self, counterparty)) {
     return [self, counterparty]
   } else {
@@ -52,8 +51,13 @@ export function getParties(self: AccountId, counterparty: AccountId): [AccountId
  * @param counterparty counterparty's accountId
  * @returns a promise resolved to Hash
  */
-export function getId(self: AccountId, counterparty: AccountId): Promise<Hash> {
-  return hash(Buffer.concat(getParties(self, counterparty), 2 * constants.ADDRESS_LENGTH))
+export function getId(self: Address, counterparty: Address): Promise<Hash> {
+  return hash(
+    Buffer.concat(
+      getParties(self, counterparty).map((x) => x.serialize()),
+      2 * constants.ADDRESS_LENGTH
+    )
+  )
 }
 
 /**
@@ -73,11 +77,11 @@ export async function privKeyToPubKey(privKey: Uint8Array): Promise<Uint8Array> 
 }
 
 /**
- * Given a public key, derive the AccountId.
- * @param pubKey the public key to derive the AccountId from
- * @returns a promise resolved to AccountId
+ * Given a public key, derive the Address.
+ * @param pubKey the public key to derive the Address from
+ * @returns a promise resolved to Address
  */
-export async function pubKeyToAccountId(pubKey: Uint8Array): Promise<AccountId> {
+export async function pubKeyToAddress(pubKey: Uint8Array): Promise<Address> {
   if (pubKey.length != constants.COMPRESSED_PUBLIC_KEY_LENGTH)
     throw Error(
       `Invalid input parameter. Expected a Uint8Array of size ${
@@ -85,7 +89,7 @@ export async function pubKeyToAccountId(pubKey: Uint8Array): Promise<AccountId> 
       }. Got '${typeof pubKey}'${pubKey.length ? ` of length ${pubKey.length}` : ''}.`
     )
 
-  return new AccountId((await hash(publicKeyConvert(pubKey, false).slice(1))).slice(12))
+  return new Address((await hash(publicKeyConvert(pubKey, false).slice(1))).serialize().slice(12))
 }
 
 /**
@@ -94,7 +98,7 @@ export async function pubKeyToAccountId(pubKey: Uint8Array): Promise<AccountId> 
  * @returns a promise resolved to Hash
  */
 export async function hash(msg: Uint8Array): Promise<Hash> {
-  return Promise.resolve(new Hash(createKeccakHash('keccak256').update(Buffer.from(msg)).digest()))
+  return Hash.create(msg)
 }
 
 /**
@@ -151,7 +155,10 @@ export async function verify(msg: Uint8Array, signature: Signature, pubKey: Uint
  */
 export async function isWinningTicket(ticketHash: Hash, challengeResponse: Hash, preImage: Hash, winProb: Hash) {
   return [A_STRICLY_LESS_THAN_B, A_EQUALS_B].includes(
-    u8aCompare(await hash(u8aConcat(ticketHash, preImage, challengeResponse)), winProb)
+    u8aCompare(
+      Hash.create(u8aConcat(ticketHash.serialize(), preImage.serialize(), challengeResponse.serialize())).serialize(),
+      winProb.serialize()
+    )
   )
 }
 
@@ -159,19 +166,19 @@ export async function isWinningTicket(ticketHash: Hash, challengeResponse: Hash,
  * Compute the winning probability that is set for a ticket
  * @param prob Desired winning probability of a ticket, e.g. 0.6 resp. 60%
  */
-export function computeWinningProbability(prob: number): Uint8Array {
+export function computeWinningProbability(prob: number): Hash {
   if (prob == 1) {
-    return new Uint8Array(Hash.SIZE).fill(0xff)
+    return new Hash(new Uint8Array(Hash.SIZE).fill(0xff))
   }
 
   if (prob == 0) {
-    return new Uint8Array(Hash.SIZE).fill(0x00)
+    return new Hash(new Uint8Array(Hash.SIZE).fill(0x00))
   }
 
   let dividend = new BN(prob.toString(2).slice(2), 2)
   let divisor = new BN(0).bincn(prob.toString(2).slice(2).length)
 
-  return new Uint8Array(new BN(0).bincn(256).isubn(1).imul(dividend).div(divisor).toArray('be', Hash.SIZE))
+  return new Hash(new Uint8Array(new BN(0).bincn(256).isubn(1).imul(dividend).div(divisor).toArray('be', Hash.SIZE)))
 }
 
 /**
@@ -183,20 +190,18 @@ export function computeWinningProbability(prob: number): Uint8Array {
  *
  * @param winProb Uint256-encoded version of winning probability
  */
-export function getWinProbabilityAsFloat(winProb: Uint8Array): number {
-  if (winProb.length != Hash.SIZE) {
-    throw Error(`Invalid array. Expected an array of ${Hash.SIZE} elements but got one with ${winProb?.length}.`)
-  }
-
-  if (u8aEquals(winProb, new Uint8Array(Hash.SIZE).fill(0xff))) {
+export function getWinProbabilityAsFloat(winProb: Hash): number {
+  if (u8aEquals(winProb.serialize(), new Uint8Array(Hash.SIZE).fill(0xff))) {
     return 1
   }
 
-  if (u8aEquals(winProb, new Uint8Array(Hash.SIZE).fill(0x00))) {
+  if (u8aEquals(winProb.serialize(), new Uint8Array(Hash.SIZE).fill(0x00))) {
     return 0
   }
 
-  return (u8aToNumber(winProb.slice(0, 3)) as number) / (u8aToNumber(new Uint8Array(3).fill(0xff)) as number)
+  return (
+    (u8aToNumber(winProb.serialize().slice(0, 3)) as number) / (u8aToNumber(new Uint8Array(3).fill(0xff)) as number)
+  )
 }
 
 /**
@@ -205,15 +210,14 @@ export function getWinProbabilityAsFloat(winProb: Uint8Array): number {
  * @param response response to verify
  */
 export async function checkChallenge(challenge: Hash, response: Hash) {
-  return u8aEquals(challenge, await hash(response))
+  return challenge.eq(response.hash())
 }
 
 /**
  * Convert between units'
- * @param amount a BN instance of the amount to be converted
+ * @param amount
  * @param sourceUnit
  * @param targetUnit
- * @returns a BN instance of the resulted conversion
  */
 export function convertUnit(amount: Balance, sourceUnit: 'eth', targetUnit: 'wei'): Balance
 export function convertUnit(amount: Balance, sourceUnit: 'wei', targetUnit: 'eth'): Balance
@@ -221,9 +225,9 @@ export function convertUnit(amount: Balance, sourceUnit: 'eth' | 'wei', targetUn
   assert(['eth', 'wei'].includes(sourceUnit), 'not implemented')
 
   if (sourceUnit === 'eth') {
-    return Web3.utils.toWei(amount, targetUnit as any) as any
+    return Web3.utils.toWei(amount.toBN(), targetUnit as any) as any
   } else {
-    return Web3.utils.fromWei(amount, targetUnit as any) as any
+    return Web3.utils.fromWei(amount.toBN(), targetUnit as any) as any
   }
 }
 
@@ -315,7 +319,7 @@ export async function waitFor({
   timestamp
 }: {
   web3: Web3
-  network: Network
+  network: Networks
   getCurrentBlock: () => Promise<BlockTransactionString>
   timestamp?: number
 }): Promise<void> {
@@ -357,29 +361,24 @@ export async function getChainId(web3: Web3): Promise<number> {
  * @param web3 a web3 instance
  * @returns the network's name
  */
-export function getNetworkName(chainId: number): Network {
-  switch (chainId) {
-    case 1:
-      return 'mainnet'
-    // case 2:
-    //   return 'morden'
-    case 3:
-      return 'ropsten'
-    // case 4:
-    //   return 'rinkeby'
-    case 5:
-      return 'goerli'
-    case 42:
-      return 'kovan'
-    case 56:
-      return 'binance'
-    case 100:
-      return 'xdai'
-    case 137:
-      return 'matic'
-    default:
-      return 'localhost'
-  }
+export function getNetworkName(chainId: number): Networks {
+  const entry = Object.entries(networks).find(([_, options]) => options.chainId === chainId)
+
+  if (entry) return entry[0] as Networks
+  return 'localhost'
+}
+
+/**
+ * Get current network's name.
+ *
+ * @param web3 a web3 instance
+ * @returns the network's name
+ */
+export function getNetworkGasPrice(network: Networks): number | undefined {
+  const entry = Object.entries(networks).find((entry) => entry[0] === network)
+
+  if (entry && entry[1].gas) return entry[1].gas
+  return undefined
 }
 
 /**
@@ -458,13 +457,13 @@ export function getSignatureParameters(
  * @returns a promise that resolves to a hash
  */
 export async function createChallenge(secretA: Uint8Array, secretB: Uint8Array): Promise<Hash> {
-  return await hash(await hash(u8aConcat(secretA, secretB)))
+  return Hash.create(u8aConcat(secretA, secretB)).hash()
 }
 
 /**
  * @param network
  * @returns true if network is private or ganache
  */
-export function isGanache(network?: Network): boolean {
+export function isGanache(network?: Networks): boolean {
   return !network || network === 'localhost'
 }

@@ -1,6 +1,6 @@
 import AcknowledgedTicket from './types/acknowledgedTicket'
 import type {
-  AccountId,
+  Address,
   Balance,
   Channel as ChannelType,
   ChannelBalance,
@@ -16,7 +16,7 @@ import type {
 declare interface ChannelStatic {
   /**
    * Creates a Channel instance from the database.
-   * @param counterparty AccountId of the counterparty
+   * @param counterparty Address of the counterparty
    * @param props additional arguments
    */
   create(
@@ -30,10 +30,10 @@ declare interface ChannelStatic {
    * Creates a dummy ticket that is sent to the final recipient.
    * The ticket MUST not have any value.
    *
-   * @param counterParty AccountId of the counterparty
+   * @param counterParty Address of the counterparty
    * @param challenge Challenge for this ticket
    */
-  createDummyChannelTicket(counterParty: AccountId, challenge: Hash, ...props: any[]): Promise<SignedTicket>
+  createDummyChannelTicket(counterParty: Address, challenge: Hash, ...props: any[]): Promise<SignedTicket>
 
   /**
    * Checks whether the channel exists on-chain and off-chain, i.e. in our database.
@@ -73,7 +73,7 @@ declare interface ChannelStatic {
    * @param counterPartyPubKey the public key of the counterparty in which we have a channel with
    * @returns a promise tha resolves into on chain channel data
    */
-  getOnChainState(channelId: Hash): Promise<ChannelEntry>
+  getOnChainState(counterparty: Public): Promise<ChannelEntry>
 
   /**
    * Fetches all channel instances from the database and initiates a settlement on
@@ -88,7 +88,7 @@ declare interface ChannelStatic {
    * @param counterParty the counterparty of the channel
    * @param amount the amount of tokens to put into the payment channel
    */
-  increaseFunds(counterParty: AccountId, amount: Balance): Promise<void>
+  increaseFunds(counterParty: Address, amount: Balance): Promise<void>
 
   /**
    * Handles a channel opening request.
@@ -127,6 +127,7 @@ declare interface ChannelStatic {
       | {
           status: 'SUCCESS'
           receipt: string
+          ackTicket: AcknowledgedTicket
         }
       | {
           status: 'FAILURE'
@@ -151,7 +152,7 @@ declare interface Channel {
   readonly stateCounter: Promise<TicketEpoch>
 
   // Current status of the channel
-  readonly status: Promise<'UNINITIALISED' | 'FUNDED' | 'OPEN' | 'PENDING'>
+  readonly status: Promise<'CLOSED' | 'PENDING_TO_CLOSE' | 'OPEN'>
 
   // Current state of the channel, i.e. `FUNDED` with `1 HOPR / 3 HOPR`
   readonly state: Promise<ChannelType>

@@ -12,6 +12,7 @@ import { LevelUp } from 'levelup'
 import Debug from 'debug'
 import Hopr from '../../'
 import HoprCoreConnector, { Types } from '@hoprnet/hopr-core-connector-interface'
+import { Hash } from '@hoprnet/hopr-core-ethereum'
 import { UnacknowledgedTicket } from '../ticket'
 
 const log = Debug('hopr-core:message:packet')
@@ -203,9 +204,14 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     const ticketChallenge = await chain.utils.hash(
       secrets.length == 1
         ? deriveTicketLastKey(secrets[0])
-        : await chain.utils.hash(
-            u8aConcat(deriveTicketKey(secrets[0]), await chain.utils.hash(deriveTicketKeyBlinding(secrets[1])))
-          )
+        : (
+            await chain.utils.hash(
+              u8aConcat(
+                deriveTicketKey(secrets[0]),
+                (await chain.utils.hash(deriveTicketKeyBlinding(secrets[1]))).serialize()
+              )
+            )
+          ).serialize()
     )
 
     if (secrets.length > 1) {
@@ -220,16 +226,16 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
         offset: packet.ticketOffset
       })
 
-      const myAccountId = await chain.utils.pubKeyToAccountId(node.getId().pubKey.marshal())
-      const counterpartyAccountId = await chain.utils.pubKeyToAccountId(channel.counterparty)
-      const amPartyA = chain.utils.isPartyA(myAccountId, counterpartyAccountId)
+      const myAddress = await chain.utils.pubKeyToAddress(node.getId().pubKey.marshal())
+      const counterpartyAddress = await chain.utils.pubKeyToAddress(channel.counterparty)
+      const amPartyA = chain.utils.isPartyA(myAddress, counterpartyAddress)
       await validateCreatedTicket({
-        myBalance: await (amPartyA ? channel.balance_a : channel.balance_b),
+        myBalance: (await (amPartyA ? channel.balance_a : channel.balance_b)).toBN(),
         signedTicket: packet._ticket
       })
     } else if (secrets.length == 1) {
       packet._ticket = await chain.channel.createDummyChannelTicket(
-        await chain.utils.pubKeyToAccountId(path[0].pubKey.marshal()),
+        await chain.utils.pubKeyToAddress(path[0].pubKey.marshal()),
         ticketChallenge,
         {
           bytes: packet.buffer,
@@ -304,12 +310,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
    * Prepares the delivery of the packet.
    */
   async prepareDelivery(): Promise<void> {
-    if (
-      !u8aEquals(
-        await this.node.paymentChannels.utils.hash(deriveTicketLastKey(this.header.derivedSecret)),
-        (await this.ticket).ticket.challenge
-      )
-    ) {
+    if (!Hash.create(deriveTicketLastKey(this.header.derivedSecret)).eq((await this.ticket).ticket.challenge as Hash)) {
       verbose('Error preparing delivery')
       throw Error('Error preparing delivery')
     }
@@ -330,19 +331,19 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     const signedTicket = await this.ticket
     const ticket = signedTicket.ticket
     const sender = this.node.getId()
-    const senderAccountId = await chain.utils.pubKeyToAccountId(sender.pubKey.marshal())
-    const targetAccountId = await chain.utils.pubKeyToAccountId(target.pubKey.marshal())
-    const amPartyA = chain.utils.isPartyA(senderAccountId, targetAccountId)
+    const senderAddress = await chain.utils.pubKeyToAddress(sender.pubKey.marshal())
+    const targetAddress = await chain.utils.pubKeyToAddress(target.pubKey.marshal())
+    const amPartyA = chain.utils.isPartyA(senderAddress, targetAddress)
     const challenge = u8aConcat(deriveTicketKey(this.header.derivedSecret), this.header.hashedKeyHalf)
 
-    if (!u8aEquals(await chain.utils.hash(await chain.utils.hash(challenge)), ticket.challenge)) {
+    if (!(await chain.utils.hash(challenge)).hash().eq(ticket.challenge)) {
       verbose('Error preparing to forward')
       throw Error('Error preparing forward')
     }
 
     const unacknowledged = new UnacknowledgedTicket(chain, undefined, {
       signedTicket,
-      secretA: deriveTicketKey(this.header.derivedSecret)
+      secretA: new Hash(deriveTicketKey(this.header.derivedSecret))
     })
 
     log(
@@ -356,9 +357,9 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     )
 
     // get new ticket amount
-    const fee = new Balance(ticket.amount.isub(new BN(this.node.ticketAmount)))
+    const fee = new Balance(ticket.amount.toBN().isub(new BN(this.node.ticketAmount)))
 
-    if (fee.gtn(0)) {
+    if (fee.toBN().gtn(0)) {
       const channelBalance = ChannelBalance.create(undefined, {
         balance: fee,
         balance_a: amPartyA ? fee : new BN(0)
@@ -372,19 +373,19 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
           this.node._interactions.payments.open.interact(target, channelBalance)
       )
 
-      this._ticket = await channel.ticket.create(fee, this.header.encryptionKey, this.node.ticketWinProb, {
+      this._ticket = await channel.ticket.create(fee, new Hash(this.header.encryptionKey), this.node.ticketWinProb, {
         bytes: this.buffer,
         offset: this.ticketOffset
       })
 
       await validateCreatedTicket({
-        myBalance: await (amPartyA ? channel.balance_a : channel.balance_b),
+        myBalance: (await (amPartyA ? channel.balance_a : channel.balance_b)).toBN(),
         signedTicket: this._ticket
       })
-    } else if (fee.isZero()) {
+    } else if (fee.toBN().isZero()) {
       this._ticket = await chain.channel.createDummyChannelTicket(
-        await chain.utils.pubKeyToAccountId(target.pubKey.marshal()),
-        this.header.encryptionKey,
+        await chain.utils.pubKeyToAddress(target.pubKey.marshal()),
+        new Hash(this.header.encryptionKey),
         {
           bytes: this.buffer,
           offset: this.ticketOffset
@@ -396,7 +397,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
 
     this.header.transformForNextNode()
 
-    this._challenge = await Challenge.create<Chain>(chain, this.header.hashedKeyHalf, fee, {
+    this._challenge = await Challenge.create<Chain>(chain, new Hash(this.header.hashedKeyHalf), fee.toBN(), {
       bytes: this.buffer,
       offset: this.challengeOffset
     }).sign(sender)

@@ -5,26 +5,25 @@ import Memdown from 'memdown'
 import { stringToU8a } from '@hoprnet/hopr-utils'
 import { privKeyToPubKey } from '.'
 import CoreConnector from '..'
-import { AccountId, Hash, Public } from '../types'
+import { Address, Hash, Public } from '../types'
 import { HoprToken } from '../tsc/web3/HoprToken'
 
 export type Account = {
   privKey: Hash
   pubKey: Public
-  address: AccountId
+  address: Address
 }
 
 /**
  * Return private key data like public key and address.
  * @param _privKey private key to derive data from
  */
-export async function getPrivKeyData(_privKey: Uint8Array): Promise<Account> {
-  const privKey = new Hash(_privKey)
+export async function getPrivKeyData(privKey: Uint8Array): Promise<Account> {
   const pubKey = new Public(await privKeyToPubKey(privKey))
-  const address = await pubKey.toAccountId()
+  const address = await pubKey.toAddress()
 
   return {
-    privKey,
+    privKey: new Hash(privKey),
     pubKey,
     address
   }

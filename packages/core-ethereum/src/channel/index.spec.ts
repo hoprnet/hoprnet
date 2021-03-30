@@ -3,7 +3,7 @@ import { Ganache } from '@hoprnet/hopr-testing'
 import { migrate } from '@hoprnet/hopr-ethereum'
 import assert from 'assert'
 import { stringToU8a, u8aEquals, u8aConcat, durations } from '@hoprnet/hopr-utils'
-import { addresses, abis } from '@hoprnet/hopr-ethereum'
+import { getAddresses, abis } from '@hoprnet/hopr-ethereum'
 import { getPrivKeyData, createAccountAndFund, createNode } from '../utils/testing.spec'
 import { createChallenge, hash } from '../utils'
 import BN from 'bn.js'
@@ -12,7 +12,7 @@ import Web3 from 'web3'
 import { HoprToken } from '../tsc/web3/HoprToken'
 import { Await } from '../tsc/utils'
 import { Channel as ChannelType, ChannelStatus, ChannelBalance, ChannelState } from '../types/channel'
-import { AcknowledgedTicket, Balance, SignedChannel, SignedTicket, AccountId } from '../types'
+import { AcknowledgedTicket, Balance, SignedChannel, SignedTicket, Address } from '../types'
 import CoreConnector from '..'
 import Channel from '.'
 import * as testconfigs from '../config.spec'
@@ -35,7 +35,7 @@ describe('test Channel class', function () {
     counterparty,
     winProb = DEFAULT_WIN_PROB
   }: {
-    counterparty: AccountId
+    counterparty: Address
     winProb?: number
   }) {
     const secretA = randomBytes(32)
@@ -59,7 +59,7 @@ describe('test Channel class', function () {
     await migrate()
 
     web3 = new Web3(configs.DEFAULT_URI)
-    hoprToken = new web3.eth.Contract(HoprTokenAbi as any, addresses?.localhost?.HoprToken)
+    hoprToken = new web3.eth.Contract(HoprTokenAbi as any, getAddresses()?.localhost?.HoprToken)
   })
 
   after(async function () {
@@ -73,11 +73,11 @@ describe('test Channel class', function () {
     const userA = await createAccountAndFund(web3, hoprToken, funder, testconfigs.DEMO_ACCOUNTS[1])
     const userB = await createAccountAndFund(web3, hoprToken, funder, testconfigs.DEMO_ACCOUNTS[2])
 
-    coreConnector = await createNode(userA.privKey)
+    coreConnector = await createNode(userA.privKey.serialize())
     await coreConnector.initOnchainValues()
     await coreConnector.start()
 
-    counterpartysCoreConnector = await createNode(userB.privKey)
+    counterpartysCoreConnector = await createNode(userB.privKey.serialize())
     await counterpartysCoreConnector.initOnchainValues()
     await counterpartysCoreConnector.start()
   })
@@ -90,8 +90,8 @@ describe('test Channel class', function () {
     this.timeout(durations.minutes(1))
 
     const channelBalance = new ChannelBalance(undefined, {
-      balance: new BN(123),
-      balance_a: new BN(122)
+      balance: new Balance(new BN(123)),
+      balance_a: new Balance(new BN(122))
     })
 
     const channel = await coreConnector.channel.create(
@@ -105,7 +105,7 @@ describe('test Channel class', function () {
               await coreConnector.channel.createSignedChannel(undefined, {
                 channel: new ChannelType(undefined, {
                   balance: channelBalance,
-                  state: new ChannelState(undefined, { state: ChannelStatus.FUNDED })
+                  state: new ChannelState(undefined, { state: ChannelStatus.CLOSED })
                 })
               })
             ).subarray()
@@ -131,21 +131,26 @@ describe('test Channel class', function () {
       }
     )
 
-    const myAddress = await coreConnector.utils.pubKeyToAccountId(coreConnector.account.keys.onChain.pubKey)
-    const counterpartyAddress = await coreConnector.utils.pubKeyToAccountId(
+    const myAddress = await coreConnector.utils.pubKeyToAddress(coreConnector.account.keys.onChain.pubKey)
+    const counterpartyAddress = await coreConnector.utils.pubKeyToAddress(
       counterpartysCoreConnector.account.keys.onChain.pubKey
     )
 
     const firstTicket = await getTicketData({
       counterparty: myAddress
     })
-    const firstAckedTicket = new AcknowledgedTicket(coreConnector, undefined, {
+    const firstAckedTicket = new AcknowledgedTicket(undefined, {
       response: firstTicket.response
     })
-    const signedTicket = await channel.ticket.create(new Balance(1), firstTicket.challenge, firstTicket.winProb, {
-      bytes: firstAckedTicket.buffer,
-      offset: firstAckedTicket.signedTicketOffset
-    })
+    const signedTicket = await channel.ticket.create(
+      new Balance(new BN(1)),
+      firstTicket.challenge,
+      firstTicket.winProb,
+      {
+        bytes: firstAckedTicket.buffer,
+        offset: firstAckedTicket.signedTicketOffset
+      }
+    )
 
     assert(
       u8aEquals(await signedTicket.signer, coreConnector.account.keys.onChain.pubKey),
@@ -159,7 +164,7 @@ describe('test Channel class', function () {
 
     assert(
       u8aEquals(dbChannels[0].counterparty, coreConnector.account.keys.onChain.pubKey),
-      `Channel record should make it into the database and its db-key should lead to the AccountId of the counterparty.`
+      `Channel record should make it into the database and its db-key should lead to the Address of the counterparty.`
     )
 
     const counterpartysChannel = await counterpartysCoreConnector.channel.create(
@@ -192,9 +197,10 @@ describe('test Channel class', function () {
     assert(await counterpartysChannel.ticket.verify(signedTicket), `Ticket signature must be valid.`)
 
     const hashedSecretBefore = await counterpartysChannel.coreConnector.account.onChainSecret
+    console.log(hashedSecretBefore, firstAckedTicket.preImage)
 
     try {
-      const result = await counterpartysCoreConnector.channel.tickets.submit(firstAckedTicket, new Uint8Array())
+      const result = await counterpartysCoreConnector.channel.tickets.submit(firstAckedTicket)
       if (result.status === 'ERROR') {
         throw result.error
       } else if (result.status === 'FAILURE') {
@@ -210,7 +216,7 @@ describe('test Channel class', function () {
 
     let errThrown = false
     try {
-      const result = await counterpartysCoreConnector.channel.tickets.submit(firstAckedTicket, new Uint8Array())
+      const result = await counterpartysCoreConnector.channel.tickets.submit(firstAckedTicket)
       if (result.status === 'ERROR' || result.status === 'FAILURE') {
         errThrown = true
       }
@@ -228,13 +234,13 @@ describe('test Channel class', function () {
     for (let i = 0; i < ATTEMPTS; i++) {
       ticketData = await getTicketData({
         counterparty: counterpartyAddress,
-        winProb: 0.5
+        winProb: 1
       })
-      let ackedTicket = new AcknowledgedTicket(counterpartysCoreConnector, undefined, {
+      let ackedTicket = new AcknowledgedTicket(undefined, {
         response: ticketData.response
       })
 
-      nextSignedTicket = await channel.ticket.create(new Balance(1), ticketData.challenge, ticketData.winProb, {
+      nextSignedTicket = await channel.ticket.create(new Balance(new BN(1)), ticketData.challenge, ticketData.winProb, {
         bytes: ackedTicket.buffer,
         offset: ackedTicket.signedTicketOffset
       })
@@ -242,8 +248,9 @@ describe('test Channel class', function () {
       assert(await counterpartysChannel.ticket.verify(nextSignedTicket), `Ticket signature must be valid.`)
 
       if (await counterpartysCoreConnector.account.reservePreImageIfIsWinning(ackedTicket)) {
-        await counterpartysCoreConnector.channel.tickets.submit(ackedTicket, new Uint8Array())
-        assert(ackedTicket.redeemed, 'ticket should get marked as redeemed')
+        const result = await counterpartysCoreConnector.channel.tickets.submit(ackedTicket)
+        assert(result.status === 'SUCCESS', 'ticket redeemption was not a success')
+        assert(result?.ackTicket?.redeemed, 'ticket should get marked as redeemed')
       }
     }
   })

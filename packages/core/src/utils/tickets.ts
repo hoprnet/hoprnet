@@ -6,7 +6,7 @@ import { u8aEquals } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 import { UnacknowledgedTicket } from '../messages/ticket/unacknowledged'
 
-type OperationSuccess = { status: 'SUCCESS'; receipt: string }
+type OperationSuccess = { status: 'SUCCESS'; receipt: string; ackTicket: Types.AcknowledgedTicket }
 type OperationFailure = { status: 'FAILURE'; message: string }
 type OperationError = { status: 'ERROR'; error: Error | string }
 export type OperationStatus = OperationSuccess | OperationFailure | OperationError
@@ -67,7 +67,7 @@ export async function deleteUnacknowledgedTickets(
       tickets.map<any>(async (ticket) => {
         return {
           type: 'del',
-          key: Buffer.from(node._dbKeys.UnAcknowledgedTickets((await ticket.signedTicket).ticket.challenge))
+          key: Buffer.from(node._dbKeys.UnAcknowledgedTickets((await ticket.signedTicket).ticket.challenge.serialize()))
         }
       })
     )
@@ -91,7 +91,6 @@ export async function getAcknowledgedTickets(
   }[]
 > {
   const { AcknowledgedTicket } = node.paymentChannels.types
-  const acknowledgedTicketSize = AcknowledgedTicket.SIZE(node.paymentChannels)
   const results: {
     ackTicket: Types.AcknowledgedTicket
     index: Uint8Array
@@ -104,10 +103,10 @@ export async function getAcknowledgedTickets(
       })
       .on('error', (err) => reject(err))
       .on('data', async ({ key, value }: { key: Buffer; value: Buffer }) => {
-        if (value.buffer.byteLength !== acknowledgedTicketSize) return
+        if (value.buffer.byteLength !== AcknowledgedTicket.SIZE) return
 
         const index = node._dbKeys.AcknowledgedTicketsParse(key)
-        const ackTicket = AcknowledgedTicket.create(node.paymentChannels, {
+        const ackTicket = AcknowledgedTicket.create({
           bytes: value.buffer,
           offset: value.byteOffset
         })
@@ -143,7 +142,9 @@ export async function deleteAcknowledgedTickets(
       tickets.map<any>(async (ticket) => {
         return {
           type: 'del',
-          key: Buffer.from(node._dbKeys.AcknowledgedTickets((await ticket.ackTicket.signedTicket).ticket.challenge))
+          key: Buffer.from(
+            node._dbKeys.AcknowledgedTickets((await ticket.ackTicket.signedTicket).ticket.challenge.serialize())
+          )
         }
       })
     )
@@ -257,11 +258,11 @@ export async function validateUnacknowledgedTicket({
   const ticket = signedTicket.ticket
   const chain = node.paymentChannels
   const selfPubKey = node.getId().pubKey.marshal()
-  const selfAccountId = await chain.utils.pubKeyToAccountId(selfPubKey)
+  const selfAddress = await chain.utils.pubKeyToAddress(selfPubKey)
   const senderB58 = senderPeerId.toB58String()
   const senderPubKey = senderPeerId.pubKey.marshal()
-  const senderAccountId = await chain.utils.pubKeyToAccountId(senderPubKey)
-  const amPartyA = chain.utils.isPartyA(selfAccountId, senderAccountId)
+  const senderAddress = await chain.utils.pubKeyToAddress(senderPubKey)
+  const amPartyA = chain.utils.isPartyA(selfAddress, senderAddress)
 
   // ticket signer MUST be the sender
   if (!u8aEquals(await signedTicket.signer, senderPubKey)) {
@@ -269,7 +270,7 @@ export async function validateUnacknowledgedTicket({
   }
 
   // ticket MUST have at least X amount
-  if (ticket.amount.lt(new BN(String(node.ticketAmount)))) {
+  if (ticket.amount.toBN().lt(new BN(String(node.ticketAmount)))) {
     throw Error(`Ticket amount '${ticket.amount.toString()}' is lower than '${node.ticketAmount}'`)
   }
 
@@ -320,30 +321,27 @@ export async function validateUnacknowledgedTicket({
   // channel MUST have enough funds
   // (performance) we are making a request to blockchain
   const senderBalance = await (amPartyA ? channel.balance_b : channel.balance_a)
-  if (senderBalance.lt(ticket.amount)) {
+  if (senderBalance.toBN().lt(ticket.amount.toBN())) {
     throw Error(`Payment channel does not have enough funds`)
   }
 
   // channel MUST have enough funds
   // (performance) tickets are stored by key, we can't query sender's tickets efficiently
   // we retrieve all signed tickets and filter the ones between sender and target
-  const signedTickets = await getTickets().then(async (signedTickets) => {
-    return signedTickets.filter((signedTicket) => {
-      return (
-        u8aEquals(signedTicket.ticket.counterparty, selfAccountId) &&
-        signedTicket.ticket.epoch.eq(epoch) &&
-        ticket.channelIteration.toNumber() === currentChannelIteration
-      )
-    })
-  })
+  let signedTickets = (await getTickets()).filter(
+    (signedTicket) =>
+      signedTicket.ticket.counterparty.eq(selfAddress) &&
+      signedTicket.ticket.epoch.eq(epoch) &&
+      ticket.channelIteration.toNumber() === currentChannelIteration
+  )
 
   // calculate total unredeemed balance
   const unredeemedBalance = signedTickets.reduce((total, signedTicket) => {
-    return new BN(total.add(signedTicket.ticket.amount))
+    return new BN(total.add(signedTicket.ticket.amount.toBN()))
   }, new BN(0))
 
   // ensure sender has enough funds
-  if (unredeemedBalance.add(new BN(ticket.amount)).gt(senderBalance)) {
+  if (unredeemedBalance.add(ticket.amount.toBN()).gt(senderBalance.toBN())) {
     throw Error(`Payment channel does not have enough funds when you include unredeemed tickets`)
   }
 }
@@ -361,7 +359,7 @@ export async function validateCreatedTicket({
 }) {
   const { ticket } = signedTicket
 
-  if (myBalance.lt(ticket.amount)) {
+  if (myBalance.lt(ticket.amount.toBN())) {
     throw Error(`Payment channel does not have enough funds ${myBalance.toString()} < ${ticket.amount.toString()}`)
   }
 }

@@ -6,7 +6,6 @@ import { Uint8ArrayE } from '../types/extended'
 import { verify } from '../utils'
 
 class SignedTicket extends Uint8ArrayE implements Types.SignedTicket {
-  private _ticket?: Ticket
   private _signature?: Signature
   private _signer?: Uint8Array
 
@@ -58,14 +57,10 @@ class SignedTicket extends Uint8ArrayE implements Types.SignedTicket {
   }
 
   get ticket(): Ticket {
-    if (!this._ticket) {
-      this._ticket = new Ticket({
-        bytes: this.buffer,
-        offset: this.ticketOffset
-      })
-    }
-
-    return this._ticket
+    return new Ticket({
+      bytes: this.buffer,
+      offset: this.ticketOffset
+    })
   }
 
   get signatureOffset(): number {
@@ -90,7 +85,11 @@ class SignedTicket extends Uint8ArrayE implements Types.SignedTicket {
 
     return new Promise(async (resolve, reject) => {
       try {
-        this._signer = secp256k1.ecdsaRecover(this.signature.signature, this.signature.recovery, await this.ticket.hash)
+        this._signer = secp256k1.ecdsaRecover(
+          this.signature.signature,
+          this.signature.recovery,
+          (await this.ticket.hash).serialize()
+        )
         return resolve(this._signer)
       } catch (err) {
         return reject(err)
@@ -99,7 +98,7 @@ class SignedTicket extends Uint8ArrayE implements Types.SignedTicket {
   }
 
   async verify(pubKey: Uint8Array): Promise<boolean> {
-    return verify(await this.ticket.hash, this.signature, pubKey)
+    return verify((await this.ticket.hash).serialize(), this.signature, pubKey)
   }
 
   static get SIZE() {

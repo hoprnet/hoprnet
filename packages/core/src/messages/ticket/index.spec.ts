@@ -1,21 +1,15 @@
 import type Hopr from '../..'
+import BN from 'bn.js'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-
 import assert from 'assert'
-
 import { randomBytes } from 'crypto'
-
 import { UnacknowledgedTicket } from '.'
-
 import { NODE_SEEDS } from '@hoprnet/hopr-demo-seeds'
-
-import { Types, Utils } from '@hoprnet/hopr-core-ethereum'
+import { Types, Utils, Hash } from '@hoprnet/hopr-core-ethereum'
 import { privKeyToPeerId } from '@hoprnet/hopr-utils'
 import { toU8a, u8aConcat, u8aToNumber } from '@hoprnet/hopr-utils'
-
 import LevelUp from 'levelup'
 import Memdown from 'memdown'
-
 import * as DbKeys from '../../dbKeys'
 
 describe(`check serialization and deserialization of ticket objects`, function () {
@@ -36,14 +30,14 @@ describe(`check serialization and deserialization of ticket objects`, function (
     const peerA = await privKeyToPeerId(NODE_SEEDS[0])
     const peerB = await privKeyToPeerId(NODE_SEEDS[1])
 
-    // const accountA = await node.paymentChannels.utils.pubKeyToAccountId(peerA.pubKey.marshal())
-    const accountB = await node.paymentChannels.utils.pubKeyToAccountId(peerB.pubKey.marshal())
+    // const accountA = await node.paymentChannels.utils.pubKeyToAddress(peerA.pubKey.marshal())
+    const accountB = await node.paymentChannels.utils.pubKeyToAddress(peerB.pubKey.marshal())
 
     const secretA = randomBytes(32)
     const secretB = randomBytes(32)
 
     const response = await node.paymentChannels.utils.hash(u8aConcat(secretA, secretB))
-    const challenge = await node.paymentChannels.utils.hash(response)
+    const challenge = response.hash()
 
     const unAcknowledgedTicket = new UnacknowledgedTicket(node.paymentChannels)
 
@@ -58,12 +52,12 @@ describe(`check serialization and deserialization of ticket objects`, function (
         offset: signedTicket.ticketOffset
       },
       {
-        amount: new node.paymentChannels.types.Balance(1),
+        amount: new node.paymentChannels.types.Balance(new BN(1)),
         counterparty: accountB,
         challenge,
-        epoch: new node.paymentChannels.types.TicketEpoch(0),
+        epoch: node.paymentChannels.types.UINT256.fromString('0'),
         winProb: new node.paymentChannels.types.Hash(new Uint8Array(32).fill(0xff)),
-        channelIteration: new node.paymentChannels.types.TicketEpoch(0)
+        channelIteration: node.paymentChannels.types.UINT256.fromString('0')
       }
     )
 
@@ -72,9 +66,11 @@ describe(`check serialization and deserialization of ticket objects`, function (
 
     assert(await unAcknowledgedTicket.verifySignature(peerA), 'signature must be valid')
 
-    await node.db.put(node._dbKeys.UnAcknowledgedTickets(challenge), Buffer.from(unAcknowledgedTicket))
+    await node.db.put(node._dbKeys.UnAcknowledgedTickets(challenge.serialize()), Buffer.from(unAcknowledgedTicket))
 
-    const fromDbUnacknowledgedTicket = (await node.db.get(node._dbKeys.UnAcknowledgedTickets(challenge))) as Uint8Array
+    const fromDbUnacknowledgedTicket = (await node.db.get(
+      node._dbKeys.UnAcknowledgedTickets(challenge.serialize())
+    )) as Uint8Array
 
     assert(
       await new UnacknowledgedTicket(node.paymentChannels, {
@@ -84,10 +80,10 @@ describe(`check serialization and deserialization of ticket objects`, function (
       'signature must be valid'
     )
 
-    const acknowledgedDbEntry = node.paymentChannels.types.AcknowledgedTicket.create(node.paymentChannels, undefined, {
+    const acknowledgedDbEntry = node.paymentChannels.types.AcknowledgedTicket.create(undefined, {
       signedTicket,
       response: await node.paymentChannels.utils.hash(u8aConcat(secretA, secretB)),
-      preImage: randomBytes(27),
+      preImage: new Hash(randomBytes(27)),
       redeemed: false
     })
 

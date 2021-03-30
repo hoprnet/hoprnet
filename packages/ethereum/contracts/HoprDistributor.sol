@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.6.0;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts-v3-0-1/access/Ownable.sol";
 import "./HoprToken.sol";
 
 contract HoprDistributor is Ownable {

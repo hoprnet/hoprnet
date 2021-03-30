@@ -2,9 +2,8 @@ import { Hash } from './types'
 import Debug from 'debug'
 import { randomBytes } from 'crypto'
 import { u8aToHex, u8aConcat, iterateHash, recoverIteratedHash } from '@hoprnet/hopr-utils'
-import type { Intermediate } from '@hoprnet/hopr-utils'
 import { publicKeyConvert } from 'secp256k1'
-import { hash as hashFunctionUtils, waitForConfirmation } from './utils'
+import { waitForConfirmation } from './utils'
 import { OnChainSecret, OnChainSecretIntermediary } from './dbKeys'
 import type { LevelUp } from 'levelup'
 import type { HoprChannels } from './tsc/web3/HoprChannels'
@@ -12,13 +11,11 @@ import type Account from './account'
 
 export const DB_ITERATION_BLOCK_SIZE = 10000
 export const TOTAL_ITERATIONS = 100000
-export const HASHED_SECRET_WIDTH = 27
 
 const log = Debug('hopr-core-ethereum:hashedSecret')
-const isNullAccount = (a: string) => a == null || ['0', '0x', '0x'.padEnd(66, '0')].includes(a)
 
 export async function hashFunction(msg: Uint8Array): Promise<Uint8Array> {
-  return (await hashFunctionUtils(msg)).slice(0, HASHED_SECRET_WIDTH)
+  return Hash.create(msg).serialize().slice(0, Hash.SIZE)
 }
 
 async function getFromDB<T>(db: LevelUp, key): Promise<T | undefined> {
@@ -56,10 +53,10 @@ class HashedSecret {
    * @returns a promise that resolves to the onChainSecret
    */
   private async createAndStoreSecretOffChainAndReturnOnChainSecret(debug: boolean): Promise<Hash> {
-    let onChainSecret = debug ? await this.getDebugAccountSecret() : new Hash(randomBytes(HASHED_SECRET_WIDTH))
+    let onChainSecret = debug ? await this.getDebugAccountSecret() : new Hash(randomBytes(Hash.SIZE))
 
     let dbBatch = this.db.batch()
-    const result = await iterateHash(onChainSecret, hashFunction, TOTAL_ITERATIONS, DB_ITERATION_BLOCK_SIZE)
+    const result = await iterateHash(onChainSecret.serialize(), hashFunction, TOTAL_ITERATIONS, DB_ITERATION_BLOCK_SIZE)
 
     for (const intermediate of result.intermediates) {
       dbBatch = dbBatch.put(
@@ -72,11 +69,12 @@ class HashedSecret {
   }
 
   private async storeSecretOnChain(secret: Hash): Promise<void> {
-    log(`storing secret on chain, setting secret to ${u8aToHex(secret)}`)
+    log(`storing secret on chain, setting secret to ${secret.toHex()}`)
     const address = (await this.account.address).toHex()
     const account = await this.channels.methods.accounts(address).call()
 
-    if (isNullAccount(account.accountX)) {
+    // has no secret stored onchain
+    if (Number(account.counter) === 0) {
       const uncompressedPubKey = publicKeyConvert(this.account.keys.onChain.pubKey, false).slice(1)
       log('account is also null, calling channel.init')
       try {
@@ -87,11 +85,7 @@ class HashedSecret {
                 from: address,
                 to: this.channels.options.address
               },
-              this.channels.methods.init(
-                u8aToHex(uncompressedPubKey.slice(0, 32)),
-                u8aToHex(uncompressedPubKey.slice(32, 64)),
-                u8aToHex(secret)
-              )
+              this.channels.methods.initializeAccount(u8aToHex(uncompressedPubKey), secret.toHex())
             )
           ).send()
         )
@@ -117,7 +111,7 @@ class HashedSecret {
                 from: address,
                 to: this.channels.options.address
               },
-              this.channels.methods.setHashedSecret(u8aToHex(secret))
+              this.channels.methods.updateAccountSecret(secret.toHex())
             )
           ).send()
         )
@@ -135,7 +129,7 @@ class HashedSecret {
 
   private async calcOnChainSecretFromDb(debug?: boolean): Promise<Hash | never> {
     let result = await iterateHash(
-      debug == true ? await this.getDebugAccountSecret() : undefined,
+      debug == true ? (await this.getDebugAccountSecret()).serialize() : undefined,
       hashFunction,
       TOTAL_ITERATIONS,
       DB_ITERATION_BLOCK_SIZE,
@@ -154,15 +148,9 @@ class HashedSecret {
    * values from the database.
    * @param hash the hash to find a preImage for
    */
-  public async findPreImage(hash: Uint8Array): Promise<Intermediate> {
-    if (hash.length != HASHED_SECRET_WIDTH) {
-      throw Error(
-        `Invalid length. Expected a Uint8Array with ${HASHED_SECRET_WIDTH} elements but got one with ${hash.length}`
-      )
-    }
-
+  public async findPreImage(hash: Hash): Promise<Hash> {
     let result = await recoverIteratedHash(
-      hash,
+      hash.serialize(),
       hashFunction,
       (index) => getFromDB(this.db, OnChainSecretIntermediary(index)),
       TOTAL_ITERATIONS,
@@ -171,7 +159,7 @@ class HashedSecret {
     if (result == undefined) {
       throw Error(`Could not find preImage.`)
     }
-    return result
+    return new Hash(result.preImage)
   }
 
   public async initialize(debug?: boolean): Promise<void> {

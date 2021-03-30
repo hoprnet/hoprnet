@@ -8,6 +8,7 @@ import chaiAsPromised from 'chai-as-promised'
 import chai, { expect } from 'chai'
 import sinon from 'sinon'
 import { validateUnacknowledgedTicket, validateCreatedTicket } from './tickets'
+import { Address, Balance, Hash } from '@hoprnet/hopr-core-ethereum'
 
 chai.use(chaiAsPromised)
 
@@ -17,16 +18,18 @@ const TARGET_ADDRESS = stringToU8a('0xf3a509473be4bcd8af0d1961d75a5a3dc9e47ba0')
 const SENDER = PeerId.createFromB58String('16Uiu2HAmM9KAPaXA4eAz58Q7Eb3LEkDvLarU4utkyLwDeEK6vM5m')
 const SENDER_ADDRESS = stringToU8a('0x65e78d07acf7b654e5ae6777a93ebbf30f639356')
 
+const mockWinProb = (num: number): Hash => new Hash(new Uint8Array(num))
+
 const createMockTicket = ({
-  targetAddress = TARGET_ADDRESS,
-  amount = new BN(1),
-  winProb = new Uint8Array(1),
+  targetAddress = new Address(TARGET_ADDRESS),
+  amount = new Balance(new BN(1)),
+  winProb = mockWinProb(1),
   epoch = new BN(1),
   channelIteration = new BN(1)
 }: {
-  targetAddress?: Uint8Array
-  amount?: BN
-  winProb?: Uint8Array
+  targetAddress?: Address
+  amount?: Balance
+  winProb?: Hash
   epoch?: BN
   channelIteration?: BN
 }) => {
@@ -42,15 +45,15 @@ const createMockTicket = ({
 
 const createMockSignedTicket = ({
   sender = SENDER,
-  targetAddress = TARGET_ADDRESS,
-  amount = new BN(1),
-  winProb = new Uint8Array(1),
+  targetAddress = new Address(TARGET_ADDRESS),
+  amount = new Balance(new BN(1)),
+  winProb = mockWinProb(1),
   channelIteration = new BN(1)
 }: {
   sender?: PeerId
-  targetAddress?: Uint8Array
-  amount?: BN
-  winProb?: Uint8Array
+  targetAddress?: Address
+  amount?: Balance
+  winProb?: Hash
   channelIteration?: BN
 }) => {
   return ({
@@ -69,10 +72,11 @@ const createMockNode = ({
   ticketWinProb = 1,
   isChannelOpen = true,
   isChannelStored = true,
-  balance_a = new BN(0),
-  balance_b = new BN(100),
+  balance_a = new Balance(new BN(0)),
+  balance_b = new Balance(new BN(100)),
   stateCounter = new BN(1),
-  getWinProbabilityAsFloat = 1
+  getWinProbabilityAsFloat = 1,
+  isPartyAVal = true
 }: {
   sender?: PeerId
   senderAddress?: Uint8Array
@@ -83,18 +87,17 @@ const createMockNode = ({
   ticketWinProb?: number
   isChannelOpen?: boolean
   isChannelStored?: boolean
-  balance_a?: BN
-  balance_b?: BN
+  balance_a?: Balance
+  balance_b?: Balance
   stateCounter?: BN
   getWinProbabilityAsFloat?: number
+  isPartyAVal?: boolean
 }) => {
-  const pubKeyToAccountId = sinon.stub()
-  pubKeyToAccountId.withArgs(sender.pubKey.marshal()).returns(Promise.resolve(senderAddress))
-  pubKeyToAccountId.withArgs(target.pubKey.marshal()).returns(Promise.resolve(targetAddress))
+  const pubKeyToAddress = sinon.stub()
+  pubKeyToAddress.withArgs(sender.pubKey.marshal()).returns(Promise.resolve({ serialize: () => senderAddress }))
+  pubKeyToAddress.withArgs(target.pubKey.marshal()).returns(Promise.resolve({ serialize: () => targetAddress }))
 
-  const isPartyA = sinon.stub()
-  isPartyA.withArgs(targetAddress, senderAddress).returns(true)
-  isPartyA.withArgs(senderAddress, targetAddress).returns(false)
+  const isPartyA = sinon.stub().returns(isPartyAVal)
 
   const stateCounterToIteration = sinon.stub()
   stateCounterToIteration.withArgs(1).returns(1)
@@ -111,7 +114,7 @@ const createMockNode = ({
       },
       utils: {
         isPartyA: isPartyA,
-        pubKeyToAccountId,
+        pubKeyToAddress,
         getWinProbabilityAsFloat: sinon.stub().returns(getWinProbabilityAsFloat),
         stateCounterToIteration
       },
@@ -147,7 +150,7 @@ describe('unit test validateUnacknowledgedTicket', function () {
   })
 
   it('should throw when signer is not sender', async function () {
-    const node = createMockNode({})
+    const node = createMockNode({ isPartyAVal: false })
     const signedTicket = createMockSignedTicket({})
 
     return expect(
@@ -181,7 +184,7 @@ describe('unit test validateUnacknowledgedTicket', function () {
       getWinProbabilityAsFloat: 0.5
     })
     const signedTicket = createMockSignedTicket({
-      winProb: new Uint8Array(0.5)
+      winProb: mockWinProb(0.5)
     })
 
     return expect(
@@ -260,8 +263,8 @@ describe('unit test validateUnacknowledgedTicket', function () {
 
   it('should throw if channel does not have enough funds', async function () {
     const node = createMockNode({
-      balance_a: new BN(100),
-      balance_b: new BN(0)
+      balance_a: new Balance(new BN(100)),
+      balance_b: new Balance(new BN(0))
     })
     const signedTicket = createMockSignedTicket({})
 
@@ -280,7 +283,7 @@ describe('unit test validateUnacknowledgedTicket', function () {
     const signedTicket = createMockSignedTicket({})
     const ticketsInDb = [
       createMockSignedTicket({
-        amount: new BN(100)
+        amount: new Balance(new BN(100))
       })
     ]
 

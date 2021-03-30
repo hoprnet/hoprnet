@@ -1,10 +1,10 @@
 {
   "name": "@hoprnet/hopr-utils",
   "description": "HOPR-based utilities to process multiple data structures",
-  "version": "1.70.10",
+  "version": "1.71.0-next.19",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
-  "license": "LGPL-3.0-only",
+  "license": "GPL-3.0",
   "types": "lib/index.d.ts",
   "main": "lib/index.js",
   "scripts": {
@@ -30,7 +30,7 @@
     "libp2p-crypto": "0.19.2",
     "multiaddr": "8.1.2",
     "multihashes": "~4.0.1",
-    "peer-id": "0.14.3",
+    "peer-id": "0.14.4",
     "strip-ansi": "^6.0.0"
   },
   "devDependencies": {

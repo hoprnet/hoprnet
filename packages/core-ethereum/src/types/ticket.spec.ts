@@ -1,22 +1,24 @@
 import assert from 'assert'
+import { expect } from 'chai'
 import { stringToU8a, randomInteger } from '@hoprnet/hopr-utils'
-import { AccountId, Ticket, Hash, TicketEpoch, Balance } from '.'
-import { privKeyToPubKey, pubKeyToAccountId, computeWinningProbability } from '../utils'
+import { Address, Ticket, Hash, Balance, UINT256 } from '.'
+import { privKeyToPubKey, pubKeyToAddress, computeWinningProbability } from '../utils'
 import * as testconfigs from '../config.spec'
+import BN from 'bn.js'
 
 describe('test ticket construction', function () {
-  let userA: AccountId
+  let userA: Address
 
   before(async function () {
-    userA = await pubKeyToAccountId(await privKeyToPubKey(stringToU8a(testconfigs.DEMO_ACCOUNTS[0])))
+    userA = await pubKeyToAddress(await privKeyToPubKey(stringToU8a(testconfigs.DEMO_ACCOUNTS[0])))
   })
 
   const generateTicketData = async () => {
-    const challenge = new Hash(Hash.SIZE)
-    const epoch = new TicketEpoch(1)
-    const amount = new Balance(1)
-    const winProb = new Hash(computeWinningProbability(1))
-    const channelIteration = new TicketEpoch(1)
+    const challenge = new Hash(new Uint8Array(Hash.SIZE))
+    const epoch = UINT256.fromString('1')
+    const amount = new Balance(new BN(1))
+    const winProb = computeWinningProbability(1)
+    const channelIteration = UINT256.fromString('1')
 
     return {
       counterparty: userA,
@@ -30,15 +32,14 @@ describe('test ticket construction', function () {
 
   it('should create new ticket using struct', async function () {
     const ticketData = await generateTicketData()
-
     const ticket = new Ticket(undefined, ticketData)
 
     assert(ticket.counterparty.eq(userA), 'wrong counterparty')
     assert(ticket.challenge.eq(ticketData.challenge), 'wrong challenge')
-    assert(ticket.epoch.eq(ticketData.epoch), 'wrong epoch')
-    assert(ticket.amount.eq(ticketData.amount), 'wrong amount')
+    assert(ticket.epoch.toBN().eq(ticketData.epoch.toBN()), 'wrong epoch')
+    assert(ticket.amount.toBN().eq(ticketData.amount.toBN()), 'wrong amount')
     assert(ticket.winProb.eq(ticketData.winProb), 'wrong winProb')
-    assert(ticket.channelIteration.eq(ticketData.channelIteration), 'wrong channelIteration')
+    assert(ticket.channelIteration.toBN().eq(ticketData.channelIteration.toBN()), 'wrong channelIteration')
   })
 
   it('should create new ticket using array', async function () {
@@ -52,10 +53,10 @@ describe('test ticket construction', function () {
 
     assert(ticketB.counterparty.eq(userA), 'wrong counterparty')
     assert(ticketB.challenge.eq(ticketData.challenge), 'wrong challenge')
-    assert(ticketB.epoch.eq(ticketData.epoch), 'wrong epoch')
-    assert(ticketB.amount.eq(ticketData.amount), 'wrong amount')
+    assert(ticketB.epoch.toBN().eq(ticketData.epoch.toBN()), 'wrong epoch')
+    assert(ticketB.amount.toBN().eq(ticketData.amount.toBN()), 'wrong amount')
     assert(ticketB.winProb.eq(ticketData.winProb), 'wrong winProb')
-    assert(ticketB.channelIteration.eq(ticketData.channelIteration), 'wrong channelIteration')
+    assert(ticketB.channelIteration.toBN().eq(ticketData.channelIteration.toBN()), 'wrong channelIteration')
   })
 
   it('should create new ticket out of continous memory', async function () {
@@ -74,20 +75,20 @@ describe('test ticket construction', function () {
 
     assert(ticket.counterparty.eq(ticketData.counterparty), 'wrong counterparty')
     assert(ticket.challenge.eq(ticketData.challenge), 'wrong challenge')
-    assert(ticket.epoch.eq(ticketData.epoch), 'wrong epoch')
-    assert(ticket.amount.eq(ticketData.amount), 'wrong amount')
+    assert(ticket.epoch.toBN().eq(ticketData.epoch.toBN()), 'wrong epoch')
+    assert(ticket.amount.toBN().eq(ticketData.amount.toBN()), 'wrong amount')
     assert(ticket.winProb.eq(ticketData.winProb), 'wrong winProb')
-    assert(ticket.channelIteration.eq(ticketData.channelIteration), 'wrong channelIteration')
+    assert(ticket.channelIteration.toBN().eq(ticketData.channelIteration.toBN()), 'wrong channelIteration')
   })
 
   it('should generate the hash correctly #1', async function () {
-    const expectedHash = new Hash(stringToU8a('0x6db4ce6e1254d1b3137c98570be35428f0764fe383cc7242a7c9cd1cc11f81d2'))
-    const counterparty = new AccountId(stringToU8a('0xb3aa2138de698597e2e3f84f60ef415d13731b6f'))
+    const expectedHash = new Hash(stringToU8a('0x4d5137ffaad9d5eb8d3cd6252fd8e7fc9b04d24e7f3cedf88d21f569d5a57c86'))
+    const counterparty = new Address(stringToU8a('0xb3aa2138de698597e2e3f84f60ef415d13731b6f'))
     const challenge = new Hash(stringToU8a('0x12047ebc6ea03568f4c81b75a4cd827785fe97206d9b22fd5364a9db1f50e234'))
-    const epoch = new TicketEpoch(1)
-    const amount = new Balance('0000000002c68af0bb140000', 16)
+    const epoch = UINT256.fromString('1')
+    const amount = new Balance(new BN('0000000002c68af0bb140000', 16))
     const winProb = new Hash(stringToU8a('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'))
-    const channelIteration = new TicketEpoch(1)
+    const channelIteration = UINT256.fromString('1')
 
     const ticketA = new Ticket(undefined, {
       counterparty,
@@ -103,13 +104,13 @@ describe('test ticket construction', function () {
       offset: ticketA.byteOffset
     })
 
-    assert(expectedHash.eq(await ticketA.hash), 'ticket hash does not match the expected value')
-    assert(expectedHash.eq(await ticketB.hash), 'ticket hash does not match the expected value')
+    expect(expectedHash.toHex()).to.eq((await ticketA.hash).toHex(), 'ticket hash does not match the expected value')
+    expect(expectedHash.toHex()).to.eq((await ticketB.hash).toHex(), 'ticket hash does not match the expected value')
 
     const wrongTicket = new Ticket(undefined, {
       counterparty,
       challenge,
-      epoch: new TicketEpoch(2),
+      epoch: UINT256.fromString('2'),
       amount,
       winProb,
       channelIteration
@@ -119,13 +120,13 @@ describe('test ticket construction', function () {
   })
 
   it('should generate the hash correctly #2', async function () {
-    const expectedHash = new Hash(stringToU8a('0x298fd1db616ee7e0b53c7d972711a2db58af524d0c18a5fe90cbe5460757c3ac'))
-    const counterparty = new AccountId(stringToU8a('0x32c160a5008e517ce06df4f7d4a39ffc52e049cf'))
+    const expectedHash = new Hash(stringToU8a('0x163a9e28a7c44ab41a6488d8041554404bcc3ff694945886c868c1aecb26e719'))
+    const counterparty = new Address(stringToU8a('0x32c160a5008e517ce06df4f7d4a39ffc52e049cf'))
     const challenge = new Hash(stringToU8a('0x91e787e6eef8cb5ddd0815e0f7f91dbe34d2a7bb2e99357039649baf61684c96'))
-    const epoch = new TicketEpoch(2)
-    const amount = new Balance('000000000de0b6b3a7640000', 16)
+    const epoch = UINT256.fromString('2')
+    const amount = new Balance(new BN('000000000de0b6b3a7640000', 16))
     const winProb = new Hash(stringToU8a('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'))
-    const channelIteration = new TicketEpoch(1)
+    const channelIteration = UINT256.fromString('1')
 
     const ticketA = new Ticket(undefined, {
       counterparty,
@@ -141,13 +142,13 @@ describe('test ticket construction', function () {
       offset: ticketA.byteOffset
     })
 
-    assert(expectedHash.eq(await ticketA.hash), 'ticket hash does not match the expected value')
-    assert(expectedHash.eq(await ticketB.hash), 'ticket hash does not match the expected value')
+    expect(expectedHash.toHex()).to.eq((await ticketA.hash).toHex(), 'ticket hash does not match the expected value')
+    expect(expectedHash.toHex()).to.eq((await ticketB.hash).toHex(), 'ticket hash does not match the expected value')
 
     const wrongTicket = new Ticket(undefined, {
       counterparty,
       challenge,
-      epoch: new TicketEpoch(1),
+      epoch: UINT256.fromString('1'),
       amount,
       winProb,
       channelIteration

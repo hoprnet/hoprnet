@@ -6,8 +6,6 @@ import HoprCoreConnector, { Types } from '@hoprnet/hopr-core-connector-interface
 import BN from 'bn.js'
 import { u8aConcat } from '@hoprnet/hopr-utils'
 
-const KEY_LENGTH = 32
-
 /**
  * The purpose of this class is to give the relayer the opportunity to claim
  * the proposed funds in case the the next downstream node responds with an
@@ -16,7 +14,7 @@ const KEY_LENGTH = 32
 class Challenge<Chain extends HoprCoreConnector> extends Uint8Array {
   // private : Uint8Array
   private paymentChannels: Chain
-  private _hashedKey: Uint8Array
+  private _hashedKey: Types.Hash
   private _fee: BN
   private _counterparty: Uint8Array
   private _challengeSignature: Types.Signature
@@ -117,8 +115,12 @@ class Challenge<Chain extends HoprCoreConnector> extends Uint8Array {
           challengeSignature.signature,
           challengeSignature.recovery,
           challengeSignature.msgPrefix != null && challengeSignature.msgPrefix.length > 0
-            ? await this.paymentChannels.utils.hash(u8aConcat(challengeSignature.msgPrefix, await this.hash))
-            : this.hash
+            ? (
+                await this.paymentChannels.utils.hash(
+                  u8aConcat(challengeSignature.msgPrefix, (await this.hash).serialize())
+                )
+              ).serialize()
+            : this.hash.serialize()
         )
       )
     })
@@ -131,7 +133,7 @@ class Challenge<Chain extends HoprCoreConnector> extends Uint8Array {
    * @param peerId that contains private key and public key of the node
    */
   async sign(peerId: PeerId): Promise<Challenge<Chain>> {
-    const signature = await this.paymentChannels.utils.sign(this.hash, peerId.privKey.marshal())
+    const signature = await this.paymentChannels.utils.sign(this.hash.serialize(), peerId.privKey.marshal())
     this.set(signature, this.challengeSignatureOffset - this.byteOffset)
     return this
   }
@@ -144,19 +146,13 @@ class Challenge<Chain extends HoprCoreConnector> extends Uint8Array {
    */
   static create<Chain extends HoprCoreConnector>(
     hoprCoreConnector: Chain,
-    hashedKey: Uint8Array,
+    hashedKey: Types.Hash,
     fee: BN,
     arr?: {
       bytes: ArrayBuffer
       offset: number
     }
   ): Challenge<Chain> {
-    if (hashedKey.length != KEY_LENGTH) {
-      throw Error(
-        `Invalid secret format. Expected a ${Uint8Array.name} of ${KEY_LENGTH} elements but got one with ${hashedKey.length}`
-      )
-    }
-
     if (arr == null) {
       const tmp = new Uint8Array(this.SIZE(hoprCoreConnector))
 
@@ -187,7 +183,11 @@ class Challenge<Chain extends HoprCoreConnector> extends Uint8Array {
       throw Error('Unable to verify challenge without a public key.')
     }
 
-    return this.paymentChannels.utils.verify(this.hash, await this.challengeSignature, peerId.pubKey.marshal())
+    return this.paymentChannels.utils.verify(
+      this.hash.serialize(),
+      await this.challengeSignature,
+      peerId.pubKey.marshal()
+    )
   }
 }
 

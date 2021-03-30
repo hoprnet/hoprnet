@@ -1,23 +1,13 @@
-import type { Channel as IChannel } from '@hoprnet/hopr-core-connector-interface'
+import type { Channel as IChannel, Types as Interfaces } from '@hoprnet/hopr-core-connector-interface'
 import BN from 'bn.js'
-import { u8aToHex, toU8a } from '@hoprnet/hopr-utils'
-import {
-  Balance,
-  Channel as ChannelType,
-  Hash,
-  Moment,
-  Public,
-  SignedChannel,
-  TicketEpoch,
-  ChannelEntry
-} from '../types'
+import { Balance, Channel as ChannelType, Hash, Public, SignedChannel, ChannelEntry, UINT256 } from '../types'
 import TicketFactory from './ticket'
 import { hash } from '../utils'
 
 import type HoprEthereum from '..'
 
 class Channel implements IChannel {
-  private _settlementWindow?: Moment
+  private _settlementWindow?: UINT256
   private _channelId?: Hash
 
   public ticket: TicketFactory
@@ -41,11 +31,11 @@ class Channel implements IChannel {
     })
   }
 
-  get stateCounter(): Promise<TicketEpoch> {
-    return new Promise<TicketEpoch>(async (resolve, reject) => {
+  get stateCounter(): Promise<UINT256> {
+    return new Promise<UINT256>(async (resolve, reject) => {
       try {
         const channel = await this.onChainChannel
-        return resolve(new TicketEpoch(toU8a(Number(channel.stateCounter))))
+        return resolve(new UINT256(channel.stateCounter))
       } catch (error) {
         return reject(error)
       }
@@ -53,10 +43,10 @@ class Channel implements IChannel {
   }
 
   get status() {
-    return new Promise<'UNINITIALISED' | 'FUNDED' | 'OPEN' | 'PENDING'>(async (resolve, reject) => {
+    return new Promise<ReturnType<Interfaces.ChannelEntry['getStatus']>>(async (resolve, reject) => {
       try {
         const channel = await this.onChainChannel
-        return resolve(channel.status)
+        return resolve(channel.getStatus())
       } catch (error) {
         return reject(error)
       }
@@ -74,11 +64,9 @@ class Channel implements IChannel {
 
     return new Promise<Hash>(async (resolve, reject) => {
       try {
-        this._channelId = new Hash(
-          await this.coreConnector.utils.getId(
-            await this.coreConnector.account.address,
-            await this.coreConnector.utils.pubKeyToAccountId(this.counterparty)
-          )
+        this._channelId = await this.coreConnector.utils.getId(
+          await this.coreConnector.account.address,
+          await this.coreConnector.utils.pubKeyToAddress(this.counterparty)
         )
       } catch (error) {
         return reject(error)
@@ -88,14 +76,14 @@ class Channel implements IChannel {
     })
   }
 
-  get settlementWindow(): Promise<Moment> {
+  get settlementWindow(): Promise<UINT256> {
     if (this._settlementWindow != null) {
       return Promise.resolve(this._settlementWindow)
     }
 
-    return new Promise<Moment>(async (resolve, reject) => {
+    return new Promise<UINT256>(async (resolve, reject) => {
       try {
-        this._settlementWindow = new Moment((await this.onChainChannel).closureTime)
+        this._settlementWindow = new UINT256((await this.onChainChannel).closureTime)
       } catch (error) {
         return reject(error)
       }
@@ -148,9 +136,11 @@ class Channel implements IChannel {
       try {
         return resolve(
           new Balance(
-            await this.coreConnector.hoprToken.methods
-              .balanceOf(u8aToHex(await this.coreConnector.utils.pubKeyToAccountId(this.counterparty)))
-              .call()
+            new BN(
+              await this.coreConnector.hoprToken.methods
+                .balanceOf((await this.coreConnector.utils.pubKeyToAddress(this.counterparty)).toHex())
+                .call()
+            )
           )
         )
       } catch (error) {
@@ -165,8 +155,8 @@ class Channel implements IChannel {
     let receipt: string
 
     try {
-      if (!(status === 'OPEN' || status === 'PENDING')) {
-        throw Error("channel must be 'OPEN' or 'PENDING'")
+      if (!(status === 'OPEN' || status === 'PENDING_TO_CLOSE')) {
+        throw Error("channel must be 'OPEN' or 'PENDING_TO_CLOSE'")
       }
 
       if (status === 'OPEN') {
@@ -176,20 +166,20 @@ class Channel implements IChannel {
             to: this.coreConnector.hoprChannels.options.address
           },
           this.coreConnector.hoprChannels.methods.initiateChannelClosure(
-            u8aToHex(await this.coreConnector.utils.pubKeyToAccountId(this.counterparty))
+            (await this.coreConnector.utils.pubKeyToAddress(this.counterparty)).toHex()
           )
         )
 
         receipt = tx.transactionHash
         tx.send()
-      } else if (status === 'PENDING') {
+      } else if (status === 'PENDING_TO_CLOSE') {
         const tx = await account.signTransaction(
           {
             from: (await account.address).toHex(),
             to: this.coreConnector.hoprChannels.options.address
           },
-          this.coreConnector.hoprChannels.methods.claimChannelClosure(
-            u8aToHex(await this.coreConnector.utils.pubKeyToAccountId(this.counterparty))
+          this.coreConnector.hoprChannels.methods.finalizeChannelClosure(
+            (await this.coreConnector.utils.pubKeyToAddress(this.counterparty)).toHex()
           )
         )
 

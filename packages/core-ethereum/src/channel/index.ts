@@ -1,7 +1,7 @@
-import type { ChannelUpdate } from '@hoprnet/hopr-core-connector-interface'
 import BN from 'bn.js'
+import chalk from 'chalk'
 import {
-  AccountId,
+  Address,
   Balance,
   ChannelBalance,
   Channel as ChannelType,
@@ -12,30 +12,29 @@ import {
   SignedChannel,
   SignedTicket,
   Ticket,
-  TicketEpoch,
-  ChannelEntry
+  ChannelEntry,
+  UINT256
 } from '../types'
 import {
   waitForConfirmation,
   getId,
-  pubKeyToAccountId,
+  pubKeyToAddress,
   sign,
   isPartyA,
   getParties,
   Log,
   stateCounterToStatus,
-  isGanache
+  isGanache,
+  computeWinningProbability
 } from '../utils'
 import { ERRORS } from '../constants'
 import type HoprEthereum from '..'
 import Channel from './channel'
-import { Uint8ArrayE } from '../types/extended'
 import { TicketStatic } from './ticket'
 
 const log = Log(['channel-factory'])
 
 const EMPTY_SIGNATURE = new Uint8Array(Signature.SIZE).fill(0x00)
-const WIN_PROB = new BN(1)
 
 class ChannelFactory {
   public tickets: TicketStatic
@@ -48,30 +47,36 @@ class ChannelFactory {
   async listenForChannels(): Promise<void> {
     const { indexer } = this.coreConnector
     const self = new Public(this.coreConnector.account.keys.onChain.pubKey)
-    const selfAccountId = await self.toAccountId()
+    const selfAddress = await self.toAddress()
 
-    indexer.on('channelOpened', async ({ partyA: _partyA, partyB: _partyB, channelEntry }: ChannelUpdate) => {
-      const partyA = new Public(_partyA)
-      const partyAAccountId = await partyA.toAccountId()
-      const partyB = new Public(_partyB)
+    indexer.on('channelOpened', async (channel: ChannelEntry) => {
+      const partyAPubKey = await this.coreConnector.indexer.getPublicKeyOf(channel.partyA)
+      const partyBPubKey = await this.coreConnector.indexer.getPublicKeyOf(channel.partyB)
+      if (!partyAPubKey || !partyBPubKey) {
+        log(chalk.red('Currently opening a channel with an unintialized account is not supported'))
+        return
+      }
 
-      log('channelOpened', partyA.toHex(), partyB.toHex())
-      const isOurs = partyA.eq(self) || partyB.eq(self)
+      log('channelOpened', channel.partyA.toHex(), channel.partyB.toHex())
+      const isOurs = channel.partyA.eq(selfAddress) || channel.partyB.eq(selfAddress)
       if (!isOurs) return
 
-      await this.onOpen(isPartyA(selfAccountId, partyAAccountId) ? partyB : partyA, channelEntry as ChannelEntry)
+      await this.onOpen(isPartyA(selfAddress, channel.partyA) ? partyBPubKey : partyAPubKey, channel)
     })
 
-    indexer.on('channelClosed', async ({ partyA: _partyA, partyB: _partyB }: ChannelUpdate) => {
-      const partyA = new Public(_partyA)
-      const partyAAccountId = await partyA.toAccountId()
-      const partyB = new Public(_partyB)
+    indexer.on('channelClosed', async (channel: ChannelEntry) => {
+      const partyAPubKey = await this.coreConnector.indexer.getPublicKeyOf(channel.partyA)
+      const partyBPubKey = await this.coreConnector.indexer.getPublicKeyOf(channel.partyB)
+      if (!partyAPubKey || !partyBPubKey) {
+        log(chalk.red('Currently closing a channel with an unintialized account is not supported'))
+        return
+      }
 
-      log('channelClosed', partyA.toHex(), partyB.toHex())
-      const isOurs = partyA.eq(self) || partyB.eq(self)
+      log('channelClosed', channel.partyA.toHex(), channel.partyB.toHex())
+      const isOurs = channel.partyA.eq(selfAddress) || channel.partyB.eq(selfAddress)
       if (!isOurs) return
 
-      await this.onClose(isPartyA(selfAccountId, partyAAccountId) ? partyB : partyA)
+      await this.onClose(isPartyA(selfAddress, channel.partyA) ? partyBPubKey : partyAPubKey)
     })
   }
 
@@ -79,8 +84,8 @@ class ChannelFactory {
     log('Received open event for channel with %s', counterparty.toHex())
 
     const balance = new ChannelBalance(undefined, {
-      balance: new BN(channelEntry.deposit),
-      balance_a: new BN(channelEntry.partyABalance)
+      balance: new Balance(new BN(channelEntry.deposit)),
+      balance_a: new Balance(new BN(channelEntry.partyABalance))
     })
     const state = new ChannelState(undefined, { state: stateCounterToStatus(channelEntry.stateCounter.toNumber()) })
     const newChannel = new ChannelType(undefined, {
@@ -106,12 +111,12 @@ class ChannelFactory {
     // await this.deleteOffChainState(counterparty)
   }
 
-  async increaseFunds(counterparty: AccountId, amount: Balance): Promise<void> {
+  async increaseFunds(counterparty: Address, amount: Balance): Promise<void> {
     try {
       const { account } = this.coreConnector
 
       const balance = await account.getBalance()
-      if (balance.isZero()) {
+      if (balance.toBN().isZero()) {
         throw Error(ERRORS.OOF_HOPR)
       }
 
@@ -124,10 +129,10 @@ class ChannelFactory {
             },
             this.coreConnector.hoprToken.methods.send(
               this.coreConnector.hoprChannels.options.address,
-              amount.toString(),
+              amount.toBN().toString(),
               this.coreConnector.web3.eth.abi.encodeParameters(
-                ['address', 'address'],
-                [(await account.address).toHex(), counterparty.toHex()]
+                ['bool', 'address', 'address'],
+                [false, (await account.address).toHex(), counterparty.toHex()]
               )
             )
           )
@@ -139,12 +144,13 @@ class ChannelFactory {
   }
 
   async isOpen(counterpartyPubKey: Uint8Array) {
-    const counterparty = await pubKeyToAccountId(counterpartyPubKey)
-    const channelId = new Hash(await getId(await this.coreConnector.account.address, counterparty))
+    const counterparty = await pubKeyToAddress(counterpartyPubKey)
+    const channelId = await getId(await this.coreConnector.account.address, counterparty)
 
     const [onChain, offChain]: [boolean, boolean] = await Promise.all([
       this.coreConnector.channel.getOnChainState(new Public(counterpartyPubKey)).then((channel) => {
-        return channel.status === 'OPEN' || channel.status === 'PENDING'
+        const status = channel.getStatus()
+        return status === 'OPEN' || status === 'PENDING_TO_CLOSE'
       }),
       this.getOffChainState(counterpartyPubKey).then(
         () => true,
@@ -173,7 +179,7 @@ class ChannelFactory {
   }
 
   async createDummyChannelTicket(
-    counterparty: AccountId,
+    counterparty: Address,
     challenge: Hash,
     arr?: {
       bytes: ArrayBuffer
@@ -184,8 +190,7 @@ class ChannelFactory {
       throw Error(`Challenge is not set`)
     }
 
-    const winProb = new Uint8ArrayE(new BN(new Uint8Array(Hash.SIZE).fill(0xff)).div(WIN_PROB).toArray('le', Hash.SIZE))
-
+    const winProb = computeWinningProbability(1) // Value is unimportant here.
     const signedTicket = new SignedTicket(arr)
 
     const ticket = new Ticket(
@@ -196,14 +201,14 @@ class ChannelFactory {
       {
         counterparty,
         challenge,
-        epoch: new TicketEpoch(0),
-        amount: new Balance(0),
+        epoch: UINT256.fromString('0'),
+        amount: new Balance(new BN(0)),
         winProb,
-        channelIteration: new TicketEpoch(0)
+        channelIteration: UINT256.fromString('0')
       }
     )
 
-    const signature = await sign(await ticket.hash, this.coreConnector.account.keys.onChain.privKey)
+    const signature = await sign((await ticket.hash).serialize(), this.coreConnector.account.keys.onChain.privKey)
     signedTicket.set(signature, signedTicket.signatureOffset - signedTicket.byteOffset)
     return signedTicket
   }
@@ -235,7 +240,7 @@ class ChannelFactory {
     sign?: (channelBalance: ChannelBalance) => Promise<SignedChannel>
   ): Promise<Channel> {
     const { account } = this.coreConnector
-    const counterparty = await pubKeyToAccountId(counterpartyPubKey)
+    const counterparty = await pubKeyToAddress(counterpartyPubKey)
     const amPartyA = isPartyA(await account.address, counterparty)
     let signedChannel: SignedChannel
 
@@ -253,13 +258,13 @@ class ChannelFactory {
     if (sign != null && channelBalance != null) {
       const channel = new Channel(this.coreConnector, counterpartyPubKey, signedChannel)
 
-      const amountToFund = new Balance(
-        amPartyA ? channelBalance.balance_a : channelBalance.balance.sub(channelBalance.balance_a)
-      )
+      const amountToFund = amPartyA
+        ? channelBalance.balance_a
+        : new Balance(channelBalance.balance.toBN().sub(channelBalance.balance_a.toBN()))
       const amountFunded = await (amPartyA ? channel.balance_a : channel.balance_b)
 
-      if (amountFunded.lt(amountToFund)) {
-        await this.increaseFunds(counterparty, new Balance(amountToFund.sub(amountFunded)))
+      if (amountFunded.toBN().lt(amountToFund.toBN())) {
+        await this.increaseFunds(counterparty, new Balance(amountToFund.toBN().sub(amountFunded.toBN())))
       }
 
       const state = new ChannelState(undefined, { state: stateCounterToStatus(0) })
@@ -287,7 +292,7 @@ class ChannelFactory {
         )
 
         await this.coreConnector.db.put(
-          Buffer.from(this.coreConnector.dbKeys.Channel(counterpartyPubKey)),
+          Buffer.from(this.coreConnector.dbKeys.Channel(new Address(counterpartyPubKey))),
           Buffer.from(signedChannel)
         )
       } catch (e) {
@@ -308,8 +313,8 @@ class ChannelFactory {
     return new Promise<R>((resolve, reject) => {
       this.coreConnector.db
         .createReadStream({
-          gte: Buffer.from(this.coreConnector.dbKeys.Channel(new Uint8Array(Hash.SIZE).fill(0x00))),
-          lte: Buffer.from(this.coreConnector.dbKeys.Channel(new Uint8Array(Hash.SIZE).fill(0xff)))
+          gte: Buffer.from(this.coreConnector.dbKeys.Channel(new Address(new Uint8Array(Hash.SIZE).fill(0x00)))),
+          lte: Buffer.from(this.coreConnector.dbKeys.Channel(new Address(new Uint8Array(Hash.SIZE).fill(0xff))))
         })
         .on('error', (err) => reject(err))
         .on('data', ({ key, value }: { key: Buffer; value: Buffer }) => {
@@ -319,7 +324,9 @@ class ChannelFactory {
           })
 
           promises.push(
-            onData(new Channel(this.coreConnector, this.coreConnector.dbKeys.ChannelKeyParse(key), signedChannel))
+            onData(
+              new Channel(this.coreConnector, this.coreConnector.dbKeys.ChannelKeyParse(key).serialize(), signedChannel)
+            )
           )
         })
         .on('end', () => resolve(onEnd(promises)))
@@ -354,7 +361,7 @@ class ChannelFactory {
 
         /*
         // Fund both ways
-        const counterparty = await pubKeyToAccountId(counterpartyPubKey)
+        const counterparty = await pubKeyToAddress(counterpartyPubKey)
         const channelBalance = signedChannel.channel.balance
 
         if (isPartyA(await this.coreConnector.account.address, counterparty)) {
@@ -382,25 +389,26 @@ class ChannelFactory {
   }
 
   getOffChainState(counterparty: Uint8Array): Promise<SignedChannel> {
-    return this.coreConnector.db.get(Buffer.from(this.coreConnector.dbKeys.Channel(counterparty))) as any
+    return this.coreConnector.db.get(Buffer.from(this.coreConnector.dbKeys.Channel(new Address(counterparty)))) as any
   }
 
   saveOffChainState(counterparty: Uint8Array, signedChannel: SignedChannel) {
     return this.coreConnector.db.put(
-      Buffer.from(this.coreConnector.dbKeys.Channel(counterparty)),
+      Buffer.from(this.coreConnector.dbKeys.Channel(new Address(counterparty))),
       Buffer.from(signedChannel)
     )
   }
 
   deleteOffChainState(counterparty: Uint8Array) {
-    return this.coreConnector.db.del(Buffer.from(this.coreConnector.dbKeys.Channel(counterparty)))
+    return this.coreConnector.db.del(Buffer.from(this.coreConnector.dbKeys.Channel(new Address(counterparty))))
   }
 
   async getOnChainState(counterparty: Public): Promise<ChannelEntry> {
     const self = new Public(this.coreConnector.account.keys.onChain.pubKey)
-    const selfAccountId = await self.toAccountId()
-    const counterpartyAccountId = await counterparty.toAccountId()
-    const [partyAAccountId] = getParties(selfAccountId, counterpartyAccountId)
+    const selfAddress = await self.toAddress()
+    const counterpartyAddress = await counterparty.toAddress()
+    const channelId = await getId(selfAddress, counterpartyAddress)
+    const [partyA, partyB] = getParties(selfAddress, counterpartyAddress)
 
     // HACK: when running our unit/intergration tests using ganache, the indexer doesn't have enough
     // time to pick up the events and reduce the data - here we are doing 2 things wrong:
@@ -408,37 +416,25 @@ class ChannelFactory {
     // 2. our actual intergration tests do not have any block mining time
     // this will be tackled in the upcoming refactor
     if (isGanache(this.coreConnector.network)) {
-      const channelId = await getId(selfAccountId, counterpartyAccountId)
       const response = await this.coreConnector.hoprChannels.methods.channels(channelId.toHex()).call()
 
-      return new ChannelEntry(undefined, {
-        blockNumber: new BN(0),
-        transactionIndex: new BN(0),
-        logIndex: new BN(0),
-        deposit: new BN(response.deposit),
-        partyABalance: new BN(response.partyABalance),
-        closureTime: new BN(response.closureTime),
-        stateCounter: new BN(response.stateCounter),
-        closureByPartyA: response.closureByPartyA
-      })
-    } else {
-      let channelEntry = await this.coreConnector.indexer.getChannelEntry(
-        partyAAccountId.eq(selfAccountId) ? self : counterparty,
-        partyAAccountId.eq(selfAccountId) ? counterparty : self
+      return new ChannelEntry(
+        partyA,
+        partyB,
+        new BN(response.deposit),
+        new BN(response.partyABalance),
+        new BN(response.closureTime),
+        new BN(response.status),
+        response.closureByPartyA,
+        new BN(0),
+        new BN(0)
       )
+    } else {
+      const channelEntry = await this.coreConnector.indexer.getChannel(channelId)
       if (channelEntry) return channelEntry
 
       // when channelEntry is not found, the onchain data is all 0
-      return new ChannelEntry(undefined, {
-        blockNumber: new BN(0),
-        transactionIndex: new BN(0),
-        logIndex: new BN(0),
-        deposit: new BN(0),
-        partyABalance: new BN(0),
-        closureTime: new BN(0),
-        stateCounter: new BN(0),
-        closureByPartyA: false
-      })
+      return new ChannelEntry(partyA, partyB, new BN(0), new BN(0), new BN(0), new BN(0), false, new BN(0), new BN(0))
     }
   }
 }

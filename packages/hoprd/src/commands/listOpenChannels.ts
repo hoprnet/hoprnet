@@ -1,6 +1,6 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
-import { moveDecimalPoint, u8aToHex, pubKeyToPeerId, u8aEquals } from '@hoprnet/hopr-utils'
+import { moveDecimalPoint, pubKeyToPeerId, u8aEquals } from '@hoprnet/hopr-utils'
 import chalk from 'chalk'
 import { AbstractCommand } from './abstractCommand'
 import { getPaddingLength, styleValue } from './utils'
@@ -67,39 +67,36 @@ export default class ListOpenChannels extends AbstractCommand {
    */
   async execute(): Promise<string | void> {
     try {
-      const { utils, types } = this.node.paymentChannels
-      const self = new types.Public(this.node.getId().pubKey.marshal())
-      const channels = await this.node.paymentChannels.indexer.getChannelEntries(self)
+      const { types, indexer } = this.node.paymentChannels
+      const selfPubKey = new types.Public(this.node.getId().pubKey.marshal())
+      const selfAddress = await selfPubKey.toAddress()
+      const channels = (await this.node.paymentChannels.indexer.getChannelsOf(selfAddress))
+        // do not print CLOSED channels
+        .filter((channel) => channel.getStatus() !== 'CLOSED')
       const result: string[] = []
 
       if (channels.length === 0) {
         return `\nNo open channels found.`
       }
 
-      for (const { partyA, partyB, channelEntry } of channels) {
-        const id = u8aToHex(await utils.getId(await partyA.toAccountId(), await partyB.toAccountId()))
-        const selfIsPartyA = u8aEquals(self, partyA)
-        const counterparty = selfIsPartyA ? partyB : partyA
-
-        // do not print UNINITIALISED channels
-        if (channelEntry.status === 'UNINITIALISED') continue
-
-        const totalBalance = moveDecimalPoint(channelEntry.deposit.toString(), types.Balance.DECIMALS * -1)
+      for (const channel of channels) {
+        const id = await channel.getChannelId()
+        const selfIsPartyA = u8aEquals(selfAddress.serialize(), channel.partyA.serialize())
+        const counterpartyPubKey = await indexer.getPublicKeyOf(selfIsPartyA ? channel.partyB : channel.partyA)
+        const totalBalance = moveDecimalPoint(channel.deposit.toString(), types.Balance.DECIMALS * -1)
         const myBalance = moveDecimalPoint(
-          selfIsPartyA
-            ? channelEntry.partyABalance.toString()
-            : channelEntry.deposit.sub(channelEntry.partyABalance).toString(),
+          selfIsPartyA ? channel.partyABalance.toString() : channel.deposit.sub(channel.partyABalance).toString(),
           types.Balance.DECIMALS * -1
         )
-        const peerId = (await pubKeyToPeerId(counterparty)).toB58String()
+        const peerId = (await pubKeyToPeerId(counterpartyPubKey)).toB58String()
 
         result.push(
           this.generateOutput({
-            id,
+            id: id.toHex(),
             totalBalance,
             myBalance,
             peerId,
-            status: channelEntry.status
+            status: channel.getStatus()
           })
         )
       }
