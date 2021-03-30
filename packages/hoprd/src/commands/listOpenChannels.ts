@@ -67,7 +67,7 @@ export default class ListOpenChannels extends AbstractCommand {
    */
   async execute(): Promise<string | void> {
     try {
-      const { utils, types, indexer } = this.node.paymentChannels
+      const { types, indexer } = this.node.paymentChannels
       const selfPubKey = new types.Public(this.node.getId().pubKey.marshal())
       const selfAddress = await selfPubKey.toAddress()
       const channels = (await this.node.paymentChannels.indexer.getChannelsOf(selfAddress))
@@ -80,13 +80,9 @@ export default class ListOpenChannels extends AbstractCommand {
       }
 
       for (const channel of channels) {
-        const id = await utils.getId(channel.parties[0], channel.parties[1])
-        const [partyA, partyB] = utils.isPartyA(channel.parties[0], channel.parties[1])
-          ? [channel.parties[0], channel.parties[1]]
-          : [channel.parties[1], channel.parties[0]]
-        const selfIsPartyA = u8aEquals(selfAddress.serialize(), partyA.serialize())
-        const counterpartyPubKey = await indexer.getPublicKeyOf(selfIsPartyA ? partyB : partyA)
-
+        const id = await channel.getChannelId()
+        const selfIsPartyA = u8aEquals(selfAddress.serialize(), channel.partyA.serialize())
+        const counterpartyPubKey = await indexer.getPublicKeyOf(selfIsPartyA ? channel.partyB : channel.partyA)
         const totalBalance = moveDecimalPoint(channel.deposit.toString(), types.Balance.DECIMALS * -1)
         const myBalance = moveDecimalPoint(
           selfIsPartyA ? channel.partyABalance.toString() : channel.deposit.sub(channel.partyABalance).toString(),

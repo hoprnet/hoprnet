@@ -4,7 +4,7 @@ import BN from 'bn.js'
 import { publicKeyConvert } from 'secp256k1'
 import { stringToU8a } from '@hoprnet/hopr-utils'
 import { AccountEntry, Address, Public, Hash, ChannelEntry } from '../types'
-import { isPartyA } from '../utils'
+import { isPartyA, getParties } from '../utils'
 
 export const onAccountInitialized = async (event: Event<'AccountInitialized'>): Promise<AccountEntry> => {
   const data = event.returnValues
@@ -38,7 +38,7 @@ export const onChannelFunded = async (
 
   const accountA = Address.fromString(data.accountA)
   const accountB = Address.fromString(data.accountB)
-  const parties: [Address, Address] = [accountA, accountB]
+  const [partyA, partyB] = getParties(accountA, accountB)
 
   if (channelEntry) {
     const deposit = channelEntry.deposit.add(new BN(data.deposit))
@@ -48,7 +48,8 @@ export const onChannelFunded = async (
     const closureByPartyA = false
 
     return new ChannelEntry(
-      parties,
+      partyA,
+      partyB,
       deposit,
       partyABalance,
       closureTime,
@@ -67,7 +68,8 @@ export const onChannelFunded = async (
     const closedAt = new BN(0)
 
     return new ChannelEntry(
-      parties,
+      partyA,
+      partyB,
       deposit,
       partyABalance,
       closureTime,
@@ -86,7 +88,8 @@ export const onChannelOpened = async (
   assert(channelEntry.getStatus() === 'CLOSED', "'onChannelOpened' failed because channel is not in 'CLOSED' status")
 
   return new ChannelEntry(
-    channelEntry.parties,
+    channelEntry.partyA,
+    channelEntry.partyB,
     channelEntry.deposit,
     channelEntry.partyABalance,
     channelEntry.closureTime,
@@ -115,7 +118,8 @@ export const onTicketRedeemed = async (
   const amount = new BN(data.amount)
 
   return new ChannelEntry(
-    channelEntry.parties,
+    channelEntry.partyA,
+    channelEntry.partyB,
     channelEntry.deposit,
     isRedeemerPartyA ? channelEntry.partyABalance.add(amount) : channelEntry.partyABalance.sub(amount),
     channelEntry.closureTime,
@@ -141,7 +145,8 @@ export const onChannelPendingToClose = async (
   const isInitiatorPartyA = isPartyA(initiator, counterparty)
 
   return new ChannelEntry(
-    channelEntry.parties,
+    channelEntry.partyA,
+    channelEntry.partyB,
     channelEntry.deposit,
     channelEntry.partyABalance,
     new BN(data.closureTime),
@@ -162,7 +167,8 @@ export const onChannelClosed = async (
   )
 
   return new ChannelEntry(
-    channelEntry.parties,
+    channelEntry.partyA,
+    channelEntry.partyB,
     new BN(0),
     new BN(0),
     new BN(0),

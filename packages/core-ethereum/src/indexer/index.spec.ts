@@ -107,13 +107,13 @@ describe('test indexer', function () {
 
       const [channel] = channels
       assert(
-        u8aEquals(channel.parties[0].serialize(), userA.address.serialize()) ||
-          u8aEquals(channel.parties[0].serialize(), userB.address.serialize()),
+        u8aEquals(channel.partyA.serialize(), userA.address.serialize()) ||
+          u8aEquals(channel.partyA.serialize(), userB.address.serialize()),
         'check Channels.store'
       )
       assert(
-        u8aEquals(channel.parties[1].serialize(), userA.address.serialize()) ||
-          u8aEquals(channel.parties[1].serialize(), userB.address.serialize()),
+        u8aEquals(channel.partyB.serialize(), userA.address.serialize()) ||
+          u8aEquals(channel.partyB.serialize(), userB.address.serialize()),
         'check Channels.store'
       )
     })

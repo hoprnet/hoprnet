@@ -4,12 +4,13 @@ import { u8aSplit, serializeToU8a, toU8a } from '@hoprnet/hopr-utils'
 import { Address } from '.' // TODO: cyclic
 import { UINT256 } from '../types/solidity'
 import { ChannelStatus } from '../types/channel'
-import { stateCounterToStatus, stateCounterToIteration } from '../utils'
+import { stateCounterToStatus, stateCounterToIteration, getId } from '../utils'
 
 // TODO: optimize storage
 class ChannelEntry implements Types.ChannelEntry {
   constructor(
-    public readonly parties: [Address, Address],
+    public readonly partyA: Address,
+    public readonly partyB: Address,
     public readonly deposit: BN,
     public readonly partyABalance: BN,
     public readonly closureTime: BN,
@@ -20,7 +21,6 @@ class ChannelEntry implements Types.ChannelEntry {
   ) {}
 
   // TODO: implement .fromObject function
-  // TODO: flatten .parties
 
   static get SIZE(): number {
     return (
@@ -48,7 +48,8 @@ class ChannelEntry implements Types.ChannelEntry {
       UINT256.SIZE,
       UINT256.SIZE
     ])
-    const parties: [Address, Address] = [new Address(items[0]), new Address(items[1])]
+    const partyA = new Address(items[0])
+    const partyB = new Address(items[1])
     const deposit = new BN(items[2])
     const partyABalance = new BN(items[3])
     const closureTime = new BN(items[4])
@@ -58,7 +59,8 @@ class ChannelEntry implements Types.ChannelEntry {
     const closedAt = new BN(items[8])
 
     return new ChannelEntry(
-      parties,
+      partyA,
+      partyB,
       deposit,
       partyABalance,
       closureTime,
@@ -71,8 +73,8 @@ class ChannelEntry implements Types.ChannelEntry {
 
   public serialize(): Uint8Array {
     return serializeToU8a([
-      [this.parties[0].serialize(), Address.SIZE],
-      [this.parties[1].serialize(), Address.SIZE],
+      [this.partyA.serialize(), Address.SIZE],
+      [this.partyB.serialize(), Address.SIZE],
       [new UINT256(this.deposit).serialize(), UINT256.SIZE],
       [new UINT256(this.partyABalance).serialize(), UINT256.SIZE],
       [new UINT256(this.closureTime).serialize(), UINT256.SIZE],
@@ -97,6 +99,10 @@ class ChannelEntry implements Types.ChannelEntry {
 
   public getIteration() {
     return stateCounterToIteration(this.stateCounter.toNumber())
+  }
+
+  public getChannelId() {
+    return getId(this.partyA, this.partyB)
   }
 }
 

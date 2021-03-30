@@ -439,8 +439,7 @@ class Indexer extends EventEmitter implements IIndexer {
 
   public async getChannelsOf(address: Address): Promise<ChannelEntry[]> {
     return db.getChannels(this.connector.db, async (channel) => {
-      const [accountA, accountB] = channel.parties
-      return address.eq(accountA) || address.eq(accountB)
+      return address.eq(channel.partyA) || address.eq(channel.partyB)
     })
   }
 
@@ -456,17 +455,18 @@ class Indexer extends EventEmitter implements IIndexer {
 
   private async toIndexerChannel(source: PeerId, channel: ChannelEntry): Promise<RoutingChannel> {
     const sourcePubKey = new Public(source.pubKey.marshal())
-    const [accountAPubKey, accountBPubKey] = await Promise.all(
-      channel.parties.map((address) => this.getPublicKeyOf(address))
-    )
+    const [partyAPubKey, partyBPubKey] = await Promise.all([
+      this.getPublicKeyOf(channel.partyA),
+      this.getPublicKeyOf(channel.partyB)
+    ])
 
-    if (sourcePubKey.eq(accountAPubKey)) {
-      return [source, await pubKeyToPeerId(accountBPubKey), new Balance(channel.partyABalance)]
+    if (sourcePubKey.eq(partyAPubKey)) {
+      return [source, await pubKeyToPeerId(partyBPubKey), new Balance(channel.partyABalance)]
     } else {
       const partyBBalance = new Balance(
         new Balance(channel.deposit).toBN().sub(new Balance(channel.partyABalance).toBN())
       )
-      return [source, await pubKeyToPeerId(accountAPubKey), partyBBalance]
+      return [source, await pubKeyToPeerId(partyAPubKey), partyBBalance]
     }
   }
 
@@ -477,7 +477,7 @@ class Indexer extends EventEmitter implements IIndexer {
       // filter out channels older than hack
       if (!channel.openedAt.gtn(HACK)) return false
       // filter out channels with uninitialized parties
-      const pubKeys = await Promise.all(channel.parties.map((address) => this.getPublicKeyOf(address)))
+      const pubKeys = await Promise.all([this.getPublicKeyOf(channel.partyA), this.getPublicKeyOf(channel.partyB)])
       return pubKeys.every((pubKeys) => pubKeys)
     })
 
@@ -488,8 +488,8 @@ class Indexer extends EventEmitter implements IIndexer {
 
     log('picking random from %d channels', channels.length)
     const random = randomChoice(channels)
-    const accountA = await this.getPublicKeyOf(random.parties[0])
-    return this.toIndexerChannel(await pubKeyToPeerId(accountA), random) // TODO: find why we do this
+    const partyA = await this.getPublicKeyOf(random.partyA)
+    return this.toIndexerChannel(await pubKeyToPeerId(partyA), random) // TODO: why do we pick partyA?
   }
 
   public async getChannelsFromPeer(source: PeerId): Promise<RoutingChannel[]> {
