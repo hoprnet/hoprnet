@@ -8,28 +8,28 @@ import chaiAsPromised from 'chai-as-promised'
 import chai, { expect } from 'chai'
 import sinon from 'sinon'
 import { validateUnacknowledgedTicket, validateCreatedTicket } from './tickets'
-import { Address, Balance } from '@hoprnet/hopr-core-ethereum'
+import { Address, Balance, Public, Hash, UINT256, Utils } from '@hoprnet/hopr-core-ethereum'
 
 chai.use(chaiAsPromised)
 
 // target is party A, sender is party B
-const TARGET = PeerId.createFromB58String('16Uiu2HAm5g4fTADcjPQrtp9LtN2wCmPJTQPD7vMnWCZp4kwKCVUT')
-const TARGET_ADDRESS = stringToU8a('0xf3a509473be4bcd8af0d1961d75a5a3dc9e47ba0')
-const SENDER = PeerId.createFromB58String('16Uiu2HAmM9KAPaXA4eAz58Q7Eb3LEkDvLarU4utkyLwDeEK6vM5m')
-const SENDER_ADDRESS = stringToU8a('0x65e78d07acf7b654e5ae6777a93ebbf30f639356')
+const TARGET = PeerId.createFromB58String('16Uiu2HAmM9KAPaXA4eAz58Q7Eb3LEkDvLarU4utkyLwDeEK6vM5m')
+const TARGET_ADDRESS = new Address(stringToU8a('0x65e78d07acf7b654e5ae6777a93ebbf30f639356'))
+const SENDER = PeerId.createFromB58String('16Uiu2HAm5g4fTADcjPQrtp9LtN2wCmPJTQPD7vMnWCZp4kwKCVUT')
+// const SENDER_ADDRESS = new Address(stringToU8a('0xf3a509473be4bcd8af0d1961d75a5a3dc9e47ba0'))
 
 const createMockTicket = ({
-  targetAddress = new Address(TARGET_ADDRESS),
+  targetAddress = TARGET_ADDRESS,
   amount = new Balance(new BN(1)),
-  winProb = new Uint8Array(1),
-  epoch = new BN(1),
-  channelIteration = new BN(1)
+  winProb = Utils.computeWinningProbability(1),
+  epoch = new UINT256(new BN(1)),
+  channelIteration = new UINT256(new BN(1))
 }: {
   targetAddress?: Address
   amount?: Balance
-  winProb?: Uint8Array
-  epoch?: BN
-  channelIteration?: BN
+  winProb?: Hash
+  epoch?: UINT256
+  channelIteration?: UINT256
 }) => {
   return ({
     counterparty: targetAddress,
@@ -43,64 +43,50 @@ const createMockTicket = ({
 
 const createMockSignedTicket = ({
   sender = SENDER,
-  targetAddress = new Address(TARGET_ADDRESS),
+  targetAddress = TARGET_ADDRESS,
   amount = new Balance(new BN(1)),
-  winProb = new Uint8Array(1),
-  channelIteration = new BN(1)
+  winProb = Utils.computeWinningProbability(1),
+  channelIteration = new UINT256(new BN(1))
 }: {
   sender?: PeerId
   targetAddress?: Address
   amount?: Balance
-  winProb?: Uint8Array
-  channelIteration?: BN
+  winProb?: Hash
+  channelIteration?: UINT256
 }) => {
   return ({
     ticket: createMockTicket({ targetAddress, amount, winProb, channelIteration }),
-    signer: Promise.resolve(sender.pubKey.marshal())
+    signer: Promise.resolve(new Public(sender.pubKey.marshal()))
   } as unknown) as Types.SignedTicket
 }
 
 const createMockNode = ({
-  sender = SENDER,
-  senderAddress = SENDER_ADDRESS,
+  // sender = SENDER,
+  // senderAddress = SENDER_ADDRESS,
   target = TARGET,
   targetAddress = TARGET_ADDRESS,
-  ticketEpoch = new BN(1),
+  ticketEpoch = new UINT256(new BN(1)),
   ticketAmount = 1,
   ticketWinProb = 1,
   isChannelOpen = true,
   isChannelStored = true,
   balance_a = new Balance(new BN(0)),
   balance_b = new Balance(new BN(100)),
-  stateCounter = new BN(1),
-  getWinProbabilityAsFloat = 1,
-  isPartyAVal = true
+  stateCounter = new UINT256(new BN(1))
 }: {
   sender?: PeerId
-  senderAddress?: Uint8Array
+  senderAddress?: Address
   target?: PeerId
-  targetAddress?: Uint8Array
-  ticketEpoch?: BN
+  targetAddress?: Address
+  ticketEpoch?: UINT256
   ticketAmount?: number
   ticketWinProb?: number
   isChannelOpen?: boolean
   isChannelStored?: boolean
   balance_a?: Balance
   balance_b?: Balance
-  stateCounter?: BN
-  getWinProbabilityAsFloat?: number
-  isPartyAVal?: boolean
+  stateCounter?: UINT256
 }) => {
-  const pubKeyToAddress = sinon.stub()
-  pubKeyToAddress.withArgs(sender.pubKey.marshal()).returns(Promise.resolve({ serialize: () => senderAddress }))
-  pubKeyToAddress.withArgs(target.pubKey.marshal()).returns(Promise.resolve({ serialize: () => targetAddress }))
-
-  const isPartyA = sinon.stub().returns(isPartyAVal)
-
-  const stateCounterToIteration = sinon.stub()
-  stateCounterToIteration.withArgs(1).returns(1)
-  stateCounterToIteration.withArgs(11).returns(2)
-
   return ({
     getId: sinon.stub().returns(target),
     ticketAmount: ticketAmount,
@@ -110,12 +96,8 @@ const createMockNode = ({
         address: targetAddress,
         ticketEpoch: Promise.resolve(ticketEpoch)
       },
-      utils: {
-        isPartyA: isPartyA,
-        pubKeyToAddress,
-        getWinProbabilityAsFloat: sinon.stub().returns(getWinProbabilityAsFloat),
-        stateCounterToIteration
-      },
+      utils: Utils,
+      types: { Public },
       channel: {
         isOpen: sinon.stub().returns(Promise.resolve(isChannelOpen)),
         create: isChannelStored
@@ -144,17 +126,17 @@ describe('unit test validateUnacknowledgedTicket', function () {
         signedTicket,
         getTickets: getTicketsMock
       })
-    ).to.eventually.to.not.rejected
+    ).to.not.eventually.rejected
   })
 
   it('should throw when signer is not sender', async function () {
-    const node = createMockNode({ isPartyAVal: false })
+    const node = createMockNode({})
     const signedTicket = createMockSignedTicket({})
 
     return expect(
       validateUnacknowledgedTicket({
         node,
-        senderPeerId: await PeerId.create(),
+        senderPeerId: TARGET,
         signedTicket,
         getTickets: getTicketsMock
       })
@@ -178,11 +160,9 @@ describe('unit test validateUnacknowledgedTicket', function () {
   })
 
   it('should throw when ticket chance is low', async function () {
-    const node = createMockNode({
-      getWinProbabilityAsFloat: 0.5
-    })
+    const node = createMockNode({})
     const signedTicket = createMockSignedTicket({
-      winProb: new Uint8Array(0.5)
+      winProb: Utils.computeWinningProbability(0.5)
     })
 
     return expect(
@@ -229,7 +209,7 @@ describe('unit test validateUnacknowledgedTicket', function () {
 
   it('should throw if ticket epoch does not match our account counter', async function () {
     const node = createMockNode({
-      ticketEpoch: new BN(2)
+      ticketEpoch: new UINT256(new BN(2))
     })
     const signedTicket = createMockSignedTicket({})
 
@@ -246,7 +226,7 @@ describe('unit test validateUnacknowledgedTicket', function () {
   it("should throw if ticket's channel iteration does not match the current channel iteration", async function () {
     const node = createMockNode({})
     const signedTicket = createMockSignedTicket({
-      channelIteration: new BN(2)
+      channelIteration: new UINT256(new BN(2))
     })
 
     return expect(

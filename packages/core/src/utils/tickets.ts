@@ -314,7 +314,7 @@ export async function validateUnacknowledgedTicket({
 
   // ticket's channelIteration MUST match the current channelIteration
   // (performance) we are making a request to blockchain
-  const currentChannelIteration = ethereum.utils.stateCounterToIteration(await channel.stateCounter)
+  const currentChannelIteration = ethereum.utils.stateCounterToIteration((await channel.stateCounter).toBN())
   const ticketChannelIteration = ticket.channelIteration.toBN()
   if (!ticketChannelIteration.eq(currentChannelIteration)) {
     throw Error(
