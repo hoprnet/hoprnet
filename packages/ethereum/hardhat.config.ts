@@ -14,11 +14,11 @@ import Web3 from 'web3'
 import { networks } from './chain/networks'
 import { ACCOUNT_DEPLOYER_PRIVKEY, ACCOUNT_A_PRIVKEY, ACCOUNT_B_PRIVKEY } from './test/constants'
 
-const { PRIVATE_KEY, INFURA, MATIC_VIGIL, ETHERSCAN } = process.env
+const { PRIVATE_KEY, INFURA_KEY, MATIC_VIGIL_KEY, ETHERSCAN_KEY, QUIKNODE_KEY } = process.env
 const GAS_MULTIPLIER = 1.1
 
 // set 'ETHERSCAN_API_KEY' so 'hardhat-deploy' can read it
-process.env.ETHERSCAN_API_KEY = ETHERSCAN
+process.env.ETHERSCAN_API_KEY = ETHERSCAN_KEY
 
 // @TODO: fix legacy: use hopr-demo-seeds
 const localhostPrivKeys = NODE_SEEDS.concat(BOOTSTRAP_SEEDS)
@@ -52,25 +52,25 @@ const hardhatConfig: HardhatUserConfig = {
     mainnet: {
       ...networks.mainnet,
       gasMultiplier: GAS_MULTIPLIER,
-      url: `https://mainnet.infura.io/v3/${INFURA}`,
+      url: `https://mainnet.infura.io/v3/${INFURA_KEY}`,
       accounts: PRIVATE_KEY ? [PRIVATE_KEY] : []
     },
     kovan: {
       ...networks.kovan,
       gasMultiplier: GAS_MULTIPLIER,
-      url: `https://kovan.infura.io/v3/${INFURA}`,
+      url: `https://kovan.infura.io/v3/${INFURA_KEY}`,
       accounts: PRIVATE_KEY ? [PRIVATE_KEY] : []
     },
     xdai: {
       ...networks.xdai,
       gasMultiplier: GAS_MULTIPLIER,
-      url: `https://xdai.poanetwork.dev`,
+      url: `https://still-patient-forest.xdai.quiknode.pro/${QUIKNODE_KEY}/`,
       accounts: PRIVATE_KEY ? [PRIVATE_KEY] : []
     },
     matic: {
       ...networks.matic,
       gasMultiplier: GAS_MULTIPLIER,
-      url: `https://rpc-mainnet.maticvigil.com/v1/${MATIC_VIGIL}`,
+      url: `https://rpc-mainnet.maticvigil.com/v1/${MATIC_VIGIL_KEY}`,
       accounts: PRIVATE_KEY ? [PRIVATE_KEY] : []
     },
     binance: {

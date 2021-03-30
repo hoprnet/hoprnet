@@ -28,6 +28,7 @@ lib
 
 # Hardhat
 hardhat
+deployments
 
 # exclude generated ABIs
 chain/abis
