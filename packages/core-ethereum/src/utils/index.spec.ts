@@ -118,13 +118,6 @@ describe('test utils', function () {
     assert(u8aEquals(address.serialize(), pair.address))
   })
 
-  it('should compute the winning probability properly', function () {
-    for (let i = 0; i < 10; i++) {
-      let rnd = Math.random()
-      assert(Math.abs(utils.computeWinningProbability(rnd)[0] / 255) - rnd < 1 / 256)
-    }
-  })
-
   it('should compute a winning probability and convert it to float', function () {
     for (let i = 0; i < 10; i++) {
       let prob = Math.random()

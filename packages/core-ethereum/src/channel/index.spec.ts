@@ -12,7 +12,7 @@ import Web3 from 'web3'
 import { HoprToken } from '../tsc/web3/HoprToken'
 import { Await } from '../tsc/utils'
 import { Channel as ChannelType, ChannelStatus, ChannelBalance, ChannelState } from '../types/channel'
-import { AcknowledgedTicket, Balance, SignedChannel, SignedTicket, Address, Hash } from '../types'
+import { AcknowledgedTicket, Balance, SignedChannel, SignedTicket, Address } from '../types'
 import CoreConnector from '..'
 import Channel from '.'
 import * as testconfigs from '../config.spec'
@@ -20,7 +20,6 @@ import * as configs from '../config'
 
 const HoprTokenAbi = abis.HoprToken
 const DEFAULT_WIN_PROB = 1
-const mockWinProb = (num: number): Hash => new Hash(new Uint8Array(num))
 
 // @TODO: rewrite legacy tests
 describe('test Channel class', function () {
@@ -47,7 +46,7 @@ describe('test Channel class', function () {
       secretA,
       secretB,
       response: await hash(u8aConcat(secretA, secretB)),
-      winProb: mockWinProb(winProb),
+      winProb,
       counterparty,
       challenge
     }
@@ -143,7 +142,7 @@ describe('test Channel class', function () {
     const firstAckedTicket = new AcknowledgedTicket(undefined, {
       response: firstTicket.response
     })
-    const signedTicket = await channel.ticket.create(new Balance(new BN(1)), firstTicket.challenge, DEFAULT_WIN_PROB, {
+    const signedTicket = await channel.ticket.create(new Balance(new BN(1)), firstTicket.challenge, firstTicket.winProb, {
       bytes: firstAckedTicket.buffer,
       offset: firstAckedTicket.signedTicketOffset
     })

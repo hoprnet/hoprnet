@@ -60,7 +60,7 @@ export declare function convertUnit(amount: Balance, sourceUnit: string, targetU
  * Compute the winning probability that is set for a ticket
  * @param prob Desired winning probability of a ticket, e.g. 0.6 resp. 60%
  */
-export declare function computeWinningProbability(prob: number): Uint8Array
+export declare function computeWinningProbability(prob: number): Hash 
 
 /**
  * Transforms Uint256 encoded probabilities into floats.
@@ -71,7 +71,7 @@ export declare function computeWinningProbability(prob: number): Uint8Array
  *
  * @param winProb Uint256-encoded version of winning probability
  */
-export declare function getWinProbabilityAsFloat(winProb: Uint8Array): number
+export declare function getWinProbabilityAsFloat(winProb: Hash): number
 
 /**
  * Convert a state counter, to a number represeting the channels iteration.

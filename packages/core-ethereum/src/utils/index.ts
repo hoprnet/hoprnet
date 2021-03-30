@@ -166,19 +166,20 @@ export async function isWinningTicket(ticketHash: Hash, challengeResponse: Hash,
  * Compute the winning probability that is set for a ticket
  * @param prob Desired winning probability of a ticket, e.g. 0.6 resp. 60%
  */
-export function computeWinningProbability(prob: number): Uint8Array {
+export function computeWinningProbability(prob: number): Hash {
   if (prob == 1) {
-    return new Uint8Array(Hash.SIZE).fill(0xff)
+    return new Hash(new Uint8Array(Hash.SIZE).fill(0xff))
   }
 
   if (prob == 0) {
-    return new Uint8Array(Hash.SIZE).fill(0x00)
+    return new Hash(new Uint8Array(Hash.SIZE).fill(0x00))
   }
 
   let dividend = new BN(prob.toString(2).slice(2), 2)
   let divisor = new BN(0).bincn(prob.toString(2).slice(2).length)
 
-  return new Uint8Array(new BN(0).bincn(256).isubn(1).imul(dividend).div(divisor).toArray('be', Hash.SIZE))
+  return new Hash(
+    new Uint8Array(new BN(0).bincn(256).isubn(1).imul(dividend).div(divisor).toArray('be', Hash.SIZE)))
 }
 
 /**
@@ -190,20 +191,16 @@ export function computeWinningProbability(prob: number): Uint8Array {
  *
  * @param winProb Uint256-encoded version of winning probability
  */
-export function getWinProbabilityAsFloat(winProb: Uint8Array): number {
-  if (winProb.length != Hash.SIZE) {
-    throw Error(`Invalid array. Expected an array of ${Hash.SIZE} elements but got one with ${winProb?.length}.`)
-  }
-
-  if (u8aEquals(winProb, new Uint8Array(Hash.SIZE).fill(0xff))) {
+export function getWinProbabilityAsFloat(winProb: Hash): number {
+  if (u8aEquals(winProb.serialize(), new Uint8Array(Hash.SIZE).fill(0xff))) {
     return 1
   }
 
-  if (u8aEquals(winProb, new Uint8Array(Hash.SIZE).fill(0x00))) {
+  if (u8aEquals(winProb.serialize(), new Uint8Array(Hash.SIZE).fill(0x00))) {
     return 0
   }
 
-  return (u8aToNumber(winProb.slice(0, 3)) as number) / (u8aToNumber(new Uint8Array(3).fill(0xff)) as number)
+  return (u8aToNumber(winProb.serialize().slice(0, 3)) as number) / (u8aToNumber(new Uint8Array(3).fill(0xff)) as number)
 }
 
 /**
@@ -212,7 +209,7 @@ export function getWinProbabilityAsFloat(winProb: Uint8Array): number {
  * @param response response to verify
  */
 export async function checkChallenge(challenge: Hash, response: Hash) {
-  return u8aEquals(challenge.serialize(), Hash.create(response.serialize()).serialize())
+  return challenge.eq(response.hash())
 }
 
 /**

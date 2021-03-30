@@ -16,12 +16,6 @@ const DEFAULT_WIN_PROB = 1
 const EMPTY_PRE_IMAGE = new Hash(new Uint8Array(Hash.SIZE).fill(0x00))
 
 class TicketStatic {
-  private readonly INVALID_MESSAGES = {
-    NO_PRE_IMAGE: 'PreImage is empty.',
-    INVALID_CHALLENGE: 'Invalid challenge.',
-    NOT_WINNING: 'Not a winning ticket.'
-  }
-
   constructor(public coreConnector: HoprEthereum) {}
 
   public async submit(
@@ -54,28 +48,29 @@ class TicketStatic {
 
       const hasPreImage = !ackTicket.preImage.eq(EMPTY_PRE_IMAGE)
       if (!hasPreImage) {
-        log(`Failed to submit ticket ${ticketChallenge.toHex()}: ${this.INVALID_MESSAGES.NO_PRE_IMAGE}`)
+        log(`Failed to submit ticket ${ticketChallenge.toHex()}: 'PreImage is empty.'`)
         return {
           status: 'FAILURE',
-          message: this.INVALID_MESSAGES.NO_PRE_IMAGE
+          message:'PreImage is empty.' 
         }
       }
 
+      console.log(ticket.challenge, ackTicket.response)
       const validChallenge = await checkChallenge(ticket.challenge, ackTicket.response)
       if (!validChallenge) {
-        log(`Failed to submit ticket ${ticketChallenge.toHex()}: ${this.INVALID_MESSAGES.INVALID_CHALLENGE}`)
+        log(`Failed to submit ticket ${ticketChallenge.toHex()}: 'Invalid challenge.'`)
         return {
           status: 'FAILURE',
-          message: this.INVALID_MESSAGES.INVALID_CHALLENGE
+          message:'Invalid challenge.' 
         }
       }
 
       const isWinning = await isWinningTicket(await ticket.hash, ackTicket.response, ackTicket.preImage, ticket.winProb)
       if (!isWinning) {
-        log(`Failed to submit ticket ${ticketChallenge.toHex()}: ${this.INVALID_MESSAGES.NOT_WINNING}`)
+        log(`Failed to submit ticket ${ticketChallenge.toHex()}:  'Not a winning ticket.'`)
         return {
           status: 'FAILURE',
-          message: this.INVALID_MESSAGES.NOT_WINNING
+          message: 'Not a winning ticket.' 
         }
       }
 
@@ -130,7 +125,7 @@ class TicketFactory {
       offset: number
     }
   ): Promise<SignedTicket> {
-    const ticketWinProb = new Hash(computeWinningProbability(winProb))
+    const ticketWinProb = computeWinningProbability(winProb)
 
     const counterparty = await pubKeyToAddress(this.channel.counterparty)
 

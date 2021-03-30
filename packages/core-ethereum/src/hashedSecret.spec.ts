@@ -125,7 +125,7 @@ describe('test hashedSecret', function () {
               from: (await connector.account.address).toHex(),
               to: connector.hoprChannels.options.address
             },
-            connector.hoprChannels.methods.updateAccountSecret(preImage.toString())
+            connector.hoprChannels.methods.updateAccountSecret(preImage.toHex())
           )
         ).send()
       )
