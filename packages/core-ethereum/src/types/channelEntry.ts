@@ -1,10 +1,15 @@
 import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import BN from 'bn.js'
 import { u8aSplit, serializeToU8a, toU8a } from '@hoprnet/hopr-utils'
-import { Address } from '.' // TODO: cyclic
+import { Address, Balance } from '.' // TODO: cyclic
 import { UINT256 } from '../types/solidity'
-import { ChannelStatus } from '../types/channel'
 import { stateCounterToStatus, stateCounterToIteration, getId } from '../utils'
+
+export enum ChannelStatus {
+  CLOSED,
+  OPEN,
+  PENDING_TO_CLOSE
+}
 
 // TODO: optimize storage
 class ChannelEntry implements Types.ChannelEntry {
@@ -103,6 +108,13 @@ class ChannelEntry implements Types.ChannelEntry {
 
   public getChannelId() {
     return getId(this.partyA, this.partyB)
+  }
+
+  public getBalances() {
+    return {
+      partyA: new Balance(this.partyABalance),
+      partyB: new Balance(this.deposit.sub(this.partyABalance))
+    }
   }
 }
 

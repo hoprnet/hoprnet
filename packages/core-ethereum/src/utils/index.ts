@@ -15,8 +15,8 @@ import {
   u8aToNumber
 } from '@hoprnet/hopr-utils'
 import { Address, Balance, Hash, Signature } from '../types'
+import { ChannelStatus } from '../types/channelEntry'
 import { ContractEventEmitter } from '../tsc/web3/types'
-import { ChannelStatus } from '../types/channel'
 import * as constants from '../constants'
 import * as time from './time'
 import BN from 'bn.js'
@@ -439,13 +439,13 @@ export async function cleanupPromiEvent<E extends ContractEventEmitter<any>, R e
 export function getSignatureParameters(
   signature: Signature
 ): {
-  r: Uint8Array
-  s: Uint8Array
+  r: Hash
+  s: Hash
   v: number
 } {
   return {
-    r: signature.signature.slice(0, 32),
-    s: signature.signature.slice(32, 64),
+    r: new Hash(signature.signature.slice(0, 32)),
+    s: new Hash(signature.signature.slice(32, 64)),
     v: signature.recovery
   }
 }

@@ -4,7 +4,7 @@ import type Channel from './channel'
 import type * as Types from './types'
 import type * as DbKeys from './dbKeys'
 import type * as Constants from './constants'
-import type Indexer, { RoutingChannel, ChannelUpdate } from './indexer'
+import type Indexer, { RoutingChannel } from './indexer'
 
 export type Currencies = 'NATIVE' | 'HOPR'
 
@@ -144,6 +144,6 @@ declare interface HoprCoreConnector {
 
 declare var HoprCoreConnector: HoprCoreConnectorStatic
 
-export { Utils, Types, DbKeys, Constants, Channel, Indexer, RoutingChannel, ChannelUpdate, HoprCoreConnectorStatic }
+export { Utils, Types, DbKeys, Constants, Channel, Indexer, RoutingChannel, HoprCoreConnectorStatic }
 
 export default HoprCoreConnector
