@@ -6,6 +6,7 @@ on:
 
 jobs:
   build_latex:
+    if: github.actor!= 'hopr-version-bot'
     runs-on: ubuntu-latest
     steps:
       - name: Set up Git repository
