@@ -7,6 +7,7 @@ import { NOISE } from 'libp2p-noise'
 
 const { HoprConnect } = require('@hoprnet/hopr-connect')
 
+
 import { Packet } from './messages/packet'
 import {
   PACKET_SIZE,
