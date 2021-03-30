@@ -4,6 +4,7 @@ import type Hopr from '@hoprnet/hopr-core'
 import { pubKeyToPeerId } from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'
 import { isBootstrapNode } from './isBootstrapNode'
+import { PublicKey } from '@hoprnet/hopr-core-ethereum'
 
 /**
  * Get node's peers.
@@ -87,7 +88,7 @@ export async function getMyOpenChannels(node: Hopr<HoprCoreConnector>): Promise<
  * @returns a promise that resolves to an array of peer ids
  */
 export async function getPartyOpenChannels(node: Hopr<HoprCoreConnector>, party: PeerId): Promise<PeerId[]> {
-  const { indexer, utils } = node.paymentChannels
+  const { indexer } = node.paymentChannels
   if (!indexer) {
     throw new Error('Indexer is required')
   }
@@ -101,7 +102,7 @@ export async function getPartyOpenChannels(node: Hopr<HoprCoreConnector>, party:
     }).map(async (peer) => {
       return {
         peer,
-        accountId: await utils.pubKeyToAddress(peer.pubKey.marshal())
+        accountId: new PublicKey(peer.pubKey.marshal())
       }
     })
   )

@@ -12,7 +12,7 @@ import { LevelUp } from 'levelup'
 import Debug from 'debug'
 import Hopr from '../../'
 import HoprCoreConnector, { Types } from '@hoprnet/hopr-core-connector-interface'
-import { Hash } from '@hoprnet/hopr-core-ethereum'
+import { Hash, PublicKey } from '@hoprnet/hopr-core-ethereum'
 import { UnacknowledgedTicket } from '../ticket'
 
 const log = Debug('hopr-core:message:packet')
@@ -217,17 +217,14 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     if (secrets.length > 1) {
       log(`before creating channel`)
 
-      const channel = await chain.channel.create(path[0].pubKey.marshal(), (_counterparty: Uint8Array) =>
-        node._interactions.payments.onChainKey.interact(path[0])
-      )
-
+      const channel = await chain.channel.create(path[0].pubKey.marshal())
       packet._ticket = await channel.ticket.create(new Balance(fee), ticketChallenge, node.ticketWinProb, {
         bytes: packet.buffer,
         offset: packet.ticketOffset
       })
 
-      const myAddress = await chain.utils.pubKeyToAddress(node.getId().pubKey.marshal())
-      const counterpartyAddress = await chain.utils.pubKeyToAddress(channel.counterparty)
+      const myAddress = new PublicKey(node.getId().pubKey.marshal()).toAddress()
+      const counterpartyAddress = channel.counterparty.toAddress()
       const amPartyA = chain.utils.isPartyA(myAddress, counterpartyAddress)
       await validateCreatedTicket({
         myBalance: (await (amPartyA ? channel.balance_a : channel.balance_b)).toBN(),
@@ -235,7 +232,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
       })
     } else if (secrets.length == 1) {
       packet._ticket = await chain.channel.createDummyChannelTicket(
-        await chain.utils.pubKeyToAddress(path[0].pubKey.marshal()),
+        new PublicKey(path[0].pubKey.marshal()).toAddress(),
         ticketChallenge,
         {
           bytes: packet.buffer,
@@ -331,8 +328,8 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     const signedTicket = await this.ticket
     const ticket = signedTicket.ticket
     const sender = this.node.getId()
-    const senderAddress = await chain.utils.pubKeyToAddress(sender.pubKey.marshal())
-    const targetAddress = await chain.utils.pubKeyToAddress(target.pubKey.marshal())
+    const senderAddress = new PublicKey(sender.pubKey.marshal()).toAddress()
+    const targetAddress = new PublicKey(target.pubKey.marshal()).toAddress()
     const amPartyA = chain.utils.isPartyA(senderAddress, targetAddress)
     const challenge = u8aConcat(deriveTicketKey(this.header.derivedSecret), this.header.hashedKeyHalf)
 
@@ -367,7 +364,6 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
 
       const channel = await chain.channel.create(
         target.pubKey.marshal(),
-        (_counterparty: Uint8Array) => this.node._interactions.payments.onChainKey.interact(target),
         channelBalance,
         (_channelBalance: Types.ChannelBalance) =>
           this.node._interactions.payments.open.interact(target, channelBalance)
@@ -384,7 +380,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
       })
     } else if (fee.toBN().isZero()) {
       this._ticket = await chain.channel.createDummyChannelTicket(
-        await chain.utils.pubKeyToAddress(target.pubKey.marshal()),
+        new PublicKey(target.pubKey.marshal()).toAddress(),
         new Hash(this.header.encryptionKey),
         {
           bytes: this.buffer,

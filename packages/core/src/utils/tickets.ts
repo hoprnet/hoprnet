@@ -5,6 +5,7 @@ import type Hopr from '..'
 import { u8aEquals } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 import { UnacknowledgedTicket } from '../messages/ticket/unacknowledged'
+import { PublicKey } from '@hoprnet/hopr-core-ethereum'
 
 type OperationSuccess = { status: 'SUCCESS'; receipt: string; ackTicket: Types.AcknowledgedTicket }
 type OperationFailure = { status: 'FAILURE'; message: string }
@@ -257,15 +258,15 @@ export async function validateUnacknowledgedTicket({
 }): Promise<void> {
   const ticket = signedTicket.ticket
   const chain = node.paymentChannels
-  const selfPubKey = node.getId().pubKey.marshal()
-  const selfAddress = await chain.utils.pubKeyToAddress(selfPubKey)
+  const selfPubKey = new PublicKey(node.getId().pubKey.marshal())
+  const selfAddress = selfPubKey.toAddress()
   const senderB58 = senderPeerId.toB58String()
-  const senderPubKey = senderPeerId.pubKey.marshal()
-  const senderAddress = await chain.utils.pubKeyToAddress(senderPubKey)
+  const senderPubKey = new PublicKey(senderPeerId.pubKey.marshal())
+  const senderAddress = senderPubKey.toAddress()
   const amPartyA = chain.utils.isPartyA(selfAddress, senderAddress)
 
   // ticket signer MUST be the sender
-  if (!u8aEquals(await signedTicket.signer, senderPubKey)) {
+  if ((await signedTicket.signer).eq(senderPubKey)) {
     throw Error(`The signer of the ticket does not match the sender`)
   }
 
@@ -293,7 +294,6 @@ export async function validateUnacknowledgedTicket({
   try {
     channel = await chain.channel.create(
       senderPubKey,
-      async () => new chain.types.Public(senderPubKey),
       undefined,
       undefined
     )

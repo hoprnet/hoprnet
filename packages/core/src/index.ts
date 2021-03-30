@@ -37,7 +37,7 @@ import chalk from 'chalk'
 import PeerId from 'peer-id'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type { HoprCoreConnectorStatic, Types, Channel, RoutingChannel } from '@hoprnet/hopr-core-connector-interface'
-import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
+import HoprCoreEthereum, { PublicKey } from '@hoprnet/hopr-core-ethereum'
 import BN from 'bn.js'
 
 import { Interactions } from './interactions'
@@ -589,8 +589,8 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     const self = this.getId()
 
     const channelId = await utils.getId(
-      await utils.pubKeyToAddress(self.pubKey.marshal()),
-      await utils.pubKeyToAddress(counterParty.pubKey.marshal())
+      new PublicKey(self.pubKey.marshal()).toAddress(),
+      new PublicKey(counterParty.pubKey.marshal()).toAddress()
     )
 
     const myAvailableTokens = await account.getBalance(true)
@@ -603,8 +603,8 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     }
 
     const amPartyA = utils.isPartyA(
-      await utils.pubKeyToAddress(self.pubKey.marshal()),
-      await utils.pubKeyToAddress(counterParty.pubKey.marshal())
+      new PublicKey(self.pubKey.marshal()),
+      new PublicKey(counterParty.pubKey.marshal())
     )
 
     const channelBalance = types.ChannelBalance.create(
@@ -622,7 +622,6 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
 
     await this.paymentChannels.channel.create(
       counterParty.pubKey.marshal(),
-      async () => this._interactions.payments.onChainKey.interact(counterParty),
       channelBalance,
       (balance: Types.ChannelBalance): Promise<Types.SignedChannel> =>
         this._interactions.payments.open.interact(counterParty, balance)
@@ -635,9 +634,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
 
   public async closeChannel(peerId: PeerId): Promise<{ receipt: string; status: string }> {
     const channel = await this.paymentChannels.channel.create(
-      peerId.pubKey.marshal(),
-      async (counterparty: Uint8Array) =>
-        this._interactions.payments.onChainKey.interact(await pubKeyToPeerId(counterparty))
+      new PublicKey(peerId.pubKey.marshal()),
     )
 
     const status = await channel.status
