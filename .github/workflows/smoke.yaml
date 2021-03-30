@@ -18,7 +18,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/checkout@v2
         with:
-          ssh-key: ${{ secrets.COMMIT_BOT_SSH }}
+          token: ${{ secrets.COMMIT_BOT_ACCESS_TOKEN }}
       - name: Use Node.js 14
         uses: actions/setup-node@v2
         with:

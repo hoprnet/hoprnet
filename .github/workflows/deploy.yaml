@@ -166,8 +166,6 @@ jobs:
     needs: [build_hoprd_docker]
     steps:
       - uses: actions/checkout@v2
-        with:
-          ssh-key: ${{ secrets.COMMIT_BOT_SSH }}
       - name: Update repo from latest pushes.
         run: |
           git config --global user.email "noreply@hoprnet.org"
