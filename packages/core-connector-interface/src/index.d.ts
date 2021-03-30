@@ -56,7 +56,7 @@ declare interface HoprCoreConnector {
     keys: {
       onChain: {
         privKey: Uint8Array
-        pubKey: PublicKey 
+        pubKey: PublicKey
       }
       offChain: {
         privKey: Uint8Array

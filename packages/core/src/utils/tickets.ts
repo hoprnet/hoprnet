@@ -292,11 +292,7 @@ export async function validateUnacknowledgedTicket({
   // (performance) we are making a request to blockchain
   let channel: Channel
   try {
-    channel = await chain.channel.create(
-      senderPubKey,
-      undefined,
-      undefined
-    )
+    channel = await chain.channel.create(senderPubKey, undefined, undefined)
   } catch (err) {
     throw Error(`Stored payment channel with '${senderB58}' not found`)
   }
