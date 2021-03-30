@@ -73,9 +73,7 @@ class Balance implements Interfaces.Balance {
 class Hash implements Interfaces.Hash {
   constructor(private arr: Uint8Array) {}
 
-  static get SIZE() {
-    return HASH_LENGTH
-  }
+  static SIZE = HASH_LENGTH
 
   static create(msg: Uint8Array) {
     return new Hash(createKeccakHash('keccak256').update(Buffer.from(msg)).digest())

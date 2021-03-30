@@ -12,7 +12,6 @@ import debug from 'debug'
 const log = debug('hopr-core-ethereum:ticket')
 
 const DEFAULT_WIN_PROB = 1
-const EMPTY_PRE_IMAGE = new Hash(new Uint8Array(Hash.SIZE).fill(0x00))
 
 class TicketStatic {
   constructor(public coreConnector: HoprEthereum) {}
@@ -42,7 +41,8 @@ class TicketStatic {
       const { hoprChannels, account, utils } = this.coreConnector
       const { r, s, v } = utils.getSignatureParameters(signedTicket.signature)
 
-      const hasPreImage = !ackTicket.preImage.eq(EMPTY_PRE_IMAGE)
+      const emptyPreImage = new Hash(new Uint8Array(Hash.SIZE).fill(0x00))
+      const hasPreImage = !ackTicket.preImage.eq(emptyPreImage)
       if (!hasPreImage) {
         log(`Failed to submit ticket ${ackTicket.response.toHex()}: 'PreImage is empty.'`)
         return {
