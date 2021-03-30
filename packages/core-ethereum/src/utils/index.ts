@@ -178,8 +178,7 @@ export function computeWinningProbability(prob: number): Hash {
   let dividend = new BN(prob.toString(2).slice(2), 2)
   let divisor = new BN(0).bincn(prob.toString(2).slice(2).length)
 
-  return new Hash(
-    new Uint8Array(new BN(0).bincn(256).isubn(1).imul(dividend).div(divisor).toArray('be', Hash.SIZE)))
+  return new Hash(new Uint8Array(new BN(0).bincn(256).isubn(1).imul(dividend).div(divisor).toArray('be', Hash.SIZE)))
 }
 
 /**
@@ -200,7 +199,9 @@ export function getWinProbabilityAsFloat(winProb: Hash): number {
     return 0
   }
 
-  return (u8aToNumber(winProb.serialize().slice(0, 3)) as number) / (u8aToNumber(new Uint8Array(3).fill(0xff)) as number)
+  return (
+    (u8aToNumber(winProb.serialize().slice(0, 3)) as number) / (u8aToNumber(new Uint8Array(3).fill(0xff)) as number)
+  )
 }
 
 /**

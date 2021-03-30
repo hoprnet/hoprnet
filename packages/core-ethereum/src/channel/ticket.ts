@@ -51,7 +51,7 @@ class TicketStatic {
         log(`Failed to submit ticket ${ticketChallenge.toHex()}: 'PreImage is empty.'`)
         return {
           status: 'FAILURE',
-          message:'PreImage is empty.' 
+          message: 'PreImage is empty.'
         }
       }
 
@@ -61,7 +61,7 @@ class TicketStatic {
         log(`Failed to submit ticket ${ticketChallenge.toHex()}: 'Invalid challenge.'`)
         return {
           status: 'FAILURE',
-          message:'Invalid challenge.' 
+          message: 'Invalid challenge.'
         }
       }
 
@@ -70,7 +70,7 @@ class TicketStatic {
         log(`Failed to submit ticket ${ticketChallenge.toHex()}:  'Not a winning ticket.'`)
         return {
           status: 'FAILURE',
-          message: 'Not a winning ticket.' 
+          message: 'Not a winning ticket.'
         }
       }
 

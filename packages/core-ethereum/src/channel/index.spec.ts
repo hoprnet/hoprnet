@@ -142,10 +142,15 @@ describe('test Channel class', function () {
     const firstAckedTicket = new AcknowledgedTicket(undefined, {
       response: firstTicket.response
     })
-    const signedTicket = await channel.ticket.create(new Balance(new BN(1)), firstTicket.challenge, firstTicket.winProb, {
-      bytes: firstAckedTicket.buffer,
-      offset: firstAckedTicket.signedTicketOffset
-    })
+    const signedTicket = await channel.ticket.create(
+      new Balance(new BN(1)),
+      firstTicket.challenge,
+      firstTicket.winProb,
+      {
+        bytes: firstAckedTicket.buffer,
+        offset: firstAckedTicket.signedTicketOffset
+      }
+    )
 
     assert(
       u8aEquals(await signedTicket.signer, coreConnector.account.keys.onChain.pubKey),
