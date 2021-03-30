@@ -10,18 +10,19 @@ HOPR then aggregates the events and store them chronologically:
     \item $Close_i:=(channelId, close)$
 \end{itemize}
 The nodes then publish the update independently to the DHT and allow HOPR end users to download it and verify the validity of the data.
-\\~\\HOPR is a privacy preserving protocol that guarantees sender-receiver unlinkability while still providing high availability.
-\\~In order to achieve the aforementioned properties, nodes use DHT to place information in the network and ask selected other nodes to replicate it and update that list every 5 minutes. 
-\\~Event logs are set to $$log_i:=hash( log_{i-1}|| Open) \quad or \quad log_i:=hash( log_{i-1}|| Close )$$ where $log_0:=hash(0)$.
-\\~When a node receives $log_i$ from another node, the validity can be checked by recreating the hash and comparing the value with the on-chain value.
-
-
 \begin{figure}[H]
     \centering
     \includegraphics[width=7cm,height=7cm,keepaspectratio]{../whitepaper/images/event_propagation.png}
     \caption{Event propagation}
     \label{fig:Event propagation}
 \end{figure}
+\hspace{-5mm}HOPR is a privacy preserving protocol that guarantees sender-receiver unlinkability while still providing high availability.
+\\~In order to achieve the aforementioned properties, nodes use DHT to place information in the network and ask selected other nodes to replicate it and update that list every 5 minutes. 
+\\~Event logs are set to $$log_i:=hash( log_{i-1}|| Open) \quad or \quad log_i:=hash( log_{i-1}|| Close )$$ where $log_0:=hash(0)$.
+\\~When a node receives $log_i$ from another node, the validity can be checked by recreating the hash and comparing the value with the on-chain value.
+
+
+
 
 
 

@@ -8,7 +8,8 @@ The preimage of a winning ticketis stored in the node’s database.
 The issuer computes the modified Bloom Filter by XORing the previous version with the one after inserting the ticket.
 \newline Once $ticket_C$ is sent to the smart contract, the intended version of the modified Bloom Filters is recovered by $bloom_{n+1} = bloom_n \vee diff$ and thereby invalidates $ticket_A$, $ticket_B$ as well as $ticket_C$.
 
-\begin{figure}
+\begin{figure}[H]
+    \centering
     \includegraphics[width=10cm,height=10cm,keepaspectratio]{../whitepaper/images/ticket_aggregation.png}
     \caption{Ticket aggregation}
     \label{fig:Ticket aggregation}
