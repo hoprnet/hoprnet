@@ -21,7 +21,7 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   await deploy('HoprChannels', {
     from: deployer,
-    args: [hoprToken.address, Math.floor(closures[deploymentType] ?? closures.local / 1e3)],
+    args: [hoprToken.address, Math.floor((closures[deploymentType] ?? closures.local) / 1e3)],
     log: true
   })
 }

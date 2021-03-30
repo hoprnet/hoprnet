@@ -21,8 +21,9 @@
   "xdai": {
     "xHOPR": "0xD057604A14982FE8D88c5fC25Aac3267eA142a08",
     "HoprToken": "0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1",
-    "HoprChannels": "0x37C334bD0e87A56301475437927896696F118e4a",
-    "HoprWrapper": "0x097707143e01318734535676cfe2e5cF8b656ae8"
+    "HoprChannels": "0x4F76259c433f6dd6C956402bA4063387783778E4",
+    "HoprWrapper": "0x097707143e01318734535676cfe2e5cF8b656ae8",
+    "HoprDistributor": "0x987cb736fBfBc4a397Acd06045bf0cD9B9deFe66"
   },
   "matic": {
     "HoprToken": "0x4774fEd3f2838f504006BE53155cA9cbDDEe9f0c",
