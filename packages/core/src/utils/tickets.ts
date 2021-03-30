@@ -275,7 +275,7 @@ export async function validateUnacknowledgedTicket({
   }
 
   // ticket MUST have at least X winning probability
-  const winProb = chain.utils.getWinProbabilityAsFloat(ticket.winProb.serialize())
+  const winProb = chain.utils.getWinProbabilityAsFloat(ticket.winProb)
   if (new BN(winProb).lt(new BN(String(node.ticketWinProb)))) {
     throw Error(`Ticket winning probability '${winProb}' is lower than '${node.ticketWinProb}'`)
   }

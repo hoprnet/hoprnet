@@ -23,18 +23,17 @@ import {
   isPartyA,
   Log,
   stateCounterToStatus,
-  isGanache
+  isGanache,
+  computeWinningProbability
 } from '../utils'
 import { ERRORS } from '../constants'
 import type HoprEthereum from '..'
 import Channel from './channel'
-import { Uint8ArrayE } from '../types/extended'
 import { TicketStatic } from './ticket'
 
 const log = Log(['channel-factory'])
 
 const EMPTY_SIGNATURE = new Uint8Array(Signature.SIZE).fill(0x00)
-const WIN_PROB = new BN(1)
 
 class ChannelFactory {
   public tickets: TicketStatic
@@ -198,10 +197,7 @@ class ChannelFactory {
       throw Error(`Challenge is not set`)
     }
 
-    const winProb = new Hash(
-      new Uint8ArrayE(new BN(new Uint8Array(Hash.SIZE).fill(0xff)).div(WIN_PROB).toArray('le', Hash.SIZE))
-    )
-
+    const winProb = computeWinningProbability(1) // Value is unimportant here.  
     const signedTicket = new SignedTicket(arr)
 
     const ticket = new Ticket(
