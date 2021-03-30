@@ -10,7 +10,6 @@ import Ticket from './ticket'
 import { UINT256 } from './solidity'
 import { Address, Balance, Hash, NativeBalance, PublicKey } from './primitives'
 
-
 class Types {
   public AccountEntry = AccountEntry
   public Address = Address
