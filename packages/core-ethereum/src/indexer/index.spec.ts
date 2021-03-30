@@ -122,20 +122,14 @@ describe('test indexer', function () {
       const expectedChannelId = await getId(userA.address, userB.address)
       const channels = await connector.indexer.getChannelsOf(userA.address)
       assert.equal(channels.length, 1, 'check Channels.get')
-
-      const [channel] = channels
-      const storedChannelId = await getId(...channel.parties)
-      assert(expectedChannelId.eq(storedChannelId), 'check Channels.get')
+      assert(expectedChannelId.eq(await channels[0].getChannelId()), 'check Channels.get')
     })
 
     it('should find channel using partyB', async function () {
       const expectedChannelId = await getId(userA.address, userB.address)
       const channels = await connector.indexer.getChannelsOf(userB.address)
       assert.equal(channels.length, 1, 'check Channels.get')
-
-      const [channel] = channels
-      const storedChannelId = await getId(...channel.parties)
-      assert(expectedChannelId.eq(storedChannelId), 'check Channels.get')
+      assert(expectedChannelId.eq(await channels[0].getChannelId()), 'check Channels.get')
     })
 
     it('should find channel using partyA & partyB', async function () {
