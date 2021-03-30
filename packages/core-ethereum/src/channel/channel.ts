@@ -136,11 +136,7 @@ class Channel implements IChannel {
       try {
         return resolve(
           new Balance(
-            new BN(
-              await this.coreConnector.hoprToken.methods
-                .balanceOf(this.counterparty.toAddress().toHex())
-                .call()
-            )
+            new BN(await this.coreConnector.hoprToken.methods.balanceOf(this.counterparty.toAddress().toHex()).call())
           )
         )
       } catch (error) {
@@ -165,9 +161,7 @@ class Channel implements IChannel {
             from: (await account.address).toHex(),
             to: this.coreConnector.hoprChannels.options.address
           },
-          this.coreConnector.hoprChannels.methods.initiateChannelClosure(
-            this.counterparty.toAddress().toHex()
-          )
+          this.coreConnector.hoprChannels.methods.initiateChannelClosure(this.counterparty.toAddress().toHex())
         )
 
         receipt = tx.transactionHash
@@ -178,9 +172,7 @@ class Channel implements IChannel {
             from: (await account.address).toHex(),
             to: this.coreConnector.hoprChannels.options.address
           },
-          this.coreConnector.hoprChannels.methods.finalizeChannelClosure(
-            this.counterparty.toAddress().toHex()
-          )
+          this.coreConnector.hoprChannels.methods.finalizeChannelClosure(this.counterparty.toAddress().toHex())
         )
 
         receipt = tx.transactionHash

@@ -7,7 +7,7 @@ import Web3 from 'web3'
 import { durations, stringToU8a, u8aEquals, u8aToHex, isExpired } from '@hoprnet/hopr-utils'
 import NonceTracker from './nonce-tracker'
 import TransactionManager from './transaction-manager'
-import { Address, AcknowledgedTicket, Balance, Hash, NativeBalance, UINT256, PublicKey} from './types'
+import { Address, AcknowledgedTicket, Balance, Hash, NativeBalance, UINT256, PublicKey } from './types'
 import { isWinningTicket, isGanache, getNetworkGasPrice } from './utils'
 import { WEB3_CACHE_TTL } from './constants'
 import * as ethereum from './ethereum'
@@ -34,7 +34,7 @@ class Account {
   public keys: {
     onChain: {
       privKey: Uint8Array
-      pubKey: PublicKey 
+      pubKey: PublicKey
     }
     offChain: {
       privKey: Uint8Array

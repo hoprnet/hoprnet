@@ -30,8 +30,8 @@ const generateTicketData = async (receiver: Address) => {
 
 describe('test signedTicket construction', async function () {
   const [, userB] = await Promise.all(
-    testconfigs.DEMO_ACCOUNTS.slice(0, 2).map(
-      async (str: string) => PublicKey.fromPrivKey(stringToU8a(str)).toAddress()
+    testconfigs.DEMO_ACCOUNTS.slice(0, 2).map(async (str: string) =>
+      PublicKey.fromPrivKey(stringToU8a(str)).toAddress()
     )
   )
 

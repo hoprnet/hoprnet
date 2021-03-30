@@ -134,7 +134,6 @@ class NativeBalance implements Interfaces.Balance {
     // Uint256
     return 32
   }
-
 }
 
 class PublicKey implements Interfaces.PublicKey {
@@ -148,9 +147,7 @@ class PublicKey implements Interfaces.PublicKey {
   }
 
   toAddress(): Address {
-    return new Address(
-      Hash.create(publicKeyConvert(this.arr, false).slice(1)).serialize().slice(12)
-    )
+    return new Address(Hash.create(publicKeyConvert(this.arr, false).slice(1)).serialize().slice(12))
   }
 
   static fromString(str: string): PublicKey {
@@ -158,7 +155,7 @@ class PublicKey implements Interfaces.PublicKey {
   }
 
   static get SIZE(): number {
-    return 33 
+    return 33
   }
 
   serialize() {
@@ -166,7 +163,7 @@ class PublicKey implements Interfaces.PublicKey {
   }
 
   toHex(): string {
-    return u8aToHex(this.arr) 
+    return u8aToHex(this.arr)
   }
 }
 

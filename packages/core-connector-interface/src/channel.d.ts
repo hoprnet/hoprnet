@@ -202,7 +202,7 @@ declare interface Channel {
     // aggregate(channel: any, tickets: Ticket[], ...props: any[]): Promise<Ticket>
   }
 
-  readonly counterparty: PublicKey 
+  readonly counterparty: PublicKey
   readonly offChainCounterparty: PublicKey
 
   /**

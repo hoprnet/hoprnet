@@ -1,6 +1,6 @@
 import { Networks, networks } from '@hoprnet/hopr-ethereum'
 import assert from 'assert'
-import {  ecdsaSign, ecdsaRecover, ecdsaVerify } from 'secp256k1'
+import { ecdsaSign, ecdsaRecover, ecdsaVerify } from 'secp256k1'
 import { PromiEvent, TransactionReceipt } from 'web3-core'
 import { BlockTransactionString } from 'web3-eth'
 import Web3 from 'web3'

@@ -7,7 +7,7 @@ import { verify } from '../utils'
 
 class SignedTicket extends Uint8ArrayE implements Types.SignedTicket {
   private _signature?: Signature
-  private _signer?: PublicKey 
+  private _signer?: PublicKey
 
   constructor(
     arr?: {
@@ -87,10 +87,11 @@ class SignedTicket extends Uint8ArrayE implements Types.SignedTicket {
       try {
         this._signer = new PublicKey(
           secp256k1.ecdsaRecover(
-          this.signature.signature,
-          this.signature.recovery,
-          (await this.ticket.hash).serialize()
-        ))
+            this.signature.signature,
+            this.signature.recovery,
+            (await this.ticket.hash).serialize()
+          )
+        )
         return resolve(this._signer)
       } catch (err) {
         return reject(err)
