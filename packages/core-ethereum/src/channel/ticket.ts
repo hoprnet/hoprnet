@@ -19,8 +19,7 @@ class TicketStatic {
   constructor(public coreConnector: HoprEthereum) {}
 
   public async submit(
-    ackTicket: AcknowledgedTicket,
-    _ticketIndex: Uint8Array
+    ackTicket: AcknowledgedTicket
   ): Promise<
     | {
         status: 'SUCCESS'
@@ -36,29 +35,26 @@ class TicketStatic {
         error: Error | string
       }
   > {
-    const ticketChallenge = ackTicket.response
-
     try {
       const signedTicket = await ackTicket.signedTicket
       const ticket = signedTicket.ticket
 
-      log('Submitting ticket', ticketChallenge.toHex())
+      log('Submitting ticket', ackTicket.response.toHex())
       const { hoprChannels, account, utils } = this.coreConnector
       const { r, s, v } = utils.getSignatureParameters(signedTicket.signature)
 
       const hasPreImage = !ackTicket.preImage.eq(EMPTY_PRE_IMAGE)
       if (!hasPreImage) {
-        log(`Failed to submit ticket ${ticketChallenge.toHex()}: 'PreImage is empty.'`)
+        log(`Failed to submit ticket ${ackTicket.response.toHex()}: 'PreImage is empty.'`)
         return {
           status: 'FAILURE',
           message: 'PreImage is empty.'
         }
       }
 
-      console.log(ticket.challenge, ackTicket.response)
       const validChallenge = await checkChallenge(ticket.challenge, ackTicket.response)
       if (!validChallenge) {
-        log(`Failed to submit ticket ${ticketChallenge.toHex()}: 'Invalid challenge.'`)
+        log(`Failed to submit ticket ${ackTicket.response.toHex()}: 'Invalid challenge.'`)
         return {
           status: 'FAILURE',
           message: 'Invalid challenge.'
@@ -67,7 +63,7 @@ class TicketStatic {
 
       const isWinning = await isWinningTicket(await ticket.hash, ackTicket.response, ackTicket.preImage, ticket.winProb)
       if (!isWinning) {
-        log(`Failed to submit ticket ${ticketChallenge.toHex()}:  'Not a winning ticket.'`)
+        log(`Failed to submit ticket ${ackTicket.response.toHex()}:  'Not a winning ticket.'`)
         return {
           status: 'FAILURE',
           message: 'Not a winning ticket.'
@@ -75,6 +71,7 @@ class TicketStatic {
       }
 
       const counterparty = await this.coreConnector.utils.pubKeyToAddress(await signedTicket.signer)
+      console.log(">>>>", ackTicket.preImage.toHex(), ackTicket.response.toHex())
 
       const transaction = await account.signTransaction(
         {
@@ -97,14 +94,14 @@ class TicketStatic {
       ackTicket.redeemed = true
       this.coreConnector.account.updateLocalState(ackTicket.preImage)
 
-      log('Successfully submitted ticket', ticketChallenge.toHex())
+      log('Successfully submitted ticket', ackTicket.response.toHex())
       return {
         status: 'SUCCESS',
         receipt: transaction.transactionHash,
         ackTicket
       }
     } catch (err) {
-      log('Unexpected error when submitting ticket', ticketChallenge.toHex(), err)
+      log('Unexpected error when submitting ticket', ackTicket.response.toHex(), err)
       return {
         status: 'ERROR',
         error: err

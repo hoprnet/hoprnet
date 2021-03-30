@@ -79,7 +79,7 @@ class Account {
           await isWinningTicket(
             await (await ticket.signedTicket).ticket.hash,
             ticket.response,
-            tmp.hash(),
+            tmp,
             (await ticket.signedTicket).ticket.winProb
           )
         ) {

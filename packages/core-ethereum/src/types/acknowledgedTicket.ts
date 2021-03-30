@@ -3,8 +3,6 @@ import { Hash, SignedTicket } from '.'
 // @TODO this is a duplicate of the same class in hopr-core
 class AcknowledgedTicket extends Uint8Array {
   private _signedTicket: SignedTicket
-  private _response: Hash
-  private _preImage: Hash
 
   constructor(
     arr?: {
@@ -32,12 +30,10 @@ class AcknowledgedTicket extends Uint8Array {
 
       if (struct.response) {
         this.set(struct.response.serialize(), this.responseOffset - this.byteOffset)
-        this._response = struct.response
       }
 
       if (struct.preImage) {
         this.set(struct.preImage.serialize(), this.preImageOffset - this.byteOffset)
-        this._preImage = struct.preImage
       }
 
       if (struct.redeemed) {
@@ -74,11 +70,7 @@ class AcknowledgedTicket extends Uint8Array {
   }
 
   get response(): Hash {
-    if (!this._response) {
-      this._response = new Hash(new Uint8Array(this.buffer, this.responseOffset, Hash.SIZE))
-    }
-
-    return this._response
+    return new Hash(new Uint8Array(this.buffer, this.responseOffset, Hash.SIZE))
   }
 
   get preImageOffset(): number {
@@ -86,17 +78,11 @@ class AcknowledgedTicket extends Uint8Array {
   }
 
   get preImage(): Hash {
-    if (!this._preImage) {
-      this._preImage = new Hash(new Uint8Array(this.buffer, this.preImageOffset, Hash.SIZE))
-    }
-
-    return this._preImage
+    return new Hash(new Uint8Array(this.buffer, this.preImageOffset, Hash.SIZE))
   }
 
   set preImage(_preImage: Hash) {
     this.set(_preImage.serialize(), this.preImageOffset - this.byteOffset)
-
-    this._preImage = new Hash(new Uint8Array(this.buffer, this.preImageOffset, Hash.SIZE))
   }
 
   get redeemedOffset(): number {
