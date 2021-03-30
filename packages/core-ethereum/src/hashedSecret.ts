@@ -85,7 +85,7 @@ class HashedSecret {
                 from: address,
                 to: this.channels.options.address
               },
-              this.channels.methods.initializeAccount(u8aToHex(uncompressedPubKey), secret.toHex()) 
+              this.channels.methods.initializeAccount(u8aToHex(uncompressedPubKey), secret.toHex())
             )
           ).send()
         )
