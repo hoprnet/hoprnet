@@ -1,8 +1,8 @@
 import assert from 'assert'
 import { expect } from 'chai'
 import { stringToU8a, randomInteger } from '@hoprnet/hopr-utils'
-import { Address, Ticket, Hash, Balance, UINT256 } from '.'
-import { privKeyToPubKey, pubKeyToAddress, computeWinningProbability } from '../utils'
+import { Address, Ticket, Hash, Balance, PublicKey, UINT256 } from '.'
+import { computeWinningProbability } from '../utils'
 import * as testconfigs from '../config.spec'
 import BN from 'bn.js'
 
@@ -10,7 +10,7 @@ describe('test ticket construction', function () {
   let userA: Address
 
   before(async function () {
-    userA = await pubKeyToAddress(await privKeyToPubKey(stringToU8a(testconfigs.DEMO_ACCOUNTS[0])))
+    userA = PublicKey.fromPrivKey(stringToU8a(testconfigs.DEMO_ACCOUNTS[0])).toAddress()
   })
 
   const generateTicketData = async () => {

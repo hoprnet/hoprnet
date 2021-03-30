@@ -2,8 +2,7 @@ import assert from 'assert'
 import { randomBytes } from 'crypto'
 import { stringToU8a, randomInteger, u8aToHex } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
-import { Address, Ticket, Hash, Balance, SignedTicket, UINT256 } from '.'
-import { pubKeyToAddress, privKeyToPubKey } from '../utils'
+import { Address, Ticket, Hash, Balance, SignedTicket, UINT256, PublicKey } from '.'
 import * as testconfigs from '../config.spec'
 
 const WIN_PROB = new BN(1)
@@ -32,13 +31,13 @@ const generateTicketData = async (receiver: Address) => {
 describe('test signedTicket construction', async function () {
   const [, userB] = await Promise.all(
     testconfigs.DEMO_ACCOUNTS.slice(0, 2).map(
-      async (str: string) => await pubKeyToAddress(await privKeyToPubKey(stringToU8a(str)))
+      async (str: string) => PublicKey.fromPrivKey(stringToU8a(str)).toAddress()
     )
   )
 
   const [userAPrivKey] = testconfigs.DEMO_ACCOUNTS.slice(0, 2).map((str: string) => stringToU8a(str))
 
-  const userAPubKey = await privKeyToPubKey(stringToU8a(testconfigs.DEMO_ACCOUNTS[0]))
+  const userAPubKey = PublicKey.fromPrivKey(stringToU8a(testconfigs.DEMO_ACCOUNTS[0]))
 
   it('should create new signedTicket using struct', async function () {
     const ticketData = await generateTicketData(userB as Address)
@@ -54,7 +53,7 @@ describe('test signedTicket construction', async function () {
 
     assert(await signedTicket.verify(userAPubKey))
 
-    assert(new Hash(await signedTicket.signer).eq(new Hash(userAPubKey)), 'signer incorrect')
+    assert((await signedTicket.signer).toHex() == userAPubKey.toHex(), 'signer incorrect')
 
     assert(signedTicket.ticket.counterparty.eq(userB as Address), 'wrong counterparty')
     assert(signedTicket.ticket.challenge.eq(ticketData.challenge), 'wrong challenge')
@@ -94,8 +93,8 @@ describe('test signedTicket construction', async function () {
 
     assert(await signedTicketB.verify(userAPubKey))
 
-    assert(new Hash(await signedTicketA.signer).eq(new Hash(userAPubKey)), 'signer incorrect')
-    assert(new Hash(await signedTicketB.signer).eq(new Hash(userAPubKey)), 'signer incorrect')
+    assert((await signedTicketA.signer).toHex() == userAPubKey.toHex(), 'signer incorrect')
+    assert((await signedTicketB.signer).toHex() == userAPubKey.toHex(), 'signer incorrect')
 
     assert(signedTicketB.ticket.counterparty.eq(userB as Address), 'wrong counterparty')
     assert(signedTicketB.ticket.challenge.eq(ticketData.challenge), 'wrong challenge')
@@ -148,7 +147,7 @@ describe('test signedTicket construction', async function () {
 
     assert(await signedTicket.verify(userAPubKey))
 
-    assert(new Hash(await signedTicket.signer).eq(new Hash(userAPubKey)), 'signer incorrect')
+    assert((await signedTicket.signer).toHex() == userAPubKey.toHex(), 'signer incorrect')
 
     assert(signedTicket.ticket.counterparty.eq(userB as Address), 'wrong counterparty')
     assert(signedTicket.ticket.challenge.eq(ticketData.challenge), 'wrong challenge')

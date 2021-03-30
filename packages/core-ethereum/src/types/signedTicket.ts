@@ -1,13 +1,13 @@
 import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import { u8aConcat } from '@hoprnet/hopr-utils'
 import secp256k1 from 'secp256k1'
-import { Signature, Ticket } from '../types'
+import { Signature, Ticket, PublicKey } from '../types'
 import { Uint8ArrayE } from '../types/extended'
 import { verify } from '../utils'
 
 class SignedTicket extends Uint8ArrayE implements Types.SignedTicket {
   private _signature?: Signature
-  private _signer?: Uint8Array
+  private _signer?: PublicKey 
 
   constructor(
     arr?: {
@@ -78,18 +78,19 @@ class SignedTicket extends Uint8ArrayE implements Types.SignedTicket {
     return this._signature
   }
 
-  get signer(): Promise<Uint8Array> {
+  get signer(): Promise<PublicKey> {
     if (this._signer) {
       return Promise.resolve(this._signer)
     }
 
     return new Promise(async (resolve, reject) => {
       try {
-        this._signer = secp256k1.ecdsaRecover(
+        this._signer = new PublicKey(
+          secp256k1.ecdsaRecover(
           this.signature.signature,
           this.signature.recovery,
           (await this.ticket.hash).serialize()
-        )
+        ))
         return resolve(this._signer)
       } catch (err) {
         return reject(err)
@@ -97,8 +98,8 @@ class SignedTicket extends Uint8ArrayE implements Types.SignedTicket {
     })
   }
 
-  async verify(pubKey: Uint8Array): Promise<boolean> {
-    return verify((await this.ticket.hash).serialize(), this.signature, pubKey)
+  async verify(pubKey: PublicKey): Promise<boolean> {
+    return verify((await this.ticket.hash).serialize(), this.signature, pubKey.serialize())
   }
 
   static get SIZE() {
