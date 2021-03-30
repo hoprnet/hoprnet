@@ -64,11 +64,9 @@ class Channel implements IChannel {
 
     return new Promise<Hash>(async (resolve, reject) => {
       try {
-        this._channelId = new Hash(
-          await this.coreConnector.utils.getId(
-            await this.coreConnector.account.address,
-            await this.coreConnector.utils.pubKeyToAddress(this.counterparty)
-          )
+        this._channelId = await this.coreConnector.utils.getId(
+          await this.coreConnector.account.address,
+          await this.coreConnector.utils.pubKeyToAddress(this.counterparty)
         )
       } catch (error) {
         return reject(error)

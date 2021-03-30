@@ -4,7 +4,7 @@ import { Acknowledgement } from '.'
 import { Challenge } from '../packet/challenge'
 import { u8aEquals, randomInteger, u8aToHex } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
-import { Utils, Types } from '@hoprnet/hopr-core-ethereum'
+import { Utils, Types, Hash } from '@hoprnet/hopr-core-ethereum'
 import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import { randomBytes } from 'crypto'
 import secp256k1 from 'secp256k1'
@@ -27,7 +27,7 @@ describe('test acknowledgement generation', function () {
     for (let i = 0; i < 10; i++) {
       const secret = randomBytes(32)
 
-      const challenge = await Challenge.create(paymentChannels, secret, new BN(0)).sign(sender)
+      const challenge = await Challenge.create(paymentChannels, new Hash(secret), new BN(0)).sign(sender)
       assert(await challenge.verify(sender), `Previously generated challenge should be valid.`)
 
       const pubKey = sender.pubKey.marshal()

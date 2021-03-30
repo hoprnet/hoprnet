@@ -1,6 +1,5 @@
-import Hash from './hash'
 import Signature from './signature'
-import { UINT256, Address, Balance } from '.' // TODO: cyclic
+import { UINT256, Address, Balance, Hash } from '.' // TODO: cyclic
 
 declare interface TicketStatic {
   readonly SIZE: number

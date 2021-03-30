@@ -37,7 +37,7 @@ describe('test utils', function () {
 
     assert(
       u8aEquals(
-        await utils.hash(testMsg),
+        (await utils.hash(testMsg)).serialize(),
         new Uint8Array([
           232,
           231,
@@ -116,13 +116,6 @@ describe('test utils', function () {
     const address = await utils.pubKeyToAddress(pair.pubKey)
 
     assert(u8aEquals(address.serialize(), pair.address))
-  })
-
-  it('should compute the winning probability properly', function () {
-    for (let i = 0; i < 10; i++) {
-      let rnd = Math.random()
-      assert(Math.abs(utils.computeWinningProbability(rnd)[0] / 255) - rnd < 1 / 256)
-    }
   })
 
   it('should compute a winning probability and convert it to float', function () {

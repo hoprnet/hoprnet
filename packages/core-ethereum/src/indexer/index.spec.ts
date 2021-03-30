@@ -52,7 +52,7 @@ describe('test indexer', function () {
     userC = await createAccountAndFund(web3, hoprToken, userA, testconfigs.DEMO_ACCOUNTS[2])
     //
     userD = await createAccountAndFund(web3, hoprToken, userA, testconfigs.DEMO_ACCOUNTS[3])
-    connector = await createNode(userA.privKey, undefined, 8)
+    connector = await createNode(userA.privKey.serialize(), undefined, 8)
 
     await connector.start()
     await connector.initOnchainValues()
@@ -122,18 +122,14 @@ describe('test indexer', function () {
       const expectedChannelId = await getId(userA.address, userB.address)
       const channels = await connector.indexer.getChannelsOf(userA.address)
       assert.equal(channels.length, 1, 'check Channels.get')
-
-      const [channel] = channels
-      assert(u8aEquals(expectedChannelId, await channel.getChannelId()), 'check Channels.get')
+      assert(expectedChannelId.eq(await channels[0].getChannelId()), 'check Channels.get')
     })
 
     it('should find channel using partyB', async function () {
       const expectedChannelId = await getId(userA.address, userB.address)
       const channels = await connector.indexer.getChannelsOf(userB.address)
       assert.equal(channels.length, 1, 'check Channels.get')
-
-      const [channel] = channels
-      assert(u8aEquals(expectedChannelId, await channel.getChannelId()), 'check Channels.get')
+      assert(expectedChannelId.eq(await channels[0].getChannelId()), 'check Channels.get')
     })
 
     it('should find channel using partyA & partyB', async function () {

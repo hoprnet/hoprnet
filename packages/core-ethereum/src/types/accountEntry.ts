@@ -3,7 +3,7 @@ import BN from 'bn.js'
 import { u8aSplit, serializeToU8a } from '@hoprnet/hopr-utils'
 import { Address } from '.' // TODO: cyclic dep
 import Public from './public'
-import Hash from './hash'
+import { Hash } from '.'
 import { UINT256 } from './solidity'
 
 class AccountEntry implements Interfaces.AccountEntry {
@@ -29,13 +29,13 @@ class AccountEntry implements Interfaces.AccountEntry {
 
   public serialize(): Uint8Array {
     const publicKey = this.publicKey || new Public({ length: Public.SIZE })
-    const secret = this.secret || new Hash({ length: Hash.SIZE })
+    const secret = this.secret || new Hash(new Uint8Array(Hash.SIZE))
     const counter = this.counter ? new UINT256(this.counter).serialize() : UINT256.fromString('0').serialize()
 
     return serializeToU8a([
       [this.address.serialize(), Address.SIZE],
       [publicKey, Public.SIZE],
-      [secret, Hash.SIZE],
+      [secret.serialize(), Hash.SIZE],
       [counter, UINT256.SIZE]
     ])
   }

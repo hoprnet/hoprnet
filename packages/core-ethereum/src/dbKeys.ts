@@ -47,9 +47,9 @@ export function Challenge(channelId: Types.Hash, challenge: Types.Hash): Uint8Ar
   return allocationHelper([
     [PREFIX.length, PREFIX],
     [challengeSubPrefix.length, challengeSubPrefix],
-    [Hash.SIZE, channelId],
+    [Hash.SIZE, channelId.serialize()],
     [SEPERATOR.length, SEPERATOR],
-    [Hash.SIZE, challenge]
+    [Hash.SIZE, challenge.serialize()]
   ])
 }
 
@@ -74,7 +74,7 @@ export function ChannelId(signatureHash: Types.Hash): Uint8Array {
   return allocationHelper([
     [PREFIX.length, PREFIX],
     [channelIdSubPrefix.length, channelIdSubPrefix],
-    [Hash.SIZE, signatureHash]
+    [Hash.SIZE, signatureHash.serialize()]
   ])
 }
 
@@ -87,9 +87,9 @@ export function Nonce(channelId: Types.Hash, nonce: Types.Hash): Uint8Array {
   return allocationHelper([
     [PREFIX.length, PREFIX],
     [nonceSubPrefix.length, nonceSubPrefix],
-    [Hash.SIZE, channelId],
+    [Hash.SIZE, channelId.serialize()],
     [SEPERATOR.length, SEPERATOR],
-    [Hash.SIZE, nonce]
+    [Hash.SIZE, nonce.serialize()]
   ])
 }
 
@@ -109,13 +109,13 @@ export function OnChainSecretIntermediary(iteration: number): Uint8Array {
 /**
  * Returns the db-key under which the tickets are saved in the database.
  */
-export function AcknowledgedTicket(counterPartyPubKey: Types.Public, challange: Types.Hash): Uint8Array {
+export function AcknowledgedTicket(counterPartyPubKey: Types.Public, challenge: Types.Hash): Uint8Array {
   return allocationHelper([
     [ticketSubPrefix.length, ticketSubPrefix],
     [acknowledgedSubPrefix.length, acknowledgedSubPrefix],
     [counterPartyPubKey.length, counterPartyPubKey],
     [SEPERATOR.length, SEPERATOR],
-    [challange.length, challange]
+    [Hash.SIZE, challenge.serialize()]
   ])
 }
 
