@@ -165,7 +165,7 @@ class HashedSecret {
   public async initialize(debug?: boolean): Promise<void> {
     if (this.initialized) return
     this.offChainSecret = await getFromDB(this.db, OnChainSecret())
-    this.onChainSecret = await this.account.onChainSecret
+    this.onChainSecret = await this.account.getOnChainSecret()
     if (this.onChainSecret != undefined && this.offChainSecret != undefined) {
       try {
         await this.findPreImage(this.onChainSecret) // throws if not found

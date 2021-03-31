@@ -9,6 +9,8 @@ declare interface ChannelStatic {
 declare interface Channel {
   readonly counterparty: Public
 
+  getId(): Promise<Hash>
+
   getState(): Promise<ChannelEntry>
 
   getBalances(): Promise<{

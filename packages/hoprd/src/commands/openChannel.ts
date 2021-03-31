@@ -5,7 +5,7 @@ import { startDelayedInterval, moveDecimalPoint } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 import chalk from 'chalk'
 import readline from 'readline'
-import { checkPeerIdInput, getPeers, getOpenChannels, styleValue } from './utils'
+import { checkPeerIdInput, getPeers, styleValue } from './utils'
 import { AbstractCommand, AutoCompleteResult, GlobalState } from './abstractCommand'
 
 export abstract class OpenChannelBase extends AbstractCommand {
@@ -37,24 +37,42 @@ export abstract class OpenChannelBase extends AbstractCommand {
       return [[this.name()], line]
     }
 
-    const peersWithOpenChannel = await getOpenChannels(this.node, this.node.getId())
-    const allPeers = getPeers(this.node, {
+    const ethereum = this.node.paymentChannels
+    const selfPubKey = new ethereum.types.Public(this.node.getId().pubKey.marshal())
+    const self = await selfPubKey.toAddress()
+
+    const peers = getPeers(this.node, {
       noBootstrapNodes: true
     })
 
-    const peers = allPeers.reduce((acc: string[], peer: PeerId) => {
-      if (!peersWithOpenChannel.find((p: PeerId) => p.equals(peer.id))) {
-        acc.push(peer.toB58String())
-      }
-      return acc
-    }, [])
+    // get channels which are ours & open
+    const channels = await ethereum.indexer.getChannels(async (channel) => {
+      // must be one of ours
+      if (!self.eq(channel.partyA) && !self.eq(channel.partyB)) return false
+      // must be open
+      if (channel.getStatus() === 'CLOSED') return false
 
-    if (peers.length < 1) {
+      return true
+    })
+
+    // show only peers which we can see
+    let availablePeers: string[] = []
+    for (const peer of peers) {
+      const pubKey = new ethereum.types.Public(peer.pubKey.marshal())
+      const address = await pubKey.toAddress()
+      const hasOpenChannel = channels.some((channel) => {
+        return address.eq(channel.partyA) || address.eq(channel.partyB)
+      })
+
+      if (!hasOpenChannel) availablePeers.push(peer.toB58String())
+    }
+
+    if (availablePeers.length < 1) {
       console.log(styleValue(`\nDoesn't know any new node to open a payment channel with.`, 'failure'))
       return [[''], line]
     }
 
-    const hits = query ? peers.filter((peerId: string) => peerId.startsWith(query)) : peers
+    const hits = query ? availablePeers.filter((peerId: string) => peerId.startsWith(query)) : availablePeers
 
     return [hits.length ? hits.map((str: string) => `open ${str}`) : ['open'], line]
   }

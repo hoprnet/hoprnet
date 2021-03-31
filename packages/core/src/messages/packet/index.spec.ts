@@ -8,16 +8,16 @@ import LevelUp from 'levelup'
 import MemDown from 'memdown'
 import BN from 'bn.js'
 
-import { ACKNOWLEDGED_TICKET_INDEX_LENGTH } from '../../dbKeys'
+// import { ACKNOWLEDGED_TICKET_INDEX_LENGTH } from '../../dbKeys'
 import { connectionHelper } from '../../test-utils'
-import type { AcknowledgedTicket } from '@hoprnet/hopr-core-connector-interface/src/types'
+// import type { AcknowledgedTicket } from '@hoprnet/hopr-core-connector-interface/src/types'
 import { privKeyToPeerId } from '@hoprnet/hopr-utils'
 import { NODE_SEEDS } from '@hoprnet/hopr-demo-seeds'
 import type Multiaddr from 'multiaddr'
 
-import Debug from 'debug'
+// import Debug from 'debug'
 
-const log = Debug(`hopr-core:test`)
+// const log = Debug(`hopr-core:test`)
 
 const TWO_SECONDS = durations.seconds(2)
 const CHANNEL_DEPOSIT = new BN(200) // HOPRli
@@ -51,31 +51,31 @@ async function generateNode(
   })) as Hopr<HoprEthereum>
 }
 
-/**
- * Fetches all tickets from the database of a node
- * @param node the HOPR instance
- */
-async function getTicketsFromDatabase(node: Hopr<any>): Promise<AcknowledgedTicket[]> {
-  let tickets: AcknowledgedTicket[] = []
+// /**
+//  * Fetches all tickets from the database of a node
+//  * @param node the HOPR instance
+//  */
+// async function getTicketsFromDatabase(node: Hopr<any>): Promise<AcknowledgedTicket[]> {
+//   let tickets: AcknowledgedTicket[] = []
 
-  return new Promise((resolve, reject) =>
-    node.db
-      .createValueStream({
-        // Note that LevelDB does not work with Uint8Array keys
-        gte: Buffer.from(node._dbKeys.AcknowledgedTickets(Buffer.alloc(ACKNOWLEDGED_TICKET_INDEX_LENGTH, 0x00))),
-        lt: Buffer.from(node._dbKeys.AcknowledgedTickets(Buffer.alloc(ACKNOWLEDGED_TICKET_INDEX_LENGTH, 0xff)))
-      })
-      // Note that LevelDB outputs Buffers and not Uint8Arrays
-      .on('data', (data: Buffer) => {
-        const acknowledged = node.paymentChannels.types.AcknowledgedTicket.create(node.paymentChannels)
-        acknowledged.set(data)
+//   return new Promise((resolve, reject) =>
+//     node.db
+//       .createValueStream({
+//         // Note that LevelDB does not work with Uint8Array keys
+//         gte: Buffer.from(node._dbKeys.AcknowledgedTickets(Buffer.alloc(ACKNOWLEDGED_TICKET_INDEX_LENGTH, 0x00))),
+//         lt: Buffer.from(node._dbKeys.AcknowledgedTickets(Buffer.alloc(ACKNOWLEDGED_TICKET_INDEX_LENGTH, 0xff)))
+//       })
+//       // Note that LevelDB outputs Buffers and not Uint8Arrays
+//       .on('data', (data: Buffer) => {
+//         const acknowledged = node.paymentChannels.types.AcknowledgedTicket.create(node.paymentChannels)
+//         acknowledged.set(data)
 
-        tickets.push(acknowledged)
-      })
-      .on('error', reject)
-      .on('end', () => resolve(tickets))
-  )
-}
+//         tickets.push(acknowledged)
+//       })
+//       .on('error', reject)
+//       .on('end', () => resolve(tickets))
+//   )
+// }
 
 /**
  * Opens and funds a payment channel between `a` and `b`.
@@ -186,18 +186,19 @@ describe('test packet composition and decomposition', function () {
 
     await new Promise((resolve) => setTimeout(resolve, 700))
 
-    for (let node of nodes) {
-      const tickets: AcknowledgedTicket[] = await getTicketsFromDatabase(node)
+    // whole test is deprecated already
+    // for (let node of nodes) {
+    //   const tickets: AcknowledgedTicket[] = await getTicketsFromDatabase(node)
 
-      if (tickets.length == 0) {
-        continue
-      }
+    //   if (tickets.length == 0) {
+    //     continue
+    //   }
 
-      for (let k = 0; k < tickets.length; k++) {
-        await node.paymentChannels.channel.tickets.submit(tickets[k] as any)
-        log(`ticket submitted`)
-      }
-    }
+    //   for (let k = 0; k < tickets.length; k++) {
+    //     await node.paymentChannels.channel.tickets.submit(tickets[k] as any)
+    //     log(`ticket submitted`)
+    //   }
+    // }
 
     await Promise.all(nodes.map((node: Hopr<HoprEthereum>) => node.stop()))
   })

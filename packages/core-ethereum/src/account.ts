@@ -1,10 +1,9 @@
 import type { TransactionConfig } from 'web3-core'
 import type HoprEthereum from '.'
-import type { ContractEventEmitter } from './tsc/web3/types'
 import type { TransactionObject } from './tsc/web3/types'
 import type { HoprToken } from './tsc/web3/HoprToken'
 import Web3 from 'web3'
-import { durations, stringToU8a, u8aEquals, u8aToHex, isExpired } from '@hoprnet/hopr-utils'
+import { durations, u8aToHex, isExpired } from '@hoprnet/hopr-utils'
 import NonceTracker from './nonce-tracker'
 import TransactionManager from './transaction-manager'
 import { Address, AcknowledgedTicket, Balance, Hash, NativeBalance, UINT256 } from './types'
@@ -21,8 +20,6 @@ const cache = new Map<'balance' | 'nativeBalance', { value: string; updatedAt: n
 
 class Account {
   private _address?: Address
-  private _ticketEpoch?: UINT256
-  private _ticketEpochListener?: ContractEventEmitter<any>
   private _onChainSecret?: Hash
   private _nonceTracker: NonceTracker
   private _transactions = new TransactionManager()
@@ -70,11 +67,7 @@ class Account {
     })
   }
 
-  async stop() {
-    if (this._ticketEpochListener) {
-      this._ticketEpochListener.removeAllListeners()
-    }
-  }
+  async stop() {}
 
   /**
    * @deprecated Nonces are automatically assigned when signing a transaction
@@ -102,52 +95,23 @@ class Account {
     return getNativeBalance(this.coreConnector.web3, await this.address, useCache)
   }
 
-  get ticketEpoch(): Promise<UINT256> {
-    if (this._ticketEpoch != null) {
-      return Promise.resolve(this._ticketEpoch)
-    }
-
-    this.attachAccountDataListener()
-
-    return this.address.then((address) => {
-      return this.coreConnector.hoprChannels.methods
-        .accounts(address.toHex())
-        .call()
-        .then((res) => {
-          this._ticketEpoch = UINT256.fromString(res.counter)
-
-          return this._ticketEpoch
-        })
-    })
+  async getTicketEpoch(): Promise<UINT256> {
+    const state = await this.coreConnector.indexer.getAccount(await this.address)
+    if (!state || !state.counter) return UINT256.fromString('0')
+    return new UINT256(state.counter)
   }
 
   /**
    * Returns the current value of the onChainSecret
    */
-  get onChainSecret(): Promise<Hash> {
-    if (this._onChainSecret != null) {
-      return Promise.resolve(this._onChainSecret)
-    }
+  async getOnChainSecret(): Promise<Hash> {
+    if (this._onChainSecret) return this._onChainSecret
 
-    this.attachAccountDataListener()
+    const state = await this.coreConnector.indexer.getAccount(await this.address)
+    if (!state || !state.secret) return new Hash(EMPTY_HASHED_SECRET)
 
-    return this.address.then((address) => {
-      return this.coreConnector.hoprChannels.methods
-        .accounts(address.toHex())
-        .call()
-        .then((res) => {
-          const hashedSecret = stringToU8a(res.secret)
-
-          // true if this string is an empty bytes32
-          if (u8aEquals(hashedSecret, EMPTY_HASHED_SECRET)) {
-            return undefined
-          }
-
-          this._onChainSecret = new Hash(hashedSecret)
-
-          return this._onChainSecret
-        })
-    })
+    this._onChainSecret = state.secret
+    return state.secret
   }
 
   /**
@@ -158,7 +122,7 @@ class Account {
   async reservePreImageIfIsWinning(ticket: AcknowledgedTicket) {
     // TODO replace this whole clusterf***
     if (!this.preimage) {
-      this.preimage = await this.coreConnector.hashedSecret.findPreImage(await this.onChainSecret)
+      this.preimage = await this.coreConnector.hashedSecret.findPreImage(await this.getOnChainSecret())
     }
     if (
       await isWinningTicket(
@@ -272,37 +236,6 @@ class Account {
     return {
       send,
       transactionHash: signedTransaction.transactionHash
-    }
-  }
-
-  private async attachAccountDataListener() {
-    if (this._ticketEpochListener == null) {
-      // listen for 'SecretHashSet' events and update 'ticketEpoch'
-      // on error, safely reset 'ticketEpoch' & event listener
-      try {
-        this._ticketEpochListener = this.coreConnector.hoprChannels.events
-          .AccountSecretUpdated({
-            fromBlock: 'latest',
-            filter: {
-              account: (await this.address).toHex()
-            }
-          })
-          .on('data', (event) => {
-            log('new ticketEpoch', event.returnValues.counter)
-
-            this._onChainSecret = new Hash(stringToU8a(event.returnValues.secret))
-            this._ticketEpoch = UINT256.fromString(event.returnValues.counter)
-          })
-          .on('error', (error) => {
-            log('error listening to SecretHashSet events', error.message)
-
-            this._ticketEpochListener?.removeAllListeners()
-            this._ticketEpoch = undefined
-          })
-      } catch (err) {
-        log(err)
-        this._ticketEpochListener?.removeAllListeners()
-      }
     }
   }
 }

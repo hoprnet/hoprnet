@@ -1,8 +1,9 @@
-import type { Channel as IChannel, Indexer } from '@hoprnet/hopr-core-connector-interface'
+import type { Channel as IChannel, Indexer, Types as Interfaces } from '@hoprnet/hopr-core-connector-interface'
 import type Connector from '.'
 import BN from 'bn.js'
 import { Public, Balance, Hash, UINT256, Ticket, SignedTicket, AcknowledgedTicket } from './types'
 import { getId, waitForConfirmation, computeWinningProbability, Log, checkChallenge, isWinningTicket } from './utils'
+import { fundChannel } from './ethereum'
 
 const log = Log(['channel'])
 const EMPTY_PRE_IMAGE = new Hash(new Uint8Array(Hash.SIZE).fill(0x00))
@@ -10,14 +11,21 @@ const EMPTY_PRE_IMAGE = new Hash(new Uint8Array(Hash.SIZE).fill(0x00))
 class Channel implements IChannel {
   constructor(
     private readonly indexer: Indexer,
-    private readonly connector: Connector, // TODO: remove this
+    private readonly connector: Connector, // TODO: replace with ethereum global context?
     private readonly self: Public,
     public readonly counterparty: Public
   ) {}
 
+  async getId() {
+    return getId(await this.self.toAddress(), await this.counterparty.toAddress())
+  }
+
   async getState() {
-    const channelId = await getId(await this.self.toAddress(), await this.counterparty.toAddress())
-    return this.indexer.getChannel(channelId)
+    const channelId = await this.getId()
+    const state = await this.indexer.getChannel(channelId)
+    if (state) return state
+
+    throw Error(`Channel state for ${channelId.toHex()} not found`)
   }
 
   async getBalances() {
@@ -32,9 +40,15 @@ class Channel implements IChannel {
   }
 
   async open(fundAmount: Balance) {
-    const state = await this.getState()
+    // check if we have initialized account, initialize if we didnt
+    await this.connector.initOnchainValues()
 
-    if (state.getStatus() !== 'CLOSED') {
+    // channel may not exist, we can still open it
+    let state: Interfaces.ChannelEntry
+    try {
+      state = await this.getState()
+    } catch {}
+    if (state && state.getStatus() !== 'CLOSED') {
       throw Error('Channel is already opened')
     }
 
@@ -45,24 +59,11 @@ class Channel implements IChannel {
     }
 
     try {
-      await waitForConfirmation(
-        (
-          await this.connector.account.signTransaction(
-            {
-              from: myAddress.toHex(),
-              to: this.connector.hoprToken.options.address
-            },
-            this.connector.hoprToken.methods.send(
-              this.connector.hoprChannels.options.address,
-              fundAmount.toBN().toString(),
-              this.connector.web3.eth.abi.encodeParameters(
-                ['bool', 'address', 'address'],
-                [true, myAddress, (await this.counterparty.toAddress()).toHex()]
-              )
-            )
-          )
-        ).send()
-      )
+      await fundChannel(this.connector, {
+        fundAmount,
+        counterparty: await this.counterparty.toAddress(),
+        openChannel: true
+      })
     } catch (err) {
       // TODO: catch race-condition
       console.log(err)
@@ -152,15 +153,15 @@ class Channel implements IChannel {
   }
 
   async createDummyTicket(challenge: Hash): Promise<SignedTicket> {
-    const ticketWinProb = computeWinningProbability(1) // Value is unimportant here.
     const counterpartyAddress = await this.counterparty.toAddress()
 
+    // TODO: document how dummy ticket works
     const ticket = new Ticket(undefined, {
       counterparty: counterpartyAddress,
       challenge,
       epoch: UINT256.fromString('0'),
       amount: new Balance(new BN(0)),
-      winProb: ticketWinProb,
+      winProb: computeWinningProbability(1),
       channelIteration: UINT256.fromString('0')
     })
 
@@ -172,16 +173,6 @@ class Channel implements IChannel {
       ticket
     })
   }
-
-  // async verifyTicket(signedTicket: SignedTicket) {
-  //   try {
-  //     await this.connector.channel.testAndSetNonce(signedTicket)
-  //   } catch {
-  //     return false
-  //   }
-
-  //   return await signedTicket.verify(await this.channel.offChainCounterparty)
-  // }
 
   async submitTicket(ackTicket: AcknowledgedTicket): ReturnType<IChannel['submitTicket']> {
     try {

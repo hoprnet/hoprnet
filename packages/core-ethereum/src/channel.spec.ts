@@ -2,16 +2,14 @@ import { randomBytes } from 'crypto'
 import { Ganache } from '@hoprnet/hopr-testing'
 import { migrate } from '@hoprnet/hopr-ethereum'
 import assert from 'assert'
-import { stringToU8a, u8aEquals, u8aConcat, durations } from '@hoprnet/hopr-utils'
+import { stringToU8a, u8aConcat, durations } from '@hoprnet/hopr-utils'
 import { getAddresses, abis } from '@hoprnet/hopr-ethereum'
-import { getPrivKeyData, createAccountAndFund, createNode } from './utils/testing.spec'
-import { createChallenge, hash } from './utils'
+import { getPrivKeyData, createAccountAndFund, createNode, Account } from './utils/testing.spec'
+import { createChallenge, isPartyA, hash } from './utils'
 import BN from 'bn.js'
-import pipe from 'it-pipe'
 import Web3 from 'web3'
 import { HoprToken } from './tsc/web3/HoprToken'
 import { Await } from './tsc/utils'
-import { Channel as ChannelType, ChannelStatus, ChannelBalance, ChannelState } from '../types/channel'
 import { AcknowledgedTicket, Balance, SignedTicket, Address } from './types'
 import CoreConnector from '.'
 import Channel from './channel'
@@ -27,8 +25,10 @@ describe('test Channel class', function () {
 
   let web3: Web3
   let hoprToken: HoprToken
-  let coreConnector: CoreConnector
-  let counterpartysCoreConnector: CoreConnector
+  let partyA: Account
+  let partyB: Account
+  let partyAConnector: CoreConnector
+  let partyBConnector: CoreConnector
   let funder: Await<ReturnType<typeof getPrivKeyData>>
 
   async function getTicketData({
@@ -72,135 +72,58 @@ describe('test Channel class', function () {
     funder = await getPrivKeyData(stringToU8a(testconfigs.FUND_ACCOUNT_PRIVATE_KEY))
     const userA = await createAccountAndFund(web3, hoprToken, funder, testconfigs.DEMO_ACCOUNTS[1])
     const userB = await createAccountAndFund(web3, hoprToken, funder, testconfigs.DEMO_ACCOUNTS[2])
+    ;[partyA, partyB] = isPartyA(userA.address, userB.address) ? [userA, userB] : [userB, userA]
 
-    coreConnector = await createNode(userA.privKey.serialize())
-    await coreConnector.initOnchainValues()
-    await coreConnector.start()
+    partyAConnector = await createNode(partyA.privKey.serialize())
+    await partyAConnector.initOnchainValues()
+    await partyAConnector.start()
 
-    counterpartysCoreConnector = await createNode(userB.privKey.serialize())
-    await counterpartysCoreConnector.initOnchainValues()
-    await counterpartysCoreConnector.start()
+    partyBConnector = await createNode(partyB.privKey.serialize())
+    await partyBConnector.initOnchainValues()
+    await partyBConnector.start()
   })
 
   afterEach(async function () {
-    await Promise.all([coreConnector.stop(), counterpartysCoreConnector.stop()])
+    await Promise.all([partyAConnector.stop(), partyBConnector.stop()])
   })
 
   it('should create a channel and submit tickets', async function () {
     this.timeout(durations.minutes(1))
 
-    const channelBalance = new ChannelBalance(undefined, {
-      balance: new Balance(new BN(123)),
-      balance_a: new Balance(new BN(122))
-    })
-
-    const channel = await coreConnector.channel.create(
-      counterpartysCoreConnector.account.keys.onChain.pubKey,
-      async () => counterpartysCoreConnector.account.keys.onChain.pubKey,
-      channelBalance,
-      async (channelBalance: ChannelBalance) => {
-        const result = await pipe(
-          [
-            (
-              await coreConnector.channel.createSignedChannel(undefined, {
-                channel: new ChannelType(undefined, {
-                  balance: channelBalance,
-                  state: new ChannelState(undefined, { state: ChannelStatus.CLOSED })
-                })
-              })
-            ).subarray()
-          ],
-          counterpartysCoreConnector.channel.handleOpeningRequest.bind(counterpartysCoreConnector.channel),
-          async (source: AsyncIterable<Uint8Array>) => {
-            let result: Uint8Array
-            for await (const msg of source) {
-              if (result! == null) {
-                result = msg.slice()
-                return result
-              } else {
-                continue
-              }
-            }
-          }
-        )
-
-        return new SignedChannel({
-          bytes: result.buffer,
-          offset: result.byteOffset
-        })
-      }
-    )
-
-    const myAddress = await coreConnector.utils.pubKeyToAddress(coreConnector.account.keys.onChain.pubKey)
-    const counterpartyAddress = await coreConnector.utils.pubKeyToAddress(
-      counterpartysCoreConnector.account.keys.onChain.pubKey
-    )
-
     const firstTicket = await getTicketData({
-      counterparty: myAddress
+      counterparty: partyA.address
     })
-    const firstAckedTicket = new AcknowledgedTicket(undefined, {
-      response: firstTicket.response
-    })
-    const signedTicket = await channel.ticket.create(
+
+    const partyAChannel = new Channel(partyAConnector.indexer, partyAConnector, partyA.pubKey, partyB.pubKey)
+    await partyAChannel.open(new Balance(new BN(123)))
+
+    const signedTicket = await partyAChannel.createTicket(
       new Balance(new BN(1)),
       firstTicket.challenge,
-      firstTicket.winProb,
-      {
-        bytes: firstAckedTicket.buffer,
-        offset: firstAckedTicket.signedTicketOffset
-      }
+      firstTicket.winProb
     )
+    const firstAckedTicket = new AcknowledgedTicket(undefined, {
+      signedTicket,
+      response: firstTicket.response
+    })
 
+    assert(partyA.pubKey.eq(await signedTicket.signer), `Check that signer is recoverable`)
+
+    const partyAIndexerChannels = await partyAConnector.indexer.getChannels()
     assert(
-      u8aEquals(await signedTicket.signer, coreConnector.account.keys.onChain.pubKey),
-      `Check that signer is recoverable`
-    )
-
-    const dbChannels = (await counterpartysCoreConnector.channel.getAll(
-      async (arg: any) => arg,
-      async (arg: any) => Promise.all(arg)
-    )) as Channel[]
-
-    assert(
-      u8aEquals(dbChannels[0].counterparty, coreConnector.account.keys.onChain.pubKey),
+      partyAIndexerChannels[0].partyA.eq(partyA.address) && partyAIndexerChannels[0].partyB.eq(partyB.address),
       `Channel record should make it into the database and its db-key should lead to the Address of the counterparty.`
     )
 
-    const counterpartysChannel = await counterpartysCoreConnector.channel.create(
-      coreConnector.account.keys.onChain.pubKey,
-      () => Promise.resolve(coreConnector.account.keys.onChain.pubKey)
-    )
+    const partyBChannel = new Channel(partyBConnector.indexer, partyBConnector, partyB.pubKey, partyA.pubKey)
+    assert((await partyAChannel.getState()).getStatus() === 'OPEN', `Checks that party A considers the channel open.`)
+    assert((await partyBChannel.getState()).getStatus() === 'OPEN', `Checks that party A considers the channel open.`)
+    assert(await partyBConnector.account.reservePreImageIfIsWinning(firstAckedTicket), `ticket must be winning`)
 
-    assert(
-      await coreConnector.channel.isOpen(counterpartysCoreConnector.account.keys.onChain.pubKey),
-      `Checks that party A considers the channel open.`
-    )
-
-    assert(
-      await counterpartysCoreConnector.channel.isOpen(coreConnector.account.keys.onChain.pubKey),
-      `Checks that party B considers the channel open.`
-    )
-
-    assert(
-      await counterpartysCoreConnector.account.reservePreImageIfIsWinning(firstAckedTicket),
-      `ticket must be winning`
-    )
-
-    await channel.testAndSetNonce(new Uint8Array(1).fill(0xff)), `Should be able to set nonce.`
-
-    assert.rejects(
-      () => channel.testAndSetNonce(new Uint8Array(1).fill(0xff)),
-      `Should reject when trying to set nonce twice.`
-    )
-
-    assert(await counterpartysChannel.ticket.verify(signedTicket), `Ticket signature must be valid.`)
-
-    const hashedSecretBefore = await counterpartysChannel.coreConnector.account.onChainSecret
-    console.log(hashedSecretBefore, firstAckedTicket.preImage)
+    const hashedSecretBefore = await partyBConnector.account.getOnChainSecret()
 
     try {
-      const result = await counterpartysCoreConnector.channel.tickets.submit(firstAckedTicket)
+      const result = await partyBChannel.submitTicket(firstAckedTicket)
       if (result.status === 'ERROR') {
         throw result.error
       } else if (result.status === 'FAILURE') {
@@ -210,13 +133,12 @@ describe('test Channel class', function () {
       throw error
     }
 
-    const hashedSecretAfter = await counterpartysChannel.coreConnector.account.onChainSecret
-
+    const hashedSecretAfter = await partyBConnector.account.getOnChainSecret()
     assert(!hashedSecretBefore.eq(hashedSecretAfter), 'Ticket redemption must alter on-chain secret.')
 
     let errThrown = false
     try {
-      const result = await counterpartysCoreConnector.channel.tickets.submit(firstAckedTicket)
+      const result = await partyBChannel.submitTicket(firstAckedTicket)
       if (result.status === 'ERROR' || result.status === 'FAILURE') {
         errThrown = true
       }
@@ -233,22 +155,21 @@ describe('test Channel class', function () {
 
     for (let i = 0; i < ATTEMPTS; i++) {
       ticketData = await getTicketData({
-        counterparty: counterpartyAddress,
+        counterparty: partyA.address,
         winProb: 1
       })
-      let ackedTicket = new AcknowledgedTicket(undefined, {
+      nextSignedTicket = await partyAChannel.createTicket(
+        new Balance(new BN(1)),
+        ticketData.challenge,
+        ticketData.winProb
+      )
+      const ackedTicket = new AcknowledgedTicket(undefined, {
+        signedTicket: nextSignedTicket,
         response: ticketData.response
       })
 
-      nextSignedTicket = await channel.ticket.create(new Balance(new BN(1)), ticketData.challenge, ticketData.winProb, {
-        bytes: ackedTicket.buffer,
-        offset: ackedTicket.signedTicketOffset
-      })
-
-      assert(await counterpartysChannel.ticket.verify(nextSignedTicket), `Ticket signature must be valid.`)
-
-      if (await counterpartysCoreConnector.account.reservePreImageIfIsWinning(ackedTicket)) {
-        const result = await counterpartysCoreConnector.channel.tickets.submit(ackedTicket)
+      if (await partyBConnector.account.reservePreImageIfIsWinning(ackedTicket)) {
+        const result = await partyBChannel.submitTicket(ackedTicket)
         assert(result.status === 'SUCCESS', 'ticket redeemption was not a success')
         assert(result?.ackTicket?.redeemed, 'ticket should get marked as redeemed')
       }

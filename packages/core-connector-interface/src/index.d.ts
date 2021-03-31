@@ -37,11 +37,11 @@ declare interface HoprCoreConnector {
     /**
      * Returns the current value of the reset counter
      */
-    ticketEpoch: Promise<Types.UINT256>
+    getTicketEpoch(): Promise<Types.UINT256>
     /**
      * Returns the current value of the onChainSecret
      */
-    onChainSecret: Promise<Types.Hash>
+    getOnChainSecret(): Promise<Types.Hash>
     /**
      * Returns the accounts address
      */

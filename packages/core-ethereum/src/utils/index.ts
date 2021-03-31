@@ -14,7 +14,7 @@ import {
   durations,
   u8aToNumber
 } from '@hoprnet/hopr-utils'
-import { Address, Balance, Hash, Signature } from '../types'
+import { Address, Balance, Hash, Signature, Public } from '../types'
 import { ChannelStatus } from '../types/channelEntry'
 import { ContractEventEmitter } from '../tsc/web3/types'
 import * as constants from '../constants'
@@ -63,9 +63,9 @@ export function getId(self: Address, counterparty: Address): Promise<Hash> {
 /**
  * Given a private key, derive public key.
  * @param privKey the private key to derive the public key from
- * @returns a promise resolved to Uint8Array
+ * @returns a promise resolved to Public
  */
-export async function privKeyToPubKey(privKey: Uint8Array): Promise<Uint8Array> {
+export async function privKeyToPubKey(privKey: Uint8Array): Promise<Public> {
   if (privKey.length != constants.PRIVATE_KEY_LENGTH)
     throw Error(
       `Invalid input parameter. Expected a Uint8Array of size ${constants.PRIVATE_KEY_LENGTH}. Got '${typeof privKey}'${
@@ -73,7 +73,7 @@ export async function privKeyToPubKey(privKey: Uint8Array): Promise<Uint8Array> 
       }.`
     )
 
-  return publicKeyCreate(privKey, true)
+  return new Public(publicKeyCreate(privKey, true))
 }
 
 /**
@@ -156,7 +156,9 @@ export async function verify(msg: Uint8Array, signature: Signature, pubKey: Uint
 export async function isWinningTicket(ticketHash: Hash, challengeResponse: Hash, preImage: Hash, winProb: Hash) {
   return [A_STRICLY_LESS_THAN_B, A_EQUALS_B].includes(
     u8aCompare(
-      Hash.create(u8aConcat(ticketHash.serialize(), preImage.serialize(), challengeResponse.serialize())).serialize(),
+      Hash.create(
+        u8aConcat(ticketHash.serialize(), preImage.serialize(), challengeResponse.serialize(), winProb.serialize())
+      ).serialize(),
       winProb.serialize()
     )
   )

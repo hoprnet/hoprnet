@@ -1,3 +1,4 @@
+import type PeerId from 'peer-id'
 import type { AccountEntry, Address, Public, Balance, ChannelEntry, Hash } from './types'
 
 export type RoutingChannel = [source: PeerId, destination: PeerId, stake: Balance]
