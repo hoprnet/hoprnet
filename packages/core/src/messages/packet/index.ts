@@ -244,6 +244,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     receivedChallenge: Challenge<Chain>
     ticketKey: Uint8Array
   }> {
+    const ethereum = this.node.paymentChannels
     this.header.deriveSecret(this.libp2p.peerId.privKey.marshal())
 
     if (await this.testAndSetTag(this.node.db)) {
@@ -264,11 +265,16 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     if (!isRecipient) {
       ;[sender, target] = await Promise.all([this.getSenderPeerId(), this.getTargetPeerId()])
 
+      const senderPubKey = new ethereum.types.Public(sender.pubKey.marshal())
+      const targetPubKey = new ethereum.types.Public(target.pubKey.marshal())
+      const channel = new ethereum.channel(ethereum.indexer, ethereum, senderPubKey, targetPubKey)
+
       try {
         await validateUnacknowledgedTicket({
           node: this.node,
           senderPeerId: sender,
           signedTicket: await this.ticket,
+          channel,
           getTickets: () =>
             getTickets(this.node, {
               signer: sender.pubKey.marshal()

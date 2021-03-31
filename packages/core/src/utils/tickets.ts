@@ -1,5 +1,5 @@
 import type Chain from '@hoprnet/hopr-core-connector-interface'
-import type { Types } from '@hoprnet/hopr-core-connector-interface'
+import type { Types, Channel } from '@hoprnet/hopr-core-connector-interface'
 import type PeerId from 'peer-id'
 import type Hopr from '..'
 import { u8aEquals } from '@hoprnet/hopr-utils'
@@ -253,11 +253,13 @@ export async function validateUnacknowledgedTicket({
   node,
   senderPeerId,
   signedTicket,
+  channel,
   getTickets
 }: {
   node: Hopr<Chain>
   senderPeerId: PeerId
   signedTicket: Types.SignedTicket
+  channel: Channel
   getTickets: () => Promise<Types.SignedTicket[]>
 }): Promise<void> {
   const ethereum = node.paymentChannels
@@ -274,7 +276,6 @@ export async function validateUnacknowledgedTicket({
   const accountCounter = (await ethereum.account.getTicketEpoch()).toBN()
   const ticketWinProb = ethereum.utils.getWinProbabilityAsFloat(ticket.winProb)
   // channel
-  const channel = new ethereum.channel(ethereum.indexer, ethereum, selfPubKey, senderPubKey)
   const channelState = await channel.getState()
 
   // ticket signer MUST be the sender
@@ -293,7 +294,7 @@ export async function validateUnacknowledgedTicket({
   }
 
   // channel MUST be open or pending to close
-  if (channelState.getStatus() !== 'CLOSED') {
+  if (channelState.getStatus() === 'CLOSED') {
     throw Error(`Payment channel with '${senderB58}' is not open or pending to close`)
   }
 

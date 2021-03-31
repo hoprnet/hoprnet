@@ -45,8 +45,6 @@ declare interface Channel {
         error: Error | string
       }
   >
-
-  // verifyTicket(signedTicket: SignedTicket): Promise<boolean>
 }
 
 declare var Channel: ChannelStatic

@@ -89,6 +89,7 @@ class HashedSecret {
             )
           ).send()
         )
+        this.account.updateLocalState(secret)
       } catch (e) {
         if (e.message.match(/Account must not be set/)) {
           // There is a potential race condition due to the fact that 2 init
@@ -115,6 +116,7 @@ class HashedSecret {
             )
           ).send()
         )
+        this.account.updateLocalState(secret)
       } catch (e) {
         if (e.message.match(/new and old hashedSecrets are the same/)) {
           // NBD. no-op

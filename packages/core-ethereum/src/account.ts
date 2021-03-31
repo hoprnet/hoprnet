@@ -15,7 +15,7 @@ import BN from 'bn.js'
 import debug from 'debug'
 const log = debug('hopr-core-ethereum:account')
 
-export const EMPTY_HASHED_SECRET = new Uint8Array(Hash.SIZE).fill(0x00)
+export const EMPTY_HASHED_SECRET = new Hash(new Uint8Array(Hash.SIZE).fill(0x00))
 const cache = new Map<'balance' | 'nativeBalance', { value: string; updatedAt: number }>()
 
 class Account {
@@ -104,13 +104,13 @@ class Account {
   /**
    * Returns the current value of the onChainSecret
    */
-  async getOnChainSecret(): Promise<Hash> {
-    if (this._onChainSecret) return this._onChainSecret
+  async getOnChainSecret(): Promise<Hash | undefined> {
+    if (this._onChainSecret && !this._onChainSecret.eq(EMPTY_HASHED_SECRET)) return this._onChainSecret
 
     const state = await this.coreConnector.indexer.getAccount(await this.address)
-    if (!state || !state.secret) return new Hash(EMPTY_HASHED_SECRET)
+    if (!state || !state.secret) return undefined
 
-    this._onChainSecret = state.secret
+    this.updateLocalState(state.secret)
     return state.secret
   }
 

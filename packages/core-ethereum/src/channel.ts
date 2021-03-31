@@ -211,7 +211,6 @@ class Channel implements IChannel {
       }
 
       const counterparty = await this.connector.utils.pubKeyToAddress(await signedTicket.signer)
-      console.log('>>>>', ackTicket.preImage.toHex(), ackTicket.response.toHex())
 
       const transaction = await account.signTransaction(
         {
