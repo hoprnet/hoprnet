@@ -1,6 +1,6 @@
 import createKeccakHash from 'keccak'
 import { ADDRESS_LENGTH, HASH_LENGTH } from '../constants'
-import { u8aToHex, u8aEquals, stringToU8a, moveDecimalPoint } from '@hoprnet/hopr-utils'
+import { u8aToHex, u8aEquals, stringToU8a, moveDecimalPoint, u8aConcat } from '@hoprnet/hopr-utils'
 import type { Types as Interfaces } from '@hoprnet/hopr-core-connector-interface'
 import Web3 from 'web3'
 import BN from 'bn.js'
@@ -127,7 +127,7 @@ export class NativeBalance implements Interfaces.Balance {
 export class PublicKey implements Interfaces.PublicKey {
   constructor(private arr: Uint8Array) {
     if (arr.length !== PublicKey.SIZE) {
-      throw new Error('Incorrect size Uint8Array for public key')
+      throw new Error('Incorrect size Uint8Array for compressed public key')
     }
     // TODO check length
   }
@@ -140,8 +140,18 @@ export class PublicKey implements Interfaces.PublicKey {
     return new PublicKey(arr)
   }
 
+  static fromUncompressedPubKey(pubkey: Uint8Array) {
+    const uncompressedPubKey = u8aConcat(new Uint8Array([4]), pubkey)
+    return new PublicKey(publicKeyConvert(uncompressedPubKey, true))
+  }
+
   toAddress(): Address {
     return new Address(Hash.create(publicKeyConvert(this.arr, false).slice(1)).serialize().slice(12))
+  }
+
+  toUncompressedPubKeyHex(): string {
+    // Needed in only a few cases for interacting with secp256k1
+    return u8aToHex(publicKeyConvert(this.arr, false).slice(1))
   }
 
   static fromString(str: string): PublicKey {

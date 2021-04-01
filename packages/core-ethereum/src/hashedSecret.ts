@@ -73,8 +73,6 @@ class HashedSecret {
     log(`storing secret on chain, setting secret to ${secret.toHex()}`)
     const address = this.account.address.toHex()
     const account = await this.channels.methods.accounts(address).call()
-
-    console.log('>>', this.account.keys.onChain.pubKey.toHex())
     // has no secret stored onchain
     if (Number(account.counter) === 0) {
       log('account is also null, calling channel.init')
@@ -86,7 +84,7 @@ class HashedSecret {
                 from: address,
                 to: this.channels.options.address
               },
-              this.channels.methods.initializeAccount(this.account.keys.onChain.pubKey.toHex(), secret.toHex())
+              this.channels.methods.initializeAccount(this.account.keys.onChain.pubKey.toUncompressedPubKeyHex(), secret.toHex())
             )
           ).send()
         )
