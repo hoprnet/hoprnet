@@ -67,8 +67,6 @@ class Account {
     })
   }
 
-  async stop() {}
-
   /**
    * @deprecated Nonces are automatically assigned when signing a transaction
    * @return next nonce
