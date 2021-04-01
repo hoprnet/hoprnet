@@ -126,10 +126,16 @@ export class NativeBalance implements Interfaces.Balance {
 
 export class PublicKey implements Interfaces.PublicKey {
   constructor(private arr: Uint8Array) {
+    if (arr.length !== PublicKey.SIZE) {
+      throw new Error('Incorrect size Uint8Array for public key')
+    }
     // TODO check length
   }
 
   static fromPrivKey(privKey: Uint8Array): PublicKey {
+    if (privKey.length !== 32) {
+      throw new Error('Incorrect size Uint8Array for private key')
+    }
     let arr = publicKeyCreate(privKey, true)
     return new PublicKey(arr)
   }
