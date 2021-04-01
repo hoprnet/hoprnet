@@ -5,7 +5,7 @@ import { startDelayedInterval, moveDecimalPoint } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 import chalk from 'chalk'
 import readline from 'readline'
-import { checkPeerIdInput, getPeers, styleValue } from './utils'
+import { checkPeerIdInput, isBootstrapNode, styleValue } from './utils'
 import { AbstractCommand, AutoCompleteResult, GlobalState } from './abstractCommand'
 
 export abstract class OpenChannelBase extends AbstractCommand {
@@ -41,9 +41,7 @@ export abstract class OpenChannelBase extends AbstractCommand {
     const selfPubKey = new ethereum.types.Public(this.node.getId().pubKey.marshal())
     const self = await selfPubKey.toAddress()
 
-    const peers = getPeers(this.node, {
-      noBootstrapNodes: true
-    })
+    const peers = this.node.getConnectedPeers().filter((p) => !isBootstrapNode(this.node, p))
 
     // get channels which are ours & open
     const channels = await ethereum.indexer.getChannels(async (channel) => {

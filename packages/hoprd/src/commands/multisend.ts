@@ -4,7 +4,7 @@ import { clearString } from '@hoprnet/hopr-utils'
 import { SendMessageBase } from './sendMessage'
 import readline from 'readline'
 import type PeerId from 'peer-id'
-import { getPeers, checkPeerIdInput, styleValue } from './utils'
+import { isBootstrapNode, checkPeerIdInput, styleValue } from './utils'
 import { GlobalState, AutoCompleteResult, CommandResponse } from './abstractCommand'
 
 export class MultiSendMessage extends SendMessageBase {
@@ -55,9 +55,9 @@ export class MultiSendMessage extends SendMessageBase {
   }
 
   public async autocomplete(query: string, line: string, state: GlobalState): Promise<AutoCompleteResult> {
-    const allIds = getPeers(this.node, {
-      noBootstrapNodes: true
-    })
+    const allIds = this.node
+      .getConnectedPeers()
+      .filter((p) => !isBootstrapNode(this.node, p))
       .map((p) => p.toB58String())
       .concat(Array.from(state.aliases.keys()))
 
