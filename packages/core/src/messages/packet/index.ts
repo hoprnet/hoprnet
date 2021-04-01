@@ -214,45 +214,22 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
           ).serialize()
     )
 
-    const senderPubKey = new chain.types.Public(node.getId().pubKey.marshal())
-    const targetPubKey = new chain.types.Public(path[0].pubKey.marshal())
+    const senderPubKey = new PublicKey(node.getId().pubKey.marshal())
+    const targetPubKey = new PublicKey(path[0].pubKey.marshal())
     const channel = new chain.channel(chain, senderPubKey, targetPubKey)
 
     if (secrets.length > 1) {
       log(`before creating channel`)
 
-<<<<<<< HEAD
-      const channel = await chain.channel.create(path[0].pubKey.marshal())
-      packet._ticket = await channel.ticket.create(new Balance(fee), ticketChallenge, node.ticketWinProb, {
-        bytes: packet.buffer,
-        offset: packet.ticketOffset
-      })
-
-      const myAddress = new PublicKey(node.getId().pubKey.marshal()).toAddress()
-      const counterpartyAddress = channel.counterparty.toAddress()
-      const amPartyA = chain.utils.isPartyA(myAddress, counterpartyAddress)
-=======
       const channelState = await channel.getBalances()
       packet._ticket = await channel.createTicket(new Balance(fee), ticketChallenge, node.ticketWinProb)
 
->>>>>>> a8af5e452929e507ca88dd63fb66494c5f085131
       await validateCreatedTicket({
         myBalance: channelState.self.toBN(),
         signedTicket: packet._ticket
       })
     } else if (secrets.length == 1) {
-<<<<<<< HEAD
-      packet._ticket = await chain.channel.createDummyChannelTicket(
-        new PublicKey(path[0].pubKey.marshal()).toAddress(),
-        ticketChallenge,
-        {
-          bytes: packet.buffer,
-          offset: packet.ticketOffset
-        }
-      )
-=======
       packet._ticket = await channel.createDummyTicket(ticketChallenge)
->>>>>>> a8af5e452929e507ca88dd63fb66494c5f085131
     }
 
     return packet
@@ -288,8 +265,8 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     if (!isRecipient) {
       ;[sender, target] = await Promise.all([this.getSenderPeerId(), this.getTargetPeerId()])
 
-      const senderPubKey = new ethereum.types.Public(sender.pubKey.marshal())
-      const targetPubKey = new ethereum.types.Public(target.pubKey.marshal())
+      const senderPubKey = new PublicKey(sender.pubKey.marshal())
+      const targetPubKey = new PublicKey(target.pubKey.marshal())
       const channel = new ethereum.channel(ethereum, senderPubKey, targetPubKey)
 
       try {
@@ -344,18 +321,12 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
    */
   async prepareForward(_originalSender: PeerId, target: PeerId): Promise<void> {
     const chain = this.node.paymentChannels
-    const { Balance, Public } = chain.types
+    const { Balance } = chain.types
     const signedTicket = await this.ticket
     const ticket = signedTicket.ticket
     const sender = this.node.getId()
-<<<<<<< HEAD
-    const senderAddress = new PublicKey(sender.pubKey.marshal()).toAddress()
-    const targetAddress = new PublicKey(target.pubKey.marshal()).toAddress()
-    const amPartyA = chain.utils.isPartyA(senderAddress, targetAddress)
-=======
-    const senderPubKey = new Public(sender.pubKey.marshal())
-    const targetPubKey = new Public(target.pubKey.marshal())
->>>>>>> a8af5e452929e507ca88dd63fb66494c5f085131
+    const senderPubKey = new PublicKey(sender.pubKey.marshal())
+    const targetPubKey = new PublicKey(target.pubKey.marshal())
     const challenge = u8aConcat(deriveTicketKey(this.header.derivedSecret), this.header.hashedKeyHalf)
 
     if (!(await chain.utils.hash(challenge)).hash().eq(ticket.challenge)) {
@@ -383,45 +354,15 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     const channel = new chain.channel(chain, senderPubKey, targetPubKey)
 
     if (fee.toBN().gtn(0)) {
-<<<<<<< HEAD
-      const channelBalance = ChannelBalance.create(undefined, {
-        balance: fee,
-        balance_a: amPartyA ? fee : new BN(0)
-      })
-
-      const channel = await chain.channel.create(
-        target.pubKey.marshal(),
-        channelBalance,
-        (_channelBalance: Types.ChannelBalance) =>
-          this.node._interactions.payments.open.interact(target, channelBalance)
-      )
-
-      this._ticket = await channel.ticket.create(fee, new Hash(this.header.encryptionKey), this.node.ticketWinProb, {
-        bytes: this.buffer,
-        offset: this.ticketOffset
-      })
-=======
       const balances = await channel.getBalances()
       this._ticket = await channel.createTicket(fee, new Hash(this.header.encryptionKey), this.node.ticketWinProb)
->>>>>>> a8af5e452929e507ca88dd63fb66494c5f085131
 
       await validateCreatedTicket({
         myBalance: balances.self.toBN(),
         signedTicket: this._ticket
       })
     } else if (fee.toBN().isZero()) {
-<<<<<<< HEAD
-      this._ticket = await chain.channel.createDummyChannelTicket(
-        new PublicKey(target.pubKey.marshal()).toAddress(),
-        new Hash(this.header.encryptionKey),
-        {
-          bytes: this.buffer,
-          offset: this.ticketOffset
-        }
-      )
-=======
       this._ticket = await channel.createDummyTicket(new Hash(this.header.encryptionKey))
->>>>>>> a8af5e452929e507ca88dd63fb66494c5f085131
     } else {
       throw Error(`Cannot forward packet`)
     }

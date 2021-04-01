@@ -8,7 +8,7 @@ import chaiAsPromised from 'chai-as-promised'
 import chai, { expect } from 'chai'
 import sinon from 'sinon'
 import { validateUnacknowledgedTicket, validateCreatedTicket } from './tickets'
-import { Address, Balance, Public, Hash, UINT256, Utils } from '@hoprnet/hopr-core-ethereum'
+import { Address, Balance, PublicKey, Hash, UINT256, Utils } from '@hoprnet/hopr-core-ethereum'
 
 chai.use(chaiAsPromised)
 
@@ -56,7 +56,7 @@ const createMockSignedTicket = ({
 }) => {
   return ({
     ticket: createMockTicket({ targetAddress, amount, winProb, channelIteration }),
-    signer: Promise.resolve(new Public(sender.pubKey.marshal()))
+    signer: Promise.resolve(new PublicKey(sender.pubKey.marshal()))
   } as unknown) as Types.SignedTicket
 }
 
@@ -123,7 +123,7 @@ const createMockNode = ({
         getTicketEpoch: sinon.stub().returns(Promise.resolve(ticketEpoch))
       },
       utils: Utils,
-      types: { Public }
+      types: { PublicKey }
     }
   } as unknown) as Hopr<Chain>
 }

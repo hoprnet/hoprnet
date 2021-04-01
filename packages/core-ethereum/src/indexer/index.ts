@@ -9,11 +9,7 @@ import chalk from 'chalk'
 import BN from 'bn.js'
 import Heap from 'heap-js'
 import { pubKeyToPeerId, randomChoice } from '@hoprnet/hopr-utils'
-<<<<<<< HEAD
-import { AccountEntry, Address, ChannelEntry, Hash, PublicKey, Balance, Snapshot } from '../types'
-=======
-import { Address, ChannelEntry, Hash, Public, Balance, Snapshot } from '../types'
->>>>>>> a8af5e452929e507ca88dd63fb66494c5f085131
+import { Address, ChannelEntry, Hash, PublicKey, Balance, Snapshot } from '../types'
 import { getId, Log as DebugLog } from '../utils'
 import * as reducers from './reducers'
 import * as db from './db'
@@ -448,11 +444,7 @@ class Indexer extends EventEmitter implements IIndexer {
   }
 
   // routing
-<<<<<<< HEAD
   public async getPublicKeyOf(address: Address): Promise<PublicKey | undefined> {
-=======
-  public async getPublicKeyOf(address: Address) {
->>>>>>> a8af5e452929e507ca88dd63fb66494c5f085131
     const account = await db.getAccount(this.connector.db, address)
     if (account && account.publicKey) {
       return account.publicKey
@@ -500,13 +492,8 @@ class Indexer extends EventEmitter implements IIndexer {
     return this.toIndexerChannel(await pubKeyToPeerId(partyA.serialize()), random) // TODO: why do we pick partyA?
   }
 
-<<<<<<< HEAD
-  public async getChannelsFromPeer(source: PeerId): Promise<RoutingChannel[]> {
-    const sourcePubKey = new PublicKey(source.pubKey.marshal())
-=======
   public async getChannelsFromPeer(source: PeerId) {
-    const sourcePubKey = new Public(source.pubKey.marshal())
->>>>>>> a8af5e452929e507ca88dd63fb66494c5f085131
+    const sourcePubKey = new PublicKey(source.pubKey.marshal())
     const channels = await this.getChannelsOf(await sourcePubKey.toAddress())
 
     let cout: RoutingChannel[] = []

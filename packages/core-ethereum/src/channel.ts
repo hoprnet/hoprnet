@@ -1,7 +1,7 @@
 import type { Channel as IChannel, Types as Interfaces } from '@hoprnet/hopr-core-connector-interface'
 import type Connector from '.'
 import BN from 'bn.js'
-import { Public, Balance, Hash, UINT256, Ticket, SignedTicket, AcknowledgedTicket } from './types'
+import { PublicKey, Balance, Hash, UINT256, Ticket, SignedTicket, AcknowledgedTicket } from './types'
 import { getId, waitForConfirmation, computeWinningProbability, Log, checkChallenge, isWinningTicket } from './utils'
 
 const log = Log(['channel'])
@@ -10,8 +10,8 @@ const EMPTY_PRE_IMAGE = new Hash(new Uint8Array(Hash.SIZE).fill(0x00))
 class Channel implements IChannel {
   constructor(
     private readonly connector: Connector, // TODO: replace with ethereum global context?
-    private readonly self: Public,
-    public readonly counterparty: Public
+    private readonly self: PublicKey,
+    public readonly counterparty: PublicKey
   ) {}
 
   async getId() {
@@ -228,7 +228,7 @@ class Channel implements IChannel {
         }
       }
 
-      const counterparty = await this.connector.utils.pubKeyToAddress(await signedTicket.signer)
+      const counterparty = (await signedTicket.signer).toAddress()
 
       const transaction = await account.signTransaction(
         {

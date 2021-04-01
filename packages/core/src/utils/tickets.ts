@@ -181,8 +181,8 @@ export async function submitAcknowledgedTicket(
   try {
     const ethereum = node.paymentChannels
     const signedTicket = await ackTicket.signedTicket
-    const self = new ethereum.types.Public(ethereum.account.keys.onChain.pubKey)
-    const counterparty = new ethereum.types.Public(await signedTicket.signer)
+    const self = new PublicKey(ethereum.account.keys.onChain.pubKey)
+    const counterparty = new PublicKey(await signedTicket.signer)
     const channel = new ethereum.channel(ethereum, self, counterparty)
 
     const result = await channel.submitTicket(ackTicket, index)
@@ -258,23 +258,13 @@ export async function validateUnacknowledgedTicket({
   channel: Channel
   getTickets: () => Promise<Types.SignedTicket[]>
 }): Promise<void> {
-<<<<<<< HEAD
-  const ticket = signedTicket.ticket
-  const chain = node.paymentChannels
-  const selfPubKey = new PublicKey(node.getId().pubKey.marshal())
-  const selfAddress = selfPubKey.toAddress()
-  const senderB58 = senderPeerId.toB58String()
-  const senderPubKey = new PublicKey(senderPeerId.pubKey.marshal())
-  const senderAddress = senderPubKey.toAddress()
-  const amPartyA = chain.utils.isPartyA(selfAddress, senderAddress)
-=======
   const ethereum = node.paymentChannels
   // self
-  const selfPubKey = new ethereum.types.Public(node.getId().pubKey.marshal())
+  const selfPubKey = new PublicKey(node.getId().pubKey.marshal())
   const selfAddress = await selfPubKey.toAddress()
   // sender
   const senderB58 = senderPeerId.toB58String()
-  const senderPubKey = new ethereum.types.Public(senderPeerId.pubKey.marshal())
+  const senderPubKey = new PublicKey(senderPeerId.pubKey.marshal())
   // ticket
   const ticket = signedTicket.ticket
   const ticketAmount = ticket.amount.toBN()
@@ -288,7 +278,6 @@ export async function validateUnacknowledgedTicket({
   } catch (err) {
     throw Error(`Error while validating unacknowledged ticket, state not found: '${err.message}'`)
   }
->>>>>>> a8af5e452929e507ca88dd63fb66494c5f085131
 
   // ticket signer MUST be the sender
   if ((await signedTicket.signer).eq(senderPubKey)) {
@@ -305,26 +294,9 @@ export async function validateUnacknowledgedTicket({
     throw Error(`Ticket winning probability '${ticketWinProb}' is lower than '${node.ticketWinProb}'`)
   }
 
-<<<<<<< HEAD
-  // channel MUST be open
-  // (performance) we are making a request to blockchain
-  const channelIsOpen = await chain.channel.isOpen(senderPubKey)
-  if (!channelIsOpen) {
-    throw Error(`Payment channel with '${senderB58}' is not open`)
-  }
-
-  // channel MUST exist in our DB
-  // (performance) we are making a request to blockchain
-  let channel: Channel
-  try {
-    channel = await chain.channel.create(senderPubKey, undefined, undefined)
-  } catch (err) {
-    throw Error(`Stored payment channel with '${senderB58}' not found`)
-=======
   // channel MUST be open or pending to close
   if (channelState.getStatus() === 'CLOSED') {
     throw Error(`Payment channel with '${senderB58}' is not open or pending to close`)
->>>>>>> a8af5e452929e507ca88dd63fb66494c5f085131
   }
 
   // ticket's epoch MUST match our account nonce
