@@ -79,10 +79,14 @@ export default class ListOpenChannels extends AbstractCommand {
         return `\nNo open channels found.`
       }
 
+      // find counterpartys' peerIds
       for (const channel of channels) {
         const id = await channel.getChannelId()
         const selfIsPartyA = u8aEquals(selfAddress.serialize(), channel.partyA.serialize())
         const counterpartyPubKey = await indexer.getPublicKeyOf(selfIsPartyA ? channel.partyB : channel.partyA)
+        // counterparty has not initialized
+        if (!counterpartyPubKey) continue
+
         const totalBalance = moveDecimalPoint(channel.deposit.toString(), types.Balance.DECIMALS * -1)
         const myBalance = moveDecimalPoint(
           selfIsPartyA ? channel.partyABalance.toString() : channel.deposit.sub(channel.partyABalance).toString(),
