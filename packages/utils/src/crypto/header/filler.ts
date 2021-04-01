@@ -4,6 +4,7 @@ import { derivePRGParameters } from './blinding'
 
 export function generateFiller(
   header: Uint8Array,
+  maxHops: number,
   routingInfoLength: number,
   routingInfoLastHopLength: number,
   secrets: Uint8Array[]
@@ -13,7 +14,8 @@ export function generateFiller(
     return
   }
 
-  const packetSize = routingInfoLastHopLength + (secrets.length - 1) * routingInfoLength
+  const packetSize = routingInfoLastHopLength + (maxHops - 1) * routingInfoLength
+  const paddingLength = (maxHops - secrets.length) * routingInfoLength
 
   let length = 0
   let start = packetSize
@@ -27,7 +29,7 @@ export function generateFiller(
 
     u8aXOR(
       true,
-      header.subarray(routingInfoLastHopLength, routingInfoLastHopLength + length),
+      header.subarray(routingInfoLastHopLength + paddingLength, routingInfoLastHopLength + paddingLength + length),
       PRG.createPRG(prgParams).digest(start, end)
     )
   }
