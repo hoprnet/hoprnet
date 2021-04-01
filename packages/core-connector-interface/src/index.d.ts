@@ -1,6 +1,6 @@
 import type { LevelUp } from 'levelup'
 import type * as Utils from './utils'
-import type Channel from './channel'
+import type Channel, { SubmitTicketResponse } from './channel'
 import type * as Types from './types'
 import type * as DbKeys from './dbKeys'
 import type * as Constants from './constants'
@@ -144,6 +144,16 @@ declare interface HoprCoreConnector {
 
 declare var HoprCoreConnector: HoprCoreConnectorStatic
 
-export { Utils, Types, DbKeys, Constants, Channel, Indexer, RoutingChannel, HoprCoreConnectorStatic }
+export {
+  Utils,
+  Types,
+  DbKeys,
+  Constants,
+  Channel,
+  SubmitTicketResponse,
+  Indexer,
+  RoutingChannel,
+  HoprCoreConnectorStatic
+}
 
 export default HoprCoreConnector

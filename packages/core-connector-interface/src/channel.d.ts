@@ -2,6 +2,21 @@ import type AcknowledgedTicket from './types/acknowledgedTicket'
 import type { Address, Balance, Hash, Public, SignedTicket, ChannelEntry } from './types'
 import type Indexer from './indexer'
 
+export type SubmitTicketResponse =
+  | {
+      status: 'SUCCESS'
+      receipt: string
+      ackTicket: AcknowledgedTicket
+    }
+  | {
+      status: 'FAILURE'
+      message: string
+    }
+  | {
+      status: 'ERROR'
+      error: Error | string
+    }
+
 declare interface ChannelStatic {
   // TODO: remove connector and replace with ethereum global context
   new (connector: any, self: Public, counterparty: Public): Channel
@@ -29,24 +44,7 @@ declare interface Channel {
 
   createDummyTicket(challenge: Hash): Promise<SignedTicket>
 
-  submitTicket(
-    ticket: AcknowledgedTicket,
-    ticketIndex: Uint8Array
-  ): Promise<
-    | {
-        status: 'SUCCESS'
-        receipt: string
-        ackTicket: AcknowledgedTicket
-      }
-    | {
-        status: 'FAILURE'
-        message: string
-      }
-    | {
-        status: 'ERROR'
-        error: Error | string
-      }
-  >
+  submitTicket(ticket: AcknowledgedTicket, ticketIndex: Uint8Array): Promise<SubmitTicketResponse>
 }
 
 declare var Channel: ChannelStatic

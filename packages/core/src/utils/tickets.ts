@@ -1,15 +1,10 @@
 import type Chain from '@hoprnet/hopr-core-connector-interface'
-import type { Types, Channel } from '@hoprnet/hopr-core-connector-interface'
+import type { Types, Channel, SubmitTicketResponse } from '@hoprnet/hopr-core-connector-interface'
 import type PeerId from 'peer-id'
 import type Hopr from '..'
 import { u8aEquals } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 import { UnacknowledgedTicket } from '../messages/ticket/unacknowledged'
-
-type OperationSuccess = { status: 'SUCCESS'; receipt: string; ackTicket: Types.AcknowledgedTicket }
-type OperationFailure = { status: 'FAILURE'; message: string }
-type OperationError = { status: 'ERROR'; error: Error | string }
-export type OperationStatus = OperationSuccess | OperationFailure | OperationError
 
 /**
  * Get all unacknowledged tickets
@@ -181,7 +176,7 @@ export async function submitAcknowledgedTicket(
   node: Hopr<Chain>,
   ackTicket: Types.AcknowledgedTicket,
   index: Uint8Array
-): Promise<OperationStatus> {
+): Promise<SubmitTicketResponse> {
   try {
     const ethereum = node.paymentChannels
     const signedTicket = await ackTicket.signedTicket
