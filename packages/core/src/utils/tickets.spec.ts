@@ -64,14 +64,12 @@ const createMockChannel = ({
   isChannelOpen = true,
   isChannelStored = true,
   self = new Balance(new BN(0)),
-  counterparty = new Balance(new BN(100)),
-  stateCounter = new UINT256(new BN(1))
+  counterparty = new Balance(new BN(100))
 }: {
   isChannelOpen?: boolean
   isChannelStored?: boolean
   self?: Balance
   counterparty?: Balance
-  stateCounter?: UINT256
 }) => {
   return ({
     getBalances: sinon.stub().returns(
@@ -88,7 +86,7 @@ const createMockChannel = ({
               return 'CLOSED'
             },
             getIteration() {
-              return Utils.stateCounterToIteration(stateCounter.toBN())
+              return new BN(1)
             }
           })
         )

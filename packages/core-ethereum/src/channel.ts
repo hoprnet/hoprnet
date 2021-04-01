@@ -229,7 +229,6 @@ class Channel implements IChannel {
       }
 
       const counterparty = (await signedTicket.signer).toAddress()
-
       const transaction = await account.signTransaction(
         {
           from: (await account.address).toHex(),

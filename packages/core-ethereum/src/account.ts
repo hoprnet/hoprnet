@@ -104,10 +104,8 @@ class Account {
    */
   async getOnChainSecret(): Promise<Hash | undefined> {
     if (this._onChainSecret && !this._onChainSecret.eq(EMPTY_HASHED_SECRET)) return this._onChainSecret
-
     const state = await this.coreConnector.indexer.getAccount(await this.address)
     if (!state || !state.secret) return undefined
-
     this.updateLocalState(state.secret)
     return state.secret
   }
