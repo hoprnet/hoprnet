@@ -1,6 +1,6 @@
-import { Log } from './utils'
+import Debug from 'debug'
 
-const log = Log(['transcation-manager'])
+const log = Debug('hopr-core-ethereum:transcation-manager')
 
 export type Transaction = {
   nonce: number

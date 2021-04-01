@@ -4,7 +4,6 @@ import { ecdsaSign, ecdsaRecover, ecdsaVerify } from 'secp256k1'
 import { PromiEvent, TransactionReceipt } from 'web3-core'
 import { BlockTransactionString } from 'web3-eth'
 import Web3 from 'web3'
-import Debug from 'debug'
 import {
   u8aCompare,
   u8aConcat,
@@ -348,16 +347,6 @@ export function getNetworkGasPrice(network: Networks): number | undefined {
 
   if (entry && entry[1].gas) return entry[1].gas
   return undefined
-}
-
-/**
- * Create a prefixed Debug instance.
- *
- * @param prefixes an array containing prefixes
- * @returns a debug instance prefixed by joining 'prefixes'
- */
-export function Log(prefixes: string[] = []) {
-  return Debug(['hopr-core-ethereum'].concat(prefixes).join(':'))
 }
 
 /**
