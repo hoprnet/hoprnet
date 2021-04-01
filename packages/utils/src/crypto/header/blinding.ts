@@ -1,5 +1,5 @@
 import { expand } from 'futoin-hkdf'
-import { PRIVATE_KEY_LENGTH, SECRET_LENGTH } from './constants'
+import { PRIVATE_KEY_LENGTH, SECRET_LENGTH, HASH_ALGORITHM, HASH_LENGTH } from './constants'
 import { PRG_IV_LENGTH, PRG_KEY_LENGTH } from '../prg'
 import type { PRGParameters } from '../prg'
 
@@ -11,7 +11,7 @@ export function deriveBlinding(secret: Uint8Array): Uint8Array {
     throw Error(`Invalid arguments`)
   }
 
-  return expand('blake2s256', 32, Buffer.from(secret), PRIVATE_KEY_LENGTH, HASH_KEY_BLINDING)
+  return expand(HASH_ALGORITHM, HASH_LENGTH, Buffer.from(secret), PRIVATE_KEY_LENGTH, HASH_KEY_BLINDING)
 }
 
 export function derivePRGParameters(secret: Uint8Array): PRGParameters {
@@ -19,7 +19,7 @@ export function derivePRGParameters(secret: Uint8Array): PRGParameters {
     throw Error(`Invalid arguments`)
   }
 
-  const rand = expand('blake2s256', 32, Buffer.from(secret), PRG_KEY_LENGTH + PRG_IV_LENGTH, HASH_KEY_PRG)
+  const rand = expand(HASH_ALGORITHM, HASH_LENGTH, Buffer.from(secret), PRG_KEY_LENGTH + PRG_IV_LENGTH, HASH_KEY_PRG)
 
   return {
     iv: rand.subarray(0, PRG_IV_LENGTH),

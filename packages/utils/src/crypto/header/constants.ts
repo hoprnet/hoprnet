@@ -1,8 +1,14 @@
 export const PRIVATE_KEY_LENGTH = 32
 
+export const COMPRESSED_PUBLIC_KEY_LENGTH = 33
 export const UNCOMPRESSED_PUBLIC_KEY_LENGTH = 65
 
-export const SECRET_LENGTH = 32
+export const HASH_ALGORITHM = 'blake2s256'
+export const HASH_LENGTH = 32
+
+export const SECRET_LENGTH = HASH_LENGTH
+
+export const MAC_LENGTH = HASH_LENGTH
 
 // prettier-ignore
 export const BASE_POINT = Uint8Array.from([
