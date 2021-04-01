@@ -1,8 +1,6 @@
 import AcknowledgedTicket from './acknowledgedTicket'
-import { Channel, ChannelBalance, ChannelState } from './channel'
 import Public from './public'
 import Signature from './signature'
-import SignedChannel from './signedChannel'
 import SignedTicket from './signedTicket'
 import Ticket from './ticket'
 import BN from 'bn.js'
@@ -85,7 +83,8 @@ declare interface ChannelEntry {
   closedAt: BN
   getStatus(): 'CLOSED' | 'OPEN' | 'PENDING_TO_CLOSE'
   getIteration(): BN
-  getChannelId(): Promise<Hash>
+  getId(): Promise<Hash>
+  getBalances(): { partyA: Balance; partyB: Balance }
 }
 declare var ChannelEntry: ChannelEntryStatic
 
@@ -105,15 +104,11 @@ export {
   Address,
   AcknowledgedTicket,
   Balance,
-  Channel,
-  ChannelBalance,
-  ChannelState,
   ChannelEntry,
   Hash,
   NativeBalance,
   Public,
   Signature,
-  SignedChannel,
   SignedTicket,
   Ticket,
   UINT256

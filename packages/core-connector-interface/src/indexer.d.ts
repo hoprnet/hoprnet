@@ -1,4 +1,5 @@
-import type { Account, Address, Public, Balance, ChannelEntry, Hash } from './types'
+import type PeerId from 'peer-id'
+import type { AccountEntry, Address, Public, Balance, ChannelEntry, Hash } from './types'
 
 export type RoutingChannel = [source: PeerId, destination: PeerId, stake: Balance]
 
@@ -16,7 +17,7 @@ declare interface Indexer {
   once<U extends keyof IndexerEvents>(event: U, listener: IndexerEvents[U]): this
   emit<U extends keyof IndexerEvents>(event: U, ...args: Parameters<IndexerEvents[U]>): boolean
 
-  getAccount(address: Address): Promise<Account | undefined>
+  getAccount(address: Address): Promise<AccountEntry | undefined>
   getChannel(channelId: Hash): Promise<ChannelEntry | undefined>
   getChannels(filter?: (channel: ChannelEntry) => Promise<boolean>): Promise<ChannelEntry[]>
   getChannelsOf(address: Address): Promise<ChannelEntry[]>

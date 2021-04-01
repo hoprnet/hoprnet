@@ -73,12 +73,3 @@ export declare function computeWinningProbability(prob: number): Hash
  * @param winProb Uint256-encoded version of winning probability
  */
 export declare function getWinProbabilityAsFloat(winProb: Hash): number
-
-/**
- * Convert a state counter, to a number represeting the channels iteration.
- * Iteration stands for the amount of times a channel has been opened and closed.
- *
- * @param stateCounter the state count
- * @returns channel's iteration
- */
-export declare function stateCounterToIteration(stateCounter: BN): BN

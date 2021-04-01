@@ -14,9 +14,8 @@ import {
   durations,
   u8aToNumber
 } from '@hoprnet/hopr-utils'
-import { Address, Balance, Hash, Signature } from '../types'
+import { Address, Balance, Hash, Signature, Public } from '../types'
 import { ContractEventEmitter } from '../tsc/web3/types'
-import { ChannelStatus } from '../types/channel'
 import * as constants from '../constants'
 import * as time from './time'
 import BN from 'bn.js'
@@ -63,9 +62,9 @@ export function getId(self: Address, counterparty: Address): Promise<Hash> {
 /**
  * Given a private key, derive public key.
  * @param privKey the private key to derive the public key from
- * @returns a promise resolved to Uint8Array
+ * @returns a promise resolved to Public
  */
-export async function privKeyToPubKey(privKey: Uint8Array): Promise<Uint8Array> {
+export async function privKeyToPubKey(privKey: Uint8Array): Promise<Public> {
   if (privKey.length != constants.PRIVATE_KEY_LENGTH)
     throw Error(
       `Invalid input parameter. Expected a Uint8Array of size ${constants.PRIVATE_KEY_LENGTH}. Got '${typeof privKey}'${
@@ -73,7 +72,7 @@ export async function privKeyToPubKey(privKey: Uint8Array): Promise<Uint8Array> 
       }.`
     )
 
-  return publicKeyCreate(privKey, true)
+  return new Public(publicKeyCreate(privKey, true))
 }
 
 /**
@@ -156,7 +155,9 @@ export async function verify(msg: Uint8Array, signature: Signature, pubKey: Uint
 export async function isWinningTicket(ticketHash: Hash, challengeResponse: Hash, preImage: Hash, winProb: Hash) {
   return [A_STRICLY_LESS_THAN_B, A_EQUALS_B].includes(
     u8aCompare(
-      Hash.create(u8aConcat(ticketHash.serialize(), preImage.serialize(), challengeResponse.serialize())).serialize(),
+      Hash.create(
+        u8aConcat(ticketHash.serialize(), preImage.serialize(), challengeResponse.serialize(), winProb.serialize())
+      ).serialize(),
       winProb.serialize()
     )
   )
@@ -382,33 +383,6 @@ export function getNetworkGasPrice(network: Networks): number | undefined {
 }
 
 /**
- * Convert a channel state counter, to an enumarated status.
- *
- * @param stateCounter the state counter
- * @returns ChannelStatus
- */
-export function stateCounterToStatus(stateCounter: BN): ChannelStatus {
-  const status = stateCounter.modn(10)
-
-  if (status >= Object.keys(ChannelStatus).length) {
-    throw Error("status like this doesn't exist")
-  }
-
-  return status
-}
-
-/**
- * Convert a state counter, to a number represeting the channels iteration.
- * Iteration stands for the amount of times a channel has been opened and closed.
- *
- * @param stateCount the state count
- * @returns ChannelStatus
- */
-export function stateCounterToIteration(stateCounter: BN): BN {
-  return new BN(String(Math.ceil((stateCounter.toNumber() + 1) / 10)))
-}
-
-/**
  * Create a prefixed Debug instance.
  *
  * @param prefixes an array containing prefixes
@@ -439,13 +413,13 @@ export async function cleanupPromiEvent<E extends ContractEventEmitter<any>, R e
 export function getSignatureParameters(
   signature: Signature
 ): {
-  r: Uint8Array
-  s: Uint8Array
+  r: Hash
+  s: Hash
   v: number
 } {
   return {
-    r: signature.signature.slice(0, 32),
-    s: signature.signature.slice(32, 64),
+    r: new Hash(signature.signature.slice(0, 32)),
+    s: new Hash(signature.signature.slice(32, 64)),
     v: signature.recovery
   }
 }

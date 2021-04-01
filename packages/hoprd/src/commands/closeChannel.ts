@@ -1,5 +1,4 @@
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-import type { Channel as ChannelInstance } from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 import type PeerId from 'peer-id'
 import type { AutoCompleteResult } from './abstractCommand'
@@ -52,14 +51,28 @@ export default class CloseChannel extends AbstractCommand {
   }
 
   async autocomplete(query: string = '', line: string = ''): Promise<AutoCompleteResult> {
+    const ethereum = this.node.paymentChannels
+    const selfPubKey = new ethereum.types.Public(this.node.getId().pubKey.marshal())
+    const self = await selfPubKey.toAddress()
+
+    // get channels which are ours & open
+    const channels = await ethereum.indexer.getChannels(async (channel) => {
+      // must be one of ours
+      if (!self.eq(channel.partyA) && !self.eq(channel.partyB)) return false
+      // must be open
+      if (channel.getStatus() !== 'CLOSED') return false
+
+      return true
+    })
+
     let peerIdStrings: string[]
     try {
-      peerIdStrings = await this.node.paymentChannels.channel.getAll(
-        async (channel: ChannelInstance) => (await pubKeyToPeerId(await channel.offChainCounterparty)).toB58String(),
-        async (peerIdPromises: Promise<string>[]) => {
-          return await Promise.all(peerIdPromises)
-        }
-      )
+      for (const channel of channels) {
+        const counterparty = channel.partyA.eq(self) ? channel.partyB : channel.partyA
+        const pubKey = await ethereum.indexer.getPublicKeyOf(counterparty)
+        const peerId = await pubKeyToPeerId(pubKey)
+        peerIdStrings.push(peerId.toB58String())
+      }
     } catch (err) {
       console.log(styleValue(err.message), 'failure')
       return [[], line]
