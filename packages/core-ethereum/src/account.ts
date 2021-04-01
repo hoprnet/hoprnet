@@ -124,7 +124,7 @@ class Account {
     }
     if (
       await isWinningTicket(
-        await (await ticket.signedTicket).ticket.hash,
+        (await ticket.signedTicket).ticket.getHash(),
         ticket.response,
         this.preimage,
         (await ticket.signedTicket).ticket.winProb

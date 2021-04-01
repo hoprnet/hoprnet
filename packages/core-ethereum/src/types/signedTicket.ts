@@ -31,7 +31,7 @@ class SignedTicket extends Uint8ArrayE implements Types.SignedTicket {
       }
 
       if (struct.ticket) {
-        const ticket = struct.ticket.toU8a()
+        const ticket = struct.ticket.serialize()
 
         if (ticket.length == Ticket.SIZE) {
           this.set(ticket, this.ticketOffset - this.byteOffset)
@@ -57,10 +57,10 @@ class SignedTicket extends Uint8ArrayE implements Types.SignedTicket {
   }
 
   get ticket(): Ticket {
-    return new Ticket({
+    return Ticket.deserialize(new Uint8Array({
       bytes: this.buffer,
       offset: this.ticketOffset
-    })
+    }))
   }
 
   get signatureOffset(): number {
@@ -88,7 +88,7 @@ class SignedTicket extends Uint8ArrayE implements Types.SignedTicket {
         this._signer = secp256k1.ecdsaRecover(
           this.signature.signature,
           this.signature.recovery,
-          (await this.ticket.hash).serialize()
+          this.ticket.getHash().serialize()
         )
         return resolve(this._signer)
       } catch (err) {
@@ -98,7 +98,7 @@ class SignedTicket extends Uint8ArrayE implements Types.SignedTicket {
   }
 
   async verify(pubKey: Uint8Array): Promise<boolean> {
-    return verify((await this.ticket.hash).serialize(), this.signature, pubKey)
+    return verify(this.ticket.getHash().serialize(), this.signature, pubKey)
   }
 
   static get SIZE() {

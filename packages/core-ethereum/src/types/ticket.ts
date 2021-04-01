@@ -1,8 +1,7 @@
 import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import BN from 'bn.js'
-import { stringToU8a, u8aToHex, u8aConcat } from '@hoprnet/hopr-utils'
+import { stringToU8a, u8aToHex, u8aConcat, serializeToU8a } from '@hoprnet/hopr-utils'
 import { Address, Balance, Hash, Signature, UINT256 } from '.'
-import { Uint8ArrayE } from '../types/extended'
 import { sign } from '../utils'
 
 import Web3 from 'web3'
@@ -19,49 +18,17 @@ function toEthSignedMessageHash(msg: string): Hash {
   return new Hash(stringToU8a(web3.eth.accounts.hashMessage(messageWithHOPRHex)))
 }
 
-class Ticket extends Uint8ArrayE implements Types.Ticket {
+class Ticket implements Types.Ticket {
   constructor(
-    arr?: {
-      bytes: ArrayBuffer
-      offset: number
-    },
-    struct?: {
-      counterparty: Address
-      challenge: Hash
-      epoch: UINT256
-      amount: Balance
-      winProb: Hash
-      channelIteration: UINT256
-    }
-  ) {
-    if (!arr && !struct) {
-      throw Error(`Invalid constructor arguments.`)
-    }
+    readonly counterparty: Address,
+    readonly challenge: Hash,
+    readonly epoch: UINT256,
+    readonly amount: Balance,
+    readonly winProb: Hash,
+    readonly channelIteration: UINT256
+  ) {}
 
-    if (!arr) {
-      super(Ticket.SIZE)
-    } else {
-      super(arr.bytes, arr.offset, Ticket.SIZE)
-    }
-
-    if (struct) {
-      this.set(struct.counterparty.serialize(), this.counterpartyOffset - this.byteOffset)
-      this.set(struct.challenge.serialize(), this.challengeOffset - this.byteOffset)
-      this.set(struct.epoch.serialize(), this.epochOffset - this.byteOffset)
-      this.set(struct.amount.serialize(), this.amountOffset - this.byteOffset)
-      this.set(struct.winProb.serialize(), this.winProbOffset - this.byteOffset)
-      this.set(struct.channelIteration.serialize(), this.channelIterationOffset - this.byteOffset)
-    }
-  }
-
-  slice(begin = 0, end = Ticket.SIZE) {
-    return this.subarray(begin, end)
-  }
-
-  subarray(begin = 0, end = Ticket.SIZE) {
-    return new Uint8Array(this.buffer, begin + this.byteOffset, end - begin)
-  }
-
+  /*
   get counterpartyOffset(): number {
     return this.byteOffset
   }
@@ -69,33 +36,32 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
   get counterparty(): Address {
     return new Address(new Uint8Array(this.buffer, this.counterpartyOffset, Address.SIZE))
   }
+  */
 
-  get challengeOffset(): number {
-    return this.byteOffset + Address.SIZE
+  public serialize(): Uint8Array {
+    // the order of the items needs to be the same as the one used in the SC
+    return serializeToU8a([
+      [this.counterparty.serialize(), Address.SIZE],
+      [this.challenge.serialize(), Hash.SIZE],
+      [this.epoch.serialize(), UINT256.SIZE],
+      [this.amount.serialize(), Balance.SIZE],
+      [this.winProb.serialize(), Hash.SIZE],
+      [this.channelIteration.serialize(), UINT256.SIZE]
+    ])
+
   }
 
+  /*
   get challenge(): Hash {
     return new Hash(new Uint8Array(this.buffer, this.challengeOffset, Hash.SIZE))
-  }
-
-  get epochOffset(): number {
-    return this.byteOffset + Address.SIZE + Hash.SIZE
   }
 
   get epoch(): UINT256 {
     return new UINT256(new BN(new Uint8Array(this.buffer, this.epochOffset, UINT256.SIZE)))
   }
 
-  get amountOffset(): number {
-    return this.byteOffset + Address.SIZE + Hash.SIZE + UINT256.SIZE
-  }
-
   get amount(): Balance {
     return new Balance(new BN(new Uint8Array(this.buffer, this.amountOffset, Balance.SIZE)))
-  }
-
-  get winProbOffset(): number {
-    return this.byteOffset + Address.SIZE + Hash.SIZE + UINT256.SIZE + UINT256.SIZE
   }
 
   get winProb(): Hash {
@@ -109,23 +75,10 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
   get channelIteration(): UINT256 {
     return new UINT256(new BN(new Uint8Array(this.buffer, this.channelIterationOffset, UINT256.SIZE)))
   }
+  */
 
-  get hash(): Promise<Hash> {
-    return Promise.resolve(
-      toEthSignedMessageHash(
-        u8aToHex(
-          // the order of the items needs to be the same as the one used in the SC
-          u8aConcat(
-            this.counterparty.serialize(),
-            this.challenge.serialize(),
-            this.epoch.serialize(),
-            this.amount.serialize(),
-            this.winProb.serialize(),
-            this.channelIteration.serialize()
-          )
-        )
-      )
-    )
+  getHash(): Hash {
+    return toEthSignedMessageHash(u8aToHex(this.serialize()))
   }
 
   static get SIZE(): number {
@@ -142,24 +95,7 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
   }
 
   async sign(privKey: Uint8Array): Promise<Signature> {
-    return sign((await this.hash).serialize(), privKey)
-  }
-
-  static create(
-    arr?: {
-      bytes: ArrayBuffer
-      offset: number
-    },
-    struct?: {
-      counterparty: Address
-      challenge: Hash
-      epoch: UINT256
-      amount: Balance
-      winProb: Hash
-      channelIteration: UINT256
-    }
-  ): Ticket {
-    return new Ticket(arr, struct)
+    return sign(this.getHash().serialize(), privKey)
   }
 }
 

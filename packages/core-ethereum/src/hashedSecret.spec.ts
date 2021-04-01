@@ -212,7 +212,7 @@ describe('test hashedSecret', function () {
         if (!ticket.preImage.eq(EMPTY_HASHED_SECRET)) {
           assert(
             await Utils.isWinningTicket(
-              await (await ticket.signedTicket).ticket.hash,
+              await (await ticket.signedTicket).ticket.getHash(),
               ticket.response,
               ticket.preImage,
               (await ticket.signedTicket).ticket.winProb

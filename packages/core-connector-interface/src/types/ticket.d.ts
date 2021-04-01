@@ -4,19 +4,13 @@ import { UINT256, Address, Balance, Hash } from '.' // TODO: cyclic
 declare interface TicketStatic {
   readonly SIZE: number
 
-  create(
-    arr?: {
-      bytes: ArrayBuffer
-      offset: number
-    },
-    struct?: {
-      counterparty: Address
-      challenge: Hash
-      epoch: UINT256
-      amount: Balance
-      winProb: Hash
-      channelIteration: UINT256
-    }
+  new (
+    counterparty: Address,
+    challenge: Hash,
+    epoch: UINT256,
+    amount: Balance,
+    winProb: Hash,
+    channelIteration: UINT256
   ): Ticket
 }
 declare interface Ticket {
@@ -27,13 +21,9 @@ declare interface Ticket {
   winProb: Hash
   channelIteration: UINT256
 
-  // computed properties
-  hash: Promise<Hash>
-
+  getHash(): Hash
   getEmbeddedFunds(): Balance
-
-  toU8a(): Uint8Array
-
+  serialize(): Uint8Array
   sign(privKey: Uint8Array): Promise<Signature>
 }
 

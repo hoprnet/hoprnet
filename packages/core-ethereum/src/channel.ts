@@ -146,20 +146,17 @@ class Channel implements IChannel {
   }
 
   async createTicket(amount: Balance, challenge: Hash, winProb: number) {
-    const ticketWinProb = computeWinningProbability(winProb)
-    const channelState = await this.getState()
     const counterpartyAddress = await this.counterparty.toAddress()
     const counterpartyState = await this.connector.indexer.getAccount(counterpartyAddress)
-    const channelIteration = new UINT256(channelState.getIteration())
 
-    const ticket = new Ticket(undefined, {
-      counterparty: counterpartyAddress,
+    const ticket = new Ticket(
+      counterpartyAddress,
       challenge,
-      epoch: new UINT256(counterpartyState!.counter),
+      new UINT256(counterpartyState.counter),
       amount,
-      winProb: ticketWinProb,
-      channelIteration
-    })
+      computeWinningProbability(winProb),
+      new UINT256((await this.getState()).getIteration())
+    )
 
     // TODO: simplify
     const signature = await ticket.sign(this.connector.account.keys.onChain.privKey)
@@ -171,17 +168,15 @@ class Channel implements IChannel {
   }
 
   async createDummyTicket(challenge: Hash): Promise<SignedTicket> {
-    const counterpartyAddress = await this.counterparty.toAddress()
-
     // TODO: document how dummy ticket works
-    const ticket = new Ticket(undefined, {
-      counterparty: counterpartyAddress,
+    const ticket = new Ticket(
+      await this.counterparty.toAddress(),
       challenge,
-      epoch: UINT256.fromString('0'),
-      amount: new Balance(new BN(0)),
-      winProb: computeWinningProbability(1),
-      channelIteration: UINT256.fromString('0')
-    })
+      UINT256.fromString('0'),
+      new Balance(new BN(0)),
+      computeWinningProbability(1),
+      UINT256.fromString('0')
+    )
 
     // TODO: simplify
     const signature = await ticket.sign(this.connector.account.keys.onChain.privKey)
@@ -219,7 +214,7 @@ class Channel implements IChannel {
         }
       }
 
-      const isWinning = await isWinningTicket(await ticket.hash, ackTicket.response, ackTicket.preImage, ticket.winProb)
+      const isWinning = await isWinningTicket(ticket.getHash(), ackTicket.response, ackTicket.preImage, ticket.winProb)
       if (!isWinning) {
         log(`Failed to submit ticket ${ackTicket.response.toHex()}:  'Not a winning ticket.'`)
         return {
