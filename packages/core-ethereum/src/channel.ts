@@ -2,10 +2,10 @@ import type { Channel as IChannel, Types as Interfaces } from '@hoprnet/hopr-cor
 import type Connector from '.'
 import BN from 'bn.js'
 import { PublicKey, Balance, Hash, UINT256, Ticket, SignedTicket, AcknowledgedTicket } from './types'
-import { getId, waitForConfirmation, computeWinningProbability, Log, checkChallenge, isWinningTicket } from './utils'
+import { getId, waitForConfirmation, computeWinningProbability, checkChallenge, isWinningTicket } from './utils'
+import Debug from 'debug'
 
-const log = Log(['channel'])
-const EMPTY_PRE_IMAGE = new Hash(new Uint8Array(Hash.SIZE).fill(0x00))
+const log = Debug('hopr-core-ethereum:channel')
 
 class Channel implements IChannel {
   constructor(
@@ -201,7 +201,8 @@ class Channel implements IChannel {
       const { hoprChannels, account, utils } = this.connector
       const { r, s, v } = utils.getSignatureParameters(signedTicket.signature)
 
-      const hasPreImage = !ackTicket.preImage.eq(EMPTY_PRE_IMAGE)
+      const emptyPreImage = new Hash(new Uint8Array(Hash.SIZE).fill(0x00))
+      const hasPreImage = !ackTicket.preImage.eq(emptyPreImage)
       if (!hasPreImage) {
         log(`Failed to submit ticket ${ackTicket.response.toHex()}: 'PreImage is empty.'`)
         return {

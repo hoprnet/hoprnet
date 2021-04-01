@@ -10,12 +10,13 @@ import BN from 'bn.js'
 import Heap from 'heap-js'
 import { pubKeyToPeerId, randomChoice } from '@hoprnet/hopr-utils'
 import { Address, ChannelEntry, Hash, PublicKey, Balance, Snapshot } from '../types'
-import { getId, Log as DebugLog } from '../utils'
+import { getId } from '../utils'
 import * as reducers from './reducers'
 import * as db from './db'
 import { isConfirmedBlock, isSyncing, snapshotComparator } from './utils'
+import Debug from 'debug'
 
-const log = DebugLog(['indexer'])
+const log = Debug('hopr-core-ethereum:indexer')
 const getSyncPercentage = (n: number, max: number) => ((n * 100) / max).toFixed(2)
 
 // @TODO: add to constants
