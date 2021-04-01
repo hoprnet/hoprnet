@@ -62,7 +62,7 @@ const createMockSignedTicket = ({
 
 const createMockChannel = ({
   isChannelOpen = true,
-  // isChannelStored = true,
+  isChannelStored = true,
   self = new Balance(new BN(0)),
   counterparty = new Balance(new BN(100)),
   stateCounter = new UINT256(new BN(1))
@@ -80,17 +80,19 @@ const createMockChannel = ({
         counterparty
       })
     ),
-    getState: sinon.stub().returns(
-      Promise.resolve({
-        getStatus() {
-          if (isChannelOpen) return 'OPEN'
-          return 'CLOSED'
-        },
-        getIteration() {
-          return Utils.stateCounterToIteration(stateCounter.toBN())
-        }
-      })
-    )
+    getState: isChannelStored
+      ? sinon.stub().returns(
+          Promise.resolve({
+            getStatus() {
+              if (isChannelOpen) return 'OPEN'
+              return 'CLOSED'
+            },
+            getIteration() {
+              return Utils.stateCounterToIteration(stateCounter.toBN())
+            }
+          })
+        )
+      : sinon.stub().rejects(new Error())
   } as unknown) as Channel
 }
 
@@ -210,22 +212,22 @@ describe('unit test validateUnacknowledgedTicket', function () {
     ).to.eventually.rejectedWith('is not open')
   })
 
-  // it('should throw if channel is not stored', async function () {
-  //   const node = createMockNode({})
-  //   const signedTicket = createMockSignedTicket({})
+  it('should throw if channel is not stored', async function () {
+    const node = createMockNode({})
+    const signedTicket = createMockSignedTicket({})
 
-  //   return expect(
-  //     validateUnacknowledgedTicket({
-  //       node,
-  //       senderPeerId: SENDER,
-  //       signedTicket,
-  //       channel: createMockChannel({
-  //         isChannelStored: false
-  //       }),
-  //       getTickets: getTicketsMock
-  //     })
-  //   ).to.eventually.rejectedWith('not found')
-  // })
+    return expect(
+      validateUnacknowledgedTicket({
+        node,
+        senderPeerId: SENDER,
+        signedTicket,
+        channel: createMockChannel({
+          isChannelStored: false
+        }),
+        getTickets: getTicketsMock
+      })
+    ).to.eventually.rejectedWith('Error while validating unacknowledged ticket, state not found')
+  })
 
   it('should throw if ticket epoch does not match our account counter', async function () {
     const node = createMockNode({

@@ -275,8 +275,13 @@ export async function validateUnacknowledgedTicket({
   const ticketCounter = ticket.epoch.toBN()
   const accountCounter = (await ethereum.account.getTicketEpoch()).toBN()
   const ticketWinProb = ethereum.utils.getWinProbabilityAsFloat(ticket.winProb)
-  // channel
-  const channelState = await channel.getState()
+
+  let channelState: Types.ChannelEntry
+  try {
+    channelState = await channel.getState()
+  } catch (err) {
+    throw Error(`Error while validating unacknowledged ticket, state not found: '${err.message}'`)
+  }
 
   // ticket signer MUST be the sender
   if (!u8aEquals(await signedTicket.signer, senderPubKey)) {
