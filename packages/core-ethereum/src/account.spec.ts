@@ -61,13 +61,13 @@ describe('test Account', function () {
 
   describe('ticketEpoch', function () {
     it('should be 1 initially', async function () {
-      const ticketEpoch = await coreConnector.account.ticketEpoch
+      const ticketEpoch = await coreConnector.account.getTicketEpoch()
 
       expect(ticketEpoch.toBN().toString()).to.equal('1', 'initial ticketEpoch is wrong')
     })
 
     it('should be 2 after setting new secret', async function () {
-      const ticketEpoch = await coreConnector.account.ticketEpoch
+      const ticketEpoch = await coreConnector.account.getTicketEpoch()
 
       expect(ticketEpoch.toBN().toString()).to.equal('2', 'ticketEpoch is wrong')
     })
@@ -79,7 +79,7 @@ describe('test Account', function () {
       // wait for reconnection
       await wait(durations.seconds(2))
 
-      const ticketEpoch = await coreConnector.account.ticketEpoch
+      const ticketEpoch = await coreConnector.account.getTicketEpoch()
 
       expect(ticketEpoch.toBN().toString()).to.equal('3', 'ticketEpoch is wrong')
     })

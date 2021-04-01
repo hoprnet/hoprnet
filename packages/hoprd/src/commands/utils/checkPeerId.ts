@@ -2,7 +2,7 @@ import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 import type { GlobalState } from '../abstractCommand'
 import PeerId from 'peer-id'
-import { getPeersIdsAsString } from './openChannels'
+import { isBootstrapNode } from './isBootstrapNode'
 
 /**
  * Takes a string, and checks whether it's an alias or a valid peerId,
@@ -57,14 +57,18 @@ export function getPeerIdsAndAliases(
   >()
 
   // add online peer ids into map
-  getPeersIdsAsString(node, {
-    noBootstrapNodes: ops.noBootstrapNodes
-  }).forEach((value) => {
-    peerIds.set(value, {
-      value,
-      isOnline: true
+  let peers = node.getConnectedPeers()
+  if (ops.noBootstrapNodes) peers = peers.filter((p) => !isBootstrapNode(node, p))
+
+  // update map
+  peers
+    .map((p) => p.toB58String())
+    .forEach((value) => {
+      peerIds.set(value, {
+        value,
+        isOnline: true
+      })
     })
-  })
 
   // add aliases peer ids into map
   Array.from(state.aliases.entries()).forEach(([alias, peerId]) => {

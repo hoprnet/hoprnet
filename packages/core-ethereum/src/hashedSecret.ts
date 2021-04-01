@@ -89,6 +89,7 @@ class HashedSecret {
             )
           ).send()
         )
+        this.account.updateLocalState(secret)
       } catch (e) {
         if (e.message.match(/Account must not be set/)) {
           // There is a potential race condition due to the fact that 2 init
@@ -115,6 +116,7 @@ class HashedSecret {
             )
           ).send()
         )
+        this.account.updateLocalState(secret)
       } catch (e) {
         if (e.message.match(/new and old hashedSecrets are the same/)) {
           // NBD. no-op
@@ -165,7 +167,7 @@ class HashedSecret {
   public async initialize(debug?: boolean): Promise<void> {
     if (this.initialized) return
     this.offChainSecret = await getFromDB(this.db, OnChainSecret())
-    this.onChainSecret = await this.account.onChainSecret
+    this.onChainSecret = await this.account.getOnChainSecret()
     if (this.onChainSecret != undefined && this.offChainSecret != undefined) {
       try {
         await this.findPreImage(this.onChainSecret) // throws if not found

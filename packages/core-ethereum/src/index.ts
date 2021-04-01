@@ -7,7 +7,7 @@ import type { HoprToken } from './tsc/web3/HoprToken'
 import Web3 from 'web3'
 import chalk from 'chalk'
 import { Networks, getAddresses, abis } from '@hoprnet/hopr-ethereum'
-import { ChannelFactory } from './channel'
+import Channel from './channel'
 import types from './types'
 import { PublicKey } from './types'
 import Indexer from './indexer'
@@ -32,7 +32,7 @@ export default class HoprEthereum implements HoprCoreConnector {
   private _stopping?: Promise<void>
   private _debug: boolean
 
-  public channel: ChannelFactory
+  public channel = Channel
   public types: types
   public indexer: Indexer
   public account: Account
@@ -53,7 +53,6 @@ export default class HoprEthereum implements HoprCoreConnector {
     this.account = new Account(this, privateKey, publicKey, chainId)
     this.indexer = new Indexer(this, maxConfirmations)
     this.types = new types()
-    this.channel = new ChannelFactory(this)
     this._debug = debug
     this.hashedSecret = new HashedSecret(this.db, this.account, this.hoprChannels)
   }
@@ -110,7 +109,6 @@ export default class HoprEthereum implements HoprCoreConnector {
         }
 
         await this.indexer.stop()
-        await this.account.stop()
         provider.disconnect(1000, 'Stopping HOPR node.')
         this._status = 'dead'
         log(chalk.green('Connector stopped'))

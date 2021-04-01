@@ -14,9 +14,9 @@ import {
   durations,
   u8aToNumber
 } from '@hoprnet/hopr-utils'
-import { Address, Balance, Hash, Signature } from '../types'
+import { Address, Balance, Hash, Signature, Public } from '../types'
+import { ChannelStatus } from '../types/channelEntry'
 import { ContractEventEmitter } from '../tsc/web3/types'
-import { ChannelStatus } from '../types/channel'
 import * as constants from '../constants'
 import * as time from './time'
 import BN from 'bn.js'
@@ -61,6 +61,41 @@ export function getId(self: Address, counterparty: Address): Promise<Hash> {
 }
 
 /**
+<<<<<<< HEAD
+=======
+ * Given a private key, derive public key.
+ * @param privKey the private key to derive the public key from
+ * @returns a promise resolved to Public
+ */
+export async function privKeyToPubKey(privKey: Uint8Array): Promise<Public> {
+  if (privKey.length != constants.PRIVATE_KEY_LENGTH)
+    throw Error(
+      `Invalid input parameter. Expected a Uint8Array of size ${constants.PRIVATE_KEY_LENGTH}. Got '${typeof privKey}'${
+        privKey.length ? ` of length ${privKey.length}` : ''
+      }.`
+    )
+
+  return new Public(publicKeyCreate(privKey, true))
+}
+
+/**
+ * Given a public key, derive the Address.
+ * @param pubKey the public key to derive the Address from
+ * @returns a promise resolved to Address
+ */
+export async function pubKeyToAddress(pubKey: Uint8Array): Promise<Address> {
+  if (pubKey.length != constants.COMPRESSED_PUBLIC_KEY_LENGTH)
+    throw Error(
+      `Invalid input parameter. Expected a Uint8Array of size ${
+        constants.COMPRESSED_PUBLIC_KEY_LENGTH
+      }. Got '${typeof pubKey}'${pubKey.length ? ` of length ${pubKey.length}` : ''}.`
+    )
+
+  return new Address((await hash(publicKeyConvert(pubKey, false).slice(1))).serialize().slice(12))
+}
+
+/**
+>>>>>>> a8af5e452929e507ca88dd63fb66494c5f085131
  * Given a message, generate hash using keccak256.
  * @param msg the message to hash
  * @returns a promise resolved to Hash
@@ -124,7 +159,9 @@ export async function verify(msg: Uint8Array, signature: Signature, pubKey: Uint
 export async function isWinningTicket(ticketHash: Hash, challengeResponse: Hash, preImage: Hash, winProb: Hash) {
   return [A_STRICLY_LESS_THAN_B, A_EQUALS_B].includes(
     u8aCompare(
-      Hash.create(u8aConcat(ticketHash.serialize(), preImage.serialize(), challengeResponse.serialize())).serialize(),
+      Hash.create(
+        u8aConcat(ticketHash.serialize(), preImage.serialize(), challengeResponse.serialize(), winProb.serialize())
+      ).serialize(),
       winProb.serialize()
     )
   )
@@ -355,8 +392,8 @@ export function getNetworkGasPrice(network: Networks): number | undefined {
  * @param stateCounter the state counter
  * @returns ChannelStatus
  */
-export function stateCounterToStatus(stateCounter: number): ChannelStatus {
-  const status = Number(stateCounter) % 10
+export function stateCounterToStatus(stateCounter: BN): ChannelStatus {
+  const status = stateCounter.modn(10)
 
   if (status >= Object.keys(ChannelStatus).length) {
     throw Error("status like this doesn't exist")
@@ -372,8 +409,8 @@ export function stateCounterToStatus(stateCounter: number): ChannelStatus {
  * @param stateCount the state count
  * @returns ChannelStatus
  */
-export function stateCounterToIteration(stateCounter: number): number {
-  return Math.ceil(Number(stateCounter + 1) / 10)
+export function stateCounterToIteration(stateCounter: BN): BN {
+  return new BN(String(Math.ceil((stateCounter.toNumber() + 1) / 10)))
 }
 
 /**
@@ -407,13 +444,13 @@ export async function cleanupPromiEvent<E extends ContractEventEmitter<any>, R e
 export function getSignatureParameters(
   signature: Signature
 ): {
-  r: Uint8Array
-  s: Uint8Array
+  r: Hash
+  s: Hash
   v: number
 } {
   return {
-    r: signature.signature.slice(0, 32),
-    s: signature.signature.slice(32, 64),
+    r: new Hash(signature.signature.slice(0, 32)),
+    s: new Hash(signature.signature.slice(32, 64)),
     v: signature.recovery
   }
 }

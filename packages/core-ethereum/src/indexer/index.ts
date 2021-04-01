@@ -9,7 +9,11 @@ import chalk from 'chalk'
 import BN from 'bn.js'
 import Heap from 'heap-js'
 import { pubKeyToPeerId, randomChoice } from '@hoprnet/hopr-utils'
+<<<<<<< HEAD
 import { AccountEntry, Address, ChannelEntry, Hash, PublicKey, Balance, Snapshot } from '../types'
+=======
+import { Address, ChannelEntry, Hash, Public, Balance, Snapshot } from '../types'
+>>>>>>> a8af5e452929e507ca88dd63fb66494c5f085131
 import { getId, Log as DebugLog } from '../utils'
 import * as reducers from './reducers'
 import * as db from './db'
@@ -425,26 +429,30 @@ class Indexer extends EventEmitter implements IIndexer {
     // log('Channel %s got closed by %s', chalk.green(channelId.toHex()), chalk.green(closerAddress.toHex()))
   }
 
-  public async getAccount(address: Address): Promise<AccountEntry | undefined> {
+  public async getAccount(address: Address) {
     return db.getAccount(this.connector.db, address)
   }
 
-  public async getChannel(channelId: Hash): Promise<ChannelEntry | undefined> {
+  public async getChannel(channelId: Hash) {
     return db.getChannel(this.connector.db, channelId)
   }
 
-  public async getChannels(filter?: (channel: ChannelEntry) => Promise<boolean>): Promise<ChannelEntry[]> {
+  public async getChannels(filter?: (channel: ChannelEntry) => Promise<boolean>) {
     return db.getChannels(this.connector.db, filter)
   }
 
-  public async getChannelsOf(address: Address): Promise<ChannelEntry[]> {
+  public async getChannelsOf(address: Address) {
     return db.getChannels(this.connector.db, async (channel) => {
       return address.eq(channel.partyA) || address.eq(channel.partyB)
     })
   }
 
   // routing
+<<<<<<< HEAD
   public async getPublicKeyOf(address: Address): Promise<PublicKey | undefined> {
+=======
+  public async getPublicKeyOf(address: Address) {
+>>>>>>> a8af5e452929e507ca88dd63fb66494c5f085131
     const account = await db.getAccount(this.connector.db, address)
     if (account && account.publicKey) {
       return account.publicKey
@@ -470,7 +478,7 @@ class Indexer extends EventEmitter implements IIndexer {
     }
   }
 
-  public async getRandomChannel(): Promise<RoutingChannel | undefined> {
+  public async getRandomChannel() {
     const HACK = 14744510 // Arbitrarily chosen block for our testnet. Total hack.
 
     const channels = await this.getChannels(async (channel) => {
@@ -492,8 +500,13 @@ class Indexer extends EventEmitter implements IIndexer {
     return this.toIndexerChannel(await pubKeyToPeerId(partyA.serialize()), random) // TODO: why do we pick partyA?
   }
 
+<<<<<<< HEAD
   public async getChannelsFromPeer(source: PeerId): Promise<RoutingChannel[]> {
     const sourcePubKey = new PublicKey(source.pubKey.marshal())
+=======
+  public async getChannelsFromPeer(source: PeerId) {
+    const sourcePubKey = new Public(source.pubKey.marshal())
+>>>>>>> a8af5e452929e507ca88dd63fb66494c5f085131
     const channels = await this.getChannelsOf(await sourcePubKey.toAddress())
 
     let cout: RoutingChannel[] = []

@@ -1,8 +1,5 @@
-import Address from './accountId'
-import Balance from './balance'
-import { Hash } from '.'
 import Signature from './signature'
-import TicketEpoch from './ticketEpoch'
+import { UINT256, Address, Balance, Hash } from '.' // TODO: cyclic
 
 declare interface TicketStatic {
   readonly SIZE: number
@@ -15,20 +12,20 @@ declare interface TicketStatic {
     struct?: {
       counterparty: Address
       challenge: Hash
-      epoch: TicketEpoch
+      epoch: UINT256
       amount: Balance
       winProb: Hash
-      channelIteration: TicketEpoch
+      channelIteration: UINT256
     }
   ): Ticket
 }
 declare interface Ticket {
   counterparty: Address
   challenge: Hash
-  epoch: TicketEpoch
+  epoch: UINT256
   amount: Balance
   winProb: Hash
-  channelIteration: TicketEpoch
+  channelIteration: UINT256
 
   // computed properties
   hash: Promise<Hash>

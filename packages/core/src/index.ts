@@ -25,7 +25,7 @@ import Heartbeat from './network/heartbeat'
 import { findPath } from './path'
 
 import { addPubKey, getAcknowledgedTickets, submitAcknowledgedTicket } from './utils'
-import { u8aToHex, pubKeyToPeerId } from '@hoprnet/hopr-utils'
+import { u8aToHex } from '@hoprnet/hopr-utils'
 import { existsSync, mkdirSync } from 'fs'
 import getIdentity from './identity'
 
@@ -36,8 +36,13 @@ import chalk from 'chalk'
 
 import PeerId from 'peer-id'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
+<<<<<<< HEAD
 import type { HoprCoreConnectorStatic, Types, Channel, RoutingChannel } from '@hoprnet/hopr-core-connector-interface'
 import HoprCoreEthereum, { PublicKey } from '@hoprnet/hopr-core-ethereum'
+=======
+import type { HoprCoreConnectorStatic, Types, RoutingChannel } from '@hoprnet/hopr-core-connector-interface'
+import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
+>>>>>>> a8af5e452929e507ca88dd63fb66494c5f085131
 import BN from 'bn.js'
 
 import { Interactions } from './interactions'
@@ -317,18 +322,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
   }
 
   private async getOpenChannels(): Promise<RoutingChannel[]> {
-    let channels: RoutingChannel[] = []
-    await this.paymentChannels.channel.getAll(
-      async (channel: Channel) => {
-        const pubKey = await channel.offChainCounterparty
-        const peerId = await pubKeyToPeerId(pubKey)
-        channels.push([this.getId(), peerId, await channel.balance]) // TODO partyA?
-      },
-      async (promises: Promise<void>[]) => {
-        await Promise.all(promises)
-      }
-    )
-    return channels
+    return this.paymentChannels.indexer.getChannelsFromPeer(this.getId())
   }
 
   /**
@@ -576,15 +570,16 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
   /**
    * Open a payment channel
    *
-   * @param counterParty the counter party's peerId
+   * @param counterparty the counter party's peerId
    * @param amountToFund the amount to fund in HOPR(wei)
    */
   public async openChannel(
-    counterParty: PeerId,
+    counterparty: PeerId,
     amountToFund: BN
   ): Promise<{
     channelId: Types.Hash
   }> {
+<<<<<<< HEAD
     const { utils, types, account } = this.paymentChannels
     const self = this.getId()
 
@@ -594,6 +589,12 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     )
 
     const myAvailableTokens = await account.getBalance(true)
+=======
+    const ethereum = this.paymentChannels
+    const selfPubKey = new ethereum.types.Public(this.getId().pubKey.marshal())
+    const counterpartyPubKey = new ethereum.types.Public(counterparty.pubKey.marshal())
+    const myAvailableTokens = await ethereum.account.getBalance(true)
+>>>>>>> a8af5e452929e507ca88dd63fb66494c5f085131
 
     // validate 'amountToFund'
     if (amountToFund.lten(0)) {
@@ -602,6 +603,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       throw Error(`You don't have enough tokens: ${amountToFund.toString(10)}<${myAvailableTokens.toBN().toString(10)}`)
     }
 
+<<<<<<< HEAD
     const amPartyA = utils.isPartyA(new PublicKey(self.pubKey.marshal()), new PublicKey(counterParty.pubKey.marshal()))
 
     const channelBalance = types.ChannelBalance.create(
@@ -623,12 +625,17 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       (balance: Types.ChannelBalance): Promise<Types.SignedChannel> =>
         this._interactions.payments.open.interact(counterParty, balance)
     )
+=======
+    const channel = new ethereum.channel(ethereum, selfPubKey, counterpartyPubKey)
+    await channel.open(new ethereum.types.Balance(amountToFund))
+>>>>>>> a8af5e452929e507ca88dd63fb66494c5f085131
 
     return {
-      channelId
+      channelId: await channel.getId()
     }
   }
 
+<<<<<<< HEAD
   public async closeChannel(peerId: PeerId): Promise<{ receipt: string; status: string }> {
     const channel = await this.paymentChannels.channel.create(new PublicKey(peerId.pubKey.marshal()))
 
@@ -636,10 +643,24 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
 
     if (!(status === 'OPEN' || status === 'PENDING_TO_CLOSE')) {
       throw new Error('To close a channel, it must be open or pending for closure')
+=======
+  public async closeChannel(counterparty: PeerId): Promise<{ receipt: string; status: string }> {
+    const ethereum = this.paymentChannels
+    const selfPubKey = new ethereum.types.Public(this.getId().pubKey.marshal())
+    const counterpartyPubKey = new ethereum.types.Public(counterparty.pubKey.marshal())
+    const channel = new ethereum.channel(ethereum, selfPubKey, counterpartyPubKey)
+    const channelState = await channel.getState()
+    const channelStatus = channelState.getStatus()
+
+    // TODO: should we wait for confirmation?
+    if (channelStatus === 'CLOSED') {
+      throw new Error('Channel is already closed')
+>>>>>>> a8af5e452929e507ca88dd63fb66494c5f085131
     }
 
-    const receipt = await channel.initiateSettlement()
-    return { receipt, status }
+    const txHash = await (channelStatus === 'OPEN' ? channel.initializeClosure() : channel.finalizeClosure())
+
+    return { receipt: txHash, status: channelStatus }
   }
 
   public async getAcknowledgedTickets() {

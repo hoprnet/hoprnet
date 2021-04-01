@@ -1,10 +1,15 @@
 import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import BN from 'bn.js'
 import { u8aSplit, serializeToU8a, toU8a } from '@hoprnet/hopr-utils'
-import { Address } from '.' // TODO: cyclic
+import { Address, Balance } from '.' // TODO: cyclic
 import { UINT256 } from '../types/solidity'
-import { ChannelStatus } from '../types/channel'
 import { stateCounterToStatus, stateCounterToIteration, getId } from '../utils'
+
+export enum ChannelStatus {
+  CLOSED,
+  OPEN,
+  PENDING_TO_CLOSE
+}
 
 // TODO: optimize storage
 class ChannelEntry implements Types.ChannelEntry {
@@ -86,7 +91,7 @@ class ChannelEntry implements Types.ChannelEntry {
   }
 
   public getStatus() {
-    const status = stateCounterToStatus(this.stateCounter.toNumber())
+    const status = stateCounterToStatus(this.stateCounter)
 
     if (status >= Object.keys(ChannelStatus).length) {
       throw Error("status like this doesn't exist")
@@ -98,11 +103,18 @@ class ChannelEntry implements Types.ChannelEntry {
   }
 
   public getIteration() {
-    return stateCounterToIteration(this.stateCounter.toNumber())
+    return stateCounterToIteration(this.stateCounter)
   }
 
   public getChannelId() {
     return getId(this.partyA, this.partyB)
+  }
+
+  public getBalances() {
+    return {
+      partyA: new Balance(this.partyABalance),
+      partyB: new Balance(this.deposit.sub(this.partyABalance))
+    }
   }
 }
 

@@ -28,7 +28,6 @@ lib
 
 # Hardhat
 hardhat
-# temporary ignored
 deployments
 
 # exclude generated ABIs
