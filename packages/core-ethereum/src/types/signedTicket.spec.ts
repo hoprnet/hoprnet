@@ -20,7 +20,6 @@ describe('test signedTicket construction', async function () {
   const userAPubKey = await privKeyToPubKey(stringToU8a(testconfigs.DEMO_ACCOUNTS[0]))
 
   it('should create new signedTicket using struct', async function () {
-
     const challenge = new Hash(randomBytes(32))
     const epoch = UINT256.fromString('0')
     const amount = new Balance(new BN(15))
@@ -29,14 +28,7 @@ describe('test signedTicket construction', async function () {
     )
     const channelIteration = UINT256.fromString('0')
 
-    const ticket = new Ticket(
-      userB,
-      challenge,
-      epoch,
-      amount,
-      winProb,
-      channelIteration
-    )
+    const ticket = new Ticket(userB, challenge, epoch, amount, winProb, channelIteration)
     const signature = await ticket.sign(userAPrivKey)
 
     const signedTicket = new SignedTicket(undefined, {

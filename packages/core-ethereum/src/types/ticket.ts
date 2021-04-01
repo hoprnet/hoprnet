@@ -48,7 +48,6 @@ class Ticket implements Types.Ticket {
       [this.winProb.serialize(), Hash.SIZE],
       [this.channelIteration.serialize(), UINT256.SIZE]
     ])
-
   }
 
   /*
