@@ -3,7 +3,8 @@ import type { Address, Balance, Hash, Public, SignedTicket, ChannelEntry } from 
 import type Indexer from './indexer'
 
 declare interface ChannelStatic {
-  new (indexer: Indexer, connector: any, self: Public, counterparty: Public): Channel
+  // TODO: remove connector and replace with ethereum global context
+  new (connector: any, self: Public, counterparty: Public): Channel
 }
 
 declare interface Channel {
@@ -18,10 +19,11 @@ declare interface Channel {
     counterparty: Balance
   }>
 
-  open(fundAmount: Balance): Promise<void>
+  open(fundAmount: Balance): Promise<string>
 
-  initializeClosure(): Promise<void>
-  finalizeClosure(): Promise<void>
+  initializeClosure(): Promise<string>
+
+  finalizeClosure(): Promise<string>
 
   createTicket(amount: Balance, challenge: Hash, winProb: number): Promise<SignedTicket>
 

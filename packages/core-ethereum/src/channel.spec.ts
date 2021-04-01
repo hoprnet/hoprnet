@@ -94,7 +94,7 @@ describe('test Channel class', function () {
       counterparty: partyA.address
     })
 
-    const partyAChannel = new Channel(partyAConnector.indexer, partyAConnector, partyA.pubKey, partyB.pubKey)
+    const partyAChannel = new Channel(partyAConnector, partyA.pubKey, partyB.pubKey)
     await partyAChannel.open(new Balance(new BN(123)))
 
     const signedTicket = await partyAChannel.createTicket(
@@ -115,7 +115,7 @@ describe('test Channel class', function () {
       `Channel record should make it into the database and its db-key should lead to the Address of the counterparty.`
     )
 
-    const partyBChannel = new Channel(partyBConnector.indexer, partyBConnector, partyB.pubKey, partyA.pubKey)
+    const partyBChannel = new Channel(partyBConnector, partyB.pubKey, partyA.pubKey)
     assert((await partyAChannel.getState()).getStatus() === 'OPEN', `Checks that party A considers the channel open.`)
     assert((await partyBChannel.getState()).getStatus() === 'OPEN', `Checks that party A considers the channel open.`)
     assert(await partyBConnector.account.reservePreImageIfIsWinning(firstAckedTicket), `ticket must be winning`)

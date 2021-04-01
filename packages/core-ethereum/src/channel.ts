@@ -1,16 +1,14 @@
-import type { Channel as IChannel, Indexer, Types as Interfaces } from '@hoprnet/hopr-core-connector-interface'
+import type { Channel as IChannel, Types as Interfaces } from '@hoprnet/hopr-core-connector-interface'
 import type Connector from '.'
 import BN from 'bn.js'
 import { Public, Balance, Hash, UINT256, Ticket, SignedTicket, AcknowledgedTicket } from './types'
 import { getId, waitForConfirmation, computeWinningProbability, Log, checkChallenge, isWinningTicket } from './utils'
-import { fundChannel } from './ethereum'
 
 const log = Log(['channel'])
 const EMPTY_PRE_IMAGE = new Hash(new Uint8Array(Hash.SIZE).fill(0x00))
 
 class Channel implements IChannel {
   constructor(
-    private readonly indexer: Indexer,
     private readonly connector: Connector, // TODO: replace with ethereum global context?
     private readonly self: Public,
     public readonly counterparty: Public
@@ -22,7 +20,7 @@ class Channel implements IChannel {
 
   async getState() {
     const channelId = await this.getId()
-    const state = await this.indexer.getChannel(channelId)
+    const state = await this.connector.indexer.getChannel(channelId)
     if (state) return state
 
     throw Error(`Channel state for ${channelId.toHex()} not found`)
@@ -53,17 +51,33 @@ class Channel implements IChannel {
     }
 
     const myAddress = await this.self.toAddress()
+    const counterpartyAddress = await this.counterparty.toAddress()
     const myBalance = await this.connector.hoprToken.methods.balanceOf(myAddress.toHex()).call()
     if (new BN(myBalance).lt(fundAmount.toBN())) {
       throw Error('We do not have enough balance to open a channel')
     }
 
     try {
-      await fundChannel(this.connector, {
-        fundAmount,
-        counterparty: await this.counterparty.toAddress(),
-        openChannel: true
-      })
+      const res = await waitForConfirmation(
+        (
+          await this.connector.account.signTransaction(
+            {
+              from: myAddress.toHex(),
+              to: this.connector.hoprToken.options.address
+            },
+            this.connector.hoprToken.methods.send(
+              this.connector.hoprChannels.options.address,
+              fundAmount.toBN().toString(),
+              this.connector.web3.eth.abi.encodeParameters(
+                ['bool', 'address', 'address'],
+                [true, myAddress.toHex(), counterpartyAddress.toHex()]
+              )
+            )
+          )
+        ).send()
+      )
+
+      return res.transactionHash
     } catch (err) {
       // TODO: catch race-condition
       console.log(err)
@@ -81,7 +95,7 @@ class Channel implements IChannel {
     }
 
     try {
-      await waitForConfirmation(
+      const res = await waitForConfirmation(
         (
           await this.connector.account.signTransaction(
             {
@@ -92,6 +106,8 @@ class Channel implements IChannel {
           )
         ).send()
       )
+
+      return res.transactionHash
     } catch (err) {
       // TODO: catch race-condition
       console.log(err)
@@ -109,7 +125,7 @@ class Channel implements IChannel {
     }
 
     try {
-      await waitForConfirmation(
+      const res = await waitForConfirmation(
         (
           await this.connector.account.signTransaction(
             {
@@ -120,6 +136,8 @@ class Channel implements IChannel {
           )
         ).send()
       )
+
+      return res.transactionHash
     } catch (err) {
       // TODO: catch race-condition
       console.log(err)
@@ -131,7 +149,7 @@ class Channel implements IChannel {
     const ticketWinProb = computeWinningProbability(winProb)
     const channelState = await this.getState()
     const counterpartyAddress = await this.counterparty.toAddress()
-    const counterpartyState = await this.indexer.getAccount(counterpartyAddress)
+    const counterpartyState = await this.connector.indexer.getAccount(counterpartyAddress)
     const channelIteration = new UINT256(channelState.getIteration())
 
     const ticket = new Ticket(undefined, {

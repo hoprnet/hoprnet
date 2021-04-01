@@ -187,7 +187,7 @@ export async function submitAcknowledgedTicket(
     const signedTicket = await ackTicket.signedTicket
     const self = new ethereum.types.Public(ethereum.account.keys.onChain.pubKey)
     const counterparty = new ethereum.types.Public(await signedTicket.signer)
-    const channel = new ethereum.channel(ethereum.indexer, ethereum, self, counterparty)
+    const channel = new ethereum.channel(ethereum, self, counterparty)
 
     const result = await channel.submitTicket(ackTicket, index)
     if (result.status === 'SUCCESS') {

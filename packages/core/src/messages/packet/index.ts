@@ -216,7 +216,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
 
     const senderPubKey = new chain.types.Public(node.getId().pubKey.marshal())
     const targetPubKey = new chain.types.Public(path[0].pubKey.marshal())
-    const channel = new chain.channel(chain.indexer, chain, senderPubKey, targetPubKey)
+    const channel = new chain.channel(chain, senderPubKey, targetPubKey)
 
     if (secrets.length > 1) {
       log(`before creating channel`)
@@ -267,7 +267,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
 
       const senderPubKey = new ethereum.types.Public(sender.pubKey.marshal())
       const targetPubKey = new ethereum.types.Public(target.pubKey.marshal())
-      const channel = new ethereum.channel(ethereum.indexer, ethereum, senderPubKey, targetPubKey)
+      const channel = new ethereum.channel(ethereum, senderPubKey, targetPubKey)
 
       try {
         await validateUnacknowledgedTicket({
@@ -351,7 +351,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
 
     // get new ticket amount
     const fee = new Balance(ticket.amount.toBN().isub(new BN(this.node.ticketAmount)))
-    const channel = new chain.channel(chain.indexer, chain, senderPubKey, targetPubKey)
+    const channel = new chain.channel(chain, senderPubKey, targetPubKey)
 
     if (fee.toBN().gtn(0)) {
       const balances = await channel.getBalances()

@@ -586,7 +586,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
       throw Error(`You don't have enough tokens: ${amountToFund.toString(10)}<${myAvailableTokens.toBN().toString(10)}`)
     }
 
-    const channel = new ethereum.channel(ethereum.indexer, ethereum, selfPubKey, counterpartyPubKey)
+    const channel = new ethereum.channel(ethereum, selfPubKey, counterpartyPubKey)
     await channel.open(new ethereum.types.Balance(amountToFund))
 
     return {
@@ -598,21 +598,18 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     const ethereum = this.paymentChannels
     const selfPubKey = new ethereum.types.Public(this.getId().pubKey.marshal())
     const counterpartyPubKey = new ethereum.types.Public(counterparty.pubKey.marshal())
-    const channel = new ethereum.channel(ethereum.indexer, ethereum, selfPubKey, counterpartyPubKey)
+    const channel = new ethereum.channel(ethereum, selfPubKey, counterpartyPubKey)
     const channelState = await channel.getState()
     const channelStatus = channelState.getStatus()
 
     // TODO: should we wait for confirmation?
     if (channelStatus === 'CLOSED') {
       throw new Error('Channel is already closed')
-    } else if (channelStatus === 'OPEN') {
-      await channel.initializeClosure()
-    } else {
-      await channel.finalizeClosure()
     }
 
-    // TODO: update
-    return { receipt: '', status: '' }
+    const txHash = await (channelStatus === 'OPEN' ? channel.initializeClosure() : channel.finalizeClosure())
+
+    return { receipt: txHash, status: channelStatus }
   }
 
   public async getAcknowledgedTickets() {
