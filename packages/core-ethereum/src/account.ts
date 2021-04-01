@@ -19,7 +19,6 @@ export const EMPTY_HASHED_SECRET = new Hash(new Uint8Array(Hash.SIZE).fill(0x00)
 const cache = new Map<'balance' | 'nativeBalance', { value: string; updatedAt: number }>()
 
 class Account {
-  private _address?: Address
   private _onChainSecret?: Hash
   private _nonceTracker: NonceTracker
   private _transactions = new TransactionManager()
@@ -73,7 +72,7 @@ class Account {
    */
   get nonce(): Promise<number> {
     return this._nonceTracker
-      .getNonceLock(this._address.toHex())
+      .getNonceLock(this.address.toHex())
       .then((res) => res.nonceDetails.params.highestSuggested)
   }
 
@@ -82,7 +81,7 @@ class Account {
    * @returns HOPR balance
    */
   public async getBalance(useCache: boolean = false): Promise<Balance> {
-    return getBalance(this.coreConnector.hoprToken, await this.address, useCache)
+    return getBalance(this.coreConnector.hoprToken, this.address, useCache)
   }
 
   /**
@@ -90,11 +89,11 @@ class Account {
    * @returns ETH balance
    */
   public async getNativeBalance(useCache: boolean = false): Promise<NativeBalance> {
-    return getNativeBalance(this.coreConnector.web3, await this.address, useCache)
+    return getNativeBalance(this.coreConnector.web3, this.address, useCache)
   }
 
   async getTicketEpoch(): Promise<UINT256> {
-    const state = await this.coreConnector.indexer.getAccount(await this.address)
+    const state = await this.coreConnector.indexer.getAccount(this.address)
     if (!state || !state.counter) return UINT256.fromString('0')
     return new UINT256(state.counter)
   }
@@ -104,7 +103,7 @@ class Account {
    */
   async getOnChainSecret(): Promise<Hash | undefined> {
     if (this._onChainSecret && !this._onChainSecret.eq(EMPTY_HASHED_SECRET)) return this._onChainSecret
-    const state = await this.coreConnector.indexer.getAccount(await this.address)
+    const state = await this.coreConnector.indexer.getAccount(this.address)
     if (!state || !state.secret) return undefined
     this.updateLocalState(state.secret)
     return state.secret
@@ -118,7 +117,11 @@ class Account {
   async reservePreImageIfIsWinning(ticket: AcknowledgedTicket) {
     // TODO replace this whole clusterf***
     if (!this.preimage) {
-      this.preimage = await this.coreConnector.hashedSecret.findPreImage(await this.getOnChainSecret())
+      const ocs = await this.getOnChainSecret()
+      if (!ocs) {
+        throw new Error('cannot reserve preimage when there is no on chain secret')
+      }
+      this.preimage = await this.coreConnector.hashedSecret.findPreImage(ocs)
     }
     if (
       await isWinningTicket(
@@ -160,7 +163,7 @@ class Account {
     const gasPrice = getNetworkGasPrice(network)
 
     // @TODO: potential deadlock, needs to be improved
-    const nonceLock = await this._nonceTracker.getNonceLock(this._address.toHex())
+    const nonceLock = await this._nonceTracker.getNonceLock(this.address.toHex())
 
     // @TODO: provide some of the values to avoid multiple calls
     const options = {

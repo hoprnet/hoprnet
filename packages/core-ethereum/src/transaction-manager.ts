@@ -1,5 +1,4 @@
 import Debug from 'debug'
-
 const log = Debug('hopr-core-ethereum:transcation-manager')
 
 export type Transaction = {

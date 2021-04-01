@@ -160,7 +160,7 @@ export default class HoprEthereum implements HoprCoreConnector {
       try {
         if (currency === 'NATIVE') {
           const tx = await this.account.signTransaction({
-            from: (await this.account.address).toHex(),
+            from: this.account.address.toHex(),
             to: recipient,
             value: amount
           })
@@ -169,7 +169,7 @@ export default class HoprEthereum implements HoprCoreConnector {
         } else {
           const tx = await this.account.signTransaction(
             {
-              from: (await this.account.address).toHex(),
+              from: this.account.address.toHex(),
               to: this.hoprToken.options.address
             },
             this.hoprToken.methods.transfer(recipient, amount)
@@ -184,7 +184,7 @@ export default class HoprEthereum implements HoprCoreConnector {
   }
 
   public async hexAccountAddress(): Promise<string> {
-    return (await this.account.address).toHex()
+    return this.account.address.toHex()
   }
 
   public smartContractInfo(): string {
@@ -219,8 +219,9 @@ export default class HoprEthereum implements HoprCoreConnector {
 
     const web3 = new Web3(provider)
 
-    const [chainId, publicKey] = await Promise.all([utils.getChainId(web3), PublicKey.fromPrivKey(seed)])
+    const chainId = await utils.getChainId(web3)
     const network = utils.getNetworkName(chainId) as Networks
+    const publicKey = PublicKey.fromPrivKey(seed)
 
     if (typeof addresses?.[network]?.HoprChannels === 'undefined') {
       throw Error(`token contract address from network ${network} not found`)

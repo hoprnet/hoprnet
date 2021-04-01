@@ -47,7 +47,7 @@ describe('test hashedSecret', function () {
 
       let onChainHash = new Types.Hash(
         stringToU8a(
-          (await connector.hoprChannels.methods.accounts((await connector.account.address).toHex()).call()).secret
+          (await connector.hoprChannels.methods.accounts(connector.account.address.toHex()).call()).secret
         )
       )
 
@@ -59,7 +59,7 @@ describe('test hashedSecret', function () {
         (
           await connector.account.signTransaction(
             {
-              from: (await connector.account.address).toHex(),
+              from: connector.account.address.toHex(),
               to: connector.hoprChannels.options.address
             },
             connector.hoprChannels.methods.updateAccountSecret(preImage.toHex())
@@ -68,7 +68,7 @@ describe('test hashedSecret', function () {
       )
       let updatedOnChainHash = new Types.Hash(
         stringToU8a(
-          (await connector.hoprChannels.methods.accounts((await connector.account.address).toHex()).call()).secret
+          (await connector.hoprChannels.methods.accounts(connector.account.address.toHex()).call()).secret
         )
       )
 
@@ -104,7 +104,7 @@ describe('test hashedSecret', function () {
 
       let onChainHash = new Types.Hash(
         stringToU8a(
-          (await connector.hoprChannels.methods.accounts((await connector.account.address).toHex()).call()).secret
+          (await connector.hoprChannels.methods.accounts(connector.account.address.toHex()).call()).secret
         )
       )
 
@@ -115,7 +115,7 @@ describe('test hashedSecret', function () {
         (
           await connector.account.signTransaction(
             {
-              from: (await connector.account.address).toHex(),
+              from: connector.account.address.toHex(),
               to: connector.hoprChannels.options.address
             },
             connector.hoprChannels.methods.updateAccountSecret(preImage.toHex())
@@ -125,7 +125,7 @@ describe('test hashedSecret', function () {
 
       let updatedOnChainHash = new Types.Hash(
         stringToU8a(
-          (await connector.hoprChannels.methods.accounts((await connector.account.address).toHex()).call()).secret
+          (await connector.hoprChannels.methods.accounts(connector.account.address.toHex()).call()).secret
         )
       )
 
