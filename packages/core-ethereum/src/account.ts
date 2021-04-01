@@ -71,9 +71,7 @@ class Account {
    * @return next nonce
    */
   get nonce(): Promise<number> {
-    return this._nonceTracker
-      .getNonceLock(this.address.toHex())
-      .then((res) => res.nonceDetails.params.highestSuggested)
+    return this._nonceTracker.getNonceLock(this.address.toHex()).then((res) => res.nonceDetails.params.highestSuggested)
   }
 
   /**

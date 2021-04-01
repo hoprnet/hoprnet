@@ -74,7 +74,7 @@ class HashedSecret {
     const address = this.account.address.toHex()
     const account = await this.channels.methods.accounts(address).call()
 
-    console.log(">>", this.account.keys.onChain.pubKey.toHex())
+    console.log('>>', this.account.keys.onChain.pubKey.toHex())
     // has no secret stored onchain
     if (Number(account.counter) === 0) {
       log('account is also null, calling channel.init')
