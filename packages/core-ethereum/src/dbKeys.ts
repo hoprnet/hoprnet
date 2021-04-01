@@ -22,7 +22,7 @@ const ON_CHAIN_SECRET_ITERATION_WIDTH = 4 // bytes
  * Returns the db-key under which the channel is saved.
  * @param counterparty counterparty of the channel
  */
-export function Channel(counterparty: Types.Address): Uint8Array {
+export function Channel(counterparty: Types.PublicKey): Uint8Array {
   return allocationHelper([
     [PREFIX.length, PREFIX],
     [channelSubPrefix.length, channelSubPrefix],

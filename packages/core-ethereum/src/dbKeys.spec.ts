@@ -22,7 +22,7 @@ describe('test dbKeys', function () {
   })
 
   it("should create 'Channel' key", function () {
-    const result = dbKeys.Channel(userB.pubKey.toAddress())
+    const result = dbKeys.Channel(userB.pubKey)
     const expected = u8aConcat(encoder.encode(`payments-channel-`), userB.pubKey.serialize())
     assert(u8aEquals(result, expected), 'check channel key creation')
   })
