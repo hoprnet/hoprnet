@@ -245,19 +245,13 @@ export async function deleteTickets(
 /**
  * Validate unacknowledged tickets as we receive them
  */
-export async function validateUnacknowledgedTicket({
-  node,
-  senderPeerId,
-  signedTicket,
-  channel,
-  getTickets
-}: {
-  node: Hopr<Chain>
-  senderPeerId: PeerId
-  signedTicket: Types.SignedTicket
-  channel: Channel
+export async function validateUnacknowledgedTicket(
+  node: Hopr<Chain>,
+  senderPeerId: PeerId,
+  signedTicket: Types.SignedTicket,
+  channel: Channel,
   getTickets: () => Promise<Types.SignedTicket[]>
-}): Promise<void> {
+): Promise<void> {
   const ethereum = node.paymentChannels
   // self
   const selfPubKey = new PublicKey(node.getId().pubKey.marshal())
@@ -280,7 +274,7 @@ export async function validateUnacknowledgedTicket({
   }
 
   // ticket signer MUST be the sender
-  if ((await signedTicket.signer).eq(senderPubKey)) {
+  if (!(await signedTicket.signer).eq(senderPubKey)) {
     throw Error(`The signer of the ticket does not match the sender`)
   }
 

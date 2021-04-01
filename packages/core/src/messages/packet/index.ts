@@ -270,16 +270,15 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
       const channel = new ethereum.channel(ethereum, senderPubKey, targetPubKey)
 
       try {
-        await validateUnacknowledgedTicket({
-          node: this.node,
-          senderPeerId: sender,
-          signedTicket: await this.ticket,
+        await validateUnacknowledgedTicket(
+          this.node,
+          sender,
+          await this.ticket,
           channel,
-          getTickets: () =>
-            getTickets(this.node, {
+          () => getTickets(this.node, {
               signer: sender.pubKey.marshal()
-            })
-        })
+          })
+        )
       } catch (error) {
         verbose('Could not validate unacknowledged ticket', error.message)
         throw error

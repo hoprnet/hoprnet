@@ -134,13 +134,13 @@ describe('unit test validateUnacknowledgedTicket', function () {
     const signedTicket = createMockSignedTicket({})
 
     return expect(
-      validateUnacknowledgedTicket({
+      validateUnacknowledgedTicket(
         node,
-        senderPeerId: SENDER,
+        SENDER,
         signedTicket,
-        channel: createMockChannel({}),
-        getTickets: getTicketsMock
-      })
+        createMockChannel({}),
+        getTicketsMock
+      )
     ).to.not.eventually.rejected
   })
 
@@ -149,13 +149,13 @@ describe('unit test validateUnacknowledgedTicket', function () {
     const signedTicket = createMockSignedTicket({})
 
     return expect(
-      validateUnacknowledgedTicket({
+      validateUnacknowledgedTicket(
         node,
-        senderPeerId: TARGET,
+        TARGET,
         signedTicket,
-        channel: createMockChannel({}),
-        getTickets: getTicketsMock
-      })
+        createMockChannel({}),
+        getTicketsMock
+      )
     ).to.eventually.rejectedWith('The signer of the ticket does not match the sender')
   })
 
@@ -166,13 +166,13 @@ describe('unit test validateUnacknowledgedTicket', function () {
     const signedTicket = createMockSignedTicket({})
 
     return expect(
-      validateUnacknowledgedTicket({
+      validateUnacknowledgedTicket(
         node,
-        senderPeerId: SENDER,
+        SENDER,
         signedTicket,
-        channel: createMockChannel({}),
-        getTickets: getTicketsMock
-      })
+        createMockChannel({}),
+        getTicketsMock
+      )
     ).to.eventually.rejectedWith('Ticket amount')
   })
 
@@ -183,13 +183,13 @@ describe('unit test validateUnacknowledgedTicket', function () {
     })
 
     return expect(
-      validateUnacknowledgedTicket({
+      validateUnacknowledgedTicket(
         node,
-        senderPeerId: SENDER,
+        SENDER,
         signedTicket,
-        channel: createMockChannel({}),
-        getTickets: getTicketsMock
-      })
+        createMockChannel({}),
+        getTicketsMock
+      )
     ).to.eventually.rejectedWith('Ticket winning probability')
   })
 
@@ -198,15 +198,15 @@ describe('unit test validateUnacknowledgedTicket', function () {
     const signedTicket = createMockSignedTicket({})
 
     return expect(
-      validateUnacknowledgedTicket({
+      validateUnacknowledgedTicket(
         node,
-        senderPeerId: SENDER,
+        SENDER,
         signedTicket,
-        channel: createMockChannel({
+        createMockChannel({
           isChannelOpen: false
         }),
-        getTickets: getTicketsMock
-      })
+        getTicketsMock
+      )
     ).to.eventually.rejectedWith('is not open')
   })
 
@@ -215,15 +215,15 @@ describe('unit test validateUnacknowledgedTicket', function () {
     const signedTicket = createMockSignedTicket({})
 
     return expect(
-      validateUnacknowledgedTicket({
+      validateUnacknowledgedTicket(
         node,
-        senderPeerId: SENDER,
+        SENDER,
         signedTicket,
-        channel: createMockChannel({
+        createMockChannel({
           isChannelStored: false
         }),
-        getTickets: getTicketsMock
-      })
+        getTicketsMock
+      )
     ).to.eventually.rejectedWith('Error while validating unacknowledged ticket, state not found')
   })
 
@@ -234,13 +234,13 @@ describe('unit test validateUnacknowledgedTicket', function () {
     const signedTicket = createMockSignedTicket({})
 
     return expect(
-      validateUnacknowledgedTicket({
+      validateUnacknowledgedTicket(
         node,
-        senderPeerId: SENDER,
+        SENDER,
         signedTicket,
-        channel: createMockChannel({}),
-        getTickets: getTicketsMock
-      })
+        createMockChannel({}),
+        getTicketsMock
+      )
     ).to.eventually.rejectedWith('does not match our account counter')
   })
 
@@ -251,13 +251,13 @@ describe('unit test validateUnacknowledgedTicket', function () {
     })
 
     return expect(
-      validateUnacknowledgedTicket({
+      validateUnacknowledgedTicket(
         node,
-        senderPeerId: SENDER,
+        SENDER,
         signedTicket,
-        channel: createMockChannel({}),
-        getTickets: getTicketsMock
-      })
+        createMockChannel({}),
+        getTicketsMock
+      )
     ).to.eventually.rejectedWith('Ticket was created for a different channel iteration')
   })
 
@@ -266,16 +266,16 @@ describe('unit test validateUnacknowledgedTicket', function () {
     const signedTicket = createMockSignedTicket({})
 
     return expect(
-      validateUnacknowledgedTicket({
+      validateUnacknowledgedTicket(
         node,
-        senderPeerId: SENDER,
+        SENDER,
         signedTicket,
-        channel: createMockChannel({
+        createMockChannel({
           self: new Balance(new BN(100)),
           counterparty: new Balance(new BN(0))
         }),
-        getTickets: getTicketsMock
-      })
+        getTicketsMock
+      )
     ).to.eventually.rejectedWith('Payment channel does not have enough funds')
   })
 
@@ -289,13 +289,13 @@ describe('unit test validateUnacknowledgedTicket', function () {
     ]
 
     return expect(
-      validateUnacknowledgedTicket({
+      validateUnacknowledgedTicket(
         node,
-        senderPeerId: SENDER,
+        SENDER,
         signedTicket,
-        channel: createMockChannel({}),
-        getTickets: async () => ticketsInDb
-      })
+        createMockChannel({}),
+        async () => ticketsInDb
+      )
     ).to.eventually.rejectedWith('Payment channel does not have enough funds when you include unredeemed tickets')
   })
 })
