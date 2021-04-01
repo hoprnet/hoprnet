@@ -31,10 +31,7 @@ describe('test filler', function () {
       )
 
       // Roll header
-      header = Uint8Array.from([
-        ...new Uint8Array(perHop),
-        ...header.slice(0, packetSize - perHop)
-      ])
+      header = Uint8Array.from([...new Uint8Array(perHop), ...header.slice(0, packetSize - perHop)])
     }
   })
 
@@ -64,10 +61,7 @@ describe('test filler', function () {
       )
 
       // Roll header
-      header = Uint8Array.from([
-        ...new Uint8Array(perHop),
-        ...header.slice(0, packetSize - perHop)
-      ])
+      header = Uint8Array.from([...new Uint8Array(perHop), ...header.slice(0, packetSize - perHop)])
     }
   })
 
