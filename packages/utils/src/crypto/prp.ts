@@ -8,8 +8,8 @@ const HASH_LENGTH = 32
 const KEY_LENGTH = 4 * INTERMEDIATE_KEY_LENGTH // 128 Bytes
 const IV_LENGTH = 4 * INTERMEDIATE_IV_LENGTH // Bytes
 const MIN_LENGTH = HASH_LENGTH // Bytes
-const HASH_ALGORITHM = 'blake2s256'
 
+const HASH_ALGORITHM = 'blake2s256'
 const CIPHER_ALGORITHM = 'chacha20'
 
 export class PRP {
