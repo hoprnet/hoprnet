@@ -11,7 +11,7 @@ export function Channel(counterparty: PublicKey): Uint8Array
  * @param arr a channel db-key
  * @param props additional arguments
  */
-export function ChannelKeyParse(arr: Uint8Array, ...props: any[]): PublicKey 
+export function ChannelKeyParse(arr: Uint8Array, ...props: any[]): PublicKey
 
 /**
  * Returns the db-key under which the challenge is saved.
