@@ -3,13 +3,7 @@ import BN from 'bn.js'
 import { u8aSplit, serializeToU8a, toU8a } from '@hoprnet/hopr-utils'
 import { Address, Balance } from '.' // TODO: cyclic
 import { UINT256 } from '../types/solidity'
-import { stateCounterToStatus, stateCounterToIteration, getId } from '../utils'
-
-export enum ChannelStatus {
-  CLOSED,
-  OPEN,
-  PENDING_TO_CLOSE
-}
+import { getId } from '../utils'
 
 // TODO: optimize storage
 class ChannelEntry implements Types.ChannelEntry {
@@ -91,22 +85,19 @@ class ChannelEntry implements Types.ChannelEntry {
   }
 
   public getStatus() {
-    const status = stateCounterToStatus(this.stateCounter)
+    const status = this.stateCounter.modn(10)
 
-    if (status >= Object.keys(ChannelStatus).length) {
-      throw Error("status like this doesn't exist")
-    }
-
-    if (status === ChannelStatus.CLOSED) return 'CLOSED'
-    else if (status === ChannelStatus.PENDING_TO_CLOSE) return 'PENDING_TO_CLOSE'
-    return 'OPEN'
+    if (status === 0) return 'CLOSED'
+    else if (status === 1) return 'OPEN'
+    else if (status === 2) return 'PENDING_TO_CLOSE'
+    throw Error(`Status at ${status} does not exist`)
   }
 
   public getIteration() {
-    return stateCounterToIteration(this.stateCounter)
+    return new BN(String(Math.ceil((this.stateCounter.toNumber() + 1) / 10)))
   }
 
-  public getChannelId() {
+  public getId() {
     return getId(this.partyA, this.partyB)
   }
 

@@ -15,7 +15,6 @@ import {
   u8aToNumber
 } from '@hoprnet/hopr-utils'
 import { Address, Balance, Hash, Signature, Public } from '../types'
-import { ChannelStatus } from '../types/channelEntry'
 import { ContractEventEmitter } from '../tsc/web3/types'
 import * as constants from '../constants'
 import * as time from './time'
@@ -381,33 +380,6 @@ export function getNetworkGasPrice(network: Networks): number | undefined {
 
   if (entry && entry[1].gas) return entry[1].gas
   return undefined
-}
-
-/**
- * Convert a channel state counter, to an enumarated status.
- *
- * @param stateCounter the state counter
- * @returns ChannelStatus
- */
-export function stateCounterToStatus(stateCounter: BN): ChannelStatus {
-  const status = stateCounter.modn(10)
-
-  if (status >= Object.keys(ChannelStatus).length) {
-    throw Error("status like this doesn't exist")
-  }
-
-  return status
-}
-
-/**
- * Convert a state counter, to a number represeting the channels iteration.
- * Iteration stands for the amount of times a channel has been opened and closed.
- *
- * @param stateCount the state count
- * @returns ChannelStatus
- */
-export function stateCounterToIteration(stateCounter: BN): BN {
-  return new BN(String(Math.ceil((stateCounter.toNumber() + 1) / 10)))
 }
 
 /**

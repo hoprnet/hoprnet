@@ -88,7 +88,7 @@ const createMockChannel = ({
               return 'CLOSED'
             },
             getIteration() {
-              return Utils.stateCounterToIteration(stateCounter.toBN())
+              return stateCounter.toBN().eq(new BN(1)) ? 'OPEN' : 'CLOSED'
             }
           })
         )

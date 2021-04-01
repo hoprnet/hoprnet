@@ -83,7 +83,7 @@ declare interface ChannelEntry {
   closedAt: BN
   getStatus(): 'CLOSED' | 'OPEN' | 'PENDING_TO_CLOSE'
   getIteration(): BN
-  getChannelId(): Promise<Hash>
+  getId(): Promise<Hash>
   getBalances(): { partyA: Balance; partyB: Balance }
 }
 declare var ChannelEntry: ChannelEntryStatic
