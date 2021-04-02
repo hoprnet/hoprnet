@@ -7,7 +7,8 @@ Although we assume that nodes in the HOPR network can communicate reliably, the 
    \item \textbf{Camouflage attacks:} A malicious node pretends to be an honest one most of the time. When its reputation value reaches a high level, it occasionally attacks the system. Since the attacker needs a long time to gain enough reputation score and be selected. Based on this, the system can still perform well.
    \item \textbf{Observe-Act Attack:} The attacker observes the reputation score distribution of honest nodes, then control malicious nodes to act and have the same reputation score in order to increase the probability that most malicious nodes are chosen as relayers.
    This attack however reveals the identities of malicious nodes which conduct this attack and their reputation will be reduced if not loose their stake.
-   \item \textbf{Payment protocol leaks}
+   \item \textbf{Circuit position leaks:} In HOPR, payments are performed hop-by-hop along a packet’s route which leaks the relayer’s position within the selected path. This leakage is considered to have a low severity but further research will be conducted on the subject.
+
    
    
    
