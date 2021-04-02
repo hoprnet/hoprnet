@@ -46,6 +46,19 @@ Therefore, the sender of the packet also provides a hint of the expected value t
 \subsubsection{The Importance of Stake}
 In order to incentivize reliable connections, we require payment channels to be staked. We also assume stake is correlated with availability and thus with reputation. Therefore, weighing by stake the selection of which mix nodes to include in the channel graph results in a mixnet populated by nodes that have the reputation of offering a high quality of service.
  Staking is also a countermeasure for sybil attacks, as creating many node identities becomes expensive. 
+\subsubsection{Types of HOPR nodes}
+We have three types of nodes in the HOPR network:
+\begin{itemize}
+    \item \textbf{(Hubs)} Nodes that are highly available, have high computational power and network bandwidth and advertising their availability 
+    through highly staked payment channels.
+    \item \textbf{(Relayers)} Nodes that have a few medium-staked payment channels to other nodes, including payment channels to Hubs.
+    \item \textbf{(End users)} Nodes that run on small hardware or in the browser, potentially without a synchronized blockchain, few payment channels to other user, low stake.
+\end{itemize}
+
+
+
+
+
 
 
 
