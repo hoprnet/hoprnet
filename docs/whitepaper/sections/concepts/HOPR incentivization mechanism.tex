@@ -27,6 +27,26 @@ The incentives break the unlinkability guarantees inherited from the SPHINX pack
     \hspace{-5mm}This however leaks the relayer’s position within the selected path since the value of the ticket is set according to the current relay fee and the number of intermediate hops, 
 more precisely $$amount:=\frac{(hops -1)* relayFee}{winProb}$$
 This leakage is considered to have a low severity but further research will be conducted on the subject.
+\subsubsection{Proof Of Relay}
+
+HOPR incentivizes packet transformation and delivery using a mechanism called “Proof-Of-Relay”. 
+This mechanism makes sure nodes relay services are verifiable.
+\paragraph{Construction} 
+\begin{itemize}
+    \item Every packet is sent together with a ticket. 
+    \item Each ticket contains a challenge.
+    \item The validity of a ticket can only be checked on reception of the packet but the on-chain logic enforces a solution to the challenge stated in the ticket.
+\end{itemize}
+Since “Proof-Of-Relay” is used to make the relay services of nodes verifiable, it is the duty of each node to check that given challenges are derivable from the given and the expected information. 
+Packets with inappropriate challenges should be dropped as they might not lead to winning tickets.
+Therefore, the sender of the packet also provides a hint of the expected value that a node is supposed to get from the next downstream node (as explained in the ticket section). 
+
+
+
+\subsubsection{The Importance of Stake}
+In order to incentivize reliable connections, we require payment channels to be staked. We also assume stake is correlated with availability and thus with reputation. Therefore, weighing by stake the selection of which mix nodes to include in the channel graph results in a mixnet populated by nodes that have the reputation of offering a high quality of service.
+ Staking is also a countermeasure for sybil attacks, as creating many node identities becomes expensive. 
+
 
 
 
