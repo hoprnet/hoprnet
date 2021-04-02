@@ -5,12 +5,6 @@ import { Address, Balance } from '.' // TODO: cyclic
 import { UINT256 } from '../types/solidity'
 import { getId } from '../utils'
 
-export enum ChannelStatus {
-  CLOSED,
-  OPEN,
-  PENDING_TO_CLOSE
-}
-
 // TODO: optimize storage
 class ChannelEntry implements Types.ChannelEntry {
   constructor(
