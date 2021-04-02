@@ -2,10 +2,13 @@
 Although we assume that nodes in the HOPR network can communicate reliably, the network can still be damaged by malicious attacks and node failures. We assume byzantine nodes with either the ability to observe all network traffic and launch network attacks or inject, drop or delay messages. 
 \\~\\There are different attack vectors which could threaten the security of HOPR network, in the following section we mention these attacks and the mitigation methods used by HOPR to resist them:
 \begin{itemize}
-    \item Sybil attacks: 
-   \item Eclipse attacks:
-   \item Camouflage attacks:
-   \item Payment protocol leaks
+    \item \textbf{Sybil attacks:} An attacker uses a single node to forge multiple identities in the network, thereby bringing network redundancy and reducing system security. This attack is expensive to conduct since they must stake a lot of HOPR tokens within each malicious node they create in order to increase their probability of being chosen as a relayer and thus attacking the network. 
+   \item \textbf{Eclipse attacks:}
+   \item \textbf{Camouflage attacks:} The attacker observes the reputation score distribution of honest nodes, then control malicious nodes to act and have the same reputation score in order to increase the probability that most malicious nodes are chosen as relayers.
+   This attack however reveals the identities of malicious nodes which conduct this attack and their reputation will be reduced if not loose their stake.
+   \item \textbf{Observe-Act Attack:}
+   \item \textbf{Payment protocol leaks}
+   
    
    
 \end{itemize}
