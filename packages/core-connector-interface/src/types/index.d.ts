@@ -6,7 +6,7 @@ import BN from 'bn.js'
 
 declare interface AddressStatic {
   readonly SIZE: number
-  new (accountId: Uint8Array): Address
+  new (arr: Uint8Array): Address
   fromString(str: string): Address
 }
 declare interface Address {
@@ -67,10 +67,7 @@ declare interface AccountEntry {
 }
 declare var AccountEntry: AccountEntryStatic
 
-declare interface ChannelEntryStatic {
-  readonly SIZE: number
-}
-declare interface ChannelEntry {
+interface ChannelEntryVals {
   partyA: Address
   partyB: Address
   deposit: BN
@@ -80,6 +77,13 @@ declare interface ChannelEntry {
   closureByPartyA: boolean
   openedAt: BN
   closedAt: BN
+}
+declare interface ChannelEntryStatic {
+  readonly SIZE: number
+  new (...ChannelEntryVals): ChannelEntry
+  fromObject(obj: ChannelEntryVals): ChannelEntry
+}
+declare interface ChannelEntry extends ChannelEntryVals {
   getStatus(): 'CLOSED' | 'OPEN' | 'PENDING_TO_CLOSE'
   getIteration(): BN
   getId(): Promise<Hash>

@@ -140,98 +140,98 @@ export const INITIALIZED_ACCOUNT = new AccountEntry(partyA, partyAPubKey, secret
 
 export const SECRET_UPDATED_ACCOUNT = new AccountEntry(partyA, partyAPubKey, secret2, new BN(2))
 
-export const EMPTY_CHANNEL = new ChannelEntry(
+export const EMPTY_CHANNEL = ChannelEntry.fromObject({
   partyA,
   partyB,
-  new BN(0),
-  new BN(0),
-  new BN(0),
-  new BN(0),
-  false,
-  new BN(0),
-  new BN(0)
-)
+  deposit: new BN(0),
+  partyABalance: new BN(0),
+  closureTime: new BN(0),
+  stateCounter: new BN(0),
+  closureByPartyA: false,
+  openedAt: new BN(0),
+  closedAt: new BN(0)
+})
 
-export const FUNDED_CHANNEL = new ChannelEntry(
+export const FUNDED_CHANNEL = ChannelEntry.fromObject({
   partyA,
   partyB,
-  new BN(3),
-  new BN(3),
-  new BN(0),
-  new BN(0),
-  false,
-  new BN(0),
-  new BN(0)
-)
+  deposit: new BN(3),
+  partyABalance: new BN(3),
+  closureTime: new BN(0),
+  stateCounter: new BN(0),
+  closureByPartyA: false,
+  openedAt: new BN(0),
+  closedAt: new BN(0)
+})
 
-export const FUNDED_CHANNEL_2 = new ChannelEntry(
+export const FUNDED_CHANNEL_2 = ChannelEntry.fromObject({
   partyA,
   partyB,
-  new BN(10),
-  new BN(3),
-  new BN(0),
-  new BN(0),
-  false,
-  new BN(0),
-  new BN(0)
-)
+  deposit: new BN(10),
+  partyABalance: new BN(3),
+  closureTime: new BN(0),
+  stateCounter: new BN(0),
+  closureByPartyA: false,
+  openedAt: new BN(0),
+  closedAt: new BN(0)
+})
 
-export const OPENED_CHANNEL = new ChannelEntry(
+export const OPENED_CHANNEL = ChannelEntry.fromObject({
   partyA,
   partyB,
-  new BN(10),
-  new BN(3),
-  new BN(0),
-  new BN(1),
-  false,
-  new BN(0),
-  new BN(0)
-)
+  deposit: new BN(10),
+  partyABalance: new BN(3),
+  closureTime: new BN(0),
+  stateCounter: new BN(1),
+  closureByPartyA: false,
+  openedAt: new BN(0),
+  closedAt: new BN(0)
+})
 
-export const REDEEMED_CHANNEL = new ChannelEntry(
+export const REDEEMED_CHANNEL = ChannelEntry.fromObject({
   partyA,
   partyB,
-  new BN(10),
-  new BN(4),
-  new BN(0),
-  new BN(1),
-  false,
-  new BN(0),
-  new BN(0)
-)
+  deposit: new BN(10),
+  partyABalance: new BN(4),
+  closureTime: new BN(0),
+  stateCounter: new BN(1),
+  closureByPartyA: false,
+  openedAt: new BN(0),
+  closedAt: new BN(0)
+})
 
-export const CLOSING_CHANNEL = new ChannelEntry(
+export const CLOSING_CHANNEL = ChannelEntry.fromObject({
   partyA,
   partyB,
-  new BN(10),
-  new BN(4),
-  new BN(1611671775),
-  new BN(2),
-  true,
-  new BN(0),
-  new BN(0)
-)
+  deposit: new BN(10),
+  partyABalance: new BN(4),
+  closureTime: new BN(1611671775),
+  stateCounter: new BN(2),
+  closureByPartyA: true,
+  openedAt: new BN(0),
+  closedAt: new BN(0)
+})
 
-export const REDEEMED_CHANNEL_2 = new ChannelEntry(
+export const REDEEMED_CHANNEL_2 = ChannelEntry.fromObject({
   partyA,
   partyB,
-  new BN(10),
-  new BN(2),
-  new BN(1611671775),
-  new BN(2),
-  false,
-  new BN(0),
-  new BN(0)
-)
+  deposit: new BN(10),
+  partyABalance: new BN(2),
+  closureTime: new BN(1611671775),
+  stateCounter: new BN(2),
+  closureByPartyA: false,
+  openedAt: new BN(0),
+  closedAt: new BN(0)
+})
 
-export const CLOSED_CHANNEL = new ChannelEntry(
+export const CLOSED_CHANNEL = ChannelEntry.fromObject({
   partyA,
   partyB,
-  new BN(0),
-  new BN(0),
-  new BN(0),
-  new BN(10),
-  false,
-  new BN(0),
-  new BN(0)
-)
+  deposit: new BN(0),
+  partyABalance: new BN(0),
+  closureTime: new BN(0),
+  stateCounter: new BN(10),
+  closureByPartyA: false,
+  openedAt: new BN(0),
+  closedAt: new BN(0)
+})
