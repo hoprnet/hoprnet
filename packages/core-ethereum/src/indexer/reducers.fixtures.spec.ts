@@ -1,11 +1,11 @@
 import type { Event } from './types'
 import BN from 'bn.js'
 import { stringToU8a } from '@hoprnet/hopr-utils'
-import { Address, Public, ChannelEntry, AccountEntry, Hash } from '../types'
+import { Address, PublicKey, ChannelEntry, AccountEntry, Hash } from '../types'
 
 const partyAUncompressedPubKey =
   '0x362b7b26bddb151a03056422d37119eab3a716562b6c3efdc62dec1540c9b0917c39b619ac36da7c9c02995f124df4353e69c226696857155d44a34744fd2327'
-const partyAPubKey = Public.fromString('0x03362b7b26bddb151a03056422d37119eab3a716562b6c3efdc62dec1540c9b091')
+const partyAPubKey = PublicKey.fromString('0x03362b7b26bddb151a03056422d37119eab3a716562b6c3efdc62dec1540c9b091')
 const partyA = Address.fromString('0x55CfF15a5159239002D57C591eF4ACA7f2ACAfE6')
 // const partyBPubKey = Public.fromString('0x03217f3cd4d0b4b82997b25d1b6b68a933929fed724531cb30bbfd4729dc6b44e0')
 const partyB = Address.fromString('0xbbCFC0fA0EBaa540e741dCA297368B2000089E2E')

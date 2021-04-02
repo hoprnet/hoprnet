@@ -575,8 +575,8 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     channelId: Types.Hash
   }> {
     const ethereum = this.paymentChannels
-    const selfPubKey = new ethereum.types.Public(this.getId().pubKey.marshal())
-    const counterpartyPubKey = new ethereum.types.Public(counterparty.pubKey.marshal())
+    const selfPubKey = new ethereum.types.PublicKey(this.getId().pubKey.marshal())
+    const counterpartyPubKey = new ethereum.types.PublicKey(counterparty.pubKey.marshal())
     const myAvailableTokens = await ethereum.account.getBalance(true)
 
     // validate 'amountToFund'
@@ -596,8 +596,8 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
 
   public async closeChannel(counterparty: PeerId): Promise<{ receipt: string; status: string }> {
     const ethereum = this.paymentChannels
-    const selfPubKey = new ethereum.types.Public(this.getId().pubKey.marshal())
-    const counterpartyPubKey = new ethereum.types.Public(counterparty.pubKey.marshal())
+    const selfPubKey = new ethereum.types.PublicKey(this.getId().pubKey.marshal())
+    const counterpartyPubKey = new ethereum.types.PublicKey(counterparty.pubKey.marshal())
     const channel = new ethereum.channel(ethereum, selfPubKey, counterpartyPubKey)
     const channelState = await channel.getState()
     const channelStatus = channelState.getStatus()

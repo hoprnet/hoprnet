@@ -23,7 +23,7 @@ class OnChainKey<Chain extends HoprCoreConnector> implements AbstractInteraction
     pipe([this.node.paymentChannels.account.keys.onChain.pubKey], struct.stream)
   }
 
-  async interact(counterparty: PeerId): Promise<Types.Public> {
+  async interact(counterparty: PeerId): Promise<Types.PublicKey> {
     const struct = await dialHelper(this.node._libp2p, counterparty, this.protocols[0], {
       timeout: ONCHAIN_KEY_TIMEOUT
     })
@@ -37,7 +37,7 @@ class OnChainKey<Chain extends HoprCoreConnector> implements AbstractInteraction
     return pipe(struct.stream, this.onReception.bind(this))
   }
 
-  async onReception(source: any): Promise<Types.Public> {
+  async onReception(source: any): Promise<Types.PublicKey> {
     let result: Uint8Array
     for await (const msg of source) {
       if (msg == null || msg.length == 0) {
@@ -52,7 +52,7 @@ class OnChainKey<Chain extends HoprCoreConnector> implements AbstractInteraction
       }
     }
 
-    return new this.node.paymentChannels.types.Public(result)
+    return new this.node.paymentChannels.types.PublicKey(result)
   }
 }
 
