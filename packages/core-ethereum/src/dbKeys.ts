@@ -8,7 +8,6 @@ import type { Types } from '@hoprnet/hopr-core-connector-interface'
 const encoder = new TextEncoder()
 const PREFIX = encoder.encode('payments-')
 const SEPERATOR = encoder.encode('-')
-const channelSubPrefix = encoder.encode('channel-')
 const challengeSubPrefix = encoder.encode('challenge-')
 const channelIdSubPrefix = encoder.encode('channelId-')
 const nonceSubPrefix = encoder.encode('nonce-')
@@ -17,26 +16,6 @@ const acknowledgedSubPrefix = encoder.encode('acknowledged-')
 const onChainSecretIntermediary = encoder.encode('onChainSecretIntermediary-')
 
 const ON_CHAIN_SECRET_ITERATION_WIDTH = 4 // bytes
-
-/**
- * Returns the db-key under which the channel is saved.
- * @param counterparty counterparty of the channel
- */
-export function Channel(counterparty: Types.PublicKey): Uint8Array {
-  return allocationHelper([
-    [PREFIX.length, PREFIX],
-    [channelSubPrefix.length, channelSubPrefix],
-    [counterparty.serialize().length, counterparty.serialize()]
-  ])
-}
-
-/**
- * Reconstructs the channelId from a db-key.
- * @param arr a channel db-key
- */
-export function ChannelKeyParse(arr: Uint8Array): PublicKey {
-  return new PublicKey(arr.slice(PREFIX.length + channelSubPrefix.length))
-}
 
 /**
  * Returns the db-key under which the challenge is saved.

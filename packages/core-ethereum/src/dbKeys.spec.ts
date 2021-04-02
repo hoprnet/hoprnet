@@ -21,19 +21,6 @@ describe('test dbKeys', function () {
     channelId = await getId(userA.address, userB.address)
   })
 
-  it("should create 'Channel' key", function () {
-    const result = dbKeys.Channel(userB.pubKey)
-    const expected = u8aConcat(encoder.encode(`payments-channel-`), userB.pubKey.serialize())
-    assert(u8aEquals(result, expected), 'check channel key creation')
-  })
-
-  it("should parse 'Channel' key", function () {
-    const key = u8aConcat(encoder.encode(`payments-channel-`), userA.pubKey.serialize())
-    const result = dbKeys.ChannelKeyParse(key)
-    const expected = userA.pubKey
-    assert(result.eq(expected), 'check channel key parsing')
-  })
-
   it("should create 'Challenge' key", function () {
     const result = dbKeys.Challenge(channelId, challenge)
     const expected = u8aConcat(
