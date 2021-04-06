@@ -37,7 +37,7 @@ import chalk from 'chalk'
 import PeerId from 'peer-id'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type { HoprCoreConnectorStatic, Types, RoutingChannel } from '@hoprnet/hopr-core-connector-interface'
-import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
+import HoprCoreEthereum, { PublicKey, Balance } from '@hoprnet/hopr-core-ethereum'
 import BN from 'bn.js'
 
 import { Interactions } from './interactions'
@@ -575,8 +575,8 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     channelId: Types.Hash
   }> {
     const ethereum = this.paymentChannels
-    const selfPubKey = new ethereum.types.PublicKey(this.getId().pubKey.marshal())
-    const counterpartyPubKey = new ethereum.types.PublicKey(counterparty.pubKey.marshal())
+    const selfPubKey = new PublicKey(this.getId().pubKey.marshal())
+    const counterpartyPubKey = new PublicKey(counterparty.pubKey.marshal())
     const myAvailableTokens = await ethereum.account.getBalance(true)
 
     // validate 'amountToFund'
@@ -587,7 +587,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
     }
 
     const channel = new ethereum.channel(ethereum, selfPubKey, counterpartyPubKey)
-    await channel.open(new ethereum.types.Balance(amountToFund))
+    await channel.open(new Balance(amountToFund))
 
     return {
       channelId: await channel.getId()
@@ -596,8 +596,8 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
 
   public async closeChannel(counterparty: PeerId): Promise<{ receipt: string; status: string }> {
     const ethereum = this.paymentChannels
-    const selfPubKey = new ethereum.types.PublicKey(this.getId().pubKey.marshal())
-    const counterpartyPubKey = new ethereum.types.PublicKey(counterparty.pubKey.marshal())
+    const selfPubKey = new PublicKey(this.getId().pubKey.marshal())
+    const counterpartyPubKey = new PublicKey(counterparty.pubKey.marshal())
     const channel = new ethereum.channel(ethereum, selfPubKey, counterpartyPubKey)
     const channelState = await channel.getState()
     const channelStatus = channelState.getStatus()

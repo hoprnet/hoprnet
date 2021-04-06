@@ -7,6 +7,7 @@ import Snapshot from './snapshot'
 import Ticket from './ticket'
 import { UINT256 } from './solidity'
 import { Address, Balance, Hash, NativeBalance, PublicKey } from './primitives'
+export * from '@hoprnet/hopr-core-connector-interface'
 
 class Types {
   public AccountEntry = AccountEntry

@@ -1,5 +1,5 @@
 import type Chain from '@hoprnet/hopr-core-connector-interface'
-import type { Types, Channel, SubmitTicketResponse } from '@hoprnet/hopr-core-connector-interface'
+import { Channel, SubmitTicketResponse, AcknowledgedTicket } from '@hoprnet/hopr-core-ethereum'
 import type PeerId from 'peer-id'
 import type Hopr from '..'
 import { u8aEquals } from '@hoprnet/hopr-utils'
@@ -82,13 +82,12 @@ export async function getAcknowledgedTickets(
   }
 ): Promise<
   {
-    ackTicket: Types.AcknowledgedTicket
+    ackTicket: AcknowledgedTicket
     index: Uint8Array
   }[]
 > {
-  const { AcknowledgedTicket } = node.paymentChannels.types
   const results: {
-    ackTicket: Types.AcknowledgedTicket
+    ackTicket: AcknowledgedTicket
     index: Uint8Array
   }[] = []
 
@@ -154,7 +153,7 @@ export async function deleteAcknowledgedTickets(
  */
 export async function updateAcknowledgedTicket(
   node: Hopr<Chain>,
-  ackTicket: Types.AcknowledgedTicket,
+  ackTicket: AcknowledgedTicket,
   index: Uint8Array
 ): Promise<void> {
   await node.db.put(Buffer.from(node._dbKeys.AcknowledgedTickets(index)), Buffer.from(ackTicket))
@@ -175,7 +174,7 @@ export async function deleteAcknowledgedTicket(node: Hopr<Chain>, index: Uint8Ar
  */
 export async function submitAcknowledgedTicket(
   node: Hopr<Chain>,
-  ackTicket: Types.AcknowledgedTicket,
+  ackTicket: AcknowledgedTicket,
   index: Uint8Array
 ): Promise<SubmitTicketResponse> {
   try {
@@ -216,7 +215,7 @@ export async function getTickets(
   filter?: {
     signer: Uint8Array
   }
-): Promise<Types.SignedTicket[]> {
+): Promise<SignedTicket[]> {
   return Promise.all([getUnacknowledgedTickets(node, filter), getAcknowledgedTickets(node, filter)]).then(
     async ([unAcks, acks]) => {
       const unAckTickets = await Promise.all(unAcks.map((o) => o.signedTicket))
@@ -248,9 +247,9 @@ export async function deleteTickets(
 export async function validateUnacknowledgedTicket(
   node: Hopr<Chain>,
   senderPeerId: PeerId,
-  signedTicket: Types.SignedTicket,
+  signedTicket: SignedTicket,
   channel: Channel,
-  getTickets: () => Promise<Types.SignedTicket[]>
+  getTickets: () => Promise<SignedTicket[]>
 ): Promise<void> {
   const ethereum = node.paymentChannels
   // self
@@ -266,7 +265,7 @@ export async function validateUnacknowledgedTicket(
   const accountCounter = (await ethereum.account.getTicketEpoch()).toBN()
   const ticketWinProb = ethereum.utils.getWinProbabilityAsFloat(ticket.winProb)
 
-  let channelState: Types.ChannelEntry
+  let channelState: ChannelEntry
   try {
     channelState = await channel.getState()
   } catch (err) {
@@ -347,7 +346,7 @@ export async function validateCreatedTicket({
   signedTicket
 }: {
   myBalance: BN
-  signedTicket: Types.SignedTicket
+  signedTicket: SignedTicket
 }) {
   const { ticket } = signedTicket
 
