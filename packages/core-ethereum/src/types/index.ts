@@ -4,7 +4,6 @@ import ChannelEntry from './channelEntry'
 import Snapshot from './snapshot'
 import Ticket from './ticket'
 import { UINT256 } from './solidity'
-export * from '@hoprnet/hopr-core-connector-interface'
 import { Address, Balance, Hash, NativeBalance, PublicKey, Signature } from './primitives'
 
 class Types {
