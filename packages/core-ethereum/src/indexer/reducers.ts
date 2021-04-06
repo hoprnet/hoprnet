@@ -165,15 +165,15 @@ export const onChannelClosed = async (
     "'onClosedChannel' failed because channel is not in 'PENDING_TO_CLOSE' status"
   )
 
-  return new ChannelEntry(
-    channelEntry.partyA,
-    channelEntry.partyB,
-    new BN(0),
-    new BN(0),
-    new BN(0),
-    channelEntry.stateCounter.addn(8),
-    false,
-    channelEntry.openedAt,
-    new BN(String(event.blockNumber))
-  )
+  return ChannelEntry.fromObject({
+    partyA: channelEntry.partyA,
+    partyB: channelEntry.partyB,
+    deposit: new BN(0),
+    partyABalance: new BN(0),
+    closureTime: new BN(0),
+    stateCounter: channelEntry.stateCounter.addn(8),
+    closureByPartyA: false,
+    openedAt: channelEntry.openedAt,
+    closedAt: new BN(String(event.blockNumber))
+  })
 }

@@ -7,7 +7,7 @@ import BN from 'bn.js'
 import { publicKeyConvert, publicKeyCreate } from 'secp256k1'
 
 export class Address implements Interfaces.Address {
-  constructor(private id: Uint8Array) {}
+  constructor(private arr: Uint8Array) {}
 
   static get SIZE(): number {
     return ADDRESS_LENGTH
@@ -19,15 +19,15 @@ export class Address implements Interfaces.Address {
   }
 
   serialize() {
-    return this.id
+    return this.arr
   }
 
   toHex(): string {
-    return Web3.utils.toChecksumAddress(u8aToHex(this.id, false))
+    return Web3.utils.toChecksumAddress(u8aToHex(this.arr, false))
   }
 
   eq(b: Address) {
-    return u8aEquals(this.id, b.serialize())
+    return u8aEquals(this.arr, b.serialize())
   }
 }
 
