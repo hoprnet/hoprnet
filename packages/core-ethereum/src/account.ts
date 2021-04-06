@@ -121,12 +121,13 @@ class Account {
       }
       this.preimage = await this.coreConnector.hashedSecret.findPreImage(ocs)
     }
+    const t = await ticket.signedTicket
     if (
       await isWinningTicket(
-        (await ticket.signedTicket).getHash(),
+        t.getHash(),
         ticket.response,
         this.preimage,
-        (await ticket.signedTicket).winProb
+        t.winProb
       )
     ) {
       ticket.preImage = this.preimage

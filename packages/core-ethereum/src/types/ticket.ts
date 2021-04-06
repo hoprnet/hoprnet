@@ -112,7 +112,7 @@ class Ticket implements Types.Ticket {
   }
 
   static get SIZE(): number {
-    return Address.SIZE + Hash.SIZE + UINT256.SIZE + UINT256.SIZE + Hash.SIZE + UINT256.SIZE
+    return Address.SIZE + Hash.SIZE + UINT256.SIZE + UINT256.SIZE + Hash.SIZE + UINT256.SIZE + Signature.SIZE
   }
 
   getEmbeddedFunds(): Balance {
@@ -129,7 +129,7 @@ class Ticket implements Types.Ticket {
   }
 
   async verify(pubKey: PublicKey): Promise<boolean> {
-    return ecdsaVerify(this.getHash().serialize(), this.signature.signature, pubKey.serialize())
+    return ecdsaVerify(this.signature.signature, this.getHash().serialize(), pubKey.serialize())
   }
 }
 

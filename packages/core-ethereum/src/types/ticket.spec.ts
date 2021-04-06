@@ -89,29 +89,24 @@ describe('test ticket construction', function () {
 const WIN_PROB = new BN(1)
 
 describe('test signedTicket construction', async function () {
-  const [, userB] = await Promise.all(
-    testconfigs.DEMO_ACCOUNTS.slice(0, 2).map(async (str: string) =>
-      PublicKey.fromPrivKey(stringToU8a(str)).toAddress()
-    )
-  )
-
-  const [userAPrivKey] = testconfigs.DEMO_ACCOUNTS.slice(0, 2).map((str: string) => stringToU8a(str))
-
+  const userB = await PublicKey.fromPrivKey(stringToU8a(testconfigs.DEMO_ACCOUNTS[1])).toAddress()
+  const userAPrivKey = stringToU8a(testconfigs.DEMO_ACCOUNTS[0])
   const userAPubKey = PublicKey.fromPrivKey(stringToU8a(testconfigs.DEMO_ACCOUNTS[0]))
 
   it('should create new signedTicket using struct', async function () {
-    const challenge = new Hash(randomBytes(32))
-    const epoch = UINT256.fromString('0')
-    const amount = new Balance(new BN(15))
-    const winProb = new Hash(
-      new Uint8Array(new BN(new Uint8Array(Hash.SIZE).fill(0xff)).div(WIN_PROB).toArray('le', Hash.SIZE))
+    const ticket = Ticket.create(
+      userB,
+      new Hash(randomBytes(32)),
+      UINT256.fromString('0'),
+      new Balance(new BN(15)),
+      new Hash(
+        new Uint8Array(new BN(new Uint8Array(Hash.SIZE).fill(0xff)).div(WIN_PROB).toArray('le', Hash.SIZE))
+      ),
+      UINT256.fromString('0'),
+      userAPrivKey
     )
-    const channelIteration = UINT256.fromString('0')
-
-    const ticket = Ticket.create(userB, challenge, epoch, amount, winProb, channelIteration, userAPrivKey)
 
     assert(ticket.verify(userAPubKey))
-
     assert(ticket.getSigner().toHex() == userAPubKey.toHex(), 'signer incorrect')
 
     // Mutate ticket and see signature fails
