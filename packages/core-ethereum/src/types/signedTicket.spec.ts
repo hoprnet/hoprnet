@@ -2,22 +2,21 @@ import assert from 'assert'
 import { randomBytes } from 'crypto'
 import { stringToU8a, randomInteger, u8aToHex } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
-import { Ticket, Hash, Balance, SignedTicket, UINT256 } from '.'
-import { pubKeyToAddress, privKeyToPubKey } from '../utils'
+import { Ticket, Hash, Balance, SignedTicket, UINT256, PublicKey } from '.'
 import * as testconfigs from '../config.spec'
 
 const WIN_PROB = new BN(1)
 
 describe('test signedTicket construction', async function () {
   const [, userB] = await Promise.all(
-    testconfigs.DEMO_ACCOUNTS.slice(0, 2).map(
-      async (str: string) => await pubKeyToAddress(await privKeyToPubKey(stringToU8a(str)))
+    testconfigs.DEMO_ACCOUNTS.slice(0, 2).map(async (str: string) =>
+      PublicKey.fromPrivKey(stringToU8a(str)).toAddress()
     )
   )
 
   const [userAPrivKey] = testconfigs.DEMO_ACCOUNTS.slice(0, 2).map((str: string) => stringToU8a(str))
 
-  const userAPubKey = await privKeyToPubKey(stringToU8a(testconfigs.DEMO_ACCOUNTS[0]))
+  const userAPubKey = PublicKey.fromPrivKey(stringToU8a(testconfigs.DEMO_ACCOUNTS[0]))
 
   it('should create new signedTicket using struct', async function () {
 
@@ -46,7 +45,7 @@ describe('test signedTicket construction', async function () {
 
     assert(await signedTicket.verify(userAPubKey))
 
-    assert(new Hash(await signedTicket.signer).eq(new Hash(userAPubKey)), 'signer incorrect')
+    assert((await signedTicket.signer).toHex() == userAPubKey.toHex(), 'signer incorrect')
 
     let exponent = randomInteger(0, 7)
     let index = randomInteger(0, signedTicket.length - 1)

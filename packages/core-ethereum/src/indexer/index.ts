@@ -9,13 +9,14 @@ import chalk from 'chalk'
 import BN from 'bn.js'
 import Heap from 'heap-js'
 import { pubKeyToPeerId, randomChoice } from '@hoprnet/hopr-utils'
-import { Address, ChannelEntry, Hash, Public, Balance, Snapshot } from '../types'
-import { getId, Log as DebugLog } from '../utils'
+import { Address, ChannelEntry, Hash, PublicKey, Balance, Snapshot } from '../types'
+import { getId } from '../utils'
 import * as reducers from './reducers'
 import * as db from './db'
 import { isConfirmedBlock, isSyncing, snapshotComparator } from './utils'
+import Debug from 'debug'
 
-const log = DebugLog(['indexer'])
+const log = Debug('hopr-core-ethereum:indexer')
 const getSyncPercentage = (n: number, max: number) => ((n * 100) / max).toFixed(2)
 
 // @TODO: add to constants
@@ -444,7 +445,7 @@ class Indexer extends EventEmitter implements IIndexer {
   }
 
   // routing
-  public async getPublicKeyOf(address: Address) {
+  public async getPublicKeyOf(address: Address): Promise<PublicKey | undefined> {
     const account = await db.getAccount(this.connector.db, address)
     if (account && account.publicKey) {
       return account.publicKey
@@ -454,19 +455,19 @@ class Indexer extends EventEmitter implements IIndexer {
   }
 
   private async toIndexerChannel(source: PeerId, channel: ChannelEntry): Promise<RoutingChannel> {
-    const sourcePubKey = new Public(source.pubKey.marshal())
+    const sourcePubKey = new PublicKey(source.pubKey.marshal())
     const [partyAPubKey, partyBPubKey] = await Promise.all([
       this.getPublicKeyOf(channel.partyA),
       this.getPublicKeyOf(channel.partyB)
     ])
 
     if (sourcePubKey.eq(partyAPubKey)) {
-      return [source, await pubKeyToPeerId(partyBPubKey), new Balance(channel.partyABalance)]
+      return [source, await pubKeyToPeerId(partyBPubKey.serialize()), new Balance(channel.partyABalance)]
     } else {
       const partyBBalance = new Balance(
         new Balance(channel.deposit).toBN().sub(new Balance(channel.partyABalance).toBN())
       )
-      return [source, await pubKeyToPeerId(partyAPubKey), partyBBalance]
+      return [source, await pubKeyToPeerId(partyAPubKey.serialize()), partyBBalance]
     }
   }
 
@@ -489,11 +490,11 @@ class Indexer extends EventEmitter implements IIndexer {
     log('picking random from %d channels', channels.length)
     const random = randomChoice(channels)
     const partyA = await this.getPublicKeyOf(random.partyA)
-    return this.toIndexerChannel(await pubKeyToPeerId(partyA), random) // TODO: why do we pick partyA?
+    return this.toIndexerChannel(await pubKeyToPeerId(partyA.serialize()), random) // TODO: why do we pick partyA?
   }
 
   public async getChannelsFromPeer(source: PeerId) {
-    const sourcePubKey = new Public(source.pubKey.marshal())
+    const sourcePubKey = new PublicKey(source.pubKey.marshal())
     const channels = await this.getChannelsOf(await sourcePubKey.toAddress())
 
     let cout: RoutingChannel[] = []

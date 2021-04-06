@@ -1,6 +1,6 @@
 import { u8aConcat } from '@hoprnet/hopr-utils'
 
-import { Hash } from '@hoprnet/hopr-core-ethereum'
+import { Hash, PublicKey } from '@hoprnet/hopr-core-ethereum'
 import HoprCoreConnector, { Types } from '@hoprnet/hopr-core-connector-interface'
 import PeerId from 'peer-id'
 
@@ -86,7 +86,7 @@ class UnacknowledgedTicket<Chain extends HoprCoreConnector> extends Uint8Array {
   }
 
   async verifySignature(peerId: PeerId) {
-    return (await this.signedTicket).verify(peerId.pubKey.marshal())
+    return (await this.signedTicket).verify(new PublicKey(peerId.pubKey.marshal()))
   }
 
   async verify(peerId: PeerId, hashedKeyHalf: Uint8Array): Promise<boolean> {

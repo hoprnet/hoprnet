@@ -1,5 +1,4 @@
 import AcknowledgedTicket from './acknowledgedTicket'
-import Public from './public'
 import Signature from './signature'
 import SignedTicket from './signedTicket'
 import Ticket from './ticket'
@@ -57,11 +56,11 @@ declare var NativeBalance: NativeBalanceStatic
 
 declare interface AccountEntryStatic {
   readonly SIZE: number
-  new (address: Address, publicKey?: Public, secret?: Hash, counter?: BN): AccountEntry
+  new (address: Address, publicKey?: PublicKey, secret?: Hash, counter?: BN): AccountEntry
 }
 declare interface AccountEntry {
   address: Address
-  publicKey?: Public
+  publicKey?: PublicKey
   secret?: Hash
   counter?: BN
   isInitialized(): boolean
@@ -99,6 +98,20 @@ declare interface UINT256 {
 }
 declare var UINT256: UINT256Static
 
+declare interface PublicKeyStatic {
+  SIZE: number
+  new (public: Uint8Array): PublicKey
+  fromString(str: string): PublicKey
+}
+
+declare interface PublicKey {
+  toAddress(): Address
+  serialize(): Uint8Array
+  toHex(): string
+}
+
+declare var PublicKey: PublicStatic
+
 export {
   AccountEntry,
   Address,
@@ -107,7 +120,7 @@ export {
   ChannelEntry,
   Hash,
   NativeBalance,
-  Public,
+  PublicKey,
   Signature,
   SignedTicket,
   Ticket,

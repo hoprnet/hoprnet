@@ -5,6 +5,7 @@ import type Hopr from '..'
 import { u8aEquals } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 import { UnacknowledgedTicket } from '../messages/ticket/unacknowledged'
+import { PublicKey } from '@hoprnet/hopr-core-ethereum'
 
 /**
  * Get all unacknowledged tickets
@@ -180,8 +181,8 @@ export async function submitAcknowledgedTicket(
   try {
     const ethereum = node.paymentChannels
     const signedTicket = await ackTicket.signedTicket
-    const self = new ethereum.types.Public(ethereum.account.keys.onChain.pubKey)
-    const counterparty = new ethereum.types.Public(await signedTicket.signer)
+    const self = new PublicKey(ethereum.account.keys.onChain.pubKey)
+    const counterparty = new PublicKey(await signedTicket.signer)
     const channel = new ethereum.channel(ethereum, self, counterparty)
 
     const result = await channel.submitTicket(ackTicket, index)
@@ -244,26 +245,20 @@ export async function deleteTickets(
 /**
  * Validate unacknowledged tickets as we receive them
  */
-export async function validateUnacknowledgedTicket({
-  node,
-  senderPeerId,
-  signedTicket,
-  channel,
-  getTickets
-}: {
-  node: Hopr<Chain>
-  senderPeerId: PeerId
-  signedTicket: Types.SignedTicket
-  channel: Channel
+export async function validateUnacknowledgedTicket(
+  node: Hopr<Chain>,
+  senderPeerId: PeerId,
+  signedTicket: Types.SignedTicket,
+  channel: Channel,
   getTickets: () => Promise<Types.SignedTicket[]>
-}): Promise<void> {
+): Promise<void> {
   const ethereum = node.paymentChannels
   // self
-  const selfPubKey = new ethereum.types.Public(node.getId().pubKey.marshal())
+  const selfPubKey = new PublicKey(node.getId().pubKey.marshal())
   const selfAddress = await selfPubKey.toAddress()
   // sender
   const senderB58 = senderPeerId.toB58String()
-  const senderPubKey = new ethereum.types.Public(senderPeerId.pubKey.marshal())
+  const senderPubKey = new PublicKey(senderPeerId.pubKey.marshal())
   // ticket
   const ticket = signedTicket.ticket
   const ticketAmount = ticket.amount.toBN()
@@ -279,7 +274,7 @@ export async function validateUnacknowledgedTicket({
   }
 
   // ticket signer MUST be the sender
-  if (!u8aEquals(await signedTicket.signer, senderPubKey)) {
+  if (!(await signedTicket.signer).eq(senderPubKey)) {
     throw Error(`The signer of the ticket does not match the sender`)
   }
 

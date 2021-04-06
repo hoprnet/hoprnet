@@ -68,7 +68,7 @@ export default class ListOpenChannels extends AbstractCommand {
   async execute(): Promise<string | void> {
     try {
       const { types, indexer } = this.node.paymentChannels
-      const selfPubKey = new types.Public(this.node.getId().pubKey.marshal())
+      const selfPubKey = new types.PublicKey(this.node.getId().pubKey.marshal())
       const selfAddress = await selfPubKey.toAddress()
       const channels = (await this.node.paymentChannels.indexer.getChannelsOf(selfAddress))
         // do not print CLOSED channels

@@ -12,7 +12,7 @@ import { LevelUp } from 'levelup'
 import Debug from 'debug'
 import Hopr from '../../'
 import HoprCoreConnector, { Types } from '@hoprnet/hopr-core-connector-interface'
-import { Hash } from '@hoprnet/hopr-core-ethereum'
+import { Hash, PublicKey } from '@hoprnet/hopr-core-ethereum'
 import { UnacknowledgedTicket } from '../ticket'
 
 const log = Debug('hopr-core:message:packet')
@@ -214,8 +214,8 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
           ).serialize()
     )
 
-    const senderPubKey = new chain.types.Public(node.getId().pubKey.marshal())
-    const targetPubKey = new chain.types.Public(path[0].pubKey.marshal())
+    const senderPubKey = new PublicKey(node.getId().pubKey.marshal())
+    const targetPubKey = new PublicKey(path[0].pubKey.marshal())
     const channel = new chain.channel(chain, senderPubKey, targetPubKey)
 
     if (secrets.length > 1) {
@@ -265,21 +265,16 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     if (!isRecipient) {
       ;[sender, target] = await Promise.all([this.getSenderPeerId(), this.getTargetPeerId()])
 
-      const senderPubKey = new ethereum.types.Public(sender.pubKey.marshal())
-      const targetPubKey = new ethereum.types.Public(target.pubKey.marshal())
+      const senderPubKey = new PublicKey(sender.pubKey.marshal())
+      const targetPubKey = new PublicKey(target.pubKey.marshal())
       const channel = new ethereum.channel(ethereum, senderPubKey, targetPubKey)
 
       try {
-        await validateUnacknowledgedTicket({
-          node: this.node,
-          senderPeerId: sender,
-          signedTicket: await this.ticket,
-          channel,
-          getTickets: () =>
-            getTickets(this.node, {
-              signer: sender.pubKey.marshal()
-            })
-        })
+        await validateUnacknowledgedTicket(this.node, sender, await this.ticket, channel, () =>
+          getTickets(this.node, {
+            signer: sender.pubKey.marshal()
+          })
+        )
       } catch (error) {
         verbose('Could not validate unacknowledged ticket', error.message)
         throw error
@@ -321,12 +316,12 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
    */
   async prepareForward(_originalSender: PeerId, target: PeerId): Promise<void> {
     const chain = this.node.paymentChannels
-    const { Balance, Public } = chain.types
+    const { Balance } = chain.types
     const signedTicket = await this.ticket
     const ticket = signedTicket.ticket
     const sender = this.node.getId()
-    const senderPubKey = new Public(sender.pubKey.marshal())
-    const targetPubKey = new Public(target.pubKey.marshal())
+    const senderPubKey = new PublicKey(sender.pubKey.marshal())
+    const targetPubKey = new PublicKey(target.pubKey.marshal())
     const challenge = u8aConcat(deriveTicketKey(this.header.derivedSecret), this.header.hashedKeyHalf)
 
     if (!(await chain.utils.hash(challenge)).hash().eq(ticket.challenge)) {

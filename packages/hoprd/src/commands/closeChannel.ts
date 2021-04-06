@@ -52,7 +52,7 @@ export default class CloseChannel extends AbstractCommand {
 
   async autocomplete(query: string = '', line: string = ''): Promise<AutoCompleteResult> {
     const ethereum = this.node.paymentChannels
-    const selfPubKey = new ethereum.types.Public(this.node.getId().pubKey.marshal())
+    const selfPubKey = new ethereum.types.PublicKey(this.node.getId().pubKey.marshal())
     const self = await selfPubKey.toAddress()
 
     // get channels which are ours & open

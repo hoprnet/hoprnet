@@ -5,7 +5,7 @@ import assert from 'assert'
 import { randomBytes } from 'crypto'
 import { UnacknowledgedTicket } from '.'
 import { NODE_SEEDS } from '@hoprnet/hopr-demo-seeds'
-import { Types, Utils, Hash } from '@hoprnet/hopr-core-ethereum'
+import { Types, Utils, Hash, PublicKey } from '@hoprnet/hopr-core-ethereum'
 import { privKeyToPeerId } from '@hoprnet/hopr-utils'
 import { toU8a, u8aConcat, u8aToNumber } from '@hoprnet/hopr-utils'
 import LevelUp from 'levelup'
@@ -31,7 +31,7 @@ describe(`check serialization and deserialization of ticket objects`, function (
     const peerB = await privKeyToPeerId(NODE_SEEDS[1])
 
     // const accountA = await node.paymentChannels.utils.pubKeyToAddress(peerA.pubKey.marshal())
-    const accountB = await node.paymentChannels.utils.pubKeyToAddress(peerB.pubKey.marshal())
+    const accountB = new PublicKey(peerB.pubKey.marshal())
 
     const secretA = randomBytes(32)
     const secretB = randomBytes(32)

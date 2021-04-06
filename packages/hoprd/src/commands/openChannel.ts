@@ -38,7 +38,7 @@ export abstract class OpenChannelBase extends AbstractCommand {
     }
 
     const ethereum = this.node.paymentChannels
-    const selfPubKey = new ethereum.types.Public(this.node.getId().pubKey.marshal())
+    const selfPubKey = new ethereum.types.PublicKey(this.node.getId().pubKey.marshal())
     const self = await selfPubKey.toAddress()
 
     const peers = this.node.getConnectedPeers().filter((p) => !isBootstrapNode(this.node, p))
@@ -56,7 +56,7 @@ export abstract class OpenChannelBase extends AbstractCommand {
     // show only peers which we can see
     let availablePeers: string[] = []
     for (const peer of peers) {
-      const pubKey = new ethereum.types.Public(peer.pubKey.marshal())
+      const pubKey = new ethereum.types.PublicKey(peer.pubKey.marshal())
       const address = await pubKey.toAddress()
       const hasOpenChannel = channels.some((channel) => {
         return address.eq(channel.partyA) || address.eq(channel.partyB)
