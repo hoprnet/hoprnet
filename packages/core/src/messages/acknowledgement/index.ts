@@ -130,10 +130,7 @@ class Acknowledgement extends Uint8Array {
   }
 
   async verify(peerId: PeerId): Promise<boolean> {
-    return (await this.responseSignature).verify(
-        (await this.hash).serialize(),
-        new PublicKey(peerId.pubKey.marshal())
-      )
+    return (await this.responseSignature).verify((await this.hash).serialize(), new PublicKey(peerId.pubKey.marshal()))
   }
 
   /**
@@ -144,11 +141,7 @@ class Acknowledgement extends Uint8Array {
    * @param derivedSecret the secret that is used to create the second key half
    * @param signer contains private key
    */
-  static async create(
-    challenge: Challenge,
-    derivedSecret: Uint8Array,
-    signer: PeerId
-  ): Promise<Acknowledgement> {
+  static async create(challenge: Challenge, derivedSecret: Uint8Array, signer: PeerId): Promise<Acknowledgement> {
     const ack = new Acknowledgement({
       bytes: new Uint8Array(Acknowledgement.SIZE()),
       offset: 0
