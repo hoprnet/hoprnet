@@ -1,10 +1,10 @@
 import { deployments } from 'hardhat'
-import Web3 from 'web3'
+import Ethers from 'ethers'
 import { signMessage, prefixMessage } from '../utils'
 import { ACCOUNT_A } from '../constants'
 import { stringToU8a, u8aToHex } from '@hoprnet/hopr-utils'
 
-const { soliditySha3 } = Web3.utils
+const { computePublicKey } = Ethers.utils
 
 const ECDSAMock = artifacts.require('ECDSAMock')
 
@@ -20,7 +20,7 @@ describe('ECDSA', function () {
   it('should convert uncompressed public key to address', async function () {
     const { ECDSA } = await useFixtures()
 
-    const address = await ECDSA.uncompressedPubKeyToAddress(ACCOUNT_A.uncompressedPubKey)
+    const address = await ECDSA.uncompressedPubKeyToAddress(computePublicKey(ACCOUNT_A.privateKey, false))
 
     expect(address).to.equal(ACCOUNT_A.address)
   })

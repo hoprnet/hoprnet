@@ -1,20 +1,17 @@
 import type { PromiseValue } from 'type-fest'
+import type { HoprToken__factory, HoprDistributor__factory } from '../types'
 import { expect } from 'chai'
-import { deployments } from 'hardhat'
+import { deployments, ethers } from 'hardhat'
 import { singletons, time, expectRevert, expectEvent, BN } from '@openzeppelin/test-helpers'
 import { durations } from '@hoprnet/hopr-utils'
-import { web3 } from 'hardhat'
 import { vmErrorMessage } from './utils'
-
-const HoprToken = artifacts.require('HoprToken')
-const HoprDistributor = artifacts.require('HoprDistributor')
 
 const SCHEDULE_UNSET = 'SCHEDULE_UNSET'
 const SCHEDULE_1_MIN_ALL = 'SCHEDULE_1_MIN_ALL'
 const SCHEDULE_TEAM = 'SCHEDULE_TEAM'
 
-const getLatestBlockTimestamp = async (web3: Web3) => {
-  return web3.eth.getBlock(await web3.eth.getBlockNumber()).then((res) => String(res.timestamp))
+const getLatestBlockTimestamp = async () => {
+  return ethers.provider.getBlock(await ethers.provider.getBlockNumber()).then((res) => String(res.timestamp))
 }
 
 const toSolPercent = (multiplier: number, percent: number): string => {
@@ -22,23 +19,25 @@ const toSolPercent = (multiplier: number, percent: number): string => {
 }
 
 const useFixtures = deployments.createFixture(async (_, ops: { startTime?: string; maxMintAmount?: string } = {}) => {
-  const startTime = ops.startTime ?? (await getLatestBlockTimestamp(web3))
+  const HoprToken = (await ethers.getContractFactory('HoprToken')) as HoprToken__factory
+  const HoprDistributor = (await ethers.getContractFactory('HoprDistributor')) as HoprDistributor__factory
+  const startTime = ops.startTime ?? (await getLatestBlockTimestamp())
   const maxMintAmount = ops.maxMintAmount ?? '500'
 
-  const [owner] = await web3.eth.getAccounts()
+  const [owner] = await ethers.getSigners()
 
-  await singletons.ERC1820Registry(owner)
+  await singletons.ERC1820Registry(owner.address)
 
-  const token = await HoprToken.new()
-  const distributor = await HoprDistributor.new(token.address, startTime, maxMintAmount)
+  const token = await HoprToken.deploy()
+  const distributor = await HoprDistributor.deploy(token.address, startTime, maxMintAmount)
   const multiplier = (await distributor.MULTIPLIER()).toNumber()
 
   await token.grantRole(await token.MINTER_ROLE(), distributor.address, {
-    from: owner
+    from: owner.address
   })
 
   return {
-    owner,
+    owner: owner.address,
     token,
     distributor,
     multiplier,
@@ -52,7 +51,7 @@ describe('HoprDistributor', function () {
     let f: PromiseValue<ReturnType<typeof useFixtures>>
 
     beforeEach(async function () {
-      const startTime = new BN(await getLatestBlockTimestamp(web3)).add(new BN(String(durations.minutes(5)))).toString()
+      const startTime = new BN(await getLatestBlockTimestamp()).add(new BN(String(durations.minutes(5)))).toString()
       f = await useFixtures({ startTime })
     })
 

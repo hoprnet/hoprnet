@@ -1,21 +1,21 @@
-import { deployments } from 'hardhat'
+import { deployments, ethers } from 'hardhat'
 import { expectEvent, expectRevert, constants, singletons, time } from '@openzeppelin/test-helpers'
-import { formatChannel } from './utils'
+import { expect } from 'chai'
 import { ACCOUNT_A, ACCOUNT_B, ACCOUNT_AB_CHANNEL_ID } from './constants'
+import { ERC777Mock__factory, ChannelsMock__factory } from '../../types'
 
-const ERC777 = artifacts.require('ERC777Mock')
-const Channels = artifacts.require('ChannelsMock')
+const abiEncoder = ethers.utils.Interface.getAbiCoder()
 
-const useFixtures = deployments.createFixture(async (_deployments, { secsClosure }: { secsClosure?: string } = {}) => {
-  const [deployer] = await web3.eth.getAccounts()
+const useFixtures = deployments.createFixture(async ({ ethers }, { secsClosure }: { secsClosure?: string } = {}) => {
+  const [deployer] = await ethers.getSigners()
 
   // deploy ERC1820Registry required by ERC777 token
-  await singletons.ERC1820Registry(deployer)
+  await singletons.ERC1820Registry(deployer.address)
 
   // deploy ERC777Mock
-  const token = await ERC777.new(deployer, '100', 'Token', 'TKN', [])
+  const token = await new ERC777Mock__factory(deployer).deploy(deployer.address, '100', 'Token', 'TKN', [])
   // deploy ChannelsMock
-  const channels = await Channels.new(token.address, secsClosure ?? '0')
+  const channels = await new ChannelsMock__factory(deployer).deploy(token.address, secsClosure ?? '0')
 
   return {
     token,
@@ -44,7 +44,7 @@ describe('Channels', function () {
       partyABalance: '70'
     })
 
-    const channel = await channels.channels(ACCOUNT_AB_CHANNEL_ID).then(formatChannel)
+    const channel = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
     expect(channel.deposit.toString()).to.equal('100')
     expect(channel.partyABalance.toString()).to.equal('70')
     expect(channel.closureTime.toString()).to.equal('0')
@@ -87,7 +87,7 @@ describe('Channels', function () {
       counterparty: ACCOUNT_B.address
     })
 
-    const channel = await channels.channels(ACCOUNT_AB_CHANNEL_ID).then(formatChannel)
+    const channel = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
     expect(channel.deposit.toString()).to.equal('100')
     expect(channel.partyABalance.toString()).to.equal('100')
     expect(channel.closureTime.toString()).to.equal('0')
@@ -140,7 +140,7 @@ describe('Channels', function () {
       counterparty: ACCOUNT_B.address
     })
 
-    const channel = await channels.channels(ACCOUNT_AB_CHANNEL_ID).then(formatChannel)
+    const channel = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
     expect(channel.deposit.toString()).to.equal('100')
     expect(channel.partyABalance.toString()).to.equal('100')
     expect(channel.closureTime.toString()).to.not.equals('0')
@@ -186,12 +186,12 @@ describe('Channels', function () {
     await token.send(
       channels.address,
       '100',
-      web3.eth.abi.encodeParameters(
+      abiEncoder.encode(
         ['bool', 'address', 'address', 'uint256', 'uint256'],
         [false, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30']
       ),
       {
-        from: deployer
+        from: deployer.address
       }
     )
     await channels.openChannelInternal(ACCOUNT_A.address, ACCOUNT_B.address)
@@ -205,7 +205,7 @@ describe('Channels', function () {
       partyBAmount: '30'
     })
 
-    const channel = await channels.channels(ACCOUNT_AB_CHANNEL_ID).then(formatChannel)
+    const channel = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
     expect(channel.deposit.toString()).to.equal('0')
     expect(channel.partyABalance.toString()).to.equal('0')
     expect(channel.closureTime.toString()).to.equal('0')
@@ -225,12 +225,12 @@ describe('Channels', function () {
     await token.send(
       channels.address,
       '100',
-      web3.eth.abi.encodeParameters(
+      abiEncoder.encode(
         ['bool', 'address', 'address', 'uint256', 'uint256'],
         [false, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30']
       ),
       {
-        from: deployer
+        from: deployer.address
       }
     )
     await channels.openChannelInternal(ACCOUNT_A.address, ACCOUNT_B.address)
@@ -244,7 +244,7 @@ describe('Channels', function () {
       partyBAmount: '30'
     })
 
-    const channel = await channels.channels(ACCOUNT_AB_CHANNEL_ID).then(formatChannel)
+    const channel = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
     expect(channel.deposit.toString()).to.equal('0')
     expect(channel.partyABalance.toString()).to.equal('0')
     expect(channel.closureTime.toString()).to.equal('0')
@@ -264,12 +264,12 @@ describe('Channels', function () {
     await token.send(
       channels.address,
       '100',
-      web3.eth.abi.encodeParameters(
+      abiEncoder.encode(
         ['bool', 'address', 'address', 'uint256', 'uint256'],
         [false, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30']
       ),
       {
-        from: deployer
+        from: deployer.address
       }
     )
     await channels.openChannelInternal(ACCOUNT_A.address, ACCOUNT_B.address)
@@ -287,12 +287,12 @@ describe('Channels', function () {
     await token.send(
       channels.address,
       '100',
-      web3.eth.abi.encodeParameters(
+      abiEncoder.encode(
         ['bool', 'address', 'address', 'uint256', 'uint256'],
         [false, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30']
       ),
       {
-        from: deployer
+        from: deployer.address
       }
     )
     await channels.openChannelInternal(ACCOUNT_A.address, ACCOUNT_B.address)

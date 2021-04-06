@@ -1,23 +1,21 @@
 import type { HardhatRuntimeEnvironment } from 'hardhat/types'
 import type { DeployFunction } from 'hardhat-deploy/types'
-
-const HoprToken = artifacts.require('HoprToken')
+import { HoprToken__factory } from '../types'
 
 const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
-  const { deployments, getNamedAccounts, network } = hre
-  const { deploy } = deployments
-  const { deployer } = await getNamedAccounts()
+  const { ethers, deployments, network, getNamedAccounts } = hre
+  const deployer = await getNamedAccounts().then((o) => ethers.getSigner(o.deployer))
 
-  const result = await deploy('HoprToken', {
-    from: deployer,
+  const result = await deployments.deploy('HoprToken', {
+    from: deployer.address,
     log: true
   })
 
   if (network.name === 'localhost') {
-    const hoprToken = await HoprToken.at(result.address)
+    const hoprToken = new HoprToken__factory(deployer).attach(result.address)
     const MINTER_ROLE = await hoprToken.MINTER_ROLE()
-    if (!(await hoprToken.hasRole(MINTER_ROLE, deployer))) {
-      await hoprToken.grantRole(MINTER_ROLE, deployer)
+    if (!(await hoprToken.hasRole(MINTER_ROLE, deployer.address))) {
+      await hoprToken.grantRole(MINTER_ROLE, deployer.address)
     }
   }
 }

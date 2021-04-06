@@ -12,15 +12,14 @@ const closures: {
 }
 
 const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
-  const { deployments, getNamedAccounts, network } = hre
-  const { deploy } = deployments
-  const { deployer } = await getNamedAccounts()
+  const { ethers, deployments, getNamedAccounts, network } = hre
+  const deployer = await getNamedAccounts().then((o) => ethers.getSigner(o.deployer))
   const deploymentType = Object.keys(network.tags).find((tag) => closures[tag])
 
   const hoprToken = await deployments.get('HoprToken')
 
-  await deploy('HoprChannels', {
-    from: deployer,
+  await deployments.deploy('HoprChannels', {
+    from: deployer.address,
     args: [hoprToken.address, Math.floor((closures[deploymentType] ?? closures.local) / 1e3)],
     log: true
   })

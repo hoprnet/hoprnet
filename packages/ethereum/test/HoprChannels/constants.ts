@@ -1,8 +1,8 @@
-import Web3 from 'web3'
+import Ethers from 'ethers'
 import { percentToUint256, createTicket } from './utils'
 import { ACCOUNT_A, ACCOUNT_B } from '../constants'
 
-const { soliditySha3 } = Web3.utils
+const { solidityKeccak256 } = Ethers.utils
 
 // accountA == partyA
 // accountB == partyB
@@ -12,12 +12,12 @@ export { ACCOUNT_A, ACCOUNT_B }
  */
 export const ACCOUNT_AB_CHANNEL_ID = '0xa5bc13ae60ec79a8babc6d0d4074c1cefd5d5fc19fafe71457214d46c90714d8'
 
-export const PROOF_OF_RELAY_SECRET_0 = soliditySha3({ type: 'string', value: 'PROOF_OF_RELAY_SECRET_0' })
-export const PROOF_OF_RELAY_SECRET_1 = soliditySha3({ type: 'string', value: 'PROOF_OF_RELAY_SECRET_1' })
+export const PROOF_OF_RELAY_SECRET_0 = solidityKeccak256(['string'], ['PROOF_OF_RELAY_SECRET_0'])
+export const PROOF_OF_RELAY_SECRET_1 = solidityKeccak256(['string'], ['PROOF_OF_RELAY_SECRET_1'])
 
-export const SECRET_0 = soliditySha3({ type: 'string', value: 'secret' })
-export const SECRET_1 = soliditySha3({ type: 'bytes32', value: SECRET_0 })
-export const SECRET_2 = soliditySha3({ type: 'bytes32', value: SECRET_1 })
+export const SECRET_0 = solidityKeccak256(['string'], ['secret'])
+export const SECRET_1 = solidityKeccak256(['bytes32'], [SECRET_0])
+export const SECRET_2 = solidityKeccak256(['bytes32'], [SECRET_1])
 
 export const WIN_PROB_100 = percentToUint256(100)
 export const WIN_PROB_0 = percentToUint256(0)

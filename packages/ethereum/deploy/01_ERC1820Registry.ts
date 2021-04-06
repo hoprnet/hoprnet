@@ -7,26 +7,24 @@ import { ERC1820_REGISTRY_ADDRESS, ERC1820_REGISTRY_DEPLOY_TX } from '@openzeppe
 // This is very close to what OZ does: https://github.com/OpenZeppelin/openzeppelin-test-helpers/blob/330fb1c33ca87790d86ac7730cfb8a42a3bc0805/src/singletons.js#L15
 // we can't use that utility since it doesn't work in public networks
 const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
-  const { web3, Web3, getNamedAccounts } = hre
-  const { toWei } = Web3.utils
-  const { deployer } = await getNamedAccounts()
+  const { ethers, getNamedAccounts } = hre
+  const deployer = await getNamedAccounts().then((o) => ethers.getSigner(o.deployer))
 
   // check if it already exists
-  if ((await web3.eth.getCode(ERC1820_REGISTRY_ADDRESS)).length > '0x'.length) {
+  if ((await ethers.provider.getCode(ERC1820_REGISTRY_ADDRESS)).length > '0x'.length) {
     console.log('ERC1820 registry already exists')
     return
   }
 
   // 0.08 ether is needed to deploy the registry, and those funds need to be transferred to the account that will deploy
   // the contract.
-  await web3.eth.sendTransaction({
-    from: deployer,
+  await deployer.sendTransaction({
     to: '0xa990077c3205cbDf861e17Fa532eeB069cE9fF96',
-    value: toWei('0.08', 'ether')
+    value: ethers.utils.parseEther('0.08')
   })
 
   // deploy
-  await web3.eth.sendSignedTransaction(ERC1820_REGISTRY_DEPLOY_TX)
+  await ethers.provider.sendTransaction(ERC1820_REGISTRY_DEPLOY_TX)
 
   console.log(`"ERC1820Registry" deployed at ${ERC1820_REGISTRY_ADDRESS}`)
 }

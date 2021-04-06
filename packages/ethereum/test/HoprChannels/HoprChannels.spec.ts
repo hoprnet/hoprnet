@@ -1,6 +1,6 @@
-import type { HoprTokenInstance, HoprChannelsInstance } from '../../types'
-import { deployments } from 'hardhat'
+import { deployments, ethers } from 'hardhat'
 import { expectEvent, time } from '@openzeppelin/test-helpers'
+import { expect } from 'chai'
 import { formatAccount, formatChannel, createTicket } from './utils'
 import {
   ACCOUNT_A,
@@ -16,25 +16,25 @@ import {
   SECRET_1,
   SECRET_0
 } from './constants'
+import { HoprToken__factory, HoprChannels__factory } from '../../types'
 
-const HoprToken = artifacts.require('HoprToken')
-const HoprChannels = artifacts.require('HoprChannels')
+const abiEncoder = ethers.utils.Interface.getAbiCoder()
 
-const useFixtures = deployments.createFixture(async () => {
-  const [deployer] = await web3.eth.getAccounts()
+const useFixtures = deployments.createFixture(async ({ ethers }) => {
+  const [deployer] = await ethers.getSigners()
 
   // run migrations
   await deployments.fixture()
 
   const hoprTokenDeployment = await deployments.get('HoprToken')
-  const hoprToken = await HoprToken.at(hoprTokenDeployment.address)
+  const hoprToken = HoprToken__factory.connect(hoprTokenDeployment.address, ethers.provider)
 
   const hoprChannelsDeployment = await deployments.get('HoprChannels')
-  const hoprChannels = await HoprChannels.at(hoprChannelsDeployment.address)
+  const hoprChannels = HoprChannels__factory.connect(hoprChannelsDeployment.address, ethers.provider)
 
   // create deployer the minter
   const minterRole = await hoprToken.MINTER_ROLE()
-  await hoprToken.grantRole(minterRole, deployer)
+  await hoprToken.grantRole(minterRole, deployer.address)
 
   // mint tokens for accountA and accountB
   await hoprToken.mint(ACCOUNT_A.address, '100', '0x0', '0x0')
@@ -184,7 +184,7 @@ describe('HoprChannels', function () {
     const response = await hoprToken.send(
       hoprChannels.address,
       '70',
-      web3.eth.abi.encodeParameters(['bool', 'address', 'address'], [false, ACCOUNT_A.address, ACCOUNT_B.address]),
+      abiEncoder.encode(['bool', 'address', 'address'], [false, ACCOUNT_A.address, ACCOUNT_B.address]),
       {
         from: ACCOUNT_A.address
       }
@@ -215,7 +215,7 @@ describe('HoprChannels', function () {
     const response = await hoprToken.send(
       hoprChannels.address,
       '70',
-      web3.eth.abi.encodeParameters(['bool', 'address', 'address'], [true, ACCOUNT_A.address, ACCOUNT_B.address]),
+      abiEncoder.encode(['bool', 'address', 'address'], [true, ACCOUNT_A.address, ACCOUNT_B.address]),
       {
         from: ACCOUNT_A.address
       }
@@ -246,7 +246,7 @@ describe('HoprChannels', function () {
     const response = await hoprToken.send(
       hoprChannels.address,
       '100',
-      web3.eth.abi.encodeParameters(
+      abiEncoder.encode(
         ['bool', 'address', 'address', 'uint256', 'uint256'],
         [false, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30']
       ),
@@ -280,7 +280,7 @@ describe('HoprChannels', function () {
     const response = await hoprToken.send(
       hoprChannels.address,
       '100',
-      web3.eth.abi.encodeParameters(
+      abiEncoder.encode(
         ['bool', 'address', 'address', 'uint256', 'uint256'],
         [true, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30']
       ),
@@ -381,7 +381,7 @@ describe('HoprChannels intergration tests', function () {
       const response = await hoprToken.send(
         hoprChannels.address,
         '30',
-        web3.eth.abi.encodeParameters(['bool', 'address', 'address'], [false, ACCOUNT_B.address, ACCOUNT_A.address]),
+        abiEncoder.encode(['bool', 'address', 'address'], [false, ACCOUNT_B.address, ACCOUNT_A.address]),
         {
           from: ACCOUNT_B.address
         }

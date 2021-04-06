@@ -1,18 +1,17 @@
 import { deployments } from 'hardhat'
 import { singletons, expectEvent, expectRevert, constants } from '@openzeppelin/test-helpers'
+import { expect } from 'chai'
 import { vmErrorMessage } from '../utils'
-import { formatAccount } from './utils'
 import { ACCOUNT_A, ACCOUNT_B, SECRET_2, SECRET_1 } from './constants'
+import { AccountsMock__factory } from '../../types'
 
-const Accounts = artifacts.require('AccountsMock')
-
-const useFixtures = deployments.createFixture(async () => {
-  const [deployer] = await web3.eth.getAccounts()
+const useFixtures = deployments.createFixture(async ({ ethers, waffle }) => {
+  const [deployer] = await ethers.getSigners()
 
   // deploy ERC1820Registry required by ERC777 token
-  await singletons.ERC1820Registry(deployer)
+  await singletons.ERC1820Registry(deployer.address)
 
-  const accounts = await Accounts.new(constants.ZERO_ADDRESS, '0')
+  const accounts = await new AccountsMock__factory(deployer).deploy(constants.ZERO_ADDRESS, '0')
 
   return {
     accounts
@@ -31,7 +30,7 @@ describe('Accounts', function () {
       secret: SECRET_2
     })
 
-    const account = await accounts.accounts(ACCOUNT_A.address).then(formatAccount)
+    const account = await accounts.accounts(ACCOUNT_A.address)
     expect(account.secret).to.equal(SECRET_2)
     expect(account.counter.toString()).to.equal('1')
   })
@@ -58,7 +57,7 @@ describe('Accounts', function () {
       secret: SECRET_1
     })
 
-    const account = await accounts.accounts(ACCOUNT_A.address).then(formatAccount)
+    const account = await accounts.accounts(ACCOUNT_A.address)
     expect(account.secret).to.equal(SECRET_1)
     expect(account.counter.toString()).to.equal('2')
   })

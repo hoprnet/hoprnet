@@ -1,18 +1,19 @@
 // load env variables
 require('dotenv').config()
 // load hardhat plugins
-import 'hardhat-typechain'
-import 'hardhat-deploy'
-import '@nomiclabs/hardhat-truffle5'
+import '@nomiclabs/hardhat-ethers'
 import '@nomiclabs/hardhat-solhint'
-import 'solidity-coverage'
+import '@nomiclabs/hardhat-waffle'
+import 'hardhat-deploy'
 import 'hardhat-gas-reporter'
-
+import 'solidity-coverage'
+import '@typechain/hardhat'
+// rest
 import { HardhatUserConfig, task, types } from 'hardhat/config'
+import Ethers from 'ethers'
 import { NODE_SEEDS, BOOTSTRAP_SEEDS } from '@hoprnet/hopr-demo-seeds'
-import Web3 from 'web3'
 import { networks } from './chain/networks'
-import { ACCOUNT_DEPLOYER_PRIVKEY, ACCOUNT_A_PRIVKEY, ACCOUNT_B_PRIVKEY } from './test/constants'
+import { ACCOUNT_DEPLOYER, ACCOUNT_A, ACCOUNT_B } from './test/constants'
 
 const { PRIVATE_KEY, INFURA_KEY, MATIC_VIGIL_KEY, ETHERSCAN_KEY, QUIKNODE_KEY } = process.env
 const GAS_MULTIPLIER = 1.1
@@ -26,10 +27,10 @@ const localhostPrivKeys = NODE_SEEDS.concat(BOOTSTRAP_SEEDS)
 // private keys used by tests
 // @TODO: fix legacy dependancy
 const hardhatPrivKeys = localhostPrivKeys
-  .concat([ACCOUNT_DEPLOYER_PRIVKEY, ACCOUNT_A_PRIVKEY, ACCOUNT_B_PRIVKEY])
+  .concat([ACCOUNT_DEPLOYER.privateKey, ACCOUNT_A.privateKey, ACCOUNT_B.privateKey])
   .map((privateKey) => ({
     privateKey,
-    balance: Web3.utils.toWei('10000', 'ether')
+    balance: Ethers.utils.parseEther('10000').toString()
   }))
 
 const hardhatConfig: HardhatUserConfig = {
@@ -111,7 +112,7 @@ const hardhatConfig: HardhatUserConfig = {
   },
   typechain: {
     outDir: './types',
-    target: 'truffle-v5'
+    target: 'ethers-v5'
   },
   gasReporter: {
     currency: 'USD',
@@ -123,7 +124,12 @@ task('fund', "Fund node's accounts by specifying HoprToken address", async (...a
   return (await import('./tasks/fund')).default(args[0], args[1], args[2])
 })
   .addParam<string>('address', 'HoprToken address', undefined, types.string)
-  .addOptionalParam<string>('amount', 'Amount of HOPR to fund', Web3.utils.toWei('1000000', 'ether'), types.string)
+  .addOptionalParam<string>(
+    'amount',
+    'Amount of HOPR to fund',
+    Ethers.utils.parseEther('1000000').toString(),
+    types.string
+  )
   .addOptionalParam<number>('accountsToFund', 'Amount of accounts to fund from demo seeds', 0, types.int)
 
 task('postCompile', 'Use export task and then update abis folder', async (...args: any[]) => {

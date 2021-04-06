@@ -9,7 +9,7 @@ const ERC777SnapshotMock: ERC777SnapshotMockContract = artifacts.require('ERC777
 const latestBlockNumber = (web3: Web3) => web3.eth.getBlockNumber()
 
 const useFixtures = deployments.createFixture(async () => {
-  const [initialHolder, recipient, other] = await web3.eth.getAccounts()
+  const [initialHolder, recipient, other] = await ethers.getSigners()
 
   await singletons.ERC1820Registry(initialHolder)
 

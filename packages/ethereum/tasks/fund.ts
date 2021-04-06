@@ -1,22 +1,22 @@
 import type { HardhatRuntimeEnvironment, RunSuperFunction } from 'hardhat/types'
-
-const HoprToken = artifacts.require('HoprToken')
+import { HoprToken__factory } from '../types'
 
 /**
  * Funds all unlocked accounts with HOPR
  */
 async function main(
   { address, amount, accountsToFund }: { address: string; amount: string; accountsToFund: number },
-  { web3, network }: HardhatRuntimeEnvironment,
+  { ethers, network }: HardhatRuntimeEnvironment,
   _runSuper: RunSuperFunction<any>
 ) {
   console.log({
     address,
     network: network.name
   })
-  const hoprToken = await HoprToken.at(address)
-  const accounts = (await web3.eth.getAccounts()).slice(0, accountsToFund)
-  const owner = accounts[0]
+  const signers = await ethers.getSigners()
+  const signer = signers[0]
+  const accounts = signers.map((signer) => signer.address).slice(0, accountsToFund)
+  const hoprToken = HoprToken__factory.connect(address, ethers.provider)
 
   console.log('Running task "fund" with config:', {
     network: network.name,
@@ -27,8 +27,8 @@ async function main(
 
   for (const account of accounts) {
     await hoprToken.mint(account, amount, '0x00', '0x00', {
-      from: owner,
-      gas: 200e3
+      from: signer.address,
+      gasLimit: 200e3
     })
 
     console.log(`Funded: ${account}`)

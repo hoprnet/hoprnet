@@ -17,7 +17,7 @@ const ERC777 = artifacts.require('ERC777Mock')
 const Tickets = artifacts.require('TicketsMock')
 
 const useFixtures = deployments.createFixture(async (_deployments, { secsClosure }: { secsClosure?: string } = {}) => {
-  const [deployer] = await web3.eth.getAccounts()
+  const [deployer] = await ethers.getSigners()
 
   // deploy ERC1820Registry required by ERC777 token
   await singletons.ERC1820Registry(deployer)
@@ -99,7 +99,7 @@ describe('Tickets', function () {
     await token.send(
       tickets.address,
       '100',
-      web3.eth.abi.encodeParameters(
+      abiEncoder.encode(
         ['bool', 'address', 'address', 'uint256', 'uint256'],
         [false, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30']
       ),
