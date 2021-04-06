@@ -103,13 +103,7 @@ class Challenge<Chain extends HoprCoreConnector> extends Uint8Array {
 
     return new Promise<Uint8Array>(async (resolve) => {
       const challengeSignature = await this.challengeSignature
-      resolve(
-        secp256k1.ecdsaRecover(
-          challengeSignature.signature,
-          challengeSignature.recovery,
-          this.hash.serialize()
-        )
-      )
+      resolve(secp256k1.ecdsaRecover(challengeSignature.signature, challengeSignature.recovery, this.hash.serialize()))
     })
   }
 

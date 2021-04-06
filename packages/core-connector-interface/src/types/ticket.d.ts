@@ -13,7 +13,7 @@ declare interface TicketStatic {
     signPriv: Uint8Array
   ): Ticket
 
-  deserialize(arr: Uint8Array): Ticket;
+  deserialize(arr: Uint8Array): Ticket
 }
 
 declare interface Ticket {
