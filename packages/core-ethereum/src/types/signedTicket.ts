@@ -57,10 +57,12 @@ class SignedTicket extends Uint8ArrayE implements Types.SignedTicket {
   }
 
   get ticket(): Ticket {
-    return Ticket.deserialize(new Uint8Array({
-      bytes: this.buffer,
-      offset: this.ticketOffset
-    }))
+    return Ticket.deserialize(
+      new Uint8Array({
+        bytes: this.buffer,
+        offset: this.ticketOffset
+      })
+    )
   }
 
   get signatureOffset(): number {
