@@ -327,7 +327,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     }
 
     const unacknowledged = new UnacknowledgedTicket(chain, undefined, {
-      signedTicket: ticket,
+      ticket: ticket,
       secretA: new Hash(deriveTicketKey(this.header.derivedSecret))
     })
 
@@ -351,7 +351,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
 
       await validateCreatedTicket({
         myBalance: balances.self.toBN(),
-        signedTicket: this._ticket
+        ticket: this._ticket
       })
     } else if (fee.toBN().isZero()) {
       this._ticket = await channel.createDummyTicket(new Hash(this.header.encryptionKey))

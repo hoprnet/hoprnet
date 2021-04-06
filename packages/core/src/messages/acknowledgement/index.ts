@@ -1,6 +1,4 @@
 import secp256k1 from 'secp256k1'
-
-import { u8aConcat } from '@hoprnet/hopr-utils'
 import { deriveTicketKeyBlinding } from '../packet/header'
 import { KEY_LENGTH } from '../packet/header/parameters'
 import { Challenge } from '../packet/challenge'
@@ -134,13 +132,7 @@ class Acknowledgement<Chain extends HoprCoreConnector> extends Uint8Array {
       this._responseSigningParty = secp256k1.ecdsaRecover(
         responseSignature.signature,
         responseSignature.recovery,
-        responseSignature.msgPrefix != null && responseSignature.msgPrefix.length > 0
-          ? (
-              await this.paymentChannels.utils.hash(
-                u8aConcat(responseSignature.msgPrefix, (await this.hash).serialize())
-              )
-            ).serialize()
-          : (await this.hash).serialize()
+        (await this.hash).serialize()
       )
 
       resolve(this._responseSigningParty)
