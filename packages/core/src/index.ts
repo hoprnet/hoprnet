@@ -36,7 +36,13 @@ import chalk from 'chalk'
 
 import PeerId from 'peer-id'
 import type { RoutingChannel } from '@hoprnet/hopr-core-connector-interface'
-import HoprCoreEthereum, { PublicKey, Balance, NativeBalance, Hash, AcknowledgedTicket } from '@hoprnet/hopr-core-ethereum'
+import HoprCoreEthereum, {
+  PublicKey,
+  Balance,
+  NativeBalance,
+  Hash,
+  AcknowledgedTicket
+} from '@hoprnet/hopr-core-ethereum'
 import BN from 'bn.js'
 
 import { Interactions } from './interactions'
@@ -212,9 +218,7 @@ class Hopr extends EventEmitter {
    *
    * @param options the parameters
    */
-  public static async create(
-    options: HoprOptions
-  ): Promise<Hopr> {
+  public static async create(options: HoprOptions): Promise<Hopr> {
     const db = Hopr.openDatabase(options)
 
     const { id, addresses } = await getIdentity({
@@ -230,10 +234,10 @@ class Hopr extends EventEmitter {
       throw Error(`Cannot start node without a bootstrap server`)
     }
 
-    let connector = (await HoprCoreEthereum.create(db, id.privKey.marshal(), {
+    let connector = await HoprCoreEthereum.create(db, id.privKey.marshal(), {
       provider: options.provider,
       debug: options.debug
-    })) 
+    })
 
     verbose('Created connector, now creating node')
 
