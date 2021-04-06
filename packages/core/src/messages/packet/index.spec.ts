@@ -21,11 +21,7 @@ const TICKET_WIN_PROB = 1 // 100%
  * @param bootstrapNode set to true to create a bootstrap node
  * @param bootstrapServers specify a list of bootstrap server
  */
-async function generateNode(
-  id: number,
-  bootstrapNode: boolean,
-  bootstrapServers?: Multiaddr[]
-): Promise<Hopr> {
+async function generateNode(id: number, bootstrapNode: boolean, bootstrapServers?: Multiaddr[]): Promise<Hopr> {
   // Start HOPR in DEBUG_MODE and use demo seeds
   return (await Hopr.create({
     id,
