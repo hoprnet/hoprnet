@@ -1,6 +1,6 @@
 import type { LevelUp } from 'levelup'
 import type { WebsocketProvider } from 'web3-core'
-import type { Currencies } from '@hoprnet/hopr-core-connector-interface'
+import type { Currencies, SubmitTicketResponse } from '@hoprnet/hopr-core-connector-interface'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type { HoprChannels } from './tsc/web3/HoprChannels'
 import type { HoprToken } from './tsc/web3/HoprToken'
@@ -253,3 +253,5 @@ export default class HoprEthereum implements HoprCoreConnector {
 
 export const Utils = utils
 export * from './types'
+
+export { Channel, SubmitTicketResponse }
