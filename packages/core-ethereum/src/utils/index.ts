@@ -82,10 +82,7 @@ export async function sign(msg: Uint8Array, privKey: Uint8Array): Promise<Signat
     )
   }
   const result = ecdsaSign(msg, privKey)
-  return new Signature(null, {
-    signature: result.signature,
-    recovery: result.recid
-  })
+  return new Signature(result.signature, result.recid)
 }
 
 /**

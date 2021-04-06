@@ -1,10 +1,9 @@
 import { u8aConcat } from '@hoprnet/hopr-utils'
-
-import { Hash, PublicKey, SignedTicket } from '@hoprnet/hopr-core-ethereum'
+import { Hash, PublicKey, Ticket } from '@hoprnet/hopr-core-ethereum'
 import PeerId from 'peer-id'
 
 class UnacknowledgedTicket extends Uint8Array {
-  private _signedTicket: SignedTicket
+  private _signedTicket: Ticket
   private _secretA: Hash
 
   constructor(
@@ -13,7 +12,7 @@ class UnacknowledgedTicket extends Uint8Array {
       offset: number
     },
     struct?: {
-      signedTicket: SignedTicket
+      ticket: Ticket
       secretA: Hash
     }
   ) {
@@ -24,10 +23,10 @@ class UnacknowledgedTicket extends Uint8Array {
     }
 
     if (struct != null) {
-      this.set(struct.signedTicket, this.signedTicketOffset - this.byteOffset)
+      this.set(struct.ticket.serialize(), this.signedTicketOffset - this.byteOffset)
       this.set(struct.secretA.serialize(), this.secretAOffset - this.byteOffset)
 
-      this._signedTicket = struct.signedTicket
+      this._signedTicket = struct.ticket
       this._secretA = struct.secretA
     }
   }
@@ -44,23 +43,22 @@ class UnacknowledgedTicket extends Uint8Array {
     return this.byteOffset
   }
 
-  get signedTicket(): Promise<SignedTicket> {
+  get signedTicket(): Promise<Ticket> {
     if (this._signedTicket != null) {
       return Promise.resolve(this._signedTicket)
     }
 
-    return new Promise<SignedTicket>(async (resolve) => {
-      this._signedTicket = await SignedTicket.create({
-        bytes: this.buffer,
-        offset: this.signedTicketOffset
-      })
+    return new Promise<Ticket>(async (resolve) => {
+      this._signedTicket = await Ticket.deserialize(
+        new Uint8Array(this.buffer, this.signedTicketOffset, Ticket.SIZE)
+      )
 
       resolve(this._signedTicket)
     })
   }
 
   get secretAOffset(): number {
-    return this.byteOffset + SignedTicket.SIZE
+    return this.byteOffset + Ticket.SIZE
   }
 
   get secretA(): Hash {
@@ -76,7 +74,7 @@ class UnacknowledgedTicket extends Uint8Array {
   async verifyChallenge(hashedKeyHalf: Uint8Array) {
     return Hash.create(u8aConcat(this.secretA.serialize(), hashedKeyHalf))
       .hash()
-      .eq((await this.signedTicket).ticket.challenge as Hash)
+      .eq((await this.signedTicket).challenge as Hash)
   }
 
   async verifySignature(peerId: PeerId) {
@@ -88,7 +86,7 @@ class UnacknowledgedTicket extends Uint8Array {
   }
 
   static SIZE(): number {
-    return SignedTicket.SIZE + Hash.SIZE
+    return Ticket.SIZE + Hash.SIZE
   }
 }
 

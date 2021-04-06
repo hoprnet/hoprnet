@@ -1,6 +1,4 @@
 import secp256k1 from 'secp256k1'
-
-import { u8aConcat } from '@hoprnet/hopr-utils'
 import { deriveTicketKeyBlinding } from '../packet/header'
 import { KEY_LENGTH } from '../packet/header/parameters'
 import { Challenge } from '../packet/challenge'
@@ -47,7 +45,7 @@ class Acknowledgement<Chain extends HoprCoreConnector> extends Uint8Array {
       }
 
       if (struct.signature != null) {
-        this.set(struct.signature, this.responseSignatureOffset - this.byteOffset)
+        this.set(struct.signature.serialize(), this.responseSignatureOffset - this.byteOffset)
       }
     }
 
@@ -117,11 +115,9 @@ class Acknowledgement<Chain extends HoprCoreConnector> extends Uint8Array {
     }
 
     return new Promise<Types.Signature>(async (resolve) => {
-      this._responseSignature = await this.paymentChannels.types.Signature.create({
-        bytes: this.buffer,
-        offset: this.responseSignatureOffset
-      })
-
+      this._responseSignature = await this.paymentChannels.types.Signature.deserialize(
+        new Uint8Array(this.buffer, this.responseSignatureOffset, this.paymentChannels.types.Signature.SIZE)
+      )
       resolve(this._responseSignature)
     })
   }
@@ -136,13 +132,7 @@ class Acknowledgement<Chain extends HoprCoreConnector> extends Uint8Array {
       this._responseSigningParty = secp256k1.ecdsaRecover(
         responseSignature.signature,
         responseSignature.recovery,
-        responseSignature.msgPrefix != null && responseSignature.msgPrefix.length > 0
-          ? (
-              await this.paymentChannels.utils.hash(
-                u8aConcat(responseSignature.msgPrefix, (await this.hash).serialize())
-              )
-            ).serialize()
-          : (await this.hash).serialize()
+        (await this.hash).serialize()
       )
 
       resolve(this._responseSigningParty)
@@ -151,7 +141,7 @@ class Acknowledgement<Chain extends HoprCoreConnector> extends Uint8Array {
 
   async sign(peerId: PeerId): Promise<Acknowledgement<Chain>> {
     const signature = await this.paymentChannels.utils.sign((await this.hash).serialize(), peerId.privKey.marshal())
-    this.set(signature, this.responseSignatureOffset - this.byteOffset)
+    this.set(signature.serialize(), this.responseSignatureOffset - this.byteOffset)
     return this
   }
 

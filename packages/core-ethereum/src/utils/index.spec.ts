@@ -95,7 +95,7 @@ describe('test utils', function () {
 
       if (await utils.verify(message, signature, pubKey)) {
         // @TODO change to assert.fail
-        console.log(`found invalid signature <${u8aToHex(signature)}>, byte #${index}, bit #${exponent}`)
+        console.log(`found invalid signature <${u8aToHex(signature.serialize())}>, byte #${index}, bit #${exponent}`)
       }
     }
   })

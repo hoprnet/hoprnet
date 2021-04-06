@@ -4,7 +4,6 @@ import PeerId from 'peer-id'
 import HoprCoreConnector, { Types } from '@hoprnet/hopr-core-connector-interface'
 
 import BN from 'bn.js'
-import { u8aConcat } from '@hoprnet/hopr-utils'
 
 /**
  * The purpose of this class is to give the relayer the opportunity to claim
@@ -17,7 +16,6 @@ class Challenge<Chain extends HoprCoreConnector> extends Uint8Array {
   private _hashedKey: Types.Hash
   private _fee: BN
   private _counterparty: Uint8Array
-  private _challengeSignature: Types.Signature
 
   constructor(
     paymentChannels: Chain,
@@ -36,7 +34,7 @@ class Challenge<Chain extends HoprCoreConnector> extends Uint8Array {
     }
 
     if (struct != null) {
-      super(struct.signature)
+      super(struct.signature.serialize())
     }
 
     this.paymentChannels = paymentChannels
@@ -46,20 +44,15 @@ class Challenge<Chain extends HoprCoreConnector> extends Uint8Array {
     return this.byteOffset
   }
 
-  get challengeSignature(): Promise<Types.Signature> {
-    if (this._challengeSignature != null) {
-      return Promise.resolve(this._challengeSignature)
-    }
-
-    return this.paymentChannels.types.Signature.create({
-      bytes: this.buffer,
-      offset: this.challengeSignatureOffset
-    })
+  get challengeSignature(): Types.Signature {
+    return this.paymentChannels.types.Signature.deserialize(
+      new Uint8Array(this.buffer, this.challengeSignatureOffset, this.paymentChannels.types.Signature.SIZE)
+    )
   }
 
   get signatureHash(): Promise<Types.Hash> {
     return new Promise(async (resolve) => {
-      resolve(await this.paymentChannels.utils.hash(await this.challengeSignature))
+      resolve(await this.paymentChannels.utils.hash(this.challengeSignature.serialize()))
     })
   }
 
@@ -110,19 +103,7 @@ class Challenge<Chain extends HoprCoreConnector> extends Uint8Array {
 
     return new Promise<Uint8Array>(async (resolve) => {
       const challengeSignature = await this.challengeSignature
-      resolve(
-        secp256k1.ecdsaRecover(
-          challengeSignature.signature,
-          challengeSignature.recovery,
-          challengeSignature.msgPrefix != null && challengeSignature.msgPrefix.length > 0
-            ? (
-                await this.paymentChannels.utils.hash(
-                  u8aConcat(challengeSignature.msgPrefix, (await this.hash).serialize())
-                )
-              ).serialize()
-            : this.hash.serialize()
-        )
-      )
+      resolve(secp256k1.ecdsaRecover(challengeSignature.signature, challengeSignature.recovery, this.hash.serialize()))
     })
   }
 
@@ -134,7 +115,7 @@ class Challenge<Chain extends HoprCoreConnector> extends Uint8Array {
    */
   async sign(peerId: PeerId): Promise<Challenge<Chain>> {
     const signature = await this.paymentChannels.utils.sign(this.hash.serialize(), peerId.privKey.marshal())
-    this.set(signature, this.challengeSignatureOffset - this.byteOffset)
+    this.set(signature.serialize(), this.challengeSignatureOffset - this.byteOffset)
     return this
   }
 

@@ -17,9 +17,9 @@ export async function getUnacknowledgedTickets(
   filter?: {
     signer: Uint8Array
   }
-): Promise<UnacknowledgedTicket<Chain>[]> {
-  const tickets: UnacknowledgedTicket<Chain>[] = []
-  const unAcknowledgedTicketSize = UnacknowledgedTicket.SIZE(node.paymentChannels)
+): Promise<UnacknowledgedTicket[]> {
+  const tickets: UnacknowledgedTicket[] = []
+  const unAcknowledgedTicketSize = UnacknowledgedTicket.SIZE()
 
   return new Promise((resolve, reject) => {
     node.db
@@ -30,13 +30,13 @@ export async function getUnacknowledgedTickets(
       .on('data', async ({ value }: { value: Buffer }) => {
         if (value.buffer.byteLength !== unAcknowledgedTicketSize) return
 
-        const unAckTicket = new UnacknowledgedTicket(node.paymentChannels, {
+        const unAckTicket = new UnacknowledgedTicket({
           bytes: value.buffer,
           offset: value.byteOffset
         })
 
         // if signer provided doesn't match our ticket's signer dont add it to the list
-        if (filter?.signer && !u8aEquals(await (await unAckTicket.signedTicket).signer, filter.signer)) {
+        if (filter?.signer && !u8aEquals((await unAckTicket.signedTicket).getSigner(), filter.signer)) {
           return
         }
 
@@ -63,7 +63,7 @@ export async function deleteUnacknowledgedTickets(
       tickets.map<any>(async (ticket) => {
         return {
           type: 'del',
-          key: Buffer.from(node._dbKeys.UnAcknowledgedTickets((await ticket.signedTicket).ticket.challenge.serialize()))
+          key: Buffer.from(node._dbKeys.UnAcknowledgedTickets((await ticket.signedTicket).challenge.serialize()))
         }
       })
     )
@@ -215,7 +215,7 @@ export async function getTickets(
   filter?: {
     signer: Uint8Array
   }
-): Promise<SignedTicket[]> {
+): Promise<Ticket[]> {
   return Promise.all([getUnacknowledgedTickets(node, filter), getAcknowledgedTickets(node, filter)]).then(
     async ([unAcks, acks]) => {
       const unAckTickets = await Promise.all(unAcks.map((o) => o.signedTicket))
@@ -247,9 +247,9 @@ export async function deleteTickets(
 export async function validateUnacknowledgedTicket(
   node: Hopr<Chain>,
   senderPeerId: PeerId,
-  signedTicket: SignedTicket,
+  ticket: Types.Ticket,
   channel: Channel,
-  getTickets: () => Promise<SignedTicket[]>
+  getTickets: () => Promise<Types.Ticket[]>
 ): Promise<void> {
   const ethereum = node.paymentChannels
   // self
@@ -258,8 +258,6 @@ export async function validateUnacknowledgedTicket(
   // sender
   const senderB58 = senderPeerId.toB58String()
   const senderPubKey = new PublicKey(senderPeerId.pubKey.marshal())
-  // ticket
-  const ticket = signedTicket.ticket
   const ticketAmount = ticket.amount.toBN()
   const ticketCounter = ticket.epoch.toBN()
   const accountCounter = (await ethereum.account.getTicketEpoch()).toBN()
@@ -273,7 +271,7 @@ export async function validateUnacknowledgedTicket(
   }
 
   // ticket signer MUST be the sender
-  if (!(await signedTicket.signer).eq(senderPubKey)) {
+  if (!ticket.getSigner().eq(senderPubKey)) {
     throw Error(`The signer of the ticket does not match the sender`)
   }
 
@@ -321,14 +319,14 @@ export async function validateUnacknowledgedTicket(
   // we retrieve all signed tickets and filter the ones between sender and target
   let signedTickets = (await getTickets()).filter(
     (signedTicket) =>
-      signedTicket.ticket.counterparty.eq(selfAddress) &&
-      signedTicket.ticket.epoch.toBN().eq(accountCounter) &&
+      signedTicket.counterparty.eq(selfAddress) &&
+      signedTicket.epoch.toBN().eq(accountCounter) &&
       ticket.channelIteration.toBN().eq(currentChannelIteration)
   )
 
   // calculate total unredeemed balance
   const unredeemedBalance = signedTickets.reduce((total, signedTicket) => {
-    return new BN(total.add(signedTicket.ticket.amount.toBN()))
+    return new BN(total.add(signedTicket.amount.toBN()))
   }, new BN(0))
 
   // ensure sender has enough funds
@@ -341,15 +339,7 @@ export async function validateUnacknowledgedTicket(
  * Validate newly created tickets
  * @param ops
  */
-export async function validateCreatedTicket({
-  myBalance,
-  signedTicket
-}: {
-  myBalance: BN
-  signedTicket: SignedTicket
-}) {
-  const { ticket } = signedTicket
-
+export async function validateCreatedTicket({ myBalance, ticket }: { myBalance: BN; ticket: Ticket }) {
   if (myBalance.lt(ticket.amount.toBN())) {
     throw Error(`Payment channel does not have enough funds ${myBalance.toString()} < ${ticket.amount.toString()}`)
   }
