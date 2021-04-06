@@ -3,8 +3,7 @@ import { UINT256, Address, Balance, Hash } from '.' // TODO: cyclic
 
 declare interface TicketStatic {
   readonly SIZE: number
-
-  new (
+  create (
     counterparty: Address,
     challenge: Hash,
     epoch: UINT256,

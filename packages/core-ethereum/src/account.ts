@@ -123,10 +123,10 @@ class Account {
     }
     if (
       await isWinningTicket(
-        (await ticket.signedTicket).ticket.getHash(),
+        (await ticket.signedTicket).getHash(),
         ticket.response,
         this.preimage,
-        (await ticket.signedTicket).ticket.winProb
+        (await ticket.signedTicket).winProb
       )
     ) {
       ticket.preImage = this.preimage

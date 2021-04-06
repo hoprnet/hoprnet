@@ -47,7 +47,7 @@ class Acknowledgement<Chain extends HoprCoreConnector> extends Uint8Array {
       }
 
       if (struct.signature != null) {
-        this.set(struct.signature, this.responseSignatureOffset - this.byteOffset)
+        this.set(struct.signature.serialize(), this.responseSignatureOffset - this.byteOffset)
       }
     }
 
@@ -117,11 +117,9 @@ class Acknowledgement<Chain extends HoprCoreConnector> extends Uint8Array {
     }
 
     return new Promise<Types.Signature>(async (resolve) => {
-      this._responseSignature = await this.paymentChannels.types.Signature.create({
-        bytes: this.buffer,
-        offset: this.responseSignatureOffset
-      })
-
+      this._responseSignature = await this.paymentChannels.types.Signature.deserialize(
+        new Uint8Array(this.buffer, this.responseSignatureOffset, this.paymentChannels.types.Signature.SIZE)
+      )
       resolve(this._responseSignature)
     })
   }
@@ -151,7 +149,7 @@ class Acknowledgement<Chain extends HoprCoreConnector> extends Uint8Array {
 
   async sign(peerId: PeerId): Promise<Acknowledgement<Chain>> {
     const signature = await this.paymentChannels.utils.sign((await this.hash).serialize(), peerId.privKey.marshal())
-    this.set(signature, this.responseSignatureOffset - this.byteOffset)
+    this.set(signature.serialize(), this.responseSignatureOffset - this.byteOffset)
     return this
   }
 

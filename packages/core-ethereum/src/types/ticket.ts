@@ -1,6 +1,6 @@
 import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import BN from 'bn.js'
-import { stringToU8a, /*u8aSplit,*/ u8aToHex, u8aConcat, serializeToU8a } from '@hoprnet/hopr-utils'
+import { stringToU8a, u8aSplit, u8aToHex, u8aConcat, serializeToU8a } from '@hoprnet/hopr-utils'
 import { Address, Balance, Hash, Signature, UINT256, PublicKey } from '.'
 import { ecdsaVerify, ecdsaSign, ecdsaRecover } from 'secp256k1'
 
@@ -68,21 +68,17 @@ class Ticket implements Types.Ticket {
       counterparty, challenge, epoch, amount, winProb, channelIteration
     })))
     const sig = ecdsaSign(hash.serialize(), signPriv)
-    const signature = new Signature(null, {
-      signature: sig.signature,
-      recovery: sig.recid
-    })
+    const signature = new Signature(sig.signature, sig.recid)
     return new Ticket(counterparty, challenge, epoch, amount, winProb, channelIteration, signature)
   }
 
   public serialize(): Uint8Array {
     const unsigned = serializeUnsigned({ ... this })
     return u8aConcat(serializeToU8a([
-      [this.signature, Signature.SIZE]
+      [this.signature.serialize(), Signature.SIZE]
     ]), unsigned)
   }
 
-/*
  static deserialize(arr: Uint8Array): Ticket {
     const components = u8aSplit(arr, [
       Address.SIZE,
@@ -90,7 +86,8 @@ class Ticket implements Types.Ticket {
       UINT256.SIZE,
       Balance.SIZE,
       Hash.SIZE,
-      UINT256.SIZE
+      UINT256.SIZE,
+      Signature.SIZE
     ])
 
     const counterparty = new Address(components[0])
@@ -99,9 +96,9 @@ class Ticket implements Types.Ticket {
     const amount = new Balance(new BN(components[3]))
     const winProb = new Hash(components[4])
     const channelIteration = new UINT256(new BN(components[4]))
-    return new Ticket(counterparty, challenge, epoch, amount, winProb, channelIteration)
+    const signature = Signature.deserialize(components[5])
+    return new Ticket(counterparty, challenge, epoch, amount, winProb, channelIteration, signature)
   }
-  */
 
   getHash(): Hash {
     return toEthSignedMessageHash(u8aToHex(serializeUnsigned({ ... this })))

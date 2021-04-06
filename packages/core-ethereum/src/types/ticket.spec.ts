@@ -20,7 +20,7 @@ describe('test ticket construction', function () {
     const amount = new Balance(new BN(1))
     const winProb = computeWinningProbability(1)
     const channelIteration = UINT256.fromString('1')
-    const signature = new Signature(null)
+    const signature = new Signature(null, 0)
     const ticket = new Ticket(userA, challenge, epoch, amount, winProb, channelIteration, signature)
 
     assert(ticket.counterparty.eq(userA), 'wrong counterparty')
@@ -39,7 +39,7 @@ describe('test ticket construction', function () {
     const amount = new Balance(new BN('0000000002c68af0bb140000', 16))
     const winProb = new Hash(stringToU8a('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'))
     const channelIteration = UINT256.fromString('1')
-    const signature = new Signature(null)
+    const signature = new Signature(null, 0)
 
     const ticketA = new Ticket(counterparty, challenge, epoch, amount, winProb, channelIteration, signature)
 
@@ -58,7 +58,7 @@ describe('test ticket construction', function () {
     const amount = new Balance(new BN('000000000de0b6b3a7640000', 16))
     const winProb = new Hash(stringToU8a('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'))
     const channelIteration = UINT256.fromString('1')
-    const signature = new Signature(null)
+    const signature = new Signature(null, 0)
 
     const ticketA = new Ticket(counterparty, challenge, epoch, amount, winProb, channelIteration, signature)
 

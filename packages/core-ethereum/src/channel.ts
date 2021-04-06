@@ -1,7 +1,7 @@
 import type { Channel as IChannel, Types as Interfaces } from '@hoprnet/hopr-core-connector-interface'
 import type Connector from '.'
 import BN from 'bn.js'
-import { PublicKey, Balance, Hash, UINT256, Ticket, SignedTicket, AcknowledgedTicket } from './types'
+import { PublicKey, Balance, Hash, UINT256, Ticket, AcknowledgedTicket } from './types'
 import { getId, waitForConfirmation, computeWinningProbability, checkChallenge, isWinningTicket } from './utils'
 import Debug from 'debug'
 
@@ -148,53 +148,37 @@ class Channel implements IChannel {
   async createTicket(amount: Balance, challenge: Hash, winProb: number) {
     const counterpartyAddress = await this.counterparty.toAddress()
     const counterpartyState = await this.connector.indexer.getAccount(counterpartyAddress)
-
-    const ticket = new Ticket(
+    return Ticket.create(
       counterpartyAddress,
       challenge,
       new UINT256(counterpartyState.counter),
       amount,
       computeWinningProbability(winProb),
-      new UINT256((await this.getState()).getIteration())
+      new UINT256((await this.getState()).getIteration()),
+      this.connector.account.keys.onChain.privKey
     )
-
-    // TODO: simplify
-    const signature = await ticket.sign(this.connector.account.keys.onChain.privKey)
-
-    return new SignedTicket(undefined, {
-      signature,
-      ticket
-    })
   }
 
-  async createDummyTicket(challenge: Hash): Promise<SignedTicket> {
+  async createDummyTicket(challenge: Hash): Promise<Ticket> {
     // TODO: document how dummy ticket works
-    const ticket = new Ticket(
+    return Ticket.create(
       await this.counterparty.toAddress(),
       challenge,
       UINT256.fromString('0'),
       new Balance(new BN(0)),
       computeWinningProbability(1),
-      UINT256.fromString('0')
+      UINT256.fromString('0'),
+      this.connector.account.keys.onChain.privKey
     )
-
-    // TODO: simplify
-    const signature = await ticket.sign(this.connector.account.keys.onChain.privKey)
-
-    return new SignedTicket(undefined, {
-      signature,
-      ticket
-    })
   }
 
   async submitTicket(ackTicket: AcknowledgedTicket): ReturnType<IChannel['submitTicket']> {
     try {
-      const signedTicket = await ackTicket.signedTicket
-      const ticket = signedTicket.ticket
+      const ticket = await ackTicket.signedTicket
 
       log('Submitting ticket', ackTicket.response.toHex())
       const { hoprChannels, account, utils } = this.connector
-      const { r, s, v } = utils.getSignatureParameters(signedTicket.signature)
+      const { r, s, v } = utils.getSignatureParameters(ticket.signature)
 
       const emptyPreImage = new Hash(new Uint8Array(Hash.SIZE).fill(0x00))
       const hasPreImage = !ackTicket.preImage.eq(emptyPreImage)
@@ -224,7 +208,7 @@ class Channel implements IChannel {
         }
       }
 
-      const counterparty = (await signedTicket.signer).toAddress()
+      const counterparty = ticket.getSigner().toAddress()
       const transaction = await account.signTransaction(
         {
           from: account.address.toHex(),

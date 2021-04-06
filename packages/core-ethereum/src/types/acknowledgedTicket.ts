@@ -56,10 +56,7 @@ class AcknowledgedTicket extends Uint8Array {
     }
 
     return new Promise<Ticket>(async (resolve) => {
-      this._signedTicket = await Ticket.deserialize({
-        bytes: this.buffer,
-        offset: this.signedTicketOffset
-      })
+      this._signedTicket = await Ticket.deserialize(new Uint8Array(this.buffer,this.signedTicketOffset, Ticket.SIZE)) 
 
       resolve(this._signedTicket)
     })
