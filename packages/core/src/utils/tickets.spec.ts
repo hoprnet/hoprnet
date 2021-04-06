@@ -26,7 +26,7 @@ const createMockTicket = ({
   epoch = new UINT256(new BN(1)),
   channelIteration = new UINT256(new BN(1))
 }: {
-  sender?: PeerId,
+  sender?: PeerId
   targetAddress?: Address
   amount?: Balance
   winProb?: Hash
