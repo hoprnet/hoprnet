@@ -99,9 +99,7 @@ describe('test signedTicket construction', async function () {
       new Hash(randomBytes(32)),
       UINT256.fromString('0'),
       new Balance(new BN(15)),
-      new Hash(
-        new Uint8Array(new BN(new Uint8Array(Hash.SIZE).fill(0xff)).div(WIN_PROB).toArray('le', Hash.SIZE))
-      ),
+      new Hash(new Uint8Array(new BN(new Uint8Array(Hash.SIZE).fill(0xff)).div(WIN_PROB).toArray('le', Hash.SIZE))),
       UINT256.fromString('0'),
       userAPrivKey
     )
