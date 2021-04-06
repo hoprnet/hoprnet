@@ -378,7 +378,7 @@ export class Packet extends Uint8Array {
    * Computes the peerId if the preceeding node and caches it for later use.
    */
   async getSenderPeerId(): Promise<PeerId> {
-    return await pubKeyToPeerId((await this.ticket).getSigner())
+    return await pubKeyToPeerId((await this.ticket).getSigner().serialize())
   }
 
   /**

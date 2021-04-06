@@ -11,7 +11,6 @@ import {
 import { Utils } from '@hoprnet/hopr-core-ethereum'
 import PeerId from 'peer-id'
 import Hopr from '../../../'
-import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import { randomBytes } from 'crypto'
 import secp256k1 from 'secp256k1'
 import { u8aEquals } from '@hoprnet/hopr-utils'
@@ -20,10 +19,10 @@ import { MAX_HOPS } from '../../../constants'
 if (MAX_HOPS > 1) {
   describe('test creation & transformation of a header', function () {
     async function createAndDecomposeHeader(
-      node: Hopr<HoprCoreConnector>,
+      node: Hopr,
       peerIds: PeerId[]
     ): Promise<{ header: Header; identifier: Uint8Array; secrets: Uint8Array[] }> {
-      const { header, identifier, secrets } = await Header.create<HoprCoreConnector>(node, peerIds)
+      const { header, identifier, secrets } = await Header.create(node, peerIds)
 
       for (let i = 0; i < peerIds.length - 1; i++) {
         header.deriveSecret(peerIds[i].privKey.marshal())
@@ -41,12 +40,12 @@ if (MAX_HOPS > 1) {
       return { header, identifier, secrets }
     }
 
-    function getNode(): Hopr<HoprCoreConnector> {
+    function getNode(): Hopr {
       const node = ({
         paymentChannels: {
           utils: Utils
         }
-      } as unknown) as Hopr<HoprCoreConnector>
+      } as unknown) as Hopr
 
       return node
     }

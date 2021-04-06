@@ -2,7 +2,7 @@ import secp256k1 from 'secp256k1'
 import { deriveTicketKeyBlinding } from '../packet/header'
 import { KEY_LENGTH } from '../packet/header/parameters'
 import { Challenge } from '../packet/challenge'
-import HoprCoreConnector, { Types } from '@hoprnet/hopr-core-connector-interface'
+import { Hash, Signature, PublicKey } from '@hoprnet/hopr-core-ethereum'
 import PeerId from 'peer-id'
 
 /**
@@ -12,8 +12,7 @@ import PeerId from 'peer-id'
  */
 class Acknowledgement extends Uint8Array {
   private _responseSigningParty?: Uint8Array
-  private _responseSignature?: Types.Signature
-  private _hashedKey?: Types.Hash
+  private _responseSignature?: Signature
 
   constructor(
     arr?: {
@@ -23,13 +22,13 @@ class Acknowledgement extends Uint8Array {
     struct?: {
       key: Uint8Array
       challenge: Challenge
-      signature?: Types.Signature
+      signature?: Signature
     }
   ) {
     if (arr == null) {
-      super(Acknowledgement.SIZE(paymentChannels))
+      super(Acknowledgement.SIZE())
     } else {
-      super(arr.bytes, arr.offset, Acknowledgement.SIZE(paymentChannels))
+      super(arr.bytes, arr.offset, Acknowledgement.SIZE())
     }
 
     if (struct != null) {
@@ -45,15 +44,13 @@ class Acknowledgement extends Uint8Array {
         this.set(struct.signature.serialize(), this.responseSignatureOffset - this.byteOffset)
       }
     }
-
-    this.paymentChannels = paymentChannels
   }
 
-  slice(begin: number = 0, end: number = Acknowledgement.SIZE(this.paymentChannels)) {
+  slice(begin: number = 0, end: number = Acknowledgement.SIZE()) {
     return this.subarray(begin, end)
   }
 
-  subarray(begin: number = 0, end: number = Acknowledgement.SIZE(this.paymentChannels)): Uint8Array {
+  subarray(begin: number = 0, end: number = Acknowledgement.SIZE()): Uint8Array {
     return new Uint8Array(this.buffer, begin + this.byteOffset, end - begin)
   }
 
@@ -65,16 +62,8 @@ class Acknowledgement extends Uint8Array {
     return new Uint8Array(this.buffer, this.keyOffset, KEY_LENGTH)
   }
 
-  get hashedKey(): Promise<Types.Hash> {
-    if (this._hashedKey != null) {
-      return Promise.resolve(this._hashedKey)
-    }
-
-    return this.paymentChannels.utils.hash(this.key).then((hashedKey: Types.Hash) => {
-      this._hashedKey = hashedKey
-
-      return hashedKey
-    })
+  get hashedKey(): Promise<Hash> {
+    return Promise.resolve(Hash.create(this.key))
   }
 
   get challengeOffset(): number {
@@ -82,20 +71,18 @@ class Acknowledgement extends Uint8Array {
   }
 
   get challenge(): Challenge {
-    return new Challenge(this.paymentChannels, {
+    return new Challenge({
       bytes: this.buffer,
       offset: this.challengeOffset
     })
   }
 
-  get hash(): Promise<Types.Hash> {
-    return this.paymentChannels.utils.hash(
-      new Uint8Array(this.buffer, this.byteOffset, KEY_LENGTH + Challenge.SIZE(this.paymentChannels))
-    )
+  get hash(): Promise<Hash> {
+    return Promise.resolve(Hash.create(new Uint8Array(this.buffer, this.byteOffset, KEY_LENGTH + Challenge.SIZE())))
   }
 
-  get challengeSignatureHash(): Promise<Types.Hash> {
-    return this.paymentChannels.utils.hash(this.challenge)
+  get challengeSignatureHash(): Promise<Hash> {
+    return Promise.resolve(Hash.create(this.challenge))
   }
 
   get challengeSigningParty() {
@@ -103,17 +90,17 @@ class Acknowledgement extends Uint8Array {
   }
 
   get responseSignatureOffset(): number {
-    return this.byteOffset + KEY_LENGTH + Challenge.SIZE(this.paymentChannels)
+    return this.byteOffset + KEY_LENGTH + Challenge.SIZE()
   }
 
-  get responseSignature(): Promise<Types.Signature> {
+  get responseSignature(): Promise<Signature> {
     if (this._responseSignature != null) {
       return Promise.resolve(this._responseSignature)
     }
 
-    return new Promise<Types.Signature>(async (resolve) => {
-      this._responseSignature = await this.paymentChannels.types.Signature.deserialize(
-        new Uint8Array(this.buffer, this.responseSignatureOffset, this.paymentChannels.types.Signature.SIZE)
+    return new Promise<Signature>(async (resolve) => {
+      this._responseSignature = Signature.deserialize(
+        new Uint8Array(this.buffer, this.responseSignatureOffset, Signature.SIZE)
       )
       resolve(this._responseSignature)
     })
@@ -137,17 +124,16 @@ class Acknowledgement extends Uint8Array {
   }
 
   async sign(peerId: PeerId): Promise<Acknowledgement> {
-    const signature = await this.paymentChannels.utils.sign((await this.hash).serialize(), peerId.privKey.marshal())
+    const signature = Signature.create((await this.hash).serialize(), peerId.privKey.marshal())
     this.set(signature.serialize(), this.responseSignatureOffset - this.byteOffset)
     return this
   }
 
   async verify(peerId: PeerId): Promise<boolean> {
-    return this.paymentChannels.utils.verify(
-      (await this.hash).serialize(),
-      await this.responseSignature,
-      peerId.pubKey.marshal()
-    )
+    return (await this.responseSignature).verify(
+        (await this.hash).serialize(),
+        new PublicKey(peerId.pubKey.marshal())
+      )
   }
 
   /**
@@ -158,14 +144,13 @@ class Acknowledgement extends Uint8Array {
    * @param derivedSecret the secret that is used to create the second key half
    * @param signer contains private key
    */
-  static async create<Chain extends HoprCoreConnector>(
-    hoprCoreConnector: Chain,
+  static async create(
     challenge: Challenge,
     derivedSecret: Uint8Array,
     signer: PeerId
   ): Promise<Acknowledgement> {
-    const ack = new Acknowledgement(hoprCoreConnector, {
-      bytes: new Uint8Array(Acknowledgement.SIZE(hoprCoreConnector)),
+    const ack = new Acknowledgement({
+      bytes: new Uint8Array(Acknowledgement.SIZE()),
       offset: 0
     })
 
@@ -175,8 +160,8 @@ class Acknowledgement extends Uint8Array {
     return ack.sign(signer)
   }
 
-  static SIZE<Chain extends HoprCoreConnector>(hoprCoreConnector: Chain): number {
-    return KEY_LENGTH + Challenge.SIZE(hoprCoreConnector) + hoprCoreConnector.types.Signature.SIZE
+  static SIZE(): number {
+    return KEY_LENGTH + Challenge.SIZE() + Signature.SIZE
   }
 }
 
