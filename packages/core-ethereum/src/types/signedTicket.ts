@@ -57,9 +57,7 @@ class SignedTicket extends Uint8ArrayE implements Types.SignedTicket {
   }
 
   get ticket(): Ticket {
-    return Ticket.deserialize(
-      new Uint8Array(this.buffer, this.ticketOffset, Ticket.SIZE)
-    )
+    return Ticket.deserialize(new Uint8Array(this.buffer, this.ticketOffset, Ticket.SIZE))
   }
 
   get signatureOffset(): number {
@@ -85,11 +83,7 @@ class SignedTicket extends Uint8ArrayE implements Types.SignedTicket {
     return new Promise(async (resolve, reject) => {
       try {
         this._signer = new PublicKey(
-          secp256k1.ecdsaRecover(
-            this.signature.signature,
-            this.signature.recovery,
-            this.ticket.getHash().serialize()
-          )
+          secp256k1.ecdsaRecover(this.signature.signature, this.signature.recovery, this.ticket.getHash().serialize())
         )
         return resolve(this._signer)
       } catch (err) {

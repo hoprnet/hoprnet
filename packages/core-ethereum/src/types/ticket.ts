@@ -50,15 +50,8 @@ class Ticket implements Types.Ticket {
     ])
   }
 
- static deserialize(arr: Uint8Array): Ticket {
-    const components = u8aSplit(arr, [
-      Address.SIZE,
-      Hash.SIZE,
-      UINT256.SIZE,
-      Balance.SIZE,
-      Hash.SIZE,
-      UINT256.SIZE
-    ])
+  static deserialize(arr: Uint8Array): Ticket {
+    const components = u8aSplit(arr, [Address.SIZE, Hash.SIZE, UINT256.SIZE, Balance.SIZE, Hash.SIZE, UINT256.SIZE])
 
     const counterparty = new Address(components[0])
     const challenge = new Hash(components[1])
