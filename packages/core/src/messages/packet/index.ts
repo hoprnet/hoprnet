@@ -23,10 +23,9 @@ const verbose = Debug('hopr-core:verbose:message:packet')
  */
 export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
   private _targetPeerId?: PeerId
-  private _senderPeerId?: PeerId
 
   private _header?: Header
-  private _ticket?: Types.SignedTicket
+  private _ticket?: Types.Ticket
   private _challenge?: Challenge<Chain>
   private _message?: Message
 
@@ -42,7 +41,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     },
     struct?: {
       header: Header
-      ticket: Types.SignedTicket
+      ticket: Types.Ticket
       challenge: Challenge<Chain>
       message: Message
     }
@@ -55,7 +54,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
 
     if (struct != null) {
       this.set(struct.header, this.headerOffset - this.byteOffset)
-      this.set(struct.ticket, this.ticketOffset - this.byteOffset)
+      this.set(struct.ticket.serialize(), this.ticketOffset - this.byteOffset)
       this.set(struct.challenge, this.challengeOffset - this.byteOffset)
       this.set(struct.message, this.messageOffset - this.byteOffset)
 
@@ -93,23 +92,21 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     return this.byteOffset + Header.SIZE
   }
 
-  get ticket(): Promise<Types.SignedTicket> {
+  get ticket(): Promise<Types.Ticket> {
     if (this._ticket != null) {
       return Promise.resolve(this._ticket)
     }
 
-    return new Promise<Types.SignedTicket>(async (resolve) => {
-      this._ticket = await this.node.paymentChannels.types.SignedTicket.create({
-        bytes: this.buffer,
-        offset: this.ticketOffset
-      })
-
+    return new Promise<Types.Ticket>(async (resolve) => {
+      this._ticket = await this.node.paymentChannels.types.Ticket.deserialize(
+        new Uint8Array(this.buffer, this.ticketOffset, this.node.paymentChannels.types.Ticket.SIZE)
+      )
       resolve(this._ticket)
     })
   }
 
   get challengeOffset() {
-    return this.byteOffset + Header.SIZE + this.node.paymentChannels.types.SignedTicket.SIZE
+    return this.byteOffset + Header.SIZE + this.node.paymentChannels.types.Ticket.SIZE
   }
 
   get challenge(): Challenge<Chain> {
@@ -127,7 +124,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     return (
       this.byteOffset +
       Header.SIZE +
-      this.node.paymentChannels.types.SignedTicket.SIZE +
+      this.node.paymentChannels.types.Ticket.SIZE +
       Challenge.SIZE(this.node.paymentChannels)
     )
   }
@@ -144,7 +141,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
   }
 
   static SIZE<Chain extends HoprCoreConnector>(hoprCoreConnector: Chain) {
-    return Header.SIZE + hoprCoreConnector.types.SignedTicket.SIZE + Challenge.SIZE(hoprCoreConnector) + Message.SIZE
+    return Header.SIZE + hoprCoreConnector.types.Ticket.SIZE + Challenge.SIZE(hoprCoreConnector) + Message.SIZE
   }
 
   /**
@@ -226,7 +223,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
 
       await validateCreatedTicket({
         myBalance: channelState.self.toBN(),
-        signedTicket: packet._ticket
+        ticket: packet._ticket
       })
     } else if (secrets.length == 1) {
       packet._ticket = await channel.createDummyTicket(ticketChallenge)
@@ -299,7 +296,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
    * Prepares the delivery of the packet.
    */
   async prepareDelivery(): Promise<void> {
-    if (!Hash.create(deriveTicketLastKey(this.header.derivedSecret)).eq((await this.ticket).ticket.challenge as Hash)) {
+    if (!Hash.create(deriveTicketLastKey(this.header.derivedSecret)).eq((await this.ticket).challenge as Hash)) {
       verbose('Error preparing delivery')
       throw Error('Error preparing delivery')
     }
@@ -317,8 +314,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
   async prepareForward(_originalSender: PeerId, target: PeerId): Promise<void> {
     const chain = this.node.paymentChannels
     const { Balance } = chain.types
-    const signedTicket = await this.ticket
-    const ticket = signedTicket.ticket
+    const ticket = await this.ticket
     const sender = this.node.getId()
     const senderPubKey = new PublicKey(sender.pubKey.marshal())
     const targetPubKey = new PublicKey(target.pubKey.marshal())
@@ -330,7 +326,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     }
 
     const unacknowledged = new UnacknowledgedTicket(chain, undefined, {
-      signedTicket,
+      ticket: ticket,
       secretA: new Hash(deriveTicketKey(this.header.derivedSecret))
     })
 
@@ -354,7 +350,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
 
       await validateCreatedTicket({
         myBalance: balances.self.toBN(),
-        signedTicket: this._ticket
+        ticket: this._ticket
       })
     } else if (fee.toBN().isZero()) {
       this._ticket = await channel.createDummyTicket(new Hash(this.header.encryptionKey))
@@ -387,13 +383,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
    * Computes the peerId if the preceeding node and caches it for later use.
    */
   async getSenderPeerId(): Promise<PeerId> {
-    if (this._senderPeerId !== undefined) {
-      return this._senderPeerId
-    }
-
-    this._senderPeerId = await pubKeyToPeerId(await (await this.ticket).signer)
-
-    return this._senderPeerId
+    return await pubKeyToPeerId((await this.ticket).getSigner())
   }
 
   /**

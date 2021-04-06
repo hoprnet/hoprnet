@@ -10,7 +10,7 @@ import BN from 'bn.js'
 import Web3 from 'web3'
 import { HoprToken } from './tsc/web3/HoprToken'
 import { Await } from './tsc/utils'
-import { AcknowledgedTicket, Balance, SignedTicket, Address } from './types'
+import { AcknowledgedTicket, Balance, Ticket, Address } from './types'
 import CoreConnector from '.'
 import Channel from './channel'
 import * as testconfigs from './config.spec'
@@ -107,7 +107,7 @@ describe('test Channel class', function () {
       response: firstTicket.response
     })
 
-    assert(partyA.pubKey.eq(await signedTicket.signer), `Check that signer is recoverable`)
+    assert(partyA.pubKey.eq(signedTicket.getSigner()), `Check that signer is recoverable`)
 
     const partyAIndexerChannels = await partyAConnector.indexer.getChannels()
     assert(
@@ -151,7 +151,7 @@ describe('test Channel class', function () {
     const ATTEMPTS = 20
 
     let ticketData
-    let nextSignedTicket: SignedTicket
+    let nextSignedTicket: Ticket
 
     for (let i = 0; i < ATTEMPTS; i++) {
       ticketData = await getTicketData({

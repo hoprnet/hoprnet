@@ -1,6 +1,4 @@
 import AcknowledgedTicket from './acknowledgedTicket'
-import Signature from './signature'
-import SignedTicket from './signedTicket'
 import Ticket from './ticket'
 import BN from 'bn.js'
 
@@ -116,6 +114,17 @@ declare interface PublicKey {
 
 declare var PublicKey: PublicStatic
 
+declare interface SignatureStatic {
+  readonly SIZE: number
+  deserialize(arr: Uint8Array): Signature
+}
+declare interface Signature {
+  signature: Uint8Array
+  recovery: number
+  serialize(): Uint8Array
+}
+declare var Signature: SignatureStatic
+
 export {
   AccountEntry,
   Address,
@@ -126,7 +135,6 @@ export {
   NativeBalance,
   PublicKey,
   Signature,
-  SignedTicket,
   Ticket,
   UINT256
 }

@@ -41,9 +41,7 @@ declare interface Channel {
   finalizeClosure(): Promise<string>
 
   createTicket(amount: Balance, challenge: Hash, winProb: number): Promise<SignedTicket>
-
   createDummyTicket(challenge: Hash): Promise<SignedTicket>
-
   submitTicket(ticket: AcknowledgedTicket, ticketIndex: Uint8Array): Promise<SubmitTicketResponse>
 }
 
