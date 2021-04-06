@@ -23,7 +23,6 @@ const verbose = Debug('hopr-core:verbose:message:packet')
  */
 export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
   private _targetPeerId?: PeerId
-  private _senderPeerId?: PeerId
 
   private _header?: Header
   private _ticket?: Types.Ticket
@@ -384,13 +383,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
    * Computes the peerId if the preceeding node and caches it for later use.
    */
   async getSenderPeerId(): Promise<PeerId> {
-    if (this._senderPeerId !== undefined) {
-      return this._senderPeerId
-    }
-
-    this._senderPeerId = await pubKeyToPeerId(await (await this.ticket).getSigner())
-
-    return this._senderPeerId
+    return await pubKeyToPeerId((await this.ticket).getSigner())
   }
 
   /**

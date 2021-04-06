@@ -1,5 +1,4 @@
 import assert from 'assert'
-//import { randomBytes } from 'crypto'
 import { durations, stringToU8a } from '@hoprnet/hopr-utils'
 import { Ganache } from '@hoprnet/hopr-testing'
 import { getAddresses, migrate, fund } from '@hoprnet/hopr-ethereum'
@@ -8,8 +7,6 @@ import * as Utils from './utils'
 import * as Types from './types'
 import * as testconfigs from './config.spec'
 import { createNode } from './utils/testing.spec'
-
-//const EMPTY_HASHED_SECRET = new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0x00))
 const FUND_ARGS = `--address ${getAddresses()?.localhost?.HoprToken} --accounts-to-fund 1`
 
 // TODO: replace legacy test
@@ -184,6 +181,7 @@ describe('test hashedSecret', function () {
     })
 
     /*
+    const EMPTY_HASHED_SECRET = new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0x00))
     it('should reserve a preImage for tickets with arbitrary winning probability', async function () {
       const ATTEMPTS = 40
 
@@ -199,7 +197,6 @@ describe('test hashedSecret', function () {
         } as unknown as Types.AcknowledgedTicket
 
         await connector.account.reservePreImageIfIsWinning(ticket)
-
         // TODO fix this mess
         if (ticket.preImage && !ticket.preImage.eq(EMPTY_HASHED_SECRET)) {
           assert(

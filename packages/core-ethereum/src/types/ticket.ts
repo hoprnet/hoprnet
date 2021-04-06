@@ -3,15 +3,10 @@ import BN from 'bn.js'
 import { stringToU8a, u8aSplit, u8aToHex, u8aConcat, serializeToU8a } from '@hoprnet/hopr-utils'
 import { Address, Balance, Hash, Signature, UINT256, PublicKey } from '.'
 import { ecdsaVerify, ecdsaSign, ecdsaRecover } from 'secp256k1'
-
 import Web3 from 'web3'
 const web3 = new Web3()
 
-/**
- * Given a message, prefix it with "\x19Ethereum Signed Message:\n" and return it's hash
- * @param msg the message to hash
- * @returns a hash
- */
+// Prefix message with "\x19Ethereum Signed Message:\n" and return hash
 function toEthSignedMessageHash(msg: string): Hash {
   const messageWithHOPR = u8aConcat(stringToU8a(Web3.utils.toHex('HOPRnet')), stringToU8a(msg))
   const messageWithHOPRHex = u8aToHex(messageWithHOPR)
@@ -132,5 +127,4 @@ class Ticket implements Types.Ticket {
     return ecdsaVerify(this.signature.signature, this.getHash().serialize(), pubKey.serialize())
   }
 }
-
 export default Ticket
