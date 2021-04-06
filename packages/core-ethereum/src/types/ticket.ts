@@ -24,15 +24,15 @@ function serializeUnsigned({
   epoch,
   amount,
   winProb,
-  channelIteration,
+  channelIteration
 }: {
-  counterparty: Address,
-  challenge: Hash,
-  epoch: UINT256,
-  amount: Balance,
-  winProb: Hash,
-  channelIteration: UINT256,
-}): Uint8Array{
+  counterparty: Address
+  challenge: Hash
+  epoch: UINT256
+  amount: Balance
+  winProb: Hash
+  channelIteration: UINT256
+}): Uint8Array {
   // the order of the items needs to be the same as the one used in the SC
   return serializeToU8a([
     [counterparty.serialize(), Address.SIZE],
@@ -64,22 +64,29 @@ class Ticket implements Types.Ticket {
     channelIteration: UINT256,
     signPriv: Uint8Array
   ): Ticket {
-    const hash = toEthSignedMessageHash(u8aToHex(serializeUnsigned({ 
-      counterparty, challenge, epoch, amount, winProb, channelIteration
-    })))
+    const hash = toEthSignedMessageHash(
+      u8aToHex(
+        serializeUnsigned({
+          counterparty,
+          challenge,
+          epoch,
+          amount,
+          winProb,
+          channelIteration
+        })
+      )
+    )
     const sig = ecdsaSign(hash.serialize(), signPriv)
     const signature = new Signature(sig.signature, sig.recid)
     return new Ticket(counterparty, challenge, epoch, amount, winProb, channelIteration, signature)
   }
 
   public serialize(): Uint8Array {
-    const unsigned = serializeUnsigned({ ... this })
-    return u8aConcat(serializeToU8a([
-      [this.signature.serialize(), Signature.SIZE]
-    ]), unsigned)
+    const unsigned = serializeUnsigned({ ...this })
+    return u8aConcat(serializeToU8a([[this.signature.serialize(), Signature.SIZE]]), unsigned)
   }
 
- static deserialize(arr: Uint8Array): Ticket {
+  static deserialize(arr: Uint8Array): Ticket {
     const components = u8aSplit(arr, [
       Address.SIZE,
       Hash.SIZE,
@@ -101,7 +108,7 @@ class Ticket implements Types.Ticket {
   }
 
   getHash(): Hash {
-    return toEthSignedMessageHash(u8aToHex(serializeUnsigned({ ... this })))
+    return toEthSignedMessageHash(u8aToHex(serializeUnsigned({ ...this })))
   }
 
   static get SIZE(): number {
@@ -118,19 +125,12 @@ class Ticket implements Types.Ticket {
   }
 
   getSigner(): PublicKey {
-    return new PublicKey(
-      ecdsaRecover(
-        this.signature.signature,
-        this.signature.recovery,
-        this.getHash().serialize()
-      )
-    )
+    return new PublicKey(ecdsaRecover(this.signature.signature, this.signature.recovery, this.getHash().serialize()))
   }
 
   async verify(pubKey: PublicKey): Promise<boolean> {
     return ecdsaVerify(this.getHash().serialize(), this.signature.signature, pubKey.serialize())
   }
-
 }
 
 export default Ticket
