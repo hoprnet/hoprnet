@@ -3,7 +3,14 @@ import type Hopr from '..'
 import { u8aEquals } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 import { UnacknowledgedTicket } from '../messages/ticket/unacknowledged'
-import { PublicKey, Ticket, ChannelEntry, Channel, AcknowledgedTicket, SubmitTicketResponse} from '@hoprnet/hopr-core-ethereum'
+import {
+  PublicKey,
+  Ticket,
+  ChannelEntry,
+  Channel,
+  AcknowledgedTicket,
+  SubmitTicketResponse
+} from '@hoprnet/hopr-core-ethereum'
 
 /**
  * Get all unacknowledged tickets

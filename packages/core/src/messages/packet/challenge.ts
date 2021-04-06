@@ -33,7 +33,6 @@ class Challenge extends Uint8Array {
     if (struct != null) {
       super(struct.signature.serialize())
     }
-
   }
 
   get challengeSignatureOffset(): number {
@@ -41,9 +40,7 @@ class Challenge extends Uint8Array {
   }
 
   get challengeSignature(): Signature {
-    return Signature.deserialize(
-      new Uint8Array(this.buffer, this.challengeSignatureOffset, Signature.SIZE)
-    )
+    return Signature.deserialize(new Uint8Array(this.buffer, this.challengeSignatureOffset, Signature.SIZE))
   }
 
   get signatureHash(): Promise<Hash> {

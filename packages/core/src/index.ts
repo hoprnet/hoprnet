@@ -120,7 +120,12 @@ class Hopr extends EventEmitter {
    * @param _options
    * @param provider
    */
-  private constructor(options: HoprOptions, public _libp2p: LibP2P, public db: LevelUp, public paymentChannels: HoprCoreEthereum) {
+  private constructor(
+    options: HoprOptions,
+    public _libp2p: LibP2P,
+    public db: LevelUp,
+    public paymentChannels: HoprCoreEthereum
+  ) {
     super()
 
     this._libp2p.connectionManager.on('peer:connect', (conn: Connection) => {
