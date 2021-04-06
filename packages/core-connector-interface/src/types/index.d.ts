@@ -1,6 +1,5 @@
 import AcknowledgedTicket from './acknowledgedTicket'
 import Signature from './signature'
-import SignedTicket from './signedTicket'
 import Ticket from './ticket'
 import BN from 'bn.js'
 
@@ -122,7 +121,6 @@ export {
   NativeBalance,
   PublicKey,
   Signature,
-  SignedTicket,
   Ticket,
   UINT256
 }

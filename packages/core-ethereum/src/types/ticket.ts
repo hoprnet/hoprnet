@@ -1,8 +1,8 @@
 import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import BN from 'bn.js'
-import { stringToU8a, u8aSplit, u8aToHex, u8aConcat, serializeToU8a } from '@hoprnet/hopr-utils'
-import { Address, Balance, Hash, Signature, UINT256 } from '.'
-import { sign } from '../utils'
+import { stringToU8a, /*u8aSplit,*/ u8aToHex, u8aConcat, serializeToU8a } from '@hoprnet/hopr-utils'
+import { Address, Balance, Hash, Signature, UINT256, PublicKey } from '.'
+import { ecdsaVerify, ecdsaSign, ecdsaRecover } from 'secp256k1'
 
 import Web3 from 'web3'
 const web3 = new Web3()
@@ -18,6 +18,32 @@ function toEthSignedMessageHash(msg: string): Hash {
   return new Hash(stringToU8a(web3.eth.accounts.hashMessage(messageWithHOPRHex)))
 }
 
+function serializeUnsigned({
+  counterparty,
+  challenge,
+  epoch,
+  amount,
+  winProb,
+  channelIteration,
+}: {
+  counterparty: Address,
+  challenge: Hash,
+  epoch: UINT256,
+  amount: Balance,
+  winProb: Hash,
+  channelIteration: UINT256,
+}): Uint8Array{
+  // the order of the items needs to be the same as the one used in the SC
+  return serializeToU8a([
+    [counterparty.serialize(), Address.SIZE],
+    [challenge.serialize(), Hash.SIZE],
+    [epoch.serialize(), UINT256.SIZE],
+    [amount.serialize(), Balance.SIZE],
+    [winProb.serialize(), Hash.SIZE],
+    [channelIteration.serialize(), UINT256.SIZE]
+  ])
+}
+
 class Ticket implements Types.Ticket {
   constructor(
     readonly counterparty: Address,
@@ -25,21 +51,38 @@ class Ticket implements Types.Ticket {
     readonly epoch: UINT256,
     readonly amount: Balance,
     readonly winProb: Hash,
-    readonly channelIteration: UINT256
+    readonly channelIteration: UINT256,
+    readonly signature: Signature
   ) {}
 
-  public serialize(): Uint8Array {
-    // the order of the items needs to be the same as the one used in the SC
-    return serializeToU8a([
-      [this.counterparty.serialize(), Address.SIZE],
-      [this.challenge.serialize(), Hash.SIZE],
-      [this.epoch.serialize(), UINT256.SIZE],
-      [this.amount.serialize(), Balance.SIZE],
-      [this.winProb.serialize(), Hash.SIZE],
-      [this.channelIteration.serialize(), UINT256.SIZE]
-    ])
+  static create(
+    counterparty: Address,
+    challenge: Hash,
+    epoch: UINT256,
+    amount: Balance,
+    winProb: Hash,
+    channelIteration: UINT256,
+    signPriv: Uint8Array
+  ): Ticket {
+    const hash = toEthSignedMessageHash(u8aToHex(serializeUnsigned({ 
+      counterparty, challenge, epoch, amount, winProb, channelIteration
+    })))
+    const sig = ecdsaSign(hash.serialize(), signPriv)
+    const signature = new Signature(null, {
+      signature: sig.signature,
+      recovery: sig.recid
+    })
+    return new Ticket(counterparty, challenge, epoch, amount, winProb, channelIteration, signature)
   }
 
+  public serialize(): Uint8Array {
+    const unsigned = serializeUnsigned({ ... this })
+    return u8aConcat(serializeToU8a([
+      [this.signature, Signature.SIZE]
+    ]), unsigned)
+  }
+
+/*
  static deserialize(arr: Uint8Array): Ticket {
     const components = u8aSplit(arr, [
       Address.SIZE,
@@ -58,9 +101,10 @@ class Ticket implements Types.Ticket {
     const channelIteration = new UINT256(new BN(components[4]))
     return new Ticket(counterparty, challenge, epoch, amount, winProb, channelIteration)
   }
+  */
 
   getHash(): Hash {
-    return toEthSignedMessageHash(u8aToHex(this.serialize()))
+    return toEthSignedMessageHash(u8aToHex(serializeUnsigned({ ... this })))
   }
 
   static get SIZE(): number {
@@ -76,9 +120,20 @@ class Ticket implements Types.Ticket {
     )
   }
 
-  async sign(privKey: Uint8Array): Promise<Signature> {
-    return sign(this.getHash().serialize(), privKey)
+  getSigner(): PublicKey {
+    return new PublicKey(
+      ecdsaRecover(
+        this.signature.signature,
+        this.signature.recovery,
+        this.getHash().serialize()
+      )
+    )
   }
+
+  async verify(pubKey: PublicKey): Promise<boolean> {
+    return ecdsaVerify(this.getHash().serialize(), this.signature.signature, pubKey.serialize())
+  }
+
 }
 
 export default Ticket

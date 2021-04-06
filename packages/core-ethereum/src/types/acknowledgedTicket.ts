@@ -1,8 +1,8 @@
-import { Hash, SignedTicket } from '.'
+import { Hash, Ticket} from '.'
 
 // @TODO this is a duplicate of the same class in hopr-core
 class AcknowledgedTicket extends Uint8Array {
-  private _signedTicket: SignedTicket
+  private _signedTicket: Ticket 
 
   constructor(
     arr?: {
@@ -10,7 +10,7 @@ class AcknowledgedTicket extends Uint8Array {
       offset: number
     },
     struct?: {
-      signedTicket?: SignedTicket
+      signedTicket?: Ticket
       response?: Hash
       preImage?: Hash
       redeemed?: boolean
@@ -24,7 +24,7 @@ class AcknowledgedTicket extends Uint8Array {
 
     if (struct) {
       if (struct.signedTicket) {
-        this.set(struct.signedTicket, this.signedTicketOffset - this.byteOffset)
+        this.set(struct.signedTicket.serialize(), this.signedTicketOffset - this.byteOffset)
         this._signedTicket = struct.signedTicket
       }
 
@@ -50,13 +50,13 @@ class AcknowledgedTicket extends Uint8Array {
     return this.byteOffset
   }
 
-  get signedTicket(): Promise<SignedTicket> {
+  get signedTicket(): Promise<Ticket> {
     if (this._signedTicket) {
       return Promise.resolve(this._signedTicket)
     }
 
-    return new Promise<SignedTicket>(async (resolve) => {
-      this._signedTicket = await SignedTicket.create({
+    return new Promise<Ticket>(async (resolve) => {
+      this._signedTicket = await Ticket.deserialize({
         bytes: this.buffer,
         offset: this.signedTicketOffset
       })
@@ -66,7 +66,7 @@ class AcknowledgedTicket extends Uint8Array {
   }
 
   get responseOffset(): number {
-    return this.byteOffset + SignedTicket.SIZE
+    return this.byteOffset + Ticket.SIZE
   }
 
   get response(): Hash {
@@ -74,7 +74,7 @@ class AcknowledgedTicket extends Uint8Array {
   }
 
   get preImageOffset(): number {
-    return this.byteOffset + SignedTicket.SIZE + Hash.SIZE
+    return this.byteOffset + Ticket.SIZE + Hash.SIZE
   }
 
   get preImage(): Hash {
@@ -86,7 +86,7 @@ class AcknowledgedTicket extends Uint8Array {
   }
 
   get redeemedOffset(): number {
-    return this.byteOffset + SignedTicket.SIZE + Hash.SIZE + Hash.SIZE
+    return this.byteOffset + Ticket.SIZE + Hash.SIZE + Hash.SIZE
   }
 
   get redeemed(): boolean {
@@ -98,12 +98,12 @@ class AcknowledgedTicket extends Uint8Array {
   }
 
   static get SIZE(): number {
-    return SignedTicket.SIZE + Hash.SIZE + Hash.SIZE + 1
+    return Ticket.SIZE + Hash.SIZE + Hash.SIZE + 1
   }
 
   static create(
     arr?: { bytes: ArrayBuffer; offset: number },
-    struct?: { signedTicket?: SignedTicket; response?: Hash; preImage?: Hash; redeemed?: boolean }
+    struct?: { signedTicket?: Ticket; response?: Hash; preImage?: Hash; redeemed?: boolean }
   ) {
     return new AcknowledgedTicket(arr, struct)
   }

@@ -2,7 +2,6 @@ import AccountEntry from './accountEntry'
 import AcknowledgedTicket from './acknowledgedTicket'
 import ChannelEntry from './channelEntry'
 import Signature from './signature'
-import SignedTicket from './signedTicket'
 import Snapshot from './snapshot'
 import Ticket from './ticket'
 import { UINT256 } from './solidity'
@@ -18,7 +17,6 @@ class Types {
   public NativeBalance = NativeBalance
   public PublicKey = PublicKey
   public Signature = Signature
-  public SignedTicket = SignedTicket
   public Snapshot = Snapshot
   public Ticket = Ticket
   public UINT256 = UINT256
@@ -34,7 +32,6 @@ export {
   NativeBalance,
   PublicKey,
   Signature,
-  SignedTicket,
   Snapshot,
   Ticket,
   UINT256

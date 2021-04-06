@@ -133,11 +133,9 @@ describe('test hashedSecret', function () {
     it('should reserve a preImage for tickets with 100% winning probabilty resp. should not reserve for 0% winning probability', async function () {
       const firstTicket = new Types.AcknowledgedTicket(undefined, {
         signedTicket: ({
-          ticket: {
             getHash: () => new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff)),
             winProb: Utils.computeWinningProbability(1)
-          }
-        } as unknown) as Types.SignedTicket,
+        }) as unknown as Types.Ticket,
         response: new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff))
       })
 
@@ -163,11 +161,9 @@ describe('test hashedSecret', function () {
 
       const notWinnigTicket = new Types.AcknowledgedTicket(undefined, {
         signedTicket: ({
-          ticket: {
-            getHash: () => new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff)),
-            winProb: Utils.computeWinningProbability(0)
-          }
-        } as unknown) as Types.SignedTicket,
+          getHash: () => new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff)),
+          winProb: Utils.computeWinningProbability(0)
+        } as unknown) as Types.Ticket,
         response: new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff))
       })
 
@@ -191,11 +187,9 @@ describe('test hashedSecret', function () {
       for (let i = 0; i < ATTEMPTS; i++) {
         ticket = new Types.AcknowledgedTicket(undefined, {
           signedTicket: ({
-            ticket: {
-              getHash: () => new Types.Hash(randomBytes(Types.Hash.SIZE)),
-              winProb: Utils.computeWinningProbability(Math.random())
-            }
-          } as unknown) as Types.SignedTicket,
+            getHash: () => new Types.Hash(randomBytes(Types.Hash.SIZE)),
+            winProb: Utils.computeWinningProbability(Math.random())
+          } as unknown) as Types.Ticket,
           response: new Types.Hash(randomBytes(Types.Hash.SIZE))
         })
 
@@ -204,10 +198,10 @@ describe('test hashedSecret', function () {
         if (!ticket.preImage.eq(EMPTY_HASHED_SECRET)) {
           assert(
             await Utils.isWinningTicket(
-              (await ticket.signedTicket).ticket.getHash(),
+              (await ticket.signedTicket).getHash(),
               ticket.response,
               ticket.preImage,
-              (await ticket.signedTicket).ticket.winProb
+              (await ticket.signedTicket).winProb
             )
           )
         }

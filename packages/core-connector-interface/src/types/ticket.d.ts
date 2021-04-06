@@ -10,9 +10,11 @@ declare interface TicketStatic {
     epoch: UINT256,
     amount: Balance,
     winProb: Hash,
-    channelIteration: UINT256
+    channelIteration: UINT256,
+    signPriv: Uint8Array 
   ): Ticket
 }
+
 declare interface Ticket {
   counterparty: Address
   challenge: Hash
@@ -20,11 +22,13 @@ declare interface Ticket {
   amount: Balance
   winProb: Hash
   channelIteration: UINT256
+  signature: Signature
 
   getHash(): Hash
   getEmbeddedFunds(): Balance
   serialize(): Uint8Array
-  sign(privKey: Uint8Array): Promise<Signature>
+  verify(pubKey: PublicKey): Promise<boolean>
+  getSigner(): PublicKey
 }
 
 declare var Ticket: TicketStatic
