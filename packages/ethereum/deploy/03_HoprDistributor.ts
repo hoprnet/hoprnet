@@ -2,7 +2,7 @@ import type { HardhatRuntimeEnvironment } from 'hardhat/types'
 import type { DeployFunction } from 'hardhat-deploy/types'
 import type { DeploymentTypes } from '../chain'
 import { durations } from '@hoprnet/hopr-utils'
-import Ethers from 'ethers'
+import { ethers } from 'ethers'
 
 const startTimes: {
   [key in DeploymentTypes]: number
@@ -15,9 +15,9 @@ const startTimes: {
 const maxMintAmounts: {
   [key in DeploymentTypes]: string
 } = {
-  local: Ethers.utils.parseEther('100000000').toString(),
-  staging: Ethers.utils.parseEther('100000000').toString(),
-  production: Ethers.utils.parseEther('100000000').toString()
+  local: ethers.utils.parseEther('100000000').toString(),
+  staging: ethers.utils.parseEther('100000000').toString(),
+  production: ethers.utils.parseEther('100000000').toString()
 }
 
 const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {

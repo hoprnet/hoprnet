@@ -1,11 +1,12 @@
-import { deployments } from 'hardhat'
-import { BN, expectRevert } from '@openzeppelin/test-helpers'
+import { deployments, ethers } from 'hardhat'
+import { expect } from 'chai'
+import { SafeUint24Mock__factory } from '../../types'
 
 const MAX_UINT24 = 16777215
-const SafeUint24Mock = artifacts.require('SafeUint24Mock')
 
 const useFixtures = deployments.createFixture(async () => {
-  const safeMath = await SafeUint24Mock.new()
+  const [signer] = await ethers.getSigners()
+  const safeMath = await new SafeUint24Mock__factory(signer).deploy()
 
   return {
     safeMath
@@ -19,16 +20,16 @@ describe('SafeMath', function () {
   }
 
   async function testFailsCommutative(fn, lhs, rhs, reason) {
-    await expectRevert(fn(lhs, rhs), reason)
-    await expectRevert(fn(rhs, lhs), reason)
+    expect(fn(lhs, rhs)).to.be.revertedWith(reason)
+    expect(fn(rhs, lhs)).to.be.revertedWith(reason)
   }
 
   describe('add', function () {
     it('adds correctly', async function () {
       const { safeMath } = await useFixtures()
 
-      const a = new BN('5678')
-      const b = new BN('1234')
+      const a = ethers.BigNumber.from('5678')
+      const b = ethers.BigNumber.from('1234')
 
       await testCommutative(safeMath.add, a, b, a.add(b))
     })
@@ -37,7 +38,7 @@ describe('SafeMath', function () {
       const { safeMath } = await useFixtures()
 
       const a = MAX_UINT24
-      const b = new BN('1')
+      const b = ethers.BigNumber.from('1')
 
       await testFailsCommutative(safeMath.add, a, b, 'SafeUint24: addition overflow')
     })
@@ -47,8 +48,8 @@ describe('SafeMath', function () {
     it('divides correctly', async function () {
       const { safeMath } = await useFixtures()
 
-      const a = new BN('5678')
-      const b = new BN('5678')
+      const a = ethers.BigNumber.from('5678')
+      const b = ethers.BigNumber.from('5678')
 
       expect((await safeMath.div(a, b)).toString()).to.be.equal(a.div(b).toString())
     })
@@ -56,8 +57,8 @@ describe('SafeMath', function () {
     it('divides zero correctly', async function () {
       const { safeMath } = await useFixtures()
 
-      const a = new BN('0')
-      const b = new BN('5678')
+      const a = ethers.BigNumber.from('0')
+      const b = ethers.BigNumber.from('5678')
 
       expect((await safeMath.div(a, b)).toString()).to.be.equal('0')
     })
@@ -65,8 +66,8 @@ describe('SafeMath', function () {
     it('returns complete number result on non-even division', async function () {
       const { safeMath } = await useFixtures()
 
-      const a = new BN('7000')
-      const b = new BN('5678')
+      const a = ethers.BigNumber.from('7000')
+      const b = ethers.BigNumber.from('5678')
 
       expect((await safeMath.div(a, b)).toString()).to.be.equal('1')
     })
@@ -74,10 +75,10 @@ describe('SafeMath', function () {
     it('reverts on division by zero', async function () {
       const { safeMath } = await useFixtures()
 
-      const a = new BN('5678')
-      const b = new BN('0')
+      const a = ethers.BigNumber.from('5678')
+      const b = ethers.BigNumber.from('0')
 
-      await expectRevert(safeMath.div(a, b), 'SafeUint24: division by zero')
+      expect(safeMath.div(a, b)).to.be.revertedWith('SafeUint24: division by zero')
     })
   })
 
@@ -86,8 +87,8 @@ describe('SafeMath', function () {
       const { safeMath } = await useFixtures()
 
       it('when the dividend is smaller than the divisor', async function () {
-        const a = new BN('284')
-        const b = new BN('5678')
+        const a = ethers.BigNumber.from('284')
+        const b = ethers.BigNumber.from('5678')
 
         expect((await safeMath.mod(a, b)).toString()).to.be.equal(a.mod(b).toString())
       })
@@ -95,8 +96,8 @@ describe('SafeMath', function () {
       it('when the dividend is equal to the divisor', async function () {
         const { safeMath } = await useFixtures()
 
-        const a = new BN('5678')
-        const b = new BN('5678')
+        const a = ethers.BigNumber.from('5678')
+        const b = ethers.BigNumber.from('5678')
 
         expect((await safeMath.mod(a, b)).toString()).to.be.equal(a.mod(b).toString())
       })
@@ -104,8 +105,8 @@ describe('SafeMath', function () {
       it('when the dividend is larger than the divisor', async function () {
         const { safeMath } = await useFixtures()
 
-        const a = new BN('7000')
-        const b = new BN('5678')
+        const a = ethers.BigNumber.from('7000')
+        const b = ethers.BigNumber.from('5678')
 
         expect((await safeMath.mod(a, b)).toString()).to.be.equal(a.mod(b).toString())
       })
@@ -113,8 +114,8 @@ describe('SafeMath', function () {
       it('when the dividend is a multiple of the divisor', async function () {
         const { safeMath } = await useFixtures()
 
-        const a = new BN('17034') // 17034 == 5678 * 3
-        const b = new BN('5678')
+        const a = ethers.BigNumber.from('17034') // 17034 == 5678 * 3
+        const b = ethers.BigNumber.from('5678')
 
         expect((await safeMath.mod(a, b)).toString()).to.be.equal(a.mod(b).toString())
       })
@@ -123,10 +124,10 @@ describe('SafeMath', function () {
     it('reverts with a 0 divisor', async function () {
       const { safeMath } = await useFixtures()
 
-      const a = new BN('5678')
-      const b = new BN('0')
+      const a = ethers.BigNumber.from('5678')
+      const b = ethers.BigNumber.from('0')
 
-      await expectRevert(safeMath.mod(a, b), 'SafeUint24: modulo by zero')
+      expect(safeMath.mod(a, b)).to.be.revertedWith('SafeUint24: modulo by zero')
     })
   })
 })

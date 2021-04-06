@@ -10,7 +10,7 @@ import 'solidity-coverage'
 import '@typechain/hardhat'
 // rest
 import { HardhatUserConfig, task, types } from 'hardhat/config'
-import Ethers from 'ethers'
+import { ethers } from 'ethers'
 import { NODE_SEEDS, BOOTSTRAP_SEEDS } from '@hoprnet/hopr-demo-seeds'
 import { networks } from './chain/networks'
 import { ACCOUNT_DEPLOYER, ACCOUNT_A, ACCOUNT_B } from './test/constants'
@@ -30,7 +30,7 @@ const hardhatPrivKeys = localhostPrivKeys
   .concat([ACCOUNT_DEPLOYER.privateKey, ACCOUNT_A.privateKey, ACCOUNT_B.privateKey])
   .map((privateKey) => ({
     privateKey,
-    balance: Ethers.utils.parseEther('10000').toString()
+    balance: ethers.utils.parseEther('10000').toString()
   }))
 
 const hardhatConfig: HardhatUserConfig = {
@@ -127,7 +127,7 @@ task('fund', "Fund node's accounts by specifying HoprToken address", async (...a
   .addOptionalParam<string>(
     'amount',
     'Amount of HOPR to fund',
-    Ethers.utils.parseEther('1000000').toString(),
+    ethers.utils.parseEther('1000000').toString(),
     types.string
   )
   .addOptionalParam<number>('accountsToFund', 'Amount of accounts to fund from demo seeds', 0, types.int)

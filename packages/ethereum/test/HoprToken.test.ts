@@ -1,7 +1,7 @@
 import type { HoprToken__factory } from '../types'
 import { expect } from 'chai'
 import { deployments, ethers } from 'hardhat'
-import { singletons, expectRevert } from '@openzeppelin/test-helpers'
+import { singletons } from '@openzeppelin/test-helpers'
 import { vmErrorMessage } from './utils'
 
 const useFixtures = deployments.createFixture(async () => {
@@ -46,12 +46,11 @@ describe('HoprToken', function () {
 
   it('should fail mint', async function () {
     const { token, userA } = await useFixtures()
-    await expectRevert(
+    expect(
       token.mint(userA, 1, '0x00', '0x00', {
         from: userA
-      }),
-      vmErrorMessage('caller does not have minter role')
-    )
+      })
+    ).to.be.revertedWith(vmErrorMessage('caller does not have minter role'))
   })
 
   it("'deployer' should be a minter", async function () {

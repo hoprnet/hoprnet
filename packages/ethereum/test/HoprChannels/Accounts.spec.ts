@@ -1,17 +1,17 @@
-import { deployments } from 'hardhat'
-import { singletons, expectEvent, expectRevert, constants } from '@openzeppelin/test-helpers'
+import { deployments, ethers } from 'hardhat'
+import { singletons } from '@openzeppelin/test-helpers'
 import { expect } from 'chai'
 import { vmErrorMessage } from '../utils'
 import { ACCOUNT_A, ACCOUNT_B, SECRET_2, SECRET_1 } from './constants'
 import { AccountsMock__factory } from '../../types'
 
-const useFixtures = deployments.createFixture(async ({ ethers, waffle }) => {
+const useFixtures = deployments.createFixture(async () => {
   const [deployer] = await ethers.getSigners()
 
   // deploy ERC1820Registry required by ERC777 token
   await singletons.ERC1820Registry(deployer.address)
 
-  const accounts = await new AccountsMock__factory(deployer).deploy(constants.ZERO_ADDRESS, '0')
+  const accounts = await new AccountsMock__factory(deployer).deploy(ethers.constants.AddressZero, '0')
 
   return {
     accounts
@@ -22,13 +22,9 @@ describe('Accounts', function () {
   it('should initialize account', async function () {
     const { accounts } = await useFixtures()
 
-    const response = await accounts.initializeAccountInternal(ACCOUNT_A.address, ACCOUNT_A.uncompressedPubKey, SECRET_2)
-
-    expectEvent(response, 'AccountInitialized', {
-      account: ACCOUNT_A.address,
-      uncompressedPubKey: ACCOUNT_A.uncompressedPubKey,
-      secret: SECRET_2
-    })
+    expect(accounts.initializeAccountInternal(ACCOUNT_A.address, ACCOUNT_A.uncompressedPublicKey, SECRET_2))
+      .to.emit(accounts, 'AccountInitialized')
+      .withArgs(ACCOUNT_A.address, ACCOUNT_A.uncompressedPublicKey, SECRET_2)
 
     const account = await accounts.accounts(ACCOUNT_A.address)
     expect(account.secret).to.equal(SECRET_2)
@@ -39,23 +35,19 @@ describe('Accounts', function () {
     const { accounts } = await useFixtures()
 
     // give wrong public key
-    await expectRevert(
-      accounts.initializeAccountInternal(ACCOUNT_A.address, ACCOUNT_B.uncompressedPubKey, SECRET_1),
-      vmErrorMessage('public key does not match account')
-    )
+    expect(
+      accounts.initializeAccountInternal(ACCOUNT_A.address, ACCOUNT_B.uncompressedPublicKey, SECRET_1)
+    ).to.be.revertedWith(vmErrorMessage('public key does not match account'))
   })
 
   it("should update account's secret", async function () {
     const { accounts } = await useFixtures()
 
-    await accounts.initializeAccountInternal(ACCOUNT_A.address, ACCOUNT_A.uncompressedPubKey, SECRET_2)
+    await accounts.initializeAccountInternal(ACCOUNT_A.address, ACCOUNT_A.uncompressedPublicKey, SECRET_2)
 
-    const response = await accounts.updateAccountSecretInternal(ACCOUNT_A.address, SECRET_1)
-
-    expectEvent(response, 'AccountSecretUpdated', {
-      account: ACCOUNT_A.address,
-      secret: SECRET_1
-    })
+    expect(accounts.updateAccountSecretInternal(ACCOUNT_A.address, SECRET_1))
+      .to.emit(accounts, 'AccountSecretUpdated')
+      .withArgs(ACCOUNT_A.address, SECRET_1)
 
     const account = await accounts.accounts(ACCOUNT_A.address)
     expect(account.secret).to.equal(SECRET_1)
@@ -65,11 +57,10 @@ describe('Accounts', function () {
   it("should fail to update account's secret when secret is empty", async function () {
     const { accounts } = await useFixtures()
 
-    await accounts.initializeAccountInternal(ACCOUNT_A.address, ACCOUNT_A.uncompressedPubKey, SECRET_1)
+    await accounts.initializeAccountInternal(ACCOUNT_A.address, ACCOUNT_A.uncompressedPublicKey, SECRET_1)
 
     // give empty SECRET
-    await expectRevert(
-      accounts.updateAccountSecretInternal(ACCOUNT_A.address, constants.ZERO_BYTES32),
+    expect(accounts.updateAccountSecretInternal(ACCOUNT_A.address, ethers.constants.HashZero)).to.be.revertedWith(
       vmErrorMessage('secret must not be empty')
     )
   })
@@ -77,11 +68,10 @@ describe('Accounts', function () {
   it("should fail to update account's secret when secret is the same as before", async function () {
     const { accounts } = await useFixtures()
 
-    await accounts.initializeAccountInternal(ACCOUNT_A.address, ACCOUNT_A.uncompressedPubKey, SECRET_1)
+    await accounts.initializeAccountInternal(ACCOUNT_A.address, ACCOUNT_A.uncompressedPublicKey, SECRET_1)
 
     // give same SECRET
-    await expectRevert(
-      accounts.updateAccountSecretInternal(ACCOUNT_A.address, SECRET_1),
+    expect(accounts.updateAccountSecretInternal(ACCOUNT_A.address, SECRET_1)).to.be.revertedWith(
       vmErrorMessage('secret must not be the same as before')
     )
   })

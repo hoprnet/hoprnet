@@ -1,4 +1,8 @@
-import type {
+import { expect } from 'chai'
+import { deployments, ethers } from 'hardhat'
+import { singletons } from '@openzeppelin/test-helpers'
+import { vmErrorMessage } from './utils'
+import {
   PermittableToken__factory,
   PermittableToken,
   HoprToken__factory,
@@ -6,16 +10,8 @@ import type {
   HoprWrapper__factory,
   HoprWrapper
 } from '../types'
-import { expect } from 'chai'
-import { deployments, ethers } from 'hardhat'
-import { singletons } from '@openzeppelin/test-helpers'
-import { vmErrorMessage } from './utils'
 
 const useFixtures = deployments.createFixture(async () => {
-  const PermittableToken = (await ethers.getContractFactory('PermittableToken')) as PermittableToken__factory
-  const HoprToken = (await ethers.getContractFactory('HoprToken')) as HoprToken__factory
-  const HoprWrapper = (await ethers.getContractFactory('HoprWrapper')) as HoprWrapper__factory
-
   const [deployer, userA] = await ethers.getSigners()
   const network = await ethers.provider.getNetwork()
 
@@ -23,11 +19,11 @@ const useFixtures = deployments.createFixture(async () => {
   await singletons.ERC1820Registry(deployer)
 
   // deploy xHOPR
-  const xHOPR = await PermittableToken.deploy('xHOPR Token', 'xHOPR', 18, network.chainId)
+  const xHOPR = await new PermittableToken__factory(deployer).deploy('xHOPR Token', 'xHOPR', 18, network.chainId)
   // deploy wxHOPR
-  const wxHOPR = await HoprToken.deploy()
+  const wxHOPR = await new HoprToken__factory(deployer).deploy()
   // deploy wrapper
-  const wrapper = await HoprWrapper.deploy(xHOPR.address, wxHOPR.address)
+  const wrapper = await new HoprWrapper__factory(deployer).deploy(xHOPR.address, wxHOPR.address)
 
   // allow wrapper to mint wxHOPR required for swapping
   await wxHOPR.grantRole(await wxHOPR.MINTER_ROLE(), wrapper.address)
@@ -51,7 +47,6 @@ describe('HoprWrapper', function () {
   let deployer: string
   let userA: string
 
-  // @TODO: use fixtures when we merge with upcoming refactor
   before(async function () {
     const fixtures = await useFixtures()
 

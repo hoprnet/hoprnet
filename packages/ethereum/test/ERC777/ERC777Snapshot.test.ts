@@ -1,12 +1,8 @@
-import type { ERC777SnapshotMockContract, ERC777SnapshotMockInstance } from '../../types'
-import type Web3 from 'web3'
-import { deployments } from 'hardhat'
+import { deployments, ethers } from 'hardhat'
+import { expect } from 'chai'
 import { singletons, BN, constants, expectRevert } from '@openzeppelin/test-helpers'
 import { vmErrorMessage } from '../utils'
-
-const ERC777SnapshotMock: ERC777SnapshotMockContract = artifacts.require('ERC777SnapshotMock')
-
-const latestBlockNumber = (web3: Web3) => web3.eth.getBlockNumber()
+import { ERC777SnapshotMock__factory, ERC777SnapshotMock } from '../../types'
 
 const useFixtures = deployments.createFixture(async () => {
   const [initialHolder, recipient, other] = await ethers.getSigners()
@@ -16,9 +12,14 @@ const useFixtures = deployments.createFixture(async () => {
   const name = 'My Token'
   const symbol = 'MTKN'
   const initialSupply = '100'
-  const token = await ERC777SnapshotMock.new(name, symbol, initialHolder, initialSupply)
+  const token = await new ERC777SnapshotMock__factory(initialHolder).deploy(
+    name,
+    symbol,
+    initialHolder.address,
+    initialSupply
+  )
 
-  const initialMintBlock = await latestBlockNumber(web3)
+  const initialMintBlock = await ethers.provider.getBlockNumber()
 
   return {
     initialHolder,
@@ -34,7 +35,7 @@ describe('ERC777Snapshot', function () {
   let initialHolder: string
   let recipient: string
   let other: string
-  let token: ERC777SnapshotMockInstance
+  let token: ERC777SnapshotMock
   let initialSupply: string
   let initialMintBlock: number
 
@@ -43,9 +44,9 @@ describe('ERC777Snapshot', function () {
   beforeEach(async function () {
     const fixtures = await useFixtures()
 
-    initialHolder = fixtures.initialHolder
-    recipient = fixtures.recipient
-    other = fixtures.other
+    initialHolder = fixtures.initialHolder.address
+    recipient = fixtures.recipient.address
+    other = fixtures.other.address
     token = fixtures.token
     initialSupply = fixtures.initialSupply
     initialMintBlock = fixtures.initialMintBlock
@@ -70,7 +71,7 @@ describe('ERC777Snapshot', function () {
     })
 
     it('should return latest totalSupply at a not-yet-created block number', async function () {
-      const blockNumber = (await latestBlockNumber(web3)) + 1
+      const blockNumber = (await ethers.provider.getBlockNumber()) + 1
       const totalSupply = await token.totalSupplyAt(blockNumber.toString())
       expect(totalSupply.toString()).to.equal(initialSupply)
     })
@@ -82,7 +83,7 @@ describe('ERC777Snapshot', function () {
 
       context('with no supply changes after the snapshot', function () {
         it('returns the current total supply', async function () {
-          const totalSupply = await token.totalSupplyAt(await latestBlockNumber(web3))
+          const totalSupply = await token.totalSupplyAt(await ethers.provider.getBlockNumber())
           expect(totalSupply.toString()).equal(initialSupply)
         })
       })
@@ -91,7 +92,7 @@ describe('ERC777Snapshot', function () {
         let firstBlockNumber: number
 
         beforeEach(async function () {
-          firstBlockNumber = await latestBlockNumber(web3)
+          firstBlockNumber = await ethers.provider.getBlockNumber()
           await token.mint(other, new BN('50'), '0x00', '0x00')
           await token.methods['burn(address,uint256,bytes,bytes)'](initialHolder, new BN('20'), '0x00', '0x00')
         })
@@ -106,7 +107,7 @@ describe('ERC777Snapshot', function () {
 
           beforeEach(async function () {
             await triggerSnapshot()
-            secondBlockNumber = await latestBlockNumber(web3)
+            secondBlockNumber = await ethers.provider.getBlockNumber()
           })
 
           it('snapshots return the supply before and after the changes', async function () {
@@ -125,7 +126,7 @@ describe('ERC777Snapshot', function () {
           beforeEach(async function () {
             for (let i = 0; i < 5; i++) {
               await triggerSnapshot()
-              blockNumbers.push(await latestBlockNumber(web3))
+              blockNumbers.push(await ethers.provider.getBlockNumber())
             }
           })
 
@@ -155,7 +156,7 @@ describe('ERC777Snapshot', function () {
     })
 
     it('should return latest balance at a not-yet-created block number', async function () {
-      const blockNumber = (await latestBlockNumber(web3)) + 1
+      const blockNumber = (await ethers.provider.getBlockNumber()) + 1
       const balance = await token.balanceOfAt(initialHolder, blockNumber.toString())
       expect(balance.toString()).to.equal(initialSupply)
     })
@@ -190,7 +191,7 @@ describe('ERC777Snapshot', function () {
           let firstBlockNumber: number
 
           beforeEach(async function () {
-            firstBlockNumber = await latestBlockNumber(web3)
+            firstBlockNumber = await ethers.provider.getBlockNumber()
           })
 
           it('snapshots return the balances before and after the changes', async function () {
@@ -216,7 +217,7 @@ describe('ERC777Snapshot', function () {
           beforeEach(async function () {
             for (let i = 0; i < 5; i++) {
               await triggerSnapshot()
-              blockNumbers.push(await latestBlockNumber(web3))
+              blockNumbers.push(await ethers.provider.getBlockNumber())
             }
           })
 
@@ -259,7 +260,7 @@ describe('ERC777Snapshot', function () {
     })
 
     it('should return account balance at block', async function () {
-      const blockNumber = await latestBlockNumber(web3)
+      const blockNumber = await ethers.provider.getBlockNumber()
       const blocks = 10
 
       for (let i = 0; i < blocks; i++) {

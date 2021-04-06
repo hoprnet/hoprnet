@@ -1,42 +1,23 @@
-import type { AsyncReturnType } from 'type-fest'
-import type { HoprChannelsInstance } from '../../types'
-import type { Account } from '../types'
-import type { Ticket } from './types'
-import { prefixMessage, signMessage } from '../utils'
-import Web3 from 'web3'
-import BN from 'bn.js'
-import { constants } from '@openzeppelin/test-helpers'
-import { stringToU8a, u8aToHex } from '@hoprnet/hopr-utils'
+import { ethers } from 'ethers'
+import { prefixMessageWithHOPR, signMessage } from '../utils'
 
-const { numberToHex, encodePacked, soliditySha3 } = Web3.utils
+export type Ticket = {
+  recipient: string
+  proofOfRelaySecret: string
+  counter: string
+  amount: string
+  winProb: string
+  iteration: string
+}
 
-/**
- * @param response web3 response
- * @returns formatted response
- */
-export const formatAccount = (response: AsyncReturnType<HoprChannelsInstance['accounts']>) => ({
-  secret: response[0],
-  counter: response[1]
-})
-
-/**
- * @param response web3 response
- * @returns formatted response
- */
-export const formatChannel = (response: AsyncReturnType<HoprChannelsInstance['channels']>) => ({
-  deposit: response[0],
-  partyABalance: response[1],
-  closureTime: response[2],
-  status: response[3],
-  closureByPartyA: response[4]
-})
+const { solidityPack, solidityKeccak256 } = ethers.utils
 
 /**
  * Upscale a percentage (0-100) to uint256's maximum number
  * @param percent
  */
 export const percentToUint256 = (percent: number): string => {
-  return numberToHex(new BN(percent).mul(constants.MAX_UINT256).idivn(100).toString())
+  return ethers.constants.MaxUint256.mul(percent).div(100).toHexString()
 }
 
 /**
@@ -45,36 +26,11 @@ export const percentToUint256 = (percent: number): string => {
  * @return ticket's hash
  */
 export const getEncodedTicket = (ticket: Ticket): string => {
-  const challenge = soliditySha3({
-    type: 'bytes32',
-    value: ticket.proofOfRelaySecret
-  })
+  const challenge = solidityKeccak256(['bytes32'], [ticket.proofOfRelaySecret])
 
-  return encodePacked(
-    {
-      type: 'address',
-      value: ticket.recipient
-    },
-    {
-      type: 'bytes32',
-      value: challenge
-    },
-    {
-      type: 'uint256',
-      value: ticket.counter
-    },
-    {
-      type: 'uint256',
-      value: ticket.amount
-    },
-    {
-      type: 'bytes32', //@TODO: change to uint256?
-      value: ticket.winProb
-    },
-    {
-      type: 'uint256',
-      value: ticket.iteration
-    }
+  return solidityPack(
+    ['address', 'bytes32', 'uint256', 'uint256', 'bytes32', 'uint256'],
+    [ticket.recipient, challenge, ticket.counter, ticket.amount, ticket.winProb, ticket.iteration]
   )
 }
 
@@ -86,54 +42,42 @@ export const getEncodedTicket = (ticket: Ticket): string => {
  * @returns ticket's luck
  */
 export const getTicketLuck = (ticket: Ticket, hash: string, secret: string): string => {
-  const encoded = encodePacked(
-    {
-      type: 'bytes32',
-      value: hash
-    },
-    {
-      type: 'bytes32',
-      value: secret
-    },
-    {
-      type: 'bytes32',
-      value: ticket.proofOfRelaySecret
-    },
-    {
-      type: 'bytes32', //@TODO: change to uint256?
-      value: ticket.winProb
-    }
+  const encoded = solidityPack(
+    ['bytes32', 'bytes32', 'bytes32', 'bytes32'],
+    [hash, secret, ticket.proofOfRelaySecret, ticket.winProb]
   )
 
-  return soliditySha3({
-    type: 'bytes',
-    value: encoded
-  })
+  return solidityKeccak256(['bytes'], [encoded])
 }
 
 /**
  * Given ticket data, generate a ticket for testing
  * @param ticket
  */
-export const createTicket = (
+export const createTicket = async (
   ticket: Ticket,
-  account: Account,
+  account: {
+    privateKey: string
+    address: string
+  },
   secret: string
-): Ticket & {
-  secret: string
-  counterparty: string
-  encoded: string
-  hash: string
-  luck: string
-  signature: string
-  r: string
-  s: string
-  v: number
-} => {
+): Promise<
+  Ticket & {
+    secret: string
+    counterparty: string
+    encoded: string
+    hash: string
+    luck: string
+    signature: string
+    r: string
+    s: string
+    v: number
+  }
+> => {
   const encoded = getEncodedTicket(ticket)
-  const hash = u8aToHex(prefixMessage(encoded))
+  const hash = prefixMessageWithHOPR(encoded)
   const luck = getTicketLuck(ticket, hash, secret)
-  const { signature, r, s, v } = signMessage(hash, stringToU8a(account.privKey))
+  const { signature, r, s, v } = await signMessage(hash, account.privateKey)
 
   return {
     ...ticket,
@@ -141,10 +85,10 @@ export const createTicket = (
     encoded,
     hash,
     luck,
-    r: u8aToHex(r),
-    s: u8aToHex(s),
+    r: r,
+    s: s,
     v: v + 27, // why add 27? https://bitcoin.stackexchange.com/a/38909
-    signature: u8aToHex(signature),
+    signature: signature,
     counterparty: account.address
   }
 }
