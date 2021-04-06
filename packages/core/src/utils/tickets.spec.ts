@@ -57,7 +57,7 @@ const createMockSignedTicket = ({
   return ({
     ticket: createMockTicket({ targetAddress, amount, winProb, channelIteration }),
     signer: Promise.resolve(new PublicKey(sender.pubKey.marshal()))
-  } as unknown) as Types.SignedTicket
+  } as unknown) as Types.Ticket
 }
 
 const createMockChannel = ({
@@ -126,7 +126,7 @@ const createMockNode = ({
   } as unknown) as Hopr<Chain>
 }
 
-const getTicketsMock = async (): Promise<Types.SignedTicket[]> => []
+const getTicketsMock = async (): Promise<Types.Ticket[]> => []
 
 describe('unit test validateUnacknowledgedTicket', function () {
   it('should pass if ticket is okay', async function () {
@@ -259,23 +259,23 @@ describe('unit test validateUnacknowledgedTicket', function () {
 
 describe('unit test validateCreatedTicket', function () {
   it('should pass if ticket is okay', async function () {
-    const signedTicket = createMockSignedTicket({})
+    const ticket = createMockSignedTicket({})
 
     return expect(
       validateCreatedTicket({
         myBalance: new BN(1),
-        signedTicket
+        ticket
       })
     ).to.eventually.to.not.rejected
   })
 
   it('should throw when signer is not sender', async function () {
-    const signedTicket = createMockSignedTicket({})
+    const ticket = createMockSignedTicket({})
 
     return expect(
       validateCreatedTicket({
         myBalance: new BN(0),
-        signedTicket
+        ticket
       })
     ).to.eventually.rejectedWith('Payment channel does not have enough funds')
   })

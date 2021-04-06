@@ -12,6 +12,8 @@ declare interface TicketStatic {
     channelIteration: UINT256,
     signPriv: Uint8Array 
   ): Ticket
+
+  deserialize(arr: Uint8Array): Ticket;
 }
 
 declare interface Ticket {
