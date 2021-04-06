@@ -35,22 +35,6 @@ declare interface HoprCoreConnector {
      */
     getNativeBalance: (useCache?: boolean) => Promise<Types.NativeBalance>
     /**
-     * Returns the current value of the reset counter
-     */
-    getTicketEpoch(): Promise<Types.UINT256>
-    /**
-     * Returns the current value of the onChainSecret
-     */
-    getOnChainSecret(): Promise<Types.Hash>
-    /**
-     * Returns the accounts address
-     */
-    address: Types.Address
-    /**
-     * The accounts nonce.
-     */
-    nonce: Promise<number>
-    /**
      * The accounts keys:
      */
     keys: {
@@ -117,11 +101,6 @@ declare interface HoprCoreConnector {
   readonly dbKeys: typeof DbKeys
 
   /**
-   * Export chain-specific constants.
-   */
-  readonly constants: typeof Constants
-
-  /**
    * Encapsulates payment channel between nodes.
    */
   readonly channel: typeof Channel
@@ -130,11 +109,6 @@ declare interface HoprCoreConnector {
    * Returns an instance of Indexer.
    */
   readonly indexer: Indexer
-
-  /**
-   * Returns unique information about the connector.
-   */
-  readonly describe?: any
 }
 
 declare var HoprCoreConnector: HoprCoreConnectorStatic
