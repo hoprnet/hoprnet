@@ -14,23 +14,22 @@ export function generateFiller(
     return
   }
 
-  const packetSize = routingInfoLastHopLength + (maxHops - 1) * routingInfoLength
+  const headerLength = routingInfoLastHopLength + (maxHops - 1) * routingInfoLength
   const paddingLength = (maxHops - secrets.length) * routingInfoLength
 
-  let length = 0
-  let start = packetSize
-  let end = packetSize
+  let length = routingInfoLength
+  let start = headerLength
 
   for (let index = 0; index < secrets.length - 1; index++) {
     const prgParams = derivePRGParameters(secrets[index])
 
-    start -= routingInfoLength
-    length += routingInfoLength
-
     u8aXOR(
       true,
-      header.subarray(routingInfoLastHopLength + paddingLength, routingInfoLastHopLength + paddingLength + length),
-      PRG.createPRG(prgParams).digest(start, end)
+      header.subarray(routingInfoLength + routingInfoLastHopLength + paddingLength, routingInfoLength + routingInfoLastHopLength + paddingLength + length),
+      PRG.createPRG(prgParams).digest(start, headerLength + routingInfoLength)
     )
+
+    length += routingInfoLength
+    start -= routingInfoLength
   }
 }

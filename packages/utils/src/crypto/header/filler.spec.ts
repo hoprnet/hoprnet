@@ -14,24 +14,30 @@ describe('test filler', function () {
     const maxHops = hops
 
     const secrets = Array.from({ length: hops }, (_) => randomBytes(SECRET_LENGTH))
-    const packetSize = perHop * (maxHops - 1) + lastHop
+    const extendedHeaderLength = perHop * maxHops + lastHop
 
-    let header = new Uint8Array(perHop * (maxHops - 1) + lastHop)
+    let extendedHeader = new Uint8Array(perHop * maxHops + lastHop)
 
-    generateFiller(header, maxHops, perHop, lastHop, secrets)
+    generateFiller(extendedHeader, maxHops, perHop, lastHop, secrets)
 
     for (let i = 0; i < hops - 1; i++) {
-      const blinding = PRG.createPRG(derivePRGParameters(secrets[secrets.length - 2 - i])).digest(0, packetSize)
+      const blinding = PRG.createPRG(derivePRGParameters(secrets[secrets.length - 2 - i])).digest(
+        0,
+        extendedHeaderLength
+      )
 
-      u8aXOR(true, header, blinding)
+      u8aXOR(true, extendedHeader, blinding)
 
       assert(
-        u8aEquals(header.subarray(packetSize - perHop), new Uint8Array(perHop)),
+        u8aEquals(extendedHeader.subarray(extendedHeaderLength - perHop), new Uint8Array(perHop)),
         `XORing blinding must erase last bits`
       )
 
       // Roll header
-      header = Uint8Array.from([...new Uint8Array(perHop), ...header.slice(0, packetSize - perHop)])
+      extendedHeader = Uint8Array.from([
+        ...new Uint8Array(perHop),
+        ...extendedHeader.slice(0, extendedHeaderLength - perHop)
+      ])
     }
   })
 
@@ -42,30 +48,33 @@ describe('test filler', function () {
     const maxHops = 5
 
     const secrets = Array.from({ length: hops }, (_) => randomBytes(SECRET_LENGTH))
-    const packetSize = perHop * (maxHops - 1) + lastHop
+    const extendedHeaderLength = perHop * maxHops + lastHop
 
-    let header = new Uint8Array(packetSize)
+    let header = new Uint8Array(extendedHeaderLength)
 
     generateFiller(header, maxHops, perHop, lastHop, secrets)
 
     assert(header.slice(0, lastHop + (maxHops - hops) * perHop).every((x) => x == 0))
 
     for (let i = 0; i < hops - 1; i++) {
-      const blinding = PRG.createPRG(derivePRGParameters(secrets[secrets.length - 2 - i])).digest(0, packetSize)
+      const blinding = PRG.createPRG(derivePRGParameters(secrets[secrets.length - 2 - i])).digest(
+        0,
+        extendedHeaderLength
+      )
 
       u8aXOR(true, header, blinding)
 
       assert(
-        u8aEquals(header.subarray(packetSize - perHop), new Uint8Array(perHop)),
+        u8aEquals(header.subarray(extendedHeaderLength - perHop), new Uint8Array(perHop)),
         `XORing blinding must erase last bits`
       )
 
       // Roll header
-      header = Uint8Array.from([...new Uint8Array(perHop), ...header.slice(0, packetSize - perHop)])
+      header = Uint8Array.from([...new Uint8Array(perHop), ...header.slice(0, extendedHeaderLength - perHop)])
     }
   })
 
-  it.skip('generate a filler and verify - edge cases', function () {
+  it('generate a filler and verify - edge cases', function () {
     const perHop = 23
     const lastHop = 31
     const hops = 1
@@ -73,12 +82,12 @@ describe('test filler', function () {
 
     const secrets = Array.from({ length: hops }, (_) => randomBytes(SECRET_LENGTH))
 
-    let header = new Uint8Array(perHop * (hops - 1) + lastHop)
+    let extendedHeader = new Uint8Array(perHop * hops + lastHop)
 
-    generateFiller(header, maxHops, perHop, lastHop, secrets)
+    generateFiller(extendedHeader, maxHops, perHop, lastHop, secrets)
 
     assert(
-      header.every((x) => x == 0),
+      extendedHeader.every((x) => x == 0),
       'must not produce fillers for zero-hop packets'
     )
 
