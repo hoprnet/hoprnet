@@ -28,16 +28,6 @@ class Ticket implements Types.Ticket {
     readonly channelIteration: UINT256
   ) {}
 
-  /*
-  get counterpartyOffset(): number {
-    return this.byteOffset
-  }
-
-  get counterparty(): Address {
-    return new Address(new Uint8Array(this.buffer, this.counterpartyOffset, Address.SIZE))
-  }
-  */
-
   public serialize(): Uint8Array {
     // the order of the items needs to be the same as the one used in the SC
     return serializeToU8a([
@@ -68,32 +58,6 @@ class Ticket implements Types.Ticket {
     const channelIteration = new UINT256(new BN(components[4]))
     return new Ticket(counterparty, challenge, epoch, amount, winProb, channelIteration)
   }
-
-  /*
-  get challenge(): Hash {
-    return new Hash(new Uint8Array(this.buffer, this.challengeOffset, Hash.SIZE))
-  }
-
-  get epoch(): UINT256 {
-    return new UINT256(new BN(new Uint8Array(this.buffer, this.epochOffset, UINT256.SIZE)))
-  }
-
-  get amount(): Balance {
-    return new Balance(new BN(new Uint8Array(this.buffer, this.amountOffset, Balance.SIZE)))
-  }
-
-  get winProb(): Hash {
-    return new Hash(new Uint8Array(this.buffer, this.winProbOffset, Hash.SIZE))
-  }
-
-  get channelIterationOffset(): number {
-    return this.byteOffset + Address.SIZE + Hash.SIZE + UINT256.SIZE + UINT256.SIZE + Hash.SIZE
-  }
-
-  get channelIteration(): UINT256 {
-    return new UINT256(new BN(new Uint8Array(this.buffer, this.channelIterationOffset, UINT256.SIZE)))
-  }
-  */
 
   getHash(): Hash {
     return toEthSignedMessageHash(u8aToHex(this.serialize()))
