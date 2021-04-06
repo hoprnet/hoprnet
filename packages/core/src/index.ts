@@ -94,9 +94,9 @@ const defaultDBPath = (id: string | number, isBootstrap: boolean): string => {
   return path.join(process.cwd(), 'db', VERSION, folder)
 }
 
-class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
+class Hopr extends EventEmitter {
   // TODO make these actually private - Do not rely on any of these properties!
-  public _interactions: Interactions<Chain>
+  public _interactions: Interactions
   // Allows us to construct HOPR with falsy options
   public _debug: boolean
   public _dbKeys = DbKeys
@@ -120,7 +120,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
    * @param _options
    * @param provider
    */
-  private constructor(options: HoprOptions, public _libp2p: LibP2P, public db: LevelUp, public paymentChannels: Chain) {
+  private constructor(options: HoprOptions, public _libp2p: LibP2P, public db: LevelUp, public paymentChannels: HoprCoreEthereum) {
     super()
 
     this._libp2p.connectionManager.on('peer:connect', (conn: Connection) => {
@@ -332,7 +332,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
    *
    * @param options
    */
-  public async start(): Promise<Hopr<Chain>> {
+  public async start(): Promise<Hopr> {
     await Promise.all([this._libp2p.start().then(() => this.heartbeat.start()), this.paymentChannels.start()])
 
     log(`Available under the following addresses:`)
@@ -436,7 +436,7 @@ class Hopr<Chain extends HoprCoreConnector> extends EventEmitter {
 
           const path: PeerId[] = [].concat(intermediatePath, [destination])
 
-          let packet: Packet<Chain>
+          let packet: Packet
           try {
             packet = await Packet.create(
               this,

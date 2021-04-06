@@ -2,6 +2,7 @@ import secp256k1 from 'secp256k1'
 import PeerId from 'peer-id'
 
 import HoprCoreConnector, { Types } from '@hoprnet/hopr-core-connector-interface'
+import { Signature, Hash } from '@hoprnet/hopr-core-ethereum'
 
 import BN from 'bn.js'
 
@@ -12,13 +13,11 @@ import BN from 'bn.js'
  */
 class Challenge<Chain extends HoprCoreConnector> extends Uint8Array {
   // private : Uint8Array
-  private paymentChannels: Chain
   private _hashedKey: Types.Hash
   private _fee: BN
   private _counterparty: Uint8Array
 
   constructor(
-    paymentChannels: Chain,
     arr?: {
       bytes: ArrayBuffer
       offset: number
@@ -28,16 +27,15 @@ class Challenge<Chain extends HoprCoreConnector> extends Uint8Array {
     }
   ) {
     if (arr == null) {
-      super(Challenge.SIZE(paymentChannels))
+      super(Challenge.SIZE())
     } else {
-      super(arr.bytes, arr.offset, Challenge.SIZE(paymentChannels))
+      super(arr.bytes, arr.offset, Challenge.SIZE())
     }
 
     if (struct != null) {
       super(struct.signature.serialize())
     }
 
-    this.paymentChannels = paymentChannels
   }
 
   get challengeSignatureOffset(): number {
@@ -45,19 +43,19 @@ class Challenge<Chain extends HoprCoreConnector> extends Uint8Array {
   }
 
   get challengeSignature(): Types.Signature {
-    return this.paymentChannels.types.Signature.deserialize(
-      new Uint8Array(this.buffer, this.challengeSignatureOffset, this.paymentChannels.types.Signature.SIZE)
+    return Signature.deserialize(
+      new Uint8Array(this.buffer, this.challengeSignatureOffset, Signature.SIZE)
     )
   }
 
-  get signatureHash(): Promise<Types.Hash> {
+  get signatureHash(): Promise<Hash> {
     return new Promise(async (resolve) => {
-      resolve(await this.paymentChannels.utils.hash(this.challengeSignature.serialize()))
+      resolve(Hash.create(this.challengeSignature.serialize()))
     })
   }
 
-  static SIZE<Chain extends HoprCoreConnector>(paymentChannels: Chain): number {
-    return paymentChannels.types.Signature.SIZE
+  static SIZE(): number {
+    return Signature.SIZE
   }
 
   get hash(): Types.Hash {
@@ -68,16 +66,16 @@ class Challenge<Chain extends HoprCoreConnector> extends Uint8Array {
     return this._hashedKey
   }
 
-  subarray(begin: number = 0, end: number = Challenge.SIZE(this.paymentChannels)): Uint8Array {
+  subarray(begin: number = 0, end: number = Challenge.SIZE()): Uint8Array {
     return new Uint8Array(this.buffer, begin + this.byteOffset, end - begin)
   }
 
   getCopy(): Challenge<Chain> {
-    const arrCopy = new Uint8Array(Challenge.SIZE(this.paymentChannels))
+    const arrCopy = new Uint8Array(Challenge.SIZE())
 
     arrCopy.set(this)
 
-    const copiedChallenge = new Challenge<Chain>(this.paymentChannels, {
+    const copiedChallenge = new Challenge({
       bytes: arrCopy.buffer,
       offset: arrCopy.byteOffset
     })
@@ -135,7 +133,7 @@ class Challenge<Chain extends HoprCoreConnector> extends Uint8Array {
     }
   ): Challenge<Chain> {
     if (arr == null) {
-      const tmp = new Uint8Array(this.SIZE(hoprCoreConnector))
+      const tmp = new Uint8Array(this.SIZE())
 
       arr = {
         bytes: tmp.buffer,

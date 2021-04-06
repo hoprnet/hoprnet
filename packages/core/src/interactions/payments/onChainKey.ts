@@ -1,5 +1,4 @@
 import type Hopr from '../../'
-import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type { Types } from '@hoprnet/hopr-core-connector-interface'
 
 import { PROTOCOL_ONCHAIN_KEY } from '../../constants'
@@ -12,10 +11,10 @@ import { dialHelper, durations } from '@hoprnet/hopr-utils'
 
 const ONCHAIN_KEY_TIMEOUT = durations.seconds(4)
 
-class OnChainKey<Chain extends HoprCoreConnector> implements AbstractInteraction {
+class OnChainKey implements AbstractInteraction {
   protocols: string[] = [PROTOCOL_ONCHAIN_KEY]
 
-  constructor(public node: Hopr<Chain>) {
+  constructor(public node: Hopr) {
     this.node._libp2p.handle(this.protocols, this.handler.bind(this))
   }
 

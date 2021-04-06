@@ -12,7 +12,7 @@ import { LevelUp } from 'levelup'
 import Debug from 'debug'
 import Hopr from '../../'
 import HoprCoreConnector, { Types } from '@hoprnet/hopr-core-connector-interface'
-import { Hash, PublicKey } from '@hoprnet/hopr-core-ethereum'
+import { Hash, PublicKey, Ticket, Balance } from '@hoprnet/hopr-core-ethereum'
 import { UnacknowledgedTicket } from '../ticket'
 
 const log = Debug('hopr-core:message:packet')
@@ -98,15 +98,15 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     }
 
     return new Promise<Types.Ticket>(async (resolve) => {
-      this._ticket = await this.node.paymentChannels.types.Ticket.deserialize(
-        new Uint8Array(this.buffer, this.ticketOffset, this.node.paymentChannels.types.Ticket.SIZE)
+      this._ticket = await Ticket.deserialize(
+        new Uint8Array(this.buffer, this.ticketOffset, Ticket.SIZE)
       )
       resolve(this._ticket)
     })
   }
 
   get challengeOffset() {
-    return this.byteOffset + Header.SIZE + this.node.paymentChannels.types.Ticket.SIZE
+    return this.byteOffset + Header.SIZE + Ticket.SIZE
   }
 
   get challenge(): Challenge<Chain> {
@@ -124,7 +124,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     return (
       this.byteOffset +
       Header.SIZE +
-      this.node.paymentChannels.types.Ticket.SIZE +
+      Ticket.SIZE +
       Challenge.SIZE(this.node.paymentChannels)
     )
   }
@@ -141,7 +141,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
   }
 
   static SIZE<Chain extends HoprCoreConnector>(hoprCoreConnector: Chain) {
-    return Header.SIZE + hoprCoreConnector.types.Ticket.SIZE + Challenge.SIZE(hoprCoreConnector) + Message.SIZE
+    return Header.SIZE + Ticket.SIZE + Challenge.SIZE(hoprCoreConnector) + Message.SIZE
   }
 
   /**
@@ -159,8 +159,6 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
     path: PeerId[]
   ): Promise<Packet<Chain>> {
     const chain = node.paymentChannels
-    const { Balance } = chain.types
-
     const arr = new Uint8Array(Packet.SIZE(chain)).fill(0x00)
     const packet = new Packet<Chain>(node, libp2p, {
       bytes: arr.buffer,
@@ -313,7 +311,6 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
    */
   async prepareForward(_originalSender: PeerId, target: PeerId): Promise<void> {
     const chain = this.node.paymentChannels
-    const { Balance } = chain.types
     const ticket = await this.ticket
     const sender = this.node.getId()
     const senderPubKey = new PublicKey(sender.pubKey.marshal())
@@ -325,7 +322,7 @@ export class Packet<Chain extends HoprCoreConnector> extends Uint8Array {
       throw Error('Error preparing forward')
     }
 
-    const unacknowledged = new UnacknowledgedTicket(chain, undefined, {
+    const unacknowledged = new UnacknowledgedTicket(undefined, {
       ticket: ticket,
       secretA: new Hash(deriveTicketKey(this.header.derivedSecret))
     })
