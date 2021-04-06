@@ -49,9 +49,7 @@ class UnacknowledgedTicket extends Uint8Array {
     }
 
     return new Promise<Ticket>(async (resolve) => {
-      this._signedTicket = await Ticket.deserialize(
-        new Uint8Array(this.buffer, this.signedTicketOffset, Ticket.SIZE)
-      )
+      this._signedTicket = await Ticket.deserialize(new Uint8Array(this.buffer, this.signedTicketOffset, Ticket.SIZE))
 
       resolve(this._signedTicket)
     })
@@ -63,9 +61,7 @@ class UnacknowledgedTicket extends Uint8Array {
 
   get secretA(): Hash {
     if (this._secretA == null) {
-      this._secretA = new Hash(
-        new Uint8Array(this.buffer, this.secretAOffset, Hash.SIZE)
-      )
+      this._secretA = new Hash(new Uint8Array(this.buffer, this.secretAOffset, Hash.SIZE))
     }
 
     return this._secretA

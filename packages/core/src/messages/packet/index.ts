@@ -97,9 +97,7 @@ export class Packet extends Uint8Array {
     }
 
     return new Promise<Ticket>(async (resolve) => {
-      this._ticket = await Ticket.deserialize(
-        new Uint8Array(this.buffer, this.ticketOffset, Ticket.SIZE)
-      )
+      this._ticket = await Ticket.deserialize(new Uint8Array(this.buffer, this.ticketOffset, Ticket.SIZE))
       resolve(this._ticket)
     })
   }
@@ -120,12 +118,7 @@ export class Packet extends Uint8Array {
   }
 
   get messageOffset(): number {
-    return (
-      this.byteOffset +
-      Header.SIZE +
-      Ticket.SIZE +
-      Challenge.SIZE()
-    )
+    return this.byteOffset + Header.SIZE + Ticket.SIZE + Challenge.SIZE()
   }
 
   get message(): Message {
@@ -151,12 +144,7 @@ export class Packet extends Uint8Array {
    * @param path array of peerId that determines the route that
    * the packet takes
    */
-  static async create(
-    node: Hopr,
-    libp2p: LibP2P,
-    msg: Uint8Array,
-    path: PeerId[]
-  ): Promise<Packet> {
+  static async create(node: Hopr, libp2p: LibP2P, msg: Uint8Array, path: PeerId[]): Promise<Packet> {
     const chain = node.paymentChannels
     const arr = new Uint8Array(Packet.SIZE()).fill(0x00)
     const packet = new Packet(node, libp2p, {
@@ -180,14 +168,10 @@ export class Packet extends Uint8Array {
     log(`Destination    : ${blue(path[path.length - 1].toB58String())}`)
     log('--------------------------------')
 
-    packet._challenge = await Challenge.create(
-      await chain.utils.hash(deriveTicketKeyBlinding(secrets[0])),
-      fee,
-      {
-        bytes: packet.buffer,
-        offset: packet.challengeOffset
-      }
-    ).sign(libp2p.peerId)
+    packet._challenge = await Challenge.create(await chain.utils.hash(deriveTicketKeyBlinding(secrets[0])), fee, {
+      bytes: packet.buffer,
+      offset: packet.challengeOffset
+    }).sign(libp2p.peerId)
 
     packet._message = Message.create(msg, {
       bytes: packet.buffer,
