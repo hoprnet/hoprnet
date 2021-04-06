@@ -151,7 +151,7 @@ describe('test Channel class', function () {
     const ATTEMPTS = 20
 
     let ticketData
-    let nextSignedTicket: Ticket 
+    let nextSignedTicket: Ticket
 
     for (let i = 0; i < ATTEMPTS; i++) {
       ticketData = await getTicketData({

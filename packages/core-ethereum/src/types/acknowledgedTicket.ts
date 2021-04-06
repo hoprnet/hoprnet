@@ -1,8 +1,8 @@
-import { Hash, Ticket} from '.'
+import { Hash, Ticket } from '.'
 
 // @TODO this is a duplicate of the same class in hopr-core
 class AcknowledgedTicket extends Uint8Array {
-  private _signedTicket: Ticket 
+  private _signedTicket: Ticket
 
   constructor(
     arr?: {
@@ -56,7 +56,7 @@ class AcknowledgedTicket extends Uint8Array {
     }
 
     return new Promise<Ticket>(async (resolve) => {
-      this._signedTicket = await Ticket.deserialize(new Uint8Array(this.buffer,this.signedTicketOffset, Ticket.SIZE)) 
+      this._signedTicket = await Ticket.deserialize(new Uint8Array(this.buffer, this.signedTicketOffset, Ticket.SIZE))
 
       resolve(this._signedTicket)
     })

@@ -193,5 +193,3 @@ export class Signature implements Interfaces.Signature {
 
   static SIZE = SIGNATURE_LENGTH + SIGNATURE_RECOVERY_LENGTH
 }
-
-

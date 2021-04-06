@@ -133,9 +133,9 @@ describe('test hashedSecret', function () {
     it('should reserve a preImage for tickets with 100% winning probabilty resp. should not reserve for 0% winning probability', async function () {
       const firstTicket = new Types.AcknowledgedTicket(undefined, {
         signedTicket: ({
-            getHash: () => new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff)),
-            winProb: Utils.computeWinningProbability(1)
-        }) as unknown as Types.Ticket,
+          getHash: () => new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff)),
+          winProb: Utils.computeWinningProbability(1)
+        } as unknown) as Types.Ticket,
         response: new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff))
       })
 

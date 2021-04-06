@@ -112,7 +112,7 @@ declare var PublicKey: PublicStatic
 
 declare interface SignatureStatic {
   readonly SIZE: number
-  deserialize(arr: Uint8Array): Signature;
+  deserialize(arr: Uint8Array): Signature
 }
 declare interface Signature {
   signature: Uint8Array

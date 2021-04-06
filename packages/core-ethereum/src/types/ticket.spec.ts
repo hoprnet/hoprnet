@@ -45,7 +45,15 @@ describe('test ticket construction', function () {
 
     expect(expectedHash.toHex()).to.eq(ticketA.getHash().toHex(), 'ticket hash does not match the expected value')
 
-    const wrongTicket = new Ticket(counterparty, challenge, UINT256.fromString('2'), amount, winProb, channelIteration, signature)
+    const wrongTicket = new Ticket(
+      counterparty,
+      challenge,
+      UINT256.fromString('2'),
+      amount,
+      winProb,
+      channelIteration,
+      signature
+    )
 
     assert(!expectedHash.eq(wrongTicket.getHash()), 'ticket hash must be different')
   })
@@ -64,7 +72,15 @@ describe('test ticket construction', function () {
 
     expect(expectedHash.toHex()).to.eq(ticketA.getHash().toHex(), 'ticket hash does not match the expected value')
 
-    const wrongTicket = new Ticket(counterparty, challenge, UINT256.fromString('1'), amount, winProb, channelIteration, signature)
+    const wrongTicket = new Ticket(
+      counterparty,
+      challenge,
+      UINT256.fromString('1'),
+      amount,
+      winProb,
+      channelIteration,
+      signature
+    )
 
     assert(!expectedHash.eq(wrongTicket.getHash()), 'ticket hash must be different')
   })
@@ -97,7 +113,6 @@ describe('test signedTicket construction', async function () {
     assert(ticket.verify(userAPubKey))
 
     assert(ticket.getSigner().toHex() == userAPubKey.toHex(), 'signer incorrect')
-
 
     // Mutate ticket and see signature fails
     // @ts-ignore readonly
