@@ -1,9 +1,8 @@
 import { AbstractCommand } from './abstractCommand'
-import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 
 export default class Version extends AbstractCommand {
-  constructor(public node: Hopr<HoprCoreConnector>) {
+  constructor(public node: Hopr) {
     super()
   }
   public name() {

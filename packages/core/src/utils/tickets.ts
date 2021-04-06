@@ -6,7 +6,6 @@ import { UnacknowledgedTicket } from '../messages/ticket/unacknowledged'
 import {
   PublicKey,
   Ticket,
-  ChannelEntry,
   Channel,
   AcknowledgedTicket,
   SubmitTicketResponse
@@ -189,7 +188,7 @@ export async function submitAcknowledgedTicket(
     const counterparty = signedTicket.getSigner()
     const channel = new ethereum.channel(ethereum, self, counterparty)
 
-    const result = await channel.submitTicket(ackTicket, index)
+    const result = await channel.submitTicket(ackTicket)
     if (result.status === 'SUCCESS') {
       ackTicket.redeemed = true
       await updateAcknowledgedTicket(node, ackTicket, index)
@@ -268,7 +267,7 @@ export async function validateUnacknowledgedTicket(
   const accountCounter = (await ethereum.account.getTicketEpoch()).toBN()
   const ticketWinProb = ethereum.utils.getWinProbabilityAsFloat(ticket.winProb)
 
-  let channelState: ChannelEntry
+  let channelState
   try {
     channelState = await channel.getState()
   } catch (err) {

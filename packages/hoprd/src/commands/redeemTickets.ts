@@ -1,4 +1,3 @@
-import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 import { moveDecimalPoint } from '@hoprnet/hopr-utils'
@@ -6,7 +5,7 @@ import { countSignedTickets, styleValue, toSignedTickets } from './utils'
 import { AbstractCommand } from './abstractCommand'
 
 export default class RedeemTickets extends AbstractCommand {
-  constructor(public node: Hopr<HoprCoreConnector>) {
+  constructor(public node: Hopr) {
     super()
   }
 

@@ -1,4 +1,3 @@
-import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 import type { GlobalState } from '../abstractCommand'
 import PeerId from 'peer-id'
@@ -35,7 +34,7 @@ export async function checkPeerIdInput(peerIdString: string, state?: GlobalState
  * @returns an array of peerIds / aliases
  */
 export function getPeerIdsAndAliases(
-  node: Hopr<HoprCoreConnector>,
+  node: Hopr,
   state: GlobalState,
   ops: {
     noBootstrapNodes: boolean

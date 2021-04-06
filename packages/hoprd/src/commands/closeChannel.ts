@@ -1,4 +1,3 @@
-import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 import type PeerId from 'peer-id'
 import type { AutoCompleteResult } from './abstractCommand'
@@ -8,7 +7,7 @@ import { AbstractCommand, GlobalState } from './abstractCommand'
 import { checkPeerIdInput, styleValue } from './utils'
 
 export default class CloseChannel extends AbstractCommand {
-  constructor(public node: Hopr<HoprCoreConnector>) {
+  constructor(public node: Hopr) {
     super()
   }
 
@@ -70,7 +69,7 @@ export default class CloseChannel extends AbstractCommand {
       for (const channel of channels) {
         const counterparty = channel.partyA.eq(self) ? channel.partyB : channel.partyA
         const pubKey = await ethereum.indexer.getPublicKeyOf(counterparty)
-        const peerId = await pubKeyToPeerId(pubKey)
+        const peerId = await pubKeyToPeerId(pubKey.serialize())
         peerIdStrings.push(peerId.toB58String())
       }
     } catch (err) {

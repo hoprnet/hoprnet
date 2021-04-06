@@ -1,4 +1,3 @@
-import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 import type PeerId from 'peer-id'
 import { startDelayedInterval, moveDecimalPoint } from '@hoprnet/hopr-utils'
@@ -9,7 +8,7 @@ import { checkPeerIdInput, isBootstrapNode, styleValue } from './utils'
 import { AbstractCommand, AutoCompleteResult, GlobalState } from './abstractCommand'
 
 export abstract class OpenChannelBase extends AbstractCommand {
-  constructor(public node: Hopr<HoprCoreConnector>) {
+  constructor(public node: Hopr) {
     super()
   }
 
@@ -118,7 +117,7 @@ export class OpenChannel extends OpenChannelBase {
 }
 
 export class OpenChannelFancy extends OpenChannelBase {
-  constructor(public node: Hopr<HoprCoreConnector>, public rl: readline.Interface) {
+  constructor(public node: Hopr, public rl: readline.Interface) {
     super(node)
   }
 

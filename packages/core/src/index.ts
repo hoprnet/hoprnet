@@ -35,9 +35,8 @@ import Multiaddr from 'multiaddr'
 import chalk from 'chalk'
 
 import PeerId from 'peer-id'
-import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-import type { HoprCoreConnectorStatic, Types, RoutingChannel } from '@hoprnet/hopr-core-connector-interface'
-import HoprCoreEthereum, { PublicKey, Balance } from '@hoprnet/hopr-core-ethereum'
+import type { RoutingChannel } from '@hoprnet/hopr-core-connector-interface'
+import HoprCoreEthereum, { PublicKey, Balance, NativeBalance, Hash, AcknowledgedTicket } from '@hoprnet/hopr-core-ethereum'
 import BN from 'bn.js'
 
 import { Interactions } from './interactions'
@@ -72,7 +71,7 @@ export type HoprOptions = {
   password?: string
   id?: number // TODO - kill this opaque accessor of db files...
   bootstrapNode?: boolean
-  connector?: HoprCoreConnectorStatic
+  connector?: HoprCoreEthereum
   bootstrapServers?: Multiaddr[]
   output?: (encoded: Uint8Array) => void
   strategy?: ChannelStrategyNames
@@ -213,10 +212,9 @@ class Hopr extends EventEmitter {
    *
    * @param options the parameters
    */
-  public static async create<CoreConnector extends HoprCoreConnector>(
+  public static async create(
     options: HoprOptions
-  ): Promise<Hopr<CoreConnector>> {
-    const Connector = options.connector ?? HoprCoreEthereum
+  ): Promise<Hopr> {
     const db = Hopr.openDatabase(options)
 
     const { id, addresses } = await getIdentity({
@@ -232,10 +230,10 @@ class Hopr extends EventEmitter {
       throw Error(`Cannot start node without a bootstrap server`)
     }
 
-    let connector = (await Connector.create(db, id.privKey.marshal(), {
+    let connector = (await HoprCoreEthereum.create(db, id.privKey.marshal(), {
       provider: options.provider,
       debug: options.debug
-    })) as CoreConnector
+    })) 
 
     verbose('Created connector, now creating node')
 
@@ -277,7 +275,7 @@ class Hopr extends EventEmitter {
       }
     })
 
-    return await new Hopr<CoreConnector>(options, libp2p, db, connector).start()
+    return await new Hopr(options, libp2p, db, connector).start()
   }
 
   private async tickChannelStrategy(newChannels: RoutingChannel[]) {
@@ -555,11 +553,11 @@ class Hopr extends EventEmitter {
     return this.strategy.name
   }
 
-  public async getBalance(): Promise<Types.Balance> {
+  public async getBalance(): Promise<Balance> {
     return await this.paymentChannels.account.getBalance(true)
   }
 
-  public async getNativeBalance(): Promise<Types.NativeBalance> {
+  public async getNativeBalance(): Promise<NativeBalance> {
     return await this.paymentChannels.account.getNativeBalance(true)
   }
 
@@ -577,7 +575,7 @@ class Hopr extends EventEmitter {
     counterparty: PeerId,
     amountToFund: BN
   ): Promise<{
-    channelId: Types.Hash
+    channelId: Hash
   }> {
     const ethereum = this.paymentChannels
     const selfPubKey = new PublicKey(this.getId().pubKey.marshal())
@@ -621,7 +619,7 @@ class Hopr extends EventEmitter {
     return getAcknowledgedTickets(this)
   }
 
-  public async submitAcknowledgedTicket(ackTicket: Types.AcknowledgedTicket, index: Uint8Array) {
+  public async submitAcknowledgedTicket(ackTicket: AcknowledgedTicket, index: Uint8Array) {
     return submitAcknowledgedTicket(this, ackTicket, index)
   }
 

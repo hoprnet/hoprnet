@@ -1,5 +1,4 @@
 import Hopr from '../..'
-import HoprEthereum from '@hoprnet/hopr-core-ethereum'
 import assert from 'assert'
 import { u8aEquals, durations } from '@hoprnet/hopr-utils'
 import { MAX_HOPS } from '../../constants'
@@ -32,7 +31,6 @@ async function generateNode(
     id,
     peerId: await privKeyToPeerId(NODE_SEEDS[id]),
     db: new LevelUp(MemDown()),
-    connector: HoprEthereum,
     provider: GANACHE_URI,
     network: 'ethereum',
     debug: true,

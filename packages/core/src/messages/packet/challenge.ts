@@ -1,6 +1,6 @@
 import secp256k1 from 'secp256k1'
 import PeerId from 'peer-id'
-import { Signature, Hash } from '@hoprnet/hopr-core-ethereum'
+import { Signature, Hash, PublicKey} from '@hoprnet/hopr-core-ethereum'
 
 import BN from 'bn.js'
 
@@ -155,8 +155,7 @@ class Challenge extends Uint8Array {
     if (!peerId.pubKey) {
       throw Error('Unable to verify challenge without a public key.')
     }
-
-    return this.challengeSignature.verify(this.hash.serialize(), peerId.pubKey.marshal())
+    return this.challengeSignature.verify(this.hash.serialize(), new PublicKey(peerId.pubKey.marshal()))
   }
 }
 
