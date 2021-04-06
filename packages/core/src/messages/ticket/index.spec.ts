@@ -46,19 +46,13 @@ describe(`check serialization and deserialization of ticket objects`, function (
       offset: unAcknowledgedTicket.signedTicketOffset
     })
 
-    const ticket = node.paymentChannels.types.Ticket.create(
-      {
-        bytes: signedTicket.buffer,
-        offset: signedTicket.ticketOffset
-      },
-      {
-        amount: new node.paymentChannels.types.Balance(new BN(1)),
-        counterparty: accountB,
+    const ticket = new node.paymentChannels.types.Ticket(
+        accountB,
         challenge,
-        epoch: node.paymentChannels.types.UINT256.fromString('0'),
-        winProb: new node.paymentChannels.types.Hash(new Uint8Array(32).fill(0xff)),
-        channelIteration: node.paymentChannels.types.UINT256.fromString('0')
-      }
+        node.paymentChannels.types.UINT256.fromString('0'),
+        new node.paymentChannels.types.Balance(new BN(1)),
+        new node.paymentChannels.types.Hash(new Uint8Array(32).fill(0xff)),
+        node.paymentChannels.types.UINT256.fromString('0')
     )
 
     const signature = await ticket.sign(peerA.privKey.marshal())

@@ -1,6 +1,6 @@
 import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import BN from 'bn.js'
-import { stringToU8a, u8aToHex, u8aConcat, serializeToU8a } from '@hoprnet/hopr-utils'
+import { stringToU8a, u8aSplit, u8aToHex, u8aConcat, serializeToU8a } from '@hoprnet/hopr-utils'
 import { Address, Balance, Hash, Signature, UINT256 } from '.'
 import { sign } from '../utils'
 
@@ -48,6 +48,25 @@ class Ticket implements Types.Ticket {
       [this.winProb.serialize(), Hash.SIZE],
       [this.channelIteration.serialize(), UINT256.SIZE]
     ])
+  }
+
+ static deserialize(arr: Uint8Array): Ticket {
+    const components = u8aSplit(arr, [
+      Address.SIZE,
+      Hash.SIZE,
+      UINT256.SIZE,
+      Balance.SIZE,
+      Hash.SIZE,
+      UINT256.SIZE
+    ])
+
+    const counterparty = new Address(components[0])
+    const challenge = new Hash(components[1])
+    const epoch = new UINT256(new BN(components[2]))
+    const amount = new Balance(new BN(components[3]))
+    const winProb = new Hash(components[4])
+    const channelIteration = new UINT256(new BN(components[4]))
+    return new Ticket(counterparty, challenge, epoch, amount, winProb, channelIteration)
   }
 
   /*
