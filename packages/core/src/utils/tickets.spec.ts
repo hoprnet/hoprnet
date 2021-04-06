@@ -19,12 +19,14 @@ const SENDER = PeerId.createFromB58String('16Uiu2HAm5g4fTADcjPQrtp9LtN2wCmPJTQPD
 // const SENDER_ADDRESS = new Address(stringToU8a('0xf3a509473be4bcd8af0d1961d75a5a3dc9e47ba0'))
 
 const createMockTicket = ({
+  sender = SENDER,
   targetAddress = TARGET_ADDRESS,
   amount = new Balance(new BN(1)),
   winProb = Utils.computeWinningProbability(1),
   epoch = new UINT256(new BN(1)),
   channelIteration = new UINT256(new BN(1))
 }: {
+  sender?: PeerId,
   targetAddress?: Address
   amount?: Balance
   winProb?: Hash
@@ -37,26 +39,8 @@ const createMockTicket = ({
     amount,
     winProb,
     epoch,
-    channelIteration
-  } as unknown) as Types.Ticket
-}
-
-const createMockSignedTicket = ({
-  sender = SENDER,
-  targetAddress = TARGET_ADDRESS,
-  amount = new Balance(new BN(1)),
-  winProb = Utils.computeWinningProbability(1),
-  channelIteration = new UINT256(new BN(1))
-}: {
-  sender?: PeerId
-  targetAddress?: Address
-  amount?: Balance
-  winProb?: Hash
-  channelIteration?: UINT256
-}) => {
-  return ({
-    ticket: createMockTicket({ targetAddress, amount, winProb, channelIteration }),
-    signer: Promise.resolve(new PublicKey(sender.pubKey.marshal()))
+    channelIteration,
+    getSigner: () => new PublicKey(sender.pubKey.marshal())
   } as unknown) as Types.Ticket
 }
 
@@ -131,7 +115,7 @@ const getTicketsMock = async (): Promise<Types.Ticket[]> => []
 describe('unit test validateUnacknowledgedTicket', function () {
   it('should pass if ticket is okay', async function () {
     const node = createMockNode({})
-    const signedTicket = createMockSignedTicket({})
+    const signedTicket = createMockTicket({})
 
     return expect(validateUnacknowledgedTicket(node, SENDER, signedTicket, createMockChannel({}), getTicketsMock)).to
       .not.eventually.rejected
@@ -139,7 +123,7 @@ describe('unit test validateUnacknowledgedTicket', function () {
 
   it('should throw when signer is not sender', async function () {
     const node = createMockNode({})
-    const signedTicket = createMockSignedTicket({})
+    const signedTicket = createMockTicket({})
 
     return expect(
       validateUnacknowledgedTicket(node, TARGET, signedTicket, createMockChannel({}), getTicketsMock)
@@ -150,7 +134,7 @@ describe('unit test validateUnacknowledgedTicket', function () {
     const node = createMockNode({
       ticketAmount: 2
     })
-    const signedTicket = createMockSignedTicket({})
+    const signedTicket = createMockTicket({})
 
     return expect(
       validateUnacknowledgedTicket(node, SENDER, signedTicket, createMockChannel({}), getTicketsMock)
@@ -159,7 +143,7 @@ describe('unit test validateUnacknowledgedTicket', function () {
 
   it('should throw when ticket chance is low', async function () {
     const node = createMockNode({})
-    const signedTicket = createMockSignedTicket({
+    const signedTicket = createMockTicket({
       winProb: Utils.computeWinningProbability(0.5)
     })
 
@@ -170,7 +154,7 @@ describe('unit test validateUnacknowledgedTicket', function () {
 
   it('should throw if there no channel open', async function () {
     const node = createMockNode({})
-    const signedTicket = createMockSignedTicket({})
+    const signedTicket = createMockTicket({})
 
     return expect(
       validateUnacknowledgedTicket(
@@ -187,7 +171,7 @@ describe('unit test validateUnacknowledgedTicket', function () {
 
   it('should throw if channel is not stored', async function () {
     const node = createMockNode({})
-    const signedTicket = createMockSignedTicket({})
+    const signedTicket = createMockTicket({})
 
     return expect(
       validateUnacknowledgedTicket(
@@ -206,7 +190,7 @@ describe('unit test validateUnacknowledgedTicket', function () {
     const node = createMockNode({
       ticketEpoch: new UINT256(new BN(2))
     })
-    const signedTicket = createMockSignedTicket({})
+    const signedTicket = createMockTicket({})
 
     return expect(
       validateUnacknowledgedTicket(node, SENDER, signedTicket, createMockChannel({}), getTicketsMock)
@@ -215,7 +199,7 @@ describe('unit test validateUnacknowledgedTicket', function () {
 
   it("should throw if ticket's channel iteration does not match the current channel iteration", async function () {
     const node = createMockNode({})
-    const signedTicket = createMockSignedTicket({
+    const signedTicket = createMockTicket({
       channelIteration: new UINT256(new BN(2))
     })
 
@@ -226,7 +210,7 @@ describe('unit test validateUnacknowledgedTicket', function () {
 
   it('should throw if channel does not have enough funds', async function () {
     const node = createMockNode({})
-    const signedTicket = createMockSignedTicket({})
+    const signedTicket = createMockTicket({})
 
     return expect(
       validateUnacknowledgedTicket(
@@ -244,9 +228,9 @@ describe('unit test validateUnacknowledgedTicket', function () {
 
   it('should throw if channel does not have enough funds when you include unredeemed tickets', async function () {
     const node = createMockNode({})
-    const signedTicket = createMockSignedTicket({})
+    const signedTicket = createMockTicket({})
     const ticketsInDb = [
-      createMockSignedTicket({
+      createMockTicket({
         amount: new Balance(new BN(100))
       })
     ]
@@ -259,7 +243,7 @@ describe('unit test validateUnacknowledgedTicket', function () {
 
 describe('unit test validateCreatedTicket', function () {
   it('should pass if ticket is okay', async function () {
-    const ticket = createMockSignedTicket({})
+    const ticket = createMockTicket({})
 
     return expect(
       validateCreatedTicket({
@@ -270,7 +254,7 @@ describe('unit test validateCreatedTicket', function () {
   })
 
   it('should throw when signer is not sender', async function () {
-    const ticket = createMockSignedTicket({})
+    const ticket = createMockTicket({})
 
     return expect(
       validateCreatedTicket({
