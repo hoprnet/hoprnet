@@ -1,4 +1,3 @@
-import type Chain from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '..'
 import { stringToU8a } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
@@ -106,7 +105,7 @@ const createMockNode = ({
       utils: Utils,
       types: { PublicKey }
     }
-  } as unknown) as Hopr<Chain>
+  } as unknown) as Hopr
 }
 
 const getTicketsMock = async (): Promise<Ticket[]> => []

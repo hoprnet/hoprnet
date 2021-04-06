@@ -1,7 +1,5 @@
 import secp256k1 from 'secp256k1'
 import PeerId from 'peer-id'
-
-import HoprCoreConnector, { Types } from '@hoprnet/hopr-core-connector-interface'
 import { Signature, Hash } from '@hoprnet/hopr-core-ethereum'
 
 import BN from 'bn.js'
@@ -11,9 +9,9 @@ import BN from 'bn.js'
  * the proposed funds in case the the next downstream node responds with an
  * inappropriate acknowledgement.
  */
-class Challenge<Chain extends HoprCoreConnector> extends Uint8Array {
+class Challenge extends Uint8Array {
   // private : Uint8Array
-  private _hashedKey: Types.Hash
+  private _hashedKey: Hash
   private _fee: BN
   private _counterparty: Uint8Array
 
@@ -23,7 +21,7 @@ class Challenge<Chain extends HoprCoreConnector> extends Uint8Array {
       offset: number
     },
     struct?: {
-      signature: Types.Signature
+      signature: Signature
     }
   ) {
     if (arr == null) {
@@ -42,7 +40,7 @@ class Challenge<Chain extends HoprCoreConnector> extends Uint8Array {
     return this.byteOffset
   }
 
-  get challengeSignature(): Types.Signature {
+  get challengeSignature(): Signature {
     return Signature.deserialize(
       new Uint8Array(this.buffer, this.challengeSignatureOffset, Signature.SIZE)
     )
@@ -58,7 +56,7 @@ class Challenge<Chain extends HoprCoreConnector> extends Uint8Array {
     return Signature.SIZE
   }
 
-  get hash(): Types.Hash {
+  get hash(): Hash {
     if (this._hashedKey == null) {
       throw Error(`Challenge was not set yet.`)
     }
@@ -70,7 +68,7 @@ class Challenge<Chain extends HoprCoreConnector> extends Uint8Array {
     return new Uint8Array(this.buffer, begin + this.byteOffset, end - begin)
   }
 
-  getCopy(): Challenge<Chain> {
+  getCopy(): Challenge {
     const arrCopy = new Uint8Array(Challenge.SIZE())
 
     arrCopy.set(this)
@@ -111,8 +109,8 @@ class Challenge<Chain extends HoprCoreConnector> extends Uint8Array {
    *
    * @param peerId that contains private key and public key of the node
    */
-  async sign(peerId: PeerId): Promise<Challenge<Chain>> {
-    const signature = await this.paymentChannels.utils.sign(this.hash.serialize(), peerId.privKey.marshal())
+  async sign(peerId: PeerId): Promise<Challenge> {
+    const signature = Signature.create(this.hash.serialize(), peerId.privKey.marshal())
     this.set(signature.serialize(), this.challengeSignatureOffset - this.byteOffset)
     return this
   }
@@ -123,15 +121,14 @@ class Challenge<Chain extends HoprCoreConnector> extends Uint8Array {
    * @param hashedKey that is used to generate the key half
    * @param fee
    */
-  static create<Chain extends HoprCoreConnector>(
-    hoprCoreConnector: Chain,
-    hashedKey: Types.Hash,
+  static create(
+    hashedKey: Hash,
     fee: BN,
     arr?: {
       bytes: ArrayBuffer
       offset: number
     }
-  ): Challenge<Chain> {
+  ): Challenge {
     if (arr == null) {
       const tmp = new Uint8Array(this.SIZE())
 
@@ -141,7 +138,7 @@ class Challenge<Chain extends HoprCoreConnector> extends Uint8Array {
       }
     }
 
-    const challenge = new Challenge(hoprCoreConnector, arr)
+    const challenge = new Challenge(arr)
 
     challenge._hashedKey = hashedKey
     challenge._fee = fee
@@ -162,11 +159,7 @@ class Challenge<Chain extends HoprCoreConnector> extends Uint8Array {
       throw Error('Unable to verify challenge without a public key.')
     }
 
-    return this.paymentChannels.utils.verify(
-      this.hash.serialize(),
-      await this.challengeSignature,
-      peerId.pubKey.marshal()
-    )
+    return this.challengeSignature.verify(this.hash.serialize(), peerId.pubKey.marshal())
   }
 }
 

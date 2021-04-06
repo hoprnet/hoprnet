@@ -10,22 +10,19 @@ import PeerId from 'peer-id'
  * and allows that party to compute the key that is necessary to redeem
  * the previously received transaction.
  */
-class Acknowledgement<Chain extends HoprCoreConnector> extends Uint8Array {
+class Acknowledgement extends Uint8Array {
   private _responseSigningParty?: Uint8Array
   private _responseSignature?: Types.Signature
   private _hashedKey?: Types.Hash
 
-  private paymentChannels: Chain
-
   constructor(
-    paymentChannels: Chain,
     arr?: {
       bytes: ArrayBuffer
       offset: number
     },
     struct?: {
       key: Uint8Array
-      challenge: Challenge<Chain>
+      challenge: Challenge
       signature?: Types.Signature
     }
   ) {
@@ -84,8 +81,8 @@ class Acknowledgement<Chain extends HoprCoreConnector> extends Uint8Array {
     return this.byteOffset + KEY_LENGTH
   }
 
-  get challenge(): Challenge<Chain> {
-    return new Challenge<Chain>(this.paymentChannels, {
+  get challenge(): Challenge {
+    return new Challenge(this.paymentChannels, {
       bytes: this.buffer,
       offset: this.challengeOffset
     })
@@ -139,7 +136,7 @@ class Acknowledgement<Chain extends HoprCoreConnector> extends Uint8Array {
     })
   }
 
-  async sign(peerId: PeerId): Promise<Acknowledgement<Chain>> {
+  async sign(peerId: PeerId): Promise<Acknowledgement> {
     const signature = await this.paymentChannels.utils.sign((await this.hash).serialize(), peerId.privKey.marshal())
     this.set(signature.serialize(), this.responseSignatureOffset - this.byteOffset)
     return this
@@ -163,10 +160,10 @@ class Acknowledgement<Chain extends HoprCoreConnector> extends Uint8Array {
    */
   static async create<Chain extends HoprCoreConnector>(
     hoprCoreConnector: Chain,
-    challenge: Challenge<Chain>,
+    challenge: Challenge,
     derivedSecret: Uint8Array,
     signer: PeerId
-  ): Promise<Acknowledgement<Chain>> {
+  ): Promise<Acknowledgement> {
     const ack = new Acknowledgement(hoprCoreConnector, {
       bytes: new Uint8Array(Acknowledgement.SIZE(hoprCoreConnector)),
       offset: 0
