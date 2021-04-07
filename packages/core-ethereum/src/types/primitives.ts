@@ -1,7 +1,13 @@
 import createKeccakHash from 'keccak'
 import { ADDRESS_LENGTH, HASH_LENGTH, SIGNATURE_LENGTH, SIGNATURE_RECOVERY_LENGTH } from '../constants'
 import { u8aToHex, u8aEquals, stringToU8a, moveDecimalPoint, u8aConcat } from '@hoprnet/hopr-utils'
-import type { Address as IAddress, Balance as IBalance, Hash as IHash, PublicKey as IPublicKey, Signature as ISignature } from '@hoprnet/hopr-core-connector-interface'
+import type {
+  Address as IAddress,
+  Balance as IBalance,
+  Hash as IHash,
+  PublicKey as IPublicKey,
+  Signature as ISignature
+} from '@hoprnet/hopr-core-connector-interface'
 import Web3 from 'web3'
 import BN from 'bn.js'
 import { publicKeyConvert, publicKeyCreate, ecdsaSign, ecdsaVerify } from 'secp256k1'

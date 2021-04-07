@@ -1,4 +1,4 @@
-import type { AccountEntry as IAccountEntry} from '@hoprnet/hopr-core-connector-interface'
+import type { AccountEntry as IAccountEntry } from '@hoprnet/hopr-core-connector-interface'
 import BN from 'bn.js'
 import { u8aSplit, serializeToU8a } from '@hoprnet/hopr-utils'
 import { Address } from '.' // TODO: cyclic dep
