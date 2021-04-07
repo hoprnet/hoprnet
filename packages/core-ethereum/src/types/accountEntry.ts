@@ -1,4 +1,4 @@
-import type { Types as Interfaces } from '@hoprnet/hopr-core-connector-interface'
+import type { AccountEntry as IAccountEntry} from '@hoprnet/hopr-core-connector-interface'
 import BN from 'bn.js'
 import { u8aSplit, serializeToU8a } from '@hoprnet/hopr-utils'
 import { Address } from '.' // TODO: cyclic dep
@@ -6,7 +6,7 @@ import { PublicKey } from '..'
 import { Hash } from '.'
 import { UINT256 } from './solidity'
 
-class AccountEntry implements Interfaces.AccountEntry {
+class AccountEntry implements IAccountEntry {
   constructor(
     public readonly address: Address,
     public readonly publicKey?: PublicKey,

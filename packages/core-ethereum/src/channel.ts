@@ -1,4 +1,4 @@
-import type { Channel as IChannel, Types as Interfaces } from '@hoprnet/hopr-core-connector-interface'
+import type { Channel as IChannel } from '@hoprnet/hopr-core-connector-interface'
 import type Connector from '.'
 import BN from 'bn.js'
 import { PublicKey, Balance, Hash, UINT256, Ticket, Acknowledgement, ChannelEntry } from './types'
@@ -42,7 +42,7 @@ class Channel implements IChannel {
     await this.connector.initOnchainValues()
 
     // channel may not exist, we can still open it
-    let state: Interfaces.ChannelEntry
+    let state: ChannelEntry
     try {
       state = await this.getState()
     } catch {}

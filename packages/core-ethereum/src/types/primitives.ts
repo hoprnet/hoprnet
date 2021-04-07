@@ -1,13 +1,13 @@
 import createKeccakHash from 'keccak'
 import { ADDRESS_LENGTH, HASH_LENGTH, SIGNATURE_LENGTH, SIGNATURE_RECOVERY_LENGTH } from '../constants'
 import { u8aToHex, u8aEquals, stringToU8a, moveDecimalPoint, u8aConcat } from '@hoprnet/hopr-utils'
-import type { Types as Interfaces } from '@hoprnet/hopr-core-connector-interface'
+import type { Address as IAddress, Balance as IBalance, Hash as IHash, PublicKey as IPublicKey, Signature as ISignature } from '@hoprnet/hopr-core-connector-interface'
 import Web3 from 'web3'
 import BN from 'bn.js'
 import { publicKeyConvert, publicKeyCreate, ecdsaSign, ecdsaVerify } from 'secp256k1'
 import { serializeToU8a, u8aSplit, u8aToNumber } from '@hoprnet/hopr-utils'
 
-export class Address implements Interfaces.Address {
+export class Address implements IAddress {
   constructor(private arr: Uint8Array) {}
 
   static get SIZE(): number {
@@ -32,7 +32,7 @@ export class Address implements Interfaces.Address {
   }
 }
 
-export class Balance implements Interfaces.Balance {
+export class Balance implements IBalance {
   constructor(private bn: BN) {}
 
   static get SYMBOL(): string {
@@ -61,7 +61,7 @@ export class Balance implements Interfaces.Balance {
   }
 }
 
-export class Hash implements Interfaces.Hash {
+export class Hash implements IHash {
   constructor(private arr: Uint8Array) {}
 
   static SIZE = HASH_LENGTH
@@ -96,7 +96,7 @@ export class Hash implements Interfaces.Hash {
   }
 }
 
-export class NativeBalance implements Interfaces.Balance {
+export class NativeBalance implements IBalance {
   constructor(private bn: BN) {}
 
   static get SYMBOL(): string {
@@ -125,7 +125,7 @@ export class NativeBalance implements Interfaces.Balance {
   }
 }
 
-export class PublicKey implements Interfaces.PublicKey {
+export class PublicKey implements IPublicKey {
   constructor(private arr: Uint8Array) {
     if (arr.length !== PublicKey.SIZE) {
       throw new Error('Incorrect size Uint8Array for compressed public key')
@@ -176,7 +176,7 @@ export class PublicKey implements Interfaces.PublicKey {
   }
 }
 
-export class Signature implements Interfaces.Signature {
+export class Signature implements ISignature {
   constructor(readonly signature: Uint8Array, readonly recovery: number) {}
 
   static deserialize(arr: Uint8Array): Signature {
