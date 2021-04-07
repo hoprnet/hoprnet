@@ -1,33 +1,26 @@
 import { u8aConcat } from '@hoprnet/hopr-utils'
-
-import { Hash, PublicKey } from '@hoprnet/hopr-core-ethereum'
-import HoprCoreConnector, { Types } from '@hoprnet/hopr-core-connector-interface'
+import { Hash, PublicKey, Ticket } from '@hoprnet/hopr-core-ethereum'
 import PeerId from 'peer-id'
 
-class UnacknowledgedTicket<Chain extends HoprCoreConnector> extends Uint8Array {
-  private _signedTicket: Types.Ticket
-  private _secretA: Types.Hash
-
-  private paymentChannels: Chain
+class UnacknowledgedTicket extends Uint8Array {
+  private _signedTicket: Ticket
+  private _secretA: Hash
 
   constructor(
-    paymentChannels: Chain,
     arr?: {
       bytes: ArrayBuffer
       offset: number
     },
     struct?: {
-      ticket: Types.Ticket
-      secretA: Types.Hash
+      ticket: Ticket
+      secretA: Hash
     }
   ) {
     if (arr == null) {
-      super(UnacknowledgedTicket.SIZE(paymentChannels))
+      super(UnacknowledgedTicket.SIZE())
     } else {
-      super(arr.bytes, arr.offset, UnacknowledgedTicket.SIZE(paymentChannels))
+      super(arr.bytes, arr.offset, UnacknowledgedTicket.SIZE())
     }
-
-    this.paymentChannels = paymentChannels
 
     if (struct != null) {
       this.set(struct.ticket.serialize(), this.signedTicketOffset - this.byteOffset)
@@ -38,11 +31,11 @@ class UnacknowledgedTicket<Chain extends HoprCoreConnector> extends Uint8Array {
     }
   }
 
-  slice(begin: number = 0, end: number = UnacknowledgedTicket.SIZE(this.paymentChannels)) {
+  slice(begin: number = 0, end: number = UnacknowledgedTicket.SIZE()) {
     return this.subarray(begin, end)
   }
 
-  subarray(begin: number = 0, end: number = UnacknowledgedTicket.SIZE(this.paymentChannels)): Uint8Array {
+  subarray(begin: number = 0, end: number = UnacknowledgedTicket.SIZE()): Uint8Array {
     return new Uint8Array(this.buffer, begin + this.byteOffset, end - begin)
   }
 
@@ -50,29 +43,25 @@ class UnacknowledgedTicket<Chain extends HoprCoreConnector> extends Uint8Array {
     return this.byteOffset
   }
 
-  get signedTicket(): Promise<Types.Ticket> {
+  get signedTicket(): Promise<Ticket> {
     if (this._signedTicket != null) {
       return Promise.resolve(this._signedTicket)
     }
 
-    return new Promise<Types.Ticket>(async (resolve) => {
-      this._signedTicket = await this.paymentChannels.types.Ticket.deserialize(
-        new Uint8Array(this.buffer, this.signedTicketOffset, this.paymentChannels.types.Ticket.SIZE)
-      )
+    return new Promise<Ticket>(async (resolve) => {
+      this._signedTicket = await Ticket.deserialize(new Uint8Array(this.buffer, this.signedTicketOffset, Ticket.SIZE))
 
       resolve(this._signedTicket)
     })
   }
 
   get secretAOffset(): number {
-    return this.byteOffset + this.paymentChannels.types.Ticket.SIZE
+    return this.byteOffset + Ticket.SIZE
   }
 
-  get secretA(): Types.Hash {
+  get secretA(): Hash {
     if (this._secretA == null) {
-      this._secretA = new this.paymentChannels.types.Hash(
-        new Uint8Array(this.buffer, this.secretAOffset, this.paymentChannels.types.Hash.SIZE)
-      )
+      this._secretA = new Hash(new Uint8Array(this.buffer, this.secretAOffset, Hash.SIZE))
     }
 
     return this._secretA
@@ -92,8 +81,8 @@ class UnacknowledgedTicket<Chain extends HoprCoreConnector> extends Uint8Array {
     return (await this.verifyChallenge(hashedKeyHalf)) && (await this.verifySignature(peerId))
   }
 
-  static SIZE<Chain extends HoprCoreConnector>(hoprCoreConnector: Chain): number {
-    return hoprCoreConnector.types.Ticket.SIZE + hoprCoreConnector.types.Hash.SIZE
+  static SIZE(): number {
+    return Ticket.SIZE + Hash.SIZE
   }
 }
 

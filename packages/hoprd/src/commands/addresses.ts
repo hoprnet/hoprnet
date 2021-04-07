@@ -1,4 +1,3 @@
-import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 import { AbstractCommand } from './abstractCommand'
 import type PeerId from 'peer-id'
@@ -6,7 +5,7 @@ import { checkPeerIdInput, styleValue } from './utils'
 import type { GlobalState } from './abstractCommand'
 
 export default class Addresses extends AbstractCommand {
-  constructor(public node: Hopr<HoprCoreConnector>) {
+  constructor(public node: Hopr) {
     super()
     this.hidden = true
   }

@@ -1,14 +1,12 @@
 import type Hopr from '../..'
-import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-
 import { PacketForwardInteraction } from './forward'
 import { PacketAcknowledgementInteraction } from './acknowledgement'
 
-class PacketInteractions<Chain extends HoprCoreConnector> {
-  acknowledgment: PacketAcknowledgementInteraction<Chain>
-  forward: PacketForwardInteraction<Chain>
+class PacketInteractions {
+  acknowledgment: PacketAcknowledgementInteraction
+  forward: PacketForwardInteraction
 
-  constructor(node: Hopr<Chain>) {
+  constructor(node: Hopr) {
     this.acknowledgment = new PacketAcknowledgementInteraction(node)
     this.forward = new PacketForwardInteraction(node)
   }

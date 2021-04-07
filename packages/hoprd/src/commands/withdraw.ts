@@ -1,4 +1,3 @@
-import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type { Currencies } from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 import { moveDecimalPoint } from '@hoprnet/hopr-utils'
@@ -8,7 +7,7 @@ import { styleValue } from './utils'
 export default class Withdraw extends AbstractCommand {
   private arguments = ['amount (ETH, HOPR)', 'currency (native, hopr)', 'recipient (blockchain address)']
 
-  constructor(public node: Hopr<HoprCoreConnector>) {
+  constructor(public node: Hopr) {
     super()
   }
 

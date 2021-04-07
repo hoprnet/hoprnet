@@ -4,7 +4,6 @@ import { Acknowledgement } from '../../messages/acknowledgement'
 import Debug from 'debug'
 import type PeerId from 'peer-id'
 import type { AbstractInteraction } from '../abstractInteraction'
-import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '../../'
 import pipe from 'it-pipe'
 import type { Connection, MuxedStream } from 'libp2p'
@@ -14,18 +13,18 @@ import { Mixer } from '../../mixer'
 const log = Debug('hopr-core:forward')
 const FORWARD_TIMEOUT = durations.seconds(6)
 
-class PacketForwardInteraction<Chain extends HoprCoreConnector> implements AbstractInteraction {
-  private mixer: Mixer<Chain>
+class PacketForwardInteraction implements AbstractInteraction {
+  private mixer: Mixer
   private concurrencyLimiter
   protocols: string[] = [PROTOCOL_STRING]
 
-  constructor(public node: Hopr<Chain>) {
+  constructor(public node: Hopr) {
     this.node._libp2p.handle(this.protocols, this.handler.bind(this))
     this.mixer = new Mixer(this.handleMixedPacket.bind(this))
     this.concurrencyLimiter = oneAtATime()
   }
 
-  async interact(counterparty: PeerId, packet: Packet<Chain>): Promise<void> {
+  async interact(counterparty: PeerId, packet: Packet): Promise<void> {
     const struct = await dialHelper(this.node._libp2p, counterparty, this.protocols[0], {
       timeout: FORWARD_TIMEOUT
     })
@@ -54,7 +53,7 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector> implements Abstr
     )
   }
 
-  async handleMixedPacket(packet: Packet<Chain>) {
+  async handleMixedPacket(packet: Packet) {
     const node = this.node
     const interact = this.interact.bind(this)
     this.concurrencyLimiter(async function () {
@@ -65,7 +64,7 @@ class PacketForwardInteraction<Chain extends HoprCoreConnector> implements Abstr
         const [sender, target] = await Promise.all([packet.getSenderPeerId(), packet.getTargetPeerId()])
 
         setImmediate(async () => {
-          const ack = new Acknowledgement(node.paymentChannels, undefined, {
+          const ack = new Acknowledgement(undefined, {
             key: ticketKey,
             challenge: receivedChallenge
           })

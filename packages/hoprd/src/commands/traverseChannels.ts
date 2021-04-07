@@ -1,10 +1,9 @@
-import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 import { AbstractCommand } from './abstractCommand'
 import type PeerID from 'peer-id'
 
 export default class TraverseChannels extends AbstractCommand {
-  constructor(public node: Hopr<HoprCoreConnector>) {
+  constructor(public node: Hopr) {
     super()
   }
 

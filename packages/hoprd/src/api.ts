@@ -1,9 +1,8 @@
 import type Hopr from '@hoprnet/hopr-core'
-import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import { Commands } from './commands'
 import bodyParser from 'body-parser'
 
-export default function setupAPI(node: Hopr<HoprCoreConnector>, logs: any, options: any) {
+export default function setupAPI(node: Hopr, logs: any, options: any) {
   const http = require('http')
   const service = require('restana')()
   service.use(bodyParser.text({ type: '*/*' }))

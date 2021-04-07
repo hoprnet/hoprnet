@@ -1,12 +1,11 @@
 import { Packet } from './messages/packet'
-import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import Heap from 'heap-js'
 import { randomInteger } from '@hoprnet/hopr-utils'
 import { MAX_PACKET_DELAY } from './constants'
 import debug from 'debug'
 const log = debug('hopr-core:mixer')
 
-type HeapElement = [number, Packet<any>]
+type HeapElement = [number, Packet]
 
 const comparator = (a: HeapElement, b: HeapElement): number => {
   if (b[0] < a[0]) {
@@ -23,17 +22,17 @@ const comparator = (a: HeapElement, b: HeapElement): number => {
  * Currently an MVP version, that simply adds a random interval to their
  * priority.
  */
-export class Mixer<Chain extends HoprCoreConnector> {
+export class Mixer {
   private queue: Heap<HeapElement>
   private next: NodeJS.Timeout
 
   public WAIT_TIME = MAX_PACKET_DELAY
 
-  constructor(private onMessage: (m: Packet<Chain>) => void, private clock = Date.now) {
+  constructor(private onMessage: (m: Packet) => void, private clock = Date.now) {
     this.queue = new Heap(comparator)
   }
 
-  public push(p: Packet<Chain>) {
+  public push(p: Packet) {
     this.queue.push([this.getPriority(), p])
     this.addTimeout()
   }

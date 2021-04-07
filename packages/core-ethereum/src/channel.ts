@@ -1,7 +1,7 @@
 import type { Channel as IChannel, Types as Interfaces } from '@hoprnet/hopr-core-connector-interface'
 import type Connector from '.'
 import BN from 'bn.js'
-import { PublicKey, Balance, Hash, UINT256, Ticket, AcknowledgedTicket } from './types'
+import { PublicKey, Balance, Hash, UINT256, Ticket, AcknowledgedTicket, ChannelEntry } from './types'
 import { getId, waitForConfirmation, computeWinningProbability, checkChallenge, isWinningTicket } from './utils'
 import Debug from 'debug'
 
@@ -18,7 +18,7 @@ class Channel implements IChannel {
     return getId(await this.self.toAddress(), await this.counterparty.toAddress())
   }
 
-  async getState() {
+  async getState(): Promise<ChannelEntry> {
     const channelId = await this.getId()
     const state = await this.connector.indexer.getChannel(channelId)
     if (state) return state

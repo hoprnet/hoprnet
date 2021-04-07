@@ -1,6 +1,4 @@
 import Hopr from '../..'
-import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-import HoprEthereum from '@hoprnet/hopr-core-ethereum'
 import assert from 'assert'
 import { u8aEquals, durations } from '@hoprnet/hopr-utils'
 import { MAX_HOPS } from '../../constants'
@@ -23,17 +21,12 @@ const TICKET_WIN_PROB = 1 // 100%
  * @param bootstrapNode set to true to create a bootstrap node
  * @param bootstrapServers specify a list of bootstrap server
  */
-async function generateNode(
-  id: number,
-  bootstrapNode: boolean,
-  bootstrapServers?: Multiaddr[]
-): Promise<Hopr<HoprEthereum>> {
+async function generateNode(id: number, bootstrapNode: boolean, bootstrapServers?: Multiaddr[]): Promise<Hopr> {
   // Start HOPR in DEBUG_MODE and use demo seeds
   return (await Hopr.create({
     id,
     peerId: await privKeyToPeerId(NODE_SEEDS[id]),
     db: new LevelUp(MemDown()),
-    connector: HoprEthereum,
     provider: GANACHE_URI,
     network: 'ethereum',
     debug: true,
@@ -41,7 +34,7 @@ async function generateNode(
     ticketWinProb: TICKET_WIN_PROB,
     bootstrapNode,
     bootstrapServers
-  })) as Hopr<HoprEthereum>
+  })) as Hopr
 }
 
 /**
@@ -49,7 +42,7 @@ async function generateNode(
  * @param a first party
  * @param b second party
  */
-async function openChannel(a: Hopr<HoprEthereum>, b: Hopr<HoprEthereum>) {
+async function openChannel(a: Hopr, b: Hopr) {
   await a.openChannel(b.getId(), CHANNEL_DEPOSIT)
 }
 
@@ -61,7 +54,7 @@ const NOOP = () => {}
  * Used to remove the receive checker after successfully receiving all messages
  * @param nodes node instances to clean up
  */
-function cleanUpReceiveChecker<Chain extends HoprCoreConnector>(nodes: Hopr<Chain>[]) {
+function cleanUpReceiveChecker(nodes: Hopr[]) {
   for (const node of nodes) {
     node.output = NOOP
   }
@@ -72,7 +65,7 @@ function cleanUpReceiveChecker<Chain extends HoprCoreConnector>(nodes: Hopr<Chai
  * @param msgs messages to check reception
  * @param node instance that should receive the messages
  */
-function receiveChecker<Chain extends HoprCoreConnector>(msgs: Uint8Array[], node: Hopr<Chain>) {
+function receiveChecker(msgs: Uint8Array[], node: Hopr) {
   const remainingMessages = msgs.slice()
 
   return new Promise<void>((resolve) => {
@@ -104,7 +97,7 @@ describe('test packet composition and decomposition', function () {
       Array.from({ length: MAX_HOPS + 1 }).map((_value, index) => generateNode(index + 1, false, bsAddresses.slice(1)))
     )
 
-    connectionHelper(nodes.map((n: Hopr<HoprEthereum>) => n._libp2p))
+    connectionHelper(nodes.map((n: Hopr) => n._libp2p))
 
     const queries: [first: number, second: number][] = []
 
@@ -153,6 +146,6 @@ describe('test packet composition and decomposition', function () {
 
     await new Promise((resolve) => setTimeout(resolve, 700))
 
-    await Promise.all(nodes.map((node: Hopr<HoprEthereum>) => node.stop()))
+    await Promise.all(nodes.map((node: Hopr) => node.stop()))
   })
 })

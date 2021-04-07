@@ -7,10 +7,7 @@ import PeerId from 'peer-id'
 import debug from 'debug'
 const log = debug('hopr-core:acknowledgement')
 const error = debug('hopr-core:acknowledgement:error')
-
 import { green, red, blue, yellow } from 'chalk'
-
-import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '../../'
 import { Acknowledgement } from '../../messages/acknowledgement'
 
@@ -35,12 +32,10 @@ const ONE = toU8a(1, 8)
 
 const ACKNOWLEDGEMENT_TIMEOUT = durations.seconds(2)
 
-class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
-  extends EventEmitter
-  implements AbstractInteraction {
+class PacketAcknowledgementInteraction extends EventEmitter implements AbstractInteraction {
   protocols: string[] = [PROTOCOL_ACKNOWLEDGEMENT]
 
-  constructor(public node: Hopr<Chain>) {
+  constructor(public node: Hopr) {
     super()
     this.node._libp2p.handle(this.protocols, this.handler.bind(this))
   }
@@ -49,7 +44,7 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
     pipe(struct.stream, this.handleHelper.bind(this))
   }
 
-  async interact(counterparty: PeerId, acknowledgement: Acknowledgement<Chain>): Promise<void> {
+  async interact(counterparty: PeerId, acknowledgement: Acknowledgement): Promise<void> {
     const struct = await dialHelper(this.node._libp2p, counterparty, this.protocols[0], {
       timeout: ACKNOWLEDGEMENT_TIMEOUT
     })
@@ -64,7 +59,7 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
   async handleHelper(source: AsyncIterable<Uint8Array>): Promise<void> {
     for await (const msg of source) {
       const arr = msg.slice()
-      const acknowledgement = new Acknowledgement(this.node.paymentChannels, {
+      const acknowledgement = new Acknowledgement({
         bytes: arr.buffer,
         offset: arr.byteOffset
       })
@@ -91,7 +86,7 @@ class PacketAcknowledgementInteraction<Chain extends HoprCoreConnector>
       }
 
       if (tmp.length > 0) {
-        const unacknowledgedTicket = new UnacknowledgedTicket(this.node.paymentChannels, {
+        const unacknowledgedTicket = new UnacknowledgedTicket({
           bytes: tmp.buffer,
           offset: tmp.byteOffset
         })
