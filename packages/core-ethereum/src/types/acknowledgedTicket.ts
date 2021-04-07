@@ -14,16 +14,8 @@ class Acknowledgement implements IAcknowledgement {
   }
 
   static deserialize(arr: Uint8Array) {
-    const components = u8aSplit(arr, [
-      Ticket.SIZE,
-      Hash.SIZE,
-      Hash.SIZE
-    ])
-    return new Acknowledgement(
-      Ticket.deserialize(components[0]),
-      new Hash(components[1]),
-      new Hash(components[2])
-    )
+    const components = u8aSplit(arr, [Ticket.SIZE, Hash.SIZE, Hash.SIZE])
+    return new Acknowledgement(Ticket.deserialize(components[0]), new Hash(components[1]), new Hash(components[2]))
   }
 
   static get SIZE(): number {
