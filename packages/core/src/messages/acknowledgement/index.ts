@@ -22,13 +22,13 @@ class AcknowledgementMessage {
   static deserialize(arr: Uint8Array) {
     const components = u8aSplit(arr, [
      KEY_LENGTH,
-     Challenge.SIZE,
+     Challenge.SIZE(),
      Signature.SIZE
     ])
     return new AcknowledgementMessage(
       components[0],
       new Challenge({ bytes: components[1], offset: components[1].byteOffset }), 
-      components[2]
+      Signature.deserialize(components[2]),
     )
   }
 
@@ -36,7 +36,7 @@ class AcknowledgementMessage {
     return serializeToU8a([
       [this.key, KEY_LENGTH],
       [this.challenge, Challenge.SIZE()],
-      [this.signature, Signature.SIZE] 
+      [this.signature.serialize(), Signature.SIZE] 
     ])
   }
 

@@ -7,8 +7,8 @@ import BN from 'bn.js'
  * @param ackTickets
  * @returns a promise that resolves into an array of signed tickets
  */
-export async function toSignedTickets(ackTickets: Types.AcknowledgedTicket[]): Promise<Types.Ticket[]> {
-  return Promise.all(ackTickets.map((ackTicket) => ackTicket.signedTicket))
+export async function toSignedTickets(ackTickets: Types.Acknowledgement[]): Promise<Types.Ticket[]> {
+  return Promise.all(ackTickets.map((ackTicket) => ackTicket.ticket))
 }
 
 /**

@@ -1,6 +1,6 @@
 import { Hash, Ticket } from '.'
 import { Acknowledgement as IAcknowledgement } from '@hoprnet/hopr-core-connector-interface'
-import { serializeToU8a } from '@hoprnet/hopr-utils'
+import { serializeToU8a, u8aSplit } from '@hoprnet/hopr-utils'
 
 class Acknowledgement implements IAcknowledgement {
   constructor(readonly ticket: Ticket, readonly response: Hash, readonly preImage: Hash) {}
@@ -11,6 +11,19 @@ class Acknowledgement implements IAcknowledgement {
       [this.response.serialize(), Hash.SIZE],
       [this.preImage.serialize(), Hash.SIZE]
     ])
+  }
+
+  static deserialize(arr: Uint8Array) {
+    const components = u8aSplit(arr, [
+      Ticket.SIZE,
+      Hash.SIZE,
+      Hash.SIZE
+    ])
+    return new Acknowledgement(
+      Ticket.deserialize(components[0]),
+      new Hash(components[1]),
+      new Hash(components[2])
+    )
   }
 
   static get SIZE(): number {

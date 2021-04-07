@@ -98,13 +98,10 @@ export async function getAcknowledgements(
         if (value.buffer.byteLength !== Acknowledgement.SIZE) return
 
         const index = node._dbKeys.AcknowledgedTicketsParse(key)
-        const ackTicket = Acknowledgement.create({
-          bytes: value.buffer,
-          offset: value.byteOffset
-        })
+        const ackTicket = Acknowledgement.deserialize(value)
 
         // if signer provided doesn't match our ticket's signer dont add it to the list
-        if (filter?.signer && !u8aEquals((await ackTicket.signedTicket).getSigner().serialize(), filter.signer)) {
+        if (filter?.signer && !u8aEquals((await ackTicket.ticket).getSigner().serialize(), filter.signer)) {
           return
         }
 
@@ -134,7 +131,7 @@ export async function deleteAcknowledgements(
         return {
           type: 'del',
           key: Buffer.from(
-            node._dbKeys.AcknowledgedTickets((await ack.ackTicket.signedTicket).challenge.serialize())
+            node._dbKeys.AcknowledgedTickets((await ack.ackTicket.ticket).challenge.serialize())
           )
         }
       })
@@ -152,7 +149,7 @@ export async function updateAcknowledgement(
   ackTicket: Acknowledgement,
   index: Uint8Array
 ): Promise<void> {
-  await node.db.put(Buffer.from(node._dbKeys.AcknowledgedTickets(index)), Buffer.from(ackTicket))
+  await node.db.put(Buffer.from(node._dbKeys.AcknowledgedTickets(index)), Buffer.from(ackTicket.serialize()))
 }
 
 /**
@@ -175,22 +172,14 @@ export async function submitAcknowledgedTicket(
 ): Promise<SubmitTicketResponse> {
   try {
     const ethereum = node.paymentChannels
-    const signedTicket = await ackTicket.signedTicket
+    const signedTicket = await ackTicket.ticket
     const self = ethereum.account.keys.onChain.pubKey
     const counterparty = signedTicket.getSigner()
     const channel = new ethereum.channel(ethereum, self, counterparty)
 
     const result = await channel.submitTicket(ackTicket)
-    if (result.status === 'SUCCESS') {
-      ackTicket.redeemed = true
-      await updateAcknowledgement(node, ackTicket, index)
-    } else if (result.status === 'FAILURE') {
-      await deleteAcknowledgement(node, index)
-    } else if (result.status === 'ERROR') {
-      await deleteAcknowledgement(node, index)
-      // @TODO: better handle this
-    }
-
+    // TODO look at result.status and actually do something
+    await deleteAcknowledgement(node, index)
     return result
   } catch (err) {
     return {
@@ -215,7 +204,7 @@ export async function getTickets(
   return Promise.all([getUnacknowledgedTickets(node, filter), getAcknowledgements(node, filter)]).then(
     async ([unAcks, acks]) => {
       const unAckTickets = await Promise.all(unAcks.map((o) => o.signedTicket))
-      const ackTickets = await Promise.all(acks.map((o) => o.ackTicket.signedTicket))
+      const ackTickets = await Promise.all(acks.map((o) => o.ackTicket.ticket))
 
       return [...unAckTickets, ...ackTickets]
     }
