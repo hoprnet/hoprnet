@@ -46,9 +46,7 @@ describe('HoprDistributor', function () {
     beforeEach(async function () {
       const blockNumber = ethers.BigNumber.from(await getLatestBlockTimestamp())
       const startTime = blockNumber.add(durations.minutes(5))
-      console.log('fixtures')
       f = await useFixtures({ startTime: startTime.toString() })
-      console.log('fixtures done')
     })
 
     it('should update start time', async function () {

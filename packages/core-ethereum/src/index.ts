@@ -21,7 +21,6 @@ import debug from 'debug'
 
 const HoprChannelsAbi = abis.HoprChannels
 const HoprTokenAbi = abis.HoprToken
-const addresses = getAddresses()
 
 const log = debug('hopr-core-ethereum')
 let provider: WebsocketProvider
@@ -189,7 +188,7 @@ export default class HoprEthereum implements HoprCoreConnector {
 
   public smartContractInfo(): string {
     const network = utils.getNetworkName(this.chainId)
-    const addr = addresses[network]
+    const addr = getAddresses()[network]
     return [`Running on: ${network}`, `HOPR Token: ${addr.HoprToken}`, `HOPR Channels: ${addr.HoprChannels}`].join('\n')
   }
 
@@ -218,6 +217,7 @@ export default class HoprEthereum implements HoprCoreConnector {
     })
 
     const web3 = new Web3(provider)
+    const addresses = getAddresses()
 
     const chainId = await utils.getChainId(web3)
     const network = utils.getNetworkName(chainId) as Networks
