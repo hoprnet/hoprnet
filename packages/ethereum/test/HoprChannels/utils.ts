@@ -17,7 +17,7 @@ const { solidityPack, solidityKeccak256 } = ethers.utils
  * @param percent
  */
 export const percentToUint256 = (percent: number): string => {
-  return ethers.constants.MaxUint256.mul(percent).div(100).toHexString()
+  return ethers.utils.hexZeroPad(ethers.utils.hexlify(ethers.constants.MaxUint256.mul(percent).div(100)), 32)
 }
 
 /**
@@ -85,10 +85,10 @@ export const createTicket = async (
     encoded,
     hash,
     luck,
-    r: r,
-    s: s,
-    v: v + 27, // why add 27? https://bitcoin.stackexchange.com/a/38909
-    signature: signature,
+    r,
+    s,
+    v,
+    signature,
     counterparty: account.address
   }
 }

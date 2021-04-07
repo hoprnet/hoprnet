@@ -1,17 +1,16 @@
 import { deployments, ethers } from 'hardhat'
 import { expect } from 'chai'
-import { singletons } from '@openzeppelin/test-helpers'
-import { vmErrorMessage } from '../utils'
 import { ACCOUNT_A, ACCOUNT_B, ACCOUNT_AB_CHANNEL_ID, SECRET_2, generateTickets, SECRET_0 } from './constants'
 import { ERC777Mock__factory, TicketsMock__factory } from '../../types'
+import deployERC1820Registry from '../../deploy/01_ERC1820Registry'
 
 const abiEncoder = ethers.utils.Interface.getAbiCoder()
 
-const useFixtures = deployments.createFixture(async (_deployments, { secsClosure }: { secsClosure?: string } = {}) => {
+const useFixtures = deployments.createFixture(async (hre, { secsClosure }: { secsClosure?: string } = {}) => {
   const [deployer] = await ethers.getSigners()
 
   // deploy ERC1820Registry required by ERC777 token
-  await singletons.ERC1820Registry(deployer)
+  await deployERC1820Registry(hre, deployer)
 
   // deploy ERC777Mock
   const token = await new ERC777Mock__factory(deployer).deploy(deployer.address, '100', 'Token', 'TKN', [])
@@ -69,7 +68,7 @@ describe('Tickets', function () {
 
     await tickets.initializeAccountInternal(ACCOUNT_B.address, ACCOUNT_B.uncompressedPublicKey, SECRET_2)
 
-    expect(
+    await expect(
       tickets.redeemTicketInternal(
         TICKET_AB_WIN.recipient,
         TICKET_AB_WIN.counterparty,
@@ -81,7 +80,7 @@ describe('Tickets', function () {
         TICKET_AB_WIN.s,
         TICKET_AB_WIN.v
       )
-    ).to.be.revertedWith(vmErrorMessage('channel must be open or pending to close'))
+    ).to.be.revertedWith('channel must be open or pending to close')
   })
 
   it('should fail to redeem ticket when channel in in different iteration', async function () {
@@ -109,7 +108,7 @@ describe('Tickets', function () {
     await tickets.fundChannelInternal(deployer, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
     await tickets.openChannelInternal(ACCOUNT_A.address, ACCOUNT_B.address)
 
-    expect(
+    await expect(
       tickets.redeemTicketInternal(
         TICKET_AB_WIN.recipient,
         TICKET_AB_WIN.counterparty,
@@ -121,7 +120,7 @@ describe('Tickets', function () {
         TICKET_AB_WIN.s,
         TICKET_AB_WIN.v
       )
-    ).to.be.revertedWith(vmErrorMessage('signer must match the counterparty'))
+    ).to.be.revertedWith('signer must match the counterparty')
   })
 
   it('should fail to redeem ticket when ticket has been already redeemed', async function () {
@@ -143,7 +142,7 @@ describe('Tickets', function () {
       TICKET_AB_WIN.v
     )
 
-    expect(
+    await expect(
       tickets.redeemTicketInternal(
         TICKET_AB_WIN.recipient,
         TICKET_AB_WIN.counterparty,
@@ -155,7 +154,7 @@ describe('Tickets', function () {
         TICKET_AB_WIN.s,
         TICKET_AB_WIN.v
       )
-    ).to.be.revertedWith(vmErrorMessage('ticket must not be used twice'))
+    ).to.be.revertedWith('ticket must not be used twice')
   })
 
   it('should fail to redeem ticket when signer is not the issuer', async function () {
@@ -165,7 +164,7 @@ describe('Tickets', function () {
     await tickets.fundChannelInternal(deployer, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
     await tickets.openChannelInternal(ACCOUNT_A.address, ACCOUNT_B.address)
 
-    expect(
+    await expect(
       tickets.redeemTicketInternal(
         TICKET_AB_WIN.recipient,
         TICKET_AB_WIN.counterparty,
@@ -177,7 +176,7 @@ describe('Tickets', function () {
         TICKET_BA_WIN.s, // signature from different ticket
         TICKET_AB_WIN.v
       )
-    ).to.be.revertedWith(vmErrorMessage('signer must match the counterparty'))
+    ).to.be.revertedWith('signer must match the counterparty')
   })
 
   it("should fail to redeem ticket if it's a loss", async function () {
@@ -187,7 +186,7 @@ describe('Tickets', function () {
     await tickets.fundChannelInternal(deployer, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
     await tickets.openChannelInternal(ACCOUNT_A.address, ACCOUNT_B.address)
 
-    expect(
+    await expect(
       tickets.redeemTicketInternal(
         TICKET_AB_LOSS.recipient,
         TICKET_AB_LOSS.counterparty,
@@ -199,7 +198,7 @@ describe('Tickets', function () {
         TICKET_AB_LOSS.s,
         TICKET_AB_LOSS.v
       )
-    ).to.be.revertedWith(vmErrorMessage('ticket must be a win'))
+    ).to.be.revertedWith('ticket must be a win')
   })
 
   it('should pack ticket', async function () {

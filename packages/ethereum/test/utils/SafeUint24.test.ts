@@ -15,8 +15,8 @@ const useFixtures = deployments.createFixture(async () => {
 
 describe('SafeMath', function () {
   async function testCommutative(fn, lhs, rhs, expected) {
-    expect((await fn(lhs, rhs)).toString()).to.be.equal(expected.toString())
-    expect((await fn(rhs, lhs)).toString()).to.be.equal(expected.toString())
+    expect(await fn(lhs, rhs)).to.be.equal(expected)
+    expect(await fn(rhs, lhs)).to.be.equal(expected)
   }
 
   async function testFailsCommutative(fn, lhs, rhs, reason) {

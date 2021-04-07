@@ -1,18 +1,16 @@
-import type { HoprToken__factory } from '../types'
 import { expect } from 'chai'
 import { deployments, ethers } from 'hardhat'
-import { singletons } from '@openzeppelin/test-helpers'
-import { vmErrorMessage } from './utils'
+import deployERC1820Registry from '../deploy/01_ERC1820Registry'
+import { HoprToken__factory } from '../types'
 
-const useFixtures = deployments.createFixture(async () => {
-  const HoprToken = (await ethers.getContractFactory('HoprToken')) as HoprToken__factory
+const useFixtures = deployments.createFixture(async (hre) => {
   const [deployer, userA] = await ethers.getSigners()
 
   // deploy ERC1820Registry required by ERC777 token
-  await singletons.ERC1820Registry(deployer)
+  await deployERC1820Registry(hre, deployer)
 
   // deploy ChannelsMock
-  const token = await HoprToken.deploy()
+  const token = await new HoprToken__factory(deployer).deploy()
 
   // allow deployet to mint tokens
   await token.grantRole(await token.MINTER_ROLE(), deployer.address)
@@ -41,23 +39,22 @@ describe('HoprToken', function () {
     const { token } = await useFixtures()
 
     const totalSupply = await token.totalSupply()
-    expect(totalSupply.isZero()).to.be.true('wrong total supply')
+    expect(totalSupply.isZero()).to.be.true
   })
 
   it('should fail mint', async function () {
     const { token, userA } = await useFixtures()
-    expect(
-      token.mint(userA, 1, '0x00', '0x00', {
-        from: userA
-      })
-    ).to.be.revertedWith(vmErrorMessage('caller does not have minter role'))
+
+    await expect(token.connect(userA).mint(userA, 1, '0x00', '0x00')).to.be.revertedWith(
+      'caller does not have minter role'
+    )
   })
 
   it("'deployer' should be a minter", async function () {
     const { token, deployer } = await useFixtures()
     const minterRole = await token.MINTER_ROLE()
 
-    expect(await token.hasRole(minterRole, deployer)).to.be.true('wrong minter')
+    expect(await token.hasRole(minterRole, deployer)).to.be.true
   })
 
   it(`should mint 100 HOPR for 'deployer'`, async function () {

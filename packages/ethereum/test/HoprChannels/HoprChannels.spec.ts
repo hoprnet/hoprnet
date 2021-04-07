@@ -1,7 +1,8 @@
 import { deployments, ethers } from 'hardhat'
-import { time } from '@openzeppelin/test-helpers'
 import { expect } from 'chai'
+import { durations } from '@hoprnet/hopr-utils'
 import { createTicket } from './utils'
+import { PromiseValue, increaseTime } from '../utils'
 import {
   ACCOUNT_A,
   ACCOUNT_B,
@@ -15,12 +16,13 @@ import {
   SECRET_0
 } from './constants'
 import { HoprToken__factory, HoprChannels__factory } from '../../types'
-import { AsyncReturnType } from 'type-fest'
 
 const abiEncoder = ethers.utils.Interface.getAbiCoder()
 
-const useFixtures = deployments.createFixture(async ({ ethers }) => {
+const useFixtures = deployments.createFixture(async () => {
   const [deployer] = await ethers.getSigners()
+  const accountA = await ethers.getSigner(ACCOUNT_A.address)
+  const accountB = await ethers.getSigner(ACCOUNT_B.address)
 
   // run migrations
   await deployments.fixture()
@@ -33,11 +35,11 @@ const useFixtures = deployments.createFixture(async ({ ethers }) => {
 
   // create deployer the minter
   const minterRole = await hoprToken.MINTER_ROLE()
-  await hoprToken.grantRole(minterRole, deployer.address)
+  await hoprToken.connect(deployer).grantRole(minterRole, deployer.address)
 
   // mint tokens for accountA and accountB
-  await hoprToken.mint(ACCOUNT_A.address, '100', '0x0', '0x0')
-  await hoprToken.mint(ACCOUNT_B.address, '100', '0x0', '0x0')
+  await hoprToken.connect(deployer).mint(ACCOUNT_A.address, '100', ethers.constants.HashZero, ethers.constants.HashZero)
+  await hoprToken.connect(deployer).mint(ACCOUNT_B.address, '100', ethers.constants.HashZero, ethers.constants.HashZero)
 
   // mocked tickets
   const mockedTickets = await generateTickets()
@@ -46,23 +48,19 @@ const useFixtures = deployments.createFixture(async ({ ethers }) => {
     hoprToken,
     hoprChannels,
     deployer,
+    accountA,
+    accountB,
     ...mockedTickets
   }
 })
 
 describe('HoprChannels', function () {
   it('should fund one direction', async function () {
-    const { hoprToken, hoprChannels } = await useFixtures()
+    const { hoprToken, hoprChannels, accountA } = await useFixtures()
 
-    await hoprToken.approve(hoprChannels.address, '70', {
-      from: ACCOUNT_A.address
-    })
+    await hoprToken.connect(accountA).approve(hoprChannels.address, '70')
 
-    expect(
-      hoprChannels.fundChannel(ACCOUNT_A.address, ACCOUNT_B.address, '70', {
-        from: ACCOUNT_A.address
-      })
-    )
+    await expect(hoprChannels.connect(accountA).fundChannel(ACCOUNT_A.address, ACCOUNT_B.address, '70'))
       .to.emit(hoprChannels, 'ChannelFunded')
       .withArgs(ACCOUNT_A.address, ACCOUNT_B.address, ACCOUNT_A.address, '70', '70')
 
@@ -78,17 +76,11 @@ describe('HoprChannels', function () {
   })
 
   it('should fund both directions', async function () {
-    const { hoprToken, hoprChannels } = await useFixtures()
+    const { hoprToken, hoprChannels, accountA } = await useFixtures()
 
-    await hoprToken.approve(hoprChannels.address, '100', {
-      from: ACCOUNT_A.address
-    })
+    await hoprToken.connect(accountA).approve(hoprChannels.address, '100')
 
-    expect(
-      hoprChannels.fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30', {
-        from: ACCOUNT_A.address
-      })
-    )
+    await expect(hoprChannels.connect(accountA).fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30'))
       .to.emit(hoprChannels, 'ChannelFunded')
       .withArgs(ACCOUNT_A.address, ACCOUNT_B.address, ACCOUNT_A.address, '100', '70')
 
@@ -104,17 +96,11 @@ describe('HoprChannels', function () {
   })
 
   it('should fund and open channel', async function () {
-    const { hoprToken, hoprChannels } = await useFixtures()
+    const { hoprToken, hoprChannels, accountA } = await useFixtures()
 
-    await hoprToken.approve(hoprChannels.address, '70', {
-      from: ACCOUNT_A.address
-    })
+    await hoprToken.connect(accountA).approve(hoprChannels.address, '70')
 
-    expect(
-      hoprChannels.fundAndOpenChannel(ACCOUNT_A.address, ACCOUNT_B.address, '70', '0', {
-        from: ACCOUNT_A.address
-      })
-    )
+    await expect(hoprChannels.connect(accountA).fundAndOpenChannel(ACCOUNT_A.address, ACCOUNT_B.address, '70', '0'))
       .to.emit(hoprChannels, 'ChannelFunded')
       .withArgs(ACCOUNT_A.address, ACCOUNT_B.address, ACCOUNT_A.address, '70', '70')
       .and.to.emit(hoprChannels, 'ChannelOpened')
@@ -132,17 +118,11 @@ describe('HoprChannels', function () {
   })
 
   it('should fund and open channel by accountB', async function () {
-    const { hoprToken, hoprChannels } = await useFixtures()
+    const { hoprToken, hoprChannels, accountB } = await useFixtures()
 
-    await hoprToken.approve(hoprChannels.address, '70', {
-      from: ACCOUNT_B.address
-    })
+    await hoprToken.connect(accountB).approve(hoprChannels.address, '70')
 
-    expect(
-      hoprChannels.fundAndOpenChannel(ACCOUNT_A.address, ACCOUNT_B.address, '70', '0', {
-        from: ACCOUNT_B.address
-      })
-    )
+    await expect(hoprChannels.connect(accountB).fundAndOpenChannel(ACCOUNT_A.address, ACCOUNT_B.address, '70', '0'))
       .to.emit(hoprChannels, 'ChannelFunded')
       .withArgs(ACCOUNT_A.address, ACCOUNT_B.address, ACCOUNT_B.address, '70', '70')
       .and.to.emit(hoprChannels, 'ChannelOpened')
@@ -160,17 +140,16 @@ describe('HoprChannels', function () {
   })
 
   it('should fund using send', async function () {
-    const { hoprToken, hoprChannels } = await useFixtures()
+    const { hoprToken, hoprChannels, accountA } = await useFixtures()
 
-    expect(
-      hoprToken.send(
-        hoprChannels.address,
-        '70',
-        abiEncoder.encode(['bool', 'address', 'address'], [false, ACCOUNT_A.address, ACCOUNT_B.address]),
-        {
-          from: ACCOUNT_A.address
-        }
-      )
+    await expect(
+      hoprToken
+        .connect(accountA)
+        .send(
+          hoprChannels.address,
+          '70',
+          abiEncoder.encode(['bool', 'address', 'address'], [false, ACCOUNT_A.address, ACCOUNT_B.address])
+        )
     )
       .to.emit(hoprChannels, 'ChannelFunded')
       .withArgs(ACCOUNT_A.address, ACCOUNT_B.address, ACCOUNT_A.address, '70', '70')
@@ -187,17 +166,16 @@ describe('HoprChannels', function () {
   })
 
   it('should fund and open using send', async function () {
-    const { hoprToken, hoprChannels } = await useFixtures()
+    const { hoprToken, hoprChannels, accountA } = await useFixtures()
 
-    expect(
-      hoprToken.send(
-        hoprChannels.address,
-        '70',
-        abiEncoder.encode(['bool', 'address', 'address'], [true, ACCOUNT_A.address, ACCOUNT_B.address]),
-        {
-          from: ACCOUNT_A.address
-        }
-      )
+    await expect(
+      hoprToken
+        .connect(accountA)
+        .send(
+          hoprChannels.address,
+          '70',
+          abiEncoder.encode(['bool', 'address', 'address'], [true, ACCOUNT_A.address, ACCOUNT_B.address])
+        )
     )
       .to.emit(hoprChannels, 'ChannelFunded')
       .withArgs(ACCOUNT_A.address, ACCOUNT_B.address, ACCOUNT_A.address, '70', '70')
@@ -214,20 +192,19 @@ describe('HoprChannels', function () {
   })
 
   it('should fund both parties using send', async function () {
-    const { hoprToken, hoprChannels } = await useFixtures()
+    const { hoprToken, hoprChannels, accountA } = await useFixtures()
 
-    expect(
-      hoprToken.send(
-        hoprChannels.address,
-        '100',
-        abiEncoder.encode(
-          ['bool', 'address', 'address', 'uint256', 'uint256'],
-          [false, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30']
-        ),
-        {
-          from: ACCOUNT_A.address
-        }
-      )
+    await expect(
+      hoprToken
+        .connect(accountA)
+        .send(
+          hoprChannels.address,
+          '100',
+          abiEncoder.encode(
+            ['bool', 'address', 'address', 'uint256', 'uint256'],
+            [false, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30']
+          )
+        )
     )
       .to.emit(hoprChannels, 'ChannelFunded')
       .withArgs(ACCOUNT_A.address, ACCOUNT_B.address, ACCOUNT_A.address, '100', '70')
@@ -244,20 +221,19 @@ describe('HoprChannels', function () {
   })
 
   it('should fund both parties and open using send', async function () {
-    const { hoprToken, hoprChannels } = await useFixtures()
+    const { hoprToken, hoprChannels, accountA } = await useFixtures()
 
-    expect(
-      hoprToken.send(
-        hoprChannels.address,
-        '100',
-        abiEncoder.encode(
-          ['bool', 'address', 'address', 'uint256', 'uint256'],
-          [true, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30']
-        ),
-        {
-          from: ACCOUNT_A.address
-        }
-      )
+    await expect(
+      hoprToken
+        .connect(accountA)
+        .send(
+          hoprChannels.address,
+          '100',
+          abiEncoder.encode(
+            ['bool', 'address', 'address', 'uint256', 'uint256'],
+            [true, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30']
+          )
+        )
     )
       .to.emit(hoprChannels, 'ChannelFunded')
       .withArgs(ACCOUNT_A.address, ACCOUNT_B.address, ACCOUNT_A.address, '100', '70')
@@ -275,7 +251,7 @@ describe('HoprChannels', function () {
 })
 
 describe('HoprChannels intergration tests', function () {
-  let f: AsyncReturnType<typeof useFixtures>
+  let f: PromiseValue<ReturnType<typeof useFixtures>>
 
   before(async function () {
     f = await useFixtures()
@@ -283,11 +259,7 @@ describe('HoprChannels intergration tests', function () {
 
   context('on a fresh channel', function () {
     it('should initialize accountA', async function () {
-      expect(
-        f.hoprChannels.initializeAccount(ACCOUNT_A.uncompressedPublicKey, SECRET_2, {
-          from: ACCOUNT_A.address
-        })
-      )
+      await expect(f.hoprChannels.connect(f.accountA).initializeAccount(ACCOUNT_A.uncompressedPublicKey, SECRET_2))
         .to.emit(f.hoprChannels, 'AccountInitialized')
         .withArgs(ACCOUNT_A.address, ACCOUNT_A.uncompressedPublicKey, SECRET_2)
 
@@ -297,11 +269,7 @@ describe('HoprChannels intergration tests', function () {
     })
 
     it('should initialize accountB', async function () {
-      expect(
-        f.hoprChannels.initializeAccount(ACCOUNT_B.uncompressedPublicKey, SECRET_2, {
-          from: ACCOUNT_B.address
-        })
-      )
+      await expect(f.hoprChannels.connect(f.accountB).initializeAccount(ACCOUNT_B.uncompressedPublicKey, SECRET_2))
         .to.emit(f.hoprChannels, 'AccountInitialized')
         .withArgs(ACCOUNT_B.address, ACCOUNT_B.uncompressedPublicKey, SECRET_2)
 
@@ -311,15 +279,9 @@ describe('HoprChannels intergration tests', function () {
     })
 
     it('should fund accountA', async function () {
-      await f.hoprToken.approve(f.hoprChannels.address, '70', {
-        from: ACCOUNT_A.address
-      })
+      await f.hoprToken.connect(f.accountA).approve(f.hoprChannels.address, '70')
 
-      expect(
-        f.hoprChannels.fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '0', {
-          from: ACCOUNT_A.address
-        })
-      )
+      await expect(f.hoprChannels.connect(f.accountA).fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '0'))
         .to.emit(f.hoprChannels, 'ChannelFunded')
         .withArgs(ACCOUNT_A.address, ACCOUNT_B.address, ACCOUNT_A.address, '70', '70')
 
@@ -332,15 +294,14 @@ describe('HoprChannels intergration tests', function () {
     })
 
     it('should fund accountB using send', async function () {
-      expect(
-        f.hoprToken.send(
-          f.hoprChannels.address,
-          '30',
-          abiEncoder.encode(['bool', 'address', 'address'], [false, ACCOUNT_B.address, ACCOUNT_A.address]),
-          {
-            from: ACCOUNT_B.address
-          }
-        )
+      await expect(
+        f.hoprToken
+          .connect(f.accountB)
+          .send(
+            f.hoprChannels.address,
+            '30',
+            abiEncoder.encode(['bool', 'address', 'address'], [false, ACCOUNT_B.address, ACCOUNT_A.address])
+          )
       )
         .to.emit(f.hoprChannels, 'ChannelFunded')
         .withArgs(ACCOUNT_B.address, ACCOUNT_A.address, ACCOUNT_B.address, '100', '70')
@@ -354,11 +315,7 @@ describe('HoprChannels intergration tests', function () {
     })
 
     it('should open channel', async function () {
-      expect(
-        f.hoprChannels.openChannel(ACCOUNT_B.address, {
-          from: ACCOUNT_A.address
-        })
-      )
+      await expect(f.hoprChannels.connect(f.accountA).openChannel(ACCOUNT_B.address))
         .to.emit(f.hoprChannels, 'ChannelOpened')
         .withArgs(ACCOUNT_A.address, ACCOUNT_B.address)
 
@@ -371,19 +328,18 @@ describe('HoprChannels intergration tests', function () {
     })
 
     it('should reedem ticket for accountA', async function () {
-      await f.hoprChannels.redeemTicket(
-        f.TICKET_BA_WIN.counterparty,
-        f.TICKET_BA_WIN.secret,
-        f.TICKET_BA_WIN.proofOfRelaySecret,
-        f.TICKET_BA_WIN.amount,
-        f.TICKET_BA_WIN.winProb,
-        f.TICKET_BA_WIN.r,
-        f.TICKET_BA_WIN.s,
-        f.TICKET_BA_WIN.v,
-        {
-          from: ACCOUNT_A.address
-        }
-      )
+      await f.hoprChannels
+        .connect(f.accountA)
+        .redeemTicket(
+          f.TICKET_BA_WIN.counterparty,
+          f.TICKET_BA_WIN.secret,
+          f.TICKET_BA_WIN.proofOfRelaySecret,
+          f.TICKET_BA_WIN.amount,
+          f.TICKET_BA_WIN.winProb,
+          f.TICKET_BA_WIN.r,
+          f.TICKET_BA_WIN.s,
+          f.TICKET_BA_WIN.v
+        )
 
       const ticket = await f.hoprChannels.tickets(f.TICKET_BA_WIN.hash)
       expect(ticket).to.be.true
@@ -400,19 +356,18 @@ describe('HoprChannels intergration tests', function () {
     })
 
     it('should reedem ticket for accountB', async function () {
-      await f.hoprChannels.redeemTicket(
-        f.TICKET_AB_WIN.counterparty,
-        f.TICKET_AB_WIN.secret,
-        f.TICKET_AB_WIN.proofOfRelaySecret,
-        f.TICKET_AB_WIN.amount,
-        f.TICKET_AB_WIN.winProb,
-        f.TICKET_AB_WIN.r,
-        f.TICKET_AB_WIN.s,
-        f.TICKET_AB_WIN.v,
-        {
-          from: ACCOUNT_B.address
-        }
-      )
+      await f.hoprChannels
+        .connect(f.accountB)
+        .redeemTicket(
+          f.TICKET_AB_WIN.counterparty,
+          f.TICKET_AB_WIN.secret,
+          f.TICKET_AB_WIN.proofOfRelaySecret,
+          f.TICKET_AB_WIN.amount,
+          f.TICKET_AB_WIN.winProb,
+          f.TICKET_AB_WIN.r,
+          f.TICKET_AB_WIN.s,
+          f.TICKET_AB_WIN.v
+        )
 
       const ticket = await f.hoprChannels.tickets(f.TICKET_AB_WIN.hash)
       expect(ticket).to.be.true
@@ -429,13 +384,12 @@ describe('HoprChannels intergration tests', function () {
     })
 
     it('should initialize channel closure', async function () {
-      expect(
-        f.hoprChannels.initiateChannelClosure(ACCOUNT_A.address, {
-          from: ACCOUNT_B.address
-        })
+      await expect(f.hoprChannels.connect(f.accountB).initiateChannelClosure(ACCOUNT_A.address)).to.emit(
+        f.hoprChannels,
+        'ChannelPendingToClose'
       )
-        .to.emit(f.hoprChannels, 'ChannelPendingToClose')
-        .withArgs(ACCOUNT_B.address, ACCOUNT_A.address)
+      // TODO: implement
+      // .withArgs(ACCOUNT_B.address, ACCOUNT_A.address)
 
       const channel = await f.hoprChannels.channels(ACCOUNT_AB_CHANNEL_ID)
       expect(channel.deposit.toString()).to.equal('100')
@@ -446,19 +400,18 @@ describe('HoprChannels intergration tests', function () {
     })
 
     it('should reedem ticket for accountA', async function () {
-      await f.hoprChannels.redeemTicket(
-        f.TICKET_BA_WIN_2.counterparty,
-        f.TICKET_BA_WIN_2.secret,
-        f.TICKET_BA_WIN_2.proofOfRelaySecret,
-        f.TICKET_BA_WIN_2.amount,
-        f.TICKET_BA_WIN_2.winProb,
-        f.TICKET_BA_WIN_2.r,
-        f.TICKET_BA_WIN_2.s,
-        f.TICKET_BA_WIN_2.v,
-        {
-          from: ACCOUNT_A.address
-        }
-      )
+      await f.hoprChannels
+        .connect(f.accountA)
+        .redeemTicket(
+          f.TICKET_BA_WIN_2.counterparty,
+          f.TICKET_BA_WIN_2.secret,
+          f.TICKET_BA_WIN_2.proofOfRelaySecret,
+          f.TICKET_BA_WIN_2.amount,
+          f.TICKET_BA_WIN_2.winProb,
+          f.TICKET_BA_WIN_2.r,
+          f.TICKET_BA_WIN_2.s,
+          f.TICKET_BA_WIN_2.v
+        )
 
       const ticket = await f.hoprChannels.tickets(f.TICKET_BA_WIN_2.hash)
       expect(ticket).to.be.true
@@ -475,13 +428,9 @@ describe('HoprChannels intergration tests', function () {
     })
 
     it('should close channel', async function () {
-      await time.increase(time.duration.days(3))
+      await increaseTime(ethers.provider, durations.days(3))
 
-      expect(
-        f.hoprChannels.finalizeChannelClosure(ACCOUNT_B.address, {
-          from: ACCOUNT_A.address
-        })
-      )
+      await expect(f.hoprChannels.connect(f.accountA).finalizeChannelClosure(ACCOUNT_B.address))
         .to.emit(f.hoprChannels, 'ChannelClosed')
         .withArgs(ACCOUNT_A.address, ACCOUNT_B.address, '80', '20')
 
@@ -544,11 +493,7 @@ describe('HoprChannels intergration tests', function () {
     )
 
     it('should update accountA', async function () {
-      expect(
-        f.hoprChannels.updateAccountSecret(SECRET_2, {
-          from: ACCOUNT_A.address
-        })
-      )
+      await expect(f.hoprChannels.connect(f.accountA).updateAccountSecret(SECRET_2))
         .to.emit(f.hoprChannels, 'AccountSecretUpdated')
         .withArgs(ACCOUNT_A.address, SECRET_2)
 
@@ -558,11 +503,7 @@ describe('HoprChannels intergration tests', function () {
     })
 
     it('should update accountB', async function () {
-      expect(
-        f.hoprChannels.updateAccountSecret(SECRET_2, {
-          from: ACCOUNT_B.address
-        })
-      )
+      await expect(f.hoprChannels.connect(f.accountB).updateAccountSecret(SECRET_2))
         .to.emit(f.hoprChannels, 'AccountSecretUpdated')
         .withArgs(ACCOUNT_B.address, SECRET_2)
 
@@ -572,14 +513,10 @@ describe('HoprChannels intergration tests', function () {
     })
 
     it('should fund both parties and open channel', async function () {
-      await f.hoprToken.approve(f.hoprChannels.address, '110', {
-        from: ACCOUNT_A.address
-      })
+      await f.hoprToken.connect(f.accountA).approve(f.hoprChannels.address, '110')
 
-      expect(
-        f.hoprChannels.fundAndOpenChannel(ACCOUNT_A.address, ACCOUNT_B.address, '70', '40', {
-          from: ACCOUNT_A.address
-        })
+      await expect(
+        f.hoprChannels.connect(f.accountA).fundAndOpenChannel(ACCOUNT_A.address, ACCOUNT_B.address, '70', '40')
       )
         .to.emit(f.hoprChannels, 'ChannelFunded')
         .withArgs(ACCOUNT_A.address, ACCOUNT_B.address, ACCOUNT_A.address, '110', '70')
@@ -593,19 +530,18 @@ describe('HoprChannels intergration tests', function () {
     })
 
     it('should reedem ticket for accountA', async function () {
-      await f.hoprChannels.redeemTicket(
-        TICKET_BA_WIN_RECYCLED.counterparty,
-        TICKET_BA_WIN_RECYCLED.secret,
-        TICKET_BA_WIN_RECYCLED.proofOfRelaySecret,
-        TICKET_BA_WIN_RECYCLED.amount,
-        TICKET_BA_WIN_RECYCLED.winProb,
-        TICKET_BA_WIN_RECYCLED.r,
-        TICKET_BA_WIN_RECYCLED.s,
-        TICKET_BA_WIN_RECYCLED.v,
-        {
-          from: ACCOUNT_A.address
-        }
-      )
+      await f.hoprChannels
+        .connect(f.accountA)
+        .redeemTicket(
+          TICKET_BA_WIN_RECYCLED.counterparty,
+          TICKET_BA_WIN_RECYCLED.secret,
+          TICKET_BA_WIN_RECYCLED.proofOfRelaySecret,
+          TICKET_BA_WIN_RECYCLED.amount,
+          TICKET_BA_WIN_RECYCLED.winProb,
+          TICKET_BA_WIN_RECYCLED.r,
+          TICKET_BA_WIN_RECYCLED.s,
+          TICKET_BA_WIN_RECYCLED.v
+        )
 
       const ticket = await f.hoprChannels.tickets(TICKET_BA_WIN_RECYCLED.hash)
       expect(ticket).to.be.true
@@ -622,19 +558,18 @@ describe('HoprChannels intergration tests', function () {
     })
 
     it('should reedem ticket for accountB', async function () {
-      await f.hoprChannels.redeemTicket(
-        TICKET_AB_WIN_RECYCLED.counterparty,
-        TICKET_AB_WIN_RECYCLED.secret,
-        TICKET_AB_WIN_RECYCLED.proofOfRelaySecret,
-        TICKET_AB_WIN_RECYCLED.amount,
-        TICKET_AB_WIN_RECYCLED.winProb,
-        TICKET_AB_WIN_RECYCLED.r,
-        TICKET_AB_WIN_RECYCLED.s,
-        TICKET_AB_WIN_RECYCLED.v,
-        {
-          from: ACCOUNT_B.address
-        }
-      )
+      await f.hoprChannels
+        .connect(f.accountB)
+        .redeemTicket(
+          TICKET_AB_WIN_RECYCLED.counterparty,
+          TICKET_AB_WIN_RECYCLED.secret,
+          TICKET_AB_WIN_RECYCLED.proofOfRelaySecret,
+          TICKET_AB_WIN_RECYCLED.amount,
+          TICKET_AB_WIN_RECYCLED.winProb,
+          TICKET_AB_WIN_RECYCLED.r,
+          TICKET_AB_WIN_RECYCLED.s,
+          TICKET_AB_WIN_RECYCLED.v
+        )
 
       const ticket = await f.hoprChannels.tickets(TICKET_AB_WIN_RECYCLED.hash)
       expect(ticket).to.be.true
@@ -651,11 +586,7 @@ describe('HoprChannels intergration tests', function () {
     })
 
     it('should initialize channel closure', async function () {
-      expect(
-        f.hoprChannels.initiateChannelClosure(ACCOUNT_A.address, {
-          from: ACCOUNT_B.address
-        })
-      )
+      await expect(f.hoprChannels.connect(f.accountB).initiateChannelClosure(ACCOUNT_A.address))
         .to.emit(f.hoprChannels, 'ChannelPendingToClose')
         .withArgs(ACCOUNT_B.address, ACCOUNT_A.address)
 
@@ -668,19 +599,18 @@ describe('HoprChannels intergration tests', function () {
     })
 
     it('should reedem ticket for accountA', async function () {
-      await f.hoprChannels.redeemTicket(
-        TICKET_BA_WIN_RECYCLED_2.counterparty,
-        TICKET_BA_WIN_RECYCLED_2.secret,
-        TICKET_BA_WIN_RECYCLED_2.proofOfRelaySecret,
-        TICKET_BA_WIN_RECYCLED_2.amount,
-        TICKET_BA_WIN_RECYCLED_2.winProb,
-        TICKET_BA_WIN_RECYCLED_2.r,
-        TICKET_BA_WIN_RECYCLED_2.s,
-        TICKET_BA_WIN_RECYCLED_2.v,
-        {
-          from: ACCOUNT_A.address
-        }
-      )
+      await f.hoprChannels
+        .connect(f.accountB)
+        .redeemTicket(
+          TICKET_BA_WIN_RECYCLED_2.counterparty,
+          TICKET_BA_WIN_RECYCLED_2.secret,
+          TICKET_BA_WIN_RECYCLED_2.proofOfRelaySecret,
+          TICKET_BA_WIN_RECYCLED_2.amount,
+          TICKET_BA_WIN_RECYCLED_2.winProb,
+          TICKET_BA_WIN_RECYCLED_2.r,
+          TICKET_BA_WIN_RECYCLED_2.s,
+          TICKET_BA_WIN_RECYCLED_2.v
+        )
 
       const ticket = await f.hoprChannels.tickets(TICKET_BA_WIN_RECYCLED_2.hash)
       expect(ticket).to.be.true
@@ -697,13 +627,9 @@ describe('HoprChannels intergration tests', function () {
     })
 
     it('should close channel', async function () {
-      await time.increase(time.duration.days(3))
+      await increaseTime(ethers.provider, durations.days(3))
 
-      expect(
-        f.hoprChannels.finalizeChannelClosure(ACCOUNT_B.address, {
-          from: ACCOUNT_A.address
-        })
-      )
+      await expect(f.hoprChannels.connect(f.accountA).finalizeChannelClosure(ACCOUNT_B.address))
         .to.emit(f.hoprChannels, 'ChannelClosed')
         .withArgs(ACCOUNT_A.address, ACCOUNT_B.address, '80', '30')
 

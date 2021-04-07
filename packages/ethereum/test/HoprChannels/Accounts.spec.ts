@@ -1,15 +1,14 @@
 import { deployments, ethers } from 'hardhat'
-import { singletons } from '@openzeppelin/test-helpers'
 import { expect } from 'chai'
-import { vmErrorMessage } from '../utils'
 import { ACCOUNT_A, ACCOUNT_B, SECRET_2, SECRET_1 } from './constants'
 import { AccountsMock__factory } from '../../types'
+import deployERC1820Registry from '../../deploy/01_ERC1820Registry'
 
-const useFixtures = deployments.createFixture(async () => {
+const useFixtures = deployments.createFixture(async (hre) => {
   const [deployer] = await ethers.getSigners()
 
   // deploy ERC1820Registry required by ERC777 token
-  await singletons.ERC1820Registry(deployer.address)
+  await deployERC1820Registry(hre, deployer)
 
   const accounts = await new AccountsMock__factory(deployer).deploy(ethers.constants.AddressZero, '0')
 
@@ -28,7 +27,7 @@ describe('Accounts', function () {
 
     const account = await accounts.accounts(ACCOUNT_A.address)
     expect(account.secret).to.equal(SECRET_2)
-    expect(account.counter.toString()).to.equal('1')
+    expect(account.counter).to.equal('1')
   })
 
   it('should fail to initialize account when public key is wrong', async function () {
@@ -37,7 +36,7 @@ describe('Accounts', function () {
     // give wrong public key
     expect(
       accounts.initializeAccountInternal(ACCOUNT_A.address, ACCOUNT_B.uncompressedPublicKey, SECRET_1)
-    ).to.be.revertedWith(vmErrorMessage('public key does not match account'))
+    ).to.be.revertedWith('public key does not match account')
   })
 
   it("should update account's secret", async function () {
@@ -51,7 +50,7 @@ describe('Accounts', function () {
 
     const account = await accounts.accounts(ACCOUNT_A.address)
     expect(account.secret).to.equal(SECRET_1)
-    expect(account.counter.toString()).to.equal('2')
+    expect(account.counter).to.equal('2')
   })
 
   it("should fail to update account's secret when secret is empty", async function () {
@@ -61,7 +60,7 @@ describe('Accounts', function () {
 
     // give empty SECRET
     expect(accounts.updateAccountSecretInternal(ACCOUNT_A.address, ethers.constants.HashZero)).to.be.revertedWith(
-      vmErrorMessage('secret must not be empty')
+      'secret must not be empty'
     )
   })
 
@@ -72,7 +71,7 @@ describe('Accounts', function () {
 
     // give same SECRET
     expect(accounts.updateAccountSecretInternal(ACCOUNT_A.address, SECRET_1)).to.be.revertedWith(
-      vmErrorMessage('secret must not be the same as before')
+      'secret must not be the same as before'
     )
   })
 })

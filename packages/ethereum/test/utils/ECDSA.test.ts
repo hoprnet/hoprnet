@@ -15,7 +15,7 @@ const useFixtures = deployments.createFixture(async () => {
   }
 })
 
-describe.only('ECDSA', function () {
+describe('ECDSA', function () {
   it('should convert uncompressed public key to address', async function () {
     const { ECDSA } = await useFixtures()
 

@@ -1,13 +1,12 @@
 import { deployments, ethers } from 'hardhat'
 import { expect } from 'chai'
-import { singletons, BN, constants, expectRevert } from '@openzeppelin/test-helpers'
-import { vmErrorMessage } from '../utils'
 import { ERC777SnapshotMock__factory, ERC777SnapshotMock } from '../../types'
+import deployERC1820Registry from '../../deploy/01_ERC1820Registry'
 
-const useFixtures = deployments.createFixture(async () => {
+const useFixtures = deployments.createFixture(async (hre) => {
   const [initialHolder, recipient, other] = await ethers.getSigners()
 
-  await singletons.ERC1820Registry(initialHolder)
+  await deployERC1820Registry(hre, initialHolder)
 
   const name = 'My Token'
   const symbol = 'MTKN'
@@ -22,9 +21,9 @@ const useFixtures = deployments.createFixture(async () => {
   const initialMintBlock = await ethers.provider.getBlockNumber()
 
   return {
-    initialHolder,
-    recipient,
-    other,
+    initialHolder: initialHolder.address,
+    recipient: recipient.address,
+    other: other.address,
     token,
     initialSupply,
     initialMintBlock
@@ -44,18 +43,17 @@ describe('ERC777Snapshot', function () {
   beforeEach(async function () {
     const fixtures = await useFixtures()
 
-    initialHolder = fixtures.initialHolder.address
-    recipient = fixtures.recipient.address
-    other = fixtures.other.address
+    initialHolder = fixtures.initialHolder
+    recipient = fixtures.recipient
+    other = fixtures.other
     token = fixtures.token
     initialSupply = fixtures.initialSupply
     initialMintBlock = fixtures.initialMintBlock
   })
 
   it('should revert when trying to snapshot unsupported amount', async function () {
-    await expectRevert(
-      token.updateValueAtNowAccount(initialHolder, constants.MAX_UINT256),
-      vmErrorMessage('casting overflow')
+    await expect(token.updateValueAtNowAccount(initialHolder, ethers.constants.MaxUint256)).to.be.revertedWith(
+      'casting overflow'
     )
   })
 
@@ -93,8 +91,8 @@ describe('ERC777Snapshot', function () {
 
         beforeEach(async function () {
           firstBlockNumber = await ethers.provider.getBlockNumber()
-          await token.mint(other, new BN('50'), '0x00', '0x00')
-          await token.methods['burn(address,uint256,bytes,bytes)'](initialHolder, new BN('20'), '0x00', '0x00')
+          await token.mint(other, ethers.BigNumber.from('50'), '0x00', '0x00')
+          await token['burn(address,uint256,bytes,bytes)'](initialHolder, ethers.BigNumber.from('20'), '0x00', '0x00')
         })
 
         it('returns the total supply before the changes', async function () {
@@ -176,9 +174,9 @@ describe('ERC777Snapshot', function () {
 
       context('with balance changes after the snapshot', function () {
         beforeEach(async function () {
-          await token.transfer(recipient, new BN('10'), { from: initialHolder })
-          await token.mint(recipient, new BN('50'), '0x00', '0x00')
-          await token.methods['burn(address,uint256,bytes,bytes)'](initialHolder, new BN('20'), '0x00', '0x00')
+          await token.transfer(recipient, ethers.BigNumber.from('10'), { from: initialHolder })
+          await token.mint(recipient, ethers.BigNumber.from('50'), '0x00', '0x00')
+          await token['burn(address,uint256,bytes,bytes)'](initialHolder, ethers.BigNumber.from('20'), '0x00', '0x00')
         })
 
         it('returns the balances before the changes', async function () {

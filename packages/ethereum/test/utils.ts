@@ -1,15 +1,8 @@
-import { ethers } from 'ethers'
+import { ethers, providers } from 'ethers'
 
-/**
- * Depending on what network tests are run, the error output
- * may vary. This utility prefixes the error to it matches
- * with hardhat's network where our tests run.
- * @param error
- * @returns error prefixed by network's message
- */
-export const vmErrorMessage = (error: string) => {
-  return `VM Exception while processing transaction: revert ${error}`
-}
+// @TODO: move this to hopr-utils
+// returns value of promise
+export type PromiseValue<T> = T extends PromiseLike<infer U> ? U : T
 
 export const getAccount = (privateKey: string) => {
   const wallet = new ethers.Wallet(privateKey)
@@ -33,7 +26,7 @@ export const prefixMessageWithHOPR = (message: string) => {
 
   return ethers.utils.solidityKeccak256(
     ['string', 'string', 'bytes'],
-    ['\x19Ethereum Signed Message:\n', withHOPR.length, withHOPR]
+    ['\x19Ethereum Signed Message:\n', withHOPR.length.toString(), withHOPR]
   )
 }
 
@@ -57,4 +50,23 @@ export const signMessage = async (message: string, privKey: string) => {
     s,
     v
   }
+}
+
+export const toSolPercent = (multiplier: number, percent: number): string => {
+  return String(Math.floor(percent * multiplier))
+}
+
+export const advanceBlock = async (provider: providers.JsonRpcProvider) => {
+  return provider.send('evm_mine', [])
+}
+
+// increases ganache time by the passed duration in seconds
+export const increaseTime = async (provider: providers.JsonRpcProvider, _duration: ethers.BigNumberish) => {
+  const duration = ethers.BigNumber.from(_duration)
+
+  if (duration.isNegative()) throw Error(`Cannot increase time by a negative amount (${duration})`)
+
+  await provider.send('evm_increaseTime', [duration.toNumber()])
+
+  await advanceBlock(provider)
 }
