@@ -1,4 +1,4 @@
-import type { Types } from '@hoprnet/hopr-core-connector-interface'
+import type { Acknowledgement, Ticket } from '@hoprnet/hopr-core-connector-interface'
 import BN from 'bn.js'
 
 /**
@@ -7,7 +7,7 @@ import BN from 'bn.js'
  * @param ackTickets
  * @returns a promise that resolves into an array of signed tickets
  */
-export async function toSignedTickets(ackTickets: Types.Acknowledgement[]): Promise<Types.Ticket[]> {
+export async function toSignedTickets(ackTickets: Acknowledgement[]): Promise<Ticket[]> {
   return Promise.all(ackTickets.map((ackTicket) => ackTicket.ticket))
 }
 
@@ -18,7 +18,7 @@ export async function toSignedTickets(ackTickets: Types.Acknowledgement[]): Prom
  * @returns the total amount of tokens in the tickets & more
  */
 export function countSignedTickets(
-  signedTickets: Types.Ticket[]
+  signedTickets: Ticket[]
 ): {
   tickets: {
     challange: string

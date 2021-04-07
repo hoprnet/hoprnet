@@ -1,4 +1,4 @@
-import type { Types } from '@hoprnet/hopr-core-connector-interface'
+import type { Acknowledgement } from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 import { moveDecimalPoint } from '@hoprnet/hopr-utils'
 import { countSignedTickets, styleValue, toSignedTickets } from './utils'
@@ -32,7 +32,7 @@ export default class RedeemTickets extends AbstractCommand {
 
       console.log(`Redeeming ${styleValue(results.length)} tickets..`)
 
-      const redeemedTickets: Types.Acknowledgement[] = []
+      const redeemedTickets: Acknowledgement[] = []
       let count = 0
 
       for (const { ackTicket, index } of results) {
