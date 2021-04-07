@@ -54,8 +54,6 @@ declare interface HoprCoreConnector {
     acknowledge(ticket: Ticket, response: Hash): Promise<Acknowledgement | undefined>
   }
 
-  readonly db: LevelUp
-
   /**
    * Initialises the connector, e.g. connect to a blockchain node.
    */
@@ -82,7 +80,6 @@ declare interface HoprCoreConnector {
   withdraw(currency: Currencies, recipient: string, amount: string): Promise<string>
 
   hexAccountAddress(): Promise<string>
-
   smartContractInfo(): string
 
   /**
