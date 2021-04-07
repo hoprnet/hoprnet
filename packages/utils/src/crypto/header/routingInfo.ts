@@ -8,7 +8,7 @@ import { createMAC } from './mac'
 import type PeerId from 'peer-id'
 
 const END_PREFIX_LENGTH = 1
-const END_PREFIX = new Uint8Array([0xff])
+const END_PREFIX = 0xff
 
 export function createRoutingInfo(
   maxHops: number,
@@ -41,7 +41,7 @@ export function createRoutingInfo(
     const params = derivePRGParameters(secret)
 
     if (index == 0) {
-      extendedHeader.set(END_PREFIX)
+      extendedHeader[0] = END_PREFIX
 
       if (lastHopLength > 0) {
         extendedHeader.set(additionalDataLastHop, END_PREFIX_LENGTH)
@@ -50,7 +50,7 @@ export function createRoutingInfo(
       const paddingLength = (maxHops - secrets.length) * routingInfoLength
 
       if (paddingLength > 0) {
-        randomFillSync(extendedHeader, lastHopLength + END_PREFIX_LENGTH, paddingLength)
+        randomFillSync(extendedHeader, lastHopLength, paddingLength)
       }
 
       u8aXOR(
@@ -70,13 +70,13 @@ export function createRoutingInfo(
 
       extendedHeader.set(additionalDataRelayer[invIndex], COMPRESSED_PUBLIC_KEY_LENGTH + MAC_LENGTH)
 
-      u8aXOR(true, extendedHeader, PRG.createPRG(params).digest(0, headerLength))
+      u8aXOR(true, extendedHeader, PRG.createPRG(params).digest(0, extendedHeaderLength))
     }
 
-    mac = createMAC(secret, extendedHeader.slice(0, headerLength))
+    mac = createMAC(secret, extendedHeader.subarray(0, headerLength))
   }
 
-  return [extendedHeader, mac]
+  return [extendedHeader.slice(0, headerLength), mac]
 }
 
 export function forwardTransform(
@@ -86,8 +86,8 @@ export function forwardTransform(
   maxHops: number,
   additionalDataRelayerLength: number,
   additionalDataLastHopLength: number
-): void | [header: Uint8Array, mac: Uint8Array, nextNode: Uint8Array, additionalInfo: Uint8Array] {
-  if (secret.length != SECRET_LENGTH || mac.length != SECRET_LENGTH) {
+): undefined | [header: Uint8Array, mac: Uint8Array, nextNode: Uint8Array, additionalInfo: Uint8Array] {
+  if (secret.length != SECRET_LENGTH || mac.length != MAC_LENGTH) {
     throw Error(`Invalid arguments`)
   }
 
@@ -107,25 +107,31 @@ export function forwardTransform(
   const params = derivePRGParameters(secret)
 
   const prg = PRG.createPRG(params)
+
   u8aXOR(true, header, prg.digest(0, headerLength))
 
+  if (header[0] == END_PREFIX) {
+    return undefined
+  }
+
   if (typeof Buffer !== 'undefined' && Buffer.isBuffer(header)) {
-    nextMac = header.subarray(0, MAC_LENGTH)
-    nextHop = header.subarray(MAC_LENGTH, MAC_LENGTH + COMPRESSED_PUBLIC_KEY_LENGTH)
+    nextHop = header.subarray(0, COMPRESSED_PUBLIC_KEY_LENGTH)
+    nextMac = header.subarray(COMPRESSED_PUBLIC_KEY_LENGTH, COMPRESSED_PUBLIC_KEY_LENGTH + MAC_LENGTH)
     additionalInfo = header.subarray(
-      MAC_LENGTH + COMPRESSED_PUBLIC_KEY_LENGTH,
-      MAC_LENGTH + COMPRESSED_PUBLIC_KEY_LENGTH + additionalDataRelayerLength
+      COMPRESSED_PUBLIC_KEY_LENGTH + MAC_LENGTH,
+      COMPRESSED_PUBLIC_KEY_LENGTH + MAC_LENGTH + additionalDataRelayerLength
     )
   } else {
-    nextMac = header.slice(0, MAC_LENGTH)
-    nextHop = header.slice(MAC_LENGTH, MAC_LENGTH + COMPRESSED_PUBLIC_KEY_LENGTH)
+    nextHop = header.slice(0, COMPRESSED_PUBLIC_KEY_LENGTH)
+    nextMac = header.slice(COMPRESSED_PUBLIC_KEY_LENGTH, COMPRESSED_PUBLIC_KEY_LENGTH + MAC_LENGTH)
     additionalInfo = header.slice(
-      MAC_LENGTH + COMPRESSED_PUBLIC_KEY_LENGTH,
-      MAC_LENGTH + COMPRESSED_PUBLIC_KEY_LENGTH + additionalDataRelayerLength
+      COMPRESSED_PUBLIC_KEY_LENGTH + MAC_LENGTH,
+      COMPRESSED_PUBLIC_KEY_LENGTH + MAC_LENGTH + additionalDataRelayerLength
     )
   }
 
-  header.copyWithin(0, routingInfoLength, headerLength - routingInfoLength)
+  header.copyWithin(0, routingInfoLength)
+
   header.set(prg.digest(headerLength, headerLength + routingInfoLength), headerLength - routingInfoLength)
 
   return [header.subarray(0, headerLength), nextMac, nextHop, additionalInfo]

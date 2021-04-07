@@ -1,24 +1,29 @@
 import { generateFiller } from './filler'
 import { randomBytes } from 'crypto'
 import { SECRET_LENGTH } from './constants'
-import { u8aXOR, u8aEquals } from '../../u8a'
+import { u8aXOR } from '../../u8a'
 import { PRG } from '../prg'
 import { derivePRGParameters } from './blinding'
 import assert from 'assert'
 
 describe('test filler', function () {
   it('generate a filler and verify', function () {
-    const perHop = 23
-    const lastHop = 31
-    const hops = 5
+    const perHop = 3
+    const lastHop = 5
+    const hops = 3
     const maxHops = hops
 
     const secrets = Array.from({ length: hops }, (_) => randomBytes(SECRET_LENGTH))
     const extendedHeaderLength = perHop * maxHops + lastHop
+    const headerLength = perHop * (maxHops - 1) + lastHop
 
     let extendedHeader = new Uint8Array(perHop * maxHops + lastHop)
 
     generateFiller(extendedHeader, maxHops, perHop, lastHop, secrets)
+
+    assert(extendedHeader.subarray(0, lastHop).every((x) => x == 0))
+
+    extendedHeader.copyWithin(perHop, 0, headerLength)
 
     for (let i = 0; i < hops - 1; i++) {
       const blinding = PRG.createPRG(derivePRGParameters(secrets[secrets.length - 2 - i])).digest(
@@ -29,32 +34,32 @@ describe('test filler', function () {
       u8aXOR(true, extendedHeader, blinding)
 
       assert(
-        u8aEquals(extendedHeader.subarray(extendedHeaderLength - perHop), new Uint8Array(perHop)),
+        extendedHeader.subarray(headerLength).every((x) => x == 0),
         `XORing blinding must erase last bits`
       )
 
       // Roll header
-      extendedHeader = Uint8Array.from([
-        ...new Uint8Array(perHop),
-        ...extendedHeader.slice(0, extendedHeaderLength - perHop)
-      ])
+      extendedHeader.copyWithin(perHop, 0, headerLength)
     }
   })
 
   it('generate a filler and verify - reduced path', function () {
-    const perHop = 23
-    const lastHop = 31
+    const perHop = 3
+    const lastHop = 5
     const hops = 4
     const maxHops = 5
 
     const secrets = Array.from({ length: hops }, (_) => randomBytes(SECRET_LENGTH))
     const extendedHeaderLength = perHop * maxHops + lastHop
+    const headerLength = perHop * (maxHops - 1) + lastHop
 
-    let header = new Uint8Array(extendedHeaderLength)
+    let extendedHeader = new Uint8Array(extendedHeaderLength)
 
-    generateFiller(header, maxHops, perHop, lastHop, secrets)
+    generateFiller(extendedHeader, maxHops, perHop, lastHop, secrets)
 
-    assert(header.slice(0, lastHop + (maxHops - hops) * perHop).every((x) => x == 0))
+    assert(extendedHeader.slice(0, lastHop + (maxHops - hops) * perHop).every((x) => x == 0))
+
+    extendedHeader.copyWithin(perHop, 0, headerLength)
 
     for (let i = 0; i < hops - 1; i++) {
       const blinding = PRG.createPRG(derivePRGParameters(secrets[secrets.length - 2 - i])).digest(
@@ -62,15 +67,15 @@ describe('test filler', function () {
         extendedHeaderLength
       )
 
-      u8aXOR(true, header, blinding)
+      u8aXOR(true, extendedHeader, blinding)
 
       assert(
-        u8aEquals(header.subarray(extendedHeaderLength - perHop), new Uint8Array(perHop)),
+        extendedHeader.subarray(headerLength).every((x) => x == 0),
         `XORing blinding must erase last bits`
       )
 
       // Roll header
-      header = Uint8Array.from([...new Uint8Array(perHop), ...header.slice(0, extendedHeaderLength - perHop)])
+      extendedHeader.copyWithin(perHop, 0, headerLength)
     }
   })
 
@@ -82,7 +87,7 @@ describe('test filler', function () {
 
     const secrets = Array.from({ length: hops }, (_) => randomBytes(SECRET_LENGTH))
 
-    let extendedHeader = new Uint8Array(perHop * hops + lastHop)
+    let extendedHeader = new Uint8Array(perHop * maxHops + lastHop)
 
     generateFiller(extendedHeader, maxHops, perHop, lastHop, secrets)
 
@@ -93,5 +98,10 @@ describe('test filler', function () {
 
     // Should not throw an error
     generateFiller(new Uint8Array(), 0, perHop, lastHop, [])
+
+    assert(
+      extendedHeader.every((x) => x == 0),
+      `must not mutate any memory on zero-length paths`
+    )
   })
 })

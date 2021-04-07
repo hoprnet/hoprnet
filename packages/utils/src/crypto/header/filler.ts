@@ -25,10 +25,7 @@ export function generateFiller(
 
     u8aXOR(
       true,
-      header.subarray(
-        routingInfoLength + routingInfoLastHopLength + paddingLength,
-        routingInfoLength + routingInfoLastHopLength + paddingLength + length
-      ),
+      header.subarray(routingInfoLastHopLength + paddingLength, routingInfoLastHopLength + paddingLength + length),
       PRG.createPRG(prgParams).digest(start, headerLength + routingInfoLength)
     )
 
