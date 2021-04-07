@@ -1,8 +1,8 @@
 import assert from 'assert'
 import PeerId from 'peer-id'
-import { Acknowledgement } from '.'
+import { AcknowledgementMessage } from '.'
 import { Challenge } from '../packet/challenge'
-import { u8aEquals, randomInteger, u8aToHex } from '@hoprnet/hopr-utils'
+import { u8aEquals } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 import { Hash } from '@hoprnet/hopr-core-ethereum'
 import { randomBytes } from 'crypto'
@@ -27,20 +27,10 @@ describe('test acknowledgement generation', function () {
       const pubKey = sender.pubKey.marshal()
       assert(u8aEquals(await challenge.counterparty, pubKey), `recovered pubKey should be equal.`)
 
-      const ack = await Acknowledgement.create(challenge, secp256k1.publicKeyCreate(secret), receiver)
+      const ack = await AcknowledgementMessage.create(challenge, secp256k1.publicKeyCreate(secret), receiver)
 
       assert(await ack.verify(receiver), `Previously generated acknowledgement should be valid.`)
       assert(u8aEquals(await ack.responseSigningParty, receiver.pubKey.marshal()), `recovered pubKey should be equal.`)
-
-      let exponent = randomInteger(0, 7)
-      let index = randomInteger(0, ack.length - 1)
-
-      ack[index] = ack[index] ^ (1 << exponent)
-
-      if (await ack.verify(receiver)) {
-        // @TODO change to assert.fail
-        console.log(`found invalid signature, <${u8aToHex(ack)}>, byte #${index}, bit #${exponent}`)
-      }
     }
   })
 })

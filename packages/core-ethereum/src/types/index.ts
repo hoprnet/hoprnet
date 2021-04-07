@@ -1,5 +1,5 @@
 import AccountEntry from './accountEntry'
-import AcknowledgedTicket from './acknowledgedTicket'
+import Acknowledgement from './acknowledgedTicket'
 import ChannelEntry from './channelEntry'
 import Snapshot from './snapshot'
 import Ticket from './ticket'
@@ -9,7 +9,7 @@ import { Address, Balance, Hash, NativeBalance, PublicKey, Signature } from './p
 class Types {
   public AccountEntry = AccountEntry
   public Address = Address
-  public AcknowledgedTicket = AcknowledgedTicket
+  public Acknowledgement = Acknowledgement
   public Balance = Balance
   public ChannelEntry = ChannelEntry
   public Hash = Hash
@@ -24,7 +24,7 @@ class Types {
 export {
   AccountEntry,
   Address,
-  AcknowledgedTicket,
+  Acknowledgement,
   Balance,
   ChannelEntry,
   Hash,

@@ -1,6 +1,6 @@
 import { PROTOCOL_STRING } from '../../constants'
 import { Packet } from '../../messages/packet'
-import { Acknowledgement } from '../../messages/acknowledgement'
+import { AcknowledgementMessage } from '../../messages/acknowledgement'
 import Debug from 'debug'
 import type PeerId from 'peer-id'
 import type { AbstractInteraction } from '../abstractInteraction'
@@ -9,6 +9,7 @@ import pipe from 'it-pipe'
 import type { Connection, MuxedStream } from 'libp2p'
 import { dialHelper, durations, oneAtATime } from '@hoprnet/hopr-utils'
 import { Mixer } from '../../mixer'
+import { Challenge } from '../../messages/packet/challenge'
 
 const log = Debug('hopr-core:forward')
 const FORWARD_TIMEOUT = durations.seconds(6)
@@ -64,11 +65,12 @@ class PacketForwardInteraction implements AbstractInteraction {
         const [sender, target] = await Promise.all([packet.getSenderPeerId(), packet.getTargetPeerId()])
 
         setImmediate(async () => {
-          const ack = new Acknowledgement(undefined, {
-            key: ticketKey,
-            challenge: receivedChallenge
-          })
-          await node._interactions.packet.acknowledgment.interact(sender, await ack.sign(node.getId()))
+          const ack = await AcknowledgementMessage.create(
+            Challenge.deserialize(ticketKey),
+            receivedChallenge,
+            node.getId()
+          )
+          await node._interactions.packet.acknowledgment.interact(sender, ack)
         })
 
         if (node.getId().equals(target)) {

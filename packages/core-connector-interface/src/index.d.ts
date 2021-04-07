@@ -48,14 +48,14 @@ declare interface HoprCoreConnector {
     }
 
     /**
-     * Check whether the given ticket is winning with the current preImage.
+     * Check whether the given ticket is winning.
      *
      * If the ticket is a win, the preImage is stored into the given acknowledged
      * ticket and its preImage will be used to check whether the next ticket is a
      * win.
-     * @param ticket the acknowledged ticket to check
+     * @param ticket the ticket to check
      */
-    reservePreImageIfIsWinning(ticket: Types.AcknowledgedTicket): Promise<boolean>
+    acknowledge(ticket: Ticket, response: Hash): Promise<Acknowledgement | undefined>
   }
 
   readonly db: LevelUp
@@ -121,7 +121,8 @@ export {
   SubmitTicketResponse,
   Indexer,
   RoutingChannel,
-  HoprCoreConnectorStatic
+  HoprCoreConnectorStatic,
+  Acknowledgement
 }
 
 export default HoprCoreConnector

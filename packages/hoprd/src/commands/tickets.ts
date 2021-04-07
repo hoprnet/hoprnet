@@ -20,9 +20,7 @@ export default class Tickets extends AbstractCommand {
     try {
       const { Balance } = this.node.paymentChannels.types
 
-      const results = await this.node.getAcknowledgedTickets().then((tickets) => {
-        return tickets.filter((ticket) => !ticket.ackTicket.redeemed)
-      })
+      const results = await this.node.getAcknowledgedTickets()
 
       if (results.length === 0) {
         return 'No tickets found.'

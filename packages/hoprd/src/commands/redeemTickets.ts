@@ -25,18 +25,14 @@ export default class RedeemTickets extends AbstractCommand {
     const { Balance } = paymentChannels.types
 
     try {
-      // get only unredeemed tickets
-      const results = await this.node.getAcknowledgedTickets().then((tickets) => {
-        return tickets.filter((ticket) => !ticket.ackTicket.redeemed)
-      })
-
+      const results = await this.node.getAcknowledgedTickets()
       if (results.length === 0) {
         return 'No unredeemed tickets found.'
       }
 
       console.log(`Redeeming ${styleValue(results.length)} tickets..`)
 
-      const redeemedTickets: Types.AcknowledgedTicket[] = []
+      const redeemedTickets: Types.Acknowledgement[] = []
       let count = 0
 
       for (const { ackTicket, index } of results) {

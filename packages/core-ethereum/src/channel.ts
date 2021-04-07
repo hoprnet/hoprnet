@@ -1,7 +1,7 @@
 import type { Channel as IChannel, Types as Interfaces } from '@hoprnet/hopr-core-connector-interface'
 import type Connector from '.'
 import BN from 'bn.js'
-import { PublicKey, Balance, Hash, UINT256, Ticket, AcknowledgedTicket, ChannelEntry } from './types'
+import { PublicKey, Balance, Hash, UINT256, Ticket, Acknowledgement, ChannelEntry } from './types'
 import { getId, waitForConfirmation, computeWinningProbability, checkChallenge, isWinningTicket } from './utils'
 import Debug from 'debug'
 
@@ -172,9 +172,9 @@ class Channel implements IChannel {
     )
   }
 
-  async submitTicket(ackTicket: AcknowledgedTicket): ReturnType<IChannel['submitTicket']> {
+  async submitTicket(ackTicket: Acknowledgement): ReturnType<IChannel['submitTicket']> {
     try {
-      const ticket = await ackTicket.signedTicket
+      const ticket = ackTicket.ticket
 
       log('Submitting ticket', ackTicket.response.toHex())
       const { hoprChannels, account, utils } = this.connector
@@ -227,7 +227,7 @@ class Channel implements IChannel {
       )
 
       await transaction.send()
-      ackTicket.redeemed = true
+      // TODO delete ackTicket
       this.connector.account.updateLocalState(ackTicket.preImage)
 
       log('Successfully submitted ticket', ackTicket.response.toHex())

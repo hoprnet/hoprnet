@@ -35,6 +35,14 @@ class Challenge extends Uint8Array {
     }
   }
 
+  serialize(): Uint8Array {
+    return this // TODO
+  }
+
+  static deserialize(arr: Uint8Array) {
+    return new Challenge({ bytes: arr.buffer, offset: arr.byteOffset }) // TODO
+  }
+
   get challengeSignatureOffset(): number {
     return this.byteOffset
   }
