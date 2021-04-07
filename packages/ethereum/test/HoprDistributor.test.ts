@@ -10,7 +10,7 @@ const SCHEDULE_1_MIN_ALL = 'SCHEDULE_1_MIN_ALL'
 const SCHEDULE_TEAM = 'SCHEDULE_TEAM'
 
 const getLatestBlockTimestamp = async () => {
-  return ethers.provider.getBlock(await ethers.provider.getBlockNumber()).then((res) => String(res.timestamp))
+  return ethers.provider.getBlock('latest').then((res) => String(res.timestamp))
 }
 
 const useFixtures = deployments.createFixture(async (hre, ops: { startTime?: string; maxMintAmount?: string } = {}) => {
@@ -23,9 +23,7 @@ const useFixtures = deployments.createFixture(async (hre, ops: { startTime?: str
   const token = await new HoprToken__factory(owner).deploy()
   const distributor = await new HoprDistributor__factory(owner).deploy(token.address, startTime, maxMintAmount)
 
-  await token.grantRole(await token.MINTER_ROLE(), distributor.address, {
-    from: owner.address
-  })
+  await token.grantRole(await token.MINTER_ROLE(), distributor.address)
 
   const multiplier = (await distributor.MULTIPLIER()).toNumber()
 
