@@ -5,7 +5,7 @@ import type Hopr from '..'
 import { u8aEquals } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 import { UnacknowledgedTicket } from '../messages/ticket/unacknowledged'
-import { PublicKey } from '@hoprnet/hopr-core-ethereum'
+import { PublicKey, Acknowledgement } from '@hoprnet/hopr-core-ethereum'
 
 /**
  * Get all unacknowledged tickets
@@ -19,7 +19,7 @@ export async function getUnacknowledgedTickets(
   }
 ): Promise<UnacknowledgedTicket<Chain>[]> {
   const tickets: UnacknowledgedTicket<Chain>[] = []
-  const unAcknowledgedTicketSize = UnacknowledgedTicket.SIZE(node.paymentChannels)
+  const unAcknowledgementSize = UnacknowledgedTicket.SIZE(node.paymentChannels)
 
   return new Promise((resolve, reject) => {
     node.db
@@ -28,7 +28,7 @@ export async function getUnacknowledgedTickets(
       })
       .on('error', (err) => reject(err))
       .on('data', async ({ value }: { value: Buffer }) => {
-        if (value.buffer.byteLength !== unAcknowledgedTicketSize) return
+        if (value.buffer.byteLength !== unAcknowledgementSize) return
 
         const unAckTicket = new UnacknowledgedTicket(node.paymentChannels, {
           bytes: value.buffer,
@@ -75,20 +75,19 @@ export async function deleteUnacknowledgedTickets(
  * @param filter optionally filter by signer
  * @returns an array of all acknowledged tickets
  */
-export async function getAcknowledgedTickets(
+export async function getAcknowledgements(
   node: Hopr<Chain>,
   filter?: {
     signer: Uint8Array
   }
 ): Promise<
   {
-    ackTicket: Types.AcknowledgedTicket
+    ackTicket: Types.Acknowledgement
     index: Uint8Array
   }[]
 > {
-  const { AcknowledgedTicket } = node.paymentChannels.types
   const results: {
-    ackTicket: Types.AcknowledgedTicket
+    ackTicket: Types.Acknowledgement
     index: Uint8Array
   }[] = []
 
@@ -99,10 +98,10 @@ export async function getAcknowledgedTickets(
       })
       .on('error', (err) => reject(err))
       .on('data', async ({ key, value }: { key: Buffer; value: Buffer }) => {
-        if (value.buffer.byteLength !== AcknowledgedTicket.SIZE) return
+        if (value.buffer.byteLength !== Acknowledgement.SIZE) return
 
         const index = node._dbKeys.AcknowledgedTicketsParse(key)
-        const ackTicket = AcknowledgedTicket.create({
+        const ackTicket = Acknowledgement.create({
           bytes: value.buffer,
           offset: value.byteOffset
         })
@@ -125,21 +124,20 @@ export async function getAcknowledgedTickets(
  * Delete acknowledged tickets
  * @param filter optionally filter by signer
  */
-export async function deleteAcknowledgedTickets(
+export async function deleteAcknowledgements(
   node: Hopr<Chain>,
   filter?: {
     signer: Uint8Array
   }
 ): Promise<void> {
-  const tickets = await getAcknowledgedTickets(node, filter)
-
+  const acks  = await getAcknowledgements(node, filter)
   await node.db.batch(
     await Promise.all(
-      tickets.map<any>(async (ticket) => {
+      acks.map<any>(async (ack) => {
         return {
           type: 'del',
           key: Buffer.from(
-            node._dbKeys.AcknowledgedTickets((await ticket.ackTicket.signedTicket).ticket.challenge.serialize())
+            node._dbKeys.AcknowledgedTickets(ack.ackTicket.ticket.challenge.serialize())
           )
         }
       })
@@ -152,9 +150,9 @@ export async function deleteAcknowledgedTickets(
  * @param ackTicket Uint8Array
  * @param index Uint8Array
  */
-export async function updateAcknowledgedTicket(
+export async function updateAcknowledgement(
   node: Hopr<Chain>,
-  ackTicket: Types.AcknowledgedTicket,
+  ackTicket: Types.Acknowledgement,
   index: Uint8Array
 ): Promise<void> {
   await node.db.put(Buffer.from(node._dbKeys.AcknowledgedTickets(index)), Buffer.from(ackTicket))
@@ -164,8 +162,8 @@ export async function updateAcknowledgedTicket(
  * Delete acknowledged ticket in database
  * @param index Uint8Array
  */
-export async function deleteAcknowledgedTicket(node: Hopr<Chain>, index: Uint8Array): Promise<void> {
-  await node.db.del(Buffer.from(node._dbKeys.AcknowledgedTickets(index)))
+export async function deleteAcknowledgement(node: Hopr<Chain>, index: Uint8Array): Promise<void> {
+  await node.db.del(Buffer.from(node._dbKeys.Acknowledgements(index)))
 }
 
 /**
@@ -173,14 +171,14 @@ export async function deleteAcknowledgedTicket(node: Hopr<Chain>, index: Uint8Ar
  * @param ackTicket Uint8Array
  * @param index Uint8Array
  */
-export async function submitAcknowledgedTicket(
+export async function submitAcknowledgement(
   node: Hopr<Chain>,
-  ackTicket: Types.AcknowledgedTicket,
+  ackTicket: Types.Acknowledgement,
   index: Uint8Array
 ): Promise<SubmitTicketResponse> {
   try {
     const ethereum = node.paymentChannels
-    const signedTicket = await ackTicket.signedTicket
+    const signedTicket = await ackTicket.ticket
     const self = new PublicKey(ethereum.account.keys.onChain.pubKey)
     const counterparty = new PublicKey(await signedTicket.signer)
     const channel = new ethereum.channel(ethereum, self, counterparty)
@@ -188,11 +186,11 @@ export async function submitAcknowledgedTicket(
     const result = await channel.submitTicket(ackTicket, index)
     if (result.status === 'SUCCESS') {
       ackTicket.redeemed = true
-      await updateAcknowledgedTicket(node, ackTicket, index)
+      await updateAcknowledgement(node, ackTicket, index)
     } else if (result.status === 'FAILURE') {
-      await deleteAcknowledgedTicket(node, index)
+      await deleteAcknowledgement(node, index)
     } else if (result.status === 'ERROR') {
-      await deleteAcknowledgedTicket(node, index)
+      await deleteAcknowledgement(node, index)
       // @TODO: better handle this
     }
 
@@ -217,7 +215,7 @@ export async function getTickets(
     signer: Uint8Array
   }
 ): Promise<Types.Ticket[]> {
-  return Promise.all([getUnacknowledgedTickets(node, filter), getAcknowledgedTickets(node, filter)]).then(
+  return Promise.all([getUnacknowledgedTickets(node, filter), getAcknowledgements(node, filter)]).then(
     async ([unAcks, acks]) => {
       const unAckTickets = await Promise.all(unAcks.map((o) => o.signedTicket))
       const ackTickets = await Promise.all(acks.map((o) => o.ackTicket.signedTicket))
@@ -239,7 +237,7 @@ export async function deleteTickets(
     signer: Uint8Array
   }
 ): Promise<void> {
-  await Promise.all([deleteUnacknowledgedTickets(node, filter), deleteAcknowledgedTickets(node, filter)])
+  await Promise.all([deleteUnacknowledgedTickets(node, filter), deleteAcknowledgements(node, filter)])
 }
 
 /**
