@@ -128,7 +128,7 @@ export async function deleteAcknowledgedTickets(
     signer: Uint8Array
   }
 ): Promise<void> {
-  const acks  = await getAcknowledgements(node, filter)
+  const acks = await getAcknowledgements(node, filter)
   await node.db.batch(
     await Promise.all(
       acks.map<any>(async (ack) => {
