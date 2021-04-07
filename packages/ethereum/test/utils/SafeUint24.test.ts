@@ -1,3 +1,4 @@
+import type { PromiseValue } from '../utils'
 import { deployments, ethers } from 'hardhat'
 import { expect } from 'chai'
 import { SafeUint24Mock__factory } from '../../types'
@@ -83,8 +84,13 @@ describe('SafeMath', function () {
   })
 
   describe('mod', function () {
-    describe('modulos correctly', async function () {
-      const { safeMath } = await useFixtures()
+    describe('modulos correctly', function () {
+      let safeMath: PromiseValue<ReturnType<typeof useFixtures>>['safeMath']
+
+      before(async function () {
+        const f = await useFixtures()
+        safeMath = f.safeMath
+      })
 
       it('when the dividend is smaller than the divisor', async function () {
         const a = ethers.BigNumber.from('284')
