@@ -1,4 +1,4 @@
-import type { UINT256 as IUINT256} from '@hoprnet/hopr-core-connector-interface'
+import type { UINT256 as IUINT256 } from '@hoprnet/hopr-core-connector-interface'
 import BN from 'bn.js'
 
 class UINT256 implements IUINT256 {
