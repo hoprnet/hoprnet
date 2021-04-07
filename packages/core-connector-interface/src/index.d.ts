@@ -119,11 +119,6 @@ export {
   Indexer,
   RoutingChannel,
   HoprCoreConnectorStatic,
-  Ticket,
-  UINT256,
-  AccountEntry,
-  ChannelEntry,
-  Acknowledgement
 }
 
 export default HoprCoreConnector
