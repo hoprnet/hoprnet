@@ -24,7 +24,7 @@ import NetworkPeers from './network/network-peers'
 import Heartbeat from './network/heartbeat'
 import { findPath } from './path'
 
-import { addPubKey, getAcknowledgedTickets, submitAcknowledgedTicket } from './utils'
+import { addPubKey, getAcknowledgements, submitAcknowledgedTicket } from './utils'
 import { u8aToHex } from '@hoprnet/hopr-utils'
 import { existsSync, mkdirSync } from 'fs'
 import getIdentity from './identity'
@@ -41,7 +41,7 @@ import HoprCoreEthereum, {
   Balance,
   NativeBalance,
   Hash,
-  AcknowledgedTicket
+  Acknowledgement
 } from '@hoprnet/hopr-core-ethereum'
 import BN from 'bn.js'
 
@@ -620,10 +620,10 @@ class Hopr extends EventEmitter {
   }
 
   public async getAcknowledgedTickets() {
-    return getAcknowledgedTickets(this)
+    return getAcknowledgements(this)
   }
 
-  public async submitAcknowledgedTicket(ackTicket: AcknowledgedTicket, index: Uint8Array) {
+  public async submitAcknowledgedTicket(ackTicket: Acknowledgement, index: Uint8Array) {
     return submitAcknowledgedTicket(this, ackTicket, index)
   }
 

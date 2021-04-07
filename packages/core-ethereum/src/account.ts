@@ -6,7 +6,7 @@ import Web3 from 'web3'
 import { durations, u8aToHex, isExpired } from '@hoprnet/hopr-utils'
 import NonceTracker from './nonce-tracker'
 import TransactionManager from './transaction-manager'
-import { Address, AcknowledgedTicket, Balance, Hash, Ticket, NativeBalance, UINT256, PublicKey } from './types'
+import { Address, Acknowledgement, Balance, Hash, Ticket, NativeBalance, UINT256, PublicKey } from './types'
 import { isWinningTicket, isGanache, getNetworkGasPrice } from './utils'
 import { WEB3_CACHE_TTL } from './constants'
 import * as ethereum from './ethereum'
@@ -121,10 +121,10 @@ class Account {
    * Reserve a preImage for the given ticket if it is a winning ticket.
    * @param ticket the acknowledged ticket
    */
-  async acknowledge(ticket: Ticket, response: Hash): Promise<AcknowledgedTicket | null> {
+  async acknowledge(ticket: Ticket, response: Hash): Promise<Acknowledgement | null> {
     await this.initPreimage()
     if (await isWinningTicket(ticket.getHash(), response, this.preimage, ticket.winProb)) {
-      const ack = new AcknowledgedTicket(ticket, response, this.preimage)
+      const ack = new Acknowledgement(ticket, response, this.preimage)
       this.preimage = await this.coreConnector.hashedSecret.findPreImage(this.preimage)
       return ack
     } else {

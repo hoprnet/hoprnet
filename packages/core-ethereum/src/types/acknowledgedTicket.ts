@@ -2,7 +2,7 @@ import { Hash, Ticket } from '.'
 import { Acknowledgement as IAcknowledgement } from '@hoprnet/hopr-core-connector-interface'
 import { serializeToU8a } from '@hoprnet/hopr-utils'
 
-class AcknowledgedTicket implements IAcknowledgement {
+class Acknowledgement implements IAcknowledgement {
   constructor(readonly ticket: Ticket, readonly response: Hash, readonly preImage: Hash) {}
 
   serialize(): Uint8Array {
@@ -18,4 +18,4 @@ class AcknowledgedTicket implements IAcknowledgement {
   }
 }
 
-export default AcknowledgedTicket
+export default Acknowledgement
