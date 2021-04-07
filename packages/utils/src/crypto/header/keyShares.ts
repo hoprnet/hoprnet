@@ -45,7 +45,7 @@ export function generateKeyShares(path: PeerId[]): [alpha: Uint8Array, secrets: 
     }
   } while (!done)
 
-  return [keyPair[1], secrets]
+  return [publicKeyConvert(keyPair[1]), secrets]
 }
 
 /**
@@ -59,7 +59,7 @@ export function forwardTransform(alpha: Uint8Array, privKey: PeerId): [alpha: Ui
 
   const key = keyExtract(publicKeyTweakMul(alpha, privKey.privKey.marshal(), false), privKey.pubKey.marshal())
 
-  return [publicKeyTweakMul(alpha, key, false), key]
+  return [publicKeyConvert(publicKeyTweakMul(alpha, key, false)), key]
 }
 
 function keyExtract(groupElement: Uint8Array, pubKey: Uint8Array) {
