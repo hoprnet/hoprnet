@@ -13,12 +13,6 @@ export function generateKeyShares(path: PeerId[]): [alpha: Uint8Array, secrets: 
 
   const product = new Uint8Array(PRIVATE_KEY_LENGTH)
 
-  // Generate the Diffie-Hellman key shares and
-  // the respective blinding factors for the
-  // relays.
-  // There exists a negligible, but NON-ZERO,
-  // probability that the key share is chosen
-  // such that it yields non-group elements.
   do {
     secrets = []
 
