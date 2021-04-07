@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 import Hopr from '@hoprnet/hopr-core'
 import type { HoprOptions } from '@hoprnet/hopr-core'
-import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import { decode } from 'rlp'
 import { getBootstrapAddresses } from '@hoprnet/hopr-utils'
 import { Commands } from './commands'
@@ -134,7 +133,7 @@ async function generateNodeOptions(): Promise<HoprOptions> {
 }
 
 async function main() {
-  let node: Hopr<HoprCoreConnector>
+  let node: Hopr
   let logs = new LogStream()
   let adminServer = undefined
   let cmds

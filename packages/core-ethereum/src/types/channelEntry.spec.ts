@@ -24,17 +24,17 @@ describe('ChannelEntry', function () {
 
   it('should contain the right values', function () {
     const channelEntry = ChannelEntry.deserialize(
-      new ChannelEntry(
+      ChannelEntry.fromObject({
         partyA,
         partyB,
-        new BN(10),
-        new BN(3),
-        new BN(10),
-        new BN(50),
-        true,
-        new BN(1),
-        new BN(2)
-      ).serialize()
+        deposit: new BN(10),
+        partyABalance: new BN(3),
+        closureTime: new BN(10),
+        stateCounter: new BN(50),
+        closureByPartyA: true,
+        openedAt: new BN(1),
+        closedAt: new BN(2)
+      }).serialize()
     )
 
     expect(channelEntry.partyA.toHex()).to.equal(partyA.toHex())

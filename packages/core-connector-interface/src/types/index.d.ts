@@ -1,12 +1,9 @@
-import AcknowledgedTicket from './acknowledgedTicket'
-import Signature from './signature'
-import SignedTicket from './signedTicket'
 import Ticket from './ticket'
 import BN from 'bn.js'
 
 declare interface AddressStatic {
   readonly SIZE: number
-  new (accountId: Uint8Array): Address
+  new (arr: Uint8Array): Address
   fromString(str: string): Address
 }
 declare interface Address {
@@ -67,10 +64,7 @@ declare interface AccountEntry {
 }
 declare var AccountEntry: AccountEntryStatic
 
-declare interface ChannelEntryStatic {
-  readonly SIZE: number
-}
-declare interface ChannelEntry {
+interface ChannelEntryVals {
   partyA: Address
   partyB: Address
   deposit: BN
@@ -80,6 +74,14 @@ declare interface ChannelEntry {
   closureByPartyA: boolean
   openedAt: BN
   closedAt: BN
+}
+declare interface ChannelEntryStatic {
+  readonly SIZE: number
+  new (...ChannelEntryVals): ChannelEntry
+  fromObject(obj: ChannelEntryVals): ChannelEntry
+}
+declare interface ChannelEntry extends ChannelEntryVals {
+  serialize(): Uint8Array
   getStatus(): 'CLOSED' | 'OPEN' | 'PENDING_TO_CLOSE'
   getIteration(): BN
   getId(): Promise<Hash>
@@ -112,17 +114,38 @@ declare interface PublicKey {
 
 declare var PublicKey: PublicStatic
 
+declare interface SignatureStatic {
+  readonly SIZE: number
+  deserialize(arr: Uint8Array): Signature
+}
+declare interface Signature {
+  signature: Uint8Array
+  recovery: number
+  serialize(): Uint8Array
+}
+declare var Signature: SignatureStatic
+
+declare interface AcknowledgedmentStatic {
+  SIZE: number
+}
+
+declare interface Acknowledgement {
+  ticket: Ticket
+  response: Hash
+  preImage: Hash
+}
+declare var AcknowledgedTicket: AcknowledgedTicketStatic
+
 export {
   AccountEntry,
   Address,
-  AcknowledgedTicket,
+  Acknowledgement,
   Balance,
   ChannelEntry,
   Hash,
   NativeBalance,
   PublicKey,
   Signature,
-  SignedTicket,
   Ticket,
   UINT256
 }

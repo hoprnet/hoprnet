@@ -1,5 +1,4 @@
 import { encode, decode } from 'rlp'
-import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 import { AbstractCommand } from './abstractCommand'
 import debug from 'debug'
@@ -31,7 +30,7 @@ export class CoverTraffic extends AbstractCommand {
   private totalLatency: number
 
   private identifier: string
-  constructor(public node: Hopr<HoprCoreConnector>) {
+  constructor(public node: Hopr) {
     super()
     this.messagesSent = 0
     this.messagesReceived = 0

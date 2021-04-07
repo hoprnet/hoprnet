@@ -1,19 +1,13 @@
 import assert from 'assert'
 import { Challenge } from './challenge'
-import { Utils, Types, Hash } from '@hoprnet/hopr-core-ethereum'
+import { Hash } from '@hoprnet/hopr-core-ethereum'
 import BN from 'bn.js'
 import PeerId from 'peer-id'
-import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import { randomBytes } from 'crypto'
 import { randomInteger, u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
 
 describe('test creation & verification of a challenge', function () {
   it('should create a verifiable challenge', async function () {
-    const paymentChannels = ({
-      utils: Utils,
-      types: new Types()
-    } as unknown) as HoprCoreConnector
-
     for (let i = 0; i < 10; i++) {
       const secret = randomBytes(32)
 
@@ -21,7 +15,7 @@ describe('test creation & verification of a challenge', function () {
         keyType: 'secp256k1'
       })
 
-      const challenge = await Challenge.create(paymentChannels, new Hash(secret), new BN(0)).sign(peerId)
+      const challenge = await Challenge.create(new Hash(secret), new BN(0)).sign(peerId)
 
       assert(await challenge.verify(peerId), `Previously generated signature should be valid.`)
 

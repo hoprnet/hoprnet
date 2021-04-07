@@ -7,8 +7,8 @@ import BN from 'bn.js'
  * @param ackTickets
  * @returns a promise that resolves into an array of signed tickets
  */
-export async function toSignedTickets(ackTickets: Types.AcknowledgedTicket[]): Promise<Types.SignedTicket[]> {
-  return Promise.all(ackTickets.map((ackTicket) => ackTicket.signedTicket))
+export async function toSignedTickets(ackTickets: Types.Acknowledgement[]): Promise<Types.Ticket[]> {
+  return Promise.all(ackTickets.map((ackTicket) => ackTicket.ticket))
 }
 
 /**
@@ -18,7 +18,7 @@ export async function toSignedTickets(ackTickets: Types.AcknowledgedTicket[]): P
  * @returns the total amount of tokens in the tickets & more
  */
 export function countSignedTickets(
-  signedTickets: Types.SignedTicket[]
+  signedTickets: Types.Ticket[]
 ): {
   tickets: {
     challange: string
@@ -29,10 +29,10 @@ export function countSignedTickets(
   const { tickets, total } = signedTickets.reduce(
     (result, signedTicket) => {
       result.tickets.push({
-        challange: signedTicket.ticket.challenge.toHex(),
-        amount: signedTicket.ticket.amount.toBN().toString(10)
+        challange: signedTicket.challenge.toHex(),
+        amount: signedTicket.amount.toBN().toString(10)
       })
-      result.total = result.total.add(signedTicket.ticket.amount.toBN())
+      result.total = result.total.add(signedTicket.amount.toBN())
 
       return result
     },

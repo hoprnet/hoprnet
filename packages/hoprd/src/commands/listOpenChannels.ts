@@ -1,4 +1,3 @@
-import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 import { moveDecimalPoint, pubKeyToPeerId, u8aEquals } from '@hoprnet/hopr-utils'
 import chalk from 'chalk'
@@ -6,7 +5,7 @@ import { AbstractCommand } from './abstractCommand'
 import { getPaddingLength, styleValue } from './utils'
 
 export default class ListOpenChannels extends AbstractCommand {
-  constructor(public node: Hopr<HoprCoreConnector>) {
+  constructor(public node: Hopr) {
     super()
   }
 
@@ -92,7 +91,7 @@ export default class ListOpenChannels extends AbstractCommand {
           selfIsPartyA ? channel.partyABalance.toString() : channel.deposit.sub(channel.partyABalance).toString(),
           types.Balance.DECIMALS * -1
         )
-        const peerId = (await pubKeyToPeerId(counterpartyPubKey)).toB58String()
+        const peerId = (await pubKeyToPeerId(counterpartyPubKey.serialize())).toB58String()
 
         result.push(
           this.generateOutput({

@@ -1,6 +1,5 @@
 import Hopr, { SUGGESTED_NATIVE_BALANCE } from '@hoprnet/hopr-core'
 import BN from 'bn.js'
-import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import http from 'http'
 import fs from 'fs'
 import ws from 'ws'
@@ -18,7 +17,7 @@ let debugLog = debug('hoprd:admin')
 export class AdminServer {
   private app: any
   private server: Server | undefined
-  private node: Hopr<HoprCoreConnector> | undefined
+  private node: Hopr | undefined
   private wsServer: any
   private cmds: any
 
@@ -54,7 +53,7 @@ export class AdminServer {
     this.logs.log('Admin server listening on port ' + this.port)
   }
 
-  registerNode(node: Hopr<HoprCoreConnector>, cmds: any, settings?: any) {
+  registerNode(node: Hopr, cmds: any, settings?: any) {
     this.node = node
     this.cmds = cmds
     if (settings) {
@@ -148,7 +147,7 @@ export async function reportMemoryUsage(logs: LogStream) {
   setTimeout(() => reportMemoryUsage(logs), 60_000)
 }
 
-export async function connectionReport(node: Hopr<HoprCoreConnector>, logs: LogStream) {
+export async function connectionReport(node: Hopr, logs: LogStream) {
   logs.logConnectedPeers(node.getConnectedPeers().map((p) => p.toB58String()))
   setTimeout(() => connectionReport(node, logs), 60_000)
 }

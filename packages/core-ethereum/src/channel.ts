@@ -1,7 +1,7 @@
 import type { Channel as IChannel, Types as Interfaces } from '@hoprnet/hopr-core-connector-interface'
 import type Connector from '.'
 import BN from 'bn.js'
-import { PublicKey, Balance, Hash, UINT256, Ticket, SignedTicket, AcknowledgedTicket } from './types'
+import { PublicKey, Balance, Hash, UINT256, Ticket, Acknowledgement, ChannelEntry } from './types'
 import { getId, waitForConfirmation, computeWinningProbability, checkChallenge, isWinningTicket } from './utils'
 import Debug from 'debug'
 
@@ -18,7 +18,7 @@ class Channel implements IChannel {
     return getId(await this.self.toAddress(), await this.counterparty.toAddress())
   }
 
-  async getState() {
+  async getState(): Promise<ChannelEntry> {
     const channelId = await this.getId()
     const state = await this.connector.indexer.getChannel(channelId)
     if (state) return state
@@ -146,60 +146,39 @@ class Channel implements IChannel {
   }
 
   async createTicket(amount: Balance, challenge: Hash, winProb: number) {
-    const ticketWinProb = computeWinningProbability(winProb)
-    const channelState = await this.getState()
     const counterpartyAddress = await this.counterparty.toAddress()
     const counterpartyState = await this.connector.indexer.getAccount(counterpartyAddress)
-    const channelIteration = new UINT256(channelState.getIteration())
-
-    const ticket = new Ticket(undefined, {
-      counterparty: counterpartyAddress,
+    return Ticket.create(
+      counterpartyAddress,
       challenge,
-      epoch: new UINT256(counterpartyState!.counter),
+      new UINT256(counterpartyState.counter),
       amount,
-      winProb: ticketWinProb,
-      channelIteration
-    })
-
-    // TODO: simplify
-    const signature = await ticket.sign(this.connector.account.keys.onChain.privKey)
-
-    return new SignedTicket(undefined, {
-      signature,
-      ticket
-    })
+      computeWinningProbability(winProb),
+      new UINT256((await this.getState()).getIteration()),
+      this.connector.account.keys.onChain.privKey
+    )
   }
 
-  async createDummyTicket(challenge: Hash): Promise<SignedTicket> {
-    const counterpartyAddress = await this.counterparty.toAddress()
-
+  async createDummyTicket(challenge: Hash): Promise<Ticket> {
     // TODO: document how dummy ticket works
-    const ticket = new Ticket(undefined, {
-      counterparty: counterpartyAddress,
+    return Ticket.create(
+      await this.counterparty.toAddress(),
       challenge,
-      epoch: UINT256.fromString('0'),
-      amount: new Balance(new BN(0)),
-      winProb: computeWinningProbability(1),
-      channelIteration: UINT256.fromString('0')
-    })
-
-    // TODO: simplify
-    const signature = await ticket.sign(this.connector.account.keys.onChain.privKey)
-
-    return new SignedTicket(undefined, {
-      signature,
-      ticket
-    })
+      UINT256.fromString('0'),
+      new Balance(new BN(0)),
+      computeWinningProbability(1),
+      UINT256.fromString('0'),
+      this.connector.account.keys.onChain.privKey
+    )
   }
 
-  async submitTicket(ackTicket: AcknowledgedTicket): ReturnType<IChannel['submitTicket']> {
+  async submitTicket(ackTicket: Acknowledgement): ReturnType<IChannel['submitTicket']> {
     try {
-      const signedTicket = await ackTicket.signedTicket
-      const ticket = signedTicket.ticket
+      const ticket = ackTicket.ticket
 
       log('Submitting ticket', ackTicket.response.toHex())
       const { hoprChannels, account, utils } = this.connector
-      const { r, s, v } = utils.getSignatureParameters(signedTicket.signature)
+      const { r, s, v } = utils.getSignatureParameters(ticket.signature)
 
       const emptyPreImage = new Hash(new Uint8Array(Hash.SIZE).fill(0x00))
       const hasPreImage = !ackTicket.preImage.eq(emptyPreImage)
@@ -220,7 +199,7 @@ class Channel implements IChannel {
         }
       }
 
-      const isWinning = await isWinningTicket(await ticket.hash, ackTicket.response, ackTicket.preImage, ticket.winProb)
+      const isWinning = await isWinningTicket(ticket.getHash(), ackTicket.response, ackTicket.preImage, ticket.winProb)
       if (!isWinning) {
         log(`Failed to submit ticket ${ackTicket.response.toHex()}:  'Not a winning ticket.'`)
         return {
@@ -229,7 +208,7 @@ class Channel implements IChannel {
         }
       }
 
-      const counterparty = (await signedTicket.signer).toAddress()
+      const counterparty = ticket.getSigner().toAddress()
       const transaction = await account.signTransaction(
         {
           from: account.address.toHex(),
@@ -248,7 +227,7 @@ class Channel implements IChannel {
       )
 
       await transaction.send()
-      ackTicket.redeemed = true
+      // TODO delete ackTicket
       this.connector.account.updateLocalState(ackTicket.preImage)
 
       log('Successfully submitted ticket', ackTicket.response.toHex())

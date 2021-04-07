@@ -1,4 +1,3 @@
-import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 import { moveDecimalPoint } from '@hoprnet/hopr-utils'
@@ -6,7 +5,7 @@ import { countSignedTickets, styleValue, toSignedTickets } from './utils'
 import { AbstractCommand } from './abstractCommand'
 
 export default class RedeemTickets extends AbstractCommand {
-  constructor(public node: Hopr<HoprCoreConnector>) {
+  constructor(public node: Hopr) {
     super()
   }
 
@@ -26,18 +25,14 @@ export default class RedeemTickets extends AbstractCommand {
     const { Balance } = paymentChannels.types
 
     try {
-      // get only unredeemed tickets
-      const results = await this.node.getAcknowledgedTickets().then((tickets) => {
-        return tickets.filter((ticket) => !ticket.ackTicket.redeemed)
-      })
-
+      const results = await this.node.getAcknowledgedTickets()
       if (results.length === 0) {
         return 'No unredeemed tickets found.'
       }
 
       console.log(`Redeeming ${styleValue(results.length)} tickets..`)
 
-      const redeemedTickets: Types.AcknowledgedTicket[] = []
+      const redeemedTickets: Types.Acknowledgement[] = []
       let count = 0
 
       for (const { ackTicket, index } of results) {

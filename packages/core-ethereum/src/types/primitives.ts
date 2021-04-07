@@ -1,13 +1,14 @@
 import createKeccakHash from 'keccak'
-import { ADDRESS_LENGTH, HASH_LENGTH } from '../constants'
+import { ADDRESS_LENGTH, HASH_LENGTH, SIGNATURE_LENGTH, SIGNATURE_RECOVERY_LENGTH } from '../constants'
 import { u8aToHex, u8aEquals, stringToU8a, moveDecimalPoint, u8aConcat } from '@hoprnet/hopr-utils'
 import type { Types as Interfaces } from '@hoprnet/hopr-core-connector-interface'
 import Web3 from 'web3'
 import BN from 'bn.js'
-import { publicKeyConvert, publicKeyCreate } from 'secp256k1'
+import { publicKeyConvert, publicKeyCreate, ecdsaSign, ecdsaVerify } from 'secp256k1'
+import { serializeToU8a, u8aSplit, u8aToNumber } from '@hoprnet/hopr-utils'
 
 export class Address implements Interfaces.Address {
-  constructor(private id: Uint8Array) {}
+  constructor(private arr: Uint8Array) {}
 
   static get SIZE(): number {
     return ADDRESS_LENGTH
@@ -19,15 +20,15 @@ export class Address implements Interfaces.Address {
   }
 
   serialize() {
-    return this.id
+    return this.arr
   }
 
   toHex(): string {
-    return Web3.utils.toChecksumAddress(u8aToHex(this.id, false))
+    return Web3.utils.toChecksumAddress(u8aToHex(this.arr, false))
   }
 
   eq(b: Address) {
-    return u8aEquals(this.id, b.serialize())
+    return u8aEquals(this.arr, b.serialize())
   }
 }
 
@@ -173,4 +174,31 @@ export class PublicKey implements Interfaces.PublicKey {
   eq(b: PublicKey) {
     return u8aEquals(this.arr, b.serialize())
   }
+}
+
+export class Signature implements Interfaces.Signature {
+  constructor(readonly signature: Uint8Array, readonly recovery: number) {}
+
+  static deserialize(arr: Uint8Array): Signature {
+    const [s, r] = u8aSplit(arr, [SIGNATURE_LENGTH, SIGNATURE_RECOVERY_LENGTH])
+    return new Signature(s, u8aToNumber(r) as number)
+  }
+
+  static create(msg: Uint8Array, privKey: Uint8Array): Signature {
+    const result = ecdsaSign(msg, privKey)
+    return new Signature(result.signature, result.recid)
+  }
+
+  serialize(): Uint8Array {
+    return serializeToU8a([
+      [this.signature, SIGNATURE_LENGTH],
+      [Uint8Array.of(this.recovery), SIGNATURE_RECOVERY_LENGTH]
+    ])
+  }
+
+  verify(msg: Uint8Array, pubKey: PublicKey): boolean {
+    return ecdsaVerify(this.signature, msg, pubKey.serialize())
+  }
+
+  static SIZE = SIGNATURE_LENGTH + SIGNATURE_RECOVERY_LENGTH
 }

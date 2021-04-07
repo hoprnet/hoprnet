@@ -1,166 +1,58 @@
 import secp256k1 from 'secp256k1'
-
-import { u8aConcat } from '@hoprnet/hopr-utils'
 import { deriveTicketKeyBlinding } from '../packet/header'
 import { KEY_LENGTH } from '../packet/header/parameters'
 import { Challenge } from '../packet/challenge'
-import HoprCoreConnector, { Types } from '@hoprnet/hopr-core-connector-interface'
+import { Hash, Signature, PublicKey } from '@hoprnet/hopr-core-ethereum'
 import PeerId from 'peer-id'
+import { serializeToU8a, u8aConcat, u8aSplit } from '@hoprnet/hopr-utils'
 
 /**
  * This class encapsulates the message that is sent back to the relayer
  * and allows that party to compute the key that is necessary to redeem
  * the previously received transaction.
  */
-class Acknowledgement<Chain extends HoprCoreConnector> extends Uint8Array {
-  private _responseSigningParty?: Uint8Array
-  private _responseSignature?: Types.Signature
-  private _hashedKey?: Types.Hash
+class AcknowledgementMessage {
+  constructor(readonly key: Uint8Array, readonly challenge: Challenge, readonly signature?: Signature) {}
 
-  private paymentChannels: Chain
-
-  constructor(
-    paymentChannels: Chain,
-    arr?: {
-      bytes: ArrayBuffer
-      offset: number
-    },
-    struct?: {
-      key: Uint8Array
-      challenge: Challenge<Chain>
-      signature?: Types.Signature
-    }
-  ) {
-    if (arr == null) {
-      super(Acknowledgement.SIZE(paymentChannels))
-    } else {
-      super(arr.bytes, arr.offset, Acknowledgement.SIZE(paymentChannels))
-    }
-
-    if (struct != null) {
-      if (struct.key != null) {
-        this.set(struct.key, this.keyOffset - this.byteOffset)
-      }
-
-      if (struct.challenge != null) {
-        this.set(struct.challenge, this.challengeOffset - this.byteOffset)
-      }
-
-      if (struct.signature != null) {
-        this.set(struct.signature, this.responseSignatureOffset - this.byteOffset)
-      }
-    }
-
-    this.paymentChannels = paymentChannels
-  }
-
-  slice(begin: number = 0, end: number = Acknowledgement.SIZE(this.paymentChannels)) {
-    return this.subarray(begin, end)
-  }
-
-  subarray(begin: number = 0, end: number = Acknowledgement.SIZE(this.paymentChannels)): Uint8Array {
-    return new Uint8Array(this.buffer, begin + this.byteOffset, end - begin)
-  }
-
-  get keyOffset(): number {
-    return this.byteOffset
-  }
-
-  get key(): Uint8Array {
-    return new Uint8Array(this.buffer, this.keyOffset, KEY_LENGTH)
-  }
-
-  get hashedKey(): Promise<Types.Hash> {
-    if (this._hashedKey != null) {
-      return Promise.resolve(this._hashedKey)
-    }
-
-    return this.paymentChannels.utils.hash(this.key).then((hashedKey: Types.Hash) => {
-      this._hashedKey = hashedKey
-
-      return hashedKey
-    })
-  }
-
-  get challengeOffset(): number {
-    return this.byteOffset + KEY_LENGTH
-  }
-
-  get challenge(): Challenge<Chain> {
-    return new Challenge<Chain>(this.paymentChannels, {
-      bytes: this.buffer,
-      offset: this.challengeOffset
-    })
-  }
-
-  get hash(): Promise<Types.Hash> {
-    return this.paymentChannels.utils.hash(
-      new Uint8Array(this.buffer, this.byteOffset, KEY_LENGTH + Challenge.SIZE(this.paymentChannels))
+  static deserialize(arr: Uint8Array) {
+    const components = u8aSplit(arr, [KEY_LENGTH, Challenge.SIZE(), Signature.SIZE])
+    return new AcknowledgementMessage(
+      components[0],
+      new Challenge({ bytes: components[1], offset: components[1].byteOffset }),
+      Signature.deserialize(components[2])
     )
   }
 
-  get challengeSignatureHash(): Promise<Types.Hash> {
-    return this.paymentChannels.utils.hash(this.challenge)
+  serialize(): Uint8Array {
+    return serializeToU8a([
+      [this.key, KEY_LENGTH],
+      [this.challenge, Challenge.SIZE()],
+      [this.signature.serialize(), Signature.SIZE]
+    ])
   }
 
-  get challengeSigningParty() {
-    return this.challenge.counterparty
+  getHashedKey(): Hash {
+    return Hash.create(this.key)
   }
 
-  get responseSignatureOffset(): number {
-    return this.byteOffset + KEY_LENGTH + Challenge.SIZE(this.paymentChannels)
-  }
+  //get challengeSignatureHash(): Promise<Hash> {
+  //  return Promise.resolve(Hash.create(this.challenge))
+  //}
 
-  get responseSignature(): Promise<Types.Signature> {
-    if (this._responseSignature != null) {
-      return Promise.resolve(this._responseSignature)
-    }
+  //get challengeSigningParty() {
+  //  return this.challenge.counterparty
+  //}
 
-    return new Promise<Types.Signature>(async (resolve) => {
-      this._responseSignature = await this.paymentChannels.types.Signature.create({
-        bytes: this.buffer,
-        offset: this.responseSignatureOffset
-      })
+  // this.signature  get responseSignature(): Promise<Signature> {
 
-      resolve(this._responseSignature)
-    })
-  }
-
-  get responseSigningParty(): Promise<Uint8Array> {
-    if (this._responseSigningParty != null) {
-      return Promise.resolve(this._responseSigningParty)
-    }
-
-    return new Promise<Uint8Array>(async (resolve) => {
-      const responseSignature = await this.responseSignature
-      this._responseSigningParty = secp256k1.ecdsaRecover(
-        responseSignature.signature,
-        responseSignature.recovery,
-        responseSignature.msgPrefix != null && responseSignature.msgPrefix.length > 0
-          ? (
-              await this.paymentChannels.utils.hash(
-                u8aConcat(responseSignature.msgPrefix, (await this.hash).serialize())
-              )
-            ).serialize()
-          : (await this.hash).serialize()
-      )
-
-      resolve(this._responseSigningParty)
-    })
-  }
-
-  async sign(peerId: PeerId): Promise<Acknowledgement<Chain>> {
-    const signature = await this.paymentChannels.utils.sign((await this.hash).serialize(), peerId.privKey.marshal())
-    this.set(signature, this.responseSignatureOffset - this.byteOffset)
-    return this
+  get responseSigningParty(): Uint8Array {
+    const hash = Hash.create(u8aConcat(this.key, this.challenge.serialize()))
+    return secp256k1.ecdsaRecover(this.signature.signature, this.signature.recovery, hash.serialize())
   }
 
   async verify(peerId: PeerId): Promise<boolean> {
-    return this.paymentChannels.utils.verify(
-      (await this.hash).serialize(),
-      await this.responseSignature,
-      peerId.pubKey.marshal()
-    )
+    const hash = Hash.create(u8aConcat(this.key, this.challenge.serialize()))
+    return this.signature.verify(hash.serialize(), new PublicKey(peerId.pubKey.marshal()))
   }
 
   /**
@@ -171,26 +63,20 @@ class Acknowledgement<Chain extends HoprCoreConnector> extends Uint8Array {
    * @param derivedSecret the secret that is used to create the second key half
    * @param signer contains private key
    */
-  static async create<Chain extends HoprCoreConnector>(
-    hoprCoreConnector: Chain,
-    challenge: Challenge<Chain>,
+  static async create(
+    challenge: Challenge,
     derivedSecret: Uint8Array,
     signer: PeerId
-  ): Promise<Acknowledgement<Chain>> {
-    const ack = new Acknowledgement(hoprCoreConnector, {
-      bytes: new Uint8Array(Acknowledgement.SIZE(hoprCoreConnector)),
-      offset: 0
-    })
-
-    ack.set(deriveTicketKeyBlinding(derivedSecret), ack.keyOffset - ack.byteOffset)
-    ack.set(challenge, ack.challengeOffset - ack.byteOffset)
-
-    return ack.sign(signer)
+  ): Promise<AcknowledgementMessage> {
+    const key = deriveTicketKeyBlinding(derivedSecret)
+    const hash = Hash.create(u8aConcat(key, challenge.serialize()))
+    const signature = Signature.create(hash.serialize(), signer.privKey.marshal())
+    return new AcknowledgementMessage(key, challenge, signature)
   }
 
-  static SIZE<Chain extends HoprCoreConnector>(hoprCoreConnector: Chain): number {
-    return KEY_LENGTH + Challenge.SIZE(hoprCoreConnector) + hoprCoreConnector.types.Signature.SIZE
+  static SIZE(): number {
+    return KEY_LENGTH + Challenge.SIZE() + Signature.SIZE
   }
 }
 
-export { Acknowledgement }
+export { AcknowledgementMessage }

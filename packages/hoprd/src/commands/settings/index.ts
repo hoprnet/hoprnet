@@ -1,6 +1,5 @@
 import { getPaddingLength, styleValue } from '../utils'
 import { AbstractCommand, GlobalState } from '../abstractCommand'
-import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 
 function booleanSetter(name: string) {
@@ -16,7 +15,7 @@ function booleanSetter(name: string) {
 export default class Settings extends AbstractCommand {
   private settings
 
-  constructor(private node: Hopr<HoprCoreConnector>) {
+  constructor(private node: Hopr) {
     super()
     this.settings = {
       includeRecipient: ['Prepends your address to all messages (true|false)', booleanSetter('includeRecipient')],

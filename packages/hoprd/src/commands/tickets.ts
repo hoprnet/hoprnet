@@ -1,11 +1,10 @@
-import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 import { moveDecimalPoint } from '@hoprnet/hopr-utils'
 import { AbstractCommand } from './abstractCommand'
 import { countSignedTickets, toSignedTickets, styleValue } from './utils'
 
 export default class Tickets extends AbstractCommand {
-  constructor(public node: Hopr<HoprCoreConnector>) {
+  constructor(public node: Hopr) {
     super()
   }
 
@@ -21,9 +20,7 @@ export default class Tickets extends AbstractCommand {
     try {
       const { Balance } = this.node.paymentChannels.types
 
-      const results = await this.node.getAcknowledgedTickets().then((tickets) => {
-        return tickets.filter((ticket) => !ticket.ackTicket.redeemed)
-      })
+      const results = await this.node.getAcknowledgedTickets()
 
       if (results.length === 0) {
         return 'No tickets found.'

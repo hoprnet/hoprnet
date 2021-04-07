@@ -1,4 +1,3 @@
-import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 import { AbstractCommand, GlobalState, AutoCompleteResult } from './abstractCommand'
 import { checkPeerIdInput, getPaddingLength, getPeerIdsAndAliases, styleValue } from './utils'
@@ -6,7 +5,7 @@ import { checkPeerIdInput, getPaddingLength, getPeerIdsAndAliases, styleValue } 
 export class Alias extends AbstractCommand {
   private parameters = ['PeerId', 'Name']
 
-  constructor(public node: Hopr<HoprCoreConnector>) {
+  constructor(public node: Hopr) {
     super()
   }
 

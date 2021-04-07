@@ -10,7 +10,7 @@ import BN from 'bn.js'
 import Web3 from 'web3'
 import { HoprToken } from './tsc/web3/HoprToken'
 import { Await } from './tsc/utils'
-import { AcknowledgedTicket, Balance, SignedTicket, Address } from './types'
+import { Balance, Ticket, Address } from './types'
 import CoreConnector from '.'
 import Channel from './channel'
 import * as testconfigs from './config.spec'
@@ -102,12 +102,10 @@ describe('test Channel class', function () {
       firstTicket.challenge,
       firstTicket.winProb
     )
-    const firstAckedTicket = new AcknowledgedTicket(undefined, {
-      signedTicket,
-      response: firstTicket.response
-    })
 
-    assert(partyA.pubKey.eq(await signedTicket.signer), `Check that signer is recoverable`)
+    const firstAckedTicket = await partyBConnector.account.acknowledge(signedTicket, firstTicket.response)
+
+    assert(partyA.pubKey.eq(signedTicket.getSigner()), `Check that signer is recoverable`)
 
     const partyAIndexerChannels = await partyAConnector.indexer.getChannels()
     assert(
@@ -118,7 +116,7 @@ describe('test Channel class', function () {
     const partyBChannel = new Channel(partyBConnector, partyB.pubKey, partyA.pubKey)
     assert((await partyAChannel.getState()).getStatus() === 'OPEN', `Checks that party A considers the channel open.`)
     assert((await partyBChannel.getState()).getStatus() === 'OPEN', `Checks that party A considers the channel open.`)
-    assert(await partyBConnector.account.reservePreImageIfIsWinning(firstAckedTicket), `ticket must be winning`)
+    assert(firstAckedTicket, `ticket must be winning`)
 
     const hashedSecretBefore = await partyBConnector.account.getOnChainSecret()
 
@@ -151,7 +149,7 @@ describe('test Channel class', function () {
     const ATTEMPTS = 20
 
     let ticketData
-    let nextSignedTicket: SignedTicket
+    let nextSignedTicket: Ticket
 
     for (let i = 0; i < ATTEMPTS; i++) {
       ticketData = await getTicketData({
@@ -163,15 +161,11 @@ describe('test Channel class', function () {
         ticketData.challenge,
         ticketData.winProb
       )
-      const ackedTicket = new AcknowledgedTicket(undefined, {
-        signedTicket: nextSignedTicket,
-        response: ticketData.response
-      })
+      const ackedTicket = await partyBConnector.account.acknowledge(nextSignedTicket, ticketData.response)
 
-      if (await partyBConnector.account.reservePreImageIfIsWinning(ackedTicket)) {
+      if (ackedTicket !== null) {
         const result = await partyBChannel.submitTicket(ackedTicket)
         assert(result.status === 'SUCCESS', 'ticket redeemption was not a success')
-        assert(result?.ackTicket?.redeemed, 'ticket should get marked as redeemed')
       }
     }
   })

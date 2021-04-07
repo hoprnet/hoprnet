@@ -1,4 +1,3 @@
-import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 import { clearString } from '@hoprnet/hopr-utils'
 import { SendMessageBase } from './sendMessage'
@@ -8,7 +7,7 @@ import { isBootstrapNode, checkPeerIdInput, styleValue } from './utils'
 import { GlobalState, AutoCompleteResult, CommandResponse } from './abstractCommand'
 
 export class MultiSendMessage extends SendMessageBase {
-  constructor(public node: Hopr<HoprCoreConnector>, public rl: readline.Interface) {
+  constructor(public node: Hopr, public rl: readline.Interface) {
     super(node)
   }
 

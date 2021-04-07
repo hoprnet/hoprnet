@@ -1,5 +1,4 @@
 import assert from 'assert'
-import { randomBytes } from 'crypto'
 import { durations, stringToU8a } from '@hoprnet/hopr-utils'
 import { Ganache } from '@hoprnet/hopr-testing'
 import { getAddresses, migrate, fund } from '@hoprnet/hopr-ethereum'
@@ -8,8 +7,6 @@ import * as Utils from './utils'
 import * as Types from './types'
 import * as testconfigs from './config.spec'
 import { createNode } from './utils/testing.spec'
-
-const EMPTY_HASHED_SECRET = new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0x00))
 const FUND_ARGS = `--address ${getAddresses()?.localhost?.HoprToken} --accounts-to-fund 1`
 
 // TODO: replace legacy test
@@ -51,6 +48,7 @@ describe('test hashedSecret', function () {
 
       let preImage = await connector.hashedSecret.findPreImage(onChainHash)
 
+      assert(preImage)
       assert(preImage.hash().eq(onChainHash))
 
       await connector.utils.waitForConfirmation(
@@ -131,87 +129,37 @@ describe('test hashedSecret', function () {
     })
 
     it('should reserve a preImage for tickets with 100% winning probabilty resp. should not reserve for 0% winning probability', async function () {
-      const firstTicket = new Types.AcknowledgedTicket(undefined, {
-        signedTicket: ({
-          ticket: {
-            hash: Promise.resolve(new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff))),
-            winProb: Utils.computeWinningProbability(1)
-          }
-        } as unknown) as Types.SignedTicket,
-        response: new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff))
-      })
+      const ticket1 = ({
+        getHash: () => new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff)),
+        winProb: Utils.computeWinningProbability(1)
+      } as unknown) as Types.Ticket
+      const response1 = new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff))
+
+      const ack = await connector.account.acknowledge(ticket1, response1)
+
+      assert(ack, 'ticket with 100% winning probability must always be a win')
+      const ack2 = await connector.account.acknowledge(ticket1, response1)
+      assert(ack2, 'ticket with 100% winning probability must always be a win')
 
       assert(
-        await connector.account.reservePreImageIfIsWinning(firstTicket),
-        'ticket with 100% winning probability must always be a win'
+        ack.preImage != null &&
+          ack2.preImage != null &&
+          !ack.preImage.eq(ack2.preImage) &&
+          ack2.preImage.hash().eq(ack.preImage)
       )
 
-      const firstPreImage = firstTicket.preImage.clone()
-      assert(
-        await connector.account.reservePreImageIfIsWinning(firstTicket),
-        'ticket with 100% winning probability must always be a win'
+      const failedAck = await connector.account.acknowledge(
+        ({
+          getHash: () => new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff)),
+          winProb: Utils.computeWinningProbability(0)
+        } as unknown) as Types.Ticket,
+        new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff))
       )
+      assert(failedAck === null, 'falsy ticket should not be a win')
 
-      const secondPreImage = firstTicket.preImage.clone()
-
-      assert(
-        firstPreImage != null &&
-          secondPreImage != null &&
-          !firstPreImage.eq(secondPreImage) &&
-          secondPreImage.hash().eq(firstPreImage)
-      )
-
-      const notWinnigTicket = new Types.AcknowledgedTicket(undefined, {
-        signedTicket: ({
-          ticket: {
-            hash: Promise.resolve(new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff))),
-            winProb: Utils.computeWinningProbability(0)
-          }
-        } as unknown) as Types.SignedTicket,
-        response: new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff))
-      })
-
-      assert(!(await connector.account.reservePreImageIfIsWinning(notWinnigTicket)), 'falsy ticket should not be a win')
-
-      assert(
-        await connector.account.reservePreImageIfIsWinning(firstTicket),
-        'ticket with 100% winning probability must always be a win'
-      )
-
-      const fourthPreImage = firstTicket.preImage.clone()
-
-      assert(fourthPreImage != null && !fourthPreImage.eq(secondPreImage) && fourthPreImage.hash().eq(secondPreImage))
-    })
-
-    it('should reserve a preImage for tickets with arbitrary winning probability', async function () {
-      const ATTEMPTS = 40
-
-      let ticket: Types.AcknowledgedTicket
-
-      for (let i = 0; i < ATTEMPTS; i++) {
-        ticket = new Types.AcknowledgedTicket(undefined, {
-          signedTicket: ({
-            ticket: {
-              hash: Promise.resolve(new Types.Hash(randomBytes(Types.Hash.SIZE))),
-              winProb: Utils.computeWinningProbability(Math.random())
-            }
-          } as unknown) as Types.SignedTicket,
-          response: new Types.Hash(randomBytes(Types.Hash.SIZE))
-        })
-
-        await connector.account.reservePreImageIfIsWinning(ticket)
-
-        if (!ticket.preImage.eq(EMPTY_HASHED_SECRET)) {
-          assert(
-            await Utils.isWinningTicket(
-              await (await ticket.signedTicket).ticket.hash,
-              ticket.response,
-              ticket.preImage,
-              (await ticket.signedTicket).ticket.winProb
-            )
-          )
-        }
-      }
+      const ack4 = await connector.account.acknowledge(ticket1, response1)
+      assert(ack4, 'ticket with 100% winning probability must always be a win')
+      assert(ack4.preImage != null && !ack4.preImage.eq(ack2.preImage) && ack4.preImage.hash().eq(ack2.preImage))
     })
   })
 })

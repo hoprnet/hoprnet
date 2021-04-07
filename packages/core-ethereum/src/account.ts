@@ -6,7 +6,7 @@ import Web3 from 'web3'
 import { durations, u8aToHex, isExpired } from '@hoprnet/hopr-utils'
 import NonceTracker from './nonce-tracker'
 import TransactionManager from './transaction-manager'
-import { Address, AcknowledgedTicket, Balance, Hash, NativeBalance, UINT256, PublicKey } from './types'
+import { Address, Acknowledgement, Balance, Hash, Ticket, NativeBalance, UINT256, PublicKey } from './types'
 import { isWinningTicket, isGanache, getNetworkGasPrice } from './utils'
 import { WEB3_CACHE_TTL } from './constants'
 import * as ethereum from './ethereum'
@@ -107,13 +107,7 @@ class Account {
     return state.secret
   }
 
-  /**
-   * Reserve a preImage for the given ticket if it is a winning ticket.
-   * @param ticket the acknowledged ticket
-   * DANGER mutates ticket.
-   */
-  async reservePreImageIfIsWinning(ticket: AcknowledgedTicket) {
-    // TODO replace this whole clusterf***
+  private async initPreimage() {
     if (!this.preimage) {
       const ocs = await this.getOnChainSecret()
       if (!ocs) {
@@ -121,19 +115,20 @@ class Account {
       }
       this.preimage = await this.coreConnector.hashedSecret.findPreImage(ocs)
     }
-    if (
-      await isWinningTicket(
-        await (await ticket.signedTicket).ticket.hash,
-        ticket.response,
-        this.preimage,
-        (await ticket.signedTicket).ticket.winProb
-      )
-    ) {
-      ticket.preImage = this.preimage
+  }
+
+  /**
+   * Reserve a preImage for the given ticket if it is a winning ticket.
+   * @param ticket the acknowledged ticket
+   */
+  async acknowledge(ticket: Ticket, response: Hash): Promise<Acknowledgement | null> {
+    await this.initPreimage()
+    if (await isWinningTicket(ticket.getHash(), response, this.preimage, ticket.winProb)) {
+      const ack = new Acknowledgement(ticket, response, this.preimage)
       this.preimage = await this.coreConnector.hashedSecret.findPreImage(this.preimage)
-      return true
+      return ack
     } else {
-      return false
+      return null
     }
   }
 
