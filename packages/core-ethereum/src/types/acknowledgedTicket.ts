@@ -3,13 +3,9 @@ import { Acknowledgement as IAcknowledgement } from '@hoprnet/hopr-core-connecto
 import { serializeToU8a } from '@hoprnet/hopr-utils'
 
 class AcknowledgedTicket implements IAcknowledgement {
-  constructor(
-    readonly ticket: Ticket,
-    readonly response: Hash,
-    readonly preImage: Hash
-  ) {}
+  constructor(readonly ticket: Ticket, readonly response: Hash, readonly preImage: Hash) {}
 
-  serialize(): Uint8Array{
+  serialize(): Uint8Array {
     return serializeToU8a([
       [this.ticket.serialize(), Ticket.SIZE],
       [this.response.serialize(), Hash.SIZE],

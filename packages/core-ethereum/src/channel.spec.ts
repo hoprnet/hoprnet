@@ -103,10 +103,7 @@ describe('test Channel class', function () {
       firstTicket.winProb
     )
 
-    const firstAckedTicket = await partyBConnector.account.acknowledge(
-      signedTicket,
-      firstTicket.response
-    )
+    const firstAckedTicket = await partyBConnector.account.acknowledge(signedTicket, firstTicket.response)
 
     assert(partyA.pubKey.eq(signedTicket.getSigner()), `Check that signer is recoverable`)
 
@@ -164,10 +161,7 @@ describe('test Channel class', function () {
         ticketData.challenge,
         ticketData.winProb
       )
-      const ackedTicket = await partyBConnector.account.acknowledge(
-        nextSignedTicket,
-        ticketData.response
-      )
+      const ackedTicket = await partyBConnector.account.acknowledge(nextSignedTicket, ticketData.response)
 
       if (ackedTicket !== null) {
         const result = await partyBChannel.submitTicket(ackedTicket)

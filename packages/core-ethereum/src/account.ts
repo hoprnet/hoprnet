@@ -95,7 +95,7 @@ class Account {
     if (!state || !state.counter) return UINT256.fromString('0')
     return new UINT256(state.counter)
   }
-  
+
   /**
    * Returns the current value of the onChainSecret
    */
@@ -107,7 +107,7 @@ class Account {
     return state.secret
   }
 
-  private async initPreimage(){
+  private async initPreimage() {
     if (!this.preimage) {
       const ocs = await this.getOnChainSecret()
       if (!ocs) {
