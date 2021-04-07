@@ -88,11 +88,6 @@ declare interface HoprCoreConnector {
   smartContractInfo(): string
 
   /**
-   * (Static) utils to use in the connector module
-   */
-  readonly utils: typeof Utils
-
-  /**
    * Export keys under which our data gets stored in the database.
    */
   readonly dbKeys: typeof DbKeys
@@ -110,6 +105,6 @@ declare interface HoprCoreConnector {
 
 declare var HoprCoreConnector: HoprCoreConnectorStatic
 
-export { Utils, DbKeys, Constants, Channel, SubmitTicketResponse, Indexer, RoutingChannel, HoprCoreConnectorStatic }
+export { DbKeys, Constants, Channel, SubmitTicketResponse, Indexer, RoutingChannel, HoprCoreConnectorStatic }
 
 export default HoprCoreConnector
