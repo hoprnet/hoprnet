@@ -35,8 +35,6 @@ const HASH_KEY_TX_LAST_BLINDED = 'Tx_Last_'
 
 const TAG_SIZE = 16
 
-import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-
 export type CipherParameters = {
   key: Uint8Array
   iv: Uint8Array
@@ -190,8 +188,8 @@ export class Header extends Uint8Array {
     return COMPRESSED_PUBLIC_KEY_LENGTH + BETA_LENGTH + MAC_SIZE
   }
 
-  static async create<Chain extends HoprCoreConnector>(
-    node: Hopr<Chain>,
+  static async create(
+    node: Hopr,
     peerIds: PeerId[],
     arr?: {
       bytes: ArrayBuffer

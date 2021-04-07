@@ -1,4 +1,3 @@
-import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 import type PeerId from 'peer-id'
 import { AutoCompleteResult } from './abstractCommand'
@@ -32,7 +31,7 @@ export class Commands {
   private commandMap: Map<string, AbstractCommand>
   private state: GlobalState
 
-  constructor(public node: Hopr<HoprCoreConnector>, rl?: readline.Interface) {
+  constructor(public node: Hopr, rl?: readline.Interface) {
     this.state = {
       aliases: new Map<string, PeerId>(),
       includeRecipient: false

@@ -82,6 +82,7 @@ declare interface ChannelEntryStatic {
   fromObject(obj: ChannelEntryVals): ChannelEntry
 }
 declare interface ChannelEntry extends ChannelEntryVals {
+  serialize(): Uint8Array
   getStatus(): 'CLOSED' | 'OPEN' | 'PENDING_TO_CLOSE'
   getIteration(): BN
   getId(): Promise<Hash>

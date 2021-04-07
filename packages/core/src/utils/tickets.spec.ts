@@ -1,5 +1,3 @@
-import type Chain from '@hoprnet/hopr-core-connector-interface'
-import type { Types, Channel } from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '..'
 import { stringToU8a } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
@@ -8,7 +6,7 @@ import chaiAsPromised from 'chai-as-promised'
 import chai, { expect } from 'chai'
 import sinon from 'sinon'
 import { validateUnacknowledgedTicket, validateCreatedTicket } from './tickets'
-import { Address, Balance, PublicKey, Hash, UINT256, Utils } from '@hoprnet/hopr-core-ethereum'
+import { Address, Balance, PublicKey, Hash, UINT256, Utils, Channel, Ticket } from '@hoprnet/hopr-core-ethereum'
 
 chai.use(chaiAsPromised)
 
@@ -41,7 +39,7 @@ const createMockTicket = ({
     epoch,
     channelIteration,
     getSigner: () => new PublicKey(sender.pubKey.marshal())
-  } as unknown) as Types.Ticket
+  } as unknown) as Ticket
 }
 
 const createMockChannel = ({
@@ -107,10 +105,10 @@ const createMockNode = ({
       utils: Utils,
       types: { PublicKey }
     }
-  } as unknown) as Hopr<Chain>
+  } as unknown) as Hopr
 }
 
-const getTicketsMock = async (): Promise<Types.Ticket[]> => []
+const getTicketsMock = async (): Promise<Ticket[]> => []
 
 describe('unit test validateUnacknowledgedTicket', function () {
   it('should pass if ticket is okay', async function () {

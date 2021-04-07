@@ -1,4 +1,3 @@
-import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 import type { AutoCompleteResult, CommandResponse } from './abstractCommand'
 import type PeerId from 'peer-id'
@@ -7,7 +6,7 @@ import { checkPeerIdInput, encodeMessage, getPeerIdsAndAliases, styleValue } fro
 import { AbstractCommand, GlobalState } from './abstractCommand'
 
 export abstract class SendMessageBase extends AbstractCommand {
-  constructor(public node: Hopr<HoprCoreConnector>) {
+  constructor(public node: Hopr) {
     super()
   }
 
