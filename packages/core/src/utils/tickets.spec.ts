@@ -6,7 +6,16 @@ import chaiAsPromised from 'chai-as-promised'
 import chai, { expect } from 'chai'
 import sinon from 'sinon'
 import { validateUnacknowledgedTicket, validateCreatedTicket } from './tickets'
-import { Address, Balance, PublicKey, Hash, UINT256, Channel, Ticket, computeWinningProbability } from '@hoprnet/hopr-core-ethereum'
+import {
+  Address,
+  Balance,
+  PublicKey,
+  Hash,
+  UINT256,
+  Channel,
+  Ticket,
+  computeWinningProbability
+} from '@hoprnet/hopr-core-ethereum'
 
 chai.use(chaiAsPromised)
 

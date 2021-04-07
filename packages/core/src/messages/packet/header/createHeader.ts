@@ -154,7 +154,7 @@ export async function createHeader(header: Header, peerIds: PeerId[]) {
         header.beta.set(header.gamma, ADDRESS_SIZE)
 
         // Used for the challenge that is created for the next node
-        header.beta.set((Hash.create(deriveTicketKeyBlinding(secrets[i]))).serialize(), ADDRESS_SIZE + MAC_SIZE)
+        header.beta.set(Hash.create(deriveTicketKeyBlinding(secrets[i])).serialize(), ADDRESS_SIZE + MAC_SIZE)
         header.beta.set(tmp, PER_HOP_SIZE)
 
         if (i < secrets.length - 1) {
@@ -167,23 +167,16 @@ export async function createHeader(header: Header, peerIds: PeerId[]) {
            *   - the relay node can verify the key derivation path
            */
           header.beta.set(
-            (
+            Hash.create(
               Hash.create(
-                (
-                  Hash.create(
-                    u8aConcat(
-                      deriveTicketKey(secrets[i]),
-                      (Hash.create(deriveTicketKeyBlinding(secrets[i + 1]))).serialize()
-                    )
-                  )
-                ).serialize()
-              )
+                u8aConcat(deriveTicketKey(secrets[i]), Hash.create(deriveTicketKeyBlinding(secrets[i + 1])).serialize())
+              ).serialize()
             ).serialize(),
             ADDRESS_SIZE + MAC_SIZE + KEY_LENGTH
           )
         } else if (i == secrets.length - 1) {
           header.beta.set(
-            (Hash.create(deriveTicketLastKey(secrets[i]))).serialize(),
+            Hash.create(deriveTicketLastKey(secrets[i])).serialize(),
             ADDRESS_SIZE + MAC_SIZE + KEY_LENGTH
           )
         }
