@@ -29,9 +29,7 @@ declare interface HoprCoreConnector {
      * Returns the current native balance (ex: ETH) of the account associated with this node.
      */
     getNativeBalance: (useCache?: boolean) => Promise<Types.NativeBalance>
-    /**
-     * The accounts keys:
-     */
+
     keys: {
       onChain: {
         privKey: Uint8Array
@@ -97,8 +95,6 @@ declare interface HoprCoreConnector {
    */
   readonly indexer: Indexer
 }
-
-declare var HoprCoreConnector: HoprCoreConnectorStatic
 
 export { DbKeys, Constants, Channel, SubmitTicketResponse, Indexer, RoutingChannel, HoprCoreConnectorStatic }
 export * from './types'
