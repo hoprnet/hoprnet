@@ -174,7 +174,7 @@ class Channel implements IChannel {
 
   async submitTicket(ackTicket: AcknowledgedTicket): ReturnType<IChannel['submitTicket']> {
     try {
-      const ticket = await ackTicket.signedTicket
+      const ticket = ackTicket.ticket
 
       log('Submitting ticket', ackTicket.response.toHex())
       const { hoprChannels, account, utils } = this.connector
@@ -227,7 +227,7 @@ class Channel implements IChannel {
       )
 
       await transaction.send()
-      ackTicket.redeemed = true
+      // TODO delete ackTicket
       this.connector.account.updateLocalState(ackTicket.preImage)
 
       log('Successfully submitted ticket', ackTicket.response.toHex())

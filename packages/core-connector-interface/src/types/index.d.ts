@@ -1,4 +1,3 @@
-import AcknowledgedTicket from './acknowledgedTicket'
 import Ticket from './ticket'
 import BN from 'bn.js'
 
@@ -125,10 +124,21 @@ declare interface Signature {
 }
 declare var Signature: SignatureStatic
 
+declare interface AcknowledgedmentStatic {
+  SIZE: number
+}
+
+declare interface Acknowledgement {
+  ticket: Ticket
+  response: Hash
+  preImage: Hash
+}
+declare var AcknowledgedTicket: AcknowledgedTicketStatic
+
 export {
   AccountEntry,
   Address,
-  AcknowledgedTicket,
+  Acknowledgement,
   Balance,
   ChannelEntry,
   Hash,
