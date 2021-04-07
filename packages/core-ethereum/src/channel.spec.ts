@@ -166,7 +166,6 @@ describe('test Channel class', function () {
       if (ackedTicket !== null) {
         const result = await partyBChannel.submitTicket(ackedTicket)
         assert(result.status === 'SUCCESS', 'ticket redeemption was not a success')
-        assert(result?.ackTicket?.redeemed, 'ticket should get marked as redeemed')
       }
     }
   })
