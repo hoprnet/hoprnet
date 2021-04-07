@@ -9,6 +9,7 @@ const log = debug('hopr-core:acknowledgement')
 import { green, red, blue, yellow } from 'chalk'
 import type Hopr from '../../'
 import { AcknowledgementMessage } from '../../messages/acknowledgement'
+import { Hash } from '@hoprnet/hopr-core-ethereum'
 
 import EventEmitter from 'events'
 
@@ -97,7 +98,7 @@ class PacketAcknowledgementInteraction extends EventEmitter implements AbstractI
     }
 
     const ticket = await unacknowledgedTicket.signedTicket
-    const response = await this.node.paymentChannels.utils.hash(
+    const response = Hash.create(
       u8aConcat(unacknowledgedTicket.secretA.serialize(), ackMsg.getHashedKey().serialize())
     )
     const acknowledgement = await this.node.paymentChannels.account.acknowledge(ticket, response)

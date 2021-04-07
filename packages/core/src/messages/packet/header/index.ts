@@ -1,13 +1,9 @@
 import secp256k1 from 'secp256k1'
 import hkdf from 'futoin-hkdf'
 import crypto from 'crypto'
-
 import { createHeader as createHeaderHelper } from './createHeader'
-import Hopr from '../../..'
 import { u8aXOR, u8aConcat, u8aEquals, u8aToHex, PRP, PRG } from '@hoprnet/hopr-utils'
-
 import { MAX_HOPS } from '../../../constants'
-
 import {
   COMPRESSED_PUBLIC_KEY_LENGTH,
   ADDRESS_SIZE,
@@ -189,7 +185,6 @@ export class Header extends Uint8Array {
   }
 
   static async create(
-    node: Hopr,
     peerIds: PeerId[],
     arr?: {
       bytes: ArrayBuffer
@@ -211,7 +206,7 @@ export class Header extends Uint8Array {
     const header = new Header(arr)
     header.tmpData = header.beta.subarray(ADDRESS_SIZE + MAC_SIZE, PER_HOP_SIZE)
 
-    return createHeaderHelper(node.paymentChannels.utils.hash, header, peerIds)
+    return createHeaderHelper(header, peerIds)
   }
 }
 

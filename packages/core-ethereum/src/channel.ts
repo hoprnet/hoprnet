@@ -2,7 +2,7 @@ import type { Channel as IChannel } from '@hoprnet/hopr-core-connector-interface
 import type Connector from '.'
 import BN from 'bn.js'
 import { PublicKey, Balance, Hash, UINT256, Ticket, Acknowledgement, ChannelEntry } from './types'
-import { getId, waitForConfirmation, computeWinningProbability, checkChallenge, isWinningTicket } from './utils'
+import { getId, waitForConfirmation, computeWinningProbability, checkChallenge, isWinningTicket, getSignatureParameters } from './utils'
 import Debug from 'debug'
 
 const log = Debug('hopr-core-ethereum:channel')
@@ -177,8 +177,8 @@ class Channel implements IChannel {
       const ticket = ackTicket.ticket
 
       log('Submitting ticket', ackTicket.response.toHex())
-      const { hoprChannels, account, utils } = this.connector
-      const { r, s, v } = utils.getSignatureParameters(ticket.signature)
+      const { hoprChannels, account } = this.connector
+      const { r, s, v } = getSignatureParameters(ticket.signature)
 
       const emptyPreImage = new Hash(new Uint8Array(Hash.SIZE).fill(0x00))
       const hasPreImage = !ackTicket.preImage.eq(emptyPreImage)

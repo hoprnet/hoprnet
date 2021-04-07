@@ -3,7 +3,7 @@ import type Hopr from '..'
 import { u8aEquals } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 import { UnacknowledgedTicket } from '../messages/ticket/unacknowledged'
-import { PublicKey, Ticket, Channel, Acknowledgement, SubmitTicketResponse } from '@hoprnet/hopr-core-ethereum'
+import { PublicKey, Ticket, Channel, Acknowledgement, SubmitTicketResponse, getWinProbabilityAsFloat } from '@hoprnet/hopr-core-ethereum'
 
 /**
  * Get all unacknowledged tickets
@@ -240,7 +240,7 @@ export async function validateUnacknowledgedTicket(
   const ticketAmount = ticket.amount.toBN()
   const ticketCounter = ticket.epoch.toBN()
   const accountCounter = (await ethereum.account.getTicketEpoch()).toBN()
-  const ticketWinProb = ethereum.utils.getWinProbabilityAsFloat(ticket.winProb)
+  const ticketWinProb = getWinProbabilityAsFloat(ticket.winProb)
 
   let channelState
   try {
