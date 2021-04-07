@@ -130,9 +130,7 @@ export async function deleteAcknowledgements(
       acks.map<any>(async (ack) => {
         return {
           type: 'del',
-          key: Buffer.from(
-            node._dbKeys.AcknowledgedTickets((await ack.ackTicket.ticket).challenge.serialize())
-          )
+          key: Buffer.from(node._dbKeys.AcknowledgedTickets((await ack.ackTicket.ticket).challenge.serialize()))
         }
       })
     )
@@ -144,11 +142,7 @@ export async function deleteAcknowledgements(
  * @param ackTicket Uint8Array
  * @param index Uint8Array
  */
-export async function updateAcknowledgement(
-  node: Hopr,
-  ackTicket: Acknowledgement,
-  index: Uint8Array
-): Promise<void> {
+export async function updateAcknowledgement(node: Hopr, ackTicket: Acknowledgement, index: Uint8Array): Promise<void> {
   await node.db.put(Buffer.from(node._dbKeys.AcknowledgedTickets(index)), Buffer.from(ackTicket.serialize()))
 }
 

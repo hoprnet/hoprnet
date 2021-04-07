@@ -98,8 +98,8 @@ class PacketAcknowledgementInteraction extends EventEmitter implements AbstractI
 
     const ticket = await unacknowledgedTicket.signedTicket
     const response = await this.node.paymentChannels.utils.hash(
-        u8aConcat(unacknowledgedTicket.secretA.serialize(), ackMsg.getHashedKey().serialize())
-      )
+      u8aConcat(unacknowledgedTicket.secretA.serialize(), ackMsg.getHashedKey().serialize())
+    )
     const acknowledgement = await this.node.paymentChannels.account.acknowledge(ticket, response)
     if (acknowledgement === null) {
       log(`Got a ticket that is not a win. Dropping ticket.`)
@@ -128,8 +128,6 @@ class PacketAcknowledgementInteraction extends EventEmitter implements AbstractI
     }
     this.emit(u8aToHex(unAcknowledgedDbKey))
   }
-
-
 
   async handleHelper(source: AsyncIterable<Uint8Array>): Promise<void> {
     for await (const msg of source) {

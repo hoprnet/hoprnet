@@ -12,23 +12,14 @@ import { serializeToU8a, u8aConcat, u8aSplit } from '@hoprnet/hopr-utils'
  * the previously received transaction.
  */
 class AcknowledgementMessage {
-  constructor(
-    readonly key: Uint8Array,
-    readonly challenge: Challenge,
-    readonly signature?: Signature
-  ) {}
-
+  constructor(readonly key: Uint8Array, readonly challenge: Challenge, readonly signature?: Signature) {}
 
   static deserialize(arr: Uint8Array) {
-    const components = u8aSplit(arr, [
-     KEY_LENGTH,
-     Challenge.SIZE(),
-     Signature.SIZE
-    ])
+    const components = u8aSplit(arr, [KEY_LENGTH, Challenge.SIZE(), Signature.SIZE])
     return new AcknowledgementMessage(
       components[0],
-      new Challenge({ bytes: components[1], offset: components[1].byteOffset }), 
-      Signature.deserialize(components[2]),
+      new Challenge({ bytes: components[1], offset: components[1].byteOffset }),
+      Signature.deserialize(components[2])
     )
   }
 
@@ -36,7 +27,7 @@ class AcknowledgementMessage {
     return serializeToU8a([
       [this.key, KEY_LENGTH],
       [this.challenge, Challenge.SIZE()],
-      [this.signature.serialize(), Signature.SIZE] 
+      [this.signature.serialize(), Signature.SIZE]
     ])
   }
 
@@ -46,21 +37,17 @@ class AcknowledgementMessage {
 
   //get challengeSignatureHash(): Promise<Hash> {
   //  return Promise.resolve(Hash.create(this.challenge))
- //}
+  //}
 
   //get challengeSigningParty() {
   //  return this.challenge.counterparty
   //}
 
- // this.signature  get responseSignature(): Promise<Signature> {
+  // this.signature  get responseSignature(): Promise<Signature> {
 
-  get responseSigningParty(): Uint8Array { 
+  get responseSigningParty(): Uint8Array {
     const hash = Hash.create(u8aConcat(this.key, this.challenge.serialize()))
-    return secp256k1.ecdsaRecover(
-      this.signature.signature,
-      this.signature.recovery,
-      hash.serialize()
-    )
+    return secp256k1.ecdsaRecover(this.signature.signature, this.signature.recovery, hash.serialize())
   }
 
   async verify(peerId: PeerId): Promise<boolean> {
@@ -76,7 +63,11 @@ class AcknowledgementMessage {
    * @param derivedSecret the secret that is used to create the second key half
    * @param signer contains private key
    */
-  static async create(challenge: Challenge, derivedSecret: Uint8Array, signer: PeerId): Promise<AcknowledgementMessage> {
+  static async create(
+    challenge: Challenge,
+    derivedSecret: Uint8Array,
+    signer: PeerId
+  ): Promise<AcknowledgementMessage> {
     const key = deriveTicketKeyBlinding(derivedSecret)
     const hash = Hash.create(u8aConcat(key, challenge.serialize()))
     const signature = Signature.create(hash.serialize(), signer.privKey.marshal())
