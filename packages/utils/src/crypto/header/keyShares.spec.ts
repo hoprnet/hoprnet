@@ -1,4 +1,4 @@
-import { generateKeyShares, deriveSecret, forwardTransform } from './keyShares'
+import { generateKeyShares, forwardTransform } from './keyShares'
 import { u8aEquals } from '../../u8a'
 
 import PeerId from 'peer-id'
@@ -14,11 +14,11 @@ describe('test key share generation', function () {
     const [alpha, secrets] = generateKeyShares(keyPairs)
 
     for (let i = 0; i < AMOUNT; i++) {
-      const key = deriveSecret(keyPairs[i].privKey.marshal(), alpha, keyPairs[i])
+      const [tmpAlpha, key] = forwardTransform(alpha, keyPairs[i])
 
       assert(u8aEquals(key, secrets[i]))
 
-      alpha.set(forwardTransform(alpha, key))
+      alpha.set(tmpAlpha)
     }
   })
 
@@ -33,11 +33,9 @@ describe('test key share generation', function () {
     assert(!u8aEquals(secrets[0], secrets[1], ...secrets.slice(2)), 'Secrets must be different')
 
     for (let i = 0; i < AMOUNT; i++) {
-      const key = deriveSecret(keyPairs[i].privKey.marshal(), alpha, keyPairs[i])
+      const [tmpAlpha, key] = forwardTransform(alpha, keyPairs[i])
 
       assert(u8aEquals(key, secrets[i]))
-
-      const tmpAlpha = forwardTransform(alpha, key)
 
       assert(!u8aEquals(alpha, tmpAlpha), 'alpha must change')
 

@@ -1,14 +1,11 @@
 import { u8aEquals, u8aXOR } from '../../u8a'
 import { derivePRGParameters } from './blinding'
-import { COMPRESSED_PUBLIC_KEY_LENGTH, MAC_LENGTH, SECRET_LENGTH } from './constants'
+import { COMPRESSED_PUBLIC_KEY_LENGTH, MAC_LENGTH, SECRET_LENGTH, END_PREFIX, END_PREFIX_LENGTH } from './constants'
 import { randomFillSync } from 'crypto'
 import { PRG } from '../prg'
 import { generateFiller } from './filler'
 import { createMAC } from './mac'
 import type PeerId from 'peer-id'
-
-const END_PREFIX_LENGTH = 1
-const END_PREFIX = 0xff
 
 export function createRoutingInfo(
   maxHops: number,

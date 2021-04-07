@@ -19,3 +19,8 @@ export const BASE_POINT = Uint8Array.from([
   252,  14,  17,   8, 168, 253,  23, 180,  72, 166, 133,
    84,  25, 156,  71, 208, 143, 251,  16, 212, 184
 ])
+
+export const PAYLOAD_SIZE = 500
+
+export const END_PREFIX_LENGTH = 1
+export const END_PREFIX = 0xff

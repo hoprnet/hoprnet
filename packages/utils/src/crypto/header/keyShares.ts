@@ -52,20 +52,14 @@ export function generateKeyShares(path: PeerId[]): [alpha: Uint8Array, secrets: 
  * @param alpha
  * @param key
  */
-export function forwardTransform(alpha: Uint8Array, key: Uint8Array) {
-  if (!publicKeyVerify(alpha) || !privateKeyVerify(key)) {
+export function forwardTransform(alpha: Uint8Array, privKey: PeerId): [alpha: Uint8Array, secret: Uint8Array] {
+  if (!publicKeyVerify(alpha) || privKey.privKey == null) {
     throw Error(`Invalid arguments`)
   }
 
-  return publicKeyTweakMul(alpha, key, false)
-}
+  const key = keyExtract(publicKeyTweakMul(alpha, privKey.privKey.marshal(), false), privKey.pubKey.marshal())
 
-export function deriveSecret(privKey: Uint8Array, groupElement: Uint8Array, peerId: PeerId) {
-  if (!publicKeyVerify(groupElement)) {
-    throw Error(`Invalid arguments`)
-  }
-
-  return keyExtract(publicKeyTweakMul(groupElement, privKey, false), peerId.pubKey.marshal())
+  return [publicKeyTweakMul(alpha, key, false), key]
 }
 
 function keyExtract(groupElement: Uint8Array, pubKey: Uint8Array) {
