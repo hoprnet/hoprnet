@@ -48,7 +48,7 @@ declare interface HoprCoreConnector {
     }
 
     /**
-     * Check whether the given ticket is winning. 
+     * Check whether the given ticket is winning.
      *
      * If the ticket is a win, the preImage is stored into the given acknowledged
      * ticket and its preImage will be used to check whether the next ticket is a

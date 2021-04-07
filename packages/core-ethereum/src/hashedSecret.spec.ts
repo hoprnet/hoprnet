@@ -129,10 +129,10 @@ describe('test hashedSecret', function () {
     })
 
     it('should reserve a preImage for tickets with 100% winning probabilty resp. should not reserve for 0% winning probability', async function () {
-      const ticket1 = {
-            getHash: () => new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff)),
-            winProb: Utils.computeWinningProbability(1)
-          } as unknown as Types.Ticket
+      const ticket1 = ({
+        getHash: () => new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff)),
+        winProb: Utils.computeWinningProbability(1)
+      } as unknown) as Types.Ticket
       const response1 = new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff))
 
       const ack = await connector.account.acknowledge(ticket1, response1)
@@ -143,16 +143,16 @@ describe('test hashedSecret', function () {
 
       assert(
         ack.preImage != null &&
-        ack2.preImage != null &&
-        !ack.preImage.eq(ack2.preImage) &&
-        ack2.preImage.hash().eq(ack.preImage)
+          ack2.preImage != null &&
+          !ack.preImage.eq(ack2.preImage) &&
+          ack2.preImage.hash().eq(ack.preImage)
       )
 
       const failedAck = await connector.account.acknowledge(
-        {
+        ({
           getHash: () => new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff)),
           winProb: Utils.computeWinningProbability(0)
-        } as unknown as Types.Ticket,
+        } as unknown) as Types.Ticket,
         new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff))
       )
       assert(failedAck === null, 'falsy ticket should not be a win')
