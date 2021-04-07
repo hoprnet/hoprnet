@@ -2,7 +2,14 @@ import type { Channel as IChannel } from '@hoprnet/hopr-core-connector-interface
 import type Connector from '.'
 import BN from 'bn.js'
 import { PublicKey, Balance, Hash, UINT256, Ticket, Acknowledgement, ChannelEntry } from './types'
-import { getId, waitForConfirmation, computeWinningProbability, checkChallenge, isWinningTicket, getSignatureParameters } from './utils'
+import {
+  getId,
+  waitForConfirmation,
+  computeWinningProbability,
+  checkChallenge,
+  isWinningTicket,
+  getSignatureParameters
+} from './utils'
 import Debug from 'debug'
 
 const log = Debug('hopr-core-ethereum:channel')

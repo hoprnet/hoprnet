@@ -181,13 +181,8 @@ export class Packet extends Uint8Array {
     const ticketChallenge = Hash.create(
       secrets.length == 1
         ? deriveTicketLastKey(secrets[0])
-        : (
-            Hash.create(
-              u8aConcat(
-                deriveTicketKey(secrets[0]),
-                (Hash.create(deriveTicketKeyBlinding(secrets[1]))).serialize()
-              )
-            )
+        : Hash.create(
+            u8aConcat(deriveTicketKey(secrets[0]), Hash.create(deriveTicketKeyBlinding(secrets[1])).serialize())
           ).serialize()
     )
 
@@ -299,7 +294,7 @@ export class Packet extends Uint8Array {
     const targetPubKey = new PublicKey(target.pubKey.marshal())
     const challenge = u8aConcat(deriveTicketKey(this.header.derivedSecret), this.header.hashedKeyHalf)
 
-    if (!(Hash.create(challenge)).hash().eq(ticket.challenge)) {
+    if (!Hash.create(challenge).hash().eq(ticket.challenge)) {
       verbose('Error preparing to forward')
       throw Error('Error preparing forward')
     }
