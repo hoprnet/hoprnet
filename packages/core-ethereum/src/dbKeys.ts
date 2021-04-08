@@ -1,4 +1,4 @@
-import { toU8a } from '@hoprnet/hopr-utils'
+import { toU8a, serializeToU8a } from '@hoprnet/hopr-utils'
 import { Hash, PublicKey } from './types'
 
 const encoder = new TextEncoder()
@@ -13,18 +13,13 @@ const onChainSecretIntermediary = encoder.encode('onChainSecretIntermediary-')
 
 const ON_CHAIN_SECRET_ITERATION_WIDTH = 4 // bytes
 
-/**
- * Returns the db-key under which the challenge is saved.
- * @param channelId channelId of the channel
- * @param challenge challenge to save
- */
 export function Challenge(channelId: Hash, challenge: Hash): Uint8Array {
-  return allocationHelper([
-    [PREFIX.length, PREFIX],
-    [challengeSubPrefix.length, challengeSubPrefix],
-    [Hash.SIZE, channelId.serialize()],
-    [SEPERATOR.length, SEPERATOR],
-    [Hash.SIZE, challenge.serialize()]
+  return serializeToU8a([
+    [PREFIX, PREFIX.length],
+    [challengeSubPrefix, challengeSubPrefix.length],
+    [channelId.serialize(), Hash.SIZE],
+    [SEPERATOR, SEPERATOR.length],
+    [challenge.serialize(), Hash.SIZE]
   ])
 }
 
@@ -46,10 +41,10 @@ export function ChallengeKeyParse(arr: Uint8Array): [Hash, Hash] {
  * @param signatureHash hash of an ackowledgement signature
  */
 export function ChannelId(signatureHash: Hash): Uint8Array {
-  return allocationHelper([
-    [PREFIX.length, PREFIX],
-    [channelIdSubPrefix.length, channelIdSubPrefix],
-    [Hash.SIZE, signatureHash.serialize()]
+  return serializeToU8a([
+    [PREFIX, PREFIX.length],
+    [channelIdSubPrefix, channelIdSubPrefix.length],
+    [signatureHash.serialize(), Hash.SIZE]
   ])
 }
 
@@ -59,12 +54,12 @@ export function ChannelId(signatureHash: Hash): Uint8Array {
  * @param nonce the nonce
  */
 export function Nonce(channelId: Hash, nonce: Hash): Uint8Array {
-  return allocationHelper([
-    [PREFIX.length, PREFIX],
-    [nonceSubPrefix.length, nonceSubPrefix],
-    [Hash.SIZE, channelId.serialize()],
-    [SEPERATOR.length, SEPERATOR],
-    [Hash.SIZE, nonce.serialize()]
+  return serializeToU8a([
+    [PREFIX, PREFIX.length],
+    [nonceSubPrefix, nonceSubPrefix.length],
+    [channelId.serialize(), Hash.SIZE],
+    [SEPERATOR, SEPERATOR.length],
+    [nonce.serialize(), Hash.SIZE]
   ])
 }
 
@@ -73,11 +68,11 @@ export function OnChainSecret(): Uint8Array {
 }
 
 export function OnChainSecretIntermediary(iteration: number): Uint8Array {
-  return allocationHelper([
-    [PREFIX.length, PREFIX],
-    [onChainSecretIntermediary.length, onChainSecretIntermediary],
-    [SEPERATOR.length, SEPERATOR],
-    [ON_CHAIN_SECRET_ITERATION_WIDTH, toU8a(iteration, ON_CHAIN_SECRET_ITERATION_WIDTH)]
+  return serializeToU8a([
+    [PREFIX, PREFIX.length],
+    [onChainSecretIntermediary, onChainSecretIntermediary.length],
+    [SEPERATOR, SEPERATOR.length],
+    [ toU8a(iteration, ON_CHAIN_SECRET_ITERATION_WIDTH), ON_CHAIN_SECRET_ITERATION_WIDTH]
   ])
 }
 
@@ -85,12 +80,12 @@ export function OnChainSecretIntermediary(iteration: number): Uint8Array {
  * Returns the db-key under which the tickets are saved in the database.
  */
 export function AcknowledgedTicket(counterPartyPubKey: PublicKey, challenge: Hash): Uint8Array {
-  return allocationHelper([
-    [ticketSubPrefix.length, ticketSubPrefix],
-    [acknowledgedSubPrefix.length, acknowledgedSubPrefix],
-    [PublicKey.SIZE, counterPartyPubKey.serialize()],
-    [SEPERATOR.length, SEPERATOR],
-    [Hash.SIZE, challenge.serialize()]
+  return serializeToU8a([
+    [ticketSubPrefix, ticketSubPrefix.length],
+    [acknowledgedSubPrefix, acknowledgedSubPrefix.length],
+    [counterPartyPubKey.serialize(), PublicKey.SIZE],
+    [SEPERATOR, SEPERATOR.length],
+    [challenge.serialize(), Hash.SIZE]
   ])
 }
 
@@ -109,20 +104,4 @@ export function AcknowledgedTicketParse(arr: Uint8Array): [PublicKey, Hash] {
     new PublicKey(arr.slice(counterPartyPubKeyStart, counterPartyPubKeyEnd)),
     new Hash(arr.slice(challengeStart, challengeEnd))
   ]
-}
-
-function allocationHelper(arr: [number, Uint8Array][]): Uint8Array {
-  const totalLength = arr.reduce((acc, current) => {
-    return acc + current[0]
-  }, 0)
-
-  let result = new Uint8Array(totalLength)
-
-  let offset = 0
-  for (let [size, data] of arr) {
-    result.set(data, offset)
-    offset += size
-  }
-
-  return result
 }
