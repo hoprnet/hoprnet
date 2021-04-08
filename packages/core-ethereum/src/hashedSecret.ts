@@ -117,7 +117,7 @@ class HashedSecret {
       hashFunction,
       TOTAL_ITERATIONS,
       DB_ITERATION_BLOCK_SIZE,
-      x => getOnChainSecretIntermediary(this.db, x)
+      (x) => getOnChainSecretIntermediary(this.db, x)
     )
 
     if (result == undefined) {
@@ -136,7 +136,7 @@ class HashedSecret {
     let result = await recoverIteratedHash(
       hash.serialize(),
       hashFunction,
-      x => getOnChainSecretIntermediary(this.db, x),
+      (x) => getOnChainSecretIntermediary(this.db, x),
       TOTAL_ITERATIONS,
       DB_ITERATION_BLOCK_SIZE
     )
@@ -148,7 +148,7 @@ class HashedSecret {
 
   public async initialize(debug?: boolean): Promise<void> {
     if (this.initialized) return
-    this.offChainSecret = await getOnChainSecret(this.db) 
+    this.offChainSecret = await getOnChainSecret(this.db)
     this.onChainSecret = await this.account.getOnChainSecret()
     if (this.onChainSecret != undefined && this.offChainSecret != undefined) {
       try {
