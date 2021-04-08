@@ -1,6 +1,5 @@
 import type { Subscription } from 'web3-core-subscriptions'
 import type PeerId from 'peer-id'
-import type { Indexer as IIndexer, RoutingChannel } from '@hoprnet/hopr-core-connector-interface'
 import type { ContractEventEmitter } from '../tsc/web3/types'
 import type HoprEthereum from '..'
 import type { Event, EventNames } from './types'
@@ -16,6 +15,8 @@ import * as db from './db'
 import { isConfirmedBlock, isSyncing, snapshotComparator } from './utils'
 import Debug from 'debug'
 
+export type RoutingChannel = [source: PeerId, destination: PeerId, stake: Balance]
+
 const log = Debug('hopr-core-ethereum:indexer')
 const getSyncPercentage = (n: number, max: number) => ((n * 100) / max).toFixed(2)
 
@@ -29,7 +30,7 @@ let genesisBlock: number
  * all channels in the network.
  * Also keeps track of the latest block number.
  */
-class Indexer extends EventEmitter implements IIndexer {
+class Indexer extends EventEmitter {
   public status: 'started' | 'restarting' | 'stopped' = 'stopped'
   public latestBlock: number = 0 // latest known on-chain block number
   private newBlocksSubscription: Subscription<any>

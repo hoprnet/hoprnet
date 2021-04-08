@@ -1,8 +1,7 @@
 import { Hash, Ticket } from '.'
-import { Acknowledgement as IAcknowledgement } from '@hoprnet/hopr-core-connector-interface'
 import { serializeToU8a, u8aSplit } from '@hoprnet/hopr-utils'
 
-class Acknowledgement implements IAcknowledgement {
+class Acknowledgement {
   constructor(readonly ticket: Ticket, readonly response: Hash, readonly preImage: Hash) {}
 
   serialize(): Uint8Array {

@@ -1,9 +1,8 @@
-import type { Acknowledgement } from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 import { moveDecimalPoint } from '@hoprnet/hopr-utils'
 import { countSignedTickets, styleValue, toSignedTickets } from './utils'
 import { AbstractCommand } from './abstractCommand'
-import { Balance } from '@hoprnet/hopr-core-ethereum'
+import { Balance, Acknowledgement } from '@hoprnet/hopr-core-ethereum'
 
 export default class RedeemTickets extends AbstractCommand {
   constructor(public node: Hopr) {

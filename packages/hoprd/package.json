@@ -40,7 +40,6 @@
     "yargs": "^16.0.3"
   },
   "devDependencies": {
-    "@hoprnet/hopr-core-connector-interface": "1.71.0-next.38",
     "@types/bs58": "^4.0.1",
     "@types/debug": "^4.1.5",
     "@types/mocha": "^8.2.0",

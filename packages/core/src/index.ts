@@ -35,8 +35,14 @@ import Multiaddr from 'multiaddr'
 import chalk from 'chalk'
 
 import PeerId from 'peer-id'
-import type { RoutingChannel } from '@hoprnet/hopr-core-connector-interface'
-import HoprCoreEthereum, { PublicKey, Balance, NativeBalance, Hash, Acknowledgement } from '@hoprnet/hopr-core-ethereum'
+import HoprCoreEthereum, {
+  PublicKey,
+  Balance,
+  NativeBalance,
+  Hash,
+  Acknowledgement,
+  RoutingChannel
+} from '@hoprnet/hopr-core-ethereum'
 import BN from 'bn.js'
 
 import { Interactions } from './interactions'

@@ -1,15 +1,14 @@
 import type { LevelUp } from 'levelup'
 import type { WebsocketProvider } from 'web3-core'
-import type { Currencies, SubmitTicketResponse } from '@hoprnet/hopr-core-connector-interface'
-import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type { HoprChannels } from './tsc/web3/HoprChannels'
 import type { HoprToken } from './tsc/web3/HoprToken'
 import Web3 from 'web3'
 import chalk from 'chalk'
 import { Networks, getAddresses, abis } from '@hoprnet/hopr-ethereum'
 import Channel from './channel'
-import { PublicKey } from './types'
+import { PublicKey, Acknowledgement } from './types'
 import Indexer from './indexer'
+import { RoutingChannel } from './indexer'
 import * as utils from './utils'
 import * as config from './config'
 import Account from './account'
@@ -23,7 +22,24 @@ const HoprTokenAbi = abis.HoprToken
 const log = debug('hopr-core-ethereum')
 let provider: WebsocketProvider
 
-export default class HoprEthereum implements HoprCoreConnector {
+export type Currencies = 'NATIVE' | 'HOPR'
+
+export type SubmitTicketResponse =
+  | {
+      status: 'SUCCESS'
+      receipt: string
+      ackTicket: Acknowledgement
+    }
+  | {
+      status: 'FAILURE'
+      message: string
+    }
+  | {
+      status: 'ERROR'
+      error: Error | string
+    }
+
+export default class HoprEthereum {
   private _status: 'dead' | 'alive' = 'dead'
   private _starting?: Promise<HoprEthereum>
   private _stopping?: Promise<void>
@@ -241,4 +257,4 @@ export default class HoprEthereum implements HoprCoreConnector {
 }
 
 export * from './types'
-export { Channel, SubmitTicketResponse, getWinProbabilityAsFloat, computeWinningProbability }
+export { Channel, getWinProbabilityAsFloat, computeWinningProbability, Indexer, RoutingChannel }

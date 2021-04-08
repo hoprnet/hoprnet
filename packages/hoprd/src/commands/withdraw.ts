@@ -1,4 +1,4 @@
-import type { Currencies } from '@hoprnet/hopr-core-connector-interface'
+import type { Currencies } from '@hoprnet/hopr-core-ethereum'
 import type Hopr from '@hoprnet/hopr-core'
 import { moveDecimalPoint } from '@hoprnet/hopr-utils'
 import { AbstractCommand, AutoCompleteResult } from './abstractCommand'
