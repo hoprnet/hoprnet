@@ -1,5 +1,5 @@
 import type Hopr from '../../'
-import{ PublicKey } from '@hoprnet/hopr-core-ethereum'
+import { PublicKey } from '@hoprnet/hopr-core-ethereum'
 
 import { PROTOCOL_ONCHAIN_KEY } from '../../constants'
 import type { AbstractInteraction } from '../abstractInteraction'
