@@ -11,6 +11,7 @@ import type { Server } from 'http'
 import stripAnsi from 'strip-ansi'
 import { LogStream } from './logs'
 import { NODE_ENV } from './env'
+import { Balance, NativeBalance } from '@hoprnet/hopr-core-ethereum'
 
 let debugLog = debug('hoprd:admin')
 
@@ -93,8 +94,7 @@ export class AdminServer {
     })
 
     this.node.on('hopr:warning:unfunded', (addr) => {
-      const min = new node.paymentChannels.types.Balance(new BN(0)).toFormattedString.apply(SUGGESTED_NATIVE_BALANCE)
-      const Balance = node.paymentChannels.types.Balance
+      const min = new Balance(new BN(0)).toFormattedString.apply(SUGGESTED_NATIVE_BALANCE)
 
       this.logs.log(
         `- The account associated with this node has no ${Balance.SYMBOL},\n` +
@@ -104,7 +104,6 @@ export class AdminServer {
     })
 
     this.node.on('hopr:warning:unfundedNative', (addr) => {
-      const NativeBalance = node.paymentChannels.types.NativeBalance
       const min = new NativeBalance(new BN(0)).toFormattedString.apply(SUGGESTED_NATIVE_BALANCE)
 
       this.logs.log(

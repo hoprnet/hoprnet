@@ -3,6 +3,7 @@ import { moveDecimalPoint, pubKeyToPeerId, u8aEquals } from '@hoprnet/hopr-utils
 import chalk from 'chalk'
 import { AbstractCommand } from './abstractCommand'
 import { getPaddingLength, styleValue } from './utils'
+import { PublicKey, Balance } from '@hoprnet/hopr-core-ethereum'
 
 export default class ListOpenChannels extends AbstractCommand {
   constructor(public node: Hopr) {
@@ -66,8 +67,8 @@ export default class ListOpenChannels extends AbstractCommand {
    */
   async execute(): Promise<string | void> {
     try {
-      const { types, indexer } = this.node.paymentChannels
-      const selfPubKey = new types.PublicKey(this.node.getId().pubKey.marshal())
+      const { indexer } = this.node.paymentChannels
+      const selfPubKey = new PublicKey(this.node.getId().pubKey.marshal())
       const selfAddress = await selfPubKey.toAddress()
       const channels = (await this.node.paymentChannels.indexer.getChannelsOf(selfAddress))
         // do not print CLOSED channels
@@ -86,10 +87,10 @@ export default class ListOpenChannels extends AbstractCommand {
         // counterparty has not initialized
         if (!counterpartyPubKey) continue
 
-        const totalBalance = moveDecimalPoint(channel.deposit.toString(), types.Balance.DECIMALS * -1)
+        const totalBalance = moveDecimalPoint(channel.deposit.toString(), Balance.DECIMALS * -1)
         const myBalance = moveDecimalPoint(
           selfIsPartyA ? channel.partyABalance.toString() : channel.deposit.sub(channel.partyABalance).toString(),
-          types.Balance.DECIMALS * -1
+          Balance.DECIMALS * -1
         )
         const peerId = (await pubKeyToPeerId(counterpartyPubKey.serialize())).toB58String()
 

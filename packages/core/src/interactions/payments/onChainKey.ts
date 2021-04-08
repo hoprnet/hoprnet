@@ -1,5 +1,5 @@
 import type Hopr from '../../'
-import type { PublicKey } from '@hoprnet/hopr-core-connector-interface'
+import{ PublicKey } from '@hoprnet/hopr-core-ethereum'
 
 import { PROTOCOL_ONCHAIN_KEY } from '../../constants'
 import type { AbstractInteraction } from '../abstractInteraction'
@@ -51,7 +51,7 @@ class OnChainKey implements AbstractInteraction {
       }
     }
 
-    return new this.node.paymentChannels.types.PublicKey(result)
+    return new PublicKey(result)
   }
 }
 
