@@ -8,19 +8,17 @@ A ticket can be issued once two nodes have established a payment channel with ea
 $$amount:=\dfrac{pathLength*relayFee}{winProb}$$
 If the issuer $(A)$ receives the packet from another node $(O)$ (packet creator) and attempts to issue a ticket for the next downstream node, 
 the challenge is given together with the routing information by the packet. We assume $(A)$ and $(O)$ are not the same.
-\begin{itemize}
-    \item[] $(A)$ does not know whether the ticket is a win or not.
-    \item[] $(A)$ sets content of a ticket to: $$t=(recipient, challenge, account.counter, amount, winProb, channel.teration, index)$$ 
-    \item[] $(A)$ then signs the ticket with its private key and sends $ticket:= (t, Sig_Issuer(t))$ to the recipient together with a mixnet packet.
-    \item[] The data for a ticket is signed by the issuer, and a ticket is the data followed by the signature: $$ticket:=(ticketData,Sig_Issuer(ticketData))$$ where 
+\\$(A)$ does not know whether the ticket is a win or not.
+\\$(A)$ sets content of a ticket to: $$t=(recipient, challenge, account.counter, amount, winProb, channel.teration, index)$$ 
+$(A)$ then signs the ticket with its private key and sends $ticket:= (t, Sig_Issuer(t))$ to the recipient together with a mixnet packet.
+\\The data for a ticket is signed by the issuer, and a ticket is the data followed by the signature: $$ticket:=(ticketData,Sig_Issuer(ticketData))$$ where 
     $$ticketData:=(amount,winProb,recipient,index,challenge,iteration,chainId,tag,version)$$
- \end{itemize}
  \begin{figure}
     \centering
     \includegraphics[width=10cm,height=10cm,keepaspectratio]{../whitepaper/images/ticket_workflow.png}
     \caption{Ticket workflow}
     \label{fig:Ticket worklow}
-    \end{figure}
+\end{figure}
 
 \subsubsection*{Challenge}
 $(O)$ creates a shared secret $s_i$ with all the relay nodes in the channel (A-B-C-Z) by using an offline version of the Diffie-Hellman key exchange.
