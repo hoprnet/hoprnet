@@ -46,7 +46,7 @@ export class Connection {
 
   async connect() {
     console.log('Connecting ...')
-    var client = await fetch('/api/ssl')
+    var client = await fetch(`https://${window.location.host}/api/ssl`)
       .then((res) => res.json())
       .then((_) => new WebSocket('wss://' + window.location.host))
       .catch((_) => new WebSocket('ws://' + window.location.host))
