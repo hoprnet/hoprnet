@@ -459,12 +459,12 @@ class Hopr extends EventEmitter {
 
           await this.db.put(Buffer.from(unAcknowledgedDBKey), Buffer.from(''))
 
-          this._interactions.packet.acknowledgment.once(u8aToHex(unAcknowledgedDBKey), () => {
+          this._interactions.acknowledgment.once(u8aToHex(unAcknowledgedDBKey), () => {
             resolve()
           })
 
           try {
-            await this._interactions.packet.forward.interact(path[0], packet)
+            await this._interactions.forward.interact(path[0], packet)
           } catch (err) {
             return reject(err)
           }

@@ -35,16 +35,6 @@ class AcknowledgementMessage {
     return Hash.create(this.key)
   }
 
-  //get challengeSignatureHash(): Promise<Hash> {
-  //  return Promise.resolve(Hash.create(this.challenge))
-  //}
-
-  //get challengeSigningParty() {
-  //  return this.challenge.counterparty
-  //}
-
-  // this.signature  get responseSignature(): Promise<Signature> {
-
   get responseSigningParty(): Uint8Array {
     const hash = Hash.create(u8aConcat(this.key, this.challenge.serialize()))
     return secp256k1.ecdsaRecover(this.signature.signature, this.signature.recovery, hash.serialize())
