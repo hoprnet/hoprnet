@@ -2,15 +2,15 @@ import { randomBytes } from 'crypto'
 import { Ganache } from '@hoprnet/hopr-testing'
 import { migrate } from '@hoprnet/hopr-ethereum'
 import assert from 'assert'
-import { stringToU8a, u8aConcat, durations } from '@hoprnet/hopr-utils'
+import { stringToU8a, durations } from '@hoprnet/hopr-utils'
 import { getAddresses, abis } from '@hoprnet/hopr-ethereum'
 import { getPrivKeyData, createAccountAndFund, createNode, Account } from './utils/testing.spec'
-import { createChallenge, isPartyA, hash } from './utils'
+import { createChallenge, isPartyA } from './utils'
 import BN from 'bn.js'
 import Web3 from 'web3'
 import { HoprToken } from './tsc/web3/HoprToken'
 import { Await } from './tsc/utils'
-import { Balance, Ticket, Address } from './types'
+import { Balance, Ticket, Address, UnacknowledgedTicket, Hash } from './types'
 import CoreConnector from '.'
 import Channel from './channel'
 import * as testconfigs from './config.spec'
@@ -38,14 +38,13 @@ describe('test Channel class', function () {
     counterparty: Address
     winProb?: number
   }) {
-    const secretA = randomBytes(32)
-    const secretB = randomBytes(32)
-    const challenge = await createChallenge(secretA, secretB)
+    const secretA = new Hash(randomBytes(32))
+    const secretB = new Hash(randomBytes(32))
+    const challenge = await createChallenge(secretA.serialize(), secretB.serialize())
 
     return {
       secretA,
       secretB,
-      response: await hash(u8aConcat(secretA, secretB)),
       winProb,
       counterparty,
       challenge
@@ -102,8 +101,8 @@ describe('test Channel class', function () {
       firstTicket.challenge,
       firstTicket.winProb
     )
-
-    const firstAckedTicket = await partyBConnector.account.acknowledge(signedTicket, firstTicket.response)
+    const unacknowledgedTicket = new UnacknowledgedTicket(signedTicket, firstTicket.secretA)
+    const firstAckedTicket = await partyBConnector.account.acknowledge(unacknowledgedTicket, firstTicket.secretB)
 
     assert(partyA.pubKey.eq(signedTicket.getSigner()), `Check that signer is recoverable`)
 
@@ -161,7 +160,8 @@ describe('test Channel class', function () {
         ticketData.challenge,
         ticketData.winProb
       )
-      const ackedTicket = await partyBConnector.account.acknowledge(nextSignedTicket, ticketData.response)
+      const nextUnacknowledgedTicket = new UnacknowledgedTicket(nextSignedTicket, ticketData.secretA)
+      const ackedTicket = await partyBConnector.account.acknowledge(nextUnacknowledgedTicket, ticketData.secretB)
 
       if (ackedTicket !== null) {
         const result = await partyBChannel.submitTicket(ackedTicket)

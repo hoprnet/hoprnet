@@ -1,8 +1,8 @@
 import { u8aConcat, u8aSplit, serializeToU8a } from '@hoprnet/hopr-utils'
-import { Hash, PublicKey, Ticket } from '@hoprnet/hopr-core-ethereum'
+import { Hash, PublicKey, Ticket } from '..'
 import PeerId from 'peer-id'
 
-class UnacknowledgedTicket {
+export class UnacknowledgedTicket {
   constructor(readonly ticket: Ticket, readonly secretA: Hash) {}
 
   static deserialize(arr: Uint8Array): UnacknowledgedTicket {
@@ -34,5 +34,3 @@ class UnacknowledgedTicket {
     return Ticket.SIZE + Hash.SIZE
   }
 }
-
-export { UnacknowledgedTicket }

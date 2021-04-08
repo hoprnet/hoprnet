@@ -2,13 +2,13 @@ import type PeerId from 'peer-id'
 import type Hopr from '..'
 import { u8aEquals } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
-import { UnacknowledgedTicket } from '../messages/ticket/unacknowledged'
 import {
   PublicKey,
   Ticket,
   Channel,
   Acknowledgement,
   SubmitTicketResponse,
+  UnacknowledgedTicket,
   getWinProbabilityAsFloat
 } from '@hoprnet/hopr-core-ethereum'
 
