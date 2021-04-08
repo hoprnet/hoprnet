@@ -62,7 +62,7 @@ export function OnChainSecretIntermediary(iteration: number): Uint8Array {
     [PREFIX, PREFIX.length],
     [onChainSecretIntermediary, onChainSecretIntermediary.length],
     [SEPERATOR, SEPERATOR.length],
-    [ toU8a(iteration, ON_CHAIN_SECRET_ITERATION_WIDTH), ON_CHAIN_SECRET_ITERATION_WIDTH]
+    [toU8a(iteration, ON_CHAIN_SECRET_ITERATION_WIDTH), ON_CHAIN_SECRET_ITERATION_WIDTH]
   ])
 }
 
