@@ -10,6 +10,7 @@ import {
   getSignatureParameters
 } from './utils'
 import Debug from 'debug'
+import type { SubmitTicketResponse } from '.'
 
 const log = Debug('hopr-core-ethereum:channel')
 
@@ -178,7 +179,7 @@ class Channel {
     )
   }
 
-  async submitTicket(ackTicket: Acknowledgement) {
+  async submitTicket(ackTicket: Acknowledgement): Promise<SubmitTicketResponse> {
     try {
       const ticket = ackTicket.ticket
 

@@ -1,4 +1,4 @@
-import type { Indexer, RoutingChannel } from '@hoprnet/hopr-core-connector-interface'
+import type { Indexer, RoutingChannel } from '@hoprnet/hopr-core-ethereum'
 import PeerId from 'peer-id'
 import BN from 'bn.js'
 import {
