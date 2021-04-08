@@ -10,9 +10,7 @@ import { Networks, getAddresses, abis } from '@hoprnet/hopr-ethereum'
 import Channel from './channel'
 import { PublicKey } from './types'
 import Indexer from './indexer'
-import * as dbkeys from './dbKeys'
 import * as utils from './utils'
-import * as constants from './constants'
 import * as config from './config'
 import Account from './account'
 import HashedSecret from './hashedSecret'
@@ -55,7 +53,6 @@ export default class HoprEthereum implements HoprCoreConnector {
     this.hashedSecret = new HashedSecret(this.db, this.account, this.hoprChannels)
   }
 
-  readonly dbKeys = dbkeys
   readonly CHAIN_NAME = 'HOPR on Ethereum'
 
   private async _start(): Promise<HoprEthereum> {
@@ -240,10 +237,6 @@ export default class HoprEthereum implements HoprCoreConnector {
     )
     log(`using blockchain address ${await coreConnector.hexAccountAddress()}`)
     return coreConnector
-  }
-
-  static get constants() {
-    return constants
   }
 }
 
