@@ -11,7 +11,7 @@ yarn-error.log
 **/.DS_Store
 
 # typechain types generated
-src/tsc/web3
+src/contracts
 
 # Typescript builds
 lib

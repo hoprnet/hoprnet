@@ -1,25 +1,11 @@
 import { Networks, networks } from '@hoprnet/hopr-ethereum'
-import assert from 'assert'
 import { ecdsaSign, ecdsaRecover, ecdsaVerify } from 'secp256k1'
-import { PromiEvent, TransactionReceipt } from 'web3-core'
-import { BlockTransactionString } from 'web3-eth'
-import Web3 from 'web3'
-import {
-  u8aCompare,
-  u8aConcat,
-  u8aEquals,
-  A_STRICLY_LESS_THAN_B,
-  A_EQUALS_B,
-  durations,
-  u8aToNumber
-} from '@hoprnet/hopr-utils'
-import { Address, Balance, Hash, Signature } from '../types'
-import { ContractEventEmitter } from '../tsc/web3/types'
+import { providers as IProviders } from 'ethers'
+import { u8aCompare, u8aConcat, u8aEquals, A_STRICLY_LESS_THAN_B, A_EQUALS_B, u8aToNumber } from '@hoprnet/hopr-utils'
+import { Address, Hash, Signature } from '../types'
 import * as constants from '../constants'
-import * as time from './time'
+import { increaseTime } from './testing'
 import BN from 'bn.js'
-
-export { time }
 
 /**
  * @param self our node's accountId
@@ -179,91 +165,6 @@ export async function checkChallenge(challenge: Hash, response: Hash) {
 }
 
 /**
- * Convert between units'
- * @param amount
- * @param sourceUnit
- * @param targetUnit
- */
-export function convertUnit(amount: Balance, sourceUnit: 'eth', targetUnit: 'wei'): Balance
-export function convertUnit(amount: Balance, sourceUnit: 'wei', targetUnit: 'eth'): Balance
-export function convertUnit(amount: Balance, sourceUnit: 'eth' | 'wei', targetUnit: 'eth' | 'wei'): Balance {
-  assert(['eth', 'wei'].includes(sourceUnit), 'not implemented')
-
-  if (sourceUnit === 'eth') {
-    return Web3.utils.toWei(amount.toBN(), targetUnit as any) as any
-  } else {
-    return Web3.utils.fromWei(amount.toBN(), targetUnit as any) as any
-  }
-}
-
-/**
- * @param error from web3
- * @returns a known error, if we don't know it we return 'UNKNOWN'
- */
-export function getWeb3ErrorType(error: string): 'OOF_NATIVE' | 'OOF_HOPR' | 'UNKNOWN' {
-  if (error.includes(`enough funds`)) {
-    return 'OOF_NATIVE'
-  } else if (error.includes(`SafeERC20:`)) {
-    return 'OOF_HOPR'
-  } else {
-    return 'UNKNOWN'
-  }
-}
-
-/**
- * Wait until transaction has been mined.
- *
- * @typeparam T Our PromiEvent
- * @param event Our event, returned by web3
- * @returns the transaction receipt
- */
-export async function waitForConfirmation<T extends PromiEvent<any>>(event: T) {
-  return new Promise<TransactionReceipt>((resolve, reject) => {
-    return event
-      .on('receipt', (receipt) => resolve(receipt))
-      .on('error', (error) => {
-        const errorType = getWeb3ErrorType(error.message)
-
-        if (errorType === 'OOF_NATIVE') {
-          reject(constants.ERRORS.OOF_NATIVE)
-        } else if (errorType === 'OOF_HOPR') {
-          reject(constants.ERRORS.OOF_HOPR)
-        } else {
-          reject(error)
-        }
-      })
-  })
-}
-
-/**
- * Wait until transaction has been mined.
- *
- * @param txHash transaction hash
- * @returns the transaction receipt
- */
-export async function waitForConfirmationUsingHash(web3: Web3, txHash: string, timeout: number = durations.minutes(5)) {
-  return new Promise<TransactionReceipt>(async (resolve, reject) => {
-    const timer = setTimeout(() => reject('Waited for txHash confirmation too long.'), timeout)
-
-    try {
-      let mined = false
-      let receipt: TransactionReceipt
-
-      while (!mined) {
-        receipt = await web3.eth.getTransactionReceipt(txHash)
-        mined = !!receipt?.blockNumber
-      }
-
-      return resolve(receipt)
-    } catch (err) {
-      return reject(err.message)
-    } finally {
-      clearTimeout(timer)
-    }
-  })
-}
-
-/**
  * An asychronous setTimeout.
  *
  * @param ms milliseconds to wait
@@ -273,57 +174,9 @@ export async function wait(ms: number) {
 }
 
 /**
- * Wait until timestamp is reached onchain.
- *
- * @param ms milliseconds to wait
- */
-export async function waitFor({
-  web3,
-  network,
-  getCurrentBlock,
-  timestamp
-}: {
-  web3: Web3
-  network: Networks
-  getCurrentBlock: () => Promise<BlockTransactionString>
-  timestamp?: number
-}): Promise<void> {
-  const now = await getCurrentBlock().then((block) => Number(block.timestamp) * 1e3)
-
-  if (timestamp < now) {
-    return undefined
-  }
-
-  const diff = now - timestamp || 60
-
-  if (isGanache(network)) {
-    await time.increase(web3, diff)
-  } else {
-    await wait(diff * 1e3)
-  }
-
-  return waitFor({
-    web3,
-    network,
-    getCurrentBlock,
-    timestamp: await getCurrentBlock().then((block) => Number(block.timestamp) * 1e3)
-  })
-}
-
-/**
- * Get chain ID.
- *
- * @param web3 a web3 instance
- * @returns the chain ID
- */
-export async function getChainId(web3: Web3): Promise<number> {
-  return web3.eth.getChainId()
-}
-
-/**
  * Get current network's name.
  *
- * @param web3 a web3 instance
+ * @param chainId a chain id
  * @returns the network's name
  */
 export function getNetworkName(chainId: number): Networks {
@@ -336,7 +189,7 @@ export function getNetworkName(chainId: number): Networks {
 /**
  * Get current network's name.
  *
- * @param web3 a web3 instance
+ * @param network
  * @returns the network's name
  */
 export function getNetworkGasPrice(network: Networks): number | undefined {
@@ -344,21 +197,6 @@ export function getNetworkGasPrice(network: Networks): number | undefined {
 
   if (entry && entry[1].gas) return entry[1].gas
   return undefined
-}
-
-/**
- * Once function 'fn' resolves, remove all listeners from 'event'.
- *
- * @typeparam E Our contract event emitteer
- * @typeparam R fn's return
- * @param event an event
- * @param fn a function to wait for
- */
-export async function cleanupPromiEvent<E extends ContractEventEmitter<any>, R extends Promise<any>>(
-  event: E,
-  fn: (event: E) => R
-): Promise<R> {
-  return fn(event).finally(() => event.removeAllListeners())
 }
 
 /**

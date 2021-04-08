@@ -8,7 +8,7 @@ import type {
   PublicKey as IPublicKey,
   Signature as ISignature
 } from '@hoprnet/hopr-core-connector-interface'
-import Web3 from 'web3'
+import { ethers } from 'ethers'
 import BN from 'bn.js'
 import { publicKeyConvert, publicKeyCreate, ecdsaSign, ecdsaVerify } from 'secp256k1'
 import { serializeToU8a, u8aSplit, u8aToNumber } from '@hoprnet/hopr-utils'
@@ -21,7 +21,7 @@ export class Address implements IAddress {
   }
 
   static fromString(str: string): Address {
-    if (!Web3.utils.isAddress(str)) throw Error(`String ${str} is not an address`)
+    if (!ethers.utils.isAddress(str)) throw Error(`String ${str} is not an address`)
     return new Address(stringToU8a(str))
   }
 
@@ -30,7 +30,7 @@ export class Address implements IAddress {
   }
 
   toHex(): string {
-    return Web3.utils.toChecksumAddress(u8aToHex(this.arr, false))
+    return ethers.utils.getAddress(u8aToHex(this.arr, false))
   }
 
   eq(b: Address) {

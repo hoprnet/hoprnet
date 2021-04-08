@@ -1,11 +1,11 @@
 import { randomBytes } from 'crypto'
-import Web3 from 'web3'
 import LevelUp from 'levelup'
 import Memdown from 'memdown'
 import { stringToU8a } from '@hoprnet/hopr-utils'
 import CoreConnector from '..'
 import { Address, Hash, PublicKey } from '../types'
-import { HoprToken } from '../tsc/web3/HoprToken'
+import { HoprToken } from '../contracts'
+import { BigNumberish, providers as IProviders, ethers, providers } from 'ethers'
 
 export type Account = {
   privKey: Hash
@@ -30,24 +30,32 @@ export async function getPrivKeyData(privKey: Uint8Array): Promise<Account> {
 
 /**
  * Fund an account.
- * @param web3 the web3 instance the our hoprToken contract is deployed to
+ * @param provider
  * @param hoprToken the hoprToken instance that will be used to mint tokens
  * @param funder object
  * @param account object
  */
-export async function fundAccount(web3: Web3, hoprToken: HoprToken, funder: Account, account: Account) {
+export async function fundAccount(
+  provider: IProviders.WebSocketProvider,
+  hoprToken: HoprToken,
+  funder: Account,
+  account: Account
+) {
+  const wallet = new ethers.Wallet(account.privKey.toHex()).connect(provider)
+
   // fund account with ETH
-  await web3.eth.sendTransaction({
-    value: web3.utils.toWei('1', 'ether'),
+  await wallet.sendTransaction({
+    value: ethers.utils.parseEther('1'),
     from: funder.address.toHex(),
     to: account.address.toHex()
   })
 
   // mint account some HOPR
-  await hoprToken.methods.mint(account.address.toHex(), web3.utils.toWei('1', 'ether'), '0x00', '0x00').send({
-    from: funder.address.toHex(),
-    gas: 200e3
-  })
+  await hoprToken
+    .connect(funder.address.toHex())
+    .mint(account.address.toHex(), ethers.utils.parseEther('1'), ethers.constants.HashZero, ethers.constants.HashZero, {
+      gasLimit: 300e3
+    })
 }
 
 /**
@@ -65,7 +73,7 @@ export async function createAccount() {
  * @returns CoreConnector
  */
 export async function createAccountAndFund(
-  web3: Web3,
+  provider: providers.WebSocketProvider,
   hoprToken: HoprToken,
   funder: Account,
   account?: string | Uint8Array | Account
@@ -78,7 +86,7 @@ export async function createAccountAndFund(
     account = await getPrivKeyData(account)
   }
 
-  await fundAccount(web3, hoprToken, funder, account)
+  await fundAccount(provider, hoprToken, funder, account)
 
   return account
 }
@@ -99,15 +107,30 @@ export async function createNode(
   })
 }
 
-/**
- * Disconnect web3 as if it lost connection
- * @param web3 Web3 instance
- */
-export async function disconnectWeb3(web3: Web3): Promise<void> {
-  try {
-    // @ts-ignore
-    return web3.currentProvider.disconnect(4000)
-  } catch (err) {
-    // console.error(err)
-  }
+// /**
+//  * Disconnect web3 as if it lost connection
+//  * @param web3 Web3 instance
+//  */
+// export async function disconnectWeb3(web3: Web3): Promise<void> {
+//   try {
+//     // @ts-ignore
+//     return web3.currentProvider.disconnect(4000)
+//   } catch (err) {
+//     // console.error(err)
+//   }
+// }
+
+export const advanceBlock = async (provider: IProviders.WebSocketProvider) => {
+  return provider.send('evm_mine', [])
+}
+
+// increases ganache time by the passed duration in seconds
+export const increaseTime = async (provider: IProviders.WebSocketProvider, _duration: BigNumberish) => {
+  const duration = ethers.BigNumber.from(_duration)
+
+  if (duration.isNegative()) throw Error(`Cannot increase time by a negative amount (${duration})`)
+
+  await provider.send('evm_increaseTime', [duration.toNumber()])
+
+  await advanceBlock(provider)
 }

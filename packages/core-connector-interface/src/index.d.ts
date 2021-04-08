@@ -29,17 +29,6 @@ declare interface HoprCoreConnector {
      */
     getNativeBalance: (useCache?: boolean) => Promise<Types.NativeBalance>
 
-    keys: {
-      onChain: {
-        privKey: Uint8Array
-        pubKey: PublicKey
-      }
-      offChain: {
-        privKey: Uint8Array
-        pubKey: PublicKey
-      }
-    }
-
     /**
      * Check whether the given ticket is winning.
      *

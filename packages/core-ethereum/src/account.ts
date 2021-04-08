@@ -1,14 +1,13 @@
-import type { TransactionConfig } from 'web3-core'
+import { providers as IProviders, Wallet as IWallet, ContractTransaction } from 'ethers'
 import type HoprEthereum from '.'
-import type { TransactionObject } from './tsc/web3/types'
-import type { HoprToken } from './tsc/web3/HoprToken'
-import Web3 from 'web3'
-import { durations, u8aToHex, isExpired } from '@hoprnet/hopr-utils'
-import NonceTracker from './nonce-tracker'
+import type { HoprToken } from './contracts'
+import { ethers, errors } from 'ethers'
+import { durations, isExpired } from '@hoprnet/hopr-utils'
+import NonceTracker, { NonceLock } from './nonce-tracker'
 import TransactionManager from './transaction-manager'
-import { Address, Acknowledgement, Balance, Hash, Ticket, NativeBalance, UINT256, PublicKey } from './types'
+import { PublicKey, Address, Acknowledgement, Balance, Hash, Ticket, NativeBalance, UINT256 } from './types'
 import { isWinningTicket, isGanache, getNetworkGasPrice } from './utils'
-import { WEB3_CACHE_TTL } from './constants'
+import { PROVIDER_CACHE_TTL } from './constants'
 import * as ethereum from './ethereum'
 import BN from 'bn.js'
 
@@ -24,51 +23,25 @@ class Account {
   private _transactions = new TransactionManager()
   private preimage: Hash
 
-  public keys: {
-    onChain: {
-      privKey: Uint8Array
-      pubKey: PublicKey
-    }
-    offChain: {
-      privKey: Uint8Array
-      pubKey: PublicKey
-    }
-  }
-
-  constructor(public coreConnector: HoprEthereum, privKey: Uint8Array, pubKey: PublicKey, private chainId: number) {
-    this.keys = {
-      onChain: {
-        privKey,
-        pubKey
-      },
-      offChain: {
-        privKey,
-        pubKey
-      }
-    }
-
+  constructor(public coreConnector: HoprEthereum, public wallet: IWallet) {
     this._nonceTracker = new NonceTracker({
       getLatestBlockNumber: async () => {
         // when running our unit/intergration tests using ganache,
         // the indexer doesn't have enough time to pick up the events and reduce the data
         return isGanache(coreConnector.network)
-          ? coreConnector.web3.eth.getBlockNumber()
+          ? coreConnector.provider.getBlockNumber()
           : coreConnector.indexer.latestBlock
       },
       getTransactionCount: async (address: string, blockNumber?: number) =>
-        coreConnector.web3.eth.getTransactionCount(address, blockNumber),
+        coreConnector.provider.getTransactionCount(address, blockNumber),
       getConfirmedTransactions: () => Array.from(this._transactions.confirmed.values()),
       getPendingTransactions: () => Array.from(this._transactions.pending.values()),
       minPending: durations.minutes(15)
     })
   }
 
-  /**
-   * @deprecated Nonces are automatically assigned when signing a transaction
-   * @return next nonce
-   */
-  get nonce(): Promise<number> {
-    return this._nonceTracker.getNonceLock(this.address.toHex()).then((res) => res.nonceDetails.params.highestSuggested)
+  public async getNonceLock(): Promise<NonceLock> {
+    return this._nonceTracker.getNonceLock(this.address.toHex())
   }
 
   /**
@@ -84,7 +57,7 @@ class Account {
    * @returns ETH balance
    */
   public async getNativeBalance(useCache: boolean = false): Promise<NativeBalance> {
-    return getNativeBalance(this.coreConnector.web3, this.address, useCache)
+    return getNativeBalance(this.coreConnector.provider, this.address, useCache)
   }
 
   async getTicketEpoch(): Promise<UINT256> {
@@ -129,96 +102,86 @@ class Account {
     }
   }
 
+  get privateKey(): Uint8Array {
+    return ethers.utils.toUtf8Bytes(this.wallet.privateKey)
+  }
+
+  get publicKey(): PublicKey {
+    return PublicKey.fromString(this.wallet.publicKey)
+  }
+
   get address(): Address {
-    return this.keys.onChain.pubKey.toAddress()
+    return Address.fromString(this.wallet.address)
   }
 
   updateLocalState(onChainSecret: Hash) {
     this._onChainSecret = onChainSecret
   }
 
-  // @TODO: switch to web3js-accounts
-  public async signTransaction<T>(
-    // config put in .send
-    txConfig: Omit<TransactionConfig, 'nonce'>,
-    // return of our contract method in web3.Contract instance
-    txObject?: TransactionObject<T>
-  ) {
-    const { web3, network } = this.coreConnector
+  private handleTransactionError(hash: string, nonce: number, releaseLock: () => void, error: string) {
+    releaseLock()
+    const reverted = ([errors.CALL_EXCEPTION] as string[]).includes(error)
 
-    const abi = txObject ? txObject.encodeABI() : undefined
-    const gas = 300e3
+    if (reverted) {
+      log('Transaction with nonce %d and hash %s reverted: %s', nonce, hash, error)
 
-    // if it returns undefined, let web3 pick gas price
-    const gasPrice = getNetworkGasPrice(network)
+      // this transaction failed but was confirmed as reverted
+      this._transactions.moveToConfirmed(hash)
+    } else {
+      log('Transaction with nonce %d failed to sent: %s', nonce, error)
 
-    // @TODO: potential deadlock, needs to be improved
-    const nonceLock = await this._nonceTracker.getNonceLock(this.address.toHex())
+      const alreadyKnown = ([errors.NONCE_EXPIRED, errors.REPLACEMENT_UNDERPRICED] as string[]).includes(error)
+      // if this hash is already known and we already have it included in
+      // pending we can safely ignore this
+      if (alreadyKnown && this._transactions.pending.has(hash)) return
 
-    // @TODO: provide some of the values to avoid multiple calls
-    const options = {
-      gas,
-      gasPrice,
-      ...txConfig,
-      chainId: this.chainId,
-      nonce: nonceLock.nextNonce,
-      data: abi
+      // this transaction was not confirmed so we just remove it
+      this._transactions.remove(hash)
     }
+  }
 
-    const signedTransaction = await web3.eth.accounts.signTransaction(options, u8aToHex(this.keys.onChain.privKey))
+  public async sendTransaction<T extends (...args: any) => Promise<ContractTransaction>>(
+    method: T,
+    ...args: Parameters<T> // TODO: omit last
+  ): Promise<ContractTransaction> {
+    const gasLimit = 300e3
+    const gasPrice = getNetworkGasPrice(this.coreConnector.network)
+    const nonceLock = await this._nonceTracker.getNonceLock(this.address.toHex())
+    const nonce = nonceLock.nextNonce
+    let transaction: ContractTransaction
 
-    const send = () => {
-      if (signedTransaction.rawTransaction == null) {
-        throw Error('Cannot process transaction because Web3.js did not give us the raw transaction.')
-      }
-
+    try {
       log('Sending transaction %o', {
-        gas: options.gas,
-        gasPrice:
-          typeof options.gasPrice === 'string' && options.gasPrice.startsWith('0x')
-            ? Web3.utils.hexToNumber(options.gasPrice)
-            : options.gasPrice,
-        nonce: options.nonce,
-        hash: signedTransaction.transactionHash
+        gasLimit,
+        gasPrice,
+        nonce
       })
+      transaction = await method(args, {
+        gasLimit,
+        gasPrice,
+        nonce
+      })
+      log('Transaction with nonce %d successfully sent %s, waiting for confimation', nonce, transaction.hash)
 
-      const event = web3.eth.sendSignedTransaction(signedTransaction.rawTransaction)
-      this._transactions.addToPending(signedTransaction.transactionHash, { nonce: options.nonce })
+      this._transactions.addToPending(transaction.hash, { nonce })
       nonceLock.releaseLock()
 
-      // @TODO: cleanup old txs
-      event.once('receipt', () => {
-        this._transactions.moveToConfirmed(signedTransaction.transactionHash)
-      })
-      event.once('error', (error) => {
-        const receipt = error['receipt']
-
-        // same tx was submitted twice
-        if (error.message.includes('already known')) return
-
-        log(
-          'Transaction failed %s %i with error %s',
-          signedTransaction.transactionHash,
-          options.nonce,
-          error.message,
-          receipt ? receipt : 'no receipt'
-        )
-
-        // mean tx was confirmed & reverted
-        if (receipt) {
-          this._transactions.moveToConfirmed(signedTransaction.transactionHash)
-        } else {
-          this._transactions.remove(signedTransaction.transactionHash)
-        }
-      })
-
-      return event
+      // this is done asynchronous
+      transaction
+        .wait()
+        .then(() => {
+          log('Transaction with nonce %d and hash %s confirmed', nonce, transaction.hash)
+          this._transactions.moveToConfirmed(transaction.hash)
+        })
+        .catch((error) => {
+          this.handleTransactionError(transaction.hash, nonce, nonceLock.releaseLock, error.message)
+        })
+    } catch (error) {
+      this.handleTransactionError(transaction.hash, nonce, nonceLock.releaseLock, error.message)
     }
 
-    return {
-      send,
-      transactionHash: signedTransaction.transactionHash
-    }
+    if (!transaction) throw Error('Could not send transaction')
+    return transaction
   }
 }
 
@@ -234,7 +197,7 @@ export const getBalance = async (
 ): Promise<Balance> => {
   if (useCache) {
     const cached = cache.get('balance')
-    const notExpired = cached && !isExpired(cached.updatedAt, new Date().getTime(), WEB3_CACHE_TTL)
+    const notExpired = cached && !isExpired(cached.updatedAt, new Date().getTime(), PROVIDER_CACHE_TTL)
     if (notExpired) return new Balance(new BN(cached.value))
   }
 
@@ -249,17 +212,17 @@ export const getBalance = async (
  * @returns ETH balance
  */
 export const getNativeBalance = async (
-  web3: Web3,
+  provider: IProviders.WebSocketProvider,
   account: Address,
   useCache: boolean = false
 ): Promise<NativeBalance> => {
   if (useCache) {
     const cached = cache.get('nativeBalance')
-    const notExpired = cached && !isExpired(cached.updatedAt, new Date().getTime(), WEB3_CACHE_TTL)
+    const notExpired = cached && !isExpired(cached.updatedAt, new Date().getTime(), PROVIDER_CACHE_TTL)
     if (notExpired) return new NativeBalance(new BN(cached.value))
   }
 
-  const value = await ethereum.getNativeBalance(web3, account)
+  const value = await ethereum.getNativeBalance(provider, account)
   cache.set('nativeBalance', { value: value.toBN().toString(), updatedAt: new Date().getTime() })
 
   return value

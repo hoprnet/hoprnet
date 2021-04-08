@@ -9,10 +9,10 @@ import { getBalance, getNativeBalance } from './account'
 import { Ganache } from '@hoprnet/hopr-testing'
 import { migrate, getAddresses, abis } from '@hoprnet/hopr-ethereum'
 import { stringToU8a, durations } from '@hoprnet/hopr-utils'
-import { getPrivKeyData, createAccountAndFund, createNode } from './utils/testing.spec'
+import { getPrivKeyData, createAccountAndFund, createNode } from './utils/testing'
 import * as testconfigs from './config.spec'
 import * as configs from './config'
-import { WEB3_CACHE_TTL } from './constants'
+import { PROVIDER_CACHE_TTL } from './constants'
 import Sinon from 'sinon'
 
 const HoprTokenAbi = abis.HoprToken
@@ -104,7 +104,7 @@ describe('test getBalance', function () {
   })
 
   it('should reset cache', async function () {
-    clock.tick(WEB3_CACHE_TTL + 1)
+    clock.tick(PROVIDER_CACHE_TTL + 1)
 
     const result = await getBalance(createHoprTokenMock('30'), address, true)
     expect(result.toBN().toString()).to.equal('30')
@@ -154,7 +154,7 @@ describe('test getNativeBalance', function () {
   })
 
   it('should reset cache', async function () {
-    clock.tick(WEB3_CACHE_TTL + 1)
+    clock.tick(PROVIDER_CACHE_TTL + 1)
 
     const result = await getNativeBalance(createWeb3('30'), address, true)
     expect(result.toBN().toString()).to.equal('30')

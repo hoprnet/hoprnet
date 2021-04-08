@@ -1,12 +1,11 @@
+import type { LevelUp } from 'levelup'
+import type Account from './account'
+import type { HoprChannels } from './contracts'
 import { Hash } from './types'
 import Debug from 'debug'
 import { randomBytes } from 'crypto'
 import { u8aConcat, iterateHash, recoverIteratedHash } from '@hoprnet/hopr-utils'
-import { waitForConfirmation } from './utils'
 import { storeHashIntermediaries, getOnChainSecretIntermediary, getOnChainSecret } from './dbKeys'
-import type { LevelUp } from 'levelup'
-import type { HoprChannels } from './tsc/web3/HoprChannels'
-import type Account from './account'
 
 export const DB_ITERATION_BLOCK_SIZE = 10000
 export const TOTAL_ITERATIONS = 100000
@@ -30,9 +29,7 @@ class HashedSecret {
   private async getDebugAccountSecret(): Promise<Hash> {
     const account = await this.channels.methods.accounts(this.account.address.toHex()).call()
     return new Hash(
-      await hashFunction(
-        u8aConcat(new Uint8Array([parseInt(account.counter)]), this.account.keys.onChain.pubKey.serialize())
-      )
+      await hashFunction(u8aConcat(new Uint8Array([parseInt(account.counter)]), this.account.publicKey.serialize()))
     )
   }
 
@@ -57,20 +54,12 @@ class HashedSecret {
     if (Number(account.counter) === 0) {
       log('account is also null, calling channel.init')
       try {
-        await waitForConfirmation(
-          (
-            await this.account.signTransaction(
-              {
-                from: address,
-                to: this.channels.options.address
-              },
-              this.channels.methods.initializeAccount(
-                this.account.keys.onChain.pubKey.toUncompressedPubKeyHex(),
-                secret.toHex()
-              )
-            )
-          ).send()
+        const transaction = await this.account.sendTransaction(
+          this.channels.initializeAccount,
+          this.account.publicKey.toUncompressedPubKeyHex(),
+          secret.toHex()
         )
+        await transaction.wait()
         this.account.updateLocalState(secret)
       } catch (e) {
         if (e.message.match(/Account must not be set/)) {
@@ -87,20 +76,11 @@ class HashedSecret {
       // @TODO this is potentially dangerous because it increases the account counter
       log('account is already on chain, storing secret.')
       try {
-        await waitForConfirmation(
-          (
-            await this.account.signTransaction(
-              {
-                from: address,
-                to: this.channels.options.address
-              },
-              this.channels.methods.updateAccountSecret(secret.toHex())
-            )
-          ).send()
-        )
+        const transaction = await this.account.sendTransaction(this.channels.updateAccountSecret, secret.toHex())
+        await transaction.wait()
         this.account.updateLocalState(secret)
       } catch (e) {
-        if (e.message.match(/new and old hashedSecrets are the same/)) {
+        if (e.message.match(/secret must not be the same as before/)) {
           // NBD. no-op
           return
         }

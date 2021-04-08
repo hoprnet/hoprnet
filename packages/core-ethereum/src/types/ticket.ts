@@ -3,14 +3,17 @@ import { Ticket as ITicket } from '@hoprnet/hopr-core-connector-interface'
 import { stringToU8a, u8aSplit, u8aToHex, u8aConcat, serializeToU8a } from '@hoprnet/hopr-utils'
 import { Address, Balance, Hash, Signature, UINT256, PublicKey } from '.'
 import { ecdsaVerify, ecdsaSign, ecdsaRecover } from 'secp256k1'
-import Web3 from 'web3'
-const web3 = new Web3()
+import { ethers } from 'ethers'
 
-// Prefix message with "\x19Ethereum Signed Message:\n" and return hash
-function toEthSignedMessageHash(msg: string): Hash {
-  const messageWithHOPR = u8aConcat(stringToU8a(Web3.utils.toHex('HOPRnet')), stringToU8a(msg))
-  const messageWithHOPRHex = u8aToHex(messageWithHOPR)
-  return new Hash(stringToU8a(web3.eth.accounts.hashMessage(messageWithHOPRHex)))
+// Prefix message with "\x19Ethereum Signed Message:\n {length} HOPRnet {message}" and return hash
+function toEthSignedMessageHash(message: string): Hash {
+  const withHOPR = ethers.utils.concat([ethers.utils.toUtf8Bytes('HOPRnet'), message])
+  const result = ethers.utils.solidityKeccak256(
+    ['string', 'string', 'bytes'],
+    ['\x19Ethereum Signed Message:\n', withHOPR.length.toString(), withHOPR]
+  )
+
+  return new Hash(stringToU8a(result))
 }
 
 function serializeUnsigned({

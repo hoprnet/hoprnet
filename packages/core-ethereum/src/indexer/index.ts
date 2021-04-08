@@ -1,7 +1,6 @@
 import type { Subscription } from 'web3-core-subscriptions'
 import type PeerId from 'peer-id'
 import type { Indexer as IIndexer, RoutingChannel } from '@hoprnet/hopr-core-connector-interface'
-import type { ContractEventEmitter } from '../tsc/web3/types'
 import type HoprEthereum from '..'
 import type { Event, EventNames } from './types'
 import EventEmitter from 'events'
@@ -129,7 +128,7 @@ class Indexer extends EventEmitter implements IIndexer {
    */
   public async isSyncing(): Promise<boolean> {
     const [onChainBlock, lastKnownBlock] = await Promise.all([
-      this.connector.web3.eth.getBlockNumber(),
+      this.connector.provider.getBlockNumber(),
       db.getLatestBlockNumber(this.connector.db)
     ])
 
@@ -197,10 +196,13 @@ class Indexer extends EventEmitter implements IIndexer {
       let events: Event<any>[] = []
 
       try {
-        events = await this.connector.hoprChannels.getPastEvents('allEvents', {
+        const x = await this.connector.hoprChannels.queryFilter(
+          this.connector.hoprChannels.filters.AccountInitialized('', null, null),
           fromBlock,
           toBlock
-        })
+        )
+
+        // events = await this.connector.hoprChannels.queryFilter(this.connector.hoprChannels.filters.AccountInitialized(), fromBlock, toBlock)
       } catch (error) {
         failedCount++
 
@@ -316,7 +318,7 @@ class Indexer extends EventEmitter implements IIndexer {
   }
 
   private async onAccountSecretUpdated(event: Event<'AccountSecretUpdated'>): Promise<void> {
-    const data = event.returnValues
+    const data = event
 
     const accountId = Address.fromString(data.account)
 

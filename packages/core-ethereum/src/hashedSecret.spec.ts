@@ -3,10 +3,11 @@ import { durations, stringToU8a } from '@hoprnet/hopr-utils'
 import { Ganache } from '@hoprnet/hopr-testing'
 import { getAddresses, migrate, fund } from '@hoprnet/hopr-ethereum'
 import HoprEthereum from '.'
-import { waitForConfirmation, computeWinningProbability } from './utils'
+import { computeWinningProbability } from './utils'
 import * as Types from './types'
 import * as testconfigs from './config.spec'
-import { createNode } from './utils/testing.spec'
+import { createNode } from './utils/testing'
+
 const FUND_ARGS = `--address ${getAddresses()?.localhost?.HoprToken} --accounts-to-fund 1`
 
 // TODO: replace legacy test

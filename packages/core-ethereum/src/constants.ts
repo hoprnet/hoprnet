@@ -12,6 +12,6 @@ export const ERRORS = {
 
 /**
  * specifies in milliseconds for how long various
- * web3 requests like `eth_getBalance` should be cached for
+ * ethereum requests like `eth_getBalance` should be cached for
  */
-export const WEB3_CACHE_TTL = 30e3 // 30 seconds
+export const PROVIDER_CACHE_TTL = 30e3 // 30 seconds
