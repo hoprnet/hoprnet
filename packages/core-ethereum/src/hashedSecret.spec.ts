@@ -3,7 +3,7 @@ import { durations, stringToU8a } from '@hoprnet/hopr-utils'
 import { Ganache } from '@hoprnet/hopr-testing'
 import { getAddresses, migrate, fund } from '@hoprnet/hopr-ethereum'
 import HoprEthereum from '.'
-import * as Utils from './utils'
+import { waitForConfirmation, computeWinningProbability } from './utils'
 import * as Types from './types'
 import * as testconfigs from './config.spec'
 import { createNode } from './utils/testing.spec'
@@ -51,7 +51,7 @@ describe('test hashedSecret', function () {
       assert(preImage)
       assert(preImage.hash().eq(onChainHash))
 
-      await connector.utils.waitForConfirmation(
+      await waitForConfirmation(
         (
           await connector.account.signTransaction(
             {
@@ -103,7 +103,7 @@ describe('test hashedSecret', function () {
       let preImage = await connector.hashedSecret.findPreImage(onChainHash)
 
       assert(preImage.hash().eq(onChainHash))
-      await connector.utils.waitForConfirmation(
+      await waitForConfirmation(
         (
           await connector.account.signTransaction(
             {
@@ -131,7 +131,7 @@ describe('test hashedSecret', function () {
     it('should reserve a preImage for tickets with 100% winning probabilty resp. should not reserve for 0% winning probability', async function () {
       const ticket1 = ({
         getHash: () => new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff)),
-        winProb: Utils.computeWinningProbability(1)
+        winProb: computeWinningProbability(1)
       } as unknown) as Types.Ticket
       const response1 = new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff))
 
@@ -151,7 +151,7 @@ describe('test hashedSecret', function () {
       const failedAck = await connector.account.acknowledge(
         ({
           getHash: () => new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff)),
-          winProb: Utils.computeWinningProbability(0)
+          winProb: computeWinningProbability(0)
         } as unknown) as Types.Ticket,
         new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff))
       )

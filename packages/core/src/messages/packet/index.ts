@@ -152,7 +152,7 @@ export class Packet extends Uint8Array {
       offset: arr.byteOffset
     })
 
-    const { header, secrets } = await Header.create(node, path, {
+    const { header, secrets } = await Header.create(path, {
       bytes: packet.buffer,
       offset: packet.headerOffset
     })
@@ -168,7 +168,7 @@ export class Packet extends Uint8Array {
     log(`Destination    : ${blue(path[path.length - 1].toB58String())}`)
     log('--------------------------------')
 
-    packet._challenge = await Challenge.create(await chain.utils.hash(deriveTicketKeyBlinding(secrets[0])), fee, {
+    packet._challenge = await Challenge.create(Hash.create(deriveTicketKeyBlinding(secrets[0])), fee, {
       bytes: packet.buffer,
       offset: packet.challengeOffset
     }).sign(libp2p.peerId)
@@ -178,16 +178,11 @@ export class Packet extends Uint8Array {
       offset: packet.messageOffset
     }).onionEncrypt(secrets)
 
-    const ticketChallenge = await chain.utils.hash(
+    const ticketChallenge = Hash.create(
       secrets.length == 1
         ? deriveTicketLastKey(secrets[0])
-        : (
-            await chain.utils.hash(
-              u8aConcat(
-                deriveTicketKey(secrets[0]),
-                (await chain.utils.hash(deriveTicketKeyBlinding(secrets[1]))).serialize()
-              )
-            )
+        : Hash.create(
+            u8aConcat(deriveTicketKey(secrets[0]), Hash.create(deriveTicketKeyBlinding(secrets[1])).serialize())
           ).serialize()
     )
 
@@ -299,7 +294,7 @@ export class Packet extends Uint8Array {
     const targetPubKey = new PublicKey(target.pubKey.marshal())
     const challenge = u8aConcat(deriveTicketKey(this.header.derivedSecret), this.header.hashedKeyHalf)
 
-    if (!(await chain.utils.hash(challenge)).hash().eq(ticket.challenge)) {
+    if (!Hash.create(challenge).hash().eq(ticket.challenge)) {
       verbose('Error preparing to forward')
       throw Error('Error preparing forward')
     }

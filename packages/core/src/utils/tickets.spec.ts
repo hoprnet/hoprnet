@@ -6,7 +6,16 @@ import chaiAsPromised from 'chai-as-promised'
 import chai, { expect } from 'chai'
 import sinon from 'sinon'
 import { validateUnacknowledgedTicket, validateCreatedTicket } from './tickets'
-import { Address, Balance, PublicKey, Hash, UINT256, Utils, Channel, Ticket } from '@hoprnet/hopr-core-ethereum'
+import {
+  Address,
+  Balance,
+  PublicKey,
+  Hash,
+  UINT256,
+  Channel,
+  Ticket,
+  computeWinningProbability
+} from '@hoprnet/hopr-core-ethereum'
 
 chai.use(chaiAsPromised)
 
@@ -20,7 +29,7 @@ const createMockTicket = ({
   sender = SENDER,
   targetAddress = TARGET_ADDRESS,
   amount = new Balance(new BN(1)),
-  winProb = Utils.computeWinningProbability(1),
+  winProb = computeWinningProbability(1),
   epoch = new UINT256(new BN(1)),
   channelIteration = new UINT256(new BN(1))
 }: {
@@ -102,7 +111,6 @@ const createMockNode = ({
         address: targetAddress,
         getTicketEpoch: sinon.stub().returns(Promise.resolve(ticketEpoch))
       },
-      utils: Utils,
       types: { PublicKey }
     }
   } as unknown) as Hopr
@@ -142,7 +150,7 @@ describe('unit test validateUnacknowledgedTicket', function () {
   it('should throw when ticket chance is low', async function () {
     const node = createMockNode({})
     const signedTicket = createMockTicket({
-      winProb: Utils.computeWinningProbability(0.5)
+      winProb: computeWinningProbability(0.5)
     })
 
     return expect(

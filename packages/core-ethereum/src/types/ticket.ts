@@ -1,5 +1,5 @@
-import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import BN from 'bn.js'
+import { Ticket as ITicket } from '@hoprnet/hopr-core-connector-interface'
 import { stringToU8a, u8aSplit, u8aToHex, u8aConcat, serializeToU8a } from '@hoprnet/hopr-utils'
 import { Address, Balance, Hash, Signature, UINT256, PublicKey } from '.'
 import { ecdsaVerify, ecdsaSign, ecdsaRecover } from 'secp256k1'
@@ -39,7 +39,7 @@ function serializeUnsigned({
   ])
 }
 
-class Ticket implements Types.Ticket {
+class Ticket implements ITicket {
   constructor(
     readonly counterparty: Address,
     readonly challenge: Hash,

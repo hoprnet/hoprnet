@@ -1,7 +1,5 @@
 import type { LevelUp } from 'levelup'
-import type * as Utils from './utils'
 import type Channel, { SubmitTicketResponse } from './channel'
-import type * as Types from './types'
 import type * as DbKeys from './dbKeys'
 import type Indexer, { RoutingChannel } from './indexer'
 
@@ -17,8 +15,6 @@ declare interface HoprCoreConnectorStatic {
    * @param options.debug run connector in debug mode if set to true
    */
   create(db: LevelUp, seed: Uint8Array, options?: { provider?: string; debug?: boolean }): Promise<HoprCoreConnector>
-
-  readonly constants: typeof Constants
 }
 
 declare interface HoprCoreConnector {
@@ -33,9 +29,7 @@ declare interface HoprCoreConnector {
      * Returns the current native balance (ex: ETH) of the account associated with this node.
      */
     getNativeBalance: (useCache?: boolean) => Promise<Types.NativeBalance>
-    /**
-     * The accounts keys:
-     */
+
     keys: {
       onChain: {
         privKey: Uint8Array
@@ -57,8 +51,6 @@ declare interface HoprCoreConnector {
      */
     acknowledge(ticket: Ticket, response: Hash): Promise<Acknowledgement | undefined>
   }
-
-  readonly db: LevelUp
 
   /**
    * Initialises the connector, e.g. connect to a blockchain node.
@@ -86,13 +78,7 @@ declare interface HoprCoreConnector {
   withdraw(currency: Currencies, recipient: string, amount: string): Promise<string>
 
   hexAccountAddress(): Promise<string>
-
   smartContractInfo(): string
-
-  /**
-   * (Static) utils to use in the connector module
-   */
-  readonly utils: typeof Utils
 
   /**
    * Export keys under which our data gets stored in the database.
@@ -110,19 +96,6 @@ declare interface HoprCoreConnector {
   readonly indexer: Indexer
 }
 
-declare var HoprCoreConnector: HoprCoreConnectorStatic
-
-export {
-  Utils,
-  Types,
-  DbKeys,
-  Constants,
-  Channel,
-  SubmitTicketResponse,
-  Indexer,
-  RoutingChannel,
-  HoprCoreConnectorStatic,
-  Acknowledgement
-}
-
+export { DbKeys, Constants, Channel, SubmitTicketResponse, Indexer, RoutingChannel, HoprCoreConnectorStatic }
+export * from './types'
 export default HoprCoreConnector

@@ -14,7 +14,7 @@ import {
   createMAC
 } from './index'
 
-import type { Types } from '@hoprnet/hopr-core-connector-interface'
+import { Hash } from '@hoprnet/hopr-core-ethereum'
 import PeerId from 'peer-id'
 import Debug from 'debug'
 const log = Debug('hopr-core:packet:header')
@@ -30,7 +30,7 @@ import {
   KEY_LENGTH
 } from './parameters'
 
-export async function createHeader(hash: (msg: Uint8Array) => Promise<Types.Hash>, header: Header, peerIds: PeerId[]) {
+export async function createHeader(header: Header, peerIds: PeerId[]) {
   function checkPeerIds() {
     if (peerIds.length > MAX_HOPS) {
       log('Exceeded max hops')
@@ -154,7 +154,7 @@ export async function createHeader(hash: (msg: Uint8Array) => Promise<Types.Hash
         header.beta.set(header.gamma, ADDRESS_SIZE)
 
         // Used for the challenge that is created for the next node
-        header.beta.set((await hash(deriveTicketKeyBlinding(secrets[i]))).serialize(), ADDRESS_SIZE + MAC_SIZE)
+        header.beta.set(Hash.create(deriveTicketKeyBlinding(secrets[i])).serialize(), ADDRESS_SIZE + MAC_SIZE)
         header.beta.set(tmp, PER_HOP_SIZE)
 
         if (i < secrets.length - 1) {
@@ -167,23 +167,16 @@ export async function createHeader(hash: (msg: Uint8Array) => Promise<Types.Hash
            *   - the relay node can verify the key derivation path
            */
           header.beta.set(
-            (
-              await hash(
-                (
-                  await hash(
-                    u8aConcat(
-                      deriveTicketKey(secrets[i]),
-                      (await hash(deriveTicketKeyBlinding(secrets[i + 1]))).serialize()
-                    )
-                  )
-                ).serialize()
-              )
+            Hash.create(
+              Hash.create(
+                u8aConcat(deriveTicketKey(secrets[i]), Hash.create(deriveTicketKeyBlinding(secrets[i + 1])).serialize())
+              ).serialize()
             ).serialize(),
             ADDRESS_SIZE + MAC_SIZE + KEY_LENGTH
           )
         } else if (i == secrets.length - 1) {
           header.beta.set(
-            (await hash(deriveTicketLastKey(secrets[i]))).serialize(),
+            Hash.create(deriveTicketLastKey(secrets[i])).serialize(),
             ADDRESS_SIZE + MAC_SIZE + KEY_LENGTH
           )
         }
