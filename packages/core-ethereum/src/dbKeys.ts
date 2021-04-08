@@ -1,4 +1,4 @@
-import { toU8a, serializeToU8a, Intermediate} from '@hoprnet/hopr-utils'
+import { toU8a, serializeToU8a, Intermediate } from '@hoprnet/hopr-utils'
 import { Hash } from './types'
 import type { LevelUp } from 'levelup'
 
