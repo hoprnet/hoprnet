@@ -46,7 +46,7 @@ hoprd --admin --host="0.0.0.0:1291"
 ### Developing with this repository
 
 ```sh
-yarn          # Install tooling
+yarn          # Install lerna and sets project up
 yarn build    # Builds contracts, clients, etc
 
 # starting network
