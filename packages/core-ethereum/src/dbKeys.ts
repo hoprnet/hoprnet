@@ -13,16 +13,6 @@ const onChainSecretIntermediary = encoder.encode('onChainSecretIntermediary-')
 
 const ON_CHAIN_SECRET_ITERATION_WIDTH = 4 // bytes
 
-export function Challenge(channelId: Hash, challenge: Hash): Uint8Array {
-  return serializeToU8a([
-    [PREFIX, PREFIX.length],
-    [challengeSubPrefix, challengeSubPrefix.length],
-    [channelId.serialize(), Hash.SIZE],
-    [SEPERATOR, SEPERATOR.length],
-    [challenge.serialize(), Hash.SIZE]
-  ])
-}
-
 /**
  * Reconstructs channelId and the specified challenge from a challenge db-key.
  * @param arr a challenge db-key
