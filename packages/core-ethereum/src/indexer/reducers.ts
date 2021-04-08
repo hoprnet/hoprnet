@@ -1,17 +1,15 @@
 import type { Event } from './types'
 import assert from 'assert'
 import BN from 'bn.js'
-import { publicKeyConvert } from 'secp256k1'
-import { stringToU8a, u8aConcat } from '@hoprnet/hopr-utils'
-import { AccountEntry, Address, Public, Hash, ChannelEntry } from '../types'
+import { stringToU8a } from '@hoprnet/hopr-utils'
+import { AccountEntry, Address, PublicKey, Hash, ChannelEntry } from '../types'
 import { isPartyA, getParties } from '../utils'
 
 export const onAccountInitialized = async (event: Event<'AccountInitialized'>): Promise<AccountEntry> => {
   const data = event.returnValues
   const address = Address.fromString(data.account)
-  // library requires identifier
-  const uncompressedPubKey = u8aConcat(new Uint8Array([4]), stringToU8a(data.uncompressedPubKey))
-  const pubKey = new Public(publicKeyConvert(uncompressedPubKey, true))
+  // library requires identifier TODO: insert identifier bytes
+  const pubKey = PublicKey.fromUncompressedPubKey(stringToU8a(data.uncompressedPubKey))
   const secret = new Hash(stringToU8a(data.secret))
   const counter = new BN(1)
 
@@ -167,15 +165,15 @@ export const onChannelClosed = async (
     "'onClosedChannel' failed because channel is not in 'PENDING_TO_CLOSE' status"
   )
 
-  return new ChannelEntry(
-    channelEntry.partyA,
-    channelEntry.partyB,
-    new BN(0),
-    new BN(0),
-    new BN(0),
-    channelEntry.stateCounter.addn(8),
-    false,
-    channelEntry.openedAt,
-    new BN(String(event.blockNumber))
-  )
+  return ChannelEntry.fromObject({
+    partyA: channelEntry.partyA,
+    partyB: channelEntry.partyB,
+    deposit: new BN(0),
+    partyABalance: new BN(0),
+    closureTime: new BN(0),
+    stateCounter: channelEntry.stateCounter.addn(8),
+    closureByPartyA: false,
+    openedAt: channelEntry.openedAt,
+    closedAt: new BN(String(event.blockNumber))
+  })
 }

@@ -1,14 +1,13 @@
 import type { TransactionConfig } from 'web3-core'
 import type HoprEthereum from '.'
-import type { ContractEventEmitter } from './tsc/web3/types'
 import type { TransactionObject } from './tsc/web3/types'
 import type { HoprToken } from './tsc/web3/HoprToken'
 import Web3 from 'web3'
-import { durations, stringToU8a, u8aEquals, u8aToHex, isExpired } from '@hoprnet/hopr-utils'
+import { durations, u8aToHex, isExpired } from '@hoprnet/hopr-utils'
 import NonceTracker from './nonce-tracker'
 import TransactionManager from './transaction-manager'
-import { Address, AcknowledgedTicket, Balance, Hash, NativeBalance, UINT256 } from './types'
-import { isWinningTicket, pubKeyToAddress, isGanache, getNetworkGasPrice } from './utils'
+import { Address, Acknowledgement, Balance, Hash, Ticket, NativeBalance, UINT256, PublicKey } from './types'
+import { isWinningTicket, isGanache, getNetworkGasPrice } from './utils'
 import { WEB3_CACHE_TTL } from './constants'
 import * as ethereum from './ethereum'
 import BN from 'bn.js'
@@ -16,33 +15,27 @@ import BN from 'bn.js'
 import debug from 'debug'
 const log = debug('hopr-core-ethereum:account')
 
-export const EMPTY_HASHED_SECRET = new Uint8Array(Hash.SIZE).fill(0x00)
+export const EMPTY_HASHED_SECRET = new Hash(new Uint8Array(Hash.SIZE).fill(0x00))
 const cache = new Map<'balance' | 'nativeBalance', { value: string; updatedAt: number }>()
 
 class Account {
-  private _address?: Address
-  private _ticketEpoch?: UINT256
-  private _ticketEpochListener?: ContractEventEmitter<any>
   private _onChainSecret?: Hash
   private _nonceTracker: NonceTracker
   private _transactions = new TransactionManager()
   private preimage: Hash
 
-  /**
-   * The accounts keys:
-   */
   public keys: {
     onChain: {
       privKey: Uint8Array
-      pubKey: Uint8Array
+      pubKey: PublicKey
     }
     offChain: {
       privKey: Uint8Array
-      pubKey: Uint8Array
+      pubKey: PublicKey
     }
   }
 
-  constructor(public coreConnector: HoprEthereum, privKey: Uint8Array, pubKey: Uint8Array, private chainId: number) {
+  constructor(public coreConnector: HoprEthereum, privKey: Uint8Array, pubKey: PublicKey, private chainId: number) {
     this.keys = {
       onChain: {
         privKey,
@@ -70,20 +63,12 @@ class Account {
     })
   }
 
-  async stop() {
-    if (this._ticketEpochListener) {
-      this._ticketEpochListener.removeAllListeners()
-    }
-  }
-
   /**
    * @deprecated Nonces are automatically assigned when signing a transaction
    * @return next nonce
    */
   get nonce(): Promise<number> {
-    return this._nonceTracker
-      .getNonceLock(this._address.toHex())
-      .then((res) => res.nonceDetails.params.highestSuggested)
+    return this._nonceTracker.getNonceLock(this.address.toHex()).then((res) => res.nonceDetails.params.highestSuggested)
   }
 
   /**
@@ -91,7 +76,7 @@ class Account {
    * @returns HOPR balance
    */
   public async getBalance(useCache: boolean = false): Promise<Balance> {
-    return getBalance(this.coreConnector.hoprToken, await this.address, useCache)
+    return getBalance(this.coreConnector.hoprToken, this.address, useCache)
   }
 
   /**
@@ -99,92 +84,53 @@ class Account {
    * @returns ETH balance
    */
   public async getNativeBalance(useCache: boolean = false): Promise<NativeBalance> {
-    return getNativeBalance(this.coreConnector.web3, await this.address, useCache)
+    return getNativeBalance(this.coreConnector.web3, this.address, useCache)
   }
 
-  get ticketEpoch(): Promise<UINT256> {
-    if (this._ticketEpoch != null) {
-      return Promise.resolve(this._ticketEpoch)
-    }
-
-    this.attachAccountDataListener()
-
-    return this.address.then((address) => {
-      return this.coreConnector.hoprChannels.methods
-        .accounts(address.toHex())
-        .call()
-        .then((res) => {
-          this._ticketEpoch = UINT256.fromString(res.counter)
-
-          return this._ticketEpoch
-        })
-    })
+  async getTicketEpoch(): Promise<UINT256> {
+    const state = await this.coreConnector.indexer.getAccount(this.address)
+    if (!state || !state.counter) return UINT256.fromString('0')
+    return new UINT256(state.counter)
   }
 
   /**
    * Returns the current value of the onChainSecret
    */
-  get onChainSecret(): Promise<Hash> {
-    if (this._onChainSecret != null) {
-      return Promise.resolve(this._onChainSecret)
+  async getOnChainSecret(): Promise<Hash | undefined> {
+    if (this._onChainSecret && !this._onChainSecret.eq(EMPTY_HASHED_SECRET)) return this._onChainSecret
+    const state = await this.coreConnector.indexer.getAccount(this.address)
+    if (!state || !state.secret) return undefined
+    this.updateLocalState(state.secret)
+    return state.secret
+  }
+
+  private async initPreimage() {
+    if (!this.preimage) {
+      const ocs = await this.getOnChainSecret()
+      if (!ocs) {
+        throw new Error('cannot reserve preimage when there is no on chain secret')
+      }
+      this.preimage = await this.coreConnector.hashedSecret.findPreImage(ocs)
     }
-
-    this.attachAccountDataListener()
-
-    return this.address.then((address) => {
-      return this.coreConnector.hoprChannels.methods
-        .accounts(address.toHex())
-        .call()
-        .then((res) => {
-          const hashedSecret = stringToU8a(res.secret)
-
-          // true if this string is an empty bytes32
-          if (u8aEquals(hashedSecret, EMPTY_HASHED_SECRET)) {
-            return undefined
-          }
-
-          this._onChainSecret = new Hash(hashedSecret)
-
-          return this._onChainSecret
-        })
-    })
   }
 
   /**
    * Reserve a preImage for the given ticket if it is a winning ticket.
    * @param ticket the acknowledged ticket
-   * DANGER mutates ticket.
    */
-  async reservePreImageIfIsWinning(ticket: AcknowledgedTicket) {
-    // TODO replace this whole clusterf***
-    if (!this.preimage) {
-      this.preimage = await this.coreConnector.hashedSecret.findPreImage(await this.onChainSecret)
-    }
-    if (
-      await isWinningTicket(
-        await (await ticket.signedTicket).ticket.hash,
-        ticket.response,
-        this.preimage,
-        (await ticket.signedTicket).ticket.winProb
-      )
-    ) {
-      ticket.preImage = this.preimage
+  async acknowledge(ticket: Ticket, response: Hash): Promise<Acknowledgement | null> {
+    await this.initPreimage()
+    if (await isWinningTicket(ticket.getHash(), response, this.preimage, ticket.winProb)) {
+      const ack = new Acknowledgement(ticket, response, this.preimage)
       this.preimage = await this.coreConnector.hashedSecret.findPreImage(this.preimage)
-      return true
+      return ack
     } else {
-      return false
+      return null
     }
   }
 
-  get address(): Promise<Address> {
-    if (this._address) {
-      return Promise.resolve(this._address)
-    }
-
-    return pubKeyToAddress(this.keys.onChain.pubKey).then((address: Address) => {
-      this._address = address
-      return this._address
-    })
+  get address(): Address {
+    return this.keys.onChain.pubKey.toAddress()
   }
 
   updateLocalState(onChainSecret: Hash) {
@@ -207,7 +153,7 @@ class Account {
     const gasPrice = getNetworkGasPrice(network)
 
     // @TODO: potential deadlock, needs to be improved
-    const nonceLock = await this._nonceTracker.getNonceLock(this._address.toHex())
+    const nonceLock = await this._nonceTracker.getNonceLock(this.address.toHex())
 
     // @TODO: provide some of the values to avoid multiple calls
     const options = {
@@ -272,37 +218,6 @@ class Account {
     return {
       send,
       transactionHash: signedTransaction.transactionHash
-    }
-  }
-
-  private async attachAccountDataListener() {
-    if (this._ticketEpochListener == null) {
-      // listen for 'SecretHashSet' events and update 'ticketEpoch'
-      // on error, safely reset 'ticketEpoch' & event listener
-      try {
-        this._ticketEpochListener = this.coreConnector.hoprChannels.events
-          .AccountSecretUpdated({
-            fromBlock: 'latest',
-            filter: {
-              account: (await this.address).toHex()
-            }
-          })
-          .on('data', (event) => {
-            log('new ticketEpoch', event.returnValues.counter)
-
-            this._onChainSecret = new Hash(stringToU8a(event.returnValues.secret))
-            this._ticketEpoch = UINT256.fromString(event.returnValues.counter)
-          })
-          .on('error', (error) => {
-            log('error listening to SecretHashSet events', error.message)
-
-            this._ticketEpochListener?.removeAllListeners()
-            this._ticketEpoch = undefined
-          })
-      } catch (err) {
-        log(err)
-        this._ticketEpochListener?.removeAllListeners()
-      }
     }
   }
 }

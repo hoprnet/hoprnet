@@ -1,4 +1,3 @@
-import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 import { moveDecimalPoint, pubKeyToPeerId, u8aEquals } from '@hoprnet/hopr-utils'
 import chalk from 'chalk'
@@ -6,7 +5,7 @@ import { AbstractCommand } from './abstractCommand'
 import { getPaddingLength, styleValue } from './utils'
 
 export default class ListOpenChannels extends AbstractCommand {
-  constructor(public node: Hopr<HoprCoreConnector>) {
+  constructor(public node: Hopr) {
     super()
   }
 
@@ -68,7 +67,7 @@ export default class ListOpenChannels extends AbstractCommand {
   async execute(): Promise<string | void> {
     try {
       const { types, indexer } = this.node.paymentChannels
-      const selfPubKey = new types.Public(this.node.getId().pubKey.marshal())
+      const selfPubKey = new types.PublicKey(this.node.getId().pubKey.marshal())
       const selfAddress = await selfPubKey.toAddress()
       const channels = (await this.node.paymentChannels.indexer.getChannelsOf(selfAddress))
         // do not print CLOSED channels
@@ -79,16 +78,20 @@ export default class ListOpenChannels extends AbstractCommand {
         return `\nNo open channels found.`
       }
 
+      // find counterpartys' peerIds
       for (const channel of channels) {
-        const id = await channel.getChannelId()
+        const id = await channel.getId()
         const selfIsPartyA = u8aEquals(selfAddress.serialize(), channel.partyA.serialize())
         const counterpartyPubKey = await indexer.getPublicKeyOf(selfIsPartyA ? channel.partyB : channel.partyA)
+        // counterparty has not initialized
+        if (!counterpartyPubKey) continue
+
         const totalBalance = moveDecimalPoint(channel.deposit.toString(), types.Balance.DECIMALS * -1)
         const myBalance = moveDecimalPoint(
           selfIsPartyA ? channel.partyABalance.toString() : channel.deposit.sub(channel.partyABalance).toString(),
           types.Balance.DECIMALS * -1
         )
-        const peerId = (await pubKeyToPeerId(counterpartyPubKey)).toB58String()
+        const peerId = (await pubKeyToPeerId(counterpartyPubKey.serialize())).toB58String()
 
         result.push(
           this.generateOutput({

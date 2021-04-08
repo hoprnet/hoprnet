@@ -1,14 +1,9 @@
-/*
-  Helper functions which generate database keys
-*/
 import { toU8a } from '@hoprnet/hopr-utils'
-import { Hash, Public, Address } from './types'
-import type { Types } from '@hoprnet/hopr-core-connector-interface'
+import { Hash, PublicKey } from './types'
 
 const encoder = new TextEncoder()
 const PREFIX = encoder.encode('payments-')
 const SEPERATOR = encoder.encode('-')
-const channelSubPrefix = encoder.encode('channel-')
 const challengeSubPrefix = encoder.encode('challenge-')
 const channelIdSubPrefix = encoder.encode('channelId-')
 const nonceSubPrefix = encoder.encode('nonce-')
@@ -19,31 +14,11 @@ const onChainSecretIntermediary = encoder.encode('onChainSecretIntermediary-')
 const ON_CHAIN_SECRET_ITERATION_WIDTH = 4 // bytes
 
 /**
- * Returns the db-key under which the channel is saved.
- * @param counterparty counterparty of the channel
- */
-export function Channel(counterparty: Types.Address): Uint8Array {
-  return allocationHelper([
-    [PREFIX.length, PREFIX],
-    [channelSubPrefix.length, channelSubPrefix],
-    [counterparty.serialize().length, counterparty.serialize()]
-  ])
-}
-
-/**
- * Reconstructs the channelId from a db-key.
- * @param arr a channel db-key
- */
-export function ChannelKeyParse(arr: Uint8Array): Types.Address {
-  return new Address(arr.slice(PREFIX.length + channelSubPrefix.length))
-}
-
-/**
  * Returns the db-key under which the challenge is saved.
  * @param channelId channelId of the channel
  * @param challenge challenge to save
  */
-export function Challenge(channelId: Types.Hash, challenge: Types.Hash): Uint8Array {
+export function Challenge(channelId: Hash, challenge: Hash): Uint8Array {
   return allocationHelper([
     [PREFIX.length, PREFIX],
     [challengeSubPrefix.length, challengeSubPrefix],
@@ -70,7 +45,7 @@ export function ChallengeKeyParse(arr: Uint8Array): [Hash, Hash] {
  * Returns the db-key under which signatures of acknowledgements are saved.
  * @param signatureHash hash of an ackowledgement signature
  */
-export function ChannelId(signatureHash: Types.Hash): Uint8Array {
+export function ChannelId(signatureHash: Hash): Uint8Array {
   return allocationHelper([
     [PREFIX.length, PREFIX],
     [channelIdSubPrefix.length, channelIdSubPrefix],
@@ -83,7 +58,7 @@ export function ChannelId(signatureHash: Types.Hash): Uint8Array {
  * @param channelId channelId of the channel
  * @param nonce the nonce
  */
-export function Nonce(channelId: Types.Hash, nonce: Types.Hash): Uint8Array {
+export function Nonce(channelId: Hash, nonce: Hash): Uint8Array {
   return allocationHelper([
     [PREFIX.length, PREFIX],
     [nonceSubPrefix.length, nonceSubPrefix],
@@ -109,11 +84,11 @@ export function OnChainSecretIntermediary(iteration: number): Uint8Array {
 /**
  * Returns the db-key under which the tickets are saved in the database.
  */
-export function AcknowledgedTicket(counterPartyPubKey: Types.Public, challenge: Types.Hash): Uint8Array {
+export function AcknowledgedTicket(counterPartyPubKey: PublicKey, challenge: Hash): Uint8Array {
   return allocationHelper([
     [ticketSubPrefix.length, ticketSubPrefix],
     [acknowledgedSubPrefix.length, acknowledgedSubPrefix],
-    [counterPartyPubKey.length, counterPartyPubKey],
+    [PublicKey.SIZE, counterPartyPubKey.serialize()],
     [SEPERATOR.length, SEPERATOR],
     [Hash.SIZE, challenge.serialize()]
   ])
@@ -124,14 +99,14 @@ export function AcknowledgedTicket(counterPartyPubKey: Types.Public, challenge: 
  * @param arr a AcknowledgedTicket db-key
  * @param props additional arguments
  */
-export function AcknowledgedTicketParse(arr: Uint8Array): [Public, Hash] {
+export function AcknowledgedTicketParse(arr: Uint8Array): [PublicKey, Hash] {
   const counterPartyPubKeyStart = ticketSubPrefix.length + acknowledgedSubPrefix.length
-  const counterPartyPubKeyEnd = counterPartyPubKeyStart + Public.SIZE
+  const counterPartyPubKeyEnd = counterPartyPubKeyStart + PublicKey.SIZE
   const challengeStart = counterPartyPubKeyEnd + SEPERATOR.length
   const challengeEnd = challengeStart + Hash.SIZE
 
   return [
-    new Public(arr.slice(counterPartyPubKeyStart, counterPartyPubKeyEnd)),
+    new PublicKey(arr.slice(counterPartyPubKeyStart, counterPartyPubKeyEnd)),
     new Hash(arr.slice(challengeStart, challengeEnd))
   ]
 }

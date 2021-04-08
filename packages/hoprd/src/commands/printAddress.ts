@@ -1,10 +1,10 @@
-import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 import { AbstractCommand } from './abstractCommand'
 import { styleValue } from './utils'
+import { PublicKey } from '@hoprnet/hopr-core-ethereum'
 
 export default class PrintAddress extends AbstractCommand {
-  constructor(public node: Hopr<HoprCoreConnector>) {
+  constructor(public node: Hopr) {
     super()
   }
 
@@ -22,8 +22,6 @@ export default class PrintAddress extends AbstractCommand {
    * @notice triggered by the CLI
    */
   public async execute(query: string): Promise<string> {
-    const { utils } = this.node.paymentChannels
-
     const hoprPrefix = 'HOPR Address:'
     const hoprAddress = this.node.getId().toB58String()
 
@@ -33,7 +31,7 @@ export default class PrintAddress extends AbstractCommand {
 
     // @TODO: use 'NativeBalance' and 'Balance' to display currencies
     const nativePrefix = 'ETH Address:'
-    const nativeAddress = (await utils.pubKeyToAddress(this.node.getId().pubKey.marshal())).toHex()
+    const nativeAddress = new PublicKey(this.node.getId().pubKey.marshal()).toHex()
 
     if (query.trim() === 'native') {
       return nativeAddress

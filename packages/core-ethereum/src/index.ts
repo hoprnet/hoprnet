@@ -1,14 +1,15 @@
 import type { LevelUp } from 'levelup'
 import type { WebsocketProvider } from 'web3-core'
-import type { Currencies } from '@hoprnet/hopr-core-connector-interface'
+import type { Currencies, SubmitTicketResponse } from '@hoprnet/hopr-core-connector-interface'
 import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type { HoprChannels } from './tsc/web3/HoprChannels'
 import type { HoprToken } from './tsc/web3/HoprToken'
 import Web3 from 'web3'
 import chalk from 'chalk'
 import { Networks, getAddresses, abis } from '@hoprnet/hopr-ethereum'
-import { ChannelFactory } from './channel'
+import Channel from './channel'
 import types from './types'
+import { PublicKey } from './types'
 import Indexer from './indexer'
 import * as dbkeys from './dbKeys'
 import * as utils from './utils'
@@ -17,6 +18,7 @@ import * as config from './config'
 import Account from './account'
 import HashedSecret from './hashedSecret'
 import debug from 'debug'
+import { getWinProbabilityAsFloat, computeWinningProbability } from './utils'
 
 const HoprChannelsAbi = abis.HoprChannels
 const HoprTokenAbi = abis.HoprToken
@@ -31,7 +33,7 @@ export default class HoprEthereum implements HoprCoreConnector {
   private _stopping?: Promise<void>
   private _debug: boolean
 
-  public channel: ChannelFactory
+  public channel = Channel
   public types: types
   public indexer: Indexer
   public account: Account
@@ -46,19 +48,17 @@ export default class HoprEthereum implements HoprCoreConnector {
     public hoprToken: HoprToken,
     debug: boolean,
     privateKey: Uint8Array,
-    publicKey: Uint8Array,
+    publicKey: PublicKey,
     maxConfirmations: number
   ) {
     this.account = new Account(this, privateKey, publicKey, chainId)
     this.indexer = new Indexer(this, maxConfirmations)
     this.types = new types()
-    this.channel = new ChannelFactory(this)
     this._debug = debug
     this.hashedSecret = new HashedSecret(this.db, this.account, this.hoprChannels)
   }
 
   readonly dbKeys = dbkeys
-  readonly utils = utils
   readonly constants = constants
   readonly CHAIN_NAME = 'HOPR on Ethereum'
 
@@ -109,7 +109,6 @@ export default class HoprEthereum implements HoprCoreConnector {
         }
 
         await this.indexer.stop()
-        await this.account.stop()
         provider.disconnect(1000, 'Stopping HOPR node.')
         this._status = 'dead'
         log(chalk.green('Connector stopped'))
@@ -161,7 +160,7 @@ export default class HoprEthereum implements HoprCoreConnector {
       try {
         if (currency === 'NATIVE') {
           const tx = await this.account.signTransaction({
-            from: (await this.account.address).toHex(),
+            from: this.account.address.toHex(),
             to: recipient,
             value: amount
           })
@@ -170,7 +169,7 @@ export default class HoprEthereum implements HoprCoreConnector {
         } else {
           const tx = await this.account.signTransaction(
             {
-              from: (await this.account.address).toHex(),
+              from: this.account.address.toHex(),
               to: this.hoprToken.options.address
             },
             this.hoprToken.methods.transfer(recipient, amount)
@@ -185,7 +184,7 @@ export default class HoprEthereum implements HoprCoreConnector {
   }
 
   public async hexAccountAddress(): Promise<string> {
-    return (await this.account.address).toHex()
+    return this.account.address.toHex()
   }
 
   public smartContractInfo(): string {
@@ -220,8 +219,9 @@ export default class HoprEthereum implements HoprCoreConnector {
 
     const web3 = new Web3(provider)
 
-    const [chainId, publicKey] = await Promise.all([utils.getChainId(web3), utils.privKeyToPubKey(seed)])
+    const chainId = await utils.getChainId(web3)
     const network = utils.getNetworkName(chainId) as Networks
+    const publicKey = PublicKey.fromPrivKey(seed)
 
     if (typeof addresses?.[network]?.HoprChannels === 'undefined') {
       throw Error(`token contract address from network ${network} not found`)
@@ -251,6 +251,5 @@ export default class HoprEthereum implements HoprCoreConnector {
   }
 }
 
-export const Types = types
-export const Utils = utils
 export * from './types'
+export { Channel, SubmitTicketResponse, getWinProbabilityAsFloat, computeWinningProbability }

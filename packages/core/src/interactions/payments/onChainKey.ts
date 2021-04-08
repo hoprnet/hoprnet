@@ -1,6 +1,5 @@
 import type Hopr from '../../'
-import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-import type { Types } from '@hoprnet/hopr-core-connector-interface'
+import type { PublicKey } from '@hoprnet/hopr-core-connector-interface'
 
 import { PROTOCOL_ONCHAIN_KEY } from '../../constants'
 import type { AbstractInteraction } from '../abstractInteraction'
@@ -12,10 +11,10 @@ import { dialHelper, durations } from '@hoprnet/hopr-utils'
 
 const ONCHAIN_KEY_TIMEOUT = durations.seconds(4)
 
-class OnChainKey<Chain extends HoprCoreConnector> implements AbstractInteraction {
+class OnChainKey implements AbstractInteraction {
   protocols: string[] = [PROTOCOL_ONCHAIN_KEY]
 
-  constructor(public node: Hopr<Chain>) {
+  constructor(public node: Hopr) {
     this.node._libp2p.handle(this.protocols, this.handler.bind(this))
   }
 
@@ -23,7 +22,7 @@ class OnChainKey<Chain extends HoprCoreConnector> implements AbstractInteraction
     pipe([this.node.paymentChannels.account.keys.onChain.pubKey], struct.stream)
   }
 
-  async interact(counterparty: PeerId): Promise<Types.Public> {
+  async interact(counterparty: PeerId): Promise<PublicKey> {
     const struct = await dialHelper(this.node._libp2p, counterparty, this.protocols[0], {
       timeout: ONCHAIN_KEY_TIMEOUT
     })
@@ -37,7 +36,7 @@ class OnChainKey<Chain extends HoprCoreConnector> implements AbstractInteraction
     return pipe(struct.stream, this.onReception.bind(this))
   }
 
-  async onReception(source: any): Promise<Types.Public> {
+  async onReception(source: any): Promise<PublicKey> {
     let result: Uint8Array
     for await (const msg of source) {
       if (msg == null || msg.length == 0) {
@@ -52,7 +51,7 @@ class OnChainKey<Chain extends HoprCoreConnector> implements AbstractInteraction
       }
     }
 
-    return new this.node.paymentChannels.types.Public(result)
+    return new this.node.paymentChannels.types.PublicKey(result)
   }
 }
 

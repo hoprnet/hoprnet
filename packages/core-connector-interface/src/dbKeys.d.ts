@@ -1,19 +1,6 @@
 import type { Address, Hash } from './types'
 
 /**
- * Returns the db-key under which the channel is saved.
- * @param counterparty counterparty of the channel
- */
-export function Channel(counterparty: Address): Uint8Array
-
-/**
- * Reconstructs the channelId from a db-key.
- * @param arr a channel db-key
- * @param props additional arguments
- */
-export function ChannelKeyParse(arr: Uint8Array, ...props: any[]): Address
-
-/**
  * Returns the db-key under which the challenge is saved.
  * @param channelId channelId of the channel
  * @param challenge challenge to save

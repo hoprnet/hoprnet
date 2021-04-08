@@ -1,8 +1,7 @@
 import { Hash } from './types'
 import Debug from 'debug'
 import { randomBytes } from 'crypto'
-import { u8aToHex, u8aConcat, iterateHash, recoverIteratedHash } from '@hoprnet/hopr-utils'
-import { publicKeyConvert } from 'secp256k1'
+import { u8aConcat, iterateHash, recoverIteratedHash } from '@hoprnet/hopr-utils'
 import { waitForConfirmation } from './utils'
 import { OnChainSecret, OnChainSecretIntermediary } from './dbKeys'
 import type { LevelUp } from 'levelup'
@@ -40,9 +39,11 @@ class HashedSecret {
    * @returns a deterministic secret that is used in debug mode
    */
   private async getDebugAccountSecret(): Promise<Hash> {
-    const account = await this.channels.methods.accounts((await this.account.address).toHex()).call()
+    const account = await this.channels.methods.accounts(this.account.address.toHex()).call()
     return new Hash(
-      await hashFunction(u8aConcat(new Uint8Array([parseInt(account.counter)]), this.account.keys.onChain.pubKey))
+      await hashFunction(
+        u8aConcat(new Uint8Array([parseInt(account.counter)]), this.account.keys.onChain.pubKey.serialize())
+      )
     )
   }
 
@@ -70,12 +71,10 @@ class HashedSecret {
 
   private async storeSecretOnChain(secret: Hash): Promise<void> {
     log(`storing secret on chain, setting secret to ${secret.toHex()}`)
-    const address = (await this.account.address).toHex()
+    const address = this.account.address.toHex()
     const account = await this.channels.methods.accounts(address).call()
-
     // has no secret stored onchain
     if (Number(account.counter) === 0) {
-      const uncompressedPubKey = publicKeyConvert(this.account.keys.onChain.pubKey, false).slice(1)
       log('account is also null, calling channel.init')
       try {
         await waitForConfirmation(
@@ -85,10 +84,14 @@ class HashedSecret {
                 from: address,
                 to: this.channels.options.address
               },
-              this.channels.methods.initializeAccount(u8aToHex(uncompressedPubKey), secret.toHex())
+              this.channels.methods.initializeAccount(
+                this.account.keys.onChain.pubKey.toUncompressedPubKeyHex(),
+                secret.toHex()
+              )
             )
           ).send()
         )
+        this.account.updateLocalState(secret)
       } catch (e) {
         if (e.message.match(/Account must not be set/)) {
           // There is a potential race condition due to the fact that 2 init
@@ -115,6 +118,7 @@ class HashedSecret {
             )
           ).send()
         )
+        this.account.updateLocalState(secret)
       } catch (e) {
         if (e.message.match(/new and old hashedSecrets are the same/)) {
           // NBD. no-op
@@ -165,7 +169,7 @@ class HashedSecret {
   public async initialize(debug?: boolean): Promise<void> {
     if (this.initialized) return
     this.offChainSecret = await getFromDB(this.db, OnChainSecret())
-    this.onChainSecret = await this.account.onChainSecret
+    this.onChainSecret = await this.account.getOnChainSecret()
     if (this.onChainSecret != undefined && this.offChainSecret != undefined) {
       try {
         await this.findPreImage(this.onChainSecret) // throws if not found

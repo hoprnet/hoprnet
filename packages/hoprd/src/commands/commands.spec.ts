@@ -53,21 +53,6 @@ describe('Commands', () => {
   })
   */
 
-  it('address', async () => {
-    let mockNode = sinon.fake() as any
-    mockNode.paymentChannels = sinon.fake()
-    mockNode.paymentChannels.constants = sinon.fake()
-    mockNode.paymentChannels.utils = sinon.fake()
-    mockNode.paymentChannels.utils.pubKeyToAddress = sinon.fake.returns({ toHex: () => '' })
-    mockNode.paymentChannels.constants.CHAIN_NAME = '2CHAINZ'
-    mockNode.getId = sinon.fake.returns({
-      toB58String: sinon.fake(),
-      pubKey: { marshal: sinon.fake() }
-    })
-    let cmds = new mod.Commands(mockNode)
-    assertMatch(await cmds.execute('address'), /HOPR/)
-  })
-
   it('send message', async () => {
     mockNode.sendMessage = sinon.fake()
     let cmds = new mod.Commands(mockNode)

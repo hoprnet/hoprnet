@@ -68,7 +68,7 @@ describe('test indexer', function () {
     it('should not store channel before confirmations', async function () {
       this.timeout(durations.seconds(5))
 
-      const uncompressedPubKeyB = publicKeyConvert(userB.pubKey, false).slice(1)
+      const uncompressedPubKeyB = publicKeyConvert(userB.pubKey.serialize(), false).slice(1)
 
       await connector.hoprChannels.methods
         .initializeAccount(u8aToHex(uncompressedPubKeyB), u8aToHex(randomBytes(Hash.SIZE)))
@@ -122,14 +122,14 @@ describe('test indexer', function () {
       const expectedChannelId = await getId(userA.address, userB.address)
       const channels = await connector.indexer.getChannelsOf(userA.address)
       assert.equal(channels.length, 1, 'check Channels.get')
-      assert(expectedChannelId.eq(await channels[0].getChannelId()), 'check Channels.get')
+      assert(expectedChannelId.eq(await channels[0].getId()), 'check Channels.get')
     })
 
     it('should find channel using partyB', async function () {
       const expectedChannelId = await getId(userA.address, userB.address)
       const channels = await connector.indexer.getChannelsOf(userB.address)
       assert.equal(channels.length, 1, 'check Channels.get')
-      assert(expectedChannelId.eq(await channels[0].getChannelId()), 'check Channels.get')
+      assert(expectedChannelId.eq(await channels[0].getId()), 'check Channels.get')
     })
 
     it('should find channel using partyA & partyB', async function () {
@@ -138,7 +138,7 @@ describe('test indexer', function () {
     })
     it('should store another channel', async function () {
       this.timeout(durations.seconds(5))
-      const uncompressedPubKeyC = publicKeyConvert(userC.pubKey, false).slice(1)
+      const uncompressedPubKeyC = publicKeyConvert(userC.pubKey.serialize(), false).slice(1)
 
       await connector.hoprChannels.methods
         .initializeAccount(u8aToHex(uncompressedPubKeyC), u8aToHex(randomBytes(Hash.SIZE)))
@@ -202,7 +202,7 @@ describe('test indexer', function () {
       this.timeout(durations.seconds(5))
       await connector.indexer.stop()
       assert(connector.indexer.status === 'stopped', 'could not stop indexer')
-      const uncompressedPubKeyD = publicKeyConvert(userD.pubKey, false).slice(1)
+      const uncompressedPubKeyD = publicKeyConvert(userD.pubKey.serialize(), false).slice(1)
 
       await connector.hoprChannels.methods
         .initializeAccount(u8aToHex(uncompressedPubKeyD), u8aToHex(randomBytes(Hash.SIZE)))

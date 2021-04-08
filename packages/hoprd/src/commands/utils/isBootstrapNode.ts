@@ -1,4 +1,3 @@
-import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 import type PeerId from 'peer-id'
 
@@ -7,7 +6,7 @@ import type PeerId from 'peer-id'
  *
  * @param peerId
  */
-export function isBootstrapNode(node: Hopr<HoprCoreConnector>, peerId: PeerId): boolean {
+export function isBootstrapNode(node: Hopr, peerId: PeerId): boolean {
   for (let i = 0; i < node.bootstrapServers.length; i++) {
     if (peerId.toB58String() === node.bootstrapServers[i].getPeerId()) {
       return true

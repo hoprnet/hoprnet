@@ -1,23 +1,14 @@
 import Hopr from '../..'
-import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
-import HoprEthereum from '@hoprnet/hopr-core-ethereum'
 import assert from 'assert'
 import { u8aEquals, durations } from '@hoprnet/hopr-utils'
 import { MAX_HOPS } from '../../constants'
 import LevelUp from 'levelup'
 import MemDown from 'memdown'
 import BN from 'bn.js'
-
-import { ACKNOWLEDGED_TICKET_INDEX_LENGTH } from '../../dbKeys'
 import { connectionHelper } from '../../test-utils'
-import type { AcknowledgedTicket } from '@hoprnet/hopr-core-connector-interface/src/types'
 import { privKeyToPeerId } from '@hoprnet/hopr-utils'
 import { NODE_SEEDS } from '@hoprnet/hopr-demo-seeds'
 import type Multiaddr from 'multiaddr'
-
-import Debug from 'debug'
-
-const log = Debug(`hopr-core:test`)
 
 const TWO_SECONDS = durations.seconds(2)
 const CHANNEL_DEPOSIT = new BN(200) // HOPRli
@@ -30,17 +21,12 @@ const TICKET_WIN_PROB = 1 // 100%
  * @param bootstrapNode set to true to create a bootstrap node
  * @param bootstrapServers specify a list of bootstrap server
  */
-async function generateNode(
-  id: number,
-  bootstrapNode: boolean,
-  bootstrapServers?: Multiaddr[]
-): Promise<Hopr<HoprEthereum>> {
+async function generateNode(id: number, bootstrapNode: boolean, bootstrapServers?: Multiaddr[]): Promise<Hopr> {
   // Start HOPR in DEBUG_MODE and use demo seeds
   return (await Hopr.create({
     id,
     peerId: await privKeyToPeerId(NODE_SEEDS[id]),
     db: new LevelUp(MemDown()),
-    connector: HoprEthereum,
     provider: GANACHE_URI,
     network: 'ethereum',
     debug: true,
@@ -48,33 +34,7 @@ async function generateNode(
     ticketWinProb: TICKET_WIN_PROB,
     bootstrapNode,
     bootstrapServers
-  })) as Hopr<HoprEthereum>
-}
-
-/**
- * Fetches all tickets from the database of a node
- * @param node the HOPR instance
- */
-async function getTicketsFromDatabase(node: Hopr<any>): Promise<AcknowledgedTicket[]> {
-  let tickets: AcknowledgedTicket[] = []
-
-  return new Promise((resolve, reject) =>
-    node.db
-      .createValueStream({
-        // Note that LevelDB does not work with Uint8Array keys
-        gte: Buffer.from(node._dbKeys.AcknowledgedTickets(Buffer.alloc(ACKNOWLEDGED_TICKET_INDEX_LENGTH, 0x00))),
-        lt: Buffer.from(node._dbKeys.AcknowledgedTickets(Buffer.alloc(ACKNOWLEDGED_TICKET_INDEX_LENGTH, 0xff)))
-      })
-      // Note that LevelDB outputs Buffers and not Uint8Arrays
-      .on('data', (data: Buffer) => {
-        const acknowledged = node.paymentChannels.types.AcknowledgedTicket.create(node.paymentChannels)
-        acknowledged.set(data)
-
-        tickets.push(acknowledged)
-      })
-      .on('error', reject)
-      .on('end', () => resolve(tickets))
-  )
+  })) as Hopr
 }
 
 /**
@@ -82,7 +42,7 @@ async function getTicketsFromDatabase(node: Hopr<any>): Promise<AcknowledgedTick
  * @param a first party
  * @param b second party
  */
-async function openChannel(a: Hopr<HoprEthereum>, b: Hopr<HoprEthereum>) {
+async function openChannel(a: Hopr, b: Hopr) {
   await a.openChannel(b.getId(), CHANNEL_DEPOSIT)
 }
 
@@ -94,7 +54,7 @@ const NOOP = () => {}
  * Used to remove the receive checker after successfully receiving all messages
  * @param nodes node instances to clean up
  */
-function cleanUpReceiveChecker<Chain extends HoprCoreConnector>(nodes: Hopr<Chain>[]) {
+function cleanUpReceiveChecker(nodes: Hopr[]) {
   for (const node of nodes) {
     node.output = NOOP
   }
@@ -105,7 +65,7 @@ function cleanUpReceiveChecker<Chain extends HoprCoreConnector>(nodes: Hopr<Chai
  * @param msgs messages to check reception
  * @param node instance that should receive the messages
  */
-function receiveChecker<Chain extends HoprCoreConnector>(msgs: Uint8Array[], node: Hopr<Chain>) {
+function receiveChecker(msgs: Uint8Array[], node: Hopr) {
   const remainingMessages = msgs.slice()
 
   return new Promise<void>((resolve) => {
@@ -137,7 +97,7 @@ describe('test packet composition and decomposition', function () {
       Array.from({ length: MAX_HOPS + 1 }).map((_value, index) => generateNode(index + 1, false, bsAddresses.slice(1)))
     )
 
-    connectionHelper(nodes.map((n: Hopr<HoprEthereum>) => n._libp2p))
+    connectionHelper(nodes.map((n: Hopr) => n._libp2p))
 
     const queries: [first: number, second: number][] = []
 
@@ -186,19 +146,6 @@ describe('test packet composition and decomposition', function () {
 
     await new Promise((resolve) => setTimeout(resolve, 700))
 
-    for (let node of nodes) {
-      const tickets: AcknowledgedTicket[] = await getTicketsFromDatabase(node)
-
-      if (tickets.length == 0) {
-        continue
-      }
-
-      for (let k = 0; k < tickets.length; k++) {
-        await node.paymentChannels.channel.tickets.submit(tickets[k] as any)
-        log(`ticket submitted`)
-      }
-    }
-
-    await Promise.all(nodes.map((node: Hopr<HoprEthereum>) => node.stop()))
+    await Promise.all(nodes.map((node: Hopr) => node.stop()))
   })
 })

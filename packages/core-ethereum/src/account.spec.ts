@@ -9,10 +9,9 @@ import { getBalance, getNativeBalance } from './account'
 import { Ganache } from '@hoprnet/hopr-testing'
 import { migrate, getAddresses, abis } from '@hoprnet/hopr-ethereum'
 import { stringToU8a, durations } from '@hoprnet/hopr-utils'
-import { getPrivKeyData, createAccountAndFund, createNode, disconnectWeb3 } from './utils/testing.spec'
+import { getPrivKeyData, createAccountAndFund, createNode } from './utils/testing.spec'
 import * as testconfigs from './config.spec'
 import * as configs from './config'
-import { wait } from './utils'
 import { WEB3_CACHE_TTL } from './constants'
 import Sinon from 'sinon'
 
@@ -57,32 +56,6 @@ describe('test Account', function () {
 
   afterEach(async function () {
     await coreConnector.stop()
-  })
-
-  describe('ticketEpoch', function () {
-    it('should be 1 initially', async function () {
-      const ticketEpoch = await coreConnector.account.ticketEpoch
-
-      expect(ticketEpoch.toBN().toString()).to.equal('1', 'initial ticketEpoch is wrong')
-    })
-
-    it('should be 2 after setting new secret', async function () {
-      const ticketEpoch = await coreConnector.account.ticketEpoch
-
-      expect(ticketEpoch.toBN().toString()).to.equal('2', 'ticketEpoch is wrong')
-    })
-
-    it('should be 3 after reconnecting to web3', async function () {
-      this.timeout(durations.seconds(10))
-      await disconnectWeb3(coreConnector.web3)
-
-      // wait for reconnection
-      await wait(durations.seconds(2))
-
-      const ticketEpoch = await coreConnector.account.ticketEpoch
-
-      expect(ticketEpoch.toBN().toString()).to.equal('3', 'ticketEpoch is wrong')
-    })
   })
 })
 

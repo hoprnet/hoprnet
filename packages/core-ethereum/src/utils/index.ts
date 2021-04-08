@@ -1,10 +1,9 @@
 import { Networks, networks } from '@hoprnet/hopr-ethereum'
 import assert from 'assert'
-import { publicKeyConvert, publicKeyCreate, ecdsaSign, ecdsaRecover, ecdsaVerify } from 'secp256k1'
+import { ecdsaSign, ecdsaRecover, ecdsaVerify } from 'secp256k1'
 import { PromiEvent, TransactionReceipt } from 'web3-core'
 import { BlockTransactionString } from 'web3-eth'
 import Web3 from 'web3'
-import Debug from 'debug'
 import {
   u8aCompare,
   u8aConcat,
@@ -16,7 +15,6 @@ import {
 } from '@hoprnet/hopr-utils'
 import { Address, Balance, Hash, Signature } from '../types'
 import { ContractEventEmitter } from '../tsc/web3/types'
-import { ChannelStatus } from '../types/channel'
 import * as constants from '../constants'
 import * as time from './time'
 import BN from 'bn.js'
@@ -61,38 +59,6 @@ export function getId(self: Address, counterparty: Address): Promise<Hash> {
 }
 
 /**
- * Given a private key, derive public key.
- * @param privKey the private key to derive the public key from
- * @returns a promise resolved to Uint8Array
- */
-export async function privKeyToPubKey(privKey: Uint8Array): Promise<Uint8Array> {
-  if (privKey.length != constants.PRIVATE_KEY_LENGTH)
-    throw Error(
-      `Invalid input parameter. Expected a Uint8Array of size ${constants.PRIVATE_KEY_LENGTH}. Got '${typeof privKey}'${
-        privKey.length ? ` of length ${privKey.length}` : ''
-      }.`
-    )
-
-  return publicKeyCreate(privKey, true)
-}
-
-/**
- * Given a public key, derive the Address.
- * @param pubKey the public key to derive the Address from
- * @returns a promise resolved to Address
- */
-export async function pubKeyToAddress(pubKey: Uint8Array): Promise<Address> {
-  if (pubKey.length != constants.COMPRESSED_PUBLIC_KEY_LENGTH)
-    throw Error(
-      `Invalid input parameter. Expected a Uint8Array of size ${
-        constants.COMPRESSED_PUBLIC_KEY_LENGTH
-      }. Got '${typeof pubKey}'${pubKey.length ? ` of length ${pubKey.length}` : ''}.`
-    )
-
-  return new Address((await hash(publicKeyConvert(pubKey, false).slice(1))).serialize().slice(12))
-}
-
-/**
  * Given a message, generate hash using keccak256.
  * @param msg the message to hash
  * @returns a promise resolved to Hash
@@ -116,10 +82,7 @@ export async function sign(msg: Uint8Array, privKey: Uint8Array): Promise<Signat
     )
   }
   const result = ecdsaSign(msg, privKey)
-  return new Signature(null, {
-    signature: result.signature,
-    recovery: result.recid
-  })
+  return new Signature(result.signature, result.recid)
 }
 
 /**
@@ -156,7 +119,9 @@ export async function verify(msg: Uint8Array, signature: Signature, pubKey: Uint
 export async function isWinningTicket(ticketHash: Hash, challengeResponse: Hash, preImage: Hash, winProb: Hash) {
   return [A_STRICLY_LESS_THAN_B, A_EQUALS_B].includes(
     u8aCompare(
-      Hash.create(u8aConcat(ticketHash.serialize(), preImage.serialize(), challengeResponse.serialize())).serialize(),
+      Hash.create(
+        u8aConcat(ticketHash.serialize(), preImage.serialize(), challengeResponse.serialize(), winProb.serialize())
+      ).serialize(),
       winProb.serialize()
     )
   )
@@ -382,43 +347,6 @@ export function getNetworkGasPrice(network: Networks): number | undefined {
 }
 
 /**
- * Convert a channel state counter, to an enumarated status.
- *
- * @param stateCounter the state counter
- * @returns ChannelStatus
- */
-export function stateCounterToStatus(stateCounter: BN): ChannelStatus {
-  const status = stateCounter.modn(10)
-
-  if (status >= Object.keys(ChannelStatus).length) {
-    throw Error("status like this doesn't exist")
-  }
-
-  return status
-}
-
-/**
- * Convert a state counter, to a number represeting the channels iteration.
- * Iteration stands for the amount of times a channel has been opened and closed.
- *
- * @param stateCount the state count
- * @returns ChannelStatus
- */
-export function stateCounterToIteration(stateCounter: BN): BN {
-  return new BN(String(Math.ceil((stateCounter.toNumber() + 1) / 10)))
-}
-
-/**
- * Create a prefixed Debug instance.
- *
- * @param prefixes an array containing prefixes
- * @returns a debug instance prefixed by joining 'prefixes'
- */
-export function Log(prefixes: string[] = []) {
-  return Debug(['hopr-core-ethereum'].concat(prefixes).join(':'))
-}
-
-/**
  * Once function 'fn' resolves, remove all listeners from 'event'.
  *
  * @typeparam E Our contract event emitteer
@@ -439,13 +367,13 @@ export async function cleanupPromiEvent<E extends ContractEventEmitter<any>, R e
 export function getSignatureParameters(
   signature: Signature
 ): {
-  r: Uint8Array
-  s: Uint8Array
+  r: Hash
+  s: Hash
   v: number
 } {
   return {
-    r: signature.signature.slice(0, 32),
-    s: signature.signature.slice(32, 64),
+    r: new Hash(signature.signature.slice(0, 32)),
+    s: new Hash(signature.signature.slice(32, 64)),
     v: signature.recovery
   }
 }

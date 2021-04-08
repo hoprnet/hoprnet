@@ -6,7 +6,7 @@ import sinon from 'sinon'
 
 let i = 0
 let fakePacket = () => {
-  return (i++ as unknown) as Packet<any>
+  return (i++ as unknown) as Packet
 }
 
 describe('test mixer ', async function () {

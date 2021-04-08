@@ -1,135 +1,113 @@
-import type { Types } from '@hoprnet/hopr-core-connector-interface'
 import BN from 'bn.js'
-import { stringToU8a, u8aToHex, u8aConcat } from '@hoprnet/hopr-utils'
-import { Address, Balance, Hash, Signature, UINT256 } from '.'
-import { Uint8ArrayE } from '../types/extended'
-import { sign } from '../utils'
-
+import { Ticket as ITicket } from '@hoprnet/hopr-core-connector-interface'
+import { stringToU8a, u8aSplit, u8aToHex, u8aConcat, serializeToU8a } from '@hoprnet/hopr-utils'
+import { Address, Balance, Hash, Signature, UINT256, PublicKey } from '.'
+import { ecdsaVerify, ecdsaSign, ecdsaRecover } from 'secp256k1'
 import Web3 from 'web3'
 const web3 = new Web3()
 
-/**
- * Given a message, prefix it with "\x19Ethereum Signed Message:\n" and return it's hash
- * @param msg the message to hash
- * @returns a hash
- */
+// Prefix message with "\x19Ethereum Signed Message:\n" and return hash
 function toEthSignedMessageHash(msg: string): Hash {
   const messageWithHOPR = u8aConcat(stringToU8a(Web3.utils.toHex('HOPRnet')), stringToU8a(msg))
   const messageWithHOPRHex = u8aToHex(messageWithHOPR)
   return new Hash(stringToU8a(web3.eth.accounts.hashMessage(messageWithHOPRHex)))
 }
 
-class Ticket extends Uint8ArrayE implements Types.Ticket {
+function serializeUnsigned({
+  counterparty,
+  challenge,
+  epoch,
+  amount,
+  winProb,
+  channelIteration
+}: {
+  counterparty: Address
+  challenge: Hash
+  epoch: UINT256
+  amount: Balance
+  winProb: Hash
+  channelIteration: UINT256
+}): Uint8Array {
+  // the order of the items needs to be the same as the one used in the SC
+  return serializeToU8a([
+    [counterparty.serialize(), Address.SIZE],
+    [challenge.serialize(), Hash.SIZE],
+    [epoch.serialize(), UINT256.SIZE],
+    [amount.serialize(), Balance.SIZE],
+    [winProb.serialize(), Hash.SIZE],
+    [channelIteration.serialize(), UINT256.SIZE]
+  ])
+}
+
+class Ticket implements ITicket {
   constructor(
-    arr?: {
-      bytes: ArrayBuffer
-      offset: number
-    },
-    struct?: {
-      counterparty: Address
-      challenge: Hash
-      epoch: UINT256
-      amount: Balance
-      winProb: Hash
-      channelIteration: UINT256
-    }
-  ) {
-    if (!arr && !struct) {
-      throw Error(`Invalid constructor arguments.`)
-    }
+    readonly counterparty: Address,
+    readonly challenge: Hash,
+    readonly epoch: UINT256,
+    readonly amount: Balance,
+    readonly winProb: Hash,
+    readonly channelIteration: UINT256,
+    readonly signature: Signature
+  ) {}
 
-    if (!arr) {
-      super(Ticket.SIZE)
-    } else {
-      super(arr.bytes, arr.offset, Ticket.SIZE)
-    }
-
-    if (struct) {
-      this.set(struct.counterparty.serialize(), this.counterpartyOffset - this.byteOffset)
-      this.set(struct.challenge.serialize(), this.challengeOffset - this.byteOffset)
-      this.set(struct.epoch.serialize(), this.epochOffset - this.byteOffset)
-      this.set(struct.amount.serialize(), this.amountOffset - this.byteOffset)
-      this.set(struct.winProb.serialize(), this.winProbOffset - this.byteOffset)
-      this.set(struct.channelIteration.serialize(), this.channelIterationOffset - this.byteOffset)
-    }
-  }
-
-  slice(begin = 0, end = Ticket.SIZE) {
-    return this.subarray(begin, end)
-  }
-
-  subarray(begin = 0, end = Ticket.SIZE) {
-    return new Uint8Array(this.buffer, begin + this.byteOffset, end - begin)
-  }
-
-  get counterpartyOffset(): number {
-    return this.byteOffset
-  }
-
-  get counterparty(): Address {
-    return new Address(new Uint8Array(this.buffer, this.counterpartyOffset, Address.SIZE))
-  }
-
-  get challengeOffset(): number {
-    return this.byteOffset + Address.SIZE
-  }
-
-  get challenge(): Hash {
-    return new Hash(new Uint8Array(this.buffer, this.challengeOffset, Hash.SIZE))
-  }
-
-  get epochOffset(): number {
-    return this.byteOffset + Address.SIZE + Hash.SIZE
-  }
-
-  get epoch(): UINT256 {
-    return new UINT256(new BN(new Uint8Array(this.buffer, this.epochOffset, UINT256.SIZE)))
-  }
-
-  get amountOffset(): number {
-    return this.byteOffset + Address.SIZE + Hash.SIZE + UINT256.SIZE
-  }
-
-  get amount(): Balance {
-    return new Balance(new BN(new Uint8Array(this.buffer, this.amountOffset, Balance.SIZE)))
-  }
-
-  get winProbOffset(): number {
-    return this.byteOffset + Address.SIZE + Hash.SIZE + UINT256.SIZE + UINT256.SIZE
-  }
-
-  get winProb(): Hash {
-    return new Hash(new Uint8Array(this.buffer, this.winProbOffset, Hash.SIZE))
-  }
-
-  get channelIterationOffset(): number {
-    return this.byteOffset + Address.SIZE + Hash.SIZE + UINT256.SIZE + UINT256.SIZE + Hash.SIZE
-  }
-
-  get channelIteration(): UINT256 {
-    return new UINT256(new BN(new Uint8Array(this.buffer, this.channelIterationOffset, UINT256.SIZE)))
-  }
-
-  get hash(): Promise<Hash> {
-    return Promise.resolve(
-      toEthSignedMessageHash(
-        u8aToHex(
-          // the order of the items needs to be the same as the one used in the SC
-          u8aConcat(
-            this.counterparty.serialize(),
-            this.challenge.serialize(),
-            this.epoch.serialize(),
-            this.amount.serialize(),
-            this.winProb.serialize(),
-            this.channelIteration.serialize()
-          )
-        )
+  static create(
+    counterparty: Address,
+    challenge: Hash,
+    epoch: UINT256,
+    amount: Balance,
+    winProb: Hash,
+    channelIteration: UINT256,
+    signPriv: Uint8Array
+  ): Ticket {
+    const hash = toEthSignedMessageHash(
+      u8aToHex(
+        serializeUnsigned({
+          counterparty,
+          challenge,
+          epoch,
+          amount,
+          winProb,
+          channelIteration
+        })
       )
     )
+    const sig = ecdsaSign(hash.serialize(), signPriv)
+    const signature = new Signature(sig.signature, sig.recid)
+    return new Ticket(counterparty, challenge, epoch, amount, winProb, channelIteration, signature)
+  }
+
+  public serialize(): Uint8Array {
+    const unsigned = serializeUnsigned({ ...this })
+    return u8aConcat(serializeToU8a([[this.signature.serialize(), Signature.SIZE]]), unsigned)
+  }
+
+  static deserialize(arr: Uint8Array): Ticket {
+    const components = u8aSplit(arr, [
+      Address.SIZE,
+      Hash.SIZE,
+      UINT256.SIZE,
+      Balance.SIZE,
+      Hash.SIZE,
+      UINT256.SIZE,
+      Signature.SIZE
+    ])
+
+    const counterparty = new Address(components[0])
+    const challenge = new Hash(components[1])
+    const epoch = new UINT256(new BN(components[2]))
+    const amount = new Balance(new BN(components[3]))
+    const winProb = new Hash(components[4])
+    const channelIteration = new UINT256(new BN(components[4]))
+    const signature = Signature.deserialize(components[5])
+    return new Ticket(counterparty, challenge, epoch, amount, winProb, channelIteration, signature)
+  }
+
+  getHash(): Hash {
+    return toEthSignedMessageHash(u8aToHex(serializeUnsigned({ ...this })))
   }
 
   static get SIZE(): number {
-    return Address.SIZE + Hash.SIZE + UINT256.SIZE + UINT256.SIZE + Hash.SIZE + UINT256.SIZE
+    return Address.SIZE + Hash.SIZE + UINT256.SIZE + UINT256.SIZE + Hash.SIZE + UINT256.SIZE + Signature.SIZE
   }
 
   getEmbeddedFunds(): Balance {
@@ -141,26 +119,12 @@ class Ticket extends Uint8ArrayE implements Types.Ticket {
     )
   }
 
-  async sign(privKey: Uint8Array): Promise<Signature> {
-    return sign((await this.hash).serialize(), privKey)
+  getSigner(): PublicKey {
+    return new PublicKey(ecdsaRecover(this.signature.signature, this.signature.recovery, this.getHash().serialize()))
   }
 
-  static create(
-    arr?: {
-      bytes: ArrayBuffer
-      offset: number
-    },
-    struct?: {
-      counterparty: Address
-      challenge: Hash
-      epoch: UINT256
-      amount: Balance
-      winProb: Hash
-      channelIteration: UINT256
-    }
-  ): Ticket {
-    return new Ticket(arr, struct)
+  async verify(pubKey: PublicKey): Promise<boolean> {
+    return ecdsaVerify(this.signature.signature, this.getHash().serialize(), pubKey.serialize())
   }
 }
-
 export default Ticket

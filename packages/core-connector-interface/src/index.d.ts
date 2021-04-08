@@ -1,10 +1,7 @@
 import type { LevelUp } from 'levelup'
-import type * as Utils from './utils'
-import type Channel from './channel'
-import type * as Types from './types'
+import type Channel, { SubmitTicketResponse } from './channel'
 import type * as DbKeys from './dbKeys'
-import type * as Constants from './constants'
-import type Indexer, { RoutingChannel, ChannelUpdate } from './indexer'
+import type Indexer, { RoutingChannel } from './indexer'
 
 export type Currencies = 'NATIVE' | 'HOPR'
 
@@ -18,8 +15,6 @@ declare interface HoprCoreConnectorStatic {
    * @param options.debug run connector in debug mode if set to true
    */
   create(db: LevelUp, seed: Uint8Array, options?: { provider?: string; debug?: boolean }): Promise<HoprCoreConnector>
-
-  readonly constants: typeof Constants
 }
 
 declare interface HoprCoreConnector {
@@ -34,48 +29,28 @@ declare interface HoprCoreConnector {
      * Returns the current native balance (ex: ETH) of the account associated with this node.
      */
     getNativeBalance: (useCache?: boolean) => Promise<Types.NativeBalance>
-    /**
-     * Returns the current value of the reset counter
-     */
-    ticketEpoch: Promise<Types.UINT256>
-    /**
-     * Returns the current value of the onChainSecret
-     */
-    onChainSecret: Promise<Types.Hash>
-    /**
-     * Returns the accounts address
-     */
-    address: Promise<Types.Address>
-    /**
-     * The accounts nonce.
-     */
-    nonce: Promise<number>
-    /**
-     * The accounts keys:
-     */
+
     keys: {
       onChain: {
         privKey: Uint8Array
-        pubKey: Uint8Array
+        pubKey: PublicKey
       }
       offChain: {
         privKey: Uint8Array
-        pubKey: Uint8Array
+        pubKey: PublicKey
       }
     }
 
     /**
-     * Check whether the given ticket is winning with the current preImage.
+     * Check whether the given ticket is winning.
      *
      * If the ticket is a win, the preImage is stored into the given acknowledged
      * ticket and its preImage will be used to check whether the next ticket is a
      * win.
-     * @param ticket the acknowledged ticket to check
+     * @param ticket the ticket to check
      */
-    reservePreImageIfIsWinning(ticket: Types.AcknowledgedTicket): Promise<boolean>
+    acknowledge(ticket: Ticket, response: Hash): Promise<Acknowledgement | undefined>
   }
-
-  readonly db: LevelUp
 
   /**
    * Initialises the connector, e.g. connect to a blockchain node.
@@ -103,28 +78,12 @@ declare interface HoprCoreConnector {
   withdraw(currency: Currencies, recipient: string, amount: string): Promise<string>
 
   hexAccountAddress(): Promise<string>
-
   smartContractInfo(): string
-
-  /**
-   * (Static) utils to use in the connector module
-   */
-  readonly utils: typeof Utils
-
-  /**
-   * Export creator for all Types used on-chain.
-   */
-  readonly types: typeof Types
 
   /**
    * Export keys under which our data gets stored in the database.
    */
   readonly dbKeys: typeof DbKeys
-
-  /**
-   * Export chain-specific constants.
-   */
-  readonly constants: typeof Constants
 
   /**
    * Encapsulates payment channel between nodes.
@@ -135,15 +94,8 @@ declare interface HoprCoreConnector {
    * Returns an instance of Indexer.
    */
   readonly indexer: Indexer
-
-  /**
-   * Returns unique information about the connector.
-   */
-  readonly describe?: any
 }
 
-declare var HoprCoreConnector: HoprCoreConnectorStatic
-
-export { Utils, Types, DbKeys, Constants, Channel, Indexer, RoutingChannel, ChannelUpdate, HoprCoreConnectorStatic }
-
+export { DbKeys, Constants, Channel, SubmitTicketResponse, Indexer, RoutingChannel, HoprCoreConnectorStatic }
+export * from './types'
 export default HoprCoreConnector

@@ -1,11 +1,11 @@
 import type { Event } from './types'
 import BN from 'bn.js'
 import { stringToU8a } from '@hoprnet/hopr-utils'
-import { Address, Public, ChannelEntry, AccountEntry, Hash } from '../types'
+import { Address, PublicKey, ChannelEntry, AccountEntry, Hash } from '../types'
 
 const partyAUncompressedPubKey =
   '0x362b7b26bddb151a03056422d37119eab3a716562b6c3efdc62dec1540c9b0917c39b619ac36da7c9c02995f124df4353e69c226696857155d44a34744fd2327'
-const partyAPubKey = Public.fromString('0x03362b7b26bddb151a03056422d37119eab3a716562b6c3efdc62dec1540c9b091')
+const partyAPubKey = PublicKey.fromString('0x03362b7b26bddb151a03056422d37119eab3a716562b6c3efdc62dec1540c9b091')
 const partyA = Address.fromString('0x55CfF15a5159239002D57C591eF4ACA7f2ACAfE6')
 // const partyBPubKey = Public.fromString('0x03217f3cd4d0b4b82997b25d1b6b68a933929fed724531cb30bbfd4729dc6b44e0')
 const partyB = Address.fromString('0xbbCFC0fA0EBaa540e741dCA297368B2000089E2E')
@@ -140,98 +140,98 @@ export const INITIALIZED_ACCOUNT = new AccountEntry(partyA, partyAPubKey, secret
 
 export const SECRET_UPDATED_ACCOUNT = new AccountEntry(partyA, partyAPubKey, secret2, new BN(2))
 
-export const EMPTY_CHANNEL = new ChannelEntry(
+export const EMPTY_CHANNEL = ChannelEntry.fromObject({
   partyA,
   partyB,
-  new BN(0),
-  new BN(0),
-  new BN(0),
-  new BN(0),
-  false,
-  new BN(0),
-  new BN(0)
-)
+  deposit: new BN(0),
+  partyABalance: new BN(0),
+  closureTime: new BN(0),
+  stateCounter: new BN(0),
+  closureByPartyA: false,
+  openedAt: new BN(0),
+  closedAt: new BN(0)
+})
 
-export const FUNDED_CHANNEL = new ChannelEntry(
+export const FUNDED_CHANNEL = ChannelEntry.fromObject({
   partyA,
   partyB,
-  new BN(3),
-  new BN(3),
-  new BN(0),
-  new BN(0),
-  false,
-  new BN(0),
-  new BN(0)
-)
+  deposit: new BN(3),
+  partyABalance: new BN(3),
+  closureTime: new BN(0),
+  stateCounter: new BN(0),
+  closureByPartyA: false,
+  openedAt: new BN(0),
+  closedAt: new BN(0)
+})
 
-export const FUNDED_CHANNEL_2 = new ChannelEntry(
+export const FUNDED_CHANNEL_2 = ChannelEntry.fromObject({
   partyA,
   partyB,
-  new BN(10),
-  new BN(3),
-  new BN(0),
-  new BN(0),
-  false,
-  new BN(0),
-  new BN(0)
-)
+  deposit: new BN(10),
+  partyABalance: new BN(3),
+  closureTime: new BN(0),
+  stateCounter: new BN(0),
+  closureByPartyA: false,
+  openedAt: new BN(0),
+  closedAt: new BN(0)
+})
 
-export const OPENED_CHANNEL = new ChannelEntry(
+export const OPENED_CHANNEL = ChannelEntry.fromObject({
   partyA,
   partyB,
-  new BN(10),
-  new BN(3),
-  new BN(0),
-  new BN(1),
-  false,
-  new BN(0),
-  new BN(0)
-)
+  deposit: new BN(10),
+  partyABalance: new BN(3),
+  closureTime: new BN(0),
+  stateCounter: new BN(1),
+  closureByPartyA: false,
+  openedAt: new BN(0),
+  closedAt: new BN(0)
+})
 
-export const REDEEMED_CHANNEL = new ChannelEntry(
+export const REDEEMED_CHANNEL = ChannelEntry.fromObject({
   partyA,
   partyB,
-  new BN(10),
-  new BN(4),
-  new BN(0),
-  new BN(1),
-  false,
-  new BN(0),
-  new BN(0)
-)
+  deposit: new BN(10),
+  partyABalance: new BN(4),
+  closureTime: new BN(0),
+  stateCounter: new BN(1),
+  closureByPartyA: false,
+  openedAt: new BN(0),
+  closedAt: new BN(0)
+})
 
-export const CLOSING_CHANNEL = new ChannelEntry(
+export const CLOSING_CHANNEL = ChannelEntry.fromObject({
   partyA,
   partyB,
-  new BN(10),
-  new BN(4),
-  new BN(1611671775),
-  new BN(2),
-  true,
-  new BN(0),
-  new BN(0)
-)
+  deposit: new BN(10),
+  partyABalance: new BN(4),
+  closureTime: new BN(1611671775),
+  stateCounter: new BN(2),
+  closureByPartyA: true,
+  openedAt: new BN(0),
+  closedAt: new BN(0)
+})
 
-export const REDEEMED_CHANNEL_2 = new ChannelEntry(
+export const REDEEMED_CHANNEL_2 = ChannelEntry.fromObject({
   partyA,
   partyB,
-  new BN(10),
-  new BN(2),
-  new BN(1611671775),
-  new BN(2),
-  false,
-  new BN(0),
-  new BN(0)
-)
+  deposit: new BN(10),
+  partyABalance: new BN(2),
+  closureTime: new BN(1611671775),
+  stateCounter: new BN(2),
+  closureByPartyA: false,
+  openedAt: new BN(0),
+  closedAt: new BN(0)
+})
 
-export const CLOSED_CHANNEL = new ChannelEntry(
+export const CLOSED_CHANNEL = ChannelEntry.fromObject({
   partyA,
   partyB,
-  new BN(0),
-  new BN(0),
-  new BN(0),
-  new BN(10),
-  false,
-  new BN(0),
-  new BN(0)
-)
+  deposit: new BN(0),
+  partyABalance: new BN(0),
+  closureTime: new BN(0),
+  stateCounter: new BN(10),
+  closureByPartyA: false,
+  openedAt: new BN(0),
+  closedAt: new BN(0)
+})

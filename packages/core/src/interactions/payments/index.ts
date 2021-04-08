@@ -1,15 +1,11 @@
 import Hopr from '../..'
-import HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 
-import { Opening } from './open'
 import { OnChainKey } from './onChainKey'
 
-class PaymentInteractions<Chain extends HoprCoreConnector> {
-  open: Opening<Chain>
-  onChainKey: OnChainKey<Chain>
+class PaymentInteractions {
+  onChainKey: OnChainKey
 
-  constructor(node: Hopr<Chain>) {
-    this.open = new Opening(node)
+  constructor(node: Hopr) {
     this.onChainKey = new OnChainKey(node)
   }
 }
