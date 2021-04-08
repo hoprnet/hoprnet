@@ -34,7 +34,7 @@ export async function getOnChainSecret(db: LevelUp): Promise<Hash | undefined> {
   return arr ? new Hash(arr) : undefined
 }
 
-export async function getOnChainSecretIntermediary(db: LevelUp, index: number): Promise<Uint8Array | undefined>{
+export async function getOnChainSecretIntermediary(db: LevelUp, index: number): Promise<Uint8Array | undefined> {
   return getFromDB(db, onChainSecretIntermediaryKey(index))
 }
 
