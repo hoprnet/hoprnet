@@ -21,13 +21,6 @@ describe('test dbKeys', function () {
     channelId = await getId(userA.address, userB.address)
   })
 
-  it("should create 'ChannelId' key", function () {
-    const sigHash = new Hash(randomBytes(32))
-    const result = dbKeys.ChannelId(sigHash)
-    const expected = u8aConcat(encoder.encode('payments-channelId-'), sigHash.serialize())
-
-    assert(u8aEquals(result, expected), 'check channelId key creation')
-  })
 
   it("should create 'Nonce' key", function () {
     const nonce = new Hash(randomBytes(32))

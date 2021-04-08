@@ -4,26 +4,12 @@ import { Hash, PublicKey } from './types'
 const encoder = new TextEncoder()
 const PREFIX = encoder.encode('payments-')
 const SEPERATOR = encoder.encode('-')
-//const challengeSubPrefix = encoder.encode('challenge-')
-const channelIdSubPrefix = encoder.encode('channelId-')
 const nonceSubPrefix = encoder.encode('nonce-')
 const ticketSubPrefix = encoder.encode('tickets-')
 const acknowledgedSubPrefix = encoder.encode('acknowledged-')
 const onChainSecretIntermediary = encoder.encode('onChainSecretIntermediary-')
 
 const ON_CHAIN_SECRET_ITERATION_WIDTH = 4 // bytes
-
-/**
- * Returns the db-key under which signatures of acknowledgements are saved.
- * @param signatureHash hash of an ackowledgement signature
- */
-export function ChannelId(signatureHash: Hash): Uint8Array {
-  return serializeToU8a([
-    [PREFIX, PREFIX.length],
-    [channelIdSubPrefix, channelIdSubPrefix.length],
-    [signatureHash.serialize(), Hash.SIZE]
-  ])
-}
 
 /**
  * Returns the db-key under which nonces are saved.
