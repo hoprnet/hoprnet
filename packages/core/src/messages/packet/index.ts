@@ -299,10 +299,7 @@ export class Packet extends Uint8Array {
       throw Error('Error preparing forward')
     }
 
-    const unacknowledged = new UnacknowledgedTicket(undefined, {
-      ticket: ticket,
-      secretA: new Hash(deriveTicketKey(this.header.derivedSecret))
-    })
+    const unacknowledged = new UnacknowledgedTicket(ticket, new Hash(deriveTicketKey(this.header.derivedSecret)))
 
     log(
       `Storing unacknowledged ticket. Expecting to receive a preImage for ${green(
@@ -311,7 +308,7 @@ export class Packet extends Uint8Array {
     )
     await this.node.db.put(
       Buffer.from(this.node._dbKeys.UnAcknowledgedTickets(this.header.hashedKeyHalf)),
-      Buffer.from(unacknowledged)
+      Buffer.from(unacknowledged.serialize())
     )
 
     // get new ticket amount

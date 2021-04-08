@@ -34,13 +34,10 @@ export async function getUnacknowledgedTickets(
       .on('data', async ({ value }: { value: Buffer }) => {
         if (value.buffer.byteLength !== UnacknowledgedTicket.SIZE()) return
 
-        const unAckTicket = new UnacknowledgedTicket({
-          bytes: value.buffer,
-          offset: value.byteOffset
-        })
+        const unAckTicket = UnacknowledgedTicket.deserialize(value)
 
         // if signer provided doesn't match our ticket's signer dont add it to the list
-        if (filter?.signer && !u8aEquals((await unAckTicket.signedTicket).getSigner().serialize(), filter.signer)) {
+        if (filter?.signer && !u8aEquals(unAckTicket.ticket.getSigner().serialize(), filter.signer)) {
           return
         }
 
@@ -67,7 +64,7 @@ export async function deleteUnacknowledgedTickets(
       tickets.map<any>(async (ticket) => {
         return {
           type: 'del',
-          key: Buffer.from(node._dbKeys.UnAcknowledgedTickets((await ticket.signedTicket).challenge.serialize()))
+          key: Buffer.from(node._dbKeys.UnAcknowledgedTickets(ticket.ticket.challenge.serialize()))
         }
       })
     )
@@ -204,7 +201,7 @@ export async function getTickets(
 ): Promise<Ticket[]> {
   return Promise.all([getUnacknowledgedTickets(node, filter), getAcknowledgements(node, filter)]).then(
     async ([unAcks, acks]) => {
-      const unAckTickets = await Promise.all(unAcks.map((o) => o.signedTicket))
+      const unAckTickets = await Promise.all(unAcks.map((o) => o.ticket))
       const ackTickets = await Promise.all(acks.map((o) => o.ackTicket.ticket))
 
       return [...unAckTickets, ...ackTickets]
