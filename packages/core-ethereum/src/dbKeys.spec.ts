@@ -16,27 +16,6 @@ describe('test dbKeys', function () {
     userA = await getPrivKeyData(randomBytes(32))
   })
 
-  /*
-  it("should create 'OnChainSecret' key", function () {
-    const result = dbKeys.OnChainSecret()
-    const expected = 'payments-onChainSecretIntermediary'
-
-    assert(new TextDecoder().decode(result).startsWith(expected), 'check onChainSecret key creation')
-  })
-  */
-
-  it("should create 'AcknowledgedTicket' key", function () {
-    const result = dbKeys.AcknowledgedTicket(userA.pubKey, challenge)
-    const expected = u8aConcat(
-      encoder.encode('tickets-acknowledged-'),
-      userA.pubKey.serialize(),
-      encoder.encode('-'),
-      challenge.serialize()
-    )
-
-    assert(u8aEquals(result, expected), 'check AcknowledgedTicket key creation')
-  })
-
   it("should parse 'AcknowledgedTicket' key", function () {
     const key = u8aConcat(
       encoder.encode('tickets-acknowledged-'),

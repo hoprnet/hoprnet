@@ -50,18 +50,6 @@ export async function storeHashIntermediaries(db: LevelUp, intermediates: Interm
   await dbBatch.write()
 }
 
-/**
- * Returns the db-key under which the tickets are saved in the database.
- */
-export function AcknowledgedTicket(counterPartyPubKey: PublicKey, challenge: Hash): Uint8Array {
-  return serializeToU8a([
-    [ticketSubPrefix, ticketSubPrefix.length],
-    [acknowledgedSubPrefix, acknowledgedSubPrefix.length],
-    [counterPartyPubKey.serialize(), PublicKey.SIZE],
-    [SEPERATOR, SEPERATOR.length],
-    [challenge.serialize(), Hash.SIZE]
-  ])
-}
 
 /**
  * Reconstructs counterPartyPubKey and the specified challenge from a AcknowledgedTicket db-key.
