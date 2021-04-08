@@ -1,7 +1,5 @@
 import type { LevelUp } from 'levelup'
 import type { WebsocketProvider } from 'web3-core'
-import type { Currencies, SubmitTicketResponse } from '@hoprnet/hopr-core-connector-interface'
-import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type { HoprChannels } from './tsc/web3/HoprChannels'
 import type { HoprToken } from './tsc/web3/HoprToken'
 import Web3 from 'web3'
@@ -23,7 +21,7 @@ const HoprTokenAbi = abis.HoprToken
 const log = debug('hopr-core-ethereum')
 let provider: WebsocketProvider
 
-export default class HoprEthereum implements HoprCoreConnector {
+export default class HoprEthereum {
   private _status: 'dead' | 'alive' = 'dead'
   private _starting?: Promise<HoprEthereum>
   private _stopping?: Promise<void>
@@ -241,4 +239,4 @@ export default class HoprEthereum implements HoprCoreConnector {
 }
 
 export * from './types'
-export { Channel, SubmitTicketResponse, getWinProbabilityAsFloat, computeWinningProbability }
+export { Channel, SubmitTicketResponse, getWinProbabilityAsFloat, computeWinningProbability, Indexer}
