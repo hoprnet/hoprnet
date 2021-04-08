@@ -16,12 +16,14 @@ describe('test dbKeys', function () {
     userA = await getPrivKeyData(randomBytes(32))
   })
 
+  /*
   it("should create 'OnChainSecret' key", function () {
     const result = dbKeys.OnChainSecret()
     const expected = 'payments-onChainSecretIntermediary'
 
     assert(new TextDecoder().decode(result).startsWith(expected), 'check onChainSecret key creation')
   })
+  */
 
   it("should create 'AcknowledgedTicket' key", function () {
     const result = dbKeys.AcknowledgedTicket(userA.pubKey, challenge)

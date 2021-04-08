@@ -3,7 +3,7 @@ import Debug from 'debug'
 import { randomBytes } from 'crypto'
 import { u8aConcat, iterateHash, recoverIteratedHash } from '@hoprnet/hopr-utils'
 import { waitForConfirmation } from './utils'
-import { OnChainSecret, OnChainSecretIntermediary } from './dbKeys'
+import { storeHashIntermediaries, getOnChainSecretIntermediary, getOnChainSecret } from './dbKeys'
 import type { LevelUp } from 'levelup'
 import type { HoprChannels } from './tsc/web3/HoprChannels'
 import type Account from './account'
@@ -15,17 +15,6 @@ const log = Debug('hopr-core-ethereum:hashedSecret')
 
 export async function hashFunction(msg: Uint8Array): Promise<Uint8Array> {
   return Hash.create(msg).serialize().slice(0, Hash.SIZE)
-}
-
-async function getFromDB<T>(db: LevelUp, key): Promise<T | undefined> {
-  try {
-    return await db.get(Buffer.from(key))
-  } catch (err) {
-    if (!err.notFound) {
-      throw err
-    }
-    return
-  }
 }
 
 class HashedSecret {
@@ -55,17 +44,8 @@ class HashedSecret {
    */
   private async createAndStoreSecretOffChainAndReturnOnChainSecret(debug: boolean): Promise<Hash> {
     let onChainSecret = debug ? await this.getDebugAccountSecret() : new Hash(randomBytes(Hash.SIZE))
-
-    let dbBatch = this.db.batch()
     const result = await iterateHash(onChainSecret.serialize(), hashFunction, TOTAL_ITERATIONS, DB_ITERATION_BLOCK_SIZE)
-
-    for (const intermediate of result.intermediates) {
-      dbBatch = dbBatch.put(
-        Buffer.from(OnChainSecretIntermediary(intermediate.iteration)),
-        Buffer.from(intermediate.preImage)
-      )
-    }
-    await dbBatch.write()
+    storeHashIntermediaries(this.db, result.intermediates)
     return new Hash(result.hash)
   }
 
@@ -137,7 +117,7 @@ class HashedSecret {
       hashFunction,
       TOTAL_ITERATIONS,
       DB_ITERATION_BLOCK_SIZE,
-      (index) => getFromDB(this.db, OnChainSecretIntermediary(index))
+      x => getOnChainSecretIntermediary(this.db, x)
     )
 
     if (result == undefined) {
@@ -156,7 +136,7 @@ class HashedSecret {
     let result = await recoverIteratedHash(
       hash.serialize(),
       hashFunction,
-      (index) => getFromDB(this.db, OnChainSecretIntermediary(index)),
+      x => getOnChainSecretIntermediary(this.db, x),
       TOTAL_ITERATIONS,
       DB_ITERATION_BLOCK_SIZE
     )
@@ -168,7 +148,7 @@ class HashedSecret {
 
   public async initialize(debug?: boolean): Promise<void> {
     if (this.initialized) return
-    this.offChainSecret = await getFromDB(this.db, OnChainSecret())
+    this.offChainSecret = await getOnChainSecret(this.db) 
     this.onChainSecret = await this.account.getOnChainSecret()
     if (this.onChainSecret != undefined && this.offChainSecret != undefined) {
       try {
