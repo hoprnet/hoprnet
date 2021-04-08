@@ -4,27 +4,11 @@ import { Hash, PublicKey } from './types'
 const encoder = new TextEncoder()
 const PREFIX = encoder.encode('payments-')
 const SEPERATOR = encoder.encode('-')
-const nonceSubPrefix = encoder.encode('nonce-')
 const ticketSubPrefix = encoder.encode('tickets-')
 const acknowledgedSubPrefix = encoder.encode('acknowledged-')
 const onChainSecretIntermediary = encoder.encode('onChainSecretIntermediary-')
 
 const ON_CHAIN_SECRET_ITERATION_WIDTH = 4 // bytes
-
-/**
- * Returns the db-key under which nonces are saved.
- * @param channelId channelId of the channel
- * @param nonce the nonce
- */
-export function Nonce(channelId: Hash, nonce: Hash): Uint8Array {
-  return serializeToU8a([
-    [PREFIX, PREFIX.length],
-    [nonceSubPrefix, nonceSubPrefix.length],
-    [channelId.serialize(), Hash.SIZE],
-    [SEPERATOR, SEPERATOR.length],
-    [nonce.serialize(), Hash.SIZE]
-  ])
-}
 
 export function OnChainSecret(): Uint8Array {
   return OnChainSecretIntermediary(0)
