@@ -50,7 +50,6 @@ export async function storeHashIntermediaries(db: LevelUp, intermediates: Interm
   await dbBatch.write()
 }
 
-
 /**
  * Reconstructs counterPartyPubKey and the specified challenge from a AcknowledgedTicket db-key.
  * @param arr a AcknowledgedTicket db-key
