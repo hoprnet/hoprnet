@@ -47,5 +47,3 @@ export async function storeHashIntermediaries(db: LevelUp, intermediates: Interm
   }
   await dbBatch.write()
 }
-
-
