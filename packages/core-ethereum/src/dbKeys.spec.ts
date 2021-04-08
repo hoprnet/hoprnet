@@ -21,7 +21,6 @@ describe('test dbKeys', function () {
     channelId = await getId(userA.address, userB.address)
   })
 
-
   it("should create 'Nonce' key", function () {
     const nonce = new Hash(randomBytes(32))
     const result = dbKeys.Nonce(channelId, nonce)
