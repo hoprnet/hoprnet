@@ -1,9 +1,5 @@
-/*
-  Helper functions which generate database keys
-*/
 import { toU8a } from '@hoprnet/hopr-utils'
 import { Hash, PublicKey } from './types'
-import type { Types } from '@hoprnet/hopr-core-connector-interface'
 
 const encoder = new TextEncoder()
 const PREFIX = encoder.encode('payments-')
@@ -22,7 +18,7 @@ const ON_CHAIN_SECRET_ITERATION_WIDTH = 4 // bytes
  * @param channelId channelId of the channel
  * @param challenge challenge to save
  */
-export function Challenge(channelId: Types.Hash, challenge: Types.Hash): Uint8Array {
+export function Challenge(channelId: Hash, challenge: Hash): Uint8Array {
   return allocationHelper([
     [PREFIX.length, PREFIX],
     [challengeSubPrefix.length, challengeSubPrefix],
@@ -49,7 +45,7 @@ export function ChallengeKeyParse(arr: Uint8Array): [Hash, Hash] {
  * Returns the db-key under which signatures of acknowledgements are saved.
  * @param signatureHash hash of an ackowledgement signature
  */
-export function ChannelId(signatureHash: Types.Hash): Uint8Array {
+export function ChannelId(signatureHash: Hash): Uint8Array {
   return allocationHelper([
     [PREFIX.length, PREFIX],
     [channelIdSubPrefix.length, channelIdSubPrefix],
@@ -62,7 +58,7 @@ export function ChannelId(signatureHash: Types.Hash): Uint8Array {
  * @param channelId channelId of the channel
  * @param nonce the nonce
  */
-export function Nonce(channelId: Types.Hash, nonce: Types.Hash): Uint8Array {
+export function Nonce(channelId: Hash, nonce: Hash): Uint8Array {
   return allocationHelper([
     [PREFIX.length, PREFIX],
     [nonceSubPrefix.length, nonceSubPrefix],
@@ -88,7 +84,7 @@ export function OnChainSecretIntermediary(iteration: number): Uint8Array {
 /**
  * Returns the db-key under which the tickets are saved in the database.
  */
-export function AcknowledgedTicket(counterPartyPubKey: Types.PublicKey, challenge: Types.Hash): Uint8Array {
+export function AcknowledgedTicket(counterPartyPubKey: PublicKey, challenge: Hash): Uint8Array {
   return allocationHelper([
     [ticketSubPrefix.length, ticketSubPrefix],
     [acknowledgedSubPrefix.length, acknowledgedSubPrefix],

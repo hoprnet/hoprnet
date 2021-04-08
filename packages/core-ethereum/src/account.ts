@@ -24,9 +24,6 @@ class Account {
   private _transactions = new TransactionManager()
   private preimage: Hash
 
-  /**
-   * The accounts keys:
-   */
   public keys: {
     onChain: {
       privKey: Uint8Array

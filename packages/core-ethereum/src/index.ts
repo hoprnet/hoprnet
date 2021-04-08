@@ -18,6 +18,7 @@ import * as config from './config'
 import Account from './account'
 import HashedSecret from './hashedSecret'
 import debug from 'debug'
+import { getWinProbabilityAsFloat, computeWinningProbability } from './utils'
 
 const HoprChannelsAbi = abis.HoprChannels
 const HoprTokenAbi = abis.HoprToken
@@ -58,7 +59,6 @@ export default class HoprEthereum implements HoprCoreConnector {
   }
 
   readonly dbKeys = dbkeys
-  readonly utils = utils
   readonly constants = constants
   readonly CHAIN_NAME = 'HOPR on Ethereum'
 
@@ -251,7 +251,5 @@ export default class HoprEthereum implements HoprCoreConnector {
   }
 }
 
-export const Utils = utils
 export * from './types'
-
-export { Channel, SubmitTicketResponse }
+export { Channel, SubmitTicketResponse, getWinProbabilityAsFloat, computeWinningProbability }
