@@ -21,21 +21,6 @@ describe('test dbKeys', function () {
     channelId = await getId(userA.address, userB.address)
   })
 
-  it("should parse 'Challenge' key", function () {
-    const key = u8aConcat(
-      encoder.encode('payments-challenge-'),
-      channelId.serialize(),
-      encoder.encode('-'),
-      challenge.serialize()
-    )
-    const [result1, result2] = dbKeys.ChallengeKeyParse(key)
-    const expected1 = channelId
-    const expected2 = challenge
-
-    assert(result1.eq(expected1), 'check challenge key parsing')
-    assert(result2.eq(expected2), 'check challenge key parsing')
-  })
-
   it("should create 'ChannelId' key", function () {
     const sigHash = new Hash(randomBytes(32))
     const result = dbKeys.ChannelId(sigHash)

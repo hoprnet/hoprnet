@@ -4,7 +4,7 @@ import { Hash, PublicKey } from './types'
 const encoder = new TextEncoder()
 const PREFIX = encoder.encode('payments-')
 const SEPERATOR = encoder.encode('-')
-const challengeSubPrefix = encoder.encode('challenge-')
+//const challengeSubPrefix = encoder.encode('challenge-')
 const channelIdSubPrefix = encoder.encode('channelId-')
 const nonceSubPrefix = encoder.encode('nonce-')
 const ticketSubPrefix = encoder.encode('tickets-')
@@ -12,19 +12,6 @@ const acknowledgedSubPrefix = encoder.encode('acknowledged-')
 const onChainSecretIntermediary = encoder.encode('onChainSecretIntermediary-')
 
 const ON_CHAIN_SECRET_ITERATION_WIDTH = 4 // bytes
-
-/**
- * Reconstructs channelId and the specified challenge from a challenge db-key.
- * @param arr a challenge db-key
- */
-export function ChallengeKeyParse(arr: Uint8Array): [Hash, Hash] {
-  const channelIdStart = PREFIX.length + challengeSubPrefix.length
-  const channelIdEnd = channelIdStart + Hash.SIZE
-  const challengeStart = channelIdEnd + SEPERATOR.length
-  const challengeEnd = challengeStart + Hash.SIZE
-
-  return [new Hash(arr.slice(channelIdStart, channelIdEnd)), new Hash(arr.slice(challengeStart, challengeEnd))]
-}
 
 /**
  * Returns the db-key under which signatures of acknowledgements are saved.
