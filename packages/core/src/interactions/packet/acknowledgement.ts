@@ -82,10 +82,7 @@ class PacketAcknowledgementInteraction extends EventEmitter implements AbstractI
       return
     }
 
-    const unacknowledgedTicket = new UnacknowledgedTicket({
-      bytes: tmp.buffer,
-      offset: tmp.byteOffset
-    })
+    const unacknowledgedTicket = UnacknowledgedTicket.deserialize(tmp)
 
     let ticketCounter: Uint8Array
     try {
@@ -97,9 +94,8 @@ class PacketAcknowledgementInteraction extends EventEmitter implements AbstractI
       ticketCounter = toU8a(0, ACKNOWLEDGED_TICKET_INDEX_LENGTH)
     }
 
-    const ticket = await unacknowledgedTicket.signedTicket
     const response = Hash.create(u8aConcat(unacknowledgedTicket.secretA.serialize(), ackMsg.getHashedKey().serialize()))
-    const acknowledgement = await this.node.paymentChannels.account.acknowledge(ticket, response)
+    const acknowledgement = await this.node.paymentChannels.account.acknowledge(unacknowledgedTicket.ticket, response)
     if (acknowledgement === null) {
       log(`Got a ticket that is not a win. Dropping ticket.`)
       await this.node.db.del(Buffer.from(unAcknowledgedDbKey))
