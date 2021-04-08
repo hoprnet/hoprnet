@@ -1,6 +1,6 @@
 import BN from 'bn.js'
 
-class UINT256  {
+class UINT256 {
   constructor(private bn: BN) {}
 
   public toBN(): BN {

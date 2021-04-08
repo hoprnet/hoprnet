@@ -239,4 +239,4 @@ export default class HoprEthereum {
 }
 
 export * from './types'
-export { Channel, SubmitTicketResponse, getWinProbabilityAsFloat, computeWinningProbability, Indexer}
+export { Channel, SubmitTicketResponse, getWinProbabilityAsFloat, computeWinningProbability, Indexer }
