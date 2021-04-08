@@ -46,13 +46,13 @@ export class Connection {
 
   async connect() {
     console.log('Connecting ...')
+    var client;
     try {
-      var client = await fetch(`https://${window.location.host}/api/ssl`)
-      .then((res) => res.json())
+      client = await fetch(`https://${window.location.host}/api/ssl`)
       .then((_) => new WebSocket('wss://' + window.location.host))
     } catch(err) {
       console.log('Invalid SSL or non-SSL support')
-      var client = new WebSocket('ws://' + window.location.host)
+      client = new WebSocket('ws://' + window.location.host)
     }
     console.log('Web socket created')
 
