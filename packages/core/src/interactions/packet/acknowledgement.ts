@@ -11,15 +11,15 @@ import { AcknowledgementMessage } from '../../messages/acknowledgement'
 import { Hash } from '@hoprnet/hopr-core-ethereum'
 import { LibP2P } from '../../'
 import { u8aToHex } from '@hoprnet/hopr-utils'
-import { getUnacknowledgedTickets, deleteTicket, replaceTicketWithAcknowledgement, UnAcknowledgedTickets } from '../../dbKeys'
+import {
+  getUnacknowledgedTickets,
+  deleteTicket,
+  replaceTicketWithAcknowledgement,
+  UnAcknowledgedTickets
+} from '../../dbKeys'
 
 import { PROTOCOL_ACKNOWLEDGEMENT } from '../../constants'
-import {
-  dialHelper,
-  durations,
-  u8aConcat,
-  pubKeyToPeerId
-} from '@hoprnet/hopr-utils'
+import { dialHelper, durations, u8aConcat, pubKeyToPeerId } from '@hoprnet/hopr-utils'
 
 const ACKNOWLEDGEMENT_TIMEOUT = durations.seconds(2)
 
@@ -48,7 +48,6 @@ class PacketAcknowledgementInteraction extends EventEmitter implements AbstractI
   }
 
   async handleAcknowledgementMessage(ackMsg: AcknowledgementMessage) {
-
     let unacknowledgedTicket = await getUnacknowledgedTickets(this.db, ackMsg.getHashedKey())
     if (!unacknowledgedTicket) {
       // Could be dummy, could be error.
