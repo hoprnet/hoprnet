@@ -53,13 +53,13 @@ yarn build    # Builds contracts, clients, etc
 yarn run:network
 
 # running bootstrap node
-DEBUG=hopr* PROVIDER=wss://127.0.0.1:8545/ DATABASE=/tmp/bootstrap yarn run:hoprd:bootstrap
+DEBUG=hopr* PROVIDER=ws://127.0.0.1:8545/ DATABASE=/tmp/bootstrap yarn run:hoprd:bootstrap
 
 # running normal node alice (run info on bootstrap node to see bootstrap address)
-DEBUG=hopr* PROVIDER=wss://127.0.0.1:8545/ DATABASE=/tmp/alice BOOTSTRAP=/ip4/127.0.0.1/... yarn run:hoprd:alice
+DEBUG=hopr* PROVIDER=ws://127.0.0.1:8545/ DATABASE=/tmp/alice BOOTSTRAP=/ip4/127.0.0.1/... yarn run:hoprd:alice
 
 # running normal node bob (run info on bootstrap node to see bootstrap address)
-DEBUG=hopr* PROVIDER=wss://127.0.0.1:8545/ DATABASE=/tmp/bob BOOTSTRAP=/ip4/127.0.0.1/... yarn run:hoprd:bob
+DEBUG=hopr* PROVIDER=ws://127.0.0.1:8545/ DATABASE=/tmp/bob BOOTSTRAP=/ip4/127.0.0.1/... yarn run:hoprd:bob
 ```
 
 ### Docker images
