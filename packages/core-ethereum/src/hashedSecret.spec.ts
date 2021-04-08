@@ -150,17 +150,15 @@ describe('test hashedSecret', function () {
           ack2.preImage.hash().eq(ack.preImage)
       )
 
-      const utfail = new UnacknowledgedTicket(({
+      const utfail = new UnacknowledgedTicket(
+        ({
           getHash: () => new Hash(new Uint8Array(Hash.SIZE).fill(0xff)),
           winProb: computeWinningProbability(0)
         } as unknown) as Ticket,
         secretA
       )
 
-      const failedAck = await connector.account.acknowledge(
-        utfail,
-        new Hash(new Uint8Array(Hash.SIZE).fill(0xff))
-      )
+      const failedAck = await connector.account.acknowledge(utfail, new Hash(new Uint8Array(Hash.SIZE).fill(0xff)))
       assert(failedAck === null, 'falsy ticket should not be a win')
 
       const ack4 = await connector.account.acknowledge(ut1, response1)

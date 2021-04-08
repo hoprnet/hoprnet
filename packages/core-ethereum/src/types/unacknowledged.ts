@@ -34,4 +34,3 @@ export class UnacknowledgedTicket {
     return Ticket.SIZE + Hash.SIZE
   }
 }
-
