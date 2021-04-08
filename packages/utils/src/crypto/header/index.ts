@@ -5,7 +5,7 @@ import { createRoutingInfo, forwardTransform as routingInfoTransform } from './r
 import { generateKeyShares, forwardTransform as keyShareTransform } from './keyShares'
 import { PRP } from '../prp'
 import { PAYLOAD_SIZE } from './constants'
-import { derivePRPParameters } from './blinding'
+import { derivePRPParameters } from './keyDerivation'
 
 function encrypt(text: Uint8Array, secrets: Uint8Array[]): Uint8Array {
   for (let i = 0; i < secrets.length; i++) {

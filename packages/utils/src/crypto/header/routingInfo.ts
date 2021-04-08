@@ -1,5 +1,5 @@
 import { u8aEquals, u8aXOR } from '../../u8a'
-import { derivePRGParameters } from './blinding'
+import { derivePRGParameters } from './keyDerivation'
 import { COMPRESSED_PUBLIC_KEY_LENGTH, MAC_LENGTH, SECRET_LENGTH, END_PREFIX, END_PREFIX_LENGTH } from './constants'
 import { randomFillSync } from 'crypto'
 import { PRG } from '../prg'

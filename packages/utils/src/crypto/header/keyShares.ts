@@ -56,6 +56,6 @@ export function forwardTransform(alpha: Uint8Array, privKey: PeerId): [alpha: Ui
   return [publicKeyConvert(publicKeyTweakMul(alpha, key, false)), key]
 }
 
-function keyExtract(groupElement: Uint8Array, pubKey: Uint8Array) {
+function keyExtract(groupElement: Uint8Array, pubKey: Uint8Array): Uint8Array {
   return extract('blake2s256', 32, Buffer.from(publicKeyConvert(groupElement)), Buffer.from(pubKey))
 }

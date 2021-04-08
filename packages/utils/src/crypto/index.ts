@@ -1,4 +1,5 @@
 export * from './hashIterator'
+export * from './header'
 export * from './prg'
 export * from './prp'
 export * from './randomFloat'

@@ -1,6 +1,6 @@
 import { u8aXOR } from '../../u8a'
 import { PRG } from '../prg'
-import { derivePRGParameters } from './blinding'
+import { derivePRGParameters } from './keyDerivation'
 
 export function generateFiller(
   header: Uint8Array,

@@ -3,7 +3,7 @@ import { randomBytes } from 'crypto'
 import { SECRET_LENGTH } from './constants'
 import { u8aXOR } from '../../u8a'
 import { PRG } from '../prg'
-import { derivePRGParameters } from './blinding'
+import { derivePRGParameters } from './keyDerivation'
 import assert from 'assert'
 
 describe('test filler', function () {
