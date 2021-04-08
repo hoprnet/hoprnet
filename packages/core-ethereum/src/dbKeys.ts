@@ -1,4 +1,4 @@
-import { toU8a, serializeToU8a, Intermediate} from '@hoprnet/hopr-utils'
+import { toU8a, serializeToU8a, Intermediate } from '@hoprnet/hopr-utils'
 import { Hash } from './types'
 import type { LevelUp } from 'levelup'
 
@@ -33,7 +33,7 @@ export async function getOnChainSecret(db: LevelUp): Promise<Hash> {
   return new Hash(await getFromDB(db, onChainSecretIntermediaryKey(0)))
 }
 
-export async function getOnChainSecretIntermediary(db: LevelUp, index: number): Promise<Uint8Array>{
+export async function getOnChainSecretIntermediary(db: LevelUp, index: number): Promise<Uint8Array> {
   return getFromDB(db, onChainSecretIntermediaryKey(index))
 }
 
