@@ -1,6 +1,5 @@
 import type { LevelUp } from 'levelup'
 import type Channel, { SubmitTicketResponse } from './channel'
-import type * as DbKeys from './dbKeys'
 import type Indexer, { RoutingChannel } from './indexer'
 
 export type Currencies = 'NATIVE' | 'HOPR'
@@ -81,11 +80,6 @@ declare interface HoprCoreConnector {
   smartContractInfo(): string
 
   /**
-   * Export keys under which our data gets stored in the database.
-   */
-  readonly dbKeys: typeof DbKeys
-
-  /**
    * Encapsulates payment channel between nodes.
    */
   readonly channel: typeof Channel
@@ -96,6 +90,6 @@ declare interface HoprCoreConnector {
   readonly indexer: Indexer
 }
 
-export { DbKeys, Constants, Channel, SubmitTicketResponse, Indexer, RoutingChannel, HoprCoreConnectorStatic }
+export { Constants, Channel, SubmitTicketResponse, Indexer, RoutingChannel, HoprCoreConnectorStatic }
 export * from './types'
 export default HoprCoreConnector
