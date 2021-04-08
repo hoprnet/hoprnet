@@ -20,7 +20,6 @@ const KEY_LENGTH = 32
 
 export const ACKNOWLEDGED_TICKET_INDEX_LENGTH = 8
 
-
 export async function getUnacknowledgedTickets(db: LevelUp, key: Hash): Promise<UnacknowledgedTicket | undefined> {
   const unAcknowledgedDbKey = UnAcknowledgedTickets(key.serialize())
   try {
@@ -29,7 +28,7 @@ export async function getUnacknowledgedTickets(db: LevelUp, key: Hash): Promise<
       return undefined
     }
     return UnacknowledgedTicket.deserialize(buff)
-  } catch (err){
+  } catch (err) {
     if (err.notFound) {
       return undefined
     }
@@ -54,20 +53,20 @@ export async function incrementTicketCounter(db: LevelUp): Promise<Uint8Array> {
   return ticketCounter
 }
 
-export async function replaceTicketWithAcknowledgement(db: LevelUp, key: Hash, acknowledgment: Acknowledgement){
+export async function replaceTicketWithAcknowledgement(db: LevelUp, key: Hash, acknowledgment: Acknowledgement) {
   const ticketCounter = await incrementTicketCounter(db)
   const unAcknowledgedDbKey = UnAcknowledgedTickets(key.serialize())
   const acknowledgedDbKey = AcknowledgedTickets(ticketCounter)
-    try {
-      await db
-        .batch()
-        .del(Buffer.from(unAcknowledgedDbKey))
-        .put(Buffer.from(acknowledgedDbKey), Buffer.from(acknowledgment.serialize()))
-        .put(Buffer.from(AcknowledgedTicketCounter()), Buffer.from(ticketCounter))
-        .write()
-    } catch (err) {
-      log(`ERROR: Error while writing to database. Error was ${err.message}.`)
-    }
+  try {
+    await db
+      .batch()
+      .del(Buffer.from(unAcknowledgedDbKey))
+      .put(Buffer.from(acknowledgedDbKey), Buffer.from(acknowledgment.serialize()))
+      .put(Buffer.from(AcknowledgedTicketCounter()), Buffer.from(ticketCounter))
+      .write()
+  } catch (err) {
+    log(`ERROR: Error while writing to database. Error was ${err.message}.`)
+  }
 }
 
 export function AcknowledgedTickets(index: Uint8Array): Uint8Array {

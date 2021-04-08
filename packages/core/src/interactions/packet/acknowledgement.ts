@@ -43,7 +43,6 @@ class PacketAcknowledgementInteraction extends EventEmitter implements AbstractI
   }
 
   async handleAcknowledgementMessage(ackMsg: AcknowledgementMessage) {
-
     let unacknowledgedTicket = await getUnacknowledgedTickets(this.db, ackMsg.getHashedKey())
     if (!unacknowledgedTicket) {
       // Could be dummy, could be error.
