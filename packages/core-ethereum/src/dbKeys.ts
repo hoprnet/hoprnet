@@ -1,12 +1,10 @@
-import { toU8a, serializeToU8a, Intermediate } from '@hoprnet/hopr-utils'
-import { Hash, PublicKey } from './types'
+import { toU8a, serializeToU8a, Intermediate} from '@hoprnet/hopr-utils'
+import { Hash } from './types'
 import type { LevelUp } from 'levelup'
 
 const encoder = new TextEncoder()
 const PREFIX = encoder.encode('payments-')
 const SEPERATOR = encoder.encode('-')
-const ticketSubPrefix = encoder.encode('tickets-')
-const acknowledgedSubPrefix = encoder.encode('acknowledged-')
 
 const ITERATION_WIDTH = 4 // bytes
 
@@ -35,7 +33,7 @@ export async function getOnChainSecret(db: LevelUp): Promise<Hash> {
   return new Hash(await getFromDB(db, onChainSecretIntermediaryKey(0)))
 }
 
-export async function getOnChainSecretIntermediary(db: LevelUp, index: number): Promise<Uint8Array> {
+export async function getOnChainSecretIntermediary(db: LevelUp, index: number): Promise<Uint8Array>{
   return getFromDB(db, onChainSecretIntermediaryKey(index))
 }
 
@@ -51,19 +49,3 @@ export async function storeHashIntermediaries(db: LevelUp, intermediates: Interm
 }
 
 
-/**
- * Reconstructs counterPartyPubKey and the specified challenge from a AcknowledgedTicket db-key.
- * @param arr a AcknowledgedTicket db-key
- * @param props additional arguments
- */
-export function AcknowledgedTicketParse(arr: Uint8Array): [PublicKey, Hash] {
-  const counterPartyPubKeyStart = ticketSubPrefix.length + acknowledgedSubPrefix.length
-  const counterPartyPubKeyEnd = counterPartyPubKeyStart + PublicKey.SIZE
-  const challengeStart = counterPartyPubKeyEnd + SEPERATOR.length
-  const challengeEnd = challengeStart + Hash.SIZE
-
-  return [
-    new PublicKey(arr.slice(counterPartyPubKeyStart, counterPartyPubKeyEnd)),
-    new Hash(arr.slice(challengeStart, challengeEnd))
-  ]
-}
