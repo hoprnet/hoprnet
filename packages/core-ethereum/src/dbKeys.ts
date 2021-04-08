@@ -29,11 +29,12 @@ function onChainSecretIntermediaryKey(iteration: number): Uint8Array {
   ])
 }
 
-export async function getOnChainSecret(db: LevelUp): Promise<Hash> {
-  return new Hash(await getFromDB(db, onChainSecretIntermediaryKey(0)))
+export async function getOnChainSecret(db: LevelUp): Promise<Hash | undefined> {
+  const arr = await getFromDB<Uint8Array>(db, onChainSecretIntermediaryKey(0))
+  return arr ? new Hash(arr) : undefined
 }
 
-export async function getOnChainSecretIntermediary(db: LevelUp, index: number): Promise<Uint8Array>{
+export async function getOnChainSecretIntermediary(db: LevelUp, index: number): Promise<Uint8Array | undefined>{
   return getFromDB(db, onChainSecretIntermediaryKey(index))
 }
 
