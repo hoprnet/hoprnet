@@ -11,8 +11,7 @@ import Message from './message'
 import { LevelUp } from 'levelup'
 import Debug from 'debug'
 import Hopr from '../../'
-import { Hash, PublicKey, Ticket, Balance } from '@hoprnet/hopr-core-ethereum'
-import { UnacknowledgedTicket } from '../ticket'
+import { Hash, PublicKey, Ticket, Balance, UnacknowledgedTicket } from '@hoprnet/hopr-core-ethereum'
 
 const log = Debug('hopr-core:message:packet')
 const verbose = Debug('hopr-core:verbose:message:packet')

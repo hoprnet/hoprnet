@@ -10,7 +10,7 @@ import BN from 'bn.js'
 import Web3 from 'web3'
 import { HoprToken } from './tsc/web3/HoprToken'
 import { Await } from './tsc/utils'
-import { Balance, Ticket, Address } from './types'
+import { Balance, Ticket, Address, UnacknowledgedTicket } from './types'
 import CoreConnector from '.'
 import Channel from './channel'
 import * as testconfigs from './config.spec'
@@ -102,8 +102,9 @@ describe('test Channel class', function () {
       firstTicket.challenge,
       firstTicket.winProb
     )
+    const unacknowledgedTicket = new UnacknowledgedTicket(signedTicket, null)
 
-    const firstAckedTicket = await partyBConnector.account.acknowledge(signedTicket, firstTicket.response)
+    const firstAckedTicket = await partyBConnector.account.acknowledge(unacknowledgedTicket, firstTicket.response)
 
     assert(partyA.pubKey.eq(signedTicket.getSigner()), `Check that signer is recoverable`)
 
@@ -161,7 +162,8 @@ describe('test Channel class', function () {
         ticketData.challenge,
         ticketData.winProb
       )
-      const ackedTicket = await partyBConnector.account.acknowledge(nextSignedTicket, ticketData.response)
+      const nextUnacknowledgedTicket = new UnacknowledgedTicket(nextSignedTicket, null)
+      const ackedTicket = await partyBConnector.account.acknowledge(nextUnacknowledgedTicket, ticketData.response)
 
       if (ackedTicket !== null) {
         const result = await partyBChannel.submitTicket(ackedTicket)

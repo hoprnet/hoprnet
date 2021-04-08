@@ -6,19 +6,14 @@ import pipe from 'it-pipe'
 import PeerId from 'peer-id'
 import debug from 'debug'
 const log = debug('hopr-core:acknowledgement')
-import { green, blue } from 'chalk'
 import { AcknowledgementMessage } from '../../messages/acknowledgement'
-import { Hash } from '@hoprnet/hopr-core-ethereum'
 import { LibP2P } from '../../'
 import { u8aToHex } from '@hoprnet/hopr-utils'
 import { getUnacknowledgedTickets, deleteTicket, replaceTicketWithAcknowledgement, UnAcknowledgedTickets } from '../../dbKeys'
-
 import { PROTOCOL_ACKNOWLEDGEMENT } from '../../constants'
 import {
   dialHelper,
   durations,
-  u8aConcat,
-  pubKeyToPeerId
 } from '@hoprnet/hopr-utils'
 
 const ACKNOWLEDGEMENT_TIMEOUT = durations.seconds(2)
@@ -56,21 +51,18 @@ class PacketAcknowledgementInteraction extends EventEmitter implements AbstractI
       return await deleteTicket(this.db, ackMsg.getHashedKey())
     }
 
-    const response = Hash.create(u8aConcat(unacknowledgedTicket.secretA.serialize(), ackMsg.getHashedKey().serialize()))
-    const acknowledgement = await this.paymentChannels.account.acknowledge(unacknowledgedTicket.ticket, response)
+    const acknowledgement = await this.paymentChannels.account.acknowledge(
+      unacknowledgedTicket, 
+      ackMsg.getHashedKey()
+    )
 
     if (acknowledgement === null) {
       log(`Got a ticket that is not a win. Dropping ticket.`)
-      return await deleteTicket(this.db, ackMsg.getHashedKey())
+      await deleteTicket(this.db, ackMsg.getHashedKey())
+    } else {
+      log(`Storing winning ticket`)
+      await replaceTicketWithAcknowledgement(this.db, ackMsg.getHashedKey(), acknowledgement)
     }
-
-    log(
-      `Storing ticket  from ${blue(
-        (await pubKeyToPeerId(await ackMsg.responseSigningParty)).toB58String()
-      )}. Ticket contains preImage for ${green(ackMsg.getHashedKey().toHex())}`
-    )
-
-    await replaceTicketWithAcknowledgement(this.db, ackMsg.getHashedKey(), acknowledgement)
     this.emit(u8aToHex(UnAcknowledgedTickets(ackMsg.getHashedKey().serialize())))
   }
 
