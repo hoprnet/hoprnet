@@ -1,45 +1,18 @@
-import type { Account } from './types'
-import { publicKeyConvert, publicKeyCreate, ecdsaSign } from 'secp256k1'
-import { stringToU8a, u8aToHex, u8aConcat } from '@hoprnet/hopr-utils'
-import Web3 from 'web3'
+import { ethers, providers } from 'ethers'
 
-const { soliditySha3, toChecksumAddress, toHex } = Web3.utils
+// @TODO: move this to hopr-utils
+// returns value of promise
+export type PromiseValue<T> = T extends PromiseLike<infer U> ? U : T
 
-/**
- * Depending on what network tests are run, the error output
- * may vary. This utility prefixes the error to it matches
- * with hardhat's network.
- * @param error
- * @returns error prefixed by network's message
- */
-export const vmErrorMessage = (error: string) => {
-  return `VM Exception while processing transaction: revert ${error}`
-}
-
-/**
- * Given a private key generate necessary data for testing
- * @param privKey
- * @returns Account
- */
-export const createAccount = (privKey: string): Account => {
-  const pubKey = publicKeyCreate(stringToU8a(privKey), true)
-  const uncompressedPubKey = publicKeyConvert(pubKey, false).slice(1)
-  const address = toChecksumAddress(
-    u8aToHex(
-      stringToU8a(
-        soliditySha3({
-          type: 'bytes',
-          value: u8aToHex(uncompressedPubKey)
-        })
-      ).slice(12)
-    )
-  )
+export const getAccount = (privateKey: string) => {
+  const wallet = new ethers.Wallet(privateKey)
+  const uncompressedPublicKey = ethers.utils.computePublicKey(wallet.publicKey, false)
 
   return {
-    privKey,
-    uncompressedPubKey: u8aToHex(uncompressedPubKey),
-    pubKey: u8aToHex(pubKey),
-    address
+    privateKey: wallet.privateKey,
+    uncompressedPublicKey: ethers.utils.hexDataSlice(uncompressedPublicKey, 1), // remove identifier
+    publicKey: ethers.utils.hexDataSlice(wallet.publicKey, 1), // remove identifier
+    address: wallet.address
   }
 }
 
@@ -48,22 +21,12 @@ export const createAccount = (privKey: string): Account => {
  * @param message
  * @returns hashed message
  */
-export const prefixMessage = (message: string): Uint8Array => {
-  const messageWithHOPR = u8aConcat(stringToU8a(toHex('HOPRnet')), stringToU8a(message))
-  const messageWithHOPRHex = u8aToHex(messageWithHOPR)
+export const prefixMessageWithHOPR = (message: string) => {
+  const withHOPR = ethers.utils.concat([ethers.utils.toUtf8Bytes('HOPRnet'), message])
 
-  return stringToU8a(
-    soliditySha3(
-      {
-        type: 'string',
-        value: '\x19Ethereum Signed Message:\n'
-      },
-      {
-        type: 'string',
-        value: messageWithHOPR.length.toString()
-      },
-      { type: 'bytes', value: messageWithHOPRHex }
-    )
+  return ethers.utils.solidityKeccak256(
+    ['string', 'string', 'bytes'],
+    ['\x19Ethereum Signed Message:\n', withHOPR.length.toString(), withHOPR]
   )
 }
 
@@ -73,16 +36,37 @@ export const prefixMessage = (message: string): Uint8Array => {
  * @param privKey
  * @returns signature properties
  */
-export const signMessage = (
-  message: string,
-  privKey: Uint8Array
-): { signature: Uint8Array; r: Uint8Array; s: Uint8Array; v: number } => {
-  const { signature, recid } = ecdsaSign(stringToU8a(message), privKey)
+export const signMessage = async (message: string, privKey: string) => {
+  const wallet = new ethers.Wallet(privKey)
+  // const signature = await wallet.signMessage(message)
+  // we do not use above since we use a different prefix
+  const signature = ethers.utils.joinSignature(wallet._signingKey().signDigest(message))
+  const { r, s, v } = ethers.utils.splitSignature(signature)
 
   return {
-    signature: signature,
-    r: signature.slice(0, 32),
-    s: signature.slice(32, 64),
-    v: recid
+    message,
+    signature,
+    r,
+    s,
+    v
   }
+}
+
+export const toSolPercent = (multiplier: number, percent: number): string => {
+  return String(Math.floor(percent * multiplier))
+}
+
+export const advanceBlock = async (provider: providers.JsonRpcProvider) => {
+  return provider.send('evm_mine', [])
+}
+
+// increases ganache time by the passed duration in seconds
+export const increaseTime = async (provider: providers.JsonRpcProvider, _duration: ethers.BigNumberish) => {
+  const duration = ethers.BigNumber.from(_duration)
+
+  if (duration.isNegative()) throw Error(`Cannot increase time by a negative amount (${duration})`)
+
+  await provider.send('evm_increaseTime', [duration.toNumber()])
+
+  await advanceBlock(provider)
 }
