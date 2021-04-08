@@ -8,12 +8,9 @@ import Web3 from 'web3'
 import chalk from 'chalk'
 import { Networks, getAddresses, abis } from '@hoprnet/hopr-ethereum'
 import Channel from './channel'
-import types from './types'
 import { PublicKey } from './types'
 import Indexer from './indexer'
-import * as dbkeys from './dbKeys'
 import * as utils from './utils'
-import * as constants from './constants'
 import * as config from './config'
 import Account from './account'
 import HashedSecret from './hashedSecret'
@@ -33,7 +30,6 @@ export default class HoprEthereum implements HoprCoreConnector {
   private _debug: boolean
 
   public channel = Channel
-  public types: types
   public indexer: Indexer
   public account: Account
   public hashedSecret: HashedSecret
@@ -52,13 +48,10 @@ export default class HoprEthereum implements HoprCoreConnector {
   ) {
     this.account = new Account(this, privateKey, publicKey, chainId)
     this.indexer = new Indexer(this, maxConfirmations)
-    this.types = new types()
     this._debug = debug
     this.hashedSecret = new HashedSecret(this.db, this.account, this.hoprChannels)
   }
 
-  readonly dbKeys = dbkeys
-  readonly constants = constants
   readonly CHAIN_NAME = 'HOPR on Ethereum'
 
   private async _start(): Promise<HoprEthereum> {
@@ -244,10 +237,6 @@ export default class HoprEthereum implements HoprCoreConnector {
     )
     log(`using blockchain address ${await coreConnector.hexAccountAddress()}`)
     return coreConnector
-  }
-
-  static get constants() {
-    return constants
   }
 }
 

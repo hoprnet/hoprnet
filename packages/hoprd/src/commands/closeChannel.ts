@@ -5,6 +5,7 @@ import chalk from 'chalk'
 import { pubKeyToPeerId } from '@hoprnet/hopr-utils'
 import { AbstractCommand, GlobalState } from './abstractCommand'
 import { checkPeerIdInput, styleValue } from './utils'
+import { PublicKey } from '@hoprnet/hopr-core-ethereum'
 
 export default class CloseChannel extends AbstractCommand {
   constructor(public node: Hopr) {
@@ -51,7 +52,7 @@ export default class CloseChannel extends AbstractCommand {
 
   async autocomplete(query: string = '', line: string = ''): Promise<AutoCompleteResult> {
     const ethereum = this.node.paymentChannels
-    const selfPubKey = new ethereum.types.PublicKey(this.node.getId().pubKey.marshal())
+    const selfPubKey = new PublicKey(this.node.getId().pubKey.marshal())
     const self = await selfPubKey.toAddress()
 
     // get channels which are ours & open
