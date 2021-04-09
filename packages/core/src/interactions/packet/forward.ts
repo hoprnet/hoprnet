@@ -13,7 +13,7 @@ const log = Debug('hopr-core:forward')
 const FORWARD_TIMEOUT = durations.seconds(6)
 const ACKNOWLEDGEMENT_TIMEOUT = durations.seconds(2)
 
-class PacketForwardInteraction{
+class PacketForwardInteraction {
   private mixer: Mixer
   private concurrencyLimiter
 
@@ -29,7 +29,7 @@ class PacketForwardInteraction{
     })
   }
 
-  async handlePacket(msg: Uint8Array){
+  async handlePacket(msg: Uint8Array) {
     const arr = msg.slice()
     const packet = new Packet(this.node, this.node._libp2p, {
       bytes: arr.buffer,
