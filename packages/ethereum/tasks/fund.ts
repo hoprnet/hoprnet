@@ -1,38 +1,43 @@
 import type { HardhatRuntimeEnvironment, RunSuperFunction } from 'hardhat/types'
-import { HoprToken__factory } from '../types'
+//import { HoprToken__factory } from '../types'
+
+
+const send = (signer, txparams) =>
+  signer.sendTransaction(txparams, (error, transactionHash) => {
+    if (error) {
+      console.log(`Error: ${error}`);
+    }
+    console.log(`transactionHash: ${transactionHash}`);
+  });
 
 /**
- * Funds all unlocked accounts with HOPR
+ * Funds an account with HOPR
  */
 async function main(
-  { address, amount, accountsToFund }: { address: string; amount: string; accountsToFund: number },
+  { address, amount }: { address: string; amount: string },
   { ethers, network }: HardhatRuntimeEnvironment,
   _runSuper: RunSuperFunction<any>
 ) {
-  console.log({
+  console.log('💰 Starting fund task', {
     address,
     network: network.name
   })
-  const signers = await ethers.getSigners()
-  const signer = signers[0]
-  const accounts = signers.map((signer) => signer.address).slice(0, accountsToFund)
-  const hoprToken = HoprToken__factory.connect(address, ethers.provider).connect(signer)
+  const etherAmount = '1'
+  const signer = ethers.provider.getSigner()
+  const tx = {
+    to: address,
+    value: ethers.utils.parseEther(etherAmount)
+  };
+  // const hoprToken = HoprToken__factory.connect(address, ethers.provider).connect(signer)
 
-  console.log('Running task "fund" with config:', {
-    network: network.name,
-    address,
-    amount,
-    accounts
-  })
+  console.log(`💵 Sending ${etherAmount} ETH to ${address} on network ${network.name}`);
+  await send(signer, tx);
 
-  for (const account of accounts) {
-    await hoprToken.mint(account, amount, ethers.constants.HashZero, ethers.constants.HashZero, {
-      from: signer.address,
-      gasLimit: 200e3
-    })
-
-    console.log(`Funded: ${account}`)
-  }
+  console.log(`[TODO] 💵 Sending ${amount} HOPR to ${address} on network ${network.name}`);
+  // await hoprToken.mint(await signer.getAddress(), amount, ethers.constants.HashZero, ethers.constants.HashZero, {
+  //   from: signer.getAddress(),
+  //   gasLimit: 200e3
+  // })
 }
 
 export default main
