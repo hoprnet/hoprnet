@@ -207,7 +207,7 @@ class Hopr extends EventEmitter {
     subscribeToAcknowledgements(subscribe, this.db, this.paymentChannels, (ack) =>
       this.emit('message-acknowledged:' + ack.getKey())
     )
-    this.forward = new PacketForwardInteraction(this, sendMessage)
+    this.forward = new PacketForwardInteraction(this, subscribe, sendMessage)
 
     if (options.ticketAmount) this.ticketAmount = String(options.ticketAmount)
     if (options.ticketWinProb) this.ticketWinProb = options.ticketWinProb
