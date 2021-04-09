@@ -28,12 +28,9 @@ This mechanism makes sure nodes relay services are verifiable.
 Since “Proof-Of-Relay” is used to make the relay services of nodes verifiable, it is the duty of each node to check that given challenges are derivable from the given and the expected information. 
 Packets with inappropriate challenges should be dropped as they might not lead to winning tickets.
 Therefore, the sender of the packet also provides a hint of the expected value that a node is supposed to get from the next downstream node (as explained in the ticket section). 
-
-
-
 \subsubsection{The Importance of Stake}
 In order to incentivize reliable connections, we require payment channels to be staked. We also assume stake is correlated with availability and thus with reputation. Therefore, weighing by stake the selection of which mix nodes to include in the channel graph results in a mixnet populated by nodes that have the reputation of offering a high quality of service.
- Staking is also a countermeasure for sybil attacks, as creating many node identities becomes expensive. 
+Staking is also a countermeasure for sybil attacks, as creating many node identities becomes expensive. 
 
 
 
