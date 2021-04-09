@@ -2,8 +2,8 @@ import { Packet } from './messages/packet'
 import Heap from 'heap-js'
 import { randomInteger } from '@hoprnet/hopr-utils'
 import { MAX_PACKET_DELAY } from './constants'
-import debug from 'debug'
-const log = debug('hopr-core:mixer')
+//import debug from 'debug'
+//const log = debug('hopr-core:mixer')
 
 type HeapElement = [number, Packet]
 
@@ -44,7 +44,7 @@ export class Mixer {
   }
 
   private tick() {
-    log(`Mixer has ${this.queue.length} elements`)
+    //log(`Mixer has ${this.queue.length} elements`)
     while (this.queue.length > 0 && this.queue.peek()[0] < this.clock()) {
       this.onMessage(this.queue.pop()[1])
     }

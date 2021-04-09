@@ -5,6 +5,7 @@ import { HEARTBEAT_INTERVAL, NETWORK_QUALITY_THRESHOLD } from '../constants'
 import sinon from 'sinon'
 import { fakePeerId } from '../test-utils'
 import PeerId from 'peer-id'
+import { Hash } from '@hoprnet/hopr-core-ethereum'
 
 describe('unit test heartbeat', async () => {
   let heartbeat: Heartbeat
@@ -12,7 +13,7 @@ describe('unit test heartbeat', async () => {
   let peers: NetworkPeerStore
   let clock: any
 
-  let send = sinon.fake.resolves(true)
+  let send = sinon.fake((_id: any, _proto: any, challenge: Uint8Array) => Hash.create(challenge).serialize())
   let subscribe = sinon.fake()
 
   beforeEach(async () => {
@@ -51,7 +52,7 @@ describe('unit test heartbeat', async () => {
       let id = fakePeerId(i)
       let peers = new NetworkPeerStore([], [id])
       let heartbeat = new Heartbeat(peers, subscribe, send, hangUp)
-      return { peers, id, send, heartbeat }
+      return { peers, id, heartbeat }
     }
 
     let alice = generateMock(1)
@@ -85,11 +86,12 @@ describe('unit test heartbeat', async () => {
     assert(alice.peers.qualityOf(chris.id) > NETWORK_QUALITY_THRESHOLD, 'chris is high q')
 
     // Chris dies, alice heartbeats again
-    alice.send = sinon.fake((id: PeerId) => {
+    //@ts-ignore
+    alice.heartbeat.sendMessageAndExpectResponse = sinon.fake((id: PeerId, _proto: any, challenge: Uint8Array) => {
       if (id.equals(chris.id)) {
-        return Promise.resolve(-1)
+        return Promise.reject()
       }
-      return Promise.resolve(0)
+      return Hash.create(challenge).serialize() 
     })
 
     clock.tick(HEARTBEAT_INTERVAL * 2)
