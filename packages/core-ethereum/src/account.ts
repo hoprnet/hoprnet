@@ -5,7 +5,16 @@ import { ethers, errors } from 'ethers'
 import { durations, isExpired, u8aConcat } from '@hoprnet/hopr-utils'
 import NonceTracker, { NonceLock } from './nonce-tracker'
 import TransactionManager from './transaction-manager'
-import { PublicKey, Address, Acknowledgement, Balance, Hash, NativeBalance, UINT256, UnacknowledgedTicket } from './types'
+import {
+  PublicKey,
+  Address,
+  Acknowledgement,
+  Balance,
+  Hash,
+  NativeBalance,
+  UINT256,
+  UnacknowledgedTicket
+} from './types'
 import { isWinningTicket, isGanache, getNetworkGasPrice } from './utils'
 import { PROVIDER_CACHE_TTL } from './constants'
 import * as ethereum from './ethereum'
