@@ -1,14 +1,14 @@
 import type { LevelUp } from 'levelup'
-import type { Currencies, SubmitTicketResponse } from '@hoprnet/hopr-core-connector-interface'
-import type HoprCoreConnector from '@hoprnet/hopr-core-connector-interface'
 import type { Wallet as IWallet, providers as IProviders } from 'ethers'
 import type { HoprToken, HoprChannels } from './contracts'
 import chalk from 'chalk'
 import { Networks, getAddresses } from '@hoprnet/hopr-ethereum'
 import { ethers } from 'ethers'
 import debug from 'debug'
+import Acknowledgement from './types'
 import Channel from './channel'
 import Indexer from './indexer'
+import { RoutingChannel } from './indexer'
 import * as utils from './utils'
 import * as config from './config'
 import Account from './account'
@@ -18,7 +18,24 @@ import { HoprToken__factory, HoprChannels__factory } from './contracts'
 
 const log = debug('hopr-core-ethereum')
 
-export default class HoprEthereum implements HoprCoreConnector {
+export type Currencies = 'NATIVE' | 'HOPR'
+
+export type SubmitTicketResponse =
+  | {
+      status: 'SUCCESS'
+      receipt: string
+      ackTicket: Acknowledgement
+    }
+  | {
+      status: 'FAILURE'
+      message: string
+    }
+  | {
+      status: 'ERROR'
+      error: Error | string
+    }
+
+export default class HoprEthereum {
   private _status: 'dead' | 'alive' = 'dead'
   private _starting?: Promise<HoprEthereum>
   private _stopping?: Promise<void>
@@ -196,4 +213,4 @@ export default class HoprEthereum implements HoprCoreConnector {
 }
 
 export * from './types'
-export { Channel, SubmitTicketResponse, getWinProbabilityAsFloat, computeWinningProbability }
+export { Channel, getWinProbabilityAsFloat, computeWinningProbability, Indexer, RoutingChannel }

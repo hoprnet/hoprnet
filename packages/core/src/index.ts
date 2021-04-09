@@ -35,8 +35,14 @@ import Multiaddr from 'multiaddr'
 import chalk from 'chalk'
 
 import PeerId from 'peer-id'
-import type { RoutingChannel } from '@hoprnet/hopr-core-connector-interface'
-import HoprCoreEthereum, { PublicKey, Balance, NativeBalance, Hash, Acknowledgement } from '@hoprnet/hopr-core-ethereum'
+import HoprCoreEthereum, {
+  PublicKey,
+  Balance,
+  NativeBalance,
+  Hash,
+  Acknowledgement,
+  RoutingChannel
+} from '@hoprnet/hopr-core-ethereum'
 import BN from 'bn.js'
 
 import { Interactions } from './interactions'
@@ -453,12 +459,12 @@ class Hopr extends EventEmitter {
 
           await this.db.put(Buffer.from(unAcknowledgedDBKey), Buffer.from(''))
 
-          this._interactions.packet.acknowledgment.once(u8aToHex(unAcknowledgedDBKey), () => {
+          this._interactions.acknowledgment.once(u8aToHex(unAcknowledgedDBKey), () => {
             resolve()
           })
 
           try {
-            await this._interactions.packet.forward.interact(path[0], packet)
+            await this._interactions.forward.interact(path[0], packet)
           } catch (err) {
             return reject(err)
           }

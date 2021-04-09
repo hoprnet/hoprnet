@@ -46,28 +46,20 @@ hoprd --admin --host="0.0.0.0:1291"
 ### Developing with this repository
 
 ```sh
-yarn          # Install tooling
-yarn setup    # Setups the monorepo
-# all done!
+yarn          # Install lerna and sets project up
+yarn build    # Builds contracts, clients, etc
 
-# if you want to regenerate yarn.lock files
-yarn util:regenerate
-yarn setup
+# starting network
+yarn run:network
 
-# if you run into errors during setup
-yarn util:reset
-yarn setup
-```
+# running bootstrap node
+DEBUG=hopr* PROVIDER=ws://127.0.0.1:8545/ DATABASE=/tmp/bootstrap yarn run:hoprd:bootstrap
 
-### Migrating smart contracts
+# running normal node alice (run info on bootstrap node to see bootstrap address)
+DEBUG=hopr* PROVIDER=ws://127.0.0.1:8545/ DATABASE=/tmp/alice BOOTSTRAP=/ip4/127.0.0.1/... yarn run:hoprd:alice
 
-See [packages/ethereum](./packages/ethereum/README.md#migrating)
-
-### Running applications
-
-```sh
-yarn run:hoprd         # Runs hoprd w/admin (:3000)
-yarn run:chat          # Runs hopr chat in terminal
+# running normal node bob (run info on bootstrap node to see bootstrap address)
+DEBUG=hopr* PROVIDER=ws://127.0.0.1:8545/ DATABASE=/tmp/bob BOOTSTRAP=/ip4/127.0.0.1/... yarn run:hoprd:bob
 ```
 
 ### Docker images

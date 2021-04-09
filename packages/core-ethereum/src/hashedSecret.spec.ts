@@ -3,8 +3,8 @@ import { durations, stringToU8a } from '@hoprnet/hopr-utils'
 import { Ganache } from '@hoprnet/hopr-testing'
 import { getAddresses, migrate, fund } from '@hoprnet/hopr-ethereum'
 import HoprEthereum from '.'
-import { computeWinningProbability } from './utils'
-import * as Types from './types'
+import {  computeWinningProbability } from './utils'
+import { UnacknowledgedTicket, Ticket, Hash } from './types'
 import * as testconfigs from './config.spec'
 import { createNode } from './utils/testing'
 
@@ -43,7 +43,7 @@ describe('test hashedSecret', function () {
     it('should publish a hashed secret', async function () {
       await connector.hashedSecret.initialize()
 
-      let onChainHash = new Types.Hash(
+      let onChainHash = new Hash(
         stringToU8a((await connector.hoprChannels.methods.accounts(connector.account.address.toHex()).call()).secret)
       )
 
@@ -56,7 +56,7 @@ describe('test hashedSecret', function () {
         await connector.account.sendTransaction(connector.hoprChannels.updateAccountSecret, preImage.toHex())
       ).wait()
 
-      let updatedOnChainHash = new Types.Hash(
+      let updatedOnChainHash = new Hash(
         stringToU8a((await connector.hoprChannels.methods.accounts(connector.account.address.toHex()).call()).secret)
       )
 
@@ -90,7 +90,7 @@ describe('test hashedSecret', function () {
     it('should publish a hashed secret', async function () {
       await connector.hashedSecret.initialize()
 
-      let onChainHash = new Types.Hash(
+      let onChainHash = new Hash(
         stringToU8a((await connector.hoprChannels.methods.accounts(connector.account.address.toHex()).call()).secret)
       )
 
@@ -102,7 +102,7 @@ describe('test hashedSecret', function () {
         await connector.account.sendTransaction(connector.hoprChannels.updateAccountSecret, preImage.toHex())
       ).wait()
 
-      let updatedOnChainHash = new Types.Hash(
+      let updatedOnChainHash = new Hash(
         stringToU8a((await connector.hoprChannels.methods.accounts(connector.account.address.toHex()).call()).secret)
       )
 
@@ -116,16 +116,18 @@ describe('test hashedSecret', function () {
     })
 
     it('should reserve a preImage for tickets with 100% winning probabilty resp. should not reserve for 0% winning probability', async function () {
+      const secretA = new Hash(new Uint8Array(Hash.SIZE).fill(0xff))
       const ticket1 = ({
-        getHash: () => new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff)),
+        getHash: () => new Hash(new Uint8Array(Hash.SIZE).fill(0xff)),
         winProb: computeWinningProbability(1)
-      } as unknown) as Types.Ticket
-      const response1 = new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff))
+      } as unknown) as Ticket
+      const ut1 = new UnacknowledgedTicket(ticket1, secretA)
+      const response1 = new Hash(new Uint8Array(Hash.SIZE).fill(0xff))
 
-      const ack = await connector.account.acknowledge(ticket1, response1)
+      const ack = await connector.account.acknowledge(ut1, response1)
 
       assert(ack, 'ticket with 100% winning probability must always be a win')
-      const ack2 = await connector.account.acknowledge(ticket1, response1)
+      const ack2 = await connector.account.acknowledge(ut1, response1)
       assert(ack2, 'ticket with 100% winning probability must always be a win')
 
       assert(
@@ -135,16 +137,18 @@ describe('test hashedSecret', function () {
           ack2.preImage.hash().eq(ack.preImage)
       )
 
-      const failedAck = await connector.account.acknowledge(
+      const utfail = new UnacknowledgedTicket(
         ({
-          getHash: () => new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff)),
+          getHash: () => new Hash(new Uint8Array(Hash.SIZE).fill(0xff)),
           winProb: computeWinningProbability(0)
-        } as unknown) as Types.Ticket,
-        new Types.Hash(new Uint8Array(Types.Hash.SIZE).fill(0xff))
+        } as unknown) as Ticket,
+        secretA
       )
+
+      const failedAck = await connector.account.acknowledge(utfail, new Hash(new Uint8Array(Hash.SIZE).fill(0xff)))
       assert(failedAck === null, 'falsy ticket should not be a win')
 
-      const ack4 = await connector.account.acknowledge(ticket1, response1)
+      const ack4 = await connector.account.acknowledge(ut1, response1)
       assert(ack4, 'ticket with 100% winning probability must always be a win')
       assert(ack4.preImage != null && !ack4.preImage.eq(ack2.preImage) && ack4.preImage.hash().eq(ack2.preImage))
     })
