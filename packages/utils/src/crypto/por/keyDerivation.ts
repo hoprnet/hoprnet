@@ -7,7 +7,7 @@ const HASH_KEY_ACK_KEY = 'HASH_KEY_ACK_KEY'
 
 const MAX_ITERATIONS = 1000
 
-export function deriveOwnKeyShareBlinding(secret: Uint8Array) {
+export function deriveOwnKeyShare(secret: Uint8Array) {
   if (secret.length != SECRET_LENGTH) {
     throw Error(`Invalid arguments`)
   }
@@ -15,7 +15,7 @@ export function deriveOwnKeyShareBlinding(secret: Uint8Array) {
   return sampleFieldElement(secret, HASH_KEY_OWN_KEY)
 }
 
-export function deriveAckKeyShareBlinding(secret: Uint8Array) {
+export function deriveAckKeyShare(secret: Uint8Array) {
   if (secret.length != SECRET_LENGTH) {
     throw Error(`Invalid arguments`)
   }
