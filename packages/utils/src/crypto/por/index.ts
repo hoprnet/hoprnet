@@ -26,11 +26,11 @@ export function createFirstChallenge(secrets: Uint8Array[]) {
 }
 
 /**
- * Creates the bitstring containing the PoR challenge for the next 
+ * Creates the bitstring containing the PoR challenge for the next
  * downstream node as well as the hint that is used to verify the
  * challenge that is given to the relayer.
  * @param secrets shared secrets with the creator of the packet
- * @returns the bitstring that is embedded next to the routing 
+ * @returns the bitstring that is embedded next to the routing
  * information for each relayer
  */
 export function createPoR(secrets: Uint8Array[]) {
@@ -48,7 +48,7 @@ export function createPoR(secrets: Uint8Array[]) {
 
 /**
  * Verifies whether an incoming packet contains all values that
- * are necessary to reconstruct the response to redeem the 
+ * are necessary to reconstruct the response to redeem the
  * incentive for relaying the packet
  * @param secret shared secret with the creator of the packet
  * @param porBytes PoR bitstring as included within the packet

@@ -25,7 +25,7 @@ export function deriveOwnKeyShare(secret: Uint8Array) {
  * for a packet and thereby unlocks the incentive for the previous
  * relayer for transforming and delivering the packet
  * @param secret shared secret with the creator of the packet
- * @returns 
+ * @returns
  */
 export function deriveAckKeyShare(secret: Uint8Array) {
   if (secret.length != SECRET_LENGTH) {
