@@ -54,9 +54,9 @@ import { Address } from 'libp2p/src/peer-store'
 import { 
   libp2pSendMessageAndExpectResponse,
   libp2pSubscribe,
-  //libp2pSendMessage
+  libp2pSendMessage
 } from '@hoprnet/hopr-utils'
-import { PacketAcknowledgementInteraction } from './interactions/packet/acknowledgement'
+import { subscribeToAcknowledgements } from './interactions/packet/acknowledgement'
 import { PacketForwardInteraction } from './interactions/packet/forward'
 
 const log = Debug(`hopr-core`)
@@ -122,7 +122,6 @@ class Hopr extends EventEmitter {
   private strategy: ChannelStrategy
   private networkPeers: NetworkPeers
   private heartbeat: Heartbeat
-  private acknowledgment: PacketAcknowledgementInteraction
   private forward: PacketForwardInteraction
 
   /**
@@ -203,12 +202,13 @@ class Hopr extends EventEmitter {
 
     const subscribe = () => libp2pSubscribe(this._libp2p)
     const sendMessageAndExpectResponse = (dest: PeerId, protocol: string, msg: Uint8Array, opts: DialOpts) => libp2pSendMessageAndExpectResponse(this._libp2p, dest, protocol, msg, opts)
-    //const sendMessage = () => libp2pSendMessage(this._libp2p) 
+    const sendMessage = () => libp2pSendMessage(this._libp2p) 
     const hangup = this._libp2p.hangUp.bind(this._libp2p)
 
     this.heartbeat = new Heartbeat(this.networkPeers, subscribe, sendMessageAndExpectResponse, hangup)
-    this.acknowledgment = new PacketAcknowledgementInteraction(this._libp2p, this.db, this.paymentChannels)
-    this.forward = new PacketForwardInteraction(this)
+
+    subscribeToAcknowledgements(subscribe, this.db, this.paymentChannels, (ack) => this.emit('message-acknowledged:' + ack.getKey()))
+    this.forward = new PacketForwardInteraction(this, sendMessage)
 
     if (options.ticketAmount) this.ticketAmount = String(options.ticketAmount)
     if (options.ticketWinProb) this.ticketWinProb = options.ticketWinProb
@@ -467,7 +467,7 @@ class Hopr extends EventEmitter {
 
           await this.db.put(Buffer.from(unAcknowledgedDBKey), Buffer.from(''))
 
-          this.acknowledgment.once(u8aToHex(unAcknowledgedDBKey), () => {
+          this.once('message-acknowledged:' + u8aToHex(unAcknowledgedDBKey), () => {
             resolve()
           })
 
