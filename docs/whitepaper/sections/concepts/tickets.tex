@@ -34,7 +34,7 @@ Tickets are received together with packets which means that the recipient and th
 $$response*G=ticket.challenge$$
 Once the recipient transforms the packet, it is able to compute $s_i$. The recipient is now also able to extract the routing information from the packet. 
 This includes a hint to the value $s_{i+1}$ given as $hint_i:=s_{i+1}*G$ 
-\newline Together with $s_i$, the node can verify that $$ticket.challenge=s_i*G+hint_i$$ with $$s_i*G+hint=si*G+s_{i+1}*G=(s_i+s_{i+1})*G$$ 
+\newline Together with $s_i$, the node can verify that $$ticket.challenge=s_i*G+hint_i$$ with $$s_i*G+hint=s_i*G+s_{i+1}*G=(s_i+s_{i+1})*G$$ 
 This allows the recipient to verify that the promised value $s_{i+1}$ indeed leads to a solution of the challenge given in the ticket. 
 If this is not the case, then the node should drop the packet.
 \newline Without this check, the sender is able to intentionally create falsy challenges that lead to unredeemable tickets.
