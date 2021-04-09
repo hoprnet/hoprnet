@@ -249,6 +249,11 @@ function generateHandler(handlerFunction: LibP2PHandlerFunction, includeReply = 
 }
 
 // Subscribe to messages to a protocol with a function
-export function libp2pSubscribe(libp2p: LibP2P, protocol: string, handler: LibP2PHandlerFunction, includeReply = false) {
+export function libp2pSubscribe(
+  libp2p: LibP2P,
+  protocol: string,
+  handler: LibP2PHandlerFunction,
+  includeReply = false
+) {
   libp2p.handle([protocol], generateHandler(handler, includeReply))
 }

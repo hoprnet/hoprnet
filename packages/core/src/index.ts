@@ -25,7 +25,7 @@ import Heartbeat from './network/heartbeat'
 import { findPath } from './path'
 
 import { addPubKey, getAcknowledgements, submitAcknowledgedTicket } from './utils'
-import { u8aToHex, DialOpts} from '@hoprnet/hopr-utils'
+import { u8aToHex, DialOpts } from '@hoprnet/hopr-utils'
 import { existsSync, mkdirSync } from 'fs'
 import getIdentity from './identity'
 
@@ -51,11 +51,7 @@ import path from 'path'
 import { ChannelStrategy, PassiveStrategy, PromiscuousStrategy } from './channel-strategy'
 import Debug from 'debug'
 import { Address } from 'libp2p/src/peer-store'
-import { 
-  libp2pSendMessageAndExpectResponse,
-  libp2pSubscribe,
-  libp2pSendMessage
-} from '@hoprnet/hopr-utils'
+import { libp2pSendMessageAndExpectResponse, libp2pSubscribe, libp2pSendMessage } from '@hoprnet/hopr-utils'
 import { subscribeToAcknowledgements } from './interactions/packet/acknowledgement'
 import { PacketForwardInteraction } from './interactions/packet/forward'
 
@@ -201,13 +197,16 @@ class Hopr extends EventEmitter {
     )
 
     const subscribe = () => libp2pSubscribe(this._libp2p)
-    const sendMessageAndExpectResponse = (dest: PeerId, protocol: string, msg: Uint8Array, opts: DialOpts) => libp2pSendMessageAndExpectResponse(this._libp2p, dest, protocol, msg, opts)
-    const sendMessage = () => libp2pSendMessage(this._libp2p) 
+    const sendMessageAndExpectResponse = (dest: PeerId, protocol: string, msg: Uint8Array, opts: DialOpts) =>
+      libp2pSendMessageAndExpectResponse(this._libp2p, dest, protocol, msg, opts)
+    const sendMessage = () => libp2pSendMessage(this._libp2p)
     const hangup = this._libp2p.hangUp.bind(this._libp2p)
 
     this.heartbeat = new Heartbeat(this.networkPeers, subscribe, sendMessageAndExpectResponse, hangup)
 
-    subscribeToAcknowledgements(subscribe, this.db, this.paymentChannels, (ack) => this.emit('message-acknowledged:' + ack.getKey()))
+    subscribeToAcknowledgements(subscribe, this.db, this.paymentChannels, (ack) =>
+      this.emit('message-acknowledged:' + ack.getKey())
+    )
     this.forward = new PacketForwardInteraction(this, sendMessage)
 
     if (options.ticketAmount) this.ticketAmount = String(options.ticketAmount)
@@ -501,7 +500,8 @@ class Hopr extends EventEmitter {
     try {
       await this.heartbeat.pingNode(destination)
       return { latency: Date.now() - start, info: '' }
-    } catch (e) { //TODO
+    } catch (e) {
+      //TODO
       return { latency: -1, info: 'error' }
     }
   }
