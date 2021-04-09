@@ -197,7 +197,8 @@ class Hopr extends EventEmitter {
 
     this.heartbeat = new Heartbeat(
       this.networkPeers,
-      (dest: PeerId, protocol: string, msg: Uint8Array) => sendMessageAndExpectResponse(this._libp2p, dest, protocol, msg),
+      (dest: PeerId, protocol: string, msg: Uint8Array) =>
+        sendMessageAndExpectResponse(this._libp2p, dest, protocol, msg),
       this._libp2p.hangUp.bind(this._libp2p)
     )
 
