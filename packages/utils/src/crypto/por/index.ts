@@ -36,7 +36,7 @@ export function preVerify(
   porBytes: Uint8Array,
   challenge: Uint8Array
 ): [valid: true, ownShare: Uint8Array, ownKey: Uint8Array, nextChallenge: Uint8Array] | [valid: false] {
-  if (secret.length != SECRET_LENGTH || porBytes.length != POR_LENGTH) {
+  if (secret.length != SECRET_LENGTH || porBytes.length != POR_STRING_LENGTH) {
     throw Error(`Invalid arguments`)
   }
 
