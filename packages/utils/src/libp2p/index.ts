@@ -192,7 +192,7 @@ export async function dial(
   throw new Error('Missing error case in dial')
 }
 
-export async function sendMessage(
+export async function libp2pSendMessage(
   libp2p: LibP2P,
   destination: PeerId,
   protocol: string,
@@ -208,7 +208,7 @@ export async function sendMessage(
   }
 }
 
-export async function sendMessageAndExpectResponse(
+export async function libp2pSendMessageAndExpectResponse(
   libp2p: LibP2P,
   destination: PeerId,
   protocol: string,
@@ -248,6 +248,6 @@ function generateHandler(handlerFunction: LibP2PHandlerFunction, includeReply = 
 }
 
 // Subscribe to messages to a protocol with a function
-export function subscribe(libp2p: LibP2P, protocol: string, handler: LibP2PHandlerFunction, includeReply = false) {
+export function libp2pSubscribe(libp2p: LibP2P, protocol: string, handler: LibP2PHandlerFunction, includeReply = false) {
   libp2p.handle([protocol], generateHandler(handler, includeReply))
 }
