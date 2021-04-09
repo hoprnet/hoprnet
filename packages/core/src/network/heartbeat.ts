@@ -15,7 +15,12 @@ export default class Heartbeat {
   constructor(
     private networkPeers: NetworkPeerStore,
     subscribe: (protocol: string, handler: LibP2PHandlerFunction, includeReply: boolean) => void,
-    private sendMessageAndExpectResponse: ( dst: PeerId, proto: string, msg: Uint8Array, opts: DialOpts) => Promise<Uint8Array>,
+    private sendMessageAndExpectResponse: (
+      dst: PeerId,
+      proto: string,
+      msg: Uint8Array,
+      opts: DialOpts
+    ) => Promise<Uint8Array>,
     private hangUp: (addr: PeerId) => Promise<void>
   ) {
     subscribe(PROTOCOL_HEARTBEAT, this.handleHeartbeatRequest.bind(this), true)
@@ -34,12 +39,9 @@ export default class Heartbeat {
     const expectedResponse = Hash.create(challenge).serialize()
 
     try {
-      const pingResponse = await this.sendMessageAndExpectResponse(
-        id, 
-        PROTOCOL_HEARTBEAT,
-        challenge,
-        { timeout: HEARTBEAT_TIMEOUT}
-      )
+      const pingResponse = await this.sendMessageAndExpectResponse(id, PROTOCOL_HEARTBEAT, challenge, {
+        timeout: HEARTBEAT_TIMEOUT
+      })
 
       if (pingResponse == null || !u8aEquals(expectedResponse, pingResponse)) {
         log(`Mismatched challenge. ${pingResponse}`)
@@ -62,7 +64,7 @@ export default class Heartbeat {
     const toPing = this.networkPeers.pingSince(thresholdTime)
 
     const doPing = async (): Promise<void> => {
-      await this.networkPeers.ping(toPing.pop(), async (id: PeerId) => await this.pingNode(id))  
+      await this.networkPeers.ping(toPing.pop(), async (id: PeerId) => await this.pingNode(id))
     }
 
     await limitConcurrency<void>(MAX_PARALLEL_CONNECTIONS, () => toPing.length <= 0, doPing)

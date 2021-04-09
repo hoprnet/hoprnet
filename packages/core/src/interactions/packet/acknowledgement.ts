@@ -1,11 +1,7 @@
 import type { LevelUp } from 'levelup'
 import debug from 'debug'
 import { AcknowledgementMessage } from '../../messages/acknowledgement'
-import {
-  getUnacknowledgedTickets,
-  deleteTicket,
-  replaceTicketWithAcknowledgement,
-} from '../../dbKeys'
+import { getUnacknowledgedTickets, deleteTicket, replaceTicketWithAcknowledgement } from '../../dbKeys'
 import { PROTOCOL_ACKNOWLEDGEMENT } from '../../constants'
 const log = debug('hopr-core:acknowledgement')
 
@@ -15,7 +11,7 @@ export function subscribeToAcknowledgements(
   paymentChannels: any,
   onMessage: (ackMessage: AcknowledgementMessage) => void
 ) {
-  subscribe(PROTOCOL_ACKNOWLEDGEMENT, async function(msg: Uint8Array){
+  subscribe(PROTOCOL_ACKNOWLEDGEMENT, async function (msg: Uint8Array) {
     const ackMsg = AcknowledgementMessage.deserialize(msg)
     let unacknowledgedTicket = await getUnacknowledgedTickets(db, ackMsg.getHashedKey())
     if (!unacknowledgedTicket) {
