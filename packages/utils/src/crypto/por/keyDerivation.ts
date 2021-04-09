@@ -7,6 +7,11 @@ const HASH_KEY_ACK_KEY = 'HASH_KEY_ACK_KEY'
 
 const MAX_ITERATIONS = 1000
 
+/**
+ * Computes the key share derivable by the relayer
+ * @param secret shared secret with the creator of the packet
+ * @returns the key share
+ */
 export function deriveOwnKeyShare(secret: Uint8Array) {
   if (secret.length != SECRET_LENGTH) {
     throw Error(`Invalid arguments`)
@@ -15,6 +20,13 @@ export function deriveOwnKeyShare(secret: Uint8Array) {
   return sampleFieldElement(secret, HASH_KEY_OWN_KEY)
 }
 
+/**
+ * Comutes the key share that is embedded in the acknowledgement
+ * for a packet and thereby unlocks the incentive for the previous
+ * relayer for transforming and delivering the packet
+ * @param secret shared secret with the creator of the packet
+ * @returns 
+ */
 export function deriveAckKeyShare(secret: Uint8Array) {
   if (secret.length != SECRET_LENGTH) {
     throw Error(`Invalid arguments`)
@@ -23,6 +35,16 @@ export function deriveAckKeyShare(secret: Uint8Array) {
   return sampleFieldElement(secret, HASH_KEY_ACK_KEY)
 }
 
+/**
+ * Samples a field element from a given seed using HKDF
+ * If the result of HKDF does not lead to a field element,
+ * the key identifier is padded until the key derivation
+ * leads to a valid field element
+ * @param secret the seed
+ * @param _hashKey identifier used to derive the field element
+ * @param __fakeExpand used for testing
+ * @returns a field element
+ */
 export function sampleFieldElement(
   secret: Uint8Array,
   _hashKey: string,

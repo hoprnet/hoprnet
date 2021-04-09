@@ -7,6 +7,13 @@ import { randomBytes } from 'crypto'
 
 const POR_STRING_LENGTH = 2 * COMPRESSED_PUBLIC_KEY_LENGTH
 
+/**
+ * Takes the secrets which the first and the second relayer are able
+ * to derive from the packet header and computes the challenge for
+ * the first ticket.
+ * @param secrets shared secrets with creator of the packet
+ * @returns the challenge first the ticket sent to the first relayer
+ */
 export function createFirstChallenge(secrets: Uint8Array[]) {
   if (secrets.length < 2 || secrets.some((secret) => secret.length != SECRET_LENGTH)) {
     throw Error(`Invalid arguments`)
@@ -18,6 +25,14 @@ export function createFirstChallenge(secrets: Uint8Array[]) {
   return createChallenge(s0, s1)
 }
 
+/**
+ * Creates the bitstring containing the PoR challenge for the next 
+ * downstream node as well as the hint that is used to verify the
+ * challenge that is given to the relayer.
+ * @param secrets shared secrets with the creator of the packet
+ * @returns the bitstring that is embedded next to the routing 
+ * information for each relayer
+ */
 export function createPoR(secrets: Uint8Array[]) {
   if (secrets.length < 2 || secrets.some((s) => s.length != SECRET_LENGTH)) {
     throw Error(`Invalid arguments`)
@@ -31,6 +46,17 @@ export function createPoR(secrets: Uint8Array[]) {
   return Uint8Array.from([...createChallenge(s1, s2), ...publicKeyCreate(s0)])
 }
 
+/**
+ * Verifies whether an incoming packet contains all values that
+ * are necessary to reconstruct the response to redeem the 
+ * incentive for relaying the packet
+ * @param secret shared secret with the creator of the packet
+ * @param porBytes PoR bitstring as included within the packet
+ * @param challenge ticket challenge of the incoming ticket
+ * @returns whether the challenge is derivable, if yes, it returns
+ * the keyShare of the relayer as well as the secret that is used
+ * to create it and the challenge for the next relayer.
+ */
 export function preVerify(
   secret: Uint8Array,
   porBytes: Uint8Array,
@@ -57,6 +83,18 @@ export function preVerify(
   }
 }
 
+/**
+ * Takes an the second key share and reconstructs the secret
+ * that is necessary to redeem the incentive for relaying the
+ * packet.
+ * @param ownShare own key share as computed from the packet
+ * @param ownKey key that as derived from the shared secret with
+ * the creator of the packet
+ * @param ack second key share as given by the acknowledgement
+ * @param challenge challenge of the ticket
+ * @returns whether the input values led to a valid response that
+ * can be used to redeem the incentive
+ */
 export function validateAcknowledgement(
   ownShare: Uint8Array,
   ownKey: Uint8Array,
@@ -66,7 +104,7 @@ export function validateAcknowledgement(
   const valid = u8aEquals(publicKeyTweakAdd(ownShare, ack), challenge)
 
   if (valid) {
-    // clone ownKey before
+    // clone ownKey before adding a tweak to it
     const response = privateKeyTweakAdd(ownKey.slice(), ack)
     return [true, response]
   } else {
