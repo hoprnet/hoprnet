@@ -6,14 +6,16 @@ They are redeemable at most once and they lose their value when the channel is c
 A ticket can be issued once two nodes have established a payment channel with each other which means that at least one of them has locked HOPR tokens.
 \newline The ticket issuer A (A could also be the packet creator) selects the winning probability of the ticket and the relay fee to use and sets amount to:
 $$\delta:=\dfrac{L*F}{P_w}$$
-If the issuer $(A)$ receives the packet from another node $(O)$ (packet creator) and attempts to issue a ticket for the next downstream node, 
+where $\delta$ is the amount of HOPR tokens set in the ticket, $L$ is the path length, $F$ is the relay fee and $P_w$ is the winning probability.
+\\~\\If the issuer $(A)$ receives the packet from another node $(O)$ (packet creator) and attempts to issue a ticket for the next downstream node, 
 the challenge is given together with the routing information by the packet. We assume $(A)$ and $(O)$ are not the same.
 \\$(A)$ does not know whether the ticket is a win or not.
 \\$(A)$ sets content of a ticket to: $$t=(R, C, \alpha_c, \delta, P_w, \zeta, I)$$ 
-$(A)$ then signs the ticket with its private key and sends $T:= (t, Sig_I(t))$ to the recipient together with a mixnet packet.
+where $R$ is the recipient, $C$ is the challenge, $\alpha_c$ is the account.counter, $\zeta$ is the channel.iteration and $I$ is the index.
+\\$(A)$ then signs the ticket with its private key and sends $T:= (t, Sig_I(t))$ to the recipient together with a mixnet packet.
 \\The data for a ticket is signed by the issuer, and a ticket is the data followed by the signature: $$T:=(T_D,Sig_{I}(T_D))$$ where 
     $$T_D:=(\delta,P_w,R,I,C,\zeta,c_{Id},tag,V)$$
- \begin{figure}
+ \begin{figure}[H]
     \centering
     \includegraphics[width=10cm,height=10cm,keepaspectratio]{../whitepaper/images/ticket_workflow.png}
     \caption{Ticket workflow}
