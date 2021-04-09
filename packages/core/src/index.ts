@@ -51,7 +51,7 @@ import path from 'path'
 import { ChannelStrategy, PassiveStrategy, PromiscuousStrategy } from './channel-strategy'
 import Debug from 'debug'
 import { Address } from 'libp2p/src/peer-store'
-import { libp2pSendMessageAndExpectResponse, libp2pSubscribe, libp2pSendMessage } from '@hoprnet/hopr-utils'
+import { libp2pSendMessageAndExpectResponse, libp2pSubscribe, libp2pSendMessage, LibP2PHandlerFunction } from '@hoprnet/hopr-utils'
 import { subscribeToAcknowledgements } from './interactions/packet/acknowledgement'
 import { PacketForwardInteraction } from './interactions/packet/forward'
 
@@ -196,10 +196,10 @@ class Hopr extends EventEmitter {
       [this.getId()].concat(this.bootstrapServers.map((bs) => PeerId.createFromB58String(bs.getPeerId())))
     )
 
-    const subscribe = () => libp2pSubscribe(this._libp2p)
+    const subscribe = (protocol: string, handler: LibP2PHandlerFunction, includeReply = false) => libp2pSubscribe(this._libp2p, protocol, handler, includeReply)
     const sendMessageAndExpectResponse = (dest: PeerId, protocol: string, msg: Uint8Array, opts: DialOpts) =>
       libp2pSendMessageAndExpectResponse(this._libp2p, dest, protocol, msg, opts)
-    const sendMessage = () => libp2pSendMessage(this._libp2p)
+    const sendMessage = (dest: PeerId, protocol: string, msg: Uint8Array, opts: DialOpts) => libp2pSendMessage(this._libp2p, dest, protocol, msg, opts)
     const hangup = this._libp2p.hangUp.bind(this._libp2p)
 
     this.heartbeat = new Heartbeat(this.networkPeers, subscribe, sendMessageAndExpectResponse, hangup)

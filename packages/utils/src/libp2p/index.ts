@@ -229,8 +229,8 @@ export async function libp2pSendMessageAndExpectResponse(
  *  interact with - this function simply allows us to assign a handler
  *  function that is called on each 'message' of the stream.
  */
-type LibP2PHandlerArgs = { connection: Connection; stream: MuxedStream; protocol: string }
-type LibP2PHandlerFunction = (msg: Uint8Array, remotePeer: PeerId) => any
+export type LibP2PHandlerArgs = { connection: Connection; stream: MuxedStream; protocol: string }
+export type LibP2PHandlerFunction = (msg: Uint8Array, remotePeer: PeerId) => any
 function generateHandler(handlerFunction: LibP2PHandlerFunction, includeReply = false) {
   // Return a function to be consumed by Libp2p.handle()
   return function libP2PHandler(args: LibP2PHandlerArgs) {
