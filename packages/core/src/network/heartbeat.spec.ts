@@ -91,7 +91,7 @@ describe('unit test heartbeat', async () => {
       if (id.equals(chris.id)) {
         return Promise.reject()
       }
-      return Hash.create(challenge).serialize() 
+      return Hash.create(challenge).serialize()
     })
 
     clock.tick(HEARTBEAT_INTERVAL * 2)
