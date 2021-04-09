@@ -50,9 +50,9 @@ import * as DbKeys from './dbKeys'
 import EventEmitter from 'events'
 import path from 'path'
 import { ChannelStrategy, PassiveStrategy, PromiscuousStrategy } from './channel-strategy'
-
 import Debug from 'debug'
 import { Address } from 'libp2p/src/peer-store'
+import { sendMessageAndExpectResponse } from '@hoprnet/hopr-utils'
 
 const log = Debug(`hopr-core`)
 const verbose = Debug('hopr-core:verbose')
@@ -149,7 +149,6 @@ class Hopr extends EventEmitter {
     }
     this.bootstrapServers = options.bootstrapServers || []
     this.isBootstrapNode = options.bootstrapNode || false
-    this._interactions = new Interactions(this, (peer: PeerId) => this.networkPeers.register(peer))
 
     if (process.env.GCLOUD) {
       try {
@@ -198,7 +197,7 @@ class Hopr extends EventEmitter {
 
     this.heartbeat = new Heartbeat(
       this.networkPeers,
-      this._interactions.heartbeat,
+      (dest: PeerId, protocol: string, msg: Uint8Array) => sendMessageAndExpectResponse(this._libp2p, dest, protocol, msg),
       this._libp2p.hangUp.bind(this._libp2p)
     )
 
@@ -492,7 +491,7 @@ class Hopr extends EventEmitter {
       throw Error(`Expecting a non-empty destination.`)
     }
     let info = ''
-    let latency = await this._interactions.heartbeat.interact(destination)
+    let latency = await this.heartbeat.sendHeartbeat(destination)
     return { latency, info }
   }
 

@@ -1,9 +1,11 @@
 import type NetworkPeerStore from './network-peers'
 import type PeerId from 'peer-id'
 import debug from 'debug'
-import { randomInteger, limitConcurrency } from '@hoprnet/hopr-utils'
+import { Hash } from '@hoprnet/hopr-core-ethereum'
+import { randomInteger, limitConcurrency, LibP2PHandlerFunction, u8aEquals } from '@hoprnet/hopr-utils'
 import { HEARTBEAT_INTERVAL, HEARTBEAT_INTERVAL_VARIANCE, MAX_PARALLEL_CONNECTIONS } from '../constants'
-import { Heartbeat as HeartbeatInteraction } from '../interactions/network/heartbeat'
+import { PROTOCOL_HEARTBEAT, HEARTBEAT_TIMEOUT } from '../constants'
+import { randomBytes } from 'crypto'
 
 const log = debug('hopr-core:heartbeat')
 
@@ -12,9 +14,18 @@ export default class Heartbeat {
 
   constructor(
     private networkPeers: NetworkPeerStore,
-    private interaction: HeartbeatInteraction,
+    subscribe: (protocol: string, handler: LibP2PHandlerFunction, includeReply: boolean) => void,
+    private sendMessageAndExpectResponse: ( dst: PeerId, proto: string, msg: Uint8Array, opts) => Promise<Uint8Array>,
     private hangUp: (addr: PeerId) => Promise<void>
-  ) {}
+  ) {
+    subscribe(PROTOCOL_HEARTBEAT, this.handleHeartbeatRequest.bind(this), true)
+  }
+  
+  public handleHeartbeatRequest(msg: Uint8Array, remotePeer: PeerId): Uint8Array{
+    this.networkPeers.register(remotePeer)
+    log('beat')
+    return Hash.create(msg).serialize()
+  }
 
   private async checkNodes(): Promise<void> {
     const thresholdTime = Date.now() - HEARTBEAT_INTERVAL
@@ -26,17 +37,30 @@ export default class Heartbeat {
       await this.networkPeers.ping(toPing.pop(), async (id: PeerId) => {
         log('ping', id.toB58String())
 
-        const pingResult = await this.interaction.interact(id).catch((err) => log('ping', err))
+        const challenge = randomBytes(16)
+        const expectedResponse = Hash.create(challenge).serialize()
 
-        if (pingResult >= 0) {
+        try {
+          const pingResponse = await this.sendMessageAndExpectResponse(
+            id, 
+            PROTOCOL_HEARTBEAT,
+            challenge,
+            { timeout: HEARTBEAT_TIMEOUT}
+          )
+
+          if (pingResponse == null || !u8aEquals(expectedResponse, pingResponse)) {
+            log(`Mismatched challenge. ${pingResponse}`)
+            await this.hangUp(id)
+            return false
+          }
+
           log('ping success to', id.toB58String())
           return true
-        } else {
-          log('ping failed to', id.toB58String())
-          await this.hangUp(id)
+        } catch (e) {
+          log(`Connection to ${id.toB58String()} failed`)
           return false
         }
-      })
+      })  
     }
 
     await limitConcurrency<void>(MAX_PARALLEL_CONNECTIONS, () => toPing.length <= 0, doPing)
