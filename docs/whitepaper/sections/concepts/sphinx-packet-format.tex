@@ -33,7 +33,7 @@ The sender (A) picks a random $x\in \mathbb{Z}^*_q$ that is used to derive new k
 \end{itemize}
  Where $y_B,y_C,y_D,y_E$ are the public keys of the nodes $B,C, D$  which we assume are available to $A$ . The $a_i$ are the group elements which, when combined with the nodes’ public keys, allows computing a shared key for each via Diffie-Hellman key exchange, 
  and so the first node in the user-chosen route can forward the packet to the next, and only that mix-node can decrypt it.
-The $s_i$ are the Diffie Hellman shared secrets, and the $b_i$ are the blinding factors.
+The $s_i$ are the Diffie Hellman shared secrets, $b_i$ are the blinding factors and $h$ is a hash function which we model by random oracles.
 
 
 \paragraph{Routing information}
