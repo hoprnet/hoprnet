@@ -1,6 +1,6 @@
 /*
-* Add a more usable API on top of LibP2P
-*/
+ * Add a more usable API on top of LibP2P
+ */
 import LibP2P from 'libp2p'
 import AbortController from 'abort-controller'
 import PeerId from 'peer-id'
@@ -18,21 +18,24 @@ export type DialOpts = {
   timeout: number
 }
 
-export type DialResponse = {
-  status: 'SUCCESS'
-  resp: { stream: MuxedStream, protocol: string }
-} | {
-  status: 'E_TIMEOUT'
-} | {
-  status: 'E_DIAL',
-  error: Error,
-  dht: boolean
-} | {
-  status: 'E_DHT_QUERY'
-  error: Error,
-  query: PeerId
-}
-
+export type DialResponse =
+  | {
+      status: 'SUCCESS'
+      resp: { stream: MuxedStream; protocol: string }
+    }
+  | {
+      status: 'E_TIMEOUT'
+    }
+  | {
+      status: 'E_DIAL'
+      error: Error
+      dht: boolean
+    }
+  | {
+      status: 'E_DHT_QUERY'
+      error: Error
+      query: PeerId
+    }
 
 /**
  * Combines libp2p methods such as dialProtocol and peerRouting.findPeer
@@ -82,7 +85,7 @@ export async function dial(
     return { status: 'E_TIMEOUT' }
   }
 
-  if (((err != null || struct == null) && libp2p._dht == undefined)) {
+  if ((err != null || struct == null) && libp2p._dht == undefined) {
     error(`Could not dial ${destination.toB58String()} directly and libp2p was started without a DHT.`)
     return { status: 'E_DIAL', error: err, dht: false }
   }
@@ -92,11 +95,10 @@ export async function dial(
 
   try {
     // Let libp2p populate its internal peerStore with fresh addresses
-    dhtAddresses =
-      (await libp2p._dht.findPeer(destination, { timeout: DEFAULT_DHT_QUERY_TIMEOUT })?.multiaddrs) ?? []
+    dhtAddresses = (await libp2p._dht.findPeer(destination, { timeout: DEFAULT_DHT_QUERY_TIMEOUT })?.multiaddrs) ?? []
   } catch (err) {
     error(`Querying the DHT for ${destination.toB58String()} failed. ${err.message}`)
-    return { status: 'E_DHT_QUERY', error: err, query: destination}
+    return { status: 'E_DHT_QUERY', error: err, query: destination }
   }
 
   const newAddresses = dhtAddresses.filter((addr) => addresses.includes(addr.toString()))
@@ -126,15 +128,15 @@ export async function dial(
 }
 
 /*
-*  LibP2P API uses async iterables which aren't particularly friendly to
-*  interact with - this function simply allows us to assign a handler
-*  function that is called on each 'message' of the stream.
-*/
+ *  LibP2P API uses async iterables which aren't particularly friendly to
+ *  interact with - this function simply allows us to assign a handler
+ *  function that is called on each 'message' of the stream.
+ */
 type LibP2PHandlerArgs = { connection: Connection; stream: MuxedStream; protocol: string }
 type HandlerFunction = (msg: Uint8Array, remotePeer: PeerId) => any
 function generateHandler(handlerFunction: HandlerFunction, includeReply = false) {
   // Return a function to be consumed by Libp2p.handle()
-  return function libP2PHandler(args: LibP2PHandlerArgs){
+  return function libP2PHandler(args: LibP2PHandlerArgs) {
     // Create the async iterable that we will use in the pipeline
     async function* pipeToHandler(source: AsyncIterable<Uint8Array>) {
       for await (const msg of source) {

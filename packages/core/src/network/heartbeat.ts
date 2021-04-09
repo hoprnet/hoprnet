@@ -20,8 +20,8 @@ export default class Heartbeat {
   ) {
     subscribe(PROTOCOL_HEARTBEAT, this.handleHeartbeatRequest.bind(this), true)
   }
-  
-  public handleHeartbeatRequest(msg: Uint8Array, remotePeer: PeerId): Uint8Array{
+
+  public handleHeartbeatRequest(msg: Uint8Array, remotePeer: PeerId): Uint8Array {
     this.networkPeers.register(remotePeer)
     log('beat')
     return Hash.create(msg).serialize()
