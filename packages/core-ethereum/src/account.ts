@@ -23,6 +23,9 @@ import BN from 'bn.js'
 import debug from 'debug'
 const log = debug('hopr-core-ethereum:account')
 
+// omits the last element in the list
+// type OmitLastElement<T extends any[]> = T extends [...infer I, infer _L] ? I : never
+
 export const EMPTY_HASHED_SECRET = new Hash(new Uint8Array(Hash.SIZE).fill(0x00))
 const cache = new Map<'balance' | 'nativeBalance', { value: string; updatedAt: number }>()
 
@@ -121,7 +124,8 @@ class Account {
   }
 
   get publicKey(): PublicKey {
-    return PublicKey.fromString(this.wallet.publicKey)
+    // convert to a compressed public key
+    return PublicKey.fromString(ethers.utils.computePublicKey(this.wallet.publicKey, true))
   }
 
   get address(): Address {
@@ -156,7 +160,7 @@ class Account {
 
   public async sendTransaction<T extends (...args: any) => Promise<ContractTransaction>>(
     method: T,
-    ...args: Parameters<T> // TODO: omit last
+    ...rest: Parameters<T>
   ): Promise<ContractTransaction> {
     const gasLimit = 300e3
     const gasPrice = getNetworkGasPrice(this.coreConnector.network)
@@ -170,17 +174,23 @@ class Account {
         gasPrice,
         nonce
       })
-      transaction = await method(args, {
-        gasLimit,
-        gasPrice,
-        nonce
-      })
+      // send transaction to our ethereum provider
+      transaction = await method(
+        ...[
+          ...rest,
+          {
+            gasLimit,
+            gasPrice,
+            nonce
+          }
+        ]
+      )
       log('Transaction with nonce %d successfully sent %s, waiting for confimation', nonce, transaction.hash)
 
       this._transactions.addToPending(transaction.hash, { nonce })
       nonceLock.releaseLock()
 
-      // this is done asynchronous
+      // monitor transaction, this is done asynchronously
       transaction
         .wait()
         .then(() => {

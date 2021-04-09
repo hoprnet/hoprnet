@@ -3,11 +3,11 @@ import { stringToU8a, durations, PromiseValue } from '@hoprnet/hopr-utils'
 import { Ganache } from '@hoprnet/hopr-testing'
 import { NODE_SEEDS } from '@hoprnet/hopr-demo-seeds'
 import { migrate, fund, getAddresses } from '@hoprnet/hopr-ethereum'
+import { ethers } from 'ethers'
 import HoprEthereum from '.'
 import { createNode, getPrivKeyData } from './utils/testing'
 import * as testconfigs from './config.spec'
 import * as configs from './config'
-import { randomBytes } from 'crypto'
 import { providers } from 'ethers'
 import { HoprToken__factory, HoprToken } from './contracts'
 
@@ -54,11 +54,11 @@ describe('test withdraw', function () {
   this.timeout(durations.minutes(5))
 
   const ganache = new Ganache()
-  let provider: providers.JsonRpcProvider
+  let provider: providers.WebSocketProvider
   let hoprToken: HoprToken
   let connector: HoprEthereum
-  let alice: PromiseValue<ReturnType<typeof getPrivKeyData>>
-  let bob: PromiseValue<ReturnType<typeof getPrivKeyData>>
+  let alice: ethers.Wallet
+  let bob: ethers.Wallet
 
   before(async function () {
     this.timeout(durations.minutes(1))
@@ -67,16 +67,15 @@ describe('test withdraw', function () {
     await migrate()
     await fund(`--address ${getAddresses()?.localhost?.HoprToken} --accounts-to-fund 2`)
 
-    alice = await getPrivKeyData(stringToU8a(NODE_SEEDS[0]))
-    bob = await getPrivKeyData(randomBytes(32))
+    provider = new providers.WebSocketProvider(configs.DEFAULT_URI)
 
-    provider = new providers.JsonRpcProvider(configs.DEFAULT_URI)
+    alice = new ethers.Wallet(NODE_SEEDS[0]).connect(provider)
+    bob = ethers.Wallet.createRandom().connect(provider)
     hoprToken = HoprToken__factory.connect(getAddresses().localhost?.HoprToken, provider)
-    connector = await createNode(alice.privKey.serialize())
+    connector = await createNode(ethers.utils.arrayify(alice.privateKey))
 
-    await hoprToken.methods.mint(alice.address.toHex(), 100, '0x0', '0x0').send({
-      from: alice.address.toHex(),
-      gas: 200e3
+    await hoprToken.connect(alice).mint(alice.address, 100, ethers.constants.HashZero, ethers.constants.HashZero, {
+      gasLimit: 300e3
     })
 
     await connector.start()
@@ -88,14 +87,14 @@ describe('test withdraw', function () {
   })
 
   it('should withdraw 1 wei (ETH)', async function () {
-    const txHash = await connector.withdraw('NATIVE', bob.address.toHex(), '1')
+    const txHash = await connector.withdraw('NATIVE', bob.address, '1')
     await provider.waitForTransaction(txHash)
 
     assert(txHash.length > 0, 'no transaction hash received')
   })
 
   it('should withdraw 1 wei (HOPR)', async function () {
-    const txHash = await connector.withdraw('HOPR', bob.address.toHex(), '1')
+    const txHash = await connector.withdraw('HOPR', bob.address, '1')
     await provider.waitForTransaction(txHash)
 
     assert(txHash.length > 0, 'no transaction hash received')

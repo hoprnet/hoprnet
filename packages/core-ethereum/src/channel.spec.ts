@@ -21,7 +21,7 @@ const DEFAULT_WIN_PROB = 1
 describe('test Channel class', function () {
   const ganache = new Ganache()
 
-  let provider: providers.JsonRpcProvider
+  let provider: providers.WebSocketProvider
   let hoprToken: HoprToken
   let partyA: Account
   let partyB: Account
@@ -55,7 +55,7 @@ describe('test Channel class', function () {
     await ganache.start()
     await migrate()
 
-    provider = new providers.JsonRpcProvider(configs.DEFAULT_URI)
+    provider = new providers.WebSocketProvider(configs.DEFAULT_URI)
     hoprToken = HoprToken__factory.connect(getAddresses().localhost?.HoprToken, provider)
   })
 

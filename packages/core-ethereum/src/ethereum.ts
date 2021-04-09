@@ -13,6 +13,6 @@ export const getNativeBalance = async (
 }
 
 export const getBalance = async (token: HoprToken, account: Address): Promise<Balance> => {
-  const result = await token.methods.balanceOf(account.toHex()).call()
-  return new Balance(new BN(result))
+  const result = await token.balanceOf(account.toHex())
+  return new Balance(new BN(result.toString()))
 }

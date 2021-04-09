@@ -24,7 +24,7 @@ describe('test indexer', function () {
   this.timeout(durations.minutes(5))
 
   const ganache = new Ganache()
-  let provider: providers.JsonRpcProvider
+  let provider: providers.WebSocketProvider
   let hoprToken: HoprToken
   let hoprChannels: HoprChannels
   let connector: CoreConnector
@@ -40,7 +40,7 @@ describe('test indexer', function () {
     await migrate()
     await fund(`--address ${getAddresses()?.localhost?.HoprToken} --accounts-to-fund 4`)
 
-    provider = new providers.JsonRpcProvider(configs.DEFAULT_URI)
+    provider = new providers.WebSocketProvider(configs.DEFAULT_URI)
     hoprToken = HoprToken__factory.connect(getAddresses().localhost?.HoprToken, provider)
     hoprChannels = HoprChannels__factory.connect(getAddresses().localhost?.HoprChannels, provider)
 
@@ -69,22 +69,17 @@ describe('test indexer', function () {
 
       const uncompressedPubKeyB = publicKeyConvert(userB.pubKey.serialize(), false).slice(1)
 
-      await connector.hoprChannels.methods
+      await connector.hoprChannels
+        .connect(userB.address.toHex())
         .initializeAccount(u8aToHex(uncompressedPubKeyB), u8aToHex(randomBytes(Hash.SIZE)))
-        .send({
-          from: userB.address.toHex()
-        })
 
-      await hoprToken.methods
+      await hoprToken
+        .connect(userA.address.toHex())
         .send(
           hoprChannels.options.address,
           1,
           abiCoder.encode(['bool', 'address', 'address'], [true, userA.address.toHex(), userB.address.toHex()])
         )
-        .send({
-          from: userA.address.toHex(),
-          gas: 300e3
-        })
 
       const channels = await connector.indexer.getChannels()
       assert.equal(channels.length, 0, 'check Channels.store')
@@ -136,22 +131,20 @@ describe('test indexer', function () {
       this.timeout(durations.seconds(5))
       const uncompressedPubKeyC = publicKeyConvert(userC.pubKey.serialize(), false).slice(1)
 
-      await connector.hoprChannels.methods
+      await connector.hoprChannels
+        .connect(userC.address.toHex())
         .initializeAccount(u8aToHex(uncompressedPubKeyC), u8aToHex(randomBytes(Hash.SIZE)))
-        .send({
-          from: userC.address.toHex()
-        })
 
-      await hoprToken.methods
+      await hoprToken
+        .connect(userA.address.toHex())
         .send(
           hoprChannels.options.address,
           1,
-          abiCoder.encode(['bool', 'address', 'address'], [true, userA.address.toHex(), userC.address.toHex()])
+          abiCoder.encode(['bool', 'address', 'address'], [true, userA.address.toHex(), userC.address.toHex()]),
+          {
+            gasLimit: 300e3
+          }
         )
-        .send({
-          from: userA.address.toHex(),
-          gas: 300e3
-        })
 
       const currentBlockNumber = await provider.getBlockNumber()
       await advanceBlockTo(provider, currentBlockNumber + configs.MAX_CONFIRMATIONS)
@@ -164,14 +157,12 @@ describe('test indexer', function () {
     })
 
     it('should not delete channel before confirmations', async function () {
-      await hoprChannels.methods.initiateChannelClosure(userB.address.toHex()).send({
-        from: userA.address.toHex(),
-        gas: 300e3
+      await hoprChannels.connect(userA.privKey.toHex()).initiateChannelClosure(userB.address.toHex(), {
+        gasLimit: 300e3
       })
       await increaseTime(provider, Math.floor(CLOSURE_DURATION / 1e3))
-      await hoprChannels.methods.finalizeChannelClosure(userB.address.toHex()).send({
-        from: userA.address.toHex(),
-        gas: 300e3
+      await hoprChannels.connect(userA.privKey.toHex()).finalizeChannelClosure(userB.address.toHex(), {
+        gasLimit: 300e3
       })
       const channels = await connector.indexer.getChannels()
       assert.equal(channels.length, 2, 'check Channels.store')
@@ -197,22 +188,20 @@ describe('test indexer', function () {
       assert(connector.indexer.status === 'stopped', 'could not stop indexer')
       const uncompressedPubKeyD = publicKeyConvert(userD.pubKey.serialize(), false).slice(1)
 
-      await connector.hoprChannels.methods
+      await connector.hoprChannels
+        .connect(userD.address.toHex())
         .initializeAccount(u8aToHex(uncompressedPubKeyD), u8aToHex(randomBytes(Hash.SIZE)))
-        .send({
-          from: userD.address.toHex()
-        })
 
-      await hoprToken.methods
+      await hoprToken
+        .connect(userA.address.toHex())
         .send(
           hoprChannels.options.address,
           1,
-          abiCoder.encode(['bool', 'address', 'address'], [true, userA.address.toHex(), userD.address.toHex()])
+          abiCoder.encode(['bool', 'address', 'address'], [true, userA.address.toHex(), userD.address.toHex()]),
+          {
+            gasLimit: 300e3
+          }
         )
-        .send({
-          from: userA.address.toHex(),
-          gas: 300e3
-        })
 
       const channels = await connector.indexer.getChannels()
       assert.equal(channels.length, 2, 'check Channels.store')

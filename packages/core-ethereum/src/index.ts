@@ -137,8 +137,8 @@ export default class HoprEthereum {
     if (currency === 'NATIVE') {
       const transaction = await this.account.wallet.sendTransaction({
         to: recipient,
-        value: amount,
-        nonce: (await this.account.getNonceLock()).nextNonce
+        value: ethers.BigNumber.from(amount),
+        nonce: ethers.BigNumber.from((await this.account.getNonceLock()).nextNonce)
       })
       return transaction.hash
     } else {

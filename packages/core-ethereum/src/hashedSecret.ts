@@ -27,9 +27,9 @@ class HashedSecret {
    * @returns a deterministic secret that is used in debug mode
    */
   private async getDebugAccountSecret(): Promise<Hash> {
-    const account = await this.channels.methods.accounts(this.account.address.toHex()).call()
+    const account = await this.channels.accounts(this.account.address.toHex())
     return new Hash(
-      await hashFunction(u8aConcat(new Uint8Array([parseInt(account.counter)]), this.account.publicKey.serialize()))
+      await hashFunction(u8aConcat(new Uint8Array([account.counter.toNumber()]), this.account.publicKey.serialize()))
     )
   }
 
@@ -49,7 +49,7 @@ class HashedSecret {
   private async storeSecretOnChain(secret: Hash): Promise<void> {
     log(`storing secret on chain, setting secret to ${secret.toHex()}`)
     const address = this.account.address.toHex()
-    const account = await this.channels.methods.accounts(address).call()
+    const account = await this.channels.accounts(address)
     // has no secret stored onchain
     if (Number(account.counter) === 0) {
       log('account is also null, calling channel.init')

@@ -44,7 +44,7 @@ describe('test hashedSecret', function () {
       await connector.hashedSecret.initialize()
 
       let onChainHash = new Hash(
-        stringToU8a((await connector.hoprChannels.methods.accounts(connector.account.address.toHex()).call()).secret)
+        stringToU8a((await connector.hoprChannels.accounts(connector.account.address.toHex())).secret)
       )
 
       let preImage = await connector.hashedSecret.findPreImage(onChainHash)
@@ -57,7 +57,7 @@ describe('test hashedSecret', function () {
       ).wait()
 
       let updatedOnChainHash = new Hash(
-        stringToU8a((await connector.hoprChannels.methods.accounts(connector.account.address.toHex()).call()).secret)
+        stringToU8a((await connector.hoprChannels.accounts(connector.account.address.toHex())).secret)
       )
 
       assert(!onChainHash.eq(updatedOnChainHash), `new and old onChainSecret must not be the same`)
@@ -91,7 +91,7 @@ describe('test hashedSecret', function () {
       await connector.hashedSecret.initialize()
 
       let onChainHash = new Hash(
-        stringToU8a((await connector.hoprChannels.methods.accounts(connector.account.address.toHex()).call()).secret)
+        stringToU8a((await connector.hoprChannels.accounts(connector.account.address.toHex())).secret)
       )
 
       let preImage = await connector.hashedSecret.findPreImage(onChainHash)
@@ -103,7 +103,7 @@ describe('test hashedSecret', function () {
       ).wait()
 
       let updatedOnChainHash = new Hash(
-        stringToU8a((await connector.hoprChannels.methods.accounts(connector.account.address.toHex()).call()).secret)
+        stringToU8a((await connector.hoprChannels.accounts(connector.account.address.toHex())).secret)
       )
 
       assert(!onChainHash.eq(updatedOnChainHash), `new and old onChainSecret must not be the same`)
