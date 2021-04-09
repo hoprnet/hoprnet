@@ -19,7 +19,7 @@ export type Account = {
  */
 export async function getPrivKeyData(privKey: Uint8Array): Promise<Account> {
   const pubKey = PublicKey.fromPrivKey(privKey)
-  const address = await pubKey.toAddress()
+  const address = pubKey.toAddress()
 
   return {
     privKey: new Hash(privKey),
@@ -36,7 +36,7 @@ export async function getPrivKeyData(privKey: Uint8Array): Promise<Account> {
  * @param account object
  */
 export async function fundAccount(
-  provider: IProviders.WebSocketProvider,
+  provider: IProviders.JsonRpcProvider,
   hoprToken: HoprToken,
   funder: Account,
   account: Account
@@ -73,7 +73,7 @@ export async function createAccount() {
  * @returns CoreConnector
  */
 export async function createAccountAndFund(
-  provider: providers.WebSocketProvider,
+  provider: providers.JsonRpcProvider,
   hoprToken: HoprToken,
   funder: Account,
   account?: string | Uint8Array | Account
@@ -120,12 +120,12 @@ export async function createNode(
 //   }
 // }
 
-export const advanceBlock = async (provider: IProviders.WebSocketProvider) => {
+export const advanceBlock = async (provider: IProviders.JsonRpcProvider) => {
   return provider.send('evm_mine', [])
 }
 
 // increases ganache time by the passed duration in seconds
-export const increaseTime = async (provider: IProviders.WebSocketProvider, _duration: BigNumberish) => {
+export const increaseTime = async (provider: IProviders.JsonRpcProvider, _duration: BigNumberish) => {
   const duration = ethers.BigNumber.from(_duration)
 
   if (duration.isNegative()) throw Error(`Cannot increase time by a negative amount (${duration})`)
@@ -133,4 +133,19 @@ export const increaseTime = async (provider: IProviders.WebSocketProvider, _dura
   await provider.send('evm_increaseTime', [duration.toNumber()])
 
   await advanceBlock(provider)
+}
+
+export const advanceBlockTo = async (provider: IProviders.JsonRpcProvider, _target: BigNumberish) => {
+  const target = ethers.BigNumber.from(_target)
+
+  const currentBlock = await provider.getBlockNumber()
+  const start = Date.now()
+  let notified
+  if (target.lt(currentBlock)) throw Error(`Target block #(${target}) is lower than current block #(${currentBlock})`)
+  while (ethers.BigNumber.from(await provider.getBlockNumber()).lt(target)) {
+    if (!notified && Date.now() - start >= 5000) {
+      notified = true
+    }
+    await advanceBlock(provider)
+  }
 }

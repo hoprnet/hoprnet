@@ -1,4 +1,3 @@
-import type { Subscription } from 'web3-core-subscriptions'
 import type PeerId from 'peer-id'
 import type { Indexer as IIndexer, RoutingChannel } from '@hoprnet/hopr-core-connector-interface'
 import type HoprEthereum from '..'
@@ -31,8 +30,6 @@ let genesisBlock: number
 class Indexer extends EventEmitter implements IIndexer {
   public status: 'started' | 'restarting' | 'stopped' = 'stopped'
   public latestBlock: number = 0 // latest known on-chain block number
-  private newBlocksSubscription: Subscription<any>
-  private newHoprChannelsEvents: ContractEventEmitter<any>
   private unconfirmedEvents = new Heap<Event<any>>(snapshotComparator)
 
   constructor(private connector: HoprEthereum, private maxConfirmations: number) {
@@ -47,14 +44,14 @@ class Indexer extends EventEmitter implements IIndexer {
     if (this.status === 'started') return
     log(`Starting indexer...`)
 
-    const { web3, hoprChannels } = this.connector
+    const { provider, hoprChannels } = this.connector
 
     // wipe indexer, do not use in production
     // await this.wipe()
 
     const [latestSavedBlock, latestOnChainBlock] = await Promise.all([
       await db.getLatestBlockNumber(this.connector.db),
-      web3.eth.getBlockNumber()
+      provider.getBlockNumber()
     ])
     this.latestBlock = latestOnChainBlock
 
@@ -83,27 +80,24 @@ class Indexer extends EventEmitter implements IIndexer {
 
     log('Subscribing to events from block %d', fromBlock)
 
-    // subscribe to events
-    this.newBlocksSubscription = web3.eth
-      .subscribe('newBlockHeaders')
-      .on('error', (error) => {
-        log(chalk.red(`web3 error: ${error.message}`))
-        this.restart()
+    // subscribe to new blocks
+    provider
+      .on('block', (blockNumber: number) => {
+        this.onNewBlock({ number: blockNumber })
       })
-      .on('data', (block) => {
-        log('New block %d', block.number)
-        this.onNewBlock(block)
+      .on('error', (error: any) => {
+        log(chalk.red(`etherjs error: ${error}`))
+        this.restart()
       })
 
-    this.newHoprChannelsEvents = hoprChannels.events
-      .allEvents({
-        fromBlock
+    hoprChannels
+      .on('*', (event: Event<any>) => {
+        this.onNewEvents([event])
       })
-      .on('error', (error) => {
-        log(chalk.red(`web3 error: ${error.message}`))
+      .on('error', (error: any) => {
+        log(chalk.red(`etherjs error: ${error}`))
         this.restart()
       })
-      .on('data', (event: Event<any>) => this.onNewEvents([event]))
 
     this.status = 'started'
     log(chalk.green('Indexer started!'))
@@ -116,8 +110,9 @@ class Indexer extends EventEmitter implements IIndexer {
     if (this.status === 'stopped') return
     log(`Stopping indexer...`)
 
-    await this.newBlocksSubscription.unsubscribe()
-    this.newHoprChannelsEvents.removeAllListeners()
+    // TODO: improve
+    this.connector.provider.removeAllListeners()
+    this.connector.hoprChannels.removeAllListeners()
 
     this.status = 'stopped'
     log(chalk.green('Indexer stopped!'))
@@ -196,13 +191,8 @@ class Indexer extends EventEmitter implements IIndexer {
       let events: Event<any>[] = []
 
       try {
-        const x = await this.connector.hoprChannels.queryFilter(
-          this.connector.hoprChannels.filters.AccountInitialized('', null, null),
-          fromBlock,
-          toBlock
-        )
-
-        // events = await this.connector.hoprChannels.queryFilter(this.connector.hoprChannels.filters.AccountInitialized(), fromBlock, toBlock)
+        // TODO: wildcard is supported but not properly typed
+        events = await this.connector.hoprChannels.queryFilter('*' as any, fromBlock, toBlock)
       } catch (error) {
         failedCount++
 
@@ -311,14 +301,14 @@ class Indexer extends EventEmitter implements IIndexer {
 
   // on new events
   private async onAccountInitialized(event: Event<'AccountInitialized'>): Promise<void> {
-    const accountId = Address.fromString(event.returnValues.account)
+    const accountId = Address.fromString(event.args.account)
     const account = await reducers.onAccountInitialized(event)
 
     await db.updateAccount(this.connector.db, accountId, account)
   }
 
   private async onAccountSecretUpdated(event: Event<'AccountSecretUpdated'>): Promise<void> {
-    const data = event
+    const data = event.args
 
     const accountId = Address.fromString(data.account)
 
@@ -331,7 +321,7 @@ class Indexer extends EventEmitter implements IIndexer {
   }
 
   private async onChannelFunded(event: Event<'ChannelFunded'>): Promise<void> {
-    const data = event.returnValues
+    const data = event.args
 
     const accountIdA = Address.fromString(data.accountA)
     const accountIdB = Address.fromString(data.accountB)
@@ -349,7 +339,7 @@ class Indexer extends EventEmitter implements IIndexer {
   }
 
   private async onChannelOpened(event: Event<'ChannelOpened'>): Promise<void> {
-    const data = event.returnValues
+    const data = event.args
 
     const openerAccountId = Address.fromString(data.opener)
     const counterpartyAccountId = Address.fromString(data.counterparty)
@@ -369,7 +359,7 @@ class Indexer extends EventEmitter implements IIndexer {
   }
 
   private async onTicketRedeemed(event: Event<'TicketRedeemed'>): Promise<void> {
-    const data = event.returnValues
+    const data = event.args
 
     const redeemerAccountId = Address.fromString(data.redeemer)
     const counterpartyAccountId = Address.fromString(data.counterparty)
@@ -387,7 +377,7 @@ class Indexer extends EventEmitter implements IIndexer {
   }
 
   private async onChannelPendingToClose(event: Event<'ChannelPendingToClose'>): Promise<void> {
-    const data = event.returnValues
+    const data = event.args
 
     const initiatorAccountId = Address.fromString(data.initiator)
     const counterpartyAccountId = Address.fromString(data.counterparty)
@@ -409,7 +399,7 @@ class Indexer extends EventEmitter implements IIndexer {
   }
 
   private async onChannelClosed(event: Event<'ChannelClosed'>): Promise<void> {
-    const data = event.returnValues
+    const data = event.args
 
     const closerAccountId = Address.fromString(data.initiator)
     const counterpartyAccountId = Address.fromString(data.counterparty)

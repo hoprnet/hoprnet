@@ -52,17 +52,10 @@ describe('test hashedSecret', function () {
       assert(preImage)
       assert(preImage.hash().eq(onChainHash))
 
-      await waitForConfirmation(
-        (
-          await connector.account.signTransaction(
-            {
-              from: connector.account.address.toHex(),
-              to: connector.hoprChannels.options.address
-            },
-            connector.hoprChannels.methods.updateAccountSecret(preImage.toHex())
-          )
-        ).send()
-      )
+      await (
+        await connector.account.sendTransaction(connector.hoprChannels.updateAccountSecret, preImage.toHex())
+      ).wait()
+
       let updatedOnChainHash = new Types.Hash(
         stringToU8a((await connector.hoprChannels.methods.accounts(connector.account.address.toHex()).call()).secret)
       )
@@ -104,17 +97,10 @@ describe('test hashedSecret', function () {
       let preImage = await connector.hashedSecret.findPreImage(onChainHash)
 
       assert(preImage.hash().eq(onChainHash))
-      await waitForConfirmation(
-        (
-          await connector.account.signTransaction(
-            {
-              from: connector.account.address.toHex(),
-              to: connector.hoprChannels.options.address
-            },
-            connector.hoprChannels.methods.updateAccountSecret(preImage.toHex())
-          )
-        ).send()
-      )
+
+      await (
+        await connector.account.sendTransaction(connector.hoprChannels.updateAccountSecret, preImage.toHex())
+      ).wait()
 
       let updatedOnChainHash = new Types.Hash(
         stringToU8a((await connector.hoprChannels.methods.accounts(connector.account.address.toHex()).call()).secret)

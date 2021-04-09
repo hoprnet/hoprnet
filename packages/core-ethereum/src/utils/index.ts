@@ -1,10 +1,8 @@
 import { Networks, networks } from '@hoprnet/hopr-ethereum'
 import { ecdsaSign, ecdsaRecover, ecdsaVerify } from 'secp256k1'
-import { providers as IProviders } from 'ethers'
 import { u8aCompare, u8aConcat, u8aEquals, A_STRICLY_LESS_THAN_B, A_EQUALS_B, u8aToNumber } from '@hoprnet/hopr-utils'
 import { Address, Hash, Signature } from '../types'
 import * as constants from '../constants'
-import { increaseTime } from './testing'
 import BN from 'bn.js'
 
 /**

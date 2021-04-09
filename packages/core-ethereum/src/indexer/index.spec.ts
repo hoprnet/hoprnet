@@ -1,22 +1,21 @@
 import type CoreConnector from '..'
 import assert from 'assert'
-import Web3 from 'web3'
 import { Ganache } from '@hoprnet/hopr-testing'
-import { migrate, fund, getAddresses, abis } from '@hoprnet/hopr-ethereum'
+import { migrate, fund, getAddresses } from '@hoprnet/hopr-ethereum'
 import { durations, u8aToHex, u8aEquals } from '@hoprnet/hopr-utils'
 import { stringToU8a } from '@hoprnet/hopr-utils'
 import * as testconfigs from '../config.spec'
 import * as configs from '../config'
-import { time, getId } from '../utils'
+import { getId } from '../utils'
 import { Account, getPrivKeyData, createAccountAndFund, createNode } from '../utils/testing'
-import { HoprToken } from '../tsc/web3/HoprToken'
-import { HoprChannels } from '../tsc/web3/HoprChannels'
 import { publicKeyConvert } from 'secp256k1'
 import { randomBytes } from 'crypto'
 import { Hash } from '../types'
+import { advanceBlockTo, increaseTime } from '../utils/testing'
+import { ethers, providers } from 'ethers'
+import { HoprToken__factory, HoprToken, HoprChannels__factory, HoprChannels } from '../contracts'
 
-const HoprTokenAbi = abis.HoprToken
-const HoprChannelsAbi = abis.HoprChannels
+const abiCoder = new ethers.utils.AbiCoder()
 const CLOSURE_DURATION = durations.days(3)
 
 // @TODO: remove legacy tests
@@ -25,7 +24,7 @@ describe('test indexer', function () {
   this.timeout(durations.minutes(5))
 
   const ganache = new Ganache()
-  let web3: Web3
+  let provider: providers.JsonRpcProvider
   let hoprToken: HoprToken
   let hoprChannels: HoprChannels
   let connector: CoreConnector
@@ -41,17 +40,17 @@ describe('test indexer', function () {
     await migrate()
     await fund(`--address ${getAddresses()?.localhost?.HoprToken} --accounts-to-fund 4`)
 
-    web3 = new Web3(configs.DEFAULT_URI)
-    hoprToken = new web3.eth.Contract(HoprTokenAbi as any, getAddresses()?.localhost?.HoprToken)
-    hoprChannels = new web3.eth.Contract(HoprChannelsAbi as any, getAddresses()?.localhost?.HoprChannels)
+    provider = new providers.JsonRpcProvider(configs.DEFAULT_URI)
+    hoprToken = HoprToken__factory.connect(getAddresses().localhost?.HoprToken, provider)
+    hoprChannels = HoprChannels__factory.connect(getAddresses().localhost?.HoprChannels, provider)
 
     userA = await getPrivKeyData(stringToU8a(testconfigs.FUND_ACCOUNT_PRIVATE_KEY))
     // userA < userB
-    userB = await createAccountAndFund(web3, hoprToken, userA, testconfigs.DEMO_ACCOUNTS[1])
+    userB = await createAccountAndFund(provider, hoprToken, userA, testconfigs.DEMO_ACCOUNTS[1])
     // userC < userA
-    userC = await createAccountAndFund(web3, hoprToken, userA, testconfigs.DEMO_ACCOUNTS[2])
+    userC = await createAccountAndFund(provider, hoprToken, userA, testconfigs.DEMO_ACCOUNTS[2])
     //
-    userD = await createAccountAndFund(web3, hoprToken, userA, testconfigs.DEMO_ACCOUNTS[3])
+    userD = await createAccountAndFund(provider, hoprToken, userA, testconfigs.DEMO_ACCOUNTS[3])
     connector = await createNode(userA.privKey.serialize(), undefined, 8)
 
     await connector.start()
@@ -80,10 +79,7 @@ describe('test indexer', function () {
         .send(
           hoprChannels.options.address,
           1,
-          web3.eth.abi.encodeParameters(
-            ['bool', 'address', 'address'],
-            [true, userA.address.toHex(), userB.address.toHex()]
-          )
+          abiCoder.encode(['bool', 'address', 'address'], [true, userA.address.toHex(), userB.address.toHex()])
         )
         .send({
           from: userA.address.toHex(),
@@ -95,8 +91,8 @@ describe('test indexer', function () {
     })
 
     it('should store channel & blockNumber correctly', async function () {
-      const currentBlockNumber = await web3.eth.getBlockNumber()
-      await time.advanceBlockTo(web3, currentBlockNumber + configs.MAX_CONFIRMATIONS)
+      const currentBlockNumber = await provider.getBlockNumber()
+      await advanceBlockTo(provider, currentBlockNumber + configs.MAX_CONFIRMATIONS)
       const channels = await connector.indexer.getChannels()
       assert.equal(channels.length, 1, 'check Channels.store')
     })
@@ -150,18 +146,15 @@ describe('test indexer', function () {
         .send(
           hoprChannels.options.address,
           1,
-          web3.eth.abi.encodeParameters(
-            ['bool', 'address', 'address'],
-            [true, userA.address.toHex(), userC.address.toHex()]
-          )
+          abiCoder.encode(['bool', 'address', 'address'], [true, userA.address.toHex(), userC.address.toHex()])
         )
         .send({
           from: userA.address.toHex(),
           gas: 300e3
         })
 
-      const currentBlockNumber = await web3.eth.getBlockNumber()
-      await time.advanceBlockTo(web3, currentBlockNumber + configs.MAX_CONFIRMATIONS)
+      const currentBlockNumber = await provider.getBlockNumber()
+      await advanceBlockTo(provider, currentBlockNumber + configs.MAX_CONFIRMATIONS)
       const channels = await connector.indexer.getChannels()
       assert.equal(channels.length, 2, 'check Channels.store')
       const channelsUsingPartyA = await connector.indexer.getChannelsOf(userA.address)
@@ -175,7 +168,7 @@ describe('test indexer', function () {
         from: userA.address.toHex(),
         gas: 300e3
       })
-      await time.increase(web3, Math.floor(CLOSURE_DURATION / 1e3))
+      await increaseTime(provider, Math.floor(CLOSURE_DURATION / 1e3))
       await hoprChannels.methods.finalizeChannelClosure(userB.address.toHex()).send({
         from: userA.address.toHex(),
         gas: 300e3
@@ -185,8 +178,8 @@ describe('test indexer', function () {
     })
 
     it('should "ZERO" channel', async function () {
-      const currentBlockNumber = await web3.eth.getBlockNumber()
-      await time.advanceBlockTo(web3, currentBlockNumber + configs.MAX_CONFIRMATIONS)
+      const currentBlockNumber = await provider.getBlockNumber()
+      await advanceBlockTo(provider, currentBlockNumber + configs.MAX_CONFIRMATIONS)
       const channels = await connector.indexer.getChannels()
       assert.equal(channels.length, 2, 'check Channels.store')
 
@@ -214,10 +207,7 @@ describe('test indexer', function () {
         .send(
           hoprChannels.options.address,
           1,
-          web3.eth.abi.encodeParameters(
-            ['bool', 'address', 'address'],
-            [true, userA.address.toHex(), userD.address.toHex()]
-          )
+          abiCoder.encode(['bool', 'address', 'address'], [true, userA.address.toHex(), userD.address.toHex()])
         )
         .send({
           from: userA.address.toHex(),
@@ -229,8 +219,8 @@ describe('test indexer', function () {
     })
 
     it('should not index new channel', async function () {
-      const currentBlockNumber = await web3.eth.getBlockNumber()
-      await time.advanceBlockTo(web3, currentBlockNumber + configs.MAX_CONFIRMATIONS)
+      const currentBlockNumber = await provider.getBlockNumber()
+      await advanceBlockTo(provider, currentBlockNumber + configs.MAX_CONFIRMATIONS)
       const channels = await connector.indexer.getChannels()
       assert.equal(channels.length, 2, 'check Channels.store')
     })

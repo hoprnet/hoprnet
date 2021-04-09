@@ -1,32 +1,28 @@
-import type { HoprToken } from './tsc/web3/HoprToken'
-import type { Await } from './tsc/utils'
 import type CoreConnector from '.'
 import { expect } from 'chai'
-import Web3 from 'web3'
 import sinon from 'sinon'
 import BN from 'bn.js'
 import { getBalance, getNativeBalance } from './account'
 import { Ganache } from '@hoprnet/hopr-testing'
-import { migrate, getAddresses, abis } from '@hoprnet/hopr-ethereum'
-import { stringToU8a, durations } from '@hoprnet/hopr-utils'
+import { migrate, getAddresses } from '@hoprnet/hopr-ethereum'
+import { stringToU8a, durations, PromiseValue } from '@hoprnet/hopr-utils'
 import { getPrivKeyData, createAccountAndFund, createNode } from './utils/testing'
 import * as testconfigs from './config.spec'
 import * as configs from './config'
 import { PROVIDER_CACHE_TTL } from './constants'
 import Sinon from 'sinon'
-
-const HoprTokenAbi = abis.HoprToken
-const HoprChannelsAbi = abis.HoprChannels
+import { ethers, providers } from 'ethers'
+import { HoprToken__factory, HoprToken } from './contracts'
 
 describe('test Account', function () {
   this.timeout(durations.minutes(5))
 
   const ganache = new Ganache()
-  let web3: Web3
+  let provider: providers.JsonRpcProvider
   let hoprToken: HoprToken
   let coreConnector: CoreConnector
-  let funder: Await<ReturnType<typeof getPrivKeyData>>
-  let user: Await<ReturnType<typeof getPrivKeyData>>
+  let funder: PromiseValue<ReturnType<typeof getPrivKeyData>>
+  let user: PromiseValue<ReturnType<typeof getPrivKeyData>>
 
   before(async function () {
     this.timeout(durations.minutes(1))
@@ -34,9 +30,8 @@ describe('test Account', function () {
     await ganache.start()
     await migrate()
 
-    web3 = new Web3(configs.DEFAULT_URI)
-    hoprToken = new web3.eth.Contract(HoprTokenAbi as any, getAddresses().localhost?.HoprToken)
-    new web3.eth.Contract(HoprChannelsAbi as any, getAddresses().localhost?.HoprChannels)
+    provider = new providers.JsonRpcProvider(configs.DEFAULT_URI)
+    hoprToken = HoprToken__factory.connect(getAddresses().localhost?.HoprToken, provider)
   })
 
   after(async function () {
@@ -46,7 +41,7 @@ describe('test Account', function () {
   beforeEach(async function () {
     this.timeout(durations.minutes(1))
     funder = await getPrivKeyData(stringToU8a(testconfigs.FUND_ACCOUNT_PRIVATE_KEY))
-    user = await createAccountAndFund(web3, hoprToken, funder, testconfigs.DEMO_ACCOUNTS[1])
+    user = await createAccountAndFund(provider, hoprToken, funder, testconfigs.DEMO_ACCOUNTS[1])
     coreConnector = await createNode(user.privKey.serialize(), false)
 
     // wait until it starts
@@ -67,11 +62,9 @@ describe('test getBalance', function () {
   }
   const createHoprTokenMock = (value: string): any => {
     return {
-      methods: {
-        balanceOf: () => ({
-          call: async () => value
-        })
-      }
+      balanceOf: () => ({
+        call: async () => ethers.BigNumber.from(value)
+      })
     }
   }
 
@@ -117,11 +110,9 @@ describe('test getNativeBalance', function () {
   const address: any = {
     toHex: sinon.stub('')
   }
-  const createWeb3 = (value: string): any => {
+  const createProvider = (value: string): any => {
     return {
-      eth: {
-        getBalance: async () => new BN(value)
-      }
+      getBalance: async () => new BN(value)
     }
   }
 
@@ -134,29 +125,29 @@ describe('test getNativeBalance', function () {
   })
 
   it('should get balance but nothing is cached', async function () {
-    const result = await getNativeBalance(createWeb3('10'), address, true)
+    const result = await getNativeBalance(createProvider('10'), address, true)
     expect(result.toBN().toString()).to.equal('10')
   })
 
   it('should get balance', async function () {
-    const result = await getNativeBalance(createWeb3('10'), address, false)
+    const result = await getNativeBalance(createProvider('10'), address, false)
     expect(result.toBN().toString()).to.equal('10')
   })
 
   it('should get cached balance', async function () {
-    const result = await getNativeBalance(createWeb3('20'), address, true)
+    const result = await getNativeBalance(createProvider('20'), address, true)
     expect(result.toBN().toString()).to.equal('10')
   })
 
   it('should not get cached balance', async function () {
-    const result = await getNativeBalance(createWeb3('20'), address, false)
+    const result = await getNativeBalance(createProvider('20'), address, false)
     expect(result.toBN().toString()).to.equal('20')
   })
 
   it('should reset cache', async function () {
     clock.tick(PROVIDER_CACHE_TTL + 1)
 
-    const result = await getNativeBalance(createWeb3('30'), address, true)
+    const result = await getNativeBalance(createProvider('30'), address, true)
     expect(result.toBN().toString()).to.equal('30')
   })
 })

@@ -2,34 +2,32 @@ import { randomBytes } from 'crypto'
 import { Ganache } from '@hoprnet/hopr-testing'
 import { migrate } from '@hoprnet/hopr-ethereum'
 import assert from 'assert'
-import { stringToU8a, u8aConcat, durations } from '@hoprnet/hopr-utils'
-import { getAddresses, abis } from '@hoprnet/hopr-ethereum'
+import { stringToU8a, u8aConcat, durations, PromiseValue } from '@hoprnet/hopr-utils'
+import { getAddresses } from '@hoprnet/hopr-ethereum'
 import { getPrivKeyData, createAccountAndFund, createNode, Account } from './utils/testing'
 import { createChallenge, isPartyA, hash } from './utils'
 import BN from 'bn.js'
-import Web3 from 'web3'
-import { HoprToken } from './tsc/web3/HoprToken'
-import { Await } from './tsc/utils'
 import { Balance, Ticket, Address } from './types'
 import CoreConnector from '.'
 import Channel from './channel'
 import * as testconfigs from './config.spec'
 import * as configs from './config'
+import { providers } from 'ethers'
+import { HoprToken__factory, HoprToken } from './contracts'
 
-const HoprTokenAbi = abis.HoprToken
 const DEFAULT_WIN_PROB = 1
 
 // @TODO: rewrite legacy tests
 describe('test Channel class', function () {
   const ganache = new Ganache()
 
-  let web3: Web3
+  let provider: providers.JsonRpcProvider
   let hoprToken: HoprToken
   let partyA: Account
   let partyB: Account
   let partyAConnector: CoreConnector
   let partyBConnector: CoreConnector
-  let funder: Await<ReturnType<typeof getPrivKeyData>>
+  let funder: PromiseValue<ReturnType<typeof getPrivKeyData>>
 
   async function getTicketData({
     counterparty,
@@ -58,8 +56,8 @@ describe('test Channel class', function () {
     await ganache.start()
     await migrate()
 
-    web3 = new Web3(configs.DEFAULT_URI)
-    hoprToken = new web3.eth.Contract(HoprTokenAbi as any, getAddresses()?.localhost?.HoprToken)
+    provider = new providers.JsonRpcProvider(configs.DEFAULT_URI)
+    hoprToken = HoprToken__factory.connect(getAddresses().localhost?.HoprToken, provider)
   })
 
   after(async function () {
@@ -70,8 +68,8 @@ describe('test Channel class', function () {
     this.timeout(durations.seconds(10))
 
     funder = await getPrivKeyData(stringToU8a(testconfigs.FUND_ACCOUNT_PRIVATE_KEY))
-    const userA = await createAccountAndFund(web3, hoprToken, funder, testconfigs.DEMO_ACCOUNTS[1])
-    const userB = await createAccountAndFund(web3, hoprToken, funder, testconfigs.DEMO_ACCOUNTS[2])
+    const userA = await createAccountAndFund(provider, hoprToken, funder, testconfigs.DEMO_ACCOUNTS[1])
+    const userB = await createAccountAndFund(provider, hoprToken, funder, testconfigs.DEMO_ACCOUNTS[2])
     ;[partyA, partyB] = isPartyA(userA.address, userB.address) ? [userA, userB] : [userB, userA]
 
     partyAConnector = await createNode(partyA.privKey.serialize())
