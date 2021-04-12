@@ -23,10 +23,10 @@ export function createRoutingInfo(
   path: PeerId[],
   secrets: Uint8Array[],
   additionalDataRelayer: Uint8Array[],
-  additionalDataLastHop: Uint8Array
+  additionalDataLastHop?: Uint8Array
 ): { routingInformation: Uint8Array; mac: Uint8Array } {
   const routingInfoLength = additionalDataRelayer[0].length + MAC_LENGTH + COMPRESSED_PUBLIC_KEY_LENGTH
-  const lastHopLength = additionalDataLastHop.length + END_PREFIX_LENGTH
+  const lastHopLength = (additionalDataLastHop?.length ?? 0) + END_PREFIX_LENGTH
 
   if (
     secrets.some((s) => s.length != SECRET_LENGTH) ||

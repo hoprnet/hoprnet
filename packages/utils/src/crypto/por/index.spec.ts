@@ -1,4 +1,4 @@
-import { createFirstChallenge, createPoR, preVerify, validateAcknowledgement } from '.'
+import { createFirstChallenge, createPoRString, preVerify, validateAcknowledgement } from '.'
 import { randomBytes } from 'crypto'
 import { SECRET_LENGTH, COMPRESSED_PUBLIC_KEY_LENGTH } from './constants'
 import { deriveAckKeyShare } from './keyDerivation'
@@ -15,10 +15,10 @@ describe('PoR - proof of relay', function () {
     const firstChallenge = createFirstChallenge(secrets)
 
     // To be included for first relayer
-    const firstPorString = createPoR(secrets)
+    const firstPorString = createPoRString(secrets)
 
     // To be included for second relayer
-    const secondPorString = createPoR(secrets.slice(1))
+    const secondPorString = createPoRString(secrets.slice(1))
 
     // Computation result of the first relayer before
     // receiving an acknowledgement from the second relayer

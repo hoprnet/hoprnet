@@ -63,7 +63,7 @@ export function createPacket(
   path: PeerId[],
   maxHops: number,
   additionalDataRelayer: Uint8Array[],
-  additionalDataLastHop: Uint8Array
+  additionalDataLastHop?: Uint8Array
 ): Uint8Array {
   if (msg.length > PAYLOAD_SIZE) {
     throw Error(`Invalid arguments. Messages greater than ${PAYLOAD_SIZE} are not yet supported`)

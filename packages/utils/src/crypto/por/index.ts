@@ -33,7 +33,7 @@ export function createFirstChallenge(secrets: Uint8Array[]) {
  * @returns the bitstring that is embedded next to the routing
  * information for each relayer
  */
-export function createPoR(secrets: Uint8Array[]) {
+export function createPoRString(secrets: Uint8Array[]) {
   if (secrets.length < 2 || secrets.some((s) => s.length != SECRET_LENGTH)) {
     throw Error(`Invalid arguments`)
   }
