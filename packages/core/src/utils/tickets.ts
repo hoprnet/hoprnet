@@ -2,7 +2,8 @@ import type PeerId from 'peer-id'
 import type Hopr from '..'
 import { u8aEquals } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
-import {
+import { LevelUp } from 'levelup'
+import HoprCoreEthereum, {
   PublicKey,
   Ticket,
   Channel,
@@ -11,6 +12,7 @@ import {
   UnacknowledgedTicket,
   getWinProbabilityAsFloat
 } from '@hoprnet/hopr-core-ethereum'
+import { UnAcknowledgedTickets, AcknowledgedTickets, AcknowledgedTicketsParse } from '../dbKeys'
 
 /**
  * Get all unacknowledged tickets
@@ -18,7 +20,7 @@ import {
  * @returns an array of all unacknowledged tickets
  */
 export async function getUnacknowledgedTickets(
-  node: Hopr,
+  db: LevelUp,
   filter?: {
     signer: Uint8Array
   }
@@ -26,11 +28,11 @@ export async function getUnacknowledgedTickets(
   const tickets: UnacknowledgedTicket[] = []
 
   return new Promise((resolve, reject) => {
-    node.db
+    db
       .createReadStream({
-        gte: Buffer.from(node._dbKeys.UnAcknowledgedTickets(new Uint8Array(0x00)))
+        gte: Buffer.from(UnAcknowledgedTickets(new Uint8Array(0x00)))
       })
-      .on('error', (err) => reject(err))
+      .on('error', (err: any) => reject(err))
       .on('data', async ({ value }: { value: Buffer }) => {
         if (value.buffer.byteLength !== UnacknowledgedTicket.SIZE()) return
 
@@ -52,19 +54,19 @@ export async function getUnacknowledgedTickets(
  * @param filter optionally filter by signer
  */
 export async function deleteUnacknowledgedTickets(
-  node: Hopr,
+  db: LevelUp,
   filter?: {
     signer: Uint8Array
   }
 ): Promise<void> {
-  const tickets = await getUnacknowledgedTickets(node, filter)
+  const tickets = await getUnacknowledgedTickets(db, filter)
 
-  await node.db.batch(
+  await db.batch(
     await Promise.all(
       tickets.map<any>(async (ticket) => {
         return {
           type: 'del',
-          key: Buffer.from(node._dbKeys.UnAcknowledgedTickets(ticket.ticket.challenge.serialize()))
+          key: Buffer.from(UnAcknowledgedTickets(ticket.ticket.challenge.serialize()))
         }
       })
     )
@@ -77,7 +79,7 @@ export async function deleteUnacknowledgedTickets(
  * @returns an array of all acknowledged tickets
  */
 export async function getAcknowledgements(
-  node: Hopr,
+  db: LevelUp,
   filter?: {
     signer: Uint8Array
   }
@@ -93,15 +95,15 @@ export async function getAcknowledgements(
   }[] = []
 
   return new Promise((resolve, reject) => {
-    node.db
+    db
       .createReadStream({
-        gte: Buffer.from(node._dbKeys.AcknowledgedTickets(new Uint8Array(0x00)))
+        gte: Buffer.from(AcknowledgedTickets(new Uint8Array(0x00)))
       })
       .on('error', (err) => reject(err))
       .on('data', async ({ key, value }: { key: Buffer; value: Buffer }) => {
         if (value.buffer.byteLength !== Acknowledgement.SIZE) return
 
-        const index = node._dbKeys.AcknowledgedTicketsParse(key)
+        const index = AcknowledgedTicketsParse(key)
         const ackTicket = Acknowledgement.deserialize(value)
 
         // if signer provided doesn't match our ticket's signer dont add it to the list
@@ -123,18 +125,18 @@ export async function getAcknowledgements(
  * @param filter optionally filter by signer
  */
 export async function deleteAcknowledgements(
-  node: Hopr,
+  db: LevelUp,
   filter?: {
     signer: Uint8Array
   }
 ): Promise<void> {
-  const acks = await getAcknowledgements(node, filter)
-  await node.db.batch(
+  const acks = await getAcknowledgements(db, filter)
+  await db.batch(
     await Promise.all(
       acks.map<any>(async (ack) => {
         return {
           type: 'del',
-          key: Buffer.from(node._dbKeys.AcknowledgedTickets((await ack.ackTicket.ticket).challenge.serialize()))
+          key: Buffer.from(AcknowledgedTickets((await ack.ackTicket.ticket).challenge.serialize()))
         }
       })
     )
@@ -146,8 +148,8 @@ export async function deleteAcknowledgements(
  * @param ackTicket Uint8Array
  * @param index Uint8Array
  */
-export async function updateAcknowledgement(node: Hopr, ackTicket: Acknowledgement, index: Uint8Array): Promise<void> {
-  await node.db.put(Buffer.from(node._dbKeys.AcknowledgedTickets(index)), Buffer.from(ackTicket.serialize()))
+export async function updateAcknowledgement(db: LevelUp, ackTicket: Acknowledgement, index: Uint8Array): Promise<void> {
+  await db.put(Buffer.from(AcknowledgedTickets(index)), Buffer.from(ackTicket.serialize()))
 }
 
 /**
@@ -194,12 +196,12 @@ export async function submitAcknowledgedTicket(
  * @returns an array of signed tickets
  */
 export async function getTickets(
-  node: Hopr,
+  db: LevelUp,
   filter?: {
     signer: Uint8Array
   }
 ): Promise<Ticket[]> {
-  return Promise.all([getUnacknowledgedTickets(node, filter), getAcknowledgements(node, filter)]).then(
+  return Promise.all([getUnacknowledgedTickets(db, filter), getAcknowledgements(db, filter)]).then(
     async ([unAcks, acks]) => {
       const unAckTickets = await Promise.all(unAcks.map((o) => o.ticket))
       const ackTickets = await Promise.all(acks.map((o) => o.ackTicket.ticket))
@@ -216,27 +218,30 @@ export async function getTickets(
  * @returns an array of signed tickets
  */
 export async function deleteTickets(
-  node: Hopr,
+  db: LevelUp,
   filter?: {
     signer: Uint8Array
   }
 ): Promise<void> {
-  await Promise.all([deleteUnacknowledgedTickets(node, filter), deleteAcknowledgements(node, filter)])
+  await Promise.all([deleteUnacknowledgedTickets(db, filter), deleteAcknowledgements(db, filter)])
 }
 
 /**
  * Validate unacknowledged tickets as we receive them
  */
 export async function validateUnacknowledgedTicket(
-  node: Hopr,
+  paymentChannels: HoprCoreEthereum,
+  id: PeerId,
+  nodeTicketAmount: string,
+  nodeTicketWinProb: number,
   senderPeerId: PeerId,
   ticket: Ticket,
   channel: Channel,
   getTickets: () => Promise<Ticket[]>
 ): Promise<void> {
-  const ethereum = node.paymentChannels
+  const ethereum = paymentChannels
   // self
-  const selfPubKey = new PublicKey(node.getId().pubKey.marshal())
+  const selfPubKey = new PublicKey(id.pubKey.marshal())
   const selfAddress = await selfPubKey.toAddress()
   // sender
   const senderB58 = senderPeerId.toB58String()
@@ -259,13 +264,13 @@ export async function validateUnacknowledgedTicket(
   }
 
   // ticket MUST have at least X amount
-  if (ticketAmount.lt(new BN(node.ticketAmount))) {
-    throw Error(`Ticket amount '${ticketAmount.toString()}' is lower than '${node.ticketAmount}'`)
+  if (ticketAmount.lt(new BN(nodeTicketAmount))) {
+    throw Error(`Ticket amount '${ticketAmount.toString()}' is lower than '${nodeTicketAmount}'`)
   }
 
   // ticket MUST have at least X winning probability
-  if (ticketWinProb < node.ticketWinProb) {
-    throw Error(`Ticket winning probability '${ticketWinProb}' is lower than '${node.ticketWinProb}'`)
+  if (ticketWinProb < nodeTicketWinProb) {
+    throw Error(`Ticket winning probability '${ticketWinProb}' is lower than '${nodeTicketWinProb}'`)
   }
 
   // channel MUST be open or pending to close
