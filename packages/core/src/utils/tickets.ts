@@ -320,4 +320,3 @@ export async function validateUnacknowledgedTicket(
     throw Error(`Payment channel does not have enough funds when you include unredeemed tickets`)
   }
 }
-
