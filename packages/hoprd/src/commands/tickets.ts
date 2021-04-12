@@ -2,6 +2,7 @@ import type Hopr from '@hoprnet/hopr-core'
 import { moveDecimalPoint } from '@hoprnet/hopr-utils'
 import { AbstractCommand } from './abstractCommand'
 import { countSignedTickets, toSignedTickets, styleValue } from './utils'
+import { Balance } from '@hoprnet/hopr-core-ethereum'
 
 export default class Tickets extends AbstractCommand {
   constructor(public node: Hopr) {
@@ -18,8 +19,6 @@ export default class Tickets extends AbstractCommand {
 
   public async execute(): Promise<string | void> {
     try {
-      const { Balance } = this.node.paymentChannels.types
-
       const results = await this.node.getAcknowledgedTickets()
 
       if (results.length === 0) {

@@ -1,8 +1,8 @@
-import type { Acknowledgement } from '@hoprnet/hopr-core-connector-interface'
 import type Hopr from '@hoprnet/hopr-core'
 import { moveDecimalPoint } from '@hoprnet/hopr-utils'
 import { countSignedTickets, styleValue, toSignedTickets } from './utils'
 import { AbstractCommand } from './abstractCommand'
+import { Balance, Acknowledgement } from '@hoprnet/hopr-core-ethereum'
 
 export default class RedeemTickets extends AbstractCommand {
   constructor(public node: Hopr) {
@@ -21,9 +21,6 @@ export default class RedeemTickets extends AbstractCommand {
    * @param query a ticket challange
    */
   public async execute(): Promise<string | void> {
-    const { paymentChannels } = this.node
-    const { Balance } = paymentChannels.types
-
     try {
       const results = await this.node.getAcknowledgedTickets()
       if (results.length === 0) {

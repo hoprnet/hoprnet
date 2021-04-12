@@ -2,9 +2,8 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "outDir": "lib",
-    "resolveJsonModule": true,
-    "types": ["./types"]
+    "resolveJsonModule": true
   },
-  "include": ["./hardhat.config.ts", "index.ts", "types", "test", "tasks", "chain", "deploy"],
-  "exclude": ["lib"]
+  "include": ["hardhat.config.ts", "index.ts", "test", "tasks", "chain", "deploy"],
+  "exclude": ["lib", "types"]
 }

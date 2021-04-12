@@ -1,19 +1,19 @@
 import type Hopr from '..'
 import PeerId from 'peer-id'
 
-import { PaymentInteractions } from './payments'
-import { PacketInteractions } from './packet'
 import { Heartbeat } from './network/heartbeat'
+import { PacketForwardInteraction } from './packet/forward'
+import { PacketAcknowledgementInteraction } from './packet/acknowledgement'
 
 class Interactions {
-  public payments: PaymentInteractions
   heartbeat: Heartbeat
-  public packet: PacketInteractions
+  acknowledgment: PacketAcknowledgementInteraction
+  forward: PacketForwardInteraction
 
   constructor(node: Hopr, heartbeat: (remotePeer: PeerId) => void) {
-    this.payments = new PaymentInteractions(node)
     this.heartbeat = new Heartbeat(node._libp2p, heartbeat)
-    this.packet = new PacketInteractions(node)
+    this.acknowledgment = new PacketAcknowledgementInteraction(node._libp2p, node.db, node.paymentChannels)
+    this.forward = new PacketForwardInteraction(node)
   }
 }
 

@@ -11,8 +11,7 @@ import Message from './message'
 import { LevelUp } from 'levelup'
 import Debug from 'debug'
 import Hopr from '../../'
-import { Hash, PublicKey, Ticket, Balance } from '@hoprnet/hopr-core-ethereum'
-import { UnacknowledgedTicket } from '../ticket'
+import { Hash, PublicKey, Ticket, Balance, UnacknowledgedTicket } from '@hoprnet/hopr-core-ethereum'
 
 const log = Debug('hopr-core:message:packet')
 const verbose = Debug('hopr-core:verbose:message:packet')
@@ -299,10 +298,7 @@ export class Packet extends Uint8Array {
       throw Error('Error preparing forward')
     }
 
-    const unacknowledged = new UnacknowledgedTicket(undefined, {
-      ticket: ticket,
-      secretA: new Hash(deriveTicketKey(this.header.derivedSecret))
-    })
+    const unacknowledged = new UnacknowledgedTicket(ticket, new Hash(deriveTicketKey(this.header.derivedSecret)))
 
     log(
       `Storing unacknowledged ticket. Expecting to receive a preImage for ${green(
@@ -311,7 +307,7 @@ export class Packet extends Uint8Array {
     )
     await this.node.db.put(
       Buffer.from(this.node._dbKeys.UnAcknowledgedTickets(this.header.hashedKeyHalf)),
-      Buffer.from(unacknowledged)
+      Buffer.from(unacknowledged.serialize())
     )
 
     // get new ticket amount

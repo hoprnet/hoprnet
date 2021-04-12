@@ -1,7 +1,6 @@
-import type { UINT256 as IUINT256 } from '@hoprnet/hopr-core-connector-interface'
 import BN from 'bn.js'
 
-class UINT256 implements IUINT256 {
+class UINT256 {
   constructor(private bn: BN) {}
 
   public toBN(): BN {

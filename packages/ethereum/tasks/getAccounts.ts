@@ -1,32 +1,31 @@
 import type { HardhatRuntimeEnvironment, RunSuperFunction } from 'hardhat/types'
 import { getAddresses } from '../chain'
-
-const HoprToken = artifacts.require('HoprToken')
+import { HoprToken__factory } from '../types'
 
 /**
  * Display unlocked accounts alongside with how much
  * ETH / HOPR they have.
  */
-async function main(_params, { network, web3 }: HardhatRuntimeEnvironment, _runSuper: RunSuperFunction<any>) {
+async function main(_params, { network, ethers }: HardhatRuntimeEnvironment, _runSuper: RunSuperFunction<any>) {
   const addresses = getAddresses()
   if (!addresses[network.name]) throw Error(`cannot find HoprToken address for network ${network.name}`)
-  const hoprToken = await HoprToken.at(addresses[network.name].HoprToken)
+  const hoprToken = HoprToken__factory.connect(addresses[network.name].HoprToken, ethers.provider)
 
   console.log('Running task "accounts" with config:', {
     network: network.name
   })
 
-  const accounts = await web3.eth.getAccounts()
+  const accounts = await ethers.getSigners()
   const nativeBalances = await Promise.all(
-    accounts.map(async (address) => {
-      const amount = await web3.eth.getBalance(address)
-      return web3.utils.fromWei(amount, 'ether')
+    accounts.map(async (account) => {
+      const amount = await account.getBalance()
+      return ethers.utils.formatEther(amount)
     })
   )
   const hoprBalances = await Promise.all(
-    accounts.map(async (address) => {
-      const amount = await hoprToken.balanceOf(address)
-      return web3.utils.fromWei(amount, 'ether')
+    accounts.map(async (account) => {
+      const amount = await hoprToken.balanceOf(account.address)
+      return ethers.utils.formatEther(amount)
     })
   )
 

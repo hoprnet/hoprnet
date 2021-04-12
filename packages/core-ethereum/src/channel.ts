@@ -1,4 +1,3 @@
-import type { Channel as IChannel } from '@hoprnet/hopr-core-connector-interface'
 import type Connector from '.'
 import BN from 'bn.js'
 import { PublicKey, Balance, Hash, UINT256, Ticket, Acknowledgement, ChannelEntry } from './types'
@@ -11,10 +10,11 @@ import {
   getSignatureParameters
 } from './utils'
 import Debug from 'debug'
+import type { SubmitTicketResponse } from '.'
 
 const log = Debug('hopr-core-ethereum:channel')
 
-class Channel implements IChannel {
+class Channel {
   constructor(
     private readonly connector: Connector, // TODO: replace with ethereum global context?
     private readonly self: PublicKey,
@@ -179,7 +179,7 @@ class Channel implements IChannel {
     )
   }
 
-  async submitTicket(ackTicket: Acknowledgement): ReturnType<IChannel['submitTicket']> {
+  async submitTicket(ackTicket: Acknowledgement): Promise<SubmitTicketResponse> {
     try {
       const ticket = ackTicket.ticket
 

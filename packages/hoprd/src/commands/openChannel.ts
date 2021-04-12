@@ -6,6 +6,7 @@ import chalk from 'chalk'
 import readline from 'readline'
 import { checkPeerIdInput, isBootstrapNode, styleValue } from './utils'
 import { AbstractCommand, AutoCompleteResult, GlobalState } from './abstractCommand'
+import { PublicKey, Balance } from '@hoprnet/hopr-core-ethereum'
 
 export abstract class OpenChannelBase extends AbstractCommand {
   constructor(public node: Hopr) {
@@ -37,7 +38,7 @@ export abstract class OpenChannelBase extends AbstractCommand {
     }
 
     const ethereum = this.node.paymentChannels
-    const selfPubKey = new ethereum.types.PublicKey(this.node.getId().pubKey.marshal())
+    const selfPubKey = new PublicKey(this.node.getId().pubKey.marshal())
     const self = await selfPubKey.toAddress()
 
     const peers = this.node.getConnectedPeers().filter((p) => !isBootstrapNode(this.node, p))
@@ -55,7 +56,7 @@ export abstract class OpenChannelBase extends AbstractCommand {
     // show only peers which we can see
     let availablePeers: string[] = []
     for (const peer of peers) {
-      const pubKey = new ethereum.types.PublicKey(peer.pubKey.marshal())
+      const pubKey = new PublicKey(peer.pubKey.marshal())
       const address = await pubKey.toAddress()
       const hasOpenChannel = channels.some((channel) => {
         return address.eq(channel.partyA) || address.eq(channel.partyB)
@@ -75,8 +76,6 @@ export abstract class OpenChannelBase extends AbstractCommand {
   }
 
   public async open(state: GlobalState, counterpartyStr: string, amountToFundStr: string): Promise<string> {
-    const { types } = this.node.paymentChannels
-
     let counterparty: PeerId
     try {
       counterparty = await checkPeerIdInput(counterpartyStr, state)
@@ -84,7 +83,7 @@ export abstract class OpenChannelBase extends AbstractCommand {
       return styleValue(err.message, 'failure')
     }
 
-    const amountToFund = new BN(moveDecimalPoint(amountToFundStr, types.Balance.DECIMALS))
+    const amountToFund = new BN(moveDecimalPoint(amountToFundStr, Balance.DECIMALS))
     await this.validateAmountToFund(amountToFund)
 
     const unsubscribe = startDelayedInterval(`Submitted transaction. Waiting for confirmation`)
@@ -122,12 +121,12 @@ export class OpenChannelFancy extends OpenChannelBase {
   }
 
   private async selectFundAmount(): Promise<string> {
-    const { types, account } = this.node.paymentChannels
+    const { account } = this.node.paymentChannels
     const myAvailableTokens = await account.getBalance(true)
-    const myAvailableTokensDisplay = moveDecimalPoint(myAvailableTokens.toString(), types.Balance.DECIMALS * -1)
+    const myAvailableTokensDisplay = moveDecimalPoint(myAvailableTokens.toString(), Balance.DECIMALS * -1)
 
-    const tokenQuestion = `How many ${types.Balance.SYMBOL} (${styleValue(`${myAvailableTokensDisplay}`, 'number')} ${
-      types.Balance.SYMBOL
+    const tokenQuestion = `How many ${Balance.SYMBOL} (${styleValue(`${myAvailableTokensDisplay}`, 'number')} ${
+      Balance.SYMBOL
     } available) shall get staked? : `
 
     const amountToFund = await new Promise<string>((resolve) => this.rl.question(tokenQuestion, resolve))

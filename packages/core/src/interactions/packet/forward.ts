@@ -70,7 +70,7 @@ class PacketForwardInteraction implements AbstractInteraction {
             receivedChallenge,
             node.getId()
           )
-          await node._interactions.packet.acknowledgment.interact(sender, ack)
+          await node._interactions.acknowledgment.interact(sender, ack)
         })
 
         if (node.getId().equals(target)) {

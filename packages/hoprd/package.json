@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hoprd",
-  "version": "1.71.0-next.34",
+  "version": "1.71.0-next.44",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -20,13 +20,14 @@
     "build": "yarn clean && tsc --project ./tsconfig.json && yarn buildAdmin && chmod u+x lib/*.js",
     "buildAdmin": "next build hopr-admin",
     "test": "node --trace-warnings --unhandled-rejections=strict ../../node_modules/.bin/mocha --reporter=tap --full-trace --exit",
+    "prebuild": "next telemetry disable",
     "prepublishOnly": "yarn build",
     "start": "node lib/index.js --admin --init --rest",
     "dev": "yarn build && NODE_ENV=development yarn start"
   },
   "dependencies": {
-    "@hoprnet/hopr-core": "1.71.0-next.34",
-    "@hoprnet/hopr-utils": "1.71.0-next.34",
+    "@hoprnet/hopr-core": "1.71.0-next.44",
+    "@hoprnet/hopr-utils": "1.71.0-next.44",
     "body-parser": "^1.19.0",
     "bs58": "^4.0.1",
     "jazzicon": "^1.5.0",
@@ -40,7 +41,6 @@
     "yargs": "^16.0.3"
   },
   "devDependencies": {
-    "@hoprnet/hopr-core-connector-interface": "1.71.0-next.34",
     "@types/bs58": "^4.0.1",
     "@types/debug": "^4.1.5",
     "@types/mocha": "^8.2.0",
