@@ -31,10 +31,18 @@ class PacketForwardInteraction {
 
   async handlePacket(msg: Uint8Array) {
     const arr = msg.slice()
-    const packet = new Packet(this.node._libp2p, this.node.paymentChannels, this.node.db, this.node.getId(), this.node.ticketAmount, this.node.ticketWinProb, {
-      bytes: arr.buffer,
-      offset: arr.byteOffset
-    })
+    const packet = new Packet(
+      this.node._libp2p,
+      this.node.paymentChannels,
+      this.node.db,
+      this.node.getId(),
+      this.node.ticketAmount,
+      this.node.ticketWinProb,
+      {
+        bytes: arr.buffer,
+        offset: arr.byteOffset
+      }
+    )
 
     this.mixer.push(packet)
   }
