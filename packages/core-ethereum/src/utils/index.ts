@@ -50,21 +50,12 @@ export function getParties(self: Address, counterparty: Address): [Address, Addr
  * @returns a promise resolved to Hash
  */
 export function getId(self: Address, counterparty: Address): Promise<Hash> {
-  return hash(
+  return Promise.resolve(Hash.create(
     Buffer.concat(
       getParties(self, counterparty).map((x) => x.serialize()),
       2 * constants.ADDRESS_LENGTH
     )
-  )
-}
-
-/**
- * Given a message, generate hash using keccak256.
- * @param msg the message to hash
- * @returns a promise resolved to Hash
- */
-export async function hash(msg: Uint8Array): Promise<Hash> {
-  return Hash.create(msg)
+  ))
 }
 
 /**
