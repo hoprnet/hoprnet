@@ -4,7 +4,8 @@ import { KEY_LENGTH } from '../packet/header/parameters'
 import { Challenge } from '../packet/challenge'
 import { Hash, Signature, PublicKey } from '@hoprnet/hopr-core-ethereum'
 import PeerId from 'peer-id'
-import { serializeToU8a, u8aSplit } from '@hoprnet/hopr-utils'
+import { serializeToU8a, u8aSplit, u8aToHex } from '@hoprnet/hopr-utils'
+import { UnAcknowledgedTickets } from '../../dbKeys'
 
 /**
  * This class encapsulates the message that is sent back to the relayer
@@ -33,6 +34,10 @@ class AcknowledgementMessage {
 
   getHashedKey(): Hash {
     return Hash.create(this.key)
+  }
+
+  getKey(): string {
+    return u8aToHex(UnAcknowledgedTickets(this.getHashedKey().serialize()))
   }
 
   get responseSigningParty(): Uint8Array {
