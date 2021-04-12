@@ -213,4 +213,3 @@ export async function deleteTickets(
 ): Promise<void> {
   await Promise.all([deleteUnacknowledgedTickets(db, filter), deleteAcknowledgements(db, filter)])
 }
-
