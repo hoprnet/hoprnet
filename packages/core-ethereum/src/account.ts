@@ -23,9 +23,6 @@ import BN from 'bn.js'
 import debug from 'debug'
 const log = debug('hopr-core-ethereum:account')
 
-// omits the last element in the list
-// type OmitLastElement<T extends any[]> = T extends [...infer I, infer _L] ? I : never
-
 export const EMPTY_HASHED_SECRET = new Hash(new Uint8Array(Hash.SIZE).fill(0x00))
 const cache = new Map<'balance' | 'nativeBalance', { value: string; updatedAt: number }>()
 
@@ -175,6 +172,7 @@ class Account {
         nonce
       })
       // send transaction to our ethereum provider
+      // TODO: better type this, make it less hacky
       transaction = await method(
         ...[
           ...rest,
