@@ -6,12 +6,12 @@ import { u8aConcat, u8aEquals, u8aToHex, pubKeyToPeerId } from '@hoprnet/hopr-ut
 import { getTickets, validateUnacknowledgedTicket, validateCreatedTicket } from '../../utils/tickets'
 import { Header, deriveTicketKey, deriveTicketKeyBlinding, deriveTagParameters, deriveTicketLastKey } from './header'
 import { Challenge } from './challenge'
-import { PacketTag } from '../../dbKeys'
+import { PacketTag, UnAcknowledgedTickets } from '../../dbKeys'
 import Message from './message'
 import { LevelUp } from 'levelup'
 import Debug from 'debug'
 import Hopr from '../../'
-import { Hash, PublicKey, Ticket, Balance, UnacknowledgedTicket } from '@hoprnet/hopr-core-ethereum'
+import HoprCoreEthereum, { Hash, PublicKey, Ticket, Balance, UnacknowledgedTicket } from '@hoprnet/hopr-core-ethereum'
 
 const log = Debug('hopr-core:message:packet')
 const verbose = Debug('hopr-core:verbose:message:packet')
@@ -27,12 +27,20 @@ export class Packet extends Uint8Array {
   private _challenge?: Challenge
   private _message?: Message
 
-  private node: Hopr
   private libp2p: LibP2P
+  private paymentChannels: HoprCoreEthereum
+  private db: LevelUp
+  private id: PeerId
+  private ticketAmount: string
+  private ticketWinProb: number
 
   constructor(
-    node: Hopr,
     libp2p: LibP2P,
+    paymentChannels: HoprCoreEthereum,
+    db: LevelUp,
+    id: PeerId,
+    ticketAmount: string,
+    ticketWinProb: number,
     arr?: {
       bytes: ArrayBuffer
       offset: number
@@ -61,9 +69,12 @@ export class Packet extends Uint8Array {
       this._challenge = struct.challenge
       this._message = struct.message
     }
-
-    this.node = node
     this.libp2p = libp2p
+    this.paymentChannels = paymentChannels
+    this.db = db
+    this.id = id
+    this.ticketAmount = ticketAmount
+    this.ticketWinProb = ticketWinProb
   }
 
   slice(begin: number = 0, end: number = Packet.SIZE()) {
@@ -146,10 +157,18 @@ export class Packet extends Uint8Array {
   static async create(node: Hopr, libp2p: LibP2P, msg: Uint8Array, path: PeerId[]): Promise<Packet> {
     const chain = node.paymentChannels
     const arr = new Uint8Array(Packet.SIZE()).fill(0x00)
-    const packet = new Packet(node, libp2p, {
-      bytes: arr.buffer,
-      offset: arr.byteOffset
-    })
+    const packet = new Packet(
+      libp2p,
+      node.paymentChannels,
+      node.db,
+      node.getId(),
+      node.ticketAmount,
+      node.ticketWinProb,
+      {
+        bytes: arr.buffer,
+        offset: arr.byteOffset
+      }
+    )
 
     const { header, secrets } = await Header.create(path, {
       bytes: packet.buffer,
@@ -215,10 +234,10 @@ export class Packet extends Uint8Array {
     receivedChallenge: Challenge
     ticketKey: Uint8Array
   }> {
-    const ethereum = this.node.paymentChannels
+    const ethereum = this.paymentChannels
     this.header.deriveSecret(this.libp2p.peerId.privKey.marshal())
 
-    if (await this.testAndSetTag(this.node.db)) {
+    if (await this.testAndSetTag(this.db)) {
       verbose('Error setting tag')
       throw Error('Error setting tag')
     }
@@ -241,10 +260,18 @@ export class Packet extends Uint8Array {
       const channel = new ethereum.channel(ethereum, senderPubKey, targetPubKey)
 
       try {
-        await validateUnacknowledgedTicket(this.node, sender, await this.ticket, channel, () =>
-          getTickets(this.node, {
-            signer: sender.pubKey.marshal()
-          })
+        await validateUnacknowledgedTicket(
+          this.paymentChannels,
+          this.id,
+          this.ticketAmount,
+          this.ticketWinProb,
+          sender,
+          await this.ticket,
+          channel,
+          () =>
+            getTickets(this.db, {
+              signer: sender.pubKey.marshal()
+            })
         )
       } catch (error) {
         verbose('Could not validate unacknowledged ticket', error.message)
@@ -286,9 +313,9 @@ export class Packet extends Uint8Array {
 
    */
   async prepareForward(_originalSender: PeerId, target: PeerId): Promise<void> {
-    const chain = this.node.paymentChannels
+    const chain = this.paymentChannels
     const ticket = await this.ticket
-    const sender = this.node.getId()
+    const sender = this.id
     const senderPubKey = new PublicKey(sender.pubKey.marshal())
     const targetPubKey = new PublicKey(target.pubKey.marshal())
     const challenge = u8aConcat(deriveTicketKey(this.header.derivedSecret), this.header.hashedKeyHalf)
@@ -305,18 +332,18 @@ export class Packet extends Uint8Array {
         u8aToHex(this.header.hashedKeyHalf)
       )} from ${blue(target.toB58String())}`
     )
-    await this.node.db.put(
-      Buffer.from(this.node._dbKeys.UnAcknowledgedTickets(this.header.hashedKeyHalf)),
+    await this.db.put(
+      Buffer.from(UnAcknowledgedTickets(this.header.hashedKeyHalf)),
       Buffer.from(unacknowledged.serialize())
     )
 
     // get new ticket amount
-    const fee = new Balance(ticket.amount.toBN().isub(new BN(this.node.ticketAmount)))
+    const fee = new Balance(ticket.amount.toBN().isub(new BN(this.ticketAmount)))
     const channel = new chain.channel(chain, senderPubKey, targetPubKey)
 
     if (fee.toBN().gtn(0)) {
       const balances = await channel.getBalances()
-      this._ticket = await channel.createTicket(fee, new Hash(this.header.encryptionKey), this.node.ticketWinProb)
+      this._ticket = await channel.createTicket(fee, new Hash(this.header.encryptionKey), this.ticketWinProb)
 
       await validateCreatedTicket({
         myBalance: balances.self.toBN(),

@@ -25,7 +25,7 @@ import Heartbeat from './network/heartbeat'
 import { findPath } from './path'
 
 import { addPubKey, getAcknowledgements, submitAcknowledgedTicket } from './utils'
-import { u8aToHex } from '@hoprnet/hopr-utils'
+import { u8aToHex, DialOpts } from '@hoprnet/hopr-utils'
 import { existsSync, mkdirSync } from 'fs'
 import getIdentity from './identity'
 
@@ -45,14 +45,20 @@ import HoprCoreEthereum, {
 } from '@hoprnet/hopr-core-ethereum'
 import BN from 'bn.js'
 
-import { Interactions } from './interactions'
 import * as DbKeys from './dbKeys'
 import EventEmitter from 'events'
 import path from 'path'
 import { ChannelStrategy, PassiveStrategy, PromiscuousStrategy } from './channel-strategy'
-
 import Debug from 'debug'
 import { Address } from 'libp2p/src/peer-store'
+import {
+  libp2pSendMessageAndExpectResponse,
+  libp2pSubscribe,
+  libp2pSendMessage,
+  LibP2PHandlerFunction
+} from '@hoprnet/hopr-utils'
+import { subscribeToAcknowledgements } from './interactions/packet/acknowledgement'
+import { PacketForwardInteraction } from './interactions/packet/forward'
 
 const log = Debug(`hopr-core`)
 const verbose = Debug('hopr-core:verbose')
@@ -101,7 +107,6 @@ const defaultDBPath = (id: string | number, isBootstrap: boolean): string => {
 
 class Hopr extends EventEmitter {
   // TODO make these actually private - Do not rely on any of these properties!
-  public _interactions: Interactions
   // Allows us to construct HOPR with falsy options
   public _debug: boolean
   public _dbKeys = DbKeys
@@ -118,6 +123,7 @@ class Hopr extends EventEmitter {
   private strategy: ChannelStrategy
   private networkPeers: NetworkPeers
   private heartbeat: Heartbeat
+  private forward: PacketForwardInteraction
 
   /**
    * @constructor
@@ -149,7 +155,6 @@ class Hopr extends EventEmitter {
     }
     this.bootstrapServers = options.bootstrapServers || []
     this.isBootstrapNode = options.bootstrapNode || false
-    this._interactions = new Interactions(this, (peer: PeerId) => this.networkPeers.register(peer))
 
     if (process.env.GCLOUD) {
       try {
@@ -196,11 +201,20 @@ class Hopr extends EventEmitter {
       [this.getId()].concat(this.bootstrapServers.map((bs) => PeerId.createFromB58String(bs.getPeerId())))
     )
 
-    this.heartbeat = new Heartbeat(
-      this.networkPeers,
-      this._interactions.heartbeat,
-      this._libp2p.hangUp.bind(this._libp2p)
+    const subscribe = (protocol: string, handler: LibP2PHandlerFunction, includeReply = false) =>
+      libp2pSubscribe(this._libp2p, protocol, handler, includeReply)
+    const sendMessageAndExpectResponse = (dest: PeerId, protocol: string, msg: Uint8Array, opts: DialOpts) =>
+      libp2pSendMessageAndExpectResponse(this._libp2p, dest, protocol, msg, opts)
+    const sendMessage = (dest: PeerId, protocol: string, msg: Uint8Array, opts: DialOpts) =>
+      libp2pSendMessage(this._libp2p, dest, protocol, msg, opts)
+    const hangup = this._libp2p.hangUp.bind(this._libp2p)
+
+    this.heartbeat = new Heartbeat(this.networkPeers, subscribe, sendMessageAndExpectResponse, hangup)
+
+    subscribeToAcknowledgements(subscribe, this.db, this.paymentChannels, (ack) =>
+      this.emit('message-acknowledged:' + ack.getKey())
     )
+    this.forward = new PacketForwardInteraction(this, subscribe, sendMessage)
 
     if (options.ticketAmount) this.ticketAmount = String(options.ticketAmount)
     if (options.ticketWinProb) this.ticketWinProb = options.ticketWinProb
@@ -459,12 +473,12 @@ class Hopr extends EventEmitter {
 
           await this.db.put(Buffer.from(unAcknowledgedDBKey), Buffer.from(''))
 
-          this._interactions.acknowledgment.once(u8aToHex(unAcknowledgedDBKey), () => {
+          this.once('message-acknowledged:' + u8aToHex(unAcknowledgedDBKey), () => {
             resolve()
           })
 
           try {
-            await this._interactions.forward.interact(path[0], packet)
+            await this.forward.interact(path[0], packet)
           } catch (err) {
             return reject(err)
           }
@@ -482,8 +496,6 @@ class Hopr extends EventEmitter {
 
   /**
    * Ping a node.
-   * @dev returns latency >= 0 or -1 if unreachable
-   *
    * @param destination PeerId of the node
    * @returns latency
    */
@@ -491,9 +503,14 @@ class Hopr extends EventEmitter {
     if (!PeerId.isPeerId(destination)) {
       throw Error(`Expecting a non-empty destination.`)
     }
-    let info = ''
-    let latency = await this._interactions.heartbeat.interact(destination)
-    return { latency, info }
+    let start = Date.now()
+    try {
+      await this.heartbeat.pingNode(destination)
+      return { latency: Date.now() - start, info: '' }
+    } catch (e) {
+      //TODO
+      return { latency: -1, info: 'error' }
+    }
   }
 
   public getConnectedPeers(): PeerId[] {
@@ -620,7 +637,7 @@ class Hopr extends EventEmitter {
   }
 
   public async getAcknowledgedTickets() {
-    return getAcknowledgements(this)
+    return getAcknowledgements(this.db)
   }
 
   public async submitAcknowledgedTicket(ackTicket: Acknowledgement, index: Uint8Array) {
