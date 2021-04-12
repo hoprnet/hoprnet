@@ -28,10 +28,9 @@ export async function getUnacknowledgedTickets(
   const tickets: UnacknowledgedTicket[] = []
 
   return new Promise((resolve, reject) => {
-    db
-      .createReadStream({
-        gte: Buffer.from(UnAcknowledgedTickets(new Uint8Array(0x00)))
-      })
+    db.createReadStream({
+      gte: Buffer.from(UnAcknowledgedTickets(new Uint8Array(0x00)))
+    })
       .on('error', (err: any) => reject(err))
       .on('data', async ({ value }: { value: Buffer }) => {
         if (value.buffer.byteLength !== UnacknowledgedTicket.SIZE()) return
@@ -95,10 +94,9 @@ export async function getAcknowledgements(
   }[] = []
 
   return new Promise((resolve, reject) => {
-    db
-      .createReadStream({
-        gte: Buffer.from(AcknowledgedTickets(new Uint8Array(0x00)))
-      })
+    db.createReadStream({
+      gte: Buffer.from(AcknowledgedTickets(new Uint8Array(0x00)))
+    })
       .on('error', (err) => reject(err))
       .on('data', async ({ key, value }: { key: Buffer; value: Buffer }) => {
         if (value.buffer.byteLength !== Acknowledgement.SIZE) return

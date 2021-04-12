@@ -157,10 +157,18 @@ export class Packet extends Uint8Array {
   static async create(node: Hopr, libp2p: LibP2P, msg: Uint8Array, path: PeerId[]): Promise<Packet> {
     const chain = node.paymentChannels
     const arr = new Uint8Array(Packet.SIZE()).fill(0x00)
-    const packet = new Packet(libp2p, node.paymentChannels, node.db, node.getId(), node.ticketAmount, node.ticketWinProb, {
-      bytes: arr.buffer,
-      offset: arr.byteOffset
-    })
+    const packet = new Packet(
+      libp2p,
+      node.paymentChannels,
+      node.db,
+      node.getId(),
+      node.ticketAmount,
+      node.ticketWinProb,
+      {
+        bytes: arr.buffer,
+        offset: arr.byteOffset
+      }
+    )
 
     const { header, secrets } = await Header.create(path, {
       bytes: packet.buffer,
@@ -257,10 +265,13 @@ export class Packet extends Uint8Array {
           this.id,
           this.ticketAmount,
           this.ticketWinProb,
-          sender, await this.ticket, channel, () =>
-          getTickets(this.db, {
-            signer: sender.pubKey.marshal()
-          })
+          sender,
+          await this.ticket,
+          channel,
+          () =>
+            getTickets(this.db, {
+              signer: sender.pubKey.marshal()
+            })
         )
       } catch (error) {
         verbose('Could not validate unacknowledged ticket', error.message)
