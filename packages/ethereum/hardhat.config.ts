@@ -132,16 +132,11 @@ task('fund', "Fund node's accounts by specifying HoprToken address", async (...a
   )
   .addOptionalParam<number>('accountsToFund', 'Amount of accounts to fund from demo seeds', 0, types.int)
 
-  task('faucet', "Faucets a local development HOPR node account with ETH and HOPR tokens", async (...args: any[]) => {
-    return (await import('./tasks/faucet')).default(args[0], args[1], args[2])
-  })
-    .addParam<string>('address', 'HoprToken address', undefined, types.string)
-    .addOptionalParam<string>(
-      'amount',
-      'Amount of HOPR to fund',
-      ethers.utils.parseEther('1').toString(),
-      types.string
-    )
+task('faucet', 'Faucets a local development HOPR node account with ETH and HOPR tokens', async (...args: any[]) => {
+  return (await import('./tasks/faucet')).default(args[0], args[1], args[2])
+})
+  .addParam<string>('address', 'HoprToken address', undefined, types.string)
+  .addOptionalParam<string>('amount', 'Amount of HOPR to fund', ethers.utils.parseEther('1').toString(), types.string)
 
 task('postCompile', 'Use export task and then update abis folder', async (...args: any[]) => {
   return (await import('./tasks/postCompile')).default(args[0], args[1], args[2])
