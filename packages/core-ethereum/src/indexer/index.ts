@@ -91,6 +91,7 @@ class Indexer extends EventEmitter {
         this.restart()
       })
 
+    // subscribe to all HoprChannels events
     hoprChannels
       .on('*', (event: Event<any>) => {
         this.onNewEvents([event])
@@ -115,6 +116,8 @@ class Indexer extends EventEmitter {
       this.connector.provider.removeAllListeners()
       this.connector.hoprChannels.removeAllListeners()
     } catch (err) {
+      // this error can be ignored
+      // tracked at https://github.com/ethers-io/ethers.js/issues/1458
       if (err.message.includes('invalid event - null')) return
       throw err
     }
