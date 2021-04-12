@@ -1,5 +1,4 @@
 import type { HoprToken } from './tsc/web3/HoprToken'
-import type { Await } from './tsc/utils'
 import type CoreConnector from '.'
 import { expect } from 'chai'
 import Web3 from 'web3'
@@ -25,8 +24,8 @@ describe('test Account', function () {
   let web3: Web3
   let hoprToken: HoprToken
   let coreConnector: CoreConnector
-  let funder: Await<ReturnType<typeof getPrivKeyData>>
-  let user: Await<ReturnType<typeof getPrivKeyData>>
+  let funder
+  let user 
 
   before(async function () {
     this.timeout(durations.minutes(1))

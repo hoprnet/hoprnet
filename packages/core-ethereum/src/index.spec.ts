@@ -6,7 +6,6 @@ import { NODE_SEEDS } from '@hoprnet/hopr-demo-seeds'
 import { migrate, fund, getAddresses, abis } from '@hoprnet/hopr-ethereum'
 import HoprEthereum from '.'
 import { HoprToken } from './tsc/web3/HoprToken'
-import { Await } from './tsc/utils'
 import { cleanupPromiEvent, waitForConfirmationUsingHash } from './utils'
 import { createNode, getPrivKeyData, createAccountAndFund } from './utils/testing.spec'
 import * as testconfigs from './config.spec'
@@ -19,7 +18,7 @@ describe('test connector', function () {
   this.timeout(durations.minutes(5))
 
   const ganache = new Ganache()
-  let owner: Await<ReturnType<typeof getPrivKeyData>>
+  let owner
   let web3: Web3
   let hoprToken: HoprToken
   let connector: HoprEthereum
@@ -105,8 +104,8 @@ describe('test withdraw', function () {
   let web3: Web3
   let hoprToken: HoprToken
   let connector: HoprEthereum
-  let alice: Await<ReturnType<typeof getPrivKeyData>>
-  let bob: Await<ReturnType<typeof getPrivKeyData>>
+  let alice 
+  let bob
 
   before(async function () {
     this.timeout(durations.minutes(1))

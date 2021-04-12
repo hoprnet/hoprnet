@@ -8,7 +8,6 @@ import { getPrivKeyData, createAccountAndFund, createNode, Account } from './uti
 import BN from 'bn.js'
 import Web3 from 'web3'
 import { HoprToken } from './tsc/web3/HoprToken'
-import { Await } from './tsc/utils'
 import { Balance, Ticket, Address, UnacknowledgedTicket, Hash } from './types'
 import CoreConnector from '.'
 import Channel from './channel'
@@ -28,7 +27,7 @@ describe('test Channel class', function () {
   let partyB: Account
   let partyAConnector: CoreConnector
   let partyBConnector: CoreConnector
-  let funder: Await<ReturnType<typeof getPrivKeyData>>
+  let funder
 
   async function getTicketData({
     counterparty,
