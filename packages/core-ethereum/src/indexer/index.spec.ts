@@ -15,8 +15,8 @@ import { randomBytes } from 'crypto'
 import { Channel } from '..'
 import { Hash } from '../types'
 
-const { arrayify } = ethers.utils
-const abiCoder = new ethers.utils.AbiCoder()
+const { arrayify, AbiCoder } = ethers.utils
+const abiCoder = new AbiCoder()
 const CLOSURE_DURATION = durations.days(3)
 
 // @TODO: remove legacy tests

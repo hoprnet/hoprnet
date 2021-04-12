@@ -118,8 +118,9 @@ class Indexer extends EventEmitter {
     } catch (err) {
       // this error can be ignored
       // tracked at https://github.com/ethers-io/ethers.js/issues/1458
-      if (err.message.includes('invalid event - null')) return
-      throw err
+      if (!err.message.includes('invalid event - null')) {
+        throw err
+      }
     }
 
     this.status = 'stopped'
