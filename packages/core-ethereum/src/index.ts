@@ -135,12 +135,19 @@ export default class HoprEthereum {
 
   async withdraw(currency: Currencies, recipient: string, amount: string): Promise<string> {
     if (currency === 'NATIVE') {
-      const transaction = await this.account.wallet.sendTransaction({
-        to: recipient,
-        value: ethers.BigNumber.from(amount),
-        nonce: ethers.BigNumber.from((await this.account.getNonceLock()).nextNonce)
-      })
-      return transaction.hash
+      const nonceLock = await this.account.getNonceLock()
+      try {
+        const transaction = await this.account.wallet.sendTransaction({
+          to: recipient,
+          value: ethers.BigNumber.from(amount),
+          nonce: ethers.BigNumber.from(nonceLock.nextNonce)
+        })
+        nonceLock.releaseLock()
+        return transaction.hash
+      } catch (err) {
+        nonceLock.releaseLock()
+        throw err
+      }
     } else {
       const transaction = await this.account.sendTransaction(this.hoprToken.transfer, recipient, amount)
       return transaction.hash

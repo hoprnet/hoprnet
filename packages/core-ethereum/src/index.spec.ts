@@ -1,21 +1,23 @@
 import assert from 'assert'
-import { stringToU8a, durations, PromiseValue } from '@hoprnet/hopr-utils'
+import { stringToU8a, durations } from '@hoprnet/hopr-utils'
 import { Ganache } from '@hoprnet/hopr-testing'
 import { NODE_SEEDS } from '@hoprnet/hopr-demo-seeds'
 import { migrate, fund, getAddresses } from '@hoprnet/hopr-ethereum'
 import { ethers } from 'ethers'
 import HoprEthereum from '.'
-import { createNode, getPrivKeyData } from './utils/testing'
+import { createNode } from './utils/testing'
 import * as testconfigs from './config.spec'
 import * as configs from './config'
 import { providers } from 'ethers'
 import { HoprToken__factory, HoprToken } from './contracts'
 
+const { arrayify } = ethers.utils
+
 describe('test connector', function () {
   this.timeout(durations.minutes(5))
 
   const ganache = new Ganache()
-  let owner: PromiseValue<ReturnType<typeof getPrivKeyData>>
+  let ownerWallet: ethers.Wallet
   let connector: HoprEthereum
 
   before(async function () {
@@ -25,8 +27,8 @@ describe('test connector', function () {
     await migrate()
     await fund(`--address ${getAddresses()?.localhost?.HoprToken} --accounts-to-fund 2`)
 
-    owner = await getPrivKeyData(stringToU8a(testconfigs.FUND_ACCOUNT_PRIVATE_KEY))
-    connector = await createNode(owner.privKey.serialize())
+    ownerWallet = new ethers.Wallet(testconfigs.FUND_ACCOUNT_PRIVATE_KEY)
+    connector = await createNode(arrayify(ownerWallet.privateKey))
 
     await connector.start()
   })
@@ -88,14 +90,14 @@ describe('test withdraw', function () {
 
   it('should withdraw 1 wei (ETH)', async function () {
     const txHash = await connector.withdraw('NATIVE', bob.address, '1')
-    await provider.waitForTransaction(txHash)
+    await provider.waitForTransaction(txHash, 1, 5e3)
 
     assert(txHash.length > 0, 'no transaction hash received')
   })
 
   it('should withdraw 1 wei (HOPR)', async function () {
     const txHash = await connector.withdraw('HOPR', bob.address, '1')
-    await provider.waitForTransaction(txHash)
+    await provider.waitForTransaction(txHash, 1, 5e3)
 
     assert(txHash.length > 0, 'no transaction hash received')
   })

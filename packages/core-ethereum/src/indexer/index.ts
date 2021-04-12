@@ -111,9 +111,13 @@ class Indexer extends EventEmitter {
     if (this.status === 'stopped') return
     log(`Stopping indexer...`)
 
-    // TODO: improve
-    this.connector.provider.removeAllListeners()
-    this.connector.hoprChannels.removeAllListeners()
+    try {
+      this.connector.provider.removeAllListeners()
+      this.connector.hoprChannels.removeAllListeners()
+    } catch (err) {
+      if (err.message.includes('invalid event - null')) return
+      throw err
+    }
 
     this.status = 'stopped'
     log(chalk.green('Indexer stopped!'))

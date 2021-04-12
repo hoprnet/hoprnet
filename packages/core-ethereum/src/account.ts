@@ -120,7 +120,7 @@ class Account {
   }
 
   get privateKey(): Uint8Array {
-    return ethers.utils.toUtf8Bytes(this.wallet.privateKey)
+    return ethers.utils.arrayify(this.wallet.privateKey)
   }
 
   get publicKey(): PublicKey {

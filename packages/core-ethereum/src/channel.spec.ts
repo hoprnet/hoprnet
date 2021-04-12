@@ -2,19 +2,20 @@ import { randomBytes } from 'crypto'
 import { Ganache } from '@hoprnet/hopr-testing'
 import { migrate } from '@hoprnet/hopr-ethereum'
 import assert from 'assert'
-import { stringToU8a, durations, PromiseValue } from '@hoprnet/hopr-utils'
+import { durations } from '@hoprnet/hopr-utils'
 import { getAddresses } from '@hoprnet/hopr-ethereum'
-import { getPrivKeyData, createAccountAndFund, createNode, Account } from './utils/testing'
-import { createChallenge, isPartyA } from './utils'
+import { createNode, fundAccount, advanceBlock } from './utils/testing'
+import { createChallenge } from './utils'
 import BN from 'bn.js'
-import { Balance, Ticket, Address, Hash, UnacknowledgedTicket } from './types'
+import { Balance, Ticket, Address, Hash, UnacknowledgedTicket, PublicKey } from './types'
 import CoreConnector from '.'
 import Channel from './channel'
 import * as testconfigs from './config.spec'
 import * as configs from './config'
-import { providers } from 'ethers'
+import { providers, ethers } from 'ethers'
 import { HoprToken__factory, HoprToken } from './contracts'
 
+const { arrayify } = ethers.utils
 const DEFAULT_WIN_PROB = 1
 
 // @TODO: rewrite legacy tests
@@ -23,11 +24,11 @@ describe('test Channel class', function () {
 
   let provider: providers.WebSocketProvider
   let hoprToken: HoprToken
-  let partyA: Account
-  let partyB: Account
+  let partyA: PublicKey
+  let partyB: PublicKey
   let partyAConnector: CoreConnector
   let partyBConnector: CoreConnector
-  let funder: PromiseValue<ReturnType<typeof getPrivKeyData>>
+  let funderWallet: ethers.Wallet
 
   async function getTicketData({
     counterparty,
@@ -66,16 +67,17 @@ describe('test Channel class', function () {
   beforeEach(async function () {
     this.timeout(durations.seconds(10))
 
-    funder = await getPrivKeyData(stringToU8a(testconfigs.FUND_ACCOUNT_PRIVATE_KEY))
-    const userA = await createAccountAndFund(provider, hoprToken, funder, testconfigs.DEMO_ACCOUNTS[1])
-    const userB = await createAccountAndFund(provider, hoprToken, funder, testconfigs.DEMO_ACCOUNTS[2])
-    ;[partyA, partyB] = isPartyA(userA.address, userB.address) ? [userA, userB] : [userB, userA]
+    funderWallet = new ethers.Wallet(testconfigs.FUND_ACCOUNT_PRIVATE_KEY).connect(provider)
+    partyA = PublicKey.fromPrivKey(arrayify(testconfigs.DEMO_ACCOUNTS[1]))
+    await fundAccount(funderWallet, hoprToken, partyA.toAddress().toHex())
+    partyB = PublicKey.fromPrivKey(arrayify(testconfigs.DEMO_ACCOUNTS[2]))
+    await fundAccount(funderWallet, hoprToken, partyB.toAddress().toHex())
 
-    partyAConnector = await createNode(partyA.privKey.serialize())
+    partyAConnector = await createNode(arrayify(testconfigs.DEMO_ACCOUNTS[1]))
     await partyAConnector.initOnchainValues()
     await partyAConnector.start()
 
-    partyBConnector = await createNode(partyB.privKey.serialize())
+    partyBConnector = await createNode(arrayify(testconfigs.DEMO_ACCOUNTS[2]))
     await partyBConnector.initOnchainValues()
     await partyBConnector.start()
   })
@@ -88,11 +90,13 @@ describe('test Channel class', function () {
     this.timeout(durations.minutes(1))
 
     const firstTicket = await getTicketData({
-      counterparty: partyA.address
+      counterparty: partyA.toAddress()
     })
 
-    const partyAChannel = new Channel(partyAConnector, partyA.pubKey, partyB.pubKey)
+    const partyAChannel = new Channel(partyAConnector, partyA, partyB)
     await partyAChannel.open(new Balance(new BN(123)))
+    await advanceBlock(provider)
+    await advanceBlock(provider)
 
     const signedTicket = await partyAChannel.createTicket(
       new Balance(new BN(1)),
@@ -102,15 +106,15 @@ describe('test Channel class', function () {
     const unacknowledgedTicket = new UnacknowledgedTicket(signedTicket, firstTicket.secretA)
     const firstAckedTicket = await partyBConnector.account.acknowledge(unacknowledgedTicket, firstTicket.secretB)
 
-    assert(partyA.pubKey.eq(signedTicket.getSigner()), `Check that signer is recoverable`)
+    assert(partyA.eq(signedTicket.getSigner()), `Check that signer is recoverable`)
 
     const partyAIndexerChannels = await partyAConnector.indexer.getChannels()
     assert(
-      partyAIndexerChannels[0].partyA.eq(partyA.address) && partyAIndexerChannels[0].partyB.eq(partyB.address),
+      partyAIndexerChannels[0].partyA.eq(partyA.toAddress()) && partyAIndexerChannels[0].partyB.eq(partyB.toAddress()),
       `Channel record should make it into the database and its db-key should lead to the Address of the counterparty.`
     )
 
-    const partyBChannel = new Channel(partyBConnector, partyB.pubKey, partyA.pubKey)
+    const partyBChannel = new Channel(partyBConnector, partyB, partyA)
     assert((await partyAChannel.getState()).getStatus() === 'OPEN', `Checks that party A considers the channel open.`)
     assert((await partyBChannel.getState()).getStatus() === 'OPEN', `Checks that party A considers the channel open.`)
     assert(firstAckedTicket, `ticket must be winning`)
@@ -150,7 +154,7 @@ describe('test Channel class', function () {
 
     for (let i = 0; i < ATTEMPTS; i++) {
       ticketData = await getTicketData({
-        counterparty: partyA.address,
+        counterparty: partyA.toAddress(),
         winProb: 1
       })
       nextSignedTicket = await partyAChannel.createTicket(
