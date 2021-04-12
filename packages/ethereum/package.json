@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-ethereum",
-  "version": "1.71.0-next.43",
+  "version": "1.71.0-next.44",
   "description": "On-chain logic for hoprnet.org",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "license": "GPL-3.0",
@@ -27,8 +27,8 @@
     "!**/*.test.js.map"
   ],
   "dependencies": {
-    "@hoprnet/hopr-demo-seeds": "1.71.0-next.43",
-    "@hoprnet/hopr-utils": "1.71.0-next.43",
+    "@hoprnet/hopr-demo-seeds": "1.71.0-next.44",
+    "@hoprnet/hopr-utils": "1.71.0-next.44",
     "@nomiclabs/hardhat-ethers": "^2.0.2",
     "@nomiclabs/hardhat-etherscan": "^2.1.1",
     "@nomiclabs/hardhat-solhint": "^2.0.0",
