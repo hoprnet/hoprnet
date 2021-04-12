@@ -5,7 +5,6 @@ import PeerId from 'peer-id'
 import chaiAsPromised from 'chai-as-promised'
 import chai, { expect } from 'chai'
 import sinon from 'sinon'
-import { validateUnacknowledgedTicket, } from './tickets'
 import {
   Address,
   Balance,
@@ -16,7 +15,7 @@ import {
   Ticket,
   computeWinningProbability
 } from '@hoprnet/hopr-core-ethereum'
-import { validateCreatedTicket } from '../messages/packet'
+import { validateCreatedTicket, validateUnacknowledgedTicket } from '../messages/packet'
 chai.use(chaiAsPromised)
 
 // target is party A, sender is party B
