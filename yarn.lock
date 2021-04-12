@@ -530,6 +530,20 @@
     webrtc-stun "3.0.0"
     wrtc "0.4.7"
 
+"@hoprnet/hopr-demo-seeds@1.71.0-next.39":
+  version "1.71.0-next.39"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-demo-seeds/-/hopr-demo-seeds-1.71.0-next.39.tgz#c205485ef2d181215237d478016468194ff53870"
+  integrity sha512-5qq6tqfY9Kc8fRLK3rH8rs/W0THUCz1+oP5xkWPGX/R9bTXN7n0Q+cSszmpAhkIV7uiCXt9yifNZeInpthnktw==
+
+"@hoprnet/hopr-testing@1.71.0-next.39":
+  version "1.71.0-next.39"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-testing/-/hopr-testing-1.71.0-next.39.tgz#87e710b2c9d6c2e8b88846218bc8942157abbcde"
+  integrity sha512-e9jCfqmR4zDG4xpmZfjzfBLCVKFsxGXsIbesYQXbXWbYIP8pmH527tkMcXS32YdlynUPfuSD5Hs83wtoKnN0lQ==
+  dependencies:
+    "@hoprnet/hopr-demo-seeds" "1.71.0-next.39"
+    debug "^4.3.1"
+    ganache-core "2.13.2"
+
 "@hoprnet/hopr-utils@1.69.3":
   version "1.69.3"
   resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-1.69.3.tgz#6824fb6e5ec49b1b703ed9acf0d6b6e9331f9ae5"
@@ -5598,7 +5612,7 @@ ethereumjs-wallet@0.6.5:
     utf8 "^3.0.0"
     uuid "^3.3.2"
 
-ethers@5.1.0, ethers@^5.0.0, ethers@^5.0.1, ethers@^5.0.2:
+ethers@5.1.0, ethers@^5.0.0, ethers@^5.0.1, ethers@^5.0.2, ethers@^5.1.0:
   version "5.1.0"
   resolved "https://registry.yarnpkg.com/ethers/-/ethers-5.1.0.tgz#8a8758e0b6cbbc19fd4b87f4d551170fa6f1a995"
   integrity sha512-2L6Ge6wMBw02FlRoCLg4E0Elt3khMNlW6ULawa10mMeeZToYJ5+uCfiuTuB+XZ6om1Y7wuO9ZzezP8FsU2M/+g==
