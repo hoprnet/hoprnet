@@ -11,8 +11,8 @@ import { derivePRGParameters } from './keyDerivation'
  * put next to the routing information
  * @param routingInfoLastHopLength length of the additional
  * data to put next to the routing information of the last
- * hop 
- * @param secrets shared secrets with the creator of the packet 
+ * hop
+ * @param secrets shared secrets with the creator of the packet
  */
 export function generateFiller(
   header: Uint8Array,

@@ -29,16 +29,13 @@ describe('padding', function () {
 
     assert.throws(() => removePadding(paddedMsg2), Error(`General error.`))
 
-    const paddedMsg3 = Uint8Array.from([
-        ...new Uint8Array(PAYLOAD_SIZE - PADDING_TAG_LENGTH),
-        ...PADDING_TAG,
-    ])
+    const paddedMsg3 = Uint8Array.from([...new Uint8Array(PAYLOAD_SIZE - PADDING_TAG_LENGTH), ...PADDING_TAG])
 
     assert.throws(() => removePadding(paddedMsg3), Error(`General error.`))
 
     const paddedMsg4 = Uint8Array.from([
-        ...new Uint8Array(PAYLOAD_SIZE - PADDING_TAG_LENGTH + 1),
-        ...PADDING_TAG.slice(1),
+      ...new Uint8Array(PAYLOAD_SIZE - PADDING_TAG_LENGTH + 1),
+      ...PADDING_TAG.slice(1)
     ])
 
     assert.throws(() => removePadding(paddedMsg4), Error(`General error.`))

@@ -21,7 +21,11 @@ export function removePadding(decoded: Uint8Array) {
 
   const index = decoded.indexOf(PADDING_TAG[0])
 
-  if (index < 0 || index >= PAYLOAD_SIZE - PADDING_TAG_LENGTH || !u8aEquals(decoded.subarray(index, index + PADDING_TAG_LENGTH), PADDING_TAG)) {
+  if (
+    index < 0 ||
+    index >= PAYLOAD_SIZE - PADDING_TAG_LENGTH ||
+    !u8aEquals(decoded.subarray(index, index + PADDING_TAG_LENGTH), PADDING_TAG)
+  ) {
     throw new Error(`General error.`)
   }
 

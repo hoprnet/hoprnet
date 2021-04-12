@@ -46,7 +46,7 @@ export function derivePRGParameters(secret: Uint8Array): PRGParameters {
  * Derive the seed for the pseudo-random permutation
  * by using the secret shared with the creator of the packet
  * @param secret shared secret with the creator of the packet
- * @returns 
+ * @returns
  */
 export function derivePRPParameters(secret: Uint8Array): PRPParameters {
   if (secret.length != SECRET_LENGTH) {
