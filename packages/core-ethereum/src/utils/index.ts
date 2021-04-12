@@ -333,16 +333,6 @@ export function getSignatureParameters(
 }
 
 /**
- * Create a challenge by concatinating and then hashing the secrets.
- * @param secretA
- * @param secretB
- * @returns a promise that resolves to a hash
- */
-export async function createChallenge(secretA: Uint8Array, secretB: Uint8Array): Promise<Hash> {
-  return Hash.create(u8aConcat(secretA, secretB)).hash()
-}
-
-/**
  * @param network
  * @returns true if network is private or ganache
  */

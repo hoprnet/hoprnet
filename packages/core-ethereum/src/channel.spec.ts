@@ -5,7 +5,6 @@ import assert from 'assert'
 import { stringToU8a, durations } from '@hoprnet/hopr-utils'
 import { getAddresses, abis } from '@hoprnet/hopr-ethereum'
 import { getPrivKeyData, createAccountAndFund, createNode, Account } from './utils/testing.spec'
-import { createChallenge } from './utils'
 import BN from 'bn.js'
 import Web3 from 'web3'
 import { HoprToken } from './tsc/web3/HoprToken'
@@ -40,7 +39,7 @@ describe('test Channel class', function () {
   }) {
     const secretA = new Hash(randomBytes(32))
     const secretB = new Hash(randomBytes(32))
-    const challenge = await createChallenge(secretA.serialize(), secretB.serialize())
+    const challenge = Hash.createChallenge(secretA.serialize(), secretB.serialize())
 
     return {
       secretA,
@@ -69,14 +68,14 @@ describe('test Channel class', function () {
     this.timeout(durations.seconds(10))
 
     funder = await getPrivKeyData(stringToU8a(testconfigs.FUND_ACCOUNT_PRIVATE_KEY))
-    const userA = await createAccountAndFund(web3, hoprToken, funder, testconfigs.DEMO_ACCOUNTS[1])
-    const userB = await createAccountAndFund(web3, hoprToken, funder, testconfigs.DEMO_ACCOUNTS[2])
+    const partyA = await createAccountAndFund(web3, hoprToken, funder, testconfigs.DEMO_ACCOUNTS[1])
+    const partyB = await createAccountAndFund(web3, hoprToken, funder, testconfigs.DEMO_ACCOUNTS[2])
 
-    partyAConnector = await createNode(userA.privKey.serialize())
+    partyAConnector = await createNode(partyA.privKey.serialize())
     await partyAConnector.initOnchainValues()
     await partyAConnector.start()
 
-    partyBConnector = await createNode(userB.privKey.serialize())
+    partyBConnector = await createNode(partyB.privKey.serialize())
     await partyBConnector.initOnchainValues()
     await partyBConnector.start()
   })
