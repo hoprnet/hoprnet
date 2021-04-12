@@ -5,7 +5,7 @@ import { expand } from 'futoin-hkdf'
 const HASH_KEY_HMAC = 'HASH_KEY_HMAC'
 
 /**
- * Computes the authentication tag to make the integrity of 
+ * Computes the authentication tag to make the integrity of
  * the packet header verifiable
  * @param secret shared secret with the creator of the packet
  * @param header the packet header
