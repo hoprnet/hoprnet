@@ -40,7 +40,7 @@ export class Address {
 
   sortPair(b: Address): [Address, Address] {
     return this.lt(b) ? [this, b] : [b, this]
-  } 
+  }
 }
 
 export class Balance {
