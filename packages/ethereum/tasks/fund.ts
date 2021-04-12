@@ -1,43 +1,38 @@
 import type { HardhatRuntimeEnvironment, RunSuperFunction } from 'hardhat/types'
-//import { HoprToken__factory } from '../types'
-
-
-const send = (signer, txparams) =>
-  signer.sendTransaction(txparams, (error, transactionHash) => {
-    if (error) {
-      console.log(`Error: ${error}`);
-    }
-    console.log(`transactionHash: ${transactionHash}`);
-  });
+import { HoprToken__factory } from '../types'
 
 /**
- * Funds an account with HOPR
+ * Funds all unlocked accounts with HOPR
  */
 async function main(
-  { address, amount }: { address: string; amount: string },
+  { address, amount, accountsToFund }: { address: string; amount: string; accountsToFund: number },
   { ethers, network }: HardhatRuntimeEnvironment,
   _runSuper: RunSuperFunction<any>
 ) {
-  console.log('💰 Starting fund task', {
+  console.log({
     address,
     network: network.name
   })
-  const etherAmount = '1'
-  const signer = ethers.provider.getSigner()
-  const tx = {
-    to: address,
-    value: ethers.utils.parseEther(etherAmount)
-  };
-  // const hoprToken = HoprToken__factory.connect(address, ethers.provider).connect(signer)
+  const signers = await ethers.getSigners()
+  const signer = signers[0]
+  const accounts = signers.map((signer) => signer.address).slice(0, accountsToFund)
+  const hoprToken = HoprToken__factory.connect(address, ethers.provider).connect(signer)
 
-  console.log(`💵 Sending ${etherAmount} ETH to ${address} on network ${network.name}`);
-  await send(signer, tx);
+  console.log('Running task "fund" with config:', {
+    network: network.name,
+    address,
+    amount,
+    accounts
+  })
 
-  console.log(`[TODO] 💵 Sending ${amount} HOPR to ${address} on network ${network.name}`);
-  // await hoprToken.mint(await signer.getAddress(), amount, ethers.constants.HashZero, ethers.constants.HashZero, {
-  //   from: signer.getAddress(),
-  //   gasLimit: 200e3
-  // })
+  for (const account of accounts) {
+    await hoprToken.mint(account, amount, ethers.constants.HashZero, ethers.constants.HashZero, {
+      from: signer.address,
+      gasLimit: 200e3
+    })
+
+    console.log(`Funded: ${account}`)
+  }
 }
 
 export default main
