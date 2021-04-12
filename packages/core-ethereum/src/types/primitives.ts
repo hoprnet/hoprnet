@@ -81,7 +81,7 @@ export class Hash {
     return new Hash(createKeccakHash('keccak256').update(Buffer.from(msg)).digest())
   }
 
-  static createChallenge(secretA: Uint8Array, secretB: Uint8Array): Hash{
+  static createChallenge(secretA: Uint8Array, secretB: Uint8Array): Hash {
     return Hash.create(u8aConcat(secretA, secretB)).hash()
   }
 
