@@ -137,7 +137,12 @@ task('faucet', 'Faucets a local development HOPR node account with ETH and HOPR 
 })
   .addParam<string>('address', 'HoprToken address', undefined, types.string)
   .addOptionalParam<string>('amount', 'Amount of HOPR to fund', ethers.utils.parseEther('1').toString(), types.string)
-  .addOptionalParam<boolean>('ishopraddress', 'Whether the address passed is a HOPR address or not', false, types.boolean)
+  .addOptionalParam<boolean>(
+    'ishopraddress',
+    'Whether the address passed is a HOPR address or not',
+    false,
+    types.boolean
+  )
 
 task('postCompile', 'Use export task and then update abis folder', async (...args: any[]) => {
   return (await import('./tasks/postCompile')).default(args[0], args[1], args[2])
