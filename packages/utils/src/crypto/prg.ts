@@ -17,13 +17,9 @@ export class PRG {
   private readonly key: Uint8Array
   private readonly iv: Uint8Array
 
-  private initialised: boolean = false
-
   private constructor(key: Uint8Array, iv: Uint8Array) {
     this.key = key
     this.iv = iv
-
-    this.initialised = true
   }
 
   static createPRG(params: PRGParameters): PRG {
@@ -37,10 +33,6 @@ export class PRG {
   }
 
   digest(start: number, end: number): Uint8Array {
-    if (!this.initialised) {
-      throw Error(`Module not initialized. Please do that first.`)
-    }
-
     if (start >= end) {
       throw Error(`Invalid range parameters. 'start' must be strictly smaller than 'end'.`)
     }

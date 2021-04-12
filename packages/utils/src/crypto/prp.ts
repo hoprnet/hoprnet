@@ -29,8 +29,6 @@ export class PRP {
   private readonly iv3: Uint8Array
   private readonly iv4: Uint8Array
 
-  private initialised: boolean = false
-
   private constructor(iv: Uint8Array, key: Uint8Array) {
     this.k1 = key.subarray(0, INTERMEDIATE_KEY_LENGTH)
     this.k2 = key.subarray(INTERMEDIATE_KEY_LENGTH, 2 * INTERMEDIATE_KEY_LENGTH)
@@ -41,8 +39,6 @@ export class PRP {
     this.iv2 = iv.subarray(INTERMEDIATE_IV_LENGTH, 2 * INTERMEDIATE_IV_LENGTH)
     this.iv3 = iv.subarray(2 * INTERMEDIATE_IV_LENGTH, 3 * INTERMEDIATE_IV_LENGTH)
     this.iv4 = iv.subarray(3 * INTERMEDIATE_IV_LENGTH, 4 * INTERMEDIATE_IV_LENGTH)
-
-    this.initialised = true
   }
 
   static createPRP(params: PRPParameters): PRP {
@@ -66,10 +62,6 @@ export class PRP {
   }
 
   permutate(plaintext: Uint8Array): Uint8Array {
-    if (!this.initialised) {
-      throw Error(`Uninitialised. Provide key and iv first.`)
-    }
-
     if (plaintext.length < PRP_MIN_LENGTH) {
       throw Error(`Expected plaintext with a length of a least '${PRP_MIN_LENGTH}' bytes. Got '${plaintext.length}'.`)
     }
@@ -85,10 +77,6 @@ export class PRP {
   }
 
   inverse(ciphertext: Uint8Array): Uint8Array {
-    if (!this.initialised) {
-      throw Error(`Uninitialised. Provide key and iv first.`)
-    }
-
     if (ciphertext.length < PRP_MIN_LENGTH) {
       throw Error(`Expected ciphertext with a length of a least '${PRP_MIN_LENGTH}' bytes. Got '${ciphertext.length}'.`)
     }
