@@ -1,6 +1,5 @@
 import { Networks, networks } from '@hoprnet/hopr-ethereum'
 import assert from 'assert'
-import { ecdsaRecover, ecdsaVerify } from 'secp256k1'
 import { PromiEvent, TransactionReceipt } from 'web3-core'
 import { BlockTransactionString } from 'web3-eth'
 import Web3 from 'web3'
@@ -20,27 +19,6 @@ import * as time from './time'
 import BN from 'bn.js'
 
 export { time }
-
-/**
- * Recovers the public key of the signer from the message
- * @param msg the message that was signed
- * @param signature the signature of the signed message
- * @returns a promise resolved to Uint8Array, the signers public key
- */
-export async function signer(msg: Uint8Array, signature: Signature): Promise<Uint8Array> {
-  return ecdsaRecover(signature.signature, signature.recovery, msg)
-}
-
-/**
- * Checks the validity of the signature by using the public key
- * @param msg the message that was signed
- * @param signature the signature of the signed message
- * @param pubKey the public key of the potential signer
- * @returns a promise resolved to true if the public key provided matches the signer's
- */
-export async function verify(msg: Uint8Array, signature: Signature, pubKey: Uint8Array): Promise<boolean> {
-  return ecdsaVerify(signature.signature, msg, pubKey)
-}
 
 /**
  * Decides whether a ticket is a win or not.
