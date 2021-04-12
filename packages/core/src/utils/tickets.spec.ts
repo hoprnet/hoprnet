@@ -315,16 +315,14 @@ describe('unit test validateCreatedTicket', function () {
   it('should pass if ticket is okay', async function () {
     const ticket = createMockTicket({})
 
-    return expect(
-      validateCreatedTicket(new BN(1), ticket)
-    ).to.eventually.to.not.rejected
+    return expect(validateCreatedTicket(new BN(1), ticket)).to.eventually.to.not.rejected
   })
 
   it('should throw when signer is not sender', async function () {
     const ticket = createMockTicket({})
 
-    return expect(
-      validateCreatedTicket(new BN(0), ticket)
-    ).to.eventually.rejectedWith('Payment channel does not have enough funds')
+    return expect(validateCreatedTicket(new BN(0), ticket)).to.eventually.rejectedWith(
+      'Payment channel does not have enough funds'
+    )
   })
 })
