@@ -1,4 +1,4 @@
-import { serializeKeyPair, deserializeKeyPair  } from '.'
+import { serializeKeyPair, deserializeKeyPair } from '.'
 
 import PeerId from 'peer-id'
 

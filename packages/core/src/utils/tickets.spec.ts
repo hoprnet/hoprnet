@@ -321,8 +321,6 @@ describe('unit test validateCreatedTicket', function () {
   it('should throw when signer is not sender', async function () {
     const ticket = createMockTicket({})
 
-    return expect(validateCreatedTicket(new BN(0), ticket)).to.throw(
-      'Payment channel does not have enough funds'
-    )
+    return expect(validateCreatedTicket(new BN(0), ticket)).to.throw('Payment channel does not have enough funds')
   })
 })
