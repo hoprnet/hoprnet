@@ -25,7 +25,7 @@ describe('test Account', function () {
   let hoprToken: HoprToken
   let coreConnector: CoreConnector
   let funder
-  let user 
+  let user
 
   before(async function () {
     this.timeout(durations.minutes(1))

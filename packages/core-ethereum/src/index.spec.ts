@@ -104,7 +104,7 @@ describe('test withdraw', function () {
   let web3: Web3
   let hoprToken: HoprToken
   let connector: HoprEthereum
-  let alice 
+  let alice
   let bob
 
   before(async function () {
