@@ -56,6 +56,17 @@ This is the case if $$H( ticketHash, response, open ) <P_w$$ where $$ticketHash:
 If this is not the case, the node should drop the ticket. 
 The final recipient of the packet does not receive a ticket because message reception is not incentivized by the HOPR protocol.
 \newline The node checks whether the information gained from the packet transformation is sufficient to fulfill the given challenge sent along with the ticket. It then replies with an acknowledgement that includes a response to the challenge.
+\\ The node also checks the following:
+\begin{itemize}
+    \item The signature of the ticket issuer is valid: $$ecrecover(Sig_{response}(0))=address(T_D.challenge)$$
+    \item The ticket has been already spent (replay protection): $$channel.index <T_D.index$$
+    \item Channel exists and is open.
+    \item Channel balance towards the ticket recipient is sufficient to cover the costs for the ticket.
+    \item Ticket index is strictly greater than the current value in the smart contract (reorder protection). This is valid because redeeming a $ticket$ with $index=n$ requires $index < n+1$ and sets $index := n+1$. So the new index becomes greater than $n$.
+
+
+\end{itemize}  
+
 
 
 
