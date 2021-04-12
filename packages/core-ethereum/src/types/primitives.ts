@@ -29,6 +29,18 @@ export class Address {
   eq(b: Address) {
     return u8aEquals(this.arr, b.serialize())
   }
+
+  compare(b: Address): number {
+    return Buffer.compare(this.serialize(), b.serialize())
+  }
+
+  lt(b: Address): boolean {
+    return this.compare(b) < 0
+  }
+
+  sortPair(b: Address): [Address, Address] {
+    return this.lt(b) ? [this, b] : [b, this]
+  }
 }
 
 export class Balance {
@@ -67,6 +79,10 @@ export class Hash {
 
   static create(msg: Uint8Array) {
     return new Hash(createKeccakHash('keccak256').update(Buffer.from(msg)).digest())
+  }
+
+  static createChallenge(secretA: Uint8Array, secretB: Uint8Array): Hash {
+    return Hash.create(u8aConcat(secretA, secretB)).hash()
   }
 
   serialize(): Uint8Array {
