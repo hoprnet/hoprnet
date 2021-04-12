@@ -1,5 +1,4 @@
 import { Networks, networks } from '@hoprnet/hopr-ethereum'
-import assert from 'assert'
 import { PromiEvent, TransactionReceipt } from 'web3-core'
 import { BlockTransactionString } from 'web3-eth'
 import Web3 from 'web3'
@@ -12,7 +11,7 @@ import {
   durations,
   u8aToNumber
 } from '@hoprnet/hopr-utils'
-import { Balance, Hash, Signature } from '../types'
+import { Hash, Signature } from '../types'
 import { ContractEventEmitter } from '../tsc/web3/types'
 import * as constants from '../constants'
 import * as time from './time'
@@ -90,24 +89,6 @@ export function getWinProbabilityAsFloat(winProb: Hash): number {
  */
 export async function checkChallenge(challenge: Hash, response: Hash) {
   return challenge.eq(response.hash())
-}
-
-/**
- * Convert between units'
- * @param amount
- * @param sourceUnit
- * @param targetUnit
- */
-export function convertUnit(amount: Balance, sourceUnit: 'eth', targetUnit: 'wei'): Balance
-export function convertUnit(amount: Balance, sourceUnit: 'wei', targetUnit: 'eth'): Balance
-export function convertUnit(amount: Balance, sourceUnit: 'eth' | 'wei', targetUnit: 'eth' | 'wei'): Balance {
-  assert(['eth', 'wei'].includes(sourceUnit), 'not implemented')
-
-  if (sourceUnit === 'eth') {
-    return Web3.utils.toWei(amount.toBN(), targetUnit as any) as any
-  } else {
-    return Web3.utils.fromWei(amount.toBN(), targetUnit as any) as any
-  }
 }
 
 /**
