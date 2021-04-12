@@ -214,10 +214,7 @@ export class Packet extends Uint8Array {
       const channelState = await channel.getBalances()
       packet._ticket = await channel.createTicket(new Balance(fee), ticketChallenge, node.ticketWinProb)
 
-      await validateCreatedTicket({
-        myBalance: channelState.self.toBN(),
-        ticket: packet._ticket
-      })
+      await validateCreatedTicket(channelState.self.toBN(), packet._ticket)
     } else if (secrets.length == 1) {
       packet._ticket = await channel.createDummyTicket(ticketChallenge)
     }
@@ -344,11 +341,7 @@ export class Packet extends Uint8Array {
     if (fee.toBN().gtn(0)) {
       const balances = await channel.getBalances()
       this._ticket = await channel.createTicket(fee, new Hash(this.header.encryptionKey), this.ticketWinProb)
-
-      await validateCreatedTicket({
-        myBalance: balances.self.toBN(),
-        ticket: this._ticket
-      })
+      await validateCreatedTicket(balances.self.toBN(), this._ticket)
     } else if (fee.toBN().isZero()) {
       this._ticket = await channel.createDummyTicket(new Hash(this.header.encryptionKey))
     } else {

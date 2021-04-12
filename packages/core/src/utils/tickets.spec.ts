@@ -317,10 +317,7 @@ describe('unit test validateCreatedTicket', function () {
     const ticket = createMockTicket({})
 
     return expect(
-      validateCreatedTicket({
-        myBalance: new BN(1),
-        ticket
-      })
+      validateCreatedTicket(new BN(1), ticket)
     ).to.eventually.to.not.rejected
   })
 
@@ -328,10 +325,7 @@ describe('unit test validateCreatedTicket', function () {
     const ticket = createMockTicket({})
 
     return expect(
-      validateCreatedTicket({
-        myBalance: new BN(0),
-        ticket
-      })
+      validateCreatedTicket(new BN(0), ticket)
     ).to.eventually.rejectedWith('Payment channel does not have enough funds')
   })
 })
