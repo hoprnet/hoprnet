@@ -3,7 +3,7 @@ import LibP2P from 'libp2p'
 import { blue, green } from 'chalk'
 import PeerId from 'peer-id'
 import { u8aConcat, u8aEquals, u8aToHex, pubKeyToPeerId } from '@hoprnet/hopr-utils'
-import { getTickets, validateUnacknowledgedTicket, validateCreatedTicket } from '../../utils/tickets'
+import { getTickets, validateUnacknowledgedTicket } from '../../utils/tickets'
 import { Header, deriveTicketKey, deriveTicketKeyBlinding, deriveTagParameters, deriveTicketLastKey } from './header'
 import { Challenge } from './challenge'
 import { PacketTag, UnAcknowledgedTickets } from '../../dbKeys'
@@ -15,6 +15,16 @@ import HoprCoreEthereum, { Hash, PublicKey, Ticket, Balance, UnacknowledgedTicke
 
 const log = Debug('hopr-core:message:packet')
 const verbose = Debug('hopr-core:verbose:message:packet')
+
+/**
+ * Validate newly created tickets
+ * @param ops
+ */
+export function validateCreatedTicket(myBalance: BN, ticket: Ticket) {
+  if (myBalance.lt(ticket.amount.toBN())) {
+    throw Error(`Payment channel does not have enough funds ${myBalance.toString()} < ${ticket.amount.toString()}`)
+  }
+}
 
 /**
  * Encapsulates the internal representation of a packet

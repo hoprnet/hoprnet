@@ -321,12 +321,3 @@ export async function validateUnacknowledgedTicket(
   }
 }
 
-/**
- * Validate newly created tickets
- * @param ops
- */
-export async function validateCreatedTicket(myBalance: BN, ticket: Ticket) {
-  if (myBalance.lt(ticket.amount.toBN())) {
-    throw Error(`Payment channel does not have enough funds ${myBalance.toString()} < ${ticket.amount.toString()}`)
-  }
-}
