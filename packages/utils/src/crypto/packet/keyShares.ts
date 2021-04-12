@@ -6,13 +6,13 @@ import { extract } from 'futoin-hkdf'
 import type PeerId from 'peer-id'
 
 /**
- * Performs an offline Diffie-Hellman key exchange with 
+ * Performs an offline Diffie-Hellman key exchange with
  * the nodes along the given path
  * @param path the path to use for the mixnet packet
  * @returns the first group element and the shared secrets
  * with the nodes along the path
  */
-export function generateKeyShares(path: PeerId[]): [alpha: Uint8Array, secrets: Uint8Array[]] {
+export function generateKeyShares(path: PeerId[]): { alpha: Uint8Array; secrets: Uint8Array[] } {
   let done = false
   let secrets: Uint8Array[]
 
@@ -46,24 +46,24 @@ export function generateKeyShares(path: PeerId[]): [alpha: Uint8Array, secrets: 
     }
   } while (!done)
 
-  return [publicKeyConvert(keyPair[1]), secrets]
+  return { alpha: publicKeyConvert(keyPair[1]), secrets }
 }
 
 /**
  * Applies the forward transformation of the key shares to
  * an incoming packet.
- * @param alpha the group element used for the offline 
+ * @param alpha the group element used for the offline
  * Diffie-Hellman key exchange
  * @param privKey private key of the relayer
  */
-export function forwardTransform(alpha: Uint8Array, privKey: PeerId): [alpha: Uint8Array, secret: Uint8Array] {
+export function forwardTransform(alpha: Uint8Array, privKey: PeerId): { alpha: Uint8Array; secret: Uint8Array } {
   if (!publicKeyVerify(alpha) || privKey.privKey == null) {
     throw Error(`Invalid arguments`)
   }
 
-  const key = keyExtract(publicKeyTweakMul(alpha, privKey.privKey.marshal(), false), privKey.pubKey.marshal())
+  const secret = keyExtract(publicKeyTweakMul(alpha, privKey.privKey.marshal(), false), privKey.pubKey.marshal())
 
-  return [publicKeyConvert(publicKeyTweakMul(alpha, key, false)), key]
+  return { alpha: publicKeyConvert(publicKeyTweakMul(alpha, secret, false)), secret }
 }
 
 function keyExtract(groupElement: Uint8Array, pubKey: Uint8Array): Uint8Array {

@@ -1,4 +1,5 @@
 import { createRoutingInfo, forwardTransform } from './routingInfo'
+import type { RelayNodeOutput } from './routingInfo'
 import { generateKeyShares } from './keyShares'
 import PeerId from 'peer-id'
 import { u8aEquals } from '../../u8a'
@@ -10,10 +11,10 @@ describe('routing info generation and mutation', function () {
 
     const peerIds = await Promise.all(Array.from({ length: AMOUNT }, (_) => PeerId.create({ keyType: 'secp256k1' })))
 
-    const [_, secrets] = generateKeyShares(peerIds)
+    const { secrets } = generateKeyShares(peerIds)
     const maxHops = 3
 
-    const [header, mac] = createRoutingInfo(
+    const { routingInformation, mac } = createRoutingInfo(
       maxHops,
       peerIds,
       secrets,
@@ -21,16 +22,26 @@ describe('routing info generation and mutation', function () {
       new Uint8Array()
     )
 
-    let transformedOutput: Uint8Array[]
+    let transformedOutput: ReturnType<typeof forwardTransform>
+
     for (let i = 0; i < secrets.length; i++) {
-      transformedOutput = forwardTransform(secrets[i], header, transformedOutput?.[1] ?? mac, maxHops, 0, 0)
+      transformedOutput = forwardTransform(
+        secrets[i],
+        routingInformation,
+        (transformedOutput as RelayNodeOutput)?.mac ?? mac,
+        maxHops,
+        0,
+        0
+      )
 
       if (i < secrets.length - 1) {
-        assert(transformedOutput != undefined)
+        assert(transformedOutput.lastNode == false)
 
-        assert(u8aEquals(peerIds[i + 1].pubKey.marshal(), transformedOutput[2]))
+        assert(u8aEquals(peerIds[i + 1].pubKey.marshal(), transformedOutput.nextNode))
       } else {
-        assert(transformedOutput == undefined)
+        assert(transformedOutput.lastNode == true)
+
+        assert(transformedOutput.additionalData.length == 0)
       }
     }
   })
@@ -40,10 +51,10 @@ describe('routing info generation and mutation', function () {
 
     const peerIds = await Promise.all(Array.from({ length: AMOUNT }, (_) => PeerId.create({ keyType: 'secp256k1' })))
 
-    const [_, secrets] = generateKeyShares(peerIds)
+    const { secrets } = generateKeyShares(peerIds)
     const maxHops = 3
 
-    const [header, mac] = createRoutingInfo(
+    const { routingInformation, mac } = createRoutingInfo(
       maxHops,
       peerIds,
       secrets,
@@ -51,16 +62,25 @@ describe('routing info generation and mutation', function () {
       new Uint8Array()
     )
 
-    let transformedOutput: Uint8Array[]
+    let transformedOutput: ReturnType<typeof forwardTransform>
     for (let i = 0; i < secrets.length; i++) {
-      transformedOutput = forwardTransform(secrets[i], header, transformedOutput?.[1] ?? mac, maxHops, 0, 0)
+      transformedOutput = forwardTransform(
+        secrets[i],
+        routingInformation,
+        (transformedOutput as RelayNodeOutput)?.mac ?? mac,
+        maxHops,
+        0,
+        0
+      )
 
       if (i < secrets.length - 1) {
-        assert(transformedOutput != undefined)
+        assert(transformedOutput.lastNode == false)
 
-        assert(u8aEquals(peerIds[i + 1].pubKey.marshal(), transformedOutput[2]))
+        assert(u8aEquals(peerIds[i + 1].pubKey.marshal(), transformedOutput.nextNode))
       } else {
-        assert(transformedOutput == undefined)
+        assert(transformedOutput.lastNode == true)
+
+        assert(transformedOutput.additionalData.length == 0)
       }
     }
   })
@@ -70,10 +90,10 @@ describe('routing info generation and mutation', function () {
 
     const peerIds = await Promise.all(Array.from({ length: AMOUNT }, (_) => PeerId.create({ keyType: 'secp256k1' })))
 
-    const [_, secrets] = generateKeyShares(peerIds)
+    const { secrets } = generateKeyShares(peerIds)
     const maxHops = 3
 
-    const [header, mac] = createRoutingInfo(
+    const { routingInformation, mac } = createRoutingInfo(
       maxHops,
       peerIds,
       secrets,
@@ -81,16 +101,26 @@ describe('routing info generation and mutation', function () {
       new Uint8Array()
     )
 
-    let transformedOutput: Uint8Array[]
+    let transformedOutput: ReturnType<typeof forwardTransform>
+
     for (let i = 0; i < secrets.length; i++) {
-      transformedOutput = forwardTransform(secrets[i], header, transformedOutput?.[1] ?? mac, maxHops, 0, 0)
+      transformedOutput = forwardTransform(
+        secrets[i],
+        routingInformation,
+        (transformedOutput as RelayNodeOutput)?.mac ?? mac,
+        maxHops,
+        0,
+        0
+      )
 
       if (i < secrets.length - 1) {
-        assert(transformedOutput != undefined)
+        assert(transformedOutput.lastNode == false)
 
-        assert(u8aEquals(peerIds[i + 1].pubKey.marshal(), transformedOutput[2]))
+        assert(u8aEquals(peerIds[i + 1].pubKey.marshal(), (transformedOutput as RelayNodeOutput).nextNode))
       } else {
-        assert(transformedOutput == undefined)
+        assert(transformedOutput.lastNode == true)
+
+        assert(transformedOutput.additionalData.length == 0)
       }
     }
   })

@@ -6,6 +6,7 @@ import { generateKeyShares, forwardTransform as keyShareTransform } from './keyS
 import { PRP } from '../prp'
 import { PAYLOAD_SIZE } from './constants'
 import { derivePRPParameters } from './keyDerivation'
+import { addPadding, removePadding } from './padding'
 
 /**
  * Encrypts the plaintext in the reverse order of the path
@@ -45,20 +46,33 @@ export function createPacket(
     throw Error(`Invalid arguments. Messages greater than ${PAYLOAD_SIZE} are not yet supported`)
   }
 
-  let paddedMsg: Uint8Array
-  if (msg.length < PAYLOAD_SIZE) {
-    paddedMsg = Uint8Array.from([...msg, ...new Uint8Array(PAYLOAD_SIZE - msg.length)])
-  } else {
-    paddedMsg = msg
-  }
+  const paddedMsg = addPadding(msg)
 
-  const [alpha, secrets] = generateKeyShares(path)
+  const { alpha, secrets } = generateKeyShares(path)
 
-  const [beta, gamma] = createRoutingInfo(maxHops, path, secrets, additionalDataRelayer, additionalDataLastHop)
+  const { routingInformation, mac } = createRoutingInfo(
+    maxHops,
+    path,
+    secrets,
+    additionalDataRelayer,
+    additionalDataLastHop
+  )
 
   const ciphertext = onionEncrypt(paddedMsg, secrets)
 
-  return Uint8Array.from([...alpha, ...beta, ...gamma, ...ciphertext])
+  return Uint8Array.from([...alpha, ...routingInformation, ...mac, ...ciphertext])
+}
+
+type LastNodeOutput = {
+  lastNode: true
+  plaintext: Uint8Array
+  additionalData: Uint8Array
+}
+type RelayNodeOutput = {
+  lastNode: false
+  packet: Uint8Array
+  nextHop: Uint8Array
+  additionalRelayData: Uint8Array
 }
 
 /**
@@ -82,9 +96,7 @@ export function forwardTransform(
   additionalDataRelayerLength: number,
   additionalDataLastHopLength: number,
   maxHops: number
-):
-  | [done: false, packet: Uint8Array, nextHop: Uint8Array, additionalRelayData: Uint8Array]
-  | [done: true, plaintext: Uint8Array, additionalData: Uint8Array] {
+): LastNodeOutput | RelayNodeOutput {
   if (privKey.privKey == null) {
     throw Error(`Invalid arguments`)
   }
@@ -93,46 +105,14 @@ export function forwardTransform(
 
   const headerLength = lastHop + (maxHops - 1) * perHop
 
-  let decoded: [alpha: Uint8Array, beta: Uint8Array, gamma: Uint8Array, ciphertext: Uint8Array]
+  let decoded = decodePacket(packet, headerLength)
 
-  if (typeof Buffer !== 'undefined' && Buffer.isBuffer(packet)) {
-    decoded = [
-      packet.slice(0, COMPRESSED_PUBLIC_KEY_LENGTH),
-      packet.slice(COMPRESSED_PUBLIC_KEY_LENGTH, COMPRESSED_PUBLIC_KEY_LENGTH + headerLength),
-      packet.slice(
-        COMPRESSED_PUBLIC_KEY_LENGTH + headerLength,
-        COMPRESSED_PUBLIC_KEY_LENGTH + headerLength + MAC_LENGTH
-      ),
-      packet.slice(
-        COMPRESSED_PUBLIC_KEY_LENGTH + headerLength + MAC_LENGTH,
-        COMPRESSED_PUBLIC_KEY_LENGTH + headerLength + MAC_LENGTH + PAYLOAD_SIZE
-      )
-    ]
-  } else {
-    decoded = [
-      packet.subarray(0, COMPRESSED_PUBLIC_KEY_LENGTH),
-      packet.subarray(COMPRESSED_PUBLIC_KEY_LENGTH, COMPRESSED_PUBLIC_KEY_LENGTH + headerLength),
-      packet.subarray(
-        COMPRESSED_PUBLIC_KEY_LENGTH + headerLength,
-        COMPRESSED_PUBLIC_KEY_LENGTH + headerLength + MAC_LENGTH
-      ),
-      packet.subarray(
-        COMPRESSED_PUBLIC_KEY_LENGTH + headerLength + MAC_LENGTH,
-        COMPRESSED_PUBLIC_KEY_LENGTH + headerLength + MAC_LENGTH + PAYLOAD_SIZE
-      )
-    ]
-  }
+  const { alpha, secret } = keyShareTransform(decoded.alpha, privKey)
 
-  const [alpha, secret] = keyShareTransform(decoded[0], privKey)
-
-  let header:
-    | [beta: Uint8Array, gamma: Uint8Array, nextNode: Uint8Array, additionalInfo: Uint8Array]
-    | [additionalData: Uint8Array]
-
-  header = routingInfoTransform(
+  let header = routingInfoTransform(
     secret,
-    decoded[1],
-    decoded[2],
+    decoded.routingInformation,
+    decoded.mac,
     maxHops,
     additionalDataRelayerLength,
     additionalDataLastHopLength
@@ -140,13 +120,45 @@ export function forwardTransform(
 
   const prp = PRP.createPRP(derivePRPParameters(secret))
 
-  prp.inverse(decoded[3])
+  prp.inverse(decoded.ciphertext)
 
-  if (header == undefined) {
-    return [true, decoded[3], header[0]]
+  if (header.lastNode == true) {
+    return { lastNode: true, plaintext: removePadding(decoded.ciphertext), additionalData: header.additionalData }
   } else {
-    const forwardPacket = Uint8Array.from([...alpha, ...header[0], ...header[1], ...decoded[3]])
+    const packet = Uint8Array.from([...alpha, ...header.header, ...header.mac, ...decoded.ciphertext])
 
-    return [false, forwardPacket, header[2], header[3]]
+    return { lastNode: false, packet, nextHop: header.nextNode, additionalRelayData: header.additionalInfo }
+  }
+}
+
+/**
+ * Takes a packet as bytestring and returns a decoded output
+ * @param _packet bytearray containing the packet
+ * @param headerLength length of the header
+ * @returns decoded output
+ */
+function decodePacket(
+  _packet: Uint8Array | Buffer,
+  headerLength: number
+): { alpha: Uint8Array; routingInformation: Uint8Array; mac: Uint8Array; ciphertext: Uint8Array } {
+  let packet: Uint8Array
+
+  if (typeof Buffer !== 'undefined' && Buffer.isBuffer(_packet)) {
+    packet = Uint8Array.from(_packet)
+  } else {
+    packet = _packet
+  }
+
+  return {
+    alpha: packet.subarray(0, COMPRESSED_PUBLIC_KEY_LENGTH),
+    routingInformation: packet.subarray(COMPRESSED_PUBLIC_KEY_LENGTH, COMPRESSED_PUBLIC_KEY_LENGTH + headerLength),
+    mac: packet.subarray(
+      COMPRESSED_PUBLIC_KEY_LENGTH + headerLength,
+      COMPRESSED_PUBLIC_KEY_LENGTH + headerLength + MAC_LENGTH
+    ),
+    ciphertext: packet.subarray(
+      COMPRESSED_PUBLIC_KEY_LENGTH + headerLength + MAC_LENGTH,
+      COMPRESSED_PUBLIC_KEY_LENGTH + headerLength + MAC_LENGTH + PAYLOAD_SIZE
+    )
   }
 }

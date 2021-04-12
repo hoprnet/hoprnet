@@ -24,7 +24,7 @@ export function createRoutingInfo(
   secrets: Uint8Array[],
   additionalDataRelayer: Uint8Array[],
   additionalDataLastHop: Uint8Array
-): [routingInformation: Uint8Array, mac: Uint8Array] {
+): { routingInformation: Uint8Array; mac: Uint8Array } {
   const routingInfoLength = additionalDataRelayer[0].length + MAC_LENGTH + COMPRESSED_PUBLIC_KEY_LENGTH
   const lastHopLength = additionalDataLastHop.length + END_PREFIX_LENGTH
 
@@ -84,7 +84,16 @@ export function createRoutingInfo(
     mac = createMAC(secret, extendedHeader.subarray(0, headerLength))
   }
 
-  return [extendedHeader.slice(0, headerLength), mac]
+  return { routingInformation: extendedHeader.slice(0, headerLength), mac }
+}
+
+export type LastNodeOutput = { lastNode: true; additionalData: Uint8Array }
+export type RelayNodeOutput = {
+  lastNode: false
+  header: Uint8Array
+  mac: Uint8Array
+  nextNode: Uint8Array
+  additionalInfo: Uint8Array
 }
 
 /**
@@ -103,14 +112,12 @@ export function createRoutingInfo(
  */
 export function forwardTransform(
   secret: Uint8Array,
-  header: Uint8Array,
+  _header: Uint8Array,
   mac: Uint8Array,
   maxHops: number,
   additionalDataRelayerLength: number,
   additionalDataLastHopLength: number
-):
-  | [additionalData: Uint8Array]
-  | [header: Uint8Array, mac: Uint8Array, nextNode: Uint8Array, additionalInfo: Uint8Array] {
+): LastNodeOutput | RelayNodeOutput {
   if (secret.length != SECRET_LENGTH || mac.length != MAC_LENGTH) {
     throw Error(`Invalid arguments`)
   }
@@ -120,13 +127,17 @@ export function forwardTransform(
 
   const headerLength = lastHopLength + (maxHops - 1) * routingInfoLength
 
+  let header: Uint8Array
+
+  if (typeof Buffer !== 'undefined' && Buffer.isBuffer(header)) {
+    header = Uint8Array.from(_header)
+  } else {
+    header = _header
+  }
+
   if (!u8aEquals(createMAC(secret, header), mac)) {
     throw Error(`General error.`)
   }
-
-  let nextMac: Uint8Array
-  let nextHop: Uint8Array
-  let additionalInfo: Uint8Array
 
   const params = derivePRGParameters(secret)
 
@@ -135,28 +146,18 @@ export function forwardTransform(
   u8aXOR(true, header, prg.digest(0, headerLength))
 
   if (header[0] == END_PREFIX) {
-    if (typeof Buffer !== 'undefined' && Buffer.isBuffer(header)) {
-      return [header.subarray(END_PREFIX_LENGTH, END_PREFIX_LENGTH + additionalDataLastHopLength)]
-    } else {
-      return [header.slice(END_PREFIX_LENGTH, END_PREFIX_LENGTH + additionalDataLastHopLength)]
+    return {
+      lastNode: true,
+      additionalData: header.slice(END_PREFIX_LENGTH, END_PREFIX_LENGTH + additionalDataLastHopLength)
     }
   }
 
-  if (typeof Buffer !== 'undefined' && Buffer.isBuffer(header)) {
-    nextHop = header.subarray(0, COMPRESSED_PUBLIC_KEY_LENGTH)
-    nextMac = header.subarray(COMPRESSED_PUBLIC_KEY_LENGTH, COMPRESSED_PUBLIC_KEY_LENGTH + MAC_LENGTH)
-    additionalInfo = header.subarray(
-      COMPRESSED_PUBLIC_KEY_LENGTH + MAC_LENGTH,
-      COMPRESSED_PUBLIC_KEY_LENGTH + MAC_LENGTH + additionalDataRelayerLength
-    )
-  } else {
-    nextHop = header.slice(0, COMPRESSED_PUBLIC_KEY_LENGTH)
-    nextMac = header.slice(COMPRESSED_PUBLIC_KEY_LENGTH, COMPRESSED_PUBLIC_KEY_LENGTH + MAC_LENGTH)
-    additionalInfo = header.slice(
-      COMPRESSED_PUBLIC_KEY_LENGTH + MAC_LENGTH,
-      COMPRESSED_PUBLIC_KEY_LENGTH + MAC_LENGTH + additionalDataRelayerLength
-    )
-  }
+  let nextHop = header.slice(0, COMPRESSED_PUBLIC_KEY_LENGTH)
+  let nextMac = header.slice(COMPRESSED_PUBLIC_KEY_LENGTH, COMPRESSED_PUBLIC_KEY_LENGTH + MAC_LENGTH)
+  let additionalInfo = header.slice(
+    COMPRESSED_PUBLIC_KEY_LENGTH + MAC_LENGTH,
+    COMPRESSED_PUBLIC_KEY_LENGTH + MAC_LENGTH + additionalDataRelayerLength
+  )
 
   if (!publicKeyVerify(nextHop)) {
     throw Error(`General error.`)
@@ -166,5 +167,5 @@ export function forwardTransform(
 
   header.set(prg.digest(headerLength, headerLength + routingInfoLength), headerLength - routingInfoLength)
 
-  return [header.subarray(0, headerLength), nextMac, nextHop, additionalInfo]
+  return { lastNode: false, header: header.subarray(0, headerLength), mac: nextMac, nextNode: nextHop, additionalInfo }
 }

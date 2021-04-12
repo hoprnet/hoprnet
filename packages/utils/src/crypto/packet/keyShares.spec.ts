@@ -11,12 +11,12 @@ describe('test key share generation', function () {
       Array.from({ length: AMOUNT }).map((_) => PeerId.create({ keyType: 'secp256k1' }))
     )
 
-    const [alpha, secrets] = generateKeyShares(keyPairs)
+    const { alpha, secrets } = generateKeyShares(keyPairs)
 
     for (let i = 0; i < AMOUNT; i++) {
-      const [tmpAlpha, key] = forwardTransform(alpha, keyPairs[i])
+      const { alpha: tmpAlpha, secret } = forwardTransform(alpha, keyPairs[i])
 
-      assert(u8aEquals(key, secrets[i]))
+      assert(u8aEquals(secret, secrets[i]))
 
       alpha.set(tmpAlpha)
     }
@@ -28,14 +28,14 @@ describe('test key share generation', function () {
       Array.from({ length: AMOUNT }).map((_) => PeerId.create({ keyType: 'secp256k1' }))
     )
 
-    const [alpha, secrets] = generateKeyShares(keyPairs)
+    const { alpha, secrets } = generateKeyShares(keyPairs)
 
     assert(!u8aEquals(secrets[0], secrets[1], ...secrets.slice(2)), 'Secrets must be different')
 
     for (let i = 0; i < AMOUNT; i++) {
-      const [tmpAlpha, key] = forwardTransform(alpha, keyPairs[i])
+      const { alpha: tmpAlpha, secret } = forwardTransform(alpha, keyPairs[i])
 
-      assert(u8aEquals(key, secrets[i]))
+      assert(u8aEquals(secret, secrets[i]))
 
       assert(!u8aEquals(alpha, tmpAlpha), 'alpha must change')
 
