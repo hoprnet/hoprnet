@@ -43,6 +43,8 @@ export function getPacketLength(
   return getHeaderLength(maxHops, additionalDataRelayerLength, additionalDataLastHopLength) + PAYLOAD_SIZE
 }
 
+export { generateKeyShares }
+
 /**
  * Creates a mixnet packet
  * @param msg payload to send
@@ -55,6 +57,8 @@ export function getPacketLength(
  * @returns the packet as u8a
  */
 export function createPacket(
+  secrets: Uint8Array[],
+  alpha: Uint8Array,
   msg: Uint8Array,
   path: PeerId[],
   maxHops: number,
@@ -66,8 +70,6 @@ export function createPacket(
   }
 
   const paddedMsg = addPadding(msg)
-
-  const { alpha, secrets } = generateKeyShares(path)
 
   const { routingInformation, mac } = createRoutingInfo(
     maxHops,

@@ -1,6 +1,6 @@
 import PeerId from 'peer-id'
 import { randomBytes } from 'crypto'
-import { createPacket, forwardTransform } from '.'
+import { createPacket, forwardTransform, generateKeyShares } from '.'
 import { PAYLOAD_SIZE } from './constants'
 import assert from 'assert'
 import { u8aEquals } from '../../u8a'
@@ -15,7 +15,11 @@ describe('header', function () {
 
     const testMsg = Uint8Array.from(randomBytes(PAYLOAD_SIZE - PADDING_TAG_LENGTH))
 
+    const { alpha, secrets } = generateKeyShares(path)
+
     let packet = createPacket(
+      secrets,
+      alpha,
       Uint8Array.from(testMsg), // clone testMsg
       path,
       maxHops,
@@ -50,7 +54,11 @@ describe('header', function () {
 
     const testMsg = Uint8Array.from(randomBytes(PAYLOAD_SIZE - PADDING_TAG_LENGTH))
 
+    const { alpha, secrets } = generateKeyShares(path)
+
     let packet = createPacket(
+      secrets,
+      alpha,
       Uint8Array.from(testMsg), // clone testMsg
       path,
       maxHops,
