@@ -1,6 +1,7 @@
 import type { HardhatRuntimeEnvironment, RunSuperFunction } from 'hardhat/types'
 import { NODE_SEEDS } from '@hoprnet/hopr-demo-seeds'
 import { HoprToken__factory } from '../types'
+// import { getAddresses } from '../chain'
 
 const send = (signer, txparams) =>
   signer.sendTransaction(txparams, (error, transactionHash) => {
@@ -14,7 +15,7 @@ const send = (signer, txparams) =>
  * Faucets HOPR and ETH tokens to a local account with HOPR
  */
 async function main(
-  { address, amount }: { address: string; amount: string },
+  { token, address, amount }: { token: string; address: string; amount: string },
   { ethers, network }: HardhatRuntimeEnvironment,
   _runSuper: RunSuperFunction<any>
 ) {
@@ -24,12 +25,14 @@ async function main(
   })
   const etherAmount = '1'
   const signer = ethers.provider.getSigner()
+  const minterWallet = new ethers.Wallet(NODE_SEEDS[0], ethers.provider)
   const tx = {
     to: address,
     value: ethers.utils.parseEther(etherAmount)
   }
-  const minterWallet = new ethers.Wallet(NODE_SEEDS[0], ethers.provider)
-  const hoprToken = HoprToken__factory.connect(address, ethers.provider).connect(minterWallet)
+  // specify token or use
+  // const token = getAddresses()?.[network.name]?.HoprToken
+  const hoprToken = HoprToken__factory.connect(token, ethers.provider).connect(minterWallet)
 
   console.log(`💧💰 Sending ${etherAmount} ETH to ${address} on network ${network.name}`)
   await send(signer, tx)
@@ -39,8 +42,6 @@ async function main(
     from: minterWallet.getAddress(),
     gasLimit: 200e3
   })
-
-  await hoprToken.balanceOf(address).then(console.log)
 }
 
 export default main
