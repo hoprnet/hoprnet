@@ -11,7 +11,13 @@ import Message from './message'
 import { LevelUp } from 'levelup'
 import Debug from 'debug'
 import Hopr from '../../'
-import HoprCoreEthereum, { Hash, PublicKey, Ticket, Balance, UnacknowledgedTicket, Channel,
+import HoprCoreEthereum, {
+  Hash,
+  PublicKey,
+  Ticket,
+  Balance,
+  UnacknowledgedTicket,
+  Channel,
   getWinProbabilityAsFloat
 } from '@hoprnet/hopr-core-ethereum'
 
