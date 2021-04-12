@@ -5,7 +5,7 @@ import { COMPRESSED_PUBLIC_KEY_LENGTH } from './constants'
 import { u8aEquals } from '../../u8a'
 import { randomBytes } from 'crypto'
 
-const POR_STRING_LENGTH = 2 * COMPRESSED_PUBLIC_KEY_LENGTH
+export const POR_STRING_LENGTH = 2 * COMPRESSED_PUBLIC_KEY_LENGTH
 
 /**
  * Takes the secrets which the first and the second relayer are able

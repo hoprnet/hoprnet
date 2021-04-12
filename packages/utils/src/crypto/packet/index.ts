@@ -24,6 +24,25 @@ function onionEncrypt(text: Uint8Array, secrets: Uint8Array[]): Uint8Array {
   return text
 }
 
+export function getHeaderLength(
+  maxHops: number,
+  additionalDataRelayerLength: number,
+  additionalDataLastHopLength: number
+) {
+  const perHop = COMPRESSED_PUBLIC_KEY_LENGTH + MAC_LENGTH + additionalDataRelayerLength
+  const lastHop = END_PREFIX_LENGTH + additionalDataLastHopLength
+
+  return lastHop + (maxHops - 1) * perHop
+}
+
+export function getPacketLength(
+  maxHops: number,
+  additionalDataRelayerLength: number,
+  additionalDataLastHopLength: number
+) {
+  return getHeaderLength(maxHops, additionalDataRelayerLength, additionalDataLastHopLength) + PAYLOAD_SIZE
+}
+
 /**
  * Creates a mixnet packet
  * @param msg payload to send
@@ -100,10 +119,8 @@ export function forwardTransform(
   if (privKey.privKey == null) {
     throw Error(`Invalid arguments`)
   }
-  const perHop = COMPRESSED_PUBLIC_KEY_LENGTH + MAC_LENGTH + additionalDataRelayerLength
-  const lastHop = END_PREFIX_LENGTH + additionalDataLastHopLength
 
-  const headerLength = lastHop + (maxHops - 1) * perHop
+  const headerLength = getHeaderLength(maxHops, additionalDataRelayerLength, additionalDataLastHopLength)
 
   let decoded = decodePacket(packet, headerLength)
 

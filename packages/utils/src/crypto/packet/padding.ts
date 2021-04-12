@@ -1,7 +1,7 @@
 import { PAYLOAD_SIZE } from './constants'
 import { u8aEquals } from '../../u8a'
 
-export const PADDING_TAG = Uint8Array.from([72, 79, 80, 82])
+export const PADDING_TAG = Uint8Array.from([72, 79, 80, 82]) // "HOPR"
 export const PADDING_TAG_LENGTH = 4
 
 export function addPadding(msg: Uint8Array) {

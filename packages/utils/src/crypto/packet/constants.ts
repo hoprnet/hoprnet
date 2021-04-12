@@ -1,5 +1,5 @@
 /**
- * Length of secp256k1 private keys resp. public keys
+ * Length of secp256k1 private keys and public keys
  */
 export const PRIVATE_KEY_LENGTH = 32
 export const COMPRESSED_PUBLIC_KEY_LENGTH = 33
