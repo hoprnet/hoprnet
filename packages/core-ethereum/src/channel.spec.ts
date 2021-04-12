@@ -68,8 +68,8 @@ describe('test Channel class', function () {
     this.timeout(durations.seconds(10))
 
     funder = await getPrivKeyData(stringToU8a(testconfigs.FUND_ACCOUNT_PRIVATE_KEY))
-    const partyA = await createAccountAndFund(web3, hoprToken, funder, testconfigs.DEMO_ACCOUNTS[1])
-    const partyB = await createAccountAndFund(web3, hoprToken, funder, testconfigs.DEMO_ACCOUNTS[2])
+    partyA = await createAccountAndFund(web3, hoprToken, funder, testconfigs.DEMO_ACCOUNTS[1])
+    partyB = await createAccountAndFund(web3, hoprToken, funder, testconfigs.DEMO_ACCOUNTS[2])
 
     partyAConnector = await createNode(partyA.privKey.serialize())
     await partyAConnector.initOnchainValues()
