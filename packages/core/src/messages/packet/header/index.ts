@@ -2,7 +2,17 @@ import secp256k1 from 'secp256k1'
 import hkdf from 'futoin-hkdf'
 import crypto from 'crypto'
 import { createHeader as createHeaderHelper } from './createHeader'
-import { u8aXOR, u8aConcat, u8aEquals, u8aToHex, PRG, PRG_IV_LENGTH, PRG_KEY_LENGTH, PRP_IV_LENGTH, PRP_KEY_LENGTH } from '@hoprnet/hopr-utils'
+import {
+  u8aXOR,
+  u8aConcat,
+  u8aEquals,
+  u8aToHex,
+  PRG,
+  PRG_IV_LENGTH,
+  PRG_KEY_LENGTH,
+  PRP_IV_LENGTH,
+  PRP_KEY_LENGTH
+} from '@hoprnet/hopr-utils'
 import { MAX_HOPS } from '../../../constants'
 import {
   COMPRESSED_PUBLIC_KEY_LENGTH,
@@ -124,7 +134,6 @@ export class Header extends Uint8Array {
     const params = derivePRGParameters(this.derivedSecret)
 
     if (lastNode) {
-
       this.tmpData.set(
         u8aXOR(
           false,
