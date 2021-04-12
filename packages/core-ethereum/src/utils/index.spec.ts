@@ -1,8 +1,9 @@
 import assert from 'assert'
 import { randomBytes } from 'crypto'
 import secp256k1 from 'secp256k1'
-import { randomInteger, u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
+import { randomInteger, u8aToHex } from '@hoprnet/hopr-utils'
 import * as utils from '.'
+import { Signature } from '../types/primitives'
 
 const generatePair = () => {
   // generate private key
@@ -26,22 +27,12 @@ const generatePair = () => {
 const generateMsg = () => randomBytes(32)
 
 describe('test utils', function () {
-  it('should sign and verify signer', async function () {
-    const { privKey, pubKey } = generatePair()
-
-    const message = generateMsg()
-    const signature = await utils.sign(message, privKey)
-    const signer = await utils.signer(message, signature)
-
-    assert(u8aEquals(pubKey, signer), `check that message is signed correctly`)
-  })
-
   it('should sign and verify messages', async function () {
     const { privKey, pubKey } = generatePair()
 
     for (let i = 0; i < 40; i++) {
       const message = generateMsg()
-      const signature = await utils.sign(message, privKey)
+      const signature = Signature.create(message, privKey)
       assert(await utils.verify(message, signature, pubKey), `check that signature is verifiable`)
 
       let exponent = randomInteger(0, 7)

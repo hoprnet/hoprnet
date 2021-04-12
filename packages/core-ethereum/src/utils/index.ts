@@ -1,6 +1,6 @@
 import { Networks, networks } from '@hoprnet/hopr-ethereum'
 import assert from 'assert'
-import { ecdsaSign, ecdsaRecover, ecdsaVerify } from 'secp256k1'
+import { ecdsaRecover, ecdsaVerify } from 'secp256k1'
 import { PromiEvent, TransactionReceipt } from 'web3-core'
 import { BlockTransactionString } from 'web3-eth'
 import Web3 from 'web3'
@@ -20,24 +20,6 @@ import * as time from './time'
 import BN from 'bn.js'
 
 export { time }
-
-/**
- * Signs a message with ECDSA
- * @param msg the message to sign
- * @param privKey the private key to use when signing
- * @param pubKey deprecated
- * @param arr
- * @returns a promise resolved to Hash
- */
-export async function sign(msg: Uint8Array, privKey: Uint8Array): Promise<Signature> {
-  if (privKey.length != constants.PRIVATE_KEY_LENGTH) {
-    throw Error(
-      `Invalid privKey argument. Expected a Uint8Array with ${constants.PRIVATE_KEY_LENGTH} elements but got one with ${privKey.length}.`
-    )
-  }
-  const result = ecdsaSign(msg, privKey)
-  return new Signature(result.signature, result.recid)
-}
 
 /**
  * Recovers the public key of the signer from the message
