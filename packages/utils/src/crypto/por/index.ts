@@ -1,20 +1,20 @@
 import { SECRET_LENGTH } from './constants'
 import { publicKeyCreate, privateKeyTweakAdd, publicKeyCombine, publicKeyTweakAdd } from 'secp256k1'
 import { deriveAckKeyShare, deriveOwnKeyShare } from './keyDerivation'
-import { COMPRESSED_PUBLIC_KEY_LENGTH } from './constants'
+import { SECP256K1 } from '../constants'
 import { u8aEquals } from '../../u8a'
 import { randomBytes } from 'crypto'
 
-export const POR_STRING_LENGTH = 2 * COMPRESSED_PUBLIC_KEY_LENGTH
+export const POR_STRING_LENGTH = 2 * SECP256K1.COMPRESSED_PUBLIC_KEY_LENGTH
 
 /**
  * Takes the secrets which the first and the second relayer are able
  * to derive from the packet header and computes the challenge for
  * the first ticket.
  * @param secrets shared secrets with creator of the packet
- * @returns the challenge first the ticket sent to the first relayer
+ * @returns the challenge for the first ticket sent to the first relayer
  */
-export function createFirstChallenge(secrets: Uint8Array[]) {
+export function createFirstChallenge(secrets: Uint8Array[]): { ackChallenge: Uint8Array; ticketChallenge: Uint8Array } {
   if (secrets.length < 2 || secrets.some((secret) => secret.length != SECRET_LENGTH)) {
     throw Error(`Invalid arguments`)
   }
@@ -22,7 +22,10 @@ export function createFirstChallenge(secrets: Uint8Array[]) {
   const s0 = deriveOwnKeyShare(secrets[0])
   const s1 = deriveAckKeyShare(secrets[1])
 
-  return createChallenge(s0, s1)
+  const ackChallenge = publicKeyCreate(deriveAckKeyShare(secrets[0]))
+  const ticketChallenge = createChallenge(s0, s1)
+
+  return { ackChallenge, ticketChallenge }
 }
 
 /**
@@ -67,8 +70,11 @@ export function preVerify(
   }
 
   const [nextChallenge, hint] = [
-    porBytes.subarray(0, COMPRESSED_PUBLIC_KEY_LENGTH),
-    porBytes.subarray(COMPRESSED_PUBLIC_KEY_LENGTH, COMPRESSED_PUBLIC_KEY_LENGTH + COMPRESSED_PUBLIC_KEY_LENGTH)
+    porBytes.subarray(0, SECP256K1.COMPRESSED_PUBLIC_KEY_LENGTH),
+    porBytes.subarray(
+      SECP256K1.COMPRESSED_PUBLIC_KEY_LENGTH,
+      SECP256K1.COMPRESSED_PUBLIC_KEY_LENGTH + SECP256K1.COMPRESSED_PUBLIC_KEY_LENGTH
+    )
   ]
 
   const ownKey = deriveOwnKeyShare(secret)

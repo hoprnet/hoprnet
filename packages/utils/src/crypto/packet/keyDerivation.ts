@@ -1,5 +1,6 @@
 import { expand } from 'futoin-hkdf'
-import { PRIVATE_KEY_LENGTH, SECRET_LENGTH, HASH_ALGORITHM, HASH_LENGTH } from './constants'
+import { SECRET_LENGTH, HASH_ALGORITHM, HASH_LENGTH } from './constants'
+import { SECP256K1 } from '../constants'
 import { PRG_IV_LENGTH, PRG_KEY_LENGTH } from '../prg'
 import { PRP_IV_LENGTH, PRP_KEY_LENGTH } from '../prp'
 import type { PRGParameters } from '../prg'
@@ -20,7 +21,7 @@ export function deriveBlinding(secret: Uint8Array): Uint8Array {
     throw Error(`Invalid arguments`)
   }
 
-  return expand(HASH_ALGORITHM, HASH_LENGTH, Buffer.from(secret), PRIVATE_KEY_LENGTH, HASH_KEY_BLINDING)
+  return expand(HASH_ALGORITHM, HASH_LENGTH, Buffer.from(secret), SECP256K1.PRIVATE_KEY_LENGTH, HASH_KEY_BLINDING)
 }
 
 /**

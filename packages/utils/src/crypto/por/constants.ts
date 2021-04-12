@@ -9,8 +9,3 @@ export const SECRET_LENGTH = 32
  */
 export const HASH_ALGORITHM = 'blake2s256'
 export const HASH_LENGTH = 32
-
-/**
- * Length of a secp256k1 public key in bytes
- */
-export const COMPRESSED_PUBLIC_KEY_LENGTH = 33

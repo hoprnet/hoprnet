@@ -1,6 +1,7 @@
 import { createFirstChallenge, createPoRString, preVerify, validateAcknowledgement } from '.'
 import { randomBytes } from 'crypto'
-import { SECRET_LENGTH, COMPRESSED_PUBLIC_KEY_LENGTH } from './constants'
+import { SECRET_LENGTH } from './constants'
+import { SECP256K1 } from '../constants'
 import { deriveAckKeyShare } from './keyDerivation'
 // import { u8aSplit } from '../../u8a'
 import assert from 'assert'
@@ -22,13 +23,13 @@ describe('PoR - proof of relay', function () {
 
     // Computation result of the first relayer before
     // receiving an acknowledgement from the second relayer
-    const result = preVerify(secrets[0], firstPorString, firstChallenge)
+    const result = preVerify(secrets[0], firstPorString, firstChallenge.ticketChallenge)
 
     assert(result.valid == true, `Challenge must be plausible`)
 
     // Simulates the transformation done by the first relayer
     assert(
-      u8aEquals(result.nextChallenge, firstPorString.subarray(0, COMPRESSED_PUBLIC_KEY_LENGTH)),
+      u8aEquals(result.nextChallenge, firstPorString.subarray(0, SECP256K1.COMPRESSED_PUBLIC_KEY_LENGTH)),
       `Forward logic must extract correct challenge for next downstream node`
     )
 
@@ -36,7 +37,12 @@ describe('PoR - proof of relay', function () {
     // the acknowledgement
     const ack = deriveAckKeyShare(secrets[1])
 
-    const validateResponseResult = validateAcknowledgement(result.ownShare, result.ownKey, ack, firstChallenge)
+    const validateResponseResult = validateAcknowledgement(
+      result.ownShare,
+      result.ownKey,
+      ack,
+      firstChallenge.ticketChallenge
+    )
 
     assert(validateResponseResult.valid == true, `Acknowledgement must solve the challenge`)
 

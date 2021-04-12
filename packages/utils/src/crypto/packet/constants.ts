@@ -1,11 +1,4 @@
 /**
- * Length of secp256k1 private keys and public keys
- */
-export const PRIVATE_KEY_LENGTH = 32
-export const COMPRESSED_PUBLIC_KEY_LENGTH = 33
-export const UNCOMPRESSED_PUBLIC_KEY_LENGTH = 65
-
-/**
  * Hash algorithm that is used to derive the shared secrets
  * and its output length
  */

@@ -1,6 +1,7 @@
 import { u8aEquals, u8aXOR } from '../../u8a'
 import { derivePRGParameters } from './keyDerivation'
-import { COMPRESSED_PUBLIC_KEY_LENGTH, MAC_LENGTH, SECRET_LENGTH, END_PREFIX, END_PREFIX_LENGTH } from './constants'
+import { MAC_LENGTH, SECRET_LENGTH, END_PREFIX, END_PREFIX_LENGTH } from './constants'
+import { SECP256K1 } from '../constants'
 import { randomFillSync } from 'crypto'
 import { PRG } from '../prg'
 import { generateFiller } from './filler'
@@ -25,7 +26,7 @@ export function createRoutingInfo(
   additionalDataRelayer: Uint8Array[],
   additionalDataLastHop?: Uint8Array
 ): { routingInformation: Uint8Array; mac: Uint8Array } {
-  const routingInfoLength = additionalDataRelayer[0].length + MAC_LENGTH + COMPRESSED_PUBLIC_KEY_LENGTH
+  const routingInfoLength = additionalDataRelayer[0].length + MAC_LENGTH + SECP256K1.COMPRESSED_PUBLIC_KEY_LENGTH
   const lastHopLength = (additionalDataLastHop?.length ?? 0) + END_PREFIX_LENGTH
 
   if (
@@ -74,9 +75,9 @@ export function createRoutingInfo(
       // Add pubkey of next downstream node
       extendedHeader.set(path[invIndex + 1].pubKey.marshal())
 
-      extendedHeader.set(mac, COMPRESSED_PUBLIC_KEY_LENGTH)
+      extendedHeader.set(mac, SECP256K1.COMPRESSED_PUBLIC_KEY_LENGTH)
 
-      extendedHeader.set(additionalDataRelayer[invIndex], COMPRESSED_PUBLIC_KEY_LENGTH + MAC_LENGTH)
+      extendedHeader.set(additionalDataRelayer[invIndex], SECP256K1.COMPRESSED_PUBLIC_KEY_LENGTH + MAC_LENGTH)
 
       u8aXOR(true, extendedHeader, PRG.createPRG(params).digest(0, extendedHeaderLength))
     }
@@ -118,7 +119,7 @@ export function forwardTransform(
   additionalDataRelayerLength: number,
   additionalDataLastHopLength: number
 ): LastNodeOutput | RelayNodeOutput {
-  const routingInfoLength = additionalDataLastHopLength + COMPRESSED_PUBLIC_KEY_LENGTH + MAC_LENGTH
+  const routingInfoLength = additionalDataLastHopLength + SECP256K1.COMPRESSED_PUBLIC_KEY_LENGTH + MAC_LENGTH
   const lastHopLength = additionalDataLastHopLength + END_PREFIX_LENGTH
 
   const headerLength = lastHopLength + (maxHops - 1) * routingInfoLength
@@ -152,11 +153,14 @@ export function forwardTransform(
     }
   }
 
-  let nextHop = header.slice(0, COMPRESSED_PUBLIC_KEY_LENGTH)
-  let nextMac = header.slice(COMPRESSED_PUBLIC_KEY_LENGTH, COMPRESSED_PUBLIC_KEY_LENGTH + MAC_LENGTH)
+  let nextHop = header.slice(0, SECP256K1.COMPRESSED_PUBLIC_KEY_LENGTH)
+  let nextMac = header.slice(
+    SECP256K1.COMPRESSED_PUBLIC_KEY_LENGTH,
+    SECP256K1.COMPRESSED_PUBLIC_KEY_LENGTH + MAC_LENGTH
+  )
   let additionalInfo = header.slice(
-    COMPRESSED_PUBLIC_KEY_LENGTH + MAC_LENGTH,
-    COMPRESSED_PUBLIC_KEY_LENGTH + MAC_LENGTH + additionalDataRelayerLength
+    SECP256K1.COMPRESSED_PUBLIC_KEY_LENGTH + MAC_LENGTH,
+    SECP256K1.COMPRESSED_PUBLIC_KEY_LENGTH + MAC_LENGTH + additionalDataRelayerLength
   )
 
   if (!publicKeyVerify(nextHop)) {

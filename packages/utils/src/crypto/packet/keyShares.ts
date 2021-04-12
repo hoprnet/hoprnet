@@ -1,5 +1,6 @@
-import { PRIVATE_KEY_LENGTH, HASH_ALGORITHM, HASH_LENGTH } from './constants'
-import { generateKeyPair } from './utils'
+import { HASH_ALGORITHM, HASH_LENGTH } from './constants'
+import { SECP256K1 } from '../constants'
+import { sampleGroupElement } from '../sampleGroupElement'
 import { privateKeyTweakMul, publicKeyTweakMul, publicKeyConvert, publicKeyVerify, privateKeyVerify } from 'secp256k1'
 import { extract } from 'futoin-hkdf'
 
@@ -18,12 +19,12 @@ export function generateKeyShares(path: PeerId[]): { alpha: Uint8Array; secrets:
 
   let keyPair: [x: Uint8Array, alpha: Uint8Array]
 
-  const product = new Uint8Array(PRIVATE_KEY_LENGTH)
+  const product = new Uint8Array(SECP256K1.PRIVATE_KEY_LENGTH)
 
   do {
     secrets = []
 
-    keyPair = generateKeyPair()
+    keyPair = sampleGroupElement()
 
     product.set(keyPair[0])
 
@@ -39,6 +40,10 @@ export function generateKeyShares(path: PeerId[]): { alpha: Uint8Array; secrets:
       secrets.push(secret)
 
       product.set(privateKeyTweakMul(product, secret))
+
+      if (!publicKeyVerify(product)) {
+        return
+      }
 
       if (index == path.length - 1) {
         done = true

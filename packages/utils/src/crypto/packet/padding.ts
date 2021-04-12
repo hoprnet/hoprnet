@@ -26,7 +26,7 @@ export function removePadding(decoded: Uint8Array) {
     index >= PAYLOAD_SIZE - PADDING_TAG_LENGTH ||
     !u8aEquals(decoded.subarray(index, index + PADDING_TAG_LENGTH), PADDING_TAG)
   ) {
-    throw new Error(`General error.`)
+    throw Error(`General error.`)
   }
 
   return decoded.slice(index + PADDING_TAG_LENGTH)
