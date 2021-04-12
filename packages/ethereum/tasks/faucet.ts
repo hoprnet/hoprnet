@@ -1,8 +1,11 @@
 import type { HardhatRuntimeEnvironment, RunSuperFunction } from 'hardhat/types'
+import { PublicKey } from '@hoprnet/hopr-core-ethereum'
 import { NODE_SEEDS } from '@hoprnet/hopr-demo-seeds'
 import { HoprToken__factory } from '../types'
 import { promisify } from 'util'
 import { stat, readFile } from 'fs'
+import { convertPubKeyFromB58String } from '@hoprnet/hopr-utils'
+
 
 const statAsync = promisify(stat)
 const readFileAsync = promisify(readFile)
@@ -13,6 +16,12 @@ const send = (signer, txparams) =>
     }
     console.log(`transactionHash: ${transactionHash}`)
   })
+
+const nativeAddress = async (hoprAddress) => {
+  const nodePeerPubkey = await convertPubKeyFromB58String(hoprAddress);
+  const hoprPubKey = new PublicKey(nodePeerPubkey.marshal())
+  return hoprPubKey.toAddress().toHex();
+}
 
 const getHoprTokenAddress = async (addressesFile) => {
   try {
@@ -28,7 +37,7 @@ const getHoprTokenAddress = async (addressesFile) => {
  * Faucets HOPR and ETH tokens to a local account with HOPR
  */
 async function main(
-  { address, amount }: { address: string; amount: string },
+  { address, amount, ishopraddress }: { address: string; amount: string, ishopraddress: boolean },
   { ethers, network }: HardhatRuntimeEnvironment,
   _runSuper: RunSuperFunction<any>
 ) {
@@ -46,18 +55,19 @@ async function main(
   const etherAmount = '1.0'
   const signer = ethers.provider.getSigner()
   const minterWallet = new ethers.Wallet(NODE_SEEDS[0], ethers.provider)
+  const nodeAddress = ishopraddress ? await nativeAddress(address) : address;
   const tx = {
-    to: address,
+    to: nodeAddress,
     value: ethers.utils.parseEther(etherAmount)
   }
   const hoprTokenAddress = await getHoprTokenAddress(addressesFile)
   const hoprToken = HoprToken__factory.connect(hoprTokenAddress, ethers.provider).connect(minterWallet)
 
-  console.log(`💧💰 Sending ${etherAmount} ETH to ${address} on network ${network.name}`)
+  console.log(`💧💰 Sending ${etherAmount} ETH to ${nodeAddress} on network ${network.name}`)
   await send(signer, tx)
 
-  console.log(`💧🟡 Sending ${ethers.utils.formatEther(amount)} HOPR to ${address} on network ${network.name}`)
-  await hoprToken.mint(address, amount, ethers.constants.HashZero, ethers.constants.HashZero, {
+  console.log(`💧🟡 Sending ${ethers.utils.formatEther(amount)} HOPR to ${nodeAddress} on network ${network.name}`)
+  await hoprToken.mint(nodeAddress, amount, ethers.constants.HashZero, ethers.constants.HashZero, {
     from: minterWallet.getAddress(),
     gasLimit: 200e3
   })

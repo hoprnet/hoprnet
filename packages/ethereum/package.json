@@ -11,6 +11,7 @@
     "build": "yarn clean && yarn build:sol && tsc && cp -R ./chain/abis ./lib/chain/abis",
     "build:sol": "hardhat compile && hardhat postCompile",
     "fund": "hardhat fund",
+    "faucet": "hardhat faucet",
     "migrate": "hardhat deploy",
     "network": "hardhat node",
     "test": "hardhat test",
