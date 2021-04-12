@@ -3,7 +3,6 @@ import assert from 'assert'
 import BN from 'bn.js'
 import { stringToU8a } from '@hoprnet/hopr-utils'
 import { AccountEntry, Address, PublicKey, Hash, ChannelEntry } from '../types'
-import { isPartyA, getParties } from '../utils'
 
 export const onAccountInitialized = async (event: Event<'AccountInitialized'>): Promise<AccountEntry> => {
   const data = event.args
@@ -37,7 +36,7 @@ export const onChannelFunded = async (
 
   const accountA = Address.fromString(data.accountA)
   const accountB = Address.fromString(data.accountB)
-  const [partyA, partyB] = getParties(accountA, accountB)
+  const [partyA, partyB] = accountA.sortPair(accountB)
 
   if (channelEntry) {
     const deposit = channelEntry.deposit.add(new BN(data.deposit.toString()))
@@ -113,14 +112,13 @@ export const onTicketRedeemed = async (
   const data = event.args
   const redeemer = Address.fromString(data.redeemer)
   const counterparty = Address.fromString(data.counterparty)
-  const isRedeemerPartyA = isPartyA(redeemer, counterparty)
   const amount = new BN(data.amount.toString())
 
   return new ChannelEntry(
     channelEntry.partyA,
     channelEntry.partyB,
     channelEntry.deposit,
-    isRedeemerPartyA ? channelEntry.partyABalance.add(amount) : channelEntry.partyABalance.sub(amount),
+    redeemer.lt(counterparty) ? channelEntry.partyABalance.add(amount) : channelEntry.partyABalance.sub(amount),
     channelEntry.closureTime,
     channelEntry.stateCounter,
     false,
@@ -141,7 +139,6 @@ export const onChannelPendingToClose = async (
   const data = event.args
   const initiator = Address.fromString(data.initiator)
   const counterparty = Address.fromString(data.counterparty)
-  const isInitiatorPartyA = isPartyA(initiator, counterparty)
 
   return new ChannelEntry(
     channelEntry.partyA,
@@ -150,7 +147,7 @@ export const onChannelPendingToClose = async (
     channelEntry.partyABalance,
     new BN(data.closureTime.toString()),
     channelEntry.stateCounter.addn(1),
-    isInitiatorPartyA,
+    initiator.lt(counterparty),
     channelEntry.openedAt,
     channelEntry.closedAt
   )

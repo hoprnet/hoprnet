@@ -1,8 +1,8 @@
 import type Connector from '.'
 import { ethers } from 'ethers'
 import BN from 'bn.js'
-import { PublicKey, Balance, Hash, UINT256, Ticket, Acknowledgement, ChannelEntry } from './types'
-import { getId, computeWinningProbability, checkChallenge, isWinningTicket, getSignatureParameters } from './utils'
+import { PublicKey, Address, Balance, Hash, UINT256, Ticket, Acknowledgement, ChannelEntry } from './types'
+import { computeWinningProbability, checkChallenge, isWinningTicket, getSignatureParameters } from './utils'
 import Debug from 'debug'
 import type { SubmitTicketResponse } from '.'
 
@@ -16,8 +16,13 @@ class Channel {
     public readonly counterparty: PublicKey
   ) {}
 
-  async getId() {
-    return getId(await this.self.toAddress(), await this.counterparty.toAddress())
+  static generateId(self: Address, counterparty: Address) {
+    let parties = self.sortPair(counterparty)
+    return Hash.create(Buffer.concat(parties.map((x) => x.serialize())))
+  }
+
+  getId() {
+    return Channel.generateId(this.self.toAddress(), this.counterparty.toAddress())
   }
 
   async getState(): Promise<ChannelEntry> {

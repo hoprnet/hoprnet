@@ -1,94 +1,7 @@
 import { Networks, networks } from '@hoprnet/hopr-ethereum'
-import { ecdsaSign, ecdsaRecover, ecdsaVerify } from 'secp256k1'
 import { u8aCompare, u8aConcat, u8aEquals, A_STRICLY_LESS_THAN_B, A_EQUALS_B, u8aToNumber } from '@hoprnet/hopr-utils'
-import { Address, Hash, Signature } from '../types'
-import * as constants from '../constants'
+import { Hash, Signature } from '../types'
 import BN from 'bn.js'
-
-/**
- * @param self our node's accountId
- * @param counterparty counterparty's accountId
- * @returns true if self is partyA
- */
-export function isPartyA(self: Address, counterparty: Address): boolean {
-  return Buffer.compare(self.serialize(), counterparty.serialize()) < 0
-}
-
-/**
- * @param self our node's accountId
- * @param counterparty counterparty's accountId
- * @returns an array of partyA's and partyB's accountIds
- */
-export function getParties(self: Address, counterparty: Address): [Address, Address] {
-  if (isPartyA(self, counterparty)) {
-    return [self, counterparty]
-  } else {
-    return [counterparty, self]
-  }
-}
-
-/**
- * Get the channel id of self and counterparty
- * @param self our node's accountId
- * @param counterparty counterparty's accountId
- * @returns a promise resolved to Hash
- */
-export function getId(self: Address, counterparty: Address): Promise<Hash> {
-  return hash(
-    Buffer.concat(
-      getParties(self, counterparty).map((x) => x.serialize()),
-      2 * constants.ADDRESS_LENGTH
-    )
-  )
-}
-
-/**
- * Given a message, generate hash using keccak256.
- * @param msg the message to hash
- * @returns a promise resolved to Hash
- */
-export async function hash(msg: Uint8Array): Promise<Hash> {
-  return Hash.create(msg)
-}
-
-/**
- * Signs a message with ECDSA
- * @param msg the message to sign
- * @param privKey the private key to use when signing
- * @param pubKey deprecated
- * @param arr
- * @returns a promise resolved to Hash
- */
-export async function sign(msg: Uint8Array, privKey: Uint8Array): Promise<Signature> {
-  if (privKey.length != constants.PRIVATE_KEY_LENGTH) {
-    throw Error(
-      `Invalid privKey argument. Expected a Uint8Array with ${constants.PRIVATE_KEY_LENGTH} elements but got one with ${privKey.length}.`
-    )
-  }
-  const result = ecdsaSign(msg, privKey)
-  return new Signature(result.signature, result.recid)
-}
-
-/**
- * Recovers the public key of the signer from the message
- * @param msg the message that was signed
- * @param signature the signature of the signed message
- * @returns a promise resolved to Uint8Array, the signers public key
- */
-export async function signer(msg: Uint8Array, signature: Signature): Promise<Uint8Array> {
-  return ecdsaRecover(signature.signature, signature.recovery, msg)
-}
-
-/**
- * Checks the validity of the signature by using the public key
- * @param msg the message that was signed
- * @param signature the signature of the signed message
- * @param pubKey the public key of the potential signer
- * @returns a promise resolved to true if the public key provided matches the signer's
- */
-export async function verify(msg: Uint8Array, signature: Signature, pubKey: Uint8Array): Promise<boolean> {
-  return ecdsaVerify(signature.signature, msg, pubKey)
-}
 
 /**
  * Decides whether a ticket is a win or not.
@@ -212,16 +125,6 @@ export function getSignatureParameters(
     s: new Hash(signature.signature.slice(32, 64)),
     v: signature.recovery
   }
-}
-
-/**
- * Create a challenge by concatinating and then hashing the secrets.
- * @param secretA
- * @param secretB
- * @returns a promise that resolves to a hash
- */
-export async function createChallenge(secretA: Uint8Array, secretB: Uint8Array): Promise<Hash> {
-  return Hash.create(u8aConcat(secretA, secretB)).hash()
 }
 
 /**

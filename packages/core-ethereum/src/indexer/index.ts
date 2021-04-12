@@ -7,11 +7,11 @@ import BN from 'bn.js'
 import Heap from 'heap-js'
 import { pubKeyToPeerId, randomChoice } from '@hoprnet/hopr-utils'
 import { Address, ChannelEntry, Hash, PublicKey, Balance, Snapshot } from '../types'
-import { getId } from '../utils'
 import * as reducers from './reducers'
 import * as db from './db'
 import { isConfirmedBlock, isSyncing, snapshotComparator } from './utils'
 import Debug from 'debug'
+import { Channel } from '..'
 
 export type RoutingChannel = [source: PeerId, destination: PeerId, stake: Balance]
 
@@ -333,7 +333,7 @@ class Indexer extends EventEmitter {
 
     const accountIdA = Address.fromString(data.accountA)
     const accountIdB = Address.fromString(data.accountB)
-    const channelId = await getId(accountIdA, accountIdB)
+    const channelId = Channel.generateId(accountIdA, accountIdB)
 
     let storedChannel = await db.getChannel(this.connector.db, channelId)
     const channel = await reducers.onChannelFunded(event, storedChannel)
@@ -351,7 +351,7 @@ class Indexer extends EventEmitter {
 
     const openerAccountId = Address.fromString(data.opener)
     const counterpartyAccountId = Address.fromString(data.counterparty)
-    const channelId = await getId(openerAccountId, counterpartyAccountId)
+    const channelId = Channel.generateId(openerAccountId, counterpartyAccountId)
     // log('Processing event %s with channelId %s', event.name, channelId.toHex())
 
     let storedChannel = await db.getChannel(this.connector.db, channelId)
@@ -371,7 +371,7 @@ class Indexer extends EventEmitter {
 
     const redeemerAccountId = Address.fromString(data.redeemer)
     const counterpartyAccountId = Address.fromString(data.counterparty)
-    const channelId = await getId(redeemerAccountId, counterpartyAccountId)
+    const channelId = Channel.generateId(redeemerAccountId, counterpartyAccountId)
     // log('Processing event %s with channelId %s', event.name, channelId.toHex())
 
     const storedChannel = await db.getChannel(this.connector.db, channelId)
@@ -389,7 +389,7 @@ class Indexer extends EventEmitter {
 
     const initiatorAccountId = Address.fromString(data.initiator)
     const counterpartyAccountId = Address.fromString(data.counterparty)
-    const channelId = await getId(initiatorAccountId, counterpartyAccountId)
+    const channelId = Channel.generateId(initiatorAccountId, counterpartyAccountId)
     // log('Processing event %s with channelId %s', event.name, channelId.toHex())
 
     const storedChannel = await db.getChannel(this.connector.db, channelId)
@@ -411,7 +411,7 @@ class Indexer extends EventEmitter {
 
     const closerAccountId = Address.fromString(data.initiator)
     const counterpartyAccountId = Address.fromString(data.counterparty)
-    const channelId = await getId(closerAccountId, counterpartyAccountId)
+    const channelId = Channel.generateId(closerAccountId, counterpartyAccountId)
     // log('Processing event %s with channelId %s', event.name, channelId.toHex())
 
     const storedChannel = await db.getChannel(this.connector.db, channelId)

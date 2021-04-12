@@ -3,59 +3,53 @@ import { Packet } from '../../messages/packet'
 import { AcknowledgementMessage } from '../../messages/acknowledgement'
 import Debug from 'debug'
 import type PeerId from 'peer-id'
-import type { AbstractInteraction } from '../abstractInteraction'
 import type Hopr from '../../'
-import pipe from 'it-pipe'
-import type { Connection, MuxedStream } from 'libp2p'
-import { dialHelper, durations, oneAtATime } from '@hoprnet/hopr-utils'
+import { durations, oneAtATime } from '@hoprnet/hopr-utils'
 import { Mixer } from '../../mixer'
 import { Challenge } from '../../messages/packet/challenge'
+import { PROTOCOL_ACKNOWLEDGEMENT } from '../../constants'
 
 const log = Debug('hopr-core:forward')
 const FORWARD_TIMEOUT = durations.seconds(6)
+const ACKNOWLEDGEMENT_TIMEOUT = durations.seconds(2)
 
-class PacketForwardInteraction implements AbstractInteraction {
+class PacketForwardInteraction {
   private mixer: Mixer
   private concurrencyLimiter
-  protocols: string[] = [PROTOCOL_STRING]
 
-  constructor(public node: Hopr) {
-    this.node._libp2p.handle(this.protocols, this.handler.bind(this))
+  constructor(public node: Hopr, private subscribe: any, private sendMessage: any) {
     this.mixer = new Mixer(this.handleMixedPacket.bind(this))
     this.concurrencyLimiter = oneAtATime()
+    this.subscribe(PROTOCOL_STRING, this.handlePacket.bind(this))
   }
 
   async interact(counterparty: PeerId, packet: Packet): Promise<void> {
-    const struct = await dialHelper(this.node._libp2p, counterparty, this.protocols[0], {
+    await this.sendMessage(counterparty, PROTOCOL_STRING, packet, {
       timeout: FORWARD_TIMEOUT
     })
-
-    if (struct == undefined) {
-      throw Error(`Failed to send packet to ${counterparty.toB58String()}.`)
-    }
-
-    pipe([packet], struct.stream)
   }
 
-  handler(struct: { connection: Connection; stream: MuxedStream; protocol: string }) {
-    pipe(
-      struct.stream,
-      async (source: AsyncIterable<Uint8Array>): Promise<void> => {
-        for await (const msg of source) {
-          const arr = msg.slice()
-          const packet = new Packet(this.node, this.node._libp2p, {
-            bytes: arr.buffer,
-            offset: arr.byteOffset
-          })
-
-          this.mixer.push(packet)
-        }
+  async handlePacket(msg: Uint8Array) {
+    const arr = msg.slice()
+    const packet = new Packet(
+      this.node._libp2p,
+      this.node.paymentChannels,
+      this.node.db,
+      this.node.getId(),
+      this.node.ticketAmount,
+      this.node.ticketWinProb,
+      {
+        bytes: arr.buffer,
+        offset: arr.byteOffset
       }
     )
+
+    this.mixer.push(packet)
   }
 
   async handleMixedPacket(packet: Packet) {
     const node = this.node
+    const sendMessage = this.sendMessage
     const interact = this.interact.bind(this)
     this.concurrencyLimiter(async function () {
       // See discussion in #1256 - apparently packet.forwardTransform cannot be
@@ -70,7 +64,9 @@ class PacketForwardInteraction implements AbstractInteraction {
             receivedChallenge,
             node.getId()
           )
-          await node._interactions.acknowledgment.interact(sender, ack)
+          sendMessage(sender, PROTOCOL_ACKNOWLEDGEMENT, ack.serialize(), {
+            timeout: ACKNOWLEDGEMENT_TIMEOUT
+          })
         })
 
         if (node.getId().equals(target)) {

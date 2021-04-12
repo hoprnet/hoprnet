@@ -1,8 +1,8 @@
 import BN from 'bn.js'
 import { u8aSplit, serializeToU8a, toU8a } from '@hoprnet/hopr-utils'
-import { Address, Balance } from '.' // TODO: cyclic
+import { Address, Balance } from './primitives'
 import { UINT256 } from '../types/solidity'
-import { getId } from '../utils'
+import { Channel } from '..'
 
 class ChannelEntry {
   constructor(
@@ -118,7 +118,7 @@ class ChannelEntry {
   }
 
   public getId() {
-    return getId(this.partyA, this.partyB)
+    return Channel.generateId(this.partyA, this.partyB)
   }
 
   public getBalances() {

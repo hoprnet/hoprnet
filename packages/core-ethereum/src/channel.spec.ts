@@ -5,7 +5,6 @@ import assert from 'assert'
 import { durations } from '@hoprnet/hopr-utils'
 import { getAddresses } from '@hoprnet/hopr-ethereum'
 import { createNode, fundAccount, advanceBlock } from './utils/testing'
-import { createChallenge } from './utils'
 import BN from 'bn.js'
 import { Balance, Ticket, Address, Hash, UnacknowledgedTicket, PublicKey } from './types'
 import CoreConnector from '.'
@@ -39,7 +38,7 @@ describe('test Channel class', function () {
   }) {
     const secretA = new Hash(randomBytes(32))
     const secretB = new Hash(randomBytes(32))
-    const challenge = await createChallenge(secretA.serialize(), secretB.serialize())
+    const challenge = Hash.createChallenge(secretA.serialize(), secretB.serialize())
 
     return {
       secretA,
