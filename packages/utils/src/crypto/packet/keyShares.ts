@@ -1,4 +1,4 @@
-import { PRIVATE_KEY_LENGTH } from './constants'
+import { PRIVATE_KEY_LENGTH, HASH_ALGORITHM, HASH_LENGTH } from './constants'
 import { generateKeyPair } from './utils'
 import { privateKeyTweakMul, publicKeyTweakMul, publicKeyConvert, publicKeyVerify, privateKeyVerify } from 'secp256k1'
 import { extract } from 'futoin-hkdf'
@@ -67,5 +67,5 @@ export function forwardTransform(alpha: Uint8Array, privKey: PeerId): { alpha: U
 }
 
 function keyExtract(groupElement: Uint8Array, pubKey: Uint8Array): Uint8Array {
-  return extract('blake2s256', 32, Buffer.from(publicKeyConvert(groupElement)), Buffer.from(pubKey))
+  return extract(HASH_ALGORITHM, HASH_LENGTH, Buffer.from(publicKeyConvert(groupElement)), Buffer.from(pubKey))
 }

@@ -61,7 +61,7 @@ export function preVerify(
   secret: Uint8Array,
   porBytes: Uint8Array,
   challenge: Uint8Array
-): [valid: true, ownShare: Uint8Array, ownKey: Uint8Array, nextChallenge: Uint8Array] | [valid: false] {
+): { valid: true; ownShare: Uint8Array; ownKey: Uint8Array; nextChallenge: Uint8Array } | { valid: false } {
   if (secret.length != SECRET_LENGTH || porBytes.length != POR_STRING_LENGTH) {
     throw Error(`Invalid arguments`)
   }
@@ -77,9 +77,9 @@ export function preVerify(
   const valid = u8aEquals(publicKeyCombine([ownShare, hint]), challenge)
 
   if (valid) {
-    return [true, ownKey, ownShare, nextChallenge]
+    return { valid: true, ownKey, ownShare, nextChallenge }
   } else {
-    return [false]
+    return { valid: false }
   }
 }
 
@@ -100,15 +100,15 @@ export function validateAcknowledgement(
   ownKey: Uint8Array,
   ack: Uint8Array,
   challenge: Uint8Array
-): [valid: true, response: Uint8Array] | [valid: false] {
+): { valid: true; response: Uint8Array } | { valid: false } {
   const valid = u8aEquals(publicKeyTweakAdd(ownShare, ack), challenge)
 
   if (valid) {
     // clone ownKey before adding a tweak to it
     const response = privateKeyTweakAdd(ownKey.slice(), ack)
-    return [true, response]
+    return { valid: true, response }
   } else {
-    return [false]
+    return { valid: false }
   }
 }
 

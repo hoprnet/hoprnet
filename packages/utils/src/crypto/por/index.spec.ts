@@ -24,11 +24,11 @@ describe('PoR - proof of relay', function () {
     // receiving an acknowledgement from the second relayer
     const result = preVerify(secrets[0], firstPorString, firstChallenge)
 
-    assert(result[0], `Challenge must be plausible`)
+    assert(result.valid == true, `Challenge must be plausible`)
 
     // Simulates the transformation done by the first relayer
     assert(
-      u8aEquals(result[3], firstPorString.subarray(0, COMPRESSED_PUBLIC_KEY_LENGTH)),
+      u8aEquals(result.nextChallenge, firstPorString.subarray(0, COMPRESSED_PUBLIC_KEY_LENGTH)),
       `Forward logic must extract correct challenge for next downstream node`
     )
 
@@ -36,20 +36,25 @@ describe('PoR - proof of relay', function () {
     // the acknowledgement
     const ack = deriveAckKeyShare(secrets[1])
 
-    const validateResponseResult = validateAcknowledgement(result[2], result[1], ack, firstChallenge)
+    const validateResponseResult = validateAcknowledgement(result.ownShare, result.ownKey, ack, firstChallenge)
 
-    assert(validateResponseResult[0], `Acknowledgement must solve the challenge`)
+    assert(validateResponseResult.valid == true, `Acknowledgement must solve the challenge`)
 
     // Simulates the transformation as done by the
     // second relayer
-    const secondResult = preVerify(secrets[1], secondPorString, result[3])
+    const secondResult = preVerify(secrets[1], secondPorString, result.nextChallenge)
 
-    assert(secondResult[0], `Second challenge must be plausible`)
+    assert(secondResult.valid == true, `Second challenge must be plausible`)
 
     const secondAck = deriveAckKeyShare(secrets[2])
 
-    const secondValidateResponseResult = validateAcknowledgement(secondResult[2], secondResult[1], secondAck, result[3])
+    const secondValidateResponseResult = validateAcknowledgement(
+      secondResult.ownShare,
+      secondResult.ownKey,
+      secondAck,
+      result.nextChallenge
+    )
 
-    assert(secondValidateResponseResult[0], `Second acknowledgement must solve the challenge`)
+    assert(secondValidateResponseResult.valid == true, `Second acknowledgement must solve the challenge`)
   })
 })
