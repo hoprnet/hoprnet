@@ -5,7 +5,7 @@ import assert from 'assert'
 import { stringToU8a, durations } from '@hoprnet/hopr-utils'
 import { getAddresses, abis } from '@hoprnet/hopr-ethereum'
 import { getPrivKeyData, createAccountAndFund, createNode, Account } from './utils/testing.spec'
-import { createChallenge, isPartyA } from './utils'
+import { createChallenge } from './utils'
 import BN from 'bn.js'
 import Web3 from 'web3'
 import { HoprToken } from './tsc/web3/HoprToken'
@@ -71,13 +71,12 @@ describe('test Channel class', function () {
     funder = await getPrivKeyData(stringToU8a(testconfigs.FUND_ACCOUNT_PRIVATE_KEY))
     const userA = await createAccountAndFund(web3, hoprToken, funder, testconfigs.DEMO_ACCOUNTS[1])
     const userB = await createAccountAndFund(web3, hoprToken, funder, testconfigs.DEMO_ACCOUNTS[2])
-    ;[partyA, partyB] = isPartyA(userA.address, userB.address) ? [userA, userB] : [userB, userA]
 
-    partyAConnector = await createNode(partyA.privKey.serialize())
+    partyAConnector = await createNode(userA.privKey.serialize())
     await partyAConnector.initOnchainValues()
     await partyAConnector.start()
 
-    partyBConnector = await createNode(partyB.privKey.serialize())
+    partyBConnector = await createNode(userB.privKey.serialize())
     await partyBConnector.initOnchainValues()
     await partyBConnector.start()
   })

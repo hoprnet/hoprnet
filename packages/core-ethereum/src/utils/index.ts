@@ -13,50 +13,13 @@ import {
   durations,
   u8aToNumber
 } from '@hoprnet/hopr-utils'
-import { Address, Balance, Hash, Signature } from '../types'
+import { Balance, Hash, Signature } from '../types'
 import { ContractEventEmitter } from '../tsc/web3/types'
 import * as constants from '../constants'
 import * as time from './time'
 import BN from 'bn.js'
 
 export { time }
-
-/**
- * @param self our node's accountId
- * @param counterparty counterparty's accountId
- * @returns true if self is partyA
- */
-export function isPartyA(self: Address, counterparty: Address): boolean {
-  return Buffer.compare(self.serialize(), counterparty.serialize()) < 0
-}
-
-/**
- * @param self our node's accountId
- * @param counterparty counterparty's accountId
- * @returns an array of partyA's and partyB's accountIds
- */
-export function getParties(self: Address, counterparty: Address): [Address, Address] {
-  if (isPartyA(self, counterparty)) {
-    return [self, counterparty]
-  } else {
-    return [counterparty, self]
-  }
-}
-
-/**
- * Get the channel id of self and counterparty
- * @param self our node's accountId
- * @param counterparty counterparty's accountId
- * @returns a promise resolved to Hash
- */
-export function getId(self: Address, counterparty: Address): Promise<Hash> {
-  return Promise.resolve(Hash.create(
-    Buffer.concat(
-      getParties(self, counterparty).map((x) => x.serialize()),
-      2 * constants.ADDRESS_LENGTH
-    )
-  ))
-}
 
 /**
  * Signs a message with ECDSA

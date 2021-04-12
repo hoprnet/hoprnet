@@ -7,12 +7,13 @@ import { durations, u8aToHex, u8aEquals } from '@hoprnet/hopr-utils'
 import { stringToU8a } from '@hoprnet/hopr-utils'
 import * as testconfigs from '../config.spec'
 import * as configs from '../config'
-import { time, getId } from '../utils'
+import { time } from '../utils'
 import { Account, getPrivKeyData, createAccountAndFund, createNode } from '../utils/testing.spec'
 import { HoprToken } from '../tsc/web3/HoprToken'
 import { HoprChannels } from '../tsc/web3/HoprChannels'
 import { publicKeyConvert } from 'secp256k1'
 import { randomBytes } from 'crypto'
+import { Channel } from '..'
 import { Hash } from '../types'
 
 const HoprTokenAbi = abis.HoprToken
@@ -119,21 +120,21 @@ describe('test indexer', function () {
     })
 
     it('should find channel using partyA', async function () {
-      const expectedChannelId = await getId(userA.address, userB.address)
+      const expectedChannelId = Channel.generateId(userA.address, userB.address)
       const channels = await connector.indexer.getChannelsOf(userA.address)
       assert.equal(channels.length, 1, 'check Channels.get')
       assert(expectedChannelId.eq(await channels[0].getId()), 'check Channels.get')
     })
 
     it('should find channel using partyB', async function () {
-      const expectedChannelId = await getId(userA.address, userB.address)
+      const expectedChannelId = Channel.generateId(userA.address, userB.address)
       const channels = await connector.indexer.getChannelsOf(userB.address)
       assert.equal(channels.length, 1, 'check Channels.get')
       assert(expectedChannelId.eq(await channels[0].getId()), 'check Channels.get')
     })
 
     it('should find channel using partyA & partyB', async function () {
-      const channel = await connector.indexer.getChannel(await getId(userA.address, userB.address))
+      const channel = await connector.indexer.getChannel(Channel.generateId(userA.address, userB.address))
       assert(!!channel, 'check Channels.getChannelEntry')
     })
     it('should store another channel', async function () {
@@ -190,7 +191,7 @@ describe('test indexer', function () {
       const channels = await connector.indexer.getChannels()
       assert.equal(channels.length, 2, 'check Channels.store')
 
-      const channel = await connector.indexer.getChannel(await getId(userA.address, userB.address))
+      const channel = await connector.indexer.getChannel(Channel.generateId(userA.address, userB.address))
       assert(!!channel, 'check Channels.getChannelEntry')
       assert(channel.deposit.isZero())
       assert(channel.partyABalance.isZero())

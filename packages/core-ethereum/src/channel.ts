@@ -1,8 +1,7 @@
 import type Connector from '.'
 import BN from 'bn.js'
-import { PublicKey, Balance, Hash, UINT256, Ticket, Acknowledgement, ChannelEntry } from './types'
+import { PublicKey, Balance, Hash, UINT256, Ticket, Acknowledgement, ChannelEntry, Address} from './types'
 import {
-  getId,
   waitForConfirmation,
   computeWinningProbability,
   checkChallenge,
@@ -21,8 +20,13 @@ class Channel {
     public readonly counterparty: PublicKey
   ) {}
 
-  async getId() {
-    return getId(await this.self.toAddress(), await this.counterparty.toAddress())
+  static generateId(self: Address, counterparty: Address) {
+    let parties = self.sortPair(counterparty)
+    return Hash.create(Buffer.concat(parties.map((x) => x.serialize())))
+  }
+
+  getId() {
+    return Channel.generateId(this.self.toAddress(), this.counterparty.toAddress())
   }
 
   async getState(): Promise<ChannelEntry> {

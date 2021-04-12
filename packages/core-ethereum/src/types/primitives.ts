@@ -29,6 +29,18 @@ export class Address {
   eq(b: Address) {
     return u8aEquals(this.arr, b.serialize())
   }
+
+  compare(b: Address): number {
+    return Buffer.compare(this.serialize(), b.serialize())
+  }
+
+  lt(b: Address): boolean {
+    return this.compare(b) < 0
+  }
+
+  sortPair(b: Address): [Address, Address] {
+    return this.lt(b) ? [this, b] : [b, this]
+  } 
 }
 
 export class Balance {
