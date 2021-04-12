@@ -13,16 +13,16 @@ describe(`PoR key derivation`, function () {
     sampleFieldElement(WORKING_SECRET, HASH_KEY)
 
     let hashKeyChanged = false
-    console.log(
-      sampleFieldElement(WORKING_SECRET, HASH_KEY, (hashKey: string) => {
-        if (hashKey === HASH_KEY) {
-          return INVALID_ELEMENT
-        } else {
-          hashKeyChanged = true
-          return VALID_ELEMENT
-        }
-      })
-    )
+
+    // Check that sampleFieldElement is indeed changing the hashkey
+    sampleFieldElement(WORKING_SECRET, HASH_KEY, (hashKey: string) => {
+      if (hashKey === HASH_KEY) {
+        return INVALID_ELEMENT
+      } else {
+        hashKeyChanged = true
+        return VALID_ELEMENT
+      }
+    })
 
     assert(hashKeyChanged)
   })

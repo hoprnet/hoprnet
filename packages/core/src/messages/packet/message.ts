@@ -81,18 +81,18 @@ class Message extends Uint8Array {
     this.encrypted = true
 
     for (let i = secrets.length; i > 0; i--) {
-      const { key, iv } = deriveCipherParameters(secrets[i - 1])
+      const params = deriveCipherParameters(secrets[i - 1])
 
-      PRP.createPRP(key, iv).permutate(this)
+      PRP.createPRP(params).permutate(this)
     }
 
     return this
   }
 
   decrypt(secret: Uint8Array): Message {
-    const { key, iv } = deriveCipherParameters(secret)
+    const params = deriveCipherParameters(secret)
 
-    PRP.createPRP(key, iv).inverse(this)
+    PRP.createPRP(params).inverse(this)
 
     return this
   }

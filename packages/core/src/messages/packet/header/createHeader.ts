@@ -112,12 +112,12 @@ export async function createHeader(header: Header, peerIds: PeerId[]) {
     let end: number = LAST_HOP_SIZE + MAX_HOPS * PER_HOP_SIZE
 
     for (let index = 0; index < secrets.length - 1; index++) {
-      let { key, iv } = derivePRGParameters(secrets[index])
+      let params = derivePRGParameters(secrets[index])
 
       start -= PER_HOP_SIZE
       length += PER_HOP_SIZE
 
-      u8aXOR(true, filler.subarray(0, length), PRG.createPRG(key, iv).digest(start, end))
+      u8aXOR(true, filler.subarray(0, length), PRG.createPRG(params).digest(start, end))
     }
 
     return filler
@@ -127,7 +127,7 @@ export async function createHeader(header: Header, peerIds: PeerId[]) {
     const tmp = new Uint8Array(BETA_LENGTH - PER_HOP_SIZE)
 
     for (let i = secrets.length; i > 0; i--) {
-      const { key, iv } = derivePRGParameters(secrets[i - 1])
+      const params = derivePRGParameters(secrets[i - 1])
 
       let paddingLength = (MAX_HOPS - secrets.length) * PER_HOP_SIZE
 
@@ -143,7 +143,7 @@ export async function createHeader(header: Header, peerIds: PeerId[]) {
         u8aXOR(
           true,
           header.beta.subarray(0, LAST_HOP_SIZE + paddingLength),
-          PRG.createPRG(key, iv).digest(0, LAST_HOP_SIZE + paddingLength)
+          PRG.createPRG(params).digest(0, LAST_HOP_SIZE + paddingLength)
         )
 
         header.beta.set(filler, LAST_HOP_SIZE + paddingLength)
@@ -181,7 +181,7 @@ export async function createHeader(header: Header, peerIds: PeerId[]) {
           )
         }
 
-        u8aXOR(true, header.beta, PRG.createPRG(key, iv).digest(0, BETA_LENGTH))
+        u8aXOR(true, header.beta, PRG.createPRG(params).digest(0, BETA_LENGTH))
       }
 
       header.gamma.set(createMAC(secrets[i - 1], header.beta), 0)

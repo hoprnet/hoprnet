@@ -2,7 +2,7 @@ import secp256k1 from 'secp256k1'
 import hkdf from 'futoin-hkdf'
 import crypto from 'crypto'
 import { createHeader as createHeaderHelper } from './createHeader'
-import { u8aXOR, u8aConcat, u8aEquals, u8aToHex, PRP, PRG } from '@hoprnet/hopr-utils'
+import { u8aXOR, u8aConcat, u8aEquals, u8aToHex, PRG, PRG_IV_LENGTH, PRG_KEY_LENGTH, PRP_IV_LENGTH, PRP_KEY_LENGTH } from '@hoprnet/hopr-utils'
 import { MAX_HOPS } from '../../../constants'
 import {
   COMPRESSED_PUBLIC_KEY_LENGTH,
@@ -121,16 +121,15 @@ export class Header extends Uint8Array {
   }
 
   extractHeaderInformation(lastNode: boolean = false): void {
-    const { key, iv } = derivePRGParameters(this.derivedSecret)
+    const params = derivePRGParameters(this.derivedSecret)
 
     if (lastNode) {
-      const { key, iv } = derivePRGParameters(this.derivedSecret)
 
       this.tmpData.set(
         u8aXOR(
           false,
           this.beta.subarray(0, DESINATION_SIZE + IDENTIFIER_SIZE),
-          PRG.createPRG(key, iv).digest(0, DESINATION_SIZE + IDENTIFIER_SIZE)
+          PRG.createPRG(params).digest(0, DESINATION_SIZE + IDENTIFIER_SIZE)
         ),
         0
       )
@@ -140,7 +139,7 @@ export class Header extends Uint8Array {
       tmp.set(this.beta, 0)
       tmp.fill(0, BETA_LENGTH, BETA_LENGTH + PER_HOP_SIZE)
 
-      u8aXOR(true, tmp, PRG.createPRG(key, iv).digest(0, BETA_LENGTH + PER_HOP_SIZE))
+      u8aXOR(true, tmp, PRG.createPRG(params).digest(0, BETA_LENGTH + PER_HOP_SIZE))
 
       // this.tmpData = this.tmpData || Buffer.alloc(ADDRESS_SIZE + PROVING_VALUES_SIZE + COMPRESSED_PUBLIC_KEY_LENGTH)
 
@@ -225,10 +224,10 @@ export function deriveCipherParameters(secret: Uint8Array): CipherParameters {
     throw Error('Secret must be a public key')
   }
 
-  const keyAndIV = hkdf(Buffer.from(secret), PRP.KEY_LENGTH + PRP.IV_LENGTH, { salt: HASH_KEY_PRP })
+  const keyAndIV = hkdf(Buffer.from(secret), PRP_KEY_LENGTH + PRP_IV_LENGTH, { salt: HASH_KEY_PRP })
 
-  const key = keyAndIV.subarray(0, PRP.KEY_LENGTH)
-  const iv = keyAndIV.subarray(PRP.KEY_LENGTH)
+  const key = keyAndIV.subarray(0, PRP_KEY_LENGTH)
+  const iv = keyAndIV.subarray(PRP_KEY_LENGTH)
 
   return { key, iv }
 }
@@ -238,10 +237,10 @@ export function derivePRGParameters(secret: Uint8Array): PRGParameters {
     throw Error('Secret must be a public key')
   }
 
-  const keyAndIV = hkdf(Buffer.from(secret), PRG.KEY_LENGTH + PRG.IV_LENGTH, { salt: HASH_KEY_PRG })
+  const keyAndIV = hkdf(Buffer.from(secret), PRG_KEY_LENGTH + PRG_IV_LENGTH, { salt: HASH_KEY_PRG })
 
-  const key = keyAndIV.subarray(0, PRG.KEY_LENGTH)
-  const iv = keyAndIV.subarray(PRG.KEY_LENGTH, PRG.KEY_LENGTH + PRG.IV_LENGTH)
+  const key = keyAndIV.subarray(0, PRG_KEY_LENGTH)
+  const iv = keyAndIV.subarray(PRG_KEY_LENGTH, PRG_KEY_LENGTH + PRG_IV_LENGTH)
 
   return { key, iv }
 }
