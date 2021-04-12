@@ -2,6 +2,18 @@ import { u8aXOR } from '../../u8a'
 import { PRG } from '../prg'
 import { derivePRGParameters } from './keyDerivation'
 
+/**
+ * Writes the filler bitstring into the header such
+ * that the integrity tag can be computed
+ * @param header header u8a to write the filler
+ * @param maxHops amount of relayers to use
+ * @param routingInfoLength length of additional data to
+ * put next to the routing information
+ * @param routingInfoLastHopLength length of the additional
+ * data to put next to the routing information of the last
+ * hop 
+ * @param secrets shared secrets with the creator of the packet 
+ */
 export function generateFiller(
   header: Uint8Array,
   maxHops: number,

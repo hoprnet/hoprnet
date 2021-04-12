@@ -7,7 +7,13 @@ import { PRP } from '../prp'
 import { PAYLOAD_SIZE } from './constants'
 import { derivePRPParameters } from './keyDerivation'
 
-function encrypt(text: Uint8Array, secrets: Uint8Array[]): Uint8Array {
+/**
+ * Encrypts the plaintext in the reverse order of the path
+ * @param text plaintext of the payload
+ * @param secrets shared secrets with the creator of the packet
+ * @returns
+ */
+function onionEncrypt(text: Uint8Array, secrets: Uint8Array[]): Uint8Array {
   for (let i = 0; i < secrets.length; i++) {
     const prp = PRP.createPRP(derivePRPParameters(secrets[secrets.length - i - 1]))
 
@@ -17,6 +23,17 @@ function encrypt(text: Uint8Array, secrets: Uint8Array[]): Uint8Array {
   return text
 }
 
+/**
+ * Creates a mixnet packet
+ * @param msg payload to send
+ * @param path nodes to use for relaying, including the final
+ * destination
+ * @param maxHops maximal number of hops to use
+ * @param additionalDataRelayer additional data to put next to
+ * each node's routing information
+ * @param additionalDataLastHop additional data for the final destination
+ * @returns the packet as u8a
+ */
 export function createPacket(
   msg: Uint8Array,
   path: PeerId[],
@@ -39,11 +56,26 @@ export function createPacket(
 
   const [beta, gamma] = createRoutingInfo(maxHops, path, secrets, additionalDataRelayer, additionalDataLastHop)
 
-  const ciphertext = encrypt(paddedMsg, secrets)
+  const ciphertext = onionEncrypt(paddedMsg, secrets)
 
   return Uint8Array.from([...alpha, ...beta, ...gamma, ...ciphertext])
 }
 
+/**
+ * Applies the transformation to the header to forward
+ * it to the next node or deliver it to the user
+ * @param privKey private key of the relayer
+ * @param packet incoming packet as u8a
+ * @param additionalDataRelayerLength length of the additional
+ * data next the routing information of each hop
+ * @param additionalDataLastHopLength lenght of the additional
+ * data for the last hop
+ * @param maxHops maximal amount of hops
+ * @returns whether the packet is valid, if yes returns
+ * the transformed packet, the public key of the next hop
+ * and the data next to the routing information. If current
+ * hop is the final recipient, it returns the plaintext
+ */
 export function forwardTransform(
   privKey: PeerId,
   packet: Uint8Array,
@@ -52,7 +84,7 @@ export function forwardTransform(
   maxHops: number
 ):
   | [done: false, packet: Uint8Array, nextHop: Uint8Array, additionalRelayData: Uint8Array]
-  | [done: true, plaintext: Uint8Array] {
+  | [done: true, plaintext: Uint8Array, additionalData: Uint8Array] {
   if (privKey.privKey == null) {
     throw Error(`Invalid arguments`)
   }
@@ -93,7 +125,9 @@ export function forwardTransform(
 
   const [alpha, secret] = keyShareTransform(decoded[0], privKey)
 
-  let header: [beta: Uint8Array, gamma: Uint8Array, nextNode: Uint8Array, additionalInfo: Uint8Array] | undefined
+  let header:
+    | [beta: Uint8Array, gamma: Uint8Array, nextNode: Uint8Array, additionalInfo: Uint8Array]
+    | [additionalData: Uint8Array]
 
   header = routingInfoTransform(
     secret,
@@ -109,7 +143,7 @@ export function forwardTransform(
   prp.inverse(decoded[3])
 
   if (header == undefined) {
-    return [true, decoded[3]]
+    return [true, decoded[3], header[0]]
   } else {
     const forwardPacket = Uint8Array.from([...alpha, ...header[0], ...header[1], ...decoded[3]])
 

@@ -5,6 +5,13 @@ import { extract } from 'futoin-hkdf'
 
 import type PeerId from 'peer-id'
 
+/**
+ * Performs an offline Diffie-Hellman key exchange with 
+ * the nodes along the given path
+ * @param path the path to use for the mixnet packet
+ * @returns the first group element and the shared secrets
+ * with the nodes along the path
+ */
 export function generateKeyShares(path: PeerId[]): [alpha: Uint8Array, secrets: Uint8Array[]] {
   let done = false
   let secrets: Uint8Array[]
@@ -43,8 +50,11 @@ export function generateKeyShares(path: PeerId[]): [alpha: Uint8Array, secrets: 
 }
 
 /**
- * @param alpha
- * @param key
+ * Applies the forward transformation of the key shares to
+ * an incoming packet.
+ * @param alpha the group element used for the offline 
+ * Diffie-Hellman key exchange
+ * @param privKey private key of the relayer
  */
 export function forwardTransform(alpha: Uint8Array, privKey: PeerId): [alpha: Uint8Array, secret: Uint8Array] {
   if (!publicKeyVerify(alpha) || privKey.privKey == null) {

@@ -5,15 +5,26 @@ import { randomFillSync } from 'crypto'
 import { PRG } from '../prg'
 import { generateFiller } from './filler'
 import { createMAC } from './mac'
+import { publicKeyVerify } from 'secp256k1'
 import type PeerId from 'peer-id'
 
+/**
+ * Creates the routing information of the mixnet packet
+ * @param maxHops maximal number of hops
+ * @param path IDs of the nodes along the path
+ * @param secrets shared secrets with the nodes along the path
+ * @param additionalDataRelayer additional data for each relayer
+ * @param additionalDataLastHop additional data for the final recipient
+ * @returns bytestring containing the routing information, and the
+ * authentication tag
+ */
 export function createRoutingInfo(
   maxHops: number,
-  peerIds: PeerId[],
+  path: PeerId[],
   secrets: Uint8Array[],
   additionalDataRelayer: Uint8Array[],
   additionalDataLastHop: Uint8Array
-) {
+): [routingInformation: Uint8Array, mac: Uint8Array] {
   const routingInfoLength = additionalDataRelayer[0].length + MAC_LENGTH + COMPRESSED_PUBLIC_KEY_LENGTH
   const lastHopLength = additionalDataLastHop.length + END_PREFIX_LENGTH
 
@@ -61,7 +72,7 @@ export function createRoutingInfo(
       extendedHeader.copyWithin(routingInfoLength, 0, headerLength)
 
       // Add pubkey of next downstream node
-      extendedHeader.set(peerIds[invIndex + 1].pubKey.marshal())
+      extendedHeader.set(path[invIndex + 1].pubKey.marshal())
 
       extendedHeader.set(mac, COMPRESSED_PUBLIC_KEY_LENGTH)
 
@@ -76,6 +87,20 @@ export function createRoutingInfo(
   return [extendedHeader.slice(0, headerLength), mac]
 }
 
+/**
+ * Applies the forward transformation to the header
+ * @param secret shared secret with the creator of the packet
+ * @param header u8a containing the header
+ * @param mac current mac
+ * @param maxHops maximal number of hops
+ * @param additionalDataRelayerLength length of the additional data for each relayer
+ * @param additionalDataLastHopLength length of the additional data for the final
+ * destination
+ * @returns if the packet is destined for this node, returns the additional data
+ * for the final destination, otherwise it returns the transformed header, the
+ * next authentication tag, the public key of the next node, and the additional data
+ * for the relayer
+ */
 export function forwardTransform(
   secret: Uint8Array,
   header: Uint8Array,
@@ -83,7 +108,9 @@ export function forwardTransform(
   maxHops: number,
   additionalDataRelayerLength: number,
   additionalDataLastHopLength: number
-): undefined | [header: Uint8Array, mac: Uint8Array, nextNode: Uint8Array, additionalInfo: Uint8Array] {
+):
+  | [additionalData: Uint8Array]
+  | [header: Uint8Array, mac: Uint8Array, nextNode: Uint8Array, additionalInfo: Uint8Array] {
   if (secret.length != SECRET_LENGTH || mac.length != MAC_LENGTH) {
     throw Error(`Invalid arguments`)
   }
@@ -108,7 +135,11 @@ export function forwardTransform(
   u8aXOR(true, header, prg.digest(0, headerLength))
 
   if (header[0] == END_PREFIX) {
-    return undefined
+    if (typeof Buffer !== 'undefined' && Buffer.isBuffer(header)) {
+      return [header.subarray(END_PREFIX_LENGTH, END_PREFIX_LENGTH + additionalDataLastHopLength)]
+    } else {
+      return [header.slice(END_PREFIX_LENGTH, END_PREFIX_LENGTH + additionalDataLastHopLength)]
+    }
   }
 
   if (typeof Buffer !== 'undefined' && Buffer.isBuffer(header)) {
@@ -125,6 +156,10 @@ export function forwardTransform(
       COMPRESSED_PUBLIC_KEY_LENGTH + MAC_LENGTH,
       COMPRESSED_PUBLIC_KEY_LENGTH + MAC_LENGTH + additionalDataRelayerLength
     )
+  }
+
+  if (!publicKeyVerify(nextHop)) {
+    throw Error(`General error.`)
   }
 
   header.copyWithin(0, routingInfoLength)

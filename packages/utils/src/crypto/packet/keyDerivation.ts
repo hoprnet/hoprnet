@@ -9,6 +9,12 @@ const HASH_KEY_BLINDING = 'HASH_KEY_BLINDING'
 const HASH_KEY_PRG = 'HASH_KEY_PRG'
 const HASH_KEY_PRP = 'HASH_KEY_PRP'
 
+/**
+ * Derive the blinding that is applied to the group element
+ * before forwarding the packet
+ * @param secret shared secret with the creator of the packet
+ * @returns the blinding
+ */
 export function deriveBlinding(secret: Uint8Array): Uint8Array {
   if (secret.length != SECRET_LENGTH) {
     throw Error(`Invalid arguments`)
@@ -17,6 +23,12 @@ export function deriveBlinding(secret: Uint8Array): Uint8Array {
   return expand(HASH_ALGORITHM, HASH_LENGTH, Buffer.from(secret), PRIVATE_KEY_LENGTH, HASH_KEY_BLINDING)
 }
 
+/**
+ * Derive the seed for the pseudo-randomness generator
+ * by using the secret shared derived from the mixnet packet
+ * @param secret shared secret with the creator of the packet
+ * @returns the PRG seed
+ */
 export function derivePRGParameters(secret: Uint8Array): PRGParameters {
   if (secret.length != SECRET_LENGTH) {
     throw Error(`Invalid arguments`)
@@ -30,6 +42,12 @@ export function derivePRGParameters(secret: Uint8Array): PRGParameters {
   }
 }
 
+/**
+ * Derive the seed for the pseudo-random permutation
+ * by using the secret shared with the creator of the packet
+ * @param secret shared secret with the creator of the packet
+ * @returns 
+ */
 export function derivePRPParameters(secret: Uint8Array): PRPParameters {
   if (secret.length != SECRET_LENGTH) {
     throw Error(`Invalid arguments`)
