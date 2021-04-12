@@ -7821,6 +7821,14 @@ iso-random-stream@^1.1.0, iso-random-stream@^1.1.1:
     buffer "^6.0.3"
     readable-stream "^3.4.0"
 
+iso-random-stream@^2.0.0:
+  version "2.0.0"
+  resolved "https://registry.yarnpkg.com/iso-random-stream/-/iso-random-stream-2.0.0.tgz#3f0118166d5443148bbc134345fb100002ad0f1d"
+  integrity sha512-lGuIu104KfBV9ubYTSaE3GeAr6I69iggXxBHbTBc5u/XKlwlWl0LCytnkIZissaKqvxablwRD9B3ktVnmIUnEg==
+  dependencies:
+    events "^3.3.0"
+    readable-stream "^3.4.0"
+
 iso-url@^1.0.0:
   version "1.1.5"
   resolved "https://registry.yarnpkg.com/iso-url/-/iso-url-1.1.5.tgz#875a0f2bf33fa1fc200f8d89e3f49eee57a8f0d9"
@@ -8549,24 +8557,24 @@ libp2p-crypto@0.18.0:
     uint8arrays "^1.1.0"
     ursa-optional "^0.10.1"
 
-libp2p-crypto@0.19.2, libp2p-crypto@^0.19.0:
-  version "0.19.2"
-  resolved "https://registry.yarnpkg.com/libp2p-crypto/-/libp2p-crypto-0.19.2.tgz#01869010dc51bf00af43175dcb0e58585ca3df86"
-  integrity sha512-dl/tViAyaBhJn0gTTIeZGxK0t+d+2FSN6vmjVdljYZc+pVMExjrx8p7lmX98qp/X97u7Vt+Oq9LvfjLoiERDCQ==
+libp2p-crypto@0.19.3, libp2p-crypto@^0.19.0:
+  version "0.19.3"
+  resolved "https://registry.yarnpkg.com/libp2p-crypto/-/libp2p-crypto-0.19.3.tgz#2f98200307028f35e31dfabd281bc4e20afa7a46"
+  integrity sha512-6xn2JRXXsn1/wWzcvmzmkMpw0j8N1/kO01V4eTjMzFpK6cS4cxHmBN3PQzYqAw6gHbjRTzsP8E+k5+iW6/VRaA==
   dependencies:
-    err-code "^2.0.0"
+    err-code "^3.0.1"
     is-typedarray "^1.0.0"
-    iso-random-stream "^1.1.0"
+    iso-random-stream "^2.0.0"
     keypair "^1.0.1"
-    multibase "^3.0.0"
-    multicodec "^2.0.0"
+    multibase "^4.0.3"
+    multicodec "^3.0.1"
     multihashes "^4.0.2"
-    multihashing-async "^2.0.1"
+    multihashing-async "^2.1.2"
     node-forge "^0.10.0"
     pem-jwk "^2.0.0"
-    protons "^2.0.0"
+    protobufjs "^6.10.2"
     secp256k1 "^4.0.0"
-    uint8arrays "^1.1.0"
+    uint8arrays "^2.1.4"
     ursa-optional "^0.10.1"
 
 libp2p-interfaces@^0.8.1, libp2p-interfaces@^0.8.2:
@@ -9635,7 +9643,7 @@ multibase@^3.0.0, multibase@^3.1.0, multibase@^3.1.1:
     "@multiformats/base-x" "^4.0.1"
     web-encoding "^1.0.6"
 
-multibase@^4.0.1:
+multibase@^4.0.1, multibase@^4.0.3:
   version "4.0.4"
   resolved "https://registry.yarnpkg.com/multibase/-/multibase-4.0.4.tgz#55ef53e6acce223c5a09341a8a3a3d973871a577"
   integrity sha512-8/JmrdSGzlw6KTgAJCOqUBSGd1V6186i/X8dDCGy/lbCKrQ+1QB6f3HE+wPr7Tpdj4U3gutaj9jG2rNX6UpiJg==
@@ -13769,7 +13777,7 @@ uint8arrays@1.1.0, uint8arrays@^1.0.0, uint8arrays@^1.1.0:
     multibase "^3.0.0"
     web-encoding "^1.0.2"
 
-uint8arrays@^2.0.5, uint8arrays@^2.1.3:
+uint8arrays@^2.0.5, uint8arrays@^2.1.3, uint8arrays@^2.1.4:
   version "2.1.4"
   resolved "https://registry.yarnpkg.com/uint8arrays/-/uint8arrays-2.1.4.tgz#ffd7f874819096aa33a47a336d4c660708d08049"
   integrity sha512-Q/Ys2JhFWpZkw8Hi2Zz7NFpVDH8avK9k2NjYKdOHoOAn5dTtOSNT9xMtaQz5D4kWVPOGKte8CAroEIdTzvF9AA==
