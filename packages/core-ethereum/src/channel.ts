@@ -1,6 +1,6 @@
 import type Connector from '.'
 import BN from 'bn.js'
-import { PublicKey, Balance, Hash, UINT256, Ticket, Acknowledgement, ChannelEntry, Address} from './types'
+import { PublicKey, Balance, Hash, UINT256, Ticket, Acknowledgement, ChannelEntry, Address } from './types'
 import {
   waitForConfirmation,
   computeWinningProbability,

@@ -4,7 +4,7 @@ import { KEY_LENGTH } from '../packet/header/parameters'
 import { Challenge } from '../packet/challenge'
 import { Hash, Signature, PublicKey } from '@hoprnet/hopr-core-ethereum'
 import PeerId from 'peer-id'
-import { serializeToU8a, u8aConcat, u8aSplit } from '@hoprnet/hopr-utils'
+import { serializeToU8a, u8aSplit } from '@hoprnet/hopr-utils'
 
 /**
  * This class encapsulates the message that is sent back to the relayer
@@ -36,12 +36,12 @@ class AcknowledgementMessage {
   }
 
   get responseSigningParty(): Uint8Array {
-    const hash = Hash.create(u8aConcat(this.key, this.challenge.serialize()))
+    const hash = Hash.createChallenge(this.key, this.challenge.serialize())
     return secp256k1.ecdsaRecover(this.signature.signature, this.signature.recovery, hash.serialize())
   }
 
   async verify(peerId: PeerId): Promise<boolean> {
-    const hash = Hash.create(u8aConcat(this.key, this.challenge.serialize()))
+    const hash = Hash.createChallenge(this.key, this.challenge.serialize())
     return this.signature.verify(hash.serialize(), new PublicKey(peerId.pubKey.marshal()))
   }
 
@@ -59,7 +59,7 @@ class AcknowledgementMessage {
     signer: PeerId
   ): Promise<AcknowledgementMessage> {
     const key = deriveTicketKeyBlinding(derivedSecret)
-    const hash = Hash.create(u8aConcat(key, challenge.serialize()))
+    const hash = Hash.createChallenge(key, challenge.serialize())
     const signature = Signature.create(hash.serialize(), signer.privKey.marshal())
     return new AcknowledgementMessage(key, challenge, signature)
   }
