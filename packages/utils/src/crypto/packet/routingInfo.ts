@@ -112,27 +112,27 @@ export type RelayNodeOutput = {
  */
 export function forwardTransform(
   secret: Uint8Array,
-  _header: Uint8Array,
+  preHeader: Uint8Array | Buffer,
   mac: Uint8Array,
   maxHops: number,
   additionalDataRelayerLength: number,
   additionalDataLastHopLength: number
 ): LastNodeOutput | RelayNodeOutput {
-  if (secret.length != SECRET_LENGTH || mac.length != MAC_LENGTH) {
-    throw Error(`Invalid arguments`)
-  }
-
   const routingInfoLength = additionalDataLastHopLength + COMPRESSED_PUBLIC_KEY_LENGTH + MAC_LENGTH
   const lastHopLength = additionalDataLastHopLength + END_PREFIX_LENGTH
 
   const headerLength = lastHopLength + (maxHops - 1) * routingInfoLength
 
+  if (secret.length != SECRET_LENGTH || mac.length != MAC_LENGTH || preHeader.length != headerLength) {
+    throw Error(`Invalid arguments`)
+  }
+
   let header: Uint8Array
 
-  if (typeof Buffer !== 'undefined' && Buffer.isBuffer(header)) {
-    header = Uint8Array.from(_header)
+  if (typeof Buffer !== 'undefined' && Buffer.isBuffer(preHeader)) {
+    header = Uint8Array.from(preHeader)
   } else {
-    header = _header
+    header = preHeader
   }
 
   if (!u8aEquals(createMAC(secret, header), mac)) {
