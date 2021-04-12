@@ -59,7 +59,7 @@
     "chai-as-promised": "^7.1.1",
     "it-pipe": "^1.1.0",
     "levelup": "^4.4.0",
-    "memdown": "^5.1.0",
+    "memdown": "^6.0.0",
     "mocha": "^8.2.0",
     "rimraf": "^3.0.2",
     "sinon": "^10.0.0",
