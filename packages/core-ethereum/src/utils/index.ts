@@ -50,12 +50,14 @@ export function getParties(self: Address, counterparty: Address): [Address, Addr
  * @returns a promise resolved to Hash
  */
 export function getId(self: Address, counterparty: Address): Promise<Hash> {
-  return Promise.resolve(Hash.create(
-    Buffer.concat(
-      getParties(self, counterparty).map((x) => x.serialize()),
-      2 * constants.ADDRESS_LENGTH
+  return Promise.resolve(
+    Hash.create(
+      Buffer.concat(
+        getParties(self, counterparty).map((x) => x.serialize()),
+        2 * constants.ADDRESS_LENGTH
+      )
     )
-  ))
+  )
 }
 
 /**
