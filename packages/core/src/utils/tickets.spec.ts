@@ -315,13 +315,11 @@ describe('unit test validateUnacknowledgedTicket', function () {
 describe('unit test validateCreatedTicket', function () {
   it('should pass if ticket is okay', async function () {
     const ticket = createMockTicket({})
-
     return expect(validateCreatedTicket(new BN(1), ticket)).to.be.undefined
   })
 
   it('should throw when signer is not sender', async function () {
     const ticket = createMockTicket({})
-
     return assert.throws(validateCreatedTicket(new BN(0), ticket) as any)
   })
 })
