@@ -87,11 +87,13 @@ export function createPacket(
 
 type LastNodeOutput = {
   lastNode: true
+  derivedSecret: Uint8Array
   plaintext: Uint8Array
   additionalData: Uint8Array
 }
 type RelayNodeOutput = {
   lastNode: false
+  derivedSecret: Uint8Array
   packet: Uint8Array
   nextHop: Uint8Array
   additionalRelayData: Uint8Array
@@ -143,11 +145,22 @@ export function forwardTransform(
   prp.inverse(decoded.ciphertext)
 
   if (header.lastNode == true) {
-    return { lastNode: true, plaintext: removePadding(decoded.ciphertext), additionalData: header.additionalData }
+    return {
+      lastNode: true,
+      derivedSecret: secret,
+      plaintext: removePadding(decoded.ciphertext),
+      additionalData: header.additionalData
+    }
   } else {
     const packet = Uint8Array.from([...alpha, ...header.header, ...header.mac, ...decoded.ciphertext])
 
-    return { lastNode: false, packet, nextHop: header.nextNode, additionalRelayData: header.additionalInfo }
+    return {
+      lastNode: false,
+      derivedSecret: secret,
+      packet,
+      nextHop: header.nextNode,
+      additionalRelayData: header.additionalInfo
+    }
   }
 }
 

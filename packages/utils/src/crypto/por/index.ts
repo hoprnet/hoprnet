@@ -7,6 +7,8 @@ import { randomBytes } from 'crypto'
 
 export const POR_STRING_LENGTH = 2 * SECP256K1.COMPRESSED_PUBLIC_KEY_LENGTH
 
+export { deriveAckKeyShare }
+
 /**
  * Takes the secrets which the first and the second relayer are able
  * to derive from the packet header and computes the challenge for

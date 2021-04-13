@@ -30,6 +30,8 @@ describe('header', function () {
     for (const [index, peer] of path.entries()) {
       const result = forwardTransform(peer, packet, 0, 0, maxHops)
 
+      assert(u8aEquals(result.derivedSecret, secrets[index]), `Derived secret must be identical to created secret`)
+
       if (index == path.length - 1) {
         assert(result.lastNode == true, `Implementation must detect final recipient`)
 
