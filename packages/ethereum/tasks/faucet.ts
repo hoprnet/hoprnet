@@ -1,10 +1,12 @@
 import type { HardhatRuntimeEnvironment, RunSuperFunction } from 'hardhat/types'
-import { PublicKey } from '@hoprnet/hopr-core-ethereum'
 import { NODE_SEEDS } from '@hoprnet/hopr-demo-seeds'
 import { HoprToken__factory } from '../types'
 import { promisify } from 'util'
 import { stat, readFile } from 'fs'
-import { convertPubKeyFromB58String } from '@hoprnet/hopr-utils'
+import { convertPubKeyFromB58String, u8aToHex } from '@hoprnet/hopr-utils'
+import { ethers } from 'ethers'
+import { publicKeyConvert } from 'secp256k1'
+import createKeccakHash from 'keccak'
 
 const statAsync = promisify(stat)
 const readFileAsync = promisify(readFile)
@@ -15,6 +17,46 @@ const send = (signer, txparams) =>
     }
     console.log(`transactionHash: ${transactionHash}`)
   })
+
+
+/*
+* @TODO: We are currently copying these classes while we are blocked by this issue.
+* https://github.com/hoprnet/hoprnet/issues/1477
+*
+* This is being reported in the following issue.
+* https://github.com/hoprnet/hoprnet/issues/1479
+*/
+
+class Hash {
+  constructor(private arr: Uint8Array) {}
+  static create(msg: Uint8Array) {
+    return new Hash(createKeccakHash('keccak256').update(Buffer.from(msg)).digest())
+  }
+  serialize(): Uint8Array {
+    return this.arr
+  }
+}
+class Address {
+  constructor(private arr: Uint8Array) {}
+  toHex(): string {
+    return ethers.utils.getAddress(u8aToHex(this.arr, false))
+  }
+}
+
+class PublicKey {
+  constructor(private arr: Uint8Array) {
+    if (arr.length !== PublicKey.SIZE) {
+      throw new Error('Incorrect size Uint8Array for compressed public key')
+    }
+    // TODO check length
+  }
+  toAddress(): Address {
+    return new Address(Hash.create(publicKeyConvert(this.arr, false).slice(1)).serialize().slice(12))
+  }
+  static get SIZE(): number {
+    return 33
+  }
+}
 
 const nativeAddress = async (hoprAddress) => {
   const nodePeerPubkey = await convertPubKeyFromB58String(hoprAddress)
