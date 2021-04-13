@@ -1,4 +1,3 @@
-import type { Currencies } from '@hoprnet/hopr-core-ethereum'
 import type Hopr from '@hoprnet/hopr-core'
 import { moveDecimalPoint } from '@hoprnet/hopr-utils'
 import { AbstractCommand, AutoCompleteResult } from './abstractCommand'
@@ -20,7 +19,7 @@ export default class Withdraw extends AbstractCommand {
   ): Promise<{
     amount: string
     weiAmount: string
-    currency: Currencies
+    currency: 'NATIVE' | 'HOPR',
     recipient: string
   }> {
     const [err, amount, currencyRaw, recipient] = this._assertUsage(query, this.arguments)
@@ -29,11 +28,14 @@ export default class Withdraw extends AbstractCommand {
       throw new Error(err)
     }
 
-    const currency = currencyRaw.toUpperCase() as Currencies
-
-    if (!['NATIVE', 'HOPR'].includes(currency)) {
+    let currency
+    if (['NATIVE', 'HOPR'].includes(currency)) {
+      currency = currencyRaw.toUpperCase()
+    } else {
       throw new Error(`Incorrect currency provided: '${currency}', correct options are: 'native', 'hopr'.`)
-    } else if (isNaN(Number(amount))) {
+    } 
+
+    if (isNaN(Number(amount))) {
       throw new Error(`Incorrect amount provided: '${amount}'.`)
     }
 

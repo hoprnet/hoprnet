@@ -18,8 +18,6 @@ import { DEFAULT_URI, MAX_CONFIRMATIONS } from './constants'
 
 const log = debug('hopr-core-ethereum')
 
-export type Currencies = 'NATIVE' | 'HOPR'
-
 export type SubmitTicketResponse =
   | {
       status: 'SUCCESS'
@@ -133,7 +131,7 @@ export default class HoprEthereum {
     await this.hashedSecret.initialize(this._debug) // no-op if already initialized
   }
 
-  async withdraw(currency: Currencies, recipient: string, amount: string): Promise<string> {
+  async withdraw(currency: 'NATIVE' | 'HOPR', recipient: string, amount: string): Promise<string> {
     if (currency === 'NATIVE') {
       const nonceLock = await this.account.getNonceLock()
       try {
