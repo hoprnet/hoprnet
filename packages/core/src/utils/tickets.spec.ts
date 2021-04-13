@@ -320,6 +320,6 @@ describe('unit test validateCreatedTicket', function () {
 
   it('should throw when signer is not sender', async function () {
     const ticket = createMockTicket({})
-    return assert.throws(validateCreatedTicket(new BN(0), ticket) as any)
+    return assert.throws(validateCreatedTicket(new BN(0), ticket) as any, Error)
   })
 })
