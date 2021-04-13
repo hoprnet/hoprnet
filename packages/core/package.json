@@ -56,7 +56,6 @@
     "secp256k1": "~4.0.2"
   },
   "devDependencies": {
-    "@hoprnet/hopr-core-connector-interface": "1.71.0-next.38",
     "@hoprnet/hopr-demo-seeds": "1.71.0-next.48",
     "@hoprnet/hopr-ethereum": "1.71.0-next.48",
     "@hoprnet/hopr-testing": "1.71.0-next.48",

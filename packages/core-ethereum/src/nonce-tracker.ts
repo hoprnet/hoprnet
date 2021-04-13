@@ -6,8 +6,8 @@ import { Mutex } from 'async-mutex'
 const log = debug('hopr-core-ethereum:nonce-tracker')
 
 /**
- *  @property opts.web3 - An ethereum provider
- *  @property opts.blockTracker - An instance of eth-block-tracker
+ *  @property opts.getLatestBlockNumber - A function that returns the latest block number
+ *  @property opts.getTransactionCount - A function the addresses transaction count
  *  @property opts.getPendingTransactions - A function that returns an array of txMeta
  *  whose status is `submitted`
  *  @property opts.getConfirmedTransactions - A function that returns an array of txMeta

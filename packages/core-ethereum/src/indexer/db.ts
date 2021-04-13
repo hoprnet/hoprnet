@@ -79,7 +79,7 @@ export const getChannel = async (db: LevelUp, channelId: Hash): Promise<ChannelE
     throw err
   }
 
-  if (channel == null || channel.length == 0) {
+  if (channel == null || channel.length != ChannelEntry.SIZE) {
     return undefined
   }
 
@@ -100,6 +100,7 @@ export const getChannels = async (
       values: true
     })
       .on('data', async (data) => {
+        if (data == null || data.length != ChannelEntry.SIZE) return
         const channel = ChannelEntry.deserialize(data)
 
         if (!filter || (await filter(channel))) {
@@ -140,7 +141,7 @@ export const getAccount = async (db: LevelUp, address: Address): Promise<Account
     throw err
   }
 
-  if (account == null || account.length == 0) {
+  if (account == null || account.length != AccountEntry.SIZE) {
     return undefined
   }
 
