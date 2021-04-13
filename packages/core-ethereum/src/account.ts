@@ -1,6 +1,6 @@
-import { providers as IProviders, Wallet as IWallet, ContractTransaction } from 'ethers'
-import type HoprEthereum from '.'
-import type { HoprToken } from './contracts'
+import type { Wallet as IWallet, ContractTransaction } from 'ethers'
+import type { Networks } from '@hoprnet/hopr-ethereum'
+import BN from 'bn.js'
 import { ethers, errors } from 'ethers'
 import { durations, isExpired, u8aConcat } from '@hoprnet/hopr-utils'
 import NonceTracker, { NonceLock } from './nonce-tracker'
@@ -13,12 +13,11 @@ import {
   Hash,
   NativeBalance,
   UINT256,
-  UnacknowledgedTicket
+  UnacknowledgedTicket,
+  AccountEntry
 } from './types'
-import { isWinningTicket, isGanache, getNetworkGasPrice } from './utils'
+import { isWinningTicket, getNetworkGasPrice } from './utils'
 import { PROVIDER_CACHE_TTL } from './constants'
-import * as ethereum from './ethereum'
-import BN from 'bn.js'
 
 import debug from 'debug'
 const log = debug('hopr-core-ethereum:account')
@@ -32,17 +31,20 @@ class Account {
   private _transactions = new TransactionManager()
   private preimage: Hash
 
-  constructor(public coreConnector: HoprEthereum, public wallet: IWallet) {
+  constructor(
+    private network: Networks,
+    private getLatestBlockNumber: () => Promise<number>,
+    // TODO: use Address
+    private getTransactionCount: (address: string, blockNumber?: number) => Promise<number>,
+    private getLiveBalance: (address: Address) => Promise<Balance>,
+    private getLiveNativeBalance: (address: Address) => Promise<NativeBalance>,
+    private getAccount: (address: Address) => Promise<AccountEntry>,
+    private findPreImage: (hash: Hash) => Promise<Hash>,
+    public wallet: IWallet
+  ) {
     this._nonceTracker = new NonceTracker({
-      getLatestBlockNumber: async () => {
-        // when running our unit/intergration tests using ganache,
-        // the indexer doesn't have enough time to pick up the events and reduce the data
-        return isGanache(coreConnector.network)
-          ? coreConnector.provider.getBlockNumber()
-          : coreConnector.indexer.latestBlock
-      },
-      getTransactionCount: async (address: string, blockNumber?: number) =>
-        coreConnector.provider.getTransactionCount(address, blockNumber),
+      getLatestBlockNumber: this.getLatestBlockNumber,
+      getTransactionCount: this.getTransactionCount,
       getConfirmedTransactions: () => Array.from(this._transactions.confirmed.values()),
       getPendingTransactions: () => Array.from(this._transactions.pending.values()),
       minPending: durations.minutes(15)
@@ -58,7 +60,7 @@ class Account {
    * @returns HOPR balance
    */
   public async getBalance(useCache: boolean = false): Promise<Balance> {
-    return getBalance(this.coreConnector.hoprToken, this.address, useCache)
+    return getBalance(this.getLiveBalance, this.address, useCache)
   }
 
   /**
@@ -66,11 +68,11 @@ class Account {
    * @returns ETH balance
    */
   public async getNativeBalance(useCache: boolean = false): Promise<NativeBalance> {
-    return getNativeBalance(this.coreConnector.provider, this.address, useCache)
+    return getNativeBalance(this.getLiveNativeBalance, this.address, useCache)
   }
 
   async getTicketEpoch(): Promise<UINT256> {
-    const state = await this.coreConnector.indexer.getAccount(this.address)
+    const state = await this.getAccount(this.address)
     if (!state || !state.counter) return UINT256.fromString('0')
     return new UINT256(state.counter)
   }
@@ -80,7 +82,7 @@ class Account {
    */
   async getOnChainSecret(): Promise<Hash | undefined> {
     if (this._onChainSecret && !this._onChainSecret.eq(EMPTY_HASHED_SECRET)) return this._onChainSecret
-    const state = await this.coreConnector.indexer.getAccount(this.address)
+    const state = await this.getAccount(this.address)
     if (!state || !state.secret) return undefined
     this.updateLocalState(state.secret)
     return state.secret
@@ -92,7 +94,7 @@ class Account {
       if (!ocs) {
         throw new Error('cannot reserve preimage when there is no on chain secret')
       }
-      this.preimage = await this.coreConnector.hashedSecret.findPreImage(ocs)
+      this.preimage = await this.findPreImage(ocs)
     }
   }
 
@@ -109,7 +111,7 @@ class Account {
     const ticket = unacknowledgedTicket.ticket
     if (await isWinningTicket(ticket.getHash(), response, this.preimage, ticket.winProb)) {
       const ack = new Acknowledgement(ticket, response, this.preimage)
-      this.preimage = await this.coreConnector.hashedSecret.findPreImage(this.preimage)
+      this.preimage = await this.findPreImage(this.preimage)
       return ack
     } else {
       return null
@@ -160,7 +162,7 @@ class Account {
     ...rest: Parameters<T>
   ): Promise<ContractTransaction> {
     const gasLimit = 300e3
-    const gasPrice = getNetworkGasPrice(this.coreConnector.network)
+    const gasPrice = getNetworkGasPrice(this.network)
     const nonceLock = await this._nonceTracker.getNonceLock(this.address.toHex())
     const nonce = nonceLock.nextNonce
     let transaction: ContractTransaction
@@ -213,7 +215,7 @@ class Account {
  * @returns HOPR balance
  */
 export const getBalance = async (
-  hoprToken: HoprToken,
+  getBalance: (account: Address) => Promise<Balance>,
   account: Address,
   useCache: boolean = false
 ): Promise<Balance> => {
@@ -223,7 +225,7 @@ export const getBalance = async (
     if (notExpired) return new Balance(new BN(cached.value))
   }
 
-  const value = await ethereum.getBalance(hoprToken, account)
+  const value = await getBalance(account)
   cache.set('balance', { value: value.toBN().toString(), updatedAt: new Date().getTime() })
 
   return value
@@ -234,7 +236,7 @@ export const getBalance = async (
  * @returns ETH balance
  */
 export const getNativeBalance = async (
-  provider: IProviders.WebSocketProvider,
+  getNativeBalance: (account: Address) => Promise<NativeBalance>,
   account: Address,
   useCache: boolean = false
 ): Promise<NativeBalance> => {
@@ -244,7 +246,7 @@ export const getNativeBalance = async (
     if (notExpired) return new NativeBalance(new BN(cached.value))
   }
 
-  const value = await ethereum.getNativeBalance(provider, account)
+  const value = await getNativeBalance(account)
   cache.set('nativeBalance', { value: value.toBN().toString(), updatedAt: new Date().getTime() })
 
   return value
