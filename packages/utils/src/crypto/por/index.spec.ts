@@ -3,9 +3,9 @@ import { randomBytes } from 'crypto'
 import { SECRET_LENGTH } from './constants'
 import { SECP256K1 } from '../constants'
 import { deriveAckKeyShare } from './keyDerivation'
-// import { u8aSplit } from '../../u8a'
 import assert from 'assert'
 import { u8aEquals } from '../../u8a'
+import { publicKeyCreate } from 'secp256k1'
 
 describe('PoR - proof of relay', function () {
   it('generate PoR string, preVerify, validate', function () {
@@ -27,9 +27,11 @@ describe('PoR - proof of relay', function () {
 
     assert(result.valid == true, `Challenge must be plausible`)
 
+    assert(u8aEquals(result.nextAckChallenge, publicKeyCreate(deriveAckKeyShare(secrets[1]))))
+
     // Simulates the transformation done by the first relayer
     assert(
-      u8aEquals(result.nextChallenge, firstPorString.subarray(0, SECP256K1.COMPRESSED_PUBLIC_KEY_LENGTH)),
+      u8aEquals(result.nextTicketChallenge, firstPorString.subarray(0, SECP256K1.COMPRESSED_PUBLIC_KEY_LENGTH)),
       `Forward logic must extract correct challenge for next downstream node`
     )
 
@@ -48,7 +50,7 @@ describe('PoR - proof of relay', function () {
 
     // Simulates the transformation as done by the
     // second relayer
-    const secondResult = preVerify(secrets[1], secondPorString, result.nextChallenge)
+    const secondResult = preVerify(secrets[1], secondPorString, result.nextTicketChallenge)
 
     assert(secondResult.valid == true, `Second challenge must be plausible`)
 
@@ -58,7 +60,7 @@ describe('PoR - proof of relay', function () {
       secondResult.ownShare,
       secondResult.ownKey,
       secondAck,
-      result.nextChallenge
+      result.nextTicketChallenge
     )
 
     assert(secondValidateResponseResult.valid == true, `Second acknowledgement must solve the challenge`)

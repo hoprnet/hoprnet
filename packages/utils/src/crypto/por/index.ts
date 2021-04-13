@@ -51,8 +51,20 @@ export function createPoRString(secrets: Uint8Array[]) {
   return Uint8Array.from([...createChallenge(s1, s2), ...publicKeyCreate(s0)])
 }
 
+type ValidOutput = {
+  valid: true
+  ownKey: Uint8Array
+  ownShare: Uint8Array
+  nextTicketChallenge: Uint8Array
+  nextAckChallenge: Uint8Array
+}
+
+type InvalidOutput = {
+  valid: false
+}
+
 /**
- * Verifies whether an incoming packet contains all values that
+ * Verifies that an incoming packet contains all values that
  * are necessary to reconstruct the response to redeem the
  * incentive for relaying the packet
  * @param secret shared secret with the creator of the packet
@@ -66,12 +78,12 @@ export function preVerify(
   secret: Uint8Array,
   porBytes: Uint8Array,
   challenge: Uint8Array
-): { valid: true; ownShare: Uint8Array; ownKey: Uint8Array; nextChallenge: Uint8Array } | { valid: false } {
+): ValidOutput | InvalidOutput {
   if (secret.length != SECRET_LENGTH || porBytes.length != POR_STRING_LENGTH) {
     throw Error(`Invalid arguments`)
   }
 
-  const [nextChallenge, hint] = [
+  const [nextTicketChallenge, hint] = [
     porBytes.subarray(0, SECP256K1.COMPRESSED_PUBLIC_KEY_LENGTH),
     porBytes.subarray(
       SECP256K1.COMPRESSED_PUBLIC_KEY_LENGTH,
@@ -85,7 +97,7 @@ export function preVerify(
   const valid = u8aEquals(publicKeyCombine([ownShare, hint]), challenge)
 
   if (valid) {
-    return { valid: true, ownKey, ownShare, nextChallenge }
+    return { valid: true, ownKey, ownShare, nextTicketChallenge, nextAckChallenge: hint }
   } else {
     return { valid: false }
   }
