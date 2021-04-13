@@ -30,7 +30,7 @@ const verbose = Debug('hopr-core:verbose:message:packet')
  */
 export function validateCreatedTicket(myBalance: BN, ticket: Ticket) {
   if (myBalance.lt(ticket.amount.toBN())) {
-    throw Error(`Payment channel does not have enough funds ${myBalance.toString()} < ${ticket.amount.toString()}`)
+    throw Error(`Payment channel does not have enough funds ${myBalance.toString()} < ${ticket.amount.toBN().toString()}`)
   }
 }
 
