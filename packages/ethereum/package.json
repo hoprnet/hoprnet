@@ -28,6 +28,7 @@
     "!**/*.test.js.map"
   ],
   "dependencies": {
+    "@hoprnet/hopr-core-ethereum": "^1.71.0-next.49",
     "@hoprnet/hopr-demo-seeds": "1.71.0-next.49",
     "@hoprnet/hopr-utils": "1.71.0-next.49",
     "@nomiclabs/hardhat-ethers": "^2.0.2",
