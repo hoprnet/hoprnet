@@ -5,7 +5,7 @@ import { stringToU8a } from '@hoprnet/hopr-utils'
 import { AccountEntry, Address, PublicKey, Hash, ChannelEntry } from '../types'
 
 export const onAccountInitialized = async (event: Event<'AccountInitialized'>): Promise<AccountEntry> => {
-  const data = event.returnValues
+  const data = event.args
   const address = Address.fromString(data.account)
   // library requires identifier TODO: insert identifier bytes
   const pubKey = PublicKey.fromUncompressedPubKey(stringToU8a(data.uncompressedPubKey))
@@ -21,9 +21,9 @@ export const onAccountSecretUpdated = async (
 ): Promise<AccountEntry> => {
   assert(storedAccount.isInitialized(), "'onAccountSecretUpdated' failed because account is not initialized")
 
-  const data = event.returnValues
+  const data = event.args
   const secret = new Hash(stringToU8a(data.secret))
-  const counter = new BN(data.counter) // TODO: depend on indexer to increment this
+  const counter = new BN(data.counter.toString()) // TODO: depend on indexer to increment this
 
   return new AccountEntry(storedAccount.address, storedAccount.publicKey, secret, counter)
 }
@@ -32,15 +32,15 @@ export const onChannelFunded = async (
   event: Event<'ChannelFunded'>,
   channelEntry?: ChannelEntry
 ): Promise<ChannelEntry> => {
-  const data = event.returnValues
+  const data = event.args
 
   const accountA = Address.fromString(data.accountA)
   const accountB = Address.fromString(data.accountB)
   const [partyA, partyB] = accountA.sortPair(accountB)
 
   if (channelEntry) {
-    const deposit = channelEntry.deposit.add(new BN(data.deposit))
-    const partyABalance = channelEntry.partyABalance.add(new BN(data.partyABalance))
+    const deposit = channelEntry.deposit.add(new BN(data.deposit.toString()))
+    const partyABalance = channelEntry.partyABalance.add(new BN(data.partyABalance.toString()))
     const closureTime = new BN(0)
     const stateCounter = channelEntry.stateCounter
     const closureByPartyA = false
@@ -57,8 +57,8 @@ export const onChannelFunded = async (
       channelEntry.closedAt
     )
   } else {
-    const deposit = new BN(data.deposit)
-    const partyABalance = new BN(data.partyABalance)
+    const deposit = new BN(data.deposit.toString())
+    const partyABalance = new BN(data.partyABalance.toString())
     const closureTime = new BN(0)
     const stateCounter = new BN(0)
     const closureByPartyA = false
@@ -109,10 +109,10 @@ export const onTicketRedeemed = async (
     "'onRedeemedTicket' failed because channel is not in 'OPEN' or 'PENDING' status"
   )
 
-  const data = event.returnValues
+  const data = event.args
   const redeemer = Address.fromString(data.redeemer)
   const counterparty = Address.fromString(data.counterparty)
-  const amount = new BN(data.amount)
+  const amount = new BN(data.amount.toString())
 
   return new ChannelEntry(
     channelEntry.partyA,
@@ -136,7 +136,7 @@ export const onChannelPendingToClose = async (
     "'onInitiatedChannelClosure' failed because channel is not in 'OPEN' status"
   )
 
-  const data = event.returnValues
+  const data = event.args
   const initiator = Address.fromString(data.initiator)
   const counterparty = Address.fromString(data.counterparty)
 
@@ -145,7 +145,7 @@ export const onChannelPendingToClose = async (
     channelEntry.partyB,
     channelEntry.deposit,
     channelEntry.partyABalance,
-    new BN(data.closureTime),
+    new BN(data.closureTime.toString()),
     channelEntry.stateCounter.addn(1),
     initiator.lt(counterparty),
     channelEntry.openedAt,

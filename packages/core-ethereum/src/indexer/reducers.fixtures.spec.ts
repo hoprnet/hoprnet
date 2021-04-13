@@ -1,5 +1,6 @@
 import type { Event } from './types'
 import BN from 'bn.js'
+import { BigNumber } from 'ethers'
 import { stringToU8a } from '@hoprnet/hopr-utils'
 import { Address, PublicKey, ChannelEntry, AccountEntry, Hash } from '../types'
 
@@ -19,7 +20,7 @@ export const ACCOUNT_INITIALIZED_EVENT = {
   blockNumber: 0,
   transactionIndex: 0,
   logIndex: 0,
-  returnValues: {
+  args: {
     account: partyA.toHex(),
     uncompressedPubKey: partyAUncompressedPubKey,
     secret: secret1.toHex()
@@ -32,10 +33,10 @@ export const ACCOUNT_SECRET_UPDATED_EVENT = {
   blockNumber: 0,
   transactionIndex: 0,
   logIndex: 0,
-  returnValues: {
+  args: {
     account: partyA.toHex(),
     secret: secret2.toHex(),
-    counter: '2'
+    counter: BigNumber.from('2')
   }
 } as Event<'AccountSecretUpdated'>
 
@@ -45,12 +46,12 @@ export const FUNDED_EVENT = {
   blockNumber: 0,
   transactionIndex: 0,
   logIndex: 0,
-  returnValues: {
+  args: {
     funder: 'funder',
     accountA: partyA.toHex(),
     accountB: partyB.toHex(),
-    deposit: '3',
-    partyABalance: '3'
+    deposit: BigNumber.from('3'),
+    partyABalance: BigNumber.from('3')
   }
 } as Event<'ChannelFunded'>
 
@@ -60,12 +61,12 @@ export const FUNDED_EVENT_2 = {
   blockNumber: 0,
   transactionIndex: 0,
   logIndex: 0,
-  returnValues: {
+  args: {
     funder: 'funder',
     accountA: partyA.toHex(),
     accountB: partyB.toHex(),
-    deposit: '7',
-    partyABalance: '0'
+    deposit: BigNumber.from('7'),
+    partyABalance: BigNumber.from('0')
   }
 } as Event<'ChannelFunded'>
 
@@ -75,7 +76,7 @@ export const OPENED_EVENT = {
   blockNumber: 0,
   transactionIndex: 0,
   logIndex: 0,
-  returnValues: {
+  args: {
     opener: partyA.toHex(),
     counterparty: partyB.toHex()
   }
@@ -87,10 +88,10 @@ export const REDEEMED_EVENT = {
   blockNumber: 0,
   transactionIndex: 0,
   logIndex: 0,
-  returnValues: {
+  args: {
     redeemer: partyA.toHex(),
     counterparty: partyB.toHex(),
-    amount: '1'
+    amount: BigNumber.from('1')
   }
 } as Event<'TicketRedeemed'>
 
@@ -100,10 +101,10 @@ export const CLOSING_EVENT = {
   blockNumber: 0,
   transactionIndex: 0,
   logIndex: 0,
-  returnValues: {
+  args: {
     initiator: partyA.toHex(),
     counterparty: partyB.toHex(),
-    closureTime: '1611671775'
+    closureTime: BigNumber.from('1611671775')
   }
 } as Event<'ChannelPendingToClose'>
 
@@ -113,10 +114,10 @@ export const REDEEMED_EVENT_2 = {
   blockNumber: 0,
   transactionIndex: 0,
   logIndex: 0,
-  returnValues: {
+  args: {
     redeemer: partyB.toHex(),
     counterparty: partyA.toHex(),
-    amount: '2'
+    amount: BigNumber.from('2')
   }
 } as Event<'TicketRedeemed'>
 
@@ -126,11 +127,11 @@ export const CLOSED_EVENT = {
   blockNumber: 0,
   transactionIndex: 0,
   logIndex: 0,
-  returnValues: {
+  args: {
     initiator: partyA.toHex(),
     counterparty: partyB.toHex(),
-    partyAAmount: '3',
-    partyBAmount: '7'
+    partyAAmount: BigNumber.from('3'),
+    partyBAmount: BigNumber.from('7')
   }
 } as Event<'ChannelClosed'>
 
