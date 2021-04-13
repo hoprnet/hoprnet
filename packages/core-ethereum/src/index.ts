@@ -10,11 +10,11 @@ import Channel from './channel'
 import Indexer from './indexer'
 import { RoutingChannel } from './indexer'
 import * as utils from './utils'
-import * as config from './config'
 import Account from './account'
 import HashedSecret from './hashedSecret'
 import { getWinProbabilityAsFloat, computeWinningProbability } from './utils'
 import { HoprToken__factory, HoprChannels__factory } from './contracts'
+import { DEFAULT_URI, MAX_CONFIRMATIONS } from './constants'
 
 const log = debug('hopr-core-ethereum')
 
@@ -178,7 +178,7 @@ export default class HoprEthereum {
     privateKey: Uint8Array,
     options?: { id?: number; provider?: string; debug?: boolean; maxConfirmations?: number }
   ): Promise<HoprEthereum> {
-    const provider = new ethers.providers.WebSocketProvider(options?.provider || config.DEFAULT_URI)
+    const provider = new ethers.providers.WebSocketProvider(options?.provider || DEFAULT_URI)
     const wallet = new ethers.Wallet(privateKey).connect(provider)
 
     // TODO: connect, disconnect, reconnect
@@ -212,7 +212,7 @@ export default class HoprEthereum {
       hoprChannels,
       hoprToken,
       options?.debug || false,
-      options.maxConfirmations ?? config.MAX_CONFIRMATIONS
+      options.maxConfirmations ?? MAX_CONFIRMATIONS
     )
     log(`using blockchain address ${await coreConnector.hexAccountAddress()}`)
     return coreConnector
