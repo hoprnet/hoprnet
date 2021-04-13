@@ -18,14 +18,13 @@ const send = (signer, txparams) =>
     console.log(`transactionHash: ${transactionHash}`)
   })
 
-
 /*
-* @TODO: We are currently copying these classes while we are blocked by this issue.
-* https://github.com/hoprnet/hoprnet/issues/1477
-*
-* This is being reported in the following issue.
-* https://github.com/hoprnet/hoprnet/issues/1479
-*/
+ * @TODO: We are currently copying these classes while we are blocked by this issue.
+ * https://github.com/hoprnet/hoprnet/issues/1477
+ *
+ * This is being reported in the following issue.
+ * https://github.com/hoprnet/hoprnet/issues/1479
+ */
 
 class Hash {
   constructor(private arr: Uint8Array) {}
