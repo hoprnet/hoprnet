@@ -1,10 +1,10 @@
-import createKeccakHash from 'keccak'
 import { ADDRESS_LENGTH, HASH_LENGTH, SIGNATURE_LENGTH, SIGNATURE_RECOVERY_LENGTH } from '../constants'
-import { u8aToHex, u8aEquals, stringToU8a, moveDecimalPoint, u8aConcat } from '@hoprnet/hopr-utils'
+import { u8aEquals, moveDecimalPoint } from '@hoprnet/hopr-utils'
 import { ethers } from 'ethers'
 import BN from 'bn.js'
-import { publicKeyConvert, publicKeyCreate, ecdsaSign, ecdsaVerify } from 'secp256k1'
 import { serializeToU8a, u8aSplit, u8aToNumber } from '@hoprnet/hopr-utils'
+
+const { utils } = ethers
 
 export class Address {
   constructor(private arr: Uint8Array) {}
@@ -14,8 +14,8 @@ export class Address {
   }
 
   static fromString(str: string): Address {
-    if (!ethers.utils.isAddress(str)) throw Error(`String ${str} is not an address`)
-    return new Address(stringToU8a(str))
+    if (!utils.isAddress(str)) throw Error(`String ${str} is not an address`)
+    return new Address(utils.arrayify(str))
   }
 
   serialize() {
@@ -23,7 +23,7 @@ export class Address {
   }
 
   toHex(): string {
-    return ethers.utils.getAddress(u8aToHex(this.arr, false))
+    return utils.getAddress(utils.hexlify(this.arr))
   }
 
   eq(b: Address) {
@@ -78,11 +78,11 @@ export class Hash {
   static SIZE = HASH_LENGTH
 
   static create(msg: Uint8Array) {
-    return new Hash(createKeccakHash('keccak256').update(Buffer.from(msg)).digest())
+    return new Hash(utils.arrayify(utils.keccak256(msg)))
   }
 
   static createChallenge(secretA: Uint8Array, secretB: Uint8Array): Hash {
-    return Hash.create(u8aConcat(secretA, secretB)).hash()
+    return Hash.create(utils.concat([secretA, secretB])).hash()
   }
 
   serialize(): Uint8Array {
@@ -94,7 +94,7 @@ export class Hash {
   }
 
   toHex(): string {
-    return u8aToHex(this.arr)
+    return utils.hexlify(this.arr)
   }
 
   clone(): Hash {
@@ -145,33 +145,31 @@ export class PublicKey {
     if (arr.length !== PublicKey.SIZE) {
       throw new Error('Incorrect size Uint8Array for compressed public key')
     }
-    // TODO check length
   }
 
   static fromPrivKey(privKey: Uint8Array): PublicKey {
-    if (privKey.length !== 32) {
-      throw new Error('Incorrect size Uint8Array for private key')
-    }
-    let arr = publicKeyCreate(privKey, true)
-    return new PublicKey(arr)
+    // removes identifier
+    return PublicKey.fromString(utils.computePublicKey(privKey, true))
   }
 
-  static fromUncompressedPubKey(pubkey: Uint8Array) {
-    const uncompressedPubKey = u8aConcat(new Uint8Array([4]), pubkey)
-    return new PublicKey(publicKeyConvert(uncompressedPubKey, true))
+  // Needed when interacting with HoprChannels
+  static fromUncompressedPubKey(pubkey: Uint8Array): PublicKey {
+    // adds identifer
+    const withIdentifier = ethers.utils.concat([new Uint8Array([4]), pubkey])
+    return PublicKey.fromString(utils.computePublicKey(withIdentifier, true))
   }
 
   toAddress(): Address {
-    return new Address(Hash.create(publicKeyConvert(this.arr, false).slice(1)).serialize().slice(12))
+    return Address.fromString(utils.computeAddress(this.serialize()))
   }
 
+  // Needed when interacting with HoprChannels
   toUncompressedPubKeyHex(): string {
-    // Needed in only a few cases for interacting with secp256k1
-    return u8aToHex(publicKeyConvert(this.arr, false).slice(1))
+    return utils.hexDataSlice(utils.computePublicKey(this.serialize(), false), 1)
   }
 
   static fromString(str: string): PublicKey {
-    return new PublicKey(stringToU8a(str))
+    return new PublicKey(utils.arrayify(str))
   }
 
   static get SIZE(): number {
@@ -183,7 +181,7 @@ export class PublicKey {
   }
 
   toHex(): string {
-    return u8aToHex(this.arr)
+    return utils.hexlify(this.arr)
   }
 
   eq(b: PublicKey) {
@@ -200,8 +198,11 @@ export class Signature {
   }
 
   static create(msg: Uint8Array, privKey: Uint8Array): Signature {
-    const result = ecdsaSign(msg, privKey)
-    return new Signature(result.signature, result.recid)
+    const signingKey = new ethers.utils.SigningKey(privKey)
+    const result = signingKey.signDigest(msg)
+    // get flattened signature
+    const signatue = ethers.utils.joinSignature(result)
+    return new Signature(utils.arrayify(signatue), result.recoveryParam)
   }
 
   serialize(): Uint8Array {
@@ -212,7 +213,7 @@ export class Signature {
   }
 
   verify(msg: Uint8Array, pubKey: PublicKey): boolean {
-    return ecdsaVerify(this.signature, msg, pubKey.serialize())
+    return u8aEquals(utils.arrayify(ethers.utils.recoverPublicKey(msg, this.signature)), pubKey.serialize())
   }
 
   static SIZE = SIGNATURE_LENGTH + SIGNATURE_RECOVERY_LENGTH
