@@ -4,7 +4,6 @@ import BN from 'bn.js'
 import PeerId from 'peer-id'
 import chaiAsPromised from 'chai-as-promised'
 import chai, { expect } from 'chai'
-import assert from 'assert'
 import sinon from 'sinon'
 import {
   Address,
@@ -316,10 +315,5 @@ describe('unit test validateCreatedTicket', function () {
   it('should pass if ticket is okay', async function () {
     const ticket = createMockTicket({})
     validateCreatedTicket(new BN(1), ticket)
-  })
-
-  it('should throw when signer is not sender', async function () {
-    const ticket = createMockTicket({})
-    return assert.throws(validateCreatedTicket(new BN(0), ticket) as any, Error)
   })
 })
