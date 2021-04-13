@@ -1,26 +1,23 @@
 import assert from 'assert'
-import Web3 from 'web3'
 import { stringToU8a, durations } from '@hoprnet/hopr-utils'
 import { Ganache } from '@hoprnet/hopr-testing'
 import { NODE_SEEDS } from '@hoprnet/hopr-demo-seeds'
-import { migrate, fund, getAddresses, abis } from '@hoprnet/hopr-ethereum'
+import { migrate, fund, getAddresses } from '@hoprnet/hopr-ethereum'
+import { ethers } from 'ethers'
 import HoprEthereum from '.'
-import { HoprToken } from './tsc/web3/HoprToken'
-import { cleanupPromiEvent, waitForConfirmationUsingHash } from './utils'
-import { createNode, getPrivKeyData, createAccountAndFund } from './utils/testing.spec'
+import { createNode } from './utils/testing'
 import * as testconfigs from './config.spec'
 import * as configs from './config'
-import { randomBytes } from 'crypto'
+import { providers } from 'ethers'
+import { HoprToken__factory, HoprToken } from './contracts'
 
-const HoprTokenAbi = abis.HoprToken
+const { arrayify } = ethers.utils
 
 describe('test connector', function () {
   this.timeout(durations.minutes(5))
 
   const ganache = new Ganache()
-  let owner
-  let web3: Web3
-  let hoprToken: HoprToken
+  let ownerWallet: ethers.Wallet
   let connector: HoprEthereum
 
   before(async function () {
@@ -30,10 +27,8 @@ describe('test connector', function () {
     await migrate()
     await fund(`--address ${getAddresses()?.localhost?.HoprToken} --accounts-to-fund 2`)
 
-    owner = await getPrivKeyData(stringToU8a(testconfigs.FUND_ACCOUNT_PRIVATE_KEY))
-    web3 = new Web3(configs.DEFAULT_URI)
-    hoprToken = new web3.eth.Contract(HoprTokenAbi as any, getAddresses()?.localhost?.HoprToken)
-    connector = await createNode(owner.privKey.serialize())
+    ownerWallet = new ethers.Wallet(testconfigs.FUND_ACCOUNT_PRIVATE_KEY)
+    connector = await createNode(arrayify(ownerWallet.privateKey))
 
     await connector.start()
   })
@@ -41,46 +36,6 @@ describe('test connector', function () {
   after(async function () {
     await connector.stop()
     await ganache.stop()
-  })
-
-  // @TODO: move this test to utils
-  describe('events', function () {
-    it('should clear events once resolved', function () {
-      let numberOfEvents = 0
-
-      const once = () => {
-        return cleanupPromiEvent(hoprToken.events.Transfer(), (event) => {
-          return new Promise((resolve, reject) => {
-            event
-              .on('data', (data) => {
-                numberOfEvents++
-                return resolve(data)
-              })
-              .on('error', reject)
-          })
-        })
-      }
-
-      return new Promise<void>(async (resolve, reject) => {
-        try {
-          const receiver = await createAccountAndFund(web3, hoprToken, owner)
-
-          await Promise.all([
-            once(),
-            hoprToken.methods.transfer(receiver.address.toHex(), 1).send({ from: owner.address.toHex(), gas: 200e3 }),
-            hoprToken.methods.transfer(receiver.address.toHex(), 1).send({ from: owner.address.toHex(), gas: 200e3 })
-          ])
-          await hoprToken.methods
-            .transfer(receiver.address.toHex(), 1)
-            .send({ from: owner.address.toHex(), gas: 200e3 })
-
-          assert.equal(numberOfEvents, 1, 'check cleanupPromiEvent')
-          return resolve()
-        } catch (err) {
-          return reject(err)
-        }
-      })
-    })
   })
 
   it('should catch initOnchainValues', async function () {
@@ -101,11 +56,11 @@ describe('test withdraw', function () {
   this.timeout(durations.minutes(5))
 
   const ganache = new Ganache()
-  let web3: Web3
+  let provider: providers.WebSocketProvider
   let hoprToken: HoprToken
   let connector: HoprEthereum
-  let alice
-  let bob
+  let alice: ethers.Wallet
+  let bob: ethers.Wallet
 
   before(async function () {
     this.timeout(durations.minutes(1))
@@ -114,16 +69,15 @@ describe('test withdraw', function () {
     await migrate()
     await fund(`--address ${getAddresses()?.localhost?.HoprToken} --accounts-to-fund 2`)
 
-    alice = await getPrivKeyData(stringToU8a(NODE_SEEDS[0]))
-    bob = await getPrivKeyData(randomBytes(32))
+    provider = new providers.WebSocketProvider(configs.DEFAULT_URI)
 
-    web3 = new Web3(configs.DEFAULT_URI)
-    hoprToken = new web3.eth.Contract(HoprTokenAbi as any, getAddresses()?.localhost?.HoprToken)
-    connector = await createNode(alice.privKey.serialize())
+    alice = new ethers.Wallet(NODE_SEEDS[0]).connect(provider)
+    bob = ethers.Wallet.createRandom().connect(provider)
+    hoprToken = HoprToken__factory.connect(getAddresses().localhost?.HoprToken, provider)
+    connector = await createNode(ethers.utils.arrayify(alice.privateKey))
 
-    await hoprToken.methods.mint(alice.address.toHex(), 100, '0x0', '0x0').send({
-      from: alice.address.toHex(),
-      gas: 200e3
+    await hoprToken.connect(alice).mint(alice.address, 100, ethers.constants.HashZero, ethers.constants.HashZero, {
+      gasLimit: 300e3
     })
 
     await connector.start()
@@ -135,15 +89,15 @@ describe('test withdraw', function () {
   })
 
   it('should withdraw 1 wei (ETH)', async function () {
-    const txHash = await connector.withdraw('NATIVE', bob.address.toHex(), '1')
-    await waitForConfirmationUsingHash(web3, txHash)
+    const txHash = await connector.withdraw('NATIVE', bob.address, '1')
+    await provider.waitForTransaction(txHash, 1, 5e3)
 
     assert(txHash.length > 0, 'no transaction hash received')
   })
 
   it('should withdraw 1 wei (HOPR)', async function () {
-    const txHash = await connector.withdraw('HOPR', bob.address.toHex(), '1')
-    await waitForConfirmationUsingHash(web3, txHash)
+    const txHash = await connector.withdraw('HOPR', bob.address, '1')
+    await provider.waitForTransaction(txHash, 1, 5e3)
 
     assert(txHash.length > 0, 'no transaction hash received')
   })

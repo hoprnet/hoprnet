@@ -1,8 +1,8 @@
 import { deployments, ethers } from 'hardhat'
 import { expect } from 'chai'
-import { durations } from '@hoprnet/hopr-utils'
+import { PromiseValue, durations } from '@hoprnet/hopr-utils'
 import { createTicket } from './utils'
-import { PromiseValue, increaseTime } from '../utils'
+import { increaseTime } from '../utils'
 import {
   ACCOUNT_A,
   ACCOUNT_B,

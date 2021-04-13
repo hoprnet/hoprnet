@@ -1,4 +1,4 @@
-import type { PromiseValue } from './utils'
+import type { PromiseValue } from '@hoprnet/hopr-utils'
 import { expect } from 'chai'
 import { deployments, ethers } from 'hardhat'
 import { PermittableToken__factory, HoprToken__factory, HoprWrapper__factory } from '../types'

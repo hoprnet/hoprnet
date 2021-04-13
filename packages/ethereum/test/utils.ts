@@ -1,9 +1,5 @@
 import { ethers, providers } from 'ethers'
 
-// @TODO: move this to hopr-utils
-// returns value of promise
-export type PromiseValue<T> = T extends PromiseLike<infer U> ? U : T
-
 export const getAccount = (privateKey: string) => {
   const wallet = new ethers.Wallet(privateKey)
   const uncompressedPublicKey = ethers.utils.computePublicKey(wallet.publicKey, false)

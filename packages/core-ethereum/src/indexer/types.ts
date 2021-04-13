@@ -1,19 +1,12 @@
-import type { ContractEventEmitter, ContractEventLog } from '../tsc/web3/types'
-import type { HoprChannels } from '../tsc/web3/HoprChannels'
+import type { HoprChannels } from '../contracts'
+import type { TypedEventFilter, TypedEvent } from '../contracts/commons'
 
 /**
  * Typechain does not provide us with clean event types, in the lines below we infer
- * the generic type from the 'ContractEventEmitter' type.
- * TODO: start using ether.js and generate better types
+ * the generic type from the 'HoprChannels.filters'.
+ * This allows us to retrieve HoprChannel's events.
  */
-type ContractEventEmitters<T extends EventNames> = ReturnType<HoprChannels['events'][T]>
-type extractGeneric<Type> = Type extends ContractEventEmitter<infer X> ? X : null
+type extractEventArgs<Type> = Type extends TypedEventFilter<infer A, infer D> ? A & D : null
 
-/**
- * HoprChannel's event names
- */
-export type EventNames = Exclude<keyof HoprChannels['events'], 'allEvents'>
-/**
- * HoprChannel's event interface
- */
-export type Event<N extends EventNames> = ContractEventLog<extractGeneric<ContractEventEmitters<N>>>
+export type EventNames = keyof HoprChannels['filters']
+export type Event<T extends EventNames> = TypedEvent<extractEventArgs<ReturnType<HoprChannels['filters'][T]>>>
