@@ -41,7 +41,7 @@ export function generateKeyShares(path: PeerId[]): { alpha: Uint8Array; secrets:
 
       product.set(privateKeyTweakMul(product, secret))
 
-      if (!publicKeyVerify(product)) {
+      if (!privateKeyVerify(product)) {
         return
       }
 

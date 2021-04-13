@@ -19,7 +19,7 @@ describe('test filler', function () {
 
     let extendedHeader = new Uint8Array(perHop * maxHops + lastHop)
 
-    generateFiller(extendedHeader, maxHops, perHop, lastHop, secrets)
+    extendedHeader.set(generateFiller(maxHops, perHop, lastHop, secrets), lastHop)
 
     assert(extendedHeader.subarray(0, lastHop).every((x) => x == 0))
 
@@ -52,10 +52,11 @@ describe('test filler', function () {
     const secrets = Array.from({ length: hops }, (_) => randomBytes(SECRET_LENGTH))
     const extendedHeaderLength = perHop * maxHops + lastHop
     const headerLength = perHop * (maxHops - 1) + lastHop
+    const paddingLength = perHop * (maxHops - hops)
 
     let extendedHeader = new Uint8Array(extendedHeaderLength)
 
-    generateFiller(extendedHeader, maxHops, perHop, lastHop, secrets)
+    extendedHeader.set(generateFiller(maxHops, perHop, lastHop, secrets), lastHop + paddingLength)
 
     assert(extendedHeader.slice(0, lastHop + (maxHops - hops) * perHop).every((x) => x == 0))
 
@@ -87,21 +88,13 @@ describe('test filler', function () {
 
     const secrets = Array.from({ length: hops }, (_) => randomBytes(SECRET_LENGTH))
 
-    let extendedHeader = new Uint8Array(perHop * maxHops + lastHop)
+    const firstFiller = generateFiller(maxHops, perHop, lastHop, secrets)
 
-    generateFiller(extendedHeader, maxHops, perHop, lastHop, secrets)
-
-    assert(
-      extendedHeader.every((x) => x == 0),
-      'must not produce fillers for zero-hop packets'
-    )
+    assert(firstFiller == undefined || firstFiller.length == 0, 'must not produce fillers for zero-hop packets')
 
     // Should not throw an error
-    generateFiller(new Uint8Array(), 0, perHop, lastHop, [])
+    const secondFiller = generateFiller(0, perHop, lastHop, [])
 
-    assert(
-      extendedHeader.every((x) => x == 0),
-      `must not mutate any memory on zero-length paths`
-    )
+    assert(secondFiller == undefined || secondFiller.length == 0, `must not mutate any memory on zero-length paths`)
   })
 })

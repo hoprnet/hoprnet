@@ -1,4 +1,4 @@
-import { publicKeyCreate, publicKeyVerify, privateKeyVerify } from 'secp256k1'
+import { publicKeyCreate, publicKeyVerify, privateKeyVerify, publicKeyConvert } from 'secp256k1'
 import { randomFillSync } from 'crypto'
 import { SECP256K1 } from './constants'
 
@@ -7,7 +7,7 @@ import { SECP256K1 } from './constants'
  * offline Diffie-Hellman key exchange.
  * @returns a secp256k1 keypair
  */
-export function sampleGroupElement(): [exponent: Uint8Array, groupElement: Uint8Array] {
+export function sampleGroupElement(compressed: boolean = false): [exponent: Uint8Array, groupElement: Uint8Array] {
   let privKey = new Uint8Array(SECP256K1.PRIVATE_KEY_LENGTH)
   let pubKey: Uint8Array
 
@@ -21,5 +21,9 @@ export function sampleGroupElement(): [exponent: Uint8Array, groupElement: Uint8
     pubKey = publicKeyCreate(privKey, false)
   } while (!publicKeyVerify(pubKey))
 
-  return [privKey, pubKey]
+  if (compressed) {
+    return [privKey, publicKeyConvert(pubKey)]
+  } else {
+    return [privKey, pubKey]
+  }
 }

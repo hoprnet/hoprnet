@@ -68,7 +68,12 @@ export function createRoutingInfo(
         PRG.createPRG(params).digest(0, lastHopLength + paddingLength)
       )
 
-      generateFiller(extendedHeader, maxHops, routingInfoLength, lastHopLength, secrets)
+      if (secrets.length > 1) {
+        extendedHeader.set(
+          generateFiller(maxHops, routingInfoLength, lastHopLength, secrets),
+          lastHopLength + paddingLength
+        )
+      }
     } else {
       extendedHeader.copyWithin(routingInfoLength, 0, headerLength)
 
