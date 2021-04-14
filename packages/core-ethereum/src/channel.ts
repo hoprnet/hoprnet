@@ -1,7 +1,7 @@
 import type Connector from '.'
 import { ethers } from 'ethers'
 import BN from 'bn.js'
-import { PublicKey, Address, Balance, Hash, UINT256, Ticket, Acknowledgement, ChannelEntry } from './types'
+import { PublicKey, Balance, Hash, UINT256, Ticket, Acknowledgement, Channel } from './types'
 import { computeWinningProbability, checkChallenge, isWinningTicket, getSignatureParameters } from './utils'
 import Debug from 'debug'
 import type { SubmitTicketResponse } from '.'
@@ -9,17 +9,12 @@ import type { SubmitTicketResponse } from '.'
 const log = Debug('hopr-core-ethereum:channel')
 const abiCoder = new ethers.utils.AbiCoder()
 
-class Channel {
+export class ChannelManager {
   constructor(
     private readonly connector: Connector, // TODO: replace with ethereum global context?
     private readonly self: PublicKey,
     public readonly counterparty: PublicKey
   ) {}
-
-  static generateId(self: Address, counterparty: Address) {
-    let parties = self.sortPair(counterparty)
-    return Hash.create(Buffer.concat(parties.map((x) => x.serialize())))
-  }
 
   getId() {
     return Channel.generateId(this.self.toAddress(), this.counterparty.toAddress())
@@ -158,11 +153,11 @@ class Channel {
     )
   }
 
-  async submitTicket(ackTicket: Acknowledgement): Promise<SubmitTicketResponse> {
+  async redeemTicket(ackTicket: Acknowledgement): Promise<SubmitTicketResponse> {
     try {
       const ticket = ackTicket.ticket
 
-      log('Submitting ticket', ackTicket.response.toHex())
+      log('Redeeming ticket', ackTicket.response.toHex())
       const { hoprChannels, account } = this.connector
       const { r, s, v } = getSignatureParameters(ticket.signature)
 
@@ -257,4 +252,3 @@ class Channel {
   */
 }
 
-export default Channel

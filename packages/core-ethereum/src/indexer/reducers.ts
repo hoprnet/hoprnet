@@ -2,7 +2,7 @@ import type { Event } from './types'
 import assert from 'assert'
 import BN from 'bn.js'
 import { stringToU8a } from '@hoprnet/hopr-utils'
-import { AccountEntry, Address, PublicKey, Hash, ChannelEntry } from '../types'
+import { AccountEntry, Address, PublicKey, Hash, Channel } from '../types'
 
 export const onAccountInitialized = async (event: Event<'AccountInitialized'>): Promise<AccountEntry> => {
   const data = event.args
@@ -30,8 +30,8 @@ export const onAccountSecretUpdated = async (
 
 export const onChannelFunded = async (
   event: Event<'ChannelFunded'>,
-  channelEntry?: ChannelEntry
-): Promise<ChannelEntry> => {
+  channelEntry?: Channel
+): Promise<Channel> => {
   const data = event.args
 
   const accountA = Address.fromString(data.accountA)
@@ -45,7 +45,7 @@ export const onChannelFunded = async (
     const stateCounter = channelEntry.stateCounter
     const closureByPartyA = false
 
-    return new ChannelEntry(
+    return new Channel(
       partyA,
       partyB,
       deposit,
@@ -54,7 +54,8 @@ export const onChannelFunded = async (
       stateCounter,
       closureByPartyA,
       channelEntry.openedAt,
-      channelEntry.closedAt
+      channelEntry.closedAt,
+      channelEntry.commitment,
     )
   } else {
     const deposit = new BN(data.deposit.toString())
@@ -64,8 +65,9 @@ export const onChannelFunded = async (
     const closureByPartyA = false
     const openedAt = new BN(0)
     const closedAt = new BN(0)
+    const commitment = new Hash(data.commitment)
 
-    return new ChannelEntry(
+    return new Channel(
       partyA,
       partyB,
       deposit,
@@ -74,18 +76,19 @@ export const onChannelFunded = async (
       stateCounter,
       closureByPartyA,
       openedAt,
-      closedAt
+      closedAt,
+      commitment
     )
   }
 }
 
 export const onChannelOpened = async (
   event: Event<'ChannelOpened'>,
-  channelEntry: ChannelEntry
-): Promise<ChannelEntry> => {
+  channelEntry: Channel
+): Promise<Channel> => {
   assert(channelEntry.getStatus() === 'CLOSED', "'onChannelOpened' failed because channel is not in 'CLOSED' status")
 
-  return new ChannelEntry(
+  return new Channel(
     channelEntry.partyA,
     channelEntry.partyB,
     channelEntry.deposit,
@@ -94,14 +97,15 @@ export const onChannelOpened = async (
     channelEntry.stateCounter.addn(1),
     false,
     new BN(String(event.blockNumber)),
-    channelEntry.closedAt
+    channelEntry.closedAt,
+    channelEntry.commitment,
   )
 }
 
 export const onTicketRedeemed = async (
   event: Event<'TicketRedeemed'>,
-  channelEntry: ChannelEntry
-): Promise<ChannelEntry> => {
+  channelEntry: Channel
+): Promise<Channel> => {
   const status = channelEntry.getStatus()
 
   assert(
@@ -113,8 +117,9 @@ export const onTicketRedeemed = async (
   const redeemer = Address.fromString(data.redeemer)
   const counterparty = Address.fromString(data.counterparty)
   const amount = new BN(data.amount.toString())
+  const newCommitment = new Hash(data.commitment)
 
-  return new ChannelEntry(
+  return new Channel(
     channelEntry.partyA,
     channelEntry.partyB,
     channelEntry.deposit,
@@ -123,14 +128,15 @@ export const onTicketRedeemed = async (
     channelEntry.stateCounter,
     false,
     channelEntry.openedAt,
-    channelEntry.closedAt
+    channelEntry.closedAt,
+    newCommitment
   )
 }
 
 export const onChannelPendingToClose = async (
   event: Event<'ChannelPendingToClose'>,
-  channelEntry: ChannelEntry
-): Promise<ChannelEntry> => {
+  channelEntry: Channel
+): Promise<Channel> => {
   assert(
     channelEntry.getStatus() === 'OPEN',
     "'onInitiatedChannelClosure' failed because channel is not in 'OPEN' status"
@@ -140,7 +146,7 @@ export const onChannelPendingToClose = async (
   const initiator = Address.fromString(data.initiator)
   const counterparty = Address.fromString(data.counterparty)
 
-  return new ChannelEntry(
+  return new Channel(
     channelEntry.partyA,
     channelEntry.partyB,
     channelEntry.deposit,
@@ -149,20 +155,21 @@ export const onChannelPendingToClose = async (
     channelEntry.stateCounter.addn(1),
     initiator.lt(counterparty),
     channelEntry.openedAt,
-    channelEntry.closedAt
+    channelEntry.closedAt,
+    channelEntry.commitment
   )
 }
 
 export const onChannelClosed = async (
   event: Event<'ChannelClosed'>,
-  channelEntry: ChannelEntry
-): Promise<ChannelEntry> => {
+  channelEntry: Channel
+): Promise<Channel> => {
   assert(
     channelEntry.getStatus() === 'PENDING_TO_CLOSE',
     "'onClosedChannel' failed because channel is not in 'PENDING_TO_CLOSE' status"
   )
 
-  return ChannelEntry.fromObject({
+  return Channel.fromObject({
     partyA: channelEntry.partyA,
     partyB: channelEntry.partyB,
     deposit: new BN(0),
@@ -171,6 +178,7 @@ export const onChannelClosed = async (
     stateCounter: channelEntry.stateCounter.addn(8),
     closureByPartyA: false,
     openedAt: channelEntry.openedAt,
-    closedAt: new BN(String(event.blockNumber))
+    closedAt: new BN(String(event.blockNumber)),
+    commitment: channelEntry.commitment
   })
 }

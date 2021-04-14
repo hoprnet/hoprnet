@@ -1,10 +1,9 @@
 import BN from 'bn.js'
 import { u8aSplit, serializeToU8a, toU8a } from '@hoprnet/hopr-utils'
-import { Address, Balance } from './primitives'
+import { Address, Balance, Hash } from './primitives'
 import { UINT256 } from '../types/solidity'
-import { Channel } from '..'
 
-class ChannelEntry {
+export class Channel {
   constructor(
     public readonly partyA: Address,
     public readonly partyB: Address,
@@ -14,7 +13,8 @@ class ChannelEntry {
     public readonly stateCounter: BN,
     public readonly closureByPartyA: boolean,
     public readonly openedAt: BN,
-    public readonly closedAt: BN
+    public readonly closedAt: BN,
+    public readonly commitment: Hash
   ) {}
 
   static get SIZE(): number {
@@ -27,7 +27,8 @@ class ChannelEntry {
       UINT256.SIZE +
       1 +
       UINT256.SIZE +
-      UINT256.SIZE
+      UINT256.SIZE + 
+      Hash.SIZE
     )
   }
 
@@ -41,8 +42,9 @@ class ChannelEntry {
     closureByPartyA: boolean
     openedAt: BN
     closedAt: BN
+    commitment: Hash
   }) {
-    return new ChannelEntry(
+    return new Channel(
       obj.partyA,
       obj.partyB,
       obj.deposit,
@@ -51,7 +53,8 @@ class ChannelEntry {
       obj.stateCounter,
       obj.closureByPartyA,
       obj.openedAt,
-      obj.closedAt
+      obj.closedAt,
+      obj.commitment
     )
   }
 
@@ -65,7 +68,8 @@ class ChannelEntry {
       UINT256.SIZE,
       1,
       UINT256.SIZE,
-      UINT256.SIZE
+      UINT256.SIZE,
+      Hash.SIZE
     ])
     const partyA = new Address(items[0])
     const partyB = new Address(items[1])
@@ -76,8 +80,9 @@ class ChannelEntry {
     const closureByPartyA = Boolean(items[6][0])
     const openedAt = new BN(items[7])
     const closedAt = new BN(items[8])
+    const commitment = new Hash(items[9])
 
-    return new ChannelEntry(
+    return new Channel(
       partyA,
       partyB,
       deposit,
@@ -86,7 +91,8 @@ class ChannelEntry {
       stateCounter,
       closureByPartyA,
       openedAt,
-      closedAt
+      closedAt,
+      commitment
     )
   }
 
@@ -100,7 +106,8 @@ class ChannelEntry {
       [new UINT256(this.stateCounter).serialize(), UINT256.SIZE],
       [toU8a(Number(this.closureByPartyA)), 1],
       [new UINT256(this.openedAt).serialize(), UINT256.SIZE],
-      [new UINT256(this.closedAt).serialize(), UINT256.SIZE]
+      [new UINT256(this.closedAt).serialize(), UINT256.SIZE],
+      [this.commitment.serialize(), Hash.SIZE]
     ])
   }
 
@@ -117,6 +124,11 @@ class ChannelEntry {
     return new BN(String(Math.ceil((this.stateCounter.toNumber() + 1) / 10)))
   }
 
+  static generateId(self: Address, counterparty: Address) {
+    let parties = self.sortPair(counterparty)
+    return Hash.create(Buffer.concat(parties.map((x) => x.serialize())))
+  }
+
   public getId() {
     return Channel.generateId(this.partyA, this.partyB)
   }
@@ -129,4 +141,3 @@ class ChannelEntry {
   }
 }
 
-export default ChannelEntry
