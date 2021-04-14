@@ -214,7 +214,14 @@ export class ChannelManager {
   }
   */
 
-  async createTicket(self: PublicKey, counterparty: PublicKey, amount: Balance, winProb: Hash, privateKey: Uint8Array, challenge: Hash): Promise<Ticket> {
+  async createTicket(
+    self: PublicKey,
+    counterparty: PublicKey,
+    amount: Balance,
+    winProb: Hash,
+    privateKey: Uint8Array,
+    challenge: Hash
+  ): Promise<Ticket> {
     const channel = await this.getChannel(self, counterparty)
     const epoch = null // TODO
     return Ticket.create(
