@@ -28,10 +28,7 @@ export const onAccountSecretUpdated = async (
   return new AccountEntry(storedAccount.address, storedAccount.publicKey, secret, counter)
 }
 
-export const onChannelFunded = async (
-  event: Event<'ChannelFunded'>,
-  channelEntry?: Channel
-): Promise<Channel> => {
+export const onChannelFunded = async (event: Event<'ChannelFunded'>, channelEntry?: Channel): Promise<Channel> => {
   const data = event.args
 
   const accountA = Address.fromString(data.accountA)
@@ -55,7 +52,7 @@ export const onChannelFunded = async (
       closureByPartyA,
       channelEntry.openedAt,
       channelEntry.closedAt,
-      channelEntry.commitment,
+      channelEntry.commitment
     )
   } else {
     const deposit = new BN(data.deposit.toString())
@@ -82,10 +79,7 @@ export const onChannelFunded = async (
   }
 }
 
-export const onChannelOpened = async (
-  event: Event<'ChannelOpened'>,
-  channelEntry: Channel
-): Promise<Channel> => {
+export const onChannelOpened = async (event: Event<'ChannelOpened'>, channelEntry: Channel): Promise<Channel> => {
   assert(channelEntry.getStatus() === 'CLOSED', "'onChannelOpened' failed because channel is not in 'CLOSED' status")
 
   return new Channel(
@@ -98,14 +92,11 @@ export const onChannelOpened = async (
     false,
     new BN(String(event.blockNumber)),
     channelEntry.closedAt,
-    channelEntry.commitment,
+    channelEntry.commitment
   )
 }
 
-export const onTicketRedeemed = async (
-  event: Event<'TicketRedeemed'>,
-  channelEntry: Channel
-): Promise<Channel> => {
+export const onTicketRedeemed = async (event: Event<'TicketRedeemed'>, channelEntry: Channel): Promise<Channel> => {
   const status = channelEntry.getStatus()
 
   assert(
@@ -160,10 +151,7 @@ export const onChannelPendingToClose = async (
   )
 }
 
-export const onChannelClosed = async (
-  event: Event<'ChannelClosed'>,
-  channelEntry: Channel
-): Promise<Channel> => {
+export const onChannelClosed = async (event: Event<'ChannelClosed'>, channelEntry: Channel): Promise<Channel> => {
   assert(
     channelEntry.getStatus() === 'PENDING_TO_CLOSE',
     "'onClosedChannel' failed because channel is not in 'PENDING_TO_CLOSE' status"

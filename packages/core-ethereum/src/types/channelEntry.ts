@@ -27,7 +27,7 @@ export class Channel {
       UINT256.SIZE +
       1 +
       UINT256.SIZE +
-      UINT256.SIZE + 
+      UINT256.SIZE +
       Hash.SIZE
     )
   }
@@ -140,4 +140,3 @@ export class Channel {
     }
   }
 }
-
