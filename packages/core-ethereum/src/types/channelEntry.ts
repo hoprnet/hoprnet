@@ -13,7 +13,7 @@ export class Channel {
     public readonly selfBalance: Balance,
     public readonly counterpartyBalance: Balance,
     public readonly closureTime: BN,
-    public readonly stateCounter: BN,
+    public readonly channelEpoch: UINT256,
     public readonly closureByPartyA: boolean,
     public readonly openedAt: BN,
     public readonly closedAt: BN,
@@ -55,7 +55,7 @@ export class Channel {
     const selfBalance = Balance.deserialize(items[4])
     const counterpartyBalance = Balance.deserialize(items[5])
     const closureTime = new BN(items[4])
-    const stateCounter = new BN(items[5])
+    const channelEpoch = UINT256.deserialize(items[5])
     const closureByPartyA = Boolean(items[6][0])
     const openedAt = new BN(items[7])
     const closedAt = new BN(items[8])
@@ -69,7 +69,7 @@ export class Channel {
       selfBalance,
       counterpartyBalance,
       closureTime,
-      stateCounter,
+      channelEpoch,
       closureByPartyA,
       openedAt,
       closedAt,
@@ -84,7 +84,7 @@ export class Channel {
       [this.selfBalance.toUINT256().serialize(), UINT256.SIZE],
       [this.counterpartyBalance.toUINT256().serialize(), UINT256.SIZE],
       [new UINT256(this.closureTime).serialize(), UINT256.SIZE],
-      [new UINT256(this.stateCounter).serialize(), UINT256.SIZE],
+      [this.channelEpoch.serialize(), UINT256.SIZE],
       [toU8a(Number(this.closureByPartyA)), 1],
       [new UINT256(this.openedAt).serialize(), UINT256.SIZE],
       [new UINT256(this.closedAt).serialize(), UINT256.SIZE],
@@ -93,8 +93,7 @@ export class Channel {
   }
 
   public getStatus() {
-    const status = this.stateCounter.modn(10)
-
+    const status = this.channelEpoch.toBN().modn(10)
     if (status === 0) return 'CLOSED'
     else if (status === 1) return 'OPEN'
     else if (status === 2) return 'PENDING_TO_CLOSE'
@@ -102,7 +101,7 @@ export class Channel {
   }
 
   public getIteration() {
-    return new BN(String(Math.ceil((this.stateCounter.toNumber() + 1) / 10)))
+    return this.channelEpoch.toBN().addn(1).divn(10)
   }
 
   static generateId(self: Address, counterparty: Address) {
