@@ -88,10 +88,7 @@ export const getChannel = async (db: LevelUp, channelId: Hash): Promise<Channel 
   return channelEntry
 }
 
-export const getChannels = async (
-  db: LevelUp,
-  filter?: (channel: Channel) => Promise<boolean>
-): Promise<Channel[]> => {
+export const getChannels = async (db: LevelUp, filter?: (channel: Channel) => Promise<boolean>): Promise<Channel[]> => {
   const channels: Channel[] = []
 
   return new Promise<Channel[]>((resolve, reject) => {

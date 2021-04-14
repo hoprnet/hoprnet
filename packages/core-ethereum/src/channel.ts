@@ -11,7 +11,7 @@ const abiCoder = new ethers.utils.AbiCoder()
 
 export class ChannelManager {
   constructor(
-    private readonly connector: Connector, // TODO: replace with ethereum global context?
+    private readonly connector: Connector // TODO: replace with ethereum global context?
   ) {}
 
   async getChannel(self: PublicKey, counterparty: PublicKey): Promise<Channel> {
@@ -26,11 +26,11 @@ export class ChannelManager {
   async channelExists(self: PublicKey, counterparty: PublicKey): Promise<boolean> {
     const id = Channel.generateId(self.toAddress(), counterparty.toAddress())
     const channel = await this.connector.indexer.getChannel(id)
-    return (channel && channel.getStatus() !== 'CLOSED')
+    return channel && channel.getStatus() !== 'CLOSED'
   }
 
   async open(self: PublicKey, counterparty: PublicKey, fundAmount: Balance) {
-    if (this.channelExists(self, counterparty)){
+    if (this.channelExists(self, counterparty)) {
       throw Error('Channel is already opened')
     }
     const myBalance = await this.connector.hoprToken.balanceOf(myAddress.toHex())
