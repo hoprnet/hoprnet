@@ -10833,17 +10833,17 @@ pbkdf2@^3.0.17, pbkdf2@^3.0.3, pbkdf2@^3.0.9:
     safe-buffer "^5.0.1"
     sha.js "^2.4.8"
 
-peer-id@0, peer-id@0.14.6, peer-id@^0.14.2, peer-id@^0.14.3, peer-id@~0.14.3:
-  version "0.14.6"
-  resolved "https://registry.yarnpkg.com/peer-id/-/peer-id-0.14.6.tgz#c3a5dcea6ca145b8badbe51c9c589bce68b96193"
-  integrity sha512-Ubww7Y69OdKISOGYfkc232MPHhcQQ9FJzSoOVmDmuxqo1jEjgT5ThvwoPom2LqAd/KRbrmk5bxFeGMvbgpazog==
+peer-id@0, peer-id@0.14.7, peer-id@^0.14.2, peer-id@^0.14.3, peer-id@~0.14.3:
+  version "0.14.7"
+  resolved "https://registry.yarnpkg.com/peer-id/-/peer-id-0.14.7.tgz#9e94ccd52a41280b36b27fe9da580950aa4c5d48"
+  integrity sha512-qtqBdJVoL6/alIzNPGFj4ewJVkKhueMElqMOs6VDzwXVTEDGyXP4iGHaplUvqA9/zJ1B7m84fOkoi0h+K+GhOg==
   dependencies:
     cids "^1.1.5"
     class-is "^1.1.0"
     libp2p-crypto "^0.19.0"
     minimist "^1.2.5"
     multihashes "^4.0.2"
-    protons "^2.0.0"
+    protobufjs "^6.10.2"
     uint8arrays "^2.0.5"
 
 peer-id@0.14.3:
