@@ -1,7 +1,7 @@
 import type { LevelUp } from 'levelup'
 import BN from 'bn.js'
 import { u8aToNumber } from '@hoprnet/hopr-utils'
-import { Hash, Address, AccountEntry, ChannelEntry, Snapshot } from '../types'
+import { Hash, Address, AccountEntry, Channel, Snapshot } from '../types'
 
 const encoder = new TextEncoder()
 const LATEST_BLOCK_NUMBER_KEY = encoder.encode('indexer-latestBlockNumber')
@@ -67,7 +67,7 @@ export const updateLatestConfirmedSnapshot = async (db: LevelUp, snapshot: Snaps
  * @param db
  * @param address
  */
-export const getChannel = async (db: LevelUp, channelId: Hash): Promise<ChannelEntry | undefined> => {
+export const getChannel = async (db: LevelUp, channelId: Hash): Promise<Channel | undefined> => {
   let channel: Uint8Array | undefined
   try {
     channel = (await db.get(Buffer.from(createChannelKey(channelId)))) as Uint8Array
@@ -79,29 +79,29 @@ export const getChannel = async (db: LevelUp, channelId: Hash): Promise<ChannelE
     throw err
   }
 
-  if (channel == null || channel.length != ChannelEntry.SIZE) {
+  if (channel == null || channel.length != Channel.SIZE) {
     return undefined
   }
 
-  const channelEntry = ChannelEntry.deserialize(channel)
+  const channelEntry = Channel.deserialize(channel)
 
   return channelEntry
 }
 
 export const getChannels = async (
   db: LevelUp,
-  filter?: (channel: ChannelEntry) => Promise<boolean>
-): Promise<ChannelEntry[]> => {
-  const channels: ChannelEntry[] = []
+  filter?: (channel: Channel) => Promise<boolean>
+): Promise<Channel[]> => {
+  const channels: Channel[] = []
 
-  return new Promise<ChannelEntry[]>((resolve, reject) => {
+  return new Promise<Channel[]>((resolve, reject) => {
     db.createValueStream({
       keys: false,
       values: true
     })
       .on('data', async (data) => {
-        if (data == null || data.length != ChannelEntry.SIZE) return
-        const channel = ChannelEntry.deserialize(data)
+        if (data == null || data.length != Channel.SIZE) return
+        const channel = Channel.deserialize(data)
 
         if (!filter || (await filter(channel))) {
           channels.push(channel)
@@ -119,7 +119,7 @@ export const getChannels = async (
  * @param address
  * @param channelEntry
  */
-export const updateChannel = async (db: LevelUp, channelId: Hash, channel: ChannelEntry): Promise<void> => {
+export const updateChannel = async (db: LevelUp, channelId: Hash, channel: Channel): Promise<void> => {
   await db.put(Buffer.from(createChannelKey(channelId)), Buffer.from(channel.serialize()))
 }
 

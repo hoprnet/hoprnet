@@ -12,48 +12,27 @@ const abiCoder = new ethers.utils.AbiCoder()
 export class ChannelManager {
   constructor(
     private readonly connector: Connector, // TODO: replace with ethereum global context?
-    private readonly self: PublicKey,
-    public readonly counterparty: PublicKey
   ) {}
 
-  getId() {
-    return Channel.generateId(this.self.toAddress(), this.counterparty.toAddress())
-  }
-
-  async getState(): Promise<ChannelEntry> {
-    const channelId = await this.getId()
-    const state = await this.connector.indexer.getChannel(channelId)
-    if (state) return state
-
-    throw Error(`Channel state for ${channelId.toHex()} not found`)
-  }
-
-  async getBalances() {
-    const state = await this.getState()
-    const { partyA, partyB } = state.getBalances()
-    const [self, counterparty] = state.partyA.eq(await this.self.toAddress()) ? [partyA, partyB] : [partyB, partyA]
-
-    return {
-      self,
-      counterparty
+  async getChannel(self: PublicKey, counterparty: PublicKey): Promise<Channel> {
+    const id = Channel.generateId(self.toAddress(), counterparty.toAddress())
+    const channel = await this.connector.indexer.getChannel(id)
+    if (!channel) {
+      throw Error(`Channel for ${id.toHex()} not found`)
     }
+    return channel
   }
 
-  async open(fundAmount: Balance) {
-    const { account, hoprToken, hoprChannels } = this.connector
+  async channelExists(self: PublicKey, counterparty: PublicKey): Promise<boolean> {
+    const id = Channel.generateId(self.toAddress(), counterparty.toAddress())
+    const channel = await this.connector.indexer.getChannel(id)
+    return (channel && channel.getStatus() !== 'CLOSED')
+  }
 
-    // channel may not exist, we can still open it
-    let state: ChannelEntry
-    try {
-      state = await this.getState()
-    } catch {}
-    if (state && state.getStatus() !== 'CLOSED') {
+  async open(self: PublicKey, counterparty: PublicKey, fundAmount: Balance) {
+    if (this.channelExists(self, counterparty)){
       throw Error('Channel is already opened')
     }
-
-    const myAddress = this.self.toAddress()
-    const counterpartyAddress = this.counterparty.toAddress()
-
     const myBalance = await this.connector.hoprToken.balanceOf(myAddress.toHex())
     if (new BN(myBalance.toString()).lt(fundAmount.toBN())) {
       throw Error('We do not have enough balance to open a channel')

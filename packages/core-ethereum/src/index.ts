@@ -6,7 +6,7 @@ import { Networks, getAddresses } from '@hoprnet/hopr-ethereum'
 import { ethers } from 'ethers'
 import debug from 'debug'
 import { Acknowledgement } from './types'
-import Channel from './channel'
+import { ChannelManager } from './channel'
 import Indexer from './indexer'
 import { RoutingChannel } from './indexer'
 import * as utils from './utils'
@@ -39,7 +39,7 @@ export default class HoprEthereum {
   private _starting?: Promise<HoprEthereum>
   private _stopping?: Promise<void>
 
-  public channel = Channel
+  public channelManager = ChannelManager
   public indexer: Indexer
   public account: Account
 
@@ -206,4 +206,4 @@ export default class HoprEthereum {
 }
 
 export * from './types'
-export { Channel, getWinProbabilityAsFloat, computeWinningProbability, Indexer, RoutingChannel }
+export { getWinProbabilityAsFloat, computeWinningProbability, Indexer, RoutingChannel }
