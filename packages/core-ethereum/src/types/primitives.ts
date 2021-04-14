@@ -7,7 +7,6 @@ import { publicKeyConvert, publicKeyCreate, ecdsaSign, ecdsaVerify } from 'secp2
 import { serializeToU8a, u8aSplit, u8aToNumber } from '@hoprnet/hopr-utils'
 import { UINT256 } from './solidity'
 
-
 export class Address {
   constructor(private arr: Uint8Array) {}
 
