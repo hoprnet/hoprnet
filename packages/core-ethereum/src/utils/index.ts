@@ -76,15 +76,6 @@ export async function checkChallenge(challenge: Hash, response: Hash) {
 }
 
 /**
- * An asychronous setTimeout.
- *
- * @param ms milliseconds to wait
- */
-export async function wait(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms))
-}
-
-/**
  * Get current network's name.
  *
  * @param chainId a chain id
@@ -125,12 +116,4 @@ export function getSignatureParameters(
     s: new Hash(signature.signature.slice(32, 64)),
     v: signature.recovery
   }
-}
-
-/**
- * @param network
- * @returns true if network is private or ganache
- */
-export function isGanache(network?: Networks): boolean {
-  return !network || network === 'localhost'
 }
