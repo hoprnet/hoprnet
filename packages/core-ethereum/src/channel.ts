@@ -26,7 +26,7 @@ class Channel {
   }
 
   async getState(): Promise<ChannelEntry> {
-    const channelId = await this.getId()
+    const channelId = this.getId()
     const state = await this.connector.indexer.getChannel(channelId)
     if (state) return state
 
@@ -36,7 +36,7 @@ class Channel {
   async getBalances() {
     const state = await this.getState()
     const { partyA, partyB } = state.getBalances()
-    const [self, counterparty] = state.partyA.eq(await this.self.toAddress()) ? [partyA, partyB] : [partyB, partyA]
+    const [self, counterparty] = state.partyA.eq(this.self.toAddress()) ? [partyA, partyB] : [partyB, partyA]
 
     return {
       self,
@@ -73,7 +73,7 @@ class Channel {
         fundAmount.toBN().toString(),
         abiCoder.encode(['bool', 'address', 'address'], [true, myAddress.toHex(), counterpartyAddress.toHex()])
       )
-      transaction.wait()
+      await transaction.wait()
 
       return transaction.hash
     } catch (err) {

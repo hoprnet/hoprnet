@@ -22,7 +22,7 @@ import { PROVIDER_CACHE_TTL } from './constants'
 import debug from 'debug'
 const log = debug('hopr-core-ethereum:account')
 
-export const EMPTY_HASHED_SECRET = new Hash(new Uint8Array(Hash.SIZE).fill(0x00))
+export const EMPTY_HASHED_SECRET = new Hash(ethers.utils.arrayify(ethers.constants.HashZero))
 const cache = new Map<'balance' | 'nativeBalance', { value: string; updatedAt: number }>()
 
 class Account {
@@ -32,27 +32,34 @@ class Account {
   private preimage: Hash
 
   constructor(
-    private network: Networks,
-    private getLatestBlockNumber: () => Promise<number>,
-    // TODO: use Address
-    private getTransactionCount: (address: string, blockNumber?: number) => Promise<number>,
-    private getLiveBalance: (address: Address) => Promise<Balance>,
-    private getLiveNativeBalance: (address: Address) => Promise<NativeBalance>,
-    private getAccount: (address: Address) => Promise<AccountEntry>,
-    private findPreImage: (hash: Hash) => Promise<Hash>,
+    private ops: {
+      network: Networks
+    },
+    private api: {
+      getLatestBlockNumber: () => Promise<number>
+      getTransactionCount: (address: Address, blockNumber?: number) => Promise<number>
+      getBalance: (address: Address) => Promise<Balance>
+      getNativeBalance: (address: Address) => Promise<NativeBalance>
+      getAccount: (address: Address) => Promise<AccountEntry>
+      findPreImage: (hash: Hash) => Promise<Hash>
+    },
     public wallet: IWallet
   ) {
-    this._nonceTracker = new NonceTracker({
-      getLatestBlockNumber: this.getLatestBlockNumber,
-      getTransactionCount: this.getTransactionCount,
-      getConfirmedTransactions: () => Array.from(this._transactions.confirmed.values()),
-      getPendingTransactions: () => Array.from(this._transactions.pending.values()),
-      minPending: durations.minutes(15)
-    })
+    this._nonceTracker = new NonceTracker(
+      {
+        minPending: durations.minutes(15)
+      },
+      {
+        getLatestBlockNumber: this.api.getLatestBlockNumber,
+        getTransactionCount: this.api.getTransactionCount,
+        getConfirmedTransactions: () => Array.from(this._transactions.confirmed.values()),
+        getPendingTransactions: () => Array.from(this._transactions.pending.values())
+      }
+    )
   }
 
   public async getNonceLock(): Promise<NonceLock> {
-    return this._nonceTracker.getNonceLock(this.address.toHex())
+    return this._nonceTracker.getNonceLock(this.address)
   }
 
   /**
@@ -60,7 +67,7 @@ class Account {
    * @returns HOPR balance
    */
   public async getBalance(useCache: boolean = false): Promise<Balance> {
-    return getBalance(this.getLiveBalance, this.address, useCache)
+    return getBalance(this.api.getBalance, this.address, useCache)
   }
 
   /**
@@ -68,11 +75,11 @@ class Account {
    * @returns ETH balance
    */
   public async getNativeBalance(useCache: boolean = false): Promise<NativeBalance> {
-    return getNativeBalance(this.getLiveNativeBalance, this.address, useCache)
+    return getNativeBalance(this.api.getNativeBalance, this.address, useCache)
   }
 
   async getTicketEpoch(): Promise<UINT256> {
-    const state = await this.getAccount(this.address)
+    const state = await this.api.getAccount(this.address)
     if (!state || !state.counter) return UINT256.fromString('0')
     return new UINT256(state.counter)
   }
@@ -82,7 +89,7 @@ class Account {
    */
   async getOnChainSecret(): Promise<Hash | undefined> {
     if (this._onChainSecret && !this._onChainSecret.eq(EMPTY_HASHED_SECRET)) return this._onChainSecret
-    const state = await this.getAccount(this.address)
+    const state = await this.api.getAccount(this.address)
     if (!state || !state.secret) return undefined
     this.updateLocalState(state.secret)
     return state.secret
@@ -94,7 +101,7 @@ class Account {
       if (!ocs) {
         throw new Error('cannot reserve preimage when there is no on chain secret')
       }
-      this.preimage = await this.findPreImage(ocs)
+      this.preimage = await this.api.findPreImage(ocs)
     }
   }
 
@@ -111,7 +118,7 @@ class Account {
     const ticket = unacknowledgedTicket.ticket
     if (await isWinningTicket(ticket.getHash(), response, this.preimage, ticket.winProb)) {
       const ack = new Acknowledgement(ticket, response, this.preimage)
-      this.preimage = await this.findPreImage(this.preimage)
+      this.preimage = await this.api.findPreImage(this.preimage)
       return ack
     } else {
       return null
@@ -135,44 +142,23 @@ class Account {
     this._onChainSecret = onChainSecret
   }
 
-  private handleTransactionError(hash: string, nonce: number, releaseLock: () => void, error: string) {
-    releaseLock()
-    const reverted = ([errors.CALL_EXCEPTION] as string[]).includes(error)
-
-    if (reverted) {
-      log('Transaction with nonce %d and hash %s reverted: %s', nonce, hash, error)
-
-      // this transaction failed but was confirmed as reverted
-      this._transactions.moveToConfirmed(hash)
-    } else {
-      log('Transaction with nonce %d failed to sent: %s', nonce, error)
-
-      const alreadyKnown = ([errors.NONCE_EXPIRED, errors.REPLACEMENT_UNDERPRICED] as string[]).includes(error)
-      // if this hash is already known and we already have it included in
-      // pending we can safely ignore this
-      if (alreadyKnown && this._transactions.pending.has(hash)) return
-
-      // this transaction was not confirmed so we just remove it
-      this._transactions.remove(hash)
-    }
-  }
-
   public async sendTransaction<T extends (...args: any) => Promise<ContractTransaction>>(
     method: T,
     ...rest: Parameters<T>
   ): Promise<ContractTransaction> {
     const gasLimit = 300e3
-    const gasPrice = getNetworkGasPrice(this.network)
-    const nonceLock = await this._nonceTracker.getNonceLock(this.address.toHex())
+    const gasPrice = getNetworkGasPrice(this.ops.network)
+    const nonceLock = await this._nonceTracker.getNonceLock(this.address)
     const nonce = nonceLock.nextNonce
     let transaction: ContractTransaction
 
+    log('Sending transaction %o', {
+      gasLimit,
+      gasPrice,
+      nonce
+    })
+
     try {
-      log('Sending transaction %o', {
-        gasLimit,
-        gasPrice,
-        nonce
-      })
       // send transaction to our ethereum provider
       // TODO: better type this, make it less hacky
       transaction = await method(
@@ -185,26 +171,44 @@ class Account {
           }
         ]
       )
-      log('Transaction with nonce %d successfully sent %s, waiting for confimation', nonce, transaction.hash)
-
-      this._transactions.addToPending(transaction.hash, { nonce })
-      nonceLock.releaseLock()
-
-      // monitor transaction, this is done asynchronously
-      transaction
-        .wait()
-        .then(() => {
-          log('Transaction with nonce %d and hash %s confirmed', nonce, transaction.hash)
-          this._transactions.moveToConfirmed(transaction.hash)
-        })
-        .catch((error) => {
-          this.handleTransactionError(transaction.hash, nonce, nonceLock.releaseLock, error.message)
-        })
     } catch (error) {
-      this.handleTransactionError(transaction.hash, nonce, nonceLock.releaseLock, error.message)
+      log('Transaction with nonce %d failed to sent: %s', nonce, error)
+      nonceLock.releaseLock()
+      throw Error('Could not send transaction')
     }
 
-    if (!transaction) throw Error('Could not send transaction')
+    log('Transaction with nonce %d successfully sent %s, waiting for confimation', nonce, transaction.hash)
+    this._transactions.addToPending(transaction.hash, { nonce })
+    nonceLock.releaseLock()
+
+    // monitor transaction, this is done asynchronously
+    transaction
+      .wait()
+      .then(() => {
+        log('Transaction with nonce %d and hash %s confirmed', nonce, transaction.hash)
+        this._transactions.moveToConfirmed(transaction.hash)
+      })
+      .catch((error) => {
+        const reverted = ([errors.CALL_EXCEPTION] as string[]).includes(error)
+
+        if (reverted) {
+          log('Transaction with nonce %d and hash %s reverted: %s', nonce, transaction.hash, error)
+
+          // this transaction failed but was confirmed as reverted
+          this._transactions.moveToConfirmed(transaction.hash)
+        } else {
+          log('Transaction with nonce %d failed to sent: %s', nonce, error)
+
+          const alreadyKnown = ([errors.NONCE_EXPIRED, errors.REPLACEMENT_UNDERPRICED] as string[]).includes(error)
+          // if this hash is already known and we already have it included in
+          // pending we can safely ignore this
+          if (alreadyKnown && this._transactions.pending.has(transaction.hash)) return
+
+          // this transaction was not confirmed so we just remove it
+          this._transactions.remove(transaction.hash)
+        }
+      })
+
     return transaction
   }
 }
