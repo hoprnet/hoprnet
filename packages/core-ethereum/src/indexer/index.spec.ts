@@ -4,7 +4,6 @@ import { Ganache } from '@hoprnet/hopr-testing'
 import { migrate, fund, getAddresses } from '@hoprnet/hopr-ethereum'
 import { durations, u8aToHex, u8aEquals } from '@hoprnet/hopr-utils'
 import * as testconfigs from '../config.spec'
-import * as configs from '../config'
 import { PublicKey } from '../types'
 import { advanceBlockTo, increaseTime } from '../utils/testing'
 import { ethers, providers } from 'ethers'
@@ -14,6 +13,7 @@ import { publicKeyConvert } from 'secp256k1'
 import { randomBytes } from 'crypto'
 import { Channel } from '..'
 import { Hash } from '../types'
+import { DEFAULT_URI, MAX_CONFIRMATIONS } from '../constants'
 
 const { arrayify, AbiCoder } = ethers.utils
 const abiCoder = new AbiCoder()
@@ -45,7 +45,7 @@ describe('test indexer', function () {
     await migrate()
     await fund(`--address ${getAddresses()?.localhost?.HoprToken} --accounts-to-fund 4`)
 
-    provider = new providers.WebSocketProvider(configs.DEFAULT_URI)
+    provider = new providers.WebSocketProvider(DEFAULT_URI)
     hoprToken = HoprToken__factory.connect(getAddresses().localhost?.HoprToken, provider)
     hoprChannels = HoprChannels__factory.connect(getAddresses().localhost?.HoprChannels, provider)
 
@@ -97,7 +97,7 @@ describe('test indexer', function () {
 
     it('should store channel & blockNumber correctly', async function () {
       const currentBlockNumber = await provider.getBlockNumber()
-      await advanceBlockTo(provider, currentBlockNumber + configs.MAX_CONFIRMATIONS)
+      await advanceBlockTo(provider, currentBlockNumber + MAX_CONFIRMATIONS)
       const channels = await connector.indexer.getChannels()
       assert.equal(channels.length, 1, 'check Channels.store')
     })
@@ -157,7 +157,7 @@ describe('test indexer', function () {
         )
 
       const currentBlockNumber = await provider.getBlockNumber()
-      await advanceBlockTo(provider, currentBlockNumber + configs.MAX_CONFIRMATIONS)
+      await advanceBlockTo(provider, currentBlockNumber + MAX_CONFIRMATIONS)
       const channels = await connector.indexer.getChannels()
       assert.equal(channels.length, 2, 'check Channels.store')
       const channelsUsingPartyA = await connector.indexer.getChannelsOf(userA.toAddress())
@@ -180,7 +180,7 @@ describe('test indexer', function () {
 
     it('should "ZERO" channel', async function () {
       const currentBlockNumber = await provider.getBlockNumber()
-      await advanceBlockTo(provider, currentBlockNumber + configs.MAX_CONFIRMATIONS)
+      await advanceBlockTo(provider, currentBlockNumber + MAX_CONFIRMATIONS)
       const channels = await connector.indexer.getChannels()
       assert.equal(channels.length, 2, 'check Channels.store')
 
@@ -219,7 +219,7 @@ describe('test indexer', function () {
 
     it('should not index new channel', async function () {
       const currentBlockNumber = await provider.getBlockNumber()
-      await advanceBlockTo(provider, currentBlockNumber + configs.MAX_CONFIRMATIONS)
+      await advanceBlockTo(provider, currentBlockNumber + MAX_CONFIRMATIONS)
       const channels = await connector.indexer.getChannels()
       assert.equal(channels.length, 2, 'check Channels.store')
     })

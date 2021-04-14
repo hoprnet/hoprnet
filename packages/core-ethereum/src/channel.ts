@@ -45,7 +45,7 @@ export class ChannelManager {
         fundAmount.toBN().toString(),
         abiCoder.encode(['bool', 'address', 'address'], [true, myAddress.toHex(), counterpartyAddress.toHex()])
       )
-      transaction.wait()
+      await transaction.wait()
 
       return transaction.hash
     } catch (err) {

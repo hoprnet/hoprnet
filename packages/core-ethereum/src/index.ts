@@ -5,19 +5,18 @@ import chalk from 'chalk'
 import { Networks, getAddresses } from '@hoprnet/hopr-ethereum'
 import { ethers } from 'ethers'
 import debug from 'debug'
-import { Acknowledgement } from './types'
 import { ChannelManager } from './channel'
 import Indexer from './indexer'
 import { RoutingChannel } from './indexer'
 import * as utils from './utils'
-import * as config from './config'
 import Account from './account'
 import { getWinProbabilityAsFloat, computeWinningProbability } from './utils'
 import { HoprToken__factory, HoprChannels__factory } from './contracts'
+import BN from 'bn.js'
+import { DEFAULT_URI, MAX_CONFIRMATIONS } from './constants'
+import { Acknowledgement, Balance, NativeBalance } from './types'
 
 const log = debug('hopr-core-ethereum')
-
-export type Currencies = 'NATIVE' | 'HOPR'
 
 export type SubmitTicketResponse =
   | {
@@ -53,8 +52,24 @@ export default class HoprEthereum {
     public hoprToken: HoprToken,
     maxConfirmations: number
   ) {
-    this.account = new Account(this, wallet)
     this.indexer = new Indexer(this, maxConfirmations)
+    this.account = new Account(
+      {
+        network: this.network
+      },
+      {
+        // TODO: use indexer when it's done syncing
+        getLatestBlockNumber: async () => this.provider.getBlockNumber(),
+        getTransactionCount: (address, blockNumber) => this.provider.getTransactionCount(address.toHex(), blockNumber),
+        getBalance: (address) =>
+          this.hoprToken.balanceOf(address.toHex()).then((res) => new Balance(new BN(res.toString()))),
+        getNativeBalance: (address) =>
+          this.provider.getBalance(address.toHex()).then((res) => new NativeBalance(new BN(res.toString()))),
+        getAccount: (address) => this.indexer.getAccount(address),
+        findPreImage: (_hash) => null//this.hashedSecret.findPreImage(hash)
+      },
+      this.wallet
+    )
   }
 
   readonly CHAIN_NAME = 'HOPR on Ethereum'
@@ -120,7 +135,7 @@ export default class HoprEthereum {
     return this._status === 'alive'
   }
 
-  async withdraw(currency: Currencies, recipient: string, amount: string): Promise<string> {
+  async withdraw(currency: 'NATIVE' | 'HOPR', recipient: string, amount: string): Promise<string> {
     if (currency === 'NATIVE') {
       const nonceLock = await this.account.getNonceLock()
       try {
@@ -165,7 +180,7 @@ export default class HoprEthereum {
     privateKey: Uint8Array,
     options?: { id?: number; provider?: string; debug?: boolean; maxConfirmations?: number }
   ): Promise<HoprEthereum> {
-    const provider = new ethers.providers.WebSocketProvider(options?.provider || config.DEFAULT_URI)
+    const provider = new ethers.providers.WebSocketProvider(options?.provider || DEFAULT_URI)
     const wallet = new ethers.Wallet(privateKey).connect(provider)
 
     // TODO: connect, disconnect, reconnect
@@ -198,7 +213,7 @@ export default class HoprEthereum {
       wallet,
       hoprChannels,
       hoprToken,
-      options.maxConfirmations ?? config.MAX_CONFIRMATIONS
+      options.maxConfirmations ?? MAX_CONFIRMATIONS
     )
     log(`using blockchain address ${await coreConnector.hexAccountAddress()}`)
     return coreConnector

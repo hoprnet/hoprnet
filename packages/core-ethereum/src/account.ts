@@ -1,20 +1,26 @@
-import { providers as IProviders, Wallet as IWallet, ContractTransaction } from 'ethers'
-import type HoprEthereum from '.'
-import type { HoprToken } from './contracts'
+import type { Wallet as IWallet, ContractTransaction } from 'ethers'
+import type { Networks } from '@hoprnet/hopr-ethereum'
+import BN from 'bn.js'
 import { ethers, errors } from 'ethers'
 import { durations, isExpired } from '@hoprnet/hopr-utils'
 import NonceTracker, { NonceLock } from './nonce-tracker'
 import TransactionManager from './transaction-manager'
-import { PublicKey, Address, Balance, Hash, NativeBalance, UINT256 } from './types'
-import { isGanache, getNetworkGasPrice } from './utils'
+import {
+  PublicKey,
+  Address,
+  Balance,
+  Hash,
+  NativeBalance,
+  UINT256,
+  AccountEntry
+} from './types'
+import { getNetworkGasPrice } from './utils'
 import { PROVIDER_CACHE_TTL } from './constants'
-import * as ethereum from './ethereum'
-import BN from 'bn.js'
 
 import debug from 'debug'
 const log = debug('hopr-core-ethereum:account')
 
-export const EMPTY_HASHED_SECRET = new Hash(new Uint8Array(Hash.SIZE).fill(0x00))
+export const EMPTY_HASHED_SECRET = new Hash(ethers.utils.arrayify(ethers.constants.HashZero))
 const cache = new Map<'balance' | 'nativeBalance', { value: string; updatedAt: number }>()
 
 class Account {
@@ -22,25 +28,35 @@ class Account {
   private _nonceTracker: NonceTracker
   private _transactions = new TransactionManager()
 
-  constructor(public coreConnector: HoprEthereum, public wallet: IWallet) {
-    this._nonceTracker = new NonceTracker({
-      getLatestBlockNumber: async () => {
-        // when running our unit/intergration tests using ganache,
-        // the indexer doesn't have enough time to pick up the events and reduce the data
-        return isGanache(coreConnector.network)
-          ? coreConnector.provider.getBlockNumber()
-          : coreConnector.indexer.latestBlock
+  constructor(
+    private ops: {
+      network: Networks
+    },
+    private api: {
+      getLatestBlockNumber: () => Promise<number>
+      getTransactionCount: (address: Address, blockNumber?: number) => Promise<number>
+      getBalance: (address: Address) => Promise<Balance>
+      getNativeBalance: (address: Address) => Promise<NativeBalance>
+      getAccount: (address: Address) => Promise<AccountEntry>
+      findPreImage: (hash: Hash) => Promise<Hash>
+    },
+    public wallet: IWallet
+  ) {
+    this._nonceTracker = new NonceTracker(
+      {
+        minPending: durations.minutes(15)
       },
-      getTransactionCount: async (address: string, blockNumber?: number) =>
-        coreConnector.provider.getTransactionCount(address, blockNumber),
-      getConfirmedTransactions: () => Array.from(this._transactions.confirmed.values()),
-      getPendingTransactions: () => Array.from(this._transactions.pending.values()),
-      minPending: durations.minutes(15)
-    })
+      {
+        getLatestBlockNumber: this.api.getLatestBlockNumber,
+        getTransactionCount: this.api.getTransactionCount,
+        getConfirmedTransactions: () => Array.from(this._transactions.confirmed.values()),
+        getPendingTransactions: () => Array.from(this._transactions.pending.values())
+      }
+    )
   }
 
   public async getNonceLock(): Promise<NonceLock> {
-    return this._nonceTracker.getNonceLock(this.address.toHex())
+    return this._nonceTracker.getNonceLock(this.address)
   }
 
   /**
@@ -48,7 +64,7 @@ class Account {
    * @returns HOPR balance
    */
   public async getBalance(useCache: boolean = false): Promise<Balance> {
-    return getBalance(this.coreConnector.hoprToken, this.address, useCache)
+    return getBalance(this.api.getBalance, this.address, useCache)
   }
 
   /**
@@ -56,11 +72,11 @@ class Account {
    * @returns ETH balance
    */
   public async getNativeBalance(useCache: boolean = false): Promise<NativeBalance> {
-    return getNativeBalance(this.coreConnector.provider, this.address, useCache)
+    return getNativeBalance(this.api.getNativeBalance, this.address, useCache)
   }
 
   async getTicketEpoch(): Promise<UINT256> {
-    const state = await this.coreConnector.indexer.getAccount(this.address)
+    const state = await this.api.getAccount(this.address)
     if (!state || !state.counter) return UINT256.fromString('0')
     return new UINT256(state.counter)
   }
@@ -70,7 +86,7 @@ class Account {
    */
   async getOnChainSecret(): Promise<Hash | undefined> {
     if (this._onChainSecret && !this._onChainSecret.eq(EMPTY_HASHED_SECRET)) return this._onChainSecret
-    const state = await this.coreConnector.indexer.getAccount(this.address)
+    const state = await this.api.getAccount(this.address)
     if (!state || !state.secret) return undefined
     this.updateLocalState(state.secret)
     return state.secret
@@ -93,44 +109,23 @@ class Account {
     this._onChainSecret = onChainSecret
   }
 
-  private handleTransactionError(hash: string, nonce: number, releaseLock: () => void, error: string) {
-    releaseLock()
-    const reverted = ([errors.CALL_EXCEPTION] as string[]).includes(error)
-
-    if (reverted) {
-      log('Transaction with nonce %d and hash %s reverted: %s', nonce, hash, error)
-
-      // this transaction failed but was confirmed as reverted
-      this._transactions.moveToConfirmed(hash)
-    } else {
-      log('Transaction with nonce %d failed to sent: %s', nonce, error)
-
-      const alreadyKnown = ([errors.NONCE_EXPIRED, errors.REPLACEMENT_UNDERPRICED] as string[]).includes(error)
-      // if this hash is already known and we already have it included in
-      // pending we can safely ignore this
-      if (alreadyKnown && this._transactions.pending.has(hash)) return
-
-      // this transaction was not confirmed so we just remove it
-      this._transactions.remove(hash)
-    }
-  }
-
   public async sendTransaction<T extends (...args: any) => Promise<ContractTransaction>>(
     method: T,
     ...rest: Parameters<T>
   ): Promise<ContractTransaction> {
     const gasLimit = 300e3
-    const gasPrice = getNetworkGasPrice(this.coreConnector.network)
-    const nonceLock = await this._nonceTracker.getNonceLock(this.address.toHex())
+    const gasPrice = getNetworkGasPrice(this.ops.network)
+    const nonceLock = await this._nonceTracker.getNonceLock(this.address)
     const nonce = nonceLock.nextNonce
     let transaction: ContractTransaction
 
+    log('Sending transaction %o', {
+      gasLimit,
+      gasPrice,
+      nonce
+    })
+
     try {
-      log('Sending transaction %o', {
-        gasLimit,
-        gasPrice,
-        nonce
-      })
       // send transaction to our ethereum provider
       // TODO: better type this, make it less hacky
       transaction = await method(
@@ -143,26 +138,44 @@ class Account {
           }
         ]
       )
-      log('Transaction with nonce %d successfully sent %s, waiting for confimation', nonce, transaction.hash)
-
-      this._transactions.addToPending(transaction.hash, { nonce })
-      nonceLock.releaseLock()
-
-      // monitor transaction, this is done asynchronously
-      transaction
-        .wait()
-        .then(() => {
-          log('Transaction with nonce %d and hash %s confirmed', nonce, transaction.hash)
-          this._transactions.moveToConfirmed(transaction.hash)
-        })
-        .catch((error) => {
-          this.handleTransactionError(transaction.hash, nonce, nonceLock.releaseLock, error.message)
-        })
     } catch (error) {
-      this.handleTransactionError(transaction.hash, nonce, nonceLock.releaseLock, error.message)
+      log('Transaction with nonce %d failed to sent: %s', nonce, error)
+      nonceLock.releaseLock()
+      throw Error('Could not send transaction')
     }
 
-    if (!transaction) throw Error('Could not send transaction')
+    log('Transaction with nonce %d successfully sent %s, waiting for confimation', nonce, transaction.hash)
+    this._transactions.addToPending(transaction.hash, { nonce })
+    nonceLock.releaseLock()
+
+    // monitor transaction, this is done asynchronously
+    transaction
+      .wait()
+      .then(() => {
+        log('Transaction with nonce %d and hash %s confirmed', nonce, transaction.hash)
+        this._transactions.moveToConfirmed(transaction.hash)
+      })
+      .catch((error) => {
+        const reverted = ([errors.CALL_EXCEPTION] as string[]).includes(error)
+
+        if (reverted) {
+          log('Transaction with nonce %d and hash %s reverted: %s', nonce, transaction.hash, error)
+
+          // this transaction failed but was confirmed as reverted
+          this._transactions.moveToConfirmed(transaction.hash)
+        } else {
+          log('Transaction with nonce %d failed to sent: %s', nonce, error)
+
+          const alreadyKnown = ([errors.NONCE_EXPIRED, errors.REPLACEMENT_UNDERPRICED] as string[]).includes(error)
+          // if this hash is already known and we already have it included in
+          // pending we can safely ignore this
+          if (alreadyKnown && this._transactions.pending.has(transaction.hash)) return
+
+          // this transaction was not confirmed so we just remove it
+          this._transactions.remove(transaction.hash)
+        }
+      })
+
     return transaction
   }
 }
@@ -173,7 +186,7 @@ class Account {
  * @returns HOPR balance
  */
 export const getBalance = async (
-  hoprToken: HoprToken,
+  getBalance: (account: Address) => Promise<Balance>,
   account: Address,
   useCache: boolean = false
 ): Promise<Balance> => {
@@ -183,7 +196,7 @@ export const getBalance = async (
     if (notExpired) return new Balance(new BN(cached.value))
   }
 
-  const value = await ethereum.getBalance(hoprToken, account)
+  const value = await getBalance(account)
   cache.set('balance', { value: value.toBN().toString(), updatedAt: new Date().getTime() })
 
   return value
@@ -194,7 +207,7 @@ export const getBalance = async (
  * @returns ETH balance
  */
 export const getNativeBalance = async (
-  provider: IProviders.WebSocketProvider,
+  getNativeBalance: (account: Address) => Promise<NativeBalance>,
   account: Address,
   useCache: boolean = false
 ): Promise<NativeBalance> => {
@@ -204,7 +217,7 @@ export const getNativeBalance = async (
     if (notExpired) return new NativeBalance(new BN(cached.value))
   }
 
-  const value = await ethereum.getNativeBalance(provider, account)
+  const value = await getNativeBalance(account)
   cache.set('nativeBalance', { value: value.toBN().toString(), updatedAt: new Date().getTime() })
 
   return value

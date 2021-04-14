@@ -7,9 +7,9 @@ import { ethers } from 'ethers'
 import HoprEthereum from '.'
 import { createNode } from './utils/testing'
 import * as testconfigs from './config.spec'
-import * as configs from './config'
 import { providers } from 'ethers'
 import { HoprToken__factory, HoprToken } from './contracts'
+import { DEFAULT_URI } from './constants'
 
 const { arrayify } = ethers.utils
 
@@ -56,7 +56,7 @@ describe('test withdraw', function () {
     await migrate()
     await fund(`--address ${getAddresses()?.localhost?.HoprToken} --accounts-to-fund 2`)
 
-    provider = new providers.WebSocketProvider(configs.DEFAULT_URI)
+    provider = new providers.WebSocketProvider(DEFAULT_URI)
 
     alice = new ethers.Wallet(NODE_SEEDS[0]).connect(provider)
     bob = ethers.Wallet.createRandom().connect(provider)

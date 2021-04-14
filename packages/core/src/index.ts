@@ -24,7 +24,7 @@ import NetworkPeers from './network/network-peers'
 import Heartbeat from './network/heartbeat'
 import { findPath } from './path'
 
-import { addPubKey, getAcknowledgements, submitAcknowledgedTicket } from './utils'
+import { getAcknowledgements, submitAcknowledgedTicket } from './utils'
 import { u8aToHex, DialOpts } from '@hoprnet/hopr-utils'
 import { existsSync, mkdirSync } from 'fs'
 import getIdentity from './identity'
@@ -463,7 +463,7 @@ class Hopr extends EventEmitter {
               this,
               this._libp2p,
               msg.slice(n * PACKET_SIZE, Math.min(msg.length, (n + 1) * PACKET_SIZE)),
-              await Promise.all(path.map(addPubKey))
+              path
             )
           } catch (err) {
             return reject(err)
