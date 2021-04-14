@@ -41,7 +41,7 @@ export function getPacketLength(
   additionalDataRelayerLength: number,
   additionalDataLastHopLength: number
 ) {
-  return getHeaderLength(maxHops, additionalDataRelayerLength, additionalDataLastHopLength) + PAYLOAD_SIZE
+  return SECP256K1.COMPRESSED_PUBLIC_KEY_LENGTH + getHeaderLength(maxHops, additionalDataRelayerLength, additionalDataLastHopLength) + MAC_LENGTH + PAYLOAD_SIZE
 }
 
 export { generateKeyShares }

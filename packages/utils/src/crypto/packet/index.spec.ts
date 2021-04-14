@@ -1,6 +1,6 @@
 import PeerId from 'peer-id'
 import { randomBytes } from 'crypto'
-import { createPacket, forwardTransform, generateKeyShares } from '.'
+import { getPacketLength, createPacket, forwardTransform, generateKeyShares } from '.'
 import { PAYLOAD_SIZE } from './constants'
 import assert from 'assert'
 import { u8aEquals } from '../../u8a'
@@ -26,6 +26,8 @@ describe('header', function () {
       Array.from({ length: AMOUNT }, (_) => new Uint8Array()),
       new Uint8Array()
     )
+
+    assert(packet.length == getPacketLength(maxHops, 0, 0))
 
     for (const [index, peer] of path.entries()) {
       const result = forwardTransform(peer, packet, 0, 0, maxHops)

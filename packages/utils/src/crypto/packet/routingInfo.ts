@@ -52,7 +52,7 @@ export function createRoutingInfo(
     if (index == 0) {
       extendedHeader[0] = END_PREFIX
 
-      if (lastHopLength > 0) {
+      if (additionalDataLastHop?.length > 0) {
         extendedHeader.set(additionalDataLastHop, END_PREFIX_LENGTH)
       }
 
