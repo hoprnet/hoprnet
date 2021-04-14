@@ -10,10 +10,7 @@ const log = Debug('hopr-core-ethereum:channel')
 const abiCoder = new ethers.utils.AbiCoder()
 
 export class ChannelManager {
-  constructor(
-    private indexer: Indexer,
-    private getBalance: (a: Address) => Promise<Balance>
-  ) {}
+  constructor(private indexer: Indexer, private getBalance: (a: Address) => Promise<Balance>) {}
 
   async getChannel(self: PublicKey, counterparty: PublicKey): Promise<Channel> {
     const id = Channel.generateId(self.toAddress(), counterparty.toAddress())
@@ -44,7 +41,10 @@ export class ChannelManager {
         hoprToken.send,
         hoprChannels.address,
         fundAmount.toBN().toString(),
-        abiCoder.encode(['bool', 'address', 'address'], [true, self.toAddress().toHex(), counterparty.toAddress().toHex()])
+        abiCoder.encode(
+          ['bool', 'address', 'address'],
+          [true, self.toAddress().toHex(), counterparty.toAddress().toHex()]
+        )
       )
       await transaction.wait()
 
@@ -97,7 +97,6 @@ export class ChannelManager {
       throw Error(`Failed to finilize channel closure`)
     }
   }
-
 
   async redeemTicket(ackTicket: Acknowledgement): Promise<SubmitTicketResponse> {
     try {
