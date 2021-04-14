@@ -52,14 +52,17 @@ yarn build    # Builds contracts, clients, etc
 # starting network
 yarn run:network
 
-# running bootstrap node
-DEBUG=hopr* PROVIDER=ws://127.0.0.1:8545/ DATABASE=/tmp/bootstrap yarn run:hoprd:bootstrap
+# running bootstrap node (separate terminal)
+DEBUG=hopr* yarn run:hoprd:bootstrap
 
-# running normal node alice (run info on bootstrap node to see bootstrap address)
-DEBUG=hopr* PROVIDER=ws://127.0.0.1:8545/ DATABASE=/tmp/alice BOOTSTRAP=/ip4/127.0.0.1/... yarn run:hoprd:alice
+# running normal node alice (separate terminal)
+DEBUG=hopr* yarn run:hoprd:alice
 
-# running normal node bob (run info on bootstrap node to see bootstrap address)
-DEBUG=hopr* PROVIDER=ws://127.0.0.1:8545/ DATABASE=/tmp/bob BOOTSTRAP=/ip4/127.0.0.1/... yarn run:hoprd:bob
+# running normal node bob (separate terminal)
+DEBUG=hopr* yarn run:hoprd:bob
+
+# fund all your nodes to get started
+yarn run:faucet:all
 ```
 
 ### Docker images
