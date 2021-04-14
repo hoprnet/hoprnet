@@ -1,13 +1,10 @@
 import type { HardhatRuntimeEnvironment } from 'hardhat/types'
 import type { DeployFunction } from 'hardhat-deploy/types'
 
-// once contracts have been deployed, we run 'postDeploy' and try to verify on etherscan
+// runs once deployment has finished
 const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
-  if (hre.network.name === 'hardhat') return
-  await hre.run('postDeploy')
-
-  // try to verify
-  if (hre.network.tags.etherscan) {
+  // verify smart contract to etherscan
+  if (hre.network.tags.etherscan && hre.network.live) {
     await hre.run('etherscan-verify')
   }
 }
