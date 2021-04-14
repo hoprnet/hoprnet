@@ -28,7 +28,11 @@ export const onAccountSecretUpdated = async (
   return new AccountEntry(storedAccount.address, storedAccount.publicKey, secret, counter)
 }
 
-export const onChannelFunded = async (thisNode: PublicKey, event: Event<'ChannelFunded'>, channelEntry?: Channel): Promise<Channel> => {
+export const onChannelFunded = async (
+  thisNode: PublicKey,
+  event: Event<'ChannelFunded'>,
+  channelEntry?: Channel
+): Promise<Channel> => {
   const data = event.args
 
   const accountA = Address.fromString(data.accountA)
@@ -45,7 +49,7 @@ export const onChannelFunded = async (thisNode: PublicKey, event: Event<'Channel
   let openedAt
   let closedAt
 
-  if (thisNode.toAddress().eq(accountA)){
+  if (thisNode.toAddress().eq(accountA)) {
     self = accountA
     counterparty = accountB
   } else {
