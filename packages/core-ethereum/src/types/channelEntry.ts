@@ -3,6 +3,21 @@ import { Address, Balance, Hash } from './primitives'
 import { UINT256 } from '../types/solidity'
 import BN from 'bn.js'
 
+const sizes = [
+  Address.SIZE,
+  Address.SIZE,
+  UINT256.SIZE,
+  UINT256.SIZE,
+  Balance.SIZE,
+  Balance.SIZE,
+  UINT256.SIZE,
+  UINT256.SIZE,
+  1,
+  UINT256.SIZE,
+  UINT256.SIZE,
+  Hash.SIZE
+]
+
 export class Channel {
   constructor(
     public readonly self: Address,
@@ -21,33 +36,11 @@ export class Channel {
   ) {}
 
   static get SIZE(): number {
-    return (
-      Address.SIZE +
-      Address.SIZE +
-      UINT256.SIZE +
-      UINT256.SIZE +
-      UINT256.SIZE +
-      UINT256.SIZE +
-      1 +
-      UINT256.SIZE +
-      UINT256.SIZE +
-      Hash.SIZE
-    )
+    return sizes.reduce((x, y) => x + y, 0)
   }
 
   static deserialize(arr: Uint8Array) {
-    const items = u8aSplit(arr, [
-      Address.SIZE,
-      Address.SIZE,
-      UINT256.SIZE,
-      UINT256.SIZE,
-      UINT256.SIZE,
-      UINT256.SIZE,
-      1,
-      UINT256.SIZE,
-      UINT256.SIZE,
-      Hash.SIZE
-    ])
+    const items = u8aSplit(arr, sizes)
     const self = new Address(items[0])
     const counterparty = new Address(items[1])
     const selfEpoch = UINT256.deserialize(items[2])

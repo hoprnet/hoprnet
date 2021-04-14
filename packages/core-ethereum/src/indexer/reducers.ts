@@ -28,55 +28,54 @@ export const onAccountSecretUpdated = async (
   return new AccountEntry(storedAccount.address, storedAccount.publicKey, secret, counter)
 }
 
-export const onChannelFunded = async (event: Event<'ChannelFunded'>, channelEntry?: Channel): Promise<Channel> => {
+export const onChannelFunded = async (thisNode: PublicKey, event: Event<'ChannelFunded'>, channelEntry?: Channel): Promise<Channel> => {
   const data = event.args
 
   const accountA = Address.fromString(data.accountA)
   const accountB = Address.fromString(data.accountB)
-  const [partyA, partyB] = accountA.sortPair(accountB)
+
+  let self: Address
+  let counterparty: Address
+  const closureByPartyA = false
+  let deposit = new BN(data.deposit.toString())
+  let partyABalance = new BN(data.partyABalance.toString())
+  const closureTime = new BN(0)
+  const commitment = new Hash(stringToU8a(data.commitment))
+  let stateCounter
+  let openedAt
+  let closedAt
+
+  if (thisNode.toAddress().eq(accountA)){
+    self = accountA
+    counterparty = accountB
+  } else {
+    // NB: This also includes channels where neither A nor B are self.
+    self = accountB
+    counterparty = accountA
+  }
 
   if (channelEntry) {
-    const deposit = channelEntry.deposit.add(new BN(data.deposit.toString()))
-    const partyABalance = channelEntry.partyABalance.add(new BN(data.partyABalance.toString()))
-    const closureTime = new BN(0)
-    const stateCounter = channelEntry.stateCounter
-    const closureByPartyA = false
-
-    return new Channel(
-      partyA,
-      partyB,
-      deposit,
-      partyABalance,
-      closureTime,
-      stateCounter,
-      closureByPartyA,
-      channelEntry.openedAt,
-      channelEntry.closedAt,
-      channelEntry.commitment
-    )
+    deposit = channelEntry.deposit.add(new BN(data.deposit.toString()))
+    partyABalance = channelEntry.partyABalance.add(new BN(data.partyABalance.toString()))
+    stateCounter = channelEntry.stateCounter
   } else {
-    const deposit = new BN(data.deposit.toString())
-    const partyABalance = new BN(data.partyABalance.toString())
-    const closureTime = new BN(0)
-    const stateCounter = new BN(0)
-    const closureByPartyA = false
-    const openedAt = new BN(0)
-    const closedAt = new BN(0)
-    const commitment = new Hash(stringToU8a(data.commitment))
-
-    return new Channel(
-      partyA,
-      partyB,
-      deposit,
-      partyABalance,
-      closureTime,
-      stateCounter,
-      closureByPartyA,
-      openedAt,
-      closedAt,
-      commitment
-    )
+    stateCounter = new BN(0)
+    openedAt = new BN(0)
+    closedAt = new BN(0)
   }
+
+  return new Channel(
+    partyA,
+    partyB,
+    deposit,
+    partyABalance,
+    closureTime,
+    stateCounter,
+    closureByPartyA,
+    openedAt,
+    closedAt,
+    commitment
+  )
 }
 
 export const onChannelOpened = async (event: Event<'ChannelOpened'>, channelEntry: Channel): Promise<Channel> => {
