@@ -1,11 +1,12 @@
 import { u8aSplit, serializeToU8a, toU8a } from '@hoprnet/hopr-utils'
 import { Address, Balance, Hash } from './primitives'
 import { UINT256 } from '../types/solidity'
+import BN from 'bn.js'
 
 export class Channel {
   constructor(
-    public readonly partyA: Address,
-    public readonly partyB: Address,
+    public readonly self: Address,
+    public readonly counterparty: Address,
     public readonly deposit: BN,
     public readonly partyABalance: BN,
     public readonly closureTime: BN,
@@ -70,8 +71,8 @@ export class Channel {
       UINT256.SIZE,
       Hash.SIZE
     ])
-    const partyA = new Address(items[0])
-    const partyB = new Address(items[1])
+    const self = new Address(items[0])
+    const counterparty = new Address(items[1])
     const deposit = new BN(items[2])
     const partyABalance = new BN(items[3])
     const closureTime = new BN(items[4])
@@ -82,8 +83,8 @@ export class Channel {
     const commitment = new Hash(items[9])
 
     return new Channel(
-      partyA,
-      partyB,
+      self,
+      counterparty,
       deposit,
       partyABalance,
       closureTime,
@@ -97,8 +98,8 @@ export class Channel {
 
   public serialize(): Uint8Array {
     return serializeToU8a([
-      [this.partyA.serialize(), Address.SIZE],
-      [this.partyB.serialize(), Address.SIZE],
+      [this.self.serialize(), Address.SIZE],
+      [this.counterparty.serialize(), Address.SIZE],
       [new UINT256(this.deposit).serialize(), UINT256.SIZE],
       [new UINT256(this.partyABalance).serialize(), UINT256.SIZE],
       [new UINT256(this.closureTime).serialize(), UINT256.SIZE],
@@ -129,7 +130,8 @@ export class Channel {
   }
 
   public getId() {
-    return Channel.generateId(this.partyA, this.partyB)
+    const parties = this.self.sortPair(this.counterparty)
+    return Channel.generateId(...parties)
   }
 
   public getBalances() {
@@ -137,32 +139,5 @@ export class Channel {
       partyA: new Balance(this.partyABalance),
       partyB: new Balance(this.deposit.sub(this.partyABalance))
     }
-  }
-
-  async createTicket(amount: Balance, challenge: Hash, winProb: number) {
-    const counterpartyAddress = this.counterparty.toAddress()
-    const counterpartyState = await this.connector.indexer.getAccount(counterpartyAddress)
-    return Ticket.create(
-      counterpartyAddress,
-      challenge,
-      new UINT256(counterpartyState.counter),
-      amount,
-      computeWinningProbability(winProb),
-      new UINT256((await this.getState()).getIteration()),
-      this.connector.account.privateKey
-    )
-  }
-
-  async createDummyTicket(challenge: Hash): Promise<Ticket> {
-    // TODO: document how dummy ticket works
-    return Ticket.create(
-      this.counterparty.toAddress(),
-      challenge,
-      UINT256.fromString('0'),
-      new Balance(new BN(0)),
-      computeWinningProbability(1),
-      UINT256.fromString('0'),
-      this.connector.account.privateKey
-    )
   }
 }

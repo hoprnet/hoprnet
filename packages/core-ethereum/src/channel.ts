@@ -195,4 +195,30 @@ export class ChannelManager {
     }
   }
   */
+
+  async createTicket(amount: Balance, challenge: Hash, winProb: number) {
+    const counterpartyAddress = this.counterparty
+    return Ticket.create(
+      counterpartyAddress,
+      challenge,
+      new UINT256(counterpartyState.counter),
+      amount,
+      computeWinningProbability(winProb),
+      new UINT256((await this.getState()).getIteration()),
+      this.connector.account.privateKey
+    )
+  }
+
+  async createDummyTicket(challenge: Hash): Promise<Ticket> {
+    // TODO: document how dummy ticket works
+    return Ticket.create(
+      this.counterparty.toAddress(),
+      challenge,
+      UINT256.fromString('0'),
+      new Balance(new BN(0)),
+      computeWinningProbability(1),
+      UINT256.fromString('0'),
+      this.connector.account.privateKey
+    )
+  }
 }
