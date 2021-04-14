@@ -11,8 +11,8 @@ describe('Channel', function () {
   it('should be empty', function () {
     const channelEntry = Channel.deserialize(new Uint8Array({ length: Channel.SIZE }))
 
-    expect(channelEntry.partyA.toHex()).to.equal(EMPTY_ADDRESS.toHex())
-    expect(channelEntry.partyB.toHex()).to.equal(EMPTY_ADDRESS.toHex())
+    expect(channelEntry.self.toHex()).to.equal(EMPTY_ADDRESS.toHex())
+    expect(channelEntry.counterparty.toHex()).to.equal(EMPTY_ADDRESS.toHex())
     expect(channelEntry.deposit.toString()).to.equal('0')
     expect(channelEntry.partyABalance.toString()).to.equal('0')
     expect(channelEntry.closureTime.toString()).to.equal('0')
@@ -38,8 +38,8 @@ describe('Channel', function () {
       }).serialize()
     )
 
-    expect(channelEntry.partyA.toHex()).to.equal(partyA.toHex())
-    expect(channelEntry.partyB.toHex()).to.equal(partyB.toHex())
+    expect(channelEntry.self.toHex()).to.equal(partyA.toHex())
+    expect(channelEntry.counterparty.toHex()).to.equal(partyB.toHex())
     expect(channelEntry.deposit.toString()).to.equal('10')
     expect(channelEntry.partyABalance.toString()).to.equal('3')
     expect(channelEntry.closureTime.toString()).to.equal('10')

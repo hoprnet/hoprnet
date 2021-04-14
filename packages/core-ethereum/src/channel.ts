@@ -1,16 +1,23 @@
-import { ethers } from 'ethers'
 import BN from 'bn.js'
 import { PublicKey, Balance, Hash, UINT256, Ticket, Acknowledgement, Channel, Address } from './types'
-import { computeWinningProbability, checkChallenge, isWinningTicket, getSignatureParameters } from './utils'
+import { checkChallenge, isWinningTicket } from './utils'
 import Debug from 'debug'
 import type { SubmitTicketResponse } from '.'
 import type Indexer from './indexer'
 
 const log = Debug('hopr-core-ethereum:channel')
-const abiCoder = new ethers.utils.AbiCoder()
 
 export class ChannelManager {
-  constructor(private indexer: Indexer, private getBalance: (a: Address) => Promise<Balance>) {}
+  constructor(
+    private indexer: Indexer,
+    private getBalance: (a: Address) => Promise<Balance>,
+    private chain: {
+      createChannel: () => Promise<void>
+      initiateChannelClosure: (channel: Channel) => Promise<void>
+      finalizeChannelClosure: (channel: Channel) => Promise<void>
+      redeemTicket: () => Promise<void>
+    }
+  ) {}
 
   async getChannel(self: PublicKey, counterparty: PublicKey): Promise<Channel> {
     const id = Channel.generateId(self.toAddress(), counterparty.toAddress())
@@ -36,6 +43,8 @@ export class ChannelManager {
       throw Error('We do not have enough balance to open a channel')
     }
 
+    this.chain.createChannel()
+    /*
     try {
       const transaction = await account.sendTransaction(
         hoprToken.send,
@@ -54,6 +63,7 @@ export class ChannelManager {
       console.log(err)
       throw Error(`Failed to open channel`)
     }
+    */
   }
 
   async initializeClosure(self: PublicKey, counterparty: PublicKey) {
@@ -62,6 +72,8 @@ export class ChannelManager {
       throw Error('Channel status is not OPEN')
     }
 
+    this.chain.initiateChannelClosure(channel)
+    /*
     try {
       const transaction = await account.sendTransaction(
         hoprChannels.initiateChannelClosure,
@@ -75,6 +87,7 @@ export class ChannelManager {
       console.log(err)
       throw Error(`Failed to initialize channel closure`)
     }
+    */
   }
 
   async finalizeClosure(self: PublicKey, counterparty: PublicKey) {
@@ -83,6 +96,8 @@ export class ChannelManager {
       throw Error('Channel status is not PENDING_TO_CLOSE')
     }
 
+    this.chain.finalizeChannelClosure(channel)
+    /*
     try {
       const transaction = await account.sendTransaction(
         hoprChannels.finalizeChannelClosure,
@@ -96,6 +111,7 @@ export class ChannelManager {
       console.log(err)
       throw Error(`Failed to finilize channel closure`)
     }
+    */
   }
 
   async redeemTicket(ackTicket: Acknowledgement): Promise<SubmitTicketResponse> {
@@ -103,7 +119,6 @@ export class ChannelManager {
       const ticket = ackTicket.ticket
 
       log('Redeeming ticket', ackTicket.response.toHex())
-      const { r, s, v } = getSignatureParameters(ticket.signature)
 
       const emptyPreImage = new Hash(new Uint8Array(Hash.SIZE).fill(0x00))
       const hasPreImage = !ackTicket.preImage.eq(emptyPreImage)
@@ -133,7 +148,10 @@ export class ChannelManager {
         }
       }
 
-      const counterparty = ticket.getSigner().toAddress()
+      this.chain.redeemTicket()
+
+      /*
+      const { r, s, v } = getSignatureParameters(ticket.signature)
       const transaction = await account.sendTransaction(
         hoprChannels.redeemTicket,
         counterparty.toHex(),
@@ -155,6 +173,7 @@ export class ChannelManager {
         receipt: transaction.hash,
         ackTicket
       }
+    */
     } catch (err) {
       log('Unexpected error when submitting ticket', ackTicket.response.toHex(), err)
       return {
@@ -195,29 +214,17 @@ export class ChannelManager {
   }
   */
 
-  async createTicket(amount: Balance, challenge: Hash, winProb: number) {
-    const counterpartyAddress = this.counterparty
+  async createTicket(self: PublicKey, counterparty: PublicKey, amount: Balance, winProb: Hash, privateKey: Uint8Array, challenge: Hash): Promise<Ticket> {
+    const channel = await this.getChannel(self, counterparty)
+    const epoch = null // TODO
     return Ticket.create(
-      counterpartyAddress,
+      counterparty.toAddress(),
       challenge,
-      new UINT256(counterpartyState.counter),
+      new UINT256(epoch),
       amount,
-      computeWinningProbability(winProb),
-      new UINT256((await this.getState()).getIteration()),
-      this.connector.account.privateKey
-    )
-  }
-
-  async createDummyTicket(challenge: Hash): Promise<Ticket> {
-    // TODO: document how dummy ticket works
-    return Ticket.create(
-      this.counterparty.toAddress(),
-      challenge,
-      UINT256.fromString('0'),
-      new Balance(new BN(0)),
-      computeWinningProbability(1),
-      UINT256.fromString('0'),
-      this.connector.account.privateKey
+      winProb,
+      new UINT256(channel.getIteration()),
+      privateKey
     )
   }
 }
