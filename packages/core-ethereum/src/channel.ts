@@ -47,9 +47,6 @@ class Channel {
   async open(fundAmount: Balance) {
     const { account, hoprToken, hoprChannels } = this.connector
 
-    // check if we have initialized account, initialize if we didnt
-    await this.connector.initOnchainValues()
-
     // channel may not exist, we can still open it
     let state: ChannelEntry
     try {
@@ -61,6 +58,7 @@ class Channel {
 
     const myAddress = this.self.toAddress()
     const counterpartyAddress = this.counterparty.toAddress()
+
     const myBalance = await this.connector.hoprToken.balanceOf(myAddress.toHex())
     if (new BN(myBalance.toString()).lt(fundAmount.toBN())) {
       throw Error('We do not have enough balance to open a channel')
@@ -226,6 +224,37 @@ class Channel {
       }
     }
   }
+
+  /*
+  private async initPreimage() {
+    if (!this.preimage) {
+      const ocs = await this.getOnChainSecret()
+      if (!ocs) {
+        throw new Error('cannot reserve preimage when there is no on chain secret')
+      }
+      this.preimage = await this.coreConnector.hashedSecret.findPreImage(ocs)
+    }
+  }
+
+  /**
+   * Reserve a preImage for the given ticket if it is a winning ticket.
+   * @param ticket the acknowledged ticket
+  async acknowledge(
+    unacknowledgedTicket: UnacknowledgedTicket,
+    acknowledgementHash: Hash
+  ): Promise<Acknowledgement | null> {
+    await this.initPreimage()
+    const response = Hash.create(u8aConcat(unacknowledgedTicket.secretA.serialize(), acknowledgementHash.serialize()))
+    const ticket = unacknowledgedTicket.ticket
+    if (await isWinningTicket(ticket.getHash(), response, this.preimage, ticket.winProb)) {
+      const ack = new Acknowledgement(ticket, response, this.preimage)
+      this.preimage = await this.coreConnector.hashedSecret.findPreImage(this.preimage)
+      return ack
+    } else {
+      return null
+    }
+  }
+  */
 }
 
 export default Channel

@@ -2,20 +2,18 @@ import { providers as IProviders, Wallet as IWallet, ContractTransaction } from 
 import type HoprEthereum from '.'
 import type { HoprToken } from './contracts'
 import { ethers, errors } from 'ethers'
-import { durations, isExpired, u8aConcat } from '@hoprnet/hopr-utils'
+import { durations, isExpired } from '@hoprnet/hopr-utils'
 import NonceTracker, { NonceLock } from './nonce-tracker'
 import TransactionManager from './transaction-manager'
 import {
   PublicKey,
   Address,
-  Acknowledgement,
   Balance,
   Hash,
   NativeBalance,
   UINT256,
-  UnacknowledgedTicket
 } from './types'
-import { isWinningTicket, isGanache, getNetworkGasPrice } from './utils'
+import { isGanache, getNetworkGasPrice } from './utils'
 import { PROVIDER_CACHE_TTL } from './constants'
 import * as ethereum from './ethereum'
 import BN from 'bn.js'
@@ -30,7 +28,6 @@ class Account {
   private _onChainSecret?: Hash
   private _nonceTracker: NonceTracker
   private _transactions = new TransactionManager()
-  private preimage: Hash
 
   constructor(public coreConnector: HoprEthereum, public wallet: IWallet) {
     this._nonceTracker = new NonceTracker({
@@ -86,35 +83,6 @@ class Account {
     return state.secret
   }
 
-  private async initPreimage() {
-    if (!this.preimage) {
-      const ocs = await this.getOnChainSecret()
-      if (!ocs) {
-        throw new Error('cannot reserve preimage when there is no on chain secret')
-      }
-      this.preimage = await this.coreConnector.hashedSecret.findPreImage(ocs)
-    }
-  }
-
-  /**
-   * Reserve a preImage for the given ticket if it is a winning ticket.
-   * @param ticket the acknowledged ticket
-   */
-  async acknowledge(
-    unacknowledgedTicket: UnacknowledgedTicket,
-    acknowledgementHash: Hash
-  ): Promise<Acknowledgement | null> {
-    await this.initPreimage()
-    const response = Hash.create(u8aConcat(unacknowledgedTicket.secretA.serialize(), acknowledgementHash.serialize()))
-    const ticket = unacknowledgedTicket.ticket
-    if (await isWinningTicket(ticket.getHash(), response, this.preimage, ticket.winProb)) {
-      const ack = new Acknowledgement(ticket, response, this.preimage)
-      this.preimage = await this.coreConnector.hashedSecret.findPreImage(this.preimage)
-      return ack
-    } else {
-      return null
-    }
-  }
 
   get privateKey(): Uint8Array {
     return ethers.utils.arrayify(this.wallet.privateKey)

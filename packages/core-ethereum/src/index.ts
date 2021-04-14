@@ -12,7 +12,6 @@ import { RoutingChannel } from './indexer'
 import * as utils from './utils'
 import * as config from './config'
 import Account from './account'
-import HashedSecret from './hashedSecret'
 import { getWinProbabilityAsFloat, computeWinningProbability } from './utils'
 import { HoprToken__factory, HoprChannels__factory } from './contracts'
 
@@ -39,12 +38,10 @@ export default class HoprEthereum {
   private _status: 'dead' | 'alive' = 'dead'
   private _starting?: Promise<HoprEthereum>
   private _stopping?: Promise<void>
-  private _debug: boolean
 
   public channel = Channel
   public indexer: Indexer
   public account: Account
-  public hashedSecret: HashedSecret
 
   constructor(
     public db: LevelUp,
@@ -54,13 +51,10 @@ export default class HoprEthereum {
     public wallet: IWallet,
     public hoprChannels: HoprChannels,
     public hoprToken: HoprToken,
-    debug: boolean,
     maxConfirmations: number
   ) {
     this.account = new Account(this, wallet)
     this.indexer = new Indexer(this, maxConfirmations)
-    this._debug = debug
-    this.hashedSecret = new HashedSecret(this.db, this.account, this.hoprChannels)
   }
 
   readonly CHAIN_NAME = 'HOPR on Ethereum'
@@ -124,13 +118,6 @@ export default class HoprEthereum {
 
   get started() {
     return this._status === 'alive'
-  }
-
-  /**
-   * Initializes the on-chain values of our account.
-   */
-  public async initOnchainValues(): Promise<void> {
-    await this.hashedSecret.initialize(this._debug) // no-op if already initialized
   }
 
   async withdraw(currency: Currencies, recipient: string, amount: string): Promise<string> {
@@ -211,7 +198,6 @@ export default class HoprEthereum {
       wallet,
       hoprChannels,
       hoprToken,
-      options?.debug || false,
       options.maxConfirmations ?? config.MAX_CONFIRMATIONS
     )
     log(`using blockchain address ${await coreConnector.hexAccountAddress()}`)

@@ -65,7 +65,6 @@ describe('test indexer', function () {
     connector = await createNode(arrayify(userAWallet.privateKey), undefined, 8)
 
     await connector.start()
-    await connector.initOnchainValues()
     await connector.db.clear()
   })
 

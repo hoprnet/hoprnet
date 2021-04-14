@@ -16,6 +16,14 @@ export async function hashFunction(msg: Uint8Array): Promise<Uint8Array> {
   return Hash.create(msg).serialize().slice(0, Hash.SIZE)
 }
 
+export class TicketCommitment {
+  constructor() {}
+
+  reserveCommitment() {
+  }
+
+}
+
 class HashedSecret {
   private initialized: boolean = false
   private onChainSecret: Hash

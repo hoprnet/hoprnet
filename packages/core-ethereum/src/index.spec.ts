@@ -1,5 +1,5 @@
 import assert from 'assert'
-import { stringToU8a, durations } from '@hoprnet/hopr-utils'
+import { durations } from '@hoprnet/hopr-utils'
 import { Ganache } from '@hoprnet/hopr-testing'
 import { NODE_SEEDS } from '@hoprnet/hopr-demo-seeds'
 import { migrate, fund, getAddresses } from '@hoprnet/hopr-ethereum'
@@ -36,19 +36,6 @@ describe('test connector', function () {
   after(async function () {
     await connector.stop()
     await ganache.stop()
-  })
-
-  it('should catch initOnchainValues', async function () {
-    this.timeout(10e3)
-
-    const connector = await createNode(stringToU8a(NODE_SEEDS[NODE_SEEDS.length - 1]))
-
-    try {
-      await connector.initOnchainValues()
-      assert(true)
-    } catch (err) {
-      assert(false, err)
-    }
   })
 })
 
