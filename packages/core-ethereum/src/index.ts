@@ -66,7 +66,7 @@ export default class HoprEthereum {
         getNativeBalance: (address) =>
           this.provider.getBalance(address.toHex()).then((res) => new NativeBalance(new BN(res.toString()))),
         getAccount: (address) => this.indexer.getAccount(address),
-        findPreImage: (_hash) => null//this.hashedSecret.findPreImage(hash)
+        findPreImage: (_hash) => null //this.hashedSecret.findPreImage(hash)
       },
       this.wallet
     )
