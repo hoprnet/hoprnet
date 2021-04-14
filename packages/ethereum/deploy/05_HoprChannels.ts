@@ -2,7 +2,7 @@ import type { HardhatRuntimeEnvironment } from 'hardhat/types'
 import type { DeployFunction } from 'hardhat-deploy/types'
 import type { DeploymentTypes } from '../chain'
 import { durations } from '@hoprnet/hopr-utils'
-import { storeContract } from './utils'
+import { storeContract } from '../tasks/utils/contracts'
 
 const closures: {
   [key in DeploymentTypes]: number
@@ -24,10 +24,7 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     args: [hoprToken.address, Math.floor((closures[deploymentType] ?? closures.local) / 1e3)],
     log: true
   })
-
-  if (network.name !== 'hardhat') {
-    await storeContract(network.name, 'HoprChannels', result.address, result.receipt.blockNumber)
-  }
+  await storeContract(network.name, 'HoprChannels', result.address, result.receipt.blockNumber)
 }
 
 export default main

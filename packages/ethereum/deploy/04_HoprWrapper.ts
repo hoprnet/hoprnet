@@ -1,6 +1,6 @@
 import type { HardhatRuntimeEnvironment } from 'hardhat/types'
 import type { DeployFunction } from 'hardhat-deploy/types'
-import { storeContract } from './utils'
+import { storeContract } from '../tasks/utils/contracts'
 
 const XHOPR_ADDRESS = '0xD057604A14982FE8D88c5fC25Aac3267eA142a08'
 
@@ -14,10 +14,7 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     args: [XHOPR_ADDRESS, hoprToken.address],
     log: true
   })
-
-  if (network.name !== 'hardhat') {
-    await storeContract(network.name, 'HoprWrapper', result.address, result.receipt.blockNumber)
-  }
+  await storeContract(network.name, 'HoprWrapper', result.address, result.receipt.blockNumber)
 }
 
 // deploy this only on xdai

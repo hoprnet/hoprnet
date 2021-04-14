@@ -1,9 +1,9 @@
-import type { ContractData } from '../chain'
+import type { ContractData } from '../../chain'
 import { join } from 'path'
 import { promises } from 'fs'
 
 const { mkdir, readFile, writeFile } = promises
-const OUTPUT_DIR = join(__dirname, '..', 'chain')
+const OUTPUT_DIR = join(__dirname, '..', '..', 'chain')
 const OUTPUT_FILE = join(OUTPUT_DIR, 'contracts.json')
 
 export const storeContract = async (
