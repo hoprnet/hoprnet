@@ -1,4 +1,3 @@
-import BN from 'bn.js'
 import { u8aSplit, serializeToU8a, toU8a } from '@hoprnet/hopr-utils'
 import { Address, Balance, Hash } from './primitives'
 import { UINT256 } from '../types/solidity'
@@ -138,5 +137,32 @@ export class Channel {
       partyA: new Balance(this.partyABalance),
       partyB: new Balance(this.deposit.sub(this.partyABalance))
     }
+  }
+
+  async createTicket(amount: Balance, challenge: Hash, winProb: number) {
+    const counterpartyAddress = this.counterparty.toAddress()
+    const counterpartyState = await this.connector.indexer.getAccount(counterpartyAddress)
+    return Ticket.create(
+      counterpartyAddress,
+      challenge,
+      new UINT256(counterpartyState.counter),
+      amount,
+      computeWinningProbability(winProb),
+      new UINT256((await this.getState()).getIteration()),
+      this.connector.account.privateKey
+    )
+  }
+
+  async createDummyTicket(challenge: Hash): Promise<Ticket> {
+    // TODO: document how dummy ticket works
+    return Ticket.create(
+      this.counterparty.toAddress(),
+      challenge,
+      UINT256.fromString('0'),
+      new Balance(new BN(0)),
+      computeWinningProbability(1),
+      UINT256.fromString('0'),
+      this.connector.account.privateKey
+    )
   }
 }
