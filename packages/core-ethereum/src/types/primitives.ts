@@ -5,6 +5,8 @@ import { ethers } from 'ethers'
 import BN from 'bn.js'
 import { publicKeyConvert, publicKeyCreate, ecdsaSign, ecdsaVerify } from 'secp256k1'
 import { serializeToU8a, u8aSplit, u8aToNumber } from '@hoprnet/hopr-utils'
+import { UINT256 } from './solidity'
+
 
 export class Address {
   constructor(private arr: Uint8Array) {}
@@ -54,12 +56,20 @@ export class Balance {
     return 18
   }
 
+  static deserialize(arr: Uint8Array): Balance {
+    return new Balance(new BN(arr))
+  }
+
   public toBN(): BN {
     return this.bn
   }
 
   public serialize(): Uint8Array {
     return new Uint8Array(this.bn.toBuffer('be', Balance.SIZE))
+  }
+
+  public toUINT256(): UINT256 {
+    return new UINT256(this.bn)
   }
 
   public toFormattedString(): string {

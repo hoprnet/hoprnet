@@ -10,6 +10,10 @@ class UINT256 {
     return new Uint8Array(this.bn.toBuffer('be', UINT256.SIZE))
   }
 
+  static deserialize(arr: Uint8Array): UINT256 {
+    return new UINT256(new BN(arr))
+  }
+
   static fromString(str: string) {
     return new UINT256(new BN(str))
   }

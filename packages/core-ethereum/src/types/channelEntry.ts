@@ -7,8 +7,11 @@ export class Channel {
   constructor(
     public readonly self: Address,
     public readonly counterparty: Address,
-    public readonly deposit: BN,
-    public readonly partyABalance: BN,
+    // Ticket epoch
+    public readonly selfEpoch: UINT256,
+    public readonly counterpartyEpoch: UINT256,
+    public readonly selfBalance: Balance,
+    public readonly counterpartyBalance: Balance,
     public readonly closureTime: BN,
     public readonly stateCounter: BN,
     public readonly closureByPartyA: boolean,
@@ -32,32 +35,6 @@ export class Channel {
     )
   }
 
-  static fromObject(obj: {
-    partyA: Address
-    partyB: Address
-    deposit: BN
-    partyABalance: BN
-    closureTime: BN
-    stateCounter: BN
-    closureByPartyA: boolean
-    openedAt: BN
-    closedAt: BN
-    commitment: Hash
-  }) {
-    return new Channel(
-      obj.partyA,
-      obj.partyB,
-      obj.deposit,
-      obj.partyABalance,
-      obj.closureTime,
-      obj.stateCounter,
-      obj.closureByPartyA,
-      obj.openedAt,
-      obj.closedAt,
-      obj.commitment
-    )
-  }
-
   static deserialize(arr: Uint8Array) {
     const items = u8aSplit(arr, [
       Address.SIZE,
@@ -73,8 +50,10 @@ export class Channel {
     ])
     const self = new Address(items[0])
     const counterparty = new Address(items[1])
-    const deposit = new BN(items[2])
-    const partyABalance = new BN(items[3])
+    const selfEpoch = UINT256.deserialize(items[2]) 
+    const counterpartyEpoch = UINT256.deserialize(items[3])
+    const selfBalance = Balance.deserialize(items[4])
+    const counterpartyBalance = Balance.deserialize(items[5])
     const closureTime = new BN(items[4])
     const stateCounter = new BN(items[5])
     const closureByPartyA = Boolean(items[6][0])
@@ -85,8 +64,10 @@ export class Channel {
     return new Channel(
       self,
       counterparty,
-      deposit,
-      partyABalance,
+      selfEpoch,
+      counterpartyEpoch,
+      selfBalance,
+      counterpartyBalance,
       closureTime,
       stateCounter,
       closureByPartyA,
@@ -100,8 +81,8 @@ export class Channel {
     return serializeToU8a([
       [this.self.serialize(), Address.SIZE],
       [this.counterparty.serialize(), Address.SIZE],
-      [new UINT256(this.deposit).serialize(), UINT256.SIZE],
-      [new UINT256(this.partyABalance).serialize(), UINT256.SIZE],
+      [this.selfBalance.toUINT256().serialize(), UINT256.SIZE],
+      [this.counterpartyBalance.toUINT256().serialize(), UINT256.SIZE],
       [new UINT256(this.closureTime).serialize(), UINT256.SIZE],
       [new UINT256(this.stateCounter).serialize(), UINT256.SIZE],
       [toU8a(Number(this.closureByPartyA)), 1],
@@ -132,12 +113,5 @@ export class Channel {
   public getId() {
     const parties = this.self.sortPair(this.counterparty)
     return Channel.generateId(...parties)
-  }
-
-  public getBalances() {
-    return {
-      partyA: new Balance(this.partyABalance),
-      partyB: new Balance(this.deposit.sub(this.partyABalance))
-    }
   }
 }
