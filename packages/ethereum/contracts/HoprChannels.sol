@@ -107,7 +107,8 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         // @TODO: remove this and rely on `msg.sender`
         address funder,
         uint256 deposit,
-        uint256 partyABalance
+        uint256 partyABalance,
+        bytes32 commitment
     );
 
     event ChannelOpened(
@@ -135,7 +136,8 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         // @TODO: remove this and rely on `msg.sender`
         address indexed redeemer,
         address indexed counterparty,
-        uint256 amount
+        uint256 amount,
+        bytes32 commitment
     );
 
     /**
@@ -458,12 +460,16 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
             channel.partyABalance = channel.partyABalance.add(amountA);
         }
 
+        // TODO!!!!
+        bytes32 commitment = keccak256("TODO!!!!!");
+
         emit ChannelFunded(
             accountA,
             accountB,
             funder,
             channel.deposit,
-            channel.partyABalance
+            channel.partyABalance,
+            commitment
         );
     }
 
@@ -738,7 +744,8 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
             channel.partyABalance = channel.partyABalance.sub(amount);
         }
 
-        emit TicketRedeemed(redeemer, counterparty, amount);
+        // TODO!!! emit commitment
+        emit TicketRedeemed(redeemer, counterparty, amount, ticketHash);
     }
 
     /**

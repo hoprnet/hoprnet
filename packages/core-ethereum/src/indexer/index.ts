@@ -6,12 +6,11 @@ import chalk from 'chalk'
 import BN from 'bn.js'
 import Heap from 'heap-js'
 import { pubKeyToPeerId, randomChoice } from '@hoprnet/hopr-utils'
-import { Address, ChannelEntry, Hash, PublicKey, Balance, Snapshot } from '../types'
+import { Address, Channel, Hash, PublicKey, Balance, Snapshot } from '../types'
 import * as reducers from './reducers'
 import * as db from './db'
 import { isConfirmedBlock, isSyncing, snapshotComparator } from './utils'
 import Debug from 'debug'
-import { Channel } from '..'
 
 export type RoutingChannel = [source: PeerId, destination: PeerId, stake: Balance]
 
@@ -435,7 +434,7 @@ class Indexer extends EventEmitter {
     return db.getChannel(this.connector.db, channelId)
   }
 
-  public async getChannels(filter?: (channel: ChannelEntry) => Promise<boolean>) {
+  public async getChannels(filter?: (channel: Channel) => Promise<boolean>) {
     return db.getChannels(this.connector.db, filter)
   }
 
@@ -455,7 +454,7 @@ class Indexer extends EventEmitter {
     return undefined
   }
 
-  private async toIndexerChannel(source: PeerId, channel: ChannelEntry): Promise<RoutingChannel> {
+  private async toIndexerChannel(source: PeerId, channel: Channel): Promise<RoutingChannel> {
     const sourcePubKey = new PublicKey(source.pubKey.marshal())
     const [partyAPubKey, partyBPubKey] = await Promise.all([
       this.getPublicKeyOf(channel.partyA),

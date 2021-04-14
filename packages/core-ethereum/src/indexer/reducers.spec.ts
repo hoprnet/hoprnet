@@ -1,4 +1,4 @@
-import type { ChannelEntry, AccountEntry } from '../types'
+import type { Channel, AccountEntry } from '../types'
 import chai, { expect } from 'chai'
 import chaiAsPromised from 'chai-as-promised'
 import * as reducers from './reducers'
@@ -93,7 +93,7 @@ describe('test indexer reducers', function () {
   })
 })
 
-const expectChannelEntriesToBeEqual = (actual: ChannelEntry, expected: ChannelEntry) => {
+const expectChannelEntriesToBeEqual = (actual: Channel, expected: Channel) => {
   expect(actual.deposit.toString()).to.equal(expected.deposit.toString(), 'deposit')
   expect(actual.partyABalance.toString()).to.equal(expected.partyABalance.toString(), 'partyABalance')
   expect(actual.closureTime.toString()).to.equal(expected.closureTime.toString(), 'closureTime')

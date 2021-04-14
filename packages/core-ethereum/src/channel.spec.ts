@@ -8,7 +8,7 @@ import { createNode, fundAccount, advanceBlock } from './utils/testing'
 import BN from 'bn.js'
 import { Balance, Ticket, Address, Hash, UnacknowledgedTicket, PublicKey } from './types'
 import CoreConnector from '.'
-import Channel from './channel'
+import { Channel } from '.'
 import * as testconfigs from './config.spec'
 import * as configs from './config'
 import { providers, ethers } from 'ethers'
@@ -73,11 +73,9 @@ describe('test Channel class', function () {
     await fundAccount(funderWallet, hoprToken, partyB.toAddress().toHex())
 
     partyAConnector = await createNode(arrayify(testconfigs.DEMO_ACCOUNTS[1]))
-    await partyAConnector.initOnchainValues()
     await partyAConnector.start()
 
     partyBConnector = await createNode(arrayify(testconfigs.DEMO_ACCOUNTS[2]))
-    await partyBConnector.initOnchainValues()
     await partyBConnector.start()
   })
 
@@ -103,7 +101,7 @@ describe('test Channel class', function () {
       firstTicket.winProb
     )
     const unacknowledgedTicket = new UnacknowledgedTicket(signedTicket, firstTicket.secretA)
-    const firstAckedTicket = await partyBConnector.account.acknowledge(unacknowledgedTicket, firstTicket.secretB)
+    const firstAckedTicket = await partyBChannel.acknowledge(unacknowledgedTicket, firstTicket.secretB)
 
     assert(partyA.eq(signedTicket.getSigner()), `Check that signer is recoverable`)
 
@@ -162,7 +160,7 @@ describe('test Channel class', function () {
         ticketData.winProb
       )
       const nextUnacknowledgedTicket = new UnacknowledgedTicket(nextSignedTicket, ticketData.secretA)
-      const ackedTicket = await partyBConnector.account.acknowledge(nextUnacknowledgedTicket, ticketData.secretB)
+      const ackedTicket = await partyBChannel.acknowledge(nextUnacknowledgedTicket, ticketData.secretB)
 
       if (ackedTicket !== null) {
         const result = await partyBChannel.submitTicket(ackedTicket)

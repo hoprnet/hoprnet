@@ -65,7 +65,7 @@ export const onChannelFunded = async (
     const closureByPartyA = false
     const openedAt = new BN(0)
     const closedAt = new BN(0)
-    const commitment = new Hash(data.commitment)
+    const commitment = new Hash(stringToU8a(data.commitment))
 
     return new Channel(
       partyA,
@@ -117,7 +117,7 @@ export const onTicketRedeemed = async (
   const redeemer = Address.fromString(data.redeemer)
   const counterparty = Address.fromString(data.counterparty)
   const amount = new BN(data.amount.toString())
-  const newCommitment = new Hash(data.commitment)
+  const newCommitment = new Hash(stringToU8a(data.commitment))
 
   return new Channel(
     channelEntry.partyA,
