@@ -19,9 +19,7 @@ export async function hashFunction(msg: Uint8Array): Promise<Uint8Array> {
 export class TicketCommitment {
   constructor() {}
 
-  reserveCommitment() {
-  }
-
+  reserveCommitment() {}
 }
 
 class HashedSecret {

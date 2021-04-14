@@ -5,14 +5,7 @@ import { ethers, errors } from 'ethers'
 import { durations, isExpired } from '@hoprnet/hopr-utils'
 import NonceTracker, { NonceLock } from './nonce-tracker'
 import TransactionManager from './transaction-manager'
-import {
-  PublicKey,
-  Address,
-  Balance,
-  Hash,
-  NativeBalance,
-  UINT256,
-} from './types'
+import { PublicKey, Address, Balance, Hash, NativeBalance, UINT256 } from './types'
 import { isGanache, getNetworkGasPrice } from './utils'
 import { PROVIDER_CACHE_TTL } from './constants'
 import * as ethereum from './ethereum'
@@ -82,7 +75,6 @@ class Account {
     this.updateLocalState(state.secret)
     return state.secret
   }
-
 
   get privateKey(): Uint8Array {
     return ethers.utils.arrayify(this.wallet.privateKey)
