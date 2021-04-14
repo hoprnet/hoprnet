@@ -3,7 +3,7 @@ import LibP2P from 'libp2p'
 import { blue, green } from 'chalk'
 import PeerId from 'peer-id'
 import { u8aConcat, u8aEquals, u8aToHex, pubKeyToPeerId } from '@hoprnet/hopr-utils'
-import { getTickets, validateUnacknowledgedTicket, validateCreatedTicket } from '../../utils/tickets'
+import { getTickets } from '../../utils/tickets'
 import { Header, deriveTicketKey, deriveTicketKeyBlinding, deriveTagParameters, deriveTicketLastKey } from './header'
 import { Challenge } from './challenge'
 import { PacketTag, UnAcknowledgedTickets } from '../../dbKeys'
@@ -11,10 +11,127 @@ import Message from './message'
 import { LevelUp } from 'levelup'
 import Debug from 'debug'
 import Hopr from '../../'
-import HoprCoreEthereum, { Hash, PublicKey, Ticket, Balance, UnacknowledgedTicket } from '@hoprnet/hopr-core-ethereum'
+import HoprCoreEthereum, {
+  Hash,
+  PublicKey,
+  Ticket,
+  Balance,
+  UnacknowledgedTicket,
+  Channel,
+  getWinProbabilityAsFloat
+} from '@hoprnet/hopr-core-ethereum'
 
 const log = Debug('hopr-core:message:packet')
 const verbose = Debug('hopr-core:verbose:message:packet')
+
+/**
+ * Validate newly created tickets
+ * @param ops
+ */
+export function validateCreatedTicket(myBalance: BN, ticket: Ticket) {
+  if (myBalance.lt(ticket.amount.toBN())) {
+    throw Error(
+      `Payment channel does not have enough funds ${myBalance.toString()} < ${ticket.amount.toBN().toString()}`
+    )
+  }
+}
+
+/**
+ * Validate unacknowledged tickets as we receive them
+ */
+export async function validateUnacknowledgedTicket(
+  paymentChannels: HoprCoreEthereum,
+  id: PeerId,
+  nodeTicketAmount: string,
+  nodeTicketWinProb: number,
+  senderPeerId: PeerId,
+  ticket: Ticket,
+  channel: Channel,
+  getTickets: () => Promise<Ticket[]>
+): Promise<void> {
+  const ethereum = paymentChannels
+  // self
+  const selfPubKey = new PublicKey(id.pubKey.marshal())
+  const selfAddress = await selfPubKey.toAddress()
+  // sender
+  const senderB58 = senderPeerId.toB58String()
+  const senderPubKey = new PublicKey(senderPeerId.pubKey.marshal())
+  const ticketAmount = ticket.amount.toBN()
+  const ticketCounter = ticket.epoch.toBN()
+  const accountCounter = (await ethereum.account.getTicketEpoch()).toBN()
+  const ticketWinProb = getWinProbabilityAsFloat(ticket.winProb)
+
+  let channelState
+  try {
+    channelState = await channel.getState()
+  } catch (err) {
+    throw Error(`Error while validating unacknowledged ticket, state not found: '${err.message}'`)
+  }
+
+  // ticket signer MUST be the sender
+  if (!ticket.getSigner().eq(senderPubKey)) {
+    throw Error(`The signer of the ticket does not match the sender`)
+  }
+
+  // ticket MUST have at least X amount
+  if (ticketAmount.lt(new BN(nodeTicketAmount))) {
+    throw Error(`Ticket amount '${ticketAmount.toString()}' is lower than '${nodeTicketAmount}'`)
+  }
+
+  // ticket MUST have at least X winning probability
+  if (ticketWinProb < nodeTicketWinProb) {
+    throw Error(`Ticket winning probability '${ticketWinProb}' is lower than '${nodeTicketWinProb}'`)
+  }
+
+  // channel MUST be open or pending to close
+  if (channelState.getStatus() === 'CLOSED') {
+    throw Error(`Payment channel with '${senderB58}' is not open or pending to close`)
+  }
+
+  // ticket's epoch MUST match our account nonce
+  // (performance) we are making a request to blockchain
+  if (!ticketCounter.eq(accountCounter)) {
+    throw Error(
+      `Ticket epoch '${ticketCounter.toString()}' does not match our account counter ${accountCounter.toString()}`
+    )
+  }
+
+  // ticket's channelIteration MUST match the current channelIteration
+  const currentChannelIteration = channelState.getIteration()
+  const ticketChannelIteration = ticket.channelIteration.toBN()
+  if (!ticketChannelIteration.eq(currentChannelIteration)) {
+    throw Error(
+      `Ticket was created for a different channel iteration ${ticketChannelIteration.toString()} != ${currentChannelIteration.toString()}`
+    )
+  }
+
+  // channel MUST have enough funds
+  // (performance) we are making a request to blockchain
+  const senderBalance = (await channel.getBalances()).counterparty
+  if (senderBalance.toBN().lt(ticket.amount.toBN())) {
+    throw Error(`Payment channel does not have enough funds`)
+  }
+
+  // channel MUST have enough funds
+  // (performance) tickets are stored by key, we can't query sender's tickets efficiently
+  // we retrieve all signed tickets and filter the ones between sender and target
+  let signedTickets = (await getTickets()).filter(
+    (signedTicket) =>
+      signedTicket.counterparty.eq(selfAddress) &&
+      signedTicket.epoch.toBN().eq(accountCounter) &&
+      ticket.channelIteration.toBN().eq(currentChannelIteration)
+  )
+
+  // calculate total unredeemed balance
+  const unredeemedBalance = signedTickets.reduce((total, signedTicket) => {
+    return new BN(total.add(signedTicket.amount.toBN()))
+  }, new BN(0))
+
+  // ensure sender has enough funds
+  if (unredeemedBalance.add(ticket.amount.toBN()).gt(senderBalance.toBN())) {
+    throw Error(`Payment channel does not have enough funds when you include unredeemed tickets`)
+  }
+}
 
 /**
  * Encapsulates the internal representation of a packet
@@ -213,11 +330,7 @@ export class Packet extends Uint8Array {
 
       const channelState = await channel.getBalances()
       packet._ticket = await channel.createTicket(new Balance(fee), ticketChallenge, node.ticketWinProb)
-
-      await validateCreatedTicket({
-        myBalance: channelState.self.toBN(),
-        ticket: packet._ticket
-      })
+      validateCreatedTicket(channelState.self.toBN(), packet._ticket)
     } else if (secrets.length == 1) {
       packet._ticket = await channel.createDummyTicket(ticketChallenge)
     }
@@ -344,11 +457,7 @@ export class Packet extends Uint8Array {
     if (fee.toBN().gtn(0)) {
       const balances = await channel.getBalances()
       this._ticket = await channel.createTicket(fee, new Hash(this.header.encryptionKey), this.ticketWinProb)
-
-      await validateCreatedTicket({
-        myBalance: balances.self.toBN(),
-        ticket: this._ticket
-      })
+      validateCreatedTicket(balances.self.toBN(), this._ticket)
     } else if (fee.toBN().isZero()) {
       this._ticket = await channel.createDummyTicket(new Hash(this.header.encryptionKey))
     } else {

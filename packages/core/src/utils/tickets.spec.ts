@@ -5,7 +5,6 @@ import PeerId from 'peer-id'
 import chaiAsPromised from 'chai-as-promised'
 import chai, { expect } from 'chai'
 import sinon from 'sinon'
-import { validateUnacknowledgedTicket, validateCreatedTicket } from './tickets'
 import {
   Address,
   Balance,
@@ -16,7 +15,7 @@ import {
   Ticket,
   computeWinningProbability
 } from '@hoprnet/hopr-core-ethereum'
-
+import { validateCreatedTicket, validateUnacknowledgedTicket } from '../messages/packet'
 chai.use(chaiAsPromised)
 
 // target is party A, sender is party B
@@ -315,23 +314,6 @@ describe('unit test validateUnacknowledgedTicket', function () {
 describe('unit test validateCreatedTicket', function () {
   it('should pass if ticket is okay', async function () {
     const ticket = createMockTicket({})
-
-    return expect(
-      validateCreatedTicket({
-        myBalance: new BN(1),
-        ticket
-      })
-    ).to.eventually.to.not.rejected
-  })
-
-  it('should throw when signer is not sender', async function () {
-    const ticket = createMockTicket({})
-
-    return expect(
-      validateCreatedTicket({
-        myBalance: new BN(0),
-        ticket
-      })
-    ).to.eventually.rejectedWith('Payment channel does not have enough funds')
+    validateCreatedTicket(new BN(1), ticket)
   })
 })

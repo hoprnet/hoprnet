@@ -10,9 +10,9 @@ import { Balance, Ticket, Address, Hash, UnacknowledgedTicket, PublicKey } from 
 import CoreConnector from '.'
 import Channel from './channel'
 import * as testconfigs from './config.spec'
-import * as configs from './config'
 import { providers, ethers } from 'ethers'
 import { HoprToken__factory, HoprToken } from './contracts'
+import { DEFAULT_URI } from './constants'
 
 const { arrayify } = ethers.utils
 const DEFAULT_WIN_PROB = 1
@@ -55,7 +55,7 @@ describe('test Channel class', function () {
     await ganache.start()
     await migrate()
 
-    provider = new providers.WebSocketProvider(configs.DEFAULT_URI)
+    provider = new providers.WebSocketProvider(DEFAULT_URI)
     hoprToken = HoprToken__factory.connect(getAddresses().localhost?.HoprToken, provider)
   })
 

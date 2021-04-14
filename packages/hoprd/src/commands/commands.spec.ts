@@ -109,21 +109,6 @@ describe('Commands', () => {
     assert(mockReadline.question.calledTwice, 'called once')
   })
 
-  it('withdraw', async () => {
-    let mockNode: any = sinon.fake()
-    mockNode.paymentChannels = sinon.fake()
-    mockNode.paymentChannels.types = sinon.fake()
-    mockNode.paymentChannels.types.Balance = sinon.fake()
-    mockNode.paymentChannels.types.NativeBalance = sinon.fake()
-    mockNode.paymentChannels.withdraw = sinon.fake()
-
-    let cmds = new mod.Commands(mockNode)
-    assertMatch((await cmds.autocomplete('withdraw'))[0][0], /amount \(ETH, HOPR\)/)
-
-    await cmds.execute('withdraw 0x123 native 1')
-    assert(mockNode.paymentChannels.withdraw.calledOnce)
-  })
-
   it('settings', async () => {
     let mockNode: any = sinon.fake()
     mockNode.getChannelStrategy = (): string => ''
