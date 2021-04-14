@@ -5,7 +5,7 @@ import chalk from 'chalk'
 import { Networks, getAddresses } from '@hoprnet/hopr-ethereum'
 import { ethers } from 'ethers'
 import debug from 'debug'
-import { Acknowledgement } from './types'
+import { Acknowledgement, Balance, NativeBalance } from './types'
 import Channel from './channel'
 import Indexer from './indexer'
 import { RoutingChannel } from './indexer'
@@ -14,6 +14,7 @@ import Account from './account'
 import HashedSecret from './hashedSecret'
 import { getWinProbabilityAsFloat, computeWinningProbability } from './utils'
 import { HoprToken__factory, HoprChannels__factory } from './contracts'
+import BN from 'bn.js'
 import { DEFAULT_URI, MAX_CONFIRMATIONS } from './constants'
 
 const log = debug('hopr-core-ethereum')
@@ -55,9 +56,25 @@ export default class HoprEthereum {
     debug: boolean,
     maxConfirmations: number
   ) {
-    this.account = new Account(this, wallet)
-    this.indexer = new Indexer(this, maxConfirmations)
     this._debug = debug
+    this.indexer = new Indexer(this, maxConfirmations)
+    this.account = new Account(
+      {
+        network: this.network
+      },
+      {
+        // TODO: use indexer when it's done syncing
+        getLatestBlockNumber: async () => this.provider.getBlockNumber(),
+        getTransactionCount: (address, blockNumber) => this.provider.getTransactionCount(address.toHex(), blockNumber),
+        getBalance: (address) =>
+          this.hoprToken.balanceOf(address.toHex()).then((res) => new Balance(new BN(res.toString()))),
+        getNativeBalance: (address) =>
+          this.provider.getBalance(address.toHex()).then((res) => new NativeBalance(new BN(res.toString()))),
+        getAccount: (address) => this.indexer.getAccount(address),
+        findPreImage: (hash) => this.hashedSecret.findPreImage(hash)
+      },
+      this.wallet
+    )
     this.hashedSecret = new HashedSecret(this.db, this.account, this.hoprChannels)
   }
 
