@@ -50,7 +50,7 @@ export class Channel {
     ])
     const self = new Address(items[0])
     const counterparty = new Address(items[1])
-    const selfEpoch = UINT256.deserialize(items[2]) 
+    const selfEpoch = UINT256.deserialize(items[2])
     const counterpartyEpoch = UINT256.deserialize(items[3])
     const selfBalance = Balance.deserialize(items[4])
     const counterpartyBalance = Balance.deserialize(items[5])
