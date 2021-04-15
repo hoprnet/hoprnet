@@ -38,7 +38,6 @@ export const getContract = async (network: string, name: string): Promise<Contra
   try {
     return require(OUTPUT_FILE)?.[network]?.[name]
   } catch {
-    console.error('You need to ensure the network deployed the contracts')
-    return
+    throw Error('You need to ensure the network deployed the contracts')
   }
 }
