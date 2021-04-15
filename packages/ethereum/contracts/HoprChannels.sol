@@ -615,10 +615,17 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
             "channel must be open or pending to close"
         );
 
+        uint256 ticketEpoch;
+        if (_isPartyA(redeemer, counterparty)) {
+          ticketEpoch = channel.partyATicketEpoch;
+        } else {
+          ticketEpoch = channel.partyBTicketEpoch;
+        }
+
         bytes32 ticketHash = _getTicketHash(
             _getEncodedTicket(
                 redeemer,
-                // TODO account.counter,
+                ticketEpoch,
                 proofOfRelaySecret,
                 _getChannelIteration(channel.status),
                 amount,

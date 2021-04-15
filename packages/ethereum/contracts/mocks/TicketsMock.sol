@@ -7,25 +7,6 @@ contract TicketsMock is HoprChannels {
     constructor(address _token, uint32 _secsClosure)
     HoprChannels(_token, _secsClosure) {}
 
-    function initializeAccountInternal(
-        address sender,
-        bytes calldata uncompressedPubKey,
-        bytes32 secret
-    ) external {
-        _initializeAccount(
-            sender,
-            uncompressedPubKey,
-            secret
-        );
-    }
-
-    function updateAccountSecretInternal(
-        address sender,
-        bytes32 secret
-    ) external {
-        _updateAccountSecret(sender, secret);
-    }
-
     function fundChannelInternal(
         address funder,
         address accountA,
