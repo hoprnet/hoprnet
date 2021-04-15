@@ -304,7 +304,7 @@ class Indexer extends EventEmitter {
 
     const channel = new ChannelEntry(
       Address.fromString(data.partyA),
-      Address.fromString(data.partyB), 
+      Address.fromString(data.partyB),
       new Balance(new BN(rawChannel[0].toString())),
       new Balance(new BN(rawChannel[1].toString()))
     )
