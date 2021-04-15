@@ -33,7 +33,6 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
      * @dev A channel struct, used to represent a channel's state
      */
     struct Channel {
-
         uint256 partyABalance;
         uint256 partyBBalance;
 
@@ -76,8 +75,8 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     uint32 public secsClosure;
 
     event ChannelCommitmentUpdated(
-        address indexed accountA,
-        address indexed accountB,
+        address partyA,
+        address partyB,
         bytes32 commitmentPartyA,
         bytes32 commitmentPartyB,
         uint256 partyATicketEpoch,
@@ -85,10 +84,8 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     );
 
     event ChannelFunded(
-        address indexed accountA,
-        address indexed accountB,
-        // @TODO: remove this and rely on `msg.sender`
-        address funder,
+        address partyA,
+        address partyB,
         uint256 partyABalance,
         uint256 partyBBalance
     );
@@ -178,15 +175,6 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     }
 
     /**
-     * @dev Opens a channel, then emits
-     * {ChannelOpened} event.
-     * @param counterparty the address of the counterparty
-     */
-    function openChannel(address counterparty) external {
-        _openChannel(msg.sender, counterparty);
-    }
-
-    /**
      * @dev Fund channel and then open it, then emits
      * {ChannelFunded} and {ChannelOpened} events.
      * @param accountA the address of accountA
@@ -272,7 +260,6 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     }
 
     // @TODO: check with team, is this function too complex?
-    // @TODO: should we support account init?
     /**
      * A hook triggered when HOPR tokens are send to this contract.
      *
@@ -367,7 +354,6 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         emit ChannelFunded(
             accountA,
             accountB,
-            funder,
             channel.partyABalance,
             channel.partyBBalance
         );
