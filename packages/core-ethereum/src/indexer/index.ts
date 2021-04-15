@@ -273,20 +273,10 @@ class Indexer extends EventEmitter {
       const eventName = event.event as EventNames
 
       try {
-        if (eventName === 'AccountInitialized') {
-          await this.onAccountInitialized(event as Event<'AccountInitialized'>)
-        } else if (eventName === 'AccountSecretUpdated') {
-          await this.onAccountSecretUpdated(event as Event<'AccountSecretUpdated'>)
-        } else if (eventName === 'ChannelFunded') {
-          await this.onChannelFunded(event as Event<'ChannelFunded'>)
-        } else if (eventName === 'ChannelOpened') {
-          await this.onChannelOpened(event as Event<'ChannelOpened'>)
+        if (eventName === 'ChannelUpdate') {
+          await this.onChannelUpdated(event as Event<'ChannelUpdate'>)
         } else if (eventName === 'TicketRedeemed') {
           await this.onTicketRedeemed(event as Event<'TicketRedeemed'>)
-        } else if (eventName === 'ChannelPendingToClose') {
-          await this.onChannelPendingToClose(event as Event<'ChannelPendingToClose'>)
-        } else if (eventName === 'ChannelClosed') {
-          await this.onChannelClosed(event as Event<'ChannelClosed'>)
         }
       } catch (err) {
         log(chalk.red('Error while reducing event'))
@@ -308,32 +298,11 @@ class Indexer extends EventEmitter {
     this.unconfirmedEvents.addAll(events)
   }
 
-  // on new events
-  private async onAccountInitialized(event: Event<'AccountInitialized'>): Promise<void> {
-    const accountId = Address.fromString(event.args.account)
-    const account = await reducers.onAccountInitialized(event)
-
-    await db.updateAccount(this.connector.db, accountId, account)
-  }
-
-  private async onAccountSecretUpdated(event: Event<'AccountSecretUpdated'>): Promise<void> {
+  private async onChannelUpdated(event: Event<'ChannelUpdate'>): Promise<void> {
     const data = event.args
 
-    const accountId = Address.fromString(data.account)
-
-    const storedAccount = await db.getAccount(this.connector.db, accountId)
-    if (!storedAccount) throw Error(`Could not find stored account ${accountId.toHex()} !`)
-
-    const account = await reducers.onAccountSecretUpdated(event, storedAccount)
-
-    await db.updateAccount(this.connector.db, accountId, account)
-  }
-
-  private async onChannelFunded(event: Event<'ChannelFunded'>): Promise<void> {
-    const data = event.args
-
-    const accountIdA = Address.fromString(data.accountA)
-    const accountIdB = Address.fromString(data.accountB)
+    const accountIdA = Address.fromString(data.partyA)
+    const accountIdB = Address.fromString(data.partyB)
     const channelId = Channel.generateId(accountIdA, accountIdB)
 
     let storedChannel = await db.getChannel(this.connector.db, channelId)
@@ -345,26 +314,6 @@ class Indexer extends EventEmitter {
     await db.updateChannel(this.connector.db, channelId, channel)
 
     // log('Channel %s got funded by %s', chalk.green(channelId.toHex()), chalk.green(event.data.funder))
-  }
-
-  private async onChannelOpened(event: Event<'ChannelOpened'>): Promise<void> {
-    const data = event.args
-
-    const openerAccountId = Address.fromString(data.opener)
-    const counterpartyAccountId = Address.fromString(data.counterparty)
-    const channelId = Channel.generateId(openerAccountId, counterpartyAccountId)
-    // log('Processing event %s with channelId %s', event.name, channelId.toHex())
-
-    let storedChannel = await db.getChannel(this.connector.db, channelId)
-    if (!storedChannel) throw Error(`Could not find stored channel ${channelId.toHex()}`)
-
-    const channel = await reducers.onChannelOpened(event, storedChannel)
-
-    await db.updateChannel(this.connector.db, channelId, channel)
-
-    this.emit('channelOpened', channel)
-
-    // log('Channel %s got opened by %s', chalk.green(channelId.toHex()), chalk.green(openerAddress.toHex()))
   }
 
   private async onTicketRedeemed(event: Event<'TicketRedeemed'>): Promise<void> {
@@ -385,47 +334,6 @@ class Indexer extends EventEmitter {
     // log('Ticket redeemd in channel %s by %s', chalk.green(channelId.toHex()), chalk.green(redeemerAddress.toHex()))
   }
 
-  private async onChannelPendingToClose(event: Event<'ChannelPendingToClose'>): Promise<void> {
-    const data = event.args
-
-    const initiatorAccountId = Address.fromString(data.initiator)
-    const counterpartyAccountId = Address.fromString(data.counterparty)
-    const channelId = Channel.generateId(initiatorAccountId, counterpartyAccountId)
-    // log('Processing event %s with channelId %s', event.name, channelId.toHex())
-
-    const storedChannel = await db.getChannel(this.connector.db, channelId)
-    if (!storedChannel) throw Error(`Could not find stored channel ${channelId.toHex()}`)
-
-    const channel = await reducers.onChannelPendingToClose(event, storedChannel)
-
-    await db.updateChannel(this.connector.db, channelId, channel)
-
-    // log(
-    //   'Channel closure initiated for %s by %s',
-    //   chalk.green(channelId.toHex()),
-    //   chalk.green(initiatorAddress.toHex())
-    // )
-  }
-
-  private async onChannelClosed(event: Event<'ChannelClosed'>): Promise<void> {
-    const data = event.args
-
-    const closerAccountId = Address.fromString(data.initiator)
-    const counterpartyAccountId = Address.fromString(data.counterparty)
-    const channelId = Channel.generateId(closerAccountId, counterpartyAccountId)
-    // log('Processing event %s with channelId %s', event.name, channelId.toHex())
-
-    const storedChannel = await db.getChannel(this.connector.db, channelId)
-    if (!storedChannel) throw Error(`Could not find stored channel ${channelId.toHex()}`)
-
-    const channel = await reducers.onChannelClosed(event, storedChannel)
-
-    await db.updateChannel(this.connector.db, channelId, channel)
-
-    this.emit('channelClosed', channel)
-
-    // log('Channel %s got closed by %s', chalk.green(channelId.toHex()), chalk.green(closerAddress.toHex()))
-  }
 
   public async getAccount(address: Address) {
     return db.getAccount(this.connector.db, address)
