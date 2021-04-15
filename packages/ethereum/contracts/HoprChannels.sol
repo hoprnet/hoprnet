@@ -111,8 +111,8 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         address indexed accountB,
         // @TODO: remove this and rely on `msg.sender`
         address funder,
-        uint256 deposit,
-        uint256 partyABalance
+        uint256 partyABalance,
+        uint256 partyBBalance
     );
 
     event ChannelOpened(
