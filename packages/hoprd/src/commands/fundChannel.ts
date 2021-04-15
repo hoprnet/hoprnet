@@ -1,0 +1,70 @@
+import type Hopr from '@hoprnet/hopr-core'
+import type PeerId from 'peer-id'
+import type { AutoCompleteResult } from './abstractCommand'
+import chalk from 'chalk'
+import BN from 'bn.js'
+import { AbstractCommand, GlobalState } from './abstractCommand'
+import { checkPeerIdInput, styleValue, isBootstrapNode } from './utils'
+
+export default class FundChannel extends AbstractCommand {
+  constructor(public node: Hopr) {
+    super()
+  }
+
+  public name() {
+    return 'fund'
+  }
+
+  public help() {
+    return 'Fund a channel, if channel is closed it will open it'
+  }
+
+  async execute(query: string, state: GlobalState): Promise<string | void> {
+    if (query == null) {
+      return styleValue(
+        `Invalid arguments. Expected 'fund <peerId> <myFund> <counterpartyFund>'. Received '${query}'`,
+        'failure'
+      )
+    }
+
+    const [error, peerIdInput, myFundInput, counterpartyFundInput] = this._assertUsage(query, [
+      'peerId',
+      'myFund',
+      'counterpartyFund'
+    ])
+    if (error) return styleValue(error, 'failure')
+
+    let peerId: PeerId
+    let myFund: BN
+    let counterpartyFund: BN
+
+    try {
+      peerId = await checkPeerIdInput(peerIdInput, state)
+      if (isNaN(Number(myFundInput))) throw Error('myFund is not a number')
+      myFund = new BN(myFundInput)
+      if (isNaN(Number(counterpartyFundInput))) throw Error('counterpartyFund is not a number')
+      counterpartyFund = new BN(counterpartyFundInput)
+    } catch (err) {
+      return styleValue(err.message, 'failure')
+    }
+
+    try {
+      const { channelId } = await this.node.fundChannel(peerId, myFund, counterpartyFund)
+      return `${chalk.green(`Successfully funded channel`)} ${styleValue(channelId.toHex(), 'hash')}`
+    } catch (err) {
+      return styleValue(err.message, 'failure')
+    }
+  }
+
+  async autocomplete(query: string = '', line: string = ''): Promise<AutoCompleteResult> {
+    const [peer] = query.split(' ')
+
+    const peers = this.node
+      .getConnectedPeers()
+      .filter((p) => !isBootstrapNode(this.node, p))
+      .map((p) => p.toB58String())
+
+    const hits = query ? peers.filter((peerId: string) => peerId.startsWith(peer)) : peers
+    return [hits.length ? hits.map((str: string) => `fund ${str}`) : ['fund'], line]
+  }
+}

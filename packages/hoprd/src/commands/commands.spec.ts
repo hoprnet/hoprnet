@@ -82,33 +82,6 @@ describe('Commands', () => {
     assert((await cmds.autocomplete('send t'))[0][0] == 'send test')
   })
 
-  it('multisend', async () => {
-    let seq = 0
-    let mockNode = sinon.fake() as any
-    mockNode.sendMessage = sinon.fake()
-
-    let mockReadline = sinon.fake() as any
-    mockReadline.write = sinon.fake()
-    mockReadline.pause = sinon.fake()
-    mockReadline.resume = sinon.fake()
-
-    mockReadline.question = sinon.fake((question: any, resolve: any) => {
-      assert(question == 'send >', 'question matches')
-      if (seq == 0) {
-        resolve('hello')
-        seq++
-      } else {
-        assert(mockNode.sendMessage.calledOnce)
-        resolve('quit')
-      }
-    })
-
-    let cmds = new mod.Commands(mockNode, mockReadline)
-    await cmds.execute('alias 16Uiu2HAmQDFS8a4Bj5PGaTqQLME5SZTRNikz9nUPT3G4T6YL9o7V test2')
-    await cmds.execute('multisend test2')
-    assert(mockReadline.question.calledTwice, 'called once')
-  })
-
   it('settings', async () => {
     let mockNode: any = sinon.fake()
     mockNode.getChannelStrategy = (): string => ''
@@ -161,6 +134,21 @@ describe('Commands', () => {
     assertMatch(aliases, /test/)
     await cmds.execute('send test Hello, world')
     assert(mockNode.sendMessage.calledOnce)
+  })
+
+  it('fund channel', async () => {
+    const channelId = '16Uiu2HAmAJStiomwq27Kkvtat8KiEHLBSnAkkKCqZmLYKVLtkiB7'
+    let mockNode: any = sinon.fake()
+    mockNode.fundChannel = sinon.fake(async () => ({
+      channelId: {
+        toHex: () => channelId
+      }
+    }))
+
+    let cmds = new mod.Commands(mockNode)
+    assertMatch(await cmds.execute(`fund ${channelId} 10 15`), /Successfully funded channel/)
+    assertMatch(await cmds.execute(`fund ${channelId} 10`), /usage:/)
+    assertMatch(await cmds.execute(`fund ${channelId} 10 y`), /is not a number/)
   })
 
   it('close channel', async () => {

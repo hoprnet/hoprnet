@@ -601,7 +601,7 @@ class Hopr extends EventEmitter {
     const ethereum = this.paymentChannels
     const selfPubKey = new PublicKey(this.getId().pubKey.marshal())
     const counterpartyPubKey = new PublicKey(counterparty.pubKey.marshal())
-    const myAvailableTokens = await ethereum.account.getBalance(true)
+    const myAvailableTokens = await ethereum.account.getBalance(false)
 
     // validate 'amountToFund'
     if (amountToFund.lten(0)) {
@@ -615,6 +615,41 @@ class Hopr extends EventEmitter {
 
     return {
       channelId: await channel.getId()
+    }
+  }
+
+  /**
+   * Fund a payment channel
+   *
+   * @param counterparty the counter party's peerId
+   * @param myFund the amount to fund the channel in my favor HOPR(wei)
+   * @param counterpartyFund the amount to fund the channel in counterparty's favor HOPR(wei)
+   */
+  public async fundChannel(
+    counterparty: PeerId,
+    myFund: BN,
+    counterpartyFund: BN
+  ): Promise<{
+    channelId: Hash
+  }> {
+    const ethereum = this.paymentChannels
+    const selfPubKey = new PublicKey(this.getId().pubKey.marshal())
+    const counterpartyPubKey = new PublicKey(counterparty.pubKey.marshal())
+    const myBalance = await ethereum.account.getBalance(false)
+    const totalFund = myFund.add(counterpartyFund)
+
+    // validate 'amountToFund'
+    if (totalFund.lten(0)) {
+      throw Error(`Invalid 'totalFund' provided: ${totalFund.toString(10)}`)
+    } else if (totalFund.gt(myBalance.toBN())) {
+      throw Error(`You don't have enough tokens: ${totalFund.toString(10)}<${myBalance.toBN().toString(10)}`)
+    }
+
+    const channel = new ethereum.channel(ethereum, selfPubKey, counterpartyPubKey)
+    await channel.fund(new Balance(myFund), new Balance(counterpartyFund))
+
+    return {
+      channelId: channel.getId()
     }
   }
 

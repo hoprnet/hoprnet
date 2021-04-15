@@ -3,12 +3,11 @@ import type PeerId from 'peer-id'
 import { startDelayedInterval, moveDecimalPoint } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 import chalk from 'chalk'
-import readline from 'readline'
 import { checkPeerIdInput, isBootstrapNode, styleValue } from './utils'
 import { AbstractCommand, AutoCompleteResult, GlobalState } from './abstractCommand'
 import { PublicKey, Balance } from '@hoprnet/hopr-core-ethereum'
 
-export abstract class OpenChannelBase extends AbstractCommand {
+export class OpenChannel extends AbstractCommand {
   constructor(public node: Hopr) {
     super()
   }
@@ -39,7 +38,7 @@ export abstract class OpenChannelBase extends AbstractCommand {
 
     const ethereum = this.node.paymentChannels
     const selfPubKey = new PublicKey(this.node.getId().pubKey.marshal())
-    const self = await selfPubKey.toAddress()
+    const self = selfPubKey.toAddress()
 
     const peers = this.node.getConnectedPeers().filter((p) => !isBootstrapNode(this.node, p))
 
@@ -57,7 +56,7 @@ export abstract class OpenChannelBase extends AbstractCommand {
     let availablePeers: string[] = []
     for (const peer of peers) {
       const pubKey = new PublicKey(peer.pubKey.marshal())
-      const address = await pubKey.toAddress()
+      const address = pubKey.toAddress()
       const hasOpenChannel = channels.some((channel) => {
         return address.eq(channel.partyA) || address.eq(channel.partyB)
       })
@@ -96,9 +95,7 @@ export abstract class OpenChannelBase extends AbstractCommand {
       return styleValue(err.message, 'failure')
     }
   }
-}
 
-export class OpenChannel extends OpenChannelBase {
   /**
    * Encapsulates the functionality that is executed once the user decides to open a payment channel
    * with another party.
@@ -112,38 +109,5 @@ export class OpenChannel extends OpenChannelBase {
     if (err) return styleValue(err, 'failure')
 
     return this.open(state, counterPartyB58Str, amountToFundStr)
-  }
-}
-
-export class OpenChannelFancy extends OpenChannelBase {
-  constructor(public node: Hopr, public rl: readline.Interface) {
-    super(node)
-  }
-
-  private async selectFundAmount(): Promise<string> {
-    const { account } = this.node.paymentChannels
-    const myAvailableTokens = await account.getBalance(true)
-    const myAvailableTokensDisplay = moveDecimalPoint(myAvailableTokens.toString(), Balance.DECIMALS * -1)
-
-    const tokenQuestion = `How many ${Balance.SYMBOL} (${styleValue(`${myAvailableTokensDisplay}`, 'number')} ${
-      Balance.SYMBOL
-    } available) shall get staked? : `
-
-    const amountToFund = await new Promise<string>((resolve) => this.rl.question(tokenQuestion, resolve))
-    return amountToFund
-  }
-
-  /**
-   * Encapsulates the functionality that is executed once the user decides to open a payment channel
-   * with another party.
-   * @param query peerId string to send message to
-   */
-  public async execute(query: string, state: GlobalState): Promise<string> {
-    if (!query) {
-      return styleValue(`Invalid arguments. Expected 'open <peerId>'. Received '${query}'`, 'failure')
-    }
-
-    const amountToFund = await this.selectFundAmount()
-    return this.open(state, query, amountToFund)
   }
 }
