@@ -17,13 +17,6 @@ contract ChannelsMock is HoprChannels {
         _fundChannel(funder, accountA, accountB, amountA, amountB);
     }
 
-    function openChannelInternal(
-        address opener,
-        address counterparty
-    ) external {
-        _openChannel(opener, counterparty);
-    }
-
     function initiateChannelClosureInternal(
         address initiator,
         address counterparty

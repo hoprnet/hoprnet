@@ -74,39 +74,10 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
      */
     uint32 public secsClosure;
 
-    event ChannelCommitmentUpdated(
+    event ChannelUpdate(
         address partyA,
         address partyB,
-        bytes32 commitmentPartyA,
-        bytes32 commitmentPartyB,
-        uint256 partyATicketEpoch,
-        uint256 partyBTicketEpoch
-    );
-
-    event ChannelFunded(
-        address partyA,
-        address partyB,
-        uint256 partyABalance,
-        uint256 partyBBalance
-    );
-
-    event ChannelOpened(
-        // @TODO: remove this and rely on `msg.sender`
-        address indexed opener,
-        address indexed counterparty
-    );
-
-    event ChannelPendingToClose(
-        // @TODO: remove this and rely on `msg.sender`
-        address indexed initiator,
-        address indexed counterparty,
-        uint256 closureTime
-    );
-
-    event ChannelClosed(
-        // @TODO: remove this and rely on `msg.sender`
-        address indexed initiator,
-        address indexed counterparty
+        Channel newState
     );
 
     event TicketRedeemed(
@@ -128,7 +99,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
 
     /**
      * @dev Funds a channel in one direction,
-     * then emits {ChannelFunded} event.
+     * then emits {ChannelUpdate} event.
      * @param funder the address of the recipient
      * @param counterparty the address of the counterparty
      * @param amount amount to fund
@@ -149,7 +120,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
 
     /**
      * @dev Funds a channel, in both directions,
-     * then emits {ChannelFunded} event.
+     * then emits {ChannelUpdate} event.
      * @param account1 the address of account1
      * @param account2 the address of account2
      * @param amount1 amount to fund account1
@@ -198,7 +169,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
      * @dev Initialize channel closure, updates channel's
      * closure time, when the cool-off period is over,
      * user may finalize closure, then emits
-     * {ChannelPendingToClose} event.
+     * {ChannelUpdate} event.
      * @param counterparty the address of the counterparty
      */
     function initiateChannelClosure(
@@ -211,7 +182,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
      * @dev Finalize channel closure, if cool-off period
      * is over it will close the channel and transfer funds
      * to the parties involved, then emits
-     * {ChannelClosed} event.
+     * {ChannelUpdate} event.
      * @param counterparty the address of the counterparty
      */
     function finalizeChannelClosure(
@@ -280,11 +251,11 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
 
     /**
      * @dev Funds a channel, then emits
-     * {ChannelFunded} event.
-     * @param accountA the address of accountA
-     * @param accountB the address of accountB
-     * @param amountA amount to fund accountA
-     * @param amountB amount to fund accountB
+     * {ChannelUpdate} event.
+     * @param account1 the address of account1
+     * @param account2 the address of account2
+     * @param amount1 amount to fund account1
+     * @param amount2 amount to fund account2
      */
     function _fundChannel(
         address account1,
@@ -295,14 +266,14 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         require(account1 != account2, "accountA and accountB must not be the same");
         require(account1 != address(0), "accountA must not be empty");
         require(account2 != address(0), "accountB must not be empty");
-        require(amountA > 0 || amountB > 0, "amountA or amountB must be greater than 0");
+        require(amount1 > 0 || amount2 > 0, "amountA or amountB must be greater than 0");
 
         address partyA;
         address partyB;
         uint256 amountA;
         uint256 amountB;
         
-        if (isPartyA(account1, account2)){
+        if (_isPartyA(account1, account2)){
           partyA = account1;
           partyB = account2;
           amountA = amount1;
@@ -313,35 +284,28 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
           amountA = amount2;
           amountB = amount1;
         }
-        require(isPartyA(partyA, partyB), "must now be sorted");
+        require(_isPartyA(partyA, partyB), "must now be sorted");
 
         (,,, Channel storage channel) = _getChannel(partyA, partyB);
 
-        require(channel.status !== ChannelStatus.PENDING_TO_CLOSE, "Cannot fund a closing channel");
+        require(channel.status != ChannelStatus.PENDING_TO_CLOSE, "Cannot fund a closing channel");
         
         if (channel.status == ChannelStatus.CLOSED) {
           // We are reopening the channel
           channel.channelEpoch = channel.channelEpoch.add(1);
           channel.status = ChannelStatus.OPEN;
-          emit ChannelOpened(opener, counterparty);
         }
 
         channel.partyABalance = channel.partyABalance.add(amountA);
         channel.partyBBalance = channel.partyBBalance.add(amountB);
-
-        emit ChannelFunded(
-            partyA,
-            partyB,
-            channel.partyABalance,
-            channel.partyBBalance
-        );
+        emit ChannelUpdate(partyA, partyB, channel);
     }
 
     /**
      * @dev Initialize channel closure, updates channel's
      * closure time, when the cool-off period is over,
      * user may finalize closure, then emits
-     * {ChannelPendingToClose} event.
+     * {ChannelUpdate} event.
      * @param initiator the address of the initiator
      * @param counterparty the address of the counterparty
      */
@@ -365,14 +329,14 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
             channel.closureByPartyA = true;
         }
 
-        emit ChannelPendingToClose(initiator, counterparty, channel.closureTime);
+        emit ChannelUpdate(initiator, counterparty, channel);
     }
 
     /**
      * @dev Finalize channel closure, if cool-off period
      * is over it will close the channel and transfer funds
      * to the parties involved, then emits
-     * {ChannelClosed} event.
+     * {ChannelUpdate} event.
      * @param initiator the address of the initiator
      * @param counterparty the address of the counterparty
      */
@@ -408,7 +372,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         delete channel.closureTime; // channel.closureTime = 0
         delete channel.closureByPartyA; // channel.closureByPartyA = false
 
-        emit ChannelClosed(initiator, counterparty);
+        emit ChannelUpdate(initiator, counterparty, channel);
     }
 
     /**
