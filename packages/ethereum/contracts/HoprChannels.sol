@@ -25,15 +25,6 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     uint256 public FUND_CHANNEL_MULTI_SIZE = abi.encode(false, address(0), address(0), uint256(0), uint256(0)).length;
 
     /**
-     * @dev An account struct, used to represent an account's state
-     */
-    struct Account {
-        // @TODO: optimize struct
-        bytes32 secret; // account's hashed secret
-        uint256 counter; // increases everytime 'secret' is changed
-    }
-
-    /**
      * @dev Possible channel statuses.
      * We find out the channel's status by
      * using {_getChannelStatus}.
@@ -65,11 +56,6 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     }
 
     /**
-     * @dev Stored accounts keyed by their address
-     */
-    mapping(address => Account) public accounts;
-
-    /**
      * @dev Stored channels keyed by their channel ids
      */
     mapping(bytes32 => Channel) public channels;
@@ -94,10 +80,10 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     event ChannelCommitmentUpdated(
         // @TODO: remove this and rely on `msg.sender`
         address indexed account,
-        bytes32 commitmentPartyA;
-        bytes32 commitmentPartyB;
-        uint256 partyATicketEpoch;
-        uint256 partyBTicketEpoch;
+        bytes32 commitmentPartyA,
+        bytes32 commitmentPartyB,
+        uint256 partyATicketEpoch,
+        uint256 partyBTicketEpoch
     );
 
     event ChannelFunded(
@@ -581,7 +567,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
      * @dev Redeem a ticket
      * @param redeemer the redeemer address
      * @param counterparty the counterparty address
-     * @param secretPreImage the secretPreImage that results to the redeemers account secret
+     * @param secretPreImage the secretPreImage that results to the redeemers channel commitment
      * @param proofOfRelaySecret the proof of relay secret
      * @param winProb the winning probability of the ticket
      * @param amount the amount in the ticket
@@ -610,6 +596,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         require(s != bytes32(0), "s must not be empty");
         require(v != uint8(0), "v must not be empty");
 
+        /* TODO 
         Account storage account = accounts[redeemer];
         require(
             account.secret == keccak256(abi.encodePacked(secretPreImage)),
@@ -617,6 +604,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
             // accounts[msg.sender].hashedSecret == bytes27(keccak256(abi.encodePacked("HOPRnet", msg.sender, bytes27(preImage)))),
             "secretPreImage must be the hash of redeemer's secret"
         );
+        */
 
         (,,, Channel storage channel) = _getChannel(
             redeemer,
@@ -630,7 +618,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         bytes32 ticketHash = _getTicketHash(
             _getEncodedTicket(
                 redeemer,
-                account.counter,
+                // TODO account.counter,
                 proofOfRelaySecret,
                 _getChannelIteration(channel.status),
                 amount,
@@ -649,7 +637,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
             "ticket must be a win"
         );
 
-        account.secret = secretPreImage;
+        // TODO account.secret = secretPreImage;
         tickets[ticketHash] = true;
 
         if (_isPartyA(redeemer, counterparty)) {
