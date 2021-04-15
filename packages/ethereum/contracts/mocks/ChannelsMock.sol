@@ -14,7 +14,7 @@ contract ChannelsMock is HoprChannels {
         uint256 amountA,
         uint256 amountB
     ) external {
-        _fundChannel(funder, accountA, accountB, amountA, amountB);
+        _fundChannel(accountA, accountB, amountA, amountB);
     }
 
     function initiateChannelClosureInternal(

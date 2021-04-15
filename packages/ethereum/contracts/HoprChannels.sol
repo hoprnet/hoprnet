@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.7.5;
+pragma abicoder v2;
 
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/introspection/IERC1820Registry.sol";
@@ -134,7 +135,6 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     ) external {
         token.safeTransferFrom(msg.sender, address(this), amount1.add(amount2));
         _fundChannel(
-            msg.sender,
             account1,
             account2,
             amount1,
@@ -244,7 +244,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         }
 
         require(from == account1 || from == account2, "funder must be either account1 or account2");
-        _fundChannel(from, account1, account2, amount1, amount2);
+        _fundChannel(account1, account2, amount1, amount2);
     }
 
     // internal code
