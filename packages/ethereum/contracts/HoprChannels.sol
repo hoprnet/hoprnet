@@ -91,19 +91,13 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
      */
     uint32 public secsClosure;
 
-    event AccountInitialized(
+    event ChannelCommitmentUpdated(
         // @TODO: remove this and rely on `msg.sender`
         address indexed account,
-        bytes uncompressedPubKey,
-        bytes32 secret
-    );
-
-    event AccountSecretUpdated(
-        // @TODO: remove this and rely on `msg.sender`
-        address indexed account,
-        bytes32 secret,
-        // @TODO: remove counter?
-        uint256 counter
+        bytes32 commitmentPartyA;
+        bytes32 commitmentPartyB;
+        uint256 partyATicketEpoch;
+        uint256 partyBTicketEpoch;
     );
 
     event ChannelFunded(
@@ -149,35 +143,6 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         token = IERC20(_token);
         secsClosure = _secsClosure;
         _ERC1820_REGISTRY.setInterfaceImplementer(address(this), TOKENS_RECIPIENT_INTERFACE_HASH, address(this));
-    }
-
-    /**
-     * @dev Initializes an account,
-     * stores it's public key, secret and counter,
-     * then emits {AccountInitialized} and {AccountSecretUpdated} events.
-     * @param secret account's secret
-     * @param uncompressedPubKey account's uncompressedPubKey
-     */
-    function initializeAccount(
-        bytes calldata uncompressedPubKey,
-        bytes32 secret
-    ) external {
-        _initializeAccount(
-            msg.sender,
-            uncompressedPubKey,
-            secret
-        );
-    }
-
-    /**
-     * @dev Updates account's secret and counter,
-     * then emits {AccountSecretUpdated} event.
-     * @param secret account's secret
-     */
-    function updateAccountSecret(
-        bytes32 secret
-    ) external {
-        _updateAccountSecret(msg.sender, secret);
     }
 
     /**
@@ -383,54 +348,6 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     }
 
     // internal code
-
-    /**
-     * @dev Initializes an account,
-     * stores it's public key, secret and counter,
-     * then emits {AccountInitialized} and {AccountSecretUpdated} events.
-     * @param account the address of the account
-     * @param uncompressedPubKey the public key of the account
-     * @param secret account's secret
-     */
-    function _initializeAccount(
-        address account,
-        bytes memory uncompressedPubKey,
-        bytes32 secret
-    ) internal {
-        Account storage accountData = accounts[account];
-
-        require(account != address(0), "account must not be empty");
-        require(ECDSA.uncompressedPubKeyToAddress(uncompressedPubKey) == account, "public key does not match account");
-        require(accountData.counter == 0, "account already initialized");
-        require(secret != bytes32(0), "secret must not be empty");
-
-        accountData.secret = secret;
-        accountData.counter = 1;
-
-        emit AccountInitialized(account, uncompressedPubKey, secret);
-    }
-
-    /**
-     * @dev Updates account's secret and counter,
-     * then emits {AccountSecretUpdated} event.
-     * @param account the address of the account
-     * @param secret account's secret
-     */
-    function _updateAccountSecret(
-        address account,
-        bytes32 secret
-    ) internal {
-        require(secret != bytes32(0), "secret must not be empty");
-
-        Account storage accountData = accounts[account];
-        // @TODO: do we need this?
-        require(secret != accountData.secret, "secret must not be the same as before");
-
-        accountData.secret = secret;
-        accountData.counter += 1;
-
-        emit AccountSecretUpdated(account, secret, accountData.counter);
-    }
 
     /**
      * @dev Funds a channel, then emits
