@@ -144,7 +144,8 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
 
     function redeemTicket(
         address counterparty,
-        bytes32 secretPreImage,
+        bytes32 nextCommitment,
+        uint256 ticketEpoch,
         bytes32 proofOfRelaySecret,
         uint256 amount,
         bytes32 winProb,
@@ -155,7 +156,8 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         _redeemTicket(
             msg.sender,
             counterparty,
-            secretPreImage,
+            nextCommitment,
+            ticketEpoch,
             proofOfRelaySecret,
             amount,
             winProb,
@@ -450,7 +452,8 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     function _redeemTicket(
         address redeemer,
         address counterparty,
-        bytes32 secretPreImage,
+        bytes32 nextCommitment,
+        uint256 ticketEpoch,
         bytes32 proofOfRelaySecret,
         uint256 amount,
         bytes32 winProb,
@@ -460,28 +463,25 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     ) internal {
         require(redeemer != address(0), "redeemer must not be empty");
         require(counterparty != address(0), "counterparty must not be empty");
-        require(secretPreImage != bytes32(0), "secretPreImage must not be empty");
+        require(nextCommitment != bytes32(0), "nextCommitment must not be empty");
         require(proofOfRelaySecret != bytes32(0), "proofOfRelaySecret must not be empty");
         require(amount != uint256(0), "amount must not be empty");
         // require(winProb != bytes32(0), "winProb must not be empty");
         require(r != bytes32(0), "r must not be empty");
         require(s != bytes32(0), "s must not be empty");
         require(v != uint8(0), "v must not be empty");
-
-        /* TODO 
-        Account storage account = accounts[redeemer];
-        require(
-            account.secret == keccak256(abi.encodePacked(secretPreImage)),
-            // @TODO: add salt
-            // accounts[msg.sender].hashedSecret == bytes27(keccak256(abi.encodePacked("HOPRnet", msg.sender, bytes27(preImage)))),
-            "secretPreImage must be the hash of redeemer's secret"
-        );
-        */
-
         (,,, Channel storage channel) = _getChannel(
             redeemer,
             counterparty
         );
+
+        if (_isPartyA(redeemer, counterparty) {
+          require(channel.partyACommitment == keccak256(abi.encodePacked(nextCommitment)), "commitment must be hash of next commitment");
+          require(channel.partyATicketEpoch == ticketEpoch, "Ticket epoch must match");
+        } else {
+          require(channel.partyBCommitment == keccak256(abi.encodePacked(nextCommitment)), "commitment must be hash of next commitment");
+          require(channel.partyBTicketEpoch == ticketEpoch, "Ticket epoch must match");
+        }
         require(channel.status != ChannelStatus.CLOSED, "channel must be open or pending to close");
 
         uint256 ticketEpoch;
@@ -513,13 +513,16 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
             "ticket must be a win"
         );
 
-        // TODO account.secret = secretPreImage;
         tickets[ticketHash] = true;
 
         if (_isPartyA(redeemer, counterparty)) {
+            channel.partyACommitment = nextCommitment;
             channel.partyABalance = channel.partyABalance.add(amount);
+            channel.partyATicketEpoch = channel.partyATicketEpoch.add(1);
         } else {
             channel.partyABalance = channel.partyABalance.sub(amount);
+            channel.partyBCommitment = nextCommitment;
+            channel.partyBTicketEpoch = channel.partyATicketEpoch.add(1);
         }
 
         emit TicketRedeemed(redeemer, counterparty, amount);
