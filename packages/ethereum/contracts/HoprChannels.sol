@@ -44,17 +44,22 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
      * @dev A channel struct, used to represent a channel's state
      */
     struct Channel {
-        // @TODO: optimize struct
-        // total tokens in deposit
-        uint256 deposit;
-        // tokens that are claimable by partyA
+
         uint256 partyABalance;
+        uint256 partyBBalance;
+
+        bytes32 commitmentPartyA;
+        bytes32 commitmentPartyB;
+        uint256 partyATicketEpoch;
+        uint256 partyBTicketEpoch;
+
+        // overloads at >16777215
+        uint24 status;
+
         // the time when the channel can be closed by either party
         // overloads at year >2105
         uint32 closureTime;
-        // status of the channel
-        // overloads at >16777215
-        uint24 status;
+
         // channel closure was initiated by party A
         bool closureByPartyA;
     }
@@ -126,9 +131,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     event ChannelClosed(
         // @TODO: remove this and rely on `msg.sender`
         address indexed initiator,
-        address indexed counterparty,
-        uint256 partyAAmount,
-        uint256 partyBAmount
+        address indexed counterparty
     );
 
     event TicketRedeemed(
@@ -450,20 +453,22 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         require(accountA != address(0), "accountA must not be empty");
         require(accountB != address(0), "accountB must not be empty");
         require(amountA > 0 || amountB > 0, "amountA or amountB must be greater than 0");
+        require(funder == accountA || funder == accountB, "funder must ba A or B");
 
         (,,, Channel storage channel) = _getChannel(accountA, accountB);
 
-        channel.deposit = channel.deposit.add(amountA).add(amountB);
-        if (_isPartyA(accountA, accountB)) {
+        if (funder == accountA) {
             channel.partyABalance = channel.partyABalance.add(amountA);
+        } else {
+            channel.partyBBalance = channel.partyBBalance.add(amountB);
         }
 
         emit ChannelFunded(
             accountA,
             accountB,
             funder,
-            channel.deposit,
-            channel.partyABalance
+            channel.partyABalance,
+            channel.partyBBalance
         );
     }
 
@@ -482,7 +487,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         require(counterparty != address(0), "counterparty must not be empty");
 
         (,,, Channel storage channel) = _getChannel(opener, counterparty);
-        require(channel.deposit > 0, "channel must be funded");
+        require(channel.partyABalance + channel.partyBBalance > 0, "channel must be funded");
 
         ChannelStatus channelStatus = _getChannelStatus(channel.status);
         require(channelStatus == ChannelStatus.CLOSED, "channel must be closed in order to open");
@@ -558,26 +563,23 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
             require(channel.closureTime < _currentBlockTimestamp(), "closureTime must be before now");
         }
 
-        uint256 partyAAmount = channel.partyABalance;
-        uint256 partyBAmount = channel.deposit.sub(channel.partyABalance);
-
         // settle balances
-        if (partyAAmount > 0) {
-            token.transfer(partyA, partyAAmount);
+        if (channel.partyABalance > 0) {
+            token.transfer(partyA, channel.partyABalance);
         }
-        if (partyBAmount > 0) {
-            token.transfer(partyB, partyBAmount);
+        if (channel.partyBBalance > 0) {
+            token.transfer(partyB, channel.partyBBalance);
         }
 
         // The state counter indicates the recycling generation and ensures that both parties are using the correct generation.
         // Increase state counter so that we can re-use the same channel after it has been closed.
         channel.status = channel.status.add(8);
-        delete channel.deposit; // channel.deposit = 0
         delete channel.partyABalance; // channel.partyABalance = 0
+        delete channel.partyBBalance; 
         delete channel.closureTime; // channel.closureTime = 0
         delete channel.closureByPartyA; // channel.closureByPartyA = false
 
-        emit ChannelClosed(initiator, counterparty, partyAAmount, partyBAmount);
+        emit ChannelClosed(initiator, counterparty);
     }
 
     /**
