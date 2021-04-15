@@ -42,9 +42,9 @@ export default class FundChannel extends AbstractCommand {
 
     try {
       peerId = await checkPeerIdInput(peerIdInput, state)
-      if (isNaN(Number(myFundInput))) throw Error('myFund is not a number')
+      if (isNaN(Number(myFundInput))) throw Error('Argument <myFund> is not a number')
       myFund = new BN(moveDecimalPoint(myFundInput, Balance.DECIMALS))
-      if (isNaN(Number(counterpartyFundInput))) throw Error('counterpartyFund is not a number')
+      if (isNaN(Number(counterpartyFundInput))) throw Error('Argument <counterpartyFund> is not a number')
       counterpartyFund = new BN(moveDecimalPoint(counterpartyFundInput, Balance.DECIMALS))
     } catch (err) {
       return styleValue(err.message, 'failure')
