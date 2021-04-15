@@ -21,9 +21,9 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     // required by ERC777 spec
     bytes32 public constant TOKENS_RECIPIENT_INTERFACE_HASH = keccak256("ERC777TokensRecipient");
     // used by {tokensReceived} to distinguish which function to call after tokens are sent
-    uint256 public FUND_CHANNEL_SIZE = abi.encode(false, address(0), address(0)).length;
+    uint256 public FUND_CHANNEL_SIZE = abi.encode(address(0), address(0)).length;
     // used by {tokensReceived} to distinguish which function to call after tokens are sent
-    uint256 public FUND_CHANNEL_MULTI_SIZE = abi.encode(false, address(0), address(0), uint256(0), uint256(0)).length;
+    uint256 public FUND_CHANNEL_MULTI_SIZE = abi.encode(address(0), address(0), uint256(0), uint256(0)).length;
 
     /**
      * @dev Possible channel statuses.
@@ -284,8 +284,6 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
           amountA = amount2;
           amountB = amount1;
         }
-        require(_isPartyA(partyA, partyB), "must now be sorted");
-
         (,,, Channel storage channel) = _getChannel(partyA, partyB);
 
         require(channel.status != ChannelStatus.PENDING_TO_CLOSE, "Cannot fund a closing channel");
