@@ -305,7 +305,8 @@ class Indexer extends EventEmitter {
     const channel = new ChannelEntry(
       Address.fromString(data.partyA),
       Address.fromString(data.partyB), 
-      new Balance(rawChannel[0])
+      new Balance(new BN(rawChannel[0].toString()))
+      new Balance(new BN(rawChannel[1].toString()))
       
 
     )
@@ -369,9 +370,7 @@ class Indexer extends EventEmitter {
     if (sourcePubKey.eq(partyAPubKey)) {
       return [source, await pubKeyToPeerId(partyBPubKey.serialize()), channel.partyABalance]
     } else {
-      const partyBBalance = new Balance(
-        new Balance(channel.deposit).toBN().sub(new Balance(channel.partyABalance).toBN())
-      )
+      const partyBBalance = channel.partyBBalance
       return [source, await pubKeyToPeerId(partyAPubKey.serialize()), partyBBalance]
     }
   }
