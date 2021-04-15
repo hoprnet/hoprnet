@@ -3,6 +3,8 @@ import type PeerId from 'peer-id'
 import type { AutoCompleteResult } from './abstractCommand'
 import chalk from 'chalk'
 import BN from 'bn.js'
+import { moveDecimalPoint } from '@hoprnet/hopr-utils'
+import { Balance } from '@hoprnet/hopr-core-ethereum'
 import { AbstractCommand, GlobalState } from './abstractCommand'
 import { checkPeerIdInput, styleValue, isBootstrapNode } from './utils'
 
@@ -41,9 +43,9 @@ export default class FundChannel extends AbstractCommand {
     try {
       peerId = await checkPeerIdInput(peerIdInput, state)
       if (isNaN(Number(myFundInput))) throw Error('myFund is not a number')
-      myFund = new BN(myFundInput)
+      myFund = new BN(moveDecimalPoint(myFundInput, Balance.DECIMALS))
       if (isNaN(Number(counterpartyFundInput))) throw Error('counterpartyFund is not a number')
-      counterpartyFund = new BN(counterpartyFundInput)
+      counterpartyFund = new BN(moveDecimalPoint(counterpartyFundInput, Balance.DECIMALS))
     } catch (err) {
       return styleValue(err.message, 'failure')
     }
