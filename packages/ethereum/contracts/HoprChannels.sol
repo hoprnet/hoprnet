@@ -76,8 +76,8 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     uint32 public secsClosure;
 
     event ChannelCommitmentUpdated(
-        // @TODO: remove this and rely on `msg.sender`
-        address indexed account,
+        address indexed accountA,
+        address indexed accountB,
         bytes32 commitmentPartyA,
         bytes32 commitmentPartyB,
         uint256 partyATicketEpoch,
