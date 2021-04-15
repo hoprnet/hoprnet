@@ -183,12 +183,12 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     /**
      * @dev Funds a channel in one direction,
      * then emits {ChannelFunded} event.
-     * @param account the address of the recipient
+     * @param funder the address of the recipient
      * @param counterparty the address of the counterparty
      * @param amount amount to fund
      */
     function fundChannel(
-        address account,
+        address funder,
         address counterparty,
         uint256 amount
     ) external {
@@ -196,7 +196,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
 
         _fundChannel(
             msg.sender,
-            account,
+            funder,
             counterparty,
             amount,
             0
