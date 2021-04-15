@@ -301,19 +301,12 @@ class Indexer extends EventEmitter {
   private async onChannelUpdated(event: Event<'ChannelUpdate'>): Promise<void> {
     const data = event.args
 
-    const accountIdA = Address.fromString(data.partyA)
-    const accountIdB = Address.fromString(data.partyB)
-    const channelId = Channel.generateId(accountIdA, accountIdB)
+    const accountA = Address.fromString(data.partyA)
+    const accountB = Address.fromString(data.partyB)
+    const channelId = Channel.generateId(accountA, accountB)
 
-    let storedChannel = await db.getChannel(this.connector.db, channelId)
-    const channel = await reducers.onChannelFunded(event, storedChannel)
-
-    // const channelId = await getId(recipientAddress, counterpartyAddress)
-    // log('Processing event %s with channelId %s', event.name, channelId.toHex())
-
+    const channel = new ChannelEntry(accountA, accountB)
     await db.updateChannel(this.connector.db, channelId, channel)
-
-    // log('Channel %s got funded by %s', chalk.green(channelId.toHex()), chalk.green(event.data.funder))
   }
 
   private async onTicketRedeemed(event: Event<'TicketRedeemed'>): Promise<void> {
