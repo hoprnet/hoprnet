@@ -300,13 +300,16 @@ class Indexer extends EventEmitter {
 
   private async onChannelUpdated(event: Event<'ChannelUpdate'>): Promise<void> {
     const data = event.args
+    const rawChannel = data[2]
+    
+    const channel = new ChannelEntry(
+      Address.fromString(data.partyA),
+      Address.fromString(data.partyB), 
+      new Balance(rawChannel[0])
+      
 
-    const accountA = Address.fromString(data.partyA)
-    const accountB = Address.fromString(data.partyB)
-    const channelId = Channel.generateId(accountA, accountB)
-
-    const channel = new ChannelEntry(accountA, accountB)
-    await db.updateChannel(this.connector.db, channelId, channel)
+    )
+    await db.updateChannel(this.connector.db, channel.getId(), channel)
   }
 
   private async onTicketRedeemed(event: Event<'TicketRedeemed'>): Promise<void> {
@@ -364,7 +367,7 @@ class Indexer extends EventEmitter {
     ])
 
     if (sourcePubKey.eq(partyAPubKey)) {
-      return [source, await pubKeyToPeerId(partyBPubKey.serialize()), new Balance(channel.partyABalance)]
+      return [source, await pubKeyToPeerId(partyBPubKey.serialize()), channel.partyABalance]
     } else {
       const partyBBalance = new Balance(
         new Balance(channel.deposit).toBN().sub(new Balance(channel.partyABalance).toBN())

@@ -8,8 +8,10 @@ class ChannelEntry {
   constructor(
     public readonly partyA: Address,
     public readonly partyB: Address,
-    public readonly deposit: BN,
-    public readonly partyABalance: BN,
+
+    public readonly partyABalance: Balance,
+    public readonly partyBBalance: Balance,
+
     public readonly closureTime: BN,
     public readonly stateCounter: BN,
     public readonly closureByPartyA: boolean,
@@ -28,30 +30,6 @@ class ChannelEntry {
       1 +
       UINT256.SIZE +
       UINT256.SIZE
-    )
-  }
-
-  static fromObject(obj: {
-    partyA: Address
-    partyB: Address
-    deposit: BN
-    partyABalance: BN
-    closureTime: BN
-    stateCounter: BN
-    closureByPartyA: boolean
-    openedAt: BN
-    closedAt: BN
-  }) {
-    return new ChannelEntry(
-      obj.partyA,
-      obj.partyB,
-      obj.deposit,
-      obj.partyABalance,
-      obj.closureTime,
-      obj.stateCounter,
-      obj.closureByPartyA,
-      obj.openedAt,
-      obj.closedAt
     )
   }
 
