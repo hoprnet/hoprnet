@@ -19,7 +19,7 @@ class ChannelEntry {
     public readonly status: ChannelStatus,
     public readonly channelEpoch: UINT256,
     public readonly closureTime: BN,
-    public readonly closureByPartyA: boolean,
+    public readonly closureByPartyA: boolean
   ) {}
 
   static get SIZE(): number {
