@@ -78,9 +78,9 @@ contract ChannelsMock is HoprChannels {
     }
 
     function getPartiesInternal(
-        address accountA,
-        address accountB
+        address account1,
+        address account2
     ) external pure returns (address, address) {
-        return _getParties(accountA, accountB);
+        return _sortAddresses(account1,account2);
     }
 }

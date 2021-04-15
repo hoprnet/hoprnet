@@ -583,11 +583,11 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     }
 
     /**
-     * @param accountA the address of accountA
-     * @param accountB the address of accountB
+     * @param account1 the address of accountA
+     * @param account2 the address of accountB
      * @return a tuple of partyA, partyB, channelId, channel
      */
-    function _getChannel(address accountA, address accountB)
+    function _getChannel(address account1, address account2)
         internal
         view
         returns (
@@ -597,7 +597,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
             Channel storage
         )
     {
-        (address partyA, address partyB) = _getParties(accountA, accountB);
+        (address partyA, address partyB) = _sortAddresses(account1, account2);
         bytes32 channelId = _getChannelId(partyA, partyB);
         Channel storage channel = channels[channelId];
 
@@ -644,7 +644,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
      * @param accountB the address of accountB
      * @return a tuple representing partyA and partyB
      */
-    function _getParties(address accountA, address accountB) internal pure returns (address, address) {
+    function _sortAddresses(address accountA, address accountB) internal pure returns (address, address) {
         if (_isPartyA(accountA, accountB)) {
             return (accountA, accountB);
         } else {

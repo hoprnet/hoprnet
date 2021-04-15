@@ -34,8 +34,8 @@ describe('Channels', function () {
       .withArgs(ACCOUNT_A.address, ACCOUNT_B.address, ACCOUNT_A.address, '100', '70')
 
     const channel = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
-    expect(channel.deposit.toString()).to.equal('100')
     expect(channel.partyABalance.toString()).to.equal('70')
+    expect(channel.partyBBalance.toString()).to.equal('30')
     expect(channel.closureTime.toString()).to.equal('0')
     expect(channel.status.toString()).to.equal('0')
     expect(channel.closureByPartyA).to.be.false
@@ -70,8 +70,8 @@ describe('Channels', function () {
       .withArgs(ACCOUNT_A.address, ACCOUNT_B.address)
 
     const channel = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
-    expect(channel.deposit.toString()).to.equal('100')
     expect(channel.partyABalance.toString()).to.equal('100')
+    expect(channel.partyBBalance.toString()).to.equal('0')
     expect(channel.closureTime.toString()).to.equal('0')
     expect(channel.status.toString()).to.equal('1')
     expect(channel.closureByPartyA).to.be.false
@@ -122,8 +122,8 @@ describe('Channels', function () {
     // .withArgs(ACCOUNT_A.address, ACCOUNT_B.address)
 
     const channel = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
-    expect(channel.deposit.toString()).to.equal('100')
     expect(channel.partyABalance.toString()).to.equal('100')
+    expect(channel.partyBBalance.toString()).to.equal('0')
     expect(channel.closureTime.toString()).to.not.equals('0')
     expect(channel.status.toString()).to.equal('2')
     expect(channel.closureByPartyA).to.be.true
@@ -179,8 +179,8 @@ describe('Channels', function () {
       .withArgs(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
 
     const channel = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
-    expect(channel.deposit.toString()).to.equal('0')
     expect(channel.partyABalance.toString()).to.equal('0')
+    expect(channel.partyBBalance.toString()).to.equal('0')
     expect(channel.closureTime.toString()).to.equal('0')
     expect(channel.status.toString()).to.equal('10')
     expect(channel.closureByPartyA).to.be.false
@@ -214,8 +214,8 @@ describe('Channels', function () {
       .withArgs(ACCOUNT_B.address, ACCOUNT_A.address, '70', '30')
 
     const channel = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
-    expect(channel.deposit.toString()).to.equal('0')
     expect(channel.partyABalance.toString()).to.equal('0')
+    expect(channel.partyBBalance.toString()).to.equal('0')
     expect(channel.closureTime.toString()).to.equal('0')
     expect(channel.status.toString()).to.equal('10')
     expect(channel.closureByPartyA).to.be.false

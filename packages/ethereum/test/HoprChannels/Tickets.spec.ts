@@ -53,8 +53,8 @@ describe('Tickets', function () {
     expect(ticket).to.be.true
 
     const channel = await tickets.channels(ACCOUNT_AB_CHANNEL_ID)
-    expect(channel.deposit.toString()).to.equal('100')
     expect(channel.partyABalance.toString()).to.equal('60')
+    expect(channel.partyBBalance.toString()).to.equal('40')
     expect(channel.closureTime.toString()).to.equal('0')
     expect(channel.status.toString()).to.equal('1')
     expect(channel.closureByPartyA).to.be.false
