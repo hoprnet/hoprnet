@@ -44,6 +44,42 @@ class Channel {
     }
   }
 
+  async fund(myFund: Balance, counterpartyFund: Balance) {
+    const { account, hoprToken, hoprChannels } = this.connector
+    const myAddress = this.self.toAddress()
+    const counterpartyAddress = this.counterparty.toAddress()
+    const totalFund = myFund.toBN().add(counterpartyFund.toBN())
+    const myBalance = await this.connector.hoprToken.balanceOf(myAddress.toHex())
+    if (totalFund.gt(new BN(myBalance.toString()))) {
+      throw Error('We do not have enough balance to fund the channel')
+    }
+
+    try {
+      const transaction = await account.sendTransaction(
+        hoprToken.send,
+        hoprChannels.address,
+        totalFund.toString(),
+        abiCoder.encode(
+          ['bool', 'address', 'address', 'uint256', 'uint256'],
+          [
+            false,
+            myAddress.toHex(),
+            counterpartyAddress.toHex(),
+            myFund.toBN().toString(),
+            counterpartyFund.toBN().toString()
+          ]
+        )
+      )
+      await transaction.wait()
+
+      return transaction.hash
+    } catch (err) {
+      // TODO: catch race-condition
+      console.log(err)
+      throw Error(`Failed to fund channel`)
+    }
+  }
+
   async open(fundAmount: Balance) {
     const { account, hoprToken, hoprChannels } = this.connector
 
