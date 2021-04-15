@@ -7,7 +7,6 @@ chai.use(chaiAsPromised)
 
 // @TODO: add more tests
 describe('test indexer reducers', function () {
-
   it('should fail to reduce FUNDED -> REDEEM', async function () {
     expect(reducers.onTicketRedeemed(fixtures.REDEEMED_EVENT, fixtures.FUNDED_CHANNEL)).to.be.rejectedWith(
       ".onTicketRedeemed' failed because channel is not in 'OPEN' or 'PENDING' status"
@@ -25,5 +24,4 @@ describe('test indexer reducers', function () {
       ".onTicketRedeemed' failed because channel is not in 'OPEN' or 'PENDING' status"
     )
   })
-
 })

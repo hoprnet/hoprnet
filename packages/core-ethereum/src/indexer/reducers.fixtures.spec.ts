@@ -29,7 +29,6 @@ export const REDEEMED_EVENT = {
   }
 } as Event<'TicketRedeemed'>
 
-
 export const EMPTY_ACCOUNT = new AccountEntry(new Address(new Uint8Array()))
 
 export const INITIALIZED_ACCOUNT = new AccountEntry(partyA, partyAPubKey, secret1, new BN(1))

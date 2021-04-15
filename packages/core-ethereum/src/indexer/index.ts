@@ -301,13 +301,11 @@ class Indexer extends EventEmitter {
   private async onChannelUpdated(event: Event<'ChannelUpdate'>): Promise<void> {
     const data = event.args
     const rawChannel = data[2]
-    
+
     const channel = new ChannelEntry(
       Address.fromString(data.partyA),
-      Address.fromString(data.partyB), 
+      Address.fromString(data.partyB),
       new Balance(rawChannel[0])
-      
-
     )
     await db.updateChannel(this.connector.db, channel.getId(), channel)
   }
@@ -329,7 +327,6 @@ class Indexer extends EventEmitter {
 
     // log('Ticket redeemd in channel %s by %s', chalk.green(channelId.toHex()), chalk.green(redeemerAddress.toHex()))
   }
-
 
   public async getAccount(address: Address) {
     return db.getAccount(this.connector.db, address)
