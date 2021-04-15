@@ -630,12 +630,13 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     }
 
     /**
-     * @param accountA the address of accountA
-     * @param accountB the address of accountB
-     * @return true if accountA is partyA
+     * Parties are ordered - find the lower one.
+     * @param query the address of which we are asking 'is this party A'
+     * @param other the other address 
+     * @return query is partyA 
      */
-    function _isPartyA(address accountA, address accountB) internal pure returns (bool) {
-        return uint160(accountA) < uint160(accountB);
+    function _isPartyA(address query, address other) internal pure returns (bool) {
+        return uint160(query) < uint160(other);
     }
 
     /**
