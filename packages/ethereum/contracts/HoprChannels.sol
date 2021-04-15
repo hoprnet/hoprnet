@@ -141,7 +141,6 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         token.safeTransferFrom(msg.sender, address(this), amount);
 
         _fundChannel(
-            msg.sender,
             funder,
             counterparty,
             amount,
@@ -296,25 +295,27 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
             "userData must match one of our supported functions"
         );
 
-        bool shouldOpen;
-        address accountA;
-        address accountB;
-        uint256 amountA;
-        uint256 amountB;
+        address account1;
+        address account2;
+        uint256 amount1;
+        uint256 amount2;
 
         if (userData.length == FUND_CHANNEL_SIZE) {
-            (shouldOpen, accountA, accountB) = abi.decode(userData, (bool, address, address));
-            amountA = amount;
+            (account1, account2) = abi.decode(userData, (address, address));
+            amount1 = amount;
         } else {
-            (shouldOpen, accountA, accountB, amountA, amountB) = abi.decode(userData, (bool, address, address, uint256, uint256));
-            require(amount == amountA.add(amountB), "amount sent must be equal to amount specified");
+            (account1, account2, amount1, amount2) = abi.decode(userData, (address, address, uint256, uint256));
+            require(amount == amount1.add(amount2), "amount sent must be equal to amount specified");
         }
 
-        _fundChannel(from, accountA, accountB, amountA, amountB);
+        require(from == accountA || from == accountB, "funder must be either accountA or accountB");
 
-        if (shouldOpen) {
-            require(from == accountA || from == accountB, "funder must be either accountA or accountB");
-            _openChannel(accountA, accountB);
+        if (isPartyA(account1, account2)){
+          _fundChannel(from, account1, account2, amount1, amount2);
+          _openChannel(account1, account2);
+        } else {
+          _fundChannel(from, account2, account1, amount2, amount1);
+          _openChannel(account2, account1);
         }
     }
 
@@ -323,37 +324,30 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     /**
      * @dev Funds a channel, then emits
      * {ChannelFunded} event.
-     * @param funder the address of the funder
      * @param accountA the address of accountA
      * @param accountB the address of accountB
      * @param amountA amount to fund accountA
      * @param amountB amount to fund accountB
      */
     function _fundChannel(
-        address funder,
-        address accountA,
-        address accountB,
+        address partyA,
+        address partyB,
         uint256 amountA,
         uint256 amountB
     ) internal {
-        require(funder != address(0), "funder must not be empty");
         require(accountA != accountB, "accountA and accountB must not be the same");
         require(accountA != address(0), "accountA must not be empty");
         require(accountB != address(0), "accountB must not be empty");
         require(amountA > 0 || amountB > 0, "amountA or amountB must be greater than 0");
-        require(funder == accountA || funder == accountB, "funder must be A or B");
+        require(isPartyA(partyA, partyB), "fundChannel takes sorted accounts");
 
-        (,,, Channel storage channel) = _getChannel(accountA, accountB);
-
-        if (funder == accountA) {
-            channel.partyABalance = channel.partyABalance.add(amountA);
-        } else {
-            channel.partyBBalance = channel.partyBBalance.add(amountB);
-        }
+        (,,, Channel storage channel) = _getChannel(partyA, partyB);
+        channel.partyABalance = channel.partyABalance.add(amountA);
+        channel.partyBBalance = channel.partyBBalance.add(amountB);
 
         emit ChannelFunded(
-            accountA,
-            accountB,
+            partyA,
+            partyB,
             channel.partyABalance,
             channel.partyBBalance
         );
