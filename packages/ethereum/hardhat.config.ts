@@ -148,10 +148,6 @@ task('postCompile', 'Use export task and then update abis folder', async (...arg
   return (await import('./tasks/postCompile')).default(args[0], args[1], args[2])
 })
 
-task('postDeploy', 'Use export task and then update addresses folder', async (...args: any[]) => {
-  return (await import('./tasks/postDeploy')).default(args[0], args[1], args[2])
-})
-
 task('accounts', 'View unlocked accounts', async (...args: any[]) => {
   return (await import('./tasks/getAccounts')).default(args[0], args[1], args[2])
 })

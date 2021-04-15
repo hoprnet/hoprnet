@@ -17,3 +17,4 @@ export const ERRORS = {
 export const PROVIDER_CACHE_TTL = 30e3 // 30 seconds
 export const DEFAULT_URI = 'ws://127.0.0.1:8545/'
 export const MAX_CONFIRMATIONS = 8
+export const INDEXER_BLOCK_RANGE = 2000

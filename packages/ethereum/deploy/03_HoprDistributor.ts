@@ -3,6 +3,7 @@ import type { DeployFunction } from 'hardhat-deploy/types'
 import type { DeploymentTypes } from '../chain'
 import { durations } from '@hoprnet/hopr-utils'
 import { ethers } from 'ethers'
+import { storeContract } from '../tasks/utils/contracts'
 
 const startTimes: {
   [key in DeploymentTypes]: number
@@ -27,7 +28,7 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   const hoprToken = await deployments.get('HoprToken')
 
-  await deployments.deploy('HoprDistributor', {
+  const result = await deployments.deploy('HoprDistributor', {
     from: deployer.address,
     args: [
       hoprToken.address,
@@ -36,6 +37,7 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     ],
     log: true
   })
+  await storeContract(network.name, 'HoprDistributor', result.address, result.receipt.blockNumber)
 }
 
 export default main

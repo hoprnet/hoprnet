@@ -2,7 +2,7 @@ import type { LevelUp } from 'levelup'
 import type { Wallet as IWallet, providers as IProviders } from 'ethers'
 import type { HoprToken, HoprChannels } from './contracts'
 import chalk from 'chalk'
-import { Networks, getAddresses } from '@hoprnet/hopr-ethereum'
+import { Networks, getContracts } from '@hoprnet/hopr-ethereum'
 import { ethers } from 'ethers'
 import debug from 'debug'
 import { Acknowledgement, Balance, NativeBalance } from './types'
@@ -15,7 +15,7 @@ import HashedSecret from './hashedSecret'
 import { getWinProbabilityAsFloat, computeWinningProbability } from './utils'
 import { HoprToken__factory, HoprChannels__factory } from './contracts'
 import BN from 'bn.js'
-import { DEFAULT_URI, MAX_CONFIRMATIONS } from './constants'
+import { DEFAULT_URI, MAX_CONFIRMATIONS, INDEXER_BLOCK_RANGE } from './constants'
 
 const log = debug('hopr-core-ethereum')
 
@@ -54,10 +54,12 @@ export default class HoprEthereum {
     public hoprChannels: HoprChannels,
     public hoprToken: HoprToken,
     debug: boolean,
-    maxConfirmations: number
+    genesisBlock: number,
+    maxConfirmations: number,
+    blockRange: number
   ) {
     this._debug = debug
-    this.indexer = new Indexer(this, maxConfirmations)
+    this.indexer = new Indexer(this, genesisBlock, maxConfirmations, blockRange)
     this.account = new Account(
       {
         network: this.network
@@ -175,8 +177,12 @@ export default class HoprEthereum {
 
   public smartContractInfo(): string {
     const network = utils.getNetworkName(this.chainId)
-    const addr = getAddresses()[network]
-    return [`Running on: ${network}`, `HOPR Token: ${addr.HoprToken}`, `HOPR Channels: ${addr.HoprChannels}`].join('\n')
+    const contracts = getContracts()[network]
+    return [
+      `Running on: ${network}`,
+      `HOPR Token: ${contracts.HoprToken.address}`,
+      `HOPR Channels: ${contracts.HoprChannels.address}`
+    ].join('\n')
   }
 
   /**
@@ -207,16 +213,16 @@ export default class HoprEthereum {
 
     const chainId = await provider.getNetwork().then((res) => res.chainId)
     const network = utils.getNetworkName(chainId) as Networks
-    const addresses = getAddresses()?.[network]
+    const contracts = getContracts()?.[network]
 
-    if (!addresses?.HoprToken) {
+    if (!contracts?.HoprToken?.address) {
       throw Error(`token contract address from network ${network} not found`)
-    } else if (!addresses?.HoprChannels) {
+    } else if (!contracts?.HoprChannels?.address) {
       throw Error(`channels contract address from network ${network} not found`)
     }
 
-    const hoprChannels = HoprChannels__factory.connect(addresses.HoprChannels, wallet)
-    const hoprToken = HoprToken__factory.connect(addresses.HoprToken, wallet)
+    const hoprChannels = HoprChannels__factory.connect(contracts.HoprChannels.address, wallet)
+    const hoprToken = HoprToken__factory.connect(contracts.HoprToken.address, wallet)
 
     const coreConnector = new HoprEthereum(
       db,
@@ -227,7 +233,9 @@ export default class HoprEthereum {
       hoprChannels,
       hoprToken,
       options?.debug || false,
-      options.maxConfirmations ?? MAX_CONFIRMATIONS
+      contracts?.HoprChannels?.deployedAt ?? 0,
+      options.maxConfirmations ?? MAX_CONFIRMATIONS,
+      INDEXER_BLOCK_RANGE
     )
     log(`using blockchain address ${await coreConnector.hexAccountAddress()}`)
     return coreConnector

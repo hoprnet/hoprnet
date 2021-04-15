@@ -2,7 +2,7 @@ import assert from 'assert'
 import { stringToU8a, durations } from '@hoprnet/hopr-utils'
 import { Ganache } from '@hoprnet/hopr-testing'
 import { NODE_SEEDS } from '@hoprnet/hopr-demo-seeds'
-import { migrate, fund, getAddresses } from '@hoprnet/hopr-ethereum'
+import { migrate, fund, getContracts } from '@hoprnet/hopr-ethereum'
 import { ethers } from 'ethers'
 import HoprEthereum from '.'
 import { createNode } from './utils/testing'
@@ -25,7 +25,7 @@ describe('test connector', function () {
 
     await ganache.start()
     await migrate()
-    await fund(`--address ${getAddresses()?.localhost?.HoprToken} --accounts-to-fund 2`)
+    await fund(`--address ${getContracts().localhost.HoprToken.address} --accounts-to-fund 2`)
 
     ownerWallet = new ethers.Wallet(testconfigs.FUND_ACCOUNT_PRIVATE_KEY)
     connector = await createNode(arrayify(ownerWallet.privateKey))
@@ -67,13 +67,13 @@ describe('test withdraw', function () {
 
     await ganache.start()
     await migrate()
-    await fund(`--address ${getAddresses()?.localhost?.HoprToken} --accounts-to-fund 2`)
+    await fund(`--address ${getContracts().localhost.HoprToken.address} --accounts-to-fund 2`)
 
     provider = new providers.WebSocketProvider(DEFAULT_URI)
 
     alice = new ethers.Wallet(NODE_SEEDS[0]).connect(provider)
     bob = ethers.Wallet.createRandom().connect(provider)
-    hoprToken = HoprToken__factory.connect(getAddresses().localhost?.HoprToken, provider)
+    hoprToken = HoprToken__factory.connect(getContracts().localhost.HoprToken.address, provider)
     connector = await createNode(ethers.utils.arrayify(alice.privateKey))
 
     await hoprToken.connect(alice).mint(alice.address, 100, ethers.constants.HashZero, ethers.constants.HashZero, {

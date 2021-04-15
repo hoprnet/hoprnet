@@ -18,11 +18,6 @@ export type RoutingChannel = [source: PeerId, destination: PeerId, stake: Balanc
 const log = Debug('hopr-core-ethereum:indexer')
 const getSyncPercentage = (n: number, max: number) => ((n * 100) / max).toFixed(2)
 
-// @TODO: add to constants
-const BLOCK_RANGE = 2000
-// @TODO: get this from somewhere else
-let genesisBlock: number
-
 /**
  * Indexes HoprChannels smart contract and stores to the DB,
  * all channels in the network.
@@ -33,9 +28,13 @@ class Indexer extends EventEmitter {
   public latestBlock: number = 0 // latest known on-chain block number
   private unconfirmedEvents = new Heap<Event<any>>(snapshotComparator)
 
-  constructor(private connector: HoprEthereum, private maxConfirmations: number) {
+  constructor(
+    private connector: HoprEthereum,
+    private genesisBlock: number,
+    private maxConfirmations: number,
+    private blockRange: number
+  ) {
     super()
-    genesisBlock = getHoprChannelsBlockNumber(this.connector.chainId)
   }
 
   /**
@@ -65,18 +64,18 @@ class Indexer extends EventEmitter {
       fromBlock = fromBlock - this.maxConfirmations
     }
     // no need to query before HoprChannels existed
-    if (fromBlock < genesisBlock) {
-      fromBlock = genesisBlock
+    if (fromBlock < this.genesisBlock) {
+      fromBlock = this.genesisBlock
     }
 
     log(
       'Starting to index from block %d, sync progress %d%',
       fromBlock,
-      getSyncPercentage(fromBlock - genesisBlock, latestOnChainBlock - genesisBlock)
+      getSyncPercentage(fromBlock - this.genesisBlock, latestOnChainBlock - this.genesisBlock)
     )
 
     // get past events
-    const lastBlock = await this.processPastEvents(fromBlock, latestOnChainBlock, BLOCK_RANGE)
+    const lastBlock = await this.processPastEvents(fromBlock, latestOnChainBlock, this.blockRange)
     fromBlock = lastBlock
 
     log('Subscribing to events from block %d', fromBlock)
@@ -220,7 +219,7 @@ class Indexer extends EventEmitter {
 
       log(
         'Sync progress %d% @ block %d',
-        getSyncPercentage(fromBlock - genesisBlock, maxToBlock - genesisBlock),
+        getSyncPercentage(fromBlock - this.genesisBlock, maxToBlock - this.genesisBlock),
         toBlock
       )
     }
@@ -511,23 +510,3 @@ class Indexer extends EventEmitter {
 }
 
 export default Indexer
-
-// HACK, get the genesis block number
-// of HoprChannels for each chain
-// TODO: get this data from `ethereum` package
-const getHoprChannelsBlockNumber = (chainId: number): number => {
-  switch (chainId) {
-    case 3:
-      return 9547931
-    case 5:
-      return 4260231
-    case 56:
-      return 2713229
-    case 100:
-      return 14744510
-    case 137:
-      return 7452411
-    default:
-      return 0
-  }
-}
