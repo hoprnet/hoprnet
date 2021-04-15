@@ -1,8 +1,7 @@
 import type { Event } from './types'
 import assert from 'assert'
 import BN from 'bn.js'
-import {Address, ChannelEntry } from '../types'
-
+import { Address, ChannelEntry } from '../types'
 
 export const onTicketRedeemed = async (
   event: Event<'TicketRedeemed'>,

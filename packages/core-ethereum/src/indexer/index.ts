@@ -301,14 +301,12 @@ class Indexer extends EventEmitter {
   private async onChannelUpdated(event: Event<'ChannelUpdate'>): Promise<void> {
     const data = event.args
     const rawChannel = data[2]
-    
+
     const channel = new ChannelEntry(
       Address.fromString(data.partyA),
       Address.fromString(data.partyB), 
-      new Balance(new BN(rawChannel[0].toString()))
+      new Balance(new BN(rawChannel[0].toString())),
       new Balance(new BN(rawChannel[1].toString()))
-      
-
     )
     await db.updateChannel(this.connector.db, channel.getId(), channel)
   }
@@ -330,7 +328,6 @@ class Indexer extends EventEmitter {
 
     // log('Ticket redeemd in channel %s by %s', chalk.green(channelId.toHex()), chalk.green(redeemerAddress.toHex()))
   }
-
 
   public async getAccount(address: Address) {
     return db.getAccount(this.connector.db, address)
@@ -376,11 +373,7 @@ class Indexer extends EventEmitter {
   }
 
   public async getRandomChannel() {
-    const HACK = 14744510 // Arbitrarily chosen block for our testnet. Total hack.
-
     const channels = await this.getChannels(async (channel) => {
-      // filter out channels older than hack
-      if (!channel.openedAt.gtn(HACK)) return false
       // filter out channels with uninitialized parties
       const pubKeys = await Promise.all([this.getPublicKeyOf(channel.partyA), this.getPublicKeyOf(channel.partyB)])
       return pubKeys.every((pubKeys) => pubKeys)
