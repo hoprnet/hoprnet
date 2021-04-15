@@ -139,71 +139,38 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         uint256 amount
     ) external {
         token.safeTransferFrom(msg.sender, address(this), amount);
-
         _fundChannel(
             funder,
             counterparty,
             amount,
             0
         );
+        _openChannel(recipient, counterparty);
     }
 
     /**
      * @dev Funds a channel, in both directions,
      * then emits {ChannelFunded} event.
-     * @param accountA the address of accountA
-     * @param accountB the address of accountB
-     * @param amountA amount to fund accountA
-     * @param amountB amount to fund accountB
+     * @param account1 the address of account1
+     * @param account2 the address of account2
+     * @param amount1 amount to fund account1
+     * @param amount2 amount to fund account2
      */
     function fundChannelMulti(
-        address accountA,
-        address accountB,
-        uint256 amountA,
-        uint256 amountB
+        address account1,
+        address account2,
+        uint256 amount1,
+        uint256 amount2
     ) external {
-        token.safeTransferFrom(msg.sender, address(this), amountA.add(amountB));
-
+        token.safeTransferFrom(msg.sender, address(this), amount1.add(amount2));
         _fundChannel(
             msg.sender,
-            accountA,
-            accountB,
-            amountA,
-            amountB
+            account1,
+            account2,
+            amount1,
+            amount2
         );
-    }
-
-    /**
-     * @dev Fund channel and then open it, then emits
-     * {ChannelFunded} and {ChannelOpened} events.
-     * @param accountA the address of accountA
-     * @param accountB the address of accountB
-     * @param amountA amount to fund accountA
-     * @param amountB amount to fund accountB
-     */
-    function fundAndOpenChannel(
-        address accountA,
-        address accountB,
-        uint256 amountA,
-        uint256 amountB
-    ) external {
-        address opener = msg.sender;
-        require(
-            opener == accountA || opener == accountB,
-            "opener must be accountA or accountB"
-        );
-
-        token.safeTransferFrom(msg.sender, address(this), amountA.add(amountB));
-
-        address counterparty;
-        if (opener == accountA) {
-            counterparty = accountB;
-        } else {
-            counterparty = accountA;
-        }
-
-        _fundChannel(opener, accountA, accountB, amountA, amountB);
-        _openChannel(opener, counterparty);
+        _openChannel(account1, account2);
     }
 
     function redeemTicket(
@@ -308,15 +275,10 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
             require(amount == amount1.add(amount2), "amount sent must be equal to amount specified");
         }
 
-        require(from == accountA || from == accountB, "funder must be either accountA or accountB");
+        require(from == account1 || from == account2, "funder must be either account1 or account2");
 
-        if (isPartyA(account1, account2)){
-          _fundChannel(from, account1, account2, amount1, amount2);
-          _openChannel(account1, account2);
-        } else {
-          _fundChannel(from, account2, account1, amount2, amount1);
-          _openChannel(account2, account1);
-        }
+        _fundChannel(from, account1, account2, amount1, amount2);
+        _openChannel(account1, account2);
     }
 
     // internal code
@@ -330,16 +292,33 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
      * @param amountB amount to fund accountB
      */
     function _fundChannel(
-        address partyA,
-        address partyB,
-        uint256 amountA,
-        uint256 amountB
+        address account1,
+        address account2,
+        uint256 amount1,
+        uint256 amount2
     ) internal {
-        require(accountA != accountB, "accountA and accountB must not be the same");
-        require(accountA != address(0), "accountA must not be empty");
-        require(accountB != address(0), "accountB must not be empty");
+        require(account1 != account2, "accountA and accountB must not be the same");
+        require(account1 != address(0), "accountA must not be empty");
+        require(account2 != address(0), "accountB must not be empty");
         require(amountA > 0 || amountB > 0, "amountA or amountB must be greater than 0");
-        require(isPartyA(partyA, partyB), "fundChannel takes sorted accounts");
+
+        address partyA;
+        address partyB;
+        uint256 amountA;
+        uint256 amountB;
+        
+        if (isPartyA(account1, account2)){
+          partyA = account1;
+          partyB = account2;
+          amountA = amount1;
+          amountB = amount2;
+        } else {
+          partyA = account2;
+          partyB = account1;
+          amountA = amount2;
+          amountB = amount1;
+        }
+        require(isPartyA(partyA, partyB), "must now be sorted");
 
         (,,, Channel storage channel) = _getChannel(partyA, partyB);
         channel.partyABalance = channel.partyABalance.add(amountA);
