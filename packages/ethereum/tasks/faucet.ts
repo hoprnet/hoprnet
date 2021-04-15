@@ -15,7 +15,7 @@ const send = (signer, txparams) =>
 
 const nativeAddress = async (hoprAddress) => {
   const nodePeerPubkey = await convertPubKeyFromB58String(hoprAddress)
-  return utils.computeAddress(utils.arrayify(nodePeerPubkey.marshal()))
+  return utils.computeAddress(nodePeerPubkey.marshal())
 }
 
 /**
