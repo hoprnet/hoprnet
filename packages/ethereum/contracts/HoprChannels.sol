@@ -316,6 +316,8 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         require(isPartyA(partyA, partyB), "must now be sorted");
 
         (,,, Channel storage channel) = _getChannel(partyA, partyB);
+
+        require(channel.status !== ChannelStatus.PENDING_TO_CLOSE, "Cannot fund a closing channel");
         
         if (channel.status == ChannelStatus.CLOSED) {
           // We are reopening the channel
@@ -323,7 +325,6 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
           channel.status = ChannelStatus.OPEN;
           emit ChannelOpened(opener, counterparty);
         }
-
 
         channel.partyABalance = channel.partyABalance.add(amountA);
         channel.partyBBalance = channel.partyBBalance.add(amountB);
