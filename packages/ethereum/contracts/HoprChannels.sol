@@ -354,7 +354,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         require(accountA != address(0), "accountA must not be empty");
         require(accountB != address(0), "accountB must not be empty");
         require(amountA > 0 || amountB > 0, "amountA or amountB must be greater than 0");
-        require(funder == accountA || funder == accountB, "funder must ba A or B");
+        require(funder == accountA || funder == accountB, "funder must be A or B");
 
         (,,, Channel storage channel) = _getChannel(accountA, accountB);
 
@@ -388,7 +388,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         require(counterparty != address(0), "counterparty must not be empty");
 
         (,,, Channel storage channel) = _getChannel(opener, counterparty);
-        require(channel.partyABalance + channel.partyBBalance > 0, "channel must be funded");
+        require(channel.partyABalance.add(channel.partyBBalance) > 0, "channel must be funded");
 
         require(channel.status == ChannelStatus.CLOSED, "channel must be closed in order to open");
 
