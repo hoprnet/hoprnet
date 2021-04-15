@@ -145,7 +145,6 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
             amount,
             0
         );
-        _openChannel(recipient, counterparty);
     }
 
     /**
@@ -170,7 +169,6 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
             amount1,
             amount2
         );
-        _openChannel(account1, account2);
     }
 
     function redeemTicket(
@@ -225,7 +223,6 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         );
     }
 
-    // @TODO: check with team, is this function too complex?
     /**
      * A hook triggered when HOPR tokens are send to this contract.
      *
@@ -276,9 +273,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         }
 
         require(from == account1 || from == account2, "funder must be either account1 or account2");
-
         _fundChannel(from, account1, account2, amount1, amount2);
-        _openChannel(account1, account2);
     }
 
     // internal code
@@ -321,6 +316,15 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         require(isPartyA(partyA, partyB), "must now be sorted");
 
         (,,, Channel storage channel) = _getChannel(partyA, partyB);
+        
+        if (channel.status == ChannelStatus.CLOSED) {
+          // We are reopening the channel
+          channel.channelEpoch = channel.channelEpoch.add(1);
+          channel.status = ChannelStatus.OPEN;
+          emit ChannelOpened(opener, counterparty);
+        }
+
+
         channel.partyABalance = channel.partyABalance.add(amountA);
         channel.partyBBalance = channel.partyBBalance.add(amountB);
 
@@ -330,31 +334,6 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
             channel.partyABalance,
             channel.partyBBalance
         );
-    }
-
-    /**
-     * @dev Opens a channel, then emits
-     * {ChannelOpened} event.
-     * @param opener the address of the opener
-     * @param counterparty the address of the counterparty
-     */
-    function _openChannel(
-        address opener,
-        address counterparty
-    ) internal {
-        require(opener != counterparty, "opener and counterparty must not be the same");
-        require(opener != address(0), "opener must not be empty");
-        require(counterparty != address(0), "counterparty must not be empty");
-
-        (,,, Channel storage channel) = _getChannel(opener, counterparty);
-        require(channel.partyABalance.add(channel.partyBBalance) > 0, "channel must be funded");
-
-        require(channel.status == ChannelStatus.CLOSED, "channel must be closed in order to open");
-
-        // The channelEpoch indicates the recycling generation and ensures that both parties are using the correct generation.
-        channel.channelEpoch = channel.channelEpoch.add(1);
-        channel.status = ChannelStatus.OPEN;
-        emit ChannelOpened(opener, counterparty);
     }
 
     /**
