@@ -58,18 +58,6 @@ contract ChannelsMock is HoprChannels {
         return _getChannelId(partyA, partyB);
     }
 
-    function getChannelStatusInternal(
-        uint24 status
-    ) external pure returns (ChannelStatus) {
-        return _getChannelStatus(status);
-    }
-
-    function getChannelIterationInternal(
-        uint24 status
-    ) external pure returns (uint256) {
-        return _getChannelIteration(status);
-    }
-
     function isPartyAInternal(
         address accountA,
         address accountB

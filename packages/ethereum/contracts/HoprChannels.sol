@@ -26,8 +26,6 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
 
     /**
      * @dev Possible channel statuses.
-     * We find out the channel's status by
-     * using {_getChannelStatus}.
      */
     enum ChannelStatus { CLOSED, OPEN, PENDING_TO_CLOSE }
 
@@ -44,8 +42,8 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         uint256 partyATicketEpoch;
         uint256 partyBTicketEpoch;
 
-        // overloads at >16777215
-        uint24 status;
+        ChannelStatus status;
+        uint channelEpoch; 
 
         // the time when the channel can be closed by either party
         // overloads at year >2105
@@ -392,11 +390,11 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         (,,, Channel storage channel) = _getChannel(opener, counterparty);
         require(channel.partyABalance + channel.partyBBalance > 0, "channel must be funded");
 
-        ChannelStatus channelStatus = _getChannelStatus(channel.status);
-        require(channelStatus == ChannelStatus.CLOSED, "channel must be closed in order to open");
+        require(channel.status == ChannelStatus.CLOSED, "channel must be closed in order to open");
 
-        channel.status = channel.status.add(1);
-
+        // The channelEpoch indicates the recycling generation and ensures that both parties are using the correct generation.
+        channel.channelEpoch = channel.channelEpoch.add(1);
+        channel.status = ChannelStatus.OPEN;
         emit ChannelOpened(opener, counterparty);
     }
 
@@ -417,15 +415,11 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         require(counterparty != address(0), "counterparty must not be empty");
 
         (,,, Channel storage channel) = _getChannel(initiator, counterparty);
-        ChannelStatus channelStatus = _getChannelStatus(channel.status);
-        require(
-            channelStatus == ChannelStatus.OPEN,
-            "channel must be open"
-        );
+        require(channel.status == ChannelStatus.OPEN, "channel must be open");
 
         // @TODO: check with team, do we need SafeMath check here?
         channel.closureTime = _currentBlockTimestamp() + secsClosure;
-        channel.status = channel.status.add(1);
+        channel.status = ChannelStatus.PENDING_TO_CLOSE;
 
         bool isPartyA = _isPartyA(initiator, counterparty);
         if (isPartyA) {
@@ -453,11 +447,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         require(counterparty != address(0), "counterparty must not be empty");
 
         (address partyA, address partyB,, Channel storage channel) = _getChannel(initiator, counterparty);
-        ChannelStatus channelStatus = _getChannelStatus(channel.status);
-        require(
-            channelStatus == ChannelStatus.PENDING_TO_CLOSE,
-            "channel must be pending to close"
-        );
+        require(channel.status == ChannelStatus.PENDING_TO_CLOSE, "channel must be pending to close");
 
         if (
             channel.closureByPartyA && (initiator == partyA) ||
@@ -474,9 +464,6 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
             token.transfer(partyB, channel.partyBBalance);
         }
 
-        // The state counter indicates the recycling generation and ensures that both parties are using the correct generation.
-        // Increase state counter so that we can re-use the same channel after it has been closed.
-        channel.status = channel.status.add(8);
         delete channel.partyABalance; // channel.partyABalance = 0
         delete channel.partyBBalance; 
         delete channel.closureTime; // channel.closureTime = 0
@@ -514,22 +501,6 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
      */
     function _getChannelId(address partyA, address partyB) internal pure returns (bytes32) {
         return keccak256(abi.encodePacked(partyA, partyB));
-    }
-
-    /**
-     * @param status channel's status
-     * @return the channel's status in 'ChannelStatus'
-     */
-    function _getChannelStatus(uint24 status) internal pure returns (ChannelStatus) {
-        return ChannelStatus(status.mod(10));
-    }
-
-    /**
-     * @param status channel's status
-     * @return the channel's iteration
-     */
-    function _getChannelIteration(uint24 status) internal pure returns (uint256) {
-        return status.div(10).add(1);
     }
 
     /**
@@ -610,10 +581,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
             redeemer,
             counterparty
         );
-        require(
-            _getChannelStatus(channel.status) != ChannelStatus.CLOSED,
-            "channel must be open or pending to close"
-        );
+        require(channel.status != ChannelStatus.CLOSED, "channel must be open or pending to close");
 
         uint256 ticketEpoch;
         if (_isPartyA(redeemer, counterparty)) {
@@ -627,7 +595,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
                 redeemer,
                 ticketEpoch,
                 proofOfRelaySecret,
-                _getChannelIteration(channel.status),
+                channel.channelEpoch,
                 amount,
                 winProb
             )
