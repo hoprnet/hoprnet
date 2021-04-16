@@ -1,8 +1,8 @@
 import { iterateHash, recoverIteratedHash, HoprDB, Hash } from '@hoprnet/hopr-utils'
 import { randomBytes } from 'crypto'
-import Debug from 'debug'
+import { Logger } from '@hoprnet/hopr-utils'
 
-const log = Debug('hopr-core-ethereum:commitment')
+const log = Logger.getLogger('hopr-core-ethereum.commitment')
 
 export const DB_ITERATION_BLOCK_SIZE = 10000
 export const TOTAL_ITERATIONS = 100000
@@ -62,10 +62,10 @@ export class Commitment {
         this.initialized = true
         return
       } catch (_e) {
-        log(`Secret is found but failed to find preimage, reinitializing..`)
+        log.warn(`Secret is found but failed to find preimage, reinitializing..`)
       }
     }
-    log(`reinitializing (db: ${dbContains}, chain: ${chainCommitment}})`)
+    log.info(`Reinitializing (db: ${dbContains}, chain: ${chainCommitment}})`)
     this.current = await this.createCommitmentChain()
     await this.setChainCommitment(this.current)
     this.initialized = true

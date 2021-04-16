@@ -1,8 +1,11 @@
 import type Hopr from '@hoprnet/hopr-core'
 import { Commands } from './commands'
 import bodyParser from 'body-parser'
+import { Logger } from '@hoprnet/hopr-utils'
 
-export default function setupAPI(node: Hopr, logs: any, options: any) {
+const log = Logger.getLogger('hoprd.api')
+
+export default function setupAPI(node: Hopr, logAdmin: any, options: any) {
   const http = require('http')
   const service = require('restana')()
   service.use(bodyParser.text({ type: '*/*' }))
@@ -23,11 +26,10 @@ export default function setupAPI(node: Hopr, logs: any, options: any) {
   http
     .createServer(service)
     .listen(port, hostname, () => {
-      logs.log(`Rest server on ${hostname} listening on port ${port}`)
+      logAdmin.log(`Rest server on ${hostname} listening on port ${port}`)
     })
     .on('error', (err: any) => {
-      console.log(`Failed to start REST API.`)
-      console.log(err)
+      log.error(`Failed to start REST API`, err)
       process.exit(1)
     })
 }

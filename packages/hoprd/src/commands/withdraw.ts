@@ -2,7 +2,9 @@ import type Hopr from '@hoprnet/hopr-core'
 import { moveDecimalPoint } from '@hoprnet/hopr-utils'
 import { AbstractCommand, AutoCompleteResult } from './abstractCommand'
 import { styleValue } from './utils'
-import { Balance, NativeBalance } from '@hoprnet/hopr-utils'
+import { Logger, Balance, NativeBalance } from '@hoprnet/hopr-utils'
+
+const log = Logger.getLogger('hoprd.commands.withdraw')
 
 export default class Withdraw extends AbstractCommand {
   private arguments = ['amount (ETH, HOPR)', 'currency (native, hopr)', 'recipient (blockchain address)']
@@ -81,6 +83,7 @@ export default class Withdraw extends AbstractCommand {
         'peerId'
       )}, receipt ${styleValue(receipt, 'hash')}.`
     } catch (err) {
+      log.error('Error while withdrawing', err)
       return styleValue(err.message, 'failure')
     }
   }

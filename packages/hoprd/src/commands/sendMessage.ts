@@ -4,6 +4,9 @@ import type PeerId from 'peer-id'
 import { MAX_HOPS } from '@hoprnet/hopr-core/lib/constants'
 import { checkPeerIdInput, encodeMessage, getPeerIdsAndAliases, styleValue } from './utils'
 import { AbstractCommand, GlobalState } from './abstractCommand'
+import { Logger } from '@hoprnet/hopr-utils'
+
+const log = Logger.getLogger('hoprd.commands.sendMessage')
 
 export abstract class SendMessageBase extends AbstractCommand {
   constructor(public node: Hopr) {
@@ -68,12 +71,7 @@ export class SendMessage extends SendMessageBase {
         }
 
         const recipient = path[path.length - 1]
-        console.log(
-          `Sending message to ${styleValue(recipient.toB58String(), 'peerId')} via ${path.slice(
-            0,
-            path.length - 1
-          )} ...`
-        )
+        log.info(`Sending message to ${recipient.toB58String()} via ${path.slice(0, path.length - 1)} ...`)
         return this.sendMessage(state, recipient, message, async () => {
           return path.slice(0, path.length - 1)
         })
@@ -81,9 +79,10 @@ export class SendMessage extends SendMessageBase {
 
       let peerId = await checkPeerIdInput(peerIdString, state)
 
-      console.log(`Sending message to ${styleValue(peerId.toB58String(), 'peerId')} ...`)
+      log.info(`Sending message to ${peerId.toB58String()} ...`)
       return this.sendMessage(state, peerId, message)
     } catch (err) {
+      log.error('Error while sending message', err)
       return styleValue(err.message, 'failure')
     }
   }

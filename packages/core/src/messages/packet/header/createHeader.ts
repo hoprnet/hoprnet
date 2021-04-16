@@ -16,8 +16,6 @@ import {
 
 import { Hash } from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'
-import Debug from 'debug'
-const log = Debug('hopr-core:packet:header')
 
 import {
   PRIVATE_KEY_LENGTH,
@@ -33,8 +31,9 @@ import {
 export async function createHeader(header: Header, peerIds: PeerId[]) {
   function checkPeerIds() {
     if (peerIds.length > MAX_HOPS) {
-      log('Exceeded max hops')
-      throw Error(`Expected at most ${MAX_HOPS} but got ${peerIds.length}`)
+      // It is not necessary to add logs here, instead we should log later when catching the Error
+      // Which will happen indeed in packages/core/src/index.ts#sendMessage
+      throw Error(`Exceeded max hops: expected at most ${MAX_HOPS} but got ${peerIds.length}`)
     }
 
     peerIds.forEach((peerId, index) => {

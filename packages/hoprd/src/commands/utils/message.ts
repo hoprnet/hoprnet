@@ -1,6 +1,8 @@
 import { encode, decode } from 'rlp'
 import { u8aToHex } from '@hoprnet/hopr-utils'
-import { styleValue } from './displayHelp'
+import { Logger } from '@hoprnet/hopr-utils'
+
+const log: Logger = Logger.getLogger('hoprd.utils.message')
 
 /**
  * Adds the current timestamp to the message in order to measure the latency.
@@ -30,10 +32,7 @@ export function decodeMessage(
       msg: msg.toString()
     }
   } catch (err) {
-    console.log(
-      styleValue(`Could not decode received message '${u8aToHex(encoded)}' Error was ${err.message}.`, 'failure')
-    )
-
+    log.error(`Could not decode received message '${u8aToHex(encoded)}'`, err)
     return {
       latency: NaN,
       msg: 'Error: Could not decode message'

@@ -6,19 +6,15 @@ import PeerId from 'peer-id'
  * Takes a string, and checks whether it's an alias or a valid peerId,
  * then it generates a PeerId instance and returns it.
  *
+ * @throws Error if PeerId cannot be created
  * @param peerIdString query that contains the peerId
  * @returns a 'PeerId' instance
  */
 export async function checkPeerIdInput(peerIdString: string, state?: GlobalState): Promise<PeerId> {
-  try {
-    if (typeof state !== 'undefined' && state.aliases && state.aliases.has(peerIdString)) {
-      return state.aliases.get(peerIdString)!
-    }
-
-    return PeerId.createFromB58String(peerIdString)
-  } catch (err) {
-    throw Error(`Invalid peerId. ${err.message}`)
+  if (typeof state !== 'undefined' && state.aliases && state.aliases.has(peerIdString)) {
+    return state.aliases.get(peerIdString)!
   }
+  return PeerId.createFromB58String(peerIdString)
 }
 
 /**

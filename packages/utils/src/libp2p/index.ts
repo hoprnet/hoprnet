@@ -7,9 +7,9 @@ import multihashes from 'multihashes'
 import LibP2P from 'libp2p'
 import AbortController from 'abort-controller'
 import Multiaddr from 'multiaddr'
-import Debug from 'debug'
 import type { Connection, MuxedStream } from 'libp2p'
 import pipe from 'it-pipe'
+import { Logger } from '../logger'
 
 export * from './privKeyToPeerId'
 export * from './peerIdToPubKey'
@@ -75,8 +75,7 @@ export function getB58String(content: string): string {
   }
 }
 
-const verbose = Debug('hopr-core:libp2p:verbose')
-const logError = Debug(`hopr-core:libp2p:error`)
+const log = Logger.getLogger('hoprd.libp2p')
 
 const DEFAULT_DHT_QUERY_TIMEOUT = 10000
 
@@ -125,7 +124,7 @@ export async function dial(
   signal = abort.signal
   timeout = setTimeout(() => {
     abort.abort()
-    verbose(`timeout while querying ${destination.toB58String()}`)
+    log.debug(`timeout while querying ${destination.toB58String()}`)
   }, opts.timeout || DEFAULT_DHT_QUERY_TIMEOUT)
 
   let err: any
@@ -152,7 +151,7 @@ export async function dial(
   }
 
   if ((err != null || struct == null) && libp2p._dht == undefined) {
-    logError(`Could not dial ${destination.toB58String()} directly and libp2p was started without a DHT.`)
+    log.error(`Could not dial ${destination.toB58String()} directly and libp2p was started without a DHT`, err)
     return { status: 'E_DIAL', error: err, dht: false }
   }
 
@@ -163,7 +162,7 @@ export async function dial(
     // Let libp2p populate its internal peerStore with fresh addresses
     dhtAddresses = (await libp2p._dht.findPeer(destination, { timeout: DEFAULT_DHT_QUERY_TIMEOUT })?.multiaddrs) ?? []
   } catch (err) {
-    logError(`Querying the DHT for ${destination.toB58String()} failed. ${err.message}`)
+    log.error(`Querying the DHT for ${destination.toB58String()} failed`, err)
     return { status: 'E_DHT_QUERY', error: err, query: destination }
   }
 
@@ -176,9 +175,9 @@ export async function dial(
 
   try {
     struct = await libp2p.dialProtocol(destination, protocol, { signal })
-    verbose(`Dial after DHT request successful`, struct)
+    log.debug(`Dial after DHT request successful`, struct)
   } catch (err) {
-    logError(`Using new addresses after querying the DHT did not lead to a connection. Cannot connect. ${err.message}`)
+    log.error(`Using new addresses after querying the DHT did not lead to a connection. Cannot connect`, err)
     return { status: 'E_DIAL', error: err, dht: true }
   }
 
@@ -204,7 +203,7 @@ export async function libp2pSendMessage(
   if (r.status === 'SUCCESS') {
     pipe([message], r.resp.stream)
   } else {
-    logError(r)
+    log.error(r)
     throw new Error(r.status)
   }
 }
@@ -220,7 +219,7 @@ export async function libp2pSendMessageAndExpectResponse(
   if (r.status === 'SUCCESS') {
     return await pipe([message], r.resp.stream)
   }
-  logError(r)
+  log.error(r)
   throw new Error(r.status)
 }
 

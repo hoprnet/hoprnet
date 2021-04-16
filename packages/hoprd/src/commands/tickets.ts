@@ -2,6 +2,9 @@ import type Hopr from '@hoprnet/hopr-core'
 import { moveDecimalPoint, Balance } from '@hoprnet/hopr-utils'
 import { AbstractCommand } from './abstractCommand'
 import { countSignedTickets, toSignedTickets, styleValue } from './utils'
+import { Logger } from '@hoprnet/hopr-utils'
+
+const log = Logger.getLogger('hoprd.commands.tickets')
 
 export default class Tickets extends AbstractCommand {
   constructor(public node: Hopr) {
@@ -32,6 +35,7 @@ export default class Tickets extends AbstractCommand {
         'number'
       )} HOPR.`
     } catch (err) {
+      log.error('Error while displaying information about tickets', err)
       return styleValue(err.message, 'failure')
     }
   }

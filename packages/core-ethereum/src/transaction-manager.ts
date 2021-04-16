@@ -1,5 +1,5 @@
-import Debug from 'debug'
-const log = Debug('hopr-core-ethereum:transcation-manager')
+import { Logger } from '@hoprnet/hopr-utils'
+const log = Logger.getLogger('hopr-core-ethereum.transcation-manager')
 
 export type Transaction = {
   nonce: number
@@ -31,7 +31,7 @@ class TranscationManager {
   public addToPending(hash: string, transaction: Pick<Transaction, 'nonce'>): void {
     if (this.pending.has(hash)) return
 
-    log('Adding pending transaction %s %i', hash, transaction.nonce)
+    log.info('Adding pending transaction %s %i', hash, transaction.nonce)
     this.pending.set(hash, { nonce: transaction.nonce, createdAt: this._getTime() })
   }
 
@@ -42,7 +42,7 @@ class TranscationManager {
   public moveToConfirmed(hash: string): void {
     if (!this.pending.has(hash)) return
 
-    log('Moving transaction to confirmed %s', hash)
+    log.info('Moving transaction to confirmed %s', hash)
     this.confirmed.set(hash, this.pending.get(hash))
     this.pending.delete(hash)
   }
@@ -52,7 +52,7 @@ class TranscationManager {
    * @param hash transaction hash
    */
   public remove(hash: string): void {
-    log('Removing transaction %s', hash)
+    log.info('Removing transaction %s', hash)
     this.pending.delete(hash)
     this.confirmed.delete(hash)
   }

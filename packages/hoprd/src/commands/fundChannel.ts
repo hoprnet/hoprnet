@@ -5,6 +5,9 @@ import BN from 'bn.js'
 import { moveDecimalPoint, Balance } from '@hoprnet/hopr-utils'
 import { AbstractCommand, GlobalState } from './abstractCommand'
 import { checkPeerIdInput, styleValue } from './utils'
+import { Logger } from '@hoprnet/hopr-utils'
+
+const log = Logger.getLogger('hoprd.commands.fundChannel')
 
 export default class FundChannel extends AbstractCommand {
   constructor(public node: Hopr) {
@@ -45,6 +48,7 @@ export default class FundChannel extends AbstractCommand {
       if (isNaN(Number(counterpartyFundInput))) throw Error('Argument <counterpartyFund> is not a number')
       counterpartyFund = new BN(moveDecimalPoint(counterpartyFundInput, Balance.DECIMALS))
     } catch (err) {
+      log.error('Error while checking peerId', err)
       return styleValue(err.message, 'failure')
     }
 

@@ -3,9 +3,10 @@ import PeerId from 'peer-id'
 import type NetworkPeers from '../network/network-peers'
 import type { RoutingChannel as Edge } from '@hoprnet/hopr-core-ethereum'
 import { NETWORK_QUALITY_THRESHOLD, MAX_PATH_ITERATIONS } from '../constants'
-import Debug from 'debug'
+import { Logger } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
-const log = Debug('hopr-core:pathfinder')
+
+const log = Logger.getLogger('hopr-core.pathfinder')
 
 export type Path = PeerId[]
 type ChannelPath = Edge[]
@@ -35,7 +36,7 @@ export async function findPath(
   getChannelsFromPeer: (p: PeerId) => Promise<Edge[]>,
   randomness: number // Proportion of randomness in stake.
 ): Promise<Path> {
-  log('find path from', start.toB58String(), 'to ', destination.toB58String(), 'length', hops)
+  log.info('Finding path from', start.toB58String(), 'to ', destination.toB58String(), 'length', hops)
 
   // Weight a node based on stake, and a random component.
   const weight = (edge: Edge): BN => {
@@ -62,7 +63,7 @@ export async function findPath(
   while (queue.length > 0 && iterations++ < MAX_PATH_ITERATIONS) {
     const currentPath = queue.peek()
     if (pathFrom(currentPath).length == hops) {
-      log('Path of correct length found', debugPath(currentPath), ':', pathWeight(currentPath).toString())
+      log.info('Path of correct length found', debugPath(currentPath), ':', pathWeight(currentPath).toString())
       return pathFrom(currentPath)
     }
 
@@ -89,6 +90,5 @@ export async function findPath(
     }
   }
 
-  log('Path not found')
   throw new Error('Path not found')
 }

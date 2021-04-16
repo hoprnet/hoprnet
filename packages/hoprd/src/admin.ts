@@ -4,16 +4,15 @@ import http from 'http'
 import fs from 'fs'
 import ws from 'ws'
 import path from 'path'
-import debug from 'debug'
 import { parse } from 'url'
 import next from 'next'
 import type { Server } from 'http'
 import stripAnsi from 'strip-ansi'
 import { LogStream } from './logs'
 import { NODE_ENV } from './env'
-import { Balance, NativeBalance } from '@hoprnet/hopr-utils'
+import { Logger, Balance, NativeBalance } from '@hoprnet/hopr-utils'
 
-let debugLog = debug('hoprd:admin')
+const log: Logger = Logger.getLogger('hoprd.admin')
 
 export class AdminServer {
   private app: any
@@ -22,7 +21,7 @@ export class AdminServer {
   private wsServer: any
   private cmds: any
 
-  constructor(private logs: LogStream, private host: string, private port: number) {}
+  constructor(private logAdmin: LogStream, private host: string, private port: number) {}
 
   async setup() {
     let adminPath = path.resolve(__dirname, '../hopr-admin/')
@@ -30,7 +29,7 @@ export class AdminServer {
       // In Docker
       adminPath = path.resolve(__dirname, './hopr-admin')
     }
-    debugLog('using', adminPath)
+    log.info('using', adminPath)
 
     this.app = next({
       dev: NODE_ENV === 'development',
@@ -45,36 +44,35 @@ export class AdminServer {
     })
 
     this.server.once('error', (err: any) => {
-      console.log(`Failed to start Admin interface`)
-      console.log(err)
+      log.error(`Failed to start Admin interface`, err)
       process.exit(1)
     })
 
     this.server.listen(this.port, this.host)
-    this.logs.log('Admin server listening on port ' + this.port)
+    this.logAdmin.log('Admin server listening on port ' + this.port)
 
     this.wsServer = new ws.Server({ server: this.server })
 
     this.wsServer.on('connection', (socket: any) => {
       socket.on('message', (message: string) => {
-        debugLog('Message from client', message)
-        this.logs.logFullLine(`admin > ${message}`)
+        log.info('Message from client', message)
+        this.logAdmin.logFullLine(`admin > ${message}`)
         if (this.cmds) {
           this.cmds.execute(message.toString()).then((resp: any) => {
             if (resp) {
               // Strings may have ansi stuff in it, get rid of it:
               resp = stripAnsi(resp)
-              this.logs.logFullLine(resp)
+              this.logAdmin.logFullLine(resp)
             }
           })
         }
         // TODO
       })
       socket.on('error', (err: string) => {
-        debugLog('Error', err)
-        this.logs.log('Websocket error', err.toString())
+        log.error('Websocket error', err)
+        this.logAdmin.log('Websocket error', err.toString())
       })
-      this.logs.subscribe(socket)
+      this.logAdmin.subscribe(socket)
     })
   }
 
@@ -86,17 +84,17 @@ export class AdminServer {
     }
 
     this.node.on('hopr:channel:opened', (channel) => {
-      this.logs.log(`Opened channel to ${channel[0].toB58String()}`)
+      this.logAdmin.log(`Opened channel to ${channel[0].toB58String()}`)
     })
 
     this.node.on('hopr:channel:closed', (peer) => {
-      this.logs.log(`Closed channel to ${peer.toB58String()}`)
+      this.logAdmin.log(`Closed channel to ${peer.toB58String()}`)
     })
 
     this.node.on('hopr:warning:unfunded', (addr) => {
       const min = new Balance(new BN(0)).toFormattedString.apply(SUGGESTED_NATIVE_BALANCE)
 
-      this.logs.log(
+      this.logAdmin.log(
         `- The account associated with this node has no ${Balance.SYMBOL},\n` +
           `  in order to send messages, or open channels, you will need to send` +
           `  at least ${min} to ${addr}`
@@ -106,7 +104,7 @@ export class AdminServer {
     this.node.on('hopr:warning:unfundedNative', (addr) => {
       const min = new NativeBalance(new BN(0)).toFormattedString.apply(SUGGESTED_NATIVE_BALANCE)
 
-      this.logs.log(
+      this.logAdmin.log(
         `- The account associated with this node has no ${NativeBalance.SYMBOL},\n` +
           `  in order to fund gas for protocol overhead you will need to send\n` +
           `  ${min} to ${addr}`
@@ -114,10 +112,10 @@ export class AdminServer {
     })
 
     // Setup some noise
-    connectionReport(this.node, this.logs)
-    reportMemoryUsage(this.logs)
+    connectionReport(this.node, this.logAdmin)
+    reportMemoryUsage(this.logAdmin)
 
-    process.env.NODE_ENV == 'production' && showDisclaimer(this.logs)
+    process.env.NODE_ENV == 'production' && showDisclaimer(this.logAdmin)
 
     this.cmds.execute(`alias ${node.getId().toB58String()} me`)
   }
@@ -135,7 +133,7 @@ export function showDisclaimer(logs: LogStream) {
 export async function reportMemoryUsage(logs: LogStream) {
   const used = process.memoryUsage()
   const usage = process.resourceUsage()
-  debugLog(`Process stats: mem ${used.rss / 1024}k (max: ${usage.maxRSS / 1024}k) ` + `cputime: ${usage.userCPUTime}`)
+  log.info(`Process stats: mem ${used.rss / 1024}k (max: ${usage.maxRSS / 1024}k) ` + `cputime: ${usage.userCPUTime}`)
   setTimeout(() => reportMemoryUsage(logs), 60_000)
 }
 

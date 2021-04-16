@@ -1,7 +1,7 @@
 import { PROTOCOL_STRING } from '../../constants'
 import { Packet } from '../../messages/packet'
 import { AcknowledgementMessage } from '../../messages/acknowledgement'
-import Debug from 'debug'
+import { Logger } from '@hoprnet/hopr-utils'
 import type PeerId from 'peer-id'
 import { durations, oneAtATime, HoprDB } from '@hoprnet/hopr-utils'
 import { Mixer } from '../../mixer'
@@ -10,7 +10,7 @@ import { PROTOCOL_ACKNOWLEDGEMENT } from '../../constants'
 import LibP2P from 'libp2p'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 
-const log = Debug('hopr-core:forward')
+const log = Logger.getLogger('hopr-core.forward')
 const FORWARD_TIMEOUT = durations.seconds(6)
 const ACKNOWLEDGEMENT_TIMEOUT = durations.seconds(2)
 
@@ -71,7 +71,7 @@ class PacketForwardInteraction {
           await interact(target, packet)
         }
       } catch (error) {
-        log('Error while handling packet', error)
+        log.error('Error while handling packet', error)
       }
     })
   }

@@ -2,6 +2,8 @@
 import Hopr from '@hoprnet/hopr-core'
 import type { HoprOptions } from '@hoprnet/hopr-core'
 import { decode } from 'rlp'
+import { Logger, configure } from '@hoprnet/hopr-utils'
+// import { Logger, configure, ipfsAppender } from '@hoprnet/hopr-utils'
 import { Commands } from './commands'
 import { LogStream } from './logs'
 import { AdminServer } from './admin'
@@ -134,35 +136,46 @@ async function generateNodeOptions(): Promise<HoprOptions> {
   return options
 }
 
+function initLogger() {
+  configure({
+    appenders: { out: { type: 'stdout' } },
+    categories: { default: { appenders: ['out'], level: 'debug' } }
+    // appenders: { custom: { type: ipfsAppender } },
+    // categories: { default: { appenders: ['custom'], level: 'debug' } }
+  })
+}
+
 async function main() {
+  initLogger()
+  const log: Logger = Logger.getLogger('hoprd')
   let node: Hopr
-  let logs = new LogStream()
+  let logAdmin = new LogStream()
   let adminServer = undefined
   let cmds
 
   function logMessageToNode(msg: Uint8Array) {
-    logs.log(`#### NODE RECEIVED MESSAGE [${new Date().toISOString()}] ####`)
+    logAdmin.log(`#### NODE RECEIVED MESSAGE [${new Date().toISOString()}] ####`)
     try {
       let [decoded, time] = decode(msg) as [Buffer, Buffer]
-      logs.log('Message:', decoded.toString())
-      logs.log('Latency:', Date.now() - parseInt(time.toString('hex'), 16) + 'ms')
+      logAdmin.log('Message:', decoded.toString())
+      logAdmin.log('Latency:', Date.now() - parseInt(time.toString('hex'), 16) + 'ms')
     } catch (err) {
-      logs.log('Could not decode message', err)
-      logs.log(msg.toString())
+      log.error('Could not decode message', err)
+      logAdmin.log(msg.toString())
     }
   }
 
   if (argv.admin) {
     // We need to setup the admin server before the HOPR node
     // as if the HOPR node fails, we need to put an error message up.
-    adminServer = new AdminServer(logs, argv.adminHost, argv.adminPort)
+    adminServer = new AdminServer(logAdmin, argv.adminHost, argv.adminPort)
     await adminServer.setup()
   }
 
-  logs.log('Creating HOPR Node')
+  logAdmin.log('Creating HOPR Node')
   let options = await generateNodeOptions()
   if (argv.dryRun) {
-    console.log(JSON.stringify(options, undefined, 2))
+    log.info(JSON.stringify(options, undefined, 2))
     process.exit(0)
   }
 
@@ -176,13 +189,13 @@ async function main() {
   // 2. Create node instance
   try {
     node = new Hopr(peerId, options)
-    logs.log('Creating HOPR Node')
+    logAdmin.log('Creating HOPR Node')
     node.on('hopr:message', logMessageToNode)
 
     // 2.1 start all monitoring services
 
     if (argv.rest) {
-      setupAPI(node, logs, argv)
+      setupAPI(node, logAdmin, argv)
     }
 
     if (argv.healthCheck) {
@@ -196,14 +209,14 @@ async function main() {
       })
       server.listen(port, hostname, (err) => {
         if (err) throw err
-        logs.log(`Healthcheck server on ${hostname} listening on port ${port}`)
+        logAdmin.log(`Healthcheck server on ${hostname} listening on port ${port}`)
       })
     }
 
-    logs.log('node is waiting for funds to', (await node.getEthereumAddress()).toHex())
+    logAdmin.log('node is waiting for funds to', (await node.getEthereumAddress()).toHex())
     // 2.5 Await funding of wallet.
     await node.waitForFunds()
-    logs.log('node funded, starting')
+    logAdmin.log('node funded, starting')
 
     // 3. Start the node.
     await node.start()
@@ -219,20 +232,20 @@ async function main() {
       let toRun = argv.run.split(';')
 
       for (let c of toRun) {
-        console.error('$', c)
+        log.error('Error while starting hoprd', c)
         if (c === 'daemonize') {
           return
         }
         let resp = await cmds.execute(c)
-        console.log(resp)
+        log.info(resp)
       }
       await node.stop()
       process.exit(0)
     }
   } catch (e) {
-    console.log(e)
-    logs.log('Node failed to start:')
-    logs.logFatalError('' + e)
+    log.fatal('Node failed to start', e)
+    logAdmin.log('Node failed to start:')
+    logAdmin.logFatalError('' + e)
     if (!argv.admin) {
       // If the admin interface is running, we should keep process alive
       process.exit(1)
@@ -240,7 +253,7 @@ async function main() {
   }
 
   function stopGracefully(signal) {
-    logs.log(`Process exiting with signal ${signal}`)
+    logAdmin.log(`Process exiting with signal ${signal}`)
     process.exit()
   }
 

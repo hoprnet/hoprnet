@@ -3,6 +3,9 @@ import type PeerId from 'peer-id'
 import type { AutoCompleteResult } from './abstractCommand'
 import { AbstractCommand, GlobalState } from './abstractCommand'
 import { checkPeerIdInput, getPeerIdsAndAliases, styleValue } from './utils'
+import { Logger } from '@hoprnet/hopr-utils'
+
+const log = Logger.getLogger('hoprd.commands.ping')
 
 export default class Ping extends AbstractCommand {
   constructor(public node: Hopr) {
@@ -26,6 +29,7 @@ export default class Ping extends AbstractCommand {
     try {
       peerId = await checkPeerIdInput(query, state)
     } catch (err) {
+      log.error('Error while checking peerId', err)
       return styleValue(err.message, 'failure')
     }
 
@@ -41,6 +45,7 @@ export default class Ping extends AbstractCommand {
     try {
       pingResult = await this.node.ping(peerId)
     } catch (err) {
+      log.error('Error while pinging node', err)
       error = err
     }
 

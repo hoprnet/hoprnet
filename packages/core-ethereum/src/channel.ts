@@ -8,16 +8,16 @@ import {
   Ticket,
   Acknowledgement,
   ChannelEntry,
-  UnacknowledgedTicket
+  UnacknowledgedTicket,
+  Logger
 } from '@hoprnet/hopr-utils'
-import Debug from 'debug'
 import type { SubmitTicketResponse } from '.'
 import { Commitment } from './commitment'
 import type { ChainWrapper } from './ethereum'
 import type Indexer from './indexer'
 import type { HoprDB } from '@hoprnet/hopr-utils'
 
-const log = Debug('hopr-core-ethereum:channel')
+const log = Logger.getLogger('hopr-core-ethereum.channel')
 
 class Channel {
   private index: number
@@ -175,11 +175,11 @@ class Channel {
     try {
       const ticket = ackTicket.ticket
 
-      log('Submitting ticket', ackTicket.response.toHex())
+      log.info('Submitting ticket', ackTicket.response.toHex())
       const emptyPreImage = new Hash(new Uint8Array(Hash.SIZE).fill(0x00))
       const hasPreImage = !ackTicket.preImage.eq(emptyPreImage)
       if (!hasPreImage) {
-        log(`Failed to submit ticket ${ackTicket.response.toHex()}: 'PreImage is empty.'`)
+        log.error(`Failed to submit ticket ${ackTicket.response.toHex()}: 'PreImage is empty.'`)
         return {
           status: 'FAILURE',
           message: 'PreImage is empty.'
@@ -188,7 +188,7 @@ class Channel {
 
       const validChallenge = ticket.checkResponse(ackTicket.response)
       if (!validChallenge) {
-        log(`Failed to submit ticket ${ackTicket.response.toHex()}: 'Invalid challenge.'`)
+        log.error(`Failed to submit ticket ${ackTicket.response.toHex()}: 'Invalid challenge.'`)
         return {
           status: 'FAILURE',
           message: 'Invalid challenge.'
@@ -197,7 +197,7 @@ class Channel {
 
       const isWinning = await ticket.isWinningTicket(ackTicket.response, ackTicket.preImage, ticket.winProb)
       if (!isWinning) {
-        log(`Failed to submit ticket ${ackTicket.response.toHex()}:  'Not a winning ticket.'`)
+        log.error(`Failed to submit ticket ${ackTicket.response.toHex()}:  'Not a winning ticket.'`)
         return {
           status: 'FAILURE',
           message: 'Not a winning ticket.'
@@ -210,14 +210,14 @@ class Channel {
       // TODO delete ackTicket
       //this.commitment.updateChainState(ackTicket.preImage)
 
-      log('Successfully submitted ticket', ackTicket.response.toHex())
+      log.info('Successfully submitted ticket', ackTicket.response.toHex())
       return {
         status: 'SUCCESS',
         receipt,
         ackTicket
       }
     } catch (err) {
-      log('Unexpected error when submitting ticket', ackTicket.response.toHex(), err)
+      log.error('Unexpected error when submitting ticket', ackTicket.response.toHex(), err)
       return {
         status: 'ERROR',
         error: err

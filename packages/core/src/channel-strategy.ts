@@ -7,9 +7,10 @@ import {
   NETWORK_QUALITY_THRESHOLD,
   MAX_AUTO_CHANNELS
 } from './constants'
-import debug from 'debug'
 import type NetworkPeers from './network/network-peers'
-const log = debug('hopr-core:channel-strategy')
+import { Logger } from '@hoprnet/hopr-utils'
+
+const log = Logger.getLogger('hopr-core.channel-strategy')
 
 export type ChannelsToOpen = [PeerId, BN]
 export type ChannelsToClose = PeerId
@@ -69,7 +70,7 @@ export class PromiscuousStrategy implements ChannelStrategy {
     peers: NetworkPeers,
     getRandomChannel: () => Promise<RoutingChannel>
   ): Promise<[ChannelsToOpen[], ChannelsToClose[]]> {
-    log('currently open', logIndexerChannels(currentChannels))
+    log.info('Currently open:', logIndexerChannels(currentChannels))
     let toOpen: ChannelsToOpen[] = []
 
     let i = 0
@@ -99,10 +100,10 @@ export class PromiscuousStrategy implements ChannelStrategy {
     ) {
       let randomChannel = await getRandomChannel()
       if (randomChannel === undefined) {
-        log('no channel available')
+        log.warn('No channel available')
         break
       }
-      log('evaluating', outgoingPeer(randomChannel).toB58String())
+      log.info('Evaluating', outgoingPeer(randomChannel).toB58String())
       peers.register(outgoingPeer(randomChannel))
       if (
         !toOpen.find((x) => dest(x).equals(outgoingPeer(randomChannel))) &&
@@ -113,7 +114,7 @@ export class PromiscuousStrategy implements ChannelStrategy {
         balance.isub(MINIMUM_REASONABLE_CHANNEL_STAKE)
       }
     }
-    log('Promiscuous toOpen: ', logChannels(toOpen))
+    log.info('Promiscuous toOpen: ', logChannels(toOpen))
     return [toOpen, toClose]
   }
 }

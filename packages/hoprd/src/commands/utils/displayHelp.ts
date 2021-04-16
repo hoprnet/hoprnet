@@ -1,4 +1,7 @@
 import { cli_options } from './cliOptions'
+import { Logger } from '@hoprnet/hopr-utils'
+
+const log: Logger = Logger.getLogger('hoprd.utils.displayHelp')
 
 const FIRST_OPTION_OFFSET = 1
 const SECOND_OPTION_OFFSET = 5
@@ -67,7 +70,7 @@ export function displayHelp() {
     }
   }
 
-  console.log(str)
+  log.info(str)
 }
 
 const EXTRA_PADDING = 2

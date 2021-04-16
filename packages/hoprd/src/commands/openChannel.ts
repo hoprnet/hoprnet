@@ -5,6 +5,9 @@ import BN from 'bn.js'
 import chalk from 'chalk'
 import { checkPeerIdInput, styleValue } from './utils'
 import { AbstractCommand, GlobalState } from './abstractCommand'
+import { Logger } from '@hoprnet/hopr-utils'
+
+const log = Logger.getLogger('hoprd.commands.openChannel')
 
 export class OpenChannel extends AbstractCommand {
   constructor(public node: Hopr) {
@@ -34,6 +37,7 @@ export class OpenChannel extends AbstractCommand {
     try {
       counterparty = await checkPeerIdInput(counterpartyStr, state)
     } catch (err) {
+      log.error('Error while checking peerId', err)
       return styleValue(err.message, 'failure')
     }
 

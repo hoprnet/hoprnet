@@ -35,7 +35,7 @@ import { getAddrs } from './identity'
 
 import EventEmitter from 'events'
 import { ChannelStrategy, PassiveStrategy, PromiscuousStrategy } from './channel-strategy'
-import Debug from 'debug'
+import { Logger } from '@hoprnet/hopr-utils'
 import { Address as LibP2PAddress } from 'libp2p/src/peer-store'
 import {
   libp2pSendMessageAndExpectResponse,
@@ -46,8 +46,7 @@ import {
 import { subscribeToAcknowledgements } from './interactions/packet/acknowledgement'
 import { PacketForwardInteraction } from './interactions/packet/forward'
 
-const log = Debug(`hopr-core`)
-const verbose = Debug('hopr-core:verbose')
+const log = Logger.getLogger('hopr-core')
 
 interface NetOptions {
   ip: string
@@ -143,10 +142,10 @@ class Hopr extends EventEmitter {
     }
 
     const chain = await this.paymentChannels
-    verbose('Started HoprEthereum. Waiting for indexer to find connected nodes.')
+    log.debug('Started HoprEthereum. Waiting for indexer to find connected nodes.')
     const publicNodes = await chain.waitForPublicNodes()
     if (publicNodes.length == 0) {
-      log('No public nodes have announced yet, we cannot rely on relay')
+      log.warn('No public nodes have announced yet, we cannot rely on relay')
     }
 
     const libp2p = await LibP2P.create({
@@ -233,11 +232,11 @@ class Hopr extends EventEmitter {
     this.status = 'RUNNING'
 
     // Log information
-    log('# STARTED NODE')
-    log('ID', this.getId().toB58String())
-    log('Protocol version', VERSION)
-    log(`Available under the following addresses:`)
-    libp2p.multiaddrs.forEach((ma: Multiaddr) => log(ma.toString()))
+    log.info('# STARTED NODE')
+    log.info('ID', this.getId().toB58String())
+    log.info('Protocol version', VERSION)
+    log.info(`Available under the following addresses:`)
+    libp2p.multiaddrs.forEach((ma: Multiaddr) => log.info(ma.toString()))
     this.maybeLogProfilingToGCloud()
   }
 
@@ -261,7 +260,7 @@ class Hopr extends EventEmitter {
   }
 
   private async tickChannelStrategy(newChannels: RoutingChannel[]) {
-    verbose('strategy tick', this.status)
+    log.debug('strategy tick', this.status)
     if (this.status != 'RUNNING') {
       return
     }
@@ -281,23 +280,23 @@ class Hopr extends EventEmitter {
       this.networkPeers,
       chain.getRandomChannel.bind(this.paymentChannels)
     )
-    verbose(`strategy wants to close ${closeChannels.length} channels`)
+    log.debug(`strategy wants to close ${closeChannels.length} channels`)
     for (let toClose of closeChannels) {
-      verbose(`closing ${toClose}`)
+      log.debug(`closing ${toClose}`)
       await this.closeChannel(toClose)
-      verbose(`closed channel to ${toClose.toB58String()}`)
+      log.debug(`closed channel to ${toClose.toB58String()}`)
       this.emit('hopr:channel:closed', toClose)
     }
-    verbose(`strategy wants to open`, nextChannels.length, 'new channels')
+    log.debug(`strategy wants to open`, nextChannels.length, 'new channels')
     for (let channelToOpen of nextChannels) {
       this.networkPeers.register(channelToOpen[0])
       try {
         // Opening channels can fail if we can't establish a connection.
         const hash = await this.openChannel(...channelToOpen)
-        verbose('- opened', channelToOpen, hash)
+        log.debug('- opened', channelToOpen, hash)
         this.emit('hopr:channel:opened', channelToOpen)
       } catch (e) {
-        log('error when trying to open strategy channels', e)
+        log.error('error when trying to open strategy channels', e)
       }
     }
   }
@@ -321,7 +320,7 @@ class Hopr extends EventEmitter {
     clearTimeout(this.checkTimeout)
     await Promise.all([this.heartbeat.stop(), (await this.paymentChannels).stop()])
 
-    await Promise.all([this.db?.close().then(() => log(`Database closed.`)), this.libp2p.stop()])
+    await Promise.all([this.db?.close().then(() => log.info(`Database closed.`)), this.libp2p.stop()])
 
     // Give the operating system some extra time to close the sockets
     await new Promise((resolve) => setTimeout(resolve, 100))
@@ -383,12 +382,13 @@ class Hopr extends EventEmitter {
         new Promise<void>(async (resolve, reject) => {
           let intermediatePath: PeerId[]
           if (getIntermediateNodesManually != undefined) {
-            verbose('manually creating intermediatePath')
+            log.debug('manually creating intermediatePath')
             intermediatePath = await getIntermediateNodesManually()
           } else {
             try {
               intermediatePath = await this.getIntermediateNodes(destination)
             } catch (e) {
+              log.error('Error while looking for intermediate nodes', e)
               reject(e)
               return
             }
@@ -410,6 +410,7 @@ class Hopr extends EventEmitter {
               path
             )
           } catch (err) {
+            log.error('Error while creating packet', err)
             return reject(err)
           }
 
@@ -431,7 +432,8 @@ class Hopr extends EventEmitter {
     try {
       await Promise.all(promises)
     } catch (err) {
-      log(`Could not send message. Error was: ${chalk.red(err.message)}`)
+      // TODO: we could simply add "err" in second parameter an deal with layout in the log4js library
+      log.error(`Could not send message. Error was: ${chalk.red(err.message)}`, err)
       throw err
     }
   }
@@ -474,18 +476,18 @@ class Hopr extends EventEmitter {
     const balance = await this.getBalance()
     const address = (await this.getEthereumAddress()).toHex()
     if (balance.toBN().lten(0)) {
-      log('unfunded node', address)
+      log.warn('unfunded node', address)
       this.emit('hopr:warning:unfunded', address)
     }
     const nativeBalance = await this.getNativeBalance()
     if (nativeBalance.toBN().lte(MIN_NATIVE_BALANCE)) {
-      log('unfunded node', address)
+      log.warn('unfunded node', address)
       this.emit('hopr:warning:unfundedNative', address)
     }
   }
 
   private async periodicCheck() {
-    log('periodic check', this.status)
+    log.debug('periodic check', this.status)
     if (this.status != 'RUNNING') {
       return
     }
@@ -493,7 +495,7 @@ class Hopr extends EventEmitter {
       await this.checkBalances()
       await this.tickChannelStrategy([])
     } catch (e) {
-      log('error in periodic check', e)
+      log.error('error in periodic check', e)
     }
     this.checkTimeout = setTimeout(() => this.periodicCheck(), CHECK_TIMEOUT)
   }
@@ -518,14 +520,14 @@ class Hopr extends EventEmitter {
 
     try {
       if (includeRouting && (ip4 || ip6)) {
-        log('announcing with routing', ip4 || ip6)
+        log.info('announcing with routing', ip4 || ip6)
         await chain.announce(ip4 || ip6)
         return
       }
-      log('announcing without routing', p2p.toString())
+      log.info('announcing without routing', p2p.toString())
       await chain.announce(p2p)
     } catch (err) {
-      log('announce failed')
+      log.error('announce failed')
       throw new Error(`Failed to announce: ${err}`)
     }
   }
@@ -715,7 +717,7 @@ class Hopr extends EventEmitter {
           if (nativeBalance.toBN().gt(MIN_NATIVE_BALANCE)) {
             resolve()
           } else {
-            log('still unfunded, trying again soon')
+            log.info('still unfunded, trying again soon')
             setTimeout(tick, CHECK_TIMEOUT)
           }
         })

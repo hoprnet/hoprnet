@@ -1,6 +1,9 @@
 import type Hopr from '@hoprnet/hopr-core'
 import { AbstractCommand } from './abstractCommand'
 import { styleValue } from './utils'
+import { Logger } from '@hoprnet/hopr-utils'
+
+const log = Logger.getLogger('hoprd.commands.stopNode')
 
 export default class StopNode extends AbstractCommand {
   constructor(public node: Hopr) {
@@ -19,7 +22,7 @@ export default class StopNode extends AbstractCommand {
    */
   public async execute(): Promise<string | void> {
     const timeout = setTimeout(() => {
-      console.log(`Ungracefully stopping node after timeout.`)
+      log.info(`Ungracefully stopping node after timeout`)
       process.exit(0)
     }, 10 * 1000)
 
@@ -28,6 +31,7 @@ export default class StopNode extends AbstractCommand {
       clearTimeout(timeout)
       process.exit(0)
     } catch (error) {
+      log.error('Error while killing process', error)
       return styleValue(error.message, 'failure')
     }
   }

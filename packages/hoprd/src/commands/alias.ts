@@ -1,6 +1,9 @@
 import type Hopr from '@hoprnet/hopr-core'
 import { AbstractCommand, GlobalState, AutoCompleteResult } from './abstractCommand'
 import { checkPeerIdInput, getPaddingLength, getPeerIdsAndAliases, styleValue } from './utils'
+import { Logger } from '@hoprnet/hopr-utils'
+
+const log: Logger = Logger.getLogger('hoprd.commands.alias')
 
 export class Alias extends AbstractCommand {
   private parameters = ['PeerId', 'Name']
@@ -38,7 +41,10 @@ export class Alias extends AbstractCommand {
     }
 
     const [error, id, name] = this._assertUsage(query, this.parameters)
-    if (error) return styleValue(error, 'failure')
+    if (error) {
+      log.error('Error while asserting alias usage', error)
+      return styleValue(error, 'failure')
+    }
 
     try {
       let peerId = await checkPeerIdInput(id)
@@ -46,6 +52,7 @@ export class Alias extends AbstractCommand {
 
       return `Set alias '${styleValue(name, 'highlight')}' to '${styleValue(peerId.toB58String(), 'peerId')}'.`
     } catch (error) {
+      log.error('Error while getting peerId', error)
       return styleValue(error.message, 'failure')
     }
   }

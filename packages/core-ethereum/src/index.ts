@@ -2,17 +2,24 @@ import type Multiaddr from 'multiaddr'
 import type PeerId from 'peer-id'
 import type { ChainWrapper } from './ethereum'
 import chalk from 'chalk'
-import debug from 'debug'
-import { Acknowledgement, PublicKey, Balance, Address, NativeBalance } from '@hoprnet/hopr-utils'
+import {
+  Logger,
+  cacheNoArgAsyncFunction,
+  HoprDB,
+  Acknowledgement,
+  PublicKey,
+  Balance,
+  Address,
+  NativeBalance
+} from '@hoprnet/hopr-utils'
 import Indexer from './indexer'
 import { RoutingChannel } from './indexer'
 import { DEFAULT_URI, MAX_CONFIRMATIONS, INDEXER_BLOCK_RANGE } from './constants'
 import { Channel } from './channel'
 import { createChainWrapper } from './ethereum'
 import { PROVIDER_CACHE_TTL } from './constants'
-import { cacheNoArgAsyncFunction, HoprDB } from '@hoprnet/hopr-utils'
 
-const log = debug('hopr-core-ethereum')
+const log = Logger.getLogger('hopr-core-ethereum')
 
 export type SubmitTicketResponse =
   | {
@@ -42,7 +49,7 @@ export default class HoprEthereum {
    * Stops the connector.
    */
   async stop(): Promise<void> {
-    log('Stopping connector..')
+    log.info('Stopping connector..')
     await this.indexer.stop()
   }
 
@@ -143,8 +150,8 @@ export default class HoprEthereum {
     await indexer.start()
 
     const coreConnector = new HoprEthereum(chain, db, indexer)
-    log(`using blockchain address ${await coreConnector.getAddress().toHex()}`)
-    log(chalk.green('Connector started'))
+    log.info(`using blockchain address ${await coreConnector.getAddress().toHex()}`)
+    log.info(chalk.green('Connector started'))
     return coreConnector
   }
 }

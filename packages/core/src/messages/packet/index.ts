@@ -7,12 +7,11 @@ import { Header, deriveTicketKey, deriveTicketKeyBlinding, deriveTagParameters, 
 import { Challenge } from './challenge'
 import Message from './message'
 import { TICKET_AMOUNT, TICKET_WIN_PROB } from '../../constants'
-import Debug from 'debug'
+import { Logger } from '@hoprnet/hopr-utils'
 import { Hash, PublicKey, Ticket, Balance, UnacknowledgedTicket } from '@hoprnet/hopr-utils'
 import HoprCoreEthereum, { Channel } from '@hoprnet/hopr-core-ethereum'
 
-const log = Debug('hopr-core:message:packet')
-const verbose = Debug('hopr-core:verbose:message:packet')
+const log = Logger.getLogger('hopr-core.message.packet')
 
 /**
  * Validate newly created tickets
@@ -277,12 +276,12 @@ export class Packet extends Uint8Array {
 
     const fee = new BN(secrets.length - 1).imul(new BN(TICKET_AMOUNT))
 
-    log('---------- New Packet ----------')
+    log.info('---------- New Packet ----------')
     path
       .slice(0, Math.max(0, path.length - 1))
-      .forEach((peerId, index) => log(`Intermediate ${index} : ${blue(peerId.toB58String())}`))
-    log(`Destination    : ${blue(path[path.length - 1].toB58String())}`)
-    log('--------------------------------')
+      .forEach((peerId, index) => log.info(`Intermediate ${index} : ${blue(peerId.toB58String())}`))
+    log.info(`Destination    : ${blue(path[path.length - 1].toB58String())}`)
+    log.info('--------------------------------')
 
     packet._challenge = await Challenge.create(Hash.create(deriveTicketKeyBlinding(secrets[0])), fee, {
       bytes: packet.buffer,
@@ -307,7 +306,7 @@ export class Packet extends Uint8Array {
     const channel = chain.getChannel(senderPubKey, targetPubKey)
 
     if (secrets.length > 1) {
-      log(`before creating channel`)
+      log.info(`Before creating channel`)
 
       const balances = await channel.getBalances()
       packet._ticket = await channel.createTicket(new Balance(fee), ticketChallenge, TICKET_WIN_PROB)
@@ -332,7 +331,15 @@ export class Packet extends Uint8Array {
     this.header.deriveSecret(this.libp2p.peerId.privKey.marshal())
     await this.testAndSetTag()
     if (!this.header.verify()) {
-      verbose('Error verifying header', this.header)
+      // TODO: instead of having to add a debug logging for the header here,
+      // we should return a CUSTOM Error that would take the header as parameter:
+      // throw HoprHeaderError('Error verifying header', this.header)
+      // And then, the code catching the error would log it with
+      // log.error('Error while doing something', err)
+      // and it would log the header object...
+      // Need to double check if log4js would actually log the header object by default,
+      // else we'd need a custom layout.
+      log.debug('Error verifying header', this.header)
       throw Error('Error verifying header')
     }
 
@@ -362,7 +369,13 @@ export class Packet extends Uint8Array {
             })
         )
       } catch (error) {
-        verbose('Could not validate unacknowledged ticket', error.message)
+        // TODO: here, instead of logging in debug mode, we should log nothing and
+        // return a custom error based on previous error, that would be logged by the catcher:
+        // throw new Error('Could not validate unacknowledged ticket', error)
+        // 'error' object would carry its full stacktrace!
+        // In Java, it is easy: https://docs.oracle.com/javase/8/docs/api/java/lang/Exception.html#Exception-java.lang.String-java.lang.Throwable-
+        // I am yet to find an equivalent in Typescript :(
+        log.debug('Could not validate unacknowledged ticket', error.message)
         throw error
       }
     }
@@ -386,7 +399,7 @@ export class Packet extends Uint8Array {
    */
   async prepareDelivery(): Promise<void> {
     if (!Hash.create(deriveTicketLastKey(this.header.derivedSecret)).eq((await this.ticket).challenge as Hash)) {
-      verbose('Error preparing delivery')
+      // No need to log anything here, the code catching this Error will log it already
       throw Error('Error preparing delivery')
     }
 
@@ -409,13 +422,12 @@ export class Packet extends Uint8Array {
     const challenge = u8aConcat(deriveTicketKey(this.header.derivedSecret), this.header.hashedKeyHalf)
 
     if (!Hash.create(challenge).hash().eq(ticket.challenge)) {
-      verbose('Error preparing to forward')
       throw Error('Error preparing forward')
     }
 
     const unacknowledged = new UnacknowledgedTicket(ticket, new Hash(deriveTicketKey(this.header.derivedSecret)))
 
-    log(
+    log.info(
       `Storing unacknowledged ticket. Expecting to receive a preImage for ${green(
         u8aToHex(this.header.hashedKeyHalf)
       )} from ${blue(target.toB58String())}`

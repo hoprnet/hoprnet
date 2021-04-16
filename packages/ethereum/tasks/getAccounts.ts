@@ -1,6 +1,9 @@
 import type { HardhatRuntimeEnvironment, RunSuperFunction } from 'hardhat/types'
 import { getContracts } from '../chain'
 import { HoprToken__factory } from '../types'
+import { Logger } from '@hoprnet/hopr-utils'
+
+const log: Logger = Logger.getLogger('hoprd.tasks.getAccounts')
 
 /**
  * Display unlocked accounts alongside with how much
@@ -11,7 +14,7 @@ async function main(_params, { network, ethers }: HardhatRuntimeEnvironment, _ru
   if (!contracts?.[network.name]) throw Error(`cannot find HoprToken address for network ${network.name}`)
   const hoprToken = HoprToken__factory.connect(contracts[network.name].HoprToken.address, ethers.provider)
 
-  console.log('Running task "accounts" with config:', {
+  log.info('Running task "accounts" with config:', {
     network: network.name
   })
 
@@ -29,7 +32,7 @@ async function main(_params, { network, ethers }: HardhatRuntimeEnvironment, _ru
     })
   )
 
-  console.table(
+  log.info(
     accounts.map((account, i) => {
       return {
         account,

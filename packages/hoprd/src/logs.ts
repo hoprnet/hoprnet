@@ -1,9 +1,9 @@
 import ws from 'ws'
-import debug from 'debug'
+import { Logger } from '@hoprnet/hopr-utils'
 
 export type Socket = ws
 
-let debugLog = debug('hoprd')
+const LOG = Logger.getLogger('hoprd')
 
 const MAX_MESSAGES_CACHED = 100
 
@@ -64,7 +64,10 @@ export class LogStream {
   }
 
   _log(msg: Message) {
-    debugLog(msg)
+    // TODO: we loose the type information here,
+    // this whole class should be reworked as follows:
+    // https://github.com/hoprnet/hoprnet/issues/1431#issuecomment-825209433
+    LOG.info(msg)
     this.messages.push(msg)
     if (this.messages.length > MAX_MESSAGES_CACHED) {
       // Avoid memory leak

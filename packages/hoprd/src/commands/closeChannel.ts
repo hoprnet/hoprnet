@@ -3,6 +3,9 @@ import type PeerId from 'peer-id'
 import chalk from 'chalk'
 import { AbstractCommand, GlobalState } from './abstractCommand'
 import { checkPeerIdInput, styleValue } from './utils'
+import { Logger } from '@hoprnet/hopr-utils'
+
+const log: Logger = Logger.getLogger('hoprd.commands.closeChannel')
 
 export default class CloseChannel extends AbstractCommand {
   constructor(public node: Hopr) {
@@ -26,6 +29,7 @@ export default class CloseChannel extends AbstractCommand {
     try {
       peerId = await checkPeerIdInput(query, state)
     } catch (err) {
+      log.error('Error while checking peerId', err)
       return styleValue(err.message, 'failure')
     }
 

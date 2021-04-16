@@ -1,13 +1,12 @@
 import type NetworkPeerStore from './network-peers'
 import type PeerId from 'peer-id'
-import debug from 'debug'
-import { Hash } from '@hoprnet/hopr-utils'
+import { Logger, Hash } from '@hoprnet/hopr-utils'
 import { randomInteger, limitConcurrency, LibP2PHandlerFunction, u8aEquals, DialOpts } from '@hoprnet/hopr-utils'
 import { HEARTBEAT_INTERVAL, HEARTBEAT_INTERVAL_VARIANCE, MAX_PARALLEL_CONNECTIONS } from '../constants'
 import { PROTOCOL_HEARTBEAT, HEARTBEAT_TIMEOUT } from '../constants'
 import { randomBytes } from 'crypto'
 
-const log = debug('hopr-core:heartbeat')
+const log = Logger.getLogger('hopr-core.heartbeat')
 
 export default class Heartbeat {
   private timeout: NodeJS.Timeout
@@ -27,13 +26,13 @@ export default class Heartbeat {
   }
 
   public handleHeartbeatRequest(msg: Uint8Array, remotePeer: PeerId): Uint8Array {
+    log.debug('beat')
     this.networkPeers.register(remotePeer)
-    log('beat')
     return Hash.create(msg).serialize()
   }
 
   public async pingNode(id: PeerId): Promise<boolean> {
-    log('ping', id.toB58String())
+    log.info('ping', id.toB58String())
 
     const challenge = randomBytes(16)
     const expectedResponse = Hash.create(challenge).serialize()
@@ -44,22 +43,22 @@ export default class Heartbeat {
       })
 
       if (pingResponse == null || !u8aEquals(expectedResponse, pingResponse)) {
-        log(`Mismatched challenge. ${pingResponse}`)
+        log.warn(`Mismatched challenge. ${pingResponse}`)
         await this.hangUp(id)
         return false
       }
 
-      log('ping success to', id.toB58String())
+      log.info('ping success to', id.toB58String())
       return true
     } catch (e) {
-      log(`Connection to ${id.toB58String()} failed: ${e}`)
+      log.error(`Connection to ${id.toB58String()} failed: ${e}`)
       return false
     }
   }
 
   private async checkNodes(): Promise<void> {
     const thresholdTime = Date.now() - HEARTBEAT_INTERVAL
-    log(`Checking nodes since ${thresholdTime} (${new Date(thresholdTime).toLocaleString()})`)
+    log.debug(`Checking nodes since ${thresholdTime} (${new Date(thresholdTime).toLocaleString()})`)
 
     const toPing = this.networkPeers.pingSince(thresholdTime)
 
@@ -68,7 +67,10 @@ export default class Heartbeat {
     }
 
     await limitConcurrency<void>(MAX_PARALLEL_CONNECTIONS, () => toPing.length <= 0, doPing)
-    log(this.networkPeers.debugLog())
+    // TODO improve this
+    // We want to log to INFO level when there is a change from before,
+    // else we should log to DEBUG, in order not to flood the logging in production
+    log.info(this.networkPeers.debugLog())
   }
 
   private tick() {
@@ -79,13 +81,13 @@ export default class Heartbeat {
   }
 
   public start() {
+    log.debug(`Heartbeat started`)
     this.tick()
-    log(`Heartbeat started`)
   }
 
   public stop() {
+    log.debug(`Heartbeat stopped`)
     clearTimeout(this.timeout)
-    log(`Heartbeat stopped`)
   }
 
   public async __forTestOnly_checkNodes() {

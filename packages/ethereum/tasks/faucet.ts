@@ -3,13 +3,16 @@ import { utils } from 'ethers'
 import { convertPubKeyFromB58String } from '@hoprnet/hopr-utils'
 import { HoprToken__factory } from '../types'
 import { getContract } from './utils/contracts'
+import { Logger } from '@hoprnet/hopr-utils'
+
+const log: Logger = Logger.getLogger('hoprd.tasks.faucet')
 
 const send = (signer, txparams) =>
   signer.sendTransaction(txparams, (error, transactionHash) => {
     if (error) {
-      console.log(`Error: ${error}`)
+      log.error(`Error whiling signing transaction`, error)
     }
-    console.log(`transactionHash: ${transactionHash}`)
+    log.info('transactionHash', transactionHash)
   })
 
 const nativeAddress = async (hoprAddress) => {
@@ -26,7 +29,7 @@ async function main(
   _runSuper: RunSuperFunction<any>
 ) {
   if (network.name !== 'localhost') {
-    console.error('🌵 Faucet is only valid in localhost network')
+    log.error('🌵 Faucet is only valid in localhost network')
     return
   }
 
@@ -35,7 +38,7 @@ async function main(
     const contract = await getContract(network.name, 'HoprToken')
     hoprTokenAddress = contract.address
   } catch {
-    console.error('⛓  You need to ensure the network deployed the contracts')
+    log.error('⛓  You need to ensure the network deployed the contracts')
     return
   }
 
@@ -48,10 +51,10 @@ async function main(
   }
   const hoprToken = HoprToken__factory.connect(hoprTokenAddress, ethers.provider).connect(signer)
 
-  console.log(`💧💰 Sending ${etherAmount} ETH to ${nodeAddress} on network ${network.name}`)
+  log.info(`💧💰 Sending ${etherAmount} ETH to ${nodeAddress} on network ${network.name}`)
   await send(signer, tx)
 
-  console.log(`💧🟡 Sending ${ethers.utils.formatEther(amount)} HOPR to ${nodeAddress} on network ${network.name}`)
+  log.info(`💧🟡 Sending ${ethers.utils.formatEther(amount)} HOPR to ${nodeAddress} on network ${network.name}`)
   await hoprToken.mint(nodeAddress, amount, ethers.constants.HashZero, ethers.constants.HashZero, {
     gasLimit: 200e3
   })
