@@ -13,6 +13,13 @@ function u8aToChannelStatus(arr: Uint8Array): ChannelStatus {
   throw Error(`Status at ${status} does not exist`)
 }
 
+function channelStatusToU8a(c: ChannelStatus): Uint8Array {
+  if (c == 'CLOSED') return Uint8Array.of(0);
+  if (c == 'OPEN') return Uint8Array.of(1);
+  return Uint8Array.of(2)
+}
+
+
 // TODO, find a better way to do this.
 const components = [
   Address,
@@ -74,8 +81,8 @@ class ChannelEntry {
       [this.partyBTicketIndex.serialize(), UINT256.SIZE],
       [channelStatusToU8a(this.status), 32],
       [this.channelEpoch.serialize(), UINT256.SIZE],
-      [this.closureTime: UINT256.SIZE],
-      [this.closureByPartyA, 1]
+      [this.closureTime.serialize(), UINT256.SIZE],
+      [Uint8Array.of(Number(this.closureByPartyA)), 1]
     ])
   }
 
