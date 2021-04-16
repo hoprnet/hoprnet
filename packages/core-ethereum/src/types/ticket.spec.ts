@@ -17,11 +17,12 @@ describe('test ticket construction', function () {
   it('should create new ticket', async function () {
     const challenge = new Hash(new Uint8Array(Hash.SIZE))
     const epoch = UINT256.fromString('1')
+    const index = UINT256.fromString('1')
     const amount = new Balance(new BN(1))
     const winProb = computeWinningProbability(1)
     const channelIteration = UINT256.fromString('1')
     const signature = new Signature(null, 0)
-    const ticket = new Ticket(userA, challenge, epoch, amount, winProb, channelIteration, signature)
+    const ticket = new Ticket(userA, challenge, epoch, index, amount, winProb, channelIteration, signature)
 
     assert(ticket.counterparty.eq(userA), 'wrong counterparty')
     assert(ticket.challenge.eq(challenge), 'wrong challenge')
@@ -36,12 +37,13 @@ describe('test ticket construction', function () {
     const counterparty = new Address(stringToU8a('0xb3aa2138de698597e2e3f84f60ef415d13731b6f'))
     const challenge = new Hash(stringToU8a('0x12047ebc6ea03568f4c81b75a4cd827785fe97206d9b22fd5364a9db1f50e234'))
     const epoch = UINT256.fromString('1')
+    const index = UINT256.fromString('1')
     const amount = new Balance(new BN('0000000002c68af0bb140000', 16))
     const winProb = new Hash(stringToU8a('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'))
     const channelIteration = UINT256.fromString('1')
     const signature = new Signature(null, 0)
 
-    const ticketA = new Ticket(counterparty, challenge, epoch, amount, winProb, channelIteration, signature)
+    const ticketA = new Ticket(counterparty, challenge, epoch, index, amount, winProb, channelIteration, signature)
 
     expect(expectedHash.toHex()).to.eq(ticketA.getHash().toHex(), 'ticket hash does not match the expected value')
 
@@ -49,6 +51,7 @@ describe('test ticket construction', function () {
       counterparty,
       challenge,
       UINT256.fromString('2'),
+      UINT256.fromString('1'),
       amount,
       winProb,
       channelIteration,
@@ -63,18 +66,20 @@ describe('test ticket construction', function () {
     const counterparty = new Address(stringToU8a('0x32c160a5008e517ce06df4f7d4a39ffc52e049cf'))
     const challenge = new Hash(stringToU8a('0x91e787e6eef8cb5ddd0815e0f7f91dbe34d2a7bb2e99357039649baf61684c96'))
     const epoch = UINT256.fromString('2')
+    const index = UINT256.fromString('1')
     const amount = new Balance(new BN('000000000de0b6b3a7640000', 16))
     const winProb = new Hash(stringToU8a('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'))
     const channelIteration = UINT256.fromString('1')
     const signature = new Signature(null, 0)
 
-    const ticketA = new Ticket(counterparty, challenge, epoch, amount, winProb, channelIteration, signature)
+    const ticketA = new Ticket(counterparty, challenge, epoch, index, amount, winProb, channelIteration, signature)
 
     expect(expectedHash.toHex()).to.eq(ticketA.getHash().toHex(), 'ticket hash does not match the expected value')
 
     const wrongTicket = new Ticket(
       counterparty,
       challenge,
+      UINT256.fromString('1'),
       UINT256.fromString('1'),
       amount,
       winProb,
@@ -98,6 +103,7 @@ describe('test signedTicket construction', async function () {
       userB,
       new Hash(randomBytes(32)),
       UINT256.fromString('0'),
+      UINT256.fromString('1'),
       new Balance(new BN(15)),
       new Hash(new Uint8Array(new BN(new Uint8Array(Hash.SIZE).fill(0xff)).div(WIN_PROB).toArray('le', Hash.SIZE))),
       UINT256.fromString('0'),

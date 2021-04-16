@@ -359,6 +359,8 @@ describe('HoprChannels intergration tests', function () {
         .redeemTicket(
           f.TICKET_AB_WIN.counterparty,
           f.TICKET_AB_WIN.secret,
+          f.TICKET_BA_WIN.ticketEpoch,
+          f.TICKET_BA_WIN.ticketIndex,
           f.TICKET_AB_WIN.proofOfRelaySecret,
           f.TICKET_AB_WIN.amount,
           f.TICKET_AB_WIN.winProb,
@@ -403,6 +405,8 @@ describe('HoprChannels intergration tests', function () {
         .redeemTicket(
           f.TICKET_BA_WIN_2.counterparty,
           f.TICKET_BA_WIN_2.secret,
+          f.TICKET_BA_WIN.ticketEpoch,
+          f.TICKET_BA_WIN.ticketIndex,
           f.TICKET_BA_WIN_2.proofOfRelaySecret,
           f.TICKET_BA_WIN_2.amount,
           f.TICKET_BA_WIN_2.winProb,
@@ -460,6 +464,8 @@ describe('HoprChannels intergration tests', function () {
         {
           recipient: ACCOUNT_B.address,
           proofOfRelaySecret: PROOF_OF_RELAY_SECRET_0,
+          ticketIndex: '0',
+          ticketEpoch: '0',
           counter: '2',
           amount: '10',
           winProb: WIN_PROB_100,
@@ -474,6 +480,8 @@ describe('HoprChannels intergration tests', function () {
           recipient: ACCOUNT_A.address,
           proofOfRelaySecret: PROOF_OF_RELAY_SECRET_0,
           counter: '2',
+          ticketIndex: '0',
+          ticketEpoch: '0',
           amount: '10',
           winProb: WIN_PROB_100,
           iteration: '2'
@@ -487,6 +495,8 @@ describe('HoprChannels intergration tests', function () {
           recipient: ACCOUNT_A.address,
           proofOfRelaySecret: PROOF_OF_RELAY_SECRET_1,
           counter: '2',
+          ticketIndex: '0',
+          ticketEpoch: '0',
           amount: '10',
           winProb: WIN_PROB_100,
           iteration: '2'
@@ -539,6 +549,8 @@ describe('HoprChannels intergration tests', function () {
         .redeemTicket(
           TICKET_BA_WIN_RECYCLED.counterparty,
           TICKET_BA_WIN_RECYCLED.secret,
+          f.TICKET_BA_WIN.ticketEpoch,
+          f.TICKET_BA_WIN.ticketIndex,
           TICKET_BA_WIN_RECYCLED.proofOfRelaySecret,
           TICKET_BA_WIN_RECYCLED.amount,
           TICKET_BA_WIN_RECYCLED.winProb,
@@ -567,6 +579,8 @@ describe('HoprChannels intergration tests', function () {
         .redeemTicket(
           TICKET_AB_WIN_RECYCLED.counterparty,
           TICKET_AB_WIN_RECYCLED.secret,
+          f.TICKET_BA_WIN.ticketEpoch,
+          f.TICKET_BA_WIN.ticketIndex,
           TICKET_AB_WIN_RECYCLED.proofOfRelaySecret,
           TICKET_AB_WIN_RECYCLED.amount,
           TICKET_AB_WIN_RECYCLED.winProb,
@@ -611,6 +625,8 @@ describe('HoprChannels intergration tests', function () {
         .redeemTicket(
           TICKET_BA_WIN_RECYCLED_2.counterparty,
           TICKET_BA_WIN_RECYCLED_2.secret,
+          f.TICKET_BA_WIN.ticketEpoch,
+          f.TICKET_BA_WIN.ticketIndex,
           TICKET_BA_WIN_RECYCLED_2.proofOfRelaySecret,
           TICKET_BA_WIN_RECYCLED_2.amount,
           TICKET_BA_WIN_RECYCLED_2.winProb,

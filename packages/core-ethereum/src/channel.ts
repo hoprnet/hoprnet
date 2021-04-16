@@ -10,11 +10,15 @@ const log = Debug('hopr-core-ethereum:channel')
 const abiCoder = new ethers.utils.AbiCoder()
 
 class Channel {
+  private index: number
+
   constructor(
     private readonly connector: Connector, // TODO: replace with ethereum global context?
     private readonly self: PublicKey,
     public readonly counterparty: PublicKey
-  ) {}
+  ) {
+    this.index = 0; // TODO - bump epoch to make sure..
+  }
 
   static generateId(self: Address, counterparty: Address) {
     let parties = self.sortPair(counterparty)
@@ -142,6 +146,7 @@ class Channel {
       counterpartyAddress,
       challenge,
       new UINT256(counterpartyState.counter),
+      new UINT256(new BN(this.index ++)),
       amount,
       computeWinningProbability(winProb),
       (await this.getState()).channelEpoch,
@@ -155,6 +160,7 @@ class Channel {
       this.counterparty.toAddress(),
       challenge,
       UINT256.fromString('0'),
+      new UINT256(new BN(this.index ++)),
       new Balance(new BN(0)),
       computeWinningProbability(1),
       UINT256.fromString('0'),
@@ -203,6 +209,8 @@ class Channel {
         hoprChannels.redeemTicket,
         counterparty.toHex(),
         ackTicket.preImage.toHex(),
+        ackTicket.ticket.epoch.serialize(),
+        ackTicket.ticket.index.serialize(),
         ackTicket.response.toHex(),
         ticket.amount.toBN().toString(),
         ticket.winProb.toHex(),

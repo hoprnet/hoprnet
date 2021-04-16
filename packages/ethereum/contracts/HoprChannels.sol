@@ -165,7 +165,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     }
 
     /**
-     * @dev Initialize channel closure, updates channel's
+     * @dev Initialize channel closure, updates channel'r
      * closure time, when the cool-off period is over,
      * user may finalize closure, then emits
      * {ChannelUpdate} event.
@@ -291,6 +291,8 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
           // We are reopening the channel
           channel.channelEpoch = channel.channelEpoch.add(1);
           channel.status = ChannelStatus.OPEN;
+          channel.partyATicketIndex = 0;
+          channel.partyBTicketIndex = 0;
         }
 
         channel.partyABalance = channel.partyABalance.add(amountA);
@@ -558,7 +560,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
      * @dev Prefix the ticket message and return
      * the actual hash that was used to sign
      * the ticket with.
-     * @return prefixed ticket hash
+r    * @return prefixed ticket hash
      */
     function _getTicketHash(
         bytes memory packedTicket
