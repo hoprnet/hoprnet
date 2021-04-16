@@ -1,15 +1,15 @@
 {
   "localhost": {
     "HoprToken": {
-      "address": "0x66DB78F4ADD912a6Cb92b672Dfa09028ecc3085E",
+      "address": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
       "deployedAt": 3
     },
     "HoprChannels": {
-      "address": "0x6c97048D67c39ADCe38bbB228fc1bA415fc8f096",
+      "address": "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9",
       "deployedAt": 6
     },
     "HoprDistributor": {
-      "address": "0x0a67180CF519aDF27f1FD32F7255bBa00B536FC6",
+      "address": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
       "deployedAt": 5
     }
   },
@@ -80,6 +80,20 @@
     "HoprChannels": {
       "address": "0x504a24F1398Be1824C35Bc5964b23Ba292991dA5",
       "deployedAt": 2713229
+    }
+  },
+  "hardhat": {
+    "HoprToken": {
+      "address": "0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e",
+      "deployedAt": 19
+    },
+    "HoprDistributor": {
+      "address": "0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0",
+      "deployedAt": 20
+    },
+    "HoprChannels": {
+      "address": "0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82",
+      "deployedAt": 21
     }
   }
 }

@@ -11,9 +11,7 @@ import '@typechain/hardhat'
 // rest
 import { HardhatUserConfig, task, types } from 'hardhat/config'
 import { ethers } from 'ethers'
-import { NODE_SEEDS, BOOTSTRAP_SEEDS } from '@hoprnet/hopr-demo-seeds'
 import { networks } from './chain/networks'
-import { ACCOUNT_DEPLOYER, ACCOUNT_A, ACCOUNT_B } from './test/constants'
 
 const { PRIVATE_KEY, INFURA_KEY, MATIC_VIGIL_KEY, ETHERSCAN_KEY, QUIKNODE_KEY } = process.env
 const GAS_MULTIPLIER = 1.1
@@ -21,33 +19,18 @@ const GAS_MULTIPLIER = 1.1
 // set 'ETHERSCAN_API_KEY' so 'hardhat-deploy' can read it
 process.env.ETHERSCAN_API_KEY = ETHERSCAN_KEY
 
-// @TODO: fix legacy: use hopr-demo-seeds
-const localhostPrivKeys = NODE_SEEDS.concat(BOOTSTRAP_SEEDS)
-
-// private keys used by tests
-// @TODO: fix legacy dependancy
-const hardhatPrivKeys = localhostPrivKeys
-  .concat([ACCOUNT_DEPLOYER.privateKey, ACCOUNT_A.privateKey, ACCOUNT_B.privateKey])
-  .map((privateKey) => ({
-    privateKey,
-    balance: ethers.utils.parseEther('10000').toString()
-  }))
-
 const hardhatConfig: HardhatUserConfig = {
   defaultNetwork: 'hardhat',
   networks: {
     hardhat: {
       live: false,
       tags: ['local', 'test'],
-      accounts: hardhatPrivKeys,
-      saveDeployments: false,
-      allowUnlimitedContractSize: true // TODO: investigate why this is needed
+      saveDeployments: false
     },
     localhost: {
       live: false,
       tags: ['local'],
       url: 'http://localhost:8545',
-      accounts: localhostPrivKeys,
       saveDeployments: false
     },
     mainnet: {
