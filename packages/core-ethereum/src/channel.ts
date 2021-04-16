@@ -33,10 +33,12 @@ class Channel {
     throw Error(`Channel state for ${channelId.toHex()} not found`)
   }
 
+  // TODO kill
   async getBalances() {
     const state = await this.getState()
-    const { partyA, partyB } = state.getBalances()
-    const [self, counterparty] = state.partyA.eq(this.self.toAddress()) ? [partyA, partyB] : [partyB, partyA]
+    const a = state.partyABalance
+    const b = state.partyABalance
+    const [self, counterparty] = state.partyA.eq(this.self.toAddress()) ? [a, b] : [b, a]
 
     return {
       self,
@@ -51,11 +53,11 @@ class Channel {
     await this.connector.initOnchainValues()
 
     // channel may not exist, we can still open it
-    let state: ChannelEntry
+    let c: ChannelEntry
     try {
-      state = await this.getState()
+      c = await this.getState()
     } catch {}
-    if (state && state.getStatus() !== 'CLOSED') {
+    if (c.status !== 'CLOSED') {
       throw Error('Channel is already opened')
     }
 
@@ -86,10 +88,10 @@ class Channel {
   async initializeClosure() {
     const { account, hoprChannels } = this.connector
 
-    const state = await this.getState()
+    const c = await this.getState()
     const counterpartyAddress = this.counterparty.toAddress()
 
-    if (state.getStatus() !== 'OPEN') {
+    if (c.status !== 'OPEN') {
       throw Error('Channel status is not OPEN')
     }
 
@@ -111,10 +113,10 @@ class Channel {
   async finalizeClosure() {
     const { account, hoprChannels } = this.connector
 
-    const state = await this.getState()
+    const c = await this.getState()
     const counterpartyAddress = this.counterparty.toAddress()
 
-    if (state.getStatus() !== 'PENDING_TO_CLOSE') {
+    if (c.status !== 'PENDING_TO_CLOSE') {
       throw Error('Channel status is not PENDING_TO_CLOSE')
     }
 
@@ -142,7 +144,7 @@ class Channel {
       new UINT256(counterpartyState.counter),
       amount,
       computeWinningProbability(winProb),
-      new UINT256((await this.getState()).getIteration()),
+      (await this.getState()).channelEpoch,
       this.connector.account.privateKey
     )
   }

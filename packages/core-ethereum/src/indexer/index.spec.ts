@@ -187,9 +187,9 @@ describe('test indexer', function () {
 
       const channel = await connector.indexer.getChannel(Channel.generateId(userA.toAddress(), userB.toAddress()))
       assert(!!channel, 'check Channels.getChannelEntry')
-      assert(channel.deposit.isZero())
-      assert(channel.partyABalance.isZero())
-      assert(channel.closureTime.isZero())
+      assert(channel.partyABalance.toBN().isZero())
+      assert(channel.partyBBalance.toBN().isZero())
+      assert(channel.closureTime.toBN().isZero())
       assert(!channel.closureByPartyA)
     })
 

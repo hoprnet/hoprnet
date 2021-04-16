@@ -114,8 +114,8 @@ describe('test Channel class', function () {
     )
 
     const partyBChannel = new Channel(partyBConnector, partyB, partyA)
-    assert((await partyAChannel.getState()).getStatus() === 'OPEN', `Checks that party A considers the channel open.`)
-    assert((await partyBChannel.getState()).getStatus() === 'OPEN', `Checks that party A considers the channel open.`)
+    assert((await partyAChannel.getState()).status === 'OPEN', `Checks that party A considers the channel open.`)
+    assert((await partyBChannel.getState()).status == 'OPEN', `Checks that party A considers the channel open.`)
     assert(firstAckedTicket, `ticket must be winning`)
 
     const hashedSecretBefore = await partyBConnector.account.getOnChainSecret()
