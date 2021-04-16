@@ -194,6 +194,34 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     }
 
     /**
+    * @dev Request a channelIteration bump, so we can make a new set of
+    * commitments
+    * @param counterparty the address of the counterparty
+    * @param newCommitment, a secret derived from this new commitment
+    */
+    function bumpChannel(
+      address counterparty,
+      bytes32 newCommitment
+    ) external {
+        require(msg.sender != address(0), "sender must not be empty");
+        require(counterparty != address(0), "counterparty must not be empty");
+        require(msg.sender != counterparty, "accountA and accountB must not be the same");
+
+        (,,, Channel storage channel) = _getChannel(
+            redeemer,
+            counterparty
+        );
+
+        if (_isPartyA(msg.sender, counterparty)){
+          channel.partyACommitment = newCommitment;
+        } else {
+          channel.partyBCommitment = newCommitment;
+        }
+        channel.channelEpoch = channel.channelEpoch.add(1);
+
+    }
+
+    /**
      * A hook triggered when HOPR tokens are send to this contract.
      *
      * @param operator address operator requesting the transfer
