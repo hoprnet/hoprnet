@@ -41,6 +41,8 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         bytes32 commitmentPartyB;
         uint256 partyATicketEpoch;
         uint256 partyBTicketEpoch;
+        uint256 partyATicketIndex;
+        uint256 partyBTicketIndex;
 
         ChannelStatus status;
         uint channelEpoch; 
@@ -478,9 +480,11 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         if (_isPartyA(redeemer, counterparty) {
           require(channel.partyACommitment == keccak256(abi.encodePacked(nextCommitment)), "commitment must be hash of next commitment");
           require(channel.partyATicketEpoch == ticketEpoch, "Ticket epoch must match");
+          require(channel.partyATicketIndex < ticketIndex, "Redemptions must be in order");
         } else {
           require(channel.partyBCommitment == keccak256(abi.encodePacked(nextCommitment)), "commitment must be hash of next commitment");
           require(channel.partyBTicketEpoch == ticketEpoch, "Ticket epoch must match");
+          require(channel.partyBTicketIndex < ticketIndex, "Redemptions must be in order");
         }
         require(channel.status != ChannelStatus.CLOSED, "channel must be open or pending to close");
 
@@ -519,10 +523,12 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
             channel.partyACommitment = nextCommitment;
             channel.partyABalance = channel.partyABalance.add(amount);
             channel.partyATicketEpoch = channel.partyATicketEpoch.add(1);
+            channel.partyATicketIndex = ticketIndex;
         } else {
             channel.partyABalance = channel.partyABalance.sub(amount);
             channel.partyBCommitment = nextCommitment;
             channel.partyBTicketEpoch = channel.partyATicketEpoch.add(1);
+            channel.partyBTicketIndex = ticketIndex;
         }
 
         emit TicketRedeemed(redeemer, counterparty, amount);
