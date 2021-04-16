@@ -292,15 +292,7 @@ class Indexer extends EventEmitter {
   }
 
   private async onChannelUpdated(event: Event<'ChannelUpdate'>): Promise<void> {
-    const data = event.args
-    const rawChannel = data[2]
-
-    const channel = new ChannelEntry(
-      Address.fromString(data.partyA),
-      Address.fromString(data.partyB),
-      new Balance(new BN(rawChannel[0].toString())),
-      new Balance(new BN(rawChannel[1].toString()))
-    )
+    const channel = ChannelEntry.fromSCEvent(event);
     await db.updateChannel(this.connector.db, channel.getId(), channel)
   }
 
