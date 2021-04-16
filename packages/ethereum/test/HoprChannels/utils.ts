@@ -7,9 +7,9 @@ export type Ticket = {
   counter: string
   amount: string
   winProb: string
-  iteration: string,
-  ticketIndex: string,
-  ticketEpoch: string,
+  iteration: string
+  ticketIndex: string
+  ticketEpoch: string
 }
 
 const { solidityPack, solidityKeccak256 } = ethers.utils

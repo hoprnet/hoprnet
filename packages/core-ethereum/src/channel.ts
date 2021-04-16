@@ -17,7 +17,7 @@ class Channel {
     private readonly self: PublicKey,
     public readonly counterparty: PublicKey
   ) {
-    this.index = 0; // TODO - bump channel epoch to make sure..
+    this.index = 0 // TODO - bump channel epoch to make sure..
   }
 
   static generateId(self: Address, counterparty: Address) {
@@ -146,7 +146,7 @@ class Channel {
       counterpartyAddress,
       challenge,
       new UINT256(counterpartyState.counter),
-      new UINT256(new BN(this.index ++)),
+      new UINT256(new BN(this.index++)),
       amount,
       computeWinningProbability(winProb),
       (await this.getState()).channelEpoch,
@@ -160,7 +160,7 @@ class Channel {
       this.counterparty.toAddress(),
       challenge,
       UINT256.fromString('0'),
-      new UINT256(new BN(this.index ++)),
+      new UINT256(new BN(this.index++)),
       new Balance(new BN(0)),
       computeWinningProbability(1),
       UINT256.fromString('0'),
