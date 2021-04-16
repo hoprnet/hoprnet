@@ -125,12 +125,12 @@ describe('HoprChannels', function () {
     const { hoprToken, hoprChannels, accountA } = await useFixtures()
 
     await hoprToken
-        .connect(accountA)
-        .send(
-          hoprChannels.address,
-          '70',
-          abiEncoder.encode(['bool', 'address', 'address'], [false, ACCOUNT_A.address, ACCOUNT_B.address])
-        )
+      .connect(accountA)
+      .send(
+        hoprChannels.address,
+        '70',
+        abiEncoder.encode(['bool', 'address', 'address'], [false, ACCOUNT_A.address, ACCOUNT_B.address])
+      )
 
     const channel = await hoprChannels.channels(ACCOUNT_AB_CHANNEL_ID)
     expect(channel.partyABalance.toString()).to.equal('70')
@@ -147,12 +147,12 @@ describe('HoprChannels', function () {
     const { hoprToken, hoprChannels, accountA } = await useFixtures()
 
     await hoprToken
-        .connect(accountA)
-        .send(
-          hoprChannels.address,
-          '70',
-          abiEncoder.encode(['bool', 'address', 'address'], [true, ACCOUNT_A.address, ACCOUNT_B.address])
-        )
+      .connect(accountA)
+      .send(
+        hoprChannels.address,
+        '70',
+        abiEncoder.encode(['bool', 'address', 'address'], [true, ACCOUNT_A.address, ACCOUNT_B.address])
+      )
 
     const channel = await hoprChannels.channels(ACCOUNT_AB_CHANNEL_ID)
     expect(channel.partyABalance.toString()).to.equal('70')
@@ -168,16 +168,16 @@ describe('HoprChannels', function () {
   it('should fund both parties using send', async function () {
     const { hoprToken, hoprChannels, accountA } = await useFixtures()
 
-    await  hoprToken
-        .connect(accountA)
-        .send(
-          hoprChannels.address,
-          '100',
-          abiEncoder.encode(
-            ['bool', 'address', 'address', 'uint256', 'uint256'],
-            [false, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30']
-          )
+    await hoprToken
+      .connect(accountA)
+      .send(
+        hoprChannels.address,
+        '100',
+        abiEncoder.encode(
+          ['bool', 'address', 'address', 'uint256', 'uint256'],
+          [false, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30']
         )
+      )
 
     const channel = await hoprChannels.channels(ACCOUNT_AB_CHANNEL_ID)
     expect(channel.partyABalance.toString()).to.equal('70')
@@ -194,15 +194,15 @@ describe('HoprChannels', function () {
     const { hoprToken, hoprChannels, accountA } = await useFixtures()
 
     await hoprToken
-        .connect(accountA)
-        .send(
-          hoprChannels.address,
-          '100',
-          abiEncoder.encode(
-            ['bool', 'address', 'address', 'uint256', 'uint256'],
-            [true, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30']
-          )
+      .connect(accountA)
+      .send(
+        hoprChannels.address,
+        '100',
+        abiEncoder.encode(
+          ['bool', 'address', 'address', 'uint256', 'uint256'],
+          [true, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30']
         )
+      )
     const channel = await hoprChannels.channels(ACCOUNT_AB_CHANNEL_ID)
     expect(channel.partyABalance.toString()).to.equal('70')
     expect(channel.partyBBalance.toString()).to.equal('30')
@@ -454,7 +454,6 @@ describe('HoprChannels intergration tests', function () {
         SECRET_0
       )
     })
-
 
     it('should fund both parties and open channel', async function () {
       await f.hoprToken.connect(f.accountA).approve(f.hoprChannels.address, '110')
