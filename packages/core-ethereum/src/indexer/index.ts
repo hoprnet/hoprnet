@@ -7,11 +7,9 @@ import BN from 'bn.js'
 import Heap from 'heap-js'
 import { pubKeyToPeerId, randomChoice } from '@hoprnet/hopr-utils'
 import { Address, ChannelEntry, Hash, PublicKey, Balance, Snapshot } from '../types'
-import * as reducers from './reducers'
 import * as db from './db'
 import { isConfirmedBlock, isSyncing, snapshotComparator } from './utils'
 import Debug from 'debug'
-import { Channel } from '..'
 
 export type RoutingChannel = [source: PeerId, destination: PeerId, stake: Balance]
 
@@ -272,16 +270,11 @@ class Indexer extends EventEmitter {
 
       const eventName = event.event as EventNames
 
-      try {
-        if (eventName === 'ChannelUpdate') {
-          await this.onChannelUpdated(event as Event<'ChannelUpdate'>)
-        } else if (eventName === 'TicketRedeemed') {
-          await this.onTicketRedeemed(event as Event<'TicketRedeemed'>)
-        }
-      } catch (err) {
-        log(chalk.red('Error while reducing event'))
-        throw err
+      if (eventName != 'ChannelUpdate') {
+        throw new Error('bad event name')
       }
+
+      await this.onChannelUpdated(event as Event<'ChannelUpdate'>)
 
       lastSnapshot = new Snapshot(new BN(event.blockNumber), new BN(event.transactionIndex), new BN(event.logIndex))
       await db.updateLatestConfirmedSnapshot(this.connector.db, lastSnapshot)
@@ -309,24 +302,6 @@ class Indexer extends EventEmitter {
       new Balance(new BN(rawChannel[1].toString()))
     )
     await db.updateChannel(this.connector.db, channel.getId(), channel)
-  }
-
-  private async onTicketRedeemed(event: Event<'TicketRedeemed'>): Promise<void> {
-    const data = event.args
-
-    const redeemerAccountId = Address.fromString(data.redeemer)
-    const counterpartyAccountId = Address.fromString(data.counterparty)
-    const channelId = Channel.generateId(redeemerAccountId, counterpartyAccountId)
-    // log('Processing event %s with channelId %s', event.name, channelId.toHex())
-
-    const storedChannel = await db.getChannel(this.connector.db, channelId)
-    if (!storedChannel) throw Error(`Could not find stored channel ${channelId.toHex()}`)
-
-    const channel = await reducers.onTicketRedeemed(event, storedChannel)
-
-    await db.updateChannel(this.connector.db, channelId, channel)
-
-    // log('Ticket redeemd in channel %s by %s', chalk.green(channelId.toHex()), chalk.green(redeemerAddress.toHex()))
   }
 
   public async getAccount(address: Address) {

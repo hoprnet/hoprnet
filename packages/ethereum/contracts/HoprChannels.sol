@@ -83,13 +83,6 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         Channel newState
     );
 
-    event TicketRedeemed(
-        // @TODO: remove this and rely on `msg.sender`
-        address indexed redeemer,
-        address indexed counterparty,
-        uint256 amount
-    );
-
     /**
      * @param _token HoprToken address
      * @param _secsClosure seconds until a channel can be closed
@@ -524,14 +517,14 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
             channel.partyABalance = channel.partyABalance.add(amount);
             channel.partyATicketEpoch = channel.partyATicketEpoch.add(1);
             channel.partyATicketIndex = ticketIndex;
+            emit ChannelUpdate(redeemer, counterparty, channel);
         } else {
             channel.partyABalance = channel.partyABalance.sub(amount);
             channel.partyBCommitment = nextCommitment;
             channel.partyBTicketEpoch = channel.partyATicketEpoch.add(1);
             channel.partyBTicketIndex = ticketIndex;
+            emit ChannelUpdate(counterparty, redeemer, channel);
         }
-
-        emit TicketRedeemed(redeemer, counterparty, amount);
     }
 
     /**
