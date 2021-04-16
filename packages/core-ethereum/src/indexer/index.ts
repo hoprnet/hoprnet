@@ -292,7 +292,7 @@ class Indexer extends EventEmitter {
   }
 
   private async onChannelUpdated(event: Event<'ChannelUpdate'>): Promise<void> {
-    const channel = ChannelEntry.fromSCEvent(event);
+    const channel = ChannelEntry.fromSCEvent(event)
     await db.updateChannel(this.connector.db, channel.getId(), channel)
   }
 
