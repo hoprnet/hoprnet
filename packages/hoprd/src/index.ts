@@ -2,7 +2,7 @@
 import Hopr from '@hoprnet/hopr-core'
 import type { HoprOptions } from '@hoprnet/hopr-core'
 import { decode } from 'rlp'
-import { getBootstrapAddresses } from '@hoprnet/hopr-utils'
+import { getBootstrapAddresses, Logger, configure, ipfsAppender } from '@hoprnet/hopr-utils'
 import { Commands } from './commands'
 import { LogStream } from './logs'
 import { AdminServer } from './admin'
@@ -132,7 +132,17 @@ async function generateNodeOptions(): Promise<HoprOptions> {
   return options
 }
 
+function initLogger() {
+  configure({
+    appenders: { custom: { type: ipfsAppender } },
+    categories: { default: { appenders: ['custom'], level: 'debug' } }
+  })
+}
+
 async function main() {
+  initLogger()
+  const logger: Logger = Logger.getLogger('hoprd')
+  logger.info('Testing new logger')
   let node: Hopr
   let logs = new LogStream()
   let adminServer = undefined

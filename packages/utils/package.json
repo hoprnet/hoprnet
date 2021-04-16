@@ -25,9 +25,11 @@
     "!**/*.spec.js.map"
   ],
   "dependencies": {
+    "@log4js-node/log4js-api": "^1.0.2",
     "abort-controller": "~3.0.0",
     "bignumber.js": "^9.0.0",
     "libp2p-crypto": "0.19.3",
+    "log4js": "^6.3.0",
     "multiaddr": "8.1.2",
     "multihashes": "~4.0.1",
     "peer-id": "0.14.7",

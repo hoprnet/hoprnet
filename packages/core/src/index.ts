@@ -1,4 +1,5 @@
 import LibP2P from 'libp2p'
+import { Logger } from '@hoprnet/hopr-utils'
 import type { Connection } from 'libp2p'
 
 const MPLEX = require('libp2p-mplex')
@@ -61,6 +62,7 @@ import { subscribeToAcknowledgements } from './interactions/packet/acknowledgeme
 import { PacketForwardInteraction } from './interactions/packet/forward'
 
 const log = Debug(`hopr-core`)
+const logger = Logger.getLogger('core')
 const verbose = Debug('hopr-core:verbose')
 
 interface NetOptions {
@@ -356,6 +358,9 @@ class Hopr extends EventEmitter {
   public async start(): Promise<Hopr> {
     await Promise.all([this._libp2p.start().then(() => this.heartbeat.start()), this.paymentChannels.start()])
 
+    logger.warn(
+      'Testing logging from core, which is a dependency of hoprd, this should trigger HOPR is awesome sentence as well!'
+    )
     log(`Available under the following addresses:`)
 
     this._libp2p.multiaddrs.forEach((ma: Multiaddr) => log(ma.toString()))
