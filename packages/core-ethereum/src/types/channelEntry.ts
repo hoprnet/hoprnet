@@ -1,10 +1,35 @@
-import BN from 'bn.js'
-import { u8aSplit, serializeToU8a, toU8a } from '@hoprnet/hopr-utils'
+import { u8aSplit, serializeToU8a, u8aToNumber } from '@hoprnet/hopr-utils'
 import { Address, Balance, Hash } from './primitives'
 import { UINT256 } from '../types/solidity'
 import { Channel } from '..'
 
 export type ChannelStatus = 'CLOSED' | 'OPEN' | 'PENDING_TO_CLOSE'
+
+function u8aToChannelStatus(arr: Uint8Array): ChannelStatus {
+  const i = u8aToNumber(arr)
+  if (i === 0) return 'CLOSED'
+  else if (i === 1) return 'OPEN'
+  else if (i === 2) return 'PENDING_TO_CLOSE'
+  throw Error(`Status at ${status} does not exist`)
+}
+
+// TODO, find a better way to do this.
+const components = [
+  Address,
+  Address,
+  Balance,
+  Balance,
+  Hash,
+  Hash,
+  UINT256,
+  UINT256,
+  UINT256,
+  UINT256,
+  { name: 'channelStatus', SIZE: 32, deserialize: u8aToChannelStatus},
+  UINT256,
+  UINT256,
+  { name: 'closureByPartyA', SIZE: 1, deserialize: () => {}}
+]
 
 class ChannelEntry {
   constructor(
@@ -16,97 +41,46 @@ class ChannelEntry {
     public readonly commitmentPartyB: Hash,
     public readonly partyATicketEpoch: UINT256,
     public readonly partyBTicketEpoch: UINT256,
+    public readonly partyATicketIndex: UINT256,
+    public readonly partyBTicketIndex: UINT256,
     public readonly status: ChannelStatus,
     public readonly channelEpoch: UINT256,
-    public readonly closureTime: BN,
+    public readonly closureTime: UINT256,
     public readonly closureByPartyA: boolean
   ) {}
 
   static get SIZE(): number {
-    return (
-      Address.SIZE +
-      Address.SIZE +
-      UINT256.SIZE +
-      UINT256.SIZE +
-      UINT256.SIZE +
-      UINT256.SIZE +
-      1 +
-      UINT256.SIZE +
-      UINT256.SIZE
-    )
+    return components.map(x => x.SIZE).reduce((x, y) => x + y, 0)
   }
 
   static deserialize(arr: Uint8Array) {
-    const items = u8aSplit(arr, [
-      Address.SIZE,
-      Address.SIZE,
-      UINT256.SIZE,
-      UINT256.SIZE,
-      UINT256.SIZE,
-      UINT256.SIZE,
-      1,
-      UINT256.SIZE,
-      UINT256.SIZE
-    ])
-    const partyA = new Address(items[0])
-    const partyB = new Address(items[1])
-    const deposit = new BN(items[2])
-    const partyABalance = new BN(items[3])
-    const closureTime = new BN(items[4])
-    const stateCounter = new BN(items[5])
-    const closureByPartyA = Boolean(items[6][0])
-    const openedAt = new BN(items[7])
-    const closedAt = new BN(items[8])
-
-    return new ChannelEntry(
-      partyA,
-      partyB,
-      deposit,
-      partyABalance,
-      closureTime,
-      stateCounter,
-      closureByPartyA,
-      openedAt,
-      closedAt
-    )
+    const items = u8aSplit(arr, components.map(x => x.SIZE))
+    const params = items.map((x, i) => components[i].deserialize(x))
+    // @ts-ignore //TODO
+    return new ChannelEntry(...params)
   }
 
   public serialize(): Uint8Array {
     return serializeToU8a([
       [this.partyA.serialize(), Address.SIZE],
       [this.partyB.serialize(), Address.SIZE],
-      [new UINT256(this.deposit).serialize(), UINT256.SIZE],
-      [new UINT256(this.partyABalance).serialize(), UINT256.SIZE],
-      [new UINT256(this.closureTime).serialize(), UINT256.SIZE],
-      [new UINT256(this.stateCounter).serialize(), UINT256.SIZE],
-      [toU8a(Number(this.closureByPartyA)), 1],
-      [new UINT256(this.openedAt).serialize(), UINT256.SIZE],
-      [new UINT256(this.closedAt).serialize(), UINT256.SIZE]
+      [this.partyABalance.serialize(), Balance.SIZE],
+      [this.partyBBalance.serialize(), Balance.SIZE],
+      [this.commitmentPartyA.serialize(), Hash.SIZE],
+      [this.commitmentPartyB.serialize(), Hash.SIZE],
+      [this.partyATicketEpoch.serialize(), UINT256.SIZE],
+      [this.partyBTicketEpoch.serialize(), UINT256.SIZE],
+      [this.partyATicketIndex.serialize(), UINT256.SIZE],
+      [this.partyBTicketIndex.serialize(), UINT256.SIZE],
+      [channelStatusToU8a(this.status), 32],
+      [this.channelEpoch.serialize(), UINT256.SIZE],
+      [this.closureTime: UINT256.SIZE],
+      [this.closureByPartyA, 1]
     ])
-  }
-
-  public getStatus() {
-    const status = this.stateCounter.modn(10)
-
-    if (status === 0) return 'CLOSED'
-    else if (status === 1) return 'OPEN'
-    else if (status === 2) return 'PENDING_TO_CLOSE'
-    throw Error(`Status at ${status} does not exist`)
-  }
-
-  public getIteration() {
-    return new BN(String(Math.ceil((this.stateCounter.toNumber() + 1) / 10)))
   }
 
   public getId() {
     return Channel.generateId(this.partyA, this.partyB)
-  }
-
-  public getBalances() {
-    return {
-      partyA: new Balance(this.partyABalance),
-      partyB: new Balance(this.deposit.sub(this.partyABalance))
-    }
   }
 }
 

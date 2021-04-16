@@ -17,6 +17,10 @@ export class Address {
     if (!ethers.utils.isAddress(str)) throw Error(`String ${str} is not an address`)
     return new Address(stringToU8a(str))
   }
+  
+  static deserialize(arr: Uint8Array) {
+    return new Address(arr)
+  }
 
   serialize() {
     return this.arr
@@ -58,6 +62,10 @@ export class Balance {
     return this.bn
   }
 
+  static deserialize(arr: Uint8Array) {
+    return new Balance(new BN(arr))
+  }
+
   public serialize(): Uint8Array {
     return new Uint8Array(this.bn.toBuffer('be', Balance.SIZE))
   }
@@ -83,6 +91,10 @@ export class Hash {
 
   static createChallenge(secretA: Uint8Array, secretB: Uint8Array): Hash {
     return Hash.create(u8aConcat(secretA, secretB)).hash()
+  }
+
+  static deserialize(arr: Uint8Array) {
+    return new Hash(arr)
   }
 
   serialize(): Uint8Array {
