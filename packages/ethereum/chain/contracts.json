@@ -81,5 +81,19 @@
       "address": "0x504a24F1398Be1824C35Bc5964b23Ba292991dA5",
       "deployedAt": 2713229
     }
+  },
+  "hardhat": {
+    "HoprToken": {
+      "address": "0xF37ed6D8633Ce36cAdCF20f533Ca1218C1132915",
+      "deployedAt": 15
+    },
+    "HoprDistributor": {
+      "address": "0x1C130e112473Ebc865adE4577548713c07ca9212",
+      "deployedAt": 16
+    },
+    "HoprChannels": {
+      "address": "0xd7812BbE70037DF7d6AB55202871577e006092e0",
+      "deployedAt": 17
+    }
   }
 }

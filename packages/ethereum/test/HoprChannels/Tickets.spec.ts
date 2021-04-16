@@ -1,6 +1,6 @@
 import { deployments, ethers } from 'hardhat'
 import { expect } from 'chai'
-import { ACCOUNT_A, ACCOUNT_B, ACCOUNT_AB_CHANNEL_ID, SECRET_2, generateTickets, SECRET_0 } from './constants'
+import { ACCOUNT_A, ACCOUNT_B, ACCOUNT_AB_CHANNEL_ID, generateTickets, SECRET_0 } from './constants'
 import { ERC777Mock__factory, TicketsMock__factory } from '../../types'
 import deployERC1820Registry from '../../deploy/01_ERC1820Registry'
 
@@ -31,10 +31,7 @@ const useFixtures = deployments.createFixture(async (hre, { secsClosure }: { sec
 describe('Tickets', function () {
   it('should redeem ticket', async function () {
     const { tickets, deployer, TICKET_AB_WIN } = await useFixtures()
-
-    await tickets.initializeAccountInternal(ACCOUNT_B.address, ACCOUNT_B.uncompressedPublicKey, SECRET_2)
     await tickets.fundChannelInternal(deployer, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
-    await tickets.openChannelInternal(ACCOUNT_A.address, ACCOUNT_B.address)
 
     // TODO: add event check
     await tickets.redeemTicketInternal(
@@ -68,8 +65,6 @@ describe('Tickets', function () {
   it('should fail to redeem ticket when channel in closed', async function () {
     const { tickets, TICKET_AB_WIN } = await useFixtures()
 
-    await tickets.initializeAccountInternal(ACCOUNT_B.address, ACCOUNT_B.uncompressedPublicKey, SECRET_2)
-
     await expect(
       tickets.redeemTicketInternal(
         TICKET_AB_WIN.recipient,
@@ -90,8 +85,6 @@ describe('Tickets', function () {
   it('should fail to redeem ticket when channel in in different iteration', async function () {
     const { token, tickets, deployer, TICKET_AB_WIN } = await useFixtures()
 
-    await tickets.initializeAccountInternal(ACCOUNT_B.address, ACCOUNT_B.uncompressedPublicKey, SECRET_2)
-
     // transfer tokens to contract
     await token.send(
       tickets.address,
@@ -105,12 +98,10 @@ describe('Tickets', function () {
       }
     )
     // open channel and then close it
-    await tickets.openChannelInternal(ACCOUNT_A.address, ACCOUNT_B.address)
     await tickets.initiateChannelClosureInternal(ACCOUNT_A.address, ACCOUNT_B.address)
     await tickets.finalizeChannelClosureInternal(ACCOUNT_A.address, ACCOUNT_B.address)
     // refund and open channel
     await tickets.fundChannelInternal(deployer, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
-    await tickets.openChannelInternal(ACCOUNT_A.address, ACCOUNT_B.address)
 
     await expect(
       tickets.redeemTicketInternal(
@@ -132,9 +123,7 @@ describe('Tickets', function () {
   it('should fail to redeem ticket when ticket has been already redeemed', async function () {
     const { tickets, deployer, TICKET_AB_WIN } = await useFixtures()
 
-    await tickets.initializeAccountInternal(ACCOUNT_B.address, ACCOUNT_B.uncompressedPublicKey, SECRET_2)
     await tickets.fundChannelInternal(deployer, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
-    await tickets.openChannelInternal(ACCOUNT_A.address, ACCOUNT_B.address)
 
     await tickets.redeemTicketInternal(
       TICKET_AB_WIN.recipient,
@@ -170,9 +159,7 @@ describe('Tickets', function () {
   it('should fail to redeem ticket when signer is not the issuer', async function () {
     const { tickets, deployer, TICKET_AB_WIN, TICKET_BA_WIN } = await useFixtures()
 
-    await tickets.initializeAccountInternal(ACCOUNT_B.address, ACCOUNT_B.uncompressedPublicKey, SECRET_2)
     await tickets.fundChannelInternal(deployer, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
-    await tickets.openChannelInternal(ACCOUNT_A.address, ACCOUNT_B.address)
 
     await expect(
       tickets.redeemTicketInternal(
@@ -194,9 +181,7 @@ describe('Tickets', function () {
   it("should fail to redeem ticket if it's a loss", async function () {
     const { tickets, deployer, TICKET_AB_LOSS } = await useFixtures()
 
-    await tickets.initializeAccountInternal(ACCOUNT_B.address, ACCOUNT_B.uncompressedPublicKey, SECRET_2)
     await tickets.fundChannelInternal(deployer, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
-    await tickets.openChannelInternal(ACCOUNT_A.address, ACCOUNT_B.address)
 
     await expect(
       tickets.redeemTicketInternal(
