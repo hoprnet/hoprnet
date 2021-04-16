@@ -14,11 +14,10 @@ function u8aToChannelStatus(arr: Uint8Array): ChannelStatus {
 }
 
 function channelStatusToU8a(c: ChannelStatus): Uint8Array {
-  if (c == 'CLOSED') return Uint8Array.of(0);
-  if (c == 'OPEN') return Uint8Array.of(1);
+  if (c == 'CLOSED') return Uint8Array.of(0)
+  if (c == 'OPEN') return Uint8Array.of(1)
   return Uint8Array.of(2)
 }
-
 
 // TODO, find a better way to do this.
 const components = [
@@ -32,10 +31,10 @@ const components = [
   UINT256,
   UINT256,
   UINT256,
-  { name: 'channelStatus', SIZE: 32, deserialize: u8aToChannelStatus},
+  { name: 'channelStatus', SIZE: 32, deserialize: u8aToChannelStatus },
   UINT256,
   UINT256,
-  { name: 'closureByPartyA', SIZE: 1, deserialize: () => {}}
+  { name: 'closureByPartyA', SIZE: 1, deserialize: () => {} }
 ]
 
 class ChannelEntry {
@@ -57,11 +56,14 @@ class ChannelEntry {
   ) {}
 
   static get SIZE(): number {
-    return components.map(x => x.SIZE).reduce((x, y) => x + y, 0)
+    return components.map((x) => x.SIZE).reduce((x, y) => x + y, 0)
   }
 
   static deserialize(arr: Uint8Array) {
-    const items = u8aSplit(arr, components.map(x => x.SIZE))
+    const items = u8aSplit(
+      arr,
+      components.map((x) => x.SIZE)
+    )
     const params = items.map((x, i) => components[i].deserialize(x))
     // @ts-ignore //TODO
     return new ChannelEntry(...params)

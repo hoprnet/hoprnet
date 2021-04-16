@@ -17,7 +17,7 @@ export class Address {
     if (!ethers.utils.isAddress(str)) throw Error(`String ${str} is not an address`)
     return new Address(stringToU8a(str))
   }
-  
+
   static deserialize(arr: Uint8Array) {
     return new Address(arr)
   }
