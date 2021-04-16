@@ -37,8 +37,8 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         uint256 partyABalance;
         uint256 partyBBalance;
 
-        bytes32 commitmentPartyA;
-        bytes32 commitmentPartyB;
+        bytes32 partyACommitment;
+        bytes32 partyBCommitment;
         uint256 partyATicketEpoch;
         uint256 partyBTicketEpoch;
         uint256 partyATicketIndex;
@@ -141,6 +141,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         address counterparty,
         bytes32 nextCommitment,
         uint256 ticketEpoch,
+        uint256 ticketIndex,
         bytes32 proofOfRelaySecret,
         uint256 amount,
         bytes32 winProb,
@@ -153,6 +154,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
             counterparty,
             nextCommitment,
             ticketEpoch,
+            ticketIndex,
             proofOfRelaySecret,
             amount,
             winProb,
@@ -436,7 +438,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
      * @dev Redeem a ticket
      * @param redeemer the redeemer address
      * @param counterparty the counterparty address
-     * @param secretPreImage the secretPreImage that results to the redeemers channel commitment
+     * @param nextCommitment the commitment that hashes to the redeemers previous commitment
      * @param proofOfRelaySecret the proof of relay secret
      * @param winProb the winning probability of the ticket
      * @param amount the amount in the ticket
@@ -449,6 +451,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         address counterparty,
         bytes32 nextCommitment,
         uint256 ticketEpoch,
+        uint256 ticketIndex,
         bytes32 proofOfRelaySecret,
         uint256 amount,
         bytes32 winProb,
@@ -470,7 +473,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
             counterparty
         );
 
-        if (_isPartyA(redeemer, counterparty) {
+        if (_isPartyA(redeemer, counterparty)) {
           require(channel.partyACommitment == keccak256(abi.encodePacked(nextCommitment)), "commitment must be hash of next commitment");
           require(channel.partyATicketEpoch == ticketEpoch, "Ticket epoch must match");
           require(channel.partyATicketIndex < ticketIndex, "Redemptions must be in order");
@@ -481,17 +484,17 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         }
         require(channel.status != ChannelStatus.CLOSED, "channel must be open or pending to close");
 
-        uint256 ticketEpoch;
+        uint256 prevTicketEpoch;
         if (_isPartyA(redeemer, counterparty)) {
-          ticketEpoch = channel.partyATicketEpoch;
+          prevTicketEpoch = channel.partyATicketEpoch;
         } else {
-          ticketEpoch = channel.partyBTicketEpoch;
+          prevTicketEpoch = channel.partyBTicketEpoch;
         }
 
         bytes32 ticketHash = _getTicketHash(
             _getEncodedTicket(
                 redeemer,
-                ticketEpoch,
+                prevTicketEpoch,
                 proofOfRelaySecret,
                 channel.channelEpoch,
                 amount,
@@ -503,7 +506,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         require(
             uint256(_getTicketLuck(
                 ticketHash,
-                secretPreImage,
+                nextCommitment,
                 proofOfRelaySecret,
                 winProb
             )) <= uint256(winProb),
@@ -573,10 +576,10 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
      */
     function _getTicketLuck(
         bytes32 ticketHash,
-        bytes32 secretPreImage,
+        bytes32 nextCommitment,
         bytes32 proofOfRelaySecret,
         bytes32 winProb
     ) internal pure returns (bytes32) {
-        return keccak256(abi.encodePacked(ticketHash, secretPreImage, proofOfRelaySecret, winProb));
+        return keccak256(abi.encodePacked(ticketHash, nextCommitment, proofOfRelaySecret, winProb));
     }
 }

@@ -329,6 +329,8 @@ describe('HoprChannels intergration tests', function () {
         .redeemTicket(
           f.TICKET_BA_WIN.counterparty,
           f.TICKET_BA_WIN.secret,
+          f.TICKET_BA_WIN.ticketEpoch,
+          f.TICKET_BA_WIN.ticketIndex,
           f.TICKET_BA_WIN.proofOfRelaySecret,
           f.TICKET_BA_WIN.amount,
           f.TICKET_BA_WIN.winProb,

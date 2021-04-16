@@ -34,7 +34,9 @@ contract TicketsMock is HoprChannels {
     function redeemTicketInternal(
         address recipient,
         address counterparty,
-        bytes32 secretPreImage,
+        bytes32 nextCommitment,
+        uint256 ticketEpoch,
+        uint256 ticketIndex,
         bytes32 proofOfRelaySecret,
         uint256 amount,
         bytes32 winProb,
@@ -42,7 +44,19 @@ contract TicketsMock is HoprChannels {
         bytes32 s,
         uint8 v
     ) external {
-        _redeemTicket(recipient, counterparty, secretPreImage, proofOfRelaySecret, amount, winProb, r, s, v);
+        _redeemTicket(
+            msg.sender,
+            counterparty,
+            nextCommitment,
+            ticketEpoch,
+            ticketIndex,
+            proofOfRelaySecret,
+            amount,
+            winProb,
+            r,
+            s,
+            v
+        );
     }
 
     function getEncodedTicketInternal(
