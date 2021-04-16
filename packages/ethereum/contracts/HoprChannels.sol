@@ -208,17 +208,17 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         require(msg.sender != counterparty, "accountA and accountB must not be the same");
 
         (,,, Channel storage channel) = _getChannel(
-            redeemer,
+            msg.sender,
             counterparty
         );
 
         if (_isPartyA(msg.sender, counterparty)){
           channel.partyACommitment = newCommitment;
+          channel.partyATicketEpoch = channel.partyATicketEpoch.add(1);
         } else {
           channel.partyBCommitment = newCommitment;
+          channel.partyATicketEpoch = channel.partyBTicketEpoch.add(1);
         }
-        channel.channelEpoch = channel.channelEpoch.add(1);
-
     }
 
     /**
