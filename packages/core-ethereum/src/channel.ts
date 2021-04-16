@@ -37,7 +37,7 @@ class Channel {
   async getBalances() {
     const state = await this.getState()
     const a = state.partyABalance
-    const b = state.partyABalance
+    const b = state.partyBBalance
     const [self, counterparty] = state.partyA.eq(this.self.toAddress()) ? [a, b] : [b, a]
 
     return {
