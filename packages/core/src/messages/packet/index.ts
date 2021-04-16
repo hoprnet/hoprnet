@@ -84,7 +84,7 @@ export async function validateUnacknowledgedTicket(
   }
 
   // channel MUST be open or pending to close
-  if (channelState.getStatus() === 'CLOSED') {
+  if (channelState.status === 'CLOSED') {
     throw Error(`Payment channel with '${senderB58}' is not open or pending to close`)
   }
 
@@ -97,9 +97,9 @@ export async function validateUnacknowledgedTicket(
   }
 
   // ticket's channelIteration MUST match the current channelIteration
-  const currentChannelIteration = channelState.getIteration()
+  const currentChannelIteration = channelState.channelEpoch
   const ticketChannelIteration = ticket.channelIteration.toBN()
-  if (!ticketChannelIteration.eq(currentChannelIteration)) {
+  if (!ticketChannelIteration.eq(currentChannelIteration.toBN())) {
     throw Error(
       `Ticket was created for a different channel iteration ${ticketChannelIteration.toString()} != ${currentChannelIteration.toString()}`
     )
@@ -119,7 +119,7 @@ export async function validateUnacknowledgedTicket(
     (signedTicket) =>
       signedTicket.counterparty.eq(selfAddress) &&
       signedTicket.epoch.toBN().eq(accountCounter) &&
-      ticket.channelIteration.toBN().eq(currentChannelIteration)
+      ticket.channelIteration.toBN().eq(currentChannelIteration.toBN())
   )
 
   // calculate total unredeemed balance

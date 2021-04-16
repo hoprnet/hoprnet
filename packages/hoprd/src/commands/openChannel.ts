@@ -48,7 +48,7 @@ export abstract class OpenChannelBase extends AbstractCommand {
       // must be one of ours
       if (!self.eq(channel.partyA) && !self.eq(channel.partyB)) return false
       // must be open
-      if (channel.getStatus() === 'CLOSED') return false
+      if (channel.status === 'CLOSED') return false
 
       return true
     })
