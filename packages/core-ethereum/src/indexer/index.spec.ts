@@ -1,7 +1,7 @@
 import type CoreConnector from '..'
 import assert from 'assert'
 import { Ganache } from '@hoprnet/hopr-testing'
-import { migrate, fund, getAddresses } from '@hoprnet/hopr-ethereum'
+import { migrate, fund, getContracts } from '@hoprnet/hopr-ethereum'
 import { durations, u8aToHex, u8aEquals } from '@hoprnet/hopr-utils'
 import * as testconfigs from '../config.spec'
 import { PublicKey } from '../types'
@@ -43,11 +43,11 @@ describe('test indexer', function () {
 
     await ganache.start()
     await migrate()
-    await fund(`--address ${getAddresses()?.localhost?.HoprToken} --accounts-to-fund 4`)
+    await fund(`--address ${getContracts().localhost.HoprToken.address} --accounts-to-fund 4`)
 
     provider = new providers.WebSocketProvider(DEFAULT_URI)
-    hoprToken = HoprToken__factory.connect(getAddresses().localhost?.HoprToken, provider)
-    hoprChannels = HoprChannels__factory.connect(getAddresses().localhost?.HoprChannels, provider)
+    hoprToken = HoprToken__factory.connect(getContracts().localhost.HoprToken.address, provider)
+    hoprChannels = HoprChannels__factory.connect(getContracts().localhost.HoprChannels.address, provider)
 
     userAWallet = new ethers.Wallet(testconfigs.FUND_ACCOUNT_PRIVATE_KEY).connect(provider)
     userA = PublicKey.fromPrivKey(arrayify(userAWallet.privateKey))

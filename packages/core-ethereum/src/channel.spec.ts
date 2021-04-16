@@ -3,7 +3,7 @@ import { Ganache } from '@hoprnet/hopr-testing'
 import { migrate } from '@hoprnet/hopr-ethereum'
 import assert from 'assert'
 import { durations } from '@hoprnet/hopr-utils'
-import { getAddresses } from '@hoprnet/hopr-ethereum'
+import { getContracts } from '@hoprnet/hopr-ethereum'
 import { createNode, fundAccount, advanceBlock } from './utils/testing'
 import BN from 'bn.js'
 import { Balance, Ticket, Address, Hash, UnacknowledgedTicket, PublicKey } from './types'
@@ -56,7 +56,7 @@ describe('test Channel class', function () {
     await migrate()
 
     provider = new providers.WebSocketProvider(DEFAULT_URI)
-    hoprToken = HoprToken__factory.connect(getAddresses().localhost?.HoprToken, provider)
+    hoprToken = HoprToken__factory.connect(getContracts().localhost.HoprToken.address, provider)
   })
 
   after(async function () {

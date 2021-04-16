@@ -1,14 +1,14 @@
 import assert from 'assert'
 import { durations, stringToU8a } from '@hoprnet/hopr-utils'
 import { Ganache } from '@hoprnet/hopr-testing'
-import { getAddresses, migrate, fund } from '@hoprnet/hopr-ethereum'
+import { getContracts, migrate, fund } from '@hoprnet/hopr-ethereum'
 import HoprEthereum from '.'
 import { computeWinningProbability } from './utils'
 import { UnacknowledgedTicket, Ticket, Hash } from './types'
 import * as testconfigs from './config.spec'
 import { createNode } from './utils/testing'
 
-const FUND_ARGS = `--address ${getAddresses()?.localhost?.HoprToken} --accounts-to-fund 1`
+const FUND_ARGS = `--address ${getContracts().localhost.HoprToken.address} --accounts-to-fund 1`
 
 // TODO: replace legacy test
 describe('test hashedSecret', function () {
