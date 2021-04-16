@@ -12,7 +12,6 @@ function numberToChannelStatus(i: number): ChannelStatus {
   else if (i === 1) return 'OPEN'
   else if (i === 2) return 'PENDING_TO_CLOSE'
   throw Error(`Status at ${status} does not exist`)
-
 }
 
 function u8aToChannelStatus(arr: Uint8Array): ChannelStatus {
@@ -75,7 +74,7 @@ class ChannelEntry {
     return new ChannelEntry(...params)
   }
 
-  static fromSCEvent(event: Event<'ChannelUpdate'>): ChannelEntry{
+  static fromSCEvent(event: Event<'ChannelUpdate'>): ChannelEntry {
     const data = event.args
     const rawChannel = data[2]
     return new ChannelEntry(
@@ -94,7 +93,6 @@ class ChannelEntry {
       new UINT256(new BN(rawChannel[10].toString())),
       Boolean(rawChannel[11])
     )
-
   }
 
   public serialize(): Uint8Array {
