@@ -32,7 +32,7 @@ export const generateTickets = async () => {
       proofOfRelaySecret: PROOF_OF_RELAY_SECRET_0,
       counter: '1',
       ticketEpoch: '0',
-      ticketIndex: '0',
+      ticketIndex: '1',
       amount: '10',
       winProb: WIN_PROB_100,
       iteration: '1'
@@ -53,7 +53,7 @@ export const generateTickets = async () => {
       proofOfRelaySecret: PROOF_OF_RELAY_SECRET_1,
       counter: '1',
       ticketEpoch: '0',
-      ticketIndex: '0',
+      ticketIndex: '1',
       amount: '10',
       winProb: WIN_PROB_100,
       iteration: '1'
@@ -71,7 +71,7 @@ export const generateTickets = async () => {
       proofOfRelaySecret: PROOF_OF_RELAY_SECRET_0,
       counter: '1',
       ticketEpoch: '0',
-      ticketIndex: '0',
+      ticketIndex: '1',
       amount: '10',
       winProb: WIN_PROB_0,
       iteration: '1'
@@ -89,7 +89,7 @@ export const generateTickets = async () => {
       proofOfRelaySecret: PROOF_OF_RELAY_SECRET_0,
       counter: '1',
       ticketEpoch: '0',
-      ticketIndex: '0',
+      ticketIndex: '1',
       amount: '10',
       winProb: WIN_PROB_100,
       iteration: '1'
@@ -110,7 +110,7 @@ export const generateTickets = async () => {
       proofOfRelaySecret: PROOF_OF_RELAY_SECRET_1,
       counter: '1',
       ticketEpoch: '0',
-      ticketIndex: '0',
+      ticketIndex: '1',
       amount: '10',
       winProb: WIN_PROB_100,
       iteration: '1'

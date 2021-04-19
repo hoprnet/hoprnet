@@ -6,6 +6,9 @@ import deployERC1820Registry from '../../deploy/01_ERC1820Registry'
 
 const abiEncoder = ethers.utils.Interface.getAbiCoder()
 
+ACCOUNT_A.wallet = ACCOUNT_B.wallet.connect(ethers.provider)
+ACCOUNT_B.wallet = ACCOUNT_B.wallet.connect(ethers.provider)
+
 const useFixtures = deployments.createFixture(async (hre, { secsClosure }: { secsClosure?: string } = {}) => {
   const [deployer] = await ethers.getSigners()
 
@@ -31,8 +34,10 @@ const useFixtures = deployments.createFixture(async (hre, { secsClosure }: { sec
 describe('Tickets', function () {
   it('should redeem ticket', async function () {
     const { tickets, deployer, TICKET_AB_WIN } = await useFixtures()
+    await tickets.connect(ACCOUNT_B.wallet).bumpChannel(ACCOUNT_A.address, SECRET_2);
     await tickets.fundChannelInternal(deployer, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
 
+    console.log((await tickets.channels(ACCOUNT_AB_CHANNEL_ID)).partyACommitment.toString())
     // TODO: add event check
     await tickets.redeemTicketInternal(
       TICKET_AB_WIN.recipient,
@@ -55,14 +60,12 @@ describe('Tickets', function () {
     expect(channel.closureTime.toString()).to.equal('0')
     expect(channel.status.toString()).to.equal('1')
     expect(channel.closureByPartyA).to.be.false
-
-    const account = await tickets.accounts(ACCOUNT_B.address)
-    expect(account.secret).to.equal(TICKET_AB_WIN.secret)
+    expect(channel.partyACommitment).to.equal(TICKET_AB_WIN.secret)
   })
 
   it('should fail to redeem ticket when channel in closed', async function () {
     const { tickets, TICKET_AB_WIN } = await useFixtures()
-    await tickets.bumpChannel(ACCOUNT_B.address, SECRET_2)
+    await tickets.connect(ACCOUNT_B.wallet).bumpChannel(ACCOUNT_A.address, SECRET_2);
 
     await expect(
       tickets.redeemTicketInternal(
@@ -81,15 +84,15 @@ describe('Tickets', function () {
 
   it('should fail to redeem ticket when channel in in different iteration', async function () {
     const { token, tickets, deployer, TICKET_AB_WIN } = await useFixtures()
-    await tickets.bumpChannel(ACCOUNT_B.address, SECRET_2)
+    await tickets.connect(ACCOUNT_B.wallet).bumpChannel(ACCOUNT_A.address, SECRET_2);
 
     // transfer tokens to contract
     await token.send(
       tickets.address,
       '100',
       abiEncoder.encode(
-        ['bool', 'address', 'address', 'uint256', 'uint256'],
-        [false, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30']
+        ['address', 'address', 'uint256', 'uint256'],
+        [ACCOUNT_A.address, ACCOUNT_B.address, '70', '30']
       ),
       {
         from: deployer
@@ -119,6 +122,7 @@ describe('Tickets', function () {
   it('should fail to redeem ticket when ticket has been already redeemed', async function () {
     const { tickets, deployer, TICKET_AB_WIN } = await useFixtures()
 
+    await tickets.connect(ACCOUNT_B.wallet).bumpChannel(ACCOUNT_A.address, SECRET_2);
     await tickets.fundChannelInternal(deployer, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
 
     await tickets.redeemTicketInternal(
@@ -151,6 +155,7 @@ describe('Tickets', function () {
   it('should fail to redeem ticket when signer is not the issuer', async function () {
     const { tickets, deployer, TICKET_AB_WIN, TICKET_BA_WIN } = await useFixtures()
 
+    await tickets.connect(ACCOUNT_B.wallet).bumpChannel(ACCOUNT_A.address, SECRET_2);
     await tickets.fundChannelInternal(deployer, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
 
     await expect(
@@ -171,7 +176,7 @@ describe('Tickets', function () {
   it("should fail to redeem ticket if it's a loss", async function () {
     const { tickets, deployer, TICKET_AB_LOSS } = await useFixtures()
 
-    await tickets.bumpChannel(ACCOUNT_A.address, SECRET_0)
+    await tickets.connect(ACCOUNT_B.wallet).bumpChannel(ACCOUNT_A.address, SECRET_2);
     await tickets.fundChannelInternal(deployer, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
 
     await expect(
@@ -201,13 +206,6 @@ describe('Tickets', function () {
       TICKET_AB_WIN.winProb
     )
     expect(encoded).to.equal(TICKET_AB_WIN.encoded)
-  })
-
-  it('should hash ticket', async function () {
-    const { tickets, TICKET_AB_WIN } = await useFixtures()
-
-    const hash = await tickets.getTicketHashInternal(TICKET_AB_WIN.encoded)
-    expect(hash).to.equal(TICKET_AB_WIN.hash)
   })
 
   it("should get ticket's luck", async function () {

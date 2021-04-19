@@ -43,7 +43,7 @@ contract TicketsMock is HoprChannels {
         bytes memory signature
     ) external {
         _redeemTicket(
-            msg.sender,
+            recipient,
             counterparty,
             nextCommitment,
             ticketEpoch,
@@ -64,12 +64,6 @@ contract TicketsMock is HoprChannels {
         bytes32 winProb
     ) external pure returns (bytes memory) {
         return _getEncodedTicket(recipient, recipientCounter, proofOfRelaySecret, channelIteration, amount, winProb);
-    }
-
-    function getTicketHashInternal(
-        bytes calldata packedTicket
-    ) external pure returns (bytes32) {
-        return _getTicketHash(packedTicket);
     }
 
     function getTicketLuckInternal(

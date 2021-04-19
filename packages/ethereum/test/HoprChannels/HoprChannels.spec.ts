@@ -91,7 +91,7 @@ describe('HoprChannels', function () {
 
     await hoprToken.connect(accountA).approve(hoprChannels.address, '70')
 
-    await hoprChannels.connect(accountA).fundAndOpenChannel(ACCOUNT_A.address, ACCOUNT_B.address, '70', '0')
+    await hoprChannels.connect(accountA).fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '0')
 
     const channel = await hoprChannels.channels(ACCOUNT_AB_CHANNEL_ID)
     expect(channel.partyABalance.toString()).to.equal('70')
@@ -109,7 +109,7 @@ describe('HoprChannels', function () {
 
     await hoprToken.connect(accountB).approve(hoprChannels.address, '70')
 
-    await hoprChannels.connect(accountB).fundAndOpenChannel(ACCOUNT_A.address, ACCOUNT_B.address, '70', '0')
+    await hoprChannels.connect(accountB).fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '0')
     const channel = await hoprChannels.channels(ACCOUNT_AB_CHANNEL_ID)
     expect(channel.partyABalance.toString()).to.equal('70')
     expect(channel.partyBBalance.toString()).to.equal('0')
@@ -129,7 +129,7 @@ describe('HoprChannels', function () {
       .send(
         hoprChannels.address,
         '70',
-        abiEncoder.encode(['bool', 'address', 'address'], [false, ACCOUNT_A.address, ACCOUNT_B.address])
+        abiEncoder.encode(['address', 'address'], [ACCOUNT_A.address, ACCOUNT_B.address])
       )
 
     const channel = await hoprChannels.channels(ACCOUNT_AB_CHANNEL_ID)
@@ -151,7 +151,7 @@ describe('HoprChannels', function () {
       .send(
         hoprChannels.address,
         '70',
-        abiEncoder.encode(['bool', 'address', 'address'], [true, ACCOUNT_A.address, ACCOUNT_B.address])
+        abiEncoder.encode(['address', 'address'], [ACCOUNT_A.address, ACCOUNT_B.address])
       )
 
     const channel = await hoprChannels.channels(ACCOUNT_AB_CHANNEL_ID)
@@ -174,8 +174,8 @@ describe('HoprChannels', function () {
         hoprChannels.address,
         '100',
         abiEncoder.encode(
-          ['bool', 'address', 'address', 'uint256', 'uint256'],
-          [false, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30']
+          ['address', 'address', 'uint256', 'uint256'],
+          [ACCOUNT_A.address, ACCOUNT_B.address, '70', '30']
         )
       )
 
@@ -184,30 +184,6 @@ describe('HoprChannels', function () {
     expect(channel.partyBBalance.toString()).to.equal('30')
     expect(channel.closureTime.toString()).to.equal('0')
     expect(channel.status.toString()).to.equal('0')
-    expect(channel.closureByPartyA).to.be.false
-
-    const accountABalance = await hoprToken.balanceOf(ACCOUNT_A.address)
-    expect(accountABalance.toString()).to.equal('0')
-  })
-
-  it('should fund both parties and open using send', async function () {
-    const { hoprToken, hoprChannels, accountA } = await useFixtures()
-
-    await hoprToken
-      .connect(accountA)
-      .send(
-        hoprChannels.address,
-        '100',
-        abiEncoder.encode(
-          ['bool', 'address', 'address', 'uint256', 'uint256'],
-          [true, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30']
-        )
-      )
-    const channel = await hoprChannels.channels(ACCOUNT_AB_CHANNEL_ID)
-    expect(channel.partyABalance.toString()).to.equal('70')
-    expect(channel.partyBBalance.toString()).to.equal('30')
-    expect(channel.closureTime.toString()).to.equal('0')
-    expect(channel.status.toString()).to.equal('1')
     expect(channel.closureByPartyA).to.be.false
 
     const accountABalance = await hoprToken.balanceOf(ACCOUNT_A.address)
@@ -227,8 +203,7 @@ describe('HoprChannels intergration tests', function () {
       await f.hoprToken.connect(f.accountA).approve(f.hoprChannels.address, '70')
 
       await expect(f.hoprChannels.connect(f.accountA).fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '0'))
-        .to.emit(f.hoprChannels, 'ChannelFunded')
-        .withArgs(ACCOUNT_A.address, ACCOUNT_B.address, ACCOUNT_A.address, '70', '70')
+        .to.emit(f.hoprChannels, 'ChannelUpdate')
 
       const channel = await f.hoprChannels.channels(ACCOUNT_AB_CHANNEL_ID)
       expect(channel.partyABalance.toString()).to.equal('70')
@@ -245,30 +220,16 @@ describe('HoprChannels intergration tests', function () {
           .send(
             f.hoprChannels.address,
             '30',
-            abiEncoder.encode(['bool', 'address', 'address'], [false, ACCOUNT_B.address, ACCOUNT_A.address])
+            abiEncoder.encode(['address', 'address'], [ACCOUNT_B.address, ACCOUNT_A.address])
           )
       )
-        .to.emit(f.hoprChannels, 'ChannelFunded')
-        .withArgs(ACCOUNT_B.address, ACCOUNT_A.address, ACCOUNT_B.address, '100', '70')
+        .to.emit(f.hoprChannels, 'ChannelUpdate')
 
       const channel = await f.hoprChannels.channels(ACCOUNT_AB_CHANNEL_ID)
       expect(channel.partyABalance.toString()).to.equal('70')
       expect(channel.partyBBalance.toString()).to.equal('30')
       expect(channel.closureTime.toString()).to.equal('0')
       expect(channel.status.toString()).to.equal('0')
-      expect(channel.closureByPartyA).to.be.false
-    })
-
-    it('should open channel', async function () {
-      await expect(f.hoprChannels.connect(f.accountA).openChannel(ACCOUNT_B.address))
-        .to.emit(f.hoprChannels, 'ChannelOpened')
-        .withArgs(ACCOUNT_A.address, ACCOUNT_B.address)
-
-      const channel = await f.hoprChannels.channels(ACCOUNT_AB_CHANNEL_ID)
-      expect(channel.partyABalance.toString()).to.equal('70')
-      expect(channel.partyBBalance.toString()).to.equal('30')
-      expect(channel.closureTime.toString()).to.equal('0')
-      expect(channel.status.toString()).to.equal('1')
       expect(channel.closureByPartyA).to.be.false
     })
 
@@ -329,10 +290,8 @@ describe('HoprChannels intergration tests', function () {
     })
 
     it('should initialize channel closure', async function () {
-      await expect(f.hoprChannels.connect(f.accountB).initiateChannelClosure(ACCOUNT_A.address)).to.emit(
-        f.hoprChannels,
-        'ChannelPendingToClose'
-      )
+      await expect(f.hoprChannels.connect(f.accountB).initiateChannelClosure(ACCOUNT_A.address))
+        .to.emit(f.hoprChannels, 'ChannelUpdate')
       // TODO: implement
       // .withArgs(ACCOUNT_B.address, ACCOUNT_A.address)
 
@@ -376,14 +335,13 @@ describe('HoprChannels intergration tests', function () {
       await increaseTime(ethers.provider, durations.days(3))
 
       await expect(f.hoprChannels.connect(f.accountA).finalizeChannelClosure(ACCOUNT_B.address))
-        .to.emit(f.hoprChannels, 'ChannelClosed')
-        .withArgs(ACCOUNT_A.address, ACCOUNT_B.address, '80', '20')
+        .to.emit(f.hoprChannels, 'ChannelUpdate')
 
       const channel = await f.hoprChannels.channels(ACCOUNT_AB_CHANNEL_ID)
       expect(channel.partyABalance.toString()).to.equal('0')
       expect(channel.partyBBalance.toString()).to.equal('0')
       expect(channel.closureTime.toString()).to.equal('0')
-      expect(channel.status.toString()).to.equal('10')
+      expect(channel.status.toString()).to.equal('0')
       expect(channel.closureByPartyA).to.be.false
 
       const accountABalance = await f.hoprToken.balanceOf(ACCOUNT_A.address)
@@ -452,13 +410,13 @@ describe('HoprChannels intergration tests', function () {
     it('should fund both parties and open channel', async function () {
       await f.hoprToken.connect(f.accountA).approve(f.hoprChannels.address, '110')
 
-      f.hoprChannels.connect(f.accountA).fundAndOpenChannel(ACCOUNT_A.address, ACCOUNT_B.address, '70', '40')
+      f.hoprChannels.connect(f.accountA).fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '40')
 
       const channel = await f.hoprChannels.channels(ACCOUNT_AB_CHANNEL_ID)
       expect(channel.partyABalance.toString()).to.equal('70')
       expect(channel.partyBBalance.toString()).to.equal('40')
       expect(channel.closureTime.toString()).to.equal('0')
-      expect(channel.status.toString()).to.equal('11')
+      expect(channel.status.toString()).to.equal('1')
       expect(channel.closureByPartyA).to.be.false
     })
 
@@ -483,7 +441,7 @@ describe('HoprChannels intergration tests', function () {
       expect(channel.partyABalance.toString()).to.equal('80')
       expect(channel.partyBBalance.toString()).to.equal('30')
       expect(channel.closureTime.toString()).to.equal('0')
-      expect(channel.status.toString()).to.equal('11')
+      expect(channel.status.toString()).to.equal('1')
       expect(channel.closureByPartyA).to.be.false
 
       const account = await f.hoprChannels.accounts(ACCOUNT_A.address)
@@ -511,7 +469,7 @@ describe('HoprChannels intergration tests', function () {
       expect(channel.partyABalance.toString()).to.equal('70')
       expect(channel.partyBBalance.toString()).to.equal('40')
       expect(channel.closureTime.toString()).to.equal('0')
-      expect(channel.status.toString()).to.equal('11')
+      expect(channel.status.toString()).to.equal('1')
       expect(channel.closureByPartyA).to.be.false
 
       const account = await f.hoprChannels.accounts(ACCOUNT_A.address)
@@ -524,7 +482,8 @@ describe('HoprChannels intergration tests', function () {
       expect(channel.partyABalance.toString()).to.equal('70')
       expect(channel.partyBBalance.toString()).to.equal('40')
       expect(channel.closureTime.toString()).to.not.be.equal('0')
-      expect(channel.status.toString()).to.equal('12')
+      expect(channel.status.toString()).to.equal('2')
+      expect(channel.channelEpoch.toString()).to.equal('1')
       expect(channel.closureByPartyA).to.be.false
     })
 
@@ -549,7 +508,8 @@ describe('HoprChannels intergration tests', function () {
       expect(channel.partyABalance.toString()).to.equal('80')
       expect(channel.partyBBalance.toString()).to.equal('30')
       expect(channel.closureTime.toString()).to.not.be.equal('0')
-      expect(channel.status.toString()).to.equal('12')
+      expect(channel.status.toString()).to.equal('2')
+      expect(channel.channelEpoch.toString()).to.equal('1')
       expect(channel.closureByPartyA).to.be.false
 
       const account = await f.hoprChannels.accounts(ACCOUNT_A.address)
@@ -564,7 +524,8 @@ describe('HoprChannels intergration tests', function () {
       expect(channel.partyABalance.toString()).to.equal('0')
       expect(channel.partyBBalance.toString()).to.equal('0')
       expect(channel.closureTime.toString()).to.equal('0')
-      expect(channel.status.toString()).to.equal('20')
+      expect(channel.status.toString()).to.equal('0')
+      expect(channel.channelEpoch.toString()).to.equal('2')
       expect(channel.closureByPartyA).to.be.false
 
       const accountABalance = await f.hoprToken.balanceOf(ACCOUNT_A.address)

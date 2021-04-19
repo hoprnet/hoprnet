@@ -16,7 +16,8 @@ const useFixtures = deployments.createFixture(async (hre, { secsClosure }: { sec
   // deploy ERC777Mock
   const token = await new ERC777Mock__factory(deployer).deploy(deployer.address, '100', 'Token', 'TKN', [])
   // deploy ChannelsMock
-  const channels = await new ChannelsMock__factory(deployer).deploy(token.address, secsClosure ?? '0')
+  let channels = await new ChannelsMock__factory(deployer).deploy(token.address, secsClosure ?? '0')
+  channels = channels.connect(ACCOUNT_B.wallet)
 
   return {
     token,
@@ -26,18 +27,17 @@ const useFixtures = deployments.createFixture(async (hre, { secsClosure }: { sec
 })
 
 describe('Channels', function () {
-  it('should fund channel', async function () {
+  it('should fund and open channel', async function () {
     const { channels } = await useFixtures()
 
+    //TODO events
     await expect(channels.fundChannelInternal(ACCOUNT_A.address, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30'))
-      .to.emit(channels, 'ChannelFunded')
-      .withArgs(ACCOUNT_A.address, ACCOUNT_B.address, ACCOUNT_A.address, '100', '70')
 
     const channel = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
     expect(channel.partyABalance.toString()).to.equal('70')
     expect(channel.partyBBalance.toString()).to.equal('30')
     expect(channel.closureTime.toString()).to.equal('0')
-    expect(channel.status.toString()).to.equal('0')
+    expect(channel.status.toString()).to.equal('1')
     expect(channel.closureByPartyA).to.be.false
   })
 
@@ -61,19 +61,6 @@ describe('Channels', function () {
     ).to.be.revertedWith('untA or amountB must be greater than 0')
   })
 
-  it('should open channel', async function () {
-    const { channels } = await useFixtures()
-
-    await channels.fundChannelInternal(ACCOUNT_A.address, ACCOUNT_A.address, ACCOUNT_B.address, '100', '0')
-
-    const channel = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
-    expect(channel.partyABalance.toString()).to.equal('100')
-    expect(channel.partyBBalance.toString()).to.equal('0')
-    expect(channel.closureTime.toString()).to.equal('0')
-    expect(channel.status.toString()).to.equal('1')
-    expect(channel.closureByPartyA).to.be.false
-  })
-
   it('should initialize channel closure', async function () {
     const { channels } = await useFixtures()
 
@@ -81,7 +68,7 @@ describe('Channels', function () {
 
     await expect(channels.initiateChannelClosureInternal(ACCOUNT_A.address, ACCOUNT_B.address)).to.emit(
       channels,
-      'ChannelPendingToClose'
+      'ChannelUpdate'
     )
     // TODO: implement
     // .withArgs(ACCOUNT_A.address, ACCOUNT_B.address)
@@ -128,8 +115,8 @@ describe('Channels', function () {
       channels.address,
       '100',
       abiEncoder.encode(
-        ['bool', 'address', 'address', 'uint256', 'uint256'],
-        [false, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30']
+        ['address', 'address', 'uint256', 'uint256'],
+        [ACCOUNT_A.address, ACCOUNT_B.address, '70', '30']
       ),
       {
         from: deployer.address
@@ -138,8 +125,7 @@ describe('Channels', function () {
     await channels.initiateChannelClosureInternal(ACCOUNT_A.address, ACCOUNT_B.address)
 
     await expect(channels.finalizeChannelClosureInternal(ACCOUNT_A.address, ACCOUNT_B.address))
-      .to.emit(channels, 'ChannelClosed')
-      .withArgs(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
+      .to.emit(channels, 'ChannelUpdate')
 
     const channel = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
     expect(channel.partyABalance.toString()).to.equal('0')
@@ -162,8 +148,8 @@ describe('Channels', function () {
       channels.address,
       '100',
       abiEncoder.encode(
-        ['bool', 'address', 'address', 'uint256', 'uint256'],
-        [false, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30']
+        ['address', 'address', 'uint256', 'uint256'],
+        [ACCOUNT_A.address, ACCOUNT_B.address, '70', '30']
       ),
       {
         from: deployer.address
@@ -172,8 +158,7 @@ describe('Channels', function () {
     await channels.initiateChannelClosureInternal(ACCOUNT_A.address, ACCOUNT_B.address)
 
     await expect(channels.finalizeChannelClosureInternal(ACCOUNT_B.address, ACCOUNT_A.address))
-      .to.emit(channels, 'ChannelClosed')
-      .withArgs(ACCOUNT_B.address, ACCOUNT_A.address, '70', '30')
+      .to.emit(channels, 'ChannelUpdate')
 
     const channel = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
     expect(channel.partyABalance.toString()).to.equal('0')
@@ -196,8 +181,8 @@ describe('Channels', function () {
       channels.address,
       '100',
       abiEncoder.encode(
-        ['bool', 'address', 'address', 'uint256', 'uint256'],
-        [false, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30']
+        ['address', 'address', 'uint256', 'uint256'],
+        [ACCOUNT_A.address, ACCOUNT_B.address, '70', '30']
       ),
       {
         from: deployer.address
@@ -216,8 +201,8 @@ describe('Channels', function () {
       channels.address,
       '100',
       abiEncoder.encode(
-        ['bool', 'address', 'address', 'uint256', 'uint256'],
-        [false, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30']
+        ['address', 'address', 'uint256', 'uint256'],
+        [ACCOUNT_A.address, ACCOUNT_B.address, '70', '30']
       ),
       {
         from: deployer.address

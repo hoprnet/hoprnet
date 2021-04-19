@@ -5,6 +5,7 @@ export const getAccount = (privateKey: string) => {
   const uncompressedPublicKey = ethers.utils.computePublicKey(wallet.publicKey, false)
 
   return {
+    wallet,
     privateKey: wallet.privateKey,
     uncompressedPublicKey: ethers.utils.hexDataSlice(uncompressedPublicKey, 1), // remove identifier
     publicKey: ethers.utils.hexDataSlice(wallet.publicKey, 1), // remove identifier
@@ -37,14 +38,10 @@ export const signMessage = async (message: string, privKey: string) => {
   // const signature = await wallet.signMessage(message)
   // we do not use above since we use a different prefix
   const signature = ethers.utils.joinSignature(wallet._signingKey().signDigest(message))
-  const { r, s, v } = ethers.utils.splitSignature(signature)
 
   return {
     message,
-    signature,
-    r,
-    s,
-    v
+    signature
   }
 }
 

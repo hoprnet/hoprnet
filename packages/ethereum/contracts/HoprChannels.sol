@@ -511,14 +511,16 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
           prevTicketEpoch = channel.partyBTicketEpoch;
         }
 
-        bytes32 ticketHash = _getTicketHash(
-            _getEncodedTicket(
-                redeemer,
-                prevTicketEpoch,
-                proofOfRelaySecret,
-                channel.channelEpoch,
-                amount,
-                winProb
+        bytes32 ticketHash = ECDSA.toEthSignedMessageHash(
+            keccak256(
+              _getEncodedTicket(
+                  redeemer,
+                  prevTicketEpoch,
+                  proofOfRelaySecret,
+                  channel.channelEpoch,
+                  amount,
+                  winProb
+              )
             )
         );
         require(!tickets[ticketHash], "ticket must not be used twice");
@@ -572,19 +574,6 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
             winProb,
             channelIteration
         );
-    }
-
-    /**
-     * @dev Prefix the ticket message and return
-     * the actual hash that was used to sign
-     * the ticket with.
-r    * @return prefixed ticket hash
-     */
-    function _getTicketHash(
-        bytes memory packedTicket
-    ) internal pure returns (bytes32) {
-        // TODO use toEthSignedMessageHash
-        return keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n", "187", "HOPRnet", packedTicket));
     }
 
     /**
