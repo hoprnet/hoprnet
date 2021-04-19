@@ -43,9 +43,9 @@ describe('Channels', function () {
   it('should fail to fund channel', async function () {
     const { channels } = await useFixtures()
 
-    await expect(
-      channels.fundChannelInternal(ACCOUNT_A.address, ACCOUNT_A.address, '70', '30')
-    ).to.be.revertedWith('accountA and accountB must not be the same')
+    await expect(channels.fundChannelInternal(ACCOUNT_A.address, ACCOUNT_A.address, '70', '30')).to.be.revertedWith(
+      'accountA and accountB must not be the same'
+    )
 
     await expect(
       channels.fundChannelInternal(ethers.constants.AddressZero, ACCOUNT_B.address, '70', '30')
@@ -55,9 +55,9 @@ describe('Channels', function () {
       channels.fundChannelInternal(ACCOUNT_A.address, ethers.constants.AddressZero, '70', '30')
     ).to.be.revertedWith('accountB must not be empty')
 
-    await expect(
-      channels.fundChannelInternal(ACCOUNT_A.address, ACCOUNT_B.address, '0', '0')
-    ).to.be.revertedWith('untA or amountB must be greater than 0')
+    await expect(channels.fundChannelInternal(ACCOUNT_A.address, ACCOUNT_B.address, '0', '0')).to.be.revertedWith(
+      'untA or amountB must be greater than 0'
+    )
   })
 
   it('should initialize channel closure', async function () {
