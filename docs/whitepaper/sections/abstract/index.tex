@@ -18,7 +18,7 @@ Another project based on onion routing is I2P peer-to-peer network. I2P has diff
     \item Peer profiles instead of directory authorities: I2P’s network information is stored in a DHT (information in the DHT is inherently untrusted) while Tor’s relay network is managed by a set of nine Directory Authorities.
 
 \end{itemize}
-I2P are vulnerable to eclipse attacks since no I2P router has a full view of the global network (similar to other peer-to-peer networks) and they also protect against only local adversaries (like Tor) and thus vulnerable to timing attacks.
+I2P are vulnerable to eclipse attacks since no I2P router has a full view of the global network (similar to other peer-to-peer networks) and they also protect against only local adversaries (like Tor) and thus vulnerable to timing, intersection and traffic analysis attacks. I2P have also showed to be vulnerable to sybil, predecessor and denial of service attacks inspite of the different contermeasures implemented to defeat those attacks.
 \\~\\Another existing solution for network privacy is VPN(Virtual Private Network). 
 VPNs builds an encrypted tunnel between the client and server to transfer communication in a secure way and they also provide a new IP address (the one of the proxy) to help bypass censership and geolocalization blocks.
 Due to the centralized trust model VPNs has, they suffer from inherent weaknesses like being a single point of failure. They are also vulnerable to powerful network eavedropers who can track the routed network traffic.
