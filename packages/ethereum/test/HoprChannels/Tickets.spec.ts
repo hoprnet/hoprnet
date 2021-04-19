@@ -37,7 +37,6 @@ describe('Tickets', function () {
     await tickets.connect(ACCOUNT_B.wallet).bumpChannel(ACCOUNT_A.address, SECRET_2)
     await tickets.fundChannelInternal(deployer, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
 
-    console.log((await tickets.channels(ACCOUNT_AB_CHANNEL_ID)).partyACommitment.toString())
     // TODO: add event check
     await tickets.redeemTicketInternal(
       TICKET_AB_WIN.recipient,

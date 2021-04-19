@@ -74,7 +74,7 @@ export const createTicket = async (
   }
 > => {
   const encoded = getEncodedTicket(ticket)
-  const hash = solidityKeccak256(['string'], [encoded])
+  const hash = solidityKeccak256(['bytes'], [encoded])
   const luck = getTicketLuck(ticket, hash, secret)
   const { signature } = await signMessage(hash, account.privateKey)
 

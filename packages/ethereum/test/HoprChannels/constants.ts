@@ -30,7 +30,7 @@ export const generateTickets = async () => {
     {
       recipient: ACCOUNT_B.address,
       proofOfRelaySecret: PROOF_OF_RELAY_SECRET_0,
-      counter: '1',
+      counter: '0',
       ticketEpoch: '0',
       ticketIndex: '1',
       amount: '10',
@@ -51,7 +51,7 @@ export const generateTickets = async () => {
     {
       recipient: ACCOUNT_B.address,
       proofOfRelaySecret: PROOF_OF_RELAY_SECRET_1,
-      counter: '1',
+      counter: '0',
       ticketEpoch: '0',
       ticketIndex: '1',
       amount: '10',
@@ -69,7 +69,7 @@ export const generateTickets = async () => {
     {
       recipient: ACCOUNT_B.address,
       proofOfRelaySecret: PROOF_OF_RELAY_SECRET_0,
-      counter: '1',
+      counter: '0',
       ticketEpoch: '0',
       ticketIndex: '1',
       amount: '10',
@@ -87,7 +87,7 @@ export const generateTickets = async () => {
     {
       recipient: ACCOUNT_A.address,
       proofOfRelaySecret: PROOF_OF_RELAY_SECRET_0,
-      counter: '1',
+      counter: '0',
       ticketEpoch: '0',
       ticketIndex: '1',
       amount: '10',
@@ -108,7 +108,7 @@ export const generateTickets = async () => {
     {
       recipient: ACCOUNT_A.address,
       proofOfRelaySecret: PROOF_OF_RELAY_SECRET_1,
-      counter: '1',
+      counter: '0',
       ticketEpoch: '0',
       ticketIndex: '1',
       amount: '10',
