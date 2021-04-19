@@ -23,7 +23,7 @@ export const signMessage = async (message: string, privKey: string) => {
   const wallet = new ethers.Wallet(privKey)
   return {
     wallet, 
-    signature: await wallet.signMessage(message)
+    signature: await wallet.signMessage(ethers.utils.arrayify(message))
   }
 }
 
