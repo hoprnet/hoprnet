@@ -1,12 +1,11 @@
 import assert from 'assert'
 import { stringToU8a, durations } from '@hoprnet/hopr-utils'
 import { Ganache } from '@hoprnet/hopr-testing'
-import { NODE_SEEDS } from '@hoprnet/hopr-demo-seeds'
 import { migrate, fund, getContracts } from '@hoprnet/hopr-ethereum'
 import { ethers } from 'ethers'
 import HoprEthereum from '.'
 import { createNode } from './utils/testing'
-import * as testconfigs from './config.spec'
+import * as fixtures from './fixtures'
 import { providers } from 'ethers'
 import { HoprToken__factory, HoprToken } from './contracts'
 import { DEFAULT_URI } from './constants'
@@ -27,7 +26,7 @@ describe('test connector', function () {
     await migrate()
     await fund(`--address ${getContracts().localhost.HoprToken.address} --accounts-to-fund 2`)
 
-    ownerWallet = new ethers.Wallet(testconfigs.FUND_ACCOUNT_PRIVATE_KEY)
+    ownerWallet = new ethers.Wallet(fixtures.ACCOUNT_A.privateKey)
     connector = await createNode(arrayify(ownerWallet.privateKey))
 
     await connector.start()
@@ -41,7 +40,7 @@ describe('test connector', function () {
   it('should catch initOnchainValues', async function () {
     this.timeout(10e3)
 
-    const connector = await createNode(stringToU8a(NODE_SEEDS[NODE_SEEDS.length - 1]))
+    const connector = await createNode(stringToU8a(fixtures.ACCOUNT_B.privateKey))
 
     try {
       await connector.initOnchainValues()
@@ -71,7 +70,7 @@ describe('test withdraw', function () {
 
     provider = new providers.WebSocketProvider(DEFAULT_URI)
 
-    alice = new ethers.Wallet(NODE_SEEDS[0]).connect(provider)
+    alice = new ethers.Wallet(fixtures.ACCOUNT_A.privateKey).connect(provider)
     bob = ethers.Wallet.createRandom().connect(provider)
     hoprToken = HoprToken__factory.connect(getContracts().localhost.HoprToken.address, provider)
     connector = await createNode(ethers.utils.arrayify(alice.privateKey))

@@ -3,9 +3,8 @@ import { durations, stringToU8a } from '@hoprnet/hopr-utils'
 import { Ganache } from '@hoprnet/hopr-testing'
 import { getContracts, migrate, fund } from '@hoprnet/hopr-ethereum'
 import HoprEthereum from '.'
-import { computeWinningProbability } from './utils'
-import { UnacknowledgedTicket, Ticket, Hash } from './types'
-import * as testconfigs from './config.spec'
+import { Hash } from './types'
+import * as fixtures from './fixtures'
 import { createNode } from './utils/testing'
 
 const FUND_ARGS = `--address ${getContracts().localhost.HoprToken.address} --accounts-to-fund 1`
@@ -19,7 +18,7 @@ describe('test hashedSecret', function () {
   // instead of using a half-assed mock we use the connector instance
   // the whole test needs to be rewritten
   async function generateConnector(): Promise<HoprEthereum> {
-    const privKey = stringToU8a(testconfigs.DEMO_ACCOUNTS[0])
+    const privKey = stringToU8a(fixtures.ACCOUNT_A.privateKey)
     return createNode(privKey, 0)
   }
 

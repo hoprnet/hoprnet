@@ -3,7 +3,7 @@ import assert from 'assert'
 import { Ganache } from '@hoprnet/hopr-testing'
 import { migrate, fund, getContracts } from '@hoprnet/hopr-ethereum'
 import { durations, u8aToHex, u8aEquals } from '@hoprnet/hopr-utils'
-import * as testconfigs from '../config.spec'
+import * as fixtures from '../fixtures'
 import { PublicKey } from '../types'
 import { advanceBlockTo, increaseTime } from '../utils/testing'
 import { ethers, providers } from 'ethers'
@@ -49,20 +49,20 @@ describe('test indexer', function () {
     hoprToken = HoprToken__factory.connect(getContracts().localhost.HoprToken.address, provider)
     hoprChannels = HoprChannels__factory.connect(getContracts().localhost.HoprChannels.address, provider)
 
-    userAWallet = new ethers.Wallet(testconfigs.FUND_ACCOUNT_PRIVATE_KEY).connect(provider)
+    userAWallet = new ethers.Wallet(provider.getSigner(0) as any).connect(provider)
     userA = PublicKey.fromPrivKey(arrayify(userAWallet.privateKey))
     // userA < userB
-    userBWallet = new ethers.Wallet(testconfigs.DEMO_ACCOUNTS[1]).connect(provider)
+    userBWallet = new ethers.Wallet(fixtures.ACCOUNT_A.privateKey).connect(provider)
     userB = PublicKey.fromPrivKey(arrayify(userBWallet.privateKey))
     await fundAccount(userAWallet, hoprToken, userBWallet.address)
     // userC < userA
-    userCWallet = new ethers.Wallet(testconfigs.DEMO_ACCOUNTS[2]).connect(provider)
+    userCWallet = new ethers.Wallet(fixtures.ACCOUNT_B.privateKey).connect(provider)
     userC = PublicKey.fromPrivKey(arrayify(userCWallet.privateKey))
     await fundAccount(userAWallet, hoprToken, userCWallet.address)
-    userDWallet = new ethers.Wallet(testconfigs.DEMO_ACCOUNTS[3]).connect(provider)
+    userDWallet = new ethers.Wallet(fixtures.ACCOUNT_C.privateKey).connect(provider)
     userD = PublicKey.fromPrivKey(arrayify(userDWallet.privateKey))
     await fundAccount(userAWallet, hoprToken, userDWallet.address)
-    connector = await createNode(arrayify(userAWallet.privateKey), undefined, 8)
+    connector = await createNode(arrayify(userAWallet.privateKey), 8)
 
     await connector.start()
     await connector.initOnchainValues()

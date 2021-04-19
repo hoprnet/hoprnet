@@ -9,7 +9,7 @@ import BN from 'bn.js'
 import { Balance, Ticket, Address, Hash, UnacknowledgedTicket, PublicKey } from './types'
 import CoreConnector from '.'
 import Channel from './channel'
-import * as testconfigs from './config.spec'
+import * as fixtures from './fixtures'
 import { providers, ethers } from 'ethers'
 import { HoprToken__factory, HoprToken } from './contracts'
 import { DEFAULT_URI } from './constants'
@@ -66,17 +66,17 @@ describe('test Channel class', function () {
   beforeEach(async function () {
     this.timeout(durations.seconds(10))
 
-    funderWallet = new ethers.Wallet(testconfigs.FUND_ACCOUNT_PRIVATE_KEY).connect(provider)
-    partyA = PublicKey.fromPrivKey(arrayify(testconfigs.DEMO_ACCOUNTS[1]))
+    funderWallet = new ethers.Wallet(provider.getSigner(0) as any).connect(provider)
+    partyA = PublicKey.fromPrivKey(arrayify(fixtures.ACCOUNT_A.privateKey))
     await fundAccount(funderWallet, hoprToken, partyA.toAddress().toHex())
-    partyB = PublicKey.fromPrivKey(arrayify(testconfigs.DEMO_ACCOUNTS[2]))
+    partyB = PublicKey.fromPrivKey(arrayify(fixtures.ACCOUNT_B.privateKey))
     await fundAccount(funderWallet, hoprToken, partyB.toAddress().toHex())
 
-    partyAConnector = await createNode(arrayify(testconfigs.DEMO_ACCOUNTS[1]))
+    partyAConnector = await createNode(arrayify(fixtures.ACCOUNT_A.privateKey))
     await partyAConnector.initOnchainValues()
     await partyAConnector.start()
 
-    partyBConnector = await createNode(arrayify(testconfigs.DEMO_ACCOUNTS[2]))
+    partyBConnector = await createNode(arrayify(fixtures.ACCOUNT_B.privateKey))
     await partyBConnector.initOnchainValues()
     await partyBConnector.start()
   })

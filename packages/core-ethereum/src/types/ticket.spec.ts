@@ -2,7 +2,7 @@ import assert from 'assert'
 import { expect } from 'chai'
 import { Address, Ticket, Hash, Balance, PublicKey, Signature, UINT256 } from '.'
 import { computeWinningProbability } from '../utils'
-import * as testconfigs from '../config.spec'
+import * as fixtures from '../fixtures'
 import BN from 'bn.js'
 import { randomBytes } from 'crypto'
 import { stringToU8a } from '@hoprnet/hopr-utils'
@@ -11,7 +11,7 @@ describe('test ticket construction', function () {
   let userA: Address
 
   before(async function () {
-    userA = PublicKey.fromPrivKey(stringToU8a(testconfigs.DEMO_ACCOUNTS[0])).toAddress()
+    userA = PublicKey.fromPrivKey(stringToU8a(fixtures.ACCOUNT_A.privateKey)).toAddress()
   })
 
   it('should create new ticket', async function () {
@@ -89,9 +89,9 @@ describe('test ticket construction', function () {
 const WIN_PROB = new BN(1)
 
 describe('test signedTicket construction', async function () {
-  const userB = await PublicKey.fromPrivKey(stringToU8a(testconfigs.DEMO_ACCOUNTS[1])).toAddress()
-  const userAPrivKey = stringToU8a(testconfigs.DEMO_ACCOUNTS[0])
-  const userAPubKey = PublicKey.fromPrivKey(stringToU8a(testconfigs.DEMO_ACCOUNTS[0]))
+  const userB = PublicKey.fromPrivKey(stringToU8a(fixtures.ACCOUNT_B.privateKey)).toAddress()
+  const userAPrivKey = stringToU8a(fixtures.ACCOUNT_A.privateKey)
+  const userAPubKey = PublicKey.fromPrivKey(userAPrivKey)
 
   it('should create new signedTicket using struct', async function () {
     const ticket = Ticket.create(

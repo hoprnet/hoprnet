@@ -4,7 +4,7 @@ import type { HoprChannels } from './contracts'
 import { Hash } from './types'
 import Debug from 'debug'
 import { randomBytes } from 'crypto'
-import { u8aConcat, iterateHash, recoverIteratedHash } from '@hoprnet/hopr-utils'
+import { iterateHash, recoverIteratedHash } from '@hoprnet/hopr-utils'
 import { storeHashIntermediaries, getOnChainSecretIntermediary, getOnChainSecret } from './dbKeys'
 
 export const DB_ITERATION_BLOCK_SIZE = 10000
