@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.7.5;
+pragma solidity ^0.8;
 
 import "../utils/SafeUint24.sol";
 

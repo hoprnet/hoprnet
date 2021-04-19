@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.7.5;
+pragma solidity ^0.8;
 pragma abicoder v2;
 
-import "@openzeppelin/contracts/math/SafeMath.sol";
-import "@openzeppelin/contracts/introspection/IERC1820Registry.sol";
-import "@openzeppelin/contracts/introspection/ERC1820Implementer.sol";
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "@openzeppelin/contracts/utils/introspection/IERC1820Registry.sol";
+import "@openzeppelin/contracts/utils/introspection/ERC1820Implementer.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC777/IERC777Recipient.sol";
-import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
-import "./utils/ECDSA.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "./utils/SafeUint24.sol";
 
 contract HoprChannels is IERC777Recipient, ERC1820Implementer {
@@ -145,9 +145,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         bytes32 proofOfRelaySecret,
         uint256 amount,
         bytes32 winProb,
-        bytes32 r,
-        bytes32 s,
-        uint8 v
+        bytes memory signature
     ) external {
         _redeemTicket(
             msg.sender,
@@ -158,9 +156,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
             proofOfRelaySecret,
             amount,
             winProb,
-            r,
-            s,
-            v
+            signature
         );
     }
 
@@ -472,9 +468,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
      * @param proofOfRelaySecret the proof of relay secret
      * @param winProb the winning probability of the ticket
      * @param amount the amount in the ticket
-     * @param r part of the signature
-     * @param s part of the signature
-     * @param v part of the signature
+     * @param signature signature
      */
     function _redeemTicket(
         address redeemer,
@@ -485,9 +479,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         bytes32 proofOfRelaySecret,
         uint256 amount,
         bytes32 winProb,
-        bytes32 r,
-        bytes32 s,
-        uint8 v
+        bytes memory signature
     ) internal {
         require(redeemer != address(0), "redeemer must not be empty");
         require(counterparty != address(0), "counterparty must not be empty");
@@ -495,9 +487,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         require(proofOfRelaySecret != bytes32(0), "proofOfRelaySecret must not be empty");
         require(amount != uint256(0), "amount must not be empty");
         // require(winProb != bytes32(0), "winProb must not be empty");
-        require(r != bytes32(0), "r must not be empty");
-        require(s != bytes32(0), "s must not be empty");
-        require(v != uint8(0), "v must not be empty");
+        //require(signature != bytes32(0), "signature must not be empty");
         (,,, Channel storage channel) = _getChannel(
             redeemer,
             counterparty
@@ -532,7 +522,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
             )
         );
         require(!tickets[ticketHash], "ticket must not be used twice");
-        require(ECDSA.recover(ticketHash, r, s, v) == counterparty, "signer must match the counterparty");
+        require(ECDSA.recover(ticketHash, signature) == counterparty, "signer must match the counterparty");
         require(
             uint256(_getTicketLuck(
                 ticketHash,
@@ -593,10 +583,8 @@ r    * @return prefixed ticket hash
     function _getTicketHash(
         bytes memory packedTicket
     ) internal pure returns (bytes32) {
-        return ECDSA.toEthSignedMessageHash(
-            "187",
-            packedTicket
-        );
+        // TODO use toEthSignedMessageHash
+        return keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n", "187", "HOPRnet", packedTicket));
     }
 
     /**

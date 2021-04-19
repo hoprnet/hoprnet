@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.7.5;
+pragma solidity ^0.8;
 
 import "../HoprChannels.sol";
 
@@ -40,9 +40,7 @@ contract TicketsMock is HoprChannels {
         bytes32 proofOfRelaySecret,
         uint256 amount,
         bytes32 winProb,
-        bytes32 r,
-        bytes32 s,
-        uint8 v
+        bytes memory signature
     ) external {
         _redeemTicket(
             msg.sender,
@@ -53,9 +51,7 @@ contract TicketsMock is HoprChannels {
             proofOfRelaySecret,
             amount,
             winProb,
-            r,
-            s,
-            v
+            signature
         );
     }
 
