@@ -1,5 +1,5 @@
 import { ethers } from 'ethers'
-import { prefixMessageWithHOPR, signMessage } from '../utils'
+import { signMessage } from '../utils'
 
 export type Ticket = {
   recipient: string
@@ -74,7 +74,7 @@ export const createTicket = async (
   }
 > => {
   const encoded = getEncodedTicket(ticket)
-  const hash = prefixMessageWithHOPR(encoded)
+  const hash = solidityKeccak256(['string'], [encoded])
   const luck = getTicketLuck(ticket, hash, secret)
   const { signature } = await signMessage(hash, account.privateKey)
 
