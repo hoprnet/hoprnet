@@ -133,7 +133,7 @@ describe('Channels', function () {
     expect(channel.partyABalance.toString()).to.equal('0')
     expect(channel.partyBBalance.toString()).to.equal('0')
     expect(channel.closureTime.toString()).to.equal('0')
-    expect(channel.status.toString()).to.equal('10')
+    expect(channel.status.toString()).to.equal('0')
     expect(channel.closureByPartyA).to.be.false
 
     const accountABalance = await token.balanceOf(ACCOUNT_A.address)
@@ -168,7 +168,7 @@ describe('Channels', function () {
     expect(channel.partyABalance.toString()).to.equal('0')
     expect(channel.partyBBalance.toString()).to.equal('0')
     expect(channel.closureTime.toString()).to.equal('0')
-    expect(channel.status.toString()).to.equal('10')
+    expect(channel.status.toString()).to.equal('0')
     expect(channel.closureByPartyA).to.be.false
 
     const accountABalance = await token.balanceOf(ACCOUNT_A.address)
@@ -245,20 +245,6 @@ describe('Channels', function () {
 
     const channelId = await channels.getChannelIdInternal(ACCOUNT_A.address, ACCOUNT_B.address)
     expect(channelId).to.be.equal(ACCOUNT_AB_CHANNEL_ID)
-  })
-
-  it('should get channel status', async function () {
-    const { channels } = await useFixtures()
-
-    const status = await channels.getChannelStatusInternal('11')
-    expect(status.toString()).to.be.equal('1')
-  })
-
-  it('should get channel iteration', async function () {
-    const { channels } = await useFixtures()
-
-    const iteration = await channels.getChannelIterationInternal('11')
-    expect(iteration.toString()).to.be.equal('2')
   })
 
   it('should be partyA', async function () {

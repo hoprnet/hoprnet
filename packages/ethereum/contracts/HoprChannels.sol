@@ -264,7 +264,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
             require(amount == amount1.add(amount2), "amount sent must be equal to amount specified");
         }
 
-        require(from == account1 || from == account2, "funder must be either account1 or account2");
+        //require(from == account1 || from == account2, "funder must be either account1 or account2");
         _fundChannel(account1, account2, amount1, amount2);
     }
 
@@ -392,6 +392,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         delete channel.partyBBalance; 
         delete channel.closureTime; // channel.closureTime = 0
         delete channel.closureByPartyA; // channel.closureByPartyA = false
+        channel.status = ChannelStatus.CLOSED;
 
         emit ChannelUpdate(initiator, counterparty, channel);
     }

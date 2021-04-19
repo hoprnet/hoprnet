@@ -4,8 +4,6 @@ import { ACCOUNT_A, ACCOUNT_B, ACCOUNT_AB_CHANNEL_ID, generateTickets, SECRET_0,
 import { ERC777Mock__factory, TicketsMock__factory } from '../../types'
 import deployERC1820Registry from '../../deploy/01_ERC1820Registry'
 
-const abiEncoder = ethers.utils.Interface.getAbiCoder()
-
 ACCOUNT_A.wallet = ACCOUNT_B.wallet.connect(ethers.provider)
 ACCOUNT_B.wallet = ACCOUNT_B.wallet.connect(ethers.provider)
 
@@ -82,21 +80,11 @@ describe('Tickets', function () {
   })
 
   it('should fail to redeem ticket when channel in in different iteration', async function () {
-    const { token, tickets, deployer, TICKET_AB_WIN } = await useFixtures()
+    const { tickets, deployer, TICKET_AB_WIN } = await useFixtures()
     await tickets.connect(ACCOUNT_B.wallet).bumpChannel(ACCOUNT_A.address, SECRET_2)
 
     // transfer tokens to contract
-    await token.send(
-      tickets.address,
-      '100',
-      abiEncoder.encode(
-        ['address', 'address', 'uint256', 'uint256'],
-        [ACCOUNT_A.address, ACCOUNT_B.address, '70', '30']
-      ),
-      {
-        from: deployer
-      }
-    )
+    await tickets.fundChannelInternal(deployer, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
     // open channel and then close it
     await tickets.initiateChannelClosureInternal(ACCOUNT_A.address, ACCOUNT_B.address)
     await tickets.finalizeChannelClosureInternal(ACCOUNT_A.address, ACCOUNT_B.address)
