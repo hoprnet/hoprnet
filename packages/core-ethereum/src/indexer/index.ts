@@ -111,16 +111,8 @@ class Indexer extends EventEmitter {
     if (this.status === 'stopped') return
     log(`Stopping indexer...`)
 
-    try {
-      this.connector.provider.removeAllListeners()
-      this.connector.hoprChannels.removeAllListeners()
-    } catch (err) {
-      // this error can be ignored
-      // tracked at https://github.com/ethers-io/ethers.js/issues/1458
-      if (!err.message.includes('invalid event - null')) {
-        throw err
-      }
-    }
+    this.connector.provider.removeAllListeners()
+    this.connector.hoprChannels.removeAllListeners()
 
     this.status = 'stopped'
     log(chalk.green('Indexer stopped!'))
