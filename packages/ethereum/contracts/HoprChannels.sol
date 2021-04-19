@@ -492,23 +492,19 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
             counterparty
         );
 
+        uint256 prevTicketEpoch;
         if (_isPartyA(redeemer, counterparty)) {
           require(channel.partyACommitment == keccak256(abi.encodePacked(nextCommitment)), "commitment must be hash of next commitment");
           require(channel.partyATicketEpoch == ticketEpoch, "Ticket epoch must match");
           require(channel.partyATicketIndex < ticketIndex, "Redemptions must be in order");
+          prevTicketEpoch = channel.partyATicketEpoch;
         } else {
           require(channel.partyBCommitment == keccak256(abi.encodePacked(nextCommitment)), "commitment must be hash of next commitment");
           require(channel.partyBTicketEpoch == ticketEpoch, "Ticket epoch must match");
           require(channel.partyBTicketIndex < ticketIndex, "Redemptions must be in order");
-        }
-        require(channel.status != ChannelStatus.CLOSED, "channel must be open or pending to close");
-
-        uint256 prevTicketEpoch;
-        if (_isPartyA(redeemer, counterparty)) {
-          prevTicketEpoch = channel.partyATicketEpoch;
-        } else {
           prevTicketEpoch = channel.partyBTicketEpoch;
         }
+        require(channel.status != ChannelStatus.CLOSED, "channel must be open or pending to close");
 
         bytes32 ticketHash = ECDSA.toEthSignedMessageHash(
             keccak256(

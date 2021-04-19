@@ -109,7 +109,7 @@ export const generateTickets = async () => {
       recipient: ACCOUNT_A.address,
       proofOfRelaySecret: PROOF_OF_RELAY_SECRET_1,
       counter: '0',
-      ticketEpoch: '0',
+      ticketEpoch: '2',
       ticketIndex: '1',
       amount: '10',
       winProb: WIN_PROB_100,
