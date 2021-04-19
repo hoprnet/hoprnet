@@ -202,8 +202,9 @@ describe('HoprChannels intergration tests', function () {
     it('should fund accountA', async function () {
       await f.hoprToken.connect(f.accountA).approve(f.hoprChannels.address, '70')
 
-      await expect(f.hoprChannels.connect(f.accountA).fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '0'))
-        .to.emit(f.hoprChannels, 'ChannelUpdate')
+      await expect(
+        f.hoprChannels.connect(f.accountA).fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '0')
+      ).to.emit(f.hoprChannels, 'ChannelUpdate')
 
       const channel = await f.hoprChannels.channels(ACCOUNT_AB_CHANNEL_ID)
       expect(channel.partyABalance.toString()).to.equal('70')
@@ -222,8 +223,7 @@ describe('HoprChannels intergration tests', function () {
             '30',
             abiEncoder.encode(['address', 'address'], [ACCOUNT_B.address, ACCOUNT_A.address])
           )
-      )
-        .to.emit(f.hoprChannels, 'ChannelUpdate')
+      ).to.emit(f.hoprChannels, 'ChannelUpdate')
 
       const channel = await f.hoprChannels.channels(ACCOUNT_AB_CHANNEL_ID)
       expect(channel.partyABalance.toString()).to.equal('70')
@@ -290,8 +290,10 @@ describe('HoprChannels intergration tests', function () {
     })
 
     it('should initialize channel closure', async function () {
-      await expect(f.hoprChannels.connect(f.accountB).initiateChannelClosure(ACCOUNT_A.address))
-        .to.emit(f.hoprChannels, 'ChannelUpdate')
+      await expect(f.hoprChannels.connect(f.accountB).initiateChannelClosure(ACCOUNT_A.address)).to.emit(
+        f.hoprChannels,
+        'ChannelUpdate'
+      )
       // TODO: implement
       // .withArgs(ACCOUNT_B.address, ACCOUNT_A.address)
 
@@ -334,8 +336,10 @@ describe('HoprChannels intergration tests', function () {
     it('should close channel', async function () {
       await increaseTime(ethers.provider, durations.days(3))
 
-      await expect(f.hoprChannels.connect(f.accountA).finalizeChannelClosure(ACCOUNT_B.address))
-        .to.emit(f.hoprChannels, 'ChannelUpdate')
+      await expect(f.hoprChannels.connect(f.accountA).finalizeChannelClosure(ACCOUNT_B.address)).to.emit(
+        f.hoprChannels,
+        'ChannelUpdate'
+      )
 
       const channel = await f.hoprChannels.channels(ACCOUNT_AB_CHANNEL_ID)
       expect(channel.partyABalance.toString()).to.equal('0')

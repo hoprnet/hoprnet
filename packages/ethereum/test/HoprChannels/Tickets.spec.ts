@@ -34,7 +34,7 @@ const useFixtures = deployments.createFixture(async (hre, { secsClosure }: { sec
 describe('Tickets', function () {
   it('should redeem ticket', async function () {
     const { tickets, deployer, TICKET_AB_WIN } = await useFixtures()
-    await tickets.connect(ACCOUNT_B.wallet).bumpChannel(ACCOUNT_A.address, SECRET_2);
+    await tickets.connect(ACCOUNT_B.wallet).bumpChannel(ACCOUNT_A.address, SECRET_2)
     await tickets.fundChannelInternal(deployer, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
 
     console.log((await tickets.channels(ACCOUNT_AB_CHANNEL_ID)).partyACommitment.toString())
@@ -65,7 +65,7 @@ describe('Tickets', function () {
 
   it('should fail to redeem ticket when channel in closed', async function () {
     const { tickets, TICKET_AB_WIN } = await useFixtures()
-    await tickets.connect(ACCOUNT_B.wallet).bumpChannel(ACCOUNT_A.address, SECRET_2);
+    await tickets.connect(ACCOUNT_B.wallet).bumpChannel(ACCOUNT_A.address, SECRET_2)
 
     await expect(
       tickets.redeemTicketInternal(
@@ -84,7 +84,7 @@ describe('Tickets', function () {
 
   it('should fail to redeem ticket when channel in in different iteration', async function () {
     const { token, tickets, deployer, TICKET_AB_WIN } = await useFixtures()
-    await tickets.connect(ACCOUNT_B.wallet).bumpChannel(ACCOUNT_A.address, SECRET_2);
+    await tickets.connect(ACCOUNT_B.wallet).bumpChannel(ACCOUNT_A.address, SECRET_2)
 
     // transfer tokens to contract
     await token.send(
@@ -122,7 +122,7 @@ describe('Tickets', function () {
   it('should fail to redeem ticket when ticket has been already redeemed', async function () {
     const { tickets, deployer, TICKET_AB_WIN } = await useFixtures()
 
-    await tickets.connect(ACCOUNT_B.wallet).bumpChannel(ACCOUNT_A.address, SECRET_2);
+    await tickets.connect(ACCOUNT_B.wallet).bumpChannel(ACCOUNT_A.address, SECRET_2)
     await tickets.fundChannelInternal(deployer, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
 
     await tickets.redeemTicketInternal(
@@ -155,7 +155,7 @@ describe('Tickets', function () {
   it('should fail to redeem ticket when signer is not the issuer', async function () {
     const { tickets, deployer, TICKET_AB_WIN, TICKET_BA_WIN } = await useFixtures()
 
-    await tickets.connect(ACCOUNT_B.wallet).bumpChannel(ACCOUNT_A.address, SECRET_2);
+    await tickets.connect(ACCOUNT_B.wallet).bumpChannel(ACCOUNT_A.address, SECRET_2)
     await tickets.fundChannelInternal(deployer, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
 
     await expect(
@@ -176,7 +176,7 @@ describe('Tickets', function () {
   it("should fail to redeem ticket if it's a loss", async function () {
     const { tickets, deployer, TICKET_AB_LOSS } = await useFixtures()
 
-    await tickets.connect(ACCOUNT_B.wallet).bumpChannel(ACCOUNT_A.address, SECRET_2);
+    await tickets.connect(ACCOUNT_B.wallet).bumpChannel(ACCOUNT_A.address, SECRET_2)
     await tickets.fundChannelInternal(deployer, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
 
     await expect(

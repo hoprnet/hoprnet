@@ -124,8 +124,10 @@ describe('Channels', function () {
     )
     await channels.initiateChannelClosureInternal(ACCOUNT_A.address, ACCOUNT_B.address)
 
-    await expect(channels.finalizeChannelClosureInternal(ACCOUNT_A.address, ACCOUNT_B.address))
-      .to.emit(channels, 'ChannelUpdate')
+    await expect(channels.finalizeChannelClosureInternal(ACCOUNT_A.address, ACCOUNT_B.address)).to.emit(
+      channels,
+      'ChannelUpdate'
+    )
 
     const channel = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
     expect(channel.partyABalance.toString()).to.equal('0')
@@ -157,8 +159,10 @@ describe('Channels', function () {
     )
     await channels.initiateChannelClosureInternal(ACCOUNT_A.address, ACCOUNT_B.address)
 
-    await expect(channels.finalizeChannelClosureInternal(ACCOUNT_B.address, ACCOUNT_A.address))
-      .to.emit(channels, 'ChannelUpdate')
+    await expect(channels.finalizeChannelClosureInternal(ACCOUNT_B.address, ACCOUNT_A.address)).to.emit(
+      channels,
+      'ChannelUpdate'
+    )
 
     const channel = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
     expect(channel.partyABalance.toString()).to.equal('0')
