@@ -1,0 +1,1 @@
+export const ACCOUNT_1 = '0x8989541ffbc48046615ced2480dffca7b1a7e98331dcd257e9c863eb24521793'

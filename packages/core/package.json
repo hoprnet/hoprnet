@@ -56,7 +56,6 @@
     "secp256k1": "~4.0.2"
   },
   "devDependencies": {
-    "@hoprnet/hopr-demo-seeds": "1.71.0-next.58",
     "@hoprnet/hopr-ethereum": "1.71.0-next.58",
     "@hoprnet/hopr-testing": "1.71.0-next.58",
     "@types/chai-as-promised": "^7.1.3",
