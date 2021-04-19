@@ -8,7 +8,6 @@ contract ChannelsMock is HoprChannels {
     HoprChannels(_token, _secsClosure) {}
 
     function fundChannelInternal(
-        address funder,
         address accountA,
         address accountB,
         uint256 amountA,

@@ -11,6 +11,7 @@ import {
   PROOF_OF_RELAY_SECRET_0,
   PROOF_OF_RELAY_SECRET_1,
   WIN_PROB_100,
+  SECRET_2,
   SECRET_1,
   SECRET_0
 } from './constants'
@@ -182,7 +183,7 @@ describe('HoprChannels', function () {
     expect(channel.partyABalance.toString()).to.equal('70')
     expect(channel.partyBBalance.toString()).to.equal('30')
     expect(channel.closureTime.toString()).to.equal('0')
-    expect(channel.status.toString()).to.equal('0')
+    expect(channel.status.toString()).to.equal('1')
     expect(channel.closureByPartyA).to.be.false
 
     const accountABalance = await hoprToken.balanceOf(ACCOUNT_A.address)
@@ -209,7 +210,7 @@ describe('HoprChannels intergration tests', function () {
       expect(channel.partyABalance.toString()).to.equal('70')
       expect(channel.partyBBalance.toString()).to.equal('0')
       expect(channel.closureTime.toString()).to.equal('0')
-      expect(channel.status.toString()).to.equal('0')
+      expect(channel.status.toString()).to.equal('1')
       expect(channel.closureByPartyA).to.be.false
     })
 
@@ -228,11 +229,13 @@ describe('HoprChannels intergration tests', function () {
       expect(channel.partyABalance.toString()).to.equal('70')
       expect(channel.partyBBalance.toString()).to.equal('30')
       expect(channel.closureTime.toString()).to.equal('0')
-      expect(channel.status.toString()).to.equal('0')
+      expect(channel.status.toString()).to.equal('1')
       expect(channel.closureByPartyA).to.be.false
     })
 
     it('should reedem ticket for accountA', async function () {
+      await f.hoprChannels.connect(f.accountA).bumpChannel(ACCOUNT_B.address, SECRET_2)
+      await f.hoprChannels.connect(f.accountB).bumpChannel(ACCOUNT_A.address, SECRET_2)
       await f.hoprChannels
         .connect(f.accountA)
         .redeemTicket(
@@ -266,7 +269,7 @@ describe('HoprChannels intergration tests', function () {
         .redeemTicket(
           f.TICKET_AB_WIN.counterparty,
           f.TICKET_AB_WIN.secret,
-          f.TICKET_BA_WIN.ticketEpoch,
+          '2',
           f.TICKET_BA_WIN.ticketIndex,
           f.TICKET_AB_WIN.proofOfRelaySecret,
           f.TICKET_AB_WIN.amount,
@@ -304,7 +307,7 @@ describe('HoprChannels intergration tests', function () {
       expect(channel.closureByPartyA).to.be.false
     })
 
-    it('should reedem ticket for accountA', async function () {
+    it('should reedeem ticket for accountA', async function () {
       await f.hoprChannels
         .connect(f.accountA)
         .redeemTicket(
@@ -315,7 +318,7 @@ describe('HoprChannels intergration tests', function () {
           f.TICKET_BA_WIN_2.proofOfRelaySecret,
           f.TICKET_BA_WIN_2.amount,
           f.TICKET_BA_WIN_2.winProb,
-          f.TICKET_BA_WIN.signature
+          f.TICKET_BA_WIN_2.signature
         )
 
       const ticket = await f.hoprChannels.tickets(f.TICKET_BA_WIN_2.hash)
