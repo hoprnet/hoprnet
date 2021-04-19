@@ -71,15 +71,12 @@ export const createTicket = async (
     hash: string
     luck: string
     signature: string
-    r: string
-    s: string
-    v: number
   }
 > => {
   const encoded = getEncodedTicket(ticket)
   const hash = prefixMessageWithHOPR(encoded)
   const luck = getTicketLuck(ticket, hash, secret)
-  const { signature, r, s, v } = await signMessage(hash, account.privateKey)
+  const { signature } = await signMessage(hash, account.privateKey)
 
   return {
     ...ticket,
@@ -87,9 +84,6 @@ export const createTicket = async (
     encoded,
     hash,
     luck,
-    r,
-    s,
-    v,
     signature,
     counterparty: account.address
   }

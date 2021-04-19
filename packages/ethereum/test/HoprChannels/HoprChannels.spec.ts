@@ -283,9 +283,7 @@ describe('HoprChannels intergration tests', function () {
           f.TICKET_BA_WIN.proofOfRelaySecret,
           f.TICKET_BA_WIN.amount,
           f.TICKET_BA_WIN.winProb,
-          f.TICKET_BA_WIN.r,
-          f.TICKET_BA_WIN.s,
-          f.TICKET_BA_WIN.v
+          f.TICKET_BA_WIN.signature
         )
 
       const ticket = await f.hoprChannels.tickets(f.TICKET_BA_WIN.hash)
@@ -313,9 +311,7 @@ describe('HoprChannels intergration tests', function () {
           f.TICKET_AB_WIN.proofOfRelaySecret,
           f.TICKET_AB_WIN.amount,
           f.TICKET_AB_WIN.winProb,
-          f.TICKET_AB_WIN.r,
-          f.TICKET_AB_WIN.s,
-          f.TICKET_AB_WIN.v
+          f.TICKET_AB_WIN.signature
         )
 
       const ticket = await f.hoprChannels.tickets(f.TICKET_AB_WIN.hash)
@@ -359,9 +355,7 @@ describe('HoprChannels intergration tests', function () {
           f.TICKET_BA_WIN_2.proofOfRelaySecret,
           f.TICKET_BA_WIN_2.amount,
           f.TICKET_BA_WIN_2.winProb,
-          f.TICKET_BA_WIN_2.r,
-          f.TICKET_BA_WIN_2.s,
-          f.TICKET_BA_WIN_2.v
+          f.TICKET_BA_WIN.signature
         )
 
       const ticket = await f.hoprChannels.tickets(f.TICKET_BA_WIN_2.hash)
@@ -479,9 +473,7 @@ describe('HoprChannels intergration tests', function () {
           TICKET_BA_WIN_RECYCLED.proofOfRelaySecret,
           TICKET_BA_WIN_RECYCLED.amount,
           TICKET_BA_WIN_RECYCLED.winProb,
-          TICKET_BA_WIN_RECYCLED.r,
-          TICKET_BA_WIN_RECYCLED.s,
-          TICKET_BA_WIN_RECYCLED.v
+          TICKET_BA_WIN_RECYCLED.signature
         )
 
       const ticket = await f.hoprChannels.tickets(TICKET_BA_WIN_RECYCLED.hash)
@@ -509,9 +501,7 @@ describe('HoprChannels intergration tests', function () {
           TICKET_AB_WIN_RECYCLED.proofOfRelaySecret,
           TICKET_AB_WIN_RECYCLED.amount,
           TICKET_AB_WIN_RECYCLED.winProb,
-          TICKET_AB_WIN_RECYCLED.r,
-          TICKET_AB_WIN_RECYCLED.s,
-          TICKET_AB_WIN_RECYCLED.v
+          TICKET_AB_WIN_RECYCLED.signature
         )
 
       const ticket = await f.hoprChannels.tickets(TICKET_AB_WIN_RECYCLED.hash)
@@ -549,9 +539,7 @@ describe('HoprChannels intergration tests', function () {
           TICKET_BA_WIN_RECYCLED_2.proofOfRelaySecret,
           TICKET_BA_WIN_RECYCLED_2.amount,
           TICKET_BA_WIN_RECYCLED_2.winProb,
-          TICKET_BA_WIN_RECYCLED_2.r,
-          TICKET_BA_WIN_RECYCLED_2.s,
-          TICKET_BA_WIN_RECYCLED_2.v
+          TICKET_BA_WIN_RECYCLED_2.signature
         )
 
       const ticket = await f.hoprChannels.tickets(TICKET_BA_WIN_RECYCLED_2.hash)

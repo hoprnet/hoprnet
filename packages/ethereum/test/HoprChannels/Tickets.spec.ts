@@ -43,9 +43,7 @@ describe('Tickets', function () {
       TICKET_AB_WIN.proofOfRelaySecret,
       TICKET_AB_WIN.amount,
       TICKET_AB_WIN.winProb,
-      TICKET_AB_WIN.r,
-      TICKET_AB_WIN.s,
-      TICKET_AB_WIN.v
+      TICKET_AB_WIN.signature
     )
 
     const ticket = await tickets.tickets(TICKET_AB_WIN.hash)
@@ -76,9 +74,7 @@ describe('Tickets', function () {
         TICKET_AB_WIN.proofOfRelaySecret,
         TICKET_AB_WIN.amount,
         TICKET_AB_WIN.winProb,
-        TICKET_AB_WIN.r,
-        TICKET_AB_WIN.s,
-        TICKET_AB_WIN.v
+        TICKET_AB_WIN.signature
       )
     ).to.be.revertedWith('channel must be open or pending to close')
   })
@@ -115,9 +111,7 @@ describe('Tickets', function () {
         TICKET_AB_WIN.proofOfRelaySecret,
         TICKET_AB_WIN.amount,
         TICKET_AB_WIN.winProb,
-        TICKET_AB_WIN.r,
-        TICKET_AB_WIN.s,
-        TICKET_AB_WIN.v
+        TICKET_AB_WIN.signature
       )
     ).to.be.revertedWith('signer must match the counterparty')
   })
@@ -136,9 +130,7 @@ describe('Tickets', function () {
       TICKET_AB_WIN.proofOfRelaySecret,
       TICKET_AB_WIN.amount,
       TICKET_AB_WIN.winProb,
-      TICKET_AB_WIN.r,
-      TICKET_AB_WIN.s,
-      TICKET_AB_WIN.v
+      TICKET_AB_WIN.signature
     )
 
     await expect(
@@ -151,9 +143,7 @@ describe('Tickets', function () {
         TICKET_AB_WIN.proofOfRelaySecret,
         TICKET_AB_WIN.amount,
         TICKET_AB_WIN.winProb,
-        TICKET_AB_WIN.r,
-        TICKET_AB_WIN.s,
-        TICKET_AB_WIN.v
+        TICKET_AB_WIN.signature
       )
     ).to.be.revertedWith('ticket must not be used twice')
   })
@@ -173,9 +163,7 @@ describe('Tickets', function () {
         TICKET_AB_WIN.proofOfRelaySecret,
         TICKET_AB_WIN.amount,
         TICKET_AB_WIN.winProb,
-        TICKET_BA_WIN.r, // signature from different ticket
-        TICKET_BA_WIN.s, // signature from different ticket
-        TICKET_AB_WIN.v
+        TICKET_BA_WIN.signature // signature from different ticket
       )
     ).to.be.revertedWith('signer must match the counterparty')
   })
@@ -196,9 +184,7 @@ describe('Tickets', function () {
         TICKET_AB_LOSS.proofOfRelaySecret,
         TICKET_AB_LOSS.amount,
         TICKET_AB_LOSS.winProb,
-        TICKET_AB_LOSS.r,
-        TICKET_AB_LOSS.s,
-        TICKET_AB_LOSS.v
+        TICKET_AB_LOSS.signature
       )
     ).to.be.revertedWith('ticket must be a win')
   })
