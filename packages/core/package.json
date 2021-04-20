@@ -83,8 +83,7 @@
     ],
     "spec": "src/**/*.spec.ts",
     "require": [
-      "ts-node/register",
-      "test.mocha.ts"
+      "ts-node/register"
     ]
   },
   "publishConfig": {
