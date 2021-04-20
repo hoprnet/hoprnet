@@ -29,7 +29,7 @@ const useFixtures = deployments.createFixture(async (hre, { secsClosure }: { sec
   }
 })
 
-describe('funding HoprChannel catches failures', async function(){
+describe('funding HoprChannel catches failures', async function () {
   let channels
   before(async function () {
     // All of these tests revert, so we can rely on stateless single fixture.
@@ -42,22 +42,20 @@ describe('funding HoprChannel catches failures', async function(){
     )
   })
 
-  it('should fail to fund channel 0->A', async function() {
+  it('should fail to fund channel 0->A', async function () {
     await expect(
       channels.fundChannelMulti(ethers.constants.AddressZero, ACCOUNT_B.address, '70', '30')
     ).to.be.revertedWith('accountA must not be empty')
   })
 
-  it('should fail to fund channel A->0', async function() {
+  it('should fail to fund channel A->0', async function () {
     await expect(
       channels.fundChannelMulti(ACCOUNT_A.address, ethers.constants.AddressZero, '70', '30')
     ).to.be.revertedWith('accountB must not be empty')
   })
 
-  it('should fail to fund a channel with 0 amount', async function() {
-    await expect(
-      channels.fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '0', '0')
-    ).to.be.revertedWith(
+  it('should fail to fund a channel with 0 amount', async function () {
+    await expect(channels.fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '0', '0')).to.be.revertedWith(
       'amountA or amountB must be greater than 0'
     )
   })
@@ -74,18 +72,16 @@ describe('funding a HoprChannel success', function () {
   })
 })
 
-
-describe('with a funded HoprChannel (A: 70, B: 30)', function() {
+describe('with a funded HoprChannel (A: 70, B: 30)', function () {
   let channels
-  beforeEach(async function(){
+  beforeEach(async function () {
     const fixtures = await useFixtures()
     channels = fixtures.channels
     await channels.fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
   })
 
   it('A can initialize channel closure', async function () {
-    await expect(
-      channels.connect(ACCOUNT_A.address).initiateChannelClosure(ACCOUNT_B.address)).to.emit(
+    await expect(channels.connect(ACCOUNT_A.address).initiateChannelClosure(ACCOUNT_B.address)).to.emit(
       channels,
       'ChannelUpdate'
     )
@@ -94,8 +90,7 @@ describe('with a funded HoprChannel (A: 70, B: 30)', function() {
   })
 
   it('B can initialize channel closure', async function () {
-    await expect(
-      channels.connect(ACCOUNT_B.address).initiateChannelClosure(ACCOUNT_A.address)).to.emit(
+    await expect(channels.connect(ACCOUNT_B.address).initiateChannelClosure(ACCOUNT_A.address)).to.emit(
       channels,
       'ChannelUpdate'
     )
@@ -110,18 +105,19 @@ describe('with a funded HoprChannel (A: 70, B: 30)', function() {
   })
 
   it('should fail to initialize channel closure A->0', async function () {
-    await expect(channels.connect(ACCOUNT_A.address).initiateChannelClosure(ethers.constants.AddressZero)).to.be.revertedWith('counterparty must not be empty')
+    await expect(
+      channels.connect(ACCOUNT_A.address).initiateChannelClosure(ethers.constants.AddressZero)
+    ).to.be.revertedWith('counterparty must not be empty')
   })
 })
 
-
-describe('With a pending_to_close HoprChannel (A:70, B:30)', function(){
+describe('With a pending_to_close HoprChannel (A:70, B:30)', function () {
   let channels
-  beforeEach(async function(){
+  beforeEach(async function () {
     const fixtures = await useFixtures()
     channels = fixtures.channels
     await channels.fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
-    await channels.connect(ACCOUNT_A.address).initiateChannelClosure(ACCOUNT_B.address);
+    await channels.connect(ACCOUNT_A.address).initiateChannelClosure(ACCOUNT_B.address)
   })
 
   it('should fail to initialize channel closure when channel is not open', async function () {
@@ -250,9 +246,9 @@ describe('With a pending_to_close HoprChannel (A:70, B:30)', function(){
   })
 })
 
-describe('test internals with mock', function() {
+describe('test internals with mock', function () {
   let channels
-  beforeEach(async function(){
+  beforeEach(async function () {
     channels = (await useFixtures()).channels
   })
 
@@ -319,7 +315,13 @@ describe('Tickets', function () {
     // TODO: add event check
     await channels.redeemTicketInternal(...redeemArgs(fixtureTickets.TICKET_AB_WIN))
     const channel = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
-    validateChannel(channel, {partyABalance: '60', partyBBalance: '40', closureTime: '0', status: '1', closureByPartyA: false})
+    validateChannel(channel, {
+      partyABalance: '60',
+      partyBBalance: '40',
+      closureTime: '0',
+      status: '1',
+      closureByPartyA: false
+    })
     expect(channel.partyBCommitment).to.equal(fixtureTickets.TICKET_AB_WIN.nextCommitment)
   })
 

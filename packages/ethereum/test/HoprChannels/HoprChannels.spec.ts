@@ -50,7 +50,6 @@ const useFixtures = deployments.createFixture(async () => {
   }
 })
 
-
 describe('HoprChannels', function () {
   it('should fund one direction', async function () {
     const { token, channels, accountA } = await useFixtures()
