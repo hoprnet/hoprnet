@@ -4,7 +4,6 @@ import { signMessage } from '../utils'
 export type Ticket = {
   recipient: string
   proofOfRelaySecret: string
-  counter: string
   amount: string
   winProb: string
   channelEpoch: string
@@ -62,10 +61,10 @@ export const createTicket = async (
     privateKey: string
     address: string
   },
-  secret: string
+  nextCommitment: string
 ): Promise<
   Ticket & {
-    secret: string
+    nextCommitment: string
     counterparty: string
     encoded: string
     hash: string
@@ -76,12 +75,12 @@ export const createTicket = async (
   const encoded = getEncodedTicket(ticket)
   const hashMessage = solidityKeccak256(['bytes'], [encoded])
   const hash = solidityKeccak256(['string', 'bytes'], ['\x19Ethereum Signed Message:\n32', hashMessage])
-  const luck = getTicketLuck(ticket, hash, secret)
+  const luck = getTicketLuck(ticket, hash, nextCommitment)
   const { signature } = await signMessage(hashMessage, account.privateKey) // TODO:
 
   return {
     ...ticket,
-    secret,
+    nextCommitment,
     encoded,
     hash: hash,
     luck,

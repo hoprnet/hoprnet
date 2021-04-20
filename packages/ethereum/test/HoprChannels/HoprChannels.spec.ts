@@ -52,7 +52,7 @@ const useFixtures = deployments.createFixture(async () => {
 
 const redeemArgs = (ticket) => [
   ticket.counterparty,
-  ticket.secret,
+  ticket.nextCommitment,
   ticket.ticketEpoch,
   ticket.ticketIndex,
   ticket.proofOfRelaySecret,
@@ -169,18 +169,13 @@ describe('HoprChannels', function () {
       )
 
     const channel = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
-    expect(channel.partyABalance.toString()).to.equal('70')
-    expect(channel.partyBBalance.toString()).to.equal('30')
-    expect(channel.closureTime.toString()).to.equal('0')
-    expect(channel.status.toString()).to.equal('1')
-    expect(channel.closureByPartyA).to.be.false
-
+    validateChannel(channel, {partyABalance: '70', partyBBalance: '30', closureTime: '0', status: '1', closureByPartyA: false})
     const accountABalance = await token.balanceOf(ACCOUNT_A.address)
     expect(accountABalance.toString()).to.equal('0')
   })
 })
 
-describe('HoprChannels intergration tests', function () {
+describe('HoprChannels lifecycle', function () {
   let f: PromiseValue<ReturnType<typeof useFixtures>>
 
   before(async function () {
@@ -190,17 +185,12 @@ describe('HoprChannels intergration tests', function () {
   context('on a fresh channel', function () {
     it('should fund accountA', async function () {
       await f.token.connect(f.accountA).approve(f.channels.address, '70')
-
       await expect(
         f.channels.connect(f.accountA).fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '0')
       ).to.emit(f.channels, 'ChannelUpdate')
 
       const channel = await f.channels.channels(ACCOUNT_AB_CHANNEL_ID)
-      expect(channel.partyABalance.toString()).to.equal('70')
-      expect(channel.partyBBalance.toString()).to.equal('0')
-      expect(channel.closureTime.toString()).to.equal('0')
-      expect(channel.status.toString()).to.equal('1')
-      expect(channel.closureByPartyA).to.be.false
+      validateChannel(channel, {partyABalance: '70', partyBBalance: '0', closureTime: '0', status: '1', closureByPartyA: false})
     })
 
     it('should fund accountB using send', async function () {
@@ -215,11 +205,7 @@ describe('HoprChannels intergration tests', function () {
       ).to.emit(f.channels, 'ChannelUpdate')
 
       const channel = await f.channels.channels(ACCOUNT_AB_CHANNEL_ID)
-      expect(channel.partyABalance.toString()).to.equal('70')
-      expect(channel.partyBBalance.toString()).to.equal('30')
-      expect(channel.closureTime.toString()).to.equal('0')
-      expect(channel.status.toString()).to.equal('1')
-      expect(channel.closureByPartyA).to.be.false
+      validateChannel(channel, {partyABalance: '70', partyBBalance: '30', closureTime: '0', status: '1', closureByPartyA: false})
     })
 
     it('should reedem ticket for accountA', async function () {
@@ -231,12 +217,7 @@ describe('HoprChannels intergration tests', function () {
         .redeemTicket(...redeemArgs(f.TICKET_BA_WIN))
 
       const channel = await f.channels.channels(ACCOUNT_AB_CHANNEL_ID)
-      expect(channel.partyABalance.toString()).to.equal('80')
-      expect(channel.partyBBalance.toString()).to.equal('20')
-      expect(channel.closureTime.toString()).to.equal('0')
-      expect(channel.status.toString()).to.equal('1')
-      expect(channel.closureByPartyA).to.be.false
-      expect(channel.partyACommitment).to.equal(SECRET_1)
+      validateChannel(channel, {partyABalance: '80', partyBBalance: '20', closureTime: '0', status: '1', closureByPartyA: false})
     })
 
     it('should reedem ticket for accountB', async function () {
@@ -323,7 +304,6 @@ describe('HoprChannels intergration tests', function () {
           proofOfRelaySecret: PROOF_OF_RELAY_SECRET_0,
           ticketIndex: '0',
           ticketEpoch: '0',
-          counter: '2',
           amount: '10',
           winProb: WIN_PROB_100,
           channelEpoch: '2'
@@ -336,7 +316,6 @@ describe('HoprChannels intergration tests', function () {
         {
           recipient: ACCOUNT_A.address,
           proofOfRelaySecret: PROOF_OF_RELAY_SECRET_0,
-          counter: '2',
           ticketIndex: '0',
           ticketEpoch: '0',
           amount: '10',
@@ -351,7 +330,6 @@ describe('HoprChannels intergration tests', function () {
         {
           recipient: ACCOUNT_A.address,
           proofOfRelaySecret: PROOF_OF_RELAY_SECRET_1,
-          counter: '2',
           ticketIndex: '0',
           ticketEpoch: '0',
           amount: '10',
@@ -381,7 +359,7 @@ describe('HoprChannels intergration tests', function () {
         .connect(f.accountA)
         .redeemTicket(
           TICKET_BA_WIN_RECYCLED.counterparty,
-          TICKET_BA_WIN_RECYCLED.secret,
+          TICKET_BA_WIN_RECYCLED.nextCommitment,
           f.TICKET_BA_WIN.ticketEpoch,
           f.TICKET_BA_WIN.ticketIndex,
           TICKET_BA_WIN_RECYCLED.proofOfRelaySecret,
@@ -407,7 +385,7 @@ describe('HoprChannels intergration tests', function () {
         .connect(f.accountB)
         .redeemTicket(
           TICKET_AB_WIN_RECYCLED.counterparty,
-          TICKET_AB_WIN_RECYCLED.secret,
+          TICKET_AB_WIN_RECYCLED.nextCommitment,
           f.TICKET_BA_WIN.ticketEpoch,
           f.TICKET_BA_WIN.ticketIndex,
           TICKET_AB_WIN_RECYCLED.proofOfRelaySecret,
@@ -444,7 +422,7 @@ describe('HoprChannels intergration tests', function () {
         .connect(f.accountA)
         .redeemTicket(
           TICKET_BA_WIN_RECYCLED_2.counterparty,
-          TICKET_BA_WIN_RECYCLED_2.secret,
+          TICKET_BA_WIN_RECYCLED_2.nextCommitment,
           f.TICKET_BA_WIN.ticketEpoch,
           f.TICKET_BA_WIN.ticketIndex,
           TICKET_BA_WIN_RECYCLED_2.proofOfRelaySecret,

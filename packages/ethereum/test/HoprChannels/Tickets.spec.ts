@@ -39,7 +39,7 @@ describe('Tickets', function () {
     await tickets.redeemTicketInternal(
       TICKET_AB_WIN.recipient,
       TICKET_AB_WIN.counterparty,
-      TICKET_AB_WIN.secret,
+      TICKET_AB_WIN.nextCommitment,
       TICKET_AB_WIN.ticketEpoch,
       TICKET_AB_WIN.ticketIndex,
       TICKET_AB_WIN.proofOfRelaySecret,
@@ -53,7 +53,7 @@ describe('Tickets', function () {
     expect(channel.closureTime.toString()).to.equal('0')
     expect(channel.status.toString()).to.equal('1')
     expect(channel.closureByPartyA).to.be.false
-    expect(channel.partyBCommitment).to.equal(TICKET_AB_WIN.secret)
+    expect(channel.partyBCommitment).to.equal(TICKET_AB_WIN.nextCommitment)
   })
 
   it('should fail to redeem ticket when channel in closed', async function () {
@@ -64,7 +64,7 @@ describe('Tickets', function () {
       tickets.redeemTicketInternal(
         TICKET_AB_WIN.recipient,
         TICKET_AB_WIN.counterparty,
-        TICKET_AB_WIN.secret,
+        TICKET_AB_WIN.nextCommitment,
         TICKET_AB_WIN.ticketEpoch,
         TICKET_AB_WIN.ticketIndex,
         TICKET_AB_WIN.proofOfRelaySecret,
@@ -76,22 +76,22 @@ describe('Tickets', function () {
   })
 
   it('should fail to redeem ticket when channel in in different channelEpoch', async function () {
-    const { tickets, TICKET_AB_WIN } = await useFixtures()
+    const { tickets, TICKET_AB_WIN, deployer } = await useFixtures()
     await tickets.connect(ACCOUNT_B.wallet).bumpChannel(ACCOUNT_A.address, SECRET_2)
 
     // transfer tokens to contract
-    await tickets.fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
+    await tickets.connect(deployer).fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
     // open channel and then close it
     await tickets.initiateChannelClosureInternal(ACCOUNT_A.address, ACCOUNT_B.address)
     await tickets.finalizeChannelClosureInternal(ACCOUNT_A.address, ACCOUNT_B.address)
     // refund and open channel
-    await tickets.fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
+    await tickets.connect(deployer).fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
 
     await expect(
       tickets.redeemTicketInternal(
         TICKET_AB_WIN.recipient,
         TICKET_AB_WIN.counterparty,
-        TICKET_AB_WIN.secret,
+        TICKET_AB_WIN.nextCommitment,
         TICKET_AB_WIN.ticketEpoch,
         TICKET_AB_WIN.ticketIndex,
         TICKET_AB_WIN.proofOfRelaySecret,
@@ -111,7 +111,7 @@ describe('Tickets', function () {
     await tickets.redeemTicketInternal(
       TICKET_AB_WIN.recipient,
       TICKET_AB_WIN.counterparty,
-      TICKET_AB_WIN.secret,
+      TICKET_AB_WIN.nextCommitment,
       TICKET_AB_WIN.ticketEpoch,
       TICKET_AB_WIN.ticketIndex,
       TICKET_AB_WIN.proofOfRelaySecret,
@@ -159,7 +159,7 @@ describe('Tickets', function () {
       tickets.redeemTicketInternal(
         TICKET_AB_WIN.recipient,
         TICKET_AB_WIN.counterparty,
-        TICKET_AB_WIN.secret,
+        TICKET_AB_WIN.nextCommitment,
         TICKET_AB_WIN.ticketEpoch,
         TICKET_AB_WIN.ticketIndex,
         TICKET_AB_WIN.proofOfRelaySecret,
@@ -180,7 +180,7 @@ describe('Tickets', function () {
       tickets.redeemTicketInternal(
         TICKET_AB_LOSS.recipient,
         TICKET_AB_LOSS.counterparty,
-        TICKET_AB_LOSS.secret,
+        TICKET_AB_LOSS.nextCommitment,
         TICKET_AB_LOSS.ticketEpoch,
         TICKET_AB_LOSS.ticketIndex,
         TICKET_AB_LOSS.proofOfRelaySecret,
@@ -196,7 +196,7 @@ describe('Tickets', function () {
 
     const encoded = await tickets.getEncodedTicketInternal(
       TICKET_AB_WIN.recipient,
-      TICKET_AB_WIN.counter,
+      TICKET_AB_WIN.ticketEpoch,
       TICKET_AB_WIN.proofOfRelaySecret,
       TICKET_AB_WIN.channelEpoch,
       TICKET_AB_WIN.amount,
@@ -210,7 +210,7 @@ describe('Tickets', function () {
 
     const luck = await tickets.getTicketLuckInternal(
       TICKET_AB_WIN.hash,
-      TICKET_AB_WIN.secret,
+      TICKET_AB_WIN.nextCommitment,
       TICKET_AB_WIN.proofOfRelaySecret,
       TICKET_AB_WIN.winProb
     )
