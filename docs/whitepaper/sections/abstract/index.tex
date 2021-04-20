@@ -14,7 +14,7 @@ Tor is an open-source software for enabling anonymous communication. It is based
 Another project based on onion routing is I2P peer-to-peer network. I2P has different design choices from those of Tor:
 \begin{itemize}
     \item Packet switched instead of circuit switched: Tor allocates connection to long lived circuits, this allocation does not change until either the connection or circuit closes. On the other hand, routers in I2P maintain multiple tunnels per destination which increases significantly the scalability and resilience against failures since packets are used in parallel.
-    \item Unidirectional instead of bidirectional tunnels: which makes deanonymization harder but needs two sets of peers to be profiled since it's unidirectional.
+    \item Unidirectional instead of bidirectional tunnels: which makes deanonymization harder since tunnel participants see half as much data in unidirectional tunnels and need two sets of peers to be profiled.
     \item Peer profiles instead of directory authorities: I2P’s network information is stored in a DHT (information in the DHT is inherently untrusted) while Tor’s relay network is managed by a set of nine Directory Authorities.
 
 \end{itemize}
