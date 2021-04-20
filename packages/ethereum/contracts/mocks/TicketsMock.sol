@@ -8,13 +8,11 @@ contract TicketsMock is HoprChannels {
     HoprChannels(_token, _secsClosure) {}
   
     function fundChannelInternal(
-        address funder,
         address accountA,
         address accountB,
         uint256 amountA,
         uint256 amountB
     ) external {
-        token.transferFrom(funder, address(this), amountA + amountB);
         _fundChannel(accountA, accountB, amountA, amountB);
     }
 

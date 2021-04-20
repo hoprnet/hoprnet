@@ -7,7 +7,7 @@ export type Ticket = {
   counter: string
   amount: string
   winProb: string
-  iteration: string
+  channelEpoch: string
   ticketIndex: string
   ticketEpoch: string
 }
@@ -32,7 +32,7 @@ export const getEncodedTicket = (ticket: Ticket): string => {
 
   return solidityPack(
     ['address', 'bytes32', 'uint256', 'uint256', 'bytes32', 'uint256'],
-    [ticket.recipient, challenge, ticket.counter, ticket.amount, ticket.winProb, ticket.iteration]
+    [ticket.recipient, challenge, ticket.ticketEpoch, ticket.amount, ticket.winProb, ticket.channelEpoch]
   )
 }
 

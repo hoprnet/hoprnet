@@ -59,12 +59,6 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     mapping(bytes32 => Channel) public channels;
 
     /**
-     * @dev Stored hashes of tickets keyed by their challenge,
-     * true if ticket has been redeemed.
-     */
-    mapping(bytes32 => bool) public tickets;
-
-    /**
      * @dev HoprToken, the token that will be used to settle payments
      */
     IERC20 public token;
@@ -495,13 +489,13 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         uint256 prevTicketEpoch;
         if (_isPartyA(redeemer, counterparty)) {
           require(channel.partyACommitment == keccak256(abi.encodePacked(nextCommitment)), "commitment must be hash of next commitment");
-          require(channel.partyATicketEpoch == ticketEpoch, "Ticket epoch must match");
-          require(channel.partyATicketIndex < ticketIndex, "Redemptions must be in order");
+          require(channel.partyATicketEpoch == ticketEpoch, "ticket epoch must match");
+          require(channel.partyATicketIndex < ticketIndex, "redemptions must be in order");
           prevTicketEpoch = channel.partyATicketEpoch;
         } else {
           require(channel.partyBCommitment == keccak256(abi.encodePacked(nextCommitment)), "commitment must be hash of next commitment");
-          require(channel.partyBTicketEpoch == ticketEpoch, "Ticket epoch must match");
-          require(channel.partyBTicketIndex < ticketIndex, "Redemptions must be in order");
+          require(channel.partyBTicketEpoch == ticketEpoch, "ticket epoch must match");
+          require(channel.partyBTicketIndex < ticketIndex, "redemptions must be in order");
           prevTicketEpoch = channel.partyBTicketEpoch;
         }
         require(channel.status != ChannelStatus.CLOSED, "channel must be open or pending to close");
@@ -518,7 +512,6 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
               )
             )
         );
-        require(!tickets[ticketHash], "ticket must not be used twice");
         require(ECDSA.recover(ticketHash, signature) == counterparty, "signer must match the counterparty");
         require(
             uint256(_getTicketLuck(
@@ -529,8 +522,6 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
             )) <= uint256(winProb),
             "ticket must be a win"
         );
-
-        tickets[ticketHash] = true;
 
         if (_isPartyA(redeemer, counterparty)) {
             channel.partyACommitment = nextCommitment;
@@ -543,7 +534,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
             channel.partyABalance = channel.partyABalance.sub(amount);
             channel.partyBBalance = channel.partyBBalance.add(amount);
             channel.partyBCommitment = nextCommitment;
-            channel.partyBTicketEpoch = channel.partyATicketEpoch.add(1);
+            channel.partyBTicketEpoch = channel.partyBTicketEpoch.add(1);
             channel.partyBTicketIndex = ticketIndex;
             emit ChannelUpdate(counterparty, redeemer, channel);
         }
@@ -555,9 +546,9 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
      */
     function _getEncodedTicket(
         address recipient,
-        uint256 recipientCounter,
+        uint256 ticketEpoch,
         bytes32 proofOfRelaySecret,
-        uint256 channelIteration,
+        uint256 channelEpoch,
         uint256 amount,
         bytes32 winProb
     ) internal pure returns (bytes memory) {
@@ -566,10 +557,10 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         return abi.encodePacked(
             recipient,
             challenge,
-            recipientCounter,
+            ticketEpoch,
             amount,
             winProb,
-            channelIteration
+            channelEpoch
         );
     }
 

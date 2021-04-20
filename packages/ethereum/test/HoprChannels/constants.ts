@@ -35,7 +35,7 @@ export const generateTickets = async () => {
       ticketIndex: '1',
       amount: '10',
       winProb: WIN_PROB_100,
-      iteration: '1'
+      channelEpoch: '1'
     },
     ACCOUNT_A,
     SECRET_1
@@ -56,7 +56,7 @@ export const generateTickets = async () => {
       ticketIndex: '1',
       amount: '10',
       winProb: WIN_PROB_100,
-      iteration: '1'
+      channelEpoch: '1'
     },
     ACCOUNT_A,
     SECRET_0
@@ -74,7 +74,7 @@ export const generateTickets = async () => {
       ticketIndex: '1',
       amount: '10',
       winProb: WIN_PROB_0,
-      iteration: '1'
+      channelEpoch: '1'
     },
     ACCOUNT_A,
     SECRET_1
@@ -92,7 +92,7 @@ export const generateTickets = async () => {
       ticketIndex: '1',
       amount: '10',
       winProb: WIN_PROB_100,
-      iteration: '1'
+      channelEpoch: '1'
     },
     ACCOUNT_B,
     SECRET_1
@@ -113,7 +113,7 @@ export const generateTickets = async () => {
       ticketIndex: '1',
       amount: '10',
       winProb: WIN_PROB_100,
-      iteration: '1'
+      channelEpoch: '1'
     },
     ACCOUNT_B,
     SECRET_0

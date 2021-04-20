@@ -31,9 +31,9 @@ const useFixtures = deployments.createFixture(async (hre, { secsClosure }: { sec
 
 describe('Tickets', function () {
   it('should redeem ticket', async function () {
-    const { tickets, deployer, TICKET_AB_WIN } = await useFixtures()
+    const { tickets, TICKET_AB_WIN } = await useFixtures()
     await tickets.connect(ACCOUNT_B.wallet).bumpChannel(ACCOUNT_A.address, SECRET_2)
-    await tickets.fundChannelInternal(deployer, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
+    await tickets.fundChannelInternal(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
 
     // TODO: add event check
     await tickets.redeemTicketInternal(
@@ -47,10 +47,6 @@ describe('Tickets', function () {
       TICKET_AB_WIN.winProb,
       TICKET_AB_WIN.signature
     )
-
-    const ticket = await tickets.tickets(TICKET_AB_WIN.hash)
-    expect(ticket).to.be.true
-
     const channel = await tickets.channels(ACCOUNT_AB_CHANNEL_ID)
     expect(channel.partyABalance.toString()).to.equal('60')
     expect(channel.partyBBalance.toString()).to.equal('40')
@@ -79,17 +75,17 @@ describe('Tickets', function () {
     ).to.be.revertedWith('channel must be open or pending to close')
   })
 
-  it('should fail to redeem ticket when channel in in different iteration', async function () {
-    const { tickets, deployer, TICKET_AB_WIN } = await useFixtures()
+  it('should fail to redeem ticket when channel in in different channelEpoch', async function () {
+    const { tickets,TICKET_AB_WIN } = await useFixtures()
     await tickets.connect(ACCOUNT_B.wallet).bumpChannel(ACCOUNT_A.address, SECRET_2)
 
     // transfer tokens to contract
-    await tickets.fundChannelInternal(deployer, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
+    await tickets.fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
     // open channel and then close it
     await tickets.initiateChannelClosureInternal(ACCOUNT_A.address, ACCOUNT_B.address)
     await tickets.finalizeChannelClosureInternal(ACCOUNT_A.address, ACCOUNT_B.address)
     // refund and open channel
-    await tickets.fundChannelInternal(deployer, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
+    await tickets.fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
 
     await expect(
       tickets.redeemTicketInternal(
@@ -107,10 +103,10 @@ describe('Tickets', function () {
   })
 
   it('should fail to redeem ticket when ticket has been already redeemed', async function () {
-    const { tickets, deployer, TICKET_AB_WIN } = await useFixtures()
+    const { tickets, TICKET_AB_WIN } = await useFixtures()
 
     await tickets.connect(ACCOUNT_B.wallet).bumpChannel(ACCOUNT_A.address, SECRET_2)
-    await tickets.fundChannelInternal(deployer, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
+    await tickets.fundChannelInternal(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
 
     await tickets.redeemTicketInternal(
       TICKET_AB_WIN.recipient,
@@ -136,14 +132,28 @@ describe('Tickets', function () {
         TICKET_AB_WIN.winProb,
         TICKET_AB_WIN.signature
       )
-    ).to.be.revertedWith('ticket must not be used twice')
+    ).to.be.revertedWith('ticket epoch must match')
+
+    await expect(
+      tickets.redeemTicketInternal(
+        TICKET_AB_WIN.recipient,
+        TICKET_AB_WIN.counterparty,
+        SECRET_0, // give the next secret so this ticket becomes redeemable
+        parseInt(TICKET_AB_WIN.ticketEpoch) + 1 + '',
+        TICKET_AB_WIN.ticketIndex,
+        TICKET_AB_WIN.proofOfRelaySecret,
+        TICKET_AB_WIN.amount,
+        TICKET_AB_WIN.winProb,
+        TICKET_AB_WIN.signature
+      )
+    ).to.be.revertedWith('redemptions must be in order')
   })
 
   it('should fail to redeem ticket when signer is not the issuer', async function () {
-    const { tickets, deployer, TICKET_AB_WIN, TICKET_BA_WIN } = await useFixtures()
+    const { tickets, TICKET_AB_WIN, TICKET_BA_WIN } = await useFixtures()
 
     await tickets.connect(ACCOUNT_B.wallet).bumpChannel(ACCOUNT_A.address, SECRET_2)
-    await tickets.fundChannelInternal(deployer, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
+    await tickets.fundChannelInternal(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
 
     await expect(
       tickets.redeemTicketInternal(
@@ -161,10 +171,10 @@ describe('Tickets', function () {
   })
 
   it("should fail to redeem ticket if it's a loss", async function () {
-    const { tickets, deployer, TICKET_AB_LOSS } = await useFixtures()
+    const { tickets, TICKET_AB_LOSS } = await useFixtures()
 
     await tickets.connect(ACCOUNT_B.wallet).bumpChannel(ACCOUNT_A.address, SECRET_2)
-    await tickets.fundChannelInternal(deployer, ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
+    await tickets.fundChannelInternal(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
 
     await expect(
       tickets.redeemTicketInternal(
@@ -188,7 +198,7 @@ describe('Tickets', function () {
       TICKET_AB_WIN.recipient,
       TICKET_AB_WIN.counter,
       TICKET_AB_WIN.proofOfRelaySecret,
-      TICKET_AB_WIN.iteration,
+      TICKET_AB_WIN.channelEpoch,
       TICKET_AB_WIN.amount,
       TICKET_AB_WIN.winProb
     )
