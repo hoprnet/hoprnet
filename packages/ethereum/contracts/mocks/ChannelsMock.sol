@@ -7,29 +7,6 @@ contract ChannelsMock is HoprChannels {
     constructor(address _token, uint32 _secsClosure)
     HoprChannels(_token, _secsClosure) {}
 
-    function fundChannelInternal(
-        address accountA,
-        address accountB,
-        uint256 amountA,
-        uint256 amountB
-    ) external {
-        _fundChannel(accountA, accountB, amountA, amountB);
-    }
-
-    function initiateChannelClosureInternal(
-        address initiator,
-        address counterparty
-    ) external {
-        _initiateChannelClosure(initiator, counterparty);
-    }
-
-    function finalizeChannelClosureInternal(
-        address initiator,
-        address counterparty
-    ) external {
-        _finalizeChannelClosure(initiator, counterparty);
-    }
-
     function getChannelInternal(
         address accountA,
         address accountB

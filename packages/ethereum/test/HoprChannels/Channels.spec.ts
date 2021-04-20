@@ -31,7 +31,7 @@ describe('Channels', function () {
     const { channels } = await useFixtures()
 
     //TODO events
-    await channels.fundChannelInternal(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
+    await channels.fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
     const channel = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
     expect(channel.partyABalance.toString()).to.equal('70')
     expect(channel.partyBBalance.toString()).to.equal('30')
@@ -43,19 +43,19 @@ describe('Channels', function () {
   it('should fail to fund channel', async function () {
     const { channels } = await useFixtures()
 
-    await expect(channels.fundChannelInternal(ACCOUNT_A.address, ACCOUNT_A.address, '70', '30')).to.be.revertedWith(
+    await expect(channels.fundChannelMulti(ACCOUNT_A.address, ACCOUNT_A.address, '70', '30')).to.be.revertedWith(
       'accountA and accountB must not be the same'
     )
 
     await expect(
-      channels.fundChannelInternal(ethers.constants.AddressZero, ACCOUNT_B.address, '70', '30')
+      channels.fundChannelMulti(ethers.constants.AddressZero, ACCOUNT_B.address, '70', '30')
     ).to.be.revertedWith('accountA must not be empty')
 
     await expect(
-      channels.fundChannelInternal(ACCOUNT_A.address, ethers.constants.AddressZero, '70', '30')
+      channels.fundChannelMulti(ACCOUNT_A.address, ethers.constants.AddressZero, '70', '30')
     ).to.be.revertedWith('accountB must not be empty')
 
-    await expect(channels.fundChannelInternal(ACCOUNT_A.address, ACCOUNT_B.address, '0', '0')).to.be.revertedWith(
+    await expect(channels.fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '0', '0')).to.be.revertedWith(
       'untA or amountB must be greater than 0'
     )
   })
@@ -63,9 +63,9 @@ describe('Channels', function () {
   it('should initialize channel closure', async function () {
     const { channels } = await useFixtures()
 
-    await channels.fundChannelInternal(ACCOUNT_A.address, ACCOUNT_B.address, '100', '0')
+    await channels.fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '100', '0')
 
-    await expect(channels.initiateChannelClosureInternal(ACCOUNT_A.address, ACCOUNT_B.address)).to.emit(
+    await expect(channels.connect(ACCOUNT_A.address).initiateChannelClosure(ACCOUNT_B.address)).to.emit(
       channels,
       'ChannelUpdate'
     )
@@ -83,7 +83,7 @@ describe('Channels', function () {
   it('should fail to initialize channel closure when channel is not open', async function () {
     const { channels } = await useFixtures()
 
-    await expect(channels.initiateChannelClosureInternal(ACCOUNT_A.address, ACCOUNT_B.address)).to.be.revertedWith(
+    await expect(channels.connect(ACCOUNT_A.address).initiateChannelClosure(ACCOUNT_B.address)).to.be.revertedWith(
       'channel must be open'
     )
   })
@@ -91,19 +91,13 @@ describe('Channels', function () {
   it('should fail to initialize channel closure', async function () {
     const { channels } = await useFixtures()
 
-    await channels.fundChannelInternal(ACCOUNT_A.address, ACCOUNT_B.address, '100', '0')
+    await channels.fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '100', '0')
 
-    await expect(channels.initiateChannelClosureInternal(ACCOUNT_A.address, ACCOUNT_A.address)).to.be.revertedWith(
+    await expect(channels.connect(ACCOUNT_A.address).initiateChannelClosure(ACCOUNT_B.address)).to.be.revertedWith(
       'initiator and counterparty must not be the same'
     )
 
-    await expect(
-      channels.initiateChannelClosureInternal(ethers.constants.AddressZero, ACCOUNT_B.address)
-    ).to.be.revertedWith('initiator must not be empty')
-
-    await expect(
-      channels.initiateChannelClosureInternal(ACCOUNT_A.address, ethers.constants.AddressZero)
-    ).to.be.revertedWith('counterparty must not be empty')
+    await expect(channels.connect(ACCOUNT_A.address).initiateChannelClosure(ethers.constants.AddressZero)).to.be.revertedWith('counterparty must not be empty')
   })
 
   it('should finalize channel closure', async function () {
@@ -121,9 +115,9 @@ describe('Channels', function () {
         from: deployer.address
       }
     )
-    await channels.initiateChannelClosureInternal(ACCOUNT_A.address, ACCOUNT_B.address)
+    await channels.connect(ACCOUNT_A.address).initiateChannelClosure(ACCOUNT_B.address)
 
-    await expect(channels.finalizeChannelClosureInternal(ACCOUNT_A.address, ACCOUNT_B.address)).to.emit(
+    await expect(channels.connect(ACCOUNT_A.address).finalizeChannelClosure(ACCOUNT_B.address)).to.emit(
       channels,
       'ChannelUpdate'
     )
@@ -156,9 +150,8 @@ describe('Channels', function () {
         from: deployer.address
       }
     )
-    await channels.initiateChannelClosureInternal(ACCOUNT_A.address, ACCOUNT_B.address)
-
-    await expect(channels.finalizeChannelClosureInternal(ACCOUNT_B.address, ACCOUNT_A.address)).to.emit(
+    await channels.connect(ACCOUNT_A.address).initiateChannelClosure(ACCOUNT_B.address)
+    await expect(channels.connect(ACCOUNT_B.address).finalizeChannelClosure(ACCOUNT_A.address)).to.emit(
       channels,
       'ChannelUpdate'
     )
@@ -191,7 +184,7 @@ describe('Channels', function () {
         from: deployer.address
       }
     )
-    await expect(channels.finalizeChannelClosureInternal(ACCOUNT_A.address, ACCOUNT_B.address)).to.be.revertedWith(
+    await expect(channels.connect(ACCOUNT_A.address).finalizeChannelClosure(ACCOUNT_B.address)).to.be.revertedWith(
       'channel must be pending to close'
     )
   })
@@ -211,21 +204,17 @@ describe('Channels', function () {
         from: deployer.address
       }
     )
-    await channels.initiateChannelClosureInternal(ACCOUNT_A.address, ACCOUNT_B.address)
+    await channels.connect(ACCOUNT_A.address).initiateChannelClosure(ACCOUNT_B.address)
 
-    await expect(channels.finalizeChannelClosureInternal(ACCOUNT_A.address, ACCOUNT_A.address)).to.be.revertedWith(
+    await expect(channels.connect(ACCOUNT_A.address).finalizeChannelClosure(ACCOUNT_A.address)).to.be.revertedWith(
       'initiator and counterparty must not be the same'
     )
 
     await expect(
-      channels.finalizeChannelClosureInternal(ethers.constants.AddressZero, ACCOUNT_B.address)
-    ).to.be.revertedWith('initiator must not be empty')
-
-    await expect(
-      channels.finalizeChannelClosureInternal(ACCOUNT_A.address, ethers.constants.AddressZero)
+      channels.connect(ACCOUNT_A.address).finalizeChannelClosure(ethers.constants.AddressZero)
     ).to.be.revertedWith('counterparty must not be empty')
 
-    await expect(channels.finalizeChannelClosureInternal(ACCOUNT_A.address, ACCOUNT_B.address)).to.be.revertedWith(
+    await expect(channels.connect(ACCOUNT_A.address).finalizeChannelClosure(ACCOUNT_B.address)).to.be.revertedWith(
       'closureTime must be before now'
     )
   })
@@ -233,7 +222,7 @@ describe('Channels', function () {
   it('should get channel data', async function () {
     const { channels } = await useFixtures()
 
-    const channelData = await channels.getChannelInternal(ACCOUNT_A.address, ACCOUNT_B.address)
+    const channelData = await channels.getChannel(ACCOUNT_A.address, ACCOUNT_B.address)
     expect(channelData[0]).to.be.equal(ACCOUNT_A.address)
     expect(channelData[1]).to.be.equal(ACCOUNT_B.address)
     expect(channelData[2]).to.be.equal(ACCOUNT_AB_CHANNEL_ID)
@@ -242,28 +231,28 @@ describe('Channels', function () {
   it('should get channel id', async function () {
     const { channels } = await useFixtures()
 
-    const channelId = await channels.getChannelIdInternal(ACCOUNT_A.address, ACCOUNT_B.address)
+    const channelId = await channels.getChannelId(ACCOUNT_A.address, ACCOUNT_B.address)
     expect(channelId).to.be.equal(ACCOUNT_AB_CHANNEL_ID)
   })
 
   it('should be partyA', async function () {
     const { channels } = await useFixtures()
 
-    const isPartyA = await channels.isPartyAInternal(ACCOUNT_A.address, ACCOUNT_B.address)
+    const isPartyA = await channels.isPartyA(ACCOUNT_A.address, ACCOUNT_B.address)
     expect(isPartyA).to.be.true
   })
 
   it('should not be partyA', async function () {
     const { channels } = await useFixtures()
 
-    const isPartyA = await channels.isPartyAInternal(ACCOUNT_B.address, ACCOUNT_A.address)
+    const isPartyA = await channels.isPartyA(ACCOUNT_B.address, ACCOUNT_A.address)
     expect(isPartyA).to.be.false
   })
 
   it('should get partyA and partyB', async function () {
     const { channels } = await useFixtures()
 
-    const parties = await channels.getPartiesInternal(ACCOUNT_A.address, ACCOUNT_B.address)
+    const parties = await channels.getParties(ACCOUNT_A.address, ACCOUNT_B.address)
     expect(parties[0]).to.be.equal(ACCOUNT_A.address)
     expect(parties[1]).to.be.equal(ACCOUNT_B.address)
   })
