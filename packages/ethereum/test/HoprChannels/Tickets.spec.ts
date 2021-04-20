@@ -76,7 +76,7 @@ describe('Tickets', function () {
   })
 
   it('should fail to redeem ticket when channel in in different channelEpoch', async function () {
-    const { tickets,TICKET_AB_WIN } = await useFixtures()
+    const { tickets, TICKET_AB_WIN } = await useFixtures()
     await tickets.connect(ACCOUNT_B.wallet).bumpChannel(ACCOUNT_A.address, SECRET_2)
 
     // transfer tokens to contract
