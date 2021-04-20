@@ -600,20 +600,6 @@
     webrtc-stun "3.0.0"
     wrtc "0.4.7"
 
-"@hoprnet/hopr-demo-seeds@1.71.0-next.39":
-  version "1.71.0-next.39"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-demo-seeds/-/hopr-demo-seeds-1.71.0-next.39.tgz#c205485ef2d181215237d478016468194ff53870"
-  integrity sha512-5qq6tqfY9Kc8fRLK3rH8rs/W0THUCz1+oP5xkWPGX/R9bTXN7n0Q+cSszmpAhkIV7uiCXt9yifNZeInpthnktw==
-
-"@hoprnet/hopr-testing@1.71.0-next.39":
-  version "1.71.0-next.39"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-testing/-/hopr-testing-1.71.0-next.39.tgz#87e710b2c9d6c2e8b88846218bc8942157abbcde"
-  integrity sha512-e9jCfqmR4zDG4xpmZfjzfBLCVKFsxGXsIbesYQXbXWbYIP8pmH527tkMcXS32YdlynUPfuSD5Hs83wtoKnN0lQ==
-  dependencies:
-    "@hoprnet/hopr-demo-seeds" "1.71.0-next.39"
-    debug "^4.3.1"
-    ganache-core "2.13.2"
-
 "@hoprnet/hopr-utils@1.69.3":
   version "1.69.3"
   resolved "https://registry.yarnpkg.com/@hoprnet/hopr-utils/-/hopr-utils-1.69.3.tgz#6824fb6e5ec49b1b703ed9acf0d6b6e9331f9ae5"
@@ -6346,7 +6332,7 @@ ganache-cli@^6.11.0:
     source-map-support "0.5.12"
     yargs "13.2.4"
 
-ganache-core@2.13.2, ganache-core@^2.13.2:
+ganache-core@^2.13.2:
   version "2.13.2"
   resolved "https://registry.yarnpkg.com/ganache-core/-/ganache-core-2.13.2.tgz#27e6fc5417c10e6e76e2e646671869d7665814a3"
   integrity sha512-tIF5cR+ANQz0+3pHWxHjIwHqFXcVo0Mb+kcsNhglNFALcYo49aQpnS9dqHartqPfMFjiHh/qFoD3mYK0d/qGgw==

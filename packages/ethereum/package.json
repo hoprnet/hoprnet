@@ -28,13 +28,15 @@
     "!**/*.test.js.map"
   ],
   "dependencies": {
+    "@openzeppelin/contracts": "3.3.0-solc-0.7",
+    "@openzeppelin/contracts-v3-0-1": "npm:@openzeppelin/contracts@3.0.1"
+  },
+  "devDependencies": {
     "@hoprnet/hopr-utils": "1.71.0-next.60",
     "@nomiclabs/hardhat-ethers": "^2.0.2",
     "@nomiclabs/hardhat-etherscan": "^2.1.1",
     "@nomiclabs/hardhat-solhint": "^2.0.0",
     "@nomiclabs/hardhat-waffle": "^2.0.1",
-    "@openzeppelin/contracts": "3.3.0-solc-0.7",
-    "@openzeppelin/contracts-v3-0-1": "npm:@openzeppelin/contracts@3.0.1",
     "@typechain/ethers-v5": "^6.0.5",
     "@typechain/hardhat": "^1.0.1",
     "dotenv": "^8.2.0",
@@ -46,9 +48,7 @@
     "solidity-coverage": "^0.7.16",
     "ts-generator": "^0.1.1",
     "ts-node": "^9.1.1",
-    "typechain": "^4.0.3"
-  },
-  "devDependencies": {
+    "typechain": "^4.0.3",
     "@types/chai": "^4.2.15",
     "@types/lodash": "^4.14.168",
     "@types/mocha": "^8.2.2",
