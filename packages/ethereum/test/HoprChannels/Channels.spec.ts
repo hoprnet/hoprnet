@@ -221,7 +221,6 @@ describe('Channels', function () {
 
   it('should get channel data', async function () {
     const { channels } = await useFixtures()
-
     const channelData = await channels.getChannel(ACCOUNT_A.address, ACCOUNT_B.address)
     expect(channelData[0]).to.be.equal(ACCOUNT_A.address)
     expect(channelData[1]).to.be.equal(ACCOUNT_B.address)
@@ -230,30 +229,211 @@ describe('Channels', function () {
 
   it('should get channel id', async function () {
     const { channels } = await useFixtures()
-
-    const channelId = await channels.getChannelId(ACCOUNT_A.address, ACCOUNT_B.address)
-    expect(channelId).to.be.equal(ACCOUNT_AB_CHANNEL_ID)
+    expect(await channels.getChannelId(ACCOUNT_A.address, ACCOUNT_B.address)).to.be.equal(ACCOUNT_AB_CHANNEL_ID)
   })
 
   it('should be partyA', async function () {
     const { channels } = await useFixtures()
-
-    const isPartyA = await channels.isPartyA(ACCOUNT_A.address, ACCOUNT_B.address)
-    expect(isPartyA).to.be.true
+    expect(await channels.isPartyA(ACCOUNT_A.address, ACCOUNT_B.address)).to.be.true
   })
 
   it('should not be partyA', async function () {
     const { channels } = await useFixtures()
-
-    const isPartyA = await channels.isPartyA(ACCOUNT_B.address, ACCOUNT_A.address)
-    expect(isPartyA).to.be.false
+    expect(await channels.isPartyA(ACCOUNT_B.address, ACCOUNT_A.address)).to.be.false
   })
 
   it('should get partyA and partyB', async function () {
     const { channels } = await useFixtures()
-
     const parties = await channels.getParties(ACCOUNT_A.address, ACCOUNT_B.address)
     expect(parties[0]).to.be.equal(ACCOUNT_A.address)
     expect(parties[1]).to.be.equal(ACCOUNT_B.address)
+  })
+})
+
+describe('Tickets', function () {
+  it('should redeem ticket', async function () {
+    const { channels, TICKET_AB_WIN } = await useFixtures()
+    await channels.connect(ACCOUNT_B.wallet).bumpChannel(ACCOUNT_A.address, SECRET_2)
+    await channels.fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
+
+    // TODO: add event check
+    await channels.redeemTicketInternal(
+      TICKET_AB_WIN.recipient,
+      TICKET_AB_WIN.counterparty,
+      TICKET_AB_WIN.nextCommitment,
+      TICKET_AB_WIN.ticketEpoch,
+      TICKET_AB_WIN.ticketIndex,
+      TICKET_AB_WIN.proofOfRelaySecret,
+      TICKET_AB_WIN.amount,
+      TICKET_AB_WIN.winProb,
+      TICKET_AB_WIN.signature
+    )
+    const channel = await tickets.channels(ACCOUNT_AB_CHANNEL_ID)
+    expect(channel.partyABalance.toString()).to.equal('60')
+    expect(channel.partyBBalance.toString()).to.equal('40')
+    expect(channel.closureTime.toString()).to.equal('0')
+    expect(channel.status.toString()).to.equal('1')
+    expect(channel.closureByPartyA).to.be.false
+    expect(channel.partyBCommitment).to.equal(TICKET_AB_WIN.nextCommitment)
+  })
+
+  it('should fail to redeem ticket when channel in closed', async function () {
+    const { tickets, TICKET_AB_WIN } = await useFixtures()
+    await tickets.connect(ACCOUNT_B.wallet).bumpChannel(ACCOUNT_A.address, SECRET_2)
+
+    await expect(
+      tickets.redeemTicketInternal(
+        TICKET_AB_WIN.recipient,
+        TICKET_AB_WIN.counterparty,
+        TICKET_AB_WIN.nextCommitment,
+        TICKET_AB_WIN.ticketEpoch,
+        TICKET_AB_WIN.ticketIndex,
+        TICKET_AB_WIN.proofOfRelaySecret,
+        TICKET_AB_WIN.amount,
+        TICKET_AB_WIN.winProb,
+        TICKET_AB_WIN.signature
+      )
+    ).to.be.revertedWith('channel must be open or pending to close')
+  })
+
+  it('should fail to redeem ticket when channel in in different channelEpoch', async function () {
+    const { tickets, TICKET_AB_WIN, deployer } = await useFixtures()
+    await tickets.connect(ACCOUNT_B.wallet).bumpChannel(ACCOUNT_A.address, SECRET_2)
+
+    // transfer tokens to contract
+    await tickets.connect(deployer).fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
+    // open channel and then close it
+    await tickets.initiateChannelClosureInternal(ACCOUNT_A.address, ACCOUNT_B.address)
+    await tickets.finalizeChannelClosureInternal(ACCOUNT_A.address, ACCOUNT_B.address)
+    // refund and open channel
+    await tickets.connect(deployer).fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
+
+    await expect(
+      tickets.redeemTicketInternal(
+        TICKET_AB_WIN.recipient,
+        TICKET_AB_WIN.counterparty,
+        TICKET_AB_WIN.nextCommitment,
+        TICKET_AB_WIN.ticketEpoch,
+        TICKET_AB_WIN.ticketIndex,
+        TICKET_AB_WIN.proofOfRelaySecret,
+        TICKET_AB_WIN.amount,
+        TICKET_AB_WIN.winProb,
+        TICKET_AB_WIN.signature
+      )
+    ).to.be.revertedWith('signer must match the counterparty')
+  })
+
+  it('should fail to redeem ticket when ticket has been already redeemed', async function () {
+    const { tickets, TICKET_AB_WIN } = await useFixtures()
+
+    await tickets.connect(ACCOUNT_B.wallet).bumpChannel(ACCOUNT_A.address, SECRET_2)
+    await tickets.fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
+
+    await tickets.redeemTicketInternal(
+      TICKET_AB_WIN.recipient,
+      TICKET_AB_WIN.counterparty,
+      TICKET_AB_WIN.nextCommitment,
+      TICKET_AB_WIN.ticketEpoch,
+      TICKET_AB_WIN.ticketIndex,
+      TICKET_AB_WIN.proofOfRelaySecret,
+      TICKET_AB_WIN.amount,
+      TICKET_AB_WIN.winProb,
+      TICKET_AB_WIN.signature
+    )
+
+    await expect(
+      tickets.redeemTicketInternal(
+        TICKET_AB_WIN.recipient,
+        TICKET_AB_WIN.counterparty,
+        SECRET_0, // give the next secret so this ticket becomes redeemable
+        TICKET_AB_WIN.ticketEpoch,
+        TICKET_AB_WIN.ticketIndex,
+        TICKET_AB_WIN.proofOfRelaySecret,
+        TICKET_AB_WIN.amount,
+        TICKET_AB_WIN.winProb,
+        TICKET_AB_WIN.signature
+      )
+    ).to.be.revertedWith('ticket epoch must match')
+
+    await expect(
+      tickets.redeemTicketInternal(
+        TICKET_AB_WIN.recipient,
+        TICKET_AB_WIN.counterparty,
+        SECRET_0, // give the next secret so this ticket becomes redeemable
+        parseInt(TICKET_AB_WIN.ticketEpoch) + 1 + '',
+        TICKET_AB_WIN.ticketIndex,
+        TICKET_AB_WIN.proofOfRelaySecret,
+        TICKET_AB_WIN.amount,
+        TICKET_AB_WIN.winProb,
+        TICKET_AB_WIN.signature
+      )
+    ).to.be.revertedWith('redemptions must be in order')
+  })
+
+  it('should fail to redeem ticket when signer is not the issuer', async function () {
+    const { tickets, TICKET_AB_WIN, TICKET_BA_WIN } = await useFixtures()
+
+    await tickets.connect(ACCOUNT_B.wallet).bumpChannel(ACCOUNT_A.address, SECRET_2)
+    await tickets.fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
+
+    await expect(
+      tickets.redeemTicketInternal(
+        TICKET_AB_WIN.recipient,
+        TICKET_AB_WIN.counterparty,
+        TICKET_AB_WIN.nextCommitment,
+        TICKET_AB_WIN.ticketEpoch,
+        TICKET_AB_WIN.ticketIndex,
+        TICKET_AB_WIN.proofOfRelaySecret,
+        TICKET_AB_WIN.amount,
+        TICKET_AB_WIN.winProb,
+        TICKET_BA_WIN.signature // signature from different ticket
+      )
+    ).to.be.revertedWith('signer must match the counterparty')
+  })
+
+  it("should fail to redeem ticket if it's a loss", async function () {
+    const { tickets, TICKET_AB_LOSS } = await useFixtures()
+
+    await tickets.connect(ACCOUNT_B.wallet).bumpChannel(ACCOUNT_A.address, SECRET_2)
+    await tickets.fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
+
+    await expect(
+      tickets.redeemTicket(
+        TICKET_AB_LOSS.counterparty,
+        TICKET_AB_LOSS.nextCommitment,
+        TICKET_AB_LOSS.ticketEpoch,
+        TICKET_AB_LOSS.ticketIndex,
+        TICKET_AB_LOSS.proofOfRelaySecret,
+        TICKET_AB_LOSS.amount,
+        TICKET_AB_LOSS.winProb,
+        TICKET_AB_LOSS.signature
+      )
+    ).to.be.revertedWith('ticket must be a win')
+  })
+
+  it('should pack ticket', async function () {
+    const { tickets, TICKET_AB_WIN } = await useFixtures()
+
+    const encoded = await tickets.getEncodedTicketInternal(
+      TICKET_AB_WIN.recipient,
+      TICKET_AB_WIN.ticketEpoch,
+      TICKET_AB_WIN.proofOfRelaySecret,
+      TICKET_AB_WIN.channelEpoch,
+      TICKET_AB_WIN.amount,
+      TICKET_AB_WIN.winProb
+    )
+    expect(encoded).to.equal(TICKET_AB_WIN.encoded)
+  })
+
+  it("should get ticket's luck", async function () {
+    const { channels, TICKET_AB_WIN } = await useFixtures()
+
+    const luck = await channels.getTicketLuckInternal(
+      TICKET_AB_WIN.hash,
+      TICKET_AB_WIN.nextCommitment,
+      TICKET_AB_WIN.proofOfRelaySecret,
+      TICKET_AB_WIN.winProb
+    )
+    expect(luck).to.equal(TICKET_AB_WIN.luck)
   })
 })
