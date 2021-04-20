@@ -1,5 +1,6 @@
 import { ethers } from 'ethers'
 import { signMessage } from '../utils'
+import { expect } from 'chai'
 
 export type Ticket = {
   recipient: string
@@ -49,6 +50,24 @@ export const getTicketLuck = (ticket: Ticket, hash: string, secret: string): str
   )
 
   return solidityKeccak256(['bytes'], [encoded])
+}
+
+export const redeemArgs = (ticket) => [
+  ticket.counterparty,
+  ticket.nextCommitment,
+  ticket.ticketEpoch,
+  ticket.ticketIndex,
+  ticket.proofOfRelaySecret,
+  ticket.amount,
+  ticket.winProb,
+  ticket.signature
+]
+
+export const validateChannel = (actual, expected) => {
+  expect(actual.partyABalance.toString()).to.equal(expected.partyABalance)
+  expect(actual.partyBBalance.toString()).to.equal(expected.partyBBalance)
+  expect(actual.status.toString()).to.equal(expected.status)
+  expect(actual.closureByPartyA).to.equal(expected.closureByPartyA)
 }
 
 /**

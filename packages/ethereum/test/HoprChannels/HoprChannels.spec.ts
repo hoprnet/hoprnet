@@ -1,7 +1,6 @@
 import { deployments, ethers } from 'hardhat'
-import { expect } from 'chai'
 import { PromiseValue, durations } from '@hoprnet/hopr-utils'
-import { createTicket } from './utils'
+import { createTicket, redeemArgs, validateChannel } from './utils'
 import { increaseTime } from '../utils'
 import {
   ACCOUNT_A,
@@ -16,6 +15,7 @@ import {
   SECRET_0
 } from './constants'
 import { HoprToken__factory, HoprChannels__factory } from '../../types'
+import { expect } from 'chai'
 
 const abiEncoder = ethers.utils.Interface.getAbiCoder()
 
@@ -50,24 +50,6 @@ const useFixtures = deployments.createFixture(async () => {
   }
 })
 
-const redeemArgs = (ticket) => [
-  ticket.counterparty,
-  ticket.nextCommitment,
-  ticket.ticketEpoch,
-  ticket.ticketIndex,
-  ticket.proofOfRelaySecret,
-  ticket.amount,
-  ticket.winProb,
-  ticket.signature
-]
-
-const validateChannel = (actual, expected) => {
-  expect(actual.partyABalance.toString()).to.equal(expected.partyABalance)
-  expect(actual.partyBBalance.toString()).to.equal(expected.partyBBalance)
-  expect(actual.closureTime.toString()).to.equal(expected.closureTime)
-  expect(actual.status.toString()).to.equal(expected.status)
-  expect(actual.closureByPartyA).to.equal(expected.closureByPartyA)
-}
 
 describe('HoprChannels', function () {
   it('should fund one direction', async function () {
