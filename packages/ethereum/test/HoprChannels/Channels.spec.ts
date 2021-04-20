@@ -97,7 +97,9 @@ describe('Channels', function () {
       'initiator and counterparty must not be the same'
     )
 
-    await expect(channels.connect(ACCOUNT_A.address).initiateChannelClosure(ethers.constants.AddressZero)).to.be.revertedWith('counterparty must not be empty')
+    await expect(
+      channels.connect(ACCOUNT_A.address).initiateChannelClosure(ethers.constants.AddressZero)
+    ).to.be.revertedWith('counterparty must not be empty')
   })
 
   it('should finalize channel closure', async function () {
