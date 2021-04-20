@@ -33,7 +33,7 @@ describe('Tickets', function () {
   it('should redeem ticket', async function () {
     const { tickets, TICKET_AB_WIN } = await useFixtures()
     await tickets.connect(ACCOUNT_B.wallet).bumpChannel(ACCOUNT_A.address, SECRET_2)
-    await tickets.fundChannelInternal(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
+    await tickets.fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
 
     // TODO: add event check
     await tickets.redeemTicketInternal(
@@ -106,7 +106,7 @@ describe('Tickets', function () {
     const { tickets, TICKET_AB_WIN } = await useFixtures()
 
     await tickets.connect(ACCOUNT_B.wallet).bumpChannel(ACCOUNT_A.address, SECRET_2)
-    await tickets.fundChannelInternal(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
+    await tickets.fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
 
     await tickets.redeemTicketInternal(
       TICKET_AB_WIN.recipient,
@@ -153,7 +153,7 @@ describe('Tickets', function () {
     const { tickets, TICKET_AB_WIN, TICKET_BA_WIN } = await useFixtures()
 
     await tickets.connect(ACCOUNT_B.wallet).bumpChannel(ACCOUNT_A.address, SECRET_2)
-    await tickets.fundChannelInternal(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
+    await tickets.fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
 
     await expect(
       tickets.redeemTicketInternal(
@@ -174,7 +174,7 @@ describe('Tickets', function () {
     const { tickets, TICKET_AB_LOSS } = await useFixtures()
 
     await tickets.connect(ACCOUNT_B.wallet).bumpChannel(ACCOUNT_A.address, SECRET_2)
-    await tickets.fundChannelInternal(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
+    await tickets.fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
 
     await expect(
       tickets.redeemTicketInternal(
