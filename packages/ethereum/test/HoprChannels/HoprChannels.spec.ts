@@ -76,10 +76,13 @@ describe('HoprChannels', function () {
     await token.connect(accountA).approve(channels.address, '70')
     await channels.connect(accountA).fundChannel(ACCOUNT_A.address, ACCOUNT_B.address, '70')
 
-    validateChannel(
-      await channels.channels(ACCOUNT_AB_CHANNEL_ID),
-      { partyABalance: '70', partyBBalance: '0', closureTime: '0', status: '1', closureByPartyA: false }
-    )
+    validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), {
+      partyABalance: '70',
+      partyBBalance: '0',
+      closureTime: '0',
+      status: '1',
+      closureByPartyA: false
+    })
     const accountABalance = await token.balanceOf(ACCOUNT_A.address)
     expect(accountABalance.toString()).to.equal('30')
   })
@@ -91,7 +94,13 @@ describe('HoprChannels', function () {
     await channels.connect(accountA).fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
 
     const channel = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
-    validateChannel(channel, {partyABalance: '70', partyBBalance: '30', closureTime: '0', status: '1', closureByPartyA: false})
+    validateChannel(channel, {
+      partyABalance: '70',
+      partyBBalance: '30',
+      closureTime: '0',
+      status: '1',
+      closureByPartyA: false
+    })
     const accountABalance = await token.balanceOf(ACCOUNT_A.address)
     expect(accountABalance.toString()).to.equal('0')
   })
@@ -103,7 +112,13 @@ describe('HoprChannels', function () {
     await channels.connect(accountA).fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '0')
 
     const channel = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
-    validateChannel(channel, {partyABalance: '70', partyBBalance: '0', closureTime: '0', status: '1', closureByPartyA: false})
+    validateChannel(channel, {
+      partyABalance: '70',
+      partyBBalance: '0',
+      closureTime: '0',
+      status: '1',
+      closureByPartyA: false
+    })
     const accountABalance = await token.balanceOf(ACCOUNT_A.address)
     expect(accountABalance.toString()).to.equal('30')
   })
@@ -115,7 +130,13 @@ describe('HoprChannels', function () {
     await channels.connect(accountB).fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '0')
 
     const channel = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
-    validateChannel(channel, {partyABalance: '70', partyBBalance: '0', closureTime: '0', status: '1', closureByPartyA: false})
+    validateChannel(channel, {
+      partyABalance: '70',
+      partyBBalance: '0',
+      closureTime: '0',
+      status: '1',
+      closureByPartyA: false
+    })
     const accountBBalance = await token.balanceOf(ACCOUNT_B.address)
     expect(accountBBalance.toString()).to.equal('30')
   })
@@ -125,14 +146,16 @@ describe('HoprChannels', function () {
 
     await token
       .connect(accountA)
-      .send(
-        channels.address,
-        '70',
-        abiEncoder.encode(['address', 'address'], [ACCOUNT_A.address, ACCOUNT_B.address])
-      )
+      .send(channels.address, '70', abiEncoder.encode(['address', 'address'], [ACCOUNT_A.address, ACCOUNT_B.address]))
 
     const channel = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
-    validateChannel(channel, {partyABalance: '70', partyBBalance: '0', closureTime: '0', status: '1', closureByPartyA: false})
+    validateChannel(channel, {
+      partyABalance: '70',
+      partyBBalance: '0',
+      closureTime: '0',
+      status: '1',
+      closureByPartyA: false
+    })
     const accountABalance = await token.balanceOf(ACCOUNT_A.address)
     expect(accountABalance.toString()).to.equal('30')
   })
@@ -142,14 +165,16 @@ describe('HoprChannels', function () {
 
     await token
       .connect(accountA)
-      .send(
-        channels.address,
-        '70',
-        abiEncoder.encode(['address', 'address'], [ACCOUNT_A.address, ACCOUNT_B.address])
-      )
+      .send(channels.address, '70', abiEncoder.encode(['address', 'address'], [ACCOUNT_A.address, ACCOUNT_B.address]))
 
     const channel = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
-    validateChannel(channel, {partyABalance: '70', partyBBalance: '0', closureTime: '0', status: '1', closureByPartyA: false})
+    validateChannel(channel, {
+      partyABalance: '70',
+      partyBBalance: '0',
+      closureTime: '0',
+      status: '1',
+      closureByPartyA: false
+    })
     const accountABalance = await token.balanceOf(ACCOUNT_A.address)
     expect(accountABalance.toString()).to.equal('30')
   })
@@ -169,7 +194,13 @@ describe('HoprChannels', function () {
       )
 
     const channel = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
-    validateChannel(channel, {partyABalance: '70', partyBBalance: '30', closureTime: '0', status: '1', closureByPartyA: false})
+    validateChannel(channel, {
+      partyABalance: '70',
+      partyBBalance: '30',
+      closureTime: '0',
+      status: '1',
+      closureByPartyA: false
+    })
     const accountABalance = await token.balanceOf(ACCOUNT_A.address)
     expect(accountABalance.toString()).to.equal('0')
   })
@@ -190,7 +221,13 @@ describe('HoprChannels lifecycle', function () {
       ).to.emit(f.channels, 'ChannelUpdate')
 
       const channel = await f.channels.channels(ACCOUNT_AB_CHANNEL_ID)
-      validateChannel(channel, {partyABalance: '70', partyBBalance: '0', closureTime: '0', status: '1', closureByPartyA: false})
+      validateChannel(channel, {
+        partyABalance: '70',
+        partyBBalance: '0',
+        closureTime: '0',
+        status: '1',
+        closureByPartyA: false
+      })
     })
 
     it('should fund accountB using send', async function () {
@@ -205,7 +242,13 @@ describe('HoprChannels lifecycle', function () {
       ).to.emit(f.channels, 'ChannelUpdate')
 
       const channel = await f.channels.channels(ACCOUNT_AB_CHANNEL_ID)
-      validateChannel(channel, {partyABalance: '70', partyBBalance: '30', closureTime: '0', status: '1', closureByPartyA: false})
+      validateChannel(channel, {
+        partyABalance: '70',
+        partyBBalance: '30',
+        closureTime: '0',
+        status: '1',
+        closureByPartyA: false
+      })
     })
 
     it('should reedem ticket for accountA', async function () {
@@ -213,17 +256,23 @@ describe('HoprChannels lifecycle', function () {
       await f.channels.connect(f.accountB).bumpChannel(ACCOUNT_A.address, SECRET_2)
       await f.channels
         .connect(f.accountA)
-        //@ts-ignore 
+        //@ts-ignore
         .redeemTicket(...redeemArgs(f.TICKET_BA_WIN))
 
       const channel = await f.channels.channels(ACCOUNT_AB_CHANNEL_ID)
-      validateChannel(channel, {partyABalance: '80', partyBBalance: '20', closureTime: '0', status: '1', closureByPartyA: false})
+      validateChannel(channel, {
+        partyABalance: '80',
+        partyBBalance: '20',
+        closureTime: '0',
+        status: '1',
+        closureByPartyA: false
+      })
     })
 
     it('should reedem ticket for accountB', async function () {
       await f.channels
         .connect(f.accountB)
-        //@ts-ignore 
+        //@ts-ignore
         .redeemTicket(...redeemArgs(f.TICKET_AB_WIN))
 
       const channel = await f.channels.channels(ACCOUNT_AB_CHANNEL_ID)
@@ -254,7 +303,7 @@ describe('HoprChannels lifecycle', function () {
     it('should reedeem ticket for accountA', async function () {
       await f.channels
         .connect(f.accountA)
-        //@ts-ignore 
+        //@ts-ignore
         .redeemTicket(...redeemArgs(f.TICKET_BA_WIN))
 
       const channel = await f.channels.channels(ACCOUNT_AB_CHANNEL_ID)
