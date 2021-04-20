@@ -57,7 +57,7 @@ describe('Tickets', function () {
     expect(channel.closureTime.toString()).to.equal('0')
     expect(channel.status.toString()).to.equal('1')
     expect(channel.closureByPartyA).to.be.false
-    expect(channel.partyACommitment).to.equal(TICKET_AB_WIN.secret)
+    expect(channel.partyBCommitment).to.equal(TICKET_AB_WIN.secret)
   })
 
   it('should fail to redeem ticket when channel in closed', async function () {

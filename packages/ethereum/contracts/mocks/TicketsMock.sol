@@ -6,7 +6,7 @@ import "../HoprChannels.sol";
 contract TicketsMock is HoprChannels {
     constructor(address _token, uint32 _secsClosure)
     HoprChannels(_token, _secsClosure) {}
-
+  
     function fundChannelInternal(
         address funder,
         address accountA,
@@ -14,6 +14,7 @@ contract TicketsMock is HoprChannels {
         uint256 amountA,
         uint256 amountB
     ) external {
+        token.transferFrom(funder, address(this), amountA + amountB);
         _fundChannel(accountA, accountB, amountA, amountB);
     }
 

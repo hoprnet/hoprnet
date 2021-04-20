@@ -74,15 +74,19 @@ export const createTicket = async (
   }
 > => {
   const encoded = getEncodedTicket(ticket)
-  const hash = solidityKeccak256(['bytes'], [encoded])
+  const hashMessage = solidityKeccak256(['bytes'], [encoded])
+  const hash = solidityKeccak256(
+    ['string', 'bytes'],
+    ['\x19Ethereum Signed Message:\n32', hashMessage]
+  )
   const luck = getTicketLuck(ticket, hash, secret)
-  const { signature } = await signMessage(hash, account.privateKey)
+  const { signature } = await signMessage(hashMessage, account.privateKey) // TODO:
 
   return {
     ...ticket,
     secret,
     encoded,
-    hash,
+    hash: hash,
     luck,
     signature,
     counterparty: account.address

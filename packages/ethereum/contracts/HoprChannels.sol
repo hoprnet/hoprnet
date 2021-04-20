@@ -535,11 +535,13 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         if (_isPartyA(redeemer, counterparty)) {
             channel.partyACommitment = nextCommitment;
             channel.partyABalance = channel.partyABalance.add(amount);
+            channel.partyBBalance = channel.partyBBalance.sub(amount);
             channel.partyATicketEpoch = channel.partyATicketEpoch.add(1);
             channel.partyATicketIndex = ticketIndex;
             emit ChannelUpdate(redeemer, counterparty, channel);
         } else {
             channel.partyABalance = channel.partyABalance.sub(amount);
+            channel.partyBBalance = channel.partyBBalance.add(amount);
             channel.partyBCommitment = nextCommitment;
             channel.partyBTicketEpoch = channel.partyATicketEpoch.add(1);
             channel.partyBTicketIndex = ticketIndex;
