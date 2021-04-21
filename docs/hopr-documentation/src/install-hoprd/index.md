@@ -7,7 +7,7 @@
    For further questions, please visit our `Telegram channel <https://t.me/hoprnet>`_.
 ```
 
-To use the HOPR network, you will need a HOPR node. Currently, the only way to do so is running `hoprd`, a node.js process that implements the HOPR protocol and effectively transforms the device you are running it in into a HOPR node.
+To use the HOPR network, you will need a HOPR node. Currently, the only way to do so is running `hoprd`, a node.js process that implements the HOPR protocol and effectively transforms the device you are running it in into a HOPR node. Please bear in mind that by simply installing `hoprd`, you are not making your computer a HOPR node. It is required you run the service as an application and have a working internet connection.
 
 There are several ways to run `hoprd`: you can run it in your own device, install it on a virtual private server (VPS) or use a dedicated hardware device such as the AVADO HOPR Node PC, which has it as a package (Docker image).
 
