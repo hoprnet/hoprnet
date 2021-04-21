@@ -84,16 +84,16 @@
   },
   "hardhat": {
     "HoprToken": {
-      "address": "0xF37ed6D8633Ce36cAdCF20f533Ca1218C1132915",
-      "deployedAt": 15
+      "address": "0x2E2c8a6710cb5168ec3362a9c1280E2A1FBf0B5E",
+      "deployedAt": 13
     },
     "HoprDistributor": {
-      "address": "0x1C130e112473Ebc865adE4577548713c07ca9212",
-      "deployedAt": 16
+      "address": "0x19E74FEdCC2b7e12cb5e470ee154E3261916c799",
+      "deployedAt": 14
     },
     "HoprChannels": {
-      "address": "0xd7812BbE70037DF7d6AB55202871577e006092e0",
-      "deployedAt": 17
+      "address": "0xF37ed6D8633Ce36cAdCF20f533Ca1218C1132915",
+      "deployedAt": 15
     }
   }
 }

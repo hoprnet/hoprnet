@@ -2,26 +2,37 @@ import { deployments, ethers } from 'hardhat'
 import { expect } from 'chai'
 import { durations } from '@hoprnet/hopr-utils'
 import { ACCOUNT_A, ACCOUNT_B, ACCOUNT_AB_CHANNEL_ID, SECRET_2, generateTickets, SECRET_0 } from './constants'
-import { ERC777Mock__factory, ChannelsMock__factory } from '../../types'
-import deployERC1820Registry from '../../deploy/01_ERC1820Registry'
+import { HoprToken__factory, ChannelsMock__factory } from '../../types'
 import { redeemArgs, validateChannel } from './utils'
+import { PromiseValue } from '@hoprnet/hopr-utils'
+import { createTicket } from './utils'
+import { increaseTime } from '../utils'
+import {
+  PROOF_OF_RELAY_SECRET_0,
+  PROOF_OF_RELAY_SECRET_1,
+  WIN_PROB_100,
+  SECRET_1,
+} from './constants'
 
 const abiEncoder = ethers.utils.Interface.getAbiCoder()
 
-const useFixtures = deployments.createFixture(async (hre, { secsClosure }: { secsClosure?: string } = {}) => {
+const useFixtures = deployments.createFixture(async () => {
   const [deployer] = await ethers.getSigners()
   const accountA = await ethers.getSigner(ACCOUNT_A.address)
   const accountB = await ethers.getSigner(ACCOUNT_B.address)
 
-  // deploy ERC1820Registry required by ERC777 token
-  await deployERC1820Registry(hre, deployer)
+  // run migrations
+  const contracts = await deployments.fixture()
+  const token = HoprToken__factory.connect(contracts['HoprToken'].address, ethers.provider)
+  const channels = ChannelsMock__factory.connect(contracts['HoprChannels'].address, ethers.provider)
 
-  // deploy ERC777Mock
-  const token = await new ERC777Mock__factory(deployer).deploy(deployer.address, '100', 'Token', 'TKN', [])
-  // deploy ChannelsMock
-  let channels = await new ChannelsMock__factory(deployer).deploy(token.address, secsClosure ?? '0')
-  channels = channels.connect(ACCOUNT_B.wallet)
+  // create deployer the minter
+  const minterRole = await token.MINTER_ROLE()
+  await token.connect(deployer).grantRole(minterRole, deployer.address)
+
   const fixtureTickets = await generateTickets()
+
+  const fund = async (addr, amount) => await token.connect(deployer).mint(addr, amount + '', ethers.constants.HashZero, ethers.constants.HashZero)
 
   return {
     token,
@@ -29,63 +40,213 @@ const useFixtures = deployments.createFixture(async (hre, { secsClosure }: { sec
     deployer,
     fixtureTickets,
     accountA,
-    accountB
+    accountB,
+    fund
   }
 })
 
 describe('funding HoprChannel catches failures', async function(){
   // TODO fund single, fund by send
-  let channels
+  let fixtures, channels, accountA
   before(async function () {
     // All of these tests revert, so we can rely on stateless single fixture.
-    channels = (await useFixtures()).channels
+    fixtures = await useFixtures()
+    channels = fixtures.channels
+    accountA = fixtures.accountA 
+    await fixtures.fund(accountA.address, 100)
   })
 
   it('should fail to fund channel A->A', async function () {
-    await expect(channels.fundChannelMulti(ACCOUNT_A.address, ACCOUNT_A.address, '70', '30')).to.be.revertedWith(
-      'accountA and accountB must not be the same'
-    )
+    await expect(channels.connect(accountA).fundChannelMulti(ACCOUNT_A.address, ACCOUNT_A.address, '70', '30'))
+      .to.be.revertedWith('accountA and accountB must not be the same')
   })
 
   it('should fail to fund channel 0->A', async function() {
     await expect(
-      channels.fundChannelMulti(ethers.constants.AddressZero, ACCOUNT_B.address, '70', '30')
+      channels.connect(accountA).fundChannelMulti(ethers.constants.AddressZero, ACCOUNT_B.address, '70', '30')
     ).to.be.revertedWith('accountA must not be empty')
   })
 
   it('should fail to fund channel A->0', async function() {
     await expect(
-      channels.fundChannelMulti(ACCOUNT_A.address, ethers.constants.AddressZero, '70', '30')
+      channels.connect(accountA).fundChannelMulti(ACCOUNT_A.address, ethers.constants.AddressZero, '70', '30')
     ).to.be.revertedWith('accountB must not be empty')
   })
 
   it('should fail to fund a channel with 0 amount', async function() {
     await expect(
-      channels.fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '0', '0')
-    ).to.be.revertedWith(
-      'amountA or amountB must be greater than 0'
-    )
+      channels.connect(accountA).fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '0', '0')
+    ).to.be.revertedWith('amountA or amountB must be greater than 0')
   })
 })
 
 describe('funding a HoprChannel success', function () {
-  it('should fund and open channel A->B', async function () {
+  // TODO test single fund, events
+  it('should multi fund and open channel A->B', async function () {
     const { channels } = await useFixtures()
-
-    //TODO events
-    await channels.fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
+    await expect(
+      channels.fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
+    ).to.emit(channels, 'ChannelUpdate')
     const channel = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
     validateChannel(channel, { partyABalance: '70', partyBBalance: '30' })
+  })
+
+  it('should fund A->B using send', async function () {
+    const { token, accountB, channels } = await useFixtures()
+    await expect(
+      token
+        .connect(accountB)
+        .send(
+          channels.address,
+          '30',
+          abiEncoder.encode(['address', 'address'], [ACCOUNT_B.address, ACCOUNT_A.address])
+        )
+    ).to.emit(channels, 'ChannelUpdate')
+    validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), {
+      partyABalance: '70',
+      partyBBalance: '30',
+      closureTime: '0',
+      status: '1',
+      closureByPartyA: false
+    })
   })
 })
 
 
-describe('with a funded HoprChannel (A: 70, B: 30)', function() {
+describe('with a funded HoprChannel (A: 70, B: 30), secrets initialized', function() {
   let channels
+  let fixtures
   beforeEach(async function(){
-    const fixtures = await useFixtures()
+    fixtures = await useFixtures()
     channels = fixtures.channels
+    await channels.connect(fixtures.accountA).bumpChannel(ACCOUNT_B.address, SECRET_2)
+    await channels.connect(fixtures.accountB).bumpChannel(ACCOUNT_A.address, SECRET_2) // TODO secret per account
     await channels.fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
+  })
+
+  it('should redeem ticket for account A', async function () {
+    await channels
+      .connect(fixtures.accountA)
+      //@ts-ignore
+      .redeemTicket(...redeemArgs(f.TICKET_BA_WIN))
+
+    const channel = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
+    validateChannel(channel, {
+      partyABalance: '80',
+      partyBBalance: '20',
+      closureTime: '0',
+      status: '1',
+      closureByPartyA: false
+    })
+    expect(channel.partyACommitment).to.equal(SECRET_1)
+  })
+
+  it('should reedem ticket for account B', async function () {
+    await channels
+      .connect(fixtures.accountB)
+      //@ts-ignore
+      .redeemTicket(...redeemArgs(f.TICKET_AB_WIN))
+
+    const channel = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
+    validateChannel(channel, {
+      partyABalance: '60',
+      partyBBalance: '40',
+      closureTime: '0',
+      status: '1',
+      closureByPartyA: false
+    })
+    expect(channel.partyBCommitment).to.equal(SECRET_1)
+  })
+  it('should fail to redeem ticket when ticket has been already redeemed', async function () {
+    const { channels, fixtureTickets } = await useFixtures()
+    const TICKET_AB_WIN = fixtureTickets.TICKET_AB_WIN
+
+    await channels.connect(ACCOUNT_B.wallet).bumpChannel(ACCOUNT_A.address, SECRET_2)
+    await channels.fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
+
+    await channels.redeemTicketInternal(
+      TICKET_AB_WIN.recipient,
+      TICKET_AB_WIN.counterparty,
+      TICKET_AB_WIN.nextCommitment,
+      TICKET_AB_WIN.ticketEpoch,
+      TICKET_AB_WIN.ticketIndex,
+      TICKET_AB_WIN.proofOfRelaySecret,
+      TICKET_AB_WIN.amount,
+      TICKET_AB_WIN.winProb,
+      TICKET_AB_WIN.signature
+    )
+
+    await expect(
+      channels.redeemTicketInternal(
+        TICKET_AB_WIN.recipient,
+        TICKET_AB_WIN.counterparty,
+        SECRET_0, // give the next secret so this ticket becomes redeemable
+        TICKET_AB_WIN.ticketEpoch,
+        TICKET_AB_WIN.ticketIndex,
+        TICKET_AB_WIN.proofOfRelaySecret,
+        TICKET_AB_WIN.amount,
+        TICKET_AB_WIN.winProb,
+        TICKET_AB_WIN.signature
+      )
+    ).to.be.revertedWith('ticket epoch must match')
+
+    await expect(
+      channels.redeemTicketInternal(
+        TICKET_AB_WIN.recipient,
+        TICKET_AB_WIN.counterparty,
+        SECRET_0, // give the next secret so this ticket becomes redeemable
+        parseInt(TICKET_AB_WIN.ticketEpoch) + 1 + '',
+        TICKET_AB_WIN.ticketIndex,
+        TICKET_AB_WIN.proofOfRelaySecret,
+        TICKET_AB_WIN.amount,
+        TICKET_AB_WIN.winProb,
+        TICKET_AB_WIN.signature
+      )
+    ).to.be.revertedWith('redemptions must be in order')
+  })
+
+  it('should fail to redeem ticket when signer is not the issuer', async function () {
+    const { channels, fixtureTickets } = await useFixtures()
+    const TICKET_AB_WIN = fixtureTickets.TICKET_AB_WIN
+    const TICKET_BA_WIN = fixtureTickets.TICKET_BA_WIN
+
+    await channels.connect(ACCOUNT_B.wallet).bumpChannel(ACCOUNT_A.address, SECRET_2)
+    await channels.fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
+
+    await expect(
+      channels.redeemTicketInternal(
+        TICKET_AB_WIN.recipient,
+        TICKET_AB_WIN.counterparty,
+        TICKET_AB_WIN.nextCommitment,
+        TICKET_AB_WIN.ticketEpoch,
+        TICKET_AB_WIN.ticketIndex,
+        TICKET_AB_WIN.proofOfRelaySecret,
+        TICKET_AB_WIN.amount,
+        TICKET_AB_WIN.winProb,
+        TICKET_BA_WIN.signature // signature from different ticket
+      )
+    ).to.be.revertedWith('signer must match the counterparty')
+  })
+
+  it("should fail to redeem ticket if it's a loss", async function () {
+    const { channels, fixtureTickets } = await useFixtures()
+    const TICKET_AB_LOSS = fixtureTickets.TICKET_AB_LOSS
+
+    await channels.connect(ACCOUNT_B.wallet).bumpChannel(ACCOUNT_A.address, SECRET_2)
+    await channels.fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
+
+    await expect(
+      channels.redeemTicket(
+        TICKET_AB_LOSS.counterparty,
+        TICKET_AB_LOSS.nextCommitment,
+        TICKET_AB_LOSS.ticketEpoch,
+        TICKET_AB_LOSS.ticketIndex,
+        TICKET_AB_LOSS.proofOfRelaySecret,
+        TICKET_AB_LOSS.amount,
+        TICKET_AB_LOSS.winProb,
+        TICKET_AB_LOSS.signature
+      )
+    ).to.be.revertedWith('ticket must be a win')
   })
 
   it('A can initialize channel closure', async function () {
@@ -255,6 +416,52 @@ describe('With a pending_to_close HoprChannel (A:70, B:30)', function(){
   })
 })
 
+describe('with a closed channel', function(){
+  // TODO Close channel
+  it('should fail to redeem ticket when channel in closed', async function () {
+    const { channels } = await useFixtures()
+    await channels.connect(ACCOUNT_B.wallet).bumpChannel(ACCOUNT_A.address, SECRET_2)
+    await channels.initiateClose()
+    await channels.finalizeClose()
+
+    await expect(
+      // @ts-ignore
+      channels.redeemTicket(...redeemArgs(TICKET_AB_WIN))
+    ).to.be.revertedWith('channel must be open or pending to close')
+  })
+})
+
+describe('with a reopened channel', function(){
+  it('should fail to redeem ticket when channel in in different channelEpoch', async function () {
+    const { channels, fixtureTickets, deployer } = await useFixtures()
+    const TICKET_AB_WIN = fixtureTickets.TICKET_AB_WIN
+    await channels.connect(ACCOUNT_B.wallet).bumpChannel(ACCOUNT_A.address, SECRET_2)
+
+    // transfer tokens to contract
+    await channels.connect(deployer).fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
+    // open channel and then close it
+    await channels.initiateChannelClosureInternal(ACCOUNT_A.address, ACCOUNT_B.address)
+    await channels.finalizeChannelClosureInternal(ACCOUNT_A.address, ACCOUNT_B.address)
+    // refund and open channel
+    await channels.connect(deployer).fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
+
+    await expect(
+      channels.redeemTicketInternal(
+        TICKET_AB_WIN.recipient,
+        TICKET_AB_WIN.counterparty,
+        TICKET_AB_WIN.nextCommitment,
+        TICKET_AB_WIN.ticketEpoch,
+        TICKET_AB_WIN.ticketIndex,
+        TICKET_AB_WIN.proofOfRelaySecret,
+        TICKET_AB_WIN.amount,
+        TICKET_AB_WIN.winProb,
+        TICKET_AB_WIN.signature
+      )
+    ).to.be.revertedWith('signer must match the counterparty')
+  })
+
+})
+
 describe('test internals with mock', function() {
   let channels
   beforeEach(async function(){
@@ -315,193 +522,9 @@ describe('test internals with mock', function() {
   })
 })
 
-describe('Tickets', function () {
-  it('should redeem ticket', async function () {
-    const { channels, fixtureTickets } = await useFixtures()
-    await channels.connect(ACCOUNT_B.wallet).bumpChannel(ACCOUNT_A.address, SECRET_2)
-    await channels.fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
 
-    // TODO: add event check
-    await channels.redeemTicketInternal(...redeemArgs(fixtureTickets.TICKET_AB_WIN))
-    const channel = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
-    validateChannel(channel, {partyABalance: '60', partyBBalance: '40', closureTime: '0', status: '1', closureByPartyA: false})
-    expect(channel.partyBCommitment).to.equal(fixtureTickets.TICKET_AB_WIN.nextCommitment)
-  })
 
-  it('should fail to redeem ticket when channel in closed', async function () {
-    const { channels } = await useFixtures()
-    await channels.connect(ACCOUNT_B.wallet).bumpChannel(ACCOUNT_A.address, SECRET_2)
-    await channels.initiateClose()
-    await channels.finalizeClose()
-
-    await expect(
-      // @ts-ignore
-      channels.redeemTicket(...redeemArgs(TICKET_AB_WIN))
-    ).to.be.revertedWith('channel must be open or pending to close')
-  })
-
-  it('should fail to redeem ticket when channel in in different channelEpoch', async function () {
-    const { channels, fixtureTickets, deployer } = await useFixtures()
-    const TICKET_AB_WIN = fixtureTickets.TICKET_AB_WIN
-    await channels.connect(ACCOUNT_B.wallet).bumpChannel(ACCOUNT_A.address, SECRET_2)
-
-    // transfer tokens to contract
-    await channels.connect(deployer).fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
-    // open channel and then close it
-    await channels.initiateChannelClosureInternal(ACCOUNT_A.address, ACCOUNT_B.address)
-    await channels.finalizeChannelClosureInternal(ACCOUNT_A.address, ACCOUNT_B.address)
-    // refund and open channel
-    await channels.connect(deployer).fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
-
-    await expect(
-      channels.redeemTicketInternal(
-        TICKET_AB_WIN.recipient,
-        TICKET_AB_WIN.counterparty,
-        TICKET_AB_WIN.nextCommitment,
-        TICKET_AB_WIN.ticketEpoch,
-        TICKET_AB_WIN.ticketIndex,
-        TICKET_AB_WIN.proofOfRelaySecret,
-        TICKET_AB_WIN.amount,
-        TICKET_AB_WIN.winProb,
-        TICKET_AB_WIN.signature
-      )
-    ).to.be.revertedWith('signer must match the counterparty')
-  })
-
-  it('should fail to redeem ticket when ticket has been already redeemed', async function () {
-    const { channels, fixtureTickets } = await useFixtures()
-    const TICKET_AB_WIN = fixtureTickets.TICKET_AB_WIN
-
-    await channels.connect(ACCOUNT_B.wallet).bumpChannel(ACCOUNT_A.address, SECRET_2)
-    await channels.fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
-
-    await channels.redeemTicketInternal(
-      TICKET_AB_WIN.recipient,
-      TICKET_AB_WIN.counterparty,
-      TICKET_AB_WIN.nextCommitment,
-      TICKET_AB_WIN.ticketEpoch,
-      TICKET_AB_WIN.ticketIndex,
-      TICKET_AB_WIN.proofOfRelaySecret,
-      TICKET_AB_WIN.amount,
-      TICKET_AB_WIN.winProb,
-      TICKET_AB_WIN.signature
-    )
-
-    await expect(
-      channels.redeemTicketInternal(
-        TICKET_AB_WIN.recipient,
-        TICKET_AB_WIN.counterparty,
-        SECRET_0, // give the next secret so this ticket becomes redeemable
-        TICKET_AB_WIN.ticketEpoch,
-        TICKET_AB_WIN.ticketIndex,
-        TICKET_AB_WIN.proofOfRelaySecret,
-        TICKET_AB_WIN.amount,
-        TICKET_AB_WIN.winProb,
-        TICKET_AB_WIN.signature
-      )
-    ).to.be.revertedWith('ticket epoch must match')
-
-    await expect(
-      channels.redeemTicketInternal(
-        TICKET_AB_WIN.recipient,
-        TICKET_AB_WIN.counterparty,
-        SECRET_0, // give the next secret so this ticket becomes redeemable
-        parseInt(TICKET_AB_WIN.ticketEpoch) + 1 + '',
-        TICKET_AB_WIN.ticketIndex,
-        TICKET_AB_WIN.proofOfRelaySecret,
-        TICKET_AB_WIN.amount,
-        TICKET_AB_WIN.winProb,
-        TICKET_AB_WIN.signature
-      )
-    ).to.be.revertedWith('redemptions must be in order')
-  })
-
-  it('should fail to redeem ticket when signer is not the issuer', async function () {
-    const { channels, fixtureTickets } = await useFixtures()
-    const TICKET_AB_WIN = fixtureTickets.TICKET_AB_WIN
-    const TICKET_BA_WIN = fixtureTickets.TICKET_BA_WIN
-
-    await channels.connect(ACCOUNT_B.wallet).bumpChannel(ACCOUNT_A.address, SECRET_2)
-    await channels.fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
-
-    await expect(
-      channels.redeemTicketInternal(
-        TICKET_AB_WIN.recipient,
-        TICKET_AB_WIN.counterparty,
-        TICKET_AB_WIN.nextCommitment,
-        TICKET_AB_WIN.ticketEpoch,
-        TICKET_AB_WIN.ticketIndex,
-        TICKET_AB_WIN.proofOfRelaySecret,
-        TICKET_AB_WIN.amount,
-        TICKET_AB_WIN.winProb,
-        TICKET_BA_WIN.signature // signature from different ticket
-      )
-    ).to.be.revertedWith('signer must match the counterparty')
-  })
-
-  it("should fail to redeem ticket if it's a loss", async function () {
-    const { channels, fixtureTickets } = await useFixtures()
-    const TICKET_AB_LOSS = fixtureTickets.TICKET_AB_LOSS
-
-    await channels.connect(ACCOUNT_B.wallet).bumpChannel(ACCOUNT_A.address, SECRET_2)
-    await channels.fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
-
-    await expect(
-      channels.redeemTicket(
-        TICKET_AB_LOSS.counterparty,
-        TICKET_AB_LOSS.nextCommitment,
-        TICKET_AB_LOSS.ticketEpoch,
-        TICKET_AB_LOSS.ticketIndex,
-        TICKET_AB_LOSS.proofOfRelaySecret,
-        TICKET_AB_LOSS.amount,
-        TICKET_AB_LOSS.winProb,
-        TICKET_AB_LOSS.signature
-      )
-    ).to.be.revertedWith('ticket must be a win')
-  })
-})
-
-import { PromiseValue } from '@hoprnet/hopr-utils'
-import { createTicket } from './utils'
-import { increaseTime } from '../utils'
-import {
-  PROOF_OF_RELAY_SECRET_0,
-  PROOF_OF_RELAY_SECRET_1,
-  WIN_PROB_100,
-  SECRET_1,
-} from './constants'
-
-/*
-import { HoprToken__factory, HoprChannels__factory } from '../../types'
-const useFixtures = deployments.createFixture(async () => {
-  const [deployer] = await ethers.getSigners()
-
-  // run migrations
-  const contracts = await deployments.fixture()
-  const token = HoprToken__factory.connect(contracts['HoprToken'].address, ethers.provider)
-  const channels = HoprChannels__factory.connect(contracts['HoprChannels'].address, ethers.provider)
-
-  // create deployer the minter
-  const minterRole = await token.MINTER_ROLE()
-  await token.connect(deployer).grantRole(minterRole, deployer.address)
-
-  // mint tokens for accountA and accountB
-  await token.connect(deployer).mint(ACCOUNT_A.address, '100', ethers.constants.HashZero, ethers.constants.HashZero)
-  await token.connect(deployer).mint(ACCOUNT_B.address, '100', ethers.constants.HashZero, ethers.constants.HashZero)
-
-  // mocked tickets
-  const mockedTickets = await generateTickets()
-
-  return {
-    token,
-    channels,
-    deployer,
-    accountA,
-    accountB,
-    ...mockedTickets
-  }
-})
-*/
+// -------------------------------------------------------
 
 describe('HoprChannels', function () {
   it('should fund one direction', async function () {
@@ -648,75 +671,6 @@ describe('HoprChannels lifecycle', function () {
   })
 
   context('on a fresh channel', function () {
-    it('should fund accountA', async function () {
-      await f.token.connect(f.accountA).approve(f.channels.address, '70')
-      await expect(
-        f.channels.connect(f.accountA).fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '0')
-      ).to.emit(f.channels, 'ChannelUpdate')
-
-      const channel = await f.channels.channels(ACCOUNT_AB_CHANNEL_ID)
-      validateChannel(channel, {
-        partyABalance: '70',
-        partyBBalance: '0',
-        closureTime: '0',
-        status: '1',
-        closureByPartyA: false
-      })
-    })
-
-    it('should fund accountB using send', async function () {
-      await expect(
-        f.token
-          .connect(f.accountB)
-          .send(
-            f.channels.address,
-            '30',
-            abiEncoder.encode(['address', 'address'], [ACCOUNT_B.address, ACCOUNT_A.address])
-          )
-      ).to.emit(f.channels, 'ChannelUpdate')
-
-      const channel = await f.channels.channels(ACCOUNT_AB_CHANNEL_ID)
-      validateChannel(channel, {
-        partyABalance: '70',
-        partyBBalance: '30',
-        closureTime: '0',
-        status: '1',
-        closureByPartyA: false
-      })
-    })
-
-    it('should reedem ticket for accountA', async function () {
-      await f.channels.connect(f.accountA).bumpChannel(ACCOUNT_B.address, SECRET_2)
-      await f.channels.connect(f.accountB).bumpChannel(ACCOUNT_A.address, SECRET_2)
-      await f.channels
-        .connect(f.accountA)
-        //@ts-ignore
-        .redeemTicket(...redeemArgs(f.TICKET_BA_WIN))
-
-      const channel = await f.channels.channels(ACCOUNT_AB_CHANNEL_ID)
-      validateChannel(channel, {
-        partyABalance: '80',
-        partyBBalance: '20',
-        closureTime: '0',
-        status: '1',
-        closureByPartyA: false
-      })
-    })
-
-    it('should reedem ticket for accountB', async function () {
-      await f.channels
-        .connect(f.accountB)
-        //@ts-ignore
-        .redeemTicket(...redeemArgs(f.TICKET_AB_WIN))
-
-      const channel = await f.channels.channels(ACCOUNT_AB_CHANNEL_ID)
-      expect(channel.partyABalance.toString()).to.equal('70')
-      expect(channel.partyBBalance.toString()).to.equal('30')
-      expect(channel.closureTime.toString()).to.equal('0')
-      expect(channel.status.toString()).to.equal('1')
-      expect(channel.closureByPartyA).to.be.false
-      expect(channel.partyBCommitment).to.equal(SECRET_1)
-    })
 
     it('should initialize channel closure', async function () {
       await expect(f.channels.connect(f.accountB).initiateChannelClosure(ACCOUNT_A.address)).to.emit(
