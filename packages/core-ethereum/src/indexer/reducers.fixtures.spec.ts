@@ -1,18 +1,8 @@
 import type { Event } from './types'
 import BN from 'bn.js'
 import { BigNumber } from 'ethers'
-import { stringToU8a } from '@hoprnet/hopr-utils'
-import { Address, PublicKey, ChannelEntry, AccountEntry, Hash } from '../types'
-
-const partyAUncompressedPubKey =
-  '0x362b7b26bddb151a03056422d37119eab3a716562b6c3efdc62dec1540c9b0917c39b619ac36da7c9c02995f124df4353e69c226696857155d44a34744fd2327'
-const partyAPubKey = PublicKey.fromString('0x03362b7b26bddb151a03056422d37119eab3a716562b6c3efdc62dec1540c9b091')
-const partyA = Address.fromString('0x55CfF15a5159239002D57C591eF4ACA7f2ACAfE6')
-// const partyBPubKey = Public.fromString('0x03217f3cd4d0b4b82997b25d1b6b68a933929fed724531cb30bbfd4729dc6b44e0')
-const partyB = Address.fromString('0xbbCFC0fA0EBaa540e741dCA297368B2000089E2E')
-
-const secret1 = new Hash(stringToU8a('0xb8b37f62ec82443e5b5557c5a187fe3686790620cc04c06187c48f8636caac89')) // secret1
-const secret2 = new Hash(stringToU8a('0x294549f8629f0eeb2b8e01aca491f701f5386a9662403b485c4efe7d447dfba3')) // secret2
+import { Address, ChannelEntry, AccountEntry } from '../types'
+import { partyA, partyB, secret1, secret2 } from './fixtures'
 
 export const ACCOUNT_INITIALIZED_EVENT = {
   event: 'AccountInitialized',
@@ -21,8 +11,8 @@ export const ACCOUNT_INITIALIZED_EVENT = {
   transactionIndex: 0,
   logIndex: 0,
   args: {
-    account: partyA.toHex(),
-    uncompressedPubKey: partyAUncompressedPubKey,
+    account: partyA.toAddress().toHex(),
+    uncompressedPubKey: partyA.toUncompressedPubKeyHex(),
     secret: secret1.toHex()
   }
 } as Event<'AccountInitialized'>
@@ -34,7 +24,7 @@ export const ACCOUNT_SECRET_UPDATED_EVENT = {
   transactionIndex: 0,
   logIndex: 0,
   args: {
-    account: partyA.toHex(),
+    account: partyA.toAddress().toHex(),
     secret: secret2.toHex(),
     counter: BigNumber.from('2')
   }
@@ -48,8 +38,8 @@ export const FUNDED_EVENT = {
   logIndex: 0,
   args: {
     funder: 'funder',
-    accountA: partyA.toHex(),
-    accountB: partyB.toHex(),
+    accountA: partyA.toAddress().toHex(),
+    accountB: partyB.toAddress().toHex(),
     deposit: BigNumber.from('3'),
     partyABalance: BigNumber.from('3')
   }
@@ -63,8 +53,8 @@ export const FUNDED_EVENT_2 = {
   logIndex: 0,
   args: {
     funder: 'funder',
-    accountA: partyA.toHex(),
-    accountB: partyB.toHex(),
+    accountA: partyA.toAddress().toHex(),
+    accountB: partyB.toAddress().toHex(),
     deposit: BigNumber.from('7'),
     partyABalance: BigNumber.from('0')
   }
@@ -77,7 +67,7 @@ export const OPENED_EVENT = {
   transactionIndex: 0,
   logIndex: 0,
   args: {
-    opener: partyA.toHex(),
+    opener: partyA.toAddress().toHex(),
     counterparty: partyB.toHex()
   }
 } as Event<'ChannelOpened'>
@@ -89,8 +79,8 @@ export const REDEEMED_EVENT = {
   transactionIndex: 0,
   logIndex: 0,
   args: {
-    redeemer: partyA.toHex(),
-    counterparty: partyB.toHex(),
+    redeemer: partyA.toAddress().toHex(),
+    counterparty: partyB.toAddress().toHex(),
     amount: BigNumber.from('1')
   }
 } as Event<'TicketRedeemed'>
@@ -102,8 +92,8 @@ export const CLOSING_EVENT = {
   transactionIndex: 0,
   logIndex: 0,
   args: {
-    initiator: partyA.toHex(),
-    counterparty: partyB.toHex(),
+    initiator: partyA.toAddress().toHex(),
+    counterparty: partyB.toAddress().toHex(),
     closureTime: BigNumber.from('1611671775')
   }
 } as Event<'ChannelPendingToClose'>
@@ -115,8 +105,8 @@ export const REDEEMED_EVENT_2 = {
   transactionIndex: 0,
   logIndex: 0,
   args: {
-    redeemer: partyB.toHex(),
-    counterparty: partyA.toHex(),
+    redeemer: partyB.toAddress().toHex(),
+    counterparty: partyA.toAddress().toHex(),
     amount: BigNumber.from('2')
   }
 } as Event<'TicketRedeemed'>
@@ -128,8 +118,8 @@ export const CLOSED_EVENT = {
   transactionIndex: 0,
   logIndex: 0,
   args: {
-    initiator: partyA.toHex(),
-    counterparty: partyB.toHex(),
+    initiator: partyA.toAddress().toHex(),
+    counterparty: partyB.toAddress().toHex(),
     partyAAmount: BigNumber.from('3'),
     partyBAmount: BigNumber.from('7')
   }
@@ -137,13 +127,13 @@ export const CLOSED_EVENT = {
 
 export const EMPTY_ACCOUNT = new AccountEntry(new Address(new Uint8Array()))
 
-export const INITIALIZED_ACCOUNT = new AccountEntry(partyA, partyAPubKey, secret1, new BN(1))
+export const INITIALIZED_ACCOUNT = new AccountEntry(partyA.toAddress(), partyA, secret1, new BN(1))
 
-export const SECRET_UPDATED_ACCOUNT = new AccountEntry(partyA, partyAPubKey, secret2, new BN(2))
+export const SECRET_UPDATED_ACCOUNT = new AccountEntry(partyA.toAddress(), partyA, secret2, new BN(2))
 
 export const EMPTY_CHANNEL = ChannelEntry.fromObject({
-  partyA,
-  partyB,
+  partyA: partyA.toAddress(),
+  partyB: partyB.toAddress(),
   deposit: new BN(0),
   partyABalance: new BN(0),
   closureTime: new BN(0),
@@ -154,8 +144,8 @@ export const EMPTY_CHANNEL = ChannelEntry.fromObject({
 })
 
 export const FUNDED_CHANNEL = ChannelEntry.fromObject({
-  partyA,
-  partyB,
+  partyA: partyA.toAddress(),
+  partyB: partyB.toAddress(),
   deposit: new BN(3),
   partyABalance: new BN(3),
   closureTime: new BN(0),
@@ -166,8 +156,8 @@ export const FUNDED_CHANNEL = ChannelEntry.fromObject({
 })
 
 export const FUNDED_CHANNEL_2 = ChannelEntry.fromObject({
-  partyA,
-  partyB,
+  partyA: partyA.toAddress(),
+  partyB: partyB.toAddress(),
   deposit: new BN(10),
   partyABalance: new BN(3),
   closureTime: new BN(0),
@@ -178,8 +168,8 @@ export const FUNDED_CHANNEL_2 = ChannelEntry.fromObject({
 })
 
 export const OPENED_CHANNEL = ChannelEntry.fromObject({
-  partyA,
-  partyB,
+  partyA: partyA.toAddress(),
+  partyB: partyB.toAddress(),
   deposit: new BN(10),
   partyABalance: new BN(3),
   closureTime: new BN(0),
@@ -190,8 +180,8 @@ export const OPENED_CHANNEL = ChannelEntry.fromObject({
 })
 
 export const REDEEMED_CHANNEL = ChannelEntry.fromObject({
-  partyA,
-  partyB,
+  partyA: partyA.toAddress(),
+  partyB: partyB.toAddress(),
   deposit: new BN(10),
   partyABalance: new BN(4),
   closureTime: new BN(0),
@@ -202,8 +192,8 @@ export const REDEEMED_CHANNEL = ChannelEntry.fromObject({
 })
 
 export const CLOSING_CHANNEL = ChannelEntry.fromObject({
-  partyA,
-  partyB,
+  partyA: partyA.toAddress(),
+  partyB: partyB.toAddress(),
   deposit: new BN(10),
   partyABalance: new BN(4),
   closureTime: new BN(1611671775),
@@ -214,8 +204,8 @@ export const CLOSING_CHANNEL = ChannelEntry.fromObject({
 })
 
 export const REDEEMED_CHANNEL_2 = ChannelEntry.fromObject({
-  partyA,
-  partyB,
+  partyA: partyA.toAddress(),
+  partyB: partyB.toAddress(),
   deposit: new BN(10),
   partyABalance: new BN(2),
   closureTime: new BN(1611671775),
@@ -226,8 +216,8 @@ export const REDEEMED_CHANNEL_2 = ChannelEntry.fromObject({
 })
 
 export const CLOSED_CHANNEL = ChannelEntry.fromObject({
-  partyA,
-  partyB,
+  partyA: partyA.toAddress(),
+  partyB: partyB.toAddress(),
   deposit: new BN(0),
   partyABalance: new BN(0),
   closureTime: new BN(0),

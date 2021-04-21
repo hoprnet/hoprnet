@@ -56,7 +56,18 @@ export default class HoprEthereum {
     maxConfirmations: number,
     blockRange: number
   ) {
-    this.indexer = new Indexer(this, genesisBlock, maxConfirmations, blockRange)
+    this.indexer = new Indexer(
+      {
+        genesisBlock,
+        maxConfirmations,
+        blockRange
+      },
+      {
+        db: this.db,
+        provider: this.provider,
+        hoprChannels: this.hoprChannels
+      }
+    )
     this.account = new Account(
       {
         network: this.network

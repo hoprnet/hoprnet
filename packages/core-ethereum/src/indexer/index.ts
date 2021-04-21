@@ -1,6 +1,8 @@
 import type PeerId from 'peer-id'
-import type HoprEthereum from '..'
+import type { LevelUp } from 'levelup'
+import type { providers as Providers } from 'ethers'
 import type { Event, EventNames } from './types'
+import type { HoprChannels } from '../contracts'
 import EventEmitter from 'events'
 import chalk from 'chalk'
 import BN from 'bn.js'
@@ -29,10 +31,16 @@ class Indexer extends EventEmitter {
   private unconfirmedEvents = new Heap<Event<any>>(snapshotComparator)
 
   constructor(
-    private connector: HoprEthereum,
-    private genesisBlock: number,
-    private maxConfirmations: number,
-    private blockRange: number
+    private ops: {
+      genesisBlock: number
+      maxConfirmations: number
+      blockRange: number
+    },
+    private api: {
+      db: LevelUp
+      provider: Providers.WebSocketProvider
+      hoprChannels: HoprChannels
+    }
   ) {
     super()
   }
@@ -44,14 +52,12 @@ class Indexer extends EventEmitter {
     if (this.status === 'started') return
     log(`Starting indexer...`)
 
-    const { provider, hoprChannels } = this.connector
-
     // wipe indexer, do not use in production
     // await this.wipe()
 
     const [latestSavedBlock, latestOnChainBlock] = await Promise.all([
-      await db.getLatestBlockNumber(this.connector.db),
-      provider.getBlockNumber()
+      db.getLatestBlockNumber(this.api.db),
+      this.api.provider.getBlockNumber()
     ])
     this.latestBlock = latestOnChainBlock
 
@@ -60,28 +66,28 @@ class Indexer extends EventEmitter {
 
     // go back 'MAX_CONFIRMATIONS' blocks in case of a re-org at time of stopping
     let fromBlock = latestSavedBlock
-    if (fromBlock - this.maxConfirmations > 0) {
-      fromBlock = fromBlock - this.maxConfirmations
+    if (fromBlock - this.ops.maxConfirmations > 0) {
+      fromBlock = fromBlock - this.ops.maxConfirmations
     }
     // no need to query before HoprChannels existed
-    if (fromBlock < this.genesisBlock) {
-      fromBlock = this.genesisBlock
+    if (fromBlock < this.ops.genesisBlock) {
+      fromBlock = this.ops.genesisBlock
     }
 
     log(
       'Starting to index from block %d, sync progress %d%',
       fromBlock,
-      getSyncPercentage(fromBlock - this.genesisBlock, latestOnChainBlock - this.genesisBlock)
+      getSyncPercentage(fromBlock - this.ops.genesisBlock, latestOnChainBlock - this.ops.genesisBlock)
     )
 
     // get past events
-    const lastBlock = await this.processPastEvents(fromBlock, latestOnChainBlock, this.blockRange)
+    const lastBlock = await this.processPastEvents(fromBlock, latestOnChainBlock, this.ops.blockRange)
     fromBlock = lastBlock
 
     log('Subscribing to events from block %d', fromBlock)
 
     // subscribe to new blocks
-    provider
+    this.api.provider
       .on('block', (blockNumber: number) => {
         this.onNewBlock({ number: blockNumber })
       })
@@ -91,7 +97,7 @@ class Indexer extends EventEmitter {
       })
 
     // subscribe to all HoprChannels events
-    hoprChannels
+    this.api.hoprChannels
       .on('*', (event: Event<any>) => {
         this.onNewEvents([event])
       })
@@ -111,8 +117,8 @@ class Indexer extends EventEmitter {
     if (this.status === 'stopped') return
     log(`Stopping indexer...`)
 
-    this.connector.provider.removeAllListeners()
-    this.connector.hoprChannels.removeAllListeners()
+    this.api.provider.removeAllListeners()
+    this.api.hoprChannels.removeAllListeners()
 
     this.status = 'stopped'
     log(chalk.green('Indexer stopped!'))
@@ -123,8 +129,8 @@ class Indexer extends EventEmitter {
    */
   public async isSyncing(): Promise<boolean> {
     const [onChainBlock, lastKnownBlock] = await Promise.all([
-      this.connector.provider.getBlockNumber(),
-      db.getLatestBlockNumber(this.connector.db)
+      this.api.provider.getBlockNumber(),
+      db.getLatestBlockNumber(this.api.db)
     ])
 
     return isSyncing(onChainBlock, lastKnownBlock)
@@ -151,14 +157,14 @@ class Indexer extends EventEmitter {
   //  * @deprecated do not use this in production
   //  */
   // private async wipe(): Promise<void> {
-  //   await this.connector.db.batch(
-  //     (await getChannelEntries(this.connector.db)).map(({ partyA, partyB }) => ({
+  //   await this.api.db.batch(
+  //     (await getChannelEntries(this.api.db)).map(({ partyA, partyB }) => ({
   //       type: 'del',
-  //       key: Buffer.from(this.connector.dbKeys.ChannelEntry(partyA, partyB))
+  //       key: Buffer.from(this.api.dbKeys.ChannelEntry(partyA, partyB))
   //     }))
   //   )
-  //   await this.connector.db.del(Buffer.from(this.connector.dbKeys.LatestConfirmedSnapshot()))
-  //   await this.connector.db.del(Buffer.from(this.connector.dbKeys.LatestBlockNumber()))
+  //   await this.api.db.del(Buffer.from(this.api.dbKeys.LatestConfirmedSnapshot()))
+  //   await this.api.db.del(Buffer.from(this.api.dbKeys.LatestBlockNumber()))
 
   //   log('wiped indexer data')
   // }
@@ -192,7 +198,7 @@ class Indexer extends EventEmitter {
 
       try {
         // TODO: wildcard is supported but not properly typed
-        events = await this.connector.hoprChannels.queryFilter('*' as any, fromBlock, toBlock)
+        events = await this.api.hoprChannels.queryFilter('*' as any, fromBlock, toBlock)
       } catch (error) {
         failedCount++
 
@@ -211,7 +217,7 @@ class Indexer extends EventEmitter {
 
       log(
         'Sync progress %d% @ block %d',
-        getSyncPercentage(fromBlock - this.genesisBlock, maxToBlock - this.genesisBlock),
+        getSyncPercentage(fromBlock - this.ops.genesisBlock, maxToBlock - this.ops.genesisBlock),
         toBlock
       )
     }
@@ -232,13 +238,13 @@ class Indexer extends EventEmitter {
       this.latestBlock = block.number
     }
 
-    let lastSnapshot = await db.getLatestConfirmedSnapshot(this.connector.db)
+    let lastSnapshot = await db.getLatestConfirmedSnapshot(this.api.db)
 
     // check unconfirmed events and process them if found
     // to be within a confirmed block
     while (
       this.unconfirmedEvents.length > 0 &&
-      isConfirmedBlock(this.unconfirmedEvents.top(1)[0].blockNumber, block.number, this.maxConfirmations)
+      isConfirmedBlock(this.unconfirmedEvents.top(1)[0].blockNumber, block.number, this.ops.maxConfirmations)
     ) {
       const event = this.unconfirmedEvents.pop()
       log('Processing event %s', event.event)
@@ -285,10 +291,10 @@ class Indexer extends EventEmitter {
       }
 
       lastSnapshot = new Snapshot(new BN(event.blockNumber), new BN(event.transactionIndex), new BN(event.logIndex))
-      await db.updateLatestConfirmedSnapshot(this.connector.db, lastSnapshot)
+      await db.updateLatestConfirmedSnapshot(this.api.db, lastSnapshot)
     }
 
-    await db.updateLatestBlockNumber(this.connector.db, new BN(block.number))
+    await db.updateLatestBlockNumber(this.api.db, new BN(block.number))
   }
 
   /**
@@ -304,7 +310,7 @@ class Indexer extends EventEmitter {
     const accountId = Address.fromString(event.args.account)
     const account = await reducers.onAccountInitialized(event)
 
-    await db.updateAccount(this.connector.db, accountId, account)
+    await db.updateAccount(this.api.db, accountId, account)
   }
 
   private async onAccountSecretUpdated(event: Event<'AccountSecretUpdated'>): Promise<void> {
@@ -312,12 +318,12 @@ class Indexer extends EventEmitter {
 
     const accountId = Address.fromString(data.account)
 
-    const storedAccount = await db.getAccount(this.connector.db, accountId)
+    const storedAccount = await db.getAccount(this.api.db, accountId)
     if (!storedAccount) throw Error(`Could not find stored account ${accountId.toHex()} !`)
 
     const account = await reducers.onAccountSecretUpdated(event, storedAccount)
 
-    await db.updateAccount(this.connector.db, accountId, account)
+    await db.updateAccount(this.api.db, accountId, account)
   }
 
   private async onChannelFunded(event: Event<'ChannelFunded'>): Promise<void> {
@@ -327,13 +333,13 @@ class Indexer extends EventEmitter {
     const accountIdB = Address.fromString(data.accountB)
     const channelId = Channel.generateId(accountIdA, accountIdB)
 
-    let storedChannel = await db.getChannel(this.connector.db, channelId)
+    let storedChannel = await db.getChannel(this.api.db, channelId)
     const channel = await reducers.onChannelFunded(event, storedChannel)
 
     // const channelId = await getId(recipientAddress, counterpartyAddress)
     // log('Processing event %s with channelId %s', event.name, channelId.toHex())
 
-    await db.updateChannel(this.connector.db, channelId, channel)
+    await db.updateChannel(this.api.db, channelId, channel)
 
     // log('Channel %s got funded by %s', chalk.green(channelId.toHex()), chalk.green(event.data.funder))
   }
@@ -346,12 +352,12 @@ class Indexer extends EventEmitter {
     const channelId = Channel.generateId(openerAccountId, counterpartyAccountId)
     // log('Processing event %s with channelId %s', event.name, channelId.toHex())
 
-    let storedChannel = await db.getChannel(this.connector.db, channelId)
+    let storedChannel = await db.getChannel(this.api.db, channelId)
     if (!storedChannel) throw Error(`Could not find stored channel ${channelId.toHex()}`)
 
     const channel = await reducers.onChannelOpened(event, storedChannel)
 
-    await db.updateChannel(this.connector.db, channelId, channel)
+    await db.updateChannel(this.api.db, channelId, channel)
 
     this.emit('channelOpened', channel)
 
@@ -366,12 +372,12 @@ class Indexer extends EventEmitter {
     const channelId = Channel.generateId(redeemerAccountId, counterpartyAccountId)
     // log('Processing event %s with channelId %s', event.name, channelId.toHex())
 
-    const storedChannel = await db.getChannel(this.connector.db, channelId)
+    const storedChannel = await db.getChannel(this.api.db, channelId)
     if (!storedChannel) throw Error(`Could not find stored channel ${channelId.toHex()}`)
 
     const channel = await reducers.onTicketRedeemed(event, storedChannel)
 
-    await db.updateChannel(this.connector.db, channelId, channel)
+    await db.updateChannel(this.api.db, channelId, channel)
 
     // log('Ticket redeemd in channel %s by %s', chalk.green(channelId.toHex()), chalk.green(redeemerAddress.toHex()))
   }
@@ -384,12 +390,12 @@ class Indexer extends EventEmitter {
     const channelId = Channel.generateId(initiatorAccountId, counterpartyAccountId)
     // log('Processing event %s with channelId %s', event.name, channelId.toHex())
 
-    const storedChannel = await db.getChannel(this.connector.db, channelId)
+    const storedChannel = await db.getChannel(this.api.db, channelId)
     if (!storedChannel) throw Error(`Could not find stored channel ${channelId.toHex()}`)
 
     const channel = await reducers.onChannelPendingToClose(event, storedChannel)
 
-    await db.updateChannel(this.connector.db, channelId, channel)
+    await db.updateChannel(this.api.db, channelId, channel)
 
     // log(
     //   'Channel closure initiated for %s by %s',
@@ -406,12 +412,12 @@ class Indexer extends EventEmitter {
     const channelId = Channel.generateId(closerAccountId, counterpartyAccountId)
     // log('Processing event %s with channelId %s', event.name, channelId.toHex())
 
-    const storedChannel = await db.getChannel(this.connector.db, channelId)
+    const storedChannel = await db.getChannel(this.api.db, channelId)
     if (!storedChannel) throw Error(`Could not find stored channel ${channelId.toHex()}`)
 
     const channel = await reducers.onChannelClosed(event, storedChannel)
 
-    await db.updateChannel(this.connector.db, channelId, channel)
+    await db.updateChannel(this.api.db, channelId, channel)
 
     this.emit('channelClosed', channel)
 
@@ -419,26 +425,26 @@ class Indexer extends EventEmitter {
   }
 
   public async getAccount(address: Address) {
-    return db.getAccount(this.connector.db, address)
+    return db.getAccount(this.api.db, address)
   }
 
   public async getChannel(channelId: Hash) {
-    return db.getChannel(this.connector.db, channelId)
+    return db.getChannel(this.api.db, channelId)
   }
 
   public async getChannels(filter?: (channel: ChannelEntry) => Promise<boolean>) {
-    return db.getChannels(this.connector.db, filter)
+    return db.getChannels(this.api.db, filter)
   }
 
   public async getChannelsOf(address: Address) {
-    return db.getChannels(this.connector.db, async (channel) => {
+    return db.getChannels(this.api.db, async (channel) => {
       return address.eq(channel.partyA) || address.eq(channel.partyB)
     })
   }
 
   // routing
   public async getPublicKeyOf(address: Address): Promise<PublicKey | undefined> {
-    const account = await db.getAccount(this.connector.db, address)
+    const account = await db.getAccount(this.api.db, address)
     if (account && account.publicKey) {
       return account.publicKey
     }
