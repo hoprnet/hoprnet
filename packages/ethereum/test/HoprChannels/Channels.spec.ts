@@ -7,12 +7,7 @@ import { redeemArgs, validateChannel } from './utils'
 import { PromiseValue } from '@hoprnet/hopr-utils'
 import { createTicket } from './utils'
 import { increaseTime } from '../utils'
-import {
-  PROOF_OF_RELAY_SECRET_0,
-  PROOF_OF_RELAY_SECRET_1,
-  WIN_PROB_100,
-  SECRET_1,
-} from './constants'
+import { PROOF_OF_RELAY_SECRET_0, PROOF_OF_RELAY_SECRET_1, WIN_PROB_100, SECRET_1 } from './constants'
 
 const abiEncoder = ethers.utils.Interface.getAbiCoder()
 
@@ -32,7 +27,8 @@ const useFixtures = deployments.createFixture(async () => {
 
   const fixtureTickets = await generateTickets()
 
-  const fund = async (addr, amount) => await token.connect(deployer).mint(addr, amount + '', ethers.constants.HashZero, ethers.constants.HashZero)
+  const fund = async (addr, amount) =>
+    await token.connect(deployer).mint(addr, amount + '', ethers.constants.HashZero, ethers.constants.HashZero)
 
   return {
     token,
@@ -45,20 +41,21 @@ const useFixtures = deployments.createFixture(async () => {
   }
 })
 
-describe('funding HoprChannel catches failures', async function(){
+describe('funding HoprChannel catches failures', async function () {
   // TODO fund single, fund by send
   let fixtures, channels, accountA
   before(async function () {
     // All of these tests revert, so we can rely on stateless single fixture.
     fixtures = await useFixtures()
     channels = fixtures.channels
-    accountA = fixtures.accountA 
+    accountA = fixtures.accountA
     await fixtures.fund(accountA.address, 100)
   })
 
   it('should fail to fund channel A->A', async function () {
-    await expect(channels.connect(accountA).fundChannelMulti(ACCOUNT_A.address, ACCOUNT_A.address, '70', '30'))
-      .to.be.revertedWith('accountA and accountB must not be the same')
+    await expect(
+      channels.connect(accountA).fundChannelMulti(ACCOUNT_A.address, ACCOUNT_A.address, '70', '30')
+    ).to.be.revertedWith('accountA and accountB must not be the same')
   })
 
   it('should fail to fund channel 0->A', async function () {
@@ -73,7 +70,7 @@ describe('funding HoprChannel catches failures', async function(){
     ).to.be.revertedWith('accountB must not be empty')
   })
 
-  it('should fail to fund a channel with 0 amount', async function() {
+  it('should fail to fund a channel with 0 amount', async function () {
     await expect(
       channels.connect(accountA).fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '0', '0')
     ).to.be.revertedWith('amountA or amountB must be greater than 0')
@@ -84,9 +81,10 @@ describe('funding a HoprChannel success', function () {
   // TODO test single fund, events
   it('should multi fund and open channel A->B', async function () {
     const { channels } = await useFixtures()
-    await expect(
-      channels.fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
-    ).to.emit(channels, 'ChannelUpdate')
+    await expect(channels.fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')).to.emit(
+      channels,
+      'ChannelUpdate'
+    )
     const channel = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
     validateChannel(channel, { partyABalance: '70', partyBBalance: '30' })
   })
@@ -96,11 +94,7 @@ describe('funding a HoprChannel success', function () {
     await expect(
       token
         .connect(accountB)
-        .send(
-          channels.address,
-          '30',
-          abiEncoder.encode(['address', 'address'], [ACCOUNT_B.address, ACCOUNT_A.address])
-        )
+        .send(channels.address, '30', abiEncoder.encode(['address', 'address'], [ACCOUNT_B.address, ACCOUNT_A.address]))
     ).to.emit(channels, 'ChannelUpdate')
     validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), {
       partyABalance: '70',
@@ -112,11 +106,10 @@ describe('funding a HoprChannel success', function () {
   })
 })
 
-
-describe('with a funded HoprChannel (A: 70, B: 30), secrets initialized', function() {
+describe('with a funded HoprChannel (A: 70, B: 30), secrets initialized', function () {
   let channels
   let fixtures
-  beforeEach(async function(){
+  beforeEach(async function () {
     fixtures = await useFixtures()
     channels = fixtures.channels
     await channels.connect(fixtures.accountA).bumpChannel(ACCOUNT_B.address, SECRET_2)
@@ -415,7 +408,7 @@ describe('With a pending_to_close HoprChannel (A:70, B:30)', function () {
   })
 })
 
-describe('with a closed channel', function(){
+describe('with a closed channel', function () {
   // TODO Close channel
   it('should fail to redeem ticket when channel in closed', async function () {
     const { channels } = await useFixtures()
@@ -430,7 +423,7 @@ describe('with a closed channel', function(){
   })
 })
 
-describe('with a reopened channel', function(){
+describe('with a reopened channel', function () {
   it('should fail to redeem ticket when channel in in different channelEpoch', async function () {
     const { channels, fixtureTickets, deployer } = await useFixtures()
     const TICKET_AB_WIN = fixtureTickets.TICKET_AB_WIN
@@ -458,10 +451,9 @@ describe('with a reopened channel', function(){
       )
     ).to.be.revertedWith('signer must match the counterparty')
   })
-
 })
 
-describe('test internals with mock', function() {
+describe('test internals with mock', function () {
   let channels
   beforeEach(async function () {
     channels = (await useFixtures()).channels
@@ -520,8 +512,6 @@ describe('test internals with mock', function() {
     expect(luck).to.equal(TICKET_AB_WIN.luck)
   })
 })
-
-
 
 // -------------------------------------------------------
 
@@ -670,7 +660,6 @@ describe('HoprChannels lifecycle', function () {
   })
 
   context('on a fresh channel', function () {
-
     it('should initialize channel closure', async function () {
       await expect(f.channels.connect(f.accountB).initiateChannelClosure(ACCOUNT_A.address)).to.emit(
         f.channels,
