@@ -44,8 +44,9 @@ bash -c "$(curl -s https://raw.githubusercontent.com/hoprnet/hopr-sh/master/setu
 ## Running HOPRd
 
 With this command, we will run hoprd and store logs,
-when running this command the first time, it will create folder `db` in which
-it will store your private data.
+when running this command the first time, it will create folder `db` in the current
+working directory where it will store the encrypted key to your node and your off-chain
+private data.
 
 ```bash
 DEBUG=hopr* hoprd --init --rest --admin 2>&1 | tee ~/hoprd-logs.txt
