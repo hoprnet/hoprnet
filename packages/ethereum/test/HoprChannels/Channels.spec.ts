@@ -1,13 +1,9 @@
 import { deployments, ethers } from 'hardhat'
 import { expect } from 'chai'
 import { durations } from '@hoprnet/hopr-utils'
-import { ACCOUNT_A, ACCOUNT_B, ACCOUNT_AB_CHANNEL_ID, SECRET_2, generateTickets, SECRET_0 } from './constants'
+import { ACCOUNT_A, ACCOUNT_B, ACCOUNT_AB_CHANNEL_ID, SECRET_2, generateTickets, SECRET_0, SECRET_1 } from './constants'
 import { HoprToken__factory, ChannelsMock__factory } from '../../types'
 import { redeemArgs, validateChannel } from './utils'
-import { PromiseValue } from '@hoprnet/hopr-utils'
-import { createTicket } from './utils'
-import { increaseTime } from '../utils'
-import { PROOF_OF_RELAY_SECRET_0, PROOF_OF_RELAY_SECRET_1, WIN_PROB_100, SECRET_1 } from './constants'
 
 const abiEncoder = ethers.utils.Interface.getAbiCoder()
 
@@ -30,6 +26,13 @@ const useFixtures = deployments.createFixture(async () => {
   const fund = async (addr, amount) =>
     await token.connect(deployer).mint(addr, amount + '', ethers.constants.HashZero, ethers.constants.HashZero)
 
+  const approve = async (account, amount) => await token.connect(account).approve(channels.address, amount)
+
+  const fundAndApprove = async (account, amount) => {
+    await fund(account.address, amount)
+    await approve(account, amount)
+  }
+
   return {
     token,
     channels,
@@ -37,7 +40,9 @@ const useFixtures = deployments.createFixture(async () => {
     fixtureTickets,
     accountA,
     accountB,
-    fund
+    fund,
+    approve,
+    fundAndApprove
   }
 })
 
@@ -49,7 +54,7 @@ describe('funding HoprChannel catches failures', async function () {
     fixtures = await useFixtures()
     channels = fixtures.channels
     accountA = fixtures.accountA
-    await fixtures.fund(accountA.address, 100)
+    await fixtures.fundAndApprove(accountA, 100)
   })
 
   it('should fail to fund channel A->A', async function () {
@@ -80,13 +85,14 @@ describe('funding HoprChannel catches failures', async function () {
 describe('funding a HoprChannel success', function () {
   // TODO test single fund, events
   it('should multi fund and open channel A->B', async function () {
-    const { channels } = await useFixtures()
-    await expect(channels.fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')).to.emit(
+    const { channels, accountA, fundAndApprove } = await useFixtures()
+    await fundAndApprove(accountA, 100)
+    await expect(channels.connect(accountA).fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')).to.emit(
       channels,
       'ChannelUpdate'
     )
     const channel = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
-    validateChannel(channel, { partyABalance: '70', partyBBalance: '30' })
+    validateChannel(channel, { partyABalance: '70', partyBBalance: '30', status: '1' })
   })
 
   it('should fund A->B using send', async function () {
@@ -99,9 +105,7 @@ describe('funding a HoprChannel success', function () {
     validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), {
       partyABalance: '70',
       partyBBalance: '30',
-      closureTime: '0',
       status: '1',
-      closureByPartyA: false
     })
   })
 })
@@ -112,16 +116,17 @@ describe('with a funded HoprChannel (A: 70, B: 30), secrets initialized', functi
   beforeEach(async function () {
     fixtures = await useFixtures()
     channels = fixtures.channels
+    fixtures.fundAndApprove(fixtures.accountA, 100)
     await channels.connect(fixtures.accountA).bumpChannel(ACCOUNT_B.address, SECRET_2)
     await channels.connect(fixtures.accountB).bumpChannel(ACCOUNT_A.address, SECRET_2) // TODO secret per account
-    await channels.fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
+    await channels.connect(fixtures.accountA).fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
   })
 
   it('should redeem ticket for account A', async function () {
     await channels
       .connect(fixtures.accountA)
       //@ts-ignore
-      .redeemTicket(...redeemArgs(f.TICKET_BA_WIN))
+      .redeemTicket(...redeemArgs(fixtures.fixtureTickets.TICKET_BA_WIN))
 
     const channel = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
     validateChannel(channel, {
@@ -138,7 +143,7 @@ describe('with a funded HoprChannel (A: 70, B: 30), secrets initialized', functi
     await channels
       .connect(fixtures.accountB)
       //@ts-ignore
-      .redeemTicket(...redeemArgs(f.TICKET_AB_WIN))
+      .redeemTicket(...redeemArgs(fixtures.fixtureTickets.TICKET_AB_WIN))
 
     const channel = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
     validateChannel(channel, {
@@ -150,24 +155,14 @@ describe('with a funded HoprChannel (A: 70, B: 30), secrets initialized', functi
     })
     expect(channel.partyBCommitment).to.equal(SECRET_1)
   })
+
   it('should fail to redeem ticket when ticket has been already redeemed', async function () {
     const { channels, fixtureTickets } = await useFixtures()
     const TICKET_AB_WIN = fixtureTickets.TICKET_AB_WIN
 
-    await channels.connect(ACCOUNT_B.wallet).bumpChannel(ACCOUNT_A.address, SECRET_2)
-    await channels.fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
-
-    await channels.redeemTicketInternal(
-      TICKET_AB_WIN.recipient,
-      TICKET_AB_WIN.counterparty,
-      TICKET_AB_WIN.nextCommitment,
-      TICKET_AB_WIN.ticketEpoch,
-      TICKET_AB_WIN.ticketIndex,
-      TICKET_AB_WIN.proofOfRelaySecret,
-      TICKET_AB_WIN.amount,
-      TICKET_AB_WIN.winProb,
-      TICKET_AB_WIN.signature
-    )
+    await channels.connect(fixtures.accountB)
+      //@ts-ignore
+      .redeemTicket(...redeemArgs(fixtures.fixtureTickets.TICKET_AB_WIN))
 
     await expect(
       channels.redeemTicketInternal(
@@ -460,26 +455,26 @@ describe('test internals with mock', function () {
   })
 
   it('should get channel data', async function () {
-    const channelData = await channels.getChannel(ACCOUNT_A.address, ACCOUNT_B.address)
+    const channelData = await channels.getChannelInternal(ACCOUNT_A.address, ACCOUNT_B.address)
     expect(channelData[0]).to.be.equal(ACCOUNT_A.address)
     expect(channelData[1]).to.be.equal(ACCOUNT_B.address)
     expect(channelData[2]).to.be.equal(ACCOUNT_AB_CHANNEL_ID)
   })
 
   it('should get channel id', async function () {
-    expect(await channels.getChannelId(ACCOUNT_A.address, ACCOUNT_B.address)).to.be.equal(ACCOUNT_AB_CHANNEL_ID)
+    expect(await channels.getChannelIdInternal(ACCOUNT_A.address, ACCOUNT_B.address)).to.be.equal(ACCOUNT_AB_CHANNEL_ID)
   })
 
   it('should be partyA', async function () {
-    expect(await channels.isPartyA(ACCOUNT_A.address, ACCOUNT_B.address)).to.be.true
+    expect(await channels.isPartyAInternal(ACCOUNT_A.address, ACCOUNT_B.address)).to.be.true
   })
 
   it('should not be partyA', async function () {
-    expect(await channels.isPartyA(ACCOUNT_B.address, ACCOUNT_A.address)).to.be.false
+    expect(await channels.isPartyAInternal(ACCOUNT_B.address, ACCOUNT_A.address)).to.be.false
   })
 
   it('should get partyA and partyB', async function () {
-    const parties = await channels.getParties(ACCOUNT_A.address, ACCOUNT_B.address)
+    const parties = await channels.getPartiesInternal(ACCOUNT_A.address, ACCOUNT_B.address)
     expect(parties[0]).to.be.equal(ACCOUNT_A.address)
     expect(parties[1]).to.be.equal(ACCOUNT_B.address)
   })
@@ -514,6 +509,12 @@ describe('test internals with mock', function () {
 })
 
 // -------------------------------------------------------
+
+/*
+import { PromiseValue } from '@hoprnet/hopr-utils'
+import { createTicket } from './utils'
+import { increaseTime } from '../utils'
+import { PROOF_OF_RELAY_SECRET_0, PROOF_OF_RELAY_SECRET_1, WIN_PROB_100, SECRET_1 } from './constants'
 
 describe('HoprChannels', function () {
   it('should fund one direction', async function () {
@@ -884,3 +885,4 @@ describe('HoprChannels lifecycle', function () {
     })
   })
 })
+*/
