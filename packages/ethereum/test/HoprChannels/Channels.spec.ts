@@ -2,7 +2,7 @@ import { deployments, ethers } from 'hardhat'
 import { expect } from 'chai'
 import { durations } from '@hoprnet/hopr-utils'
 import { ACCOUNT_A, ACCOUNT_B, ACCOUNT_AB_CHANNEL_ID, SECRET_2, generateTickets, SECRET_0, SECRET_1 } from './constants'
-import { HoprToken__factory, ChannelsMock__factory } from '../../types'
+import { HoprToken__factory, ChannelsMock__factory, HoprChannels__factory } from '../../types'
 import { redeemArgs, validateChannel } from './utils'
 
 const abiEncoder = ethers.utils.Interface.getAbiCoder()
@@ -15,7 +15,8 @@ const useFixtures = deployments.createFixture(async () => {
   // run migrations
   const contracts = await deployments.fixture()
   const token = HoprToken__factory.connect(contracts['HoprToken'].address, ethers.provider)
-  const channels = ChannelsMock__factory.connect(contracts['HoprChannels'].address, ethers.provider)
+  const channels = HoprChannels__factory.connect(contracts['HoprChannels'].address, ethers.provider)
+  const mockChannels = await new ChannelsMock__factory(deployer).deploy(token.address, 0) 
 
   // create deployer the minter
   const minterRole = await token.MINTER_ROLE()
@@ -42,6 +43,7 @@ const useFixtures = deployments.createFixture(async () => {
     accountB,
     fund,
     approve,
+    mockChannels,
     fundAndApprove
   }
 })
@@ -453,7 +455,7 @@ describe('with a reopened channel', function () {
 describe('test internals with mock', function () {
   let channels
   beforeEach(async function () {
-    channels = (await useFixtures()).channels
+    channels = (await useFixtures()).mockChannels
   })
 
   it('should get channel data', async function () {
@@ -482,7 +484,7 @@ describe('test internals with mock', function () {
   })
 
   it('should pack ticket', async function () {
-    const { channels, fixtureTickets } = await useFixtures()
+    const { fixtureTickets } = await useFixtures()
     const TICKET_AB_WIN = fixtureTickets.TICKET_AB_WIN
 
     const encoded = await channels.getEncodedTicketInternal(
@@ -497,7 +499,7 @@ describe('test internals with mock', function () {
   })
 
   it("should get ticket's luck", async function () {
-    const { channels, fixtureTickets } = await useFixtures()
+    const { fixtureTickets } = await useFixtures()
     const TICKET_AB_WIN = fixtureTickets.TICKET_AB_WIN
 
     const luck = await channels.getTicketLuckInternal(
