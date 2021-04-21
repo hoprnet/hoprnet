@@ -7,6 +7,7 @@ In payment channels, two parties A and B lock some funds within a smart contract
 This implies that the last HOPR acknowledgement contains all previous incentives plus the incentive for the most recent interaction 
    $$value(ACK_n) =\sum_{i=1}^nfee(packet_i)$$
 If B received $ACK_n$ before sending $packet_{n-1}$, it has no incentive to process $packet_{n-1}$ rather than $packet_{n-2}$. 
+\\~\\To avoid this limitation of traditional payment channels, HOPR utilizes probabilistic payments
 
 \subsubsection{Probabilistic payments}  
 The payouts use a concept called “tickets”, a ticket can be either a win or a loss with a certain winning probability. This means nodes are incentivized to continue relaying packets as they don’t know which ticket is a win. 
