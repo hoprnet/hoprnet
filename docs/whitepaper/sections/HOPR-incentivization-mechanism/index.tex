@@ -1,6 +1,6 @@
 \section{HOPR incentivization mechanism}
 HOPR incentivizes nodes in order to achieve correct transformation and delivery of mixnet packets. 
-This is accomplished using a mechanism called “Proof-Of-Relay” with the following second-layer solutions which are both cost effective and privacy preserving.
+This is accomplished using a mechanism called “Proof-Of-Relay” with the following layer 2 solutions which are both cost effective and privacy preserving.
 
 \subsection{Probabilistic payments within payment channels}
 In payment channels, two parties A and B lock some funds within a smart contract, make multiple transactions off-chain and only commit the aggregation on-chain. 
@@ -9,9 +9,8 @@ This implies that the last HOPR acknowledgement contains all previous incentives
 If B received $ACK_n$ before sending $packet_{n-1}$, it has no incentive to process $packet_{n-1}$ rather than $packet_{n-2}$. 
 
 \subsubsection{Probabilistic payments}  
-The payouts use a concept called “tickets”. In this scheme, there is a known selection rate $s$ (assuming $s=1000$).
-A ticket can be a win or a loss with $\frac{1}{1000}$ probability which means nodes are incentivized to continue relaying packets as they don’t know which ticket is a win. 
-\\~\\HOPR uses a custom-made second-layer solution. It is inspired by payment channels and probabilistic payments where incentives can be claimed independently: 
+The payouts use a concept called “tickets”, a ticket can be either a win or a loss with a certain winning probability. This means nodes are incentivized to continue relaying packets as they don’t know which ticket is a win. 
+\\~\\HOPR uses a custom-made layer 2 solution. It is inspired by payment channels and probabilistic payments where incentives can be claimed independently: 
 $$value ( ACK_i )=value ( ACK_j ) \quad for \quad i,j\in \{1,n\}$$
 Hence, there is no added value in pretending packet loss or intentionally changing the order in which packets are processed. 
 
