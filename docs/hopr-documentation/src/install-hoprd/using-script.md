@@ -17,9 +17,7 @@ $ ./setup-hoprd.sh
 
 ### macOS
 
-Type following commands into your terminal, if you are using a VPS, log in into your VPS.
-
-If you have not installed the XCode Command-line utils, please install them via:
+Type following commands into your terminal. If you have not installed the XCode Command-line utils, please install them via:
 
 ```bash
 $ xcode-select --install
