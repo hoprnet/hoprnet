@@ -11,7 +11,7 @@ To use the HOPR network, you will need a HOPR node. There are several ways to ru
 
 We support multiple distribution mechanisms to install a HOPR node:
 
-- **[hopr-sh](using-script.md)**: An automated script able to install all the dependencies on your operating system alongside a HOPR node.
+- **(recommended)** **[hopr-sh](using-script.md)**: An automated script able to install all the dependencies on your operating system alongside a HOPR node.
 - **[avado](using-avado.md)**: An [AVADO](https://ava.do/) plug-n-play device able to install a HOPR node as a DappNode package from their store.
 - **[npm](using-npm.md)**: The popular [Node Package Manager](https://www.npmjs.com/) (npm), which requires node.js.
 - **[docker](using-docker.md)**: Using [Docker](https://www.docker.com/) you can run a HOPR node within a container with a shared volume to store your node info.
