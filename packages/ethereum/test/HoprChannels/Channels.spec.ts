@@ -61,13 +61,13 @@ describe('funding HoprChannel catches failures', async function(){
       .to.be.revertedWith('accountA and accountB must not be the same')
   })
 
-  it('should fail to fund channel 0->A', async function() {
+  it('should fail to fund channel 0->A', async function () {
     await expect(
       channels.connect(accountA).fundChannelMulti(ethers.constants.AddressZero, ACCOUNT_B.address, '70', '30')
     ).to.be.revertedWith('accountA must not be empty')
   })
 
-  it('should fail to fund channel A->0', async function() {
+  it('should fail to fund channel A->0', async function () {
     await expect(
       channels.connect(accountA).fundChannelMulti(ACCOUNT_A.address, ethers.constants.AddressZero, '70', '30')
     ).to.be.revertedWith('accountB must not be empty')
@@ -250,8 +250,7 @@ describe('with a funded HoprChannel (A: 70, B: 30), secrets initialized', functi
   })
 
   it('A can initialize channel closure', async function () {
-    await expect(
-      channels.connect(ACCOUNT_A.address).initiateChannelClosure(ACCOUNT_B.address)).to.emit(
+    await expect(channels.connect(ACCOUNT_A.address).initiateChannelClosure(ACCOUNT_B.address)).to.emit(
       channels,
       'ChannelUpdate'
     )
@@ -260,8 +259,7 @@ describe('with a funded HoprChannel (A: 70, B: 30), secrets initialized', functi
   })
 
   it('B can initialize channel closure', async function () {
-    await expect(
-      channels.connect(ACCOUNT_B.address).initiateChannelClosure(ACCOUNT_A.address)).to.emit(
+    await expect(channels.connect(ACCOUNT_B.address).initiateChannelClosure(ACCOUNT_A.address)).to.emit(
       channels,
       'ChannelUpdate'
     )
@@ -276,18 +274,19 @@ describe('with a funded HoprChannel (A: 70, B: 30), secrets initialized', functi
   })
 
   it('should fail to initialize channel closure A->0', async function () {
-    await expect(channels.connect(ACCOUNT_A.address).initiateChannelClosure(ethers.constants.AddressZero)).to.be.revertedWith('counterparty must not be empty')
+    await expect(
+      channels.connect(ACCOUNT_A.address).initiateChannelClosure(ethers.constants.AddressZero)
+    ).to.be.revertedWith('counterparty must not be empty')
   })
 })
 
-
-describe('With a pending_to_close HoprChannel (A:70, B:30)', function(){
+describe('With a pending_to_close HoprChannel (A:70, B:30)', function () {
   let channels
-  beforeEach(async function(){
+  beforeEach(async function () {
     const fixtures = await useFixtures()
     channels = fixtures.channels
     await channels.fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
-    await channels.connect(ACCOUNT_A.address).initiateChannelClosure(ACCOUNT_B.address);
+    await channels.connect(ACCOUNT_A.address).initiateChannelClosure(ACCOUNT_B.address)
   })
 
   it('should fail to initialize channel closure when channel is not open', async function () {
@@ -464,7 +463,7 @@ describe('with a reopened channel', function(){
 
 describe('test internals with mock', function() {
   let channels
-  beforeEach(async function(){
+  beforeEach(async function () {
     channels = (await useFixtures()).channels
   })
 
