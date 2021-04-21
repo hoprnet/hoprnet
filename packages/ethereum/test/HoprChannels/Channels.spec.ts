@@ -392,7 +392,7 @@ describe('With a pending_to_close HoprChannel (A:70, B:30)', function () {
     const fixtures = await useFixtures()
     channels = fixtures.channels
     token = fixtures.token
-    fixtures.fundAndApprove(fixtures.accountA, 100)
+    await fixtures.fundAndApprove(fixtures.accountA, 100)
     await channels.connect(fixtures.accountA).fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
     await channels.connect(fixtures.accountA).initiateChannelClosure(ACCOUNT_B.address)
   })
