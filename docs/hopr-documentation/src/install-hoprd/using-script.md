@@ -25,6 +25,8 @@ What release are you installing? Format: X.XX.X (https://github.com/hoprnet/hopr
 latest
 ```
 
+You might need to restart your terminal for your computer to be able to find `hoprd` after the script completes installation.
+
 ### Ubuntu or Debian
 
 Type following commands into your terminal, if you are using a VPS, log in into your VPS.
