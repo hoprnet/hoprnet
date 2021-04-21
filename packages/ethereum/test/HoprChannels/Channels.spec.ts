@@ -96,14 +96,15 @@ describe('funding a HoprChannel success', function () {
   })
 
   it('should fund A->B using send', async function () {
-    const { token, accountB, channels } = await useFixtures()
+    const { token, accountB, channels, fund } = await useFixtures()
+    await fund(accountB.address, '30')
     await expect(
       token
         .connect(accountB)
         .send(channels.address, '30', abiEncoder.encode(['address', 'address'], [ACCOUNT_B.address, ACCOUNT_A.address]))
     ).to.emit(channels, 'ChannelUpdate')
     validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), {
-      partyABalance: '70',
+      partyABalance: '0',
       partyBBalance: '30',
       status: '1'
     })
