@@ -4,7 +4,7 @@ The simplest way to get started with HOPR is to run our pre-prepared [script](ht
 
 ```eval_rst
 .. ATTENTION::
-   Please bear in mind that at the time of writing, ``hoprd`` does not work with node version ``15`` or higher.
+   Please bear in mind that at the time of writing, ``hoprd`` only has been tested in version ``14``. For now, ``hoprd`` does not work with version ``15`` or higher as some dependencies (particularly ``webrtc``) breaks in any version ``>14``.
 ```
 
 ## Setup and install HOPRd
