@@ -105,7 +105,7 @@ describe('funding a HoprChannel success', function () {
     validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), {
       partyABalance: '70',
       partyBBalance: '30',
-      status: '1',
+      status: '1'
     })
   })
 })
@@ -160,7 +160,8 @@ describe('with a funded HoprChannel (A: 70, B: 30), secrets initialized', functi
     const { channels, fixtureTickets } = await useFixtures()
     const TICKET_AB_WIN = fixtureTickets.TICKET_AB_WIN
 
-    await channels.connect(fixtures.accountB)
+    await channels
+      .connect(fixtures.accountB)
       //@ts-ignore
       .redeemTicket(...redeemArgs(fixtures.fixtureTickets.TICKET_AB_WIN))
 

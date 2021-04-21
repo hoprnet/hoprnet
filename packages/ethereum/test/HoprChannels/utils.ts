@@ -63,7 +63,6 @@ export const redeemArgs = (ticket) => [
   ticket.signature
 ]
 
-
 export const validateChannel = (actual, expected) => {
   expect(actual.partyABalance.toString()).to.equal(expected.partyABalance)
   expect(actual.partyBBalance.toString()).to.equal(expected.partyBBalance)
