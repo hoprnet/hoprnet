@@ -16,7 +16,6 @@ contract ChannelsMock is HoprChannels {
         bytes32
     ) {
         (address partyA, address partyB, bytes32 channelId,) = _getChannel(accountA, accountB);
-
         return (partyA, partyB, channelId);
     }
 
