@@ -136,7 +136,7 @@ const useFixtures = deployments.createFixture(async () => {
   const contracts = await deployments.fixture()
   const token = HoprToken__factory.connect(contracts['HoprToken'].address, ethers.provider)
   const channels = HoprChannels__factory.connect(contracts['HoprChannels'].address, ethers.provider)
-  const mockChannels = await new ChannelsMock__factory(deployer).deploy(token.address, 0) 
+  const mockChannels = await new ChannelsMock__factory(deployer).deploy(token.address, 0)
 
   // create deployer the minter
   const minterRole = await token.MINTER_ROLE()
@@ -288,9 +288,7 @@ describe('with a funded HoprChannel (A: 70, B: 30), secrets initialized', functi
       .redeemTicket(...redeemArgs(TICKET_AB_WIN))
 
     await expect(
-      channels 
-        .connect(fixtures.accountB)
-        .redeemTicket(
+      channels.connect(fixtures.accountB).redeemTicket(
         TICKET_AB_WIN.counterparty,
         SECRET_0, // give the next secret so this ticket becomes redeemable
         TICKET_AB_WIN.ticketEpoch,
@@ -303,9 +301,7 @@ describe('with a funded HoprChannel (A: 70, B: 30), secrets initialized', functi
     ).to.be.revertedWith('ticket epoch must match')
 
     await expect(
-      channels
-        .connect(fixtures.accountB)
-        .redeemTicket(
+      channels.connect(fixtures.accountB).redeemTicket(
         TICKET_AB_WIN.counterparty,
         SECRET_0, // give the next secret so this ticket becomes redeemable
         parseInt(TICKET_AB_WIN.ticketEpoch) + 1 + '',
@@ -322,9 +318,7 @@ describe('with a funded HoprChannel (A: 70, B: 30), secrets initialized', functi
     const TICKET_AB_WIN = fixtures.fixtureTickets.TICKET_AB_WIN
     const TICKET_BA_WIN = fixtures.fixtureTickets.TICKET_BA_WIN
     await expect(
-      channels
-      .connect(fixtures.accountB)
-      .redeemTicket(
+      channels.connect(fixtures.accountB).redeemTicket(
         TICKET_AB_WIN.counterparty,
         TICKET_AB_WIN.nextCommitment,
         TICKET_AB_WIN.ticketEpoch,
@@ -341,17 +335,17 @@ describe('with a funded HoprChannel (A: 70, B: 30), secrets initialized', functi
     const TICKET_AB_LOSS = fixtures.fixtureTickets.TICKET_AB_LOSS
     await expect(
       channels
-      .connect(fixtures.accountB)
-      .redeemTicket(
-        TICKET_AB_LOSS.counterparty,
-        TICKET_AB_LOSS.nextCommitment,
-        TICKET_AB_LOSS.ticketEpoch,
-        TICKET_AB_LOSS.ticketIndex,
-        TICKET_AB_LOSS.proofOfRelaySecret,
-        TICKET_AB_LOSS.amount,
-        TICKET_AB_LOSS.winProb,
-        TICKET_AB_LOSS.signature
-      )
+        .connect(fixtures.accountB)
+        .redeemTicket(
+          TICKET_AB_LOSS.counterparty,
+          TICKET_AB_LOSS.nextCommitment,
+          TICKET_AB_LOSS.ticketEpoch,
+          TICKET_AB_LOSS.ticketIndex,
+          TICKET_AB_LOSS.proofOfRelaySecret,
+          TICKET_AB_LOSS.amount,
+          TICKET_AB_LOSS.winProb,
+          TICKET_AB_LOSS.signature
+        )
     ).to.be.revertedWith('ticket must be a win')
   })
 
