@@ -4,6 +4,27 @@ The simplest way to get started with HOPR is to run our pre-prepared [script](ht
 
 ## Setup and install HOPRd
 
+Our script will ask you to accept our [Privacy Policy](https://hoprnet.org/privacy-policy), and afterwards prompt you for a version to install. You can use any of our [public releases](https://www.npmjs.com/package/@hoprnet/hoprd), but `latest` also work.
+
+```bash
+$ bash -c "$(curl -s https://raw.githubusercontent.com/hoprnet/hopr-sh/master/setup-hoprd.sh)"
+
+██╗  ██╗ ██████╗ ██████╗ ██████╗ 
+██║  ██║██╔═══██╗██╔══██╗██╔══██╗
+███████║██║   ██║██████╔╝██████╔╝
+██╔══██║██║   ██║██╔═══╝ ██╔══██╗
+██║  ██║╚██████╔╝██║     ██║  ██║
+╚═╝  ╚═╝ ╚═════╝ ╚═╝     ╚═╝  ╚═╝
+
+By installing this node, you agree to our Privacy Policy found at https://hoprnet.org/privacy-policy
+Do you agree to our Privacy Policy? [y/n]:y
+Terrific!
+Warning! Running this script repeatedly will cause you to have a new node address each time.
+Would you like to run this script? [y/n]:y
+What release are you installing? Format: X.XX.X (https://github.com/hoprnet/hoprnet/releases)
+latest
+```
+
 ### Ubuntu or Debian
 
 Type following commands into your terminal, if you are using a VPS, log in into your VPS.
