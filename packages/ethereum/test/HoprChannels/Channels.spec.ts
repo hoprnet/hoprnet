@@ -136,7 +136,7 @@ const useFixtures = deployments.createFixture(async () => {
   const contracts = await deployments.fixture()
   const token = HoprToken__factory.connect(contracts['HoprToken'].address, ethers.provider)
   const channels = HoprChannels__factory.connect(contracts['HoprChannels'].address, ethers.provider)
-  const mockChannels = await new ChannelsMock__factory(deployer).deploy(token.address, 0)
+  const mockChannels = await new ChannelsMock__factory(deployer).deploy(token.address, 0) 
 
   // create deployer the minter
   const minterRole = await token.MINTER_ROLE()
@@ -288,7 +288,9 @@ describe('with a funded HoprChannel (A: 70, B: 30), secrets initialized', functi
       .redeemTicket(...redeemArgs(TICKET_AB_WIN))
 
     await expect(
-      channels.connect(fixtures.accountB).redeemTicket(
+      channels 
+        .connect(fixtures.accountB)
+        .redeemTicket(
         TICKET_AB_WIN.counterparty,
         SECRET_0, // give the next secret so this ticket becomes redeemable
         TICKET_AB_WIN.ticketEpoch,
@@ -301,7 +303,9 @@ describe('with a funded HoprChannel (A: 70, B: 30), secrets initialized', functi
     ).to.be.revertedWith('ticket epoch must match')
 
     await expect(
-      channels.connect(fixtures.accountB).redeemTicket(
+      channels
+        .connect(fixtures.accountB)
+        .redeemTicket(
         TICKET_AB_WIN.counterparty,
         SECRET_0, // give the next secret so this ticket becomes redeemable
         parseInt(TICKET_AB_WIN.ticketEpoch) + 1 + '',
@@ -318,7 +322,9 @@ describe('with a funded HoprChannel (A: 70, B: 30), secrets initialized', functi
     const TICKET_AB_WIN = fixtures.fixtureTickets.TICKET_AB_WIN
     const TICKET_BA_WIN = fixtures.fixtureTickets.TICKET_BA_WIN
     await expect(
-      channels.connect(fixtures.accountB).redeemTicket(
+      channels
+      .connect(fixtures.accountB)
+      .redeemTicket(
         TICKET_AB_WIN.counterparty,
         TICKET_AB_WIN.nextCommitment,
         TICKET_AB_WIN.ticketEpoch,
@@ -335,17 +341,17 @@ describe('with a funded HoprChannel (A: 70, B: 30), secrets initialized', functi
     const TICKET_AB_LOSS = fixtures.fixtureTickets.TICKET_AB_LOSS
     await expect(
       channels
-        .connect(fixtures.accountB)
-        .redeemTicket(
-          TICKET_AB_LOSS.counterparty,
-          TICKET_AB_LOSS.nextCommitment,
-          TICKET_AB_LOSS.ticketEpoch,
-          TICKET_AB_LOSS.ticketIndex,
-          TICKET_AB_LOSS.proofOfRelaySecret,
-          TICKET_AB_LOSS.amount,
-          TICKET_AB_LOSS.winProb,
-          TICKET_AB_LOSS.signature
-        )
+      .connect(fixtures.accountB)
+      .redeemTicket(
+        TICKET_AB_LOSS.counterparty,
+        TICKET_AB_LOSS.nextCommitment,
+        TICKET_AB_LOSS.ticketEpoch,
+        TICKET_AB_LOSS.ticketIndex,
+        TICKET_AB_LOSS.proofOfRelaySecret,
+        TICKET_AB_LOSS.amount,
+        TICKET_AB_LOSS.winProb,
+        TICKET_AB_LOSS.signature
+      )
     ).to.be.revertedWith('ticket must be a win')
   })
 
@@ -377,6 +383,13 @@ describe('with a funded HoprChannel (A: 70, B: 30), secrets initialized', functi
     await expect(
       channels.connect(ACCOUNT_A.address).initiateChannelClosure(ethers.constants.AddressZero)
     ).to.be.revertedWith('counterparty must not be empty')
+  })
+
+
+  it('should fail to finalize channel closure when is not pending', async function () {
+    await expect(channels.connect(ACCOUNT_A.address).finalizeChannelClosure(ACCOUNT_B.address)).to.be.revertedWith(
+      'channel must be pending to close'
+    )
   })
 })
 
@@ -414,31 +427,6 @@ describe('With a pending_to_close HoprChannel (A:70, B:30)', function () {
     expect(accountABalance.toString()).to.equal('70')
     const accountBBalance = await token.balanceOf(ACCOUNT_B.address)
     expect(accountBBalance.toString()).to.equal('30')
-  })
-
-  it('should finalize channel closure immediately', async function () {
-    await expect(channels.connect(ACCOUNT_B.address).finalizeChannelClosure(ACCOUNT_A.address)).to.emit(
-      channels,
-      'ChannelUpdate'
-    )
-
-    const channel = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
-    expect(channel.partyABalance.toString()).to.equal('0')
-    expect(channel.partyBBalance.toString()).to.equal('0')
-    expect(channel.closureTime.toString()).to.equal('0')
-    expect(channel.status.toString()).to.equal('0')
-    expect(channel.closureByPartyA).to.be.false
-
-    const accountABalance = await token.balanceOf(ACCOUNT_A.address)
-    expect(accountABalance.toString()).to.equal('70')
-    const accountBBalance = await token.balanceOf(ACCOUNT_B.address)
-    expect(accountBBalance.toString()).to.equal('30')
-  })
-
-  it('should fail to finalize channel closure when is not pending', async function () {
-    await expect(channels.connect(ACCOUNT_A.address).finalizeChannelClosure(ACCOUNT_B.address)).to.be.revertedWith(
-      'channel must be pending to close'
-    )
   })
 
   it('should fail to finalize channel closure', async function () {
