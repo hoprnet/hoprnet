@@ -38,8 +38,8 @@ class Channel {
   ): Promise<Acknowledgement | null> {
     const response = Hash.create(unacknowledgedTicket.secretA.serialize(), acknowledgementHash.serialize())
     const ticket = unacknowledgedTicket.ticket
-    if (await isWinningTicket(ticket.getHash(), response, this.commitment.getCurrentCommitment(), ticket.winProb)) {
-      const ack = new Acknowledgement(ticket, response, this.commitment.getCurrentCommitment())
+    if (await isWinningTicket(ticket.getHash(), response, await this.commitment.getCurrentCommitment(), ticket.winProb)) {
+      const ack = new Acknowledgement(ticket, response, await this.commitment.getCurrentCommitment())
       await this.commitment.bumpCommitment()
       return ack
     } else {
@@ -111,10 +111,6 @@ class Channel {
 
   async open(fundAmount: Balance) {
     const { account, hoprToken, hoprChannels } = this.connector
-
-    // check if we have initialized account, initialize if we didnt
-    await this.connector.initOnchainValues()
-
     // channel may not exist, we can still open it
     let c: ChannelEntry
     try {

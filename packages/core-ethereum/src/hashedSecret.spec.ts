@@ -1,47 +1,15 @@
-import assert from 'assert'
-import { durations, stringToU8a } from '@hoprnet/hopr-utils'
-import { Ganache } from '@hoprnet/hopr-testing'
-import { getContracts, migrate, fund } from '@hoprnet/hopr-ethereum'
-import HoprEthereum from '.'
-import { computeWinningProbability } from './utils'
-import { UnacknowledgedTicket, Ticket, Hash } from './types'
-import * as testconfigs from './config.spec'
-import { createNode } from './utils/testing'
-
-const FUND_ARGS = `--address ${getContracts().localhost.HoprToken.address} --accounts-to-fund 1`
+//import assert from 'assert'
 
 // TODO: replace legacy test
-describe('test hashedSecret', function () {
-  this.timeout(durations.minutes(10))
-  const ganache = new Ganache()
-  let connector: HoprEthereum
+describe('test commitment', function () {
 
-  // instead of using a half-assed mock we use the connector instance
-  // the whole test needs to be rewritten
-  async function generateConnector(debug?: boolean): Promise<HoprEthereum> {
-    const privKey = stringToU8a(testconfigs.DEMO_ACCOUNTS[0])
-    return createNode(privKey, debug, 0)
-  }
+
+  it('constructor', function(){})
 
   describe('random pre-image', function () {
-    this.timeout(durations.minutes(2))
-
-    before(async function () {
-      this.timeout(durations.minutes(1))
-      await ganache.start()
-      await migrate()
-      await fund(FUND_ARGS)
-
-      connector = await generateConnector()
-    })
-
-    after(async function () {
-      await connector.stop()
-      await ganache.stop()
-    })
 
     it('should publish a hashed secret', async function () {
-      await connector.hashedSecret.initialize()
+      /*
 
       let onChainHash = new Hash(
         stringToU8a((await connector.hoprChannels.accounts(connector.account.getAddress().toHex())).secret)
@@ -67,27 +35,13 @@ describe('test hashedSecret', function () {
       assert(!preImage.eq(updatedPreImage), `new and old pre-image must not be the same`)
 
       assert(updatedPreImage.hash().eq(updatedOnChainHash))
+      */
     })
   })
 
   describe('deterministic debug pre-image', function () {
-    this.timeout(durations.minutes(2))
-
-    before(async function () {
-      this.timeout(durations.minutes(1))
-      await ganache.start()
-      await migrate()
-      await fund(FUND_ARGS)
-
-      connector = await generateConnector(true)
-    })
-
-    after(async function () {
-      await connector.stop()
-      await ganache.stop()
-    })
-
     it('should publish a hashed secret', async function () {
+      /*
       await connector.hashedSecret.initialize()
 
       let onChainHash = new Hash(
@@ -151,6 +105,7 @@ describe('test hashedSecret', function () {
       const ack4 = await connector.account.acknowledge(ut1, response1)
       assert(ack4, 'ticket with 100% winning probability must always be a win')
       assert(ack4.preImage != null && !ack4.preImage.eq(ack2.preImage) && ack4.preImage.hash().eq(ack2.preImage))
+      */
     })
   })
 })
