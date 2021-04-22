@@ -23,6 +23,7 @@ describe('header', function () {
       Uint8Array.from(testMsg), // clone testMsg
       path,
       maxHops,
+      0,
       Array.from({ length: AMOUNT }, (_) => new Uint8Array()),
       new Uint8Array()
     )
@@ -66,6 +67,7 @@ describe('header', function () {
       Uint8Array.from(testMsg), // clone testMsg
       path,
       maxHops,
+      0,
       Array.from({ length: AMOUNT }, (_) => new Uint8Array()),
       new Uint8Array()
     )

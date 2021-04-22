@@ -23,19 +23,20 @@ export function createRoutingInfo(
   maxHops: number,
   path: PeerId[],
   secrets: Uint8Array[],
+  additionalDataRelayerLength: number,
   additionalDataRelayer: Uint8Array[],
   additionalDataLastHop?: Uint8Array
 ): { routingInformation: Uint8Array; mac: Uint8Array } {
-  const routingInfoLength = additionalDataRelayer[0].length + MAC_LENGTH + SECP256K1.COMPRESSED_PUBLIC_KEY_LENGTH
-  const lastHopLength = (additionalDataLastHop?.length ?? 0) + END_PREFIX_LENGTH
-
   if (
     secrets.some((s) => s.length != SECRET_LENGTH) ||
-    additionalDataRelayer.slice(1)?.some((r) => r.length != additionalDataRelayer[0].length) ||
+    additionalDataRelayer.some((r) => r.length != additionalDataRelayerLength) ||
     secrets.length > maxHops
   ) {
     throw Error(`Invalid arguments`)
   }
+
+  const routingInfoLength = additionalDataRelayerLength + MAC_LENGTH + SECP256K1.COMPRESSED_PUBLIC_KEY_LENGTH
+  const lastHopLength = (additionalDataLastHop?.length ?? 0) + END_PREFIX_LENGTH
 
   const headerLength = lastHopLength + (maxHops - 1) * routingInfoLength
   const extendedHeaderLength = lastHopLength + maxHops * routingInfoLength
@@ -124,7 +125,7 @@ export function forwardTransform(
   additionalDataRelayerLength: number,
   additionalDataLastHopLength: number
 ): LastNodeOutput | RelayNodeOutput {
-  const routingInfoLength = additionalDataLastHopLength + SECP256K1.COMPRESSED_PUBLIC_KEY_LENGTH + MAC_LENGTH
+  const routingInfoLength = additionalDataRelayerLength + SECP256K1.COMPRESSED_PUBLIC_KEY_LENGTH + MAC_LENGTH
   const lastHopLength = additionalDataLastHopLength + END_PREFIX_LENGTH
 
   const headerLength = lastHopLength + (maxHops - 1) * routingInfoLength

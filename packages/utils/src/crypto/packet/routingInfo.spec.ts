@@ -18,6 +18,7 @@ describe('routing info generation and mutation', function () {
       maxHops,
       peerIds,
       secrets,
+      0,
       Array.from({ length: AMOUNT }, (_) => new Uint8Array()),
       new Uint8Array()
     )
@@ -58,6 +59,7 @@ describe('routing info generation and mutation', function () {
       maxHops,
       peerIds,
       secrets,
+      0,
       Array.from({ length: AMOUNT }, (_) => new Uint8Array()),
       new Uint8Array()
     )
@@ -97,6 +99,7 @@ describe('routing info generation and mutation', function () {
       maxHops,
       peerIds,
       secrets,
+      0,
       Array.from({ length: AMOUNT }, (_) => new Uint8Array()),
       new Uint8Array()
     )

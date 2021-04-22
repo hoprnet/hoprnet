@@ -68,6 +68,7 @@ export function createPacket(
   msg: Uint8Array,
   path: PeerId[],
   maxHops: number,
+  additionalDataRelayerLength: number,
   additionalDataRelayer: Uint8Array[],
   additionalDataLastHop?: Uint8Array
 ): Uint8Array {
@@ -81,6 +82,7 @@ export function createPacket(
     maxHops,
     path,
     secrets,
+    additionalDataRelayerLength,
     additionalDataRelayer,
     additionalDataLastHop
   )

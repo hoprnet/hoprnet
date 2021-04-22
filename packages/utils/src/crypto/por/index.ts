@@ -17,12 +17,12 @@ export { deriveAckKeyShare }
  * @returns the challenge for the first ticket sent to the first relayer
  */
 export function createFirstChallenge(secrets: Uint8Array[]): { ackChallenge: Uint8Array; ticketChallenge: Uint8Array } {
-  if (secrets.length < 2 || secrets.some((secret) => secret.length != SECRET_LENGTH)) {
+  if (secrets.some((secret) => secret.length != SECRET_LENGTH)) {
     throw Error(`Invalid arguments`)
   }
 
   const s0 = deriveOwnKeyShare(secrets[0])
-  const s1 = deriveAckKeyShare(secrets[1])
+  const s1 = deriveAckKeyShare(secrets.length < 2 ? randomBytes(SECRET_LENGTH) : secrets[1])
 
   const ackChallenge = publicKeyCreate(deriveAckKeyShare(secrets[0]))
   const ticketChallenge = createChallenge(s0, s1)
