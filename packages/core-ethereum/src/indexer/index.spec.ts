@@ -76,19 +76,12 @@ describe('test indexer', function () {
   context('intergration tests', function () {
     it('should not store channel before confirmations', async function () {
       this.timeout(durations.seconds(5))
-
-      const uncompressedPubKeyB = publicKeyConvert(userB.serialize(), false).slice(1)
-
-      await connector.hoprChannels
-        .connect(userBWallet)
-        .initializeAccount(u8aToHex(uncompressedPubKeyB), u8aToHex(randomBytes(Hash.SIZE)))
-
       await hoprToken
         .connect(userAWallet)
         .send(
           hoprChannels.address,
           1,
-          abiCoder.encode(['bool', 'address', 'address'], [true, userA.toAddress().toHex(), userB.toAddress().toHex()])
+          abiCoder.encode(['address', 'address'], [userA.toAddress().toHex(), userB.toAddress().toHex()])
         )
 
       const channels = await connector.indexer.getChannels()

@@ -39,7 +39,7 @@ const components = [
   { name: 'channelStatus', SIZE: 2, deserialize: u8aToChannelStatus },
   UINT256,
   UINT256,
-  { name: 'closureByPartyA', SIZE: 1, deserialize: Boolean }
+  { name: 'closureByPartyA', SIZE: 1, deserialize: (x) => x[0] == 1 }
 ]
 
 class ChannelEntry {
