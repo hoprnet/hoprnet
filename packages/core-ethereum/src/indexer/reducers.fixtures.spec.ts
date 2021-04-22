@@ -1,6 +1,6 @@
 import type { Event } from './types'
 import BN from 'bn.js'
-import { BigNumber } from 'ethers'
+import { BigNumber, constants } from 'ethers'
 import { stringToU8a } from '@hoprnet/hopr-utils'
 import { Address, PublicKey, ChannelEntry, AccountEntry, Hash } from '../types'
 
@@ -135,7 +135,7 @@ export const CLOSED_EVENT = {
   }
 } as Event<'ChannelClosed'>
 
-export const EMPTY_ACCOUNT = new AccountEntry(new Address(new Uint8Array()))
+export const EMPTY_ACCOUNT = new AccountEntry(Address.fromString(constants.AddressZero))
 
 export const INITIALIZED_ACCOUNT = new AccountEntry(partyA, partyAPubKey, secret1, new BN(1))
 

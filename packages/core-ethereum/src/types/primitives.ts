@@ -6,8 +6,65 @@ import BN from 'bn.js'
 import { publicKeyConvert, publicKeyCreate, ecdsaSign, ecdsaVerify } from 'secp256k1'
 import { serializeToU8a, u8aSplit, u8aToNumber } from '@hoprnet/hopr-utils'
 
+export class PublicKey {
+  constructor(private arr: Uint8Array) {
+    if (arr.length !== PublicKey.SIZE) {
+      throw new Error('Incorrect size Uint8Array for compressed public key')
+    }
+  }
+
+  static fromPrivKey(privKey: Uint8Array): PublicKey {
+    if (privKey.length !== 32) {
+      throw new Error('Incorrect size Uint8Array for private key')
+    }
+
+    return new PublicKey(publicKeyCreate(privKey, true))
+  }
+
+  static fromUncompressedPubKey(arr: Uint8Array) {
+    if (arr.length !== 65) {
+      throw new Error('Incorrect size Uint8Array for uncompressed public key')
+    }
+
+    return new PublicKey(publicKeyConvert(arr, true))
+  }
+
+  toAddress(): Address {
+    return new Address(Hash.create(publicKeyConvert(this.arr, false).slice(1)).serialize().slice(12))
+  }
+
+  toUncompressedPubKeyHex(): string {
+    // Needed in only a few cases for interacting with secp256k1
+    return u8aToHex(publicKeyConvert(this.arr, false).slice(1))
+  }
+
+  static fromString(str: string): PublicKey {
+    return new PublicKey(stringToU8a(str))
+  }
+
+  static get SIZE(): number {
+    return 33
+  }
+
+  serialize() {
+    return this.arr
+  }
+
+  toHex(): string {
+    return u8aToHex(this.arr)
+  }
+
+  eq(b: PublicKey) {
+    return u8aEquals(this.arr, b.serialize())
+  }
+}
+
 export class Address {
-  constructor(private arr: Uint8Array) {}
+  constructor(private arr: Uint8Array) {
+    if (arr.length !== Address.SIZE) {
+      throw new Error('Incorrect size Uint8Array for address')
+    }
+  }
 
   static get SIZE(): number {
     return ADDRESS_LENGTH
@@ -43,37 +100,12 @@ export class Address {
   }
 }
 
-export class Balance {
-  constructor(private bn: BN) {}
-
-  static get SYMBOL(): string {
-    return `HOPR`
-  }
-
-  static get DECIMALS(): number {
-    return 18
-  }
-
-  public toBN(): BN {
-    return this.bn
-  }
-
-  public serialize(): Uint8Array {
-    return new Uint8Array(this.bn.toBuffer('be', Balance.SIZE))
-  }
-
-  public toFormattedString(): string {
-    return moveDecimalPoint(this.bn.toString(), Balance.DECIMALS * -1) + ' ' + Balance.SYMBOL
-  }
-
-  static get SIZE(): number {
-    // Uint256
-    return 32
-  }
-}
-
 export class Hash {
-  constructor(private arr: Uint8Array) {}
+  constructor(private arr: Uint8Array) {
+    if (arr.length !== Hash.SIZE) {
+      throw new Error('Incorrect size Uint8Array for hash')
+    }
+  }
 
   static SIZE = HASH_LENGTH
 
@@ -105,89 +137,6 @@ export class Hash {
     // Sometimes we double hash.
     return Hash.create(this.serialize())
   }
-
-  get length() {
-    return this.arr.length
-  }
-}
-
-export class NativeBalance {
-  constructor(private bn: BN) {}
-
-  static get SYMBOL(): string {
-    return `xDAI`
-  }
-
-  static get DECIMALS(): number {
-    return 18
-  }
-
-  public toBN(): BN {
-    return this.bn
-  }
-
-  public serialize(): Uint8Array {
-    return new Uint8Array(this.bn.toBuffer('be', NativeBalance.SIZE))
-  }
-
-  public toFormattedString(): string {
-    return moveDecimalPoint(this.bn.toString(), NativeBalance.DECIMALS * -1) + ' ' + NativeBalance.SYMBOL
-  }
-
-  static get SIZE(): number {
-    // Uint256
-    return 32
-  }
-}
-
-export class PublicKey {
-  constructor(private arr: Uint8Array) {
-    if (arr.length !== PublicKey.SIZE) {
-      throw new Error('Incorrect size Uint8Array for compressed public key')
-    }
-    // TODO check length
-  }
-
-  static fromPrivKey(privKey: Uint8Array): PublicKey {
-    if (privKey.length !== 32) {
-      throw new Error('Incorrect size Uint8Array for private key')
-    }
-    let arr = publicKeyCreate(privKey, true)
-    return new PublicKey(arr)
-  }
-
-  static fromUncompressedPubKey(uncompressedPubKey: Uint8Array) {
-    return new PublicKey(publicKeyConvert(uncompressedPubKey, true))
-  }
-
-  toAddress(): Address {
-    return new Address(Hash.create(publicKeyConvert(this.arr, false).slice(1)).serialize().slice(12))
-  }
-
-  toUncompressedPubKeyHex(): string {
-    // Needed in only a few cases for interacting with secp256k1
-    return u8aToHex(publicKeyConvert(this.arr, false).slice(1))
-  }
-
-  static fromString(str: string): PublicKey {
-    return new PublicKey(stringToU8a(str))
-  }
-
-  static get SIZE(): number {
-    return 33
-  }
-
-  serialize() {
-    return this.arr
-  }
-
-  toHex(): string {
-    return u8aToHex(this.arr)
-  }
-
-  eq(b: PublicKey) {
-    return u8aEquals(this.arr, b.serialize())
-  }
 }
 
 export class Signature {
@@ -215,4 +164,70 @@ export class Signature {
   }
 
   static SIZE = SIGNATURE_LENGTH + SIGNATURE_RECOVERY_LENGTH
+}
+
+export class Balance {
+  constructor(private bn: BN) {}
+
+  static get SYMBOL(): string {
+    return `HOPR`
+  }
+
+  static deserialize(arr: Uint8Array) {
+    return new Balance(new BN(arr))
+  }
+
+  static get DECIMALS(): number {
+    return 18
+  }
+
+  public toBN(): BN {
+    return this.bn
+  }
+
+  public serialize(): Uint8Array {
+    return new Uint8Array(this.bn.toBuffer('be', Balance.SIZE))
+  }
+
+  public toFormattedString(): string {
+    return moveDecimalPoint(this.bn.toString(), Balance.DECIMALS * -1) + ' ' + Balance.SYMBOL
+  }
+
+  static get SIZE(): number {
+    // Uint256
+    return 32
+  }
+}
+
+export class NativeBalance {
+  constructor(private bn: BN) {}
+
+  static get SYMBOL(): string {
+    return `xDAI`
+  }
+
+  static get DECIMALS(): number {
+    return 18
+  }
+
+  static deserialize(arr: Uint8Array) {
+    return new NativeBalance(new BN(arr))
+  }
+
+  public toBN(): BN {
+    return this.bn
+  }
+
+  public serialize(): Uint8Array {
+    return new Uint8Array(this.bn.toBuffer('be', NativeBalance.SIZE))
+  }
+
+  public toFormattedString(): string {
+    return moveDecimalPoint(this.bn.toString(), NativeBalance.DECIMALS * -1) + ' ' + NativeBalance.SYMBOL
+  }
+
+  static get SIZE(): number {
+    // Uint256
+    return 32
+  }
 }
