@@ -43,7 +43,7 @@ describe('acknowledement message', function () {
           Acknowledgement.create(randomBytes(Challenge.SIZE) as any, key, counterparty).serialize(),
           self,
           counterparty
-        ) != null
+        )
     )
   })
 })

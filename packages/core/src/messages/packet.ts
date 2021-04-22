@@ -18,6 +18,7 @@ import { publicKeyCreate } from 'secp256k1'
 import BN from 'bn.js'
 import { LevelUp } from 'levelup'
 import { checkPacketTag } from '../dbKeys'
+import { Acknowledgement } from './acknowledgement'
 
 export const MAX_HOPS = 3
 
@@ -44,8 +45,9 @@ export class Packet {
     return this
   }
 
-  private setFinal(plaintext: Uint8Array, packetTag: Uint8Array) {
+  private setFinal(plaintext: Uint8Array, packetTag: Uint8Array, ownKey: Uint8Array) {
     this.packetTag = packetTag
+    this.ownKey = ownKey
     this.isReceiver = true
     this.isReadyToForward = false
     this.plaintext = plaintext
@@ -74,7 +76,16 @@ export class Packet {
     return this
   }
 
-  static async create(msg: Uint8Array, path: PeerId[], privKey: PeerId, chain: HoprCoreEthereum): Promise<Packet> {
+  static async create(
+    msg: Uint8Array,
+    path: PeerId[],
+    privKey: PeerId,
+    chain: HoprCoreEthereum,
+    ticketOpts: {
+      value: Balance
+      winProb: number
+    }
+  ): Promise<Packet> {
     const { alpha, secrets } = generateKeyShares(path)
 
     const { ackChallenge, ticketChallenge } = createFirstChallenge(secrets)
@@ -94,7 +105,7 @@ export class Packet {
 
     const channel = new chain.channel(chain, self, nextPeer)
 
-    const ticket = await channel.createTicket(new Balance(new BN(0)), new PublicKey(ticketChallenge), 1)
+    const ticket = await channel.createTicket(ticketOpts.value, new PublicKey(ticketChallenge), ticketOpts.winProb)
 
     return new Packet(packet, challenge, ticket).setReadyToForward()
   }
@@ -127,7 +138,6 @@ export class Packet {
 
     const transformedOutput = forwardTransform(privKey, packet, POR_STRING_LENGTH, 0, MAX_HOPS)
 
-    transformedOutput.packetTag
     const ackKey = deriveAckKeyShare(transformedOutput.derivedSecret)
 
     const challenge = Challenge.deserialize(preChallenge, publicKeyCreate(ackKey), pubKeySender)
@@ -135,7 +145,11 @@ export class Packet {
     const ticket = Ticket.deserialize(preTicket)
 
     if (transformedOutput.lastNode == true) {
-      return new Packet(packet, challenge, ticket).setFinal(transformedOutput.plaintext, transformedOutput.packetTag)
+      return new Packet(packet, challenge, ticket).setFinal(
+        transformedOutput.plaintext,
+        transformedOutput.packetTag,
+        transformedOutput.derivedSecret
+      )
     }
 
     const verificationOutput = preVerify(
@@ -164,6 +178,14 @@ export class Packet {
     if (!tagValid) {
       throw Error(`General error.`)
     }
+  }
+
+  createAcknowledgement(privKey: PeerId) {
+    if (this.ownKey == undefined) {
+      throw Error(`Invalid state`)
+    }
+
+    return Acknowledgement.create(this.challenge, this.ownKey, privKey)
   }
 
   async forwardTransform(privKey: PeerId, chain: HoprCoreEthereum): Promise<void> {

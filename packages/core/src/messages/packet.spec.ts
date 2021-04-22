@@ -39,7 +39,10 @@ describe('packet creation and transformation', function () {
 
     const testMsg = new TextEncoder().encode('test')
 
-    let packet = await Packet.create(testMsg, path, self, chain as any)
+    let packet = await Packet.create(testMsg, path, self, chain as any, {
+      value: new Balance(new BN(0)),
+      winProb: 1
+    })
 
     for (const [index, node] of path.entries()) {
       packet = Packet.deserialize(packet.serialize(), node, index == 0 ? self : path[index - 1])
@@ -71,7 +74,10 @@ describe('packet creation and transformation', function () {
 
     const testMsg = new TextEncoder().encode('test')
 
-    let packet = await Packet.create(testMsg, path, self, chain as any)
+    let packet = await Packet.create(testMsg, path, self, chain as any, {
+      value: new Balance(new BN(0)),
+      winProb: 1
+    })
 
     for (const [index, node] of path.entries()) {
       packet = Packet.deserialize(packet.serialize(), node, index == 0 ? self : path[index - 1])
@@ -103,7 +109,10 @@ describe('packet creation and transformation', function () {
 
     const testMsg = new TextEncoder().encode('test')
 
-    let packet = await Packet.create(testMsg, path, self, chain as any)
+    let packet = await Packet.create(testMsg, path, self, chain as any, {
+      value: new Balance(new BN(0)),
+      winProb: 1
+    })
 
     for (const [index, node] of path.entries()) {
       packet = Packet.deserialize(packet.serialize(), node, index == 0 ? self : path[index - 1])
@@ -135,7 +144,10 @@ describe('packet creation and transformation', function () {
 
     const testMsg = new TextEncoder().encode('test')
 
-    const packet = await Packet.create(testMsg, path, self, chain as any)
+    const packet = await Packet.create(testMsg, path, self, chain as any, {
+      value: new Balance(new BN(0)),
+      winProb: 1
+    })
 
     const transformedPacket = Packet.deserialize(packet.serialize(), path[0], self)
 
