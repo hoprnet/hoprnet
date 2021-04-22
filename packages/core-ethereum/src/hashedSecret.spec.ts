@@ -11,7 +11,7 @@ describe('test commitment', function () {
   describe('random pre-image', function () {
     let fakeSet, fakeGet, fakeDB, fakeId
 
-    beforeEach(async function(){
+    beforeEach(async function () {
       fakeSet = sinon.fake()
       fakeGet = sinon.fake()
       fakeDB = new LevelUp(MemDown())
