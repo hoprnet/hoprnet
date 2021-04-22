@@ -11,7 +11,7 @@ import { pubKeyToPeerId, randomChoice } from '@hoprnet/hopr-utils'
 import { Address, ChannelEntry, Hash, PublicKey, Balance, Snapshot } from '../types'
 import * as reducers from './reducers'
 import * as db from './db'
-import { isConfirmedBlock, isSyncing, snapshotComparator } from './utils'
+import { isConfirmedBlock, snapshotComparator } from './utils'
 import Debug from 'debug'
 import { Channel } from '..'
 
@@ -51,9 +51,6 @@ class Indexer extends EventEmitter {
   public async start(): Promise<void> {
     if (this.status === 'started') return
     log(`Starting indexer...`)
-
-    // wipe indexer, do not use in production
-    // await this.wipe()
 
     const [latestSavedBlock, latestOnChainBlock] = await Promise.all([
       db.getLatestBlockNumber(this.api.db),
@@ -124,18 +121,6 @@ class Indexer extends EventEmitter {
     log(chalk.green('Indexer stopped!'))
   }
 
-  /**
-   * @returns returns true if it's syncing
-   */
-  public async isSyncing(): Promise<boolean> {
-    const [onChainBlock, lastKnownBlock] = await Promise.all([
-      this.api.provider.getBlockNumber(),
-      db.getLatestBlockNumber(this.api.db)
-    ])
-
-    return isSyncing(onChainBlock, lastKnownBlock)
-  }
-
   private async restart(): Promise<void> {
     if (this.status === 'restarting') return
     log('Indexer restaring')
@@ -151,23 +136,6 @@ class Indexer extends EventEmitter {
       log(chalk.red('Failed to restart: %s', err.message))
     }
   }
-
-  // /**
-  //  * Wipes all indexer related stored data in the DB.
-  //  * @deprecated do not use this in production
-  //  */
-  // private async wipe(): Promise<void> {
-  //   await this.api.db.batch(
-  //     (await getChannelEntries(this.api.db)).map(({ partyA, partyB }) => ({
-  //       type: 'del',
-  //       key: Buffer.from(this.api.dbKeys.ChannelEntry(partyA, partyB))
-  //     }))
-  //   )
-  //   await this.api.db.del(Buffer.from(this.api.dbKeys.LatestConfirmedSnapshot()))
-  //   await this.api.db.del(Buffer.from(this.api.dbKeys.LatestBlockNumber()))
-
-  //   log('wiped indexer data')
-  // }
 
   /**
    * Query past events, this will loop until it gets all blocks from {toBlock} to {fromBlock}.

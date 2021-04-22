@@ -70,7 +70,7 @@ const useFixtures = (ops: { latestBlockNumber?: number; pastEvents?: Event<any>[
   }
 }
 
-describe.only('test indexer', function () {
+describe('test indexer', function () {
   it('should start indexer', async function () {
     const { indexer } = useFixtures()
 
@@ -167,5 +167,35 @@ describe.only('test indexer', function () {
     const channelsOfPartyB = await indexer.getChannelsOf(fixtures.partyB.toAddress())
     assert.strictEqual(channelsOfPartyB.length, 1)
     expectChannelsToBeEqual(channelsOfPartyB[0], fixtures.OPENED_CHANNEL)
+  })
+
+  it('should handle provider error by restarting', async function () {
+    const { indexer, provider } = useFixtures({
+      latestBlockNumber: 4,
+      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.FUNDED_EVENT, fixtures.OPENED_EVENT]
+    })
+
+    await indexer.start()
+
+    provider.emit('error', new Error('MOCK'))
+
+    setImmediate(async () => {
+      assert.strictEqual(indexer.status, 'restarting')
+    })
+  })
+
+  it('should contract error by restarting', async function () {
+    const { indexer, hoprChannels } = useFixtures({
+      latestBlockNumber: 4,
+      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.FUNDED_EVENT, fixtures.OPENED_EVENT]
+    })
+
+    await indexer.start()
+
+    hoprChannels.emit('error', new Error('MOCK'))
+
+    setImmediate(async () => {
+      assert.strictEqual(indexer.status, 'restarting')
+    })
   })
 })
