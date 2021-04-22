@@ -15,7 +15,7 @@ describe('test ticket construction', function () {
   })
 
   it('should create new ticket', async function () {
-    const challenge = new Hash(new Uint8Array(Hash.SIZE))
+    const challenge = new PublicKey(new Uint8Array(Hash.SIZE))
     const epoch = UINT256.fromString('1')
     const amount = new Balance(new BN(1))
     const winProb = computeWinningProbability(1)
@@ -32,9 +32,9 @@ describe('test ticket construction', function () {
   })
 
   it('should generate the hash correctly #1', async function () {
-    const expectedHash = new Hash(stringToU8a('0x4d5137ffaad9d5eb8d3cd6252fd8e7fc9b04d24e7f3cedf88d21f569d5a57c86'))
+    const expectedHash = new Hash(stringToU8a('0xb3739c3614045c81352c6a42e11eb7287c657fb4f9a0099f401f5a04ee383f1a'))
     const counterparty = new Address(stringToU8a('0xb3aa2138de698597e2e3f84f60ef415d13731b6f'))
-    const challenge = new Hash(stringToU8a('0x12047ebc6ea03568f4c81b75a4cd827785fe97206d9b22fd5364a9db1f50e234'))
+    const challenge = new PublicKey(stringToU8a('0x03c2aa76d6837c51337001c8b5a60473726064fc35d0a40b8f0e1f068cc8e38e10'))
     const epoch = UINT256.fromString('1')
     const amount = new Balance(new BN('0000000002c68af0bb140000', 16))
     const winProb = new Hash(stringToU8a('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'))
@@ -59,9 +59,9 @@ describe('test ticket construction', function () {
   })
 
   it('should generate the hash correctly #2', async function () {
-    const expectedHash = new Hash(stringToU8a('0x163a9e28a7c44ab41a6488d8041554404bcc3ff694945886c868c1aecb26e719'))
+    const expectedHash = new Hash(stringToU8a('0x2876159da8c14d8a6551767643f4f6a39814aed87bfe5f41700e57139cc302c9'))
     const counterparty = new Address(stringToU8a('0x32c160a5008e517ce06df4f7d4a39ffc52e049cf'))
-    const challenge = new Hash(stringToU8a('0x91e787e6eef8cb5ddd0815e0f7f91dbe34d2a7bb2e99357039649baf61684c96'))
+    const challenge = new PublicKey(stringToU8a('0x03025fcceb8f338198b866e8bb3621f4cbba8cdcd77b72d95328a296049e9e1230'))
     const epoch = UINT256.fromString('2')
     const amount = new Balance(new BN('000000000de0b6b3a7640000', 16))
     const winProb = new Hash(stringToU8a('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'))
@@ -96,7 +96,7 @@ describe('test signedTicket construction', async function () {
   it('should create new signedTicket using struct', async function () {
     const ticket = Ticket.create(
       userB,
-      new Hash(randomBytes(32)),
+      new PublicKey(randomBytes(33)),
       UINT256.fromString('0'),
       new Balance(new BN(15)),
       new Hash(new Uint8Array(new BN(new Uint8Array(Hash.SIZE).fill(0xff)).div(WIN_PROB).toArray('le', Hash.SIZE))),

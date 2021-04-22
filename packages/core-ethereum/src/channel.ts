@@ -5,7 +5,7 @@ import {
   getId,
   waitForConfirmation,
   computeWinningProbability,
-  checkChallenge,
+  //checkChallenge,
   isWinningTicket,
   getSignatureParameters
 } from './utils'
@@ -152,8 +152,8 @@ class Channel {
     }
   }
 
-  async createTicket(amount: Balance, challenge: Hash, winProb: number) {
-    const counterpartyAddress = await this.counterparty.toAddress()
+  async createTicket(amount: Balance, challenge: PublicKey, winProb: number) {
+    const counterpartyAddress = this.counterparty.toAddress()
     const counterpartyState = await this.connector.indexer.getAccount(counterpartyAddress)
     return Ticket.create(
       counterpartyAddress,
@@ -166,10 +166,10 @@ class Channel {
     )
   }
 
-  async createDummyTicket(challenge: Hash): Promise<Ticket> {
+  createDummyTicket(challenge: PublicKey): Ticket {
     // TODO: document how dummy ticket works
     return Ticket.create(
-      await this.counterparty.toAddress(),
+      this.counterparty.toAddress(),
       challenge,
       UINT256.fromString('0'),
       new Balance(new BN(0)),
@@ -197,14 +197,15 @@ class Channel {
         }
       }
 
-      const validChallenge = await checkChallenge(ticket.challenge, ackTicket.response)
-      if (!validChallenge) {
-        log(`Failed to submit ticket ${ackTicket.response.toHex()}: 'Invalid challenge.'`)
-        return {
-          status: 'FAILURE',
-          message: 'Invalid challenge.'
-        }
-      }
+      // @TODO: replace this with better check
+      // const validChallenge = await checkChallenge(ticket.challenge, ackTicket.response)
+      // if (!validChallenge) {
+      //   log(`Failed to submit ticket ${ackTicket.response.toHex()}: 'Invalid challenge.'`)
+      //   return {
+      //     status: 'FAILURE',
+      //     message: 'Invalid challenge.'
+      //   }
+      // }
 
       const isWinning = await isWinningTicket(ticket.getHash(), ackTicket.response, ackTicket.preImage, ticket.winProb)
       if (!isWinning) {

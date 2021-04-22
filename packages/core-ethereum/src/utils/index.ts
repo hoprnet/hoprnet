@@ -13,7 +13,7 @@ import {
   durations,
   u8aToNumber
 } from '@hoprnet/hopr-utils'
-import { Address, Balance, Hash, Signature } from '../types'
+import { Address, Balance, Hash, PublicKey, Signature } from '../types'
 import { ContractEventEmitter } from '../tsc/web3/types'
 import * as constants from '../constants'
 import * as time from './time'
@@ -174,7 +174,7 @@ export function getWinProbabilityAsFloat(winProb: Hash): number {
  * @param challenge challenge for which we search a preImage
  * @param response response to verify
  */
-export async function checkChallenge(challenge: Hash, response: Hash) {
+export function checkChallenge(challenge: Hash, response: Hash) {
   return challenge.eq(response.hash())
 }
 
@@ -384,8 +384,9 @@ export function getSignatureParameters(
  * @param secretB
  * @returns a promise that resolves to a hash
  */
-export async function createChallenge(secretA: Uint8Array, secretB: Uint8Array): Promise<Hash> {
-  return Hash.create(u8aConcat(secretA, secretB)).hash()
+export function createChallenge(_secretA: Uint8Array, _secretB: Uint8Array): PublicKey {
+  // @TODO
+  return new PublicKey(new Uint8Array(PublicKey.SIZE))
 }
 
 /**

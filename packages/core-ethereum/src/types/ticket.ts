@@ -21,7 +21,7 @@ function serializeUnsigned({
   channelIteration
 }: {
   counterparty: Address
-  challenge: Hash
+  challenge: PublicKey
   epoch: UINT256
   amount: Balance
   winProb: Hash
@@ -30,7 +30,7 @@ function serializeUnsigned({
   // the order of the items needs to be the same as the one used in the SC
   return serializeToU8a([
     [counterparty.serialize(), Address.SIZE],
-    [challenge.serialize(), Hash.SIZE],
+    [challenge.serialize(), PublicKey.SIZE],
     [epoch.serialize(), UINT256.SIZE],
     [amount.serialize(), Balance.SIZE],
     [winProb.serialize(), Hash.SIZE],
@@ -41,7 +41,7 @@ function serializeUnsigned({
 class Ticket {
   constructor(
     readonly counterparty: Address,
-    readonly challenge: Hash,
+    readonly challenge: PublicKey,
     readonly epoch: UINT256,
     readonly amount: Balance,
     readonly winProb: Hash,
@@ -51,7 +51,7 @@ class Ticket {
 
   static create(
     counterparty: Address,
-    challenge: Hash,
+    challenge: PublicKey,
     epoch: UINT256,
     amount: Balance,
     winProb: Hash,
@@ -77,13 +77,13 @@ class Ticket {
 
   public serialize(): Uint8Array {
     const unsigned = serializeUnsigned({ ...this })
-    return u8aConcat(serializeToU8a([[this.signature.serialize(), Signature.SIZE]]), unsigned)
+    return Uint8Array.from([...unsigned, ...this.signature.serialize()])
   }
 
   static deserialize(arr: Uint8Array): Ticket {
     const components = u8aSplit(arr, [
       Address.SIZE,
-      Hash.SIZE,
+      PublicKey.SIZE,
       UINT256.SIZE,
       Balance.SIZE,
       Hash.SIZE,
@@ -92,12 +92,13 @@ class Ticket {
     ])
 
     const counterparty = new Address(components[0])
-    const challenge = new Hash(components[1])
+    console.log(`challenge when deserializign`, u8aToHex(components[1]))
+    const challenge = new PublicKey(components[1])
     const epoch = new UINT256(new BN(components[2]))
     const amount = new Balance(new BN(components[3]))
     const winProb = new Hash(components[4])
-    const channelIteration = new UINT256(new BN(components[4]))
-    const signature = Signature.deserialize(components[5])
+    const channelIteration = new UINT256(new BN(components[5]))
+    const signature = Signature.deserialize(components[6])
     return new Ticket(counterparty, challenge, epoch, amount, winProb, channelIteration, signature)
   }
 
@@ -106,7 +107,7 @@ class Ticket {
   }
 
   static get SIZE(): number {
-    return Address.SIZE + Hash.SIZE + UINT256.SIZE + UINT256.SIZE + Hash.SIZE + UINT256.SIZE + Signature.SIZE
+    return Address.SIZE + PublicKey.SIZE + UINT256.SIZE + UINT256.SIZE + Hash.SIZE + UINT256.SIZE + Signature.SIZE
   }
 
   getEmbeddedFunds(): Balance {
@@ -122,7 +123,7 @@ class Ticket {
     return new PublicKey(ecdsaRecover(this.signature.signature, this.signature.recovery, this.getHash().serialize()))
   }
 
-  async verify(pubKey: PublicKey): Promise<boolean> {
+  verify(pubKey: PublicKey): boolean {
     return ecdsaVerify(this.signature.signature, this.getHash().serialize(), pubKey.serialize())
   }
 }
