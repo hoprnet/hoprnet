@@ -1,30 +1,28 @@
-import type { TransactionConfig } from 'web3-core'
-import type HoprEthereum from '.'
-import type { TransactionObject } from './tsc/web3/types'
-import type { HoprToken } from './tsc/web3/HoprToken'
-import Web3 from 'web3'
-import { durations, u8aToHex, isExpired, u8aConcat } from '@hoprnet/hopr-utils'
-import NonceTracker from './nonce-tracker'
+import type { Wallet as IWallet, ContractTransaction } from 'ethers'
+import type { Networks } from '@hoprnet/hopr-ethereum'
+import BN from 'bn.js'
+import { ethers, errors } from 'ethers'
+import { durations, isExpired, u8aConcat } from '@hoprnet/hopr-utils'
+import NonceTracker, { NonceLock } from './nonce-tracker'
 import TransactionManager from './transaction-manager'
 import {
+  PublicKey,
   Address,
   Acknowledgement,
   Balance,
   Hash,
-  UnacknowledgedTicket,
   NativeBalance,
   UINT256,
-  PublicKey
+  UnacknowledgedTicket,
+  AccountEntry
 } from './types'
-import { isWinningTicket, isGanache, getNetworkGasPrice } from './utils'
-import { WEB3_CACHE_TTL } from './constants'
-import * as ethereum from './ethereum'
-import BN from 'bn.js'
+import { isWinningTicket, getNetworkGasPrice } from './utils'
+import { PROVIDER_CACHE_TTL } from './constants'
 
 import debug from 'debug'
 const log = debug('hopr-core-ethereum:account')
 
-export const EMPTY_HASHED_SECRET = new Hash(new Uint8Array(Hash.SIZE).fill(0x00))
+export const EMPTY_HASHED_SECRET = new Hash(ethers.utils.arrayify(ethers.constants.HashZero))
 const cache = new Map<'balance' | 'nativeBalance', { value: string; updatedAt: number }>()
 
 class Account {
@@ -33,51 +31,35 @@ class Account {
   private _transactions = new TransactionManager()
   private preimage: Hash
 
-  public keys: {
-    onChain: {
-      privKey: Uint8Array
-      pubKey: PublicKey
-    }
-    offChain: {
-      privKey: Uint8Array
-      pubKey: PublicKey
-    }
-  }
-
-  constructor(public coreConnector: HoprEthereum, privKey: Uint8Array, pubKey: PublicKey, private chainId: number) {
-    this.keys = {
-      onChain: {
-        privKey,
-        pubKey
+  constructor(
+    private ops: {
+      network: Networks
+    },
+    private api: {
+      getLatestBlockNumber: () => Promise<number>
+      getTransactionCount: (address: Address, blockNumber?: number) => Promise<number>
+      getBalance: (address: Address) => Promise<Balance>
+      getNativeBalance: (address: Address) => Promise<NativeBalance>
+      getAccount: (address: Address) => Promise<AccountEntry>
+      findPreImage: (hash: Hash) => Promise<Hash>
+    },
+    public wallet: IWallet
+  ) {
+    this._nonceTracker = new NonceTracker(
+      {
+        minPending: durations.minutes(15)
       },
-      offChain: {
-        privKey,
-        pubKey
+      {
+        getLatestBlockNumber: this.api.getLatestBlockNumber,
+        getTransactionCount: this.api.getTransactionCount,
+        getConfirmedTransactions: () => Array.from(this._transactions.confirmed.values()),
+        getPendingTransactions: () => Array.from(this._transactions.pending.values())
       }
-    }
-
-    this._nonceTracker = new NonceTracker({
-      getLatestBlockNumber: async () => {
-        // when running our unit/intergration tests using ganache,
-        // the indexer doesn't have enough time to pick up the events and reduce the data
-        return isGanache(coreConnector.network)
-          ? coreConnector.web3.eth.getBlockNumber()
-          : coreConnector.indexer.latestBlock
-      },
-      getTransactionCount: async (address: string, blockNumber?: number) =>
-        coreConnector.web3.eth.getTransactionCount(address, blockNumber),
-      getConfirmedTransactions: () => Array.from(this._transactions.confirmed.values()),
-      getPendingTransactions: () => Array.from(this._transactions.pending.values()),
-      minPending: durations.minutes(15)
-    })
+    )
   }
 
-  /**
-   * @deprecated Nonces are automatically assigned when signing a transaction
-   * @return next nonce
-   */
-  get nonce(): Promise<number> {
-    return this._nonceTracker.getNonceLock(this.address.toHex()).then((res) => res.nonceDetails.params.highestSuggested)
+  public async getNonceLock(): Promise<NonceLock> {
+    return this._nonceTracker.getNonceLock(this.address)
   }
 
   /**
@@ -85,7 +67,7 @@ class Account {
    * @returns HOPR balance
    */
   public async getBalance(useCache: boolean = false): Promise<Balance> {
-    return getBalance(this.coreConnector.hoprToken, this.address, useCache)
+    return getBalance(this.api.getBalance, this.address, useCache)
   }
 
   /**
@@ -93,11 +75,11 @@ class Account {
    * @returns ETH balance
    */
   public async getNativeBalance(useCache: boolean = false): Promise<NativeBalance> {
-    return getNativeBalance(this.coreConnector.web3, this.address, useCache)
+    return getNativeBalance(this.api.getNativeBalance, this.address, useCache)
   }
 
   async getTicketEpoch(): Promise<UINT256> {
-    const state = await this.coreConnector.indexer.getAccount(this.address)
+    const state = await this.api.getAccount(this.address)
     if (!state || !state.counter) return UINT256.fromString('0')
     return new UINT256(state.counter)
   }
@@ -107,7 +89,7 @@ class Account {
    */
   async getOnChainSecret(): Promise<Hash | undefined> {
     if (this._onChainSecret && !this._onChainSecret.eq(EMPTY_HASHED_SECRET)) return this._onChainSecret
-    const state = await this.coreConnector.indexer.getAccount(this.address)
+    const state = await this.api.getAccount(this.address)
     if (!state || !state.secret) return undefined
     this.updateLocalState(state.secret)
     return state.secret
@@ -119,7 +101,7 @@ class Account {
       if (!ocs) {
         throw new Error('cannot reserve preimage when there is no on chain secret')
       }
-      this.preimage = await this.coreConnector.hashedSecret.findPreImage(ocs)
+      this.preimage = await this.api.findPreImage(ocs)
     }
   }
 
@@ -136,103 +118,98 @@ class Account {
     const ticket = unacknowledgedTicket.ticket
     if (await isWinningTicket(ticket.getHash(), response, this.preimage, ticket.winProb)) {
       const ack = new Acknowledgement(ticket, response, this.preimage)
-      this.preimage = await this.coreConnector.hashedSecret.findPreImage(this.preimage)
+      this.preimage = await this.api.findPreImage(this.preimage)
       return ack
     } else {
       return null
     }
   }
 
+  get privateKey(): Uint8Array {
+    return ethers.utils.arrayify(this.wallet.privateKey)
+  }
+
+  get publicKey(): PublicKey {
+    // convert to a compressed public key
+    return PublicKey.fromString(ethers.utils.computePublicKey(this.wallet.publicKey, true))
+  }
+
   get address(): Address {
-    return this.keys.onChain.pubKey.toAddress()
+    return Address.fromString(this.wallet.address)
   }
 
   updateLocalState(onChainSecret: Hash) {
     this._onChainSecret = onChainSecret
   }
 
-  // @TODO: switch to web3js-accounts
-  public async signTransaction<T>(
-    // config put in .send
-    txConfig: Omit<TransactionConfig, 'nonce'>,
-    // return of our contract method in web3.Contract instance
-    txObject?: TransactionObject<T>
-  ) {
-    const { web3, network } = this.coreConnector
+  public async sendTransaction<T extends (...args: any) => Promise<ContractTransaction>>(
+    method: T,
+    ...rest: Parameters<T>
+  ): Promise<ContractTransaction> {
+    const gasLimit = 300e3
+    const gasPrice = getNetworkGasPrice(this.ops.network)
+    const nonceLock = await this._nonceTracker.getNonceLock(this.address)
+    const nonce = nonceLock.nextNonce
+    let transaction: ContractTransaction
 
-    const abi = txObject ? txObject.encodeABI() : undefined
-    const gas = 300e3
-
-    // if it returns undefined, let web3 pick gas price
-    const gasPrice = getNetworkGasPrice(network)
-
-    // @TODO: potential deadlock, needs to be improved
-    const nonceLock = await this._nonceTracker.getNonceLock(this.address.toHex())
-
-    // @TODO: provide some of the values to avoid multiple calls
-    const options = {
-      gas,
+    log('Sending transaction %o', {
+      gasLimit,
       gasPrice,
-      ...txConfig,
-      chainId: this.chainId,
-      nonce: nonceLock.nextNonce,
-      data: abi
+      nonce
+    })
+
+    try {
+      // send transaction to our ethereum provider
+      // TODO: better type this, make it less hacky
+      transaction = await method(
+        ...[
+          ...rest,
+          {
+            gasLimit,
+            gasPrice,
+            nonce
+          }
+        ]
+      )
+    } catch (error) {
+      log('Transaction with nonce %d failed to sent: %s', nonce, error)
+      nonceLock.releaseLock()
+      throw Error('Could not send transaction')
     }
 
-    const signedTransaction = await web3.eth.accounts.signTransaction(options, u8aToHex(this.keys.onChain.privKey))
+    log('Transaction with nonce %d successfully sent %s, waiting for confimation', nonce, transaction.hash)
+    this._transactions.addToPending(transaction.hash, { nonce })
+    nonceLock.releaseLock()
 
-    const send = () => {
-      if (signedTransaction.rawTransaction == null) {
-        throw Error('Cannot process transaction because Web3.js did not give us the raw transaction.')
-      }
-
-      log('Sending transaction %o', {
-        gas: options.gas,
-        gasPrice:
-          typeof options.gasPrice === 'string' && options.gasPrice.startsWith('0x')
-            ? Web3.utils.hexToNumber(options.gasPrice)
-            : options.gasPrice,
-        nonce: options.nonce,
-        hash: signedTransaction.transactionHash
+    // monitor transaction, this is done asynchronously
+    transaction
+      .wait()
+      .then(() => {
+        log('Transaction with nonce %d and hash %s confirmed', nonce, transaction.hash)
+        this._transactions.moveToConfirmed(transaction.hash)
       })
+      .catch((error) => {
+        const reverted = ([errors.CALL_EXCEPTION] as string[]).includes(error)
 
-      const event = web3.eth.sendSignedTransaction(signedTransaction.rawTransaction)
-      this._transactions.addToPending(signedTransaction.transactionHash, { nonce: options.nonce })
-      nonceLock.releaseLock()
+        if (reverted) {
+          log('Transaction with nonce %d and hash %s reverted: %s', nonce, transaction.hash, error)
 
-      // @TODO: cleanup old txs
-      event.once('receipt', () => {
-        this._transactions.moveToConfirmed(signedTransaction.transactionHash)
-      })
-      event.once('error', (error) => {
-        const receipt = error['receipt']
-
-        // same tx was submitted twice
-        if (error.message.includes('already known')) return
-
-        log(
-          'Transaction failed %s %i with error %s',
-          signedTransaction.transactionHash,
-          options.nonce,
-          error.message,
-          receipt ? receipt : 'no receipt'
-        )
-
-        // mean tx was confirmed & reverted
-        if (receipt) {
-          this._transactions.moveToConfirmed(signedTransaction.transactionHash)
+          // this transaction failed but was confirmed as reverted
+          this._transactions.moveToConfirmed(transaction.hash)
         } else {
-          this._transactions.remove(signedTransaction.transactionHash)
+          log('Transaction with nonce %d failed to sent: %s', nonce, error)
+
+          const alreadyKnown = ([errors.NONCE_EXPIRED, errors.REPLACEMENT_UNDERPRICED] as string[]).includes(error)
+          // if this hash is already known and we already have it included in
+          // pending we can safely ignore this
+          if (alreadyKnown && this._transactions.pending.has(transaction.hash)) return
+
+          // this transaction was not confirmed so we just remove it
+          this._transactions.remove(transaction.hash)
         }
       })
 
-      return event
-    }
-
-    return {
-      send,
-      transactionHash: signedTransaction.transactionHash
-    }
+    return transaction
   }
 }
 
@@ -242,17 +219,17 @@ class Account {
  * @returns HOPR balance
  */
 export const getBalance = async (
-  hoprToken: HoprToken,
+  getBalance: (account: Address) => Promise<Balance>,
   account: Address,
   useCache: boolean = false
 ): Promise<Balance> => {
   if (useCache) {
     const cached = cache.get('balance')
-    const notExpired = cached && !isExpired(cached.updatedAt, new Date().getTime(), WEB3_CACHE_TTL)
+    const notExpired = cached && !isExpired(cached.updatedAt, new Date().getTime(), PROVIDER_CACHE_TTL)
     if (notExpired) return new Balance(new BN(cached.value))
   }
 
-  const value = await ethereum.getBalance(hoprToken, account)
+  const value = await getBalance(account)
   cache.set('balance', { value: value.toBN().toString(), updatedAt: new Date().getTime() })
 
   return value
@@ -263,17 +240,17 @@ export const getBalance = async (
  * @returns ETH balance
  */
 export const getNativeBalance = async (
-  web3: Web3,
+  getNativeBalance: (account: Address) => Promise<NativeBalance>,
   account: Address,
   useCache: boolean = false
 ): Promise<NativeBalance> => {
   if (useCache) {
     const cached = cache.get('nativeBalance')
-    const notExpired = cached && !isExpired(cached.updatedAt, new Date().getTime(), WEB3_CACHE_TTL)
+    const notExpired = cached && !isExpired(cached.updatedAt, new Date().getTime(), PROVIDER_CACHE_TTL)
     if (notExpired) return new NativeBalance(new BN(cached.value))
   }
 
-  const value = await ethereum.getNativeBalance(web3, account)
+  const value = await getNativeBalance(account)
   cache.set('nativeBalance', { value: value.toBN().toString(), updatedAt: new Date().getTime() })
 
   return value

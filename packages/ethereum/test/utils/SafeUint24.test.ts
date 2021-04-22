@@ -1,4 +1,4 @@
-import type { PromiseValue } from '../utils'
+import type { PromiseValue } from '@hoprnet/hopr-utils'
 import { deployments, ethers } from 'hardhat'
 import { expect } from 'chai'
 import { SafeUint24Mock__factory } from '../../types'

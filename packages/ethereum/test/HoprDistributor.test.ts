@@ -1,7 +1,7 @@
 import { expect } from 'chai'
 import { deployments, ethers } from 'hardhat'
-import { durations } from '@hoprnet/hopr-utils'
-import { PromiseValue, toSolPercent, increaseTime } from './utils'
+import { PromiseValue, durations } from '@hoprnet/hopr-utils'
+import { toSolPercent, increaseTime } from './utils'
 import { HoprToken__factory, HoprDistributor__factory } from '../types'
 import deployERC1820Registry from '../deploy/01_ERC1820Registry'
 

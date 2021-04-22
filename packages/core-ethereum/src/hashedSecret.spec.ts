@@ -1,13 +1,14 @@
 import assert from 'assert'
 import { durations, stringToU8a } from '@hoprnet/hopr-utils'
 import { Ganache } from '@hoprnet/hopr-testing'
-import { getAddresses, migrate, fund } from '@hoprnet/hopr-ethereum'
+import { getContracts, migrate, fund } from '@hoprnet/hopr-ethereum'
 import HoprEthereum from '.'
-import { waitForConfirmation, computeWinningProbability } from './utils'
+import { computeWinningProbability } from './utils'
 import { UnacknowledgedTicket, Ticket, Hash } from './types'
 import * as testconfigs from './config.spec'
-import { createNode } from './utils/testing.spec'
-const FUND_ARGS = `--address ${getAddresses()?.localhost?.HoprToken} --accounts-to-fund 1`
+import { createNode } from './utils/testing'
+
+const FUND_ARGS = `--address ${getContracts().localhost.HoprToken.address} --accounts-to-fund 1`
 
 // TODO: replace legacy test
 describe('test hashedSecret', function () {
@@ -43,7 +44,7 @@ describe('test hashedSecret', function () {
       await connector.hashedSecret.initialize()
 
       let onChainHash = new Hash(
-        stringToU8a((await connector.hoprChannels.methods.accounts(connector.account.address.toHex()).call()).secret)
+        stringToU8a((await connector.hoprChannels.accounts(connector.account.address.toHex())).secret)
       )
 
       let preImage = await connector.hashedSecret.findPreImage(onChainHash)
@@ -51,19 +52,12 @@ describe('test hashedSecret', function () {
       assert(preImage)
       assert(preImage.hash().eq(onChainHash))
 
-      await waitForConfirmation(
-        (
-          await connector.account.signTransaction(
-            {
-              from: connector.account.address.toHex(),
-              to: connector.hoprChannels.options.address
-            },
-            connector.hoprChannels.methods.updateAccountSecret(preImage.toHex())
-          )
-        ).send()
-      )
+      await (
+        await connector.account.sendTransaction(connector.hoprChannels.updateAccountSecret, preImage.toHex())
+      ).wait()
+
       let updatedOnChainHash = new Hash(
-        stringToU8a((await connector.hoprChannels.methods.accounts(connector.account.address.toHex()).call()).secret)
+        stringToU8a((await connector.hoprChannels.accounts(connector.account.address.toHex())).secret)
       )
 
       assert(!onChainHash.eq(updatedOnChainHash), `new and old onChainSecret must not be the same`)
@@ -97,26 +91,19 @@ describe('test hashedSecret', function () {
       await connector.hashedSecret.initialize()
 
       let onChainHash = new Hash(
-        stringToU8a((await connector.hoprChannels.methods.accounts(connector.account.address.toHex()).call()).secret)
+        stringToU8a((await connector.hoprChannels.accounts(connector.account.address.toHex())).secret)
       )
 
       let preImage = await connector.hashedSecret.findPreImage(onChainHash)
 
       assert(preImage.hash().eq(onChainHash))
-      await waitForConfirmation(
-        (
-          await connector.account.signTransaction(
-            {
-              from: connector.account.address.toHex(),
-              to: connector.hoprChannels.options.address
-            },
-            connector.hoprChannels.methods.updateAccountSecret(preImage.toHex())
-          )
-        ).send()
-      )
+
+      await (
+        await connector.account.sendTransaction(connector.hoprChannels.updateAccountSecret, preImage.toHex())
+      ).wait()
 
       let updatedOnChainHash = new Hash(
-        stringToU8a((await connector.hoprChannels.methods.accounts(connector.account.address.toHex()).call()).secret)
+        stringToU8a((await connector.hoprChannels.accounts(connector.account.address.toHex())).secret)
       )
 
       assert(!onChainHash.eq(updatedOnChainHash), `new and old onChainSecret must not be the same`)
