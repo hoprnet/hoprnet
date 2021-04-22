@@ -45,43 +45,6 @@ export const generateTickets = async () => {
   )
 
   /**
-   * Winning ticket created by accountA for accountB.
-   * Compared to TICKET_AB_WIN it has different proof of secret,
-   * this effectively makes it a different ticket that can be
-   * redeemed.
-   */
-  const TICKET_AB_WIN_2 = await createTicket(
-    {
-      recipient: ACCOUNT_B.address,
-      proofOfRelaySecret: PROOF_OF_RELAY_SECRET_1,
-      ticketEpoch: '0',
-      ticketIndex: '1',
-      amount: '10',
-      winProb: WIN_PROB_100,
-      channelEpoch: '1'
-    },
-    ACCOUNT_A,
-    SECRET_0
-  )
-
-  /**
-   * Losing ticket created by accountA for accountB
-   */
-  const TICKET_AB_LOSS = await createTicket(
-    {
-      recipient: ACCOUNT_B.address,
-      proofOfRelaySecret: PROOF_OF_RELAY_SECRET_0,
-      ticketEpoch: '0',
-      ticketIndex: '1',
-      amount: '10',
-      winProb: WIN_PROB_0,
-      channelEpoch: '1'
-    },
-    ACCOUNT_A,
-    SECRET_1
-  )
-
-  /**
    * Winning ticket created by accountB for accountA
    */
   const TICKET_BA_WIN = await createTicket(
@@ -118,44 +81,11 @@ export const generateTickets = async () => {
     SECRET_0
   )
 
-  // Recycled
-
-  const TICKET_AB_WIN_RECYCLED = await createTicket(
-    {
-      recipient: ACCOUNT_B.address,
-      proofOfRelaySecret: PROOF_OF_RELAY_SECRET_0,
-      ticketIndex: '1',
-      ticketEpoch: '0',
-      amount: '10',
-      winProb: WIN_PROB_100,
-      channelEpoch: '2'
-    },
-    ACCOUNT_A,
-    SECRET_1
-  )
-
-  const TICKET_BA_WIN_RECYCLED = await createTicket(
-    {
-      recipient: ACCOUNT_A.address,
-      proofOfRelaySecret: PROOF_OF_RELAY_SECRET_0,
-      ticketIndex: '1',
-      ticketEpoch: '2',
-      amount: '10',
-      winProb: WIN_PROB_100,
-      channelEpoch: '2'
-    },
-    ACCOUNT_B,
-    SECRET_1
-  )
 
   return {
     TICKET_AB_WIN,
-    TICKET_AB_WIN_2,
-    TICKET_AB_LOSS,
     TICKET_BA_WIN,
-    TICKET_BA_WIN_2,
-    TICKET_AB_WIN_RECYCLED,
-    TICKET_BA_WIN_RECYCLED
+    TICKET_BA_WIN_2
   }
 }
 
@@ -385,20 +315,24 @@ describe('with a funded HoprChannel (A: 70, B: 30), secrets initialized', functi
   })
 
   it("should fail to redeem ticket if it's a loss", async function () {
-    const TICKET_AB_LOSS = fixtures.fixtureTickets.TICKET_AB_LOSS
+    const TICKET_AB_LOSS = await createTicket(
+      {
+        recipient: ACCOUNT_B.address,
+        proofOfRelaySecret: PROOF_OF_RELAY_SECRET_0,
+        ticketEpoch: '0',
+        ticketIndex: '1',
+        amount: '10',
+        winProb: WIN_PROB_0,
+        channelEpoch: '1'
+      },
+      ACCOUNT_A,
+      SECRET_1
+    )
     await expect(
       channels
         .connect(fixtures.accountB)
-        .redeemTicket(
-          TICKET_AB_LOSS.counterparty,
-          TICKET_AB_LOSS.nextCommitment,
-          TICKET_AB_LOSS.ticketEpoch,
-          TICKET_AB_LOSS.ticketIndex,
-          TICKET_AB_LOSS.proofOfRelaySecret,
-          TICKET_AB_LOSS.amount,
-          TICKET_AB_LOSS.winProb,
-          TICKET_AB_LOSS.signature
-        )
+        //@ts-ignore
+        .redeemTicket(...redeemArgs(TICKET_AB_LOSS))
     ).to.be.revertedWith('ticket must be a win')
   })
 
@@ -520,7 +454,7 @@ describe('with a closed channel', function () {
 })
 
 describe('with a reopened channel', function () {
-  let channels, fixtures
+  let channels, fixtures, TICKET_AB_WIN_RECYCLED, TICKET_BA_WIN_RECYCLED
   beforeEach(async function () {
     fixtures = await useFixtures()
     channels = fixtures.channels
@@ -533,6 +467,32 @@ describe('with a reopened channel', function () {
     await channels.connect(fixtures.accountA).finalizeChannelClosure(ACCOUNT_B.address)
     await fixtures.fundAndApprove(fixtures.accountA, 100)
     await channels.connect(fixtures.accountA).fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
+    TICKET_AB_WIN_RECYCLED = await createTicket(
+      {
+        recipient: ACCOUNT_B.address,
+        proofOfRelaySecret: PROOF_OF_RELAY_SECRET_0,
+        ticketIndex: '1',
+        ticketEpoch: '0',
+        amount: '10',
+        winProb: WIN_PROB_100,
+        channelEpoch: '2'
+      },
+      ACCOUNT_A,
+      SECRET_1
+    )
+    TICKET_BA_WIN_RECYCLED = await createTicket(
+      {
+        recipient: ACCOUNT_A.address,
+        proofOfRelaySecret: PROOF_OF_RELAY_SECRET_0,
+        ticketIndex: '1',
+        ticketEpoch: '2',
+        amount: '10',
+        winProb: WIN_PROB_100,
+        channelEpoch: '2'
+      },
+      ACCOUNT_B,
+      SECRET_1
+    )
   })
 
   it('should fail to redeem ticket when channel in in different channelEpoch', async function () {
@@ -548,7 +508,7 @@ describe('with a reopened channel', function () {
     await channels
       .connect(fixtures.accountA)
       //@ts-ignore
-      .redeemTicket(...redeemArgs(fixtures.fixtureTickets.TICKET_BA_WIN_RECYCLED))
+      .redeemTicket(...redeemArgs(TICKET_BA_WIN_RECYCLED))
 
     const channel = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
     validateChannel(channel, {
@@ -565,7 +525,7 @@ describe('with a reopened channel', function () {
     await channels
       .connect(fixtures.accountB)
       //@ts-ignore
-      .redeemTicket(...redeemArgs(fixtures.fixtureTickets.TICKET_AB_WIN_RECYCLED))
+      .redeemTicket(...redeemArgs(TICKET_AB_WIN_RECYCLED))
 
     const channel = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
     validateChannel(channel, {

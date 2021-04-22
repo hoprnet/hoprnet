@@ -2,7 +2,7 @@ import type Connector from '.'
 import { ethers } from 'ethers'
 import BN from 'bn.js'
 import { PublicKey, Address, Balance, Hash, UINT256, Ticket, Acknowledgement, ChannelEntry } from './types'
-import { computeWinningProbability, checkChallenge, isWinningTicket, getSignatureParameters } from './utils'
+import { computeWinningProbability, checkChallenge, isWinningTicket } from './utils'
 import Debug from 'debug'
 import type { SubmitTicketResponse } from '.'
 
@@ -210,7 +210,6 @@ class Channel {
 
       log('Submitting ticket', ackTicket.response.toHex())
       const { hoprChannels, account } = this.connector
-      const { r, s, v } = getSignatureParameters(ticket.signature)
 
       const emptyPreImage = new Hash(new Uint8Array(Hash.SIZE).fill(0x00))
       const hasPreImage = !ackTicket.preImage.eq(emptyPreImage)
@@ -250,9 +249,7 @@ class Channel {
         ackTicket.response.toHex(),
         ticket.amount.toBN().toString(),
         ticket.winProb.toHex(),
-        r.toHex(),
-        s.toHex(),
-        v + 27
+        ticket.signature.serialize()
       )
       await transaction.wait()
       // TODO delete ackTicket
