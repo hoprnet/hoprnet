@@ -171,7 +171,6 @@ const useFixtures = deployments.createFixture(async () => {
 })
 
 describe('funding HoprChannel catches failures', async function () {
-  // TODO fund single, fund by send
   let fixtures, channels, accountA
   before(async function () {
     // All of these tests revert, so we can rely on stateless single fixture.
@@ -207,7 +206,7 @@ describe('funding HoprChannel catches failures', async function () {
 })
 
 describe('funding a HoprChannel success', function () {
-  // TODO test single fund, events
+  // TODO events
   it('should multi fund and open channel A->B', async function () {
     const { channels, accountA, fundAndApprove } = await useFixtures()
     await fundAndApprove(accountA, 100)
