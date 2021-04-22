@@ -120,31 +120,33 @@ export const generateTickets = async () => {
 
   // Recycled
 
-  const TICKET_AB_WIN_RECYCLED = await createTicket({
-          recipient: ACCOUNT_B.address,
-          proofOfRelaySecret: PROOF_OF_RELAY_SECRET_0,
-          ticketIndex: '1',
-          ticketEpoch: '0',
-          amount: '10',
-          winProb: WIN_PROB_100,
-          channelEpoch: '2'
-        },
-        ACCOUNT_A,
-        SECRET_1
-      )
+  const TICKET_AB_WIN_RECYCLED = await createTicket(
+    {
+      recipient: ACCOUNT_B.address,
+      proofOfRelaySecret: PROOF_OF_RELAY_SECRET_0,
+      ticketIndex: '1',
+      ticketEpoch: '0',
+      amount: '10',
+      winProb: WIN_PROB_100,
+      channelEpoch: '2'
+    },
+    ACCOUNT_A,
+    SECRET_1
+  )
 
-  const TICKET_BA_WIN_RECYCLED = await createTicket({
-          recipient: ACCOUNT_A.address,
-          proofOfRelaySecret: PROOF_OF_RELAY_SECRET_0,
-          ticketIndex: '1',
-          ticketEpoch: '2',
-          amount: '10',
-          winProb: WIN_PROB_100,
-          channelEpoch: '2'
-        },
-        ACCOUNT_B,
-        SECRET_1
-      )
+  const TICKET_BA_WIN_RECYCLED = await createTicket(
+    {
+      recipient: ACCOUNT_A.address,
+      proofOfRelaySecret: PROOF_OF_RELAY_SECRET_0,
+      ticketIndex: '1',
+      ticketEpoch: '2',
+      amount: '10',
+      winProb: WIN_PROB_100,
+      channelEpoch: '2'
+    },
+    ACCOUNT_B,
+    SECRET_1
+  )
 
   return {
     TICKET_AB_WIN,
@@ -267,7 +269,14 @@ describe('funding a HoprChannel success', function () {
     await expect(
       token
         .connect(accountB)
-        .send(channels.address, '30', abiEncoder.encode(['address', 'address', 'uint256', 'uint256'], [ACCOUNT_B.address, ACCOUNT_A.address, '30', '0']))
+        .send(
+          channels.address,
+          '30',
+          abiEncoder.encode(
+            ['address', 'address', 'uint256', 'uint256'],
+            [ACCOUNT_B.address, ACCOUNT_A.address, '30', '0']
+          )
+        )
     ).to.emit(channels, 'ChannelUpdate')
     validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), {
       partyABalance: '0',
@@ -498,7 +507,7 @@ describe('with a closed channel', function () {
     ).to.be.revertedWith('channel must be open or pending to close')
   })
 
-  it('should allow a fund to reopen channel', async function(){
+  it('should allow a fund to reopen channel', async function () {
     await fixtures.fundAndApprove(fixtures.accountA, 100)
     await channels.connect(fixtures.accountA).fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
     validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), {
@@ -528,9 +537,10 @@ describe('with a reopened channel', function () {
 
   it('should fail to redeem ticket when channel in in different channelEpoch', async function () {
     await expect(
-      channels.connect(fixtures.accountB)
-      //@ts-ignore
-      .redeemTicket(...redeemArgs(fixtures.fixtureTickets.TICKET_AB_WIN))
+      channels
+        .connect(fixtures.accountB)
+        //@ts-ignore
+        .redeemTicket(...redeemArgs(fixtures.fixtureTickets.TICKET_AB_WIN))
     ).to.be.revertedWith('signer must match the counterparty')
   })
 
