@@ -30,7 +30,7 @@
     "libp2p-crypto": "0.19.3",
     "multiaddr": "8.1.2",
     "multihashes": "~4.0.1",
-    "peer-id": "0.14.7",
+    "peer-id": "0.14.8",
     "strip-ansi": "^6.0.0"
   },
   "devDependencies": {

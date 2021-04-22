@@ -11027,10 +11027,10 @@ pbkdf2@^3.0.17, pbkdf2@^3.0.3, pbkdf2@^3.0.9:
     safe-buffer "^5.0.1"
     sha.js "^2.4.8"
 
-peer-id@0, peer-id@0.14.7, peer-id@^0.14.2, peer-id@^0.14.3, peer-id@~0.14.3:
-  version "0.14.7"
-  resolved "https://registry.yarnpkg.com/peer-id/-/peer-id-0.14.7.tgz#9e94ccd52a41280b36b27fe9da580950aa4c5d48"
-  integrity sha512-qtqBdJVoL6/alIzNPGFj4ewJVkKhueMElqMOs6VDzwXVTEDGyXP4iGHaplUvqA9/zJ1B7m84fOkoi0h+K+GhOg==
+peer-id@0, peer-id@0.14.8, peer-id@^0.14.2, peer-id@^0.14.3, peer-id@~0.14.3:
+  version "0.14.8"
+  resolved "https://registry.yarnpkg.com/peer-id/-/peer-id-0.14.8.tgz#667c6bedc8ab313c81376f6aca0baa2140266fab"
+  integrity sha512-GpuLpob/9FrEFvyZrKKsISEkaBYsON2u0WtiawLHj1ii6ewkoeRiSDFLyIefYhw0jGvQoeoZS05jaT52X7Bvig==
   dependencies:
     cids "^1.1.5"
     class-is "^1.1.0"
