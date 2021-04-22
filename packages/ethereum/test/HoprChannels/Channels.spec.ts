@@ -3,6 +3,7 @@ import { expect } from 'chai'
 import { HoprToken__factory, ChannelsMock__factory, HoprChannels__factory } from '../../types'
 import { redeemArgs, validateChannel } from './utils'
 import { percentToUint256, createTicket } from './utils'
+import { increaseTime } from '../utils'
 import { ACCOUNT_A, ACCOUNT_B } from '../constants'
 
 const { solidityKeccak256 } = ethers.utils
@@ -387,9 +388,9 @@ describe('with a funded HoprChannel (A: 70, B: 30), secrets initialized', functi
 })
 
 describe('With a pending_to_close HoprChannel (A:70, B:30)', function () {
-  let channels, token
+  let channels, token, fixtures
   beforeEach(async function () {
-    const fixtures = await useFixtures()
+    fixtures = await useFixtures()
     channels = fixtures.channels
     token = fixtures.token
     await fixtures.fundAndApprove(fixtures.accountA, 100)
@@ -398,13 +399,14 @@ describe('With a pending_to_close HoprChannel (A:70, B:30)', function () {
   })
 
   it('should fail to initialize channel closure when channel is not open', async function () {
-    await expect(channels.connect(ACCOUNT_A.address).initiateChannelClosure(ACCOUNT_B.address)).to.be.revertedWith(
+    await expect(channels.connect(fixtures.accountA).initiateChannelClosure(ACCOUNT_B.address)).to.be.revertedWith(
       'channel must be open'
     )
   })
 
   it('should finalize channel closure', async function () {
-    await expect(channels.connect(ACCOUNT_A.address).finalizeChannelClosure(ACCOUNT_B.address)).to.emit(
+    await increaseTime(ethers.provider, 1000)
+    await expect(channels.connect(fixtures.accountA).finalizeChannelClosure(ACCOUNT_B.address)).to.emit(
       channels,
       'ChannelUpdate'
     )
