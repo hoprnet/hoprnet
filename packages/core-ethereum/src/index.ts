@@ -172,7 +172,7 @@ export default class HoprEthereum {
   }
 
   public async hexAccountAddress(): Promise<string> {
-    return this.account.address.toHex()
+    return this.account.getAddress().toHex()
   }
 
   public smartContractInfo(): string {

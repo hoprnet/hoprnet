@@ -59,7 +59,7 @@ class Account {
   }
 
   public async getNonceLock(): Promise<NonceLock> {
-    return this._nonceTracker.getNonceLock(this.address)
+    return this._nonceTracker.getNonceLock(this.getAddress())
   }
 
   /**
@@ -67,7 +67,7 @@ class Account {
    * @returns HOPR balance
    */
   public async getBalance(useCache: boolean = false): Promise<Balance> {
-    return getBalance(this.api.getBalance, this.address, useCache)
+    return getBalance(this.api.getBalance, this.getAddress(), useCache)
   }
 
   /**
@@ -75,11 +75,11 @@ class Account {
    * @returns ETH balance
    */
   public async getNativeBalance(useCache: boolean = false): Promise<NativeBalance> {
-    return getNativeBalance(this.api.getNativeBalance, this.address, useCache)
+    return getNativeBalance(this.api.getNativeBalance, this.getAddress(), useCache)
   }
 
   async getTicketEpoch(): Promise<UINT256> {
-    const state = await this.api.getAccount(this.address)
+    const state = await this.api.getAccount(this.getAddress())
     if (!state || !state.counter) return UINT256.fromString('0')
     return new UINT256(state.counter)
   }
@@ -89,7 +89,7 @@ class Account {
    */
   async getOnChainSecret(): Promise<Hash | undefined> {
     if (this._onChainSecret && !this._onChainSecret.eq(EMPTY_HASHED_SECRET)) return this._onChainSecret
-    const state = await this.api.getAccount(this.address)
+    const state = await this.api.getAccount(this.getAddress())
     if (!state || !state.secret) return undefined
     this.updateLocalState(state.secret)
     return state.secret
@@ -134,7 +134,7 @@ class Account {
     return PublicKey.fromString(ethers.utils.computePublicKey(this.wallet.publicKey, true))
   }
 
-  get address(): Address {
+  getAddress(): Address {
     return Address.fromString(this.wallet.address)
   }
 
@@ -148,7 +148,7 @@ class Account {
   ): Promise<ContractTransaction> {
     const gasLimit = 300e3
     const gasPrice = getNetworkGasPrice(this.ops.network)
-    const nonceLock = await this._nonceTracker.getNonceLock(this.address)
+    const nonceLock = await this._nonceTracker.getNonceLock(this.getAddress())
     const nonce = nonceLock.nextNonce
     let transaction: ContractTransaction
 

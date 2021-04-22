@@ -5,8 +5,6 @@ import { increaseTime } from '../utils'
 import { ACCOUNT_A, ACCOUNT_B } from '../constants'
 import { signMessage } from '../utils'
 
-const { solidityPack, solidityKeccak256 } = ethers.utils
-
 type Ticket = {
   recipient: string
   proofOfRelaySecret: string
@@ -17,24 +15,22 @@ type Ticket = {
   ticketEpoch: string
 }
 
-const percentToUint256 = (percent: number): string => {
-  return ethers.utils.hexZeroPad(ethers.utils.hexlify(ethers.constants.MaxUint256.mul(percent).div(100)), 32)
-}
+const percentToUint256 = (percent) => ethers.utils.hexZeroPad(ethers.utils.hexlify(ethers.constants.MaxUint256.mul(percent).div(100)), 32)
 
 const getEncodedTicket = (ticket: Ticket): string => {
-  const challenge = solidityKeccak256(['bytes32'], [ticket.proofOfRelaySecret])
-  return solidityPack(
+  const challenge = ethers.utils.solidityKeccak256(['bytes32'], [ticket.proofOfRelaySecret])
+  return ethers.utils.solidityPack(
     ['address', 'bytes32', 'uint256', 'uint256', 'bytes32', 'uint256'],
     [ticket.recipient, challenge, ticket.ticketEpoch, ticket.amount, ticket.winProb, ticket.channelEpoch]
   )
 }
 
 export const getTicketLuck = (ticket: Ticket, hash: string, secret: string): string => {
-  const encoded = solidityPack(
+  const encoded = ethers.utils.solidityPack(
     ['bytes32', 'bytes32', 'bytes32', 'bytes32'],
     [hash, secret, ticket.proofOfRelaySecret, ticket.winProb]
   )
-  return solidityKeccak256(['bytes'], [encoded])
+  return ethers.utils.solidityKeccak256(['bytes'], [encoded])
 }
 
 export const redeemArgs = (ticket) => [
@@ -73,8 +69,8 @@ export const createTicket = async (
   }
 > => {
   const encoded = getEncodedTicket(ticket)
-  const hashMessage = solidityKeccak256(['bytes'], [encoded])
-  const hash = solidityKeccak256(['string', 'bytes'], ['\x19Ethereum Signed Message:\n32', hashMessage])
+  const hashMessage = ethers.utils.solidityKeccak256(['bytes'], [encoded])
+  const hash = ethers.utils.solidityKeccak256(['string', 'bytes'], ['\x19Ethereum Signed Message:\n32', hashMessage])
   const luck = getTicketLuck(ticket, hash, nextCommitment)
   const { signature } = await signMessage(hashMessage, account.privateKey)
 
@@ -95,12 +91,12 @@ export const createTicket = async (
  */
 export const ACCOUNT_AB_CHANNEL_ID = '0xa5bc13ae60ec79a8babc6d0d4074c1cefd5d5fc19fafe71457214d46c90714d8'
 
-export const PROOF_OF_RELAY_SECRET_0 = solidityKeccak256(['string'], ['PROOF_OF_RELAY_SECRET_0'])
-export const PROOF_OF_RELAY_SECRET_1 = solidityKeccak256(['string'], ['PROOF_OF_RELAY_SECRET_1'])
+export const PROOF_OF_RELAY_SECRET_0 = ethers.utils.solidityKeccak256(['string'], ['PROOF_OF_RELAY_SECRET_0'])
+export const PROOF_OF_RELAY_SECRET_1 = ethers.utils.solidityKeccak256(['string'], ['PROOF_OF_RELAY_SECRET_1'])
 
-export const SECRET_0 = solidityKeccak256(['string'], ['secret'])
-export const SECRET_1 = solidityKeccak256(['bytes32'], [SECRET_0])
-export const SECRET_2 = solidityKeccak256(['bytes32'], [SECRET_1])
+export const SECRET_0 = ethers.utils.solidityKeccak256(['string'], ['secret'])
+export const SECRET_1 = ethers.utils.solidityKeccak256(['bytes32'], [SECRET_0])
+export const SECRET_2 = ethers.utils.solidityKeccak256(['bytes32'], [SECRET_1])
 
 export const WIN_PROB_100 = percentToUint256(100)
 export const WIN_PROB_0 = percentToUint256(0)
