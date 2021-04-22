@@ -26,11 +26,9 @@ describe('test commitment', function () {
     assert(c2, 'gives current commitment')
     assert(c2.hash().eq(c1))
 
-    // 
+    //
     let cm2 = new Commitment(fakeSet, fakeGet, fakeDB, fakeId)
     let c3 = await cm2.getCurrentCommitment()
-    assert(c2.eq(c3), "Repeated initializations should return the same")
-    
+    assert(c2.eq(c3), 'Repeated initializations should return the same')
   })
 })
-
