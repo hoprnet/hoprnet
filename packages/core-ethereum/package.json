@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-core-ethereum",
-  "version": "1.71.0-next.58",
+  "version": "1.71.0-next.64",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -27,8 +27,8 @@
     "!**/*.spec.js.map"
   ],
   "dependencies": {
-    "@hoprnet/hopr-ethereum": "1.71.0-next.58",
-    "@hoprnet/hopr-utils": "1.71.0-next.58",
+    "@hoprnet/hopr-ethereum": "1.71.0-next.64",
+    "@hoprnet/hopr-utils": "1.71.0-next.64",
     "async-mutex": "^0.3.0",
     "bn.js": "^5.1.2",
     "chalk": "^4.1.0",
@@ -52,7 +52,7 @@
     "chai": "^4.3.4",
     "chai-as-promised": "^7.1.1",
     "it-pipe": "^1.1.0",
-    "levelup": "^4.4.0",
+    "levelup": "^5.0.0",
     "memdown": "^6.0.0",
     "mocha": "^8.2.0",
     "rimraf": "^3.0.2",
