@@ -10,9 +10,9 @@ describe('ChannelEntry', function () {
 
     expect(channelEntry.partyA.toHex()).to.equal(EMPTY_ADDRESS.toHex())
     expect(channelEntry.partyB.toHex()).to.equal(EMPTY_ADDRESS.toHex())
-    expect(channelEntry.partyBBalance.toString()).to.equal('0')
-    expect(channelEntry.partyABalance.toString()).to.equal('0')
-    expect(channelEntry.closureTime.toString()).to.equal('0')
+    expect(channelEntry.partyBBalance.toBN().toString()).to.equal('0')
+    expect(channelEntry.partyABalance.toBN().toString()).to.equal('0')
+    expect(channelEntry.closureTime.toBN().toString()).to.equal('0')
     expect(channelEntry.closureByPartyA).to.be.false
   })
 })

@@ -11,7 +11,6 @@ import Indexer from './indexer'
 import { RoutingChannel } from './indexer'
 import * as utils from './utils'
 import Account from './account'
-import HashedSecret from './hashedSecret'
 import { getWinProbabilityAsFloat, computeWinningProbability } from './utils'
 import { HoprToken__factory, HoprChannels__factory } from './contracts'
 import BN from 'bn.js'
@@ -38,12 +37,10 @@ export default class HoprEthereum {
   private _status: 'dead' | 'alive' = 'dead'
   private _starting?: Promise<HoprEthereum>
   private _stopping?: Promise<void>
-  private _debug: boolean
 
   public channel = Channel
   public indexer: Indexer
   public account: Account
-  public hashedSecret: HashedSecret
 
   constructor(
     public db: LevelUp,
@@ -53,12 +50,10 @@ export default class HoprEthereum {
     public wallet: IWallet,
     public hoprChannels: HoprChannels,
     public hoprToken: HoprToken,
-    debug: boolean,
     genesisBlock: number,
     maxConfirmations: number,
     blockRange: number
   ) {
-    this._debug = debug
     this.indexer = new Indexer(this, genesisBlock, maxConfirmations, blockRange)
     this.account = new Account(
       {
@@ -72,12 +67,10 @@ export default class HoprEthereum {
           this.hoprToken.balanceOf(address.toHex()).then((res) => new Balance(new BN(res.toString()))),
         getNativeBalance: (address) =>
           this.provider.getBalance(address.toHex()).then((res) => new NativeBalance(new BN(res.toString()))),
-        getAccount: (address) => this.indexer.getAccount(address),
-        findPreImage: (hash) => this.hashedSecret.findPreImage(hash)
+        getAccount: (address) => this.indexer.getAccount(address)
       },
       this.wallet
     )
-    this.hashedSecret = new HashedSecret(this.db, this.account, this.hoprChannels)
   }
 
   readonly CHAIN_NAME = 'HOPR on Ethereum'
@@ -141,13 +134,6 @@ export default class HoprEthereum {
 
   get started() {
     return this._status === 'alive'
-  }
-
-  /**
-   * Initializes the on-chain values of our account.
-   */
-  public async initOnchainValues(): Promise<void> {
-    await this.hashedSecret.initialize(this._debug) // no-op if already initialized
   }
 
   async withdraw(currency: 'NATIVE' | 'HOPR', recipient: string, amount: string): Promise<string> {
@@ -232,7 +218,6 @@ export default class HoprEthereum {
       wallet,
       hoprChannels,
       hoprToken,
-      options?.debug || false,
       contracts?.HoprChannels?.deployedAt ?? 0,
       options.maxConfirmations ?? MAX_CONFIRMATIONS,
       INDEXER_BLOCK_RANGE

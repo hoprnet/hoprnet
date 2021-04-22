@@ -1,16 +1,18 @@
 import type Connector from '.'
 import { ethers } from 'ethers'
 import BN from 'bn.js'
-import { PublicKey, Address, Balance, Hash, UINT256, Ticket, Acknowledgement, ChannelEntry } from './types'
+import { PublicKey, Address, Balance, Hash, UINT256, Ticket, Acknowledgement, ChannelEntry, UnacknowledgedTicket } from './types'
 import { computeWinningProbability, checkChallenge, isWinningTicket } from './utils'
 import Debug from 'debug'
 import type { SubmitTicketResponse } from '.'
+import { Commitment } from './commitment'
 
 const log = Debug('hopr-core-ethereum:channel')
 const abiCoder = new ethers.utils.AbiCoder()
 
 class Channel {
   private index: number
+  private commitment: Commitment
 
   constructor(
     private readonly connector: Connector, // TODO: replace with ethereum global context?
@@ -18,12 +20,33 @@ class Channel {
     public readonly counterparty: PublicKey
   ) {
     this.index = 0 // TODO - bump channel epoch to make sure..
+    this.commitment = new Commitment()
   }
 
   static generateId(self: Address, counterparty: Address) {
     let parties = self.sortPair(counterparty)
     return Hash.create(Buffer.concat(parties.map((x) => x.serialize())))
   }
+
+  /**
+   * Reserve a preImage for the given ticket if it is a winning ticket.
+   * @param ticket the acknowledged ticket
+   */
+  async acknowledge(
+    unacknowledgedTicket: UnacknowledgedTicket,
+    acknowledgementHash: Hash
+  ): Promise<Acknowledgement | null> {
+    const response = Hash.create(unacknowledgedTicket.secretA.serialize(), acknowledgementHash.serialize())
+    const ticket = unacknowledgedTicket.ticket
+    if (await isWinningTicket(ticket.getHash(), response, this.commitment.getCurrentCommitment(), ticket.winProb)) {
+      const ack = new Acknowledgement(ticket, response, this.commitment.getCurrentCommitment())
+      await this.commitment.bumpCommitment()
+      return ack
+    } else {
+      return null
+    }
+  }
+
 
   getId() {
     return Channel.generateId(this.self.toAddress(), this.counterparty.toAddress())

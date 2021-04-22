@@ -73,11 +73,9 @@ describe('test Channel class', function () {
     await fundAccount(funderWallet, hoprToken, partyB.toAddress().toHex())
 
     partyAConnector = await createNode(arrayify(testconfigs.DEMO_ACCOUNTS[1]))
-    await partyAConnector.initOnchainValues()
     await partyAConnector.start()
 
     partyBConnector = await createNode(arrayify(testconfigs.DEMO_ACCOUNTS[2]))
-    await partyBConnector.initOnchainValues()
     await partyBConnector.start()
   })
 
@@ -93,6 +91,7 @@ describe('test Channel class', function () {
     })
 
     const partyAChannel = new Channel(partyAConnector, partyA, partyB)
+    const partyBChannel = new Channel(partyBConnector, partyB, partyA)
     await partyAChannel.open(new Balance(new BN(123)))
     await advanceBlock(provider)
     await advanceBlock(provider)
@@ -103,7 +102,7 @@ describe('test Channel class', function () {
       firstTicket.winProb
     )
     const unacknowledgedTicket = new UnacknowledgedTicket(signedTicket, firstTicket.secretA)
-    const firstAckedTicket = await partyBConnector.account.acknowledge(unacknowledgedTicket, firstTicket.secretB)
+    const firstAckedTicket = await partyBChannel.acknowledge(unacknowledgedTicket, firstTicket.secretB)
 
     assert(partyA.eq(signedTicket.getSigner()), `Check that signer is recoverable`)
 
@@ -112,8 +111,6 @@ describe('test Channel class', function () {
       partyAIndexerChannels[0].partyA.eq(partyA.toAddress()) && partyAIndexerChannels[0].partyB.eq(partyB.toAddress()),
       `Channel record should make it into the database and its db-key should lead to the Address of the counterparty.`
     )
-
-    const partyBChannel = new Channel(partyBConnector, partyB, partyA)
     assert((await partyAChannel.getState()).status === 'OPEN', `Checks that party A considers the channel open.`)
     assert((await partyBChannel.getState()).status == 'OPEN', `Checks that party A considers the channel open.`)
     assert(firstAckedTicket, `ticket must be winning`)
@@ -162,7 +159,7 @@ describe('test Channel class', function () {
         ticketData.winProb
       )
       const nextUnacknowledgedTicket = new UnacknowledgedTicket(nextSignedTicket, ticketData.secretA)
-      const ackedTicket = await partyBConnector.account.acknowledge(nextUnacknowledgedTicket, ticketData.secretB)
+      const ackedTicket = await partyBChannel.acknowledge(nextUnacknowledgedTicket, ticketData.secretB)
 
       if (ackedTicket !== null) {
         const result = await partyBChannel.submitTicket(ackedTicket)

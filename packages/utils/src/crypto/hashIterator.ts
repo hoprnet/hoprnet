@@ -55,7 +55,7 @@ export async function iterateHash(
 export async function recoverIteratedHash(
   hashValue: Uint8Array,
   hashFunc: (preImage: Uint8Array) => Promise<Uint8Array> | Uint8Array,
-  hint: (index: number) => Uint8Array | undefined | Promise<Uint8Array | undefined>,
+  hint: (index: number) =>  Promise<Uint8Array>,
   maxIterations: number,
   stepSize?: number,
   indexHint?: number

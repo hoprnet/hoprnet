@@ -1,56 +1,14 @@
 import assert from 'assert'
-import { stringToU8a, durations } from '@hoprnet/hopr-utils'
+import { durations } from '@hoprnet/hopr-utils'
 import { Ganache } from '@hoprnet/hopr-testing'
 import { NODE_SEEDS } from '@hoprnet/hopr-demo-seeds'
 import { migrate, fund, getContracts } from '@hoprnet/hopr-ethereum'
 import { ethers } from 'ethers'
 import HoprEthereum from '.'
 import { createNode } from './utils/testing'
-import * as testconfigs from './config.spec'
 import { providers } from 'ethers'
 import { HoprToken__factory, HoprToken } from './contracts'
 import { DEFAULT_URI } from './constants'
-
-const { arrayify } = ethers.utils
-
-describe('test connector', function () {
-  this.timeout(durations.minutes(5))
-
-  const ganache = new Ganache()
-  let ownerWallet: ethers.Wallet
-  let connector: HoprEthereum
-
-  before(async function () {
-    this.timeout(durations.minutes(1))
-
-    await ganache.start()
-    await migrate()
-    await fund(`--address ${getContracts().localhost.HoprToken.address} --accounts-to-fund 2`)
-
-    ownerWallet = new ethers.Wallet(testconfigs.FUND_ACCOUNT_PRIVATE_KEY)
-    connector = await createNode(arrayify(ownerWallet.privateKey))
-
-    await connector.start()
-  })
-
-  after(async function () {
-    await connector.stop()
-    await ganache.stop()
-  })
-
-  it('should catch initOnchainValues', async function () {
-    this.timeout(10e3)
-
-    const connector = await createNode(stringToU8a(NODE_SEEDS[NODE_SEEDS.length - 1]))
-
-    try {
-      await connector.initOnchainValues()
-      assert(true)
-    } catch (err) {
-      assert(false, err)
-    }
-  })
-})
 
 describe('test withdraw', function () {
   this.timeout(durations.minutes(5))
