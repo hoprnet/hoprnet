@@ -37,13 +37,12 @@ describe('acknowledement message', function () {
 
     const key = randomBytes(SECRET_LENGTH)
 
-    assert.throws(
-      () =>
-        Acknowledgement.deserialize(
-          Acknowledgement.create(randomBytes(Challenge.SIZE) as any, key, counterparty).serialize(),
-          self,
-          counterparty
-        )
+    assert.throws(() =>
+      Acknowledgement.deserialize(
+        Acknowledgement.create(randomBytes(Challenge.SIZE) as any, key, counterparty).serialize(),
+        self,
+        counterparty
+      )
     )
   })
 })
