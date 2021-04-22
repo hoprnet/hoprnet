@@ -1,11 +1,28 @@
-//import assert from 'assert'
+import assert from 'assert'
+import LevelUp from 'levelup'
+import MemDown from 'memdown'
+import { Commitment } from './commitment'
+import sinon from 'sinon'
 
 // TODO: replace legacy test
 describe('test commitment', function () {
   it('constructor', function () {})
 
   describe('random pre-image', function () {
+    let fakeSet, fakeGet, fakeDB, fakeId
+
+    beforeEach(async function(){
+      fakeSet = sinon.fake()
+      fakeGet = sinon.fake()
+      fakeDB = new LevelUp(MemDown())
+      fakeId = 'test'
+    })
+
     it('should publish a hashed secret', async function () {
+      let cm = new Commitment(fakeSet, fakeGet, fakeDB, fakeId)
+
+      assert(cm.getCurrentCommitment(), 'gives current commitment')
+
       /*
 
       let onChainHash = new Hash(

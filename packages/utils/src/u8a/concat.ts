@@ -17,7 +17,7 @@ export function u8aConcat(...list: (Uint8Array | undefined)[]): Uint8Array {
     return new Uint8Array()
   }
   if (list.length == 1) {
-    return list[0]
+    return list[0] ? list[0].slice() : new Uint8Array()
   }
   let totalLength = 0
 
