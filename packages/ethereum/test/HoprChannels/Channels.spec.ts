@@ -224,7 +224,14 @@ describe('funding a HoprChannel success', function () {
     await expect(
       token
         .connect(accountB)
-        .send(channels.address, '30', abiEncoder.encode(['address', 'address', 'uint256', 'uint256'], [ACCOUNT_B.address, ACCOUNT_A.address, '30', '0']))
+        .send(
+          channels.address,
+          '30',
+          abiEncoder.encode(
+            ['address', 'address', 'uint256', 'uint256'],
+            [ACCOUNT_B.address, ACCOUNT_A.address, '30', '0']
+          )
+        )
     ).to.emit(channels, 'ChannelUpdate')
     validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), {
       partyABalance: '0',
