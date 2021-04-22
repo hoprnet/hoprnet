@@ -1,14 +1,14 @@
 import type { Event } from './types'
 import assert from 'assert'
 import BN from 'bn.js'
-import { stringToU8a } from '@hoprnet/hopr-utils'
+import { stringToU8a, u8aConcat } from '@hoprnet/hopr-utils'
 import { AccountEntry, Address, PublicKey, Hash, ChannelEntry } from '../types'
 
 export const onAccountInitialized = async (event: Event<'AccountInitialized'>): Promise<AccountEntry> => {
   const data = event.args
   const address = Address.fromString(data.account)
-  // library requires identifier TODO: insert identifier bytes
-  const pubKey = PublicKey.fromUncompressedPubKey(stringToU8a(data.uncompressedPubKey))
+  // library requires identifier
+  const pubKey = PublicKey.fromUncompressedPubKey(u8aConcat(new Uint8Array([4]), stringToU8a(data.uncompressedPubKey)))
   const secret = new Hash(stringToU8a(data.secret))
   const counter = new BN(1)
 

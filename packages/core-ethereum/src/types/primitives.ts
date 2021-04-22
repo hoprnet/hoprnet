@@ -156,8 +156,7 @@ export class PublicKey {
     return new PublicKey(arr)
   }
 
-  static fromUncompressedPubKey(pubkey: Uint8Array) {
-    const uncompressedPubKey = u8aConcat(new Uint8Array([4]), pubkey)
+  static fromUncompressedPubKey(uncompressedPubKey: Uint8Array) {
     return new PublicKey(publicKeyConvert(uncompressedPubKey, true))
   }
 
