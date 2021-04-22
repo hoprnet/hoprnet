@@ -1,4 +1,11 @@
-import { Ticket, PublicKey, Balance, Channel, UnacknowledgedTicket, getWinProbabilityAsFloat } from '@hoprnet/hopr-core-ethereum'
+import {
+  Ticket,
+  PublicKey,
+  Balance,
+  Channel,
+  UnacknowledgedTicket,
+  getWinProbabilityAsFloat
+} from '@hoprnet/hopr-core-ethereum'
 import type HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 import { Challenge } from './challenge'
 import {
@@ -135,7 +142,6 @@ export async function validateUnacknowledgedTicket(
     throw Error(`Payment channel does not have enough funds when you include unredeemed tickets`)
   }
 }
-
 
 export class Packet {
   public isReceiver: boolean
