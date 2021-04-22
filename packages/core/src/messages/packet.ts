@@ -17,7 +17,7 @@ import type PeerId from 'peer-id'
 import { publicKeyCreate } from 'secp256k1'
 import BN from 'bn.js'
 import { LevelUp } from 'levelup'
-import { checkPacketTag } from '../../dbKeys'
+import { checkPacketTag } from '../dbKeys'
 
 export const MAX_HOPS = 3
 
