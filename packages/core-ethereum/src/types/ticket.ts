@@ -92,7 +92,6 @@ class Ticket {
     ])
 
     const counterparty = new Address(components[0])
-    console.log(`challenge when deserializign`, u8aToHex(components[1]))
     const challenge = new PublicKey(components[1])
     const epoch = new UINT256(new BN(components[2]))
     const amount = new Balance(new BN(components[3]))

@@ -15,7 +15,7 @@ describe('test ticket construction', function () {
   })
 
   it('should create new ticket', async function () {
-    const challenge = new PublicKey(new Uint8Array(Hash.SIZE))
+    const challenge = new PublicKey(new Uint8Array(PublicKey.SIZE))
     const epoch = UINT256.fromString('1')
     const amount = new Balance(new BN(1))
     const winProb = computeWinningProbability(1)
