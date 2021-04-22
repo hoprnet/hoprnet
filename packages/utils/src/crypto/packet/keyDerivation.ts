@@ -1,5 +1,5 @@
 import { expand } from 'futoin-hkdf'
-import { SECRET_LENGTH, HASH_ALGORITHM, HASH_LENGTH } from './constants'
+import { SECRET_LENGTH, HASH_ALGORITHM, HASH_LENGTH, TAG_LENGTH } from './constants'
 import { SECP256K1 } from '../constants'
 import { PRG_IV_LENGTH, PRG_KEY_LENGTH } from '../prg'
 import { PRP_IV_LENGTH, PRP_KEY_LENGTH } from '../prp'
@@ -9,6 +9,7 @@ import type { PRPParameters } from '../prp'
 const HASH_KEY_BLINDING = 'HASH_KEY_BLINDING'
 const HASH_KEY_PRG = 'HASH_KEY_PRG'
 const HASH_KEY_PRP = 'HASH_KEY_PRP'
+const HASH_KEY_PACKET_TAG = 'HASH_KEY_PACKET_TAG'
 
 /**
  * Derive the blinding that is applied to the group element
@@ -60,4 +61,12 @@ export function derivePRPParameters(secret: Uint8Array): PRPParameters {
   const iv = rand.subarray(PRP_KEY_LENGTH)
 
   return { key, iv }
+}
+
+export function derivePacketTag(secret: Uint8Array): Uint8Array {
+  if (secret.length != SECRET_LENGTH) {
+    throw Error(`Invalid arguments`)
+  }
+
+  return expand(HASH_ALGORITHM, HASH_LENGTH, Buffer.from(secret), TAG_LENGTH, HASH_KEY_PACKET_TAG)
 }

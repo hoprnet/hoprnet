@@ -28,3 +28,8 @@ export const PAYLOAD_SIZE = 500
  */
 export const END_PREFIX = 0xff
 export const END_PREFIX_LENGTH = 1
+
+/**
+ * Length of the tag used to prevent from replay attacks
+ */
+export const TAG_LENGTH = 16

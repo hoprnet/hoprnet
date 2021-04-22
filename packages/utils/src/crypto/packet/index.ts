@@ -6,7 +6,7 @@ import { createRoutingInfo, forwardTransform as routingInfoTransform } from './r
 import { generateKeyShares, forwardTransform as keyShareTransform } from './keyShares'
 import { PRP } from '../prp'
 import { PAYLOAD_SIZE } from './constants'
-import { derivePRPParameters } from './keyDerivation'
+import { derivePacketTag, derivePRPParameters } from './keyDerivation'
 import { addPadding, removePadding } from './padding'
 
 /**
@@ -92,19 +92,23 @@ export function createPacket(
   return Uint8Array.from([...alpha, ...routingInformation, ...mac, ...ciphertext])
 }
 
+type Output = {
+  derivedSecret: Uint8Array
+  packetTag: Uint8Array
+}
+
 type LastNodeOutput = {
   lastNode: true
-  derivedSecret: Uint8Array
   plaintext: Uint8Array
   additionalData: Uint8Array
-}
+} & Output
+
 type RelayNodeOutput = {
   lastNode: false
-  derivedSecret: Uint8Array
   packet: Uint8Array
   nextHop: Uint8Array
   additionalRelayData: Uint8Array
-}
+} & Output
 
 /**
  * Applies the transformation to the header to forward
@@ -151,10 +155,15 @@ export function forwardTransform(
 
   prp.inverse(decoded.ciphertext)
 
+  const common = {
+    packetTag: derivePacketTag(secret),
+    derivedSecret: secret
+  }
+
   if (header.lastNode == true) {
     return {
+      ...common,
       lastNode: true,
-      derivedSecret: secret,
       plaintext: removePadding(decoded.ciphertext),
       additionalData: header.additionalData
     }
@@ -162,8 +171,8 @@ export function forwardTransform(
     const packet = Uint8Array.from([...alpha, ...header.header, ...header.mac, ...decoded.ciphertext])
 
     return {
+      ...common,
       lastNode: false,
-      derivedSecret: secret,
       packet,
       nextHop: header.nextNode,
       additionalRelayData: header.additionalInfo
