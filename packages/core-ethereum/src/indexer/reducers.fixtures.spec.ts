@@ -68,7 +68,7 @@ export const OPENED_EVENT = {
   logIndex: 0,
   args: {
     opener: partyA.toAddress().toHex(),
-    counterparty: partyB.toHex()
+    counterparty: partyB.toAddress().toHex()
   }
 } as Event<'ChannelOpened'>
 

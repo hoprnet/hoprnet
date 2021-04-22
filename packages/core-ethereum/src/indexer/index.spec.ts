@@ -1,6 +1,7 @@
 import type { providers as Providers } from 'ethers'
 import type { HoprChannels } from '../contracts'
 import type { Event } from './types'
+import type { TypedEvent } from '../contracts/commons'
 import assert from 'assert'
 import EventEmitter from 'events'
 import LevelUp from 'levelup'
@@ -10,21 +11,32 @@ import { expectAccountsToBeEqual, expectChannelsToBeEqual } from './fixtures'
 import * as fixtures from './fixtures'
 
 const createProviderMock = (ops: { latestBlockNumber?: number } = {}) => {
-  const latestBlockNumber = ops.latestBlockNumber ?? 0
+  let latestBlockNumber = ops.latestBlockNumber ?? 0
 
-  const eventEmitter: any = new EventEmitter()
-  eventEmitter.getBlockNumber = async (): Promise<number> => latestBlockNumber
+  const provider = (new EventEmitter() as unknown) as Providers.WebSocketProvider
+  provider.getBlockNumber = async (): Promise<number> => latestBlockNumber
 
-  return (eventEmitter as unknown) as Providers.WebSocketProvider
+  return {
+    provider,
+    newBlock() {
+      latestBlockNumber++
+      // provider.emit('block', latestBlockNumber)
+    }
+  }
 }
 
 const createHoprChannelsMock = (ops: { pastEvents?: Event<any>[] } = {}) => {
   const pastEvents = ops.pastEvents ?? []
 
-  const eventEmitter: any = new EventEmitter()
-  eventEmitter.queryFilter = async (): Promise<Event<any>[]> => pastEvents
+  const hoprChannels = (new EventEmitter() as unknown) as HoprChannels
+  hoprChannels.queryFilter = async (): Promise<TypedEvent<any>[]> => pastEvents
 
-  return (eventEmitter as unknown) as HoprChannels
+  return {
+    hoprChannels,
+    newEvent(event: Event<any>) {
+      hoprChannels.emit('*', event)
+    }
+  }
 }
 
 const useFixtures = (ops: { latestBlockNumber?: number; pastEvents?: Event<any>[] } = {}) => {
@@ -32,8 +44,8 @@ const useFixtures = (ops: { latestBlockNumber?: number; pastEvents?: Event<any>[
   const pastEvents = ops.pastEvents ?? []
 
   const db = new LevelUp(MemDown())
-  const provider = createProviderMock({ latestBlockNumber })
-  const hoprChannels = createHoprChannelsMock({ pastEvents })
+  const { provider, newBlock } = createProviderMock({ latestBlockNumber })
+  const { hoprChannels, newEvent } = createHoprChannelsMock({ pastEvents })
 
   const indexer = new Indexer(
     {
@@ -51,7 +63,9 @@ const useFixtures = (ops: { latestBlockNumber?: number; pastEvents?: Event<any>[
   return {
     db,
     provider,
+    newBlock,
     hoprChannels,
+    newEvent,
     indexer
   }
 }
@@ -98,5 +112,26 @@ describe.only('test indexer', function () {
 
     const channel = await indexer.getChannel(fixtures.FUNDED_CHANNEL.getId())
     expectChannelsToBeEqual(channel, fixtures.FUNDED_CHANNEL)
+  })
+
+  it.only('should continue processing events', async function () {
+    const { indexer, provider, newBlock } = useFixtures({
+      latestBlockNumber: 3,
+      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.FUNDED_EVENT]
+    })
+    await indexer.start()
+
+    // @ts-ignore
+    indexer.onNewEvents([fixtures.OPENED_EVENT])
+
+    newBlock()
+    console.log(await provider.getBlockNumber())
+    // @ts-ignore
+    await indexer.onNewBlock({ number: await provider.getBlockNumber() })
+
+    console.log(indexer.latestBlock)
+
+    const channel = await indexer.getChannel(fixtures.OPENED_CHANNEL.getId())
+    expectChannelsToBeEqual(channel, fixtures.OPENED_CHANNEL)
   })
 })

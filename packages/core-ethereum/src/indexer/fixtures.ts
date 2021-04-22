@@ -68,3 +68,27 @@ export const FUNDED_CHANNEL = ChannelEntry.fromObject({
   openedAt: new BN(0),
   closedAt: new BN(0)
 })
+
+export const OPENED_EVENT = {
+  event: 'ChannelOpened',
+  transactionHash: '',
+  blockNumber: 3,
+  transactionIndex: 0,
+  logIndex: 0,
+  args: {
+    opener: partyA.toAddress().toHex(),
+    counterparty: partyB.toAddress().toHex()
+  }
+} as Event<'ChannelOpened'>
+
+export const OPENED_CHANNEL = ChannelEntry.fromObject({
+  partyA: partyA.toAddress(),
+  partyB: partyB.toAddress(),
+  deposit: new BN(3),
+  partyABalance: new BN(3),
+  closureTime: new BN(0),
+  stateCounter: new BN(1),
+  closureByPartyA: false,
+  openedAt: new BN(3),
+  closedAt: new BN(0)
+})

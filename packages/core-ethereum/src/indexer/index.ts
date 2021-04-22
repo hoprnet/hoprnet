@@ -247,6 +247,7 @@ class Indexer extends EventEmitter {
       isConfirmedBlock(this.unconfirmedEvents.top(1)[0].blockNumber, block.number, this.ops.maxConfirmations)
     ) {
       const event = this.unconfirmedEvents.pop()
+      console.log('Processing event %s', event.event)
       log('Processing event %s', event.event)
       // log(chalk.blue(event.blockNumber.toString(), event.transactionIndex.toString(), event.logIndex.toString()))
 
