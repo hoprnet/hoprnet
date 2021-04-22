@@ -16,5 +16,4 @@ We support multiple distribution mechanisms to install a HOPR node:
 - **[npm](using-npm.md)**: The popular [Node Package Manager](https://www.npmjs.com/) (npm), which requires node.js.
 - **[docker](using-docker.md)**: Using [Docker](https://www.docker.com/) you can run a HOPR node within a container with a shared volume to store your node info.
 
-
 Regardless of which way you install your HOPR node, you will access it and interact with it through your browser. By default, a hopr node exposes an admin interface available on `localhost:3000`, although flags can change these settings.
