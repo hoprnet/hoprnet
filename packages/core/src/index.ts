@@ -523,24 +523,16 @@ class Hopr extends EventEmitter {
 
   private async checkBalances() {
     const balance = await this.getBalance()
-    let unfunded = false
     if (balance.toBN().lten(0)) {
       const address = await this.paymentChannels.hexAccountAddress()
       log('unfunded node', address)
       this.emit('hopr:warning:unfunded', address)
-      unfunded = true
     }
     const nativeBalance = await this.getNativeBalance()
     if (nativeBalance.toBN().lte(MIN_NATIVE_BALANCE)) {
       const address = await this.paymentChannels.hexAccountAddress()
       log('unfunded node', address)
       this.emit('hopr:warning:unfundedNative', address)
-      unfunded = true
-    }
-    if (!unfunded) {
-      // Technically we only have to do this the first time, but there are no
-      // side effects to doing this on each tick.
-      this.paymentChannels.initOnchainValues() // No-op if called many times.
     }
   }
 

@@ -30,7 +30,7 @@ class Channel {
     public readonly counterparty: PublicKey
   ) {
     this.index = 0 // TODO - bump channel epoch to make sure..
-    this.commitment = new Commitment()
+    this.commitment = new Commitment(() => {}, () => {}, this.connector.db, this.getId())
   }
 
   static generateId(self: Address, counterparty: Address) {
