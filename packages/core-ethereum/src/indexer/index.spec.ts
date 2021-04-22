@@ -1,4 +1,4 @@
-import type { providers as Providers } from 'ethers'
+import { providers as Providers } from 'ethers'
 import type { HoprChannels } from '../contracts'
 import type { Event } from './types'
 import type { TypedEvent } from '../contracts/commons'
@@ -20,7 +20,7 @@ const createProviderMock = (ops: { latestBlockNumber?: number } = {}) => {
     provider,
     newBlock() {
       latestBlockNumber++
-      // provider.emit('block', latestBlockNumber)
+      provider.emit('block', latestBlockNumber)
     }
   }
 }
@@ -114,24 +114,19 @@ describe.only('test indexer', function () {
     expectChannelsToBeEqual(channel, fixtures.FUNDED_CHANNEL)
   })
 
-  it.only('should continue processing events', async function () {
-    const { indexer, provider, newBlock } = useFixtures({
+  it('should continue processing events', async function () {
+    const { indexer, newEvent, newBlock } = useFixtures({
       latestBlockNumber: 3,
       pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.FUNDED_EVENT]
     })
     await indexer.start()
 
-    // @ts-ignore
-    indexer.onNewEvents([fixtures.OPENED_EVENT])
-
+    newEvent(fixtures.OPENED_EVENT)
     newBlock()
-    console.log(await provider.getBlockNumber())
-    // @ts-ignore
-    await indexer.onNewBlock({ number: await provider.getBlockNumber() })
 
-    console.log(indexer.latestBlock)
-
-    const channel = await indexer.getChannel(fixtures.OPENED_CHANNEL.getId())
-    expectChannelsToBeEqual(channel, fixtures.OPENED_CHANNEL)
+    setImmediate(async () => {
+      const channel = await indexer.getChannel(fixtures.OPENED_CHANNEL.getId())
+      expectChannelsToBeEqual(channel, fixtures.OPENED_CHANNEL)
+    })
   })
 })
