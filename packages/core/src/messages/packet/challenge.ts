@@ -36,7 +36,6 @@ export class Challenge {
   }
 
   static create(ackChallenge: Uint8Array, privKey: PeerId): Challenge {
-    console.log(ackChallenge.length, SECP256K1.COMPRESSED_PUBLIC_KEY_LENGTH)
     if (ackChallenge.length != SECP256K1.COMPRESSED_PUBLIC_KEY_LENGTH || privKey.privKey == null) {
       throw Error(`Invalid arguments`)
     }
