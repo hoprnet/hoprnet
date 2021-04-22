@@ -5,15 +5,7 @@ import { ethers, errors } from 'ethers'
 import { durations, isExpired } from '@hoprnet/hopr-utils'
 import NonceTracker, { NonceLock } from './nonce-tracker'
 import TransactionManager from './transaction-manager'
-import {
-  PublicKey,
-  Address,
-  Balance,
-  Hash,
-  NativeBalance,
-  UINT256,
-  AccountEntry
-} from './types'
+import { PublicKey, Address, Balance, Hash, NativeBalance, UINT256, AccountEntry } from './types'
 import { getNetworkGasPrice } from './utils'
 import { PROVIDER_CACHE_TTL } from './constants'
 

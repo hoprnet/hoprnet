@@ -10,4 +10,3 @@ export async function getFromDB<T>(db: LevelUp, key): Promise<T | undefined> {
     return
   }
 }
-

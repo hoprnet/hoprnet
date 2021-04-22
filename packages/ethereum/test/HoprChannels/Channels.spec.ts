@@ -15,7 +15,8 @@ type Ticket = {
   ticketEpoch: string
 }
 
-const percentToUint256 = (percent) => ethers.utils.hexZeroPad(ethers.utils.hexlify(ethers.constants.MaxUint256.mul(percent).div(100)), 32)
+const percentToUint256 = (percent) =>
+  ethers.utils.hexZeroPad(ethers.utils.hexlify(ethers.constants.MaxUint256.mul(percent).div(100)), 32)
 
 const getEncodedTicket = (ticket: Ticket): string => {
   const challenge = ethers.utils.solidityKeccak256(['bytes32'], [ticket.proofOfRelaySecret])
@@ -338,18 +339,20 @@ describe('with a funded HoprChannel (A: 70, B: 30), secrets initialized', functi
 
   it('should fail to redeem ticket when signer is not the issuer', async function () {
     const TICKET_AB_WIN = fixtures.TICKET_AB_WIN
-    const FAKE_SIGNATURE = await fixtures.accountA.signMessage(ethers.utils.id("0"))
+    const FAKE_SIGNATURE = await fixtures.accountA.signMessage(ethers.utils.id('0'))
     await expect(
-      channels.connect(fixtures.accountB).redeemTicket(
-        TICKET_AB_WIN.counterparty,
-        TICKET_AB_WIN.nextCommitment,
-        TICKET_AB_WIN.ticketEpoch,
-        TICKET_AB_WIN.ticketIndex,
-        TICKET_AB_WIN.proofOfRelaySecret,
-        TICKET_AB_WIN.amount,
-        TICKET_AB_WIN.winProb,
-        FAKE_SIGNATURE 
-      )
+      channels
+        .connect(fixtures.accountB)
+        .redeemTicket(
+          TICKET_AB_WIN.counterparty,
+          TICKET_AB_WIN.nextCommitment,
+          TICKET_AB_WIN.ticketEpoch,
+          TICKET_AB_WIN.ticketIndex,
+          TICKET_AB_WIN.proofOfRelaySecret,
+          TICKET_AB_WIN.amount,
+          TICKET_AB_WIN.winProb,
+          FAKE_SIGNATURE
+        )
     ).to.be.revertedWith('signer must match the counterparty')
   })
 

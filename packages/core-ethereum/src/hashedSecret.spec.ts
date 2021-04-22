@@ -2,12 +2,9 @@
 
 // TODO: replace legacy test
 describe('test commitment', function () {
-
-
-  it('constructor', function(){})
+  it('constructor', function () {})
 
   describe('random pre-image', function () {
-
     it('should publish a hashed secret', async function () {
       /*
 

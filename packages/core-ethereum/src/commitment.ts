@@ -15,21 +15,18 @@ async function hashFunction(msg: Uint8Array): Promise<Uint8Array> {
 }
 
 function keyFor(channelId: Hash, iteration: number): Uint8Array {
-  const prefix  = new TextEncoder().encode('commitment:')
-  return u8aConcat(
-    prefix,
-    channelId.serialize(),
-    Uint8Array.of(iteration)
-  )
+  const prefix = new TextEncoder().encode('commitment:')
+  return u8aConcat(prefix, channelId.serialize(), Uint8Array.of(iteration))
 }
 
-export async function storeHashIntermediaries(db: LevelUp, channelId: Hash, intermediates: Intermediate[]): Promise<void> {
+export async function storeHashIntermediaries(
+  db: LevelUp,
+  channelId: Hash,
+  intermediates: Intermediate[]
+): Promise<void> {
   let dbBatch = db.batch()
   for (const intermediate of intermediates) {
-    dbBatch = dbBatch.put(
-      Buffer.from(keyFor(channelId, intermediate.iteration)),
-      Buffer.from(intermediate.preImage)
-    )
+    dbBatch = dbBatch.put(Buffer.from(keyFor(channelId, intermediate.iteration)), Buffer.from(intermediate.preImage))
   }
   await dbBatch.write()
 }
@@ -42,8 +39,8 @@ export class Commitment {
     private setChainCommitment,
     private getChainCommitment,
     private db: LevelUp,
-    private channelId: Hash, // used in db key
-  ){}
+    private channelId: Hash // used in db key
+  ) {}
 
   public async getCurrentCommitment(): Promise<Hash> {
     if (!this.initialized) {
@@ -78,7 +75,7 @@ export class Commitment {
     if (this.initialized) return
     const dbContains = await this.hasDBSecret()
     const chainCommitment = await this.getChainCommitment()
-    if (chainCommitment  && dbContains) {
+    if (chainCommitment && dbContains) {
       try {
         await this.findPreImage(chainCommitment) // throws if not found
         this.initialized = true
@@ -107,7 +104,7 @@ export class Commitment {
 
   private async getDBFor(iteration: number): Promise<Uint8Array> {
     const arr = await getFromDB<Uint8Array>(this.db, keyFor(this.channelId, iteration))
-    if (!arr) { 
+    if (!arr) {
       throw new Error('Could not find preimage')
     }
     return arr

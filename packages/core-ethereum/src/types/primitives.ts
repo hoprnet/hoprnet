@@ -86,7 +86,11 @@ export class Hash {
   static SIZE = HASH_LENGTH
 
   static create(...inputs: Uint8Array[]) {
-    return new Hash(createKeccakHash('keccak256').update(Buffer.from(u8aConcat(...inputs))).digest())
+    return new Hash(
+      createKeccakHash('keccak256')
+        .update(Buffer.from(u8aConcat(...inputs)))
+        .digest()
+    )
   }
 
   static createChallenge(secretA: Uint8Array, secretB: Uint8Array): Hash {

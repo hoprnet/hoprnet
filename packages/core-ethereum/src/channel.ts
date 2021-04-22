@@ -1,7 +1,17 @@
 import type Connector from '.'
 import { ethers } from 'ethers'
 import BN from 'bn.js'
-import { PublicKey, Address, Balance, Hash, UINT256, Ticket, Acknowledgement, ChannelEntry, UnacknowledgedTicket } from './types'
+import {
+  PublicKey,
+  Address,
+  Balance,
+  Hash,
+  UINT256,
+  Ticket,
+  Acknowledgement,
+  ChannelEntry,
+  UnacknowledgedTicket
+} from './types'
 import { computeWinningProbability, checkChallenge, isWinningTicket } from './utils'
 import Debug from 'debug'
 import type { SubmitTicketResponse } from '.'
@@ -38,7 +48,9 @@ class Channel {
   ): Promise<Acknowledgement | null> {
     const response = Hash.create(unacknowledgedTicket.secretA.serialize(), acknowledgementHash.serialize())
     const ticket = unacknowledgedTicket.ticket
-    if (await isWinningTicket(ticket.getHash(), response, await this.commitment.getCurrentCommitment(), ticket.winProb)) {
+    if (
+      await isWinningTicket(ticket.getHash(), response, await this.commitment.getCurrentCommitment(), ticket.winProb)
+    ) {
       const ack = new Acknowledgement(ticket, response, await this.commitment.getCurrentCommitment())
       await this.commitment.bumpCommitment()
       return ack
@@ -46,7 +58,6 @@ class Channel {
       return null
     }
   }
-
 
   getId() {
     return Channel.generateId(this.self.toAddress(), this.counterparty.toAddress())
