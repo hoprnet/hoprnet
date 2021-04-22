@@ -104,7 +104,32 @@ export function UnAcknowledgedTicketsParse(arg: Uint8Array): Uint8Array {
   )
 }
 
-export function PacketTag(tag: Uint8Array): Uint8Array {
+/**
+ * Checks if the given packet tag is present in the database
+ * @param db database to store tags
+ * @param tag packet tag
+ * @returns true if tag is unknown, otherwise false
+ */
+export async function checkPacketTag(db: LevelUp, tag: Uint8Array): Promise<boolean> {
+  let tagPresent = true
+
+  const dbKey = PacketTag(tag)
+  try {
+    await db.get(dbKey)
+  } catch (err) {
+    if (err.notFound) {
+      tagPresent = false
+    }
+  }
+
+  if (!tagPresent) {
+    await db.put(dbKey, Buffer.from(''))
+  }
+
+  return !tagPresent
+}
+
+function PacketTag(tag: Uint8Array): Uint8Array {
   return allocationHelper([
     [PACKET_PREFIX.length, PACKET_PREFIX],
     [packetTagSubPrefix.length, packetTagSubPrefix],
