@@ -81,7 +81,6 @@ export const generateTickets = async () => {
     SECRET_0
   )
 
-
   return {
     TICKET_AB_WIN,
     TICKET_BA_WIN,
