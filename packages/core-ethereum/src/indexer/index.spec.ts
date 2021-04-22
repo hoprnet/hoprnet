@@ -129,4 +129,43 @@ describe.only('test indexer', function () {
       expectChannelsToBeEqual(channel, fixtures.OPENED_CHANNEL)
     })
   })
+
+  it('should get public key of addresses', async function () {
+    const { indexer } = useFixtures({
+      latestBlockNumber: 2,
+      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT]
+    })
+
+    await indexer.start()
+
+    const pubKey = await indexer.getPublicKeyOf(fixtures.partyA.toAddress())
+    assert.strictEqual(pubKey.toHex(), fixtures.partyA.toHex())
+  })
+
+  it('should get all data from DB', async function () {
+    const { indexer } = useFixtures({
+      latestBlockNumber: 4,
+      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.FUNDED_EVENT, fixtures.OPENED_EVENT]
+    })
+
+    await indexer.start()
+
+    const account = await indexer.getAccount(fixtures.partyA.toAddress())
+    expectAccountsToBeEqual(account, fixtures.PARTY_A_INITIALIZED_ACCOUNT)
+
+    const channel = await indexer.getChannel(fixtures.OPENED_CHANNEL.getId())
+    expectChannelsToBeEqual(channel, fixtures.OPENED_CHANNEL)
+
+    const channels = await indexer.getChannels()
+    assert.strictEqual(channels.length, 1)
+    expectChannelsToBeEqual(channels[0], fixtures.OPENED_CHANNEL)
+
+    const channelsOfPartyA = await indexer.getChannelsOf(fixtures.partyA.toAddress())
+    assert.strictEqual(channelsOfPartyA.length, 1)
+    expectChannelsToBeEqual(channelsOfPartyA[0], fixtures.OPENED_CHANNEL)
+
+    const channelsOfPartyB = await indexer.getChannelsOf(fixtures.partyB.toAddress())
+    assert.strictEqual(channelsOfPartyB.length, 1)
+    expectChannelsToBeEqual(channelsOfPartyB[0], fixtures.OPENED_CHANNEL)
+  })
 })
