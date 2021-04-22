@@ -51,6 +51,7 @@ To allow peer discovery, we use a signaling server able to relay the Distributed
 ```bash
 $ DEBUG=hopr* yarn run:hoprd:bootstrap
 ```
+
 ### 6. Run alice and bob
 
 Using different terminals for each process, run now `alice` and `bob`, our pre-configured nodes which can be used to test the application.
