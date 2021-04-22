@@ -19,8 +19,6 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     // required by ERC777 spec
     bytes32 public constant TOKENS_RECIPIENT_INTERFACE_HASH = keccak256("ERC777TokensRecipient");
     // used by {tokensReceived} to distinguish which function to call after tokens are sent
-    uint256 public FUND_CHANNEL_SIZE = abi.encode(address(0), address(0)).length;
-    // used by {tokensReceived} to distinguish which function to call after tokens are sent
     uint256 public FUND_CHANNEL_MULTI_SIZE = abi.encode(address(0), address(0), uint256(0), uint256(0)).length;
 
     /**
@@ -83,27 +81,6 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         token = IERC20(_token);
         secsClosure = _secsClosure;
         _ERC1820_REGISTRY.setInterfaceImplementer(address(this), TOKENS_RECIPIENT_INTERFACE_HASH, address(this));
-    }
-
-    /**
-     * @dev Funds a channel in one direction,
-     * then emits {ChannelUpdate} event.
-     * @param funder the address of the recipient
-     * @param counterparty the address of the counterparty
-     * @param amount amount to fund
-     */
-    function fundChannel(
-        address funder,
-        address counterparty,
-        uint256 amount
-    ) external {
-        token.safeTransferFrom(msg.sender, address(this), amount);
-        _fundChannel(
-            funder,
-            counterparty,
-            amount,
-            0
-        );
     }
 
     /**
@@ -240,7 +217,6 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
 
         // must be one of our supported functions
         require(
-            userData.length == FUND_CHANNEL_SIZE ||
             userData.length == FUND_CHANNEL_MULTI_SIZE,
             "userData must match one of our supported functions"
         );
@@ -250,13 +226,8 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         uint256 amount1;
         uint256 amount2;
 
-        if (userData.length == FUND_CHANNEL_SIZE) {
-            (account1, account2) = abi.decode(userData, (address, address));
-            amount1 = amount;
-        } else {
-            (account1, account2, amount1, amount2) = abi.decode(userData, (address, address, uint256, uint256));
-            require(amount == amount1.add(amount2), "amount sent must be equal to amount specified");
-        }
+        (account1, account2, amount1, amount2) = abi.decode(userData, (address, address, uint256, uint256));
+        require(amount == amount1.add(amount2), "amount sent must be equal to amount specified");
 
         //require(from == account1 || from == account2, "funder must be either account1 or account2");
         _fundChannel(account1, account2, amount1, amount2);

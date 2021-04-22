@@ -24,6 +24,7 @@ export const SECRET_2 = solidityKeccak256(['bytes32'], [SECRET_1])
 
 export const WIN_PROB_100 = percentToUint256(100)
 export const WIN_PROB_0 = percentToUint256(0)
+const ENOUGH_TIME_FOR_CLOSURE = 100
 
 export const generateTickets = async () => {
   /**
@@ -224,7 +225,7 @@ describe('funding a HoprChannel success', function () {
     await expect(
       token
         .connect(accountB)
-        .send(channels.address, '30', abiEncoder.encode(['address', 'address'], [ACCOUNT_B.address, ACCOUNT_A.address]))
+        .send(channels.address, '30', abiEncoder.encode(['address', 'address', 'uint256', 'uint256'], [ACCOUNT_B.address, ACCOUNT_A.address, '30', '0']))
     ).to.emit(channels, 'ChannelUpdate')
     validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), {
       partyABalance: '0',
@@ -405,23 +406,19 @@ describe('With a pending_to_close HoprChannel (A:70, B:30)', function () {
   })
 
   it('should finalize channel closure', async function () {
-    await increaseTime(ethers.provider, 1000)
+    await increaseTime(ethers.provider, ENOUGH_TIME_FOR_CLOSURE)
     await expect(channels.connect(fixtures.accountA).finalizeChannelClosure(ACCOUNT_B.address)).to.emit(
       channels,
       'ChannelUpdate'
     )
-
-    const channel = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
-    expect(channel.partyABalance.toString()).to.equal('0')
-    expect(channel.partyBBalance.toString()).to.equal('0')
-    expect(channel.closureTime.toString()).to.equal('0')
-    expect(channel.status.toString()).to.equal('0')
-    expect(channel.closureByPartyA).to.be.false
-
-    const accountABalance = await token.balanceOf(ACCOUNT_A.address)
-    expect(accountABalance.toString()).to.equal('70')
-    const accountBBalance = await token.balanceOf(ACCOUNT_B.address)
-    expect(accountBBalance.toString()).to.equal('30')
+    validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), {
+      partyABalance: '0',
+      partyBBalance: '0',
+      status: '0',
+      closureByPartyA: false
+    })
+    expect((await token.balanceOf(ACCOUNT_A.address)).toString()).to.equal('70')
+    expect((await token.balanceOf(ACCOUNT_B.address)).toString()).to.equal('30')
   })
 
   it('should fail to finalize channel closure', async function () {
@@ -438,22 +435,29 @@ describe('With a pending_to_close HoprChannel (A:70, B:30)', function () {
     )
   })
 })
-/*
-describe('with a closed channel', function () {
-  // TODO Close channel
-  it('should fail to redeem ticket when channel in closed', async function () {
-    const { channels } = await useFixtures()
-    await channels.connect(ACCOUNT_B.wallet).bumpChannel(ACCOUNT_A.address, SECRET_2)
-    await channels.initiateClose()
-    await channels.finalizeClose()
 
+describe('with a closed channel', function () {
+  let channels, fixtures
+  beforeEach(async function () {
+    fixtures = await useFixtures()
+    channels = fixtures.channels
+    await fixtures.fundAndApprove(fixtures.accountA, 100)
+    await channels.connect(fixtures.accountA).fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
+    await channels.connect(fixtures.accountA).initiateChannelClosure(ACCOUNT_B.address)
+    await channels.connect(fixtures.accountB).bumpChannel(ACCOUNT_A.address, SECRET_2)
+    await increaseTime(ethers.provider, ENOUGH_TIME_FOR_CLOSURE)
+    await channels.connect(fixtures.accountA).finalizeChannelClosure(ACCOUNT_B.address)
+  })
+
+  it('should fail to redeem ticket when channel in closed', async function () {
     await expect(
       // @ts-ignore
-      channels.redeemTicket(...redeemArgs(TICKET_AB_WIN))
+      channels.connect(fixtures.accountB).redeemTicket(...redeemArgs(fixtures.fixtureTickets.TICKET_AB_WIN))
     ).to.be.revertedWith('channel must be open or pending to close')
   })
 })
 
+/*
 describe('with a reopened channel', function () {
   it('should fail to redeem ticket when channel in in different channelEpoch', async function () {
     const { channels, fixtureTickets, deployer } = await useFixtures()
