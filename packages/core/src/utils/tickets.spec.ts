@@ -74,10 +74,9 @@ const createMockChannel = ({
         counterparty
       })
     ),
-    getState: () =>{
-      if (isChannelStored)
-        return mockChannelEntry(isChannelOpen)
-      throw new Error('state not found') 
+    getState: () => {
+      if (isChannelStored) return mockChannelEntry(isChannelOpen)
+      throw new Error('state not found')
     },
     channelEpoch: new BN(1)
   } as unknown) as Channel
