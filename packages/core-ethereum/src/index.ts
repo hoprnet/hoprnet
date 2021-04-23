@@ -13,8 +13,8 @@ import Account from './account'
 import { getWinProbabilityAsFloat, computeWinningProbability } from './utils'
 import { HoprToken__factory, HoprChannels__factory } from './contracts'
 import { DEFAULT_URI, MAX_CONFIRMATIONS, INDEXER_BLOCK_RANGE } from './constants'
-import { ChainInteractions } from './chainInteractions'
 import { Channel } from './channel'
+import { createChainWrapper } from './ethereum'
 
 const log = debug('hopr-core-ethereum')
 
@@ -55,7 +55,7 @@ export default class HoprEthereum {
     blockRange: number
   ) {
     this.indexer = new Indexer(this, genesisBlock, maxConfirmations, blockRange)
-    this.chain = new ChainInteractions(this.provider, this.hoprToken)
+    this.chain = createChainWrapper(this.provider, this.hoprToken)
     this.account = new Account(this.network, this.chain, this.indexer, this.wallet)
   }
 
