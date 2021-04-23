@@ -16,3 +16,13 @@ export const getBalance = async (token: HoprToken, account: Address): Promise<Ba
   const result = await token.balanceOf(account.toHex())
   return new Balance(new BN(result.toString()))
 }
+
+export function createChainWrapper(provider, token) {
+  return {
+    // TODO: use indexer when it's done syncing
+    getLatestBlockNumber: async () => provider.getBlockNumber(),
+    getTransactionCount: (address, blockNumber) => provider.getTransactionCount(address.toHex(), blockNumber),
+    getBalance: (address) => token.balanceOf(address.toHex()).then((res) => new Balance(new BN(res.toString()))),
+    getNativeBalance: (address) => provider.getBalance(address.toHex()).then((res) => new NativeBalance(new BN(res.toString())))
+  }
+}
