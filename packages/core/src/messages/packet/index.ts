@@ -323,7 +323,7 @@ export class Packet extends Uint8Array {
 
     const senderPubKey = new PublicKey(node.getId().pubKey.marshal())
     const targetPubKey = new PublicKey(path[0].pubKey.marshal())
-    const channel = new chain.channel(chain, senderPubKey, targetPubKey)
+    const channel = chain.getChannel(senderPubKey, targetPubKey)
 
     if (secrets.length > 1) {
       log(`before creating channel`)
@@ -370,7 +370,7 @@ export class Packet extends Uint8Array {
 
       const senderPubKey = new PublicKey(sender.pubKey.marshal())
       const targetPubKey = new PublicKey(target.pubKey.marshal())
-      const channel = new ethereum.channel(ethereum, senderPubKey, targetPubKey)
+      const channel = ethereum.getChannel(senderPubKey, targetPubKey)
 
       try {
         await validateUnacknowledgedTicket(
@@ -452,7 +452,7 @@ export class Packet extends Uint8Array {
 
     // get new ticket amount
     const fee = new Balance(ticket.amount.toBN().isub(new BN(this.ticketAmount)))
-    const channel = new chain.channel(chain, senderPubKey, targetPubKey)
+    const channel = chain.getChannel(senderPubKey, targetPubKey)
 
     if (fee.toBN().gtn(0)) {
       const balances = await channel.getBalances()

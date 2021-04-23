@@ -5,7 +5,7 @@ import chalk from 'chalk'
 import { Networks, getContracts } from '@hoprnet/hopr-ethereum'
 import { ethers } from 'ethers'
 import debug from 'debug'
-import { Acknowledgement } from './types'
+import { Acknowledgement, PublicKey } from './types'
 import Indexer from './indexer'
 import { RoutingChannel } from './indexer'
 import * as utils from './utils'
@@ -14,6 +14,7 @@ import { getWinProbabilityAsFloat, computeWinningProbability } from './utils'
 import { HoprToken__factory, HoprChannels__factory } from './contracts'
 import { DEFAULT_URI, MAX_CONFIRMATIONS, INDEXER_BLOCK_RANGE } from './constants'
 import { ChainInteractions } from './chainInteractions'
+import { Channel } from './channel'
 
 const log = debug('hopr-core-ethereum')
 
@@ -118,6 +119,10 @@ export default class HoprEthereum {
     return this._status === 'alive'
   }
 
+  public getChannel(src: PublicKey, counterparty: PublicKey) {
+    return new Channel(this, src, counterparty)
+  }
+
   async withdraw(currency: 'NATIVE' | 'HOPR', recipient: string, amount: string): Promise<string> {
     if (currency === 'NATIVE') {
       const nonceLock = await this.account.getNonceLock()
@@ -199,4 +204,4 @@ export default class HoprEthereum {
 }
 
 export * from './types'
-export { getWinProbabilityAsFloat, computeWinningProbability, Indexer, RoutingChannel }
+export { Channel, getWinProbabilityAsFloat, computeWinningProbability, Indexer, RoutingChannel }

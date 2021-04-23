@@ -163,7 +163,7 @@ export async function submitAcknowledgedTicket(
     const signedTicket = ackTicket.ticket
     const self = ethereum.account.publicKey
     const counterparty = signedTicket.getSigner()
-    const channel = new ethereum.channel(ethereum, self, counterparty)
+    const channel = ethereum.getChannel(self, counterparty)
 
     const result = await channel.submitTicket(ackTicket)
     // TODO look at result.status and actually do something

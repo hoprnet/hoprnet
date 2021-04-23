@@ -591,7 +591,7 @@ class Hopr extends EventEmitter {
       throw Error(`You don't have enough tokens: ${amountToFund.toString(10)}<${myAvailableTokens.toBN().toString(10)}`)
     }
 
-    const channel = new ethereum.channel(ethereum, selfPubKey, counterpartyPubKey)
+    const channel = ethereum.getChannel(selfPubKey, counterpartyPubKey)
     await channel.open(new Balance(amountToFund))
 
     return {
@@ -626,7 +626,7 @@ class Hopr extends EventEmitter {
       throw Error(`You don't have enough tokens: ${totalFund.toString(10)}<${myBalance.toBN().toString(10)}`)
     }
 
-    const channel = new ethereum.channel(ethereum, selfPubKey, counterpartyPubKey)
+    const channel = ethereum.getChannel(selfPubKey, counterpartyPubKey)
     await channel.fund(new Balance(myFund), new Balance(counterpartyFund))
 
     return {
@@ -638,7 +638,7 @@ class Hopr extends EventEmitter {
     const ethereum = this.paymentChannels
     const selfPubKey = new PublicKey(this.getId().pubKey.marshal())
     const counterpartyPubKey = new PublicKey(counterparty.pubKey.marshal())
-    const channel = new ethereum.channel(ethereum, selfPubKey, counterpartyPubKey)
+    const channel = ethereum.getChannel(selfPubKey, counterpartyPubKey)
     const channelState = await channel.getState()
 
     // TODO: should we wait for confirmation?
