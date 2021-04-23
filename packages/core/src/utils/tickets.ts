@@ -28,7 +28,7 @@ export async function getUnacknowledgedTickets(
         const unAckTicket = UnacknowledgedTicket.deserialize(value)
 
         // if signer provided doesn't match our ticket's signer dont add it to the list
-        if (filter?.signer && !u8aEquals(unAckTicket.ticket.getSigner().serialize(), filter.signer)) {
+        if (filter?.signer && !unAckTicket.verify(filter.signer)) {
           return
         }
 
@@ -95,7 +95,7 @@ export async function getAcknowledgements(
         const ackTicket = Acknowledgement.deserialize(value)
 
         // if signer provided doesn't match our ticket's signer dont add it to the list
-        if (filter?.signer && !u8aEquals((await ackTicket.ticket).getSigner().serialize(), filter.signer)) {
+        if (filter?.signer && !ackTicket.ticket.verify(filter.signer)) {
           return
         }
 
