@@ -5,17 +5,16 @@ import chalk from 'chalk'
 import { Networks, getContracts } from '@hoprnet/hopr-ethereum'
 import { ethers } from 'ethers'
 import debug from 'debug'
-import { Acknowledgement, Balance, NativeBalance } from './types'
-import Channel from './channel'
+import { Acknowledgement, PublicKey } from './types'
 import Indexer from './indexer'
 import { RoutingChannel } from './indexer'
 import * as utils from './utils'
 import Account from './account'
-import HashedSecret from './hashedSecret'
 import { getWinProbabilityAsFloat, computeWinningProbability } from './utils'
 import { HoprToken__factory, HoprChannels__factory } from './contracts'
-import BN from 'bn.js'
 import { DEFAULT_URI, MAX_CONFIRMATIONS, INDEXER_BLOCK_RANGE } from './constants'
+import { Channel } from './channel'
+import { createChainWrapper } from './ethereum'
 
 const log = debug('hopr-core-ethereum')
 
@@ -38,11 +37,10 @@ export default class HoprEthereum {
   private _status: 'dead' | 'alive' = 'dead'
   private _starting?: Promise<HoprEthereum>
   private _stopping?: Promise<void>
+  private chain
 
-  public channel = Channel
   public indexer: Indexer
   public account: Account
-  public hashedSecret: HashedSecret
 
   constructor(
     public db: LevelUp,
@@ -57,33 +55,15 @@ export default class HoprEthereum {
     blockRange: number
   ) {
     this.indexer = new Indexer(this, genesisBlock, maxConfirmations, blockRange)
-    this.account = new Account(
-      {
-        network: this.network
-      },
-      {
-        // TODO: use indexer when it's done syncing
-        getLatestBlockNumber: async () => this.provider.getBlockNumber(),
-        getTransactionCount: (address, blockNumber) => this.provider.getTransactionCount(address.toHex(), blockNumber),
-        getBalance: (address) =>
-          this.hoprToken.balanceOf(address.toHex()).then((res) => new Balance(new BN(res.toString()))),
-        getNativeBalance: (address) =>
-          this.provider.getBalance(address.toHex()).then((res) => new NativeBalance(new BN(res.toString()))),
-        getAccount: (address) => this.indexer.getAccount(address),
-        findPreImage: (hash) => this.hashedSecret.findPreImage(hash)
-      },
-      this.wallet
-    )
-    this.hashedSecret = new HashedSecret(this.db, this.account, this.hoprChannels)
+    this.chain = createChainWrapper(this.provider, this.hoprToken)
+    this.account = new Account(this.network, this.chain, this.indexer, this.wallet)
   }
 
   readonly CHAIN_NAME = 'HOPR on Ethereum'
 
   private async _start(): Promise<HoprEthereum> {
     await this.provider.ready
-    // await this.initOnchainValues()
     await this.indexer.start()
-    // await provider.connect()
     this._status = 'alive'
     log(chalk.green('Connector started'))
     return this
@@ -126,7 +106,6 @@ export default class HoprEthereum {
         }
 
         await this.indexer.stop()
-        // provider.disconnect(1000, 'Stopping HOPR node.')
         this._status = 'dead'
         log(chalk.green('Connector stopped'))
       })
@@ -140,11 +119,8 @@ export default class HoprEthereum {
     return this._status === 'alive'
   }
 
-  /**
-   * Initializes the on-chain values of our account.
-   */
-  public async initOnchainValues(): Promise<void> {
-    await this.hashedSecret.initialize() // no-op if already initialized
+  public getChannel(src: PublicKey, counterparty: PublicKey) {
+    return new Channel(this, src, counterparty)
   }
 
   async withdraw(currency: 'NATIVE' | 'HOPR', recipient: string, amount: string): Promise<string> {
@@ -169,7 +145,7 @@ export default class HoprEthereum {
   }
 
   public async hexAccountAddress(): Promise<string> {
-    return this.account.address.toHex()
+    return this.account.getAddress().toHex()
   }
 
   public smartContractInfo(): string {
@@ -197,16 +173,6 @@ export default class HoprEthereum {
   ): Promise<HoprEthereum> {
     const provider = new ethers.providers.WebSocketProvider(options?.provider || DEFAULT_URI)
     const wallet = new ethers.Wallet(privateKey).connect(provider)
-
-    // TODO: connect, disconnect, reconnect
-    // provider = new Web3.providers.WebsocketProvider(providerUri, {
-    //   reconnect: {
-    //     auto: true,
-    //     delay: 1000, // ms
-    //     maxAttempts: 30
-    //   }
-    // })
-
     const chainId = await provider.getNetwork().then((res) => res.chainId)
     const network = utils.getNetworkName(chainId) as Networks
     const contracts = getContracts()?.[network]

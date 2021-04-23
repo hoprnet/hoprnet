@@ -12,9 +12,9 @@ describe('test hash iterator', function () {
   const MAX_ITERATIONS = 4 * STEPSIZE + 2
   const LENGTH = 4
 
-  const hint = (i: number): Uint8Array => {
+  const hint = (i: number): Promise<Uint8Array> => {
     if (i % STEPSIZE == 0) {
-      return toU8a(i, LENGTH)
+      return Promise.resolve(toU8a(i, LENGTH))
     }
   }
   it('should iterate', async function () {

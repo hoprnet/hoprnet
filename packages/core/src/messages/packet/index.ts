@@ -84,7 +84,7 @@ export async function validateUnacknowledgedTicket(
   }
 
   // channel MUST be open or pending to close
-  if (channelState.getStatus() === 'CLOSED') {
+  if (channelState.status === 'CLOSED') {
     throw Error(`Payment channel with '${senderB58}' is not open or pending to close`)
   }
 
@@ -97,9 +97,9 @@ export async function validateUnacknowledgedTicket(
   }
 
   // ticket's channelIteration MUST match the current channelIteration
-  const currentChannelIteration = channelState.getIteration()
+  const currentChannelIteration = channelState.channelEpoch
   const ticketChannelIteration = ticket.channelIteration.toBN()
-  if (!ticketChannelIteration.eq(currentChannelIteration)) {
+  if (!ticketChannelIteration.eq(currentChannelIteration.toBN())) {
     throw Error(
       `Ticket was created for a different channel iteration ${ticketChannelIteration.toString()} != ${currentChannelIteration.toString()}`
     )
@@ -119,7 +119,7 @@ export async function validateUnacknowledgedTicket(
     (signedTicket) =>
       signedTicket.counterparty.eq(selfAddress) &&
       signedTicket.epoch.toBN().eq(accountCounter) &&
-      ticket.channelIteration.toBN().eq(currentChannelIteration)
+      ticket.channelIteration.toBN().eq(currentChannelIteration.toBN())
   )
 
   // calculate total unredeemed balance
@@ -323,7 +323,7 @@ export class Packet extends Uint8Array {
 
     const senderPubKey = new PublicKey(node.getId().pubKey.marshal())
     const targetPubKey = new PublicKey(path[0].pubKey.marshal())
-    const channel = new chain.channel(chain, senderPubKey, targetPubKey)
+    const channel = chain.getChannel(senderPubKey, targetPubKey)
 
     if (secrets.length > 1) {
       log(`before creating channel`)
@@ -370,7 +370,7 @@ export class Packet extends Uint8Array {
 
       const senderPubKey = new PublicKey(sender.pubKey.marshal())
       const targetPubKey = new PublicKey(target.pubKey.marshal())
-      const channel = new ethereum.channel(ethereum, senderPubKey, targetPubKey)
+      const channel = ethereum.getChannel(senderPubKey, targetPubKey)
 
       try {
         await validateUnacknowledgedTicket(
@@ -452,7 +452,7 @@ export class Packet extends Uint8Array {
 
     // get new ticket amount
     const fee = new Balance(ticket.amount.toBN().isub(new BN(this.ticketAmount)))
-    const channel = new chain.channel(chain, senderPubKey, targetPubKey)
+    const channel = chain.getChannel(senderPubKey, targetPubKey)
 
     if (fee.toBN().gtn(0)) {
       const balances = await channel.getBalances()

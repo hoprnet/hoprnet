@@ -14,20 +14,6 @@ export const getAccount = (privateKey: string) => {
 }
 
 /**
- * Prefix message with our special message
- * @param message
- * @returns hashed message
- */
-export const prefixMessageWithHOPR = (message: string) => {
-  const withHOPR = ethers.utils.concat([ethers.utils.toUtf8Bytes('HOPRnet'), message])
-
-  return ethers.utils.solidityKeccak256(
-    ['string', 'string', 'bytes'],
-    ['\x19Ethereum Signed Message:\n', withHOPR.length.toString(), withHOPR]
-  )
-}
-
-/**
  * Sign message using private key provided
  * @param message
  * @param privKey
@@ -35,17 +21,9 @@ export const prefixMessageWithHOPR = (message: string) => {
  */
 export const signMessage = async (message: string, privKey: string) => {
   const wallet = new ethers.Wallet(privKey)
-  // const signature = await wallet.signMessage(message)
-  // we do not use above since we use a different prefix
-  const signature = ethers.utils.joinSignature(wallet._signingKey().signDigest(message))
-  const { r, s, v } = ethers.utils.splitSignature(signature)
-
   return {
-    message,
-    signature,
-    r,
-    s,
-    v
+    wallet,
+    signature: await wallet.signMessage(ethers.utils.arrayify(message))
   }
 }
 

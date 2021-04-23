@@ -1,24 +1,67 @@
 import type Connector from '.'
 import { ethers } from 'ethers'
 import BN from 'bn.js'
-import { PublicKey, Address, Balance, Hash, UINT256, Ticket, Acknowledgement, ChannelEntry } from './types'
-import { computeWinningProbability, checkChallenge, isWinningTicket, getSignatureParameters } from './utils'
+import {
+  PublicKey,
+  Address,
+  Balance,
+  Hash,
+  UINT256,
+  Ticket,
+  Acknowledgement,
+  ChannelEntry,
+  UnacknowledgedTicket
+} from './types'
+import { computeWinningProbability, checkChallenge, isWinningTicket } from './utils'
 import Debug from 'debug'
 import type { SubmitTicketResponse } from '.'
+import { Commitment } from './commitment'
 
 const log = Debug('hopr-core-ethereum:channel')
 const abiCoder = new ethers.utils.AbiCoder()
 
 class Channel {
+  private index: number
+  private commitment: Commitment
+
   constructor(
     private readonly connector: Connector, // TODO: replace with ethereum global context?
     private readonly self: PublicKey,
     public readonly counterparty: PublicKey
-  ) {}
+  ) {
+    this.index = 0 // TODO - bump channel epoch to make sure..
+    this.commitment = new Commitment(
+      () => {},
+      () => {},
+      this.connector.db,
+      this.getId()
+    )
+  }
 
   static generateId(self: Address, counterparty: Address) {
     let parties = self.sortPair(counterparty)
     return Hash.create(Buffer.concat(parties.map((x) => x.serialize())))
+  }
+
+  /**
+   * Reserve a preImage for the given ticket if it is a winning ticket.
+   * @param ticket the acknowledged ticket
+   */
+  async acknowledge(
+    unacknowledgedTicket: UnacknowledgedTicket,
+    acknowledgementHash: Hash
+  ): Promise<Acknowledgement | null> {
+    const response = Hash.create(unacknowledgedTicket.secretA.serialize(), acknowledgementHash.serialize())
+    const ticket = unacknowledgedTicket.ticket
+    if (
+      await isWinningTicket(ticket.getHash(), response, await this.commitment.getCurrentCommitment(), ticket.winProb)
+    ) {
+      const ack = new Acknowledgement(ticket, response, await this.commitment.getCurrentCommitment())
+      await this.commitment.bumpCommitment()
+      return ack
+    } else {
+      return null
+    }
   }
 
   getId() {
@@ -33,10 +76,12 @@ class Channel {
     throw Error(`Channel state for ${channelId.toHex()} not found`)
   }
 
+  // TODO kill
   async getBalances() {
     const state = await this.getState()
-    const { partyA, partyB } = state.getBalances()
-    const [self, counterparty] = state.partyA.eq(this.self.toAddress()) ? [partyA, partyB] : [partyB, partyA]
+    const a = state.partyABalance
+    const b = state.partyBBalance
+    const [self, counterparty] = state.partyA.eq(this.self.toAddress()) ? [a, b] : [b, a]
 
     return {
       self,
@@ -82,16 +127,12 @@ class Channel {
 
   async open(fundAmount: Balance) {
     const { account, hoprToken, hoprChannels } = this.connector
-
-    // check if we have initialized account, initialize if we didnt
-    await this.connector.initOnchainValues()
-
     // channel may not exist, we can still open it
-    let state: ChannelEntry
+    let c: ChannelEntry
     try {
-      state = await this.getState()
+      c = await this.getState()
     } catch {}
-    if (state && state.getStatus() !== 'CLOSED') {
+    if (c && c.status !== 'CLOSED') {
       throw Error('Channel is already opened')
     }
 
@@ -107,7 +148,10 @@ class Channel {
         hoprToken.send,
         hoprChannels.address,
         fundAmount.toBN().toString(),
-        abiCoder.encode(['bool', 'address', 'address'], [true, myAddress.toHex(), counterpartyAddress.toHex()])
+        abiCoder.encode(
+          ['address', 'address', 'uint256', 'uint256'],
+          [myAddress.toHex(), counterpartyAddress.toHex(), fundAmount.toBN().toString(), '0']
+        )
       )
       await transaction.wait()
 
@@ -122,10 +166,10 @@ class Channel {
   async initializeClosure() {
     const { account, hoprChannels } = this.connector
 
-    const state = await this.getState()
+    const c = await this.getState()
     const counterpartyAddress = this.counterparty.toAddress()
 
-    if (state.getStatus() !== 'OPEN') {
+    if (c.status !== 'OPEN') {
       throw Error('Channel status is not OPEN')
     }
 
@@ -147,10 +191,10 @@ class Channel {
   async finalizeClosure() {
     const { account, hoprChannels } = this.connector
 
-    const state = await this.getState()
+    const c = await this.getState()
     const counterpartyAddress = this.counterparty.toAddress()
 
-    if (state.getStatus() !== 'PENDING_TO_CLOSE') {
+    if (c.status !== 'PENDING_TO_CLOSE') {
       throw Error('Channel status is not PENDING_TO_CLOSE')
     }
 
@@ -171,14 +215,15 @@ class Channel {
 
   async createTicket(amount: Balance, challenge: Hash, winProb: number) {
     const counterpartyAddress = this.counterparty.toAddress()
-    const counterpartyState = await this.connector.indexer.getAccount(counterpartyAddress)
+    const c = await this.getState()
     return Ticket.create(
       counterpartyAddress,
       challenge,
-      new UINT256(counterpartyState.counter),
+      c.ticketEpochFor(this.counterparty.toAddress()),
+      new UINT256(new BN(this.index++)),
       amount,
       computeWinningProbability(winProb),
-      new UINT256((await this.getState()).getIteration()),
+      (await this.getState()).channelEpoch,
       this.connector.account.privateKey
     )
   }
@@ -189,6 +234,7 @@ class Channel {
       this.counterparty.toAddress(),
       challenge,
       UINT256.fromString('0'),
+      new UINT256(new BN(this.index++)),
       new Balance(new BN(0)),
       computeWinningProbability(1),
       UINT256.fromString('0'),
@@ -202,7 +248,6 @@ class Channel {
 
       log('Submitting ticket', ackTicket.response.toHex())
       const { hoprChannels, account } = this.connector
-      const { r, s, v } = getSignatureParameters(ticket.signature)
 
       const emptyPreImage = new Hash(new Uint8Array(Hash.SIZE).fill(0x00))
       const hasPreImage = !ackTicket.preImage.eq(emptyPreImage)
@@ -237,12 +282,12 @@ class Channel {
         hoprChannels.redeemTicket,
         counterparty.toHex(),
         ackTicket.preImage.toHex(),
+        ackTicket.ticket.epoch.serialize(),
+        ackTicket.ticket.index.serialize(),
         ackTicket.response.toHex(),
         ticket.amount.toBN().toString(),
         ticket.winProb.toHex(),
-        r.toHex(),
-        s.toHex(),
-        v + 27
+        ticket.signature.serialize()
       )
       await transaction.wait()
       // TODO delete ackTicket
@@ -264,4 +309,4 @@ class Channel {
   }
 }
 
-export default Channel
+export { Channel }

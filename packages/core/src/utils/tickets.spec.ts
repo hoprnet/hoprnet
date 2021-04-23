@@ -50,6 +50,12 @@ const createMockTicket = ({
   } as unknown) as Ticket
 }
 
+const mockChannelEntry = (isChannelOpen: boolean) =>
+  Promise.resolve({
+    status: isChannelOpen ? 'OPEN' : 'CLOSED',
+    channelEpoch: { toBN: () => new BN(1) }
+  })
+
 const createMockChannel = ({
   isChannelOpen = true,
   isChannelStored = true,
@@ -68,19 +74,11 @@ const createMockChannel = ({
         counterparty
       })
     ),
-    getState: isChannelStored
-      ? sinon.stub().returns(
-          Promise.resolve({
-            getStatus() {
-              if (isChannelOpen) return 'OPEN'
-              return 'CLOSED'
-            },
-            getIteration() {
-              return new BN(1)
-            }
-          })
-        )
-      : sinon.stub().rejects(new Error())
+    getState: () => {
+      if (isChannelStored) return mockChannelEntry(isChannelOpen)
+      throw new Error('state not found')
+    },
+    channelEpoch: new BN(1)
   } as unknown) as Channel
 }
 
