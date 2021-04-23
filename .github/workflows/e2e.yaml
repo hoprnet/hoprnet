@@ -38,6 +38,13 @@ jobs:
       # @TODO
       # - Cache build process to allow multiple jobs per e2e test
       # - Move step for testing to a separate job
-      - name: End-to-end tests
+      - name: Nodes have a valid eth address
         shell: bash {0}
         run: ./test/e2e/1_nodes_have_valid_eth_address.sh
+
+      # @TODO
+      # - Cache build process to allow multiple jobs per e2e test
+      # - Move step for testing to a separate job
+      - name: Nodes can hold assets in wallet
+        shell: bash {0}
+        run: ./test/e2e/2_nodes_can_be_funded.sh
