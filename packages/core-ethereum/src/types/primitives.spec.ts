@@ -9,7 +9,10 @@ const uncompressedPubKey =
 const publicKey = '0x021464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8'
 const address = '0x115Bc5B501CdD8D1fA5098D3c9Be8dd5954CA371'
 
-describe('test Address primitive', function () {
+describe.only('test Address primitive', function () {
+  const empty = new Address(new Uint8Array({ length: Address.SIZE }))
+  const larger = new Address(new Uint8Array({ length: Address.SIZE }).fill(1))
+
   it('should have a size of 20', function () {
     assert.strictEqual(Address.SIZE, 20)
   })
@@ -30,7 +33,23 @@ describe('test Address primitive', function () {
     assert(Address.fromString(address).eq(Address.fromString(address)), 'addresses not equal')
   })
 
-  // TODO: test compare, lt, sortPair
+  it('should compare correctly', function () {
+    assert.strictEqual(empty.compare(empty), 0)
+    assert.strictEqual(empty.compare(larger), -1)
+    assert.strictEqual(larger.compare(empty), 1)
+  })
+
+  it('should be less than correctly', function () {
+    assert(empty.lt(larger))
+    assert(!larger.lt(empty))
+  })
+
+  it('should sort addresses correctly', function () {
+    const [partyA, partyB] = empty.sortPair(larger)
+
+    assert.strictEqual(partyA.toHex(), empty.toHex())
+    assert.strictEqual(partyB.toHex(), larger.toHex())
+  })
 })
 
 describe('test PublicKey primitive', function () {

@@ -63,6 +63,8 @@ export class Address {
   constructor(private arr: Uint8Array) {
     if (arr.length !== Address.SIZE) {
       throw new Error('Incorrect size Uint8Array for address')
+    } else if (!ethers.utils.isAddress(u8aToHex(arr))) {
+      throw new Error('Incorrect Uint8Array for address')
     }
   }
 
@@ -71,7 +73,6 @@ export class Address {
   }
 
   static fromString(str: string): Address {
-    if (!ethers.utils.isAddress(str)) throw Error(`String ${str} is not an address`)
     return new Address(stringToU8a(str))
   }
 
