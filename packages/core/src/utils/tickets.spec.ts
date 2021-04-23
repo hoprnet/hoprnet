@@ -52,7 +52,6 @@ const createMockTicket = ({
 
 const createMockChannel = ({
   isChannelOpen = true,
-  isChannelStored = true,
   self = new Balance(new BN(0)),
   counterparty = new Balance(new BN(100))
 }: {
@@ -68,19 +67,8 @@ const createMockChannel = ({
         counterparty
       })
     ),
-    getState: isChannelStored
-      ? sinon.stub().returns(
-          Promise.resolve({
-            getStatus() {
-              if (isChannelOpen) return 'OPEN'
-              return 'CLOSED'
-            },
-            getIteration() {
-              return new BN(1)
-            }
-          })
-        )
-      : sinon.stub().rejects(new Error())
+    channelState: isChannelOpen ? 'OPEN' :  'CLOSED',
+    channelEpoch: new BN(1) 
   } as unknown) as Channel
 }
 

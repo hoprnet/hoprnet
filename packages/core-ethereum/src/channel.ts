@@ -132,7 +132,7 @@ class Channel {
     try {
       c = await this.getState()
     } catch {}
-    if (c.status !== 'CLOSED') {
+    if (c && c.status !== 'CLOSED') {
       throw Error('Channel is already opened')
     }
 
@@ -148,7 +148,7 @@ class Channel {
         hoprToken.send,
         hoprChannels.address,
         fundAmount.toBN().toString(),
-        abiCoder.encode(['bool', 'address', 'address'], [true, myAddress.toHex(), counterpartyAddress.toHex()])
+        abiCoder.encode(['address', 'address', 'uint256', 'uint256'], [myAddress.toHex(), counterpartyAddress.toHex(), fundAmount.toBN().toString(), '0'])
       )
       await transaction.wait()
 
@@ -212,11 +212,11 @@ class Channel {
 
   async createTicket(amount: Balance, challenge: Hash, winProb: number) {
     const counterpartyAddress = this.counterparty.toAddress()
-    const counterpartyState = await this.connector.indexer.getAccount(counterpartyAddress)
+    const c = await this.getState()
     return Ticket.create(
       counterpartyAddress,
       challenge,
-      new UINT256(counterpartyState.counter),
+      c.ticketEpochFor(this.counterparty.toAddress()),
       new UINT256(new BN(this.index++)),
       amount,
       computeWinningProbability(winProb),

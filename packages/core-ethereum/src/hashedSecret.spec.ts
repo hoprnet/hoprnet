@@ -3,6 +3,7 @@ import LevelUp from 'levelup'
 import MemDown from 'memdown'
 import { Commitment } from './commitment'
 import sinon from 'sinon'
+import { Hash } from './types'
 
 describe('test commitment', function () {
   let fakeSet, fakeGet, fakeDB, fakeId
@@ -10,7 +11,7 @@ describe('test commitment', function () {
     fakeSet = sinon.fake.resolves(true)
     fakeGet = sinon.fake.resolves(undefined)
     fakeDB = new LevelUp(MemDown())
-    fakeId = 'test'
+    fakeId = new Hash(new Uint8Array([1]))
   })
 
   it('should publish a hashed secret', async function () {

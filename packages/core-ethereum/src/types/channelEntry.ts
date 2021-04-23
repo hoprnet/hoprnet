@@ -117,6 +117,16 @@ class ChannelEntry {
   public getId() {
     return Channel.generateId(this.partyA, this.partyB)
   }
+
+  public ticketEpochFor(addr: Address) {
+    if (addr.eq(this.partyA)){
+      return this.partyATicketEpoch
+    }
+    if (addr.eq(this.partyB)){
+      return this.partyBTicketEpoch
+    }
+    throw new Error('Wrong addr for this channel')
+  }
 }
 
 export default ChannelEntry
