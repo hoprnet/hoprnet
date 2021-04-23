@@ -30,6 +30,7 @@ The sender (A) picks a random $x\in \mathbb{Z}^*_q$ that is used to derive new k
 \item $a_0=g^x,s_0=y^x_B,b_0=h(a_0,s_0)$
 \item $a_1=g^{xb_0},s_1=y^{xb_0}_C,b_1=h(a_1,s_1)$
 \item $a_2=g^{xb_0b_1},s_2=y^{xb_0b_1}_D,b_2=h(a_2,s_2)$
+\item $a_3=g^{xb_0b_1b_2},s_3=y^{xb_0b_1b_2}_D,b_3=h(a_3,s_3)$
 \end{itemize}
  Where $y_B,y_C,y_D,y_Z$ are the public keys of the nodes $B,C, D$  which we assume are available to $A$ . The $a_i$ are the group elements which, when combined with the nodes’ public keys, allows computing a shared key for each via Diffie-Hellman (DH) key exchange, 
  and so the first node in the user-chosen route can forward the packet to the next, and only that mix-node can decrypt it.
