@@ -31,4 +31,3 @@ describe('test commitment', function () {
     assert(c2.eq(c3), "Repeated initializations should return the same")
   })
 })
-
