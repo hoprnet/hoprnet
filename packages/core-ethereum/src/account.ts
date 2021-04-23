@@ -37,8 +37,8 @@ class Account {
         minPending: durations.minutes(15)
       },
       {
-        getLatestBlockNumber: this.api.getLatestBlockNumber,
-        getTransactionCount: this.api.getTransactionCount,
+        getLatestBlockNumber: this.api.getLatestBlockNumber.bind(this.api),
+        getTransactionCount: this.api.getTransactionCount.bind(this.api),
         getConfirmedTransactions: () => Array.from(this._transactions.confirmed.values()),
         getPendingTransactions: () => Array.from(this._transactions.pending.values())
       }

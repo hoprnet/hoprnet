@@ -105,7 +105,6 @@ export default class HoprEthereum {
         }
 
         await this.indexer.stop()
-        // provider.disconnect(1000, 'Stopping HOPR node.')
         this._status = 'dead'
         log(chalk.green('Connector stopped'))
       })
@@ -170,16 +169,6 @@ export default class HoprEthereum {
   ): Promise<HoprEthereum> {
     const provider = new ethers.providers.WebSocketProvider(options?.provider || DEFAULT_URI)
     const wallet = new ethers.Wallet(privateKey).connect(provider)
-
-    // TODO: connect, disconnect, reconnect
-    // provider = new Web3.providers.WebsocketProvider(providerUri, {
-    //   reconnect: {
-    //     auto: true,
-    //     delay: 1000, // ms
-    //     maxAttempts: 30
-    //   }
-    // })
-
     const chainId = await provider.getNetwork().then((res) => res.chainId)
     const network = utils.getNetworkName(chainId) as Networks
     const contracts = getContracts()?.[network]
