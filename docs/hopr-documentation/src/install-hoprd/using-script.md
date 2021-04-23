@@ -14,7 +14,7 @@ Our script will ask you to accept our [Privacy Policy](https://hoprnet.org/priva
 ```bash
 $ bash -c "$(curl -s https://raw.githubusercontent.com/hoprnet/hopr-sh/master/setup-hoprd.sh)"
 
-██╗  ██╗ ██████╗ ██████╗ ██████╗ 
+██╗  ██╗ ██████╗ ██████╗ ██████╗
 ██║  ██║██╔═══██╗██╔══██╗██╔══██╗
 ███████║██║   ██║██████╔╝██████╔╝
 ██╔══██║██║   ██║██╔═══╝ ██╔══██╗
@@ -59,6 +59,7 @@ $ curl https://raw.githubusercontent.com/hoprnet/hopr-sh/master/setup-hoprd-maco
 $ chmod +x setup-hoprd.sh
 $ ./setup-hoprd.sh
 ```
+
 ### One-liner
 
 If you like to live dangerously and have no regards to safety and trust us (you shouldn’t) and want a one-liner script, here it is.
