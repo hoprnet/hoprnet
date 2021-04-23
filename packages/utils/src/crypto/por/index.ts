@@ -121,10 +121,11 @@ export function validateAcknowledgement(
   ownKey: Uint8Array,
   ack: Uint8Array,
   challenge: Uint8Array,
-  ownShare?: Uint8Array
+  ownShare?: Uint8Array,
+  response?: Uint8Array
 ): { valid: true; response: Uint8Array } | { valid: false } {
   // clone ownKey before adding a tweak to it
-  const response = privateKeyTweakAdd(Uint8Array.from(ownKey), ack)
+  response = response ?? privateKeyTweakAdd(Uint8Array.from(ownKey), ack)
 
   let valid: boolean
 

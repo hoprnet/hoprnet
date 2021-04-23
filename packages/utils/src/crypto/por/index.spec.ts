@@ -77,6 +77,23 @@ describe('PoR - proof of relay', function () {
 
     const firstChallenge = createFirstChallenge(secrets)
 
-    assert(validateAcknowledgement(firstChallenge.ownKey, deriveAckKeyShare(secrets[1]), firstChallenge.ticketChallenge).valid == true)
+    const validateResult = validateAcknowledgement(
+      firstChallenge.ownKey,
+      deriveAckKeyShare(secrets[1]),
+      firstChallenge.ticketChallenge
+    )
+
+    assert(validateResult.valid == true, `Challenge must be solved`)
+
+    assert(
+      validateAcknowledgement(
+        firstChallenge.ownKey,
+        deriveAckKeyShare(secrets[1]),
+        firstChallenge.ticketChallenge,
+        undefined,
+        validateResult.response
+      ).valid == true,
+      `Returned response must solve the challenge`
+    )
   })
 })
