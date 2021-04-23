@@ -38,7 +38,6 @@ export default class HoprEthereum {
   private _status: 'dead' | 'alive' = 'dead'
   private _starting?: Promise<HoprEthereum>
   private _stopping?: Promise<void>
-  private _debug: boolean
 
   public channel = Channel
   public indexer: Indexer
@@ -53,12 +52,10 @@ export default class HoprEthereum {
     public wallet: IWallet,
     public hoprChannels: HoprChannels,
     public hoprToken: HoprToken,
-    debug: boolean,
     genesisBlock: number,
     maxConfirmations: number,
     blockRange: number
   ) {
-    this._debug = debug
     this.indexer = new Indexer(this, genesisBlock, maxConfirmations, blockRange)
     this.account = new Account(
       {
@@ -147,7 +144,7 @@ export default class HoprEthereum {
    * Initializes the on-chain values of our account.
    */
   public async initOnchainValues(): Promise<void> {
-    await this.hashedSecret.initialize(this._debug) // no-op if already initialized
+    await this.hashedSecret.initialize() // no-op if already initialized
   }
 
   async withdraw(currency: 'NATIVE' | 'HOPR', recipient: string, amount: string): Promise<string> {
@@ -191,13 +188,12 @@ export default class HoprEthereum {
    * @param db database instance
    * @param privateKey that is used to derive that on-chain identity
    * @param options.provider provider URI that is used to connect to the blockchain
-   * @param options.debug debug mode, will generate account secrets using account's public key
    * @returns a promise resolved to the connector
    */
   public static async create(
     db: LevelUp,
     privateKey: Uint8Array,
-    options?: { id?: number; provider?: string; debug?: boolean; maxConfirmations?: number }
+    options?: { provider?: string; maxConfirmations?: number }
   ): Promise<HoprEthereum> {
     const provider = new ethers.providers.WebSocketProvider(options?.provider || DEFAULT_URI)
     const wallet = new ethers.Wallet(privateKey).connect(provider)
@@ -232,7 +228,6 @@ export default class HoprEthereum {
       wallet,
       hoprChannels,
       hoprToken,
-      options?.debug || false,
       contracts?.HoprChannels?.deployedAt ?? 0,
       options.maxConfirmations ?? MAX_CONFIRMATIONS,
       INDEXER_BLOCK_RANGE

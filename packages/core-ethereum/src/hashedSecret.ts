@@ -4,7 +4,7 @@ import type { HoprChannels } from './contracts'
 import { Hash } from './types'
 import Debug from 'debug'
 import { randomBytes } from 'crypto'
-import { u8aConcat, iterateHash, recoverIteratedHash } from '@hoprnet/hopr-utils'
+import { iterateHash, recoverIteratedHash } from '@hoprnet/hopr-utils'
 import { storeHashIntermediaries, getOnChainSecretIntermediary, getOnChainSecret } from './dbKeys'
 
 export const DB_ITERATION_BLOCK_SIZE = 10000
@@ -24,23 +24,13 @@ class HashedSecret {
   constructor(private db: LevelUp, private account: Account, private channels: HoprChannels) {}
 
   /**
-   * @returns a deterministic secret that is used in debug mode
-   */
-  private async getDebugAccountSecret(): Promise<Hash> {
-    const account = await this.channels.accounts(this.account.address.toHex())
-    return new Hash(
-      await hashFunction(u8aConcat(new Uint8Array([account.counter.toNumber()]), this.account.publicKey.serialize()))
-    )
-  }
-
-  /**
-   * Creates a random secret OR a deterministic one if running in debug mode,
+   * Creates a random secret,
    * it will then loop X amount of times, on each loop we hash the previous result.
    * We store the last result.
    * @returns a promise that resolves to the onChainSecret
    */
-  private async createAndStoreSecretOffChainAndReturnOnChainSecret(debug: boolean): Promise<Hash> {
-    let onChainSecret = debug ? await this.getDebugAccountSecret() : new Hash(randomBytes(Hash.SIZE))
+  private async createAndStoreSecretOffChainAndReturnOnChainSecret(): Promise<Hash> {
+    let onChainSecret = new Hash(randomBytes(Hash.SIZE))
     const result = await iterateHash(onChainSecret.serialize(), hashFunction, TOTAL_ITERATIONS, DB_ITERATION_BLOCK_SIZE)
     storeHashIntermediaries(this.db, result.intermediates)
     return new Hash(result.hash)
@@ -91,17 +81,13 @@ class HashedSecret {
     log('stored on chain')
   }
 
-  private async calcOnChainSecretFromDb(debug?: boolean): Promise<Hash | never> {
-    let result = await iterateHash(
-      debug == true ? (await this.getDebugAccountSecret()).serialize() : undefined,
-      hashFunction,
-      TOTAL_ITERATIONS,
-      DB_ITERATION_BLOCK_SIZE,
-      (x) => getOnChainSecretIntermediary(this.db, x)
+  private async calcOnChainSecretFromDb(): Promise<Hash | never> {
+    let result = await iterateHash(undefined, hashFunction, TOTAL_ITERATIONS, DB_ITERATION_BLOCK_SIZE, (x) =>
+      getOnChainSecretIntermediary(this.db, x)
     )
 
     if (result == undefined) {
-      return await this.createAndStoreSecretOffChainAndReturnOnChainSecret(debug)
+      return await this.createAndStoreSecretOffChainAndReturnOnChainSecret()
     }
 
     return new Hash(result.hash)
@@ -126,7 +112,7 @@ class HashedSecret {
     return new Hash(result.preImage)
   }
 
-  public async initialize(debug?: boolean): Promise<void> {
+  public async initialize(): Promise<void> {
     if (this.initialized) return
     this.offChainSecret = await getOnChainSecret(this.db)
     this.onChainSecret = await this.account.getOnChainSecret()
@@ -141,11 +127,11 @@ class HashedSecret {
     }
     if (this.offChainSecret && !this.onChainSecret) {
       log('secret exists offchain but not on chain')
-      const onChainSecret = await this.calcOnChainSecretFromDb(debug)
+      const onChainSecret = await this.calcOnChainSecretFromDb()
       await this.storeSecretOnChain(onChainSecret)
     } else {
       log('reinitializing')
-      const onChainSecret = await this.createAndStoreSecretOffChainAndReturnOnChainSecret(debug)
+      const onChainSecret = await this.createAndStoreSecretOffChainAndReturnOnChainSecret()
       await this.storeSecretOnChain(onChainSecret)
     }
     this.initialized = true

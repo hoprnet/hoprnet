@@ -5,6 +5,7 @@ export const getAccount = (privateKey: string) => {
   const uncompressedPublicKey = ethers.utils.computePublicKey(wallet.publicKey, false)
 
   return {
+    wallet,
     privateKey: wallet.privateKey,
     uncompressedPublicKey: ethers.utils.hexDataSlice(uncompressedPublicKey, 1), // remove identifier
     publicKey: ethers.utils.hexDataSlice(wallet.publicKey, 1), // remove identifier

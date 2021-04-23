@@ -21,8 +21,14 @@ const abiEncoder = ethers.utils.Interface.getAbiCoder()
 
 const useFixtures = deployments.createFixture(async () => {
   const [deployer] = await ethers.getSigners()
-  const accountA = await ethers.getSigner(ACCOUNT_A.address)
-  const accountB = await ethers.getSigner(ACCOUNT_B.address)
+  await deployer.sendTransaction({
+    to: ACCOUNT_A.address,
+    value: ethers.utils.parseEther('1')
+  })
+  await deployer.sendTransaction({
+    to: ACCOUNT_B.address,
+    value: ethers.utils.parseEther('1')
+  })
 
   // run migrations
   const contracts = await deployments.fixture()
@@ -44,8 +50,8 @@ const useFixtures = deployments.createFixture(async () => {
     hoprToken,
     hoprChannels,
     deployer,
-    accountA,
-    accountB,
+    accountA: ACCOUNT_A.wallet.connect(ethers.provider),
+    accountB: ACCOUNT_B.wallet.connect(ethers.provider),
     ...mockedTickets
   }
 })
