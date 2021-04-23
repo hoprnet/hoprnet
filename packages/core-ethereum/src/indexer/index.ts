@@ -9,11 +9,9 @@ import BN from 'bn.js'
 import Heap from 'heap-js'
 import { pubKeyToPeerId, randomChoice } from '@hoprnet/hopr-utils'
 import { Address, ChannelEntry, Hash, PublicKey, Balance, Snapshot } from '../types'
-import * as reducers from './reducers'
 import * as db from './db'
 import { isConfirmedBlock, snapshotComparator } from './utils'
 import Debug from 'debug'
-import { Channel } from '..'
 
 export type RoutingChannel = [source: PeerId, destination: PeerId, stake: Balance]
 
@@ -237,26 +235,11 @@ class Indexer extends EventEmitter {
 
       const eventName = event.event as EventNames
 
-      try {
-        if (eventName === 'AccountInitialized') {
-          await this.onAccountInitialized(event as Event<'AccountInitialized'>)
-        } else if (eventName === 'AccountSecretUpdated') {
-          await this.onAccountSecretUpdated(event as Event<'AccountSecretUpdated'>)
-        } else if (eventName === 'ChannelFunded') {
-          await this.onChannelFunded(event as Event<'ChannelFunded'>)
-        } else if (eventName === 'ChannelOpened') {
-          await this.onChannelOpened(event as Event<'ChannelOpened'>)
-        } else if (eventName === 'TicketRedeemed') {
-          await this.onTicketRedeemed(event as Event<'TicketRedeemed'>)
-        } else if (eventName === 'ChannelPendingToClose') {
-          await this.onChannelPendingToClose(event as Event<'ChannelPendingToClose'>)
-        } else if (eventName === 'ChannelClosed') {
-          await this.onChannelClosed(event as Event<'ChannelClosed'>)
-        }
-      } catch (err) {
-        log(chalk.red('Error while reducing event'))
-        throw err
+      if (eventName != 'ChannelUpdate') {
+        throw new Error('bad event name')
       }
+
+      await this.onChannelUpdated(event as Event<'ChannelUpdate'>)
 
       lastSnapshot = new Snapshot(new BN(event.blockNumber), new BN(event.transactionIndex), new BN(event.logIndex))
       await db.updateLatestConfirmedSnapshot(this.api.db, lastSnapshot)
@@ -273,123 +256,9 @@ class Indexer extends EventEmitter {
     this.unconfirmedEvents.addAll(events)
   }
 
-  // on new events
-  private async onAccountInitialized(event: Event<'AccountInitialized'>): Promise<void> {
-    const accountId = Address.fromString(event.args.account)
-    const account = await reducers.onAccountInitialized(event)
-
-    await db.updateAccount(this.api.db, accountId, account)
-  }
-
-  private async onAccountSecretUpdated(event: Event<'AccountSecretUpdated'>): Promise<void> {
-    const data = event.args
-
-    const accountId = Address.fromString(data.account)
-
-    const storedAccount = await db.getAccount(this.api.db, accountId)
-    if (!storedAccount) throw Error(`Could not find stored account ${accountId.toHex()} !`)
-
-    const account = await reducers.onAccountSecretUpdated(event, storedAccount)
-
-    await db.updateAccount(this.api.db, accountId, account)
-  }
-
-  private async onChannelFunded(event: Event<'ChannelFunded'>): Promise<void> {
-    const data = event.args
-
-    const accountIdA = Address.fromString(data.accountA)
-    const accountIdB = Address.fromString(data.accountB)
-    const channelId = Channel.generateId(accountIdA, accountIdB)
-
-    let storedChannel = await db.getChannel(this.api.db, channelId)
-    const channel = await reducers.onChannelFunded(event, storedChannel)
-
-    // const channelId = await getId(recipientAddress, counterpartyAddress)
-    // log('Processing event %s with channelId %s', event.name, channelId.toHex())
-
-    await db.updateChannel(this.api.db, channelId, channel)
-
-    // log('Channel %s got funded by %s', chalk.green(channelId.toHex()), chalk.green(event.data.funder))
-  }
-
-  private async onChannelOpened(event: Event<'ChannelOpened'>): Promise<void> {
-    const data = event.args
-
-    const openerAccountId = Address.fromString(data.opener)
-    const counterpartyAccountId = Address.fromString(data.counterparty)
-    const channelId = Channel.generateId(openerAccountId, counterpartyAccountId)
-    // log('Processing event %s with channelId %s', event.name, channelId.toHex())
-
-    let storedChannel = await db.getChannel(this.api.db, channelId)
-    if (!storedChannel) throw Error(`Could not find stored channel ${channelId.toHex()}`)
-
-    const channel = await reducers.onChannelOpened(event, storedChannel)
-
-    await db.updateChannel(this.api.db, channelId, channel)
-
-    this.emit('channelOpened', channel)
-
-    // log('Channel %s got opened by %s', chalk.green(channelId.toHex()), chalk.green(openerAddress.toHex()))
-  }
-
-  private async onTicketRedeemed(event: Event<'TicketRedeemed'>): Promise<void> {
-    const data = event.args
-
-    const redeemerAccountId = Address.fromString(data.redeemer)
-    const counterpartyAccountId = Address.fromString(data.counterparty)
-    const channelId = Channel.generateId(redeemerAccountId, counterpartyAccountId)
-    // log('Processing event %s with channelId %s', event.name, channelId.toHex())
-
-    const storedChannel = await db.getChannel(this.api.db, channelId)
-    if (!storedChannel) throw Error(`Could not find stored channel ${channelId.toHex()}`)
-
-    const channel = await reducers.onTicketRedeemed(event, storedChannel)
-
-    await db.updateChannel(this.api.db, channelId, channel)
-
-    // log('Ticket redeemd in channel %s by %s', chalk.green(channelId.toHex()), chalk.green(redeemerAddress.toHex()))
-  }
-
-  private async onChannelPendingToClose(event: Event<'ChannelPendingToClose'>): Promise<void> {
-    const data = event.args
-
-    const initiatorAccountId = Address.fromString(data.initiator)
-    const counterpartyAccountId = Address.fromString(data.counterparty)
-    const channelId = Channel.generateId(initiatorAccountId, counterpartyAccountId)
-    // log('Processing event %s with channelId %s', event.name, channelId.toHex())
-
-    const storedChannel = await db.getChannel(this.api.db, channelId)
-    if (!storedChannel) throw Error(`Could not find stored channel ${channelId.toHex()}`)
-
-    const channel = await reducers.onChannelPendingToClose(event, storedChannel)
-
-    await db.updateChannel(this.api.db, channelId, channel)
-
-    // log(
-    //   'Channel closure initiated for %s by %s',
-    //   chalk.green(channelId.toHex()),
-    //   chalk.green(initiatorAddress.toHex())
-    // )
-  }
-
-  private async onChannelClosed(event: Event<'ChannelClosed'>): Promise<void> {
-    const data = event.args
-
-    const closerAccountId = Address.fromString(data.initiator)
-    const counterpartyAccountId = Address.fromString(data.counterparty)
-    const channelId = Channel.generateId(closerAccountId, counterpartyAccountId)
-    // log('Processing event %s with channelId %s', event.name, channelId.toHex())
-
-    const storedChannel = await db.getChannel(this.api.db, channelId)
-    if (!storedChannel) throw Error(`Could not find stored channel ${channelId.toHex()}`)
-
-    const channel = await reducers.onChannelClosed(event, storedChannel)
-
-    await db.updateChannel(this.api.db, channelId, channel)
-
-    this.emit('channelClosed', channel)
-
-    // log('Channel %s got closed by %s', chalk.green(channelId.toHex()), chalk.green(closerAddress.toHex()))
+  private async onChannelUpdated(event: Event<'ChannelUpdate'>): Promise<void> {
+    const channel = ChannelEntry.fromSCEvent(event)
+    await db.updateChannel(this.connector.db, channel.getId(), channel)
   }
 
   public async getAccount(address: Address) {
@@ -428,21 +297,15 @@ class Indexer extends EventEmitter {
     ])
 
     if (sourcePubKey.eq(partyAPubKey)) {
-      return [source, await pubKeyToPeerId(partyBPubKey.serialize()), new Balance(channel.partyABalance)]
+      return [source, await pubKeyToPeerId(partyBPubKey.serialize()), channel.partyABalance]
     } else {
-      const partyBBalance = new Balance(
-        new Balance(channel.deposit).toBN().sub(new Balance(channel.partyABalance).toBN())
-      )
+      const partyBBalance = channel.partyBBalance
       return [source, await pubKeyToPeerId(partyAPubKey.serialize()), partyBBalance]
     }
   }
 
   public async getRandomChannel() {
-    const HACK = 14744510 // Arbitrarily chosen block for our testnet. Total hack.
-
     const channels = await this.getChannels(async (channel) => {
-      // filter out channels older than hack
-      if (!channel.openedAt.gtn(HACK)) return false
       // filter out channels with uninitialized parties
       const pubKeys = await Promise.all([this.getPublicKeyOf(channel.partyA), this.getPublicKeyOf(channel.partyB)])
       return pubKeys.every((pubKeys) => pubKeys)

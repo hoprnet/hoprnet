@@ -6,6 +6,11 @@ class UINT256 {
   public toBN(): BN {
     return this.bn
   }
+
+  static deserialize(arr: Uint8Array) {
+    return new UINT256(new BN(arr))
+  }
+
   public serialize(): Uint8Array {
     return new Uint8Array(this.bn.toBuffer('be', UINT256.SIZE))
   }

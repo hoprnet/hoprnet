@@ -2,21 +2,12 @@ import type { Wallet as IWallet, ContractTransaction } from 'ethers'
 import type { Networks } from '@hoprnet/hopr-ethereum'
 import BN from 'bn.js'
 import { ethers, errors } from 'ethers'
-import { durations, isExpired, u8aConcat } from '@hoprnet/hopr-utils'
+import { durations, isExpired } from '@hoprnet/hopr-utils'
 import NonceTracker, { NonceLock } from './nonce-tracker'
 import TransactionManager from './transaction-manager'
-import {
-  PublicKey,
-  Address,
-  Acknowledgement,
-  Balance,
-  Hash,
-  NativeBalance,
-  UINT256,
-  UnacknowledgedTicket,
-  AccountEntry
-} from './types'
-import { isWinningTicket, getNetworkGasPrice } from './utils'
+import { PublicKey, Address, Balance, Hash, NativeBalance, UINT256 } from './types'
+import Indexer from './indexer'
+import { getNetworkGasPrice } from './utils'
 import { PROVIDER_CACHE_TTL } from './constants'
 
 import debug from 'debug'
@@ -29,20 +20,16 @@ class Account {
   private _onChainSecret?: Hash
   private _nonceTracker: NonceTracker
   private _transactions = new TransactionManager()
-  private preimage: Hash
 
   constructor(
-    private ops: {
-      network: Networks
-    },
+    private network: Networks,
     private api: {
       getLatestBlockNumber: () => Promise<number>
       getTransactionCount: (address: Address, blockNumber?: number) => Promise<number>
       getBalance: (address: Address) => Promise<Balance>
       getNativeBalance: (address: Address) => Promise<NativeBalance>
-      getAccount: (address: Address) => Promise<AccountEntry>
-      findPreImage: (hash: Hash) => Promise<Hash>
     },
+    private indexer: Indexer,
     public wallet: IWallet
   ) {
     this._nonceTracker = new NonceTracker(
@@ -50,8 +37,8 @@ class Account {
         minPending: durations.minutes(15)
       },
       {
-        getLatestBlockNumber: this.api.getLatestBlockNumber,
-        getTransactionCount: this.api.getTransactionCount,
+        getLatestBlockNumber: this.api.getLatestBlockNumber.bind(this.api),
+        getTransactionCount: this.api.getTransactionCount.bind(this.api),
         getConfirmedTransactions: () => Array.from(this._transactions.confirmed.values()),
         getPendingTransactions: () => Array.from(this._transactions.pending.values())
       }
@@ -59,7 +46,7 @@ class Account {
   }
 
   public async getNonceLock(): Promise<NonceLock> {
-    return this._nonceTracker.getNonceLock(this.address)
+    return this._nonceTracker.getNonceLock(this.getAddress())
   }
 
   /**
@@ -67,7 +54,7 @@ class Account {
    * @returns HOPR balance
    */
   public async getBalance(useCache: boolean = false): Promise<Balance> {
-    return getBalance(this.api.getBalance, this.address, useCache)
+    return getBalance(this.api.getBalance, this.getAddress(), useCache)
   }
 
   /**
@@ -75,11 +62,11 @@ class Account {
    * @returns ETH balance
    */
   public async getNativeBalance(useCache: boolean = false): Promise<NativeBalance> {
-    return getNativeBalance(this.api.getNativeBalance, this.address, useCache)
+    return getNativeBalance(this.api.getNativeBalance, this.getAddress(), useCache)
   }
 
   async getTicketEpoch(): Promise<UINT256> {
-    const state = await this.api.getAccount(this.address)
+    const state = await this.indexer.getAccount(this.getAddress())
     if (!state || !state.counter) return UINT256.fromString('0')
     return new UINT256(state.counter)
   }
@@ -89,40 +76,10 @@ class Account {
    */
   async getOnChainSecret(): Promise<Hash | undefined> {
     if (this._onChainSecret && !this._onChainSecret.eq(EMPTY_HASHED_SECRET)) return this._onChainSecret
-    const state = await this.api.getAccount(this.address)
+    const state = await this.indexer.getAccount(this.getAddress())
     if (!state || !state.secret) return undefined
     this.updateLocalState(state.secret)
     return state.secret
-  }
-
-  private async initPreimage() {
-    if (!this.preimage) {
-      const ocs = await this.getOnChainSecret()
-      if (!ocs) {
-        throw new Error('cannot reserve preimage when there is no on chain secret')
-      }
-      this.preimage = await this.api.findPreImage(ocs)
-    }
-  }
-
-  /**
-   * Reserve a preImage for the given ticket if it is a winning ticket.
-   * @param ticket the acknowledged ticket
-   */
-  async acknowledge(
-    unacknowledgedTicket: UnacknowledgedTicket,
-    acknowledgementHash: Hash
-  ): Promise<Acknowledgement | null> {
-    await this.initPreimage()
-    const response = Hash.create(u8aConcat(unacknowledgedTicket.secretA.serialize(), acknowledgementHash.serialize()))
-    const ticket = unacknowledgedTicket.ticket
-    if (await isWinningTicket(ticket.getHash(), response, this.preimage, ticket.winProb)) {
-      const ack = new Acknowledgement(ticket, response, this.preimage)
-      this.preimage = await this.api.findPreImage(this.preimage)
-      return ack
-    } else {
-      return null
-    }
   }
 
   get privateKey(): Uint8Array {
@@ -134,7 +91,7 @@ class Account {
     return PublicKey.fromString(ethers.utils.computePublicKey(this.wallet.publicKey, true))
   }
 
-  get address(): Address {
+  getAddress(): Address {
     return Address.fromString(this.wallet.address)
   }
 
@@ -147,8 +104,8 @@ class Account {
     ...rest: Parameters<T>
   ): Promise<ContractTransaction> {
     const gasLimit = 300e3
-    const gasPrice = getNetworkGasPrice(this.ops.network)
-    const nonceLock = await this._nonceTracker.getNonceLock(this.address)
+    const gasPrice = getNetworkGasPrice(this.network)
+    const nonceLock = await this._nonceTracker.getNonceLock(this.getAddress())
     const nonce = nonceLock.nextNonce
     let transaction: ContractTransaction
 

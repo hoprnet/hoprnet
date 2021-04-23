@@ -72,7 +72,7 @@ export default class ListOpenChannels extends AbstractCommand {
       const selfAddress = await selfPubKey.toAddress()
       const channels = (await this.node.paymentChannels.indexer.getChannelsOf(selfAddress))
         // do not print CLOSED channels
-        .filter((channel) => channel.getStatus() !== 'CLOSED')
+        .filter((channel) => channel.status !== 'CLOSED')
       const result: string[] = []
 
       if (channels.length === 0) {
@@ -87,9 +87,9 @@ export default class ListOpenChannels extends AbstractCommand {
         // counterparty has not initialized
         if (!counterpartyPubKey) continue
 
-        const totalBalance = moveDecimalPoint(channel.deposit.toString(), Balance.DECIMALS * -1)
+        const totalBalance = channel.partyABalance.toBN().add(channel.partyABalance.toBN())
         const myBalance = moveDecimalPoint(
-          selfIsPartyA ? channel.partyABalance.toString() : channel.deposit.sub(channel.partyABalance).toString(),
+          selfIsPartyA ? channel.partyABalance.toString() : totalBalance.sub(channel.partyABalance.toBN()).toString(),
           Balance.DECIMALS * -1
         )
         const peerId = (await pubKeyToPeerId(counterpartyPubKey.serialize())).toB58String()
@@ -97,10 +97,10 @@ export default class ListOpenChannels extends AbstractCommand {
         result.push(
           this.generateOutput({
             id: id.toHex(),
-            totalBalance,
+            totalBalance: moveDecimalPoint(totalBalance.toString(), Balance.DECIMALS * -1),
             myBalance,
             peerId,
-            status: channel.getStatus()
+            status: channel.status
           })
         )
       }
