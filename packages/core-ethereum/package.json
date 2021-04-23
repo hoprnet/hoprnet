@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-core-ethereum",
-  "version": "1.71.0-next.64",
+  "version": "1.71.0-next.69",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -27,20 +27,18 @@
     "!**/*.spec.js.map"
   ],
   "dependencies": {
-    "@hoprnet/hopr-ethereum": "1.71.0-next.64",
-    "@hoprnet/hopr-utils": "1.71.0-next.64",
+    "@hoprnet/hopr-ethereum": "1.71.0-next.69",
+    "@hoprnet/hopr-utils": "1.71.0-next.69",
     "async-mutex": "^0.3.0",
     "bn.js": "^5.1.2",
     "chalk": "^4.1.0",
     "debug": "^4.3.1",
     "ethers": "^5.1.0",
     "heap-js": "^2.1.2",
-    "peer-id": "0.14.7",
+    "peer-id": "0.14.8",
     "secp256k1": "^4.0.2"
   },
   "devDependencies": {
-    "@hoprnet/hopr-demo-seeds": "1.71.0-next.39",
-    "@hoprnet/hopr-testing": "1.71.0-next.39",
     "@typechain/ethers-v5": "^6.0.5",
     "@types/debug": "^4.1.5",
     "@types/levelup": "^4.3.0",
@@ -68,8 +66,7 @@
     ],
     "spec": "**/*.spec.ts",
     "require": [
-      "ts-node/register",
-      "test.mocha.ts"
+      "ts-node/register"
     ]
   },
   "publishConfig": {

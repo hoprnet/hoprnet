@@ -159,13 +159,12 @@ export default class HoprEthereum {
    * @param db database instance
    * @param privateKey that is used to derive that on-chain identity
    * @param options.provider provider URI that is used to connect to the blockchain
-   * @param options.debug debug mode, will generate account secrets using account's public key
    * @returns a promise resolved to the connector
    */
   public static async create(
     db: LevelUp,
     privateKey: Uint8Array,
-    options?: { id?: number; provider?: string; debug?: boolean; maxConfirmations?: number }
+    options?: { provider?: string; maxConfirmations?: number }
   ): Promise<HoprEthereum> {
     const provider = new ethers.providers.WebSocketProvider(options?.provider || DEFAULT_URI)
     const wallet = new ethers.Wallet(privateKey).connect(provider)

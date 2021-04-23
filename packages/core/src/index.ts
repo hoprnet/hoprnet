@@ -71,7 +71,6 @@ interface NetOptions {
 export type ChannelStrategyNames = 'passive' | 'promiscuous'
 
 export type HoprOptions = {
-  debug: boolean
   network: string
   provider: string
   ticketAmount?: number
@@ -81,7 +80,6 @@ export type HoprOptions = {
   createDbIfNotExist?: boolean
   peerId?: PeerId
   password?: string
-  id?: number // TODO - kill this opaque accessor of db files...
   bootstrapNode?: boolean
   connector?: HoprCoreEthereum
   bootstrapServers?: Multiaddr[]
@@ -93,12 +91,10 @@ export type HoprOptions = {
   }
 }
 
-const defaultDBPath = (id: string | number, isBootstrap: boolean): string => {
+const defaultDBPath = (isBootstrap: boolean): string => {
   let folder: string
   if (isBootstrap) {
     folder = `bootstrap`
-  } else if (id) {
-    folder = `node_${id}`
   } else {
     folder = `node`
   }
@@ -108,7 +104,6 @@ const defaultDBPath = (id: string | number, isBootstrap: boolean): string => {
 class Hopr extends EventEmitter {
   // TODO make these actually private - Do not rely on any of these properties!
   // Allows us to construct HOPR with falsy options
-  public _debug: boolean
   public _dbKeys = DbKeys
 
   public output: (arr: Uint8Array) => void
@@ -222,7 +217,6 @@ class Hopr extends EventEmitter {
     verbose('# STARTED NODE')
     verbose('ID', this.getId().toB58String())
     verbose('Protocol version', VERSION)
-    this._debug = options.debug
   }
 
   /**
@@ -240,17 +234,12 @@ class Hopr extends EventEmitter {
       db
     })
 
-    if (
-      !options.debug &&
-      !options.bootstrapNode &&
-      (options.bootstrapServers == null || options.bootstrapServers.length == 0)
-    ) {
+    if (!options.bootstrapNode && (options.bootstrapServers == null || options.bootstrapServers.length == 0)) {
       throw Error(`Cannot start node without a bootstrap server`)
     }
 
     let connector = await HoprCoreEthereum.create(db, id.privKey.marshal(), {
-      provider: options.provider,
-      debug: options.debug
+      provider: options.provider
     })
 
     verbose('Created connector, now creating node')
@@ -696,7 +685,7 @@ class Hopr extends EventEmitter {
     if (options.dbPath) {
       dbPath = options.dbPath
     } else {
-      dbPath = defaultDBPath(options.id, options.bootstrapNode)
+      dbPath = defaultDBPath(options.bootstrapNode)
     }
 
     dbPath = path.resolve(dbPath)
