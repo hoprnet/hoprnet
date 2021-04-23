@@ -50,10 +50,11 @@ const createMockTicket = ({
   } as unknown) as Ticket
 }
 
-const mockChannelEntry = (isChannelOpen: boolean) => Promise.resolve({
-  status: isChannelOpen ? 'OPEN' : 'CLOSED',
-  channelEpoch: {toBN: () =>  new BN(1) },
-})
+const mockChannelEntry = (isChannelOpen: boolean) =>
+  Promise.resolve({
+    status: isChannelOpen ? 'OPEN' : 'CLOSED',
+    channelEpoch: { toBN: () => new BN(1) }
+  })
 
 const createMockChannel = ({
   isChannelOpen = true,
