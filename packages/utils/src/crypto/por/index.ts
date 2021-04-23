@@ -16,7 +16,9 @@ export { deriveAckKeyShare }
  * @param secrets shared secrets with creator of the packet
  * @returns the challenge for the first ticket sent to the first relayer
  */
-export function createFirstChallenge(secrets: Uint8Array[]): { ackChallenge: Uint8Array; ticketChallenge: Uint8Array } {
+export function createFirstChallenge(
+  secrets: Uint8Array[]
+): { ackChallenge: Uint8Array; ticketChallenge: Uint8Array; ownKey: Uint8Array } {
   if (secrets.some((secret) => secret.length != SECRET_LENGTH)) {
     throw Error(`Invalid arguments`)
   }
@@ -27,7 +29,7 @@ export function createFirstChallenge(secrets: Uint8Array[]): { ackChallenge: Uin
   const ackChallenge = publicKeyCreate(deriveAckKeyShare(secrets[0]))
   const ticketChallenge = createChallenge(s0, s1)
 
-  return { ackChallenge, ticketChallenge }
+  return { ackChallenge, ticketChallenge, ownKey: s0 }
 }
 
 /**
@@ -122,11 +124,11 @@ export function validateAcknowledgement(
   ownShare?: Uint8Array
 ): { valid: true; response: Uint8Array } | { valid: false } {
   // clone ownKey before adding a tweak to it
-  const response = privateKeyTweakAdd(ownKey.slice(), ack)
+  const response = privateKeyTweakAdd(Uint8Array.from(ownKey), ack)
 
   let valid: boolean
 
-  if (ownKey == undefined) {
+  if (ownShare == undefined) {
     valid = u8aEquals(publicKeyCreate(response), challenge)
   } else {
     valid = u8aEquals(publicKeyTweakAdd(ownShare, ack), challenge)
@@ -140,5 +142,6 @@ export function validateAcknowledgement(
 }
 
 function createChallenge(s0: Uint8Array, s1: Uint8Array) {
-  return publicKeyCreate(privateKeyTweakAdd(s0, s1))
+  // Clone s0 before adding tweak to it
+  return publicKeyCreate(privateKeyTweakAdd(Uint8Array.from(s0), s1))
 }

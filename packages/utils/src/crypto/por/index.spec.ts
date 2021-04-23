@@ -48,6 +48,11 @@ describe('PoR - proof of relay', function () {
 
     assert(validateResponseResult.valid == true, `Acknowledgement must solve the challenge`)
 
+    assert(
+      validateAcknowledgement(result.ownKey, ack, firstChallenge.ticketChallenge).valid,
+      `Should be valid also without group element`
+    )
+
     // Simulates the transformation as done by the
     // second relayer
     const secondResult = preVerify(secrets[1], secondPorString, result.nextTicketChallenge)
@@ -64,5 +69,14 @@ describe('PoR - proof of relay', function () {
     )
 
     assert(secondValidateResponseResult.valid == true, `Second acknowledgement must solve the challenge`)
+  })
+
+  it('test functionality for unit tests', function () {
+    const AMOUNT = 2
+    const secrets = Array.from({ length: AMOUNT }, (_) => randomBytes(SECRET_LENGTH))
+
+    const firstChallenge = createFirstChallenge(secrets)
+
+    assert(validateAcknowledgement(firstChallenge.ownKey, deriveAckKeyShare(secrets[1]), firstChallenge.ticketChallenge).valid == true)
   })
 })
