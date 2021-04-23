@@ -107,8 +107,8 @@ const abiEncoder = ethers.utils.Interface.getAbiCoder()
 
 const useFixtures = deployments.createFixture(async () => {
   const [deployer] = await ethers.getSigners()
-  const accountA = await ethers.getSigner(ACCOUNT_A.address)
-  const accountB = await ethers.getSigner(ACCOUNT_B.address)
+  const accountA = new ethers.Wallet(ACCOUNT_A.privateKey).connect(ethers.provider)
+  const accountB = new ethers.Wallet(ACCOUNT_B.privateKey).connect(ethers.provider)
 
   // run migrations
   const contracts = await deployments.fixture()
@@ -119,6 +119,8 @@ const useFixtures = deployments.createFixture(async () => {
   // create deployer the minter
   const minterRole = await token.MINTER_ROLE()
   await token.connect(deployer).grantRole(minterRole, deployer.address)
+
+  const fundEther = async (addr, amount) => await deployer.sendTransaction({ to: addr, value: amount })
 
   const fund = async (addr, amount) =>
     await token.connect(deployer).mint(addr, amount + '', ethers.constants.HashZero, ethers.constants.HashZero)
@@ -143,6 +145,9 @@ const useFixtures = deployments.createFixture(async () => {
     ACCOUNT_A,
     SECRET_1
   )
+
+  await fundEther(accountA.address, ethers.utils.parseEther('1'))
+  await fundEther(accountB.address, ethers.utils.parseEther('1'))
 
   return {
     token,
