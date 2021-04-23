@@ -140,7 +140,11 @@ export class Hash {
 }
 
 export class Signature {
-  constructor(readonly signature: Uint8Array, readonly recovery: number) {}
+  constructor(readonly signature: Uint8Array, readonly recovery: number) {
+    if (signature.length !== SIGNATURE_LENGTH) {
+      throw new Error('Incorrect size Uint8Array for signature')
+    }
+  }
 
   static deserialize(arr: Uint8Array): Signature {
     const [s, r] = u8aSplit(arr, [SIGNATURE_LENGTH, SIGNATURE_RECOVERY_LENGTH])
