@@ -1,7 +1,7 @@
 import assert from 'assert'
 import { utils } from 'ethers'
 import BN from 'bn.js'
-import { Address, PublicKey, Hash, Balance, NativeBalance } from './primitives'
+import { Address, PublicKey, Hash, Balance, NativeBalance, Signature } from './primitives'
 
 const privateKey = '0xe17fe86ce6e99f4806715b0c9412f8dad89334bf07f72d5834207a9d8f19d7f8'
 const uncompressedPubKey =
@@ -9,7 +9,7 @@ const uncompressedPubKey =
 const publicKey = '0x021464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8'
 const address = '0x115Bc5B501CdD8D1fA5098D3c9Be8dd5954CA371'
 
-describe.only('test Address primitive', function () {
+describe('test Address primitive', function () {
   const empty = new Address(new Uint8Array({ length: Address.SIZE }))
   const larger = new Address(new Uint8Array({ length: Address.SIZE }).fill(1))
 
@@ -106,7 +106,19 @@ describe('test Hash primitive', function () {
     assert.strictEqual(Hash.create(utils.toUtf8Bytes(hashPreImage)).toHex(), hash)
   })
 
-  // TODO: test clone, hash
+  it('should clone hash', function () {
+    const _hash = new Hash(utils.arrayify(hash))
+    const hashCloned = _hash.clone()
+
+    assert.strictEqual(_hash.toHex(), hashCloned.toHex())
+  })
+
+  it('should hash again', function () {
+    assert.strictEqual(
+      Hash.create(utils.toUtf8Bytes(hashPreImage)).hash().toHex(),
+      '0x04cd40a3ea7972c6f30142d02fd5ddcac438fe6c59e634cecb827fbee9d385fc'
+    )
+  })
 })
 
 describe('test Balance primitive', function () {
@@ -149,5 +161,42 @@ describe('test NativeBalance primitive', function () {
       NativeBalance.deserialize(new NativeBalance(balance).serialize()).toBN().toString(),
       balance.toString()
     )
+  })
+})
+
+describe('test Signature primitive', function () {
+  const message = utils.keccak256(utils.toUtf8Bytes('hello'))
+  const signature =
+    '0x583ced30525d3b0663c223c834b80c4662043f7a2aa4f001354a2858f517571b08d65c7340e9067a0dcc18b3529ac2aab3dc3067621607b1268b645923cf003f'
+  const recovery = 0
+
+  it('should have a size of 65', function () {
+    assert.strictEqual(Signature.SIZE, 65)
+  })
+
+  it('should create Signature from Uint8Array and number', function () {
+    const s = new Signature(utils.arrayify(signature), recovery)
+
+    assert.strictEqual(utils.hexlify(s.signature), signature)
+    assert.strictEqual(s.recovery, recovery)
+  })
+
+  it('should create Signature from message', function () {
+    const s = Signature.create(utils.arrayify(message), utils.arrayify(privateKey))
+
+    assert.strictEqual(utils.hexlify(s.signature), signature)
+    assert.strictEqual(s.recovery, recovery)
+  })
+
+  it('should verify Signature', function () {
+    const s = new Signature(utils.arrayify(signature), recovery)
+
+    assert(s.verify(utils.arrayify(message), PublicKey.fromString(publicKey)))
+  })
+
+  it('should correctly serialize & deserialize', function () {
+    const s = Signature.deserialize(new Signature(utils.arrayify(signature), recovery).serialize())
+
+    assert(s.verify(utils.arrayify(message), PublicKey.fromString(publicKey)))
   })
 })
