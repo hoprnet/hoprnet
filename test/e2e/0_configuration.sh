@@ -25,7 +25,7 @@ function rpc_network {
 }
 
 # Starts a bootstrap server, including an admin, and rest interface
-# @param nonde
+# @param none
 # @dev Sleeps for 10 seconds upon start
 function bootstrap_node {
   echo "🤖 (BS) Running bootstrap node"
@@ -34,6 +34,17 @@ function bootstrap_node {
   echo "🤖 (BS) Bootstrap started (127.0.0.1:9091,3000,3001)"
   echo "⏰ Waiting (10) seconds for bootstrap node to start"
   sleep 10
+}
+
+# Funds a HOPR node with ETH + HOPR tokens
+# @param $1 - HOPR address for node
+# @dev Sleeps for 20 seconds after funding
+function fund_node {
+  echo "💰 Funding 1 ETH and 1 HOPR to $1"
+  hardhat faucet --config packages/ethereum/hardhat.config.ts --address $1 --network localhost --ishopraddress true
+  echo "💰 $1 funded with 1 ETH and 1 HOPR"
+  echo "⏰ Waiting (20) seconds for node to catch-up w/balance"
+  sleep 20
 }
 
 DATAFILE=`basename "$0"`
