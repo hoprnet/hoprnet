@@ -27,7 +27,7 @@ describe('PoR - proof of relay', function () {
 
     assert(result.valid == true, `Challenge must be plausible`)
 
-    assert(u8aEquals(result.nextAckChallenge, publicKeyCreate(deriveAckKeyShare(secrets[1]))))
+    assert(u8aEquals(result.ackChallenge, publicKeyCreate(deriveAckKeyShare(secrets[1]))))
 
     // Simulates the transformation done by the first relayer
     assert(
@@ -40,10 +40,10 @@ describe('PoR - proof of relay', function () {
     const ack = deriveAckKeyShare(secrets[1])
 
     const validateResponseResult = validateAcknowledgement(
-      result.ownShare,
       result.ownKey,
       ack,
-      firstChallenge.ticketChallenge
+      firstChallenge.ticketChallenge,
+      result.ownShare
     )
 
     assert(validateResponseResult.valid == true, `Acknowledgement must solve the challenge`)
@@ -57,10 +57,10 @@ describe('PoR - proof of relay', function () {
     const secondAck = deriveAckKeyShare(secrets[2])
 
     const secondValidateResponseResult = validateAcknowledgement(
-      secondResult.ownShare,
       secondResult.ownKey,
       secondAck,
-      result.nextTicketChallenge
+      result.nextTicketChallenge,
+      secondResult.ownShare
     )
 
     assert(secondValidateResponseResult.valid == true, `Second acknowledgement must solve the challenge`)

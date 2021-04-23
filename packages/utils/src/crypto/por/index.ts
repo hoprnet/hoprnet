@@ -56,7 +56,7 @@ type ValidOutput = {
   ownKey: Uint8Array
   ownShare: Uint8Array
   nextTicketChallenge: Uint8Array
-  nextAckChallenge: Uint8Array
+  ackChallenge: Uint8Array
 }
 
 type InvalidOutput = {
@@ -97,7 +97,7 @@ export function preVerify(
   const valid = u8aEquals(publicKeyCombine([ownShare, hint]), challenge)
 
   if (valid) {
-    return { valid: true, ownKey, ownShare, nextTicketChallenge, nextAckChallenge: hint }
+    return { valid: true, ownKey, ownShare, nextTicketChallenge, ackChallenge: hint }
   } else {
     return { valid: false }
   }
@@ -116,16 +116,23 @@ export function preVerify(
  * can be used to redeem the incentive
  */
 export function validateAcknowledgement(
-  ownShare: Uint8Array,
   ownKey: Uint8Array,
   ack: Uint8Array,
-  challenge: Uint8Array
+  challenge: Uint8Array,
+  ownShare?: Uint8Array
 ): { valid: true; response: Uint8Array } | { valid: false } {
-  const valid = u8aEquals(publicKeyTweakAdd(ownShare, ack), challenge)
+  // clone ownKey before adding a tweak to it
+  const response = privateKeyTweakAdd(ownKey.slice(), ack)
+
+  let valid: boolean
+
+  if (ownKey == undefined) {
+    valid = u8aEquals(publicKeyCreate(response), challenge)
+  } else {
+    valid = u8aEquals(publicKeyTweakAdd(ownShare, ack), challenge)
+  }
 
   if (valid) {
-    // clone ownKey before adding a tweak to it
-    const response = privateKeyTweakAdd(ownKey.slice(), ack)
     return { valid: true, response }
   } else {
     return { valid: false }
