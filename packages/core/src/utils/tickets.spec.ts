@@ -67,8 +67,8 @@ const createMockChannel = ({
         counterparty
       })
     ),
-    channelState: isChannelOpen ? 'OPEN' :  'CLOSED',
-    channelEpoch: new BN(1) 
+    channelState: isChannelOpen ? 'OPEN' : 'CLOSED',
+    channelEpoch: new BN(1)
   } as unknown) as Channel
 }
 

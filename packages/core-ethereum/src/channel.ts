@@ -148,7 +148,10 @@ class Channel {
         hoprToken.send,
         hoprChannels.address,
         fundAmount.toBN().toString(),
-        abiCoder.encode(['address', 'address', 'uint256', 'uint256'], [myAddress.toHex(), counterpartyAddress.toHex(), fundAmount.toBN().toString(), '0'])
+        abiCoder.encode(
+          ['address', 'address', 'uint256', 'uint256'],
+          [myAddress.toHex(), counterpartyAddress.toHex(), fundAmount.toBN().toString(), '0']
+        )
       )
       await transaction.wait()
 

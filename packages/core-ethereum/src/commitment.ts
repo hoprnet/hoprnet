@@ -106,5 +106,4 @@ export class Commitment {
   private async searchDBFor(iteration: number): Promise<Uint8Array | undefined> {
     return await getFromDB<Uint8Array>(this.db, keyFor(this.channelId, iteration))
   }
-  
 }

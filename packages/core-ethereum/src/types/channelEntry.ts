@@ -119,10 +119,10 @@ class ChannelEntry {
   }
 
   public ticketEpochFor(addr: Address) {
-    if (addr.eq(this.partyA)){
+    if (addr.eq(this.partyA)) {
       return this.partyATicketEpoch
     }
-    if (addr.eq(this.partyB)){
+    if (addr.eq(this.partyB)) {
       return this.partyBTicketEpoch
     }
     throw new Error('Wrong addr for this channel')
