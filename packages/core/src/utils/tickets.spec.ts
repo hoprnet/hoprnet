@@ -57,6 +57,7 @@ const mockChannelEntry = (isChannelOpen: boolean) => Promise.resolve({
 
 const createMockChannel = ({
   isChannelOpen = true,
+  isChannelStored = true,
   self = new Balance(new BN(0)),
   counterparty = new Balance(new BN(100))
 }: {
@@ -72,7 +73,11 @@ const createMockChannel = ({
         counterparty
       })
     ),
-    getState: () => mockChannelEntry(isChannelOpen),
+    getState: () =>{
+      if (isChannelStored)
+        return mockChannelEntry(isChannelOpen)
+      throw new Error('state not found') 
+    },
     channelEpoch: new BN(1)
   } as unknown) as Channel
 }
