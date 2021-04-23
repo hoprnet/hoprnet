@@ -50,6 +50,11 @@ const createMockTicket = ({
   } as unknown) as Ticket
 }
 
+const mockChannelEntry = (isChannelOpen: boolean) => Promise.resolve({
+  status: isChannelOpen ? 'OPEN' : 'CLOSED',
+  channelEpoch: {toBN: () =>  new BN(1) },
+})
+
 const createMockChannel = ({
   isChannelOpen = true,
   self = new Balance(new BN(0)),
@@ -67,7 +72,7 @@ const createMockChannel = ({
         counterparty
       })
     ),
-    channelState: isChannelOpen ? 'OPEN' : 'CLOSED',
+    getState: () => mockChannelEntry(isChannelOpen),
     channelEpoch: new BN(1)
   } as unknown) as Channel
 }
