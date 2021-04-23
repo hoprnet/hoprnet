@@ -1,32 +1,26 @@
 #!/bin/bash
 set -e
-shopt -s expand_aliases
 
-alias hardhat="node packages/ethereum/node_modules/.bin/hardhat"
-alias hoprd="node packages/hoprd/lib/index.js --admin --init --rest --provider=ws://127.0.0.1:8545/ --password=''"
-
-function finish {
-  # Cleaning up everything
-  echo "🧽 Cleaning up processes"
-  if [[ -n "$PROVIDER_PID" ]]; then kill $PROVIDER_PID; fi
-}
-trap finish EXIT
-
-DATAFILE=`basename "$0"`
+source 'test/e2e/0_configuration.sh'
 
 # Running RPC
-echo "⛑ Running hardhat local node"
-hardhat node --config packages/ethereum/hardhat.config.ts > /tmp/$DATAFILE-rpc.txt 2>&1 &
-PROVIDER_PID="$!"
+rpc_network
+# Running bootstrap server
+bootstrap_node
 
-echo "⏰ Waiting (20) seconds for hardhat node to start"
-sleep 20
-echo "🤖 (BS) Running bootstrap node"
+echo "🤖 (BS) Requesting bootstrap address"
+BOOTSTRAP_ADDRESS=$(curl -s http://127.0.0.1:3001/api/v1/address/eth)
+echo "⛓  ETH Address: $BOOTSTRAP_ADDRESS"
+IS_VALID_ETH_ADDRESS=$(node -e \
+  "const ethers = require('ethers'); console.log(ethers.utils.isAddress('$BOOTSTRAP_ADDRESS'))")
 
-DEBUG=hopr* hoprd --data=/tmp/$DATAFILE-bootstrap --runAsBootstrap > /tmp/$DATAFILE-bs.txt 2>&1 &
-BOOTSTRAP_PID="$!"
-BOOTSTRAP_ADDRESS=$(curl localhost:3001/api/v1/address/hopr)
- 
-echo "⛓ Address: $BOOTSTRAP_ADDRESS"
+if [ $IS_VALID_ETH_ADDRESS == 'true' ]; then
+  echo "✅ Node outputs a valid address: $IS_VALID_ETH_ADDRESS"
+  exit 0
+else
+  echo "⛔️ Node outputs an invalid address: $BOOTSTRAP_ADDRESS"
+  exit 1 
+fi
 
-sleep 100
+
+
