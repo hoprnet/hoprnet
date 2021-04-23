@@ -19,6 +19,7 @@ function serializeUnsigned({
   counterparty,
   challenge,
   epoch,
+  index,
   amount,
   winProb,
   channelIteration
@@ -26,6 +27,7 @@ function serializeUnsigned({
   counterparty: Address
   challenge: Hash
   epoch: UINT256
+  index: UINT256
   amount: Balance
   winProb: Hash
   channelIteration: UINT256
@@ -35,6 +37,7 @@ function serializeUnsigned({
     [counterparty.serialize(), Address.SIZE],
     [challenge.serialize(), Hash.SIZE],
     [epoch.serialize(), UINT256.SIZE],
+    [index.serialize(), UINT256.SIZE],
     [amount.serialize(), Balance.SIZE],
     [winProb.serialize(), Hash.SIZE],
     [channelIteration.serialize(), UINT256.SIZE]
@@ -46,6 +49,7 @@ class Ticket {
     readonly counterparty: Address,
     readonly challenge: Hash,
     readonly epoch: UINT256,
+    readonly index: UINT256,
     readonly amount: Balance,
     readonly winProb: Hash,
     readonly channelIteration: UINT256,
@@ -56,6 +60,7 @@ class Ticket {
     counterparty: Address,
     challenge: Hash,
     epoch: UINT256,
+    index: UINT256,
     amount: Balance,
     winProb: Hash,
     channelIteration: UINT256,
@@ -67,6 +72,7 @@ class Ticket {
           counterparty,
           challenge,
           epoch,
+          index,
           amount,
           winProb,
           channelIteration
@@ -75,7 +81,7 @@ class Ticket {
     )
     const sig = ecdsaSign(hash.serialize(), signPriv)
     const signature = new Signature(sig.signature, sig.recid)
-    return new Ticket(counterparty, challenge, epoch, amount, winProb, channelIteration, signature)
+    return new Ticket(counterparty, challenge, epoch, index, amount, winProb, channelIteration, signature)
   }
 
   public serialize(): Uint8Array {
@@ -97,11 +103,12 @@ class Ticket {
     const counterparty = new Address(components[0])
     const challenge = new Hash(components[1])
     const epoch = new UINT256(new BN(components[2]))
-    const amount = new Balance(new BN(components[3]))
-    const winProb = new Hash(components[4])
-    const channelIteration = new UINT256(new BN(components[4]))
-    const signature = Signature.deserialize(components[5])
-    return new Ticket(counterparty, challenge, epoch, amount, winProb, channelIteration, signature)
+    const index = new UINT256(new BN(components[3]))
+    const amount = new Balance(new BN(components[4]))
+    const winProb = new Hash(components[5])
+    const channelIteration = new UINT256(new BN(components[6]))
+    const signature = Signature.deserialize(components[7])
+    return new Ticket(counterparty, challenge, epoch, index, amount, winProb, channelIteration, signature)
   }
 
   getHash(): Hash {

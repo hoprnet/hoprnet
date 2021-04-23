@@ -512,24 +512,16 @@ class Hopr extends EventEmitter {
 
   private async checkBalances() {
     const balance = await this.getBalance()
-    let unfunded = false
     if (balance.toBN().lten(0)) {
       const address = await this.paymentChannels.hexAccountAddress()
       log('unfunded node', address)
       this.emit('hopr:warning:unfunded', address)
-      unfunded = true
     }
     const nativeBalance = await this.getNativeBalance()
     if (nativeBalance.toBN().lte(MIN_NATIVE_BALANCE)) {
       const address = await this.paymentChannels.hexAccountAddress()
       log('unfunded node', address)
       this.emit('hopr:warning:unfundedNative', address)
-      unfunded = true
-    }
-    if (!unfunded) {
-      // Technically we only have to do this the first time, but there are no
-      // side effects to doing this on each tick.
-      this.paymentChannels.initOnchainValues() // No-op if called many times.
     }
   }
 
@@ -599,7 +591,7 @@ class Hopr extends EventEmitter {
       throw Error(`You don't have enough tokens: ${amountToFund.toString(10)}<${myAvailableTokens.toBN().toString(10)}`)
     }
 
-    const channel = new ethereum.channel(ethereum, selfPubKey, counterpartyPubKey)
+    const channel = ethereum.getChannel(selfPubKey, counterpartyPubKey)
     await channel.open(new Balance(amountToFund))
 
     return {
@@ -634,7 +626,7 @@ class Hopr extends EventEmitter {
       throw Error(`You don't have enough tokens: ${totalFund.toString(10)}<${myBalance.toBN().toString(10)}`)
     }
 
-    const channel = new ethereum.channel(ethereum, selfPubKey, counterpartyPubKey)
+    const channel = ethereum.getChannel(selfPubKey, counterpartyPubKey)
     await channel.fund(new Balance(myFund), new Balance(counterpartyFund))
 
     return {
@@ -646,18 +638,17 @@ class Hopr extends EventEmitter {
     const ethereum = this.paymentChannels
     const selfPubKey = new PublicKey(this.getId().pubKey.marshal())
     const counterpartyPubKey = new PublicKey(counterparty.pubKey.marshal())
-    const channel = new ethereum.channel(ethereum, selfPubKey, counterpartyPubKey)
+    const channel = ethereum.getChannel(selfPubKey, counterpartyPubKey)
     const channelState = await channel.getState()
-    const channelStatus = channelState.getStatus()
 
     // TODO: should we wait for confirmation?
-    if (channelStatus === 'CLOSED') {
+    if (channelState.status === 'CLOSED') {
       throw new Error('Channel is already closed')
     }
 
-    const txHash = await (channelStatus === 'OPEN' ? channel.initializeClosure() : channel.finalizeClosure())
+    const txHash = await (channelState.status === 'OPEN' ? channel.initializeClosure() : channel.finalizeClosure())
 
-    return { receipt: txHash, status: channelStatus }
+    return { receipt: txHash, status: channelState.status }
   }
 
   public async getAcknowledgedTickets() {

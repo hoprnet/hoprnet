@@ -1,42 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.7.5;
+pragma solidity ^0.8;
 
 import "../HoprChannels.sol";
 
 contract ChannelsMock is HoprChannels {
     constructor(address _token, uint32 _secsClosure)
     HoprChannels(_token, _secsClosure) {}
-
-    function fundChannelInternal(
-        address funder,
-        address accountA,
-        address accountB,
-        uint256 amountA,
-        uint256 amountB
-    ) external {
-        _fundChannel(funder, accountA, accountB, amountA, amountB);
-    }
-
-    function openChannelInternal(
-        address opener,
-        address counterparty
-    ) external {
-        _openChannel(opener, counterparty);
-    }
-
-    function initiateChannelClosureInternal(
-        address initiator,
-        address counterparty
-    ) external {
-        _initiateChannelClosure(initiator, counterparty);
-    }
-
-    function finalizeChannelClosureInternal(
-        address initiator,
-        address counterparty
-    ) external {
-        _finalizeChannelClosure(initiator, counterparty);
-    }
 
     function getChannelInternal(
         address accountA,
@@ -47,7 +16,6 @@ contract ChannelsMock is HoprChannels {
         bytes32
     ) {
         (address partyA, address partyB, bytes32 channelId,) = _getChannel(accountA, accountB);
-
         return (partyA, partyB, channelId);
     }
 
@@ -58,18 +26,6 @@ contract ChannelsMock is HoprChannels {
         return _getChannelId(partyA, partyB);
     }
 
-    function getChannelStatusInternal(
-        uint24 status
-    ) external pure returns (ChannelStatus) {
-        return _getChannelStatus(status);
-    }
-
-    function getChannelIterationInternal(
-        uint24 status
-    ) external pure returns (uint256) {
-        return _getChannelIteration(status);
-    }
-
     function isPartyAInternal(
         address accountA,
         address accountB
@@ -78,9 +34,29 @@ contract ChannelsMock is HoprChannels {
     }
 
     function getPartiesInternal(
-        address accountA,
-        address accountB
+        address account1,
+        address account2
     ) external pure returns (address, address) {
-        return _getParties(accountA, accountB);
+        return _sortAddresses(account1,account2);
+    }
+
+    function getEncodedTicketInternal(
+        address recipient,
+        uint256 recipientCounter,
+        bytes32 proofOfRelaySecret,
+        uint256 channelIteration,
+        uint256 amount,
+        bytes32 winProb
+    ) external pure returns (bytes memory) {
+        return _getEncodedTicket(recipient, recipientCounter, proofOfRelaySecret, channelIteration, amount, winProb);
+    }
+
+    function getTicketLuckInternal(
+        bytes32 ticketHash,
+        bytes32 secretPreImage,
+        bytes32 proofOfRelaySecret,
+        bytes32 winProb
+    ) external pure returns (bytes32) {
+        return _getTicketLuck(ticketHash, secretPreImage, proofOfRelaySecret, winProb);
     }
 }

@@ -76,6 +76,10 @@ export class Address {
     return new Address(stringToU8a(str))
   }
 
+  static deserialize(arr: Uint8Array) {
+    return new Address(arr)
+  }
+
   serialize() {
     return this.arr
   }
@@ -110,12 +114,20 @@ export class Hash {
 
   static SIZE = HASH_LENGTH
 
-  static create(msg: Uint8Array) {
-    return new Hash(createKeccakHash('keccak256').update(Buffer.from(msg)).digest())
+  static create(...inputs: Uint8Array[]) {
+    return new Hash(
+      createKeccakHash('keccak256')
+        .update(Buffer.from(u8aConcat(...inputs)))
+        .digest()
+    )
   }
 
   static createChallenge(secretA: Uint8Array, secretB: Uint8Array): Hash {
     return Hash.create(u8aConcat(secretA, secretB)).hash()
+  }
+
+  static deserialize(arr: Uint8Array) {
+    return new Hash(arr)
   }
 
   serialize(): Uint8Array {
@@ -178,16 +190,16 @@ export class Balance {
     return `HOPR`
   }
 
-  static deserialize(arr: Uint8Array) {
-    return new Balance(new BN(arr))
-  }
-
   static get DECIMALS(): number {
     return 18
   }
 
   public toBN(): BN {
     return this.bn
+  }
+
+  static deserialize(arr: Uint8Array) {
+    return new Balance(new BN(arr))
   }
 
   public serialize(): Uint8Array {
