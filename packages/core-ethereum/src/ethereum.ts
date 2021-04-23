@@ -23,6 +23,7 @@ export function createChainWrapper(provider, token) {
     getLatestBlockNumber: async () => provider.getBlockNumber(),
     getTransactionCount: (address, blockNumber) => provider.getTransactionCount(address.toHex(), blockNumber),
     getBalance: (address) => token.balanceOf(address.toHex()).then((res) => new Balance(new BN(res.toString()))),
-    getNativeBalance: (address) => provider.getBalance(address.toHex()).then((res) => new NativeBalance(new BN(res.toString())))
+    getNativeBalance: (address) =>
+      provider.getBalance(address.toHex()).then((res) => new NativeBalance(new BN(res.toString())))
   }
 }
