@@ -1,7 +1,7 @@
 import { u8aSplit, serializeToU8a, u8aToNumber, stringToU8a } from '@hoprnet/hopr-utils'
 import { Address, Balance, Hash } from './primitives'
 import { UINT256 } from '../types/solidity'
-import { Channel } from '..'
+import { Channel } from '../channel'
 import type { Event } from '../indexer/types'
 import BN from 'bn.js'
 

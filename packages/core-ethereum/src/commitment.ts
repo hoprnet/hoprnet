@@ -61,7 +61,7 @@ export class Commitment {
     let result = await recoverIteratedHash(
       hash.serialize(),
       hashFunction,
-      async (x) => await this.getDBFor(x),
+      async (x) => await this.searchDBFor(x),
       TOTAL_ITERATIONS,
       DB_ITERATION_BLOCK_SIZE
     )
@@ -78,6 +78,7 @@ export class Commitment {
     if (chainCommitment && dbContains) {
       try {
         await this.findPreImage(chainCommitment) // throws if not found
+        this.current = chainCommitment
         this.initialized = true
         return
       } catch (_e) {
@@ -85,8 +86,8 @@ export class Commitment {
       }
     }
     log(`reinitializing (db: ${dbContains}, chain: ${chainCommitment}})`)
-    const commitment = await this.createCommitmentChain()
-    await this.setChainCommitment(commitment)
+    this.current = await this.createCommitmentChain()
+    await this.setChainCommitment(this.current)
     this.initialized = true
   }
 
@@ -94,7 +95,7 @@ export class Commitment {
   private async createCommitmentChain(): Promise<Hash> {
     const seed = new Hash(randomBytes(Hash.SIZE)) // TODO seed off privKey + channel
     const result = await iterateHash(seed.serialize(), hashFunction, TOTAL_ITERATIONS, DB_ITERATION_BLOCK_SIZE)
-    storeHashIntermediaries(this.db, this.channelId, result.intermediates)
+    await storeHashIntermediaries(this.db, this.channelId, result.intermediates)
     return new Hash(result.hash)
   }
 
@@ -102,11 +103,8 @@ export class Commitment {
     return (await getFromDB<Uint8Array>(this.db, keyFor(this.channelId, 0))) != undefined
   }
 
-  private async getDBFor(iteration: number): Promise<Uint8Array> {
-    const arr = await getFromDB<Uint8Array>(this.db, keyFor(this.channelId, iteration))
-    if (!arr) {
-      throw new Error('Could not find preimage')
-    }
-    return arr
+  private async searchDBFor(iteration: number): Promise<Uint8Array | undefined> {
+    return await getFromDB<Uint8Array>(this.db, keyFor(this.channelId, iteration))
   }
+  
 }

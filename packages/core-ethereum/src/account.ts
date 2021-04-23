@@ -5,7 +5,8 @@ import { ethers, errors } from 'ethers'
 import { durations, isExpired } from '@hoprnet/hopr-utils'
 import NonceTracker, { NonceLock } from './nonce-tracker'
 import TransactionManager from './transaction-manager'
-import { PublicKey, Address, Balance, Hash, NativeBalance, UINT256, AccountEntry } from './types'
+import { PublicKey, Address, Balance, Hash, NativeBalance, UINT256 } from './types'
+import Indexer from './indexer'
 import { getNetworkGasPrice } from './utils'
 import { PROVIDER_CACHE_TTL } from './constants'
 
@@ -21,16 +22,14 @@ class Account {
   private _transactions = new TransactionManager()
 
   constructor(
-    private ops: {
-      network: Networks
-    },
+    private network: Networks,
     private api: {
       getLatestBlockNumber: () => Promise<number>
       getTransactionCount: (address: Address, blockNumber?: number) => Promise<number>
       getBalance: (address: Address) => Promise<Balance>
       getNativeBalance: (address: Address) => Promise<NativeBalance>
-      getAccount: (address: Address) => Promise<AccountEntry>
     },
+    private indexer: Indexer,
     public wallet: IWallet
   ) {
     this._nonceTracker = new NonceTracker(
@@ -67,7 +66,7 @@ class Account {
   }
 
   async getTicketEpoch(): Promise<UINT256> {
-    const state = await this.api.getAccount(this.getAddress())
+    const state = await this.indexer.getAccount(this.getAddress())
     if (!state || !state.counter) return UINT256.fromString('0')
     return new UINT256(state.counter)
   }
@@ -77,7 +76,7 @@ class Account {
    */
   async getOnChainSecret(): Promise<Hash | undefined> {
     if (this._onChainSecret && !this._onChainSecret.eq(EMPTY_HASHED_SECRET)) return this._onChainSecret
-    const state = await this.api.getAccount(this.getAddress())
+    const state = await this.indexer.getAccount(this.getAddress())
     if (!state || !state.secret) return undefined
     this.updateLocalState(state.secret)
     return state.secret
@@ -105,7 +104,7 @@ class Account {
     ...rest: Parameters<T>
   ): Promise<ContractTransaction> {
     const gasLimit = 300e3
-    const gasPrice = getNetworkGasPrice(this.ops.network)
+    const gasPrice = getNetworkGasPrice(this.network)
     const nonceLock = await this._nonceTracker.getNonceLock(this.getAddress())
     const nonce = nonceLock.nextNonce
     let transaction: ContractTransaction

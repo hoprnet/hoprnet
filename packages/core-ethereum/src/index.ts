@@ -5,16 +5,15 @@ import chalk from 'chalk'
 import { Networks, getContracts } from '@hoprnet/hopr-ethereum'
 import { ethers } from 'ethers'
 import debug from 'debug'
-import { Acknowledgement, Balance, NativeBalance } from './types'
-import Channel from './channel'
+import { Acknowledgement } from './types'
 import Indexer from './indexer'
 import { RoutingChannel } from './indexer'
 import * as utils from './utils'
 import Account from './account'
 import { getWinProbabilityAsFloat, computeWinningProbability } from './utils'
 import { HoprToken__factory, HoprChannels__factory } from './contracts'
-import BN from 'bn.js'
 import { DEFAULT_URI, MAX_CONFIRMATIONS, INDEXER_BLOCK_RANGE } from './constants'
+import { ChainInteractions } from './chainInteractions'
 
 const log = debug('hopr-core-ethereum')
 
@@ -37,8 +36,8 @@ export default class HoprEthereum {
   private _status: 'dead' | 'alive' = 'dead'
   private _starting?: Promise<HoprEthereum>
   private _stopping?: Promise<void>
+  private chain
 
-  public channel = Channel
   public indexer: Indexer
   public account: Account
 
@@ -55,31 +54,15 @@ export default class HoprEthereum {
     blockRange: number
   ) {
     this.indexer = new Indexer(this, genesisBlock, maxConfirmations, blockRange)
-    this.account = new Account(
-      {
-        network: this.network
-      },
-      {
-        // TODO: use indexer when it's done syncing
-        getLatestBlockNumber: async () => this.provider.getBlockNumber(),
-        getTransactionCount: (address, blockNumber) => this.provider.getTransactionCount(address.toHex(), blockNumber),
-        getBalance: (address) =>
-          this.hoprToken.balanceOf(address.toHex()).then((res) => new Balance(new BN(res.toString()))),
-        getNativeBalance: (address) =>
-          this.provider.getBalance(address.toHex()).then((res) => new NativeBalance(new BN(res.toString()))),
-        getAccount: (address) => this.indexer.getAccount(address)
-      },
-      this.wallet
-    )
+    this.chain = new ChainInteractions(this.provider, this.hoprToken)
+    this.account = new Account(this.network, this.chain, this.indexer, this.wallet)
   }
 
   readonly CHAIN_NAME = 'HOPR on Ethereum'
 
   private async _start(): Promise<HoprEthereum> {
     await this.provider.ready
-    // await this.initOnchainValues()
     await this.indexer.start()
-    // await provider.connect()
     this._status = 'alive'
     log(chalk.green('Connector started'))
     return this
@@ -228,4 +211,4 @@ export default class HoprEthereum {
 }
 
 export * from './types'
-export { Channel, getWinProbabilityAsFloat, computeWinningProbability, Indexer, RoutingChannel }
+export { getWinProbabilityAsFloat, computeWinningProbability, Indexer, RoutingChannel }

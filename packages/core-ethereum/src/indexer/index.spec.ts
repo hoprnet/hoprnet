@@ -11,7 +11,7 @@ import { HoprToken__factory, HoprToken, HoprChannels__factory, HoprChannels } fr
 import { createNode, fundAccount } from '../utils/testing'
 import { publicKeyConvert } from 'secp256k1'
 import { randomBytes } from 'crypto'
-import { Channel } from '..'
+import { Channel } from '../channel'
 import { Hash } from '../types'
 import { DEFAULT_URI, MAX_CONFIRMATIONS } from '../constants'
 
