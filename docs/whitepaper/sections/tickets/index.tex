@@ -5,7 +5,7 @@ They are redeemable at most once and they lose their value when the channel is c
 \subsection{Ticket issuance}
 A ticket can be issued once two nodes have established a payment channel with each other which means that at least one of them has locked HOPR tokens.
 \newline The ticket issuer A (A could also be the packet creator) selects the winning probability of the ticket and the relay fee to use and sets amount to:
-$$\delta:=\dfrac{L*F}{P_w}$$
+$$\delta:=\dfrac{L\times F}{P_w}$$
 where $\delta$ is the amount of HOPR tokens set in the ticket, $L$ is the path length, $F$ is the relay fee and $P_w$ is the winning probability.
 \\~\\The issuer $(A)$ issues a ticket for the next downstream node, 
 the challenge is given together with the routing information by the packet. 
