@@ -25,13 +25,13 @@ where $R$ is the recipient, $C$ is the challenge, $\alpha_c$ is the account.coun
 \subsubsection{Challenge}
 $(A)$ creates a shared secret $s_i$ with all the relay nodes in the channel (B-C-D-Z) by using an offline version of the Diffie-Hellman key exchange.
 \newline The shared secret $s_i$ is used as a seed for a PRG (Pseudo Random Generator) to create secret shares $s_i,s_i'$ for each node along the route. 
-Relayers compute $s_i$ and get $s_i+1'$ from the next downstream node. 
-\newline The sender $(A)$ creates $challenge_i:=(s_i+s_i+1')*G$ and a hint for B,C,D,Z (let’s suppose these are the relay nodes and $Z$ will be the final destination) a “hint” how the promised value $s_C',s_D',s_Z'$ is going to look like. 
-The value “hint” is computed as $hint_i:=s_i+1'*G$ 
+Relayers compute $s_i$ and get $s_{i+1}'$ from the next downstream node. 
+\newline The sender $(A)$ creates $challenge_i:=(s_i+s_{i+1}')*G$ and a hint for B,C,D,Z (let’s suppose these are the relay nodes and $Z$ will be the final destination) a “hint” how the promised value $s_C',s_D',s_Z'$ is going to look like. 
+The value “hint” is computed as $hint_i:=s_{i+1}'*G$ 
 
 
 \subsection{Ticket validation}
-Tickets are received together with packets which means that the recipient and the next downstream node share a secret $s$ whose key shares $s_i$ and $s_i+1$ are derivable by those nodes.
+Tickets are received together with packets which means that the recipient and the next downstream node share a secret $s$ whose key shares $s_i$ and $s_{i+1}$ are derivable by those nodes.
 \newline Once $(A)$ receives $s_{i+1}^{(1)}$ from (B) by the secret sharing, it can compute $response:=s_i^{(0)}+s_{i+1}^{(1)}$ such that it verifies  
 $$response*G=ticket.challenge$$
 Once the recipient transforms the packet, it is able to compute $s_i$. The recipient is now also able to extract the routing information from the packet. 
