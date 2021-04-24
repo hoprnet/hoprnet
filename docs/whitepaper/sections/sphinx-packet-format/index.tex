@@ -38,12 +38,12 @@ The element $g$ is a generator of $G$ which is a prime order cyclic group satisf
 
 
 \paragraph{Routing information}
-Each node on the path needs to know the next downstream node. Therefore, the sender $(A)$ generates routing information $\beta_i$ for $(B)$, $(C)$ and (D) as well as message END to tell $(E)$ that it is the final receiver of the message. 
+Each node on the path needs to know the next downstream node. Therefore, the sender $(A)$ generates routing information $\beta_i$ for $(B)$, $(C)$ and (D) as well as message END to tell $(Z)$ that it is the final receiver of the message. 
 \newline As $(A)$ has a shared secret with each of the nodes along the path, it is able to derive blindings for each of them.
 \newline Once $(B)$ receives the packet, it derives the shared key $s_0$ by computing $$s_0=(a_0)^b=(g^x)^b=(g^b)^x=y^x_B$$ and removes its blindings. This allows $(B)$ to unblind the routing info that tells $(B)$ the public key of the next downstream node $(C)$ and deletes the routing information from the header. Afterwards, it fills the empty space with its own blinding.
 \\$(B)$ also removes one layer of encryption from the payload.
 Same happens at $(C)$ and $(D)$: key derivation, unblinding, deleting, shifting, decryption and blinding. 
-In addition to all these steps, $(Z)$ finds a message that symbolizes the end of the path and tells that it’s the recipient.
+In addition to all these steps, the final mix-header to the destination node $(Z)$ must include a final destination address that symbolizes the end of the path and tells that it’s the recipient and an Identifier used to generate reply messages back to the sender.
 
 \paragraph{Integrity}
 Each node along the path receives an authentication tag $\gamma_i$ in the form of a message authentication code (MAC)
