@@ -5,7 +5,7 @@ USER root
 
 # Install packages is a script provided by the base gitpod image
 # Ref: https://github.com/gitpod-io/workspace-images/tree/master/base
-RUN sudo install-packages \
+RUN install-packages \
       tmux \
       neovim
 
