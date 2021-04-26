@@ -1,4 +1,4 @@
-import type { Indexer, RoutingChannel } from '@hoprnet/hopr-core-ethereum'
+import type { RoutingChannel } from '@hoprnet/hopr-core-ethereum'
 import PeerId from 'peer-id'
 import BN from 'bn.js'
 import {
@@ -35,7 +35,7 @@ export interface ChannelStrategy {
     newChannels: RoutingChannel[],
     currentChannels: RoutingChannel[],
     networkPeers: NetworkPeers,
-    indexer: Indexer
+    getRandomChannel: () => Promise<RoutingChannel>
   ): Promise<[ChannelsToOpen[], ChannelsToClose[]]>
   // TBD: Include ChannelsToClose as well.
 }
@@ -52,8 +52,7 @@ export class PassiveStrategy implements ChannelStrategy {
     _balance: BN,
     _n: RoutingChannel[],
     _c: RoutingChannel[],
-    _p: NetworkPeers,
-    _indexer: Indexer
+    _p: NetworkPeers
   ): Promise<[ChannelsToOpen[], ChannelsToClose[]]> {
     return [[], []]
   }
@@ -68,7 +67,7 @@ export class PromiscuousStrategy implements ChannelStrategy {
     _n: RoutingChannel[],
     currentChannels: RoutingChannel[],
     peers: NetworkPeers,
-    indexer: Indexer
+    getRandomChannel: () => Promise<RoutingChannel>,
   ): Promise<[ChannelsToOpen[], ChannelsToClose[]]> {
     log('currently open', logIndexerChannels(currentChannels))
     let toOpen: ChannelsToOpen[] = []
@@ -98,7 +97,7 @@ export class PromiscuousStrategy implements ChannelStrategy {
       i++ < MAX_NEW_CHANNELS_PER_TICK &&
       currentChannels.length + toOpen.length < MAX_AUTO_CHANNELS
     ) {
-      let randomChannel = await indexer.getRandomChannel()
+      let randomChannel = await getRandomChannel()
       if (randomChannel === undefined) {
         log('no channel available')
         break

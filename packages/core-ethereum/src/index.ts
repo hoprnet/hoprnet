@@ -1,15 +1,18 @@
 import type { LevelUp } from 'levelup'
 import chalk from 'chalk'
 import debug from 'debug'
-import { Acknowledgement, PublicKey } from './types'
+import { Acknowledgement, PublicKey, Balance, Address, NativeBalance } from './types'
 import Indexer from './indexer'
 import { RoutingChannel } from './indexer'
-import Account from './account'
 import { getWinProbabilityAsFloat, computeWinningProbability } from './utils'
 import { DEFAULT_URI, MAX_CONFIRMATIONS, INDEXER_BLOCK_RANGE } from './constants'
 import { Channel } from './channel'
 import { createChainWrapper } from './ethereum'
 import type { ChainWrapper } from './ethereum'
+import type PeerId from 'peer-id'
+import { PROVIDER_CACHE_TTL } from './constants'
+import { isExpired } from '@hoprnet/hopr-utils'
+import BN from 'bn.js'
 
 const log = debug('hopr-core-ethereum')
 
@@ -32,9 +35,9 @@ export default class HoprEthereum {
   private _status: 'dead' | 'alive' = 'dead'
   private _starting?: Promise<HoprEthereum>
   private _stopping?: Promise<void>
-
-  public indexer: Indexer
-  public account: Account
+  private indexer: Indexer
+  private balanceCache = new Map<'balance' | 'nativeBalance', { value: string; updatedAt: number }>()
+  private privateKey: Uint8Array
 
   constructor(
     private chain: ChainWrapper,
@@ -43,7 +46,7 @@ export default class HoprEthereum {
     blockRange: number
   ) {
     this.indexer = new Indexer(chain.getGenesisBlock(), this.db, this.chain, maxConfirmations, blockRange)
-    this.account = new Account(this.chain, this.indexer, chain.getWallet())
+    this.privateKey = this.chain.getPrivateKey()
   }
 
   readonly CHAIN_NAME = 'HOPR on Ethereum'
@@ -107,7 +110,7 @@ export default class HoprEthereum {
   }
 
   public getChannel(src: PublicKey, counterparty: PublicKey) {
-    return new Channel(src, counterparty, this.db, this.chain, this.indexer, this.account.privateKey)
+    return new Channel(src, counterparty, this.db, this.chain, this.indexer, this.privateKey)
   }
 
   async withdraw(currency: 'NATIVE' | 'HOPR', recipient: string, amount: string): Promise<string> {
@@ -115,9 +118,54 @@ export default class HoprEthereum {
   }
 
   public async hexAccountAddress(): Promise<string> {
-    return this.account.getAddress().toHex()
+    return this.getAddress().toHex()
   }
 
+  public getChannelsFromPeer(p: PeerId) {
+    return this.indexer.getChannelsFromPeer(p)
+  }
+
+  public getRandomChannel() {
+    return this.indexer.getRandomChannel()
+  }
+
+  /**
+   * Retrieves HOPR balance, optionally uses the cache.
+   * @returns HOPR balance
+   */
+  public async getBalance(useCache: boolean = false): Promise<Balance> {
+    if (useCache) {
+      const cached = this.balanceCache.get('balance')
+      const notExpired = cached && !isExpired(cached.updatedAt, new Date().getTime(), PROVIDER_CACHE_TTL)
+      if (notExpired) return new Balance(new BN(cached.value))
+    }
+
+    const value = await this.chain.getBalance(this.getAddress())
+    this.balanceCache.set('balance', { value: value.toBN().toString(), updatedAt: new Date().getTime() })
+
+    return value
+  }
+
+  getAddress(): Address {
+    return Address.fromString(this.chain.getWallet().address)
+  }
+
+  /**
+   * Retrieves ETH balance, optionally uses the cache.
+   * @returns ETH balance
+   */
+  public async getNativeBalance(useCache: boolean = false): Promise<NativeBalance> {
+    if (useCache) {
+      const cached = this.balanceCache.get('nativeBalance')
+      const notExpired = cached && !isExpired(cached.updatedAt, new Date().getTime(), PROVIDER_CACHE_TTL)
+      if (notExpired) return new NativeBalance(new BN(cached.value))
+    }
+
+    const value = await this.chain.getNativeBalance(this.getAddress())
+    this.balanceCache.set('nativeBalance', { value: value.toBN().toString(), updatedAt: new Date().getTime() })
+
+    return value
+  }
   /*
   public smartContractInfo(): string {
     const network = utils.getNetworkName(this.chainId)

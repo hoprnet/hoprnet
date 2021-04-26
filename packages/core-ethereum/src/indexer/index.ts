@@ -136,6 +136,7 @@ class Indexer extends EventEmitter {
   //  */
   // private async wipe(): Promise<void> {
   //   await this.connector.db.batch(
+  //   getChannelsFromPeer: 
   //     (await getChannelEntries(this.connector.db)).map(({ partyA, partyB }) => ({
   //       type: 'del',
   //       key: Buffer.from(this.connector.dbKeys.ChannelEntry(partyA, partyB))
@@ -334,7 +335,7 @@ class Indexer extends EventEmitter {
     return this.toIndexerChannel(await pubKeyToPeerId(partyA.serialize()), random) // TODO: why do we pick partyA?
   }
 
-  public async getChannelsFromPeer(source: PeerId) {
+  public async getChannelsFromPeer(source: PeerId): Promise<RoutingChannel[]> {
     const sourcePubKey = new PublicKey(source.pubKey.marshal())
     const channels = await this.getChannelsOf(await sourcePubKey.toAddress())
 

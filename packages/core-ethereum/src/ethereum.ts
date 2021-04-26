@@ -241,7 +241,8 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
       provider.removeAllListeners()
       channels.removeAllListeners()
     },
-    getChannels: () => channels
+    getChannels: () => channels,
+    getPrivateKey: () => ethers.utils.arrayify(wallet.privateKey)
   }
 
 
