@@ -11,10 +11,12 @@ describe('test commitment', function () {
     fakeSet = sinon.fake.resolves(true)
     fakeGet = sinon.fake.resolves(undefined)
     fakeDB = new LevelUp(MemDown())
-    fakeId = new Hash(new Uint8Array([1]))
+    fakeId = new Hash(new Uint8Array({ length: Hash.SIZE }).fill(1))
   })
 
   it('should publish a hashed secret', async function () {
+    this.timeout(3000)
+
     let cm = new Commitment(fakeSet, fakeGet, fakeDB, fakeId)
     let c1 = await cm.getCurrentCommitment()
     assert(c1 != null, 'gives current commitment')
