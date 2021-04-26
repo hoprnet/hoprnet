@@ -18,17 +18,40 @@ export const expectAccountsToBeEqual = (actual: AccountEntry, expected: AccountE
 }
 
 export const expectChannelsToBeEqual = (actual: ChannelEntry, expected: ChannelEntry) => {
-  assert.strictEqual(actual.deposit.toString(), expected.deposit.toString(), 'deposit')
-  assert.strictEqual(actual.partyABalance.toString(), expected.partyABalance.toString(), 'partyABalance')
-  assert.strictEqual(actual.closureTime.toString(), expected.closureTime.toString(), 'closureTime')
-  assert.strictEqual(actual.stateCounter.toString(), expected.stateCounter.toString(), 'stateCounter')
+  assert.strictEqual(actual.partyA.toHex(), expected.partyA.toHex(), 'partyA')
+  assert.strictEqual(actual.partyB.toHex(), expected.partyB.toHex(), 'partyB')
+  assert.strictEqual(actual.partyABalance.toBN().toString(), expected.partyABalance.toBN().toString(), 'partyABalance')
+  assert.strictEqual(actual.partyBBalance.toBN().toString(), expected.partyBBalance.toBN().toString(), 'partyBBalance')
+  assert.strictEqual(actual.commitmentPartyA.toHex(), expected.commitmentPartyA.toHex(), 'commitmentPartyA')
+  assert.strictEqual(actual.commitmentPartyB.toHex(), expected.commitmentPartyB.toHex(), 'commitmentPartyB')
+  assert.strictEqual(
+    actual.partyATicketEpoch.toBN().toString(),
+    expected.partyATicketEpoch.toBN().toString(),
+    'partyATicketEpoch'
+  )
+  assert.strictEqual(
+    actual.partyBTicketEpoch.toBN().toString(),
+    expected.partyBTicketEpoch.toBN().toString(),
+    'partyBTicketEpoch'
+  )
+  assert.strictEqual(
+    actual.partyATicketIndex.toBN().toString(),
+    expected.partyATicketIndex.toBN().toString(),
+    'partyATicketIndex'
+  )
+  assert.strictEqual(
+    actual.partyBTicketIndex.toBN().toString(),
+    expected.partyBTicketIndex.toBN().toString(),
+    'partyBTicketIndex'
+  )
+  assert.strictEqual(actual.status, expected.status, 'status')
+  assert.strictEqual(actual.channelEpoch.toBN().toString(), expected.channelEpoch.toBN().toString(), 'channelEpoch')
+  assert.strictEqual(actual.closureTime.toBN().toString(), expected.closureTime.toBN().toString(), 'closureTime')
   assert.strictEqual(actual.closureByPartyA, expected.closureByPartyA, 'closureByPartyA')
-  assert.strictEqual(actual.openedAt.toString(), expected.openedAt.toString(), 'openedAt')
-  assert.strictEqual(actual.closedAt.toString(), expected.closedAt.toString(), 'closedAt')
 }
 
 export const PARTY_A_INITIALIZED_EVENT = {
-  event: 'AccountInitialized',
+  event: 'ChannelUpdate',
   transactionHash: '',
   blockNumber: 1,
   transactionIndex: 0,
@@ -38,7 +61,7 @@ export const PARTY_A_INITIALIZED_EVENT = {
     uncompressedPubKey: partyA.toUncompressedPubKeyHex(),
     secret: secret1.toHex()
   }
-} as Event<'AccountInitialized'>
+} as Event<'ChannelUpdate'>
 
 export const PARTY_A_INITIALIZED_ACCOUNT = new AccountEntry(partyA.toAddress(), partyA, secret1, new BN(1))
 

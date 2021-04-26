@@ -75,23 +75,22 @@ class ChannelEntry {
   }
 
   static fromSCEvent(event: Event<'ChannelUpdate'>): ChannelEntry {
-    const data = event.args
-    const rawChannel = data[2]
+    const { partyA, partyB, newState } = event.args
     return new ChannelEntry(
-      Address.fromString(data.partyA),
-      Address.fromString(data.partyB),
-      new Balance(new BN(rawChannel[0].toString())),
-      new Balance(new BN(rawChannel[1].toString())),
-      new Hash(stringToU8a(rawChannel[2])),
-      new Hash(stringToU8a(rawChannel[3])),
-      new UINT256(new BN(rawChannel[4].toString())),
-      new UINT256(new BN(rawChannel[5].toString())),
-      new UINT256(new BN(rawChannel[6].toString())),
-      new UINT256(new BN(rawChannel[7].toString())),
-      numberToChannelStatus(rawChannel[8]),
-      new UINT256(new BN(rawChannel[9].toString())),
-      new UINT256(new BN(rawChannel[10].toString())),
-      Boolean(rawChannel[11])
+      Address.fromString(partyA),
+      Address.fromString(partyB),
+      new Balance(new BN(newState.partyABalance.toString())),
+      new Balance(new BN(newState.partyBBalance.toString())),
+      new Hash(stringToU8a(newState.partyACommitment)),
+      new Hash(stringToU8a(newState.partyBCommitment)),
+      new UINT256(new BN(newState.partyATicketEpoch.toString())),
+      new UINT256(new BN(newState.partyBTicketEpoch.toString())),
+      new UINT256(new BN(newState.partyATicketIndex.toString())),
+      new UINT256(new BN(newState.partyBTicketIndex.toString())),
+      numberToChannelStatus(newState.status),
+      new UINT256(new BN(newState.channelEpoch.toString())),
+      new UINT256(new BN(newState.closureTime.toString())),
+      newState.closureByPartyA
     )
   }
 
