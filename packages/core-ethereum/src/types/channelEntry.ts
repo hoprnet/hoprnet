@@ -136,7 +136,6 @@ class ChannelEntry {
       return this.commitmentPartyB
     }
     throw new Error('Wrong addr for this channel')
-
   }
 }
 

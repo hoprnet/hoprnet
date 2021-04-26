@@ -4,7 +4,7 @@ import { Address } from './types'
 import type { HoprToken, HoprChannels } from './contracts'
 import BN from 'bn.js'
 import { Balance, NativeBalance, Hash } from './types'
-import { durations} from '@hoprnet/hopr-utils'
+import { durations } from '@hoprnet/hopr-utils'
 import NonceTracker from './nonce-tracker'
 import TransactionManager from './transaction-manager'
 import { getNetworkGasPrice } from './utils'
@@ -250,4 +250,3 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
 
 type Unpack<T> = T extends Promise<infer U> ? U : T;
 export type ChainWrapper = Unpack<ReturnType<typeof createChainWrapper>>
-
