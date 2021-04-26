@@ -67,7 +67,7 @@ export class PromiscuousStrategy implements ChannelStrategy {
     _n: RoutingChannel[],
     currentChannels: RoutingChannel[],
     peers: NetworkPeers,
-    getRandomChannel: () => Promise<RoutingChannel>,
+    getRandomChannel: () => Promise<RoutingChannel>
   ): Promise<[ChannelsToOpen[], ChannelsToClose[]]> {
     log('currently open', logIndexerChannels(currentChannels))
     let toOpen: ChannelsToOpen[] = []

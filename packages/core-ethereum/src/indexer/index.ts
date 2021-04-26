@@ -136,7 +136,7 @@ class Indexer extends EventEmitter {
   //  */
   // private async wipe(): Promise<void> {
   //   await this.connector.db.batch(
-  //   getChannelsFromPeer: 
+  //   getChannelsFromPeer:
   //     (await getChannelEntries(this.connector.db)).map(({ partyA, partyB }) => ({
   //       type: 'del',
   //       key: Buffer.from(this.connector.dbKeys.ChannelEntry(partyA, partyB))
