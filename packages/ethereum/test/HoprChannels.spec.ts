@@ -168,7 +168,9 @@ describe('announce user', function () {
   it('should announce user', async function () {
     const { channels, deployer } = await useFixtures()
 
-    await expect(channels.connect(deployer).announce(MULTI_ADDR)).to.emit(channels, 'Announcement').withArgs(MULTI_ADDR)
+    await expect(channels.connect(deployer).announce(MULTI_ADDR))
+      .to.emit(channels, 'Announcement')
+      .withArgs(deployer.address, MULTI_ADDR)
   })
 })
 
