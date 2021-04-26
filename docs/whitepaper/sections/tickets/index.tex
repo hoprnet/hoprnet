@@ -51,7 +51,7 @@ The challenge can be computed from acknowledgement as $challenge:=ack*G$.
 \newline Once it receives an acknowledgement, it checks whether it stores an unacknowledged ticket for the received acknowledgement. 
 If this is not the case, the node should drop the acknowledgement.  
 \newline The node then computes the response to the challenge given in the ticket as $$response:=(s_i+s_{i+1})*G$$
-Additionally, the node retrieves the opening value $open$ to the current on-chain commitment (used to verify whether a ticket is a win) and checks whether response, open leads to a winning ticket. 
+Additionally, the node retrieves the opening value $open$ to the current on-chain commitment (used to verify whether a ticket is a win) and checks whether $response$, $open$ leads to a winning ticket. 
 This is the case if $$H( ticketHash, response, open ) <P_w$$ where $$ticketHash:=H(T_D)$$
 If this is not the case, the node should drop the ticket. 
 The final recipient of the packet does not receive a ticket because message reception is not incentivized by the HOPR protocol.
