@@ -1,17 +1,11 @@
 import type { LevelUp } from 'levelup'
-import type { Wallet as IWallet, providers as IProviders } from 'ethers'
-import type { HoprToken, HoprChannels } from './contracts'
 import chalk from 'chalk'
-import { Networks, getContracts } from '@hoprnet/hopr-ethereum'
-import { ethers } from 'ethers'
 import debug from 'debug'
 import { Acknowledgement, PublicKey } from './types'
 import Indexer from './indexer'
 import { RoutingChannel } from './indexer'
-import * as utils from './utils'
 import Account from './account'
 import { getWinProbabilityAsFloat, computeWinningProbability } from './utils'
-import { HoprToken__factory, HoprChannels__factory } from './contracts'
 import { DEFAULT_URI, MAX_CONFIRMATIONS, INDEXER_BLOCK_RANGE } from './constants'
 import { Channel } from './channel'
 import { createChainWrapper } from './ethereum'
@@ -38,32 +32,24 @@ export default class HoprEthereum {
   private _status: 'dead' | 'alive' = 'dead'
   private _starting?: Promise<HoprEthereum>
   private _stopping?: Promise<void>
-  private chain: ChainWrapper
 
   public indexer: Indexer
   public account: Account
 
   constructor(
-    public db: LevelUp,
-    public provider: IProviders.WebSocketProvider,
-    public chainId: number,
-    public network: Networks,
-    public wallet: IWallet,
-    public hoprChannels: HoprChannels,
-    public hoprToken: HoprToken,
-    genesisBlock: number,
+    private chain: ChainWrapper,
+    private db: LevelUp,
     maxConfirmations: number,
     blockRange: number
   ) {
-    this.indexer = new Indexer(this, genesisBlock, maxConfirmations, blockRange)
-    this.chain = createChainWrapper(this.provider, this.hoprToken, this.hoprChannels, this.network, this.account.getAddress())
-    this.account = new Account(this.chain, this.indexer, this.wallet)
+    this.indexer = new Indexer(chain.getGenesisBlock(), this.db, this.chain, maxConfirmations, blockRange)
+    this.account = new Account(this.chain, this.indexer, chain.getWallet())
   }
 
   readonly CHAIN_NAME = 'HOPR on Ethereum'
 
   private async _start(): Promise<HoprEthereum> {
-    await this.provider.ready
+    await this.chain.waitUntilReady()
     await this.indexer.start()
     this._status = 'alive'
     log(chalk.green('Connector started'))
@@ -132,6 +118,7 @@ export default class HoprEthereum {
     return this.account.getAddress().toHex()
   }
 
+  /*
   public smartContractInfo(): string {
     const network = utils.getNetworkName(this.chainId)
     const contracts = getContracts()[network]
@@ -141,6 +128,7 @@ export default class HoprEthereum {
       `HOPR Channels: ${contracts.HoprChannels.address}`
     ].join('\n')
   }
+  */
 
   /**
    * Creates an uninitialised instance.
@@ -155,30 +143,13 @@ export default class HoprEthereum {
     privateKey: Uint8Array,
     options?: { provider?: string; maxConfirmations?: number }
   ): Promise<HoprEthereum> {
-    const provider = new ethers.providers.WebSocketProvider(options?.provider || DEFAULT_URI)
-    const wallet = new ethers.Wallet(privateKey).connect(provider)
-    const chainId = await provider.getNetwork().then((res) => res.chainId)
-    const network = utils.getNetworkName(chainId) as Networks
-    const contracts = getContracts()?.[network]
-
-    if (!contracts?.HoprToken?.address) {
-      throw Error(`token contract address from network ${network} not found`)
-    } else if (!contracts?.HoprChannels?.address) {
-      throw Error(`channels contract address from network ${network} not found`)
-    }
-
-    const hoprChannels = HoprChannels__factory.connect(contracts.HoprChannels.address, wallet)
-    const hoprToken = HoprToken__factory.connect(contracts.HoprToken.address, wallet)
-
+    const chain = await createChainWrapper(
+      options?.provider || DEFAULT_URI,
+      privateKey,
+    )
     const coreConnector = new HoprEthereum(
+      chain,
       db,
-      provider,
-      chainId,
-      network,
-      wallet,
-      hoprChannels,
-      hoprToken,
-      contracts?.HoprChannels?.deployedAt ?? 0,
       options.maxConfirmations ?? MAX_CONFIRMATIONS,
       INDEXER_BLOCK_RANGE
     )

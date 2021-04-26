@@ -1,5 +1,5 @@
 import type PeerId from 'peer-id'
-import type HoprEthereum from '..'
+import { LevelUp } from 'levelup'
 import type { Event, EventNames } from './types'
 import EventEmitter from 'events'
 import chalk from 'chalk'
@@ -10,6 +10,7 @@ import { Address, ChannelEntry, Hash, PublicKey, Balance, Snapshot } from '../ty
 import * as db from './db'
 import { isConfirmedBlock, isSyncing, snapshotComparator } from './utils'
 import Debug from 'debug'
+import type { ChainWrapper } from '../ethereum'
 
 export type RoutingChannel = [source: PeerId, destination: PeerId, stake: Balance]
 
@@ -27,8 +28,9 @@ class Indexer extends EventEmitter {
   private unconfirmedEvents = new Heap<Event<any>>(snapshotComparator)
 
   constructor(
-    private connector: HoprEthereum,
     private genesisBlock: number,
+    private db: LevelUp,
+    private chain: ChainWrapper,
     private maxConfirmations: number,
     private blockRange: number
   ) {
@@ -42,14 +44,12 @@ class Indexer extends EventEmitter {
     if (this.status === 'started') return
     log(`Starting indexer...`)
 
-    const { provider, hoprChannels } = this.connector
-
     // wipe indexer, do not use in production
     // await this.wipe()
 
     const [latestSavedBlock, latestOnChainBlock] = await Promise.all([
-      await db.getLatestBlockNumber(this.connector.db),
-      provider.getBlockNumber()
+      await db.getLatestBlockNumber(this.db),
+      this.chain.getLatestBlockNumber()
     ])
     this.latestBlock = latestOnChainBlock
 
@@ -78,25 +78,12 @@ class Indexer extends EventEmitter {
 
     log('Subscribing to events from block %d', fromBlock)
 
-    // subscribe to new blocks
-    provider
-      .on('block', (blockNumber: number) => {
-        this.onNewBlock({ number: blockNumber })
-      })
-      .on('error', (error: any) => {
-        log(chalk.red(`etherjs error: ${error}`))
-        this.restart()
-      })
-
-    // subscribe to all HoprChannels events
-    hoprChannels
-      .on('*', (event: Event<any>) => {
-        this.onNewEvents([event])
-      })
-      .on('error', (error: any) => {
-        log(chalk.red(`etherjs error: ${error}`))
-        this.restart()
-      })
+    this.chain.subscribeBlock(this.onNewBlock.bind(this))
+    this.chain.subscribeError((error: any) => {
+      log(chalk.red(`etherjs error: ${error}`))
+      this.restart()
+    })
+    this.chain.subscribeChannelEvents((e) => this.onNewEvents([e]))
 
     this.status = 'started'
     log(chalk.green('Indexer started!'))
@@ -109,8 +96,7 @@ class Indexer extends EventEmitter {
     if (this.status === 'stopped') return
     log(`Stopping indexer...`)
 
-    this.connector.provider.removeAllListeners()
-    this.connector.hoprChannels.removeAllListeners()
+    this.chain.unsubscribe()
 
     this.status = 'stopped'
     log(chalk.green('Indexer stopped!'))
@@ -121,8 +107,8 @@ class Indexer extends EventEmitter {
    */
   public async isSyncing(): Promise<boolean> {
     const [onChainBlock, lastKnownBlock] = await Promise.all([
-      this.connector.provider.getBlockNumber(),
-      db.getLatestBlockNumber(this.connector.db)
+      this.chain.getLatestBlockNumber(),
+      db.getLatestBlockNumber(this.db)
     ])
 
     return isSyncing(onChainBlock, lastKnownBlock)
@@ -190,7 +176,7 @@ class Indexer extends EventEmitter {
 
       try {
         // TODO: wildcard is supported but not properly typed
-        events = await this.connector.hoprChannels.queryFilter('*' as any, fromBlock, toBlock)
+        events = await this.chain.getChannels().queryFilter('*' as any, fromBlock, toBlock)
       } catch (error) {
         failedCount++
 
@@ -203,7 +189,7 @@ class Indexer extends EventEmitter {
       }
 
       this.onNewEvents(events)
-      await this.onNewBlock({ number: toBlock })
+      await this.onNewBlock(toBlock)
       failedCount = 0
       fromBlock = toBlock
 
@@ -224,19 +210,19 @@ class Indexer extends EventEmitter {
    * confirmed blocks.
    * @param block
    */
-  private async onNewBlock(block: { number: number }): Promise<void> {
+  private async onNewBlock(blockNumber: number): Promise<void> {
     // update latest block
-    if (this.latestBlock < block.number) {
-      this.latestBlock = block.number
+    if (this.latestBlock < blockNumber) {
+      this.latestBlock = blockNumber
     }
 
-    let lastSnapshot = await db.getLatestConfirmedSnapshot(this.connector.db)
+    let lastSnapshot = await db.getLatestConfirmedSnapshot(this.db)
 
     // check unconfirmed events and process them if found
     // to be within a confirmed block
     while (
       this.unconfirmedEvents.length > 0 &&
-      isConfirmedBlock(this.unconfirmedEvents.top(1)[0].blockNumber, block.number, this.maxConfirmations)
+      isConfirmedBlock(this.unconfirmedEvents.top(1)[0].blockNumber, blockNumber, this.maxConfirmations)
     ) {
       const event = this.unconfirmedEvents.pop()
       log('Processing event %s', event.event)
@@ -268,10 +254,10 @@ class Indexer extends EventEmitter {
       await this.onChannelUpdated(event as Event<'ChannelUpdate'>)
 
       lastSnapshot = new Snapshot(new BN(event.blockNumber), new BN(event.transactionIndex), new BN(event.logIndex))
-      await db.updateLatestConfirmedSnapshot(this.connector.db, lastSnapshot)
+      await db.updateLatestConfirmedSnapshot(this.db, lastSnapshot)
     }
 
-    await db.updateLatestBlockNumber(this.connector.db, new BN(block.number))
+    await db.updateLatestBlockNumber(this.db, new BN(blockNumber))
   }
 
   /**
@@ -284,30 +270,30 @@ class Indexer extends EventEmitter {
 
   private async onChannelUpdated(event: Event<'ChannelUpdate'>): Promise<void> {
     const channel = ChannelEntry.fromSCEvent(event)
-    await db.updateChannel(this.connector.db, channel.getId(), channel)
+    await db.updateChannel(this.db, channel.getId(), channel)
   }
 
   public async getAccount(address: Address) {
-    return db.getAccount(this.connector.db, address)
+    return db.getAccount(this.db, address)
   }
 
   public async getChannel(channelId: Hash) {
-    return db.getChannel(this.connector.db, channelId)
+    return db.getChannel(this.db, channelId)
   }
 
   public async getChannels(filter?: (channel: ChannelEntry) => Promise<boolean>) {
-    return db.getChannels(this.connector.db, filter)
+    return db.getChannels(this.db, filter)
   }
 
   public async getChannelsOf(address: Address) {
-    return db.getChannels(this.connector.db, async (channel) => {
+    return db.getChannels(this.db, async (channel) => {
       return address.eq(channel.partyA) || address.eq(channel.partyB)
     })
   }
 
   // routing
   public async getPublicKeyOf(address: Address): Promise<PublicKey | undefined> {
-    const account = await db.getAccount(this.connector.db, address)
+    const account = await db.getAccount(this.db, address)
     if (account && account.publicKey) {
       return account.publicKey
     }

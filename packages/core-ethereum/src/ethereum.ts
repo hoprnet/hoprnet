@@ -1,6 +1,6 @@
-import type { providers as IProviders, ContractTransaction } from 'ethers'
+import type { ContractTransaction } from 'ethers'
 import ethers, { errors } from 'ethers'
-import type { Address } from './types'
+import { Address } from './types'
 import type { HoprToken, HoprChannels } from './contracts'
 import BN from 'bn.js'
 import { Balance, NativeBalance, Hash } from './types'
@@ -9,14 +9,30 @@ import NonceTracker from './nonce-tracker'
 import TransactionManager from './transaction-manager'
 import { getNetworkGasPrice } from './utils'
 import Debug from 'debug'
-import { Networks } from '@hoprnet/hopr-ethereum'
+import { Networks, getContracts} from '@hoprnet/hopr-ethereum'
+import { getNetworkName } from './utils'
+import { HoprToken__factory, HoprChannels__factory } from './contracts'
 
 const log = Debug('hopr:core-ethereum:chain-operations')
 const abiCoder = new ethers.utils.AbiCoder()
 
 export type Receipt = string
 
-export function createChainWrapper(provider: IProviders.WebSocketProvider, token: HoprToken, channels: HoprChannels, network: Networks, address: Address) {
+export async function createChainWrapper(providerURI: string, privateKey: Uint8Array) {
+  const provider = new ethers.providers.WebSocketProvider(providerURI)
+  const wallet = new ethers.Wallet(privateKey).connect(provider)
+  const address = Address.fromString(this.wallet.address)
+  const chainId = await provider.getNetwork().then((res) => res.chainId)
+  const network = getNetworkName(chainId) as Networks
+  const contracts = getContracts()?.[network]
+
+  if (!contracts?.HoprToken?.address) {
+    throw Error(`token contract address from network ${network} not found`)
+  } else if (!contracts?.HoprChannels?.address) {
+    throw Error(`channels contract address from network ${network} not found`)
+  }
+  const channels = HoprChannels__factory.connect(contracts.HoprChannels.address, wallet)
+  const token = HoprToken__factory.connect(contracts.HoprToken.address, wallet)
 
   const transactions = new TransactionManager()
   const nonceTracker = new NonceTracker({
@@ -209,12 +225,29 @@ export function createChainWrapper(provider: IProviders.WebSocketProvider, token
     finalizeChannelClosure: (counterparty) => finalizeChannelClosure(channels, counterparty),
     initiateChannelClosure: (counterparty) => initiateChannelClosure(channels, counterparty),
     redeemTicket: (counterparty, ackTicket, ticket) => redeemTicket(channels, counterparty, ackTicket, ticket),
-    setCommitment: (comm: Hash) => setCommitment(channels, comm)
+    setCommitment: (comm: Hash) => setCommitment(channels, comm),
+    getGenesisBlock: () => contracts?.HoprChannels?.deployedAt ?? 0,
+    getWallet: () => wallet,
+    waitUntilReady: async () => await this.provider.ready,
+    getLatestBlockNumber: async () => provider.getBlockNumber(),
+    subscribeBlock: (cb) => provider.on('block', cb),
+    subscribeError: (cb) => {
+      provider.on('error', cb)
+      channels.on('error', cb)
+    },
+    // subscribe to all HoprChannels events
+    subscribeChannelEvents: (cb) => channels.on('*', (event) => cb(event)),
+    unsubscribe: () => {
+      provider.removeAllListeners()
+      channels.removeAllListeners()
+    },
+    getChannels: () => channels
   }
 
 
   return api
 }
 
-export type ChainWrapper = ReturnType<typeof createChainWrapper>
+type Unpack<T> = T extends Promise<infer U> ? U : T;
+export type ChainWrapper = Unpack<ReturnType<typeof createChainWrapper>>
 
