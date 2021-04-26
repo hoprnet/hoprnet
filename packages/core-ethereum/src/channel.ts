@@ -1,5 +1,4 @@
-import type Connector from '.'
-import { ethers } from 'ethers'
+import { LevelUp } from 'levelup'
 import BN from 'bn.js'
 import {
   PublicKey,
@@ -16,24 +15,28 @@ import { computeWinningProbability, checkChallenge, isWinningTicket } from './ut
 import Debug from 'debug'
 import type { SubmitTicketResponse } from '.'
 import { Commitment } from './commitment'
+import type { ChainWrapper } from './ethereum'
+import type Indexer from './indexer'
 
 const log = Debug('hopr-core-ethereum:channel')
-const abiCoder = new ethers.utils.AbiCoder()
 
 class Channel {
   private index: number
   private commitment: Commitment
 
   constructor(
-    private readonly connector: Connector, // TODO: replace with ethereum global context?
     private readonly self: PublicKey,
-    public readonly counterparty: PublicKey
+    private readonly counterparty: PublicKey,
+    private readonly db: LevelUp,
+    private readonly chain: ChainWrapper,
+    private readonly indexer: Indexer,
+    private readonly privateKey: Uint8Array
   ) {
     this.index = 0 // TODO - bump channel epoch to make sure..
     this.commitment = new Commitment(
       () => {},
       () => {},
-      this.connector.db,
+      this.db,
       this.getId()
     )
   }
@@ -70,7 +73,7 @@ class Channel {
 
   async getState(): Promise<ChannelEntry> {
     const channelId = this.getId()
-    const state = await this.connector.indexer.getChannel(channelId)
+    const state = await this.indexer.getChannel(channelId)
     if (state) return state
 
     throw Error(`Channel state for ${channelId.toHex()} not found`)
@@ -90,43 +93,17 @@ class Channel {
   }
 
   async fund(myFund: Balance, counterpartyFund: Balance) {
-    const { account, hoprToken, hoprChannels } = this.connector
     const myAddress = this.self.toAddress()
     const counterpartyAddress = this.counterparty.toAddress()
     const totalFund = myFund.toBN().add(counterpartyFund.toBN())
-    const myBalance = await this.connector.hoprToken.balanceOf(myAddress.toHex())
+    const myBalance = await this.chain.getBalance(myAddress)
     if (totalFund.gt(new BN(myBalance.toString()))) {
       throw Error('We do not have enough balance to fund the channel')
     }
-
-    try {
-      const transaction = await account.sendTransaction(
-        hoprToken.send,
-        hoprChannels.address,
-        totalFund.toString(),
-        abiCoder.encode(
-          ['bool', 'address', 'address', 'uint256', 'uint256'],
-          [
-            false,
-            myAddress.toHex(),
-            counterpartyAddress.toHex(),
-            myFund.toBN().toString(),
-            counterpartyFund.toBN().toString()
-          ]
-        )
-      )
-      await transaction.wait()
-
-      return transaction.hash
-    } catch (err) {
-      // TODO: catch race-condition
-      console.log(err)
-      throw Error(`Failed to fund channel`)
-    }
+    await this.chain.fundChannel(myAddress, counterpartyAddress, myFund, counterpartyFund)
   }
 
   async open(fundAmount: Balance) {
-    const { account, hoprToken, hoprChannels } = this.connector
     // channel may not exist, we can still open it
     let c: ChannelEntry
     try {
@@ -138,79 +115,30 @@ class Channel {
 
     const myAddress = this.self.toAddress()
     const counterpartyAddress = this.counterparty.toAddress()
-    const myBalance = await this.connector.hoprToken.balanceOf(myAddress.toHex())
+    const myBalance = await this.chain.getBalance(myAddress)
     if (new BN(myBalance.toString()).lt(fundAmount.toBN())) {
       throw Error('We do not have enough balance to open a channel')
     }
-
-    try {
-      const transaction = await account.sendTransaction(
-        hoprToken.send,
-        hoprChannels.address,
-        fundAmount.toBN().toString(),
-        abiCoder.encode(
-          ['address', 'address', 'uint256', 'uint256'],
-          [myAddress.toHex(), counterpartyAddress.toHex(), fundAmount.toBN().toString(), '0']
-        )
-      )
-      await transaction.wait()
-
-      return transaction.hash
-    } catch (err) {
-      // TODO: catch race-condition
-      console.log(err)
-      throw Error(`Failed to open channel`)
-    }
+    await this.chain.openChannel(myAddress, counterpartyAddress, fundAmount)
   }
 
   async initializeClosure() {
-    const { account, hoprChannels } = this.connector
-
     const c = await this.getState()
     const counterpartyAddress = this.counterparty.toAddress()
-
     if (c.status !== 'OPEN') {
       throw Error('Channel status is not OPEN')
     }
-
-    try {
-      const transaction = await account.sendTransaction(
-        hoprChannels.initiateChannelClosure,
-        counterpartyAddress.toHex()
-      )
-      await transaction.wait()
-
-      return transaction.hash
-    } catch (err) {
-      // TODO: catch race-condition
-      console.log(err)
-      throw Error(`Failed to initialize channel closure`)
-    }
+    await this.chain.initiateChannelClosure(counterpartyAddress)
   }
 
   async finalizeClosure() {
-    const { account, hoprChannels } = this.connector
-
     const c = await this.getState()
     const counterpartyAddress = this.counterparty.toAddress()
 
     if (c.status !== 'PENDING_TO_CLOSE') {
       throw Error('Channel status is not PENDING_TO_CLOSE')
     }
-
-    try {
-      const transaction = await account.sendTransaction(
-        hoprChannels.finalizeChannelClosure,
-        counterpartyAddress.toHex()
-      )
-      await transaction.wait()
-
-      return transaction.hash
-    } catch (err) {
-      // TODO: catch race-condition
-      console.log(err)
-      throw Error(`Failed to finilize channel closure`)
-    }
+    await this.chain.finalizeChannelClosure(counterpartyAddress)
   }
 
   async createTicket(amount: Balance, challenge: Hash, winProb: number) {
@@ -224,7 +152,7 @@ class Channel {
       amount,
       computeWinningProbability(winProb),
       (await this.getState()).channelEpoch,
-      this.connector.account.privateKey
+      this.privateKey
     )
   }
 
@@ -238,7 +166,7 @@ class Channel {
       new Balance(new BN(0)),
       computeWinningProbability(1),
       UINT256.fromString('0'),
-      this.connector.account.privateKey
+      this.privateKey
     )
   }
 
@@ -247,8 +175,6 @@ class Channel {
       const ticket = ackTicket.ticket
 
       log('Submitting ticket', ackTicket.response.toHex())
-      const { hoprChannels, account } = this.connector
-
       const emptyPreImage = new Hash(new Uint8Array(Hash.SIZE).fill(0x00))
       const hasPreImage = !ackTicket.preImage.eq(emptyPreImage)
       if (!hasPreImage) {
@@ -278,20 +204,10 @@ class Channel {
       }
 
       const counterparty = ticket.getSigner().toAddress()
-      const transaction = await account.sendTransaction(
-        hoprChannels.redeemTicket,
-        counterparty.toHex(),
-        ackTicket.preImage.toHex(),
-        ackTicket.ticket.epoch.serialize(),
-        ackTicket.ticket.index.serialize(),
-        ackTicket.response.toHex(),
-        ticket.amount.toBN().toString(),
-        ticket.winProb.toHex(),
-        ticket.signature.serialize()
-      )
-      await transaction.wait()
+      const transaction = await this.chain.redeemTicket(counterparty, ackTicket, ticket)
+
       // TODO delete ackTicket
-      this.connector.account.updateLocalState(ackTicket.preImage)
+      //this.commitment.updateChainState(ackTicket.preImage)
 
       log('Successfully submitted ticket', ackTicket.response.toHex())
       return {

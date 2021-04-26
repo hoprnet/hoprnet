@@ -3,6 +3,7 @@ import debug from 'debug'
 import assert from 'assert'
 import { Mutex } from 'async-mutex'
 import { Address } from './types'
+import type { ChainWrapper } from './ethereum'
 
 const log = debug('hopr-core-ethereum:nonce-tracker')
 
@@ -76,17 +77,7 @@ export type Transaction = ITransaction & {
 export default class NonceTracker {
   private lockMap: Record<string, Mutex>
 
-  constructor(
-    private ops: {
-      minPending?: number
-    },
-    private api: {
-      getLatestBlockNumber: () => Promise<number>
-      getTransactionCount: (address: Address, blockNumber?: number) => Promise<number>
-      getPendingTransactions: (address: Address) => Transaction[]
-      getConfirmedTransactions: (address: Address) => Transaction[]
-    }
-  ) {
+  constructor(private api: ChainWrapper, private minPending?: number) {
     this.lockMap = {}
   }
 
@@ -163,13 +154,13 @@ export default class NonceTracker {
    * @return true if it contains a stuck transaction
    */
   private _containsStuckTx(txs: Transaction[]): boolean {
-    if (!this.ops.minPending) return false
+    if (!this.minPending) return false
 
     const now = new Date().getTime()
 
     // checks if one of the txs is stuck
     return txs.some((tx) => {
-      return tx.createdAt + this.ops.minPending < now
+      return tx.createdAt + this.minPending < now
     })
   }
 

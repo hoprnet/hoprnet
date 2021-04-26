@@ -15,6 +15,7 @@ import { HoprToken__factory, HoprChannels__factory } from './contracts'
 import { DEFAULT_URI, MAX_CONFIRMATIONS, INDEXER_BLOCK_RANGE } from './constants'
 import { Channel } from './channel'
 import { createChainWrapper } from './ethereum'
+import type { ChainWrapper } from './ethereum'
 
 const log = debug('hopr-core-ethereum')
 
@@ -37,7 +38,7 @@ export default class HoprEthereum {
   private _status: 'dead' | 'alive' = 'dead'
   private _starting?: Promise<HoprEthereum>
   private _stopping?: Promise<void>
-  private chain
+  private chain: ChainWrapper
 
   public indexer: Indexer
   public account: Account
@@ -55,8 +56,8 @@ export default class HoprEthereum {
     blockRange: number
   ) {
     this.indexer = new Indexer(this, genesisBlock, maxConfirmations, blockRange)
-    this.chain = createChainWrapper(this.provider, this.hoprToken)
-    this.account = new Account(this.network, this.chain, this.indexer, this.wallet)
+    this.chain = createChainWrapper(this.provider, this.hoprToken, this.hoprChannels)
+    this.account = new Account(this.chain, this.indexer, this.wallet)
   }
 
   readonly CHAIN_NAME = 'HOPR on Ethereum'
@@ -120,28 +121,11 @@ export default class HoprEthereum {
   }
 
   public getChannel(src: PublicKey, counterparty: PublicKey) {
-    return new Channel(this, src, counterparty)
+    return new Channel(src, counterparty, this.db, this.chain, this.indexer, this.account.privateKey)
   }
 
   async withdraw(currency: 'NATIVE' | 'HOPR', recipient: string, amount: string): Promise<string> {
-    if (currency === 'NATIVE') {
-      const nonceLock = await this.account.getNonceLock()
-      try {
-        const transaction = await this.account.wallet.sendTransaction({
-          to: recipient,
-          value: ethers.BigNumber.from(amount),
-          nonce: ethers.BigNumber.from(nonceLock.nextNonce)
-        })
-        nonceLock.releaseLock()
-        return transaction.hash
-      } catch (err) {
-        nonceLock.releaseLock()
-        throw err
-      }
-    } else {
-      const transaction = await this.account.sendTransaction(this.hoprToken.transfer, recipient, amount)
-      return transaction.hash
-    }
+    return this.chain.withdraw(currency, recipient, amount)
   }
 
   public async hexAccountAddress(): Promise<string> {
