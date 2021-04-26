@@ -13,6 +13,8 @@ import Debug from 'debug'
 const log = Debug('hopr:core-ethereum:chain-operations')
 const abiCoder = new ethers.utils.AbiCoder()
 
+export type Receipt = string
+
 export function createChainWrapper(provider: IProviders.WebSocketProvider, token: HoprToken, channels: HoprChannels) {
   const api = {
     // TODO: use indexer when it's done syncing
@@ -162,7 +164,7 @@ async function fundChannel(
     throw Error(`Failed to fund channel`)
   }
 }
-async function openChannel(hoprToken, hoprChannels, myAddress, counterpartyAddress, fundAmount) {
+async function openChannel(hoprToken, hoprChannels, myAddress, counterpartyAddress, fundAmount): Promise<Receipt> {
   try {
     const transaction = await sendTransaction(
       hoprToken.send,
@@ -183,33 +185,21 @@ async function openChannel(hoprToken, hoprChannels, myAddress, counterpartyAddre
   }
 }
 
-async function finalizeChannelClosure(hoprChannels, counterpartyAddress) {
-  try {
-    const transaction = await sendTransaction(hoprChannels.finalizeChannelClosure, counterpartyAddress.toHex())
-    await transaction.wait()
-
-    return transaction.hash
-  } catch (err) {
-    // TODO: catch race-condition
-    console.log(err)
-    throw Error(`Failed to finilize channel closure`)
-  }
+async function finalizeChannelClosure(channels: HoprChannels, counterparty: Address): Promise<Receipt> {
+  const transaction = await sendTransaction(channels.finalizeChannelClosure, counterparty.toHex())
+  await transaction.wait()
+  return transaction.hash
+  // TODO: catch race-condition
 }
 
-async function initiateChannelClosure(hoprChannels, counterpartyAddress) {
-  try {
-    const transaction = await sendTransaction(hoprChannels.initiateChannelClosure, counterpartyAddress.toHex())
-    await transaction.wait()
-
-    return transaction.hash
-  } catch (err) {
-    // TODO: catch race-condition
-    console.log(err)
-    throw Error(`Failed to initialize channel closure`)
-  }
+async function initiateChannelClosure(channels: HoprChannels, counterparty: Address): Promise<Receipt> {
+  const transaction = await sendTransaction(channels.initiateChannelClosure, counterparty.toHex())
+  await transaction.wait()
+  return transaction.hash
+  // TODO: catch race-condition
 }
 
-async function redeemTicket(hoprChannels, counterparty, ackTicket, ticket) {
+async function redeemTicket(hoprChannels, counterparty, ackTicket, ticket): Promise<Receipt> {
   const transaction = await sendTransaction(
     hoprChannels.redeemTicket,
     counterparty.toHex(),
@@ -222,21 +212,15 @@ async function redeemTicket(hoprChannels, counterparty, ackTicket, ticket) {
     ticket.signature.serialize()
   )
   await transaction.wait()
-  return transaction
+  return transaction.hash
 }
 
-async function setCommitment(channels: HoprChannels, commitment: Hash){
-  try {
-    const transaction = await sendTransaction(
-      channels.bumpCommitment,
-      commitment.toHex()
-    )
-    await transaction.wait()
-    return transaction.hash
-  } catch (err) {
-    // TODO: catch race-condition
-    log(err)
-    throw Error(`Failed to initialize channel closure`)
-  }
+async function setCommitment(channels: HoprChannels, commitment: Hash): Promise<Receipt> {
+  const transaction = await sendTransaction(
+    channels.bumpCommitment,
+    commitment.toHex()
+  )
+  await transaction.wait()
+  return transaction.hash
 }
 
