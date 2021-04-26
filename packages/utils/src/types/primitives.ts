@@ -1,10 +1,10 @@
 import createKeccakHash from 'keccak'
-import { ADDRESS_LENGTH, HASH_LENGTH, SIGNATURE_LENGTH, SIGNATURE_RECOVERY_LENGTH } from '../constants'
-import { u8aToHex, u8aEquals, stringToU8a, moveDecimalPoint, u8aConcat } from '@hoprnet/hopr-utils'
 import { ethers } from 'ethers'
 import BN from 'bn.js'
 import { publicKeyConvert, publicKeyCreate, ecdsaSign, ecdsaVerify } from 'secp256k1'
-import { serializeToU8a, u8aSplit, u8aToNumber } from '@hoprnet/hopr-utils'
+import { moveDecimalPoint } from '../math'
+import { u8aToHex, u8aEquals, stringToU8a, u8aConcat, serializeToU8a, u8aToNumber, u8aSplit } from '../u8a'
+import { ADDRESS_LENGTH, HASH_LENGTH, SIGNATURE_LENGTH, SIGNATURE_RECOVERY_LENGTH } from '../constants'
 
 export class PublicKey {
   constructor(private arr: Uint8Array) {

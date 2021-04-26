@@ -1,12 +1,11 @@
 import assert from 'assert'
 import { expect } from 'chai'
+import { stringToU8a, SIGNATURE_LENGTH } from '@hoprnet/hopr-utils'
 import { Address, Ticket, Hash, Balance, PublicKey, Signature, UINT256 } from '.'
 import { computeWinningProbability } from '../utils'
-import { SIGNATURE_LENGTH } from '../constants'
 import * as fixtures from '../fixtures'
 import BN from 'bn.js'
 import { randomBytes } from 'crypto'
-import { stringToU8a } from '@hoprnet/hopr-utils'
 
 describe('test ticket construction', function () {
   let userA: Address
