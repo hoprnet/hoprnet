@@ -4,7 +4,7 @@ import type { Address } from './types'
 import type { HoprToken, HoprChannels } from './contracts'
 import BN from 'bn.js'
 import { Balance, NativeBalance, Hash } from './types'
-import { durations} from '@hoprnet/hopr-utils'
+import { durations } from '@hoprnet/hopr-utils'
 import NonceTracker from './nonce-tracker'
 import TransactionManager from './transaction-manager'
 import { getNetworkGasPrice } from './utils'
@@ -225,12 +225,9 @@ async function redeemTicket(hoprChannels, counterparty, ackTicket, ticket) {
   return transaction
 }
 
-async function setCommitment(channels: HoprChannels, commitment: Hash){
+async function setCommitment(channels: HoprChannels, commitment: Hash) {
   try {
-    const transaction = await sendTransaction(
-      channels.bumpCommitment,
-      commitment.toHex()
-    )
+    const transaction = await sendTransaction(channels.bumpCommitment, commitment.toHex())
     await transaction.wait()
     return transaction.hash
   } catch (err) {
@@ -239,4 +236,3 @@ async function setCommitment(channels: HoprChannels, commitment: Hash){
     throw Error(`Failed to initialize channel closure`)
   }
 }
-
