@@ -116,7 +116,6 @@ describe('unit test validateUnacknowledgedTicket', function () {
 
     return expect(
       validateUnacknowledgedTicket(
-        node.paymentChannels,
         node.getId(),
         '1',
         1,
@@ -134,7 +133,6 @@ describe('unit test validateUnacknowledgedTicket', function () {
 
     return expect(
       validateUnacknowledgedTicket(
-        node.paymentChannels,
         node.getId(),
         '1',
         1,
@@ -152,7 +150,6 @@ describe('unit test validateUnacknowledgedTicket', function () {
 
     return expect(
       validateUnacknowledgedTicket(
-        node.paymentChannels,
         node.getId(),
         '2',
         1,
@@ -172,7 +169,6 @@ describe('unit test validateUnacknowledgedTicket', function () {
 
     return expect(
       validateUnacknowledgedTicket(
-        node.paymentChannels,
         node.getId(),
         '1',
         1,
@@ -190,7 +186,6 @@ describe('unit test validateUnacknowledgedTicket', function () {
 
     return expect(
       validateUnacknowledgedTicket(
-        node.paymentChannels,
         node.getId(),
         '1',
         1,
@@ -210,7 +205,6 @@ describe('unit test validateUnacknowledgedTicket', function () {
 
     return expect(
       validateUnacknowledgedTicket(
-        node.paymentChannels,
         node.getId(),
         '1',
         1,
@@ -232,7 +226,6 @@ describe('unit test validateUnacknowledgedTicket', function () {
 
     return expect(
       validateUnacknowledgedTicket(
-        node.paymentChannels,
         node.getId(),
         '1',
         1,
@@ -252,7 +245,6 @@ describe('unit test validateUnacknowledgedTicket', function () {
 
     return expect(
       validateUnacknowledgedTicket(
-        node.paymentChannels,
         node.getId(),
         '1',
         1,
@@ -270,7 +262,6 @@ describe('unit test validateUnacknowledgedTicket', function () {
 
     return expect(
       validateUnacknowledgedTicket(
-        node.paymentChannels,
         node.getId(),
         '1',
         1,
@@ -296,7 +287,6 @@ describe('unit test validateUnacknowledgedTicket', function () {
 
     return expect(
       validateUnacknowledgedTicket(
-        node.paymentChannels,
         node.getId(),
         '1',
         1,

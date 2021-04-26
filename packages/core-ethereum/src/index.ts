@@ -11,8 +11,7 @@ import { createChainWrapper } from './ethereum'
 import type { ChainWrapper } from './ethereum'
 import type PeerId from 'peer-id'
 import { PROVIDER_CACHE_TTL } from './constants'
-import { isExpired } from '@hoprnet/hopr-utils'
-import BN from 'bn.js'
+import { cacheNoArgAsyncFunction } from '@hoprnet/hopr-utils'
 
 const log = debug('hopr-core-ethereum')
 
@@ -36,7 +35,6 @@ export default class HoprEthereum {
   private _starting?: Promise<HoprEthereum>
   private _stopping?: Promise<void>
   private indexer: Indexer
-  private balanceCache = new Map<'balance' | 'nativeBalance', { value: string; updatedAt: number }>()
   private privateKey: Uint8Array
 
   constructor(private chain: ChainWrapper, private db: LevelUp, maxConfirmations: number, blockRange: number) {
@@ -124,54 +122,38 @@ export default class HoprEthereum {
     return this.indexer.getRandomChannel()
   }
 
+
+  private uncachedGetBalance = () => this.chain.getBalance(this.getAddress())
+  private cachedGetBalance = cacheNoArgAsyncFunction<Balance>(this.uncachedGetBalance, PROVIDER_CACHE_TTL) 
   /**
    * Retrieves HOPR balance, optionally uses the cache.
    * @returns HOPR balance
    */
   public async getBalance(useCache: boolean = false): Promise<Balance> {
-    if (useCache) {
-      const cached = this.balanceCache.get('balance')
-      const notExpired = cached && !isExpired(cached.updatedAt, new Date().getTime(), PROVIDER_CACHE_TTL)
-      if (notExpired) return new Balance(new BN(cached.value))
-    }
-
-    const value = await this.chain.getBalance(this.getAddress())
-    this.balanceCache.set('balance', { value: value.toBN().toString(), updatedAt: new Date().getTime() })
-
-    return value
+    return useCache ? this.cachedGetBalance() : this.uncachedGetBalance()
   }
 
   getAddress(): Address {
     return Address.fromString(this.chain.getWallet().address)
   }
 
+  getPublicKey() {
+    return this.chain.getPublicKey()
+  }
+
   /**
    * Retrieves ETH balance, optionally uses the cache.
    * @returns ETH balance
    */
+  private uncachedGetNativeBalance = () => this.chain.getNativeBalance(this.getAddress())
+  private cachedGetNativeBalance = cacheNoArgAsyncFunction<NativeBalance>(this.uncachedGetNativeBalance, PROVIDER_CACHE_TTL) 
   public async getNativeBalance(useCache: boolean = false): Promise<NativeBalance> {
-    if (useCache) {
-      const cached = this.balanceCache.get('nativeBalance')
-      const notExpired = cached && !isExpired(cached.updatedAt, new Date().getTime(), PROVIDER_CACHE_TTL)
-      if (notExpired) return new NativeBalance(new BN(cached.value))
-    }
-
-    const value = await this.chain.getNativeBalance(this.getAddress())
-    this.balanceCache.set('nativeBalance', { value: value.toBN().toString(), updatedAt: new Date().getTime() })
-
-    return value
+    return useCache ? this.cachedGetNativeBalance() : this.uncachedGetNativeBalance()
   }
-  /*
+
   public smartContractInfo(): string {
-    const network = utils.getNetworkName(this.chainId)
-    const contracts = getContracts()[network]
-    return [
-      `Running on: ${network}`,
-      `HOPR Token: ${contracts.HoprToken.address}`,
-      `HOPR Channels: ${contracts.HoprChannels.address}`
-    ].join('\n')
+    return this.chain.getInfo()
   }
-  */
 
   /**
    * Creates an uninitialised instance.

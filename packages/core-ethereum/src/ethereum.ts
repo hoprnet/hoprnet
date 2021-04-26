@@ -3,7 +3,7 @@ import ethers, { errors } from 'ethers'
 import { Address } from './types'
 import type { HoprToken, HoprChannels } from './contracts'
 import BN from 'bn.js'
-import { Balance, NativeBalance, Hash } from './types'
+import { Balance, NativeBalance, Hash, PublicKey } from './types'
 import { durations } from '@hoprnet/hopr-utils'
 import NonceTracker from './nonce-tracker'
 import TransactionManager from './transaction-manager'
@@ -244,7 +244,13 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
       channels.removeAllListeners()
     },
     getChannels: () => channels,
-    getPrivateKey: () => ethers.utils.arrayify(wallet.privateKey)
+    getPrivateKey: () => ethers.utils.arrayify(wallet.privateKey),
+    getPublicKey: () => PublicKey.fromString(ethers.utils.computePublicKey(wallet.publicKey, true)),
+    getInfo: () => [
+        `Running on: ${getNetworkName(chainId)}`,
+        `HOPR Token: ${contracts.HoprToken.address}`,
+        `HOPR Channels: ${contracts.HoprChannels.address}`
+      ].join('\n')
   }
 
   return api

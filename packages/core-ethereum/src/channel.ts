@@ -132,7 +132,7 @@ class Channel {
     if (c.status !== 'OPEN') {
       throw Error('Channel status is not OPEN')
     }
-    await this.chain.initiateChannelClosure(counterpartyAddress)
+    return await this.chain.initiateChannelClosure(counterpartyAddress)
   }
 
   async finalizeClosure() {
@@ -142,7 +142,7 @@ class Channel {
     if (c.status !== 'PENDING_TO_CLOSE') {
       throw Error('Channel status is not PENDING_TO_CLOSE')
     }
-    await this.chain.finalizeChannelClosure(counterpartyAddress)
+    return await this.chain.finalizeChannelClosure(counterpartyAddress)
   }
 
   async createTicket(amount: Balance, challenge: Hash, winProb: number) {
