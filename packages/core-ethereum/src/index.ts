@@ -56,7 +56,7 @@ export default class HoprEthereum {
     blockRange: number
   ) {
     this.indexer = new Indexer(this, genesisBlock, maxConfirmations, blockRange)
-    this.chain = createChainWrapper(this.provider, this.hoprToken, this.hoprChannels)
+    this.chain = createChainWrapper(this.provider, this.hoprToken, this.hoprChannels, this.network, this.account.getAddress())
     this.account = new Account(this.chain, this.indexer, this.wallet)
   }
 

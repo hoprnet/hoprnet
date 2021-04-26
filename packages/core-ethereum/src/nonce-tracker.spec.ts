@@ -2,7 +2,6 @@ import { expect } from 'chai'
 import NonceTracker, { Transaction } from './nonce-tracker'
 import { durations } from '@hoprnet/hopr-utils'
 import { Address } from './types'
-import type { ChainWrapper } from './ethereum'
 
 const USER_ADDRESS = Address.fromString('0x7d3517b0d011698406d6e0aed8453f0be2697926')
 
@@ -20,12 +19,12 @@ describe('nonce-tracker', function () {
   }
 
   beforeEach(function () {
-    nonceTracker = new NonceTracker(({
+    nonceTracker = new NonceTracker({
       getLatestBlockNumber: async () => 1,
       getTransactionCount: getTransactionCountFromConfirmed,
       getPendingTransactions: () => pendingTxs,
       getConfirmedTransactions: () => confirmedTxs
-    } as unknown) as ChainWrapper)
+    })
     pendingTxs = []
     confirmedTxs = []
   })
@@ -85,13 +84,12 @@ describe('nonce-tracker', function () {
   })
 
   it('should create nonce 32 when we dont have confirmed txs', async function () {
-    nonceTracker = new NonceTracker(({
+    nonceTracker = new NonceTracker({
       getLatestBlockNumber: async () => 1,
       getTransactionCount: async () => 3,
       getPendingTransactions: () => pendingTxs,
       getConfirmedTransactions: () => confirmedTxs
-    } as unknown) as ChainWrapper)
-
+    })
     pendingTxs = genMultiTx({
       fromNonce: 3,
       count: 29
@@ -121,13 +119,12 @@ describe('nonce-tracker', function () {
   })
 
   it('should create nonce 3 when local confirmed count is higher than network nonce', async function () {
-    nonceTracker = new NonceTracker(({
+    nonceTracker = new NonceTracker({
       getLatestBlockNumber: async () => 1,
       getTransactionCount: async () => 1,
       getPendingTransactions: () => pendingTxs,
       getConfirmedTransactions: () => confirmedTxs
-    } as unknown) as ChainWrapper)
-
+    })
     confirmedTxs = genMultiTx({ count: 3 })
 
     const nonceLock = await nonceTracker.getNonceLock(USER_ADDRESS)
@@ -136,13 +133,12 @@ describe('nonce-tracker', function () {
   })
 
   it('should create nonce 2 when local pending count is higher than other metrics', async function () {
-    nonceTracker = new NonceTracker(({
+    nonceTracker = new NonceTracker({
       getLatestBlockNumber: async () => 1,
       getTransactionCount: async () => 1,
       getPendingTransactions: () => pendingTxs,
       getConfirmedTransactions: () => confirmedTxs
-    } as unknown) as ChainWrapper)
-
+    })
     pendingTxs = genMultiTx({ count: 2 })
 
     const nonceLock = await nonceTracker.getNonceLock(USER_ADDRESS)
@@ -151,13 +147,12 @@ describe('nonce-tracker', function () {
   })
 
   it('should create nonce 5 after those when provider nonce is higher than other metrics', async function () {
-    nonceTracker = new NonceTracker(({
+    nonceTracker = new NonceTracker({
       getLatestBlockNumber: async () => 1,
       getTransactionCount: async () => 5,
       getPendingTransactions: () => pendingTxs,
       getConfirmedTransactions: () => confirmedTxs
-    } as unknown) as ChainWrapper)
-
+    })
     pendingTxs = genMultiTx({ count: 2 })
 
     const nonceLock = await nonceTracker.getNonceLock(USER_ADDRESS)
@@ -167,12 +162,12 @@ describe('nonce-tracker', function () {
 
   it('should create nonce 5 after those when there are some pending nonces below the remote one and some over.', async function () {
     pendingTxs = genMultiTx({ count: 5 })
-    nonceTracker = new NonceTracker(({
+    nonceTracker = new NonceTracker({
       getLatestBlockNumber: async () => 1,
       getTransactionCount: async () => 3,
       getPendingTransactions: () => pendingTxs,
       getConfirmedTransactions: () => confirmedTxs
-    } as unknown) as ChainWrapper)
+    })
 
     const nonceLock = await nonceTracker.getNonceLock(USER_ADDRESS)
     expect(nonceLock.nextNonce).to.equal(5, `nonce should be 5 got ${nonceLock.nextNonce}`)
@@ -183,12 +178,12 @@ describe('nonce-tracker', function () {
     genMultiTx({ count: 5 })
     pendingTxs = genMultiTx({ count: 5, fromNonce: 5 })
 
-    nonceTracker = new NonceTracker(({
+    nonceTracker = new NonceTracker({
       getLatestBlockNumber: async () => 1,
       getTransactionCount: async () => 0,
       getPendingTransactions: () => pendingTxs,
       getConfirmedTransactions: () => confirmedTxs
-    } as unknown) as ChainWrapper)
+    })
 
     const nonceLock = await nonceTracker.getNonceLock(USER_ADDRESS)
     expect(nonceLock.nextNonce).to.equal(0, `nonce should be 0 got ${nonceLock.nextNonce}`)
@@ -201,12 +196,12 @@ describe('nonce-tracker', function () {
       forceNonce: 100,
       count: 1
     })
-    nonceTracker = new NonceTracker(({
+    nonceTracker = new NonceTracker({
       getLatestBlockNumber: async () => 1,
       getTransactionCount: async () => 50,
       getPendingTransactions: () => pendingTxs,
       getConfirmedTransactions: () => confirmedTxs
-    } as unknown) as ChainWrapper)
+    })
 
     const nonceLock = await nonceTracker.getNonceLock(USER_ADDRESS)
     expect(nonceLock.nextNonce).to.equal(50, `nonce should be 50 got ${nonceLock.nextNonce}`)
@@ -216,12 +211,12 @@ describe('nonce-tracker', function () {
   it('should create nonce 74 after network nonce', async function () {
     confirmedTxs = genMultiTx({ count: 64 })
     pendingTxs = genMultiTx({ count: 10, fromNonce: 64 })
-    nonceTracker = new NonceTracker(({
+    nonceTracker = new NonceTracker({
       getLatestBlockNumber: async () => 1,
       getTransactionCount: async () => 64,
       getPendingTransactions: () => pendingTxs,
       getConfirmedTransactions: () => confirmedTxs
-    } as unknown) as ChainWrapper)
+    })
 
     const nonceLock = await nonceTracker.getNonceLock(USER_ADDRESS)
     expect(nonceLock.nextNonce).to.equal(74, `nonce should be 74 got ${nonceLock.nextNonce}`)
@@ -229,12 +224,12 @@ describe('nonce-tracker', function () {
   })
 
   it('should not ignore long-time pending transactions when minPending is not provided', async function () {
-    nonceTracker = new NonceTracker(({
+    nonceTracker = new NonceTracker({
       getLatestBlockNumber: async () => 1,
       getTransactionCount: getTransactionCountFromConfirmed,
       getPendingTransactions: () => pendingTxs,
       getConfirmedTransactions: () => confirmedTxs
-    } as unknown) as ChainWrapper)
+    })
 
     let createdAt = new Date().getTime() - durations.seconds(30)
 
@@ -255,12 +250,12 @@ describe('nonce-tracker', function () {
     const minPending = durations.seconds(30)
 
     nonceTracker = new NonceTracker(
-      ({
+      {
         getLatestBlockNumber: async () => 1,
         getTransactionCount: getTransactionCountFromConfirmed,
         getPendingTransactions: () => pendingTxs,
         getConfirmedTransactions: () => confirmedTxs
-      } as unknown) as ChainWrapper,
+      },
       minPending
     )
 

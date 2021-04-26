@@ -3,7 +3,6 @@ import debug from 'debug'
 import assert from 'assert'
 import { Mutex } from 'async-mutex'
 import { Address } from './types'
-import type { ChainWrapper } from './ethereum'
 
 const log = debug('hopr-core-ethereum:nonce-tracker')
 
@@ -77,7 +76,15 @@ export type Transaction = ITransaction & {
 export default class NonceTracker {
   private lockMap: Record<string, Mutex>
 
-  constructor(private api: ChainWrapper, private minPending?: number) {
+  constructor(
+    private api: {
+      getLatestBlockNumber: () => Promise<number>
+      getTransactionCount: (address: Address, blockNumber?: number) => Promise<number>
+      getPendingTransactions: (address: Address) => Transaction[]
+      getConfirmedTransactions: (address: Address) => Transaction[]
+    },
+    private minPending?: number
+  ) {
     this.lockMap = {}
   }
 

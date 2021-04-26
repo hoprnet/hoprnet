@@ -208,7 +208,7 @@ class Channel {
       }
 
       const counterparty = ticket.getSigner().toAddress()
-      const transaction = await this.chain.redeemTicket(counterparty, ackTicket, ticket)
+      const receipt = await this.chain.redeemTicket(counterparty, ackTicket, ticket)
 
       // TODO delete ackTicket
       //this.commitment.updateChainState(ackTicket.preImage)
@@ -216,7 +216,7 @@ class Channel {
       log('Successfully submitted ticket', ackTicket.response.toHex())
       return {
         status: 'SUCCESS',
-        receipt: transaction.hash,
+        receipt,
         ackTicket
       }
     } catch (err) {
