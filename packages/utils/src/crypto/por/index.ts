@@ -118,10 +118,10 @@ export function preVerify(
  * can be used to redeem the incentive
  */
 export function validateAcknowledgement(
-  ownKey: Uint8Array,
-  ack: Uint8Array,
+  ownKey: Uint8Array | undefined,
+  ack: Uint8Array | undefined,
   challenge: Uint8Array,
-  ownShare?: Uint8Array,
+  ownShare?: Uint8Array | undefined,
   response?: Uint8Array
 ): { valid: true; response: Uint8Array } | { valid: false } {
   // clone ownKey before adding a tweak to it

@@ -87,7 +87,7 @@ describe('PoR - proof of relay', function () {
 
     assert(
       validateAcknowledgement(
-        firstChallenge.ownKey,
+        undefined,
         deriveAckKeyShare(secrets[1]),
         firstChallenge.ticketChallenge,
         undefined,
