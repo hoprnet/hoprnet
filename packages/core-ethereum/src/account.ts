@@ -11,12 +11,7 @@ export const EMPTY_HASHED_SECRET = new Hash(ethers.utils.arrayify(ethers.constan
 const cache = new Map<'balance' | 'nativeBalance', { value: string; updatedAt: number }>()
 
 class Account {
-  constructor(
-    private api: ChainWrapper,
-    private indexer: Indexer,
-    public wallet: IWallet
-  ) {
-  }
+  constructor(private api: ChainWrapper, private indexer: Indexer, public wallet: IWallet) {}
 
   /**
    * Retrieves HOPR balance, optionally uses the cache.
@@ -53,7 +48,6 @@ class Account {
     return Address.fromString(this.wallet.address)
   }
 }
-
 
 /**
  * Retrieves HOPR balance, optionally uses the cache.

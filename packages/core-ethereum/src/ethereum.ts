@@ -4,7 +4,7 @@ import type { Address } from './types'
 import type { HoprToken, HoprChannels } from './contracts'
 import BN from 'bn.js'
 import { Balance, NativeBalance } from './types'
-import { durations} from '@hoprnet/hopr-utils'
+import { durations } from '@hoprnet/hopr-utils'
 import NonceTracker from './nonce-tracker'
 import TransactionManager from './transaction-manager'
 import { getNetworkGasPrice } from './utils'
@@ -14,19 +14,20 @@ const log = Debug('hopr:core-ethereum:chain-operations')
 const abiCoder = new ethers.utils.AbiCoder()
 
 export function createChainWrapper(provider: IProviders.WebSocketProvider, token: HoprToken, channels: HoprChannels) {
-
   const api = {
     // TODO: use indexer when it's done syncing
     getLatestBlockNumber: async () => provider.getBlockNumber(),
     getTransactionCount: (address, blockNumber) => provider.getTransactionCount(address.toHex(), blockNumber),
-    getBalance: (address: Address) => token.balanceOf(address.toHex()).then((res) => new Balance(new BN(res.toString()))),
+    getBalance: (address: Address) =>
+      token.balanceOf(address.toHex()).then((res) => new Balance(new BN(res.toString()))),
     getNativeBalance: (address) =>
       provider.getBalance(address.toHex()).then((res) => new NativeBalance(new BN(res.toString()))),
     getConfirmedTransactions: (_addr) => Array.from(transactions.confirmed.values()),
     getPendingTransactions: (_addr) => Array.from(transactions.pending.values()),
     getNonceLock: (addr) => nonceTracker.getNonceLock(addr),
     withdraw: (currency: 'NATIVE' | 'HOPR', recipient: string, amount: string) => withdraw(currency, recipient, amount),
-    fundChannel: (me: Address, counterparty: Address, myTotal: Balance, theirTotal: Balance) => fundChannel(token, channels, me, counterparty, myTotal, theirTotal),
+    fundChannel: (me: Address, counterparty: Address, myTotal: Balance, theirTotal: Balance) =>
+      fundChannel(token, channels, me, counterparty, myTotal, theirTotal),
     openChannel: (me, counterparty, amount) => openChannel(token, channels, me, counterparty, amount),
     finalizeChannelClosure: (counterparty) => finalizeChannelClosure(channels, counterparty),
     initiateChannelClosure: (counterparty) => initiateChannelClosure(channels, counterparty),
@@ -36,7 +37,7 @@ export function createChainWrapper(provider: IProviders.WebSocketProvider, token
   const nonceTracker = new NonceTracker(api, durations.minutes(15))
   const transactions = new TransactionManager()
 
-  return api 
+  return api
 }
 
 export type ChainWrapper = ReturnType<typeof createChainWrapper>
@@ -132,8 +133,14 @@ async function withdraw(currency: 'NATIVE' | 'HOPR', recipient: string, amount: 
   }
 }
 
-
-async function fundChannel(token: HoprToken, channels: HoprChannels, myAddress: Address, counterpartyAddress: Address, myFund: Balance, counterpartyFund: Balance) {
+async function fundChannel(
+  token: HoprToken,
+  channels: HoprChannels,
+  myAddress: Address,
+  counterpartyAddress: Address,
+  myFund: Balance,
+  counterpartyFund: Balance
+) {
   const totalFund = myFund.toBN().add(counterpartyFund.toBN())
   try {
     const transaction = await sendTransaction(
@@ -142,12 +149,7 @@ async function fundChannel(token: HoprToken, channels: HoprChannels, myAddress: 
       totalFund.toString(),
       abiCoder.encode(
         ['address', 'address', 'uint256', 'uint256'],
-        [
-          myAddress.toHex(),
-          counterpartyAddress.toHex(),
-          myFund.toBN().toString(),
-          counterpartyFund.toBN().toString()
-        ]
+        [myAddress.toHex(), counterpartyAddress.toHex(), myFund.toBN().toString(), counterpartyFund.toBN().toString()]
       )
     )
     await transaction.wait()
@@ -182,10 +184,7 @@ async function openChannel(hoprToken, hoprChannels, myAddress, counterpartyAddre
 
 async function finalizeChannelClosure(hoprChannels, counterpartyAddress) {
   try {
-    const transaction = await sendTransaction(
-      hoprChannels.finalizeChannelClosure,
-      counterpartyAddress.toHex()
-    )
+    const transaction = await sendTransaction(hoprChannels.finalizeChannelClosure, counterpartyAddress.toHex())
     await transaction.wait()
 
     return transaction.hash
@@ -196,12 +195,9 @@ async function finalizeChannelClosure(hoprChannels, counterpartyAddress) {
   }
 }
 
-async function initiateChannelClosure(hoprChannels, counterpartyAddress){
+async function initiateChannelClosure(hoprChannels, counterpartyAddress) {
   try {
-    const transaction = await sendTransaction(
-      hoprChannels.initiateChannelClosure,
-      counterpartyAddress.toHex()
-    )
+    const transaction = await sendTransaction(hoprChannels.initiateChannelClosure, counterpartyAddress.toHex())
     await transaction.wait()
 
     return transaction.hash
@@ -212,7 +208,7 @@ async function initiateChannelClosure(hoprChannels, counterpartyAddress){
   }
 }
 
-async function redeemTicket(hoprChannels, counterparty, ackTicket, ticket){
+async function redeemTicket(hoprChannels, counterparty, ackTicket, ticket) {
   const transaction = await sendTransaction(
     hoprChannels.redeemTicket,
     counterparty.toHex(),
