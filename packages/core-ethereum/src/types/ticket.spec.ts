@@ -2,6 +2,7 @@ import assert from 'assert'
 import { expect } from 'chai'
 import { Address, Ticket, Hash, Balance, PublicKey, Signature, UINT256 } from '.'
 import { computeWinningProbability } from '../utils'
+import { SIGNATURE_LENGTH } from '../constants'
 import * as fixtures from '../fixtures'
 import BN from 'bn.js'
 import { randomBytes } from 'crypto'
@@ -15,13 +16,13 @@ describe('test ticket construction', function () {
   })
 
   it('should create new ticket', async function () {
-    const challenge = new Hash(new Uint8Array(Hash.SIZE))
+    const challenge = new Hash(new Uint8Array({ length: Hash.SIZE }))
     const epoch = UINT256.fromString('1')
     const index = UINT256.fromString('1')
     const amount = new Balance(new BN(1))
     const winProb = computeWinningProbability(1)
     const channelIteration = UINT256.fromString('1')
-    const signature = new Signature(null, 0)
+    const signature = new Signature(new Uint8Array({ length: SIGNATURE_LENGTH }), 0)
     const ticket = new Ticket(userA, challenge, epoch, index, amount, winProb, channelIteration, signature)
 
     assert(ticket.counterparty.eq(userA), 'wrong counterparty')
@@ -41,7 +42,7 @@ describe('test ticket construction', function () {
     const amount = new Balance(new BN('0000000002c68af0bb140000', 16))
     const winProb = new Hash(stringToU8a('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'))
     const channelIteration = UINT256.fromString('1')
-    const signature = new Signature(null, 0)
+    const signature = new Signature(new Uint8Array({ length: SIGNATURE_LENGTH }), 0)
 
     const ticketA = new Ticket(counterparty, challenge, epoch, index, amount, winProb, channelIteration, signature)
 
@@ -70,7 +71,7 @@ describe('test ticket construction', function () {
     const amount = new Balance(new BN('000000000de0b6b3a7640000', 16))
     const winProb = new Hash(stringToU8a('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'))
     const channelIteration = UINT256.fromString('1')
-    const signature = new Signature(null, 0)
+    const signature = new Signature(new Uint8Array({ length: SIGNATURE_LENGTH }), 0)
 
     const ticketA = new Ticket(counterparty, challenge, epoch, index, amount, winProb, channelIteration, signature)
 
