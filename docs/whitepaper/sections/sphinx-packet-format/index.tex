@@ -46,6 +46,7 @@ Each node on the path needs to know the next downstream node. Therefore, the sen
 Same happens at $(C)$ and $(D)$: key derivation, unblinding, deleting, shifting, decryption and blinding. 
 In addition to all these steps, the final mix-header to the destination node $(Z)$ must include a final destination address that symbolizes the end of the path and tells that it’s the recipient and an Identifier used to generate reply messages back to the sender.
 \\~\\Some padding is added at each mix stage, in order to keep the length of the message invariant at each hop. In the original Sphinx paper, a zero-byte padding is added which could reveal information about the path length and the final destination and thus breaking the SPHINX security properties.
+As a countermeasure in HOPR, We pad the routing information with random data.
 
 \paragraph{Integrity}
 Each node along the path receives an authentication tag $\gamma_i$ in the form of a message authentication code (MAC)
