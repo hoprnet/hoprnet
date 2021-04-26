@@ -1,4 +1,12 @@
-import { Ticket, PublicKey, Balance, Channel, UnacknowledgedTicket, getWinProbabilityAsFloat } from '@hoprnet/hopr-core-ethereum'
+import {
+  Ticket,
+  PublicKey,
+  Balance,
+  Channel,
+  UnacknowledgedTicket,
+  getWinProbabilityAsFloat,
+  Hash
+} from '@hoprnet/hopr-core-ethereum'
 import type HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 import { Challenge } from './challenge'
 import {
@@ -11,7 +19,9 @@ import {
   generateKeyShares,
   createPoRString,
   createFirstChallenge,
-  preVerify
+  preVerify,
+  u8aToHex,
+  pubKeyToPeerId
 } from '@hoprnet/hopr-utils'
 import type PeerId from 'peer-id'
 import { publicKeyCreate } from 'secp256k1'
@@ -19,12 +29,15 @@ import BN from 'bn.js'
 import { LevelUp } from 'levelup'
 import { checkPacketTag, UnAcknowledgedTickets } from '../dbKeys'
 import { Acknowledgement } from './acknowledgement'
+import { blue, green } from 'chalk'
+import Debug from 'debug'
+import { getTickets } from '../utils'
 
 export const MAX_HOPS = 3
 
 const PACKET_LENGTH = getPacketLength(MAX_HOPS, POR_STRING_LENGTH, 0)
 
-// const log = Debug('hopr-core:message:packet')
+const log = Debug('hopr-core:message:packet')
 // const verbose = Debug('hopr-core:verbose:message:packet')
 
 /**
@@ -43,25 +56,21 @@ export function validateCreatedTicket(myBalance: BN, ticket: Ticket) {
  * Validate unacknowledged tickets as we receive them
  */
 export async function validateUnacknowledgedTicket(
-  paymentChannels: HoprCoreEthereum,
+  chain: HoprCoreEthereum,
   id: PeerId,
   nodeTicketAmount: string,
   nodeTicketWinProb: number,
-  senderPeerId: PeerId,
+  senderPubKey: Uint8Array,
   ticket: Ticket,
   channel: Channel,
   getTickets: () => Promise<Ticket[]>
 ): Promise<void> {
-  const ethereum = paymentChannels
-  // self
   const selfPubKey = new PublicKey(id.pubKey.marshal())
   const selfAddress = selfPubKey.toAddress()
-  // sender
-  const senderB58 = senderPeerId.toB58String()
-  const senderPubKey = new PublicKey(senderPeerId.pubKey.marshal())
+
   const ticketAmount = ticket.amount.toBN()
   const ticketCounter = ticket.epoch.toBN()
-  const accountCounter = (await ethereum.account.getTicketEpoch()).toBN()
+  const accountCounter = (await chain.account.getTicketEpoch()).toBN()
   const ticketWinProb = getWinProbabilityAsFloat(ticket.winProb)
 
   let channelState
@@ -72,7 +81,7 @@ export async function validateUnacknowledgedTicket(
   }
 
   // ticket signer MUST be the sender
-  if (!ticket.getSigner().eq(senderPubKey)) {
+  if (!ticket.verify(new PublicKey(senderPubKey))) {
     throw Error(`The signer of the ticket does not match the sender`)
   }
 
@@ -88,7 +97,9 @@ export async function validateUnacknowledgedTicket(
 
   // channel MUST be open or pending to close
   if (channelState.getStatus() === 'CLOSED') {
-    throw Error(`Payment channel with '${senderB58}' is not open or pending to close`)
+    throw Error(
+      `Payment channel with '${(await pubKeyToPeerId(senderPubKey)).toB58String()}' is not open or pending to close`
+    )
   }
 
   // ticket's epoch MUST match our account nonce
@@ -136,7 +147,6 @@ export async function validateUnacknowledgedTicket(
   }
 }
 
-
 export class Packet {
   public isReceiver: boolean
   public isReadyToForward: boolean
@@ -144,11 +154,12 @@ export class Packet {
   public plaintext: Uint8Array
 
   public packetTag: Uint8Array
+  public previousHop: Uint8Array
   public nextHop: Uint8Array
   public ownShare: Uint8Array
   public ownKey: Uint8Array
   public nextChallenge: Uint8Array
-  public nextAckChallenge: Uint8Array
+  public ackChallenge: Uint8Array
 
   private constructor(private packet: Uint8Array, private challenge: Challenge, private ticket: Ticket) {}
 
@@ -172,8 +183,9 @@ export class Packet {
     ownKey: Uint8Array,
     ownShare: Uint8Array,
     nextHop: Uint8Array,
+    previousHop: Uint8Array,
     nextChallenge: Uint8Array,
-    nextAckChallenge: Uint8Array,
+    ackChallenge: Uint8Array,
     packetTag: Uint8Array
   ) {
     this.isReceiver = false
@@ -181,9 +193,10 @@ export class Packet {
 
     this.ownKey = ownKey
     this.ownShare = ownShare
+    this.previousHop = previousHop
     this.nextHop = nextHop
     this.nextChallenge = nextChallenge
-    this.nextAckChallenge = nextAckChallenge
+    this.ackChallenge = ackChallenge
     this.packetTag = packetTag
 
     return this
@@ -279,8 +292,9 @@ export class Packet {
       verificationOutput.ownKey,
       verificationOutput.ownShare,
       transformedOutput.nextHop,
+      pubKeySender.pubKey.marshal(),
       verificationOutput.nextTicketChallenge,
-      verificationOutput.nextAckChallenge,
+      verificationOutput.ackChallenge,
       transformedOutput.packetTag
     )
   }
@@ -291,6 +305,30 @@ export class Packet {
     if (!tagValid) {
       throw Error(`General error.`)
     }
+  }
+
+  async storeUnacknowledgedTicket(db: LevelUp) {
+    if (this.ownKey == undefined || this.ownShare) {
+      throw Error(`Invalid state`)
+    }
+
+    const unacknowledged = new UnacknowledgedTicket(this.ticket, new Hash(this.ownKey))
+
+    log(
+      `Storing unacknowledged ticket. Expecting to receive a preImage for ${green(
+        u8aToHex(this.ackChallenge)
+      )} from ${blue((await pubKeyToPeerId(this.nextHop)).toB58String())}`
+    )
+
+    await db.put(Buffer.from(UnAcknowledgedTickets(this.ackChallenge)), Buffer.from(unacknowledged.serialize()))
+  }
+
+  async validateUnacknowledgedTicket(db: LevelUp, chain: HoprCoreEthereum, privKey: PeerId) {
+    validateUnacknowledgedTicket(chain, privKey, '', 0, this.previousHop, this.ticket, undefined as any, () =>
+      getTickets(db, {
+        signer: this.previousHop
+      })
+    )
   }
 
   createAcknowledgement(privKey: PeerId) {
@@ -317,7 +355,7 @@ export class Packet {
 
     this.ticket = await channel.createTicket(new Balance(new BN(0)), new PublicKey(this.nextChallenge), 0)
 
-    this.challenge = Challenge.create(this.nextAckChallenge, privKey)
+    this.challenge = Challenge.create(this.ackChallenge, privKey)
 
     this.isReadyToForward = true
   }
