@@ -9,7 +9,7 @@ import NonceTracker from './nonce-tracker'
 import TransactionManager from './transaction-manager'
 import { getNetworkGasPrice } from './utils'
 import Debug from 'debug'
-import { Networks, getContracts} from '@hoprnet/hopr-ethereum'
+import { Networks, getContracts } from '@hoprnet/hopr-ethereum'
 import { getNetworkName } from './utils'
 import { HoprToken__factory, HoprChannels__factory } from './contracts'
 
@@ -35,13 +35,15 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
   const token = HoprToken__factory.connect(contracts.HoprToken.address, wallet)
 
   const transactions = new TransactionManager()
-  const nonceTracker = new NonceTracker({
-    getLatestBlockNumber: async () => provider.getBlockNumber(),
-    getTransactionCount: (address, blockNumber) => provider.getTransactionCount(address.toHex(), blockNumber),
-    getConfirmedTransactions: (_addr) => Array.from(transactions.confirmed.values()),
-    getPendingTransactions: (_addr) => Array.from(transactions.pending.values()),
-
-  }, durations.minutes(15))
+  const nonceTracker = new NonceTracker(
+    {
+      getLatestBlockNumber: async () => provider.getBlockNumber(),
+      getTransactionCount: (address, blockNumber) => provider.getTransactionCount(address.toHex(), blockNumber),
+      getConfirmedTransactions: (_addr) => Array.from(transactions.confirmed.values()),
+      getPendingTransactions: (_addr) => Array.from(transactions.pending.values())
+    },
+    durations.minutes(15)
+  )
 
   async function sendTransaction<T extends (...args: any) => Promise<ContractTransaction>>(
     method: T,
@@ -156,7 +158,13 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
     return transaction.hash
   }
 
-  async function openChannel(token: HoprToken, channels: HoprChannels, me: Address, counterparty: Address, amount: Balance): Promise<Receipt> {
+  async function openChannel(
+    token: HoprToken,
+    channels: HoprChannels,
+    me: Address,
+    counterparty: Address,
+    amount: Balance
+  ): Promise<Receipt> {
     const transaction = await sendTransaction(
       token.send,
       channels.address,
@@ -171,10 +179,7 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
   }
 
   async function finalizeChannelClosure(channels: HoprChannels, counterparty: Address): Promise<Receipt> {
-    const transaction = await sendTransaction(
-      channels.finalizeChannelClosure,
-      counterparty.toHex()
-    )
+    const transaction = await sendTransaction(channels.finalizeChannelClosure, counterparty.toHex())
     await transaction.wait()
     return transaction.hash
     // TODO: catch race-condition
@@ -204,10 +209,7 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
   }
 
   async function setCommitment(channels: HoprChannels, commitment: Hash): Promise<Receipt> {
-    const transaction = await sendTransaction(
-      channels.bumpCommitment,
-      commitment.toHex()
-    )
+    const transaction = await sendTransaction(channels.bumpCommitment, commitment.toHex())
     await transaction.wait()
     return transaction.hash
   }
@@ -244,9 +246,8 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
     getChannels: () => channels
   }
 
-
   return api
 }
 
-type Unpack<T> = T extends Promise<infer U> ? U : T;
+type Unpack<T> = T extends Promise<infer U> ? U : T
 export type ChainWrapper = Unpack<ReturnType<typeof createChainWrapper>>

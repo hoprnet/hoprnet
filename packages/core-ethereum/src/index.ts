@@ -36,12 +36,7 @@ export default class HoprEthereum {
   public indexer: Indexer
   public account: Account
 
-  constructor(
-    private chain: ChainWrapper,
-    private db: LevelUp,
-    maxConfirmations: number,
-    blockRange: number
-  ) {
+  constructor(private chain: ChainWrapper, private db: LevelUp, maxConfirmations: number, blockRange: number) {
     this.indexer = new Indexer(chain.getGenesisBlock(), this.db, this.chain, maxConfirmations, blockRange)
     this.account = new Account(this.chain, this.indexer, chain.getWallet())
   }
@@ -143,10 +138,7 @@ export default class HoprEthereum {
     privateKey: Uint8Array,
     options?: { provider?: string; maxConfirmations?: number }
   ): Promise<HoprEthereum> {
-    const chain = await createChainWrapper(
-      options?.provider || DEFAULT_URI,
-      privateKey,
-    )
+    const chain = await createChainWrapper(options?.provider || DEFAULT_URI, privateKey)
     const coreConnector = new HoprEthereum(
       chain,
       db,
