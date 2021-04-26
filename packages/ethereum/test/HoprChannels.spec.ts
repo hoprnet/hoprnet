@@ -1,9 +1,9 @@
 import { deployments, ethers } from 'hardhat'
 import { expect } from 'chai'
-import { HoprToken__factory, ChannelsMock__factory, HoprChannels__factory } from '../../types'
-import { increaseTime } from '../utils'
-import { ACCOUNT_A, ACCOUNT_B } from '../constants'
-import { signMessage } from '../utils'
+import { HoprToken__factory, ChannelsMock__factory, HoprChannels__factory } from '../types'
+import { increaseTime } from './utils'
+import { ACCOUNT_A, ACCOUNT_B } from './constants'
+import { signMessage } from './utils'
 
 type Ticket = {
   recipient: string
@@ -102,6 +102,7 @@ export const SECRET_2 = ethers.utils.solidityKeccak256(['bytes32'], [SECRET_1])
 export const WIN_PROB_100 = percentToUint256(100)
 export const WIN_PROB_0 = percentToUint256(0)
 const ENOUGH_TIME_FOR_CLOSURE = 100
+const MULTI_ADDR = '/ip4/127.0.0.1/tcp/0/p2p/16Uiu2HAmCPgzWWQWNAn2E3UXx1G3CMzxbPfLr1SFzKqnFjDcbdwg'
 
 const abiEncoder = ethers.utils.Interface.getAbiCoder()
 
@@ -163,7 +164,15 @@ const useFixtures = deployments.createFixture(async () => {
   }
 })
 
-describe('funding HoprChannel catches failures', async function () {
+describe('announce user', function () {
+  it('should announce user', async function () {
+    const { channels, deployer } = await useFixtures()
+
+    await expect(channels.connect(deployer).announce(MULTI_ADDR)).to.emit(channels, 'Announcement').withArgs(MULTI_ADDR)
+  })
+})
+
+describe('funding HoprChannel catches failures', function () {
   let fixtures, channels, accountA
   before(async function () {
     // All of these tests revert, so we can rely on stateless single fixture.
@@ -420,7 +429,7 @@ describe('with a funded HoprChannel (A: 70, B: 30), secrets initialized', functi
   })
 })
 
-describe('With a pending_to_close HoprChannel (A:70, B:30)', function () {
+describe('with a pending_to_close HoprChannel (A:70, B:30)', function () {
   let channels, token, fixtures
   beforeEach(async function () {
     fixtures = await useFixtures()
