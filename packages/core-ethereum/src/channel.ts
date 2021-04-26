@@ -34,8 +34,8 @@ class Channel {
   ) {
     this.index = 0 // TODO - bump channel epoch to make sure..
     this.commitment = new Commitment(
-      () => {},
-      () => {},
+      (commitment) => this.chain.setCommitment(commitment),
+      () => this.getChainCommitment(),
       this.db,
       this.getId()
     )
@@ -69,6 +69,10 @@ class Channel {
 
   getId() {
     return Channel.generateId(this.self.toAddress(), this.counterparty.toAddress())
+  }
+
+  async getChainCommitment(): Promise<Hash> {
+    return (await this.getState()).commitmentFor(this.self.toAddress())
   }
 
   async getState(): Promise<ChannelEntry> {

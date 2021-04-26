@@ -3,7 +3,7 @@ import ethers, { errors } from 'ethers'
 import type { Address } from './types'
 import type { HoprToken, HoprChannels } from './contracts'
 import BN from 'bn.js'
-import { Balance, NativeBalance } from './types'
+import { Balance, NativeBalance, Hash } from './types'
 import { durations} from '@hoprnet/hopr-utils'
 import NonceTracker from './nonce-tracker'
 import TransactionManager from './transaction-manager'
@@ -30,7 +30,8 @@ export function createChainWrapper(provider: IProviders.WebSocketProvider, token
     openChannel: (me, counterparty, amount) => openChannel(token, channels, me, counterparty, amount),
     finalizeChannelClosure: (counterparty) => finalizeChannelClosure(channels, counterparty),
     initiateChannelClosure: (counterparty) => initiateChannelClosure(channels, counterparty),
-    redeemTicket: (counterparty, ackTicket, ticket) => redeemTicket(channels, counterparty, ackTicket, ticket)
+    redeemTicket: (counterparty, ackTicket, ticket) => redeemTicket(channels, counterparty, ackTicket, ticket),
+    setCommitment: (comm: Hash) => setCommitment(channels, comm)
   }
 
   const nonceTracker = new NonceTracker(api, durations.minutes(15))
@@ -227,3 +228,19 @@ async function redeemTicket(hoprChannels, counterparty, ackTicket, ticket){
   await transaction.wait()
   return transaction
 }
+
+async function setCommitment(channels: HoprChannels, commitment: Hash){
+  try {
+    const transaction = await sendTransaction(
+      channels.bumpCommitment,
+      commitment.toHex()
+    )
+    await transaction.wait()
+    return transaction.hash
+  } catch (err) {
+    // TODO: catch race-condition
+    log(err)
+    throw Error(`Failed to initialize channel closure`)
+  }
+}
+
