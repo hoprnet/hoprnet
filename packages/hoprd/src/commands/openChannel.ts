@@ -1,6 +1,6 @@
 import type Hopr from '@hoprnet/hopr-core'
 import type PeerId from 'peer-id'
-import { startDelayedInterval, moveDecimalPoint } from '@hoprnet/hopr-utils'
+import { moveDecimalPoint } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 import chalk from 'chalk'
 import { checkPeerIdInput, isBootstrapNode, styleValue } from './utils'
@@ -85,13 +85,10 @@ export class OpenChannel extends AbstractCommand {
     const amountToFund = new BN(moveDecimalPoint(amountToFundStr, Balance.DECIMALS))
     await this.validateAmountToFund(amountToFund)
 
-    const unsubscribe = startDelayedInterval(`Submitted transaction. Waiting for confirmation`)
     try {
       const { channelId } = await this.node.openChannel(counterparty, amountToFund)
-      unsubscribe()
       return `${chalk.green(`Successfully opened channel`)} ${styleValue(channelId.toHex(), 'hash')}`
     } catch (err) {
-      unsubscribe()
       return styleValue(err.message, 'failure')
     }
   }
