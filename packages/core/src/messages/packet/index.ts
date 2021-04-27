@@ -40,7 +40,6 @@ export function validateCreatedTicket(myBalance: BN, ticket: Ticket) {
  * Validate unacknowledged tickets as we receive them
  */
 export async function validateUnacknowledgedTicket(
-  paymentChannels: HoprCoreEthereum,
   id: PeerId,
   nodeTicketAmount: string,
   nodeTicketWinProb: number,
@@ -49,7 +48,6 @@ export async function validateUnacknowledgedTicket(
   channel: Channel,
   getTickets: () => Promise<Ticket[]>
 ): Promise<void> {
-  const ethereum = paymentChannels
   // self
   const selfPubKey = new PublicKey(id.pubKey.marshal())
   const selfAddress = await selfPubKey.toAddress()
@@ -58,7 +56,6 @@ export async function validateUnacknowledgedTicket(
   const senderPubKey = new PublicKey(senderPeerId.pubKey.marshal())
   const ticketAmount = ticket.amount.toBN()
   const ticketCounter = ticket.epoch.toBN()
-  const accountCounter = (await ethereum.account.getTicketEpoch()).toBN()
   const ticketWinProb = getWinProbabilityAsFloat(ticket.winProb)
 
   let channelState
@@ -90,9 +87,10 @@ export async function validateUnacknowledgedTicket(
 
   // ticket's epoch MUST match our account nonce
   // (performance) we are making a request to blockchain
-  if (!ticketCounter.eq(accountCounter)) {
+  const channelTicketEpoch = (await channel.getState()).ticketEpochFor(selfAddress).toBN()
+  if (!ticketCounter.eq(channelTicketEpoch)) {
     throw Error(
-      `Ticket epoch '${ticketCounter.toString()}' does not match our account counter ${accountCounter.toString()}`
+      `Ticket epoch '${ticketCounter.toString()}' does not match our account counter ${channelTicketEpoch.toString()}`
     )
   }
 
@@ -118,7 +116,7 @@ export async function validateUnacknowledgedTicket(
   let signedTickets = (await getTickets()).filter(
     (signedTicket) =>
       signedTicket.counterparty.eq(selfAddress) &&
-      signedTicket.epoch.toBN().eq(accountCounter) &&
+      signedTicket.epoch.toBN().eq(channelTicketEpoch) &&
       ticket.channelIteration.toBN().eq(currentChannelIteration.toBN())
   )
 
@@ -328,9 +326,9 @@ export class Packet extends Uint8Array {
     if (secrets.length > 1) {
       log(`before creating channel`)
 
-      const channelState = await channel.getBalances()
+      const balances = await channel.getBalances()
       packet._ticket = await channel.createTicket(new Balance(fee), ticketChallenge, node.ticketWinProb)
-      validateCreatedTicket(channelState.self.toBN(), packet._ticket)
+      validateCreatedTicket(balances.self.toBN(), packet._ticket)
     } else if (secrets.length == 1) {
       packet._ticket = await channel.createDummyTicket(ticketChallenge)
     }
@@ -374,7 +372,6 @@ export class Packet extends Uint8Array {
 
       try {
         await validateUnacknowledgedTicket(
-          this.paymentChannels,
           this.id,
           this.ticketAmount,
           this.ticketWinProb,

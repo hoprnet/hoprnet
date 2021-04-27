@@ -1,8 +1,7 @@
 import type PeerId from 'peer-id'
-import type { LevelUp } from 'levelup'
-import type { providers as Providers } from 'ethers'
 import type { Event, EventNames } from './types'
-import type { HoprChannels } from '../contracts'
+import type { ChainWrapper } from '../ethereum'
+import { LevelUp } from 'levelup'
 import EventEmitter from 'events'
 import chalk from 'chalk'
 import BN from 'bn.js'
@@ -29,16 +28,11 @@ class Indexer extends EventEmitter {
   private unconfirmedEvents = new Heap<Event<any>>(snapshotComparator)
 
   constructor(
-    private ops: {
-      genesisBlock: number
-      maxConfirmations: number
-      blockRange: number
-    },
-    private api: {
-      db: LevelUp
-      provider: Providers.WebSocketProvider
-      hoprChannels: HoprChannels
-    }
+    private genesisBlock: number,
+    private db: LevelUp,
+    private chain: ChainWrapper,
+    private maxConfirmations: number,
+    private blockRange: number
   ) {
     super()
   }
@@ -50,9 +44,12 @@ class Indexer extends EventEmitter {
     if (this.status === 'started') return
     log(`Starting indexer...`)
 
+    // wipe indexer, do not use in production
+    // await this.wipe()
+
     const [latestSavedBlock, latestOnChainBlock] = await Promise.all([
-      db.getLatestBlockNumber(this.api.db),
-      this.api.provider.getBlockNumber()
+      await db.getLatestBlockNumber(this.db),
+      this.chain.getLatestBlockNumber()
     ])
     this.latestBlock = latestOnChainBlock
 
@@ -61,45 +58,32 @@ class Indexer extends EventEmitter {
 
     // go back 'MAX_CONFIRMATIONS' blocks in case of a re-org at time of stopping
     let fromBlock = latestSavedBlock
-    if (fromBlock - this.ops.maxConfirmations > 0) {
-      fromBlock = fromBlock - this.ops.maxConfirmations
+    if (fromBlock - this.maxConfirmations > 0) {
+      fromBlock = fromBlock - this.maxConfirmations
     }
     // no need to query before HoprChannels existed
-    if (fromBlock < this.ops.genesisBlock) {
-      fromBlock = this.ops.genesisBlock
+    if (fromBlock < this.genesisBlock) {
+      fromBlock = this.genesisBlock
     }
 
     log(
       'Starting to index from block %d, sync progress %d%',
       fromBlock,
-      getSyncPercentage(fromBlock - this.ops.genesisBlock, latestOnChainBlock - this.ops.genesisBlock)
+      getSyncPercentage(fromBlock - this.genesisBlock, latestOnChainBlock - this.genesisBlock)
     )
 
     // get past events
-    const lastBlock = await this.processPastEvents(fromBlock, latestOnChainBlock, this.ops.blockRange)
+    const lastBlock = await this.processPastEvents(fromBlock, latestOnChainBlock, this.blockRange)
     fromBlock = lastBlock
 
     log('Subscribing to events from block %d', fromBlock)
 
-    // subscribe to new blocks
-    this.api.provider
-      .on('block', (blockNumber: number) => {
-        this.onNewBlock({ number: blockNumber })
-      })
-      .on('error', (error: any) => {
-        log(chalk.red(`etherjs error: ${error}`))
-        this.restart()
-      })
-
-    // subscribe to all HoprChannels events
-    this.api.hoprChannels
-      .on('*', (event: Event<any>) => {
-        this.onNewEvents([event])
-      })
-      .on('error', (error: any) => {
-        log(chalk.red(`etherjs error: ${error}`))
-        this.restart()
-      })
+    this.chain.subscribeBlock(this.onNewBlock.bind(this))
+    this.chain.subscribeError((error: any) => {
+      log(chalk.red(`etherjs error: ${error}`))
+      this.restart()
+    })
+    this.chain.subscribeChannelEvents((e) => this.onNewEvents([e]))
 
     this.status = 'started'
     log(chalk.green('Indexer started!'))
@@ -112,8 +96,7 @@ class Indexer extends EventEmitter {
     if (this.status === 'stopped') return
     log(`Stopping indexer...`)
 
-    this.api.provider.removeAllListeners()
-    this.api.hoprChannels.removeAllListeners()
+    this.chain.unsubscribe()
 
     this.status = 'stopped'
     log(chalk.green('Indexer stopped!'))
@@ -164,7 +147,7 @@ class Indexer extends EventEmitter {
 
       try {
         // TODO: wildcard is supported but not properly typed
-        events = await this.api.hoprChannels.queryFilter('*' as any, fromBlock, toBlock)
+        events = await this.chain.getChannels().queryFilter('*' as any, fromBlock, toBlock)
       } catch (error) {
         failedCount++
 
@@ -177,13 +160,13 @@ class Indexer extends EventEmitter {
       }
 
       this.onNewEvents(events)
-      await this.onNewBlock({ number: toBlock })
+      await this.onNewBlock(toBlock)
       failedCount = 0
       fromBlock = toBlock
 
       log(
         'Sync progress %d% @ block %d',
-        getSyncPercentage(fromBlock - this.ops.genesisBlock, maxToBlock - this.ops.genesisBlock),
+        getSyncPercentage(fromBlock - this.genesisBlock, maxToBlock - this.genesisBlock),
         toBlock
       )
     }
@@ -198,19 +181,19 @@ class Indexer extends EventEmitter {
    * confirmed blocks.
    * @param block
    */
-  private async onNewBlock(block: { number: number }): Promise<void> {
+  private async onNewBlock(blockNumber: number): Promise<void> {
     // update latest block
-    if (this.latestBlock < block.number) {
-      this.latestBlock = block.number
+    if (this.latestBlock < blockNumber) {
+      this.latestBlock = blockNumber
     }
 
-    let lastSnapshot = await db.getLatestConfirmedSnapshot(this.api.db)
+    let lastSnapshot = await db.getLatestConfirmedSnapshot(this.db)
 
     // check unconfirmed events and process them if found
     // to be within a confirmed block
     while (
       this.unconfirmedEvents.length > 0 &&
-      isConfirmedBlock(this.unconfirmedEvents.top(1)[0].blockNumber, block.number, this.ops.maxConfirmations)
+      isConfirmedBlock(this.unconfirmedEvents.top(1)[0].blockNumber, blockNumber, this.maxConfirmations)
     ) {
       const event = this.unconfirmedEvents.pop()
       log('Processing event %s', event.event)
@@ -244,10 +227,10 @@ class Indexer extends EventEmitter {
       }
 
       lastSnapshot = new Snapshot(new BN(event.blockNumber), new BN(event.transactionIndex), new BN(event.logIndex))
-      await db.updateLatestConfirmedSnapshot(this.api.db, lastSnapshot)
+      await db.updateLatestConfirmedSnapshot(this.db, lastSnapshot)
     }
 
-    await db.updateLatestBlockNumber(this.api.db, new BN(block.number))
+    await db.updateLatestBlockNumber(this.db, new BN(blockNumber))
   }
 
   /**
@@ -260,35 +243,35 @@ class Indexer extends EventEmitter {
 
   private async onAnnouncement(event: Event<'Announcement'>): Promise<void> {
     const account = AccountEntry.fromSCEvent(event)
-    await db.updateAccount(this.api.db, account.address, account)
+    await db.updateAccount(this.db, account.address, account)
   }
 
   private async onChannelUpdated(event: Event<'ChannelUpdate'>): Promise<void> {
     const channel = ChannelEntry.fromSCEvent(event)
-    await db.updateChannel(this.api.db, channel.getId(), channel)
+    await db.updateChannel(this.db, channel.getId(), channel)
   }
 
   public async getAccount(address: Address) {
-    return db.getAccount(this.api.db, address)
+    return db.getAccount(this.db, address)
   }
 
   public async getChannel(channelId: Hash) {
-    return db.getChannel(this.api.db, channelId)
+    return db.getChannel(this.db, channelId)
   }
 
   public async getChannels(filter?: (channel: ChannelEntry) => Promise<boolean>) {
-    return db.getChannels(this.api.db, filter)
+    return db.getChannels(this.db, filter)
   }
 
   public async getChannelsOf(address: Address) {
-    return db.getChannels(this.api.db, async (channel) => {
+    return db.getChannels(this.db, async (channel) => {
       return address.eq(channel.partyA) || address.eq(channel.partyB)
     })
   }
 
   // routing
   public async getPublicKeyOf(address: Address): Promise<PublicKey | undefined> {
-    const account = await db.getAccount(this.api.db, address)
+    const account = await db.getAccount(this.db, address)
     if (account && account.hasAnnounced()) {
       return account.getPublicKey()
     }
@@ -329,7 +312,7 @@ class Indexer extends EventEmitter {
     return this.toIndexerChannel(await pubKeyToPeerId(partyA.serialize()), random) // TODO: why do we pick partyA?
   }
 
-  public async getChannelsFromPeer(source: PeerId) {
+  public async getChannelsFromPeer(source: PeerId): Promise<RoutingChannel[]> {
     const sourcePubKey = new PublicKey(source.pubKey.marshal())
     const channels = await this.getChannelsOf(await sourcePubKey.toAddress())
 

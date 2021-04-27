@@ -1,20 +1,17 @@
 import type { LevelUp } from 'levelup'
-import type { Wallet as IWallet, providers as IProviders } from 'ethers'
-import type { HoprToken, HoprChannels } from './contracts'
 import chalk from 'chalk'
-import { Networks, getContracts } from '@hoprnet/hopr-ethereum'
-import { ethers } from 'ethers'
 import debug from 'debug'
-import { Acknowledgement, PublicKey } from './types'
+import { Acknowledgement, PublicKey, Balance, Address, NativeBalance } from './types'
 import Indexer from './indexer'
 import { RoutingChannel } from './indexer'
-import * as utils from './utils'
-import Account from './account'
 import { getWinProbabilityAsFloat, computeWinningProbability } from './utils'
-import { HoprToken__factory, HoprChannels__factory } from './contracts'
 import { DEFAULT_URI, MAX_CONFIRMATIONS, INDEXER_BLOCK_RANGE } from './constants'
 import { Channel } from './channel'
 import { createChainWrapper } from './ethereum'
+import type { ChainWrapper } from './ethereum'
+import type PeerId from 'peer-id'
+import { PROVIDER_CACHE_TTL } from './constants'
+import { cacheNoArgAsyncFunction } from '@hoprnet/hopr-utils'
 
 const log = debug('hopr-core-ethereum')
 
@@ -37,43 +34,18 @@ export default class HoprEthereum {
   private _status: 'dead' | 'alive' = 'dead'
   private _starting?: Promise<HoprEthereum>
   private _stopping?: Promise<void>
-  private chain
+  private indexer: Indexer
+  private privateKey: Uint8Array
 
-  public indexer: Indexer
-  public account: Account
-
-  constructor(
-    public db: LevelUp,
-    public provider: IProviders.WebSocketProvider,
-    public chainId: number,
-    public network: Networks,
-    public wallet: IWallet,
-    public hoprChannels: HoprChannels,
-    public hoprToken: HoprToken,
-    genesisBlock: number,
-    maxConfirmations: number,
-    blockRange: number
-  ) {
-    this.indexer = new Indexer(
-      {
-        genesisBlock,
-        maxConfirmations,
-        blockRange
-      },
-      {
-        db: this.db,
-        provider: this.provider,
-        hoprChannels: this.hoprChannels
-      }
-    )
-    this.chain = createChainWrapper(this.provider, this.hoprToken)
-    this.account = new Account(this.network, this.chain, this.indexer, this.wallet)
+  constructor(private chain: ChainWrapper, private db: LevelUp, maxConfirmations: number, blockRange: number) {
+    this.indexer = new Indexer(chain.getGenesisBlock(), this.db, this.chain, maxConfirmations, blockRange)
+    this.privateKey = this.chain.getPrivateKey()
   }
 
   readonly CHAIN_NAME = 'HOPR on Ethereum'
 
   private async _start(): Promise<HoprEthereum> {
-    await this.provider.ready
+    await this.chain.waitUntilReady()
     await this.indexer.start()
     this._status = 'alive'
     log(chalk.green('Connector started'))
@@ -131,42 +103,66 @@ export default class HoprEthereum {
   }
 
   public getChannel(src: PublicKey, counterparty: PublicKey) {
-    return new Channel(this, src, counterparty)
+    return new Channel(src, counterparty, this.db, this.chain, this.indexer, this.privateKey)
   }
 
   async withdraw(currency: 'NATIVE' | 'HOPR', recipient: string, amount: string): Promise<string> {
-    if (currency === 'NATIVE') {
-      const nonceLock = await this.account.getNonceLock()
-      try {
-        const transaction = await this.account.wallet.sendTransaction({
-          to: recipient,
-          value: ethers.BigNumber.from(amount),
-          nonce: ethers.BigNumber.from(nonceLock.nextNonce)
-        })
-        nonceLock.releaseLock()
-        return transaction.hash
-      } catch (err) {
-        nonceLock.releaseLock()
-        throw err
-      }
-    } else {
-      const transaction = await this.account.sendTransaction(this.hoprToken.transfer, recipient, amount)
-      return transaction.hash
-    }
+    return this.chain.withdraw(currency, recipient, amount)
   }
 
   public async hexAccountAddress(): Promise<string> {
-    return this.account.getAddress().toHex()
+    return this.getAddress().toHex()
+  }
+
+  public getChannelsFromPeer(p: PeerId) {
+    return this.indexer.getChannelsFromPeer(p)
+  }
+
+  public getChannelsOf(addr: Address) {
+    return this.indexer.getChannelsOf(addr)
+  }
+
+  public getPublicKeyOf(addr: Address) {
+    return this.indexer.getPublicKeyOf(addr)
+  }
+
+  public getRandomChannel() {
+    return this.indexer.getRandomChannel()
+  }
+
+  private uncachedGetBalance = () => this.chain.getBalance(this.getAddress())
+  private cachedGetBalance = cacheNoArgAsyncFunction<Balance>(this.uncachedGetBalance, PROVIDER_CACHE_TTL)
+  /**
+   * Retrieves HOPR balance, optionally uses the cache.
+   * @returns HOPR balance
+   */
+  public async getBalance(useCache: boolean = false): Promise<Balance> {
+    return useCache ? this.cachedGetBalance() : this.uncachedGetBalance()
+  }
+
+  getAddress(): Address {
+    return Address.fromString(this.chain.getWallet().address)
+  }
+
+  getPublicKey() {
+    return this.chain.getPublicKey()
+  }
+
+  /**
+   * Retrieves ETH balance, optionally uses the cache.
+   * @returns ETH balance
+   */
+  private uncachedGetNativeBalance = () => this.chain.getNativeBalance(this.getAddress())
+  private cachedGetNativeBalance = cacheNoArgAsyncFunction<NativeBalance>(
+    this.uncachedGetNativeBalance,
+    PROVIDER_CACHE_TTL
+  )
+  public async getNativeBalance(useCache: boolean = false): Promise<NativeBalance> {
+    return useCache ? this.cachedGetNativeBalance() : this.uncachedGetNativeBalance()
   }
 
   public smartContractInfo(): string {
-    const network = utils.getNetworkName(this.chainId)
-    const contracts = getContracts()[network]
-    return [
-      `Running on: ${network}`,
-      `HOPR Token: ${contracts.HoprToken.address}`,
-      `HOPR Channels: ${contracts.HoprChannels.address}`
-    ].join('\n')
+    return this.chain.getInfo()
   }
 
   /**
@@ -182,30 +178,10 @@ export default class HoprEthereum {
     privateKey: Uint8Array,
     options?: { provider?: string; maxConfirmations?: number }
   ): Promise<HoprEthereum> {
-    const provider = new ethers.providers.WebSocketProvider(options?.provider || DEFAULT_URI)
-    const wallet = new ethers.Wallet(privateKey).connect(provider)
-    const chainId = await provider.getNetwork().then((res) => res.chainId)
-    const network = utils.getNetworkName(chainId) as Networks
-    const contracts = getContracts()?.[network]
-
-    if (!contracts?.HoprToken?.address) {
-      throw Error(`token contract address from network ${network} not found`)
-    } else if (!contracts?.HoprChannels?.address) {
-      throw Error(`channels contract address from network ${network} not found`)
-    }
-
-    const hoprChannels = HoprChannels__factory.connect(contracts.HoprChannels.address, wallet)
-    const hoprToken = HoprToken__factory.connect(contracts.HoprToken.address, wallet)
-
+    const chain = await createChainWrapper(options?.provider || DEFAULT_URI, privateKey)
     const coreConnector = new HoprEthereum(
+      chain,
       db,
-      provider,
-      chainId,
-      network,
-      wallet,
-      hoprChannels,
-      hoprToken,
-      contracts?.HoprChannels?.deployedAt ?? 0,
       options.maxConfirmations ?? MAX_CONFIRMATIONS,
       INDEXER_BLOCK_RANGE
     )

@@ -117,12 +117,22 @@ class ChannelEntry {
     return Channel.generateId(this.partyA, this.partyB)
   }
 
-  public ticketEpochFor(addr: Address) {
+  public ticketEpochFor(addr: Address): UINT256 {
     if (addr.eq(this.partyA)) {
       return this.partyATicketEpoch
     }
     if (addr.eq(this.partyB)) {
       return this.partyBTicketEpoch
+    }
+    throw new Error('Wrong addr for this channel')
+  }
+
+  public commitmentFor(addr: Address): Hash {
+    if (addr.eq(this.partyA)) {
+      return this.commitmentPartyA
+    }
+    if (addr.eq(this.partyB)) {
+      return this.commitmentPartyB
     }
     throw new Error('Wrong addr for this channel')
   }

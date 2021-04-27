@@ -1,7 +1,8 @@
-import { providers as Providers } from 'ethers'
+import type { providers as Providers } from 'ethers'
 import type { HoprChannels } from '../contracts'
 import type { Event } from './types'
 import type { TypedEvent } from '../contracts/commons'
+import type { ChainWrapper } from '../ethereum'
 import assert from 'assert'
 import EventEmitter from 'events'
 import LevelUp from 'levelup'
@@ -39,6 +40,23 @@ const createHoprChannelsMock = (ops: { pastEvents?: Event<any>[] } = {}) => {
   }
 }
 
+const createChainMock = (provider: Providers.WebSocketProvider, hoprChannels: HoprChannels): ChainWrapper => {
+  return ({
+    getLatestBlockNumber: () => provider.getBlockNumber(),
+    subscribeBlock: (cb) => provider.on('block', cb),
+    subscribeError: (cb) => {
+      provider.on('error', cb)
+      hoprChannels.on('error', cb)
+    },
+    subscribeChannelEvents: (cb) => hoprChannels.on('*', cb),
+    unsubscribe: () => {
+      provider.removeAllListeners()
+      hoprChannels.removeAllListeners()
+    },
+    getChannels: () => hoprChannels
+  } as unknown) as ChainWrapper
+}
+
 const useFixtures = (ops: { latestBlockNumber?: number; pastEvents?: Event<any>[] } = {}) => {
   const latestBlockNumber = ops.latestBlockNumber ?? 0
   const pastEvents = ops.pastEvents ?? []
@@ -46,19 +64,9 @@ const useFixtures = (ops: { latestBlockNumber?: number; pastEvents?: Event<any>[
   const db = new LevelUp(MemDown())
   const { provider, newBlock } = createProviderMock({ latestBlockNumber })
   const { hoprChannels, newEvent } = createHoprChannelsMock({ pastEvents })
+  const chain = createChainMock(provider, hoprChannels)
 
-  const indexer = new Indexer(
-    {
-      genesisBlock: 0,
-      maxConfirmations: 1,
-      blockRange: 5
-    },
-    {
-      db,
-      provider,
-      hoprChannels
-    }
-  )
+  const indexer = new Indexer(0, db, chain, 1, 5)
 
   return {
     db,

@@ -67,10 +67,9 @@ export default class ListOpenChannels extends AbstractCommand {
    */
   async execute(): Promise<string | void> {
     try {
-      const { indexer } = this.node.paymentChannels
       const selfPubKey = new PublicKey(this.node.getId().pubKey.marshal())
       const selfAddress = await selfPubKey.toAddress()
-      const channels = (await this.node.paymentChannels.indexer.getChannelsOf(selfAddress))
+      const channels = (await this.node.paymentChannels.getChannelsOf(selfAddress))
         // do not print CLOSED channels
         .filter((channel) => channel.status !== 'CLOSED')
       const result: string[] = []
@@ -83,7 +82,9 @@ export default class ListOpenChannels extends AbstractCommand {
       for (const channel of channels) {
         const id = await channel.getId()
         const selfIsPartyA = u8aEquals(selfAddress.serialize(), channel.partyA.serialize())
-        const counterpartyPubKey = await indexer.getPublicKeyOf(selfIsPartyA ? channel.partyB : channel.partyA)
+        const counterpartyPubKey = await this.node.paymentChannels.getPublicKeyOf(
+          selfIsPartyA ? channel.partyB : channel.partyA
+        )
         // counterparty has not initialized
         if (!counterpartyPubKey) continue
 
