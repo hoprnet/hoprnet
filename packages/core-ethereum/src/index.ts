@@ -130,9 +130,8 @@ export default class HoprEthereum {
     return this.indexer.getRandomChannel()
   }
 
-
   private uncachedGetBalance = () => this.chain.getBalance(this.getAddress())
-  private cachedGetBalance = cacheNoArgAsyncFunction<Balance>(this.uncachedGetBalance, PROVIDER_CACHE_TTL) 
+  private cachedGetBalance = cacheNoArgAsyncFunction<Balance>(this.uncachedGetBalance, PROVIDER_CACHE_TTL)
   /**
    * Retrieves HOPR balance, optionally uses the cache.
    * @returns HOPR balance
@@ -154,7 +153,10 @@ export default class HoprEthereum {
    * @returns ETH balance
    */
   private uncachedGetNativeBalance = () => this.chain.getNativeBalance(this.getAddress())
-  private cachedGetNativeBalance = cacheNoArgAsyncFunction<NativeBalance>(this.uncachedGetNativeBalance, PROVIDER_CACHE_TTL) 
+  private cachedGetNativeBalance = cacheNoArgAsyncFunction<NativeBalance>(
+    this.uncachedGetNativeBalance,
+    PROVIDER_CACHE_TTL
+  )
   public async getNativeBalance(useCache: boolean = false): Promise<NativeBalance> {
     return useCache ? this.cachedGetNativeBalance() : this.uncachedGetNativeBalance()
   }

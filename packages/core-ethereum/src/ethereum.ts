@@ -246,7 +246,8 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
     getChannels: () => channels,
     getPrivateKey: () => ethers.utils.arrayify(wallet.privateKey),
     getPublicKey: () => PublicKey.fromString(ethers.utils.computePublicKey(wallet.publicKey, true)),
-    getInfo: () => [
+    getInfo: () =>
+      [
         `Running on: ${getNetworkName(chainId)}`,
         `HOPR Token: ${contracts.HoprToken.address}`,
         `HOPR Channels: ${contracts.HoprChannels.address}`

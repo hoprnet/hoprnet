@@ -42,4 +42,3 @@ describe('cache', function () {
     assert.equal(funcMock.callCount, 2)
   })
 })
-

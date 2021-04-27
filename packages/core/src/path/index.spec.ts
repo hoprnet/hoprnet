@@ -52,13 +52,27 @@ describe('test pathfinder with some simple topologies', function () {
   }
 
   it('should find a path through a reliable star', async function () {
-    const path = await findPath(TEST_NODES[1], fakePeerId(6), 2, RELIABLE_NETWORK, fakeIndexer(STAR, STAKE_1).getChannelsFromPeer, 0)
+    const path = await findPath(
+      TEST_NODES[1],
+      fakePeerId(6),
+      2,
+      RELIABLE_NETWORK,
+      fakeIndexer(STAR, STAKE_1).getChannelsFromPeer,
+      0
+    )
     checkPath(path, STAR)
     assert(path.length == 2, 'Should find a valid acyclic path')
   })
 
   it('should find the most valuable path through a reliable star', async function () {
-    const path = await findPath(TEST_NODES[1], fakePeerId(6), 2, RELIABLE_NETWORK, fakeIndexer(STAR, STAKE_N).getChannelsFromPeer, 0)
+    const path = await findPath(
+      TEST_NODES[1],
+      fakePeerId(6),
+      2,
+      RELIABLE_NETWORK,
+      fakeIndexer(STAR, STAKE_N).getChannelsFromPeer,
+      0
+    )
     checkPath(path, STAR)
     assert((path[1].id as any) == 4, 'Last hop should be 4 (most valuable choice)')
   })
@@ -66,7 +80,14 @@ describe('test pathfinder with some simple topologies', function () {
   it('should not find a path if it doesnt exist', async () => {
     let thrown = false
     try {
-      await findPath(TEST_NODES[1], fakePeerId(6), 4, RELIABLE_NETWORK, fakeIndexer(STAR, STAKE_1).getChannelsFromPeer, 0)
+      await findPath(
+        TEST_NODES[1],
+        fakePeerId(6),
+        4,
+        RELIABLE_NETWORK,
+        fakeIndexer(STAR, STAKE_1).getChannelsFromPeer,
+        0
+      )
     } catch (e) {
       thrown = true
     }
@@ -74,7 +95,14 @@ describe('test pathfinder with some simple topologies', function () {
   })
 
   it('should find a path through a reliable arrow', async () => {
-    const path = await findPath(TEST_NODES[0], fakePeerId(6), 4, RELIABLE_NETWORK, fakeIndexer(ARROW, STAKE_1).getChannelsFromPeer, 0)
+    const path = await findPath(
+      TEST_NODES[0],
+      fakePeerId(6),
+      4,
+      RELIABLE_NETWORK,
+      fakeIndexer(ARROW, STAKE_1).getChannelsFromPeer,
+      0
+    )
     checkPath(path, ARROW)
     assert(path.length == 4, 'Should find a valid acyclic path')
   })
@@ -82,7 +110,14 @@ describe('test pathfinder with some simple topologies', function () {
   it('should not find a path if a node is unreliable', async () => {
     let thrown = false
     try {
-      await findPath(TEST_NODES[0], fakePeerId(6), 4, UNRELIABLE_NETWORK, fakeIndexer(ARROW, STAKE_1).getChannelsFromPeer, 0)
+      await findPath(
+        TEST_NODES[0],
+        fakePeerId(6),
+        4,
+        UNRELIABLE_NETWORK,
+        fakeIndexer(ARROW, STAKE_1).getChannelsFromPeer,
+        0
+      )
     } catch (e) {
       thrown = true
     }
