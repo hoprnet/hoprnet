@@ -6,7 +6,7 @@ import BN from 'bn.js'
 import { moveDecimalPoint } from '@hoprnet/hopr-utils'
 import { Balance } from '@hoprnet/hopr-core-ethereum'
 import { AbstractCommand, GlobalState } from './abstractCommand'
-import { checkPeerIdInput, styleValue, isBootstrapNode } from './utils'
+import { checkPeerIdInput, styleValue } from './utils'
 
 export default class FundChannel extends AbstractCommand {
   constructor(public node: Hopr) {
@@ -63,7 +63,6 @@ export default class FundChannel extends AbstractCommand {
 
     const peers = this.node
       .getConnectedPeers()
-      .filter((p) => !isBootstrapNode(this.node, p))
       .map((p) => p.toB58String())
 
     const hits = query ? peers.filter((peerId: string) => peerId.startsWith(peer)) : peers

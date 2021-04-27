@@ -40,7 +40,6 @@ export abstract class SendMessageBase extends AbstractCommand {
 
   public async autocomplete(query: string = '', line: string = '', state: GlobalState): Promise<AutoCompleteResult> {
     const allIds = getPeerIdsAndAliases(this.node, state, {
-      noBootstrapNodes: true,
       returnAlias: true,
       mustBeOnline: true
     })
