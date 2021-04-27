@@ -470,31 +470,6 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
             redeemer,
             counterparty
         );
-
-        bytes32 ticketHash = _getTicketHash(
-            _getEncodedTicket(
-                redeemer,
-                account.counter,
-                // proofOfRelaySecret,
-                _getChannelIteration(channel.status),
-                amount,
-                winProb
-            )
-        );
-
-        bytes32 fakedHash = _getTicketHash2(
-            _getEncodedTicket2(
-                redeemer,
-                account.counter,
-                proofOfRelaySecret,
-                _getChannelIteration(channel.status),
-                amount,
-                winProb
-            )
-        );
-
-        require(!tickets[fakedHash], "ticket must not be used twice");
-        require(ECDSA.recover(ticketHash, r, s, v) == counterparty, "signer must match the counterparty");
         
         uint256 prevTicketEpoch;
         if (_isPartyA(redeemer, counterparty)) {
@@ -510,6 +485,19 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         }
         require(channel.status != ChannelStatus.CLOSED, "channel must be open or pending to close");
 
+        bytes32 ticketHash = ECDSA.toEthSignedMessageHash(
+            keccak256(
+              _getEncodedTicket(
+                  redeemer,
+                  prevTicketEpoch,
+                //   proofOfRelaySecret,
+                  channel.channelEpoch,
+                  amount,
+                  winProb
+              )
+            )
+        );
+
         require(ECDSA.recover(ticketHash, signature) == counterparty, "signer must match the counterparty");
         require(
             uint256(_getTicketLuck(
@@ -520,10 +508,6 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
             )) <= uint256(winProb),
             "ticket must be a win"
         );
-
-        account.secret = secretPreImage;
-
-        tickets[fakedHash] = true;
 
         if (_isPartyA(redeemer, counterparty)) {
             channel.partyACommitment = nextCommitment;
@@ -565,51 +549,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
             channelIteration
         );
     }
-
-    // Temporary fix
-    function _getEncodedTicket2(
-        address recipient,
-        uint256 recipientCounter,
-        bytes32 proofOfRelaySecret,
-        uint256 channelIteration,
-        uint256 amount,
-        bytes32 winProb
-    ) internal pure returns (bytes memory) {
-        return abi.encodePacked(
-            recipient,
-            proofOfRelaySecret,
-            recipientCounter,
-            amount,
-            winProb,
-            channelIteration
-        );
-    }
-
-    // Temporary fix
-    function _getTicketHash2(
-        bytes memory packedTicket
-    ) internal pure returns (bytes32) {
-        return ECDSA.toEthSignedMessageHash(
-            "187",
-            packedTicket
-        );
-    }
-
-    /**
-     * @dev Prefix the ticket message and return
-     * the actual hash that was used to sign
-     * the ticket with.
-     * @return prefixed ticket hash
-     */
-    function _getTicketHash(
-        bytes memory packedTicket
-    ) internal pure returns (bytes32) {
-        return ECDSA.toEthSignedMessageHash(
-            "155",
-            packedTicket
-        );
-    }
-
+    
     /**
      * @dev Get the ticket's "luck" by
      * hashing provided values.

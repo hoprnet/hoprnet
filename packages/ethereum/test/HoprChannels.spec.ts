@@ -19,10 +19,10 @@ const percentToUint256 = (percent) =>
   ethers.utils.hexZeroPad(ethers.utils.hexlify(ethers.constants.MaxUint256.mul(percent).div(100)), 32)
 
 const getEncodedTicket = (ticket: Ticket): string => {
-  const challenge = ethers.utils.solidityKeccak256(['bytes32'], [ticket.proofOfRelaySecret])
+  // const challenge = ethers.utils.solidityKeccak256(['bytes32'], [ticket.proofOfRelaySecret])
   return ethers.utils.solidityPack(
-    ['address', 'bytes32', 'uint256', 'uint256', 'bytes32', 'uint256'],
-    [ticket.recipient, challenge, ticket.ticketEpoch, ticket.amount, ticket.winProb, ticket.channelEpoch]
+    ['address'/*, 'bytes32'*/, 'uint256', 'uint256', 'bytes32', 'uint256'],
+    [ticket.recipient/*, challenge*/, ticket.ticketEpoch, ticket.amount, ticket.winProb, ticket.channelEpoch]
   )
 }
 
