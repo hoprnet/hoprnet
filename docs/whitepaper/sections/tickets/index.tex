@@ -1,7 +1,7 @@
 \section{Tickets}
 In the HOPR protocol, nodes that have staked funds within a payment channel can issue tickets that are used for payment to other nodes. 
 Tickets are used for probabilistic payments; every ticket is bound to a specific payment channel and cannot be spent elsewhere. 
-They are redeemable at most once and they lose their value when the channel is closed or when the commitment is reset. 
+They are redeemable at most once and they lose their value when the channel is closed or when the commitment is reset. A commitment is secret on-chain value that is used to verify whether a ticket is a win or not when it's revealed in order to redeem it.
 \subsection{Ticket issuance}
 A ticket can be issued once two nodes have established a payment channel with each other which means that at least one of them has locked HOPR tokens.
 \newline The ticket issuer A (A could also be the packet creator) selects the winning probability of the ticket and the relay fee to use and sets amount to:
