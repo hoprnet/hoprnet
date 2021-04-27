@@ -1,5 +1,5 @@
 import type { ContractTransaction } from 'ethers'
-import ethers, { errors } from 'ethers'
+import ethers, { utils, errors } from 'ethers'
 import { Address } from './types'
 import type { HoprToken, HoprChannels } from './contracts'
 import BN from 'bn.js'
@@ -14,7 +14,7 @@ import { getNetworkName } from './utils'
 import { HoprToken__factory, HoprChannels__factory } from './contracts'
 
 const log = Debug('hopr:core-ethereum:chain-operations')
-const abiCoder = new ethers.utils.AbiCoder()
+const abiCoder = new utils.AbiCoder()
 
 export type Receipt = string
 
