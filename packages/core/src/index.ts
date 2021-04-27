@@ -217,7 +217,8 @@ class Hopr extends EventEmitter {
       provider: options.provider
     })
 
-    verbose('Created connector, now creating node')
+    verbose('Started HoprEthereum. Waiting for indexer to find connected nodes.')
+    const publicNodes = connector.waitForPublicNodes()
 
     const libp2p = await LibP2P.create({
       peerId: id,
@@ -233,7 +234,7 @@ class Hopr extends EventEmitter {
       config: {
         transport: {
           HoprConnect: {
-            bootstrapServers: [] // TODO
+            bootstrapServers: publicNodes 
             // @dev Use these settings to simulate NAT behavior
             // __noDirectConnections: true,
             // __noWebRTCUpgrade: false
@@ -257,7 +258,13 @@ class Hopr extends EventEmitter {
       }
     })
 
-    return await new Hopr(options, libp2p, db, connector).start()
+    await libp2p.start()
+    const node = new Hopr(options, libp2p, db, connector)
+    await node.heartbeat.start()
+    log(`Available under the following addresses:`)
+    libp2p.multiaddrs.forEach((ma: Multiaddr) => log(ma.toString()))
+    node.periodicCheck()
+    return node
   }
 
   private async tickChannelStrategy(newChannels: RoutingChannel[]) {
@@ -310,22 +317,6 @@ class Hopr extends EventEmitter {
    */
   public getVersion() {
     return FULL_VERSION
-  }
-  /**
-   * This method starts the node and registers all necessary handlers. It will
-   * also open the database and creates one if it doesn't exists.
-   *
-   * @param options
-   */
-  public async start(): Promise<Hopr> {
-    await Promise.all([this._libp2p.start().then(() => this.heartbeat.start()), this.paymentChannels.start()])
-
-    log(`Available under the following addresses:`)
-
-    this._libp2p.multiaddrs.forEach((ma: Multiaddr) => log(ma.toString()))
-    this.running = true
-    this.periodicCheck()
-    return this
   }
 
   /**
