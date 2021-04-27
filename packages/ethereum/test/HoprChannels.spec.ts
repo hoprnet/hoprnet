@@ -21,8 +21,8 @@ const percentToUint256 = (percent) =>
 const getEncodedTicket = (ticket: Ticket): string => {
   // const challenge = ethers.utils.solidityKeccak256(['bytes32'], [ticket.proofOfRelaySecret])
   return ethers.utils.solidityPack(
-    ['address'/*, 'bytes32'*/, 'uint256', 'uint256', 'bytes32', 'uint256'],
-    [ticket.recipient/*, challenge*/, ticket.ticketEpoch, ticket.amount, ticket.winProb, ticket.channelEpoch]
+    ['address' /*, 'bytes32'*/, 'uint256', 'uint256', 'bytes32', 'uint256'],
+    [ticket.recipient /*, challenge*/, ticket.ticketEpoch, ticket.amount, ticket.winProb, ticket.channelEpoch]
   )
 }
 
