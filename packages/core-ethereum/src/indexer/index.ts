@@ -293,7 +293,7 @@ class Indexer {
   }
 
   public async getPublicNodes(): Promise<Multiaddr[]> {
-    return []
+    return (await db.getAccounts(this.db, async (account: AccountEntry) => account.containsRouting())).map((account: AccountEntry) => account.multiAddr) 
   }
 
   public async getRandomChannel() {

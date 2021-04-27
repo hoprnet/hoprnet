@@ -159,3 +159,24 @@ export const getAccount = async (db: LevelUp, address: Address): Promise<Account
 export const updateAccount = async (db: LevelUp, address: Address, account: AccountEntry): Promise<void> => {
   await db.put(Buffer.from(createAccountKey(address)), Buffer.from(account.serialize()))
 }
+
+export const getAccounts = async(db: LevelUp, filter?: (account: AccountEntry) => Promise<boolean>) => {
+  const accounts: AccountEntry[] = []
+
+  return new Promise<AccountEntry[]>((resolve, reject) => {
+    db.createValueStream({
+      keys: false,
+      values: true
+    })
+      .on('data', async (data) => {
+        if (data == null || data.length != ChannelEntry.SIZE) return
+        const account = AccountEntry.deserialize(data)
+
+        if (!filter || (await filter(account))) {
+          accounts.push(account)
+        }
+      })
+      .on('end', () => resolve(accounts))
+      .on('error', reject)
+  })
+}

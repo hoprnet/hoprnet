@@ -60,6 +60,12 @@ class AccountEntry {
     return new PublicKey(PeerId.createFromB58String(this.multiAddr.getPeerId()).pubKey.marshal())
   }
 
+  public containsRouting(): boolean {
+    const protos = this.multiAddr.protoNames()
+    return (protos.includes('ip4') && protos.includes('tcp'))
+    
+  }
+
   public hasAnnounced(): boolean {
     return typeof this.multiAddr !== 'undefined'
   }
