@@ -82,7 +82,9 @@ export default class ListOpenChannels extends AbstractCommand {
       for (const channel of channels) {
         const id = await channel.getId()
         const selfIsPartyA = u8aEquals(selfAddress.serialize(), channel.partyA.serialize())
-        const counterpartyPubKey = await this.node.paymentChannels.getPublicKeyOf(selfIsPartyA ? channel.partyB : channel.partyA)
+        const counterpartyPubKey = await this.node.paymentChannels.getPublicKeyOf(
+          selfIsPartyA ? channel.partyB : channel.partyA
+        )
         // counterparty has not initialized
         if (!counterpartyPubKey) continue
 
