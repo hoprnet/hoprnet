@@ -17,8 +17,12 @@ export class UnacknowledgedTicket {
     ])
   }
 
+  public verifySignature(signer: PublicKey): boolean {
+    return this.ticket.verify(signer)
+  }
+
   verify(signer: PublicKey, acknowledgement: Hash): ReturnType<typeof validateAcknowledgement> {
-    if (!this.ticket.verify(signer)) {
+    if (!this.verifySignature(signer)) {
       return { valid: false }
     }
 

@@ -1,6 +1,6 @@
 import type Hopr from '..'
-import { u8aEquals } from '@hoprnet/hopr-utils'
 import { LevelUp } from 'levelup'
+import { PublicKey } from '@hoprnet/hopr-utils'
 import { Ticket, Acknowledgement, SubmitTicketResponse, UnacknowledgedTicket } from '@hoprnet/hopr-core-ethereum'
 import { UnAcknowledgedTickets, AcknowledgedTickets, AcknowledgedTicketsParse } from '../dbKeys'
 
@@ -28,7 +28,7 @@ export async function getUnacknowledgedTickets(
         const unAckTicket = UnacknowledgedTicket.deserialize(value)
 
         // if signer provided doesn't match our ticket's signer dont add it to the list
-        if (filter?.signer && !unAckTicket.verify(filter.signer)) {
+        if (filter?.signer && !unAckTicket.verifySignature(new PublicKey(filter.signer))) {
           return
         }
 
@@ -95,7 +95,7 @@ export async function getAcknowledgements(
         const ackTicket = Acknowledgement.deserialize(value)
 
         // if signer provided doesn't match our ticket's signer dont add it to the list
-        if (filter?.signer && !ackTicket.ticket.verify(filter.signer)) {
+        if (filter?.signer && !ackTicket.ticket.verify(new PublicKey(filter.signer))) {
           return
         }
 
