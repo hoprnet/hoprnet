@@ -118,6 +118,14 @@ export default class HoprEthereum {
     return this.indexer.getChannelsFromPeer(p)
   }
 
+  public getChannelsOf(addr: Address) {
+    return this.indexer.getChannelsOf(addr)
+  }
+
+  public getPublicKeyOf(addr: Address) {
+    return this.indexer.getPublicKeyOf(addr)
+  }
+
   public getRandomChannel() {
     return this.indexer.getRandomChannel()
   }

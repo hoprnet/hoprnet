@@ -19,7 +19,7 @@ export default class TraverseChannels extends AbstractCommand {
     if (depth >= maxDepth) {
       return ''
     }
-    const chans = await this.node.paymentChannels.indexer.getChannelsFromPeer(id)
+    const chans = await this.node.paymentChannels.getChannelsFromPeer(id)
     if (chans.length == 0) {
       return `\n${prev} - ${id.toB58String()}*`
     } else {
