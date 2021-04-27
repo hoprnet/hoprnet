@@ -218,7 +218,10 @@ class Hopr extends EventEmitter {
     })
 
     verbose('Started HoprEthereum. Waiting for indexer to find connected nodes.')
-    const publicNodes = connector.waitForPublicNodes()
+    const publicNodes = await connector.waitForPublicNodes()
+    if (publicNodes.length == 0) {
+      log('no nodes have announced yet, we cannot rely on relay')
+    }
 
     const libp2p = await LibP2P.create({
       peerId: id,

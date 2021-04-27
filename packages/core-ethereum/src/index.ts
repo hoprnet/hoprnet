@@ -12,6 +12,7 @@ import type { ChainWrapper } from './ethereum'
 import type PeerId from 'peer-id'
 import { PROVIDER_CACHE_TTL } from './constants'
 import { cacheNoArgAsyncFunction } from '@hoprnet/hopr-utils'
+import Multiaddr from 'multiaddr'
 
 const log = debug('hopr-core-ethereum')
 
@@ -109,6 +110,10 @@ export default class HoprEthereum {
 
   public smartContractInfo(): string {
     return this.chain.getInfo()
+  }
+
+  public async waitForPublicNodes(): Promise<Multiaddr[]> {
+    return await this.indexer.getPublicNodes()
   }
 
   /**

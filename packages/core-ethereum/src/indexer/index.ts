@@ -2,7 +2,6 @@ import type PeerId from 'peer-id'
 import type { Event, EventNames } from './types'
 import type { ChainWrapper } from '../ethereum'
 import { LevelUp } from 'levelup'
-import EventEmitter from 'events'
 import chalk from 'chalk'
 import BN from 'bn.js'
 import Heap from 'heap-js'
@@ -11,6 +10,7 @@ import { Address, ChannelEntry, AccountEntry, Hash, PublicKey, Balance, Snapshot
 import * as db from './db'
 import { isConfirmedBlock, snapshotComparator } from './utils'
 import Debug from 'debug'
+import Multiaddr from 'multiaddr'
 
 export type RoutingChannel = [source: PeerId, destination: PeerId, stake: Balance]
 
@@ -22,7 +22,7 @@ const getSyncPercentage = (n: number, max: number) => ((n * 100) / max).toFixed(
  * all channels in the network.
  * Also keeps track of the latest block number.
  */
-class Indexer extends EventEmitter {
+class Indexer {
   public status: 'started' | 'restarting' | 'stopped' = 'stopped'
   public latestBlock: number = 0 // latest known on-chain block number
   private unconfirmedEvents = new Heap<Event<any>>(snapshotComparator)
@@ -33,9 +33,7 @@ class Indexer extends EventEmitter {
     private chain: ChainWrapper,
     private maxConfirmations: number,
     private blockRange: number
-  ) {
-    super()
-  }
+  ) {}
 
   /**
    * Starts indexing.
@@ -292,6 +290,10 @@ class Indexer extends EventEmitter {
       const partyBBalance = channel.partyBBalance
       return [source, await pubKeyToPeerId(partyAPubKey.serialize()), partyBBalance]
     }
+  }
+
+  public async getPublicNodes(): Promise<Multiaddr[]> {
+    return []
   }
 
   public async getRandomChannel() {
