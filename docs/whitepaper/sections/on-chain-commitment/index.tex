@@ -16,7 +16,7 @@ The number of iterations $n$ can be chosen as a constant and should reflect the 
 \subsection{Opening phase}
 In order to redeem a ticket, a node has to reveal the opening to the current commitment $cm_n$ that is stored in the smart contract. 
 \\~The opening shouldn’t be revealed otherwise since it discloses whether a ticket is a win or not.
-The ticket is a win if: $$H( ticketHash, response, open ) <P_w$$ where $$ticketHash:=H(T_D)$$
+The ticket is a win if: $$H( ticketHash, response, open ) <P_w$$ where $$ticketHash:=H(t)$$
 The opening is computed as $open_{n-1} = hash^{n-1}(r)$ such that $cm_n=hash( open_{n-1})$. 
 \\~\\The on-chain logic verifies whether the latest opening $open_n$ indeed opens the current on-chain commitment $cm_n$. 
 If this is the case, the current on-chain commitment is replaced by the given opening. 
