@@ -1,11 +1,8 @@
 import type Hopr from '@hoprnet/hopr-core'
 import type PeerId from 'peer-id'
-import type { AutoCompleteResult } from './abstractCommand'
 import chalk from 'chalk'
-import { pubKeyToPeerId } from '@hoprnet/hopr-utils'
 import { AbstractCommand, GlobalState } from './abstractCommand'
 import { checkPeerIdInput, styleValue } from './utils'
-import { PublicKey } from '@hoprnet/hopr-core-ethereum'
 
 export default class CloseChannel extends AbstractCommand {
   constructor(public node: Hopr) {
@@ -48,42 +45,5 @@ export default class CloseChannel extends AbstractCommand {
     } catch (err) {
       return styleValue(err.message, 'failure')
     }
-  }
-
-  async autocomplete(query: string = '', line: string = ''): Promise<AutoCompleteResult> {
-    const ethereum = this.node.paymentChannels
-    const selfPubKey = new PublicKey(this.node.getId().pubKey.marshal())
-    const self = await selfPubKey.toAddress()
-
-    // get channels which are ours & open
-    const channels = await ethereum.indexer.getChannels(async (channel) => {
-      // must be one of ours
-      if (!self.eq(channel.partyA) && !self.eq(channel.partyB)) return false
-      // must be open
-      if (channel.getStatus() !== 'CLOSED') return false
-
-      return true
-    })
-
-    let peerIdStrings: string[]
-    try {
-      for (const channel of channels) {
-        const counterparty = channel.partyA.eq(self) ? channel.partyB : channel.partyA
-        const pubKey = await ethereum.indexer.getPublicKeyOf(counterparty)
-        const peerId = await pubKeyToPeerId(pubKey.serialize())
-        peerIdStrings.push(peerId.toB58String())
-      }
-    } catch (err) {
-      console.log(styleValue(err.message), 'failure')
-      return [[], line]
-    }
-
-    if (peerIdStrings != null && peerIdStrings.length < 1) {
-      console.log(styleValue(`\nCannot find any open channels to close.`), 'failure')
-      return [[''], line]
-    }
-
-    const hits = query ? peerIdStrings.filter((peerId: string) => peerId.startsWith(query)) : peerIdStrings
-    return [hits.length ? hits.map((str: string) => `close ${str}`) : ['close'], line]
   }
 }

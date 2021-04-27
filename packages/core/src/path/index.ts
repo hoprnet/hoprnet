@@ -1,7 +1,7 @@
 import Heap from 'heap-js'
 import PeerId from 'peer-id'
 import type NetworkPeers from '../network/network-peers'
-import type { Indexer, RoutingChannel as Edge } from '@hoprnet/hopr-core-ethereum'
+import type { RoutingChannel as Edge } from '@hoprnet/hopr-core-ethereum'
 import { NETWORK_QUALITY_THRESHOLD, MAX_PATH_ITERATIONS } from '../constants'
 import Debug from 'debug'
 import BN from 'bn.js'
@@ -32,7 +32,7 @@ export async function findPath(
   destination: PeerId,
   hops: number,
   networkPeers: NetworkPeers,
-  indexer: Indexer,
+  getChannelsFromPeer: (p: PeerId) => Promise<Edge[]>,
   randomness: number // Proportion of randomness in stake.
 ): Promise<Path> {
   log('find path from', start.toB58String(), 'to ', destination.toB58String(), 'length', hops)
@@ -57,7 +57,7 @@ export async function findPath(
   let queue = new Heap<ChannelPath>(comparePath)
   let deadEnds = new Set<string>()
   let iterations = 0
-  queue.addAll((await indexer.getChannelsFromPeer(start)).map((x) => [x]))
+  queue.addAll((await getChannelsFromPeer(start)).map((x) => [x]))
 
   while (queue.length > 0 && iterations++ < MAX_PATH_ITERATIONS) {
     const currentPath = queue.peek()
@@ -67,7 +67,7 @@ export async function findPath(
     }
 
     const lastPeer = next(currentPath[currentPath.length - 1])
-    const newChannels = (await indexer.getChannelsFromPeer(lastPeer))
+    const newChannels = (await getChannelsFromPeer(lastPeer))
       .filter((c) => {
         networkPeers.register(next(c))
         return (

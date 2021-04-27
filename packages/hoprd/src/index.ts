@@ -113,7 +113,6 @@ function parseHosts(): HoprOptions['hosts'] {
 
 async function generateNodeOptions(): Promise<HoprOptions> {
   let options: HoprOptions = {
-    debug: Boolean(process.env.HOPR_DEBUG),
     bootstrapNode: argv.runAsBootstrap,
     createDbIfNotExist: argv.init,
     network: argv.network,

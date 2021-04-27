@@ -1,6 +1,5 @@
 import type { HardhatRuntimeEnvironment, RunSuperFunction } from 'hardhat/types'
 import { utils } from 'ethers'
-import { NODE_SEEDS } from '@hoprnet/hopr-demo-seeds'
 import { convertPubKeyFromB58String } from '@hoprnet/hopr-utils'
 import { HoprToken__factory } from '../types'
 import { getContract } from './utils/contracts'
@@ -40,23 +39,20 @@ async function main(
     return
   }
 
-  console.log('🚰 Starting local faucet task')
   const etherAmount = '1.0'
   const signer = ethers.provider.getSigner()
-  const minterWallet = new ethers.Wallet(NODE_SEEDS[0], ethers.provider)
   const nodeAddress = ishopraddress ? await nativeAddress(address) : address
   const tx = {
     to: nodeAddress,
     value: ethers.utils.parseEther(etherAmount)
   }
-  const hoprToken = HoprToken__factory.connect(hoprTokenAddress, ethers.provider).connect(minterWallet)
+  const hoprToken = HoprToken__factory.connect(hoprTokenAddress, ethers.provider).connect(signer)
 
   console.log(`💧💰 Sending ${etherAmount} ETH to ${nodeAddress} on network ${network.name}`)
   await send(signer, tx)
 
   console.log(`💧🟡 Sending ${ethers.utils.formatEther(amount)} HOPR to ${nodeAddress} on network ${network.name}`)
   await hoprToken.mint(nodeAddress, amount, ethers.constants.HashZero, ethers.constants.HashZero, {
-    from: minterWallet.getAddress(),
     gasLimit: 200e3
   })
 }

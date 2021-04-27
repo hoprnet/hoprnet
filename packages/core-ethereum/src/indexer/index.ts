@@ -1,5 +1,5 @@
 import type PeerId from 'peer-id'
-import type HoprEthereum from '..'
+import { LevelUp } from 'levelup'
 import type { Event, EventNames } from './types'
 import EventEmitter from 'events'
 import chalk from 'chalk'
@@ -7,11 +7,10 @@ import BN from 'bn.js'
 import Heap from 'heap-js'
 import { pubKeyToPeerId, randomChoice } from '@hoprnet/hopr-utils'
 import { Address, ChannelEntry, Hash, PublicKey, Balance, Snapshot } from '../types'
-import * as reducers from './reducers'
 import * as db from './db'
 import { isConfirmedBlock, isSyncing, snapshotComparator } from './utils'
 import Debug from 'debug'
-import { Channel } from '..'
+import type { ChainWrapper } from '../ethereum'
 
 export type RoutingChannel = [source: PeerId, destination: PeerId, stake: Balance]
 
@@ -29,8 +28,9 @@ class Indexer extends EventEmitter {
   private unconfirmedEvents = new Heap<Event<any>>(snapshotComparator)
 
   constructor(
-    private connector: HoprEthereum,
     private genesisBlock: number,
+    private db: LevelUp,
+    private chain: ChainWrapper,
     private maxConfirmations: number,
     private blockRange: number
   ) {
@@ -44,14 +44,12 @@ class Indexer extends EventEmitter {
     if (this.status === 'started') return
     log(`Starting indexer...`)
 
-    const { provider, hoprChannels } = this.connector
-
     // wipe indexer, do not use in production
     // await this.wipe()
 
     const [latestSavedBlock, latestOnChainBlock] = await Promise.all([
-      await db.getLatestBlockNumber(this.connector.db),
-      provider.getBlockNumber()
+      await db.getLatestBlockNumber(this.db),
+      this.chain.getLatestBlockNumber()
     ])
     this.latestBlock = latestOnChainBlock
 
@@ -80,25 +78,12 @@ class Indexer extends EventEmitter {
 
     log('Subscribing to events from block %d', fromBlock)
 
-    // subscribe to new blocks
-    provider
-      .on('block', (blockNumber: number) => {
-        this.onNewBlock({ number: blockNumber })
-      })
-      .on('error', (error: any) => {
-        log(chalk.red(`etherjs error: ${error}`))
-        this.restart()
-      })
-
-    // subscribe to all HoprChannels events
-    hoprChannels
-      .on('*', (event: Event<any>) => {
-        this.onNewEvents([event])
-      })
-      .on('error', (error: any) => {
-        log(chalk.red(`etherjs error: ${error}`))
-        this.restart()
-      })
+    this.chain.subscribeBlock(this.onNewBlock.bind(this))
+    this.chain.subscribeError((error: any) => {
+      log(chalk.red(`etherjs error: ${error}`))
+      this.restart()
+    })
+    this.chain.subscribeChannelEvents((e) => this.onNewEvents([e]))
 
     this.status = 'started'
     log(chalk.green('Indexer started!'))
@@ -111,8 +96,7 @@ class Indexer extends EventEmitter {
     if (this.status === 'stopped') return
     log(`Stopping indexer...`)
 
-    this.connector.provider.removeAllListeners()
-    this.connector.hoprChannels.removeAllListeners()
+    this.chain.unsubscribe()
 
     this.status = 'stopped'
     log(chalk.green('Indexer stopped!'))
@@ -123,8 +107,8 @@ class Indexer extends EventEmitter {
    */
   public async isSyncing(): Promise<boolean> {
     const [onChainBlock, lastKnownBlock] = await Promise.all([
-      this.connector.provider.getBlockNumber(),
-      db.getLatestBlockNumber(this.connector.db)
+      this.chain.getLatestBlockNumber(),
+      db.getLatestBlockNumber(this.db)
     ])
 
     return isSyncing(onChainBlock, lastKnownBlock)
@@ -152,6 +136,7 @@ class Indexer extends EventEmitter {
   //  */
   // private async wipe(): Promise<void> {
   //   await this.connector.db.batch(
+  //   getChannelsFromPeer:
   //     (await getChannelEntries(this.connector.db)).map(({ partyA, partyB }) => ({
   //       type: 'del',
   //       key: Buffer.from(this.connector.dbKeys.ChannelEntry(partyA, partyB))
@@ -192,7 +177,7 @@ class Indexer extends EventEmitter {
 
       try {
         // TODO: wildcard is supported but not properly typed
-        events = await this.connector.hoprChannels.queryFilter('*' as any, fromBlock, toBlock)
+        events = await this.chain.getChannels().queryFilter('*' as any, fromBlock, toBlock)
       } catch (error) {
         failedCount++
 
@@ -205,7 +190,7 @@ class Indexer extends EventEmitter {
       }
 
       this.onNewEvents(events)
-      await this.onNewBlock({ number: toBlock })
+      await this.onNewBlock(toBlock)
       failedCount = 0
       fromBlock = toBlock
 
@@ -226,19 +211,19 @@ class Indexer extends EventEmitter {
    * confirmed blocks.
    * @param block
    */
-  private async onNewBlock(block: { number: number }): Promise<void> {
+  private async onNewBlock(blockNumber: number): Promise<void> {
     // update latest block
-    if (this.latestBlock < block.number) {
-      this.latestBlock = block.number
+    if (this.latestBlock < blockNumber) {
+      this.latestBlock = blockNumber
     }
 
-    let lastSnapshot = await db.getLatestConfirmedSnapshot(this.connector.db)
+    let lastSnapshot = await db.getLatestConfirmedSnapshot(this.db)
 
     // check unconfirmed events and process them if found
     // to be within a confirmed block
     while (
       this.unconfirmedEvents.length > 0 &&
-      isConfirmedBlock(this.unconfirmedEvents.top(1)[0].blockNumber, block.number, this.maxConfirmations)
+      isConfirmedBlock(this.unconfirmedEvents.top(1)[0].blockNumber, blockNumber, this.maxConfirmations)
     ) {
       const event = this.unconfirmedEvents.pop()
       log('Processing event %s', event.event)
@@ -263,32 +248,17 @@ class Indexer extends EventEmitter {
 
       const eventName = event.event as EventNames
 
-      try {
-        if (eventName === 'AccountInitialized') {
-          await this.onAccountInitialized(event as Event<'AccountInitialized'>)
-        } else if (eventName === 'AccountSecretUpdated') {
-          await this.onAccountSecretUpdated(event as Event<'AccountSecretUpdated'>)
-        } else if (eventName === 'ChannelFunded') {
-          await this.onChannelFunded(event as Event<'ChannelFunded'>)
-        } else if (eventName === 'ChannelOpened') {
-          await this.onChannelOpened(event as Event<'ChannelOpened'>)
-        } else if (eventName === 'TicketRedeemed') {
-          await this.onTicketRedeemed(event as Event<'TicketRedeemed'>)
-        } else if (eventName === 'ChannelPendingToClose') {
-          await this.onChannelPendingToClose(event as Event<'ChannelPendingToClose'>)
-        } else if (eventName === 'ChannelClosed') {
-          await this.onChannelClosed(event as Event<'ChannelClosed'>)
-        }
-      } catch (err) {
-        log(chalk.red('Error while reducing event'))
-        throw err
+      if (eventName != 'ChannelUpdate') {
+        throw new Error('bad event name')
       }
 
+      await this.onChannelUpdated(event as Event<'ChannelUpdate'>)
+
       lastSnapshot = new Snapshot(new BN(event.blockNumber), new BN(event.transactionIndex), new BN(event.logIndex))
-      await db.updateLatestConfirmedSnapshot(this.connector.db, lastSnapshot)
+      await db.updateLatestConfirmedSnapshot(this.db, lastSnapshot)
     }
 
-    await db.updateLatestBlockNumber(this.connector.db, new BN(block.number))
+    await db.updateLatestBlockNumber(this.db, new BN(blockNumber))
   }
 
   /**
@@ -299,146 +269,32 @@ class Indexer extends EventEmitter {
     this.unconfirmedEvents.addAll(events)
   }
 
-  // on new events
-  private async onAccountInitialized(event: Event<'AccountInitialized'>): Promise<void> {
-    const accountId = Address.fromString(event.args.account)
-    const account = await reducers.onAccountInitialized(event)
-
-    await db.updateAccount(this.connector.db, accountId, account)
-  }
-
-  private async onAccountSecretUpdated(event: Event<'AccountSecretUpdated'>): Promise<void> {
-    const data = event.args
-
-    const accountId = Address.fromString(data.account)
-
-    const storedAccount = await db.getAccount(this.connector.db, accountId)
-    if (!storedAccount) throw Error(`Could not find stored account ${accountId.toHex()} !`)
-
-    const account = await reducers.onAccountSecretUpdated(event, storedAccount)
-
-    await db.updateAccount(this.connector.db, accountId, account)
-  }
-
-  private async onChannelFunded(event: Event<'ChannelFunded'>): Promise<void> {
-    const data = event.args
-
-    const accountIdA = Address.fromString(data.accountA)
-    const accountIdB = Address.fromString(data.accountB)
-    const channelId = Channel.generateId(accountIdA, accountIdB)
-
-    let storedChannel = await db.getChannel(this.connector.db, channelId)
-    const channel = await reducers.onChannelFunded(event, storedChannel)
-
-    // const channelId = await getId(recipientAddress, counterpartyAddress)
-    // log('Processing event %s with channelId %s', event.name, channelId.toHex())
-
-    await db.updateChannel(this.connector.db, channelId, channel)
-
-    // log('Channel %s got funded by %s', chalk.green(channelId.toHex()), chalk.green(event.data.funder))
-  }
-
-  private async onChannelOpened(event: Event<'ChannelOpened'>): Promise<void> {
-    const data = event.args
-
-    const openerAccountId = Address.fromString(data.opener)
-    const counterpartyAccountId = Address.fromString(data.counterparty)
-    const channelId = Channel.generateId(openerAccountId, counterpartyAccountId)
-    // log('Processing event %s with channelId %s', event.name, channelId.toHex())
-
-    let storedChannel = await db.getChannel(this.connector.db, channelId)
-    if (!storedChannel) throw Error(`Could not find stored channel ${channelId.toHex()}`)
-
-    const channel = await reducers.onChannelOpened(event, storedChannel)
-
-    await db.updateChannel(this.connector.db, channelId, channel)
-
-    this.emit('channelOpened', channel)
-
-    // log('Channel %s got opened by %s', chalk.green(channelId.toHex()), chalk.green(openerAddress.toHex()))
-  }
-
-  private async onTicketRedeemed(event: Event<'TicketRedeemed'>): Promise<void> {
-    const data = event.args
-
-    const redeemerAccountId = Address.fromString(data.redeemer)
-    const counterpartyAccountId = Address.fromString(data.counterparty)
-    const channelId = Channel.generateId(redeemerAccountId, counterpartyAccountId)
-    // log('Processing event %s with channelId %s', event.name, channelId.toHex())
-
-    const storedChannel = await db.getChannel(this.connector.db, channelId)
-    if (!storedChannel) throw Error(`Could not find stored channel ${channelId.toHex()}`)
-
-    const channel = await reducers.onTicketRedeemed(event, storedChannel)
-
-    await db.updateChannel(this.connector.db, channelId, channel)
-
-    // log('Ticket redeemd in channel %s by %s', chalk.green(channelId.toHex()), chalk.green(redeemerAddress.toHex()))
-  }
-
-  private async onChannelPendingToClose(event: Event<'ChannelPendingToClose'>): Promise<void> {
-    const data = event.args
-
-    const initiatorAccountId = Address.fromString(data.initiator)
-    const counterpartyAccountId = Address.fromString(data.counterparty)
-    const channelId = Channel.generateId(initiatorAccountId, counterpartyAccountId)
-    // log('Processing event %s with channelId %s', event.name, channelId.toHex())
-
-    const storedChannel = await db.getChannel(this.connector.db, channelId)
-    if (!storedChannel) throw Error(`Could not find stored channel ${channelId.toHex()}`)
-
-    const channel = await reducers.onChannelPendingToClose(event, storedChannel)
-
-    await db.updateChannel(this.connector.db, channelId, channel)
-
-    // log(
-    //   'Channel closure initiated for %s by %s',
-    //   chalk.green(channelId.toHex()),
-    //   chalk.green(initiatorAddress.toHex())
-    // )
-  }
-
-  private async onChannelClosed(event: Event<'ChannelClosed'>): Promise<void> {
-    const data = event.args
-
-    const closerAccountId = Address.fromString(data.initiator)
-    const counterpartyAccountId = Address.fromString(data.counterparty)
-    const channelId = Channel.generateId(closerAccountId, counterpartyAccountId)
-    // log('Processing event %s with channelId %s', event.name, channelId.toHex())
-
-    const storedChannel = await db.getChannel(this.connector.db, channelId)
-    if (!storedChannel) throw Error(`Could not find stored channel ${channelId.toHex()}`)
-
-    const channel = await reducers.onChannelClosed(event, storedChannel)
-
-    await db.updateChannel(this.connector.db, channelId, channel)
-
-    this.emit('channelClosed', channel)
-
-    // log('Channel %s got closed by %s', chalk.green(channelId.toHex()), chalk.green(closerAddress.toHex()))
+  private async onChannelUpdated(event: Event<'ChannelUpdate'>): Promise<void> {
+    const channel = ChannelEntry.fromSCEvent(event)
+    await db.updateChannel(this.db, channel.getId(), channel)
   }
 
   public async getAccount(address: Address) {
-    return db.getAccount(this.connector.db, address)
+    return db.getAccount(this.db, address)
   }
 
   public async getChannel(channelId: Hash) {
-    return db.getChannel(this.connector.db, channelId)
+    return db.getChannel(this.db, channelId)
   }
 
   public async getChannels(filter?: (channel: ChannelEntry) => Promise<boolean>) {
-    return db.getChannels(this.connector.db, filter)
+    return db.getChannels(this.db, filter)
   }
 
   public async getChannelsOf(address: Address) {
-    return db.getChannels(this.connector.db, async (channel) => {
+    return db.getChannels(this.db, async (channel) => {
       return address.eq(channel.partyA) || address.eq(channel.partyB)
     })
   }
 
   // routing
   public async getPublicKeyOf(address: Address): Promise<PublicKey | undefined> {
-    const account = await db.getAccount(this.connector.db, address)
+    const account = await db.getAccount(this.db, address)
     if (account && account.publicKey) {
       return account.publicKey
     }
@@ -454,21 +310,15 @@ class Indexer extends EventEmitter {
     ])
 
     if (sourcePubKey.eq(partyAPubKey)) {
-      return [source, await pubKeyToPeerId(partyBPubKey.serialize()), new Balance(channel.partyABalance)]
+      return [source, await pubKeyToPeerId(partyBPubKey.serialize()), channel.partyABalance]
     } else {
-      const partyBBalance = new Balance(
-        new Balance(channel.deposit).toBN().sub(new Balance(channel.partyABalance).toBN())
-      )
+      const partyBBalance = channel.partyBBalance
       return [source, await pubKeyToPeerId(partyAPubKey.serialize()), partyBBalance]
     }
   }
 
   public async getRandomChannel() {
-    const HACK = 14744510 // Arbitrarily chosen block for our testnet. Total hack.
-
     const channels = await this.getChannels(async (channel) => {
-      // filter out channels older than hack
-      if (!channel.openedAt.gtn(HACK)) return false
       // filter out channels with uninitialized parties
       const pubKeys = await Promise.all([this.getPublicKeyOf(channel.partyA), this.getPublicKeyOf(channel.partyB)])
       return pubKeys.every((pubKeys) => pubKeys)
@@ -485,7 +335,7 @@ class Indexer extends EventEmitter {
     return this.toIndexerChannel(await pubKeyToPeerId(partyA.serialize()), random) // TODO: why do we pick partyA?
   }
 
-  public async getChannelsFromPeer(source: PeerId) {
+  public async getChannelsFromPeer(source: PeerId): Promise<RoutingChannel[]> {
     const sourcePubKey = new PublicKey(source.pubKey.marshal())
     const channels = await this.getChannelsOf(await sourcePubKey.toAddress())
 

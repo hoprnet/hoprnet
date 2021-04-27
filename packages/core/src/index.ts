@@ -71,7 +71,6 @@ interface NetOptions {
 export type ChannelStrategyNames = 'passive' | 'promiscuous'
 
 export type HoprOptions = {
-  debug: boolean
   network: string
   provider: string
   ticketAmount?: number
@@ -81,7 +80,6 @@ export type HoprOptions = {
   createDbIfNotExist?: boolean
   peerId?: PeerId
   password?: string
-  id?: number // TODO - kill this opaque accessor of db files...
   bootstrapNode?: boolean
   connector?: HoprCoreEthereum
   bootstrapServers?: Multiaddr[]
@@ -93,12 +91,10 @@ export type HoprOptions = {
   }
 }
 
-const defaultDBPath = (id: string | number, isBootstrap: boolean): string => {
+const defaultDBPath = (isBootstrap: boolean): string => {
   let folder: string
   if (isBootstrap) {
     folder = `bootstrap`
-  } else if (id) {
-    folder = `node_${id}`
   } else {
     folder = `node`
   }
@@ -108,7 +104,6 @@ const defaultDBPath = (id: string | number, isBootstrap: boolean): string => {
 class Hopr extends EventEmitter {
   // TODO make these actually private - Do not rely on any of these properties!
   // Allows us to construct HOPR with falsy options
-  public _debug: boolean
   public _dbKeys = DbKeys
 
   public output: (arr: Uint8Array) => void
@@ -222,7 +217,6 @@ class Hopr extends EventEmitter {
     verbose('# STARTED NODE')
     verbose('ID', this.getId().toB58String())
     verbose('Protocol version', VERSION)
-    this._debug = options.debug
   }
 
   /**
@@ -240,17 +234,12 @@ class Hopr extends EventEmitter {
       db
     })
 
-    if (
-      !options.debug &&
-      !options.bootstrapNode &&
-      (options.bootstrapServers == null || options.bootstrapServers.length == 0)
-    ) {
+    if (!options.bootstrapNode && (options.bootstrapServers == null || options.bootstrapServers.length == 0)) {
       throw Error(`Cannot start node without a bootstrap server`)
     }
 
     let connector = await HoprCoreEthereum.create(db, id.privKey.marshal(), {
-      provider: options.provider,
-      debug: options.debug
+      provider: options.provider
     })
 
     verbose('Created connector, now creating node')
@@ -314,7 +303,7 @@ class Hopr extends EventEmitter {
       newChannels,
       currentChannels,
       this.networkPeers,
-      this.paymentChannels.indexer
+      this.paymentChannels.getRandomChannel.bind(this.paymentChannels)
     )
     verbose(`strategy wants to close ${closeChannels.length} channels`)
     for (let toClose of closeChannels) {
@@ -338,7 +327,7 @@ class Hopr extends EventEmitter {
   }
 
   private async getOpenChannels(): Promise<RoutingChannel[]> {
-    return this.paymentChannels.indexer.getChannelsFromPeer(this.getId())
+    return this.paymentChannels.getChannelsFromPeer(this.getId())
   }
 
   /**
@@ -523,24 +512,16 @@ class Hopr extends EventEmitter {
 
   private async checkBalances() {
     const balance = await this.getBalance()
-    let unfunded = false
     if (balance.toBN().lten(0)) {
       const address = await this.paymentChannels.hexAccountAddress()
       log('unfunded node', address)
       this.emit('hopr:warning:unfunded', address)
-      unfunded = true
     }
     const nativeBalance = await this.getNativeBalance()
     if (nativeBalance.toBN().lte(MIN_NATIVE_BALANCE)) {
       const address = await this.paymentChannels.hexAccountAddress()
       log('unfunded node', address)
       this.emit('hopr:warning:unfundedNative', address)
-      unfunded = true
-    }
-    if (!unfunded) {
-      // Technically we only have to do this the first time, but there are no
-      // side effects to doing this on each tick.
-      this.paymentChannels.initOnchainValues() // No-op if called many times.
     }
   }
 
@@ -575,11 +556,11 @@ class Hopr extends EventEmitter {
   }
 
   public async getBalance(): Promise<Balance> {
-    return await this.paymentChannels.account.getBalance(true)
+    return await this.paymentChannels.getBalance(true)
   }
 
   public async getNativeBalance(): Promise<NativeBalance> {
-    return await this.paymentChannels.account.getNativeBalance(true)
+    return await this.paymentChannels.getNativeBalance(true)
   }
 
   public smartContractInfo(): string {
@@ -601,7 +582,7 @@ class Hopr extends EventEmitter {
     const ethereum = this.paymentChannels
     const selfPubKey = new PublicKey(this.getId().pubKey.marshal())
     const counterpartyPubKey = new PublicKey(counterparty.pubKey.marshal())
-    const myAvailableTokens = await ethereum.account.getBalance(false)
+    const myAvailableTokens = await ethereum.getBalance(false)
 
     // validate 'amountToFund'
     if (amountToFund.lten(0)) {
@@ -610,7 +591,7 @@ class Hopr extends EventEmitter {
       throw Error(`You don't have enough tokens: ${amountToFund.toString(10)}<${myAvailableTokens.toBN().toString(10)}`)
     }
 
-    const channel = new ethereum.channel(ethereum, selfPubKey, counterpartyPubKey)
+    const channel = ethereum.getChannel(selfPubKey, counterpartyPubKey)
     await channel.open(new Balance(amountToFund))
 
     return {
@@ -635,7 +616,7 @@ class Hopr extends EventEmitter {
     const ethereum = this.paymentChannels
     const selfPubKey = new PublicKey(this.getId().pubKey.marshal())
     const counterpartyPubKey = new PublicKey(counterparty.pubKey.marshal())
-    const myBalance = await ethereum.account.getBalance(false)
+    const myBalance = await ethereum.getBalance(false)
     const totalFund = myFund.add(counterpartyFund)
 
     // validate 'amountToFund'
@@ -645,7 +626,7 @@ class Hopr extends EventEmitter {
       throw Error(`You don't have enough tokens: ${totalFund.toString(10)}<${myBalance.toBN().toString(10)}`)
     }
 
-    const channel = new ethereum.channel(ethereum, selfPubKey, counterpartyPubKey)
+    const channel = ethereum.getChannel(selfPubKey, counterpartyPubKey)
     await channel.fund(new Balance(myFund), new Balance(counterpartyFund))
 
     return {
@@ -657,18 +638,17 @@ class Hopr extends EventEmitter {
     const ethereum = this.paymentChannels
     const selfPubKey = new PublicKey(this.getId().pubKey.marshal())
     const counterpartyPubKey = new PublicKey(counterparty.pubKey.marshal())
-    const channel = new ethereum.channel(ethereum, selfPubKey, counterpartyPubKey)
+    const channel = ethereum.getChannel(selfPubKey, counterpartyPubKey)
     const channelState = await channel.getState()
-    const channelStatus = channelState.getStatus()
 
     // TODO: should we wait for confirmation?
-    if (channelStatus === 'CLOSED') {
+    if (channelState.status === 'CLOSED') {
       throw new Error('Channel is already closed')
     }
 
-    const txHash = await (channelStatus === 'OPEN' ? channel.initializeClosure() : channel.finalizeClosure())
+    const txHash = await (channelState.status === 'OPEN' ? channel.initializeClosure() : channel.finalizeClosure())
 
-    return { receipt: txHash, status: channelStatus }
+    return { receipt: txHash, status: channelState.status }
   }
 
   public async getAcknowledgedTickets() {
@@ -691,7 +671,7 @@ class Hopr extends EventEmitter {
       destination,
       MAX_HOPS - 1,
       this.networkPeers,
-      this.paymentChannels.indexer,
+      this.paymentChannels.getChannelsFromPeer.bind(this.paymentChannels),
       PATH_RANDOMNESS
     )
   }
@@ -705,7 +685,7 @@ class Hopr extends EventEmitter {
     if (options.dbPath) {
       dbPath = options.dbPath
     } else {
-      dbPath = defaultDBPath(options.id, options.bootstrapNode)
+      dbPath = defaultDBPath(options.bootstrapNode)
     }
 
     dbPath = path.resolve(dbPath)

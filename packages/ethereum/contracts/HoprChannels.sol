@@ -1,18 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.7.5;
+pragma solidity ^0.8;
+pragma abicoder v2;
 
-import "@openzeppelin/contracts/math/SafeMath.sol";
-import "@openzeppelin/contracts/introspection/IERC1820Registry.sol";
-import "@openzeppelin/contracts/introspection/ERC1820Implementer.sol";
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "@openzeppelin/contracts/utils/introspection/IERC1820Registry.sol";
+import "@openzeppelin/contracts/utils/introspection/ERC1820Implementer.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC777/IERC777Recipient.sol";
-import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
-import "./utils/ECDSA.sol";
-import "./utils/SafeUint24.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
 contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     using SafeMath for uint256;
-    using SafeUint24 for uint24;
     using SafeERC20 for IERC20;
 
     // required by ERC1820 spec
@@ -20,23 +19,10 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     // required by ERC777 spec
     bytes32 public constant TOKENS_RECIPIENT_INTERFACE_HASH = keccak256("ERC777TokensRecipient");
     // used by {tokensReceived} to distinguish which function to call after tokens are sent
-    uint256 public FUND_CHANNEL_SIZE = abi.encode(false, address(0), address(0)).length;
-    // used by {tokensReceived} to distinguish which function to call after tokens are sent
-    uint256 public FUND_CHANNEL_MULTI_SIZE = abi.encode(false, address(0), address(0), uint256(0), uint256(0)).length;
-
-    /**
-     * @dev An account struct, used to represent an account's state
-     */
-    struct Account {
-        // @TODO: optimize struct
-        bytes32 secret; // account's hashed secret
-        uint256 counter; // increases everytime 'secret' is changed
-    }
+    uint256 public FUND_CHANNEL_MULTI_SIZE = abi.encode(address(0), address(0), uint256(0), uint256(0)).length;
 
     /**
      * @dev Possible channel statuses.
-     * We find out the channel's status by
-     * using {_getChannelStatus}.
      */
     enum ChannelStatus { CLOSED, OPEN, PENDING_TO_CLOSE }
 
@@ -44,36 +30,31 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
      * @dev A channel struct, used to represent a channel's state
      */
     struct Channel {
-        // @TODO: optimize struct
-        // total tokens in deposit
-        uint256 deposit;
-        // tokens that are claimable by partyA
         uint256 partyABalance;
+        uint256 partyBBalance;
+
+        bytes32 partyACommitment;
+        bytes32 partyBCommitment;
+        uint256 partyATicketEpoch;
+        uint256 partyBTicketEpoch;
+        uint256 partyATicketIndex;
+        uint256 partyBTicketIndex;
+
+        ChannelStatus status;
+        uint channelEpoch; 
+
         // the time when the channel can be closed by either party
         // overloads at year >2105
         uint32 closureTime;
-        // status of the channel
-        // overloads at >16777215
-        uint24 status;
+
         // channel closure was initiated by party A
         bool closureByPartyA;
     }
 
     /**
-     * @dev Stored accounts keyed by their address
-     */
-    mapping(address => Account) public accounts;
-
-    /**
      * @dev Stored channels keyed by their channel ids
      */
     mapping(bytes32 => Channel) public channels;
-
-    /**
-     * @dev Stored hashes of tickets keyed by their challenge,
-     * true if ticket has been redeemed.
-     */
-    mapping(bytes32 => bool) public tickets;
 
     /**
      * @dev HoprToken, the token that will be used to settle payments
@@ -86,56 +67,15 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
      */
     uint32 public secsClosure;
 
-    event AccountInitialized(
-        // @TODO: remove this and rely on `msg.sender`
+   event Announcement(
         address indexed account,
-        bytes uncompressedPubKey,
-        bytes32 secret
+        string multiaddr
     );
 
-    event AccountSecretUpdated(
-        // @TODO: remove this and rely on `msg.sender`
-        address indexed account,
-        bytes32 secret,
-        // @TODO: remove counter?
-        uint256 counter
-    );
-
-    event ChannelFunded(
-        address indexed accountA,
-        address indexed accountB,
-        // @TODO: remove this and rely on `msg.sender`
-        address funder,
-        uint256 deposit,
-        uint256 partyABalance
-    );
-
-    event ChannelOpened(
-        // @TODO: remove this and rely on `msg.sender`
-        address indexed opener,
-        address indexed counterparty
-    );
-
-    event ChannelPendingToClose(
-        // @TODO: remove this and rely on `msg.sender`
-        address indexed initiator,
-        address indexed counterparty,
-        uint256 closureTime
-    );
-
-    event ChannelClosed(
-        // @TODO: remove this and rely on `msg.sender`
-        address indexed initiator,
-        address indexed counterparty,
-        uint256 partyAAmount,
-        uint256 partyBAmount
-    );
-
-    event TicketRedeemed(
-        // @TODO: remove this and rely on `msg.sender`
-        address indexed redeemer,
-        address indexed counterparty,
-        uint256 amount
+    event ChannelUpdate(
+        address indexed partyA,
+        address indexed partyB,
+        Channel newState
     );
 
     /**
@@ -149,152 +89,65 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     }
 
     /**
-     * @dev Initializes an account,
-     * stores it's public key, secret and counter,
-     * then emits {AccountInitialized} and {AccountSecretUpdated} events.
-     * @param secret account's secret
-     * @param uncompressedPubKey account's uncompressedPubKey
+     * @dev Announces msg.sender's multiaddress.
+     * Confirmation should be done off-chain.
+     * @param multiaddr the multiaddress
      */
-    function initializeAccount(
-        bytes calldata uncompressedPubKey,
-        bytes32 secret
-    ) external {
-        _initializeAccount(
-            msg.sender,
-            uncompressedPubKey,
-            secret
-        );
-    }
-
-    /**
-     * @dev Updates account's secret and counter,
-     * then emits {AccountSecretUpdated} event.
-     * @param secret account's secret
-     */
-    function updateAccountSecret(
-        bytes32 secret
-    ) external {
-        _updateAccountSecret(msg.sender, secret);
-    }
-
-    /**
-     * @dev Funds a channel in one direction,
-     * then emits {ChannelFunded} event.
-     * @param account the address of the recipient
-     * @param counterparty the address of the counterparty
-     * @param amount amount to fund
-     */
-    function fundChannel(
-        address account,
-        address counterparty,
-        uint256 amount
-    ) external {
-        token.safeTransferFrom(msg.sender, address(this), amount);
-
-        _fundChannel(
-            msg.sender,
-            account,
-            counterparty,
-            amount,
-            0
-        );
+    function announce(string calldata multiaddr) external {
+        emit Announcement(msg.sender, multiaddr);
     }
 
     /**
      * @dev Funds a channel, in both directions,
-     * then emits {ChannelFunded} event.
-     * @param accountA the address of accountA
-     * @param accountB the address of accountB
-     * @param amountA amount to fund accountA
-     * @param amountB amount to fund accountB
+     * then emits {ChannelUpdate} event.
+     * @param account1 the address of account1
+     * @param account2 the address of account2
+     * @param amount1 amount to fund account1
+     * @param amount2 amount to fund account2
      */
     function fundChannelMulti(
-        address accountA,
-        address accountB,
-        uint256 amountA,
-        uint256 amountB
+        address account1,
+        address account2,
+        uint256 amount1,
+        uint256 amount2
     ) external {
-        token.safeTransferFrom(msg.sender, address(this), amountA.add(amountB));
-
+        token.safeTransferFrom(msg.sender, address(this), amount1.add(amount2));
         _fundChannel(
-            msg.sender,
-            accountA,
-            accountB,
-            amountA,
-            amountB
+            account1,
+            account2,
+            amount1,
+            amount2
         );
-    }
-
-    /**
-     * @dev Opens a channel, then emits
-     * {ChannelOpened} event.
-     * @param counterparty the address of the counterparty
-     */
-    function openChannel(address counterparty) external {
-        _openChannel(msg.sender, counterparty);
-    }
-
-    /**
-     * @dev Fund channel and then open it, then emits
-     * {ChannelFunded} and {ChannelOpened} events.
-     * @param accountA the address of accountA
-     * @param accountB the address of accountB
-     * @param amountA amount to fund accountA
-     * @param amountB amount to fund accountB
-     */
-    function fundAndOpenChannel(
-        address accountA,
-        address accountB,
-        uint256 amountA,
-        uint256 amountB
-    ) external {
-        address opener = msg.sender;
-        require(
-            opener == accountA || opener == accountB,
-            "opener must be accountA or accountB"
-        );
-
-        token.safeTransferFrom(msg.sender, address(this), amountA.add(amountB));
-
-        address counterparty;
-        if (opener == accountA) {
-            counterparty = accountB;
-        } else {
-            counterparty = accountA;
-        }
-
-        _fundChannel(opener, accountA, accountB, amountA, amountB);
-        _openChannel(opener, counterparty);
     }
 
     function redeemTicket(
         address counterparty,
-        bytes32 secretPreImage,
+        bytes32 nextCommitment,
+        uint256 ticketEpoch,
+        uint256 ticketIndex,
         bytes32 proofOfRelaySecret,
         uint256 amount,
         bytes32 winProb,
-        bytes32 r,
-        bytes32 s,
-        uint8 v
+        bytes memory signature
     ) external {
         _redeemTicket(
             msg.sender,
             counterparty,
-            secretPreImage,
+            nextCommitment,
+            ticketEpoch,
+            ticketIndex,
             proofOfRelaySecret,
             amount,
             winProb,
-            r,
-            s,
-            v
+            signature
         );
     }
 
     /**
-     * @dev Initialize channel closure, updates channel's
+     * @dev Initialize channel closure, updates channel'r
      * closure time, when the cool-off period is over,
      * user may finalize closure, then emits
-     * {ChannelPendingToClose} event.
+     * {ChannelUpdate} event.
      * @param counterparty the address of the counterparty
      */
     function initiateChannelClosure(
@@ -307,7 +160,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
      * @dev Finalize channel closure, if cool-off period
      * is over it will close the channel and transfer funds
      * to the parties involved, then emits
-     * {ChannelClosed} event.
+     * {ChannelUpdate} event.
      * @param counterparty the address of the counterparty
      */
     function finalizeChannelClosure(
@@ -319,8 +172,34 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         );
     }
 
-    // @TODO: check with team, is this function too complex?
-    // @TODO: should we support account init?
+    /**
+    * @dev Request a channelIteration bump, so we can make a new set of
+    * commitments
+    * @param counterparty the address of the counterparty
+    * @param newCommitment, a secret derived from this new commitment
+    */
+    function bumpChannel(
+      address counterparty,
+      bytes32 newCommitment
+    ) external {
+        require(msg.sender != address(0), "sender must not be empty");
+        require(counterparty != address(0), "counterparty must not be empty");
+        require(msg.sender != counterparty, "accountA and accountB must not be the same");
+
+        (,,, Channel storage channel) = _getChannel(
+            msg.sender,
+            counterparty
+        );
+
+        if (_isPartyA(msg.sender, counterparty)){
+          channel.partyACommitment = newCommitment;
+          channel.partyATicketEpoch = channel.partyATicketEpoch.add(1);
+        } else {
+          channel.partyBCommitment = newCommitment;
+          channel.partyATicketEpoch = channel.partyBTicketEpoch.add(1);
+        }
+    }
+
     /**
      * A hook triggered when HOPR tokens are send to this contract.
      *
@@ -352,151 +231,81 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
 
         // must be one of our supported functions
         require(
-            userData.length == FUND_CHANNEL_SIZE ||
             userData.length == FUND_CHANNEL_MULTI_SIZE,
             "userData must match one of our supported functions"
         );
 
-        bool shouldOpen;
-        address accountA;
-        address accountB;
-        uint256 amountA;
-        uint256 amountB;
+        address account1;
+        address account2;
+        uint256 amount1;
+        uint256 amount2;
 
-        if (userData.length == FUND_CHANNEL_SIZE) {
-            (shouldOpen, accountA, accountB) = abi.decode(userData, (bool, address, address));
-            amountA = amount;
-        } else {
-            (shouldOpen, accountA, accountB, amountA, amountB) = abi.decode(userData, (bool, address, address, uint256, uint256));
-            require(amount == amountA.add(amountB), "amount sent must be equal to amount specified");
-        }
+        (account1, account2, amount1, amount2) = abi.decode(userData, (address, address, uint256, uint256));
+        require(amount == amount1.add(amount2), "amount sent must be equal to amount specified");
 
-        _fundChannel(from, accountA, accountB, amountA, amountB);
-
-        if (shouldOpen) {
-            require(from == accountA || from == accountB, "funder must be either accountA or accountB");
-            _openChannel(accountA, accountB);
-        }
+        //require(from == account1 || from == account2, "funder must be either account1 or account2");
+        _fundChannel(account1, account2, amount1, amount2);
     }
 
     // internal code
 
     /**
-     * @dev Initializes an account,
-     * stores it's public key, secret and counter,
-     * then emits {AccountInitialized} and {AccountSecretUpdated} events.
-     * @param account the address of the account
-     * @param uncompressedPubKey the public key of the account
-     * @param secret account's secret
-     */
-    function _initializeAccount(
-        address account,
-        bytes memory uncompressedPubKey,
-        bytes32 secret
-    ) internal {
-        Account storage accountData = accounts[account];
-
-        require(account != address(0), "account must not be empty");
-        require(ECDSA.uncompressedPubKeyToAddress(uncompressedPubKey) == account, "public key does not match account");
-        require(accountData.counter == 0, "account already initialized");
-        require(secret != bytes32(0), "secret must not be empty");
-
-        accountData.secret = secret;
-        accountData.counter = 1;
-
-        emit AccountInitialized(account, uncompressedPubKey, secret);
-    }
-
-    /**
-     * @dev Updates account's secret and counter,
-     * then emits {AccountSecretUpdated} event.
-     * @param account the address of the account
-     * @param secret account's secret
-     */
-    function _updateAccountSecret(
-        address account,
-        bytes32 secret
-    ) internal {
-        require(secret != bytes32(0), "secret must not be empty");
-
-        Account storage accountData = accounts[account];
-        // @TODO: do we need this?
-        require(secret != accountData.secret, "secret must not be the same as before");
-
-        accountData.secret = secret;
-        accountData.counter += 1;
-
-        emit AccountSecretUpdated(account, secret, accountData.counter);
-    }
-
-    /**
      * @dev Funds a channel, then emits
-     * {ChannelFunded} event.
-     * @param funder the address of the funder
-     * @param accountA the address of accountA
-     * @param accountB the address of accountB
-     * @param amountA amount to fund accountA
-     * @param amountB amount to fund accountB
+     * {ChannelUpdate} event.
+     * @param account1 the address of account1
+     * @param account2 the address of account2
+     * @param amount1 amount to fund account1
+     * @param amount2 amount to fund account2
      */
     function _fundChannel(
-        address funder,
-        address accountA,
-        address accountB,
-        uint256 amountA,
-        uint256 amountB
+        address account1,
+        address account2,
+        uint256 amount1,
+        uint256 amount2
     ) internal {
-        require(funder != address(0), "funder must not be empty");
-        require(accountA != accountB, "accountA and accountB must not be the same");
-        require(accountA != address(0), "accountA must not be empty");
-        require(accountB != address(0), "accountB must not be empty");
-        require(amountA > 0 || amountB > 0, "amountA or amountB must be greater than 0");
+        require(account1 != account2, "accountA and accountB must not be the same");
+        require(account1 != address(0), "accountA must not be empty");
+        require(account2 != address(0), "accountB must not be empty");
+        require(amount1 > 0 || amount2 > 0, "amountA or amountB must be greater than 0");
 
-        (,,, Channel storage channel) = _getChannel(accountA, accountB);
+        address partyA;
+        address partyB;
+        uint256 amountA;
+        uint256 amountB;
+        
+        if (_isPartyA(account1, account2)){
+          partyA = account1;
+          partyB = account2;
+          amountA = amount1;
+          amountB = amount2;
+        } else {
+          partyA = account2;
+          partyB = account1;
+          amountA = amount2;
+          amountB = amount1;
+        }
+        (,,, Channel storage channel) = _getChannel(partyA, partyB);
 
-        channel.deposit = channel.deposit.add(amountA).add(amountB);
-        if (_isPartyA(accountA, accountB)) {
-            channel.partyABalance = channel.partyABalance.add(amountA);
+        require(channel.status != ChannelStatus.PENDING_TO_CLOSE, "Cannot fund a closing channel");
+        
+        if (channel.status == ChannelStatus.CLOSED) {
+          // We are reopening the channel
+          channel.channelEpoch = channel.channelEpoch.add(1);
+          channel.status = ChannelStatus.OPEN;
+          channel.partyATicketIndex = 0;
+          channel.partyBTicketIndex = 0;
         }
 
-        emit ChannelFunded(
-            accountA,
-            accountB,
-            funder,
-            channel.deposit,
-            channel.partyABalance
-        );
-    }
-
-    /**
-     * @dev Opens a channel, then emits
-     * {ChannelOpened} event.
-     * @param opener the address of the opener
-     * @param counterparty the address of the counterparty
-     */
-    function _openChannel(
-        address opener,
-        address counterparty
-    ) internal {
-        require(opener != counterparty, "opener and counterparty must not be the same");
-        require(opener != address(0), "opener must not be empty");
-        require(counterparty != address(0), "counterparty must not be empty");
-
-        (,,, Channel storage channel) = _getChannel(opener, counterparty);
-        require(channel.deposit > 0, "channel must be funded");
-
-        ChannelStatus channelStatus = _getChannelStatus(channel.status);
-        require(channelStatus == ChannelStatus.CLOSED, "channel must be closed in order to open");
-
-        channel.status = channel.status.add(1);
-
-        emit ChannelOpened(opener, counterparty);
+        channel.partyABalance = channel.partyABalance.add(amountA);
+        channel.partyBBalance = channel.partyBBalance.add(amountB);
+        emit ChannelUpdate(partyA, partyB, channel);
     }
 
     /**
      * @dev Initialize channel closure, updates channel's
      * closure time, when the cool-off period is over,
      * user may finalize closure, then emits
-     * {ChannelPendingToClose} event.
+     * {ChannelUpdate} event.
      * @param initiator the address of the initiator
      * @param counterparty the address of the counterparty
      */
@@ -509,29 +318,25 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         require(counterparty != address(0), "counterparty must not be empty");
 
         (,,, Channel storage channel) = _getChannel(initiator, counterparty);
-        ChannelStatus channelStatus = _getChannelStatus(channel.status);
-        require(
-            channelStatus == ChannelStatus.OPEN,
-            "channel must be open"
-        );
+        require(channel.status == ChannelStatus.OPEN, "channel must be open");
 
         // @TODO: check with team, do we need SafeMath check here?
         channel.closureTime = _currentBlockTimestamp() + secsClosure;
-        channel.status = channel.status.add(1);
+        channel.status = ChannelStatus.PENDING_TO_CLOSE;
 
         bool isPartyA = _isPartyA(initiator, counterparty);
         if (isPartyA) {
             channel.closureByPartyA = true;
         }
 
-        emit ChannelPendingToClose(initiator, counterparty, channel.closureTime);
+        emit ChannelUpdate(initiator, counterparty, channel);
     }
 
     /**
      * @dev Finalize channel closure, if cool-off period
      * is over it will close the channel and transfer funds
      * to the parties involved, then emits
-     * {ChannelClosed} event.
+     * {ChannelUpdate} event.
      * @param initiator the address of the initiator
      * @param counterparty the address of the counterparty
      */
@@ -545,11 +350,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         require(counterparty != address(0), "counterparty must not be empty");
 
         (address partyA, address partyB,, Channel storage channel) = _getChannel(initiator, counterparty);
-        ChannelStatus channelStatus = _getChannelStatus(channel.status);
-        require(
-            channelStatus == ChannelStatus.PENDING_TO_CLOSE,
-            "channel must be pending to close"
-        );
+        require(channel.status == ChannelStatus.PENDING_TO_CLOSE, "channel must be pending to close");
 
         if (
             channel.closureByPartyA && (initiator == partyA) ||
@@ -558,34 +359,29 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
             require(channel.closureTime < _currentBlockTimestamp(), "closureTime must be before now");
         }
 
-        uint256 partyAAmount = channel.partyABalance;
-        uint256 partyBAmount = channel.deposit.sub(channel.partyABalance);
-
         // settle balances
-        if (partyAAmount > 0) {
-            token.transfer(partyA, partyAAmount);
+        if (channel.partyABalance > 0) {
+            token.transfer(partyA, channel.partyABalance);
         }
-        if (partyBAmount > 0) {
-            token.transfer(partyB, partyBAmount);
+        if (channel.partyBBalance > 0) {
+            token.transfer(partyB, channel.partyBBalance);
         }
 
-        // The state counter indicates the recycling generation and ensures that both parties are using the correct generation.
-        // Increase state counter so that we can re-use the same channel after it has been closed.
-        channel.status = channel.status.add(8);
-        delete channel.deposit; // channel.deposit = 0
         delete channel.partyABalance; // channel.partyABalance = 0
+        delete channel.partyBBalance; 
         delete channel.closureTime; // channel.closureTime = 0
         delete channel.closureByPartyA; // channel.closureByPartyA = false
+        channel.status = ChannelStatus.CLOSED;
 
-        emit ChannelClosed(initiator, counterparty, partyAAmount, partyBAmount);
+        emit ChannelUpdate(initiator, counterparty, channel);
     }
 
     /**
-     * @param accountA the address of accountA
-     * @param accountB the address of accountB
+     * @param account1 the address of accountA
+     * @param account2 the address of accountB
      * @return a tuple of partyA, partyB, channelId, channel
      */
-    function _getChannel(address accountA, address accountB)
+    function _getChannel(address account1, address account2)
         internal
         view
         returns (
@@ -595,7 +391,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
             Channel storage
         )
     {
-        (address partyA, address partyB) = _getParties(accountA, accountB);
+        (address partyA, address partyB) = _sortAddresses(account1, account2);
         bytes32 channelId = _getChannelId(partyA, partyB);
         Channel storage channel = channels[channelId];
 
@@ -612,28 +408,13 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     }
 
     /**
-     * @param status channel's status
-     * @return the channel's status in 'ChannelStatus'
+     * Parties are ordered - find the lower one.
+     * @param query the address of which we are asking 'is this party A'
+     * @param other the other address 
+     * @return query is partyA 
      */
-    function _getChannelStatus(uint24 status) internal pure returns (ChannelStatus) {
-        return ChannelStatus(status.mod(10));
-    }
-
-    /**
-     * @param status channel's status
-     * @return the channel's iteration
-     */
-    function _getChannelIteration(uint24 status) internal pure returns (uint256) {
-        return status.div(10).add(1);
-    }
-
-    /**
-     * @param accountA the address of accountA
-     * @param accountB the address of accountB
-     * @return true if accountA is partyA
-     */
-    function _isPartyA(address accountA, address accountB) internal pure returns (bool) {
-        return uint160(accountA) < uint160(accountB);
+    function _isPartyA(address query, address other) internal pure returns (bool) {
+        return uint160(query) < uint160(other);
     }
 
     /**
@@ -641,7 +422,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
      * @param accountB the address of accountB
      * @return a tuple representing partyA and partyB
      */
-    function _getParties(address accountA, address accountB) internal pure returns (address, address) {
+    function _sortAddresses(address accountA, address accountB) internal pure returns (address, address) {
         if (_isPartyA(accountA, accountB)) {
             return (accountA, accountB);
         } else {
@@ -661,50 +442,33 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
      * @dev Redeem a ticket
      * @param redeemer the redeemer address
      * @param counterparty the counterparty address
-     * @param secretPreImage the secretPreImage that results to the redeemers account secret
+     * @param nextCommitment the commitment that hashes to the redeemers previous commitment
      * @param proofOfRelaySecret the proof of relay secret
      * @param winProb the winning probability of the ticket
      * @param amount the amount in the ticket
-     * @param r part of the signature
-     * @param s part of the signature
-     * @param v part of the signature
+     * @param signature signature
      */
     function _redeemTicket(
         address redeemer,
         address counterparty,
-        bytes32 secretPreImage,
+        bytes32 nextCommitment,
+        uint256 ticketEpoch,
+        uint256 ticketIndex,
         bytes32 proofOfRelaySecret,
         uint256 amount,
         bytes32 winProb,
-        bytes32 r,
-        bytes32 s,
-        uint8 v
+        bytes memory signature
     ) internal {
         require(redeemer != address(0), "redeemer must not be empty");
         require(counterparty != address(0), "counterparty must not be empty");
-        require(secretPreImage != bytes32(0), "secretPreImage must not be empty");
+        require(nextCommitment != bytes32(0), "nextCommitment must not be empty");
         require(proofOfRelaySecret != bytes32(0), "proofOfRelaySecret must not be empty");
         require(amount != uint256(0), "amount must not be empty");
         // require(winProb != bytes32(0), "winProb must not be empty");
-        require(r != bytes32(0), "r must not be empty");
-        require(s != bytes32(0), "s must not be empty");
-        require(v != uint8(0), "v must not be empty");
-
-        Account storage account = accounts[redeemer];
-        require(
-            account.secret == keccak256(abi.encodePacked(secretPreImage)),
-            // @TODO: add salt
-            // accounts[msg.sender].hashedSecret == bytes27(keccak256(abi.encodePacked("HOPRnet", msg.sender, bytes27(preImage)))),
-            "secretPreImage must be the hash of redeemer's secret"
-        );
-
+        //require(signature != bytes32(0), "signature must not be empty");
         (,,, Channel storage channel) = _getChannel(
             redeemer,
             counterparty
-        );
-        require(
-            _getChannelStatus(channel.status) != ChannelStatus.CLOSED,
-            "channel must be open or pending to close"
         );
 
         bytes32 ticketHash = _getTicketHash(
@@ -732,10 +496,25 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         require(!tickets[fakedHash], "ticket must not be used twice");
         require(ECDSA.recover(ticketHash, r, s, v) == counterparty, "signer must match the counterparty");
         
+        uint256 prevTicketEpoch;
+        if (_isPartyA(redeemer, counterparty)) {
+          require(channel.partyACommitment == keccak256(abi.encodePacked(nextCommitment)), "commitment must be hash of next commitment");
+          require(channel.partyATicketEpoch == ticketEpoch, "ticket epoch must match");
+          require(channel.partyATicketIndex < ticketIndex, "redemptions must be in order");
+          prevTicketEpoch = channel.partyATicketEpoch;
+        } else {
+          require(channel.partyBCommitment == keccak256(abi.encodePacked(nextCommitment)), "commitment must be hash of next commitment");
+          require(channel.partyBTicketEpoch == ticketEpoch, "ticket epoch must match");
+          require(channel.partyBTicketIndex < ticketIndex, "redemptions must be in order");
+          prevTicketEpoch = channel.partyBTicketEpoch;
+        }
+        require(channel.status != ChannelStatus.CLOSED, "channel must be open or pending to close");
+
+        require(ECDSA.recover(ticketHash, signature) == counterparty, "signer must match the counterparty");
         require(
             uint256(_getTicketLuck(
                 ticketHash,
-                secretPreImage,
+                nextCommitment,
                 proofOfRelaySecret,
                 winProb
             )) <= uint256(winProb),
@@ -747,12 +526,20 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         tickets[fakedHash] = true;
 
         if (_isPartyA(redeemer, counterparty)) {
+            channel.partyACommitment = nextCommitment;
             channel.partyABalance = channel.partyABalance.add(amount);
+            channel.partyBBalance = channel.partyBBalance.sub(amount);
+            channel.partyATicketEpoch = channel.partyATicketEpoch.add(1);
+            channel.partyATicketIndex = ticketIndex;
+            emit ChannelUpdate(redeemer, counterparty, channel);
         } else {
             channel.partyABalance = channel.partyABalance.sub(amount);
+            channel.partyBBalance = channel.partyBBalance.add(amount);
+            channel.partyBCommitment = nextCommitment;
+            channel.partyBTicketEpoch = channel.partyBTicketEpoch.add(1);
+            channel.partyBTicketIndex = ticketIndex;
+            emit ChannelUpdate(counterparty, redeemer, channel);
         }
-
-        emit TicketRedeemed(redeemer, counterparty, amount);
     }
 
     /**
@@ -830,10 +617,10 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
      */
     function _getTicketLuck(
         bytes32 ticketHash,
-        bytes32 secretPreImage,
+        bytes32 nextCommitment,
         bytes32 proofOfRelaySecret,
         bytes32 winProb
     ) internal pure returns (bytes32) {
-        return keccak256(abi.encodePacked(ticketHash, secretPreImage, proofOfRelaySecret, winProb));
+        return keccak256(abi.encodePacked(ticketHash, nextCommitment, proofOfRelaySecret, winProb));
     }
 }

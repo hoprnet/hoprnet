@@ -21,13 +21,8 @@ export async function fundAccount(funder: ethers.Wallet, token: HoprToken, recei
  * @param privKey the private key of the connector
  * @returns CoreConnector
  */
-export async function createNode(
-  privKey: Uint8Array,
-  debug: boolean = true,
-  maxConfirmations: number = 0
-): Promise<CoreConnector> {
+export async function createNode(privKey: Uint8Array, maxConfirmations: number = 0): Promise<CoreConnector> {
   return CoreConnector.create(new LevelUp(Memdown()), privKey, {
-    debug,
     maxConfirmations
   })
 }

@@ -67,12 +67,11 @@ export default class ListOpenChannels extends AbstractCommand {
    */
   async execute(): Promise<string | void> {
     try {
-      const { indexer } = this.node.paymentChannels
       const selfPubKey = new PublicKey(this.node.getId().pubKey.marshal())
       const selfAddress = await selfPubKey.toAddress()
-      const channels = (await this.node.paymentChannels.indexer.getChannelsOf(selfAddress))
+      const channels = (await this.node.paymentChannels.getChannelsOf(selfAddress))
         // do not print CLOSED channels
-        .filter((channel) => channel.getStatus() !== 'CLOSED')
+        .filter((channel) => channel.status !== 'CLOSED')
       const result: string[] = []
 
       if (channels.length === 0) {
@@ -83,13 +82,15 @@ export default class ListOpenChannels extends AbstractCommand {
       for (const channel of channels) {
         const id = await channel.getId()
         const selfIsPartyA = u8aEquals(selfAddress.serialize(), channel.partyA.serialize())
-        const counterpartyPubKey = await indexer.getPublicKeyOf(selfIsPartyA ? channel.partyB : channel.partyA)
+        const counterpartyPubKey = await this.node.paymentChannels.getPublicKeyOf(
+          selfIsPartyA ? channel.partyB : channel.partyA
+        )
         // counterparty has not initialized
         if (!counterpartyPubKey) continue
 
-        const totalBalance = moveDecimalPoint(channel.deposit.toString(), Balance.DECIMALS * -1)
+        const totalBalance = channel.partyABalance.toBN().add(channel.partyABalance.toBN())
         const myBalance = moveDecimalPoint(
-          selfIsPartyA ? channel.partyABalance.toString() : channel.deposit.sub(channel.partyABalance).toString(),
+          selfIsPartyA ? channel.partyABalance.toString() : totalBalance.sub(channel.partyABalance.toBN()).toString(),
           Balance.DECIMALS * -1
         )
         const peerId = (await pubKeyToPeerId(counterpartyPubKey.serialize())).toB58String()
@@ -97,10 +98,10 @@ export default class ListOpenChannels extends AbstractCommand {
         result.push(
           this.generateOutput({
             id: id.toHex(),
-            totalBalance,
+            totalBalance: moveDecimalPoint(totalBalance.toString(), Balance.DECIMALS * -1),
             myBalance,
             peerId,
-            status: channel.getStatus()
+            status: channel.status
           })
         )
       }

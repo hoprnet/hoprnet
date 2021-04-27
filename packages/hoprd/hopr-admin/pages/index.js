@@ -30,7 +30,7 @@ export default function Home() {
       </Head>
 
       <Logo onClick={() => setShowConnected(!showConnected)} />
-      <h1>HOPR Logs [TESTNET NODE]</h1>
+      <h1>HOPR Logs</h1>
 
       <Logs messages={messages} connecting={connecting} />
 
