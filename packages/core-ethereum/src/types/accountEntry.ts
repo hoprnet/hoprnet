@@ -62,8 +62,7 @@ class AccountEntry {
 
   public containsRouting(): boolean {
     const protos = this.multiAddr.protoNames()
-    return (protos.includes('ip4') && protos.includes('tcp'))
-    
+    return protos.includes('ip4') && protos.includes('tcp')
   }
 
   public hasAnnounced(): boolean {

@@ -40,7 +40,6 @@ export default class HoprEthereum {
 
   readonly CHAIN_NAME = 'HOPR on Ethereum'
 
-
   /**
    * Stops the connector.
    */
@@ -132,17 +131,16 @@ export default class HoprEthereum {
     const chain = await createChainWrapper(options?.provider || DEFAULT_URI, privateKey)
     await chain.waitUntilReady()
 
-    const indexer = new Indexer(chain.getGenesisBlock(), db, chain, 
-        options.maxConfirmations ?? MAX_CONFIRMATIONS,
-        INDEXER_BLOCK_RANGE
+    const indexer = new Indexer(
+      chain.getGenesisBlock(),
+      db,
+      chain,
+      options.maxConfirmations ?? MAX_CONFIRMATIONS,
+      INDEXER_BLOCK_RANGE
     )
     await indexer.start()
 
-    const coreConnector = new HoprEthereum(
-      chain,
-      db,
-      indexer
-    )
+    const coreConnector = new HoprEthereum(chain, db, indexer)
     log(`using blockchain address ${await coreConnector.hexAccountAddress()}`)
     log(chalk.green('Connector started'))
     return coreConnector

@@ -160,7 +160,7 @@ export const updateAccount = async (db: LevelUp, address: Address, account: Acco
   await db.put(Buffer.from(createAccountKey(address)), Buffer.from(account.serialize()))
 }
 
-export const getAccounts = async(db: LevelUp, filter?: (account: AccountEntry) => Promise<boolean>) => {
+export const getAccounts = async (db: LevelUp, filter?: (account: AccountEntry) => Promise<boolean>) => {
   const accounts: AccountEntry[] = []
 
   return new Promise<AccountEntry[]>((resolve, reject) => {

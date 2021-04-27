@@ -237,7 +237,7 @@ class Hopr extends EventEmitter {
       config: {
         transport: {
           HoprConnect: {
-            bootstrapServers: publicNodes 
+            bootstrapServers: publicNodes
             // @dev Use these settings to simulate NAT behavior
             // __noDirectConnections: true,
             // __noWebRTCUpgrade: false
