@@ -326,9 +326,9 @@ export class Packet extends Uint8Array {
     if (secrets.length > 1) {
       log(`before creating channel`)
 
-      const channelState = await channel.getBalances()
+      const balances = await channel.getBalances()
       packet._ticket = await channel.createTicket(new Balance(fee), ticketChallenge, node.ticketWinProb)
-      validateCreatedTicket(channelState.self.toBN(), packet._ticket)
+      validateCreatedTicket(balances.self.toBN(), packet._ticket)
     } else if (secrets.length == 1) {
       packet._ticket = await channel.createDummyTicket(ticketChallenge)
     }

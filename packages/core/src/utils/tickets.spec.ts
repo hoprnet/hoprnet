@@ -13,7 +13,8 @@ import {
   UINT256,
   Channel,
   Ticket,
-  computeWinningProbability
+  computeWinningProbability,
+  ChannelEntry
 } from '@hoprnet/hopr-core-ethereum'
 import { validateCreatedTicket, validateUnacknowledgedTicket } from '../messages/packet'
 chai.use(chaiAsPromised)
@@ -50,22 +51,33 @@ const createMockTicket = ({
   } as unknown) as Ticket
 }
 
-const mockChannelEntry = (isChannelOpen: boolean) =>
-  Promise.resolve({
-    status: isChannelOpen ? 'OPEN' : 'CLOSED',
-    channelEpoch: { toBN: () => new BN(1) }
-  })
+const mockChannelEntry = (isChannelOpen: boolean, ticketEpoch: UINT256) =>
+  Promise.resolve(new ChannelEntry(
+    TARGET_ADDRESS,
+    TARGET_ADDRESS,
+    null, null,
+    null, null,
+    ticketEpoch, null,
+    null, null,
+    isChannelOpen ? 'OPEN' : 'CLOSED',
+    new UINT256(new BN(1)),
+    null, false
+  )
+
+)
 
 const createMockChannel = ({
   isChannelOpen = true,
   isChannelStored = true,
   self = new Balance(new BN(0)),
-  counterparty = new Balance(new BN(100))
+  counterparty = new Balance(new BN(100)),
+  ticketEpoch = new UINT256(new BN(1))
 }: {
   isChannelOpen?: boolean
   isChannelStored?: boolean
   self?: Balance
-  counterparty?: Balance
+  counterparty?: Balance,
+  ticketEpoch?: UINT256
 }) => {
   return ({
     getBalances: sinon.stub().returns(
@@ -75,7 +87,7 @@ const createMockChannel = ({
       })
     ),
     getState: () => {
-      if (isChannelStored) return mockChannelEntry(isChannelOpen)
+      if (isChannelStored) return mockChannelEntry(isChannelOpen, ticketEpoch)
       throw new Error('state not found')
     },
     channelEpoch: new BN(1)
@@ -86,22 +98,14 @@ const createMockNode = ({
   // sender = SENDER,
   // senderAddress = SENDER_ADDRESS,
   target = TARGET,
-  targetAddress = TARGET_ADDRESS,
-  ticketEpoch = new UINT256(new BN(1))
 }: {
   sender?: PeerId
   senderAddress?: Address
   target?: PeerId
-  targetAddress?: Address
-  ticketEpoch?: UINT256
 }) => {
   return ({
     getId: sinon.stub().returns(target),
     paymentChannels: {
-      account: {
-        address: targetAddress,
-        getTicketEpoch: sinon.stub().returns(Promise.resolve(ticketEpoch))
-      },
       types: { PublicKey }
     }
   } as unknown) as Hopr
@@ -187,13 +191,12 @@ describe('unit test validateUnacknowledgedTicket', function () {
   })
 
   it('should throw if ticket epoch does not match our account counter', async function () {
-    const node = createMockNode({
-      ticketEpoch: new UINT256(new BN(2))
-    })
+    const node = createMockNode({})
     const signedTicket = createMockTicket({})
+    const mockChannel = createMockChannel({ticketEpoch: new UINT256(new BN(2))})
 
     return expect(
-      validateUnacknowledgedTicket(node.getId(), '1', 1, SENDER, signedTicket, createMockChannel({}), getTicketsMock)
+      validateUnacknowledgedTicket(node.getId(), '1', 1, SENDER, signedTicket, mockChannel, getTicketsMock)
     ).to.eventually.rejectedWith('does not match our account counter')
   })
 
