@@ -75,7 +75,6 @@ class Channel {
       return transaction.hash
     } catch (err) {
       // TODO: catch race-condition
-      console.log(err)
       throw Error(`Failed to fund channel`)
     }
   }
@@ -197,6 +196,13 @@ class Channel {
   }
 
   async submitTicket(ackTicket: Acknowledgement): Promise<SubmitTicketResponse> {
+    if (!ackTicket.verify(this.counterparty)) {
+      return {
+        status: 'FAILURE',
+        message: 'Invalid response to acknowledgement'
+      }
+    }
+
     try {
       const ticket = ackTicket.ticket
 
@@ -214,16 +220,6 @@ class Channel {
         }
       }
 
-      // @TODO: replace this with better check
-      // const validChallenge = await checkChallenge(ticket.challenge, ackTicket.response)
-      // if (!validChallenge) {
-      //   log(`Failed to submit ticket ${ackTicket.response.toHex()}: 'Invalid challenge.'`)
-      //   return {
-      //     status: 'FAILURE',
-      //     message: 'Invalid challenge.'
-      //   }
-      // }
-
       const isWinning = await isWinningTicket(ticket.getHash(), ackTicket.response, ackTicket.preImage, ticket.winProb)
       if (!isWinning) {
         log(`Failed to submit ticket ${ackTicket.response.toHex()}:  'Not a winning ticket.'`)
@@ -233,10 +229,9 @@ class Channel {
         }
       }
 
-      const counterparty = ticket.getSigner().toAddress()
       const transaction = await account.sendTransaction(
         hoprChannels.redeemTicket,
-        counterparty.toHex(),
+        this.counterparty.toAddress().toHex(),
         ackTicket.preImage.toHex(),
         ackTicket.response.toHex(),
         ticket.amount.toBN().toString(),
@@ -245,6 +240,7 @@ class Channel {
         s.toHex(),
         v + 27
       )
+
       await transaction.wait()
       // TODO delete ackTicket
       this.connector.account.updateLocalState(ackTicket.preImage)

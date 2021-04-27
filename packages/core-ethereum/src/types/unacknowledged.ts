@@ -1,9 +1,9 @@
-import { u8aSplit, serializeToU8a } from '@hoprnet/hopr-utils'
+import { u8aSplit, serializeToU8a, validateAcknowledgement } from '@hoprnet/hopr-utils'
 import { Hash, PublicKey, Ticket } from '..'
 import PeerId from 'peer-id'
 
 export class UnacknowledgedTicket {
-  constructor(readonly ticket: Ticket, readonly secretA: Hash) {}
+  constructor(readonly ticket: Ticket, readonly ownKey: Hash) {}
 
   static deserialize(arr: Uint8Array): UnacknowledgedTicket {
     const components = u8aSplit(arr, [Ticket.SIZE, Hash.SIZE])
@@ -14,21 +14,24 @@ export class UnacknowledgedTicket {
   public serialize(): Uint8Array {
     return serializeToU8a([
       [this.ticket.serialize(), Ticket.SIZE],
-      [this.secretA.serialize(), Hash.SIZE]
+      [this.ownKey.serialize(), Hash.SIZE]
     ])
   }
 
-  private verifyChallenge(_hashedKeyHalf: Uint8Array): boolean {
-    // @TODO: fix this
-    return true
+  public verifyChallenge(acknowledgement: Hash) {
+    return validateAcknowledgement(
+      this.ownKey.serialize(),
+      acknowledgement.serialize(),
+      this.ticket.challenge.serialize()
+    )
   }
 
   private verifySignature(peerId: PeerId): boolean {
     return this.ticket.verify(new PublicKey(peerId.pubKey.marshal()))
   }
 
-  verify(peerId: PeerId, hashedKeyHalf: Uint8Array): boolean {
-    return this.verifyChallenge(hashedKeyHalf) && this.verifySignature(peerId)
+  verify(peerId: PeerId): boolean {
+    return this.verifySignature(peerId)
   }
 
   static SIZE(): number {

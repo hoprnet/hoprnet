@@ -2,11 +2,11 @@ import { randomBytes } from 'crypto'
 import { Ganache } from '@hoprnet/hopr-testing'
 import { migrate } from '@hoprnet/hopr-ethereum'
 import assert from 'assert'
-import { durations } from '@hoprnet/hopr-utils'
+import { durations, createFirstChallenge, deriveAckKeyShare } from '@hoprnet/hopr-utils'
 import { getContracts } from '@hoprnet/hopr-ethereum'
 import { createNode, fundAccount, advanceBlock } from './utils/testing'
 import BN from 'bn.js'
-import { Balance, Ticket, Address, Hash, UnacknowledgedTicket, PublicKey } from './types'
+import { Balance, Ticket, UnacknowledgedTicket, PublicKey, Hash } from './types'
 import CoreConnector from '.'
 import Channel from './channel'
 import * as testconfigs from './config.spec'
@@ -29,23 +29,17 @@ describe('test Channel class', function () {
   let partyBConnector: CoreConnector
   let funderWallet: ethers.Wallet
 
-  async function getTicketData({
-    counterparty,
-    winProb = DEFAULT_WIN_PROB
-  }: {
-    counterparty: Address
-    winProb?: number
-  }) {
-    const secretA = new Hash(randomBytes(32))
-    const secretB = new Hash(randomBytes(32))
-    const challenge = Hash.createChallenge(secretA.serialize(), secretB.serialize())
+  function getTicketData({ counterparty, winProb = DEFAULT_WIN_PROB }: { counterparty: PublicKey; winProb?: number }) {
+    const secrets = Array.from({ length: 2 }, () => randomBytes(32))
+
+    const { ticketChallenge, ownKey } = createFirstChallenge(secrets)
 
     return {
-      secretA,
-      secretB,
+      ownKey,
+      ackKey: deriveAckKeyShare(secrets[1]),
       winProb,
       counterparty,
-      challenge
+      challenge: ticketChallenge
     }
   }
 
@@ -88,24 +82,29 @@ describe('test Channel class', function () {
   it('should create a channel and submit tickets', async function () {
     this.timeout(durations.minutes(1))
 
-    const firstTicket = await getTicketData({
-      counterparty: partyA.toAddress()
+    const firstTicket = getTicketData({
+      counterparty: partyA
     })
 
     const partyAChannel = new Channel(partyAConnector, partyA, partyB)
     await partyAChannel.open(new Balance(new BN(123)))
+
     await advanceBlock(provider)
     await advanceBlock(provider)
 
     const signedTicket = await partyAChannel.createTicket(
       new Balance(new BN(1)),
-      firstTicket.challenge,
+      new PublicKey(firstTicket.challenge),
       firstTicket.winProb
     )
-    const unacknowledgedTicket = new UnacknowledgedTicket(signedTicket, firstTicket.secretA)
-    const firstAckedTicket = await partyBConnector.account.acknowledge(unacknowledgedTicket, firstTicket.secretB)
+    const unacknowledgedTicket = new UnacknowledgedTicket(signedTicket, new Hash(firstTicket.ownKey))
 
-    assert(partyA.eq(signedTicket.getSigner()), `Check that signer is recoverable`)
+    const firstAckedTicket = await partyBConnector.account.acknowledge(
+      unacknowledgedTicket,
+      new Hash(firstTicket.ackKey)
+    )
+
+    assert(signedTicket.verify(partyA), `Check that signer is recoverable`)
 
     const partyAIndexerChannels = await partyAConnector.indexer.getChannels()
     assert(
@@ -152,17 +151,20 @@ describe('test Channel class', function () {
     let nextSignedTicket: Ticket
 
     for (let i = 0; i < ATTEMPTS; i++) {
-      ticketData = await getTicketData({
-        counterparty: partyA.toAddress(),
+      ticketData = getTicketData({
+        counterparty: partyA,
         winProb: 1
       })
       nextSignedTicket = await partyAChannel.createTicket(
         new Balance(new BN(1)),
-        ticketData.challenge,
+        new PublicKey(ticketData.challenge),
         ticketData.winProb
       )
-      const nextUnacknowledgedTicket = new UnacknowledgedTicket(nextSignedTicket, ticketData.secretA)
-      const ackedTicket = await partyBConnector.account.acknowledge(nextUnacknowledgedTicket, ticketData.secretB)
+      const nextUnacknowledgedTicket = new UnacknowledgedTicket(nextSignedTicket, new Hash(ticketData.ownKey))
+      const ackedTicket = await partyBConnector.account.acknowledge(
+        nextUnacknowledgedTicket,
+        new Hash(ticketData.ackKey)
+      )
 
       if (ackedTicket !== null) {
         const result = await partyBChannel.submitTicket(ackedTicket)

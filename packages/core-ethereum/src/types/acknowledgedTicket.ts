@@ -1,15 +1,28 @@
 import { Hash, Ticket } from '.'
-import { serializeToU8a, u8aSplit } from '@hoprnet/hopr-utils'
+import { serializeToU8a, u8aSplit, validateAcknowledgement } from '@hoprnet/hopr-utils'
+import { PublicKey } from '..'
 
 class Acknowledgement {
   constructor(readonly ticket: Ticket, readonly response: Hash, readonly preImage: Hash) {}
 
-  serialize(): Uint8Array {
+  public serialize(): Uint8Array {
     return serializeToU8a([
       [this.ticket.serialize(), Ticket.SIZE],
       [this.response.serialize(), Hash.SIZE],
       [this.preImage.serialize(), Hash.SIZE]
     ])
+  }
+
+  public verify(ticketIssuer: PublicKey): boolean {
+    return (
+      validateAcknowledgement(
+        undefined,
+        undefined,
+        this.ticket.challenge.serialize(),
+        undefined,
+        this.response.serialize()
+      ).valid && this.ticket.verify(ticketIssuer)
+    )
   }
 
   static deserialize(arr: Uint8Array) {

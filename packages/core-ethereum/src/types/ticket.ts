@@ -1,7 +1,7 @@
 import BN from 'bn.js'
-import { stringToU8a, u8aSplit, u8aToHex, u8aConcat, serializeToU8a } from '@hoprnet/hopr-utils'
+import { stringToU8a, u8aSplit, u8aToHex, serializeToU8a } from '@hoprnet/hopr-utils'
 import { Address, Balance, Hash, Signature, UINT256, PublicKey } from '.'
-import { ecdsaVerify, ecdsaSign, ecdsaRecover } from 'secp256k1'
+import { ecdsaRecover, ecdsaSign } from 'secp256k1'
 import { ethers } from 'ethers'
 
 // Prefix message with "\x19Ethereum Signed Message:\n {length} HOPRnet {message}" and return hash
@@ -63,14 +63,15 @@ class Ticket {
   ): Ticket {
     const hash = toEthSignedMessageHash(
       u8aToHex(
-        serializeUnsigned({
-          counterparty,
-          challenge,
-          epoch,
-          amount,
-          winProb,
-          channelIteration
-        })
+        serializeToU8a([
+          [counterparty.serialize(), Address.SIZE],
+          // @TODO
+          // [challenge.serialize(), PublicKey.SIZE],
+          [epoch.serialize(), UINT256.SIZE],
+          [amount.serialize(), Balance.SIZE],
+          [winProb.serialize(), Hash.SIZE],
+          [channelIteration.serialize(), UINT256.SIZE]
+        ])
       )
     )
     const sig = ecdsaSign(hash.serialize(), signPriv)
@@ -105,7 +106,19 @@ class Ticket {
   }
 
   getHash(): Hash {
-    return toEthSignedMessageHash(u8aToHex(serializeUnsigned({ ...this })))
+    return toEthSignedMessageHash(
+      u8aToHex(
+        serializeToU8a([
+          [this.counterparty.serialize(), Address.SIZE],
+          // @TODO
+          // [challenge.serialize(), PublicKey.SIZE],
+          [this.epoch.serialize(), UINT256.SIZE],
+          [this.amount.serialize(), Balance.SIZE],
+          [this.winProb.serialize(), Hash.SIZE],
+          [this.channelIteration.serialize(), UINT256.SIZE]
+        ])
+      )
+    )
   }
 
   static get SIZE(): number {
@@ -121,12 +134,10 @@ class Ticket {
     )
   }
 
-  getSigner(): PublicKey {
-    return new PublicKey(ecdsaRecover(this.signature.signature, this.signature.recovery, this.getHash().serialize()))
-  }
-
   verify(pubKey: PublicKey): boolean {
-    return ecdsaVerify(this.signature.signature, this.getHash().serialize(), pubKey.serialize())
+    return pubKey.eq(
+      new PublicKey(ecdsaRecover(this.signature.signature, this.signature.recovery, this.getHash().serialize()))
+    )
   }
 }
 export default Ticket

@@ -88,12 +88,12 @@ describe('test ticket construction', function () {
 
 const WIN_PROB = new BN(1)
 
-describe('test signedTicket construction', async function () {
-  const userB = await PublicKey.fromPrivKey(stringToU8a(testconfigs.DEMO_ACCOUNTS[1])).toAddress()
+describe('test signedTicket construction', function () {
+  const userB = PublicKey.fromPrivKey(stringToU8a(testconfigs.DEMO_ACCOUNTS[1])).toAddress()
   const userAPrivKey = stringToU8a(testconfigs.DEMO_ACCOUNTS[0])
   const userAPubKey = PublicKey.fromPrivKey(stringToU8a(testconfigs.DEMO_ACCOUNTS[0]))
 
-  it('should create new signedTicket using struct', async function () {
+  it('should create new signedTicket using struct', function () {
     const ticket = Ticket.create(
       userB,
       new PublicKey(randomBytes(33)),
@@ -105,11 +105,10 @@ describe('test signedTicket construction', async function () {
     )
 
     assert(ticket.verify(userAPubKey))
-    assert(ticket.getSigner().toHex() == userAPubKey.toHex(), 'signer incorrect')
 
     // Mutate ticket and see signature fails
     // @ts-ignore readonly
     ticket.amount = new Balance(new BN(123))
-    assert(!(await ticket.verify(userAPubKey)), 'Mutated ticket signatures should not work')
+    assert(!ticket.verify(userAPubKey), 'Mutated ticket signatures should not work')
   })
 })

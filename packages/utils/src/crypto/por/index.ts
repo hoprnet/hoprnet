@@ -129,7 +129,7 @@ export function validateAcknowledgement(
 
   let valid: boolean
 
-  if (ownShare == undefined) {
+  if (ownShare == undefined || ack == undefined) {
     valid = u8aEquals(publicKeyCreate(response), challenge)
   } else {
     valid = u8aEquals(publicKeyTweakAdd(ownShare, ack), challenge)

@@ -2,7 +2,7 @@ import type { Wallet as IWallet, ContractTransaction } from 'ethers'
 import type { Networks } from '@hoprnet/hopr-ethereum'
 import BN from 'bn.js'
 import { ethers, errors } from 'ethers'
-import { durations, isExpired, u8aConcat } from '@hoprnet/hopr-utils'
+import { durations, isExpired } from '@hoprnet/hopr-utils'
 import NonceTracker, { NonceLock } from './nonce-tracker'
 import TransactionManager from './transaction-manager'
 import {
@@ -111,14 +111,22 @@ class Account {
    */
   async acknowledge(
     unacknowledgedTicket: UnacknowledgedTicket,
-    acknowledgementHash: Hash
+    acknowledgement: Hash
   ): Promise<Acknowledgement | null> {
-    await this.initPreimage()
-    const response = Hash.create(u8aConcat(unacknowledgedTicket.secretA.serialize(), acknowledgementHash.serialize()))
     const ticket = unacknowledgedTicket.ticket
-    if (await isWinningTicket(ticket.getHash(), response, this.preimage, ticket.winProb)) {
-      const ack = new Acknowledgement(ticket, response, this.preimage)
+
+    const validateResult = unacknowledgedTicket.verifyChallenge(acknowledgement)
+
+    if (validateResult.valid == false) {
+      throw Error(`Ticket is not valid`)
+    }
+
+    await this.initPreimage()
+
+    if (await isWinningTicket(ticket.getHash(), new Hash(validateResult.response), this.preimage, ticket.winProb)) {
+      const ack = new Acknowledgement(ticket, new Hash(validateResult.response), this.preimage)
       this.preimage = await this.api.findPreImage(this.preimage)
+
       return ack
     } else {
       return null
