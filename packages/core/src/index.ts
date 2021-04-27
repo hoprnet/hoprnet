@@ -99,8 +99,6 @@ class Hopr extends EventEmitter {
   public _dbKeys = DbKeys
 
   public output: (arr: Uint8Array) => void
-  public isBootstrapNode: boolean
-  public bootstrapServers: Multiaddr[]
   public initializedWithOptions: HoprOptions
   public ticketAmount: string = TICKET_AMOUNT
   public ticketWinProb: number = TICKET_WIN_PROB
@@ -161,9 +159,6 @@ class Hopr extends EventEmitter {
     if (process.env.GCLOUD) {
       try {
         var name = 'hopr_node_' + this.getId().toB58String().slice(-5).toLowerCase()
-        if (this.isBootstrapNode) {
-          name = 'hopr_bootstrap_' + this.getId().toB58String().slice(-5).toLowerCase()
-        }
         require('@google-cloud/profiler')
           .start({
             projectId: 'hoprassociation',
@@ -179,8 +174,7 @@ class Hopr extends EventEmitter {
     }
 
     this.networkPeers = new NetworkPeers(
-      Array.from(this._libp2p.peerStore.peers.values()).map((x) => x.id),
-      [this.getId()].concat(this.bootstrapServers.map((bs) => PeerId.createFromB58String(bs.getPeerId())))
+      Array.from(this._libp2p.peerStore.peers.values()).map((x) => x.id)
     )
 
     const subscribe = (protocol: string, handler: LibP2PHandlerFunction, includeReply = false) =>
@@ -241,7 +235,7 @@ class Hopr extends EventEmitter {
       config: {
         transport: {
           HoprConnect: {
-            bootstrapServers: options.bootstrapServers
+            bootstrapServers: [] // TODO 
             // @dev Use these settings to simulate NAT behavior
             // __noDirectConnections: true,
             // __noWebRTCUpgrade: false
