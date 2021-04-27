@@ -303,7 +303,7 @@ class Hopr extends EventEmitter {
       newChannels,
       currentChannels,
       this.networkPeers,
-      this.paymentChannels.indexer
+      this.paymentChannels.getRandomChannel.bind(this.paymentChannels)
     )
     verbose(`strategy wants to close ${closeChannels.length} channels`)
     for (let toClose of closeChannels) {
@@ -327,7 +327,7 @@ class Hopr extends EventEmitter {
   }
 
   private async getOpenChannels(): Promise<RoutingChannel[]> {
-    return this.paymentChannels.indexer.getChannelsFromPeer(this.getId())
+    return this.paymentChannels.getChannelsFromPeer(this.getId())
   }
 
   /**
@@ -556,11 +556,11 @@ class Hopr extends EventEmitter {
   }
 
   public async getBalance(): Promise<Balance> {
-    return await this.paymentChannels.account.getBalance(true)
+    return await this.paymentChannels.getBalance(true)
   }
 
   public async getNativeBalance(): Promise<NativeBalance> {
-    return await this.paymentChannels.account.getNativeBalance(true)
+    return await this.paymentChannels.getNativeBalance(true)
   }
 
   public smartContractInfo(): string {
@@ -582,7 +582,7 @@ class Hopr extends EventEmitter {
     const ethereum = this.paymentChannels
     const selfPubKey = new PublicKey(this.getId().pubKey.marshal())
     const counterpartyPubKey = new PublicKey(counterparty.pubKey.marshal())
-    const myAvailableTokens = await ethereum.account.getBalance(false)
+    const myAvailableTokens = await ethereum.getBalance(false)
 
     // validate 'amountToFund'
     if (amountToFund.lten(0)) {
@@ -616,7 +616,7 @@ class Hopr extends EventEmitter {
     const ethereum = this.paymentChannels
     const selfPubKey = new PublicKey(this.getId().pubKey.marshal())
     const counterpartyPubKey = new PublicKey(counterparty.pubKey.marshal())
-    const myBalance = await ethereum.account.getBalance(false)
+    const myBalance = await ethereum.getBalance(false)
     const totalFund = myFund.add(counterpartyFund)
 
     // validate 'amountToFund'
@@ -671,7 +671,7 @@ class Hopr extends EventEmitter {
       destination,
       MAX_HOPS - 1,
       this.networkPeers,
-      this.paymentChannels.indexer,
+      this.paymentChannels.getChannelsFromPeer.bind(this.paymentChannels),
       PATH_RANDOMNESS
     )
   }
