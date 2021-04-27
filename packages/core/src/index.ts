@@ -81,7 +81,6 @@ export type HoprOptions = {
   peerId?: PeerId
   password?: string
   connector?: HoprCoreEthereum
-  output?: (encoded: Uint8Array) => void
   strategy?: ChannelStrategyNames
   hosts?: {
     ip4?: NetOptions
@@ -98,7 +97,6 @@ class Hopr extends EventEmitter {
   // Allows us to construct HOPR with falsy options
   public _dbKeys = DbKeys
 
-  public output: (arr: Uint8Array) => void
   public initializedWithOptions: HoprOptions
   public ticketAmount: string = TICKET_AMOUNT
   public ticketWinProb: number = TICKET_WIN_PROB
@@ -131,13 +129,6 @@ class Hopr extends EventEmitter {
 
     this.setChannelStrategy(options.strategy || 'passive')
     this.initializedWithOptions = options
-    this.output = (arr: Uint8Array) => {
-      this.emit('hopr:message', arr)
-      if (options.output) {
-        log('DEPRECATED: options.output is replaced with a hopr:message event')
-        options.output(arr)
-      }
-    }
 
     if (process.env.GCLOUD) {
       try {
