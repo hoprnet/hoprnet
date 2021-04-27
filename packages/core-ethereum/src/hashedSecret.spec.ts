@@ -1,8 +1,9 @@
 import assert from 'assert'
-import { durations, stringToU8a } from '@hoprnet/hopr-utils'
+import { durations, stringToU8a, createFirstChallenge, deriveAckKeyShare } from '@hoprnet/hopr-utils'
+import { randomBytes } from 'crypto'
 import { Ganache } from '@hoprnet/hopr-testing'
 import { getContracts, migrate, fund } from '@hoprnet/hopr-ethereum'
-import HoprEthereum from '.'
+import HoprEthereum, { PublicKey } from '.'
 import { computeWinningProbability } from './utils'
 import { UnacknowledgedTicket, Ticket, Hash } from './types'
 import * as testconfigs from './config.spec'
@@ -116,18 +117,23 @@ describe('test hashedSecret', function () {
     })
 
     it('should reserve a preImage for tickets with 100% winning probabilty resp. should not reserve for 0% winning probability', async function () {
-      const secretA = new Hash(new Uint8Array(Hash.SIZE).fill(0xff))
+      const secrets = Array.from({ length: 2 }, () => randomBytes(32))
+
+      const { ticketChallenge, ownKey } = createFirstChallenge(secrets)
+
+      const ackKey = deriveAckKeyShare(secrets[1])
+
       const ticket1 = ({
         getHash: () => new Hash(new Uint8Array(Hash.SIZE).fill(0xff)),
-        winProb: computeWinningProbability(1)
+        winProb: computeWinningProbability(1),
+        challenge: new PublicKey(ticketChallenge)
       } as unknown) as Ticket
-      const ut1 = new UnacknowledgedTicket(ticket1, secretA)
-      const response1 = new Hash(new Uint8Array(Hash.SIZE).fill(0xff))
+      const ut1 = new UnacknowledgedTicket(ticket1, new Hash(ownKey))
 
-      const ack = await connector.account.acknowledge(ut1, response1)
+      const ack = await connector.account.acknowledge(ut1, new Hash(ackKey))
 
       assert(ack, 'ticket with 100% winning probability must always be a win')
-      const ack2 = await connector.account.acknowledge(ut1, response1)
+      const ack2 = await connector.account.acknowledge(ut1, new Hash(ackKey))
       assert(ack2, 'ticket with 100% winning probability must always be a win')
 
       assert(
@@ -140,15 +146,16 @@ describe('test hashedSecret', function () {
       const utfail = new UnacknowledgedTicket(
         ({
           getHash: () => new Hash(new Uint8Array(Hash.SIZE).fill(0xff)),
-          winProb: computeWinningProbability(0)
+          winProb: computeWinningProbability(0),
+          challenge: new PublicKey(ticketChallenge)
         } as unknown) as Ticket,
-        secretA
+        new Hash(ownKey)
       )
 
-      const failedAck = await connector.account.acknowledge(utfail, new Hash(new Uint8Array(Hash.SIZE).fill(0xff)))
+      const failedAck = await connector.account.acknowledge(utfail, new Hash(ackKey))
       assert(failedAck === null, 'falsy ticket should not be a win')
 
-      const ack4 = await connector.account.acknowledge(ut1, response1)
+      const ack4 = await connector.account.acknowledge(ut1, new Hash(ackKey))
       assert(ack4, 'ticket with 100% winning probability must always be a win')
       assert(ack4.preImage != null && !ack4.preImage.eq(ack2.preImage) && ack4.preImage.hash().eq(ack2.preImage))
     })
