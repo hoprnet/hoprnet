@@ -65,21 +65,20 @@ DEBUG=hopr* yarn run:hoprd:bob
 yarn run:faucet:all
 ```
 
+### End-to-end tests
+
+The repository contains multiple packages, which are needed for `hoprd`, our HOPR protocol client to work. To ensure its constant functionality,
+we created end-to-end tests, which can be found under the `test/e2e` directory.
+
+To add a new end-to-end test, please ensure the following:
+
+1. You prefix your test with a unique number, to ensure it’s imported by our `test_manager` script properly.
+2. Follow the same structure other tests have. Wrap your tests within `main` function and source `0_configuration.sh`
+3. Modify our `workflows/e2e.yaml` to include the new number of the under the `strategy.matrix.number` array.
+
 ### Docker images
 
 All our docker images can be found [here](https://console.cloud.google.com/gcr/images/hoprassociation/GLOBAL) and are prefixed as `gcr.io/hoprassociation/$PROJECT:$RELEASE`. Stable releases live in [Docker Hub](https://hub.docker.com/u/hopr)
-
-## HOPR ecosystem
-
-- [**Core**](./packages/core/README.md): HOPR Protocol definition and source code.
-- **Server**: gRPC-enabled Server to communicate with a HOPR Node
-- **Protos**: Protobuf API for interacting with a HOPR Server
-- **Chat**: Interactive REPL-like chat PoC for HOPR Nodes
-- **Chatbot**: Automata able to reply to messages sent via HOPR Chat
-- **Devops**: Infrastructure code for managing HOPR centralised servers.
-- **Whitepaper**: Technical whitepaper for the HOPR Protocol
-- **Documentation**: General documentation for HOPR
-- **Assets**: Press and brand materials for HOPR & Association
 
 <!-- CONTACT -->
 
