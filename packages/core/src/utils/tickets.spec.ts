@@ -52,19 +52,24 @@ const createMockTicket = ({
 }
 
 const mockChannelEntry = (isChannelOpen: boolean, ticketEpoch: UINT256) =>
-  Promise.resolve(new ChannelEntry(
-    TARGET_ADDRESS,
-    TARGET_ADDRESS,
-    null, null,
-    null, null,
-    ticketEpoch, null,
-    null, null,
-    isChannelOpen ? 'OPEN' : 'CLOSED',
-    new UINT256(new BN(1)),
-    null, false
+  Promise.resolve(
+    new ChannelEntry(
+      TARGET_ADDRESS,
+      TARGET_ADDRESS,
+      null,
+      null,
+      null,
+      null,
+      ticketEpoch,
+      null,
+      null,
+      null,
+      isChannelOpen ? 'OPEN' : 'CLOSED',
+      new UINT256(new BN(1)),
+      null,
+      false
+    )
   )
-
-)
 
 const createMockChannel = ({
   isChannelOpen = true,
@@ -76,7 +81,7 @@ const createMockChannel = ({
   isChannelOpen?: boolean
   isChannelStored?: boolean
   self?: Balance
-  counterparty?: Balance,
+  counterparty?: Balance
   ticketEpoch?: UINT256
 }) => {
   return ({
@@ -97,7 +102,7 @@ const createMockChannel = ({
 const createMockNode = ({
   // sender = SENDER,
   // senderAddress = SENDER_ADDRESS,
-  target = TARGET,
+  target = TARGET
 }: {
   sender?: PeerId
   senderAddress?: Address
@@ -193,7 +198,7 @@ describe('unit test validateUnacknowledgedTicket', function () {
   it('should throw if ticket epoch does not match our account counter', async function () {
     const node = createMockNode({})
     const signedTicket = createMockTicket({})
-    const mockChannel = createMockChannel({ticketEpoch: new UINT256(new BN(2))})
+    const mockChannel = createMockChannel({ ticketEpoch: new UINT256(new BN(2)) })
 
     return expect(
       validateUnacknowledgedTicket(node.getId(), '1', 1, SENDER, signedTicket, mockChannel, getTicketsMock)
