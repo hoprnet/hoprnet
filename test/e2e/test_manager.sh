@@ -10,7 +10,7 @@ run_test() {
     exit 1
   fi
   echo "🧠 Starting test manager, for test $1"
-  local TEST="$(ls -h test/e2e/ | grep $1)"
+  local TEST="$(ls -h test/e2e/ | grep $1 -m1)"
   if [ -z ${TEST} ]; then
     echo "Test $1 not found, try another number"
     exit 1
