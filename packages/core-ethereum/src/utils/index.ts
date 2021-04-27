@@ -67,15 +67,6 @@ export function getWinProbabilityAsFloat(winProb: Hash): number {
 }
 
 /**
- * Checks whether the given response solves a given challenge
- * @param challenge challenge for which we search a preImage
- * @param response response to verify
- */
-export function checkChallenge(challenge: Hash, response: Hash) {
-  return challenge.eq(response.hash())
-}
-
-/**
  * Get current network's name.
  *
  * @param chainId a chain id
