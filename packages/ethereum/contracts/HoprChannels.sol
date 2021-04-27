@@ -67,9 +67,14 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
      */
     uint32 public secsClosure;
 
+   event Announcement(
+        address indexed account,
+        string multiaddr
+    );
+
     event ChannelUpdate(
-        address partyA,
-        address partyB,
+        address indexed partyA,
+        address indexed partyB,
         Channel newState
     );
 
@@ -81,6 +86,15 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         token = IERC20(_token);
         secsClosure = _secsClosure;
         _ERC1820_REGISTRY.setInterfaceImplementer(address(this), TOKENS_RECIPIENT_INTERFACE_HASH, address(this));
+    }
+
+    /**
+     * @dev Announces msg.sender's multiaddress.
+     * Confirmation should be done off-chain.
+     * @param multiaddr the multiaddress
+     */
+    function announce(string calldata multiaddr) external {
+        emit Announcement(msg.sender, multiaddr);
     }
 
     /**
