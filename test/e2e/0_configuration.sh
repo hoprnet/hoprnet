@@ -10,6 +10,8 @@ function cleanup {
   echo "🧽 Cleaning up processes"
   if [[ -n "$PROVIDER_PID" ]]; then kill $PROVIDER_PID; fi
   if [[ -n "$BOOTSTRAP_PID" ]]; then kill $BOOTSTRAP_PID; fi
+  echo "🧽 Printing last 10 lines from logs"
+  tail -n 10 /tmp/$DATAFILE-*.txt
 }
 
 # Starts a hardhat node w/an exposed RPC endpoint @ 127.0.0.1
