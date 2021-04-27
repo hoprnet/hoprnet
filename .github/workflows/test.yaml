@@ -7,7 +7,7 @@ on:
       - '**/docs/**/*'
 
 jobs:
-  build:
+  build_and_test:
     name: Build & Test
     runs-on: ubuntu-latest
 
