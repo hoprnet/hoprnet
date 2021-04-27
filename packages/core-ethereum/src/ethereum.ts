@@ -1,5 +1,5 @@
 import type { ContractTransaction } from 'ethers'
-import { providers, utils, errors, Wallet, BigNumber} from 'ethers'
+import { providers, utils, errors, Wallet, BigNumber } from 'ethers'
 import { Address } from './types'
 import type { HoprToken, HoprChannels } from './contracts'
 import BN from 'bn.js'
