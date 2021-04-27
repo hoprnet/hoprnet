@@ -50,6 +50,7 @@
     "hardhat": "^2.1.2",
     "hardhat-deploy": "^0.7.0-beta.57",
     "hardhat-gas-reporter": "^1.0.4",
+    "multiaddr": "8.1.2",
     "rimraf": "^3.0.2",
     "solidity-coverage": "^0.7.16",
     "ts-generator": "^0.1.1",

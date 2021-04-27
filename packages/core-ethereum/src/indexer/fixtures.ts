@@ -1,6 +1,6 @@
 import type { Event } from './types'
 import assert from 'assert'
-import BN from 'bn.js'
+import Multiaddr from 'multiaddr'
 import { BigNumber } from 'ethers'
 import { stringToU8a } from '@hoprnet/hopr-utils'
 import { PublicKey, Hash, AccountEntry, ChannelEntry } from '../types'
@@ -9,10 +9,13 @@ export const partyA = PublicKey.fromString('0x03362b7b26bddb151a03056422d37119ea
 export const partyB = PublicKey.fromString('0x03217f3cd4d0b4b82997b25d1b6b68a933929fed724531cb30bbfd4729dc6b44e0')
 export const secret1 = new Hash(stringToU8a('0xb8b37f62ec82443e5b5557c5a187fe3686790620cc04c06187c48f8636caac89'))
 export const secret2 = new Hash(stringToU8a('0x294549f8629f0eeb2b8e01aca491f701f5386a9662403b485c4efe7d447dfba3'))
+export const partyAMultiAddr = Multiaddr(
+  '/ip4/34.65.237.196/tcp/9091/p2p/16Uiu2HAmGJSpah8otZ92EouCVzqBb96g64iE5Xx3Rh6YDnTJL5Bv'
+)
 
 export const expectAccountsToBeEqual = (actual: AccountEntry, expected: AccountEntry) => {
   assert.strictEqual(actual.address.toString(), expected.address.toString(), 'address')
-  assert.strictEqual(actual.publicKey.toString(), expected.publicKey.toString(), 'publicKey')
+  assert.strictEqual(actual.getPublicKey().toString(), expected.getPublicKey().toString(), 'publicKey')
   assert.strictEqual(actual.secret.toString(), expected.secret.toString(), 'secret')
   assert.strictEqual(actual.counter.toString(), expected.counter.toString(), 'counter')
 }
@@ -51,67 +54,71 @@ export const expectChannelsToBeEqual = (actual: ChannelEntry, expected: ChannelE
 }
 
 export const PARTY_A_INITIALIZED_EVENT = {
-  event: 'ChannelUpdate',
+  event: 'Announcement',
   transactionHash: '',
   blockNumber: 1,
   transactionIndex: 0,
   logIndex: 0,
   args: {
     account: partyA.toAddress().toHex(),
-    uncompressedPubKey: partyA.toUncompressedPubKeyHex(),
-    secret: secret1.toHex()
+    multiaddr: partyAMultiAddr.toString()
   }
-} as Event<'ChannelUpdate'>
+} as Event<'Announcement'>
 
-export const PARTY_A_INITIALIZED_ACCOUNT = new AccountEntry(partyA.toAddress(), partyA, secret1, new BN(1))
+export const PARTY_A_INITIALIZED_ACCOUNT = new AccountEntry(partyA.toAddress(), partyAMultiAddr)
 
 export const FUNDED_EVENT = {
-  event: 'ChannelFunded',
+  event: 'ChannelUpdate',
   transactionHash: '',
   blockNumber: 2,
   transactionIndex: 0,
   logIndex: 0,
   args: {
-    funder: partyA.toAddress().toHex(),
-    accountA: partyA.toAddress().toHex(),
-    accountB: partyB.toAddress().toHex(),
-    deposit: BigNumber.from('3'),
-    partyABalance: BigNumber.from('3')
-  }
-} as Event<'ChannelFunded'>
+    partyA: partyA.toAddress().toHex(),
+    partyB: partyB.toAddress().toHex(),
+    newState: {
+      partyABalance: BigNumber.from('3'),
+      partyBBalance: BigNumber.from('0'),
+      partyACommitment: new Hash(new Uint8Array({ length: Hash.SIZE })).toHex(),
+      partyBCommitment: new Hash(new Uint8Array({ length: Hash.SIZE })).toHex(),
+      partyATicketEpoch: BigNumber.from('0'),
+      partyBTicketEpoch: BigNumber.from('0'),
+      partyATicketIndex: BigNumber.from('0'),
+      partyBTicketIndex: BigNumber.from('0'),
+      status: 0,
+      channelEpoch: BigNumber.from('0'),
+      closureTime: BigNumber.from('0'),
+      closureByPartyA: false
+    }
+  } as any
+} as Event<'ChannelUpdate'>
 
-export const FUNDED_CHANNEL = ChannelEntry.fromObject({
-  partyA: partyA.toAddress(),
-  partyB: partyB.toAddress(),
-  deposit: new BN(3),
-  partyABalance: new BN(3),
-  closureTime: new BN(0),
-  stateCounter: new BN(0),
-  closureByPartyA: false,
-  openedAt: new BN(0),
-  closedAt: new BN(0)
-})
+export const FUNDED_CHANNEL = ChannelEntry.fromSCEvent(FUNDED_EVENT)
 
 export const OPENED_EVENT = {
-  event: 'ChannelOpened',
+  event: 'ChannelUpdate',
   transactionHash: '',
   blockNumber: 3,
   transactionIndex: 0,
   logIndex: 0,
   args: {
-    opener: partyA.toAddress().toHex(),
-    counterparty: partyB.toAddress().toHex()
-  }
-} as Event<'ChannelOpened'>
+    partyA: partyA.toAddress().toHex(),
+    partyB: partyB.toAddress().toHex(),
+    newState: {
+      partyABalance: BigNumber.from('3'),
+      partyBBalance: BigNumber.from('0'),
+      partyACommitment: new Hash(new Uint8Array({ length: Hash.SIZE })).toHex(),
+      partyBCommitment: new Hash(new Uint8Array({ length: Hash.SIZE })).toHex(),
+      partyATicketEpoch: BigNumber.from('0'),
+      partyBTicketEpoch: BigNumber.from('0'),
+      partyATicketIndex: BigNumber.from('0'),
+      partyBTicketIndex: BigNumber.from('0'),
+      status: 1,
+      channelEpoch: BigNumber.from('0'),
+      closureTime: BigNumber.from('0'),
+      closureByPartyA: false
+    }
+  } as any
+} as Event<'ChannelUpdate'>
 
-export const OPENED_CHANNEL = ChannelEntry.fromObject({
-  partyA: partyA.toAddress(),
-  partyB: partyB.toAddress(),
-  deposit: new BN(3),
-  partyABalance: new BN(3),
-  closureTime: new BN(0),
-  stateCounter: new BN(1),
-  closureByPartyA: false,
-  openedAt: new BN(3),
-  closedAt: new BN(0)
-})
+export const OPENED_CHANNEL = ChannelEntry.fromSCEvent(OPENED_EVENT)

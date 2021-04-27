@@ -36,7 +36,7 @@ const components = [
   UINT256,
   UINT256,
   UINT256,
-  { name: 'channelStatus', SIZE: 2, deserialize: u8aToChannelStatus },
+  { name: 'channelStatus', SIZE: 1, deserialize: u8aToChannelStatus },
   UINT256,
   UINT256,
   { name: 'closureByPartyA', SIZE: 1, deserialize: (x) => x[0] == 1 }
@@ -106,7 +106,7 @@ class ChannelEntry {
       [this.partyBTicketEpoch.serialize(), UINT256.SIZE],
       [this.partyATicketIndex.serialize(), UINT256.SIZE],
       [this.partyBTicketIndex.serialize(), UINT256.SIZE],
-      [channelStatusToU8a(this.status), 32],
+      [channelStatusToU8a(this.status), 1],
       [this.channelEpoch.serialize(), UINT256.SIZE],
       [this.closureTime.serialize(), UINT256.SIZE],
       [Uint8Array.of(Number(this.closureByPartyA)), 1]

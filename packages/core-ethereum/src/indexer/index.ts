@@ -8,7 +8,7 @@ import chalk from 'chalk'
 import BN from 'bn.js'
 import Heap from 'heap-js'
 import { pubKeyToPeerId, randomChoice } from '@hoprnet/hopr-utils'
-import { Address, ChannelEntry, Hash, PublicKey, Balance, Snapshot } from '../types'
+import { Address, ChannelEntry, AccountEntry, Hash, PublicKey, Balance, Snapshot } from '../types'
 import * as db from './db'
 import { isConfirmedBlock, snapshotComparator } from './utils'
 import Debug from 'debug'
@@ -235,11 +235,13 @@ class Indexer extends EventEmitter {
 
       const eventName = event.event as EventNames
 
-      if (eventName != 'ChannelUpdate') {
+      if (eventName === 'Announcement') {
+        await this.onAnnouncement(event as Event<'Announcement'>)
+      } else if (eventName === 'ChannelUpdate') {
+        await this.onChannelUpdated(event as Event<'ChannelUpdate'>)
+      } else {
         throw new Error('bad event name')
       }
-
-      await this.onChannelUpdated(event as Event<'ChannelUpdate'>)
 
       lastSnapshot = new Snapshot(new BN(event.blockNumber), new BN(event.transactionIndex), new BN(event.logIndex))
       await db.updateLatestConfirmedSnapshot(this.api.db, lastSnapshot)
@@ -256,9 +258,14 @@ class Indexer extends EventEmitter {
     this.unconfirmedEvents.addAll(events)
   }
 
+  private async onAnnouncement(event: Event<'Announcement'>): Promise<void> {
+    const account = AccountEntry.fromSCEvent(event)
+    await db.updateAccount(this.api.db, account.address, account)
+  }
+
   private async onChannelUpdated(event: Event<'ChannelUpdate'>): Promise<void> {
     const channel = ChannelEntry.fromSCEvent(event)
-    await db.updateChannel(this.connector.db, channel.getId(), channel)
+    await db.updateChannel(this.api.db, channel.getId(), channel)
   }
 
   public async getAccount(address: Address) {
@@ -282,8 +289,8 @@ class Indexer extends EventEmitter {
   // routing
   public async getPublicKeyOf(address: Address): Promise<PublicKey | undefined> {
     const account = await db.getAccount(this.api.db, address)
-    if (account && account.publicKey) {
-      return account.publicKey
+    if (account && account.hasAnnounced()) {
+      return account.getPublicKey()
     }
 
     return undefined
