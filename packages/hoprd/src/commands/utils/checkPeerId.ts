@@ -1,7 +1,6 @@
 import type Hopr from '@hoprnet/hopr-core'
 import type { GlobalState } from '../abstractCommand'
 import PeerId from 'peer-id'
-import { isBootstrapNode } from './isBootstrapNode'
 
 /**
  * Takes a string, and checks whether it's an alias or a valid peerId,
@@ -28,7 +27,6 @@ export async function checkPeerIdInput(peerIdString: string, state?: GlobalState
  *
  * @param node hopr node
  * @param state global state
- * @param ops.noBootstrapNodes do not return any bootstrap nodes
  * @param ops.returnAlias when available, return the peerIds's alias
  * @param ops.mustBeOnline only return online peerIds
  * @returns an array of peerIds / aliases
@@ -37,11 +35,9 @@ export function getPeerIdsAndAliases(
   node: Hopr,
   state: GlobalState,
   ops: {
-    noBootstrapNodes: boolean
     returnAlias: boolean
     mustBeOnline: boolean
   } = {
-    noBootstrapNodes: false,
     returnAlias: false,
     mustBeOnline: false
   }
@@ -57,7 +53,6 @@ export function getPeerIdsAndAliases(
 
   // add online peer ids into map
   let peers = node.getConnectedPeers()
-  if (ops.noBootstrapNodes) peers = peers.filter((p) => !isBootstrapNode(node, p))
 
   // update map
   peers

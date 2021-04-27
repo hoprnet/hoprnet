@@ -80,9 +80,7 @@ export type HoprOptions = {
   createDbIfNotExist?: boolean
   peerId?: PeerId
   password?: string
-  bootstrapNode?: boolean
   connector?: HoprCoreEthereum
-  bootstrapServers?: Multiaddr[]
   output?: (encoded: Uint8Array) => void
   strategy?: ChannelStrategyNames
   hosts?: {
@@ -91,14 +89,8 @@ export type HoprOptions = {
   }
 }
 
-const defaultDBPath = (isBootstrap: boolean): string => {
-  let folder: string
-  if (isBootstrap) {
-    folder = `bootstrap`
-  } else {
-    folder = `node`
-  }
-  return path.join(process.cwd(), 'db', VERSION, folder)
+const defaultDBPath = (): string => {
+  return path.join(process.cwd(), 'db', VERSION, 'node')
 }
 
 class Hopr extends EventEmitter {
@@ -148,15 +140,10 @@ class Hopr extends EventEmitter {
         options.output(arr)
       }
     }
-    this.bootstrapServers = options.bootstrapServers || []
-    this.isBootstrapNode = options.bootstrapNode || false
 
     if (process.env.GCLOUD) {
       try {
         var name = 'hopr_node_' + this.getId().toB58String().slice(-5).toLowerCase()
-        if (this.isBootstrapNode) {
-          name = 'hopr_bootstrap_' + this.getId().toB58String().slice(-5).toLowerCase()
-        }
         require('@google-cloud/profiler')
           .start({
             projectId: 'hoprassociation',
@@ -234,10 +221,6 @@ class Hopr extends EventEmitter {
       db
     })
 
-    if (!options.bootstrapNode && (options.bootstrapServers == null || options.bootstrapServers.length == 0)) {
-      throw Error(`Cannot start node without a bootstrap server`)
-    }
-
     let connector = await HoprCoreEthereum.create(db, id.privKey.marshal(), {
       provider: options.provider
     })
@@ -278,7 +261,7 @@ class Hopr extends EventEmitter {
       dialer: {
         // Temporary fix, see https://github.com/hoprnet/hopr-connect/issues/77
         addressSorter: (a) => a,
-        concurrency: options.bootstrapNode ? 1000 : 100
+        concurrency: 100
       }
     })
 
@@ -685,7 +668,7 @@ class Hopr extends EventEmitter {
     if (options.dbPath) {
       dbPath = options.dbPath
     } else {
-      dbPath = defaultDBPath(options.bootstrapNode)
+      dbPath = defaultDBPath()
     }
 
     dbPath = path.resolve(dbPath)

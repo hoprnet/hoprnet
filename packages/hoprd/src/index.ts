@@ -2,7 +2,6 @@
 import Hopr from '@hoprnet/hopr-core'
 import type { HoprOptions } from '@hoprnet/hopr-core'
 import { decode } from 'rlp'
-import { getBootstrapAddresses } from '@hoprnet/hopr-utils'
 import { Commands } from './commands'
 import { LogStream } from './logs'
 import { AdminServer } from './admin'
@@ -66,15 +65,6 @@ const argv = yargs
     describe: 'List all the options used to run the HOPR node, but quit instead of starting',
     default: false
   })
-  .option('runAsBootstrap', {
-    boolean: true,
-    describe: 'run as a bootstrap node',
-    default: false
-  })
-  .option('bootstrapServers', {
-    describe: 'manually specify bootstrap servers',
-    default: undefined
-  })
   .option('data', {
     describe: 'manually specify the database directory to use',
     default: ''
@@ -113,10 +103,8 @@ function parseHosts(): HoprOptions['hosts'] {
 
 async function generateNodeOptions(): Promise<HoprOptions> {
   let options: HoprOptions = {
-    bootstrapNode: argv.runAsBootstrap,
     createDbIfNotExist: argv.init,
     network: argv.network,
-    bootstrapServers: argv.runAsBootstrap ? [] : [...(await getBootstrapAddresses(argv.bootstrapServers)).values()],
     provider: argv.provider,
     hosts: parseHosts()
   }
