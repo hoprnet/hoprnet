@@ -12,4 +12,3 @@ For further information about HOPR, please see our [online documentation](https:
 ## Testnet
 
 All our development is done in our [development branch](https://github.com/hoprnet/hopr-core/tree/develop).
-

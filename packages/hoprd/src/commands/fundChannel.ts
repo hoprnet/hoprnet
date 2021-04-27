@@ -61,9 +61,7 @@ export default class FundChannel extends AbstractCommand {
   async autocomplete(query: string = '', line: string = ''): Promise<AutoCompleteResult> {
     const [peer] = query.split(' ')
 
-    const peers = this.node
-      .getConnectedPeers()
-      .map((p) => p.toB58String())
+    const peers = this.node.getConnectedPeers().map((p) => p.toB58String())
 
     const hits = query ? peers.filter((peerId: string) => peerId.startsWith(peer)) : peers
     return [hits.length ? hits.map((str: string) => `fund ${str}`) : ['fund'], line]
