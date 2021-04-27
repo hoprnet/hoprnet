@@ -5,8 +5,8 @@ source 'test/e2e/0_configuration.sh'
 
 # Running RPC
 rpc_network
-# Running bootstrap server
-bootstrap_node
+# Running noder
+start_node
 
 echo "🤖 (BS) Requesting bootstrap address"
 BOOTSTRAP_ETH_ADDRESS=$(curl -s http://127.0.0.1:3001/api/v1/address/eth)

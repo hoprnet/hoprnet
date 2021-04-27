@@ -11,6 +11,18 @@ function cleanup {
   if [[ -n "$PROVIDER_PID" ]]; then kill $PROVIDER_PID; fi
 }
 
+# Starts a node, including an admin, and rest interface
+# @param none
+# @dev Sleeps for 10 seconds upon start
+function start_node {
+  echo "🤖 Running a node"
+  DEBUG=hopr* hoprd --data=/tmp/$DATAFILE  > /tmp/$DATAFILE.txt 2>&1 &
+  BOOTSTRAP_PID="$!"
+  echo "🤖 Node started (127.0.0.1:9091,3000,3001)"
+  echo "⏰ Waiting (10) seconds for node to start"
+  sleep 10
+}
+
 # Starts a hardhat node w/an exposed RPC endpoint @ 127.0.0.1
 # @param none
 # @dev Sleeps for 20 seconds upon start.
