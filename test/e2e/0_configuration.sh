@@ -17,10 +17,13 @@ function cleanup {
 function start_node {
   echo "🤖 Running a node"
   DEBUG=hopr* hoprd --data=/tmp/$DATAFILE  > /tmp/$DATAFILE.txt 2>&1 &
-  BOOTSTRAP_PID="$!"
+  PID="$!"
   echo "🤖 Node started (127.0.0.1:9091,3000,3001)"
   echo "⏰ Waiting (10) seconds for node to start"
   sleep 10
+  if [[ -n "$PID" ]]; then kill $PID; fi
+  echo "🧽 Printing last 10 lines from logs"
+  tail -n 10 /tmp/$DATAFILE-*.txt
 }
 
 # Starts a hardhat node w/an exposed RPC endpoint @ 127.0.0.1
