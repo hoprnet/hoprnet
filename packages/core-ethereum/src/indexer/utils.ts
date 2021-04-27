@@ -33,13 +33,3 @@ export const isConfirmedBlock = (
 ): boolean => {
   return blockNumber + maxConfirmations <= onChainBlockNumber
 }
-
-/**
- * We consider the indexer up to date if it's only lacking by 4 blocks behind.
- * @param onChainBlock
- * @param lastKnownBlock
- * @returns returns true if it's syncing
- */
-export const isSyncing = (onChainBlock: number, lastKnownBlock: number): boolean => {
-  return lastKnownBlock + 4 >= onChainBlock
-}

@@ -67,9 +67,9 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
      */
     uint32 public secsClosure;
 
-   event Announcement(
+    event Announcement(
         address indexed account,
-        string multiaddr
+        bytes multiaddr
     );
 
     event ChannelUpdate(
@@ -93,7 +93,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
      * Confirmation should be done off-chain.
      * @param multiaddr the multiaddress
      */
-    function announce(string calldata multiaddr) external {
+    function announce(bytes calldata multiaddr) external {
         emit Announcement(msg.sender, multiaddr);
     }
 
