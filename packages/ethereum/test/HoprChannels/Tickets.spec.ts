@@ -49,7 +49,8 @@ describe('Tickets', function () {
       TICKET_AB_WIN.v
     )
 
-    const ticket = await tickets.tickets(TICKET_AB_WIN.hash)
+    // @TOOD robert
+    const ticket = await tickets.tickets(TICKET_AB_WIN.fakeHash)
     expect(ticket).to.be.true
 
     const channel = await tickets.channels(ACCOUNT_AB_CHANNEL_ID)

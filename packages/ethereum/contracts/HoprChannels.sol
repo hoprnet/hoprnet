@@ -718,7 +718,18 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
             )
         );
 
-        require(!tickets[ticketHash], "ticket must not be used twice");
+        bytes32 fakedHash = _getTicketHash2(
+            _getEncodedTicket2(
+                redeemer,
+                account.counter,
+                proofOfRelaySecret,
+                _getChannelIteration(channel.status),
+                amount,
+                winProb
+            )
+        );
+
+        require(!tickets[fakedHash], "ticket must not be used twice");
         require(ECDSA.recover(ticketHash, r, s, v) == counterparty, "signer must match the counterparty");
         
         require(
@@ -732,7 +743,8 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         );
 
         account.secret = secretPreImage;
-        tickets[ticketHash] = true;
+
+        tickets[fakedHash] = true;
 
         if (_isPartyA(redeemer, counterparty)) {
             channel.partyABalance = channel.partyABalance.add(amount);
@@ -764,6 +776,35 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
             amount,
             winProb,
             channelIteration
+        );
+    }
+
+    // Temporary fix
+    function _getEncodedTicket2(
+        address recipient,
+        uint256 recipientCounter,
+        bytes32 proofOfRelaySecret,
+        uint256 channelIteration,
+        uint256 amount,
+        bytes32 winProb
+    ) internal pure returns (bytes memory) {
+        return abi.encodePacked(
+            recipient,
+            proofOfRelaySecret,
+            recipientCounter,
+            amount,
+            winProb,
+            channelIteration
+        );
+    }
+
+    // Temporary fix
+    function _getTicketHash2(
+        bytes memory packedTicket
+    ) internal pure returns (bytes32) {
+        return ECDSA.toEthSignedMessageHash(
+            "187",
+            packedTicket
         );
     }
 

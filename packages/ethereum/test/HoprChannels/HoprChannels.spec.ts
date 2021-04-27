@@ -337,7 +337,8 @@ describe('HoprChannels intergration tests', function () {
           f.TICKET_BA_WIN.v
         )
 
-      const ticket = await f.hoprChannels.tickets(f.TICKET_BA_WIN.hash)
+      // @TOOD robert
+      const ticket = await f.hoprChannels.tickets(f.TICKET_BA_WIN.fakeHash)
       expect(ticket).to.be.true
 
       const channel = await f.hoprChannels.channels(ACCOUNT_AB_CHANNEL_ID)
@@ -365,7 +366,8 @@ describe('HoprChannels intergration tests', function () {
           f.TICKET_AB_WIN.v
         )
 
-      const ticket = await f.hoprChannels.tickets(f.TICKET_AB_WIN.hash)
+      // @TODO robert
+      const ticket = await f.hoprChannels.tickets(f.TICKET_AB_WIN.fakeHash)
       expect(ticket).to.be.true
 
       const channel = await f.hoprChannels.channels(ACCOUNT_AB_CHANNEL_ID)
@@ -409,7 +411,8 @@ describe('HoprChannels intergration tests', function () {
           f.TICKET_BA_WIN_2.v
         )
 
-      const ticket = await f.hoprChannels.tickets(f.TICKET_BA_WIN_2.hash)
+      // @TODO robert
+      const ticket = await f.hoprChannels.tickets(f.TICKET_BA_WIN_2.fakeHash)
       expect(ticket).to.be.true
 
       const channel = await f.hoprChannels.channels(ACCOUNT_AB_CHANNEL_ID)
@@ -545,7 +548,8 @@ describe('HoprChannels intergration tests', function () {
           TICKET_BA_WIN_RECYCLED.v
         )
 
-      const ticket = await f.hoprChannels.tickets(TICKET_BA_WIN_RECYCLED.hash)
+      // @TODO robert
+      const ticket = await f.hoprChannels.tickets(TICKET_BA_WIN_RECYCLED.fakeHash)
       expect(ticket).to.be.true
 
       const channel = await f.hoprChannels.channels(ACCOUNT_AB_CHANNEL_ID)
@@ -573,7 +577,8 @@ describe('HoprChannels intergration tests', function () {
           TICKET_AB_WIN_RECYCLED.v
         )
 
-      const ticket = await f.hoprChannels.tickets(TICKET_AB_WIN_RECYCLED.hash)
+      // @TOOD robert
+      const ticket = await f.hoprChannels.tickets(TICKET_AB_WIN_RECYCLED.fakeHash)
       expect(ticket).to.be.true
 
       const channel = await f.hoprChannels.channels(ACCOUNT_AB_CHANNEL_ID)
@@ -617,7 +622,8 @@ describe('HoprChannels intergration tests', function () {
           TICKET_BA_WIN_RECYCLED_2.v
         )
 
-      const ticket = await f.hoprChannels.tickets(TICKET_BA_WIN_RECYCLED_2.hash)
+      // @TODO robert
+      const ticket = await f.hoprChannels.tickets(TICKET_BA_WIN_RECYCLED_2.fakeHash)
       expect(ticket).to.be.true
 
       const channel = await f.hoprChannels.channels(ACCOUNT_AB_CHANNEL_ID)

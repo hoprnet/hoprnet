@@ -20,17 +20,30 @@ export const percentToUint256 = (percent: number): string => {
   return ethers.utils.hexZeroPad(ethers.utils.hexlify(ethers.constants.MaxUint256.mul(percent).div(100)), 32)
 }
 
+// @TODO robert
 /**
  * Encode ticket data that is used to create a ticket hash
  * @param ticket
  * @return ticket's hash
  */
 export const getEncodedTicket = (ticket: Ticket): string => {
-  const challenge = solidityKeccak256(['bytes32'], [ticket.proofOfRelaySecret])
+  // @TODO currently disabled
+  // const challenge = solidityKeccak256(['bytes32'], [ticket.proofOfRelaySecret])
+
+  return solidityPack(
+    ['address' /*, 'bytes32'*/, 'uint256', 'uint256', 'bytes32', 'uint256'],
+    [ticket.recipient /*, challenge, */, ticket.counter, ticket.amount, ticket.winProb, ticket.iteration]
+  )
+}
+
+// temporary fix @TODO robert
+export const getEncodedTicket2 = (ticket: Ticket): string => {
+  // @TODO currently disabled
+  // const challenge = solidityKeccak256(['bytes32'], [ticket.proofOfRelaySecret])
 
   return solidityPack(
     ['address', 'bytes32', 'uint256', 'uint256', 'bytes32', 'uint256'],
-    [ticket.recipient, challenge, ticket.counter, ticket.amount, ticket.winProb, ticket.iteration]
+    [ticket.recipient, ticket.proofOfRelaySecret, ticket.counter, ticket.amount, ticket.winProb, ticket.iteration]
   )
 }
 
@@ -67,6 +80,8 @@ export const createTicket = async (
     counterparty: string
     encoded: string
     hash: string
+    // @TODO robert
+    fakeHash: string
     luck: string
     signature: string
     r: string
@@ -76,6 +91,10 @@ export const createTicket = async (
 > => {
   const encoded = getEncodedTicket(ticket)
   const hash = prefixMessageWithHOPR(encoded)
+
+  // temporary fix @TODO robert
+  const fakeHash = prefixMessageWithHOPR(getEncodedTicket2(ticket))
+
   const luck = getTicketLuck(ticket, hash, secret)
   const { signature, r, s, v } = await signMessage(hash, account.privateKey)
 
@@ -84,6 +103,8 @@ export const createTicket = async (
     secret,
     encoded,
     hash,
+    // @TODO robert
+    fakeHash,
     luck,
     r,
     s,
