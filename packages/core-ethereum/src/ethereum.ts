@@ -1,5 +1,5 @@
 import type { ContractTransaction } from 'ethers'
-import ethers, { utils, errors } from 'ethers'
+import { providers, utils, errors, Wallet, BigNumber} from 'ethers'
 import { Address } from './types'
 import type { HoprToken, HoprChannels } from './contracts'
 import BN from 'bn.js'
@@ -19,9 +19,9 @@ const abiCoder = new utils.AbiCoder()
 export type Receipt = string
 
 export async function createChainWrapper(providerURI: string, privateKey: Uint8Array) {
-  const provider = new ethers.providers.WebSocketProvider(providerURI)
-  const wallet = new ethers.Wallet(privateKey).connect(provider)
-  const address = Address.fromString(this.wallet.address)
+  const provider = new providers.WebSocketProvider(providerURI)
+  const wallet = new Wallet(privateKey).connect(provider)
+  const address = Address.fromString(wallet.address)
   const chainId = await provider.getNetwork().then((res) => res.chainId)
   const network = getNetworkName(chainId) as Networks
   const contracts = getContracts()?.[network]
@@ -81,7 +81,7 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
     }
 
     log('Transaction with nonce %d successfully sent %s, waiting for confimation', nonce, transaction.hash)
-    this._transactions.addToPending(transaction.hash, { nonce })
+    transactions.addToPending(transaction.hash, { nonce })
     nonceLock.releaseLock()
 
     // monitor transaction, this is done asynchronously
@@ -89,7 +89,7 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
       .wait()
       .then(() => {
         log('Transaction with nonce %d and hash %s confirmed', nonce, transaction.hash)
-        this._transactions.moveToConfirmed(transaction.hash)
+        transactions.moveToConfirmed(transaction.hash)
       })
       .catch((error) => {
         const reverted = ([errors.CALL_EXCEPTION] as string[]).includes(error)
@@ -98,17 +98,17 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
           log('Transaction with nonce %d and hash %s reverted: %s', nonce, transaction.hash, error)
 
           // this transaction failed but was confirmed as reverted
-          this._transactions.moveToConfirmed(transaction.hash)
+          transactions.moveToConfirmed(transaction.hash)
         } else {
           log('Transaction with nonce %d failed to sent: %s', nonce, error)
 
           const alreadyKnown = ([errors.NONCE_EXPIRED, errors.REPLACEMENT_UNDERPRICED] as string[]).includes(error)
           // if this hash is already known and we already have it included in
           // pending we can safely ignore this
-          if (alreadyKnown && this._transactions.pending.has(transaction.hash)) return
+          if (alreadyKnown && transactions.pending.has(transaction.hash)) return
 
           // this transaction was not confirmed so we just remove it
-          this._transactions.remove(transaction.hash)
+          transactions.remove(transaction.hash)
         }
       })
 
@@ -117,12 +117,12 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
 
   async function withdraw(currency: 'NATIVE' | 'HOPR', recipient: string, amount: string): Promise<string> {
     if (currency === 'NATIVE') {
-      const nonceLock = await this.account.getNonceLock()
+      const nonceLock = await nonceTracker.getNonceLock(address)
       try {
-        const transaction = await this.account.wallet.sendTransaction({
+        const transaction = await wallet.sendTransaction({
           to: recipient,
-          value: ethers.BigNumber.from(amount),
-          nonce: ethers.BigNumber.from(nonceLock.nextNonce)
+          value: BigNumber.from(amount),
+          nonce: BigNumber.from(nonceLock.nextNonce)
         })
         nonceLock.releaseLock()
         return transaction.hash
@@ -131,7 +131,7 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
         throw err
       }
     } else {
-      const transaction = await this.account.sendTransaction(this.hoprToken.transfer, recipient, amount)
+      const transaction = await sendTransaction(token.transfer, recipient, amount)
       return transaction.hash
     }
   }
@@ -230,7 +230,7 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
     setCommitment: (comm: Hash) => setCommitment(channels, comm),
     getGenesisBlock: () => contracts?.HoprChannels?.deployedAt ?? 0,
     getWallet: () => wallet,
-    waitUntilReady: async () => await this.provider.ready,
+    waitUntilReady: async () => await provider.ready,
     getLatestBlockNumber: async () => provider.getBlockNumber(),
     subscribeBlock: (cb) => provider.on('block', cb),
     subscribeError: (cb) => {
@@ -244,8 +244,8 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
       channels.removeAllListeners()
     },
     getChannels: () => channels,
-    getPrivateKey: () => ethers.utils.arrayify(wallet.privateKey),
-    getPublicKey: () => PublicKey.fromString(ethers.utils.computePublicKey(wallet.publicKey, true)),
+    getPrivateKey: () => utils.arrayify(wallet.privateKey),
+    getPublicKey: () => PublicKey.fromString(utils.computePublicKey(wallet.publicKey, true)),
     getInfo: () =>
       [
         `Running on: ${getNetworkName(chainId)}`,
