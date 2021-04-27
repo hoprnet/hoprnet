@@ -54,7 +54,7 @@ class Channel {
     unacknowledgedTicket: UnacknowledgedTicket,
     acknowledgementHash: Hash
   ): Promise<Acknowledgement | null> {
-    // @TODO 
+    // @TODO
     const response = Hash.create(unacknowledgedTicket.serialize(), acknowledgementHash.serialize())
     const ticket = unacknowledgedTicket.ticket
     if (
