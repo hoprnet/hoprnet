@@ -52,10 +52,16 @@ class Channel {
    */
   async acknowledge(
     unacknowledgedTicket: UnacknowledgedTicket,
-    acknowledgementHash: Hash
+    acknowledgement: Hash
   ): Promise<Acknowledgement | null> {
-    // @TODO
-    const response = Hash.create(unacknowledgedTicket.serialize(), acknowledgementHash.serialize())
+    const validateResult = unacknowledgedTicket.verifyChallenge(acknowledgement)
+
+    if (validateResult.valid == false) {
+      throw Error(`Ticket invalid`)
+    }
+
+    const response = new Hash(validateResult.response)
+
     const ticket = unacknowledgedTicket.ticket
     if (
       await isWinningTicket(ticket.getHash(), response, await this.commitment.getCurrentCommitment(), ticket.winProb)
