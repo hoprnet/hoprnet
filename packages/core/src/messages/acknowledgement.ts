@@ -1,5 +1,5 @@
 import { Challenge } from './challenge'
-import { deriveAckKeyShare } from '@hoprnet/hopr-utils'
+import { deriveAckKeyShare, Hash } from '@hoprnet/hopr-utils'
 import { ecdsaSign, ecdsaVerify, publicKeyCreate } from 'secp256k1'
 import { SECRET_LENGTH, HASH_ALGORITHM } from './constants'
 import { SECP256K1, u8aSplit } from '@hoprnet/hopr-utils'
@@ -44,7 +44,7 @@ export class Acknowledgement {
       SECRET_LENGTH
     ])
 
-    const challengeToVerify = createHash(HASH_ALGORITHM).update(publicKeyCreate(ackKeyShare)).digest()
+    const challengeToVerify = createHash(HASH_ALGORITHM).update(getAckChallenge(ackKeyShare)).digest()
 
     if (!ecdsaVerify(challengeSignature, challengeToVerify, ownPubKey.pubKey.marshal())) {
       throw Error(`General error.`)
@@ -61,7 +61,15 @@ export class Acknowledgement {
     return new Acknowledgement(ackSignature, challengeSignature, ackKeyShare)
   }
 
+  get ackChallenge() {
+    return new Hash(getAckChallenge(this.ackKeyShare))
+  }
+
   serialize() {
     return Uint8Array.from([...this.ackSignature, ...this.challengeSignature, ...this.ackKeyShare])
   }
+}
+
+function getAckChallenge(ackKeyShare: Uint8Array) {
+  return publicKeyCreate(ackKeyShare)
 }

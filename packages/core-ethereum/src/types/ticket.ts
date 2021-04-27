@@ -142,10 +142,12 @@ class Ticket {
     )
   }
 
+  recoverSigner() {
+    return new PublicKey(ecdsaRecover(this.signature.signature, this.signature.recovery, this.getHash().serialize()))
+  }
+
   verify(pubKey: PublicKey): boolean {
-    return pubKey.eq(
-      new PublicKey(ecdsaRecover(this.signature.signature, this.signature.recovery, this.getHash().serialize()))
-    )
+    return pubKey.eq(this.recoverSigner())
   }
 }
 export default Ticket

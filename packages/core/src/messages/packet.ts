@@ -55,22 +55,26 @@ export function validateCreatedTicket(myBalance: BN, ticket: Ticket) {
 /**
  * Validate unacknowledged tickets as we receive them
  */
+/**
+ * Validate unacknowledged tickets as we receive them
+ */
 export async function validateUnacknowledgedTicket(
-  chain: HoprCoreEthereum,
   id: PeerId,
   nodeTicketAmount: string,
   nodeTicketWinProb: number,
-  senderPubKey: Uint8Array,
+  senderPeerId: PeerId,
   ticket: Ticket,
   channel: Channel,
   getTickets: () => Promise<Ticket[]>
 ): Promise<void> {
+  // self
   const selfPubKey = new PublicKey(id.pubKey.marshal())
-  const selfAddress = selfPubKey.toAddress()
-
+  const selfAddress = await selfPubKey.toAddress()
+  // sender
+  const senderB58 = senderPeerId.toB58String()
+  const senderPubKey = new PublicKey(senderPeerId.pubKey.marshal())
   const ticketAmount = ticket.amount.toBN()
   const ticketCounter = ticket.epoch.toBN()
-  const accountCounter = (await chain.account.getTicketEpoch()).toBN()
   const ticketWinProb = getWinProbabilityAsFloat(ticket.winProb)
 
   let channelState
@@ -81,7 +85,7 @@ export async function validateUnacknowledgedTicket(
   }
 
   // ticket signer MUST be the sender
-  if (!ticket.verify(new PublicKey(senderPubKey))) {
+  if (!ticket.verify(senderPubKey)) {
     throw Error(`The signer of the ticket does not match the sender`)
   }
 
@@ -96,24 +100,23 @@ export async function validateUnacknowledgedTicket(
   }
 
   // channel MUST be open or pending to close
-  if (channelState.getStatus() === 'CLOSED') {
-    throw Error(
-      `Payment channel with '${(await pubKeyToPeerId(senderPubKey)).toB58String()}' is not open or pending to close`
-    )
+  if (channelState.status === 'CLOSED') {
+    throw Error(`Payment channel with '${senderB58}' is not open or pending to close`)
   }
 
   // ticket's epoch MUST match our account nonce
   // (performance) we are making a request to blockchain
-  if (!ticketCounter.eq(accountCounter)) {
+  const channelTicketEpoch = (await channel.getState()).ticketEpochFor(selfAddress).toBN()
+  if (!ticketCounter.eq(channelTicketEpoch)) {
     throw Error(
-      `Ticket epoch '${ticketCounter.toString()}' does not match our account counter ${accountCounter.toString()}`
+      `Ticket epoch '${ticketCounter.toString()}' does not match our account counter ${channelTicketEpoch.toString()}`
     )
   }
 
   // ticket's channelIteration MUST match the current channelIteration
-  const currentChannelIteration = channelState.getIteration()
+  const currentChannelIteration = channelState.channelEpoch
   const ticketChannelIteration = ticket.channelIteration.toBN()
-  if (!ticketChannelIteration.eq(currentChannelIteration)) {
+  if (!ticketChannelIteration.eq(currentChannelIteration.toBN())) {
     throw Error(
       `Ticket was created for a different channel iteration ${ticketChannelIteration.toString()} != ${currentChannelIteration.toString()}`
     )
@@ -132,8 +135,8 @@ export async function validateUnacknowledgedTicket(
   let signedTickets = (await getTickets()).filter(
     (signedTicket) =>
       signedTicket.counterparty.eq(selfAddress) &&
-      signedTicket.epoch.toBN().eq(accountCounter) &&
-      ticket.channelIteration.toBN().eq(currentChannelIteration)
+      signedTicket.epoch.toBN().eq(channelTicketEpoch) &&
+      ticket.channelIteration.toBN().eq(currentChannelIteration.toBN())
   )
 
   // calculate total unredeemed balance
@@ -229,7 +232,7 @@ export class Packet {
 
     const packet = createPacket(secrets, alpha, msg, path, MAX_HOPS, POR_STRING_LENGTH, porStrings)
 
-    const channel = new chain.channel(chain, self, nextPeer)
+    const channel = chain.getChannel(self, nextPeer)
 
     const ticket = await channel.createTicket(ticketOpts.value, new PublicKey(ticketChallenge), ticketOpts.winProb)
 
@@ -324,7 +327,10 @@ export class Packet {
   }
 
   async validateUnacknowledgedTicket(db: LevelUp, chain: HoprCoreEthereum, privKey: PeerId) {
-    validateUnacknowledgedTicket(chain, privKey, '', 0, this.previousHop, this.ticket, undefined as any, () =>
+    const previousHop = await pubKeyToPeerId(this.previousHop)
+    const channel = chain.getChannel(new PublicKey(privKey.pubKey.marshal()), new PublicKey(this.previousHop))
+
+    validateUnacknowledgedTicket(privKey, '', 0, previousHop, this.ticket, channel, () =>
       getTickets(db, {
         signer: this.previousHop
       })
@@ -351,7 +357,7 @@ export class Packet {
     const self = new PublicKey(privKey.pubKey.marshal())
     const nextPeer = new PublicKey(this.nextHop)
 
-    const channel = new chain.channel(chain, self, nextPeer)
+    const channel = chain.getChannel(self, nextPeer)
 
     this.ticket = await channel.createTicket(new Balance(new BN(0)), new PublicKey(this.nextChallenge), 0)
 
