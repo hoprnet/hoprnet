@@ -1,7 +1,8 @@
 import type { ContractTransaction } from 'ethers'
+import type Multiaddr from 'multiaddr'
+import type { HoprToken, HoprChannels } from './contracts'
 import { providers, utils, errors, Wallet, BigNumber } from 'ethers'
 import { Address } from './types'
-import type { HoprToken, HoprChannels } from './contracts'
 import BN from 'bn.js'
 import { Balance, NativeBalance, Hash, PublicKey } from './types'
 import { durations } from '@hoprnet/hopr-utils'
@@ -115,6 +116,12 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
     return transaction
   }
 
+  async function announce(multiaddr: Multiaddr): Promise<string> {
+    const transaction = await sendTransaction(channels.announce, multiaddr.bytes)
+    await transaction.wait()
+    return transaction.hash
+  }
+
   async function withdraw(currency: 'NATIVE' | 'HOPR', recipient: string, amount: string): Promise<string> {
     if (currency === 'NATIVE') {
       const nonceLock = await nonceTracker.getNonceLock(address)
@@ -220,6 +227,7 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
       token.balanceOf(address.toHex()).then((res) => new Balance(new BN(res.toString()))),
     getNativeBalance: (address) =>
       provider.getBalance(address.toHex()).then((res) => new NativeBalance(new BN(res.toString()))),
+    announce,
     withdraw: (currency: 'NATIVE' | 'HOPR', recipient: string, amount: string) => withdraw(currency, recipient, amount),
     fundChannel: (me: Address, counterparty: Address, myTotal: Balance, theirTotal: Balance) =>
       fundChannel(token, channels, me, counterparty, myTotal, theirTotal),
