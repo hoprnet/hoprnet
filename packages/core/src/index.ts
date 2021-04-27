@@ -173,9 +173,7 @@ class Hopr extends EventEmitter {
       }
     }
 
-    this.networkPeers = new NetworkPeers(
-      Array.from(this._libp2p.peerStore.peers.values()).map((x) => x.id)
-    )
+    this.networkPeers = new NetworkPeers(Array.from(this._libp2p.peerStore.peers.values()).map((x) => x.id))
 
     const subscribe = (protocol: string, handler: LibP2PHandlerFunction, includeReply = false) =>
       libp2pSubscribe(this._libp2p, protocol, handler, includeReply)
@@ -235,7 +233,7 @@ class Hopr extends EventEmitter {
       config: {
         transport: {
           HoprConnect: {
-            bootstrapServers: [] // TODO 
+            bootstrapServers: [] // TODO
             // @dev Use these settings to simulate NAT behavior
             // __noDirectConnections: true,
             // __noWebRTCUpgrade: false
