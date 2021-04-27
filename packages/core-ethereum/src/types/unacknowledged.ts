@@ -1,6 +1,5 @@
 import { u8aSplit, serializeToU8a, validateAcknowledgement } from '@hoprnet/hopr-utils'
 import { Hash, PublicKey, Ticket } from '..'
-import PeerId from 'peer-id'
 
 export class UnacknowledgedTicket {
   constructor(readonly ticket: Ticket, readonly ownKey: Hash) {}
@@ -18,20 +17,16 @@ export class UnacknowledgedTicket {
     ])
   }
 
-  public verifyChallenge(acknowledgement: Hash) {
+  verify(signer: PublicKey, acknowledgement: Hash): ReturnType<typeof validateAcknowledgement> {
+    if (!this.ticket.verify(signer)) {
+      return { valid: false }
+    }
+
     return validateAcknowledgement(
       this.ownKey.serialize(),
       acknowledgement.serialize(),
       this.ticket.challenge.serialize()
     )
-  }
-
-  private verifySignature(peerId: PeerId): boolean {
-    return this.ticket.verify(new PublicKey(peerId.pubKey.marshal()))
-  }
-
-  verify(peerId: PeerId): boolean {
-    return this.verifySignature(peerId)
   }
 
   static SIZE(): number {

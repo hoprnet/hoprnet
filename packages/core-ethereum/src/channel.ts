@@ -54,7 +54,7 @@ class Channel {
     unacknowledgedTicket: UnacknowledgedTicket,
     acknowledgement: Hash
   ): Promise<Acknowledgement | null> {
-    const validateResult = unacknowledgedTicket.verifyChallenge(acknowledgement)
+    const validateResult = unacknowledgedTicket.verify(this.counterparty, acknowledgement)
 
     if (validateResult.valid == false) {
       throw Error(`Ticket invalid`)
