@@ -1,4 +1,7 @@
 import type { LevelUp } from 'levelup'
+import type Multiaddr from 'multiaddr'
+import type PeerId from 'peer-id'
+import type { ChainWrapper } from './ethereum'
 import chalk from 'chalk'
 import debug from 'debug'
 import { Acknowledgement, PublicKey, Balance, Address, NativeBalance } from './types'
@@ -8,8 +11,6 @@ import { getWinProbabilityAsFloat, computeWinningProbability } from './utils'
 import { DEFAULT_URI, MAX_CONFIRMATIONS, INDEXER_BLOCK_RANGE } from './constants'
 import { Channel } from './channel'
 import { createChainWrapper } from './ethereum'
-import type { ChainWrapper } from './ethereum'
-import type PeerId from 'peer-id'
 import { PROVIDER_CACHE_TTL } from './constants'
 import { cacheNoArgAsyncFunction } from '@hoprnet/hopr-utils'
 
@@ -106,6 +107,10 @@ export default class HoprEthereum {
     return new Channel(src, counterparty, this.db, this.chain, this.indexer, this.privateKey)
   }
 
+  async announce(multiaddr: Multiaddr): Promise<string> {
+    return this.chain.announce(multiaddr)
+  }
+
   async withdraw(currency: 'NATIVE' | 'HOPR', recipient: string, amount: string): Promise<string> {
     return this.chain.withdraw(currency, recipient, amount)
   }
@@ -120,6 +125,10 @@ export default class HoprEthereum {
 
   public getChannelsOf(addr: Address) {
     return this.indexer.getChannelsOf(addr)
+  }
+
+  public async getAccount(addr: Address) {
+    return this.indexer.getAccount(addr)
   }
 
   public getPublicKeyOf(addr: Address) {

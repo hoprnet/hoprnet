@@ -23,6 +23,11 @@ const argv = yargs
     describe: 'The network host to run the HOPR node on.',
     default: '0.0.0.0:9091'
   })
+  .option('announce', {
+    boolean: false,
+    describe: 'Announce public IP to the network',
+    default: false
+  })
   .option('admin', {
     boolean: true,
     describe: 'Run an admin interface on localhost:3000',
@@ -118,6 +123,7 @@ async function generateNodeOptions(): Promise<HoprOptions> {
     network: argv.network,
     bootstrapServers: argv.runAsBootstrap ? [] : [...(await getBootstrapAddresses(argv.bootstrapServers)).values()],
     provider: argv.provider,
+    announce: argv.announce,
     hosts: parseHosts()
   }
 
