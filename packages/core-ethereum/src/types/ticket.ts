@@ -129,7 +129,7 @@ class Ticket {
 
   static floatToUint256(float: number): UINT256 {
     if (float > 1) throw Error('Float cannot be larger than 1')
-    const percent = Math.floor(float * 100)
+    const percent = float * 100
     return new UINT256(new BN(ethers.constants.MaxUint256.mul(percent).div(100).toString()))
   }
 
