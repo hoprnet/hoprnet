@@ -164,7 +164,7 @@ export class Packet {
   public nextChallenge: Uint8Array
   public ackChallenge: Uint8Array
 
-  private constructor(private packet: Uint8Array, private challenge: Challenge, private ticket: Ticket) {}
+  public constructor(private packet: Uint8Array, private challenge: Challenge, private ticket: Ticket) {}
 
   private setReadyToForward() {
     this.isReadyToForward = true

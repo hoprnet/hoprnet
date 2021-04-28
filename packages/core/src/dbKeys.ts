@@ -1,6 +1,6 @@
 import type { LevelUp } from 'levelup'
 import { Hash, Acknowledgement, UnacknowledgedTicket } from '@hoprnet/hopr-core-ethereum'
-import { u8aAdd, toU8a } from '@hoprnet/hopr-utils'
+import { u8aAdd, toU8a, PublicKey } from '@hoprnet/hopr-utils'
 import debug from 'debug'
 const log = debug('hopr-core:db')
 
@@ -20,7 +20,7 @@ const KEY_LENGTH = 32
 
 export const ACKNOWLEDGED_TICKET_INDEX_LENGTH = 8
 
-export async function getUnacknowledgedTickets(db: LevelUp, key: Hash): Promise<UnacknowledgedTicket | undefined> {
+export async function getUnacknowledgedTickets(db: LevelUp, key: PublicKey): Promise<UnacknowledgedTicket | undefined> {
   const unAcknowledgedDbKey = UnAcknowledgedTickets(key.serialize())
   try {
     const buff = await db.get(Buffer.from(unAcknowledgedDbKey))
@@ -36,7 +36,7 @@ export async function getUnacknowledgedTickets(db: LevelUp, key: Hash): Promise<
   }
 }
 
-export async function deleteTicket(db: LevelUp, key: Hash) {
+export async function deleteTicket(db: LevelUp, key: PublicKey) {
   const k = UnAcknowledgedTickets(key.serialize())
   await db.del(Buffer.from(k))
 }
@@ -53,7 +53,7 @@ export async function incrementTicketCounter(db: LevelUp): Promise<Uint8Array> {
   return ticketCounter
 }
 
-export async function replaceTicketWithAcknowledgement(db: LevelUp, key: Hash, acknowledgment: Acknowledgement) {
+export async function replaceTicketWithAcknowledgement(db: LevelUp, key: PublicKey, acknowledgment: Acknowledgement) {
   const ticketCounter = await incrementTicketCounter(db)
   const unAcknowledgedDbKey = UnAcknowledgedTickets(key.serialize())
   const acknowledgedDbKey = AcknowledgedTickets(ticketCounter)
@@ -93,7 +93,7 @@ export function UnAcknowledgedTickets(hashedKey: Uint8Array): Uint8Array {
     [TICKET_PREFIX.length, TICKET_PREFIX],
     [unAcknowledgedSubPrefix.length, unAcknowledgedSubPrefix],
     [SEPERATOR.length, SEPERATOR],
-    [KEY_LENGTH, hashedKey]
+    [PublicKey.SIZE, hashedKey]
   ])
 }
 

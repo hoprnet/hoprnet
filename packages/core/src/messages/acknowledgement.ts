@@ -1,5 +1,5 @@
 import { Challenge } from './challenge'
-import { deriveAckKeyShare, Hash } from '@hoprnet/hopr-utils'
+import { deriveAckKeyShare, PublicKey } from '@hoprnet/hopr-utils'
 import { ecdsaSign, ecdsaVerify, publicKeyCreate } from 'secp256k1'
 import { SECRET_LENGTH, HASH_ALGORITHM } from './constants'
 import { SECP256K1, u8aSplit } from '@hoprnet/hopr-utils'
@@ -10,7 +10,7 @@ export class Acknowledgement {
   private constructor(
     private ackSignature: Uint8Array,
     private challengeSignature: Uint8Array,
-    private ackKeyShare: Uint8Array
+    public ackKeyShare: Uint8Array
   ) {}
 
   static get SIZE() {
@@ -62,7 +62,7 @@ export class Acknowledgement {
   }
 
   get ackChallenge() {
-    return new Hash(getAckChallenge(this.ackKeyShare))
+    return new PublicKey(getAckChallenge(this.ackKeyShare))
   }
 
   serialize() {

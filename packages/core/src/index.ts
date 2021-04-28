@@ -206,10 +206,17 @@ class Hopr extends EventEmitter {
 
     this.heartbeat = new Heartbeat(this.networkPeers, subscribe, sendMessageAndExpectResponse, hangup)
 
-    subscribeToAcknowledgements(subscribe, this.db, this.paymentChannels, (ack) =>
-      this.emit('message-acknowledged:' + ack.getKey())
+    subscribeToAcknowledgements(subscribe, this.db, this.paymentChannels, this.getId(), (ack) =>
+      this.emit('message-acknowledged:' + ack.ackChallenge)
     )
-    this.forward = new PacketForwardInteraction(this, subscribe, sendMessage)
+    this.forward = new PacketForwardInteraction(
+      subscribe,
+      sendMessage,
+      this.getId(),
+      this.paymentChannels,
+      this.emitMessage.bind(this),
+      this.db
+    )
 
     if (options.ticketAmount) this.ticketAmount = String(options.ticketAmount)
     if (options.ticketWinProb) this.ticketWinProb = options.ticketWinProb
@@ -595,7 +602,7 @@ class Hopr extends EventEmitter {
     await channel.open(new Balance(amountToFund))
 
     return {
-      channelId: await channel.getId()
+      channelId: channel.getId()
     }
   }
 
@@ -657,6 +664,10 @@ class Hopr extends EventEmitter {
 
   public async submitAcknowledgedTicket(ackTicket: Acknowledgement, index: Uint8Array) {
     return submitAcknowledgedTicket(this, ackTicket, index)
+  }
+
+  public emitMessage(msg: Uint8Array) {
+    this.emit('hopr:message', msg)
   }
 
   /**
