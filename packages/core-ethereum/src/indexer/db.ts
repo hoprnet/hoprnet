@@ -1,6 +1,5 @@
 import type { LevelUp } from 'levelup'
 import BN from 'bn.js'
-import { u8aToNumber } from '@hoprnet/hopr-utils'
 import { Hash, Address, AccountEntry, ChannelEntry, Snapshot } from '../types'
 import { getFromDB } from '../utils'
 
@@ -16,15 +15,9 @@ const createAccountKey = (address: Address): Uint8Array => encoder.encode(`index
  * @returns promise that resolves to a number
  */
 export const getLatestBlockNumber = async (db: LevelUp): Promise<number> => {
-  try {
-    return u8aToNumber(await db.get(Buffer.from(LATEST_BLOCK_NUMBER_KEY))) as number
-  } catch (err) {
-    if (err.notFound) {
-      return 0
-    }
-
-    throw err
-  }
+  const data = await getFromDB<Uint8Array>(db, LATEST_BLOCK_NUMBER_KEY)
+  if (!data) return 0
+  return new BN(data).toNumber()
 }
 
 /**
