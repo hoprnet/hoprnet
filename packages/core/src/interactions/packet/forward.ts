@@ -70,7 +70,7 @@ class PacketForwardInteraction {
         })
 
         if (node.getId().equals(target)) {
-          node.output(packet.message.plaintext)
+          node.emit('hopr:message', packet.message.plaintext)
         } else {
           await interact(target, packet)
         }

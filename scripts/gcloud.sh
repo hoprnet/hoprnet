@@ -20,13 +20,13 @@ GCLOUD_DEFAULTS="$ZONE $GCLOUD_MACHINE $GCLOUD_META $GCLOUD_TAGS $GCLOUD_BOOTDIS
 alias gssh="gcloud compute ssh --ssh-flag='-t' $ZONE"
 
 
-# $1 = role (ie. bootstrap)
+# $1 = name (ie. node-4) 
 # Requires:
 # - VERSION_MAJ_MIN
 # - RELEASE_NAME
 gcloud_vm_name() {
-  # For example, 1-57-larnaca-bootstrap, prerelease-master-bootstrap
-  echo "bootstrap-$(echo $VERSION_MAJ_MIN | sed 's/\./-/g')-$RELEASE_NAME"
+  # For example, 1-57-larnaca-node-2, prerelease-master-node-4
+  echo "hopr-$(echo $VERSION_MAJ_MIN | sed 's/\./-/g')-$RELEASE_NAME-$1"
 }
 
 # Get or create an IP address

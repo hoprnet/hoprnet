@@ -9,7 +9,18 @@ function cleanup {
   # Cleaning up everything
   echo "🧽 Cleaning up processes"
   if [[ -n "$PROVIDER_PID" ]]; then kill $PROVIDER_PID; fi
-  if [[ -n "$BOOTSTRAP_PID" ]]; then kill $BOOTSTRAP_PID; fi
+}
+
+# Starts a node, including an admin, and rest interface
+# @param none
+# @dev Sleeps for 10 seconds upon start
+function start_node {
+  echo "🤖 Running a node"
+  DEBUG=hopr* hoprd --data=/tmp/$DATAFILE  > /tmp/$DATAFILE.txt 2>&1 &
+  PID="$!"
+  echo "🤖 Node started (127.0.0.1:9091,3000,3001)"
+  echo "⏰ Waiting (10) seconds for node to start"
+  sleep 10
   echo "🧽 Printing last 10 lines from logs"
   tail -n 10 /tmp/$DATAFILE-*.txt
 }
@@ -24,18 +35,6 @@ function rpc_network {
   echo "⛑  Hardhat node started (127.0.0.1:8545)"
   echo "⏰ Waiting (20) seconds for hardhat node to deploy contracts"
   sleep 20
-}
-
-# Starts a bootstrap server, including an admin, and rest interface
-# @param none
-# @dev Sleeps for 10 seconds upon start
-function bootstrap_node {
-  echo "🤖 (BS) Running bootstrap node"
-  DEBUG=hopr* hoprd --data=/tmp/$DATAFILE-bootstrap --runAsBootstrap > /tmp/$DATAFILE-bs.txt 2>&1 &
-  BOOTSTRAP_PID="$!"
-  echo "🤖 (BS) Bootstrap started (127.0.0.1:9091,3000,3001)"
-  echo "⏰ Waiting (10) seconds for bootstrap node to start"
-  sleep 10
 }
 
 # Funds a HOPR node with ETH + HOPR tokens

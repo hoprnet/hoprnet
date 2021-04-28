@@ -81,10 +81,7 @@ export type HoprOptions = {
   createDbIfNotExist?: boolean
   peerId?: PeerId
   password?: string
-  bootstrapNode?: boolean
   connector?: HoprCoreEthereum
-  bootstrapServers?: Multiaddr[]
-  output?: (encoded: Uint8Array) => void
   strategy?: ChannelStrategyNames
   hosts?: {
     ip4?: NetOptions
@@ -92,14 +89,8 @@ export type HoprOptions = {
   }
 }
 
-const defaultDBPath = (isBootstrap: boolean): string => {
-  let folder: string
-  if (isBootstrap) {
-    folder = `bootstrap`
-  } else {
-    folder = `node`
-  }
-  return path.join(process.cwd(), 'db', VERSION, folder)
+const defaultDBPath = (): string => {
+  return path.join(process.cwd(), 'db', VERSION, 'node')
 }
 
 class Hopr extends EventEmitter {
@@ -107,9 +98,6 @@ class Hopr extends EventEmitter {
   // Allows us to construct HOPR with falsy options
   public _dbKeys = DbKeys
 
-  public output: (arr: Uint8Array) => void
-  public isBootstrapNode: boolean
-  public bootstrapServers: Multiaddr[]
   public initializedWithOptions: HoprOptions
   public ticketAmount: string = TICKET_AMOUNT
   public ticketWinProb: number = TICKET_WIN_PROB
@@ -143,22 +131,10 @@ class Hopr extends EventEmitter {
 
     this.setChannelStrategy(options.strategy || 'passive')
     this.initializedWithOptions = options
-    this.output = (arr: Uint8Array) => {
-      this.emit('hopr:message', arr)
-      if (options.output) {
-        log('DEPRECATED: options.output is replaced with a hopr:message event')
-        options.output(arr)
-      }
-    }
-    this.bootstrapServers = options.bootstrapServers || []
-    this.isBootstrapNode = options.bootstrapNode || false
 
     if (process.env.GCLOUD) {
       try {
         var name = 'hopr_node_' + this.getId().toB58String().slice(-5).toLowerCase()
-        if (this.isBootstrapNode) {
-          name = 'hopr_bootstrap_' + this.getId().toB58String().slice(-5).toLowerCase()
-        }
         require('@google-cloud/profiler')
           .start({
             projectId: 'hoprassociation',
@@ -176,9 +152,6 @@ class Hopr extends EventEmitter {
     if (process.env.GCLOUD) {
       try {
         var name = 'hopr_node_' + this.getId().toB58String().slice(-5).toLowerCase()
-        if (this.isBootstrapNode) {
-          name = 'hopr_bootstrap_' + this.getId().toB58String().slice(-5).toLowerCase()
-        }
         require('@google-cloud/profiler')
           .start({
             projectId: 'hoprassociation',
@@ -193,10 +166,7 @@ class Hopr extends EventEmitter {
       }
     }
 
-    this.networkPeers = new NetworkPeers(
-      Array.from(this._libp2p.peerStore.peers.values()).map((x) => x.id),
-      [this.getId()].concat(this.bootstrapServers.map((bs) => PeerId.createFromB58String(bs.getPeerId())))
-    )
+    this.networkPeers = new NetworkPeers(Array.from(this._libp2p.peerStore.peers.values()).map((x) => x.id))
 
     const subscribe = (protocol: string, handler: LibP2PHandlerFunction, includeReply = false) =>
       libp2pSubscribe(this._libp2p, protocol, handler, includeReply)
@@ -236,15 +206,15 @@ class Hopr extends EventEmitter {
       db
     })
 
-    if (!options.bootstrapNode && (options.bootstrapServers == null || options.bootstrapServers.length == 0)) {
-      throw Error(`Cannot start node without a bootstrap server`)
-    }
-
     let connector = await HoprCoreEthereum.create(db, id.privKey.marshal(), {
       provider: options.provider
     })
 
-    verbose('Created connector, now creating node')
+    verbose('Started HoprEthereum. Waiting for indexer to find connected nodes.')
+    const publicNodes = await connector.waitForPublicNodes()
+    if (publicNodes.length == 0) {
+      log('no nodes have announced yet, we cannot rely on relay')
+    }
 
     const libp2p = await LibP2P.create({
       peerId: id,
@@ -260,7 +230,7 @@ class Hopr extends EventEmitter {
       config: {
         transport: {
           HoprConnect: {
-            bootstrapServers: options.bootstrapServers
+            bootstrapServers: publicNodes
             // @dev Use these settings to simulate NAT behavior
             // __noDirectConnections: true,
             // __noWebRTCUpgrade: false
@@ -280,11 +250,17 @@ class Hopr extends EventEmitter {
       dialer: {
         // Temporary fix, see https://github.com/hoprnet/hopr-connect/issues/77
         addressSorter: (a) => a,
-        concurrency: options.bootstrapNode ? 1000 : 100
+        concurrency: 100
       }
     })
 
-    return await new Hopr(options, libp2p, db, connector).start()
+    await libp2p.start()
+    const node = new Hopr(options, libp2p, db, connector)
+    await node.heartbeat.start()
+    log(`Available under the following addresses:`)
+    libp2p.multiaddrs.forEach((ma: Multiaddr) => log(ma.toString()))
+    node.periodicCheck()
+    return node
   }
 
   private async tickChannelStrategy(newChannels: RoutingChannel[]) {
@@ -337,22 +313,6 @@ class Hopr extends EventEmitter {
    */
   public getVersion() {
     return FULL_VERSION
-  }
-  /**
-   * This method starts the node and registers all necessary handlers. It will
-   * also open the database and creates one if it doesn't exists.
-   *
-   * @param options
-   */
-  public async start(): Promise<Hopr> {
-    await Promise.all([this._libp2p.start().then(() => this.heartbeat.start()), this.paymentChannels.start()])
-
-    log(`Available under the following addresses:`)
-
-    this._libp2p.multiaddrs.forEach((ma: Multiaddr) => log(ma.toString()))
-    this.running = true
-    this.periodicCheck()
-    return this
   }
 
   /**
@@ -723,7 +683,7 @@ class Hopr extends EventEmitter {
     if (options.dbPath) {
       dbPath = options.dbPath
     } else {
-      dbPath = defaultDBPath(options.bootstrapNode)
+      dbPath = defaultDBPath()
     }
 
     dbPath = path.resolve(dbPath)

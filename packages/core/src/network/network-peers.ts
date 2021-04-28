@@ -23,7 +23,7 @@ class NetworkPeers {
     return this.peers.find((x) => x.id.toB58String() === peer.toB58String())
   }
 
-  constructor(existingPeers: Array<PeerId>, private exclude: PeerId[]) {
+  constructor(existingPeers: Array<PeerId>, private exclude: PeerId[] = []) {
     this.peers = []
 
     for (const peer of existingPeers) {
