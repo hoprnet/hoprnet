@@ -118,13 +118,13 @@ class Hopr extends EventEmitter {
    */
   private constructor(
     options: HoprOptions,
-    public _libp2p: LibP2P,
+    private libp2p: LibP2P,
     public db: LevelUp,
     public paymentChannels: HoprCoreEthereum
   ) {
     super()
 
-    this._libp2p.connectionManager.on('peer:connect', (conn: Connection) => {
+    this.libp2p.connectionManager.on('peer:connect', (conn: Connection) => {
       this.emit('hopr:peer:connection', conn.remotePeer)
       this.networkPeers.register(conn.remotePeer)
     })
@@ -166,22 +166,22 @@ class Hopr extends EventEmitter {
       }
     }
 
-    this.networkPeers = new NetworkPeers(Array.from(this._libp2p.peerStore.peers.values()).map((x) => x.id))
+    this.networkPeers = new NetworkPeers(Array.from(this.libp2p.peerStore.peers.values()).map((x) => x.id))
 
     const subscribe = (protocol: string, handler: LibP2PHandlerFunction, includeReply = false) =>
-      libp2pSubscribe(this._libp2p, protocol, handler, includeReply)
+      libp2pSubscribe(this.libp2p, protocol, handler, includeReply)
     const sendMessageAndExpectResponse = (dest: PeerId, protocol: string, msg: Uint8Array, opts: DialOpts) =>
-      libp2pSendMessageAndExpectResponse(this._libp2p, dest, protocol, msg, opts)
+      libp2pSendMessageAndExpectResponse(this.libp2p, dest, protocol, msg, opts)
     const sendMessage = (dest: PeerId, protocol: string, msg: Uint8Array, opts: DialOpts) =>
-      libp2pSendMessage(this._libp2p, dest, protocol, msg, opts)
-    const hangup = this._libp2p.hangUp.bind(this._libp2p)
+      libp2pSendMessage(this.libp2p, dest, protocol, msg, opts)
+    const hangup = this.libp2p.hangUp.bind(this.libp2p)
 
     this.heartbeat = new Heartbeat(this.networkPeers, subscribe, sendMessageAndExpectResponse, hangup)
 
     subscribeToAcknowledgements(subscribe, this.db, this.paymentChannels, (ack) =>
       this.emit('message-acknowledged:' + ack.getKey())
     )
-    this.forward = new PacketForwardInteraction(this, subscribe, sendMessage)
+    this.forward = new PacketForwardInteraction(this, this.libp2p, subscribe, sendMessage)
 
     if (options.ticketAmount) this.ticketAmount = String(options.ticketAmount)
     if (options.ticketWinProb) this.ticketWinProb = options.ticketWinProb
@@ -326,7 +326,7 @@ class Hopr extends EventEmitter {
     this.running = false
     await Promise.all([this.heartbeat.stop(), this.paymentChannels.stop()])
 
-    await Promise.all([this.db?.close().then(() => log(`Database closed.`)), this._libp2p.stop()])
+    await Promise.all([this.db?.close().then(() => log(`Database closed.`)), this.libp2p.stop()])
 
     // Give the operating system some extra time to close the sockets
     await new Promise((resolve) => setTimeout(resolve, 100))
@@ -337,7 +337,7 @@ class Hopr extends EventEmitter {
   }
 
   public getId(): PeerId {
-    return this._libp2p.peerId // Not a documented API, but in the sourceu
+    return this.libp2p.peerId // Not a documented API, but in the source
   }
 
   /**
@@ -346,17 +346,17 @@ class Hopr extends EventEmitter {
    */
   public async getAnnouncedAddresses(peer: PeerId = this.getId()): Promise<Multiaddr[]> {
     if (peer.equals(this.getId())) {
-      return this._libp2p.multiaddrs
+      return this.libp2p.multiaddrs
     }
 
-    return (await this._libp2p.peerRouting.findPeer(peer))?.multiaddrs || []
+    return (await this.libp2p.peerRouting.findPeer(peer))?.multiaddrs || []
   }
 
   /**
    * List the addresses on which the node is listening
    */
   public getListeningAddresses(): Multiaddr[] {
-    return this._libp2p.addressManager.getListenAddrs()
+    return this.libp2p.addressManager.getListenAddrs()
   }
 
   /**
@@ -364,7 +364,7 @@ class Hopr extends EventEmitter {
    * @param peer peer to query for
    */
   public getObservedAddresses(peer: PeerId): Address[] {
-    return this._libp2p.peerStore.get(peer)?.addresses ?? []
+    return this.libp2p.peerStore.get(peer)?.addresses ?? []
   }
 
   /**
@@ -412,7 +412,7 @@ class Hopr extends EventEmitter {
           try {
             packet = await Packet.create(
               this,
-              this._libp2p,
+              this.libp2p,
               msg.slice(n * PACKET_SIZE, Math.min(msg.length, (n + 1) * PACKET_SIZE)),
               path
             )
