@@ -1,6 +1,6 @@
 # Scripts
 
-### Start a testnet 
+### Start a testnet
 
 ```bash
 source testnet.sh
