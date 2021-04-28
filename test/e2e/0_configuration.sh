@@ -9,6 +9,8 @@ function cleanup {
   # Cleaning up everything
   echo "🧽 Cleaning up processes"
   if [[ -n "$PROVIDER_PID" ]]; then kill $PROVIDER_PID; fi
+  echo "🧽 Printing last 10 lines from logs"
+  tail -n 10 /tmp/$DATAFILE-*.txt
 }
 
 # Starts a node, including an admin, and rest interface
@@ -21,8 +23,6 @@ function start_node {
   echo "🤖 Node started (127.0.0.1:9091,3000,3001)"
   echo "⏰ Waiting (10) seconds for node to start"
   sleep 10
-  echo "🧽 Printing last 10 lines from logs"
-  tail -n 10 /tmp/$DATAFILE-*.txt
 }
 
 # Starts a hardhat node w/an exposed RPC endpoint @ 127.0.0.1
