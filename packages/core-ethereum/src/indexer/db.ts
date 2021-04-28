@@ -1,7 +1,7 @@
 import type { LevelUp } from 'levelup'
 import BN from 'bn.js'
-import { u8aToNumber } from '@hoprnet/hopr-utils'
 import { Hash, Address, AccountEntry, ChannelEntry, Snapshot } from '../types'
+import { getFromDB } from '../utils'
 
 const encoder = new TextEncoder()
 const LATEST_BLOCK_NUMBER_KEY = encoder.encode('indexer-latestBlockNumber')
@@ -15,15 +15,9 @@ const createAccountKey = (address: Address): Uint8Array => encoder.encode(`index
  * @returns promise that resolves to a number
  */
 export const getLatestBlockNumber = async (db: LevelUp): Promise<number> => {
-  try {
-    return u8aToNumber(await db.get(Buffer.from(LATEST_BLOCK_NUMBER_KEY))) as number
-  } catch (err) {
-    if (err.notFound) {
-      return 0
-    }
-
-    throw err
-  }
+  const data = await getFromDB<Uint8Array>(db, LATEST_BLOCK_NUMBER_KEY)
+  if (!data) return 0
+  return new BN(data).toNumber()
 }
 
 /**
@@ -41,16 +35,11 @@ export const updateLatestBlockNumber = async (db: LevelUp, blockNumber: BN): Pro
  * @returns promise that resolves to a snapshot
  */
 export const getLatestConfirmedSnapshot = async (db: LevelUp): Promise<Snapshot | undefined> => {
-  try {
-    const result = (await db.get(Buffer.from(LATEST_CONFIRMED_SNAPSHOT_KEY))) as Uint8Array
-    return Snapshot.deserialize(result)
-  } catch (err) {
-    if (err.notFound) {
-      return undefined
-    }
-
-    throw err
+  const data = await getFromDB<Uint8Array>(db, LATEST_CONFIRMED_SNAPSHOT_KEY)
+  if (!data || data.length != Snapshot.SIZE) {
+    return undefined
   }
+  return Snapshot.deserialize(data)
 }
 
 /**
@@ -68,24 +57,11 @@ export const updateLatestConfirmedSnapshot = async (db: LevelUp, snapshot: Snaps
  * @param address
  */
 export const getChannel = async (db: LevelUp, channelId: Hash): Promise<ChannelEntry | undefined> => {
-  let channel: Uint8Array | undefined
-  try {
-    channel = (await db.get(Buffer.from(createChannelKey(channelId)))) as Uint8Array
-  } catch (err) {
-    if (err.notFound) {
-      return undefined
-    }
-
-    throw err
-  }
-
-  if (channel == null || channel.length != ChannelEntry.SIZE) {
+  const data = await getFromDB<Uint8Array>(db, createChannelKey(channelId))
+  if (!data || data.length != ChannelEntry.SIZE) {
     return undefined
   }
-
-  const channelEntry = ChannelEntry.deserialize(channel)
-
-  return channelEntry
+  return ChannelEntry.deserialize(data)
 }
 
 export const getChannels = async (
@@ -130,22 +106,11 @@ export const updateChannel = async (db: LevelUp, channelId: Hash, channel: Chann
  * @returns Account
  */
 export const getAccount = async (db: LevelUp, address: Address): Promise<AccountEntry | undefined> => {
-  let account: Uint8Array | undefined
-  try {
-    account = (await db.get(Buffer.from(createAccountKey(address)))) as Uint8Array
-  } catch (err) {
-    if (err.notFound) {
-      return undefined
-    }
-
-    throw err
-  }
-
-  if (account == null || account.length != AccountEntry.SIZE) {
+  const data = await getFromDB<Uint8Array>(db, createAccountKey(address))
+  if (!data || data.length != AccountEntry.SIZE) {
     return undefined
   }
-
-  return AccountEntry.deserialize(account)
+  return AccountEntry.deserialize(data)
 }
 
 /**

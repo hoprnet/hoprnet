@@ -1,5 +1,5 @@
 import assert from 'assert'
-import * as utils from '.'
+import * as utils from './utils'
 
 describe('test utils', function () {
   it('should compute a winning probability and convert it to float', function () {

@@ -3,7 +3,7 @@ import { iterateHash, recoverIteratedHash, u8aConcat, Intermediate } from '@hopr
 import type { LevelUp } from 'levelup'
 import { randomBytes } from 'crypto'
 import Debug from 'debug'
-import { getFromDB } from './dbKeys'
+import { getFromDB } from './utils'
 
 const log = Debug('hopr-core-ethereum:commitment')
 
