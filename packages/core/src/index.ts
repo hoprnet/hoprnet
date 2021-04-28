@@ -250,7 +250,15 @@ class Hopr extends EventEmitter {
     )
 
     const onMessage = (msg: Uint8Array) => this.emit('hopr:message', msg)
-    this.forward = new PacketForwardInteraction(this.db, this.paymentChannels, this.getId(), this.libp2p, subscribe, sendMessage, onMessage)
+    this.forward = new PacketForwardInteraction(
+      this.db,
+      this.paymentChannels,
+      this.getId(),
+      this.libp2p,
+      subscribe,
+      sendMessage,
+      onMessage
+    )
 
     verbose('# STARTED NODE')
     verbose('ID', this.getId().toB58String())
