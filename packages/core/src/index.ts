@@ -73,6 +73,7 @@ export type ChannelStrategyNames = 'passive' | 'promiscuous'
 export type HoprOptions = {
   network: string
   provider: string
+  announce?: boolean
   ticketAmount?: number
   ticketWinProb?: number
   db?: LevelUp
@@ -107,6 +108,7 @@ class Hopr extends EventEmitter {
   private networkPeers: NetworkPeers
   private heartbeat: Heartbeat
   private forward: PacketForwardInteraction
+  private announcing = false
 
   /**
    * @constructor
@@ -493,10 +495,46 @@ class Hopr extends EventEmitter {
     try {
       await this.checkBalances()
       await this.tickChannelStrategy([])
+      await this.announce(this.initializedWithOptions.announce)
     } catch (e) {
       log('error in periodic check', e)
     }
     this.checkTimeout = setTimeout(() => this.periodicCheck(), CHECK_TIMEOUT)
+  }
+
+  private async announce(includeRouting: boolean = false): Promise<void> {
+    // exit if we are already announcing
+    if (this.announcing) return
+
+    const account = await this.paymentChannels.getAccount(this.paymentChannels.getAddress())
+    // exit if we already announced
+    if (account.hasAnnounced()) return
+
+    // exit if we don't have enough ETH
+    const nativeBalance = await this.getNativeBalance()
+    if (nativeBalance.toBN().lte(MIN_NATIVE_BALANCE)) return
+
+    const multiaddrs = await this.getAnnouncedAddresses()
+    const ip4 = multiaddrs.find((s) => s.toString().includes('/ip4/'))
+    const ip6 = multiaddrs.find((s) => s.toString().includes('/ip6/'))
+    const p2p = multiaddrs.find((s) => s.toString().includes('/p2p/'))
+    // exit if none of these multiaddrs are available
+    if (!ip4 && !ip6 && !p2p) return
+
+    try {
+      this.announcing = true
+
+      if (includeRouting && (ip4 || ip6 || p2p)) {
+        await this.paymentChannels.announce(ip4 || ip6 || p2p)
+      } else if (!includeRouting && p2p) {
+        await this.paymentChannels.announce(p2p)
+      }
+
+      this.announcing = false
+    } catch (err) {
+      this.announcing = false
+      throw new Error(`Failed to announce: ${err}`)
+    }
   }
 
   public setChannelStrategy(strategy: ChannelStrategyNames) {
