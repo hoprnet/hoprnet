@@ -26,7 +26,7 @@ alias gssh="gcloud compute ssh --ssh-flag='-t' $ZONE"
 # - RELEASE_NAME
 gcloud_vm_name() {
   # For example, 1-57-larnaca-node-2, prerelease-master-node-4
-  echo "$(echo $VERSION_MAJ_MIN | sed 's/\./-/g')-$RELEASE_NAME-$1"
+  echo "hopr-$(echo $VERSION_MAJ_MIN | sed 's/\./-/g')-$RELEASE_NAME-$1"
 }
 
 # Get or create an IP address
