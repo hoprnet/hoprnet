@@ -525,13 +525,16 @@ class Hopr extends EventEmitter {
       this.announcing = true
 
       if (includeRouting && (ip4 || ip6 || p2p)) {
+        log('announcing with routing', ip4 || ip6 || p2p)
         await this.paymentChannels.announce(ip4 || ip6 || p2p)
       } else if (!includeRouting && p2p) {
+        log('announcing without routing')
         await this.paymentChannels.announce(p2p)
       }
 
       this.announcing = false
     } catch (err) {
+      log('announce failed')
       this.announcing = false
       throw new Error(`Failed to announce: ${err}`)
     }
