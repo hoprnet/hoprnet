@@ -8,13 +8,13 @@ on:
 
 jobs:
   e2e:
-    name: Test Nr. ${{ matrix.number }}
+    name: ${{ matrix.test }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     strategy:
       fail-fast: true
       matrix:
-        number: [1, 2]
+        test: [1_nodes_have_valid_eth_address, 2_nodes_can_be_funded]
 
     steps:
       - uses: actions/checkout@v2
@@ -43,4 +43,4 @@ jobs:
 
       - name: Test
         shell: bash {0}
-        run: ./test/e2e/test_manager.sh ${{ matrix.number }}
+        run: ./test/e2e/${{ matrix.test }}.sh 
