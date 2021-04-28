@@ -1,6 +1,7 @@
 import assert from 'assert'
 import { expect } from 'chai'
 import { stringToU8a, SIGNATURE_LENGTH } from '@hoprnet/hopr-utils'
+import { ethers } from 'ethers'
 import { Address, Ticket, Hash, Balance, PublicKey, Signature, UINT256 } from '.'
 import * as fixtures from '../fixtures'
 import BN from 'bn.js'
@@ -14,7 +15,8 @@ describe('test ticket construction', function () {
   })
 
   it('should create new ticket', async function () {
-    const challenge = new Hash(new Uint8Array({ length: Hash.SIZE }))
+    const challengeResponse = new Hash(new Uint8Array({ length: Hash.SIZE }))
+    const challenge = challengeResponse.hash()
     const epoch = UINT256.fromString('1')
     const index = UINT256.fromString('1')
     const amount = new Balance(new BN(1))
@@ -29,6 +31,8 @@ describe('test ticket construction', function () {
     assert(ticket.amount.toBN().eq(amount.toBN()), 'wrong amount')
     assert(ticket.winProb.toBN().eq(winProb.toBN()), 'wrong winProb')
     assert(ticket.channelIteration.toBN().eq(channelIteration.toBN()), 'wrong channelIteration')
+    assert(ticket.checkResponse(challengeResponse), 'challengeResponse failed')
+    assert(ticket.isWinningTicket(challengeResponse, challengeResponse, winProb), 'ticket should be winning')
   })
 
   it('should generate the hash correctly #1', async function () {
@@ -87,6 +91,13 @@ describe('test ticket construction', function () {
     )
 
     assert(!expectedHash.eq(wrongTicket.getHash()), 'ticket hash must be different')
+  })
+})
+
+describe('test ticket methods', function () {
+  it('should convert float to uint256', function () {
+    assert(Ticket.floatToUint256(0).toBN().isZero())
+    assert(Ticket.floatToUint256(1).toBN().eq(new BN(ethers.constants.MaxUint256.toString())))
   })
 })
 
