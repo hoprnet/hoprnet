@@ -18,7 +18,7 @@ export function subscribeToAcknowledgements(
   pubKey: PeerId,
   onMessage: (ackMessage: Acknowledgement) => void
 ) {
-  subscribe(PROTOCOL_ACKNOWLEDGEMENT, async function (msg: Uint8Array, remotePeer: PeerId) { 
+  subscribe(PROTOCOL_ACKNOWLEDGEMENT, async function (msg: Uint8Array, remotePeer: PeerId) {
     const ackMsg = Acknowledgement.deserialize(msg, pubKey, remotePeer)
     let unacknowledgedTicket = await getUnacknowledgedTickets(db, ackMsg.ackChallenge)
 
