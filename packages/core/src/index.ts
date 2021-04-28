@@ -257,7 +257,9 @@ class Hopr extends EventEmitter {
     subscribeToAcknowledgements(subscribe, this.db, this.paymentChannels, (ack) =>
       this.emit('message-acknowledged:' + ack.getKey())
     )
-    this.forward = new PacketForwardInteraction(this, this.libp2p, subscribe, sendMessage)
+
+    const onMessage = (msg: Uint8Array) => this.emit('hopr:message', msg)
+    this.forward = new PacketForwardInteraction(this.db, this.paymentChannels, this.getId(), this.libp2p, subscribe, sendMessage, onMessage)
 
     verbose('# STARTED NODE')
     verbose('ID', this.getId().toB58String())
@@ -406,7 +408,9 @@ class Hopr extends EventEmitter {
           let packet: Packet
           try {
             packet = await Packet.create(
-              this,
+              this.paymentChannels,
+              this.db,
+              this.getId(),
               this.libp2p,
               msg.slice(n * PACKET_SIZE, Math.min(msg.length, (n + 1) * PACKET_SIZE)),
               path
@@ -646,7 +650,7 @@ class Hopr extends EventEmitter {
   }
 
   public async submitAcknowledgedTicket(ackTicket: Acknowledgement, index: Uint8Array) {
-    return submitAcknowledgedTicket(this, ackTicket, index)
+    return submitAcknowledgedTicket(this.db, this.paymentChannels, ackTicket, index)
   }
 
   /**

@@ -3,12 +3,13 @@ import { Packet } from '../../messages/packet'
 import { AcknowledgementMessage } from '../../messages/acknowledgement'
 import Debug from 'debug'
 import type PeerId from 'peer-id'
-import type Hopr from '../../'
 import { durations, oneAtATime } from '@hoprnet/hopr-utils'
 import { Mixer } from '../../mixer'
 import { Challenge } from '../../messages/packet/challenge'
 import { PROTOCOL_ACKNOWLEDGEMENT } from '../../constants'
 import LibP2P from 'libp2p'
+import { LevelUp } from 'levelup'
+import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 
 const log = Debug('hopr-core:forward')
 const FORWARD_TIMEOUT = durations.seconds(6)
@@ -18,7 +19,7 @@ class PacketForwardInteraction {
   private mixer: Mixer
   private concurrencyLimiter
 
-  constructor(public node: Hopr, private libp2p: LibP2P, private subscribe: any, private sendMessage: any) {
+  constructor(private db: LevelUp, private paymentChannels: HoprCoreEthereum, private id: PeerId, private libp2p: LibP2P, private subscribe: any, private sendMessage: any, private onMessage: (msg: Uint8Array) => void) {
     this.mixer = new Mixer(this.handleMixedPacket.bind(this))
     this.concurrencyLimiter = oneAtATime()
     this.subscribe(PROTOCOL_STRING, this.handlePacket.bind(this))
@@ -34,11 +35,9 @@ class PacketForwardInteraction {
     const arr = msg.slice()
     const packet = new Packet(
       this.libp2p,
-      this.node.paymentChannels,
-      this.node.db,
-      this.node.getId(),
-      this.node.ticketAmount,
-      this.node.ticketWinProb,
+      this.paymentChannels,
+      this.db,
+      this.id,
       {
         bytes: arr.buffer,
         offset: arr.byteOffset
@@ -49,8 +48,7 @@ class PacketForwardInteraction {
   }
 
   async handleMixedPacket(packet: Packet) {
-    const node = this.node
-    const sendMessage = this.sendMessage
+    const { id, onMessage, sendMessage } = this
     const interact = this.interact.bind(this)
     this.concurrencyLimiter(async function () {
       // See discussion in #1256 - apparently packet.forwardTransform cannot be
@@ -63,15 +61,15 @@ class PacketForwardInteraction {
           const ack = await AcknowledgementMessage.create(
             Challenge.deserialize(ticketKey),
             receivedChallenge,
-            node.getId()
+            id 
           )
           sendMessage(sender, PROTOCOL_ACKNOWLEDGEMENT, ack.serialize(), {
             timeout: ACKNOWLEDGEMENT_TIMEOUT
           })
         })
 
-        if (node.getId().equals(target)) {
-          node.emit('hopr:message', packet.message.plaintext)
+        if (id.equals(target)) {
+          onMessage(packet.message.plaintext)
         } else {
           await interact(target, packet)
         }
