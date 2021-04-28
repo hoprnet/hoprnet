@@ -27,7 +27,7 @@ $(A)$ creates a shared secret $s_i$ with all the relay nodes in the channel (B-C
 \newline The shared secret $s_i$ is used as a seed for a PRG (Pseudo Random Generator) to create secret shares $s_i,s_i'$ for each node along the route. 
 Relayers compute $s_i$ and get $s_{i+1}'$ from the next downstream node. 
 \newline The sender $(A)$ creates $T_{c_i}:=(s_i+s_{i+1}')*G$ and a hint for B,C,D,Z (let’s suppose these are the relay nodes and $Z$ will be the final destination) a “hint” how the promised value $s_C',s_D',s_Z'$ is going to look like. 
-The value “hint” is computed as $hint_i:=s_{i+1}'*G$ 
+The value “hint” is computed as $hint_i:=s_{i+1}'*G$ where $*$ is the curve multiplication operation and $G$ is a generator of the curve.
 
 
 \subsection{Ticket validation}
