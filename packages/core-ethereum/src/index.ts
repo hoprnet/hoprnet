@@ -13,7 +13,6 @@ import { Channel } from './channel'
 import { createChainWrapper } from './ethereum'
 import { PROVIDER_CACHE_TTL } from './constants'
 import { cacheNoArgAsyncFunction } from '@hoprnet/hopr-utils'
-import Multiaddr from 'multiaddr'
 
 const log = debug('hopr-core-ethereum')
 
