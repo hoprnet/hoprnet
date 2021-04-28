@@ -1,6 +1,11 @@
 import { u8aEquals } from '@hoprnet/hopr-utils'
 import { LevelUp } from 'levelup'
-import HoprCoreEthereum, { Ticket, Acknowledgement, SubmitTicketResponse, UnacknowledgedTicket } from '@hoprnet/hopr-core-ethereum'
+import HoprCoreEthereum, {
+  Ticket,
+  Acknowledgement,
+  SubmitTicketResponse,
+  UnacknowledgedTicket
+} from '@hoprnet/hopr-core-ethereum'
 import { UnAcknowledgedTickets, AcknowledgedTickets, AcknowledgedTicketsParse } from '../dbKeys'
 
 /**

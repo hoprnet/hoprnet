@@ -265,18 +265,19 @@ export class Packet extends Uint8Array {
    * @param path array of peerId that determines the route that
    * the packet takes
    */
-  static async create(chain: HoprCoreEthereum, db: LevelUp, id: PeerId, libp2p: LibP2P, msg: Uint8Array, path: PeerId[]): Promise<Packet> {
+  static async create(
+    chain: HoprCoreEthereum,
+    db: LevelUp,
+    id: PeerId,
+    libp2p: LibP2P,
+    msg: Uint8Array,
+    path: PeerId[]
+  ): Promise<Packet> {
     const arr = new Uint8Array(Packet.SIZE()).fill(0x00)
-    const packet = new Packet(
-      libp2p,
-      chain,
-      db,
-      id,
-      {
-        bytes: arr.buffer,
-        offset: arr.byteOffset
-      }
-    )
+    const packet = new Packet(libp2p, chain, db, id, {
+      bytes: arr.buffer,
+      offset: arr.byteOffset
+    })
 
     const { header, secrets } = await Header.create(path, {
       bytes: packet.buffer,
@@ -320,7 +321,7 @@ export class Packet extends Uint8Array {
       log(`before creating channel`)
 
       const balances = await channel.getBalances()
-      packet._ticket = await channel.createTicket(new Balance(fee), ticketChallenge, TICKET_WIN_PROB) 
+      packet._ticket = await channel.createTicket(new Balance(fee), ticketChallenge, TICKET_WIN_PROB)
       validateCreatedTicket(balances.self.toBN(), packet._ticket)
     } else if (secrets.length == 1) {
       packet._ticket = await channel.createDummyTicket(ticketChallenge)

@@ -84,12 +84,7 @@ export type HoprOptions = {
   }
 }
 
-export type NodeStatus = (
-  'UNINITIALIZED' |
-  'INITIALIZING' |
-  'RUNNING' |
-  'DESTROYED'
-)
+export type NodeStatus = 'UNINITIALIZED' | 'INITIALIZING' | 'RUNNING' | 'DESTROYED'
 
 class Hopr extends EventEmitter {
   public status: NodeStatus = 'UNINITIALIZED'
@@ -111,13 +106,10 @@ class Hopr extends EventEmitter {
    * @param options
    * @param provider
    */
-  public constructor(
-    private options: HoprOptions,
-  ) {
+  public constructor(private options: HoprOptions) {
     super()
     this.db = openDatabase(options)
   }
-
 
   /**
    * Initialize node
@@ -143,8 +135,7 @@ class Hopr extends EventEmitter {
    *
    * @param options
    */
-  public async initialize(
-  ) {
+  public async initialize() {
     const { id, addresses } = await getIdentity(this.options, this.db)
 
     let connector = await HoprCoreEthereum.create(this.db, id.privKey.marshal(), {
@@ -265,7 +256,6 @@ class Hopr extends EventEmitter {
     verbose('ID', this.getId().toB58String())
     verbose('Protocol version', VERSION)
   }
-
 
   private async tickChannelStrategy(newChannels: RoutingChannel[]) {
     verbose('strategy tick', this.status)
@@ -518,7 +508,6 @@ class Hopr extends EventEmitter {
     if (!ip4 && !ip6 && !p2p) return
 
     try {
-
       if (includeRouting && (ip4 || ip6 || p2p)) {
         log('announcing with routing', ip4 || ip6 || p2p)
         await this.paymentChannels.announce(ip4 || ip6 || p2p)
@@ -526,7 +515,6 @@ class Hopr extends EventEmitter {
         log('announcing without routing')
         await this.paymentChannels.announce(p2p)
       }
-
     } catch (err) {
       log('announce failed')
       throw new Error(`Failed to announce: ${err}`)
