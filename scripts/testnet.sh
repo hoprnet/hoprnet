@@ -81,6 +81,7 @@ start_testnode_vm() {
       --container-image=$2 \
       --container-arg="--password" --container-arg="$BS_PASSWORD" \
       --container-arg="--init" --container-arg="true" \
+      --container-arg="--announce" --container-arg="true" \
       --container-arg="--rest" --container-arg="true" \
       --container-arg="--restHost" --container-arg="0.0.0.0" \
       --container-arg="--healthCheck" --container-arg="true" \
