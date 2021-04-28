@@ -194,9 +194,28 @@ class Hopr extends EventEmitter {
   /**
    * Creates a new node
    * This is necessary as some of the constructor for the node needs to be
-   * asynchronous..
+   * asynchronous
    *
-   * @param options the parameters
+   * The node has a fairly complex lifecycle. This method should do all setup
+   * required for a node to be functioning.
+   *
+   * - Create the database if required.
+   *   - Create a privateKey if required
+   *
+   * - Create a link to the ethereum blockchain
+   *   - Finish indexing previous blocks [SLOW]
+   *   - Find publicly accessible relays
+   *
+   * - Start LibP2P and work out our network configuration.
+   *   - Pass the list of relays from the indexer
+   *
+   * - Wait for wallet to be funded with ETH [requires user interaction]
+   *
+   * - Announce address, pubkey, and multiaddr on chain.
+   *
+   * - Start heartbeat etc.
+   *
+   * @param options
    */
   public static async create(options: HoprOptions): Promise<Hopr> {
     const db = Hopr.openDatabase(options)
