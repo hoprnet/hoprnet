@@ -22,8 +22,8 @@ start_testnet internal 2 $IMG
 echo "Testnet up and running. Leaving it for 20 mins"
 sleep 72000 # 20mins
 echo "Testnet has run for 20m, time to kill it."
-gcloud_get_logs internal-bootstrap $IMG > bootstrap-logs.txt
+gcloud_get_logs internal-node-1 $IMG > node-1.txt
 gcloud_get_logs internal-node-2 $IMG > node-2.txt
-cat bootstrap-logs.txt
+cat node-1.txt
 cleanup
 
