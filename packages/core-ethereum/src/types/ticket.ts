@@ -148,7 +148,7 @@ class Ticket {
       ).serialize()
     )
 
-    return luck.gt(winProb.toBN())
+    return luck.lte(winProb.toBN())
   }
 
   /**
