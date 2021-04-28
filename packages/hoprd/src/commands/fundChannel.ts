@@ -1,6 +1,5 @@
 import type Hopr from '@hoprnet/hopr-core'
 import type PeerId from 'peer-id'
-import type { AutoCompleteResult } from './abstractCommand'
 import chalk from 'chalk'
 import BN from 'bn.js'
 import { moveDecimalPoint } from '@hoprnet/hopr-utils'
@@ -56,14 +55,5 @@ export default class FundChannel extends AbstractCommand {
     } catch (err) {
       return styleValue(err.message, 'failure')
     }
-  }
-
-  async autocomplete(query: string = '', line: string = ''): Promise<AutoCompleteResult> {
-    const [peer] = query.split(' ')
-
-    const peers = this.node.getConnectedPeers().map((p) => p.toB58String())
-
-    const hits = query ? peers.filter((peerId: string) => peerId.startsWith(peer)) : peers
-    return [hits.length ? hits.map((str: string) => `fund ${str}`) : ['fund'], line]
   }
 }
