@@ -9,8 +9,8 @@ import { Challenge } from './challenge'
 import { PacketTag, UnAcknowledgedTickets } from '../../dbKeys'
 import Message from './message'
 import { LevelUp } from 'levelup'
+import { TICKET_AMOUNT, TICKET_WIN_PROB } from '../../constants'
 import Debug from 'debug'
-import Hopr from '../../'
 import HoprCoreEthereum, {
   Hash,
   PublicKey,
@@ -154,8 +154,6 @@ export class Packet extends Uint8Array {
     paymentChannels: HoprCoreEthereum,
     db: LevelUp,
     id: PeerId,
-    ticketAmount: string,
-    ticketWinProb: number,
     arr?: {
       bytes: ArrayBuffer
       offset: number
@@ -188,8 +186,6 @@ export class Packet extends Uint8Array {
     this.paymentChannels = paymentChannels
     this.db = db
     this.id = id
-    this.ticketAmount = ticketAmount
-    this.ticketWinProb = ticketWinProb
   }
 
   slice(begin: number = 0, end: number = Packet.SIZE()) {
@@ -269,16 +265,13 @@ export class Packet extends Uint8Array {
    * @param path array of peerId that determines the route that
    * the packet takes
    */
-  static async create(node: Hopr, libp2p: LibP2P, msg: Uint8Array, path: PeerId[]): Promise<Packet> {
-    const chain = node.paymentChannels
+  static async create(chain: HoprCoreEthereum, db: LevelUp, id: PeerId, libp2p: LibP2P, msg: Uint8Array, path: PeerId[]): Promise<Packet> {
     const arr = new Uint8Array(Packet.SIZE()).fill(0x00)
     const packet = new Packet(
       libp2p,
-      node.paymentChannels,
-      node.db,
-      node.getId(),
-      node.ticketAmount,
-      node.ticketWinProb,
+      chain,
+      db,
+      id,
       {
         bytes: arr.buffer,
         offset: arr.byteOffset
@@ -292,7 +285,7 @@ export class Packet extends Uint8Array {
 
     packet._header = header
 
-    const fee = new BN(secrets.length - 1).imul(new BN(node.ticketAmount))
+    const fee = new BN(secrets.length - 1).imul(new BN(TICKET_AMOUNT))
 
     log('---------- New Packet ----------')
     path
@@ -319,7 +312,7 @@ export class Packet extends Uint8Array {
           ).serialize()
     )
 
-    const senderPubKey = new PublicKey(node.getId().pubKey.marshal())
+    const senderPubKey = new PublicKey(id.pubKey.marshal())
     const targetPubKey = new PublicKey(path[0].pubKey.marshal())
     const channel = chain.getChannel(senderPubKey, targetPubKey)
 
@@ -327,7 +320,7 @@ export class Packet extends Uint8Array {
       log(`before creating channel`)
 
       const balances = await channel.getBalances()
-      packet._ticket = await channel.createTicket(new Balance(fee), ticketChallenge, node.ticketWinProb)
+      packet._ticket = await channel.createTicket(new Balance(fee), ticketChallenge, TICKET_WIN_PROB) 
       validateCreatedTicket(balances.self.toBN(), packet._ticket)
     } else if (secrets.length == 1) {
       packet._ticket = await channel.createDummyTicket(ticketChallenge)

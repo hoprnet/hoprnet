@@ -1,7 +1,6 @@
-import type Hopr from '..'
 import { u8aEquals } from '@hoprnet/hopr-utils'
 import { LevelUp } from 'levelup'
-import { Ticket, Acknowledgement, SubmitTicketResponse, UnacknowledgedTicket } from '@hoprnet/hopr-core-ethereum'
+import HoprCoreEthereum, { Ticket, Acknowledgement, SubmitTicketResponse, UnacknowledgedTicket } from '@hoprnet/hopr-core-ethereum'
 import { UnAcknowledgedTickets, AcknowledgedTickets, AcknowledgedTicketsParse } from '../dbKeys'
 
 /**
@@ -144,8 +143,8 @@ export async function updateAcknowledgement(db: LevelUp, ackTicket: Acknowledgem
  * Delete acknowledged ticket in database
  * @param index Uint8Array
  */
-export async function deleteAcknowledgement(node: Hopr, index: Uint8Array): Promise<void> {
-  await node.db.del(Buffer.from(node._dbKeys.AcknowledgedTickets(index)))
+export async function deleteAcknowledgement(db: LevelUp, index: Uint8Array): Promise<void> {
+  await db.del(Buffer.from(AcknowledgedTickets(index)))
 }
 
 /**
@@ -154,12 +153,12 @@ export async function deleteAcknowledgement(node: Hopr, index: Uint8Array): Prom
  * @param index Uint8Array
  */
 export async function submitAcknowledgedTicket(
-  node: Hopr,
+  db: LevelUp,
+  ethereum: HoprCoreEthereum,
   ackTicket: Acknowledgement,
   index: Uint8Array
 ): Promise<SubmitTicketResponse> {
   try {
-    const ethereum = node.paymentChannels
     const signedTicket = ackTicket.ticket
     const self = ethereum.getPublicKey()
     const counterparty = signedTicket.getSigner()
@@ -167,7 +166,7 @@ export async function submitAcknowledgedTicket(
 
     const result = await channel.submitTicket(ackTicket)
     // TODO look at result.status and actually do something
-    await deleteAcknowledgement(node, index)
+    await deleteAcknowledgement(db, index)
     return result
   } catch (err) {
     return {

@@ -40,16 +40,12 @@ function getAddrs(id: PeerId, options: HoprOptions): Multiaddr[] {
   return addrs.map((addr: Multiaddr) => addr.encapsulate(`/p2p/${id.toB58String()}`))
 }
 
-async function getPeerId(options: HoprOptions): Promise<PeerId> {
+async function getPeerId(options: HoprOptions, db: LevelUp): Promise<PeerId> {
   if (options.peerId != null && PeerId.isPeerId(options.peerId)) {
     return options.peerId
   }
 
-  if (options.db == null) {
-    throw Error('Cannot get/store any peerId without a database handle.')
-  }
-
-  return getFromDatabase(options.db, options.password)
+  return getFromDatabase(db, options.password)
 }
 
 /**
@@ -100,18 +96,14 @@ async function recoverIdentity(serializedKeyPair: Uint8Array, pw?: string): Prom
 
 async function createIdentity(db: LevelUp, pw?: string): Promise<PeerId> {
   pw = pw !== undefined ? pw : await askForPassword('Please type in a password to encrypt the secret key.')
-
   const peerId = await PeerId.create({ keyType: 'secp256k1' })
-
   const serializedKeyPair = serializeKeyPair(peerId, new TextEncoder().encode(pw))
-
   await db.put(Buffer.from(KeyPair), Buffer.from(serializedKeyPair))
-
   return peerId
 }
 
-export default async function getIdentity(options: HoprOptions) {
-  let id = await getPeerId(options)
+export default async function getIdentity(options: HoprOptions, db: LevelUp) {
+  let id = await getPeerId(options, db)
 
   return {
     id,
