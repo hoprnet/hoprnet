@@ -8,6 +8,7 @@ import { durations, oneAtATime } from '@hoprnet/hopr-utils'
 import { Mixer } from '../../mixer'
 import { Challenge } from '../../messages/packet/challenge'
 import { PROTOCOL_ACKNOWLEDGEMENT } from '../../constants'
+import LibP2P from 'libp2p'
 
 const log = Debug('hopr-core:forward')
 const FORWARD_TIMEOUT = durations.seconds(6)
@@ -17,7 +18,7 @@ class PacketForwardInteraction {
   private mixer: Mixer
   private concurrencyLimiter
 
-  constructor(public node: Hopr, private subscribe: any, private sendMessage: any) {
+  constructor(public node: Hopr, private libp2p: LibP2P, private subscribe: any, private sendMessage: any) {
     this.mixer = new Mixer(this.handleMixedPacket.bind(this))
     this.concurrencyLimiter = oneAtATime()
     this.subscribe(PROTOCOL_STRING, this.handlePacket.bind(this))
@@ -32,7 +33,7 @@ class PacketForwardInteraction {
   async handlePacket(msg: Uint8Array) {
     const arr = msg.slice()
     const packet = new Packet(
-      this.node._libp2p,
+      this.libp2p,
       this.node.paymentChannels,
       this.node.db,
       this.node.getId(),
