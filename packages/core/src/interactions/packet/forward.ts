@@ -5,12 +5,11 @@ import type HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 import type PeerId from 'peer-id'
 import { durations, pubKeyToPeerId } from '@hoprnet/hopr-utils'
 import { Mixer } from '../../mixer'
-import { PROTOCOL_ACKNOWLEDGEMENT } from '../../constants'
 import { LevelUp } from 'levelup'
+import { sendAcknowledgement } from './acknowledgement'
 
 // const log = Debug('hopr-core:forward')
 const FORWARD_TIMEOUT = durations.seconds(6)
-const ACKNOWLEDGEMENT_TIMEOUT = durations.seconds(2)
 
 class PacketForwardInteraction {
   private mixer: Mixer
@@ -54,16 +53,6 @@ class PacketForwardInteraction {
 
     sendAcknowledgement(packet, await pubKeyToPeerId(packet.previousHop), this.sendMessage, this.privKey)
   }
-}
-
-export function sendAcknowledgement(packet: Packet, destination: PeerId, sendMessage: any, privKey: PeerId) {
-  setImmediate(async () => {
-    const ack = packet.createAcknowledgement(privKey)
-
-    sendMessage(destination, PROTOCOL_ACKNOWLEDGEMENT, ack.serialize(), {
-      timeout: ACKNOWLEDGEMENT_TIMEOUT
-    })
-  })
 }
 
 export { PacketForwardInteraction }
