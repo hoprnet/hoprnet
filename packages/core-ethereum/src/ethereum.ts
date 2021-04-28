@@ -2,16 +2,15 @@ import type { ContractTransaction } from 'ethers'
 import type Multiaddr from 'multiaddr'
 import type { HoprToken, HoprChannels } from './contracts'
 import { providers, utils, errors, Wallet, BigNumber } from 'ethers'
-import { Address } from './types'
+import { Address, Ticket, Acknowledgement } from './types'
 import BN from 'bn.js'
 import { Balance, NativeBalance, Hash, PublicKey } from './types'
-import { durations } from '@hoprnet/hopr-utils'
+import { durations, PromiseValue } from '@hoprnet/hopr-utils'
 import NonceTracker from './nonce-tracker'
 import TransactionManager from './transaction-manager'
-import { getNetworkGasPrice } from './utils'
+import { getNetworkGasPrice, getNetworkName } from './utils'
 import Debug from 'debug'
 import { Networks, getContracts } from '@hoprnet/hopr-ethereum'
-import { getNetworkName } from './utils'
 import { HoprToken__factory, HoprChannels__factory } from './contracts'
 
 const log = Debug('hopr:core-ethereum:chain-operations')
@@ -199,9 +198,14 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
     // TODO: catch race-condition
   }
 
-  async function redeemTicket(hoprChannels, counterparty, ackTicket, ticket): Promise<Receipt> {
+  async function redeemTicket(
+    channels: HoprChannels,
+    counterparty: Address,
+    ackTicket: Acknowledgement,
+    ticket: Ticket
+  ): Promise<Receipt> {
     const transaction = await sendTransaction(
-      hoprChannels.redeemTicket,
+      channels.redeemTicket,
       counterparty.toHex(),
       ackTicket.preImage.toHex(),
       ackTicket.ticket.epoch.serialize(),
@@ -265,5 +269,4 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
   return api
 }
 
-type Unpack<T> = T extends Promise<infer U> ? U : T
-export type ChainWrapper = Unpack<ReturnType<typeof createChainWrapper>>
+export type ChainWrapper = PromiseValue<ReturnType<typeof createChainWrapper>>

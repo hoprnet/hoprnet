@@ -1,6 +1,6 @@
 import { Networks, networks } from '@hoprnet/hopr-ethereum'
 import { u8aCompare, u8aConcat, u8aEquals, A_STRICLY_LESS_THAN_B, A_EQUALS_B, u8aToNumber } from '@hoprnet/hopr-utils'
-import { Hash, Signature } from '../types'
+import { Hash, Signature } from './types'
 import BN from 'bn.js'
 
 /**
