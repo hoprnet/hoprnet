@@ -21,7 +21,6 @@ function start_node {
   echo "🤖 Node started (127.0.0.1:9091,3000,3001)"
   echo "⏰ Waiting (10) seconds for node to start"
   sleep 10
-  if [[ -n "$PID" ]]; then kill $PID; fi
   echo "🧽 Printing last 10 lines from logs"
   tail -n 10 /tmp/$DATAFILE-*.txt
 }
