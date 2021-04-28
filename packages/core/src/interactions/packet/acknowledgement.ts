@@ -2,14 +2,16 @@ import type { LevelUp } from 'levelup'
 import debug from 'debug'
 import { Acknowledgement } from '../../messages/acknowledgement'
 import { getUnacknowledgedTickets, deleteTicket, replaceTicketWithAcknowledgement } from '../../dbKeys'
+import type HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 import { PROTOCOL_ACKNOWLEDGEMENT } from '../../constants'
 import PeerId from 'peer-id'
+import { PublicKey } from '@hoprnet/hopr-utils'
 const log = debug('hopr-core:acknowledgement')
 
 export function subscribeToAcknowledgements(
   subscribe: any,
   db: LevelUp,
-  paymentChannels: any,
+  chain: HoprCoreEthereum,
   pubKey: PeerId,
   onMessage: (ackMessage: Acknowledgement) => void
 ) {
@@ -23,14 +25,16 @@ export function subscribeToAcknowledgements(
       return await deleteTicket(db, ackMsg.ackChallenge)
     }
 
-    const acknowledgement = await paymentChannels.account.acknowledge(unacknowledgedTicket, ackMsg.ackChallenge)
+    const channel = chain.getChannel(new PublicKey(pubKey.pubKey.marshal()), new PublicKey(remotePeer.pubKey.marshal()))
 
-    if (acknowledgement === null) {
+    const ackedTicket = await channel.acknowledge(unacknowledgedTicket, ackMsg.ackChallenge)
+
+    if (ackedTicket === null) {
       log(`Got a ticket that is not a win. Dropping ticket.`)
       await deleteTicket(db, ackMsg.ackChallenge)
     } else {
       log(`Storing winning ticket`)
-      await replaceTicketWithAcknowledgement(db, ackMsg.ackChallenge, acknowledgement)
+      await replaceTicketWithAcknowledgement(db, ackMsg.ackChallenge, ackedTicket)
     }
     onMessage(ackMsg)
   })
