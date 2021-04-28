@@ -64,6 +64,7 @@ DEBUG=hopr* yarn run:hoprd:bob
 # fund all your nodes to get started
 yarn run:faucet:all
 ```
+
 ### Docker images
 
 All our docker images can be found [here](https://console.cloud.google.com/gcr/images/hoprassociation/GLOBAL) and are prefixed as `gcr.io/hoprassociation/$PROJECT:$RELEASE`. Stable releases live in [Docker Hub](https://hub.docker.com/u/hopr)
