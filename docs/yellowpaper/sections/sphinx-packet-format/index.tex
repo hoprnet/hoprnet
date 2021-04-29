@@ -22,7 +22,7 @@ Sphinx is a cryptographic message format used to relay anonymized messages withi
     \label{fig:Sphinx packet format}
 \end{figure}
 \subparagraph{Notation:}Let $\kappa=128$ be a security parameter. An adversary will have to do about $2\kappa$ work to break the security of Sphinx with non negligible probability.
-Let $r$ be the maximum number of nodes that a Sphinx mix message will traverse before being delivered to its destination. Let $Z$ be  the destination address, an identifier $I \in \{0, 1\}^\kappa$ and a sequence of mix nodes $\{n_0, n_1, . . . , n_{v-1}\}$ with $v\leq r$ the length of the path traversed by the packet. It must also be the case that $|Z| \leq (2(r - v) + 2)$.
+Let $r$ be the maximum number of nodes that a Sphinx mix message will traverse before being delivered to its destination. Let $\Delta$ be  the destination address, an identifier $I \in \{0, 1\}^\kappa$ and a sequence of mix nodes $\{n_0, n_1, . . . , n_{v-1}\}$ with $v\leq r$ the length of the path traversed by the packet. It must also be the case that $|Z| \leq (2(r - v) + 2)$.
 \\$G$ is a prime order cyclic group satisfying the Decisional Diffie-Hellman Assumption. The element $g$ is a generator of $G$ and $q$ is the (prime) order of $G$, with $q\approx2^{\kappa}$.
 $G^*$is the set of non-identity elements of G. $h_b$is a hash function used to compute blinding factors and we model by random oracles such that:
 $h:G^*\times G^*\rightarrow\mathbb{Z}^*_q$ where $\mathbb{Z}^*_q$ is the field of non-identity elements of $\mathbb{Z}_q$ (field of integers).
