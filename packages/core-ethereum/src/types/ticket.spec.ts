@@ -1,8 +1,8 @@
 import assert from 'assert'
 import { expect } from 'chai'
 import { stringToU8a, SIGNATURE_LENGTH } from '@hoprnet/hopr-utils'
+import { ethers } from 'ethers'
 import { Address, Ticket, Hash, Balance, PublicKey, Signature, UINT256 } from '.'
-import { computeWinningProbability } from '../utils'
 import * as fixtures from '../fixtures'
 import BN from 'bn.js'
 import { randomBytes } from 'crypto'
@@ -15,11 +15,12 @@ describe('test ticket construction', function () {
   })
 
   it('should create new ticket', async function () {
-    const challenge = new Hash(new Uint8Array({ length: Hash.SIZE }))
+    const challengeResponse = new Hash(new Uint8Array({ length: Hash.SIZE }))
+    const challenge = challengeResponse.hash()
     const epoch = UINT256.fromString('1')
     const index = UINT256.fromString('1')
     const amount = new Balance(new BN(1))
-    const winProb = computeWinningProbability(1)
+    const winProb = Ticket.fromProbability(1)
     const channelIteration = UINT256.fromString('1')
     const signature = new Signature(new Uint8Array({ length: SIGNATURE_LENGTH }), 0)
     const ticket = new Ticket(userA, challenge, epoch, index, amount, winProb, channelIteration, signature)
@@ -28,8 +29,10 @@ describe('test ticket construction', function () {
     assert(ticket.challenge.eq(challenge), 'wrong challenge')
     assert(ticket.epoch.toBN().eq(epoch.toBN()), 'wrong epoch')
     assert(ticket.amount.toBN().eq(amount.toBN()), 'wrong amount')
-    assert(ticket.winProb.eq(winProb), 'wrong winProb')
+    assert(ticket.winProb.toBN().eq(winProb.toBN()), 'wrong winProb')
     assert(ticket.channelIteration.toBN().eq(channelIteration.toBN()), 'wrong channelIteration')
+    assert(ticket.checkResponse(challengeResponse), 'challengeResponse failed')
+    assert(ticket.isWinningTicket(challengeResponse, challengeResponse, winProb), 'ticket should be winning')
   })
 
   it('should generate the hash correctly #1', async function () {
@@ -39,7 +42,7 @@ describe('test ticket construction', function () {
     const epoch = UINT256.fromString('1')
     const index = UINT256.fromString('1')
     const amount = new Balance(new BN('0000000002c68af0bb140000', 16))
-    const winProb = new Hash(stringToU8a('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'))
+    const winProb = Ticket.fromProbability(1)
     const channelIteration = UINT256.fromString('1')
     const signature = new Signature(new Uint8Array({ length: SIGNATURE_LENGTH }), 0)
 
@@ -68,7 +71,7 @@ describe('test ticket construction', function () {
     const epoch = UINT256.fromString('2')
     const index = UINT256.fromString('1')
     const amount = new Balance(new BN('000000000de0b6b3a7640000', 16))
-    const winProb = new Hash(stringToU8a('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'))
+    const winProb = Ticket.fromProbability(1)
     const channelIteration = UINT256.fromString('1')
     const signature = new Signature(new Uint8Array({ length: SIGNATURE_LENGTH }), 0)
 
@@ -91,7 +94,12 @@ describe('test ticket construction', function () {
   })
 })
 
-const WIN_PROB = new BN(1)
+describe('test ticket methods', function () {
+  it('should convert float to uint256', function () {
+    assert(Ticket.fromProbability(0).toBN().isZero())
+    assert(Ticket.fromProbability(1).toBN().eq(new BN(ethers.constants.MaxUint256.toString())))
+  })
+})
 
 describe('test signedTicket construction', async function () {
   const userB = PublicKey.fromPrivKey(stringToU8a(fixtures.ACCOUNT_B.privateKey)).toAddress()
@@ -105,7 +113,7 @@ describe('test signedTicket construction', async function () {
       UINT256.fromString('0'),
       UINT256.fromString('1'),
       new Balance(new BN(15)),
-      new Hash(new Uint8Array(new BN(new Uint8Array(Hash.SIZE).fill(0xff)).div(WIN_PROB).toArray('le', Hash.SIZE))),
+      Ticket.fromProbability(1),
       UINT256.fromString('0'),
       userAPrivKey
     )

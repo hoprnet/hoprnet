@@ -1,5 +1,8 @@
+image:
+  file: .gitpod.dockerfile
+
 tasks:
-  - init: yarn && yarn setup
+  - init: yarn && yarn build
 
 ports:
   - port: 3000-9095

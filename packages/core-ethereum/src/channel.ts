@@ -11,7 +11,6 @@ import {
   ChannelEntry,
   UnacknowledgedTicket
 } from './types'
-import { computeWinningProbability, checkChallenge, isWinningTicket } from './utils'
 import Debug from 'debug'
 import type { SubmitTicketResponse } from '.'
 import { Commitment } from './commitment'
@@ -56,9 +55,7 @@ class Channel {
   ): Promise<Acknowledgement | null> {
     const response = Hash.create(unacknowledgedTicket.secretA.serialize(), acknowledgementHash.serialize())
     const ticket = unacknowledgedTicket.ticket
-    if (
-      await isWinningTicket(ticket.getHash(), response, await this.commitment.getCurrentCommitment(), ticket.winProb)
-    ) {
+    if (ticket.isWinningTicket(response, await this.commitment.getCurrentCommitment(), ticket.winProb)) {
       const ack = new Acknowledgement(ticket, response, await this.commitment.getCurrentCommitment())
       await this.commitment.bumpCommitment()
       return ack
@@ -154,7 +151,7 @@ class Channel {
       c.ticketEpochFor(this.counterparty.toAddress()),
       new UINT256(new BN(this.index++)),
       amount,
-      computeWinningProbability(winProb),
+      Ticket.fromProbability(winProb),
       (await this.getState()).channelEpoch,
       this.privateKey
     )
@@ -168,7 +165,7 @@ class Channel {
       UINT256.fromString('0'),
       new UINT256(new BN(this.index++)),
       new Balance(new BN(0)),
-      computeWinningProbability(1),
+      Ticket.fromProbability(1),
       UINT256.fromString('0'),
       this.privateKey
     )
@@ -189,7 +186,7 @@ class Channel {
         }
       }
 
-      const validChallenge = await checkChallenge(ticket.challenge, ackTicket.response)
+      const validChallenge = ticket.checkResponse(ackTicket.response)
       if (!validChallenge) {
         log(`Failed to submit ticket ${ackTicket.response.toHex()}: 'Invalid challenge.'`)
         return {
@@ -198,7 +195,7 @@ class Channel {
         }
       }
 
-      const isWinning = await isWinningTicket(ticket.getHash(), ackTicket.response, ackTicket.preImage, ticket.winProb)
+      const isWinning = await ticket.isWinningTicket(ackTicket.response, ackTicket.preImage, ticket.winProb)
       if (!isWinning) {
         log(`Failed to submit ticket ${ackTicket.response.toHex()}:  'Not a winning ticket.'`)
         return {
