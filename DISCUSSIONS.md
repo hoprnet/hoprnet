@@ -6,10 +6,10 @@ The following are particular topics the team has agreed to discuss on, or are re
 
 _These discussion involve the actual definition of the HOPR protocol, as defined by our yellowpaper. Some topics within the protocol are external to its definition, and are instead better suited to be implemented as a separate discussion._
 
-### Decover traffic allocation = % of staked + unreleased tokens
+### Cover traffic allocation = % of staked + unreleased tokens
 
-#### Problem Statement
-Cover traffic should be allocated proportional to the total amount of (a) HOPR tokens staked + (b) unreleased tokens (for early token buyers & team).
+#### Problem statement
+Cover traffic should be allocated proportional to the total amount of (a) HOPR tgokens staked + (b) unreleased tokens (for early token buyers & team).
 
 #### Discussion
 
@@ -30,4 +30,12 @@ This was initially defined in #947.
 ## Implementation
 
 _These discussions relate to the implementation of the HOPR protocol, or more particularly, `hoprd`. The protocol is defined by our yellowpaper, but the only existing implementation is located in `packages/hoprd`, as a Typescript/JavaScript node.js application._
+
+### Major refactor needed in our database
+
+#### Problem statement
+We sprinkle references to an IndexedDb throughout the code, and rely on buffer serialisation everywhere we access it.
+
+#### Discussion
+It would be more maintainable and readable to create a database abstraction to allow us to mock out, or separate database implementation details from the desired interface.
 
