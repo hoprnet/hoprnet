@@ -3,10 +3,12 @@ import PeerId from 'peer-id'
 import Memdown from 'memdown'
 import { randomBytes } from 'crypto'
 import { EventEmitter } from 'events'
+import BN from 'bn.js'
 
 import { subscribeToAcknowledgements, sendAcknowledgement } from './acknowledgement'
-import { Balance, createFirstChallenge, PublicKey } from '@hoprnet/hopr-utils'
-import { Ticket } from '@hoprnet/hopr-core-ethereum'
+import type { PublicKey } from '@hoprnet/hopr-utils'
+import { Balance, createFirstChallenge } from '@hoprnet/hopr-utils'
+import { Ticket, UINT256, Hash } from '@hoprnet/hopr-core-ethereum'
 
 import { Challenge } from '../../messages/challenge'
 import { Packet } from '../../messages/packet'
@@ -15,26 +17,37 @@ import Defer from 'p-defer'
 
 const SECRET_LENGTH = 32
 
-function createFakeChain() {
+function createFakeChain(privKey: PeerId) {
   const acknowledge = () => {}
-  const createTicket = () => {}
 
-  const getChannel = () => ({
+  const getChannel = (_self: PublicKey, counterparty: PublicKey) => ({
     acknowledge,
-    createTicket
+    createTicket: (amount: Balance, challenge: PublicKey, _winProb: number) => {
+      return Ticket.create(
+        counterparty.toAddress(),
+        challenge,
+        new UINT256(new BN(0)),
+        new UINT256(new BN(0)),
+        amount,
+        new Hash(new Uint8Array(Hash.SIZE).fill(0xff)),
+        new UINT256(new BN(0)),
+        privKey.privKey.marshal()
+      )
+    }
   })
 
   return { getChannel }
 }
 
 function createFakeSendReceive(events: EventEmitter, self: PeerId) {
-  const send = (destination: PeerId, _protocol: any, msg: Uint8Array) => {
-    events.emit('msg', msg, self, destination)
+  const send = (destination: PeerId, protocol: any, msg: Uint8Array) => {
+    console.log(`destination`, destination.toB58String())
+    events.emit('msg', msg, self, destination, protocol)
   }
 
-  const subscribe = (_protocol: any, foo: (msg: Uint8Array, sender: PeerId) => any) => {
-    events.on('msg', (msg, sender, destination) => {
-      if (self.equals(destination)) {
+  const subscribe = (protocol: string, foo: (msg: Uint8Array, sender: PeerId) => any) => {
+    events.on('msg', (msg, sender, destination, protocolSubscription) => {
+      if (self.equals(destination) && protocol === protocolSubscription) {
         foo(msg, sender)
       }
     })
@@ -58,8 +71,12 @@ describe('packet interaction', function () {
     ;[self, counterparty] = await Promise.all(Array.from({ length: 2 }, (_) => PeerId.create({ keyType: 'secp256k1' })))
   })
 
-  it('acknowledgement workflow', async function () {
-    const chain = createFakeChain()
+  afterEach(function () {
+    events.removeAllListeners()
+  })
+
+  it.skip('acknowledgement workflow', async function () {
+    const chainSelf = createFakeChain(self)
     const libp2pSelf = createFakeSendReceive(events, self)
     const libp2pCounterparty = createFakeSendReceive(events, counterparty)
 
@@ -79,7 +96,7 @@ describe('packet interaction', function () {
 
     const defer = Defer()
 
-    subscribeToAcknowledgements(libp2pSelf.subscribe, db, chain as any, self, () => {
+    subscribeToAcknowledgements(libp2pSelf.subscribe, db, chainSelf as any, self, () => {
       defer.resolve()
     })
 
@@ -88,22 +105,45 @@ describe('packet interaction', function () {
     await defer.promise
   })
 
-  // it('packet-acknowledgement workflow', async function () {
-  //   const [sender, relay0, relay1, relay2, receiver] = await Promise.all(
-  //     Array.from({ length: 5 }, (_) => PeerId.create({ keyType: 'secp256k1' }))
-  //   )
+  it('packet-acknowledgement workflow', async function () {
+    const [sender, relay0, relay1, relay2, receiver] = await Promise.all(
+      Array.from({ length: 5 }, (_) => PeerId.create({ keyType: 'secp256k1' }))
+    )
 
-  //   const chain = createFakeChain()
-  //   const libp2p = createFakeSendReceive(self, counterparty)
+    console.log(`sender`, sender.toB58String(), `relay0`, relay0.toB58String())
 
-  //   const testMsg = new TextEncoder().encode('testMsg')
-  //   const packet = await Packet.create(testMsg, [relay0, relay1, receiver], sender, chain as any, {
-  //     value: new Balance(new BN(0)),
-  //     winProb: 1
-  //   })
+    const chainSender = createFakeChain(sender)
+    const chainRelay0 = createFakeChain(relay0)
 
-  //   const forward = new PacketForwardInteraction(libp2p.subscribe, libp2p.send, sender, chain as any, console.log, db)
+    const libp2pSender = createFakeSendReceive(events, sender)
+    const libp2pRelay0 = createFakeSendReceive(events, relay0)
 
-  //   console.log(packet)
-  // })
+    const testMsg = new TextEncoder().encode('testMsg')
+    const packet = await Packet.create(testMsg, [relay0, relay1, receiver], sender, chainSender as any, {
+      value: new Balance(new BN(0)),
+      winProb: 1
+    })
+
+    console.log(Packet.SIZE, packet.serialize().length)
+
+    const senderInteraction = new PacketForwardInteraction(
+      libp2pSender.subscribe,
+      libp2pSender.send,
+      sender,
+      chainSender as any,
+      console.log,
+      db
+    )
+
+    const relay0Interaction = new PacketForwardInteraction(
+      libp2pRelay0.subscribe,
+      libp2pRelay0.send,
+      sender,
+      chainRelay0 as any,
+      console.log,
+      db
+    )
+
+    senderInteraction.interact(relay0, packet)
+  })
 })

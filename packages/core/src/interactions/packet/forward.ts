@@ -27,7 +27,7 @@ export class PacketForwardInteraction {
   }
 
   async interact(counterparty: PeerId, packet: Packet): Promise<void> {
-    await this.sendMessage(counterparty, PROTOCOL_STRING, packet, {
+    await this.sendMessage(counterparty, PROTOCOL_STRING, packet.serialize(), {
       timeout: FORWARD_TIMEOUT
     })
   }

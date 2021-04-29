@@ -35,7 +35,7 @@ import { getTickets } from '../utils'
 
 export const MAX_HOPS = 3 // 3 relayer and 1 destination
 
-const PACKET_LENGTH = getPacketLength(MAX_HOPS, POR_STRING_LENGTH, 0)
+const PACKET_LENGTH = getPacketLength(MAX_HOPS + 1, POR_STRING_LENGTH, 0)
 
 const log = Debug('hopr-core:message:packet')
 // const verbose = Debug('hopr-core:verbose:message:packet')
