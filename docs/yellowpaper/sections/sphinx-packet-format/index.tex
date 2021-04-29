@@ -56,11 +56,13 @@ The payload is where the actual message is hidden and is computed in different l
 \\~\\Same happens at $(C)$ and $(D)$: key derivation, unblinding, deleting, shifting, decryption and blinding. 
 In addition to all these steps, the final mix-header to the destination node $(Z)$ must include a final destination address that symbolizes the end of the path and tells that it’s the recipient and an Identifier used to generate reply messages back to the sender.
 \subsection*{Implementation choices}
+The implementation choices taken by HOPR team are the following:
 \begin{itemize}
     \item \textbf{Cyclic group:} The cyclic group used in the HOPR Sphinx implementation is an elliptic curve group on the Ethereum secp256k1 curve and thus operations will be done on the elliptic curve.
-    \item \textbf{Hash function:} We use BLAKE2s hash function in HOPR which is a cryptographic hash function faster than SHA-2 and SHA-3, yet is at least as secure as SHA-3 and produces digests of any size between 1 and 32 bytes.
-    \item \textbf{MAC:} BLAKE2 hash algorithm is being used for encryption and decryption of the payload in HOPR's implementation of the SPHINX packet format. Any attempt of modification by an attacker would result in message distruction and thus is would be irrecoverable. we use a MAC based on a hash function BLAKE2s.
+    \item \textbf{Hash function:} BLAKE2s hash function which is a cryptographic hash function faster than SHA-2 and SHA-3, yet is at least as secure as SHA-3 and produces digests of any size between 1 and 32 bytes.
+    \item \textbf{MAC:} MAC based on a hash function BLAKE2s.
     \item \textbf{Encryption scheme:} LIONESS implementation based on the ChaCha20 stream cipher.
+    \item \textbf{Padding:} We replace the 0-padding by a randomized padding for the exit-mix node. In the original SPHINX paper, a sequence of only 0s is used for padding. This allows the last mix-node in the path to infer information about the length of the path and the last destination, hence breaking one of the security properties promised by Sphinx.
 \end{itemize}
 
 
