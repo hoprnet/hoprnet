@@ -6,6 +6,20 @@ The following are particular topics the team has agreed to discuss on, or are re
 
 _These discussion involve the actual definition of the HOPR protocol, as defined by our yellowpaper. Some topics within the protocol are external to its definition, and are instead better suited to be implemented as a separate discussion._
 
+### SURBs
+
+#### Problem statement
+Right now, because of sender/receiver unlinkability, the receiver can not know how to reply back to the sender.
+
+#### Discussion
+There exists a concept called SURBs - Single-Use Reply Blocks, This means, we create in addition to the header that we use to send the message to the receiver a second one that is used to reply to the sender.
+
+We can refactor the header generation function such that we can create Reply-headers.
+
+#### Additional notes
+
+This was initially brought up in #743.
+
 ### Cover traffic allocation = % of staked + unreleased tokens
 
 #### Problem statement
