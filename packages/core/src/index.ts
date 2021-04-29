@@ -94,7 +94,7 @@ class Hopr extends EventEmitter {
   private forward: PacketForwardInteraction
   private libp2p: LibP2P
   private db: CoreDB
-  private paymentChannels: HoprCoreEthereum
+  private paymentChannels: Promise<HoprCoreEthereum>
 
   /**
    * Create an uninitialized Hopr Node
@@ -112,6 +112,9 @@ class Hopr extends EventEmitter {
       throw new Error('Hopr Node must be initialized with an id with a private key')
     }
     this.db = new CoreDB(options)
+    this.paymentChannels = HoprCoreEthereum.create(this.db.getLevelUpTempUntilRefactored(), this.id.privKey.marshal(), {
+      provider: this.options.provider
+    })
   }
 
   /**
@@ -138,16 +141,13 @@ class Hopr extends EventEmitter {
    * @param options
    */
   public async start() {
-    let connector = await HoprCoreEthereum.create(this.db.getLevelUpTempUntilRefactored(), this.id.privKey.marshal(), {
-      provider: this.options.provider
-    })
-
-    if ((await connector.getNativeBalance()).toBN().lte(MIN_NATIVE_BALANCE)) {
+    if ((await this.getNativeBalance()).toBN().lte(MIN_NATIVE_BALANCE)) {
       throw new Error('Cannot start node without a funded wallet')
     }
 
+    const chain = await this.paymentChannels
     verbose('Started HoprEthereum. Waiting for indexer to find connected nodes.')
-    const publicNodes = await connector.waitForPublicNodes()
+    const publicNodes = await chain.waitForPublicNodes()
     if (publicNodes.length == 0) {
       log('No public nodes have announced yet, we cannot rely on relay')
     }
@@ -192,16 +192,10 @@ class Hopr extends EventEmitter {
 
     await libp2p.start()
     this.libp2p = libp2p
-    this.paymentChannels = connector
     this.libp2p.connectionManager.on('peer:connect', (conn: Connection) => {
       this.emit('hopr:peer:connection', conn.remotePeer)
       this.networkPeers.register(conn.remotePeer)
     })
-
-    await this.heartbeat.start()
-    this.periodicCheck()
-    this.setChannelStrategy(this.options.strategy || 'passive')
-
     this.networkPeers = new NetworkPeers(Array.from(this.libp2p.peerStore.peers.values()).map((x) => x.id))
 
     const subscribe = (protocol: string, handler: LibP2PHandlerFunction, includeReply = false) =>
@@ -214,20 +208,24 @@ class Hopr extends EventEmitter {
 
     this.heartbeat = new Heartbeat(this.networkPeers, subscribe, sendMessageAndExpectResponse, hangup)
 
-    subscribeToAcknowledgements(subscribe, this.db, this.paymentChannels, (ack) =>
+    subscribeToAcknowledgements(subscribe, this.db, await this.paymentChannels, (ack) =>
       this.emit('message-acknowledged:' + ack.getKey())
     )
 
     const onMessage = (msg: Uint8Array) => this.emit('hopr:message', msg)
     this.forward = new PacketForwardInteraction(
       this.db,
-      this.paymentChannels,
+      await this.paymentChannels,
       this.getId(),
       this.libp2p,
       subscribe,
       sendMessage,
       onMessage
     )
+
+    await this.heartbeat.start()
+    this.periodicCheck()
+    this.setChannelStrategy(this.options.strategy || 'passive')
 
     // Log information
     log('# STARTED NODE')
@@ -270,12 +268,13 @@ class Hopr extends EventEmitter {
       this.networkPeers.register(channel[1]) // Make sure current channels are 'interesting'
     }
     const balance = await this.getBalance()
+    const chain = await this.paymentChannels
     const [nextChannels, closeChannels] = await this.strategy.tick(
       balance.toBN(),
       newChannels,
       currentChannels,
       this.networkPeers,
-      this.paymentChannels.getRandomChannel.bind(this.paymentChannels)
+      chain.getRandomChannel.bind(this.paymentChannels)
     )
     verbose(`strategy wants to close ${closeChannels.length} channels`)
     for (let toClose of closeChannels) {
@@ -299,7 +298,7 @@ class Hopr extends EventEmitter {
   }
 
   private async getOpenChannels(): Promise<RoutingChannel[]> {
-    return this.paymentChannels.getChannelsFromPeer(this.getId())
+    return (await this.paymentChannels).getChannelsFromPeer(this.getId())
   }
 
   /**
@@ -315,7 +314,7 @@ class Hopr extends EventEmitter {
   public async stop(): Promise<void> {
     this.status = 'DESTROYED'
     clearTimeout(this.checkTimeout)
-    await Promise.all([this.heartbeat.stop(), this.paymentChannels.stop()])
+    await Promise.all([this.heartbeat.stop(), (await this.paymentChannels).stop()])
 
     await Promise.all([this.db?.close().then(() => log(`Database closed.`)), this.libp2p.stop()])
 
@@ -398,7 +397,7 @@ class Hopr extends EventEmitter {
           let packet: Packet
           try {
             packet = await Packet.create(
-              this.paymentChannels,
+              await this.paymentChannels,
               this.db,
               this.getId(),
               this.libp2p,
@@ -461,7 +460,7 @@ class Hopr extends EventEmitter {
 
   private async checkBalances() {
     const balance = await this.getBalance()
-    const address = await this.paymentChannels.getAddress().toHex()
+    const address = (await this.getEthereumAddress()).toHex()
     if (balance.toBN().lten(0)) {
       log('unfunded node', address)
       this.emit('hopr:warning:unfunded', address)
@@ -489,7 +488,8 @@ class Hopr extends EventEmitter {
   }
 
   private async announce(includeRouting: boolean = false): Promise<void> {
-    const account = await this.paymentChannels.getAccount(this.paymentChannels.getAddress())
+    const chain = await this.paymentChannels
+    const account = await chain.getAccount(await this.getEthereumAddress())
     // exit if we already announced
     if (account.hasAnnounced()) return
 
@@ -507,10 +507,10 @@ class Hopr extends EventEmitter {
     try {
       if (includeRouting && (ip4 || ip6 || p2p)) {
         log('announcing with routing', ip4 || ip6 || p2p)
-        await this.paymentChannels.announce(ip4 || ip6 || p2p)
+        await chain.announce(ip4 || ip6 || p2p)
       } else if (!includeRouting && p2p) {
         log('announcing without routing')
-        await this.paymentChannels.announce(p2p)
+        await chain.announce(p2p)
       }
     } catch (err) {
       log('announce failed')
@@ -535,15 +535,18 @@ class Hopr extends EventEmitter {
   }
 
   public async getBalance(): Promise<Balance> {
-    return await this.paymentChannels.getBalance(true)
+    const chain = await this.paymentChannels
+    return await chain.getBalance(true)
   }
 
   public async getNativeBalance(): Promise<NativeBalance> {
-    return await this.paymentChannels.getNativeBalance(true)
+    const chain = await this.paymentChannels
+    return await chain.getNativeBalance(true)
   }
 
-  public smartContractInfo(): string {
-    return this.paymentChannels.smartContractInfo()
+  public async smartContractInfo(): Promise<string> {
+    const chain = await this.paymentChannels
+    return chain.smartContractInfo()
   }
 
   /**
@@ -558,7 +561,7 @@ class Hopr extends EventEmitter {
   ): Promise<{
     channelId: Hash
   }> {
-    const ethereum = this.paymentChannels
+    const ethereum = await this.paymentChannels
     const selfPubKey = new PublicKey(this.getId().pubKey.marshal())
     const counterpartyPubKey = new PublicKey(counterparty.pubKey.marshal())
     const myAvailableTokens = await ethereum.getBalance(false)
@@ -592,7 +595,7 @@ class Hopr extends EventEmitter {
   ): Promise<{
     channelId: Hash
   }> {
-    const ethereum = this.paymentChannels
+    const ethereum = await this.paymentChannels
     const selfPubKey = new PublicKey(this.getId().pubKey.marshal())
     const counterpartyPubKey = new PublicKey(counterparty.pubKey.marshal())
     const myBalance = await ethereum.getBalance(false)
@@ -614,7 +617,7 @@ class Hopr extends EventEmitter {
   }
 
   public async closeChannel(counterparty: PeerId): Promise<{ receipt: string; status: string }> {
-    const ethereum = this.paymentChannels
+    const ethereum = await this.paymentChannels
     const selfPubKey = new PublicKey(this.getId().pubKey.marshal())
     const counterpartyPubKey = new PublicKey(counterparty.pubKey.marshal())
     const channel = ethereum.getChannel(selfPubKey, counterpartyPubKey)
@@ -635,23 +638,27 @@ class Hopr extends EventEmitter {
   }
 
   public async submitAcknowledgedTicket(ackTicket: Acknowledgement, index: Uint8Array) {
-    return this.db.submitAcknowledgedTicket(this.paymentChannels, ackTicket, index)
+    return this.db.submitAcknowledgedTicket(await this.paymentChannels, ackTicket, index)
   }
 
   public async getChannelsOf(addr: Address): Promise<ChannelEntry[]> {
-    return await this.paymentChannels.getChannelsOf(addr)
+    const ethereum = await this.paymentChannels
+    return await ethereum.getChannelsOf(addr)
   }
 
   public async getPublicKeyOf(addr: Address): Promise<PublicKey> {
-    return await this.paymentChannels.getPublicKeyOf(addr)
+    const ethereum = await this.paymentChannels
+    return await ethereum.getPublicKeyOf(addr)
   }
 
-  public getEthereumAddress(): Address {
-    return this.paymentChannels.getAddress()
+  public async getEthereumAddress(): Promise<Address> {
+    const ethereum = await this.paymentChannels
+    return ethereum.getAddress()
   }
 
   public async withdraw(currency: 'NATIVE' | 'HOPR', recipient: string, amount: string): Promise<string> {
-    return this.paymentChannels.withdraw(currency, recipient, amount)
+    const ethereum = await this.paymentChannels
+    return ethereum.withdraw(currency, recipient, amount)
   }
 
   /**
@@ -661,14 +668,32 @@ class Hopr extends EventEmitter {
    * @param destination instance of peerInfo that contains the peerId of the destination
    */
   private async getIntermediateNodes(destination: PeerId): Promise<PeerId[]> {
+    const ethereum = await this.paymentChannels
     return await findPath(
       this.getId(),
       destination,
       MAX_HOPS - 1,
       this.networkPeers,
-      this.paymentChannels.getChannelsFromPeer.bind(this.paymentChannels),
+      ethereum.getChannelsFromPeer.bind(this.paymentChannels),
       PATH_RANDOMNESS
     )
+  }
+
+  // This is a utility method to wait until the node is funded.
+  public async waitForFunds(): Promise<void> {
+    return new Promise((resolve) => {
+      const tick = () => {
+        this.getNativeBalance().then((nativeBalance) => {
+          if (nativeBalance.toBN().gt(MIN_NATIVE_BALANCE)) {
+            resolve()
+          } else {
+            log('still unfunded, trying again soon')
+            setTimeout(tick, CHECK_TIMEOUT)
+          }
+        })
+      }
+      tick()
+    })
   }
 }
 
