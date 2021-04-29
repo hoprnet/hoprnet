@@ -7,7 +7,6 @@ import debug from 'debug'
 import { Acknowledgement, PublicKey, Balance, Address, NativeBalance } from './types'
 import Indexer from './indexer'
 import { RoutingChannel } from './indexer'
-import { getWinProbabilityAsFloat, computeWinningProbability } from './utils'
 import { DEFAULT_URI, MAX_CONFIRMATIONS, INDEXER_BLOCK_RANGE } from './constants'
 import { Channel } from './channel'
 import { createChainWrapper } from './ethereum'
@@ -156,4 +155,4 @@ export default class HoprEthereum {
 }
 
 export * from './types'
-export { Channel, getWinProbabilityAsFloat, computeWinningProbability, Indexer, RoutingChannel }
+export { Channel, Indexer, RoutingChannel }

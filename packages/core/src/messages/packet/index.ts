@@ -17,8 +17,7 @@ import HoprCoreEthereum, {
   Ticket,
   Balance,
   UnacknowledgedTicket,
-  Channel,
-  getWinProbabilityAsFloat
+  Channel
 } from '@hoprnet/hopr-core-ethereum'
 
 const log = Debug('hopr-core:message:packet')
@@ -50,13 +49,12 @@ export async function validateUnacknowledgedTicket(
 ): Promise<void> {
   // self
   const selfPubKey = new PublicKey(id.pubKey.marshal())
-  const selfAddress = await selfPubKey.toAddress()
+  const selfAddress = selfPubKey.toAddress()
   // sender
   const senderB58 = senderPeerId.toB58String()
   const senderPubKey = new PublicKey(senderPeerId.pubKey.marshal())
   const ticketAmount = ticket.amount.toBN()
   const ticketCounter = ticket.epoch.toBN()
-  const ticketWinProb = getWinProbabilityAsFloat(ticket.winProb)
 
   let channelState
   try {
@@ -76,8 +74,8 @@ export async function validateUnacknowledgedTicket(
   }
 
   // ticket MUST have at least X winning probability
-  if (ticketWinProb < nodeTicketWinProb) {
-    throw Error(`Ticket winning probability '${ticketWinProb}' is lower than '${nodeTicketWinProb}'`)
+  if (ticket.winProb.toBN().lt(Ticket.fromProbability(nodeTicketWinProb).toBN())) {
+    throw Error(`Ticket winning probability is lower than '${nodeTicketWinProb}'`)
   }
 
   // channel MUST be open or pending to close
