@@ -11,7 +11,7 @@ import { sendAcknowledgement } from './acknowledgement'
 // const log = Debug('hopr-core:forward')
 const FORWARD_TIMEOUT = durations.seconds(6)
 
-class PacketForwardInteraction {
+export class PacketForwardInteraction {
   private mixer: Mixer
 
   constructor(
@@ -54,5 +54,3 @@ class PacketForwardInteraction {
     sendAcknowledgement(packet, await pubKeyToPeerId(packet.previousHop), this.sendMessage, this.privKey)
   }
 }
-
-export { PacketForwardInteraction }

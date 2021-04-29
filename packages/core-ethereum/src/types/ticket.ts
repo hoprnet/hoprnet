@@ -95,6 +95,7 @@ class Ticket {
       Address.SIZE,
       PublicKey.SIZE,
       UINT256.SIZE,
+      UINT256.SIZE,
       Balance.SIZE,
       Hash.SIZE,
       UINT256.SIZE,
@@ -130,7 +131,16 @@ class Ticket {
   }
 
   static get SIZE(): number {
-    return Address.SIZE + PublicKey.SIZE + UINT256.SIZE + UINT256.SIZE + Hash.SIZE + UINT256.SIZE + Signature.SIZE
+    return (
+      Address.SIZE +
+      PublicKey.SIZE +
+      UINT256.SIZE +
+      UINT256.SIZE +
+      Balance.SIZE +
+      Hash.SIZE +
+      UINT256.SIZE +
+      Signature.SIZE
+    )
   }
 
   getEmbeddedFunds(): Balance {

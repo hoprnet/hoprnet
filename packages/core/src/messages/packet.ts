@@ -33,7 +33,7 @@ import { blue, green } from 'chalk'
 import Debug from 'debug'
 import { getTickets } from '../utils'
 
-export const MAX_HOPS = 3
+export const MAX_HOPS = 3 // 3 relayer and 1 destination
 
 const PACKET_LENGTH = getPacketLength(MAX_HOPS, POR_STRING_LENGTH, 0)
 
@@ -230,7 +230,7 @@ export class Packet {
     const self = new PublicKey(privKey.pubKey.marshal())
     const nextPeer = new PublicKey(path[0].pubKey.marshal())
 
-    const packet = createPacket(secrets, alpha, msg, path, MAX_HOPS, POR_STRING_LENGTH, porStrings)
+    const packet = createPacket(secrets, alpha, msg, path, MAX_HOPS + 1, POR_STRING_LENGTH, porStrings)
 
     const channel = chain.getChannel(self, nextPeer)
 
