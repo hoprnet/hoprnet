@@ -213,7 +213,6 @@ async function main() {
     await node.start()
     cmds = new Commands(node)
 
-
     if (argv.run && argv.run !== '') {
       // Run a single command and then exit.
       // We support multiple semicolon separated commands
