@@ -20,7 +20,7 @@ describe('test ticket construction', function () {
     const epoch = UINT256.fromString('1')
     const index = UINT256.fromString('1')
     const amount = new Balance(new BN(1))
-    const winProb = Ticket.floatToUint256(1)
+    const winProb = Ticket.fromProbability(1)
     const channelIteration = UINT256.fromString('1')
     const signature = new Signature(new Uint8Array({ length: SIGNATURE_LENGTH }), 0)
     const ticket = new Ticket(userA, challenge, epoch, index, amount, winProb, channelIteration, signature)
@@ -42,7 +42,7 @@ describe('test ticket construction', function () {
     const epoch = UINT256.fromString('1')
     const index = UINT256.fromString('1')
     const amount = new Balance(new BN('0000000002c68af0bb140000', 16))
-    const winProb = Ticket.floatToUint256(1)
+    const winProb = Ticket.fromProbability(1)
     const channelIteration = UINT256.fromString('1')
     const signature = new Signature(new Uint8Array({ length: SIGNATURE_LENGTH }), 0)
 
@@ -71,7 +71,7 @@ describe('test ticket construction', function () {
     const epoch = UINT256.fromString('2')
     const index = UINT256.fromString('1')
     const amount = new Balance(new BN('000000000de0b6b3a7640000', 16))
-    const winProb = Ticket.floatToUint256(1)
+    const winProb = Ticket.fromProbability(1)
     const channelIteration = UINT256.fromString('1')
     const signature = new Signature(new Uint8Array({ length: SIGNATURE_LENGTH }), 0)
 
@@ -96,8 +96,8 @@ describe('test ticket construction', function () {
 
 describe('test ticket methods', function () {
   it('should convert float to uint256', function () {
-    assert(Ticket.floatToUint256(0).toBN().isZero())
-    assert(Ticket.floatToUint256(1).toBN().eq(new BN(ethers.constants.MaxUint256.toString())))
+    assert(Ticket.fromProbability(0).toBN().isZero())
+    assert(Ticket.fromProbability(1).toBN().eq(new BN(ethers.constants.MaxUint256.toString())))
   })
 })
 
@@ -113,7 +113,7 @@ describe('test signedTicket construction', async function () {
       UINT256.fromString('0'),
       UINT256.fromString('1'),
       new Balance(new BN(15)),
-      Ticket.floatToUint256(1),
+      Ticket.fromProbability(1),
       UINT256.fromString('0'),
       userAPrivKey
     )
