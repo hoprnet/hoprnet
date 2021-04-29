@@ -151,7 +151,7 @@ class Channel {
       c.ticketEpochFor(this.counterparty.toAddress()),
       new UINT256(new BN(this.index++)),
       amount,
-      Ticket.floatToUint256(winProb),
+      Ticket.fromProbability(winProb),
       (await this.getState()).channelEpoch,
       this.privateKey
     )
@@ -165,7 +165,7 @@ class Channel {
       UINT256.fromString('0'),
       new UINT256(new BN(this.index++)),
       new Balance(new BN(0)),
-      Ticket.floatToUint256(1),
+      Ticket.fromProbability(1),
       UINT256.fromString('0'),
       this.privateKey
     )

@@ -19,7 +19,7 @@ const createMockTicket = ({
   sender = SENDER,
   targetAddress = TARGET_ADDRESS,
   amount = new Balance(new BN(1)),
-  winProb = Ticket.floatToUint256(1),
+  winProb = Ticket.fromProbability(1),
   epoch = new UINT256(new BN(1)),
   channelIteration = new UINT256(new BN(1))
 }: {
@@ -139,7 +139,7 @@ describe('unit test validateUnacknowledgedTicket', function () {
   it('should throw when ticket chance is low', async function () {
     const node = createMockNode({})
     const signedTicket = createMockTicket({
-      winProb: Ticket.floatToUint256(0.5)
+      winProb: Ticket.fromProbability(0.5)
     })
 
     return expect(
