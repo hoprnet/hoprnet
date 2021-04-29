@@ -64,7 +64,9 @@ _These discussion relate to topics that involve the HOPR ecosystem as a whole, e
 ### Self-host documentation
 
 #### Problem statement
+
 Currently, we are hosting our [documentation](http://docs.hoprnet.org/en/latest/) on an online service, readthedocs.org.
 
 #### Discussion
+
 For increase security and privacy, we should be hosting the documentation ourselves and/or via a decentralized platform (e.g. IPFS)
