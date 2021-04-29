@@ -21,6 +21,15 @@ Sphinx is a cryptographic message format used to relay anonymized messages withi
     \caption{Sphinx packet format}
     \label{fig:Sphinx packet format}
 \end{figure}
+\subparagraph{Notation:}Let $\kappa=128$ be a security parameter. An adversary will have to do about $2\kappa$ work to break the security of Sphinx with non negligible probability.
+Let $r$ be the maximum number of nodes that a Sphinx mix message will traverse before being delivered to its destination.
+$G$ is a prime order cyclic group satisfying the Decisional Diffie-Hellman Assumption. The element $g$ is a generator of $G$ and $q$ is the (prime) order of $G$, with $q\approx2^{\kappa}$.
+$G^*$is the set of non-identity elements of G. $h_b$is a hash function used to compute blinding factors and we model by random oracles such that:
+$h:G^*\times G^*\rightarrow\mathbb{Z}^*_q$ where $\mathbb{Z}^*_q$ is the field of non-identity elements of $\mathbb{Z}_q$ (field of integers).
+\\~\\Each node $n$ has a private key $x_n\in \mathbb{Z}^*_q$ and a public key $y_n=g^{x_n}\in G^*$.
+The $a_i$ are the group elements which, when combined with the nodes’ public keys, allows computing a shared key for each via Diffie-Hellman (DH) key exchange, and so the first node in the user-chosen route can forward the packet to the next, and only that mix-node can decrypt it.
+The $s_i$ are the DH shared secrets, $b_i$ are the blinding factors.
+
 \paragraph{Key derivation}
 The sender (A) picks a random $x\in \mathbb{Z}^*_q$ that is used to derive new keys for every packet. 
 \newline (A) randomly picks a path consisting of intermediate nodes (B), (C),(D) [see section path-finding] and the final destination of the packet (Z) 
@@ -32,10 +41,7 @@ The sender (A) picks a random $x\in \mathbb{Z}^*_q$ that is used to derive new k
 \item $a_2=g^{xb_0b_1},s_2=y^{xb_0b_1}_D,b_2=h(a_2,s_2)$
 \item $a_3=g^{xb_0b_1b_2},s_3=y^{xb_0b_1b_2}_D,b_3=h(a_3,s_3)$
 \end{itemize}
- Where $y_B,y_C,y_D,y_Z$ are the public keys of the nodes $B,C, D$  which we assume to be available to $A$ . The $a_i$ are the group elements which, when combined with the nodes’ public keys, allows computing a shared key for each via Diffie-Hellman (DH) key exchange, 
- and so the first node in the user-chosen route can forward the packet to the next, and only that mix-node can decrypt it.
-The element $g$ is a generator of $G$ which is a prime order cyclic group satisfying the Decisional DH Assumption. The $s_i$ are the DH shared secrets, $b_i$ are the blinding factors and $h$ is a hash function which is used to compute blinding factors.
-
+ Where $y_B,y_C,y_D,y_Z$ are the public keys of the nodes $B,C, D$  which we assume to be available to $A$ .
 
 \paragraph{Routing information}
 Each node on the path needs to know the next downstream node. Therefore, the sender $(A)$ generates routing information $\beta_i$ for $(B)$, $(C)$ and (D) as well as message END to tell $(Z)$ that it is the final receiver of the message.
