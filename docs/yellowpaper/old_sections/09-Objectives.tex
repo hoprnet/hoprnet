@@ -1,0 +1,45 @@
+\section{Objectives}
+The HOPR team engaged with various contributors and organizations in the blockchain and web3 ecosystem to establish the \MYhref{https://medium.com/web3foundation/messaging-for-web-3-0-building-an-anonymous-messaging-protocol-e29db72f4d19}{objectives towards a decentralized and privacy-preserving communication protocol}. In the following sections we detail how the identified objectives are being addressed by HOPR.
+
+\subsection{Ensuring metadata protection}
+The HOPR message layer comprises a Chaumian mixnet. As such, no node in the network and no passive observer can tell if a certain node was sender or relayer of a message. Likewise, they cannot tell if a particular node was receiver or relayer of a message. This works as long as sender, relayer and recipient are subject to sufficient traffic so that they can mix their packets into the existing background packet traffic. As several nodes are relaying the traffic between sender and receiver, it is hard to link the two and thus establish who is talking to who.
+
+The payment channels that HOPR leverages on the payment layer, are not settled on-chain after every packet and thus privacy that was established by the message layer is maintained by the payment layer. The channels between sender-relayer, multiple relayers and between relayer and recipient are settled infrequently, e.g. on a monthly basis, and therefore make it difficult to link payment- and message layer activities. Relayers can choose when they want to settle, they might choose to do so frequently in order to have a constant revenue but on the other hand they would not settle too often as that comes at the cost of on-chain transaction fees. In addition, when settling for a very low number of relayed packets (worst case is all relayers of a path are settling after just one single packet) closing the payment channel might leak some information about the path along which a certain packet was routed. To prevent this and guarantee sufficient privacy, a certain amount of traffic should be routed along the relay nodes that are chosen for a particular packet before the corresponding payment channels are settled. It is the task of the sender of a packet to choose a route via relay nodes that fulfill such conditions which are also deemed sufficiently trustworthy. As trust might be subjective, HOPR does not impose a strategy for establishing a path and instead allows the sender to choose relay nodes.
+
+\paragraph{Objectives that HOPR achieves:}
+
+\begin{enumerate}
+    \item Sender anonymity (who sent a message?)
+    \item Receiver anonymity (who read a message?)
+    \item Sender-receiver unlinkability (who is talking to whom?)
+\end{enumerate}
+
+\subsection{Convenience, Usability}
+HOPR does not make assumptions about latency or anonymity and instead lets applications define these parameters. Higher latency provides for more efficient mixing of packets and thus increased anonymity but might not be suitable for all applications (e.g. instant messaging needs lower latencies than e.g. email services). The SPHINX packet format that HOPR utilizes provides for high anonymity guarantees and at the same time contains overhead bandwidth. While traffic through HOPR will be significantly slower than direct communication due to the involvement of intermediate relay hops as well as additional artificial latencies to mix packets, the throughput of HOPR should allow for reasonable bandwidth to at least send several Kilobytes of traffic per second per sender. The payment layer aims at implementing efficient cryptography so that even low-energy devices are capable of sending, relaying and receiving traffic. Therefore, HOPR does not involve cryptographic building blocks that are currently en vogue in various web3 projects such as zk-SNARKs or trusted execution environments which require heavy computational resources or specialized hardware that is unlikely to be found in e.g. low-power internet-of-things (IoT) devices that need a metadata-private machine-to-machine (M2M) communication protocol. 
+
+\paragraph{Objectives that HOPR achieves:}
+
+\begin{enumerate}\setcounter{enumi}{3}
+    \item Reasonable latency (under 5 seconds, to allow for instant messaging)
+    \item Reasonable bandwidth (not specified, ability to work with mobile data plan in undeveloped countries)
+    \item Adaptable anonymity (adjustable pricing and resource consumption depending on how anonymous you want to be)
+\end{enumerate}
+
+\subsection{Decentralization}
+HOPR is a decentralized network without central points of failure and it allows anyone to join and use the services. It specifically does not rely on mailbox providers or other trusted parties. The message layer does require some on-chain activities for opening or closing/settling payment channels but existing public blockchains today (e.g. Ethereum) are easily capable of handling traffic of up to 1M nodes which would lead to several million transactions per month which arise from a few channel open and channel close transactions per node.
+
+\paragraph{Objectives that HOPR achieves:}
+
+\begin{enumerate}\setcounter{enumi}{6}
+    \item Scalable (up to approx. 1M active nodes)
+    \item No specialized service providers (pure peer-to-peer protocol)
+\end{enumerate}
+
+\subsection{Incentives}
+The payment layer is an integral part of HOPR and provides incentives for relayers to get paid in proportion to the number of packets that they relayed. The payment layer is detailed in depth in a later section.
+
+\paragraph{Objectives that HOPR achieves:}
+
+\begin{enumerate}\setcounter{enumi}{8}
+    \item Incentivization for relayers
+\end{enumerate}
