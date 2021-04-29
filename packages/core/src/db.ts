@@ -12,7 +12,7 @@ import HoprCoreEthereum, {
   SubmitTicketResponse,
   UnacknowledgedTicket
 } from '@hoprnet/hopr-core-ethereum'
- 
+
 const log = Debug(`hopr-core:db`)
 
 const defaultDBPath = (): string => {
@@ -34,7 +34,6 @@ const packetTagSubPrefix = encoder.encode('tag-')
 const KEY_LENGTH = 32
 
 export const ACKNOWLEDGED_TICKET_INDEX_LENGTH = 8
-
 
 export function AcknowledgedTickets(index: Uint8Array): Uint8Array {
   return allocationHelper([
@@ -98,7 +97,6 @@ function allocationHelper(arr: Config[]) {
   return result
 }
 
-
 export class CoreDB {
   private db: LevelUp
 
@@ -124,7 +122,6 @@ export class CoreDB {
     this.db = levelup(leveldown(dbPath))
   }
 
-
   public getLevelUpTempUntilRefactored(): LevelUp {
     // TODO remove this when we can refactor other code to use methods
     return this.db
@@ -135,17 +132,14 @@ export class CoreDB {
    * @param filter optionally filter by signer
    * @returns an array of all unacknowledged tickets
    */
-  public async getUnacknowledgedTickets(
-    filter?: {
-      signer: Uint8Array
-    }
-  ): Promise<UnacknowledgedTicket[]> {
+  public async getUnacknowledgedTickets(filter?: { signer: Uint8Array }): Promise<UnacknowledgedTicket[]> {
     const tickets: UnacknowledgedTicket[] = []
 
     return new Promise((resolve, reject) => {
-      this.db.createReadStream({
-        gte: Buffer.from(UnAcknowledgedTickets(new Uint8Array(0x00)))
-      })
+      this.db
+        .createReadStream({
+          gte: Buffer.from(UnAcknowledgedTickets(new Uint8Array(0x00)))
+        })
         .on('error', (err: any) => reject(err))
         .on('data', async ({ value }: { value: Buffer }) => {
           if (value.buffer.byteLength !== UnacknowledgedTicket.SIZE()) return
@@ -167,11 +161,7 @@ export class CoreDB {
    * Delete unacknowledged tickets
    * @param filter optionally filter by signer
    */
-  async deleteUnacknowledgedTickets(
-    filter?: {
-      signer: Uint8Array
-    }
-  ): Promise<void> {
+  async deleteUnacknowledgedTickets(filter?: { signer: Uint8Array }): Promise<void> {
     const tickets = await this.getUnacknowledgedTickets(filter)
 
     await this.db.batch(
@@ -191,11 +181,9 @@ export class CoreDB {
    * @param filter optionally filter by signer
    * @returns an array of all acknowledged tickets
    */
-  async getAcknowledgements(
-    filter?: {
-      signer: Uint8Array
-    }
-  ): Promise<
+  async getAcknowledgements(filter?: {
+    signer: Uint8Array
+  }): Promise<
     {
       ackTicket: Acknowledgement
       index: Uint8Array
@@ -207,9 +195,10 @@ export class CoreDB {
     }[] = []
 
     return new Promise((resolve, reject) => {
-      this.db.createReadStream({
-        gte: Buffer.from(AcknowledgedTickets(new Uint8Array(0x00)))
-      })
+      this.db
+        .createReadStream({
+          gte: Buffer.from(AcknowledgedTickets(new Uint8Array(0x00)))
+        })
         .on('error', (err) => reject(err))
         .on('data', async ({ key, value }: { key: Buffer; value: Buffer }) => {
           if (value.buffer.byteLength !== Acknowledgement.SIZE) return
@@ -235,11 +224,7 @@ export class CoreDB {
    * Delete acknowledged tickets
    * @param filter optionally filter by signer
    */
-  async deleteAcknowledgements(
-    filter?: {
-      signer: Uint8Array
-    }
-  ): Promise<void> {
+  async deleteAcknowledgements(filter?: { signer: Uint8Array }): Promise<void> {
     const acks = await this.getAcknowledgements(filter)
     await this.db.batch(
       await Promise.all(
@@ -304,11 +289,7 @@ export class CoreDB {
    * @param filter optionally filter by signer
    * @returns an array of signed tickets
    */
-  async getTickets(
-    filter?: {
-      signer: Uint8Array
-    }
-  ): Promise<Ticket[]> {
+  async getTickets(filter?: { signer: Uint8Array }): Promise<Ticket[]> {
     return Promise.all([this.getUnacknowledgedTickets(filter), this.getAcknowledgements(filter)]).then(
       async ([unAcks, acks]) => {
         const unAckTickets = await Promise.all(unAcks.map((o) => o.ticket))
@@ -325,22 +306,15 @@ export class CoreDB {
    * @param filter optionally filter by signer
    * @returns an array of signed tickets
    */
-  async deleteTickets(
-    filter?: {
-      signer: Uint8Array
-    }
-  ): Promise<void> {
+  async deleteTickets(filter?: { signer: Uint8Array }): Promise<void> {
     await Promise.all([this.deleteUnacknowledgedTickets(filter), this.deleteAcknowledgements(filter)])
   }
 
   async storeUnacknowledgedTickets(key: Uint8Array, unacknowledged: UnacknowledgedTicket) {
-    this.db.put(
-      Buffer.from(UnAcknowledgedTickets(key)),
-      Buffer.from(unacknowledged.serialize())
-    )
+    this.db.put(Buffer.from(UnAcknowledgedTickets(key)), Buffer.from(unacknowledged.serialize()))
   }
 
-  async hasPacket(id: Uint8Array){
+  async hasPacket(id: Uint8Array) {
     try {
       await this.db.get(PacketTag(id))
     } catch (err) {
@@ -354,20 +328,20 @@ export class CoreDB {
   }
 
   async getUnacknowledgedTicketsByKey(key: Hash): Promise<UnacknowledgedTicket | undefined> {
-  const unAcknowledgedDbKey = UnAcknowledgedTickets(key.serialize())
-  try {
-    const buff = await this.db.get(Buffer.from(unAcknowledgedDbKey))
-    if (buff.length === 0) {
-      return undefined
+    const unAcknowledgedDbKey = UnAcknowledgedTickets(key.serialize())
+    try {
+      const buff = await this.db.get(Buffer.from(unAcknowledgedDbKey))
+      if (buff.length === 0) {
+        return undefined
+      }
+      return UnacknowledgedTicket.deserialize(buff)
+    } catch (err) {
+      if (err.notFound) {
+        return undefined
+      }
+      throw err
     }
-    return UnacknowledgedTicket.deserialize(buff)
-  } catch (err) {
-    if (err.notFound) {
-      return undefined
-    }
-    throw err
   }
-}
 
   async deleteTicket(key: Hash) {
     const k = UnAcknowledgedTickets(key.serialize())
@@ -383,24 +357,24 @@ export class CoreDB {
         .batch()
         .del(Buffer.from(unAcknowledgedDbKey))
         .put(Buffer.from(acknowledgedDbKey), Buffer.from(acknowledgment.serialize()))
-      .put(Buffer.from(AcknowledgedTicketCounter()), Buffer.from(ticketCounter))
-      .write()
-  } catch (err) {
-    log(`ERROR: Error while writing to database. Error was ${err.message}.`)
+        .put(Buffer.from(AcknowledgedTicketCounter()), Buffer.from(ticketCounter))
+        .write()
+    } catch (err) {
+      log(`ERROR: Error while writing to database. Error was ${err.message}.`)
+    }
   }
-}
 
-async incrementTicketCounter(): Promise<Uint8Array> {
-  let ticketCounter
-  try {
-    let tmpTicketCounter = await this.db.get(Buffer.from(AcknowledgedTicketCounter()))
-    ticketCounter = u8aAdd(true, tmpTicketCounter, toU8a(1, ACKNOWLEDGED_TICKET_INDEX_LENGTH))
-  } catch (err) {
-    // Set ticketCounter to initial value
-    ticketCounter = toU8a(0, ACKNOWLEDGED_TICKET_INDEX_LENGTH)
+  async incrementTicketCounter(): Promise<Uint8Array> {
+    let ticketCounter
+    try {
+      let tmpTicketCounter = await this.db.get(Buffer.from(AcknowledgedTicketCounter()))
+      ticketCounter = u8aAdd(true, tmpTicketCounter, toU8a(1, ACKNOWLEDGED_TICKET_INDEX_LENGTH))
+    } catch (err) {
+      // Set ticketCounter to initial value
+      ticketCounter = toU8a(0, ACKNOWLEDGED_TICKET_INDEX_LENGTH)
+    }
+    return ticketCounter
   }
-  return ticketCounter
-}
 
   async storeUnacknowledgedTicket(challenge: Hash) {
     const unAcknowledgedDBKey = UnAcknowledgedTickets(challenge.serialize())
@@ -408,8 +382,7 @@ async incrementTicketCounter(): Promise<Uint8Array> {
     return unAcknowledgedDBKey
   }
 
-  public close(){
+  public close() {
     return this.db.close()
   }
 }
-
