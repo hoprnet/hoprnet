@@ -1,0 +1,21 @@
+\section{Architecture Overview}
+The HOPR protocol outlined in this paper comprises various modules which are detailed in later sections. A reference implementation of the HOPR protocol is the HOPR node software. A first version of the HOPR node is written in Javascript / NodeJS to optimize for time to release and a steep learning curve. At a later time, a more efficient and secure implementation, possibly written in Rust, will be provided. The HOPR node comprises a core module of the payment and message layer as well as a REST-JSON API which is interfaced either directly or via libraries by applications that run on top of HOPR.
+
+\setlength{\tabcolsep}{1em} % for the horizontal padding
+{\renewcommand{\arraystretch}{2}% for the vertical padding
+\begin{center}
+    \begin{tabular}{|l|l|l|}
+        \hline
+        Application & \multicolumn{2}{|c|}{CLI / UI}\\
+        \hline
+        \multirow{3}{*}{HOPR} & \multicolumn{2}{|c|}{APIs \& libraries}\\
+        \cline{2-3}
+         & Message layer & Payment layer\\
+        \hline
+        Infrastructure & libp2p & Ethereum\\
+        \hline
+    \end{tabular}
+\end{center}
+}
+
+HOPR provides privacy by relaying packets from sender via multiple relay hops who receive a payment for their services to the recipient. The message layer presented in section \ref{MessageLayer} ensures security, integrity and metadata privacy of the data packet as it is sent from the sender via relay hops to the recipient. It is based on libp2p and thus supports various lower-level transport modules such as TCP, WebRTC, WebSocket or UDP. The payment layer detailed in section \ref{PaymentLayer} allows relay nodes to get paid for providing privacy for sender and recipient in a fashion that does not expose critical metadata about the packet. The payment happens via deterministic micropayment channels outlined in section \ref{ProbabilisticMicropayments}. These payment channels are interfacing an existing public ledger, the current proof-of-concept implementation relies on the main Ethereum blockchain. The fairness of this payment mechanism relies on our Proof-of-Relay secret sharing mechanism described in section \ref{ProofOfRelay}. Many of these processes rely on cryptographic keys, the derivation of which is discussed in section \ref{KeyDerivation}. The payments that are carried out between nodes in the HOPR network are performed in HOPR tokens which is introduced in section \ref{Token}.
