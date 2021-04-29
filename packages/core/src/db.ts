@@ -40,7 +40,6 @@ export function UnAcknowledgedTickets(hashedKey: Uint8Array): Uint8Array {
   return u8aConcat(TICKET_PREFIX, unAcknowledgedSubPrefix, hashedKey)
 }
 
-
 export class CoreDB {
   private db: LevelUp
 
@@ -50,7 +49,7 @@ export class CoreDB {
       dbPath = options.dbPath
     } else {
       // default
-      dbPath = path.join(process.cwd(), 'db', VERSION, 'node') 
+      dbPath = path.join(process.cwd(), 'db', VERSION, 'node')
     }
 
     dbPath = path.resolve(dbPath)
@@ -280,9 +279,8 @@ export class CoreDB {
     this.db.put(Buffer.from(UnAcknowledgedTickets(key)), Buffer.from(unacknowledged.serialize()))
   }
 
-
   async hasPacket(id: Uint8Array) {
-    if (this.has(this.keyOf(PACKET_TAG_PREFIX, id))){
+    if (this.has(this.keyOf(PACKET_TAG_PREFIX, id))) {
       await this.touch(this.keyOf(PACKET_TAG_PREFIX, id))
       return true
     }
