@@ -30,4 +30,3 @@ export function getAddrs(id: PeerId, options: HoprOptions): Multiaddr[] {
 
   return addrs.map((addr: Multiaddr) => addr.encapsulate(`/p2p/${id.toB58String()}`))
 }
-

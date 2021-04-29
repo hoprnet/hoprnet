@@ -239,10 +239,9 @@ class Hopr extends EventEmitter {
     log(`Available under the following addresses:`)
     libp2p.multiaddrs.forEach((ma: Multiaddr) => log(ma.toString()))
     this.maybeLogProfilingToGCloud()
-
   }
 
-  private maybeLogProfilingToGCloud(){
+  private maybeLogProfilingToGCloud() {
     if (process.env.GCLOUD) {
       try {
         var name = 'hopr_node_' + this.getId().toB58String().slice(-5).toLowerCase()
