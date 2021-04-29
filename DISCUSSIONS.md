@@ -39,3 +39,14 @@ We sprinkle references to an IndexedDb throughout the code, and rely on buffer s
 #### Discussion
 It would be more maintainable and readable to create a database abstraction to allow us to mock out, or separate database implementation details from the desired interface.
 
+## Ecosystem
+
+_These discussion relate to topics that involve the HOPR ecosystem as a whole, either on how people interact with the protocol, `hoprd`, its documentantion, or other principles around privacy._
+
+### Self-host documentation
+
+#### Problem statement
+Currently, we are hosting our [documentation](http://docs.hoprnet.org/en/latest/) on an online service, readthedocs.org.
+
+#### Discussion
+For increase security and privacy, we should be hosting the documentation ourselves and/or via a decentralized platform (e.g. IPFS)
