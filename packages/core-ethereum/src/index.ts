@@ -60,10 +60,6 @@ export default class HoprEthereum {
     return this.chain.withdraw(currency, recipient, amount)
   }
 
-  public async hexAccountAddress(): Promise<string> {
-    return this.getAddress().toHex()
-  }
-
   public getChannelsFromPeer(p: PeerId) {
     return this.indexer.getChannelsFromPeer(p)
   }
@@ -149,7 +145,7 @@ export default class HoprEthereum {
     await indexer.start()
 
     const coreConnector = new HoprEthereum(chain, db, indexer)
-    log(`using blockchain address ${await coreConnector.hexAccountAddress()}`)
+    log(`using blockchain address ${await coreConnector.getAddress().toHex()}`)
     log(chalk.green('Connector started'))
     return coreConnector
   }

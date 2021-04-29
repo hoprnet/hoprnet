@@ -35,6 +35,8 @@ import PeerId from 'peer-id'
 import HoprCoreEthereum, {
   PublicKey,
   Balance,
+  Address,
+  ChannelEntry,
   NativeBalance,
   Hash,
   Acknowledgement,
@@ -45,7 +47,7 @@ import BN from 'bn.js'
 import EventEmitter from 'events'
 import { ChannelStrategy, PassiveStrategy, PromiscuousStrategy } from './channel-strategy'
 import Debug from 'debug'
-import { Address } from 'libp2p/src/peer-store'
+import { Address as LibP2PAddress } from 'libp2p/src/peer-store'
 import {
   libp2pSendMessageAndExpectResponse,
   libp2pSubscribe,
@@ -350,7 +352,7 @@ class Hopr extends EventEmitter {
    * Gets the observed addresses of a given peer.
    * @param peer peer to query for
    */
-  public getObservedAddresses(peer: PeerId): Address[] {
+  public getObservedAddresses(peer: PeerId): LibP2PAddress[] {
     return this.libp2p.peerStore.get(peer)?.addresses ?? []
   }
 
@@ -463,14 +465,13 @@ class Hopr extends EventEmitter {
 
   private async checkBalances() {
     const balance = await this.getBalance()
+    const address = await this.paymentChannels.getAddress().toHex()
     if (balance.toBN().lten(0)) {
-      const address = await this.paymentChannels.hexAccountAddress()
       log('unfunded node', address)
       this.emit('hopr:warning:unfunded', address)
     }
     const nativeBalance = await this.getNativeBalance()
     if (nativeBalance.toBN().lte(MIN_NATIVE_BALANCE)) {
-      const address = await this.paymentChannels.hexAccountAddress()
       log('unfunded node', address)
       this.emit('hopr:warning:unfundedNative', address)
     }
@@ -639,6 +640,22 @@ class Hopr extends EventEmitter {
 
   public async submitAcknowledgedTicket(ackTicket: Acknowledgement, index: Uint8Array) {
     return submitAcknowledgedTicket(this.db, this.paymentChannels, ackTicket, index)
+  }
+
+  public async getChannelsOf(addr: Address): Promise<ChannelEntry[]> {
+    return await this.paymentChannels.getChannelsOf(addr)
+  }
+
+  public async getPublicKeyOf(addr: Address): Promise<PublicKey> {
+    return await this.paymentChannels.getPublicKeyOf(addr)
+  }
+
+  public getEthereumAddress(): Address {
+    return this.paymentChannels.getAddress()
+  }
+
+  async withdraw(currency: 'NATIVE' | 'HOPR', recipient: string, amount: string): Promise<string> {
+    return this.paymentChannels.withdraw(currency, recipient, amount)
   }
 
   /**

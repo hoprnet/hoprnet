@@ -73,10 +73,9 @@ export default class Withdraw extends AbstractCommand {
   public async execute(query?: string): Promise<string> {
     try {
       const { amount, weiAmount, currency, recipient } = await this.checkArgs(query ?? '')
-      const { paymentChannels } = this.node
       const symbol = currency === 'NATIVE' ? NativeBalance.SYMBOL : Balance.SYMBOL
 
-      const receipt = await paymentChannels.withdraw(currency, recipient, weiAmount)
+      const receipt = await this.node.withdraw(currency, recipient, weiAmount)
       return `Withdrawing ${styleValue(amount, 'number')} ${symbol} to ${styleValue(
         recipient,
         'peerId'
