@@ -39,12 +39,12 @@ The element $g$ is a generator of $G$ which is a prime order cyclic group satisf
 
 \paragraph{Routing information}
 Each node on the path needs to know the next downstream node. Therefore, the sender $(A)$ generates routing information $\beta_i$ for $(B)$, $(C)$ and (D) as well as message END to tell $(Z)$ that it is the final receiver of the message.
+$$\beta_i=(\Delta\|I\|0_{(2(r-v)+2)\kappa-|\Delta|}\oplus PRNG(s_{v-1})_{[ \,0....(2(r-v)+3)\kappa-1})\|\phi$$
 \newline As $(A)$ has a shared secret with each of the nodes along the path, it is able to derive blindings for each of them. 
 \newline Each node along the path receives an authentication tag $\gamma_i$ in the form of a message authentication code (MAC)
 which is encoded in the header.
-\newline Some padding is added at each mix stage, in order to keep the length of the message invariant at each hop. In the original Sphinx paper, a zero-byte padding is added which could reveal information about the path length and the final destination and thus breaking the SPHINX security properties.
-As a countermeasure in HOPR, We pad the routing information with random data.
-\\~\\The mix header is constructed as follow: $$M_i=(a_i,\beta_i,\gamma_i)$$ where $$\beta_i=(\Delta\|I\|0_{(2(r-v)+2)\kappa-|\Delta|}\oplus PRNG(s_{v-1})_{[ \,0....(2(r-v)+3)\kappa-1})\|\phi$$
+\newline Some padding is added at each mix stage, in order to keep the length of the message invariant at each hop. 
+\\~\\The mix header is constructed as follow: $$M_i=(a_i,\beta_i,\gamma_i)$$ 
 \newline Once $(B)$ receives the packet, it derives the shared key $s_0$ by computing $$s_0=(a_0)^b=(g^x)^b=(g^b)^x=y^x_B$$ and removes its blindings. This allows $(B)$ to unblind the routing info that tells $(B)$ the public key of the next downstream node $(C)$. In order to extract the routing instructions, the mix-node B first appends a zero-byte padding at the end of $\beta_0$ and decrypts the padded block of routing information $B$ by XORing it with $PRNG(s_{v-1})$ as follows:
 $$(\beta_0\|0_{2\kappa})\oplus PRNG(s_{v-1})$$
 (B) parses the routing instructions from (A) in order to obtain the address of the next mix-node (C), as well the new integrity tag $\gamma_1$ and $\beta_1$, which should be forwarded to the next hop and blinds the key share $a_0=g^x$ by setting it to $a_1=g^{xb_0}$
@@ -56,7 +56,12 @@ The payload is where the actual message is hidden and is computed in different l
 \\~\\Same happens at $(C)$ and $(D)$: key derivation, unblinding, deleting, shifting, decryption and blinding. 
 In addition to all these steps, the final mix-header to the destination node $(Z)$ must include a final destination address that symbolizes the end of the path and tells that it’s the recipient and an Identifier used to generate reply messages back to the sender.
 \subsection*{Implementation choices}
-The cyclic group used in the HOPR Sphinx implementation is an elliptic curve group on the Ethereum secp256k1 curve and thus operations will be done on the elliptic curve. We use BLAKE2s hash function in HOPR which is a cryptographic hash function faster than SHA-2 and SHA-3, yet is at least as secure as SHA-3 and produces digests of any size between 1 and 32 bytes. The payload is where the actual message is hidden and is computed in different layers using a block cipher encryption algorithm and is decrypted at each stage of mixing. LIONESS implementation based on the ChaCha20 stream cipher and the BLAKE2 hash algorithm is being used for encryption and decryption of the payload in HOPR's implementation of the SPHINX packet format. Any attempt of modification by an attacker would result in message distruction and thus is would be irrecoverable. we use a MAC based on a hash function BLAKE2s.
+\begin{itemize}
+    \item \textbf{Cyclic group:} The cyclic group used in the HOPR Sphinx implementation is an elliptic curve group on the Ethereum secp256k1 curve and thus operations will be done on the elliptic curve.
+    \item \textbf{Hash function:} We use BLAKE2s hash function in HOPR which is a cryptographic hash function faster than SHA-2 and SHA-3, yet is at least as secure as SHA-3 and produces digests of any size between 1 and 32 bytes.
+    \item \textbf{MAC:} BLAKE2 hash algorithm is being used for encryption and decryption of the payload in HOPR's implementation of the SPHINX packet format. Any attempt of modification by an attacker would result in message distruction and thus is would be irrecoverable. we use a MAC based on a hash function BLAKE2s.
+    \item \textbf{Encryption scheme:} LIONESS implementation based on the ChaCha20 stream cipher.
+\end{itemize}
 
 
 
