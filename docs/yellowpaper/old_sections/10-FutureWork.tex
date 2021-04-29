@@ -1,0 +1,30 @@
+\section{Future Work}
+HOPR is by no means complete and there are still various aspects that need further thought, design and implementation work. This section lists the known limitations that need further significant work.
+
+\subsection{Get amount from payment channel}
+We need to find out not just that $S$ was correct but also how much money was associated with it. An approach based on polynomials should work but needs to be defined in more details. 
+
+\subsection{Economics}
+Make sure everyone gets sufficiently incentivized and disincentivize bad behavior (and define what that exactly is, e.g. lots of dropped packages, spam, etc). How much does one packet cost? We are envisioning a dynamic fee pricing that is updated, e.g. every 10 days. Similarly to the Ethereum block gas limit adjustment, relayers that did settle channels within that time frame get a vote on the fee. Maybe it is better to have a general token-based voting, not just for the relayers.
+
+\subsection{Cover Traffic}
+We plan to finance cover traffic through an inflationary token model. However, delivering this cover traffic needs to be specified. At first it might be done by HOPR AG, later it might be fully decentralized with path establishment in TEE without leaking information and without ability to cheat.
+
+\subsection{QoS / Slashing}
+If nodes are not online or do not want to support an upstream node then they should get punished by slashing some of their staked funds. Potentially an extra amount needs to be staked separate from the channels to ensure that all connected parties get their unsettled channel funds even if the counter-party got slashed. However, the upstream node should not be able to troll the downstream node with attempting to slash them although they are online. The downstream node should have a way to respond to such on-chain accusations. One way to reach fairness might be to slash both nodes half of the normal slashing amount in case the downstream node does respond within some time frame. This time frame should be short so that nodes cannot be offline for e.g. one day without getting punished but also cannot be too short (e.g. one minute) so that a transaction did not get mined in time.
+
+\subsection{On-Demand NAT traversal}
+Currently we are routing all traffic between nodes via the bootstrap node to be on the safe side. This does not significantly decrease privacy as HOPR is resistant against passive observers but it is a waste of resources and adds latency unnecessarily. Instead, nodes should detect when STUN or TURN is required and use some other HOPR node in reach as a relay server. That relay service might at a later time also be incentivized. 
+
+\subsection{Tooling \& Documentation}
+We need minimally:
+\begin{itemize}
+    \item HOPR management GUI, probably web-based running on localhost similar to IPFS
+    \item public analytics website of public data (showing channels open/close, cover traffic, some DHT data etc)
+    \item REST JSON API
+    \item JS wrapper library
+    \item libraries in other languages
+    \item tutorials
+    \item detailed documentation
+    \item an integrated example on the website
+\end{itemize}
