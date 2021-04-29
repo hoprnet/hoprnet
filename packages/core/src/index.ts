@@ -111,7 +111,7 @@ class Hopr extends EventEmitter {
       // TODO - assert secp256k1?
       throw new Error('Hopr Node must be initialized with an id with a private key')
     }
-    this.db = new CoreDB(options)
+    this.db = new CoreDB(options, PublicKey.fromPrivKey(id.privKey.marshal()).toAddress())
     this.paymentChannels = HoprCoreEthereum.create(this.db.getLevelUpTempUntilRefactored(), this.id.privKey.marshal(), {
       provider: this.options.provider
     })
@@ -141,6 +141,7 @@ class Hopr extends EventEmitter {
    * @param options
    */
   public async start() {
+    this.status = 'INITIALIZING'
     if ((await this.getNativeBalance()).toBN().lte(MIN_NATIVE_BALANCE)) {
       throw new Error('Cannot start node without a funded wallet')
     }
@@ -226,6 +227,7 @@ class Hopr extends EventEmitter {
     await this.heartbeat.start()
     this.periodicCheck()
     this.setChannelStrategy(this.options.strategy || 'passive')
+    this.status = 'RUNNING'
 
     // Log information
     log('# STARTED NODE')

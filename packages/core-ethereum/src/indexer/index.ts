@@ -180,6 +180,7 @@ class Indexer {
    * @param block
    */
   private async onNewBlock(blockNumber: number): Promise<void> {
+    log('indexer got new block')
     // update latest block
     if (this.latestBlock < blockNumber) {
       this.latestBlock = blockNumber
@@ -241,6 +242,7 @@ class Indexer {
 
   private async onAnnouncement(event: Event<'Announcement'>): Promise<void> {
     const account = AccountEntry.fromSCEvent(event)
+    log('New node announced', account.address.toHex())
     await db.updateAccount(this.db, account.address, account)
   }
 

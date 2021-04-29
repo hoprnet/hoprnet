@@ -5,7 +5,7 @@ import path from 'path'
 import { VERSION } from './constants'
 import type { HoprOptions } from '.'
 import Debug from 'debug'
-import { u8aEquals, Hash, u8aAdd, toU8a, u8aConcat } from '@hoprnet/hopr-utils'
+import { u8aEquals, Hash, u8aAdd, toU8a, u8aConcat, Address } from '@hoprnet/hopr-utils'
 import assert from 'assert'
 import HoprCoreEthereum, {
   Ticket,
@@ -43,7 +43,7 @@ export function UnAcknowledgedTickets(hashedKey: Uint8Array): Uint8Array {
 export class CoreDB {
   private db: LevelUp
 
-  constructor(options: HoprOptions) {
+  constructor(options: HoprOptions, private id: Address) {
     let dbPath: string
     if (options.dbPath) {
       dbPath = options.dbPath
@@ -64,10 +64,11 @@ export class CoreDB {
       }
     }
     this.db = levelup(leveldown(dbPath))
+    log('namespacing db by pubkey: ', id.toHex())
   }
 
   private keyOf(...segments: Uint8Array[]): Uint8Array {
-    return u8aConcat.apply(null, segments)
+    return u8aConcat.call(this.id.toHex(), ... segments)
   }
 
   private async has(key: Uint8Array): Promise<boolean> {
