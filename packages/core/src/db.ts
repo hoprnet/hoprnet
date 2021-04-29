@@ -5,7 +5,8 @@ import path from 'path'
 import { VERSION } from './constants'
 import type { HoprOptions } from '.'
 import Debug from 'debug'
-import { u8aEquals, Hash, u8aAdd, toU8a } from '@hoprnet/hopr-utils'
+import { u8aEquals, Hash, u8aAdd, toU8a, u8aConcat } from '@hoprnet/hopr-utils'
+import assert from 'assert'
 import HoprCoreEthereum, {
   Ticket,
   Acknowledgement,
@@ -22,60 +23,42 @@ const defaultDBPath = (): string => {
 const encoder = new TextEncoder()
 const TICKET_PREFIX: Uint8Array = encoder.encode('tickets-')
 const PACKET_PREFIX: Uint8Array = encoder.encode('packets-')
-const SEPERATOR: Uint8Array = encoder.encode('-')
-
+const SEPARATOR: Uint8Array = encoder.encode('-')
 const acknowledgedSubPrefix = encoder.encode('acknowledged-')
 const acknowledgedTicketCounter = encoder.encode('acknowledgedCounter')
-
 const unAcknowledgedSubPrefix = encoder.encode('unacknowledged-')
-
 const packetTagSubPrefix = encoder.encode('tag-')
-
 const KEY_LENGTH = 32
 
-export const ACKNOWLEDGED_TICKET_INDEX_LENGTH = 8
+const ACKNOWLEDGED_TICKET_INDEX_LENGTH = 8
 
-
-export function AcknowledgedTickets(index: Uint8Array): Uint8Array {
-  return allocationHelper([
-    [TICKET_PREFIX.length, TICKET_PREFIX],
-    [acknowledgedSubPrefix.length, acknowledgedSubPrefix],
-    [ACKNOWLEDGED_TICKET_INDEX_LENGTH, index]
-  ])
+function keyAcknowledgedTickets(index: Uint8Array): Uint8Array {
+  assert.equal(index.length, ACKNOWLEDGED_TICKET_INDEX_LENGTH)
+  return u8aConcat(TICKET_PREFIX, acknowledgedSubPrefix, index)
 }
 
-export function AcknowledgedTicketsParse(arr: Uint8Array): Uint8Array {
+function AcknowledgedTicketsParse(arr: Uint8Array): Uint8Array {
   return arr.slice(TICKET_PREFIX.length + acknowledgedSubPrefix.length, arr.length)
 }
 
-export function AcknowledgedTicketCounter() {
-  return allocationHelper([
-    [TICKET_PREFIX.length, TICKET_PREFIX],
-    [acknowledgedTicketCounter.length, acknowledgedTicketCounter]
-  ])
+function AcknowledgedTicketCounter() {
+  return u8aConcat(TICKET_PREFIX, acknowledgedTicketCounter)
 }
 
 export function UnAcknowledgedTickets(hashedKey: Uint8Array): Uint8Array {
   return allocationHelper([
     [TICKET_PREFIX.length, TICKET_PREFIX],
     [unAcknowledgedSubPrefix.length, unAcknowledgedSubPrefix],
-    [SEPERATOR.length, SEPERATOR],
+    [SEPARATOR.length, SEPARATOR],
     [KEY_LENGTH, hashedKey]
   ])
 }
 
-export function UnAcknowledgedTicketsParse(arg: Uint8Array): Uint8Array {
-  return arg.slice(
-    TICKET_PREFIX.length + unAcknowledgedSubPrefix.length + SEPERATOR.length,
-    TICKET_PREFIX.length + unAcknowledgedSubPrefix.length + SEPERATOR.length + KEY_LENGTH
-  )
-}
-
-export function PacketTag(tag: Uint8Array): Uint8Array {
+function PacketTag(tag: Uint8Array): Uint8Array {
   return allocationHelper([
     [PACKET_PREFIX.length, PACKET_PREFIX],
     [packetTagSubPrefix.length, packetTagSubPrefix],
-    [SEPERATOR.length, SEPERATOR],
+    [SEPARATOR.length, SEPARATOR],
     [tag.length, tag]
   ])
 }
@@ -123,7 +106,6 @@ export class CoreDB {
     }
     this.db = levelup(leveldown(dbPath))
   }
-
 
   public getLevelUpTempUntilRefactored(): LevelUp {
     // TODO remove this when we can refactor other code to use methods
@@ -208,7 +190,7 @@ export class CoreDB {
 
     return new Promise((resolve, reject) => {
       this.db.createReadStream({
-        gte: Buffer.from(AcknowledgedTickets(new Uint8Array(0x00)))
+        gte: Buffer.from(keyAcknowledgedTickets(new Uint8Array(0x00)))
       })
         .on('error', (err) => reject(err))
         .on('data', async ({ key, value }: { key: Buffer; value: Buffer }) => {
@@ -246,7 +228,7 @@ export class CoreDB {
         acks.map<any>(async (ack) => {
           return {
             type: 'del',
-            key: Buffer.from(AcknowledgedTickets((await ack.ackTicket.ticket).challenge.serialize()))
+            key: Buffer.from(keyAcknowledgedTickets((await ack.ackTicket.ticket).challenge.serialize()))
           }
         })
       )
@@ -259,7 +241,7 @@ export class CoreDB {
    * @param index Uint8Array
    */
   async updateAcknowledgement(ackTicket: Acknowledgement, index: Uint8Array): Promise<void> {
-    await this.db.put(Buffer.from(AcknowledgedTickets(index)), Buffer.from(ackTicket.serialize()))
+    await this.db.put(Buffer.from(keyAcknowledgedTickets(index)), Buffer.from(ackTicket.serialize()))
   }
 
   /**
@@ -267,7 +249,7 @@ export class CoreDB {
    * @param index Uint8Array
    */
   async deleteAcknowledgement(index: Uint8Array): Promise<void> {
-    await this.db.del(Buffer.from(AcknowledgedTickets(index)))
+    await this.db.del(Buffer.from(keyAcknowledgedTickets(index)))
   }
 
   /**
@@ -377,7 +359,7 @@ export class CoreDB {
   async replaceTicketWithAcknowledgement(key: Hash, acknowledgment: Acknowledgement) {
     const ticketCounter = await this.incrementTicketCounter()
     const unAcknowledgedDbKey = UnAcknowledgedTickets(key.serialize())
-    const acknowledgedDbKey = AcknowledgedTickets(ticketCounter)
+    const acknowledgedDbKey = keyAcknowledgedTickets(ticketCounter)
     try {
       await this.db
         .batch()
