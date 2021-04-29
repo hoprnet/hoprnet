@@ -158,9 +158,11 @@ async function main() {
   }
 
   try {
-    node = await Hopr.create(options)
-    logs.log('Created HOPR Node')
+    node = new Hopr(options)
+    logs.log('Creating HOPR Node')
     node.on('hopr:message', logMessageToNode)
+
+    await node.start()
     cmds = new Commands(node)
 
     if (argv.rest) {

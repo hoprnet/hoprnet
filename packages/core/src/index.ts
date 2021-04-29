@@ -24,7 +24,6 @@ import { findPath } from './path'
 
 import { getAcknowledgements, submitAcknowledgedTicket } from './utils'
 import { u8aToHex, DialOpts } from '@hoprnet/hopr-utils'
-import getIdentity from './identity'
 
 import Multiaddr from 'multiaddr'
 import chalk from 'chalk'
@@ -43,6 +42,7 @@ import HoprCoreEthereum, {
   RoutingChannel
 } from '@hoprnet/hopr-core-ethereum'
 import BN from 'bn.js'
+import { getAddrs } from './identity'
 
 import EventEmitter from 'events'
 import { ChannelStrategy, PassiveStrategy, PromiscuousStrategy } from './channel-strategy'
@@ -76,7 +76,6 @@ export type HoprOptions = {
   ticketWinProb?: number
   dbPath?: string
   createDbIfNotExist?: boolean
-  peerId?: PeerId
   password?: string
   connector?: HoprCoreEthereum
   strategy?: ChannelStrategyNames
@@ -108,19 +107,23 @@ class Hopr extends EventEmitter {
    * @param options
    * @param provider
    */
-  public constructor(private options: HoprOptions) {
+  public constructor(private id: PeerId, private options: HoprOptions) {
     super()
+
+    if (!id.privKey) {
+      // TODO - assert secp256k1?
+      throw new Error('Hopr Node must be initialized with an id with a private key')
+    }
     this.db = openDatabase(options)
   }
 
   /**
-   * Initialize node
+   * Start node
    *
    * The node has a fairly complex lifecycle. This method should do all setup
    * required for a node to be functioning.
    *
-   * - Create the database if required.
-   *   - Create a privateKey if required
+   * If the node is not funded, it will throw.
    *
    * - Create a link to the ethereum blockchain
    *   - Finish indexing previous blocks [SLOW]
@@ -137,12 +140,14 @@ class Hopr extends EventEmitter {
    *
    * @param options
    */
-  public async initialize() {
-    const { id, addresses } = await getIdentity(this.options, this.db)
-
-    let connector = await HoprCoreEthereum.create(this.db, id.privKey.marshal(), {
+  public async start() {
+    let connector = await HoprCoreEthereum.create(this.db, this.id.privKey.marshal(), {
       provider: this.options.provider
     })
+
+    if (await connector.getNativeBalance() < MIN_NATIVE_BALANCE) {
+      throw new Error('Cannot start node without a funded wallet')
+    }
 
     verbose('Started HoprEthereum. Waiting for indexer to find connected nodes.')
     const publicNodes = await connector.waitForPublicNodes()
@@ -151,8 +156,8 @@ class Hopr extends EventEmitter {
     }
 
     const libp2p = await LibP2P.create({
-      peerId: id,
-      addresses: { listen: addresses.map((x) => x.toString()) },
+      peerId: this.id,
+      addresses: { listen: getAddrs(this.id, this.options).map((x) => x.toString()) },
       // libp2p modules
       modules: {
         transport: [HoprConnect as any], // TODO re https://github.com/hoprnet/hopr-connect/issues/78
@@ -189,51 +194,16 @@ class Hopr extends EventEmitter {
     })
 
     await libp2p.start()
-    await this.heartbeat.start()
-    log(`Available under the following addresses:`)
-    libp2p.multiaddrs.forEach((ma: Multiaddr) => log(ma.toString()))
-    this.periodicCheck()
-
+    this.libp2p = libp2p
+    this.paymentChannels = connector
     this.libp2p.connectionManager.on('peer:connect', (conn: Connection) => {
       this.emit('hopr:peer:connection', conn.remotePeer)
       this.networkPeers.register(conn.remotePeer)
     })
 
+    await this.heartbeat.start()
+    this.periodicCheck()
     this.setChannelStrategy(this.options.strategy || 'passive')
-
-    if (process.env.GCLOUD) {
-      try {
-        var name = 'hopr_node_' + this.getId().toB58String().slice(-5).toLowerCase()
-        require('@google-cloud/profiler')
-          .start({
-            projectId: 'hoprassociation',
-            serviceContext: {
-              service: name,
-              version: FULL_VERSION
-            }
-          })
-          .catch((e: any) => console.log(e))
-      } catch (e) {
-        console.log(e)
-      }
-    }
-
-    if (process.env.GCLOUD) {
-      try {
-        var name = 'hopr_node_' + this.getId().toB58String().slice(-5).toLowerCase()
-        require('@google-cloud/profiler')
-          .start({
-            projectId: 'hoprassociation',
-            serviceContext: {
-              service: name,
-              version: FULL_VERSION
-            }
-          })
-          .catch((e: any) => console.log(e))
-      } catch (e) {
-        console.log(e)
-      }
-    }
 
     this.networkPeers = new NetworkPeers(Array.from(this.libp2p.peerStore.peers.values()).map((x) => x.id))
 
@@ -254,9 +224,33 @@ class Hopr extends EventEmitter {
     const onMessage = (msg: Uint8Array) => this.emit('hopr:message', msg)
     this.forward = new PacketForwardInteraction(this.db, this.paymentChannels, this.getId(), this.libp2p, subscribe, sendMessage, onMessage)
 
-    verbose('# STARTED NODE')
-    verbose('ID', this.getId().toB58String())
-    verbose('Protocol version', VERSION)
+    // Log information
+    log('# STARTED NODE')
+    log('ID', this.getId().toB58String())
+    log('Protocol version', VERSION)
+    log(`Available under the following addresses:`)
+    libp2p.multiaddrs.forEach((ma: Multiaddr) => log(ma.toString()))
+    this.maybeLogProfilingToGCloud()
+
+  }
+
+  private maybeLogProfilingToGCloud(){
+    if (process.env.GCLOUD) {
+      try {
+        var name = 'hopr_node_' + this.getId().toB58String().slice(-5).toLowerCase()
+        require('@google-cloud/profiler')
+          .start({
+            projectId: 'hoprassociation',
+            serviceContext: {
+              service: name,
+              version: FULL_VERSION
+            }
+          })
+          .catch((e: any) => console.log(e))
+      } catch (e) {
+        console.log(e)
+      }
+    }
   }
 
   private async tickChannelStrategy(newChannels: RoutingChannel[]) {
@@ -326,7 +320,7 @@ class Hopr extends EventEmitter {
   }
 
   public getId(): PeerId {
-    return this.libp2p.peerId // Not a documented API, but in the source
+    return this.id
   }
 
   /**

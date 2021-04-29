@@ -13,10 +13,11 @@ import Multiaddr from 'multiaddr'
 import { KeyPair } from './dbKeys'
 
 const DEFAULT_PORT = 9091
+
 /**
  * Assemble the addresses that we are using
  */
-function getAddrs(id: PeerId, options: HoprOptions): Multiaddr[] {
+export function getAddrs(id: PeerId, options: HoprOptions): Multiaddr[] {
   const addrs = []
 
   if (options.hosts === undefined || (options.hosts.ip4 === undefined && options.hosts.ip6 === undefined)) {
@@ -38,14 +39,6 @@ function getAddrs(id: PeerId, options: HoprOptions): Multiaddr[] {
   }
 
   return addrs.map((addr: Multiaddr) => addr.encapsulate(`/p2p/${id.toB58String()}`))
-}
-
-async function getPeerId(options: HoprOptions, db: LevelUp): Promise<PeerId> {
-  if (options.peerId != null && PeerId.isPeerId(options.peerId)) {
-    return options.peerId
-  }
-
-  return getFromDatabase(db, options.password)
 }
 
 /**
@@ -102,11 +95,3 @@ async function createIdentity(db: LevelUp, pw?: string): Promise<PeerId> {
   return peerId
 }
 
-export default async function getIdentity(options: HoprOptions, db: LevelUp) {
-  let id = await getPeerId(options, db)
-
-  return {
-    id,
-    addresses: getAddrs(id, options)
-  }
-}
