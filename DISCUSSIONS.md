@@ -49,6 +49,20 @@ This was initially defined in #947.
 
 _These discussions relate to the implementation of the HOPR protocol, or more particularly, `hoprd`. The protocol is defined by our yellowpaper, but the only existing implementation is located in `packages/hoprd`, as a Typescript/JavaScript node.js application._
 
+### Use EIP712 for hashes before signing
+
+#### Problem statement
+
+HOPR signatures provide no context on what's being signed.
+
+#### Discussion
+
+By implementing [EIP-712](https://eips.ethereum.org/EIPS/eip-712), we can provide meaningful information to our hashes for further inspection and debugging.
+
+#### Additional notes
+
+Initially reported in #1365.
+
 ### Adding an on-ramp layer to hoprd
 
 #### Problem statement
