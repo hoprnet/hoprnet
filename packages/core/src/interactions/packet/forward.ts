@@ -19,7 +19,15 @@ class PacketForwardInteraction {
   private mixer: Mixer
   private concurrencyLimiter
 
-  constructor(private db: LevelUp, private paymentChannels: HoprCoreEthereum, private id: PeerId, private libp2p: LibP2P, private subscribe: any, private sendMessage: any, private onMessage: (msg: Uint8Array) => void) {
+  constructor(
+    private db: LevelUp,
+    private paymentChannels: HoprCoreEthereum,
+    private id: PeerId,
+    private libp2p: LibP2P,
+    private subscribe: any,
+    private sendMessage: any,
+    private onMessage: (msg: Uint8Array) => void
+  ) {
     this.mixer = new Mixer(this.handleMixedPacket.bind(this))
     this.concurrencyLimiter = oneAtATime()
     this.subscribe(PROTOCOL_STRING, this.handlePacket.bind(this))
@@ -33,16 +41,10 @@ class PacketForwardInteraction {
 
   async handlePacket(msg: Uint8Array) {
     const arr = msg.slice()
-    const packet = new Packet(
-      this.libp2p,
-      this.paymentChannels,
-      this.db,
-      this.id,
-      {
-        bytes: arr.buffer,
-        offset: arr.byteOffset
-      }
-    )
+    const packet = new Packet(this.libp2p, this.paymentChannels, this.db, this.id, {
+      bytes: arr.buffer,
+      offset: arr.byteOffset
+    })
 
     this.mixer.push(packet)
   }
@@ -58,11 +60,7 @@ class PacketForwardInteraction {
         const [sender, target] = await Promise.all([packet.getSenderPeerId(), packet.getTargetPeerId()])
 
         setImmediate(async () => {
-          const ack = await AcknowledgementMessage.create(
-            Challenge.deserialize(ticketKey),
-            receivedChallenge,
-            id 
-          )
+          const ack = await AcknowledgementMessage.create(Challenge.deserialize(ticketKey), receivedChallenge, id)
           sendMessage(sender, PROTOCOL_ACKNOWLEDGEMENT, ack.serialize(), {
             timeout: ACKNOWLEDGEMENT_TIMEOUT
           })
