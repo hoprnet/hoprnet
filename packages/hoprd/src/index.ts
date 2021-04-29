@@ -9,6 +9,8 @@ import * as yargs from 'yargs'
 import setupAPI from './api'
 import { getIdentity } from './identity'
 
+const DEFAULT_ID_PATH = '~/.hopr-identity'
+
 const argv = yargs
   .option('network', {
     describe: 'Which network to run the HOPR node on',
@@ -60,7 +62,12 @@ const argv = yargs
     default: 8080
   })
   .option('password', {
-    describe: 'A password to encrypt your keys'
+    describe: 'A password to encrypt your keys',
+    default: ''
+  })
+  .option('identity', {
+    describe: 'The path to the identity file',
+    default: DEFAULT_ID_PATH
   })
   .option('run', {
     describe: 'Run a single hopr command, same syntax as in hopr-admin',
@@ -161,15 +168,20 @@ async function main() {
   // 1. Find or create an identity
   const peerId = await getIdentity({
     initialize: argv.init,
-    idPath: argv.identity || DEFAULT_ID_PATH,
+    idPath: argv.identity,
     password: argv.password
   })
 
+  // 2. Create node instance
   try {
     node = new Hopr(peerId, options)
     logs.log('Creating HOPR Node')
     node.on('hopr:message', logMessageToNode)
 
+    // 2.5 Await funding of wallet.
+    // TODO
+
+    // 3. Start the node.
     await node.start()
     cmds = new Commands(node)
 

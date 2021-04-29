@@ -2,6 +2,9 @@
 import PeerId from 'peer-id'
 import { randomBytes, createCipheriv, scryptSync, createHmac } from 'crypto'
 import { privKeyToPeerId, u8aEquals } from '@hoprnet/hopr-utils'
+import fs from 'fs'
+import Debug from 'debug'
+const log = Debug(`hoprd:identity`)
 
 export const KEYPAIR_CIPHER_ALGORITHM = 'chacha20'
 export const KEYPAIR_IV_LENGTH = 16
@@ -80,20 +83,9 @@ export type IdentityOptions = {
   password: string,
 }
 
-async function recoverIdentity(serializedKeyPair: Uint8Array, pw?: string): Promise<PeerId> {
-  let peerId: PeerId
-
-  if (pw !== undefined) {
-    try {
-      return await deserializeKeyPair(serializedKeyPair, new TextEncoder().encode(pw))
-    } catch (err) {
-      // Exit with error message
-      console.log(`Could not recover id from database with given password.`)
-      process.exit(1)
-    }
-  }
-
-  return peerId
+async function loadIdentity(path: string, password: string): Promise<PeerId> {
+  const serialized: Uint8Array = fs.readFileSync(path)
+  return await deserializeKeyPair(serialized, new TextEncoder().encode(password))
 }
 
 async function storeIdentity(path: string, id: Uint8Array) {

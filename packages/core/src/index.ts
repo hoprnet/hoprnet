@@ -145,7 +145,7 @@ class Hopr extends EventEmitter {
       provider: this.options.provider
     })
 
-    if ((await connector.getNativeBalance()).lte(MIN_NATIVE_BALANCE)) {
+    if ((await connector.getNativeBalance()).toBN().lte(MIN_NATIVE_BALANCE)) {
       throw new Error('Cannot start node without a funded wallet')
     }
 
@@ -656,7 +656,7 @@ class Hopr extends EventEmitter {
     return this.paymentChannels.getAddress()
   }
 
-  async withdraw(currency: 'NATIVE' | 'HOPR', recipient: string, amount: string): Promise<string> {
+  public async withdraw(currency: 'NATIVE' | 'HOPR', recipient: string, amount: string): Promise<string> {
     return this.paymentChannels.withdraw(currency, recipient, amount)
   }
 
