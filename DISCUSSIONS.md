@@ -9,9 +9,11 @@ _These discussion involve the actual definition of the HOPR protocol, as defined
 ### SURBs
 
 #### Problem statement
+
 Right now, because of sender/receiver unlinkability, the receiver can not know how to reply back to the sender.
 
 #### Discussion
+
 There exists a concept called SURBs - Single-Use Reply Blocks, This means, we create in addition to the header that we use to send the message to the receiver a second one that is used to reply to the sender.
 
 We can refactor the header generation function such that we can create Reply-headers.
@@ -50,6 +52,7 @@ _These discussions relate to the implementation of the HOPR protocol, or more pa
 ### Adding an on-ramp layer to hoprd
 
 #### Problem statement
+
 Right now we are stuck w/having to fund every initial node, which is cumbersome and not scalable for mainnet.
 
 #### Discussion
