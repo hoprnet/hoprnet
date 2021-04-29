@@ -16,10 +16,6 @@ import HoprCoreEthereum, {
 
 const log = Debug(`hopr-core:db`)
 
-const defaultDBPath = (): string => {
-  return path.join(process.cwd(), 'db', VERSION, 'node')
-}
-
 const encoder = new TextEncoder()
 const TICKET_PREFIX: Uint8Array = encoder.encode('tickets-')
 const PACKET_PREFIX: Uint8Array = encoder.encode('packets-')
@@ -29,7 +25,6 @@ const acknowledgedTicketCounter = encoder.encode('acknowledgedCounter')
 const unAcknowledgedSubPrefix = encoder.encode('unacknowledged-')
 const packetTagSubPrefix = encoder.encode('tag-')
 const KEY_LENGTH = 32
-
 const ACKNOWLEDGED_TICKET_INDEX_LENGTH = 8
 
 function keyAcknowledgedTickets(index: Uint8Array): Uint8Array {
@@ -46,12 +41,8 @@ function AcknowledgedTicketCounter() {
 }
 
 export function UnAcknowledgedTickets(hashedKey: Uint8Array): Uint8Array {
-  return allocationHelper([
-    [TICKET_PREFIX.length, TICKET_PREFIX],
-    [unAcknowledgedSubPrefix.length, unAcknowledgedSubPrefix],
-    [SEPARATOR.length, SEPARATOR],
-    [KEY_LENGTH, hashedKey]
-  ])
+  assert.equal(hashedKey.length, KEY_LENGTH)
+  return u8aConcat(TICKET_PREFIX, unAcknowledgedSubPrefix, SEPARATOR, hashedKey)
 }
 
 function PacketTag(tag: Uint8Array): Uint8Array {
@@ -63,7 +54,6 @@ function PacketTag(tag: Uint8Array): Uint8Array {
   ])
 }
 
-export const KeyPair = encoder.encode('keyPair')
 
 type Config = [number, Uint8Array]
 
@@ -89,7 +79,8 @@ export class CoreDB {
     if (options.dbPath) {
       dbPath = options.dbPath
     } else {
-      dbPath = defaultDBPath()
+      // default
+      dbPath = path.join(process.cwd(), 'db', VERSION, 'node') 
     }
 
     dbPath = path.resolve(dbPath)
