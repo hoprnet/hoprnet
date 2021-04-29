@@ -6,6 +6,22 @@ The following are particular topics the team has agreed to discuss on, or are re
 
 _These discussion involve the actual definition of the HOPR protocol, as defined by our yellowpaper. Some topics within the protocol are external to its definition, and are instead better suited to be implemented as a separate discussion._
 
+### SURBs
+
+#### Problem statement
+
+Right now, because of sender/receiver unlinkability, the receiver can not know how to reply back to the sender.
+
+#### Discussion
+
+There exists a concept called SURBs - Single-Use Reply Blocks, This means, we create in addition to the header that we use to send the message to the receiver a second one that is used to reply to the sender.
+
+We can refactor the header generation function such that we can create Reply-headers.
+
+#### Additional notes
+
+This was initially brought up in #743.
+
 ### Cover traffic allocation = % of staked + unreleased tokens
 
 #### Problem statement
@@ -32,6 +48,20 @@ This was initially defined in #947.
 ## Implementation
 
 _These discussions relate to the implementation of the HOPR protocol, or more particularly, `hoprd`. The protocol is defined by our yellowpaper, but the only existing implementation is located in `packages/hoprd`, as a Typescript/JavaScript node.js application._
+
+### Adding an on-ramp layer to hoprd
+
+#### Problem statement
+
+Right now we are stuck w/having to fund every initial node, which is cumbersome and not scalable for mainnet.
+
+#### Discussion
+
+Ideally, we provide a way within the node to allow users to be able to on-ramp their node directly in the app (e.g. integrate https://ramp.network/ as a command within chat or as a widget in hoprd)
+
+#### Additional notes
+
+Initially saw in #430.
 
 ### Major refactor needed in our database
 
