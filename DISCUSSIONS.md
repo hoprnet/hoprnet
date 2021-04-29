@@ -47,6 +47,19 @@ This was initially defined in #947.
 
 _These discussions relate to the implementation of the HOPR protocol, or more particularly, `hoprd`. The protocol is defined by our yellowpaper, but the only existing implementation is located in `packages/hoprd`, as a Typescript/JavaScript node.js application._
 
+### Adding an on-ramp layer to hoprd
+
+#### Problem statement
+Right now we are stuck w/having to fund every initial node, which is cumbersome and not scalable for mainnet.
+
+#### Discussion
+
+Ideally, we provide a way within the node to allow users to be able to on-ramp their node directly in the app (e.g. integrate https://ramp.network/ as a command within chat or as a widget in hoprd)
+
+#### Additional notes
+
+Initially saw in #430.
+
 ### Major refactor needed in our database
 
 #### Problem statement
