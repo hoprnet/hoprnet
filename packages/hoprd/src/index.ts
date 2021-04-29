@@ -7,6 +7,7 @@ import { LogStream } from './logs'
 import { AdminServer } from './admin'
 import * as yargs from 'yargs'
 import setupAPI from './api'
+import { getIdentity } from './identity'
 
 const argv = yargs
   .option('network', {
@@ -157,8 +158,15 @@ async function main() {
     process.exit(0)
   }
 
+  // 1. Find or create an identity
+  const peerId = await getIdentity({
+    initialize: argv.init,
+    idPath: argv.identity || DEFAULT_ID_PATH,
+    password: argv.password
+  })
+
   try {
-    node = new Hopr(options)
+    node = new Hopr(peerId, options)
     logs.log('Creating HOPR Node')
     node.on('hopr:message', logMessageToNode)
 

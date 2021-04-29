@@ -1,3 +1,4 @@
+// TODO - replace serialization with a library
 import PeerId from 'peer-id'
 import { randomBytes, createCipheriv, scryptSync, createHmac } from 'crypto'
 import { privKeyToPeerId, u8aEquals } from '@hoprnet/hopr-utils'
@@ -72,4 +73,51 @@ export async function deserializeKeyPair(encryptedSerializedKeyPair: Uint8Array,
   let plaintext = createCipheriv(KEYPAIR_CIPHER_ALGORITHM, key, iv).update(ciphertext)
 
   return await privKeyToPeerId(plaintext)
+}
+export type IdentityOptions = {
+  initialize: boolean,
+  idPath: string,
+  password: string,
+}
+
+async function recoverIdentity(serializedKeyPair: Uint8Array, pw?: string): Promise<PeerId> {
+  let peerId: PeerId
+
+  if (pw !== undefined) {
+    try {
+      return await deserializeKeyPair(serializedKeyPair, new TextEncoder().encode(pw))
+    } catch (err) {
+      // Exit with error message
+      console.log(`Could not recover id from database with given password.`)
+      process.exit(1)
+    }
+  }
+
+  return peerId
+}
+
+async function storeIdentity(path: string, id: Uint8Array) {
+  fs.writeFileSync(path, id)
+}
+
+async function createIdentity(idPath:string, password: string): Promise<PeerId> {
+  const peerId = await PeerId.create({ keyType: 'secp256k1' })
+  const serializedKeyPair = serializeKeyPair(peerId, new TextEncoder().encode(password))
+  await storeIdentity(idPath, serializedKeyPair)
+  return peerId
+}
+
+
+export async function getIdentity(options: IdentityOptions): Promise<PeerId>{
+  try {
+    return await loadIdentity(options.idPath, options.password)
+  } catch {
+    log('Could not load identity', options.idPath)
+  }
+
+  if (options.initialize) {
+    log('Creating new identity', options.idPath)
+    return await createIdentity(options.idPath, options.password)
+  }
+  throw new Error('Cannot load identity')
 }

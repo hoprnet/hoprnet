@@ -145,7 +145,7 @@ class Hopr extends EventEmitter {
       provider: this.options.provider
     })
 
-    if (await connector.getNativeBalance() < MIN_NATIVE_BALANCE) {
+    if ((await connector.getNativeBalance()).lte(MIN_NATIVE_BALANCE)) {
       throw new Error('Cannot start node without a funded wallet')
     }
 
