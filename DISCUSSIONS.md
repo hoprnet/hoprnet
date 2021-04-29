@@ -9,6 +9,7 @@ _These discussion involve the actual definition of the HOPR protocol, as defined
 ### Cover traffic allocation = % of staked + unreleased tokens
 
 #### Problem statement
+
 Cover traffic should be allocated proportional to the total amount of (a) HOPR tgokens staked + (b) unreleased tokens (for early token buyers & team).
 
 #### Discussion
@@ -25,6 +26,7 @@ There's two design issues here:
 - (b) how do we link unreleased tokens that is assigned to an Ethereum address via the allocator contract (see #684) to a HOPR account of a node. This could be done via a linking smart contract that gets consumed here. Such a contract would be called for the beneficiary of the unreleased tokens (address noted in allocator contract) with a parameter of the HOPR pub key that it's assigning it's cover traffic to).
 
 #### Additional notes
+
 This was initially defined in #947.
 
 ## Implementation
@@ -34,8 +36,9 @@ _These discussions relate to the implementation of the HOPR protocol, or more pa
 ### Major refactor needed in our database
 
 #### Problem statement
+
 We sprinkle references to an IndexedDb throughout the code, and rely on buffer serialisation everywhere we access it.
 
 #### Discussion
-It would be more maintainable and readable to create a database abstraction to allow us to mock out, or separate database implementation details from the desired interface.
 
+It would be more maintainable and readable to create a database abstraction to allow us to mock out, or separate database implementation details from the desired interface.
