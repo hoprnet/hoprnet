@@ -22,7 +22,7 @@ Sphinx is a cryptographic message format used to relay anonymized messages withi
     \label{fig:Sphinx packet format}
 \end{figure}
 \subparagraph{Notation:}Let $\kappa=128$ be a security parameter. An adversary will have to do about $2\kappa$ work to break the security of Sphinx with non negligible probability.
-Let $r$ be the maximum number of nodes that a Sphinx mix message will traverse before being delivered to its destination. Let $Z$ be  the destination address, an identifier $I \in \{0, 1\}^\kappa$ and a sequence of mix nodes $\{n_0, n_1, . . . , n_{v-1}\}$ with $v\leq r$. It must also be the case that $|Z| \leq (2(r - v) + 2)$.
+Let $r$ be the maximum number of nodes that a Sphinx mix message will traverse before being delivered to its destination. Let $Z$ be  the destination address, an identifier $I \in \{0, 1\}^\kappa$ and a sequence of mix nodes $\{n_0, n_1, . . . , n_{v-1}\}$ with $v\leq r$ the length of the path traversed by the packet. It must also be the case that $|Z| \leq (2(r - v) + 2)$.
 \\$G$ is a prime order cyclic group satisfying the Decisional Diffie-Hellman Assumption. The element $g$ is a generator of $G$ and $q$ is the (prime) order of $G$, with $q\approx2^{\kappa}$.
 $G^*$is the set of non-identity elements of G. $h_b$is a hash function used to compute blinding factors and we model by random oracles such that:
 $h:G^*\times G^*\rightarrow\mathbb{Z}^*_q$ where $\mathbb{Z}^*_q$ is the field of non-identity elements of $\mathbb{Z}_q$ (field of integers).
@@ -70,7 +70,7 @@ The implementation choices taken by HOPR team are the following:
     \item \textbf{Hash function:} BLAKE2s hash function which is a cryptographic hash function faster than SHA-2 and SHA-3, yet is at least as secure as SHA-3 and produces digests of any size between 1 and 32 bytes.
     \item \textbf{MAC:} HMAC based on a hash function BLAKE2s.
     \item \textbf{Encryption scheme:} LIONESS implementation based on the ChaCha20 stream cipher.
-    \item \textbf{Padding:} We replace the 0-padding by a randomized padding for the exit-mix node. In the original SPHINX paper, a sequence of only 0s is used for padding. This allows the last mix-node in the path to infer information about the length of the path and the last destination, hence breaking one of the security properties promised by Sphinx.
+    \item \textbf{Padding:} In the original SPHINX paper, a sequence of only 0s is used for padding, this allows the last mix-node in the path to infer information about the length of the path and the last destination, hence breaking one of the security properties promised by Sphinx. In order to prevent this attack, We replace the 0-padding by a randomized padding for the last exit-mix node and always take $v=r$. This way, the exit node can't identify where the padding starts and thus won't be able to find the path length that preceeds the padding.
 \end{itemize}
 
 
