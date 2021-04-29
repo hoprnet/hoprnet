@@ -161,9 +161,10 @@ export class CoreDB {
     }[] = []
 
     return new Promise((resolve, reject) => {
-      this.db.createReadStream({
-        gte: Buffer.from(keyAcknowledgedTickets(new Uint8Array(0x00)))
-      })
+      this.db
+        .createReadStream({
+          gte: Buffer.from(keyAcknowledgedTickets(new Uint8Array(0x00)))
+        })
         .on('error', (err) => reject(err))
         .on('data', async ({ key, value }: { key: Buffer; value: Buffer }) => {
           if (value.buffer.byteLength !== Acknowledgement.SIZE) return
