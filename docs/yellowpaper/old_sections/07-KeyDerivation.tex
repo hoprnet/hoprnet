@@ -1,0 +1,19 @@
+\section{Key Derivation} \label{KeyDerivation}
+
+The key halves $s_a$ and $s_b$ are derived via the \MYhref{https://en.wikipedia.org/wiki/HKDF}{HKDF} key derivation function which is based on HMAC-SHA256. The input key material (IKM) is obtained from the SPHINX packet header and different salt values are used for the different types of keys (e.g. $s_a$ or $s_b$).
+
+The sender of a packet (Alice in the example above) generates a secret pseudo random number $x_{b_0}$ which she then turns into a curve point $X_{b_0} = g^{x_{b_0}}$. This allows Bob to derive the input key material $IKM = (X_{b_0})^{b_0}$. Finally Bob can then use this IKM to generate the different types of keys $key=HKDF(IKM, salt)$.
+
+The $IKM$ can be derived both by Alice (from the left side of the equation below) and also from Bob (from the right side in the equation below):
+
+${B_0}^{x_{b_0}} = (g^{b_0})^{x_{b_0}} = g^{x_{b_0} * b_0} = (g^{x_{b_0}})^{b_0} = (X_{b_0})^{b_0}$
+
+$x_{b_0}$ : Alice generates this (random number) and keeps it secret
+
+$b_0$: private key of Bob
+
+$B_0$: pub key of Bob, Alice knows that
+
+$X_{b_0}$: This is what Alice stores in SPHINX header for Bob and from which he derives the input key material
+
+$(X_{b_0})^{b_0}$: This is the input key material that Bob derives with his private key
