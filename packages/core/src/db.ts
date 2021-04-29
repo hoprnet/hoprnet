@@ -18,12 +18,11 @@ const log = Debug(`hopr-core:db`)
 
 const encoder = new TextEncoder()
 const TICKET_PREFIX: Uint8Array = encoder.encode('tickets-')
-const PACKET_PREFIX: Uint8Array = encoder.encode('packets-')
-const SEPARATOR: Uint8Array = encoder.encode('-')
+const PACKET_TAG_PREFIX: Uint8Array = encoder.encode('packets-tag-')
+const ACKNOWLEDGED_TICKET_COUNTER = encoder.encode('tickets-acknowledgedCounter')
 const acknowledgedSubPrefix = encoder.encode('acknowledged-')
-const acknowledgedTicketCounter = encoder.encode('acknowledgedCounter')
 const unAcknowledgedSubPrefix = encoder.encode('unacknowledged-')
-const packetTagSubPrefix = encoder.encode('tag-')
+
 const KEY_LENGTH = 32
 const ACKNOWLEDGED_TICKET_INDEX_LENGTH = 8
 
@@ -36,40 +35,11 @@ function AcknowledgedTicketsParse(arr: Uint8Array): Uint8Array {
   return arr.slice(TICKET_PREFIX.length + acknowledgedSubPrefix.length, arr.length)
 }
 
-function AcknowledgedTicketCounter() {
-  return u8aConcat(TICKET_PREFIX, acknowledgedTicketCounter)
-}
-
 export function UnAcknowledgedTickets(hashedKey: Uint8Array): Uint8Array {
   assert.equal(hashedKey.length, KEY_LENGTH)
-  return u8aConcat(TICKET_PREFIX, unAcknowledgedSubPrefix, SEPARATOR, hashedKey)
+  return u8aConcat(TICKET_PREFIX, unAcknowledgedSubPrefix, hashedKey)
 }
 
-function PacketTag(tag: Uint8Array): Uint8Array {
-  return allocationHelper([
-    [PACKET_PREFIX.length, PACKET_PREFIX],
-    [packetTagSubPrefix.length, packetTagSubPrefix],
-    [SEPARATOR.length, SEPARATOR],
-    [tag.length, tag]
-  ])
-}
-
-
-type Config = [number, Uint8Array]
-
-function allocationHelper(arr: Config[]) {
-  const totalLength = arr.reduce((acc, current) => acc + current[0], 0)
-
-  let result = new Uint8Array(totalLength)
-
-  let offset = 0
-  for (let [size, data] of arr) {
-    result.set(data, offset)
-    offset += size
-  }
-
-  return result
-}
 
 export class CoreDB {
   private db: LevelUp
@@ -95,6 +65,27 @@ export class CoreDB {
       }
     }
     this.db = levelup(leveldown(dbPath))
+  }
+
+  private keyOf(...segments: Uint8Array[]): Uint8Array {
+    return u8aConcat.apply(null, segments)
+  }
+
+  private async has(key: Uint8Array): Promise<boolean> {
+    try {
+      await this.db.get(key)
+      return true
+    } catch (err) {
+      if (err.type === 'NotFoundError' || err.notFound === undefined || !err.notFound) {
+        return false
+      } else {
+        throw err
+      }
+    }
+  }
+
+  private async touch(key: Uint8Array): Promise<void> {
+    return await this.db.put(Buffer.from(key), Buffer.from(''))
   }
 
   public getLevelUpTempUntilRefactored(): LevelUp {
@@ -288,15 +279,11 @@ export class CoreDB {
     this.db.put(Buffer.from(UnAcknowledgedTickets(key)), Buffer.from(unacknowledged.serialize()))
   }
 
+
   async hasPacket(id: Uint8Array) {
-    try {
-      await this.db.get(PacketTag(id))
-    } catch (err) {
-      if (err.type === 'NotFoundError' || err.notFound === undefined || !err.notFound) {
-        await this.db.put(Buffer.from(PacketTag(id)), Buffer.from(''))
-      } else {
-        throw err
-      }
+    if (this.has(this.keyOf(PACKET_TAG_PREFIX, id))){
+      await this.touch(this.keyOf(PACKET_TAG_PREFIX, id))
+      return true
     }
     throw Error('Key is already present. Cannot accept packet because it might be a duplicate.')
   }
@@ -331,7 +318,7 @@ export class CoreDB {
         .batch()
         .del(Buffer.from(unAcknowledgedDbKey))
         .put(Buffer.from(acknowledgedDbKey), Buffer.from(acknowledgment.serialize()))
-        .put(Buffer.from(AcknowledgedTicketCounter()), Buffer.from(ticketCounter))
+        .put(Buffer.from(ACKNOWLEDGED_TICKET_COUNTER), Buffer.from(ticketCounter))
         .write()
     } catch (err) {
       log(`ERROR: Error while writing to database. Error was ${err.message}.`)
@@ -341,7 +328,7 @@ export class CoreDB {
   async incrementTicketCounter(): Promise<Uint8Array> {
     let ticketCounter
     try {
-      let tmpTicketCounter = await this.db.get(Buffer.from(AcknowledgedTicketCounter()))
+      let tmpTicketCounter = await this.db.get(Buffer.from(ACKNOWLEDGED_TICKET_COUNTER))
       ticketCounter = u8aAdd(true, tmpTicketCounter, toU8a(1, ACKNOWLEDGED_TICKET_INDEX_LENGTH))
     } catch (err) {
       // Set ticketCounter to initial value
@@ -352,7 +339,7 @@ export class CoreDB {
 
   async storeUnacknowledgedTicket(challenge: Hash) {
     const unAcknowledgedDBKey = UnAcknowledgedTickets(challenge.serialize())
-    this.db.put(Buffer.from(unAcknowledgedDBKey), Buffer.from(''))
+    await this.touch(unAcknowledgedDBKey)
     return unAcknowledgedDBKey
   }
 
