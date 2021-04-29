@@ -3,12 +3,10 @@ import LibP2P from 'libp2p'
 import { blue, green } from 'chalk'
 import PeerId from 'peer-id'
 import { u8aConcat, u8aEquals, u8aToHex, pubKeyToPeerId } from '@hoprnet/hopr-utils'
-import { getTickets } from '../../utils/tickets'
 import { Header, deriveTicketKey, deriveTicketKeyBlinding, deriveTagParameters, deriveTicketLastKey } from './header'
 import { Challenge } from './challenge'
-import { PacketTag, UnAcknowledgedTickets } from '../../dbKeys'
+import { CoreDB } from '../../db'
 import Message from './message'
-import { LevelUp } from 'levelup'
 import { TICKET_AMOUNT, TICKET_WIN_PROB } from '../../constants'
 import Debug from 'debug'
 import HoprCoreEthereum, {
@@ -144,7 +142,7 @@ export class Packet extends Uint8Array {
 
   private libp2p: LibP2P
   private paymentChannels: HoprCoreEthereum
-  private db: LevelUp
+  private db: CoreDB 
   private id: PeerId
   private ticketAmount: string
   private ticketWinProb: number
@@ -152,7 +150,7 @@ export class Packet extends Uint8Array {
   constructor(
     libp2p: LibP2P,
     paymentChannels: HoprCoreEthereum,
-    db: LevelUp,
+    db: CoreDB,
     id: PeerId,
     arr?: {
       bytes: ArrayBuffer
@@ -267,7 +265,7 @@ export class Packet extends Uint8Array {
    */
   static async create(
     chain: HoprCoreEthereum,
-    db: LevelUp,
+    db: CoreDB,
     id: PeerId,
     libp2p: LibP2P,
     msg: Uint8Array,
@@ -341,12 +339,7 @@ export class Packet extends Uint8Array {
   }> {
     const ethereum = this.paymentChannels
     this.header.deriveSecret(this.libp2p.peerId.privKey.marshal())
-
-    if (await this.testAndSetTag(this.db)) {
-      verbose('Error setting tag')
-      throw Error('Error setting tag')
-    }
-
+    await this.testAndSetTag()
     if (!this.header.verify()) {
       verbose('Error verifying header', this.header)
       throw Error('Error verifying header')
@@ -373,7 +366,7 @@ export class Packet extends Uint8Array {
           await this.ticket,
           channel,
           () =>
-            getTickets(this.db, {
+            this.db.getTickets({
               signer: sender.pubKey.marshal()
             })
         )
@@ -436,10 +429,7 @@ export class Packet extends Uint8Array {
         u8aToHex(this.header.hashedKeyHalf)
       )} from ${blue(target.toB58String())}`
     )
-    await this.db.put(
-      Buffer.from(UnAcknowledgedTickets(this.header.hashedKeyHalf)),
-      Buffer.from(unacknowledged.serialize())
-    )
+    await this.db.storeUnacknowledgedTickets(this.header.hashedKeyHalf, unacknowledged)
 
     // get new ticket amount
     const fee = new Balance(ticket.amount.toBN().isub(new BN(this.ticketAmount)))
@@ -486,20 +476,7 @@ export class Packet extends Uint8Array {
   /**
    * Checks whether the packet has already been seen.
    */
-  async testAndSetTag(db: LevelUp): Promise<boolean> {
-    const key = PacketTag(deriveTagParameters(this.header.derivedSecret))
-
-    try {
-      await db.get(key)
-    } catch (err) {
-      if (err.type === 'NotFoundError' || err.notFound === undefined || !err.notFound) {
-        await db.put(Buffer.from(key), Buffer.from(''))
-        return false
-      } else {
-        throw err
-      }
-    }
-
-    throw Error('Key is already present. Cannot accept packet because it might be a duplicate.')
+  async testAndSetTag(): Promise<void> {
+    await this.db.hasPacket(deriveTagParameters(this.header.derivedSecret))
   }
 }

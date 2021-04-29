@@ -22,13 +22,10 @@ import NetworkPeers from './network/network-peers'
 import Heartbeat from './network/heartbeat'
 import { findPath } from './path'
 
-import { getAcknowledgements, submitAcknowledgedTicket } from './utils'
 import { u8aToHex, DialOpts } from '@hoprnet/hopr-utils'
 
 import Multiaddr from 'multiaddr'
 import chalk from 'chalk'
-import type { LevelUp } from 'levelup'
-import * as dbKeys from './dbKeys'
 
 import PeerId from 'peer-id'
 import HoprCoreEthereum, {
@@ -56,7 +53,7 @@ import {
 } from '@hoprnet/hopr-utils'
 import { subscribeToAcknowledgements } from './interactions/packet/acknowledgement'
 import { PacketForwardInteraction } from './interactions/packet/forward'
-import { openDatabase } from './db'
+import { CoreDB } from './db'
 
 const log = Debug(`hopr-core`)
 const verbose = Debug('hopr-core:verbose')
@@ -96,7 +93,7 @@ class Hopr extends EventEmitter {
   private heartbeat: Heartbeat
   private forward: PacketForwardInteraction
   private libp2p: LibP2P
-  private db: LevelUp
+  private db: CoreDB
   private paymentChannels: HoprCoreEthereum
 
   /**
@@ -114,7 +111,7 @@ class Hopr extends EventEmitter {
       // TODO - assert secp256k1?
       throw new Error('Hopr Node must be initialized with an id with a private key')
     }
-    this.db = openDatabase(options)
+    this.db = new CoreDB(options)
   }
 
   /**
@@ -141,7 +138,7 @@ class Hopr extends EventEmitter {
    * @param options
    */
   public async start() {
-    let connector = await HoprCoreEthereum.create(this.db, this.id.privKey.marshal(), {
+    let connector = await HoprCoreEthereum.create(this.db.getLevelUpTempUntilRefactored(), this.id.privKey.marshal(), {
       provider: this.options.provider
     })
 
@@ -412,11 +409,9 @@ class Hopr extends EventEmitter {
             return reject(err)
           }
 
-          const unAcknowledgedDBKey = dbKeys.UnAcknowledgedTickets(packet.challenge.hash.serialize())
+          let packetKey = await this.db.storeUnacknowledgedTicket(packet.challenge.hash)
 
-          await this.db.put(Buffer.from(unAcknowledgedDBKey), Buffer.from(''))
-
-          this.once('message-acknowledged:' + u8aToHex(unAcknowledgedDBKey), () => {
+          this.once('message-acknowledged:' + u8aToHex(packetKey), () => {
             resolve()
           })
 
@@ -636,11 +631,11 @@ class Hopr extends EventEmitter {
   }
 
   public async getAcknowledgedTickets() {
-    return getAcknowledgements(this.db)
+    return this.db.getAcknowledgements()
   }
 
   public async submitAcknowledgedTicket(ackTicket: Acknowledgement, index: Uint8Array) {
-    return submitAcknowledgedTicket(this.db, this.paymentChannels, ackTicket, index)
+    return this.db.submitAcknowledgedTicket(this.paymentChannels, ackTicket, index)
   }
 
   public async getChannelsOf(addr: Address): Promise<ChannelEntry[]> {

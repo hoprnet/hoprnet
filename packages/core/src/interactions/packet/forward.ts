@@ -8,8 +8,8 @@ import { Mixer } from '../../mixer'
 import { Challenge } from '../../messages/packet/challenge'
 import { PROTOCOL_ACKNOWLEDGEMENT } from '../../constants'
 import LibP2P from 'libp2p'
-import { LevelUp } from 'levelup'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
+import { CoreDB } from '../../db'
 
 const log = Debug('hopr-core:forward')
 const FORWARD_TIMEOUT = durations.seconds(6)
@@ -20,7 +20,7 @@ class PacketForwardInteraction {
   private concurrencyLimiter
 
   constructor(
-    private db: LevelUp,
+    private db: CoreDB,
     private paymentChannels: HoprCoreEthereum,
     private id: PeerId,
     private libp2p: LibP2P,
