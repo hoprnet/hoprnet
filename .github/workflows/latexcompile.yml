@@ -17,16 +17,16 @@ jobs:
             apk add make
             tlmgr update --self
             tlmgr install preprint blindtext makecell multirow float
-            cd docs/whitepaper
+            cd docs/yellowpaper
             latexmk -pdf
             latexmk -c
-            mv main.pdf whitepaper.pdf
+            mv main.pdf yellowpaper.pdf
       - name: Commit latest version
         run: |
           git config --global user.email "noreply@hoprnet.org"
           git config --global user.name "HOPR LaTeX build robot"
-          git add docs/whitepaper/whitepaper.pdf
-          git commit -a -m "Update whitepaper" || true
+          git add docs/yellowpaper/yellowpaper.pdf
+          git commit -a -m "Update yellow paper" || true
           git pull origin ${{ github.ref }}
           git push origin ${{ github.ref }}
       # This should go into a release workflow
