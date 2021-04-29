@@ -1,7 +1,6 @@
 import { Packet, MAX_HOPS } from './packet'
 import PeerId from 'peer-id'
 import { Ticket, Hash, UINT256, Balance, PublicKey } from '@hoprnet/hopr-core-ethereum'
-import { randomBytes } from 'crypto'
 import BN from 'bn.js'
 import { u8aEquals } from '@hoprnet/hopr-utils'
 import assert from 'assert'
@@ -9,23 +8,25 @@ import Memdown from 'memdown'
 import LevelUp from 'levelup'
 
 function createMockTickets(privKey: Uint8Array) {
-  class Channel {
-    constructor(_connector: any, _self: PublicKey, private counterparty: PublicKey) {}
+  const acknowledge = () => {}
 
-    createTicket(_winProb: any, challenge: PublicKey, _balance: any) {
+  const getChannel = (_self: PublicKey, counterparty: PublicKey) => ({
+    acknowledge,
+    createTicket: (amount: Balance, challenge: PublicKey, _winProb: number) => {
       return Ticket.create(
-        this.counterparty.toAddress(),
+        counterparty.toAddress(),
         challenge,
         new UINT256(new BN(0)),
-        new Balance(new BN(0)),
-        new Hash(randomBytes(Hash.SIZE)),
+        new UINT256(new BN(0)),
+        amount,
+        new Hash(new Uint8Array(Hash.SIZE).fill(0xff)),
         new UINT256(new BN(0)),
         privKey
       )
     }
-  }
+  })
 
-  return { channel: Channel }
+  return { getChannel }
 }
 
 describe('packet creation and transformation', function () {
@@ -49,7 +50,6 @@ describe('packet creation and transformation', function () {
 
       const db = LevelUp(Memdown())
       await packet.checkPacketTag(db)
-      await packet.storeUnacknowledgedTicket(db)
 
       assert.rejects(packet.checkPacketTag(db))
 
@@ -60,6 +60,8 @@ describe('packet creation and transformation', function () {
 
         assert(u8aEquals(packet.plaintext, testMsg))
       } else {
+        await packet.storeUnacknowledgedTicket(db)
+
         await packet.forwardTransform(node, chain as any)
       }
     }

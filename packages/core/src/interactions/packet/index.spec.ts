@@ -6,7 +6,7 @@ import { EventEmitter } from 'events'
 import BN from 'bn.js'
 
 import { subscribeToAcknowledgements, sendAcknowledgement } from './acknowledgement'
-import type { PublicKey } from '@hoprnet/hopr-utils'
+import { PublicKey, u8aEquals } from '@hoprnet/hopr-utils'
 import { Balance, createFirstChallenge } from '@hoprnet/hopr-utils'
 import { Ticket, UINT256, Hash } from '@hoprnet/hopr-core-ethereum'
 
@@ -41,7 +41,6 @@ function createFakeChain(privKey: PeerId) {
 
 function createFakeSendReceive(events: EventEmitter, self: PeerId) {
   const send = (destination: PeerId, protocol: any, msg: Uint8Array) => {
-    console.log(`destination`, destination.toB58String())
     events.emit('msg', msg, self, destination, protocol)
   }
 
@@ -60,22 +59,19 @@ function createFakeSendReceive(events: EventEmitter, self: PeerId) {
 }
 
 describe('packet interaction', function () {
-  let self: PeerId
-  let counterparty: PeerId
-
   const db = LevelUp(Memdown())
 
   let events = new EventEmitter()
-
-  before(async function () {
-    ;[self, counterparty] = await Promise.all(Array.from({ length: 2 }, (_) => PeerId.create({ keyType: 'secp256k1' })))
-  })
 
   afterEach(function () {
     events.removeAllListeners()
   })
 
-  it.skip('acknowledgement workflow', async function () {
+  it('acknowledgement workflow', async function () {
+    const [self, counterparty] = await Promise.all(
+      Array.from({ length: 2 }, (_) => PeerId.create({ keyType: 'secp256k1' }))
+    )
+
     const chainSelf = createFakeChain(self)
     const libp2pSelf = createFakeSendReceive(events, self)
     const libp2pCounterparty = createFakeSendReceive(events, counterparty)
@@ -110,21 +106,25 @@ describe('packet interaction', function () {
       Array.from({ length: 5 }, (_) => PeerId.create({ keyType: 'secp256k1' }))
     )
 
-    console.log(`sender`, sender.toB58String(), `relay0`, relay0.toB58String())
-
     const chainSender = createFakeChain(sender)
     const chainRelay0 = createFakeChain(relay0)
+    const chainRelay1 = createFakeChain(relay1)
+    const chainRelay2 = createFakeChain(relay2)
+    const chainReceiver = createFakeChain(receiver)
 
     const libp2pSender = createFakeSendReceive(events, sender)
     const libp2pRelay0 = createFakeSendReceive(events, relay0)
+    const libp2pRelay1 = createFakeSendReceive(events, relay1)
+    const libp2pRelay2 = createFakeSendReceive(events, relay2)
+    const libp2pReceiver = createFakeSendReceive(events, receiver)
 
     const testMsg = new TextEncoder().encode('testMsg')
-    const packet = await Packet.create(testMsg, [relay0, relay1, receiver], sender, chainSender as any, {
+    const packet = await Packet.create(testMsg, [relay0, relay1, relay2, receiver], sender, chainSender as any, {
       value: new Balance(new BN(0)),
       winProb: 1
     })
 
-    console.log(Packet.SIZE, packet.serialize().length)
+    const msgDefer = Defer()
 
     const senderInteraction = new PacketForwardInteraction(
       libp2pSender.subscribe,
@@ -138,12 +138,45 @@ describe('packet interaction', function () {
     const relay0Interaction = new PacketForwardInteraction(
       libp2pRelay0.subscribe,
       libp2pRelay0.send,
-      sender,
+      relay0,
       chainRelay0 as any,
       console.log,
       db
     )
 
+    const relay1Interaction = new PacketForwardInteraction(
+      libp2pRelay1.subscribe,
+      libp2pRelay1.send,
+      relay1,
+      chainRelay1 as any,
+      console.log,
+      db
+    )
+
+    const relay2Interaction = new PacketForwardInteraction(
+      libp2pRelay2.subscribe,
+      libp2pRelay2.send,
+      relay2,
+      chainRelay2 as any,
+      console.log,
+      db
+    )
+
+    const receiverInteraction = new PacketForwardInteraction(
+      libp2pReceiver.subscribe,
+      libp2pReceiver.send,
+      receiver,
+      chainReceiver as any,
+      (msg: Uint8Array) => {
+        if (u8aEquals(msg, testMsg)) {
+          msgDefer.resolve()
+        }
+      },
+      db
+    )
+
     senderInteraction.interact(relay0, packet)
+
+    await msgDefer.promise
   })
 })

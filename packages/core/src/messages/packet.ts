@@ -265,7 +265,7 @@ export class Packet {
 
     const [packet, preChallenge, preTicket] = u8aSplit(arr, [PACKET_LENGTH, Challenge.SIZE, Ticket.SIZE])
 
-    const transformedOutput = forwardTransform(privKey, packet, POR_STRING_LENGTH, 0, MAX_HOPS)
+    const transformedOutput = forwardTransform(privKey, packet, POR_STRING_LENGTH, 0, MAX_HOPS + 1)
 
     const ackKey = deriveAckKeyShare(transformedOutput.derivedSecret)
 
@@ -311,7 +311,7 @@ export class Packet {
   }
 
   async storeUnacknowledgedTicket(db: LevelUp) {
-    if (this.ownKey == undefined || this.ownShare) {
+    if (this.ownKey == undefined) {
       throw Error(`Invalid state`)
     }
 
