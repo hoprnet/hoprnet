@@ -8,8 +8,9 @@ import { AdminServer } from './admin'
 import * as yargs from 'yargs'
 import setupAPI from './api'
 import { getIdentity } from './identity'
+import path from 'path'
 
-const DEFAULT_ID_PATH = '~/.hopr-identity'
+const DEFAULT_ID_PATH = path.join(process.env.HOME, '.hopr-identity')
 
 const argv = yargs
   .option('network', {

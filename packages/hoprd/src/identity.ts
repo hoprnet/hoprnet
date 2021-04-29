@@ -3,6 +3,7 @@ import PeerId from 'peer-id'
 import { randomBytes, createCipheriv, scryptSync, createHmac } from 'crypto'
 import { privKeyToPeerId, u8aEquals } from '@hoprnet/hopr-utils'
 import fs from 'fs'
+import path from 'path'
 import Debug from 'debug'
 const log = Debug(`hoprd:identity`)
 
@@ -21,11 +22,8 @@ export const KEYPAIR_MESSAGE_DIGEST_ALGORITHM = 'sha256'
  */
 export function serializeKeyPair(peerId: PeerId, password: Uint8Array) {
   const salt: Buffer = randomBytes(KEYPAIR_SALT_LENGTH)
-
   const key = scryptSync(password, salt, KEYPAIR_CIPHER_KEY_LENGTH, KEYPAIR_SCRYPT_PARAMS)
-
   const iv = randomBytes(KEYPAIR_IV_LENGTH)
-
   const ciphertext = createCipheriv(KEYPAIR_CIPHER_ALGORITHM, key, iv).update(peerId.privKey.marshal())
 
   return Uint8Array.from([
@@ -78,28 +76,29 @@ export async function deserializeKeyPair(encryptedSerializedKeyPair: Uint8Array,
   return await privKeyToPeerId(plaintext)
 }
 export type IdentityOptions = {
-  initialize: boolean
-  idPath: string
-  password: string
+  initialize: boolean,
+  idPath: string,
+  password: string,
 }
 
-async function loadIdentity(path: string, password: string): Promise<PeerId> {
-  const serialized: Uint8Array = fs.readFileSync(path)
+async function loadIdentity(pth: string, password: string): Promise<PeerId> {
+  const serialized: Uint8Array = fs.readFileSync(path.resolve(pth))
   return await deserializeKeyPair(serialized, new TextEncoder().encode(password))
 }
 
-async function storeIdentity(path: string, id: Uint8Array) {
-  fs.writeFileSync(path, id)
+async function storeIdentity(pth: string, id: Uint8Array) {
+  fs.writeFileSync(path.resolve(pth), id)
 }
 
-async function createIdentity(idPath: string, password: string): Promise<PeerId> {
+async function createIdentity(idPath:string, password: string): Promise<PeerId> {
   const peerId = await PeerId.create({ keyType: 'secp256k1' })
   const serializedKeyPair = serializeKeyPair(peerId, new TextEncoder().encode(password))
   await storeIdentity(idPath, serializedKeyPair)
   return peerId
 }
 
-export async function getIdentity(options: IdentityOptions): Promise<PeerId> {
+
+export async function getIdentity(options: IdentityOptions): Promise<PeerId>{
   try {
     return await loadIdentity(options.idPath, options.password)
   } catch {
