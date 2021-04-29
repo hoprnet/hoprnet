@@ -78,9 +78,9 @@ export async function deserializeKeyPair(encryptedSerializedKeyPair: Uint8Array,
   return await privKeyToPeerId(plaintext)
 }
 export type IdentityOptions = {
-  initialize: boolean,
-  idPath: string,
-  password: string,
+  initialize: boolean
+  idPath: string
+  password: string
 }
 
 async function loadIdentity(path: string, password: string): Promise<PeerId> {
@@ -92,15 +92,14 @@ async function storeIdentity(path: string, id: Uint8Array) {
   fs.writeFileSync(path, id)
 }
 
-async function createIdentity(idPath:string, password: string): Promise<PeerId> {
+async function createIdentity(idPath: string, password: string): Promise<PeerId> {
   const peerId = await PeerId.create({ keyType: 'secp256k1' })
   const serializedKeyPair = serializeKeyPair(peerId, new TextEncoder().encode(password))
   await storeIdentity(idPath, serializedKeyPair)
   return peerId
 }
 
-
-export async function getIdentity(options: IdentityOptions): Promise<PeerId>{
+export async function getIdentity(options: IdentityOptions): Promise<PeerId> {
   try {
     return await loadIdentity(options.idPath, options.password)
   } catch {
