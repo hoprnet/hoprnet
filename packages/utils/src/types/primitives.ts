@@ -105,7 +105,7 @@ export class Address {
   }
 
   static createMock(): Address{
-    return new Address(new Uint8Array(Address.SIZE))
+    return Address.fromString('0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9') 
   }
 }
 
