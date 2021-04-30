@@ -13,7 +13,7 @@
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
   "engines": {
-    "node": "14",
+    "node": "14 || 15",
     "yarn": "1"
   },
   "scripts": {
@@ -31,7 +31,7 @@
     "!**/*.spec.js.map"
   ],
   "dependencies": {
-    "@hoprnet/hopr-connect": "0.2.23",
+    "@hoprnet/hopr-connect": "~0.2.23",
     "@hoprnet/hopr-core-ethereum": "1.71.0-next.101",
     "@hoprnet/hopr-utils": "1.71.0-next.101",
     "abort-controller": "^3.0.0",
