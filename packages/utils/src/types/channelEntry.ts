@@ -1,5 +1,5 @@
 import { u8aSplit, serializeToU8a, u8aToNumber, stringToU8a } from '..'
-import { Address, Balance, Hash,} from './primitives'
+import { Address, Balance, Hash } from './primitives'
 import { UINT256 } from './solidity'
 import BN from 'bn.js'
 
@@ -141,4 +141,3 @@ export class ChannelEntry {
     throw new Error('Wrong addr for this channel')
   }
 }
-

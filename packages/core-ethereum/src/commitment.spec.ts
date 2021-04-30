@@ -8,7 +8,7 @@ describe('test commitment', function () {
   beforeEach(async function () {
     fakeSet = sinon.fake.resolves(true)
     fakeGet = sinon.fake.resolves(undefined)
-    fakeDB = HoprDB.createMock() 
+    fakeDB = HoprDB.createMock()
     fakeId = new Hash(new Uint8Array({ length: Hash.SIZE }).fill(1))
   })
 

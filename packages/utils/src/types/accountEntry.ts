@@ -69,4 +69,3 @@ export class AccountEntry {
     return typeof this.multiAddr !== 'undefined'
   }
 }
-

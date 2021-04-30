@@ -21,4 +21,3 @@ export class Acknowledgement {
     return Ticket.SIZE + Hash.SIZE + Hash.SIZE
   }
 }
-
