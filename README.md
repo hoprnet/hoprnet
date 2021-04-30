@@ -37,6 +37,7 @@ alias hoprd='docker run --rm -v $(pwd)/db:/app/db gcr.io/hoprassociation/hoprd:l
 ```
 
 ### Flags
+
 #### Starting database
 
 ```sh
