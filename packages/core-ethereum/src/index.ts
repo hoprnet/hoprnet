@@ -3,7 +3,7 @@ import type PeerId from 'peer-id'
 import type { ChainWrapper } from './ethereum'
 import chalk from 'chalk'
 import debug from 'debug'
-import { Acknowledgement, PublicKey, Balance, Address, NativeBalance  } from './types'
+import { Acknowledgement, PublicKey, Balance, Address, NativeBalance  } from '@hoprnet/hopr-utils'
 import Indexer from './indexer'
 import { RoutingChannel } from './indexer'
 import { DEFAULT_URI, MAX_CONFIRMATIONS, INDEXER_BLOCK_RANGE } from './constants'
@@ -149,5 +149,4 @@ export default class HoprEthereum {
   }
 }
 
-export * from './types'
 export { Channel, Indexer, RoutingChannel }

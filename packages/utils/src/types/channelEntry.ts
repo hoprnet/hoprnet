@@ -1,7 +1,6 @@
 import { u8aSplit, serializeToU8a, u8aToNumber, stringToU8a } from '..'
 import { Address, Balance, Hash } from '.'
 import { UINT256 } from '.'
-import type { Event } from './indexer'
 import BN from 'bn.js'
 
 export type ChannelStatus = 'CLOSED' | 'OPEN' | 'PENDING_TO_CLOSE'
@@ -78,7 +77,7 @@ class ChannelEntry {
     return new ChannelEntry(...params)
   }
 
-  static fromSCEvent(event: Event<'ChannelUpdate'>): ChannelEntry {
+  static fromSCEvent(event: any): ChannelEntry { // TODO type
     const { partyA, partyB, newState } = event.args
     return new ChannelEntry(
       Address.fromString(partyA),

@@ -9,7 +9,7 @@ import {
   Acknowledgement,
   ChannelEntry,
   UnacknowledgedTicket
-} from './types'
+} from '@hoprnet/hopr-utils'
 import Debug from 'debug'
 import type { SubmitTicketResponse } from '.'
 import { Commitment } from './commitment'

@@ -1,6 +1,6 @@
 import secp256k1 from 'secp256k1'
 import PeerId from 'peer-id'
-import { Signature, Hash, PublicKey } from '@hoprnet/hopr-core-ethereum'
+import { Signature, Hash, PublicKey } from '@hoprnet/hopr-utils'
 
 import BN from 'bn.js'
 

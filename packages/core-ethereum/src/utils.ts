@@ -1,5 +1,5 @@
 import { Networks, networks } from '@hoprnet/hopr-ethereum'
-import { Hash, Signature } from './types'
+import { Hash, Signature } from '@hoprnet/hopr-utils'
 
 /**
  * Get current network's name.

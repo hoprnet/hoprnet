@@ -1,5 +1,4 @@
-import { Hash } from './types'
-import { iterateHash, recoverIteratedHash, HoprDB} from '@hoprnet/hopr-utils'
+import { iterateHash, recoverIteratedHash, HoprDB, Hash } from '@hoprnet/hopr-utils'
 import { randomBytes } from 'crypto'
 import Debug from 'debug'
 

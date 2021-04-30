@@ -219,35 +219,6 @@ export class HoprDB {
   }
 
   /**
-   * Submit acknowledged ticket and update database
-   * @param ackTicket Uint8Array
-   * @param index Uint8Array
-   */
-  /*
-  public async submitAcknowledgedTicket(
-    ethereum: HoprCoreEthereum,
-    ackTicket: Acknowledgement
-  ): Promise<SubmitTicketResponse> {
-    try {
-      const signedTicket = ackTicket.ticket
-      const self = ethereum.getPublicKey()
-      const counterparty = signedTicket.getSigner()
-      const channel = ethereum.getChannel(self, counterparty)
-
-      const result = await channel.submitTicket(ackTicket)
-      // TODO look at result.status and actually do something
-      await this.deleteAcknowledgement(ackTicket)
-      return result
-    } catch (err) {
-      return {
-        status: 'ERROR',
-        error: err
-      }
-    }
-  }
-  */
-
-  /**
    * Get signed tickets, both unacknowledged and acknowledged
    * @param node
    * @param filter optionally filter by signer

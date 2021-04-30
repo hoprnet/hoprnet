@@ -3,7 +3,7 @@ import LevelUp from 'levelup'
 import MemDown from 'memdown'
 import { Commitment } from './commitment'
 import sinon from 'sinon'
-import { Hash } from './types'
+import { Hash } from '@hoprnet/hopr-utils'
 
 describe('test commitment', function () {
   let fakeSet, fakeGet, fakeDB, fakeId

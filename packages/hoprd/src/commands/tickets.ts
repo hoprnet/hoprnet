@@ -1,8 +1,7 @@
 import type Hopr from '@hoprnet/hopr-core'
-import { moveDecimalPoint } from '@hoprnet/hopr-utils'
+import { moveDecimalPoint, Balance } from '@hoprnet/hopr-utils'
 import { AbstractCommand } from './abstractCommand'
 import { countSignedTickets, toSignedTickets, styleValue } from './utils'
-import { Balance } from '@hoprnet/hopr-core-ethereum'
 
 export default class Tickets extends AbstractCommand {
   constructor(public node: Hopr) {

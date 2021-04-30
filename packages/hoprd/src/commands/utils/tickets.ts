@@ -1,4 +1,4 @@
-import type { Acknowledgement, Ticket } from '@hoprnet/hopr-core-ethereum'
+import type { Acknowledgement, Ticket } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 
 /**

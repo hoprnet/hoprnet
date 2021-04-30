@@ -28,7 +28,7 @@ import Multiaddr from 'multiaddr'
 import chalk from 'chalk'
 
 import PeerId from 'peer-id'
-import HoprCoreEthereum, {
+import {
   PublicKey,
   Balance,
   Address,
@@ -36,8 +36,8 @@ import HoprCoreEthereum, {
   NativeBalance,
   Hash,
   Acknowledgement,
-  RoutingChannel
-} from '@hoprnet/hopr-core-ethereum'
+} from '@hoprnet/hopr-utils'
+import HoprCoreEthereum, { RoutingChannel } from '@hoprnet/hopr-core-ethereum'
 import BN from 'bn.js'
 import { getAddrs } from './identity'
 
@@ -639,7 +639,23 @@ class Hopr extends EventEmitter {
   }
 
   public async submitAcknowledgedTicket(ackTicket: Acknowledgement) {
-    return this.db.submitAcknowledgedTicket(await this.paymentChannels, ackTicket)
+    try {
+      const ethereum = await this.paymentChannels
+      const signedTicket = ackTicket.ticket
+      const self = ethereum.getPublicKey()
+      const counterparty = signedTicket.getSigner()
+      const channel = ethereum.getChannel(self, counterparty)
+
+      const result = await channel.submitTicket(ackTicket)
+      // TODO look at result.status and actually do something
+      await this.db.deleteAcknowledgement(ackTicket)
+      return result
+    } catch (err) {
+      return {
+        status: 'ERROR',
+        error: err
+      }
+    }
   }
 
   public async getChannelsOf(addr: Address): Promise<ChannelEntry[]> {

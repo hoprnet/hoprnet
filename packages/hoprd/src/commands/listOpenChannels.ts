@@ -3,7 +3,7 @@ import { moveDecimalPoint, pubKeyToPeerId, u8aEquals } from '@hoprnet/hopr-utils
 import chalk from 'chalk'
 import { AbstractCommand } from './abstractCommand'
 import { getPaddingLength, styleValue } from './utils'
-import { PublicKey, Balance } from '@hoprnet/hopr-core-ethereum'
+import { PublicKey, Balance } from '@hoprnet/hopr-utils'
 
 export default class ListOpenChannels extends AbstractCommand {
   constructor(public node: Hopr) {

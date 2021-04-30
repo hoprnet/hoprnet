@@ -11,7 +11,7 @@ import type { Server } from 'http'
 import stripAnsi from 'strip-ansi'
 import { LogStream } from './logs'
 import { NODE_ENV } from './env'
-import { Balance, NativeBalance } from '@hoprnet/hopr-core-ethereum'
+import { Balance, NativeBalance } from '@hoprnet/hopr-utils'
 
 let debugLog = debug('hoprd:admin')
 

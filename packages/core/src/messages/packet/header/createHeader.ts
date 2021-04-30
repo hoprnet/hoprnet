@@ -14,7 +14,7 @@ import {
   createMAC
 } from './index'
 
-import { Hash } from '@hoprnet/hopr-core-ethereum'
+import { Hash } from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'
 import Debug from 'debug'
 const log = Debug('hopr-core:packet:header')
