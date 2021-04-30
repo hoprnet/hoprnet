@@ -68,7 +68,7 @@ export class CoreDB {
 
   private async has(key: Uint8Array): Promise<boolean> {
     try {
-      await this.db.get(key)
+      await this.db.get(Buffer.from(key))
       return true
     } catch (err) {
       if (err.type === 'NotFoundError' || err.notFound === undefined || !err.notFound) {
@@ -87,6 +87,10 @@ export class CoreDB {
     return await this.put(key, new Uint8Array()) 
   }
 
+  private async get(key: Uint8Array): Promise<Uint8Array>{
+    return await this.db.get(Buffer.from(this.keyOf(key)))
+  }
+
   private async getAll<T>(prefix: Uint8Array, deserialize: (u: Uint8Array) => T, filter: (o:T) => boolean): Promise<T[]> {
     const res: T[] = []
     return new Promise<T[]>((resolve, reject) => {
@@ -103,6 +107,10 @@ export class CoreDB {
         })
         .on('end', () => resolve(res))
     })
+  }
+
+  private async del(key: Uint8Array): Promise<void> {
+    await this.db.del(Buffer.from(this.keyOf(key)))
   }
 
   public getLevelUpTempUntilRefactored(): LevelUp {
@@ -195,7 +203,7 @@ export class CoreDB {
    * @param index Uint8Array
    */
   async deleteAcknowledgement(acknowledgement: Acknowledgement): Promise<void> {
-    await this.db.del(Buffer.from(keyAcknowledgedTickets(acknowledgement.ticket.challenge.serialize())))
+    await this.del(keyAcknowledgedTickets(acknowledgement.ticket.challenge.serialize()))
   }
 
   /**
@@ -236,7 +244,6 @@ export class CoreDB {
       async ([unAcks, acks]) => {
         const unAckTickets = await Promise.all(unAcks.map((o) => o.ticket))
         const ackTickets = await Promise.all(acks.map((o) => o.ticket))
-
         return [...unAckTickets, ...ackTickets]
       }
     )
@@ -267,7 +274,7 @@ export class CoreDB {
   async getUnacknowledgedTicketsByKey(key: Hash): Promise<UnacknowledgedTicket | undefined> {
     const unAcknowledgedDbKey = UnAcknowledgedTickets(key.serialize())
     try {
-      const buff = await this.db.get(Buffer.from(unAcknowledgedDbKey))
+      const buff = await this.get(unAcknowledgedDbKey)
       if (buff.length === 0) {
         return undefined
       }
@@ -281,12 +288,11 @@ export class CoreDB {
   }
 
   async deleteTicket(key: Hash) {
-    const k = UnAcknowledgedTickets(key.serialize())
-    await this.db.del(Buffer.from(k))
+    await this.del(UnAcknowledgedTickets(key.serialize()))
   }
 
   async replaceTicketWithAcknowledgement(key: Hash, acknowledgment: Acknowledgement) {
-    const ticketCounter = await this.incrementTicketCounter()
+    const ticketCounter = await this.getTicketCounter()
     const unAcknowledgedDbKey = UnAcknowledgedTickets(key.serialize())
     const acknowledgedDbKey = keyAcknowledgedTickets(ticketCounter)
     try {
@@ -301,16 +307,14 @@ export class CoreDB {
     }
   }
 
-  async incrementTicketCounter(): Promise<Uint8Array> {
-    let ticketCounter
+  private async getTicketCounter(): Promise<Uint8Array> {
     try {
-      let tmpTicketCounter = await this.db.get(Buffer.from(ACKNOWLEDGED_TICKET_COUNTER))
-      ticketCounter = u8aAdd(true, tmpTicketCounter, toU8a(1, ACKNOWLEDGED_TICKET_INDEX_LENGTH))
+      let tmpTicketCounter = await this.get(ACKNOWLEDGED_TICKET_COUNTER)
+      return u8aAdd(true, tmpTicketCounter, toU8a(1, ACKNOWLEDGED_TICKET_INDEX_LENGTH))
     } catch (err) {
       // Set ticketCounter to initial value
-      ticketCounter = toU8a(0, ACKNOWLEDGED_TICKET_INDEX_LENGTH)
+      return toU8a(0, ACKNOWLEDGED_TICKET_INDEX_LENGTH)
     }
-    return ticketCounter
   }
 
   async storeUnacknowledgedTicket(challenge: Hash) {
