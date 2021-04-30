@@ -1,5 +1,5 @@
 import BN from 'bn.js'
-import { stringToU8a, u8aSplit, u8aToHex, serializeToU8a } from '@hoprnet/hopr-utils'
+import { stringToU8a, u8aSplit, u8aToHex, serializeToU8a } from '..'
 import { Address, Balance, Hash, Signature, UINT256, PublicKey } from '.'
 import { ecdsaRecover, ecdsaSign } from 'secp256k1'
 import { ethers } from 'ethers'

@@ -1,4 +1,5 @@
-import { Ticket, PublicKey, Balance, Channel, UnacknowledgedTicket, Hash } from '@hoprnet/hopr-core-ethereum'
+import { Channel } from '@hoprnet/hopr-core-ethereum'
+import { Ticket, PublicKey, Balance, UnacknowledgedTicket, Hash, HoprDB } from '@hoprnet/hopr-utils'
 import type HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 import { Challenge } from './challenge'
 import {
@@ -18,12 +19,9 @@ import {
 import type PeerId from 'peer-id'
 import { publicKeyCreate } from 'secp256k1'
 import BN from 'bn.js'
-import { LevelUp } from 'levelup'
-import { checkPacketTag, UnAcknowledgedTickets } from '../dbKeys'
 import { Acknowledgement } from './acknowledgement'
 import { blue, green } from 'chalk'
 import Debug from 'debug'
-import { getTickets } from '../utils'
 
 export const MAX_HOPS = 3 // 3 relayer and 1 destination
 
@@ -294,15 +292,15 @@ export class Packet {
     )
   }
 
-  async checkPacketTag(db: LevelUp) {
-    const tagValid = await checkPacketTag(db, this.packetTag)
+  async checkPacketTag(db: HoprDB) {
+    const present = await db.hasPacket(this.packetTag)
 
-    if (!tagValid) {
+    if (present) {
       throw Error(`General error.`)
     }
   }
 
-  async storeUnacknowledgedTicket(db: LevelUp) {
+  async storeUnacknowledgedTicket(db: HoprDB) {
     if (this.ownKey == undefined) {
       throw Error(`Invalid state`)
     }
@@ -315,15 +313,15 @@ export class Packet {
       )} from ${blue((await pubKeyToPeerId(this.nextHop)).toB58String())}`
     )
 
-    await db.put(Buffer.from(UnAcknowledgedTickets(this.ackChallenge)), Buffer.from(unacknowledged.serialize()))
+    db.storeUnacknowledgedTickets(this.ackChallenge, unacknowledged)
   }
 
-  async validateUnacknowledgedTicket(db: LevelUp, chain: HoprCoreEthereum, privKey: PeerId) {
+  async validateUnacknowledgedTicket(db: HoprDB, chain: HoprCoreEthereum, privKey: PeerId) {
     const previousHop = await pubKeyToPeerId(this.previousHop)
     const channel = chain.getChannel(new PublicKey(privKey.pubKey.marshal()), new PublicKey(this.previousHop))
 
     validateUnacknowledgedTicket(privKey, '', 0, previousHop, this.ticket, channel, () =>
-      getTickets(db, {
+      db.getTickets({
         signer: this.previousHop
       })
     )

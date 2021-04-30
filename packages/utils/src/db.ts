@@ -4,9 +4,9 @@ import MemDown from 'memdown'
 import { existsSync, mkdirSync } from 'fs'
 import path from 'path'
 import Debug from 'debug'
-import { u8aEquals, Hash, u8aAdd, toU8a, u8aConcat, Address, Intermediate } from '.'
+import { Hash, u8aAdd, toU8a, u8aConcat, Address, Intermediate } from '.'
 import assert from 'assert'
-import { Ticket, Acknowledgement, UnacknowledgedTicket, AccountEntry, ChannelEntry, Snapshot } from './types'
+import { Ticket, Acknowledgement, UnacknowledgedTicket, AccountEntry, ChannelEntry, Snapshot, PublicKey } from './types'
 import BN from 'bn.js'
 
 const log = Debug(`hopr-core:db`)
@@ -16,7 +16,8 @@ const TICKET_PREFIX: Uint8Array = encoder.encode('tickets-')
 const PACKET_TAG_PREFIX: Uint8Array = encoder.encode('packets-tag-')
 const ACKNOWLEDGED_TICKET_COUNTER = encoder.encode('tickets-acknowledgedCounter')
 const UNACKNOWLEDGED_TICKETS_PREFIX = u8aConcat(TICKET_PREFIX, encoder.encode('unacknowledged-'))
-const KEY_LENGTH = 32
+
+const COMPRESSED_PUBLIC_KEY_LENGTH = 33
 const ACKNOWLEDGED_TICKET_INDEX_LENGTH = 8
 const ACKNOWLEDGED_TICKET_PREFIX = u8aConcat(TICKET_PREFIX, encoder.encode('acknowledged-'))
 const LATEST_BLOCK_NUMBER_KEY = encoder.encode('indexer-latestBlockNumber')
@@ -32,15 +33,19 @@ function keyAcknowledgedTickets(index: Uint8Array): Uint8Array {
   return u8aConcat(ACKNOWLEDGED_TICKET_PREFIX, index)
 }
 
-export function UnAcknowledgedTickets(hashedKey: Uint8Array): Uint8Array {
-  assert.equal(hashedKey.length, KEY_LENGTH)
-  return u8aConcat(UNACKNOWLEDGED_TICKETS_PREFIX, hashedKey)
+export function UnAcknowledgedTickets(ackChallenge: Uint8Array): Uint8Array {
+  assert.equal(ackChallenge.length, COMPRESSED_PUBLIC_KEY_LENGTH)
+  return u8aConcat(UNACKNOWLEDGED_TICKETS_PREFIX, ackChallenge)
 }
 
 export class HoprDB {
   private db: LevelUp
 
   constructor(private id: Address, initialize: boolean, version: string, dbPath?: string) {
+    if (version === 'mock') {
+      return
+    }
+
     if (!dbPath) {
       dbPath = path.join(process.cwd(), 'db', version)
     }
@@ -136,7 +141,7 @@ export class HoprDB {
   public async getUnacknowledgedTickets(filter?: { signer: Uint8Array }): Promise<UnacknowledgedTicket[]> {
     const filterFunc = (u: UnacknowledgedTicket): boolean => {
       // if signer provided doesn't match our ticket's signer dont add it to the list
-      if (filter?.signer && !u8aEquals(u.ticket.getSigner().serialize(), filter.signer)) {
+      if (filter?.signer && u.ticket.verify(new PublicKey(filter.signer))) {
         return false
       }
       return true
@@ -175,7 +180,7 @@ export class HoprDB {
   async getAcknowledgements(filter?: { signer: Uint8Array }): Promise<Acknowledgement[]> {
     const filterFunc = (a: Acknowledgement): boolean => {
       // if signer provided doesn't match our ticket's signer dont add it to the list
-      if (filter?.signer && !u8aEquals(a.ticket.getSigner().serialize(), filter.signer)) {
+      if (filter?.signer && a.ticket.verify(new PublicKey(filter.signer))) {
         return false
       }
       return true
@@ -248,15 +253,21 @@ export class HoprDB {
     await this.put(UnAcknowledgedTickets(key), unacknowledged.serialize())
   }
 
-  async hasPacket(id: Uint8Array) {
-    if (await this.has(this.keyOf(PACKET_TAG_PREFIX, id))) {
-      await this.touch(this.keyOf(PACKET_TAG_PREFIX, id))
-      return true
+  async hasPacket(packetTag: Uint8Array) {
+    let present = false
+    try {
+      await this.get(this.keyOf(PACKET_TAG_PREFIX, packetTag))
+      present = true
+    } catch {}
+
+    if (!present) {
+      await this.put(this.keyOf(PACKET_TAG_PREFIX, packetTag), new Uint8Array())
     }
-    throw Error('Key is already present. Cannot accept packet because it might be a duplicate.')
+
+    return present
   }
 
-  async getUnacknowledgedTicketsByKey(key: Hash): Promise<UnacknowledgedTicket | undefined> {
+  async getUnacknowledgedTicketsByKey(key: PublicKey): Promise<UnacknowledgedTicket | undefined> {
     const unAcknowledgedDbKey = UnAcknowledgedTickets(key.serialize())
     try {
       const buff = await this.get(unAcknowledgedDbKey)
@@ -272,11 +283,11 @@ export class HoprDB {
     }
   }
 
-  async deleteTicket(key: Hash) {
+  async deleteTicket(key: PublicKey) {
     await this.del(UnAcknowledgedTickets(key.serialize()))
   }
 
-  async replaceTicketWithAcknowledgement(key: Hash, acknowledgment: Acknowledgement) {
+  async replaceTicketWithAcknowledgement(key: PublicKey, acknowledgment: Acknowledgement) {
     const ticketCounter = await this.getTicketCounter()
     const unAcknowledgedDbKey = UnAcknowledgedTickets(key.serialize())
     const acknowledgedDbKey = keyAcknowledgedTickets(ticketCounter)
@@ -302,7 +313,7 @@ export class HoprDB {
     }
   }
 
-  async storeUnacknowledgedTicket(challenge: Hash) {
+  async storeUnacknowledgedTicket(challenge: PublicKey) {
     const unAcknowledgedDBKey = UnAcknowledgedTickets(challenge.serialize())
     await this.touch(unAcknowledgedDBKey)
     return unAcknowledgedDBKey

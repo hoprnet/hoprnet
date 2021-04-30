@@ -1,11 +1,10 @@
 import { Packet, MAX_HOPS } from './packet'
+import { HoprDB } from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'
-import { Ticket, UINT256, Balance, PublicKey } from '@hoprnet/hopr-core-ethereum'
+import { Ticket, UINT256, Balance, PublicKey } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 import { u8aEquals } from '@hoprnet/hopr-utils'
 import assert from 'assert'
-import Memdown from 'memdown'
-import LevelUp from 'levelup'
 
 function createMockTickets(privKey: Uint8Array) {
   const acknowledge = () => {}
@@ -48,7 +47,8 @@ describe('packet creation and transformation', function () {
     for (const [index, node] of path.entries()) {
       packet = Packet.deserialize(packet.serialize(), node, index == 0 ? self : path[index - 1])
 
-      const db = LevelUp(Memdown())
+      const db = HoprDB.createMock()
+
       await packet.checkPacketTag(db)
 
       assert.rejects(packet.checkPacketTag(db))

@@ -211,13 +211,12 @@ class Hopr extends EventEmitter {
 
     const onMessage = (msg: Uint8Array) => this.emit('hopr:message', msg)
     this.forward = new PacketForwardInteraction(
-      this.db,
-      await this.paymentChannels,
-      this.getId(),
-      this.libp2p,
       subscribe,
       sendMessage,
-      onMessage
+      this.getId(),
+      await this.paymentChannels,
+      onMessage,
+      this.db
     )
 
     this.heartbeat.start()
@@ -400,15 +399,15 @@ class Hopr extends EventEmitter {
               this.getId(),
               await this.paymentChannels,
               {
-                value: new Balance(new BN(this.ticketAmount)),
-                winProb: this.ticketWinProb
+                value: new Balance(new BN(this.options.ticketAmount)),
+                winProb: this.options.ticketWinProb
               }
             )
           } catch (err) {
             return reject(err)
           }
 
-          let packetKey = await this.db.storeUnacknowledgedTicket(packet.ackChallenge)
+          let packetKey = await this.db.storeUnacknowledgedTicket(new PublicKey(packet.ackChallenge))
 
           this.once('message-acknowledged:' + u8aToHex(packetKey), () => {
             resolve()
@@ -642,7 +641,7 @@ class Hopr extends EventEmitter {
       const ethereum = await this.paymentChannels
       const signedTicket = ackTicket.ticket
       const self = ethereum.getPublicKey()
-      const counterparty = signedTicket.getSigner()
+      const counterparty = signedTicket.recoverSigner()
       const channel = ethereum.getChannel(self, counterparty)
 
       const result = await channel.submitTicket(ackTicket)

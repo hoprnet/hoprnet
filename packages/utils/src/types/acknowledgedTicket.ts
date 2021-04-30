@@ -1,5 +1,5 @@
 import { Hash, Ticket } from '.'
-import { serializeToU8a, u8aSplit, validateAcknowledgement } from '@hoprnet/hopr-utils'
+import { serializeToU8a, u8aSplit, validateAcknowledgement } from '..'
 import { PublicKey } from '..'
 
 export class Acknowledgement {

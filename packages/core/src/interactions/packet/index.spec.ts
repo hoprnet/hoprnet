@@ -1,14 +1,11 @@
-import LevelUp from 'levelup'
 import PeerId from 'peer-id'
-import Memdown from 'memdown'
 import { randomBytes } from 'crypto'
 import { EventEmitter } from 'events'
 import BN from 'bn.js'
 
 import { subscribeToAcknowledgements, sendAcknowledgement } from './acknowledgement'
-import { PublicKey, u8aEquals } from '@hoprnet/hopr-utils'
+import { PublicKey, u8aEquals, Ticket, UINT256, HoprDB } from '@hoprnet/hopr-utils'
 import { Balance, createFirstChallenge } from '@hoprnet/hopr-utils'
-import { Ticket, UINT256 } from '@hoprnet/hopr-core-ethereum'
 
 import { Challenge } from '../../messages/challenge'
 import { Packet } from '../../messages/packet'
@@ -59,7 +56,7 @@ function createFakeSendReceive(events: EventEmitter, self: PeerId) {
 }
 
 describe('packet interaction', function () {
-  const db = LevelUp(Memdown())
+  const db = HoprDB.createMock()
 
   let events = new EventEmitter()
 

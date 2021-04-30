@@ -24,7 +24,7 @@ export function subscribeToAcknowledgements(
     if (!unacknowledgedTicket) {
       // Could be dummy, could be error.
       log('dropping unknown ticket')
-      return await db.deleteTicket(db, ackMsg.ackChallenge)
+      return await db.deleteTicket(ackMsg.ackChallenge)
     }
 
     const channel = chain.getChannel(new PublicKey(pubKey.pubKey.marshal()), new PublicKey(remotePeer.pubKey.marshal()))
@@ -33,10 +33,10 @@ export function subscribeToAcknowledgements(
 
     if (ackedTicket === null) {
       log(`Got a ticket that is not a win. Dropping ticket.`)
-      await db.deleteTicket(db, ackMsg.ackChallenge)
+      await db.deleteTicket(ackMsg.ackChallenge)
     } else {
       log(`Storing winning ticket`)
-      await db.replaceTicketWithAcknowledgement(db, ackMsg.ackChallenge, ackedTicket)
+      await db.replaceTicketWithAcknowledgement(ackMsg.ackChallenge, ackedTicket)
     }
 
     onMessage(ackMsg)
