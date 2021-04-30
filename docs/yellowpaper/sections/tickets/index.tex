@@ -60,7 +60,7 @@ The final recipient of the packet does not receive a ticket because message rece
 \begin{itemize}
     \item Challenge check $$response*G=T_{c_i}$$
     \item The ticket has been already redeemed (replay protection): $$channel.index <t.index$$
-    \item Channel \textbf{exists} and is \textbf{open}. If the node does not have a record about the channel or considers the channel to be in a state different from \textbf{open}, the ticket is dropped and the reception of the accompanying packet is rejected.
+    \item Channel \textbf{exists} and is \textbf{open}. The check happens locally and not on-chain using the blockchain indexer in order not to reveal any metadata. If the node does not have a record about the channel or considers the channel to be in a state different from \textbf{open}, the ticket is dropped and the reception of the accompanying packet is rejected.
     \item Channel balance towards the ticket recipient is sufficient to cover the costs for the ticket: $$ channel.balance>\delta$$ where $\delta$ is the ticket amount. 
     \item Ticket index is strictly greater than the current value in the smart contract (reorder protection). This is valid because redeeming a $ticket$ with $index=n$ requires $index < n+1$ and sets $index := n+1$. So the new index becomes greater than $n$.
 
