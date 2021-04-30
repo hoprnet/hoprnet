@@ -117,7 +117,7 @@ export class AdminServer {
     connectionReport(this.node, this.logs)
     reportMemoryUsage(this.logs)
 
-    showDisclaimer(this.logs)
+    process.env.NODE_ENV == 'production' && showDisclaimer(this.logs)
 
     this.cmds.execute(`alias ${node.getId().toB58String()} me`)
   }
