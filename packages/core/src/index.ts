@@ -110,7 +110,12 @@ class Hopr extends EventEmitter {
       // TODO - assert secp256k1?
       throw new Error('Hopr Node must be initialized with an id with a private key')
     }
-    this.db = new HoprDB(PublicKey.fromPrivKey(id.privKey.marshal()).toAddress(), options.createDbIfNotExist, VERSION, options.dbPath)
+    this.db = new HoprDB(
+      PublicKey.fromPrivKey(id.privKey.marshal()).toAddress(),
+      options.createDbIfNotExist,
+      VERSION,
+      options.dbPath
+    )
     this.paymentChannels = HoprCoreEthereum.create(this.db, this.id.privKey.marshal(), {
       provider: this.options.provider
     })
