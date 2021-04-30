@@ -5,7 +5,7 @@ import { HEARTBEAT_INTERVAL, NETWORK_QUALITY_THRESHOLD } from '../constants'
 import sinon from 'sinon'
 import { fakePeerId } from '../test-utils'
 import PeerId from 'peer-id'
-import { Hash } from '@hoprnet/hopr-core-ethereum'
+import { Hash } from '@hoprnet/hopr-utils'
 
 describe('unit test heartbeat', async () => {
   let heartbeat: Heartbeat

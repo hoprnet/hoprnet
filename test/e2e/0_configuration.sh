@@ -9,8 +9,8 @@ function cleanup {
   # Cleaning up everything
   echo "🧽 Cleaning up processes"
   if [[ -n "$PROVIDER_PID" ]]; then kill $PROVIDER_PID; fi
-  echo "🧽 Printing last 10 lines from logs"
-  tail -n 10 /tmp/$DATAFILE-*.txt
+  echo "🧽 Printing last 100 lines from logs"
+  tail -n 100 /tmp/$DATAFILE-*.txt
 }
 
 # Starts a node, including an admin, and rest interface

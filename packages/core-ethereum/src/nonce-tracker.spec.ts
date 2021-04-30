@@ -1,7 +1,6 @@
 import { expect } from 'chai'
 import NonceTracker, { Transaction } from './nonce-tracker'
-import { durations } from '@hoprnet/hopr-utils'
-import { Address } from './types'
+import { durations, Address } from '@hoprnet/hopr-utils'
 
 const USER_ADDRESS = Address.fromString('0x7d3517b0d011698406d6e0aed8453f0be2697926')
 

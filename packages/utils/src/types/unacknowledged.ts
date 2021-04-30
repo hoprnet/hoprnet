@@ -1,4 +1,4 @@
-import { u8aConcat, u8aSplit, serializeToU8a } from '@hoprnet/hopr-utils'
+import { u8aConcat, u8aSplit, serializeToU8a } from '..'
 import { Hash, PublicKey, Ticket } from '..'
 import PeerId from 'peer-id'
 

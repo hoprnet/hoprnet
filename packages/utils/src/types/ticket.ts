@@ -1,5 +1,5 @@
 import BN from 'bn.js'
-import { stringToU8a, u8aSplit, u8aToHex, u8aConcat, serializeToU8a } from '@hoprnet/hopr-utils'
+import { stringToU8a, u8aSplit, u8aToHex, u8aConcat, serializeToU8a } from '..'
 import { Address, Balance, Hash, Signature, UINT256, PublicKey } from '.'
 import { ecdsaVerify, ecdsaSign, ecdsaRecover } from 'secp256k1'
 import { ethers } from 'ethers'
@@ -44,7 +44,7 @@ function serializeUnsigned({
   ])
 }
 
-class Ticket {
+export class Ticket {
   constructor(
     readonly counterparty: Address,
     readonly challenge: Hash,
@@ -160,4 +160,3 @@ class Ticket {
     return this.challenge.eq(response.hash())
   }
 }
-export default Ticket

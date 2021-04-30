@@ -2,7 +2,7 @@ import type Hopr from '@hoprnet/hopr-core'
 import { moveDecimalPoint } from '@hoprnet/hopr-utils'
 import { countSignedTickets, styleValue, toSignedTickets } from './utils'
 import { AbstractCommand } from './abstractCommand'
-import { Balance, Acknowledgement } from '@hoprnet/hopr-core-ethereum'
+import { Balance, Acknowledgement } from '@hoprnet/hopr-utils'
 
 export default class RedeemTickets extends AbstractCommand {
   constructor(public node: Hopr) {
@@ -32,9 +32,9 @@ export default class RedeemTickets extends AbstractCommand {
       const redeemedTickets: Acknowledgement[] = []
       let count = 0
 
-      for (const { ackTicket, index } of results) {
+      for (const ackTicket of results) {
         ++count
-        const result = await this.node.submitAcknowledgedTicket(ackTicket, index)
+        const result = await this.node.submitAcknowledgedTicket(ackTicket)
 
         if (result.status === 'SUCCESS') {
           console.log(`Redeemed ticket ${styleValue(count)}`)

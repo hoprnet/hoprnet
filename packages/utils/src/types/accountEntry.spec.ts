@@ -1,7 +1,6 @@
 import { expect } from 'chai'
 import Multiaddr from 'multiaddr'
-import { Address } from '.'
-import AccountEntry from './accountEntry'
+import { Address, AccountEntry } from '.'
 
 // TODO: move these & similar into constants file
 const EMPTY_ADDRESS = new Address(new Uint8Array({ length: Address.SIZE }))

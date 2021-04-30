@@ -1,11 +1,10 @@
 import type Hopr from '@hoprnet/hopr-core'
 import type PeerId from 'peer-id'
-import { moveDecimalPoint } from '@hoprnet/hopr-utils'
+import { moveDecimalPoint, Balance } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 import chalk from 'chalk'
 import { checkPeerIdInput, styleValue } from './utils'
 import { AbstractCommand, GlobalState } from './abstractCommand'
-import { Balance } from '@hoprnet/hopr-core-ethereum'
 
 export class OpenChannel extends AbstractCommand {
   constructor(public node: Hopr) {
