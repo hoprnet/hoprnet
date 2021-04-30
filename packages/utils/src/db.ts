@@ -370,7 +370,7 @@ export class HoprDB {
   }
 
   static createMock(): HoprDB {
-    const mock = new HoprDB(Address.createMock(), false, 'mock')
+    const mock = new HoprDB(Address.createMock(), true, 'mock')
     mock.db = new levelup(MemDown())
     return mock
   }
