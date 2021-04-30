@@ -8758,15 +8758,15 @@ libp2p-mplex@0.10.3:
     it-pushable "^1.4.1"
     varint "^6.0.0"
 
-libp2p-noise@^2.0.4:
-  version "2.0.5"
-  resolved "https://registry.yarnpkg.com/libp2p-noise/-/libp2p-noise-2.0.5.tgz#470b3d19af68176b4835b5722e1c68dfa0040860"
-  integrity sha512-hmR1Y4bJ6hxEO+1aIF1HeJrUNh9NHUbH8gUTtMqpIe7zfdggGau9XKMY0InbafBPFF/WxeIOJDKZiQV4qy2fFg==
+libp2p-noise@^3.0.0:
+  version "3.0.0"
+  resolved "https://registry.yarnpkg.com/libp2p-noise/-/libp2p-noise-3.0.0.tgz#9320c4dd42019f4f75e2fddf265c4c5f5e5546ab"
+  integrity sha512-2UrR9mw+VeMRs0eOwqEqVEoFJxjCgibQsX4nnDFmFvb1C3+BnTuIUsqNS5YkxLhw3/q++8MvB/p5/2X0MRfA7g==
   dependencies:
     bcrypto "^5.4.0"
     debug "^4.3.1"
     it-buffer "^0.1.1"
-    it-length-prefixed "^3.0.0"
+    it-length-prefixed "^5.0.2"
     it-pair "^1.0.0"
     it-pb-rpc "^0.1.9"
     it-pipe "^1.1.0"

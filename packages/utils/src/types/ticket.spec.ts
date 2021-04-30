@@ -1,17 +1,20 @@
 import assert from 'assert'
 import { expect } from 'chai'
-import { stringToU8a, SIGNATURE_LENGTH } from '@hoprnet/hopr-utils'
+import { stringToU8a, SIGNATURE_LENGTH } from '..'
 import { ethers } from 'ethers'
 import { Address, Ticket, Hash, Balance, PublicKey, Signature, UINT256 } from '.'
-import * as fixtures from '../fixtures'
 import BN from 'bn.js'
 import { randomBytes } from 'crypto'
+import { Wallet } from 'ethers'
+
+const ACCOUNT_A = new Wallet('0x4471496ef88d9a7d86a92b7676f3c8871a60792a37fae6fc3abc347c3aa3b16b')
+const ACCOUNT_B = new Wallet('0x18a664889e28a432495758f0522b53b2f04a35f810b78c6ea01db305141bcba2')
 
 describe('test ticket construction', function () {
   let userA: Address
 
   before(async function () {
-    userA = PublicKey.fromPrivKey(stringToU8a(fixtures.ACCOUNT_A.privateKey)).toAddress()
+    userA = PublicKey.fromPrivKey(stringToU8a(ACCOUNT_A.privateKey)).toAddress()
   })
 
   it('should create new ticket', async function () {
@@ -101,8 +104,8 @@ describe('test ticket methods', function () {
 })
 
 describe('test signedTicket construction', async function () {
-  const userB = PublicKey.fromPrivKey(stringToU8a(fixtures.ACCOUNT_B.privateKey)).toAddress()
-  const userAPrivKey = stringToU8a(fixtures.ACCOUNT_A.privateKey)
+  const userB = PublicKey.fromPrivKey(stringToU8a(ACCOUNT_B.privateKey)).toAddress()
+  const userAPrivKey = stringToU8a(ACCOUNT_A.privateKey)
   const userAPubKey = PublicKey.fromPrivKey(userAPrivKey)
 
   it('should create new signedTicket using struct', function () {

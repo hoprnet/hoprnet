@@ -1,31 +1,30 @@
-import type { LevelUp } from 'levelup'
 import debug from 'debug'
 import { Acknowledgement } from '../../messages/acknowledgement'
-import { getUnacknowledgedTickets, deleteTicket, replaceTicketWithAcknowledgement } from '../../dbKeys'
-import type HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
-import { PROTOCOL_ACKNOWLEDGEMENT } from '../../constants'
+import { PublicKey, Hash, durations } from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'
-import { PublicKey, durations, Hash } from '@hoprnet/hopr-utils'
-import type { Packet } from '../../messages/packet'
+import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
+import { Packet } from '../../messages/packet'
+import { PROTOCOL_ACKNOWLEDGEMENT } from '../../constants'
+import { HoprDB } from '@hoprnet/hopr-utils'
 const log = debug('hopr-core:acknowledgement')
 
 const ACKNOWLEDGEMENT_TIMEOUT = durations.seconds(2)
 
 export function subscribeToAcknowledgements(
   subscribe: any,
-  db: LevelUp,
+  db: HoprDB,
   chain: HoprCoreEthereum,
   pubKey: PeerId,
   onMessage: (ackMessage: Acknowledgement) => void
 ) {
   subscribe(PROTOCOL_ACKNOWLEDGEMENT, async function (msg: Uint8Array, remotePeer: PeerId) {
     const ackMsg = Acknowledgement.deserialize(msg, pubKey, remotePeer)
-    let unacknowledgedTicket = await getUnacknowledgedTickets(db, ackMsg.ackChallenge)
+    let unacknowledgedTicket = await db.getUnacknowledgedTicketsByKey(ackMsg.ackChallenge)
 
     if (!unacknowledgedTicket) {
       // Could be dummy, could be error.
       log('dropping unknown ticket')
-      return await deleteTicket(db, ackMsg.ackChallenge)
+      return await db.deleteTicket(db, ackMsg.ackChallenge)
     }
 
     const channel = chain.getChannel(new PublicKey(pubKey.pubKey.marshal()), new PublicKey(remotePeer.pubKey.marshal()))
@@ -34,10 +33,10 @@ export function subscribeToAcknowledgements(
 
     if (ackedTicket === null) {
       log(`Got a ticket that is not a win. Dropping ticket.`)
-      await deleteTicket(db, ackMsg.ackChallenge)
+      await db.deleteTicket(db, ackMsg.ackChallenge)
     } else {
       log(`Storing winning ticket`)
-      await replaceTicketWithAcknowledgement(db, ackMsg.ackChallenge, ackedTicket)
+      await db.replaceTicketWithAcknowledgement(db, ackMsg.ackChallenge, ackedTicket)
     }
 
     onMessage(ackMsg)

@@ -1,11 +1,11 @@
 import BN from 'bn.js'
-import { u8aSplit, serializeToU8a } from '@hoprnet/hopr-utils'
+import { u8aSplit, serializeToU8a } from '..'
 import { UINT256 } from '../types/solidity'
 
 /**
  * Represents a snapshot in the blockchain.
  */
-class Snapshot {
+export class Snapshot {
   constructor(public readonly blockNumber: BN, public readonly transactionIndex: BN, public readonly logIndex: BN) {}
 
   static deserialize(arr: Uint8Array) {
@@ -29,5 +29,3 @@ class Snapshot {
     return UINT256.SIZE * 3
   }
 }
-
-export default Snapshot

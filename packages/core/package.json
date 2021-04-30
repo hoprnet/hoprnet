@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-core",
-  "version": "1.71.0-next.95",
+  "version": "1.71.0-next.99",
   "description": "Privacy-preserving messaging protocol with incentivations for relay operators",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -32,8 +32,8 @@
   ],
   "dependencies": {
     "@hoprnet/hopr-connect": "0.2.23",
-    "@hoprnet/hopr-core-ethereum": "1.71.0-next.95",
-    "@hoprnet/hopr-utils": "1.71.0-next.95",
+    "@hoprnet/hopr-core-ethereum": "1.71.0-next.99",
+    "@hoprnet/hopr-utils": "1.71.0-next.99",
     "abort-controller": "^3.0.0",
     "bn.js": "5.2.0",
     "chalk": "~4.1.0",
@@ -47,7 +47,7 @@
     "libp2p-crypto": "0.19.4",
     "libp2p-kad-dht": "0.22.0",
     "libp2p-mplex": "0.10.3",
-    "libp2p-noise": "^2.0.4",
+    "libp2p-noise": "^3.0.0",
     "multiaddr": "8.1.2",
     "multihashes": "4.0.2",
     "peer-id": "0.14.8",
@@ -56,7 +56,7 @@
     "secp256k1": "~4.0.2"
   },
   "devDependencies": {
-    "@hoprnet/hopr-ethereum": "1.71.0-next.95",
+    "@hoprnet/hopr-ethereum": "1.71.0-next.99",
     "@types/chai-as-promised": "^7.1.3",
     "@types/debug": "^4.1.5",
     "@types/err-code": "^3.0.0",

@@ -7,6 +7,10 @@ import { LogStream } from './logs'
 import { AdminServer } from './admin'
 import * as yargs from 'yargs'
 import setupAPI from './api'
+import { getIdentity } from './identity'
+import path from 'path'
+
+const DEFAULT_ID_PATH = path.join(process.env.HOME, '.hopr-identity')
 
 const argv = yargs
   .option('network', {
@@ -59,7 +63,12 @@ const argv = yargs
     default: 8080
   })
   .option('password', {
-    describe: 'A password to encrypt your keys'
+    describe: 'A password to encrypt your keys',
+    default: ''
+  })
+  .option('identity', {
+    describe: 'The path to the identity file',
+    default: DEFAULT_ID_PATH
   })
   .option('run', {
     describe: 'Run a single hopr command, same syntax as in hopr-admin',
@@ -157,11 +166,20 @@ async function main() {
     process.exit(0)
   }
 
+  // 1. Find or create an identity
+  const peerId = await getIdentity({
+    initialize: argv.init,
+    idPath: argv.identity,
+    password: argv.password
+  })
+
+  // 2. Create node instance
   try {
-    node = await Hopr.create(options)
-    logs.log('Created HOPR Node')
+    node = new Hopr(peerId, options)
+    logs.log('Creating HOPR Node')
     node.on('hopr:message', logMessageToNode)
-    cmds = new Commands(node)
+
+    // 2.1 start all monitoring services
 
     if (argv.rest) {
       setupAPI(node, logs, argv)
@@ -185,6 +203,15 @@ async function main() {
     if (adminServer) {
       adminServer.registerNode(node, cmds)
     }
+
+    logs.log('node is waiting for funds to', (await node.getEthereumAddress()).toHex())
+    // 2.5 Await funding of wallet.
+    await node.waitForFunds()
+    logs.log('node funded, starting')
+
+    // 3. Start the node.
+    await node.start()
+    cmds = new Commands(node)
 
     if (argv.run && argv.run !== '') {
       // Run a single command and then exit.

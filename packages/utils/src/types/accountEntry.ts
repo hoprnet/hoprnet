@@ -1,12 +1,11 @@
-import type { Event } from '../indexer/types'
 import Multiaddr from 'multiaddr'
 import PeerId from 'peer-id'
 import { ethers } from 'ethers'
-import { u8aSplit, serializeToU8a, MULTI_ADDR_MAX_LENGTH, u8aEquals } from '@hoprnet/hopr-utils'
+import { u8aSplit, serializeToU8a, MULTI_ADDR_MAX_LENGTH, u8aEquals } from '..'
 import BN from 'bn.js'
 import { Address, PublicKey, Hash } from '.' // TODO: cyclic dep
 
-class AccountEntry {
+export class AccountEntry {
   constructor(public readonly address: Address, public readonly multiAddr?: Multiaddr) {}
 
   static get SIZE(): number {
@@ -23,7 +22,8 @@ class AccountEntry {
     return new AccountEntry(address, isBEmpty ? undefined : Multiaddr(strippedB))
   }
 
-  static fromSCEvent(event: Event<'Announcement'>): AccountEntry {
+  static fromSCEvent(event: any): AccountEntry {
+    //TODO types
     const { account, multiaddr } = event.args
     const address = Address.fromString(account)
     const accountEntry = new AccountEntry(address, Multiaddr(multiaddr))
@@ -69,5 +69,3 @@ class AccountEntry {
     return typeof this.multiAddr !== 'undefined'
   }
 }
-
-export default AccountEntry

@@ -1,6 +1,5 @@
 import { expect } from 'chai'
-import { Address } from '.'
-import ChannelEntry from './channelEntry'
+import { Address, ChannelEntry } from '.'
 
 const EMPTY_ADDRESS = new Address(new Uint8Array({ length: Address.SIZE }))
 

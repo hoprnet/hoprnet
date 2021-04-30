@@ -1,7 +1,7 @@
 import type Hopr from '@hoprnet/hopr-core'
 import { AbstractCommand } from './abstractCommand'
 import { styleValue } from './utils'
-import { PublicKey } from '@hoprnet/hopr-core-ethereum'
+import { PublicKey } from '@hoprnet/hopr-utils'
 
 export default class PrintAddress extends AbstractCommand {
   constructor(public node: Hopr) {

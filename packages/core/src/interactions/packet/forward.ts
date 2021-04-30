@@ -3,9 +3,8 @@ import { Packet } from '../../messages/packet'
 import type HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 // import Debug from 'debug'
 import type PeerId from 'peer-id'
-import { durations, pubKeyToPeerId } from '@hoprnet/hopr-utils'
+import { durations, pubKeyToPeerId, HoprDB } from '@hoprnet/hopr-utils'
 import { Mixer } from '../../mixer'
-import { LevelUp } from 'levelup'
 import { sendAcknowledgement } from './acknowledgement'
 
 // const log = Debug('hopr-core:forward')
@@ -20,7 +19,7 @@ export class PacketForwardInteraction {
     private privKey: PeerId,
     private chain: HoprCoreEthereum,
     private emitMessage: (msg: Uint8Array) => void,
-    private db: LevelUp
+    private db: HoprDB
   ) {
     this.mixer = new Mixer(this.handleMixedPacket.bind(this))
     this.subscribe(PROTOCOL_STRING, this.handlePacket.bind(this))

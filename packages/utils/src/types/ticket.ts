@@ -44,7 +44,7 @@ function serializeUnsigned({
   ])
 }
 
-class Ticket {
+export class Ticket {
   constructor(
     readonly counterparty: Address,
     readonly challenge: PublicKey,
@@ -190,4 +190,3 @@ class Ticket {
     return luck.lte(winProb.toBN())
   }
 }
-export default Ticket

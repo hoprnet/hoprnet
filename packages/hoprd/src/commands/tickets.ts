@@ -1,8 +1,7 @@
 import type Hopr from '@hoprnet/hopr-core'
-import { moveDecimalPoint } from '@hoprnet/hopr-utils'
+import { moveDecimalPoint, Balance } from '@hoprnet/hopr-utils'
 import { AbstractCommand } from './abstractCommand'
 import { countSignedTickets, toSignedTickets, styleValue } from './utils'
-import { Balance } from '@hoprnet/hopr-core-ethereum'
 
 export default class Tickets extends AbstractCommand {
   constructor(public node: Hopr) {
@@ -19,13 +18,12 @@ export default class Tickets extends AbstractCommand {
 
   public async execute(): Promise<string | void> {
     try {
-      const results = await this.node.getAcknowledgedTickets()
+      const ackTickets = await this.node.getAcknowledgedTickets()
 
-      if (results.length === 0) {
+      if (ackTickets.length === 0) {
         return 'No tickets found.'
       }
 
-      const ackTickets = results.map((o) => o.ackTicket)
       const unredeemedResults = countSignedTickets(await toSignedTickets(ackTickets))
       const unredeemedAmount = moveDecimalPoint(unredeemedResults.total.toString(), Balance.DECIMALS * -1)
 

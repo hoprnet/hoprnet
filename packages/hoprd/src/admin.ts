@@ -11,7 +11,7 @@ import type { Server } from 'http'
 import stripAnsi from 'strip-ansi'
 import { LogStream } from './logs'
 import { NODE_ENV } from './env'
-import { Balance, NativeBalance } from '@hoprnet/hopr-core-ethereum'
+import { Balance, NativeBalance } from '@hoprnet/hopr-utils'
 
 let debugLog = debug('hoprd:admin')
 
@@ -123,7 +123,7 @@ export class AdminServer {
   }
 }
 
-const DISCLAIMER = `-- This software is still under development --\n\tDo NOT add assets to the node that you can't lose`
+const DISCLAIMER = `-- This software is still under development --\n\tFor testing, this node requires 1 xDAI, and at least 10 wxHOPR \n\tHowever, do NOT add assets to the node that you can't lose`
 
 export function showDisclaimer(logs: LogStream) {
   logs.warn(DISCLAIMER)

@@ -77,16 +77,6 @@ Ideally, we provide a way within the node to allow users to be able to on-ramp t
 
 Initially saw in #430.
 
-### Major refactor needed in our database
-
-#### Problem statement
-
-We sprinkle references to an IndexedDb throughout the code, and rely on buffer serialisation everywhere we access it.
-
-#### Discussion
-
-It would be more maintainable and readable to create a database abstraction to allow us to mock out, or separate database implementation details from the desired interface.
-
 ## Ecosystem
 
 _These discussion relate to topics that involve the HOPR ecosystem as a whole, either on how people interact with the protocol, `hoprd`, its documentantion, or other principles around privacy._
