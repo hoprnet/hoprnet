@@ -23,7 +23,7 @@ import { Acknowledgement } from './acknowledgement'
 import { blue, green } from 'chalk'
 import Debug from 'debug'
 
-export const MAX_HOPS = 3 // 3 relayer and 1 destination
+export const MAX_HOPS = 3 // 3 relayers and 1 destination
 
 const PACKET_LENGTH = getPacketLength(MAX_HOPS + 1, POR_STRING_LENGTH, 0)
 
