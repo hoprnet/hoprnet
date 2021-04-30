@@ -104,7 +104,7 @@ export class Address {
     return this.lt(b) ? [this, b] : [b, this]
   }
 
-  static createMock(): Address{
+  static createMock(): Address {
     return new Address(new Uint8Array(Address.SIZE))
   }
 }

@@ -29,4 +29,3 @@ export class Snapshot {
     return UINT256.SIZE * 3
   }
 }
-
