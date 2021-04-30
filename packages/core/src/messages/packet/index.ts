@@ -139,7 +139,7 @@ export class Packet extends Uint8Array {
 
   private libp2p: LibP2P
   private paymentChannels: HoprCoreEthereum
-  private db: HoprDB 
+  private db: HoprDB
   private id: PeerId
   private ticketAmount: string
   private ticketWinProb: number

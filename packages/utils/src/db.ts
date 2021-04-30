@@ -12,7 +12,6 @@ import {
   UnacknowledgedTicket, AccountEntry, ChannelEntry, Snapshot } from './types'
 import BN from 'bn.js'
 
-
 const log = Debug(`hopr-core:db`)
 
 const encoder = new TextEncoder()
@@ -96,7 +95,7 @@ export class HoprDB {
   private async maybeGet(key: Uint8Array): Promise<Uint8Array | undefined> {
     try {
       return this.get(key)
-    } catch(err) {
+    } catch (err) {
       if (err.notFound) {
         return undefined
       }
@@ -104,15 +103,19 @@ export class HoprDB {
     }
   }
 
-  private async getAll<T>(prefix: Uint8Array, deserialize: (u: Uint8Array) => T, filter: (o:T) => boolean): Promise<T[]> {
+  private async getAll<T>(
+    prefix: Uint8Array,
+    deserialize: (u: Uint8Array) => T,
+    filter: (o: T) => boolean
+  ): Promise<T[]> {
     const res: T[] = []
     const prefixKeyed = this.keyOf(prefix)
     return new Promise<T[]>((resolve, reject) => {
       this.db
         .createReadStream()
         .on('error', reject)
-        .on('data', async({ key, value }: { key: Buffer, value: Buffer }) => {
-          if (!key.subarray(0, prefixKeyed.length).equals(prefixKeyed)){
+        .on('data', async ({ key, value }: { key: Buffer; value: Buffer }) => {
+          if (!key.subarray(0, prefixKeyed.length).equals(prefixKeyed)) {
             return
           }
           const obj = deserialize(value)
@@ -312,10 +315,7 @@ export class HoprDB {
     return this.db.close()
   }
 
-  async storeHashIntermediaries(
-    channelId: Hash,
-    intermediates: Intermediate[]
-  ): Promise<void> {
+  async storeHashIntermediaries(channelId: Hash, intermediates: Intermediate[]): Promise<void> {
     let dbBatch = this.db.batch()
     const keyFor = (iteration: number) => u8aConcat(COMMITMENT_PREFIX, channelId.serialize(), Uint8Array.of(iteration))
     for (const intermediate of intermediates) {
@@ -324,7 +324,7 @@ export class HoprDB {
     await dbBatch.write()
   }
 
-  async getCommitment(channelId: Hash, iteration: number){
+  async getCommitment(channelId: Hash, iteration: number) {
     return this.get(u8aConcat(COMMITMENT_PREFIX, channelId.serialize(), Uint8Array.of(iteration)))
   }
 
@@ -346,12 +346,12 @@ export class HoprDB {
     await this.put(LATEST_CONFIRMED_SNAPSHOT_KEY, snapshot.serialize())
   }
 
-  async getChannel(channelId: Hash): Promise<ChannelEntry | undefined>  {
+  async getChannel(channelId: Hash): Promise<ChannelEntry | undefined> {
     const data = await this.maybeGet(createChannelKey(channelId))
     return data ? ChannelEntry.deserialize(data) : undefined
   }
 
-  async getChannels(filter?: (channel: ChannelEntry) => boolean): Promise<ChannelEntry[]>{
+  async getChannels(filter?: (channel: ChannelEntry) => boolean): Promise<ChannelEntry[]> {
     return this.getAll<ChannelEntry>(CHANNEL_PREFIX, ChannelEntry.deserialize, filter)
   }
 
@@ -376,5 +376,5 @@ export class HoprDB {
     const mock = new HoprDB(new Address(new Uint8Array()), false, 'mock')
     mock.db = new levelup(MemDown())
     return mock
-  } 
+  }
 }
