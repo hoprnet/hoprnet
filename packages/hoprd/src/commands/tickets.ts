@@ -19,13 +19,12 @@ export default class Tickets extends AbstractCommand {
 
   public async execute(): Promise<string | void> {
     try {
-      const results = await this.node.getAcknowledgedTickets()
+      const ackTickets = await this.node.getAcknowledgedTickets()
 
-      if (results.length === 0) {
+      if (ackTickets.length === 0) {
         return 'No tickets found.'
       }
 
-      const ackTickets = results.map((o) => o.ackTicket)
       const unredeemedResults = countSignedTickets(await toSignedTickets(ackTickets))
       const unredeemedAmount = moveDecimalPoint(unredeemedResults.total.toString(), Balance.DECIMALS * -1)
 

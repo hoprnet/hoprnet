@@ -20,24 +20,19 @@ const encoder = new TextEncoder()
 const TICKET_PREFIX: Uint8Array = encoder.encode('tickets-')
 const PACKET_TAG_PREFIX: Uint8Array = encoder.encode('packets-tag-')
 const ACKNOWLEDGED_TICKET_COUNTER = encoder.encode('tickets-acknowledgedCounter')
-const acknowledgedSubPrefix = encoder.encode('acknowledged-')
-const unAcknowledgedSubPrefix = encoder.encode('unacknowledged-')
-
+const UNACKNOWLEDGED_TICKETS_PREFIX = u8aConcat(TICKET_PREFIX, encoder.encode('unacknowledged-'))
 const KEY_LENGTH = 32
 const ACKNOWLEDGED_TICKET_INDEX_LENGTH = 8
+const ACKNOWLEDGED_TICKET_PREFIX = u8aConcat(TICKET_PREFIX, encoder.encode('acknowledged-'))
 
 function keyAcknowledgedTickets(index: Uint8Array): Uint8Array {
   assert.equal(index.length, ACKNOWLEDGED_TICKET_INDEX_LENGTH)
-  return u8aConcat(TICKET_PREFIX, acknowledgedSubPrefix, index)
-}
-
-function AcknowledgedTicketsParse(arr: Uint8Array): Uint8Array {
-  return arr.slice(TICKET_PREFIX.length + acknowledgedSubPrefix.length, arr.length)
+  return u8aConcat(ACKNOWLEDGED_TICKET_PREFIX, index)
 }
 
 export function UnAcknowledgedTickets(hashedKey: Uint8Array): Uint8Array {
   assert.equal(hashedKey.length, KEY_LENGTH)
-  return u8aConcat(TICKET_PREFIX, unAcknowledgedSubPrefix, hashedKey)
+  return u8aConcat(UNACKNOWLEDGED_TICKETS_PREFIX, hashedKey)
 }
 
 export class CoreDB {
@@ -84,8 +79,30 @@ export class CoreDB {
     }
   }
 
+  private async put(key: Uint8Array, value: Uint8Array): Promise<void> {
+    await this.db.put(Buffer.from(this.keyOf(key)), Buffer.from(value))
+  }
+
   private async touch(key: Uint8Array): Promise<void> {
-    return await this.db.put(Buffer.from(key), Buffer.from(''))
+    return await this.put(key, new Uint8Array()) 
+  }
+
+  private async getAll<T>(prefix: Uint8Array, deserialize: (u: Uint8Array) => T, filter: (o:T) => boolean): Promise<T[]> {
+    const res: T[] = []
+    return new Promise<T[]>((resolve, reject) => {
+      this.db.createReadStream()
+        .on('error', reject)
+        .on('data', async({ key, value }: { key: Buffer, value: Buffer }) => {
+          if (!key.subarray(0, prefix.length).equals(prefix)){
+            return
+          }
+          const obj = deserialize(value)
+          if (filter(obj)) {
+            res.push(obj)
+          }
+        })
+        .on('end', () => resolve(res))
+    })
   }
 
   public getLevelUpTempUntilRefactored(): LevelUp {
@@ -99,28 +116,14 @@ export class CoreDB {
    * @returns an array of all unacknowledged tickets
    */
   public async getUnacknowledgedTickets(filter?: { signer: Uint8Array }): Promise<UnacknowledgedTicket[]> {
-    const tickets: UnacknowledgedTicket[] = []
-
-    return new Promise((resolve, reject) => {
-      this.db
-        .createReadStream({
-          gte: Buffer.from(UnAcknowledgedTickets(new Uint8Array(0x00)))
-        })
-        .on('error', (err: any) => reject(err))
-        .on('data', async ({ value }: { value: Buffer }) => {
-          if (value.buffer.byteLength !== UnacknowledgedTicket.SIZE()) return
-
-          const unAckTicket = UnacknowledgedTicket.deserialize(value)
-
-          // if signer provided doesn't match our ticket's signer dont add it to the list
-          if (filter?.signer && !u8aEquals(unAckTicket.ticket.getSigner().serialize(), filter.signer)) {
-            return
-          }
-
-          tickets.push(unAckTicket)
-        })
-        .on('end', () => resolve(tickets))
-    })
+    const filterFunc = (u: UnacknowledgedTicket): boolean => {
+      // if signer provided doesn't match our ticket's signer dont add it to the list
+      if (filter?.signer && !u8aEquals(u.ticket.getSigner().serialize(), filter.signer)) {
+        return false
+      }
+      return true
+    }
+    return this.getAll<UnacknowledgedTicket>(UNACKNOWLEDGED_TICKETS_PREFIX, UnacknowledgedTicket.deserialize, filterFunc)
   }
 
   /**
@@ -149,41 +152,15 @@ export class CoreDB {
    */
   async getAcknowledgements(filter?: {
     signer: Uint8Array
-  }): Promise<
-    {
-      ackTicket: Acknowledgement
-      index: Uint8Array
-    }[]
-  > {
-    const results: {
-      ackTicket: Acknowledgement
-      index: Uint8Array
-    }[] = []
-
-    return new Promise((resolve, reject) => {
-      this.db
-        .createReadStream({
-          gte: Buffer.from(keyAcknowledgedTickets(new Uint8Array(0x00)))
-        })
-        .on('error', (err) => reject(err))
-        .on('data', async ({ key, value }: { key: Buffer; value: Buffer }) => {
-          if (value.buffer.byteLength !== Acknowledgement.SIZE) return
-
-          const index = AcknowledgedTicketsParse(key)
-          const ackTicket = Acknowledgement.deserialize(value)
-
-          // if signer provided doesn't match our ticket's signer dont add it to the list
-          if (filter?.signer && !u8aEquals((await ackTicket.ticket).getSigner().serialize(), filter.signer)) {
-            return
-          }
-
-          results.push({
-            ackTicket,
-            index
-          })
-        })
-        .on('end', () => resolve(results))
-    })
+  }): Promise<Acknowledgement[]> {
+    const filterFunc = (a: Acknowledgement): boolean => {
+        // if signer provided doesn't match our ticket's signer dont add it to the list
+        if (filter?.signer && !u8aEquals(a.ticket.getSigner().serialize(), filter.signer)) {
+          return false
+        }
+      return true
+    }
+    return this.getAll<Acknowledgement>(ACKNOWLEDGED_TICKET_PREFIX, Acknowledgement.deserialize, filterFunc)
   }
 
   /**
@@ -197,7 +174,7 @@ export class CoreDB {
         acks.map<any>(async (ack) => {
           return {
             type: 'del',
-            key: Buffer.from(keyAcknowledgedTickets((await ack.ackTicket.ticket).challenge.serialize()))
+            key: Buffer.from(keyAcknowledgedTickets(ack.ticket.challenge.serialize()))
           }
         })
       )
@@ -210,15 +187,15 @@ export class CoreDB {
    * @param index Uint8Array
    */
   async updateAcknowledgement(ackTicket: Acknowledgement, index: Uint8Array): Promise<void> {
-    await this.db.put(Buffer.from(keyAcknowledgedTickets(index)), Buffer.from(ackTicket.serialize()))
+    await this.put(keyAcknowledgedTickets(index), ackTicket.serialize())
   }
 
   /**
    * Delete acknowledged ticket in database
    * @param index Uint8Array
    */
-  async deleteAcknowledgement(index: Uint8Array): Promise<void> {
-    await this.db.del(Buffer.from(keyAcknowledgedTickets(index)))
+  async deleteAcknowledgement(acknowledgement: Acknowledgement): Promise<void> {
+    await this.db.del(Buffer.from(keyAcknowledgedTickets(acknowledgement.ticket.challenge.serialize())))
   }
 
   /**
@@ -229,7 +206,6 @@ export class CoreDB {
   public async submitAcknowledgedTicket(
     ethereum: HoprCoreEthereum,
     ackTicket: Acknowledgement,
-    index: Uint8Array
   ): Promise<SubmitTicketResponse> {
     try {
       const signedTicket = ackTicket.ticket
@@ -239,7 +215,7 @@ export class CoreDB {
 
       const result = await channel.submitTicket(ackTicket)
       // TODO look at result.status and actually do something
-      await this.deleteAcknowledgement(index)
+      await this.deleteAcknowledgement(ackTicket)
       return result
     } catch (err) {
       return {
@@ -259,7 +235,7 @@ export class CoreDB {
     return Promise.all([this.getUnacknowledgedTickets(filter), this.getAcknowledgements(filter)]).then(
       async ([unAcks, acks]) => {
         const unAckTickets = await Promise.all(unAcks.map((o) => o.ticket))
-        const ackTickets = await Promise.all(acks.map((o) => o.ackTicket.ticket))
+        const ackTickets = await Promise.all(acks.map((o) => o.ticket))
 
         return [...unAckTickets, ...ackTickets]
       }
@@ -277,7 +253,7 @@ export class CoreDB {
   }
 
   async storeUnacknowledgedTickets(key: Uint8Array, unacknowledged: UnacknowledgedTicket) {
-    this.db.put(Buffer.from(UnAcknowledgedTickets(key)), Buffer.from(unacknowledged.serialize()))
+    await this.put(UnAcknowledgedTickets(key), unacknowledged.serialize())
   }
 
   async hasPacket(id: Uint8Array) {

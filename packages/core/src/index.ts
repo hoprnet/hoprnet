@@ -639,8 +639,8 @@ class Hopr extends EventEmitter {
     return this.db.getAcknowledgements()
   }
 
-  public async submitAcknowledgedTicket(ackTicket: Acknowledgement, index: Uint8Array) {
-    return this.db.submitAcknowledgedTicket(await this.paymentChannels, ackTicket, index)
+  public async submitAcknowledgedTicket(ackTicket: Acknowledgement) {
+    return this.db.submitAcknowledgedTicket(await this.paymentChannels, ackTicket)
   }
 
   public async getChannelsOf(addr: Address): Promise<ChannelEntry[]> {

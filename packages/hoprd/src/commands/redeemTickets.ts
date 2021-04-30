@@ -32,9 +32,9 @@ export default class RedeemTickets extends AbstractCommand {
       const redeemedTickets: Acknowledgement[] = []
       let count = 0
 
-      for (const { ackTicket, index } of results) {
+      for (const ackTicket of results) {
         ++count
-        const result = await this.node.submitAcknowledgedTicket(ackTicket, index)
+        const result = await this.node.submitAcknowledgedTicket(ackTicket)
 
         if (result.status === 'SUCCESS') {
           console.log(`Redeemed ticket ${styleValue(count)}`)
