@@ -1,6 +1,6 @@
 import { Packet, MAX_HOPS } from './packet'
 import PeerId from 'peer-id'
-import { Ticket, Hash, UINT256, Balance, PublicKey } from '@hoprnet/hopr-core-ethereum'
+import { Ticket, UINT256, Balance, PublicKey } from '@hoprnet/hopr-core-ethereum'
 import BN from 'bn.js'
 import { u8aEquals } from '@hoprnet/hopr-utils'
 import assert from 'assert'
@@ -19,7 +19,7 @@ function createMockTickets(privKey: Uint8Array) {
         new UINT256(new BN(0)),
         new UINT256(new BN(0)),
         amount,
-        new Hash(new Uint8Array(Hash.SIZE).fill(0xff)),
+        Ticket.fromProbability(1),
         new UINT256(new BN(0)),
         privKey
       )

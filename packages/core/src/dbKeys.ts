@@ -1,5 +1,5 @@
 import type { LevelUp } from 'levelup'
-import { Hash, Acknowledgement, UnacknowledgedTicket } from '@hoprnet/hopr-core-ethereum'
+import { Acknowledgement, UnacknowledgedTicket } from '@hoprnet/hopr-core-ethereum'
 import { u8aAdd, toU8a, PublicKey } from '@hoprnet/hopr-utils'
 import debug from 'debug'
 const log = debug('hopr-core:db')

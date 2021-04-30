@@ -8,7 +8,7 @@ import BN from 'bn.js'
 import { subscribeToAcknowledgements, sendAcknowledgement } from './acknowledgement'
 import { PublicKey, u8aEquals } from '@hoprnet/hopr-utils'
 import { Balance, createFirstChallenge } from '@hoprnet/hopr-utils'
-import { Ticket, UINT256, Hash } from '@hoprnet/hopr-core-ethereum'
+import { Ticket, UINT256 } from '@hoprnet/hopr-core-ethereum'
 
 import { Challenge } from '../../messages/challenge'
 import { Packet } from '../../messages/packet'
@@ -135,6 +135,7 @@ describe('packet interaction', function () {
       db
     )
 
+    // @ts-expect-error
     const relay0Interaction = new PacketForwardInteraction(
       libp2pRelay0.subscribe,
       libp2pRelay0.send,
@@ -144,6 +145,7 @@ describe('packet interaction', function () {
       db
     )
 
+    // @ts-expect-error
     const relay1Interaction = new PacketForwardInteraction(
       libp2pRelay1.subscribe,
       libp2pRelay1.send,
@@ -153,6 +155,7 @@ describe('packet interaction', function () {
       db
     )
 
+    // @ts-expect-error
     const relay2Interaction = new PacketForwardInteraction(
       libp2pRelay2.subscribe,
       libp2pRelay2.send,
@@ -162,6 +165,7 @@ describe('packet interaction', function () {
       db
     )
 
+    // @ts-expect-error
     const receiverInteraction = new PacketForwardInteraction(
       libp2pReceiver.subscribe,
       libp2pReceiver.send,

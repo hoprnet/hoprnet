@@ -1,12 +1,4 @@
-import {
-  Ticket,
-  PublicKey,
-  Balance,
-  Channel,
-  UnacknowledgedTicket,
-  getWinProbabilityAsFloat,
-  Hash
-} from '@hoprnet/hopr-core-ethereum'
+import { Ticket, PublicKey, Balance, Channel, UnacknowledgedTicket, Hash } from '@hoprnet/hopr-core-ethereum'
 import type HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 import { Challenge } from './challenge'
 import {
@@ -69,13 +61,13 @@ export async function validateUnacknowledgedTicket(
 ): Promise<void> {
   // self
   const selfPubKey = new PublicKey(id.pubKey.marshal())
-  const selfAddress = await selfPubKey.toAddress()
+  const selfAddress = selfPubKey.toAddress()
   // sender
   const senderB58 = senderPeerId.toB58String()
   const senderPubKey = new PublicKey(senderPeerId.pubKey.marshal())
   const ticketAmount = ticket.amount.toBN()
   const ticketCounter = ticket.epoch.toBN()
-  const ticketWinProb = getWinProbabilityAsFloat(ticket.winProb)
+  const ticketWinProb = ticket.winProb.toBN()
 
   let channelState
   try {
@@ -95,7 +87,7 @@ export async function validateUnacknowledgedTicket(
   }
 
   // ticket MUST have at least X winning probability
-  if (ticketWinProb < nodeTicketWinProb) {
+  if (ticketWinProb.lt(Ticket.fromProbability(nodeTicketWinProb).toBN())) {
     throw Error(`Ticket winning probability '${ticketWinProb}' is lower than '${nodeTicketWinProb}'`)
   }
 
