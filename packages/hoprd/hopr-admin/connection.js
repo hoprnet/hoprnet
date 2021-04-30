@@ -49,10 +49,11 @@ export class Connection {
     var client
     try {
       // See https://stackoverflow.com/a/55487820
-      var client = navigator.clipboard ?
-        await fetch(`https://${window.location.host}/api/ssl`).then(
-          (_) => new WebSocket('wss://' + window.location.host)
-        ) : new WebSocket('ws://' + window.location.host)
+      var client = navigator.clipboard
+        ? await fetch(`https://${window.location.host}/api/ssl`).then(
+            (_) => new WebSocket('wss://' + window.location.host)
+          )
+        : new WebSocket('ws://' + window.location.host)
     } catch (err) {
       console.log('Invalid SSL or non-SSL support')
       client = new WebSocket('ws://' + window.location.host)
