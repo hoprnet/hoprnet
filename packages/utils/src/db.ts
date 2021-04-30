@@ -66,7 +66,7 @@ export class HoprDB {
   }
 
   private keyOf(...segments: Uint8Array[]): Uint8Array {
-    return u8aConcat.call(this.id.toHex(), ... segments)
+    return u8aConcat.call(this.id.toHex(), ...segments)
   }
 
   private async has(key: Uint8Array): Promise<boolean> {
@@ -87,10 +87,10 @@ export class HoprDB {
   }
 
   private async touch(key: Uint8Array): Promise<void> {
-    return await this.put(key, new Uint8Array()) 
+    return await this.put(key, new Uint8Array())
   }
 
-  private async get(key: Uint8Array): Promise<Uint8Array>{
+  private async get(key: Uint8Array): Promise<Uint8Array> {
     return await this.db.get(Buffer.from(this.keyOf(key)))
   }
 
@@ -109,7 +109,8 @@ export class HoprDB {
     const res: T[] = []
     const prefixKeyed = this.keyOf(prefix)
     return new Promise<T[]>((resolve, reject) => {
-      this.db.createReadStream()
+      this.db
+        .createReadStream()
         .on('error', reject)
         .on('data', async({ key, value }: { key: Buffer, value: Buffer }) => {
           if (!key.subarray(0, prefixKeyed.length).equals(prefixKeyed)){
@@ -141,7 +142,11 @@ export class HoprDB {
       }
       return true
     }
-    return this.getAll<UnacknowledgedTicket>(UNACKNOWLEDGED_TICKETS_PREFIX, UnacknowledgedTicket.deserialize, filterFunc)
+    return this.getAll<UnacknowledgedTicket>(
+      UNACKNOWLEDGED_TICKETS_PREFIX,
+      UnacknowledgedTicket.deserialize,
+      filterFunc
+    )
   }
 
   /**
@@ -168,14 +173,12 @@ export class HoprDB {
    * @param filter optionally filter by signer
    * @returns an array of all acknowledged tickets
    */
-  async getAcknowledgements(filter?: {
-    signer: Uint8Array
-  }): Promise<Acknowledgement[]> {
+  async getAcknowledgements(filter?: { signer: Uint8Array }): Promise<Acknowledgement[]> {
     const filterFunc = (a: Acknowledgement): boolean => {
-        // if signer provided doesn't match our ticket's signer dont add it to the list
-        if (filter?.signer && !u8aEquals(a.ticket.getSigner().serialize(), filter.signer)) {
-          return false
-        }
+      // if signer provided doesn't match our ticket's signer dont add it to the list
+      if (filter?.signer && !u8aEquals(a.ticket.getSigner().serialize(), filter.signer)) {
+        return false
+      }
       return true
     }
     return this.getAll<Acknowledgement>(ACKNOWLEDGED_TICKET_PREFIX, Acknowledgement.deserialize, filterFunc)
@@ -223,7 +226,7 @@ export class HoprDB {
    */
   public async submitAcknowledgedTicket(
     ethereum: HoprCoreEthereum,
-    ackTicket: Acknowledgement,
+    ackTicket: Acknowledgement
   ): Promise<SubmitTicketResponse> {
     try {
       const signedTicket = ackTicket.ticket
