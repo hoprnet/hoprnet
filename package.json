@@ -13,7 +13,7 @@
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
   "engines": {
-    "node": "14",
+    "node": "14 || 15",
     "yarn": "1"
   },
   "files": [
@@ -32,7 +32,7 @@
     "prepublishOnly": "yarn build"
   },
   "dependencies": {
-    "@hoprnet/hopr-utils": "1.69.3",
+    "@hoprnet/hopr-utils": "~1.69.3",
     "abortable-iterator": "^3.0.0",
     "bl": "^4.1",
     "debug": "^4.3.1",
