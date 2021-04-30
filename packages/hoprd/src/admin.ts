@@ -117,13 +117,13 @@ export class AdminServer {
     connectionReport(this.node, this.logs)
     reportMemoryUsage(this.logs)
 
-    process.env.NODE_ENV == 'production' && showDisclaimer(this.logs)
+    showDisclaimer(this.logs)
 
     this.cmds.execute(`alias ${node.getId().toB58String()} me`)
   }
 }
 
-const DISCLAIMER = `-- This software is still under development --\n\tDo NOT add assets to the node that you can't lose`
+const DISCLAIMER = `-- This software is still under development --\n\tFor testing, this node requires 1 xDAI, and at least 10 wxHOPR \n\tHowever, do NOT add assets to the node that you can't lose`
 
 export function showDisclaimer(logs: LogStream) {
   logs.warn(DISCLAIMER)
