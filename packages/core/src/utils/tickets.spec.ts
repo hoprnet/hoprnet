@@ -7,7 +7,7 @@ import chai, { expect } from 'chai'
 import sinon from 'sinon'
 import { Channel } from '@hoprnet/hopr-core-ethereum'
 import { Address, Balance, PublicKey, UINT256, Ticket, ChannelEntry } from '@hoprnet/hopr-utils'
-import { validateUnacknowledgedTicket } from '../messages/packet'
+import { validateUnacknowledgedTicket, validateCreatedTicket } from '../messages/packet'
 chai.use(chaiAsPromised)
 
 // target is party A, sender is party B
@@ -250,9 +250,9 @@ describe('unit test validateUnacknowledgedTicket', function () {
   })
 })
 
-// describe('unit test validateCreatedTicket', function () {
-//   it('should pass if ticket is okay', async function () {
-//     const ticket = createMockTicket({})
-//     validateCreatedTicket(new BN(1), ticket)
-//   })
-// })
+describe('unit test validateCreatedTicket', function () {
+  it('should pass if ticket is okay', async function () {
+    const ticket = createMockTicket({})
+    validateCreatedTicket(new BN(1), ticket)
+  })
+})
