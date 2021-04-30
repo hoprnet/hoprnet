@@ -1,7 +1,7 @@
 import { Hash, Ticket } from '.'
-import { serializeToU8a, u8aSplit } from '@hoprnet/hopr-utils'
+import { serializeToU8a, u8aSplit } from '..'
 
-class Acknowledgement {
+export class Acknowledgement {
   constructor(readonly ticket: Ticket, readonly response: Hash, readonly preImage: Hash) {}
 
   serialize(): Uint8Array {
@@ -21,5 +21,3 @@ class Acknowledgement {
     return Ticket.SIZE + Hash.SIZE + Hash.SIZE
   }
 }
-
-export default Acknowledgement

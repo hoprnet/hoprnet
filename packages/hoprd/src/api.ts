@@ -8,7 +8,7 @@ export default function setupAPI(node: Hopr, logs: any, options: any) {
   service.use(bodyParser.text({ type: '*/*' }))
 
   service.get('/api/v1/version', (_, res) => res.send(node.getVersion()))
-  service.get('/api/v1/address/eth', async (_, res) => res.send(await node.paymentChannels.hexAccountAddress()))
+  service.get('/api/v1/address/eth', async (_, res) => res.send((await node.getEthereumAddress()).toHex()))
   service.get('/api/v1/address/hopr', async (_, res) => res.send(node.getId().toB58String()))
 
   const cmds = new Commands(node)

@@ -19,7 +19,6 @@ import Tickets from './tickets'
 import RedeemTickets from './redeemTickets'
 import Settings from './settings'
 import Withdraw from './withdraw'
-import TraverseChannels from './traverseChannels'
 import { Alias } from './alias'
 import { Info } from './info'
 import { CoverTraffic } from './cover-traffic'
@@ -55,7 +54,6 @@ export class Commands {
       new Tickets(node),
       new SendMessage(node),
       new Settings(node),
-      new TraverseChannels(node),
       new Withdraw(node),
       new OpenChannel(node),
       new FundChannel(node)

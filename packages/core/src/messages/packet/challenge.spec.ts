@@ -1,6 +1,6 @@
 import assert from 'assert'
 import { Challenge } from './challenge'
-import { Hash } from '@hoprnet/hopr-core-ethereum'
+import { Hash } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 import PeerId from 'peer-id'
 import { randomBytes } from 'crypto'

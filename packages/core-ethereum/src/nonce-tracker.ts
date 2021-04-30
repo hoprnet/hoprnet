@@ -2,7 +2,7 @@ import type { Transaction as ITransaction } from './transaction-manager'
 import debug from 'debug'
 import assert from 'assert'
 import { Mutex } from 'async-mutex'
-import { Address } from './types'
+import { Address } from '@hoprnet/hopr-utils'
 
 const log = debug('hopr-core-ethereum:nonce-tracker')
 

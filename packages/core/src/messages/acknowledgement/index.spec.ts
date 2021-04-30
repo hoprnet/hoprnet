@@ -4,7 +4,7 @@ import { AcknowledgementMessage } from '.'
 import { Challenge } from '../packet/challenge'
 import { u8aEquals } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
-import { Hash } from '@hoprnet/hopr-core-ethereum'
+import { Hash } from '@hoprnet/hopr-utils'
 import { randomBytes } from 'crypto'
 import secp256k1 from 'secp256k1'
 

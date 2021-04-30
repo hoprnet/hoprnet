@@ -1,11 +1,14 @@
-import { u8aSplit, serializeToU8a, u8aToNumber, stringToU8a } from '@hoprnet/hopr-utils'
-import { Address, Balance, Hash } from '@hoprnet/hopr-utils'
-import { UINT256 } from '../types/solidity'
-import { Channel } from '../channel'
-import type { Event } from '../indexer/types'
+import { u8aSplit, serializeToU8a, u8aToNumber, stringToU8a } from '..'
+import { Address, Balance, Hash } from './primitives'
+import { UINT256 } from './solidity'
 import BN from 'bn.js'
 
 export type ChannelStatus = 'CLOSED' | 'OPEN' | 'PENDING_TO_CLOSE'
+
+export function generateChannelId(self: Address, counterparty: Address) {
+  let parties = self.sortPair(counterparty)
+  return Hash.create(Buffer.concat(parties.map((x) => x.serialize())))
+}
 
 function numberToChannelStatus(i: number): ChannelStatus {
   if (i === 0) return 'CLOSED'
@@ -42,7 +45,7 @@ const components = [
   { name: 'closureByPartyA', SIZE: 1, deserialize: (x) => x[0] == 1 }
 ]
 
-class ChannelEntry {
+export class ChannelEntry {
   constructor(
     public readonly partyA: Address,
     public readonly partyB: Address,
@@ -74,7 +77,8 @@ class ChannelEntry {
     return new ChannelEntry(...params)
   }
 
-  static fromSCEvent(event: Event<'ChannelUpdate'>): ChannelEntry {
+  static fromSCEvent(event: any): ChannelEntry {
+    // TODO type
     const { partyA, partyB, newState } = event.args
     return new ChannelEntry(
       Address.fromString(partyA),
@@ -114,7 +118,7 @@ class ChannelEntry {
   }
 
   public getId() {
-    return Channel.generateId(this.partyA, this.partyB)
+    return generateChannelId(this.partyA, this.partyB)
   }
 
   public ticketEpochFor(addr: Address): UINT256 {
@@ -137,5 +141,3 @@ class ChannelEntry {
     throw new Error('Wrong addr for this channel')
   }
 }
-
-export default ChannelEntry

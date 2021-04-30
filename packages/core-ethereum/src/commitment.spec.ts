@@ -1,16 +1,14 @@
 import assert from 'assert'
-import LevelUp from 'levelup'
-import MemDown from 'memdown'
 import { Commitment } from './commitment'
 import sinon from 'sinon'
-import { Hash } from './types'
+import { Hash, HoprDB } from '@hoprnet/hopr-utils'
 
 describe('test commitment', function () {
   let fakeSet, fakeGet, fakeDB, fakeId
   beforeEach(async function () {
     fakeSet = sinon.fake.resolves(true)
     fakeGet = sinon.fake.resolves(undefined)
-    fakeDB = new LevelUp(MemDown())
+    fakeDB = HoprDB.createMock()
     fakeId = new Hash(new Uint8Array({ length: Hash.SIZE }).fill(1))
   })
 

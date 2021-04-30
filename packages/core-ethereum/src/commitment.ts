@@ -1,9 +1,6 @@
-import { Hash } from './types'
-import { iterateHash, recoverIteratedHash, u8aConcat, Intermediate } from '@hoprnet/hopr-utils'
-import type { LevelUp } from 'levelup'
+import { iterateHash, recoverIteratedHash, HoprDB, Hash } from '@hoprnet/hopr-utils'
 import { randomBytes } from 'crypto'
 import Debug from 'debug'
-import { getFromDB } from './utils'
 
 const log = Debug('hopr-core-ethereum:commitment')
 
@@ -14,23 +11,6 @@ async function hashFunction(msg: Uint8Array): Promise<Uint8Array> {
   return Hash.create(msg).serialize().slice(0, Hash.SIZE)
 }
 
-function keyFor(channelId: Hash, iteration: number): Uint8Array {
-  const prefix = new TextEncoder().encode('commitment:')
-  return u8aConcat(prefix, channelId.serialize(), Uint8Array.of(iteration))
-}
-
-export async function storeHashIntermediaries(
-  db: LevelUp,
-  channelId: Hash,
-  intermediates: Intermediate[]
-): Promise<void> {
-  let dbBatch = db.batch()
-  for (const intermediate of intermediates) {
-    dbBatch = dbBatch.put(Buffer.from(keyFor(channelId, intermediate.iteration)), Buffer.from(intermediate.preImage))
-  }
-  await dbBatch.write()
-}
-
 export class Commitment {
   private initialized: boolean = false
   private current: Hash
@@ -38,7 +18,7 @@ export class Commitment {
   constructor(
     private setChainCommitment,
     private getChainCommitment,
-    private db: LevelUp,
+    private db: HoprDB,
     private channelId: Hash // used in db key
   ) {}
 
@@ -95,15 +75,15 @@ export class Commitment {
   private async createCommitmentChain(): Promise<Hash> {
     const seed = new Hash(randomBytes(Hash.SIZE)) // TODO seed off privKey + channel
     const result = await iterateHash(seed.serialize(), hashFunction, TOTAL_ITERATIONS, DB_ITERATION_BLOCK_SIZE)
-    await storeHashIntermediaries(this.db, this.channelId, result.intermediates)
+    await this.db.storeHashIntermediaries(this.channelId, result.intermediates)
     return new Hash(result.hash)
   }
 
   private async hasDBSecret(): Promise<boolean> {
-    return (await getFromDB<Uint8Array>(this.db, keyFor(this.channelId, 0))) != undefined
+    return (await this.db.getCommitment(this.channelId, 0)) != undefined
   }
 
   private async searchDBFor(iteration: number): Promise<Uint8Array | undefined> {
-    return await getFromDB<Uint8Array>(this.db, keyFor(this.channelId, iteration))
+    return await this.db.getCommitment(this.channelId, iteration)
   }
 }

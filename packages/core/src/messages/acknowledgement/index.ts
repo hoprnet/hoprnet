@@ -2,10 +2,9 @@ import secp256k1 from 'secp256k1'
 import { deriveTicketKeyBlinding } from '../packet/header'
 import { KEY_LENGTH } from '../packet/header/parameters'
 import { Challenge } from '../packet/challenge'
-import { Hash, Signature, PublicKey } from '@hoprnet/hopr-core-ethereum'
+import { Hash, Signature, PublicKey } from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'
-import { serializeToU8a, u8aSplit, u8aToHex } from '@hoprnet/hopr-utils'
-import { UnAcknowledgedTickets } from '../../dbKeys'
+import { serializeToU8a, u8aSplit, u8aToHex, UnAcknowledgedTickets } from '@hoprnet/hopr-utils'
 
 /**
  * This class encapsulates the message that is sent back to the relayer
