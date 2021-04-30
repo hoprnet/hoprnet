@@ -314,7 +314,8 @@ export class HoprDB {
 
   async storeHashIntermediaries(channelId: Hash, intermediates: Intermediate[]): Promise<void> {
     let dbBatch = this.db.batch()
-    const keyFor = (iteration: number) => this.keyOf(u8aConcat(COMMITMENT_PREFIX, channelId.serialize(), Uint8Array.of(iteration)))
+    const keyFor = (iteration: number) =>
+      this.keyOf(u8aConcat(COMMITMENT_PREFIX, channelId.serialize(), Uint8Array.of(iteration)))
     for (const intermediate of intermediates) {
       dbBatch = dbBatch.put(Buffer.from(keyFor(intermediate.iteration)), Buffer.from(intermediate.preImage))
     }
@@ -326,7 +327,7 @@ export class HoprDB {
   }
 
   async getLatestBlockNumber(): Promise<number> {
-    if (!await this.has(LATEST_BLOCK_NUMBER_KEY)) return 0
+    if (!(await this.has(LATEST_BLOCK_NUMBER_KEY))) return 0
     return new BN(await this.get(LATEST_BLOCK_NUMBER_KEY)).toNumber()
   }
 
