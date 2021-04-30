@@ -28,7 +28,6 @@ export const MAX_HOPS = 3 // 3 relayer and 1 destination
 const PACKET_LENGTH = getPacketLength(MAX_HOPS + 1, POR_STRING_LENGTH, 0)
 
 const log = Debug('hopr-core:message:packet')
-// const verbose = Debug('hopr-core:verbose:message:packet')
 
 /**
  * Validate newly created tickets
@@ -42,9 +41,6 @@ export function validateCreatedTicket(myBalance: BN, ticket: Ticket) {
   }
 }
 
-/**
- * Validate unacknowledged tickets as we receive them
- */
 /**
  * Validate unacknowledged tickets as we receive them
  */
