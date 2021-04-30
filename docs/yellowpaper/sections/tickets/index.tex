@@ -23,11 +23,11 @@ where $\delta$ is the ticket amount, $P_w$ is the winning probability, $R$ is th
 \end{figure}
 
 \subsubsection{Challenge}
-$(A)$ creates a shared secret $s_i$ with all the relay nodes in the channel (B-C-D-Z) by using an offline version of the Diffie-Hellman key exchange.
+$(A)$ creates a shared secret $s_i$ with all the relay nodes in the channel (B-C-D-Z) by using an offline version of the Diffie-Hellman key exchange. This shared key is a session key that's generated from the master DH key sphinx key. 
 \newline The shared secret $s_i$ is used as a seed for a PRG (Pseudo Random Generator) to create secret shares $s_i,s_i'$ for each node along the route. 
 Relayers compute $s_i$ and get $s_{i+1}'$ from the next downstream node. 
 \newline The sender $(A)$ creates $T_{c_i}:=(s_i+s_{i+1}')*G$ and a hint for B,C,D,Z (let’s suppose these are the relay nodes and $Z$ will be the final destination) a “hint” how the promised value $s_C',s_D',s_Z'$ is going to look like. 
-The value “hint” is computed as $hint_i:=s_{i+1}'*G$ where $*$ is the curve multiplication operation and $G$ is a generator of the curve.
+The value “hint” is computed as $hint_i:=s_{i+1}'*G$ where $*$ is the curve multiplication operation and $G$ is a generator of the curve (the same used in the sphinx section).
 
 
 \subsection{Ticket validation}
@@ -35,7 +35,7 @@ Tickets are received together with packets which means that the recipient and th
 \newline Once $(A)$ receives $s_{i+1}^{(1)}$ from (B) by the secret sharing, it can compute: $$response_i:=s_i^{(0)}+s_{i+1}^{(1)}$$ such that it verifies  
 $$response_i*G=T_{c_i}$$
 Once the recipient transforms the packet, it is able to compute $s_i$. The recipient is now also able to extract the routing information from the packet. 
-This includes a hint to the value $s_{i+1}$ given as $hint_i:=s_{i+1}*G$.
+This includes a hint to the value $s_{i+1}$ given as $hint_i:=s_{i+1}*G$ which is stored in the sphinx packet header.
 \\The unacknowledged ticket is stored in the database under the $hint$ to the promised value to make sure that the acknowledgement can be afterwards linked to the unacknowledged ticket.
 \newline Together with $s_i$, the node can verify that $$T_{c_i}=s_i*G+hint_i$$ with $$s_i*G+hint_i=s_i*G+s_{i+1}*G=(s_i+s_{i+1})*G$$ 
 This allows the recipient to verify that the promised value $s_{i+1}$ indeed leads to a solution of the challenge given in the ticket. 
@@ -58,10 +58,10 @@ The final recipient of the packet does not receive a ticket because message rece
 \newline The node checks whether the information gained from the packet transformation is sufficient to fulfill the given challenge sent along with the ticket. It then replies with an acknowledgement that includes a response to the challenge.
 \\ The node also checks the following:
 \begin{itemize}
-    \item The signature of the ticket issuer is valid: $$ecrecover(Sig_{response_i}(0))=address(T_{c_i})$$
+    \item The signature of the ticket issuer is valid if the ECDSA public key recovery function results in $address(T_{c_i})$
     \item The ticket has been already redeemed (replay protection): $$channel.index <t.index$$
-    \item Channel exists and is open.
-    \item Channel balance towards the ticket recipient is sufficient to cover the costs for the ticket.
+    \item Channel \textbf{exists} and is \textbf{open}. If the node does not have a record about the channel or considers the channel to be in a state different from \textbf{open}, the ticket is dropped and the reception of the accompanying packet is rejected.
+    \item Channel balance towards the ticket recipient is sufficient to cover the costs for the ticket: $$ channel.balance>F$$ where $F$ is the relay fee for a ticket 
     \item Ticket index is strictly greater than the current value in the smart contract (reorder protection). This is valid because redeeming a $ticket$ with $index=n$ requires $index < n+1$ and sets $index := n+1$. So the new index becomes greater than $n$.
 
 
