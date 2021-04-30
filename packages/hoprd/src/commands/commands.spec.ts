@@ -31,7 +31,6 @@ describe('Commands', () => {
   })
 
   it('ping', async () => {
-    mockNode.bootstrapServers = []
     mockNode.ping = sinon.fake.returns({ info: '', latency: 10 })
     let mockPeerId = '16Uiu2HAkyXRaL7fKu4qcjaKuo4WXizrpK63Ltd6kG2tH6oSV58AW'
     let cmds = new mod.Commands(mockNode)
@@ -71,7 +70,6 @@ describe('Commands', () => {
   it('autocomplete sendmessage', async () => {
     let mockNode: any = sinon.fake()
     mockNode.sendMessage = sinon.fake()
-    mockNode.bootstrapServers = []
     mockNode.getConnectedPeers = () => [{ toB58String: () => '16Uiu2HAmAJStiomwq27Kkvtat8KiEHLBSnAkkKCqZmLYKVLtkiB7' }]
 
     let cmds = new mod.Commands(mockNode)

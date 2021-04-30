@@ -2,7 +2,7 @@ import type Hopr from '@hoprnet/hopr-core'
 import type PeerId from 'peer-id'
 import type { AutoCompleteResult } from './abstractCommand'
 import { AbstractCommand, GlobalState } from './abstractCommand'
-import { checkPeerIdInput, isBootstrapNode, getPeerIdsAndAliases, styleValue } from './utils'
+import { checkPeerIdInput, getPeerIdsAndAliases, styleValue } from './utils'
 
 export default class Ping extends AbstractCommand {
   constructor(public node: Hopr) {
@@ -30,9 +30,6 @@ export default class Ping extends AbstractCommand {
     }
 
     let out = ''
-    if (isBootstrapNode(this.node, peerId)) {
-      out += styleValue(`Pinging the bootstrap node ...`, 'highlight') + '\n'
-    }
 
     let pingResult: {
       info: string
@@ -59,7 +56,6 @@ export default class Ping extends AbstractCommand {
 
   public async autocomplete(query: string = '', line: string = '', state: GlobalState): Promise<AutoCompleteResult> {
     const allIds = getPeerIdsAndAliases(this.node, state, {
-      noBootstrapNodes: true,
       returnAlias: true,
       mustBeOnline: true
     })

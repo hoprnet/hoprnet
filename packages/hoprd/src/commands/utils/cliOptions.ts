@@ -1,7 +1,6 @@
 // allowed CLI options
 // @ts-ignore
 export const cli_options: string[][] = [
-  ['-b', '--bootstrapNode', undefined, 'starts HOPR as a bootstrap node'],
   ['-n', '--network', '<connector>', 'starts HOPR with blockchain connector <connector>'],
   ['-h', '--help', undefined, 'shows this help page'],
   ['-l', '--listConnectors', undefined, 'shows all available connectors'],

@@ -1,16 +1,16 @@
 import type PeerId from 'peer-id'
-import { LevelUp } from 'levelup'
 import type { Event, EventNames } from './types'
-import EventEmitter from 'events'
+import type { ChainWrapper } from '../ethereum'
+import { LevelUp } from 'levelup'
 import chalk from 'chalk'
 import BN from 'bn.js'
 import Heap from 'heap-js'
 import { pubKeyToPeerId, randomChoice } from '@hoprnet/hopr-utils'
-import { Address, ChannelEntry, Hash, PublicKey, Balance, Snapshot } from '../types'
+import { Address, ChannelEntry, AccountEntry, Hash, PublicKey, Balance, Snapshot } from '../types'
 import * as db from './db'
-import { isConfirmedBlock, isSyncing, snapshotComparator } from './utils'
+import { isConfirmedBlock, snapshotComparator } from './utils'
 import Debug from 'debug'
-import type { ChainWrapper } from '../ethereum'
+import Multiaddr from 'multiaddr'
 
 export type RoutingChannel = [source: PeerId, destination: PeerId, stake: Balance]
 
@@ -22,7 +22,7 @@ const getSyncPercentage = (n: number, max: number) => ((n * 100) / max).toFixed(
  * all channels in the network.
  * Also keeps track of the latest block number.
  */
-class Indexer extends EventEmitter {
+class Indexer {
   public status: 'started' | 'restarting' | 'stopped' = 'stopped'
   public latestBlock: number = 0 // latest known on-chain block number
   private unconfirmedEvents = new Heap<Event<any>>(snapshotComparator)
@@ -33,9 +33,7 @@ class Indexer extends EventEmitter {
     private chain: ChainWrapper,
     private maxConfirmations: number,
     private blockRange: number
-  ) {
-    super()
-  }
+  ) {}
 
   /**
    * Starts indexing.
@@ -102,18 +100,6 @@ class Indexer extends EventEmitter {
     log(chalk.green('Indexer stopped!'))
   }
 
-  /**
-   * @returns returns true if it's syncing
-   */
-  public async isSyncing(): Promise<boolean> {
-    const [onChainBlock, lastKnownBlock] = await Promise.all([
-      this.chain.getLatestBlockNumber(),
-      db.getLatestBlockNumber(this.db)
-    ])
-
-    return isSyncing(onChainBlock, lastKnownBlock)
-  }
-
   private async restart(): Promise<void> {
     if (this.status === 'restarting') return
     log('Indexer restaring')
@@ -129,24 +115,6 @@ class Indexer extends EventEmitter {
       log(chalk.red('Failed to restart: %s', err.message))
     }
   }
-
-  // /**
-  //  * Wipes all indexer related stored data in the DB.
-  //  * @deprecated do not use this in production
-  //  */
-  // private async wipe(): Promise<void> {
-  //   await this.connector.db.batch(
-  //   getChannelsFromPeer:
-  //     (await getChannelEntries(this.connector.db)).map(({ partyA, partyB }) => ({
-  //       type: 'del',
-  //       key: Buffer.from(this.connector.dbKeys.ChannelEntry(partyA, partyB))
-  //     }))
-  //   )
-  //   await this.connector.db.del(Buffer.from(this.connector.dbKeys.LatestConfirmedSnapshot()))
-  //   await this.connector.db.del(Buffer.from(this.connector.dbKeys.LatestBlockNumber()))
-
-  //   log('wiped indexer data')
-  // }
 
   /**
    * Query past events, this will loop until it gets all blocks from {toBlock} to {fromBlock}.
@@ -248,11 +216,13 @@ class Indexer extends EventEmitter {
 
       const eventName = event.event as EventNames
 
-      if (eventName != 'ChannelUpdate') {
+      if (eventName === 'Announcement') {
+        await this.onAnnouncement(event as Event<'Announcement'>)
+      } else if (eventName === 'ChannelUpdate') {
+        await this.onChannelUpdated(event as Event<'ChannelUpdate'>)
+      } else {
         throw new Error('bad event name')
       }
-
-      await this.onChannelUpdated(event as Event<'ChannelUpdate'>)
 
       lastSnapshot = new Snapshot(new BN(event.blockNumber), new BN(event.transactionIndex), new BN(event.logIndex))
       await db.updateLatestConfirmedSnapshot(this.db, lastSnapshot)
@@ -267,6 +237,11 @@ class Indexer extends EventEmitter {
    */
   private onNewEvents(events: Event<any>[]): void {
     this.unconfirmedEvents.addAll(events)
+  }
+
+  private async onAnnouncement(event: Event<'Announcement'>): Promise<void> {
+    const account = AccountEntry.fromSCEvent(event)
+    await db.updateAccount(this.db, account.address, account)
   }
 
   private async onChannelUpdated(event: Event<'ChannelUpdate'>): Promise<void> {
@@ -295,8 +270,8 @@ class Indexer extends EventEmitter {
   // routing
   public async getPublicKeyOf(address: Address): Promise<PublicKey | undefined> {
     const account = await db.getAccount(this.db, address)
-    if (account && account.publicKey) {
-      return account.publicKey
+    if (account && account.hasAnnounced()) {
+      return account.getPublicKey()
     }
 
     return undefined
@@ -315,6 +290,12 @@ class Indexer extends EventEmitter {
       const partyBBalance = channel.partyBBalance
       return [source, await pubKeyToPeerId(partyAPubKey.serialize()), partyBBalance]
     }
+  }
+
+  public async getPublicNodes(): Promise<Multiaddr[]> {
+    return (await db.getAccounts(this.db, async (account: AccountEntry) => account.containsRouting())).map(
+      (account: AccountEntry) => account.multiAddr
+    )
   }
 
   public async getRandomChannel() {

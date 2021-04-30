@@ -67,9 +67,9 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
      */
     uint32 public secsClosure;
 
-   event Announcement(
+    event Announcement(
         address indexed account,
-        string multiaddr
+        bytes multiaddr
     );
 
     event ChannelUpdate(
@@ -93,7 +93,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
      * Confirmation should be done off-chain.
      * @param multiaddr the multiaddress
      */
-    function announce(string calldata multiaddr) external {
+    function announce(bytes calldata multiaddr) external {
         emit Announcement(msg.sender, multiaddr);
     }
 
@@ -127,7 +127,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         uint256 ticketIndex,
         bytes32 proofOfRelaySecret,
         uint256 amount,
-        bytes32 winProb,
+        uint256 winProb,
         bytes memory signature
     ) external {
         _redeemTicket(
@@ -456,7 +456,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         uint256 ticketIndex,
         bytes32 proofOfRelaySecret,
         uint256 amount,
-        bytes32 winProb,
+        uint256 winProb,
         bytes memory signature
     ) internal {
         require(redeemer != address(0), "redeemer must not be empty");
@@ -464,8 +464,6 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         require(nextCommitment != bytes32(0), "nextCommitment must not be empty");
         require(proofOfRelaySecret != bytes32(0), "proofOfRelaySecret must not be empty");
         require(amount != uint256(0), "amount must not be empty");
-        // require(winProb != bytes32(0), "winProb must not be empty");
-        //require(signature != bytes32(0), "signature must not be empty");
         (,,, Channel storage channel) = _getChannel(
             redeemer,
             counterparty
@@ -505,7 +503,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
                 nextCommitment,
                 proofOfRelaySecret,
                 winProb
-            )) <= uint256(winProb),
+            )) <= winProb,
             "ticket must be a win"
         );
 
@@ -536,7 +534,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         // bytes32 proofOfRelaySecret,
         uint256 channelIteration,
         uint256 amount,
-        bytes32 winProb
+        uint256 winProb
     ) internal pure returns (bytes memory) {
         // bytes32 challenge = keccak256(abi.encodePacked(proofOfRelaySecret));
 
@@ -559,7 +557,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         bytes32 ticketHash,
         bytes32 nextCommitment,
         bytes32 proofOfRelaySecret,
-        bytes32 winProb
+        uint256 winProb
     ) internal pure returns (bytes32) {
         return keccak256(abi.encodePacked(ticketHash, nextCommitment, proofOfRelaySecret, winProb));
     }

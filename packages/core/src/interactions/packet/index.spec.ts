@@ -29,7 +29,7 @@ function createFakeChain(privKey: PeerId) {
         new UINT256(new BN(0)),
         new UINT256(new BN(0)),
         amount,
-        new Hash(new Uint8Array(Hash.SIZE).fill(0xff)),
+        Ticket.fromProbability(1),
         new UINT256(new BN(0)),
         privKey.privKey.marshal()
       )

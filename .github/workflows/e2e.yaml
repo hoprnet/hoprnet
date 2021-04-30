@@ -1,4 +1,4 @@
-name: HOPR End-to-end testing
+name: HOPR End-to-end tests
 
 on:
   push:
@@ -7,9 +7,15 @@ on:
       - '**/docs/**/*'
 
 jobs:
-  build:
-    name: Build project 
+  e2e:
+    name: ${{ matrix.test }}
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    strategy:
+      fail-fast: true
+      matrix:
+        test: [1_nodes_have_valid_eth_address, 2_nodes_can_be_funded]
+
     steps:
       - uses: actions/checkout@v2
 
@@ -27,7 +33,7 @@ jobs:
             */*/node_modules
           key: ${{ runner.os }}-lerna-${{ hashFiles('**/yarn.lock') }}
 
-      - name: Install dependencies
+      - name: Install
         run: |
           yarn
 
@@ -35,16 +41,6 @@ jobs:
         run: |
           yarn build
 
-      # @TODO
-      # - Cache build process to allow multiple jobs per e2e test
-      # - Move step for testing to a separate job
-      - name: Nodes have a valid eth address
+      - name: Test
         shell: bash {0}
-        run: ./test/e2e/1_nodes_have_valid_eth_address.sh
-
-      # @TODO
-      # - Cache build process to allow multiple jobs per e2e test
-      # - Move step for testing to a separate job
-      - name: Nodes can hold assets in wallet
-        shell: bash {0}
-        run: ./test/e2e/2_nodes_can_be_funded.sh
+        run: ./test/e2e/${{ matrix.test }}.sh 

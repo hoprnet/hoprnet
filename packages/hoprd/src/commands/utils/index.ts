@@ -1,6 +1,5 @@
 export * from './checkPeerId'
 export * from './displayHelp'
-export * from './isBootstrapNode'
 export * from './message'
 export * from './cliOptions'
 export * from './knownConnectors'

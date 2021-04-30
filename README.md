@@ -69,18 +69,6 @@ yarn run:faucet:all
 
 All our docker images can be found [here](https://console.cloud.google.com/gcr/images/hoprassociation/GLOBAL) and are prefixed as `gcr.io/hoprassociation/$PROJECT:$RELEASE`. Stable releases live in [Docker Hub](https://hub.docker.com/u/hopr)
 
-## HOPR ecosystem
-
-- [**Core**](./packages/core/README.md): HOPR Protocol definition and source code.
-- **Server**: gRPC-enabled Server to communicate with a HOPR Node
-- **Protos**: Protobuf API for interacting with a HOPR Server
-- **Chat**: Interactive REPL-like chat PoC for HOPR Nodes
-- **Chatbot**: Automata able to reply to messages sent via HOPR Chat
-- **Devops**: Infrastructure code for managing HOPR centralised servers.
-- **Whitepaper**: Technical whitepaper for the HOPR Protocol
-- **Documentation**: General documentation for HOPR
-- **Assets**: Press and brand materials for HOPR & Association
-
 <!-- CONTACT -->
 
 ## Contact

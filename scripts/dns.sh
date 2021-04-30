@@ -2,16 +2,16 @@
 set -e #u
 
 # Get dns entry for a release and node
-# e.g. gcloud_dns_entry master bootstrap
+# e.g. gcloud_dns_entry master 
 # $1 = release name
-# $2 = role (eg. bootstrap, node)
+# $2 = role (eg. node-4)
 gcloud_dns_entry() {
   echo "$1-$2.hoprnet.link"
 }
 
 # Get or create a TXT record within a release
 # $1 = release name
-# $2 = role (eg. bootstrap, node)
+# $2 = role (eg. node-4)
 # $3 = multiaddress
 gcloud_dns_txt_record() {
   # Multiple runs in the same machine will fail w/an existing transaction.yml file
@@ -47,9 +47,9 @@ gcloud_dns_txt_record() {
 }
 
 # Get or create a TXT record within a release
-# e.g. gcloud_txt_record master bootstrap '/ip4/34.65.204.200/tcp/9091/p2p/16Uiu2HAmNuRyLxM56eTEhNR8jPJrPYBbv9Foimz7EJAifL2BaeeF'
+# e.g. gcloud_txt_record master node-2 '/ip4/34.65.204.200/tcp/9091/p2p/16Uiu2HAmNuRyLxM56eTEhNR8jPJrPYBbv9Foimz7EJAifL2BaeeF'
 # $1 = release name
-# $2 = role (eg. bootstrap, node)
+# $2 = role (eg. node)
 # $3 = multiaddress
 # Requires:
 # - RELEASE_NAME
