@@ -7388,16 +7388,15 @@ ipaddr.js@1.9.1:
   integrity sha512-0KI/607xoxSToH7GjN1FfSbLoU0+btTicjsQSWQlh/hZykN8KpmMf7uYwPW3R+akZ6R/w18ZlXSHBYXiYUPO3g==
 
 ipfs-utils@^6.0.0:
-  version "6.0.7"
-  resolved "https://registry.yarnpkg.com/ipfs-utils/-/ipfs-utils-6.0.7.tgz#876acf88ca012e33a8be29f16e6826eafaa4b16b"
-  integrity sha512-VlFDyRuCSOKXPOXb68nXSUVEPA+eXbdS7LT22k4aZvFNIoB2OtysDEt8lal93UOB/QS0Gy+6DUoxj1wJ37SIxQ==
+  version "6.0.8"
+  resolved "https://registry.yarnpkg.com/ipfs-utils/-/ipfs-utils-6.0.8.tgz#a0e4cad19af35569226fac93a84664b4c222d946"
+  integrity sha512-mDDQaDisI/uWk+X08wyw+jBcq76IXwMjgyaoyEgJDb/Izb+QbBCSJjo9q+EvbMxh6/l6q0NiAfbbsxEyQYPW9w==
   dependencies:
     abort-controller "^3.0.0"
     any-signal "^2.1.0"
     buffer "^6.0.1"
     electron-fetch "^1.7.2"
     err-code "^3.0.1"
-    fs-extra "^9.0.1"
     is-electron "^2.2.0"
     iso-url "^1.0.0"
     it-glob "~0.0.11"
@@ -8519,7 +8518,7 @@ level-ws@^2.0.0:
     readable-stream "^3.1.0"
     xtend "^4.0.1"
 
-leveldown@~6.0.0:
+leveldown@^6.0.0, leveldown@~6.0.0:
   version "6.0.0"
   resolved "https://registry.yarnpkg.com/leveldown/-/leveldown-6.0.0.tgz#3ec7f00463c45f8f7c8e68248d10ab299059c7ca"
   integrity sha512-NEsyqpfdDhpFO49Zm9htNSsWixMa9Q9sUXgrBTaQNPyPo2Kx1wRctgIXMzc7tduXJqNff8QAwulv2eZDboghxQ==
