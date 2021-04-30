@@ -1,6 +1,5 @@
 import { u8aSplit, serializeToU8a, u8aToNumber, stringToU8a } from '..'
-import { Address, Balance, Hash } from '.'
-import { UINT256 } from '.'
+import { Address, Balance, Hash, UINT256} from '.'
 import BN from 'bn.js'
 
 export type ChannelStatus = 'CLOSED' | 'OPEN' | 'PENDING_TO_CLOSE'
@@ -45,7 +44,7 @@ const components = [
   { name: 'closureByPartyA', SIZE: 1, deserialize: (x) => x[0] == 1 }
 ]
 
-class ChannelEntry {
+export class ChannelEntry {
   constructor(
     public readonly partyA: Address,
     public readonly partyB: Address,
@@ -141,4 +140,3 @@ class ChannelEntry {
   }
 }
 
-export default ChannelEntry

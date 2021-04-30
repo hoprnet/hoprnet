@@ -5,7 +5,7 @@ import { u8aSplit, serializeToU8a, MULTI_ADDR_MAX_LENGTH, u8aEquals } from '..'
 import BN from 'bn.js'
 import { Address, PublicKey, Hash } from '.' // TODO: cyclic dep
 
-class AccountEntry {
+export class AccountEntry {
   constructor(public readonly address: Address, public readonly multiAddr?: Multiaddr) {}
 
   static get SIZE(): number {
@@ -69,4 +69,3 @@ class AccountEntry {
   }
 }
 
-export default AccountEntry
