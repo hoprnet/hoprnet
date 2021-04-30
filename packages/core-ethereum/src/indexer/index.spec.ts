@@ -5,9 +5,8 @@ import type { TypedEvent } from '../contracts/commons'
 import type { ChainWrapper } from '../ethereum'
 import assert from 'assert'
 import EventEmitter from 'events'
-import LevelUp from 'levelup'
-import MemDown from 'memdown'
 import Indexer from '.'
+import { HoprDB } from '@hoprnet/hopr-utils'
 import { expectAccountsToBeEqual, expectChannelsToBeEqual } from './fixtures'
 import * as fixtures from './fixtures'
 
@@ -61,7 +60,7 @@ const useFixtures = (ops: { latestBlockNumber?: number; pastEvents?: Event<any>[
   const latestBlockNumber = ops.latestBlockNumber ?? 0
   const pastEvents = ops.pastEvents ?? []
 
-  const db = new LevelUp(MemDown())
+  const db = HoprDB.createMock()
   const { provider, newBlock } = createProviderMock({ latestBlockNumber })
   const { hoprChannels, newEvent } = createHoprChannelsMock({ pastEvents })
   const chain = createChainMock(provider, hoprChannels)

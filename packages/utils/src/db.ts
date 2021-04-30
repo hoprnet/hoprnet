@@ -1,18 +1,18 @@
 import levelup, { LevelUp } from 'levelup'
 import leveldown from 'leveldown'
+import MemDown from 'memdown'
 import { existsSync, mkdirSync } from 'fs'
 import path from 'path'
-import { VERSION } from './constants'
-import type { HoprOptions } from '.'
 import Debug from 'debug'
-import { u8aEquals, Hash, u8aAdd, toU8a, u8aConcat, Address } from '@hoprnet/hopr-utils'
+import { u8aEquals, Hash, u8aAdd, toU8a, u8aConcat, Address, Intermediate } from '.'
 import assert from 'assert'
 import HoprCoreEthereum, {
   Ticket,
   Acknowledgement,
   SubmitTicketResponse,
-  UnacknowledgedTicket
-} from '@hoprnet/hopr-core-ethereum'
+  UnacknowledgedTicket,  AccountEntry, ChannelEntry, Snapshot } from  '@hoprnet/hopr-core-ethereum'
+import BN from 'bn.js'
+
 
 const log = Debug(`hopr-core:db`)
 
@@ -24,6 +24,13 @@ const UNACKNOWLEDGED_TICKETS_PREFIX = u8aConcat(TICKET_PREFIX, encoder.encode('u
 const KEY_LENGTH = 32
 const ACKNOWLEDGED_TICKET_INDEX_LENGTH = 8
 const ACKNOWLEDGED_TICKET_PREFIX = u8aConcat(TICKET_PREFIX, encoder.encode('acknowledged-'))
+const LATEST_BLOCK_NUMBER_KEY = encoder.encode('indexer-latestBlockNumber')
+const LATEST_CONFIRMED_SNAPSHOT_KEY = encoder.encode('indexer-latestConfirmedSnapshot')
+const ACCOUNT_PREFIX = encoder.encode('indexer-account-')
+const CHANNEL_PREFIX = encoder.encode('indexer-channel-')
+const createChannelKey = (channelId: Hash): Uint8Array => u8aConcat(CHANNEL_PREFIX, encoder.encode(channelId.toHex()))
+const createAccountKey = (address: Address): Uint8Array => u8aConcat(ACCOUNT_PREFIX, encoder.encode(address.toHex()))
+const COMMITMENT_PREFIX = encoder.encode('commitment:')
 
 function keyAcknowledgedTickets(index: Uint8Array): Uint8Array {
   assert.equal(index.length, ACKNOWLEDGED_TICKET_INDEX_LENGTH)
@@ -35,24 +42,20 @@ export function UnAcknowledgedTickets(hashedKey: Uint8Array): Uint8Array {
   return u8aConcat(UNACKNOWLEDGED_TICKETS_PREFIX, hashedKey)
 }
 
-export class CoreDB {
+export class HoprDB {
   private db: LevelUp
 
-  constructor(options: HoprOptions, private id: Address) {
-    let dbPath: string
-    if (options.dbPath) {
-      dbPath = options.dbPath
-    } else {
-      // default
-      dbPath = path.join(process.cwd(), 'db', VERSION, 'node')
+  constructor(private id: Address, initialize: boolean, version: string, dbPath?: string) {
+    if (!dbPath) {
+      dbPath = path.join(process.cwd(), 'db', version)
     }
 
     dbPath = path.resolve(dbPath)
 
     log('using db at ', dbPath)
     if (!existsSync(dbPath)) {
-      log('db does not exist, creating?:', options.createDbIfNotExist)
-      if (options.createDbIfNotExist) {
+      log('db does not exist, creating?:', initialize)
+      if (initialize) {
         mkdirSync(dbPath, { recursive: true })
       } else {
         throw new Error('Database does not exist: ' + dbPath)
@@ -91,13 +94,25 @@ export class CoreDB {
     return await this.db.get(Buffer.from(this.keyOf(key)))
   }
 
+  private async maybeGet(key: Uint8Array): Promise<Uint8Array | undefined> {
+    try {
+      return this.get(key)
+    } catch(err) {
+      if (err.notFound) {
+        return undefined
+      }
+      throw err
+    }
+  }
+
   private async getAll<T>(prefix: Uint8Array, deserialize: (u: Uint8Array) => T, filter: (o:T) => boolean): Promise<T[]> {
     const res: T[] = []
+    const prefixKeyed = this.keyOf(prefix)
     return new Promise<T[]>((resolve, reject) => {
       this.db.createReadStream()
         .on('error', reject)
         .on('data', async({ key, value }: { key: Buffer, value: Buffer }) => {
-          if (!key.subarray(0, prefix.length).equals(prefix)){
+          if (!key.subarray(0, prefixKeyed.length).equals(prefixKeyed)){
             return
           }
           const obj = deserialize(value)
@@ -111,11 +126,6 @@ export class CoreDB {
 
   private async del(key: Uint8Array): Promise<void> {
     await this.db.del(Buffer.from(this.keyOf(key)))
-  }
-
-  public getLevelUpTempUntilRefactored(): LevelUp {
-    // TODO remove this when we can refactor other code to use methods
-    return this.db
   }
 
   /**
@@ -326,4 +336,70 @@ export class CoreDB {
   public close() {
     return this.db.close()
   }
+
+  async storeHashIntermediaries(
+    channelId: Hash,
+    intermediates: Intermediate[]
+  ): Promise<void> {
+    let dbBatch = this.db.batch()
+    const keyFor = (iteration: number) => u8aConcat(COMMITMENT_PREFIX, channelId.serialize(), Uint8Array.of(iteration))
+    for (const intermediate of intermediates) {
+      dbBatch = dbBatch.put(Buffer.from(keyFor(intermediate.iteration)), Buffer.from(intermediate.preImage))
+    }
+    await dbBatch.write()
+  }
+
+  async getCommitment(channelId: Hash, iteration: number){
+    return this.get(u8aConcat(COMMITMENT_PREFIX, channelId.serialize(), Uint8Array.of(iteration)))
+  }
+
+  async getLatestBlockNumber(): Promise<number> {
+    if (!this.has(LATEST_BLOCK_NUMBER_KEY)) return 0
+    return new BN(await this.get(LATEST_BLOCK_NUMBER_KEY)).toNumber()
+  }
+
+  async updateLatestBlockNumber(blockNumber: BN): Promise<void> {
+    await this.put(LATEST_BLOCK_NUMBER_KEY, blockNumber.toBuffer())
+  }
+
+  async getLatestConfirmedSnapshot(): Promise<Snapshot | undefined> {
+    const data = await this.maybeGet(LATEST_CONFIRMED_SNAPSHOT_KEY)
+    return data ? Snapshot.deserialize(data) : undefined
+  }
+
+  async updateLatestConfirmedSnapshot(snapshot: Snapshot): Promise<void> {
+    await this.put(LATEST_CONFIRMED_SNAPSHOT_KEY, snapshot.serialize())
+  }
+
+  async getChannel(channelId: Hash): Promise<ChannelEntry | undefined>  {
+    const data = await this.maybeGet(createChannelKey(channelId))
+    return data ? ChannelEntry.deserialize(data) : undefined
+  }
+
+  async getChannels(filter?: (channel: ChannelEntry) => boolean): Promise<ChannelEntry[]>{
+    return this.getAll<ChannelEntry>(CHANNEL_PREFIX, ChannelEntry.deserialize, filter)
+  }
+
+  async updateChannel(channelId: Hash, channel: ChannelEntry): Promise<void> {
+    await this.put(createChannelKey(channelId), channel.serialize())
+  }
+
+  async getAccount(address: Address): Promise<AccountEntry | undefined> {
+    const data = await this.maybeGet(createAccountKey(address))
+    return data ? AccountEntry.deserialize(data) : undefined
+  }
+
+  async updateAccount(address: Address, account: AccountEntry): Promise<void> {
+    await this.put(createAccountKey(address), account.serialize())
+  }
+
+  async getAccounts(filter?: (account: AccountEntry) => boolean) {
+    return this.getAll<AccountEntry>(ACCOUNT_PREFIX, AccountEntry.deserialize, filter)
+  }
+
+  static createMock(): HoprDB {
+    const mock = new HoprDB(new Address(new Uint8Array()), false, 'mock')
+    mock.db = new levelup(MemDown())
+    return mock
+  } 
 }

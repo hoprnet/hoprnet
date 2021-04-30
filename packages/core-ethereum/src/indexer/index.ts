@@ -1,13 +1,11 @@
 import type PeerId from 'peer-id'
 import type { Event, EventNames } from './types'
 import type { ChainWrapper } from '../ethereum'
-import { LevelUp } from 'levelup'
 import chalk from 'chalk'
 import BN from 'bn.js'
 import Heap from 'heap-js'
-import { pubKeyToPeerId, randomChoice } from '@hoprnet/hopr-utils'
+import { pubKeyToPeerId, randomChoice, HoprDB } from '@hoprnet/hopr-utils'
 import { Address, ChannelEntry, AccountEntry, Hash, PublicKey, Balance, Snapshot } from '../types'
-import * as db from './db'
 import { isConfirmedBlock, snapshotComparator } from './utils'
 import Debug from 'debug'
 import Multiaddr from 'multiaddr'
@@ -29,7 +27,7 @@ class Indexer {
 
   constructor(
     private genesisBlock: number,
-    private db: LevelUp,
+    private db: HoprDB,
     private chain: ChainWrapper,
     private maxConfirmations: number,
     private blockRange: number
@@ -46,7 +44,7 @@ class Indexer {
     // await this.wipe()
 
     const [latestSavedBlock, latestOnChainBlock] = await Promise.all([
-      await db.getLatestBlockNumber(this.db),
+      await this.db.getLatestBlockNumber(),
       this.chain.getLatestBlockNumber()
     ])
     this.latestBlock = latestOnChainBlock
@@ -186,7 +184,7 @@ class Indexer {
       this.latestBlock = blockNumber
     }
 
-    let lastSnapshot = await db.getLatestConfirmedSnapshot(this.db)
+    let lastSnapshot = await this.db.getLatestConfirmedSnapshot()
 
     // check unconfirmed events and process them if found
     // to be within a confirmed block
@@ -226,10 +224,10 @@ class Indexer {
       }
 
       lastSnapshot = new Snapshot(new BN(event.blockNumber), new BN(event.transactionIndex), new BN(event.logIndex))
-      await db.updateLatestConfirmedSnapshot(this.db, lastSnapshot)
+      await this.db.updateLatestConfirmedSnapshot(lastSnapshot)
     }
 
-    await db.updateLatestBlockNumber(this.db, new BN(blockNumber))
+    await this.db.updateLatestBlockNumber(new BN(blockNumber))
   }
 
   /**
@@ -243,35 +241,35 @@ class Indexer {
   private async onAnnouncement(event: Event<'Announcement'>): Promise<void> {
     const account = AccountEntry.fromSCEvent(event)
     log('New node announced', account.address.toHex())
-    await db.updateAccount(this.db, account.address, account)
+    await this.db.updateAccount(account.address, account)
   }
 
   private async onChannelUpdated(event: Event<'ChannelUpdate'>): Promise<void> {
     const channel = ChannelEntry.fromSCEvent(event)
-    await db.updateChannel(this.db, channel.getId(), channel)
+    await this.db.updateChannel(channel.getId(), channel)
   }
 
   public async getAccount(address: Address) {
-    return db.getAccount(this.db, address)
+    return this.db.getAccount(address)
   }
 
   public async getChannel(channelId: Hash) {
-    return db.getChannel(this.db, channelId)
+    return this.db.getChannel(channelId)
   }
 
-  public async getChannels(filter?: (channel: ChannelEntry) => Promise<boolean>) {
-    return db.getChannels(this.db, filter)
+  public async getChannels(filter?: (channel: ChannelEntry) => boolean) {
+    return this.db.getChannels(filter)
   }
 
   public async getChannelsOf(address: Address) {
-    return db.getChannels(this.db, async (channel) => {
+    return this.db.getChannels((channel) => {
       return address.eq(channel.partyA) || address.eq(channel.partyB)
     })
   }
 
   // routing
   public async getPublicKeyOf(address: Address): Promise<PublicKey | undefined> {
-    const account = await db.getAccount(this.db, address)
+    const account = await this.db.getAccount(address)
     if (account && account.hasAnnounced()) {
       return account.getPublicKey()
     }
@@ -295,17 +293,13 @@ class Indexer {
   }
 
   public async getPublicNodes(): Promise<Multiaddr[]> {
-    return (await db.getAccounts(this.db, async (account: AccountEntry) => account.containsRouting())).map(
+    return (await this.db.getAccounts((account: AccountEntry) => account.containsRouting())).map(
       (account: AccountEntry) => account.multiAddr
     )
   }
 
   public async getRandomChannel() {
-    const channels = await this.getChannels(async (channel) => {
-      // filter out channels with uninitialized parties
-      const pubKeys = await Promise.all([this.getPublicKeyOf(channel.partyA), this.getPublicKeyOf(channel.partyB)])
-      return pubKeys.every((pubKeys) => pubKeys)
-    })
+    const channels = await this.getChannels()
 
     if (channels.length === 0) {
       log('no channels exist in indexer > hack')

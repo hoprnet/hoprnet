@@ -1,12 +1,12 @@
 import debug from 'debug'
 import { AcknowledgementMessage } from '../../messages/acknowledgement'
 import { PROTOCOL_ACKNOWLEDGEMENT } from '../../constants'
-import { CoreDB } from '../../db'
+import { HoprDB } from '@hoprnet/hopr-utils'
 const log = debug('hopr-core:acknowledgement')
 
 export function subscribeToAcknowledgements(
   subscribe: any,
-  db: CoreDB,
+  db: HoprDB,
   paymentChannels: any,
   onMessage: (ackMessage: AcknowledgementMessage) => void
 ) {

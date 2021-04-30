@@ -1,4 +1,3 @@
-import { LevelUp } from 'levelup'
 import BN from 'bn.js'
 import {
   PublicKey,
@@ -16,6 +15,7 @@ import type { SubmitTicketResponse } from '.'
 import { Commitment } from './commitment'
 import type { ChainWrapper } from './ethereum'
 import type Indexer from './indexer'
+import type { HoprDB } from '@hoprnet/hopr-utils'
 
 const log = Debug('hopr-core-ethereum:channel')
 
@@ -26,7 +26,7 @@ class Channel {
   constructor(
     private readonly self: PublicKey,
     private readonly counterparty: PublicKey,
-    private readonly db: LevelUp,
+    private readonly db: HoprDB,
     private readonly chain: ChainWrapper,
     private readonly indexer: Indexer,
     private readonly privateKey: Uint8Array

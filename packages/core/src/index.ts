@@ -22,7 +22,7 @@ import NetworkPeers from './network/network-peers'
 import Heartbeat from './network/heartbeat'
 import { findPath } from './path'
 
-import { u8aToHex, DialOpts } from '@hoprnet/hopr-utils'
+import { u8aToHex, DialOpts, HoprDB } from '@hoprnet/hopr-utils'
 
 import Multiaddr from 'multiaddr'
 import chalk from 'chalk'
@@ -53,7 +53,6 @@ import {
 } from '@hoprnet/hopr-utils'
 import { subscribeToAcknowledgements } from './interactions/packet/acknowledgement'
 import { PacketForwardInteraction } from './interactions/packet/forward'
-import { CoreDB } from './db'
 
 const log = Debug(`hopr-core`)
 const verbose = Debug('hopr-core:verbose')
@@ -93,7 +92,7 @@ class Hopr extends EventEmitter {
   private heartbeat: Heartbeat
   private forward: PacketForwardInteraction
   private libp2p: LibP2P
-  private db: CoreDB
+  private db: HoprDB
   private paymentChannels: Promise<HoprCoreEthereum>
 
   /**
@@ -111,8 +110,8 @@ class Hopr extends EventEmitter {
       // TODO - assert secp256k1?
       throw new Error('Hopr Node must be initialized with an id with a private key')
     }
-    this.db = new CoreDB(options, PublicKey.fromPrivKey(id.privKey.marshal()).toAddress())
-    this.paymentChannels = HoprCoreEthereum.create(this.db.getLevelUpTempUntilRefactored(), this.id.privKey.marshal(), {
+    this.db = new HoprDB(PublicKey.fromPrivKey(id.privKey.marshal()).toAddress(), options.createDbIfNotExist, VERSION, options.dbPath)
+    this.paymentChannels = HoprCoreEthereum.create(this.db, this.id.privKey.marshal(), {
       provider: this.options.provider
     })
   }

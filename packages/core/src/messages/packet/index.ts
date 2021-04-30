@@ -2,10 +2,9 @@ import BN from 'bn.js'
 import LibP2P from 'libp2p'
 import { blue, green } from 'chalk'
 import PeerId from 'peer-id'
-import { u8aConcat, u8aEquals, u8aToHex, pubKeyToPeerId } from '@hoprnet/hopr-utils'
+import { u8aConcat, u8aEquals, u8aToHex, pubKeyToPeerId, HoprDB } from '@hoprnet/hopr-utils'
 import { Header, deriveTicketKey, deriveTicketKeyBlinding, deriveTagParameters, deriveTicketLastKey } from './header'
 import { Challenge } from './challenge'
-import { CoreDB } from '../../db'
 import Message from './message'
 import { TICKET_AMOUNT, TICKET_WIN_PROB } from '../../constants'
 import Debug from 'debug'
@@ -140,7 +139,7 @@ export class Packet extends Uint8Array {
 
   private libp2p: LibP2P
   private paymentChannels: HoprCoreEthereum
-  private db: CoreDB
+  private db: HoprDB 
   private id: PeerId
   private ticketAmount: string
   private ticketWinProb: number
@@ -148,7 +147,7 @@ export class Packet extends Uint8Array {
   constructor(
     libp2p: LibP2P,
     paymentChannels: HoprCoreEthereum,
-    db: CoreDB,
+    db: HoprDB,
     id: PeerId,
     arr?: {
       bytes: ArrayBuffer
@@ -263,7 +262,7 @@ export class Packet extends Uint8Array {
    */
   static async create(
     chain: HoprCoreEthereum,
-    db: CoreDB,
+    db: HoprDB,
     id: PeerId,
     libp2p: LibP2P,
     msg: Uint8Array,

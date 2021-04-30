@@ -3,13 +3,12 @@ import { Packet } from '../../messages/packet'
 import { AcknowledgementMessage } from '../../messages/acknowledgement'
 import Debug from 'debug'
 import type PeerId from 'peer-id'
-import { durations, oneAtATime } from '@hoprnet/hopr-utils'
+import { durations, oneAtATime, HoprDB } from '@hoprnet/hopr-utils'
 import { Mixer } from '../../mixer'
 import { Challenge } from '../../messages/packet/challenge'
 import { PROTOCOL_ACKNOWLEDGEMENT } from '../../constants'
 import LibP2P from 'libp2p'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
-import { CoreDB } from '../../db'
 
 const log = Debug('hopr-core:forward')
 const FORWARD_TIMEOUT = durations.seconds(6)
@@ -20,7 +19,7 @@ class PacketForwardInteraction {
   private concurrencyLimiter
 
   constructor(
-    private db: CoreDB,
+    private db: HoprDB,
     private paymentChannels: HoprCoreEthereum,
     private id: PeerId,
     private libp2p: LibP2P,

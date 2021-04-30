@@ -1,17 +1,16 @@
-import type { LevelUp } from 'levelup'
 import type Multiaddr from 'multiaddr'
 import type PeerId from 'peer-id'
 import type { ChainWrapper } from './ethereum'
 import chalk from 'chalk'
 import debug from 'debug'
-import { Acknowledgement, PublicKey, Balance, Address, NativeBalance } from './types'
+import { Acknowledgement, PublicKey, Balance, Address, NativeBalance  } from './types'
 import Indexer from './indexer'
 import { RoutingChannel } from './indexer'
 import { DEFAULT_URI, MAX_CONFIRMATIONS, INDEXER_BLOCK_RANGE } from './constants'
 import { Channel } from './channel'
 import { createChainWrapper } from './ethereum'
 import { PROVIDER_CACHE_TTL } from './constants'
-import { cacheNoArgAsyncFunction } from '@hoprnet/hopr-utils'
+import { cacheNoArgAsyncFunction, HoprDB } from '@hoprnet/hopr-utils'
 
 const log = debug('hopr-core-ethereum')
 
@@ -33,7 +32,7 @@ export type SubmitTicketResponse =
 export default class HoprEthereum {
   private privateKey: Uint8Array
 
-  constructor(private chain: ChainWrapper, private db: LevelUp, private indexer: Indexer) {
+  constructor(private chain: ChainWrapper, private db: HoprDB, private indexer: Indexer) {
     this.privateKey = this.chain.getPrivateKey()
   }
 
@@ -127,7 +126,7 @@ export default class HoprEthereum {
    * @returns a promise resolved to the connector
    */
   public static async create(
-    db: LevelUp,
+    db: HoprDB,
     privateKey: Uint8Array,
     options?: { provider?: string; maxConfirmations?: number }
   ): Promise<HoprEthereum> {
