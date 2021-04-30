@@ -201,7 +201,7 @@ class Channel {
       }
 
       const isWinning = ticket.isWinningTicket(ackTicket.response, ackTicket.preImage, ticket.winProb)
-      
+
       if (!isWinning) {
         log(`Failed to submit ticket ${ackTicket.response.toHex()}:  'Not a winning ticket.'`)
         return {
