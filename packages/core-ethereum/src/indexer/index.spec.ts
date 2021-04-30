@@ -164,7 +164,7 @@ describe('test indexer', function () {
     expectChannelsToBeEqual(channel, fixtures.OPENED_CHANNEL)
 
     const channels = await indexer.getChannels()
-    assert.strictEqual(channels.length, 1)
+    assert.strictEqual(channels.length, 1, 'expected channels')
     expectChannelsToBeEqual(channels[0], fixtures.OPENED_CHANNEL)
 
     const channelsOfPartyA = await indexer.getChannelsOf(fixtures.partyA.toAddress())

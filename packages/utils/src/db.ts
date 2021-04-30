@@ -61,15 +61,15 @@ export class HoprDB {
   }
 
   private keyOf(...segments: Uint8Array[]): Uint8Array {
-    return u8aConcat.call(this.id.toHex(), ...segments)
+    return u8aConcat(encoder.encode(this.id.toHex()), ...segments)
   }
 
   private async has(key: Uint8Array): Promise<boolean> {
     try {
-      await this.db.get(Buffer.from(key))
+      await this.db.get(Buffer.from(this.keyOf(key)))
       return true
     } catch (err) {
-      if (err.type === 'NotFoundError' || err.notFound === undefined || !err.notFound) {
+      if (err.type === 'NotFoundError' || err.notFound) {
         return false
       } else {
         throw err
@@ -91,9 +91,9 @@ export class HoprDB {
 
   private async maybeGet(key: Uint8Array): Promise<Uint8Array | undefined> {
     try {
-      return this.get(key)
+      return await this.get(key)
     } catch (err) {
-      if (err.notFound) {
+      if (err.type === 'NotFoundError' || err.notFound) {
         return undefined
       }
       throw err
@@ -249,7 +249,7 @@ export class HoprDB {
   }
 
   async hasPacket(id: Uint8Array) {
-    if (this.has(this.keyOf(PACKET_TAG_PREFIX, id))) {
+    if (await this.has(this.keyOf(PACKET_TAG_PREFIX, id))) {
       await this.touch(this.keyOf(PACKET_TAG_PREFIX, id))
       return true
     }
@@ -314,7 +314,7 @@ export class HoprDB {
 
   async storeHashIntermediaries(channelId: Hash, intermediates: Intermediate[]): Promise<void> {
     let dbBatch = this.db.batch()
-    const keyFor = (iteration: number) => u8aConcat(COMMITMENT_PREFIX, channelId.serialize(), Uint8Array.of(iteration))
+    const keyFor = (iteration: number) => this.keyOf(u8aConcat(COMMITMENT_PREFIX, channelId.serialize(), Uint8Array.of(iteration)))
     for (const intermediate of intermediates) {
       dbBatch = dbBatch.put(Buffer.from(keyFor(intermediate.iteration)), Buffer.from(intermediate.preImage))
     }
@@ -322,11 +322,11 @@ export class HoprDB {
   }
 
   async getCommitment(channelId: Hash, iteration: number) {
-    return this.get(u8aConcat(COMMITMENT_PREFIX, channelId.serialize(), Uint8Array.of(iteration)))
+    return await this.maybeGet(u8aConcat(COMMITMENT_PREFIX, channelId.serialize(), Uint8Array.of(iteration)))
   }
 
   async getLatestBlockNumber(): Promise<number> {
-    if (!this.has(LATEST_BLOCK_NUMBER_KEY)) return 0
+    if (!await this.has(LATEST_BLOCK_NUMBER_KEY)) return 0
     return new BN(await this.get(LATEST_BLOCK_NUMBER_KEY)).toNumber()
   }
 
@@ -349,6 +349,7 @@ export class HoprDB {
   }
 
   async getChannels(filter?: (channel: ChannelEntry) => boolean): Promise<ChannelEntry[]> {
+    filter = filter || (() => true)
     return this.getAll<ChannelEntry>(CHANNEL_PREFIX, ChannelEntry.deserialize, filter)
   }
 
