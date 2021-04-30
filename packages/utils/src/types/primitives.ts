@@ -118,9 +118,7 @@ export class Hash {
   static SIZE = HASH_LENGTH
 
   static create(...inputs: Uint8Array[]) {
-    return new Hash(
-      return new Hash(utils.arrayify(utils.keccak256(u8aConcat(...inputs))));
-    )
+    return new Hash(utils.arrayify(utils.keccak256(u8aConcat(...inputs))));
   }
 
   static createChallenge(secretA: Uint8Array, secretB: Uint8Array): Hash {
