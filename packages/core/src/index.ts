@@ -418,16 +418,20 @@ class Hopr extends EventEmitter {
           let packet: Packet
           try {
             packet = await Packet.create(
-              this,
-              this.libp2p,
               msg.slice(n * PACKET_SIZE, Math.min(msg.length, (n + 1) * PACKET_SIZE)),
-              path
+              path,
+              this.getId(),
+              this.paymentChannels,
+              {
+                value: new Balance(new BN(this.ticketAmount)),
+                winProb: this.ticketWinProb
+              }
             )
           } catch (err) {
             return reject(err)
           }
 
-          const unAcknowledgedDBKey = this._dbKeys.UnAcknowledgedTickets(packet.challenge.hash.serialize())
+          const unAcknowledgedDBKey = this._dbKeys.UnAcknowledgedTickets(packet.ackChallenge)
 
           await this.db.put(Buffer.from(unAcknowledgedDBKey), Buffer.from(''))
 
