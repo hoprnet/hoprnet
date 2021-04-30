@@ -28,15 +28,7 @@ import Multiaddr from 'multiaddr'
 import chalk from 'chalk'
 
 import PeerId from 'peer-id'
-import {
-  PublicKey,
-  Balance,
-  Address,
-  ChannelEntry,
-  NativeBalance,
-  Hash,
-  Acknowledgement,
-} from '@hoprnet/hopr-utils'
+import { PublicKey, Balance, Address, ChannelEntry, NativeBalance, Hash, Acknowledgement } from '@hoprnet/hopr-utils'
 import HoprCoreEthereum, { RoutingChannel } from '@hoprnet/hopr-core-ethereum'
 import BN from 'bn.js'
 import { getAddrs } from './identity'

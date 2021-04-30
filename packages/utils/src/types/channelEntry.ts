@@ -1,5 +1,6 @@
 import { u8aSplit, serializeToU8a, u8aToNumber, stringToU8a } from '..'
-import { Address, Balance, Hash, UINT256} from '.'
+import { Address, Balance, Hash,} from './primitives'
+import { UINT256 } from './solidity'
 import BN from 'bn.js'
 
 export type ChannelStatus = 'CLOSED' | 'OPEN' | 'PENDING_TO_CLOSE'
@@ -76,7 +77,8 @@ export class ChannelEntry {
     return new ChannelEntry(...params)
   }
 
-  static fromSCEvent(event: any): ChannelEntry { // TODO type
+  static fromSCEvent(event: any): ChannelEntry {
+    // TODO type
     const { partyA, partyB, newState } = event.args
     return new ChannelEntry(
       Address.fromString(partyA),

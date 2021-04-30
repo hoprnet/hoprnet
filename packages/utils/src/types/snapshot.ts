@@ -5,7 +5,7 @@ import { UINT256 } from '../types/solidity'
 /**
  * Represents a snapshot in the blockchain.
  */
-class Snapshot {
+export class Snapshot {
   constructor(public readonly blockNumber: BN, public readonly transactionIndex: BN, public readonly logIndex: BN) {}
 
   static deserialize(arr: Uint8Array) {
@@ -30,4 +30,3 @@ class Snapshot {
   }
 }
 
-export default Snapshot

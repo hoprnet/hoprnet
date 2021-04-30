@@ -44,7 +44,7 @@ function serializeUnsigned({
   ])
 }
 
-class Ticket {
+export class Ticket {
   constructor(
     readonly counterparty: Address,
     readonly challenge: Hash,
@@ -160,4 +160,3 @@ class Ticket {
     return this.challenge.eq(response.hash())
   }
 }
-export default Ticket

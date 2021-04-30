@@ -1,6 +1,6 @@
 import { expect } from 'chai'
 import BN from 'bn.js'
-import Snapshot from './snapshot'
+import { Snapshot } from './snapshot'
 
 describe('Snapshot', function () {
   it('should be empty', function () {

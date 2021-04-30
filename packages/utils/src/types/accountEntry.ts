@@ -22,7 +22,8 @@ export class AccountEntry {
     return new AccountEntry(address, isBEmpty ? undefined : Multiaddr(strippedB))
   }
 
-  static fromSCEvent(event: any): AccountEntry { //TODO types
+  static fromSCEvent(event: any): AccountEntry {
+    //TODO types
     const { account, multiaddr } = event.args
     const address = Address.fromString(account)
     const accountEntry = new AccountEntry(address, Multiaddr(multiaddr))
