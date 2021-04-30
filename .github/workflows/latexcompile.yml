@@ -16,7 +16,7 @@ jobs:
           run: |
             apk add make
             tlmgr update --self
-            tlmgr install preprint blindtext makecell multirow float algorithm2e
+            tlmgr install preprint blindtext makecell multirow float algorithm2e ifoddpage
             cd docs/yellowpaper
             latexmk -pdf
             latexmk -c
