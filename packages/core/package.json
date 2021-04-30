@@ -47,7 +47,7 @@
     "libp2p-crypto": "0.19.4",
     "libp2p-kad-dht": "0.22.0",
     "libp2p-mplex": "0.10.3",
-    "libp2p-noise": "^2.0.4",
+    "libp2p-noise": "^3.0.0",
     "multiaddr": "8.1.2",
     "multihashes": "4.0.2",
     "peer-id": "0.14.8",
