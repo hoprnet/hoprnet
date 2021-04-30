@@ -6,11 +6,10 @@ import path from 'path'
 import Debug from 'debug'
 import { u8aEquals, Hash, u8aAdd, toU8a, u8aConcat, Address, Intermediate } from '.'
 import assert from 'assert'
-import HoprCoreEthereum, {
+import {
   Ticket,
   Acknowledgement,
-  SubmitTicketResponse,
-  UnacknowledgedTicket,  AccountEntry, ChannelEntry, Snapshot } from  '@hoprnet/hopr-core-ethereum'
+  UnacknowledgedTicket, AccountEntry, ChannelEntry, Snapshot } from './types'
 import BN from 'bn.js'
 
 
@@ -224,6 +223,7 @@ export class HoprDB {
    * @param ackTicket Uint8Array
    * @param index Uint8Array
    */
+  /*
   public async submitAcknowledgedTicket(
     ethereum: HoprCoreEthereum,
     ackTicket: Acknowledgement
@@ -245,6 +245,7 @@ export class HoprDB {
       }
     }
   }
+  */
 
   /**
    * Get signed tickets, both unacknowledged and acknowledged

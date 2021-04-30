@@ -1,8 +1,8 @@
-import type { Event } from '../indexer/types'
+import type { Event } from './indexer'
 import Multiaddr from 'multiaddr'
 import PeerId from 'peer-id'
 import { ethers } from 'ethers'
-import { u8aSplit, serializeToU8a, MULTI_ADDR_MAX_LENGTH, u8aEquals } from '@hoprnet/hopr-utils'
+import { u8aSplit, serializeToU8a, MULTI_ADDR_MAX_LENGTH, u8aEquals } from '..'
 import BN from 'bn.js'
 import { Address, PublicKey, Hash } from '.' // TODO: cyclic dep
 

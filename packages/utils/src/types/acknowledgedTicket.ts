@@ -1,5 +1,5 @@
 import { Hash, Ticket } from '.'
-import { serializeToU8a, u8aSplit } from '@hoprnet/hopr-utils'
+import { serializeToU8a, u8aSplit } from '..'
 
 class Acknowledgement {
   constructor(readonly ticket: Ticket, readonly response: Hash, readonly preImage: Hash) {}

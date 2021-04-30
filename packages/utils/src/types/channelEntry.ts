@@ -1,11 +1,15 @@
-import { u8aSplit, serializeToU8a, u8aToNumber, stringToU8a } from '@hoprnet/hopr-utils'
-import { Address, Balance, Hash } from '@hoprnet/hopr-utils'
-import { UINT256 } from '../types/solidity'
-import { Channel } from '../channel'
-import type { Event } from '../indexer/types'
+import { u8aSplit, serializeToU8a, u8aToNumber, stringToU8a } from '..'
+import { Address, Balance, Hash } from '.'
+import { UINT256 } from '.'
+import type { Event } from './indexer'
 import BN from 'bn.js'
 
 export type ChannelStatus = 'CLOSED' | 'OPEN' | 'PENDING_TO_CLOSE'
+
+export function generateChannelId(self: Address, counterparty: Address) {
+  let parties = self.sortPair(counterparty)
+  return Hash.create(Buffer.concat(parties.map((x) => x.serialize())))
+}
 
 function numberToChannelStatus(i: number): ChannelStatus {
   if (i === 0) return 'CLOSED'
@@ -114,7 +118,7 @@ class ChannelEntry {
   }
 
   public getId() {
-    return Channel.generateId(this.partyA, this.partyB)
+    return generateChannelId(this.partyA, this.partyB)
   }
 
   public ticketEpochFor(addr: Address): UINT256 {

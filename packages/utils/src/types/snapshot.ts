@@ -1,5 +1,5 @@
 import BN from 'bn.js'
-import { u8aSplit, serializeToU8a } from '@hoprnet/hopr-utils'
+import { u8aSplit, serializeToU8a } from '..'
 import { UINT256 } from '../types/solidity'
 
 /**

@@ -1,6 +1,6 @@
 import assert from 'assert'
 import { expect } from 'chai'
-import { stringToU8a, SIGNATURE_LENGTH } from '@hoprnet/hopr-utils'
+import { stringToU8a, SIGNATURE_LENGTH } from '..'
 import { ethers } from 'ethers'
 import { Address, Ticket, Hash, Balance, PublicKey, Signature, UINT256 } from '.'
 import * as fixtures from '../fixtures'
