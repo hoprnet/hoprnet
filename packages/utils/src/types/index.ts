@@ -7,13 +7,4 @@ import Ticket from './ticket'
 import { UINT256 } from './solidity'
 export * from './primitives'
 
-export {
-  AccountEntry,
-  Acknowledgement,
-  ChannelEntry,
-  Snapshot,
-  Ticket,
-  UINT256,
-  UnacknowledgedTicket
-}
-
+export { AccountEntry, Acknowledgement, ChannelEntry, Snapshot, Ticket, UINT256, UnacknowledgedTicket }

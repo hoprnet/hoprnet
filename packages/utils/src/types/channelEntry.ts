@@ -77,7 +77,8 @@ class ChannelEntry {
     return new ChannelEntry(...params)
   }
 
-  static fromSCEvent(event: any): ChannelEntry { // TODO type
+  static fromSCEvent(event: any): ChannelEntry {
+    // TODO type
     const { partyA, partyB, newState } = event.args
     return new ChannelEntry(
       Address.fromString(partyA),

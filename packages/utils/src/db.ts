@@ -6,10 +6,7 @@ import path from 'path'
 import Debug from 'debug'
 import { u8aEquals, Hash, u8aAdd, toU8a, u8aConcat, Address, Intermediate } from '.'
 import assert from 'assert'
-import {
-  Ticket,
-  Acknowledgement,
-  UnacknowledgedTicket, AccountEntry, ChannelEntry, Snapshot } from './types'
+import { Ticket, Acknowledgement, UnacknowledgedTicket, AccountEntry, ChannelEntry, Snapshot } from './types'
 import BN from 'bn.js'
 
 const log = Debug(`hopr-core:db`)
