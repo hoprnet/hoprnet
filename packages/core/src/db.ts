@@ -146,7 +146,7 @@ export class CoreDB {
         tickets.map<any>(async (ticket) => {
           return {
             type: 'del',
-            key: Buffer.from(UnAcknowledgedTickets(ticket.ticket.challenge.serialize()))
+            key: Buffer.from(this.keyOf(UnAcknowledgedTickets(ticket.ticket.challenge.serialize())))
           }
         })
       )
@@ -182,7 +182,7 @@ export class CoreDB {
         acks.map<any>(async (ack) => {
           return {
             type: 'del',
-            key: Buffer.from(keyAcknowledgedTickets(ack.ticket.challenge.serialize()))
+            key: Buffer.from(this.keyOf(keyAcknowledgedTickets(ack.ticket.challenge.serialize())))
           }
         })
       )
@@ -298,9 +298,9 @@ export class CoreDB {
     try {
       await this.db
         .batch()
-        .del(Buffer.from(unAcknowledgedDbKey))
-        .put(Buffer.from(acknowledgedDbKey), Buffer.from(acknowledgment.serialize()))
-        .put(Buffer.from(ACKNOWLEDGED_TICKET_COUNTER), Buffer.from(ticketCounter))
+        .del(Buffer.from(this.keyOf(unAcknowledgedDbKey)))
+        .put(Buffer.from(this.keyOf(acknowledgedDbKey)), Buffer.from(acknowledgment.serialize()))
+        .put(Buffer.from(this.keyOf(ACKNOWLEDGED_TICKET_COUNTER)), Buffer.from(ticketCounter))
         .write()
     } catch (err) {
       log(`ERROR: Error while writing to database. Error was ${err.message}.`)
