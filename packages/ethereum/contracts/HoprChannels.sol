@@ -125,7 +125,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         bytes32 nextCommitment,
         uint256 ticketEpoch,
         uint256 ticketIndex,
-        bytes32 proofOfRelaySecret,
+        bytes32 porSecret,
         uint256 amount,
         uint256 winProb,
         bytes memory signature
@@ -136,7 +136,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
             nextCommitment,
             ticketEpoch,
             ticketIndex,
-            proofOfRelaySecret,
+            porSecret,
             amount,
             winProb,
             signature
@@ -443,7 +443,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
      * @param redeemer the redeemer address
      * @param counterparty the counterparty address
      * @param nextCommitment the commitment that hashes to the redeemers previous commitment
-     * @param proofOfRelaySecret the proof of relay secret
+     * @param porSecret the proof of relay secret
      * @param winProb the winning probability of the ticket
      * @param amount the amount in the ticket
      * @param signature signature
@@ -454,7 +454,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         bytes32 nextCommitment,
         uint256 ticketEpoch,
         uint256 ticketIndex,
-        bytes32 proofOfRelaySecret,
+        bytes32 porSecret,
         uint256 amount,
         uint256 winProb,
         bytes memory signature
@@ -462,7 +462,6 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         require(redeemer != address(0), "redeemer must not be empty");
         require(counterparty != address(0), "counterparty must not be empty");
         require(nextCommitment != bytes32(0), "nextCommitment must not be empty");
-        require(proofOfRelaySecret != bytes32(0), "proofOfRelaySecret must not be empty");
         require(amount != uint256(0), "amount must not be empty");
         (,,, Channel storage channel) = _getChannel(
             redeemer,
@@ -488,9 +487,10 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
               _getEncodedTicket(
                   redeemer,
                   prevTicketEpoch,
-                //   proofOfRelaySecret,
+                  porSecret,
                   channel.channelEpoch,
                   amount,
+                  ticketIndex,
                   winProb
               )
             )
@@ -501,7 +501,6 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
             uint256(_getTicketLuck(
                 ticketHash,
                 nextCommitment,
-                proofOfRelaySecret,
                 winProb
             )) <= winProb,
             "ticket must be a win"
@@ -525,25 +524,45 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     }
 
     /**
+     * @dev computes the challenge from the given response.
+     * This is done by misusing ecrecover to perform a ec-point multiplication
+     * with a scalar.
+     */
+    function computeChallenge(bytes32 response) public pure returns (address)  {
+        // Field order of the base field
+        uint256 FIELD_ORDER = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141;
+
+        // x-coordinate of the base point
+        uint256 gx = 0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798;
+        // y-coordinate of base-point is even, so v is 27
+        uint8 gv = 27;
+
+        address signer = ecrecover(0, gv, bytes32(gx), bytes32(mulmod(uint256(response), gx, FIELD_ORDER)));
+
+        return signer;
+    }
+    /**
      * @dev Encode ticket data
      * @return bytes
      */
     function _getEncodedTicket(
         address recipient,
         uint256 recipientCounter,
-        // bytes32 proofOfRelaySecret,
+        bytes32 porSecret,
         uint256 channelIteration,
         uint256 amount,
+        uint256 ticketIndex,
         uint256 winProb
     ) internal pure returns (bytes memory) {
-        // bytes32 challenge = keccak256(abi.encodePacked(proofOfRelaySecret));
+        address challenge = computeChallenge(porSecret);
 
         return abi.encodePacked(
             recipient,
-            // challenge,
+            challenge,
             recipientCounter,
             amount,
             winProb,
+            ticketIndex,
             channelIteration
         );
     }
@@ -556,9 +575,8 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     function _getTicketLuck(
         bytes32 ticketHash,
         bytes32 nextCommitment,
-        bytes32 proofOfRelaySecret,
         uint256 winProb
     ) internal pure returns (bytes32) {
-        return keccak256(abi.encodePacked(ticketHash, nextCommitment, proofOfRelaySecret, winProb));
+        return keccak256(abi.encodePacked(ticketHash, nextCommitment, winProb));
     }
 }

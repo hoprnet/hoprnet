@@ -7,6 +7,7 @@ import { u8aToHex, u8aEquals, stringToU8a, u8aConcat, serializeToU8a, u8aToNumbe
 import { ADDRESS_LENGTH, HASH_LENGTH, SIGNATURE_LENGTH, SIGNATURE_RECOVERY_LENGTH } from '../constants'
 
 export class PublicKey {
+  // @TODO use uncompressed public key internally
   constructor(private arr: Uint8Array) {
     if (arr.length !== PublicKey.SIZE) {
       throw new Error('Incorrect size Uint8Array for compressed public key')
