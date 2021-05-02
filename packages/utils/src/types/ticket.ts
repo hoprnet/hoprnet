@@ -25,7 +25,7 @@ function serializeUnsigned({
   channelIteration
 }: {
   counterparty: Address
-  challenge: PublicKey
+  challenge: Address
   epoch: UINT256
   index: UINT256
   amount: Balance
@@ -35,7 +35,7 @@ function serializeUnsigned({
   // the order of the items needs to be the same as the one used in the SC
   return serializeToU8a([
     [counterparty.serialize(), Address.SIZE],
-    [challenge.serialize(), PublicKey.SIZE],
+    [challenge.serialize(), Address.SIZE],
     [epoch.serialize(), UINT256.SIZE],
     [index.serialize(), UINT256.SIZE],
     [amount.serialize(), Balance.SIZE],
@@ -47,7 +47,7 @@ function serializeUnsigned({
 export class Ticket {
   constructor(
     readonly counterparty: Address,
-    readonly challenge: PublicKey,
+    readonly challenge: Address,
     readonly epoch: UINT256,
     readonly index: UINT256,
     readonly amount: Balance,
@@ -58,7 +58,7 @@ export class Ticket {
 
   static create(
     counterparty: Address,
-    challenge: PublicKey,
+    challenge: Address,
     epoch: UINT256,
     index: UINT256,
     amount: Balance,
@@ -70,8 +70,7 @@ export class Ticket {
       u8aToHex(
         serializeToU8a([
           [counterparty.serialize(), Address.SIZE],
-          // @TODO
-          // [challenge.serialize(), PublicKey.SIZE],
+          [challenge.serialize(), Address.SIZE],
           [epoch.serialize(), UINT256.SIZE],
           [index.serialize(), UINT256.SIZE],
           [amount.serialize(), Balance.SIZE],
@@ -93,7 +92,7 @@ export class Ticket {
   static deserialize(arr: Uint8Array): Ticket {
     const components = u8aSplit(arr, [
       Address.SIZE,
-      PublicKey.SIZE,
+      Address.SIZE,
       UINT256.SIZE,
       UINT256.SIZE,
       Balance.SIZE,
@@ -103,7 +102,7 @@ export class Ticket {
     ])
 
     const counterparty = new Address(components[0])
-    const challenge = new PublicKey(components[1])
+    const challenge = new Address(components[1])
     const epoch = new UINT256(new BN(components[2]))
     const index = new UINT256(new BN(components[3]))
     const amount = new Balance(new BN(components[4]))
@@ -118,8 +117,7 @@ export class Ticket {
       u8aToHex(
         serializeToU8a([
           [this.counterparty.serialize(), Address.SIZE],
-          // @TODO
-          // [challenge.serialize(), PublicKey.SIZE],
+          [this.challenge.serialize(), Address.SIZE],
           [this.epoch.serialize(), UINT256.SIZE],
           [this.index.serialize(), UINT256.SIZE],
           [this.amount.serialize(), Balance.SIZE],
@@ -133,7 +131,7 @@ export class Ticket {
   static get SIZE(): number {
     return (
       Address.SIZE +
-      PublicKey.SIZE +
+      Address.SIZE +
       UINT256.SIZE +
       UINT256.SIZE +
       Balance.SIZE +

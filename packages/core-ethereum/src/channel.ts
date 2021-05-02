@@ -149,7 +149,7 @@ class Channel {
     return await this.chain.finalizeChannelClosure(counterpartyAddress)
   }
 
-  async createTicket(amount: Balance, challenge: PublicKey, winProb: number) {
+  async createTicket(amount: Balance, challenge: Address, winProb: number) {
     const counterpartyAddress = this.counterparty.toAddress()
     const c = await this.getState()
     return Ticket.create(
@@ -164,7 +164,7 @@ class Channel {
     )
   }
 
-  createDummyTicket(challenge: PublicKey): Ticket {
+  createDummyTicket(challenge: Address): Ticket {
     // TODO: document how dummy ticket works
     return Ticket.create(
       this.counterparty.toAddress(),
