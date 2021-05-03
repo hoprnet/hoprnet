@@ -40,7 +40,9 @@ describe('test ticket construction', function () {
   it('should generate the hash correctly #1', async function () {
     const expectedHash = new Hash(stringToU8a('0xfeaf3e31d5a4b002f7808945392f3e15fda433824206524aa144ecd7164b6af5'))
     const counterparty = new Address(stringToU8a('0xb3aa2138de698597e2e3f84f60ef415d13731b6f'))
-    const challenge = new PublicKey(stringToU8a('0x03c2aa76d6837c51337001c8b5a60473726064fc35d0a40b8f0e1f068cc8e38e10')).toAddress()
+    const challenge = new PublicKey(
+      stringToU8a('0x03c2aa76d6837c51337001c8b5a60473726064fc35d0a40b8f0e1f068cc8e38e10')
+    ).toAddress()
     const epoch = UINT256.fromString('1')
     const index = UINT256.fromString('1')
     const amount = new Balance(new BN('0000000002c68af0bb140000', 16))
@@ -69,7 +71,9 @@ describe('test ticket construction', function () {
   it('should generate the hash correctly #2', async function () {
     const expectedHash = new Hash(stringToU8a('0x9d0c0bba60c64f656eb34dce0bcb8a932e5b19d55b77476249439ed17b79af04'))
     const counterparty = new Address(stringToU8a('0x32c160a5008e517ce06df4f7d4a39ffc52e049cf'))
-    const challenge = new PublicKey(stringToU8a('0x03025fcceb8f338198b866e8bb3621f4cbba8cdcd77b72d95328a296049e9e1230')).toAddress()
+    const challenge = new PublicKey(
+      stringToU8a('0x03025fcceb8f338198b866e8bb3621f4cbba8cdcd77b72d95328a296049e9e1230')
+    ).toAddress()
     const epoch = UINT256.fromString('2')
     const index = UINT256.fromString('1')
     const amount = new Balance(new BN('000000000de0b6b3a7640000', 16))
