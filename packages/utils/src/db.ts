@@ -376,8 +376,8 @@ export class HoprDB {
       id: Address.createMock(),
       db: new levelup(MemDown())
     }
-    Object.setPrototypeOf(mock, HoprDB)
-    // @ts-ignore
+    Object.setPrototypeOf(mock, HoprDB.prototype)
+    //@ts-ignore
     return mock
   }
 }
