@@ -2,13 +2,13 @@
 # yarn lockfile v1
 
 
-"0http@^3.0.0":
-  version "3.1.0"
-  resolved "https://registry.yarnpkg.com/0http/-/0http-3.1.0.tgz#ce949ca1c7c5864259fde47d4eb3baf218feb139"
-  integrity sha512-Bs3MiiZFB7CskT6IQ4AI3a70IgsEHbNx6kg/XIMgJcpERacdJpHdJfIDzfrc/WyxKoh0swiOjGhciLBsz8RkGw==
+"0http@^3.1.1":
+  version "3.1.1"
+  resolved "https://registry.yarnpkg.com/0http/-/0http-3.1.1.tgz#682dbf66e827e8c6763598b08909a13afcce691c"
+  integrity sha512-qyWvQJzOEr+rMtmzUYgrMn9E2PKLxc6a74LkSuowK8W/qq2qUjBzCNwXbfjBJCZdFHpJcvewQ5FKkySTGCZuag==
   dependencies:
     lru-cache "^6.0.0"
-    trouter "^3.1.0"
+    trouter "^3.2.0"
 
 "@babel/code-frame@7.12.11":
   version "7.12.11"
@@ -581,7 +581,7 @@
   resolved "https://registry.yarnpkg.com/@hapi/hoek/-/hoek-9.2.0.tgz#f3933a44e365864f4dad5db94158106d511e8131"
   integrity sha512-sqKVVVOe5ivCaXDWivIJYVSaEgdQK9ul7a4Kity5Iw7u9+wBAPbX1RMSnLLmp7O4Vzj0WOWwMAJsTL00xwaNug==
 
-"@hoprnet/hopr-connect@0.2.23":
+"@hoprnet/hopr-connect@~0.2.23":
   version "0.2.23"
   resolved "https://registry.yarnpkg.com/@hoprnet/hopr-connect/-/hopr-connect-0.2.23.tgz#e0a0a47f641163618e230163ca18aa55035d98bd"
   integrity sha512-CyC5HMAGmVeSn/6Xt2C200WE6xeuYg3fyzK7wchjqmGFaZWCNJ9S6O/qZAp718UIWTupDfAoTRLBLWzEf5/5dA==
@@ -12058,11 +12058,11 @@ responselike@^1.0.2:
     lowercase-keys "^1.0.0"
 
 restana@^4.8.0:
-  version "4.8.1"
-  resolved "https://registry.yarnpkg.com/restana/-/restana-4.8.1.tgz#a6431d37c2a061bdf80ea1da3e7f340ef5397d7d"
-  integrity sha512-1EWtvy9Px8xpKP+TbIpdvsQgdZZo3K7Pfio165bNXdLMPw8NwQttPfVCXRUjMzzQ0yoJV5AAXhKqLkdGOW2YSg==
+  version "4.9.1"
+  resolved "https://registry.yarnpkg.com/restana/-/restana-4.9.1.tgz#1168a86ea5c7fcf3868855f8b1c4889973cb6acc"
+  integrity sha512-V2AgZCs54/Q3AffX/M5ru3vVAeQB6fmInccIzluxYGXdEGhF+ANbHrzeKUTKgk1cx0cgAGDikr9gPdZreD1e7A==
   dependencies:
-    "0http" "^3.0.0"
+    "0http" "^3.1.1"
 
 restore-cursor@^2.0.0:
   version "2.0.0"
@@ -13524,7 +13524,7 @@ trim-right@^1.0.1:
   resolved "https://registry.yarnpkg.com/trim-right/-/trim-right-1.0.1.tgz#cb2e1203067e0c8de1f614094b9fe45704ea6003"
   integrity sha1-yy4SAwZ+DI3h9hQJS5/kVwTqYAM=
 
-trouter@^3.1.0:
+trouter@^3.2.0:
   version "3.2.0"
   resolved "https://registry.yarnpkg.com/trouter/-/trouter-3.2.0.tgz#a9c510fce21b8e659a28732c9de9d82871efe8df"
   integrity sha512-rLLXbhTObLy2MBVjLC+jTnoIKw99n0GuJs9ov10J870vDw5qhTurPzsDrudNtBf5w/CZ9ctZy2p2IMmhGcel2w==
@@ -15069,10 +15069,23 @@ yargs@13.3.2, yargs@^13.3.0:
     y18n "^4.0.0"
     yargs-parser "^13.1.2"
 
-yargs@16.2.0, yargs@^16.0.3, yargs@^16.2.0:
+yargs@16.2.0, yargs@^16.2.0:
   version "16.2.0"
   resolved "https://registry.yarnpkg.com/yargs/-/yargs-16.2.0.tgz#1c82bf0f6b6a66eafce7ef30e376f49a12477f66"
   integrity sha512-D1mvvtDG0L5ft/jGWkLpG1+m0eQxOfaBvTNELraWj22wSVUMWxZUvYgJYcKh6jGGIkJFhH4IZPQhR4TKpc8mBw==
+  dependencies:
+    cliui "^7.0.2"
+    escalade "^3.1.1"
+    get-caller-file "^2.0.5"
+    require-directory "^2.1.1"
+    string-width "^4.2.0"
+    y18n "^5.0.5"
+    yargs-parser "^20.2.2"
+
+yargs@^17.0.0:
+  version "17.0.0"
+  resolved "https://registry.yarnpkg.com/yargs/-/yargs-17.0.0.tgz#147db33e222e8e6a7829df5f2ae696b58d1c82bf"
+  integrity sha512-gbtedDPfBgG40iLbaRXhqYJycUYqFVZQLIxl1cG5Ez/xZL/47TetSYzPSIixkWa36GKHr9D/o/oSG1vHXF4zTw==
   dependencies:
     cliui "^7.0.2"
     escalade "^3.1.1"

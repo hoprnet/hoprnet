@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hoprd",
-  "version": "1.71.0-next.101",
+  "version": "1.71.0-next.104",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -26,8 +26,8 @@
     "dev": "yarn build && NODE_ENV=development yarn start"
   },
   "dependencies": {
-    "@hoprnet/hopr-core": "1.71.0-next.101",
-    "@hoprnet/hopr-utils": "1.71.0-next.101",
+    "@hoprnet/hopr-core": "1.71.0-next.104",
+    "@hoprnet/hopr-utils": "1.71.0-next.104",
     "body-parser": "^1.19.0",
     "bs58": "^4.0.1",
     "jazzicon": "^1.5.0",
@@ -38,7 +38,7 @@
     "restana": "^4.8.0",
     "rlp": "^2.2.6",
     "tiny-hashes": "^1.0.1",
-    "yargs": "^16.0.3"
+    "yargs": "^17.0.0"
   },
   "devDependencies": {
     "@types/bs58": "^4.0.1",
