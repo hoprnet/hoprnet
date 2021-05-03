@@ -222,7 +222,7 @@ class Hopr extends EventEmitter {
       onMessage
     )
 
-    ethereum.indexer.on('peer', ({id, multiaddrs}: {id: PeerId, multiaddrs: Multiaddr[]}) => {
+    ethereum.indexer.on('peer', ({ id, multiaddrs }: { id: PeerId; multiaddrs: Multiaddr[] }) => {
       this.libp2p.peerStore.addressBook.add(id, multiaddrs)
     })
 
