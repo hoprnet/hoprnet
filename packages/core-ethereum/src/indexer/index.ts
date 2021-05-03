@@ -219,7 +219,7 @@ class Indexer extends EventEmitter {
       const eventName = event.event as EventNames
 
       if (eventName === 'Announcement') {
-        await this.onAnnouncement(event as Event<'Announcement'>)
+        await this.onAnnouncement(event as Event<'Announcement'>, new BN(blockNumber.toPrecision()))
       } else if (eventName === 'ChannelUpdate') {
         await this.onChannelUpdated(event as Event<'ChannelUpdate'>)
       } else {
@@ -241,14 +241,14 @@ class Indexer extends EventEmitter {
     this.unconfirmedEvents.addAll(events)
   }
 
-  private async onAnnouncement(event: Event<'Announcement'>): Promise<void> {
-    const account = AccountEntry.fromSCEvent(event)
+  private async onAnnouncement(event: Event<'Announcement'>, blockNumber: BN): Promise<void> {
+    const account = AccountEntry.fromSCEvent(event, blockNumber)
     log('New node announced', account.address.toHex())
     this.emit('peer', {
       id: account.getPeerId(),
       multiaddrs: [account.multiAddr]
     })
-    await this.db.updateAccount(account.address, account)
+    await this.db.updateAccount(account)
   }
 
   private async onChannelUpdated(event: Event<'ChannelUpdate'>): Promise<void> {

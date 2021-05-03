@@ -6,27 +6,31 @@ import BN from 'bn.js'
 import { Address, PublicKey, Hash } from '.' // TODO: cyclic dep
 
 export class AccountEntry {
-  constructor(public readonly address: Address, public readonly multiAddr?: Multiaddr) {}
+  constructor(public readonly address: Address,
+              public readonly multiAddr: Multiaddr,
+              public readonly updatedBlock: BN
+             ) {}
 
   static get SIZE(): number {
     return Address.SIZE + MULTI_ADDR_MAX_LENGTH
   }
 
   static deserialize(arr: Uint8Array) {
-    const [a, b] = u8aSplit(arr, [Address.SIZE, MULTI_ADDR_MAX_LENGTH])
+    const [a, b, c] = u8aSplit(arr, [Address.SIZE, MULTI_ADDR_MAX_LENGTH, 32])
     // strip b as it may contain zeros since we don't know
     // the exact multiaddr length
     const strippedB = ethers.utils.stripZeros(b)
     const isBEmpty = u8aEquals(strippedB, new Uint8Array({ length: strippedB.length }))
     const address = new Address(a)
-    return new AccountEntry(address, isBEmpty ? undefined : Multiaddr(strippedB))
+    const blockNumber = new BN(c) 
+    return new AccountEntry(address, isBEmpty ? undefined : Multiaddr(strippedB), blockNumber)
   }
 
-  static fromSCEvent(event: any): AccountEntry {
+  static fromSCEvent(event: any, blockNumber: BN): AccountEntry {
     //TODO types
     const { account, multiaddr } = event.args
     const address = Address.fromString(account)
-    const accountEntry = new AccountEntry(address, Multiaddr(multiaddr))
+    const accountEntry = new AccountEntry(address, Multiaddr(multiaddr), blockNumber)
 
     if (!accountEntry.getPublicKey().toAddress().eq(address)) {
       throw Error("Multiaddr in announcement does not match sender's address")

@@ -200,9 +200,6 @@ async function main() {
       })
     }
 
-    if (adminServer) {
-      adminServer.registerNode(node, cmds)
-    }
 
     logs.log('node is waiting for funds to', (await node.getEthereumAddress()).toHex())
     // 2.5 Await funding of wallet.
@@ -212,6 +209,10 @@ async function main() {
     // 3. Start the node.
     await node.start()
     cmds = new Commands(node)
+
+    if (adminServer) {
+      adminServer.registerNode(node, cmds)
+    }
 
     if (argv.run && argv.run !== '') {
       // Run a single command and then exit.

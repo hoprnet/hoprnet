@@ -1,4 +1,5 @@
 import type { Event } from './types'
+import BN from 'bn.js'
 import assert from 'assert'
 import Multiaddr from 'multiaddr'
 import { BigNumber } from 'ethers'
@@ -65,7 +66,7 @@ export const PARTY_A_INITIALIZED_EVENT = {
   }
 } as Event<'Announcement'>
 
-export const PARTY_A_INITIALIZED_ACCOUNT = new AccountEntry(partyA.toAddress(), partyAMultiAddr)
+export const PARTY_A_INITIALIZED_ACCOUNT = new AccountEntry(partyA.toAddress(), partyAMultiAddr, new BN(1))
 
 export const FUNDED_EVENT = {
   event: 'ChannelUpdate',

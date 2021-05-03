@@ -455,6 +455,9 @@ class Hopr extends EventEmitter {
   }
 
   public getConnectedPeers(): PeerId[] {
+    if (!this.networkPeers) {
+      return []
+    }
     return this.networkPeers.all()
   }
 
