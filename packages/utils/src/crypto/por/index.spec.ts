@@ -6,6 +6,7 @@ import { deriveAckKeyShare } from './keyDerivation'
 import assert from 'assert'
 import { u8aEquals } from '../../u8a'
 import { publicKeyCreate } from 'secp256k1'
+import { PublicKey } from '../../types'
 
 describe('PoR - proof of relay', function () {
   it('generate PoR string, preVerify, validate', function () {
@@ -23,7 +24,7 @@ describe('PoR - proof of relay', function () {
 
     // Computation result of the first relayer before
     // receiving an acknowledgement from the second relayer
-    const result = preVerify(secrets[0], firstPorString, firstChallenge.ticketChallenge)
+    const result = preVerify(secrets[0], firstPorString, new PublicKey(firstChallenge.ticketChallenge).toAddress().serialize())
 
     assert(result.valid == true, `Challenge must be plausible`)
 
@@ -55,7 +56,7 @@ describe('PoR - proof of relay', function () {
 
     // Simulates the transformation as done by the
     // second relayer
-    const secondResult = preVerify(secrets[1], secondPorString, result.nextTicketChallenge)
+    const secondResult = preVerify(secrets[1], secondPorString, new PublicKey(result.nextTicketChallenge).toAddress().serialize())
 
     assert(secondResult.valid == true, `Second challenge must be plausible`)
 

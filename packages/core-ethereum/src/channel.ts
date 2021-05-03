@@ -59,9 +59,15 @@ class Channel {
 
     const response = unacknowledgedTicket.getResponse(acknowledgement)
 
+    if (!response.valid) {
+      throw Error(`Ticket invalid`)
+    }
+
     const ticket = unacknowledgedTicket.ticket
-    if (ticket.isWinningTicket(response, await this.commitment.getCurrentCommitment(), ticket.winProb)) {
-      const ack = new Acknowledgement(ticket, response, await this.commitment.getCurrentCommitment())
+    if (
+      ticket.isWinningTicket(new Hash(response.response), await this.commitment.getCurrentCommitment(), ticket.winProb)
+    ) {
+      const ack = new Acknowledgement(ticket, new Hash(response.response), await this.commitment.getCurrentCommitment())
       await this.commitment.bumpCommitment()
       return ack
     } else {

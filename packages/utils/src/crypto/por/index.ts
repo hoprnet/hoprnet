@@ -4,6 +4,7 @@ import { deriveAckKeyShare, deriveOwnKeyShare } from './keyDerivation'
 import { SECP256K1 } from '../constants'
 import { u8aEquals } from '../../u8a'
 import { randomBytes } from 'crypto'
+import { PublicKey } from '../../types'
 
 export const POR_STRING_LENGTH = 2 * SECP256K1.COMPRESSED_PUBLIC_KEY_LENGTH
 
@@ -96,7 +97,7 @@ export function preVerify(
   const ownKey = deriveOwnKeyShare(secret)
   const ownShare = publicKeyCreate(ownKey)
 
-  const valid = u8aEquals(publicKeyCombine([ownShare, hint]), challenge)
+  const valid = u8aEquals(new PublicKey(publicKeyCombine([ownShare, hint])).toAddress().serialize(), challenge)
 
   if (valid) {
     return { valid: true, ownKey, ownShare, nextTicketChallenge, ackChallenge: hint }
