@@ -9,6 +9,7 @@ import { Address, ChannelEntry, AccountEntry, Hash, PublicKey, Balance, Snapshot
 import { isConfirmedBlock, snapshotComparator } from './utils'
 import Debug from 'debug'
 import Multiaddr from 'multiaddr'
+import { EventEmitter } from 'events'
 
 export type RoutingChannel = [source: PeerId, destination: PeerId, stake: Balance]
 
@@ -20,7 +21,7 @@ const getSyncPercentage = (n: number, max: number) => ((n * 100) / max).toFixed(
  * all channels in the network.
  * Also keeps track of the latest block number.
  */
-class Indexer {
+class Indexer extends EventEmitter {
   public status: 'started' | 'restarting' | 'stopped' = 'stopped'
   public latestBlock: number = 0 // latest known on-chain block number
   private unconfirmedEvents = new Heap<Event<any>>(snapshotComparator)
@@ -31,7 +32,9 @@ class Indexer {
     private chain: ChainWrapper,
     private maxConfirmations: number,
     private blockRange: number
-  ) {}
+  ) {
+    super()
+  }
 
   /**
    * Starts indexing.
@@ -241,6 +244,10 @@ class Indexer {
   private async onAnnouncement(event: Event<'Announcement'>): Promise<void> {
     const account = AccountEntry.fromSCEvent(event)
     log('New node announced', account.address.toHex())
+    this.emit('peer', {
+      id: account.getPeerId(),
+      multiaddrs: [account.multiAddr]
+    })
     await this.db.updateAccount(account.address, account)
   }
 

@@ -209,16 +209,22 @@ class Hopr extends EventEmitter {
       this.emit('message-acknowledged:' + ack.getKey())
     )
 
+    const ethereum = await this.paymentChannels
+
     const onMessage = (msg: Uint8Array) => this.emit('hopr:message', msg)
     this.forward = new PacketForwardInteraction(
       this.db,
-      await this.paymentChannels,
+      ethereum,
       this.getId(),
       this.libp2p,
       subscribe,
       sendMessage,
       onMessage
     )
+
+    ethereum.indexer.on('peer', ({id, multiaddrs}: {id: PeerId, multiaddrs: Multiaddr[]}) => {
+      this.libp2p.peerStore.addressBook.add(id, multiaddrs)
+    })
 
     await this.heartbeat.start()
     this.periodicCheck()
