@@ -11,7 +11,15 @@ where $\delta$ is the amount of HOPR tokens set in the ticket, $L$ is the path l
 the challenge is given together with the routing information by the packet. 
 \\$(A)$ does not know whether the ticket is a win or not.
 \\$(A)$ sets content of a ticket to: $$t:=(\delta,P_w,R,I,T_c,\zeta,c_{Id},tag,V)$$ 
-where $\delta$ is the ticket amount, $P_w$ is the winning probability, $R$ is the recipient's adress on the blockchain (hashed public key into 20 bytes), $I$ is the ticket index which is set by the ticket issuer and should be increased with every issued ticket, $T_c$ is the ticket challenge, $\alpha_c$ is the account.counter, $\zeta$ is the channel.iteration, $c_{Id},tag,V$ are ChainId, HOPR tag and HOPR version which are given as constants and can depend on the utilized blockchain.
+\textbf{Ticket amount $\delta$:}
+\\\textbf{Winning probability $P_w$:} is the winning probability.
+\\\textbf{Recipient's adress $R$:} is the recipient's adress on the blockchain (hashed public key into 20 bytes).
+\\\textbf{Ticket Index $I$:} is the ticket index which is set by the ticket issuer and should be increased with every issued ticket.
+\\\textbf{Ticket challenge $T_c$:}  is the ticket challenge.
+\\\textbf{Acount counter $\alpha_c$:} is the account.counter.
+\\\textbf{Channel iteration $\zeta$:} is the channel.iteration.
+\\\textbf{ChainId $c_{Id}$:}
+\\\textbf{Version $V$, $tag$:} HOPR tag and version which are given as constants and can depend on the utilized blockchain.
 \\~\\$(A)$ then signs the ticket with its private key and sends $T:= (t, Sig_I(t))$ to the recipient together with a mixnet packet.
 
 
