@@ -205,6 +205,7 @@ class Hopr extends EventEmitter {
 
     this.heartbeat = new Heartbeat(this.networkPeers, subscribe, sendMessageAndExpectResponse, hangup)
 
+    await this.announce(this.options.announce)
     subscribeToAcknowledgements(subscribe, this.db, await this.paymentChannels, (ack) =>
       this.emit('message-acknowledged:' + ack.getKey())
     )
@@ -461,8 +462,12 @@ class Hopr extends EventEmitter {
     return this.networkPeers.all()
   }
 
-  public connectionReport(): string {
-    return this.networkPeers.debugLog()
+  public async connectionReport(): Promise<string> {
+    const connected = this.networkPeers.debugLog()
+    const announced = await (await this.paymentChannels).indexer.getAnnouncedAddresses()
+    return `${connected}
+    \n${announced.length} peers have announced themselves on chain:
+    \n${announced.map(x => x.toString()).join('\n')}` 
   }
 
   private async checkBalances() {
@@ -487,7 +492,6 @@ class Hopr extends EventEmitter {
     try {
       await this.checkBalances()
       await this.tickChannelStrategy([])
-      await this.announce(this.options.announce)
     } catch (e) {
       log('error in periodic check', e)
     }
@@ -495,10 +499,11 @@ class Hopr extends EventEmitter {
   }
 
   private async announce(includeRouting: boolean = false): Promise<void> {
+    log('announcing self', includeRouting)
     const chain = await this.paymentChannels
-    const account = await chain.getAccount(await this.getEthereumAddress())
+    //const account = await chain.getAccount(await this.getEthereumAddress())
     // exit if we already announced
-    if (account.hasAnnounced()) return
+    //if (account.hasAnnounced()) return
 
     // exit if we don't have enough ETH
     const nativeBalance = await this.getNativeBalance()

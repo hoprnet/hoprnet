@@ -52,14 +52,6 @@ export class AdminServer {
 
     this.server.listen(this.port, this.host)
     this.logs.log('Admin server listening on port ' + this.port)
-  }
-
-  registerNode(node: Hopr, cmds: any, settings?: any) {
-    this.node = node
-    this.cmds = cmds
-    if (settings) {
-      this.cmds.setState(settings)
-    }
 
     this.wsServer = new ws.Server({ server: this.server })
 
@@ -84,6 +76,14 @@ export class AdminServer {
       })
       this.logs.subscribe(socket)
     })
+  }
+
+  registerNode(node: Hopr, cmds: any, settings?: any) {
+    this.node = node
+    this.cmds = cmds
+    if (settings) {
+      this.cmds.setState(settings)
+    }
 
     this.node.on('hopr:channel:opened', (channel) => {
       this.logs.log(`Opened channel to ${channel[0].toB58String()}`)

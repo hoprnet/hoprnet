@@ -299,6 +299,12 @@ class Indexer extends EventEmitter {
     }
   }
 
+  public async getAnnouncedAddresses(): Promise<Multiaddr[]> {
+    return (await this.db.getAccounts()).map(
+      (account: AccountEntry) => account.multiAddr
+    )
+  }
+
   public async getPublicNodes(): Promise<Multiaddr[]> {
     return (await this.db.getAccounts((account: AccountEntry) => account.containsRouting())).map(
       (account: AccountEntry) => account.multiAddr

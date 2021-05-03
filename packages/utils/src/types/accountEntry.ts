@@ -56,7 +56,8 @@ export class AccountEntry {
 
     return serializeToU8a([
       [this.address.serialize(), Address.SIZE],
-      [multiaddr, MULTI_ADDR_MAX_LENGTH]
+      [multiaddr, MULTI_ADDR_MAX_LENGTH],
+      [this.updatedBlock.toBuffer('be', 32), 32]
     ])
   }
 
