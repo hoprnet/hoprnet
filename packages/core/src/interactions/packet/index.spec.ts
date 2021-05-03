@@ -4,7 +4,7 @@ import { EventEmitter } from 'events'
 import BN from 'bn.js'
 
 import { subscribeToAcknowledgements, sendAcknowledgement } from './acknowledgement'
-import { PublicKey, u8aEquals, Ticket, UINT256, HoprDB } from '@hoprnet/hopr-utils'
+import { Address, PublicKey, u8aEquals, Ticket, UINT256, HoprDB } from '@hoprnet/hopr-utils'
 import { Balance, createFirstChallenge } from '@hoprnet/hopr-utils'
 
 import { Challenge } from '../../messages/challenge'
@@ -19,7 +19,7 @@ function createFakeChain(privKey: PeerId) {
 
   const getChannel = (_self: PublicKey, counterparty: PublicKey) => ({
     acknowledge,
-    createTicket: (amount: Balance, challenge: PublicKey, _winProb: number) => {
+    createTicket: (amount: Balance, challenge: Address, _winProb: number) => {
       return Ticket.create(
         counterparty.toAddress(),
         challenge,
