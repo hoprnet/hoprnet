@@ -71,7 +71,7 @@ Any attempt of modification by an attacker would result in message distruction a
 \subsection*{Implementation choices}
 The implementation choices taken by HOPR team are the following:
 \begin{itemize}
-    \item \textbf{Cyclic group:} The cyclic group used in the HOPR Sphinx implementation is an elliptic curve group on the Ethereum secp256k1 curve and thus operations will be done on the elliptic curve.
+    \item \textbf{Cyclic group:} The cyclic group used in the HOPR Sphinx implementation is an elliptic curve group on the secp256k1 curve and thus operations will be done on the elliptic curve.
     \item \textbf{Hash function:} BLAKE2s hash function which is a cryptographic hash function faster than SHA-2 and SHA-3, yet is at least as secure as SHA-3 and produces digests of any size between 1 and 32 bytes.
     \item \textbf{MAC:} HMAC based on a hash function BLAKE2s.
     \item \textbf{Encryption scheme:} LIONESS implementation based on the ChaCha20 stream cipher.
