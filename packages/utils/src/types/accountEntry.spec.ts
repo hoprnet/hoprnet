@@ -20,7 +20,9 @@ describe('AccountEntry', function () {
   })
 
   it('should contain the right values', function () {
-    const accountEntry = AccountEntry.deserialize(new AccountEntry(PARTY_A_ADDRESS, PARTY_A_MULTI_ADDR, new BN('1')).serialize())
+    const accountEntry = AccountEntry.deserialize(
+      new AccountEntry(PARTY_A_ADDRESS, PARTY_A_MULTI_ADDR, new BN('1')).serialize()
+    )
 
     expect(accountEntry.address.toHex()).to.equal(PARTY_A_ADDRESS.toHex())
     expect(accountEntry.multiAddr.toString()).to.equal(PARTY_A_MULTI_ADDR.toString())

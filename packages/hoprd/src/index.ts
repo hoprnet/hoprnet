@@ -200,7 +200,6 @@ async function main() {
       })
     }
 
-
     logs.log('node is waiting for funds to', (await node.getEthereumAddress()).toHex())
     // 2.5 Await funding of wallet.
     await node.waitForFunds()

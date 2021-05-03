@@ -6,10 +6,11 @@ import BN from 'bn.js'
 import { Address, PublicKey, Hash } from '.' // TODO: cyclic dep
 
 export class AccountEntry {
-  constructor(public readonly address: Address,
-              public readonly multiAddr: Multiaddr,
-              public readonly updatedBlock: BN
-             ) {}
+  constructor(
+    public readonly address: Address,
+    public readonly multiAddr: Multiaddr,
+    public readonly updatedBlock: BN
+  ) {}
 
   static get SIZE(): number {
     return Address.SIZE + MULTI_ADDR_MAX_LENGTH
@@ -22,7 +23,7 @@ export class AccountEntry {
     const strippedB = ethers.utils.stripZeros(b)
     const isBEmpty = u8aEquals(strippedB, new Uint8Array({ length: strippedB.length }))
     const address = new Address(a)
-    const blockNumber = new BN(c) 
+    const blockNumber = new BN(c)
     return new AccountEntry(address, isBEmpty ? undefined : Multiaddr(strippedB), blockNumber)
   }
 
