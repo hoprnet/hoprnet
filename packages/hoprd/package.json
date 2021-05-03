@@ -38,7 +38,7 @@
     "restana": "^4.8.0",
     "rlp": "^2.2.6",
     "tiny-hashes": "^1.0.1",
-    "yargs": "^16.0.3"
+    "yargs": "^17.0.0"
   },
   "devDependencies": {
     "@types/bs58": "^4.0.1",
