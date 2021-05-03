@@ -372,8 +372,12 @@ export class HoprDB {
   }
 
   static createMock(): HoprDB {
-    const mock = new HoprDB(Address.createMock(), true, 'mock')
-    mock.db = new levelup(MemDown())
+    const mock = {
+      id: Address.createMock(),
+      db: new levelup(MemDown())
+    }
+    Object.setPrototypeOf(mock, HoprDB.prototype)
+    //@ts-ignore
     return mock
   }
 }
