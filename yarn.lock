@@ -9757,7 +9757,7 @@ multiaddr@8.1.2, multiaddr@^8.0.0, multiaddr@^8.1.0, multiaddr@^8.1.2, multiaddr
     uint8arrays "^1.1.0"
     varint "^5.0.0"
 
-multiaddr@^9.0.0, multiaddr@^9.0.1:
+multiaddr@9.0.1, multiaddr@^9.0.0, multiaddr@^9.0.1:
   version "9.0.1"
   resolved "https://registry.yarnpkg.com/multiaddr/-/multiaddr-9.0.1.tgz#4a3b5a21b37e4df5b443f2ca957304ea5bfd4604"
   integrity sha512-fubxMjVoRPcz3GYBb63Z6ADCY6BoqezbnL2o8owDcfYqhwW61oFtIlsZGiNKIVC2Fk1Od5rf/3z34QSGJFT/uA==
