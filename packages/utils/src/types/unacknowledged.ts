@@ -21,15 +21,19 @@ export class UnacknowledgedTicket {
     return this.ticket.verify(signer)
   }
 
-  verify(signer: PublicKey, acknowledgement: Hash): ReturnType<typeof validateAcknowledgement> {
-    if (!this.verifySignature(signer)) {
-      return { valid: false }
-    }
-
+  public getResponse(acknowledgement: Hash) {
     return validateAcknowledgement(
       this.ownKey.serialize(),
       acknowledgement.serialize(),
       this.ticket.challenge.serialize()
+    )
+  }
+
+  public verify(signer: PublicKey, acknowledgement: Hash): boolean {
+    return (
+      this.verifySignature(signer) &&
+      validateAcknowledgement(this.ownKey.serialize(), acknowledgement.serialize(), this.ticket.challenge.serialize())
+        .valid
     )
   }
 

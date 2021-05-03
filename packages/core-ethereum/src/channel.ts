@@ -53,13 +53,11 @@ class Channel {
     unacknowledgedTicket: UnacknowledgedTicket,
     acknowledgement: Hash
   ): Promise<Acknowledgement | null> {
-    const validateResult = unacknowledgedTicket.verify(this.counterparty, acknowledgement)
-
-    if (validateResult.valid == false) {
+    if (!unacknowledgedTicket.verify(this.counterparty, acknowledgement)) {
       throw Error(`Ticket invalid`)
     }
 
-    const response = new Hash(validateResult.response)
+    const response = unacknowledgedTicket.getResponse(acknowledgement)
 
     const ticket = unacknowledgedTicket.ticket
     if (ticket.isWinningTicket(response, await this.commitment.getCurrentCommitment(), ticket.winProb)) {
