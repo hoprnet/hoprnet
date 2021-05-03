@@ -62,7 +62,12 @@ The payload is where the actual message is hidden and is computed in different l
 $$\delta_i=\pi^{-1}(h_{\pi}(s_{i-1}), \delta_{i-1})$$
 Any attempt of modification by an attacker would result in message distruction and thus is would be irrecoverable. 
 \\~\\Same happens at $(C)$ and $(D)$: key derivation, unblinding, deleting, shifting, decryption and blinding. 
-
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=11cm,height=11cm,keepaspectratio]{../yellowpaper/images/sphinx1.png}
+    \caption{The processing of a Sphinx message}
+    \label{fig:The processing of a Sphinx message }
+\end{figure}
 \subsection*{Implementation choices}
 The implementation choices taken by HOPR team are the following:
 \begin{itemize}
