@@ -153,6 +153,17 @@ class Channel {
     return await this.chain.finalizeChannelClosure(counterpartyAddress)
   }
 
+  /**
+   * Creates a signed ticket that includes the given amount of
+   * tokens
+   * @dev Due to a missing feature, namely ECMUL, in Ethereum, the
+   * challenge is given as an Ethereum address because the signature
+   * recovery algorithm is used to perform an EC-point multiplication.
+   * @param amount value of the ticket
+   * @param challenge challenge to solve in order to redeem the ticket
+   * @param winProb the winning probability to use
+   * @returns a signed ticket
+   */
   async createTicket(amount: Balance, challenge: Address, winProb: number) {
     const counterpartyAddress = this.counterparty.toAddress()
     const c = await this.getState()
@@ -168,6 +179,12 @@ class Channel {
     )
   }
 
+  // @TODO Replace this with (truely) random data
+  /**
+   * Creates a ticket that is sent next to the packet to the last node.
+   * @param challenge dummy challenge, potential no valid response known
+   * @returns a ticket without any value
+   */
   createDummyTicket(challenge: Address): Ticket {
     // TODO: document how dummy ticket works
     return Ticket.create(
