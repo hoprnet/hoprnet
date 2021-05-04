@@ -44,7 +44,7 @@ The sender $(A)$ picks a random $x\in \mathbb{Z}^*_q$ that is used to derive new
  Where $y_B,y_C,y_D,y_Z$ are the public keys of the nodes $B,C, D$  which we assume to be available to $A$ .
 
 \paragraph{Routing information}
-Each node on the path needs to know the next downstream node. Therefore, the sender $(A)$ generates routing information $\beta_i$ for $(B)$, $(C)$ and (D) as well as message END to tell $(Z)$ that it is the final receiver of the message. The END message is a distinguished prefix byte (since it isn't an element of $G$) that's added to the final receiver's address.
+Each node on the path needs to know the next downstream node. Therefore, the sender $(A)$ generates routing information $\beta_i$ for $(B)$, $(C)$ and (D) as well as message END to tell $(Z)$ that it is the final receiver of the message. The END message is a distinguished prefix byte that's added to the final receiver's compressed address $Z=(x,y)$ (either $0\times02$ or $0\times03$ depending if the $y$ coordinate is even or odd).
 $$\beta_i=(Z\|I\|0_{(2(r-v)+2)\kappa-|Z|}\oplus PRNG(s_{v-1})_{[ \,0....(2(r-v)+3)\kappa-1})\|\phi$$
 Such that $Z$ is the destination address and $|Z|$ is its length. $I$ is an identifier used for SURBs (Single-Use-Reply Blocks) such that $I \in \{0, 1\}^\kappa$.
 $v\leq r$ is the length of the path traversed by the packet where $|Z| \leq (2(r - v) + 2)$. $\phi$ is a filler string that is used to ensure the header packets remain constant in size as layers of encryption are added or removed. 
