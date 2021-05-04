@@ -4,7 +4,7 @@ import assert from 'assert'
 import Multiaddr from 'multiaddr'
 import { BigNumber } from 'ethers'
 import { stringToU8a } from '@hoprnet/hopr-utils'
-import { PublicKey, Hash, AccountEntry, ChannelEntry } from '@hoprnet/hopr-utils'
+import { PublicKey, Hash, AccountEntry, ChannelEntry, u8aToHex } from '@hoprnet/hopr-utils'
 
 export const partyA = PublicKey.fromString('0x03362b7b26bddb151a03056422d37119eab3a716562b6c3efdc62dec1540c9b091')
 export const partyB = PublicKey.fromString('0x03217f3cd4d0b4b82997b25d1b6b68a933929fed724531cb30bbfd4729dc6b44e0')
@@ -62,7 +62,7 @@ export const PARTY_A_INITIALIZED_EVENT = {
   logIndex: 0,
   args: {
     account: partyA.toAddress().toHex(),
-    multiaddr: partyAMultiAddr.toString()
+    multiaddr: u8aToHex(partyAMultiAddr.bytes)
   }
 } as Event<'Announcement'>
 
