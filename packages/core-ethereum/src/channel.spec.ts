@@ -1,12 +1,10 @@
 import type Indexer from './indexer'
 import type { ChainWrapper } from './ethereum'
+import { ChannelEntry, Hash, PublicKey, Balance, UINT256, HoprDB } from '@hoprnet/hopr-utils'
 import assert from 'assert'
-import LevelUp from 'levelup'
-import MemDown from 'memdown'
 import BN from 'bn.js'
 import { utils } from 'ethers'
 import { Channel } from './channel'
-import { ChannelEntry, Hash, PublicKey, Balance, UINT256 } from './types'
 import * as fixtures from './fixtures'
 
 const createChainMock = (_channelEntry: ChannelEntry): ChainWrapper => {
@@ -33,7 +31,7 @@ const createMocks = () => {
   const selfPrivateKey = utils.arrayify(fixtures.ACCOUNT_A.privateKey)
   const self = PublicKey.fromPrivKey(selfPrivateKey)
   const counterparty = PublicKey.fromPrivKey(utils.arrayify(fixtures.ACCOUNT_B.privateKey))
-  const db = new LevelUp(MemDown())
+  const db = HoprDB.createMock()
 
   const nextCommitmentPartyA = Hash.create(new Uint8Array([0]))
   const commitmentPartyA = nextCommitmentPartyA.hash()
@@ -77,7 +75,7 @@ const createMocks = () => {
   }
 }
 
-describe.only('test channel', function () {
+describe('test channel', function () {
   let mocks: ReturnType<typeof createMocks>
   let channel: Channel
 
