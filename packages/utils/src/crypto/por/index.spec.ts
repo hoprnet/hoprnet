@@ -36,7 +36,10 @@ describe('PoR - proof of relay', function () {
 
     // Simulates the transformation done by the first relayer
     assert(
-      u8aEquals(result.nextTicketChallenge, firstPorString.subarray(0, SECP256K1_CONSTANTS.COMPRESSED_PUBLIC_KEY_LENGTH)),
+      u8aEquals(
+        result.nextTicketChallenge,
+        firstPorString.subarray(0, SECP256K1_CONSTANTS.COMPRESSED_PUBLIC_KEY_LENGTH)
+      ),
       `Forward logic must extract correct challenge for next downstream node`
     )
 
