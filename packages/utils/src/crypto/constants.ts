@@ -8,8 +8,3 @@ export const SECP256K1_CONSTANTS = {
   SIGNATURE_LENGTH: 64,
   RECOVERABLE_SIGNATURE_LENGTH: 65
 }
-
-/**
- * Set to false to make crypto errors opaque
- */
-export const CRYPTO_DEBUG_MODE = true
