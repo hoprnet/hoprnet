@@ -1,5 +1,5 @@
 import { deployments, ethers } from 'hardhat'
-import Multiaddr from 'multiaddr'
+import { multiaddr } from 'multiaddr'
 import { expect } from 'chai'
 import { HoprToken__factory, ChannelsMock__factory, HoprChannels__factory } from '../types'
 import { increaseTime, signMessage } from './utils'
@@ -102,7 +102,7 @@ export const WIN_PROB_100 = percentToUint256(100)
 export const WIN_PROB_0 = percentToUint256(0)
 const ENOUGH_TIME_FOR_CLOSURE = 100
 const MULTI_ADDR = ethers.utils.hexlify(
-  Multiaddr('/ip4/127.0.0.1/tcp/0/p2p/16Uiu2HAmCPgzWWQWNAn2E3UXx1G3CMzxbPfLr1SFzKqnFjDcbdwg').bytes
+  multiaddr('/ip4/127.0.0.1/tcp/0/p2p/16Uiu2HAmCPgzWWQWNAn2E3UXx1G3CMzxbPfLr1SFzKqnFjDcbdwg').bytes
 )
 
 const abiEncoder = ethers.utils.Interface.getAbiCoder()
