@@ -73,7 +73,7 @@ via `direnv allow`. Otherwise you must enter the `nix-shell` manually:
 nix-shell
 ```
 
-Now you may follow the instructions in [Developing](#developing).
+Now you may follow the instructions in [Develop](#develop).
 
 ## Usage
 
