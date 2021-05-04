@@ -1,8 +1,7 @@
 import { Acknowledgement } from './acknowledgement'
 import { Challenge } from './challenge'
 import { randomBytes } from 'crypto'
-import { SECRET_LENGTH } from './constants'
-import { deriveAckKeyShare } from '@hoprnet/hopr-utils'
+import { deriveAckKeyShare, SECRET_LENGTH } from '../crypto'
 import { publicKeyCreate } from 'secp256k1'
 import assert from 'assert'
 

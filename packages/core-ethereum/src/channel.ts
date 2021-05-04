@@ -6,7 +6,7 @@ import {
   Hash,
   UINT256,
   Ticket,
-  Acknowledgement,
+  AcknowledgedTicket,
   ChannelEntry,
   UnacknowledgedTicket
 } from '@hoprnet/hopr-utils'
@@ -52,7 +52,7 @@ class Channel {
   async acknowledge(
     unacknowledgedTicket: UnacknowledgedTicket,
     acknowledgement: Hash
-  ): Promise<Acknowledgement | null> {
+  ): Promise<AcknowledgedTicket | null> {
     if (!unacknowledgedTicket.verify(this.counterparty, acknowledgement)) {
       throw Error(`The acknowledgement is not sufficient to solve the embedded challenge.`)
     }
@@ -67,7 +67,11 @@ class Channel {
     if (
       ticket.isWinningTicket(new Hash(response.response), await this.commitment.getCurrentCommitment(), ticket.winProb)
     ) {
-      const ack = new Acknowledgement(ticket, new Hash(response.response), await this.commitment.getCurrentCommitment())
+      const ack = new AcknowledgedTicket(
+        ticket,
+        new Hash(response.response),
+        await this.commitment.getCurrentCommitment()
+      )
       await this.commitment.bumpCommitment()
       return ack
     } else {
@@ -199,7 +203,7 @@ class Channel {
     )
   }
 
-  async submitTicket(ackTicket: Acknowledgement): Promise<SubmitTicketResponse> {
+  async submitTicket(ackTicket: AcknowledgedTicket): Promise<SubmitTicketResponse> {
     if (!ackTicket.verify(this.counterparty)) {
       return {
         status: 'FAILURE',

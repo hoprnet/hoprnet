@@ -6,7 +6,7 @@ import path from 'path'
 import Debug from 'debug'
 import { Hash, u8aAdd, toU8a, u8aConcat, Address, Intermediate } from '.'
 import assert from 'assert'
-import { Ticket, Acknowledgement, UnacknowledgedTicket, AccountEntry, ChannelEntry, Snapshot, PublicKey } from './types'
+import { Ticket, AcknowledgedTicket, UnacknowledgedTicket, AccountEntry, ChannelEntry, Snapshot, PublicKey } from './types'
 import BN from 'bn.js'
 
 const log = Debug(`hopr-core:db`)
@@ -177,15 +177,15 @@ export class HoprDB {
    * @param filter optionally filter by signer
    * @returns an array of all acknowledged tickets
    */
-  async getAcknowledgements(filter?: { signer: Uint8Array }): Promise<Acknowledgement[]> {
-    const filterFunc = (a: Acknowledgement): boolean => {
+  async getAcknowledgements(filter?: { signer: Uint8Array }): Promise<AcknowledgedTicket[]> {
+    const filterFunc = (a: AcknowledgedTicket): boolean => {
       // if signer provided doesn't match our ticket's signer dont add it to the list
       if (filter?.signer && a.ticket.verify(new PublicKey(filter.signer))) {
         return false
       }
       return true
     }
-    return this.getAll<Acknowledgement>(ACKNOWLEDGED_TICKET_PREFIX, Acknowledgement.deserialize, filterFunc)
+    return this.getAll<AcknowledgedTicket>(ACKNOWLEDGED_TICKET_PREFIX, AcknowledgedTicket.deserialize, filterFunc)
   }
 
   /**
@@ -211,7 +211,7 @@ export class HoprDB {
    * @param ackTicket Uint8Array
    * @param index Uint8Array
    */
-  async updateAcknowledgement(ackTicket: Acknowledgement, index: Uint8Array): Promise<void> {
+  async updateAcknowledgement(ackTicket: AcknowledgedTicket, index: Uint8Array): Promise<void> {
     await this.put(keyAcknowledgedTickets(index), ackTicket.serialize())
   }
 
@@ -219,7 +219,7 @@ export class HoprDB {
    * Delete acknowledged ticket in database
    * @param index Uint8Array
    */
-  async deleteAcknowledgement(acknowledgement: Acknowledgement): Promise<void> {
+  async deleteAcknowledgement(acknowledgement: AcknowledgedTicket): Promise<void> {
     await this.del(keyAcknowledgedTickets(acknowledgement.ticket.challenge.serialize()))
   }
 
@@ -287,7 +287,7 @@ export class HoprDB {
     await this.del(UnAcknowledgedTickets(key.serialize()))
   }
 
-  async replaceTicketWithAcknowledgement(key: PublicKey, acknowledgment: Acknowledgement) {
+  async replaceTicketWithAcknowledgement(key: PublicKey, acknowledgment: AcknowledgedTicket) {
     const ticketCounter = await this.getTicketCounter()
     const unAcknowledgedDbKey = UnAcknowledgedTickets(key.serialize())
     const acknowledgedDbKey = keyAcknowledgedTickets(ticketCounter)

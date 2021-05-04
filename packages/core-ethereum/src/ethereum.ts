@@ -2,10 +2,18 @@ import type { ContractTransaction } from 'ethers'
 import type Multiaddr from 'multiaddr'
 import type { HoprToken, HoprChannels } from './contracts'
 import { providers, utils, errors, Wallet, BigNumber } from 'ethers'
-import { Address, Ticket, Acknowledgement } from '@hoprnet/hopr-utils'
+import {
+  Address,
+  Ticket,
+  AcknowledgedTicket,
+  Balance,
+  NativeBalance,
+  Hash,
+  PublicKey,
+  durations,
+  PromiseValue
+} from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
-import { Balance, NativeBalance, Hash, PublicKey } from '@hoprnet/hopr-utils'
-import { durations, PromiseValue } from '@hoprnet/hopr-utils'
 import NonceTracker from './nonce-tracker'
 import TransactionManager from './transaction-manager'
 import { getNetworkGasPrice, getNetworkName } from './utils'
@@ -201,7 +209,7 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
   async function redeemTicket(
     channels: HoprChannels,
     counterparty: Address,
-    ackTicket: Acknowledgement,
+    ackTicket: AcknowledgedTicket,
     ticket: Ticket
   ): Promise<Receipt> {
     const transaction = await sendTransaction(

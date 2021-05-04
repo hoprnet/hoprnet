@@ -1,5 +1,5 @@
-import { u8aEquals, SECP256K1_CONSTANTS } from '@hoprnet/hopr-utils'
-import { HASH_ALGORITHM } from './constants'
+import { u8aEquals, SECP256K1_CONSTANTS } from '..'
+import { HASH_ALGORITHM } from '../crypto'
 import { ecdsaSign, ecdsaVerify, publicKeyCreate } from 'secp256k1'
 import { createHash } from 'crypto'
 

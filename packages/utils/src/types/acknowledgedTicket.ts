@@ -2,7 +2,7 @@ import { Hash, Ticket } from '.'
 import { serializeToU8a, u8aSplit, validateAcknowledgement } from '..'
 import { PublicKey } from '..'
 
-export class Acknowledgement {
+export class AcknowledgedTicket {
   constructor(readonly ticket: Ticket, readonly response: Hash, readonly preImage: Hash) {}
 
   public serialize(): Uint8Array {
@@ -27,7 +27,7 @@ export class Acknowledgement {
 
   static deserialize(arr: Uint8Array) {
     const components = u8aSplit(arr, [Ticket.SIZE, Hash.SIZE, Hash.SIZE])
-    return new Acknowledgement(Ticket.deserialize(components[0]), new Hash(components[1]), new Hash(components[2]))
+    return new AcknowledgedTicket(Ticket.deserialize(components[0]), new Hash(components[1]), new Hash(components[2]))
   }
 
   static get SIZE(): number {

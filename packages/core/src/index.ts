@@ -7,7 +7,6 @@ import { NOISE } from 'libp2p-noise'
 
 const { HoprConnect } = require('@hoprnet/hopr-connect')
 
-import { Packet } from './messages/packet'
 import {
   PACKET_SIZE,
   MAX_HOPS,
@@ -22,13 +21,27 @@ import NetworkPeers from './network/network-peers'
 import Heartbeat from './network/heartbeat'
 import { findPath } from './path'
 
-import { u8aToHex, DialOpts, HoprDB } from '@hoprnet/hopr-utils'
-
 import Multiaddr from 'multiaddr'
 import chalk from 'chalk'
 
 import PeerId from 'peer-id'
-import { PublicKey, Balance, Address, ChannelEntry, NativeBalance, Hash, Acknowledgement } from '@hoprnet/hopr-utils'
+import {
+  PublicKey,
+  Balance,
+  Address,
+  ChannelEntry,
+  NativeBalance,
+  Hash,
+  Acknowledgement,
+  u8aToHex,
+  DialOpts,
+  HoprDB,
+  Packet,
+  libp2pSendMessageAndExpectResponse,
+  libp2pSubscribe,
+  libp2pSendMessage,
+  LibP2PHandlerFunction
+} from '@hoprnet/hopr-utils'
 import HoprCoreEthereum, { RoutingChannel } from '@hoprnet/hopr-core-ethereum'
 import BN from 'bn.js'
 import { getAddrs } from './identity'
@@ -37,12 +50,7 @@ import EventEmitter from 'events'
 import { ChannelStrategy, PassiveStrategy, PromiscuousStrategy } from './channel-strategy'
 import Debug from 'debug'
 import { Address as LibP2PAddress } from 'libp2p/src/peer-store'
-import {
-  libp2pSendMessageAndExpectResponse,
-  libp2pSubscribe,
-  libp2pSendMessage,
-  LibP2PHandlerFunction
-} from '@hoprnet/hopr-utils'
+
 import { subscribeToAcknowledgements } from './interactions/packet/acknowledgement'
 import { PacketForwardInteraction } from './interactions/packet/forward'
 

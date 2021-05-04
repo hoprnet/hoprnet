@@ -1,5 +1,5 @@
 import { PROTOCOL_STRING } from '../../constants'
-import { Packet } from '../../messages/packet'
+import { Packet } from '@hoprnet/hopr-utils'
 import type HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 // import Debug from 'debug'
 import type PeerId from 'peer-id'

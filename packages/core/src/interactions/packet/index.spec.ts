@@ -7,8 +7,7 @@ import { subscribeToAcknowledgements, sendAcknowledgement } from './acknowledgem
 import { Address, PublicKey, u8aEquals, Ticket, UINT256, HoprDB } from '@hoprnet/hopr-utils'
 import { Balance, createFirstChallenge } from '@hoprnet/hopr-utils'
 
-import { Challenge } from '../../messages/challenge'
-import { Packet } from '../../messages/packet'
+import { Challenge, Packet } from '@hoprnet/hopr-utils'
 import { PacketForwardInteraction } from './forward'
 import Defer from 'p-defer'
 

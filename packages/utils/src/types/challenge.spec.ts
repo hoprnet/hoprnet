@@ -1,5 +1,5 @@
 import { Challenge } from './challenge'
-import { sampleGroupElement } from '@hoprnet/hopr-utils'
+import { sampleGroupElement } from '..'
 import PeerId from 'peer-id'
 import assert from 'assert'
 import { randomBytes } from 'libp2p-crypto'
