@@ -1,5 +1,6 @@
 import Heap from 'heap-js'
-import { randomInteger, Packet } from '@hoprnet/hopr-utils'
+import { randomInteger } from '@hoprnet/hopr-utils'
+import type { Packet } from './messages'
 import { MAX_PACKET_DELAY } from './constants'
 //import debug from 'debug'
 //const log = debug('hopr-core:mixer')

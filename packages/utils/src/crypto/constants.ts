@@ -8,7 +8,3 @@ export const SECP256K1_CONSTANTS = {
   SIGNATURE_LENGTH: 64,
   RECOVERABLE_SIGNATURE_LENGTH: 65
 }
-
-export const SECRET_LENGTH = 32
-
-export const HASH_ALGORITHM = 'blake2s256'

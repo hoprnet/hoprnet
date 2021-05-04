@@ -3,7 +3,8 @@ import { PublicKey, Hash, durations } from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 import { PROTOCOL_ACKNOWLEDGEMENT } from '../../constants'
-import { HoprDB, Acknowledgement, Packet } from '@hoprnet/hopr-utils'
+import { Acknowledgement, Packet } from '../../messages'
+import { HoprDB } from '@hoprnet/hopr-utils'
 const log = debug('hopr-core:acknowledgement')
 
 const ACKNOWLEDGEMENT_TIMEOUT = durations.seconds(2)

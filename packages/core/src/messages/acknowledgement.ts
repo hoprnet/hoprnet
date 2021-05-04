@@ -1,7 +1,7 @@
 import { Challenge } from './challenge'
-import { deriveAckKeyShare, SECP256K1_CONSTANTS, PublicKey, u8aSplit } from '..'
+import { deriveAckKeyShare, SECP256K1_CONSTANTS, PublicKey, u8aSplit } from '@hoprnet/hopr-utils'
 import { ecdsaSign, ecdsaVerify, publicKeyCreate } from 'secp256k1'
-import { SECRET_LENGTH, HASH_ALGORITHM } from '../crypto'
+import { SECRET_LENGTH, HASH_ALGORITHM } from './constants'
 import { createHash } from 'crypto'
 import type PeerId from 'peer-id'
 

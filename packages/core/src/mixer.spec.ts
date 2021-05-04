@@ -1,4 +1,4 @@
-import type { Packet } from '@hoprnet/hopr-utils'
+import type { Packet } from './messages'
 import { Mixer } from './mixer'
 import assert from 'assert'
 import { MAX_PACKET_DELAY } from './constants'

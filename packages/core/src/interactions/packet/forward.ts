@@ -1,13 +1,11 @@
 import { PROTOCOL_STRING } from '../../constants'
-import { Packet } from '@hoprnet/hopr-utils'
+import { Packet } from '../../messages'
 import type HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
-// import Debug from 'debug'
 import type PeerId from 'peer-id'
 import { durations, pubKeyToPeerId, HoprDB } from '@hoprnet/hopr-utils'
 import { Mixer } from '../../mixer'
 import { sendAcknowledgement } from './acknowledgement'
 
-// const log = Debug('hopr-core:forward')
 const FORWARD_TIMEOUT = durations.seconds(6)
 
 export class PacketForwardInteraction {

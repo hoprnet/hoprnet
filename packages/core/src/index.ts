@@ -35,7 +35,6 @@ import {
   u8aToHex,
   DialOpts,
   HoprDB,
-  Packet,
   libp2pSendMessageAndExpectResponse,
   libp2pSubscribe,
   libp2pSendMessage,
@@ -53,6 +52,8 @@ import { Address as LibP2PAddress } from 'libp2p/src/peer-store'
 
 import { subscribeToAcknowledgements } from './interactions/packet/acknowledgement'
 import { PacketForwardInteraction } from './interactions/packet/forward'
+
+import { Packet } from './messages'
 
 const log = Debug(`hopr-core`)
 const verbose = Debug('hopr-core:verbose')
@@ -234,7 +235,7 @@ class Hopr extends EventEmitter {
       this.libp2p.peerStore.addressBook.add(id, multiaddrs)
     })
 
-    await this.heartbeat.start()
+    this.heartbeat.start()
     this.periodicCheck()
     this.setChannelStrategy(this.options.strategy || 'passive')
     this.status = 'RUNNING'

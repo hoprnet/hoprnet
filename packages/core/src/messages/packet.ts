@@ -1,9 +1,11 @@
 import { Channel } from '@hoprnet/hopr-core-ethereum'
-import { Ticket, PublicKey, Balance, UnacknowledgedTicket, Hash, HoprDB } from '..'
-import type HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
-import { Challenge } from './challenge'
-import { u8aSplit, u8aToHex } from '../u8a'
 import {
+  Ticket,
+  PublicKey,
+  Balance,
+  UnacknowledgedTicket,
+  Hash,
+  HoprDB,
   getPacketLength,
   POR_STRING_LENGTH,
   deriveAckKeyShare,
@@ -12,9 +14,13 @@ import {
   generateKeyShares,
   createPoRString,
   createFirstChallenge,
-  preVerify
-} from '../crypto'
-import { pubKeyToPeerId } from '..'
+  preVerify,
+  u8aSplit,
+  u8aToHex,
+  pubKeyToPeerId
+} from '@hoprnet/hopr-utils'
+import type HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
+import { Challenge } from './challenge'
 import type PeerId from 'peer-id'
 import { publicKeyCreate } from 'secp256k1'
 import BN from 'bn.js'

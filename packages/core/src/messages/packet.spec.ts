@@ -1,9 +1,7 @@
 import { Packet, MAX_HOPS } from './packet'
-import { HoprDB } from '..'
+import { HoprDB, Ticket, UINT256, Balance, PublicKey, Address, u8aEquals } from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'
-import { Ticket, UINT256, Balance, PublicKey, Address } from '.'
 import BN from 'bn.js'
-import { u8aEquals } from '../u8a'
 import assert from 'assert'
 
 function createMockTickets(privKey: Uint8Array) {
