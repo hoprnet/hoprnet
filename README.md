@@ -17,40 +17,79 @@
   </p>
 </p>
 
-## Instructions
+## Table of Contents
 
-### Installing a binary from NPM
+- [Install](#install)
+  - [Using NPM](#using-npm)
+  - [Using Docker](#using-docker)
+  - [Using Nix package manager](#using-nix-package-manager)
+- [Usage](#usage)
+  - [Starting database](#starting-database)
+  - [Starting node with custom port](#starting-node-with-custom-port)
+- [Develop](#develop)
+- [License](#license)
+
+## Install
+
+### Using NPM
+
+Using the [hoprd npm package][6]:
 
 ```sh
 npm install -g @hoprnet/hoprd
 hoprd --admin
 ```
 
-### Running in a docker container
+### Using Docker
 
-We maintain a docker container at
-`gcr.io/hoprassociation/hoprd:$RELEASE`, `latest` tags `master`. To use our Docker images, first pull the image and then proceed to alias it as follows:
+All our docker images can be found in [our Google Cloud Container Registry][4].
+Each image is prefixed with `gcr.io/hoprassociation/$PROJECT:$RELEASE`.
+The `latest` tag represents the `master` branch.
+Stable releases are published on [Docker Hub][5].
+
+For ease of use you can set up a shell alias to run the latest docker container:
 
 ```sh
-docker pull gcr.io/hoprassociation/hoprd
-alias hoprd='docker run --rm -v $(pwd)/db:/app/db gcr.io/hoprassociation/hoprd:latest'
+alias hoprd='docker run --pull always --rm -v $(pwd)/db:/app/db gcr.io/hoprassociation/hoprd:latest'
 ```
 
-### Flags
+### Using [Nix package manager][1]
 
-#### Starting database
+NOTE: This setup should only be used for development or if you know what you
+are doing and don't neetd further supported. Otherwise you should use the `npm`
+or `docker` setup.
+
+You will need to clone the `hoprnet` repo first:
+
+```sh
+git clone https://github.com/hoprnet/hoprnet
+```
+
+If you have [direnv][2] and [lorri][3] set up properly your `nix-shell` will be
+configured automatically upon entering the `hoprnet` directory and enabling it
+via `direnv allow`. Otherwise you must enter the `nix-shell` manually:
+
+```sh
+nix-shell
+```
+
+Now you may follow the instructions in [Developing](#developing).
+
+## Usage
+
+### Starting database
 
 ```sh
 hoprd --admin --init
 ```
 
-#### Running with a custom host (HOPR Node)
+### Starting node with custom port
 
 ```sh
 hoprd --admin --host="0.0.0.0:1291"
 ```
 
-### Developing
+## Develop
 
 ```sh
 yarn          # Install lerna and sets project up
@@ -72,18 +111,23 @@ DEBUG=hopr* yarn run:hoprd:bob
 yarn run:faucet:all
 ```
 
-### Docker images
-
-All our docker images can be found [here](https://console.cloud.google.com/gcr/images/hoprassociation/GLOBAL) and are prefixed as `gcr.io/hoprassociation/$PROJECT:$RELEASE`. Stable releases live in [Docker Hub](https://hub.docker.com/u/hopr)
-
-<!-- CONTACT -->
-
 ## Contact
 
-- Twitter - https://twitter.com/hoprnet
-- Telegram - https://t.me/hoprnet
-- Medium - https://medium.com/hoprnet
-- Reddit - https://www.reddit.com/r/HOPR/
-- Email - contact@hoprnet.org
-- Discord - https://discord.gg/5FWSfq7
-- Youtube - https://www.youtube.com/channel/UC2DzUtC90LXdW7TfT3igasA
+- [Twitter](https://twitter.com/hoprnet)
+- [Telegram](https://t.me/hoprnet)
+- [Medium](https://medium.com/hoprnet)
+- [Reddit](https://www.reddit.com/r/HOPR/)
+- [Email](mailto:contact@hoprnet.org)
+- [Discord](https://discord.gg/5FWSfq7)
+- [Youtube](https://www.youtube.com/channel/UC2DzUtC90LXdW7TfT3igasA)
+
+## License
+
+[GPL v3](LICENSE) © HOPR Association
+
+[1]: https://nixos.org/learn.html
+[2]: https://search.nixos.org/packages?channel=20.09&show=direnv&from=0&size=50&sort=relevance&query=direnv
+[3]: https://search.nixos.org/packages?channel=20.09&show=lorri&from=0&size=50&sort=relevance&query=lorri
+[4]: https://console.cloud.google.com/gcr/images/hoprassociation/GLOBAL
+[5]: https://hub.docker.com/u/hopr
+[6]: https://www.npmjs.com/package/@hoprnet/hoprd
