@@ -39,7 +39,7 @@
     "multihashes": "~4.0.1",
     "peer-id": "0.14.8",
     "secp256k1": "^4.0.2",
-    "strip-ansi": "^6.0.0"
+    "strip-ansi": "^7.0.0"
   },
   "devDependencies": {
     "@types/mocha": "^8.2.0",
