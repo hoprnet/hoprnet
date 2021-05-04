@@ -246,7 +246,7 @@ class Indexer extends EventEmitter {
       //TODO types
       const multiaddr = Multiaddr(stringToU8a(event.args.multiaddr))
       const address = Address.fromString(event.args.account)
-      const account = new AccountEntry(address, multiaddr,  blockNumber)
+      const account = new AccountEntry(address, multiaddr, blockNumber)
       if (!account.getPublicKey().toAddress().eq(address)) {
         throw Error("Multiaddr in announcement does not match sender's address")
       }
@@ -261,7 +261,7 @@ class Indexer extends EventEmitter {
       await this.db.updateAccount(account)
     } catch (e) {
       // Issue with the multiaddress, no worries, we ignore this announcement.
-      log("Error with announced peer", e, event)
+      log('Error with announced peer', e, event)
     }
   }
 
@@ -314,9 +314,7 @@ class Indexer extends EventEmitter {
   }
 
   public async getAnnouncedAddresses(): Promise<Multiaddr[]> {
-    return (await this.db.getAccounts()).map(
-      (account: AccountEntry) => account.multiAddr
-    )
+    return (await this.db.getAccounts()).map((account: AccountEntry) => account.multiAddr)
   }
 
   public async getPublicNodes(): Promise<Multiaddr[]> {
