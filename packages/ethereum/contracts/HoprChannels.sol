@@ -524,9 +524,14 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     }
 
     /**
-     * @dev computes the challenge from the given response.
-     * This is done by misusing ecrecover to perform a ec-point multiplication
-     * with a scalar.
+     * Uses the response to recompute the challenge. This is done
+     * by multiplying the base point of the curve with the given response.
+     * Due to the lack of embedded ECMUL functionality in the current
+     * version of the EVM, this is done by misusing the `ecrecover` 
+     * functionality. `ecrecover` performs the point multiplication and 
+     * converts the output to an Ethereum address (sliced hash of the product
+     * of base point and scalar).
+     * @param response response that is used to recompute the challenge
      */
     function computeChallenge(bytes32 response) public pure returns (address)  {
         // Field order of the base field
