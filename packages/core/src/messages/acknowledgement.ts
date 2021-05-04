@@ -2,7 +2,7 @@ import { Challenge } from './challenge'
 import { deriveAckKeyShare, PublicKey } from '@hoprnet/hopr-utils'
 import { ecdsaSign, ecdsaVerify, publicKeyCreate } from 'secp256k1'
 import { SECRET_LENGTH, HASH_ALGORITHM } from './constants'
-import { SECP256K1_CONSTANTS, u8aSplit, CryptoError } from '@hoprnet/hopr-utils'
+import { SECP256K1_CONSTANTS, u8aSplit } from '@hoprnet/hopr-utils'
 import { createHash } from 'crypto'
 import type PeerId from 'peer-id'
 
@@ -47,7 +47,7 @@ export class Acknowledgement {
     const challengeToVerify = createHash(HASH_ALGORITHM).update(getAckChallenge(ackKeyShare)).digest()
 
     if (!ecdsaVerify(challengeSignature, challengeToVerify, ownPubKey.pubKey.marshal())) {
-      throw new CryptoError(`Challenge signature verification failed.`)
+      throw Error(`Challenge signature verification failed.`)
     }
 
     const ackToVerify = createHash(HASH_ALGORITHM)
@@ -55,7 +55,7 @@ export class Acknowledgement {
       .digest()
 
     if (!ecdsaVerify(ackSignature, ackToVerify, senderPubKey.pubKey.marshal())) {
-      throw new CryptoError(`Acknowledgement signature verification failed.`)
+      throw Error(`Acknowledgement signature verification failed.`)
     }
 
     return new Acknowledgement(ackSignature, challengeSignature, ackKeyShare)

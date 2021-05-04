@@ -2,7 +2,6 @@ import { u8aEquals, u8aXOR } from '../../u8a'
 import { derivePRGParameters } from './keyDerivation'
 import { MAC_LENGTH, SECRET_LENGTH, END_PREFIX, END_PREFIX_LENGTH } from './constants'
 import { SECP256K1_CONSTANTS } from '../constants'
-import { CryptoError } from '../cryptoError'
 import { randomFillSync } from 'crypto'
 import { PRG } from '../prg'
 import { generateFiller } from './filler'
@@ -144,7 +143,7 @@ export function forwardTransform(
   }
 
   if (!u8aEquals(createMAC(secret, header), mac)) {
-    throw new CryptoError(`Header integrity check failed.`)
+    throw Error(`Header integrity check failed.`)
   }
 
   const params = derivePRGParameters(secret)
@@ -171,7 +170,7 @@ export function forwardTransform(
   )
 
   if (!publicKeyVerify(nextHop)) {
-    throw new CryptoError(`Blinding of the group element failed. Result is not a valid curve point.`)
+    throw Error(`Blinding of the group element failed. Result is not a valid curve point.`)
   }
 
   header.copyWithin(0, routingInfoLength)
