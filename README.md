@@ -29,7 +29,14 @@ hoprd --admin
 ### Running in a docker container
 
 We maintain a docker container at
-`gcr.io/hoprassociation/hoprd:$RELEASE`
+`gcr.io/hoprassociation/hoprd:$RELEASE`, `latest` tags `master`. To use our Docker images, first pull the image and then proceed to alias it as follows:
+
+```sh
+docker pull gcr.io/hoprassociation/hoprd
+alias hoprd='docker run --rm -v $(pwd)/db:/app/db gcr.io/hoprassociation/hoprd:latest'
+```
+
+### Flags
 
 #### Starting database
 
@@ -43,7 +50,7 @@ hoprd --admin --init
 hoprd --admin --host="0.0.0.0:1291"
 ```
 
-### Developing with this repository
+### Developing
 
 ```sh
 yarn          # Install lerna and sets project up
