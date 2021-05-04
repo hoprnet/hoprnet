@@ -54,13 +54,13 @@ class Channel {
     acknowledgement: Hash
   ): Promise<Acknowledgement | null> {
     if (!unacknowledgedTicket.verify(this.counterparty, acknowledgement)) {
-      throw Error(`Ticket invalid`)
+      throw Error(`The acknowledgement is not sufficient to solve the embedded challenge.`)
     }
 
     const response = unacknowledgedTicket.getResponse(acknowledgement)
 
     if (!response.valid) {
-      throw Error(`Ticket invalid`)
+      throw Error(`Could not determine a valid response.`)
     }
 
     const ticket = unacknowledgedTicket.ticket
