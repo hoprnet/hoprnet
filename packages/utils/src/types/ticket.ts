@@ -141,15 +141,6 @@ export class Ticket {
     )
   }
 
-  getEmbeddedFunds(): Balance {
-    return new Balance(
-      this.amount
-        .toBN()
-        .mul(new BN(this.winProb.serialize()))
-        .div(new BN(new Uint8Array(Hash.SIZE).fill(0xff)))
-    )
-  }
-
   recoverSigner() {
     return new PublicKey(ecdsaRecover(this.signature.signature, this.signature.recovery, this.getHash().serialize()))
   }
