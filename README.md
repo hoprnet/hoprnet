@@ -112,6 +112,7 @@ DEBUG=hopr* yarn run:hoprd:bob
 # fund all your nodes to get started
 yarn run:faucet:all
 ```
+
 ## Tooling
 
 As some tools are only partially supported, please tag the respective team member
@@ -120,7 +121,7 @@ whenever you need an issue about a particular tool.
 | Maintainer       | Technology  |
 | :--------------- | :---------: |
 | @jjperezaguinaga | Visual Code |
-| @tolbrino        | Nix         |
+| @tolbrino        |     Nix     |
 
 ## Contact
 
