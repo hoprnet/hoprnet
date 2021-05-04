@@ -643,7 +643,7 @@ class Hopr extends EventEmitter {
       const counterparty = signedTicket.getSigner()
       const channel = ethereum.getChannel(self, counterparty)
 
-      const result = await channel.submitTicket(ackTicket)
+      const result = await channel.redeemTicket(ackTicket)
       // TODO look at result.status and actually do something
       await this.db.deleteAcknowledgement(ackTicket)
       return result

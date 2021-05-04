@@ -11,7 +11,7 @@ import {
   UnacknowledgedTicket
 } from '@hoprnet/hopr-utils'
 import Debug from 'debug'
-import type { SubmitTicketResponse } from '.'
+import type { RedeemTicketResponse } from '.'
 import { Commitment } from './commitment'
 import type { ChainWrapper } from './ethereum'
 import type Indexer from './indexer'
@@ -171,7 +171,7 @@ class Channel {
     )
   }
 
-  async submitTicket(ackTicket: Acknowledgement): Promise<SubmitTicketResponse> {
+  async redeemTicket(ackTicket: Acknowledgement): Promise<RedeemTicketResponse> {
     try {
       const ticket = ackTicket.ticket
 
