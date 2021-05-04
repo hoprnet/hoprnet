@@ -262,7 +262,7 @@ class Indexer extends EventEmitter {
       if (!account.getPeerId() || !PeerId.isPeerId(account.getPeerId())) {
         throw Error('Peer ID in multiaddr is null')
       }
-      log('New node announced', account.address.toHex(), account.multiAddr.toString())
+      log.info('New node announced', account.address.toHex(), account.multiAddr.toString())
       this.emit('peer', {
         id: account.getPeerId(),
         multiaddrs: [account.multiAddr]
