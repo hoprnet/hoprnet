@@ -1,14 +1,15 @@
-import type PeerId from 'peer-id'
+import PeerId from 'peer-id'
 import type { Event, EventNames } from './types'
 import type { ChainWrapper } from '../ethereum'
 import chalk from 'chalk'
 import BN from 'bn.js'
 import Heap from 'heap-js'
-import { pubKeyToPeerId, randomChoice, HoprDB } from '@hoprnet/hopr-utils'
+import { pubKeyToPeerId, randomChoice, HoprDB, stringToU8a } from '@hoprnet/hopr-utils'
 import { Address, ChannelEntry, AccountEntry, Hash, PublicKey, Balance, Snapshot } from '@hoprnet/hopr-utils'
 import { isConfirmedBlock, snapshotComparator } from './utils'
 import Debug from 'debug'
 import Multiaddr from 'multiaddr'
+import { EventEmitter } from 'events'
 
 export type RoutingChannel = [source: PeerId, destination: PeerId, stake: Balance]
 
@@ -20,7 +21,7 @@ const getSyncPercentage = (n: number, max: number) => ((n * 100) / max).toFixed(
  * all channels in the network.
  * Also keeps track of the latest block number.
  */
-class Indexer {
+class Indexer extends EventEmitter {
   public status: 'started' | 'restarting' | 'stopped' = 'stopped'
   public latestBlock: number = 0 // latest known on-chain block number
   private unconfirmedEvents = new Heap<Event<any>>(snapshotComparator)
@@ -31,7 +32,9 @@ class Indexer {
     private chain: ChainWrapper,
     private maxConfirmations: number,
     private blockRange: number
-  ) {}
+  ) {
+    super()
+  }
 
   /**
    * Starts indexing.
@@ -216,7 +219,7 @@ class Indexer {
       const eventName = event.event as EventNames
 
       if (eventName === 'Announcement') {
-        await this.onAnnouncement(event as Event<'Announcement'>)
+        await this.onAnnouncement(event as Event<'Announcement'>, new BN(blockNumber.toPrecision()))
       } else if (eventName === 'ChannelUpdate') {
         await this.onChannelUpdated(event as Event<'ChannelUpdate'>)
       } else {
@@ -238,10 +241,28 @@ class Indexer {
     this.unconfirmedEvents.addAll(events)
   }
 
-  private async onAnnouncement(event: Event<'Announcement'>): Promise<void> {
-    const account = AccountEntry.fromSCEvent(event)
-    log('New node announced', account.address.toHex())
-    await this.db.updateAccount(account.address, account)
+  private async onAnnouncement(event: Event<'Announcement'>, blockNumber: BN): Promise<void> {
+    try {
+      //TODO types
+      const multiaddr = Multiaddr(stringToU8a(event.args.multiaddr))
+      const address = Address.fromString(event.args.account)
+      const account = new AccountEntry(address, multiaddr, blockNumber)
+      if (!account.getPublicKey().toAddress().eq(address)) {
+        throw Error("Multiaddr in announcement does not match sender's address")
+      }
+      if (!account.getPeerId() || !PeerId.isPeerId(account.getPeerId())) {
+        throw Error('Peer ID in multiaddr is null')
+      }
+      log('New node announced', account.address.toHex(), account.multiAddr.toString())
+      this.emit('peer', {
+        id: account.getPeerId(),
+        multiaddrs: [account.multiAddr]
+      })
+      await this.db.updateAccount(account)
+    } catch (e) {
+      // Issue with the multiaddress, no worries, we ignore this announcement.
+      log('Error with announced peer', e, event)
+    }
   }
 
   private async onChannelUpdated(event: Event<'ChannelUpdate'>): Promise<void> {
@@ -290,6 +311,10 @@ class Indexer {
       const partyBBalance = channel.partyBBalance
       return [source, await pubKeyToPeerId(partyAPubKey.serialize()), partyBBalance]
     }
+  }
+
+  public async getAnnouncedAddresses(): Promise<Multiaddr[]> {
+    return (await this.db.getAccounts()).map((account: AccountEntry) => account.multiAddr)
   }
 
   public async getPublicNodes(): Promise<Multiaddr[]> {

@@ -363,8 +363,8 @@ export class HoprDB {
     return data ? AccountEntry.deserialize(data) : undefined
   }
 
-  async updateAccount(address: Address, account: AccountEntry): Promise<void> {
-    await this.put(createAccountKey(address), account.serialize())
+  async updateAccount(account: AccountEntry): Promise<void> {
+    await this.put(createAccountKey(account.address), account.serialize())
   }
 
   async getAccounts(filter?: (account: AccountEntry) => boolean) {

@@ -1,6 +1,7 @@
 import { expect } from 'chai'
 import Multiaddr from 'multiaddr'
 import { Address, AccountEntry } from '.'
+import BN from 'bn.js'
 
 // TODO: move these & similar into constants file
 const EMPTY_ADDRESS = new Address(new Uint8Array({ length: Address.SIZE }))
@@ -18,15 +19,10 @@ describe('AccountEntry', function () {
     expect(accountEntry.multiAddr).to.equal(undefined)
   })
 
-  it('should contain the right values when only address passed', function () {
-    const accountEntry = AccountEntry.deserialize(new AccountEntry(PARTY_A_ADDRESS).serialize())
-
-    expect(accountEntry.address.toHex()).to.equal(PARTY_A_ADDRESS.toHex())
-    expect(accountEntry.multiAddr).to.equal(undefined)
-  })
-
   it('should contain the right values', function () {
-    const accountEntry = AccountEntry.deserialize(new AccountEntry(PARTY_A_ADDRESS, PARTY_A_MULTI_ADDR).serialize())
+    const accountEntry = AccountEntry.deserialize(
+      new AccountEntry(PARTY_A_ADDRESS, PARTY_A_MULTI_ADDR, new BN('1')).serialize()
+    )
 
     expect(accountEntry.address.toHex()).to.equal(PARTY_A_ADDRESS.toHex())
     expect(accountEntry.multiAddr.toString()).to.equal(PARTY_A_MULTI_ADDR.toString())

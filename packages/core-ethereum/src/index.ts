@@ -32,7 +32,7 @@ export type SubmitTicketResponse =
 export default class HoprEthereum {
   private privateKey: Uint8Array
 
-  constructor(private chain: ChainWrapper, private db: HoprDB, private indexer: Indexer) {
+  constructor(private chain: ChainWrapper, private db: HoprDB, public indexer: Indexer) {
     this.privateKey = this.chain.getPrivateKey()
   }
 
