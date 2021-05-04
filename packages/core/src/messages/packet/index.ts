@@ -8,7 +8,7 @@ import { Challenge } from './challenge'
 import Message from './message'
 import { TICKET_AMOUNT, TICKET_WIN_PROB } from '../../constants'
 import Debug from 'debug'
-import { Hash, PublicKey, Ticket, Balance, UnacknowledgedTicket } from '@hoprnet/hopr-utils'
+import { Hash, PublicKey, Ticket, Balance, UnacknowledgedTicket, UINT256 } from '@hoprnet/hopr-utils'
 import HoprCoreEthereum, { Channel } from '@hoprnet/hopr-core-ethereum'
 
 const log = Debug('hopr-core:message:packet')
