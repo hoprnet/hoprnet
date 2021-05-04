@@ -65,7 +65,7 @@ export async function validateUnacknowledgedTicket(
   }
 
   // ticket MUST have at least X winning probability
-  if (ticket.winProb.toBN().lt(Ticket.fromProbability(nodeTicketWinProb).toBN())) {
+  if (ticket.winProb.toBN().lt(UINT256.fromProbability(nodeTicketWinProb).toBN())) {
     throw Error(`Ticket winning probability is lower than '${nodeTicketWinProb}'`)
   }
 
