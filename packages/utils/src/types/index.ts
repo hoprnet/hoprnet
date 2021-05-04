@@ -9,5 +9,3 @@ export * from './snapshot'
 export * from './solidity'
 export * from './ticket'
 export * from './unacknowledged'
-
-
