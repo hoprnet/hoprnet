@@ -125,7 +125,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         bytes32 nextCommitment,
         uint256 ticketEpoch,
         uint256 ticketIndex,
-        bytes32 porSecret,
+        bytes32 proofOfRelaySecret,
         uint256 amount,
         uint256 winProb,
         bytes memory signature
@@ -136,7 +136,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
             nextCommitment,
             ticketEpoch,
             ticketIndex,
-            porSecret,
+            proofOfRelaySecret,
             amount,
             winProb,
             signature
@@ -443,7 +443,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
      * @param redeemer the redeemer address
      * @param counterparty the counterparty address
      * @param nextCommitment the commitment that hashes to the redeemers previous commitment
-     * @param porSecret the proof of relay secret
+     * @param proofOfRelaySecret the proof of relay secret
      * @param winProb the winning probability of the ticket
      * @param amount the amount in the ticket
      * @param signature signature
@@ -454,7 +454,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         bytes32 nextCommitment,
         uint256 ticketEpoch,
         uint256 ticketIndex,
-        bytes32 porSecret,
+        bytes32 proofOfRelaySecret,
         uint256 amount,
         uint256 winProb,
         bytes memory signature
@@ -487,7 +487,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
               _getEncodedTicket(
                   redeemer,
                   prevTicketEpoch,
-                  porSecret,
+                  proofOfRelaySecret,
                   channel.channelEpoch,
                   amount,
                   ticketIndex,
@@ -553,13 +553,13 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     function _getEncodedTicket(
         address recipient,
         uint256 recipientCounter,
-        bytes32 porSecret,
+        bytes32 proofOfRelaySecret,
         uint256 channelIteration,
         uint256 amount,
         uint256 ticketIndex,
         uint256 winProb
     ) internal pure returns (bytes memory) {
-        address challenge = computeChallenge(porSecret);
+        address challenge = computeChallenge(proofOfRelaySecret);
 
         return abi.encodePacked(
             recipient,

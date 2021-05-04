@@ -43,13 +43,13 @@ contract ChannelsMock is HoprChannels {
     function getEncodedTicketInternal(
         address recipient,
         uint256 recipientCounter,
-        bytes32 porSecret,
+        bytes32 proofOfRelaySecret,
         uint256 channelIteration,
         uint256 amount,
         uint256 ticketIndex,
         uint256 winProb
     ) external pure returns (bytes memory) {
-        return _getEncodedTicket(recipient, recipientCounter, porSecret, channelIteration, amount, ticketIndex, winProb);
+        return _getEncodedTicket(recipient, recipientCounter, proofOfRelaySecret, channelIteration, amount, ticketIndex, winProb);
     }
 
     function getTicketLuckInternal(

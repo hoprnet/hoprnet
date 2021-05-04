@@ -8,7 +8,7 @@ import { PublicKey, stringToU8a } from '@hoprnet/hopr-utils'
 
 type Ticket = {
   recipient: string
-  porSecret: string
+  proofOfRelaySecret: string
   amount: string
   winProb: string
   channelEpoch: string
@@ -18,12 +18,12 @@ type Ticket = {
 
 const percentToUint256 = (percent: any) => ethers.constants.MaxUint256.mul(percent).div(100)
 
-const computeChallenge = (porSecret: string): string => {
-  return PublicKey.fromPrivKey(stringToU8a(porSecret)).toAddress().toHex()
+const computeChallenge = (proofOfRelaySecret: string): string => {
+  return PublicKey.fromPrivKey(stringToU8a(proofOfRelaySecret)).toAddress().toHex()
 }
 
 const getEncodedTicket = (ticket: Ticket): string => {
-  const challenge = computeChallenge(ticket.porSecret)
+  const challenge = computeChallenge(ticket.proofOfRelaySecret)
 
   return ethers.utils.solidityPack(
     ['address', 'bytes20', 'uint256', 'uint256', 'uint256', 'uint256', 'uint256'],
@@ -49,7 +49,7 @@ export const redeemArgs = (ticket) => [
   ticket.nextCommitment,
   ticket.ticketEpoch,
   ticket.ticketIndex,
-  ticket.porSecret,
+  ticket.proofOfRelaySecret,
   ticket.amount,
   ticket.winProb,
   ticket.signature
@@ -148,7 +148,7 @@ const useFixtures = deployments.createFixture(async () => {
   const TICKET_AB_WIN = await createTicket(
     {
       recipient: ACCOUNT_B.address,
-      porSecret: PROOF_OF_RELAY_SECRET_0,
+      proofOfRelaySecret: PROOF_OF_RELAY_SECRET_0,
       ticketEpoch: '0',
       ticketIndex: '1',
       amount: '10',
@@ -287,7 +287,7 @@ describe('with a funded HoprChannel (A: 70, B: 30), secrets initialized', functi
     const TICKET_BA_WIN = await createTicket(
       {
         recipient: ACCOUNT_A.address,
-        porSecret: PROOF_OF_RELAY_SECRET_0,
+        proofOfRelaySecret: PROOF_OF_RELAY_SECRET_0,
         ticketEpoch: '1',
         ticketIndex: '1',
         amount: '10',
@@ -345,7 +345,7 @@ describe('with a funded HoprChannel (A: 70, B: 30), secrets initialized', functi
         SECRET_0, // give the next secret so this ticket becomes redeemable
         TICKET_AB_WIN.ticketEpoch,
         TICKET_AB_WIN.ticketIndex,
-        TICKET_AB_WIN.porSecret,
+        TICKET_AB_WIN.proofOfRelaySecret,
         TICKET_AB_WIN.amount,
         TICKET_AB_WIN.winProb,
         TICKET_AB_WIN.signature
@@ -358,7 +358,7 @@ describe('with a funded HoprChannel (A: 70, B: 30), secrets initialized', functi
         SECRET_0, // give the next secret so this ticket becomes redeemable
         parseInt(TICKET_AB_WIN.ticketEpoch) + 1 + '',
         TICKET_AB_WIN.ticketIndex,
-        TICKET_AB_WIN.porSecret,
+        TICKET_AB_WIN.proofOfRelaySecret,
         TICKET_AB_WIN.amount,
         TICKET_AB_WIN.winProb,
         TICKET_AB_WIN.signature
@@ -377,7 +377,7 @@ describe('with a funded HoprChannel (A: 70, B: 30), secrets initialized', functi
           TICKET_AB_WIN.nextCommitment,
           TICKET_AB_WIN.ticketEpoch,
           TICKET_AB_WIN.ticketIndex,
-          TICKET_AB_WIN.porSecret,
+          TICKET_AB_WIN.proofOfRelaySecret,
           TICKET_AB_WIN.amount,
           TICKET_AB_WIN.winProb,
           FAKE_SIGNATURE
@@ -389,7 +389,7 @@ describe('with a funded HoprChannel (A: 70, B: 30), secrets initialized', functi
     const TICKET_AB_LOSS = await createTicket(
       {
         recipient: ACCOUNT_B.address,
-        porSecret: PROOF_OF_RELAY_SECRET_0,
+        proofOfRelaySecret: PROOF_OF_RELAY_SECRET_0,
         ticketEpoch: '0',
         ticketIndex: '1',
         amount: '10',
@@ -541,7 +541,7 @@ describe('with a reopened channel', function () {
     TICKET_AB_WIN_RECYCLED = await createTicket(
       {
         recipient: ACCOUNT_B.address,
-        porSecret: PROOF_OF_RELAY_SECRET_0,
+        proofOfRelaySecret: PROOF_OF_RELAY_SECRET_0,
         ticketIndex: '1',
         ticketEpoch: '0',
         amount: '10',
@@ -554,7 +554,7 @@ describe('with a reopened channel', function () {
     TICKET_BA_WIN_RECYCLED = await createTicket(
       {
         recipient: ACCOUNT_A.address,
-        porSecret: PROOF_OF_RELAY_SECRET_0,
+        proofOfRelaySecret: PROOF_OF_RELAY_SECRET_0,
         ticketIndex: '1',
         ticketEpoch: '2',
         amount: '10',
@@ -658,7 +658,7 @@ describe('test internals with mock', function () {
     const encoded = await channels.getEncodedTicketInternal(
       TICKET_AB_WIN.recipient,
       TICKET_AB_WIN.ticketEpoch,
-      TICKET_AB_WIN.porSecret,
+      TICKET_AB_WIN.proofOfRelaySecret,
       TICKET_AB_WIN.channelEpoch,
       TICKET_AB_WIN.amount,
       TICKET_AB_WIN.ticketIndex,
