@@ -1,7 +1,7 @@
 {
   "name": "@hoprnet/hopr-utils",
   "description": "HOPR-based utilities to process multiple data structures",
-  "version": "1.71.0-next.107",
+  "version": "1.71.0-next.108",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
   "license": "GPL-3.0",
@@ -39,7 +39,7 @@
     "multihashes": "~4.0.1",
     "peer-id": "0.14.8",
     "secp256k1": "^4.0.2",
-    "strip-ansi": "^6.0.0"
+    "strip-ansi": "^7.0.0"
   },
   "devDependencies": {
     "@types/mocha": "^8.2.0",
