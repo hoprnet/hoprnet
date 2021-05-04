@@ -676,10 +676,6 @@ class Hopr extends EventEmitter {
     return ethereum.withdraw(currency, recipient, amount)
   }
 
-  public emitMessage(msg: Uint8Array) {
-    this.emit('hopr:message', msg)
-  }
-
   /**
    * Takes a destination and samples randomly intermediate nodes
    * that will relay that message before it reaches its destination.
