@@ -49,8 +49,8 @@ export class AccountEntry {
     ])
   }
 
-  public getPeerId() {
-    return this.multiAddr.getPeerId()
+  public getPeerId(): PeerId {
+    return PeerId.createFromB58String(this.multiAddr.getPeerId())
   }
 
   public getPublicKey(): PublicKey {
