@@ -48,6 +48,7 @@ Each node on the path needs to know the next downstream node. Therefore, the sen
 $$\beta_i=(Z\|I\|0_{(2(r-v)+2)\kappa-|Z|}\oplus PRNG(s_{v-1})_{[ \,0....(2(r-v)+3)\kappa-1})\|\phi$$
 Such that $Z$ is the destination address and $|Z|$ is its length. $I$ is an identifier used for SURBs (Single-Use-Reply Blocks) such that $I \in \{0, 1\}^\kappa$.
 $v\leq r$ is the length of the path traversed by the packet where $|Z| \leq (2(r - v) + 2)$. $\phi$ is a filler string that is used to ensure the header packets remain constant in size as layers of encryption are added or removed. 
+\\~\\$\beta_i$ is computed as the concatenation of $Z$, $I$ and a sequence of padding which is then encrypted by XORing with the output of a pseudo-random number generator seeded with shared key $s_{v-1}$ of node $v-1$. The result is finally merged with $\phi$ to ensure the header packets remain constant in size.
 \\~\\Since $(A)$ has a shared secret with each of the nodes along the path, it is able to derive blindings for each of them. 
 \newline Each node along the path receives an authentication tag $\gamma_i$ in the form of a message authentication code (MAC)
 which is encoded in the header.
