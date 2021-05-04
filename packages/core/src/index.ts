@@ -467,7 +467,7 @@ class Hopr extends EventEmitter {
     const announced = await (await this.paymentChannels).indexer.getAnnouncedAddresses()
     return `${connected}
     \n${announced.length} peers have announced themselves on chain:
-    \n${announced.map(x => x.toString()).join('\n')}` 
+    \n${announced.map((x) => x.toString()).join('\n')}`
   }
 
   private async checkBalances() {
