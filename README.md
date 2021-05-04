@@ -27,6 +27,8 @@
   - [Starting database](#starting-database)
   - [Starting node with custom port](#starting-node-with-custom-port)
 - [Develop](#develop)
+- [Tooling](#tooling)
+- [Contact](#contact)
 - [License](#license)
 
 ## Install
@@ -75,16 +77,6 @@ nix-shell
 
 Now you may follow the instructions in [Develop](#develop).
 
-## Tooling
-
-As some tools are only partially supported, please tag the respective team member
-whenever you need an issue about a particular tool.
-
-| Maintainer       | Technology  |
-| :--------------- | :---------: |
-| @jjperezaguinaga | Visual Code |
-| @tolbrino        |     Nix     |
-
 ## Usage
 
 ### Starting database
@@ -120,6 +112,15 @@ DEBUG=hopr* yarn run:hoprd:bob
 # fund all your nodes to get started
 yarn run:faucet:all
 ```
+## Tooling
+
+As some tools are only partially supported, please tag the respective team member
+whenever you need an issue about a particular tool.
+
+| Maintainer       | Technology  |
+| :--------------- | :---------: |
+| @jjperezaguinaga | Visual Code |
+| @tolbrino        | Nix         |
 
 ## Contact
 
