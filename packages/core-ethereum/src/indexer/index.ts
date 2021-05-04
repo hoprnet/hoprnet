@@ -242,13 +242,18 @@ class Indexer extends EventEmitter {
   }
 
   private async onAnnouncement(event: Event<'Announcement'>, blockNumber: BN): Promise<void> {
-    const account = AccountEntry.fromSCEvent(event, blockNumber)
-    log('New node announced', account.address.toHex())
-    this.emit('peer', {
-      id: account.getPeerId(),
-      multiaddrs: [account.multiAddr]
-    })
-    await this.db.updateAccount(account)
+    try {
+      const account = AccountEntry.fromSCEvent(event, blockNumber)
+      log('New node announced', account.address.toHex())
+      this.emit('peer', {
+        id: account.getPeerId(),
+        multiaddrs: [account.multiAddr]
+      })
+      await this.db.updateAccount(account)
+    } catch (e) {
+      // Issue with the multiaddress, no worries, we ignore this announcement.
+      log("Error with announced peer", e, event)
+    }
   }
 
   private async onChannelUpdated(event: Event<'ChannelUpdate'>): Promise<void> {
@@ -300,7 +305,9 @@ class Indexer extends EventEmitter {
   }
 
   public async getAnnouncedAddresses(): Promise<Multiaddr[]> {
-    return (await this.db.getAccounts()).map((account: AccountEntry) => account.multiAddr)
+    return (await this.db.getAccounts()).map(
+      (account: AccountEntry) => account.multiAddr
+    )
   }
 
   public async getPublicNodes(): Promise<Multiaddr[]> {
