@@ -2,7 +2,7 @@ import { Challenge } from './challenge'
 import { deriveAckKeyShare, PublicKey } from '@hoprnet/hopr-utils'
 import { ecdsaSign, ecdsaVerify, publicKeyCreate } from 'secp256k1'
 import { SECRET_LENGTH, HASH_ALGORITHM } from './constants'
-import { SECP256K1, u8aSplit } from '@hoprnet/hopr-utils'
+import { SECP256K1_CONSTANTS, u8aSplit, CryptoError } from '@hoprnet/hopr-utils'
 import { createHash } from 'crypto'
 import type PeerId from 'peer-id'
 
@@ -14,7 +14,7 @@ export class Acknowledgement {
   ) {}
 
   static get SIZE() {
-    return SECP256K1.SIGNATURE_LENGTH + Challenge.SIZE + SECRET_LENGTH
+    return SECP256K1_CONSTANTS.SIGNATURE_LENGTH + Challenge.SIZE + SECRET_LENGTH
   }
 
   static create(challenge: Challenge, derivedSecret: Uint8Array, privKey: PeerId) {
@@ -39,15 +39,15 @@ export class Acknowledgement {
     }
 
     const [ackSignature, challengeSignature, ackKeyShare] = u8aSplit(arr, [
-      SECP256K1.SIGNATURE_LENGTH,
-      SECP256K1.SIGNATURE_LENGTH,
+      SECP256K1_CONSTANTS.SIGNATURE_LENGTH,
+      SECP256K1_CONSTANTS.SIGNATURE_LENGTH,
       SECRET_LENGTH
     ])
 
     const challengeToVerify = createHash(HASH_ALGORITHM).update(getAckChallenge(ackKeyShare)).digest()
 
     if (!ecdsaVerify(challengeSignature, challengeToVerify, ownPubKey.pubKey.marshal())) {
-      throw Error(`General error.`)
+      throw new CryptoError(`Challenge signature verification failed.`)
     }
 
     const ackToVerify = createHash(HASH_ALGORITHM)
@@ -55,7 +55,7 @@ export class Acknowledgement {
       .digest()
 
     if (!ecdsaVerify(ackSignature, ackToVerify, senderPubKey.pubKey.marshal())) {
-      throw Error(`General error.`)
+      throw new CryptoError(`Acknowledgement signature verification failed.`)
     }
 
     return new Acknowledgement(ackSignature, challengeSignature, ackKeyShare)

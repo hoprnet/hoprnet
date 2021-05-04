@@ -1,12 +1,12 @@
 import { SECRET_LENGTH } from './constants'
 import { publicKeyCreate, privateKeyTweakAdd, publicKeyCombine, publicKeyTweakAdd } from 'secp256k1'
 import { deriveAckKeyShare, deriveOwnKeyShare } from './keyDerivation'
-import { SECP256K1 } from '../constants'
+import { SECP256K1_CONSTANTS } from '../constants'
 import { u8aEquals } from '../../u8a'
 import { randomBytes } from 'crypto'
 import { PublicKey } from '../../types'
 
-export const POR_STRING_LENGTH = 2 * SECP256K1.COMPRESSED_PUBLIC_KEY_LENGTH
+export const POR_STRING_LENGTH = 2 * SECP256K1_CONSTANTS.COMPRESSED_PUBLIC_KEY_LENGTH
 
 export { deriveAckKeyShare }
 
@@ -87,10 +87,10 @@ export function preVerify(
   }
 
   const [nextTicketChallenge, hint] = [
-    porBytes.subarray(0, SECP256K1.COMPRESSED_PUBLIC_KEY_LENGTH),
+    porBytes.subarray(0, SECP256K1_CONSTANTS.COMPRESSED_PUBLIC_KEY_LENGTH),
     porBytes.subarray(
-      SECP256K1.COMPRESSED_PUBLIC_KEY_LENGTH,
-      SECP256K1.COMPRESSED_PUBLIC_KEY_LENGTH + SECP256K1.COMPRESSED_PUBLIC_KEY_LENGTH
+      SECP256K1_CONSTANTS.COMPRESSED_PUBLIC_KEY_LENGTH,
+      SECP256K1_CONSTANTS.COMPRESSED_PUBLIC_KEY_LENGTH + SECP256K1_CONSTANTS.COMPRESSED_PUBLIC_KEY_LENGTH
     )
   ]
 

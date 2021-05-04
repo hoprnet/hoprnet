@@ -1,7 +1,7 @@
 import type PeerId from 'peer-id'
 
 import { MAC_LENGTH, END_PREFIX_LENGTH } from './constants'
-import { SECP256K1 } from '../constants'
+import { SECP256K1_CONSTANTS } from '../constants'
 import { createRoutingInfo, forwardTransform as routingInfoTransform } from './routingInfo'
 import { generateKeyShares, forwardTransform as keyShareTransform } from './keyShares'
 import { PRP } from '../prp'
@@ -30,7 +30,7 @@ export function getHeaderLength(
   additionalDataRelayerLength: number,
   additionalDataLastHopLength: number
 ) {
-  const perHop = SECP256K1.COMPRESSED_PUBLIC_KEY_LENGTH + MAC_LENGTH + additionalDataRelayerLength
+  const perHop = SECP256K1_CONSTANTS.COMPRESSED_PUBLIC_KEY_LENGTH + MAC_LENGTH + additionalDataRelayerLength
   const lastHop = END_PREFIX_LENGTH + additionalDataLastHopLength
 
   return lastHop + (maxHops - 1) * perHop
@@ -42,7 +42,7 @@ export function getPacketLength(
   additionalDataLastHopLength: number
 ) {
   return (
-    SECP256K1.COMPRESSED_PUBLIC_KEY_LENGTH +
+    SECP256K1_CONSTANTS.COMPRESSED_PUBLIC_KEY_LENGTH +
     getHeaderLength(maxHops, additionalDataRelayerLength, additionalDataLastHopLength) +
     MAC_LENGTH +
     PAYLOAD_SIZE
@@ -199,18 +199,18 @@ function decodePacket(
   }
 
   return {
-    alpha: packet.subarray(0, SECP256K1.COMPRESSED_PUBLIC_KEY_LENGTH),
+    alpha: packet.subarray(0, SECP256K1_CONSTANTS.COMPRESSED_PUBLIC_KEY_LENGTH),
     routingInformation: packet.subarray(
-      SECP256K1.COMPRESSED_PUBLIC_KEY_LENGTH,
-      SECP256K1.COMPRESSED_PUBLIC_KEY_LENGTH + headerLength
+      SECP256K1_CONSTANTS.COMPRESSED_PUBLIC_KEY_LENGTH,
+      SECP256K1_CONSTANTS.COMPRESSED_PUBLIC_KEY_LENGTH + headerLength
     ),
     mac: packet.subarray(
-      SECP256K1.COMPRESSED_PUBLIC_KEY_LENGTH + headerLength,
-      SECP256K1.COMPRESSED_PUBLIC_KEY_LENGTH + headerLength + MAC_LENGTH
+      SECP256K1_CONSTANTS.COMPRESSED_PUBLIC_KEY_LENGTH + headerLength,
+      SECP256K1_CONSTANTS.COMPRESSED_PUBLIC_KEY_LENGTH + headerLength + MAC_LENGTH
     ),
     ciphertext: packet.subarray(
-      SECP256K1.COMPRESSED_PUBLIC_KEY_LENGTH + headerLength + MAC_LENGTH,
-      SECP256K1.COMPRESSED_PUBLIC_KEY_LENGTH + headerLength + MAC_LENGTH + PAYLOAD_SIZE
+      SECP256K1_CONSTANTS.COMPRESSED_PUBLIC_KEY_LENGTH + headerLength + MAC_LENGTH,
+      SECP256K1_CONSTANTS.COMPRESSED_PUBLIC_KEY_LENGTH + headerLength + MAC_LENGTH + PAYLOAD_SIZE
     )
   }
 }

@@ -23,21 +23,21 @@ describe('padding', function () {
       ...TEST_MESSAGE
     ])
 
-    assert.throws(() => removePadding(paddedMsg), Error(`General error.`))
+    assert.throws(() => removePadding(paddedMsg), Error(`Incorrect padding.`))
 
     const paddedMsg2 = addPadding(TEST_MESSAGE).slice(1)
 
-    assert.throws(() => removePadding(paddedMsg2), Error(`General error.`))
+    assert.throws(() => removePadding(paddedMsg2), Error(`Incorrect message length. Dropping message.`))
 
     const paddedMsg3 = Uint8Array.from([...new Uint8Array(PAYLOAD_SIZE - PADDING_TAG_LENGTH), ...PADDING_TAG])
 
-    assert.throws(() => removePadding(paddedMsg3), Error(`General error.`))
+    assert.throws(() => removePadding(paddedMsg3), Error(`Incorrect padding.`))
 
     const paddedMsg4 = Uint8Array.from([
       ...new Uint8Array(PAYLOAD_SIZE - PADDING_TAG_LENGTH + 1),
       ...PADDING_TAG.slice(1)
     ])
 
-    assert.throws(() => removePadding(paddedMsg4), Error(`General error.`))
+    assert.throws(() => removePadding(paddedMsg4), Error(`Incorrect padding.`))
   })
 })

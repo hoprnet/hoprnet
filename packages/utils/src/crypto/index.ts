@@ -1,4 +1,5 @@
 export * from './constants'
+export * from './cryptoError'
 export * from './hashIterator'
 export * from './packet'
 export * from './por'

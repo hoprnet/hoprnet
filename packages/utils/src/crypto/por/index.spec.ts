@@ -1,7 +1,7 @@
 import { createFirstChallenge, createPoRString, preVerify, validateAcknowledgement } from '.'
 import { randomBytes } from 'crypto'
 import { SECRET_LENGTH } from './constants'
-import { SECP256K1 } from '../constants'
+import { SECP256K1_CONSTANTS } from '../constants'
 import { deriveAckKeyShare } from './keyDerivation'
 import assert from 'assert'
 import { u8aEquals } from '../../u8a'
@@ -32,7 +32,7 @@ describe('PoR - proof of relay', function () {
 
     // Simulates the transformation done by the first relayer
     assert(
-      u8aEquals(result.nextTicketChallenge, firstPorString.subarray(0, SECP256K1.COMPRESSED_PUBLIC_KEY_LENGTH)),
+      u8aEquals(result.nextTicketChallenge, firstPorString.subarray(0, SECP256K1_CONSTANTS.COMPRESSED_PUBLIC_KEY_LENGTH)),
       `Forward logic must extract correct challenge for next downstream node`
     )
 

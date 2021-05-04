@@ -1,10 +1,15 @@
 /**
  * Several ECDSA on secp256k1 related constants
  */
-export const SECP256K1 = {
+export const SECP256K1_CONSTANTS = {
   PRIVATE_KEY_LENGTH: 32,
   COMPRESSED_PUBLIC_KEY_LENGTH: 33,
   UNCOMPRESSED_PUBLIC_KEY_LENGTH: 65,
   SIGNATURE_LENGTH: 64,
   RECOVERABLE_SIGNATURE_LENGTH: 65
 }
+
+/**
+ * Set to false to make crypto errors opaque
+ */
+export const CRYPTO_DEBUG_MODE = true

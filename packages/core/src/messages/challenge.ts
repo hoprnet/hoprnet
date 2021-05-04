@@ -1,4 +1,4 @@
-import { u8aEquals, SECP256K1 } from '@hoprnet/hopr-utils'
+import { u8aEquals, SECP256K1_CONSTANTS, CryptoError } from '@hoprnet/hopr-utils'
 import { HASH_ALGORITHM } from './constants'
 import { ecdsaSign, ecdsaVerify, publicKeyCreate } from 'secp256k1'
 import { createHash } from 'crypto'
@@ -9,11 +9,11 @@ export class Challenge {
   private constructor(private ackChallenge: Uint8Array, private signature: Uint8Array) {}
 
   static get SIZE(): number {
-    return SECP256K1.SIGNATURE_LENGTH
+    return SECP256K1_CONSTANTS.SIGNATURE_LENGTH
   }
 
   static deserialize(preArray: Uint8Array | Buffer, ackChallenge: Uint8Array, pubKey: PeerId): Challenge {
-    if (preArray.length != SECP256K1.SIGNATURE_LENGTH) {
+    if (preArray.length != SECP256K1_CONSTANTS.SIGNATURE_LENGTH) {
       throw Error(`Invalid arguments`)
     }
 
@@ -25,7 +25,7 @@ export class Challenge {
     }
 
     if (!verifyChallenge(pubKey, arr, ackChallenge)) {
-      throw Error(`General error.`)
+      throw new CryptoError(`Challenge is not derivable.`)
     }
 
     return new Challenge(ackChallenge, arr)
@@ -36,7 +36,7 @@ export class Challenge {
   }
 
   static create(ackChallenge: Uint8Array, privKey: PeerId): Challenge {
-    if (ackChallenge.length != SECP256K1.COMPRESSED_PUBLIC_KEY_LENGTH || privKey.privKey == null) {
+    if (ackChallenge.length != SECP256K1_CONSTANTS.COMPRESSED_PUBLIC_KEY_LENGTH || privKey.privKey == null) {
       throw Error(`Invalid arguments`)
     }
 

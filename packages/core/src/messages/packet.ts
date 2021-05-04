@@ -1,5 +1,5 @@
 import { Channel } from '@hoprnet/hopr-core-ethereum'
-import { Ticket, PublicKey, Balance, UnacknowledgedTicket, Hash, HoprDB } from '@hoprnet/hopr-utils'
+import { CryptoError, Ticket, PublicKey, Balance, UnacknowledgedTicket, Hash, HoprDB } from '@hoprnet/hopr-utils'
 import type HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 import { Challenge } from './challenge'
 import {
@@ -278,7 +278,7 @@ export class Packet {
     )
 
     if (verificationOutput.valid != true) {
-      throw Error(`General error.`)
+      throw new CryptoError(`PoR value pre-verification failed.`)
     }
 
     return new Packet(transformedOutput.packet, challenge, ticket).setForward(
@@ -296,7 +296,7 @@ export class Packet {
     const present = await db.hasPacket(this.packetTag)
 
     if (present) {
-      throw Error(`General error.`)
+      throw new CryptoError(`Potential replay attack detected. Packet tag is already present.`)
     }
   }
 

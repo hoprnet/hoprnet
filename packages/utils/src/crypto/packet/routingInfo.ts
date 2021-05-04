@@ -1,7 +1,8 @@
 import { u8aEquals, u8aXOR } from '../../u8a'
 import { derivePRGParameters } from './keyDerivation'
 import { MAC_LENGTH, SECRET_LENGTH, END_PREFIX, END_PREFIX_LENGTH } from './constants'
-import { SECP256K1 } from '../constants'
+import { SECP256K1_CONSTANTS } from '../constants'
+import { CryptoError } from '../cryptoError'
 import { randomFillSync } from 'crypto'
 import { PRG } from '../prg'
 import { generateFiller } from './filler'
@@ -35,7 +36,7 @@ export function createRoutingInfo(
     throw Error(`Invalid arguments`)
   }
 
-  const routingInfoLength = additionalDataRelayerLength + MAC_LENGTH + SECP256K1.COMPRESSED_PUBLIC_KEY_LENGTH
+  const routingInfoLength = additionalDataRelayerLength + MAC_LENGTH + SECP256K1_CONSTANTS.COMPRESSED_PUBLIC_KEY_LENGTH
   const lastHopLength = (additionalDataLastHop?.length ?? 0) + END_PREFIX_LENGTH
 
   const headerLength = lastHopLength + (maxHops - 1) * routingInfoLength
@@ -81,9 +82,9 @@ export function createRoutingInfo(
       // Add pubkey of next downstream node
       extendedHeader.set(path[invIndex + 1].pubKey.marshal())
 
-      extendedHeader.set(mac, SECP256K1.COMPRESSED_PUBLIC_KEY_LENGTH)
+      extendedHeader.set(mac, SECP256K1_CONSTANTS.COMPRESSED_PUBLIC_KEY_LENGTH)
 
-      extendedHeader.set(additionalDataRelayer[invIndex], SECP256K1.COMPRESSED_PUBLIC_KEY_LENGTH + MAC_LENGTH)
+      extendedHeader.set(additionalDataRelayer[invIndex], SECP256K1_CONSTANTS.COMPRESSED_PUBLIC_KEY_LENGTH + MAC_LENGTH)
 
       u8aXOR(true, extendedHeader, PRG.createPRG(params).digest(0, extendedHeaderLength))
     }
@@ -125,7 +126,7 @@ export function forwardTransform(
   additionalDataRelayerLength: number,
   additionalDataLastHopLength: number
 ): LastNodeOutput | RelayNodeOutput {
-  const routingInfoLength = additionalDataRelayerLength + SECP256K1.COMPRESSED_PUBLIC_KEY_LENGTH + MAC_LENGTH
+  const routingInfoLength = additionalDataRelayerLength + SECP256K1_CONSTANTS.COMPRESSED_PUBLIC_KEY_LENGTH + MAC_LENGTH
   const lastHopLength = additionalDataLastHopLength + END_PREFIX_LENGTH
 
   const headerLength = lastHopLength + (maxHops - 1) * routingInfoLength
@@ -143,7 +144,7 @@ export function forwardTransform(
   }
 
   if (!u8aEquals(createMAC(secret, header), mac)) {
-    throw Error(`General error.`)
+    throw new CryptoError(`Header integrity check failed.`)
   }
 
   const params = derivePRGParameters(secret)
@@ -159,18 +160,18 @@ export function forwardTransform(
     }
   }
 
-  let nextHop = header.slice(0, SECP256K1.COMPRESSED_PUBLIC_KEY_LENGTH)
+  let nextHop = header.slice(0, SECP256K1_CONSTANTS.COMPRESSED_PUBLIC_KEY_LENGTH)
   let nextMac = header.slice(
-    SECP256K1.COMPRESSED_PUBLIC_KEY_LENGTH,
-    SECP256K1.COMPRESSED_PUBLIC_KEY_LENGTH + MAC_LENGTH
+    SECP256K1_CONSTANTS.COMPRESSED_PUBLIC_KEY_LENGTH,
+    SECP256K1_CONSTANTS.COMPRESSED_PUBLIC_KEY_LENGTH + MAC_LENGTH
   )
   let additionalInfo = header.slice(
-    SECP256K1.COMPRESSED_PUBLIC_KEY_LENGTH + MAC_LENGTH,
-    SECP256K1.COMPRESSED_PUBLIC_KEY_LENGTH + MAC_LENGTH + additionalDataRelayerLength
+    SECP256K1_CONSTANTS.COMPRESSED_PUBLIC_KEY_LENGTH + MAC_LENGTH,
+    SECP256K1_CONSTANTS.COMPRESSED_PUBLIC_KEY_LENGTH + MAC_LENGTH + additionalDataRelayerLength
   )
 
   if (!publicKeyVerify(nextHop)) {
-    throw Error(`General error.`)
+    throw new CryptoError(`Blinding of the group element failed. Result is not a valid curve point.`)
   }
 
   header.copyWithin(0, routingInfoLength)
