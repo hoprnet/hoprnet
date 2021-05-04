@@ -1,5 +1,4 @@
-import createKeccakHash from 'keccak'
-import { ethers } from 'ethers'
+import { utils, ethers } from 'ethers'
 import BN from 'bn.js'
 import { publicKeyConvert, publicKeyCreate, ecdsaSign, ecdsaVerify } from 'secp256k1'
 import { moveDecimalPoint } from '../math'
@@ -120,11 +119,7 @@ export class Hash {
   static SIZE = HASH_LENGTH
 
   static create(...inputs: Uint8Array[]) {
-    return new Hash(
-      createKeccakHash('keccak256')
-        .update(Buffer.from(u8aConcat(...inputs)))
-        .digest()
-    )
+    return new Hash(utils.arrayify(utils.keccak256(u8aConcat(...inputs))))
   }
 
   static createChallenge(secretA: Uint8Array, secretB: Uint8Array): Hash {

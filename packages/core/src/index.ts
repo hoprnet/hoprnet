@@ -32,7 +32,6 @@ import {
   ChannelEntry,
   NativeBalance,
   Hash,
-  Acknowledgement,
   u8aToHex,
   DialOpts,
   HoprDB,
@@ -40,7 +39,8 @@ import {
   libp2pSendMessageAndExpectResponse,
   libp2pSubscribe,
   libp2pSendMessage,
-  LibP2PHandlerFunction
+  LibP2PHandlerFunction,
+  AcknowledgedTicket
 } from '@hoprnet/hopr-utils'
 import HoprCoreEthereum, { RoutingChannel } from '@hoprnet/hopr-core-ethereum'
 import BN from 'bn.js'
@@ -216,6 +216,9 @@ class Hopr extends EventEmitter {
     subscribeToAcknowledgements(subscribe, this.db, await this.paymentChannels, this.getId(), (ack) =>
       this.emit('message-acknowledged:' + ack.ackChallenge)
     )
+    await this.announce(this.options.announce)
+
+    const ethereum = await this.paymentChannels
 
     const onMessage = (msg: Uint8Array) => this.emit('hopr:message', msg)
     this.forward = new PacketForwardInteraction(
@@ -227,7 +230,11 @@ class Hopr extends EventEmitter {
       this.db
     )
 
-    this.heartbeat.start()
+    ethereum.indexer.on('peer', ({ id, multiaddrs }: { id: PeerId; multiaddrs: Multiaddr[] }) => {
+      this.libp2p.peerStore.addressBook.add(id, multiaddrs)
+    })
+
+    await this.heartbeat.start()
     this.periodicCheck()
     this.setChannelStrategy(this.options.strategy || 'passive')
     this.status = 'RUNNING'
@@ -458,11 +465,18 @@ class Hopr extends EventEmitter {
   }
 
   public getConnectedPeers(): PeerId[] {
+    if (!this.networkPeers) {
+      return []
+    }
     return this.networkPeers.all()
   }
 
-  public connectionReport(): string {
-    return this.networkPeers.debugLog()
+  public async connectionReport(): Promise<string> {
+    const connected = this.networkPeers.debugLog()
+    const announced = await (await this.paymentChannels).indexer.getAnnouncedAddresses()
+    return `${connected}
+    \n${announced.length} peers have announced themselves on chain:
+    \n${announced.map((x) => x.toString()).join('\n')}`
   }
 
   private async checkBalances() {
@@ -487,7 +501,6 @@ class Hopr extends EventEmitter {
     try {
       await this.checkBalances()
       await this.tickChannelStrategy([])
-      await this.announce(this.options.announce)
     } catch (e) {
       log('error in periodic check', e)
     }
@@ -495,10 +508,11 @@ class Hopr extends EventEmitter {
   }
 
   private async announce(includeRouting: boolean = false): Promise<void> {
+    log('announcing self', includeRouting)
     const chain = await this.paymentChannels
-    const account = await chain.getAccount(await this.getEthereumAddress())
+    //const account = await chain.getAccount(await this.getEthereumAddress())
     // exit if we already announced
-    if (account.hasAnnounced()) return
+    //if (account.hasAnnounced()) return
 
     // exit if we don't have enough ETH
     const nativeBalance = await this.getNativeBalance()
@@ -507,18 +521,18 @@ class Hopr extends EventEmitter {
     const multiaddrs = await this.getAnnouncedAddresses()
     const ip4 = multiaddrs.find((s) => s.toString().includes('/ip4/'))
     const ip6 = multiaddrs.find((s) => s.toString().includes('/ip6/'))
-    const p2p = multiaddrs.find((s) => s.toString().includes('/p2p/'))
+    const p2p = Multiaddr('/p2p/' + this.getId().toB58String())
     // exit if none of these multiaddrs are available
     if (!ip4 && !ip6 && !p2p) return
 
     try {
-      if (includeRouting && (ip4 || ip6 || p2p)) {
-        log('announcing with routing', ip4 || ip6 || p2p)
-        await chain.announce(ip4 || ip6 || p2p)
-      } else if (!includeRouting && p2p) {
-        log('announcing without routing')
-        await chain.announce(p2p)
+      if (includeRouting && (ip4 || ip6)) {
+        log('announcing with routing', ip4 || ip6)
+        await chain.announce(ip4 || ip6)
+        return
       }
+      log('announcing without routing', p2p.toString())
+      await chain.announce(p2p)
     } catch (err) {
       log('announce failed')
       throw new Error(`Failed to announce: ${err}`)
@@ -644,7 +658,7 @@ class Hopr extends EventEmitter {
     return this.db.getAcknowledgements()
   }
 
-  public async submitAcknowledgedTicket(ackTicket: Acknowledgement) {
+  public async submitAcknowledgedTicket(ackTicket: AcknowledgedTicket) {
     try {
       const ethereum = await this.paymentChannels
       const signedTicket = ackTicket.ticket

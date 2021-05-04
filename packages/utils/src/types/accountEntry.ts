@@ -6,33 +6,25 @@ import BN from 'bn.js'
 import { Address, PublicKey, Hash } from '.' // TODO: cyclic dep
 
 export class AccountEntry {
-  constructor(public readonly address: Address, public readonly multiAddr?: Multiaddr) {}
+  constructor(
+    public readonly address: Address,
+    public readonly multiAddr: Multiaddr,
+    public readonly updatedBlock: BN
+  ) {}
 
   static get SIZE(): number {
-    return Address.SIZE + MULTI_ADDR_MAX_LENGTH
+    return Address.SIZE + MULTI_ADDR_MAX_LENGTH + 32
   }
 
   static deserialize(arr: Uint8Array) {
-    const [a, b] = u8aSplit(arr, [Address.SIZE, MULTI_ADDR_MAX_LENGTH])
+    const [a, b, c] = u8aSplit(arr, [Address.SIZE, MULTI_ADDR_MAX_LENGTH, 32])
     // strip b as it may contain zeros since we don't know
     // the exact multiaddr length
     const strippedB = ethers.utils.stripZeros(b)
     const isBEmpty = u8aEquals(strippedB, new Uint8Array({ length: strippedB.length }))
     const address = new Address(a)
-    return new AccountEntry(address, isBEmpty ? undefined : Multiaddr(strippedB))
-  }
-
-  static fromSCEvent(event: any): AccountEntry {
-    //TODO types
-    const { account, multiaddr } = event.args
-    const address = Address.fromString(account)
-    const accountEntry = new AccountEntry(address, Multiaddr(multiaddr))
-
-    if (!accountEntry.getPublicKey().toAddress().eq(address)) {
-      throw Error("Multiaddr in announcement does not match sender's address")
-    }
-
-    return accountEntry
+    const blockNumber = new BN(c)
+    return new AccountEntry(address, isBEmpty ? undefined : Multiaddr(strippedB), blockNumber)
   }
 
   // TODO: kill
@@ -52,8 +44,13 @@ export class AccountEntry {
 
     return serializeToU8a([
       [this.address.serialize(), Address.SIZE],
-      [multiaddr, MULTI_ADDR_MAX_LENGTH]
+      [multiaddr, MULTI_ADDR_MAX_LENGTH],
+      [this.updatedBlock.toBuffer('be', 32), 32]
     ])
+  }
+
+  public getPeerId(): PeerId {
+    return PeerId.createFromB58String(this.multiAddr.getPeerId())
   }
 
   public getPublicKey(): PublicKey {

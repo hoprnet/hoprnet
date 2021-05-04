@@ -374,8 +374,8 @@ export class HoprDB {
     return data ? AccountEntry.deserialize(data) : undefined
   }
 
-  async updateAccount(address: Address, account: AccountEntry): Promise<void> {
-    await this.put(createAccountKey(address), account.serialize())
+  async updateAccount(account: AccountEntry): Promise<void> {
+    await this.put(createAccountKey(account.address), account.serialize())
   }
 
   async getAccounts(filter?: (account: AccountEntry) => boolean) {
@@ -383,8 +383,12 @@ export class HoprDB {
   }
 
   static createMock(): HoprDB {
-    const mock = new HoprDB(Address.createMock(), true, 'mock')
-    mock.db = new levelup(MemDown())
+    const mock = {
+      id: Address.createMock(),
+      db: new levelup(MemDown())
+    }
+    Object.setPrototypeOf(mock, HoprDB.prototype)
+    //@ts-ignore
     return mock
   }
 }
