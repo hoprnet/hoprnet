@@ -75,6 +75,16 @@ nix-shell
 
 Now you may follow the instructions in [Develop](#develop).
 
+## Tooling
+
+As some tools are only partially supported, please tag the respective team member
+whenever you need an issue about a particular tool.
+
+| Maintainer       | Technology  |
+| :--------------- | :---------: |
+| @jjperezaguinaga | Visual Code |
+| @tolbrino        |     Nix     |
+
 ## Usage
 
 ### Starting database
