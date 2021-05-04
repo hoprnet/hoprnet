@@ -8,7 +8,7 @@ import { pubKeyToPeerId, randomChoice, HoprDB } from '@hoprnet/hopr-utils'
 import { Address, ChannelEntry, AccountEntry, Hash, PublicKey, Balance, Snapshot } from '@hoprnet/hopr-utils'
 import { isConfirmedBlock, snapshotComparator } from './utils'
 import Debug from 'debug'
-import Multiaddr from 'multiaddr'
+import type { Multiaddr } from 'multiaddr'
 
 export type RoutingChannel = [source: PeerId, destination: PeerId, stake: Balance]
 

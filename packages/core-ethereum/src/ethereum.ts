@@ -1,5 +1,5 @@
 import type { ContractTransaction } from 'ethers'
-import type Multiaddr from 'multiaddr'
+import type { Multiaddr } from 'multiaddr'
 import type { HoprToken, HoprChannels } from './contracts'
 import { providers, utils, errors, Wallet, BigNumber } from 'ethers'
 import { Address, Ticket, Acknowledgement } from '@hoprnet/hopr-utils'

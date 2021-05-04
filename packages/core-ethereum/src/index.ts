@@ -1,4 +1,4 @@
-import type Multiaddr from 'multiaddr'
+import type { Multiaddr } from 'multiaddr'
 import type PeerId from 'peer-id'
 import type { ChainWrapper } from './ethereum'
 import chalk from 'chalk'
