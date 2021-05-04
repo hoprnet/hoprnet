@@ -1,4 +1,5 @@
-import Multiaddr from 'multiaddr'
+import { multiaddr } from 'multiaddr'
+import type { Multiaddr } from 'multiaddr'
 import PeerId from 'peer-id'
 import { ethers } from 'ethers'
 import { u8aSplit, serializeToU8a, MULTI_ADDR_MAX_LENGTH, u8aEquals } from '..'
@@ -19,14 +20,14 @@ export class AccountEntry {
     const strippedB = ethers.utils.stripZeros(b)
     const isBEmpty = u8aEquals(strippedB, new Uint8Array({ length: strippedB.length }))
     const address = new Address(a)
-    return new AccountEntry(address, isBEmpty ? undefined : Multiaddr(strippedB))
+    return new AccountEntry(address, isBEmpty ? undefined : multiaddr(strippedB))
   }
 
   static fromSCEvent(event: any): AccountEntry {
     //TODO types
     const { account, multiaddr } = event.args
     const address = Address.fromString(account)
-    const accountEntry = new AccountEntry(address, Multiaddr(multiaddr))
+    const accountEntry = new AccountEntry(address, multiaddr(multiaddr))
 
     if (!accountEntry.getPublicKey().toAddress().eq(address)) {
       throw Error("Multiaddr in announcement does not match sender's address")
