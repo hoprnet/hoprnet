@@ -27,19 +27,6 @@ export class AccountEntry {
     return new AccountEntry(address, isBEmpty ? undefined : Multiaddr(strippedB), blockNumber)
   }
 
-  static fromSCEvent(event: any, blockNumber: BN): AccountEntry {
-    //TODO types
-    const { account, multiaddr } = event.args
-    const address = Address.fromString(account)
-    const accountEntry = new AccountEntry(address, Multiaddr(multiaddr), blockNumber)
-
-    if (!accountEntry.getPublicKey().toAddress().eq(address)) {
-      throw Error("Multiaddr in announcement does not match sender's address")
-    }
-
-    return accountEntry
-  }
-
   // TODO: kill
   public get secret() {
     return new Hash(new Uint8Array({ length: Hash.SIZE }))

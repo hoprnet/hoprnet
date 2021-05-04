@@ -1,10 +1,10 @@
-import type PeerId from 'peer-id'
+import PeerId from 'peer-id'
 import type { Event, EventNames } from './types'
 import type { ChainWrapper } from '../ethereum'
 import chalk from 'chalk'
 import BN from 'bn.js'
 import Heap from 'heap-js'
-import { pubKeyToPeerId, randomChoice, HoprDB } from '@hoprnet/hopr-utils'
+import { pubKeyToPeerId, randomChoice, HoprDB, stringToU8a } from '@hoprnet/hopr-utils'
 import { Address, ChannelEntry, AccountEntry, Hash, PublicKey, Balance, Snapshot } from '@hoprnet/hopr-utils'
 import { isConfirmedBlock, snapshotComparator } from './utils'
 import Debug from 'debug'
@@ -243,8 +243,17 @@ class Indexer extends EventEmitter {
 
   private async onAnnouncement(event: Event<'Announcement'>, blockNumber: BN): Promise<void> {
     try {
-      const account = AccountEntry.fromSCEvent(event, blockNumber)
-      log('New node announced', account.address.toHex())
+      //TODO types
+      const multiaddr = Multiaddr(stringToU8a(event.args.multiaddr))
+      const address = Address.fromString(event.args.account)
+      const account = new AccountEntry(address, multiaddr,  blockNumber)
+      if (!account.getPublicKey().toAddress().eq(address)) {
+        throw Error("Multiaddr in announcement does not match sender's address")
+      }
+      if (!account.getPeerId() || !PeerId.isPeerId(account.getPeerId())) {
+        throw Error('Peer ID in multiaddr is null')
+      }
+      log('New node announced', account.address.toHex(), account.multiAddr.toString())
       this.emit('peer', {
         id: account.getPeerId(),
         multiaddrs: [account.multiAddr]

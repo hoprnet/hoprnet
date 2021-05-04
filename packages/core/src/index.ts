@@ -512,18 +512,18 @@ class Hopr extends EventEmitter {
     const multiaddrs = await this.getAnnouncedAddresses()
     const ip4 = multiaddrs.find((s) => s.toString().includes('/ip4/'))
     const ip6 = multiaddrs.find((s) => s.toString().includes('/ip6/'))
-    const p2p = multiaddrs.find((s) => s.toString().includes('/p2p/'))
+    const p2p = Multiaddr('/p2p/' + this.getId().toB58String())
     // exit if none of these multiaddrs are available
     if (!ip4 && !ip6 && !p2p) return
 
     try {
-      if (includeRouting && (ip4 || ip6 || p2p)) {
-        log('announcing with routing', ip4 || ip6 || p2p)
-        await chain.announce(ip4 || ip6 || p2p)
-      } else if (!includeRouting && p2p) {
-        log('announcing without routing')
-        await chain.announce(p2p)
+      if (includeRouting && (ip4 || ip6)) {
+        log('announcing with routing', ip4 || ip6)
+        await chain.announce(ip4 || ip6)
+        return
       }
+      log('announcing without routing', p2p.toString())
+      await chain.announce(p2p)
     } catch (err) {
       log('announce failed')
       throw new Error(`Failed to announce: ${err}`)
