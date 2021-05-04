@@ -1,4 +1,4 @@
-import type { Acknowledgement, Ticket } from '@hoprnet/hopr-utils'
+import type { AcknowledgedTicket, Ticket } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 
 /**
@@ -7,7 +7,7 @@ import BN from 'bn.js'
  * @param ackTickets
  * @returns a promise that resolves into an array of signed tickets
  */
-export async function toSignedTickets(ackTickets: Acknowledgement[]): Promise<Ticket[]> {
+export async function toSignedTickets(ackTickets: AcknowledgedTicket[]): Promise<Ticket[]> {
   return Promise.all(ackTickets.map((ackTicket) => ackTicket.ticket))
 }
 
