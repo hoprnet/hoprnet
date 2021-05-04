@@ -13,7 +13,7 @@ export class AccountEntry {
   ) {}
 
   static get SIZE(): number {
-    return Address.SIZE + MULTI_ADDR_MAX_LENGTH
+    return Address.SIZE + MULTI_ADDR_MAX_LENGTH + 32
   }
 
   static deserialize(arr: Uint8Array) {
