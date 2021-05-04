@@ -1,5 +1,5 @@
 import LibP2P from 'libp2p'
-import Multiaddr from 'multiaddr'
+import type { Multiaddr } from 'multiaddr'
 import PeerId from 'peer-id'
 const TCP = require('libp2p-tcp')
 const MPLEX = require('libp2p-mplex')

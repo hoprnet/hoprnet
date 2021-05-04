@@ -24,7 +24,7 @@ import { findPath } from './path'
 
 import { u8aToHex, DialOpts, HoprDB } from '@hoprnet/hopr-utils'
 
-import Multiaddr from 'multiaddr'
+import { Multiaddr } from 'multiaddr'
 import chalk from 'chalk'
 
 import PeerId from 'peer-id'

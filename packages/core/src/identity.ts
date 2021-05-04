@@ -1,6 +1,7 @@
 import type { HoprOptions } from '.'
 import PeerId from 'peer-id'
-import Multiaddr from 'multiaddr'
+import { multiaddr } from 'multiaddr'
+import type { Multiaddr } from 'multiaddr'
 
 const DEFAULT_PORT = 9091
 
@@ -11,7 +12,7 @@ export function getAddrs(id: PeerId, options: HoprOptions): Multiaddr[] {
   const addrs = []
 
   if (options.hosts === undefined || (options.hosts.ip4 === undefined && options.hosts.ip6 === undefined)) {
-    addrs.push(Multiaddr(`/ip4/0.0.0.0/tcp/${DEFAULT_PORT}`))
+    addrs.push(multiaddr(`/ip4/0.0.0.0/tcp/${DEFAULT_PORT}`))
   }
 
   if (options.hosts !== undefined) {
@@ -20,11 +21,11 @@ export function getAddrs(id: PeerId, options: HoprOptions): Multiaddr[] {
     }
 
     if (options.hosts.ip4 !== undefined) {
-      addrs.push(Multiaddr(`/ip4/${options.hosts.ip4.ip}/tcp/${options.hosts.ip4.port}`))
+      addrs.push(multiaddr(`/ip4/${options.hosts.ip4.ip}/tcp/${options.hosts.ip4.port}`))
     }
 
     if (options.hosts.ip6 !== undefined) {
-      addrs.push(Multiaddr(`/ip6/${options.hosts.ip6.ip}/tcp/${options.hosts.ip6.port}`))
+      addrs.push(multiaddr(`/ip6/${options.hosts.ip6.ip}/tcp/${options.hosts.ip6.port}`))
     }
   }
 
