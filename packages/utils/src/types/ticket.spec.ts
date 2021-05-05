@@ -33,8 +33,6 @@ describe('test ticket construction', function () {
     assert(ticket.amount.toBN().eq(amount.toBN()), 'wrong amount')
     assert(ticket.winProb.toBN().eq(winProb.toBN()), 'wrong winProb')
     assert(ticket.channelIteration.toBN().eq(channelIteration.toBN()), 'wrong channelIteration')
-    // assert(ticket.checkResponse(challengeResponse), 'challengeResponse failed')
-    // assert(ticket.isWinningTicket(challengeResponse, challengeResponse, winProb), 'ticket should be winning')
   })
 
   it('should generate the hash correctly #1', async function () {
