@@ -368,6 +368,7 @@ export class HoprDB {
   }
 
   async getAccounts(filter?: (account: AccountEntry) => boolean) {
+    filter = filter || (() => true)
     return this.getAll<AccountEntry>(ACCOUNT_PREFIX, AccountEntry.deserialize, filter)
   }
 
