@@ -33,7 +33,6 @@ jobs:
 
       - name: Run shellcheck
         run: |
-          apt install shellcheck
           find . -name "*.sh" ! -ipath "./node_modules/**" | xargs shellcheck -a -Calways
 
       - name: Lint & Fix
