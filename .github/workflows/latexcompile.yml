@@ -26,7 +26,7 @@ jobs:
           git config --global user.email "noreply@hoprnet.org"
           git config --global user.name "HOPR LaTeX build robot"
           git add docs/yellowpaper/yellowpaper.pdf
-          git commit -a -m "Update yellow paper" || true
+          git commit -a -m "Update yellowpaper" || true
           git pull origin ${{ github.ref }}
           git push origin ${{ github.ref }}
       # This should go into a release workflow
