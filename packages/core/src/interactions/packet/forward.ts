@@ -6,7 +6,6 @@ import { durations, pubKeyToPeerId, HoprDB } from '@hoprnet/hopr-utils'
 import { Mixer } from '../../mixer'
 import { sendAcknowledgement } from './acknowledgement'
 
-
 const FORWARD_TIMEOUT = durations.seconds(6)
 
 export class PacketForwardInteraction {

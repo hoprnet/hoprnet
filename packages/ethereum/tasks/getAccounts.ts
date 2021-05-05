@@ -2,7 +2,6 @@ import type { HardhatRuntimeEnvironment, RunSuperFunction } from 'hardhat/types'
 import { getContracts } from '../chain'
 import { HoprToken__factory } from '../types'
 
-
 /**
  * Display unlocked accounts alongside with how much
  * ETH / HOPR they have.

@@ -3,7 +3,6 @@ import { Logger, AcknowledgedTicket, moveDecimalPoint, Balance } from '@hoprnet/
 import { countSignedTickets, styleValue, toSignedTickets } from './utils'
 import { AbstractCommand } from './abstractCommand'
 
-
 const log = Logger.getLogger('hoprd.commands.redeemTickets')
 
 export default class RedeemTickets extends AbstractCommand {

@@ -4,7 +4,6 @@ import { convertPubKeyFromB58String } from '@hoprnet/hopr-utils'
 import { HoprToken__factory } from '../types'
 import { getContract } from './utils/contracts'
 
-
 const send = (signer, txparams) =>
   signer.sendTransaction(txparams, (error, transactionHash) => {
     if (error) {

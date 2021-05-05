@@ -11,7 +11,6 @@ import { configure as log4jsConfigure } from 'log4js'
 import { Configuration as Log4jsConfiguration } from 'log4js'
 import Debug from 'debug'
 
-
 /** for hoprd only */
 type Configuration = Log4jsConfiguration
 function configure(config: Configuration): void {
@@ -29,7 +28,7 @@ export const setuConfigLogger = () => {
 
 export abstract class Logger {
   static getLogger(category?: string, useDebug = true): ConfigLogger | DebugLogger {
-    return useDebug ? new DebugLogger(category) : new ConfigLogger(category);
+    return useDebug ? new DebugLogger(category) : new ConfigLogger(category)
   }
   abstract trace(message: unknown, ...args: unknown[]): void
   abstract fatal(message: unknown, ...args: unknown[]): void
@@ -53,33 +52,33 @@ class DebugLogger extends Logger {
   }
 
   public debug(message: unknown, ...args: unknown[]): void {
-    this.logger.log = console.debug.bind(console);
-    this.log(message, args);
+    this.logger.log = console.debug.bind(console)
+    this.log(message, args)
   }
 
   public error(message: unknown, ...args: unknown[]): void {
-    this.logger.log = console.error.bind(console);
-    this.log(message, args);
+    this.logger.log = console.error.bind(console)
+    this.log(message, args)
   }
 
   public info(message: unknown, ...args: unknown[]): void {
-    this.logger.log = console.log.bind(console);
-    this.log(message, args);
+    this.logger.log = console.log.bind(console)
+    this.log(message, args)
   }
 
   public warn(message: unknown, ...args: unknown[]): void {
-    this.logger.log = console.warn.bind(console);
-    this.log(message, args);
+    this.logger.log = console.warn.bind(console)
+    this.log(message, args)
   }
 
   public fatal(message: unknown, ...args: unknown[]): void {
-    this.logger.log = console.error.bind(console);
-    this.log(message, args);
+    this.logger.log = console.error.bind(console)
+    this.log(message, args)
   }
 
   public trace(message: unknown, ...args: unknown[]): void {
-    this.logger.log = console.trace.bind(console);
-    this.log(message, args);
+    this.logger.log = console.trace.bind(console)
+    this.log(message, args)
   }
 }
 
@@ -87,10 +86,10 @@ class ConfigLogger extends Logger {
   private readonly logger: Log4jsLogger
 
   public constructor(category?: string) {
-    super();
+    super()
     this.logger = getLogger(category)
   }
-  
+
   /**
    * By default, log4js adds an ugly empty list '[]' to the logs when the arg list is empty...
    **/

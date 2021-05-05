@@ -2,7 +2,16 @@ import type Multiaddr from 'multiaddr'
 import type PeerId from 'peer-id'
 import type { ChainWrapper } from './ethereum'
 import chalk from 'chalk'
-import { Logger, AcknowledgedTicket, PublicKey, Balance, Address, NativeBalance, HoprDB, cacheNoArgAsyncFunction } from '@hoprnet/hopr-utils'
+import {
+  Logger,
+  AcknowledgedTicket,
+  PublicKey,
+  Balance,
+  Address,
+  NativeBalance,
+  HoprDB,
+  cacheNoArgAsyncFunction
+} from '@hoprnet/hopr-utils'
 import Indexer from './indexer'
 import { RoutingChannel } from './indexer'
 import { PROVIDER_DEFAULT_URI, INDEXER_MAX_CONFIRMATIONS, INDEXER_BLOCK_RANGE } from './constants'
