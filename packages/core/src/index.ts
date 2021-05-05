@@ -679,6 +679,7 @@ class Hopr extends EventEmitter {
     }
   }
 
+  
   public async getChannelsOf(addr: Address): Promise<ChannelEntry[]> {
     const ethereum = await this.paymentChannels
     return await ethereum.getChannelsOf(addr)
