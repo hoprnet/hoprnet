@@ -32,7 +32,10 @@ export class Commitment {
     if (!this.initialized) {
       await this.initialize()
     }
-    this.db.setCurrentCommitment(this.channelId, await this.findPreImage(await this.db.getCurrentCommitment(this.channelId)))
+    this.db.setCurrentCommitment(
+      this.channelId,
+      await this.findPreImage(await this.db.getCurrentCommitment(this.channelId))
+    )
   }
 
   private async findPreImage(hash: Hash): Promise<Hash> {
@@ -74,7 +77,7 @@ export class Commitment {
     const result = await iterateHash(seed.serialize(), hashFunction, TOTAL_ITERATIONS, DB_ITERATION_BLOCK_SIZE)
     await this.db.storeHashIntermediaries(this.channelId, result.intermediates)
     const current = new Hash(result.hash)
-    this.db.setCurrentCommitment(this.channelId,current)
+    this.db.setCurrentCommitment(this.channelId, current)
     await this.setChainCommitment(current)
   }
 
