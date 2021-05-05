@@ -26,13 +26,13 @@ import { publicKeyCreate } from 'secp256k1'
 import BN from 'bn.js'
 import { Acknowledgement } from './acknowledgement'
 import { blue, green } from 'chalk'
-import Debug from 'debug'
+import { Logger } from '@hoprnet/hopr-utils'
 
 export const MAX_HOPS = 3 // 3 relayers and 1 destination
 
 const PACKET_LENGTH = getPacketLength(MAX_HOPS + 1, POR_STRING_LENGTH, 0)
 
-const log = Debug('hopr-core:message:packet')
+const log = Logger.getLogger('hopr-core.message:packet')
 
 /**
  * Validate newly created tickets
@@ -312,7 +312,7 @@ export class Packet {
 
     const unacknowledged = new UnacknowledgedTicket(this.ticket, new Hash(this.ownKey))
 
-    log(
+    log.info(
       `Storing unacknowledged ticket. Expecting to receive a preImage for ${green(
         u8aToHex(this.ackChallenge)
       )} from ${blue((await pubKeyToPeerId(this.nextHop)).toB58String())}`

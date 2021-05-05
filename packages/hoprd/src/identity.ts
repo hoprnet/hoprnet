@@ -1,11 +1,10 @@
 // TODO - replace serialization with a library
 import PeerId from 'peer-id'
 import { randomBytes, createCipheriv, scryptSync, createHmac } from 'crypto'
-import { privKeyToPeerId, u8aEquals } from '@hoprnet/hopr-utils'
+import { privKeyToPeerId, u8aEquals, Logger } from '@hoprnet/hopr-utils'
 import fs from 'fs'
 import path from 'path'
-import Debug from 'debug'
-const log = Debug(`hoprd:identity`)
+const log = Logger.getLogger(`hoprd.identity`)
 
 export const KEYPAIR_CIPHER_ALGORITHM = 'chacha20'
 export const KEYPAIR_IV_LENGTH = 16
@@ -101,11 +100,11 @@ export async function getIdentity(options: IdentityOptions): Promise<PeerId> {
   try {
     return await loadIdentity(options.idPath, options.password)
   } catch {
-    log('Could not load identity', options.idPath)
+    log.error('Could not load identity', options.idPath)
   }
 
   if (options.initialize) {
-    log('Creating new identity', options.idPath)
+    log.info('Creating new identity', options.idPath)
     return await createIdentity(options.idPath, options.password)
   }
   throw new Error('Cannot load identity')

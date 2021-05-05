@@ -1,10 +1,9 @@
 import type { Transaction as ITransaction } from './transaction-manager'
-import debug from 'debug'
 import assert from 'assert'
 import { Mutex } from 'async-mutex'
-import { Address } from '@hoprnet/hopr-utils'
+import { Address, Logger } from '@hoprnet/hopr-utils'
 
-const log = debug('hopr-core-ethereum:nonce-tracker')
+const log = Logger.getLogger('hopr-core-ethereum.nonce-tracker')
 
 /**
  * @property highestLocallyConfirmed - A hex string of the highest nonce on a confirmed transaction.
@@ -120,7 +119,7 @@ export default class NonceTracker {
       const allPendingTxs = this.api.getPendingTransactions(address)
       const hasStuckTx = this._containsStuckTx(allPendingTxs)
       if (hasStuckTx) {
-        log('Found stuck txs')
+        log.info('Found stuck txs')
       }
 
       // if a struck tx is found, we overwrite pending txs

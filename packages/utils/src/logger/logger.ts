@@ -17,7 +17,7 @@ function configure(config: Configuration): void {
   log4jsConfigure(config)
 }
 
-export const setuConfigLogger = () => {
+export const setupConfigLogger = () => {
   configure({
     appenders: { out: { type: 'stdout' } },
     categories: { default: { appenders: ['out'], level: 'debug' } }
@@ -28,7 +28,7 @@ export const setuConfigLogger = () => {
 
 export abstract class Logger {
   static getLogger(category?: string, useDebug = true): ConfigLogger | DebugLogger {
-    return useDebug ? new DebugLogger(category) : new ConfigLogger(category)
+    return useDebug ? new DebugLogger(category.replace('.', ':')) : new ConfigLogger(category)
   }
   abstract trace(message: unknown, ...args: unknown[]): void
   abstract fatal(message: unknown, ...args: unknown[]): void

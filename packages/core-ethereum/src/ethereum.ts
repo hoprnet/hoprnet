@@ -11,17 +11,17 @@ import {
   Hash,
   PublicKey,
   durations,
-  PromiseValue
+  PromiseValue,
+  Logger
 } from '@hoprnet/hopr-utils'
 import BN from 'bn.js'
 import NonceTracker from './nonce-tracker'
 import TransactionManager from './transaction-manager'
 import { getNetworkGasPrice, getNetworkName } from './utils'
-import Debug from 'debug'
 import { Networks, getContracts } from '@hoprnet/hopr-ethereum'
 import { HoprToken__factory, HoprChannels__factory } from './contracts'
 
-const log = Debug('hopr:core-ethereum:chain-operations')
+const log = Logger.getLogger('hopr.core-ethereum.chain-operations')
 const abiCoder = new utils.AbiCoder()
 
 export type Receipt = string
@@ -65,7 +65,7 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
     const nonce = nonceLock.nextNonce
     let transaction: ContractTransaction
 
-    log('Sending transaction %o', {
+    log.info('Sending transaction %o', {
       gasLimit,
       gasPrice,
       nonce
@@ -85,12 +85,12 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
         ]
       )
     } catch (error) {
-      log('Transaction with nonce %d failed to sent: %s', nonce, error)
+      log.error('Transaction with nonce %d failed to sent: %s', nonce, error)
       nonceLock.releaseLock()
       throw Error('Could not send transaction')
     }
 
-    log('Transaction with nonce %d successfully sent %s, waiting for confimation', nonce, transaction.hash)
+    log.info('Transaction with nonce %d successfully sent %s, waiting for confimation', nonce, transaction.hash)
     transactions.addToPending(transaction.hash, { nonce })
     nonceLock.releaseLock()
 
@@ -98,19 +98,19 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
     transaction
       .wait()
       .then(() => {
-        log('Transaction with nonce %d and hash %s confirmed', nonce, transaction.hash)
+        log.info('Transaction with nonce %d and hash %s confirmed', nonce, transaction.hash)
         transactions.moveToConfirmed(transaction.hash)
       })
       .catch((error) => {
         const reverted = ([errors.CALL_EXCEPTION] as string[]).includes(error)
 
         if (reverted) {
-          log('Transaction with nonce %d and hash %s reverted: %s', nonce, transaction.hash, error)
+          log.warn('Transaction with nonce %d and hash %s reverted: %s', nonce, transaction.hash, error)
 
           // this transaction failed but was confirmed as reverted
           transactions.moveToConfirmed(transaction.hash)
         } else {
-          log('Transaction with nonce %d failed to sent: %s', nonce, error)
+          log.error('Transaction with nonce %d failed to sent: %s', nonce, error)
 
           const alreadyKnown = ([errors.NONCE_EXPIRED, errors.REPLACEMENT_UNDERPRICED] as string[]).includes(error)
           // if this hash is already known and we already have it included in

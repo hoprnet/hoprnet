@@ -3,7 +3,6 @@ import leveldown from 'leveldown'
 import MemDown from 'memdown'
 import { existsSync, mkdirSync } from 'fs'
 import path from 'path'
-import Debug from 'debug'
 import { Hash, u8aAdd, toU8a, u8aConcat, Address, Intermediate } from '.'
 import assert from 'assert'
 import {
@@ -16,8 +15,9 @@ import {
   PublicKey
 } from './types'
 import BN from 'bn.js'
+import { Logger } from '@hoprnet/hopr-utils'
 
-const log = Debug(`hopr-core:db`)
+const log = Logger.getLogger(`hopr-core.db`)
 
 const encoder = new TextEncoder()
 const TICKET_PREFIX: Uint8Array = encoder.encode('tickets-')
@@ -57,9 +57,9 @@ export class HoprDB {
 
     dbPath = path.resolve(dbPath)
 
-    log('using db at ', dbPath)
+    log.info('using db at ', dbPath)
     if (!existsSync(dbPath)) {
-      log('db does not exist, creating?:', initialize)
+      log.warn('db does not exist, creating?:', initialize)
       if (initialize) {
         mkdirSync(dbPath, { recursive: true })
       } else {
@@ -67,7 +67,7 @@ export class HoprDB {
       }
     }
     this.db = levelup(leveldown(dbPath))
-    log('namespacing db by pubkey: ', id.toHex())
+    log.info('namespacing db by pubkey: ', id.toHex())
   }
 
   private keyOf(...segments: Uint8Array[]): Uint8Array {
@@ -301,7 +301,7 @@ export class HoprDB {
         .put(Buffer.from(this.keyOf(ACKNOWLEDGED_TICKET_COUNTER)), Buffer.from(ticketCounter))
         .write()
     } catch (err) {
-      log(`ERROR: Error while writing to database. Error was ${err.message}.`)
+      log.error(`Error while writing to database`, err)
     }
   }
 
