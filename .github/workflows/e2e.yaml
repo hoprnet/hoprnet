@@ -19,19 +19,26 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: Use Node.js 
+      - name: Use Node.js
         uses: actions/setup-node@v2
         with:
           node-version: 14
           registry-url: https://registry.npmjs.org/
 
-      - name: Restore cache of node modules.
+      - name: Get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "::set-output name=dir::$(yarn config get cacheFolder)"
+
+      - name: Restore cache of node modules and yarn cache
         uses: actions/cache@v2
         with:
           path: |
             node_modules
             */*/node_modules
-          key: ${{ runner.os }}-lerna-${{ hashFiles('**/yarn.lock') }}
+            ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-nodejs-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-nodejs-
 
       - name: Install
         run: |
@@ -43,4 +50,4 @@ jobs:
 
       - name: Test
         shell: bash {0}
-        run: ./test/e2e/${{ matrix.test }}.sh 
+        run: ./test/e2e/${{ matrix.test }}.sh
