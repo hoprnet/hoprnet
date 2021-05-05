@@ -1,11 +1,11 @@
-import { PRP } from './prp'
+import { PRP, PRP_IV_LENGTH, PRP_KEY_LENGTH } from './prp'
 import { u8aEquals } from '../u8a'
 import assert from 'assert'
 import { randomBytes } from 'crypto'
 
 describe(`test Pseudo-Random Permutation`, function () {
   it(`should 'encrypt' and 'decrypt' a U8a`, function () {
-    const prp = PRP.createPRP(randomBytes(PRP.KEY_LENGTH), randomBytes(PRP.IV_LENGTH))
+    const prp = PRP.createPRP({ key: randomBytes(PRP_KEY_LENGTH), iv: randomBytes(PRP_IV_LENGTH) })
 
     const message = randomBytes(200) // turn .slice() into copy
     const ciphertext = prp.permutate(Uint8Array.from(message))
@@ -17,7 +17,7 @@ describe(`test Pseudo-Random Permutation`, function () {
   })
 
   it(`should 'decrypt' and 'encrypt' a U8a`, function () {
-    const prp = PRP.createPRP(randomBytes(PRP.KEY_LENGTH), randomBytes(PRP.IV_LENGTH))
+    const prp = PRP.createPRP({ key: randomBytes(PRP_KEY_LENGTH), iv: randomBytes(PRP_IV_LENGTH) })
 
     const message = randomBytes(200) // turn .slice() into copy
     const ciphertext = prp.inverse(Uint8Array.from(message))

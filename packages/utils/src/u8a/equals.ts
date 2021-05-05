@@ -5,7 +5,7 @@
  * @param b second array
  * @param arrays additional arrays
  */
-function u8aEquals(a: Uint8Array, b: Uint8Array, ...arrays: Uint8Array[]) {
+export function u8aEquals(a: Uint8Array, b: Uint8Array, ...arrays: Uint8Array[]) {
   const aLength = a.length
 
   if (aLength != b.length) {
@@ -81,5 +81,3 @@ function u8aEquals(a: Uint8Array, b: Uint8Array, ...arrays: Uint8Array[]) {
 
   return true
 }
-
-export { u8aEquals }

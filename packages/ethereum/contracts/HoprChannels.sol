@@ -462,13 +462,12 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         require(redeemer != address(0), "redeemer must not be empty");
         require(counterparty != address(0), "counterparty must not be empty");
         require(nextCommitment != bytes32(0), "nextCommitment must not be empty");
-        require(proofOfRelaySecret != bytes32(0), "proofOfRelaySecret must not be empty");
         require(amount != uint256(0), "amount must not be empty");
         (,,, Channel storage channel) = _getChannel(
             redeemer,
             counterparty
         );
-
+        
         uint256 prevTicketEpoch;
         if (_isPartyA(redeemer, counterparty)) {
           require(channel.partyACommitment == keccak256(abi.encodePacked(nextCommitment)), "commitment must be hash of next commitment");
@@ -491,16 +490,17 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
                   proofOfRelaySecret,
                   channel.channelEpoch,
                   amount,
+                  ticketIndex,
                   winProb
               )
             )
         );
+
         require(ECDSA.recover(ticketHash, signature) == counterparty, "signer must match the counterparty");
         require(
             uint256(_getTicketLuck(
                 ticketHash,
                 nextCommitment,
-                proofOfRelaySecret,
                 winProb
             )) <= winProb,
             "ticket must be a win"
@@ -524,29 +524,55 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     }
 
     /**
+     * Uses the response to recompute the challenge. This is done
+     * by multiplying the base point of the curve with the given response.
+     * Due to the lack of embedded ECMUL functionality in the current
+     * version of the EVM, this is done by misusing the `ecrecover` 
+     * functionality. `ecrecover` performs the point multiplication and 
+     * converts the output to an Ethereum address (sliced hash of the product
+     * of base point and scalar).
+     * See https://ethresear.ch/t/you-can-kinda-abuse-ecrecover-to-do-ecmul-in-secp256k1-today/2384
+     * @param response response that is used to recompute the challenge
+     */
+    function computeChallenge(bytes32 response) public pure returns (address)  {
+        // Field order of the base field
+        uint256 FIELD_ORDER = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141;
+
+        // x-coordinate of the base point
+        uint256 gx = 0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798;
+        // y-coordinate of base-point is even, so v is 27
+        uint8 gv = 27;
+
+        address signer = ecrecover(0, gv, bytes32(gx), bytes32(mulmod(uint256(response), gx, FIELD_ORDER)));
+
+        return signer;
+    }
+    /**
      * @dev Encode ticket data
      * @return bytes
      */
     function _getEncodedTicket(
         address recipient,
-        uint256 ticketEpoch,
+        uint256 recipientCounter,
         bytes32 proofOfRelaySecret,
-        uint256 channelEpoch,
+        uint256 channelIteration,
         uint256 amount,
+        uint256 ticketIndex,
         uint256 winProb
     ) internal pure returns (bytes memory) {
-        bytes32 challenge = keccak256(abi.encodePacked(proofOfRelaySecret));
+        address challenge = computeChallenge(proofOfRelaySecret);
 
         return abi.encodePacked(
             recipient,
             challenge,
-            ticketEpoch,
+            recipientCounter,
             amount,
             winProb,
-            channelEpoch
+            ticketIndex,
+            channelIteration
         );
     }
-
+    
     /**
      * @dev Get the ticket's "luck" by
      * hashing provided values.
@@ -555,9 +581,8 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     function _getTicketLuck(
         bytes32 ticketHash,
         bytes32 nextCommitment,
-        bytes32 proofOfRelaySecret,
         uint256 winProb
     ) internal pure returns (bytes32) {
-        return keccak256(abi.encodePacked(ticketHash, nextCommitment, proofOfRelaySecret, winProb));
+        return keccak256(abi.encodePacked(ticketHash, nextCommitment, winProb));
     }
 }

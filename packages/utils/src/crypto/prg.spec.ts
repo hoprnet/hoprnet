@@ -1,4 +1,4 @@
-import { PRG } from './prg'
+import { PRG, PRG_KEY_LENGTH, PRG_IV_LENGTH } from './prg'
 import { randomBytes } from 'crypto'
 import assert from 'assert'
 import { randomInteger } from '../'
@@ -6,9 +6,9 @@ import { u8aEquals } from '../u8a'
 
 describe('Test Pseudo-Random Generator', async function () {
   it('should create a digest', function () {
-    const [key, iv] = [randomBytes(PRG.KEY_LENGTH), randomBytes(PRG.IV_LENGTH)]
+    const [key, iv] = [randomBytes(PRG_KEY_LENGTH), randomBytes(PRG_IV_LENGTH)]
 
-    const prg = PRG.createPRG(key, iv)
+    const prg = PRG.createPRG({ key, iv })
     const digest = prg.digest(0, 500)
 
     const firstSlice = prg.digest(0, 32)
@@ -24,7 +24,7 @@ describe('Test Pseudo-Random Generator', async function () {
       `check that slice somewhere in the middle is the same`
     )
     assert(
-      u8aEquals(PRG.createPRG(key, iv).digest(start, start + length), prg.digest(start, start + length)),
+      u8aEquals(PRG.createPRG({ key, iv }).digest(start, start + length), prg.digest(start, start + length)),
       `check that slice somewhere in the middle is the same when computed by different methods`
     )
 
