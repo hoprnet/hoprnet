@@ -11,9 +11,9 @@ import '@typechain/hardhat'
 // rest
 import { HardhatUserConfig, task, types } from 'hardhat/config'
 import { ethers } from 'ethers'
-import { networks } from './chain/networks'
+import { networks, NetworkTag } from './chain/networks'
 
-const { PRIVATE_KEY, INFURA_KEY, MATIC_VIGIL_KEY, ETHERSCAN_KEY, QUIKNODE_KEY } = process.env
+const { PRIVATE_KEY, ETHERSCAN_KEY, POKT_KEY, QUIKNODE_KEY } = process.env
 const GAS_MULTIPLIER = 1.1
 
 // set 'ETHERSCAN_API_KEY' so 'hardhat-deploy' can read it
@@ -24,43 +24,34 @@ const hardhatConfig: HardhatUserConfig = {
   networks: {
     hardhat: {
       live: false,
-      tags: ['local', 'test'],
+      tags: ['testing'] as NetworkTag[],
       saveDeployments: false
     },
     localhost: {
       live: false,
-      tags: ['local'],
+      tags: ['development'] as NetworkTag[],
       url: 'http://localhost:8545',
-      saveDeployments: false
+      saveDeployments: false,
+      // increase block every 3s to 6s
+      mining: {
+        auto: false,
+        interval: [3000, 6000]
+      }
     },
-    mainnet: {
-      ...networks.mainnet,
+    goerli: {
+      ...networks.goerli,
+      live: true,
+      tags: ['staging'] as NetworkTag[],
       gasMultiplier: GAS_MULTIPLIER,
-      url: `https://mainnet.infura.io/v3/${INFURA_KEY}`,
-      accounts: PRIVATE_KEY ? [PRIVATE_KEY] : []
-    },
-    kovan: {
-      ...networks.kovan,
-      gasMultiplier: GAS_MULTIPLIER,
-      url: `https://kovan.infura.io/v3/${INFURA_KEY}`,
+      url: `https://eth-goerli.gateway.pokt.network/v1/${POKT_KEY}/`,
       accounts: PRIVATE_KEY ? [PRIVATE_KEY] : []
     },
     xdai: {
       ...networks.xdai,
+      live: true,
+      tags: ['production'] as NetworkTag[],
       gasMultiplier: GAS_MULTIPLIER,
       url: `https://still-patient-forest.xdai.quiknode.pro/${QUIKNODE_KEY}/`,
-      accounts: PRIVATE_KEY ? [PRIVATE_KEY] : []
-    },
-    matic: {
-      ...networks.matic,
-      gasMultiplier: GAS_MULTIPLIER,
-      url: `https://rpc-mainnet.maticvigil.com/v1/${MATIC_VIGIL_KEY}`,
-      accounts: PRIVATE_KEY ? [PRIVATE_KEY] : []
-    },
-    binance: {
-      ...networks.binance,
-      gasMultiplier: GAS_MULTIPLIER,
-      url: 'https://bsc-dataseed.binance.org',
       accounts: PRIVATE_KEY ? [PRIVATE_KEY] : []
     }
   },

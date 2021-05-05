@@ -7,7 +7,8 @@ import { storeContract } from '../tasks/utils/contracts'
 const closures: {
   [key in DeploymentTypes]: number
 } = {
-  local: durations.minutes(1),
+  testing: durations.minutes(1),
+  development: durations.minutes(1),
   staging: durations.minutes(10),
   production: durations.minutes(60)
 }
@@ -21,7 +22,7 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   const result = await deployments.deploy('HoprChannels', {
     from: deployer.address,
-    args: [hoprToken.address, Math.floor((closures[deploymentType] ?? closures.local) / 1e3)],
+    args: [hoprToken.address, Math.floor((closures[deploymentType] ?? closures.testing) / 1e3)],
     log: true
   })
   await storeContract(network.name, 'HoprChannels', result.address, result.receipt.blockNumber)

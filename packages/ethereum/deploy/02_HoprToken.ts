@@ -13,7 +13,7 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   })
   await storeContract(network.name, 'HoprToken', result.address, result.receipt.blockNumber)
 
-  if (network.name === 'localhost') {
+  if (network.tags.testing || network.tags.development) {
     const hoprToken = new HoprToken__factory(deployer).attach(result.address)
     const MINTER_ROLE = await hoprToken.MINTER_ROLE()
     if (!(await hoprToken.hasRole(MINTER_ROLE, deployer.address))) {
