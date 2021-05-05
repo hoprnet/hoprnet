@@ -39,7 +39,7 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     ],
     log: true
   })
-  await storeContract(network.name, 'HoprDistributor', result.address, result.receipt.blockNumber)
+  await storeContract(network.name, network.tags, 'HoprDistributor', result.address, result.receipt.blockNumber)
 }
 
 export default main

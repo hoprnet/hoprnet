@@ -25,7 +25,7 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     args: [hoprToken.address, Math.floor((closures[deploymentType] ?? closures.testing) / 1e3)],
     log: true
   })
-  await storeContract(network.name, 'HoprChannels', result.address, result.receipt.blockNumber)
+  await storeContract(network.name, network.tags, 'HoprChannels', result.address, result.receipt.blockNumber)
 }
 
 export default main

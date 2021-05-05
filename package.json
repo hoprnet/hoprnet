@@ -13,7 +13,7 @@
     "lint:fix": "npx prettier --write .",
     "test": "lerna run test --stream",
     "test:core": "yarn build:core && lerna exec --scope @hoprnet/hopr-core yarn test",
-    "run:network": "lerna exec --scope @hoprnet/hopr-ethereum -- yarn network --network hardhat",
+    "run:network": "lerna exec --scope @hoprnet/hopr-ethereum -- yarn network",
     "run:hoprd:alice": "lerna exec --scope @hoprnet/hoprd -- yarn dev --host=0.0.0.0:9092 --adminPort=3010 --restPort=3011 --provider=ws://127.0.0.1:8545/ --password='' --data=/tmp/alice --identity=/tmp/alice-identity",
     "run:hoprd:bob": "lerna exec --scope @hoprnet/hoprd -- yarn dev --host=0.0.0.0:9093 --adminPort=3020 --restPort=3021 --provider=ws://127.0.0.1:8545/ --password='' --data=/tmp/bob --identity=/tmp/bob-identity",
     "run:faucet:alice": "curl localhost:3011/api/v1/address/hopr | xargs -I {} lerna exec --scope @hoprnet/hopr-ethereum -- yarn faucet --address {} --network localhost --ishopraddress true",

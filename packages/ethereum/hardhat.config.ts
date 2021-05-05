@@ -13,7 +13,7 @@ import { HardhatUserConfig, task, types } from 'hardhat/config'
 import { ethers } from 'ethers'
 import { networks, NetworkTag } from './chain/networks'
 
-const { PRIVATE_KEY, ETHERSCAN_KEY, POKT_KEY, QUIKNODE_KEY } = process.env
+const { PRIVATE_KEY, ETHERSCAN_KEY, POKT_KEY, QUIKNODE_KEY, DEVELOPMENT = false } = process.env
 const GAS_MULTIPLIER = 1.1
 
 // set 'ETHERSCAN_API_KEY' so 'hardhat-deploy' can read it
@@ -22,21 +22,19 @@ process.env.ETHERSCAN_API_KEY = ETHERSCAN_KEY
 const hardhatConfig: HardhatUserConfig = {
   defaultNetwork: 'hardhat',
   networks: {
+    // hardhat-deploy cannot run deployments if the network is not hardhat
+    // we use an ENV variable (which is specified in our NPM script)
+    // to let hardhat know we want to enable mining
     hardhat: {
       live: false,
-      tags: ['testing'] as NetworkTag[],
-      saveDeployments: false
-    },
-    localhost: {
-      live: false,
-      tags: ['development'] as NetworkTag[],
-      url: 'http://localhost:8545',
+      tags: [DEVELOPMENT ? 'development' : 'testing'] as NetworkTag[],
       saveDeployments: false,
-      // increase block every 3s to 6s
-      mining: {
-        auto: false,
-        interval: [3000, 6000]
-      }
+      mining: DEVELOPMENT
+        ? {
+            auto: true, // every transaction will trigger a new block (without this deployments fail)
+            interval: [3000, 6000] // mine new block every 3s - 6s
+          }
+        : undefined
     },
     goerli: {
       ...networks.goerli,
