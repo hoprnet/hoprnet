@@ -7,7 +7,6 @@ HOPR uses a random selection algorithm to determine the identities of nodes part
           \begin{itemize}
               \item Availability
               \item Payment channel graph
-              \item Reputation
               \item Stake
           \end{itemize}
           Each node gets a score that is proportional to the previously mentioned factors.
@@ -56,8 +55,6 @@ A node is considered online if the ping response (“PONG”) comes back within 
 \subsection{Payment channel graph}
 Every node that intends to send messages needs to have a basic understanding about the topology of the network which means whether the channel is open and funded with enough HOPR tokens for the relaying service. In case no existing payment channel is open, the sender creates a new channel and funds it with enough HOPR tokens
 
-\subsection{Reputation}
-The node’s reputation either increases or decreases its probability of being chosen depending on its behavior. We assume the majority of nodes are honest but there are some who misbehave to attack the network. For that reason, HOPR plans to implement a reputation system (check future work for more information.
 \subsection{Stake}
 The HOPR tokens are used to create payment channels with other nodes in the network and thereby staked in the HOPR network. The node will then use the HOPR token to cover transaction costs when interacting with the blockchain. The more stake a node locks the higher probability that it would be chosen as a relayer.
 
