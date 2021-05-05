@@ -712,7 +712,7 @@ class Hopr extends EventEmitter {
       destination,
       MAX_HOPS - 1,
       this.networkPeers,
-      ethereum.getChannelsFromPeer.bind(this.paymentChannels),
+      ethereum.getChannelsFromPeer.bind(ethereum),
       PATH_RANDOMNESS
     )
   }
