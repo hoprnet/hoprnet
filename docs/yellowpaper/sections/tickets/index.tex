@@ -5,21 +5,20 @@ They are redeemable at most once and they lose their value when the channel is c
 \subsection{Ticket issuance}
 A ticket can be issued once two nodes have established a payment channel with each other which means that at least one of them has locked HOPR tokens.
 \newline The ticket issuer A (A could also be the packet creator) selects the winning probability of the ticket and the relay fee to use and sets amount to:
-$$\delta:=\dfrac{L\times F}{P_w}$$
-where $\delta$ is the amount of HOPR tokens set in the ticket, $L$ is the path length, $F$ is the relay fee and $P_w$ is the winning probability.
+$$\sigma:=\dfrac{L\times F}{P_w}$$
+where $\sigma$ is the amount of HOPR tokens set in the ticket, $L$ is the path length, $F$ is the relay fee and $P_w$ is the ticket's winning probability.
 \\~\\The issuer $(A)$ issues a ticket for the next downstream node, 
 the challenge is given together with the routing information by the packet. 
 \\$(A)$ does not know whether the ticket is a win or not.
-\\$(A)$ sets content of a ticket to: $$t:=(\delta,P_w,R,I,T_c,\zeta,c_{Id},tag,V)$$ 
-\textbf{Ticket amount $\delta$:}
-\\\textbf{Winning probability $P_w$:} is the winning probability.
-\\\textbf{Recipient's adress $R$:} is the recipient's adress on the blockchain (hashed public key into 20 bytes).
-\\\textbf{Ticket Index $I$:} is the ticket index which is set by the ticket issuer and should be increased with every issued ticket.
-\\\textbf{Ticket challenge $T_c$:}  is the ticket challenge.
-\\\textbf{Acount counter $\alpha_c$:} is the account.counter.
-\\\textbf{Channel iteration $\zeta$:} is the channel.iteration.
-\\\textbf{ChainId $c_{Id}$:}
-\\\textbf{Version $V$, $tag$:} HOPR tag and version which are given as constants and can depend on the utilized blockchain.
+\\$(A)$ sets content of a ticket to: $$t:=(\sigma,P_w,R,I,T_c,\zeta,c_{Id},\tau,V)$$ 
+\\\textbf{Recipient's adress $R$:} is a unique identifier that is derived from the recipient's public key.
+\\\textbf{Ticket Index $I$:} is set by the ticket issuer and increases with every issued ticket. The recipient verifies that the index increases with every packet and drops packets if this is not the case. Redeeming a ticket with index $n$ invalidates all tickets with index $I<n$, hence the relayer has a strong incentive to not accept tickets with unchanged index.
+\\\textbf{Ticket challenge $T_c$:}  is set by the ticket issuer and used to ckeck whether a ticket is redeemable before the packet is been relayed. The packet is dropped if that's not the case.
+\\\textbf{Acount counter $\alpha_c$:} is used as a mechanism to prevent cheating by turning non-winning tickets into winning ones. This is done by increasing the value of $\alpha_c$ whenever a node resets a commitment which helps keeping track of updates to the on-chain commitments.
+\\\textbf{Channel iteration $\zeta$:} is used to give each reincarnation of the payment channel a new identifier such that tickets issued for previous instances of the channel lose their validity once a channel is reopened.
+\\\textbf{ChainId $c_{Id}$:} The channel identifier which is defined by the ticket issuer in order to determine which channel will be used between issuer and recipient. For example, tickets that are valid on xDAI are not valid on Ethereum.
+\\\textbf{Tag $\tau$} is given as a constant and depends on the utilized blockchain. It is used to distinguish HOPR tickets from others with the same structure that are meant for different payment channels and invalidates their usage in HOPR.
+\\\textbf{Version $V$} is given as a constant and depends on the utilized blockchain. It is used to invalidate tickets that were issued for previous versions of HOPR from being used in future iterations of the protocol.
 \\~\\$(A)$ then signs the ticket with its private key and sends $T:= (t, Sig_I(t))$ to the recipient together with a mixnet packet.
 
 
@@ -34,7 +33,7 @@ the challenge is given together with the routing information by the packet.
 $(A)$ creates a shared secret $s_i$ with all the relay nodes in the channel (B-C-D-Z) by using an offline version of the Diffie-Hellman key exchange. This shared key is a session key that's generated from the master DH key sphinx key. 
 \newline The shared secret $s_i$ is used as a seed for a PRG (Pseudo Random Generator) to create secret shares $s_i,s_i'$ for each node along the route. 
 Relayers compute $s_i$ and get $s_{i+1}'$ from the next downstream node. 
-\newline The sender $(A)$ creates $T_{c_i}:=(s_i+s_{i+1}')*G$ and a hint for B,C,D,Z (let’s suppose these are the relay nodes and $Z$ will be the final destination) a “hint” how the promised value $s_C',s_D',s_Z'$ is going to look like. 
+\newline The sender $(A)$ creates $T_{c_i}:=(s_i+s_{i+1}')*G$ and a hint for B,C,D,Z of how the promised value $s_C',s_D',s_Z'$ is going to look like. 
 The value “hint” or $h$ is computed as $h_i:=s_{i+1}'*G$ where $*$ is the curve multiplication operation and $G$ is a generator of the curve (the same used in the sphinx section).
 
 
@@ -69,7 +68,7 @@ The final recipient of the packet does not receive a ticket because message rece
     \item Challenge check $$r*G=T_{c_i}$$
     \item The ticket has been already redeemed (replay protection): $$channel.index <t.index$$
     \item Channel \textbf{exists} and is \textbf{open}. The check happens locally and not on-chain using the blockchain indexer in order not to reveal any metadata. If the node does not have a record about the channel or considers the channel to be in a state different from \textbf{open}, the ticket is dropped and the reception of the accompanying packet is rejected.
-    \item Channel balance towards the ticket recipient is sufficient to cover the costs for the ticket: $$ channel.balance>\delta$$ where $\delta$ is the ticket amount. 
+    \item Channel balance towards the ticket recipient is sufficient to cover the costs for the ticket: $$ channel.balance>\sigma$$ where $\sigma$ is the ticket amount. 
     \item Ticket index is strictly greater than the current value in the smart contract (reorder protection). This is valid because redeeming a $ticket$ with $index=n$ requires $index < n+1$ and sets $index := n+1$. So the new index becomes greater than $n$.
 
 
