@@ -74,8 +74,9 @@ export class Commitment {
     const result = await iterateHash(seed.serialize(), hashFunction, TOTAL_ITERATIONS, DB_ITERATION_BLOCK_SIZE)
     await this.db.storeHashIntermediaries(this.channelId, result.intermediates)
     const current = new Hash(result.hash)
-    this.db.setCurrentCommitment(this.channelId,current)
+    await this.db.setCurrentCommitment(this.channelId, current)
     await this.setChainCommitment(current)
+    log('commitment chain initialized')
   }
 
   private async hasDBSecret(): Promise<boolean> {
