@@ -89,7 +89,7 @@ const hardhatConfig: HardhatUserConfig = {
   },
   gasReporter: {
     currency: 'USD',
-    excludeContracts: ['mocks', 'Migrations.sol', 'utils/console.sol']
+    excludeContracts: ['mocks', 'utils/console.sol']
   }
 }
 
