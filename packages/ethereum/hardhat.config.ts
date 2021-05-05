@@ -24,7 +24,8 @@ const hardhatConfig: HardhatUserConfig = {
   networks: {
     // hardhat-deploy cannot run deployments if the network is not hardhat
     // we use an ENV variable (which is specified in our NPM script)
-    // to let hardhat know we want to enable mining
+    // to let hardhat know we want to run hardhat in 'development' mode
+    // this essentially enables mining, see below
     hardhat: {
       live: false,
       tags: [DEVELOPMENT ? 'development' : 'testing'] as NetworkTag[],
