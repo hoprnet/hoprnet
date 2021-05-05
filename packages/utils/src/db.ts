@@ -80,6 +80,7 @@ export class HoprDB {
   private async has(key: Uint8Array): Promise<boolean> {
     try {
       await this.db.get(Buffer.from(this.keyOf(key)))
+
       return true
     } catch (err) {
       if (err.type === 'NotFoundError' || err.notFound) {
@@ -262,11 +263,7 @@ export class HoprDB {
   }
 
   async hasPacket(packetTag: Uint8Array) {
-    let present = false
-    try {
-      await this.get(this.keyOf(PACKET_TAG_PREFIX, packetTag))
-      present = true
-    } catch {}
+    let present = await this.has(this.keyOf(PACKET_TAG_PREFIX, packetTag))
 
     if (!present) {
       await this.put(this.keyOf(PACKET_TAG_PREFIX, packetTag), new Uint8Array())
