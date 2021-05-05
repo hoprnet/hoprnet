@@ -531,6 +531,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
      * functionality. `ecrecover` performs the point multiplication and 
      * converts the output to an Ethereum address (sliced hash of the product
      * of base point and scalar).
+     * See https://ethresear.ch/t/you-can-kinda-abuse-ecrecover-to-do-ecmul-in-secp256k1-today/2384
      * @param response response that is used to recompute the challenge
      */
     function computeChallenge(bytes32 response) public pure returns (address)  {
