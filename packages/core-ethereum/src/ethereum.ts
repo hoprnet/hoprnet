@@ -249,8 +249,7 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
       provider.on('error', cb)
       channels.on('error', cb)
     },
-    // subscribe to all HoprChannels events
-    subscribeChannelEvents: (cb) => channels.on('*', (event) => cb(event)),
+    subscribeChannelEvents: (cb) => channels.on('*', cb),
     unsubscribe: () => {
       provider.removeAllListeners()
       channels.removeAllListeners()
