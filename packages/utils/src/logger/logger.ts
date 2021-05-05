@@ -9,49 +9,113 @@
 import { getLogger, Logger as Log4jsLogger } from '@log4js-node/log4js-api'
 import { configure as log4jsConfigure } from 'log4js'
 import { Configuration as Log4jsConfiguration } from 'log4js'
+import Debug from 'debug'
 
-export class Logger {
-  private readonly logger: Log4jsLogger
 
-  private constructor(category?: string) {
-    this.logger = getLogger(category)
+/** for hoprd only */
+type Configuration = Log4jsConfiguration
+function configure(config: Configuration): void {
+  log4jsConfigure(config)
+}
+
+export const setuConfigLogger = () => {
+  configure({
+    appenders: { out: { type: 'stdout' } },
+    categories: { default: { appenders: ['out'], level: 'debug' } }
+    // appenders: { custom: { type: ipfsAppender } },
+    // categories: { default: { appenders: ['custom'], level: 'debug' } }
+  })
+}
+
+export abstract class Logger {
+  static getLogger(category?: string, useDebug = true): ConfigLogger | DebugLogger {
+    return useDebug ? new DebugLogger(category) : new ConfigLogger(category);
+  }
+  abstract trace(message: unknown, ...args: unknown[]): void
+  abstract fatal(message: unknown, ...args: unknown[]): void
+  abstract error(message: unknown, ...args: unknown[]): void
+  abstract warn(message: unknown, ...args: unknown[]): void
+  abstract info(message: unknown, ...args: unknown[]): void
+  abstract debug(message: unknown, ...args: unknown[]): void
+}
+class DebugLogger extends Logger {
+  private readonly logger: Debug.Debugger
+
+  public constructor(category?: string) {
+    super()
+    this.logger = Debug('hopr')
+    this.logger.extend(category)
   }
 
-  static getLogger(category?: string): Logger {
-    return new Logger(category)
+  protected log(message: unknown, ...args: unknown[]): void {
+    if (args?.length) this.logger.log(message, args)
+    else this.logger.log(message)
   }
 
-  /**
-   * By default, log4js adds an ugly empty list '[]' to the logs when the arg list is empty...
-   **/
-  trace(message: unknown, ...args: unknown[]): void {
-    if (args?.length) this.logger.trace(message, args)
-    else this.logger.trace(message)
+  public debug(message: unknown, ...args: unknown[]): void {
+    this.logger.log = console.debug.bind(console);
+    this.log(message, args);
   }
-  debug(message: unknown, ...args: unknown[]): void {
-    if (args?.length) this.logger.debug(message, args)
-    else this.logger.debug(message)
+
+  public error(message: unknown, ...args: unknown[]): void {
+    this.logger.log = console.error.bind(console);
+    this.log(message, args);
   }
-  info(message: unknown, ...args: unknown[]): void {
-    if (args?.length) this.logger.info(message, args)
-    else this.logger.info(message)
+
+  public info(message: unknown, ...args: unknown[]): void {
+    this.logger.log = console.log.bind(console);
+    this.log(message, args);
   }
-  warn(message: unknown, ...args: unknown[]): void {
-    if (args?.length) this.logger.warn(message, args)
-    else this.logger.warn(message)
+
+  public warn(message: unknown, ...args: unknown[]): void {
+    this.logger.log = console.warn.bind(console);
+    this.log(message, args);
   }
-  error(message: unknown, ...args: unknown[]): void {
-    if (args?.length) this.logger.error(message, args)
-    else this.logger.error(message)
+
+  public fatal(message: unknown, ...args: unknown[]): void {
+    this.logger.log = console.error.bind(console);
+    this.log(message, args);
   }
-  fatal(message: unknown, ...args: unknown[]): void {
-    if (args?.length) this.logger.fatal(message, args)
-    else this.logger.fatal(message)
+
+  public trace(message: unknown, ...args: unknown[]): void {
+    this.logger.log = console.trace.bind(console);
+    this.log(message, args);
   }
 }
 
-/** for hoprd only */
-export type Configuration = Log4jsConfiguration
-export function configure(config: Configuration): void {
-  log4jsConfigure(config)
+class ConfigLogger extends Logger {
+  private readonly logger: Log4jsLogger
+
+  public constructor(category?: string) {
+    super();
+    this.logger = getLogger(category)
+  }
+  
+  /**
+   * By default, log4js adds an ugly empty list '[]' to the logs when the arg list is empty...
+   **/
+  public trace(message: unknown, ...args: unknown[]): void {
+    if (args?.length) this.logger.trace(message, args)
+    else this.logger.trace(message)
+  }
+  public debug(message: unknown, ...args: unknown[]): void {
+    if (args?.length) this.logger.debug(message, args)
+    else this.logger.debug(message)
+  }
+  public info(message: unknown, ...args: unknown[]): void {
+    if (args?.length) this.logger.info(message, args)
+    else this.logger.info(message)
+  }
+  public warn(message: unknown, ...args: unknown[]): void {
+    if (args?.length) this.logger.warn(message, args)
+    else this.logger.warn(message)
+  }
+  public error(message: unknown, ...args: unknown[]): void {
+    if (args?.length) this.logger.error(message, args)
+    else this.logger.error(message)
+  }
+  public fatal(message: unknown, ...args: unknown[]): void {
+    if (args?.length) this.logger.fatal(message, args)
+    else this.logger.fatal(message)
+  }
 }

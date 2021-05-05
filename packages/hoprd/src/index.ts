@@ -2,7 +2,7 @@
 import Hopr from '@hoprnet/hopr-core'
 import type { HoprOptions } from '@hoprnet/hopr-core'
 import { decode } from 'rlp'
-import { Logger, configure } from '@hoprnet/hopr-utils'
+import { Logger, setupConfigLogger } from '@hoprnet/hopr-utils'
 // import { Logger, configure, ipfsAppender } from '@hoprnet/hopr-utils'
 import { Commands } from './commands'
 import { LogStream } from './logs'
@@ -136,17 +136,8 @@ async function generateNodeOptions(): Promise<HoprOptions> {
   return options
 }
 
-function initLogger() {
-  configure({
-    appenders: { out: { type: 'stdout' } },
-    categories: { default: { appenders: ['out'], level: 'debug' } }
-    // appenders: { custom: { type: ipfsAppender } },
-    // categories: { default: { appenders: ['custom'], level: 'debug' } }
-  })
-}
-
 async function main() {
-  initLogger()
+  !process.env.DEBUG && setupConfigLogger()
   const log: Logger = Logger.getLogger('hoprd')
   let node: Hopr
   let logAdmin = new LogStream()
