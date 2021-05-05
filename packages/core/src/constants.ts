@@ -5,7 +5,6 @@ const pkg = require('../package.json')
 export const TICKET_AMOUNT = '10000000000000000' // 0.01 HOPR
 export const TICKET_WIN_PROB = 1 // 100%
 export const PACKET_SIZE = 500
-export const MARSHALLED_PUBLIC_KEY_SIZE = 37
 export const NAME = 'ipfs' // 'hopr'
 
 export const FULL_VERSION = pkg.version
