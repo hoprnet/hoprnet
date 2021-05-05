@@ -32,7 +32,10 @@ export class Commitment {
     if (!this.initialized) {
       await this.initialize()
     }
-    this.db.setCurrentCommitment(this.channelId, await this.findPreImage(await this.db.getCurrentCommitment(this.channelId)))
+    this.db.setCurrentCommitment(
+      this.channelId,
+      await this.findPreImage(await this.db.getCurrentCommitment(this.channelId))
+    )
   }
 
   private async findPreImage(hash: Hash): Promise<Hash> {
