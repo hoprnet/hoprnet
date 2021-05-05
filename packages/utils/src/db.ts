@@ -35,6 +35,7 @@ const CHANNEL_PREFIX = encoder.encode('indexer-channel-')
 const createChannelKey = (channelId: Hash): Uint8Array => u8aConcat(CHANNEL_PREFIX, encoder.encode(channelId.toHex()))
 const createAccountKey = (address: Address): Uint8Array => u8aConcat(ACCOUNT_PREFIX, encoder.encode(address.toHex()))
 const COMMITMENT_PREFIX = encoder.encode('commitment:')
+const CURRENT = encoder.encode('current')
 
 function keyAcknowledgedTickets(index: Uint8Array): Uint8Array {
   assert.equal(index.length, ACKNOWLEDGED_TICKET_INDEX_LENGTH)
@@ -342,6 +343,14 @@ export class HoprDB {
     return await this.maybeGet(u8aConcat(COMMITMENT_PREFIX, channelId.serialize(), Uint8Array.of(iteration)))
   }
 
+  async getCurrentCommitment(channelId: Hash): Promise<Hash> {
+    return new Hash(await this.get(u8aConcat(COMMITMENT_PREFIX, CURRENT, channelId.serialize())))
+  }
+
+  async setCurrentCommitment(channelId: Hash, commitment: Hash) {
+    return this.put(u8aConcat(COMMITMENT_PREFIX, CURRENT, channelId.serialize()), commitment.serialize())
+  }
+
   async getLatestBlockNumber(): Promise<number> {
     if (!(await this.has(LATEST_BLOCK_NUMBER_KEY))) return 0
     return new BN(await this.get(LATEST_BLOCK_NUMBER_KEY)).toNumber()
@@ -384,6 +393,7 @@ export class HoprDB {
   }
 
   async getAccounts(filter?: (account: AccountEntry) => boolean) {
+    filter = filter || (() => true)
     return this.getAll<AccountEntry>(ACCOUNT_PREFIX, AccountEntry.deserialize, filter)
   }
 
