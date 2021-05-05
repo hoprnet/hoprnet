@@ -13,7 +13,6 @@ async function hashFunction(msg: Uint8Array): Promise<Uint8Array> {
 
 export class Commitment {
   private initialized: boolean = false
-  private current: Hash
 
   constructor(
     private setChainCommitment,
@@ -26,14 +25,14 @@ export class Commitment {
     if (!this.initialized) {
       await this.initialize()
     }
-    return this.current
+    return await this.db.getCurrentCommitment(this.channelId)
   }
 
   public async bumpCommitment() {
     if (!this.initialized) {
       await this.initialize()
     }
-    this.current = await this.findPreImage(this.current)
+    this.db.setCurrentCommitment(this.channelId, await this.findPreImage(await this.db.getCurrentCommitment(this.channelId)))
   }
 
   private async findPreImage(hash: Hash): Promise<Hash> {
@@ -58,7 +57,7 @@ export class Commitment {
     if (chainCommitment && dbContains) {
       try {
         await this.findPreImage(chainCommitment) // throws if not found
-        this.current = chainCommitment
+        await this.db.getCurrentCommitment(this.channelId) // Find out if we have one
         this.initialized = true
         return
       } catch (_e) {
@@ -66,17 +65,17 @@ export class Commitment {
       }
     }
     log(`reinitializing (db: ${dbContains}, chain: ${chainCommitment}})`)
-    this.current = await this.createCommitmentChain()
-    await this.setChainCommitment(this.current)
+    await this.createCommitmentChain()
     this.initialized = true
   }
 
-  // returns last hash in chain
-  private async createCommitmentChain(): Promise<Hash> {
+  private async createCommitmentChain(): Promise<void> {
     const seed = new Hash(randomBytes(Hash.SIZE)) // TODO seed off privKey + channel
     const result = await iterateHash(seed.serialize(), hashFunction, TOTAL_ITERATIONS, DB_ITERATION_BLOCK_SIZE)
     await this.db.storeHashIntermediaries(this.channelId, result.intermediates)
-    return new Hash(result.hash)
+    const current = new Hash(result.hash)
+    this.db.setCurrentCommitment(this.channelId,current)
+    await this.setChainCommitment(current)
   }
 
   private async hasDBSecret(): Promise<boolean> {
