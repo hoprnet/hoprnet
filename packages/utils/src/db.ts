@@ -51,10 +51,6 @@ export class HoprDB {
   private db: LevelUp
 
   constructor(private id: Address, initialize: boolean, version: string, dbPath?: string) {
-    if (version === 'mock') {
-      return
-    }
-
     if (!dbPath) {
       dbPath = path.join(process.cwd(), 'db', version)
     }
