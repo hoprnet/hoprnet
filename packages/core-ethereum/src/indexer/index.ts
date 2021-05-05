@@ -43,9 +43,6 @@ class Indexer extends EventEmitter {
     if (this.status === 'started') return
     log(`Starting indexer...`)
 
-    // wipe indexer, do not use in production
-    // await this.wipe()
-
     const [latestSavedBlock, latestOnChainBlock] = await Promise.all([
       await this.db.getLatestBlockNumber(),
       this.chain.getLatestBlockNumber()
@@ -77,12 +74,16 @@ class Indexer extends EventEmitter {
 
     log('Subscribing to events from block %d', fromBlock)
 
-    this.chain.subscribeBlock(this.onNewBlock.bind(this))
+    this.chain.subscribeBlock((b) => {
+      this.onNewBlock(b)
+    })
     this.chain.subscribeError((error: any) => {
       log(chalk.red(`etherjs error: ${error}`))
       this.restart()
     })
-    this.chain.subscribeChannelEvents((e) => this.onNewEvents([e]))
+    this.chain.subscribeChannelEvents((e) => {
+      this.onNewEvents([e])
+    })
 
     this.status = 'started'
     log(chalk.green('Indexer started!'))
@@ -181,7 +182,8 @@ class Indexer extends EventEmitter {
    * @param block
    */
   private async onNewBlock(blockNumber: number): Promise<void> {
-    log('indexer got new block')
+    log('Indexer got new block %d', blockNumber)
+
     // update latest block
     if (this.latestBlock < blockNumber) {
       this.latestBlock = blockNumber

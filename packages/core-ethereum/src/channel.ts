@@ -6,7 +6,7 @@ import {
   Hash,
   UINT256,
   Ticket,
-  Acknowledgement,
+  AcknowledgedTicket,
   ChannelEntry,
   UnacknowledgedTicket
 } from '@hoprnet/hopr-utils'
@@ -33,7 +33,7 @@ class Channel {
   ) {
     this.index = 0 // TODO - bump channel epoch to make sure..
     this.commitment = new Commitment(
-      (commitment) => this.chain.setCommitment(commitment),
+      (commitment: Hash) => this.chain.setCommitment(commitment),
       () => this.getChainCommitment(),
       this.db,
       this.getId()
@@ -51,12 +51,27 @@ class Channel {
    */
   async acknowledge(
     unacknowledgedTicket: UnacknowledgedTicket,
-    acknowledgementHash: Hash
-  ): Promise<Acknowledgement | null> {
-    const response = Hash.create(unacknowledgedTicket.secretA.serialize(), acknowledgementHash.serialize())
+    acknowledgement: Hash
+  ): Promise<AcknowledgedTicket | null> {
+    if (!unacknowledgedTicket.verify(this.counterparty, acknowledgement)) {
+      throw Error(`The acknowledgement is not sufficient to solve the embedded challenge.`)
+    }
+
+    const response = unacknowledgedTicket.getResponse(acknowledgement)
+
+    if (!response.valid) {
+      throw Error(`Could not determine a valid response.`)
+    }
+
     const ticket = unacknowledgedTicket.ticket
-    if (ticket.isWinningTicket(response, await this.commitment.getCurrentCommitment(), ticket.winProb)) {
-      const ack = new Acknowledgement(ticket, response, await this.commitment.getCurrentCommitment())
+    if (
+      ticket.isWinningTicket(new Hash(response.response), await this.commitment.getCurrentCommitment(), ticket.winProb)
+    ) {
+      const ack = new AcknowledgedTicket(
+        ticket,
+        new Hash(response.response),
+        await this.commitment.getCurrentCommitment()
+      )
       await this.commitment.bumpCommitment()
       return ack
     } else {
@@ -142,7 +157,18 @@ class Channel {
     return await this.chain.finalizeChannelClosure(counterpartyAddress)
   }
 
-  async createTicket(amount: Balance, challenge: Hash, winProb: number) {
+  /**
+   * Creates a signed ticket that includes the given amount of
+   * tokens
+   * @dev Due to a missing feature, namely ECMUL, in Ethereum, the
+   * challenge is given as an Ethereum address because the signature
+   * recovery algorithm is used to perform an EC-point multiplication.
+   * @param amount value of the ticket
+   * @param challenge challenge to solve in order to redeem the ticket
+   * @param winProb the winning probability to use
+   * @returns a signed ticket
+   */
+  async createTicket(amount: Balance, challenge: Address, winProb: number) {
     const counterpartyAddress = this.counterparty.toAddress()
     const c = await this.getState()
     return Ticket.create(
@@ -157,7 +183,13 @@ class Channel {
     )
   }
 
-  async createDummyTicket(challenge: Hash): Promise<Ticket> {
+  // @TODO Replace this with (truely) random data
+  /**
+   * Creates a ticket that is sent next to the packet to the last node.
+   * @param challenge dummy challenge, potential no valid response known
+   * @returns a ticket without any value
+   */
+  createDummyTicket(challenge: Address): Ticket {
     // TODO: document how dummy ticket works
     return Ticket.create(
       this.counterparty.toAddress(),
@@ -171,7 +203,14 @@ class Channel {
     )
   }
 
-  async submitTicket(ackTicket: Acknowledgement): Promise<SubmitTicketResponse> {
+  async submitTicket(ackTicket: AcknowledgedTicket): Promise<SubmitTicketResponse> {
+    if (!ackTicket.verify(this.counterparty)) {
+      return {
+        status: 'FAILURE',
+        message: 'Invalid response to acknowledgement'
+      }
+    }
+
     try {
       const ticket = ackTicket.ticket
 
@@ -186,16 +225,8 @@ class Channel {
         }
       }
 
-      const validChallenge = ticket.checkResponse(ackTicket.response)
-      if (!validChallenge) {
-        log(`Failed to submit ticket ${ackTicket.response.toHex()}: 'Invalid challenge.'`)
-        return {
-          status: 'FAILURE',
-          message: 'Invalid challenge.'
-        }
-      }
+      const isWinning = ticket.isWinningTicket(ackTicket.response, ackTicket.preImage, ticket.winProb)
 
-      const isWinning = await ticket.isWinningTicket(ackTicket.response, ackTicket.preImage, ticket.winProb)
       if (!isWinning) {
         log(`Failed to submit ticket ${ackTicket.response.toHex()}:  'Not a winning ticket.'`)
         return {
@@ -204,8 +235,7 @@ class Channel {
         }
       }
 
-      const counterparty = ticket.getSigner().toAddress()
-      const receipt = await this.chain.redeemTicket(counterparty, ackTicket, ticket)
+      const receipt = await this.chain.redeemTicket(this.counterparty.toAddress().toHex(), ackTicket, ticket)
 
       // TODO delete ackTicket
       //this.commitment.updateChainState(ackTicket.preImage)

@@ -8,7 +8,8 @@ import { storeContract } from '../tasks/utils/contracts'
 const startTimes: {
   [key in DeploymentTypes]: number
 } = {
-  local: durations.days(1),
+  testing: durations.days(1),
+  development: durations.days(1),
   staging: durations.days(1),
   production: durations.days(1)
 }
@@ -16,7 +17,8 @@ const startTimes: {
 const maxMintAmounts: {
   [key in DeploymentTypes]: string
 } = {
-  local: ethers.utils.parseEther('100000000').toString(),
+  testing: ethers.utils.parseEther('100000000').toString(),
+  development: ethers.utils.parseEther('100000000').toString(),
   staging: ethers.utils.parseEther('100000000').toString(),
   production: ethers.utils.parseEther('100000000').toString()
 }
@@ -32,12 +34,12 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     from: deployer.address,
     args: [
       hoprToken.address,
-      Math.floor(startTimes[deploymentType] ?? startTimes.local / 1e3),
-      maxMintAmounts[deploymentType] ?? maxMintAmounts.local
+      Math.floor(startTimes[deploymentType] ?? startTimes.testing / 1e3),
+      maxMintAmounts[deploymentType] ?? maxMintAmounts.testing
     ],
     log: true
   })
-  await storeContract(network.name, 'HoprDistributor', result.address, result.receipt.blockNumber)
+  await storeContract(network.name, network.tags, 'HoprDistributor', result.address, result.receipt.blockNumber)
 }
 
 export default main

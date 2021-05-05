@@ -1,5 +1,9 @@
-#!/bin/bash
-set -e #u
+#!/usr/bin/env bash
+
+set -o errexit
+set -o nounset
+set -o pipefail
+
 shopt -s expand_aliases
 #set -o xtrace
 
@@ -29,11 +33,11 @@ RELEASE=$(node -p -e "require('./packages/hoprd/package.json').version")
 # Get RELEASE_NAME, from environment
 get_environment
 
-TESTNET_NAME="$RELEASE_NAME-$(echo "$VERSION_MAJ_MIN" | sed 's/\./-/g')"
+TESTNET_NAME="$RELEASE_NAME-${VERSION_MAJ_MIN//./-}"
 TESTNET_SIZE=3
 
 echo "Cleaning up before deploy"
 cleanup
 
 echo "Starting testnet '$TESTNET_NAME' with $TESTNET_SIZE nodes and image hoprd:$RELEASE"
-start_testnet $TESTNET_NAME $TESTNET_SIZE "gcr.io/hoprassociation/hoprd:$RELEASE" 
+start_testnet "$TESTNET_NAME" "$TESTNET_SIZE" "gcr.io/hoprassociation/hoprd:$RELEASE"

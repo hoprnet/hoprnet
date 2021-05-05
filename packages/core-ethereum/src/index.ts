@@ -3,10 +3,10 @@ import type PeerId from 'peer-id'
 import type { ChainWrapper } from './ethereum'
 import chalk from 'chalk'
 import debug from 'debug'
-import { Acknowledgement, PublicKey, Balance, Address, NativeBalance } from '@hoprnet/hopr-utils'
+import { AcknowledgedTicket, PublicKey, Balance, Address, NativeBalance } from '@hoprnet/hopr-utils'
 import Indexer from './indexer'
 import { RoutingChannel } from './indexer'
-import { DEFAULT_URI, MAX_CONFIRMATIONS, INDEXER_BLOCK_RANGE } from './constants'
+import { PROVIDER_DEFAULT_URI, INDEXER_MAX_CONFIRMATIONS, INDEXER_BLOCK_RANGE } from './constants'
 import { Channel } from './channel'
 import { createChainWrapper } from './ethereum'
 import { PROVIDER_CACHE_TTL } from './constants'
@@ -18,7 +18,7 @@ export type SubmitTicketResponse =
   | {
       status: 'SUCCESS'
       receipt: string
-      ackTicket: Acknowledgement
+      ackTicket: AcknowledgedTicket
     }
   | {
       status: 'FAILURE'
@@ -130,14 +130,14 @@ export default class HoprEthereum {
     privateKey: Uint8Array,
     options?: { provider?: string; maxConfirmations?: number }
   ): Promise<HoprEthereum> {
-    const chain = await createChainWrapper(options?.provider || DEFAULT_URI, privateKey)
+    const chain = await createChainWrapper(options?.provider || PROVIDER_DEFAULT_URI, privateKey)
     await chain.waitUntilReady()
 
     const indexer = new Indexer(
       chain.getGenesisBlock(),
       db,
       chain,
-      options.maxConfirmations ?? MAX_CONFIRMATIONS,
+      options.maxConfirmations ?? INDEXER_MAX_CONFIRMATIONS,
       INDEXER_BLOCK_RANGE
     )
     await indexer.start()
