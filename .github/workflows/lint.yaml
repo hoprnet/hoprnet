@@ -40,7 +40,7 @@ jobs:
 
       - name: Run shellcheck
         run: |
-          find . -name "*.sh" ! -ipath "./node_modules/**" | xargs shellcheck -a -Calways
+          find . -name "*.sh" ! -ipath "**/node_modules/**" | xargs shellcheck -a -Calways
 
       - name: Lint & Fix
         run: |
