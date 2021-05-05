@@ -66,7 +66,7 @@ For public network migrations (rinkeby, kovan, [etc](./utils/networks.ts)), you 
 
 ```bash
 # local migration
-yarn network --network localhost
+yarn network
 
 # public migration
 yarn migrate --network matic

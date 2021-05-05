@@ -1,8 +1,8 @@
 import type Hopr from '@hoprnet/hopr-core'
-import { moveDecimalPoint } from '@hoprnet/hopr-utils'
+import { Logger, AcknowledgedTicket, moveDecimalPoint, Balance } from '@hoprnet/hopr-utils'
 import { countSignedTickets, styleValue, toSignedTickets } from './utils'
 import { AbstractCommand } from './abstractCommand'
-import { Logger, Balance, Acknowledgement } from '@hoprnet/hopr-utils'
+
 
 const log = Logger.getLogger('hoprd.commands.redeemTickets')
 
@@ -31,7 +31,7 @@ export default class RedeemTickets extends AbstractCommand {
 
       log.info(`Redeeming ${results.length} tickets..`)
 
-      const redeemedTickets: Acknowledgement[] = []
+      const redeemedTickets: AcknowledgedTicket[] = []
       let count = 0
 
       for (const ackTicket of results) {

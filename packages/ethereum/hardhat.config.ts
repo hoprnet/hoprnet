@@ -11,9 +11,9 @@ import '@typechain/hardhat'
 // rest
 import { HardhatUserConfig, task, types } from 'hardhat/config'
 import { ethers } from 'ethers'
-import { networks } from './chain/networks'
+import { networks, NetworkTag } from './chain/networks'
 
-const { PRIVATE_KEY, INFURA_KEY, MATIC_VIGIL_KEY, ETHERSCAN_KEY, QUIKNODE_KEY } = process.env
+const { PRIVATE_KEY, ETHERSCAN_KEY, POKT_KEY, QUIKNODE_KEY, DEVELOPMENT = false } = process.env
 const GAS_MULTIPLIER = 1.1
 
 // set 'ETHERSCAN_API_KEY' so 'hardhat-deploy' can read it
@@ -22,45 +22,35 @@ process.env.ETHERSCAN_API_KEY = ETHERSCAN_KEY
 const hardhatConfig: HardhatUserConfig = {
   defaultNetwork: 'hardhat',
   networks: {
+    // hardhat-deploy cannot run deployments if the network is not hardhat
+    // we use an ENV variable (which is specified in our NPM script)
+    // to let hardhat know we want to run hardhat in 'development' mode
+    // this essentially enables mining, see below
     hardhat: {
       live: false,
-      tags: ['local', 'test'],
-      saveDeployments: false
+      tags: [DEVELOPMENT ? 'development' : 'testing'] as NetworkTag[],
+      saveDeployments: false,
+      mining: DEVELOPMENT
+        ? {
+            auto: true, // every transaction will trigger a new block (without this deployments fail)
+            interval: [3000, 6000] // mine new block every 3s - 6s
+          }
+        : undefined
     },
-    localhost: {
-      live: false,
-      tags: ['local'],
-      url: 'http://localhost:8545',
-      saveDeployments: false
-    },
-    mainnet: {
-      ...networks.mainnet,
+    goerli: {
+      ...networks.goerli,
+      live: true,
+      tags: ['staging'] as NetworkTag[],
       gasMultiplier: GAS_MULTIPLIER,
-      url: `https://mainnet.infura.io/v3/${INFURA_KEY}`,
-      accounts: PRIVATE_KEY ? [PRIVATE_KEY] : []
-    },
-    kovan: {
-      ...networks.kovan,
-      gasMultiplier: GAS_MULTIPLIER,
-      url: `https://kovan.infura.io/v3/${INFURA_KEY}`,
+      url: `https://eth-goerli.gateway.pokt.network/v1/${POKT_KEY}/`,
       accounts: PRIVATE_KEY ? [PRIVATE_KEY] : []
     },
     xdai: {
       ...networks.xdai,
+      live: true,
+      tags: ['production'] as NetworkTag[],
       gasMultiplier: GAS_MULTIPLIER,
       url: `https://still-patient-forest.xdai.quiknode.pro/${QUIKNODE_KEY}/`,
-      accounts: PRIVATE_KEY ? [PRIVATE_KEY] : []
-    },
-    matic: {
-      ...networks.matic,
-      gasMultiplier: GAS_MULTIPLIER,
-      url: `https://rpc-mainnet.maticvigil.com/v1/${MATIC_VIGIL_KEY}`,
-      accounts: PRIVATE_KEY ? [PRIVATE_KEY] : []
-    },
-    binance: {
-      ...networks.binance,
-      gasMultiplier: GAS_MULTIPLIER,
-      url: 'https://bsc-dataseed.binance.org',
       accounts: PRIVATE_KEY ? [PRIVATE_KEY] : []
     }
   },
@@ -99,7 +89,7 @@ const hardhatConfig: HardhatUserConfig = {
   },
   gasReporter: {
     currency: 'USD',
-    excludeContracts: ['mocks', 'Migrations.sol', 'utils/console.sol']
+    excludeContracts: ['mocks', 'utils/console.sol']
   }
 }
 

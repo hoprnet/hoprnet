@@ -5,9 +5,10 @@ import PeerId from 'peer-id'
 import chaiAsPromised from 'chai-as-promised'
 import chai, { expect } from 'chai'
 import sinon from 'sinon'
-import { Address, Balance, PublicKey, UINT256, Ticket, ChannelEntry } from '@hoprnet/hopr-utils'
 import { Channel } from '@hoprnet/hopr-core-ethereum'
-import { validateCreatedTicket, validateUnacknowledgedTicket } from '../messages/packet'
+import { Address, Balance, PublicKey, UINT256, Ticket, ChannelEntry } from '@hoprnet/hopr-utils'
+import { validateUnacknowledgedTicket, validateCreatedTicket } from '../messages'
+
 chai.use(chaiAsPromised)
 
 // target is party A, sender is party B
@@ -38,7 +39,7 @@ const createMockTicket = ({
     winProb,
     epoch,
     channelIteration,
-    getSigner: () => new PublicKey(sender.pubKey.marshal())
+    verify: (pubKey: PublicKey) => pubKey.eq(new PublicKey(sender.pubKey.marshal()))
   } as unknown) as Ticket
 }
 
