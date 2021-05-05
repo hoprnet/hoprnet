@@ -32,16 +32,16 @@
     "prepublishOnly": "yarn build"
   },
   "dependencies": {
-    "@hoprnet/hopr-utils": "~1.69.3",
+    "@hoprnet/hopr-utils": "^1.70.11",
     "abortable-iterator": "^3.0.0",
-    "bl": "^4.1",
+    "bl": "^5.0",
     "debug": "^4.3.1",
-    "it-handshake": "~1.0.2",
+    "it-handshake": "^2.0.0",
     "multiaddr": "~8.1.2",
-    "multihashes": "^3.1.2",
-    "p-defer": "~3.0.0",
-    "peer-id": "~0.14.3",
-    "simple-peer": "9.9.3",
+    "multihashes": "^4.0.2",
+    "p-defer": "3",
+    "peer-id": "~0.14.8",
+    "simple-peer": "9.11",
     "stream-to-it": "^0.2.2",
     "webrtc-stun": "3.0.0",
     "wrtc": "0.4.7"
@@ -55,13 +55,13 @@
     "it-pair": "^1.0.0",
     "it-pipe": "^1.1.0",
     "libp2p": "^0.30.9",
-    "libp2p-interfaces": "^0.8.3",
+    "libp2p-interfaces": "^0.10",
     "libp2p-mplex": "0.10",
-    "libp2p-noise": "^2.0.5",
+    "libp2p-noise": "^3.0",
     "mocha": "^8.3.0",
     "prettier": "~2.2.1",
     "ts-node": "~9.1.1",
-    "typescript": "4.1.5"
+    "typescript": "^4.2"
   },
   "mocha": {
     "extension": [
