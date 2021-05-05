@@ -25,8 +25,8 @@ async function main(
   { ethers, network }: HardhatRuntimeEnvironment,
   _runSuper: RunSuperFunction<any>
 ) {
-  if (network.name !== 'localhost') {
-    console.error('🌵 Faucet is only valid in localhost network')
+  if (network.tags.development) {
+    console.error('🌵 Faucet is only valid in a development network')
     return
   }
 

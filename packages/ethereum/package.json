@@ -13,7 +13,7 @@
     "fund": "hardhat fund",
     "faucet": "hardhat faucet",
     "migrate": "hardhat deploy",
-    "network": "hardhat node",
+    "network": "DEVELOPMENT=true hardhat node",
     "test": "hardhat test",
     "coverage": "hardhat coverage",
     "prepublishOnly": "yarn build"

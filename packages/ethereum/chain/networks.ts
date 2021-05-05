@@ -1,48 +1,21 @@
 import { ethers } from 'ethers'
 
-export type PublicNetworks = 'mainnet' | 'ropsten' | 'kovan' | 'xdai' | 'matic' | 'binance'
+export type PublicNetworks = 'xdai' | 'goerli'
 export type Networks = 'hardhat' | 'localhost' | PublicNetworks
-export type DeploymentTypes = 'local' | 'staging' | 'production'
+export type DeploymentTypes = 'testing' | 'development' | 'staging' | 'production'
+export type NetworkTag = DeploymentTypes | 'etherscan'
 
 export const networks: {
   [network in PublicNetworks]: {
-    live: boolean
     chainId: number
-    tags?: string[]
     gas?: number
   }
 } = {
-  mainnet: {
-    live: true,
-    tags: ['production', 'etherscan'],
-    chainId: 1
-  },
-  ropsten: {
-    live: true,
-    tags: ['staging', 'etherscan'],
-    chainId: 3
-  },
-  kovan: {
-    live: true,
-    tags: ['staging', 'etherscan'],
-    chainId: 42
-  },
   xdai: {
-    live: true,
-    tags: ['staging'],
     chainId: 100,
     gas: Number(ethers.utils.parseUnits('1', 'gwei'))
   },
-  matic: {
-    live: true,
-    tags: ['staging'],
-    chainId: 137,
-    gas: Number(ethers.utils.parseUnits('1', 'gwei'))
-  },
-  binance: {
-    live: true,
-    tags: ['staging'],
-    chainId: 56,
-    gas: Number(ethers.utils.parseUnits('20', 'gwei')) // binance chain requires >= 20gwei
+  goerli: {
+    chainId: 5
   }
 }
