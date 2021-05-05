@@ -262,7 +262,7 @@ export class HoprDB {
     await this.put(UnAcknowledgedTickets(key), unacknowledged.serialize())
   }
 
-  async hasPacket(packetTag: Uint8Array) {
+  async checkAndSetPacketTag(packetTag: Uint8Array) {
     let present = await this.has(this.keyOf(PACKET_TAG_PREFIX, packetTag))
 
     if (!present) {

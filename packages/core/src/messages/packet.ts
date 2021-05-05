@@ -298,7 +298,7 @@ export class Packet {
   }
 
   async checkPacketTag(db: HoprDB) {
-    const present = await db.hasPacket(this.packetTag)
+    const present = await db.checkAndSetPacketTag(this.packetTag)
 
     if (present) {
       throw Error(`Potential replay attack detected. Packet tag is already present.`)
