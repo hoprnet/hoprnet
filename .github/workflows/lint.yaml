@@ -6,9 +6,9 @@ on:
     paths-ignore:
       - '**/docs/**/*'
 
-
 jobs:
   lint:
+    if: github.actor != 'robertkiel'
     name: Lint 
     runs-on: ubuntu-latest
     steps:
