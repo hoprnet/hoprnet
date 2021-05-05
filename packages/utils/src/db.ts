@@ -15,7 +15,7 @@ import {
   PublicKey
 } from './types'
 import BN from 'bn.js'
-import { Logger } from '@hoprnet/hopr-utils'
+import { Logger } from './logger'
 
 const log = Logger.getLogger(`hopr-core.db`)
 

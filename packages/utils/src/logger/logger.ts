@@ -42,8 +42,7 @@ class DebugLogger extends Logger {
 
   public constructor(category?: string) {
     super()
-    this.logger = Debug('hopr')
-    this.logger.extend(category)
+    this.logger = Debug(category)
   }
 
   protected log(message: unknown, ...args: unknown[]): void {
