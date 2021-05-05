@@ -12,11 +12,9 @@ $$value_(ACK_n) =\sum_{i=1}^nfee_{packet_i}$$ where $n$ is the total number of m
 \\~\\In probabilistic payments, the payouts use a concept called “tickets”, a ticket can be either a win or a loss with a certain winning probability. This means nodes are incentivized to continue relaying packets as they don’t know which ticket is a win.
 \\~\\HOPR uses a custom-made layer 2 solution. It is inspired by payment channels and probabilistic payments where incentives can be claimed independently:
 $$value ( ACK_i )=value ( ACK_j ) \quad for \quad i,j\in \{1,n\}$$
-<<<<<<< HEAD
 Hence, there is no added value in pretending packet loss or intentionally changing the order in which packets are processed. 
 \subsubsection{Channel management}
-=======
-Hence, there is no added value in pretending packet loss or intentionally changing the order in which packets are processed.
+
 
 \begin{figure}[H]
     \centering
@@ -25,7 +23,6 @@ Hence, there is no added value in pretending packet loss or intentionally changi
     \label{fig:Payment channel graph}
 \end{figure}
 
->>>>>>> 69f5d05030f54ccc0d062189db223fbd48a05cb5
 \subsection{Proof Of Relay}
 
 HOPR incentivizes packet transformation and delivery using a mechanism called “Proof-Of-Relay”.
