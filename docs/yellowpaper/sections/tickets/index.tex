@@ -11,7 +11,8 @@ where $\sigma$ is the amount of HOPR tokens set in the ticket, $L$ is the path l
 the challenge is given together with the routing information by the packet. 
 \\$(A)$ does not know whether the ticket is a win or not.
 \\$(A)$ sets content of a ticket to: $$t:=(\sigma,P_w,R,I,T_c,\zeta,c_{Id},\tau,V)$$ 
-\\\textbf{Recipient's adress $R$:} is a unique identifier that is derived from the recipient's public key.
+\\~\\$(A)$ then signs the ticket with its private key and sends $T:= (t, Sig_I(t))$ to the recipient together with a mixnet packet.
+\\~\\\textbf{Recipient's adress $R$:} is a unique identifier that is derived from the recipient's public key.
 \\\textbf{Ticket Index $I$:} is set by the ticket issuer and increases with every issued ticket. The recipient verifies that the index increases with every packet and drops packets if this is not the case. Redeeming a ticket with index $n$ invalidates all tickets with index $I<n$, hence the relayer has a strong incentive to not accept tickets with unchanged index.
 \\\textbf{Ticket challenge $T_c$:}  is set by the ticket issuer and used to ckeck whether a ticket is redeemable before the packet is been relayed. The packet is dropped if that's not the case.
 \\\textbf{Acount counter $\alpha_c$:} is used as a mechanism to prevent cheating by turning non-winning tickets into winning ones. This is done by increasing the value of $\alpha_c$ whenever a node resets a commitment which helps keeping track of updates to the on-chain commitments.
@@ -19,7 +20,6 @@ the challenge is given together with the routing information by the packet.
 \\\textbf{ChainId $c_{Id}$:} The channel identifier which is defined by the ticket issuer in order to determine which channel will be used between issuer and recipient. For example, tickets that are valid on xDAI are not valid on Ethereum.
 \\\textbf{Tag $\tau$} is given as a constant and depends on the utilized blockchain. It is used to distinguish HOPR tickets from others with the same structure that are meant for different payment channels and invalidates their usage in HOPR.
 \\\textbf{Version $V$} is given as a constant and depends on the utilized blockchain. It is used to invalidate tickets that were issued for previous versions of HOPR from being used in future iterations of the protocol.
-\\~\\$(A)$ then signs the ticket with its private key and sends $T:= (t, Sig_I(t))$ to the recipient together with a mixnet packet.
 
 
  \begin{figure}[H]
