@@ -20,6 +20,7 @@ mkShell {
     ## base
     git
     unstable.niv
+    shellcheck
 
     ## node, minimum recommended version is v14, see README for more details
     unstable.nodejs-14_x # v14.16.1

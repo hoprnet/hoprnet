@@ -1,9 +1,8 @@
-import { u8aConcat, u8aSplit, serializeToU8a } from '..'
+import { u8aSplit, serializeToU8a, validateAcknowledgement } from '..'
 import { Hash, PublicKey, Ticket } from '..'
-import PeerId from 'peer-id'
 
 export class UnacknowledgedTicket {
-  constructor(readonly ticket: Ticket, readonly secretA: Hash) {}
+  constructor(readonly ticket: Ticket, readonly ownKey: Hash) {}
 
   static deserialize(arr: Uint8Array): UnacknowledgedTicket {
     const components = u8aSplit(arr, [Ticket.SIZE, Hash.SIZE])
@@ -14,20 +13,28 @@ export class UnacknowledgedTicket {
   public serialize(): Uint8Array {
     return serializeToU8a([
       [this.ticket.serialize(), Ticket.SIZE],
-      [this.secretA.serialize(), Hash.SIZE]
+      [this.ownKey.serialize(), Hash.SIZE]
     ])
   }
 
-  private verifyChallenge(hashedKeyHalf: Uint8Array): boolean {
-    return Hash.create(u8aConcat(this.secretA.serialize(), hashedKeyHalf)).hash().eq(this.ticket.challenge)
+  public verifySignature(signer: PublicKey): boolean {
+    return this.ticket.verify(signer)
   }
 
-  private async verifySignature(peerId: PeerId): Promise<boolean> {
-    return this.ticket.verify(new PublicKey(peerId.pubKey.marshal()))
+  public getResponse(acknowledgement: Hash) {
+    return validateAcknowledgement(
+      this.ownKey.serialize(),
+      acknowledgement.serialize(),
+      this.ticket.challenge.serialize()
+    )
   }
 
-  async verify(peerId: PeerId, hashedKeyHalf: Uint8Array): Promise<boolean> {
-    return this.verifyChallenge(hashedKeyHalf) && (await this.verifySignature(peerId))
+  public verify(signer: PublicKey, acknowledgement: Hash): boolean {
+    return (
+      this.verifySignature(signer) &&
+      validateAcknowledgement(this.ownKey.serialize(), acknowledgement.serialize(), this.ticket.challenge.serialize())
+        .valid
+    )
   }
 
   static SIZE(): number {

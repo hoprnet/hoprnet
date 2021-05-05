@@ -3,16 +3,13 @@ import { utils } from 'ethers'
 import { convertPubKeyFromB58String } from '@hoprnet/hopr-utils'
 import { HoprToken__factory } from '../types'
 import { getContract } from './utils/contracts'
-import { Logger } from '@hoprnet/hopr-utils'
-
-const log: Logger = Logger.getLogger('hoprd.tasks.faucet')
 
 const send = (signer, txparams) =>
   signer.sendTransaction(txparams, (error, transactionHash) => {
     if (error) {
-      log.error(`Error whiling signing transaction`, error)
+      console.error(`Error whiling signing transaction`, error)
     }
-    log.info('transactionHash', transactionHash)
+    console.info('transactionHash', transactionHash)
   })
 
 const nativeAddress = async (hoprAddress) => {
@@ -28,8 +25,8 @@ async function main(
   { ethers, network }: HardhatRuntimeEnvironment,
   _runSuper: RunSuperFunction<any>
 ) {
-  if (network.name !== 'localhost') {
-    log.error('🌵 Faucet is only valid in localhost network')
+  if (network.tags.development) {
+    console.error('🌵 Faucet is only valid in a development network')
     return
   }
 
@@ -38,7 +35,7 @@ async function main(
     const contract = await getContract(network.name, 'HoprToken')
     hoprTokenAddress = contract.address
   } catch {
-    log.error('⛓  You need to ensure the network deployed the contracts')
+    console.error('⛓  You need to ensure the network deployed the contracts')
     return
   }
 
@@ -51,10 +48,10 @@ async function main(
   }
   const hoprToken = HoprToken__factory.connect(hoprTokenAddress, ethers.provider).connect(signer)
 
-  log.info(`💧💰 Sending ${etherAmount} ETH to ${nodeAddress} on network ${network.name}`)
+  console.info(`💧💰 Sending ${etherAmount} ETH to ${nodeAddress} on network ${network.name}`)
   await send(signer, tx)
 
-  log.info(`💧🟡 Sending ${ethers.utils.formatEther(amount)} HOPR to ${nodeAddress} on network ${network.name}`)
+  console.info(`💧🟡 Sending ${ethers.utils.formatEther(amount)} HOPR to ${nodeAddress} on network ${network.name}`)
   await hoprToken.mint(nodeAddress, amount, ethers.constants.HashZero, ethers.constants.HashZero, {
     gasLimit: 200e3
   })

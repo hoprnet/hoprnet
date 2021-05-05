@@ -1,4 +1,4 @@
-import type { ContractData } from '../../chain'
+import type { ContractData, NetworkTag } from '../../chain'
 import { join } from 'path'
 import { promises } from 'fs'
 
@@ -8,10 +8,14 @@ const OUTPUT_FILE = join(OUTPUT_DIR, 'contracts.json')
 
 export const storeContract = async (
   network: string,
+  tags: Record<NetworkTag, boolean>,
   name: string,
   address: string,
   deployedAt: number
 ): Promise<void> => {
+  // do not store testing addresses
+  if (tags.testing) return
+
   let contracts: {
     [network: string]: {
       [contract: string]: ContractData

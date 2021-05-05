@@ -7,7 +7,6 @@ import { NOISE } from 'libp2p-noise'
 
 const { HoprConnect } = require('@hoprnet/hopr-connect')
 
-import { Packet } from './messages/packet'
 import {
   PACKET_SIZE,
   MAX_HOPS,
@@ -22,13 +21,26 @@ import NetworkPeers from './network/network-peers'
 import Heartbeat from './network/heartbeat'
 import { findPath } from './path'
 
-import { u8aToHex, DialOpts, HoprDB } from '@hoprnet/hopr-utils'
-
 import Multiaddr from 'multiaddr'
 import chalk from 'chalk'
 
 import PeerId from 'peer-id'
-import { PublicKey, Balance, Address, ChannelEntry, NativeBalance, Hash, Acknowledgement } from '@hoprnet/hopr-utils'
+import {
+  PublicKey,
+  Balance,
+  Address,
+  ChannelEntry,
+  NativeBalance,
+  Hash,
+  u8aToHex,
+  DialOpts,
+  HoprDB,
+  libp2pSendMessageAndExpectResponse,
+  libp2pSubscribe,
+  libp2pSendMessage,
+  LibP2PHandlerFunction,
+  AcknowledgedTicket
+} from '@hoprnet/hopr-utils'
 import HoprCoreEthereum, { RoutingChannel } from '@hoprnet/hopr-core-ethereum'
 import BN from 'bn.js'
 import { getAddrs } from './identity'
@@ -37,14 +49,11 @@ import EventEmitter from 'events'
 import { ChannelStrategy, PassiveStrategy, PromiscuousStrategy } from './channel-strategy'
 import { Logger } from '@hoprnet/hopr-utils'
 import { Address as LibP2PAddress } from 'libp2p/src/peer-store'
-import {
-  libp2pSendMessageAndExpectResponse,
-  libp2pSubscribe,
-  libp2pSendMessage,
-  LibP2PHandlerFunction
-} from '@hoprnet/hopr-utils'
+
 import { subscribeToAcknowledgements } from './interactions/packet/acknowledgement'
 import { PacketForwardInteraction } from './interactions/packet/forward'
+
+import { Packet } from './messages'
 
 const log = Logger.getLogger('hopr-core')
 
@@ -204,29 +213,28 @@ class Hopr extends EventEmitter {
 
     this.heartbeat = new Heartbeat(this.networkPeers, subscribe, sendMessageAndExpectResponse, hangup)
 
-    await this.announce(this.options.announce)
-    subscribeToAcknowledgements(subscribe, this.db, await this.paymentChannels, (ack) =>
-      this.emit('message-acknowledged:' + ack.getKey())
+    subscribeToAcknowledgements(subscribe, this.db, await this.paymentChannels, this.getId(), (ack) =>
+      this.emit('message-acknowledged:' + ack.ackChallenge)
     )
+    await this.announce(this.options.announce)
 
     const ethereum = await this.paymentChannels
 
     const onMessage = (msg: Uint8Array) => this.emit('hopr:message', msg)
     this.forward = new PacketForwardInteraction(
-      this.db,
-      ethereum,
-      this.getId(),
-      this.libp2p,
       subscribe,
       sendMessage,
-      onMessage
+      this.getId(),
+      await this.paymentChannels,
+      onMessage,
+      this.db
     )
 
     ethereum.indexer.on('peer', ({ id, multiaddrs }: { id: PeerId; multiaddrs: Multiaddr[] }) => {
       this.libp2p.peerStore.addressBook.add(id, multiaddrs)
     })
 
-    await this.heartbeat.start()
+    this.heartbeat.start()
     this.periodicCheck()
     this.setChannelStrategy(this.options.strategy || 'passive')
     this.status = 'RUNNING'
@@ -402,19 +410,21 @@ class Hopr extends EventEmitter {
           let packet: Packet
           try {
             packet = await Packet.create(
-              await this.paymentChannels,
-              this.db,
-              this.getId(),
-              this.libp2p,
               msg.slice(n * PACKET_SIZE, Math.min(msg.length, (n + 1) * PACKET_SIZE)),
-              path
+              path,
+              this.getId(),
+              await this.paymentChannels,
+              {
+                value: new Balance(new BN(this.options.ticketAmount)),
+                winProb: this.options.ticketWinProb
+              }
             )
           } catch (err) {
             log.error('Error while creating packet', err)
             return reject(err)
           }
 
-          let packetKey = await this.db.storeUnacknowledgedTicket(packet.challenge.hash)
+          let packetKey = await this.db.storeUnacknowledgedTicket(new PublicKey(packet.ackChallenge))
 
           this.once('message-acknowledged:' + u8aToHex(packetKey), () => {
             resolve()
@@ -591,7 +601,7 @@ class Hopr extends EventEmitter {
     await channel.open(new Balance(amountToFund))
 
     return {
-      channelId: await channel.getId()
+      channelId: channel.getId()
     }
   }
 
@@ -651,12 +661,12 @@ class Hopr extends EventEmitter {
     return this.db.getAcknowledgements()
   }
 
-  public async submitAcknowledgedTicket(ackTicket: Acknowledgement) {
+  public async submitAcknowledgedTicket(ackTicket: AcknowledgedTicket) {
     try {
       const ethereum = await this.paymentChannels
       const signedTicket = ackTicket.ticket
       const self = ethereum.getPublicKey()
-      const counterparty = signedTicket.getSigner()
+      const counterparty = signedTicket.recoverSigner()
       const channel = ethereum.getChannel(self, counterparty)
 
       const result = await channel.submitTicket(ackTicket)
@@ -704,7 +714,7 @@ class Hopr extends EventEmitter {
       destination,
       MAX_HOPS - 1,
       this.networkPeers,
-      ethereum.getChannelsFromPeer.bind(this.paymentChannels),
+      ethereum.getChannelsFromPeer.bind(ethereum),
       PATH_RANDOMNESS
     )
   }
