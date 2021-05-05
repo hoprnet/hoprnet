@@ -27,7 +27,9 @@ const abiCoder = new utils.AbiCoder()
 export type Receipt = string
 
 export async function createChainWrapper(providerURI: string, privateKey: Uint8Array) {
-  const provider = new providers.WebSocketProvider(providerURI)
+  const provider = providerURI.startsWith('http')
+    ? new providers.JsonRpcProvider(providerURI)
+    : new providers.WebSocketProvider(providerURI)
   const wallet = new Wallet(privateKey).connect(provider)
   const address = Address.fromString(wallet.address)
   const chainId = await provider.getNetwork().then((res) => res.chainId)
