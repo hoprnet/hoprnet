@@ -1,14 +1,11 @@
-#!/usr/bin/env bash
-
-set -o errexit
-set -o nounset
-set -o pipefail
+#!/bin/bash
+set -e #u
 
 # Don't source this file twice
 test -z "${DNS_SOURCED:-}" && DNS_SOURCED=1 || exit 0
 
 # Get dns entry for a release and node
-# e.g. gcloud_dns_entry master
+# e.g. gcloud_dns_entry master 
 # $1 = release name
 # $2 = role (eg. node-4)
 gcloud_dns_entry() {
@@ -22,22 +19,16 @@ gcloud_dns_entry() {
 gcloud_dns_txt_record() {
   # Multiple runs in the same machine will fail w/an existing transaction.yml file
   rm -f transaction.yaml
-
-  local dns_entry
-  local txt_record
-
-  dns_entry=$(gcloud_dns_entry "$1" "$2")
-  txt_record=$(dig TXT +short "$dns_entry")
-
+  local dns_entry=$(gcloud_dns_entry $1 $2)
+  local txt_record=$(dig TXT +short $dns_entry)
   if [ -z "$txt_record" ]; then
     # echo "log | Dns Entry: $dns_entry"
     # Google takes some time to propagate their DNS entries, so it could be that the record has already been created.
-    local maybe_txt_record
-    maybe_txt_record=$(gcloud dns record-sets list --zone=hoprnet-link --name="$dns_entry."  --type="TXT")
+    local maybe_txt_record=$(gcloud dns record-sets list --zone=hoprnet-link --name="$dns_entry."  --type="TXT")
     if [ -z "$maybe_txt_record" ]; then
       # echo "log | Status: Not created, creating"
       gcloud dns record-sets transaction start --zone="hoprnet-link"
-
+      
       gcloud dns record-sets transaction add "dnsaddr=$3" \
         --name="$dns_entry" \
         --ttl="30" \
@@ -46,16 +37,16 @@ gcloud_dns_txt_record() {
 
       # Piping out execute as it polutes stdout upon completion
       gcloud dns record-sets transaction execute --quiet --zone="hoprnet-link" 1>&2
-      txt_record="\"dnsaddr=$3"\"
+      local txt_record=\""dnsaddr=$3"\"
     else
       # echo "log | Status: Created but not propagated."
       # Google echos “record-sets lists” in the form “NAME TYPE TTL DATA $dns_entry. TXT 30 "dnsaddr=..."'
       # echo "debug | Maybe Record: $maybe_txt_record"
-      txt_record=$(echo "$maybe_txt_record" | cut -f8 -d' ')
+      local txt_record=$(echo $maybe_txt_record | cut -f8 -d' ')
       # echo "debug | Record: $txt_record"
     fi
   fi
-  echo "$txt_record"
+  echo $txt_record
 }
 
 # Get or create a TXT record within a release
@@ -67,5 +58,5 @@ gcloud_dns_txt_record() {
 # - RELEASE_NAME
 gcloud_txt_record() {
   # Workaround with file descriptors to avoid poluting stdout
-  ( gcloud_dns_txt_record "$1" "$2" "$3" 3>&1 1>&2- 2>&3- ) | grep 'dnsaddr'
+  ( gcloud_dns_txt_record $1 $2 $3 3>&1 1>&2- 2>&3- ) | grep 'dnsaddr'
 }

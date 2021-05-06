@@ -1,8 +1,5 @@
-#!/usr/bin/env bash
-
-set -o errexit
-set -o nounset
-set -o pipefail
+#!/bin/bash
+set -e #u
 
 # Don't source this file twice
 test -z "${NIGHTLY_SOURCED:-}" && NIGHTLY_SOURCED=1 || exit 0
@@ -21,18 +18,13 @@ RELEASE=$(node -p -e "require('./packages/hoprd/package.json').version")
 IMG="gcr.io/hoprassociation/hoprd:$RELEASE"
 
 source scripts/dependencies.sh
-
 echo "Cleaning up devops before running nightly testnet"
 cleanup
-
 echo "Starting nightly testnet"
-start_testnet nightly 2 "$IMG"
-
+start_testnet nightly 2 $IMG
 echo "Testnet up and running. Leaving it for 20 mins"
 sleep 72000 # 20mins
-
 echo "Testnet has run for 20m, time to kill it."
-gcloud_get_logs nightly-node-2 "$IMG" > node-2.txt
-
-echo "Cleaning up devops after running nightly testnet"
+gcloud_get_logs nightly-node-2 $IMG > node-2.txt 
 cleanup
+

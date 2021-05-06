@@ -17,25 +17,18 @@ jobs:
           node-version: 14
           registry-url: https://registry.npmjs.org/
 
-      - name: Get yarn cache directory path
-        id: yarn-cache-dir-path
-        run: echo "::set-output name=dir::$(yarn config get cacheFolder)"
-
-      - name: Restore cache of node modules and yarn cache
+      - name: Restore cache of node modules
         uses: actions/cache@v2
         with:
           path: |
             node_modules
             */*/node_modules
-            ${{ steps.yarn-cache-dir-path.outputs.dir }}
-          key: ${{ runner.os }}-nodejs-${{ hashFiles('**/yarn.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-nodejs-
+          key: ${{ runner.os }}-lerna-${{ hashFiles('**/yarn.lock') }}
 
       - name: Install dependencies
         run: |
           yarn
-          yarn lerna bootstrap
+          node_modules/.bin/lerna bootstrap
           #yarn autoclean --force
 
       - name: Link & Build
@@ -67,9 +60,9 @@ jobs:
           git config --global user.name "HOPR Versioning robot"
           git config pull.rebase false
           git pull origin master
-          yarn lerna version ${{ env.VERSION_TYPE }} --yes --exact --no-push --no-changelog --preid next
+          node_modules/.bin/lerna version ${{ env.VERSION_TYPE }} --yes --exact --no-push --no-changelog --preid next 
           git push origin master
-          yarn lerna publish from-package --yes
+          node_modules/.bin/lerna publish from-package --yes
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
@@ -83,9 +76,9 @@ jobs:
           git config --global user.name "HOPR Versioning robot"
           git config pull.rebase false
           git pull origin ${{ github.ref }}
-          yarn lerna version patch --yes --exact --no-push --no-changelog
-          git push origin ${{ github.ref }}
-          yarn lerna publish from-package --yes
+          node_modules/.bin/lerna version patch --yes --exact --no-push --no-changelog 
+          git push origin ${{ github.ref }} 
+          node_modules/.bin/lerna publish from-package --yes
         env:
           NODE_AUTH_TOKEN:
             ${{ secrets.NPM_TOKEN }}
