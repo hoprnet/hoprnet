@@ -90,6 +90,7 @@ jobs:
         run: echo ${{ env.RELEASE }}
 
       - name: Wait for NPM
+        if: github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')
         run: |
           sleep 5m # Allow NPM registry to catch uo
 
