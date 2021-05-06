@@ -31,10 +31,10 @@ the challenge is given together with the routing information by the packet.
 
 \subsubsection{Challenge}
 $(A)$ creates a shared secret $s_i$ with all the relay nodes in the channel (B-C-D-Z) by using an offline version of the Diffie-Hellman key exchange. This shared key is a session key that's generated from the master DH key sphinx key. 
-\newline The shared secret $s_i$ is used as a seed for a PRG (Pseudo Random Generator) to create secret shares $s_i,s_i'$ for each node along the route. 
+\\~\\ The shared secret $s_i$ is used as a seed for a PRG (Pseudo Random Generator) to create secret shares $s_i,s_i'$ for each node along the route. 
 Relayers compute $s_i$ and get $s_{i+1}'$ from the next downstream node. 
-\newline The sender $(A)$ creates $T_{c_i}:=(s_i+s_{i+1}')*G$ and a hint for B,C,D,Z of how the promised value $s_C',s_D',s_Z'$ is going to look like. 
-The value “hint” or $H$ is computed as $H_i:=s_{i+1}'*G$ where $*$ is the curve multiplication operation and $G$ is a generator of the curve (the same used in the sphinx section).
+\newline The sender $(A)$ creates $$T_{c_i}:=(s_i+s_{i+1}')*G$$ and a hint for B,C,D,Z of how the promised value $s_C',s_D',s_Z'$ is going to look like. 
+The value “hint” or $H$ is computed as $$H_i:=s_{i+1}'*G$$ where $*$ is the curve multiplication operation and $G$ is a generator of the curve (the same used in the sphinx section).
 
 
 \subsection{Ticket validation}
