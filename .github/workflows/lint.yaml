@@ -26,6 +26,7 @@ jobs:
 
       - name: Restore cache of node modules and yarn cache
         uses: actions/cache@v2
+        id: nodejs-cache
         with:
           path: |
             node_modules
@@ -36,6 +37,7 @@ jobs:
             ${{ runner.os }}-nodejs-
 
       - name: Install dependencies
+        if: steps.nodejs-cache.outputs.cache-hit != 'true'
         run: |
           yarn
 
@@ -43,17 +45,21 @@ jobs:
         run: |
           find . -name "*.sh" ! -ipath "**/node_modules/**" | xargs shellcheck -a -Calways
 
+      - name: Run Linter
+        run: |
+          yarn lint:fix
+
       - name: Check if changed 
         id: check-changed
         run: |
           echo "::set-output name=changed::$(git status --porcelain)"
           echo ${{ steps.check-changed.changed }}
+
       - name: Lint & Fix
         if: steps.check-changed.changed != ''
         run: |
           git config --global user.email "noreply@hoprnet.org"
           git config --global user.name "HOPR Linting robot"
-          yarn lint:fix
           git commit -a -m "Fix linting" || true
           git pull origin ${{ github.ref }}
           git push origin ${{ github.ref }}
