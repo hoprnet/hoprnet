@@ -227,7 +227,7 @@ export class Packet {
 
     const ticket = await channel.createTicket(
       ticketOpts.value,
-      new PublicKey(ticketChallenge).toAddress(),
+      new PublicKey(ticketChallenge),
       ticketOpts.winProb
     )
 

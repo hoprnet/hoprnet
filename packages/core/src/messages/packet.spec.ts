@@ -1,5 +1,5 @@
 import { Packet, MAX_HOPS } from './packet'
-import { HoprDB, Ticket, UINT256, Balance, PublicKey, Address, u8aEquals } from '@hoprnet/hopr-utils'
+import { HoprDB, Ticket, UINT256, Balance, PublicKey, u8aEquals } from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'
 import BN from 'bn.js'
 import assert from 'assert'
@@ -9,7 +9,7 @@ function createMockTickets(privKey: Uint8Array) {
 
   const getChannel = (_self: PublicKey, counterparty: PublicKey) => ({
     acknowledge,
-    createTicket: (amount: Balance, challenge: Address, _winProb: number) => {
+    createTicket: (amount: Balance, challenge: PublicKey, _winProb: number) => {
       return Ticket.create(
         counterparty.toAddress(),
         challenge,
