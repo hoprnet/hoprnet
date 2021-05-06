@@ -4,6 +4,9 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+# Don't source this file twice
+test -z "${DNS_SOURCED:-}" && DNS_SOURCED=1 || exit 0
+
 # Get dns entry for a release and node
 # e.g. gcloud_dns_entry master
 # $1 = release name
