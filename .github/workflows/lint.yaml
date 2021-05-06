@@ -53,7 +53,7 @@ jobs:
         run: |
           echo "::set-output name=changed::$(git status --porcelain)"
 
-      - name: Lint & Fix
+      - name: Commit changed files
         if: steps.check-changed.outputs.changed != ''
         run: |
           git config --global user.email "noreply@hoprnet.org"
