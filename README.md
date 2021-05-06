@@ -19,6 +19,7 @@
 
 ## Table of Contents
 
+- [Getting Started](#getting-started)
 - [Install](#install)
   - [Using NPM](#using-npm)
   - [Using Docker](#using-docker)
@@ -30,6 +31,12 @@
 - [Tooling](#tooling)
 - [Contact](#contact)
 - [License](#license)
+
+## Getting Started
+
+A good place to start is the
+[Getting Started guide on YouTube][7] which walks through the following
+instructions using GitPod.
 
 ## Install
 
@@ -143,3 +150,4 @@ whenever you need an issue about a particular tool.
 [4]: https://console.cloud.google.com/gcr/images/hoprassociation/GLOBAL
 [5]: https://hub.docker.com/u/hopr
 [6]: https://www.npmjs.com/package/@hoprnet/hoprd
+[7]: https://www.youtube.com/watch?v=d0Eb6haIUu4

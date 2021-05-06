@@ -14,7 +14,7 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     args: [XHOPR_ADDRESS, hoprToken.address],
     log: true
   })
-  await storeContract(network.name, 'HoprWrapper', result.address, result.receipt.blockNumber)
+  await storeContract(network.name, network.tags, 'HoprWrapper', result.address, result.receipt.blockNumber)
 }
 
 // deploy this only on xdai

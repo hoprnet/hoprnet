@@ -2,27 +2,15 @@
   "localhost": {
     "HoprToken": {
       "address": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
-      "deployedAt": 3
+      "deployedAt": 4
     },
     "HoprChannels": {
       "address": "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9",
-      "deployedAt": 6
+      "deployedAt": 7
     },
     "HoprDistributor": {
       "address": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
-      "deployedAt": 5
-    }
-  },
-  "ropsten": {
-    "HoprToken": {
-      "address": "0xAE9083fC7FAa0e35F8c5b94A33B86eD6F587Ea51"
-    },
-    "HoprChannels": {
-      "address": "0x225468f44A9E8cfe7DaA49d504475E21c4bEfD13",
-      "deployedAt": 9547935
-    },
-    "HoprDistributor": {
-      "address": "0xfb7A68692b27839ee82c711cf79Bd19BE698B011"
+      "deployedAt": 6
     }
   },
   "goerli": {
@@ -35,15 +23,6 @@
     },
     "HoprDistributor": {
       "address": "0xf4Ff7E5bf2cC7eF89196c8086982F6f5Ec502685"
-    }
-  },
-  "kovan": {
-    "HoprToken": {
-      "address": "0xDD78859E6714D045a31Caa0075C1523f6E08fFe1"
-    },
-    "HoprChannels": {
-      "address": "0x6eCe0EC9E5F408e664ACc397A8Ac7241841c6658",
-      "deployedAt": 19240754
     }
   },
   "xdai": {
@@ -62,38 +41,6 @@
     },
     "HoprDistributor": {
       "address": "0x987cb736fBfBc4a397Acd06045bf0cD9B9deFe66"
-    }
-  },
-  "matic": {
-    "HoprToken": {
-      "address": "0x4774fEd3f2838f504006BE53155cA9cbDDEe9f0c"
-    },
-    "HoprChannels": {
-      "address": "0xE345a588e9d7DcCD0E92E6E00EF097EA8a0eFDB0",
-      "deployedAt": 7452411
-    }
-  },
-  "binance": {
-    "HoprToken": {
-      "address": "0x9cf282412730c268f24fe877A3483ed230A3060c"
-    },
-    "HoprChannels": {
-      "address": "0x504a24F1398Be1824C35Bc5964b23Ba292991dA5",
-      "deployedAt": 2713229
-    }
-  },
-  "hardhat": {
-    "HoprToken": {
-      "address": "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707",
-      "deployedAt": 13
-    },
-    "HoprDistributor": {
-      "address": "0x0165878A594ca255338adfa4d48449f69242Eb8F",
-      "deployedAt": 14
-    },
-    "HoprChannels": {
-      "address": "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853",
-      "deployedAt": 15
     }
   }
 }
