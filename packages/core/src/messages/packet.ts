@@ -106,6 +106,7 @@ export async function validateUnacknowledgedTicket(
   }
 
   // ticket's index MUST be higher than our account nonce
+  // TODO: keep track of uncommited tickets
   const channelTicketIndex = (await channel.getState()).ticketIndexFor(selfAddress).toBN()
   if (!ticketIndex.gt(channelTicketIndex)) {
     throw Error(
