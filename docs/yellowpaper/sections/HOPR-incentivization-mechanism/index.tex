@@ -16,21 +16,23 @@ Hence, there is no added value in pretending packet loss or intentionally changi
 \subsubsection{Channel management}
 Initially, each payment channel in HOPR is \textit{closed} which means that in order to transfer packets, those channels have to be opened. Nodes can open channels to other nodes by either:
 \begin{itemize}
-<<<<<<< HEAD
     \item \textbf{Unidirectional channels:} Locking parts of their funds (staking) and calling the method \textit{open()}.
     \item \textbf{Bidirectional channels:} Both parties agree on funding the channel in both directions. Node B can give their consent to node A for example to lock funds into the channel by signing an authorisation request sent by A $$auth(A: <\gamma>, B: <\delta>)$$ where $\gamma$ is the amount to be staked by A and $\delta$ is the amount to be staked by B. Both values can also be equal. 
     \\ A can then open the channel by calling the method \textit{openwithSignature()}. Once the call has succeeded, an on-chain event \textit{ChannelOpened} is thrown. The channel is now \textit{open}.
 \end{itemize} 
 As long as the channel remains open, nodes can claim their incentives for forwarding packets which is represented as tickets (see ticket section). Tickets are redeemed by dispatching a \textit{redeemTickets()} call. The balance of the channel is then updated according to the balance defined in the ticket.
-\\~\\Nodes can close a payment channel in order to access their funds. This can be done using a single call to \textit{closewithSignature()} if both A and B agree. A can also initiate the process by calling \textit{initiateClosure()}. This changes the state to PENDINGTIMEOUT. Other nodes will have now time to claim not yet claimed tickets. Once the timeout is done, any of the involved parties can call withdraw(). This turns the channel state into CLOSED. Additionally, nodes can close the payment channel interactively. This is done by dispatching an on-chain call to close(). This changes the on-chain state to CLOSEDA or CLOSEDB and allows the redemption of previously unredeemed tickets. If the channel state is CLOSEDA, the other party (partyB) can give its consent to close the channel by calling agreeB(). If the channel state is CLOSEDB, the other party (partyA) can give its consent to close the channel by calling agreeA(). This makes sure that payment channels are not closed without the consent of other parties.
-open(). Locking funds of other nodes requires their consent which is given by digital signatures (here, ECDSA on secp256k1), openwithSignature(). Once the call has succeeded, an on-chain event ChannelOpened is thrown. The channel is now OPEN.
-
-=======
-    \item \textbf{Unidirectional channels:} Locking parts of their funds (staking).
-    \item \textbf{Bidirectional channels:} Both parties agree on funding the channel in both directions.
+\\~\\Nodes can close a payment channel in order to access their funds. There are three possible ways to do so:
+\begin{itemize}
+    \item Interactively
+    \item Using a timeout
+    \item Immediately witn a signature
 \end{itemize}
+
+interactively: usign agreeA(), agreeB()
+using a timeout: close(), then withdraw()
+immediately using signatures: closeWithSignature()This can be done using a single call to \textit{closewithSignature()} if both A and B agree. A can also initiate the process by calling \textit{initiateClosure()}. This changes the state to PENDINGTIMEOUT. Other nodes will have now time to claim not yet claimed tickets. Once the timeout is done, any of the involved parties can call withdraw(). This turns the channel state into CLOSED. Additionally, nodes can close the payment channel interactively. This is done by dispatching an on-chain call to close(). This changes the on-chain state to CLOSEDA or CLOSEDB and allows the redemption of previously unredeemed tickets. If the channel state is CLOSEDA, the other party (partyB) can give its consent to close the channel by calling agreeB(). If the channel state is CLOSEDB, the other party (partyA) can give its consent to close the channel by calling agreeA(). This makes sure that payment channels are not closed without the consent of other parties.
+open(). Locking funds of other nodes requires their consent which is given by digital signatures (here, ECDSA on secp256k1), openwithSignature(). Once the call has succeeded, an on-chain event ChannelOpened is thrown. The channel is now OPEN.
 As long as the channel remains open, nodes can claim their incentives for forwarding packets which is represented as tickets (see ticket section). Tickets are redeemed by dispatching a redeemTickets() call. The balance of the channel is then updated according to the balance defined in the ticket. The achieved gains remain locked in the payment channel and can be spent for future tickets.
->>>>>>> d4650963e0213f10a239b3a63001b8c469b08da3
 
 \begin{figure}[H]
     \centering
@@ -38,6 +40,32 @@ As long as the channel remains open, nodes can claim their incentives for forwar
     \caption{Payment channel state graph}
     \label{fig:Payment channel graph}
 \end{figure}
+\subsection{On-chain Commitment}
+
+\subsubsection*{Definition}
+A commitment scheme is a protocol between usually two parties $A$ and $B$ and fulfills two properties (hiding and biding).
+\\~\\\textbf{Hiding:} The ability to commit a value only known by the sender.
+\\~\textbf{Binding:} The committed value must be the only one that the sender can compute and that validates during the reveal phase. 
+\\~\\HOPR uses on-chain commitments to verify whether a ticket is a win or not in order to redeem it later on. The relayer doesn't know beforehand whether the ticket is a win or not until they receive an acknowledgment from the next downstream node eand can't change the outcome.
+\subsubsection{Setup phase}
+Once a node joins the HOPR network, it creates an iterated commitment and stores the opening key in the database. 
+Iterated commitment scheme means $open_n$ opens $cm_n$ whereas $open_{n-1}$ opens $cm_{n-1}=open_n$ and so on. 
+\newline The final commitment is computed as $cm_n:= h^n(r)$ where hash is a preimage-resistant hash function and 
+$r$ is chosen uniformly at random by the node in order to prevent the issuer from knowing whether the ticket will be a win or not. 
+\\~\\ Furthermore, it will prevent it from tweaking the given challenge such that the ticket cannot be a win.
+The number of iterations $n$ can be chosen as a constant and should reflect the number of tickets a node intends to redeem.
+
+\subsubsection{Opening phase}
+In order to redeem a ticket, a node has to reveal the opening to the current commitment $cm_n$ that is stored in the smart contract. 
+\\~The opening shouldn’t be revealed otherwise since it discloses whether a ticket is a win or not.
+The ticket is a win if: $$h( t_h, r, open ) <P_w$$ where $$t_h:=h(t)$$
+The opening is computed as $open_{n-1} = h^{n-1}(r)$ such that $cm_n=h( open_{n-1})$. 
+\\~\\The on-chain logic verifies whether the latest opening $open_n$ indeed opens the current on-chain commitment $cm_n$. 
+If this is the case, the current on-chain commitment is replaced by the given opening. 
+\\~The on-chain keeps track of updates to the on-chain commitments to prevent double-spending. 
+So whenever a node resets a commitment, a counter, namely $account.counter$ is increased and a call to $updateCommitment$ invalidates all previously unredeemed tickets.
+
+
 
 \subsection{Proof Of Relay}
 
