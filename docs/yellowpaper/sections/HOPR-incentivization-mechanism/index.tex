@@ -23,16 +23,10 @@ Initially, each payment channel in HOPR is \textit{closed} which means that in o
 As long as the channel remains open, nodes can claim their incentives for forwarding packets which is represented as tickets (see ticket section). Tickets are redeemed by dispatching a \textit{redeemTickets()} call. The balance of the channel is then updated according to the balance defined in the ticket.
 \\~\\Nodes can close a payment channel in order to access their funds. There are three possible ways to do so:
 \begin{itemize}
-    \item Interactively
-    \item Using a timeout
-    \item Immediately witn a signature
+    \item \textbf{Interactively:} This is done by dispatching an on-chain call to \textit{close()}. This changes the on-chain state to $closed_A$ or $closed_B$ and allows the redemption of previously unredeemed tickets. 
+    \item \textbf{Using a timeout:} A can initiate the process by calling \textit{initiateClosure()}. This changes the state to $pending\_timeout$. Other nodes will have now time to claim not yet claimed tickets. Once the timeout is done, any of the involved parties can call \textit{withdraw()}. This turns the channel state into \textit{closed}. 
+    \item \textbf{Immediately witn a signature:} This can be done using a single call to \textit{closewithSignature()} by party A and the other party B can give its consent to close the channel by calling \textit{agreeB()}.
 \end{itemize}
-
-interactively: usign agreeA(), agreeB()
-using a timeout: close(), then withdraw()
-immediately using signatures: closeWithSignature()This can be done using a single call to \textit{closewithSignature()} if both A and B agree. A can also initiate the process by calling \textit{initiateClosure()}. This changes the state to PENDINGTIMEOUT. Other nodes will have now time to claim not yet claimed tickets. Once the timeout is done, any of the involved parties can call withdraw(). This turns the channel state into CLOSED. Additionally, nodes can close the payment channel interactively. This is done by dispatching an on-chain call to close(). This changes the on-chain state to CLOSEDA or CLOSEDB and allows the redemption of previously unredeemed tickets. If the channel state is CLOSEDA, the other party (partyB) can give its consent to close the channel by calling agreeB(). If the channel state is CLOSEDB, the other party (partyA) can give its consent to close the channel by calling agreeA(). This makes sure that payment channels are not closed without the consent of other parties.
-open(). Locking funds of other nodes requires their consent which is given by digital signatures (here, ECDSA on secp256k1), openwithSignature(). Once the call has succeeded, an on-chain event ChannelOpened is thrown. The channel is now OPEN.
-As long as the channel remains open, nodes can claim their incentives for forwarding packets which is represented as tickets (see ticket section). Tickets are redeemed by dispatching a redeemTickets() call. The balance of the channel is then updated according to the balance defined in the ticket. The achieved gains remain locked in the payment channel and can be spent for future tickets.
 
 \begin{figure}[H]
     \centering
