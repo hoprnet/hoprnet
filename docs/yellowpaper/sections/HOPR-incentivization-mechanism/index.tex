@@ -14,7 +14,12 @@ $$value_(ACK_n) =\sum_{i=1}^nfee_{packet_i}$$ where $n$ is the total number of m
 $$value ( ACK_i )=value ( ACK_j ) \quad for \quad i,j\in \{1,n\}$$
 Hence, there is no added value in pretending packet loss or intentionally changing the order in which packets are processed. 
 \subsubsection{Channel management}
-
+Initially, each payment channel in HOPR is \textit{closed} which means that in order to transfer packets, those channels have to be opened. Nodes can open channels to other nodes by either:
+\begin{itemize}
+    \item \textbf{Unidirectional channels:} Locking parts of their funds (staking).
+    \item \textbf{Bidirectional channels:} Both parties agree on funding the channel in both directions.
+\end{itemize} 
+As long as the channel remains open, nodes can claim their incentives for forwarding packets which is represented as tickets (see ticket section). Tickets are redeemed by dispatching a redeemTickets() call. The balance of the channel is then updated according to the balance defined in the ticket. The achieved gains remain locked in the payment channel and can be spent for future tickets.
 
 \begin{figure}[H]
     \centering
