@@ -53,15 +53,12 @@ jobs:
         id: check-changed
         run: |
           echo "::set-output name=changed::$(git status --porcelain)"
-          git status --porcelain
-          echo ${{ steps.check-changed.outputs.changed }}
-
       - name: echoing
         run: |
           echo ${{ steps.check-changed.outputs.changed }}
 
       - name: Lint & Fix
-        if: steps.check-changed.changed != ''
+        if: steps.check-changed.outputs.changed != ''
         run: |
           git config --global user.email "noreply@hoprnet.org"
           git config --global user.name "HOPR Linting robot"
