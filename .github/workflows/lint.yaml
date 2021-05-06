@@ -54,7 +54,11 @@ jobs:
         run: |
           echo "::set-output name=changed::$(git status --porcelain)"
           git status --porcelain
-          echo ${{ steps.check-changed.changed }}
+          echo ${{ steps.check-changed.outputs.changed }}
+
+      - name: echoing
+        run: |
+          echo ${{ steps.check-changed.outputs.changed }}
 
       - name: Lint & Fix
         if: steps.check-changed.changed != ''
