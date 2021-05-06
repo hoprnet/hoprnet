@@ -16,7 +16,7 @@ OLD_RELEASES='zurich zug luzern larnaca queretaro basodino saentis debug-dbg nig
 get_environment() {
   BRANCH=$(echo "$GITHUB_REF" | sed -e "s#refs/heads/##g") # Removing `refs/heads`
 
-  if [ "$BRANCH" == 'master' ] || [ "$BRANCH" == debug-deploy/* ]; then
+  if [[ "$BRANCH" == 'master' ]] || [[ "$BRANCH" == debug-deploy/* ]]; then
     RELEASE_NAME='master'
     RELEASE_IP='34.65.102.152'
     VERSION_MAJ_MIN='prerelease'
@@ -100,4 +100,3 @@ get_environment() {
   RELEASE_IP='34.65.56.229'
   VERSION_MAJ_MIN='dbg'
 }
-
