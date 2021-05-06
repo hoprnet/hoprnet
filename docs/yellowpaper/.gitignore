@@ -3,6 +3,8 @@
 *.fls
 *.log
 *.out
+*.bbl
+*.blg
 *.synctex.gz
 
 # Built PDF files
