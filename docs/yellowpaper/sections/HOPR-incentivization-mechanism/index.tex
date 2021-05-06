@@ -21,6 +21,10 @@ Initially, each payment channel in HOPR is \textit{closed} which means that in o
     \\ A can then open the channel by calling the method \textit{openwithSignature()}. Once the call has succeeded, an on-chain event \textit{ChannelOpened} is thrown. The channel is now \textit{open}.
 \end{itemize} 
 As long as the channel remains open, nodes can claim their incentives for forwarding packets which is represented as tickets (see ticket section). Tickets are redeemed by dispatching a \textit{redeemTickets()} call. The balance of the channel is then updated according to the balance defined in the ticket.
+\\~\\Nodes can close a payment channel in order to access their funds. This can be done using a single call to \textit{closewithSignature()} if both A and B agree. A can also initiate the process by calling \textit{initiateClosure()}. This changes the state to PENDINGTIMEOUT. Other nodes will have now time to claim not yet claimed tickets. Once the timeout is done, any of the involved parties can call withdraw(). This turns the channel state into CLOSED. Additionally, nodes can close the payment channel interactively. This is done by dispatching an on-chain call to close(). This changes the on-chain state to CLOSEDA or CLOSEDB and allows the redemption of previously unredeemed tickets. If the channel state is CLOSEDA, the other party (partyB) can give its consent to close the channel by calling agreeB(). If the channel state is CLOSEDB, the other party (partyA) can give its consent to close the channel by calling agreeA(). This makes sure that payment channels are not closed without the consent of other parties.
+open(). Locking funds of other nodes requires their consent which is given by digital signatures (here, ECDSA on secp256k1), openwithSignature(). Once the call has succeeded, an on-chain event ChannelOpened is thrown. The channel is now OPEN.
+
+
 \begin{figure}[H]
     \centering
     \includegraphics[width=\textwidth,keepaspectratio]{../yellowpaper/images/payment_channel_graph.png}
