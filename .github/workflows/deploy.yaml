@@ -150,7 +150,7 @@ jobs:
           git pull origin ${{ github.ref }} # This should pull new packages with versions etc.
 
       - name: Setup Google Cloud Credentials
-        uses: google-github-actions/setup-gcloud
+        uses: google-github-actions/setup-gcloud@v0.2.1
         with:
           project_id: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
           service_account_key: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
@@ -226,7 +226,7 @@ jobs:
           git pull origin ${{ github.ref }} # This should pull new packages with versions etc.
 
       - name: Setup Google Cloud Credentials
-        uses: google-github-actions/setup-gcloud
+        uses: google-github-actions/setup-gcloud@v0.2.1
         with:
           project_id: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
           service_account_key: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
