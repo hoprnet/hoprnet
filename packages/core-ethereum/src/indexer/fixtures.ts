@@ -17,8 +17,7 @@ export const partyAMultiAddr = Multiaddr(
 export const expectAccountsToBeEqual = (actual: AccountEntry, expected: AccountEntry) => {
   assert.strictEqual(actual.address.toString(), expected.address.toString(), 'address')
   assert.strictEqual(actual.getPublicKey().toString(), expected.getPublicKey().toString(), 'publicKey')
-  assert.strictEqual(actual.secret.toString(), expected.secret.toString(), 'secret')
-  assert.strictEqual(actual.counter.toString(), expected.counter.toString(), 'counter')
+  assert.strictEqual(actual.updatedBlock.toString(), expected.updatedBlock.toString(), 'updatedBlock')
 }
 
 export const expectChannelsToBeEqual = (actual: ChannelEntry, expected: ChannelEntry) => {

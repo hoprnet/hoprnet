@@ -1,11 +1,25 @@
 import type Indexer from './indexer'
 import type { ChainWrapper } from './ethereum'
-import { ChannelEntry, Hash, PublicKey, Balance, UINT256, HoprDB } from '@hoprnet/hopr-utils'
+import {
+  ChannelEntry,
+  Hash,
+  PublicKey,
+  Address,
+  Balance,
+  UINT256,
+  HoprDB,
+  createFirstChallenge
+} from '@hoprnet/hopr-utils'
 import assert from 'assert'
 import BN from 'bn.js'
 import { utils } from 'ethers'
 import { Channel } from './channel'
 import * as fixtures from './fixtures'
+
+const createChallenge = (secret1: Uint8Array, secret2: Uint8Array): Address => {
+  const { ticketChallenge } = createFirstChallenge([secret1, secret2])
+  return new PublicKey(ticketChallenge).toAddress()
+}
 
 const createChainMock = (_channelEntry: ChannelEntry): ChainWrapper => {
   return ({
@@ -54,9 +68,10 @@ const createMocks = () => {
     new UINT256(new BN(0)),
     false
   )
-  const secretA = new Uint8Array([1])
-  const secretB = new Uint8Array([2])
-  const challange = Hash.createChallenge(secretA, secretB)
+  const challange = createChallenge(
+    Hash.create(new Uint8Array([1])).serialize(),
+    Hash.create(new Uint8Array([2])).serialize()
+  )
 
   const indexer = createIndexerMock(channelEntry)
   const chain = createChainMock(channelEntry)
@@ -96,11 +111,11 @@ describe('test channel', function () {
     )
   })
 
-  it('should create a ticket', async function () {
-    // const ticket = await channel.createTicket(new Balance(new BN(1)), mocks.challange, 1)
-    // assert(ticket.isWinningTicket(mocks.nextCommitmentPartyA, mocks.challange, UINT256.fromProbability(1)))
-    // assert(ticket.checkResponse(mocks.challange))
-  })
+  // it('should create a ticket', async function () {
+  //   const ticket = await channel.createTicket(new Balance(new BN(1)), mocks.challange, 1)
+
+  //   assert(ticket.isWinningTicket(mocks.nextCommitmentPartyA, mocks.challange, UINT256.fromProbability(1)))
+  // })
 
   it('should submit a ticket', async function () {
     // const ticket = await channel.createTicket(new Balance(new BN(1)), mocks.challange, 1)
