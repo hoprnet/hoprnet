@@ -33,6 +33,7 @@ jobs:
           key: ${{ runner.os }}-lerna-${{ hashFiles('**/yarn.lock') }}
 
       - name: Install dependencies
+        if: steps.nodejs-cache.outputs.cache-hit != 'true'
         run: |
           yarn --prefer-offline
           node_modules/.bin/lerna bootstrap

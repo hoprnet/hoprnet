@@ -134,29 +134,30 @@ jobs:
     needs: [build]
     steps:
       - uses: actions/checkout@v2
+
       - name: Update repo from latest pushes.
         run: |
           git config --global user.email "noreply@hoprnet.org"
           git config --global user.name "HOPR Versioning robot"
           git config pull.rebase false
           git pull origin ${{ github.ref }} # This should pull new packages with versions etc.
+
       - name: Setup Google Cloud Credentials
-        uses: GoogleCloudPlatform/github-actions/setup-gcloud@master
+        uses: google-github-actions/setup-gcloud@v0.2.1
         with:
-          version: '290.0.1'
+          project_id: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
           service_account_key: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
           export_default_credentials: true
+
       - name: Get version from package.json
-        run: echo "RELEASE=$(node -p -e "require('./packages/hoprd/package.json').version")" >> $GITHUB_ENV 
-      - name: Set Project for Google Cloud HOPR Association
-        working-directory: packages/hoprd
-        run: gcloud config set project ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
+        run : echo "RELEASE=$(node -p -e "require('./packages/hoprd/package.json').version")" >> $GITHUB_ENV
+
       - name: Building Docker image using Google Cloud Build
         working-directory: packages/hoprd
         run: | # TODO - actually parse semver to tag v1
           gcloud builds submit --tag gcr.io/hoprassociation/hoprd:${{ env.RELEASE }}
           gcloud container images add-tag gcr.io/hoprassociation/hoprd:${{ env.RELEASE }} gcr.io/hoprassociation/hoprd:1
-          gcloud container images add-tag gcr.io/hoprassociation/hoprd:${{ env.RELEASE }} gcr.io/hoprassociation/hoprd:latest 
+          gcloud container images add-tag gcr.io/hoprassociation/hoprd:${{ env.RELEASE }} gcr.io/hoprassociation/hoprd:latest
 
   avado:
     name: Build Avado (master or release pushes)
@@ -164,6 +165,7 @@ jobs:
     needs: [build_hoprd_docker]
     steps:
       - uses: actions/checkout@v2
+
       - name: Update repo from latest pushes.
         run: |
           git config --global user.email "noreply@hoprnet.org"
@@ -173,12 +175,12 @@ jobs:
 
       - name: Get version from package.json
         run: |
-          echo "RELEASE=$(node -p -e "require('./packages/hoprd/package.json').version")" >> $GITHUB_ENV 
+          echo "RELEASE=$(node -p -e "require('./packages/hoprd/package.json').version")" >> $GITHUB_ENV
 
       - name: Avado hack version if we are in master (they don't support prerelease versions)
         if: github.ref == 'refs/heads/master'
         run: |
-          echo "RELEASE=0.100.0" >> $GITHUB_ENV # Set this to an arbitrary number less than 1 
+          echo "RELEASE=0.100.0" >> $GITHUB_ENV # Set this to an arbitrary number less than 1
 
       - name: Build Avado
         working-directory: packages/avado
@@ -202,25 +204,27 @@ jobs:
     needs: [build_hoprd_docker]
     steps:
       - uses: actions/checkout@v2
+
       - name: Use Node.js 14
         uses: actions/setup-node@v2
         with:
           node-version: 14
           registry-url: https://registry.npmjs.org/
+
       - name: Update repo from latest pushes.
         run: |
           git config --global user.email "noreply@hoprnet.org"
           git config --global user.name "HOPR Versioning robot"
           git config pull.rebase false
           git pull origin ${{ github.ref }} # This should pull new packages with versions etc.
+
       - name: Setup Google Cloud Credentials
-        uses: GoogleCloudPlatform/github-actions/setup-gcloud@master
+        uses: google-github-actions/setup-gcloud@v0.2.1
         with:
-          version: '290.0.1'
+          project_id: ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
           service_account_key: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
           export_default_credentials: true
-      - name: Set Project for Google Cloud HOPR Association
-        run: gcloud config set project ${{ secrets.GOOGLE_HOPRASSOCIATION_PROJECT }}
+
       - name: Run start script
         run: |
           bash scripts/deploy.sh
@@ -228,4 +232,3 @@ jobs:
           FUNDING_PRIV_KEY: ${{ secrets.FUNDING_WALLET_PRIVATE_KEY }}
           GITHUB_REF: ${{ github.ref }}
           BS_PASSWORD: ${{ secrets.BS_PASSWORD }}
-

@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Don't source this file twice
+test -z "${ENVIRONMENTS_SOURCED:-}" && ENVIRONMENTS_SOURCED=1 || exit 0
+
 source scripts/utils.sh
 
 # These will be cleaned up and machines stopped

@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e #u
 
+test -z "${GCLOUD_SOURCED:-}" && GCLOUD_SOURCED=1 || exit 0
+
 # ------ GCloud utilities ------
 #
 # NB. functions here should not rely on any external env. variables, or functions
