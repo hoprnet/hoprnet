@@ -53,6 +53,7 @@ jobs:
         id: check-changed
         run: |
           echo "::set-output name=changed::$(git status --porcelain)"
+          git status --porcelain
           echo ${{ steps.check-changed.changed }}
 
       - name: Lint & Fix
