@@ -47,9 +47,9 @@ jobs:
         id: check-changed
         run: |
           echo "::set-output name=changed::$(git status --porcelain)"
-
+          echo ${{ steps.check-changed.changed }}
       - name: Lint & Fix
-        if: steps.check-changed.changed == ''
+        if: steps.check-changed.changed != ''
         run: |
           git config --global user.email "noreply@hoprnet.org"
           git config --global user.name "HOPR Linting robot"
