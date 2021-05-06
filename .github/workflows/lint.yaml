@@ -49,7 +49,7 @@ jobs:
           echo "::set-output name=changed::$(git status --porcelain)"
 
       - name: Lint & Fix
-        if: step.check-changed.changed == ''
+        if: steps.check-changed.changed == ''
         run: |
           git config --global user.email "noreply@hoprnet.org"
           git config --global user.name "HOPR Linting robot"
