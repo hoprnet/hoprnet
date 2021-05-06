@@ -66,7 +66,8 @@ export async function validateUnacknowledgedTicket(
   const senderB58 = senderPeerId.toB58String()
   const senderPubKey = new PublicKey(senderPeerId.pubKey.marshal())
   const ticketAmount = ticket.amount.toBN()
-  const ticketCounter = ticket.epoch.toBN()
+  const ticketEpoch = ticket.epoch.toBN()
+  const ticketIndex = ticket.index.toBN()
   const ticketWinProb = ticket.winProb.toBN()
 
   let channelState
@@ -97,11 +98,18 @@ export async function validateUnacknowledgedTicket(
   }
 
   // ticket's epoch MUST match our account nonce
-  // (performance) we are making a request to blockchain
   const channelTicketEpoch = (await channel.getState()).ticketEpochFor(selfAddress).toBN()
-  if (!ticketCounter.eq(channelTicketEpoch)) {
+  if (!ticketEpoch.eq(channelTicketEpoch)) {
     throw Error(
-      `Ticket epoch '${ticketCounter.toString()}' does not match our account counter ${channelTicketEpoch.toString()}`
+      `Ticket epoch '${ticketEpoch.toString()}' does not match our account epoch ${channelTicketEpoch.toString()}`
+    )
+  }
+
+  // ticket's index MUST be higher than our account nonce
+  const channelTicketIndex = (await channel.getState()).ticketIndexFor(selfAddress).toBN()
+  if (!ticketIndex.gt(channelTicketIndex)) {
+    throw Error(
+      `Ticket index '${ticketIndex.toString()}' must be higher than last ticket index ${channelTicketIndex.toString()}`
     )
   }
 
@@ -326,7 +334,7 @@ export class Packet {
     const previousHop = await pubKeyToPeerId(this.previousHop)
     const channel = chain.getChannel(new PublicKey(privKey.pubKey.marshal()), new PublicKey(this.previousHop))
 
-    validateUnacknowledgedTicket(privKey, '', 0, previousHop, this.ticket, channel, () =>
+    return validateUnacknowledgedTicket(privKey, '', 0, previousHop, this.ticket, channel, () =>
       db.getTickets({
         signer: this.previousHop
       })
