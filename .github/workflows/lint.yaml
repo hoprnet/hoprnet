@@ -8,7 +8,6 @@ on:
 
 jobs:
   lint:
-    if: github.actor != 'dependabot'
     name: Lint 
     runs-on: ubuntu-latest
     steps:
@@ -53,9 +52,6 @@ jobs:
         id: check-changed
         run: |
           echo "::set-output name=changed::$(git status --porcelain)"
-      - name: echoing
-        run: |
-          echo ${{ steps.check-changed.outputs.changed }}
 
       - name: Lint & Fix
         if: steps.check-changed.outputs.changed != ''
