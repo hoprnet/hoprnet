@@ -91,7 +91,6 @@ Currently, we are hosting our [documentation](http://docs.hoprnet.org/en/latest/
 
 For increase security and privacy, we should be hosting the documentation ourselves and/or via a decentralized platform (e.g. IPFS)
 
-
 ## Premature Optimisations
 
 At the moment we want to create a proof of concept, therefore any optimisation
