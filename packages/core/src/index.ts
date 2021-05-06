@@ -105,7 +105,6 @@ class Hopr extends EventEmitter {
    * @param provider
    */
   public constructor(private id: PeerId, private options: HoprOptions) {
-    
     super()
 
     if (!id.privKey) {
