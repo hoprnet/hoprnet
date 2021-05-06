@@ -5,13 +5,11 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-if [ -z "$GCLOUD_INCLUDED" ]; then
-  source scripts/gcloud.sh
-fi
+# Don't source this file twice
+test -z "${CLEANUP_SOURCED:-}" && CLEANUP_SOURCED=1 || exit 0
 
-if [ -z "$OLD_RELEASES" ]; then
-  source scripts/environments.sh
-fi
+source scripts/gcloud.sh
+source scripts/environments.sh
 
 cleanup_ips() {
   local IPS

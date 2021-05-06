@@ -4,6 +4,9 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+# Don't source this file twice
+test -z "${NIGHTLY_SOURCED:-}" && NIGHTLY_SOURCED=1 || exit 0
+
 source scripts/testnet.sh
 source scripts/cleanup.sh
 

@@ -4,11 +4,11 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-if [ -z "$GCLOUD_INCLUDED" ]; then
-  source scripts/gcloud.sh
-  source scripts/dns.sh
-fi
+# Don't source this file twice
+test -z "${TESTNET_SOURCED:-}" && TESTNET_SOURCED=1 || exit 0
 
+source scripts/gcloud.sh
+source scripts/dns.sh
 source scripts/utils.sh
 
 MIN_FUNDS=0.01291

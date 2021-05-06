@@ -4,13 +4,13 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+test -z "${GCLOUD_SOURCED:-}" && GCLOUD_SOURCED=1 || exit 0
+
 # ------ GCloud utilities ------
 #
 # NB. functions here should not rely on any external env. variables, or functions
 # not in this file, as this is intended for reuse in various scenarios.
 
-# shellcheck disable=SC2034
-GCLOUD_INCLUDED=1 # So we can test for inclusion
 ZONE="--zone=europe-west6-a"
 REGION="--region=europe-west6"
 
