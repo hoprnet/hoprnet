@@ -1,8 +1,5 @@
 #!/bin/bash
 
-# Don't source this file twice
-test -z "${QA_SOURCED:-}" && QA_SOURCED=1 || exit 0
-
 # Smoke test a running node
 
 #$1 command

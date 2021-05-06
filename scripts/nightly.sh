@@ -1,9 +1,6 @@
 #!/bin/bash
 set -e #u
 
-# Don't source this file twice
-test -z "${NIGHTLY_SOURCED:-}" && NIGHTLY_SOURCED=1 || exit 0
-
 source scripts/testnet.sh
 source scripts/cleanup.sh
 

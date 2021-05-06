@@ -1,7 +1,7 @@
 name: HOPR Deploy
 on:
   push:
-    branches: ['master', 'release/**', 'avado']
+    branches: ['master', 'release/**', 'avado', 'debug-deploy/**']
     paths-ignore:
       - '**/docs/**/*'
 
@@ -90,6 +90,7 @@ jobs:
         run: echo ${{ env.RELEASE }}
 
       - name: Wait for NPM
+        if: github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')
         run: |
           sleep 5m # Allow NPM registry to catch uo
 
@@ -227,7 +228,7 @@ jobs:
 
       - name: Run start script
         run: |
-          bash scripts/deploy.sh
+          bash -x scripts/deploy.sh
         env:
           FUNDING_PRIV_KEY: ${{ secrets.FUNDING_WALLET_PRIVATE_KEY }}
           GITHUB_REF: ${{ github.ref }}
