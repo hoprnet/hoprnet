@@ -16,11 +16,11 @@ Hence, there is no added value in pretending packet loss or intentionally changi
 \subsubsection{Channel management}
 Initially, each payment channel in HOPR is \textit{closed} which means that in order to transfer packets, those channels have to be opened. Nodes can open channels to other nodes by either:
 \begin{itemize}
-    \item \textbf{Unidirectional channels:} Locking parts of their funds (staking).
-    \item \textbf{Bidirectional channels:} Both parties agree on funding the channel in both directions.
+    \item \textbf{Unidirectional channels:} Locking parts of their funds (staking) and calling the method \textit{open()}.
+    \item \textbf{Bidirectional channels:} Both parties agree on funding the channel in both directions. Node B can give their consent to node A for example to lock funds into the channel by signing an authorisation request sent by A $$auth(A: <\gamma>, B: <\delta>)$$ where $\gamma$ is the amount to be staked by A and $\delta$ is the amount to be staked by B. Both values can also be equal. 
+    \\ A can then open the channel by calling the method \textit{openwithSignature()}. Once the call has succeeded, an on-chain event \textit{ChannelOpened} is thrown. The channel is now \textit{open}.
 \end{itemize} 
-As long as the channel remains open, nodes can claim their incentives for forwarding packets which is represented as tickets (see ticket section). Tickets are redeemed by dispatching a redeemTickets() call. The balance of the channel is then updated according to the balance defined in the ticket. The achieved gains remain locked in the payment channel and can be spent for future tickets.
-
+As long as the channel remains open, nodes can claim their incentives for forwarding packets which is represented as tickets (see ticket section). Tickets are redeemed by dispatching a \textit{redeemTickets()} call. The balance of the channel is then updated according to the balance defined in the ticket.
 \begin{figure}[H]
     \centering
     \includegraphics[width=\textwidth,keepaspectratio]{../yellowpaper/images/payment_channel_graph.png}
