@@ -12,10 +12,11 @@ $$value_(ACK_n) =\sum_{i=1}^nfee_{packet_i}$$ where $n$ is the total number of m
 \\~\\In probabilistic payments, the payouts use a concept called “tickets”, a ticket can be either a win or a loss with a certain winning probability. This means nodes are incentivized to continue relaying packets as they don’t know which ticket is a win.
 \\~\\HOPR uses a custom-made layer 2 solution. It is inspired by payment channels and probabilistic payments where incentives can be claimed independently:
 $$value ( ACK_i )=value ( ACK_j ) \quad for \quad i,j\in \{1,n\}$$
-Hence, there is no added value in pretending packet loss or intentionally changing the order in which packets are processed. 
+Hence, there is no added value in pretending packet loss or intentionally changing the order in which packets are processed.
 \subsubsection{Channel management}
 Initially, each payment channel in HOPR is \textit{closed} which means that in order to transfer packets, those channels have to be opened. Nodes can open channels to other nodes by either:
 \begin{itemize}
+<<<<<<< HEAD
     \item \textbf{Unidirectional channels:} Locking parts of their funds (staking) and calling the method \textit{open()}.
     \item \textbf{Bidirectional channels:} Both parties agree on funding the channel in both directions. Node B can give their consent to node A for example to lock funds into the channel by signing an authorisation request sent by A $$auth(A: <\gamma>, B: <\delta>)$$ where $\gamma$ is the amount to be staked by A and $\delta$ is the amount to be staked by B. Both values can also be equal. 
     \\ A can then open the channel by calling the method \textit{openwithSignature()}. Once the call has succeeded, an on-chain event \textit{ChannelOpened} is thrown. The channel is now \textit{open}.
@@ -24,6 +25,12 @@ As long as the channel remains open, nodes can claim their incentives for forwar
 \\~\\Nodes can close a payment channel in order to access their funds. This can be done using a single call to \textit{closewithSignature()} if both A and B agree. A can also initiate the process by calling \textit{initiateClosure()}. This changes the state to PENDINGTIMEOUT. Other nodes will have now time to claim not yet claimed tickets. Once the timeout is done, any of the involved parties can call withdraw(). This turns the channel state into CLOSED. Additionally, nodes can close the payment channel interactively. This is done by dispatching an on-chain call to close(). This changes the on-chain state to CLOSEDA or CLOSEDB and allows the redemption of previously unredeemed tickets. If the channel state is CLOSEDA, the other party (partyB) can give its consent to close the channel by calling agreeB(). If the channel state is CLOSEDB, the other party (partyA) can give its consent to close the channel by calling agreeA(). This makes sure that payment channels are not closed without the consent of other parties.
 open(). Locking funds of other nodes requires their consent which is given by digital signatures (here, ECDSA on secp256k1), openwithSignature(). Once the call has succeeded, an on-chain event ChannelOpened is thrown. The channel is now OPEN.
 
+=======
+    \item \textbf{Unidirectional channels:} Locking parts of their funds (staking).
+    \item \textbf{Bidirectional channels:} Both parties agree on funding the channel in both directions.
+\end{itemize}
+As long as the channel remains open, nodes can claim their incentives for forwarding packets which is represented as tickets (see ticket section). Tickets are redeemed by dispatching a redeemTickets() call. The balance of the channel is then updated according to the balance defined in the ticket. The achieved gains remain locked in the payment channel and can be spent for future tickets.
+>>>>>>> d4650963e0213f10a239b3a63001b8c469b08da3
 
 \begin{figure}[H]
     \centering
@@ -42,16 +49,30 @@ This mechanism makes sure nodes relay services are verifiable.
     \item Each ticket contains a challenge.
     \item The validity of a ticket can only be checked on reception of the packet but the on-chain logic enforces a solution to the challenge stated in the ticket.
 \end{itemize}
+
 Since “Proof-Of-Relay” is used to make the relay services of nodes verifiable, it is the duty of each node to check that given challenges are derivable from the given and the expected information.
 Packets with inappropriate challenges should be dropped as they might not lead to winning tickets.
 Therefore, the sender of the packet also provides a hint of the expected value that a node is supposed to get from the next downstream node (as explained in the ticket section).
 
-
-
-
-
-
-
-
-
-
+\begin{figure}[H]
+\begin{center}
+    \begin{tabular}{| m{2em} | m{15em} | m{2em} |}
+        \hline
+        $\alpha$ & $\beta$                   & $\gamma$ \\
+                 & \begin{tabular}{| m{2em} | m{3em} | m{6em} |}
+            \hline
+            $Y_B$ & $hint_B$ & $challenge_{BC}$ \\
+            \hline
+            $Y_C$ & $hint_C$ & $random$         \\
+            \hline
+            $Y_D$ & $hint_D$ & $random$         \\
+            \hline
+            \multicolumn{3}{| l |}{End}         \\
+            \hline
+        \end{tabular} &          \\[3em]
+        \hline
+    \end{tabular}
+\end{center}
+\caption{SPHINX with PoR}
+\label{fig:SPHINX with PoR}
+\end{figure}
