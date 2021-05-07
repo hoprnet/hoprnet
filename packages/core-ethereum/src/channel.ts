@@ -11,7 +11,7 @@ import {
   UnacknowledgedTicket
 } from '@hoprnet/hopr-utils'
 import Debug from 'debug'
-import type { SubmitTicketResponse } from '.'
+import type { RedeemTicketResponse } from '.'
 import { Commitment } from './commitment'
 import type { ChainWrapper } from './ethereum'
 import type Indexer from './indexer'
@@ -177,7 +177,7 @@ class Channel {
       c.ticketEpochFor(this.counterparty.toAddress()),
       new UINT256(new BN(this.index++)),
       amount,
-      Ticket.fromProbability(winProb),
+      UINT256.fromProbability(winProb),
       (await this.getState()).channelEpoch,
       this.privateKey
     )
@@ -197,13 +197,13 @@ class Channel {
       UINT256.fromString('0'),
       new UINT256(new BN(this.index++)),
       new Balance(new BN(0)),
-      Ticket.fromProbability(1),
+      UINT256.fromProbability(1),
       UINT256.fromString('0'),
       this.privateKey
     )
   }
 
-  async submitTicket(ackTicket: AcknowledgedTicket): Promise<SubmitTicketResponse> {
+  async redeemTicket(ackTicket: AcknowledgedTicket): Promise<RedeemTicketResponse> {
     if (!ackTicket.verify(this.counterparty)) {
       return {
         status: 'FAILURE',
