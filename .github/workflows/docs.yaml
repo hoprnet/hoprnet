@@ -33,6 +33,9 @@ jobs:
 
       - name: Generate docs
         run: |
+          # remove previously generated docs to ensure renamed/removed modules
+          # are not kept in the docs
+          rm -rf packages/*/docs
           yarn build
           yarn docs:generate
 

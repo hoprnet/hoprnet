@@ -14,8 +14,8 @@
     "build:types": "typechain --target ethers-v5 --outDir './src/contracts' '../../node_modules/@hoprnet/hopr-ethereum/chain/abis/*.json'",
     "build": "yarn clean && yarn build:types && mkdir -p ./lib/contracts && cp -R ./src/contracts ./lib/contracts && tsc",
     "prepublishOnly": "yarn build",
-    "docs:generate": "yarn typedoc src",
-    "docs:watch": "yarn typedoc --watch src"
+    "docs:generate": "yarn typedoc",
+    "docs:watch": "yarn typedoc --watch"
   },
   "engines": {
     "node": "14 || 15",

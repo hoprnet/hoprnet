@@ -1,5 +1,5 @@
 export * from './accountEntry'
-export * from './acknowledged'
+export * from './acknowledgedTicket'
 export * from './channelEntry'
 export * from './primitives'
 export * from './snapshot'
