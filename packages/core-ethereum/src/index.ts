@@ -14,7 +14,7 @@ import { cacheNoArgAsyncFunction, HoprDB } from '@hoprnet/hopr-utils'
 
 const log = debug('hopr-core-ethereum')
 
-export type SubmitTicketResponse =
+export type RedeemTicketResponse =
   | {
       status: 'SUCCESS'
       receipt: string

@@ -3,7 +3,7 @@ import PeerId from 'peer-id'
 import { ethers } from 'ethers'
 import { u8aSplit, serializeToU8a, MULTI_ADDR_MAX_LENGTH, u8aEquals } from '..'
 import BN from 'bn.js'
-import { Address, PublicKey, Hash } from '.' // TODO: cyclic dep
+import { Address, PublicKey } from '.' // TODO: cyclic dep
 
 export class AccountEntry {
   constructor(
@@ -25,15 +25,6 @@ export class AccountEntry {
     const address = new Address(a)
     const blockNumber = new BN(c)
     return new AccountEntry(address, isBEmpty ? undefined : Multiaddr(strippedB), blockNumber)
-  }
-
-  // TODO: kill
-  public get secret() {
-    return new Hash(new Uint8Array({ length: Hash.SIZE }))
-  }
-  // TODO: kill
-  public get counter() {
-    return new BN(0)
   }
 
   public serialize(): Uint8Array {

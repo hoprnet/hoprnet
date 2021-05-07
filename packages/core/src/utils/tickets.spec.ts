@@ -21,8 +21,9 @@ const createMockTicket = ({
   sender = SENDER,
   targetAddress = TARGET_ADDRESS,
   amount = new Balance(new BN(1)),
-  winProb = Ticket.fromProbability(1),
+  winProb = UINT256.fromProbability(1),
   epoch = new UINT256(new BN(1)),
+  index = new UINT256(new BN(1)),
   channelIteration = new UINT256(new BN(1))
 }: {
   sender?: PeerId
@@ -30,6 +31,7 @@ const createMockTicket = ({
   amount?: Balance
   winProb?: UINT256
   epoch?: UINT256
+  index?: UINT256
   channelIteration?: UINT256
 }) => {
   return ({
@@ -38,12 +40,13 @@ const createMockTicket = ({
     amount,
     winProb,
     epoch,
+    index,
     channelIteration,
     verify: (pubKey: PublicKey) => pubKey.eq(new PublicKey(sender.pubKey.marshal()))
   } as unknown) as Ticket
 }
 
-const mockChannelEntry = (isChannelOpen: boolean, ticketEpoch: UINT256) =>
+const mockChannelEntry = (isChannelOpen: boolean, ticketEpoch: UINT256, ticketIndex: UINT256) =>
   Promise.resolve(
     new ChannelEntry(
       TARGET_ADDRESS,
@@ -54,7 +57,7 @@ const mockChannelEntry = (isChannelOpen: boolean, ticketEpoch: UINT256) =>
       null,
       ticketEpoch,
       null,
-      null,
+      ticketIndex,
       null,
       isChannelOpen ? 'OPEN' : 'CLOSED',
       new UINT256(new BN(1)),
@@ -68,13 +71,15 @@ const createMockChannel = ({
   isChannelStored = true,
   self = new Balance(new BN(0)),
   counterparty = new Balance(new BN(100)),
-  ticketEpoch = new UINT256(new BN(1))
+  ticketEpoch = new UINT256(new BN(1)),
+  ticketIndex = new UINT256(new BN(0))
 }: {
   isChannelOpen?: boolean
   isChannelStored?: boolean
   self?: Balance
   counterparty?: Balance
   ticketEpoch?: UINT256
+  ticketIndex?: UINT256
 }) => {
   return ({
     getBalances: sinon.stub().returns(
@@ -84,7 +89,7 @@ const createMockChannel = ({
       })
     ),
     getState: () => {
-      if (isChannelStored) return mockChannelEntry(isChannelOpen, ticketEpoch)
+      if (isChannelStored) return mockChannelEntry(isChannelOpen, ticketEpoch, ticketIndex)
       throw new Error('state not found')
     },
     channelEpoch: new BN(1)
@@ -141,7 +146,7 @@ describe('unit test validateUnacknowledgedTicket', function () {
   it('should throw when ticket chance is low', async function () {
     const node = createMockNode({})
     const signedTicket = createMockTicket({
-      winProb: Ticket.fromProbability(0.5)
+      winProb: UINT256.fromProbability(0.5)
     })
 
     return expect(
@@ -187,14 +192,24 @@ describe('unit test validateUnacknowledgedTicket', function () {
     ).to.eventually.rejectedWith('Error while validating unacknowledged ticket, state not found')
   })
 
-  it('should throw if ticket epoch does not match our account counter', async function () {
+  it('should throw if ticket epoch does not match our account epoch', async function () {
     const node = createMockNode({})
     const signedTicket = createMockTicket({})
     const mockChannel = createMockChannel({ ticketEpoch: new UINT256(new BN(2)) })
 
     return expect(
       validateUnacknowledgedTicket(node.getId(), '1', 1, SENDER, signedTicket, mockChannel, getTicketsMock)
-    ).to.eventually.rejectedWith('does not match our account counter')
+    ).to.eventually.rejectedWith('does not match our account epoch')
+  })
+
+  it('should throw if ticket index must be higher than last ticket index', async function () {
+    const node = createMockNode({})
+    const signedTicket = createMockTicket({})
+    const mockChannel = createMockChannel({ ticketIndex: new UINT256(new BN(1)) })
+
+    return expect(
+      validateUnacknowledgedTicket(node.getId(), '1', 1, SENDER, signedTicket, mockChannel, getTicketsMock)
+    ).to.eventually.rejectedWith('must be higher than last ticket index')
   })
 
   it("should throw if ticket's channel iteration does not match the current channel iteration", async function () {

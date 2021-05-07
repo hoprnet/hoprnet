@@ -122,10 +122,6 @@ export class Hash {
     return new Hash(utils.arrayify(utils.keccak256(u8aConcat(...inputs))))
   }
 
-  static createChallenge(secretA: Uint8Array, secretB: Uint8Array): Hash {
-    return Hash.create(u8aConcat(secretA, secretB)).hash()
-  }
-
   static deserialize(arr: Uint8Array) {
     return new Hash(arr)
   }
