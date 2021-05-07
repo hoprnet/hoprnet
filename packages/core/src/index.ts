@@ -423,7 +423,7 @@ class Hopr extends EventEmitter {
             return reject(err)
           }
 
-          let packetKey = await this.db.storeUnacknowledgedTicket(new PublicKey(packet.ackChallenge))
+          let packetKey = await this.db.storeUnacknowledgedTicket(packet.ackChallenge)
 
           this.once('message-acknowledged:' + u8aToHex(packetKey), () => {
             resolve()

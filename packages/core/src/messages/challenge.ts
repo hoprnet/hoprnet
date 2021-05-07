@@ -1,4 +1,4 @@
-import { u8aEquals, SECP256K1_CONSTANTS } from '@hoprnet/hopr-utils'
+import { SECP256K1_CONSTANTS, PublicKey } from '@hoprnet/hopr-utils'
 import { HASH_ALGORITHM } from './constants'
 import { ecdsaSign, ecdsaVerify, publicKeyCreate } from 'secp256k1'
 import { createHash } from 'crypto'
@@ -6,13 +6,13 @@ import { createHash } from 'crypto'
 import type PeerId from 'peer-id'
 
 export class Challenge {
-  private constructor(private ackChallenge: Uint8Array, private signature: Uint8Array) {}
+  private constructor(private ackChallenge: PublicKey, private signature: Uint8Array) {}
 
   static get SIZE(): number {
     return SECP256K1_CONSTANTS.SIGNATURE_LENGTH
   }
 
-  static deserialize(preArray: Uint8Array | Buffer, ackChallenge: Uint8Array, pubKey: PeerId): Challenge {
+  static deserialize(preArray: Uint8Array | Buffer, ackChallenge: PublicKey, pubKey: PeerId): Challenge {
     if (preArray.length != SECP256K1_CONSTANTS.SIGNATURE_LENGTH) {
       throw Error(`Invalid arguments`)
     }
@@ -35,8 +35,8 @@ export class Challenge {
     return Uint8Array.from(this.signature)
   }
 
-  static create(ackChallenge: Uint8Array, privKey: PeerId): Challenge {
-    if (ackChallenge.length != SECP256K1_CONSTANTS.COMPRESSED_PUBLIC_KEY_LENGTH || privKey.privKey == null) {
+  static create(ackChallenge: PublicKey, privKey: PeerId): Challenge {
+    if (privKey.privKey == null) {
       throw Error(`Invalid arguments`)
     }
 
@@ -48,14 +48,14 @@ export class Challenge {
   }
 
   solve(secret: Uint8Array): boolean {
-    return u8aEquals(publicKeyCreate(secret), this.ackChallenge)
+    return this.ackChallenge.eq(new PublicKey(publicKeyCreate(secret)))
   }
 }
 
-function verifyChallenge(pubKey: PeerId, signature: Uint8Array, challenge: Uint8Array): boolean {
+function verifyChallenge(pubKey: PeerId, signature: Uint8Array, challenge: PublicKey): boolean {
   return ecdsaVerify(signature, hashChallenge(challenge), pubKey.pubKey.marshal())
 }
 
-function hashChallenge(ackChallenge: Uint8Array): Uint8Array {
-  return createHash(HASH_ALGORITHM).update(ackChallenge).digest()
+function hashChallenge(ackChallenge: PublicKey): Uint8Array {
+  return createHash(HASH_ALGORITHM).update(ackChallenge.serialize()).digest()
 }
