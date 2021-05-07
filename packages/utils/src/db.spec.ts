@@ -59,11 +59,8 @@ describe(`database tests`, function () {
 
     assert((await db.getTickets()).length == 1, `DB should find one ticket`)
 
-    const empty = await db.getUnacknowledgedTicketsByKey(key)
+    assert((await db.getUnacknowledgedTicketsByKey(key)) == undefined, `DB should not contain any unacknowledgedTicket`)
 
-    console.log(empty)
-    assert(empty == undefined)
-
-    // const ackedTicket = await db.getA
+    assert((await db.getAcknowledgedTickets()).length == 1, `DB should contain exactly one acknowledged ticket`)
   })
 })
