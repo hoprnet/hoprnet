@@ -15,13 +15,8 @@ export class AcknowledgedTicket {
 
   public verify(ticketIssuer: PublicKey): boolean {
     return (
-      validateAcknowledgement(
-        undefined,
-        undefined,
-        this.ticket.challenge,
-        undefined,
-        this.response.serialize()
-      ).valid && this.ticket.verify(ticketIssuer)
+      validateAcknowledgement(undefined, undefined, this.ticket.challenge, undefined, this.response.serialize())
+        .valid && this.ticket.verify(ticketIssuer)
     )
   }
 
