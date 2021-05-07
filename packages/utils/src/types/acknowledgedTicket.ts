@@ -18,7 +18,7 @@ export class AcknowledgedTicket {
       validateAcknowledgement(
         undefined,
         undefined,
-        this.ticket.challenge.serialize(),
+        this.ticket.challenge,
         undefined,
         this.response.serialize()
       ).valid && this.ticket.verify(ticketIssuer)

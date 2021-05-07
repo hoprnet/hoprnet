@@ -17,7 +17,6 @@ import {
   createFirstChallenge,
   preVerify,
   u8aSplit,
-  u8aToHex,
   pubKeyToPeerId
 } from '@hoprnet/hopr-utils'
 import type HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
@@ -162,12 +161,12 @@ export class Packet {
   public nextHop: Uint8Array
   public ownShare: Uint8Array
   public ownKey: Uint8Array
-  public nextChallenge: Uint8Array
-  public ackChallenge: Uint8Array
+  public nextChallenge: PublicKey
+  public ackChallenge: PublicKey
 
   public constructor(private packet: Uint8Array, private challenge: Challenge, private ticket: Ticket) {}
 
-  private setReadyToForward(ackChallenge: Uint8Array) {
+  private setReadyToForward(ackChallenge: PublicKey) {
     this.ackChallenge = ackChallenge
     this.isReadyToForward = true
 
@@ -189,8 +188,8 @@ export class Packet {
     ownShare: Uint8Array,
     nextHop: Uint8Array,
     previousHop: Uint8Array,
-    nextChallenge: Uint8Array,
-    ackChallenge: Uint8Array,
+    nextChallenge: PublicKey,
+    ackChallenge: PublicKey,
     packetTag: Uint8Array
   ) {
     this.isReceiver = false
@@ -219,11 +218,11 @@ export class Packet {
   ): Promise<Packet> {
     const isDirectMessage = path.length === 1
     const { alpha, secrets } = generateKeyShares(path)
-    const { ackChallenge, ticketChallenge } = createFirstChallenge(secrets)
+    const { ackChallenge, ticketChallenge } = createFirstChallenge(secrets[0], secrets[1])
     const porStrings: Uint8Array[] = []
 
     for (let i = 0; i < path.length - 1; i++) {
-      porStrings.push(createPoRString(secrets.slice(i)))
+      porStrings.push(createPoRString(secrets[i+1], i + 2 < path.length ? secrets[i + 2] : undefined))
     }
 
     const challenge = Challenge.create(ackChallenge, privKey)
@@ -234,9 +233,9 @@ export class Packet {
 
     let ticket: Ticket
     if (isDirectMessage) {
-      ticket = channel.createDummyTicket(new PublicKey(ticketChallenge))
+      ticket = channel.createDummyTicket(ticketChallenge)
     } else {
-      ticket = await channel.createTicket(ticketOpts.value, new PublicKey(ticketChallenge), ticketOpts.winProb)
+      ticket = await channel.createTicket(ticketOpts.value, ticketChallenge, ticketOpts.winProb)
     }
 
     return new Packet(packet, challenge, ticket).setReadyToForward(ackChallenge)
@@ -272,7 +271,7 @@ export class Packet {
 
     const ackKey = deriveAckKeyShare(transformedOutput.derivedSecret)
 
-    const challenge = Challenge.deserialize(preChallenge, publicKeyCreate(ackKey), pubKeySender)
+    const challenge = Challenge.deserialize(preChallenge, new PublicKey(publicKeyCreate(ackKey)), pubKeySender)
 
     const ticket = Ticket.deserialize(preTicket)
 
@@ -287,7 +286,7 @@ export class Packet {
     const verificationOutput = preVerify(
       transformedOutput.derivedSecret,
       transformedOutput.additionalRelayData,
-      ticket.challenge.serialize()
+      ticket.challenge
     )
 
     if (verificationOutput.valid != true) {
@@ -322,7 +321,7 @@ export class Packet {
 
     log(
       `Storing unacknowledged ticket. Expecting to receive a preImage for ${green(
-        u8aToHex(this.ackChallenge)
+        this.ackChallenge.toHex()
       )} from ${blue(pubKeyToPeerId(this.nextHop).toB58String())}`
     )
 
@@ -362,7 +361,7 @@ export class Packet {
 
     const channel = chain.getChannel(self, nextPeer)
 
-    this.ticket = await channel.createTicket(new Balance(new BN(0)), new PublicKey(this.nextChallenge), 0)
+    this.ticket = await channel.createTicket(new Balance(new BN(0)), this.nextChallenge, 0)
 
     this.challenge = Challenge.create(this.ackChallenge, privKey)
 
