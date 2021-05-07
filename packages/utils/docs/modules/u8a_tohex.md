@@ -12,7 +12,7 @@
 
 ### u8aToHex
 
-▸ **u8aToHex**(`arr?`: Uint8Array, `prefixed?`: *boolean*): *string*
+▸ **u8aToHex**(`arr?`: Uint8Array, `prefixed?`: _boolean_): _string_
 
 Converts a Uint8Array to a hex string.
 
@@ -20,11 +20,11 @@ Converts a Uint8Array to a hex string.
 
 #### Parameters
 
-| Name | Type | Default value | Description |
-| :------ | :------ | :------ | :------ |
-| `arr?` | Uint8Array | - | Uint8Array |
-| `prefixed` | *boolean* | true | if `true` add a `0x` in the beginning |
+| Name       | Type       | Default value | Description                           |
+| :--------- | :--------- | :------------ | :------------------------------------ |
+| `arr?`     | Uint8Array | -             | Uint8Array                            |
+| `prefixed` | _boolean_  | true          | if `true` add a `0x` in the beginning |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Defined in: [u8a/toHex.ts:8](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/u8a/toHex.ts#L8)

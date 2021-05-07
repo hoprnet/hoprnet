@@ -6,7 +6,7 @@
 
 ## Hierarchy
 
-- *Interface*
+- _Interface_
 
   ↳ **HoprChannelsInterface**
 
@@ -47,37 +47,37 @@
 
 ### \_abiCoder
 
-• `Readonly` **\_abiCoder**: *AbiCoder*
+• `Readonly` **\_abiCoder**: _AbiCoder_
 
 Inherited from: ethers.utils.Interface.\_abiCoder
 
 Defined in: node_modules/@ethersproject/abi/lib/interface.d.ts:43
 
-___
+---
 
 ### \_isInterface
 
-• `Readonly` **\_isInterface**: *boolean*
+• `Readonly` **\_isInterface**: _boolean_
 
 Inherited from: ethers.utils.Interface.\_isInterface
 
 Defined in: node_modules/@ethersproject/abi/lib/interface.d.ts:44
 
-___
+---
 
 ### deploy
 
-• `Readonly` **deploy**: *ConstructorFragment*
+• `Readonly` **deploy**: _ConstructorFragment_
 
 Inherited from: ethers.utils.Interface.deploy
 
 Defined in: node_modules/@ethersproject/abi/lib/interface.d.ts:42
 
-___
+---
 
 ### errors
 
-• `Readonly` **errors**: *object*
+• `Readonly` **errors**: _object_
 
 #### Type declaration
 
@@ -85,67 +85,67 @@ Inherited from: ethers.utils.Interface.errors
 
 Defined in: node_modules/@ethersproject/abi/lib/interface.d.ts:30
 
-___
+---
 
 ### events
 
-• **events**: *object*
+• **events**: _object_
 
 #### Type declaration
 
-| Name | Type |
-| :------ | :------ |
-| `Announcement(address,bytes)` | *EventFragment* |
-| `ChannelUpdate(address,address,tuple)` | *EventFragment* |
+| Name                                   | Type            |
+| :------------------------------------- | :-------------- |
+| `Announcement(address,bytes)`          | _EventFragment_ |
+| `ChannelUpdate(address,address,tuple)` | _EventFragment_ |
 
 Overrides: ethers.utils.Interface.events
 
 Defined in: packages/core-ethereum/src/contracts/HoprChannels.d.ts:145
 
-___
+---
 
 ### fragments
 
-• `Readonly` **fragments**: readonly *Fragment*[]
+• `Readonly` **fragments**: readonly _Fragment_[]
 
 Inherited from: ethers.utils.Interface.fragments
 
 Defined in: node_modules/@ethersproject/abi/lib/interface.d.ts:29
 
-___
+---
 
 ### functions
 
-• **functions**: *object*
+• **functions**: _object_
 
 #### Type declaration
 
-| Name | Type |
-| :------ | :------ |
-| `FUND_CHANNEL_MULTI_SIZE()` | *FunctionFragment* |
-| `TOKENS_RECIPIENT_INTERFACE_HASH()` | *FunctionFragment* |
-| `announce(bytes)` | *FunctionFragment* |
-| `bumpChannel(address,bytes32)` | *FunctionFragment* |
-| `canImplementInterfaceForAddress(bytes32,address)` | *FunctionFragment* |
-| `channels(bytes32)` | *FunctionFragment* |
-| `computeChallenge(bytes32)` | *FunctionFragment* |
-| `finalizeChannelClosure(address)` | *FunctionFragment* |
-| `fundChannelMulti(address,address,uint256,uint256)` | *FunctionFragment* |
-| `initiateChannelClosure(address)` | *FunctionFragment* |
-| `redeemTicket(address,bytes32,uint256,uint256,bytes32,uint256,uint256,bytes)` | *FunctionFragment* |
-| `secsClosure()` | *FunctionFragment* |
-| `token()` | *FunctionFragment* |
-| `tokensReceived(address,address,address,uint256,bytes,bytes)` | *FunctionFragment* |
+| Name                                                                          | Type               |
+| :---------------------------------------------------------------------------- | :----------------- |
+| `FUND_CHANNEL_MULTI_SIZE()`                                                   | _FunctionFragment_ |
+| `TOKENS_RECIPIENT_INTERFACE_HASH()`                                           | _FunctionFragment_ |
+| `announce(bytes)`                                                             | _FunctionFragment_ |
+| `bumpChannel(address,bytes32)`                                                | _FunctionFragment_ |
+| `canImplementInterfaceForAddress(bytes32,address)`                            | _FunctionFragment_ |
+| `channels(bytes32)`                                                           | _FunctionFragment_ |
+| `computeChallenge(bytes32)`                                                   | _FunctionFragment_ |
+| `finalizeChannelClosure(address)`                                             | _FunctionFragment_ |
+| `fundChannelMulti(address,address,uint256,uint256)`                           | _FunctionFragment_ |
+| `initiateChannelClosure(address)`                                             | _FunctionFragment_ |
+| `redeemTicket(address,bytes32,uint256,uint256,bytes32,uint256,uint256,bytes)` | _FunctionFragment_ |
+| `secsClosure()`                                                               | _FunctionFragment_ |
+| `token()`                                                                     | _FunctionFragment_ |
+| `tokensReceived(address,address,address,uint256,bytes,bytes)`                 | _FunctionFragment_ |
 
 Overrides: ethers.utils.Interface.functions
 
 Defined in: packages/core-ethereum/src/contracts/HoprChannels.d.ts:23
 
-___
+---
 
 ### structs
 
-• `Readonly` **structs**: *object*
+• `Readonly` **structs**: _object_
 
 #### Type declaration
 
@@ -157,726 +157,726 @@ Defined in: node_modules/@ethersproject/abi/lib/interface.d.ts:39
 
 ### \_decodeParams
 
-▸ **_decodeParams**(`params`: readonly *ParamType*[], `data`: BytesLike): *Result*
+▸ **\_decodeParams**(`params`: readonly _ParamType_[], `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `params` | readonly *ParamType*[] |
-| `data` | BytesLike |
+| Name     | Type                   |
+| :------- | :--------------------- |
+| `params` | readonly _ParamType_[] |
+| `data`   | BytesLike              |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Inherited from: ethers.utils.Interface.\_decodeParams
 
 Defined in: node_modules/@ethersproject/abi/lib/interface.d.ts:55
 
-___
+---
 
 ### \_encodeParams
 
-▸ **_encodeParams**(`params`: readonly *ParamType*[], `values`: readonly *any*[]): *string*
+▸ **\_encodeParams**(`params`: readonly _ParamType_[], `values`: readonly _any_[]): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `params` | readonly *ParamType*[] |
-| `values` | readonly *any*[] |
+| Name     | Type                   |
+| :------- | :--------------------- |
+| `params` | readonly _ParamType_[] |
+| `values` | readonly _any_[]       |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Inherited from: ethers.utils.Interface.\_encodeParams
 
 Defined in: node_modules/@ethersproject/abi/lib/interface.d.ts:56
 
-___
+---
 
 ### decodeEventLog
 
-▸ **decodeEventLog**(`eventFragment`: *string* \| *EventFragment*, `data`: BytesLike, `topics?`: readonly *string*[]): *Result*
+▸ **decodeEventLog**(`eventFragment`: _string_ \| _EventFragment_, `data`: BytesLike, `topics?`: readonly _string_[]): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `eventFragment` | *string* \| *EventFragment* |
-| `data` | BytesLike |
-| `topics?` | readonly *string*[] |
+| Name            | Type                        |
+| :-------------- | :-------------------------- |
+| `eventFragment` | _string_ \| _EventFragment_ |
+| `data`          | BytesLike                   |
+| `topics?`       | readonly _string_[]         |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Inherited from: ethers.utils.Interface.decodeEventLog
 
 Defined in: node_modules/@ethersproject/abi/lib/interface.d.ts:67
 
-___
+---
 
 ### decodeFunctionData
 
-▸ **decodeFunctionData**(`functionFragment`: *string* \| *FunctionFragment*, `data`: BytesLike): *Result*
+▸ **decodeFunctionData**(`functionFragment`: _string_ \| _FunctionFragment_, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | *string* \| *FunctionFragment* |
-| `data` | BytesLike |
+| Name               | Type                           |
+| :----------------- | :----------------------------- |
+| `functionFragment` | _string_ \| _FunctionFragment_ |
+| `data`             | BytesLike                      |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Inherited from: ethers.utils.Interface.decodeFunctionData
 
 Defined in: node_modules/@ethersproject/abi/lib/interface.d.ts:58
 
-___
+---
 
 ### decodeFunctionResult
 
-▸ **decodeFunctionResult**(`functionFragment`: ``"FUND_CHANNEL_MULTI_SIZE"``, `data`: BytesLike): *Result*
+▸ **decodeFunctionResult**(`functionFragment`: `"FUND_CHANNEL_MULTI_SIZE"`, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"FUND_CHANNEL_MULTI_SIZE"`` |
-| `data` | BytesLike |
+| Name               | Type                        |
+| :----------------- | :-------------------------- |
+| `functionFragment` | `"FUND_CHANNEL_MULTI_SIZE"` |
+| `data`             | BytesLike                   |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Overrides: ethers.utils.Interface.decodeFunctionResult
 
 Defined in: packages/core-ethereum/src/contracts/HoprChannels.d.ts:97
 
-▸ **decodeFunctionResult**(`functionFragment`: ``"TOKENS_RECIPIENT_INTERFACE_HASH"``, `data`: BytesLike): *Result*
+▸ **decodeFunctionResult**(`functionFragment`: `"TOKENS_RECIPIENT_INTERFACE_HASH"`, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"TOKENS_RECIPIENT_INTERFACE_HASH"`` |
-| `data` | BytesLike |
+| Name               | Type                                |
+| :----------------- | :---------------------------------- |
+| `functionFragment` | `"TOKENS_RECIPIENT_INTERFACE_HASH"` |
+| `data`             | BytesLike                           |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Overrides: ethers.utils.Interface.decodeFunctionResult
 
 Defined in: packages/core-ethereum/src/contracts/HoprChannels.d.ts:101
 
-▸ **decodeFunctionResult**(`functionFragment`: ``"announce"``, `data`: BytesLike): *Result*
+▸ **decodeFunctionResult**(`functionFragment`: `"announce"`, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"announce"`` |
-| `data` | BytesLike |
+| Name               | Type         |
+| :----------------- | :----------- |
+| `functionFragment` | `"announce"` |
+| `data`             | BytesLike    |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Overrides: ethers.utils.Interface.decodeFunctionResult
 
 Defined in: packages/core-ethereum/src/contracts/HoprChannels.d.ts:105
 
-▸ **decodeFunctionResult**(`functionFragment`: ``"bumpChannel"``, `data`: BytesLike): *Result*
+▸ **decodeFunctionResult**(`functionFragment`: `"bumpChannel"`, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"bumpChannel"`` |
-| `data` | BytesLike |
+| Name               | Type            |
+| :----------------- | :-------------- |
+| `functionFragment` | `"bumpChannel"` |
+| `data`             | BytesLike       |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Overrides: ethers.utils.Interface.decodeFunctionResult
 
 Defined in: packages/core-ethereum/src/contracts/HoprChannels.d.ts:106
 
-▸ **decodeFunctionResult**(`functionFragment`: ``"canImplementInterfaceForAddress"``, `data`: BytesLike): *Result*
+▸ **decodeFunctionResult**(`functionFragment`: `"canImplementInterfaceForAddress"`, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"canImplementInterfaceForAddress"`` |
-| `data` | BytesLike |
+| Name               | Type                                |
+| :----------------- | :---------------------------------- |
+| `functionFragment` | `"canImplementInterfaceForAddress"` |
+| `data`             | BytesLike                           |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Overrides: ethers.utils.Interface.decodeFunctionResult
 
 Defined in: packages/core-ethereum/src/contracts/HoprChannels.d.ts:110
 
-▸ **decodeFunctionResult**(`functionFragment`: ``"channels"``, `data`: BytesLike): *Result*
+▸ **decodeFunctionResult**(`functionFragment`: `"channels"`, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"channels"`` |
-| `data` | BytesLike |
+| Name               | Type         |
+| :----------------- | :----------- |
+| `functionFragment` | `"channels"` |
+| `data`             | BytesLike    |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Overrides: ethers.utils.Interface.decodeFunctionResult
 
 Defined in: packages/core-ethereum/src/contracts/HoprChannels.d.ts:114
 
-▸ **decodeFunctionResult**(`functionFragment`: ``"computeChallenge"``, `data`: BytesLike): *Result*
+▸ **decodeFunctionResult**(`functionFragment`: `"computeChallenge"`, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"computeChallenge"`` |
-| `data` | BytesLike |
+| Name               | Type                 |
+| :----------------- | :------------------- |
+| `functionFragment` | `"computeChallenge"` |
+| `data`             | BytesLike            |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Overrides: ethers.utils.Interface.decodeFunctionResult
 
 Defined in: packages/core-ethereum/src/contracts/HoprChannels.d.ts:115
 
-▸ **decodeFunctionResult**(`functionFragment`: ``"finalizeChannelClosure"``, `data`: BytesLike): *Result*
+▸ **decodeFunctionResult**(`functionFragment`: `"finalizeChannelClosure"`, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"finalizeChannelClosure"`` |
-| `data` | BytesLike |
+| Name               | Type                       |
+| :----------------- | :------------------------- |
+| `functionFragment` | `"finalizeChannelClosure"` |
+| `data`             | BytesLike                  |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Overrides: ethers.utils.Interface.decodeFunctionResult
 
 Defined in: packages/core-ethereum/src/contracts/HoprChannels.d.ts:119
 
-▸ **decodeFunctionResult**(`functionFragment`: ``"fundChannelMulti"``, `data`: BytesLike): *Result*
+▸ **decodeFunctionResult**(`functionFragment`: `"fundChannelMulti"`, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"fundChannelMulti"`` |
-| `data` | BytesLike |
+| Name               | Type                 |
+| :----------------- | :------------------- |
+| `functionFragment` | `"fundChannelMulti"` |
+| `data`             | BytesLike            |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Overrides: ethers.utils.Interface.decodeFunctionResult
 
 Defined in: packages/core-ethereum/src/contracts/HoprChannels.d.ts:123
 
-▸ **decodeFunctionResult**(`functionFragment`: ``"initiateChannelClosure"``, `data`: BytesLike): *Result*
+▸ **decodeFunctionResult**(`functionFragment`: `"initiateChannelClosure"`, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"initiateChannelClosure"`` |
-| `data` | BytesLike |
+| Name               | Type                       |
+| :----------------- | :------------------------- |
+| `functionFragment` | `"initiateChannelClosure"` |
+| `data`             | BytesLike                  |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Overrides: ethers.utils.Interface.decodeFunctionResult
 
 Defined in: packages/core-ethereum/src/contracts/HoprChannels.d.ts:127
 
-▸ **decodeFunctionResult**(`functionFragment`: ``"redeemTicket"``, `data`: BytesLike): *Result*
+▸ **decodeFunctionResult**(`functionFragment`: `"redeemTicket"`, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"redeemTicket"`` |
-| `data` | BytesLike |
+| Name               | Type             |
+| :----------------- | :--------------- |
+| `functionFragment` | `"redeemTicket"` |
+| `data`             | BytesLike        |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Overrides: ethers.utils.Interface.decodeFunctionResult
 
 Defined in: packages/core-ethereum/src/contracts/HoprChannels.d.ts:131
 
-▸ **decodeFunctionResult**(`functionFragment`: ``"secsClosure"``, `data`: BytesLike): *Result*
+▸ **decodeFunctionResult**(`functionFragment`: `"secsClosure"`, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"secsClosure"`` |
-| `data` | BytesLike |
+| Name               | Type            |
+| :----------------- | :-------------- |
+| `functionFragment` | `"secsClosure"` |
+| `data`             | BytesLike       |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Overrides: ethers.utils.Interface.decodeFunctionResult
 
 Defined in: packages/core-ethereum/src/contracts/HoprChannels.d.ts:135
 
-▸ **decodeFunctionResult**(`functionFragment`: ``"token"``, `data`: BytesLike): *Result*
+▸ **decodeFunctionResult**(`functionFragment`: `"token"`, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"token"`` |
-| `data` | BytesLike |
+| Name               | Type      |
+| :----------------- | :-------- |
+| `functionFragment` | `"token"` |
+| `data`             | BytesLike |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Overrides: ethers.utils.Interface.decodeFunctionResult
 
 Defined in: packages/core-ethereum/src/contracts/HoprChannels.d.ts:139
 
-▸ **decodeFunctionResult**(`functionFragment`: ``"tokensReceived"``, `data`: BytesLike): *Result*
+▸ **decodeFunctionResult**(`functionFragment`: `"tokensReceived"`, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"tokensReceived"`` |
-| `data` | BytesLike |
+| Name               | Type               |
+| :----------------- | :----------------- |
+| `functionFragment` | `"tokensReceived"` |
+| `data`             | BytesLike          |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Overrides: ethers.utils.Interface.decodeFunctionResult
 
 Defined in: packages/core-ethereum/src/contracts/HoprChannels.d.ts:140
 
-___
+---
 
 ### encodeDeploy
 
-▸ **encodeDeploy**(`values?`: readonly *any*[]): *string*
+▸ **encodeDeploy**(`values?`: readonly _any_[]): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `values?` | readonly *any*[] |
+| Name      | Type             |
+| :-------- | :--------------- |
+| `values?` | readonly _any_[] |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Inherited from: ethers.utils.Interface.encodeDeploy
 
 Defined in: node_modules/@ethersproject/abi/lib/interface.d.ts:57
 
-___
+---
 
 ### encodeEventLog
 
-▸ **encodeEventLog**(`eventFragment`: *EventFragment*, `values`: readonly *any*[]): *object*
+▸ **encodeEventLog**(`eventFragment`: _EventFragment_, `values`: readonly _any_[]): _object_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `eventFragment` | *EventFragment* |
-| `values` | readonly *any*[] |
+| Name            | Type             |
+| :-------------- | :--------------- |
+| `eventFragment` | _EventFragment_  |
+| `values`        | readonly _any_[] |
 
-**Returns:** *object*
+**Returns:** _object_
 
-| Name | Type |
-| :------ | :------ |
-| `data` | *string* |
-| `topics` | *string*[] |
+| Name     | Type       |
+| :------- | :--------- |
+| `data`   | _string_   |
+| `topics` | _string_[] |
 
 Inherited from: ethers.utils.Interface.encodeEventLog
 
 Defined in: node_modules/@ethersproject/abi/lib/interface.d.ts:63
 
-___
+---
 
 ### encodeFilterTopics
 
-▸ **encodeFilterTopics**(`eventFragment`: *EventFragment*, `values`: readonly *any*[]): (*string* \| *string*[])[]
+▸ **encodeFilterTopics**(`eventFragment`: _EventFragment_, `values`: readonly _any_[]): (_string_ \| _string_[])[]
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `eventFragment` | *EventFragment* |
-| `values` | readonly *any*[] |
+| Name            | Type             |
+| :-------------- | :--------------- |
+| `eventFragment` | _EventFragment_  |
+| `values`        | readonly _any_[] |
 
-**Returns:** (*string* \| *string*[])[]
+**Returns:** (_string_ \| _string_[])[]
 
 Inherited from: ethers.utils.Interface.encodeFilterTopics
 
 Defined in: node_modules/@ethersproject/abi/lib/interface.d.ts:62
 
-___
+---
 
 ### encodeFunctionData
 
-▸ **encodeFunctionData**(`functionFragment`: ``"FUND_CHANNEL_MULTI_SIZE"``, `values?`: *undefined*): *string*
+▸ **encodeFunctionData**(`functionFragment`: `"FUND_CHANNEL_MULTI_SIZE"`, `values?`: _undefined_): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"FUND_CHANNEL_MULTI_SIZE"`` |
-| `values?` | *undefined* |
+| Name               | Type                        |
+| :----------------- | :-------------------------- |
+| `functionFragment` | `"FUND_CHANNEL_MULTI_SIZE"` |
+| `values?`          | _undefined_                 |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: ethers.utils.Interface.encodeFunctionData
 
 Defined in: packages/core-ethereum/src/contracts/HoprChannels.d.ts:40
 
-▸ **encodeFunctionData**(`functionFragment`: ``"TOKENS_RECIPIENT_INTERFACE_HASH"``, `values?`: *undefined*): *string*
+▸ **encodeFunctionData**(`functionFragment`: `"TOKENS_RECIPIENT_INTERFACE_HASH"`, `values?`: _undefined_): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"TOKENS_RECIPIENT_INTERFACE_HASH"`` |
-| `values?` | *undefined* |
+| Name               | Type                                |
+| :----------------- | :---------------------------------- |
+| `functionFragment` | `"TOKENS_RECIPIENT_INTERFACE_HASH"` |
+| `values?`          | _undefined_                         |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: ethers.utils.Interface.encodeFunctionData
 
 Defined in: packages/core-ethereum/src/contracts/HoprChannels.d.ts:44
 
-▸ **encodeFunctionData**(`functionFragment`: ``"announce"``, `values`: [BytesLike]): *string*
+▸ **encodeFunctionData**(`functionFragment`: `"announce"`, `values`: [BytesLike]): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"announce"`` |
-| `values` | [BytesLike] |
+| Name               | Type         |
+| :----------------- | :----------- |
+| `functionFragment` | `"announce"` |
+| `values`           | [BytesLike]  |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: ethers.utils.Interface.encodeFunctionData
 
 Defined in: packages/core-ethereum/src/contracts/HoprChannels.d.ts:48
 
-▸ **encodeFunctionData**(`functionFragment`: ``"bumpChannel"``, `values`: [*string*, BytesLike]): *string*
+▸ **encodeFunctionData**(`functionFragment`: `"bumpChannel"`, `values`: [*string*, BytesLike]): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"bumpChannel"`` |
-| `values` | [*string*, BytesLike] |
+| Name               | Type                  |
+| :----------------- | :-------------------- |
+| `functionFragment` | `"bumpChannel"`       |
+| `values`           | [*string*, BytesLike] |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: ethers.utils.Interface.encodeFunctionData
 
 Defined in: packages/core-ethereum/src/contracts/HoprChannels.d.ts:49
 
-▸ **encodeFunctionData**(`functionFragment`: ``"canImplementInterfaceForAddress"``, `values`: [BytesLike, *string*]): *string*
+▸ **encodeFunctionData**(`functionFragment`: `"canImplementInterfaceForAddress"`, `values`: [BytesLike, *string*]): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"canImplementInterfaceForAddress"`` |
-| `values` | [BytesLike, *string*] |
+| Name               | Type                                |
+| :----------------- | :---------------------------------- |
+| `functionFragment` | `"canImplementInterfaceForAddress"` |
+| `values`           | [BytesLike, *string*]               |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: ethers.utils.Interface.encodeFunctionData
 
 Defined in: packages/core-ethereum/src/contracts/HoprChannels.d.ts:53
 
-▸ **encodeFunctionData**(`functionFragment`: ``"channels"``, `values`: [BytesLike]): *string*
+▸ **encodeFunctionData**(`functionFragment`: `"channels"`, `values`: [BytesLike]): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"channels"`` |
-| `values` | [BytesLike] |
+| Name               | Type         |
+| :----------------- | :----------- |
+| `functionFragment` | `"channels"` |
+| `values`           | [BytesLike]  |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: ethers.utils.Interface.encodeFunctionData
 
 Defined in: packages/core-ethereum/src/contracts/HoprChannels.d.ts:57
 
-▸ **encodeFunctionData**(`functionFragment`: ``"computeChallenge"``, `values`: [BytesLike]): *string*
+▸ **encodeFunctionData**(`functionFragment`: `"computeChallenge"`, `values`: [BytesLike]): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"computeChallenge"`` |
-| `values` | [BytesLike] |
+| Name               | Type                 |
+| :----------------- | :------------------- |
+| `functionFragment` | `"computeChallenge"` |
+| `values`           | [BytesLike]          |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: ethers.utils.Interface.encodeFunctionData
 
 Defined in: packages/core-ethereum/src/contracts/HoprChannels.d.ts:58
 
-▸ **encodeFunctionData**(`functionFragment`: ``"finalizeChannelClosure"``, `values`: [*string*]): *string*
+▸ **encodeFunctionData**(`functionFragment`: `"finalizeChannelClosure"`, `values`: [*string*]): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"finalizeChannelClosure"`` |
-| `values` | [*string*] |
+| Name               | Type                       |
+| :----------------- | :------------------------- |
+| `functionFragment` | `"finalizeChannelClosure"` |
+| `values`           | [*string*]                 |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: ethers.utils.Interface.encodeFunctionData
 
 Defined in: packages/core-ethereum/src/contracts/HoprChannels.d.ts:62
 
-▸ **encodeFunctionData**(`functionFragment`: ``"fundChannelMulti"``, `values`: [*string*, *string*, BigNumberish, BigNumberish]): *string*
+▸ **encodeFunctionData**(`functionFragment`: `"fundChannelMulti"`, `values`: [*string*, *string*, BigNumberish, BigNumberish]): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"fundChannelMulti"`` |
-| `values` | [*string*, *string*, BigNumberish, BigNumberish] |
+| Name               | Type                                             |
+| :----------------- | :----------------------------------------------- |
+| `functionFragment` | `"fundChannelMulti"`                             |
+| `values`           | [*string*, *string*, BigNumberish, BigNumberish] |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: ethers.utils.Interface.encodeFunctionData
 
 Defined in: packages/core-ethereum/src/contracts/HoprChannels.d.ts:66
 
-▸ **encodeFunctionData**(`functionFragment`: ``"initiateChannelClosure"``, `values`: [*string*]): *string*
+▸ **encodeFunctionData**(`functionFragment`: `"initiateChannelClosure"`, `values`: [*string*]): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"initiateChannelClosure"`` |
-| `values` | [*string*] |
+| Name               | Type                       |
+| :----------------- | :------------------------- |
+| `functionFragment` | `"initiateChannelClosure"` |
+| `values`           | [*string*]                 |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: ethers.utils.Interface.encodeFunctionData
 
 Defined in: packages/core-ethereum/src/contracts/HoprChannels.d.ts:70
 
-▸ **encodeFunctionData**(`functionFragment`: ``"redeemTicket"``, `values`: [*string*, BytesLike, BigNumberish, BigNumberish, BytesLike, BigNumberish, BigNumberish, BytesLike]): *string*
+▸ **encodeFunctionData**(`functionFragment`: `"redeemTicket"`, `values`: [*string*, BytesLike, BigNumberish, BigNumberish, BytesLike, BigNumberish, BigNumberish, BytesLike]): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"redeemTicket"`` |
-| `values` | [*string*, BytesLike, BigNumberish, BigNumberish, BytesLike, BigNumberish, BigNumberish, BytesLike] |
+| Name               | Type                                                                                                |
+| :----------------- | :-------------------------------------------------------------------------------------------------- |
+| `functionFragment` | `"redeemTicket"`                                                                                    |
+| `values`           | [*string*, BytesLike, BigNumberish, BigNumberish, BytesLike, BigNumberish, BigNumberish, BytesLike] |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: ethers.utils.Interface.encodeFunctionData
 
 Defined in: packages/core-ethereum/src/contracts/HoprChannels.d.ts:74
 
-▸ **encodeFunctionData**(`functionFragment`: ``"secsClosure"``, `values?`: *undefined*): *string*
+▸ **encodeFunctionData**(`functionFragment`: `"secsClosure"`, `values?`: _undefined_): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"secsClosure"`` |
-| `values?` | *undefined* |
+| Name               | Type            |
+| :----------------- | :-------------- |
+| `functionFragment` | `"secsClosure"` |
+| `values?`          | _undefined_     |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: ethers.utils.Interface.encodeFunctionData
 
 Defined in: packages/core-ethereum/src/contracts/HoprChannels.d.ts:87
 
-▸ **encodeFunctionData**(`functionFragment`: ``"token"``, `values?`: *undefined*): *string*
+▸ **encodeFunctionData**(`functionFragment`: `"token"`, `values?`: _undefined_): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"token"`` |
-| `values?` | *undefined* |
+| Name               | Type        |
+| :----------------- | :---------- |
+| `functionFragment` | `"token"`   |
+| `values?`          | _undefined_ |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: ethers.utils.Interface.encodeFunctionData
 
 Defined in: packages/core-ethereum/src/contracts/HoprChannels.d.ts:91
 
-▸ **encodeFunctionData**(`functionFragment`: ``"tokensReceived"``, `values`: [*string*, *string*, *string*, BigNumberish, BytesLike, BytesLike]): *string*
+▸ **encodeFunctionData**(`functionFragment`: `"tokensReceived"`, `values`: [*string*, *string*, *string*, BigNumberish, BytesLike, BytesLike]): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"tokensReceived"`` |
-| `values` | [*string*, *string*, *string*, BigNumberish, BytesLike, BytesLike] |
+| Name               | Type                                                               |
+| :----------------- | :----------------------------------------------------------------- |
+| `functionFragment` | `"tokensReceived"`                                                 |
+| `values`           | [*string*, *string*, *string*, BigNumberish, BytesLike, BytesLike] |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: ethers.utils.Interface.encodeFunctionData
 
 Defined in: packages/core-ethereum/src/contracts/HoprChannels.d.ts:92
 
-___
+---
 
 ### encodeFunctionResult
 
-▸ **encodeFunctionResult**(`functionFragment`: *string* \| *FunctionFragment*, `values?`: readonly *any*[]): *string*
+▸ **encodeFunctionResult**(`functionFragment`: _string_ \| _FunctionFragment_, `values?`: readonly _any_[]): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | *string* \| *FunctionFragment* |
-| `values?` | readonly *any*[] |
+| Name               | Type                           |
+| :----------------- | :----------------------------- |
+| `functionFragment` | _string_ \| _FunctionFragment_ |
+| `values?`          | readonly _any_[]               |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Inherited from: ethers.utils.Interface.encodeFunctionResult
 
 Defined in: node_modules/@ethersproject/abi/lib/interface.d.ts:61
 
-___
+---
 
 ### format
 
-▸ **format**(`format?`: *string*): *string* \| *string*[]
+▸ **format**(`format?`: _string_): _string_ \| _string_[]
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `format?` | *string* |
+| Name      | Type     |
+| :-------- | :------- |
+| `format?` | _string_ |
 
-**Returns:** *string* \| *string*[]
+**Returns:** _string_ \| _string_[]
 
 Inherited from: ethers.utils.Interface.format
 
 Defined in: node_modules/@ethersproject/abi/lib/interface.d.ts:46
 
-___
+---
 
 ### getEvent
 
-▸ **getEvent**(`nameOrSignatureOrTopic`: ``"Announcement"``): *EventFragment*
+▸ **getEvent**(`nameOrSignatureOrTopic`: `"Announcement"`): _EventFragment_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `nameOrSignatureOrTopic` | ``"Announcement"`` |
+| Name                     | Type             |
+| :----------------------- | :--------------- |
+| `nameOrSignatureOrTopic` | `"Announcement"` |
 
-**Returns:** *EventFragment*
+**Returns:** _EventFragment_
 
 Overrides: ethers.utils.Interface.getEvent
 
 Defined in: packages/core-ethereum/src/contracts/HoprChannels.d.ts:150
 
-▸ **getEvent**(`nameOrSignatureOrTopic`: ``"ChannelUpdate"``): *EventFragment*
+▸ **getEvent**(`nameOrSignatureOrTopic`: `"ChannelUpdate"`): _EventFragment_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `nameOrSignatureOrTopic` | ``"ChannelUpdate"`` |
+| Name                     | Type              |
+| :----------------------- | :---------------- |
+| `nameOrSignatureOrTopic` | `"ChannelUpdate"` |
 
-**Returns:** *EventFragment*
+**Returns:** _EventFragment_
 
 Overrides: ethers.utils.Interface.getEvent
 
 Defined in: packages/core-ethereum/src/contracts/HoprChannels.d.ts:151
 
-___
+---
 
 ### getEventTopic
 
-▸ **getEventTopic**(`eventFragment`: *string* \| *EventFragment*): *string*
+▸ **getEventTopic**(`eventFragment`: _string_ \| _EventFragment_): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `eventFragment` | *string* \| *EventFragment* |
+| Name            | Type                        |
+| :-------------- | :-------------------------- |
+| `eventFragment` | _string_ \| _EventFragment_ |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Inherited from: ethers.utils.Interface.getEventTopic
 
 Defined in: node_modules/@ethersproject/abi/lib/interface.d.ts:54
 
-___
+---
 
 ### getFunction
 
-▸ **getFunction**(`nameOrSignatureOrSighash`: *string*): *FunctionFragment*
+▸ **getFunction**(`nameOrSignatureOrSighash`: _string_): _FunctionFragment_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `nameOrSignatureOrSighash` | *string* |
+| Name                       | Type     |
+| :------------------------- | :------- |
+| `nameOrSignatureOrSighash` | _string_ |
 
-**Returns:** *FunctionFragment*
+**Returns:** _FunctionFragment_
 
 Inherited from: ethers.utils.Interface.getFunction
 
 Defined in: node_modules/@ethersproject/abi/lib/interface.d.ts:51
 
-___
+---
 
 ### getSighash
 
-▸ **getSighash**(`functionFragment`: *string* \| *FunctionFragment*): *string*
+▸ **getSighash**(`functionFragment`: _string_ \| _FunctionFragment_): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | *string* \| *FunctionFragment* |
+| Name               | Type                           |
+| :----------------- | :----------------------------- |
+| `functionFragment` | _string_ \| _FunctionFragment_ |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Inherited from: ethers.utils.Interface.getSighash
 
 Defined in: node_modules/@ethersproject/abi/lib/interface.d.ts:53
 
-___
+---
 
 ### parseLog
 
-▸ **parseLog**(`log`: { `data`: *string* ; `topics`: *string*[]  }): *LogDescription*
+▸ **parseLog**(`log`: { `data`: _string_ ; `topics`: _string_[] }): _LogDescription_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `log` | *object* |
-| `log.data` | *string* |
-| `log.topics` | *string*[] |
+| Name         | Type       |
+| :----------- | :--------- |
+| `log`        | _object_   |
+| `log.data`   | _string_   |
+| `log.topics` | _string_[] |
 
-**Returns:** *LogDescription*
+**Returns:** _LogDescription_
 
 Inherited from: ethers.utils.Interface.parseLog
 
 Defined in: node_modules/@ethersproject/abi/lib/interface.d.ts:72
 
-___
+---
 
 ### parseTransaction
 
-▸ **parseTransaction**(`tx`: { `data`: *string* ; `value?`: BigNumberish  }): *TransactionDescription*
+▸ **parseTransaction**(`tx`: { `data`: _string_ ; `value?`: BigNumberish }): _TransactionDescription_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `tx` | *object* |
-| `tx.data` | *string* |
+| Name        | Type         |
+| :---------- | :----------- |
+| `tx`        | _object_     |
+| `tx.data`   | _string_     |
 | `tx.value?` | BigNumberish |
 
-**Returns:** *TransactionDescription*
+**Returns:** _TransactionDescription_
 
 Inherited from: ethers.utils.Interface.parseTransaction
 

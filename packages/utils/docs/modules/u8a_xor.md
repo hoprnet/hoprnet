@@ -12,16 +12,16 @@
 
 ### u8aXOR
 
-▸ **u8aXOR**(`inPlace?`: *boolean*, ...`list`: Uint8Array[]): Uint8Array
+▸ **u8aXOR**(`inPlace?`: _boolean_, ...`list`: Uint8Array[]): Uint8Array
 
 Apply an XOR on a list of arrays.
 
 #### Parameters
 
-| Name | Type | Default value | Description |
-| :------ | :------ | :------ | :------ |
-| `inPlace` | *boolean* | false | if `true` overwrite first Array with result |
-| `...list` | Uint8Array[] | - | arrays to XOR |
+| Name      | Type         | Default value | Description                                 |
+| :-------- | :----------- | :------------ | :------------------------------------------ |
+| `inPlace` | _boolean_    | false         | if `true` overwrite first Array with result |
+| `...list` | Uint8Array[] | -             | arrays to XOR                               |
 
 **Returns:** Uint8Array
 

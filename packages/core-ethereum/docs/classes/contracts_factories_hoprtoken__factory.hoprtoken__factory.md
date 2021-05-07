@@ -1,8 +1,8 @@
-[@hoprnet/hopr-core-ethereum](../README.md) / [Exports](../modules.md) / [contracts/factories/HoprToken__factory](../modules/contracts_factories_hoprtoken__factory.md) / HoprToken__factory
+[@hoprnet/hopr-core-ethereum](../README.md) / [Exports](../modules.md) / [contracts/factories/HoprToken\_\_factory](../modules/contracts_factories_hoprtoken__factory.md) / HoprToken\_\_factory
 
 # Class: HoprToken\_\_factory
 
-[contracts/factories/HoprToken__factory](../modules/contracts_factories_hoprtoken__factory.md).HoprToken__factory
+[contracts/factories/HoprToken\_\_factory](../modules/contracts_factories_hoprtoken__factory.md).HoprToken\_\_factory
 
 ## Table of contents
 
@@ -18,23 +18,23 @@
 
 ### constructor
 
-\+ **new HoprToken__factory**(): [*HoprToken\_\_factory*](contracts_factories_hoprtoken__factory.hoprtoken__factory.md)
+\+ **new HoprToken\_\_factory**(): [_HoprToken\_\_factory_](contracts_factories_hoprtoken__factory.hoprtoken__factory.md)
 
-**Returns:** [*HoprToken\_\_factory*](contracts_factories_hoprtoken__factory.hoprtoken__factory.md)
+**Returns:** [_HoprToken\_\_factory_](contracts_factories_hoprtoken__factory.hoprtoken__factory.md)
 
 ## Methods
 
 ### connect
 
-▸ `Static` **connect**(`address`: *string*, `signerOrProvider`: *Provider* \| *Signer*): [*HoprToken*](contracts_hoprtoken.hoprtoken.md)
+▸ `Static` **connect**(`address`: _string_, `signerOrProvider`: _Provider_ \| _Signer_): [_HoprToken_](contracts_hoprtoken.hoprtoken.md)
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `address` | *string* |
-| `signerOrProvider` | *Provider* \| *Signer* |
+| Name               | Type                   |
+| :----------------- | :--------------------- |
+| `address`          | _string_               |
+| `signerOrProvider` | _Provider_ \| _Signer_ |
 
-**Returns:** [*HoprToken*](contracts_hoprtoken.hoprtoken.md)
+**Returns:** [_HoprToken_](contracts_hoprtoken.hoprtoken.md)
 
-Defined in: packages/core-ethereum/src/contracts/factories/HoprToken__factory.ts:11
+Defined in: packages/core-ethereum/src/contracts/factories/HoprToken\_\_factory.ts:11

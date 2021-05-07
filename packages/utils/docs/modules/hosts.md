@@ -20,14 +20,14 @@
 
 ### Hosts
 
-Ƭ **Hosts**: *object*
+Ƭ **Hosts**: _object_
 
 #### Type declaration
 
-| Name | Type |
-| :------ | :------ |
-| `ip4?` | [*NetOptions*](../interfaces/hosts.netoptions.md) |
-| `ip6?` | [*NetOptions*](../interfaces/hosts.netoptions.md) |
+| Name   | Type                                              |
+| :----- | :------------------------------------------------ |
+| `ip4?` | [_NetOptions_](../interfaces/hosts.netoptions.md) |
+| `ip6?` | [_NetOptions_](../interfaces/hosts.netoptions.md) |
 
 Defined in: [hosts.ts:6](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/hosts.ts#L6)
 
@@ -35,8 +35,8 @@ Defined in: [hosts.ts:6](https://github.com/hoprnet/hoprnet/blob/448a47a/package
 
 ### parseHosts
 
-▸ **parseHosts**(): [*Hosts*](hosts.md#hosts)
+▸ **parseHosts**(): [_Hosts_](hosts.md#hosts)
 
-**Returns:** [*Hosts*](hosts.md#hosts)
+**Returns:** [_Hosts_](hosts.md#hosts)
 
 Defined in: [hosts.ts:11](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/hosts.ts#L11)

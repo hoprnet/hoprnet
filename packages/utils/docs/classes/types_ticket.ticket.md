@@ -39,22 +39,22 @@
 
 ### constructor
 
-\+ **new Ticket**(`counterparty`: [*Address*](types_primitives.address.md), `challenge`: [*Address*](types_primitives.address.md), `epoch`: [*UINT256*](types_solidity.uint256.md), `index`: [*UINT256*](types_solidity.uint256.md), `amount`: [*Balance*](types_primitives.balance.md), `winProb`: [*UINT256*](types_solidity.uint256.md), `channelIteration`: [*UINT256*](types_solidity.uint256.md), `signature`: [*Signature*](types_primitives.signature.md)): [*Ticket*](types_ticket.ticket.md)
+\+ **new Ticket**(`counterparty`: [_Address_](types_primitives.address.md), `challenge`: [_Address_](types_primitives.address.md), `epoch`: [_UINT256_](types_solidity.uint256.md), `index`: [_UINT256_](types_solidity.uint256.md), `amount`: [_Balance_](types_primitives.balance.md), `winProb`: [_UINT256_](types_solidity.uint256.md), `channelIteration`: [_UINT256_](types_solidity.uint256.md), `signature`: [_Signature_](types_primitives.signature.md)): [_Ticket_](types_ticket.ticket.md)
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `counterparty` | [*Address*](types_primitives.address.md) |
-| `challenge` | [*Address*](types_primitives.address.md) |
-| `epoch` | [*UINT256*](types_solidity.uint256.md) |
-| `index` | [*UINT256*](types_solidity.uint256.md) |
-| `amount` | [*Balance*](types_primitives.balance.md) |
-| `winProb` | [*UINT256*](types_solidity.uint256.md) |
-| `channelIteration` | [*UINT256*](types_solidity.uint256.md) |
-| `signature` | [*Signature*](types_primitives.signature.md) |
+| Name               | Type                                         |
+| :----------------- | :------------------------------------------- |
+| `counterparty`     | [_Address_](types_primitives.address.md)     |
+| `challenge`        | [_Address_](types_primitives.address.md)     |
+| `epoch`            | [_UINT256_](types_solidity.uint256.md)       |
+| `index`            | [_UINT256_](types_solidity.uint256.md)       |
+| `amount`           | [_Balance_](types_primitives.balance.md)     |
+| `winProb`          | [_UINT256_](types_solidity.uint256.md)       |
+| `channelIteration` | [_UINT256_](types_solidity.uint256.md)       |
+| `signature`        | [_Signature_](types_primitives.signature.md) |
 
-**Returns:** [*Ticket*](types_ticket.ticket.md)
+**Returns:** [_Ticket_](types_ticket.ticket.md)
 
 Defined in: [types/ticket.ts:47](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/types/ticket.ts#L47)
 
@@ -62,57 +62,57 @@ Defined in: [types/ticket.ts:47](https://github.com/hoprnet/hoprnet/blob/448a47a
 
 ### amount
 
-• `Readonly` **amount**: [*Balance*](types_primitives.balance.md)
+• `Readonly` **amount**: [_Balance_](types_primitives.balance.md)
 
-___
+---
 
 ### challenge
 
-• `Readonly` **challenge**: [*Address*](types_primitives.address.md)
+• `Readonly` **challenge**: [_Address_](types_primitives.address.md)
 
-___
+---
 
 ### channelIteration
 
-• `Readonly` **channelIteration**: [*UINT256*](types_solidity.uint256.md)
+• `Readonly` **channelIteration**: [_UINT256_](types_solidity.uint256.md)
 
-___
+---
 
 ### counterparty
 
-• `Readonly` **counterparty**: [*Address*](types_primitives.address.md)
+• `Readonly` **counterparty**: [_Address_](types_primitives.address.md)
 
-___
+---
 
 ### epoch
 
-• `Readonly` **epoch**: [*UINT256*](types_solidity.uint256.md)
+• `Readonly` **epoch**: [_UINT256_](types_solidity.uint256.md)
 
-___
+---
 
 ### index
 
-• `Readonly` **index**: [*UINT256*](types_solidity.uint256.md)
+• `Readonly` **index**: [_UINT256_](types_solidity.uint256.md)
 
-___
+---
 
 ### signature
 
-• `Readonly` **signature**: [*Signature*](types_primitives.signature.md)
+• `Readonly` **signature**: [_Signature_](types_primitives.signature.md)
 
-___
+---
 
 ### winProb
 
-• `Readonly` **winProb**: [*UINT256*](types_solidity.uint256.md)
+• `Readonly` **winProb**: [_UINT256_](types_solidity.uint256.md)
 
 ## Accessors
 
 ### SIZE
 
-• `Static` get **SIZE**(): *number*
+• `Static` get **SIZE**(): _number_
 
-**Returns:** *number*
+**Returns:** _number_
 
 Defined in: [types/ticket.ts:133](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/types/ticket.ts#L133)
 
@@ -120,17 +120,17 @@ Defined in: [types/ticket.ts:133](https://github.com/hoprnet/hoprnet/blob/448a47
 
 ### getHash
 
-▸ **getHash**(): [*Hash*](types_primitives.hash.md)
+▸ **getHash**(): [_Hash_](types_primitives.hash.md)
 
-**Returns:** [*Hash*](types_primitives.hash.md)
+**Returns:** [_Hash_](types_primitives.hash.md)
 
 Defined in: [types/ticket.ts:117](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/types/ticket.ts#L117)
 
-___
+---
 
 ### isWinningTicket
 
-▸ **isWinningTicket**(`preImage`: [*Hash*](types_primitives.hash.md), `challengeResponse`: [*Hash*](types_primitives.hash.md), `winProb`: [*UINT256*](types_solidity.uint256.md)): *boolean*
+▸ **isWinningTicket**(`preImage`: [_Hash_](types_primitives.hash.md), `challengeResponse`: [_Hash_](types_primitives.hash.md), `winProb`: [_UINT256_](types_solidity.uint256.md)): _boolean_
 
 Decides whether a ticket is a win or not.
 Note that this mimics the on-chain logic.
@@ -140,87 +140,87 @@ a ticket before we submit it to the blockchain.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `preImage` | [*Hash*](types_primitives.hash.md) | preImage of the current onChainSecret |
-| `challengeResponse` | [*Hash*](types_primitives.hash.md) | response that solves the signed challenge |
-| `winProb` | [*UINT256*](types_solidity.uint256.md) | winning probability of the ticket |
+| Name                | Type                                   | Description                               |
+| :------------------ | :------------------------------------- | :---------------------------------------- |
+| `preImage`          | [_Hash_](types_primitives.hash.md)     | preImage of the current onChainSecret     |
+| `challengeResponse` | [_Hash_](types_primitives.hash.md)     | response that solves the signed challenge |
+| `winProb`           | [_UINT256_](types_solidity.uint256.md) | winning probability of the ticket         |
 
-**Returns:** *boolean*
+**Returns:** _boolean_
 
 Defined in: [types/ticket.ts:163](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/types/ticket.ts#L163)
 
-___
+---
 
 ### recoverSigner
 
-▸ **recoverSigner**(): [*PublicKey*](types_primitives.publickey.md)
+▸ **recoverSigner**(): [_PublicKey_](types_primitives.publickey.md)
 
-**Returns:** [*PublicKey*](types_primitives.publickey.md)
+**Returns:** [_PublicKey_](types_primitives.publickey.md)
 
 Defined in: [types/ticket.ts:146](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/types/ticket.ts#L146)
 
-___
+---
 
 ### serialize
 
-▸ **serialize**(): *Uint8Array*
+▸ **serialize**(): _Uint8Array_
 
-**Returns:** *Uint8Array*
+**Returns:** _Uint8Array_
 
 Defined in: [types/ticket.ts:89](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/types/ticket.ts#L89)
 
-___
+---
 
 ### verify
 
-▸ **verify**(`pubKey`: [*PublicKey*](types_primitives.publickey.md)): *boolean*
+▸ **verify**(`pubKey`: [_PublicKey_](types_primitives.publickey.md)): _boolean_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `pubKey` | [*PublicKey*](types_primitives.publickey.md) |
+| Name     | Type                                         |
+| :------- | :------------------------------------------- |
+| `pubKey` | [_PublicKey_](types_primitives.publickey.md) |
 
-**Returns:** *boolean*
+**Returns:** _boolean_
 
 Defined in: [types/ticket.ts:150](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/types/ticket.ts#L150)
 
-___
+---
 
 ### create
 
-▸ `Static` **create**(`counterparty`: [*Address*](types_primitives.address.md), `challenge`: [*PublicKey*](types_primitives.publickey.md), `epoch`: [*UINT256*](types_solidity.uint256.md), `index`: [*UINT256*](types_solidity.uint256.md), `amount`: [*Balance*](types_primitives.balance.md), `winProb`: [*UINT256*](types_solidity.uint256.md), `channelIteration`: [*UINT256*](types_solidity.uint256.md), `signPriv`: *Uint8Array*): [*Ticket*](types_ticket.ticket.md)
+▸ `Static` **create**(`counterparty`: [_Address_](types_primitives.address.md), `challenge`: [_PublicKey_](types_primitives.publickey.md), `epoch`: [_UINT256_](types_solidity.uint256.md), `index`: [_UINT256_](types_solidity.uint256.md), `amount`: [_Balance_](types_primitives.balance.md), `winProb`: [_UINT256_](types_solidity.uint256.md), `channelIteration`: [_UINT256_](types_solidity.uint256.md), `signPriv`: _Uint8Array_): [_Ticket_](types_ticket.ticket.md)
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `counterparty` | [*Address*](types_primitives.address.md) |
-| `challenge` | [*PublicKey*](types_primitives.publickey.md) |
-| `epoch` | [*UINT256*](types_solidity.uint256.md) |
-| `index` | [*UINT256*](types_solidity.uint256.md) |
-| `amount` | [*Balance*](types_primitives.balance.md) |
-| `winProb` | [*UINT256*](types_solidity.uint256.md) |
-| `channelIteration` | [*UINT256*](types_solidity.uint256.md) |
-| `signPriv` | *Uint8Array* |
+| Name               | Type                                         |
+| :----------------- | :------------------------------------------- |
+| `counterparty`     | [_Address_](types_primitives.address.md)     |
+| `challenge`        | [_PublicKey_](types_primitives.publickey.md) |
+| `epoch`            | [_UINT256_](types_solidity.uint256.md)       |
+| `index`            | [_UINT256_](types_solidity.uint256.md)       |
+| `amount`           | [_Balance_](types_primitives.balance.md)     |
+| `winProb`          | [_UINT256_](types_solidity.uint256.md)       |
+| `channelIteration` | [_UINT256_](types_solidity.uint256.md)       |
+| `signPriv`         | _Uint8Array_                                 |
 
-**Returns:** [*Ticket*](types_ticket.ticket.md)
+**Returns:** [_Ticket_](types_ticket.ticket.md)
 
 Defined in: [types/ticket.ts:59](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/types/ticket.ts#L59)
 
-___
+---
 
 ### deserialize
 
-▸ `Static` **deserialize**(`arr`: *Uint8Array*): [*Ticket*](types_ticket.ticket.md)
+▸ `Static` **deserialize**(`arr`: _Uint8Array_): [_Ticket_](types_ticket.ticket.md)
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `arr` | *Uint8Array* |
+| Name  | Type         |
+| :---- | :----------- |
+| `arr` | _Uint8Array_ |
 
-**Returns:** [*Ticket*](types_ticket.ticket.md)
+**Returns:** [_Ticket_](types_ticket.ticket.md)
 
 Defined in: [types/ticket.ts:94](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/types/ticket.ts#L94)

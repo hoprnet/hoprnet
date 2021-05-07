@@ -16,16 +16,16 @@
 
 ### durations
 
-• `Const` **durations**: *object*
+• `Const` **durations**: _object_
 
 #### Type declaration
 
-| Name | Type |
-| :------ | :------ |
-| `days` | (`days`: *number*) => *number* |
-| `hours` | (`hours`: *number*) => *number* |
-| `minutes` | (`minutes`: *number*) => *number* |
-| `seconds` | (`seconds`: *number*) => *number* |
+| Name      | Type                              |
+| :-------- | :-------------------------------- |
+| `days`    | (`days`: _number_) => _number_    |
+| `hours`   | (`hours`: _number_) => _number_   |
+| `minutes` | (`minutes`: _number_) => _number_ |
+| `seconds` | (`seconds`: _number_) => _number_ |
 
 Defined in: [time.ts:1](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/time.ts#L1)
 
@@ -33,19 +33,19 @@ Defined in: [time.ts:1](https://github.com/hoprnet/hoprnet/blob/448a47a/packages
 
 ### isExpired
 
-▸ **isExpired**(`value`: *number*, `now`: *number*, `ttl`: *number*): *boolean*
+▸ **isExpired**(`value`: _number_, `now`: _number_, `ttl`: _number_): _boolean_
 
 Compares timestamps to find out if "value" has expired.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `value` | *number* | timestamp to compare with |
-| `now` | *number* | timestamp example: `new Date().getTime()` |
-| `ttl` | *number* | in milliseconds |
+| Name    | Type     | Description                               |
+| :------ | :------- | :---------------------------------------- |
+| `value` | _number_ | timestamp to compare with                 |
+| `now`   | _number_ | timestamp example: `new Date().getTime()` |
+| `ttl`   | _number_ | in milliseconds                           |
 
-**Returns:** *boolean*
+**Returns:** _boolean_
 
 true if it's expired
 

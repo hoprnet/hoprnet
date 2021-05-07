@@ -28,85 +28,85 @@
 
 Re-exports: [AccountEntry](../classes/types_accountentry.accountentry.md)
 
-___
+---
 
 ### AcknowledgedTicket
 
 Re-exports: [AcknowledgedTicket](../classes/types_acknowledged.acknowledgedticket.md)
 
-___
+---
 
 ### Address
 
 Re-exports: [Address](../classes/types_primitives.address.md)
 
-___
+---
 
 ### Balance
 
 Re-exports: [Balance](../classes/types_primitives.balance.md)
 
-___
+---
 
 ### ChannelEntry
 
 Re-exports: [ChannelEntry](../classes/types_channelentry.channelentry.md)
 
-___
+---
 
 ### ChannelStatus
 
 Re-exports: [ChannelStatus](types_channelentry.md#channelstatus)
 
-___
+---
 
 ### Hash
 
 Re-exports: [Hash](../classes/types_primitives.hash.md)
 
-___
+---
 
 ### NativeBalance
 
 Re-exports: [NativeBalance](../classes/types_primitives.nativebalance.md)
 
-___
+---
 
 ### PublicKey
 
 Re-exports: [PublicKey](../classes/types_primitives.publickey.md)
 
-___
+---
 
 ### Signature
 
 Re-exports: [Signature](../classes/types_primitives.signature.md)
 
-___
+---
 
 ### Snapshot
 
 Re-exports: [Snapshot](../classes/types_snapshot.snapshot.md)
 
-___
+---
 
 ### Ticket
 
 Re-exports: [Ticket](../classes/types_ticket.ticket.md)
 
-___
+---
 
 ### UINT256
 
 Re-exports: [UINT256](../classes/types_solidity.uint256.md)
 
-___
+---
 
 ### UnacknowledgedTicket
 
 Re-exports: [UnacknowledgedTicket](../classes/types_unacknowledgedticket.unacknowledgedticket.md)
 
-___
+---
 
 ### generateChannelId
 

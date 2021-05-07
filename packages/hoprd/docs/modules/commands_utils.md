@@ -6,9 +6,9 @@
 
 ### References
 
-- [CHALK\_STRINGS](commands_utils.md#chalk_strings)
+- [CHALK_STRINGS](commands_utils.md#chalk_strings)
 - [checkPeerIdInput](commands_utils.md#checkpeeridinput)
-- [cli\_options](commands_utils.md#cli_options)
+- [cli_options](commands_utils.md#cli_options)
 - [countSignedTickets](commands_utils.md#countsignedtickets)
 - [decodeMessage](commands_utils.md#decodemessage)
 - [displayHelp](commands_utils.md#displayhelp)
@@ -22,77 +22,77 @@
 
 ## References
 
-### CHALK\_STRINGS
+### CHALK_STRINGS
 
-Re-exports: [CHALK\_STRINGS](commands_utils_displayhelp.md#chalk_strings)
+Re-exports: [CHALK_STRINGS](commands_utils_displayhelp.md#chalk_strings)
 
-___
+---
 
 ### checkPeerIdInput
 
 Re-exports: [checkPeerIdInput](commands_utils_checkpeerid.md#checkpeeridinput)
 
-___
+---
 
-### cli\_options
+### cli_options
 
-Re-exports: [cli\_options](commands_utils_clioptions.md#cli_options)
+Re-exports: [cli_options](commands_utils_clioptions.md#cli_options)
 
-___
+---
 
 ### countSignedTickets
 
 Re-exports: [countSignedTickets](commands_utils_tickets.md#countsignedtickets)
 
-___
+---
 
 ### decodeMessage
 
 Re-exports: [decodeMessage](commands_utils_message.md#decodemessage)
 
-___
+---
 
 ### displayHelp
 
 Re-exports: [displayHelp](commands_utils_displayhelp.md#displayhelp)
 
-___
+---
 
 ### encodeMessage
 
 Re-exports: [encodeMessage](commands_utils_message.md#encodemessage)
 
-___
+---
 
 ### getOptions
 
 Re-exports: [getOptions](commands_utils_displayhelp.md#getoptions)
 
-___
+---
 
 ### getPaddingLength
 
 Re-exports: [getPaddingLength](commands_utils_displayhelp.md#getpaddinglength)
 
-___
+---
 
 ### getPeerIdsAndAliases
 
 Re-exports: [getPeerIdsAndAliases](commands_utils_checkpeerid.md#getpeeridsandaliases)
 
-___
+---
 
 ### knownConnectors
 
 Re-exports: [knownConnectors](commands_utils_knownconnectors.md#knownconnectors)
 
-___
+---
 
 ### styleValue
 
 Re-exports: [styleValue](commands_utils_displayhelp.md#stylevalue)
 
-___
+---
 
 ### toSignedTickets
 

@@ -6,33 +6,33 @@
 
 ### References
 
-- [CHECK\_TIMEOUT](index.md#check_timeout)
-- [DEFAULT\_STUN\_PORT](index.md#default_stun_port)
-- [FULL\_VERSION](index.md#full_version)
-- [HEARTBEAT\_INTERVAL](index.md#heartbeat_interval)
-- [HEARTBEAT\_INTERVAL\_VARIANCE](index.md#heartbeat_interval_variance)
-- [HEARTBEAT\_TIMEOUT](index.md#heartbeat_timeout)
-- [MAX\_AUTO\_CHANNELS](index.md#max_auto_channels)
-- [MAX\_HOPS](index.md#max_hops)
-- [MAX\_NEW\_CHANNELS\_PER\_TICK](index.md#max_new_channels_per_tick)
-- [MAX\_PACKET\_DELAY](index.md#max_packet_delay)
-- [MAX\_PARALLEL\_CONNECTIONS](index.md#max_parallel_connections)
-- [MAX\_PATH\_ITERATIONS](index.md#max_path_iterations)
-- [MINIMUM\_REASONABLE\_CHANNEL\_STAKE](index.md#minimum_reasonable_channel_stake)
-- [MIN\_NATIVE\_BALANCE](index.md#min_native_balance)
+- [CHECK_TIMEOUT](index.md#check_timeout)
+- [DEFAULT_STUN_PORT](index.md#default_stun_port)
+- [FULL_VERSION](index.md#full_version)
+- [HEARTBEAT_INTERVAL](index.md#heartbeat_interval)
+- [HEARTBEAT_INTERVAL_VARIANCE](index.md#heartbeat_interval_variance)
+- [HEARTBEAT_TIMEOUT](index.md#heartbeat_timeout)
+- [MAX_AUTO_CHANNELS](index.md#max_auto_channels)
+- [MAX_HOPS](index.md#max_hops)
+- [MAX_NEW_CHANNELS_PER_TICK](index.md#max_new_channels_per_tick)
+- [MAX_PACKET_DELAY](index.md#max_packet_delay)
+- [MAX_PARALLEL_CONNECTIONS](index.md#max_parallel_connections)
+- [MAX_PATH_ITERATIONS](index.md#max_path_iterations)
+- [MINIMUM_REASONABLE_CHANNEL_STAKE](index.md#minimum_reasonable_channel_stake)
+- [MIN_NATIVE_BALANCE](index.md#min_native_balance)
 - [NAME](index.md#name)
-- [NETWORK\_QUALITY\_THRESHOLD](index.md#network_quality_threshold)
-- [PACKET\_SIZE](index.md#packet_size)
-- [PATH\_RANDOMNESS](index.md#path_randomness)
-- [PROTOCOL\_ACKNOWLEDGEMENT](index.md#protocol_acknowledgement)
-- [PROTOCOL\_HEARTBEAT](index.md#protocol_heartbeat)
-- [PROTOCOL\_ONCHAIN\_KEY](index.md#protocol_onchain_key)
-- [PROTOCOL\_PAYMENT\_CHANNEL](index.md#protocol_payment_channel)
-- [PROTOCOL\_STRING](index.md#protocol_string)
-- [SUGGESTED\_BALANCE](index.md#suggested_balance)
-- [SUGGESTED\_NATIVE\_BALANCE](index.md#suggested_native_balance)
-- [TICKET\_AMOUNT](index.md#ticket_amount)
-- [TICKET\_WIN\_PROB](index.md#ticket_win_prob)
+- [NETWORK_QUALITY_THRESHOLD](index.md#network_quality_threshold)
+- [PACKET_SIZE](index.md#packet_size)
+- [PATH_RANDOMNESS](index.md#path_randomness)
+- [PROTOCOL_ACKNOWLEDGEMENT](index.md#protocol_acknowledgement)
+- [PROTOCOL_HEARTBEAT](index.md#protocol_heartbeat)
+- [PROTOCOL_ONCHAIN_KEY](index.md#protocol_onchain_key)
+- [PROTOCOL_PAYMENT_CHANNEL](index.md#protocol_payment_channel)
+- [PROTOCOL_STRING](index.md#protocol_string)
+- [SUGGESTED_BALANCE](index.md#suggested_balance)
+- [SUGGESTED_NATIVE_BALANCE](index.md#suggested_native_balance)
+- [TICKET_AMOUNT](index.md#ticket_amount)
+- [TICKET_WIN_PROB](index.md#ticket_win_prob)
 - [VERSION](index.md#version)
 
 ### Namespaces
@@ -52,167 +52,167 @@
 
 ## References
 
-### CHECK\_TIMEOUT
+### CHECK_TIMEOUT
 
-Re-exports: [CHECK\_TIMEOUT](constants.md#check_timeout)
+Re-exports: [CHECK_TIMEOUT](constants.md#check_timeout)
 
-___
+---
 
-### DEFAULT\_STUN\_PORT
+### DEFAULT_STUN_PORT
 
-Re-exports: [DEFAULT\_STUN\_PORT](constants.md#default_stun_port)
+Re-exports: [DEFAULT_STUN_PORT](constants.md#default_stun_port)
 
-___
+---
 
-### FULL\_VERSION
+### FULL_VERSION
 
-Re-exports: [FULL\_VERSION](constants.md#full_version)
+Re-exports: [FULL_VERSION](constants.md#full_version)
 
-___
+---
 
-### HEARTBEAT\_INTERVAL
+### HEARTBEAT_INTERVAL
 
-Re-exports: [HEARTBEAT\_INTERVAL](constants.md#heartbeat_interval)
+Re-exports: [HEARTBEAT_INTERVAL](constants.md#heartbeat_interval)
 
-___
+---
 
-### HEARTBEAT\_INTERVAL\_VARIANCE
+### HEARTBEAT_INTERVAL_VARIANCE
 
-Re-exports: [HEARTBEAT\_INTERVAL\_VARIANCE](constants.md#heartbeat_interval_variance)
+Re-exports: [HEARTBEAT_INTERVAL_VARIANCE](constants.md#heartbeat_interval_variance)
 
-___
+---
 
-### HEARTBEAT\_TIMEOUT
+### HEARTBEAT_TIMEOUT
 
-Re-exports: [HEARTBEAT\_TIMEOUT](constants.md#heartbeat_timeout)
+Re-exports: [HEARTBEAT_TIMEOUT](constants.md#heartbeat_timeout)
 
-___
+---
 
-### MAX\_AUTO\_CHANNELS
+### MAX_AUTO_CHANNELS
 
-Re-exports: [MAX\_AUTO\_CHANNELS](constants.md#max_auto_channels)
+Re-exports: [MAX_AUTO_CHANNELS](constants.md#max_auto_channels)
 
-___
+---
 
-### MAX\_HOPS
+### MAX_HOPS
 
-Re-exports: [MAX\_HOPS](constants.md#max_hops)
+Re-exports: [MAX_HOPS](constants.md#max_hops)
 
-___
+---
 
-### MAX\_NEW\_CHANNELS\_PER\_TICK
+### MAX_NEW_CHANNELS_PER_TICK
 
-Re-exports: [MAX\_NEW\_CHANNELS\_PER\_TICK](constants.md#max_new_channels_per_tick)
+Re-exports: [MAX_NEW_CHANNELS_PER_TICK](constants.md#max_new_channels_per_tick)
 
-___
+---
 
-### MAX\_PACKET\_DELAY
+### MAX_PACKET_DELAY
 
-Re-exports: [MAX\_PACKET\_DELAY](constants.md#max_packet_delay)
+Re-exports: [MAX_PACKET_DELAY](constants.md#max_packet_delay)
 
-___
+---
 
-### MAX\_PARALLEL\_CONNECTIONS
+### MAX_PARALLEL_CONNECTIONS
 
-Re-exports: [MAX\_PARALLEL\_CONNECTIONS](constants.md#max_parallel_connections)
+Re-exports: [MAX_PARALLEL_CONNECTIONS](constants.md#max_parallel_connections)
 
-___
+---
 
-### MAX\_PATH\_ITERATIONS
+### MAX_PATH_ITERATIONS
 
-Re-exports: [MAX\_PATH\_ITERATIONS](constants.md#max_path_iterations)
+Re-exports: [MAX_PATH_ITERATIONS](constants.md#max_path_iterations)
 
-___
+---
 
-### MINIMUM\_REASONABLE\_CHANNEL\_STAKE
+### MINIMUM_REASONABLE_CHANNEL_STAKE
 
-Re-exports: [MINIMUM\_REASONABLE\_CHANNEL\_STAKE](constants.md#minimum_reasonable_channel_stake)
+Re-exports: [MINIMUM_REASONABLE_CHANNEL_STAKE](constants.md#minimum_reasonable_channel_stake)
 
-___
+---
 
-### MIN\_NATIVE\_BALANCE
+### MIN_NATIVE_BALANCE
 
-Re-exports: [MIN\_NATIVE\_BALANCE](constants.md#min_native_balance)
+Re-exports: [MIN_NATIVE_BALANCE](constants.md#min_native_balance)
 
-___
+---
 
 ### NAME
 
 Re-exports: [NAME](constants.md#name)
 
-___
+---
 
-### NETWORK\_QUALITY\_THRESHOLD
+### NETWORK_QUALITY_THRESHOLD
 
-Re-exports: [NETWORK\_QUALITY\_THRESHOLD](constants.md#network_quality_threshold)
+Re-exports: [NETWORK_QUALITY_THRESHOLD](constants.md#network_quality_threshold)
 
-___
+---
 
-### PACKET\_SIZE
+### PACKET_SIZE
 
-Re-exports: [PACKET\_SIZE](constants.md#packet_size)
+Re-exports: [PACKET_SIZE](constants.md#packet_size)
 
-___
+---
 
-### PATH\_RANDOMNESS
+### PATH_RANDOMNESS
 
-Re-exports: [PATH\_RANDOMNESS](constants.md#path_randomness)
+Re-exports: [PATH_RANDOMNESS](constants.md#path_randomness)
 
-___
+---
 
-### PROTOCOL\_ACKNOWLEDGEMENT
+### PROTOCOL_ACKNOWLEDGEMENT
 
-Re-exports: [PROTOCOL\_ACKNOWLEDGEMENT](constants.md#protocol_acknowledgement)
+Re-exports: [PROTOCOL_ACKNOWLEDGEMENT](constants.md#protocol_acknowledgement)
 
-___
+---
 
-### PROTOCOL\_HEARTBEAT
+### PROTOCOL_HEARTBEAT
 
-Re-exports: [PROTOCOL\_HEARTBEAT](constants.md#protocol_heartbeat)
+Re-exports: [PROTOCOL_HEARTBEAT](constants.md#protocol_heartbeat)
 
-___
+---
 
-### PROTOCOL\_ONCHAIN\_KEY
+### PROTOCOL_ONCHAIN_KEY
 
-Re-exports: [PROTOCOL\_ONCHAIN\_KEY](constants.md#protocol_onchain_key)
+Re-exports: [PROTOCOL_ONCHAIN_KEY](constants.md#protocol_onchain_key)
 
-___
+---
 
-### PROTOCOL\_PAYMENT\_CHANNEL
+### PROTOCOL_PAYMENT_CHANNEL
 
-Re-exports: [PROTOCOL\_PAYMENT\_CHANNEL](constants.md#protocol_payment_channel)
+Re-exports: [PROTOCOL_PAYMENT_CHANNEL](constants.md#protocol_payment_channel)
 
-___
+---
 
-### PROTOCOL\_STRING
+### PROTOCOL_STRING
 
-Re-exports: [PROTOCOL\_STRING](constants.md#protocol_string)
+Re-exports: [PROTOCOL_STRING](constants.md#protocol_string)
 
-___
+---
 
-### SUGGESTED\_BALANCE
+### SUGGESTED_BALANCE
 
-Re-exports: [SUGGESTED\_BALANCE](constants.md#suggested_balance)
+Re-exports: [SUGGESTED_BALANCE](constants.md#suggested_balance)
 
-___
+---
 
-### SUGGESTED\_NATIVE\_BALANCE
+### SUGGESTED_NATIVE_BALANCE
 
-Re-exports: [SUGGESTED\_NATIVE\_BALANCE](constants.md#suggested_native_balance)
+Re-exports: [SUGGESTED_NATIVE_BALANCE](constants.md#suggested_native_balance)
 
-___
+---
 
-### TICKET\_AMOUNT
+### TICKET_AMOUNT
 
-Re-exports: [TICKET\_AMOUNT](constants.md#ticket_amount)
+Re-exports: [TICKET_AMOUNT](constants.md#ticket_amount)
 
-___
+---
 
-### TICKET\_WIN\_PROB
+### TICKET_WIN_PROB
 
-Re-exports: [TICKET\_WIN\_PROB](constants.md#ticket_win_prob)
+Re-exports: [TICKET_WIN_PROB](constants.md#ticket_win_prob)
 
-___
+---
 
 ### VERSION
 
@@ -222,40 +222,40 @@ Re-exports: [VERSION](constants.md#version)
 
 ### ChannelStrategyNames
 
-Ƭ **ChannelStrategyNames**: ``"passive"`` \| ``"promiscuous"``
+Ƭ **ChannelStrategyNames**: `"passive"` \| `"promiscuous"`
 
 Defined in: [packages/core/src/index.ts:66](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/index.ts#L66)
 
-___
+---
 
 ### HoprOptions
 
-Ƭ **HoprOptions**: *object*
+Ƭ **HoprOptions**: _object_
 
 #### Type declaration
 
-| Name | Type |
-| :------ | :------ |
-| `announce?` | *boolean* |
-| `connector?` | HoprCoreEthereum |
-| `createDbIfNotExist?` | *boolean* |
-| `dbPath?` | *string* |
-| `hosts?` | *object* |
-| `hosts.ip4?` | NetOptions |
-| `hosts.ip6?` | NetOptions |
-| `network` | *string* |
-| `password?` | *string* |
-| `provider` | *string* |
-| `strategy?` | [*ChannelStrategyNames*](index.md#channelstrategynames) |
-| `ticketAmount?` | *number* |
-| `ticketWinProb?` | *number* |
+| Name                  | Type                                                    |
+| :-------------------- | :------------------------------------------------------ |
+| `announce?`           | _boolean_                                               |
+| `connector?`          | HoprCoreEthereum                                        |
+| `createDbIfNotExist?` | _boolean_                                               |
+| `dbPath?`             | _string_                                                |
+| `hosts?`              | _object_                                                |
+| `hosts.ip4?`          | NetOptions                                              |
+| `hosts.ip6?`          | NetOptions                                              |
+| `network`             | _string_                                                |
+| `password?`           | _string_                                                |
+| `provider`            | _string_                                                |
+| `strategy?`           | [_ChannelStrategyNames_](index.md#channelstrategynames) |
+| `ticketAmount?`       | _number_                                                |
+| `ticketWinProb?`      | _number_                                                |
 
 Defined in: [packages/core/src/index.ts:68](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/index.ts#L68)
 
-___
+---
 
 ### NodeStatus
 
-Ƭ **NodeStatus**: ``"UNINITIALIZED"`` \| ``"INITIALIZING"`` \| ``"RUNNING"`` \| ``"DESTROYED"``
+Ƭ **NodeStatus**: `"UNINITIALIZED"` \| `"INITIALIZING"` \| `"RUNNING"` \| `"DESTROYED"`
 
 Defined in: [packages/core/src/index.ts:85](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/index.ts#L85)

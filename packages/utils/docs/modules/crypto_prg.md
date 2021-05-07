@@ -14,45 +14,45 @@
 
 ### Variables
 
-- [PRG\_COUNTER\_LENGTH](crypto_prg.md#prg_counter_length)
-- [PRG\_IV\_LENGTH](crypto_prg.md#prg_iv_length)
-- [PRG\_KEY\_LENGTH](crypto_prg.md#prg_key_length)
+- [PRG_COUNTER_LENGTH](crypto_prg.md#prg_counter_length)
+- [PRG_IV_LENGTH](crypto_prg.md#prg_iv_length)
+- [PRG_KEY_LENGTH](crypto_prg.md#prg_key_length)
 
 ## Type aliases
 
 ### PRGParameters
 
-Ƭ **PRGParameters**: *object*
+Ƭ **PRGParameters**: _object_
 
 #### Type declaration
 
-| Name | Type |
-| :------ | :------ |
-| `iv` | Uint8Array |
+| Name  | Type       |
+| :---- | :--------- |
+| `iv`  | Uint8Array |
 | `key` | Uint8Array |
 
 Defined in: [crypto/prg.ts:11](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/crypto/prg.ts#L11)
 
 ## Variables
 
-### PRG\_COUNTER\_LENGTH
+### PRG_COUNTER_LENGTH
 
-• `Const` **PRG\_COUNTER\_LENGTH**: ``4``= 4
+• `Const` **PRG_COUNTER_LENGTH**: `4`= 4
 
 Defined in: [crypto/prg.ts:7](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/crypto/prg.ts#L7)
 
-___
+---
 
-### PRG\_IV\_LENGTH
+### PRG_IV_LENGTH
 
-• `Const` **PRG\_IV\_LENGTH**: ``12``= 12
+• `Const` **PRG_IV_LENGTH**: `12`= 12
 
 Defined in: [crypto/prg.ts:6](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/crypto/prg.ts#L6)
 
-___
+---
 
-### PRG\_KEY\_LENGTH
+### PRG_KEY_LENGTH
 
-• `Const` **PRG\_KEY\_LENGTH**: ``16``
+• `Const` **PRG_KEY_LENGTH**: `16`
 
 Defined in: [crypto/prg.ts:5](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/crypto/prg.ts#L5)

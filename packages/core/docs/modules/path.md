@@ -24,22 +24,22 @@ Defined in: [packages/core/src/path/index.ts:10](https://github.com/hoprnet/hopr
 
 ### findPath
 
-▸ **findPath**(`start`: PeerId, `destination`: PeerId, `hops`: *number*, `networkPeers`: [*default*](../classes/network_network_peers.default.md), `getChannelsFromPeer`: (`p`: PeerId) => *Promise*<Edge[]\>, `randomness`: *number*): *Promise*<[*Path*](path.md#path)\>
+▸ **findPath**(`start`: PeerId, `destination`: PeerId, `hops`: _number_, `networkPeers`: [_default_](../classes/network_network_peers.default.md), `getChannelsFromPeer`: (`p`: PeerId) => _Promise_<Edge[]\>, `randomness`: _number_): _Promise_<[_Path_](path.md#path)\>
 
 Find a path through the payment channels.
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `start` | PeerId |
-| `destination` | PeerId |
-| `hops` | *number* |
-| `networkPeers` | [*default*](../classes/network_network_peers.default.md) |
-| `getChannelsFromPeer` | (`p`: PeerId) => *Promise*<Edge[]\> |
-| `randomness` | *number* |
+| Name                  | Type                                                     |
+| :-------------------- | :------------------------------------------------------- |
+| `start`               | PeerId                                                   |
+| `destination`         | PeerId                                                   |
+| `hops`                | _number_                                                 |
+| `networkPeers`        | [_default_](../classes/network_network_peers.default.md) |
+| `getChannelsFromPeer` | (`p`: PeerId) => _Promise_<Edge[]\>                      |
+| `randomness`          | _number_                                                 |
 
-**Returns:** *Promise*<[*Path*](path.md#path)\>
+**Returns:** _Promise_<[_Path_](path.md#path)\>
 
 path as Array<PeerId> (including start, but not including
 destination

@@ -33,17 +33,17 @@
 
 ### constructor
 
-\+ **new AccountEntry**(`address`: [*Address*](types_primitives.address.md), `multiAddr`: *Multiaddr*, `updatedBlock`: *BN*): [*AccountEntry*](types_accountentry.accountentry.md)
+\+ **new AccountEntry**(`address`: [_Address_](types_primitives.address.md), `multiAddr`: _Multiaddr_, `updatedBlock`: _BN_): [_AccountEntry_](types_accountentry.accountentry.md)
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `address` | [*Address*](types_primitives.address.md) |
-| `multiAddr` | *Multiaddr* |
-| `updatedBlock` | *BN* |
+| Name           | Type                                     |
+| :------------- | :--------------------------------------- |
+| `address`      | [_Address_](types_primitives.address.md) |
+| `multiAddr`    | _Multiaddr_                              |
+| `updatedBlock` | _BN_                                     |
 
-**Returns:** [*AccountEntry*](types_accountentry.accountentry.md)
+**Returns:** [_AccountEntry_](types_accountentry.accountentry.md)
 
 Defined in: [types/accountEntry.ts:8](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/types/accountEntry.ts#L8)
 
@@ -51,27 +51,27 @@ Defined in: [types/accountEntry.ts:8](https://github.com/hoprnet/hoprnet/blob/44
 
 ### address
 
-• `Readonly` **address**: [*Address*](types_primitives.address.md)
+• `Readonly` **address**: [_Address_](types_primitives.address.md)
 
-___
+---
 
 ### multiAddr
 
-• `Readonly` **multiAddr**: *Multiaddr*
+• `Readonly` **multiAddr**: _Multiaddr_
 
-___
+---
 
 ### updatedBlock
 
-• `Readonly` **updatedBlock**: *BN*
+• `Readonly` **updatedBlock**: _BN_
 
 ## Accessors
 
 ### SIZE
 
-• `Static` get **SIZE**(): *number*
+• `Static` get **SIZE**(): _number_
 
-**Returns:** *number*
+**Returns:** _number_
 
 Defined in: [types/accountEntry.ts:15](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/types/accountEntry.ts#L15)
 
@@ -79,64 +79,64 @@ Defined in: [types/accountEntry.ts:15](https://github.com/hoprnet/hoprnet/blob/4
 
 ### containsRouting
 
-▸ **containsRouting**(): *boolean*
+▸ **containsRouting**(): _boolean_
 
-**Returns:** *boolean*
+**Returns:** _boolean_
 
 Defined in: [types/accountEntry.ts:51](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/types/accountEntry.ts#L51)
 
-___
+---
 
 ### getPeerId
 
-▸ **getPeerId**(): *PeerId*
+▸ **getPeerId**(): _PeerId_
 
-**Returns:** *PeerId*
+**Returns:** _PeerId_
 
 Defined in: [types/accountEntry.ts:43](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/types/accountEntry.ts#L43)
 
-___
+---
 
 ### getPublicKey
 
-▸ **getPublicKey**(): [*PublicKey*](types_primitives.publickey.md)
+▸ **getPublicKey**(): [_PublicKey_](types_primitives.publickey.md)
 
-**Returns:** [*PublicKey*](types_primitives.publickey.md)
+**Returns:** [_PublicKey_](types_primitives.publickey.md)
 
 Defined in: [types/accountEntry.ts:47](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/types/accountEntry.ts#L47)
 
-___
+---
 
 ### hasAnnounced
 
-▸ **hasAnnounced**(): *boolean*
+▸ **hasAnnounced**(): _boolean_
 
-**Returns:** *boolean*
+**Returns:** _boolean_
 
 Defined in: [types/accountEntry.ts:56](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/types/accountEntry.ts#L56)
 
-___
+---
 
 ### serialize
 
-▸ **serialize**(): *Uint8Array*
+▸ **serialize**(): _Uint8Array_
 
-**Returns:** *Uint8Array*
+**Returns:** _Uint8Array_
 
 Defined in: [types/accountEntry.ts:30](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/types/accountEntry.ts#L30)
 
-___
+---
 
 ### deserialize
 
-▸ `Static` **deserialize**(`arr`: *Uint8Array*): [*AccountEntry*](types_accountentry.accountentry.md)
+▸ `Static` **deserialize**(`arr`: _Uint8Array_): [_AccountEntry_](types_accountentry.accountentry.md)
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `arr` | *Uint8Array* |
+| Name  | Type         |
+| :---- | :----------- |
+| `arr` | _Uint8Array_ |
 
-**Returns:** [*AccountEntry*](types_accountentry.accountentry.md)
+**Returns:** [_AccountEntry_](types_accountentry.accountentry.md)
 
 Defined in: [types/accountEntry.ts:19](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/types/accountEntry.ts#L19)

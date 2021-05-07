@@ -12,21 +12,21 @@
 
 ### cacheNoArgAsyncFunction
 
-▸ **cacheNoArgAsyncFunction**<T\>(`func`: () => *Promise*<T\>, `expiry`: *number*): *function*
+▸ **cacheNoArgAsyncFunction**<T\>(`func`: () => _Promise_<T\>, `expiry`: _number_): _function_
 
 #### Type parameters
 
 | Name |
-| :------ |
-| `T` |
+| :--- |
+| `T`  |
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `func` | () => *Promise*<T\> |
-| `expiry` | *number* |
+| Name     | Type                |
+| :------- | :------------------ |
+| `func`   | () => _Promise_<T\> |
+| `expiry` | _number_            |
 
-**Returns:** () => *Promise*<T\>
+**Returns:** () => _Promise_<T\>
 
 Defined in: [cache.ts:3](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/cache.ts#L3)

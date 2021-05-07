@@ -6,7 +6,7 @@
 
 ## Hierarchy
 
-- *Interface*
+- _Interface_
 
   ↳ **HoprDistributorInterface**
 
@@ -47,37 +47,37 @@
 
 ### \_abiCoder
 
-• `Readonly` **\_abiCoder**: *AbiCoder*
+• `Readonly` **\_abiCoder**: _AbiCoder_
 
 Inherited from: ethers.utils.Interface.\_abiCoder
 
 Defined in: node_modules/@ethersproject/abi/lib/interface.d.ts:43
 
-___
+---
 
 ### \_isInterface
 
-• `Readonly` **\_isInterface**: *boolean*
+• `Readonly` **\_isInterface**: _boolean_
 
 Inherited from: ethers.utils.Interface.\_isInterface
 
 Defined in: node_modules/@ethersproject/abi/lib/interface.d.ts:44
 
-___
+---
 
 ### deploy
 
-• `Readonly` **deploy**: *ConstructorFragment*
+• `Readonly` **deploy**: _ConstructorFragment_
 
 Inherited from: ethers.utils.Interface.deploy
 
 Defined in: node_modules/@ethersproject/abi/lib/interface.d.ts:42
 
-___
+---
 
 ### errors
 
-• `Readonly` **errors**: *object*
+• `Readonly` **errors**: _object_
 
 #### Type declaration
 
@@ -85,73 +85,73 @@ Inherited from: ethers.utils.Interface.errors
 
 Defined in: node_modules/@ethersproject/abi/lib/interface.d.ts:30
 
-___
+---
 
 ### events
 
-• **events**: *object*
+• **events**: _object_
 
 #### Type declaration
 
-| Name | Type |
-| :------ | :------ |
-| `AllocationAdded(address,uint128,string)` | *EventFragment* |
-| `Claimed(address,uint128,string)` | *EventFragment* |
-| `OwnershipTransferred(address,address)` | *EventFragment* |
-| `ScheduleAdded(uint128[],uint128[],string)` | *EventFragment* |
+| Name                                        | Type            |
+| :------------------------------------------ | :-------------- |
+| `AllocationAdded(address,uint128,string)`   | _EventFragment_ |
+| `Claimed(address,uint128,string)`           | _EventFragment_ |
+| `OwnershipTransferred(address,address)`     | _EventFragment_ |
+| `ScheduleAdded(uint128[],uint128[],string)` | _EventFragment_ |
 
 Overrides: ethers.utils.Interface.events
 
 Defined in: packages/core-ethereum/src/contracts/HoprDistributor.d.ts:157
 
-___
+---
 
 ### fragments
 
-• `Readonly` **fragments**: readonly *Fragment*[]
+• `Readonly` **fragments**: readonly _Fragment_[]
 
 Inherited from: ethers.utils.Interface.fragments
 
 Defined in: node_modules/@ethersproject/abi/lib/interface.d.ts:29
 
-___
+---
 
 ### functions
 
-• **functions**: *object*
+• **functions**: _object_
 
 #### Type declaration
 
-| Name | Type |
-| :------ | :------ |
-| `MULTIPLIER()` | *FunctionFragment* |
-| `addAllocations(address[],uint128[],string)` | *FunctionFragment* |
-| `addSchedule(uint128[],uint128[],string)` | *FunctionFragment* |
-| `allocations(address,string)` | *FunctionFragment* |
-| `claim(string)` | *FunctionFragment* |
-| `claimFor(address,string)` | *FunctionFragment* |
-| `getClaimable(address,string)` | *FunctionFragment* |
-| `getSchedule(string)` | *FunctionFragment* |
-| `maxMintAmount()` | *FunctionFragment* |
-| `owner()` | *FunctionFragment* |
-| `renounceOwnership()` | *FunctionFragment* |
-| `revokeAccount(address,string)` | *FunctionFragment* |
-| `startTime()` | *FunctionFragment* |
-| `token()` | *FunctionFragment* |
-| `totalMinted()` | *FunctionFragment* |
-| `totalToBeMinted()` | *FunctionFragment* |
-| `transferOwnership(address)` | *FunctionFragment* |
-| `updateStartTime(uint128)` | *FunctionFragment* |
+| Name                                         | Type               |
+| :------------------------------------------- | :----------------- |
+| `MULTIPLIER()`                               | _FunctionFragment_ |
+| `addAllocations(address[],uint128[],string)` | _FunctionFragment_ |
+| `addSchedule(uint128[],uint128[],string)`    | _FunctionFragment_ |
+| `allocations(address,string)`                | _FunctionFragment_ |
+| `claim(string)`                              | _FunctionFragment_ |
+| `claimFor(address,string)`                   | _FunctionFragment_ |
+| `getClaimable(address,string)`               | _FunctionFragment_ |
+| `getSchedule(string)`                        | _FunctionFragment_ |
+| `maxMintAmount()`                            | _FunctionFragment_ |
+| `owner()`                                    | _FunctionFragment_ |
+| `renounceOwnership()`                        | _FunctionFragment_ |
+| `revokeAccount(address,string)`              | _FunctionFragment_ |
+| `startTime()`                                | _FunctionFragment_ |
+| `token()`                                    | _FunctionFragment_ |
+| `totalMinted()`                              | _FunctionFragment_ |
+| `totalToBeMinted()`                          | _FunctionFragment_ |
+| `transferOwnership(address)`                 | _FunctionFragment_ |
+| `updateStartTime(uint128)`                   | _FunctionFragment_ |
 
 Overrides: ethers.utils.Interface.functions
 
 Defined in: packages/core-ethereum/src/contracts/HoprDistributor.d.ts:23
 
-___
+---
 
 ### structs
 
-• `Readonly` **structs**: *object*
+• `Readonly` **structs**: _object_
 
 #### Type declaration
 
@@ -163,874 +163,874 @@ Defined in: node_modules/@ethersproject/abi/lib/interface.d.ts:39
 
 ### \_decodeParams
 
-▸ **_decodeParams**(`params`: readonly *ParamType*[], `data`: BytesLike): *Result*
+▸ **\_decodeParams**(`params`: readonly _ParamType_[], `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `params` | readonly *ParamType*[] |
-| `data` | BytesLike |
+| Name     | Type                   |
+| :------- | :--------------------- |
+| `params` | readonly _ParamType_[] |
+| `data`   | BytesLike              |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Inherited from: ethers.utils.Interface.\_decodeParams
 
 Defined in: node_modules/@ethersproject/abi/lib/interface.d.ts:55
 
-___
+---
 
 ### \_encodeParams
 
-▸ **_encodeParams**(`params`: readonly *ParamType*[], `values`: readonly *any*[]): *string*
+▸ **\_encodeParams**(`params`: readonly _ParamType_[], `values`: readonly _any_[]): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `params` | readonly *ParamType*[] |
-| `values` | readonly *any*[] |
+| Name     | Type                   |
+| :------- | :--------------------- |
+| `params` | readonly _ParamType_[] |
+| `values` | readonly _any_[]       |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Inherited from: ethers.utils.Interface.\_encodeParams
 
 Defined in: node_modules/@ethersproject/abi/lib/interface.d.ts:56
 
-___
+---
 
 ### decodeEventLog
 
-▸ **decodeEventLog**(`eventFragment`: *string* \| *EventFragment*, `data`: BytesLike, `topics?`: readonly *string*[]): *Result*
+▸ **decodeEventLog**(`eventFragment`: _string_ \| _EventFragment_, `data`: BytesLike, `topics?`: readonly _string_[]): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `eventFragment` | *string* \| *EventFragment* |
-| `data` | BytesLike |
-| `topics?` | readonly *string*[] |
+| Name            | Type                        |
+| :-------------- | :-------------------------- |
+| `eventFragment` | _string_ \| _EventFragment_ |
+| `data`          | BytesLike                   |
+| `topics?`       | readonly _string_[]         |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Inherited from: ethers.utils.Interface.decodeEventLog
 
 Defined in: node_modules/@ethersproject/abi/lib/interface.d.ts:67
 
-___
+---
 
 ### decodeFunctionData
 
-▸ **decodeFunctionData**(`functionFragment`: *string* \| *FunctionFragment*, `data`: BytesLike): *Result*
+▸ **decodeFunctionData**(`functionFragment`: _string_ \| _FunctionFragment_, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | *string* \| *FunctionFragment* |
-| `data` | BytesLike |
+| Name               | Type                           |
+| :----------------- | :----------------------------- |
+| `functionFragment` | _string_ \| _FunctionFragment_ |
+| `data`             | BytesLike                      |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Inherited from: ethers.utils.Interface.decodeFunctionData
 
 Defined in: node_modules/@ethersproject/abi/lib/interface.d.ts:58
 
-___
+---
 
 ### decodeFunctionResult
 
-▸ **decodeFunctionResult**(`functionFragment`: ``"MULTIPLIER"``, `data`: BytesLike): *Result*
+▸ **decodeFunctionResult**(`functionFragment`: `"MULTIPLIER"`, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"MULTIPLIER"`` |
-| `data` | BytesLike |
+| Name               | Type           |
+| :----------------- | :------------- |
+| `functionFragment` | `"MULTIPLIER"` |
+| `data`             | BytesLike      |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Overrides: ethers.utils.Interface.decodeFunctionResult
 
 Defined in: packages/core-ethereum/src/contracts/HoprDistributor.d.ts:102
 
-▸ **decodeFunctionResult**(`functionFragment`: ``"addAllocations"``, `data`: BytesLike): *Result*
+▸ **decodeFunctionResult**(`functionFragment`: `"addAllocations"`, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"addAllocations"`` |
-| `data` | BytesLike |
+| Name               | Type               |
+| :----------------- | :----------------- |
+| `functionFragment` | `"addAllocations"` |
+| `data`             | BytesLike          |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Overrides: ethers.utils.Interface.decodeFunctionResult
 
 Defined in: packages/core-ethereum/src/contracts/HoprDistributor.d.ts:103
 
-▸ **decodeFunctionResult**(`functionFragment`: ``"addSchedule"``, `data`: BytesLike): *Result*
+▸ **decodeFunctionResult**(`functionFragment`: `"addSchedule"`, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"addSchedule"`` |
-| `data` | BytesLike |
+| Name               | Type            |
+| :----------------- | :-------------- |
+| `functionFragment` | `"addSchedule"` |
+| `data`             | BytesLike       |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Overrides: ethers.utils.Interface.decodeFunctionResult
 
 Defined in: packages/core-ethereum/src/contracts/HoprDistributor.d.ts:107
 
-▸ **decodeFunctionResult**(`functionFragment`: ``"allocations"``, `data`: BytesLike): *Result*
+▸ **decodeFunctionResult**(`functionFragment`: `"allocations"`, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"allocations"`` |
-| `data` | BytesLike |
+| Name               | Type            |
+| :----------------- | :-------------- |
+| `functionFragment` | `"allocations"` |
+| `data`             | BytesLike       |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Overrides: ethers.utils.Interface.decodeFunctionResult
 
 Defined in: packages/core-ethereum/src/contracts/HoprDistributor.d.ts:111
 
-▸ **decodeFunctionResult**(`functionFragment`: ``"claim"``, `data`: BytesLike): *Result*
+▸ **decodeFunctionResult**(`functionFragment`: `"claim"`, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"claim"`` |
-| `data` | BytesLike |
+| Name               | Type      |
+| :----------------- | :-------- |
+| `functionFragment` | `"claim"` |
+| `data`             | BytesLike |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Overrides: ethers.utils.Interface.decodeFunctionResult
 
 Defined in: packages/core-ethereum/src/contracts/HoprDistributor.d.ts:115
 
-▸ **decodeFunctionResult**(`functionFragment`: ``"claimFor"``, `data`: BytesLike): *Result*
+▸ **decodeFunctionResult**(`functionFragment`: `"claimFor"`, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"claimFor"`` |
-| `data` | BytesLike |
+| Name               | Type         |
+| :----------------- | :----------- |
+| `functionFragment` | `"claimFor"` |
+| `data`             | BytesLike    |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Overrides: ethers.utils.Interface.decodeFunctionResult
 
 Defined in: packages/core-ethereum/src/contracts/HoprDistributor.d.ts:116
 
-▸ **decodeFunctionResult**(`functionFragment`: ``"getClaimable"``, `data`: BytesLike): *Result*
+▸ **decodeFunctionResult**(`functionFragment`: `"getClaimable"`, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"getClaimable"`` |
-| `data` | BytesLike |
+| Name               | Type             |
+| :----------------- | :--------------- |
+| `functionFragment` | `"getClaimable"` |
+| `data`             | BytesLike        |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Overrides: ethers.utils.Interface.decodeFunctionResult
 
 Defined in: packages/core-ethereum/src/contracts/HoprDistributor.d.ts:117
 
-▸ **decodeFunctionResult**(`functionFragment`: ``"getSchedule"``, `data`: BytesLike): *Result*
+▸ **decodeFunctionResult**(`functionFragment`: `"getSchedule"`, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"getSchedule"`` |
-| `data` | BytesLike |
+| Name               | Type            |
+| :----------------- | :-------------- |
+| `functionFragment` | `"getSchedule"` |
+| `data`             | BytesLike       |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Overrides: ethers.utils.Interface.decodeFunctionResult
 
 Defined in: packages/core-ethereum/src/contracts/HoprDistributor.d.ts:121
 
-▸ **decodeFunctionResult**(`functionFragment`: ``"maxMintAmount"``, `data`: BytesLike): *Result*
+▸ **decodeFunctionResult**(`functionFragment`: `"maxMintAmount"`, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"maxMintAmount"`` |
-| `data` | BytesLike |
+| Name               | Type              |
+| :----------------- | :---------------- |
+| `functionFragment` | `"maxMintAmount"` |
+| `data`             | BytesLike         |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Overrides: ethers.utils.Interface.decodeFunctionResult
 
 Defined in: packages/core-ethereum/src/contracts/HoprDistributor.d.ts:125
 
-▸ **decodeFunctionResult**(`functionFragment`: ``"owner"``, `data`: BytesLike): *Result*
+▸ **decodeFunctionResult**(`functionFragment`: `"owner"`, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"owner"`` |
-| `data` | BytesLike |
+| Name               | Type      |
+| :----------------- | :-------- |
+| `functionFragment` | `"owner"` |
+| `data`             | BytesLike |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Overrides: ethers.utils.Interface.decodeFunctionResult
 
 Defined in: packages/core-ethereum/src/contracts/HoprDistributor.d.ts:129
 
-▸ **decodeFunctionResult**(`functionFragment`: ``"renounceOwnership"``, `data`: BytesLike): *Result*
+▸ **decodeFunctionResult**(`functionFragment`: `"renounceOwnership"`, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"renounceOwnership"`` |
-| `data` | BytesLike |
+| Name               | Type                  |
+| :----------------- | :-------------------- |
+| `functionFragment` | `"renounceOwnership"` |
+| `data`             | BytesLike             |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Overrides: ethers.utils.Interface.decodeFunctionResult
 
 Defined in: packages/core-ethereum/src/contracts/HoprDistributor.d.ts:130
 
-▸ **decodeFunctionResult**(`functionFragment`: ``"revokeAccount"``, `data`: BytesLike): *Result*
+▸ **decodeFunctionResult**(`functionFragment`: `"revokeAccount"`, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"revokeAccount"`` |
-| `data` | BytesLike |
+| Name               | Type              |
+| :----------------- | :---------------- |
+| `functionFragment` | `"revokeAccount"` |
+| `data`             | BytesLike         |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Overrides: ethers.utils.Interface.decodeFunctionResult
 
 Defined in: packages/core-ethereum/src/contracts/HoprDistributor.d.ts:134
 
-▸ **decodeFunctionResult**(`functionFragment`: ``"startTime"``, `data`: BytesLike): *Result*
+▸ **decodeFunctionResult**(`functionFragment`: `"startTime"`, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"startTime"`` |
-| `data` | BytesLike |
+| Name               | Type          |
+| :----------------- | :------------ |
+| `functionFragment` | `"startTime"` |
+| `data`             | BytesLike     |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Overrides: ethers.utils.Interface.decodeFunctionResult
 
 Defined in: packages/core-ethereum/src/contracts/HoprDistributor.d.ts:138
 
-▸ **decodeFunctionResult**(`functionFragment`: ``"token"``, `data`: BytesLike): *Result*
+▸ **decodeFunctionResult**(`functionFragment`: `"token"`, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"token"`` |
-| `data` | BytesLike |
+| Name               | Type      |
+| :----------------- | :-------- |
+| `functionFragment` | `"token"` |
+| `data`             | BytesLike |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Overrides: ethers.utils.Interface.decodeFunctionResult
 
 Defined in: packages/core-ethereum/src/contracts/HoprDistributor.d.ts:139
 
-▸ **decodeFunctionResult**(`functionFragment`: ``"totalMinted"``, `data`: BytesLike): *Result*
+▸ **decodeFunctionResult**(`functionFragment`: `"totalMinted"`, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"totalMinted"`` |
-| `data` | BytesLike |
+| Name               | Type            |
+| :----------------- | :-------------- |
+| `functionFragment` | `"totalMinted"` |
+| `data`             | BytesLike       |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Overrides: ethers.utils.Interface.decodeFunctionResult
 
 Defined in: packages/core-ethereum/src/contracts/HoprDistributor.d.ts:140
 
-▸ **decodeFunctionResult**(`functionFragment`: ``"totalToBeMinted"``, `data`: BytesLike): *Result*
+▸ **decodeFunctionResult**(`functionFragment`: `"totalToBeMinted"`, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"totalToBeMinted"`` |
-| `data` | BytesLike |
+| Name               | Type                |
+| :----------------- | :------------------ |
+| `functionFragment` | `"totalToBeMinted"` |
+| `data`             | BytesLike           |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Overrides: ethers.utils.Interface.decodeFunctionResult
 
 Defined in: packages/core-ethereum/src/contracts/HoprDistributor.d.ts:144
 
-▸ **decodeFunctionResult**(`functionFragment`: ``"transferOwnership"``, `data`: BytesLike): *Result*
+▸ **decodeFunctionResult**(`functionFragment`: `"transferOwnership"`, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"transferOwnership"`` |
-| `data` | BytesLike |
+| Name               | Type                  |
+| :----------------- | :-------------------- |
+| `functionFragment` | `"transferOwnership"` |
+| `data`             | BytesLike             |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Overrides: ethers.utils.Interface.decodeFunctionResult
 
 Defined in: packages/core-ethereum/src/contracts/HoprDistributor.d.ts:148
 
-▸ **decodeFunctionResult**(`functionFragment`: ``"updateStartTime"``, `data`: BytesLike): *Result*
+▸ **decodeFunctionResult**(`functionFragment`: `"updateStartTime"`, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"updateStartTime"`` |
-| `data` | BytesLike |
+| Name               | Type                |
+| :----------------- | :------------------ |
+| `functionFragment` | `"updateStartTime"` |
+| `data`             | BytesLike           |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Overrides: ethers.utils.Interface.decodeFunctionResult
 
 Defined in: packages/core-ethereum/src/contracts/HoprDistributor.d.ts:152
 
-___
+---
 
 ### encodeDeploy
 
-▸ **encodeDeploy**(`values?`: readonly *any*[]): *string*
+▸ **encodeDeploy**(`values?`: readonly _any_[]): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `values?` | readonly *any*[] |
+| Name      | Type             |
+| :-------- | :--------------- |
+| `values?` | readonly _any_[] |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Inherited from: ethers.utils.Interface.encodeDeploy
 
 Defined in: node_modules/@ethersproject/abi/lib/interface.d.ts:57
 
-___
+---
 
 ### encodeEventLog
 
-▸ **encodeEventLog**(`eventFragment`: *EventFragment*, `values`: readonly *any*[]): *object*
+▸ **encodeEventLog**(`eventFragment`: _EventFragment_, `values`: readonly _any_[]): _object_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `eventFragment` | *EventFragment* |
-| `values` | readonly *any*[] |
+| Name            | Type             |
+| :-------------- | :--------------- |
+| `eventFragment` | _EventFragment_  |
+| `values`        | readonly _any_[] |
 
-**Returns:** *object*
+**Returns:** _object_
 
-| Name | Type |
-| :------ | :------ |
-| `data` | *string* |
-| `topics` | *string*[] |
+| Name     | Type       |
+| :------- | :--------- |
+| `data`   | _string_   |
+| `topics` | _string_[] |
 
 Inherited from: ethers.utils.Interface.encodeEventLog
 
 Defined in: node_modules/@ethersproject/abi/lib/interface.d.ts:63
 
-___
+---
 
 ### encodeFilterTopics
 
-▸ **encodeFilterTopics**(`eventFragment`: *EventFragment*, `values`: readonly *any*[]): (*string* \| *string*[])[]
+▸ **encodeFilterTopics**(`eventFragment`: _EventFragment_, `values`: readonly _any_[]): (_string_ \| _string_[])[]
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `eventFragment` | *EventFragment* |
-| `values` | readonly *any*[] |
+| Name            | Type             |
+| :-------------- | :--------------- |
+| `eventFragment` | _EventFragment_  |
+| `values`        | readonly _any_[] |
 
-**Returns:** (*string* \| *string*[])[]
+**Returns:** (_string_ \| _string_[])[]
 
 Inherited from: ethers.utils.Interface.encodeFilterTopics
 
 Defined in: node_modules/@ethersproject/abi/lib/interface.d.ts:62
 
-___
+---
 
 ### encodeFunctionData
 
-▸ **encodeFunctionData**(`functionFragment`: ``"MULTIPLIER"``, `values?`: *undefined*): *string*
+▸ **encodeFunctionData**(`functionFragment`: `"MULTIPLIER"`, `values?`: _undefined_): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"MULTIPLIER"`` |
-| `values?` | *undefined* |
+| Name               | Type           |
+| :----------------- | :------------- |
+| `functionFragment` | `"MULTIPLIER"` |
+| `values?`          | _undefined_    |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: ethers.utils.Interface.encodeFunctionData
 
 Defined in: packages/core-ethereum/src/contracts/HoprDistributor.d.ts:44
 
-▸ **encodeFunctionData**(`functionFragment`: ``"addAllocations"``, `values`: [*string*[], BigNumberish[], *string*]): *string*
+▸ **encodeFunctionData**(`functionFragment`: `"addAllocations"`, `values`: [_string_[], BigNumberish[], _string_]): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"addAllocations"`` |
-| `values` | [*string*[], BigNumberish[], *string*] |
+| Name               | Type                                   |
+| :----------------- | :------------------------------------- |
+| `functionFragment` | `"addAllocations"`                     |
+| `values`           | [_string_[], BigNumberish[], _string_] |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: ethers.utils.Interface.encodeFunctionData
 
 Defined in: packages/core-ethereum/src/contracts/HoprDistributor.d.ts:48
 
-▸ **encodeFunctionData**(`functionFragment`: ``"addSchedule"``, `values`: [BigNumberish[], BigNumberish[], *string*]): *string*
+▸ **encodeFunctionData**(`functionFragment`: `"addSchedule"`, `values`: [BigNumberish[], BigNumberish[], _string_]): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"addSchedule"`` |
-| `values` | [BigNumberish[], BigNumberish[], *string*] |
+| Name               | Type                                       |
+| :----------------- | :----------------------------------------- |
+| `functionFragment` | `"addSchedule"`                            |
+| `values`           | [BigNumberish[], BigNumberish[], _string_] |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: ethers.utils.Interface.encodeFunctionData
 
 Defined in: packages/core-ethereum/src/contracts/HoprDistributor.d.ts:52
 
-▸ **encodeFunctionData**(`functionFragment`: ``"allocations"``, `values`: [*string*, *string*]): *string*
+▸ **encodeFunctionData**(`functionFragment`: `"allocations"`, `values`: [*string*, *string*]): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"allocations"`` |
-| `values` | [*string*, *string*] |
+| Name               | Type                 |
+| :----------------- | :------------------- |
+| `functionFragment` | `"allocations"`      |
+| `values`           | [*string*, *string*] |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: ethers.utils.Interface.encodeFunctionData
 
 Defined in: packages/core-ethereum/src/contracts/HoprDistributor.d.ts:56
 
-▸ **encodeFunctionData**(`functionFragment`: ``"claim"``, `values`: [*string*]): *string*
+▸ **encodeFunctionData**(`functionFragment`: `"claim"`, `values`: [*string*]): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"claim"`` |
-| `values` | [*string*] |
+| Name               | Type       |
+| :----------------- | :--------- |
+| `functionFragment` | `"claim"`  |
+| `values`           | [*string*] |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: ethers.utils.Interface.encodeFunctionData
 
 Defined in: packages/core-ethereum/src/contracts/HoprDistributor.d.ts:60
 
-▸ **encodeFunctionData**(`functionFragment`: ``"claimFor"``, `values`: [*string*, *string*]): *string*
+▸ **encodeFunctionData**(`functionFragment`: `"claimFor"`, `values`: [*string*, *string*]): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"claimFor"`` |
-| `values` | [*string*, *string*] |
+| Name               | Type                 |
+| :----------------- | :------------------- |
+| `functionFragment` | `"claimFor"`         |
+| `values`           | [*string*, *string*] |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: ethers.utils.Interface.encodeFunctionData
 
 Defined in: packages/core-ethereum/src/contracts/HoprDistributor.d.ts:61
 
-▸ **encodeFunctionData**(`functionFragment`: ``"getClaimable"``, `values`: [*string*, *string*]): *string*
+▸ **encodeFunctionData**(`functionFragment`: `"getClaimable"`, `values`: [*string*, *string*]): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"getClaimable"`` |
-| `values` | [*string*, *string*] |
+| Name               | Type                 |
+| :----------------- | :------------------- |
+| `functionFragment` | `"getClaimable"`     |
+| `values`           | [*string*, *string*] |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: ethers.utils.Interface.encodeFunctionData
 
 Defined in: packages/core-ethereum/src/contracts/HoprDistributor.d.ts:65
 
-▸ **encodeFunctionData**(`functionFragment`: ``"getSchedule"``, `values`: [*string*]): *string*
+▸ **encodeFunctionData**(`functionFragment`: `"getSchedule"`, `values`: [*string*]): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"getSchedule"`` |
-| `values` | [*string*] |
+| Name               | Type            |
+| :----------------- | :-------------- |
+| `functionFragment` | `"getSchedule"` |
+| `values`           | [*string*]      |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: ethers.utils.Interface.encodeFunctionData
 
 Defined in: packages/core-ethereum/src/contracts/HoprDistributor.d.ts:69
 
-▸ **encodeFunctionData**(`functionFragment`: ``"maxMintAmount"``, `values?`: *undefined*): *string*
+▸ **encodeFunctionData**(`functionFragment`: `"maxMintAmount"`, `values?`: _undefined_): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"maxMintAmount"`` |
-| `values?` | *undefined* |
+| Name               | Type              |
+| :----------------- | :---------------- |
+| `functionFragment` | `"maxMintAmount"` |
+| `values?`          | _undefined_       |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: ethers.utils.Interface.encodeFunctionData
 
 Defined in: packages/core-ethereum/src/contracts/HoprDistributor.d.ts:70
 
-▸ **encodeFunctionData**(`functionFragment`: ``"owner"``, `values?`: *undefined*): *string*
+▸ **encodeFunctionData**(`functionFragment`: `"owner"`, `values?`: _undefined_): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"owner"`` |
-| `values?` | *undefined* |
+| Name               | Type        |
+| :----------------- | :---------- |
+| `functionFragment` | `"owner"`   |
+| `values?`          | _undefined_ |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: ethers.utils.Interface.encodeFunctionData
 
 Defined in: packages/core-ethereum/src/contracts/HoprDistributor.d.ts:74
 
-▸ **encodeFunctionData**(`functionFragment`: ``"renounceOwnership"``, `values?`: *undefined*): *string*
+▸ **encodeFunctionData**(`functionFragment`: `"renounceOwnership"`, `values?`: _undefined_): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"renounceOwnership"`` |
-| `values?` | *undefined* |
+| Name               | Type                  |
+| :----------------- | :-------------------- |
+| `functionFragment` | `"renounceOwnership"` |
+| `values?`          | _undefined_           |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: ethers.utils.Interface.encodeFunctionData
 
 Defined in: packages/core-ethereum/src/contracts/HoprDistributor.d.ts:75
 
-▸ **encodeFunctionData**(`functionFragment`: ``"revokeAccount"``, `values`: [*string*, *string*]): *string*
+▸ **encodeFunctionData**(`functionFragment`: `"revokeAccount"`, `values`: [*string*, *string*]): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"revokeAccount"`` |
-| `values` | [*string*, *string*] |
+| Name               | Type                 |
+| :----------------- | :------------------- |
+| `functionFragment` | `"revokeAccount"`    |
+| `values`           | [*string*, *string*] |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: ethers.utils.Interface.encodeFunctionData
 
 Defined in: packages/core-ethereum/src/contracts/HoprDistributor.d.ts:79
 
-▸ **encodeFunctionData**(`functionFragment`: ``"startTime"``, `values?`: *undefined*): *string*
+▸ **encodeFunctionData**(`functionFragment`: `"startTime"`, `values?`: _undefined_): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"startTime"`` |
-| `values?` | *undefined* |
+| Name               | Type          |
+| :----------------- | :------------ |
+| `functionFragment` | `"startTime"` |
+| `values?`          | _undefined_   |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: ethers.utils.Interface.encodeFunctionData
 
 Defined in: packages/core-ethereum/src/contracts/HoprDistributor.d.ts:83
 
-▸ **encodeFunctionData**(`functionFragment`: ``"token"``, `values?`: *undefined*): *string*
+▸ **encodeFunctionData**(`functionFragment`: `"token"`, `values?`: _undefined_): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"token"`` |
-| `values?` | *undefined* |
+| Name               | Type        |
+| :----------------- | :---------- |
+| `functionFragment` | `"token"`   |
+| `values?`          | _undefined_ |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: ethers.utils.Interface.encodeFunctionData
 
 Defined in: packages/core-ethereum/src/contracts/HoprDistributor.d.ts:84
 
-▸ **encodeFunctionData**(`functionFragment`: ``"totalMinted"``, `values?`: *undefined*): *string*
+▸ **encodeFunctionData**(`functionFragment`: `"totalMinted"`, `values?`: _undefined_): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"totalMinted"`` |
-| `values?` | *undefined* |
+| Name               | Type            |
+| :----------------- | :-------------- |
+| `functionFragment` | `"totalMinted"` |
+| `values?`          | _undefined_     |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: ethers.utils.Interface.encodeFunctionData
 
 Defined in: packages/core-ethereum/src/contracts/HoprDistributor.d.ts:85
 
-▸ **encodeFunctionData**(`functionFragment`: ``"totalToBeMinted"``, `values?`: *undefined*): *string*
+▸ **encodeFunctionData**(`functionFragment`: `"totalToBeMinted"`, `values?`: _undefined_): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"totalToBeMinted"`` |
-| `values?` | *undefined* |
+| Name               | Type                |
+| :----------------- | :------------------ |
+| `functionFragment` | `"totalToBeMinted"` |
+| `values?`          | _undefined_         |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: ethers.utils.Interface.encodeFunctionData
 
 Defined in: packages/core-ethereum/src/contracts/HoprDistributor.d.ts:89
 
-▸ **encodeFunctionData**(`functionFragment`: ``"transferOwnership"``, `values`: [*string*]): *string*
+▸ **encodeFunctionData**(`functionFragment`: `"transferOwnership"`, `values`: [*string*]): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"transferOwnership"`` |
-| `values` | [*string*] |
+| Name               | Type                  |
+| :----------------- | :-------------------- |
+| `functionFragment` | `"transferOwnership"` |
+| `values`           | [*string*]            |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: ethers.utils.Interface.encodeFunctionData
 
 Defined in: packages/core-ethereum/src/contracts/HoprDistributor.d.ts:93
 
-▸ **encodeFunctionData**(`functionFragment`: ``"updateStartTime"``, `values`: [BigNumberish]): *string*
+▸ **encodeFunctionData**(`functionFragment`: `"updateStartTime"`, `values`: [BigNumberish]): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"updateStartTime"`` |
-| `values` | [BigNumberish] |
+| Name               | Type                |
+| :----------------- | :------------------ |
+| `functionFragment` | `"updateStartTime"` |
+| `values`           | [BigNumberish]      |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: ethers.utils.Interface.encodeFunctionData
 
 Defined in: packages/core-ethereum/src/contracts/HoprDistributor.d.ts:97
 
-___
+---
 
 ### encodeFunctionResult
 
-▸ **encodeFunctionResult**(`functionFragment`: *string* \| *FunctionFragment*, `values?`: readonly *any*[]): *string*
+▸ **encodeFunctionResult**(`functionFragment`: _string_ \| _FunctionFragment_, `values?`: readonly _any_[]): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | *string* \| *FunctionFragment* |
-| `values?` | readonly *any*[] |
+| Name               | Type                           |
+| :----------------- | :----------------------------- |
+| `functionFragment` | _string_ \| _FunctionFragment_ |
+| `values?`          | readonly _any_[]               |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Inherited from: ethers.utils.Interface.encodeFunctionResult
 
 Defined in: node_modules/@ethersproject/abi/lib/interface.d.ts:61
 
-___
+---
 
 ### format
 
-▸ **format**(`format?`: *string*): *string* \| *string*[]
+▸ **format**(`format?`: _string_): _string_ \| _string_[]
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `format?` | *string* |
+| Name      | Type     |
+| :-------- | :------- |
+| `format?` | _string_ |
 
-**Returns:** *string* \| *string*[]
+**Returns:** _string_ \| _string_[]
 
 Inherited from: ethers.utils.Interface.format
 
 Defined in: node_modules/@ethersproject/abi/lib/interface.d.ts:46
 
-___
+---
 
 ### getEvent
 
-▸ **getEvent**(`nameOrSignatureOrTopic`: ``"AllocationAdded"``): *EventFragment*
+▸ **getEvent**(`nameOrSignatureOrTopic`: `"AllocationAdded"`): _EventFragment_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `nameOrSignatureOrTopic` | ``"AllocationAdded"`` |
+| Name                     | Type                |
+| :----------------------- | :------------------ |
+| `nameOrSignatureOrTopic` | `"AllocationAdded"` |
 
-**Returns:** *EventFragment*
+**Returns:** _EventFragment_
 
 Overrides: ethers.utils.Interface.getEvent
 
 Defined in: packages/core-ethereum/src/contracts/HoprDistributor.d.ts:164
 
-▸ **getEvent**(`nameOrSignatureOrTopic`: ``"Claimed"``): *EventFragment*
+▸ **getEvent**(`nameOrSignatureOrTopic`: `"Claimed"`): _EventFragment_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `nameOrSignatureOrTopic` | ``"Claimed"`` |
+| Name                     | Type        |
+| :----------------------- | :---------- |
+| `nameOrSignatureOrTopic` | `"Claimed"` |
 
-**Returns:** *EventFragment*
+**Returns:** _EventFragment_
 
 Overrides: ethers.utils.Interface.getEvent
 
 Defined in: packages/core-ethereum/src/contracts/HoprDistributor.d.ts:165
 
-▸ **getEvent**(`nameOrSignatureOrTopic`: ``"OwnershipTransferred"``): *EventFragment*
+▸ **getEvent**(`nameOrSignatureOrTopic`: `"OwnershipTransferred"`): _EventFragment_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `nameOrSignatureOrTopic` | ``"OwnershipTransferred"`` |
+| Name                     | Type                     |
+| :----------------------- | :----------------------- |
+| `nameOrSignatureOrTopic` | `"OwnershipTransferred"` |
 
-**Returns:** *EventFragment*
+**Returns:** _EventFragment_
 
 Overrides: ethers.utils.Interface.getEvent
 
 Defined in: packages/core-ethereum/src/contracts/HoprDistributor.d.ts:166
 
-▸ **getEvent**(`nameOrSignatureOrTopic`: ``"ScheduleAdded"``): *EventFragment*
+▸ **getEvent**(`nameOrSignatureOrTopic`: `"ScheduleAdded"`): _EventFragment_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `nameOrSignatureOrTopic` | ``"ScheduleAdded"`` |
+| Name                     | Type              |
+| :----------------------- | :---------------- |
+| `nameOrSignatureOrTopic` | `"ScheduleAdded"` |
 
-**Returns:** *EventFragment*
+**Returns:** _EventFragment_
 
 Overrides: ethers.utils.Interface.getEvent
 
 Defined in: packages/core-ethereum/src/contracts/HoprDistributor.d.ts:167
 
-___
+---
 
 ### getEventTopic
 
-▸ **getEventTopic**(`eventFragment`: *string* \| *EventFragment*): *string*
+▸ **getEventTopic**(`eventFragment`: _string_ \| _EventFragment_): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `eventFragment` | *string* \| *EventFragment* |
+| Name            | Type                        |
+| :-------------- | :-------------------------- |
+| `eventFragment` | _string_ \| _EventFragment_ |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Inherited from: ethers.utils.Interface.getEventTopic
 
 Defined in: node_modules/@ethersproject/abi/lib/interface.d.ts:54
 
-___
+---
 
 ### getFunction
 
-▸ **getFunction**(`nameOrSignatureOrSighash`: *string*): *FunctionFragment*
+▸ **getFunction**(`nameOrSignatureOrSighash`: _string_): _FunctionFragment_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `nameOrSignatureOrSighash` | *string* |
+| Name                       | Type     |
+| :------------------------- | :------- |
+| `nameOrSignatureOrSighash` | _string_ |
 
-**Returns:** *FunctionFragment*
+**Returns:** _FunctionFragment_
 
 Inherited from: ethers.utils.Interface.getFunction
 
 Defined in: node_modules/@ethersproject/abi/lib/interface.d.ts:51
 
-___
+---
 
 ### getSighash
 
-▸ **getSighash**(`functionFragment`: *string* \| *FunctionFragment*): *string*
+▸ **getSighash**(`functionFragment`: _string_ \| _FunctionFragment_): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | *string* \| *FunctionFragment* |
+| Name               | Type                           |
+| :----------------- | :----------------------------- |
+| `functionFragment` | _string_ \| _FunctionFragment_ |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Inherited from: ethers.utils.Interface.getSighash
 
 Defined in: node_modules/@ethersproject/abi/lib/interface.d.ts:53
 
-___
+---
 
 ### parseLog
 
-▸ **parseLog**(`log`: { `data`: *string* ; `topics`: *string*[]  }): *LogDescription*
+▸ **parseLog**(`log`: { `data`: _string_ ; `topics`: _string_[] }): _LogDescription_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `log` | *object* |
-| `log.data` | *string* |
-| `log.topics` | *string*[] |
+| Name         | Type       |
+| :----------- | :--------- |
+| `log`        | _object_   |
+| `log.data`   | _string_   |
+| `log.topics` | _string_[] |
 
-**Returns:** *LogDescription*
+**Returns:** _LogDescription_
 
 Inherited from: ethers.utils.Interface.parseLog
 
 Defined in: node_modules/@ethersproject/abi/lib/interface.d.ts:72
 
-___
+---
 
 ### parseTransaction
 
-▸ **parseTransaction**(`tx`: { `data`: *string* ; `value?`: BigNumberish  }): *TransactionDescription*
+▸ **parseTransaction**(`tx`: { `data`: _string_ ; `value?`: BigNumberish }): _TransactionDescription_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `tx` | *object* |
-| `tx.data` | *string* |
+| Name        | Type         |
+| :---------- | :----------- |
+| `tx`        | _object_     |
+| `tx.data`   | _string_     |
 | `tx.value?` | BigNumberish |
 
-**Returns:** *TransactionDescription*
+**Returns:** _TransactionDescription_
 
 Inherited from: ethers.utils.Interface.parseTransaction
 

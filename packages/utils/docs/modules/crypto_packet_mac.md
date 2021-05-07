@@ -19,10 +19,10 @@ the packet header verifiable
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
+| Name     | Type       | Description                                  |
+| :------- | :--------- | :------------------------------------------- |
 | `secret` | Uint8Array | shared secret with the creator of the packet |
-| `header` | Uint8Array | the packet header |
+| `header` | Uint8Array | the packet header                            |
 
 **Returns:** Uint8Array
 

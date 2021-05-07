@@ -10,21 +10,21 @@
 
 ### Variables
 
-- [DB\_ITERATION\_BLOCK\_SIZE](commitment.md#db_iteration_block_size)
-- [TOTAL\_ITERATIONS](commitment.md#total_iterations)
+- [DB_ITERATION_BLOCK_SIZE](commitment.md#db_iteration_block_size)
+- [TOTAL_ITERATIONS](commitment.md#total_iterations)
 
 ## Variables
 
-### DB\_ITERATION\_BLOCK\_SIZE
+### DB_ITERATION_BLOCK_SIZE
 
-• `Const` **DB\_ITERATION\_BLOCK\_SIZE**: ``10000``= 10000
+• `Const` **DB_ITERATION_BLOCK_SIZE**: `10000`= 10000
 
 Defined in: [packages/core-ethereum/src/commitment.ts:7](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core-ethereum/src/commitment.ts#L7)
 
-___
+---
 
-### TOTAL\_ITERATIONS
+### TOTAL_ITERATIONS
 
-• `Const` **TOTAL\_ITERATIONS**: ``100000``= 100000
+• `Const` **TOTAL_ITERATIONS**: `100000`= 100000
 
 Defined in: [packages/core-ethereum/src/commitment.ts:8](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core-ethereum/src/commitment.ts#L8)

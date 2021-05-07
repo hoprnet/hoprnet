@@ -12,23 +12,23 @@
 
 ### limitConcurrency
 
-▸ **limitConcurrency**<T\>(`maxConcurrency`: *number*, `exitCond`: () => *boolean*, `createPromise`: () => *Promise*<T\>, `maxIterations?`: *number*): *Promise*<T[]\>
+▸ **limitConcurrency**<T\>(`maxConcurrency`: _number_, `exitCond`: () => _boolean_, `createPromise`: () => _Promise_<T\>, `maxIterations?`: _number_): _Promise_<T[]\>
 
 #### Type parameters
 
 | Name |
-| :------ |
-| `T` |
+| :--- |
+| `T`  |
 
 #### Parameters
 
-| Name | Type | Default value |
-| :------ | :------ | :------ |
-| `maxConcurrency` | *number* | - |
-| `exitCond` | () => *boolean* | - |
-| `createPromise` | () => *Promise*<T\> | - |
-| `maxIterations` | *number* | 1e3 |
+| Name             | Type                | Default value |
+| :--------------- | :------------------ | :------------ |
+| `maxConcurrency` | _number_            | -             |
+| `exitCond`       | () => _boolean_     | -             |
+| `createPromise`  | () => _Promise_<T\> | -             |
+| `maxIterations`  | _number_            | 1e3           |
 
-**Returns:** *Promise*<T[]\>
+**Returns:** _Promise_<T[]\>
 
 Defined in: [collection/promise-pool.ts:1](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/collection/promise-pool.ts#L1)

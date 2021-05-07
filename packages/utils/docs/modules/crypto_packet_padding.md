@@ -6,8 +6,8 @@
 
 ### Variables
 
-- [PADDING\_TAG](crypto_packet_padding.md#padding_tag)
-- [PADDING\_TAG\_LENGTH](crypto_packet_padding.md#padding_tag_length)
+- [PADDING_TAG](crypto_packet_padding.md#padding_tag)
+- [PADDING_TAG_LENGTH](crypto_packet_padding.md#padding_tag_length)
 
 ### Functions
 
@@ -16,17 +16,17 @@
 
 ## Variables
 
-### PADDING\_TAG
+### PADDING_TAG
 
-• `Const` **PADDING\_TAG**: *Uint8Array*
+• `Const` **PADDING_TAG**: _Uint8Array_
 
 Defined in: [crypto/packet/padding.ts:4](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/crypto/packet/padding.ts#L4)
 
-___
+---
 
-### PADDING\_TAG\_LENGTH
+### PADDING_TAG_LENGTH
 
-• `Const` **PADDING\_TAG\_LENGTH**: ``4``= 4
+• `Const` **PADDING_TAG_LENGTH**: `4`= 4
 
 Defined in: [crypto/packet/padding.ts:5](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/crypto/packet/padding.ts#L5)
 
@@ -34,7 +34,7 @@ Defined in: [crypto/packet/padding.ts:5](https://github.com/hoprnet/hoprnet/blob
 
 ### addPadding
 
-▸ **addPadding**(`msg`: Uint8Array): *Uint8Array*
+▸ **addPadding**(`msg`: Uint8Array): _Uint8Array_
 
 Adds a deterministic padding to a given payload.
 
@@ -43,21 +43,21 @@ considered invalid
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
+| Name  | Type       | Description        |
+| :---- | :--------- | :----------------- |
 | `msg` | Uint8Array | the payload to pad |
 
-**Returns:** *Uint8Array*
+**Returns:** _Uint8Array_
 
 the padded payload
 
 Defined in: [crypto/packet/padding.ts:14](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/crypto/packet/padding.ts#L14)
 
-___
+---
 
 ### removePadding
 
-▸ **removePadding**(`decoded`: Uint8Array): *Uint8Array*
+▸ **removePadding**(`decoded`: Uint8Array): _Uint8Array_
 
 Removes the padding from a given payload and fails if
 the padding does not exist or if the payload has the
@@ -65,11 +65,11 @@ wrong size.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
+| Name      | Type       | Description      |
+| :-------- | :--------- | :--------------- |
 | `decoded` | Uint8Array | a padded payload |
 
-**Returns:** *Uint8Array*
+**Returns:** _Uint8Array_
 
 the message without the padding
 

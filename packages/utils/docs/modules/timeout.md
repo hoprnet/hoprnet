@@ -12,21 +12,21 @@
 
 ### timeoutAfter
 
-▸ **timeoutAfter**<T\>(`body`: (`abortSignal`: AbortSignal) => *Promise*<T\>, `timeout`: *number*): *Promise*<T\>
+▸ **timeoutAfter**<T\>(`body`: (`abortSignal`: AbortSignal) => _Promise_<T\>, `timeout`: _number_): _Promise_<T\>
 
 #### Type parameters
 
 | Name |
-| :------ |
-| `T` |
+| :--- |
+| `T`  |
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `body` | (`abortSignal`: AbortSignal) => *Promise*<T\> |
-| `timeout` | *number* |
+| Name      | Type                                          |
+| :-------- | :-------------------------------------------- |
+| `body`    | (`abortSignal`: AbortSignal) => _Promise_<T\> |
+| `timeout` | _number_                                      |
 
-**Returns:** *Promise*<T\>
+**Returns:** _Promise_<T\>
 
 Defined in: [timeout.ts:5](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/timeout.ts#L5)

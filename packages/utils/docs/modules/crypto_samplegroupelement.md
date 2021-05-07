@@ -12,7 +12,7 @@
 
 ### sampleGroupElement
 
-▸ **sampleGroupElement**(`compressed?`: *boolean*): [exponent: Uint8Array, groupElement: Uint8Array]
+▸ **sampleGroupElement**(`compressed?`: _boolean_): [exponent: Uint8Array, groupElement: Uint8Array]
 
 Samples a valid exponent and returns the exponent
 and the product of exponent and base-point.
@@ -21,9 +21,9 @@ and the product of exponent and base-point.
 
 #### Parameters
 
-| Name | Type | Default value |
-| :------ | :------ | :------ |
-| `compressed` | *boolean* | false |
+| Name         | Type      | Default value |
+| :----------- | :-------- | :------------ |
+| `compressed` | _boolean_ | false         |
 
 **Returns:** [exponent: Uint8Array, groupElement: Uint8Array]
 

@@ -32,16 +32,16 @@
 
 ### constructor
 
-\+ **new default**(`existingPeers`: *PeerId*[], `exclude?`: *PeerId*[]): [*default*](network_network_peers.default.md)
+\+ **new default**(`existingPeers`: _PeerId_[], `exclude?`: _PeerId_[]): [_default_](network_network_peers.default.md)
 
 #### Parameters
 
-| Name | Type | Default value |
-| :------ | :------ | :------ |
-| `existingPeers` | *PeerId*[] | - |
-| `exclude` | *PeerId*[] | [] |
+| Name            | Type       | Default value |
+| :-------------- | :--------- | :------------ |
+| `existingPeers` | _PeerId_[] | -             |
+| `exclude`       | _PeerId_[] | []            |
 
-**Returns:** [*default*](network_network_peers.default.md)
+**Returns:** [_default_](network_network_peers.default.md)
 
 Defined in: [packages/core/src/network/network-peers.ts:24](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/network/network-peers.ts#L24)
 
@@ -57,158 +57,158 @@ Defined in: [packages/core/src/network/network-peers.ts:20](https://github.com/h
 
 ### all
 
-▸ **all**(): *PeerId*[]
+▸ **all**(): _PeerId_[]
 
-**Returns:** *PeerId*[]
+**Returns:** _PeerId_[]
 
 Defined in: [packages/core/src/network/network-peers.ts:100](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/network/network-peers.ts#L100)
 
-___
+---
 
 ### debugLog
 
-▸ **debugLog**(): *string*
+▸ **debugLog**(): _string_
 
-**Returns:** *string*
+**Returns:** _string_
 
 Defined in: [packages/core/src/network/network-peers.ts:108](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/network/network-peers.ts#L108)
 
-___
+---
 
 ### find
 
-▸ `Private` **find**(`peer`: *PeerId*): Entry
+▸ `Private` **find**(`peer`: _PeerId_): Entry
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `peer` | *PeerId* |
+| Name   | Type     |
+| :----- | :------- |
+| `peer` | _PeerId_ |
 
 **Returns:** Entry
 
 Defined in: [packages/core/src/network/network-peers.ts:22](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/network/network-peers.ts#L22)
 
-___
+---
 
 ### has
 
-▸ **has**(`peer`: *PeerId*): *boolean*
+▸ **has**(`peer`: _PeerId_): _boolean_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `peer` | *PeerId* |
+| Name   | Type     |
+| :----- | :------- |
+| `peer` | _PeerId_ |
 
-**Returns:** *boolean*
+**Returns:** _boolean_
 
 Defined in: [packages/core/src/network/network-peers.ts:104](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/network/network-peers.ts#L104)
 
-___
+---
 
 ### length
 
-▸ **length**(): *number*
+▸ **length**(): _number_
 
-**Returns:** *number*
+**Returns:** _number_
 
 Defined in: [packages/core/src/network/network-peers.ts:96](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/network/network-peers.ts#L96)
 
-___
+---
 
 ### nextPing
 
-▸ `Private` **nextPing**(`e`: Entry): *number*
+▸ `Private` **nextPing**(`e`: Entry): _number_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `e` | Entry |
+| Name | Type  |
+| :--- | :---- |
+| `e`  | Entry |
 
-**Returns:** *number*
+**Returns:** _number_
 
 Defined in: [packages/core/src/network/network-peers.ts:34](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/network/network-peers.ts#L34)
 
-___
+---
 
 ### ping
 
-▸ **ping**(`peer`: *PeerId*, `interaction`: (`peerID`: *PeerId*) => *Promise*<boolean\>): *Promise*<void\>
+▸ **ping**(`peer`: _PeerId_, `interaction`: (`peerID`: _PeerId_) => _Promise_<boolean\>): _Promise_<void\>
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `peer` | *PeerId* |
-| `interaction` | (`peerID`: *PeerId*) => *Promise*<boolean\> |
+| Name          | Type                                        |
+| :------------ | :------------------------------------------ |
+| `peer`        | _PeerId_                                    |
+| `interaction` | (`peerID`: _PeerId_) => _Promise_<boolean\> |
 
-**Returns:** *Promise*<void\>
+**Returns:** _Promise_<void\>
 
 Defined in: [packages/core/src/network/network-peers.ts:57](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/network/network-peers.ts#L57)
 
-___
+---
 
 ### pingSince
 
-▸ **pingSince**(`thresholdTime`: *number*): *PeerId*[]
+▸ **pingSince**(`thresholdTime`: _number_): _PeerId_[]
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `thresholdTime` | *number* |
+| Name            | Type     |
+| :-------------- | :------- |
+| `thresholdTime` | _number_ |
 
-**Returns:** *PeerId*[]
+**Returns:** _PeerId_[]
 
 Defined in: [packages/core/src/network/network-peers.ts:53](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/network/network-peers.ts#L53)
 
-___
+---
 
 ### qualityOf
 
-▸ **qualityOf**(`peer`: *PeerId*): *number*
+▸ **qualityOf**(`peer`: _PeerId_): _number_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `peer` | *PeerId* |
+| Name   | Type     |
+| :----- | :------- |
+| `peer` | _PeerId_ |
 
-**Returns:** *number*
+**Returns:** _number_
 
 Defined in: [packages/core/src/network/network-peers.ts:42](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/network/network-peers.ts#L42)
 
-___
+---
 
 ### randomSubset
 
-▸ **randomSubset**(`size`: *number*, `filter?`: (`peer`: *PeerId*) => *boolean*): *PeerId*[]
+▸ **randomSubset**(`size`: _number_, `filter?`: (`peer`: _PeerId_) => _boolean_): _PeerId_[]
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `size` | *number* |
-| `filter?` | (`peer`: *PeerId*) => *boolean* |
+| Name      | Type                            |
+| :-------- | :------------------------------ |
+| `size`    | _number_                        |
+| `filter?` | (`peer`: _PeerId_) => _boolean_ |
 
-**Returns:** *PeerId*[]
+**Returns:** _PeerId_[]
 
 Defined in: [packages/core/src/network/network-peers.ts:75](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/network/network-peers.ts#L75)
 
-___
+---
 
 ### register
 
-▸ **register**(`id`: *PeerId*): *void*
+▸ **register**(`id`: _PeerId_): _void_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `id` | *PeerId* |
+| Name | Type     |
+| :--- | :------- |
+| `id` | _PeerId_ |
 
-**Returns:** *void*
+**Returns:** _void_
 
 Defined in: [packages/core/src/network/network-peers.ts:83](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/network/network-peers.ts#L83)

@@ -17,7 +17,7 @@ priority.
 
 ### Properties
 
-- [WAIT\_TIME](mixer.mixer-1.md#wait_time)
+- [WAIT_TIME](mixer.mixer-1.md#wait_time)
 - [next](mixer.mixer-1.md#next)
 - [queue](mixer.mixer-1.md#queue)
 
@@ -33,40 +33,40 @@ priority.
 
 ### constructor
 
-\+ **new Mixer**(`onMessage`: (`m`: [*Packet*](messages_packet.packet.md)) => *void*, `clock?`: () => *number*): [*Mixer*](mixer.mixer-1.md)
+\+ **new Mixer**(`onMessage`: (`m`: [_Packet_](messages_packet.packet.md)) => _void_, `clock?`: () => _number_): [_Mixer_](mixer.mixer-1.md)
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `onMessage` | (`m`: [*Packet*](messages_packet.packet.md)) => *void* |
-| `clock` | () => *number* |
+| Name        | Type                                                   |
+| :---------- | :----------------------------------------------------- |
+| `onMessage` | (`m`: [_Packet_](messages_packet.packet.md)) => _void_ |
+| `clock`     | () => _number_                                         |
 
-**Returns:** [*Mixer*](mixer.mixer-1.md)
+**Returns:** [_Mixer_](mixer.mixer-1.md)
 
 Defined in: [packages/core/src/mixer.ts:29](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/mixer.ts#L29)
 
 ## Properties
 
-### WAIT\_TIME
+### WAIT_TIME
 
-• **WAIT\_TIME**: *number*
+• **WAIT_TIME**: _number_
 
 Defined in: [packages/core/src/mixer.ts:29](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/mixer.ts#L29)
 
-___
+---
 
 ### next
 
-• `Private` **next**: *Timeout*
+• `Private` **next**: _Timeout_
 
 Defined in: [packages/core/src/mixer.ts:27](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/mixer.ts#L27)
 
-___
+---
 
 ### queue
 
-• `Private` **queue**: *Heap*<HeapElement\>
+• `Private` **queue**: _Heap_<HeapElement\>
 
 Defined in: [packages/core/src/mixer.ts:26](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/mixer.ts#L26)
 
@@ -74,54 +74,54 @@ Defined in: [packages/core/src/mixer.ts:26](https://github.com/hoprnet/hoprnet/b
 
 ### addTimeout
 
-▸ `Private` **addTimeout**(): *void*
+▸ `Private` **addTimeout**(): _void_
 
-**Returns:** *void*
+**Returns:** _void_
 
 Defined in: [packages/core/src/mixer.ts:40](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/mixer.ts#L40)
 
-___
+---
 
 ### getPriority
 
-▸ `Private` **getPriority**(): *number*
+▸ `Private` **getPriority**(): _number_
 
-**Returns:** *number*
+**Returns:** _number_
 
 Defined in: [packages/core/src/mixer.ts:59](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/mixer.ts#L59)
 
-___
+---
 
 ### intervalUntilNextMessage
 
-▸ `Private` **intervalUntilNextMessage**(): *number*
+▸ `Private` **intervalUntilNextMessage**(): _number_
 
-**Returns:** *number*
+**Returns:** _number_
 
 Defined in: [packages/core/src/mixer.ts:55](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/mixer.ts#L55)
 
-___
+---
 
 ### push
 
-▸ **push**(`p`: [*Packet*](messages_packet.packet.md)): *void*
+▸ **push**(`p`: [_Packet_](messages_packet.packet.md)): _void_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `p` | [*Packet*](messages_packet.packet.md) |
+| Name | Type                                  |
+| :--- | :------------------------------------ |
+| `p`  | [_Packet_](messages_packet.packet.md) |
 
-**Returns:** *void*
+**Returns:** _void_
 
 Defined in: [packages/core/src/mixer.ts:35](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/mixer.ts#L35)
 
-___
+---
 
 ### tick
 
-▸ `Private` **tick**(): *void*
+▸ `Private` **tick**(): _void_
 
-**Returns:** *void*
+**Returns:** _void_
 
 Defined in: [packages/core/src/mixer.ts:46](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/mixer.ts#L46)

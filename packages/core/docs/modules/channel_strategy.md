@@ -26,7 +26,7 @@
 
 Defined in: [packages/core/src/channel-strategy.ts:15](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/channel-strategy.ts#L15)
 
-___
+---
 
 ### ChannelsToOpen
 

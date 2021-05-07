@@ -6,7 +6,7 @@
 
 ### Variables
 
-- [CHALK\_STRINGS](commands_utils_displayhelp.md#chalk_strings)
+- [CHALK_STRINGS](commands_utils_displayhelp.md#chalk_strings)
 
 ### Functions
 
@@ -17,16 +17,16 @@
 
 ## Variables
 
-### CHALK\_STRINGS
+### CHALK_STRINGS
 
-• `Const` **CHALK\_STRINGS**: *object*
+• `Const` **CHALK_STRINGS**: _object_
 
 #### Type declaration
 
-| Name | Type |
-| :------ | :------ |
-| `no` | *string* |
-| `yes` | *string* |
+| Name  | Type     |
+| :---- | :------- |
+| `no`  | _string_ |
+| `yes` | _string_ |
 
 Defined in: [commands/utils/displayHelp.ts:78](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/utils/displayHelp.ts#L78)
 
@@ -34,59 +34,59 @@ Defined in: [commands/utils/displayHelp.ts:78](https://github.com/hoprnet/hoprne
 
 ### displayHelp
 
-▸ **displayHelp**(): *void*
+▸ **displayHelp**(): _void_
 
-**Returns:** *void*
+**Returns:** _void_
 
 Defined in: [commands/utils/displayHelp.ts:6](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/utils/displayHelp.ts#L6)
 
-___
+---
 
 ### getOptions
 
-▸ **getOptions**(`options`: { `description?`: *string* ; `value`: *any*  }[], `style?`: ``"compact"`` \| ``"vertical"``): *string*[]
+▸ **getOptions**(`options`: { `description?`: _string_ ; `value`: _any_ }[], `style?`: `"compact"` \| `"vertical"`): _string_[]
 
 #### Parameters
 
-| Name | Type | Default value |
-| :------ | :------ | :------ |
-| `options` | { `description?`: *string* ; `value`: *any*  }[] | - |
-| `style` | ``"compact"`` \| ``"vertical"`` | 'compact' |
+| Name      | Type                                            | Default value |
+| :-------- | :---------------------------------------------- | :------------ |
+| `options` | { `description?`: _string_ ; `value`: _any_ }[] | -             |
+| `style`   | `"compact"` \| `"vertical"`                     | 'compact'     |
 
-**Returns:** *string*[]
+**Returns:** _string_[]
 
 Defined in: [commands/utils/displayHelp.ts:87](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/utils/displayHelp.ts#L87)
 
-___
+---
 
 ### getPaddingLength
 
-▸ **getPaddingLength**(`items`: *string*[], `addExtraPadding?`: *boolean*): *number*
+▸ **getPaddingLength**(`items`: _string_[], `addExtraPadding?`: _boolean_): _number_
 
 #### Parameters
 
-| Name | Type | Default value |
-| :------ | :------ | :------ |
-| `items` | *string*[] | - |
-| `addExtraPadding` | *boolean* | true |
+| Name              | Type       | Default value |
+| :---------------- | :--------- | :------------ |
+| `items`           | _string_[] | -             |
+| `addExtraPadding` | _boolean_  | true          |
 
-**Returns:** *number*
+**Returns:** _number_
 
 Defined in: [commands/utils/displayHelp.ts:74](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/utils/displayHelp.ts#L74)
 
-___
+---
 
 ### styleValue
 
-▸ **styleValue**(`value`: *any*, `_type?`: *any*): *string*
+▸ **styleValue**(`value`: _any_, `_type?`: _any_): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `value` | *any* |
-| `_type?` | *any* |
+| Name     | Type  |
+| :------- | :---- |
+| `value`  | _any_ |
+| `_type?` | _any_ |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Defined in: [commands/utils/displayHelp.ts:83](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/utils/displayHelp.ts#L83)

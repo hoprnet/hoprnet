@@ -12,14 +12,14 @@
 
 ### timer
 
-▸ **timer**(`fn`: () => *void*): *number*
+▸ **timer**(`fn`: () => _void_): _number_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `fn` | () => *void* |
+| Name | Type         |
+| :--- | :----------- |
+| `fn` | () => _void_ |
 
-**Returns:** *number*
+**Returns:** _number_
 
 Defined in: [utils.ts:3](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/utils.ts#L3)

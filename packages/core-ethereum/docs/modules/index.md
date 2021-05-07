@@ -24,13 +24,13 @@
 
 Re-exports: [Channel](../classes/channel.channel-1.md)
 
-___
+---
 
 ### Indexer
 
 Renames and exports: [default](../classes/indexer.default.md)
 
-___
+---
 
 ### RoutingChannel
 
@@ -40,6 +40,6 @@ Re-exports: [RoutingChannel](indexer.md#routingchannel)
 
 ### RedeemTicketResponse
 
-Ƭ **RedeemTicketResponse**: { `ackTicket`: AcknowledgedTicket ; `receipt`: *string* ; `status`: ``"SUCCESS"``  } \| { `message`: *string* ; `status`: ``"FAILURE"``  } \| { `error`: Error \| *string* ; `status`: ``"ERROR"``  }
+Ƭ **RedeemTicketResponse**: { `ackTicket`: AcknowledgedTicket ; `receipt`: _string_ ; `status`: `"SUCCESS"` } \| { `message`: _string_ ; `status`: `"FAILURE"` } \| { `error`: Error \| _string_ ; `status`: `"ERROR"` }
 
 Defined in: [packages/core-ethereum/src/index.ts:17](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core-ethereum/src/index.ts#L17)

@@ -6,9 +6,9 @@
 
 ### Variables
 
-- [A\_EQUALS\_B](u8a_u8acompare.md#a_equals_b)
-- [A\_STRICLY\_LESS\_THAN\_B](u8a_u8acompare.md#a_stricly_less_than_b)
-- [A\_STRICTLY\_GREATER\_THAN\_B](u8a_u8acompare.md#a_strictly_greater_than_b)
+- [A_EQUALS_B](u8a_u8acompare.md#a_equals_b)
+- [A_STRICLY_LESS_THAN_B](u8a_u8acompare.md#a_stricly_less_than_b)
+- [A_STRICTLY_GREATER_THAN_B](u8a_u8acompare.md#a_strictly_greater_than_b)
 
 ### Functions
 
@@ -16,25 +16,25 @@
 
 ## Variables
 
-### A\_EQUALS\_B
+### A_EQUALS_B
 
-• `Const` **A\_EQUALS\_B**: ``0``= 0
+• `Const` **A_EQUALS_B**: `0`= 0
 
 Defined in: [u8a/u8aCompare.ts:2](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/u8a/u8aCompare.ts#L2)
 
-___
+---
 
-### A\_STRICLY\_LESS\_THAN\_B
+### A_STRICLY_LESS_THAN_B
 
-• `Const` **A\_STRICLY\_LESS\_THAN\_B**: ``-1``= -1
+• `Const` **A_STRICLY_LESS_THAN_B**: `-1`= -1
 
 Defined in: [u8a/u8aCompare.ts:1](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/u8a/u8aCompare.ts#L1)
 
-___
+---
 
-### A\_STRICTLY\_GREATER\_THAN\_B
+### A_STRICTLY_GREATER_THAN_B
 
-• `Const` **A\_STRICTLY\_GREATER\_THAN\_B**: ``1``= 1
+• `Const` **A_STRICTLY_GREATER_THAN_B**: `1`= 1
 
 Defined in: [u8a/u8aCompare.ts:3](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/u8a/u8aCompare.ts#L3)
 
@@ -42,15 +42,15 @@ Defined in: [u8a/u8aCompare.ts:3](https://github.com/hoprnet/hoprnet/blob/448a47
 
 ### u8aCompare
 
-▸ **u8aCompare**(`a`: Uint8Array, `b`: Uint8Array): *number*
+▸ **u8aCompare**(`a`: Uint8Array, `b`: Uint8Array): _number_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `a` | Uint8Array |
-| `b` | Uint8Array |
+| Name | Type       |
+| :--- | :--------- |
+| `a`  | Uint8Array |
+| `b`  | Uint8Array |
 
-**Returns:** *number*
+**Returns:** _number_
 
 Defined in: [u8a/u8aCompare.ts:5](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/u8a/u8aCompare.ts#L5)

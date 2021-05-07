@@ -29,17 +29,17 @@
 
 ### constructor
 
-\+ `Private` **new Acknowledgement**(`ackSignature`: *Uint8Array*, `challengeSignature`: *Uint8Array*, `ackKeyShare`: *Uint8Array*): [*Acknowledgement*](messages_acknowledgement.acknowledgement.md)
+\+ `Private` **new Acknowledgement**(`ackSignature`: _Uint8Array_, `challengeSignature`: _Uint8Array_, `ackKeyShare`: _Uint8Array_): [_Acknowledgement_](messages_acknowledgement.acknowledgement.md)
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `ackSignature` | *Uint8Array* |
-| `challengeSignature` | *Uint8Array* |
-| `ackKeyShare` | *Uint8Array* |
+| Name                 | Type         |
+| :------------------- | :----------- |
+| `ackSignature`       | _Uint8Array_ |
+| `challengeSignature` | _Uint8Array_ |
+| `ackKeyShare`        | _Uint8Array_ |
 
-**Returns:** [*Acknowledgement*](messages_acknowledgement.acknowledgement.md)
+**Returns:** [_Acknowledgement_](messages_acknowledgement.acknowledgement.md)
 
 Defined in: [packages/core/src/messages/acknowledgement.ts:8](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/messages/acknowledgement.ts#L8)
 
@@ -47,25 +47,25 @@ Defined in: [packages/core/src/messages/acknowledgement.ts:8](https://github.com
 
 ### ackKeyShare
 
-• **ackKeyShare**: *Uint8Array*
+• **ackKeyShare**: _Uint8Array_
 
 ## Accessors
 
 ### ackChallenge
 
-• get **ackChallenge**(): *PublicKey*
+• get **ackChallenge**(): _PublicKey_
 
-**Returns:** *PublicKey*
+**Returns:** _PublicKey_
 
 Defined in: [packages/core/src/messages/acknowledgement.ts:63](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/messages/acknowledgement.ts#L63)
 
-___
+---
 
 ### SIZE
 
-• `Static` get **SIZE**(): *number*
+• `Static` get **SIZE**(): _number_
 
-**Returns:** *number*
+**Returns:** _number_
 
 Defined in: [packages/core/src/messages/acknowledgement.ts:15](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/messages/acknowledgement.ts#L15)
 
@@ -73,44 +73,44 @@ Defined in: [packages/core/src/messages/acknowledgement.ts:15](https://github.co
 
 ### serialize
 
-▸ **serialize**(): *Uint8Array*
+▸ **serialize**(): _Uint8Array_
 
-**Returns:** *Uint8Array*
+**Returns:** _Uint8Array_
 
 Defined in: [packages/core/src/messages/acknowledgement.ts:67](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/messages/acknowledgement.ts#L67)
 
-___
+---
 
 ### create
 
-▸ `Static` **create**(`challenge`: [*Challenge*](messages_challenge.challenge.md), `derivedSecret`: *Uint8Array*, `privKey`: *PeerId*): [*Acknowledgement*](messages_acknowledgement.acknowledgement.md)
+▸ `Static` **create**(`challenge`: [_Challenge_](messages_challenge.challenge.md), `derivedSecret`: _Uint8Array_, `privKey`: _PeerId_): [_Acknowledgement_](messages_acknowledgement.acknowledgement.md)
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `challenge` | [*Challenge*](messages_challenge.challenge.md) |
-| `derivedSecret` | *Uint8Array* |
-| `privKey` | *PeerId* |
+| Name            | Type                                           |
+| :-------------- | :--------------------------------------------- |
+| `challenge`     | [_Challenge_](messages_challenge.challenge.md) |
+| `derivedSecret` | _Uint8Array_                                   |
+| `privKey`       | _PeerId_                                       |
 
-**Returns:** [*Acknowledgement*](messages_acknowledgement.acknowledgement.md)
+**Returns:** [_Acknowledgement_](messages_acknowledgement.acknowledgement.md)
 
 Defined in: [packages/core/src/messages/acknowledgement.ts:19](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/messages/acknowledgement.ts#L19)
 
-___
+---
 
 ### deserialize
 
-▸ `Static` **deserialize**(`preArray`: *Uint8Array*, `ownPubKey`: *PeerId*, `senderPubKey`: *PeerId*): [*Acknowledgement*](messages_acknowledgement.acknowledgement.md)
+▸ `Static` **deserialize**(`preArray`: _Uint8Array_, `ownPubKey`: _PeerId_, `senderPubKey`: _PeerId_): [_Acknowledgement_](messages_acknowledgement.acknowledgement.md)
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `preArray` | *Uint8Array* |
-| `ownPubKey` | *PeerId* |
-| `senderPubKey` | *PeerId* |
+| Name           | Type         |
+| :------------- | :----------- |
+| `preArray`     | _Uint8Array_ |
+| `ownPubKey`    | _PeerId_     |
+| `senderPubKey` | _PeerId_     |
 
-**Returns:** [*Acknowledgement*](messages_acknowledgement.acknowledgement.md)
+**Returns:** [_Acknowledgement_](messages_acknowledgement.acknowledgement.md)
 
 Defined in: [packages/core/src/messages/acknowledgement.ts:28](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/messages/acknowledgement.ts#L28)

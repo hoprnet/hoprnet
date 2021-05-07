@@ -20,14 +20,14 @@
 
 ### LibP2PMocks
 
-Ƭ **LibP2PMocks**: *object*
+Ƭ **LibP2PMocks**: _object_
 
 #### Type declaration
 
-| Name | Type |
-| :------ | :------ |
-| `address` | Multiaddr |
-| `node` | [*LibP2P*](../classes/index.libp2p-1.md) |
+| Name      | Type                                     |
+| :-------- | :--------------------------------------- |
+| `address` | Multiaddr                                |
+| `node`    | [_LibP2P_](../classes/index.libp2p-1.md) |
 
 Defined in: [packages/core/src/test-utils.ts:29](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/test-utils.ts#L29)
 
@@ -35,21 +35,21 @@ Defined in: [packages/core/src/test-utils.ts:29](https://github.com/hoprnet/hopr
 
 ### connectionHelper
 
-▸ **connectionHelper**(`nodes`: [*LibP2P*](../classes/index.libp2p-1.md)[]): *void*
+▸ **connectionHelper**(`nodes`: [_LibP2P_](../classes/index.libp2p-1.md)[]): _void_
 
 Informs each node about the others existence.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `nodes` | [*LibP2P*](../classes/index.libp2p-1.md)[] | Hopr nodes |
+| Name    | Type                                       | Description |
+| :------ | :----------------------------------------- | :---------- |
+| `nodes` | [_LibP2P_](../classes/index.libp2p-1.md)[] | Hopr nodes  |
 
-**Returns:** *void*
+**Returns:** _void_
 
 Defined in: [packages/core/src/test-utils.ts:12](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/test-utils.ts#L12)
 
-___
+---
 
 ### fakeAddress
 
@@ -57,57 +57,57 @@ ___
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
+| Name | Type   |
+| :--- | :----- |
 | `id` | PeerId |
 
 **Returns:** Multiaddr
 
 Defined in: [packages/core/src/test-utils.ts:61](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/test-utils.ts#L61)
 
-___
+---
 
 ### fakePeerId
 
-▸ **fakePeerId**(`i`: *number* \| *string*): PeerId
+▸ **fakePeerId**(`i`: _number_ \| _string_): PeerId
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `i` | *number* \| *string* |
+| Name | Type                 |
+| :--- | :------------------- |
+| `i`  | _number_ \| _string_ |
 
 **Returns:** PeerId
 
 Defined in: [packages/core/src/test-utils.ts:53](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/test-utils.ts#L53)
 
-___
+---
 
 ### generateLibP2PMock
 
-▸ **generateLibP2PMock**(`addr?`: *string*): *Promise*<[*LibP2PMocks*](test_utils.md#libp2pmocks)\>
+▸ **generateLibP2PMock**(`addr?`: _string_): _Promise_<[_LibP2PMocks_](test_utils.md#libp2pmocks)\>
 
 #### Parameters
 
-| Name | Type | Default value |
-| :------ | :------ | :------ |
-| `addr` | *string* | '/ip4/0.0.0.0/tcp/0' |
+| Name   | Type     | Default value        |
+| :----- | :------- | :------------------- |
+| `addr` | _string_ | '/ip4/0.0.0.0/tcp/0' |
 
-**Returns:** *Promise*<[*LibP2PMocks*](test_utils.md#libp2pmocks)\>
+**Returns:** _Promise_<[_LibP2PMocks_](test_utils.md#libp2pmocks)\>
 
 Defined in: [packages/core/src/test-utils.ts:34](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/test-utils.ts#L34)
 
-___
+---
 
 ### getAddress
 
-▸ **getAddress**(`node`: [*LibP2P*](../classes/index.libp2p-1.md)): Multiaddr
+▸ **getAddress**(`node`: [_LibP2P_](../classes/index.libp2p-1.md)): Multiaddr
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `node` | [*LibP2P*](../classes/index.libp2p-1.md) |
+| Name   | Type                                     |
+| :----- | :--------------------------------------- |
+| `node` | [_LibP2P_](../classes/index.libp2p-1.md) |
 
 **Returns:** Multiaddr
 

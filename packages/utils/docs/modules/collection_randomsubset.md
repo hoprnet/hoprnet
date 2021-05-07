@@ -12,7 +12,7 @@
 
 ### randomSubset
 
-▸ **randomSubset**<T\>(`array`: T[], `subsetSize`: *number*, `filter?`: (`candidate`: T) => *boolean*): T[]
+▸ **randomSubset**<T\>(`array`: T[], `subsetSize`: _number_, `filter?`: (`candidate`: T) => _boolean_): T[]
 
 Picks @param subsetSize elements at random from @param array .
 The order of the picked elements does not coincide with their
@@ -24,16 +24,16 @@ the result will contain less than @param subsetSize elements.
 #### Type parameters
 
 | Name |
-| :------ |
-| `T` |
+| :--- |
+| `T`  |
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `array` | T[] | the array to pick the elements from |
-| `subsetSize` | *number* | the requested size of the subset |
-| `filter?` | (`candidate`: T) => *boolean* | called with `(peerInfo)` and should return `true` for every node that should be in the subset |
+| Name         | Type                          | Description                                                                                   |
+| :----------- | :---------------------------- | :-------------------------------------------------------------------------------------------- |
+| `array`      | T[]                           | the array to pick the elements from                                                           |
+| `subsetSize` | _number_                      | the requested size of the subset                                                              |
+| `filter?`    | (`candidate`: T) => _boolean_ | called with `(peerInfo)` and should return `true` for every node that should be in the subset |
 
 **Returns:** T[]
 

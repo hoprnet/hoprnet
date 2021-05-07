@@ -6,7 +6,7 @@
 
 ## Hierarchy
 
-- [*AbstractCommand*](commands_abstractcommand.abstractcommand.md)
+- [_AbstractCommand_](commands_abstractcommand.abstractcommand.md)
 
   ↳ **CoverTraffic**
 
@@ -45,15 +45,15 @@
 
 ### constructor
 
-\+ **new CoverTraffic**(`node`: *Hopr*): [*CoverTraffic*](commands_cover_traffic.covertraffic.md)
+\+ **new CoverTraffic**(`node`: _Hopr_): [_CoverTraffic_](commands_cover_traffic.covertraffic.md)
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `node` | *Hopr* |
+| Name   | Type   |
+| :----- | :----- |
+| `node` | _Hopr_ |
 
-**Returns:** [*CoverTraffic*](commands_cover_traffic.covertraffic.md)
+**Returns:** [_CoverTraffic_](commands_cover_traffic.covertraffic.md)
 
 Overrides: [AbstractCommand](commands_abstractcommand.abstractcommand.md)
 
@@ -63,71 +63,71 @@ Defined in: [commands/cover-traffic.ts:32](https://github.com/hoprnet/hoprnet/bl
 
 ### hidden
 
-• **hidden**: *boolean*= false
+• **hidden**: _boolean_= false
 
 Inherited from: [AbstractCommand](commands_abstractcommand.abstractcommand.md).[hidden](commands_abstractcommand.abstractcommand.md#hidden)
 
 Defined in: [commands/abstractCommand.ts:15](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/abstractCommand.ts#L15)
 
-___
+---
 
 ### identifier
 
-• `Private` **identifier**: *string*
+• `Private` **identifier**: _string_
 
 Defined in: [commands/cover-traffic.ts:32](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/cover-traffic.ts#L32)
 
-___
+---
 
 ### messagesReceived
 
-• `Private` **messagesReceived**: *number*
+• `Private` **messagesReceived**: _number_
 
 Defined in: [commands/cover-traffic.ts:29](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/cover-traffic.ts#L29)
 
-___
+---
 
 ### messagesSent
 
-• `Private` **messagesSent**: *number*
+• `Private` **messagesSent**: _number_
 
 Defined in: [commands/cover-traffic.ts:28](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/cover-traffic.ts#L28)
 
-___
+---
 
 ### node
 
-• **node**: *Hopr*
+• **node**: _Hopr_
 
-___
+---
 
 ### registered
 
-• `Private` **registered**: *boolean*
+• `Private` **registered**: _boolean_
 
 Defined in: [commands/cover-traffic.ts:26](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/cover-traffic.ts#L26)
 
-___
+---
 
 ### seq
 
-• `Private` **seq**: *number*= 0
+• `Private` **seq**: _number_= 0
 
 Defined in: [commands/cover-traffic.ts:24](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/cover-traffic.ts#L24)
 
-___
+---
 
 ### timeout
 
-• `Private` **timeout**: *Timeout*
+• `Private` **timeout**: _Timeout_
 
 Defined in: [commands/cover-traffic.ts:25](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/cover-traffic.ts#L25)
 
-___
+---
 
 ### totalLatency
 
-• `Private` **totalLatency**: *number*
+• `Private` **totalLatency**: _number_
 
 Defined in: [commands/cover-traffic.ts:30](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/cover-traffic.ts#L30)
 
@@ -135,153 +135,153 @@ Defined in: [commands/cover-traffic.ts:30](https://github.com/hoprnet/hoprnet/bl
 
 ### \_assertUsage
 
-▸ `Protected` **_assertUsage**(`query`: *string*, `parameters`: *string*[], `test?`: *RegExp*): *string*[]
+▸ `Protected` **\_assertUsage**(`query`: _string_, `parameters`: _string_[], `test?`: _RegExp_): _string_[]
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `query` | *string* |
-| `parameters` | *string*[] |
-| `test?` | *RegExp* |
+| Name         | Type       |
+| :----------- | :--------- |
+| `query`      | _string_   |
+| `parameters` | _string_[] |
+| `test?`      | _RegExp_   |
 
-**Returns:** *string*[]
+**Returns:** _string_[]
 
 Inherited from: [AbstractCommand](commands_abstractcommand.abstractcommand.md)
 
 Defined in: [commands/abstractCommand.ts:54](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/abstractCommand.ts#L54)
 
-___
+---
 
 ### \_autocompleteByFiltering
 
-▸ `Protected` **_autocompleteByFiltering**(`query`: *string*, `allResults`: *string*[], `line`: *string*): [*AutoCompleteResult*](../modules/commands_abstractcommand.md#autocompleteresult)
+▸ `Protected` **\_autocompleteByFiltering**(`query`: _string_, `allResults`: _string_[], `line`: _string_): [_AutoCompleteResult_](../modules/commands_abstractcommand.md#autocompleteresult)
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `query` | *string* |
-| `allResults` | *string*[] |
-| `line` | *string* |
+| Name         | Type       |
+| :----------- | :--------- |
+| `query`      | _string_   |
+| `allResults` | _string_[] |
+| `line`       | _string_   |
 
-**Returns:** [*AutoCompleteResult*](../modules/commands_abstractcommand.md#autocompleteresult)
+**Returns:** [_AutoCompleteResult_](../modules/commands_abstractcommand.md#autocompleteresult)
 
 Inherited from: [AbstractCommand](commands_abstractcommand.abstractcommand.md)
 
 Defined in: [commands/abstractCommand.ts:33](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/abstractCommand.ts#L33)
 
-___
+---
 
 ### autocomplete
 
-▸ **autocomplete**(`_query`: *string*, `line`: *string*, `_state`: [*GlobalState*](../modules/commands_abstractcommand.md#globalstate)): *Promise*<[*AutoCompleteResult*](../modules/commands_abstractcommand.md#autocompleteresult)\>
+▸ **autocomplete**(`_query`: _string_, `line`: _string_, `_state`: [_GlobalState_](../modules/commands_abstractcommand.md#globalstate)): _Promise_<[_AutoCompleteResult_](../modules/commands_abstractcommand.md#autocompleteresult)\>
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `_query` | *string* |
-| `line` | *string* |
-| `_state` | [*GlobalState*](../modules/commands_abstractcommand.md#globalstate) |
+| Name     | Type                                                                |
+| :------- | :------------------------------------------------------------------ |
+| `_query` | _string_                                                            |
+| `line`   | _string_                                                            |
+| `_state` | [_GlobalState_](../modules/commands_abstractcommand.md#globalstate) |
 
-**Returns:** *Promise*<[*AutoCompleteResult*](../modules/commands_abstractcommand.md#autocompleteresult)\>
+**Returns:** _Promise_<[_AutoCompleteResult_](../modules/commands_abstractcommand.md#autocompleteresult)\>
 
 Inherited from: [AbstractCommand](commands_abstractcommand.abstractcommand.md)
 
 Defined in: [commands/abstractCommand.ts:26](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/abstractCommand.ts#L26)
 
-___
+---
 
 ### execute
 
-▸ **execute**(`query`: *string*): *Promise*<string\>
+▸ **execute**(`query`: _string_): _Promise_<string\>
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `query` | *string* |
+| Name    | Type     |
+| :------ | :------- |
+| `query` | _string_ |
 
-**Returns:** *Promise*<string\>
+**Returns:** _Promise_<string\>
 
 Overrides: [AbstractCommand](commands_abstractcommand.abstractcommand.md)
 
 Defined in: [commands/cover-traffic.ts:82](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/cover-traffic.ts#L82)
 
-___
+---
 
 ### handleMessage
 
-▸ `Private` **handleMessage**(`msg`: *Uint8Array*): *void*
+▸ `Private` **handleMessage**(`msg`: _Uint8Array_): _void_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `msg` | *Uint8Array* |
+| Name  | Type         |
+| :---- | :----------- |
+| `msg` | _Uint8Array_ |
 
-**Returns:** *void*
+**Returns:** _void_
 
 Defined in: [commands/cover-traffic.ts:63](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/cover-traffic.ts#L63)
 
-___
+---
 
 ### help
 
-▸ **help**(): *string*
+▸ **help**(): _string_
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: [AbstractCommand](commands_abstractcommand.abstractcommand.md)
 
 Defined in: [commands/cover-traffic.ts:45](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/cover-traffic.ts#L45)
 
-___
+---
 
 ### name
 
-▸ **name**(): *string*
+▸ **name**(): _string_
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: [AbstractCommand](commands_abstractcommand.abstractcommand.md)
 
 Defined in: [commands/cover-traffic.ts:41](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/cover-traffic.ts#L41)
 
-___
+---
 
 ### stats
 
-▸ `Private` **stats**(): *string*
+▸ `Private` **stats**(): _string_
 
-**Returns:** *string*
+**Returns:** _string_
 
 Defined in: [commands/cover-traffic.ts:73](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/cover-traffic.ts#L73)
 
-___
+---
 
 ### tick
 
-▸ `Private` **tick**(): *Promise*<void\>
+▸ `Private` **tick**(): _Promise_<void\>
 
-**Returns:** *Promise*<void\>
+**Returns:** _Promise_<void\>
 
 Defined in: [commands/cover-traffic.ts:49](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/cover-traffic.ts#L49)
 
-___
+---
 
 ### usage
 
-▸ `Protected` **usage**(`parameters`: *string*[]): *string*
+▸ `Protected` **usage**(`parameters`: _string_[]): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `parameters` | *string*[] |
+| Name         | Type       |
+| :----------- | :--------- |
+| `parameters` | _string_[] |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Inherited from: [AbstractCommand](commands_abstractcommand.abstractcommand.md)
 

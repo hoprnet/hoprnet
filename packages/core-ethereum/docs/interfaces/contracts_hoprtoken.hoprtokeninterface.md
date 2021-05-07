@@ -6,7 +6,7 @@
 
 ## Hierarchy
 
-- *Interface*
+- _Interface_
 
   ↳ **HoprTokenInterface**
 
@@ -47,37 +47,37 @@
 
 ### \_abiCoder
 
-• `Readonly` **\_abiCoder**: *AbiCoder*
+• `Readonly` **\_abiCoder**: _AbiCoder_
 
 Inherited from: ethers.utils.Interface.\_abiCoder
 
 Defined in: node_modules/@ethersproject/abi/lib/interface.d.ts:43
 
-___
+---
 
 ### \_isInterface
 
-• `Readonly` **\_isInterface**: *boolean*
+• `Readonly` **\_isInterface**: _boolean_
 
 Inherited from: ethers.utils.Interface.\_isInterface
 
 Defined in: node_modules/@ethersproject/abi/lib/interface.d.ts:44
 
-___
+---
 
 ### deploy
 
-• `Readonly` **deploy**: *ConstructorFragment*
+• `Readonly` **deploy**: _ConstructorFragment_
 
 Inherited from: ethers.utils.Interface.deploy
 
 Defined in: node_modules/@ethersproject/abi/lib/interface.d.ts:42
 
-___
+---
 
 ### errors
 
-• `Readonly` **errors**: *object*
+• `Readonly` **errors**: _object_
 
 #### Type declaration
 
@@ -85,92 +85,92 @@ Inherited from: ethers.utils.Interface.errors
 
 Defined in: node_modules/@ethersproject/abi/lib/interface.d.ts:30
 
-___
+---
 
 ### events
 
-• **events**: *object*
+• **events**: _object_
 
 #### Type declaration
 
-| Name | Type |
-| :------ | :------ |
-| `Approval(address,address,uint256)` | *EventFragment* |
-| `AuthorizedOperator(address,address)` | *EventFragment* |
-| `Burned(address,address,uint256,bytes,bytes)` | *EventFragment* |
-| `Minted(address,address,uint256,bytes,bytes)` | *EventFragment* |
-| `RevokedOperator(address,address)` | *EventFragment* |
-| `RoleGranted(bytes32,address,address)` | *EventFragment* |
-| `RoleRevoked(bytes32,address,address)` | *EventFragment* |
-| `Sent(address,address,address,uint256,bytes,bytes)` | *EventFragment* |
-| `Transfer(address,address,uint256)` | *EventFragment* |
+| Name                                                | Type            |
+| :-------------------------------------------------- | :-------------- |
+| `Approval(address,address,uint256)`                 | _EventFragment_ |
+| `AuthorizedOperator(address,address)`               | _EventFragment_ |
+| `Burned(address,address,uint256,bytes,bytes)`       | _EventFragment_ |
+| `Minted(address,address,uint256,bytes,bytes)`       | _EventFragment_ |
+| `RevokedOperator(address,address)`                  | _EventFragment_ |
+| `RoleGranted(bytes32,address,address)`              | _EventFragment_ |
+| `RoleRevoked(bytes32,address,address)`              | _EventFragment_ |
+| `Sent(address,address,address,uint256,bytes,bytes)` | _EventFragment_ |
+| `Transfer(address,address,uint256)`                 | _EventFragment_ |
 
 Overrides: ethers.utils.Interface.events
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:265
 
-___
+---
 
 ### fragments
 
-• `Readonly` **fragments**: readonly *Fragment*[]
+• `Readonly` **fragments**: readonly _Fragment_[]
 
 Inherited from: ethers.utils.Interface.fragments
 
 Defined in: node_modules/@ethersproject/abi/lib/interface.d.ts:29
 
-___
+---
 
 ### functions
 
-• **functions**: *object*
+• **functions**: _object_
 
 #### Type declaration
 
-| Name | Type |
-| :------ | :------ |
-| `DEFAULT_ADMIN_ROLE()` | *FunctionFragment* |
-| `MINTER_ROLE()` | *FunctionFragment* |
-| `accountSnapshots(address,uint256)` | *FunctionFragment* |
-| `allowance(address,address)` | *FunctionFragment* |
-| `approve(address,uint256)` | *FunctionFragment* |
-| `authorizeOperator(address)` | *FunctionFragment* |
-| `balanceOf(address)` | *FunctionFragment* |
-| `balanceOfAt(address,uint128)` | *FunctionFragment* |
-| `burn(uint256,bytes)` | *FunctionFragment* |
-| `decimals()` | *FunctionFragment* |
-| `defaultOperators()` | *FunctionFragment* |
-| `getRoleAdmin(bytes32)` | *FunctionFragment* |
-| `getRoleMember(bytes32,uint256)` | *FunctionFragment* |
-| `getRoleMemberCount(bytes32)` | *FunctionFragment* |
-| `grantRole(bytes32,address)` | *FunctionFragment* |
-| `granularity()` | *FunctionFragment* |
-| `hasRole(bytes32,address)` | *FunctionFragment* |
-| `isOperatorFor(address,address)` | *FunctionFragment* |
-| `mint(address,uint256,bytes,bytes)` | *FunctionFragment* |
-| `name()` | *FunctionFragment* |
-| `operatorBurn(address,uint256,bytes,bytes)` | *FunctionFragment* |
-| `operatorSend(address,address,uint256,bytes,bytes)` | *FunctionFragment* |
-| `renounceRole(bytes32,address)` | *FunctionFragment* |
-| `revokeOperator(address)` | *FunctionFragment* |
-| `revokeRole(bytes32,address)` | *FunctionFragment* |
-| `send(address,uint256,bytes)` | *FunctionFragment* |
-| `symbol()` | *FunctionFragment* |
-| `totalSupply()` | *FunctionFragment* |
-| `totalSupplyAt(uint128)` | *FunctionFragment* |
-| `totalSupplySnapshots(uint256)` | *FunctionFragment* |
-| `transfer(address,uint256)` | *FunctionFragment* |
-| `transferFrom(address,address,uint256)` | *FunctionFragment* |
+| Name                                                | Type               |
+| :-------------------------------------------------- | :----------------- |
+| `DEFAULT_ADMIN_ROLE()`                              | _FunctionFragment_ |
+| `MINTER_ROLE()`                                     | _FunctionFragment_ |
+| `accountSnapshots(address,uint256)`                 | _FunctionFragment_ |
+| `allowance(address,address)`                        | _FunctionFragment_ |
+| `approve(address,uint256)`                          | _FunctionFragment_ |
+| `authorizeOperator(address)`                        | _FunctionFragment_ |
+| `balanceOf(address)`                                | _FunctionFragment_ |
+| `balanceOfAt(address,uint128)`                      | _FunctionFragment_ |
+| `burn(uint256,bytes)`                               | _FunctionFragment_ |
+| `decimals()`                                        | _FunctionFragment_ |
+| `defaultOperators()`                                | _FunctionFragment_ |
+| `getRoleAdmin(bytes32)`                             | _FunctionFragment_ |
+| `getRoleMember(bytes32,uint256)`                    | _FunctionFragment_ |
+| `getRoleMemberCount(bytes32)`                       | _FunctionFragment_ |
+| `grantRole(bytes32,address)`                        | _FunctionFragment_ |
+| `granularity()`                                     | _FunctionFragment_ |
+| `hasRole(bytes32,address)`                          | _FunctionFragment_ |
+| `isOperatorFor(address,address)`                    | _FunctionFragment_ |
+| `mint(address,uint256,bytes,bytes)`                 | _FunctionFragment_ |
+| `name()`                                            | _FunctionFragment_ |
+| `operatorBurn(address,uint256,bytes,bytes)`         | _FunctionFragment_ |
+| `operatorSend(address,address,uint256,bytes,bytes)` | _FunctionFragment_ |
+| `renounceRole(bytes32,address)`                     | _FunctionFragment_ |
+| `revokeOperator(address)`                           | _FunctionFragment_ |
+| `revokeRole(bytes32,address)`                       | _FunctionFragment_ |
+| `send(address,uint256,bytes)`                       | _FunctionFragment_ |
+| `symbol()`                                          | _FunctionFragment_ |
+| `totalSupply()`                                     | _FunctionFragment_ |
+| `totalSupplyAt(uint128)`                            | _FunctionFragment_ |
+| `totalSupplySnapshots(uint256)`                     | _FunctionFragment_ |
+| `transfer(address,uint256)`                         | _FunctionFragment_ |
+| `transferFrom(address,address,uint256)`             | _FunctionFragment_ |
 
 Overrides: ethers.utils.Interface.functions
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:23
 
-___
+---
 
 ### structs
 
-• `Readonly` **structs**: *object*
+• `Readonly` **structs**: _object_
 
 #### Type declaration
 
@@ -182,1364 +182,1364 @@ Defined in: node_modules/@ethersproject/abi/lib/interface.d.ts:39
 
 ### \_decodeParams
 
-▸ **_decodeParams**(`params`: readonly *ParamType*[], `data`: BytesLike): *Result*
+▸ **\_decodeParams**(`params`: readonly _ParamType_[], `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `params` | readonly *ParamType*[] |
-| `data` | BytesLike |
+| Name     | Type                   |
+| :------- | :--------------------- |
+| `params` | readonly _ParamType_[] |
+| `data`   | BytesLike              |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Inherited from: ethers.utils.Interface.\_decodeParams
 
 Defined in: node_modules/@ethersproject/abi/lib/interface.d.ts:55
 
-___
+---
 
 ### \_encodeParams
 
-▸ **_encodeParams**(`params`: readonly *ParamType*[], `values`: readonly *any*[]): *string*
+▸ **\_encodeParams**(`params`: readonly _ParamType_[], `values`: readonly _any_[]): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `params` | readonly *ParamType*[] |
-| `values` | readonly *any*[] |
+| Name     | Type                   |
+| :------- | :--------------------- |
+| `params` | readonly _ParamType_[] |
+| `values` | readonly _any_[]       |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Inherited from: ethers.utils.Interface.\_encodeParams
 
 Defined in: node_modules/@ethersproject/abi/lib/interface.d.ts:56
 
-___
+---
 
 ### decodeEventLog
 
-▸ **decodeEventLog**(`eventFragment`: *string* \| *EventFragment*, `data`: BytesLike, `topics?`: readonly *string*[]): *Result*
+▸ **decodeEventLog**(`eventFragment`: _string_ \| _EventFragment_, `data`: BytesLike, `topics?`: readonly _string_[]): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `eventFragment` | *string* \| *EventFragment* |
-| `data` | BytesLike |
-| `topics?` | readonly *string*[] |
+| Name            | Type                        |
+| :-------------- | :-------------------------- |
+| `eventFragment` | _string_ \| _EventFragment_ |
+| `data`          | BytesLike                   |
+| `topics?`       | readonly _string_[]         |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Inherited from: ethers.utils.Interface.decodeEventLog
 
 Defined in: node_modules/@ethersproject/abi/lib/interface.d.ts:67
 
-___
+---
 
 ### decodeFunctionData
 
-▸ **decodeFunctionData**(`functionFragment`: *string* \| *FunctionFragment*, `data`: BytesLike): *Result*
+▸ **decodeFunctionData**(`functionFragment`: _string_ \| _FunctionFragment_, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | *string* \| *FunctionFragment* |
-| `data` | BytesLike |
+| Name               | Type                           |
+| :----------------- | :----------------------------- |
+| `functionFragment` | _string_ \| _FunctionFragment_ |
+| `data`             | BytesLike                      |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Inherited from: ethers.utils.Interface.decodeFunctionData
 
 Defined in: node_modules/@ethersproject/abi/lib/interface.d.ts:58
 
-___
+---
 
 ### decodeFunctionResult
 
-▸ **decodeFunctionResult**(`functionFragment`: ``"DEFAULT_ADMIN_ROLE"``, `data`: BytesLike): *Result*
+▸ **decodeFunctionResult**(`functionFragment`: `"DEFAULT_ADMIN_ROLE"`, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"DEFAULT_ADMIN_ROLE"`` |
-| `data` | BytesLike |
+| Name               | Type                   |
+| :----------------- | :--------------------- |
+| `functionFragment` | `"DEFAULT_ADMIN_ROLE"` |
+| `data`             | BytesLike              |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Overrides: ethers.utils.Interface.decodeFunctionResult
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:175
 
-▸ **decodeFunctionResult**(`functionFragment`: ``"MINTER_ROLE"``, `data`: BytesLike): *Result*
+▸ **decodeFunctionResult**(`functionFragment`: `"MINTER_ROLE"`, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"MINTER_ROLE"`` |
-| `data` | BytesLike |
+| Name               | Type            |
+| :----------------- | :-------------- |
+| `functionFragment` | `"MINTER_ROLE"` |
+| `data`             | BytesLike       |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Overrides: ethers.utils.Interface.decodeFunctionResult
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:179
 
-▸ **decodeFunctionResult**(`functionFragment`: ``"accountSnapshots"``, `data`: BytesLike): *Result*
+▸ **decodeFunctionResult**(`functionFragment`: `"accountSnapshots"`, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"accountSnapshots"`` |
-| `data` | BytesLike |
+| Name               | Type                 |
+| :----------------- | :------------------- |
+| `functionFragment` | `"accountSnapshots"` |
+| `data`             | BytesLike            |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Overrides: ethers.utils.Interface.decodeFunctionResult
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:183
 
-▸ **decodeFunctionResult**(`functionFragment`: ``"allowance"``, `data`: BytesLike): *Result*
+▸ **decodeFunctionResult**(`functionFragment`: `"allowance"`, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"allowance"`` |
-| `data` | BytesLike |
+| Name               | Type          |
+| :----------------- | :------------ |
+| `functionFragment` | `"allowance"` |
+| `data`             | BytesLike     |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Overrides: ethers.utils.Interface.decodeFunctionResult
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:187
 
-▸ **decodeFunctionResult**(`functionFragment`: ``"approve"``, `data`: BytesLike): *Result*
+▸ **decodeFunctionResult**(`functionFragment`: `"approve"`, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"approve"`` |
-| `data` | BytesLike |
+| Name               | Type        |
+| :----------------- | :---------- |
+| `functionFragment` | `"approve"` |
+| `data`             | BytesLike   |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Overrides: ethers.utils.Interface.decodeFunctionResult
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:188
 
-▸ **decodeFunctionResult**(`functionFragment`: ``"authorizeOperator"``, `data`: BytesLike): *Result*
+▸ **decodeFunctionResult**(`functionFragment`: `"authorizeOperator"`, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"authorizeOperator"`` |
-| `data` | BytesLike |
+| Name               | Type                  |
+| :----------------- | :-------------------- |
+| `functionFragment` | `"authorizeOperator"` |
+| `data`             | BytesLike             |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Overrides: ethers.utils.Interface.decodeFunctionResult
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:189
 
-▸ **decodeFunctionResult**(`functionFragment`: ``"balanceOf"``, `data`: BytesLike): *Result*
+▸ **decodeFunctionResult**(`functionFragment`: `"balanceOf"`, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"balanceOf"`` |
-| `data` | BytesLike |
+| Name               | Type          |
+| :----------------- | :------------ |
+| `functionFragment` | `"balanceOf"` |
+| `data`             | BytesLike     |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Overrides: ethers.utils.Interface.decodeFunctionResult
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:193
 
-▸ **decodeFunctionResult**(`functionFragment`: ``"balanceOfAt"``, `data`: BytesLike): *Result*
+▸ **decodeFunctionResult**(`functionFragment`: `"balanceOfAt"`, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"balanceOfAt"`` |
-| `data` | BytesLike |
+| Name               | Type            |
+| :----------------- | :-------------- |
+| `functionFragment` | `"balanceOfAt"` |
+| `data`             | BytesLike       |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Overrides: ethers.utils.Interface.decodeFunctionResult
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:194
 
-▸ **decodeFunctionResult**(`functionFragment`: ``"burn"``, `data`: BytesLike): *Result*
+▸ **decodeFunctionResult**(`functionFragment`: `"burn"`, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"burn"`` |
-| `data` | BytesLike |
+| Name               | Type      |
+| :----------------- | :-------- |
+| `functionFragment` | `"burn"`  |
+| `data`             | BytesLike |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Overrides: ethers.utils.Interface.decodeFunctionResult
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:198
 
-▸ **decodeFunctionResult**(`functionFragment`: ``"decimals"``, `data`: BytesLike): *Result*
+▸ **decodeFunctionResult**(`functionFragment`: `"decimals"`, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"decimals"`` |
-| `data` | BytesLike |
+| Name               | Type         |
+| :----------------- | :----------- |
+| `functionFragment` | `"decimals"` |
+| `data`             | BytesLike    |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Overrides: ethers.utils.Interface.decodeFunctionResult
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:199
 
-▸ **decodeFunctionResult**(`functionFragment`: ``"defaultOperators"``, `data`: BytesLike): *Result*
+▸ **decodeFunctionResult**(`functionFragment`: `"defaultOperators"`, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"defaultOperators"`` |
-| `data` | BytesLike |
+| Name               | Type                 |
+| :----------------- | :------------------- |
+| `functionFragment` | `"defaultOperators"` |
+| `data`             | BytesLike            |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Overrides: ethers.utils.Interface.decodeFunctionResult
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:200
 
-▸ **decodeFunctionResult**(`functionFragment`: ``"getRoleAdmin"``, `data`: BytesLike): *Result*
+▸ **decodeFunctionResult**(`functionFragment`: `"getRoleAdmin"`, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"getRoleAdmin"`` |
-| `data` | BytesLike |
+| Name               | Type             |
+| :----------------- | :--------------- |
+| `functionFragment` | `"getRoleAdmin"` |
+| `data`             | BytesLike        |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Overrides: ethers.utils.Interface.decodeFunctionResult
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:204
 
-▸ **decodeFunctionResult**(`functionFragment`: ``"getRoleMember"``, `data`: BytesLike): *Result*
+▸ **decodeFunctionResult**(`functionFragment`: `"getRoleMember"`, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"getRoleMember"`` |
-| `data` | BytesLike |
+| Name               | Type              |
+| :----------------- | :---------------- |
+| `functionFragment` | `"getRoleMember"` |
+| `data`             | BytesLike         |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Overrides: ethers.utils.Interface.decodeFunctionResult
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:208
 
-▸ **decodeFunctionResult**(`functionFragment`: ``"getRoleMemberCount"``, `data`: BytesLike): *Result*
+▸ **decodeFunctionResult**(`functionFragment`: `"getRoleMemberCount"`, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"getRoleMemberCount"`` |
-| `data` | BytesLike |
+| Name               | Type                   |
+| :----------------- | :--------------------- |
+| `functionFragment` | `"getRoleMemberCount"` |
+| `data`             | BytesLike              |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Overrides: ethers.utils.Interface.decodeFunctionResult
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:212
 
-▸ **decodeFunctionResult**(`functionFragment`: ``"grantRole"``, `data`: BytesLike): *Result*
+▸ **decodeFunctionResult**(`functionFragment`: `"grantRole"`, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"grantRole"`` |
-| `data` | BytesLike |
+| Name               | Type          |
+| :----------------- | :------------ |
+| `functionFragment` | `"grantRole"` |
+| `data`             | BytesLike     |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Overrides: ethers.utils.Interface.decodeFunctionResult
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:216
 
-▸ **decodeFunctionResult**(`functionFragment`: ``"granularity"``, `data`: BytesLike): *Result*
+▸ **decodeFunctionResult**(`functionFragment`: `"granularity"`, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"granularity"`` |
-| `data` | BytesLike |
+| Name               | Type            |
+| :----------------- | :-------------- |
+| `functionFragment` | `"granularity"` |
+| `data`             | BytesLike       |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Overrides: ethers.utils.Interface.decodeFunctionResult
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:217
 
-▸ **decodeFunctionResult**(`functionFragment`: ``"hasRole"``, `data`: BytesLike): *Result*
+▸ **decodeFunctionResult**(`functionFragment`: `"hasRole"`, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"hasRole"`` |
-| `data` | BytesLike |
+| Name               | Type        |
+| :----------------- | :---------- |
+| `functionFragment` | `"hasRole"` |
+| `data`             | BytesLike   |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Overrides: ethers.utils.Interface.decodeFunctionResult
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:221
 
-▸ **decodeFunctionResult**(`functionFragment`: ``"isOperatorFor"``, `data`: BytesLike): *Result*
+▸ **decodeFunctionResult**(`functionFragment`: `"isOperatorFor"`, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"isOperatorFor"`` |
-| `data` | BytesLike |
+| Name               | Type              |
+| :----------------- | :---------------- |
+| `functionFragment` | `"isOperatorFor"` |
+| `data`             | BytesLike         |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Overrides: ethers.utils.Interface.decodeFunctionResult
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:222
 
-▸ **decodeFunctionResult**(`functionFragment`: ``"mint"``, `data`: BytesLike): *Result*
+▸ **decodeFunctionResult**(`functionFragment`: `"mint"`, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"mint"`` |
-| `data` | BytesLike |
+| Name               | Type      |
+| :----------------- | :-------- |
+| `functionFragment` | `"mint"`  |
+| `data`             | BytesLike |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Overrides: ethers.utils.Interface.decodeFunctionResult
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:226
 
-▸ **decodeFunctionResult**(`functionFragment`: ``"name"``, `data`: BytesLike): *Result*
+▸ **decodeFunctionResult**(`functionFragment`: `"name"`, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"name"`` |
-| `data` | BytesLike |
+| Name               | Type      |
+| :----------------- | :-------- |
+| `functionFragment` | `"name"`  |
+| `data`             | BytesLike |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Overrides: ethers.utils.Interface.decodeFunctionResult
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:227
 
-▸ **decodeFunctionResult**(`functionFragment`: ``"operatorBurn"``, `data`: BytesLike): *Result*
+▸ **decodeFunctionResult**(`functionFragment`: `"operatorBurn"`, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"operatorBurn"`` |
-| `data` | BytesLike |
+| Name               | Type             |
+| :----------------- | :--------------- |
+| `functionFragment` | `"operatorBurn"` |
+| `data`             | BytesLike        |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Overrides: ethers.utils.Interface.decodeFunctionResult
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:228
 
-▸ **decodeFunctionResult**(`functionFragment`: ``"operatorSend"``, `data`: BytesLike): *Result*
+▸ **decodeFunctionResult**(`functionFragment`: `"operatorSend"`, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"operatorSend"`` |
-| `data` | BytesLike |
+| Name               | Type             |
+| :----------------- | :--------------- |
+| `functionFragment` | `"operatorSend"` |
+| `data`             | BytesLike        |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Overrides: ethers.utils.Interface.decodeFunctionResult
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:232
 
-▸ **decodeFunctionResult**(`functionFragment`: ``"renounceRole"``, `data`: BytesLike): *Result*
+▸ **decodeFunctionResult**(`functionFragment`: `"renounceRole"`, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"renounceRole"`` |
-| `data` | BytesLike |
+| Name               | Type             |
+| :----------------- | :--------------- |
+| `functionFragment` | `"renounceRole"` |
+| `data`             | BytesLike        |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Overrides: ethers.utils.Interface.decodeFunctionResult
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:236
 
-▸ **decodeFunctionResult**(`functionFragment`: ``"revokeOperator"``, `data`: BytesLike): *Result*
+▸ **decodeFunctionResult**(`functionFragment`: `"revokeOperator"`, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"revokeOperator"`` |
-| `data` | BytesLike |
+| Name               | Type               |
+| :----------------- | :----------------- |
+| `functionFragment` | `"revokeOperator"` |
+| `data`             | BytesLike          |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Overrides: ethers.utils.Interface.decodeFunctionResult
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:240
 
-▸ **decodeFunctionResult**(`functionFragment`: ``"revokeRole"``, `data`: BytesLike): *Result*
+▸ **decodeFunctionResult**(`functionFragment`: `"revokeRole"`, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"revokeRole"`` |
-| `data` | BytesLike |
+| Name               | Type           |
+| :----------------- | :------------- |
+| `functionFragment` | `"revokeRole"` |
+| `data`             | BytesLike      |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Overrides: ethers.utils.Interface.decodeFunctionResult
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:244
 
-▸ **decodeFunctionResult**(`functionFragment`: ``"send"``, `data`: BytesLike): *Result*
+▸ **decodeFunctionResult**(`functionFragment`: `"send"`, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"send"`` |
-| `data` | BytesLike |
+| Name               | Type      |
+| :----------------- | :-------- |
+| `functionFragment` | `"send"`  |
+| `data`             | BytesLike |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Overrides: ethers.utils.Interface.decodeFunctionResult
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:245
 
-▸ **decodeFunctionResult**(`functionFragment`: ``"symbol"``, `data`: BytesLike): *Result*
+▸ **decodeFunctionResult**(`functionFragment`: `"symbol"`, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"symbol"`` |
-| `data` | BytesLike |
+| Name               | Type       |
+| :----------------- | :--------- |
+| `functionFragment` | `"symbol"` |
+| `data`             | BytesLike  |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Overrides: ethers.utils.Interface.decodeFunctionResult
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:246
 
-▸ **decodeFunctionResult**(`functionFragment`: ``"totalSupply"``, `data`: BytesLike): *Result*
+▸ **decodeFunctionResult**(`functionFragment`: `"totalSupply"`, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"totalSupply"`` |
-| `data` | BytesLike |
+| Name               | Type            |
+| :----------------- | :-------------- |
+| `functionFragment` | `"totalSupply"` |
+| `data`             | BytesLike       |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Overrides: ethers.utils.Interface.decodeFunctionResult
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:247
 
-▸ **decodeFunctionResult**(`functionFragment`: ``"totalSupplyAt"``, `data`: BytesLike): *Result*
+▸ **decodeFunctionResult**(`functionFragment`: `"totalSupplyAt"`, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"totalSupplyAt"`` |
-| `data` | BytesLike |
+| Name               | Type              |
+| :----------------- | :---------------- |
+| `functionFragment` | `"totalSupplyAt"` |
+| `data`             | BytesLike         |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Overrides: ethers.utils.Interface.decodeFunctionResult
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:251
 
-▸ **decodeFunctionResult**(`functionFragment`: ``"totalSupplySnapshots"``, `data`: BytesLike): *Result*
+▸ **decodeFunctionResult**(`functionFragment`: `"totalSupplySnapshots"`, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"totalSupplySnapshots"`` |
-| `data` | BytesLike |
+| Name               | Type                     |
+| :----------------- | :----------------------- |
+| `functionFragment` | `"totalSupplySnapshots"` |
+| `data`             | BytesLike                |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Overrides: ethers.utils.Interface.decodeFunctionResult
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:255
 
-▸ **decodeFunctionResult**(`functionFragment`: ``"transfer"``, `data`: BytesLike): *Result*
+▸ **decodeFunctionResult**(`functionFragment`: `"transfer"`, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"transfer"`` |
-| `data` | BytesLike |
+| Name               | Type         |
+| :----------------- | :----------- |
+| `functionFragment` | `"transfer"` |
+| `data`             | BytesLike    |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Overrides: ethers.utils.Interface.decodeFunctionResult
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:259
 
-▸ **decodeFunctionResult**(`functionFragment`: ``"transferFrom"``, `data`: BytesLike): *Result*
+▸ **decodeFunctionResult**(`functionFragment`: `"transferFrom"`, `data`: BytesLike): _Result_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"transferFrom"`` |
-| `data` | BytesLike |
+| Name               | Type             |
+| :----------------- | :--------------- |
+| `functionFragment` | `"transferFrom"` |
+| `data`             | BytesLike        |
 
-**Returns:** *Result*
+**Returns:** _Result_
 
 Overrides: ethers.utils.Interface.decodeFunctionResult
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:260
 
-___
+---
 
 ### encodeDeploy
 
-▸ **encodeDeploy**(`values?`: readonly *any*[]): *string*
+▸ **encodeDeploy**(`values?`: readonly _any_[]): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `values?` | readonly *any*[] |
+| Name      | Type             |
+| :-------- | :--------------- |
+| `values?` | readonly _any_[] |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Inherited from: ethers.utils.Interface.encodeDeploy
 
 Defined in: node_modules/@ethersproject/abi/lib/interface.d.ts:57
 
-___
+---
 
 ### encodeEventLog
 
-▸ **encodeEventLog**(`eventFragment`: *EventFragment*, `values`: readonly *any*[]): *object*
+▸ **encodeEventLog**(`eventFragment`: _EventFragment_, `values`: readonly _any_[]): _object_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `eventFragment` | *EventFragment* |
-| `values` | readonly *any*[] |
+| Name            | Type             |
+| :-------------- | :--------------- |
+| `eventFragment` | _EventFragment_  |
+| `values`        | readonly _any_[] |
 
-**Returns:** *object*
+**Returns:** _object_
 
-| Name | Type |
-| :------ | :------ |
-| `data` | *string* |
-| `topics` | *string*[] |
+| Name     | Type       |
+| :------- | :--------- |
+| `data`   | _string_   |
+| `topics` | _string_[] |
 
 Inherited from: ethers.utils.Interface.encodeEventLog
 
 Defined in: node_modules/@ethersproject/abi/lib/interface.d.ts:63
 
-___
+---
 
 ### encodeFilterTopics
 
-▸ **encodeFilterTopics**(`eventFragment`: *EventFragment*, `values`: readonly *any*[]): (*string* \| *string*[])[]
+▸ **encodeFilterTopics**(`eventFragment`: _EventFragment_, `values`: readonly _any_[]): (_string_ \| _string_[])[]
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `eventFragment` | *EventFragment* |
-| `values` | readonly *any*[] |
+| Name            | Type             |
+| :-------------- | :--------------- |
+| `eventFragment` | _EventFragment_  |
+| `values`        | readonly _any_[] |
 
-**Returns:** (*string* \| *string*[])[]
+**Returns:** (_string_ \| _string_[])[]
 
 Inherited from: ethers.utils.Interface.encodeFilterTopics
 
 Defined in: node_modules/@ethersproject/abi/lib/interface.d.ts:62
 
-___
+---
 
 ### encodeFunctionData
 
-▸ **encodeFunctionData**(`functionFragment`: ``"DEFAULT_ADMIN_ROLE"``, `values?`: *undefined*): *string*
+▸ **encodeFunctionData**(`functionFragment`: `"DEFAULT_ADMIN_ROLE"`, `values?`: _undefined_): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"DEFAULT_ADMIN_ROLE"`` |
-| `values?` | *undefined* |
+| Name               | Type                   |
+| :----------------- | :--------------------- |
+| `functionFragment` | `"DEFAULT_ADMIN_ROLE"` |
+| `values?`          | _undefined_            |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: ethers.utils.Interface.encodeFunctionData
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:58
 
-▸ **encodeFunctionData**(`functionFragment`: ``"MINTER_ROLE"``, `values?`: *undefined*): *string*
+▸ **encodeFunctionData**(`functionFragment`: `"MINTER_ROLE"`, `values?`: _undefined_): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"MINTER_ROLE"`` |
-| `values?` | *undefined* |
+| Name               | Type            |
+| :----------------- | :-------------- |
+| `functionFragment` | `"MINTER_ROLE"` |
+| `values?`          | _undefined_     |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: ethers.utils.Interface.encodeFunctionData
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:62
 
-▸ **encodeFunctionData**(`functionFragment`: ``"accountSnapshots"``, `values`: [*string*, BigNumberish]): *string*
+▸ **encodeFunctionData**(`functionFragment`: `"accountSnapshots"`, `values`: [*string*, BigNumberish]): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"accountSnapshots"`` |
-| `values` | [*string*, BigNumberish] |
+| Name               | Type                     |
+| :----------------- | :----------------------- |
+| `functionFragment` | `"accountSnapshots"`     |
+| `values`           | [*string*, BigNumberish] |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: ethers.utils.Interface.encodeFunctionData
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:66
 
-▸ **encodeFunctionData**(`functionFragment`: ``"allowance"``, `values`: [*string*, *string*]): *string*
+▸ **encodeFunctionData**(`functionFragment`: `"allowance"`, `values`: [*string*, *string*]): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"allowance"`` |
-| `values` | [*string*, *string*] |
+| Name               | Type                 |
+| :----------------- | :------------------- |
+| `functionFragment` | `"allowance"`        |
+| `values`           | [*string*, *string*] |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: ethers.utils.Interface.encodeFunctionData
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:70
 
-▸ **encodeFunctionData**(`functionFragment`: ``"approve"``, `values`: [*string*, BigNumberish]): *string*
+▸ **encodeFunctionData**(`functionFragment`: `"approve"`, `values`: [*string*, BigNumberish]): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"approve"`` |
-| `values` | [*string*, BigNumberish] |
+| Name               | Type                     |
+| :----------------- | :----------------------- |
+| `functionFragment` | `"approve"`              |
+| `values`           | [*string*, BigNumberish] |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: ethers.utils.Interface.encodeFunctionData
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:74
 
-▸ **encodeFunctionData**(`functionFragment`: ``"authorizeOperator"``, `values`: [*string*]): *string*
+▸ **encodeFunctionData**(`functionFragment`: `"authorizeOperator"`, `values`: [*string*]): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"authorizeOperator"`` |
-| `values` | [*string*] |
+| Name               | Type                  |
+| :----------------- | :-------------------- |
+| `functionFragment` | `"authorizeOperator"` |
+| `values`           | [*string*]            |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: ethers.utils.Interface.encodeFunctionData
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:78
 
-▸ **encodeFunctionData**(`functionFragment`: ``"balanceOf"``, `values`: [*string*]): *string*
+▸ **encodeFunctionData**(`functionFragment`: `"balanceOf"`, `values`: [*string*]): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"balanceOf"`` |
-| `values` | [*string*] |
+| Name               | Type          |
+| :----------------- | :------------ |
+| `functionFragment` | `"balanceOf"` |
+| `values`           | [*string*]    |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: ethers.utils.Interface.encodeFunctionData
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:82
 
-▸ **encodeFunctionData**(`functionFragment`: ``"balanceOfAt"``, `values`: [*string*, BigNumberish]): *string*
+▸ **encodeFunctionData**(`functionFragment`: `"balanceOfAt"`, `values`: [*string*, BigNumberish]): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"balanceOfAt"`` |
-| `values` | [*string*, BigNumberish] |
+| Name               | Type                     |
+| :----------------- | :----------------------- |
+| `functionFragment` | `"balanceOfAt"`          |
+| `values`           | [*string*, BigNumberish] |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: ethers.utils.Interface.encodeFunctionData
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:83
 
-▸ **encodeFunctionData**(`functionFragment`: ``"burn"``, `values`: [BigNumberish, BytesLike]): *string*
+▸ **encodeFunctionData**(`functionFragment`: `"burn"`, `values`: [BigNumberish, BytesLike]): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"burn"`` |
-| `values` | [BigNumberish, BytesLike] |
+| Name               | Type                      |
+| :----------------- | :------------------------ |
+| `functionFragment` | `"burn"`                  |
+| `values`           | [BigNumberish, BytesLike] |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: ethers.utils.Interface.encodeFunctionData
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:87
 
-▸ **encodeFunctionData**(`functionFragment`: ``"decimals"``, `values?`: *undefined*): *string*
+▸ **encodeFunctionData**(`functionFragment`: `"decimals"`, `values?`: _undefined_): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"decimals"`` |
-| `values?` | *undefined* |
+| Name               | Type         |
+| :----------------- | :----------- |
+| `functionFragment` | `"decimals"` |
+| `values?`          | _undefined_  |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: ethers.utils.Interface.encodeFunctionData
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:91
 
-▸ **encodeFunctionData**(`functionFragment`: ``"defaultOperators"``, `values?`: *undefined*): *string*
+▸ **encodeFunctionData**(`functionFragment`: `"defaultOperators"`, `values?`: _undefined_): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"defaultOperators"`` |
-| `values?` | *undefined* |
+| Name               | Type                 |
+| :----------------- | :------------------- |
+| `functionFragment` | `"defaultOperators"` |
+| `values?`          | _undefined_          |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: ethers.utils.Interface.encodeFunctionData
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:92
 
-▸ **encodeFunctionData**(`functionFragment`: ``"getRoleAdmin"``, `values`: [BytesLike]): *string*
+▸ **encodeFunctionData**(`functionFragment`: `"getRoleAdmin"`, `values`: [BytesLike]): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"getRoleAdmin"`` |
-| `values` | [BytesLike] |
+| Name               | Type             |
+| :----------------- | :--------------- |
+| `functionFragment` | `"getRoleAdmin"` |
+| `values`           | [BytesLike]      |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: ethers.utils.Interface.encodeFunctionData
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:96
 
-▸ **encodeFunctionData**(`functionFragment`: ``"getRoleMember"``, `values`: [BytesLike, BigNumberish]): *string*
+▸ **encodeFunctionData**(`functionFragment`: `"getRoleMember"`, `values`: [BytesLike, BigNumberish]): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"getRoleMember"`` |
-| `values` | [BytesLike, BigNumberish] |
+| Name               | Type                      |
+| :----------------- | :------------------------ |
+| `functionFragment` | `"getRoleMember"`         |
+| `values`           | [BytesLike, BigNumberish] |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: ethers.utils.Interface.encodeFunctionData
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:100
 
-▸ **encodeFunctionData**(`functionFragment`: ``"getRoleMemberCount"``, `values`: [BytesLike]): *string*
+▸ **encodeFunctionData**(`functionFragment`: `"getRoleMemberCount"`, `values`: [BytesLike]): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"getRoleMemberCount"`` |
-| `values` | [BytesLike] |
+| Name               | Type                   |
+| :----------------- | :--------------------- |
+| `functionFragment` | `"getRoleMemberCount"` |
+| `values`           | [BytesLike]            |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: ethers.utils.Interface.encodeFunctionData
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:104
 
-▸ **encodeFunctionData**(`functionFragment`: ``"grantRole"``, `values`: [BytesLike, *string*]): *string*
+▸ **encodeFunctionData**(`functionFragment`: `"grantRole"`, `values`: [BytesLike, *string*]): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"grantRole"`` |
-| `values` | [BytesLike, *string*] |
+| Name               | Type                  |
+| :----------------- | :-------------------- |
+| `functionFragment` | `"grantRole"`         |
+| `values`           | [BytesLike, *string*] |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: ethers.utils.Interface.encodeFunctionData
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:108
 
-▸ **encodeFunctionData**(`functionFragment`: ``"granularity"``, `values?`: *undefined*): *string*
+▸ **encodeFunctionData**(`functionFragment`: `"granularity"`, `values?`: _undefined_): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"granularity"`` |
-| `values?` | *undefined* |
+| Name               | Type            |
+| :----------------- | :-------------- |
+| `functionFragment` | `"granularity"` |
+| `values?`          | _undefined_     |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: ethers.utils.Interface.encodeFunctionData
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:112
 
-▸ **encodeFunctionData**(`functionFragment`: ``"hasRole"``, `values`: [BytesLike, *string*]): *string*
+▸ **encodeFunctionData**(`functionFragment`: `"hasRole"`, `values`: [BytesLike, *string*]): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"hasRole"`` |
-| `values` | [BytesLike, *string*] |
+| Name               | Type                  |
+| :----------------- | :-------------------- |
+| `functionFragment` | `"hasRole"`           |
+| `values`           | [BytesLike, *string*] |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: ethers.utils.Interface.encodeFunctionData
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:116
 
-▸ **encodeFunctionData**(`functionFragment`: ``"isOperatorFor"``, `values`: [*string*, *string*]): *string*
+▸ **encodeFunctionData**(`functionFragment`: `"isOperatorFor"`, `values`: [*string*, *string*]): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"isOperatorFor"`` |
-| `values` | [*string*, *string*] |
+| Name               | Type                 |
+| :----------------- | :------------------- |
+| `functionFragment` | `"isOperatorFor"`    |
+| `values`           | [*string*, *string*] |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: ethers.utils.Interface.encodeFunctionData
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:120
 
-▸ **encodeFunctionData**(`functionFragment`: ``"mint"``, `values`: [*string*, BigNumberish, BytesLike, BytesLike]): *string*
+▸ **encodeFunctionData**(`functionFragment`: `"mint"`, `values`: [*string*, BigNumberish, BytesLike, BytesLike]): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"mint"`` |
-| `values` | [*string*, BigNumberish, BytesLike, BytesLike] |
+| Name               | Type                                           |
+| :----------------- | :--------------------------------------------- |
+| `functionFragment` | `"mint"`                                       |
+| `values`           | [*string*, BigNumberish, BytesLike, BytesLike] |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: ethers.utils.Interface.encodeFunctionData
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:124
 
-▸ **encodeFunctionData**(`functionFragment`: ``"name"``, `values?`: *undefined*): *string*
+▸ **encodeFunctionData**(`functionFragment`: `"name"`, `values?`: _undefined_): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"name"`` |
-| `values?` | *undefined* |
+| Name               | Type        |
+| :----------------- | :---------- |
+| `functionFragment` | `"name"`    |
+| `values?`          | _undefined_ |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: ethers.utils.Interface.encodeFunctionData
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:128
 
-▸ **encodeFunctionData**(`functionFragment`: ``"operatorBurn"``, `values`: [*string*, BigNumberish, BytesLike, BytesLike]): *string*
+▸ **encodeFunctionData**(`functionFragment`: `"operatorBurn"`, `values`: [*string*, BigNumberish, BytesLike, BytesLike]): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"operatorBurn"`` |
-| `values` | [*string*, BigNumberish, BytesLike, BytesLike] |
+| Name               | Type                                           |
+| :----------------- | :--------------------------------------------- |
+| `functionFragment` | `"operatorBurn"`                               |
+| `values`           | [*string*, BigNumberish, BytesLike, BytesLike] |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: ethers.utils.Interface.encodeFunctionData
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:129
 
-▸ **encodeFunctionData**(`functionFragment`: ``"operatorSend"``, `values`: [*string*, *string*, BigNumberish, BytesLike, BytesLike]): *string*
+▸ **encodeFunctionData**(`functionFragment`: `"operatorSend"`, `values`: [*string*, *string*, BigNumberish, BytesLike, BytesLike]): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"operatorSend"`` |
-| `values` | [*string*, *string*, BigNumberish, BytesLike, BytesLike] |
+| Name               | Type                                                     |
+| :----------------- | :------------------------------------------------------- |
+| `functionFragment` | `"operatorSend"`                                         |
+| `values`           | [*string*, *string*, BigNumberish, BytesLike, BytesLike] |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: ethers.utils.Interface.encodeFunctionData
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:133
 
-▸ **encodeFunctionData**(`functionFragment`: ``"renounceRole"``, `values`: [BytesLike, *string*]): *string*
+▸ **encodeFunctionData**(`functionFragment`: `"renounceRole"`, `values`: [BytesLike, *string*]): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"renounceRole"`` |
-| `values` | [BytesLike, *string*] |
+| Name               | Type                  |
+| :----------------- | :-------------------- |
+| `functionFragment` | `"renounceRole"`      |
+| `values`           | [BytesLike, *string*] |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: ethers.utils.Interface.encodeFunctionData
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:137
 
-▸ **encodeFunctionData**(`functionFragment`: ``"revokeOperator"``, `values`: [*string*]): *string*
+▸ **encodeFunctionData**(`functionFragment`: `"revokeOperator"`, `values`: [*string*]): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"revokeOperator"`` |
-| `values` | [*string*] |
+| Name               | Type               |
+| :----------------- | :----------------- |
+| `functionFragment` | `"revokeOperator"` |
+| `values`           | [*string*]         |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: ethers.utils.Interface.encodeFunctionData
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:141
 
-▸ **encodeFunctionData**(`functionFragment`: ``"revokeRole"``, `values`: [BytesLike, *string*]): *string*
+▸ **encodeFunctionData**(`functionFragment`: `"revokeRole"`, `values`: [BytesLike, *string*]): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"revokeRole"`` |
-| `values` | [BytesLike, *string*] |
+| Name               | Type                  |
+| :----------------- | :-------------------- |
+| `functionFragment` | `"revokeRole"`        |
+| `values`           | [BytesLike, *string*] |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: ethers.utils.Interface.encodeFunctionData
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:145
 
-▸ **encodeFunctionData**(`functionFragment`: ``"send"``, `values`: [*string*, BigNumberish, BytesLike]): *string*
+▸ **encodeFunctionData**(`functionFragment`: `"send"`, `values`: [*string*, BigNumberish, BytesLike]): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"send"`` |
-| `values` | [*string*, BigNumberish, BytesLike] |
+| Name               | Type                                |
+| :----------------- | :---------------------------------- |
+| `functionFragment` | `"send"`                            |
+| `values`           | [*string*, BigNumberish, BytesLike] |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: ethers.utils.Interface.encodeFunctionData
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:149
 
-▸ **encodeFunctionData**(`functionFragment`: ``"symbol"``, `values?`: *undefined*): *string*
+▸ **encodeFunctionData**(`functionFragment`: `"symbol"`, `values?`: _undefined_): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"symbol"`` |
-| `values?` | *undefined* |
+| Name               | Type        |
+| :----------------- | :---------- |
+| `functionFragment` | `"symbol"`  |
+| `values?`          | _undefined_ |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: ethers.utils.Interface.encodeFunctionData
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:153
 
-▸ **encodeFunctionData**(`functionFragment`: ``"totalSupply"``, `values?`: *undefined*): *string*
+▸ **encodeFunctionData**(`functionFragment`: `"totalSupply"`, `values?`: _undefined_): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"totalSupply"`` |
-| `values?` | *undefined* |
+| Name               | Type            |
+| :----------------- | :-------------- |
+| `functionFragment` | `"totalSupply"` |
+| `values?`          | _undefined_     |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: ethers.utils.Interface.encodeFunctionData
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:154
 
-▸ **encodeFunctionData**(`functionFragment`: ``"totalSupplyAt"``, `values`: [BigNumberish]): *string*
+▸ **encodeFunctionData**(`functionFragment`: `"totalSupplyAt"`, `values`: [BigNumberish]): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"totalSupplyAt"`` |
-| `values` | [BigNumberish] |
+| Name               | Type              |
+| :----------------- | :---------------- |
+| `functionFragment` | `"totalSupplyAt"` |
+| `values`           | [BigNumberish]    |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: ethers.utils.Interface.encodeFunctionData
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:158
 
-▸ **encodeFunctionData**(`functionFragment`: ``"totalSupplySnapshots"``, `values`: [BigNumberish]): *string*
+▸ **encodeFunctionData**(`functionFragment`: `"totalSupplySnapshots"`, `values`: [BigNumberish]): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"totalSupplySnapshots"`` |
-| `values` | [BigNumberish] |
+| Name               | Type                     |
+| :----------------- | :----------------------- |
+| `functionFragment` | `"totalSupplySnapshots"` |
+| `values`           | [BigNumberish]           |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: ethers.utils.Interface.encodeFunctionData
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:162
 
-▸ **encodeFunctionData**(`functionFragment`: ``"transfer"``, `values`: [*string*, BigNumberish]): *string*
+▸ **encodeFunctionData**(`functionFragment`: `"transfer"`, `values`: [*string*, BigNumberish]): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"transfer"`` |
-| `values` | [*string*, BigNumberish] |
+| Name               | Type                     |
+| :----------------- | :----------------------- |
+| `functionFragment` | `"transfer"`             |
+| `values`           | [*string*, BigNumberish] |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: ethers.utils.Interface.encodeFunctionData
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:166
 
-▸ **encodeFunctionData**(`functionFragment`: ``"transferFrom"``, `values`: [*string*, *string*, BigNumberish]): *string*
+▸ **encodeFunctionData**(`functionFragment`: `"transferFrom"`, `values`: [*string*, *string*, BigNumberish]): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | ``"transferFrom"`` |
-| `values` | [*string*, *string*, BigNumberish] |
+| Name               | Type                               |
+| :----------------- | :--------------------------------- |
+| `functionFragment` | `"transferFrom"`                   |
+| `values`           | [*string*, *string*, BigNumberish] |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: ethers.utils.Interface.encodeFunctionData
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:170
 
-___
+---
 
 ### encodeFunctionResult
 
-▸ **encodeFunctionResult**(`functionFragment`: *string* \| *FunctionFragment*, `values?`: readonly *any*[]): *string*
+▸ **encodeFunctionResult**(`functionFragment`: _string_ \| _FunctionFragment_, `values?`: readonly _any_[]): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | *string* \| *FunctionFragment* |
-| `values?` | readonly *any*[] |
+| Name               | Type                           |
+| :----------------- | :----------------------------- |
+| `functionFragment` | _string_ \| _FunctionFragment_ |
+| `values?`          | readonly _any_[]               |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Inherited from: ethers.utils.Interface.encodeFunctionResult
 
 Defined in: node_modules/@ethersproject/abi/lib/interface.d.ts:61
 
-___
+---
 
 ### format
 
-▸ **format**(`format?`: *string*): *string* \| *string*[]
+▸ **format**(`format?`: _string_): _string_ \| _string_[]
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `format?` | *string* |
+| Name      | Type     |
+| :-------- | :------- |
+| `format?` | _string_ |
 
-**Returns:** *string* \| *string*[]
+**Returns:** _string_ \| _string_[]
 
 Inherited from: ethers.utils.Interface.format
 
 Defined in: node_modules/@ethersproject/abi/lib/interface.d.ts:46
 
-___
+---
 
 ### getEvent
 
-▸ **getEvent**(`nameOrSignatureOrTopic`: ``"Approval"``): *EventFragment*
+▸ **getEvent**(`nameOrSignatureOrTopic`: `"Approval"`): _EventFragment_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `nameOrSignatureOrTopic` | ``"Approval"`` |
+| Name                     | Type         |
+| :----------------------- | :----------- |
+| `nameOrSignatureOrTopic` | `"Approval"` |
 
-**Returns:** *EventFragment*
+**Returns:** _EventFragment_
 
 Overrides: ethers.utils.Interface.getEvent
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:277
 
-▸ **getEvent**(`nameOrSignatureOrTopic`: ``"AuthorizedOperator"``): *EventFragment*
+▸ **getEvent**(`nameOrSignatureOrTopic`: `"AuthorizedOperator"`): _EventFragment_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `nameOrSignatureOrTopic` | ``"AuthorizedOperator"`` |
+| Name                     | Type                   |
+| :----------------------- | :--------------------- |
+| `nameOrSignatureOrTopic` | `"AuthorizedOperator"` |
 
-**Returns:** *EventFragment*
+**Returns:** _EventFragment_
 
 Overrides: ethers.utils.Interface.getEvent
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:278
 
-▸ **getEvent**(`nameOrSignatureOrTopic`: ``"Burned"``): *EventFragment*
+▸ **getEvent**(`nameOrSignatureOrTopic`: `"Burned"`): _EventFragment_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `nameOrSignatureOrTopic` | ``"Burned"`` |
+| Name                     | Type       |
+| :----------------------- | :--------- |
+| `nameOrSignatureOrTopic` | `"Burned"` |
 
-**Returns:** *EventFragment*
+**Returns:** _EventFragment_
 
 Overrides: ethers.utils.Interface.getEvent
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:279
 
-▸ **getEvent**(`nameOrSignatureOrTopic`: ``"Minted"``): *EventFragment*
+▸ **getEvent**(`nameOrSignatureOrTopic`: `"Minted"`): _EventFragment_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `nameOrSignatureOrTopic` | ``"Minted"`` |
+| Name                     | Type       |
+| :----------------------- | :--------- |
+| `nameOrSignatureOrTopic` | `"Minted"` |
 
-**Returns:** *EventFragment*
+**Returns:** _EventFragment_
 
 Overrides: ethers.utils.Interface.getEvent
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:280
 
-▸ **getEvent**(`nameOrSignatureOrTopic`: ``"RevokedOperator"``): *EventFragment*
+▸ **getEvent**(`nameOrSignatureOrTopic`: `"RevokedOperator"`): _EventFragment_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `nameOrSignatureOrTopic` | ``"RevokedOperator"`` |
+| Name                     | Type                |
+| :----------------------- | :------------------ |
+| `nameOrSignatureOrTopic` | `"RevokedOperator"` |
 
-**Returns:** *EventFragment*
+**Returns:** _EventFragment_
 
 Overrides: ethers.utils.Interface.getEvent
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:281
 
-▸ **getEvent**(`nameOrSignatureOrTopic`: ``"RoleGranted"``): *EventFragment*
+▸ **getEvent**(`nameOrSignatureOrTopic`: `"RoleGranted"`): _EventFragment_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `nameOrSignatureOrTopic` | ``"RoleGranted"`` |
+| Name                     | Type            |
+| :----------------------- | :-------------- |
+| `nameOrSignatureOrTopic` | `"RoleGranted"` |
 
-**Returns:** *EventFragment*
+**Returns:** _EventFragment_
 
 Overrides: ethers.utils.Interface.getEvent
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:282
 
-▸ **getEvent**(`nameOrSignatureOrTopic`: ``"RoleRevoked"``): *EventFragment*
+▸ **getEvent**(`nameOrSignatureOrTopic`: `"RoleRevoked"`): _EventFragment_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `nameOrSignatureOrTopic` | ``"RoleRevoked"`` |
+| Name                     | Type            |
+| :----------------------- | :-------------- |
+| `nameOrSignatureOrTopic` | `"RoleRevoked"` |
 
-**Returns:** *EventFragment*
+**Returns:** _EventFragment_
 
 Overrides: ethers.utils.Interface.getEvent
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:283
 
-▸ **getEvent**(`nameOrSignatureOrTopic`: ``"Sent"``): *EventFragment*
+▸ **getEvent**(`nameOrSignatureOrTopic`: `"Sent"`): _EventFragment_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `nameOrSignatureOrTopic` | ``"Sent"`` |
+| Name                     | Type     |
+| :----------------------- | :------- |
+| `nameOrSignatureOrTopic` | `"Sent"` |
 
-**Returns:** *EventFragment*
+**Returns:** _EventFragment_
 
 Overrides: ethers.utils.Interface.getEvent
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:284
 
-▸ **getEvent**(`nameOrSignatureOrTopic`: ``"Transfer"``): *EventFragment*
+▸ **getEvent**(`nameOrSignatureOrTopic`: `"Transfer"`): _EventFragment_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `nameOrSignatureOrTopic` | ``"Transfer"`` |
+| Name                     | Type         |
+| :----------------------- | :----------- |
+| `nameOrSignatureOrTopic` | `"Transfer"` |
 
-**Returns:** *EventFragment*
+**Returns:** _EventFragment_
 
 Overrides: ethers.utils.Interface.getEvent
 
 Defined in: packages/core-ethereum/src/contracts/HoprToken.d.ts:285
 
-___
+---
 
 ### getEventTopic
 
-▸ **getEventTopic**(`eventFragment`: *string* \| *EventFragment*): *string*
+▸ **getEventTopic**(`eventFragment`: _string_ \| _EventFragment_): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `eventFragment` | *string* \| *EventFragment* |
+| Name            | Type                        |
+| :-------------- | :-------------------------- |
+| `eventFragment` | _string_ \| _EventFragment_ |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Inherited from: ethers.utils.Interface.getEventTopic
 
 Defined in: node_modules/@ethersproject/abi/lib/interface.d.ts:54
 
-___
+---
 
 ### getFunction
 
-▸ **getFunction**(`nameOrSignatureOrSighash`: *string*): *FunctionFragment*
+▸ **getFunction**(`nameOrSignatureOrSighash`: _string_): _FunctionFragment_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `nameOrSignatureOrSighash` | *string* |
+| Name                       | Type     |
+| :------------------------- | :------- |
+| `nameOrSignatureOrSighash` | _string_ |
 
-**Returns:** *FunctionFragment*
+**Returns:** _FunctionFragment_
 
 Inherited from: ethers.utils.Interface.getFunction
 
 Defined in: node_modules/@ethersproject/abi/lib/interface.d.ts:51
 
-___
+---
 
 ### getSighash
 
-▸ **getSighash**(`functionFragment`: *string* \| *FunctionFragment*): *string*
+▸ **getSighash**(`functionFragment`: _string_ \| _FunctionFragment_): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `functionFragment` | *string* \| *FunctionFragment* |
+| Name               | Type                           |
+| :----------------- | :----------------------------- |
+| `functionFragment` | _string_ \| _FunctionFragment_ |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Inherited from: ethers.utils.Interface.getSighash
 
 Defined in: node_modules/@ethersproject/abi/lib/interface.d.ts:53
 
-___
+---
 
 ### parseLog
 
-▸ **parseLog**(`log`: { `data`: *string* ; `topics`: *string*[]  }): *LogDescription*
+▸ **parseLog**(`log`: { `data`: _string_ ; `topics`: _string_[] }): _LogDescription_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `log` | *object* |
-| `log.data` | *string* |
-| `log.topics` | *string*[] |
+| Name         | Type       |
+| :----------- | :--------- |
+| `log`        | _object_   |
+| `log.data`   | _string_   |
+| `log.topics` | _string_[] |
 
-**Returns:** *LogDescription*
+**Returns:** _LogDescription_
 
 Inherited from: ethers.utils.Interface.parseLog
 
 Defined in: node_modules/@ethersproject/abi/lib/interface.d.ts:72
 
-___
+---
 
 ### parseTransaction
 
-▸ **parseTransaction**(`tx`: { `data`: *string* ; `value?`: BigNumberish  }): *TransactionDescription*
+▸ **parseTransaction**(`tx`: { `data`: _string_ ; `value?`: BigNumberish }): _TransactionDescription_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `tx` | *object* |
-| `tx.data` | *string* |
+| Name        | Type         |
+| :---------- | :----------- |
+| `tx`        | _object_     |
+| `tx.data`   | _string_     |
 | `tx.value?` | BigNumberish |
 
-**Returns:** *TransactionDescription*
+**Returns:** _TransactionDescription_
 
 Inherited from: ethers.utils.Interface.parseTransaction
 

@@ -18,28 +18,29 @@
 #### Type parameters
 
 | Name |
-| :------ |
-| `T` |
+| :--- |
+| `T`  |
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `collection` | T[] |
+| Name         | Type |
+| :----------- | :--- |
+| `collection` | T[]  |
 
 **Returns:** T
 
 Defined in: [crypto/randomInteger.ts:85](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/crypto/randomInteger.ts#L85)
 
-___
+---
 
 ### randomInteger
 
-▸ **randomInteger**(`start`: *number*, `end?`: *number*, `_seed?`: Uint8Array): *number*
+▸ **randomInteger**(`start`: _number_, `end?`: _number_, `_seed?`: Uint8Array): _number_
 
 Returns a random value between `start` and `end`.
 
 **`example`**
+
 ```
 randomInteger(3) // result in { 0, 1, 2, 3 }
 randomInteger(0, 3) // result in { 0, 1, 2, 3 }
@@ -49,13 +50,13 @@ randomInteger(8, 8) == 8
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `start` | *number* | start of the interval |
-| `end?` | *number* | end of the interval inclusive |
-| `_seed?` | Uint8Array | - |
+| Name     | Type       | Description                   |
+| :------- | :--------- | :---------------------------- |
+| `start`  | _number_   | start of the interval         |
+| `end?`   | _number_   | end of the interval inclusive |
+| `_seed?` | Uint8Array | -                             |
 
-**Returns:** *number*
+**Returns:** _number_
 
 random number between @param start and @param end
 

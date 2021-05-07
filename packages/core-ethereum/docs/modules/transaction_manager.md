@@ -16,13 +16,13 @@
 
 ### Transaction
 
-Ƭ **Transaction**: *object*
+Ƭ **Transaction**: _object_
 
 #### Type declaration
 
-| Name | Type |
-| :------ | :------ |
-| `createdAt` | *number* |
-| `nonce` | *number* |
+| Name        | Type     |
+| :---------- | :------- |
+| `createdAt` | _number_ |
+| `nonce`     | _number_ |
 
 Defined in: [packages/core-ethereum/src/transaction-manager.ts:4](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core-ethereum/src/transaction-manager.ts#L4)

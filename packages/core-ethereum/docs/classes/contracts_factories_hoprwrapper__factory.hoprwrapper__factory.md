@@ -1,8 +1,8 @@
-[@hoprnet/hopr-core-ethereum](../README.md) / [Exports](../modules.md) / [contracts/factories/HoprWrapper__factory](../modules/contracts_factories_hoprwrapper__factory.md) / HoprWrapper__factory
+[@hoprnet/hopr-core-ethereum](../README.md) / [Exports](../modules.md) / [contracts/factories/HoprWrapper\_\_factory](../modules/contracts_factories_hoprwrapper__factory.md) / HoprWrapper\_\_factory
 
 # Class: HoprWrapper\_\_factory
 
-[contracts/factories/HoprWrapper__factory](../modules/contracts_factories_hoprwrapper__factory.md).HoprWrapper__factory
+[contracts/factories/HoprWrapper\_\_factory](../modules/contracts_factories_hoprwrapper__factory.md).HoprWrapper\_\_factory
 
 ## Table of contents
 
@@ -18,23 +18,23 @@
 
 ### constructor
 
-\+ **new HoprWrapper__factory**(): [*HoprWrapper\_\_factory*](contracts_factories_hoprwrapper__factory.hoprwrapper__factory.md)
+\+ **new HoprWrapper\_\_factory**(): [_HoprWrapper\_\_factory_](contracts_factories_hoprwrapper__factory.hoprwrapper__factory.md)
 
-**Returns:** [*HoprWrapper\_\_factory*](contracts_factories_hoprwrapper__factory.hoprwrapper__factory.md)
+**Returns:** [_HoprWrapper\_\_factory_](contracts_factories_hoprwrapper__factory.hoprwrapper__factory.md)
 
 ## Methods
 
 ### connect
 
-▸ `Static` **connect**(`address`: *string*, `signerOrProvider`: *Provider* \| *Signer*): [*HoprWrapper*](contracts_hoprwrapper.hoprwrapper.md)
+▸ `Static` **connect**(`address`: _string_, `signerOrProvider`: _Provider_ \| _Signer_): [_HoprWrapper_](contracts_hoprwrapper.hoprwrapper.md)
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `address` | *string* |
-| `signerOrProvider` | *Provider* \| *Signer* |
+| Name               | Type                   |
+| :----------------- | :--------------------- |
+| `address`          | _string_               |
+| `signerOrProvider` | _Provider_ \| _Signer_ |
 
-**Returns:** [*HoprWrapper*](contracts_hoprwrapper.hoprwrapper.md)
+**Returns:** [_HoprWrapper_](contracts_hoprwrapper.hoprwrapper.md)
 
-Defined in: packages/core-ethereum/src/contracts/factories/HoprWrapper__factory.ts:11
+Defined in: packages/core-ethereum/src/contracts/factories/HoprWrapper\_\_factory.ts:11

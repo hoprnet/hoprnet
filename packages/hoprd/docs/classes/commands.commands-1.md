@@ -29,15 +29,15 @@
 
 ### constructor
 
-\+ **new Commands**(`node`: *Hopr*): [*Commands*](commands.commands-1.md)
+\+ **new Commands**(`node`: _Hopr_): [_Commands_](commands.commands-1.md)
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `node` | *Hopr* |
+| Name   | Type   |
+| :----- | :----- |
+| `node` | _Hopr_ |
 
-**Returns:** [*Commands*](commands.commands-1.md)
+**Returns:** [_Commands_](commands.commands-1.md)
 
 Defined in: [commands/index.ts:30](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/index.ts#L30)
 
@@ -45,29 +45,29 @@ Defined in: [commands/index.ts:30](https://github.com/hoprnet/hoprnet/blob/448a4
 
 ### commandMap
 
-• `Private` **commandMap**: *Map*<string, [*AbstractCommand*](commands_abstractcommand.abstractcommand.md)\>
+• `Private` **commandMap**: _Map_<string, [_AbstractCommand_](commands_abstractcommand.abstractcommand.md)\>
 
 Defined in: [commands/index.ts:29](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/index.ts#L29)
 
-___
+---
 
 ### commands
 
-• `Readonly` **commands**: [*AbstractCommand*](commands_abstractcommand.abstractcommand.md)[]
+• `Readonly` **commands**: [_AbstractCommand_](commands_abstractcommand.abstractcommand.md)[]
 
 Defined in: [commands/index.ts:28](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/index.ts#L28)
 
-___
+---
 
 ### node
 
-• **node**: *Hopr*
+• **node**: _Hopr_
 
-___
+---
 
 ### state
 
-• `Private` **state**: [*GlobalState*](../modules/commands_abstractcommand.md#globalstate)
+• `Private` **state**: [_GlobalState_](../modules/commands_abstractcommand.md#globalstate)
 
 Defined in: [commands/index.ts:30](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/index.ts#L30)
 
@@ -75,72 +75,72 @@ Defined in: [commands/index.ts:30](https://github.com/hoprnet/hoprnet/blob/448a4
 
 ### allCommands
 
-▸ **allCommands**(): *string*[]
+▸ **allCommands**(): _string_[]
 
-**Returns:** *string*[]
+**Returns:** _string_[]
 
 Defined in: [commands/index.ts:75](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/index.ts#L75)
 
-___
+---
 
 ### autocomplete
 
-▸ **autocomplete**(`message`: *string*): *Promise*<[*AutoCompleteResult*](../modules/commands_abstractcommand.md#autocompleteresult)\>
+▸ **autocomplete**(`message`: _string_): _Promise_<[_AutoCompleteResult_](../modules/commands_abstractcommand.md#autocompleteresult)\>
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `message` | *string* |
+| Name      | Type     |
+| :-------- | :------- |
+| `message` | _string_ |
 
-**Returns:** *Promise*<[*AutoCompleteResult*](../modules/commands_abstractcommand.md#autocompleteresult)\>
+**Returns:** _Promise_<[_AutoCompleteResult_](../modules/commands_abstractcommand.md#autocompleteresult)\>
 
 Defined in: [commands/index.ts:101](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/index.ts#L101)
 
-___
+---
 
 ### execute
 
-▸ **execute**(`message`: *string*): *Promise*<[*CommandResponse*](../modules/commands_abstractcommand.md#commandresponse)\>
+▸ **execute**(`message`: _string_): _Promise_<[_CommandResponse_](../modules/commands_abstractcommand.md#commandresponse)\>
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `message` | *string* |
+| Name      | Type     |
+| :-------- | :------- |
+| `message` | _string_ |
 
-**Returns:** *Promise*<[*CommandResponse*](../modules/commands_abstractcommand.md#commandresponse)\>
+**Returns:** _Promise_<[_CommandResponse_](../modules/commands_abstractcommand.md#commandresponse)\>
 
 Defined in: [commands/index.ts:83](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/index.ts#L83)
 
-___
+---
 
 ### find
 
-▸ **find**(`command`: *string*): [*AbstractCommand*](commands_abstractcommand.abstractcommand.md)
+▸ **find**(`command`: _string_): [_AbstractCommand_](commands_abstractcommand.abstractcommand.md)
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `command` | *string* |
+| Name      | Type     |
+| :-------- | :------- |
+| `command` | _string_ |
 
-**Returns:** [*AbstractCommand*](commands_abstractcommand.abstractcommand.md)
+**Returns:** [_AbstractCommand_](commands_abstractcommand.abstractcommand.md)
 
 Defined in: [commands/index.ts:79](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/index.ts#L79)
 
-___
+---
 
 ### setState
 
-▸ **setState**(`settings`: *any*): *void*
+▸ **setState**(`settings`: _any_): _void_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `settings` | *any* |
+| Name       | Type  |
+| :--------- | :---- |
+| `settings` | _any_ |
 
-**Returns:** *void*
+**Returns:** _void_
 
 Defined in: [commands/index.ts:71](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/index.ts#L71)

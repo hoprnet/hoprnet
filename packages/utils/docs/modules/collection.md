@@ -15,7 +15,7 @@
 
 Re-exports: [randomPermutation](collection_randompermutation.md#randompermutation)
 
-___
+---
 
 ### randomSubset
 

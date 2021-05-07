@@ -12,7 +12,7 @@
 
 ### knownConnectors
 
-• `Const` **knownConnectors**: *string*[][]
+• `Const` **knownConnectors**: _string_[][]
 
 Alphabetical list of known connectors.
 

@@ -12,16 +12,16 @@
 
 ### getAddrs
 
-▸ **getAddrs**(`id`: PeerId, `options`: [*HoprOptions*](index.md#hoproptions)): Multiaddr[]
+▸ **getAddrs**(`id`: PeerId, `options`: [_HoprOptions_](index.md#hoproptions)): Multiaddr[]
 
 Assemble the addresses that we are using
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `id` | PeerId |
-| `options` | [*HoprOptions*](index.md#hoproptions) |
+| Name      | Type                                  |
+| :-------- | :------------------------------------ |
+| `id`      | PeerId                                |
+| `options` | [_HoprOptions_](index.md#hoproptions) |
 
 **Returns:** Multiaddr[]
 

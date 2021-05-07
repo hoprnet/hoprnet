@@ -6,7 +6,7 @@
 
 ## Implements
 
-- [*ChannelStrategy*](../interfaces/channel_strategy.channelstrategy.md)
+- [_ChannelStrategy_](../interfaces/channel_strategy.channelstrategy.md)
 
 ## Table of contents
 
@@ -26,15 +26,15 @@
 
 ### constructor
 
-\+ **new PassiveStrategy**(): [*PassiveStrategy*](channel_strategy.passivestrategy.md)
+\+ **new PassiveStrategy**(): [_PassiveStrategy_](channel_strategy.passivestrategy.md)
 
-**Returns:** [*PassiveStrategy*](channel_strategy.passivestrategy.md)
+**Returns:** [_PassiveStrategy_](channel_strategy.passivestrategy.md)
 
 ## Properties
 
 ### name
 
-• **name**: *string*= 'passive'
+• **name**: _string_= 'passive'
 
 Implementation of: [ChannelStrategy](../interfaces/channel_strategy.channelstrategy.md).[name](../interfaces/channel_strategy.channelstrategy.md#name)
 
@@ -44,18 +44,18 @@ Defined in: [packages/core/src/channel-strategy.ts:49](https://github.com/hoprne
 
 ### tick
 
-▸ **tick**(`_balance`: *BN*, `_n`: RoutingChannel[], `_c`: RoutingChannel[], `_p`: [*default*](network_network_peers.default.md)): *Promise*<[[*ChannelsToOpen*](../modules/channel_strategy.md#channelstoopen)[], *PeerId*[]]\>
+▸ **tick**(`_balance`: _BN_, `_n`: RoutingChannel[], `_c`: RoutingChannel[], `_p`: [_default_](network_network_peers.default.md)): _Promise_<[[*ChannelsToOpen*](../modules/channel_strategy.md#channelstoopen)[], *PeerId*[]]\>
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `_balance` | *BN* |
-| `_n` | RoutingChannel[] |
-| `_c` | RoutingChannel[] |
-| `_p` | [*default*](network_network_peers.default.md) |
+| Name       | Type                                          |
+| :--------- | :-------------------------------------------- |
+| `_balance` | _BN_                                          |
+| `_n`       | RoutingChannel[]                              |
+| `_c`       | RoutingChannel[]                              |
+| `_p`       | [_default_](network_network_peers.default.md) |
 
-**Returns:** *Promise*<[[*ChannelsToOpen*](../modules/channel_strategy.md#channelstoopen)[], *PeerId*[]]\>
+**Returns:** _Promise_<[[*ChannelsToOpen*](../modules/channel_strategy.md#channelstoopen)[], *PeerId*[]]\>
 
 Implementation of: [ChannelStrategy](../interfaces/channel_strategy.channelstrategy.md)
 

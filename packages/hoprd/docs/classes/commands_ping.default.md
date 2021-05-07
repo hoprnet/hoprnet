@@ -6,7 +6,7 @@
 
 ## Hierarchy
 
-- [*AbstractCommand*](commands_abstractcommand.abstractcommand.md)
+- [_AbstractCommand_](commands_abstractcommand.abstractcommand.md)
 
   ↳ **default**
 
@@ -35,15 +35,15 @@
 
 ### constructor
 
-\+ **new default**(`node`: *Hopr*): [*default*](commands_ping.default.md)
+\+ **new default**(`node`: _Hopr_): [_default_](commands_ping.default.md)
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `node` | *Hopr* |
+| Name   | Type   |
+| :----- | :----- |
+| `node` | _Hopr_ |
 
-**Returns:** [*default*](commands_ping.default.md)
+**Returns:** [_default_](commands_ping.default.md)
 
 Overrides: [AbstractCommand](commands_abstractcommand.abstractcommand.md)
 
@@ -53,134 +53,134 @@ Defined in: [commands/ping.ts:7](https://github.com/hoprnet/hoprnet/blob/448a47a
 
 ### hidden
 
-• **hidden**: *boolean*= false
+• **hidden**: _boolean_= false
 
 Inherited from: [AbstractCommand](commands_abstractcommand.abstractcommand.md).[hidden](commands_abstractcommand.abstractcommand.md#hidden)
 
 Defined in: [commands/abstractCommand.ts:15](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/abstractCommand.ts#L15)
 
-___
+---
 
 ### node
 
-• **node**: *Hopr*
+• **node**: _Hopr_
 
 ## Methods
 
 ### \_assertUsage
 
-▸ `Protected` **_assertUsage**(`query`: *string*, `parameters`: *string*[], `test?`: *RegExp*): *string*[]
+▸ `Protected` **\_assertUsage**(`query`: _string_, `parameters`: _string_[], `test?`: _RegExp_): _string_[]
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `query` | *string* |
-| `parameters` | *string*[] |
-| `test?` | *RegExp* |
+| Name         | Type       |
+| :----------- | :--------- |
+| `query`      | _string_   |
+| `parameters` | _string_[] |
+| `test?`      | _RegExp_   |
 
-**Returns:** *string*[]
+**Returns:** _string_[]
 
 Inherited from: [AbstractCommand](commands_abstractcommand.abstractcommand.md)
 
 Defined in: [commands/abstractCommand.ts:54](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/abstractCommand.ts#L54)
 
-___
+---
 
 ### \_autocompleteByFiltering
 
-▸ `Protected` **_autocompleteByFiltering**(`query`: *string*, `allResults`: *string*[], `line`: *string*): [*AutoCompleteResult*](../modules/commands_abstractcommand.md#autocompleteresult)
+▸ `Protected` **\_autocompleteByFiltering**(`query`: _string_, `allResults`: _string_[], `line`: _string_): [_AutoCompleteResult_](../modules/commands_abstractcommand.md#autocompleteresult)
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `query` | *string* |
-| `allResults` | *string*[] |
-| `line` | *string* |
+| Name         | Type       |
+| :----------- | :--------- |
+| `query`      | _string_   |
+| `allResults` | _string_[] |
+| `line`       | _string_   |
 
-**Returns:** [*AutoCompleteResult*](../modules/commands_abstractcommand.md#autocompleteresult)
+**Returns:** [_AutoCompleteResult_](../modules/commands_abstractcommand.md#autocompleteresult)
 
 Inherited from: [AbstractCommand](commands_abstractcommand.abstractcommand.md)
 
 Defined in: [commands/abstractCommand.ts:33](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/abstractCommand.ts#L33)
 
-___
+---
 
 ### autocomplete
 
-▸ **autocomplete**(`query?`: *string*, `line?`: *string*, `state`: [*GlobalState*](../modules/commands_abstractcommand.md#globalstate)): *Promise*<[*AutoCompleteResult*](../modules/commands_abstractcommand.md#autocompleteresult)\>
+▸ **autocomplete**(`query?`: _string_, `line?`: _string_, `state`: [_GlobalState_](../modules/commands_abstractcommand.md#globalstate)): _Promise_<[_AutoCompleteResult_](../modules/commands_abstractcommand.md#autocompleteresult)\>
 
 #### Parameters
 
-| Name | Type | Default value |
-| :------ | :------ | :------ |
-| `query` | *string* | '' |
-| `line` | *string* | '' |
-| `state` | [*GlobalState*](../modules/commands_abstractcommand.md#globalstate) | - |
+| Name    | Type                                                                | Default value |
+| :------ | :------------------------------------------------------------------ | :------------ |
+| `query` | _string_                                                            | ''            |
+| `line`  | _string_                                                            | ''            |
+| `state` | [_GlobalState_](../modules/commands_abstractcommand.md#globalstate) | -             |
 
-**Returns:** *Promise*<[*AutoCompleteResult*](../modules/commands_abstractcommand.md#autocompleteresult)\>
+**Returns:** _Promise_<[_AutoCompleteResult_](../modules/commands_abstractcommand.md#autocompleteresult)\>
 
 Overrides: [AbstractCommand](commands_abstractcommand.abstractcommand.md)
 
 Defined in: [commands/ping.ts:57](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/ping.ts#L57)
 
-___
+---
 
 ### execute
 
-▸ **execute**(`query`: *string*, `state`: [*GlobalState*](../modules/commands_abstractcommand.md#globalstate)): *Promise*<string\>
+▸ **execute**(`query`: _string_, `state`: [_GlobalState_](../modules/commands_abstractcommand.md#globalstate)): _Promise_<string\>
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `query` | *string* |
-| `state` | [*GlobalState*](../modules/commands_abstractcommand.md#globalstate) |
+| Name    | Type                                                                |
+| :------ | :------------------------------------------------------------------ |
+| `query` | _string_                                                            |
+| `state` | [_GlobalState_](../modules/commands_abstractcommand.md#globalstate) |
 
-**Returns:** *Promise*<string\>
+**Returns:** _Promise_<string\>
 
 Overrides: [AbstractCommand](commands_abstractcommand.abstractcommand.md)
 
 Defined in: [commands/ping.ts:20](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/ping.ts#L20)
 
-___
+---
 
 ### help
 
-▸ **help**(): *string*
+▸ **help**(): _string_
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: [AbstractCommand](commands_abstractcommand.abstractcommand.md)
 
 Defined in: [commands/ping.ts:16](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/ping.ts#L16)
 
-___
+---
 
 ### name
 
-▸ **name**(): *string*
+▸ **name**(): _string_
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: [AbstractCommand](commands_abstractcommand.abstractcommand.md)
 
 Defined in: [commands/ping.ts:12](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/ping.ts#L12)
 
-___
+---
 
 ### usage
 
-▸ `Protected` **usage**(`parameters`: *string*[]): *string*
+▸ `Protected` **usage**(`parameters`: _string_[]): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `parameters` | *string*[] |
+| Name         | Type       |
+| :----------- | :--------- |
+| `parameters` | _string_[] |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Inherited from: [AbstractCommand](commands_abstractcommand.abstractcommand.md)
 

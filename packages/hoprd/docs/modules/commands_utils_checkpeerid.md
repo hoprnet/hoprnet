@@ -13,44 +13,44 @@
 
 ### checkPeerIdInput
 
-▸ **checkPeerIdInput**(`peerIdString`: *string*, `state?`: [*GlobalState*](commands_abstractcommand.md#globalstate)): *Promise*<PeerId\>
+▸ **checkPeerIdInput**(`peerIdString`: _string_, `state?`: [_GlobalState_](commands_abstractcommand.md#globalstate)): _Promise_<PeerId\>
 
 Takes a string, and checks whether it's an alias or a valid peerId,
 then it generates a PeerId instance and returns it.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `peerIdString` | *string* | query that contains the peerId |
-| `state?` | [*GlobalState*](commands_abstractcommand.md#globalstate) | - |
+| Name           | Type                                                     | Description                    |
+| :------------- | :------------------------------------------------------- | :----------------------------- |
+| `peerIdString` | _string_                                                 | query that contains the peerId |
+| `state?`       | [_GlobalState_](commands_abstractcommand.md#globalstate) | -                              |
 
-**Returns:** *Promise*<PeerId\>
+**Returns:** _Promise_<PeerId\>
 
 a 'PeerId' instance
 
 Defined in: [commands/utils/checkPeerId.ts:12](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/utils/checkPeerId.ts#L12)
 
-___
+---
 
 ### getPeerIdsAndAliases
 
-▸ **getPeerIdsAndAliases**(`node`: Hopr, `state`: [*GlobalState*](commands_abstractcommand.md#globalstate), `ops?`: { `mustBeOnline`: *boolean* ; `returnAlias`: *boolean*  }): *string*[]
+▸ **getPeerIdsAndAliases**(`node`: Hopr, `state`: [_GlobalState_](commands_abstractcommand.md#globalstate), `ops?`: { `mustBeOnline`: _boolean_ ; `returnAlias`: _boolean_ }): _string_[]
 
 Returns a list of peerIds and aliases.
 Optionally, you may choose various options.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `node` | Hopr | hopr node |
-| `state` | [*GlobalState*](commands_abstractcommand.md#globalstate) | global state |
-| `ops` | *object* | - |
-| `ops.mustBeOnline` | *boolean* | only return online peerIds |
-| `ops.returnAlias` | *boolean* | when available, return the peerIds's alias |
+| Name               | Type                                                     | Description                                |
+| :----------------- | :------------------------------------------------------- | :----------------------------------------- |
+| `node`             | Hopr                                                     | hopr node                                  |
+| `state`            | [_GlobalState_](commands_abstractcommand.md#globalstate) | global state                               |
+| `ops`              | _object_                                                 | -                                          |
+| `ops.mustBeOnline` | _boolean_                                                | only return online peerIds                 |
+| `ops.returnAlias`  | _boolean_                                                | when available, return the peerIds's alias |
 
-**Returns:** *string*[]
+**Returns:** _string_[]
 
 an array of peerIds / aliases
 

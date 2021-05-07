@@ -10,13 +10,13 @@
 
 ### Variables
 
-- [KEYPAIR\_CIPHER\_ALGORITHM](identity.md#keypair_cipher_algorithm)
-- [KEYPAIR\_CIPHER\_KEY\_LENGTH](identity.md#keypair_cipher_key_length)
-- [KEYPAIR\_IV\_LENGTH](identity.md#keypair_iv_length)
-- [KEYPAIR\_MESSAGE\_DIGEST\_ALGORITHM](identity.md#keypair_message_digest_algorithm)
-- [KEYPAIR\_PADDING](identity.md#keypair_padding)
-- [KEYPAIR\_SALT\_LENGTH](identity.md#keypair_salt_length)
-- [KEYPAIR\_SCRYPT\_PARAMS](identity.md#keypair_scrypt_params)
+- [KEYPAIR_CIPHER_ALGORITHM](identity.md#keypair_cipher_algorithm)
+- [KEYPAIR_CIPHER_KEY_LENGTH](identity.md#keypair_cipher_key_length)
+- [KEYPAIR_IV_LENGTH](identity.md#keypair_iv_length)
+- [KEYPAIR_MESSAGE_DIGEST_ALGORITHM](identity.md#keypair_message_digest_algorithm)
+- [KEYPAIR_PADDING](identity.md#keypair_padding)
+- [KEYPAIR_SALT_LENGTH](identity.md#keypair_salt_length)
+- [KEYPAIR_SCRYPT_PARAMS](identity.md#keypair_scrypt_params)
 
 ### Functions
 
@@ -28,79 +28,79 @@
 
 ### IdentityOptions
 
-Ƭ **IdentityOptions**: *object*
+Ƭ **IdentityOptions**: _object_
 
 #### Type declaration
 
-| Name | Type |
-| :------ | :------ |
-| `idPath` | *string* |
-| `initialize` | *boolean* |
-| `password` | *string* |
+| Name         | Type      |
+| :----------- | :-------- |
+| `idPath`     | _string_  |
+| `initialize` | _boolean_ |
+| `password`   | _string_  |
 
 Defined in: [identity.ts:78](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/identity.ts#L78)
 
 ## Variables
 
-### KEYPAIR\_CIPHER\_ALGORITHM
+### KEYPAIR_CIPHER_ALGORITHM
 
-• `Const` **KEYPAIR\_CIPHER\_ALGORITHM**: ``"chacha20"``= 'chacha20'
+• `Const` **KEYPAIR_CIPHER_ALGORITHM**: `"chacha20"`= 'chacha20'
 
 Defined in: [identity.ts:10](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/identity.ts#L10)
 
-___
+---
 
-### KEYPAIR\_CIPHER\_KEY\_LENGTH
+### KEYPAIR_CIPHER_KEY_LENGTH
 
-• `Const` **KEYPAIR\_CIPHER\_KEY\_LENGTH**: ``32``= 32
+• `Const` **KEYPAIR_CIPHER_KEY_LENGTH**: `32`= 32
 
 Defined in: [identity.ts:12](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/identity.ts#L12)
 
-___
+---
 
-### KEYPAIR\_IV\_LENGTH
+### KEYPAIR_IV_LENGTH
 
-• `Const` **KEYPAIR\_IV\_LENGTH**: ``16``= 16
+• `Const` **KEYPAIR_IV_LENGTH**: `16`= 16
 
 Defined in: [identity.ts:11](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/identity.ts#L11)
 
-___
+---
 
-### KEYPAIR\_MESSAGE\_DIGEST\_ALGORITHM
+### KEYPAIR_MESSAGE_DIGEST_ALGORITHM
 
-• `Const` **KEYPAIR\_MESSAGE\_DIGEST\_ALGORITHM**: ``"sha256"``= 'sha256'
+• `Const` **KEYPAIR_MESSAGE_DIGEST_ALGORITHM**: `"sha256"`= 'sha256'
 
 Defined in: [identity.ts:16](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/identity.ts#L16)
 
-___
+---
 
-### KEYPAIR\_PADDING
+### KEYPAIR_PADDING
 
-• `Const` **KEYPAIR\_PADDING**: *Buffer*
+• `Const` **KEYPAIR_PADDING**: _Buffer_
 
 Defined in: [identity.ts:15](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/identity.ts#L15)
 
-___
+---
 
-### KEYPAIR\_SALT\_LENGTH
+### KEYPAIR_SALT_LENGTH
 
-• `Const` **KEYPAIR\_SALT\_LENGTH**: ``32``= 32
+• `Const` **KEYPAIR_SALT_LENGTH**: `32`= 32
 
 Defined in: [identity.ts:13](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/identity.ts#L13)
 
-___
+---
 
-### KEYPAIR\_SCRYPT\_PARAMS
+### KEYPAIR_SCRYPT_PARAMS
 
-• `Const` **KEYPAIR\_SCRYPT\_PARAMS**: *object*
+• `Const` **KEYPAIR_SCRYPT_PARAMS**: _object_
 
 #### Type declaration
 
-| Name | Type |
-| :------ | :------ |
-| `N` | *number* |
-| `p` | *number* |
-| `r` | *number* |
+| Name | Type     |
+| :--- | :------- |
+| `N`  | _number_ |
+| `p`  | _number_ |
+| `r`  | _number_ |
 
 Defined in: [identity.ts:14](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/identity.ts#L14)
 
@@ -108,7 +108,7 @@ Defined in: [identity.ts:14](https://github.com/hoprnet/hoprnet/blob/448a47a/pac
 
 ### deserializeKeyPair
 
-▸ **deserializeKeyPair**(`encryptedSerializedKeyPair`: Uint8Array, `password`: Uint8Array): *Promise*<PeerId\>
+▸ **deserializeKeyPair**(`encryptedSerializedKeyPair`: Uint8Array, `password`: Uint8Array): _Promise_<PeerId\>
 
 Deserializes a serialized key pair and returns a peerId.
 
@@ -120,46 +120,46 @@ hash function and consumes therefore a lot of memory.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
+| Name                         | Type       | Description                        |
+| :--------------------------- | :--------- | :--------------------------------- |
 | `encryptedSerializedKeyPair` | Uint8Array | the encoded and encrypted key pair |
-| `password` | Uint8Array | - |
+| `password`                   | Uint8Array | -                                  |
 
-**Returns:** *Promise*<PeerId\>
+**Returns:** _Promise_<PeerId\>
 
 Defined in: [identity.ts:49](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/identity.ts#L49)
 
-___
+---
 
 ### getIdentity
 
-▸ **getIdentity**(`options`: [*IdentityOptions*](identity.md#identityoptions)): *Promise*<PeerId\>
+▸ **getIdentity**(`options`: [_IdentityOptions_](identity.md#identityoptions)): _Promise_<PeerId\>
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `options` | [*IdentityOptions*](identity.md#identityoptions) |
+| Name      | Type                                             |
+| :-------- | :----------------------------------------------- |
+| `options` | [_IdentityOptions_](identity.md#identityoptions) |
 
-**Returns:** *Promise*<PeerId\>
+**Returns:** _Promise_<PeerId\>
 
 Defined in: [identity.ts:100](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/identity.ts#L100)
 
-___
+---
 
 ### serializeKeyPair
 
-▸ **serializeKeyPair**(`peerId`: PeerId, `password`: Uint8Array): *Uint8Array*
+▸ **serializeKeyPair**(`peerId`: PeerId, `password`: Uint8Array): _Uint8Array_
 
 Serializes a given peerId by serializing the included private key and public key.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `peerId` | PeerId | the peerId that should be serialized |
-| `password` | Uint8Array | - |
+| Name       | Type       | Description                          |
+| :--------- | :--------- | :----------------------------------- |
+| `peerId`   | PeerId     | the peerId that should be serialized |
+| `password` | Uint8Array | -                                    |
 
-**Returns:** *Uint8Array*
+**Returns:** _Uint8Array_
 
 Defined in: [identity.ts:23](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/identity.ts#L23)

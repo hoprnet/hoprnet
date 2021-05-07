@@ -6,7 +6,7 @@
 
 ## Hierarchy
 
-- [*SendMessageBase*](commands_sendmessage.sendmessagebase.md)
+- [_SendMessageBase_](commands_sendmessage.sendmessagebase.md)
 
   ↳ **SendMessage**
 
@@ -36,15 +36,15 @@
 
 ### constructor
 
-\+ **new SendMessage**(`node`: *Hopr*): [*SendMessage*](commands_sendmessage.sendmessage.md)
+\+ **new SendMessage**(`node`: _Hopr_): [_SendMessage_](commands_sendmessage.sendmessage.md)
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `node` | *Hopr* |
+| Name   | Type   |
+| :----- | :----- |
+| `node` | _Hopr_ |
 
-**Returns:** [*SendMessage*](commands_sendmessage.sendmessage.md)
+**Returns:** [_SendMessage_](commands_sendmessage.sendmessage.md)
 
 Inherited from: [SendMessageBase](commands_sendmessage.sendmessagebase.md)
 
@@ -54,17 +54,17 @@ Defined in: [commands/sendMessage.ts:8](https://github.com/hoprnet/hoprnet/blob/
 
 ### hidden
 
-• **hidden**: *boolean*= false
+• **hidden**: _boolean_= false
 
 Inherited from: [SendMessageBase](commands_sendmessage.sendmessagebase.md).[hidden](commands_sendmessage.sendmessagebase.md#hidden)
 
 Defined in: [commands/abstractCommand.ts:15](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/abstractCommand.ts#L15)
 
-___
+---
 
 ### node
 
-• **node**: *Hopr*
+• **node**: _Hopr_
 
 Inherited from: [SendMessageBase](commands_sendmessage.sendmessagebase.md).[node](commands_sendmessage.sendmessagebase.md#node)
 
@@ -72,139 +72,139 @@ Inherited from: [SendMessageBase](commands_sendmessage.sendmessagebase.md).[node
 
 ### \_assertUsage
 
-▸ `Protected` **_assertUsage**(`query`: *string*, `parameters`: *string*[], `test?`: *RegExp*): *string*[]
+▸ `Protected` **\_assertUsage**(`query`: _string_, `parameters`: _string_[], `test?`: _RegExp_): _string_[]
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `query` | *string* |
-| `parameters` | *string*[] |
-| `test?` | *RegExp* |
+| Name         | Type       |
+| :----------- | :--------- |
+| `query`      | _string_   |
+| `parameters` | _string_[] |
+| `test?`      | _RegExp_   |
 
-**Returns:** *string*[]
+**Returns:** _string_[]
 
 Inherited from: [SendMessageBase](commands_sendmessage.sendmessagebase.md)
 
 Defined in: [commands/abstractCommand.ts:54](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/abstractCommand.ts#L54)
 
-___
+---
 
 ### \_autocompleteByFiltering
 
-▸ `Protected` **_autocompleteByFiltering**(`query`: *string*, `allResults`: *string*[], `line`: *string*): [*AutoCompleteResult*](../modules/commands_abstractcommand.md#autocompleteresult)
+▸ `Protected` **\_autocompleteByFiltering**(`query`: _string_, `allResults`: _string_[], `line`: _string_): [_AutoCompleteResult_](../modules/commands_abstractcommand.md#autocompleteresult)
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `query` | *string* |
-| `allResults` | *string*[] |
-| `line` | *string* |
+| Name         | Type       |
+| :----------- | :--------- |
+| `query`      | _string_   |
+| `allResults` | _string_[] |
+| `line`       | _string_   |
 
-**Returns:** [*AutoCompleteResult*](../modules/commands_abstractcommand.md#autocompleteresult)
+**Returns:** [_AutoCompleteResult_](../modules/commands_abstractcommand.md#autocompleteresult)
 
 Inherited from: [SendMessageBase](commands_sendmessage.sendmessagebase.md)
 
 Defined in: [commands/abstractCommand.ts:33](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/abstractCommand.ts#L33)
 
-___
+---
 
 ### autocomplete
 
-▸ **autocomplete**(`query?`: *string*, `line?`: *string*, `state`: [*GlobalState*](../modules/commands_abstractcommand.md#globalstate)): *Promise*<[*AutoCompleteResult*](../modules/commands_abstractcommand.md#autocompleteresult)\>
+▸ **autocomplete**(`query?`: _string_, `line?`: _string_, `state`: [_GlobalState_](../modules/commands_abstractcommand.md#globalstate)): _Promise_<[_AutoCompleteResult_](../modules/commands_abstractcommand.md#autocompleteresult)\>
 
 #### Parameters
 
-| Name | Type | Default value |
-| :------ | :------ | :------ |
-| `query` | *string* | '' |
-| `line` | *string* | '' |
-| `state` | [*GlobalState*](../modules/commands_abstractcommand.md#globalstate) | - |
+| Name    | Type                                                                | Default value |
+| :------ | :------------------------------------------------------------------ | :------------ |
+| `query` | _string_                                                            | ''            |
+| `line`  | _string_                                                            | ''            |
+| `state` | [_GlobalState_](../modules/commands_abstractcommand.md#globalstate) | -             |
 
-**Returns:** *Promise*<[*AutoCompleteResult*](../modules/commands_abstractcommand.md#autocompleteresult)\>
+**Returns:** _Promise_<[_AutoCompleteResult_](../modules/commands_abstractcommand.md#autocompleteresult)\>
 
 Inherited from: [SendMessageBase](commands_sendmessage.sendmessagebase.md)
 
 Defined in: [commands/sendMessage.ts:41](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/sendMessage.ts#L41)
 
-___
+---
 
 ### execute
 
-▸ **execute**(`query`: *string*, `state`: [*GlobalState*](../modules/commands_abstractcommand.md#globalstate)): *Promise*<[*CommandResponse*](../modules/commands_abstractcommand.md#commandresponse)\>
+▸ **execute**(`query`: _string_, `state`: [_GlobalState_](../modules/commands_abstractcommand.md#globalstate)): _Promise_<[_CommandResponse_](../modules/commands_abstractcommand.md#commandresponse)\>
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `query` | *string* |
-| `state` | [*GlobalState*](../modules/commands_abstractcommand.md#globalstate) |
+| Name    | Type                                                                |
+| :------ | :------------------------------------------------------------------ |
+| `query` | _string_                                                            |
+| `state` | [_GlobalState_](../modules/commands_abstractcommand.md#globalstate) |
 
-**Returns:** *Promise*<[*CommandResponse*](../modules/commands_abstractcommand.md#commandresponse)\>
+**Returns:** _Promise_<[_CommandResponse_](../modules/commands_abstractcommand.md#commandresponse)\>
 
 Overrides: [SendMessageBase](commands_sendmessage.sendmessagebase.md)
 
 Defined in: [commands/sendMessage.ts:52](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/sendMessage.ts#L52)
 
-___
+---
 
 ### help
 
-▸ **help**(): *string*
+▸ **help**(): _string_
 
-**Returns:** *string*
+**Returns:** _string_
 
 Inherited from: [SendMessageBase](commands_sendmessage.sendmessagebase.md)
 
 Defined in: [commands/sendMessage.ts:17](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/sendMessage.ts#L17)
 
-___
+---
 
 ### name
 
-▸ **name**(): *string*
+▸ **name**(): _string_
 
-**Returns:** *string*
+**Returns:** _string_
 
 Inherited from: [SendMessageBase](commands_sendmessage.sendmessagebase.md)
 
 Defined in: [commands/sendMessage.ts:13](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/sendMessage.ts#L13)
 
-___
+---
 
 ### sendMessage
 
-▸ `Protected` **sendMessage**(`state`: [*GlobalState*](../modules/commands_abstractcommand.md#globalstate), `recipient`: *PeerId*, `rawMessage`: *string*, `getIntermediateNodes?`: () => *Promise*<PeerId[]\>): *Promise*<string \| void\>
+▸ `Protected` **sendMessage**(`state`: [_GlobalState_](../modules/commands_abstractcommand.md#globalstate), `recipient`: _PeerId_, `rawMessage`: _string_, `getIntermediateNodes?`: () => _Promise_<PeerId[]\>): _Promise_<string \| void\>
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `state` | [*GlobalState*](../modules/commands_abstractcommand.md#globalstate) |
-| `recipient` | *PeerId* |
-| `rawMessage` | *string* |
-| `getIntermediateNodes?` | () => *Promise*<PeerId[]\> |
+| Name                    | Type                                                                |
+| :---------------------- | :------------------------------------------------------------------ |
+| `state`                 | [_GlobalState_](../modules/commands_abstractcommand.md#globalstate) |
+| `recipient`             | _PeerId_                                                            |
+| `rawMessage`            | _string_                                                            |
+| `getIntermediateNodes?` | () => _Promise_<PeerId[]\>                                          |
 
-**Returns:** *Promise*<string \| void\>
+**Returns:** _Promise_<string \| void\>
 
 Inherited from: [SendMessageBase](commands_sendmessage.sendmessagebase.md)
 
 Defined in: [commands/sendMessage.ts:26](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/sendMessage.ts#L26)
 
-___
+---
 
 ### usage
 
-▸ `Protected` **usage**(`parameters`: *string*[]): *string*
+▸ `Protected` **usage**(`parameters`: _string_[]): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `parameters` | *string*[] |
+| Name         | Type       |
+| :----------- | :--------- |
+| `parameters` | _string_[] |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Inherited from: [SendMessageBase](commands_sendmessage.sendmessagebase.md)
 

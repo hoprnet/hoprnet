@@ -28,18 +28,18 @@
 
 ### constructor
 
-\+ **new Commitment**(`setChainCommitment`: *any*, `getChainCommitment`: *any*, `db`: *HoprDB*, `channelId`: *Hash*): [*Commitment*](commitment.commitment-1.md)
+\+ **new Commitment**(`setChainCommitment`: _any_, `getChainCommitment`: _any_, `db`: _HoprDB_, `channelId`: _Hash_): [_Commitment_](commitment.commitment-1.md)
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `setChainCommitment` | *any* |
-| `getChainCommitment` | *any* |
-| `db` | *HoprDB* |
-| `channelId` | *Hash* |
+| Name                 | Type     |
+| :------------------- | :------- |
+| `setChainCommitment` | _any_    |
+| `getChainCommitment` | _any_    |
+| `db`                 | _HoprDB_ |
+| `channelId`          | _Hash_   |
 
-**Returns:** [*Commitment*](commitment.commitment-1.md)
+**Returns:** [_Commitment_](commitment.commitment-1.md)
 
 Defined in: [packages/core-ethereum/src/commitment.ts:15](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core-ethereum/src/commitment.ts#L15)
 
@@ -47,7 +47,7 @@ Defined in: [packages/core-ethereum/src/commitment.ts:15](https://github.com/hop
 
 ### initialized
 
-• `Private` **initialized**: *boolean*= false
+• `Private` **initialized**: _boolean_= false
 
 Defined in: [packages/core-ethereum/src/commitment.ts:15](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core-ethereum/src/commitment.ts#L15)
 
@@ -55,80 +55,80 @@ Defined in: [packages/core-ethereum/src/commitment.ts:15](https://github.com/hop
 
 ### bumpCommitment
 
-▸ **bumpCommitment**(): *Promise*<void\>
+▸ **bumpCommitment**(): _Promise_<void\>
 
-**Returns:** *Promise*<void\>
+**Returns:** _Promise_<void\>
 
 Defined in: [packages/core-ethereum/src/commitment.ts:31](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core-ethereum/src/commitment.ts#L31)
 
-___
+---
 
 ### createCommitmentChain
 
-▸ `Private` **createCommitmentChain**(): *Promise*<void\>
+▸ `Private` **createCommitmentChain**(): _Promise_<void\>
 
-**Returns:** *Promise*<void\>
+**Returns:** _Promise_<void\>
 
 Defined in: [packages/core-ethereum/src/commitment.ts:75](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core-ethereum/src/commitment.ts#L75)
 
-___
+---
 
 ### findPreImage
 
-▸ `Private` **findPreImage**(`hash`: *Hash*): *Promise*<Hash\>
+▸ `Private` **findPreImage**(`hash`: _Hash_): _Promise_<Hash\>
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `hash` | *Hash* |
+| Name   | Type   |
+| :----- | :----- |
+| `hash` | _Hash_ |
 
-**Returns:** *Promise*<Hash\>
+**Returns:** _Promise_<Hash\>
 
 Defined in: [packages/core-ethereum/src/commitment.ts:41](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core-ethereum/src/commitment.ts#L41)
 
-___
+---
 
 ### getCurrentCommitment
 
-▸ **getCurrentCommitment**(): *Promise*<Hash\>
+▸ **getCurrentCommitment**(): _Promise_<Hash\>
 
-**Returns:** *Promise*<Hash\>
+**Returns:** _Promise_<Hash\>
 
 Defined in: [packages/core-ethereum/src/commitment.ts:24](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core-ethereum/src/commitment.ts#L24)
 
-___
+---
 
 ### hasDBSecret
 
-▸ `Private` **hasDBSecret**(): *Promise*<boolean\>
+▸ `Private` **hasDBSecret**(): _Promise_<boolean\>
 
-**Returns:** *Promise*<boolean\>
+**Returns:** _Promise_<boolean\>
 
 Defined in: [packages/core-ethereum/src/commitment.ts:85](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core-ethereum/src/commitment.ts#L85)
 
-___
+---
 
 ### initialize
 
-▸ `Private` **initialize**(): *Promise*<void\>
+▸ `Private` **initialize**(): _Promise_<void\>
 
-**Returns:** *Promise*<void\>
+**Returns:** _Promise_<void\>
 
 Defined in: [packages/core-ethereum/src/commitment.ts:56](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core-ethereum/src/commitment.ts#L56)
 
-___
+---
 
 ### searchDBFor
 
-▸ `Private` **searchDBFor**(`iteration`: *number*): *Promise*<Uint8Array\>
+▸ `Private` **searchDBFor**(`iteration`: _number_): _Promise_<Uint8Array\>
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `iteration` | *number* |
+| Name        | Type     |
+| :---------- | :------- |
+| `iteration` | _number_ |
 
-**Returns:** *Promise*<Uint8Array\>
+**Returns:** _Promise_<Uint8Array\>
 
 Defined in: [packages/core-ethereum/src/commitment.ts:89](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core-ethereum/src/commitment.ts#L89)

@@ -6,34 +6,34 @@
 
 ### Variables
 
-- [HASH\_ALGORITHM](crypto_por_constants.md#hash_algorithm)
-- [HASH\_LENGTH](crypto_por_constants.md#hash_length)
-- [SECRET\_LENGTH](crypto_por_constants.md#secret_length)
+- [HASH_ALGORITHM](crypto_por_constants.md#hash_algorithm)
+- [HASH_LENGTH](crypto_por_constants.md#hash_length)
+- [SECRET_LENGTH](crypto_por_constants.md#secret_length)
 
 ## Variables
 
-### HASH\_ALGORITHM
+### HASH_ALGORITHM
 
-• `Const` **HASH\_ALGORITHM**: ``"blake2s256"``= 'blake2s256'
+• `Const` **HASH_ALGORITHM**: `"blake2s256"`= 'blake2s256'
 
 Hash algorithm used to derive the shared secret and
 the length of its output.
 
 Defined in: [crypto/por/constants.ts:10](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/crypto/por/constants.ts#L10)
 
-___
+---
 
-### HASH\_LENGTH
+### HASH_LENGTH
 
-• `Const` **HASH\_LENGTH**: ``32``= 32
+• `Const` **HASH_LENGTH**: `32`= 32
 
 Defined in: [crypto/por/constants.ts:11](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/crypto/por/constants.ts#L11)
 
-___
+---
 
-### SECRET\_LENGTH
+### SECRET_LENGTH
 
-• `Const` **SECRET\_LENGTH**: ``32``= 32
+• `Const` **SECRET_LENGTH**: `32`= 32
 
 Length of the secret that is derived from mixnet packet
 

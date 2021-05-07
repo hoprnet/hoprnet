@@ -25,16 +25,16 @@
 
 ### constructor
 
-\+ `Private` **new Challenge**(`ackChallenge`: *Uint8Array*, `signature`: *Uint8Array*): [*Challenge*](messages_challenge.challenge.md)
+\+ `Private` **new Challenge**(`ackChallenge`: _Uint8Array_, `signature`: _Uint8Array_): [_Challenge_](messages_challenge.challenge.md)
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `ackChallenge` | *Uint8Array* |
-| `signature` | *Uint8Array* |
+| Name           | Type         |
+| :------------- | :----------- |
+| `ackChallenge` | _Uint8Array_ |
+| `signature`    | _Uint8Array_ |
 
-**Returns:** [*Challenge*](messages_challenge.challenge.md)
+**Returns:** [_Challenge_](messages_challenge.challenge.md)
 
 Defined in: [packages/core/src/messages/challenge.ts:8](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/messages/challenge.ts#L8)
 
@@ -42,9 +42,9 @@ Defined in: [packages/core/src/messages/challenge.ts:8](https://github.com/hoprn
 
 ### SIZE
 
-• `Static` get **SIZE**(): *number*
+• `Static` get **SIZE**(): _number_
 
-**Returns:** *number*
+**Returns:** _number_
 
 Defined in: [packages/core/src/messages/challenge.ts:11](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/messages/challenge.ts#L11)
 
@@ -52,59 +52,59 @@ Defined in: [packages/core/src/messages/challenge.ts:11](https://github.com/hopr
 
 ### serialize
 
-▸ **serialize**(): *Uint8Array*
+▸ **serialize**(): _Uint8Array_
 
-**Returns:** *Uint8Array*
+**Returns:** _Uint8Array_
 
 Defined in: [packages/core/src/messages/challenge.ts:34](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/messages/challenge.ts#L34)
 
-___
+---
 
 ### solve
 
-▸ **solve**(`secret`: *Uint8Array*): *boolean*
+▸ **solve**(`secret`: _Uint8Array_): _boolean_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `secret` | *Uint8Array* |
+| Name     | Type         |
+| :------- | :----------- |
+| `secret` | _Uint8Array_ |
 
-**Returns:** *boolean*
+**Returns:** _boolean_
 
 Defined in: [packages/core/src/messages/challenge.ts:50](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/messages/challenge.ts#L50)
 
-___
+---
 
 ### create
 
-▸ `Static` **create**(`ackChallenge`: *Uint8Array*, `privKey`: *PeerId*): [*Challenge*](messages_challenge.challenge.md)
+▸ `Static` **create**(`ackChallenge`: _Uint8Array_, `privKey`: _PeerId_): [_Challenge_](messages_challenge.challenge.md)
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `ackChallenge` | *Uint8Array* |
-| `privKey` | *PeerId* |
+| Name           | Type         |
+| :------------- | :----------- |
+| `ackChallenge` | _Uint8Array_ |
+| `privKey`      | _PeerId_     |
 
-**Returns:** [*Challenge*](messages_challenge.challenge.md)
+**Returns:** [_Challenge_](messages_challenge.challenge.md)
 
 Defined in: [packages/core/src/messages/challenge.ts:38](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/messages/challenge.ts#L38)
 
-___
+---
 
 ### deserialize
 
-▸ `Static` **deserialize**(`preArray`: *Uint8Array* \| *Buffer*, `ackChallenge`: *Uint8Array*, `pubKey`: *PeerId*): [*Challenge*](messages_challenge.challenge.md)
+▸ `Static` **deserialize**(`preArray`: _Uint8Array_ \| _Buffer_, `ackChallenge`: _Uint8Array_, `pubKey`: _PeerId_): [_Challenge_](messages_challenge.challenge.md)
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `preArray` | *Uint8Array* \| *Buffer* |
-| `ackChallenge` | *Uint8Array* |
-| `pubKey` | *PeerId* |
+| Name           | Type                     |
+| :------------- | :----------------------- |
+| `preArray`     | _Uint8Array_ \| _Buffer_ |
+| `ackChallenge` | _Uint8Array_             |
+| `pubKey`       | _PeerId_                 |
 
-**Returns:** [*Challenge*](messages_challenge.challenge.md)
+**Returns:** [_Challenge_](messages_challenge.challenge.md)
 
 Defined in: [packages/core/src/messages/challenge.ts:15](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/messages/challenge.ts#L15)

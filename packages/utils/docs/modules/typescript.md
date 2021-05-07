@@ -12,14 +12,14 @@
 
 ### PromiseValue
 
-Ƭ **PromiseValue**<T\>: T *extends* *PromiseLike*<*infer* U\> ? U : T
+Ƭ **PromiseValue**<T\>: T _extends_ _PromiseLike_<_infer_ U\> ? U : T
 
 Infer the return value of a promise
 
 #### Type parameters
 
 | Name |
-| :------ |
-| `T` |
+| :--- |
+| `T`  |
 
 Defined in: [typescript/index.ts:4](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/typescript/index.ts#L4)

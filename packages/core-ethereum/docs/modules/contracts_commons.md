@@ -17,25 +17,25 @@
 
 ### TypedListener
 
-Ƭ **TypedListener**<EventArgsArray, EventArgsObject\>: (...`listenerArg`: [...EventArgsArray, [*TypedEvent*](../interfaces/contracts_commons.typedevent.md)<EventArgsArray & EventArgsObject\>]) => *void*
+Ƭ **TypedListener**<EventArgsArray, EventArgsObject\>: (...`listenerArg`: [...EventArgsArray, [_TypedEvent_](../interfaces/contracts_commons.typedevent.md)<EventArgsArray & EventArgsObject\>]) => _void_
 
 #### Type parameters
 
-| Name | Type |
-| :------ | :------ |
-| `EventArgsArray` | *any*[] |
-| `EventArgsObject` | - |
+| Name              | Type    |
+| :---------------- | :------ |
+| `EventArgsArray`  | _any_[] |
+| `EventArgsObject` | -       |
 
 #### Type declaration
 
-▸ (...`listenerArg`: [...EventArgsArray, [*TypedEvent*](../interfaces/contracts_commons.typedevent.md)<EventArgsArray & EventArgsObject\>]): *void*
+▸ (...`listenerArg`: [...EventArgsArray, [_TypedEvent_](../interfaces/contracts_commons.typedevent.md)<EventArgsArray & EventArgsObject\>]): _void_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `...listenerArg` | [...EventArgsArray, [*TypedEvent*](../interfaces/contracts_commons.typedevent.md)<EventArgsArray & EventArgsObject\>] |
+| Name             | Type                                                                                                                  |
+| :--------------- | :-------------------------------------------------------------------------------------------------------------------- |
+| `...listenerArg` | [...EventArgsArray, [_TypedEvent_](../interfaces/contracts_commons.typedevent.md)<EventArgsArray & EventArgsObject\>] |
 
-**Returns:** *void*
+**Returns:** _void_
 
 Defined in: packages/core-ethereum/src/contracts/commons.ts:15

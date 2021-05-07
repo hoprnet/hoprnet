@@ -6,48 +6,48 @@
 
 ### Variables
 
-- [ACCOUNT\_A](fixtures.md#account_a)
-- [ACCOUNT\_B](fixtures.md#account_b)
-- [ACCOUNT\_C](fixtures.md#account_c)
-- [ACCOUNT\_D](fixtures.md#account_d)
-- [CHANNEL\_ID\_A\_B](fixtures.md#channel_id_a_b)
+- [ACCOUNT_A](fixtures.md#account_a)
+- [ACCOUNT_B](fixtures.md#account_b)
+- [ACCOUNT_C](fixtures.md#account_c)
+- [ACCOUNT_D](fixtures.md#account_d)
+- [CHANNEL_ID_A_B](fixtures.md#channel_id_a_b)
 
 ## Variables
 
-### ACCOUNT\_A
+### ACCOUNT_A
 
-• `Const` **ACCOUNT\_A**: *Wallet*
+• `Const` **ACCOUNT_A**: _Wallet_
 
 Defined in: [packages/core-ethereum/src/fixtures.ts:3](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core-ethereum/src/fixtures.ts#L3)
 
-___
+---
 
-### ACCOUNT\_B
+### ACCOUNT_B
 
-• `Const` **ACCOUNT\_B**: *Wallet*
+• `Const` **ACCOUNT_B**: _Wallet_
 
 Defined in: [packages/core-ethereum/src/fixtures.ts:4](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core-ethereum/src/fixtures.ts#L4)
 
-___
+---
 
-### ACCOUNT\_C
+### ACCOUNT_C
 
-• `Const` **ACCOUNT\_C**: *Wallet*
+• `Const` **ACCOUNT_C**: _Wallet_
 
 Defined in: [packages/core-ethereum/src/fixtures.ts:6](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core-ethereum/src/fixtures.ts#L6)
 
-___
+---
 
-### ACCOUNT\_D
+### ACCOUNT_D
 
-• `Const` **ACCOUNT\_D**: *Wallet*
+• `Const` **ACCOUNT_D**: _Wallet_
 
 Defined in: [packages/core-ethereum/src/fixtures.ts:7](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core-ethereum/src/fixtures.ts#L7)
 
-___
+---
 
-### CHANNEL\_ID\_A\_B
+### CHANNEL_ID_A_B
 
-• `Const` **CHANNEL\_ID\_A\_B**: ``"0x6e454104cde7f1c088b14c3ead07945f6f2c1ce72fef4171a7670e528d1a043c"``= '0x6e454104cde7f1c088b14c3ead07945f6f2c1ce72fef4171a7670e528d1a043c'
+• `Const` **CHANNEL_ID_A_B**: `"0x6e454104cde7f1c088b14c3ead07945f6f2c1ce72fef4171a7670e528d1a043c"`= '0x6e454104cde7f1c088b14c3ead07945f6f2c1ce72fef4171a7670e528d1a043c'
 
 Defined in: [packages/core-ethereum/src/fixtures.ts:5](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core-ethereum/src/fixtures.ts#L5)

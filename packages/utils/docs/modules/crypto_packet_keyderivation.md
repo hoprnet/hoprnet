@@ -22,8 +22,8 @@ before forwarding the packet
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
+| Name     | Type       | Description                                  |
+| :------- | :--------- | :------------------------------------------- |
 | `secret` | Uint8Array | shared secret with the creator of the packet |
 
 **Returns:** Uint8Array
@@ -32,47 +32,47 @@ the blinding
 
 Defined in: [crypto/packet/keyDerivation.ts:20](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/crypto/packet/keyDerivation.ts#L20)
 
-___
+---
 
 ### derivePRGParameters
 
-▸ **derivePRGParameters**(`secret`: Uint8Array): [*PRGParameters*](crypto_prg.md#prgparameters)
+▸ **derivePRGParameters**(`secret`: Uint8Array): [_PRGParameters_](crypto_prg.md#prgparameters)
 
 Derive the seed for the pseudo-randomness generator
 by using the secret shared derived from the mixnet packet
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
+| Name     | Type       | Description                                  |
+| :------- | :--------- | :------------------------------------------- |
 | `secret` | Uint8Array | shared secret with the creator of the packet |
 
-**Returns:** [*PRGParameters*](crypto_prg.md#prgparameters)
+**Returns:** [_PRGParameters_](crypto_prg.md#prgparameters)
 
 the PRG seed
 
 Defined in: [crypto/packet/keyDerivation.ts:40](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/crypto/packet/keyDerivation.ts#L40)
 
-___
+---
 
 ### derivePRPParameters
 
-▸ **derivePRPParameters**(`secret`: Uint8Array): [*PRPParameters*](crypto_prp.md#prpparameters)
+▸ **derivePRPParameters**(`secret`: Uint8Array): [_PRPParameters_](crypto_prp.md#prpparameters)
 
 Derive the seed for the pseudo-random permutation
 by using the secret shared with the creator of the packet
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
+| Name     | Type       | Description                                  |
+| :------- | :--------- | :------------------------------------------- |
 | `secret` | Uint8Array | shared secret with the creator of the packet |
 
-**Returns:** [*PRPParameters*](crypto_prp.md#prpparameters)
+**Returns:** [_PRPParameters_](crypto_prp.md#prpparameters)
 
 Defined in: [crypto/packet/keyDerivation.ts:59](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/crypto/packet/keyDerivation.ts#L59)
 
-___
+---
 
 ### derivePacketTag
 
@@ -80,8 +80,8 @@ ___
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
+| Name     | Type       |
+| :------- | :--------- |
 | `secret` | Uint8Array |
 
 **Returns:** Uint8Array

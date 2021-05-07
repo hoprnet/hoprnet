@@ -12,7 +12,7 @@
 
 ### pubKeyToPeerId
 
-▸ **pubKeyToPeerId**(`pubKey`: Uint8Array \| *string*): PeerId
+▸ **pubKeyToPeerId**(`pubKey`: Uint8Array \| _string_): PeerId
 
 Converts a plain compressed ECDSA public key over the curve `secp256k1`
 to a peerId in order to use it with libp2p.
@@ -22,9 +22,9 @@ Using `libsecp256k1` directly does not work.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `pubKey` | Uint8Array \| *string* | the plain public key |
+| Name     | Type                   | Description          |
+| :------- | :--------------------- | :------------------- |
+| `pubKey` | Uint8Array \| _string_ | the plain public key |
 
 **Returns:** PeerId
 

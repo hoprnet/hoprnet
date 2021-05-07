@@ -12,8 +12,8 @@
 
 ### randomFloat
 
-▸ **randomFloat**(): *number*
+▸ **randomFloat**(): _number_
 
-**Returns:** *number*
+**Returns:** _number_
 
 Defined in: [crypto/randomFloat.ts:3](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/crypto/randomFloat.ts#L3)

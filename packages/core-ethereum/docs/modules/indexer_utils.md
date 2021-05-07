@@ -13,47 +13,47 @@
 
 ### isConfirmedBlock
 
-▸ `Const` **isConfirmedBlock**(`blockNumber`: *number*, `onChainBlockNumber`: *number*, `maxConfirmations`: *number*): *boolean*
+▸ `Const` **isConfirmedBlock**(`blockNumber`: _number_, `onChainBlockNumber`: _number_, `maxConfirmations`: _number_): _boolean_
 
 Compares blockNumber and onChainBlockNumber and returns `true`
 if blockNumber is considered confirmed.
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `blockNumber` | *number* |
-| `onChainBlockNumber` | *number* |
-| `maxConfirmations` | *number* |
+| Name                 | Type     |
+| :------------------- | :------- |
+| `blockNumber`        | _number_ |
+| `onChainBlockNumber` | _number_ |
+| `maxConfirmations`   | _number_ |
 
-**Returns:** *boolean*
+**Returns:** _boolean_
 
 boolean
 
 Defined in: [packages/core-ethereum/src/indexer/utils.ts:29](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core-ethereum/src/indexer/utils.ts#L29)
 
-___
+---
 
 ### snapshotComparator
 
-▸ `Const` **snapshotComparator**(`snapA`: { `blockNumber`: *number* ; `logIndex`: *number* ; `transactionIndex`: *number*  }, `snapB`: { `blockNumber`: *number* ; `logIndex`: *number* ; `transactionIndex`: *number*  }): *number*
+▸ `Const` **snapshotComparator**(`snapA`: { `blockNumber`: _number_ ; `logIndex`: _number_ ; `transactionIndex`: _number_ }, `snapB`: { `blockNumber`: _number_ ; `logIndex`: _number_ ; `transactionIndex`: _number_ }): _number_
 
 Compares the two snapshots provided.
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `snapA` | *object* |
-| `snapA.blockNumber` | *number* |
-| `snapA.logIndex` | *number* |
-| `snapA.transactionIndex` | *number* |
-| `snapB` | *object* |
-| `snapB.blockNumber` | *number* |
-| `snapB.logIndex` | *number* |
-| `snapB.transactionIndex` | *number* |
+| Name                     | Type     |
+| :----------------------- | :------- |
+| `snapA`                  | _object_ |
+| `snapA.blockNumber`      | _number_ |
+| `snapA.logIndex`         | _number_ |
+| `snapA.transactionIndex` | _number_ |
+| `snapB`                  | _object_ |
+| `snapB.blockNumber`      | _number_ |
+| `snapB.logIndex`         | _number_ |
+| `snapB.transactionIndex` | _number_ |
 
-**Returns:** *number*
+**Returns:** _number_
 
 0 if they're equal, negative if `a` goes up, positive if `b` goes up
 

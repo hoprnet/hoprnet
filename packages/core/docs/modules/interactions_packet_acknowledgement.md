@@ -13,37 +13,37 @@
 
 ### sendAcknowledgement
 
-▸ **sendAcknowledgement**(`packet`: [*Packet*](../classes/messages_packet.packet.md), `destination`: PeerId, `sendMessage`: *any*, `privKey`: PeerId): *void*
+▸ **sendAcknowledgement**(`packet`: [_Packet_](../classes/messages_packet.packet.md), `destination`: PeerId, `sendMessage`: _any_, `privKey`: PeerId): _void_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `packet` | [*Packet*](../classes/messages_packet.packet.md) |
-| `destination` | PeerId |
-| `sendMessage` | *any* |
-| `privKey` | PeerId |
+| Name          | Type                                             |
+| :------------ | :----------------------------------------------- |
+| `packet`      | [_Packet_](../classes/messages_packet.packet.md) |
+| `destination` | PeerId                                           |
+| `sendMessage` | _any_                                            |
+| `privKey`     | PeerId                                           |
 
-**Returns:** *void*
+**Returns:** _void_
 
 Defined in: [packages/core/src/interactions/packet/acknowledgement.ts:45](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/interactions/packet/acknowledgement.ts#L45)
 
-___
+---
 
 ### subscribeToAcknowledgements
 
-▸ **subscribeToAcknowledgements**(`subscribe`: *any*, `db`: HoprDB, `chain`: HoprCoreEthereum, `pubKey`: PeerId, `onMessage`: (`ackMessage`: [*Acknowledgement*](../classes/messages_acknowledgement.acknowledgement.md)) => *void*): *void*
+▸ **subscribeToAcknowledgements**(`subscribe`: _any_, `db`: HoprDB, `chain`: HoprCoreEthereum, `pubKey`: PeerId, `onMessage`: (`ackMessage`: [_Acknowledgement_](../classes/messages_acknowledgement.acknowledgement.md)) => _void_): _void_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `subscribe` | *any* |
-| `db` | HoprDB |
-| `chain` | HoprCoreEthereum |
-| `pubKey` | PeerId |
-| `onMessage` | (`ackMessage`: [*Acknowledgement*](../classes/messages_acknowledgement.acknowledgement.md)) => *void* |
+| Name        | Type                                                                                                  |
+| :---------- | :---------------------------------------------------------------------------------------------------- |
+| `subscribe` | _any_                                                                                                 |
+| `db`        | HoprDB                                                                                                |
+| `chain`     | HoprCoreEthereum                                                                                      |
+| `pubKey`    | PeerId                                                                                                |
+| `onMessage` | (`ackMessage`: [_Acknowledgement_](../classes/messages_acknowledgement.acknowledgement.md)) => _void_ |
 
-**Returns:** *void*
+**Returns:** _void_
 
 Defined in: [packages/core/src/interactions/packet/acknowledgement.ts:12](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/interactions/packet/acknowledgement.ts#L12)

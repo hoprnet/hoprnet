@@ -6,90 +6,90 @@
 
 ### Variables
 
-- [END\_PREFIX](crypto_packet_constants.md#end_prefix)
-- [END\_PREFIX\_LENGTH](crypto_packet_constants.md#end_prefix_length)
-- [HASH\_ALGORITHM](crypto_packet_constants.md#hash_algorithm)
-- [HASH\_LENGTH](crypto_packet_constants.md#hash_length)
-- [MAC\_LENGTH](crypto_packet_constants.md#mac_length)
-- [PAYLOAD\_SIZE](crypto_packet_constants.md#payload_size)
-- [SECRET\_LENGTH](crypto_packet_constants.md#secret_length)
-- [TAG\_LENGTH](crypto_packet_constants.md#tag_length)
+- [END_PREFIX](crypto_packet_constants.md#end_prefix)
+- [END_PREFIX_LENGTH](crypto_packet_constants.md#end_prefix_length)
+- [HASH_ALGORITHM](crypto_packet_constants.md#hash_algorithm)
+- [HASH_LENGTH](crypto_packet_constants.md#hash_length)
+- [MAC_LENGTH](crypto_packet_constants.md#mac_length)
+- [PAYLOAD_SIZE](crypto_packet_constants.md#payload_size)
+- [SECRET_LENGTH](crypto_packet_constants.md#secret_length)
+- [TAG_LENGTH](crypto_packet_constants.md#tag_length)
 
 ## Variables
 
-### END\_PREFIX
+### END_PREFIX
 
-• `Const` **END\_PREFIX**: ``255``= 0xff
+• `Const` **END_PREFIX**: `255`= 0xff
 
 Prefix that signals a relayer that it is the final
 recipient
 
 Defined in: [crypto/packet/constants.ts:29](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/crypto/packet/constants.ts#L29)
 
-___
+---
 
-### END\_PREFIX\_LENGTH
+### END_PREFIX_LENGTH
 
-• `Const` **END\_PREFIX\_LENGTH**: ``1``= 1
+• `Const` **END_PREFIX_LENGTH**: `1`= 1
 
 Defined in: [crypto/packet/constants.ts:30](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/crypto/packet/constants.ts#L30)
 
-___
+---
 
-### HASH\_ALGORITHM
+### HASH_ALGORITHM
 
-• `Const` **HASH\_ALGORITHM**: ``"blake2s256"``= 'blake2s256'
+• `Const` **HASH_ALGORITHM**: `"blake2s256"`= 'blake2s256'
 
 Hash algorithm that is used to derive the shared secrets
 and its output length
 
 Defined in: [crypto/packet/constants.ts:5](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/crypto/packet/constants.ts#L5)
 
-___
+---
 
-### HASH\_LENGTH
+### HASH_LENGTH
 
-• `Const` **HASH\_LENGTH**: ``32``= 32
+• `Const` **HASH_LENGTH**: `32`= 32
 
 Defined in: [crypto/packet/constants.ts:6](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/crypto/packet/constants.ts#L6)
 
-___
+---
 
-### MAC\_LENGTH
+### MAC_LENGTH
 
-• `Const` **MAC\_LENGTH**: ``32``
+• `Const` **MAC_LENGTH**: `32`
 
 Length of the MAC as used for integrity protection
 of mixnet packets
 
 Defined in: [crypto/packet/constants.ts:18](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/crypto/packet/constants.ts#L18)
 
-___
+---
 
-### PAYLOAD\_SIZE
+### PAYLOAD_SIZE
 
-• `Const` **PAYLOAD\_SIZE**: ``500``= 500
+• `Const` **PAYLOAD_SIZE**: `500`= 500
 
 Size of the payload per packet
 
 Defined in: [crypto/packet/constants.ts:23](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/crypto/packet/constants.ts#L23)
 
-___
+---
 
-### SECRET\_LENGTH
+### SECRET_LENGTH
 
-• `Const` **SECRET\_LENGTH**: ``32``
+• `Const` **SECRET_LENGTH**: `32`
 
 Length of the shared secret that is derived from
 the mixnet packet
 
 Defined in: [crypto/packet/constants.ts:12](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/crypto/packet/constants.ts#L12)
 
-___
+---
 
-### TAG\_LENGTH
+### TAG_LENGTH
 
-• `Const` **TAG\_LENGTH**: ``16``= 16
+• `Const` **TAG_LENGTH**: `16`= 16
 
 Length of the tag used to prevent from replay attacks
 

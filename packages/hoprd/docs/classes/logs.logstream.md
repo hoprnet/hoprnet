@@ -33,9 +33,9 @@
 
 ### constructor
 
-\+ **new LogStream**(): [*LogStream*](logs.logstream.md)
+\+ **new LogStream**(): [_LogStream_](logs.logstream.md)
 
-**Returns:** [*LogStream*](logs.logstream.md)
+**Returns:** [_LogStream_](logs.logstream.md)
 
 Defined in: [logs.ts:20](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/logs.ts#L20)
 
@@ -43,11 +43,11 @@ Defined in: [logs.ts:20](https://github.com/hoprnet/hoprnet/blob/448a47a/package
 
 ### connections
 
-• `Private` **connections**: *any*[]= []
+• `Private` **connections**: _any_[]= []
 
 Defined in: [logs.ts:20](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/logs.ts#L20)
 
-___
+---
 
 ### messages
 
@@ -59,176 +59,176 @@ Defined in: [logs.ts:19](https://github.com/hoprnet/hoprnet/blob/448a47a/package
 
 ### \_log
 
-▸ **_log**(`msg`: Message): *void*
+▸ **\_log**(`msg`: Message): _void_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
+| Name  | Type    |
+| :---- | :------ |
 | `msg` | Message |
 
-**Returns:** *void*
+**Returns:** _void_
 
 Defined in: [logs.ts:66](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/logs.ts#L66)
 
-___
+---
 
 ### \_sendMessage
 
-▸ **_sendMessage**(`m`: Message, `s`: *any*): *void*
+▸ **\_sendMessage**(`m`: Message, `s`: _any_): _void_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `m` | Message |
-| `s` | *any* |
+| Name | Type    |
+| :--- | :------ |
+| `m`  | Message |
+| `s`  | _any_   |
 
-**Returns:** *void*
+**Returns:** _void_
 
 Defined in: [logs.ts:86](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/logs.ts#L86)
 
-___
+---
 
 ### debug
 
-▸ **debug**(`message`: *string*): *void*
+▸ **debug**(`message`: _string_): _void_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `message` | *string* |
+| Name      | Type     |
+| :-------- | :------- |
+| `message` | _string_ |
 
-**Returns:** *void*
+**Returns:** _void_
 
 Defined in: [logs.ts:48](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/logs.ts#L48)
 
-___
+---
 
 ### error
 
-▸ **error**(`message`: *string*, `trace`: *string*): *void*
+▸ **error**(`message`: _string_, `trace`: _string_): _void_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `message` | *string* |
-| `trace` | *string* |
+| Name      | Type     |
+| :-------- | :------- |
+| `message` | _string_ |
+| `trace`   | _string_ |
 
-**Returns:** *void*
+**Returns:** _void_
 
 Defined in: [logs.ts:34](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/logs.ts#L34)
 
-___
+---
 
 ### log
 
-▸ **log**(...`args`: *string*[]): *void*
+▸ **log**(...`args`: _string_[]): _void_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `...args` | *string*[] |
+| Name      | Type       |
+| :-------- | :--------- |
+| `...args` | _string_[] |
 
-**Returns:** *void*
+**Returns:** _void_
 
 Defined in: [logs.ts:29](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/logs.ts#L29)
 
-___
+---
 
 ### logConnectedPeers
 
-▸ **logConnectedPeers**(`peers`: *string*[]): *void*
+▸ **logConnectedPeers**(`peers`: _string_[]): _void_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `peers` | *string*[] |
+| Name    | Type       |
+| :------ | :--------- |
+| `peers` | _string_[] |
 
-**Returns:** *void*
+**Returns:** _void_
 
 Defined in: [logs.ts:61](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/logs.ts#L61)
 
-___
+---
 
 ### logFatalError
 
-▸ **logFatalError**(`message`: *string*): *void*
+▸ **logFatalError**(`message`: _string_): _void_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `message` | *string* |
+| Name      | Type     |
+| :-------- | :------- |
+| `message` | _string_ |
 
-**Returns:** *void*
+**Returns:** _void_
 
 Defined in: [logs.ts:39](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/logs.ts#L39)
 
-___
+---
 
 ### logFullLine
 
-▸ **logFullLine**(...`args`: *string*[]): *void*
+▸ **logFullLine**(...`args`: _string_[]): _void_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `...args` | *string*[] |
+| Name      | Type       |
+| :-------- | :--------- |
+| `...args` | _string_[] |
 
-**Returns:** *void*
+**Returns:** _void_
 
 Defined in: [logs.ts:56](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/logs.ts#L56)
 
-___
+---
 
 ### subscribe
 
-▸ **subscribe**(`sock`: *any*): *void*
+▸ **subscribe**(`sock`: _any_): _void_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `sock` | *any* |
+| Name   | Type  |
+| :----- | :---- |
+| `sock` | _any_ |
 
-**Returns:** *void*
+**Returns:** _void_
 
 Defined in: [logs.ts:24](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/logs.ts#L24)
 
-___
+---
 
 ### verbose
 
-▸ **verbose**(`message`: *string*): *void*
+▸ **verbose**(`message`: _string_): _void_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `message` | *string* |
+| Name      | Type     |
+| :-------- | :------- |
+| `message` | _string_ |
 
-**Returns:** *void*
+**Returns:** _void_
 
 Defined in: [logs.ts:52](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/logs.ts#L52)
 
-___
+---
 
 ### warn
 
-▸ **warn**(`message`: *string*): *void*
+▸ **warn**(`message`: _string_): _void_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `message` | *string* |
+| Name      | Type     |
+| :-------- | :------- |
+| `message` | _string_ |
 
-**Returns:** *void*
+**Returns:** _void_
 
 Defined in: [logs.ts:44](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/logs.ts#L44)

@@ -1,8 +1,8 @@
-[@hoprnet/hopr-core-ethereum](../README.md) / [Exports](../modules.md) / [contracts/factories/HoprChannels__factory](../modules/contracts_factories_hoprchannels__factory.md) / HoprChannels__factory
+[@hoprnet/hopr-core-ethereum](../README.md) / [Exports](../modules.md) / [contracts/factories/HoprChannels\_\_factory](../modules/contracts_factories_hoprchannels__factory.md) / HoprChannels\_\_factory
 
 # Class: HoprChannels\_\_factory
 
-[contracts/factories/HoprChannels__factory](../modules/contracts_factories_hoprchannels__factory.md).HoprChannels__factory
+[contracts/factories/HoprChannels\_\_factory](../modules/contracts_factories_hoprchannels__factory.md).HoprChannels\_\_factory
 
 ## Table of contents
 
@@ -18,23 +18,23 @@
 
 ### constructor
 
-\+ **new HoprChannels__factory**(): [*HoprChannels\_\_factory*](contracts_factories_hoprchannels__factory.hoprchannels__factory.md)
+\+ **new HoprChannels\_\_factory**(): [_HoprChannels\_\_factory_](contracts_factories_hoprchannels__factory.hoprchannels__factory.md)
 
-**Returns:** [*HoprChannels\_\_factory*](contracts_factories_hoprchannels__factory.hoprchannels__factory.md)
+**Returns:** [_HoprChannels\_\_factory_](contracts_factories_hoprchannels__factory.hoprchannels__factory.md)
 
 ## Methods
 
 ### connect
 
-▸ `Static` **connect**(`address`: *string*, `signerOrProvider`: *Provider* \| *Signer*): [*HoprChannels*](contracts_hoprchannels.hoprchannels.md)
+▸ `Static` **connect**(`address`: _string_, `signerOrProvider`: _Provider_ \| _Signer_): [_HoprChannels_](contracts_hoprchannels.hoprchannels.md)
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `address` | *string* |
-| `signerOrProvider` | *Provider* \| *Signer* |
+| Name               | Type                   |
+| :----------------- | :--------------------- |
+| `address`          | _string_               |
+| `signerOrProvider` | _Provider_ \| _Signer_ |
 
-**Returns:** [*HoprChannels*](contracts_hoprchannels.hoprchannels.md)
+**Returns:** [_HoprChannels_](contracts_hoprchannels.hoprchannels.md)
 
-Defined in: packages/core-ethereum/src/contracts/factories/HoprChannels__factory.ts:11
+Defined in: packages/core-ethereum/src/contracts/factories/HoprChannels\_\_factory.ts:11

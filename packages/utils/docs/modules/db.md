@@ -20,8 +20,8 @@
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
+| Name           | Type       |
+| :------------- | :--------- |
 | `ackChallenge` | Uint8Array |
 
 **Returns:** Uint8Array

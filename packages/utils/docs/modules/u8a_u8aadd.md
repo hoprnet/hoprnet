@@ -12,7 +12,7 @@
 
 ### u8aAdd
 
-▸ **u8aAdd**(`inplace`: *boolean*, `a`: Uint8Array, `b`: Uint8Array): Uint8Array
+▸ **u8aAdd**(`inplace`: _boolean_, `a`: Uint8Array, `b`: Uint8Array): Uint8Array
 
 Adds the contents of two arrays together while ignoring the final overflow.
 Computes `a + b % ( 2 ** (8 * a.length) - 1)`
@@ -24,11 +24,11 @@ u8aAdd(false, new Uint8Array([0, 1], new Uint8Array([0, 255])) // Uint8Array([1,
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `inplace` | *boolean* | result is stored in a if set to true |
-| `a` | Uint8Array | first array |
-| `b` | Uint8Array | second array |
+| Name      | Type       | Description                          |
+| :-------- | :--------- | :----------------------------------- |
+| `inplace` | _boolean_  | result is stored in a if set to true |
+| `a`       | Uint8Array | first array                          |
+| `b`       | Uint8Array | second array                         |
 
 **Returns:** Uint8Array
 

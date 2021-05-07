@@ -33,25 +33,25 @@ on transactions.
 
 ### constructor
 
-\+ **new default**(): [*default*](transaction_manager.default.md)
+\+ **new default**(): [_default_](transaction_manager.default.md)
 
-**Returns:** [*default*](transaction_manager.default.md)
+**Returns:** [_default_](transaction_manager.default.md)
 
 ## Properties
 
 ### confirmed
 
-• `Readonly` **confirmed**: *Map*<string, [*Transaction*](../modules/transaction_manager.md#transaction)\>
+• `Readonly` **confirmed**: _Map_<string, [_Transaction_](../modules/transaction_manager.md#transaction)\>
 
 confirmed transactions
 
 Defined in: [packages/core-ethereum/src/transaction-manager.ts:24](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core-ethereum/src/transaction-manager.ts#L24)
 
-___
+---
 
 ### pending
 
-• `Readonly` **pending**: *Map*<string, [*Transaction*](../modules/transaction_manager.md#transaction)\>
+• `Readonly` **pending**: _Map_<string, [_Transaction_](../modules/transaction_manager.md#transaction)\>
 
 pending transactions
 
@@ -61,79 +61,79 @@ Defined in: [packages/core-ethereum/src/transaction-manager.ts:20](https://githu
 
 ### \_getTime
 
-▸ `Private` **_getTime**(): *number*
+▸ `Private` **\_getTime**(): _number_
 
-**Returns:** *number*
+**Returns:** _number_
 
 current timestamp
 
 Defined in: [packages/core-ethereum/src/transaction-manager.ts:78](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core-ethereum/src/transaction-manager.ts#L78)
 
-___
+---
 
 ### addToPending
 
-▸ **addToPending**(`hash`: *string*, `transaction`: *Pick*<[*Transaction*](../modules/transaction_manager.md#transaction), ``"nonce"``\>): *void*
+▸ **addToPending**(`hash`: _string_, `transaction`: _Pick_<[_Transaction_](../modules/transaction_manager.md#transaction), `"nonce"`\>): _void_
 
 Adds transaction in pending
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `hash` | *string* | transaction hash |
-| `transaction` | *Pick*<[*Transaction*](../modules/transaction_manager.md#transaction), ``"nonce"``\> | object |
+| Name          | Type                                                                               | Description      |
+| :------------ | :--------------------------------------------------------------------------------- | :--------------- |
+| `hash`        | _string_                                                                           | transaction hash |
+| `transaction` | _Pick_<[_Transaction_](../modules/transaction_manager.md#transaction), `"nonce"`\> | object           |
 
-**Returns:** *void*
+**Returns:** _void_
 
 Defined in: [packages/core-ethereum/src/transaction-manager.ts:31](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core-ethereum/src/transaction-manager.ts#L31)
 
-___
+---
 
 ### moveToConfirmed
 
-▸ **moveToConfirmed**(`hash`: *string*): *void*
+▸ **moveToConfirmed**(`hash`: _string_): _void_
 
 Moves transcation from pending to confirmed
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `hash` | *string* | transaction hash |
+| Name   | Type     | Description      |
+| :----- | :------- | :--------------- |
+| `hash` | _string_ | transaction hash |
 
-**Returns:** *void*
+**Returns:** _void_
 
 Defined in: [packages/core-ethereum/src/transaction-manager.ts:42](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core-ethereum/src/transaction-manager.ts#L42)
 
-___
+---
 
 ### prune
 
-▸ **prune**(): *void*
+▸ **prune**(): _void_
 
 Removes confirmed blocks except last 5 nonces.
 This is a way for us to clean up some memory which we know
 we don't need anymore.
 
-**Returns:** *void*
+**Returns:** _void_
 
 Defined in: [packages/core-ethereum/src/transaction-manager.ts:65](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core-ethereum/src/transaction-manager.ts#L65)
 
-___
+---
 
 ### remove
 
-▸ **remove**(`hash`: *string*): *void*
+▸ **remove**(`hash`: _string_): _void_
 
 Removed transcation from pending and confirmed
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `hash` | *string* | transaction hash |
+| Name   | Type     | Description      |
+| :----- | :------- | :--------------- |
+| `hash` | _string_ | transaction hash |
 
-**Returns:** *void*
+**Returns:** _void_
 
 Defined in: [packages/core-ethereum/src/transaction-manager.ts:54](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core-ethereum/src/transaction-manager.ts#L54)

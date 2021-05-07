@@ -13,42 +13,42 @@
 
 ### countSignedTickets
 
-▸ **countSignedTickets**(`signedTickets`: Ticket[]): *object*
+▸ **countSignedTickets**(`signedTickets`: Ticket[]): _object_
 
 Derive various data from the given signed tickets.
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
+| Name            | Type     |
+| :-------------- | :------- |
 | `signedTickets` | Ticket[] |
 
-**Returns:** *object*
+**Returns:** _object_
 
-| Name | Type |
-| :------ | :------ |
-| `tickets` | { `amount`: *string* ; `challange`: *string*  }[] |
-| `total` | *string* |
+| Name      | Type                                             |
+| :-------- | :----------------------------------------------- |
+| `tickets` | { `amount`: _string_ ; `challange`: _string_ }[] |
+| `total`   | _string_                                         |
 
 the total amount of tokens in the tickets & more
 
 Defined in: [commands/utils/tickets.ts:20](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/utils/tickets.ts#L20)
 
-___
+---
 
 ### toSignedTickets
 
-▸ **toSignedTickets**(`ackTickets`: AcknowledgedTicket[]): *Promise*<Ticket[]\>
+▸ **toSignedTickets**(`ackTickets`: AcknowledgedTicket[]): _Promise_<Ticket[]\>
 
 Retrieves all signed tickets from the given acknowledged tickets.
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
+| Name         | Type                 |
+| :----------- | :------------------- |
 | `ackTickets` | AcknowledgedTicket[] |
 
-**Returns:** *Promise*<Ticket[]\>
+**Returns:** _Promise_<Ticket[]\>
 
 a promise that resolves into an array of signed tickets
 

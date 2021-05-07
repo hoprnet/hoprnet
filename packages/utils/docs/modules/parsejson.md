@@ -12,16 +12,16 @@
 
 ### parseJSON
 
-▸ **parseJSON**(`str`: *string*): *object*
+▸ **parseJSON**(`str`: _string_): _object_
 
 Parse JSON while recovering all Buffer elements
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `str` | *string* | JSON string |
+| Name  | Type     | Description |
+| :---- | :------- | :---------- |
+| `str` | _string_ | JSON string |
 
-**Returns:** *object*
+**Returns:** _object_
 
 Defined in: [parseJSON.ts:5](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/parseJSON.ts#L5)

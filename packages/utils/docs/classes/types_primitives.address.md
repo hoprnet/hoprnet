@@ -30,15 +30,15 @@
 
 ### constructor
 
-\+ **new Address**(`arr`: *Uint8Array*): [*Address*](types_primitives.address.md)
+\+ **new Address**(`arr`: _Uint8Array_): [_Address_](types_primitives.address.md)
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `arr` | *Uint8Array* |
+| Name  | Type         |
+| :---- | :----------- |
+| `arr` | _Uint8Array_ |
 
-**Returns:** [*Address*](types_primitives.address.md)
+**Returns:** [_Address_](types_primitives.address.md)
 
 Defined in: [types/primitives.ts:72](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/types/primitives.ts#L72)
 
@@ -46,9 +46,9 @@ Defined in: [types/primitives.ts:72](https://github.com/hoprnet/hoprnet/blob/448
 
 ### SIZE
 
-• `Static` get **SIZE**(): *number*
+• `Static` get **SIZE**(): _number_
 
-**Returns:** *number*
+**Returns:** _number_
 
 Defined in: [types/primitives.ts:81](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/types/primitives.ts#L81)
 
@@ -56,124 +56,124 @@ Defined in: [types/primitives.ts:81](https://github.com/hoprnet/hoprnet/blob/448
 
 ### compare
 
-▸ **compare**(`b`: [*Address*](types_primitives.address.md)): *number*
+▸ **compare**(`b`: [_Address_](types_primitives.address.md)): _number_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `b` | [*Address*](types_primitives.address.md) |
+| Name | Type                                     |
+| :--- | :--------------------------------------- |
+| `b`  | [_Address_](types_primitives.address.md) |
 
-**Returns:** *number*
+**Returns:** _number_
 
 Defined in: [types/primitives.ts:105](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/types/primitives.ts#L105)
 
-___
+---
 
 ### eq
 
-▸ **eq**(`b`: [*Address*](types_primitives.address.md)): *boolean*
+▸ **eq**(`b`: [_Address_](types_primitives.address.md)): _boolean_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `b` | [*Address*](types_primitives.address.md) |
+| Name | Type                                     |
+| :--- | :--------------------------------------- |
+| `b`  | [_Address_](types_primitives.address.md) |
 
-**Returns:** *boolean*
+**Returns:** _boolean_
 
 Defined in: [types/primitives.ts:101](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/types/primitives.ts#L101)
 
-___
+---
 
 ### lt
 
-▸ **lt**(`b`: [*Address*](types_primitives.address.md)): *boolean*
+▸ **lt**(`b`: [_Address_](types_primitives.address.md)): _boolean_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `b` | [*Address*](types_primitives.address.md) |
+| Name | Type                                     |
+| :--- | :--------------------------------------- |
+| `b`  | [_Address_](types_primitives.address.md) |
 
-**Returns:** *boolean*
+**Returns:** _boolean_
 
 Defined in: [types/primitives.ts:109](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/types/primitives.ts#L109)
 
-___
+---
 
 ### serialize
 
-▸ **serialize**(): *Uint8Array*
+▸ **serialize**(): _Uint8Array_
 
-**Returns:** *Uint8Array*
+**Returns:** _Uint8Array_
 
 Defined in: [types/primitives.ts:93](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/types/primitives.ts#L93)
 
-___
+---
 
 ### sortPair
 
-▸ **sortPair**(`b`: [*Address*](types_primitives.address.md)): [[*Address*](types_primitives.address.md), [*Address*](types_primitives.address.md)]
+▸ **sortPair**(`b`: [_Address_](types_primitives.address.md)): [[_Address_](types_primitives.address.md), [_Address_](types_primitives.address.md)]
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `b` | [*Address*](types_primitives.address.md) |
+| Name | Type                                     |
+| :--- | :--------------------------------------- |
+| `b`  | [_Address_](types_primitives.address.md) |
 
-**Returns:** [[*Address*](types_primitives.address.md), [*Address*](types_primitives.address.md)]
+**Returns:** [[_Address_](types_primitives.address.md), [_Address_](types_primitives.address.md)]
 
 Defined in: [types/primitives.ts:113](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/types/primitives.ts#L113)
 
-___
+---
 
 ### toHex
 
-▸ **toHex**(): *string*
+▸ **toHex**(): _string_
 
-**Returns:** *string*
+**Returns:** _string_
 
 Defined in: [types/primitives.ts:97](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/types/primitives.ts#L97)
 
-___
+---
 
 ### createMock
 
-▸ `Static` **createMock**(): [*Address*](types_primitives.address.md)
+▸ `Static` **createMock**(): [_Address_](types_primitives.address.md)
 
-**Returns:** [*Address*](types_primitives.address.md)
+**Returns:** [_Address_](types_primitives.address.md)
 
 Defined in: [types/primitives.ts:117](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/types/primitives.ts#L117)
 
-___
+---
 
 ### deserialize
 
-▸ `Static` **deserialize**(`arr`: *Uint8Array*): [*Address*](types_primitives.address.md)
+▸ `Static` **deserialize**(`arr`: _Uint8Array_): [_Address_](types_primitives.address.md)
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `arr` | *Uint8Array* |
+| Name  | Type         |
+| :---- | :----------- |
+| `arr` | _Uint8Array_ |
 
-**Returns:** [*Address*](types_primitives.address.md)
+**Returns:** [_Address_](types_primitives.address.md)
 
 Defined in: [types/primitives.ts:89](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/types/primitives.ts#L89)
 
-___
+---
 
 ### fromString
 
-▸ `Static` **fromString**(`str`: *string*): [*Address*](types_primitives.address.md)
+▸ `Static` **fromString**(`str`: _string_): [_Address_](types_primitives.address.md)
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `str` | *string* |
+| Name  | Type     |
+| :---- | :------- |
+| `str` | _string_ |
 
-**Returns:** [*Address*](types_primitives.address.md)
+**Returns:** [_Address_](types_primitives.address.md)
 
 Defined in: [types/primitives.ts:85](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/types/primitives.ts#L85)

@@ -6,21 +6,21 @@
 
 ### Variables
 
-- [HASH\_ALGORITHM](messages_constants.md#hash_algorithm)
-- [SECRET\_LENGTH](messages_constants.md#secret_length)
+- [HASH_ALGORITHM](messages_constants.md#hash_algorithm)
+- [SECRET_LENGTH](messages_constants.md#secret_length)
 
 ## Variables
 
-### HASH\_ALGORITHM
+### HASH_ALGORITHM
 
-• `Const` **HASH\_ALGORITHM**: ``"blake2s256"``= 'blake2s256'
+• `Const` **HASH_ALGORITHM**: `"blake2s256"`= 'blake2s256'
 
 Defined in: [packages/core/src/messages/constants.ts:3](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/messages/constants.ts#L3)
 
-___
+---
 
-### SECRET\_LENGTH
+### SECRET_LENGTH
 
-• `Const` **SECRET\_LENGTH**: ``32``= 32
+• `Const` **SECRET_LENGTH**: `32`= 32
 
 Defined in: [packages/core/src/messages/constants.ts:1](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/messages/constants.ts#L1)

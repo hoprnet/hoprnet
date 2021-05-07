@@ -12,15 +12,15 @@
 
 ### moveDecimalPoint
 
-▸ **moveDecimalPoint**(`amount`: BigNumber \| *string* \| *number*, `position`: *number*): *string*
+▸ **moveDecimalPoint**(`amount`: BigNumber \| _string_ \| _number_, `position`: _number_): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `amount` | BigNumber \| *string* \| *number* |
-| `position` | *number* |
+| Name       | Type                              |
+| :--------- | :-------------------------------- |
+| `amount`   | BigNumber \| _string_ \| _number_ |
+| `position` | _number_                          |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Defined in: [math/moveDecimalPoint.ts:3](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/math/moveDecimalPoint.ts#L3)

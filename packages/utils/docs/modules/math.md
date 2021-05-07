@@ -15,7 +15,7 @@
 
 Re-exports: [gcd](math_gcd.md#gcd)
 
-___
+---
 
 ### moveDecimalPoint
 

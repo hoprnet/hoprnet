@@ -13,39 +13,39 @@
 
 ### decodeMessage
 
-▸ **decodeMessage**(`encoded`: Uint8Array): *object*
+▸ **decodeMessage**(`encoded`: Uint8Array): _object_
 
 Tries to decode the message and returns the message as well as
 the measured latency.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
+| Name      | Type       | Description        |
+| :-------- | :--------- | :----------------- |
 | `encoded` | Uint8Array | an encoded message |
 
-**Returns:** *object*
+**Returns:** _object_
 
-| Name | Type |
-| :------ | :------ |
-| `latency` | *number* |
-| `msg` | *string* |
+| Name      | Type     |
+| :-------- | :------- |
+| `latency` | _number_ |
+| `msg`     | _string_ |
 
 Defined in: [commands/utils/message.ts:18](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/utils/message.ts#L18)
 
-___
+---
 
 ### encodeMessage
 
-▸ **encodeMessage**(`msg`: *string*): Uint8Array
+▸ **encodeMessage**(`msg`: _string_): Uint8Array
 
 Adds the current timestamp to the message in order to measure the latency.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `msg` | *string* | the message |
+| Name  | Type     | Description |
+| :---- | :------- | :---------- |
+| `msg` | _string_ | the message |
 
 **Returns:** Uint8Array
 

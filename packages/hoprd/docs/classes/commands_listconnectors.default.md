@@ -6,7 +6,7 @@
 
 ## Hierarchy
 
-- [*AbstractCommand*](commands_abstractcommand.abstractcommand.md)
+- [_AbstractCommand_](commands_abstractcommand.abstractcommand.md)
 
   ↳ **default**
 
@@ -34,9 +34,9 @@
 
 ### constructor
 
-\+ **new default**(): [*default*](commands_listconnectors.default.md)
+\+ **new default**(): [_default_](commands_listconnectors.default.md)
 
-**Returns:** [*default*](commands_listconnectors.default.md)
+**Returns:** [_default_](commands_listconnectors.default.md)
 
 Inherited from: [AbstractCommand](commands_abstractcommand.abstractcommand.md)
 
@@ -44,7 +44,7 @@ Inherited from: [AbstractCommand](commands_abstractcommand.abstractcommand.md)
 
 ### hidden
 
-• **hidden**: *boolean*= false
+• **hidden**: _boolean_= false
 
 Inherited from: [AbstractCommand](commands_abstractcommand.abstractcommand.md).[hidden](commands_abstractcommand.abstractcommand.md#hidden)
 
@@ -54,115 +54,115 @@ Defined in: [commands/abstractCommand.ts:15](https://github.com/hoprnet/hoprnet/
 
 ### \_assertUsage
 
-▸ `Protected` **_assertUsage**(`query`: *string*, `parameters`: *string*[], `test?`: *RegExp*): *string*[]
+▸ `Protected` **\_assertUsage**(`query`: _string_, `parameters`: _string_[], `test?`: _RegExp_): _string_[]
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `query` | *string* |
-| `parameters` | *string*[] |
-| `test?` | *RegExp* |
+| Name         | Type       |
+| :----------- | :--------- |
+| `query`      | _string_   |
+| `parameters` | _string_[] |
+| `test?`      | _RegExp_   |
 
-**Returns:** *string*[]
+**Returns:** _string_[]
 
 Inherited from: [AbstractCommand](commands_abstractcommand.abstractcommand.md)
 
 Defined in: [commands/abstractCommand.ts:54](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/abstractCommand.ts#L54)
 
-___
+---
 
 ### \_autocompleteByFiltering
 
-▸ `Protected` **_autocompleteByFiltering**(`query`: *string*, `allResults`: *string*[], `line`: *string*): [*AutoCompleteResult*](../modules/commands_abstractcommand.md#autocompleteresult)
+▸ `Protected` **\_autocompleteByFiltering**(`query`: _string_, `allResults`: _string_[], `line`: _string_): [_AutoCompleteResult_](../modules/commands_abstractcommand.md#autocompleteresult)
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `query` | *string* |
-| `allResults` | *string*[] |
-| `line` | *string* |
+| Name         | Type       |
+| :----------- | :--------- |
+| `query`      | _string_   |
+| `allResults` | _string_[] |
+| `line`       | _string_   |
 
-**Returns:** [*AutoCompleteResult*](../modules/commands_abstractcommand.md#autocompleteresult)
+**Returns:** [_AutoCompleteResult_](../modules/commands_abstractcommand.md#autocompleteresult)
 
 Inherited from: [AbstractCommand](commands_abstractcommand.abstractcommand.md)
 
 Defined in: [commands/abstractCommand.ts:33](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/abstractCommand.ts#L33)
 
-___
+---
 
 ### autocomplete
 
-▸ **autocomplete**(`_query`: *string*, `line`: *string*, `_state`: [*GlobalState*](../modules/commands_abstractcommand.md#globalstate)): *Promise*<[*AutoCompleteResult*](../modules/commands_abstractcommand.md#autocompleteresult)\>
+▸ **autocomplete**(`_query`: _string_, `line`: _string_, `_state`: [_GlobalState_](../modules/commands_abstractcommand.md#globalstate)): _Promise_<[_AutoCompleteResult_](../modules/commands_abstractcommand.md#autocompleteresult)\>
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `_query` | *string* |
-| `line` | *string* |
-| `_state` | [*GlobalState*](../modules/commands_abstractcommand.md#globalstate) |
+| Name     | Type                                                                |
+| :------- | :------------------------------------------------------------------ |
+| `_query` | _string_                                                            |
+| `line`   | _string_                                                            |
+| `_state` | [_GlobalState_](../modules/commands_abstractcommand.md#globalstate) |
 
-**Returns:** *Promise*<[*AutoCompleteResult*](../modules/commands_abstractcommand.md#autocompleteresult)\>
+**Returns:** _Promise_<[_AutoCompleteResult_](../modules/commands_abstractcommand.md#autocompleteresult)\>
 
 Inherited from: [AbstractCommand](commands_abstractcommand.abstractcommand.md)
 
 Defined in: [commands/abstractCommand.ts:26](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/abstractCommand.ts#L26)
 
-___
+---
 
 ### execute
 
-▸ **execute**(): *Promise*<string\>
+▸ **execute**(): _Promise_<string\>
 
 Check which connectors are present right now.
 
 **`notice`** triggered by the CLI
 
-**Returns:** *Promise*<string\>
+**Returns:** _Promise_<string\>
 
 Overrides: [AbstractCommand](commands_abstractcommand.abstractcommand.md)
 
 Defined in: [commands/listConnectors.ts:17](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/listConnectors.ts#L17)
 
-___
+---
 
 ### help
 
-▸ **help**(): *string*
+▸ **help**(): _string_
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: [AbstractCommand](commands_abstractcommand.abstractcommand.md)
 
 Defined in: [commands/listConnectors.ts:10](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/listConnectors.ts#L10)
 
-___
+---
 
 ### name
 
-▸ **name**(): *string*
+▸ **name**(): _string_
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: [AbstractCommand](commands_abstractcommand.abstractcommand.md)
 
 Defined in: [commands/listConnectors.ts:6](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/listConnectors.ts#L6)
 
-___
+---
 
 ### usage
 
-▸ `Protected` **usage**(`parameters`: *string*[]): *string*
+▸ `Protected` **usage**(`parameters`: _string_[]): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `parameters` | *string*[] |
+| Name         | Type       |
+| :----------- | :--------- |
+| `parameters` | _string_[] |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Inherited from: [AbstractCommand](commands_abstractcommand.abstractcommand.md)
 

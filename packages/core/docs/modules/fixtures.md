@@ -6,12 +6,12 @@
 
 ### Variables
 
-- [ACCOUNT\_1](fixtures.md#account_1)
+- [ACCOUNT_1](fixtures.md#account_1)
 
 ## Variables
 
-### ACCOUNT\_1
+### ACCOUNT_1
 
-• `Const` **ACCOUNT\_1**: ``"0x8989541ffbc48046615ced2480dffca7b1a7e98331dcd257e9c863eb24521793"``= '0x8989541ffbc48046615ced2480dffca7b1a7e98331dcd257e9c863eb24521793'
+• `Const` **ACCOUNT_1**: `"0x8989541ffbc48046615ced2480dffca7b1a7e98331dcd257e9c863eb24521793"`= '0x8989541ffbc48046615ced2480dffca7b1a7e98331dcd257e9c863eb24521793'
 
 Defined in: [packages/core/src/fixtures.ts:1](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/fixtures.ts#L1)

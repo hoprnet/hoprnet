@@ -45,17 +45,17 @@
 
 ### constructor
 
-\+ **new Packet**(`packet`: *Uint8Array*, `challenge`: [*Challenge*](messages_challenge.challenge.md), `ticket`: *Ticket*): [*Packet*](messages_packet.packet.md)
+\+ **new Packet**(`packet`: _Uint8Array_, `challenge`: [_Challenge_](messages_challenge.challenge.md), `ticket`: _Ticket_): [_Packet_](messages_packet.packet.md)
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `packet` | *Uint8Array* |
-| `challenge` | [*Challenge*](messages_challenge.challenge.md) |
-| `ticket` | *Ticket* |
+| Name        | Type                                           |
+| :---------- | :--------------------------------------------- |
+| `packet`    | _Uint8Array_                                   |
+| `challenge` | [_Challenge_](messages_challenge.challenge.md) |
+| `ticket`    | _Ticket_                                       |
 
-**Returns:** [*Packet*](messages_packet.packet.md)
+**Returns:** [_Packet_](messages_packet.packet.md)
 
 Defined in: [packages/core/src/messages/packet.ts:166](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/messages/packet.ts#L166)
 
@@ -63,79 +63,79 @@ Defined in: [packages/core/src/messages/packet.ts:166](https://github.com/hoprne
 
 ### ackChallenge
 
-• **ackChallenge**: *Uint8Array*
+• **ackChallenge**: _Uint8Array_
 
 Defined in: [packages/core/src/messages/packet.ts:166](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/messages/packet.ts#L166)
 
-___
+---
 
 ### isReadyToForward
 
-• **isReadyToForward**: *boolean*
+• **isReadyToForward**: _boolean_
 
 Defined in: [packages/core/src/messages/packet.ts:156](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/messages/packet.ts#L156)
 
-___
+---
 
 ### isReceiver
 
-• **isReceiver**: *boolean*
+• **isReceiver**: _boolean_
 
 Defined in: [packages/core/src/messages/packet.ts:155](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/messages/packet.ts#L155)
 
-___
+---
 
 ### nextChallenge
 
-• **nextChallenge**: *Uint8Array*
+• **nextChallenge**: _Uint8Array_
 
 Defined in: [packages/core/src/messages/packet.ts:165](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/messages/packet.ts#L165)
 
-___
+---
 
 ### nextHop
 
-• **nextHop**: *Uint8Array*
+• **nextHop**: _Uint8Array_
 
 Defined in: [packages/core/src/messages/packet.ts:162](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/messages/packet.ts#L162)
 
-___
+---
 
 ### ownKey
 
-• **ownKey**: *Uint8Array*
+• **ownKey**: _Uint8Array_
 
 Defined in: [packages/core/src/messages/packet.ts:164](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/messages/packet.ts#L164)
 
-___
+---
 
 ### ownShare
 
-• **ownShare**: *Uint8Array*
+• **ownShare**: _Uint8Array_
 
 Defined in: [packages/core/src/messages/packet.ts:163](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/messages/packet.ts#L163)
 
-___
+---
 
 ### packetTag
 
-• **packetTag**: *Uint8Array*
+• **packetTag**: _Uint8Array_
 
 Defined in: [packages/core/src/messages/packet.ts:160](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/messages/packet.ts#L160)
 
-___
+---
 
 ### plaintext
 
-• **plaintext**: *Uint8Array*
+• **plaintext**: _Uint8Array_
 
 Defined in: [packages/core/src/messages/packet.ts:158](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/messages/packet.ts#L158)
 
-___
+---
 
 ### previousHop
 
-• **previousHop**: *Uint8Array*
+• **previousHop**: _Uint8Array_
 
 Defined in: [packages/core/src/messages/packet.ts:161](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/messages/packet.ts#L161)
 
@@ -143,9 +143,9 @@ Defined in: [packages/core/src/messages/packet.ts:161](https://github.com/hoprne
 
 ### SIZE
 
-• `Static` get **SIZE**(): *number*
+• `Static` get **SIZE**(): _number_
 
-**Returns:** *number*
+**Returns:** _number_
 
 Defined in: [packages/core/src/messages/packet.ts:249](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/messages/packet.ts#L249)
 
@@ -153,187 +153,187 @@ Defined in: [packages/core/src/messages/packet.ts:249](https://github.com/hoprne
 
 ### checkPacketTag
 
-▸ **checkPacketTag**(`db`: *HoprDB*): *Promise*<void\>
+▸ **checkPacketTag**(`db`: _HoprDB_): _Promise_<void\>
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `db` | *HoprDB* |
+| Name | Type     |
+| :--- | :------- |
+| `db` | _HoprDB_ |
 
-**Returns:** *Promise*<void\>
+**Returns:** _Promise_<void\>
 
 Defined in: [packages/core/src/messages/packet.ts:308](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/messages/packet.ts#L308)
 
-___
+---
 
 ### createAcknowledgement
 
-▸ **createAcknowledgement**(`privKey`: *PeerId*): [*Acknowledgement*](messages_acknowledgement.acknowledgement.md)
+▸ **createAcknowledgement**(`privKey`: _PeerId_): [_Acknowledgement_](messages_acknowledgement.acknowledgement.md)
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `privKey` | *PeerId* |
+| Name      | Type     |
+| :-------- | :------- |
+| `privKey` | _PeerId_ |
 
-**Returns:** [*Acknowledgement*](messages_acknowledgement.acknowledgement.md)
+**Returns:** [_Acknowledgement_](messages_acknowledgement.acknowledgement.md)
 
 Defined in: [packages/core/src/messages/packet.ts:343](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/messages/packet.ts#L343)
 
-___
+---
 
 ### forwardTransform
 
-▸ **forwardTransform**(`privKey`: *PeerId*, `chain`: *default*): *Promise*<void\>
+▸ **forwardTransform**(`privKey`: _PeerId_, `chain`: _default_): _Promise_<void\>
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `privKey` | *PeerId* |
-| `chain` | *default* |
+| Name      | Type      |
+| :-------- | :-------- |
+| `privKey` | _PeerId_  |
+| `chain`   | _default_ |
 
-**Returns:** *Promise*<void\>
+**Returns:** _Promise_<void\>
 
 Defined in: [packages/core/src/messages/packet.ts:351](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/messages/packet.ts#L351)
 
-___
+---
 
 ### serialize
 
-▸ **serialize**(): *Uint8Array*
+▸ **serialize**(): _Uint8Array_
 
-**Returns:** *Uint8Array*
+**Returns:** _Uint8Array_
 
 Defined in: [packages/core/src/messages/packet.ts:245](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/messages/packet.ts#L245)
 
-___
+---
 
 ### setFinal
 
-▸ `Private` **setFinal**(`plaintext`: *Uint8Array*, `packetTag`: *Uint8Array*, `ownKey`: *Uint8Array*): [*Packet*](messages_packet.packet.md)
+▸ `Private` **setFinal**(`plaintext`: _Uint8Array_, `packetTag`: _Uint8Array_, `ownKey`: _Uint8Array_): [_Packet_](messages_packet.packet.md)
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `plaintext` | *Uint8Array* |
-| `packetTag` | *Uint8Array* |
-| `ownKey` | *Uint8Array* |
+| Name        | Type         |
+| :---------- | :----------- |
+| `plaintext` | _Uint8Array_ |
+| `packetTag` | _Uint8Array_ |
+| `ownKey`    | _Uint8Array_ |
 
-**Returns:** [*Packet*](messages_packet.packet.md)
+**Returns:** [_Packet_](messages_packet.packet.md)
 
 Defined in: [packages/core/src/messages/packet.ts:177](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/messages/packet.ts#L177)
 
-___
+---
 
 ### setForward
 
-▸ `Private` **setForward**(`ownKey`: *Uint8Array*, `ownShare`: *Uint8Array*, `nextHop`: *Uint8Array*, `previousHop`: *Uint8Array*, `nextChallenge`: *Uint8Array*, `ackChallenge`: *Uint8Array*, `packetTag`: *Uint8Array*): [*Packet*](messages_packet.packet.md)
+▸ `Private` **setForward**(`ownKey`: _Uint8Array_, `ownShare`: _Uint8Array_, `nextHop`: _Uint8Array_, `previousHop`: _Uint8Array_, `nextChallenge`: _Uint8Array_, `ackChallenge`: _Uint8Array_, `packetTag`: _Uint8Array_): [_Packet_](messages_packet.packet.md)
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `ownKey` | *Uint8Array* |
-| `ownShare` | *Uint8Array* |
-| `nextHop` | *Uint8Array* |
-| `previousHop` | *Uint8Array* |
-| `nextChallenge` | *Uint8Array* |
-| `ackChallenge` | *Uint8Array* |
-| `packetTag` | *Uint8Array* |
+| Name            | Type         |
+| :-------------- | :----------- |
+| `ownKey`        | _Uint8Array_ |
+| `ownShare`      | _Uint8Array_ |
+| `nextHop`       | _Uint8Array_ |
+| `previousHop`   | _Uint8Array_ |
+| `nextChallenge` | _Uint8Array_ |
+| `ackChallenge`  | _Uint8Array_ |
+| `packetTag`     | _Uint8Array_ |
 
-**Returns:** [*Packet*](messages_packet.packet.md)
+**Returns:** [_Packet_](messages_packet.packet.md)
 
 Defined in: [packages/core/src/messages/packet.ts:187](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/messages/packet.ts#L187)
 
-___
+---
 
 ### setReadyToForward
 
-▸ `Private` **setReadyToForward**(`ackChallenge`: *Uint8Array*): [*Packet*](messages_packet.packet.md)
+▸ `Private` **setReadyToForward**(`ackChallenge`: _Uint8Array_): [_Packet_](messages_packet.packet.md)
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `ackChallenge` | *Uint8Array* |
+| Name           | Type         |
+| :------------- | :----------- |
+| `ackChallenge` | _Uint8Array_ |
 
-**Returns:** [*Packet*](messages_packet.packet.md)
+**Returns:** [_Packet_](messages_packet.packet.md)
 
 Defined in: [packages/core/src/messages/packet.ts:170](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/messages/packet.ts#L170)
 
-___
+---
 
 ### storeUnacknowledgedTicket
 
-▸ **storeUnacknowledgedTicket**(`db`: *HoprDB*): *Promise*<void\>
+▸ **storeUnacknowledgedTicket**(`db`: _HoprDB_): _Promise_<void\>
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `db` | *HoprDB* |
+| Name | Type     |
+| :--- | :------- |
+| `db` | _HoprDB_ |
 
-**Returns:** *Promise*<void\>
+**Returns:** _Promise_<void\>
 
 Defined in: [packages/core/src/messages/packet.ts:316](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/messages/packet.ts#L316)
 
-___
+---
 
 ### validateUnacknowledgedTicket
 
-▸ **validateUnacknowledgedTicket**(`db`: *HoprDB*, `chain`: *default*, `privKey`: *PeerId*): *Promise*<void\>
+▸ **validateUnacknowledgedTicket**(`db`: _HoprDB_, `chain`: _default_, `privKey`: _PeerId_): _Promise_<void\>
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `db` | *HoprDB* |
-| `chain` | *default* |
-| `privKey` | *PeerId* |
+| Name      | Type      |
+| :-------- | :-------- |
+| `db`      | _HoprDB_  |
+| `chain`   | _default_ |
+| `privKey` | _PeerId_  |
 
-**Returns:** *Promise*<void\>
+**Returns:** _Promise_<void\>
 
 Defined in: [packages/core/src/messages/packet.ts:332](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/messages/packet.ts#L332)
 
-___
+---
 
 ### create
 
-▸ `Static` **create**(`msg`: *Uint8Array*, `path`: *PeerId*[], `privKey`: *PeerId*, `chain`: *default*, `ticketOpts`: { `value`: *Balance* ; `winProb`: *number*  }): *Promise*<[*Packet*](messages_packet.packet.md)\>
+▸ `Static` **create**(`msg`: _Uint8Array_, `path`: _PeerId_[], `privKey`: _PeerId_, `chain`: _default_, `ticketOpts`: { `value`: _Balance_ ; `winProb`: _number_ }): _Promise_<[_Packet_](messages_packet.packet.md)\>
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `msg` | *Uint8Array* |
-| `path` | *PeerId*[] |
-| `privKey` | *PeerId* |
-| `chain` | *default* |
-| `ticketOpts` | *object* |
-| `ticketOpts.value` | *Balance* |
-| `ticketOpts.winProb` | *number* |
+| Name                 | Type         |
+| :------------------- | :----------- |
+| `msg`                | _Uint8Array_ |
+| `path`               | _PeerId_[]   |
+| `privKey`            | _PeerId_     |
+| `chain`              | _default_    |
+| `ticketOpts`         | _object_     |
+| `ticketOpts.value`   | _Balance_    |
+| `ticketOpts.winProb` | _number_     |
 
-**Returns:** *Promise*<[*Packet*](messages_packet.packet.md)\>
+**Returns:** _Promise_<[_Packet_](messages_packet.packet.md)\>
 
 Defined in: [packages/core/src/messages/packet.ts:210](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/messages/packet.ts#L210)
 
-___
+---
 
 ### deserialize
 
-▸ `Static` **deserialize**(`preArray`: *Uint8Array*, `privKey`: *PeerId*, `pubKeySender`: *PeerId*): [*Packet*](messages_packet.packet.md)
+▸ `Static` **deserialize**(`preArray`: _Uint8Array_, `privKey`: _PeerId_, `pubKeySender`: _PeerId_): [_Packet_](messages_packet.packet.md)
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `preArray` | *Uint8Array* |
-| `privKey` | *PeerId* |
-| `pubKeySender` | *PeerId* |
+| Name           | Type         |
+| :------------- | :----------- |
+| `preArray`     | _Uint8Array_ |
+| `privKey`      | _PeerId_     |
+| `pubKeySender` | _PeerId_     |
 
-**Returns:** [*Packet*](messages_packet.packet.md)
+**Returns:** [_Packet_](messages_packet.packet.md)
 
 Defined in: [packages/core/src/messages/packet.ts:253](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/messages/packet.ts#L253)

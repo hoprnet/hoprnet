@@ -12,18 +12,18 @@
 
 ### toLengthPrefixedU8a
 
-▸ **toLengthPrefixedU8a**(`arg`: Uint8Array, `additionalPadding?`: Uint8Array, `length?`: *number*): *Uint8Array*
+▸ **toLengthPrefixedU8a**(`arg`: Uint8Array, `additionalPadding?`: Uint8Array, `length?`: _number_): _Uint8Array_
 
 Adds a length-prefix to a Uint8Array
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `arg` | Uint8Array | data to add padding |
+| Name                 | Type       | Description                                                          |
+| :------------------- | :--------- | :------------------------------------------------------------------- |
+| `arg`                | Uint8Array | data to add padding                                                  |
 | `additionalPadding?` | Uint8Array | optional additional padding that is inserted between length and data |
-| `length?` | *number* | optional target length |
+| `length?`            | _number_   | optional target length                                               |
 
-**Returns:** *Uint8Array*
+**Returns:** _Uint8Array_
 
 Defined in: [u8a/toLengthPrefixedU8a.ts:12](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/u8a/toLengthPrefixedU8a.ts#L12)

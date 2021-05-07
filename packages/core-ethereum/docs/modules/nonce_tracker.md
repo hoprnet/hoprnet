@@ -23,7 +23,7 @@
 
 ### HighestContinuousFrom
 
-Ƭ **HighestContinuousFrom**: *object*
+Ƭ **HighestContinuousFrom**: _object_
 
 **`property`** name - The name for how the nonce was calculated based on the data used
 
@@ -33,21 +33,21 @@
 
 #### Type declaration
 
-| Name | Type |
-| :------ | :------ |
-| `details` | *object* |
-| `details.highest` | *number* |
-| `details.startPoint` | *number* |
-| `name` | *string* |
-| `nonce` | *number* |
+| Name                 | Type     |
+| :------------------- | :------- |
+| `details`            | _object_ |
+| `details.highest`    | _number_ |
+| `details.startPoint` | _number_ |
+| `name`               | _string_ |
+| `nonce`              | _number_ |
 
 Defined in: [packages/core-ethereum/src/nonce-tracker.ts:57](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core-ethereum/src/nonce-tracker.ts#L57)
 
-___
+---
 
 ### NetworkNextNonce
 
-Ƭ **NetworkNextNonce**: *object*
+Ƭ **NetworkNextNonce**: _object_
 
 **`property`** name - The name for how the nonce was calculated based on the data used
 
@@ -59,21 +59,21 @@ ___
 
 #### Type declaration
 
-| Name | Type |
-| :------ | :------ |
-| `details` | *object* |
-| `details.baseCount` | *number* |
-| `details.blockNumber` | *number* |
-| `name` | *string* |
-| `nonce` | *number* |
+| Name                  | Type     |
+| :-------------------- | :------- |
+| `details`             | _object_ |
+| `details.baseCount`   | _number_ |
+| `details.blockNumber` | _number_ |
+| `name`                | _string_ |
+| `nonce`               | _number_ |
 
 Defined in: [packages/core-ethereum/src/nonce-tracker.ts:43](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core-ethereum/src/nonce-tracker.ts#L43)
 
-___
+---
 
 ### NonceDetails
 
-Ƭ **NonceDetails**: *object*
+Ƭ **NonceDetails**: _object_
 
 **`property`** highestLocallyConfirmed - A hex string of the highest nonce on a confirmed transaction.
 
@@ -87,21 +87,21 @@ ___
 
 #### Type declaration
 
-| Name | Type |
-| :------ | :------ |
-| `local` | [*HighestContinuousFrom*](nonce_tracker.md#highestcontinuousfrom) |
-| `network` | [*NetworkNextNonce*](nonce_tracker.md#networknextnonce) |
-| `params` | *object* |
-| `params.highestLocallyConfirmed` | *number* |
-| `params.highestSuggested` | *number* |
-| `params.nextNetworkNonce` | *number* |
+| Name                             | Type                                                              |
+| :------------------------------- | :---------------------------------------------------------------- |
+| `local`                          | [_HighestContinuousFrom_](nonce_tracker.md#highestcontinuousfrom) |
+| `network`                        | [_NetworkNextNonce_](nonce_tracker.md#networknextnonce)           |
+| `params`                         | _object_                                                          |
+| `params.highestLocallyConfirmed` | _number_                                                          |
+| `params.highestSuggested`        | _number_                                                          |
+| `params.nextNetworkNonce`        | _number_                                                          |
 
 Defined in: [packages/core-ethereum/src/nonce-tracker.ts:16](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core-ethereum/src/nonce-tracker.ts#L16)
 
-___
+---
 
 ### Transaction
 
-Ƭ **Transaction**: [*Transaction*](transaction_manager.md#transaction) & { `from?`: *string* ; `hash?`: *string* ; `status?`: *string*  }
+Ƭ **Transaction**: [_Transaction_](transaction_manager.md#transaction) & { `from?`: _string_ ; `hash?`: _string_ ; `status?`: _string_ }
 
 Defined in: [packages/core-ethereum/src/nonce-tracker.ts:66](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core-ethereum/src/nonce-tracker.ts#L66)

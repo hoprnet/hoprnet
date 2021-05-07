@@ -6,12 +6,12 @@
 
 ### Variables
 
-- [LENGTH\_PREFIX\_LENGTH](u8a_constants.md#length_prefix_length)
+- [LENGTH_PREFIX_LENGTH](u8a_constants.md#length_prefix_length)
 
 ## Variables
 
-### LENGTH\_PREFIX\_LENGTH
+### LENGTH_PREFIX_LENGTH
 
-• `Const` **LENGTH\_PREFIX\_LENGTH**: ``4``= 4
+• `Const` **LENGTH_PREFIX_LENGTH**: `4`= 4
 
 Defined in: [u8a/constants.ts:1](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/u8a/constants.ts#L1)

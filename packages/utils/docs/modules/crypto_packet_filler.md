@@ -12,19 +12,19 @@
 
 ### generateFiller
 
-▸ **generateFiller**(`maxHops`: *number*, `routingInfoLength`: *number*, `routingInfoLastHopLength`: *number*, `secrets`: Uint8Array[]): Uint8Array
+▸ **generateFiller**(`maxHops`: _number_, `routingInfoLength`: _number_, `routingInfoLastHopLength`: _number_, `secrets`: Uint8Array[]): Uint8Array
 
 Writes the filler bitstring into the header such
 that the integrity tag can be computed
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `maxHops` | *number* | amount of relayers to use |
-| `routingInfoLength` | *number* | length of additional data to put next to the routing information |
-| `routingInfoLastHopLength` | *number* | length of the additional data to put next to the routing information of the last hop |
-| `secrets` | Uint8Array[] | shared secrets with the creator of the packet |
+| Name                       | Type         | Description                                                                          |
+| :------------------------- | :----------- | :----------------------------------------------------------------------------------- |
+| `maxHops`                  | _number_     | amount of relayers to use                                                            |
+| `routingInfoLength`        | _number_     | length of additional data to put next to the routing information                     |
+| `routingInfoLastHopLength` | _number_     | length of the additional data to put next to the routing information of the last hop |
+| `secrets`                  | Uint8Array[] | shared secrets with the creator of the packet                                        |
 
 **Returns:** Uint8Array
 

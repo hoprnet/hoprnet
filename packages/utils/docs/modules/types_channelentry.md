@@ -20,7 +20,7 @@
 
 ### ChannelStatus
 
-Ƭ **ChannelStatus**: ``"CLOSED"`` \| ``"OPEN"`` \| ``"PENDING_TO_CLOSE"``
+Ƭ **ChannelStatus**: `"CLOSED"` \| `"OPEN"` \| `"PENDING_TO_CLOSE"`
 
 Defined in: [types/channelEntry.ts:6](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/types/channelEntry.ts#L6)
 
@@ -28,15 +28,15 @@ Defined in: [types/channelEntry.ts:6](https://github.com/hoprnet/hoprnet/blob/44
 
 ### generateChannelId
 
-▸ **generateChannelId**(`self`: [*Address*](../classes/types_primitives.address.md), `counterparty`: [*Address*](../classes/types_primitives.address.md)): [*Hash*](../classes/types_primitives.hash.md)
+▸ **generateChannelId**(`self`: [_Address_](../classes/types_primitives.address.md), `counterparty`: [_Address_](../classes/types_primitives.address.md)): [_Hash_](../classes/types_primitives.hash.md)
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `self` | [*Address*](../classes/types_primitives.address.md) |
-| `counterparty` | [*Address*](../classes/types_primitives.address.md) |
+| Name           | Type                                                |
+| :------------- | :-------------------------------------------------- |
+| `self`         | [_Address_](../classes/types_primitives.address.md) |
+| `counterparty` | [_Address_](../classes/types_primitives.address.md) |
 
-**Returns:** [*Hash*](../classes/types_primitives.hash.md)
+**Returns:** [_Hash_](../classes/types_primitives.hash.md)
 
 Defined in: [types/channelEntry.ts:8](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/types/channelEntry.ts#L8)

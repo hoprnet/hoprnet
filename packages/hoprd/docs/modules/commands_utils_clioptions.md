@@ -6,12 +6,12 @@
 
 ### Variables
 
-- [cli\_options](commands_utils_clioptions.md#cli_options)
+- [cli_options](commands_utils_clioptions.md#cli_options)
 
 ## Variables
 
-### cli\_options
+### cli_options
 
-• `Const` **cli\_options**: *string*[][]
+• `Const` **cli_options**: _string_[][]
 
 Defined in: [commands/utils/cliOptions.ts:3](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/utils/cliOptions.ts#L3)

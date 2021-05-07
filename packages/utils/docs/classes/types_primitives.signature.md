@@ -27,16 +27,16 @@
 
 ### constructor
 
-\+ **new Signature**(`signature`: *Uint8Array*, `recovery`: *number*): [*Signature*](types_primitives.signature.md)
+\+ **new Signature**(`signature`: _Uint8Array_, `recovery`: _number_): [_Signature_](types_primitives.signature.md)
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `signature` | *Uint8Array* |
-| `recovery` | *number* |
+| Name        | Type         |
+| :---------- | :----------- |
+| `signature` | _Uint8Array_ |
+| `recovery`  | _number_     |
 
-**Returns:** [*Signature*](types_primitives.signature.md)
+**Returns:** [_Signature_](types_primitives.signature.md)
 
 Defined in: [types/primitives.ts:161](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/types/primitives.ts#L161)
 
@@ -44,19 +44,19 @@ Defined in: [types/primitives.ts:161](https://github.com/hoprnet/hoprnet/blob/44
 
 ### recovery
 
-• `Readonly` **recovery**: *number*
+• `Readonly` **recovery**: _number_
 
-___
+---
 
 ### signature
 
-• `Readonly` **signature**: *Uint8Array*
+• `Readonly` **signature**: _Uint8Array_
 
-___
+---
 
 ### SIZE
 
-▪ `Static` **SIZE**: *number*
+▪ `Static` **SIZE**: _number_
 
 Defined in: [types/primitives.ts:189](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/types/primitives.ts#L189)
 
@@ -64,58 +64,58 @@ Defined in: [types/primitives.ts:189](https://github.com/hoprnet/hoprnet/blob/44
 
 ### serialize
 
-▸ **serialize**(): *Uint8Array*
+▸ **serialize**(): _Uint8Array_
 
-**Returns:** *Uint8Array*
+**Returns:** _Uint8Array_
 
 Defined in: [types/primitives.ts:178](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/types/primitives.ts#L178)
 
-___
+---
 
 ### verify
 
-▸ **verify**(`msg`: *Uint8Array*, `pubKey`: [*PublicKey*](types_primitives.publickey.md)): *boolean*
+▸ **verify**(`msg`: _Uint8Array_, `pubKey`: [_PublicKey_](types_primitives.publickey.md)): _boolean_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `msg` | *Uint8Array* |
-| `pubKey` | [*PublicKey*](types_primitives.publickey.md) |
+| Name     | Type                                         |
+| :------- | :------------------------------------------- |
+| `msg`    | _Uint8Array_                                 |
+| `pubKey` | [_PublicKey_](types_primitives.publickey.md) |
 
-**Returns:** *boolean*
+**Returns:** _boolean_
 
 Defined in: [types/primitives.ts:185](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/types/primitives.ts#L185)
 
-___
+---
 
 ### create
 
-▸ `Static` **create**(`msg`: *Uint8Array*, `privKey`: *Uint8Array*): [*Signature*](types_primitives.signature.md)
+▸ `Static` **create**(`msg`: _Uint8Array_, `privKey`: _Uint8Array_): [_Signature_](types_primitives.signature.md)
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `msg` | *Uint8Array* |
-| `privKey` | *Uint8Array* |
+| Name      | Type         |
+| :-------- | :----------- |
+| `msg`     | _Uint8Array_ |
+| `privKey` | _Uint8Array_ |
 
-**Returns:** [*Signature*](types_primitives.signature.md)
+**Returns:** [_Signature_](types_primitives.signature.md)
 
 Defined in: [types/primitives.ts:173](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/types/primitives.ts#L173)
 
-___
+---
 
 ### deserialize
 
-▸ `Static` **deserialize**(`arr`: *Uint8Array*): [*Signature*](types_primitives.signature.md)
+▸ `Static` **deserialize**(`arr`: _Uint8Array_): [_Signature_](types_primitives.signature.md)
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `arr` | *Uint8Array* |
+| Name  | Type         |
+| :---- | :----------- |
+| `arr` | _Uint8Array_ |
 
-**Returns:** [*Signature*](types_primitives.signature.md)
+**Returns:** [_Signature_](types_primitives.signature.md)
 
 Defined in: [types/primitives.ts:168](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/types/primitives.ts#L168)

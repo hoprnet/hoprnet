@@ -1,4 +1,4 @@
-[@hoprnet/hopr-core-ethereum](../README.md) / [Exports](../modules.md) / contracts/factories/HoprWrapper__factory
+[@hoprnet/hopr-core-ethereum](../README.md) / [Exports](../modules.md) / contracts/factories/HoprWrapper\_\_factory
 
 # Module: contracts/factories/HoprWrapper\_\_factory
 

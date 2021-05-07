@@ -14,35 +14,35 @@
 
 ### getNetworkGasPrice
 
-▸ **getNetworkGasPrice**(`network`: Networks): *number* \| *undefined*
+▸ **getNetworkGasPrice**(`network`: Networks): _number_ \| _undefined_
 
 Get current network's name.
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
+| Name      | Type     |
+| :-------- | :------- |
 | `network` | Networks |
 
-**Returns:** *number* \| *undefined*
+**Returns:** _number_ \| _undefined_
 
 the network's name
 
 Defined in: [packages/core-ethereum/src/utils.ts:23](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core-ethereum/src/utils.ts#L23)
 
-___
+---
 
 ### getNetworkName
 
-▸ **getNetworkName**(`chainId`: *number*): Networks
+▸ **getNetworkName**(`chainId`: _number_): Networks
 
 Get current network's name.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `chainId` | *number* | a chain id |
+| Name      | Type     | Description |
+| :-------- | :------- | :---------- |
+| `chainId` | _number_ | a chain id  |
 
 **Returns:** Networks
 
@@ -50,26 +50,26 @@ the network's name
 
 Defined in: [packages/core-ethereum/src/utils.ts:10](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core-ethereum/src/utils.ts#L10)
 
-___
+---
 
 ### getSignatureParameters
 
-▸ **getSignatureParameters**(`signature`: Signature): *object*
+▸ **getSignatureParameters**(`signature`: Signature): _object_
 
 Get r,s,v values of a signature
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
+| Name        | Type      |
+| :---------- | :-------- |
 | `signature` | Signature |
 
-**Returns:** *object*
+**Returns:** _object_
 
-| Name | Type |
-| :------ | :------ |
-| `r` | Hash |
-| `s` | Hash |
-| `v` | *number* |
+| Name | Type     |
+| :--- | :------- |
+| `r`  | Hash     |
+| `s`  | Hash     |
+| `v`  | _number_ |
 
 Defined in: [packages/core-ethereum/src/utils.ts:33](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core-ethereum/src/utils.ts#L33)

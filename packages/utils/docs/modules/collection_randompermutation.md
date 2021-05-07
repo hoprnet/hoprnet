@@ -20,7 +20,7 @@ by using the (optimized) Fisher-Yates shuffling algorithm.
 **`example`**
 
 ```javascript
-randomPermutation([1,2,3,4]);
+randomPermutation([1, 2, 3, 4])
 // first run: [2,4,1,2]
 // second run: [3,1,2,4]
 // ...
@@ -29,14 +29,14 @@ randomPermutation([1,2,3,4]);
 #### Type parameters
 
 | Name |
-| :------ |
-| `T` |
+| :--- |
+| `T`  |
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `array` | T[] | the array to permutate |
+| Name    | Type | Description            |
+| :------ | :--- | :--------------------- |
+| `array` | T[]  | the array to permutate |
 
 **Returns:** T[]
 

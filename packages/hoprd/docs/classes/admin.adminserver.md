@@ -27,17 +27,17 @@
 
 ### constructor
 
-\+ **new AdminServer**(`logs`: [*LogStream*](logs.logstream.md), `host`: *string*, `port`: *number*): [*AdminServer*](admin.adminserver.md)
+\+ **new AdminServer**(`logs`: [_LogStream_](logs.logstream.md), `host`: _string_, `port`: _number_): [_AdminServer_](admin.adminserver.md)
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `logs` | [*LogStream*](logs.logstream.md) |
-| `host` | *string* |
-| `port` | *number* |
+| Name   | Type                             |
+| :----- | :------------------------------- |
+| `logs` | [_LogStream_](logs.logstream.md) |
+| `host` | _string_                         |
+| `port` | _number_                         |
 
-**Returns:** [*AdminServer*](admin.adminserver.md)
+**Returns:** [_AdminServer_](admin.adminserver.md)
 
 Defined in: [admin.ts:23](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/admin.ts#L23)
 
@@ -45,39 +45,39 @@ Defined in: [admin.ts:23](https://github.com/hoprnet/hoprnet/blob/448a47a/packag
 
 ### app
 
-• `Private` **app**: *any*
+• `Private` **app**: _any_
 
 Defined in: [admin.ts:19](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/admin.ts#L19)
 
-___
+---
 
 ### cmds
 
-• `Private` **cmds**: *any*
+• `Private` **cmds**: _any_
 
 Defined in: [admin.ts:23](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/admin.ts#L23)
 
-___
+---
 
 ### node
 
-• `Private` **node**: *Hopr*
+• `Private` **node**: _Hopr_
 
 Defined in: [admin.ts:21](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/admin.ts#L21)
 
-___
+---
 
 ### server
 
-• `Private` **server**: *Server*
+• `Private` **server**: _Server_
 
 Defined in: [admin.ts:20](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/admin.ts#L20)
 
-___
+---
 
 ### wsServer
 
-• `Private` **wsServer**: *any*
+• `Private` **wsServer**: _any_
 
 Defined in: [admin.ts:22](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/admin.ts#L22)
 
@@ -85,26 +85,26 @@ Defined in: [admin.ts:22](https://github.com/hoprnet/hoprnet/blob/448a47a/packag
 
 ### registerNode
 
-▸ **registerNode**(`node`: *Hopr*, `cmds`: *any*, `settings?`: *any*): *void*
+▸ **registerNode**(`node`: _Hopr_, `cmds`: _any_, `settings?`: _any_): _void_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `node` | *Hopr* |
-| `cmds` | *any* |
-| `settings?` | *any* |
+| Name        | Type   |
+| :---------- | :----- |
+| `node`      | _Hopr_ |
+| `cmds`      | _any_  |
+| `settings?` | _any_  |
 
-**Returns:** *void*
+**Returns:** _void_
 
 Defined in: [admin.ts:81](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/admin.ts#L81)
 
-___
+---
 
 ### setup
 
-▸ **setup**(): *Promise*<void\>
+▸ **setup**(): _Promise_<void\>
 
-**Returns:** *Promise*<void\>
+**Returns:** _Promise_<void\>
 
 Defined in: [admin.ts:27](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/admin.ts#L27)

@@ -1,8 +1,8 @@
-[@hoprnet/hopr-core-ethereum](../README.md) / [Exports](../modules.md) / [contracts/factories/HoprDistributor__factory](../modules/contracts_factories_hoprdistributor__factory.md) / HoprDistributor__factory
+[@hoprnet/hopr-core-ethereum](../README.md) / [Exports](../modules.md) / [contracts/factories/HoprDistributor\_\_factory](../modules/contracts_factories_hoprdistributor__factory.md) / HoprDistributor\_\_factory
 
 # Class: HoprDistributor\_\_factory
 
-[contracts/factories/HoprDistributor__factory](../modules/contracts_factories_hoprdistributor__factory.md).HoprDistributor__factory
+[contracts/factories/HoprDistributor\_\_factory](../modules/contracts_factories_hoprdistributor__factory.md).HoprDistributor\_\_factory
 
 ## Table of contents
 
@@ -18,23 +18,23 @@
 
 ### constructor
 
-\+ **new HoprDistributor__factory**(): [*HoprDistributor\_\_factory*](contracts_factories_hoprdistributor__factory.hoprdistributor__factory.md)
+\+ **new HoprDistributor\_\_factory**(): [_HoprDistributor\_\_factory_](contracts_factories_hoprdistributor__factory.hoprdistributor__factory.md)
 
-**Returns:** [*HoprDistributor\_\_factory*](contracts_factories_hoprdistributor__factory.hoprdistributor__factory.md)
+**Returns:** [_HoprDistributor\_\_factory_](contracts_factories_hoprdistributor__factory.hoprdistributor__factory.md)
 
 ## Methods
 
 ### connect
 
-▸ `Static` **connect**(`address`: *string*, `signerOrProvider`: *Provider* \| *Signer*): [*HoprDistributor*](contracts_hoprdistributor.hoprdistributor.md)
+▸ `Static` **connect**(`address`: _string_, `signerOrProvider`: _Provider_ \| _Signer_): [_HoprDistributor_](contracts_hoprdistributor.hoprdistributor.md)
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `address` | *string* |
-| `signerOrProvider` | *Provider* \| *Signer* |
+| Name               | Type                   |
+| :----------------- | :--------------------- |
+| `address`          | _string_               |
+| `signerOrProvider` | _Provider_ \| _Signer_ |
 
-**Returns:** [*HoprDistributor*](contracts_hoprdistributor.hoprdistributor.md)
+**Returns:** [_HoprDistributor_](contracts_hoprdistributor.hoprdistributor.md)
 
-Defined in: packages/core-ethereum/src/contracts/factories/HoprDistributor__factory.ts:11
+Defined in: packages/core-ethereum/src/contracts/factories/HoprDistributor\_\_factory.ts:11

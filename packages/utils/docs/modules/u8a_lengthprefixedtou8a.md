@@ -12,18 +12,18 @@
 
 ### lengthPrefixedToU8a
 
-▸ **lengthPrefixedToU8a**(`arg`: Uint8Array, `additionalPadding?`: Uint8Array, `targetLength?`: *number*): *Uint8Array*
+▸ **lengthPrefixedToU8a**(`arg`: Uint8Array, `additionalPadding?`: Uint8Array, `targetLength?`: _number_): _Uint8Array_
 
 Decodes a length-prefixed array and returns the encoded data.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `arg` | Uint8Array | array to decode |
+| Name                 | Type       | Description                  |
+| :------------------- | :--------- | :--------------------------- |
+| `arg`                | Uint8Array | array to decode              |
 | `additionalPadding?` | Uint8Array | additional padding to remove |
-| `targetLength?` | *number* | optional target length |
+| `targetLength?`      | _number_   | optional target length       |
 
-**Returns:** *Uint8Array*
+**Returns:** _Uint8Array_
 
 Defined in: [u8a/lengthPrefixedToU8a.ts:11](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/u8a/lengthPrefixedToU8a.ts#L11)

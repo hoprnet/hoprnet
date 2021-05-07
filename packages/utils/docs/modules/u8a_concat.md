@@ -12,26 +12,27 @@
 
 ### u8aConcat
 
-▸ **u8aConcat**(...`list`: (Uint8Array \| *undefined*)[]): Uint8Array
+▸ **u8aConcat**(...`list`: (Uint8Array \| _undefined_)[]): Uint8Array
 
 Concatenates the input arrays into a single `UInt8Array`.
 
 **`example`**
 u8aConcat(
-  new Uint8Array([1, 1, 1]),
-  new Uint8Array([2, 2, 2])
+new Uint8Array([1, 1, 1]),
+new Uint8Array([2, 2, 2])
 ); // Uint8Arrau([1, 1, 1, 2, 2, 2])
- * u8aConcat(
+
+- u8aConcat(
   new Uint8Array([1, 1, 1]),
   undefined
   new Uint8Array([2, 2, 2])
-); // Uint8Arrau([1, 1, 1, 2, 2, 2])
+  ); // Uint8Arrau([1, 1, 1, 2, 2, 2])
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `...list` | (Uint8Array \| *undefined*)[] |
+| Name      | Type                          |
+| :-------- | :---------------------------- |
+| `...list` | (Uint8Array \| _undefined_)[] |
 
 **Returns:** Uint8Array
 

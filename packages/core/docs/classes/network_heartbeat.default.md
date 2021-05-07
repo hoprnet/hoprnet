@@ -16,7 +16,7 @@
 
 ### Methods
 
-- [\_\_forTestOnly\_checkNodes](network_heartbeat.default.md#__fortestonly_checknodes)
+- [\_\_forTestOnly_checkNodes](network_heartbeat.default.md#__fortestonly_checknodes)
 - [checkNodes](network_heartbeat.default.md#checknodes)
 - [handleHeartbeatRequest](network_heartbeat.default.md#handleheartbeatrequest)
 - [pingNode](network_heartbeat.default.md#pingnode)
@@ -28,18 +28,18 @@
 
 ### constructor
 
-\+ **new default**(`networkPeers`: [*default*](network_network_peers.default.md), `subscribe`: (`protocol`: *string*, `handler`: LibP2PHandlerFunction, `includeReply`: *boolean*) => *void*, `sendMessageAndExpectResponse`: (`dst`: *PeerId*, `proto`: *string*, `msg`: *Uint8Array*, `opts`: DialOpts) => *Promise*<Uint8Array\>, `hangUp`: (`addr`: *PeerId*) => *Promise*<void\>): [*default*](network_heartbeat.default.md)
+\+ **new default**(`networkPeers`: [_default_](network_network_peers.default.md), `subscribe`: (`protocol`: _string_, `handler`: LibP2PHandlerFunction, `includeReply`: _boolean_) => _void_, `sendMessageAndExpectResponse`: (`dst`: _PeerId_, `proto`: _string_, `msg`: _Uint8Array_, `opts`: DialOpts) => _Promise_<Uint8Array\>, `hangUp`: (`addr`: _PeerId_) => _Promise_<void\>): [_default_](network_heartbeat.default.md)
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `networkPeers` | [*default*](network_network_peers.default.md) |
-| `subscribe` | (`protocol`: *string*, `handler`: LibP2PHandlerFunction, `includeReply`: *boolean*) => *void* |
-| `sendMessageAndExpectResponse` | (`dst`: *PeerId*, `proto`: *string*, `msg`: *Uint8Array*, `opts`: DialOpts) => *Promise*<Uint8Array\> |
-| `hangUp` | (`addr`: *PeerId*) => *Promise*<void\> |
+| Name                           | Type                                                                                                  |
+| :----------------------------- | :---------------------------------------------------------------------------------------------------- |
+| `networkPeers`                 | [_default_](network_network_peers.default.md)                                                         |
+| `subscribe`                    | (`protocol`: _string_, `handler`: LibP2PHandlerFunction, `includeReply`: _boolean_) => _void_         |
+| `sendMessageAndExpectResponse` | (`dst`: _PeerId_, `proto`: _string_, `msg`: _Uint8Array_, `opts`: DialOpts) => _Promise_<Uint8Array\> |
+| `hangUp`                       | (`addr`: _PeerId_) => _Promise_<void\>                                                                |
 
-**Returns:** [*default*](network_heartbeat.default.md)
+**Returns:** [_default_](network_heartbeat.default.md)
 
 Defined in: [packages/core/src/network/heartbeat.ts:13](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/network/heartbeat.ts#L13)
 
@@ -47,89 +47,89 @@ Defined in: [packages/core/src/network/heartbeat.ts:13](https://github.com/hoprn
 
 ### timeout
 
-• `Private` **timeout**: *Timeout*
+• `Private` **timeout**: _Timeout_
 
 Defined in: [packages/core/src/network/heartbeat.ts:13](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/network/heartbeat.ts#L13)
 
 ## Methods
 
-### \_\_forTestOnly\_checkNodes
+### \_\_forTestOnly_checkNodes
 
-▸ **__forTestOnly_checkNodes**(): *Promise*<void\>
+▸ **\_\_forTestOnly_checkNodes**(): _Promise_<void\>
 
-**Returns:** *Promise*<void\>
+**Returns:** _Promise_<void\>
 
 Defined in: [packages/core/src/network/heartbeat.ts:91](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/network/heartbeat.ts#L91)
 
-___
+---
 
 ### checkNodes
 
-▸ `Private` **checkNodes**(): *Promise*<void\>
+▸ `Private` **checkNodes**(): _Promise_<void\>
 
-**Returns:** *Promise*<void\>
+**Returns:** _Promise_<void\>
 
 Defined in: [packages/core/src/network/heartbeat.ts:60](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/network/heartbeat.ts#L60)
 
-___
+---
 
 ### handleHeartbeatRequest
 
-▸ **handleHeartbeatRequest**(`msg`: *Uint8Array*, `remotePeer`: *PeerId*): *Uint8Array*
+▸ **handleHeartbeatRequest**(`msg`: _Uint8Array_, `remotePeer`: _PeerId_): _Uint8Array_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `msg` | *Uint8Array* |
-| `remotePeer` | *PeerId* |
+| Name         | Type         |
+| :----------- | :----------- |
+| `msg`        | _Uint8Array_ |
+| `remotePeer` | _PeerId_     |
 
-**Returns:** *Uint8Array*
+**Returns:** _Uint8Array_
 
 Defined in: [packages/core/src/network/heartbeat.ts:29](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/network/heartbeat.ts#L29)
 
-___
+---
 
 ### pingNode
 
-▸ **pingNode**(`id`: *PeerId*): *Promise*<boolean\>
+▸ **pingNode**(`id`: _PeerId_): _Promise_<boolean\>
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `id` | *PeerId* |
+| Name | Type     |
+| :--- | :------- |
+| `id` | _PeerId_ |
 
-**Returns:** *Promise*<boolean\>
+**Returns:** _Promise_<boolean\>
 
 Defined in: [packages/core/src/network/heartbeat.ts:35](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/network/heartbeat.ts#L35)
 
-___
+---
 
 ### start
 
-▸ **start**(): *void*
+▸ **start**(): _void_
 
-**Returns:** *void*
+**Returns:** _void_
 
 Defined in: [packages/core/src/network/heartbeat.ts:81](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/network/heartbeat.ts#L81)
 
-___
+---
 
 ### stop
 
-▸ **stop**(): *void*
+▸ **stop**(): _void_
 
-**Returns:** *void*
+**Returns:** _void_
 
 Defined in: [packages/core/src/network/heartbeat.ts:86](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/network/heartbeat.ts#L86)
 
-___
+---
 
 ### tick
 
-▸ `Private` **tick**(): *void*
+▸ `Private` **tick**(): _void_
 
-**Returns:** *void*
+**Returns:** _void_
 
 Defined in: [packages/core/src/network/heartbeat.ts:74](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/network/heartbeat.ts#L74)

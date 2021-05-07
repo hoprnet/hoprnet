@@ -18,47 +18,47 @@
 
 ### connectionReport
 
-▸ **connectionReport**(`node`: Hopr, `logs`: [*LogStream*](../classes/logs.logstream.md)): *Promise*<void\>
+▸ **connectionReport**(`node`: Hopr, `logs`: [_LogStream_](../classes/logs.logstream.md)): _Promise_<void\>
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `node` | Hopr |
-| `logs` | [*LogStream*](../classes/logs.logstream.md) |
+| Name   | Type                                        |
+| :----- | :------------------------------------------ |
+| `node` | Hopr                                        |
+| `logs` | [_LogStream_](../classes/logs.logstream.md) |
 
-**Returns:** *Promise*<void\>
+**Returns:** _Promise_<void\>
 
 Defined in: [admin.ts:142](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/admin.ts#L142)
 
-___
+---
 
 ### reportMemoryUsage
 
-▸ **reportMemoryUsage**(`logs`: [*LogStream*](../classes/logs.logstream.md)): *Promise*<void\>
+▸ **reportMemoryUsage**(`logs`: [_LogStream_](../classes/logs.logstream.md)): _Promise_<void\>
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `logs` | [*LogStream*](../classes/logs.logstream.md) |
+| Name   | Type                                        |
+| :----- | :------------------------------------------ |
+| `logs` | [_LogStream_](../classes/logs.logstream.md) |
 
-**Returns:** *Promise*<void\>
+**Returns:** _Promise_<void\>
 
 Defined in: [admin.ts:135](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/admin.ts#L135)
 
-___
+---
 
 ### showDisclaimer
 
-▸ **showDisclaimer**(`logs`: [*LogStream*](../classes/logs.logstream.md)): *void*
+▸ **showDisclaimer**(`logs`: [_LogStream_](../classes/logs.logstream.md)): _void_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `logs` | [*LogStream*](../classes/logs.logstream.md) |
+| Name   | Type                                        |
+| :----- | :------------------------------------------ |
+| `logs` | [_LogStream_](../classes/logs.logstream.md) |
 
-**Returns:** *void*
+**Returns:** _void_
 
 Defined in: [admin.ts:128](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/admin.ts#L128)

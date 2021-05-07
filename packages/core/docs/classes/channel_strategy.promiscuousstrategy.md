@@ -6,7 +6,7 @@
 
 ## Implements
 
-- [*ChannelStrategy*](../interfaces/channel_strategy.channelstrategy.md)
+- [_ChannelStrategy_](../interfaces/channel_strategy.channelstrategy.md)
 
 ## Table of contents
 
@@ -26,15 +26,15 @@
 
 ### constructor
 
-\+ **new PromiscuousStrategy**(): [*PromiscuousStrategy*](channel_strategy.promiscuousstrategy.md)
+\+ **new PromiscuousStrategy**(): [_PromiscuousStrategy_](channel_strategy.promiscuousstrategy.md)
 
-**Returns:** [*PromiscuousStrategy*](channel_strategy.promiscuousstrategy.md)
+**Returns:** [_PromiscuousStrategy_](channel_strategy.promiscuousstrategy.md)
 
 ## Properties
 
 ### name
 
-• **name**: *string*= 'promiscuous'
+• **name**: _string_= 'promiscuous'
 
 Implementation of: [ChannelStrategy](../interfaces/channel_strategy.channelstrategy.md).[name](../interfaces/channel_strategy.channelstrategy.md#name)
 
@@ -44,19 +44,19 @@ Defined in: [packages/core/src/channel-strategy.ts:63](https://github.com/hoprne
 
 ### tick
 
-▸ **tick**(`balance`: *BN*, `_n`: RoutingChannel[], `currentChannels`: RoutingChannel[], `peers`: [*default*](network_network_peers.default.md), `getRandomChannel`: () => *Promise*<RoutingChannel\>): *Promise*<[[*ChannelsToOpen*](../modules/channel_strategy.md#channelstoopen)[], *PeerId*[]]\>
+▸ **tick**(`balance`: _BN_, `_n`: RoutingChannel[], `currentChannels`: RoutingChannel[], `peers`: [_default_](network_network_peers.default.md), `getRandomChannel`: () => _Promise_<RoutingChannel\>): _Promise_<[[*ChannelsToOpen*](../modules/channel_strategy.md#channelstoopen)[], *PeerId*[]]\>
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `balance` | *BN* |
-| `_n` | RoutingChannel[] |
-| `currentChannels` | RoutingChannel[] |
-| `peers` | [*default*](network_network_peers.default.md) |
-| `getRandomChannel` | () => *Promise*<RoutingChannel\> |
+| Name               | Type                                          |
+| :----------------- | :-------------------------------------------- |
+| `balance`          | _BN_                                          |
+| `_n`               | RoutingChannel[]                              |
+| `currentChannels`  | RoutingChannel[]                              |
+| `peers`            | [_default_](network_network_peers.default.md) |
+| `getRandomChannel` | () => _Promise_<RoutingChannel\>              |
 
-**Returns:** *Promise*<[[*ChannelsToOpen*](../modules/channel_strategy.md#channelstoopen)[], *PeerId*[]]\>
+**Returns:** _Promise_<[[*ChannelsToOpen*](../modules/channel_strategy.md#channelstoopen)[], *PeerId*[]]\>
 
 Implementation of: [ChannelStrategy](../interfaces/channel_strategy.channelstrategy.md)
 

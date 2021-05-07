@@ -24,20 +24,20 @@
 
 ### constructor
 
-\+ **new PacketForwardInteraction**(`subscribe`: *any*, `sendMessage`: *any*, `privKey`: *PeerId*, `chain`: *default*, `emitMessage`: (`msg`: *Uint8Array*) => *void*, `db`: *HoprDB*): [*PacketForwardInteraction*](interactions_packet_forward.packetforwardinteraction.md)
+\+ **new PacketForwardInteraction**(`subscribe`: _any_, `sendMessage`: _any_, `privKey`: _PeerId_, `chain`: _default_, `emitMessage`: (`msg`: _Uint8Array_) => _void_, `db`: _HoprDB_): [_PacketForwardInteraction_](interactions_packet_forward.packetforwardinteraction.md)
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `subscribe` | *any* |
-| `sendMessage` | *any* |
-| `privKey` | *PeerId* |
-| `chain` | *default* |
-| `emitMessage` | (`msg`: *Uint8Array*) => *void* |
-| `db` | *HoprDB* |
+| Name          | Type                            |
+| :------------ | :------------------------------ |
+| `subscribe`   | _any_                           |
+| `sendMessage` | _any_                           |
+| `privKey`     | _PeerId_                        |
+| `chain`       | _default_                       |
+| `emitMessage` | (`msg`: _Uint8Array_) => _void_ |
+| `db`          | _HoprDB_                        |
 
-**Returns:** [*PacketForwardInteraction*](interactions_packet_forward.packetforwardinteraction.md)
+**Returns:** [_PacketForwardInteraction_](interactions_packet_forward.packetforwardinteraction.md)
 
 Defined in: [packages/core/src/interactions/packet/forward.ts:12](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/interactions/packet/forward.ts#L12)
 
@@ -45,7 +45,7 @@ Defined in: [packages/core/src/interactions/packet/forward.ts:12](https://github
 
 ### mixer
 
-• `Private` **mixer**: [*Mixer*](mixer.mixer-1.md)
+• `Private` **mixer**: [_Mixer_](mixer.mixer-1.md)
 
 Defined in: [packages/core/src/interactions/packet/forward.ts:12](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/interactions/packet/forward.ts#L12)
 
@@ -53,48 +53,48 @@ Defined in: [packages/core/src/interactions/packet/forward.ts:12](https://github
 
 ### handleMixedPacket
 
-▸ **handleMixedPacket**(`packet`: [*Packet*](messages_packet.packet.md)): *Promise*<void\>
+▸ **handleMixedPacket**(`packet`: [_Packet_](messages_packet.packet.md)): _Promise_<void\>
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `packet` | [*Packet*](messages_packet.packet.md) |
+| Name     | Type                                  |
+| :------- | :------------------------------------ |
+| `packet` | [_Packet_](messages_packet.packet.md) |
 
-**Returns:** *Promise*<void\>
+**Returns:** _Promise_<void\>
 
 Defined in: [packages/core/src/interactions/packet/forward.ts:38](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/interactions/packet/forward.ts#L38)
 
-___
+---
 
 ### handlePacket
 
-▸ **handlePacket**(`msg`: *Uint8Array*, `remotePeer`: *PeerId*): *Promise*<void\>
+▸ **handlePacket**(`msg`: _Uint8Array_, `remotePeer`: _PeerId_): _Promise_<void\>
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `msg` | *Uint8Array* |
-| `remotePeer` | *PeerId* |
+| Name         | Type         |
+| :----------- | :----------- |
+| `msg`        | _Uint8Array_ |
+| `remotePeer` | _PeerId_     |
 
-**Returns:** *Promise*<void\>
+**Returns:** _Promise_<void\>
 
 Defined in: [packages/core/src/interactions/packet/forward.ts:32](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/interactions/packet/forward.ts#L32)
 
-___
+---
 
 ### interact
 
-▸ **interact**(`counterparty`: *PeerId*, `packet`: [*Packet*](messages_packet.packet.md)): *Promise*<void\>
+▸ **interact**(`counterparty`: _PeerId_, `packet`: [_Packet_](messages_packet.packet.md)): _Promise_<void\>
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `counterparty` | *PeerId* |
-| `packet` | [*Packet*](messages_packet.packet.md) |
+| Name           | Type                                  |
+| :------------- | :------------------------------------ |
+| `counterparty` | _PeerId_                              |
+| `packet`       | [_Packet_](messages_packet.packet.md) |
 
-**Returns:** *Promise*<void\>
+**Returns:** _Promise_<void\>
 
 Defined in: [packages/core/src/interactions/packet/forward.ts:26](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/interactions/packet/forward.ts#L26)

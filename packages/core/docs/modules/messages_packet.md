@@ -10,7 +10,7 @@
 
 ### Variables
 
-- [MAX\_HOPS](messages_packet.md#max_hops)
+- [MAX_HOPS](messages_packet.md#max_hops)
 
 ### Functions
 
@@ -19,9 +19,9 @@
 
 ## Variables
 
-### MAX\_HOPS
+### MAX_HOPS
 
-• `Const` **MAX\_HOPS**: ``3``= 3
+• `Const` **MAX_HOPS**: `3`= 3
 
 Defined in: [packages/core/src/messages/packet.ts:32](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/messages/packet.ts#L32)
 
@@ -29,41 +29,41 @@ Defined in: [packages/core/src/messages/packet.ts:32](https://github.com/hoprnet
 
 ### validateCreatedTicket
 
-▸ **validateCreatedTicket**(`myBalance`: BN, `ticket`: Ticket): *void*
+▸ **validateCreatedTicket**(`myBalance`: BN, `ticket`: Ticket): _void_
 
 Validate newly created tickets
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `myBalance` | BN |
-| `ticket` | Ticket |
+| Name        | Type   |
+| :---------- | :----- |
+| `myBalance` | BN     |
+| `ticket`    | Ticket |
 
-**Returns:** *void*
+**Returns:** _void_
 
 Defined in: [packages/core/src/messages/packet.ts:42](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/messages/packet.ts#L42)
 
-___
+---
 
 ### validateUnacknowledgedTicket
 
-▸ **validateUnacknowledgedTicket**(`id`: PeerId, `nodeTicketAmount`: *string*, `nodeTicketWinProb`: *number*, `senderPeerId`: PeerId, `ticket`: Ticket, `channel`: Channel, `getTickets`: () => *Promise*<Ticket[]\>): *Promise*<void\>
+▸ **validateUnacknowledgedTicket**(`id`: PeerId, `nodeTicketAmount`: _string_, `nodeTicketWinProb`: _number_, `senderPeerId`: PeerId, `ticket`: Ticket, `channel`: Channel, `getTickets`: () => _Promise_<Ticket[]\>): _Promise_<void\>
 
 Validate unacknowledged tickets as we receive them
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `id` | PeerId |
-| `nodeTicketAmount` | *string* |
-| `nodeTicketWinProb` | *number* |
-| `senderPeerId` | PeerId |
-| `ticket` | Ticket |
-| `channel` | Channel |
-| `getTickets` | () => *Promise*<Ticket[]\> |
+| Name                | Type                       |
+| :------------------ | :------------------------- |
+| `id`                | PeerId                     |
+| `nodeTicketAmount`  | _string_                   |
+| `nodeTicketWinProb` | _number_                   |
+| `senderPeerId`      | PeerId                     |
+| `ticket`            | Ticket                     |
+| `channel`           | Channel                    |
+| `getTickets`        | () => _Promise_<Ticket[]\> |
 
-**Returns:** *Promise*<void\>
+**Returns:** _Promise_<void\>
 
 Defined in: [packages/core/src/messages/packet.ts:53](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/core/src/messages/packet.ts#L53)

@@ -37,7 +37,7 @@
 
 Re-exports: [privKeyToPeerId](libp2p_privkeytopeerid.md#privkeytopeerid)
 
-___
+---
 
 ### pubKeyToPeerId
 
@@ -47,58 +47,58 @@ Re-exports: [pubKeyToPeerId](libp2p_pubkeytopeerid.md#pubkeytopeerid)
 
 ### DialOpts
 
-Ƭ **DialOpts**: *object*
+Ƭ **DialOpts**: _object_
 
 #### Type declaration
 
-| Name | Type |
-| :------ | :------ |
-| `timeout` | *number* |
+| Name      | Type     |
+| :-------- | :------- |
+| `timeout` | _number_ |
 
 Defined in: [libp2p/index.ts:82](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/libp2p/index.ts#L82)
 
-___
+---
 
 ### DialResponse
 
-Ƭ **DialResponse**: { `resp`: { `protocol`: *string* ; `stream`: MuxedStream  } ; `status`: ``"SUCCESS"``  } \| { `status`: ``"E_TIMEOUT"``  } \| { `dht`: *boolean* ; `error`: Error ; `status`: ``"E_DIAL"``  } \| { `error`: Error ; `query`: PeerId ; `status`: ``"E_DHT_QUERY"``  }
+Ƭ **DialResponse**: { `resp`: { `protocol`: _string_ ; `stream`: MuxedStream } ; `status`: `"SUCCESS"` } \| { `status`: `"E_TIMEOUT"` } \| { `dht`: _boolean_ ; `error`: Error ; `status`: `"E_DIAL"` } \| { `error`: Error ; `query`: PeerId ; `status`: `"E_DHT_QUERY"` }
 
 Defined in: [libp2p/index.ts:86](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/libp2p/index.ts#L86)
 
-___
+---
 
 ### LibP2PHandlerArgs
 
-Ƭ **LibP2PHandlerArgs**: *object*
+Ƭ **LibP2PHandlerArgs**: _object_
 
 #### Type declaration
 
-| Name | Type |
-| :------ | :------ |
-| `connection` | Connection |
-| `protocol` | *string* |
-| `stream` | MuxedStream |
+| Name         | Type        |
+| :----------- | :---------- |
+| `connection` | Connection  |
+| `protocol`   | _string_    |
+| `stream`     | MuxedStream |
 
 Defined in: [libp2p/index.ts:231](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/libp2p/index.ts#L231)
 
-___
+---
 
 ### LibP2PHandlerFunction
 
-Ƭ **LibP2PHandlerFunction**: (`msg`: Uint8Array, `remotePeer`: PeerId) => *any*
+Ƭ **LibP2PHandlerFunction**: (`msg`: Uint8Array, `remotePeer`: PeerId) => _any_
 
 #### Type declaration
 
-▸ (`msg`: Uint8Array, `remotePeer`: PeerId): *any*
+▸ (`msg`: Uint8Array, `remotePeer`: PeerId): _any_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `msg` | Uint8Array |
-| `remotePeer` | PeerId |
+| Name         | Type       |
+| :----------- | :--------- |
+| `msg`        | Uint8Array |
+| `remotePeer` | PeerId     |
 
-**Returns:** *any*
+**Returns:** _any_
 
 Defined in: [libp2p/index.ts:232](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/libp2p/index.ts#L232)
 
@@ -106,7 +106,7 @@ Defined in: [libp2p/index.ts:232](https://github.com/hoprnet/hoprnet/blob/448a47
 
 ### b58StringRegex
 
-• `Const` **b58StringRegex**: *RegExp*
+• `Const` **b58StringRegex**: _RegExp_
 
 Regular expresion used to match b58Strings
 
@@ -116,43 +116,43 @@ Defined in: [libp2p/index.ts:22](https://github.com/hoprnet/hoprnet/blob/448a47a
 
 ### convertPubKeyFromB58String
 
-▸ **convertPubKeyFromB58String**(`b58string`: *string*): *Promise*<PublicKey\>
+▸ **convertPubKeyFromB58String**(`b58string`: _string_): _Promise_<PublicKey\>
 
 Takes a B58String and converts them to a PublicKey
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `b58string` | *string* |
+| Name        | Type     |
+| :---------- | :------- |
+| `b58string` | _string_ |
 
-**Returns:** *Promise*<PublicKey\>
+**Returns:** _Promise_<PublicKey\>
 
 Defined in: [libp2p/index.ts:39](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/libp2p/index.ts#L39)
 
-___
+---
 
 ### convertPubKeyFromPeerId
 
-▸ **convertPubKeyFromPeerId**(`peerId`: PeerId): *Promise*<PublicKey\>
+▸ **convertPubKeyFromPeerId**(`peerId`: PeerId): _Promise_<PublicKey\>
 
 Takes a peerId and returns its corresponding public key.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
+| Name     | Type   | Description                              |
+| :------- | :----- | :--------------------------------------- |
 | `peerId` | PeerId | the PeerId used to generate a public key |
 
-**Returns:** *Promise*<PublicKey\>
+**Returns:** _Promise_<PublicKey\>
 
 Defined in: [libp2p/index.ts:29](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/libp2p/index.ts#L29)
 
-___
+---
 
 ### dial
 
-▸ **dial**(`libp2p`: LibP2P, `destination`: PeerId, `protocol`: *string*, `opts?`: [*DialOpts*](libp2p.md#dialopts)): *Promise*<[*DialResponse*](libp2p.md#dialresponse)\>
+▸ **dial**(`libp2p`: LibP2P, `destination`: PeerId, `protocol`: _string_, `opts?`: [_DialOpts_](libp2p.md#dialopts)): _Promise_<[_DialResponse_](libp2p.md#dialresponse)\>
 
 Combines libp2p methods such as dialProtocol and peerRouting.findPeer
 to establish a connection.
@@ -160,108 +160,108 @@ Contains a baseline protection against dialing same addresses twice.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `libp2p` | LibP2P | a libp2p instance |
-| `destination` | PeerId | PeerId of the destination |
-| `protocol` | *string* | - |
-| `opts?` | [*DialOpts*](libp2p.md#dialopts) |  |
+| Name          | Type                             | Description               |
+| :------------ | :------------------------------- | :------------------------ |
+| `libp2p`      | LibP2P                           | a libp2p instance         |
+| `destination` | PeerId                           | PeerId of the destination |
+| `protocol`    | _string_                         | -                         |
+| `opts?`       | [_DialOpts_](libp2p.md#dialopts) |                           |
 
-**Returns:** *Promise*<[*DialResponse*](libp2p.md#dialresponse)\>
+**Returns:** _Promise_<[_DialResponse_](libp2p.md#dialresponse)\>
 
 Defined in: [libp2p/index.ts:114](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/libp2p/index.ts#L114)
 
-___
+---
 
 ### getB58String
 
-▸ **getB58String**(`content`: *string*): *string*
+▸ **getB58String**(`content`: _string_): _string_
 
 Returns the b58String within a given content. Returns empty string if none is found.
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `content` | *string* |
+| Name      | Type     |
+| :-------- | :------- |
+| `content` | _string_ |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Defined in: [libp2p/index.ts:66](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/libp2p/index.ts#L66)
 
-___
+---
 
 ### hasB58String
 
-▸ **hasB58String**(`content`: *string*): Boolean
+▸ **hasB58String**(`content`: _string_): Boolean
 
 Returns true or false if given string does not contain a b58string
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `content` | *string* |
+| Name      | Type     |
+| :-------- | :------- |
+| `content` | _string_ |
 
 **Returns:** Boolean
 
 Defined in: [libp2p/index.ts:49](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/libp2p/index.ts#L49)
 
-___
+---
 
 ### libp2pSendMessage
 
-▸ **libp2pSendMessage**(`libp2p`: LibP2P, `destination`: PeerId, `protocol`: *string*, `message`: Uint8Array, `opts?`: [*DialOpts*](libp2p.md#dialopts)): *Promise*<void\>
+▸ **libp2pSendMessage**(`libp2p`: LibP2P, `destination`: PeerId, `protocol`: _string_, `message`: Uint8Array, `opts?`: [_DialOpts_](libp2p.md#dialopts)): _Promise_<void\>
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `libp2p` | LibP2P |
-| `destination` | PeerId |
-| `protocol` | *string* |
-| `message` | Uint8Array |
-| `opts?` | [*DialOpts*](libp2p.md#dialopts) |
+| Name          | Type                             |
+| :------------ | :------------------------------- |
+| `libp2p`      | LibP2P                           |
+| `destination` | PeerId                           |
+| `protocol`    | _string_                         |
+| `message`     | Uint8Array                       |
+| `opts?`       | [_DialOpts_](libp2p.md#dialopts) |
 
-**Returns:** *Promise*<void\>
+**Returns:** _Promise_<void\>
 
 Defined in: [libp2p/index.ts:195](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/libp2p/index.ts#L195)
 
-___
+---
 
 ### libp2pSendMessageAndExpectResponse
 
-▸ **libp2pSendMessageAndExpectResponse**(`libp2p`: LibP2P, `destination`: PeerId, `protocol`: *string*, `message`: Uint8Array, `opts?`: [*DialOpts*](libp2p.md#dialopts)): *Promise*<Uint8Array\>
+▸ **libp2pSendMessageAndExpectResponse**(`libp2p`: LibP2P, `destination`: PeerId, `protocol`: _string_, `message`: Uint8Array, `opts?`: [_DialOpts_](libp2p.md#dialopts)): _Promise_<Uint8Array\>
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `libp2p` | LibP2P |
-| `destination` | PeerId |
-| `protocol` | *string* |
-| `message` | Uint8Array |
-| `opts?` | [*DialOpts*](libp2p.md#dialopts) |
+| Name          | Type                             |
+| :------------ | :------------------------------- |
+| `libp2p`      | LibP2P                           |
+| `destination` | PeerId                           |
+| `protocol`    | _string_                         |
+| `message`     | Uint8Array                       |
+| `opts?`       | [_DialOpts_](libp2p.md#dialopts) |
 
-**Returns:** *Promise*<Uint8Array\>
+**Returns:** _Promise_<Uint8Array\>
 
 Defined in: [libp2p/index.ts:211](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/libp2p/index.ts#L211)
 
-___
+---
 
 ### libp2pSubscribe
 
-▸ **libp2pSubscribe**(`libp2p`: LibP2P, `protocol`: *string*, `handler`: [*LibP2PHandlerFunction*](libp2p.md#libp2phandlerfunction), `includeReply?`: *boolean*): *void*
+▸ **libp2pSubscribe**(`libp2p`: LibP2P, `protocol`: _string_, `handler`: [_LibP2PHandlerFunction_](libp2p.md#libp2phandlerfunction), `includeReply?`: _boolean_): _void_
 
 #### Parameters
 
-| Name | Type | Default value |
-| :------ | :------ | :------ |
-| `libp2p` | LibP2P | - |
-| `protocol` | *string* | - |
-| `handler` | [*LibP2PHandlerFunction*](libp2p.md#libp2phandlerfunction) | - |
-| `includeReply` | *boolean* | false |
+| Name           | Type                                                       | Default value |
+| :------------- | :--------------------------------------------------------- | :------------ |
+| `libp2p`       | LibP2P                                                     | -             |
+| `protocol`     | _string_                                                   | -             |
+| `handler`      | [_LibP2PHandlerFunction_](libp2p.md#libp2phandlerfunction) | -             |
+| `includeReply` | _boolean_                                                  | false         |
 
-**Returns:** *void*
+**Returns:** _void_
 
 Defined in: [libp2p/index.ts:251](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/utils/src/libp2p/index.ts#L251)

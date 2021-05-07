@@ -12,7 +12,7 @@
 
 ### u8aAllocate
 
-▸ **u8aAllocate**(`__namedParameters`: MemoryPage, ...`list`: (Uint8Array \| *undefined*)[]): Uint8Array
+▸ **u8aAllocate**(`__namedParameters`: MemoryPage, ...`list`: (Uint8Array \| _undefined_)[]): Uint8Array
 
 Writes to the provided mempage the data on a given list of u8a on a given offset
 
@@ -20,10 +20,10 @@ Writes to the provided mempage the data on a given list of u8a on a given offset
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `__namedParameters` | MemoryPage |
-| `...list` | (Uint8Array \| *undefined*)[] |
+| Name                | Type                          |
+| :------------------ | :---------------------------- |
+| `__namedParameters` | MemoryPage                    |
+| `...list`           | (Uint8Array \| _undefined_)[] |
 
 **Returns:** Uint8Array
 

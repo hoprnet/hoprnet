@@ -6,7 +6,7 @@
 
 ## Hierarchy
 
-- [*AbstractCommand*](commands_abstractcommand.abstractcommand.md)
+- [_AbstractCommand_](commands_abstractcommand.abstractcommand.md)
 
   ↳ **default**
 
@@ -37,15 +37,15 @@
 
 ### constructor
 
-\+ **new default**(`node`: *Hopr*): [*default*](commands_withdraw.default.md)
+\+ **new default**(`node`: _Hopr_): [_default_](commands_withdraw.default.md)
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `node` | *Hopr* |
+| Name   | Type   |
+| :----- | :----- |
+| `node` | _Hopr_ |
 
-**Returns:** [*default*](commands_withdraw.default.md)
+**Returns:** [_default_](commands_withdraw.default.md)
 
 Overrides: [AbstractCommand](commands_abstractcommand.abstractcommand.md)
 
@@ -55,107 +55,107 @@ Defined in: [commands/withdraw.ts:8](https://github.com/hoprnet/hoprnet/blob/448
 
 ### arguments
 
-• `Private` **arguments**: *string*[]
+• `Private` **arguments**: _string_[]
 
 Defined in: [commands/withdraw.ts:8](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/withdraw.ts#L8)
 
-___
+---
 
 ### hidden
 
-• **hidden**: *boolean*= false
+• **hidden**: _boolean_= false
 
 Inherited from: [AbstractCommand](commands_abstractcommand.abstractcommand.md).[hidden](commands_abstractcommand.abstractcommand.md#hidden)
 
 Defined in: [commands/abstractCommand.ts:15](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/abstractCommand.ts#L15)
 
-___
+---
 
 ### node
 
-• **node**: *Hopr*
+• **node**: _Hopr_
 
 ## Methods
 
 ### \_assertUsage
 
-▸ `Protected` **_assertUsage**(`query`: *string*, `parameters`: *string*[], `test?`: *RegExp*): *string*[]
+▸ `Protected` **\_assertUsage**(`query`: _string_, `parameters`: _string_[], `test?`: _RegExp_): _string_[]
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `query` | *string* |
-| `parameters` | *string*[] |
-| `test?` | *RegExp* |
+| Name         | Type       |
+| :----------- | :--------- |
+| `query`      | _string_   |
+| `parameters` | _string_[] |
+| `test?`      | _RegExp_   |
 
-**Returns:** *string*[]
+**Returns:** _string_[]
 
 Inherited from: [AbstractCommand](commands_abstractcommand.abstractcommand.md)
 
 Defined in: [commands/abstractCommand.ts:54](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/abstractCommand.ts#L54)
 
-___
+---
 
 ### \_autocompleteByFiltering
 
-▸ `Protected` **_autocompleteByFiltering**(`query`: *string*, `allResults`: *string*[], `line`: *string*): [*AutoCompleteResult*](../modules/commands_abstractcommand.md#autocompleteresult)
+▸ `Protected` **\_autocompleteByFiltering**(`query`: _string_, `allResults`: _string_[], `line`: _string_): [_AutoCompleteResult_](../modules/commands_abstractcommand.md#autocompleteresult)
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `query` | *string* |
-| `allResults` | *string*[] |
-| `line` | *string* |
+| Name         | Type       |
+| :----------- | :--------- |
+| `query`      | _string_   |
+| `allResults` | _string_[] |
+| `line`       | _string_   |
 
-**Returns:** [*AutoCompleteResult*](../modules/commands_abstractcommand.md#autocompleteresult)
+**Returns:** [_AutoCompleteResult_](../modules/commands_abstractcommand.md#autocompleteresult)
 
 Inherited from: [AbstractCommand](commands_abstractcommand.abstractcommand.md)
 
 Defined in: [commands/abstractCommand.ts:33](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/abstractCommand.ts#L33)
 
-___
+---
 
 ### autocomplete
 
-▸ **autocomplete**(`query?`: *string*): *Promise*<[*AutoCompleteResult*](../modules/commands_abstractcommand.md#autocompleteresult)\>
+▸ **autocomplete**(`query?`: _string_): _Promise_<[_AutoCompleteResult_](../modules/commands_abstractcommand.md#autocompleteresult)\>
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `query?` | *string* |
+| Name     | Type     |
+| :------- | :------- |
+| `query?` | _string_ |
 
-**Returns:** *Promise*<[*AutoCompleteResult*](../modules/commands_abstractcommand.md#autocompleteresult)\>
+**Returns:** _Promise_<[_AutoCompleteResult_](../modules/commands_abstractcommand.md#autocompleteresult)\>
 
 Overrides: [AbstractCommand](commands_abstractcommand.abstractcommand.md)
 
 Defined in: [commands/withdraw.ts:65](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/withdraw.ts#L65)
 
-___
+---
 
 ### checkArgs
 
-▸ `Private` **checkArgs**(`query`: *string*): *Promise*<{ `amount`: *string* ; `currency`: ``"NATIVE"`` \| ``"HOPR"`` ; `recipient`: *string* ; `weiAmount`: *string*  }\>
+▸ `Private` **checkArgs**(`query`: _string_): _Promise_<{ `amount`: _string_ ; `currency`: `"NATIVE"` \| `"HOPR"` ; `recipient`: _string_ ; `weiAmount`: _string_ }\>
 
 Will throw if any of the arguments are incorrect.
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `query` | *string* |
+| Name    | Type     |
+| :------ | :------- |
+| `query` | _string_ |
 
-**Returns:** *Promise*<{ `amount`: *string* ; `currency`: ``"NATIVE"`` \| ``"HOPR"`` ; `recipient`: *string* ; `weiAmount`: *string*  }\>
+**Returns:** _Promise_<{ `amount`: _string_ ; `currency`: `"NATIVE"` \| `"HOPR"` ; `recipient`: _string_ ; `weiAmount`: _string_ }\>
 
 Defined in: [commands/withdraw.ts:17](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/withdraw.ts#L17)
 
-___
+---
 
 ### execute
 
-▸ **execute**(`query?`: *string*): *Promise*<string\>
+▸ **execute**(`query?`: _string_): _Promise_<string\>
 
 Withdraws native or hopr balance.
 
@@ -163,53 +163,53 @@ Withdraws native or hopr balance.
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `query?` | *string* |
+| Name     | Type     |
+| :------- | :------- |
+| `query?` | _string_ |
 
-**Returns:** *Promise*<string\>
+**Returns:** _Promise_<string\>
 
 Overrides: [AbstractCommand](commands_abstractcommand.abstractcommand.md)
 
 Defined in: [commands/withdraw.ts:73](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/withdraw.ts#L73)
 
-___
+---
 
 ### help
 
-▸ **help**(): *string*
+▸ **help**(): _string_
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: [AbstractCommand](commands_abstractcommand.abstractcommand.md)
 
 Defined in: [commands/withdraw.ts:61](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/withdraw.ts#L61)
 
-___
+---
 
 ### name
 
-▸ **name**(): *string*
+▸ **name**(): _string_
 
-**Returns:** *string*
+**Returns:** _string_
 
 Overrides: [AbstractCommand](commands_abstractcommand.abstractcommand.md)
 
 Defined in: [commands/withdraw.ts:57](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/withdraw.ts#L57)
 
-___
+---
 
 ### usage
 
-▸ `Protected` **usage**(`parameters`: *string*[]): *string*
+▸ `Protected` **usage**(`parameters`: _string_[]): _string_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `parameters` | *string*[] |
+| Name         | Type       |
+| :----------- | :--------- |
+| `parameters` | _string_[] |
 
-**Returns:** *string*
+**Returns:** _string_
 
 Inherited from: [AbstractCommand](commands_abstractcommand.abstractcommand.md)
 

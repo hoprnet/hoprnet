@@ -1,19 +1,19 @@
 [@hoprnet/hopr-core-ethereum](../README.md) / [Exports](../modules.md) / [contracts/commons](../modules/contracts_commons.md) / TypedEventFilter
 
-# Interface: TypedEventFilter<_EventArgsArray, _EventArgsObject\>
+# Interface: TypedEventFilter<\_EventArgsArray, \_EventArgsObject\>
 
 [contracts/commons](../modules/contracts_commons.md).TypedEventFilter
 
 ## Type parameters
 
-| Name |
-| :------ |
-| `_EventArgsArray` |
+| Name               |
+| :----------------- |
+| `_EventArgsArray`  |
 | `_EventArgsObject` |
 
 ## Hierarchy
 
-- *EventFilter*
+- _EventFilter_
 
   ↳ **TypedEventFilter**
 
@@ -28,17 +28,17 @@
 
 ### address
 
-• `Optional` **address**: *string*
+• `Optional` **address**: _string_
 
 Inherited from: EventFilter.address
 
 Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:34
 
-___
+---
 
 ### topics
 
-• `Optional` **topics**: (*string* \| *string*[])[]
+• `Optional` **topics**: (_string_ \| _string_[])[]
 
 Inherited from: EventFilter.topics
 

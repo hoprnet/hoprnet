@@ -22,30 +22,30 @@
 
 ### AutoCompleteResult
 
-Ƭ **AutoCompleteResult**: [*string*[], *string*]
+Ƭ **AutoCompleteResult**: [_string_[], _string_]
 
 Defined in: [commands/abstractCommand.ts:4](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/abstractCommand.ts#L4)
 
-___
+---
 
 ### CommandResponse
 
-Ƭ **CommandResponse**: *string* \| *void*
+Ƭ **CommandResponse**: _string_ \| _void_
 
 Defined in: [commands/abstractCommand.ts:6](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/abstractCommand.ts#L6)
 
-___
+---
 
 ### GlobalState
 
-Ƭ **GlobalState**: *object*
+Ƭ **GlobalState**: _object_
 
 #### Type declaration
 
-| Name | Type |
-| :------ | :------ |
-| `aliases` | *Map*<string, PeerId\> |
-| `includeRecipient` | *boolean* |
+| Name               | Type                   |
+| :----------------- | :--------------------- |
+| `aliases`          | _Map_<string, PeerId\> |
+| `includeRecipient` | _boolean_              |
 
 Defined in: [commands/abstractCommand.ts:8](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/abstractCommand.ts#L8)
 
@@ -53,14 +53,14 @@ Defined in: [commands/abstractCommand.ts:8](https://github.com/hoprnet/hoprnet/b
 
 ### emptyAutoCompleteResult
 
-▸ `Const` **emptyAutoCompleteResult**(`line`: *string*): [*AutoCompleteResult*](commands_abstractcommand.md#autocompleteresult)
+▸ `Const` **emptyAutoCompleteResult**(`line`: _string_): [_AutoCompleteResult_](commands_abstractcommand.md#autocompleteresult)
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `line` | *string* |
+| Name   | Type     |
+| :----- | :------- |
+| `line` | _string_ |
 
-**Returns:** [*AutoCompleteResult*](commands_abstractcommand.md#autocompleteresult)
+**Returns:** [_AutoCompleteResult_](commands_abstractcommand.md#autocompleteresult)
 
 Defined in: [commands/abstractCommand.ts:5](https://github.com/hoprnet/hoprnet/blob/448a47a/packages/hoprd/src/commands/abstractCommand.ts#L5)
