@@ -8,8 +8,7 @@ import { Channel } from './channel'
 import * as fixtures from './fixtures'
 
 const createChallenge = (secret1: Uint8Array, secret2: Uint8Array): PublicKey => {
-  const { ticketChallenge } = createFirstChallenge([secret1, secret2])
-  return new PublicKey(ticketChallenge)
+  return createFirstChallenge(secret1, secret2).ticketChallenge
 }
 
 const createChainMock = (_channelEntry: ChannelEntry): ChainWrapper => {
