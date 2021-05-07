@@ -45,9 +45,9 @@ export class PacketForwardInteraction {
       await packet.storeUnacknowledgedTicket(this.db)
       await packet.forwardTransform(this.privKey, this.chain)
 
-      await this.interact(await pubKeyToPeerId(packet.nextHop), packet)
+      await this.interact(pubKeyToPeerId(packet.nextHop), packet)
     }
 
-    sendAcknowledgement(packet, await pubKeyToPeerId(packet.previousHop), this.sendMessage, this.privKey)
+    sendAcknowledgement(packet, pubKeyToPeerId(packet.previousHop), this.sendMessage, this.privKey)
   }
 }
