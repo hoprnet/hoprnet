@@ -25,7 +25,7 @@ function createFakeChain(privKey: PeerId) {
         new UINT256(new BN(0)),
         new UINT256(new BN(0)),
         amount,
-        Ticket.fromProbability(1),
+        UINT256.fromProbability(1),
         new UINT256(new BN(0)),
         privKey.privKey.marshal()
       )
