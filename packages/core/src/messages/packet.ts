@@ -323,14 +323,14 @@ export class Packet {
     log(
       `Storing unacknowledged ticket. Expecting to receive a preImage for ${green(
         u8aToHex(this.ackChallenge)
-      )} from ${blue((await pubKeyToPeerId(this.nextHop)).toB58String())}`
+      )} from ${blue((pubKeyToPeerId(this.nextHop)).toB58String())}`
     )
 
-    db.storeUnacknowledgedTickets(this.ackChallenge, unacknowledged)
+    await db.storeUnacknowledgedTickets(this.ackChallenge, unacknowledged)
   }
 
   async validateUnacknowledgedTicket(db: HoprDB, chain: HoprCoreEthereum, privKey: PeerId) {
-    const previousHop = await pubKeyToPeerId(this.previousHop)
+    const previousHop = pubKeyToPeerId(this.previousHop)
     const channel = chain.getChannel(new PublicKey(privKey.pubKey.marshal()), new PublicKey(this.previousHop))
 
     return validateUnacknowledgedTicket(privKey, '', 0, previousHop, this.ticket, channel, () =>
