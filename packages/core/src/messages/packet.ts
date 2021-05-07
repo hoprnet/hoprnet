@@ -234,13 +234,9 @@ export class Packet {
 
     let ticket: Ticket
     if (isDirectMessage) {
-      ticket = channel.createDummyTicket(new PublicKey(ticketChallenge).toAddress())
+      ticket = channel.createDummyTicket(new PublicKey(ticketChallenge))
     } else {
-      ticket = await channel.createTicket(
-        ticketOpts.value,
-        new PublicKey(ticketChallenge).toAddress(),
-        ticketOpts.winProb
-      )
+      ticket = await channel.createTicket(ticketOpts.value, new PublicKey(ticketChallenge), ticketOpts.winProb)
     }
 
     return new Packet(packet, challenge, ticket).setReadyToForward(ackChallenge)
@@ -366,7 +362,7 @@ export class Packet {
 
     const channel = chain.getChannel(self, nextPeer)
 
-    this.ticket = await channel.createTicket(new Balance(new BN(0)), new PublicKey(this.nextChallenge).toAddress(), 0)
+    this.ticket = await channel.createTicket(new Balance(new BN(0)), new PublicKey(this.nextChallenge), 0)
 
     this.challenge = Challenge.create(this.ackChallenge, privKey)
 

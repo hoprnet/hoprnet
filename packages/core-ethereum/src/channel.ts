@@ -168,7 +168,7 @@ class Channel {
    * @param winProb the winning probability to use
    * @returns a signed ticket
    */
-  async createTicket(amount: Balance, challenge: Address, winProb: number) {
+  async createTicket(amount: Balance, challenge: PublicKey, winProb: number) {
     const counterpartyAddress = this.counterparty.toAddress()
     const c = await this.getState()
     return Ticket.create(
@@ -189,7 +189,7 @@ class Channel {
    * @param challenge dummy challenge, potential no valid response known
    * @returns a ticket without any value
    */
-  createDummyTicket(challenge: Address): Ticket {
+  createDummyTicket(challenge: PublicKey): Ticket {
     // TODO: document how dummy ticket works
     return Ticket.create(
       this.counterparty.toAddress(),
