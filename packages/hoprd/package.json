@@ -23,7 +23,9 @@
     "prebuild": "next telemetry disable",
     "prepublishOnly": "yarn build",
     "start": "node lib/index.js --admin --init --rest",
-    "dev": "yarn build && NODE_ENV=development yarn start"
+    "dev": "yarn build && NODE_ENV=development yarn start",
+    "docs:generate": "yarn typedoc",
+    "docs:watch": "yarn typedoc --watch"
   },
   "dependencies": {
     "@hoprnet/hopr-core": "1.71.0-next.132",

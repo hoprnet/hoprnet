@@ -16,7 +16,9 @@
     "network": "DEVELOPMENT=true hardhat node",
     "test": "hardhat test",
     "coverage": "hardhat coverage",
-    "prepublishOnly": "yarn build"
+    "prepublishOnly": "yarn build",
+    "docs:generate": "yarn typedoc",
+    "docs:watch": "yarn typedoc --watch"
   },
   "files": [
     "contracts",
