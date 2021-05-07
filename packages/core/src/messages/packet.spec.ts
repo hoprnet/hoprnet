@@ -42,6 +42,8 @@ describe('packet creation and transformation', function () {
       winProb: 1
     })
 
+    assert(packet.ackChallenge != null, `ack challenge must be set to track if message was sent`)
+
     for (const [index, node] of path.entries()) {
       packet = Packet.deserialize(packet.serialize(), node, index == 0 ? self : path[index - 1])
 
@@ -80,6 +82,8 @@ describe('packet creation and transformation', function () {
       winProb: 1
     })
 
+    assert(packet.ackChallenge != null, `ack challenge must be set to track if message was sent`)
+
     for (const [index, node] of path.entries()) {
       packet = Packet.deserialize(packet.serialize(), node, index == 0 ? self : path[index - 1])
 
@@ -117,6 +121,8 @@ describe('packet creation and transformation', function () {
       value: new Balance(new BN(0)),
       winProb: 1
     })
+
+    assert(packet.ackChallenge != null, `ack challenge must be set to track if message was sent`)
 
     for (const [index, node] of path.entries()) {
       packet = Packet.deserialize(packet.serialize(), node, index == 0 ? self : path[index - 1])
