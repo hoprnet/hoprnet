@@ -33,6 +33,7 @@ jobs:
 
       - name: Generate docs
         run: |
+          yarn build
           yarn docs:generate
 
       - name: Check if changed
