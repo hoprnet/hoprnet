@@ -323,7 +323,7 @@ export class Packet {
     log(
       `Storing unacknowledged ticket. Expecting to receive a preImage for ${green(
         u8aToHex(this.ackChallenge)
-      )} from ${blue((pubKeyToPeerId(this.nextHop)).toB58String())}`
+      )} from ${blue(pubKeyToPeerId(this.nextHop).toB58String())}`
     )
 
     await db.storeUnacknowledgedTickets(this.ackChallenge, unacknowledged)
