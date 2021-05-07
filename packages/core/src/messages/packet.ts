@@ -222,7 +222,7 @@ export class Packet {
     const porStrings: Uint8Array[] = []
 
     for (let i = 0; i < path.length - 1; i++) {
-      porStrings.push(createPoRString(secrets[i+1], i + 2 < path.length ? secrets[i + 2] : undefined))
+      porStrings.push(createPoRString(secrets[i + 1], i + 2 < path.length ? secrets[i + 2] : undefined))
     }
 
     const challenge = Challenge.create(ackChallenge, privKey)

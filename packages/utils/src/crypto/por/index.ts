@@ -96,7 +96,13 @@ export function preVerify(secret: Uint8Array, porBytes: Uint8Array, challenge: A
   const valid = new PublicKey(publicKeyCombine([ownShare, hint])).toAddress().eq(challenge)
 
   if (valid) {
-    return { valid: true, ownKey, ownShare, nextTicketChallenge: new PublicKey(nextTicketChallenge), ackChallenge: new PublicKey(hint) }
+    return {
+      valid: true,
+      ownKey,
+      ownShare,
+      nextTicketChallenge: new PublicKey(nextTicketChallenge),
+      ackChallenge: new PublicKey(hint)
+    }
   } else {
     return { valid: false }
   }
