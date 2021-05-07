@@ -167,7 +167,8 @@ export class Packet {
 
   public constructor(private packet: Uint8Array, private challenge: Challenge, private ticket: Ticket) {}
 
-  private setReadyToForward() {
+  private setReadyToForward(ackChallenge: Uint8Array) {
+    this.ackChallenge = ackChallenge
     this.isReadyToForward = true
 
     return this
@@ -241,7 +242,7 @@ export class Packet {
       ticketOpts.winProb
     )
 
-    return new Packet(packet, challenge, ticket).setReadyToForward()
+    return new Packet(packet, challenge, ticket).setReadyToForward(ackChallenge)
   }
 
   serialize(): Uint8Array {
