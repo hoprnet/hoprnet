@@ -2,7 +2,7 @@ name: HOPR Generate API docs
 
 on:
   push:
-    branches: ['**']
+    branches: ['master', 'release/**', 'avado', 'debug-docs/**']
 
 jobs:
   docs:
