@@ -6,8 +6,6 @@ if [ -z "$GCLOUD_INCLUDED" ]; then
   source scripts/dns.sh
 fi
 
-source scripts/gcloud.sh
-source scripts/dns.sh
 source scripts/utils.sh
 
 MIN_FUNDS=0.01291

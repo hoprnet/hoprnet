@@ -3,9 +3,6 @@ set -e #u
 shopt -s expand_aliases
 #set -o xtrace
 
-# Don't source this file twice
-test -z "${DEPLOY_SOURCED:-}" && DEPLOY_SOURCED=1 || exit 0
-
 source scripts/environments.sh
 source scripts/testnet.sh
 source scripts/cleanup.sh
