@@ -113,7 +113,7 @@ describe('test signedTicket construction', async function () {
   it('should create new signedTicket using struct', function () {
     const ticket = Ticket.create(
       userB,
-      new Address(randomBytes(20)),
+      PublicKey.fromPrivKey(randomBytes(32)),
       UINT256.fromString('0'),
       UINT256.fromString('1'),
       new Balance(new BN(15)),
