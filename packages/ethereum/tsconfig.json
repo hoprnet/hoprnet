@@ -5,5 +5,9 @@
     "resolveJsonModule": true
   },
   "include": ["hardhat.config.ts", "index.ts", "test", "tasks", "chain", "deploy"],
-  "exclude": ["lib", "types"]
+  "exclude": ["lib", "types"],
+  "typedocOptions": {
+    "disableOutputCheck": true,
+    "out": "docs"
+  }
 }

@@ -21,7 +21,9 @@
     "build": "yarn clean && tsc -p .",
     "test": "yarn testOnce",
     "testOnce": "node --trace-warnings --unhandled-rejections=strict node_modules/.bin/mocha --reporter=tap --full-trace --exit",
-    "prepublishOnly": "yarn build"
+    "prepublishOnly": "yarn build",
+    "docs:generate": "yarn typedoc src",
+    "docs:watch": "yarn typedoc --watch src"
   },
   "files": [
     "lib",
@@ -75,6 +77,8 @@
     "mocha": "^8.3.2",
     "rimraf": "^3.0.2",
     "sinon": "^10.0.0",
+    "typedoc": "^0.20.36",
+    "typedoc-plugin-markdown": "^3.8.0",
     "typescript": "^4.1"
   },
   "mocha": {

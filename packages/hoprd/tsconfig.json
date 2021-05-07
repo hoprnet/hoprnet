@@ -12,5 +12,9 @@
     "outDir": "./lib"
   },
   "exclude": ["lib"],
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts"],
+  "typedocOptions": {
+    "disableOutputCheck": true,
+    "out": "docs"
+  }
 }

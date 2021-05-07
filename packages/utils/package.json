@@ -12,7 +12,9 @@
     "test": "mocha --parallel",
     "dev": "yarn clean && tsc -w",
     "build": "yarn clean && tsc -p .",
-    "prepublishOnly": "yarn build"
+    "prepublishOnly": "yarn build",
+    "docs:generate": "yarn typedoc src",
+    "docs:watch": "yarn typedoc --watch src"
   },
   "engines": {
     "node": "14 || 15"

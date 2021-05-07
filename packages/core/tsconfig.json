@@ -8,5 +8,9 @@
     "outDir": "lib"
   },
   "exclude": ["lib", "node_modules"],
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts"],
+  "typedocOptions": {
+    "disableOutputCheck": true,
+    "out": "docs"
+  }
 }

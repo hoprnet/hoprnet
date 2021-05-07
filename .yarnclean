@@ -10,6 +10,8 @@ doc
 website
 images
 assets
+# see https://github.com/yarnpkg/yarn/issues/2803
+!typedoc-default-themes/bin/default/assets
 
 # examples
 example
