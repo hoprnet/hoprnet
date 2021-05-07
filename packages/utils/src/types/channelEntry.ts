@@ -131,6 +131,16 @@ export class ChannelEntry {
     throw new Error('Wrong addr for this channel')
   }
 
+  public ticketIndexFor(addr: Address): UINT256 {
+    if (addr.eq(this.partyA)) {
+      return this.partyATicketIndex
+    }
+    if (addr.eq(this.partyB)) {
+      return this.partyBTicketIndex
+    }
+    throw new Error('Wrong addr for this channel')
+  }
+
   public commitmentFor(addr: Address): Hash {
     if (addr.eq(this.partyA)) {
       return this.commitmentPartyA
