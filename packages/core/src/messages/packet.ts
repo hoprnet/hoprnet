@@ -217,10 +217,9 @@ export class Packet {
       winProb: number
     }
   ): Promise<Packet> {
+    const isDirectMessage = path.length === 1
     const { alpha, secrets } = generateKeyShares(path)
-
     const { ackChallenge, ticketChallenge } = createFirstChallenge(secrets)
-
     const porStrings: Uint8Array[] = []
 
     for (let i = 0; i < path.length - 1; i++) {
@@ -228,19 +227,21 @@ export class Packet {
     }
 
     const challenge = Challenge.create(ackChallenge, privKey)
-
     const self = new PublicKey(privKey.pubKey.marshal())
     const nextPeer = new PublicKey(path[0].pubKey.marshal())
-
     const packet = createPacket(secrets, alpha, msg, path, MAX_HOPS + 1, POR_STRING_LENGTH, porStrings)
-
     const channel = chain.getChannel(self, nextPeer)
 
-    const ticket = await channel.createTicket(
-      ticketOpts.value,
-      new PublicKey(ticketChallenge).toAddress(),
-      ticketOpts.winProb
-    )
+    let ticket: Ticket
+    if (isDirectMessage) {
+      ticket = channel.createDummyTicket(new PublicKey(ticketChallenge).toAddress())
+    } else {
+      ticket = await channel.createTicket(
+        ticketOpts.value,
+        new PublicKey(ticketChallenge).toAddress(),
+        ticketOpts.winProb
+      )
+    }
 
     return new Packet(packet, challenge, ticket).setReadyToForward(ackChallenge)
   }

@@ -1,24 +1,15 @@
 import type Indexer from './indexer'
 import type { ChainWrapper } from './ethereum'
-import {
-  ChannelEntry,
-  Hash,
-  PublicKey,
-  Address,
-  Balance,
-  UINT256,
-  HoprDB,
-  createFirstChallenge
-} from '@hoprnet/hopr-utils'
+import { ChannelEntry, Hash, PublicKey, Balance, UINT256, HoprDB, createFirstChallenge } from '@hoprnet/hopr-utils'
 import assert from 'assert'
 import BN from 'bn.js'
 import { utils } from 'ethers'
 import { Channel } from './channel'
 import * as fixtures from './fixtures'
 
-const createChallenge = (secret1: Uint8Array, secret2: Uint8Array): Address => {
+const createChallenge = (secret1: Uint8Array, secret2: Uint8Array): PublicKey => {
   const { ticketChallenge } = createFirstChallenge([secret1, secret2])
-  return new PublicKey(ticketChallenge).toAddress()
+  return new PublicKey(ticketChallenge)
 }
 
 const createChainMock = (_channelEntry: ChannelEntry): ChainWrapper => {
@@ -109,15 +100,5 @@ describe('test channel', function () {
       utils.hexlify((await channel.getState()).serialize()),
       utils.hexlify(mocks.channelEntry.serialize())
     )
-  })
-
-  // it('should create a ticket', async function () {
-  //   const ticket = await channel.createTicket(new Balance(new BN(1)), mocks.challange, 1)
-
-  //   assert(ticket.isWinningTicket(mocks.nextCommitmentPartyA, mocks.challange, UINT256.fromProbability(1)))
-  // })
-
-  it('should submit a ticket', async function () {
-    // const ticket = await channel.createTicket(new Balance(new BN(1)), mocks.challange, 1)
   })
 })

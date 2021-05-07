@@ -509,7 +509,7 @@ class Hopr extends EventEmitter {
   }
 
   private async announce(includeRouting: boolean = false): Promise<void> {
-    log('announcing self', includeRouting)
+    log('announcing self, include routing:', includeRouting)
     const chain = await this.paymentChannels
     //const account = await chain.getAccount(await this.getEthereumAddress())
     // exit if we already announced
