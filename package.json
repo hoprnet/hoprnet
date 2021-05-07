@@ -22,7 +22,8 @@
     "util:clean": "lerna exec --stream -- rimraf node_modules/@hoprnet",
     "util:reset": "lerna clean --yes",
     "util:build": "lerna exec --stream -- yarn build",
-    "util:link": "lerna link"
+    "util:link": "lerna link",
+    "docs:generate": "lerna exec --stream -- yarn docs:generate"
   },
   "dependencies": {
     "lerna": "^4.0.0"
