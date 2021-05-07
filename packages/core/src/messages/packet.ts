@@ -354,7 +354,7 @@ export class Packet {
 
     const channel = chain.getChannel(self, nextPeer)
 
-    this.ticket = await channel.createTicket(new Balance(new BN(0)), new PublicKey(this.nextChallenge).toAddress(), 0)
+    this.ticket = await channel.createTicket(new Balance(new BN(0)), new PublicKey(this.nextChallenge), 0)
 
     this.challenge = Challenge.create(this.ackChallenge, privKey)
 
