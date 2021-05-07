@@ -66,13 +66,13 @@ export class Ticket {
     channelIteration: UINT256,
     signPriv: Uint8Array
   ): Ticket {
-    const challengeBytes = challenge.toAddress()
+    const encodedChallenge = challenge.toAddress()
 
     const hash = toEthSignedMessageHash(
       u8aToHex(
         serializeToU8a([
           [counterparty.serialize(), Address.SIZE],
-          [challengeBytes.serialize(), Address.SIZE],
+          [encodedChallenge.serialize(), Address.SIZE],
           [epoch.serialize(), UINT256.SIZE],
           [index.serialize(), UINT256.SIZE],
           [amount.serialize(), Balance.SIZE],
@@ -83,7 +83,7 @@ export class Ticket {
     )
     const sig = ecdsaSign(hash.serialize(), signPriv)
     const signature = new Signature(sig.signature, sig.recid)
-    return new Ticket(counterparty, challengeBytes, epoch, index, amount, winProb, channelIteration, signature)
+    return new Ticket(counterparty, encodedChallenge, epoch, index, amount, winProb, channelIteration, signature)
   }
 
   public serialize(): Uint8Array {
