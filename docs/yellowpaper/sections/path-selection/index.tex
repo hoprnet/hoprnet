@@ -48,7 +48,7 @@ Once an edge is selected, it is added to the current path. All paths are then so
 
 \subsection{Availability}
 Availability is estimated using the heartbeat protocol.
-Each node maintains a list of neighbor nodes in the network and either ping or passively listen to them in order to determine whether they are online or offline.
+Each node maintains a list of neighbor nodes (logical neighbors in the heartbeat ring) in the network and either ping or passively listen to them in order to determine whether they are online or offline.
 A node is considered online if the ping response (“PONG”) comes back within a certain timeframe. Otherwise, the node is considered offline and its waiting time for the next PING attempt is doubled.
 
 
