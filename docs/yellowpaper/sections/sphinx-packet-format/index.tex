@@ -67,7 +67,8 @@ This integrity check allows to verify whether or not the header was modified.
 \paragraph{Encrypt \& Decrypt}
 The payload is where the actual message is hidden and is computed in different layers using a block cipher encryption algorithm and is decrypted at each stage of mixing. $(B)$ removes one layer of encryption from the payload $\delta_0$ and sends it to $(C)$ where:
 $$\delta_i=\pi^{-1}(h_{\pi}(s_{i-1}), \delta_{i-1})$$
-Any attempt of modification by an attacker would result in message distruction and thus is would be irrecoverable.
+where $\pi$ and $\pi^{-1}$ are families of pseudo-random permutations (PRPs) and $h_{\pi}$ is a hash function used to key $\pi$
+\\~\\Any attempt of modification by an attacker would result in message distruction and thus is would be irrecoverable.
 \\~\\Same happens at $(C)$ and $(D)$: key derivation, unblinding, deleting, shifting, decryption and blinding.
 \begin{figure}[H]
     \centering
