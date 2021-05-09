@@ -1,4 +1,4 @@
-name: HOPR Lint and fix
+name: HOPR Lint fix
 
 on:
   push:
@@ -25,6 +25,7 @@ jobs:
 
       - name: Restore cache of node modules and yarn cache
         uses: actions/cache@v2
+        id: nodejs-cache
         with:
           path: |
             node_modules
@@ -35,18 +36,24 @@ jobs:
             ${{ runner.os }}-nodejs-
 
       - name: Install dependencies
+        if: steps.nodejs-cache.outputs.cache-hit != 'true'
         run: |
           yarn
 
-      - name: Run shellcheck
+      - name: Run linter
         run: |
-          find . -name "*.sh" ! -ipath "**/node_modules/**" | xargs shellcheck -a -Calways
+          yarn lint:fix
 
-      - name: Lint & Fix
+      - name: Check if changed
+        id: check-changed
+        run: |
+          echo "::set-output name=changed::$(git status --porcelain)"
+
+      - name: Commit changes
+        if: steps.check-changed.outputs.changed != ''
         run: |
           git config --global user.email "noreply@hoprnet.org"
           git config --global user.name "HOPR Linting robot"
-          yarn lint:fix
           git commit -a -m "Fix linting" || true
           git pull origin ${{ github.ref }}
           git push origin ${{ github.ref }}

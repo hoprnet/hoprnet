@@ -423,7 +423,7 @@ class Hopr extends EventEmitter {
             return reject(err)
           }
 
-          let packetKey = await this.db.storeUnacknowledgedTicket(new PublicKey(packet.ackChallenge))
+          let packetKey = await this.db.storeUnacknowledgedTicket(packet.ackChallenge)
 
           this.once('message-acknowledged:' + u8aToHex(packetKey), () => {
             resolve()
@@ -509,7 +509,7 @@ class Hopr extends EventEmitter {
   }
 
   private async announce(includeRouting: boolean = false): Promise<void> {
-    log('announcing self', includeRouting)
+    log('announcing self, include routing:', includeRouting)
     const chain = await this.paymentChannels
     //const account = await chain.getAccount(await this.getEthereumAddress())
     // exit if we already announced
@@ -667,7 +667,7 @@ class Hopr extends EventEmitter {
       const counterparty = signedTicket.recoverSigner()
       const channel = ethereum.getChannel(self, counterparty)
 
-      const result = await channel.submitTicket(ackTicket)
+      const result = await channel.redeemTicket(ackTicket)
       // TODO look at result.status and actually do something
       await this.db.deleteAcknowledgement(ackTicket)
       return result

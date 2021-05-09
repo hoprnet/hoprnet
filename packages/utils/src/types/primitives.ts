@@ -4,6 +4,8 @@ import { publicKeyConvert, publicKeyCreate, ecdsaSign, ecdsaVerify } from 'secp2
 import { moveDecimalPoint } from '../math'
 import { u8aToHex, u8aEquals, stringToU8a, u8aConcat, serializeToU8a, u8aToNumber, u8aSplit } from '../u8a'
 import { ADDRESS_LENGTH, HASH_LENGTH, SIGNATURE_LENGTH, SIGNATURE_RECOVERY_LENGTH } from '../constants'
+import type PeerId from 'peer-id'
+import { pubKeyToPeerId } from '../libp2p'
 
 export class PublicKey {
   // @TODO use uncompressed public key internally
@@ -29,6 +31,10 @@ export class PublicKey {
     return new PublicKey(publicKeyConvert(arr, true))
   }
 
+  static fromPeerId(peerId: PeerId) {
+    return new PublicKey(peerId.pubKey.marshal())
+  }
+
   toAddress(): Address {
     return new Address(Hash.create(publicKeyConvert(this.arr, false).slice(1)).serialize().slice(12))
   }
@@ -36,6 +42,10 @@ export class PublicKey {
   toUncompressedPubKeyHex(): string {
     // Needed in only a few cases for interacting with secp256k1
     return u8aToHex(publicKeyConvert(this.arr, false).slice(1))
+  }
+
+  toPeerId(): PeerId {
+    return pubKeyToPeerId(this.serialize())
   }
 
   static fromString(str: string): PublicKey {
@@ -120,10 +130,6 @@ export class Hash {
 
   static create(...inputs: Uint8Array[]) {
     return new Hash(utils.arrayify(utils.keccak256(u8aConcat(...inputs))))
-  }
-
-  static createChallenge(secretA: Uint8Array, secretB: Uint8Array): Hash {
-    return Hash.create(u8aConcat(secretA, secretB)).hash()
   }
 
   static deserialize(arr: Uint8Array) {

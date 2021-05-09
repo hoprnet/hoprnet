@@ -4,7 +4,6 @@ import { SECRET_LENGTH } from './constants'
 import { SECP256K1_CONSTANTS } from '../constants'
 import { deriveAckKeyShare } from './keyDerivation'
 import assert from 'assert'
-import { u8aEquals } from '../../u8a'
 import { publicKeyCreate } from 'secp256k1'
 import { PublicKey } from '../../types'
 
@@ -14,31 +13,26 @@ describe('PoR - proof of relay', function () {
     const secrets = Array.from({ length: AMOUNT }, (_) => randomBytes(SECRET_LENGTH))
 
     // Challenge generation
-    const firstChallenge = createFirstChallenge(secrets)
+    const firstChallenge = createFirstChallenge(secrets[0], secrets[1])
 
     // To be included for first relayer
-    const firstPorString = createPoRString(secrets)
+    const firstPorString = createPoRString(secrets[1], secrets[2])
 
     // To be included for second relayer
-    const secondPorString = createPoRString(secrets.slice(1))
+    const secondPorString = createPoRString(secrets[2], secrets[3])
 
     // Computation result of the first relayer before
     // receiving an acknowledgement from the second relayer
-    const result = preVerify(
-      secrets[0],
-      firstPorString,
-      new PublicKey(firstChallenge.ticketChallenge).toAddress().serialize()
-    )
+    const result = preVerify(secrets[0], firstPorString, firstChallenge.ticketChallenge.toAddress())
 
     assert(result.valid == true, `Challenge must be plausible`)
 
-    assert(u8aEquals(result.ackChallenge, publicKeyCreate(deriveAckKeyShare(secrets[1]))))
+    assert(result.ackChallenge.eq(new PublicKey(publicKeyCreate(deriveAckKeyShare(secrets[1])))))
 
     // Simulates the transformation done by the first relayer
     assert(
-      u8aEquals(
-        result.nextTicketChallenge,
-        firstPorString.subarray(0, SECP256K1_CONSTANTS.COMPRESSED_PUBLIC_KEY_LENGTH)
+      result.nextTicketChallenge.eq(
+        new PublicKey(firstPorString.subarray(0, SECP256K1_CONSTANTS.COMPRESSED_PUBLIC_KEY_LENGTH))
       ),
       `Forward logic must extract correct challenge for next downstream node`
     )
@@ -50,24 +44,20 @@ describe('PoR - proof of relay', function () {
     const validateResponseResult = validateAcknowledgement(
       result.ownKey,
       ack,
-      firstChallenge.ticketChallenge,
+      firstChallenge.ticketChallenge.toAddress(),
       result.ownShare
     )
 
     assert(validateResponseResult.valid == true, `Acknowledgement must solve the challenge`)
 
     assert(
-      validateAcknowledgement(result.ownKey, ack, firstChallenge.ticketChallenge).valid,
+      validateAcknowledgement(result.ownKey, ack, firstChallenge.ticketChallenge.toAddress()).valid,
       `Should be valid also without group element`
     )
 
     // Simulates the transformation as done by the
     // second relayer
-    const secondResult = preVerify(
-      secrets[1],
-      secondPorString,
-      new PublicKey(result.nextTicketChallenge).toAddress().serialize()
-    )
+    const secondResult = preVerify(secrets[1], secondPorString, result.nextTicketChallenge.toAddress())
 
     assert(secondResult.valid == true, `Second challenge must be plausible`)
 
@@ -76,7 +66,7 @@ describe('PoR - proof of relay', function () {
     const secondValidateResponseResult = validateAcknowledgement(
       secondResult.ownKey,
       secondAck,
-      result.nextTicketChallenge,
+      result.nextTicketChallenge.toAddress(),
       secondResult.ownShare
     )
 
@@ -87,12 +77,12 @@ describe('PoR - proof of relay', function () {
     const AMOUNT = 2
     const secrets = Array.from({ length: AMOUNT }, (_) => randomBytes(SECRET_LENGTH))
 
-    const firstChallenge = createFirstChallenge(secrets)
+    const firstChallenge = createFirstChallenge(secrets[0], secrets[1])
 
     const validateResult = validateAcknowledgement(
       firstChallenge.ownKey,
       deriveAckKeyShare(secrets[1]),
-      firstChallenge.ticketChallenge
+      firstChallenge.ticketChallenge.toAddress()
     )
 
     assert(validateResult.valid == true, `Challenge must be solved`)
@@ -101,7 +91,7 @@ describe('PoR - proof of relay', function () {
       validateAcknowledgement(
         undefined,
         deriveAckKeyShare(secrets[1]),
-        firstChallenge.ticketChallenge,
+        firstChallenge.ticketChallenge.toAddress(),
         undefined,
         validateResult.response
       ).valid == true,

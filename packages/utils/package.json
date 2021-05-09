@@ -1,7 +1,7 @@
 {
   "name": "@hoprnet/hopr-utils",
   "description": "HOPR-based utilities to process multiple data structures",
-  "version": "1.71.0-next.120",
+  "version": "1.71.0-next.133",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
   "license": "GPL-3.0",
@@ -12,7 +12,9 @@
     "test": "mocha --parallel",
     "dev": "yarn clean && tsc -w",
     "build": "yarn clean && tsc -p .",
-    "prepublishOnly": "yarn build"
+    "prepublishOnly": "yarn build",
+    "docs:generate": "yarn typedoc",
+    "docs:watch": "yarn typedoc --watch"
   },
   "engines": {
     "node": "14 || 15"

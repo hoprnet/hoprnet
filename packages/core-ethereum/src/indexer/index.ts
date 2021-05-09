@@ -4,7 +4,7 @@ import type { ChainWrapper } from '../ethereum'
 import chalk from 'chalk'
 import BN from 'bn.js'
 import Heap from 'heap-js'
-import { pubKeyToPeerId, randomChoice, HoprDB, stringToU8a } from '@hoprnet/hopr-utils'
+import { randomChoice, HoprDB, stringToU8a } from '@hoprnet/hopr-utils'
 import { Address, ChannelEntry, AccountEntry, Hash, PublicKey, Balance, Snapshot } from '@hoprnet/hopr-utils'
 import { isConfirmedBlock, snapshotComparator } from './utils'
 import Debug from 'debug'
@@ -308,10 +308,10 @@ class Indexer extends EventEmitter {
     ])
 
     if (sourcePubKey.eq(partyAPubKey)) {
-      return [source, await pubKeyToPeerId(partyBPubKey.serialize()), channel.partyABalance]
+      return [source, partyBPubKey.toPeerId(), channel.partyABalance]
     } else {
       const partyBBalance = channel.partyBBalance
-      return [source, await pubKeyToPeerId(partyAPubKey.serialize()), partyBBalance]
+      return [source, partyAPubKey.toPeerId(), partyBBalance]
     }
   }
 
@@ -336,12 +336,12 @@ class Indexer extends EventEmitter {
     log('picking random from %d channels', channels.length)
     const random = randomChoice(channels)
     const partyA = await this.getPublicKeyOf(random.partyA)
-    return this.toIndexerChannel(await pubKeyToPeerId(partyA.serialize()), random) // TODO: why do we pick partyA?
+    return this.toIndexerChannel(partyA.toPeerId(), random) // TODO: why do we pick partyA?
   }
 
   public async getChannelsFromPeer(source: PeerId): Promise<RoutingChannel[]> {
     const sourcePubKey = new PublicKey(source.pubKey.marshal())
-    const channels = await this.getChannelsOf(await sourcePubKey.toAddress())
+    const channels = await this.getChannelsOf(sourcePubKey.toAddress())
 
     let cout: RoutingChannel[] = []
     for (let channel of channels) {

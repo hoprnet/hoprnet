@@ -29,6 +29,7 @@ jobs:
         run: echo "::set-output name=dir::$(yarn config get cacheFolder)"
 
       - name: Restore cache of node modules and yarn cache
+        id: nodejs-cache
         uses: actions/cache@v2
         with:
           path: |
@@ -40,26 +41,27 @@ jobs:
             ${{ runner.os }}-nodejs-
 
       - name: Install dependencies
+        if: steps.nodejs-cache.outputs.cache-hit != 'true'
         run: |
           yarn --prefer-offline
-          yarn lerna bootstrap
+          node_modules/.bin/lerna bootstrap
 
       - name: Build (all)
-        if: matrix.package == 'all'
+        if: matrix.package == 'all' 
         run: |
-          yarn lerna link
-          yarn lerna run build --include-dependencies --ignore @hoprnet/hopr-core --ignore @hoprnet/hopr-ethereum --ignore @hoprnet/hopr-core-ethereum
+          node_modules/.bin/lerna link 
+          node_modules/.bin/lerna run build --include-dependencies --ignore @hoprnet/hopr-core --ignore @hoprnet/hopr-ethereum --ignore @hoprnet/hopr-core-ethereum
 
       - name: Test (all)
         if: matrix.package == 'all'
         run: |
-          yarn lerna run test --ignore @hoprnet/hopr-core --ignore @hoprnet/hopr-ethereum --ignore @hoprnet/hopr-core-ethereum
+          node_modules/.bin/lerna run test --ignore @hoprnet/hopr-core --ignore @hoprnet/hopr-ethereum --ignore @hoprnet/hopr-core-ethereum
 
       - name: Build ${{ matrix.package }}
         if: matrix.package != 'all'
         run: |
-          yarn lerna run build --include-dependencies --scope @hoprnet/hopr-${{ matrix.package }}
+          node_modules/.bin/lerna run build --include-dependencies --scope @hoprnet/hopr-${{ matrix.package }}
       - name: Test ${{ matrix.package }}
-        if: matrix.package != 'all'
+        if: matrix.package != 'all' 
         run: |
-          yarn lerna run test --scope @hoprnet/hopr-${{ matrix.package }}
+          node_modules/.bin/lerna run test --scope @hoprnet/hopr-${{ matrix.package }}

@@ -58,7 +58,7 @@ export class Ticket {
 
   static create(
     counterparty: Address,
-    challenge: Address,
+    challenge: PublicKey,
     epoch: UINT256,
     index: UINT256,
     amount: Balance,
@@ -66,11 +66,13 @@ export class Ticket {
     channelIteration: UINT256,
     signPriv: Uint8Array
   ): Ticket {
+    const encodedChallenge = challenge.toAddress()
+
     const hash = toEthSignedMessageHash(
       u8aToHex(
         serializeToU8a([
           [counterparty.serialize(), Address.SIZE],
-          [challenge.serialize(), Address.SIZE],
+          [encodedChallenge.serialize(), Address.SIZE],
           [epoch.serialize(), UINT256.SIZE],
           [index.serialize(), UINT256.SIZE],
           [amount.serialize(), Balance.SIZE],
@@ -81,7 +83,7 @@ export class Ticket {
     )
     const sig = ecdsaSign(hash.serialize(), signPriv)
     const signature = new Signature(sig.signature, sig.recid)
-    return new Ticket(counterparty, challenge, epoch, index, amount, winProb, channelIteration, signature)
+    return new Ticket(counterparty, encodedChallenge, epoch, index, amount, winProb, channelIteration, signature)
   }
 
   public serialize(): Uint8Array {
@@ -147,12 +149,6 @@ export class Ticket {
 
   verify(pubKey: PublicKey): boolean {
     return pubKey.eq(this.recoverSigner())
-  }
-
-  static fromProbability(float: number): UINT256 {
-    if (float > 1) throw Error('Float cannot be larger than 1')
-    const percent = float * 100
-    return new UINT256(new BN(ethers.constants.MaxUint256.mul(percent).div(100).toString()))
   }
 
   /**

@@ -1,5 +1,5 @@
 import { Packet, MAX_HOPS } from './packet'
-import { HoprDB, Ticket, UINT256, Balance, PublicKey, Address, u8aEquals } from '@hoprnet/hopr-utils'
+import { HoprDB, Ticket, UINT256, Balance, PublicKey, u8aEquals } from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'
 import BN from 'bn.js'
 import assert from 'assert'
@@ -9,14 +9,26 @@ function createMockTickets(privKey: Uint8Array) {
 
   const getChannel = (_self: PublicKey, counterparty: PublicKey) => ({
     acknowledge,
-    createTicket: (amount: Balance, challenge: Address, _winProb: number) => {
+    createTicket: (amount: Balance, challenge: PublicKey, _winProb: number) => {
       return Ticket.create(
         counterparty.toAddress(),
         challenge,
         new UINT256(new BN(0)),
         new UINT256(new BN(0)),
         amount,
-        Ticket.fromProbability(1),
+        UINT256.fromProbability(1),
+        new UINT256(new BN(0)),
+        privKey
+      )
+    },
+    createDummyTicket: (challenge: PublicKey) => {
+      return Ticket.create(
+        counterparty.toAddress(),
+        challenge,
+        new UINT256(new BN(0)),
+        new UINT256(new BN(0)),
+        new Balance(new BN(0)),
+        UINT256.fromProbability(1),
         new UINT256(new BN(0)),
         privKey
       )
@@ -41,6 +53,8 @@ describe('packet creation and transformation', function () {
       value: new Balance(new BN(0)),
       winProb: 1
     })
+
+    assert(packet.ackChallenge != null, `ack challenge must be set to track if message was sent`)
 
     for (const [index, node] of path.entries()) {
       packet = Packet.deserialize(packet.serialize(), node, index == 0 ? self : path[index - 1])
@@ -80,6 +94,8 @@ describe('packet creation and transformation', function () {
       winProb: 1
     })
 
+    assert(packet.ackChallenge != null, `ack challenge must be set to track if message was sent`)
+
     for (const [index, node] of path.entries()) {
       packet = Packet.deserialize(packet.serialize(), node, index == 0 ? self : path[index - 1])
 
@@ -117,6 +133,8 @@ describe('packet creation and transformation', function () {
       value: new Balance(new BN(0)),
       winProb: 1
     })
+
+    assert(packet.ackChallenge != null, `ack challenge must be set to track if message was sent`)
 
     for (const [index, node] of path.entries()) {
       packet = Packet.deserialize(packet.serialize(), node, index == 0 ? self : path[index - 1])
