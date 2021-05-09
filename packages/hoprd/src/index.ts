@@ -29,7 +29,7 @@ const argv = yargs
     default: '0.0.0.0:9091'
   })
   .option('announce', {
-    boolean: false,
+    boolean: true,
     describe: 'Announce public IP to the network',
     default: false
   })

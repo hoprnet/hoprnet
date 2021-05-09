@@ -12,5 +12,13 @@
     "outDir": "./lib"
   },
   "exclude": ["lib"],
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts"],
+  "typedocOptions": {
+    "entryPoints": ["index.ts"],
+    "disableOutputCheck": true,
+    "out": "docs",
+    // by default we don't want links to source code to change on every change
+    // when building docs for releases we can fix the revision on the cmdline
+    "gitRevision": "master"
+  }
 }

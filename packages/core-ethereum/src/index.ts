@@ -21,7 +21,7 @@ import { PROVIDER_CACHE_TTL } from './constants'
 
 const log = Logger.getLogger('hopr-core-ethereum')
 
-export type SubmitTicketResponse =
+export type RedeemTicketResponse =
   | {
       status: 'SUCCESS'
       receipt: string

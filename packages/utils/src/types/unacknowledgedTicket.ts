@@ -22,18 +22,13 @@ export class UnacknowledgedTicket {
   }
 
   public getResponse(acknowledgement: Hash) {
-    return validateAcknowledgement(
-      this.ownKey.serialize(),
-      acknowledgement.serialize(),
-      this.ticket.challenge.serialize()
-    )
+    return validateAcknowledgement(this.ownKey.serialize(), acknowledgement.serialize(), this.ticket.challenge)
   }
 
   public verify(signer: PublicKey, acknowledgement: Hash): boolean {
     return (
       this.verifySignature(signer) &&
-      validateAcknowledgement(this.ownKey.serialize(), acknowledgement.serialize(), this.ticket.challenge.serialize())
-        .valid
+      validateAcknowledgement(this.ownKey.serialize(), acknowledgement.serialize(), this.ticket.challenge).valid
     )
   }
 

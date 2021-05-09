@@ -201,7 +201,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     }
 
     /**
-     * A hook triggered when HOPR tokens are send to this contract.
+     * A hook triggered when HOPR tokens are sent to this contract.
      *
      * @param operator address operator requesting the transfer
      * @param from address token holder address

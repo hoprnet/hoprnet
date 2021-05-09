@@ -12,8 +12,7 @@ import pipe from 'it-pipe'
 import { Logger } from '../logger'
 
 export * from './privKeyToPeerId'
-export * from './peerIdToPubKey'
-export * from './pubKeyFromPeerId'
+export * from './pubKeyToPeerId'
 
 /**
  * Regular expresion used to match b58Strings
