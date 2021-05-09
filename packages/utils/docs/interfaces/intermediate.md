@@ -13,14 +13,14 @@
 
 ### iteration
 
-• **iteration**: *number*
+• **iteration**: _number_
 
 Defined in: [crypto/hashIterator.ts:4](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/hashIterator.ts#L4)
 
-___
+---
 
 ### preImage
 
-• **preImage**: *Uint8Array*
+• **preImage**: _Uint8Array_
 
 Defined in: [crypto/hashIterator.ts:5](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/hashIterator.ts#L5)
