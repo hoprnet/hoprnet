@@ -27,8 +27,8 @@ export const setupConfigLogger = () => {
 }
 
 export abstract class Logger {
-  static getLogger(category?: string, useDebug = true): ConfigLogger | DebugLogger {
-    return useDebug ? new DebugLogger(category.replace('.', ':')) : new ConfigLogger(category)
+  static getLogger(category?: string, useDebug = true): Logger {
+    return useDebug ? new DebugLogger(category) : new ConfigLogger(category)
   }
   abstract trace(message: unknown, ...args: unknown[]): void
   abstract fatal(message: unknown, ...args: unknown[]): void
@@ -37,55 +37,53 @@ export abstract class Logger {
   abstract info(message: unknown, ...args: unknown[]): void
   abstract debug(message: unknown, ...args: unknown[]): void
 }
-class DebugLogger extends Logger {
+class DebugLogger implements Logger {
   private readonly logger: Debug.Debugger
 
   public constructor(category?: string) {
-    super()
     this.logger = Debug(category)
   }
 
   protected log(message: unknown, ...args: unknown[]): void {
-    if (args?.length) this.logger.log(message, args)
-    else this.logger.log(message)
+    if (args?.length) this.logger(message, ...args)
+    else this.logger(message)
   }
 
   public debug(message: unknown, ...args: unknown[]): void {
     this.logger.log = console.debug.bind(console)
-    this.log(message, args)
+    this.log(message, ...args)
   }
 
   public error(message: unknown, ...args: unknown[]): void {
     this.logger.log = console.error.bind(console)
-    this.log(message, args)
+    this.log(message, ...args)
   }
 
   public info(message: unknown, ...args: unknown[]): void {
     this.logger.log = console.log.bind(console)
-    this.log(message, args)
+    this.log(message, ...args)
   }
 
   public warn(message: unknown, ...args: unknown[]): void {
     this.logger.log = console.warn.bind(console)
-    this.log(message, args)
+    this.log(message, ...args)
   }
 
   public fatal(message: unknown, ...args: unknown[]): void {
     this.logger.log = console.error.bind(console)
-    this.log(message, args)
+    this.log(message, ...args)
   }
 
   public trace(message: unknown, ...args: unknown[]): void {
     this.logger.log = console.trace.bind(console)
-    this.log(message, args)
+    this.log(message, ...args)
   }
 }
 
-class ConfigLogger extends Logger {
+class ConfigLogger implements Logger {
   private readonly logger: Log4jsLogger
 
   public constructor(category?: string) {
-    super()
     this.logger = getLogger(category)
   }
 
