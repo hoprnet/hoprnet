@@ -28,17 +28,17 @@
 
 ### constructor
 
-\+ **new AcknowledgedTicket**(`ticket`: [*Ticket*](ticket.md), `response`: [*Hash*](hash.md), `preImage`: [*Hash*](hash.md)): [*AcknowledgedTicket*](acknowledgedticket.md)
+\+ **new AcknowledgedTicket**(`ticket`: [_Ticket_](ticket.md), `response`: [_Hash_](hash.md), `preImage`: [_Hash_](hash.md)): [_AcknowledgedTicket_](acknowledgedticket.md)
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `ticket` | [*Ticket*](ticket.md) |
-| `response` | [*Hash*](hash.md) |
-| `preImage` | [*Hash*](hash.md) |
+| Name       | Type                  |
+| :--------- | :-------------------- |
+| `ticket`   | [_Ticket_](ticket.md) |
+| `response` | [_Hash_](hash.md)     |
+| `preImage` | [_Hash_](hash.md)     |
 
-**Returns:** [*AcknowledgedTicket*](acknowledgedticket.md)
+**Returns:** [_AcknowledgedTicket_](acknowledgedticket.md)
 
 Defined in: [types/acknowledgedTicket.ts:5](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/acknowledgedTicket.ts#L5)
 
@@ -46,27 +46,27 @@ Defined in: [types/acknowledgedTicket.ts:5](https://github.com/hoprnet/hoprnet/b
 
 ### preImage
 
-• `Readonly` **preImage**: [*Hash*](hash.md)
+• `Readonly` **preImage**: [_Hash_](hash.md)
 
-___
+---
 
 ### response
 
-• `Readonly` **response**: [*Hash*](hash.md)
+• `Readonly` **response**: [_Hash_](hash.md)
 
-___
+---
 
 ### ticket
 
-• `Readonly` **ticket**: [*Ticket*](ticket.md)
+• `Readonly` **ticket**: [_Ticket_](ticket.md)
 
 ## Accessors
 
 ### SIZE
 
-• `Static` get **SIZE**(): *number*
+• `Static` get **SIZE**(): _number_
 
-**Returns:** *number*
+**Returns:** _number_
 
 Defined in: [types/acknowledgedTicket.ts:28](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/acknowledgedTicket.ts#L28)
 
@@ -74,40 +74,40 @@ Defined in: [types/acknowledgedTicket.ts:28](https://github.com/hoprnet/hoprnet/
 
 ### serialize
 
-▸ **serialize**(): *Uint8Array*
+▸ **serialize**(): _Uint8Array_
 
-**Returns:** *Uint8Array*
+**Returns:** _Uint8Array_
 
 Defined in: [types/acknowledgedTicket.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/acknowledgedTicket.ts#L8)
 
-___
+---
 
 ### verify
 
-▸ **verify**(`ticketIssuer`: [*PublicKey*](publickey.md)): *boolean*
+▸ **verify**(`ticketIssuer`: [_PublicKey_](publickey.md)): _boolean_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `ticketIssuer` | [*PublicKey*](publickey.md) |
+| Name           | Type                        |
+| :------------- | :-------------------------- |
+| `ticketIssuer` | [_PublicKey_](publickey.md) |
 
-**Returns:** *boolean*
+**Returns:** _boolean_
 
 Defined in: [types/acknowledgedTicket.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/acknowledgedTicket.ts#L16)
 
-___
+---
 
 ### deserialize
 
-▸ `Static` **deserialize**(`arr`: *Uint8Array*): [*AcknowledgedTicket*](acknowledgedticket.md)
+▸ `Static` **deserialize**(`arr`: _Uint8Array_): [_AcknowledgedTicket_](acknowledgedticket.md)
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `arr` | *Uint8Array* |
+| Name  | Type         |
+| :---- | :----------- |
+| `arr` | _Uint8Array_ |
 
-**Returns:** [*AcknowledgedTicket*](acknowledgedticket.md)
+**Returns:** [_AcknowledgedTicket_](acknowledgedticket.md)
 
 Defined in: [types/acknowledgedTicket.ts:23](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/acknowledgedTicket.ts#L23)
