@@ -659,6 +659,40 @@ class Hopr extends EventEmitter {
     return this.db.getAcknowledgements()
   }
 
+  public async getTicketStatistics() {
+    const ack = (await this.getAcknowledgedTickets())
+    return {
+      pending: 0,
+      acknowledged: ack.length,
+      winProportion: 0,
+      unredeemed: 0,
+      unredeemedValue: 0,
+      redeemed: 0, 
+      redeemedValue: 0,
+    }
+  }
+
+  public async redeemAllTickets() {
+      const redeemedTickets: AcknowledgedTicket[] = []
+      let count = 0
+
+      for (const ackTicket of results) {
+        ++count
+        const result = await this.node.submitAcknowledgedTicket(ackTicket)
+
+        if (result.status === 'SUCCESS') {
+          console.log(`Redeemed ticket ${styleValue(count)}`)
+          redeemedTickets.push(ackTicket)
+        } else {
+          console.log(`Failed to redeem ticket ${styleValue(count)}`)
+        }
+      }
+
+      const signedTickets = await toSignedTickets(redeemedTickets)
+      const result = countSignedTickets(signedTickets)
+      const total = moveDecimalPoint(result.total, Balance.DECIMALS * -1)
+  }
+
   public async submitAcknowledgedTicket(ackTicket: AcknowledgedTicket) {
     try {
       const ethereum = await this.paymentChannels
