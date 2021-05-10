@@ -59,7 +59,11 @@ $v\leq r$ is the length of the path traversed by the packet where $|Z| \leq (2(r
 which is encoded in the header.
 \newline Some padding is added at each mix stage in order to keep the length of the message invariant at each hop.
 \\~\\The mix header is constructed as follow: $$M_i=(\alpha_i,\beta_i,\gamma_i)$$
-\newline Once $(B)$ receives the packet, it derives the shared key $s_0$ by computing $$s_0=(\alpha_0)^b=(g^x)^b=(g^b)^x=y^x_B$$ and removes its blindings. This allows $(B)$ to unblind the routing info that tells $(B)$ the public key of the next downstream node $(C)$. In order to extract the routing instructions, the mix-node B first appends a zero-byte padding at the end of $\beta_0$ and decrypts the padded block of routing information $B$ by XORing it with $PRNG(s_{v-1})$ as follows:
+\newline Once $(B)$ receives the packet, it derives the shared key $s_0$ by computing $$s_0=(\alpha_0)^b=(g^x)^b=(g^b)^x=y^x_B$$ and removes its blindings. This allows $(B)$ to unblind the routing info that tells $(B)$ the public key of the next downstream node $(C)$. 
+\paragraph{Unblinding} 
+The unblinding works as follow:
+\\$(B)$ computes the keyed-hash of the encrypted routing information $\beta_0$ as $$\gamma_0=HMAC(s_0,\beta_0)$$ and compares with the integrity tag $\gamma_0$ attached in the packet header. If the integrity check fails because the header has been tampered with, the packet is dropped. Otherwise, the mix-node proceeds to the next step.
+\\$(B)$ is now ready to decrypt the attached $\beta_0$. In order to extract the routing instructions, the mix-node $(B)$ first appends a zero-byte padding at the end of $\beta_0$ and decrypts the padded block of routing information $B$ by XORing it with $PRNG(s_{v-1})$ as follows:
 $$(\beta_0\|0_{2\kappa})\oplus PRNG(s_{v-1})$$
 (B) parses the routing instructions from $(A)$ in order to obtain the address of the next mix-node $(C)$, as well the new integrity tag $\gamma_1$ and $\beta_1$, which should be forwarded to the next hop and blinds the key share $\alpha_0=g^x$ by setting it to $\alpha_1=g^{xb_0}$
 \paragraph{Integrity check}
