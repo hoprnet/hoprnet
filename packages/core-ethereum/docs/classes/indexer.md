@@ -8,7 +8,7 @@ Also keeps track of the latest block number.
 
 ## Hierarchy
 
-- *EventEmitter*
+- _EventEmitter_
 
   ↳ **Indexer**
 
@@ -71,41 +71,41 @@ Also keeps track of the latest block number.
 
 ### constructor
 
-\+ **new Indexer**(`genesisBlock`: *number*, `db`: *HoprDB*, `chain`: { `announce`: (`multiaddr`: Multiaddr) => *Promise*<string\> ; `finalizeChannelClosure`: (`counterparty`: *any*) => *Promise*<string\> ; `fundChannel`: (`me`: *Address*, `counterparty`: *Address*, `myTotal`: *Balance*, `theirTotal`: *Balance*) => *Promise*<string\> ; `getBalance`: (`address`: *Address*) => *Promise*<Balance\> ; `getChannels`: () => *HoprChannels* ; `getGenesisBlock`: () => *number* ; `getInfo`: () => *string* ; `getLatestBlockNumber`: () => *Promise*<number\> ; `getNativeBalance`: (`address`: *any*) => *Promise*<NativeBalance\> ; `getPrivateKey`: () => *Uint8Array* ; `getPublicKey`: () => *PublicKey* ; `getWallet`: () => *Wallet* ; `initiateChannelClosure`: (`counterparty`: *any*) => *Promise*<string\> ; `openChannel`: (`me`: *any*, `counterparty`: *any*, `amount`: *any*) => *Promise*<string\> ; `redeemTicket`: (`counterparty`: *any*, `ackTicket`: *any*, `ticket`: *any*) => *Promise*<string\> ; `setCommitment`: (`comm`: *Hash*) => *Promise*<string\> ; `subscribeBlock`: (`cb`: *any*) => *JsonRpcProvider* \| *WebSocketProvider* ; `subscribeChannelEvents`: (`cb`: *any*) => *HoprChannels* ; `subscribeError`: (`cb`: *any*) => *void* ; `unsubscribe`: () => *void* ; `waitUntilReady`: () => *Promise*<Network\> ; `withdraw`: (`currency`: ``"NATIVE"`` \| ``"HOPR"``, `recipient`: *string*, `amount`: *string*) => *Promise*<string\>  }, `maxConfirmations`: *number*, `blockRange`: *number*): [*Indexer*](indexer.md)
+\+ **new Indexer**(`genesisBlock`: _number_, `db`: _HoprDB_, `chain`: { `announce`: (`multiaddr`: Multiaddr) => _Promise_<string\> ; `finalizeChannelClosure`: (`counterparty`: _any_) => _Promise_<string\> ; `fundChannel`: (`me`: _Address_, `counterparty`: _Address_, `myTotal`: _Balance_, `theirTotal`: _Balance_) => _Promise_<string\> ; `getBalance`: (`address`: _Address_) => _Promise_<Balance\> ; `getChannels`: () => _HoprChannels_ ; `getGenesisBlock`: () => _number_ ; `getInfo`: () => _string_ ; `getLatestBlockNumber`: () => _Promise_<number\> ; `getNativeBalance`: (`address`: _any_) => _Promise_<NativeBalance\> ; `getPrivateKey`: () => _Uint8Array_ ; `getPublicKey`: () => _PublicKey_ ; `getWallet`: () => _Wallet_ ; `initiateChannelClosure`: (`counterparty`: _any_) => _Promise_<string\> ; `openChannel`: (`me`: _any_, `counterparty`: _any_, `amount`: _any_) => _Promise_<string\> ; `redeemTicket`: (`counterparty`: _any_, `ackTicket`: _any_, `ticket`: _any_) => _Promise_<string\> ; `setCommitment`: (`comm`: _Hash_) => _Promise_<string\> ; `subscribeBlock`: (`cb`: _any_) => _JsonRpcProvider_ \| _WebSocketProvider_ ; `subscribeChannelEvents`: (`cb`: _any_) => _HoprChannels_ ; `subscribeError`: (`cb`: _any_) => _void_ ; `unsubscribe`: () => _void_ ; `waitUntilReady`: () => _Promise_<Network\> ; `withdraw`: (`currency`: `"NATIVE"` \| `"HOPR"`, `recipient`: _string_, `amount`: _string_) => _Promise_<string\> }, `maxConfirmations`: _number_, `blockRange`: _number_): [_Indexer_](indexer.md)
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `genesisBlock` | *number* |
-| `db` | *HoprDB* |
-| `chain` | *object* |
-| `chain.announce` | (`multiaddr`: Multiaddr) => *Promise*<string\> |
-| `chain.finalizeChannelClosure` | (`counterparty`: *any*) => *Promise*<string\> |
-| `chain.fundChannel` | (`me`: *Address*, `counterparty`: *Address*, `myTotal`: *Balance*, `theirTotal`: *Balance*) => *Promise*<string\> |
-| `chain.getBalance` | (`address`: *Address*) => *Promise*<Balance\> |
-| `chain.getChannels` | () => *HoprChannels* |
-| `chain.getGenesisBlock` | () => *number* |
-| `chain.getInfo` | () => *string* |
-| `chain.getLatestBlockNumber` | () => *Promise*<number\> |
-| `chain.getNativeBalance` | (`address`: *any*) => *Promise*<NativeBalance\> |
-| `chain.getPrivateKey` | () => *Uint8Array* |
-| `chain.getPublicKey` | () => *PublicKey* |
-| `chain.getWallet` | () => *Wallet* |
-| `chain.initiateChannelClosure` | (`counterparty`: *any*) => *Promise*<string\> |
-| `chain.openChannel` | (`me`: *any*, `counterparty`: *any*, `amount`: *any*) => *Promise*<string\> |
-| `chain.redeemTicket` | (`counterparty`: *any*, `ackTicket`: *any*, `ticket`: *any*) => *Promise*<string\> |
-| `chain.setCommitment` | (`comm`: *Hash*) => *Promise*<string\> |
-| `chain.subscribeBlock` | (`cb`: *any*) => *JsonRpcProvider* \| *WebSocketProvider* |
-| `chain.subscribeChannelEvents` | (`cb`: *any*) => *HoprChannels* |
-| `chain.subscribeError` | (`cb`: *any*) => *void* |
-| `chain.unsubscribe` | () => *void* |
-| `chain.waitUntilReady` | () => *Promise*<Network\> |
-| `chain.withdraw` | (`currency`: ``"NATIVE"`` \| ``"HOPR"``, `recipient`: *string*, `amount`: *string*) => *Promise*<string\> |
-| `maxConfirmations` | *number* |
-| `blockRange` | *number* |
+| Name                           | Type                                                                                                              |
+| :----------------------------- | :---------------------------------------------------------------------------------------------------------------- |
+| `genesisBlock`                 | _number_                                                                                                          |
+| `db`                           | _HoprDB_                                                                                                          |
+| `chain`                        | _object_                                                                                                          |
+| `chain.announce`               | (`multiaddr`: Multiaddr) => _Promise_<string\>                                                                    |
+| `chain.finalizeChannelClosure` | (`counterparty`: _any_) => _Promise_<string\>                                                                     |
+| `chain.fundChannel`            | (`me`: _Address_, `counterparty`: _Address_, `myTotal`: _Balance_, `theirTotal`: _Balance_) => _Promise_<string\> |
+| `chain.getBalance`             | (`address`: _Address_) => _Promise_<Balance\>                                                                     |
+| `chain.getChannels`            | () => _HoprChannels_                                                                                              |
+| `chain.getGenesisBlock`        | () => _number_                                                                                                    |
+| `chain.getInfo`                | () => _string_                                                                                                    |
+| `chain.getLatestBlockNumber`   | () => _Promise_<number\>                                                                                          |
+| `chain.getNativeBalance`       | (`address`: _any_) => _Promise_<NativeBalance\>                                                                   |
+| `chain.getPrivateKey`          | () => _Uint8Array_                                                                                                |
+| `chain.getPublicKey`           | () => _PublicKey_                                                                                                 |
+| `chain.getWallet`              | () => _Wallet_                                                                                                    |
+| `chain.initiateChannelClosure` | (`counterparty`: _any_) => _Promise_<string\>                                                                     |
+| `chain.openChannel`            | (`me`: _any_, `counterparty`: _any_, `amount`: _any_) => _Promise_<string\>                                       |
+| `chain.redeemTicket`           | (`counterparty`: _any_, `ackTicket`: _any_, `ticket`: _any_) => _Promise_<string\>                                |
+| `chain.setCommitment`          | (`comm`: _Hash_) => _Promise_<string\>                                                                            |
+| `chain.subscribeBlock`         | (`cb`: _any_) => _JsonRpcProvider_ \| _WebSocketProvider_                                                         |
+| `chain.subscribeChannelEvents` | (`cb`: _any_) => _HoprChannels_                                                                                   |
+| `chain.subscribeError`         | (`cb`: _any_) => _void_                                                                                           |
+| `chain.unsubscribe`            | () => _void_                                                                                                      |
+| `chain.waitUntilReady`         | () => _Promise_<Network\>                                                                                         |
+| `chain.withdraw`               | (`currency`: `"NATIVE"` \| `"HOPR"`, `recipient`: _string_, `amount`: _string_) => _Promise_<string\>             |
+| `maxConfirmations`             | _number_                                                                                                          |
+| `blockRange`                   | _number_                                                                                                          |
 
-**Returns:** [*Indexer*](indexer.md)
+**Returns:** [_Indexer_](indexer.md)
 
 Overrides: EventEmitter.constructor
 
@@ -115,41 +115,41 @@ Defined in: [core-ethereum/src/indexer/index.ts:27](https://github.com/hoprnet/h
 
 ### latestBlock
 
-• **latestBlock**: *number*= 0
+• **latestBlock**: _number_= 0
 
 Defined in: [core-ethereum/src/indexer/index.ts:26](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L26)
 
-___
+---
 
 ### status
 
-• **status**: ``"started"`` \| ``"restarting"`` \| ``"stopped"``= 'stopped'
+• **status**: `"started"` \| `"restarting"` \| `"stopped"`= 'stopped'
 
 Defined in: [core-ethereum/src/indexer/index.ts:25](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L25)
 
-___
+---
 
 ### unconfirmedEvents
 
-• `Private` **unconfirmedEvents**: *Heap*<Event<any\>\>
+• `Private` **unconfirmedEvents**: _Heap_<Event<any\>\>
 
 Defined in: [core-ethereum/src/indexer/index.ts:27](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L27)
 
-___
+---
 
 ### captureRejectionSymbol
 
-▪ `Static` `Readonly` **captureRejectionSymbol**: *typeof* [*captureRejectionSymbol*](indexer.md#capturerejectionsymbol)
+▪ `Static` `Readonly` **captureRejectionSymbol**: _typeof_ [_captureRejectionSymbol_](indexer.md#capturerejectionsymbol)
 
 Inherited from: EventEmitter.captureRejectionSymbol
 
 Defined in: core-ethereum/node_modules/@types/node/events.d.ts:43
 
-___
+---
 
 ### captureRejections
 
-▪ `Static` **captureRejections**: *boolean*
+▪ `Static` **captureRejections**: _boolean_
 
 Sets or gets the default captureRejection value for all emitters.
 
@@ -157,21 +157,21 @@ Inherited from: EventEmitter.captureRejections
 
 Defined in: core-ethereum/node_modules/@types/node/events.d.ts:49
 
-___
+---
 
 ### defaultMaxListeners
 
-▪ `Static` **defaultMaxListeners**: *number*
+▪ `Static` **defaultMaxListeners**: _number_
 
 Inherited from: EventEmitter.defaultMaxListeners
 
 Defined in: core-ethereum/node_modules/@types/node/events.d.ts:50
 
-___
+---
 
 ### errorMonitor
 
-▪ `Static` `Readonly` **errorMonitor**: *typeof* [*errorMonitor*](indexer.md#errormonitor)
+▪ `Static` `Readonly` **errorMonitor**: _typeof_ [_errorMonitor_](indexer.md#errormonitor)
 
 This symbol shall be used to install a listener for only monitoring `'error'`
 events. Listeners installed using this symbol are called before the regular
@@ -189,219 +189,219 @@ Defined in: core-ethereum/node_modules/@types/node/events.d.ts:42
 
 ### addListener
 
-▸ **addListener**(`event`: *string* \| *symbol*, `listener`: (...`args`: *any*[]) => *void*): [*Indexer*](indexer.md)
+▸ **addListener**(`event`: _string_ \| _symbol_, `listener`: (...`args`: _any_[]) => _void_): [_Indexer_](indexer.md)
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `event` | *string* \| *symbol* |
-| `listener` | (...`args`: *any*[]) => *void* |
+| Name       | Type                           |
+| :--------- | :----------------------------- |
+| `event`    | _string_ \| _symbol_           |
+| `listener` | (...`args`: _any_[]) => _void_ |
 
-**Returns:** [*Indexer*](indexer.md)
+**Returns:** [_Indexer_](indexer.md)
 
 Inherited from: EventEmitter.addListener
 
 Defined in: core-ethereum/node_modules/@types/node/events.d.ts:62
 
-___
+---
 
 ### emit
 
-▸ **emit**(`event`: *string* \| *symbol*, ...`args`: *any*[]): *boolean*
+▸ **emit**(`event`: _string_ \| _symbol_, ...`args`: _any_[]): _boolean_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `event` | *string* \| *symbol* |
-| `...args` | *any*[] |
+| Name      | Type                 |
+| :-------- | :------------------- |
+| `event`   | _string_ \| _symbol_ |
+| `...args` | _any_[]              |
 
-**Returns:** *boolean*
+**Returns:** _boolean_
 
 Inherited from: EventEmitter.emit
 
 Defined in: core-ethereum/node_modules/@types/node/events.d.ts:72
 
-___
+---
 
 ### eventNames
 
-▸ **eventNames**(): (*string* \| *symbol*)[]
+▸ **eventNames**(): (_string_ \| _symbol_)[]
 
-**Returns:** (*string* \| *symbol*)[]
+**Returns:** (_string_ \| _symbol_)[]
 
 Inherited from: EventEmitter.eventNames
 
 Defined in: core-ethereum/node_modules/@types/node/events.d.ts:77
 
-___
+---
 
 ### getAccount
 
-▸ **getAccount**(`address`: *Address*): *Promise*<AccountEntry\>
+▸ **getAccount**(`address`: _Address_): _Promise_<AccountEntry\>
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `address` | *Address* |
+| Name      | Type      |
+| :-------- | :-------- |
+| `address` | _Address_ |
 
-**Returns:** *Promise*<AccountEntry\>
+**Returns:** _Promise_<AccountEntry\>
 
 Defined in: [core-ethereum/src/indexer/index.ts:275](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L275)
 
-___
+---
 
 ### getAnnouncedAddresses
 
-▸ **getAnnouncedAddresses**(): *Promise*<Multiaddr[]\>
+▸ **getAnnouncedAddresses**(): _Promise_<Multiaddr[]\>
 
-**Returns:** *Promise*<Multiaddr[]\>
+**Returns:** _Promise_<Multiaddr[]\>
 
 Defined in: [core-ethereum/src/indexer/index.ts:318](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L318)
 
-___
+---
 
 ### getChannel
 
-▸ **getChannel**(`channelId`: *Hash*): *Promise*<ChannelEntry\>
+▸ **getChannel**(`channelId`: _Hash_): _Promise_<ChannelEntry\>
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `channelId` | *Hash* |
+| Name        | Type   |
+| :---------- | :----- |
+| `channelId` | _Hash_ |
 
-**Returns:** *Promise*<ChannelEntry\>
+**Returns:** _Promise_<ChannelEntry\>
 
 Defined in: [core-ethereum/src/indexer/index.ts:279](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L279)
 
-___
+---
 
 ### getChannels
 
-▸ **getChannels**(`filter?`: (`channel`: *ChannelEntry*) => *boolean*): *Promise*<ChannelEntry[]\>
+▸ **getChannels**(`filter?`: (`channel`: _ChannelEntry_) => _boolean_): _Promise_<ChannelEntry[]\>
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `filter?` | (`channel`: *ChannelEntry*) => *boolean* |
+| Name      | Type                                     |
+| :-------- | :--------------------------------------- |
+| `filter?` | (`channel`: _ChannelEntry_) => _boolean_ |
 
-**Returns:** *Promise*<ChannelEntry[]\>
+**Returns:** _Promise_<ChannelEntry[]\>
 
 Defined in: [core-ethereum/src/indexer/index.ts:283](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L283)
 
-___
+---
 
 ### getChannelsFromPeer
 
-▸ **getChannelsFromPeer**(`source`: *PeerId*): *Promise*<[*RoutingChannel*](../modules.md#routingchannel)[]\>
+▸ **getChannelsFromPeer**(`source`: _PeerId_): _Promise_<[_RoutingChannel_](../modules.md#routingchannel)[]\>
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `source` | *PeerId* |
+| Name     | Type     |
+| :------- | :------- |
+| `source` | _PeerId_ |
 
-**Returns:** *Promise*<[*RoutingChannel*](../modules.md#routingchannel)[]\>
+**Returns:** _Promise_<[_RoutingChannel_](../modules.md#routingchannel)[]\>
 
 Defined in: [core-ethereum/src/indexer/index.ts:342](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L342)
 
-___
+---
 
 ### getChannelsOf
 
-▸ **getChannelsOf**(`address`: *Address*): *Promise*<ChannelEntry[]\>
+▸ **getChannelsOf**(`address`: _Address_): _Promise_<ChannelEntry[]\>
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `address` | *Address* |
+| Name      | Type      |
+| :-------- | :-------- |
+| `address` | _Address_ |
 
-**Returns:** *Promise*<ChannelEntry[]\>
+**Returns:** _Promise_<ChannelEntry[]\>
 
 Defined in: [core-ethereum/src/indexer/index.ts:287](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L287)
 
-___
+---
 
 ### getMaxListeners
 
-▸ **getMaxListeners**(): *number*
+▸ **getMaxListeners**(): _number_
 
-**Returns:** *number*
+**Returns:** _number_
 
 Inherited from: EventEmitter.getMaxListeners
 
 Defined in: core-ethereum/node_modules/@types/node/events.d.ts:69
 
-___
+---
 
 ### getPublicKeyOf
 
-▸ **getPublicKeyOf**(`address`: *Address*): *Promise*<PublicKey\>
+▸ **getPublicKeyOf**(`address`: _Address_): _Promise_<PublicKey\>
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `address` | *Address* |
+| Name      | Type      |
+| :-------- | :-------- |
+| `address` | _Address_ |
 
-**Returns:** *Promise*<PublicKey\>
+**Returns:** _Promise_<PublicKey\>
 
 Defined in: [core-ethereum/src/indexer/index.ts:294](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L294)
 
-___
+---
 
 ### getPublicNodes
 
-▸ **getPublicNodes**(): *Promise*<Multiaddr[]\>
+▸ **getPublicNodes**(): _Promise_<Multiaddr[]\>
 
-**Returns:** *Promise*<Multiaddr[]\>
+**Returns:** _Promise_<Multiaddr[]\>
 
 Defined in: [core-ethereum/src/indexer/index.ts:322](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L322)
 
-___
+---
 
 ### getRandomChannel
 
-▸ **getRandomChannel**(): *Promise*<[*RoutingChannel*](../modules.md#routingchannel)\>
+▸ **getRandomChannel**(): _Promise_<[_RoutingChannel_](../modules.md#routingchannel)\>
 
-**Returns:** *Promise*<[*RoutingChannel*](../modules.md#routingchannel)\>
+**Returns:** _Promise_<[_RoutingChannel_](../modules.md#routingchannel)\>
 
 Defined in: [core-ethereum/src/indexer/index.ts:328](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L328)
 
-___
+---
 
 ### listenerCount
 
-▸ **listenerCount**(`event`: *string* \| *symbol*): *number*
+▸ **listenerCount**(`event`: _string_ \| _symbol_): _number_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `event` | *string* \| *symbol* |
+| Name    | Type                 |
+| :------ | :------------------- |
+| `event` | _string_ \| _symbol_ |
 
-**Returns:** *number*
+**Returns:** _number_
 
 Inherited from: EventEmitter.listenerCount
 
 Defined in: core-ethereum/node_modules/@types/node/events.d.ts:73
 
-___
+---
 
 ### listeners
 
-▸ **listeners**(`event`: *string* \| *symbol*): Function[]
+▸ **listeners**(`event`: _string_ \| _symbol_): Function[]
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `event` | *string* \| *symbol* |
+| Name    | Type                 |
+| :------ | :------------------- |
+| `event` | _string_ \| _symbol_ |
 
 **Returns:** Function[]
 
@@ -409,82 +409,82 @@ Inherited from: EventEmitter.listeners
 
 Defined in: core-ethereum/node_modules/@types/node/events.d.ts:70
 
-___
+---
 
 ### off
 
-▸ **off**(`event`: *string* \| *symbol*, `listener`: (...`args`: *any*[]) => *void*): [*Indexer*](indexer.md)
+▸ **off**(`event`: _string_ \| _symbol_, `listener`: (...`args`: _any_[]) => _void_): [_Indexer_](indexer.md)
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `event` | *string* \| *symbol* |
-| `listener` | (...`args`: *any*[]) => *void* |
+| Name       | Type                           |
+| :--------- | :----------------------------- |
+| `event`    | _string_ \| _symbol_           |
+| `listener` | (...`args`: _any_[]) => _void_ |
 
-**Returns:** [*Indexer*](indexer.md)
+**Returns:** [_Indexer_](indexer.md)
 
 Inherited from: EventEmitter.off
 
 Defined in: core-ethereum/node_modules/@types/node/events.d.ts:66
 
-___
+---
 
 ### on
 
-▸ **on**(`event`: *string* \| *symbol*, `listener`: (...`args`: *any*[]) => *void*): [*Indexer*](indexer.md)
+▸ **on**(`event`: _string_ \| _symbol_, `listener`: (...`args`: _any_[]) => _void_): [_Indexer_](indexer.md)
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `event` | *string* \| *symbol* |
-| `listener` | (...`args`: *any*[]) => *void* |
+| Name       | Type                           |
+| :--------- | :----------------------------- |
+| `event`    | _string_ \| _symbol_           |
+| `listener` | (...`args`: _any_[]) => _void_ |
 
-**Returns:** [*Indexer*](indexer.md)
+**Returns:** [_Indexer_](indexer.md)
 
 Inherited from: EventEmitter.on
 
 Defined in: core-ethereum/node_modules/@types/node/events.d.ts:63
 
-___
+---
 
 ### onAnnouncement
 
-▸ `Private` **onAnnouncement**(`event`: *Event*<``"Announcement"``\>, `blockNumber`: *BN*): *Promise*<void\>
+▸ `Private` **onAnnouncement**(`event`: _Event_<`"Announcement"`\>, `blockNumber`: _BN_): _Promise_<void\>
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `event` | *Event*<``"Announcement"``\> |
-| `blockNumber` | *BN* |
+| Name          | Type                       |
+| :------------ | :------------------------- |
+| `event`       | _Event_<`"Announcement"`\> |
+| `blockNumber` | _BN_                       |
 
-**Returns:** *Promise*<void\>
+**Returns:** _Promise_<void\>
 
 Defined in: [core-ethereum/src/indexer/index.ts:246](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L246)
 
-___
+---
 
 ### onChannelUpdated
 
-▸ `Private` **onChannelUpdated**(`event`: *Event*<``"ChannelUpdate"``\>): *Promise*<void\>
+▸ `Private` **onChannelUpdated**(`event`: _Event_<`"ChannelUpdate"`\>): _Promise_<void\>
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `event` | *Event*<``"ChannelUpdate"``\> |
+| Name    | Type                        |
+| :------ | :-------------------------- |
+| `event` | _Event_<`"ChannelUpdate"`\> |
 
-**Returns:** *Promise*<void\>
+**Returns:** _Promise_<void\>
 
 Defined in: [core-ethereum/src/indexer/index.ts:270](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L270)
 
-___
+---
 
 ### onNewBlock
 
-▸ `Private` **onNewBlock**(`blockNumber`: *number*): *Promise*<void\>
+▸ `Private` **onNewBlock**(`blockNumber`: _number_): _Promise_<void\>
 
 Called whenever a new block found.
 This will update {this.latestBlock},
@@ -493,94 +493,94 @@ confirmed blocks.
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `blockNumber` | *number* |
+| Name          | Type     |
+| :------------ | :------- |
+| `blockNumber` | _number_ |
 
-**Returns:** *Promise*<void\>
+**Returns:** _Promise_<void\>
 
 Defined in: [core-ethereum/src/indexer/index.ts:184](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L184)
 
-___
+---
 
 ### onNewEvents
 
-▸ `Private` **onNewEvents**(`events`: *Event*<any\>[]): *void*
+▸ `Private` **onNewEvents**(`events`: _Event_<any\>[]): _void_
 
 Called whenever we receive new events.
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `events` | *Event*<any\>[] |
+| Name     | Type            |
+| :------- | :-------------- |
+| `events` | _Event_<any\>[] |
 
-**Returns:** *void*
+**Returns:** _void_
 
 Defined in: [core-ethereum/src/indexer/index.ts:242](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L242)
 
-___
+---
 
 ### once
 
-▸ **once**(`event`: *string* \| *symbol*, `listener`: (...`args`: *any*[]) => *void*): [*Indexer*](indexer.md)
+▸ **once**(`event`: _string_ \| _symbol_, `listener`: (...`args`: _any_[]) => _void_): [_Indexer_](indexer.md)
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `event` | *string* \| *symbol* |
-| `listener` | (...`args`: *any*[]) => *void* |
+| Name       | Type                           |
+| :--------- | :----------------------------- |
+| `event`    | _string_ \| _symbol_           |
+| `listener` | (...`args`: _any_[]) => _void_ |
 
-**Returns:** [*Indexer*](indexer.md)
+**Returns:** [_Indexer_](indexer.md)
 
 Inherited from: EventEmitter.once
 
 Defined in: core-ethereum/node_modules/@types/node/events.d.ts:64
 
-___
+---
 
 ### prependListener
 
-▸ **prependListener**(`event`: *string* \| *symbol*, `listener`: (...`args`: *any*[]) => *void*): [*Indexer*](indexer.md)
+▸ **prependListener**(`event`: _string_ \| _symbol_, `listener`: (...`args`: _any_[]) => _void_): [_Indexer_](indexer.md)
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `event` | *string* \| *symbol* |
-| `listener` | (...`args`: *any*[]) => *void* |
+| Name       | Type                           |
+| :--------- | :----------------------------- |
+| `event`    | _string_ \| _symbol_           |
+| `listener` | (...`args`: _any_[]) => _void_ |
 
-**Returns:** [*Indexer*](indexer.md)
+**Returns:** [_Indexer_](indexer.md)
 
 Inherited from: EventEmitter.prependListener
 
 Defined in: core-ethereum/node_modules/@types/node/events.d.ts:75
 
-___
+---
 
 ### prependOnceListener
 
-▸ **prependOnceListener**(`event`: *string* \| *symbol*, `listener`: (...`args`: *any*[]) => *void*): [*Indexer*](indexer.md)
+▸ **prependOnceListener**(`event`: _string_ \| _symbol_, `listener`: (...`args`: _any_[]) => _void_): [_Indexer_](indexer.md)
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `event` | *string* \| *symbol* |
-| `listener` | (...`args`: *any*[]) => *void* |
+| Name       | Type                           |
+| :--------- | :----------------------------- |
+| `event`    | _string_ \| _symbol_           |
+| `listener` | (...`args`: _any_[]) => _void_ |
 
-**Returns:** [*Indexer*](indexer.md)
+**Returns:** [_Indexer_](indexer.md)
 
 Inherited from: EventEmitter.prependOnceListener
 
 Defined in: core-ethereum/node_modules/@types/node/events.d.ts:76
 
-___
+---
 
 ### processPastEvents
 
-▸ `Private` **processPastEvents**(`fromBlock`: *number*, `maxToBlock`: *number*, `maxBlockRange`: *number*): *Promise*<number\>
+▸ `Private` **processPastEvents**(`fromBlock`: _number_, `maxToBlock`: _number_, `maxBlockRange`: _number_): _Promise_<number\>
 
 Query past events, this will loop until it gets all blocks from {toBlock} to {fromBlock}.
 If we exceed response pull limit, we switch into quering smaller chunks.
@@ -588,29 +588,29 @@ TODO: optimize DB and fetch requests
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `fromBlock` | *number* |
-| `maxToBlock` | *number* |
-| `maxBlockRange` | *number* |
+| Name            | Type     |
+| :-------------- | :------- |
+| `fromBlock`     | _number_ |
+| `maxToBlock`    | _number_ |
+| `maxBlockRange` | _number_ |
 
-**Returns:** *Promise*<number\>
+**Returns:** _Promise_<number\>
 
 past events and last queried block
 
 Defined in: [core-ethereum/src/indexer/index.ts:130](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L130)
 
-___
+---
 
 ### rawListeners
 
-▸ **rawListeners**(`event`: *string* \| *symbol*): Function[]
+▸ **rawListeners**(`event`: _string_ \| _symbol_): Function[]
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `event` | *string* \| *symbol* |
+| Name    | Type                 |
+| :------ | :------------------- |
+| `event` | _string_ \| _symbol_ |
 
 **Returns:** Function[]
 
@@ -618,181 +618,181 @@ Inherited from: EventEmitter.rawListeners
 
 Defined in: core-ethereum/node_modules/@types/node/events.d.ts:71
 
-___
+---
 
 ### removeAllListeners
 
-▸ **removeAllListeners**(`event?`: *string* \| *symbol*): [*Indexer*](indexer.md)
+▸ **removeAllListeners**(`event?`: _string_ \| _symbol_): [_Indexer_](indexer.md)
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `event?` | *string* \| *symbol* |
+| Name     | Type                 |
+| :------- | :------------------- |
+| `event?` | _string_ \| _symbol_ |
 
-**Returns:** [*Indexer*](indexer.md)
+**Returns:** [_Indexer_](indexer.md)
 
 Inherited from: EventEmitter.removeAllListeners
 
 Defined in: core-ethereum/node_modules/@types/node/events.d.ts:67
 
-___
+---
 
 ### removeListener
 
-▸ **removeListener**(`event`: *string* \| *symbol*, `listener`: (...`args`: *any*[]) => *void*): [*Indexer*](indexer.md)
+▸ **removeListener**(`event`: _string_ \| _symbol_, `listener`: (...`args`: _any_[]) => _void_): [_Indexer_](indexer.md)
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `event` | *string* \| *symbol* |
-| `listener` | (...`args`: *any*[]) => *void* |
+| Name       | Type                           |
+| :--------- | :----------------------------- |
+| `event`    | _string_ \| _symbol_           |
+| `listener` | (...`args`: _any_[]) => _void_ |
 
-**Returns:** [*Indexer*](indexer.md)
+**Returns:** [_Indexer_](indexer.md)
 
 Inherited from: EventEmitter.removeListener
 
 Defined in: core-ethereum/node_modules/@types/node/events.d.ts:65
 
-___
+---
 
 ### restart
 
-▸ `Private` **restart**(): *Promise*<void\>
+▸ `Private` **restart**(): _Promise_<void\>
 
-**Returns:** *Promise*<void\>
+**Returns:** _Promise_<void\>
 
 Defined in: [core-ethereum/src/indexer/index.ts:105](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L105)
 
-___
+---
 
 ### setMaxListeners
 
-▸ **setMaxListeners**(`n`: *number*): [*Indexer*](indexer.md)
+▸ **setMaxListeners**(`n`: _number_): [_Indexer_](indexer.md)
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `n` | *number* |
+| Name | Type     |
+| :--- | :------- |
+| `n`  | _number_ |
 
-**Returns:** [*Indexer*](indexer.md)
+**Returns:** [_Indexer_](indexer.md)
 
 Inherited from: EventEmitter.setMaxListeners
 
 Defined in: core-ethereum/node_modules/@types/node/events.d.ts:68
 
-___
+---
 
 ### start
 
-▸ **start**(): *Promise*<void\>
+▸ **start**(): _Promise_<void\>
 
 Starts indexing.
 
-**Returns:** *Promise*<void\>
+**Returns:** _Promise_<void\>
 
 Defined in: [core-ethereum/src/indexer/index.ts:42](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L42)
 
-___
+---
 
 ### stop
 
-▸ **stop**(): *Promise*<void\>
+▸ **stop**(): _Promise_<void\>
 
 Stops indexing.
 
-**Returns:** *Promise*<void\>
+**Returns:** _Promise_<void\>
 
 Defined in: [core-ethereum/src/indexer/index.ts:95](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L95)
 
-___
+---
 
 ### toIndexerChannel
 
-▸ `Private` **toIndexerChannel**(`source`: *PeerId*, `channel`: *ChannelEntry*): *Promise*<[*RoutingChannel*](../modules.md#routingchannel)\>
+▸ `Private` **toIndexerChannel**(`source`: _PeerId_, `channel`: _ChannelEntry_): _Promise_<[_RoutingChannel_](../modules.md#routingchannel)\>
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `source` | *PeerId* |
-| `channel` | *ChannelEntry* |
+| Name      | Type           |
+| :-------- | :------------- |
+| `source`  | _PeerId_       |
+| `channel` | _ChannelEntry_ |
 
-**Returns:** *Promise*<[*RoutingChannel*](../modules.md#routingchannel)\>
+**Returns:** _Promise_<[_RoutingChannel_](../modules.md#routingchannel)\>
 
 Defined in: [core-ethereum/src/indexer/index.ts:303](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L303)
 
-___
+---
 
 ### listenerCount
 
-▸ `Static` **listenerCount**(`emitter`: *EventEmitter*, `event`: *string* \| *symbol*): *number*
+▸ `Static` **listenerCount**(`emitter`: _EventEmitter_, `event`: _string_ \| _symbol_): _number_
 
 **`deprecated`** since v4.0.0
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `emitter` | *EventEmitter* |
-| `event` | *string* \| *symbol* |
+| Name      | Type                 |
+| :-------- | :------------------- |
+| `emitter` | _EventEmitter_       |
+| `event`   | _string_ \| _symbol_ |
 
-**Returns:** *number*
+**Returns:** _number_
 
 Inherited from: EventEmitter.listenerCount
 
 Defined in: core-ethereum/node_modules/@types/node/events.d.ts:31
 
-___
+---
 
 ### on
 
-▸ `Static` **on**(`emitter`: *EventEmitter*, `event`: *string*): *AsyncIterableIterator*<any\>
+▸ `Static` **on**(`emitter`: _EventEmitter_, `event`: _string_): _AsyncIterableIterator_<any\>
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `emitter` | *EventEmitter* |
-| `event` | *string* |
+| Name      | Type           |
+| :-------- | :------------- |
+| `emitter` | _EventEmitter_ |
+| `event`   | _string_       |
 
-**Returns:** *AsyncIterableIterator*<any\>
+**Returns:** _AsyncIterableIterator_<any\>
 
 Inherited from: EventEmitter.on
 
 Defined in: core-ethereum/node_modules/@types/node/events.d.ts:28
 
-___
+---
 
 ### once
 
-▸ `Static` **once**(`emitter`: *NodeEventTarget*, `event`: *string* \| *symbol*): *Promise*<any[]\>
+▸ `Static` **once**(`emitter`: _NodeEventTarget_, `event`: _string_ \| _symbol_): _Promise_<any[]\>
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `emitter` | *NodeEventTarget* |
-| `event` | *string* \| *symbol* |
+| Name      | Type                 |
+| :-------- | :------------------- |
+| `emitter` | _NodeEventTarget_    |
+| `event`   | _string_ \| _symbol_ |
 
-**Returns:** *Promise*<any[]\>
+**Returns:** _Promise_<any[]\>
 
 Inherited from: EventEmitter.once
 
 Defined in: core-ethereum/node_modules/@types/node/events.d.ts:26
 
-▸ `Static` **once**(`emitter`: DOMEventTarget, `event`: *string*): *Promise*<any[]\>
+▸ `Static` **once**(`emitter`: DOMEventTarget, `event`: _string_): _Promise_<any[]\>
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
+| Name      | Type           |
+| :-------- | :------------- |
 | `emitter` | DOMEventTarget |
-| `event` | *string* |
+| `event`   | _string_       |
 
-**Returns:** *Promise*<any[]\>
+**Returns:** _Promise_<any[]\>
 
 Inherited from: EventEmitter.once
 
