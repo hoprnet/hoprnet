@@ -41,26 +41,22 @@ describe(`database tests`, function () {
   })
 
   it('ticket workflow', async function () {
-    const key = PublicKey.fromPrivKey(randomBytes(32))
-    await db.storeUnacknowledgedTickets(
-      key,
-      new UnacknowledgedTicket(createMockedTicket(), new Hash(new Uint8Array(Hash.SIZE)))
-    )
+    const unAck = new UnacknowledgedTicket(createMockedTicket(), new Hash(new Uint8Array(Hash.SIZE)))
+    const ack = new AcknowledgedTicket(unAck.ticket, new Hash(randomBytes(Hash.SIZE)), new Hash(randomBytes(Hash.SIZE)))
 
+    await db.storeUnacknowledgedTicket(unAck)
     assert((await db.getTickets()).length == 1, `DB should find one ticket`)
 
-    const ticket = await db.getUnacknowledgedTicketsByKey(key)
-    assert(ticket != null)
+    const ticket = await db.getUnacknowledgedTicket(unAck.ticket.challenge)
+    assert(!!ticket)
 
-    await db.replaceTicketWithAcknowledgement(
-      key,
-      new AcknowledgedTicket(ticket.ticket, new Hash(randomBytes(Hash.SIZE)), new Hash(randomBytes(Hash.SIZE)))
-    )
+    await db.unAckToAckTicket(ack)
 
     assert((await db.getTickets()).length == 1, `DB should find one ticket`)
-
-    assert((await db.getUnacknowledgedTicketsByKey(key)) == undefined, `DB should not contain any unacknowledgedTicket`)
-
+    assert(
+      !(await db.getUnacknowledgedTicket(unAck.ticket.challenge)),
+      `DB should not contain any unacknowledgedTicket`
+    )
     assert((await db.getAcknowledgedTickets()).length == 1, `DB should contain exactly one acknowledged ticket`)
   })
 })
