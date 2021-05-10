@@ -670,7 +670,7 @@ class Hopr extends EventEmitter {
 
       const result = await channel.redeemTicket(ackTicket)
       // TODO look at result.status and actually do something
-      await this.db.delAcknowledgement(ackTicket)
+      await this.db.delAcknowledgedTicket(ackTicket)
       return result
     } catch (err) {
       return {

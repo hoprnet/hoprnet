@@ -199,7 +199,7 @@ export class HoprDB {
    * Delete acknowledged tickets
    * @param filter optionally filter by signer
    */
-  public async delAcknowledgements(filter?: { signer: Uint8Array }): Promise<void> {
+  public async delAcknowledgedTickets(filter?: { signer: Uint8Array }): Promise<void> {
     const acks = await this.getAcknowledgedTickets(filter)
     await this.db.batch(
       await Promise.all(
@@ -218,7 +218,7 @@ export class HoprDB {
    * @param ackTicket Uint8Array
    * @param index Uint8Array
    */
-  public async updateAcknowledgement(ackTicket: AcknowledgedTicket): Promise<void> {
+  public async updateAcknowledgedTicket(ackTicket: AcknowledgedTicket): Promise<void> {
     await this.put(acknowledgedTicketKey(ackTicket.ticket.challenge), ackTicket.serialize())
   }
 
@@ -226,7 +226,7 @@ export class HoprDB {
    * Delete acknowledged ticket in database
    * @param index Uint8Array
    */
-  public async delAcknowledgement(ackTicket: AcknowledgedTicket): Promise<void> {
+  public async delAcknowledgedTicket(ackTicket: AcknowledgedTicket): Promise<void> {
     await this.del(acknowledgedTicketKey(ackTicket.ticket.challenge))
   }
 
@@ -267,7 +267,7 @@ export class HoprDB {
    * @returns an array of signed tickets
    */
   public async delTickets(filter?: { signer: Uint8Array }): Promise<void> {
-    await Promise.all([this.delUnacknowledgedTickets(filter), this.delAcknowledgements(filter)])
+    await Promise.all([this.delUnacknowledgedTickets(filter), this.delAcknowledgedTickets(filter)])
   }
 
   async checkAndSetPacketTag(packetTag: Uint8Array) {

@@ -34,7 +34,7 @@ export function subscribeToAcknowledgements(
 
     if (ackedTicket === null) {
       log(`Got a ticket that is not a win. Dropping ticket.`)
-      await db.delAcknowledgement(ackedTicket)
+      await db.delAcknowledgedTicket(ackedTicket)
     } else {
       log(`Storing winning ticket`)
       await db.unAckToAckTicket(ackedTicket)
