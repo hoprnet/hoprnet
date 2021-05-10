@@ -29,15 +29,15 @@
 
 ### constructor
 
-\+ **new PublicKey**(`arr`: *Uint8Array*): [*PublicKey*](publickey.md)
+\+ **new PublicKey**(`arr`: _Uint8Array_): [_PublicKey_](publickey.md)
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `arr` | *Uint8Array* |
+| Name  | Type         |
+| :---- | :----------- |
+| `arr` | _Uint8Array_ |
 
-**Returns:** [*PublicKey*](publickey.md)
+**Returns:** [_PublicKey_](publickey.md)
 
 Defined in: [types/primitives.ts:10](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L10)
 
@@ -45,9 +45,9 @@ Defined in: [types/primitives.ts:10](https://github.com/hoprnet/hoprnet/blob/mas
 
 ### SIZE
 
-• `Static` get **SIZE**(): *number*
+• `Static` get **SIZE**(): _number_
 
-**Returns:** *number*
+**Returns:** _number_
 
 Defined in: [types/primitives.ts:55](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L55)
 
@@ -55,128 +55,128 @@ Defined in: [types/primitives.ts:55](https://github.com/hoprnet/hoprnet/blob/mas
 
 ### eq
 
-▸ **eq**(`b`: [*PublicKey*](publickey.md)): *boolean*
+▸ **eq**(`b`: [_PublicKey_](publickey.md)): _boolean_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `b` | [*PublicKey*](publickey.md) |
+| Name | Type                        |
+| :--- | :-------------------------- |
+| `b`  | [_PublicKey_](publickey.md) |
 
-**Returns:** *boolean*
+**Returns:** _boolean_
 
 Defined in: [types/primitives.ts:67](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L67)
 
-___
+---
 
 ### serialize
 
-▸ **serialize**(): *Uint8Array*
+▸ **serialize**(): _Uint8Array_
 
-**Returns:** *Uint8Array*
+**Returns:** _Uint8Array_
 
 Defined in: [types/primitives.ts:59](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L59)
 
-___
+---
 
 ### toAddress
 
-▸ **toAddress**(): [*Address*](address.md)
+▸ **toAddress**(): [_Address_](address.md)
 
-**Returns:** [*Address*](address.md)
+**Returns:** [_Address_](address.md)
 
 Defined in: [types/primitives.ts:38](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L38)
 
-___
+---
 
 ### toHex
 
-▸ **toHex**(): *string*
+▸ **toHex**(): _string_
 
-**Returns:** *string*
+**Returns:** _string_
 
 Defined in: [types/primitives.ts:63](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L63)
 
-___
+---
 
 ### toPeerId
 
-▸ **toPeerId**(): *PeerId*
+▸ **toPeerId**(): _PeerId_
 
-**Returns:** *PeerId*
+**Returns:** _PeerId_
 
 Defined in: [types/primitives.ts:47](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L47)
 
-___
+---
 
 ### toUncompressedPubKeyHex
 
-▸ **toUncompressedPubKeyHex**(): *string*
+▸ **toUncompressedPubKeyHex**(): _string_
 
-**Returns:** *string*
+**Returns:** _string_
 
 Defined in: [types/primitives.ts:42](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L42)
 
-___
+---
 
 ### fromPeerId
 
-▸ `Static` **fromPeerId**(`peerId`: *PeerId*): [*PublicKey*](publickey.md)
+▸ `Static` **fromPeerId**(`peerId`: _PeerId_): [_PublicKey_](publickey.md)
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `peerId` | *PeerId* |
+| Name     | Type     |
+| :------- | :------- |
+| `peerId` | _PeerId_ |
 
-**Returns:** [*PublicKey*](publickey.md)
+**Returns:** [_PublicKey_](publickey.md)
 
 Defined in: [types/primitives.ts:34](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L34)
 
-___
+---
 
 ### fromPrivKey
 
-▸ `Static` **fromPrivKey**(`privKey`: *Uint8Array*): [*PublicKey*](publickey.md)
+▸ `Static` **fromPrivKey**(`privKey`: _Uint8Array_): [_PublicKey_](publickey.md)
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `privKey` | *Uint8Array* |
+| Name      | Type         |
+| :-------- | :----------- |
+| `privKey` | _Uint8Array_ |
 
-**Returns:** [*PublicKey*](publickey.md)
+**Returns:** [_PublicKey_](publickey.md)
 
 Defined in: [types/primitives.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L18)
 
-___
+---
 
 ### fromString
 
-▸ `Static` **fromString**(`str`: *string*): [*PublicKey*](publickey.md)
+▸ `Static` **fromString**(`str`: _string_): [_PublicKey_](publickey.md)
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `str` | *string* |
+| Name  | Type     |
+| :---- | :------- |
+| `str` | _string_ |
 
-**Returns:** [*PublicKey*](publickey.md)
+**Returns:** [_PublicKey_](publickey.md)
 
 Defined in: [types/primitives.ts:51](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L51)
 
-___
+---
 
 ### fromUncompressedPubKey
 
-▸ `Static` **fromUncompressedPubKey**(`arr`: *Uint8Array*): [*PublicKey*](publickey.md)
+▸ `Static` **fromUncompressedPubKey**(`arr`: _Uint8Array_): [_PublicKey_](publickey.md)
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `arr` | *Uint8Array* |
+| Name  | Type         |
+| :---- | :----------- |
+| `arr` | _Uint8Array_ |
 
-**Returns:** [*PublicKey*](publickey.md)
+**Returns:** [_PublicKey_](publickey.md)
 
 Defined in: [types/primitives.ts:26](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L26)

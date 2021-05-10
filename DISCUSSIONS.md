@@ -90,3 +90,11 @@ Currently, we are hosting our [documentation](http://docs.hoprnet.org/en/latest/
 #### Discussion
 
 For increase security and privacy, we should be hosting the documentation ourselves and/or via a decentralized platform (e.g. IPFS)
+
+## Premature Optimisations
+
+At the moment we want to create a proof of concept, therefore any optimisation
+is out of scope.
+
+- Shrinking packet size by removing derivable values (initially in #1523)
+- Bulk redeem tickets (originally #793)
