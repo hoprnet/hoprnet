@@ -1,14 +1,12 @@
-name: HOPR Lint fix
+name: HOPR Generate API docs
 
 on:
   push:
-    branches: ['**']
-    paths-ignore:
-      - '**/docs/**/*'
+    branches: ['master', 'release/**', 'avado', 'debug-docs/**']
 
 jobs:
-  lint:
-    name: Lint
+  docs:
+    name: Generate API docs
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -19,30 +17,27 @@ jobs:
           node-version: 14
           registry-url: https://registry.npmjs.org/
 
-      - name: Get yarn cache directory path
-        id: yarn-cache-dir-path
-        run: echo "::set-output name=dir::$(yarn config get cacheFolder)"
-
-      - name: Restore cache of node modules and yarn cache
+      - name: Restore cache of node modules.
         uses: actions/cache@v2
         id: nodejs-cache
         with:
           path: |
             node_modules
             */*/node_modules
-            ${{ steps.yarn-cache-dir-path.outputs.dir }}
-          key: ${{ runner.os }}-nodejs-${{ hashFiles('**/yarn.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-nodejs-
+          key: ${{ runner.os }}-lerna-${{ hashFiles('**/yarn.lock') }}
 
       - name: Install dependencies
         if: steps.nodejs-cache.outputs.cache-hit != 'true'
         run: |
           yarn
 
-      - name: Run linter
+      - name: Generate docs
         run: |
-          yarn lint:fix
+          # remove previously generated docs to ensure renamed/removed modules
+          # are not kept in the docs
+          rm -rf packages/*/docs
+          yarn build
+          yarn docs:generate
 
       - name: Check if changed
         id: check-changed
@@ -53,7 +48,8 @@ jobs:
         if: steps.check-changed.outputs.changed != ''
         run: |
           git config --global user.email "noreply@hoprnet.org"
-          git config --global user.name "HOPR Linting robot"
-          git commit -a -m "Fix linting" || true
+          git config --global user.name "HOPR Documentation robot"
+          git add packages/*/docs
+          git commit -m "Re-generate API docs for packages" || true
           git pull origin ${{ github.ref }}
           git push origin ${{ github.ref }}

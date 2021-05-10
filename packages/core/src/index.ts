@@ -656,7 +656,7 @@ class Hopr extends EventEmitter {
   }
 
   public async getAcknowledgedTickets() {
-    return this.db.getAcknowledgements()
+    return this.db.getAcknowledgedTickets()
   }
 
   public async submitAcknowledgedTicket(ackTicket: AcknowledgedTicket) {

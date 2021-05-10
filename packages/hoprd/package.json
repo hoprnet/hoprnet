@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hoprd",
-  "version": "1.71.0-next.131",
+  "version": "1.71.0-next.139",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -23,11 +23,13 @@
     "prebuild": "next telemetry disable",
     "prepublishOnly": "yarn build",
     "start": "node lib/index.js --admin --init --rest",
-    "dev": "yarn build && NODE_ENV=development yarn start"
+    "dev": "yarn build && NODE_ENV=development yarn start",
+    "docs:generate": "yarn typedoc",
+    "docs:watch": "yarn typedoc --watch"
   },
   "dependencies": {
-    "@hoprnet/hopr-core": "1.71.0-next.131",
-    "@hoprnet/hopr-utils": "1.71.0-next.131",
+    "@hoprnet/hopr-core": "1.71.0-next.139",
+    "@hoprnet/hopr-utils": "1.71.0-next.139",
     "body-parser": "^1.19.0",
     "bs58": "^4.0.1",
     "jazzicon": "^1.5.0",
