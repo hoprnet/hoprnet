@@ -181,7 +181,7 @@ export class HoprDB {
    * @param filter optionally filter by signer
    * @returns an array of all acknowledged tickets
    */
-  async getAcknowledgements(filter?: { signer: Uint8Array }): Promise<AcknowledgedTicket[]> {
+  async getAcknowledgedTickets(filter?: { signer: Uint8Array }): Promise<AcknowledgedTicket[]> {
     const filterFunc = (a: AcknowledgedTicket): boolean => {
       // if signer provided doesn't match our ticket's signer dont add it to the list
       if (filter?.signer && a.ticket.verify(new PublicKey(filter.signer))) {
@@ -197,7 +197,7 @@ export class HoprDB {
    * @param filter optionally filter by signer
    */
   async deleteAcknowledgements(filter?: { signer: Uint8Array }): Promise<void> {
-    const acks = await this.getAcknowledgements(filter)
+    const acks = await this.getAcknowledgedTickets(filter)
     await this.db.batch(
       await Promise.all(
         acks.map<any>(async (ack) => {
@@ -234,7 +234,7 @@ export class HoprDB {
    * @returns an array of signed tickets
    */
   async getTickets(filter?: { signer: Uint8Array }): Promise<Ticket[]> {
-    return Promise.all([this.getUnacknowledgedTickets(filter), this.getAcknowledgements(filter)]).then(
+    return Promise.all([this.getUnacknowledgedTickets(filter), this.getAcknowledgedTickets(filter)]).then(
       async ([unAcks, acks]) => {
         const unAckTickets = await Promise.all(unAcks.map((o) => o.ticket))
         const ackTickets = await Promise.all(acks.map((o) => o.ticket))
