@@ -12,8 +12,7 @@ import type { Connection, MuxedStream } from 'libp2p'
 import pipe from 'it-pipe'
 
 export * from './privKeyToPeerId'
-export * from './peerIdToPubKey'
-export * from './pubKeyFromPeerId'
+export * from './pubKeyToPeerId'
 
 /**
  * Regular expresion used to match b58Strings

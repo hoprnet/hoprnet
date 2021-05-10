@@ -1,5 +1,5 @@
 import type Hopr from '@hoprnet/hopr-core'
-import { moveDecimalPoint, pubKeyToPeerId, u8aEquals } from '@hoprnet/hopr-utils'
+import { moveDecimalPoint, u8aEquals } from '@hoprnet/hopr-utils'
 import chalk from 'chalk'
 import { AbstractCommand } from './abstractCommand'
 import { getPaddingLength, styleValue } from './utils'
@@ -68,7 +68,7 @@ export default class ListOpenChannels extends AbstractCommand {
   async execute(): Promise<string | void> {
     try {
       const selfPubKey = new PublicKey(this.node.getId().pubKey.marshal())
-      const selfAddress = await selfPubKey.toAddress()
+      const selfAddress = selfPubKey.toAddress()
       const channels = (await this.node.getChannelsOf(selfAddress))
         // do not print CLOSED channels
         .filter((channel) => channel.status !== 'CLOSED')
@@ -80,7 +80,7 @@ export default class ListOpenChannels extends AbstractCommand {
 
       // find counterpartys' peerIds
       for (const channel of channels) {
-        const id = await channel.getId()
+        const id = channel.getId()
         const selfIsPartyA = u8aEquals(selfAddress.serialize(), channel.partyA.serialize())
         const counterpartyPubKey = await this.node.getPublicKeyOf(selfIsPartyA ? channel.partyB : channel.partyA)
         // counterparty has not initialized
@@ -91,7 +91,7 @@ export default class ListOpenChannels extends AbstractCommand {
           selfIsPartyA ? channel.partyABalance.toString() : totalBalance.sub(channel.partyABalance.toBN()).toString(),
           Balance.DECIMALS * -1
         )
-        const peerId = (await pubKeyToPeerId(counterpartyPubKey.serialize())).toB58String()
+        const peerId = counterpartyPubKey.toPeerId().toB58String()
 
         result.push(
           this.generateOutput({

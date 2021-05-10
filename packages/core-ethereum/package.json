@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-core-ethereum",
-  "version": "1.71.0-next.127",
+  "version": "1.71.0-next.139",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -13,7 +13,9 @@
     "dev": "yarn clean && yarn build:types && tsc -w",
     "build:types": "typechain --target ethers-v5 --outDir './src/contracts' '../../node_modules/@hoprnet/hopr-ethereum/chain/abis/*.json'",
     "build": "yarn clean && yarn build:types && mkdir -p ./lib/contracts && cp -R ./src/contracts ./lib/contracts && tsc",
-    "prepublishOnly": "yarn build"
+    "prepublishOnly": "yarn build",
+    "docs:generate": "yarn typedoc",
+    "docs:watch": "yarn typedoc --watch"
   },
   "engines": {
     "node": "14 || 15",
@@ -27,8 +29,8 @@
     "!**/*.spec.js.map"
   ],
   "dependencies": {
-    "@hoprnet/hopr-ethereum": "1.71.0-next.127",
-    "@hoprnet/hopr-utils": "1.71.0-next.127",
+    "@hoprnet/hopr-ethereum": "1.71.0-next.139",
+    "@hoprnet/hopr-utils": "1.71.0-next.139",
     "async-mutex": "^0.3.0",
     "bn.js": "^5.1.2",
     "chalk": "^4.1.0",
