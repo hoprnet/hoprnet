@@ -31,17 +31,17 @@
 
 ### constructor
 
-\+ **new AccountEntry**(`address`: [_Address_](address.md), `multiAddr`: _Multiaddr_, `updatedBlock`: _BN_): [_AccountEntry_](accountentry.md)
+\+ **new AccountEntry**(`address`: [*Address*](address.md), `multiAddr`: *Multiaddr*, `updatedBlock`: *BN*): [*AccountEntry*](accountentry.md)
 
 #### Parameters
 
-| Name           | Type                    |
-| :------------- | :---------------------- |
-| `address`      | [_Address_](address.md) |
-| `multiAddr`    | _Multiaddr_             |
-| `updatedBlock` | _BN_                    |
+| Name | Type |
+| :------ | :------ |
+| `address` | [*Address*](address.md) |
+| `multiAddr` | *Multiaddr* |
+| `updatedBlock` | *BN* |
 
-**Returns:** [_AccountEntry_](accountentry.md)
+**Returns:** [*AccountEntry*](accountentry.md)
 
 Defined in: [types/accountEntry.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L8)
 
@@ -49,27 +49,27 @@ Defined in: [types/accountEntry.ts:8](https://github.com/hoprnet/hoprnet/blob/ma
 
 ### address
 
-• `Readonly` **address**: [_Address_](address.md)
+• `Readonly` **address**: [*Address*](address.md)
 
----
+___
 
 ### multiAddr
 
-• `Readonly` **multiAddr**: _Multiaddr_
+• `Readonly` **multiAddr**: *Multiaddr*
 
----
+___
 
 ### updatedBlock
 
-• `Readonly` **updatedBlock**: _BN_
+• `Readonly` **updatedBlock**: *BN*
 
 ## Accessors
 
 ### SIZE
 
-• `Static` get **SIZE**(): _number_
+• `Static` get **SIZE**(): *number*
 
-**Returns:** _number_
+**Returns:** *number*
 
 Defined in: [types/accountEntry.ts:15](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L15)
 
@@ -77,64 +77,64 @@ Defined in: [types/accountEntry.ts:15](https://github.com/hoprnet/hoprnet/blob/m
 
 ### containsRouting
 
-▸ **containsRouting**(): _boolean_
+▸ **containsRouting**(): *boolean*
 
-**Returns:** _boolean_
+**Returns:** *boolean*
 
 Defined in: [types/accountEntry.ts:51](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L51)
 
----
+___
 
 ### getPeerId
 
-▸ **getPeerId**(): _PeerId_
+▸ **getPeerId**(): *PeerId*
 
-**Returns:** _PeerId_
+**Returns:** *PeerId*
 
 Defined in: [types/accountEntry.ts:43](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L43)
 
----
+___
 
 ### getPublicKey
 
-▸ **getPublicKey**(): [_PublicKey_](publickey.md)
+▸ **getPublicKey**(): [*PublicKey*](publickey.md)
 
-**Returns:** [_PublicKey_](publickey.md)
+**Returns:** [*PublicKey*](publickey.md)
 
 Defined in: [types/accountEntry.ts:47](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L47)
 
----
+___
 
 ### hasAnnounced
 
-▸ **hasAnnounced**(): _boolean_
+▸ **hasAnnounced**(): *boolean*
 
-**Returns:** _boolean_
+**Returns:** *boolean*
 
 Defined in: [types/accountEntry.ts:56](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L56)
 
----
+___
 
 ### serialize
 
-▸ **serialize**(): _Uint8Array_
+▸ **serialize**(): *Uint8Array*
 
-**Returns:** _Uint8Array_
+**Returns:** *Uint8Array*
 
 Defined in: [types/accountEntry.ts:30](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L30)
 
----
+___
 
 ### deserialize
 
-▸ `Static` **deserialize**(`arr`: _Uint8Array_): [_AccountEntry_](accountentry.md)
+▸ `Static` **deserialize**(`arr`: *Uint8Array*): [*AccountEntry*](accountentry.md)
 
 #### Parameters
 
-| Name  | Type         |
-| :---- | :----------- |
-| `arr` | _Uint8Array_ |
+| Name | Type |
+| :------ | :------ |
+| `arr` | *Uint8Array* |
 
-**Returns:** [_AccountEntry_](accountentry.md)
+**Returns:** [*AccountEntry*](accountentry.md)
 
 Defined in: [types/accountEntry.ts:19](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L19)
