@@ -77,15 +77,15 @@ Therefore, the sender of the packet also provides a hint of the expected value t
     \begin{tabular}{| m{2em} | m{15em} | m{2em} |}
         \hline
         $\alpha$ & $\beta$                   & $\gamma$ \\
-                 & \begin{tabular}{| m{2em} | m{3em} | m{6em} |}
+                 & \begin{tabular}{| c m{2em} | m{3em} | m{6em} |}
             \hline
-            $Y_B$ & $hint_B$ & $challenge_{BC}$ \\
+            \multicolumn{2}{| c |}{$Y_B$} & $hint_B$ & $challenge_{BC}$ \\
             \hline
-            $Y_C$ & $hint_C$ & $random$         \\
+            \multicolumn{2}{| c |}{$Y_C$} & $hint_C$ & $random$         \\
             \hline
-            $Y_D$ & $hint_D$ & $random$         \\
+            \multicolumn{2}{| c |}{$Y_D$} & $hint_D$ & $random$         \\
             \hline
-            \multicolumn{3}{| l |}{End}         \\
+            End  & \multicolumn{3}{| l |}{}         \\
             \hline
         \end{tabular} &          \\[3em]
         \hline

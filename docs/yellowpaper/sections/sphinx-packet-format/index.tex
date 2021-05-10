@@ -1,6 +1,7 @@
 \section{Sphinx Packet Format}
 
-HOPR uses the SPHINX packet format to encapsulate and route data packets in order to achieve sender and receiver unlinkability. The SPHINX packet format determines how mixnet packet are created and transformed in order to relay them to the next downstream node. Each sphinx packet consists of two parts:
+HOPR uses the SPHINX packet format \cite{sphinxpaper} to encapsulate and route data packets in order to achieve sender and receiver unlinkability. The SPHINX packet format determines how mixnet packet are created and transformed in order to relay them to the next downstream node. Each sphinx packet consists of two parts:
+
 \begin{figure}[H]
     \begin{center}
         \begin{tabular}{| c |}
@@ -15,7 +16,7 @@ HOPR uses the SPHINX packet format to encapsulate and route data packets in orde
             \hline
             \hline
             \\[-0.7em]
-            Body                      \\[1.0em]
+            Body                      \\[0.7em]
             \hline
         \end{tabular}
     \end{center}
@@ -25,10 +26,10 @@ HOPR uses the SPHINX packet format to encapsulate and route data packets in orde
 
 \subsection{Construction}
 
-\paragraph{Notation:}Let $\kappa=128$ be the security parameter. An adversary will have to do about $2^\kappa$ operations to break the security of Sphinx with non negligible probability.
+\paragraph{Notation:}Let $\kappa=128$ be the security parameter. An adversary will have to do about $2^\kappa$ operations to break the security of Sphinx with non negligible probability. 
 Let $r$ be the maximum number of nodes that a Sphinx mix message will traverse before being delivered to its destination.
 \\$G$ is a prime order cyclic group satisfying the Decisional Diffie-Hellman Assumption. The element $g$ is a generator of $G$ and $q$ is the (prime) order of $G$, with $q\approx2^{\kappa}$.
-$G^*$is the set of non-identity elements of G. $h_b$ is a hash function used to compute blinding factors and we model by random oracles such that:
+$G^*$is the set of non-identity elements of G. $h_b$ is a pre-image resistant hash function used to compute blinding factors and modeled as a random oracle such that:
 $h:G^*\times G^*\rightarrow\mathbb{Z}^*_q$ where $\mathbb{Z}^*_q$ is the field of non-identity elements of $\mathbb{Z}_q$ (field of integers).
     \\~\\Each node $n$ has a private key $x_n\in \mathbb{Z}^*_q$ and a public key $y_n=g^{x_n}\in G^*$.
     The $a_i$ are the group elements which, when combined with the nodes’ public keys, allow computing a shared key for each via Diffie-Hellman (DH) key exchange, and so the first node in the user-chosen route can forward the packet to the next, and only that mix-node can decrypt it.
@@ -37,7 +38,7 @@ $h:G^*\times G^*\rightarrow\mathbb{Z}^*_q$ where $\mathbb{Z}^*_q$ is the field o
     \paragraph{Key derivation}
     The sender $(A)$ picks a random $x\in \mathbb{Z}^*_q$ that is used to derive new keys for every packet.
     \newline $(A)$ randomly picks a path consisting of intermediate nodes $(B)$, $(C)$,$(D)$ and the final destination of the packet $(Z)$.
-    \newline $(A)$ performs an offline Diffie-Hellman key exchange with each of these nodes and derives shared keys with each of these nodes.
+    \newline $(A)$ performs an offline Diffie-Hellman key exchange with each of these nodes and derives shared keys with each of them.
     \newline $(A)$ computes a sequence of $r$ tuples (in our case r=4)  $$(a_0,s_0,b_0),.................,(a_{r-1},s_{r-1},b_{r-1})$$ as follows:
     \begin{itemize}
         \item $a_0=g^x,s_0=y^x_B,b_0=h_b(a_0,s_0)$
@@ -48,7 +49,7 @@ $h:G^*\times G^*\rightarrow\mathbb{Z}^*_q$ where $\mathbb{Z}^*_q$ is the field o
     Where $y_B,y_C,y_D,y_Z$ are the public keys of the nodes $B,C, D$  which we assume to be available to $A$ .
 
     \paragraph{Routing information}
-    Each node on the path needs to know the next downstream node. Therefore, the sender $(A)$ generates routing information $\beta_i$ for $(B)$, $(C)$ and (D) as well as message END to tell $(Z)$ that it is the final receiver of the message. The END message is a distinguished prefix byte that's added to the final receiver's compressed address $Z=(x,y)$ (either $0\times02$ or $0\times03$ depending if the $y$ coordinate is even or odd).
+    Each node on the path needs to know the next downstream node. Therefore, the sender $(A)$ generates routing information $\beta_i$ for $(B)$, $(C)$ and $(D)$ as well as message $END$ to tell $(Z)$ that it is the final receiver of the message. The END message is a distinguished prefix byte that's added to the final receiver's compressed address $Z=(x,y)$ (either $0\times02$ or $0\times03$ depending if the $y$ coordinate is even or odd).
     $$\beta_i=(Z\|I\|0_{(2(r-v)+2)\kappa-|Z|}\oplus PRNG(s_{v-1})_{[ \,0....(2(r-v)+3)\kappa-1})\|\phi$$
     Such that $Z$ is the destination address and $|Z|$ is its length. $I$ is an identifier used for SURBs (Single-Use-Reply Blocks) such that $I \in \{0, 1\}^\kappa$.
 $v\leq r$ is the length of the path traversed by the packet where $|Z| \leq (2(r - v) + 2)$. $\phi$ is a filler string that is used to ensure the header packets remain constant in size as layers of encryption are added or removed.
