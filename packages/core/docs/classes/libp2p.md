@@ -56,7 +56,7 @@
 
 ## Hierarchy
 
-- *Libp2p\_base*
+- _Libp2p_base_
 
   ↳ **LibP2P**
 
@@ -134,19 +134,19 @@
 
 ### constructor
 
-\+ **new LibP2P**(`_options`: [*Libp2pOptions*](../modules/libp2p.md#libp2poptions) & [*constructorOptions*](../modules/libp2p.md#constructoroptions)): [*LibP2P*](libp2p.md)
+\+ **new LibP2P**(`_options`: [_Libp2pOptions_](../modules/libp2p.md#libp2poptions) & [_constructorOptions_](../modules/libp2p.md#constructoroptions)): [_LibP2P_](libp2p.md)
 
 Libp2p node.
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `_options` | [*Libp2pOptions*](../modules/libp2p.md#libp2poptions) & [*constructorOptions*](../modules/libp2p.md#constructoroptions) |
+| Name       | Type                                                                                                                    |
+| :--------- | :---------------------------------------------------------------------------------------------------------------------- |
+| `_options` | [_Libp2pOptions_](../modules/libp2p.md#libp2poptions) & [_constructorOptions_](../modules/libp2p.md#constructoroptions) |
 
-**Returns:** [*LibP2P*](libp2p.md)
+**Returns:** [_LibP2P_](libp2p.md)
 
-Overrides: Libp2p\_base.constructor
+Overrides: Libp2p_base.constructor
 
 Defined in: node_modules/libp2p/dist/src/index.d.ts:63
 
@@ -154,39 +154,39 @@ Defined in: node_modules/libp2p/dist/src/index.d.ts:63
 
 ### \_config
 
-• **\_config**: *any*
+• **\_config**: _any_
 
 Defined in: node_modules/libp2p/dist/src/index.d.ts:79
 
-___
+---
 
 ### \_dht
 
-• **\_dht**: *any*
+• **\_dht**: _any_
 
 Defined in: node_modules/libp2p/dist/src/index.d.ts:103
 
-___
+---
 
 ### \_discovery
 
-• **\_discovery**: *Map*<any, any\>
+• **\_discovery**: _Map_<any, any\>
 
 Defined in: node_modules/libp2p/dist/src/index.d.ts:81
 
-___
+---
 
 ### \_isStarted
 
-• **\_isStarted**: *boolean*
+• **\_isStarted**: _boolean_
 
 Defined in: node_modules/libp2p/dist/src/index.d.ts:129
 
-___
+---
 
 ### \_maybeConnect
 
-• `Private` **\_maybeConnect**: *any*
+• `Private` **\_maybeConnect**: _any_
 
 Will dial to the given `peerId` if the current number of
 connected peers is less than the configured `ConnectionManager`
@@ -196,29 +196,29 @@ minConnections.
 
 Defined in: node_modules/libp2p/dist/src/index.d.ts:220
 
-___
+---
 
 ### \_modules
 
-• **\_modules**: *any*
+• **\_modules**: _any_
 
 Defined in: node_modules/libp2p/dist/src/index.d.ts:78
 
-___
+---
 
 ### \_onDidStart
 
-• `Private` **\_onDidStart**: *any*
+• `Private` **\_onDidStart**: _any_
 
 Called when libp2p has started and before it returns
 
 Defined in: node_modules/libp2p/dist/src/index.d.ts:211
 
-___
+---
 
 ### \_onDiscoveryPeer
 
-• `Private` **\_onDiscoveryPeer**: *any*
+• `Private` **\_onDiscoveryPeer**: _any_
 
 Called whenever peer discovery services emit `peer` events.
 Known peers may be emitted.
@@ -227,19 +227,19 @@ Known peers may be emitted.
 
 Defined in: node_modules/libp2p/dist/src/index.d.ts:115
 
-___
+---
 
 ### \_options
 
-• **\_options**: *any*
+• **\_options**: _any_
 
 Defined in: node_modules/libp2p/dist/src/index.d.ts:71
 
-___
+---
 
 ### \_setupPeerDiscovery
 
-• `Private` **\_setupPeerDiscovery**: *any*
+• `Private` **\_setupPeerDiscovery**: _any_
 
 Initializes and starts peer discovery services
 
@@ -247,155 +247,155 @@ Initializes and starts peer discovery services
 
 Defined in: node_modules/libp2p/dist/src/index.d.ts:227
 
-___
+---
 
 ### \_transport
 
-• **\_transport**: *any*[]
+• **\_transport**: _any_[]
 
 Defined in: node_modules/libp2p/dist/src/index.d.ts:80
 
-___
+---
 
 ### addressManager
 
-• **addressManager**: *AddressManager*
+• **addressManager**: _AddressManager_
 
 Defined in: node_modules/libp2p/dist/src/index.d.ts:77
 
-___
+---
 
 ### addresses
 
-• **addresses**: *any*
+• **addresses**: _any_
 
 Defined in: node_modules/libp2p/dist/src/index.d.ts:76
 
-___
+---
 
 ### connectionManager
 
-• **connectionManager**: *ConnectionManager*
+• **connectionManager**: _ConnectionManager_
 
 Defined in: node_modules/libp2p/dist/src/index.d.ts:82
 
-___
+---
 
 ### contentRouting
 
-• **contentRouting**: *ContentRouting*
+• **contentRouting**: _ContentRouting_
 
 Defined in: node_modules/libp2p/dist/src/index.d.ts:107
 
-___
+---
 
 ### datastore
 
-• **datastore**: *any*
+• **datastore**: _any_
 
 Defined in: node_modules/libp2p/dist/src/index.d.ts:74
 
-___
+---
 
 ### dialer
 
-• **dialer**: *Dialer*
+• **dialer**: _Dialer_
 
 Defined in: node_modules/libp2p/dist/src/index.d.ts:100
 
-___
+---
 
 ### identifyService
 
-• **identifyService**: *IdentifyService*
+• **identifyService**: _IdentifyService_
 
 Defined in: node_modules/libp2p/dist/src/index.d.ts:102
 
-___
+---
 
 ### keychain
 
-• **keychain**: *Keychain*
+• **keychain**: _Keychain_
 
 Defined in: node_modules/libp2p/dist/src/index.d.ts:84
 
-___
+---
 
 ### metrics
 
-• **metrics**: *Metrics*
+• **metrics**: _Metrics_
 
 Defined in: node_modules/libp2p/dist/src/index.d.ts:83
 
-___
+---
 
 ### natManager
 
-• **natManager**: *NatManager*
+• **natManager**: _NatManager_
 
 Defined in: node_modules/libp2p/dist/src/index.d.ts:87
 
-___
+---
 
 ### peerId
 
-• **peerId**: *PeerId*
+• **peerId**: _PeerId_
 
 Defined in: node_modules/libp2p/dist/src/index.d.ts:73
 
-___
+---
 
 ### peerRouting
 
-• **peerRouting**: *PeerRouting*
+• **peerRouting**: _PeerRouting_
 
 Defined in: node_modules/libp2p/dist/src/index.d.ts:106
 
-___
+---
 
 ### peerStore
 
-• **peerStore**: *PeerStore*
+• **peerStore**: _PeerStore_
 
 Defined in: node_modules/libp2p/dist/src/index.d.ts:75
 
-___
+---
 
 ### pubsub
 
-• **pubsub**: *PubsubBaseProtocol*
+• **pubsub**: _PubsubBaseProtocol_
 
 Defined in: node_modules/libp2p/dist/src/index.d.ts:105
 
-___
+---
 
 ### registrar
 
-• **registrar**: *Registrar*
+• **registrar**: _Registrar_
 
 Defined in: node_modules/libp2p/dist/src/index.d.ts:88
 
-___
+---
 
 ### relay
 
-• **relay**: *Relay*
+• **relay**: _Relay_
 
 Defined in: node_modules/libp2p/dist/src/index.d.ts:101
 
-___
+---
 
 ### transportManager
 
-• **transportManager**: *TransportManager*
+• **transportManager**: _TransportManager_
 
 Defined in: node_modules/libp2p/dist/src/index.d.ts:86
 
-___
+---
 
 ### upgrader
 
-• **upgrader**: *Upgrader*
+• **upgrader**: _Upgrader_
 
 Defined in: node_modules/libp2p/dist/src/index.d.ts:85
 
@@ -403,20 +403,20 @@ Defined in: node_modules/libp2p/dist/src/index.d.ts:85
 
 ### connections
 
-• get **connections**(): *Map*<string, Connection[]\>
+• get **connections**(): _Map_<string, Connection[]\>
 
 Gets a Map of the current connections. The keys are the stringified
 `PeerId` of the peer. The value is an array of Connections to that peer.
 
-**Returns:** *Map*<string, Connection[]\>
+**Returns:** _Map_<string, Connection[]\>
 
 Defined in: node_modules/libp2p/dist/src/index.d.ts:145
 
-___
+---
 
 ### multiaddrs
 
-• get **multiaddrs**(): *Multiaddr*[]
+• get **multiaddrs**(): _Multiaddr_[]
 
 Get a deduplicated list of peer advertising multiaddrs by concatenating
 the listen addresses used by transports with any configured
@@ -425,7 +425,7 @@ announce addresses as well as observed addresses reported by peers.
 If Announce addrs are specified, configured listen addresses will be
 ignored though observed addresses will still be included.
 
-**Returns:** *Multiaddr*[]
+**Returns:** _Multiaddr_[]
 
 Defined in: node_modules/libp2p/dist/src/index.d.ts:183
 
@@ -433,57 +433,57 @@ Defined in: node_modules/libp2p/dist/src/index.d.ts:183
 
 ### \_onStarting
 
-▸ **_onStarting**(): *Promise*<void\>
+▸ **\_onStarting**(): _Promise_<void\>
 
-**Returns:** *Promise*<void\>
+**Returns:** _Promise_<void\>
 
 Defined in: node_modules/libp2p/dist/src/index.d.ts:205
 
-___
+---
 
 ### addListener
 
-▸ **addListener**(`event`: *string* \| *symbol*, `listener`: (...`args`: *any*[]) => *void*): *any*
+▸ **addListener**(`event`: _string_ \| _symbol_, `listener`: (...`args`: _any_[]) => _void_): _any_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `event` | *string* \| *symbol* |
-| `listener` | (...`args`: *any*[]) => *void* |
+| Name       | Type                           |
+| :--------- | :----------------------------- |
+| `event`    | _string_ \| _symbol_           |
+| `listener` | (...`args`: _any_[]) => _void_ |
 
-**Returns:** *any*
+**Returns:** _any_
 
-Inherited from: Libp2p\_base.addListener
+Inherited from: Libp2p_base.addListener
 
 Defined in: node_modules/libp2p/dist/src/types.d.ts:74
 
-___
+---
 
 ### dial
 
-▸ **dial**(`peer`: *string* \| *PeerId* \| *Multiaddr*, `options?`: { `signal?`: AbortSignal  }): *Promise*<Connection\>
+▸ **dial**(`peer`: _string_ \| _PeerId_ \| _Multiaddr_, `options?`: { `signal?`: AbortSignal }): _Promise_<Connection\>
 
 Dials to the provided peer. If successful, the known metadata of the
 peer will be added to the nodes `peerStore`
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `peer` | *string* \| *PeerId* \| *Multiaddr* | The peer to dial |
-| `options?` | *object* | - |
-| `options.signal?` | AbortSignal | - |
+| Name              | Type                                | Description      |
+| :---------------- | :---------------------------------- | :--------------- |
+| `peer`            | _string_ \| _PeerId_ \| _Multiaddr_ | The peer to dial |
+| `options?`        | _object_                            | -                |
+| `options.signal?` | AbortSignal                         | -                |
 
-**Returns:** *Promise*<Connection\>
+**Returns:** _Promise_<Connection\>
 
 Defined in: node_modules/libp2p/dist/src/index.d.ts:155
 
-___
+---
 
 ### dialProtocol
 
-▸ **dialProtocol**(`peer`: *string* \| *PeerId* \| *Multiaddr*, `protocols`: *string* \| *string*[], `options?`: { `signal?`: AbortSignal  }): *Promise*<any\>
+▸ **dialProtocol**(`peer`: _string_ \| _PeerId_ \| _Multiaddr_, `protocols`: _string_ \| _string_[], `options?`: { `signal?`: AbortSignal }): _Promise_<any\>
 
 Dials to the provided peer and handshakes with the given protocol.
 If successful, the known metadata of the peer will be added to the nodes `peerStore`,
@@ -493,354 +493,354 @@ and the `Connection` will be returned
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `peer` | *string* \| *PeerId* \| *Multiaddr* | The peer to dial |
-| `protocols` | *string* \| *string*[] |  |
-| `options?` | *object* | - |
-| `options.signal?` | AbortSignal | - |
+| Name              | Type                                | Description      |
+| :---------------- | :---------------------------------- | :--------------- |
+| `peer`            | _string_ \| _PeerId_ \| _Multiaddr_ | The peer to dial |
+| `protocols`       | _string_ \| _string_[]              |                  |
+| `options?`        | _object_                            | -                |
+| `options.signal?` | AbortSignal                         | -                |
 
-**Returns:** *Promise*<any\>
+**Returns:** _Promise_<any\>
 
 Defined in: node_modules/libp2p/dist/src/index.d.ts:170
 
-___
+---
 
 ### emit
 
-▸ **emit**(`event`: *string* \| *symbol*, ...`args`: *any*[]): *boolean*
+▸ **emit**(`event`: _string_ \| _symbol_, ...`args`: _any_[]): _boolean_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `event` | *string* \| *symbol* |
-| `...args` | *any*[] |
+| Name      | Type                 |
+| :-------- | :------------------- |
+| `event`   | _string_ \| _symbol_ |
+| `...args` | _any_[]              |
 
-**Returns:** *boolean*
+**Returns:** _boolean_
 
-Inherited from: Libp2p\_base.emit
+Inherited from: Libp2p_base.emit
 
 Defined in: node_modules/libp2p/dist/src/types.d.ts:84
 
-___
+---
 
 ### getMaxListeners
 
-▸ **getMaxListeners**(): *number*
+▸ **getMaxListeners**(): _number_
 
-**Returns:** *number*
+**Returns:** _number_
 
-Inherited from: Libp2p\_base.getMaxListeners
+Inherited from: Libp2p_base.getMaxListeners
 
 Defined in: node_modules/libp2p/dist/src/types.d.ts:81
 
-___
+---
 
 ### handle
 
-▸ **handle**(`protocols`: *string* \| *string*[], `handler`: (`__namedParameters`: { `connection`: *any* ; `protocol`: *any* ; `stream`: *any*  }) => *void*): *void*
+▸ **handle**(`protocols`: _string_ \| _string_[], `handler`: (`__namedParameters`: { `connection`: _any_ ; `protocol`: _any_ ; `stream`: _any_ }) => _void_): _void_
 
 Registers the `handler` for each protocol
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `protocols` | *string* \| *string*[] |
-| `handler` | (`__namedParameters`: { `connection`: *any* ; `protocol`: *any* ; `stream`: *any*  }) => *void* |
+| Name        | Type                                                                                           |
+| :---------- | :--------------------------------------------------------------------------------------------- |
+| `protocols` | _string_ \| _string_[]                                                                         |
+| `handler`   | (`__namedParameters`: { `connection`: _any_ ; `protocol`: _any_ ; `stream`: _any_ }) => _void_ |
 
-**Returns:** *void*
+**Returns:** _void_
 
 Defined in: node_modules/libp2p/dist/src/index.d.ts:95
 
-___
+---
 
 ### hangUp
 
-▸ **hangUp**(`peer`: *string* \| *PeerId* \| *Multiaddr*): *Promise*<void\>
+▸ **hangUp**(`peer`: _string_ \| _PeerId_ \| _Multiaddr_): _Promise_<void\>
 
 Disconnects all connections to the given `peer`
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `peer` | *string* \| *PeerId* \| *Multiaddr* | the peer to close connections to |
+| Name   | Type                                | Description                      |
+| :----- | :---------------------------------- | :------------------------------- |
+| `peer` | _string_ \| _PeerId_ \| _Multiaddr_ | the peer to close connections to |
 
-**Returns:** *Promise*<void\>
+**Returns:** _Promise_<void\>
 
 Defined in: node_modules/libp2p/dist/src/index.d.ts:190
 
-___
+---
 
 ### isStarted
 
-▸ **isStarted**(): *boolean*
+▸ **isStarted**(): _boolean_
 
-**Returns:** *boolean*
+**Returns:** _boolean_
 
 Defined in: node_modules/libp2p/dist/src/index.d.ts:138
 
-___
+---
 
 ### listenerCount
 
-▸ **listenerCount**(`event`: *string* \| *symbol*): *number*
+▸ **listenerCount**(`event`: _string_ \| _symbol_): _number_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `event` | *string* \| *symbol* |
+| Name    | Type                 |
+| :------ | :------------------- |
+| `event` | _string_ \| _symbol_ |
 
-**Returns:** *number*
+**Returns:** _number_
 
-Inherited from: Libp2p\_base.listenerCount
+Inherited from: Libp2p_base.listenerCount
 
 Defined in: node_modules/libp2p/dist/src/types.d.ts:85
 
-___
+---
 
 ### listeners
 
-▸ **listeners**(`event`: *string* \| *symbol*): Function[]
+▸ **listeners**(`event`: _string_ \| _symbol_): Function[]
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `event` | *string* \| *symbol* |
+| Name    | Type                 |
+| :------ | :------------------- |
+| `event` | _string_ \| _symbol_ |
 
 **Returns:** Function[]
 
-Inherited from: Libp2p\_base.listeners
+Inherited from: Libp2p_base.listeners
 
 Defined in: node_modules/libp2p/dist/src/types.d.ts:82
 
-___
+---
 
 ### loadKeychain
 
-▸ **loadKeychain**(): *Promise*<void\>
+▸ **loadKeychain**(): _Promise_<void\>
 
 Load keychain keys from the datastore.
 Imports the private key as 'self', if needed.
 
 **`async`**
 
-**Returns:** *Promise*<void\>
+**Returns:** _Promise_<void\>
 
 Defined in: node_modules/libp2p/dist/src/index.d.ts:137
 
-___
+---
 
 ### off
 
-▸ **off**(`event`: *string* \| *symbol*, `listener`: (...`args`: *any*[]) => *void*): *any*
+▸ **off**(`event`: _string_ \| _symbol_, `listener`: (...`args`: _any_[]) => _void_): _any_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `event` | *string* \| *symbol* |
-| `listener` | (...`args`: *any*[]) => *void* |
+| Name       | Type                           |
+| :--------- | :----------------------------- |
+| `event`    | _string_ \| _symbol_           |
+| `listener` | (...`args`: _any_[]) => _void_ |
 
-**Returns:** *any*
+**Returns:** _any_
 
-Inherited from: Libp2p\_base.off
+Inherited from: Libp2p_base.off
 
 Defined in: node_modules/libp2p/dist/src/types.d.ts:78
 
-___
+---
 
 ### on
 
-▸ **on**(`event`: *string* \| *symbol*, `listener`: (...`args`: *any*[]) => *void*): *any*
+▸ **on**(`event`: _string_ \| _symbol_, `listener`: (...`args`: _any_[]) => _void_): _any_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `event` | *string* \| *symbol* |
-| `listener` | (...`args`: *any*[]) => *void* |
+| Name       | Type                           |
+| :--------- | :----------------------------- |
+| `event`    | _string_ \| _symbol_           |
+| `listener` | (...`args`: _any_[]) => _void_ |
 
-**Returns:** *any*
+**Returns:** _any_
 
-Inherited from: Libp2p\_base.on
+Inherited from: Libp2p_base.on
 
 Defined in: node_modules/libp2p/dist/src/types.d.ts:75
 
-___
+---
 
 ### once
 
-▸ **once**(`event`: *string* \| *symbol*, `listener`: (...`args`: *any*[]) => *void*): *any*
+▸ **once**(`event`: _string_ \| _symbol_, `listener`: (...`args`: _any_[]) => _void_): _any_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `event` | *string* \| *symbol* |
-| `listener` | (...`args`: *any*[]) => *void* |
+| Name       | Type                           |
+| :--------- | :----------------------------- |
+| `event`    | _string_ \| _symbol_           |
+| `listener` | (...`args`: _any_[]) => _void_ |
 
-**Returns:** *any*
+**Returns:** _any_
 
-Inherited from: Libp2p\_base.once
+Inherited from: Libp2p_base.once
 
 Defined in: node_modules/libp2p/dist/src/types.d.ts:76
 
-___
+---
 
 ### ping
 
-▸ **ping**(`peer`: *string* \| *PeerId* \| *Multiaddr*): *Promise*<number\>
+▸ **ping**(`peer`: _string_ \| _PeerId_ \| _Multiaddr_): _Promise_<number\>
 
 Pings the given peer in order to obtain the operation latency.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `peer` | *string* \| *PeerId* \| *Multiaddr* | The peer to ping |
+| Name   | Type                                | Description      |
+| :----- | :---------------------------------- | :--------------- |
+| `peer` | _string_ \| _PeerId_ \| _Multiaddr_ | The peer to ping |
 
-**Returns:** *Promise*<number\>
+**Returns:** _Promise_<number\>
 
 Defined in: node_modules/libp2p/dist/src/index.d.ts:197
 
-___
+---
 
 ### rawListeners
 
-▸ **rawListeners**(`event`: *string* \| *symbol*): Function[]
+▸ **rawListeners**(`event`: _string_ \| _symbol_): Function[]
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `event` | *string* \| *symbol* |
+| Name    | Type                 |
+| :------ | :------------------- |
+| `event` | _string_ \| _symbol_ |
 
 **Returns:** Function[]
 
-Inherited from: Libp2p\_base.rawListeners
+Inherited from: Libp2p_base.rawListeners
 
 Defined in: node_modules/libp2p/dist/src/types.d.ts:83
 
-___
+---
 
 ### removeAllListeners
 
-▸ **removeAllListeners**(`event?`: *string* \| *symbol*): *any*
+▸ **removeAllListeners**(`event?`: _string_ \| _symbol_): _any_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `event?` | *string* \| *symbol* |
+| Name     | Type                 |
+| :------- | :------------------- |
+| `event?` | _string_ \| _symbol_ |
 
-**Returns:** *any*
+**Returns:** _any_
 
-Inherited from: Libp2p\_base.removeAllListeners
+Inherited from: Libp2p_base.removeAllListeners
 
 Defined in: node_modules/libp2p/dist/src/types.d.ts:79
 
-___
+---
 
 ### removeListener
 
-▸ **removeListener**(`event`: *string* \| *symbol*, `listener`: (...`args`: *any*[]) => *void*): *any*
+▸ **removeListener**(`event`: _string_ \| _symbol_, `listener`: (...`args`: _any_[]) => _void_): _any_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `event` | *string* \| *symbol* |
-| `listener` | (...`args`: *any*[]) => *void* |
+| Name       | Type                           |
+| :--------- | :----------------------------- |
+| `event`    | _string_ \| _symbol_           |
+| `listener` | (...`args`: _any_[]) => _void_ |
 
-**Returns:** *any*
+**Returns:** _any_
 
-Inherited from: Libp2p\_base.removeListener
+Inherited from: Libp2p_base.removeListener
 
 Defined in: node_modules/libp2p/dist/src/types.d.ts:77
 
-___
+---
 
 ### setMaxListeners
 
-▸ **setMaxListeners**(`n`: *number*): *any*
+▸ **setMaxListeners**(`n`: _number_): _any_
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `n` | *number* |
+| Name | Type     |
+| :--- | :------- |
+| `n`  | _number_ |
 
-**Returns:** *any*
+**Returns:** _any_
 
-Inherited from: Libp2p\_base.setMaxListeners
+Inherited from: Libp2p_base.setMaxListeners
 
 Defined in: node_modules/libp2p/dist/src/types.d.ts:80
 
-___
+---
 
 ### start
 
-▸ **start**(): *Promise*<void\>
+▸ **start**(): _Promise_<void\>
 
 Starts the libp2p node and all its subsystems
 
-**Returns:** *Promise*<void\>
+**Returns:** _Promise_<void\>
 
 Defined in: node_modules/libp2p/dist/src/index.d.ts:121
 
-___
+---
 
 ### stop
 
-▸ **stop**(): *Promise*<void\>
+▸ **stop**(): _Promise_<void\>
 
 Stop the libp2p node by closing its listeners and open connections
 
 **`async`**
 
-**Returns:** *Promise*<void\>
+**Returns:** _Promise_<void\>
 
 Defined in: node_modules/libp2p/dist/src/index.d.ts:128
 
-___
+---
 
 ### unhandle
 
-▸ **unhandle**(`protocols`: *string* \| *string*[]): *void*
+▸ **unhandle**(`protocols`: _string_ \| _string_[]): _void_
 
 Removes the handler for each protocol. The protocol
 will no longer be supported on streams.
 
 #### Parameters
 
-| Name | Type |
-| :------ | :------ |
-| `protocols` | *string* \| *string*[] |
+| Name        | Type                   |
+| :---------- | :--------------------- |
+| `protocols` | _string_ \| _string_[] |
 
-**Returns:** *void*
+**Returns:** _void_
 
 Defined in: node_modules/libp2p/dist/src/index.d.ts:204
 
-___
+---
 
 ### create
 
-▸ `Static` **create**(`options`: [*Libp2pOptions*](../modules/libp2p.md#libp2poptions) & [*CreateOptions*](../modules/libp2p.md#createoptions)): *Promise*<[*LibP2P*](libp2p.md)\>
+▸ `Static` **create**(`options`: [_Libp2pOptions_](../modules/libp2p.md#libp2poptions) & [_CreateOptions_](../modules/libp2p.md#createoptions)): _Promise_<[_LibP2P_](libp2p.md)\>
 
 Like `new Libp2p(options)` except it will create a `PeerId`
 instance if one is not provided in options.
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `options` | [*Libp2pOptions*](../modules/libp2p.md#libp2poptions) & [*CreateOptions*](../modules/libp2p.md#createoptions) | Libp2p configuration options |
+| Name      | Type                                                                                                          | Description                  |
+| :-------- | :------------------------------------------------------------------------------------------------------------ | :--------------------------- |
+| `options` | [_Libp2pOptions_](../modules/libp2p.md#libp2poptions) & [_CreateOptions_](../modules/libp2p.md#createoptions) | Libp2p configuration options |
 
-**Returns:** *Promise*<[*LibP2P*](libp2p.md)\>
+**Returns:** _Promise_<[_LibP2P_](libp2p.md)\>
 
 Defined in: node_modules/libp2p/dist/src/index.d.ts:63
