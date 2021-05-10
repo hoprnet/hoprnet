@@ -30,21 +30,21 @@
 
 Defined in: node_modules/libp2p/dist/src/index.d.ts:233
 
-___
+---
 
 ### CreateOptions
 
-Ƭ **CreateOptions**: *object*
+Ƭ **CreateOptions**: _object_
 
 #### Type declaration
 
-| Name | Type |
-| :------ | :------ |
+| Name      | Type       |
+| :-------- | :--------- |
 | `peerId?` | \_\_module |
 
 Defined in: node_modules/libp2p/dist/src/index.d.ts:248
 
-___
+---
 
 ### Crypto
 
@@ -52,7 +52,7 @@ ___
 
 Defined in: node_modules/libp2p/dist/src/index.d.ts:258
 
-___
+---
 
 ### Events
 
@@ -60,63 +60,63 @@ ___
 
 Defined in: node_modules/libp2p/dist/src/index.d.ts:254
 
-___
+---
 
 ### Libp2pConfig
 
-Ƭ **Libp2pConfig**: *object*
+Ƭ **Libp2pConfig**: _object_
 
 #### Type declaration
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `dht?` | *any* | dht module options |
-| `peerDiscovery?` | *any* | - |
-| `pubsub?` | \_\_module | pubsub module options |
-| `relay?` | [*RelayOptions*](libp2p.md#relayoptions) | - |
-| `transport?` | *Record*<string, any\> | transport options indexed by transport key |
+| Name             | Type                                     | Description                                |
+| :--------------- | :--------------------------------------- | :----------------------------------------- |
+| `dht?`           | _any_                                    | dht module options                         |
+| `peerDiscovery?` | _any_                                    | -                                          |
+| `pubsub?`        | \_\_module                               | pubsub module options                      |
+| `relay?`         | [_RelayOptions_](libp2p.md#relayoptions) | -                                          |
+| `transport?`     | _Record_<string, any\>                   | transport options indexed by transport key |
 
 Defined in: node_modules/libp2p/dist/src/index.d.ts:269
 
-___
+---
 
 ### Libp2pModules
 
-Ƭ **Libp2pModules**: *object*
+Ƭ **Libp2pModules**: _object_
 
 #### Type declaration
 
-| Name | Type |
-| :------ | :------ |
-| `connEncryption` | [*Crypto*](libp2p.md#crypto)[] |
-| `streamMuxer` | [*MuxerFactory*](libp2p.md#muxerfactory)[] |
-| `transport` | TransportFactory[] |
+| Name             | Type                                       |
+| :--------------- | :----------------------------------------- |
+| `connEncryption` | [_Crypto_](libp2p.md#crypto)[]             |
+| `streamMuxer`    | [_MuxerFactory_](libp2p.md#muxerfactory)[] |
+| `transport`      | TransportFactory[]                         |
 
 Defined in: node_modules/libp2p/dist/src/index.d.ts:285
 
-___
+---
 
 ### Libp2pOptions
 
-Ƭ **Libp2pOptions**: *object*
+Ƭ **Libp2pOptions**: _object_
 
 #### Type declaration
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `addresses?` | AddressManagerOptions | - |
-| `config?` | [*Libp2pConfig*](libp2p.md#libp2pconfig) | - |
-| `connectionManager?` | ConnectionManagerOptions | - |
-| `dialer?` | DialerOptions | - |
-| `keychain?` | *any* | - |
-| `metrics?` | MetricsOptions | - |
-| `modules` | [*Libp2pModules*](libp2p.md#libp2pmodules) | libp2p modules to use |
-| `peerStore?` | [*PeerStoreOptions*](libp2p.md#peerstoreoptions) & PersistentPeerStoreOptions | - |
-| `transportManager?` | TransportManagerOptions | - |
+| Name                 | Type                                                                          | Description           |
+| :------------------- | :---------------------------------------------------------------------------- | :-------------------- |
+| `addresses?`         | AddressManagerOptions                                                         | -                     |
+| `config?`            | [_Libp2pConfig_](libp2p.md#libp2pconfig)                                      | -                     |
+| `connectionManager?` | ConnectionManagerOptions                                                      | -                     |
+| `dialer?`            | DialerOptions                                                                 | -                     |
+| `keychain?`          | _any_                                                                         | -                     |
+| `metrics?`           | MetricsOptions                                                                | -                     |
+| `modules`            | [_Libp2pModules_](libp2p.md#libp2pmodules)                                    | libp2p modules to use |
+| `peerStore?`         | [_PeerStoreOptions_](libp2p.md#peerstoreoptions) & PersistentPeerStoreOptions | -                     |
+| `transportManager?`  | TransportManagerOptions                                                       | -                     |
 
 Defined in: node_modules/libp2p/dist/src/index.d.ts:234
 
-___
+---
 
 ### Multiaddr
 
@@ -124,7 +124,7 @@ ___
 
 Defined in: node_modules/libp2p/dist/src/index.d.ts:232
 
-___
+---
 
 ### MuxedStream
 
@@ -132,7 +132,7 @@ ___
 
 Defined in: node_modules/libp2p/dist/src/index.d.ts:255
 
-___
+---
 
 ### MuxerFactory
 
@@ -140,21 +140,21 @@ ___
 
 Defined in: node_modules/libp2p/dist/src/index.d.ts:257
 
-___
+---
 
 ### PeerStoreOptions
 
-Ƭ **PeerStoreOptions**: *object*
+Ƭ **PeerStoreOptions**: _object_
 
 #### Type declaration
 
-| Name | Type |
-| :------ | :------ |
-| `persistence` | *boolean* |
+| Name          | Type      |
+| :------------ | :-------- |
+| `persistence` | _boolean_ |
 
 Defined in: node_modules/libp2p/dist/src/index.d.ts:260
 
-___
+---
 
 ### Pubsub
 
@@ -162,24 +162,24 @@ ___
 
 Defined in: node_modules/libp2p/dist/src/index.d.ts:259
 
-___
+---
 
 ### RelayOptions
 
-Ƭ **RelayOptions**: *object*
+Ƭ **RelayOptions**: _object_
 
 #### Type declaration
 
-| Name | Type |
-| :------ | :------ |
+| Name        | Type                  |
+| :---------- | :-------------------- |
 | `advertise` | RelayAdvertiseOptions |
-| `autoRelay` | AutoRelayOptions |
-| `enabled` | *boolean* |
-| `hop` | HopOptions |
+| `autoRelay` | AutoRelayOptions      |
+| `enabled`   | _boolean_             |
+| `hop`       | HopOptions            |
 
 Defined in: node_modules/libp2p/dist/src/index.d.ts:263
 
-___
+---
 
 ### TransportFactory
 
@@ -187,16 +187,16 @@ ___
 
 Defined in: node_modules/libp2p/dist/src/index.d.ts:256
 
-___
+---
 
 ### constructorOptions
 
-Ƭ **constructorOptions**: *object*
+Ƭ **constructorOptions**: _object_
 
 #### Type declaration
 
-| Name | Type |
-| :------ | :------ |
+| Name     | Type       |
+| :------- | :--------- |
 | `peerId` | \_\_module |
 
 Defined in: node_modules/libp2p/dist/src/index.d.ts:251
