@@ -18,12 +18,14 @@ export function subscribeToAcknowledgements(
 ) {
   subscribe(PROTOCOL_ACKNOWLEDGEMENT, async function (msg: Uint8Array, remotePeer: PeerId) {
     const ackMsg = Acknowledgement.deserialize(msg, pubKey, remotePeer)
-    let unacknowledgedTicket = await db.getUnacknowledgedTicketsByKey(ackMsg.ackChallenge)
+    let unacknowledgedTicket = await db.getUnacknowledgedTicket(ackMsg.ackChallenge.toAddress())
 
     if (!unacknowledgedTicket) {
       // Could be dummy, could be error.
       log('dropping unknown ticket')
-      return await db.deleteTicket(ackMsg.ackChallenge)
+      // @ts-ignore
+      // @TODO: improve types
+      return await db.delAcknowledgement({ ticket: { challenge: ackMsg.ackChallenge.toAddress() } })
     }
 
     const channel = chain.getChannel(new PublicKey(pubKey.pubKey.marshal()), new PublicKey(remotePeer.pubKey.marshal()))
@@ -32,10 +34,10 @@ export function subscribeToAcknowledgements(
 
     if (ackedTicket === null) {
       log(`Got a ticket that is not a win. Dropping ticket.`)
-      await db.deleteTicket(ackMsg.ackChallenge)
+      await db.delAcknowledgement(ackedTicket)
     } else {
       log(`Storing winning ticket`)
-      await db.replaceTicketWithAcknowledgement(ackMsg.ackChallenge, ackedTicket)
+      await db.unAckToAckTicket(ackedTicket)
     }
 
     onMessage(ackMsg)

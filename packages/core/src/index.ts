@@ -35,6 +35,7 @@ import {
   u8aToHex,
   DialOpts,
   HoprDB,
+  unacknowledgedTicketKey,
   libp2pSendMessageAndExpectResponse,
   libp2pSubscribe,
   libp2pSendMessage,
@@ -423,9 +424,9 @@ class Hopr extends EventEmitter {
             return reject(err)
           }
 
-          let packetKey = await this.db.storeUnacknowledgedTicket(packet.ackChallenge)
+          const key = unacknowledgedTicketKey(packet.ackChallenge.toAddress())
 
-          this.once('message-acknowledged:' + u8aToHex(packetKey), () => {
+          this.once('message-acknowledged:' + u8aToHex(key), () => {
             resolve()
           })
 
@@ -669,7 +670,7 @@ class Hopr extends EventEmitter {
 
       const result = await channel.redeemTicket(ackTicket)
       // TODO look at result.status and actually do something
-      await this.db.deleteAcknowledgement(ackTicket)
+      await this.db.delAcknowledgement(ackTicket)
       return result
     } catch (err) {
       return {

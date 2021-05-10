@@ -22,7 +22,7 @@ const encoder = new TextEncoder()
 const TICKET_PREFIX = encoder.encode('tickets-')
 const UNACKNOWLEDGED_TICKETS_PREFIX = u8aConcat(TICKET_PREFIX, encoder.encode('unacknowledged-'))
 const ACKNOWLEDGED_TICKETS_PREFIX = u8aConcat(TICKET_PREFIX, encoder.encode('acknowledged-'))
-const unacknowledgedTicketKey = (challenge: Address) => {
+export const unacknowledgedTicketKey = (challenge: Address) => {
   return u8aConcat(UNACKNOWLEDGED_TICKETS_PREFIX, challenge.serialize())
 }
 const acknowledgedTicketKey = (challenge: Address) => {
@@ -230,7 +230,7 @@ export class HoprDB {
     await this.del(acknowledgedTicketKey(ackTicket.ticket.challenge))
   }
 
-  public async unAckToAckTicket(ackTicket: AcknowledgedTicket) {
+  public async unAckToAckTicket(ackTicket: AcknowledgedTicket): Promise<void> {
     const unAcknowledgedDbKey = unacknowledgedTicketKey(ackTicket.ticket.challenge)
     const acknowledgedDbKey = acknowledgedTicketKey(ackTicket.ticket.challenge)
     try {

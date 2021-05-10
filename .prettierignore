@@ -32,3 +32,6 @@ packages/core-ethereum/src/contracts
 .github
 
 lerna.json
+
+# docs
+packages/*/docs

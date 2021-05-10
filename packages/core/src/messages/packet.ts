@@ -325,7 +325,7 @@ export class Packet {
       )} from ${blue(pubKeyToPeerId(this.nextHop).toB58String())}`
     )
 
-    await db.storeUnacknowledgedTickets(this.ackChallenge, unacknowledged)
+    await db.storeUnacknowledgedTicket(unacknowledged)
   }
 
   async validateUnacknowledgedTicket(db: HoprDB, chain: HoprCoreEthereum, privKey: PeerId) {
