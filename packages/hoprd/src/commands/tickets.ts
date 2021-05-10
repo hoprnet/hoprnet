@@ -5,7 +5,6 @@ import { styleValue } from './utils'
 import BN from 'bn.js'
 import type { AcknowledgedTicket, Ticket } from '@hoprnet/hopr-utils'
 
-
 /**
  * Retrieves all signed tickets from the given acknowledged tickets.
  *
