@@ -17,7 +17,8 @@ import {
   createFirstChallenge,
   preVerify,
   u8aSplit,
-  pubKeyToPeerId
+  pubKeyToPeerId,
+  HalfKeyChallenge
 } from '@hoprnet/hopr-utils'
 import type HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 import { Challenge } from './challenge'
