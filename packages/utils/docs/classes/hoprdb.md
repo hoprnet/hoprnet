@@ -268,7 +268,7 @@ Defined in: [db.ts:390](https://github.com/hoprnet/hoprnet/blob/master/packages/
 
 ### getAcknowledgedTickets
 
-▸ **getAcknowledgedTickets**(`filter?`: { `signer`: *Uint8Array*  }): *Promise*<[*AcknowledgedTicket*](acknowledgedticket.md)[]\>
+▸ **getAcknowledgedTickets**(`filter?`: { `signer`: _Uint8Array_ }): _Promise_<[_AcknowledgedTicket_](acknowledgedticket.md)[]\>
 
 Get all acknowledged tickets
 
