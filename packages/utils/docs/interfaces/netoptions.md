@@ -13,14 +13,14 @@
 
 ### ip
 
-• **ip**: _string_
+• **ip**: *string*
 
 Defined in: [hosts.ts:2](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/hosts.ts#L2)
 
----
+___
 
 ### port
 
-• **port**: _number_
+• **port**: *number*
 
 Defined in: [hosts.ts:3](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/hosts.ts#L3)
