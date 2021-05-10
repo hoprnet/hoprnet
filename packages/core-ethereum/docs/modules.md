@@ -19,11 +19,11 @@
 
 ### RedeemTicketResponse
 
-Ƭ **RedeemTicketResponse**: { `ackTicket`: AcknowledgedTicket ; `receipt`: *string* ; `status`: ``"SUCCESS"``  } \| { `message`: *string* ; `status`: ``"FAILURE"``  } \| { `error`: Error \| *string* ; `status`: ``"ERROR"``  }
+Ƭ **RedeemTicketResponse**: { `ackTicket`: AcknowledgedTicket ; `receipt`: _string_ ; `status`: `"SUCCESS"` } \| { `message`: _string_ ; `status`: `"FAILURE"` } \| { `error`: Error \| _string_ ; `status`: `"ERROR"` }
 
 Defined in: [core-ethereum/src/index.ts:17](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L17)
 
-___
+---
 
 ### RoutingChannel
 
