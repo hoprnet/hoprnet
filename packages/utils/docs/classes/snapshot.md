@@ -29,17 +29,17 @@ Represents a snapshot in the blockchain.
 
 ### constructor
 
-\+ **new Snapshot**(`blockNumber`: _BN_, `transactionIndex`: _BN_, `logIndex`: _BN_): [_Snapshot_](snapshot.md)
+\+ **new Snapshot**(`blockNumber`: *BN*, `transactionIndex`: *BN*, `logIndex`: *BN*): [*Snapshot*](snapshot.md)
 
 #### Parameters
 
-| Name               | Type |
-| :----------------- | :--- |
-| `blockNumber`      | _BN_ |
-| `transactionIndex` | _BN_ |
-| `logIndex`         | _BN_ |
+| Name | Type |
+| :------ | :------ |
+| `blockNumber` | *BN* |
+| `transactionIndex` | *BN* |
+| `logIndex` | *BN* |
 
-**Returns:** [_Snapshot_](snapshot.md)
+**Returns:** [*Snapshot*](snapshot.md)
 
 Defined in: [types/snapshot.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/snapshot.ts#L8)
 
@@ -47,27 +47,27 @@ Defined in: [types/snapshot.ts:8](https://github.com/hoprnet/hoprnet/blob/master
 
 ### blockNumber
 
-• `Readonly` **blockNumber**: _BN_
+• `Readonly` **blockNumber**: *BN*
 
----
+___
 
 ### logIndex
 
-• `Readonly` **logIndex**: _BN_
+• `Readonly` **logIndex**: *BN*
 
----
+___
 
 ### transactionIndex
 
-• `Readonly` **transactionIndex**: _BN_
+• `Readonly` **transactionIndex**: *BN*
 
 ## Accessors
 
 ### SIZE
 
-• `Static` get **SIZE**(): _number_
+• `Static` get **SIZE**(): *number*
 
-**Returns:** _number_
+**Returns:** *number*
 
 Defined in: [types/snapshot.ts:28](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/snapshot.ts#L28)
 
@@ -75,24 +75,24 @@ Defined in: [types/snapshot.ts:28](https://github.com/hoprnet/hoprnet/blob/maste
 
 ### serialize
 
-▸ **serialize**(): _Uint8Array_
+▸ **serialize**(): *Uint8Array*
 
-**Returns:** _Uint8Array_
+**Returns:** *Uint8Array*
 
 Defined in: [types/snapshot.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/snapshot.ts#L20)
 
----
+___
 
 ### deserialize
 
-▸ `Static` **deserialize**(`arr`: _Uint8Array_): [_Snapshot_](snapshot.md)
+▸ `Static` **deserialize**(`arr`: *Uint8Array*): [*Snapshot*](snapshot.md)
 
 #### Parameters
 
-| Name  | Type         |
-| :---- | :----------- |
-| `arr` | _Uint8Array_ |
+| Name | Type |
+| :------ | :------ |
+| `arr` | *Uint8Array* |
 
-**Returns:** [_Snapshot_](snapshot.md)
+**Returns:** [*Snapshot*](snapshot.md)
 
 Defined in: [types/snapshot.ts:11](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/snapshot.ts#L11)
