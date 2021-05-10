@@ -26,15 +26,15 @@
 
 ### constructor
 
-\+ **new Hash**(`arr`: _Uint8Array_): [_Hash_](hash.md)
+\+ **new Hash**(`arr`: *Uint8Array*): [*Hash*](hash.md)
 
 #### Parameters
 
-| Name  | Type         |
-| :---- | :----------- |
-| `arr` | _Uint8Array_ |
+| Name | Type |
+| :------ | :------ |
+| `arr` | *Uint8Array* |
 
-**Returns:** [_Hash_](hash.md)
+**Returns:** [*Hash*](hash.md)
 
 Defined in: [types/primitives.ts:122](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L122)
 
@@ -42,7 +42,7 @@ Defined in: [types/primitives.ts:122](https://github.com/hoprnet/hoprnet/blob/ma
 
 ### SIZE
 
-▪ `Static` **SIZE**: _number_
+▪ `Static` **SIZE**: *number*
 
 Defined in: [types/primitives.ts:129](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L129)
 
@@ -50,86 +50,86 @@ Defined in: [types/primitives.ts:129](https://github.com/hoprnet/hoprnet/blob/ma
 
 ### clone
 
-▸ **clone**(): [_Hash_](hash.md)
+▸ **clone**(): [*Hash*](hash.md)
 
-**Returns:** [_Hash_](hash.md)
+**Returns:** [*Hash*](hash.md)
 
 Defined in: [types/primitives.ts:151](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L151)
 
----
+___
 
 ### eq
 
-▸ **eq**(`b`: [_Hash_](hash.md)): _boolean_
+▸ **eq**(`b`: [*Hash*](hash.md)): *boolean*
 
 #### Parameters
 
-| Name | Type              |
-| :--- | :---------------- |
-| `b`  | [_Hash_](hash.md) |
+| Name | Type |
+| :------ | :------ |
+| `b` | [*Hash*](hash.md) |
 
-**Returns:** _boolean_
+**Returns:** *boolean*
 
 Defined in: [types/primitives.ts:143](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L143)
 
----
+___
 
 ### hash
 
-▸ **hash**(): [_Hash_](hash.md)
+▸ **hash**(): [*Hash*](hash.md)
 
-**Returns:** [_Hash_](hash.md)
+**Returns:** [*Hash*](hash.md)
 
 Defined in: [types/primitives.ts:155](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L155)
 
----
+___
 
 ### serialize
 
-▸ **serialize**(): _Uint8Array_
+▸ **serialize**(): *Uint8Array*
 
-**Returns:** _Uint8Array_
+**Returns:** *Uint8Array*
 
 Defined in: [types/primitives.ts:139](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L139)
 
----
+___
 
 ### toHex
 
-▸ **toHex**(): _string_
+▸ **toHex**(): *string*
 
-**Returns:** _string_
+**Returns:** *string*
 
 Defined in: [types/primitives.ts:147](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L147)
 
----
+___
 
 ### create
 
-▸ `Static` **create**(...`inputs`: _Uint8Array_[]): [_Hash_](hash.md)
+▸ `Static` **create**(...`inputs`: *Uint8Array*[]): [*Hash*](hash.md)
 
 #### Parameters
 
-| Name        | Type           |
-| :---------- | :------------- |
-| `...inputs` | _Uint8Array_[] |
+| Name | Type |
+| :------ | :------ |
+| `...inputs` | *Uint8Array*[] |
 
-**Returns:** [_Hash_](hash.md)
+**Returns:** [*Hash*](hash.md)
 
 Defined in: [types/primitives.ts:131](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L131)
 
----
+___
 
 ### deserialize
 
-▸ `Static` **deserialize**(`arr`: _Uint8Array_): [_Hash_](hash.md)
+▸ `Static` **deserialize**(`arr`: *Uint8Array*): [*Hash*](hash.md)
 
 #### Parameters
 
-| Name  | Type         |
-| :---- | :----------- |
-| `arr` | _Uint8Array_ |
+| Name | Type |
+| :------ | :------ |
+| `arr` | *Uint8Array* |
 
-**Returns:** [_Hash_](hash.md)
+**Returns:** [*Hash*](hash.md)
 
 Defined in: [types/primitives.ts:135](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L135)

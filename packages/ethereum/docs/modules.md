@@ -26,54 +26,54 @@
 
 ### ContractData
 
-Ƭ **ContractData**: _object_
+Ƭ **ContractData**: *object*
 
 #### Type declaration
 
-| Name          | Type     |
-| :------------ | :------- |
-| `address`     | _string_ |
-| `deployedAt?` | _number_ |
+| Name | Type |
+| :------ | :------ |
+| `address` | *string* |
+| `deployedAt?` | *number* |
 
 Defined in: [chain/index.ts:7](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/chain/index.ts#L7)
 
----
+___
 
 ### ContractNames
 
-Ƭ **ContractNames**: `"HoprToken"` \| `"HoprChannels"` \| `"HoprDistributor"`
+Ƭ **ContractNames**: ``"HoprToken"`` \| ``"HoprChannels"`` \| ``"HoprDistributor"``
 
 Defined in: [chain/index.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/chain/index.ts#L6)
 
----
+___
 
 ### DeploymentTypes
 
-Ƭ **DeploymentTypes**: `"testing"` \| `"development"` \| `"staging"` \| `"production"`
+Ƭ **DeploymentTypes**: ``"testing"`` \| ``"development"`` \| ``"staging"`` \| ``"production"``
 
 Defined in: [chain/networks.ts:5](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/chain/networks.ts#L5)
 
----
+___
 
 ### NetworkTag
 
-Ƭ **NetworkTag**: [_DeploymentTypes_](modules.md#deploymenttypes) \| `"etherscan"`
+Ƭ **NetworkTag**: [*DeploymentTypes*](modules.md#deploymenttypes) \| ``"etherscan"``
 
 Defined in: [chain/networks.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/chain/networks.ts#L6)
 
----
+___
 
 ### Networks
 
-Ƭ **Networks**: `"hardhat"` \| `"localhost"` \| [_PublicNetworks_](modules.md#publicnetworks)
+Ƭ **Networks**: ``"hardhat"`` \| ``"localhost"`` \| [*PublicNetworks*](modules.md#publicnetworks)
 
 Defined in: [chain/networks.ts:4](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/chain/networks.ts#L4)
 
----
+___
 
 ### PublicNetworks
 
-Ƭ **PublicNetworks**: `"xdai"` \| `"goerli"`
+Ƭ **PublicNetworks**: ``"xdai"`` \| ``"goerli"``
 
 Defined in: [chain/networks.ts:3](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/chain/networks.ts#L3)
 
@@ -85,7 +85,7 @@ Defined in: [chain/networks.ts:3](https://github.com/hoprnet/hoprnet/blob/master
 
 Defined in: [chain/index.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/chain/index.ts#L20)
 
----
+___
 
 ### networks
 
@@ -97,15 +97,15 @@ Defined in: [chain/networks.ts:8](https://github.com/hoprnet/hoprnet/blob/master
 
 ### getContracts
 
-▸ `Const` **getContracts**(): _object_
+▸ `Const` **getContracts**(): *object*
 
-**Returns:** _object_
+**Returns:** *object*
 
-| Name        | Type |
-| :---------- | :--- |
-| `goerli`    |      |
-| `hardhat`   |      |
-| `localhost` |      |
-| `xdai`      |      |
+| Name | Type |
+| :------ | :------ |
+| `goerli` |  |
+| `hardhat` |  |
+| `localhost` |  |
+| `xdai` |  |
 
 Defined in: [chain/index.ts:14](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/chain/index.ts#L14)
