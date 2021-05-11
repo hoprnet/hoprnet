@@ -90,10 +90,10 @@ describe('test channel', function () {
   })
 
   it('should create channel', async function () {
-    assert.strictEqual(channel.getId().toHex(), fixtures.CHANNEL_ID_A_B)
+    assert.strictEqual(channel.getId().toHex(), fixtures.CHANNEL_ID)
     assert.strictEqual(
       Channel.generateId(mocks.self.toAddress(), mocks.counterparty.toAddress()).toHex(),
-      fixtures.CHANNEL_ID_A_B
+      fixtures.CHANNEL_ID
     )
     assert.strictEqual(
       utils.hexlify((await channel.getState()).serialize()),
