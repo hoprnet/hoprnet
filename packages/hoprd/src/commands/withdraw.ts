@@ -16,9 +16,7 @@ export default class Withdraw extends AbstractCommand {
   /**
    * Will throw if any of the arguments are incorrect.
    */
-  private async checkArgs(
-    query: string
-  ): Promise<{
+  private async checkArgs(query: string): Promise<{
     amount: string
     weiAmount: string
     currency: 'NATIVE' | 'HOPR'

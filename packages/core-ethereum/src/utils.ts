@@ -30,9 +30,7 @@ export function getNetworkGasPrice(network: Networks): number | undefined {
 /**
  * Get r,s,v values of a signature
  */
-export function getSignatureParameters(
-  signature: Signature
-): {
+export function getSignatureParameters(signature: Signature): {
   r: Hash
   s: Hash
   v: number
