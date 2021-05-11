@@ -52,7 +52,7 @@ get_hopr_address() {
 # $1 = IP
 # $2 = Hopr command
 run_command(){
-  echo "$(curl --silent -X POST -d "$2" $1:3001/api/v1/command)" 
+  curl --silent -X POST --data "$2" $1:3001/api/v1/command
 }
 
 
