@@ -66,4 +66,17 @@ describe(`database tests`, function () {
 
     assert((await db.getAcknowledgedTickets()).length == 1, `DB should contain exactly one acknowledged ticket`)
   })
+
+  it('block number workflow', async function () {
+    const initialBlockNumber = await db.getLatestBlockNumber()
+
+    assert(initialBlockNumber == 0, `initial block number must be set to 0`)
+
+    const blockNumber = new BN(23)
+    await db.updateLatestBlockNumber(blockNumber)
+
+    const latestBlockNumber = await db.getLatestBlockNumber()
+
+    assert(blockNumber.eqn(latestBlockNumber), `block number must be updated`)
+  })
 })
