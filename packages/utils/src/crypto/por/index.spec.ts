@@ -1,11 +1,8 @@
-import { createFirstChallenge, createPoRString, preVerify, validateAcknowledgement } from '.'
+import { createFirstChallenge, createPoRString, decodePoRBytes, preVerify, validateAcknowledgement } from '.'
 import { randomBytes } from 'crypto'
 import { SECRET_LENGTH } from './constants'
-import { SECP256K1_CONSTANTS } from '../constants'
 import { deriveAckKeyShare } from './keyDerivation'
 import assert from 'assert'
-import { publicKeyCreate } from 'secp256k1'
-import { PublicKey } from '../../types'
 
 describe('PoR - proof of relay', function () {
   it('generate PoR string, preVerify, validate', function () {
@@ -27,13 +24,11 @@ describe('PoR - proof of relay', function () {
 
     assert(result.valid == true, `Challenge must be plausible`)
 
-    assert(result.ackChallenge.eq(new PublicKey(publicKeyCreate(deriveAckKeyShare(secrets[1])))))
+    assert(result.ackChallenge.eq(deriveAckKeyShare(secrets[1]).toChallenge()))
 
     // Simulates the transformation done by the first relayer
     assert(
-      result.nextTicketChallenge.eq(
-        new PublicKey(firstPorString.subarray(0, SECP256K1_CONSTANTS.COMPRESSED_PUBLIC_KEY_LENGTH))
-      ),
+      result.nextTicketChallenge.eq(decodePoRBytes(firstPorString).nextTicketChallenge),
       `Forward logic must extract correct challenge for next downstream node`
     )
 

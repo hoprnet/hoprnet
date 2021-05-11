@@ -1,8 +1,8 @@
 import { SECRET_LENGTH } from './constants'
-import { publicKeyCreate, privateKeyTweakAdd, publicKeyCombine, publicKeyTweakAdd } from 'secp256k1'
+import { privateKeyTweakAdd, publicKeyCombine, publicKeyTweakAdd } from 'secp256k1'
 import { deriveAckKeyShare, deriveOwnKeyShare } from './keyDerivation'
 import { SECP256K1_CONSTANTS } from '../constants'
-import { Address, PublicKey } from '../../types'
+import { Address, PublicKey, HalfKeyChallenge, HalfKey, Challenge, Response } from '../../types'
 import { u8aSplit } from '../../u8a'
 import { randomBytes } from 'crypto'
 
@@ -21,7 +21,7 @@ export { deriveAckKeyShare }
 export function createFirstChallenge(
   secretB: Uint8Array,
   secretC?: Uint8Array
-): { ackChallenge: PublicKey; ticketChallenge: PublicKey; ownKey: Uint8Array } {
+): { ackChallenge: HalfKeyChallenge; ticketChallenge: Challenge; ownKey: HalfKey } {
   if (secretB.length != SECRET_LENGTH || (secretC != undefined && secretC.length != SECRET_LENGTH)) {
     throw Error(`Invalid arguments`)
   }
@@ -29,8 +29,8 @@ export function createFirstChallenge(
   const s0 = deriveOwnKeyShare(secretB)
   const s1 = deriveAckKeyShare(secretC ?? randomBytes(SECRET_LENGTH))
 
-  const ackChallenge = new PublicKey(publicKeyCreate(deriveAckKeyShare(secretB)))
-  const ticketChallenge = new PublicKey(createChallenge(s0, s1))
+  const ackChallenge = deriveAckKeyShare(secretB).toChallenge()
+  const ticketChallenge = createChallenge(s0, s1)
 
   return { ackChallenge, ticketChallenge, ownKey: s0 }
 }
@@ -54,15 +54,15 @@ export function createPoRString(secretC: Uint8Array, secretD?: Uint8Array): Uint
   const s1 = deriveOwnKeyShare(secretC)
   const s2 = deriveAckKeyShare(secretD ?? randomBytes(SECRET_LENGTH))
 
-  return Uint8Array.from([...createChallenge(s1, s2), ...publicKeyCreate(s0)])
+  return Uint8Array.from([...createChallenge(s1, s2).serialize(), ...s0.toChallenge().serialize()])
 }
 
 type ValidOutput = {
   valid: true
-  ownKey: Uint8Array
-  ownShare: Uint8Array
-  nextTicketChallenge: PublicKey
-  ackChallenge: PublicKey
+  ownKey: HalfKey
+  ownShare: HalfKeyChallenge
+  nextTicketChallenge: Challenge
+  ackChallenge: HalfKeyChallenge
 }
 
 type InvalidOutput = {
@@ -85,26 +85,40 @@ export function preVerify(secret: Uint8Array, porBytes: Uint8Array, challenge: A
     throw Error(`Invalid arguments`)
   }
 
-  const [nextTicketChallenge, hint] = u8aSplit(porBytes, [
-    SECP256K1_CONSTANTS.COMPRESSED_PUBLIC_KEY_LENGTH,
-    SECP256K1_CONSTANTS.COMPRESSED_PUBLIC_KEY_LENGTH
-  ])
+  const { nextTicketChallenge, ackChallenge } = decodePoRBytes(porBytes)
 
   const ownKey = deriveOwnKeyShare(secret)
-  const ownShare = publicKeyCreate(ownKey)
+  const ownShare = ownKey.toChallenge()
 
-  const valid = new PublicKey(publicKeyCombine([ownShare, hint])).toAddress().eq(challenge)
+  const valid = new PublicKey(publicKeyCombine([ownShare.serialize(), ackChallenge.serialize()])).toAddress().eq(challenge)
 
   if (valid) {
     return {
       valid: true,
       ownKey,
       ownShare,
-      nextTicketChallenge: new PublicKey(nextTicketChallenge),
-      ackChallenge: new PublicKey(hint)
+      nextTicketChallenge,
+      ackChallenge
     }
   } else {
     return { valid: false }
+  }
+}
+
+export function decodePoRBytes(
+  porBytes: Uint8Array
+): {
+  nextTicketChallenge: Challenge
+  ackChallenge: HalfKeyChallenge
+} {
+  const [nextTicketChallenge, hint] = u8aSplit(porBytes, [
+    SECP256K1_CONSTANTS.COMPRESSED_PUBLIC_KEY_LENGTH,
+    SECP256K1_CONSTANTS.COMPRESSED_PUBLIC_KEY_LENGTH
+  ])
+
+  return {
+    nextTicketChallenge: new Challenge(nextTicketChallenge),
+    ackChallenge: new HalfKeyChallenge(hint)
   }
 }
 
@@ -116,26 +130,28 @@ export function preVerify(secret: Uint8Array, porBytes: Uint8Array, challenge: A
  * @param ownKey key that as derived from the shared secret with
  * the creator of the packet
  * @param ack second key share as given by the acknowledgement
- * @param challenge challenge of the ticket
+ * @param ethereumChallenge challenge of the ticket
  * @returns whether the input values led to a valid response that
  * can be used to redeem the incentive
  */
 export function validateAcknowledgement(
-  ownKey: Uint8Array | undefined,
-  ack: Uint8Array | undefined,
-  challenge: Address,
-  ownShare?: Uint8Array | undefined,
-  response?: Uint8Array
-): { valid: true; response: Uint8Array } | { valid: false } {
+  ownKey: HalfKey | undefined,
+  ack: HalfKey | undefined,
+  ethereumChallenge: Address,
+  ownShare?: HalfKeyChallenge | undefined,
+  response?: Response
+): { valid: true; response: Response } | { valid: false } {
   // clone ownKey before adding a tweak to it
-  response = response ?? privateKeyTweakAdd(Uint8Array.from(ownKey), ack)
+  response = response ?? new Response(privateKeyTweakAdd(ownKey.serialize(), ack.serialize()))
 
   let valid: boolean
 
   if (ownShare == undefined || ack == undefined) {
-    valid = new PublicKey(publicKeyCreate(response)).toAddress().eq(challenge)
+    valid = response.toChallenge().toEthereumChallenge().eq(ethereumChallenge)
   } else {
-    valid = new PublicKey(publicKeyTweakAdd(ownShare, ack)).toAddress().eq(challenge)
+    valid = new Challenge(publicKeyTweakAdd(ownShare.serialize(), ack.serialize()))
+      .toEthereumChallenge()
+      .eq(ethereumChallenge)
   }
 
   if (valid) {
@@ -145,7 +161,6 @@ export function validateAcknowledgement(
   }
 }
 
-function createChallenge(s0: Uint8Array, s1: Uint8Array) {
-  // Clone s0 before adding tweak to it
-  return publicKeyCreate(privateKeyTweakAdd(Uint8Array.from(s0), s1))
+function createChallenge(s0: HalfKey, s1: HalfKey): Challenge {
+  return new Response(privateKeyTweakAdd(s0.serialize(), s1.serialize())).toChallenge()
 }
