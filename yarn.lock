@@ -407,7 +407,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@hoprnet/hopr-connect@workspace:."
   dependencies:
-    "@hoprnet/hopr-utils": 1.71.0-next.142
+    "@hoprnet/hopr-utils": 1.71.0-next.145
     "@types/debug": ^4.1.5
     "@types/mocha": ^8.2.2
     "@types/node": 14
@@ -416,7 +416,6 @@ __metadata:
     abortable-iterator: ^3.0.0
     bl: ^5.0
     debug: ^4.3.1
-    futoin-hkdf: ^1.3.3
     it-handshake: ^2.0.0
     it-pair: ^1.0.0
     it-pipe: ^1.1.0
@@ -439,15 +438,16 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@hoprnet/hopr-utils@npm:1.71.0-next.142":
-  version: 1.71.0-next.142
-  resolution: "@hoprnet/hopr-utils@npm:1.71.0-next.142"
+"@hoprnet/hopr-utils@npm:1.71.0-next.145":
+  version: 1.71.0-next.145
+  resolution: "@hoprnet/hopr-utils@npm:1.71.0-next.145"
   dependencies:
     abort-controller: ~3.0.0
     bignumber.js: ^9.0.0
     bn.js: ^5.2.0
     chalk: ^4.1.1
     ethers: ^5.1.3
+    futoin-hkdf: ~1.3.2
     it-pipe: ^1.1.0
     leveldown: ^6.0.0
     levelup: ^5.0.0
@@ -459,7 +459,7 @@ __metadata:
     peer-id: 0.14.8
     secp256k1: ^4.0.2
     strip-ansi: ^7.0.0
-  checksum: 3ac0ba998c0b9926d74539768e1177d22a7a7c6815e621dea05236e00e1bcca40dfe8e685daa50590d01d650e9cb8654754d041268142fba1e746a08be692c76
+  checksum: 729c74d362999bc8f5446ea57dacf4bc65f34b83f2845c327bdef9784445a287fdb1b402b96490abab74be0238926240dc05cb1b4903f79bda878d05d87bc408
   languageName: node
   linkType: hard
 
@@ -1806,7 +1806,7 @@ fsevents@~2.3.1:
   languageName: node
   linkType: hard
 
-"futoin-hkdf@npm:^1.3.3":
+"futoin-hkdf@npm:~1.3.2":
   version: 1.3.3
   resolution: "futoin-hkdf@npm:1.3.3"
   checksum: 039ce283450d72230830597cf38b61c29f6c8d6bf112d928c113a77582d609a28b51fd4913b985029ee4467dcffa5ae65d70c8a0457052fd3aa70b070efa2c82
