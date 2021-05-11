@@ -7,7 +7,7 @@ import Heap from 'heap-js'
 import { randomChoice, HoprDB, stringToU8a, Logger } from '@hoprnet/hopr-utils'
 import { Address, ChannelEntry, AccountEntry, Hash, PublicKey, Balance, Snapshot } from '@hoprnet/hopr-utils'
 import { isConfirmedBlock, snapshotComparator } from './utils'
-import Multiaddr from 'multiaddr'
+import { Multiaddr } from 'multiaddr'
 import { EventEmitter } from 'events'
 
 export type RoutingChannel = [source: PeerId, destination: PeerId, stake: Balance]
@@ -243,7 +243,7 @@ class Indexer extends EventEmitter {
   private async onAnnouncement(event: Event<'Announcement'>, blockNumber: BN): Promise<void> {
     try {
       //TODO types
-      const multiaddr = Multiaddr(stringToU8a(event.args.multiaddr))
+      const multiaddr = new Multiaddr(stringToU8a(event.args.multiaddr))
       const address = Address.fromString(event.args.account)
       const account = new AccountEntry(address, multiaddr, blockNumber)
       if (!account.getPublicKey().toAddress().eq(address)) {

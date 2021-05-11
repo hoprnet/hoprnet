@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-core-ethereum",
-  "version": "1.71.0-next.133",
+  "version": "1.71.0-next.141",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -29,15 +29,15 @@
     "!**/*.spec.js.map"
   ],
   "dependencies": {
-    "@hoprnet/hopr-ethereum": "1.71.0-next.133",
-    "@hoprnet/hopr-utils": "1.71.0-next.133",
+    "@hoprnet/hopr-ethereum": "1.71.0-next.141",
+    "@hoprnet/hopr-utils": "1.71.0-next.141",
     "async-mutex": "^0.3.0",
     "bn.js": "^5.1.2",
     "chalk": "^4.1.0",
     "debug": "^4.3.1",
     "ethers": "^5.1.0",
     "heap-js": "^2.1.2",
-    "multiaddr": "8.1.2",
+    "multiaddr": "9.0.1",
     "peer-id": "0.14.8",
     "secp256k1": "^4.0.2"
   },

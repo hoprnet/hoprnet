@@ -25,7 +25,7 @@
 - [get](hoprdb.md#get)
 - [getAccount](hoprdb.md#getaccount)
 - [getAccounts](hoprdb.md#getaccounts)
-- [getAcknowledgements](hoprdb.md#getacknowledgements)
+- [getAcknowledgedTickets](hoprdb.md#getacknowledgedtickets)
 - [getAll](hoprdb.md#getall)
 - [getChannel](hoprdb.md#getchannel)
 - [getChannels](hoprdb.md#getchannels)
@@ -266,9 +266,9 @@ Defined in: [db.ts:390](https://github.com/hoprnet/hoprnet/blob/master/packages/
 
 ---
 
-### getAcknowledgements
+### getAcknowledgedTickets
 
-▸ **getAcknowledgements**(`filter?`: { `signer`: _Uint8Array_ }): _Promise_<[_AcknowledgedTicket_](acknowledgedticket.md)[]\>
+▸ **getAcknowledgedTickets**(`filter?`: { `signer`: *Uint8Array*  }): *Promise*<[*AcknowledgedTicket*](acknowledgedticket.md)[]\>
 
 Get all acknowledged tickets
 
