@@ -44,15 +44,7 @@ You are ready to build and deploy the **HOPR Channels** contract in your local n
 $ yarn run:network
 ```
 
-### 5. Run a local bootstrap server
-
-To allow peer discovery, we use a signaling server able to relay the Distributed Hash Table (DHT) with the registry of other nodes in the network. Running the following command will by default expose your bootstrap server to your local port `9091`.
-
-```bash
-$ DEBUG=hopr* yarn run:hoprd:bootstrap
-```
-
-### 6. Run alice and bob
+### 5. Run alice and bob
 
 Using different terminals for each process, run now `alice` and `bob`, our pre-configured nodes which can be used to test the application.
 
@@ -64,7 +56,7 @@ $ DEBUG=hopr* yarn run:hoprd:alice
 $ DEBUG=hopr* yarn run:hoprd:bob
 ```
 
-### 7. Fund your nodes
+### 6. Fund your nodes
 
 With all your nodes up and running, you now need to have local HOPR tokens for your nodes to be able to send messages. Use our local `faucet` which would mint both `1 ETH` and `1 HOPR` token for you to use.
 
