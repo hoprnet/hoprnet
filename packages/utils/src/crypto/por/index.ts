@@ -2,7 +2,7 @@ import { SECRET_LENGTH } from './constants'
 import { privateKeyTweakAdd, publicKeyCombine, publicKeyTweakAdd } from 'secp256k1'
 import { deriveAckKeyShare, deriveOwnKeyShare } from './keyDerivation'
 import { SECP256K1_CONSTANTS } from '../constants'
-import { Address, PublicKey, HalfKeyChallenge, HalfKey, Challenge, Response } from '../../types'
+import { HalfKeyChallenge, HalfKey, Challenge, Response, EthereumChallenge, CurvePoint } from '../../types'
 import { u8aSplit } from '../../u8a'
 import { randomBytes } from 'crypto'
 
@@ -80,7 +80,11 @@ type InvalidOutput = {
  * the keyShare of the relayer as well as the secret that is used
  * to create it and the challenge for the next relayer.
  */
-export function preVerify(secret: Uint8Array, porBytes: Uint8Array, challenge: Address): ValidOutput | InvalidOutput {
+export function preVerify(
+  secret: Uint8Array,
+  porBytes: Uint8Array,
+  challenge: EthereumChallenge
+): ValidOutput | InvalidOutput {
   if (secret.length != SECRET_LENGTH || porBytes.length != POR_STRING_LENGTH) {
     throw Error(`Invalid arguments`)
   }
@@ -90,7 +94,9 @@ export function preVerify(secret: Uint8Array, porBytes: Uint8Array, challenge: A
   const ownKey = deriveOwnKeyShare(secret)
   const ownShare = ownKey.toChallenge()
 
-  const valid = new PublicKey(publicKeyCombine([ownShare.serialize(), ackChallenge.serialize()])).toAddress().eq(challenge)
+  const valid = new CurvePoint(publicKeyCombine([ownShare.serialize(), ackChallenge.serialize()]))
+    .toAddress()
+    .eq(challenge)
 
   if (valid) {
     return {
@@ -137,7 +143,7 @@ export function decodePoRBytes(
 export function validateAcknowledgement(
   ownKey: HalfKey | undefined,
   ack: HalfKey | undefined,
-  ethereumChallenge: Address,
+  ethereumChallenge: EthereumChallenge,
   ownShare?: HalfKeyChallenge | undefined,
   response?: Response
 ): { valid: true; response: Response } | { valid: false } {
