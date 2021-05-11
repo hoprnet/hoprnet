@@ -107,10 +107,9 @@ start_testnode() {
 add_keys() {
   if test -f "$1"; then
     echo "Reading keys from $1"
-    xargs -a $1 -I {} gcloud compute os-login ssh-keys add --key="{}"
+    cat $1 | xargs -I {} gcloud compute os-login ssh-keys add --key="{}"
   else
     echo "Authorized keys file not found"
-    exit 1
   fi
 }
 
@@ -129,6 +128,7 @@ start_testnet() {
     echo "Start node $i"
     start_testnode $1 $3 $i
   done
-  add_keys scripts/keys/authorized_keys
+  # @jose can you fix this pls.
+  # add_keys scripts/keys/authorized_keys
 }
 

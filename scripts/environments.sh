@@ -3,7 +3,7 @@
 source scripts/utils.sh
 
 # These will be cleaned up and machines stopped
-OLD_RELEASES='zurich zug luzern larnaca queretaro basodino saentis debug-dbg nightly internal'
+OLD_RELEASES='zurich zug luzern larnaca queretaro basodino saentis debug-dbg nightly internal integration-test'
 
 # ===== Load env variables for the current github ref =====
 # Takes:
@@ -95,7 +95,7 @@ get_environment() {
   esac
 
   echo "Unknown release / environment: '$BRANCH'"
-  exit 1
+  #exit 1
   RELEASE_NAME='debug'
   RELEASE_IP='34.65.56.229'
   VERSION_MAJ_MIN='dbg'
