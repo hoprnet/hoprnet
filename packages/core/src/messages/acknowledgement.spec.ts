@@ -2,8 +2,7 @@ import { Acknowledgement } from './acknowledgement'
 import { Challenge } from './challenge'
 import { SECRET_LENGTH } from './constants'
 import { randomBytes } from 'crypto'
-import { deriveAckKeyShare, PublicKey } from '@hoprnet/hopr-utils'
-import { publicKeyCreate } from 'secp256k1'
+import { deriveAckKeyShare, HalfKey } from '@hoprnet/hopr-utils'
 import assert from 'assert'
 
 import PeerId from 'peer-id'
@@ -15,14 +14,13 @@ describe('acknowledement message', function () {
       Array.from({ length: AMOUNT }).map((_) => PeerId.create({ keyType: 'secp256k1' }))
     )
 
-    const key = randomBytes(SECRET_LENGTH)
-    const ackKey = deriveAckKeyShare(key)
+    const ackKey= new HalfKey(randomBytes(SECRET_LENGTH))
 
-    const challenge = Challenge.create(new PublicKey(publicKeyCreate(ackKey)), self)
+    const challenge = Challenge.create(ackKey.toChallenge(), self)
 
     assert(
       Acknowledgement.deserialize(
-        Acknowledgement.create(challenge, key, counterparty).serialize(),
+        Acknowledgement.create(challenge, ackKey, counterparty).serialize(),
         self,
         counterparty
       ) != null
@@ -39,7 +37,7 @@ describe('acknowledement message', function () {
 
     assert.throws(() =>
       Acknowledgement.deserialize(
-        Acknowledgement.create(randomBytes(Challenge.SIZE) as any, key, counterparty).serialize(),
+        Acknowledgement.create(randomBytes(Challenge.SIZE) as any, deriveAckKeyShare(key), counterparty).serialize(),
         self,
         counterparty
       )

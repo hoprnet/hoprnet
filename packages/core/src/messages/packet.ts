@@ -5,7 +5,6 @@ import {
   PublicKey,
   Balance,
   UnacknowledgedTicket,
-  Hash,
   HoprDB,
   getPacketLength,
   POR_STRING_LENGTH,
@@ -18,12 +17,13 @@ import {
   preVerify,
   u8aSplit,
   pubKeyToPeerId,
-  HalfKeyChallenge
+  HalfKeyChallenge,
+  HalfKey,
+  Challenge as ChallengeType
 } from '@hoprnet/hopr-utils'
 import type HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 import { Challenge } from './challenge'
 import type PeerId from 'peer-id'
-import { publicKeyCreate } from 'secp256k1'
 import BN from 'bn.js'
 import { Acknowledgement } from './acknowledgement'
 import { blue, green } from 'chalk'
@@ -160,23 +160,24 @@ export class Packet {
   public packetTag: Uint8Array
   public previousHop: Uint8Array
   public nextHop: Uint8Array
-  public ownShare: Uint8Array
-  public ownKey: Uint8Array
-  public nextChallenge: PublicKey
-  public ackChallenge: PublicKey
+  public ownShare: HalfKeyChallenge
+  public ownKey: HalfKey
+  public ackKey: HalfKey
+  public nextChallenge: ChallengeType
+  public ackChallenge: HalfKeyChallenge
 
   public constructor(private packet: Uint8Array, private challenge: Challenge, private ticket: Ticket) {}
 
-  private setReadyToForward(ackChallenge: PublicKey) {
+  private setReadyToForward(ackChallenge: HalfKeyChallenge) {
     this.ackChallenge = ackChallenge
     this.isReadyToForward = true
 
     return this
   }
 
-  private setFinal(plaintext: Uint8Array, packetTag: Uint8Array, ownKey: Uint8Array) {
+  private setFinal(plaintext: Uint8Array, packetTag: Uint8Array, ackKey: HalfKey) {
     this.packetTag = packetTag
-    this.ownKey = ownKey
+    this.ackKey = ackKey
     this.isReceiver = true
     this.isReadyToForward = false
     this.plaintext = plaintext
@@ -185,17 +186,19 @@ export class Packet {
   }
 
   private setForward(
-    ownKey: Uint8Array,
-    ownShare: Uint8Array,
+    ackKey: HalfKey,
+    ownKey: HalfKey,
+    ownShare: HalfKeyChallenge,
     nextHop: Uint8Array,
     previousHop: Uint8Array,
-    nextChallenge: PublicKey,
-    ackChallenge: PublicKey,
+    nextChallenge: ChallengeType,
+    ackChallenge: HalfKeyChallenge,
     packetTag: Uint8Array
   ) {
     this.isReceiver = false
     this.isReadyToForward = false
 
+    this.ackKey = ackKey
     this.ownKey = ownKey
     this.ownShare = ownShare
     this.previousHop = previousHop
@@ -272,7 +275,7 @@ export class Packet {
 
     const ackKey = deriveAckKeyShare(transformedOutput.derivedSecret)
 
-    const challenge = Challenge.deserialize(preChallenge, new PublicKey(publicKeyCreate(ackKey)), pubKeySender)
+    const challenge = Challenge.deserialize(preChallenge, ackKey.toChallenge(), pubKeySender)
 
     const ticket = Ticket.deserialize(preTicket)
 
@@ -280,7 +283,7 @@ export class Packet {
       return new Packet(packet, challenge, ticket).setFinal(
         transformedOutput.plaintext,
         transformedOutput.packetTag,
-        transformedOutput.derivedSecret
+        ackKey
       )
     }
 
@@ -295,6 +298,7 @@ export class Packet {
     }
 
     return new Packet(transformedOutput.packet, challenge, ticket).setForward(
+      ackKey,
       verificationOutput.ownKey,
       verificationOutput.ownShare,
       transformedOutput.nextHop,
@@ -318,7 +322,7 @@ export class Packet {
       throw Error(`Invalid state`)
     }
 
-    const unacknowledged = new UnacknowledgedTicket(this.ticket, new Hash(this.ownKey))
+    const unacknowledged = new UnacknowledgedTicket(this.ticket, this.ownKey)
 
     log(
       `Storing unacknowledged ticket. Expecting to receive a preImage for ${green(
@@ -341,11 +345,11 @@ export class Packet {
   }
 
   createAcknowledgement(privKey: PeerId) {
-    if (this.ownKey == undefined) {
+    if (this.ackKey == undefined) {
       throw Error(`Invalid state`)
     }
 
-    return Acknowledgement.create(this.challenge, this.ownKey, privKey)
+    return Acknowledgement.create(this.challenge, this.ackKey, privKey)
   }
 
   async forwardTransform(privKey: PeerId, chain: HoprCoreEthereum): Promise<void> {

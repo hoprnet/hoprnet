@@ -1,5 +1,5 @@
 import { Challenge } from './challenge'
-import { PublicKey, sampleGroupElement } from '@hoprnet/hopr-utils'
+import { HalfKeyChallenge, sampleGroupElement } from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'
 import assert from 'assert'
 import { randomBytes } from 'libp2p-crypto'
@@ -10,11 +10,15 @@ describe('test creation & verification of a challenge', function () {
 
     const [exponent, ackChallenge] = sampleGroupElement(true)
 
-    const challenge = Challenge.create(new PublicKey(ackChallenge), peerId)
+    const challenge = Challenge.create(new HalfKeyChallenge(ackChallenge), peerId)
 
     assert(challenge.serialize().length == Challenge.SIZE, `Size must be correct`)
 
-    const deserializedChallenge = Challenge.deserialize(challenge.serialize(), new PublicKey(ackChallenge), peerId)
+    const deserializedChallenge = Challenge.deserialize(
+      challenge.serialize(),
+      new HalfKeyChallenge(ackChallenge),
+      peerId
+    )
 
     assert(deserializedChallenge.solve(exponent), `Challenge must be solvable`)
   })
@@ -24,10 +28,10 @@ describe('test creation & verification of a challenge', function () {
 
     const [_, ackChallenge] = sampleGroupElement(true)
 
-    const challenge = Challenge.create(new PublicKey(ackChallenge), peerId)
+    const challenge = Challenge.create(new HalfKeyChallenge(ackChallenge), peerId)
 
     assert(challenge.serialize().length == Challenge.SIZE, `Size must be correct`)
 
-    assert.throws(() => Challenge.deserialize(randomBytes(Challenge.SIZE), new PublicKey(ackChallenge), peerId))
+    assert.throws(() => Challenge.deserialize(randomBytes(Challenge.SIZE), new HalfKeyChallenge(ackChallenge), peerId))
   })
 })
