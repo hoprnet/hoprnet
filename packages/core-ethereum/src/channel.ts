@@ -4,11 +4,13 @@ import {
   Address,
   Balance,
   Hash,
+  HalfKey,
   UINT256,
   Ticket,
   AcknowledgedTicket,
   ChannelEntry,
-  UnacknowledgedTicket
+  UnacknowledgedTicket,
+  Challenge
 } from '@hoprnet/hopr-utils'
 import Debug from 'debug'
 import type { RedeemTicketResponse } from '.'
@@ -51,7 +53,7 @@ class Channel {
    */
   async acknowledge(
     unacknowledgedTicket: UnacknowledgedTicket,
-    acknowledgement: Hash
+    acknowledgement: HalfKey
   ): Promise<AcknowledgedTicket | null> {
     if (!unacknowledgedTicket.verify(this.counterparty, acknowledgement)) {
       throw Error(`The acknowledgement is not sufficient to solve the embedded challenge.`)
@@ -59,19 +61,10 @@ class Channel {
 
     const response = unacknowledgedTicket.getResponse(acknowledgement)
 
-    if (!response.valid) {
-      throw Error(`Could not determine a valid response.`)
-    }
-
     const ticket = unacknowledgedTicket.ticket
-    if (
-      ticket.isWinningTicket(new Hash(response.response), await this.commitment.getCurrentCommitment(), ticket.winProb)
-    ) {
-      const ack = new AcknowledgedTicket(
-        ticket,
-        new Hash(response.response),
-        await this.commitment.getCurrentCommitment()
-      )
+
+    if (ticket.isWinningTicket(response, await this.commitment.getCurrentCommitment(), ticket.winProb)) {
+      const ack = new AcknowledgedTicket(ticket, response, await this.commitment.getCurrentCommitment())
       await this.commitment.bumpCommitment()
       return ack
     } else {
@@ -168,7 +161,7 @@ class Channel {
    * @param winProb the winning probability to use
    * @returns a signed ticket
    */
-  async createTicket(amount: Balance, challenge: PublicKey, winProb: number) {
+  async createTicket(amount: Balance, challenge: Challenge, winProb: number) {
     const counterpartyAddress = this.counterparty.toAddress()
     const c = await this.getState()
     return Ticket.create(
@@ -189,7 +182,7 @@ class Channel {
    * @param challenge dummy challenge, potential no valid response known
    * @returns a ticket without any value
    */
-  createDummyTicket(challenge: PublicKey): Ticket {
+  createDummyTicket(challenge: Challenge): Ticket {
     // TODO: document how dummy ticket works
     return Ticket.create(
       this.counterparty.toAddress(),

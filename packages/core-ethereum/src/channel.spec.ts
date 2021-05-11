@@ -1,13 +1,13 @@
 import type Indexer from './indexer'
 import type { ChainWrapper } from './ethereum'
-import { ChannelEntry, Hash, PublicKey, Balance, UINT256, HoprDB, createFirstChallenge } from '@hoprnet/hopr-utils'
+import { ChannelEntry, Hash, PublicKey, Challenge, Balance, UINT256, HoprDB, createFirstChallenge } from '@hoprnet/hopr-utils'
 import assert from 'assert'
 import BN from 'bn.js'
 import { utils } from 'ethers'
 import { Channel } from './channel'
 import * as fixtures from './fixtures'
 
-const createChallenge = (secret1: Uint8Array, secret2: Uint8Array): PublicKey => {
+const createChallenge = (secret1: Uint8Array, secret2: Uint8Array): Challenge => {
   return createFirstChallenge(secret1, secret2).ticketChallenge
 }
 
