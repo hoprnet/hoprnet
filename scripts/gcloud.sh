@@ -19,6 +19,7 @@ GCLOUD_DEFAULTS="$ZONE $GCLOUD_MACHINE $GCLOUD_META $GCLOUD_TAGS $GCLOUD_BOOTDIS
 
 alias gssh="gcloud compute ssh --ssh-flag='-t' $ZONE"
 
+# NB: This is useless for getting an IP of a VM
 # Get or create an IP address
 # $1 = name
 gcloud_get_address() { 
@@ -30,6 +31,12 @@ gcloud_get_address() {
     local ip=$(gcloud compute addresses describe $1 $REGION 2>&1)
   fi
   echo $ip | awk '{ print $2 }'
+}
+
+# Get external IP for running node or die
+# $1 - name
+gcloud_get_ip() {
+  echo $(gcloud compute instances list | grep "$1" | awk '{ print $5 }')
 }
 
 # $1 = VM name

@@ -49,6 +49,12 @@ get_hopr_address() {
   echo $(curl $1:3001/api/v1/address/hopr)
 }
 
+# $1 = IP
+# $2 = Hopr command
+run_command(){
+  echo "$(curl --silent -X POST -d "$2" $1:3001/api/v1/command)" 
+}
+
 
 # $1 = vm name
 # $2 = docker image

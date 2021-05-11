@@ -157,6 +157,7 @@ class Hopr extends EventEmitter {
     if (publicNodes.length == 0) {
       log('No public nodes have announced yet, we cannot rely on relay')
     }
+    verbose('Using public nodes:', publicNodes) 
 
     const libp2p = await LibP2P.create({
       peerId: this.id,
@@ -473,6 +474,9 @@ class Hopr extends EventEmitter {
   }
 
   public async connectionReport(): Promise<string> {
+    if (!this.networkPeers) {
+      return 'Node has not started yet'
+    }
     const connected = this.networkPeers.debugLog()
     const announced = await (await this.paymentChannels).indexer.getAnnouncedAddresses()
     return `${connected}
