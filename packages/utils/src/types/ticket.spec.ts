@@ -2,7 +2,7 @@ import assert from 'assert'
 import { expect } from 'chai'
 import { stringToU8a, SIGNATURE_LENGTH } from '..'
 import { ethers } from 'ethers'
-import { Address, Ticket, Hash, Balance, PublicKey, Signature, UINT256 } from '.'
+import { Address, Ticket, Hash, Balance, PublicKey, Signature, UINT256, Response } from '.'
 import BN from 'bn.js'
 import { randomBytes } from 'crypto'
 import { Wallet } from 'ethers'
@@ -113,7 +113,7 @@ describe('test signedTicket construction', async function () {
   it('should create new signedTicket using struct', function () {
     const ticket = Ticket.create(
       userB,
-      PublicKey.fromPrivKey(randomBytes(32)),
+      new Response(randomBytes(32)).toChallenge(),
       UINT256.fromString('0'),
       UINT256.fromString('1'),
       new Balance(new BN(15)),

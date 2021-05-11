@@ -1,15 +1,25 @@
 import { HoprDB } from './db'
-import { PublicKey, UnacknowledgedTicket, Ticket } from '.'
 import { randomBytes } from 'crypto'
 
 import assert from 'assert'
-import { AcknowledgedTicket, Address, Balance, Hash, UINT256, HalfKey, Response, Opening } from './types'
+import {
+  UnacknowledgedTicket,
+  Ticket,
+  AcknowledgedTicket,
+  Address,
+  Balance,
+  Hash,
+  UINT256,
+  HalfKey,
+  Response,
+  Opening
+} from './types'
 import BN from 'bn.js'
 
 function createMockedTicket() {
   return Ticket.create(
     new Address(randomBytes(Address.SIZE)),
-    PublicKey.fromPrivKey(randomBytes(32)),
+    new Response(randomBytes(32)).toChallenge(),
     UINT256.fromString('0'),
     UINT256.fromString('0'),
     new Balance(new BN(0)),
