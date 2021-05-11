@@ -66,7 +66,7 @@
 
 **Returns:** [*ChannelEntry*](channelentry.md)
 
-Defined in: [types/channelEntry.ts:48](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L48)
+Defined in: [types/channelEntry.ts:48](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L48)
 
 ## Properties
 
@@ -160,7 +160,7 @@ ___
 
 **Returns:** *number*
 
-Defined in: [types/channelEntry.ts:66](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L66)
+Defined in: [types/channelEntry.ts:66](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L66)
 
 ## Methods
 
@@ -176,7 +176,7 @@ Defined in: [types/channelEntry.ts:66](https://github.com/hoprnet/hoprnet/blob/m
 
 **Returns:** [*Hash*](hash.md)
 
-Defined in: [types/channelEntry.ts:144](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L144)
+Defined in: [types/channelEntry.ts:144](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L144)
 
 ___
 
@@ -186,7 +186,7 @@ ___
 
 **Returns:** [*Hash*](hash.md)
 
-Defined in: [types/channelEntry.ts:120](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L120)
+Defined in: [types/channelEntry.ts:120](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L120)
 
 ___
 
@@ -196,7 +196,7 @@ ___
 
 **Returns:** *Uint8Array*
 
-Defined in: [types/channelEntry.ts:101](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L101)
+Defined in: [types/channelEntry.ts:101](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L101)
 
 ___
 
@@ -212,7 +212,7 @@ ___
 
 **Returns:** [*UINT256*](uint256.md)
 
-Defined in: [types/channelEntry.ts:124](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L124)
+Defined in: [types/channelEntry.ts:124](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L124)
 
 ___
 
@@ -228,7 +228,7 @@ ___
 
 **Returns:** [*UINT256*](uint256.md)
 
-Defined in: [types/channelEntry.ts:134](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L134)
+Defined in: [types/channelEntry.ts:134](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L134)
 
 ___
 
@@ -244,7 +244,7 @@ ___
 
 **Returns:** [*ChannelEntry*](channelentry.md)
 
-Defined in: [types/channelEntry.ts:70](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L70)
+Defined in: [types/channelEntry.ts:70](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L70)
 
 ___
 
@@ -260,4 +260,4 @@ ___
 
 **Returns:** [*ChannelEntry*](channelentry.md)
 
-Defined in: [types/channelEntry.ts:80](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L80)
+Defined in: [types/channelEntry.ts:80](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L80)

@@ -33,7 +33,7 @@
 
 **Returns:** [*PRG*](prg.md)
 
-Defined in: [crypto/prg.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prg.ts#L18)
+Defined in: [crypto/prg.ts:18](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/crypto/prg.ts#L18)
 
 ## Properties
 
@@ -41,7 +41,7 @@ Defined in: [crypto/prg.ts:18](https://github.com/hoprnet/hoprnet/blob/master/pa
 
 • `Private` `Readonly` **iv**: *Uint8Array*
 
-Defined in: [crypto/prg.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prg.ts#L18)
+Defined in: [crypto/prg.ts:18](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/crypto/prg.ts#L18)
 
 ___
 
@@ -49,7 +49,7 @@ ___
 
 • `Private` `Readonly` **key**: *Uint8Array*
 
-Defined in: [crypto/prg.ts:17](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prg.ts#L17)
+Defined in: [crypto/prg.ts:17](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/crypto/prg.ts#L17)
 
 ## Methods
 
@@ -66,7 +66,7 @@ Defined in: [crypto/prg.ts:17](https://github.com/hoprnet/hoprnet/blob/master/pa
 
 **Returns:** *Uint8Array*
 
-Defined in: [crypto/prg.ts:35](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prg.ts#L35)
+Defined in: [crypto/prg.ts:35](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/crypto/prg.ts#L35)
 
 ___
 
@@ -82,4 +82,4 @@ ___
 
 **Returns:** [*PRG*](prg.md)
 
-Defined in: [crypto/prg.ts:25](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prg.ts#L25)
+Defined in: [crypto/prg.ts:25](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/crypto/prg.ts#L25)

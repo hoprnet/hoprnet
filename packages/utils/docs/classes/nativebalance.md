@@ -35,7 +35,7 @@
 
 **Returns:** [*NativeBalance*](nativebalance.md)
 
-Defined in: [types/primitives.ts:225](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L225)
+Defined in: [types/primitives.ts:225](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L225)
 
 ## Accessors
 
@@ -45,7 +45,7 @@ Defined in: [types/primitives.ts:225](https://github.com/hoprnet/hoprnet/blob/ma
 
 **Returns:** *number*
 
-Defined in: [types/primitives.ts:232](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L232)
+Defined in: [types/primitives.ts:232](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L232)
 
 ___
 
@@ -55,7 +55,7 @@ ___
 
 **Returns:** *number*
 
-Defined in: [types/primitives.ts:252](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L252)
+Defined in: [types/primitives.ts:252](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L252)
 
 ___
 
@@ -65,7 +65,7 @@ ___
 
 **Returns:** *string*
 
-Defined in: [types/primitives.ts:228](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L228)
+Defined in: [types/primitives.ts:228](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L228)
 
 ## Methods
 
@@ -75,7 +75,7 @@ Defined in: [types/primitives.ts:228](https://github.com/hoprnet/hoprnet/blob/ma
 
 **Returns:** *Uint8Array*
 
-Defined in: [types/primitives.ts:244](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L244)
+Defined in: [types/primitives.ts:244](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L244)
 
 ___
 
@@ -85,7 +85,7 @@ ___
 
 **Returns:** *BN*
 
-Defined in: [types/primitives.ts:240](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L240)
+Defined in: [types/primitives.ts:240](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L240)
 
 ___
 
@@ -95,7 +95,7 @@ ___
 
 **Returns:** *string*
 
-Defined in: [types/primitives.ts:248](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L248)
+Defined in: [types/primitives.ts:248](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L248)
 
 ___
 
@@ -111,4 +111,4 @@ ___
 
 **Returns:** [*NativeBalance*](nativebalance.md)
 
-Defined in: [types/primitives.ts:236](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L236)
+Defined in: [types/primitives.ts:236](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L236)

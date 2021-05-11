@@ -34,7 +34,7 @@
 
 **Returns:** [*UINT256*](uint256.md)
 
-Defined in: [types/solidity.ts:4](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L4)
+Defined in: [types/solidity.ts:4](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L4)
 
 ## Accessors
 
@@ -44,7 +44,7 @@ Defined in: [types/solidity.ts:4](https://github.com/hoprnet/hoprnet/blob/master
 
 **Returns:** *number*
 
-Defined in: [types/solidity.ts:29](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L29)
+Defined in: [types/solidity.ts:29](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L29)
 
 ## Methods
 
@@ -54,7 +54,7 @@ Defined in: [types/solidity.ts:29](https://github.com/hoprnet/hoprnet/blob/maste
 
 **Returns:** *Uint8Array*
 
-Defined in: [types/solidity.ts:15](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L15)
+Defined in: [types/solidity.ts:15](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L15)
 
 ___
 
@@ -64,7 +64,7 @@ ___
 
 **Returns:** *BN*
 
-Defined in: [types/solidity.ts:7](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L7)
+Defined in: [types/solidity.ts:7](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L7)
 
 ___
 
@@ -80,7 +80,7 @@ ___
 
 **Returns:** [*UINT256*](uint256.md)
 
-Defined in: [types/solidity.ts:11](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L11)
+Defined in: [types/solidity.ts:11](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L11)
 
 ___
 
@@ -96,7 +96,7 @@ ___
 
 **Returns:** [*UINT256*](uint256.md)
 
-Defined in: [types/solidity.ts:23](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L23)
+Defined in: [types/solidity.ts:23](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L23)
 
 ___
 
@@ -112,4 +112,4 @@ ___
 
 **Returns:** [*UINT256*](uint256.md)
 
-Defined in: [types/solidity.ts:19](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L19)
+Defined in: [types/solidity.ts:19](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L19)

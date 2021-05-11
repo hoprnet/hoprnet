@@ -38,7 +38,7 @@
 
 **Returns:** [*Address*](address.md)
 
-Defined in: [types/primitives.ts:72](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L72)
+Defined in: [types/primitives.ts:72](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L72)
 
 ## Accessors
 
@@ -48,7 +48,7 @@ Defined in: [types/primitives.ts:72](https://github.com/hoprnet/hoprnet/blob/mas
 
 **Returns:** *number*
 
-Defined in: [types/primitives.ts:81](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L81)
+Defined in: [types/primitives.ts:81](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L81)
 
 ## Methods
 
@@ -64,7 +64,7 @@ Defined in: [types/primitives.ts:81](https://github.com/hoprnet/hoprnet/blob/mas
 
 **Returns:** *number*
 
-Defined in: [types/primitives.ts:105](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L105)
+Defined in: [types/primitives.ts:105](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L105)
 
 ___
 
@@ -80,7 +80,7 @@ ___
 
 **Returns:** *boolean*
 
-Defined in: [types/primitives.ts:101](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L101)
+Defined in: [types/primitives.ts:101](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L101)
 
 ___
 
@@ -96,7 +96,7 @@ ___
 
 **Returns:** *boolean*
 
-Defined in: [types/primitives.ts:109](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L109)
+Defined in: [types/primitives.ts:109](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L109)
 
 ___
 
@@ -106,7 +106,7 @@ ___
 
 **Returns:** *Uint8Array*
 
-Defined in: [types/primitives.ts:93](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L93)
+Defined in: [types/primitives.ts:93](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L93)
 
 ___
 
@@ -122,7 +122,7 @@ ___
 
 **Returns:** [[*Address*](address.md), [*Address*](address.md)]
 
-Defined in: [types/primitives.ts:113](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L113)
+Defined in: [types/primitives.ts:113](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L113)
 
 ___
 
@@ -132,7 +132,7 @@ ___
 
 **Returns:** *string*
 
-Defined in: [types/primitives.ts:97](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L97)
+Defined in: [types/primitives.ts:97](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L97)
 
 ___
 
@@ -142,7 +142,7 @@ ___
 
 **Returns:** [*Address*](address.md)
 
-Defined in: [types/primitives.ts:117](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L117)
+Defined in: [types/primitives.ts:117](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L117)
 
 ___
 
@@ -158,7 +158,7 @@ ___
 
 **Returns:** [*Address*](address.md)
 
-Defined in: [types/primitives.ts:89](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L89)
+Defined in: [types/primitives.ts:89](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L89)
 
 ___
 
@@ -174,4 +174,4 @@ ___
 
 **Returns:** [*Address*](address.md)
 
-Defined in: [types/primitives.ts:85](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L85)
+Defined in: [types/primitives.ts:85](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L85)

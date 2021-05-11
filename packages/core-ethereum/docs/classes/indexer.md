@@ -109,7 +109,7 @@ Also keeps track of the latest block number.
 
 Overrides: EventEmitter.constructor
 
-Defined in: [core-ethereum/src/indexer/index.ts:27](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L27)
+Defined in: [core-ethereum/src/indexer/index.ts:27](https://github.com/jlherren/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L27)
 
 ## Properties
 
@@ -117,7 +117,7 @@ Defined in: [core-ethereum/src/indexer/index.ts:27](https://github.com/hoprnet/h
 
 • **latestBlock**: *number*= 0
 
-Defined in: [core-ethereum/src/indexer/index.ts:26](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L26)
+Defined in: [core-ethereum/src/indexer/index.ts:26](https://github.com/jlherren/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L26)
 
 ___
 
@@ -125,7 +125,7 @@ ___
 
 • **status**: ``"started"`` \| ``"restarting"`` \| ``"stopped"``= 'stopped'
 
-Defined in: [core-ethereum/src/indexer/index.ts:25](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L25)
+Defined in: [core-ethereum/src/indexer/index.ts:25](https://github.com/jlherren/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L25)
 
 ___
 
@@ -133,7 +133,7 @@ ___
 
 • `Private` **unconfirmedEvents**: *Heap*<Event<any\>\>
 
-Defined in: [core-ethereum/src/indexer/index.ts:27](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L27)
+Defined in: [core-ethereum/src/indexer/index.ts:27](https://github.com/jlherren/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L27)
 
 ___
 
@@ -249,7 +249,7 @@ ___
 
 **Returns:** *Promise*<AccountEntry\>
 
-Defined in: [core-ethereum/src/indexer/index.ts:275](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L275)
+Defined in: [core-ethereum/src/indexer/index.ts:275](https://github.com/jlherren/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L275)
 
 ___
 
@@ -259,7 +259,7 @@ ___
 
 **Returns:** *Promise*<Multiaddr[]\>
 
-Defined in: [core-ethereum/src/indexer/index.ts:318](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L318)
+Defined in: [core-ethereum/src/indexer/index.ts:318](https://github.com/jlherren/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L318)
 
 ___
 
@@ -275,7 +275,7 @@ ___
 
 **Returns:** *Promise*<ChannelEntry\>
 
-Defined in: [core-ethereum/src/indexer/index.ts:279](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L279)
+Defined in: [core-ethereum/src/indexer/index.ts:279](https://github.com/jlherren/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L279)
 
 ___
 
@@ -291,7 +291,7 @@ ___
 
 **Returns:** *Promise*<ChannelEntry[]\>
 
-Defined in: [core-ethereum/src/indexer/index.ts:283](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L283)
+Defined in: [core-ethereum/src/indexer/index.ts:283](https://github.com/jlherren/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L283)
 
 ___
 
@@ -307,7 +307,7 @@ ___
 
 **Returns:** *Promise*<[*RoutingChannel*](../modules.md#routingchannel)[]\>
 
-Defined in: [core-ethereum/src/indexer/index.ts:342](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L342)
+Defined in: [core-ethereum/src/indexer/index.ts:342](https://github.com/jlherren/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L342)
 
 ___
 
@@ -323,7 +323,7 @@ ___
 
 **Returns:** *Promise*<ChannelEntry[]\>
 
-Defined in: [core-ethereum/src/indexer/index.ts:287](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L287)
+Defined in: [core-ethereum/src/indexer/index.ts:287](https://github.com/jlherren/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L287)
 
 ___
 
@@ -351,7 +351,7 @@ ___
 
 **Returns:** *Promise*<PublicKey\>
 
-Defined in: [core-ethereum/src/indexer/index.ts:294](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L294)
+Defined in: [core-ethereum/src/indexer/index.ts:294](https://github.com/jlherren/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L294)
 
 ___
 
@@ -361,7 +361,7 @@ ___
 
 **Returns:** *Promise*<Multiaddr[]\>
 
-Defined in: [core-ethereum/src/indexer/index.ts:322](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L322)
+Defined in: [core-ethereum/src/indexer/index.ts:322](https://github.com/jlherren/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L322)
 
 ___
 
@@ -371,7 +371,7 @@ ___
 
 **Returns:** *Promise*<[*RoutingChannel*](../modules.md#routingchannel)\>
 
-Defined in: [core-ethereum/src/indexer/index.ts:328](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L328)
+Defined in: [core-ethereum/src/indexer/index.ts:328](https://github.com/jlherren/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L328)
 
 ___
 
@@ -462,7 +462,7 @@ ___
 
 **Returns:** *Promise*<void\>
 
-Defined in: [core-ethereum/src/indexer/index.ts:246](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L246)
+Defined in: [core-ethereum/src/indexer/index.ts:246](https://github.com/jlherren/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L246)
 
 ___
 
@@ -478,7 +478,7 @@ ___
 
 **Returns:** *Promise*<void\>
 
-Defined in: [core-ethereum/src/indexer/index.ts:270](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L270)
+Defined in: [core-ethereum/src/indexer/index.ts:270](https://github.com/jlherren/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L270)
 
 ___
 
@@ -499,7 +499,7 @@ confirmed blocks.
 
 **Returns:** *Promise*<void\>
 
-Defined in: [core-ethereum/src/indexer/index.ts:184](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L184)
+Defined in: [core-ethereum/src/indexer/index.ts:184](https://github.com/jlherren/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L184)
 
 ___
 
@@ -517,7 +517,7 @@ Called whenever we receive new events.
 
 **Returns:** *void*
 
-Defined in: [core-ethereum/src/indexer/index.ts:242](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L242)
+Defined in: [core-ethereum/src/indexer/index.ts:242](https://github.com/jlherren/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L242)
 
 ___
 
@@ -598,7 +598,7 @@ TODO: optimize DB and fetch requests
 
 past events and last queried block
 
-Defined in: [core-ethereum/src/indexer/index.ts:130](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L130)
+Defined in: [core-ethereum/src/indexer/index.ts:130](https://github.com/jlherren/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L130)
 
 ___
 
@@ -663,7 +663,7 @@ ___
 
 **Returns:** *Promise*<void\>
 
-Defined in: [core-ethereum/src/indexer/index.ts:105](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L105)
+Defined in: [core-ethereum/src/indexer/index.ts:105](https://github.com/jlherren/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L105)
 
 ___
 
@@ -693,7 +693,7 @@ Starts indexing.
 
 **Returns:** *Promise*<void\>
 
-Defined in: [core-ethereum/src/indexer/index.ts:42](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L42)
+Defined in: [core-ethereum/src/indexer/index.ts:42](https://github.com/jlherren/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L42)
 
 ___
 
@@ -705,7 +705,7 @@ Stops indexing.
 
 **Returns:** *Promise*<void\>
 
-Defined in: [core-ethereum/src/indexer/index.ts:95](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L95)
+Defined in: [core-ethereum/src/indexer/index.ts:95](https://github.com/jlherren/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L95)
 
 ___
 
@@ -722,7 +722,7 @@ ___
 
 **Returns:** *Promise*<[*RoutingChannel*](../modules.md#routingchannel)\>
 
-Defined in: [core-ethereum/src/indexer/index.ts:303](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L303)
+Defined in: [core-ethereum/src/indexer/index.ts:303](https://github.com/jlherren/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L303)
 
 ___
 

@@ -15,7 +15,7 @@
 
 • **iteration**: *number*
 
-Defined in: [crypto/hashIterator.ts:4](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/hashIterator.ts#L4)
+Defined in: [crypto/hashIterator.ts:4](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/crypto/hashIterator.ts#L4)
 
 ___
 
@@ -23,4 +23,4 @@ ___
 
 • **preImage**: *Uint8Array*
 
-Defined in: [crypto/hashIterator.ts:5](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/hashIterator.ts#L5)
+Defined in: [crypto/hashIterator.ts:5](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/crypto/hashIterator.ts#L5)

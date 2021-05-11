@@ -40,7 +40,7 @@
 
 **Returns:** [*PRP*](prp.md)
 
-Defined in: [crypto/prp.ts:30](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L30)
+Defined in: [crypto/prp.ts:30](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L30)
 
 ## Properties
 
@@ -48,7 +48,7 @@ Defined in: [crypto/prp.ts:30](https://github.com/hoprnet/hoprnet/blob/master/pa
 
 • `Private` `Readonly` **iv1**: *Uint8Array*
 
-Defined in: [crypto/prp.ts:27](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L27)
+Defined in: [crypto/prp.ts:27](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L27)
 
 ___
 
@@ -56,7 +56,7 @@ ___
 
 • `Private` `Readonly` **iv2**: *Uint8Array*
 
-Defined in: [crypto/prp.ts:28](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L28)
+Defined in: [crypto/prp.ts:28](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L28)
 
 ___
 
@@ -64,7 +64,7 @@ ___
 
 • `Private` `Readonly` **iv3**: *Uint8Array*
 
-Defined in: [crypto/prp.ts:29](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L29)
+Defined in: [crypto/prp.ts:29](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L29)
 
 ___
 
@@ -72,7 +72,7 @@ ___
 
 • `Private` `Readonly` **iv4**: *Uint8Array*
 
-Defined in: [crypto/prp.ts:30](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L30)
+Defined in: [crypto/prp.ts:30](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L30)
 
 ___
 
@@ -80,7 +80,7 @@ ___
 
 • `Private` `Readonly` **k1**: *Uint8Array*
 
-Defined in: [crypto/prp.ts:22](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L22)
+Defined in: [crypto/prp.ts:22](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L22)
 
 ___
 
@@ -88,7 +88,7 @@ ___
 
 • `Private` `Readonly` **k2**: *Uint8Array*
 
-Defined in: [crypto/prp.ts:23](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L23)
+Defined in: [crypto/prp.ts:23](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L23)
 
 ___
 
@@ -96,7 +96,7 @@ ___
 
 • `Private` `Readonly` **k3**: *Uint8Array*
 
-Defined in: [crypto/prp.ts:24](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L24)
+Defined in: [crypto/prp.ts:24](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L24)
 
 ___
 
@@ -104,7 +104,7 @@ ___
 
 • `Private` `Readonly` **k4**: *Uint8Array*
 
-Defined in: [crypto/prp.ts:25](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L25)
+Defined in: [crypto/prp.ts:25](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L25)
 
 ## Methods
 
@@ -120,7 +120,7 @@ Defined in: [crypto/prp.ts:25](https://github.com/hoprnet/hoprnet/blob/master/pa
 
 **Returns:** *Uint8Array*
 
-Defined in: [crypto/prp.ts:79](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L79)
+Defined in: [crypto/prp.ts:79](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L79)
 
 ___
 
@@ -136,7 +136,7 @@ ___
 
 **Returns:** *Uint8Array*
 
-Defined in: [crypto/prp.ts:64](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L64)
+Defined in: [crypto/prp.ts:64](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L64)
 
 ___
 
@@ -152,4 +152,4 @@ ___
 
 **Returns:** [*PRP*](prp.md)
 
-Defined in: [crypto/prp.ts:44](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L44)
+Defined in: [crypto/prp.ts:44](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L44)

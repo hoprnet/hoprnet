@@ -75,7 +75,7 @@
 
 **Returns:** [*default*](default.md)
 
-Defined in: [core-ethereum/src/index.ts:33](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L33)
+Defined in: [core-ethereum/src/index.ts:33](https://github.com/jlherren/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L33)
 
 ## Properties
 
@@ -83,7 +83,7 @@ Defined in: [core-ethereum/src/index.ts:33](https://github.com/hoprnet/hoprnet/b
 
 • `Readonly` **CHAIN\_NAME**: ``"HOPR on Ethereum"``= 'HOPR on Ethereum'
 
-Defined in: [core-ethereum/src/index.ts:39](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L39)
+Defined in: [core-ethereum/src/index.ts:39](https://github.com/jlherren/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L39)
 
 ___
 
@@ -99,7 +99,7 @@ ___
 
 Defined in: utils/lib/cache.d.ts:1
 
-Defined in: [core-ethereum/src/index.ts:82](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L82)
+Defined in: [core-ethereum/src/index.ts:82](https://github.com/jlherren/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L82)
 
 ___
 
@@ -115,7 +115,7 @@ ___
 
 Defined in: utils/lib/cache.d.ts:1
 
-Defined in: [core-ethereum/src/index.ts:104](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L104)
+Defined in: [core-ethereum/src/index.ts:104](https://github.com/jlherren/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L104)
 
 ___
 
@@ -129,7 +129,7 @@ ___
 
 • `Private` **privateKey**: *Uint8Array*
 
-Defined in: [core-ethereum/src/index.ts:33](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L33)
+Defined in: [core-ethereum/src/index.ts:33](https://github.com/jlherren/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L33)
 
 ## Methods
 
@@ -145,7 +145,7 @@ Defined in: [core-ethereum/src/index.ts:33](https://github.com/hoprnet/hoprnet/b
 
 **Returns:** *Promise*<string\>
 
-Defined in: [core-ethereum/src/index.ts:53](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L53)
+Defined in: [core-ethereum/src/index.ts:53](https://github.com/jlherren/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L53)
 
 ___
 
@@ -161,7 +161,7 @@ ___
 
 **Returns:** *Promise*<AccountEntry\>
 
-Defined in: [core-ethereum/src/index.ts:69](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L69)
+Defined in: [core-ethereum/src/index.ts:69](https://github.com/jlherren/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L69)
 
 ___
 
@@ -171,7 +171,7 @@ ___
 
 **Returns:** *Address*
 
-Defined in: [core-ethereum/src/index.ts:91](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L91)
+Defined in: [core-ethereum/src/index.ts:91](https://github.com/jlherren/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L91)
 
 ___
 
@@ -191,7 +191,7 @@ Retrieves HOPR balance, optionally uses the cache.
 
 HOPR balance
 
-Defined in: [core-ethereum/src/index.ts:87](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L87)
+Defined in: [core-ethereum/src/index.ts:87](https://github.com/jlherren/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L87)
 
 ___
 
@@ -208,7 +208,7 @@ ___
 
 **Returns:** [*Channel*](channel.md)
 
-Defined in: [core-ethereum/src/index.ts:49](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L49)
+Defined in: [core-ethereum/src/index.ts:49](https://github.com/jlherren/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L49)
 
 ___
 
@@ -224,7 +224,7 @@ ___
 
 **Returns:** *Promise*<[*RoutingChannel*](../modules.md#routingchannel)[]\>
 
-Defined in: [core-ethereum/src/index.ts:61](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L61)
+Defined in: [core-ethereum/src/index.ts:61](https://github.com/jlherren/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L61)
 
 ___
 
@@ -240,7 +240,7 @@ ___
 
 **Returns:** *Promise*<ChannelEntry[]\>
 
-Defined in: [core-ethereum/src/index.ts:65](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L65)
+Defined in: [core-ethereum/src/index.ts:65](https://github.com/jlherren/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L65)
 
 ___
 
@@ -256,7 +256,7 @@ ___
 
 **Returns:** *Promise*<NativeBalance\>
 
-Defined in: [core-ethereum/src/index.ts:108](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L108)
+Defined in: [core-ethereum/src/index.ts:108](https://github.com/jlherren/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L108)
 
 ___
 
@@ -266,7 +266,7 @@ ___
 
 **Returns:** *PublicKey*
 
-Defined in: [core-ethereum/src/index.ts:95](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L95)
+Defined in: [core-ethereum/src/index.ts:95](https://github.com/jlherren/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L95)
 
 ___
 
@@ -282,7 +282,7 @@ ___
 
 **Returns:** *Promise*<PublicKey\>
 
-Defined in: [core-ethereum/src/index.ts:73](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L73)
+Defined in: [core-ethereum/src/index.ts:73](https://github.com/jlherren/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L73)
 
 ___
 
@@ -292,7 +292,7 @@ ___
 
 **Returns:** *Promise*<[*RoutingChannel*](../modules.md#routingchannel)\>
 
-Defined in: [core-ethereum/src/index.ts:77](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L77)
+Defined in: [core-ethereum/src/index.ts:77](https://github.com/jlherren/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L77)
 
 ___
 
@@ -302,7 +302,7 @@ ___
 
 **Returns:** *string*
 
-Defined in: [core-ethereum/src/index.ts:112](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L112)
+Defined in: [core-ethereum/src/index.ts:112](https://github.com/jlherren/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L112)
 
 ___
 
@@ -314,7 +314,7 @@ Stops the connector.
 
 **Returns:** *Promise*<void\>
 
-Defined in: [core-ethereum/src/index.ts:44](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L44)
+Defined in: [core-ethereum/src/index.ts:44](https://github.com/jlherren/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L44)
 
 ___
 
@@ -324,7 +324,7 @@ ___
 
 **Returns:** *Promise*<Balance\>
 
-Defined in: [core-ethereum/src/index.ts:81](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L81)
+Defined in: [core-ethereum/src/index.ts:81](https://github.com/jlherren/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L81)
 
 ___
 
@@ -338,7 +338,7 @@ Retrieves ETH balance, optionally uses the cache.
 
 ETH balance
 
-Defined in: [core-ethereum/src/index.ts:103](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L103)
+Defined in: [core-ethereum/src/index.ts:103](https://github.com/jlherren/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L103)
 
 ___
 
@@ -348,7 +348,7 @@ ___
 
 **Returns:** *Promise*<Multiaddr[]\>
 
-Defined in: [core-ethereum/src/index.ts:116](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L116)
+Defined in: [core-ethereum/src/index.ts:116](https://github.com/jlherren/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L116)
 
 ___
 
@@ -366,7 +366,7 @@ ___
 
 **Returns:** *Promise*<string\>
 
-Defined in: [core-ethereum/src/index.ts:57](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L57)
+Defined in: [core-ethereum/src/index.ts:57](https://github.com/jlherren/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L57)
 
 ___
 
@@ -390,4 +390,4 @@ Creates an uninitialised instance.
 
 a promise resolved to the connector
 
-Defined in: [core-ethereum/src/index.ts:128](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L128)
+Defined in: [core-ethereum/src/index.ts:128](https://github.com/jlherren/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L128)

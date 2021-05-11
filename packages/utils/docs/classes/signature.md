@@ -36,7 +36,7 @@
 
 **Returns:** [*Signature*](signature.md)
 
-Defined in: [types/primitives.ts:161](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L161)
+Defined in: [types/primitives.ts:161](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L161)
 
 ## Properties
 
@@ -56,7 +56,7 @@ ___
 
 ▪ `Static` **SIZE**: *number*
 
-Defined in: [types/primitives.ts:189](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L189)
+Defined in: [types/primitives.ts:189](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L189)
 
 ## Methods
 
@@ -66,7 +66,7 @@ Defined in: [types/primitives.ts:189](https://github.com/hoprnet/hoprnet/blob/ma
 
 **Returns:** *Uint8Array*
 
-Defined in: [types/primitives.ts:178](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L178)
+Defined in: [types/primitives.ts:178](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L178)
 
 ___
 
@@ -83,7 +83,7 @@ ___
 
 **Returns:** *boolean*
 
-Defined in: [types/primitives.ts:185](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L185)
+Defined in: [types/primitives.ts:185](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L185)
 
 ___
 
@@ -100,7 +100,7 @@ ___
 
 **Returns:** [*Signature*](signature.md)
 
-Defined in: [types/primitives.ts:173](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L173)
+Defined in: [types/primitives.ts:173](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L173)
 
 ___
 
@@ -116,4 +116,4 @@ ___
 
 **Returns:** [*Signature*](signature.md)
 
-Defined in: [types/primitives.ts:168](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L168)
+Defined in: [types/primitives.ts:168](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L168)

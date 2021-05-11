@@ -43,7 +43,7 @@
 
 **Returns:** [*AccountEntry*](accountentry.md)
 
-Defined in: [types/accountEntry.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L8)
+Defined in: [types/accountEntry.ts:8](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L8)
 
 ## Properties
 
@@ -71,7 +71,7 @@ ___
 
 **Returns:** *number*
 
-Defined in: [types/accountEntry.ts:15](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L15)
+Defined in: [types/accountEntry.ts:15](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L15)
 
 ## Methods
 
@@ -81,7 +81,7 @@ Defined in: [types/accountEntry.ts:15](https://github.com/hoprnet/hoprnet/blob/m
 
 **Returns:** *boolean*
 
-Defined in: [types/accountEntry.ts:51](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L51)
+Defined in: [types/accountEntry.ts:51](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L51)
 
 ___
 
@@ -91,7 +91,7 @@ ___
 
 **Returns:** *PeerId*
 
-Defined in: [types/accountEntry.ts:43](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L43)
+Defined in: [types/accountEntry.ts:43](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L43)
 
 ___
 
@@ -101,7 +101,7 @@ ___
 
 **Returns:** [*PublicKey*](publickey.md)
 
-Defined in: [types/accountEntry.ts:47](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L47)
+Defined in: [types/accountEntry.ts:47](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L47)
 
 ___
 
@@ -111,7 +111,7 @@ ___
 
 **Returns:** *boolean*
 
-Defined in: [types/accountEntry.ts:56](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L56)
+Defined in: [types/accountEntry.ts:56](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L56)
 
 ___
 
@@ -121,7 +121,7 @@ ___
 
 **Returns:** *Uint8Array*
 
-Defined in: [types/accountEntry.ts:30](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L30)
+Defined in: [types/accountEntry.ts:30](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L30)
 
 ___
 
@@ -137,4 +137,4 @@ ___
 
 **Returns:** [*AccountEntry*](accountentry.md)
 
-Defined in: [types/accountEntry.ts:19](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L19)
+Defined in: [types/accountEntry.ts:19](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/accountEntry.ts#L19)

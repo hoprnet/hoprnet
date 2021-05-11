@@ -40,7 +40,7 @@
 
 **Returns:** [*AcknowledgedTicket*](acknowledgedticket.md)
 
-Defined in: [types/acknowledgedTicket.ts:5](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/acknowledgedTicket.ts#L5)
+Defined in: [types/acknowledgedTicket.ts:5](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/acknowledgedTicket.ts#L5)
 
 ## Properties
 
@@ -68,7 +68,7 @@ ___
 
 **Returns:** *number*
 
-Defined in: [types/acknowledgedTicket.ts:28](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/acknowledgedTicket.ts#L28)
+Defined in: [types/acknowledgedTicket.ts:28](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/acknowledgedTicket.ts#L28)
 
 ## Methods
 
@@ -78,7 +78,7 @@ Defined in: [types/acknowledgedTicket.ts:28](https://github.com/hoprnet/hoprnet/
 
 **Returns:** *Uint8Array*
 
-Defined in: [types/acknowledgedTicket.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/acknowledgedTicket.ts#L8)
+Defined in: [types/acknowledgedTicket.ts:8](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/acknowledgedTicket.ts#L8)
 
 ___
 
@@ -94,7 +94,7 @@ ___
 
 **Returns:** *boolean*
 
-Defined in: [types/acknowledgedTicket.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/acknowledgedTicket.ts#L16)
+Defined in: [types/acknowledgedTicket.ts:16](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/acknowledgedTicket.ts#L16)
 
 ___
 
@@ -110,4 +110,4 @@ ___
 
 **Returns:** [*AcknowledgedTicket*](acknowledgedticket.md)
 
-Defined in: [types/acknowledgedTicket.ts:23](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/acknowledgedTicket.ts#L23)
+Defined in: [types/acknowledgedTicket.ts:23](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/acknowledgedTicket.ts#L23)

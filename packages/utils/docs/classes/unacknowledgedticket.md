@@ -37,7 +37,7 @@
 
 **Returns:** [*UnacknowledgedTicket*](unacknowledgedticket.md)
 
-Defined in: [types/unacknowledgedTicket.ts:4](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/unacknowledgedTicket.ts#L4)
+Defined in: [types/unacknowledgedTicket.ts:4](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/unacknowledgedTicket.ts#L4)
 
 ## Properties
 
@@ -65,7 +65,7 @@ ___
 
 **Returns:** { `response`: *Uint8Array* ; `valid`: ``true``  } \| { `valid`: ``false``  }
 
-Defined in: [types/unacknowledgedTicket.ts:24](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/unacknowledgedTicket.ts#L24)
+Defined in: [types/unacknowledgedTicket.ts:24](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/unacknowledgedTicket.ts#L24)
 
 ___
 
@@ -75,7 +75,7 @@ ___
 
 **Returns:** *Uint8Array*
 
-Defined in: [types/unacknowledgedTicket.ts:13](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/unacknowledgedTicket.ts#L13)
+Defined in: [types/unacknowledgedTicket.ts:13](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/unacknowledgedTicket.ts#L13)
 
 ___
 
@@ -92,7 +92,7 @@ ___
 
 **Returns:** *boolean*
 
-Defined in: [types/unacknowledgedTicket.ts:28](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/unacknowledgedTicket.ts#L28)
+Defined in: [types/unacknowledgedTicket.ts:28](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/unacknowledgedTicket.ts#L28)
 
 ___
 
@@ -108,7 +108,7 @@ ___
 
 **Returns:** *boolean*
 
-Defined in: [types/unacknowledgedTicket.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/unacknowledgedTicket.ts#L20)
+Defined in: [types/unacknowledgedTicket.ts:20](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/unacknowledgedTicket.ts#L20)
 
 ___
 
@@ -118,7 +118,7 @@ ___
 
 **Returns:** *number*
 
-Defined in: [types/unacknowledgedTicket.ts:35](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/unacknowledgedTicket.ts#L35)
+Defined in: [types/unacknowledgedTicket.ts:35](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/unacknowledgedTicket.ts#L35)
 
 ___
 
@@ -134,4 +134,4 @@ ___
 
 **Returns:** [*UnacknowledgedTicket*](unacknowledgedticket.md)
 
-Defined in: [types/unacknowledgedTicket.ts:7](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/unacknowledgedTicket.ts#L7)
+Defined in: [types/unacknowledgedTicket.ts:7](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/unacknowledgedTicket.ts#L7)

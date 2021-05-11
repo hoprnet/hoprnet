@@ -35,7 +35,7 @@
 | `address` | *string* |
 | `deployedAt?` | *number* |
 
-Defined in: [chain/index.ts:7](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/chain/index.ts#L7)
+Defined in: [chain/index.ts:7](https://github.com/jlherren/hoprnet/blob/master/packages/ethereum/chain/index.ts#L7)
 
 ___
 
@@ -43,7 +43,7 @@ ___
 
 Ƭ **ContractNames**: ``"HoprToken"`` \| ``"HoprChannels"`` \| ``"HoprDistributor"``
 
-Defined in: [chain/index.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/chain/index.ts#L6)
+Defined in: [chain/index.ts:6](https://github.com/jlherren/hoprnet/blob/master/packages/ethereum/chain/index.ts#L6)
 
 ___
 
@@ -51,7 +51,7 @@ ___
 
 Ƭ **DeploymentTypes**: ``"testing"`` \| ``"development"`` \| ``"staging"`` \| ``"production"``
 
-Defined in: [chain/networks.ts:5](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/chain/networks.ts#L5)
+Defined in: [chain/networks.ts:5](https://github.com/jlherren/hoprnet/blob/master/packages/ethereum/chain/networks.ts#L5)
 
 ___
 
@@ -59,7 +59,7 @@ ___
 
 Ƭ **NetworkTag**: [*DeploymentTypes*](modules.md#deploymenttypes) \| ``"etherscan"``
 
-Defined in: [chain/networks.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/chain/networks.ts#L6)
+Defined in: [chain/networks.ts:6](https://github.com/jlherren/hoprnet/blob/master/packages/ethereum/chain/networks.ts#L6)
 
 ___
 
@@ -67,7 +67,7 @@ ___
 
 Ƭ **Networks**: ``"hardhat"`` \| ``"localhost"`` \| [*PublicNetworks*](modules.md#publicnetworks)
 
-Defined in: [chain/networks.ts:4](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/chain/networks.ts#L4)
+Defined in: [chain/networks.ts:4](https://github.com/jlherren/hoprnet/blob/master/packages/ethereum/chain/networks.ts#L4)
 
 ___
 
@@ -75,7 +75,7 @@ ___
 
 Ƭ **PublicNetworks**: ``"xdai"`` \| ``"goerli"``
 
-Defined in: [chain/networks.ts:3](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/chain/networks.ts#L3)
+Defined in: [chain/networks.ts:3](https://github.com/jlherren/hoprnet/blob/master/packages/ethereum/chain/networks.ts#L3)
 
 ## Variables
 
@@ -83,7 +83,7 @@ Defined in: [chain/networks.ts:3](https://github.com/hoprnet/hoprnet/blob/master
 
 • `Const` **abis**: { [name in ContractNames]: any[]}
 
-Defined in: [chain/index.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/chain/index.ts#L20)
+Defined in: [chain/index.ts:20](https://github.com/jlherren/hoprnet/blob/master/packages/ethereum/chain/index.ts#L20)
 
 ___
 
@@ -91,7 +91,7 @@ ___
 
 • `Const` **networks**: { [network in PublicNetworks]: object}
 
-Defined in: [chain/networks.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/chain/networks.ts#L8)
+Defined in: [chain/networks.ts:8](https://github.com/jlherren/hoprnet/blob/master/packages/ethereum/chain/networks.ts#L8)
 
 ## Functions
 
@@ -108,4 +108,4 @@ Defined in: [chain/networks.ts:8](https://github.com/hoprnet/hoprnet/blob/master
 | `localhost` |  |
 | `xdai` |  |
 
-Defined in: [chain/index.ts:14](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/chain/index.ts#L14)
+Defined in: [chain/index.ts:14](https://github.com/jlherren/hoprnet/blob/master/packages/ethereum/chain/index.ts#L14)

@@ -35,7 +35,7 @@
 
 **Returns:** [*Balance*](balance.md)
 
-Defined in: [types/primitives.ts:192](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L192)
+Defined in: [types/primitives.ts:192](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L192)
 
 ## Accessors
 
@@ -45,7 +45,7 @@ Defined in: [types/primitives.ts:192](https://github.com/hoprnet/hoprnet/blob/ma
 
 **Returns:** *number*
 
-Defined in: [types/primitives.ts:199](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L199)
+Defined in: [types/primitives.ts:199](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L199)
 
 ___
 
@@ -55,7 +55,7 @@ ___
 
 **Returns:** *number*
 
-Defined in: [types/primitives.ts:219](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L219)
+Defined in: [types/primitives.ts:219](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L219)
 
 ___
 
@@ -65,7 +65,7 @@ ___
 
 **Returns:** *string*
 
-Defined in: [types/primitives.ts:195](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L195)
+Defined in: [types/primitives.ts:195](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L195)
 
 ## Methods
 
@@ -75,7 +75,7 @@ Defined in: [types/primitives.ts:195](https://github.com/hoprnet/hoprnet/blob/ma
 
 **Returns:** *Uint8Array*
 
-Defined in: [types/primitives.ts:211](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L211)
+Defined in: [types/primitives.ts:211](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L211)
 
 ___
 
@@ -85,7 +85,7 @@ ___
 
 **Returns:** *BN*
 
-Defined in: [types/primitives.ts:203](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L203)
+Defined in: [types/primitives.ts:203](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L203)
 
 ___
 
@@ -95,7 +95,7 @@ ___
 
 **Returns:** *string*
 
-Defined in: [types/primitives.ts:215](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L215)
+Defined in: [types/primitives.ts:215](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L215)
 
 ___
 
@@ -111,4 +111,4 @@ ___
 
 **Returns:** [*Balance*](balance.md)
 
-Defined in: [types/primitives.ts:207](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L207)
+Defined in: [types/primitives.ts:207](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L207)

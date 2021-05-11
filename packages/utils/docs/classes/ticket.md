@@ -54,7 +54,7 @@
 
 **Returns:** [*Ticket*](ticket.md)
 
-Defined in: [types/ticket.ts:47](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L47)
+Defined in: [types/ticket.ts:47](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L47)
 
 ## Properties
 
@@ -112,7 +112,7 @@ ___
 
 **Returns:** *number*
 
-Defined in: [types/ticket.ts:133](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L133)
+Defined in: [types/ticket.ts:133](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L133)
 
 ## Methods
 
@@ -122,7 +122,7 @@ Defined in: [types/ticket.ts:133](https://github.com/hoprnet/hoprnet/blob/master
 
 **Returns:** [*Hash*](hash.md)
 
-Defined in: [types/ticket.ts:117](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L117)
+Defined in: [types/ticket.ts:117](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L117)
 
 ___
 
@@ -146,7 +146,7 @@ a ticket before we submit it to the blockchain.
 
 **Returns:** *boolean*
 
-Defined in: [types/ticket.ts:163](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L163)
+Defined in: [types/ticket.ts:163](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L163)
 
 ___
 
@@ -156,7 +156,7 @@ ___
 
 **Returns:** [*PublicKey*](publickey.md)
 
-Defined in: [types/ticket.ts:146](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L146)
+Defined in: [types/ticket.ts:146](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L146)
 
 ___
 
@@ -166,7 +166,7 @@ ___
 
 **Returns:** *Uint8Array*
 
-Defined in: [types/ticket.ts:89](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L89)
+Defined in: [types/ticket.ts:89](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L89)
 
 ___
 
@@ -182,7 +182,7 @@ ___
 
 **Returns:** *boolean*
 
-Defined in: [types/ticket.ts:150](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L150)
+Defined in: [types/ticket.ts:150](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L150)
 
 ___
 
@@ -205,7 +205,7 @@ ___
 
 **Returns:** [*Ticket*](ticket.md)
 
-Defined in: [types/ticket.ts:59](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L59)
+Defined in: [types/ticket.ts:59](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L59)
 
 ___
 
@@ -221,4 +221,4 @@ ___
 
 **Returns:** [*Ticket*](ticket.md)
 
-Defined in: [types/ticket.ts:94](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L94)
+Defined in: [types/ticket.ts:94](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L94)

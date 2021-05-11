@@ -41,7 +41,7 @@ Represents a snapshot in the blockchain.
 
 **Returns:** [*Snapshot*](snapshot.md)
 
-Defined in: [types/snapshot.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/snapshot.ts#L8)
+Defined in: [types/snapshot.ts:8](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/snapshot.ts#L8)
 
 ## Properties
 
@@ -69,7 +69,7 @@ ___
 
 **Returns:** *number*
 
-Defined in: [types/snapshot.ts:28](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/snapshot.ts#L28)
+Defined in: [types/snapshot.ts:28](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/snapshot.ts#L28)
 
 ## Methods
 
@@ -79,7 +79,7 @@ Defined in: [types/snapshot.ts:28](https://github.com/hoprnet/hoprnet/blob/maste
 
 **Returns:** *Uint8Array*
 
-Defined in: [types/snapshot.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/snapshot.ts#L20)
+Defined in: [types/snapshot.ts:20](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/snapshot.ts#L20)
 
 ___
 
@@ -95,4 +95,4 @@ ___
 
 **Returns:** [*Snapshot*](snapshot.md)
 
-Defined in: [types/snapshot.ts:11](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/snapshot.ts#L11)
+Defined in: [types/snapshot.ts:11](https://github.com/jlherren/hoprnet/blob/master/packages/utils/src/types/snapshot.ts#L11)
