@@ -242,24 +242,25 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
   }
 
   const api = {
-    // TODO: use indexer when it's done syncing
     getBalance: (address: Address) =>
       token.balanceOf(address.toHex()).then((res) => new Balance(new BN(res.toString()))),
-    getNativeBalance: (address) =>
+    getNativeBalance: (address: Address) =>
       provider.getBalance(address.toHex()).then((res) => new NativeBalance(new BN(res.toString()))),
     announce,
     withdraw: (currency: 'NATIVE' | 'HOPR', recipient: string, amount: string) => withdraw(currency, recipient, amount),
     fundChannel: (me: Address, counterparty: Address, myTotal: Balance, theirTotal: Balance) =>
       fundChannel(token, channels, me, counterparty, myTotal, theirTotal),
-    openChannel: (me, counterparty, amount) => openChannel(token, channels, me, counterparty, amount),
-    finalizeChannelClosure: (counterparty) => finalizeChannelClosure(channels, counterparty),
-    initiateChannelClosure: (counterparty) => initiateChannelClosure(channels, counterparty),
-    redeemTicket: (counterparty, ackTicket, ticket) => redeemTicket(channels, counterparty, ackTicket, ticket),
+    openChannel: (me: Address, counterparty: Address, amount: Balance) =>
+      openChannel(token, channels, me, counterparty, amount),
+    finalizeChannelClosure: (counterparty: Address) => finalizeChannelClosure(channels, counterparty),
+    initiateChannelClosure: (counterparty: Address) => initiateChannelClosure(channels, counterparty),
+    redeemTicket: (counterparty: Address, ackTicket: AcknowledgedTicket, ticket: Ticket) =>
+      redeemTicket(channels, counterparty, ackTicket, ticket),
     setCommitment: (comm: Hash) => setCommitment(channels, comm),
     getGenesisBlock: () => contracts?.HoprChannels?.deployedAt ?? 0,
     getWallet: () => wallet,
     waitUntilReady: async () => await provider.ready,
-    getLatestBlockNumber: async () => provider.getBlockNumber(),
+    getLatestBlockNumber: async () => provider.getBlockNumber(), // TODO: use indexer when it's done syncing
     subscribeBlock: (cb) => provider.on('block', cb),
     subscribeError: (cb) => {
       provider.on('error', cb)
