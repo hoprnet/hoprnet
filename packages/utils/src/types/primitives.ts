@@ -120,7 +120,7 @@ export class Address {
 }
 
 export class Hash {
-  constructor(private arr: Uint8Array) {
+  constructor(protected arr: Uint8Array) {
     if (arr.length !== Hash.SIZE) {
       throw new Error('Incorrect size Uint8Array for hash')
     }
