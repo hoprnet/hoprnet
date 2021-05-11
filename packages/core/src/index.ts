@@ -85,6 +85,7 @@ export type HoprOptions = {
 export type NodeStatus = 'UNINITIALIZED' | 'INITIALIZING' | 'RUNNING' | 'DESTROYED'
 
 class Hopr extends EventEmitter {
+  
   public status: NodeStatus = 'UNINITIALIZED'
 
   private checkTimeout: NodeJS.Timeout
