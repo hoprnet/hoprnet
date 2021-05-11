@@ -1,7 +1,7 @@
 import type { Event } from './types'
 import BN from 'bn.js'
 import assert from 'assert'
-import Multiaddr from 'multiaddr'
+import { Multiaddr } from 'multiaddr'
 import { BigNumber } from 'ethers'
 import { stringToU8a } from '@hoprnet/hopr-utils'
 import { PublicKey, Hash, AccountEntry, ChannelEntry, u8aToHex } from '@hoprnet/hopr-utils'
@@ -10,7 +10,7 @@ export const partyA = PublicKey.fromString('0x03362b7b26bddb151a03056422d37119ea
 export const partyB = PublicKey.fromString('0x03217f3cd4d0b4b82997b25d1b6b68a933929fed724531cb30bbfd4729dc6b44e0')
 export const secret1 = new Hash(stringToU8a('0xb8b37f62ec82443e5b5557c5a187fe3686790620cc04c06187c48f8636caac89'))
 export const secret2 = new Hash(stringToU8a('0x294549f8629f0eeb2b8e01aca491f701f5386a9662403b485c4efe7d447dfba3'))
-export const partyAMultiAddr = Multiaddr(
+export const partyAMultiAddr = new Multiaddr(
   '/ip4/34.65.237.196/tcp/9091/p2p/16Uiu2HAmGJSpah8otZ92EouCVzqBb96g64iE5Xx3Rh6YDnTJL5Bv'
 )
 

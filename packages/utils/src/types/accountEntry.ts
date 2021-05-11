@@ -1,4 +1,4 @@
-import Multiaddr from 'multiaddr'
+import { Multiaddr } from 'multiaddr'
 import PeerId from 'peer-id'
 import { ethers } from 'ethers'
 import { u8aSplit, serializeToU8a, MULTI_ADDR_MAX_LENGTH, u8aEquals } from '..'
@@ -24,7 +24,7 @@ export class AccountEntry {
     const isBEmpty = u8aEquals(strippedB, new Uint8Array({ length: strippedB.length }))
     const address = new Address(a)
     const blockNumber = new BN(c)
-    return new AccountEntry(address, isBEmpty ? undefined : Multiaddr(strippedB), blockNumber)
+    return new AccountEntry(address, isBEmpty ? undefined : new Multiaddr(strippedB), blockNumber)
   }
 
   public serialize(): Uint8Array {
