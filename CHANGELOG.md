@@ -1,3 +1,12 @@
+<a name="0.2.25"></a>
+
+## [0.2.25](https://github.com/hoprnet/hopr-connect/compare/v0.2.23...v0.2.25) (2021-05-11)
+
+### Upgrades:
+
+- `libp2p@0.31`
+- `multiaddr@9.0`
+
 <a name="0.2.23"></a>
 
 ## [0.2.23](https://github.com/hoprnet/hopr-connect/compare/v0.2.21...v0.2.23) (2021-03-01)
