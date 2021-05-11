@@ -90,7 +90,9 @@ export function preVerify(secret: Uint8Array, porBytes: Uint8Array, challenge: A
   const ownKey = deriveOwnKeyShare(secret)
   const ownShare = ownKey.toChallenge()
 
-  const valid = new PublicKey(publicKeyCombine([ownShare.serialize(), ackChallenge.serialize()])).toAddress().eq(challenge)
+  const valid = new PublicKey(publicKeyCombine([ownShare.serialize(), ackChallenge.serialize()]))
+    .toAddress()
+    .eq(challenge)
 
   if (valid) {
     return {
