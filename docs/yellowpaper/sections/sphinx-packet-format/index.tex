@@ -74,7 +74,7 @@ After that $(B)$ extracts the public key of $(C)$, it deletes the routing inform
 By using the derived shared secret $s_i$, each node is able to recompute the authentication tag and check the integrity of the received packet as follows: $$\gamma_i=HMAC(s_i,\beta_i)$$
 This integrity check allows to verify whether or not the header was modified.
 \paragraph{Encrypt \& Decrypt}
-The payload is where the actual message is hidden and is computed in different layers using a block cipher encryption algorithm and is decrypted at each stage of mixing. $(B)$ removes one layer of encryption from the payload $\delta_0$ and sends it to $(C)$ where:
+The payload is where the actual message is hidden and is computed in different layers using a wide block cipher encryption algorithm and is decrypted at each stage of mixing. $(B)$ removes one layer of encryption from the payload $\delta_0$ and sends it to $(C)$ where:
 $$\delta_i=\pi^{-1}(h_{\pi}(s_{i-1}), \delta_{i-1})$$
 where $\pi$ and $\pi^{-1}$ are families of pseudo-random permutations (PRPs) and $h_{\pi}$ is a hash function used to key $\pi$
 \\~\\Any attempt of modification by an attacker would result in message distruction and thus is would be irrecoverable.
@@ -91,7 +91,7 @@ Within HOPR, the following cryptographic primitives were used:
     \item \textbf{Cyclic group:} The cyclic group used in the HOPR Sphinx implementation is an elliptic curve group on the secp256k1 curve and thus operations will be done on the elliptic curve.
     \item \textbf{Hash function:} BLAKE2s hash function which is a cryptographic hash function faster than SHA-2 and SHA-3, yet is at least as secure as SHA-3 and produces digests of any size between 1 and 32 bytes.
     \item \textbf{MAC:} HMAC based on a hash function BLAKE2s.
-    \item \textbf{Encryption scheme:} LIONESS \cite{lionesspaper} implementation, using BLAKE2s as a hash function and ChaCha20 as a stream cipher.
+    \item \textbf{Encryption scheme:} LIONESS \cite{lionesspaper} implementation, using BLAKE2s as a hash function and ChaCha20 as a stream cipher. We use the LIONESS PRP to implement $\pi$.
     \item \textbf{Padding:} In the original SPHINX paper, a sequence of only 0s is used for padding, this allows the last mix-node in the path to infer information about the length of the path and the last destination, hence breaking one of the security properties promised by Sphinx. In order to prevent this attack, We replace the 0-padding by a randomized padding for the last exit-mix node and always take $v=r$. This way, the exit node can't identify where the padding starts and thus won't be able to find the path length that preceeds the padding.
 \end{itemize}
 
