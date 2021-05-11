@@ -4,7 +4,7 @@ import MemDown from 'memdown'
 import { existsSync, mkdirSync } from 'fs'
 import path from 'path'
 import Debug from 'debug'
-import { Hash, u8aAdd, toU8a, u8aConcat, Address, Intermediate } from '.'
+import { Hash, u8aAdd, toU8a, u8aConcat, HalfKeyChallenge, Address, Intermediate } from '.'
 import assert from 'assert'
 import {
   Ticket,
@@ -41,7 +41,7 @@ function keyAcknowledgedTickets(index: Uint8Array): Uint8Array {
   return u8aConcat(ACKNOWLEDGED_TICKET_PREFIX, index)
 }
 
-export function UnAcknowledgedTickets(encodedAckChallenge: Address): Uint8Array {
+export function UnAcknowledgedTickets(encodedAckChallenge: HalfKeyChallenge): Uint8Array {
   return u8aConcat(UNACKNOWLEDGED_TICKETS_PREFIX, encodedAckChallenge.serialize())
 }
 
@@ -169,7 +169,7 @@ export class HoprDB {
         tickets.map<any>(async (ticket) => {
           return {
             type: 'del',
-            key: Buffer.from(this.keyOf(UnAcknowledgedTickets(ticket.ticket.challenge)))
+            key: Buffer.from(this.keyOf(UnAcknowledgedTickets(ticket.ownKey.toChallenge())))
           }
         })
       )
@@ -253,8 +253,8 @@ export class HoprDB {
     await Promise.all([this.deleteUnacknowledgedTickets(filter), this.deleteAcknowledgements(filter)])
   }
 
-  async storeUnacknowledgedTickets(key: PublicKey, unacknowledged: UnacknowledgedTicket) {
-    await this.put(UnAcknowledgedTickets(key.toAddress()), unacknowledged.serialize())
+  async storeUnacknowledgedTickets(challenge: HalfKeyChallenge, unacknowledged: UnacknowledgedTicket) {
+    await this.put(UnAcknowledgedTickets(challenge), unacknowledged.serialize())
   }
 
   async checkAndSetPacketTag(packetTag: Uint8Array) {
@@ -267,8 +267,8 @@ export class HoprDB {
     return present
   }
 
-  async getUnacknowledgedTicketsByKey(key: PublicKey): Promise<UnacknowledgedTicket | undefined> {
-    const unAcknowledgedDbKey = UnAcknowledgedTickets(key.toAddress())
+  async getUnacknowledgedTicketsByKey(challenge: HalfKeyChallenge): Promise<UnacknowledgedTicket | undefined> {
+    const unAcknowledgedDbKey = UnAcknowledgedTickets(challenge)
 
     try {
       const buff = await this.get(unAcknowledgedDbKey)
@@ -284,13 +284,13 @@ export class HoprDB {
     }
   }
 
-  async deleteTicket(key: PublicKey) {
-    await this.del(UnAcknowledgedTickets(key.toAddress()))
+  async deleteTicket(challenge: HalfKeyChallenge) {
+    await this.del(UnAcknowledgedTickets(challenge))
   }
 
-  async replaceTicketWithAcknowledgement(key: PublicKey, acknowledgment: AcknowledgedTicket) {
+  async replaceTicketWithAcknowledgement(keyHalfChallenge: HalfKeyChallenge, acknowledgment: AcknowledgedTicket) {
     const ticketCounter = await this.getTicketCounter()
-    const unAcknowledgedDbKey = UnAcknowledgedTickets(key.toAddress())
+    const unAcknowledgedDbKey = UnAcknowledgedTickets(keyHalfChallenge)
     const acknowledgedDbKey = keyAcknowledgedTickets(ticketCounter)
     try {
       await this.db
@@ -314,8 +314,8 @@ export class HoprDB {
     }
   }
 
-  async storeUnacknowledgedTicket(challenge: PublicKey) {
-    const unAcknowledgedDBKey = UnAcknowledgedTickets(challenge.toAddress())
+  async storeUnacknowledgedTicket(challenge: HalfKeyChallenge) {
+    const unAcknowledgedDBKey = UnAcknowledgedTickets(challenge)
     await this.touch(unAcknowledgedDBKey)
     return unAcknowledgedDBKey
   }
@@ -393,12 +393,12 @@ export class HoprDB {
   }
 
   static createMock(): HoprDB {
-    const mock = {
+    const mock: HoprDB = {
       id: Address.createMock(),
       db: new levelup(MemDown())
-    }
+    } as any
     Object.setPrototypeOf(mock, HoprDB.prototype)
-    //@ts-ignore
+
     return mock
   }
 }
