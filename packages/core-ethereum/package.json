@@ -48,7 +48,7 @@
     "@types/memdown": "^3.0.0",
     "@types/mocha": "^8.2.0",
     "@types/node": "14.14.35",
-    "@types/secp256k1": "^4.0.1",
+    "@types/secp256k1": "^4.0.2",
     "@types/sinon": "^10.0.0",
     "chai": "^4.3.4",
     "chai-as-promised": "^7.1.1",
