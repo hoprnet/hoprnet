@@ -27,8 +27,8 @@ export const setupConfigLogger = () => {
 }
 
 export abstract class Logger {
-  static getLogger(category?: string, useDebug = true): Logger {
-    return useDebug ? new DebugLogger(category) : new ConfigLogger(category)
+  static getLogger(category?: string): Logger {
+    return process.env.DEBUG ? new DebugLogger(category) : new ConfigLogger(category)
   }
   abstract trace(message: unknown, ...args: unknown[]): void
   abstract fatal(message: unknown, ...args: unknown[]): void
