@@ -1,4 +1,13 @@
-import { createFirstChallenge, createPoRString, decodePoRBytes, preVerify, validateAcknowledgement } from '.'
+import {
+  createFirstChallenge,
+  createPoRString,
+  decodePoRBytes,
+  preVerify,
+  validatePoRHalfKeys,
+  validatePoRHint,
+  validatePoRResponse
+} from '.'
+import { Response } from '../../types'
 import { randomBytes } from 'crypto'
 import { SECRET_LENGTH } from './constants'
 import { deriveAckKeyShare } from './keyDerivation'
@@ -36,18 +45,9 @@ describe('PoR - proof of relay', function () {
     // the acknowledgement
     const ack = deriveAckKeyShare(secrets[1])
 
-    const validateResponseResult = validateAcknowledgement(
-      result.ownKey,
-      ack,
-      firstChallenge.ticketChallenge.toAddress(),
-      result.ownShare
-    )
-
-    assert(validateResponseResult.valid == true, `Acknowledgement must solve the challenge`)
-
     assert(
-      validateAcknowledgement(result.ownKey, ack, firstChallenge.ticketChallenge.toAddress()).valid,
-      `Should be valid also without group element`
+      validatePoRHalfKeys(firstChallenge.ticketChallenge.toEthereumChallenge(), result.ownKey, ack),
+      `Acknowledgement must solve the challenge`
     )
 
     // Simulates the transformation as done by the
@@ -58,14 +58,15 @@ describe('PoR - proof of relay', function () {
 
     const secondAck = deriveAckKeyShare(secrets[2])
 
-    const secondValidateResponseResult = validateAcknowledgement(
-      secondResult.ownKey,
-      secondAck,
-      result.nextTicketChallenge.toAddress(),
-      secondResult.ownShare
+    assert(
+      validatePoRHalfKeys(result.nextTicketChallenge.toEthereumChallenge(), secondResult.ownKey, secondAck),
+      `Second acknowledgement must solve the challenge`
     )
 
-    assert(secondValidateResponseResult.valid == true, `Second acknowledgement must solve the challenge`)
+    assert(
+      validatePoRHint(result.nextTicketChallenge.toEthereumChallenge(), secondResult.ownShare, secondAck),
+      `Second acknowledgement must solve the challenge`
+    )
   })
 
   it('test functionality for unit tests', function () {
@@ -74,22 +75,20 @@ describe('PoR - proof of relay', function () {
 
     const firstChallenge = createFirstChallenge(secrets[0], secrets[1])
 
-    const validateResult = validateAcknowledgement(
-      firstChallenge.ownKey,
-      deriveAckKeyShare(secrets[1]),
-      firstChallenge.ticketChallenge.toAddress()
+    assert(
+      validatePoRHalfKeys(
+        firstChallenge.ticketChallenge.toEthereumChallenge(),
+        firstChallenge.ownKey,
+        deriveAckKeyShare(secrets[1])
+      ),
+      `Challenge must be solved`
     )
 
-    assert(validateResult.valid == true, `Challenge must be solved`)
-
     assert(
-      validateAcknowledgement(
-        undefined,
-        deriveAckKeyShare(secrets[1]),
-        firstChallenge.ticketChallenge.toAddress(),
-        undefined,
-        validateResult.response
-      ).valid == true,
+      validatePoRResponse(
+        firstChallenge.ticketChallenge.toEthereumChallenge(),
+        Response.fromHalfKeys(firstChallenge.ownKey, deriveAckKeyShare(secrets[1]))
+      ),
       `Returned response must solve the challenge`
     )
   })
