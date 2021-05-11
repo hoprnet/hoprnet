@@ -39,7 +39,7 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
   const chainId = await provider.getNetwork().then((res) => res.chainId)
   const networkInfo = knownNetworks.find((info) => info.chainId === chainId)
   // get network's name by looking into our known networks
-  const network: Networks = networkInfo.name || 'localhost'
+  const network: Networks = networkInfo?.name || 'localhost'
   const contracts = getContracts()?.[network]
 
   if (!contracts?.HoprToken?.address) {
