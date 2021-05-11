@@ -16,7 +16,7 @@ import { MultiaddrConnection, Upgrader } from 'libp2p'
 
 import type { Listener as InterfaceListener } from 'libp2p-interfaces'
 import type PeerId from 'peer-id'
-import { Multiaddr, multiaddr } from 'multiaddr'
+import { Multiaddr } from 'multiaddr'
 
 import { handleStunRequest, getExternalIp } from './stun'
 import { getAddrs } from './addrs'
@@ -243,7 +243,7 @@ class Listener extends EventEmitter implements InterfaceListener {
     }
 
     for (const res of this.relayConnectResults ?? []) {
-      addrs.push(multiaddr(`/p2p/${res.id}/p2p-circuit/p2p/${this.peerId}`))
+      addrs.push(new Multiaddr(`/p2p/${res.id}/p2p-circuit/p2p/${this.peerId}`))
     }
 
     addrs.push(

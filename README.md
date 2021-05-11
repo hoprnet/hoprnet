@@ -63,7 +63,7 @@ import { NOISE } from 'libp2p-noise'
 const PeerId = require('peer-id')
 
 import HoprConnect from 'hopr-connect'
-import { multiaddr, Multiaddr } from 'multiaddr'
+import { Multiaddr } from 'multiaddr'
 
 const peerId = await PeerId.create({ keyType: 'secp256k1' })
 
@@ -76,7 +76,7 @@ const node = await libp2p.create({
     peerDiscovery: [HoprConnect.discovery]
   },
   addresses: {
-    listen: multiaddr(`/ip4/127.0.0.1/tcp/9091/p2p/${peerId.toB58String()}`)
+    listen: new Multiaddr(`/ip4/127.0.0.1/tcp/9091/p2p/${peerId.toB58String()}`)
   },
   dialer: {
     // Temporary fix
@@ -94,7 +94,7 @@ import { NOISE } from 'libp2p-noise'
 const PeerId = require('peer-id')
 
 import HoprConnect from 'hopr-connect'
-import { multiaddr, Multiaddr } from 'multiaddr'
+import { Multiaddr } from 'multiaddr'
 
 const bootstrapId = '16Uiu2HAmCPgzWWQWNAn2E3UXx1G3CMzxbPfLr1SFzKqnFjDcbdwg' // Change this
 const peerId = await PeerId.create({ keyType: 'secp256k1' })
@@ -108,11 +108,11 @@ const node = await libp2p.create({
     peerDiscovery: [HoprConnect.discovery]
   },
   addresses: {
-    listen: multiaddr(`/ip4/127.0.0.1/tcp/9092/p2p/${peerId.toB58String()}`)
+    listen: new Multiaddr(`/ip4/127.0.0.1/tcp/9092/p2p/${peerId.toB58String()}`)
   },
   config: {
     HoprConnect: {
-      bootstrapServers: [multiaddr(`/ip4/127.0.0.1/tcp/9091/p2p/${bootstrapId.toB58String()}`)],
+      bootstrapServers: [new Multiaddr(`/ip4/127.0.0.1/tcp/9091/p2p/${bootstrapId.toB58String()}`)],
       // Testing:
       __noDirectConnections: false, // set to true to simulate NAT
       __noWebRTCUpgrade: false // set to true to simulate bidirectional NAT
