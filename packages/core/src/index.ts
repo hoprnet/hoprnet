@@ -157,7 +157,7 @@ class Hopr extends EventEmitter {
     if (publicNodes.length == 0) {
       log('No public nodes have announced yet, we cannot rely on relay')
     }
-    verbose('Using public nodes:', publicNodes) 
+    verbose('Using public nodes:', publicNodes)
 
     const libp2p = await LibP2P.create({
       peerId: this.id,
