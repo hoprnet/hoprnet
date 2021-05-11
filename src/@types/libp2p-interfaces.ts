@@ -11,9 +11,7 @@ declare module 'libp2p-interfaces' {
     remoteAddr: Multiaddr
     localPeer: PeerId
     remotePeer: PeerId
-    newStream(
-      protocols?: string[]
-    ): Promise<{
+    newStream(protocols?: string[]): Promise<{
       protocol: string
       stream: Stream
     }>

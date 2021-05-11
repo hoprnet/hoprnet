@@ -54,10 +54,10 @@ describe('test TCP connection', function () {
   })
 
   it('should test TCPConnection against Listener', async function () {
-    const upgrader = ({
+    const upgrader = {
       upgradeInbound: (arg: any) => Promise.resolve(arg),
       upgradeOutbound: (arg: any) => Promise.resolve(arg)
-    } as unknown) as Upgrader
+    } as unknown as Upgrader
 
     const peerId = await PeerId.create({ keyType: 'secp256k1' })
     const listener = new Listener(

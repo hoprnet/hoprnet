@@ -23,17 +23,20 @@ describe('test addr filtering', function () {
     )
 
     assert(
-      filter.filter(new Multiaddr(`/p2p/${firstPeer.toB58String()}/p2p-circuit/p2p/${firstPeer.toB58String()}`)) == false,
+      filter.filter(new Multiaddr(`/p2p/${firstPeer.toB58String()}/p2p-circuit/p2p/${firstPeer.toB58String()}`)) ==
+        false,
       'Should not accept relay circuits that include own address'
     )
 
     assert(
-      filter.filter(new Multiaddr(`/p2p/${secondPeer.toB58String()}/p2p-circuit/p2p/${secondPeer.toB58String()}`)) == false,
+      filter.filter(new Multiaddr(`/p2p/${secondPeer.toB58String()}/p2p-circuit/p2p/${secondPeer.toB58String()}`)) ==
+        false,
       'Should not accept loopbacks'
     )
 
     assert(
-      filter.filter(new Multiaddr(`/p2p/${secondPeer.toB58String()}/p2p-circuit/p2p/${firstPeer.toB58String()}`)) == true,
+      filter.filter(new Multiaddr(`/p2p/${secondPeer.toB58String()}/p2p-circuit/p2p/${firstPeer.toB58String()}`)) ==
+        true,
       'Should accept proper circuits'
     )
   })
@@ -52,7 +55,10 @@ describe('test addr filtering', function () {
       'Should not accept invalid ports before initialization'
     )
 
-    assert(filter.filter(new Multiaddr(`/ip6/::1/tcp/0`)) == true, 'Should not accept invalid ports before initialization')
+    assert(
+      filter.filter(new Multiaddr(`/ip6/::1/tcp/0`)) == true,
+      'Should not accept invalid ports before initialization'
+    )
 
     filter.setAddrs([], [])
 
@@ -106,7 +112,10 @@ describe('test addr filtering', function () {
 
     assert(filter.filter(new Multiaddr(`/ip4/172.17.0.1/tcp/1`)) == false, `Should not dial own address`)
 
-    assert(filter.filter(new Multiaddr(`/ip4/172.17.0.1/tcp/2`)) == true, `Should dial on different on same local address`)
+    assert(
+      filter.filter(new Multiaddr(`/ip4/172.17.0.1/tcp/2`)) == true,
+      `Should dial on different on same local address`
+    )
 
     assert(filter.filter(new Multiaddr(`/ip4/203.0.113.16/tcp/1`)) == false, `Should not dial own address`)
 

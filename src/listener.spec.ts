@@ -59,13 +59,13 @@ describe('check listening to sockets', function () {
     const peerId = await PeerId.create({ keyType: 'secp256k1' })
     const listener = new Listener(
       undefined,
-      ({
+      {
         upgradeInbound: async (conn: MultiaddrConnection) => {
           state.msgReceived.resolve()
           return conn
         },
         upgradeOutbound: async (conn: MultiaddrConnection) => conn
-      } as unknown) as Upgrader,
+      } as unknown as Upgrader,
       undefined,
       undefined,
       peerId,
@@ -116,7 +116,7 @@ describe('check listening to sockets', function () {
     for (let i = 0; i < 2; i++) {
       listener = new Listener(
         () => {},
-        (undefined as unknown) as Upgrader,
+        undefined as unknown as Upgrader,
         [
           new Multiaddr(`/ip4/127.0.0.1/udp/${stunServers[0].address().port}`),
           new Multiaddr(`/ip4/127.0.0.1/udp/${stunServers[1].address().port}`)
@@ -158,9 +158,9 @@ describe('check listening to sockets', function () {
 
     const listener = new Listener(
       () => {},
-      ({
+      {
         upgradeOutbound: async (maConn: MultiaddrConnection) => maConn
-      } as unknown) as Upgrader,
+      } as unknown as Upgrader,
       [new Multiaddr(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)],
       [new Multiaddr(`/ip4/127.0.0.1/tcp/${bootstrap.listener.getPort()}/p2p/${bootstrap.peerId.toB58String()}`)],
       peerId,
@@ -209,9 +209,9 @@ describe('check listening to sockets', function () {
             conn.conn.end()
             msgReceived[index].received.resolve()
           },
-          ({
+          {
             upgradeInbound: async (conn: MultiaddrConnection) => conn
-          } as unknown) as Upgrader,
+          } as unknown as Upgrader,
           stunServers,
           undefined,
           await PeerId.create({ keyType: 'secp256k1' }),
@@ -281,9 +281,9 @@ describe('check listening to sockets', function () {
         // @ts-ignore
         conn.conn.end()
       },
-      ({
+      {
         upgradeInbound: async (conn: MultiaddrConnection) => conn
-      } as unknown) as Upgrader,
+      } as unknown as Upgrader,
       undefined,
       undefined,
       peerId,
@@ -309,9 +309,9 @@ describe('check listening to sockets', function () {
         // @ts-ignore
         conn.conn.end()
       },
-      ({
+      {
         upgradeInbound: async (conn: MultiaddrConnection) => conn
-      } as unknown) as Upgrader,
+      } as unknown as Upgrader,
       undefined,
       undefined,
       await PeerId.create({ keyType: 'secp256k1' }),

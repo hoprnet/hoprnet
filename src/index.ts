@@ -170,7 +170,7 @@ class HoprConnect implements Transport {
     // This works because destination peerId is for both address
     // types at the third place.
     // Other addresses are not supported.
-    const destination = PeerId.createFromBytes(((maTuples[2][1] as unknown) as Uint8Array).slice(1))
+    const destination = PeerId.createFromBytes((maTuples[2][1] as unknown as Uint8Array).slice(1))
 
     if (destination.equals(this._peerId)) {
       throw new AbortError(`Cannot dial ourself`)
@@ -185,7 +185,7 @@ class HoprConnect implements Transport {
 
         return await this.dialDirectly(ma, options)
       case CODE_P2P:
-        const relay = PeerId.createFromBytes(((maTuples[0][1] as unknown) as Uint8Array).slice(1))
+        const relay = PeerId.createFromBytes((maTuples[0][1] as unknown as Uint8Array).slice(1))
 
         return await this.dialWithRelay(relay, destination, options)
       default:
