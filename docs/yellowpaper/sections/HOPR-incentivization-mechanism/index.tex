@@ -18,9 +18,7 @@ Initially, each payment channel in HOPR is \textit{closed} which means that in o
 \paragraph{Opening a channel} Nodes can open channels to other nodes by the following:
 A calls the method \textit{fundChannel()}. Once the call has succeeded, an on-chain event \textit{ChannelOpened} is thrown. The channel is now \textit{open}.
 
-$$fundChannel(A: <\gamma>, B: <\delta>)$$ where $\gamma$ is the amount to be staked by A and $\delta$ is the amount to be staked by B. Both values can also be equal. 
-A can either fund the whole channel or only their part. In the second case, B can call the same function to fund their part and by doing so will be eligible to redeem tickets afterwards.
-\\A is also able to fund other channels which A is not part of.
+$$fundChannel(A: <\lambda>, B: <\mu>)$$ where $\lambda$ is the amount to be staked by A and $\mu$ is the amount to be staked by B. Both values can also be equal. A is also able to fund other channels which A is not part of.
 
 \paragraph{Redeem tickets}
 As long as the channel remains open, nodes can claim their incentives for forwarding packets which is represented as tickets (see ticket section). Tickets are redeemed by dispatching a \textit{redeemTicket()} call. The balance of the channel is then updated according to the balance defined in the ticket.
