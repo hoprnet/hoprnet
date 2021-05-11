@@ -1,6 +1,15 @@
 import type Indexer from './indexer'
 import type { ChainWrapper } from './ethereum'
-import { ChannelEntry, Hash, PublicKey, Challenge, Balance, UINT256, HoprDB, createFirstChallenge } from '@hoprnet/hopr-utils'
+import {
+  ChannelEntry,
+  Hash,
+  PublicKey,
+  Challenge,
+  Balance,
+  UINT256,
+  HoprDB,
+  createFirstChallenge
+} from '@hoprnet/hopr-utils'
 import assert from 'assert'
 import BN from 'bn.js'
 import { utils } from 'ethers'

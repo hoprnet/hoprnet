@@ -14,7 +14,7 @@ describe('acknowledement message', function () {
       Array.from({ length: AMOUNT }).map((_) => PeerId.create({ keyType: 'secp256k1' }))
     )
 
-    const ackKey= new HalfKey(randomBytes(SECRET_LENGTH))
+    const ackKey = new HalfKey(randomBytes(SECRET_LENGTH))
 
     const challenge = Challenge.create(ackKey.toChallenge(), self)
 
