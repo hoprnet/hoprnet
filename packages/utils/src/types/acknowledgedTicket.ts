@@ -1,5 +1,5 @@
 import { Hash, Ticket } from '.'
-import { serializeToU8a, u8aSplit, validateAcknowledgement } from '..'
+import { serializeToU8a, u8aSplit, validatePoRResponse } from '..'
 import { PublicKey, Opening, Response } from '.'
 
 export class AcknowledgedTicket {
@@ -14,10 +14,7 @@ export class AcknowledgedTicket {
   }
 
   public verify(ticketIssuer: PublicKey): boolean {
-    return (
-      validateAcknowledgement(undefined, undefined, this.ticket.challenge, undefined, this.response).valid &&
-      this.ticket.verify(ticketIssuer)
-    )
+    return validatePoRResponse(this.ticket.challenge, this.response) && this.ticket.verify(ticketIssuer)
   }
 
   static deserialize(arr: Uint8Array) {

@@ -1,4 +1,4 @@
-import { u8aSplit, serializeToU8a, validateAcknowledgement } from '..'
+import { u8aSplit, serializeToU8a, validatePoRHalfKeys } from '..'
 import { HalfKeyChallenge, HalfKey, PublicKey, Ticket, Response } from '.'
 
 export class UnacknowledgedTicket {
@@ -22,15 +22,7 @@ export class UnacknowledgedTicket {
   }
 
   public getResponse(acknowledgement: HalfKey): Response {
-    // @TODO implement this differently
-    const validationResult = validateAcknowledgement(this.ownKey, acknowledgement, this.ticket.challenge)
-
-    if (!validationResult.valid) {
-      // @TODO
-      throw Error(`Ack not valid`)
-    }
-
-    return validationResult.response
+    return Response.fromHalfKeys(this.ownKey, acknowledgement)
   }
 
   public getChallenge(): HalfKeyChallenge {
@@ -38,9 +30,7 @@ export class UnacknowledgedTicket {
   }
 
   public verify(signer: PublicKey, acknowledgement: HalfKey): boolean {
-    return (
-      this.verifySignature(signer) && validateAcknowledgement(this.ownKey, acknowledgement, this.ticket.challenge).valid
-    )
+    return this.verifySignature(signer) && validatePoRHalfKeys(this.ticket.challenge, this.ownKey, acknowledgement)
   }
 
   static SIZE(): number {

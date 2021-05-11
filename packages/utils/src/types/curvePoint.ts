@@ -52,7 +52,7 @@ export class CurvePoint {
   }
 
   static get SIZE(): number {
-    return 33
+    return SECP256K1_CONSTANTS.COMPRESSED_PUBLIC_KEY_LENGTH
   }
 
   serialize() {
