@@ -1,7 +1,8 @@
 /// <reference path="./@types/bl.ts" />
 /// <reference path="./@types/libp2p.ts" />
 
-import Multiaddr from 'multiaddr'
+import { multiaddr } from 'multiaddr'
+import type { Multiaddr } from 'multiaddr'
 import type { MultiaddrConnection, Stream, StreamResult } from 'libp2p'
 import { randomBytes } from 'crypto'
 import Defer, { DeferredPromise } from 'p-defer'
@@ -102,8 +103,8 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
 
     this._id = u8aToHex(randomBytes(4), false)
 
-    this.localAddr = Multiaddr(`/p2p/${opts.relay.toB58String()}/p2p-circuit/p2p/${opts.self.toB58String()}`)
-    this.remoteAddr = Multiaddr(`/p2p/${opts.relay.toB58String()}/p2p-circuit/p2p/${opts.counterparty.toB58String()}`)
+    this.localAddr = multiaddr(`/p2p/${opts.relay.toB58String()}/p2p-circuit/p2p/${opts.self.toB58String()}`)
+    this.remoteAddr = multiaddr(`/p2p/${opts.relay.toB58String()}/p2p-circuit/p2p/${opts.counterparty.toB58String()}`)
 
     this.webRTC = opts.webRTC
 

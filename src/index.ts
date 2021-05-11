@@ -4,7 +4,7 @@ import debug from 'debug'
 import Listener from './listener'
 import { CODE_IP4, CODE_IP6, CODE_P2P, DELIVERY, USE_WEBRTC } from './constants'
 import { AbortError } from 'abortable-iterator'
-import type Multiaddr from 'multiaddr'
+import type { Multiaddr } from 'multiaddr'
 import PeerId from 'peer-id'
 import type libp2p from 'libp2p'
 import type { Dialer, Upgrader, DialOptions, ConnHandler, Handler, ConnectionManager } from 'libp2p'
@@ -89,10 +89,10 @@ class HoprConnect implements Transport {
         }
 
         switch (cOpts.family) {
-          case 'ipv6':
+          case 6:
             // We do not use STUN for IPv6 for the moment
             break
-          case 'ipv4':
+          case 4:
             if (this.stunServers == undefined) {
               this.stunServers = [bs]
             } else {

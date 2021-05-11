@@ -1,6 +1,5 @@
 import { networkInterfaces, NetworkInterfaceInfo } from 'os'
-import Multiaddr from 'multiaddr'
-
+import { Multiaddr } from 'multiaddr'
 import Debug from 'debug'
 const log = Debug('hopr-connect')
 
@@ -75,8 +74,9 @@ export function getAddrs(
       multiaddrs.push(
         Multiaddr.fromNodeAddress(
           {
-            ...address,
-            port: port.toString()
+            address: address.address,
+            port,
+            family: parseInt(address.family.slice(3)) as 4 | 6
           },
           'tcp'
         ).encapsulate(`/p2p/${peerId}`)

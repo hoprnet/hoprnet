@@ -6,13 +6,14 @@ const MPLEX = require('libp2p-mplex')
 import { HoprConnect } from '../src'
 import { Charly } from './identities'
 import PeerId from 'peer-id'
-import Multiaddr from 'multiaddr'
+import { multiaddr } from 'multiaddr'
+import type { Multiaddr } from 'multiaddr'
 
 async function main() {
   const node = await libp2p.create({
     peerId: await PeerId.createFromPrivKey(Charly),
     addresses: {
-      listen: [Multiaddr(`/ip4/0.0.0.0/tcp/9092/p2p/${(await PeerId.createFromPrivKey(Charly)).toB58String()}`)]
+      listen: [multiaddr(`/ip4/0.0.0.0/tcp/9092/p2p/${(await PeerId.createFromPrivKey(Charly)).toB58String()}`)]
     },
     modules: {
       transport: [HoprConnect],

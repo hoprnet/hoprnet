@@ -1,4 +1,4 @@
-import Multiaddr from 'multiaddr'
+import { Multiaddr } from 'multiaddr'
 import type { Network } from './utils/constants'
 import { getLocalAddresses, isPrivateAddress, checkNetworks, isLinkLocaleAddress } from './utils'
 import { CODE_IP4, CODE_IP6, CODE_P2P, CODE_CIRCUIT, CODE_TCP } from './constants'
@@ -132,7 +132,7 @@ export class Filter {
         family = 'IPv6'
         break
       case CODE_P2P:
-        return checkCircuitAddress(tuples, this.peerId)
+        return checkCircuitAddress(tuples as [number, Uint8Array][], this.peerId)
       default:
         return false
     }
@@ -142,7 +142,7 @@ export class Filter {
       return false
     }
 
-    const [ipFamily, ipAddr, tcpPort] = [...tuples[0], tuples[1][1]]
+    const [ipFamily, ipAddr, tcpPort] = [...tuples[0], tuples[1][1]] as [number, Uint8Array, Uint8Array]
 
     if (isLinkLocaleAddress(ipAddr, family)) {
       // Cannot bind or listen to link-locale addresses

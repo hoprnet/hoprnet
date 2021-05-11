@@ -7,7 +7,8 @@ import { NOISE } from 'libp2p-noise'
 const MPLEX = require('libp2p-mplex')
 
 import { HoprConnect } from '../src'
-import Multiaddr from 'multiaddr'
+import { multiaddr } from 'multiaddr'
+import type { Multiaddr } from 'multiaddr'
 import PeerId from 'peer-id'
 import { Alice, Bob, Charly } from './identities'
 import pipe from 'it-pipe'
@@ -15,7 +16,7 @@ import pipe from 'it-pipe'
 const TEST_PROTOCOL = '/hopr-connect/test/0.0.1'
 
 async function main() {
-  const RELAY_ADDRESS = Multiaddr(`/ip4/127.0.0.1/tcp/9092/p2p/${await PeerId.createFromPrivKey(Charly)}`)
+  const RELAY_ADDRESS = multiaddr(`/ip4/127.0.0.1/tcp/9092/p2p/${await PeerId.createFromPrivKey(Charly)}`)
 
   let peerId: PeerId
   let port: number
@@ -36,7 +37,7 @@ async function main() {
   const node = await libp2p.create({
     peerId,
     addresses: {
-      listen: [Multiaddr(`/ip4/0.0.0.0/tcp/${port}/p2p/${peerId.toB58String()}`)]
+      listen: [multiaddr(`/ip4/0.0.0.0/tcp/${port}/p2p/${peerId.toB58String()}`)]
     },
     modules: {
       transport: [HoprConnect],
@@ -96,7 +97,7 @@ async function main() {
     case '0':
       try {
         conn = await node.dialProtocol(
-          Multiaddr(
+          multiaddr(
             `/p2p/${await PeerId.createFromPrivKey(Charly)}/p2p-circuit/p2p/${await PeerId.createFromPrivKey(Bob)}`
           ),
           TEST_PROTOCOL

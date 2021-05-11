@@ -1,7 +1,8 @@
 import * as stun from 'webrtc-stun'
 
 import type { Socket, RemoteInfo } from 'dgram'
-import Multiaddr from 'multiaddr'
+import type { Multiaddr } from 'multiaddr'
+import { multiaddr } from 'multiaddr'
 import debug from 'debug'
 import { randomSubset } from '@hoprnet/hopr-utils'
 
@@ -24,14 +25,14 @@ export const STUN_TIMEOUT = 1000
 
 // Only used to determine the external address of the bootstrap server
 export const PUBLIC_STUN_SERVERS = [
-  Multiaddr(`/dns4/stun.l.google.com/udp/19302`),
-  Multiaddr(`/dns4/stun1.l.google.com/udp/19302`),
-  Multiaddr(`/dns4/stun2.l.google.com/udp/19302`),
-  Multiaddr(`/dns4/stun3.l.google.com/udp/19302`),
-  Multiaddr(`/dns4/stun4.l.google.com/udp/19302`),
-  Multiaddr(`/dns4/stun.sipgate.net/udp/3478`),
-  Multiaddr(`/dns4/stun.callwithus.com/udp/3478`),
-  Multiaddr(`/dns4/stun.counterpath.net/udp/3478`)
+  multiaddr(`/dns4/stun.l.google.com/udp/19302`),
+  multiaddr(`/dns4/stun1.l.google.com/udp/19302`),
+  multiaddr(`/dns4/stun2.l.google.com/udp/19302`),
+  multiaddr(`/dns4/stun3.l.google.com/udp/19302`),
+  multiaddr(`/dns4/stun4.l.google.com/udp/19302`),
+  multiaddr(`/dns4/stun.sipgate.net/udp/3478`),
+  multiaddr(`/dns4/stun.callwithus.com/udp/3478`),
+  multiaddr(`/dns4/stun.counterpath.net/udp/3478`)
 ]
 
 export const DEFAULT_PARALLEL_STUN_CALLS = 4
@@ -149,7 +150,7 @@ export function getExternalIp(
 
       verbose(`STUN request sent to ${nodeAddress.address}:${nodeAddress.port}`)
 
-      socket.send(res.toBuffer(), nodeAddress.port as any, nodeAddress.address)
+      socket.send(res.toBuffer(), nodeAddress.port, nodeAddress.address)
     }
 
     const done = () => {

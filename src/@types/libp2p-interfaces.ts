@@ -1,6 +1,6 @@
 declare module 'libp2p-interfaces' {
   type EventEmitter = import('events').EventEmitter
-  type Multiaddr = import('multiaddr')
+  type Multiaddr = import('multiaddr').Multiaddr
   type PeerId = import('peer-id')
   type Upgrader = import('libp2p').Upgrader
   type LibP2P = import('libp2p').default

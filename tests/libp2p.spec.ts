@@ -1,9 +1,10 @@
-import Multiaddr from 'multiaddr'
+import type { Multiaddr } from 'multiaddr'
+import { multiaddr } from 'multiaddr'
 
 const testsTransport = require('libp2p-interfaces/src/transport/tests')
 // const testsDiscovery = require('libp2p-interfaces/src/peer-discovery/tests')
 
-import HoprConnect from '../src'
+import { HoprConnect } from '../src'
 import PeerId from 'peer-id'
 
 import libp2p, { Handler, MultiaddrConnection, Upgrader } from 'libp2p'
@@ -18,7 +19,7 @@ async function startBootstrapServer(privKey: Uint8Array, port: number): Promise<
   const node = await libp2p.create({
     peerId: await PeerId.createFromPrivKey(privKey),
     addresses: {
-      listen: [Multiaddr(`/ip4/0.0.0.0/tcp/${port}`)]
+      listen: [multiaddr(`/ip4/0.0.0.0/tcp/${port}`)]
     },
     modules: {
       transport: [HoprConnect],
@@ -45,7 +46,7 @@ async function startClient(privKey: Uint8Array, port: number, bootstrapAddress: 
   const node = await libp2p.create({
     peerId: await PeerId.createFromPrivKey(privKey),
     addresses: {
-      listen: [Multiaddr(`/ip4/0.0.0.0/tcp/${port}`)]
+      listen: [multiaddr(`/ip4/0.0.0.0/tcp/${port}`)]
     },
     modules: {
       transport: [HoprConnect],
@@ -85,14 +86,14 @@ describe('libp2p compliance', () => {
       const client = await startClient(
         Charly,
         9095,
-        Multiaddr(`/ip4/127.0.0.1/tcp/9092/p2p/${await PeerId.createFromPrivKey(Alice)}`)
+        multiaddr(`/ip4/127.0.0.1/tcp/9092/p2p/${await PeerId.createFromPrivKey(Alice)}`)
       )
 
-      await client.dial(Multiaddr(`/ip4/127.0.0.1/tcp/9092/p2p/${await PeerId.createFromPrivKey(Alice)}`))
+      await client.dial(multiaddr(`/ip4/127.0.0.1/tcp/9092/p2p/${await PeerId.createFromPrivKey(Alice)}`))
 
       const addrs = [
-        Multiaddr(`/ip4/127.0.0.1/tcp/9093/p2p/${await PeerId.createFromPrivKey(Bob)}`),
-        Multiaddr(`/p2p/${await PeerId.createFromPrivKey(Dave)}`)
+        multiaddr(`/ip4/127.0.0.1/tcp/9093/p2p/${await PeerId.createFromPrivKey(Bob)}`),
+        multiaddr(`/p2p/${await PeerId.createFromPrivKey(Dave)}`)
       ]
 
       const upgrader = await myUpgrader(await PeerId.createFromPrivKey(Bob))
@@ -127,7 +128,7 @@ describe('libp2p compliance', () => {
           },
           dialer: {
             async connectToPeer(_pId: PeerId) {
-              return transport.dial(Multiaddr(`/ip4/127.0.0.1/tcp/9092/p2p/${await PeerId.createFromPrivKey(Alice)}`))
+              return transport.dial(multiaddr(`/ip4/127.0.0.1/tcp/9092/p2p/${await PeerId.createFromPrivKey(Alice)}`))
             },
             _pendingDials: []
           },
@@ -136,7 +137,7 @@ describe('libp2p compliance', () => {
           },
           multiaddrs: []
         } as any,
-        bootstrapServers: [Multiaddr(`/ip4/127.0.0.1/tcp/9092/p2p/${await PeerId.createFromPrivKey(Alice)}`)],
+        bootstrapServers: [multiaddr(`/ip4/127.0.0.1/tcp/9092/p2p/${await PeerId.createFromPrivKey(Alice)}`)],
         __noDirectConnections: true
       })
 

@@ -3,7 +3,7 @@
 
 import net from 'net'
 import abortable, { AbortError } from 'abortable-iterator'
-import type { Socket } from 'net'
+import type { Socket, AddressInfo } from 'net'
 import Debug from 'debug'
 
 const log = Debug('hopr-connect:tcp')
@@ -13,7 +13,7 @@ const verbose = Debug('hopr-connect:verbose:tcp')
 const SOCKET_CLOSE_TIMEOUT = 2000
 
 import type { MultiaddrConnection, Stream, DialOptions, StreamType } from 'libp2p'
-import Multiaddr from 'multiaddr'
+import { Multiaddr } from 'multiaddr'
 import toIterable from 'stream-to-it'
 import { toU8aStream } from './utils'
 import { PeerId } from 'libp2p-interfaces'
@@ -33,9 +33,15 @@ class TCPConnection implements MultiaddrConnection {
   }
 
   constructor(public remoteAddr: Multiaddr, self: PeerId, public conn: Socket, options?: DialOptions) {
-    this.localAddr = Multiaddr.fromNodeAddress(this.conn.address() as any, 'tcp').encapsulate(
-      `/p2p/${self.toB58String()}`
-    )
+    const connAddr = this.conn.address() as AddressInfo
+    this.localAddr = Multiaddr.fromNodeAddress(
+      {
+        address: connAddr.address,
+        family: parseInt(connAddr.family.slice(3)) as 4 | 6,
+        port: connAddr.port
+      },
+      'tcp'
+    ).encapsulate(`/p2p/${self.toB58String()}`)
 
     this.timeline = {
       open: Date.now()
@@ -194,9 +200,9 @@ class TCPConnection implements MultiaddrConnection {
 
     const remoteAddr = Multiaddr.fromNodeAddress(
       {
-        family: socket.remoteFamily as any,
+        family: parseInt(socket.remoteFamily.slice(3)) as 4 | 6,
         address: socket.remoteAddress,
-        port: socket.remotePort.toString()
+        port: socket.remotePort
       },
       'tcp'
     )

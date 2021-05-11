@@ -6,7 +6,7 @@ import type LibP2P from 'libp2p'
 import Debug from 'debug'
 import AbortController, { AbortSignal } from 'abort-controller'
 import PeerId from 'peer-id'
-import { Multiaddr } from 'libp2p/src/peer-store/address-book'
+import { Multiaddr } from 'multiaddr'
 
 const verbose = Debug('hopr-connect:dialer:verbose')
 const error = Debug('hopr-connect:dialer:error')

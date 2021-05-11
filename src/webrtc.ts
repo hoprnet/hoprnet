@@ -1,7 +1,7 @@
 import SimplePeer from 'simple-peer'
 import debug from 'debug'
 
-import type Multiaddr from 'multiaddr'
+import type { Multiaddr } from 'multiaddr'
 
 const wrtc = require('wrtc')
 
