@@ -18,10 +18,10 @@ The incentives break the unlinkability guarantees inherited from the SPHINX pack
         \draw [->,draw] (c.east) to node [align=center,below] {packet\\ticket} (d.west);
         \draw [->,draw] (d.east) to node [align=center,below] {packet\\(ticket)}  (z.west);
 
-        \path [->,draw,bend left] (a.north east) to node [above] {3$\cdot$incentive} (b.north west);
-        \path [->,draw,bend left] (b.north east) to node [above] {2$\cdot$incentive} (c.north west);
-        \path [->,draw,bend left] (c.north east) to node [above] {1$\cdot$incentive} (d.north west);
-        \path [->,draw,bend left] (d.north east) to node [above] {0$\cdot$incentive} (z.north west);
+        \path [->,draw,bend left,dashed] (a.north east) to node [above] {3$\cdot$incentive} (b.north west);
+        \path [->,draw,bend left,dashed] (b.north east) to node [above] {2$\cdot$incentive} (c.north west);
+        \path [->,draw,bend left,dashed] (c.north east) to node [above] {1$\cdot$incentive} (d.north west);
+        \path [->,draw,bend left,dashed] (d.north east) to node [above] {0$\cdot$incentive} (z.north west);
 
     \end{tikzpicture}    
     \caption{Incentive workflow}
