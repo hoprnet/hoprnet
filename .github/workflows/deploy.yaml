@@ -53,7 +53,7 @@ jobs:
       - name: Install dependencies / link / build
         run: |
           yarn
-          yarn lerna bootstrap
+          yarn setup
           yarn util:link
           yarn build
 
