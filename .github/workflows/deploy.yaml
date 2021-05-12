@@ -62,6 +62,7 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           HOPR_PACKAGE: hoprd
+          HOPR_VERSION_MAJMIN: true
 
       # Pushing a PR to a release branch should increment the patch version in
       # accordance with semver.
@@ -70,8 +71,7 @@ jobs:
         run: |
           # skip releasing for changes from our bots to prevent circular change propagation
           [ "noreply@hoprnet.org" = "$(git show -s --format='%ae' ${HOPR_GITHUB_REF})" ] && exit 0
-          HOPR_PACKAGE_VERSION=$(./scripts/get-package-version.sh) \
-            bash -x scripts/publish-patch-release.sh
+          bash -x scripts/publish-patch-release.sh
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           HOPR_PACKAGE: hoprd

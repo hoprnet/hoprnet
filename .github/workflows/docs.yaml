@@ -15,6 +15,9 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
+      - name: Configure Git info
+        run: bash -x scripts/configure-git-info.sh
+
       - name: Use Node.js
         uses: actions/setup-node@v2
         with:
