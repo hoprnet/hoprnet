@@ -51,11 +51,11 @@ $h:G^*\times G^*\rightarrow\mathbb{Z}^*_q$ where $\mathbb{Z}^*_q$ is the field o
     Each node on the path needs to know the next downstream node. Therefore, the sender $(A)$ generates routing information $\beta_i$ for $(B)$, $(C)$ and $(D)$ as well as message $END$ to tell $(Z)$ that it is the final receiver of the message. The END message is a distinguished prefix byte that's added to the final receiver's compressed address $Z=(x,y)$ (either $0\times02$ or $0\times03$ depending if the $y$ coordinate is even or odd).
     $$\beta_i=(Z\|0_{(2(r-v)+2)\kappa-|Z|}\oplus PRNG(s_{v-1})_{[ \,0....(2(r-v)+3)\kappa-1})\|\phi$$
     Such that $Z$ is the destination address and $|Z|$ is its length.
-$v\leq r$ is the length of the path traversed by the packet where $|Z| \leq (2(r - v) + 2)$. $\phi$ is a filler string that is used to ensure the header packets remain constant in size as layers of encryption are added or removed.
+    $v\leq r$ is the length of the path traversed by the packet where $|Z| \leq (2(r - v) + 2)$. $\phi$ is a filler string that is used to ensure the header packets remain constant in size as layers of encryption are added or removed.
     \\~\\$\beta_i$ is computed as the concatenation of $Z$ and a sequence of padding which is then encrypted by XORing with the output of a pseudo-random number generator seeded with shared key $s_{v-1}$ of node $v-1$. The result is finally concatenated with $\phi$ to ensure the header packets remain constant in size.
-\\ In the original sphinx paper, $Z$ is concatenated with an identifier $I$ and $0$ padding sequence where $I$ is used for SURBs (Single-Use-Reply Blocks) such that $I \in \{0, 1\}^\kappa$. We don't use $I$ for the moment since we don't use SURBs.
-\\~\\Since $(A)$ has a shared secret with each of the nodes along the path, it is able to derive blindings for each of them.
-\newline Each node along the path receives an authentication tag $\gamma_i$ in the form of a message authentication code (MAC)
+        \\ In the original sphinx paper, $Z$ is concatenated with an identifier $I$ and $0$ padding sequence where $I$ is used for SURBs (Single-Use-Reply Blocks) such that $I \in \{0, 1\}^\kappa$. We don't use $I$ for the moment since we don't use SURBs.
+        \\~\\Since $(A)$ has a shared secret with each of the nodes along the path, it is able to derive blindings for each of them.
+        \newline Each node along the path receives an authentication tag $\gamma_i$ in the form of a message authentication code (MAC)
 which is encoded in the header.
 \newline Some padding is added at each mix stage in order to keep the length of the message invariant at each hop.
 \\~\\The mix header is constructed as follow: $$M_i=(\alpha_i,\beta_i,\gamma_i)$$
@@ -68,17 +68,19 @@ $(B)$ computes the keyed-hash of the encrypted routing information $\beta_0$ as 
 \paragraph{Unblinding}
 The unblinding works as follow:
 \\$(B)$ decrypts the attached $\beta_0$ in order to extract the routing instructions. First, $(B)$ appends a zero-byte padding at the end of $\beta_0$ and decrypts the padded block of routing information $B$ by XORing it with $PRNG(s_{0})$ as follows:
-    $$(\beta_0\|0_{2\kappa})\oplus PRNG(s_{0})$$
-    (B) parses the routing instructions from $(A)$ in order to obtain the address of the next mix-node $(C)$, as well the new integrity tag $\gamma_1$ and $\beta_1$, which should be forwarded to the next hop.
-    \paragraph{Delete and shift}
-    After that $(B)$ extracts the public key of $(C)$, it deletes the routing information from the packet. Afterwards, it fills the empty space with its own blinding which is different from the one received from $(A)$ by setting the key share $\alpha_0$ to $\alpha_1=g^{xb_0}$.
-    \paragraph{Encrypt \& Decrypt}
-    The payload $\delta$ is where the actual message is hidden and is computed in different layers using a wide block cipher encryption algorithm and is decrypted at each stage of mixing.
-    \\The payload is constructed as follow:
-    $$\delta= 0_{l} \|\tau\|\delta$$ where $\tau$ is the authentication tag string and $|\tau|=4$ is its length (let's suppose $\tau=``HOPR "$). $l$ is the $0$ padding length where
+$$(\beta_0\|0_{2\kappa})\oplus PRNG(s_{0})$$
+(B) parses the routing instructions from $(A)$ in order to obtain the address of the next mix-node $(C)$, as well the new integrity tag $\gamma_1$ and $\beta_1$, which should be forwarded to the next hop.
+\paragraph{Delete and shift}
+After that $(B)$ extracts the public key of $(C)$, it deletes the routing information from the packet. Afterwards, it fills the empty space with its own blinding which is different from the one received from $(A)$ by setting the key share $\alpha_0$ to $\alpha_1=g^{xb_0}$.
+\paragraph{Encrypt \& Decrypt}
+The payload $\delta$ is where the actual message is hidden and is computed in different layers using a wide block cipher encryption algorithm and is decrypted at each stage of mixing.
+\\The payload is constructed as follow:
+$$\delta= 0_{l} \|\tau\|\delta$$ where $\tau$ is the authentication tag string which is generated arbitrarily and $|\tau|=4$ is its length (let's suppose $\tau=``HOPR "$). $l$ is the $0$ padding length where
 $0 <= l <= |\delta| - 4$
-    \\~\\Any attempt of modification by an attacker would result in message distruction and thus is would be irrecoverable.
-    \\~\\Same happens at $(C)$ and $(D)$: key derivation, unblinding, deleting, shifting, integrity check, decryption and blinding.
+\\~\\The sphinx uses Lioness wide block cipher scheme for encryption and decryption purposes. This scheme uses four independent keys $k_1$, $k_2$,$k_3$ and $k_4$ which $(A)$ derives from the master keys $s_0$, $s_1$, $s_2$ and $s_3$.
+\\~\\Any attempt of modification by an attacker would result in message distruction and thus is would be irrecoverable.
+\\~\\Same happens at $(C)$ and $(D)$: key derivation, unblinding, deleting, shifting, integrity check, decryption and blinding.
+
 \begin{figure}[H]
     \centering
     \includegraphics[width=11cm,height=11cm,keepaspectratio]{../yellowpaper/images/sphinx1.png}
