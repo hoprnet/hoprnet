@@ -44,7 +44,7 @@ Defined in: [types/primitives.ts:122](https://github.com/hoprnet/hoprnet/blob/ma
 
 ▪ `Static` **SIZE**: *number*
 
-Defined in: [types/primitives.ts:129](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L129)
+Defined in: [types/primitives.ts:133](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L133)
 
 ## Methods
 
@@ -54,7 +54,7 @@ Defined in: [types/primitives.ts:129](https://github.com/hoprnet/hoprnet/blob/ma
 
 **Returns:** [*Hash*](hash.md)
 
-Defined in: [types/primitives.ts:151](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L151)
+Defined in: [types/primitives.ts:155](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L155)
 
 ___
 
@@ -70,7 +70,7 @@ ___
 
 **Returns:** *boolean*
 
-Defined in: [types/primitives.ts:143](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L143)
+Defined in: [types/primitives.ts:147](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L147)
 
 ___
 
@@ -80,7 +80,7 @@ ___
 
 **Returns:** [*Hash*](hash.md)
 
-Defined in: [types/primitives.ts:155](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L155)
+Defined in: [types/primitives.ts:159](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L159)
 
 ___
 
@@ -90,7 +90,7 @@ ___
 
 **Returns:** *Uint8Array*
 
-Defined in: [types/primitives.ts:139](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L139)
+Defined in: [types/primitives.ts:143](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L143)
 
 ___
 
@@ -100,7 +100,7 @@ ___
 
 **Returns:** *string*
 
-Defined in: [types/primitives.ts:147](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L147)
+Defined in: [types/primitives.ts:151](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L151)
 
 ___
 
@@ -116,7 +116,7 @@ ___
 
 **Returns:** [*Hash*](hash.md)
 
-Defined in: [types/primitives.ts:131](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L131)
+Defined in: [types/primitives.ts:135](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L135)
 
 ___
 
@@ -132,4 +132,4 @@ ___
 
 **Returns:** [*Hash*](hash.md)
 
-Defined in: [types/primitives.ts:135](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L135)
+Defined in: [types/primitives.ts:139](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L139)

@@ -37,14 +37,14 @@
 
 ### constructor
 
-\+ **new Ticket**(`counterparty`: [*Address*](address.md), `challenge`: [*Address*](address.md), `epoch`: [*UINT256*](uint256.md), `index`: [*UINT256*](uint256.md), `amount`: [*Balance*](balance.md), `winProb`: [*UINT256*](uint256.md), `channelIteration`: [*UINT256*](uint256.md), `signature`: [*Signature*](signature.md)): [*Ticket*](ticket.md)
+\+ **new Ticket**(`counterparty`: [*Address*](address.md), `challenge`: [*EthereumChallenge*](ethereumchallenge.md), `epoch`: [*UINT256*](uint256.md), `index`: [*UINT256*](uint256.md), `amount`: [*Balance*](balance.md), `winProb`: [*UINT256*](uint256.md), `channelIteration`: [*UINT256*](uint256.md), `signature`: [*Signature*](signature.md)): [*Ticket*](ticket.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
 | `counterparty` | [*Address*](address.md) |
-| `challenge` | [*Address*](address.md) |
+| `challenge` | [*EthereumChallenge*](ethereumchallenge.md) |
 | `epoch` | [*UINT256*](uint256.md) |
 | `index` | [*UINT256*](uint256.md) |
 | `amount` | [*Balance*](balance.md) |
@@ -54,7 +54,7 @@
 
 **Returns:** [*Ticket*](ticket.md)
 
-Defined in: [types/ticket.ts:47](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L47)
+Defined in: [types/ticket.ts:49](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L49)
 
 ## Properties
 
@@ -66,7 +66,7 @@ ___
 
 ### challenge
 
-• `Readonly` **challenge**: [*Address*](address.md)
+• `Readonly` **challenge**: [*EthereumChallenge*](ethereumchallenge.md)
 
 ___
 
@@ -112,7 +112,7 @@ ___
 
 **Returns:** *number*
 
-Defined in: [types/ticket.ts:133](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L133)
+Defined in: [types/ticket.ts:135](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L135)
 
 ## Methods
 
@@ -122,13 +122,13 @@ Defined in: [types/ticket.ts:133](https://github.com/hoprnet/hoprnet/blob/master
 
 **Returns:** [*Hash*](hash.md)
 
-Defined in: [types/ticket.ts:117](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L117)
+Defined in: [types/ticket.ts:119](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L119)
 
 ___
 
 ### isWinningTicket
 
-▸ **isWinningTicket**(`preImage`: [*Hash*](hash.md), `challengeResponse`: [*Hash*](hash.md), `winProb`: [*UINT256*](uint256.md)): *boolean*
+▸ **isWinningTicket**(`preImage`: [*Hash*](hash.md), `challengeResponse`: [*Response*](response.md), `winProb`: [*UINT256*](uint256.md)): *boolean*
 
 Decides whether a ticket is a win or not.
 Note that this mimics the on-chain logic.
@@ -141,12 +141,12 @@ a ticket before we submit it to the blockchain.
 | Name | Type | Description |
 | :------ | :------ | :------ |
 | `preImage` | [*Hash*](hash.md) | preImage of the current onChainSecret |
-| `challengeResponse` | [*Hash*](hash.md) | response that solves the signed challenge |
+| `challengeResponse` | [*Response*](response.md) | response that solves the signed challenge |
 | `winProb` | [*UINT256*](uint256.md) | winning probability of the ticket |
 
 **Returns:** *boolean*
 
-Defined in: [types/ticket.ts:163](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L163)
+Defined in: [types/ticket.ts:165](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L165)
 
 ___
 
@@ -156,7 +156,7 @@ ___
 
 **Returns:** [*PublicKey*](publickey.md)
 
-Defined in: [types/ticket.ts:146](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L146)
+Defined in: [types/ticket.ts:148](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L148)
 
 ___
 
@@ -166,7 +166,7 @@ ___
 
 **Returns:** *Uint8Array*
 
-Defined in: [types/ticket.ts:89](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L89)
+Defined in: [types/ticket.ts:91](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L91)
 
 ___
 
@@ -182,20 +182,20 @@ ___
 
 **Returns:** *boolean*
 
-Defined in: [types/ticket.ts:150](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L150)
+Defined in: [types/ticket.ts:152](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L152)
 
 ___
 
 ### create
 
-▸ `Static` **create**(`counterparty`: [*Address*](address.md), `challenge`: [*PublicKey*](publickey.md), `epoch`: [*UINT256*](uint256.md), `index`: [*UINT256*](uint256.md), `amount`: [*Balance*](balance.md), `winProb`: [*UINT256*](uint256.md), `channelIteration`: [*UINT256*](uint256.md), `signPriv`: *Uint8Array*): [*Ticket*](ticket.md)
+▸ `Static` **create**(`counterparty`: [*Address*](address.md), `challenge`: [*Challenge*](challenge.md), `epoch`: [*UINT256*](uint256.md), `index`: [*UINT256*](uint256.md), `amount`: [*Balance*](balance.md), `winProb`: [*UINT256*](uint256.md), `channelIteration`: [*UINT256*](uint256.md), `signPriv`: *Uint8Array*): [*Ticket*](ticket.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
 | `counterparty` | [*Address*](address.md) |
-| `challenge` | [*PublicKey*](publickey.md) |
+| `challenge` | [*Challenge*](challenge.md) |
 | `epoch` | [*UINT256*](uint256.md) |
 | `index` | [*UINT256*](uint256.md) |
 | `amount` | [*Balance*](balance.md) |
@@ -205,7 +205,7 @@ ___
 
 **Returns:** [*Ticket*](ticket.md)
 
-Defined in: [types/ticket.ts:59](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L59)
+Defined in: [types/ticket.ts:61](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L61)
 
 ___
 
@@ -221,4 +221,4 @@ ___
 
 **Returns:** [*Ticket*](ticket.md)
 
-Defined in: [types/ticket.ts:94](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L94)
+Defined in: [types/ticket.ts:96](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L96)
