@@ -1,0 +1,39 @@
+\subsection{Probabilistic payments}
+In traditional payment channels, two parties A and B lock some funds within a smart contract, make multiple transactions off-chain and only commit the aggregation on-chain.
+\\~\\HOPR uses a concept called $acknowledgements$ which allows every node to creates a message that acknowledges the processing of the packet to the previous node. This acknowledgement contains the cryptographic material to unlock the payout for the previous node. Note that the acknowledgement is always sent to the previous node - even if there was no payment.
+\\The fact that we are using payment channels implies that the last HOPR acknowledgement contains all previous incentives plus the incentive for the most recent interaction
+$$value_(ACK_n) =\sum_{i=1}^nfee_{packet_i}$$ where $n$ is the total number of mixnet packets transformed.
+\\~\\If B received $ACK_n$ before sending $packet_{n-1}$, it has no incentive to process $packet_{n-1}$ rather than $packet_{n-2}$.
+\\~\\To avoid this limitation of traditional payment channels, HOPR utilizes probabilistic payments
+\\~\\In probabilistic payments, the payouts use a concept called “tickets”, a ticket can be either a win or a loss with a certain winning probability. This means nodes are incentivized to continue relaying packets as they don’t know which ticket is a win.
+\\~\\HOPR uses a custom-made layer 2 solution. It is inspired by payment channels and probabilistic payments where incentives can be claimed independently:
+$$value ( ACK_i )=value ( ACK_j ) \quad for \quad i,j\in \{1,n\}$$
+Hence, there is no added value in pretending packet loss or intentionally changing the order in which packets are processed.
+\subsubsection{Channel management}
+Initially, each payment channel in HOPR is \textit{closed} which means that in order to transfer packets, those channels have to be opened.
+\paragraph{Opening a channel} Nodes can open channels to other nodes by the following:
+A calls the method \textit{fundChannel()}. Once the call has succeeded, an on-chain event \textit{ChannelOpened} is thrown. The channel is now \textit{open}.
+
+
+$$fundChannel(A: <\lambda>, B: <\mu>)$$ where $\lambda$ is the amount to be staked by A and $\mu$ is the amount to be staked by B. Both values can also be equal. A is also able to fund other channels which A is not part of.
+
+\paragraph{Redeem tickets}
+As long as the channel remains open, nodes can claim their incentives for forwarding packets which is represented as tickets (see ticket section). Tickets are redeemed by dispatching a \textit{redeemTicket()} call. The balance of the channel is then updated according to the balance defined in the ticket.
+\paragraph{Closing a channel}
+Nodes can close a payment channel in order to access their funds. The way to do so is using a timeout.
+A can initiate the process by calling \textit{initiateChannelClosure()}. This changes the state to $pending\_timeout$. Other nodes will have now time to claim not yet claimed tickets. Once the timeout is done, any of the involved parties can call \textit{withdraw()}. Alice can then call \textit{finalizeChannelClosure()} which turns the channel state into \textit{closed}.
+
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}[looseness=1,auto]
+        \path (0,0) node (closed) [ellipse,draw] {$Closed$};
+        \path (5,0)  node (open) [ellipse,draw] {$Open$};
+        \path (2.5,-1)  node (pending) [ellipse,draw,align=left] {$Pending$\\$Timeout$};
+
+        \draw [->,draw](closed) to [bend left] node {$open()$} (open);
+        \draw [->,draw](open) to [bend left] node [align=left] {$initiate$\\$ChannelClosure()$} (pending);
+        \draw [->,draw](pending) to [bend left] node {$withdraw()$} (closed);
+    \end{tikzpicture}
+    \label{fig:channel workflow}
+    \caption{Channel workflow}
+\end{figure}

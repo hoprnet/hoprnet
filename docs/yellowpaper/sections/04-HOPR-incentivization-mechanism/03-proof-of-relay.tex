@@ -1,0 +1,36 @@
+\subsection{Proof Of Relay}
+
+HOPR incentivizes packet transformation and delivery using a mechanism called “Proof-Of-Relay”.
+This mechanism makes sure nodes relay services are verifiable.
+\paragraph{Construction}
+\begin{itemize}
+    \item Every packet is sent together with a ticket.
+    \item Each ticket contains a challenge.
+    \item The validity of a ticket can only be checked on reception of the packet but the on-chain logic enforces a solution to the challenge stated in the ticket.
+\end{itemize}
+
+Since “Proof-Of-Relay” is used to make the relay services of nodes verifiable, it is the duty of each node to check that given challenges are derivable from the given and the expected information.
+Packets with inappropriate challenges should be dropped as they might not lead to winning tickets.
+Therefore, the sender of the packet also provides a hint of the expected value that a node is supposed to get from the next downstream node (as explained in the ticket section).
+
+\begin{figure}[H]
+    \centering
+    \begin{tabular}{| m{2em} | m{15em} | m{2em} |}
+        \hline
+        $\alpha$ & $\beta$                   & $\gamma$ \\
+                 & \begin{tabular}{| c m{2em} | m{3em} | m{6em} |}
+            \hline
+            \multicolumn{2}{| c |}{$Y_B$} & $hint_B$                 & $challenge_{BC}$ \\
+            \hline
+            \multicolumn{2}{| c |}{$Y_C$} & $hint_C$                 & $random$         \\
+            \hline
+            \multicolumn{2}{| c |}{$Y_D$} & $hint_D$                 & $random$         \\
+            \hline
+            End                           & \multicolumn{3}{| l |}{}                    \\
+            \hline
+        \end{tabular} &          \\[3em]
+        \hline
+    \end{tabular}
+    \caption{SPHINX with PoR}
+    \label{fig:SPHINX with PoR}
+\end{figure}
