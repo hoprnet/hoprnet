@@ -77,16 +77,17 @@ The payload $\delta$ is where the actual message is hidden and is computed in di
 \\The payload is constructed as follow:
 $$\delta= 0_{l} \|\tau\|\delta$$ where $\tau$ is the authentication tag string which is generated arbitrarily and $|\tau|=4$ is its length (let's suppose $\tau=``HOPR "$). $l$ is the $0$ padding length where
 $0 <= l <= |\delta| - 4$
-\\~\\The sphinx uses Lioness wide block cipher scheme for encryption and decryption purposes. This scheme uses four independent keys $k_1$, $k_2$,$k_3$ and $k_4$ which $(A)$ derives from the master keys $s_0$, $s_1$, $s_2$ and $s_3$.
-\\~\\Any attempt of modification by an attacker would result in message distruction and thus is would be irrecoverable.
-\\~\\Same happens at $(C)$ and $(D)$: key derivation, unblinding, deleting, shifting, integrity check, decryption and blinding.
-
+\\~\\Let $m$ be the block size in bits, which will typically be large. Let $H_k(\tau)$ be a keyed hash function with the key $k$ for the payload $\tau$, $k$ consists of four independent keys $k_1$, $k_2$,$k_3$ and $k_4$ which $(A)$ derives from the master keys $s_0$, $s_1$, $s_2$ and $s_3$. The sphinx uses Lioness wide block cipher scheme for encryption and decryption purposes.
+Let $S(\tau)$ be a pseudo random function (stream cipher) which given the input $\tau$ will generate an output of arbitrary length. $\tau$ is divided into two parts left $L$ and right $R$ whose sizes are $|L|=w$ and $|R|=m-w$ so we get $\tau=R\|L$.
+\subparagraph{Encryption}
+\subparagraph{Decryption} The decryption happens as follow:
 \begin{figure}[H]
     \centering
     \includegraphics[width=11cm,height=11cm,keepaspectratio]{../yellowpaper/images/sphinx1.png}
     \caption{The processing of a Sphinx message}
     \label{fig:The processing of a Sphinx message }
 \end{figure}
+\hspace{-5mm}Same happens at $(C)$ and $(D)$: key derivation, unblinding, deleting, shifting, integrity check, decryption and blinding.
 \subsection{Implementation choices}
 Within HOPR, the following cryptographic primitives were used:
 \begin{itemize}
