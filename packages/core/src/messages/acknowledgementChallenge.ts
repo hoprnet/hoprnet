@@ -12,7 +12,11 @@ export class AcknowledgementChallenge {
     return SECP256K1_CONSTANTS.SIGNATURE_LENGTH
   }
 
-  static deserialize(preArray: Uint8Array | Buffer, ackChallenge: HalfKeyChallenge, pubKey: PeerId): AcknowledgementChallenge {
+  static deserialize(
+    preArray: Uint8Array | Buffer,
+    ackChallenge: HalfKeyChallenge,
+    pubKey: PeerId
+  ): AcknowledgementChallenge {
     if (preArray.length != SECP256K1_CONSTANTS.SIGNATURE_LENGTH) {
       throw Error(`Invalid arguments`)
     }
