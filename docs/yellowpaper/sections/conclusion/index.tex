@@ -13,10 +13,10 @@ The incentives break the unlinkability guarantees inherited from the SPHINX pack
         \draw (7.5,0) node (d) [rectangle,draw] {$D$};
         \draw (10,0) node (z) [rectangle,draw] {$Z$};
 
-        \draw [->,draw] (a.east) to node [align=center,below] {packet\\ticket} (b.west);
-        \draw [->,draw] (b.east) to node [align=center,below] {packet\\ticket} (c.west);
-        \draw [->,draw] (c.east) to node [align=center,below] {packet\\ticket} (d.west);
-        \draw [->,draw] (d.east) to node [align=center,below] {packet\\(ticket)}  (z.west);
+        \draw [->,draw] (a.east) to node [align=center,below] {packet,\\ticket} (b.west);
+        \draw [->,draw] (b.east) to node [align=center,below] {packet,\\ticket} (c.west);
+        \draw [->,draw] (c.east) to node [align=center,below] {packet,\\ticket} (d.west);
+        \draw [->,draw] (d.east) to node [align=center,below] {packet,\\(ticket)}  (z.west);
 
         \path [->,draw,bend left,dashed] (a.north east) to node [above] {3$\cdot$incentive} (b.north west);
         \path [->,draw,bend left,dashed] (b.north east) to node [above] {2$\cdot$incentive} (c.north west);
