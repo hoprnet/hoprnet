@@ -4,10 +4,10 @@ import { EventEmitter } from 'events'
 import BN from 'bn.js'
 
 import { subscribeToAcknowledgements, sendAcknowledgement } from './acknowledgement'
-import { PublicKey, u8aEquals, Ticket, UINT256, HoprDB } from '@hoprnet/hopr-utils'
-import { Balance, createFirstChallenge } from '@hoprnet/hopr-utils'
+import { PublicKey, u8aEquals, Ticket, UINT256, HoprDB, Challenge, deriveAckKeyShare } from '@hoprnet/hopr-utils'
+import { Balance, createPoRValuesForSender } from '@hoprnet/hopr-utils'
 
-import { Challenge, Packet } from '../../messages'
+import { AcknowledgementChallenge, Packet } from '../../messages'
 import { PacketForwardInteraction } from './forward'
 import Defer from 'p-defer'
 
@@ -18,7 +18,7 @@ function createFakeChain(privKey: PeerId) {
 
   const getChannel = (_self: PublicKey, counterparty: PublicKey) => ({
     acknowledge,
-    createTicket: (amount: Balance, challenge: PublicKey, _winProb: number) => {
+    createTicket: (amount: Balance, challenge: Challenge, _winProb: number) => {
       return Ticket.create(
         counterparty.toAddress(),
         challenge,
@@ -74,13 +74,14 @@ describe('packet interaction', function () {
 
     const secrets = Array.from({ length: 2 }, (_) => randomBytes(SECRET_LENGTH))
 
-    const { ackChallenge } = createFirstChallenge(secrets[0], secrets[1])
+    const { ackChallenge, ownKey } = createPoRValuesForSender(secrets[0], secrets[1])
 
-    const challenge = Challenge.create(ackChallenge, self)
+    const challenge = AcknowledgementChallenge.create(ackChallenge, self)
 
     const fakePacket = new Packet(new Uint8Array(), challenge, { serialize: () => new Uint8Array(Ticket.SIZE) } as any)
 
-    fakePacket.ownKey = secrets[0]
+    fakePacket.ownKey = ownKey
+    fakePacket.ackKey = deriveAckKeyShare(secrets[0])
     fakePacket.nextHop = counterparty.pubKey.marshal()
     fakePacket.ackChallenge = ackChallenge
 

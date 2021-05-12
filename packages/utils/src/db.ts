@@ -4,7 +4,7 @@ import MemDown from 'memdown'
 import { existsSync, mkdirSync } from 'fs'
 import path from 'path'
 import Debug from 'debug'
-import { Hash, u8aConcat, Address, Intermediate } from '.'
+import { Hash, u8aConcat, Address, Intermediate, HalfKeyChallenge } from '.'
 import {
   Ticket,
   AcknowledgedTicket,
@@ -15,6 +15,7 @@ import {
   PublicKey
 } from './types'
 import BN from 'bn.js'
+import { u8aEquals } from './u8a'
 
 const log = Debug(`hopr-core:db`)
 const encoder = new TextEncoder()
@@ -22,10 +23,10 @@ const encoder = new TextEncoder()
 const TICKET_PREFIX = encoder.encode('tickets-')
 const UNACKNOWLEDGED_TICKETS_PREFIX = u8aConcat(TICKET_PREFIX, encoder.encode('unacknowledged-'))
 const ACKNOWLEDGED_TICKETS_PREFIX = u8aConcat(TICKET_PREFIX, encoder.encode('acknowledged-'))
-export const unacknowledgedTicketKey = (challenge: Address) => {
+export const unacknowledgedTicketKey = (challenge: HalfKeyChallenge) => {
   return u8aConcat(UNACKNOWLEDGED_TICKETS_PREFIX, challenge.serialize())
 }
-const acknowledgedTicketKey = (challenge: Address) => {
+const acknowledgedTicketKey = (challenge: HalfKeyChallenge) => {
   return u8aConcat(ACKNOWLEDGED_TICKETS_PREFIX, challenge.serialize())
 }
 const PACKET_TAG_PREFIX: Uint8Array = encoder.encode('packets-tag-')
@@ -83,6 +84,10 @@ export class HoprDB {
     await this.db.put(Buffer.from(this.keyOf(key)), Buffer.from(value))
   }
 
+  private async touch(key: Uint8Array): Promise<void> {
+    return await this.put(key, new Uint8Array())
+  }
+
   private async get(key: Uint8Array): Promise<Uint8Array> {
     return await this.db.get(Buffer.from(this.keyOf(key)))
   }
@@ -110,10 +115,10 @@ export class HoprDB {
         .createReadStream()
         .on('error', reject)
         .on('data', async ({ key, value }: { key: Buffer; value: Buffer }) => {
-          if (!key.subarray(0, prefixKeyed.length).equals(prefixKeyed)) {
+          if (!u8aEquals(key.subarray(0, prefixKeyed.length), prefixKeyed)) {
             return
           }
-          const obj = deserialize(value)
+          const obj = deserialize(Uint8Array.from(value))
           if (filter(obj)) {
             res.push(obj)
           }
@@ -159,23 +164,23 @@ export class HoprDB {
         tickets.map<any>(async (unAckTicket) => {
           return {
             type: 'del',
-            key: Buffer.from(this.keyOf(unacknowledgedTicketKey(unAckTicket.ticket.challenge)))
+            key: Buffer.from(this.keyOf(unacknowledgedTicketKey(unAckTicket.ownKey.toChallenge())))
           }
         })
       )
     )
   }
 
-  public async getUnacknowledgedTicket(challenge: Address): Promise<UnacknowledgedTicket> {
+  public async getUnacknowledgedTicket(challenge: HalfKeyChallenge): Promise<UnacknowledgedTicket> {
     return UnacknowledgedTicket.deserialize(await this.get(unacknowledgedTicketKey(challenge)))
   }
 
   public async storeUnacknowledgedTicket(unackTicket: UnacknowledgedTicket): Promise<void> {
-    await this.put(unacknowledgedTicketKey(unackTicket.ticket.challenge), unackTicket.serialize())
+    await this.put(unacknowledgedTicketKey(unackTicket.getChallenge()), unackTicket.serialize())
   }
 
   public async delUnacknowledgedTicket(unackTicket: UnacknowledgedTicket): Promise<void> {
-    await this.del(unacknowledgedTicketKey(unackTicket.ticket.challenge))
+    await this.del(unacknowledgedTicketKey(unackTicket.getChallenge()))
   }
 
   /**
@@ -206,7 +211,7 @@ export class HoprDB {
         acks.map<any>(async (ackTicket) => {
           return {
             type: 'del',
-            key: Buffer.from(this.keyOf(acknowledgedTicketKey(ackTicket.ticket.challenge)))
+            key: Buffer.from(this.keyOf(acknowledgedTicketKey(ackTicket.response.toChallenge())))
           }
         })
       )
@@ -219,7 +224,7 @@ export class HoprDB {
    * @param index Uint8Array
    */
   public async updateAcknowledgedTicket(ackTicket: AcknowledgedTicket): Promise<void> {
-    await this.put(acknowledgedTicketKey(ackTicket.ticket.challenge), ackTicket.serialize())
+    await this.put(acknowledgedTicketKey(ackTicket.response.toChallenge()), ackTicket.serialize())
   }
 
   /**
@@ -227,12 +232,14 @@ export class HoprDB {
    * @param index Uint8Array
    */
   public async delAcknowledgedTicket(ackTicket: AcknowledgedTicket): Promise<void> {
-    await this.del(acknowledgedTicketKey(ackTicket.ticket.challenge))
+    await this.del(acknowledgedTicketKey(ackTicket.response.toChallenge()))
   }
 
   public async unAckToAckTicket(ackTicket: AcknowledgedTicket): Promise<void> {
-    const unAcknowledgedDbKey = unacknowledgedTicketKey(ackTicket.ticket.challenge)
-    const acknowledgedDbKey = acknowledgedTicketKey(ackTicket.ticket.challenge)
+    const challenge = ackTicket.response.toChallenge()
+
+    const unAcknowledgedDbKey = unacknowledgedTicketKey(challenge)
+    const acknowledgedDbKey = acknowledgedTicketKey(challenge)
     try {
       await this.db
         .batch()
@@ -274,7 +281,7 @@ export class HoprDB {
     let present = await this.has(this.keyOf(PACKET_TAG_PREFIX, packetTag))
 
     if (!present) {
-      await this.put(this.keyOf(PACKET_TAG_PREFIX, packetTag), new Uint8Array())
+      await this.touch(this.keyOf(PACKET_TAG_PREFIX, packetTag))
     }
 
     return present
@@ -299,7 +306,7 @@ export class HoprDB {
   }
 
   async getCurrentCommitment(channelId: Hash): Promise<Hash> {
-    return new Hash(await this.get(u8aConcat(COMMITMENT_PREFIX, CURRENT, channelId.serialize())))
+    return new Hash(Uint8Array.from(await this.get(u8aConcat(COMMITMENT_PREFIX, CURRENT, channelId.serialize()))))
   }
 
   async setCurrentCommitment(channelId: Hash, commitment: Hash) {
@@ -317,7 +324,7 @@ export class HoprDB {
 
   async getLatestConfirmedSnapshot(): Promise<Snapshot | undefined> {
     const data = await this.maybeGet(LATEST_CONFIRMED_SNAPSHOT_KEY)
-    return data ? Snapshot.deserialize(data) : undefined
+    return data ? Snapshot.deserialize(Uint8Array.from(data)) : undefined
   }
 
   async updateLatestConfirmedSnapshot(snapshot: Snapshot): Promise<void> {
@@ -326,7 +333,7 @@ export class HoprDB {
 
   async getChannel(channelId: Hash): Promise<ChannelEntry | undefined> {
     const data = await this.maybeGet(createChannelKey(channelId))
-    return data ? ChannelEntry.deserialize(data) : undefined
+    return data ? ChannelEntry.deserialize(Uint8Array.from(data)) : undefined
   }
 
   async getChannels(filter?: (channel: ChannelEntry) => boolean): Promise<ChannelEntry[]> {
@@ -340,7 +347,7 @@ export class HoprDB {
 
   async getAccount(address: Address): Promise<AccountEntry | undefined> {
     const data = await this.maybeGet(createAccountKey(address))
-    return data ? AccountEntry.deserialize(data) : undefined
+    return data ? AccountEntry.deserialize(Uint8Array.from(data)) : undefined
   }
 
   async updateAccount(account: AccountEntry): Promise<void> {
@@ -353,12 +360,12 @@ export class HoprDB {
   }
 
   static createMock(): HoprDB {
-    const mock = {
+    const mock: HoprDB = {
       id: Address.createMock(),
       db: new levelup(MemDown())
-    }
+    } as any
     Object.setPrototypeOf(mock, HoprDB.prototype)
-    //@ts-ignore
+
     return mock
   }
 }

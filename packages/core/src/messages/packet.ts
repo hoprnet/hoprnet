@@ -5,7 +5,6 @@ import {
   PublicKey,
   Balance,
   UnacknowledgedTicket,
-  Hash,
   HoprDB,
   getPacketLength,
   POR_STRING_LENGTH,
@@ -14,15 +13,17 @@ import {
   forwardTransform,
   generateKeyShares,
   createPoRString,
-  createFirstChallenge,
+  createPoRValuesForSender,
   preVerify,
   u8aSplit,
-  pubKeyToPeerId
+  pubKeyToPeerId,
+  HalfKeyChallenge,
+  HalfKey,
+  Challenge
 } from '@hoprnet/hopr-utils'
 import type HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
-import { Challenge } from './challenge'
+import { AcknowledgementChallenge } from './acknowledgementChallenge'
 import type PeerId from 'peer-id'
-import { publicKeyCreate } from 'secp256k1'
 import BN from 'bn.js'
 import { Acknowledgement } from './acknowledgement'
 import { blue, green } from 'chalk'
@@ -159,23 +160,24 @@ export class Packet {
   public packetTag: Uint8Array
   public previousHop: Uint8Array
   public nextHop: Uint8Array
-  public ownShare: Uint8Array
-  public ownKey: Uint8Array
-  public nextChallenge: PublicKey
-  public ackChallenge: PublicKey
+  public ownShare: HalfKeyChallenge
+  public ownKey: HalfKey
+  public ackKey: HalfKey
+  public nextChallenge: Challenge
+  public ackChallenge: HalfKeyChallenge
 
-  public constructor(private packet: Uint8Array, private challenge: Challenge, private ticket: Ticket) {}
+  public constructor(private packet: Uint8Array, private challenge: AcknowledgementChallenge, private ticket: Ticket) {}
 
-  private setReadyToForward(ackChallenge: PublicKey) {
+  private setReadyToForward(ackChallenge: HalfKeyChallenge) {
     this.ackChallenge = ackChallenge
     this.isReadyToForward = true
 
     return this
   }
 
-  private setFinal(plaintext: Uint8Array, packetTag: Uint8Array, ownKey: Uint8Array) {
+  private setFinal(plaintext: Uint8Array, packetTag: Uint8Array, ackKey: HalfKey) {
     this.packetTag = packetTag
-    this.ownKey = ownKey
+    this.ackKey = ackKey
     this.isReceiver = true
     this.isReadyToForward = false
     this.plaintext = plaintext
@@ -184,17 +186,19 @@ export class Packet {
   }
 
   private setForward(
-    ownKey: Uint8Array,
-    ownShare: Uint8Array,
+    ackKey: HalfKey,
+    ownKey: HalfKey,
+    ownShare: HalfKeyChallenge,
     nextHop: Uint8Array,
     previousHop: Uint8Array,
-    nextChallenge: PublicKey,
-    ackChallenge: PublicKey,
+    nextChallenge: Challenge,
+    ackChallenge: HalfKeyChallenge,
     packetTag: Uint8Array
   ) {
     this.isReceiver = false
     this.isReadyToForward = false
 
+    this.ackKey = ackKey
     this.ownKey = ownKey
     this.ownShare = ownShare
     this.previousHop = previousHop
@@ -218,14 +222,14 @@ export class Packet {
   ): Promise<Packet> {
     const isDirectMessage = path.length === 1
     const { alpha, secrets } = generateKeyShares(path)
-    const { ackChallenge, ticketChallenge } = createFirstChallenge(secrets[0], secrets[1])
+    const { ackChallenge, ticketChallenge } = createPoRValuesForSender(secrets[0], secrets[1])
     const porStrings: Uint8Array[] = []
 
     for (let i = 0; i < path.length - 1; i++) {
       porStrings.push(createPoRString(secrets[i + 1], i + 2 < path.length ? secrets[i + 2] : undefined))
     }
 
-    const challenge = Challenge.create(ackChallenge, privKey)
+    const challenge = AcknowledgementChallenge.create(ackChallenge, privKey)
     const self = new PublicKey(privKey.pubKey.marshal())
     const nextPeer = new PublicKey(path[0].pubKey.marshal())
     const packet = createPacket(secrets, alpha, msg, path, MAX_HOPS + 1, POR_STRING_LENGTH, porStrings)
@@ -246,7 +250,7 @@ export class Packet {
   }
 
   static get SIZE() {
-    return PACKET_LENGTH + Challenge.SIZE + Ticket.SIZE
+    return PACKET_LENGTH + AcknowledgementChallenge.SIZE + Ticket.SIZE
   }
 
   static deserialize(preArray: Uint8Array, privKey: PeerId, pubKeySender: PeerId): Packet {
@@ -265,13 +269,13 @@ export class Packet {
       arr = preArray
     }
 
-    const [packet, preChallenge, preTicket] = u8aSplit(arr, [PACKET_LENGTH, Challenge.SIZE, Ticket.SIZE])
+    const [packet, preChallenge, preTicket] = u8aSplit(arr, [PACKET_LENGTH, AcknowledgementChallenge.SIZE, Ticket.SIZE])
 
     const transformedOutput = forwardTransform(privKey, packet, POR_STRING_LENGTH, 0, MAX_HOPS + 1)
 
     const ackKey = deriveAckKeyShare(transformedOutput.derivedSecret)
 
-    const challenge = Challenge.deserialize(preChallenge, new PublicKey(publicKeyCreate(ackKey)), pubKeySender)
+    const challenge = AcknowledgementChallenge.deserialize(preChallenge, ackKey.toChallenge(), pubKeySender)
 
     const ticket = Ticket.deserialize(preTicket)
 
@@ -279,7 +283,7 @@ export class Packet {
       return new Packet(packet, challenge, ticket).setFinal(
         transformedOutput.plaintext,
         transformedOutput.packetTag,
-        transformedOutput.derivedSecret
+        ackKey
       )
     }
 
@@ -294,6 +298,7 @@ export class Packet {
     }
 
     return new Packet(transformedOutput.packet, challenge, ticket).setForward(
+      ackKey,
       verificationOutput.ownKey,
       verificationOutput.ownShare,
       transformedOutput.nextHop,
@@ -317,7 +322,7 @@ export class Packet {
       throw Error(`Invalid state`)
     }
 
-    const unacknowledged = new UnacknowledgedTicket(this.ticket, new Hash(this.ownKey))
+    const unacknowledged = new UnacknowledgedTicket(this.ticket, this.ownKey)
 
     log(
       `Storing unacknowledged ticket. Expecting to receive a preImage for ${green(
@@ -340,11 +345,11 @@ export class Packet {
   }
 
   createAcknowledgement(privKey: PeerId) {
-    if (this.ownKey == undefined) {
+    if (this.ackKey == undefined) {
       throw Error(`Invalid state`)
     }
 
-    return Acknowledgement.create(this.challenge, this.ownKey, privKey)
+    return Acknowledgement.create(this.challenge, this.ackKey, privKey)
   }
 
   async forwardTransform(privKey: PeerId, chain: HoprCoreEthereum): Promise<void> {
@@ -363,7 +368,7 @@ export class Packet {
 
     this.ticket = await channel.createTicket(new Balance(new BN(0)), this.nextChallenge, 0)
 
-    this.challenge = Challenge.create(this.ackChallenge, privKey)
+    this.challenge = AcknowledgementChallenge.create(this.ackChallenge, privKey)
 
     this.isReadyToForward = true
   }
