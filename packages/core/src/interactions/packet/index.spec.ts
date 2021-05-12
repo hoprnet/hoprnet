@@ -10,7 +10,7 @@ import {
   Ticket,
   UINT256,
   HoprDB,
-  Challenge as ChallengeType,
+  Challenge,
   deriveAckKeyShare
 } from '@hoprnet/hopr-utils'
 import { Balance, createFirstChallenge } from '@hoprnet/hopr-utils'
@@ -26,7 +26,7 @@ function createFakeChain(privKey: PeerId) {
 
   const getChannel = (_self: PublicKey, counterparty: PublicKey) => ({
     acknowledge,
-    createTicket: (amount: Balance, challenge: ChallengeType, _winProb: number) => {
+    createTicket: (amount: Balance, challenge: Challenge, _winProb: number) => {
       return Ticket.create(
         counterparty.toAddress(),
         challenge,

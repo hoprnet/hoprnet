@@ -19,7 +19,7 @@ import {
   pubKeyToPeerId,
   HalfKeyChallenge,
   HalfKey,
-  Challenge as ChallengeType
+  Challenge
 } from '@hoprnet/hopr-utils'
 import type HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 import { AcknowledgementChallenge } from './acknowledgementChallenge'
@@ -163,7 +163,7 @@ export class Packet {
   public ownShare: HalfKeyChallenge
   public ownKey: HalfKey
   public ackKey: HalfKey
-  public nextChallenge: ChallengeType
+  public nextChallenge: Challenge
   public ackChallenge: HalfKeyChallenge
 
   public constructor(private packet: Uint8Array, private challenge: AcknowledgementChallenge, private ticket: Ticket) {}
@@ -191,7 +191,7 @@ export class Packet {
     ownShare: HalfKeyChallenge,
     nextHop: Uint8Array,
     previousHop: Uint8Array,
-    nextChallenge: ChallengeType,
+    nextChallenge: Challenge,
     ackChallenge: HalfKeyChallenge,
     packetTag: Uint8Array
   ) {
