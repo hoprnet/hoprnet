@@ -424,7 +424,7 @@ class Hopr extends EventEmitter {
             return reject(err)
           }
 
-          const key = unacknowledgedTicketKey(packet.ackChallenge.toAddress())
+          const key = unacknowledgedTicketKey(packet.ackChallenge)
 
           this.once('message-acknowledged:' + u8aToHex(key), () => {
             resolve()

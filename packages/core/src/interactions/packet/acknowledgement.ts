@@ -18,7 +18,7 @@ export function subscribeToAcknowledgements(
 ) {
   subscribe(PROTOCOL_ACKNOWLEDGEMENT, async function (msg: Uint8Array, remotePeer: PeerId) {
     const ackMsg = Acknowledgement.deserialize(msg, pubKey, remotePeer)
-    let unacknowledgedTicket = await db.getUnacknowledgedTicket(ackMsg.ackChallenge.toAddress())
+    let unacknowledgedTicket = await db.getUnacknowledgedTicket(ackMsg.ackChallenge)
 
     if (!unacknowledgedTicket) {
       // Could be dummy, could be error.
