@@ -121,7 +121,11 @@ export class Address {
 
 export class Hash {
   constructor(private arr: Uint8Array) {
-    if (arr.length !== Hash.SIZE) {
+    if (typeof Buffer !== 'undefined' && Buffer.isBuffer(arr)) {
+      throw Error(`Expected a Uint8Array but got a Buffer`)
+    }
+
+    if (arr.length != Hash.SIZE) {
       throw new Error('Incorrect size Uint8Array for hash')
     }
   }
