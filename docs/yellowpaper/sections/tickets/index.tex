@@ -1,51 +1,70 @@
 \section{Tickets}
-In the HOPR protocol, nodes that have staked funds within a payment channel can issue tickets that are used for payment to other nodes. 
-Tickets are used for probabilistic payments; every ticket is bound to a specific payment channel and cannot be spent elsewhere. 
+In the HOPR protocol, nodes that have staked funds within a payment channel can issue tickets that are used for payment to other nodes.
+Tickets are used for probabilistic payments; every ticket is bound to a specific payment channel and cannot be spent elsewhere.
 They are redeemable at most once and they lose their value when the channel is closed or when the commitment is reset. A commitment is secret on-chain value that is used to verify whether a ticket is a win or not when it's revealed in order to redeem it.
 \subsection{Ticket issuance}
 A ticket can be issued once two nodes have established a payment channel with each other which means that at least one of them has locked HOPR tokens.
 \newline The ticket issuer A (A could also be the packet creator) selects the winning probability of the ticket and the relay fee to use and sets amount to:
 $$\sigma:=\dfrac{L\times F}{P_w}$$
 where $\sigma$ is the amount of HOPR tokens set in the ticket, $L$ is the path length, $F$ is the relay fee and $P_w$ is the ticket's winning probability.
-\\~\\The issuer $(A)$ issues a ticket for the next downstream node, 
-the challenge is given together with the routing information by the packet. 
+\\~\\The issuer $(A)$ issues a ticket for the next downstream node,
+the challenge is given together with the routing information by the packet.
 \\$(A)$ does not know whether the ticket is a win or not.
-\\$(A)$ sets content of a ticket to: $$t:=(\sigma,P_w,R,I,T_c,\zeta,c_{Id},\tau,V)$$ 
+    \\$(A)$ sets content of a ticket to: $$t:=(\sigma,P_w,R,I,T_c,\zeta,c_{Id},\tau,V)$$
 \\~\\$(A)$ then signs the ticket with its private key and sends $T:= (t, Sig_I(t))$ to the recipient together with a mixnet packet.
-\\~\\\textbf{Recipient's adress $R$:} is a unique identifier that is derived from the recipient's public key.
-\\\textbf{Ticket Index $I$:} is set by the ticket issuer and increases with every issued ticket. The recipient verifies that the index increases with every packet and drops packets if this is not the case. Redeeming a ticket with index $n$ invalidates all tickets with index $I<n$, hence the relayer has a strong incentive to not accept tickets with unchanged index.
-\\\textbf{Ticket challenge $T_c$:}  is set by the ticket issuer and used to ckeck whether a ticket is redeemable before the packet is been relayed. The packet is dropped if that's not the case.
-\\\textbf{Acount counter $\alpha_c$:} is used as a mechanism to prevent cheating by turning non-winning tickets into winning ones. This is done by increasing the value of $\alpha_c$ whenever a node resets a commitment which helps keeping track of updates to the on-chain commitments.
-\\\textbf{Channel iteration $\zeta$:} is used to give each reincarnation of the payment channel a new identifier such that tickets issued for previous instances of the channel lose their validity once a channel is reopened.
-\\\textbf{ChainId $c_{Id}$:} The channel identifier which is defined by the ticket issuer in order to determine which channel will be used between issuer and recipient. For example, tickets that are valid on xDAI are not valid on Ethereum.
-\\\textbf{Tag $\tau$} is given as a constant and depends on the utilized blockchain. It is used to distinguish HOPR tickets from others with the same structure that are meant for different payment channels and invalidates their usage in HOPR.
-\\\textbf{Version $V$} is given as a constant and depends on the utilized blockchain. It is used to invalidate tickets that were issued for previous versions of HOPR from being used in future iterations of the protocol.
+    \\~\\\textbf{Recipient's adress $R$:} is a unique identifier that is derived from the recipient's public key.
+    \\\textbf{Ticket Index $I$:} is set by the ticket issuer and increases with every issued ticket. The recipient verifies that the index increases with every packet and drops packets if this is not the case. Redeeming a ticket with index $n$ invalidates all tickets with index $I<n$, hence the relayer has a strong incentive to not accept tickets with unchanged index.
+    \\\textbf{Ticket challenge $T_c$:}  is set by the ticket issuer and used to ckeck whether a ticket is redeemable before the packet is been relayed. The packet is dropped if that's not the case.
+    \\\textbf{Acount counter $\alpha_c$:} is used as a mechanism to prevent cheating by turning non-winning tickets into winning ones. This is done by increasing the value of $\alpha_c$ whenever a node resets a commitment which helps keeping track of updates to the on-chain commitments.
+    \\\textbf{Channel iteration $\zeta$:} is used to give each reincarnation of the payment channel a new identifier such that tickets issued for previous instances of the channel lose their validity once a channel is reopened.
+    \\\textbf{ChainId $c_{Id}$:} The channel identifier which is defined by the ticket issuer in order to determine which channel will be used between issuer and recipient. For example, tickets that are valid on xDAI are not valid on Ethereum.
+    \\\textbf{Tag $\tau$} is given as a constant and depends on the utilized blockchain. It is used to distinguish HOPR tickets from others with the same structure that are meant for different payment channels and invalidates their usage in HOPR.
+    \\\textbf{Version $V$} is given as a constant and depends on the utilized blockchain. It is used to invalidate tickets that were issued for previous versions of HOPR from being used in future iterations of the protocol.
 
 
- \begin{figure}[H]
-    \centering
-    \includegraphics[width=10cm,height=10cm,keepaspectratio]{../yellowpaper/images/ticket_workflow.png}
-    \caption{Ticket workflow}
-    \label{fig:Ticket worklow}
-\end{figure}
 
-\subsubsection{Challenge}
-$(A)$ creates a shared secret $s_i$ with all the relay nodes in the channel (B-C-D-Z) by using an offline version of the Diffie-Hellman key exchange. This shared key is a session key that's generated from the master DH key sphinx key. 
-\\~\\ The shared secret $s_i$ is used as a seed for a PRG (Pseudo Random Generator) to create secret shares $s_i,s_i'$ for each node along the route. 
-Relayers compute $s_i$ and get $s_{i+1}'$ from the next downstream node. 
-\newline The sender $(A)$ creates $$T_{c_i}:=(s_i+s_{i+1}')*G$$ and a hint for B,C,D,Z of how the promised value $s_C',s_D',s_Z'$ is going to look like. 
+    \begin{figure}[H]
+        \centering
+        \begin{tikzpicture}[auto]
+            \draw (0,0) node (a) [rectangle,draw] {$A$};
+            \draw (2.5,0) node (b) [rectangle,draw] {$B$};
+            \draw (5,0) node (c) [rectangle,draw] {$C$};
+            \draw (7.5,0) node (d) [rectangle,draw] {$D$};
+            \draw (10,0) node (z) [rectangle,draw] {$Z$};
+
+            \draw [->,draw,dashed] (a.east) to node [align=center,below] {packet,\\ticket} (b.west);
+            \draw [->,draw] (b.east) to node [align=center,below] {packet,\\ticket} (c.west);
+            \draw [->,draw] (c.east) to node [align=center,below] {packet,\\ticket} (d.west);
+            \draw [->,draw,dashed] (d.east) to node [align=center,below] {packet,\\(ticket)}  (z.west);
+
+            \path[->] (a) edge [out=-120,in=-60,distance=2em,below] node [align=center] {send\\message}  (a);    % \draw 
+            \path[->] (b) edge [out=-120,in=-60,distance=2em,below] node [align=center] {issue\\packet}  (b);    % \draw 
+            \path[->] (c) edge [out=-120,in=-60,distance=2em,below] node [align=center] {relay\\packet}  (c);    % \draw 
+            \path[->] (d) edge [out=-120,in=-60,distance=2em,below] node [align=center] {create\\ack}  (d);    % \draw 
+            \path[->] (z) edge [out=-120,in=-60,distance=2em,below] node [align=center] {receive\\message}  (z);    % \draw 
+
+            \path[->,draw,looseness=1.5,dashed,bend right] (d.north west) to [above] node {ack} (c.north east);
+        \end{tikzpicture}    \caption{Ticket workflow}
+        \label{fig:Ticket worklow}
+    \end{figure}
+
+    \subsubsection{Challenge}
+$(A)$ creates a shared secret $s_i$ with all the relay nodes in the channel (B-C-D-Z) by using an offline version of the Diffie-Hellman key exchange. This shared key is a session key that's generated from the master DH key sphinx key.
+    \\~\\ The shared secret $s_i$ is used as a seed for a PRG (Pseudo Random Generator) to create secret shares $s_i,s_i'$ for each node along the route.
+    Relayers compute $s_i$ and get $s_{i+1}'$ from the next downstream node.
+    \newline The sender $(A)$ creates $$T_{c_i}:=(s_i+s_{i+1}')*G$$ and a hint for B,C,D,Z of how the promised value $s_C',s_D',s_Z'$ is going to look like.
 The value “hint” or $H$ is computed as $$H_i:=s_{i+1}'*G$$ where $*$ is the curve multiplication operation and $G$ is a generator of the curve (the same used in the sphinx section).
 
 
 \subsection{Ticket validation}
 Tickets are received together with packets which means that the recipient and the next downstream node share a secret $s$ whose key shares $s_i$ and $s_{i+1}$ are derivable by those nodes.
-\newline Once $(A)$ receives $s_{i+1}^{(1)}$ from (B) by the secret sharing, it can compute $$r_i:=s_i^{(0)}+s_{i+1}^{(1)}$$ where $r_i$ is the response $r$ at iteration $i$ such that it verifies  
+\newline Once $(A)$ receives $s_{i+1}^{(1)}$ from (B) by the secret sharing, it can compute $$r_i:=s_i^{(0)}+s_{i+1}^{(1)}$$ where $r_i$ is the response $r$ at iteration $i$ such that it verifies
 $$r_i*G=T_{c_i}$$
-Once the recipient transforms the packet, it is able to compute $s_i$. The recipient is now also able to extract the routing information from the packet. 
+Once the recipient transforms the packet, it is able to compute $s_i$. The recipient is now also able to extract the routing information from the packet.
 This includes a hint to the value $s_{i+1}$ given as $$H_i=s_{i+1}*G$$ which is stored in the sphinx packet header.
 \\The unacknowledged ticket is stored in the database under the hint to the promised value to make sure that the acknowledgement can be afterwards linked to the unacknowledged ticket.
-\newline Together with $s_i$, the node can verify that $$T_{c_i}=s_i*G+H_i$$ with $$s_i*G+H_i=s_i*G+s_{i+1}*G=(s_i+s_{i+1})*G$$ 
-This allows the recipient to verify that the promised value $s_{i+1}$ indeed leads to a solution of the challenge given in the ticket. 
+\newline Together with $s_i$, the node can verify that $$T_{c_i}=s_i*G+H_i$$ with $$s_i*G+H_i=s_i*G+s_{i+1}*G=(s_i+s_{i+1})*G$$
+This allows the recipient to verify that the promised value $s_{i+1}$ indeed leads to a solution of the challenge given in the ticket.
 If this is not the case, then the node should drop the packet.
 \newline Without this check, the sender is able to intentionally create falsy challenges that lead to unredeemable tickets.
 
@@ -53,14 +72,14 @@ If this is not the case, then the node should drop the packet.
 \subsection{Ticket redemption}
 
 
-In order to unlock the ticket, the node stores it within its database until it receives an acknowledgement containing $s_{i+1}$ from the next downstream node. 
+In order to unlock the ticket, the node stores it within its database until it receives an acknowledgement containing $s_{i+1}$ from the next downstream node.
 The challenge can be computed from acknowledgement as $T_{c_i}=ack_i*G$.
-\newline Once it receives an acknowledgement, it checks whether it stores an unacknowledged ticket for the received acknowledgement. 
-If this is not the case, the node should drop the acknowledgement.  
+\newline Once it receives an acknowledgement, it checks whether it stores an unacknowledged ticket for the received acknowledgement.
+If this is not the case, the node should drop the acknowledgement.
 \newline The node then computes the response to the challenge given in the ticket as $$r_i=(s_i+s_{i+1})*G$$
-Additionally, the node retrieves the opening value $open$ to the current on-chain commitment (used to verify whether a ticket is a win) and checks whether $r$, $open$ leads to a winning ticket. 
+Additionally, the node retrieves the opening value $open$ to the current on-chain commitment (used to verify whether a ticket is a win) and checks whether $r$, $open$ leads to a winning ticket.
 This is the case if $$h(t_h, r_i, open ) <P_w$$ where $t_h=h(t)$ is the ticket hash and $h$ is a hash function.
-If this is not the case, the node should drop the ticket. 
+If this is not the case, the node should drop the ticket.
 The final recipient of the packet does not receive a ticket because message reception is not incentivized by the HOPR protocol.
 \newline The node checks whether the information gained from the packet transformation is sufficient to fulfill the given challenge sent along with the ticket. It then replies with an acknowledgement that includes a response to the challenge.
 \\ The node also checks the following:
@@ -68,11 +87,11 @@ The final recipient of the packet does not receive a ticket because message rece
     \item Challenge check $$r*G=T_{c_i}$$
     \item The ticket has been already redeemed (replay protection): $$C_I <I$$ where $C_I$ is the channel index and $I$ the ticket index.
     \item Channel \textbf{exists} and is \textbf{open}. The check happens locally and not on-chain using the blockchain indexer in order not to reveal any metadata. If the node does not have a record about the channel or considers the channel to be in a state different from \textbf{open}, the ticket is dropped and the reception of the accompanying packet is rejected.
-    \item Channel balance towards the ticket recipient is sufficient to cover the costs for the ticket: $$ C_b>\sigma$$ where $\sigma$ is the ticket amount and $C_b$ is the channel balance. 
+    \item Channel balance towards the ticket recipient is sufficient to cover the costs for the ticket: $$ C_b>\sigma$$ where $\sigma$ is the ticket amount and $C_b$ is the channel balance.
     \item Ticket index is strictly greater than the current value in the smart contract (reorder protection). This is valid because redeeming a $ticket$ with index $I=n$ requires $I < n+1$ and sets $I= n+1$. So the new index becomes greater than $n$.
 
 
-\end{itemize}  
+\end{itemize}
 
 
 

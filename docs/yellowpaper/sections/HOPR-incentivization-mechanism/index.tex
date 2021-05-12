@@ -28,17 +28,16 @@ Nodes can close a payment channel in order to access their funds. The way to do 
 A can initiate the process by calling \textit{initiateChannelClosure()}. This changes the state to $pending\_timeout$. Other nodes will have now time to claim not yet claimed tickets. Once the timeout is done, any of the involved parties can call \textit{withdraw()}. Alice can then call \textit{finalizeChannelClosure()} which turns the channel state into \textit{closed}.
 
 \begin{figure}[H]
-    \begin{center}
-        \begin{tikzpicture}[looseness=1,auto]
-            \path (0,0) node (closed) [ellipse,draw] {$Closed$};
-            \path (5,0)  node (open) [ellipse,draw] {$Open$};
-            \path (2.5,-1)  node (pending) [ellipse,draw,align=left] {$Pending$\\$Timeout$};
+    \centering
+    \begin{tikzpicture}[looseness=1,auto]
+        \path (0,0) node (closed) [ellipse,draw] {$Closed$};
+        \path (5,0)  node (open) [ellipse,draw] {$Open$};
+        \path (2.5,-1)  node (pending) [ellipse,draw,align=left] {$Pending$\\$Timeout$};
 
-            \draw [->,draw](closed) to [bend left] node {$open()$} (open);
-            \draw [->,draw](open.south) to [bend left] node [align=left] {$initiate$\\$ChannelClosure()$} (pending.east);
-            \draw [->,draw](pending.west) to [bend left] node {$withdraw()$} (closed.south);
-        \end{tikzpicture}
-    \end{center}
+        \draw [->,draw](closed) to [bend left] node {$open()$} (open);
+        \draw [->,draw](open.south) to [bend left] node [align=left] {$initiate$\\$ChannelClosure()$} (pending.east);
+        \draw [->,draw](pending.west) to [bend left] node {$withdraw()$} (closed.south);
+    \end{tikzpicture}
     \label{fig:channel workflow}
     \caption{Channel workflow}
 \end{figure}
@@ -86,24 +85,23 @@ Packets with inappropriate challenges should be dropped as they might not lead t
 Therefore, the sender of the packet also provides a hint of the expected value that a node is supposed to get from the next downstream node (as explained in the ticket section).
 
 \begin{figure}[H]
-    \begin{center}
-        \begin{tabular}{| m{2em} | m{15em} | m{2em} |}
+    \centering
+    \begin{tabular}{| m{2em} | m{15em} | m{2em} |}
+        \hline
+        $\alpha$ & $\beta$                   & $\gamma$ \\
+                 & \begin{tabular}{| c m{2em} | m{3em} | m{6em} |}
             \hline
-            $\alpha$ & $\beta$                   & $\gamma$ \\
-                     & \begin{tabular}{| c m{2em} | m{3em} | m{6em} |}
-                \hline
-                \multicolumn{2}{| c |}{$Y_B$} & $hint_B$                 & $challenge_{BC}$ \\
-                \hline
-                \multicolumn{2}{| c |}{$Y_C$} & $hint_C$                 & $random$         \\
-                \hline
-                \multicolumn{2}{| c |}{$Y_D$} & $hint_D$                 & $random$         \\
-                \hline
-                End                           & \multicolumn{3}{| l |}{}                    \\
-                \hline
-            \end{tabular} &          \\[3em]
+            \multicolumn{2}{| c |}{$Y_B$} & $hint_B$                 & $challenge_{BC}$ \\
             \hline
-        \end{tabular}
-    \end{center}
+            \multicolumn{2}{| c |}{$Y_C$} & $hint_C$                 & $random$         \\
+            \hline
+            \multicolumn{2}{| c |}{$Y_D$} & $hint_D$                 & $random$         \\
+            \hline
+            End                           & \multicolumn{3}{| l |}{}                    \\
+            \hline
+        \end{tabular} &          \\[3em]
+        \hline
+    \end{tabular}
     \caption{SPHINX with PoR}
     \label{fig:SPHINX with PoR}
 \end{figure}
