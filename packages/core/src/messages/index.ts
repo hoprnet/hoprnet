@@ -1,3 +1,3 @@
 export * from './acknowledgement'
-export * from './challenge'
+export * from './acknowledgementChallenge'
 export * from './packet'

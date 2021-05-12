@@ -1,4 +1,4 @@
-import { Challenge } from './challenge'
+import { AcknowledgementChallenge } from './acknowledgementChallenge'
 import { SECP256K1_CONSTANTS, u8aSplit, HalfKey } from '@hoprnet/hopr-utils'
 import { ecdsaSign, ecdsaVerify } from 'secp256k1'
 import { SECRET_LENGTH, HASH_ALGORITHM } from './constants'
@@ -13,10 +13,10 @@ export class Acknowledgement {
   ) {}
 
   static get SIZE() {
-    return SECP256K1_CONSTANTS.SIGNATURE_LENGTH + Challenge.SIZE + SECRET_LENGTH
+    return SECP256K1_CONSTANTS.SIGNATURE_LENGTH + AcknowledgementChallenge.SIZE + SECRET_LENGTH
   }
 
-  static create(challenge: Challenge, ackKey: HalfKey, privKey: PeerId) {
+  static create(challenge: AcknowledgementChallenge, ackKey: HalfKey, privKey: PeerId) {
     const toSign = Uint8Array.from([...challenge.serialize(), ...ackKey.serialize()])
 
     const signature = ecdsaSign(createHash(HASH_ALGORITHM).update(toSign).digest(), privKey.privKey.marshal())

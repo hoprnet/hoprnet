@@ -22,7 +22,7 @@ import {
   Challenge as ChallengeType
 } from '@hoprnet/hopr-utils'
 import type HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
-import { Challenge } from './challenge'
+import { AcknowledgementChallenge } from './acknowledgementChallenge'
 import type PeerId from 'peer-id'
 import BN from 'bn.js'
 import { Acknowledgement } from './acknowledgement'
@@ -166,7 +166,7 @@ export class Packet {
   public nextChallenge: ChallengeType
   public ackChallenge: HalfKeyChallenge
 
-  public constructor(private packet: Uint8Array, private challenge: Challenge, private ticket: Ticket) {}
+  public constructor(private packet: Uint8Array, private challenge: AcknowledgementChallenge, private ticket: Ticket) {}
 
   private setReadyToForward(ackChallenge: HalfKeyChallenge) {
     this.ackChallenge = ackChallenge
@@ -229,7 +229,7 @@ export class Packet {
       porStrings.push(createPoRString(secrets[i + 1], i + 2 < path.length ? secrets[i + 2] : undefined))
     }
 
-    const challenge = Challenge.create(ackChallenge, privKey)
+    const challenge = AcknowledgementChallenge.create(ackChallenge, privKey)
     const self = new PublicKey(privKey.pubKey.marshal())
     const nextPeer = new PublicKey(path[0].pubKey.marshal())
     const packet = createPacket(secrets, alpha, msg, path, MAX_HOPS + 1, POR_STRING_LENGTH, porStrings)
@@ -250,7 +250,7 @@ export class Packet {
   }
 
   static get SIZE() {
-    return PACKET_LENGTH + Challenge.SIZE + Ticket.SIZE
+    return PACKET_LENGTH + AcknowledgementChallenge.SIZE + Ticket.SIZE
   }
 
   static deserialize(preArray: Uint8Array, privKey: PeerId, pubKeySender: PeerId): Packet {
@@ -269,13 +269,13 @@ export class Packet {
       arr = preArray
     }
 
-    const [packet, preChallenge, preTicket] = u8aSplit(arr, [PACKET_LENGTH, Challenge.SIZE, Ticket.SIZE])
+    const [packet, preChallenge, preTicket] = u8aSplit(arr, [PACKET_LENGTH, AcknowledgementChallenge.SIZE, Ticket.SIZE])
 
     const transformedOutput = forwardTransform(privKey, packet, POR_STRING_LENGTH, 0, MAX_HOPS + 1)
 
     const ackKey = deriveAckKeyShare(transformedOutput.derivedSecret)
 
-    const challenge = Challenge.deserialize(preChallenge, ackKey.toChallenge(), pubKeySender)
+    const challenge = AcknowledgementChallenge.deserialize(preChallenge, ackKey.toChallenge(), pubKeySender)
 
     const ticket = Ticket.deserialize(preTicket)
 
@@ -368,7 +368,7 @@ export class Packet {
 
     this.ticket = await channel.createTicket(new Balance(new BN(0)), this.nextChallenge, 0)
 
-    this.challenge = Challenge.create(this.ackChallenge, privKey)
+    this.challenge = AcknowledgementChallenge.create(this.ackChallenge, privKey)
 
     this.isReadyToForward = true
   }

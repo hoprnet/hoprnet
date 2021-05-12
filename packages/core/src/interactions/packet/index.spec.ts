@@ -15,7 +15,7 @@ import {
 } from '@hoprnet/hopr-utils'
 import { Balance, createFirstChallenge } from '@hoprnet/hopr-utils'
 
-import { Challenge, Packet } from '../../messages'
+import { AcknowledgementChallenge, Packet } from '../../messages'
 import { PacketForwardInteraction } from './forward'
 import Defer from 'p-defer'
 
@@ -84,7 +84,7 @@ describe('packet interaction', function () {
 
     const { ackChallenge, ownKey } = createFirstChallenge(secrets[0], secrets[1])
 
-    const challenge = Challenge.create(ackChallenge, self)
+    const challenge = AcknowledgementChallenge.create(ackChallenge, self)
 
     const fakePacket = new Packet(new Uint8Array(), challenge, { serialize: () => new Uint8Array(Ticket.SIZE) } as any)
 

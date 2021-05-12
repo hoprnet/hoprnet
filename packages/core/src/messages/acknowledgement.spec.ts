@@ -1,5 +1,5 @@
 import { Acknowledgement } from './acknowledgement'
-import { Challenge } from './challenge'
+import { AcknowledgementChallenge } from './acknowledgementChallenge'
 import { SECRET_LENGTH } from './constants'
 import { randomBytes } from 'crypto'
 import { deriveAckKeyShare, HalfKey } from '@hoprnet/hopr-utils'
@@ -16,7 +16,7 @@ describe('acknowledement message', function () {
 
     const ackKey = new HalfKey(randomBytes(SECRET_LENGTH))
 
-    const challenge = Challenge.create(ackKey.toChallenge(), self)
+    const challenge = AcknowledgementChallenge.create(ackKey.toChallenge(), self)
 
     assert(
       Acknowledgement.deserialize(
@@ -37,7 +37,7 @@ describe('acknowledement message', function () {
 
     assert.throws(() =>
       Acknowledgement.deserialize(
-        Acknowledgement.create(randomBytes(Challenge.SIZE) as any, deriveAckKeyShare(key), counterparty).serialize(),
+        Acknowledgement.create(randomBytes(AcknowledgementChallenge.SIZE) as any, deriveAckKeyShare(key), counterparty).serialize(),
         self,
         counterparty
       )
