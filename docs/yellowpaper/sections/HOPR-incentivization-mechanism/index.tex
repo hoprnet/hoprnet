@@ -14,9 +14,25 @@ $$value_(ACK_n) =\sum_{i=1}^nfee_{packet_i}$$ where $n$ is the total number of m
 $$value ( ACK_i )=value ( ACK_j ) \quad for \quad i,j\in \{1,n\}$$
 Hence, there is no added value in pretending packet loss or intentionally changing the order in which packets are processed.
 \subsubsection{Channel management}
-Initially, each payment channel in HOPR is \textit{closed} which means that in order to transfer packets, those channels have to be opened. 
+Initially, each payment channel in HOPR is \textit{closed} which means that in order to transfer packets, those channels have to be opened.
 \paragraph{Opening a channel} Nodes can open channels to other nodes by the following:
 A calls the method \textit{fundChannel()}. Once the call has succeeded, an on-chain event \textit{ChannelOpened} is thrown. The channel is now \textit{open}.
+
+\begin{figure}
+    \begin{center}
+        \begin{tikzpicture}[looseness=1,auto]
+            \path (0,0) node (closed) [ellipse,draw] {$Closed$};
+            \path (5,0)  node (open) [ellipse,draw] {$Open$};
+            \path (2.5,-1)  node (pending) [ellipse,draw,align=left] {$Pending$\\$Timeout$};
+
+            \draw [->,draw](closed) to [bend left] node {$open()$} (open);
+            \draw [->,draw](open.south) to [bend left] node [align=left] {$initiate$\\$ChannelClosure()$} (pending.east);
+            \draw [->,draw](pending.west) to [bend left] node {$withdraw()$} (closed.south);
+        \end{tikzpicture}
+    \end{center}
+    \label{fig:channel workflow}
+    \caption{Channel workflow}
+\end{figure}
 
 $$fundChannel(A: <\lambda>, B: <\mu>)$$ where $\lambda$ is the amount to be staked by A and $\mu$ is the amount to be staked by B. Both values can also be equal. A is also able to fund other channels which A is not part of.
 
@@ -24,7 +40,7 @@ $$fundChannel(A: <\lambda>, B: <\mu>)$$ where $\lambda$ is the amount to be stak
 As long as the channel remains open, nodes can claim their incentives for forwarding packets which is represented as tickets (see ticket section). Tickets are redeemed by dispatching a \textit{redeemTicket()} call. The balance of the channel is then updated according to the balance defined in the ticket.
 \paragraph{Closing a channel}
 Nodes can close a payment channel in order to access their funds. The way to do so is using a timeout.
-A can initiate the process by calling \textit{initiateChannelClosure()}. This changes the state to $pending\_timeout$. Other nodes will have now time to claim not yet claimed tickets. Once the timeout is done, any of the involved parties can call \textit{withdraw()}. Alice can then call \textit{finalizeChannelClosure()} which turns the channel state into \textit{closed}. 
+A can initiate the process by calling \textit{initiateChannelClosure()}. This changes the state to $pending\_timeout$. Other nodes will have now time to claim not yet claimed tickets. Once the timeout is done, any of the involved parties can call \textit{withdraw()}. Alice can then call \textit{finalizeChannelClosure()} which turns the channel state into \textit{closed}.
 
 
 
@@ -33,24 +49,24 @@ A can initiate the process by calling \textit{initiateChannelClosure()}. This ch
 \subsubsection*{Definition}
 A commitment scheme is a protocol between usually two parties $A$ and $B$ and fulfills two properties (hiding and biding).
 \\~\\\textbf{Hiding:} The ability to commit a value only known by the sender.
-\\~\textbf{Binding:} The committed value must be the only one that the sender can compute and that validates during the reveal phase. 
+\\~\textbf{Binding:} The committed value must be the only one that the sender can compute and that validates during the reveal phase.
 \\~\\HOPR uses on-chain commitments to verify whether a ticket is a win or not in order to redeem it later on. The relayer doesn't know beforehand whether the ticket is a win or not until they receive an acknowledgment from the next downstream node eand can't change the outcome.
 \subsubsection{Setup phase}
-Once a node joins the HOPR network, it creates an iterated commitment and stores the opening key in the database. 
-Iterated commitment scheme means $open_n$ opens $cm_n$ whereas $open_{n-1}$ opens $cm_{n-1}=open_n$ and so on. 
-\newline The final commitment is computed as $cm_n:= h^n(r)$ where hash is a preimage-resistant hash function and 
-$r$ is chosen uniformly at random by the node in order to prevent the issuer from knowing whether the ticket will be a win or not. 
+Once a node joins the HOPR network, it creates an iterated commitment and stores the opening key in the database.
+Iterated commitment scheme means $open_n$ opens $cm_n$ whereas $open_{n-1}$ opens $cm_{n-1}=open_n$ and so on.
+\newline The final commitment is computed as $cm_n:= h^n(r)$ where hash is a preimage-resistant hash function and
+$r$ is chosen uniformly at random by the node in order to prevent the issuer from knowing whether the ticket will be a win or not.
 \\~\\ Furthermore, it will prevent it from tweaking the given challenge such that the ticket cannot be a win.
 The number of iterations $n$ can be chosen as a constant and should reflect the number of tickets a node intends to redeem.
 
 \subsubsection{Opening phase}
-In order to redeem a ticket, a node has to reveal the opening to the current commitment $cm_n$ that is stored in the smart contract. 
+In order to redeem a ticket, a node has to reveal the opening to the current commitment $cm_n$ that is stored in the smart contract.
 \\~The opening shouldn’t be revealed otherwise since it discloses whether a ticket is a win or not.
 The ticket is a win if: $$h( t_h, r, open ) <P_w$$ where $$t_h=h(t)$$
-The opening is computed as $open_{n-1} = h^{n-1}(r)$ such that $cm_n=h( open_{n-1})$. 
-\\~\\The on-chain logic verifies whether the latest opening $open_n$ indeed opens the current on-chain commitment $cm_n$. 
-If this is the case, the current on-chain commitment is replaced by the given opening. 
-\\~The on-chain keeps track of updates to the on-chain commitments to prevent double-spending. 
+The opening is computed as $open_{n-1} = h^{n-1}(r)$ such that $cm_n=h( open_{n-1})$.
+\\~\\The on-chain logic verifies whether the latest opening $open_n$ indeed opens the current on-chain commitment $cm_n$.
+If this is the case, the current on-chain commitment is replaced by the given opening.
+\\~The on-chain keeps track of updates to the on-chain commitments to prevent double-spending.
 So whenever a node resets a commitment, a counter, namely $account.counter$ is increased and a call to $updateCommitment$ invalidates all previously unredeemed tickets.
 
 
@@ -71,24 +87,24 @@ Packets with inappropriate challenges should be dropped as they might not lead t
 Therefore, the sender of the packet also provides a hint of the expected value that a node is supposed to get from the next downstream node (as explained in the ticket section).
 
 \begin{figure}[H]
-\begin{center}
-    \begin{tabular}{| m{2em} | m{15em} | m{2em} |}
-        \hline
-        $\alpha$ & $\beta$                   & $\gamma$ \\
-                 & \begin{tabular}{| c m{2em} | m{3em} | m{6em} |}
+    \begin{center}
+        \begin{tabular}{| m{2em} | m{15em} | m{2em} |}
             \hline
-            \multicolumn{2}{| c |}{$Y_B$} & $hint_B$ & $challenge_{BC}$ \\
+            $\alpha$ & $\beta$                   & $\gamma$ \\
+                     & \begin{tabular}{| c m{2em} | m{3em} | m{6em} |}
+                \hline
+                \multicolumn{2}{| c |}{$Y_B$} & $hint_B$                 & $challenge_{BC}$ \\
+                \hline
+                \multicolumn{2}{| c |}{$Y_C$} & $hint_C$                 & $random$         \\
+                \hline
+                \multicolumn{2}{| c |}{$Y_D$} & $hint_D$                 & $random$         \\
+                \hline
+                End                           & \multicolumn{3}{| l |}{}                    \\
+                \hline
+            \end{tabular} &          \\[3em]
             \hline
-            \multicolumn{2}{| c |}{$Y_C$} & $hint_C$ & $random$         \\
-            \hline
-            \multicolumn{2}{| c |}{$Y_D$} & $hint_D$ & $random$         \\
-            \hline
-            End  & \multicolumn{3}{| l |}{}         \\
-            \hline
-        \end{tabular} &          \\[3em]
-        \hline
-    \end{tabular}
-\end{center}
-\caption{SPHINX with PoR}
-\label{fig:SPHINX with PoR}
+        \end{tabular}
+    \end{center}
+    \caption{SPHINX with PoR}
+    \label{fig:SPHINX with PoR}
 \end{figure}
