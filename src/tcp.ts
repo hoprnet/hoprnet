@@ -5,6 +5,7 @@ import net from 'net'
 import abortable, { AbortError } from 'abortable-iterator'
 import type { Socket, AddressInfo } from 'net'
 import Debug from 'debug'
+import { nodeToMultiaddr } from './utils'
 
 const log = Debug('hopr-connect:tcp')
 const error = Debug('hopr-connect:tcp:error')
@@ -33,15 +34,9 @@ class TCPConnection implements MultiaddrConnection {
   }
 
   constructor(public remoteAddr: Multiaddr, self: PeerId, public conn: Socket, options?: DialOptions) {
-    const connAddr = this.conn.address() as AddressInfo
-    this.localAddr = Multiaddr.fromNodeAddress(
-      {
-        address: connAddr.address,
-        family: parseInt(connAddr.family.slice(3)) as 4 | 6,
-        port: connAddr.port
-      },
-      'tcp'
-    ).encapsulate(`/p2p/${self.toB58String()}`)
+    this.localAddr = Multiaddr.fromNodeAddress(nodeToMultiaddr(this.conn.address() as AddressInfo), 'tcp').encapsulate(
+      `/p2p/${self.toB58String()}`
+    )
 
     this.timeline = {
       open: Date.now()
@@ -199,11 +194,11 @@ class TCPConnection implements MultiaddrConnection {
     }
 
     const remoteAddr = Multiaddr.fromNodeAddress(
-      {
-        family: parseInt(socket.remoteFamily.slice(3)) as 4 | 6,
+      nodeToMultiaddr({
         address: socket.remoteAddress,
-        port: socket.remotePort
-      },
+        port: socket.remotePort,
+        family: socket.remoteFamily
+      }),
       'tcp'
     )
 
