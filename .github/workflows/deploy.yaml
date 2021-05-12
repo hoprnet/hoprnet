@@ -57,8 +57,8 @@ jobs:
         run: |
           # skip releasing for changes from our bots to prevent circular change propagation
           [ "noreply@hoprnet.org" = "$(git show -s --format='%ae' ${HOPR_GITHUB_REF})" ] && exit 0
-          HOPR_PACKAGE_VERSION=$(./scripts/get-package-version.sh)
-          bash -x scripts/publish-pre-release.sh
+          HOPR_PACKAGE_VERSION=$(./scripts/get-package-version.sh) \
+            bash -x scripts/publish-pre-release.sh
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           HOPR_PACKAGE: hoprd
@@ -70,8 +70,8 @@ jobs:
         run: |
           # skip releasing for changes from our bots to prevent circular change propagation
           [ "noreply@hoprnet.org" = "$(git show -s --format='%ae' ${HOPR_GITHUB_REF})" ] && exit 0
-          HOPR_PACKAGE_VERSION=$(./scripts/get-package-version.sh)
-          bash -x scripts/publish-patch-release.sh
+          HOPR_PACKAGE_VERSION=$(./scripts/get-package-version.sh) \
+            bash -x scripts/publish-patch-release.sh
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           HOPR_PACKAGE: hoprd
