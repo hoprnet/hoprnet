@@ -29,6 +29,8 @@
   - [Starting database](#starting-database)
   - [Starting node with custom port](#starting-node-with-custom-port)
 - [Develop](#develop)
+- [Test](#test)
+  - [Github Actions CI](#github-actions-ci)
 - [Tooling](#tooling)
 - [Contact](#contact)
 - [License](#license)
@@ -118,6 +120,22 @@ DEBUG=hopr* yarn run:hoprd:bob
 yarn run:faucet:all
 ```
 
+## Test
+
+### Github Actions CI
+
+We run a fair amount of automation using Github Actions. To ease development
+of these workflows one can use [act][8] to run workflows locally in a
+Docker environment.
+
+E.g. running the build workflow:
+
+```sh
+act -j build
+```
+
+For more information please refer to [act][8]'s documentation.
+
 ## Tooling
 
 As some tools are only partially supported, please tag the respective team member
@@ -149,3 +167,4 @@ whenever you need an issue about a particular tool.
 [5]: https://hub.docker.com/u/hopr
 [6]: https://www.npmjs.com/package/@hoprnet/hoprd
 [7]: https://www.youtube.com/watch?v=d0Eb6haIUu4
+[8]: https://github.com/nektos/act
