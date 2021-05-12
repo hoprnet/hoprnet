@@ -37,7 +37,11 @@ describe('acknowledement message', function () {
 
     assert.throws(() =>
       Acknowledgement.deserialize(
-        Acknowledgement.create(randomBytes(AcknowledgementChallenge.SIZE) as any, deriveAckKeyShare(key), counterparty).serialize(),
+        Acknowledgement.create(
+          randomBytes(AcknowledgementChallenge.SIZE) as any,
+          deriveAckKeyShare(key),
+          counterparty
+        ).serialize(),
         self,
         counterparty
       )
