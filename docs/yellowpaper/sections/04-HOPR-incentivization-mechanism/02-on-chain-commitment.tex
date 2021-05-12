@@ -1,0 +1,30 @@
+\subsection{On-chain Commitment}
+
+HOPR uses a commitment scheme to deposit values on-chain and reveal them once a node redeems an incentive for relaying packets. This comes with the benefit that the redeeming party discloses a secret that is unknown to the issuer of the incentive until it is claimed on-chain. The $opening$ and the $response$ to the PoR challenge are then used by the smart contract to determine whether the ticket has been or not.
+
+\begin{defnsub}
+    A commitment scheme is a protocol between usually two parties $A$ and $B$ and fulfills two properties (hiding and biding).
+
+    \noindent\textbf{Hiding:} The ability to commit a value only known by the sender.
+
+    \noindent\textbf{Binding:} The committed value must be the only one that the sender can compute and that validates during the reveal phase.
+\end{defnsub}
+
+\subsubsection{Setup phase}
+Once a node joins the HOPR network, it creates an iterated commitment and stores the opening key in the database.
+Iterated commitment scheme means $open_n$ opens $cm_n$ whereas $open_{n-1}$ opens $cm_{n-1}=open_n$ and so on.
+\newline The final commitment is computed as $cm_n:= h^n(r)$ where hash is a preimage-resistant hash function and
+$r$ is chosen uniformly at random by the node in order to prevent the issuer from knowing whether the ticket will be a win or not.
+\\~\\ Furthermore, it will prevent it from tweaking the given challenge such that the ticket cannot be a win.
+The number of iterations $n$ can be chosen as a constant and should reflect the number of tickets a node intends to redeem.
+
+\subsubsection{Opening phase}
+In order to redeem a ticket, a node has to reveal the opening to the current commitment $cm_n$ that is stored in the smart contract.
+\\~The opening shouldn’t be revealed otherwise since it discloses whether a ticket is a win or not.
+The ticket is a win if: $$h( t_h, r, open ) <P_w$$ where $$t_h=h(t)$$
+The opening is computed as $open_{n-1} = h^{n-1}(r)$ such that $cm_n=h( open_{n-1})$.
+\\~\\The on-chain logic verifies whether the latest opening $open_n$ indeed opens the current on-chain commitment $cm_n$.
+If this is the case, the current on-chain commitment is replaced by the given opening.
+\\~The on-chain keeps track of updates to the on-chain commitments to prevent double-spending.
+So whenever a node resets a commitment, a counter, namely $account.counter$ is increased and a call to $updateCommitment$ invalidates all previously unredeemed tickets.
+
