@@ -76,8 +76,9 @@ After that $(B)$ extracts the public key of $(C)$, it deletes the routing inform
 \paragraph{Encrypt \& Decrypt}
 The payload $\delta$ is where the actual message is hidden and is computed in different layers using a wide block cipher encryption algorithm and is decrypted at each stage of mixing. 
 \\The payload is constructed as follow:
-$$\delta= 0_{l} \|\tau\|\delta$$ where $\tau$ is the authentication tag string and $|\tau|=4$ is its length (let's suppose $\tau=``HOPR "$). $l$ is the $0$ padding length where 
+$$\delta= 0_{l} \|\tau\|\delta$$ where $\tau$ is the authentication tag string which is generated arbitrarily and $|\tau|=4$ is its length (let's suppose $\tau=``HOPR "$). $l$ is the $0$ padding length where 
 $0 <= l <= |\delta| - 4$
+\\~\\The sphinx uses Lioness wide block cipher scheme for encryption and decryption purposes. This scheme uses four independent keys $k_1$, $k_2$,$k_3$ and $k_4$ which $(A)$ derives from the master keys $s_0$, $s_1$, $s_2$ and $s_3$.
 \\~\\Any attempt of modification by an attacker would result in message distruction and thus is would be irrecoverable.
 \\~\\Same happens at $(C)$ and $(D)$: key derivation, unblinding, deleting, shifting, integrity check, decryption and blinding.
 \begin{figure}[H]
