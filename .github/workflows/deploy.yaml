@@ -82,7 +82,7 @@ jobs:
           HOPR_PACKAGE: hoprd
 
       - name: Wait for NPM
-        if: (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')) && !env.ACT
+        if: (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')) && env.ACT == ""
         run: |
           export HOPR_PACKAGE_VERSION=$(./scripts/get-package-version.sh)
           bash -x scripts/wait-for-npm-package.sh

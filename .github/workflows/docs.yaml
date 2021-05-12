@@ -48,7 +48,7 @@ jobs:
         run: bash -x scripts/regenerate-typedocs.sh
 
       - name: Commit docs changes
-        if: !env.ACT
+        if: env.ACT == ""
         run: bash -x scripts/commit-and-push-all-changes.sh
         env:
           HOPR_GIT_MSG: "Re-generate API docs for packages"
