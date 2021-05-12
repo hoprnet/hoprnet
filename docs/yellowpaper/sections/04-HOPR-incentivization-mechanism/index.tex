@@ -35,8 +35,8 @@ A can initiate the process by calling \textit{initiateChannelClosure()}. This ch
         \path (2.5,-1)  node (pending) [ellipse,draw,align=left] {$Pending$\\$Timeout$};
 
         \draw [->,draw](closed) to [bend left] node {$open()$} (open);
-        \draw [->,draw](open.south) to [bend left] node [align=left] {$initiate$\\$ChannelClosure()$} (pending.east);
-        \draw [->,draw](pending.west) to [bend left] node {$withdraw()$} (closed.south);
+        \draw [->,draw](open) to [bend left] node [align=left] {$initiate$\\$ChannelClosure()$} (pending);
+        \draw [->,draw](pending) to [bend left] node {$withdraw()$} (closed);
     \end{tikzpicture}
     \label{fig:channel workflow}
     \caption{Channel workflow}
