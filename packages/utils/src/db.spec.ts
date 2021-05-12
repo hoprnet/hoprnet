@@ -11,15 +11,14 @@ import {
   Hash,
   UINT256,
   HalfKey,
-  Response,
-  Opening
+  Response
 } from './types'
 import BN from 'bn.js'
 
 function createMockedTicket() {
   return Ticket.create(
     new Address(randomBytes(Address.SIZE)),
-    new Response(randomBytes(32)).toChallenge(),
+    new Response(Uint8Array.from(randomBytes(32))).toChallenge(),
     UINT256.fromString('0'),
     UINT256.fromString('0'),
     new Balance(new BN(0)),
@@ -51,10 +50,10 @@ describe(`database tests`, function () {
   })
 
   it('ticket workflow', async function () {
-    const keyChallenge = new HalfKey(randomBytes(HalfKey.SIZE)).toChallenge()
+    const keyChallenge = new HalfKey(Uint8Array.from(randomBytes(HalfKey.SIZE))).toChallenge()
     await db.storeUnacknowledgedTickets(
       keyChallenge,
-      new UnacknowledgedTicket(createMockedTicket(), new HalfKey(randomBytes(HalfKey.SIZE)))
+      new UnacknowledgedTicket(createMockedTicket(), new HalfKey(Uint8Array.from(randomBytes(HalfKey.SIZE))))
     )
 
     assert((await db.getTickets()).length == 1, `DB should find one ticket`)
@@ -64,7 +63,11 @@ describe(`database tests`, function () {
 
     await db.replaceTicketWithAcknowledgement(
       keyChallenge,
-      new AcknowledgedTicket(ticket.ticket, new Response(randomBytes(Hash.SIZE)), new Opening(randomBytes(Hash.SIZE)))
+      new AcknowledgedTicket(
+        ticket.ticket,
+        new Response(Uint8Array.from(randomBytes(Hash.SIZE))),
+        new Hash(Uint8Array.from(randomBytes(Hash.SIZE)))
+      )
     )
 
     assert((await db.getTickets()).length == 1, `DB should find one ticket`)

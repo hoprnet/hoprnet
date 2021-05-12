@@ -63,7 +63,7 @@ class Channel {
 
     const ticket = unacknowledgedTicket.ticket
 
-    if (ticket.isWinningTicket(response, await this.commitment.getCurrentCommitment(), ticket.winProb)) {
+    if (ticket.isWinningTicket(await this.commitment.getCurrentCommitment(), response, ticket.winProb)) {
       const ack = new AcknowledgedTicket(ticket, response, await this.commitment.getCurrentCommitment())
       await this.commitment.bumpCommitment()
       return ack
@@ -218,7 +218,7 @@ class Channel {
         }
       }
 
-      const isWinning = ticket.isWinningTicket(ackTicket.response, ackTicket.preImage, ticket.winProb)
+      const isWinning = ticket.isWinningTicket(ackTicket.preImage, ackTicket.response, ticket.winProb)
 
       if (!isWinning) {
         log(`Failed to submit ticket ${ackTicket.response.toHex()}:  'Not a winning ticket.'`)

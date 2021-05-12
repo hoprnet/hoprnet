@@ -2,7 +2,7 @@ import assert from 'assert'
 import { expect } from 'chai'
 import { stringToU8a, SIGNATURE_LENGTH } from '..'
 import { ethers } from 'ethers'
-import { Address, Ticket, Hash, Balance, PublicKey, Signature, UINT256, Response } from '.'
+import { Address, Ticket, Hash, Balance, PublicKey, Signature, UINT256, Response, Challenge } from '.'
 import BN from 'bn.js'
 import { randomBytes } from 'crypto'
 import { Wallet } from 'ethers'
@@ -18,7 +18,7 @@ describe('test ticket construction', function () {
   })
 
   it('should create new ticket', async function () {
-    const challenge = PublicKey.fromPrivKey(randomBytes(32)).toAddress()
+    const challenge = new Response(Uint8Array.from(randomBytes(32))).toChallenge().toEthereumChallenge()
     const epoch = UINT256.fromString('1')
     const index = UINT256.fromString('1')
     const amount = new Balance(new BN(1))
@@ -38,9 +38,9 @@ describe('test ticket construction', function () {
   it('should generate the hash correctly #1', async function () {
     const expectedHash = new Hash(stringToU8a('0xd74dbe2b69fbb48babd30ac1dadaad6d24f412ed287191c44adf932ea36415ab'))
     const counterparty = new Address(stringToU8a('0xb3aa2138de698597e2e3f84f60ef415d13731b6f'))
-    const challenge = new PublicKey(
+    const challenge = new Challenge(
       stringToU8a('0x03c2aa76d6837c51337001c8b5a60473726064fc35d0a40b8f0e1f068cc8e38e10')
-    ).toAddress()
+    ).toEthereumChallenge()
     const epoch = UINT256.fromString('1')
     const index = UINT256.fromString('1')
     const amount = new Balance(new BN('0000000002c68af0bb140000', 16))
@@ -69,9 +69,9 @@ describe('test ticket construction', function () {
   it('should generate the hash correctly #2', async function () {
     const expectedHash = new Hash(stringToU8a('0x3a7f4f551d68fbb2d093bcf1ec951fb27cae179aab20cb2390a453de1e79afde'))
     const counterparty = new Address(stringToU8a('0x32c160a5008e517ce06df4f7d4a39ffc52e049cf'))
-    const challenge = new PublicKey(
+    const challenge = new Challenge(
       stringToU8a('0x03025fcceb8f338198b866e8bb3621f4cbba8cdcd77b72d95328a296049e9e1230')
-    ).toAddress()
+    ).toEthereumChallenge()
     const epoch = UINT256.fromString('2')
     const index = UINT256.fromString('1')
     const amount = new Balance(new BN('000000000de0b6b3a7640000', 16))
@@ -113,7 +113,7 @@ describe('test signedTicket construction', async function () {
   it('should create new signedTicket using struct', function () {
     const ticket = Ticket.create(
       userB,
-      new Response(randomBytes(32)).toChallenge(),
+      new Response(Uint8Array.from(randomBytes(32))).toChallenge(),
       UINT256.fromString('0'),
       UINT256.fromString('1'),
       new Balance(new BN(15)),

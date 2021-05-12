@@ -120,17 +120,13 @@ export class Address {
 }
 
 export class Hash {
-  protected arr: Uint8Array
-  constructor(arr: Uint8Array) {
-    if (arr.length !== Hash.SIZE) {
-      throw new Error('Incorrect size Uint8Array for hash')
+  constructor(private arr: Uint8Array) {
+    if (typeof Buffer !== 'undefined' && Buffer.isBuffer(arr)) {
+      throw Error(`Expected a Uint8Array but got a Buffer`)
     }
 
-    if (typeof Buffer != undefined && Buffer.isBuffer(arr)) {
-      // Make sure that clone always uses Uint8Arrays and not Buffers
-      this.arr = Uint8Array.from(arr)
-    } else {
-      this.arr = arr
+    if (arr.length != Hash.SIZE) {
+      throw new Error('Incorrect size Uint8Array for hash')
     }
   }
 

@@ -50,7 +50,7 @@ export class Commitment {
     if (result == undefined) {
       throw Error(`Could not find preImage.`)
     }
-    return new Hash(result.preImage)
+    return new Hash(Uint8Array.from(result.preImage))
   }
 
   private async initialize(): Promise<void> {
@@ -73,10 +73,10 @@ export class Commitment {
   }
 
   private async createCommitmentChain(): Promise<void> {
-    const seed = new Hash(randomBytes(Hash.SIZE)) // TODO seed off privKey + channel
+    const seed = new Hash(Uint8Array.from(randomBytes(Hash.SIZE))) // TODO seed off privKey + channel
     const result = await iterateHash(seed.serialize(), hashFunction, TOTAL_ITERATIONS, DB_ITERATION_BLOCK_SIZE)
     await this.db.storeHashIntermediaries(this.channelId, result.intermediates)
-    const current = new Hash(result.hash)
+    const current = new Hash(Uint8Array.from(result.hash))
     await this.db.setCurrentCommitment(this.channelId, current)
     await this.setChainCommitment(current)
     log('commitment chain initialized')

@@ -1,6 +1,6 @@
 import BN from 'bn.js'
 import { stringToU8a, u8aSplit, u8aToHex, serializeToU8a } from '..'
-import { Address, Balance, Hash, Signature, UINT256, PublicKey } from '.'
+import { Address, Balance, Hash, Signature, UINT256, PublicKey, Response } from '.'
 import { ecdsaRecover, ecdsaSign } from 'secp256k1'
 import { ethers } from 'ethers'
 import { Challenge } from './challenge'
@@ -49,7 +49,7 @@ function serializeUnsigned({
 export class Ticket {
   constructor(
     readonly counterparty: Address,
-    readonly challenge: Address,
+    readonly challenge: EthereumChallenge,
     readonly epoch: UINT256,
     readonly index: UINT256,
     readonly amount: Balance,
@@ -162,7 +162,7 @@ export class Ticket {
    * @param preImage preImage of the current onChainSecret
    * @param winProb winning probability of the ticket
    */
-  isWinningTicket(preImage: Hash, challengeResponse: Hash, winProb: UINT256): boolean {
+  isWinningTicket(preImage: Hash, challengeResponse: Response, winProb: UINT256): boolean {
     const luck = new BN(
       Hash.create(
         Uint8Array.from([

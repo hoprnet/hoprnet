@@ -16,6 +16,7 @@ import {
   PublicKey
 } from './types'
 import BN from 'bn.js'
+import { u8aEquals } from './u8a'
 
 const log = Debug(`hopr-core:db`)
 
@@ -121,10 +122,10 @@ export class HoprDB {
         .createReadStream()
         .on('error', reject)
         .on('data', async ({ key, value }: { key: Buffer; value: Buffer }) => {
-          if (!key.subarray(0, prefixKeyed.length).equals(prefixKeyed)) {
+          if (!u8aEquals(key.subarray(0, prefixKeyed.length), prefixKeyed)) {
             return
           }
-          const obj = deserialize(value)
+          const obj = deserialize(Uint8Array.from(value))
           if (filter(obj)) {
             res.push(obj)
           }
@@ -261,7 +262,7 @@ export class HoprDB {
     let present = await this.has(this.keyOf(PACKET_TAG_PREFIX, packetTag))
 
     if (!present) {
-      await this.put(this.keyOf(PACKET_TAG_PREFIX, packetTag), new Uint8Array())
+      await this.touch(this.keyOf(PACKET_TAG_PREFIX, packetTag))
     }
 
     return present
@@ -275,7 +276,7 @@ export class HoprDB {
       if (buff.length === 0) {
         return undefined
       }
-      return UnacknowledgedTicket.deserialize(buff)
+      return UnacknowledgedTicket.deserialize(Uint8Array.from(buff))
     } catch (err) {
       if (err.notFound) {
         return undefined
@@ -339,7 +340,7 @@ export class HoprDB {
   }
 
   async getCurrentCommitment(channelId: Hash): Promise<Hash> {
-    return new Hash(await this.get(u8aConcat(COMMITMENT_PREFIX, CURRENT, channelId.serialize())))
+    return new Hash(Uint8Array.from(await this.get(u8aConcat(COMMITMENT_PREFIX, CURRENT, channelId.serialize()))))
   }
 
   async setCurrentCommitment(channelId: Hash, commitment: Hash) {
@@ -357,7 +358,7 @@ export class HoprDB {
 
   async getLatestConfirmedSnapshot(): Promise<Snapshot | undefined> {
     const data = await this.maybeGet(LATEST_CONFIRMED_SNAPSHOT_KEY)
-    return data ? Snapshot.deserialize(data) : undefined
+    return data ? Snapshot.deserialize(Uint8Array.from(data)) : undefined
   }
 
   async updateLatestConfirmedSnapshot(snapshot: Snapshot): Promise<void> {
@@ -366,7 +367,7 @@ export class HoprDB {
 
   async getChannel(channelId: Hash): Promise<ChannelEntry | undefined> {
     const data = await this.maybeGet(createChannelKey(channelId))
-    return data ? ChannelEntry.deserialize(data) : undefined
+    return data ? ChannelEntry.deserialize(Uint8Array.from(data)) : undefined
   }
 
   async getChannels(filter?: (channel: ChannelEntry) => boolean): Promise<ChannelEntry[]> {
@@ -380,7 +381,7 @@ export class HoprDB {
 
   async getAccount(address: Address): Promise<AccountEntry | undefined> {
     const data = await this.maybeGet(createAccountKey(address))
-    return data ? AccountEntry.deserialize(data) : undefined
+    return data ? AccountEntry.deserialize(Uint8Array.from(data)) : undefined
   }
 
   async updateAccount(account: AccountEntry): Promise<void> {

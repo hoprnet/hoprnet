@@ -29,7 +29,7 @@ describe('PoR - proof of relay', function () {
 
     // Computation result of the first relayer before
     // receiving an acknowledgement from the second relayer
-    const result = preVerify(secrets[0], firstPorString, firstChallenge.ticketChallenge.toAddress())
+    const result = preVerify(secrets[0], firstPorString, firstChallenge.ticketChallenge.toEthereumChallenge())
 
     assert(result.valid == true, `Challenge must be plausible`)
 
@@ -52,7 +52,7 @@ describe('PoR - proof of relay', function () {
 
     // Simulates the transformation as done by the
     // second relayer
-    const secondResult = preVerify(secrets[1], secondPorString, result.nextTicketChallenge.toAddress())
+    const secondResult = preVerify(secrets[1], secondPorString, result.nextTicketChallenge.toEthereumChallenge())
 
     assert(secondResult.valid == true, `Second challenge must be plausible`)
 

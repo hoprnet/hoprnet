@@ -57,7 +57,7 @@ export function sampleFieldElement(
   let i = 0
 
   do {
-    result = __fakeExpand?.(hashKey) ?? expand(HASH_ALGORITHM, HASH_LENGTH, Buffer.from(secret), SECRET_LENGTH, hashKey)
+    result = __fakeExpand?.(hashKey) ?? Uint8Array.from(expand(HASH_ALGORITHM, HASH_LENGTH, Buffer.from(secret), SECRET_LENGTH, hashKey))
 
     if (!privateKeyVerify(result)) {
       if (i == MAX_ITERATIONS) {
