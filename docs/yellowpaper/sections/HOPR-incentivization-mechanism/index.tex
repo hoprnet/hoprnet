@@ -18,7 +18,16 @@ Initially, each payment channel in HOPR is \textit{closed} which means that in o
 \paragraph{Opening a channel} Nodes can open channels to other nodes by the following:
 A calls the method \textit{fundChannel()}. Once the call has succeeded, an on-chain event \textit{ChannelOpened} is thrown. The channel is now \textit{open}.
 
-\begin{figure}
+
+$$fundChannel(A: <\lambda>, B: <\mu>)$$ where $\lambda$ is the amount to be staked by A and $\mu$ is the amount to be staked by B. Both values can also be equal. A is also able to fund other channels which A is not part of.
+
+\paragraph{Redeem tickets}
+As long as the channel remains open, nodes can claim their incentives for forwarding packets which is represented as tickets (see ticket section). Tickets are redeemed by dispatching a \textit{redeemTicket()} call. The balance of the channel is then updated according to the balance defined in the ticket.
+\paragraph{Closing a channel}
+Nodes can close a payment channel in order to access their funds. The way to do so is using a timeout.
+A can initiate the process by calling \textit{initiateChannelClosure()}. This changes the state to $pending\_timeout$. Other nodes will have now time to claim not yet claimed tickets. Once the timeout is done, any of the involved parties can call \textit{withdraw()}. Alice can then call \textit{finalizeChannelClosure()} which turns the channel state into \textit{closed}.
+
+\begin{figure}[H]
     \begin{center}
         \begin{tikzpicture}[looseness=1,auto]
             \path (0,0) node (closed) [ellipse,draw] {$Closed$};
@@ -33,16 +42,6 @@ A calls the method \textit{fundChannel()}. Once the call has succeeded, an on-ch
     \label{fig:channel workflow}
     \caption{Channel workflow}
 \end{figure}
-
-$$fundChannel(A: <\lambda>, B: <\mu>)$$ where $\lambda$ is the amount to be staked by A and $\mu$ is the amount to be staked by B. Both values can also be equal. A is also able to fund other channels which A is not part of.
-
-\paragraph{Redeem tickets}
-As long as the channel remains open, nodes can claim their incentives for forwarding packets which is represented as tickets (see ticket section). Tickets are redeemed by dispatching a \textit{redeemTicket()} call. The balance of the channel is then updated according to the balance defined in the ticket.
-\paragraph{Closing a channel}
-Nodes can close a payment channel in order to access their funds. The way to do so is using a timeout.
-A can initiate the process by calling \textit{initiateChannelClosure()}. This changes the state to $pending\_timeout$. Other nodes will have now time to claim not yet claimed tickets. Once the timeout is done, any of the involved parties can call \textit{withdraw()}. Alice can then call \textit{finalizeChannelClosure()} which turns the channel state into \textit{closed}.
-
-
 
 \subsection{On-chain Commitment}
 
