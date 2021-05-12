@@ -2,6 +2,7 @@ import type { ContractTransaction } from 'ethers'
 import type { Multiaddr } from 'multiaddr'
 import type { HoprToken, HoprChannels } from './contracts'
 import { providers, utils, errors, Wallet, BigNumber } from 'ethers'
+import { Networks, networks, getContracts } from '@hoprnet/hopr-ethereum'
 import {
   Address,
   Ticket,
@@ -16,15 +17,18 @@ import {
 import BN from 'bn.js'
 import NonceTracker from './nonce-tracker'
 import TransactionManager from './transaction-manager'
-import { getNetworkGasPrice, getNetworkName } from './utils'
 import Debug from 'debug'
-import { Networks, getContracts } from '@hoprnet/hopr-ethereum'
 import { HoprToken__factory, HoprChannels__factory } from './contracts'
 
 const log = Debug('hopr:core-ethereum:chain-operations')
 const abiCoder = new utils.AbiCoder()
+const knownNetworks = Object.entries(networks).map(([name, data]) => ({
+  name: name as Networks,
+  ...data
+}))
 
 export type Receipt = string
+export type ChainWrapper = PromiseValue<ReturnType<typeof createChainWrapper>>
 
 export async function createChainWrapper(providerURI: string, privateKey: Uint8Array) {
   const provider = providerURI.startsWith('http')
@@ -33,7 +37,9 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
   const wallet = new Wallet(privateKey).connect(provider)
   const address = Address.fromString(wallet.address)
   const chainId = await provider.getNetwork().then((res) => res.chainId)
-  const network = getNetworkName(chainId) as Networks
+  const networkInfo = knownNetworks.find((info) => info.chainId === chainId)
+  // get network's name by looking into our known networks
+  const network: Networks = networkInfo?.name || 'localhost'
   const contracts = getContracts()?.[network]
 
   if (!contracts?.HoprToken?.address) {
@@ -60,7 +66,7 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
     ...rest: Parameters<T>
   ): Promise<ContractTransaction> {
     const gasLimit = 300e3
-    const gasPrice = getNetworkGasPrice(network)
+    const gasPrice = networkInfo?.gas
     const nonceLock = await nonceTracker.getNonceLock(address)
     const nonce = nonceLock.nextNonce
     let transaction: ContractTransaction
@@ -236,24 +242,25 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
   }
 
   const api = {
-    // TODO: use indexer when it's done syncing
     getBalance: (address: Address) =>
       token.balanceOf(address.toHex()).then((res) => new Balance(new BN(res.toString()))),
-    getNativeBalance: (address) =>
+    getNativeBalance: (address: Address) =>
       provider.getBalance(address.toHex()).then((res) => new NativeBalance(new BN(res.toString()))),
     announce,
     withdraw: (currency: 'NATIVE' | 'HOPR', recipient: string, amount: string) => withdraw(currency, recipient, amount),
     fundChannel: (me: Address, counterparty: Address, myTotal: Balance, theirTotal: Balance) =>
       fundChannel(token, channels, me, counterparty, myTotal, theirTotal),
-    openChannel: (me, counterparty, amount) => openChannel(token, channels, me, counterparty, amount),
-    finalizeChannelClosure: (counterparty) => finalizeChannelClosure(channels, counterparty),
-    initiateChannelClosure: (counterparty) => initiateChannelClosure(channels, counterparty),
-    redeemTicket: (counterparty, ackTicket, ticket) => redeemTicket(channels, counterparty, ackTicket, ticket),
+    openChannel: (me: Address, counterparty: Address, amount: Balance) =>
+      openChannel(token, channels, me, counterparty, amount),
+    finalizeChannelClosure: (counterparty: Address) => finalizeChannelClosure(channels, counterparty),
+    initiateChannelClosure: (counterparty: Address) => initiateChannelClosure(channels, counterparty),
+    redeemTicket: (counterparty: Address, ackTicket: AcknowledgedTicket, ticket: Ticket) =>
+      redeemTicket(channels, counterparty, ackTicket, ticket),
     setCommitment: (comm: Hash) => setCommitment(channels, comm),
     getGenesisBlock: () => contracts?.HoprChannels?.deployedAt ?? 0,
     getWallet: () => wallet,
     waitUntilReady: async () => await provider.ready,
-    getLatestBlockNumber: async () => provider.getBlockNumber(),
+    getLatestBlockNumber: async () => provider.getBlockNumber(), // TODO: use indexer when it's done syncing
     subscribeBlock: (cb) => provider.on('block', cb),
     subscribeError: (cb) => {
       provider.on('error', cb)
@@ -269,7 +276,7 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
     getPublicKey: () => PublicKey.fromString(utils.computePublicKey(wallet.publicKey, true)),
     getInfo: () =>
       [
-        `Running on: ${getNetworkName(chainId)}`,
+        `Running on: ${network}`,
         `HOPR Token: ${contracts.HoprToken.address}`,
         `HOPR Channels: ${contracts.HoprChannels.address}`
       ].join('\n')
@@ -277,5 +284,3 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
 
   return api
 }
-
-export type ChainWrapper = PromiseValue<ReturnType<typeof createChainWrapper>>
