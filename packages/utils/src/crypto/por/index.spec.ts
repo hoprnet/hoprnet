@@ -1,5 +1,5 @@
 import {
-  createFirstChallenge,
+  createPoRValuesForSender,
   createPoRString,
   decodePoRBytes,
   preVerify,
@@ -19,7 +19,7 @@ describe('PoR - proof of relay', function () {
     const secrets = Array.from({ length: AMOUNT }, (_) => randomBytes(SECRET_LENGTH))
 
     // Challenge generation
-    const firstChallenge = createFirstChallenge(secrets[0], secrets[1])
+    const firstChallenge = createPoRValuesForSender(secrets[0], secrets[1])
 
     // To be included for first relayer
     const firstPorString = createPoRString(secrets[1], secrets[2])
@@ -73,7 +73,7 @@ describe('PoR - proof of relay', function () {
     const AMOUNT = 2
     const secrets = Array.from({ length: AMOUNT }, (_) => randomBytes(SECRET_LENGTH))
 
-    const firstChallenge = createFirstChallenge(secrets[0], secrets[1])
+    const firstChallenge = createPoRValuesForSender(secrets[0], secrets[1])
 
     assert(
       validatePoRHalfKeys(

@@ -13,7 +13,7 @@ import {
   forwardTransform,
   generateKeyShares,
   createPoRString,
-  createFirstChallenge,
+  createPoRValuesForSender,
   preVerify,
   u8aSplit,
   pubKeyToPeerId,
@@ -222,7 +222,7 @@ export class Packet {
   ): Promise<Packet> {
     const isDirectMessage = path.length === 1
     const { alpha, secrets } = generateKeyShares(path)
-    const { ackChallenge, ticketChallenge } = createFirstChallenge(secrets[0], secrets[1])
+    const { ackChallenge, ticketChallenge } = createPoRValuesForSender(secrets[0], secrets[1])
     const porStrings: Uint8Array[] = []
 
     for (let i = 0; i < path.length - 1; i++) {

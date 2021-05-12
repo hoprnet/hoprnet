@@ -8,7 +8,7 @@ import {
   Balance,
   UINT256,
   HoprDB,
-  createFirstChallenge
+  createPoRValuesForSender
 } from '@hoprnet/hopr-utils'
 import assert from 'assert'
 import BN from 'bn.js'
@@ -17,7 +17,7 @@ import { Channel } from './channel'
 import * as fixtures from './fixtures'
 
 const createChallenge = (secret1: Uint8Array, secret2: Uint8Array): Challenge => {
-  return createFirstChallenge(secret1, secret2).ticketChallenge
+  return createPoRValuesForSender(secret1, secret2).ticketChallenge
 }
 
 const createChainMock = (_channelEntry: ChannelEntry): ChainWrapper => {

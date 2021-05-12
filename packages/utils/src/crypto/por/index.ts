@@ -17,7 +17,7 @@ export { deriveAckKeyShare }
  * @param secretC shared secret with node +2
  * @returns the challenge for the first ticket sent to the first relayer
  */
-export function createFirstChallenge(
+export function createPoRValuesForSender(
   secretB: Uint8Array,
   secretC?: Uint8Array
 ): { ackChallenge: HalfKeyChallenge; ticketChallenge: Challenge; ownKey: HalfKey } {
