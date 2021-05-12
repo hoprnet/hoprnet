@@ -46,10 +46,9 @@ $h:G^*\times G^*\rightarrow\mathbb{Z}^*_q$ where $\mathbb{Z}^*_q$ is the field o
         \item $\alpha_3=g^{xb_0b_1b_2},s_3=y^{xb_0b_1b_2}_D,b_3=h_b(a_3,s_3)$
     \end{itemize}
     Where $y_B,y_C,y_D,y_Z$ are the public keys of the nodes $B,C, D$  which we assume to be available to $A$ .
-
     \paragraph{Routing information}
     Each node on the path needs to know the next downstream node. Therefore, the sender $(A)$ generates routing information $\beta_i$ for $(B)$, $(C)$ and $(D)$ as well as message $END$ to tell $(Z)$ that it is the final receiver of the message. The END message is a distinguished prefix byte that's added to the final receiver's compressed address $Z=(x,y)$ (either $0\times02$ or $0\times03$ depending if the $y$ coordinate is even or odd).
-    $$\beta_i=(Z\|0_{(2(r-v)+2)\kappa-|Z|}\oplus PRNG(s_{v-1})_{[ \,0....(2(r-v)+3)\kappa-1})\|\phi$$
+    $$\beta_v=(Z\|0_{(2(r-v)+2)\kappa-|Z|}\oplus PRNG(s_{v-1})_{[ \,0....(2(r-v)+3)\kappa-1})\|\ph_3$$
     Such that $Z$ is the destination address and $|Z|$ is its length.
     $v\leq r$ is the length of the path traversed by the packet where $|Z| \leq (2(r - v) + 2)$. $\phi$ is a filler string that is used to ensure the header packets remain constant in size as layers of encryption are added or removed.
     \\~\\$\beta_i$ is computed as the concatenation of $Z$ and a sequence of padding which is then encrypted by XORing with the output of a pseudo-random number generator seeded with shared key $s_{v-1}$ of node $v-1$. The result is finally concatenated with $\phi$ to ensure the header packets remain constant in size.
