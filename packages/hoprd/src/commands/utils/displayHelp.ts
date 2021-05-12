@@ -29,10 +29,9 @@ export function displayHelp() {
 
   for (let i = 0; i < cli_options.length; i++) {
     str += (cli_options[i][0] || '').padEnd(firstOptionMaxLength + FIRST_OPTION_OFFSET, ' ')
-    str += (
-      cli_options[i][1] != null
-        ? '[' + cli_options[i][1] + ']' + (cli_options[i][2] != null ? ' ' + cli_options[i][2] : '')
-        : ''
+    str += (cli_options[i][1] != null
+      ? '[' + cli_options[i][1] + ']' + (cli_options[i][2] != null ? ' ' + cli_options[i][2] : '')
+      : ''
     ).padEnd(secondOptionMaxLength + SECOND_OPTION_OFFSET, ' ')
 
     if (offset + cli_options[i][3].length > process.stdout.columns) {

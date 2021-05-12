@@ -24,13 +24,13 @@ function checkPath(path: PeerId[], edges: Map<PeerId, PeerId[]>) {
 
 describe('test pathfinder with some simple topologies', function () {
   const TEST_NODES = Array.from({ length: 5 }).map((_, i) => fakePeerId(i))
-  const RELIABLE_NETWORK = { qualityOf: (_p: any) => 1, register: () => {} } as unknown as NetworkPeers
-  const UNRELIABLE_NETWORK = {
+  const RELIABLE_NETWORK = ({ qualityOf: (_p: any) => 1, register: () => {} } as unknown) as NetworkPeers
+  const UNRELIABLE_NETWORK = ({
     qualityOf: (p: any) => ((p.id as any) % 3 == 0 ? 0 : 1),
     register: () => {}
-  } as unknown as NetworkPeers // Node 3 is down
+  } as unknown) as NetworkPeers // Node 3 is down
   const STAKE_1 = () => new Balance(new BN(1))
-  const STAKE_N = (x: PeerId) => new Balance(new BN((x.id as unknown as number) + 0.1))
+  const STAKE_N = (x: PeerId) => new Balance(new BN(((x.id as unknown) as number) + 0.1))
 
   // Bidirectional star, all pass through node 0
   const STAR = new Map<PeerId, PeerId[]>()

@@ -12,7 +12,7 @@ const createChallenge = (secret1: Uint8Array, secret2: Uint8Array): PublicKey =>
 }
 
 const createChainMock = (_channelEntry: ChannelEntry): ChainWrapper => {
-  return {
+  return ({
     async setCommitment() {},
     async getBalance() {},
     async fundChannel() {},
@@ -20,7 +20,7 @@ const createChainMock = (_channelEntry: ChannelEntry): ChainWrapper => {
     async initiateChannelClosure() {},
     async finalizeChannelClosure() {},
     async redeemTicket() {}
-  } as unknown as ChainWrapper
+  } as unknown) as ChainWrapper
 }
 
 const createIndexerMock = (channelEntry: ChannelEntry): Indexer => {
