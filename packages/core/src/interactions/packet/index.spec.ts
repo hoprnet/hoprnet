@@ -4,15 +4,7 @@ import { EventEmitter } from 'events'
 import BN from 'bn.js'
 
 import { subscribeToAcknowledgements, sendAcknowledgement } from './acknowledgement'
-import {
-  PublicKey,
-  u8aEquals,
-  Ticket,
-  UINT256,
-  HoprDB,
-  Challenge,
-  deriveAckKeyShare
-} from '@hoprnet/hopr-utils'
+import { PublicKey, u8aEquals, Ticket, UINT256, HoprDB, Challenge, deriveAckKeyShare } from '@hoprnet/hopr-utils'
 import { Balance, createFirstChallenge } from '@hoprnet/hopr-utils'
 
 import { AcknowledgementChallenge, Packet } from '../../messages'
