@@ -97,8 +97,6 @@ ___
 
 **Returns:** *Promise*<Balance\>
 
-Defined in: utils/lib/cache.d.ts:1
-
 Defined in: [core-ethereum/src/index.ts:89](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L89)
 
 ___
@@ -112,8 +110,6 @@ ___
 ▸ (): *Promise*<NativeBalance\>
 
 **Returns:** *Promise*<NativeBalance\>
-
-Defined in: utils/lib/cache.d.ts:1
 
 Defined in: [core-ethereum/src/index.ts:111](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L111)
 
