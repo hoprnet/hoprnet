@@ -20,7 +20,6 @@ describe('test commitment', function () {
     assert(c1 != null, 'gives current commitment')
     assert.equal(fakeGet.callCount, 1, 'should look on chain')
     assert(fakeSet.callCount == 1, 'should set a new commitment on chain')
-    console.log(fakeSet.args[0] == c1, 'sets current commitment')
     await cm.bumpCommitment()
     let c2 = await cm.getCurrentCommitment()
     assert(c2, 'gives current commitment')

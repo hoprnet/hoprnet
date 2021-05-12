@@ -21,7 +21,7 @@ import NetworkPeers from './network/network-peers'
 import Heartbeat from './network/heartbeat'
 import { findPath } from './path'
 
-import Multiaddr from 'multiaddr'
+import { Multiaddr } from 'multiaddr'
 import chalk from 'chalk'
 
 import PeerId from 'peer-id'
@@ -193,7 +193,7 @@ class Hopr extends EventEmitter {
       dialer: {
         // Temporary fix, see https://github.com/hoprnet/hopr-connect/issues/77
         addressSorter: (a) => a,
-        concurrency: 100
+        maxDialsPerPeer: 100
       }
     })
 
@@ -478,7 +478,7 @@ class Hopr extends EventEmitter {
     const announced = await (await this.paymentChannels).indexer.getAnnouncedAddresses()
     return `${connected}
     \n${announced.length} peers have announced themselves on chain:
-    \n${announced.map((x) => x.toString()).join('\n')}`
+    \n${announced.map((x: Multiaddr) => x.toString()).join('\n')}`
   }
 
   private async checkBalances() {
@@ -523,7 +523,7 @@ class Hopr extends EventEmitter {
     const multiaddrs = await this.getAnnouncedAddresses()
     const ip4 = multiaddrs.find((s) => s.toString().includes('/ip4/'))
     const ip6 = multiaddrs.find((s) => s.toString().includes('/ip6/'))
-    const p2p = Multiaddr('/p2p/' + this.getId().toB58String())
+    const p2p = new Multiaddr('/p2p/' + this.getId().toB58String())
     // exit if none of these multiaddrs are available
     if (!ip4 && !ip6 && !p2p) return
 

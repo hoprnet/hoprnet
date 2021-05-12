@@ -7,17 +7,27 @@
 ### Type aliases
 
 - [Connection](libp2p.md#connection)
+- [ContentRoutingModule](libp2p.md#contentroutingmodule)
 - [CreateOptions](libp2p.md#createoptions)
 - [Crypto](libp2p.md#crypto)
-- [Events](libp2p.md#events)
+- [Datastore](libp2p.md#datastore)
+- [DhtOptions](libp2p.md#dhtoptions)
+- [HandlerProps](libp2p.md#handlerprops)
+- [KeychainOptions](libp2p.md#keychainoptions)
 - [Libp2pConfig](libp2p.md#libp2pconfig)
 - [Libp2pModules](libp2p.md#libp2pmodules)
 - [Libp2pOptions](libp2p.md#libp2poptions)
-- [Multiaddr](libp2p.md#multiaddr)
+- [MetricsOptions](libp2p.md#metricsoptions)
 - [MuxedStream](libp2p.md#muxedstream)
 - [MuxerFactory](libp2p.md#muxerfactory)
+- [PeerDiscoveryFactory](libp2p.md#peerdiscoveryfactory)
+- [PeerRoutingModule](libp2p.md#peerroutingmodule)
 - [PeerStoreOptions](libp2p.md#peerstoreoptions)
+- [Protector](libp2p.md#protector)
 - [Pubsub](libp2p.md#pubsub)
+- [PubsubLocalOptions](libp2p.md#pubsublocaloptions)
+- [PubsubOptions](libp2p.md#pubsuboptions)
+- [RandomWalkOptions](libp2p.md#randomwalkoptions)
 - [RelayOptions](libp2p.md#relayoptions)
 - [TransportFactory](libp2p.md#transportfactory)
 - [constructorOptions](libp2p.md#constructoroptions)
@@ -28,7 +38,15 @@
 
 Ƭ **Connection**: \_\_module
 
-Defined in: node_modules/libp2p/dist/src/index.d.ts:233
+Defined in: node_modules/libp2p/dist/src/index.d.ts:485
+
+___
+
+### ContentRoutingModule
+
+Ƭ **ContentRoutingModule**: ContentRouting
+
+Defined in: node_modules/libp2p/dist/src/index.d.ts:492
 
 ___
 
@@ -40,9 +58,9 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `peerId?` | \_\_module |
+| `peerId?` | PeerId |
 
-Defined in: node_modules/libp2p/dist/src/index.d.ts:248
+Defined in: node_modules/libp2p/dist/src/index.d.ts:486
 
 ___
 
@@ -50,15 +68,64 @@ ___
 
 Ƭ **Crypto**: Crypto
 
-Defined in: node_modules/libp2p/dist/src/index.d.ts:258
+Defined in: node_modules/libp2p/dist/src/index.d.ts:495
 
 ___
 
-### Events
+### Datastore
 
-Ƭ **Events**: EventEmitterFactory
+Ƭ **Datastore**: Datastore
 
-Defined in: node_modules/libp2p/dist/src/index.d.ts:254
+Defined in: node_modules/libp2p/dist/src/index.d.ts:498
+
+___
+
+### DhtOptions
+
+Ƭ **DhtOptions**: *object*
+
+#### Type declaration
+
+| Name | Type |
+| :------ | :------ |
+| `clientMode?` | *boolean* |
+| `enabled?` | *boolean* |
+| `kBucketSize?` | *number* |
+| `randomWalk?` | [*RandomWalkOptions*](libp2p.md#randomwalkoptions) |
+| `selectors?` | DhtSelectors |
+| `validators?` | DhtValidators |
+
+Defined in: node_modules/libp2p/dist/src/index.d.ts:506
+
+___
+
+### HandlerProps
+
+Ƭ **HandlerProps**: *object*
+
+#### Type declaration
+
+| Name | Type |
+| :------ | :------ |
+| `connection` | [*Connection*](libp2p.md#connection) |
+| `protocol` | *string* |
+| `stream` | [*MuxedStream*](libp2p.md#muxedstream) |
+
+Defined in: node_modules/libp2p/dist/src/index.d.ts:475
+
+___
+
+### KeychainOptions
+
+Ƭ **KeychainOptions**: *object*
+
+#### Type declaration
+
+| Name | Type |
+| :------ | :------ |
+| `datastore?` | Datastore |
+
+Defined in: node_modules/libp2p/dist/src/index.d.ts:514
 
 ___
 
@@ -70,13 +137,14 @@ ___
 
 | Name | Type | Description |
 | :------ | :------ | :------ |
-| `dht?` | *any* | dht module options |
-| `peerDiscovery?` | *any* | - |
-| `pubsub?` | \_\_module | pubsub module options |
+| `dht?` | [*DhtOptions*](libp2p.md#dhtoptions) | dht module options |
+| `nat?` | NatManager.NatManagerOptions | - |
+| `peerDiscovery?` | *Record*<string, boolean \| Object\> | - |
+| `pubsub?` | [*PubsubLocalOptions*](libp2p.md#pubsublocaloptions) & PubsubOptions | pubsub module options |
 | `relay?` | [*RelayOptions*](libp2p.md#relayoptions) | - |
-| `transport?` | *Record*<string, any\> | transport options indexed by transport key |
+| `transport?` | *Record*<string, Object\> | transport options indexed by transport key |
 
-Defined in: node_modules/libp2p/dist/src/index.d.ts:269
+Defined in: node_modules/libp2p/dist/src/index.d.ts:451
 
 ___
 
@@ -89,10 +157,16 @@ ___
 | Name | Type |
 | :------ | :------ |
 | `connEncryption` | [*Crypto*](libp2p.md#crypto)[] |
+| `connProtector?` | \_\_module |
+| `contentRouting?` | ContentRouting[] |
+| `dht?` | Object |
+| `peerDiscovery?` | PeerDiscoveryFactory[] |
+| `peerRouting?` | PeerRouting[] |
+| `pubsub?` | (...`args`: *any*[]) => [*Pubsub*](libp2p.md#pubsub) |
 | `streamMuxer` | [*MuxerFactory*](libp2p.md#muxerfactory)[] |
 | `transport` | TransportFactory[] |
 
-Defined in: node_modules/libp2p/dist/src/index.d.ts:285
+Defined in: node_modules/libp2p/dist/src/index.d.ts:440
 
 ___
 
@@ -104,25 +178,34 @@ ___
 
 | Name | Type | Description |
 | :------ | :------ | :------ |
-| `addresses?` | AddressManagerOptions | - |
+| `addresses?` | AddressManager.AddressManagerOptions | - |
 | `config?` | [*Libp2pConfig*](libp2p.md#libp2pconfig) | - |
-| `connectionManager?` | ConnectionManagerOptions | - |
-| `dialer?` | DialerOptions | - |
-| `keychain?` | *any* | - |
-| `metrics?` | MetricsOptions | - |
+| `connectionManager?` | ConnectionManager.ConnectionManagerOptions | - |
+| `datastore?` | Datastore | - |
+| `dialer?` | Dialer.DialerOptions | - |
+| `host?` | IdentifyService.HostProperties | libp2p host |
+| `keychain?` | [*KeychainOptions*](libp2p.md#keychainoptions) & Keychain.KeychainOptions | - |
+| `metrics?` | [*MetricsOptions*](libp2p.md#metricsoptions) & Metrics.MetricsOptions | - |
 | `modules` | [*Libp2pModules*](libp2p.md#libp2pmodules) | libp2p modules to use |
-| `peerStore?` | [*PeerStoreOptions*](libp2p.md#peerstoreoptions) & PersistentPeerStoreOptions | - |
-| `transportManager?` | TransportManagerOptions | - |
+| `peerRouting?` | PeerRouting.PeerRoutingOptions | - |
+| `peerStore?` | [*PeerStoreOptions*](libp2p.md#peerstoreoptions) & PersistentPeerStore.PersistentPeerStoreOptions | - |
+| `transportManager?` | TransportManager.TransportManagerOptions | - |
 
-Defined in: node_modules/libp2p/dist/src/index.d.ts:234
+Defined in: node_modules/libp2p/dist/src/index.d.ts:414
 
 ___
 
-### Multiaddr
+### MetricsOptions
 
-Ƭ **Multiaddr**: \_\_module
+Ƭ **MetricsOptions**: *object*
 
-Defined in: node_modules/libp2p/dist/src/index.d.ts:232
+#### Type declaration
+
+| Name | Type |
+| :------ | :------ |
+| `enabled` | *boolean* |
+
+Defined in: node_modules/libp2p/dist/src/index.d.ts:523
 
 ___
 
@@ -130,7 +213,7 @@ ___
 
 Ƭ **MuxedStream**: MuxedStream
 
-Defined in: node_modules/libp2p/dist/src/index.d.ts:255
+Defined in: node_modules/libp2p/dist/src/index.d.ts:489
 
 ___
 
@@ -138,7 +221,23 @@ ___
 
 Ƭ **MuxerFactory**: MuxerFactory
 
-Defined in: node_modules/libp2p/dist/src/index.d.ts:257
+Defined in: node_modules/libp2p/dist/src/index.d.ts:491
+
+___
+
+### PeerDiscoveryFactory
+
+Ƭ **PeerDiscoveryFactory**: PeerDiscoveryFactory
+
+Defined in: node_modules/libp2p/dist/src/index.d.ts:493
+
+___
+
+### PeerRoutingModule
+
+Ƭ **PeerRoutingModule**: PeerRouting
+
+Defined in: node_modules/libp2p/dist/src/index.d.ts:494
 
 ___
 
@@ -152,7 +251,15 @@ ___
 | :------ | :------ |
 | `persistence` | *boolean* |
 
-Defined in: node_modules/libp2p/dist/src/index.d.ts:260
+Defined in: node_modules/libp2p/dist/src/index.d.ts:517
+
+___
+
+### Protector
+
+Ƭ **Protector**: \_\_module
+
+Defined in: node_modules/libp2p/dist/src/index.d.ts:499
 
 ___
 
@@ -160,7 +267,46 @@ ___
 
 Ƭ **Pubsub**: \_\_module
 
-Defined in: node_modules/libp2p/dist/src/index.d.ts:259
+Defined in: node_modules/libp2p/dist/src/index.d.ts:496
+
+___
+
+### PubsubLocalOptions
+
+Ƭ **PubsubLocalOptions**: *object*
+
+#### Type declaration
+
+| Name | Type |
+| :------ | :------ |
+| `enabled` | *boolean* |
+
+Defined in: node_modules/libp2p/dist/src/index.d.ts:520
+
+___
+
+### PubsubOptions
+
+Ƭ **PubsubOptions**: PubsubOptions
+
+Defined in: node_modules/libp2p/dist/src/index.d.ts:497
+
+___
+
+### RandomWalkOptions
+
+Ƭ **RandomWalkOptions**: *object*
+
+#### Type declaration
+
+| Name | Type |
+| :------ | :------ |
+| `enabled?` | *boolean* |
+| `interval?` | *number* |
+| `queriesPerPeriod?` | *number* |
+| `timeout?` | *number* |
+
+Defined in: node_modules/libp2p/dist/src/index.d.ts:500
 
 ___
 
@@ -172,12 +318,12 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `advertise` | RelayAdvertiseOptions |
-| `autoRelay` | AutoRelayOptions |
-| `enabled` | *boolean* |
-| `hop` | HopOptions |
+| `advertise?` | Relay.RelayAdvertiseOptions |
+| `autoRelay?` | Relay.AutoRelayOptions |
+| `enabled?` | *boolean* |
+| `hop?` | Relay.HopOptions |
 
-Defined in: node_modules/libp2p/dist/src/index.d.ts:263
+Defined in: node_modules/libp2p/dist/src/index.d.ts:526
 
 ___
 
@@ -185,7 +331,7 @@ ___
 
 Ƭ **TransportFactory**: TransportFactory
 
-Defined in: node_modules/libp2p/dist/src/index.d.ts:256
+Defined in: node_modules/libp2p/dist/src/index.d.ts:490
 
 ___
 
@@ -197,6 +343,6 @@ ___
 
 | Name | Type |
 | :------ | :------ |
-| `peerId` | \_\_module |
+| `peerId` | PeerId |
 
-Defined in: node_modules/libp2p/dist/src/index.d.ts:251
+Defined in: node_modules/libp2p/dist/src/index.d.ts:434

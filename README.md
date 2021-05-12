@@ -19,6 +19,7 @@
 
 ## Table of Contents
 
+- [Table of Contents](#table-of-contents)
 - [Getting Started](#getting-started)
 - [Install](#install)
   - [Using NPM](#using-npm)
@@ -106,9 +107,6 @@ yarn build    # Builds contracts, clients, etc
 
 # starting network
 yarn run:network
-
-# running bootstrap node (separate terminal)
-DEBUG=hopr* yarn run:hoprd:bootstrap
 
 # running normal node alice (separate terminal)
 DEBUG=hopr* yarn run:hoprd:alice

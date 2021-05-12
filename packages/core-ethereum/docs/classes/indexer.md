@@ -71,7 +71,7 @@ Also keeps track of the latest block number.
 
 ### constructor
 
-\+ **new Indexer**(`genesisBlock`: *number*, `db`: *HoprDB*, `chain`: { `announce`: (`multiaddr`: Multiaddr) => *Promise*<string\> ; `finalizeChannelClosure`: (`counterparty`: *any*) => *Promise*<string\> ; `fundChannel`: (`me`: *Address*, `counterparty`: *Address*, `myTotal`: *Balance*, `theirTotal`: *Balance*) => *Promise*<string\> ; `getBalance`: (`address`: *Address*) => *Promise*<Balance\> ; `getChannels`: () => *HoprChannels* ; `getGenesisBlock`: () => *number* ; `getInfo`: () => *string* ; `getLatestBlockNumber`: () => *Promise*<number\> ; `getNativeBalance`: (`address`: *any*) => *Promise*<NativeBalance\> ; `getPrivateKey`: () => *Uint8Array* ; `getPublicKey`: () => *PublicKey* ; `getWallet`: () => *Wallet* ; `initiateChannelClosure`: (`counterparty`: *any*) => *Promise*<string\> ; `openChannel`: (`me`: *any*, `counterparty`: *any*, `amount`: *any*) => *Promise*<string\> ; `redeemTicket`: (`counterparty`: *any*, `ackTicket`: *any*, `ticket`: *any*) => *Promise*<string\> ; `setCommitment`: (`comm`: *Hash*) => *Promise*<string\> ; `subscribeBlock`: (`cb`: *any*) => *JsonRpcProvider* \| *WebSocketProvider* ; `subscribeChannelEvents`: (`cb`: *any*) => *HoprChannels* ; `subscribeError`: (`cb`: *any*) => *void* ; `unsubscribe`: () => *void* ; `waitUntilReady`: () => *Promise*<Network\> ; `withdraw`: (`currency`: ``"NATIVE"`` \| ``"HOPR"``, `recipient`: *string*, `amount`: *string*) => *Promise*<string\>  }, `maxConfirmations`: *number*, `blockRange`: *number*): [*Indexer*](indexer.md)
+\+ **new Indexer**(`genesisBlock`: *number*, `db`: *HoprDB*, `chain`: { `announce`: (`multiaddr`: Multiaddr) => *Promise*<string\> ; `finalizeChannelClosure`: (`counterparty`: *Address*) => *Promise*<string\> ; `fundChannel`: (`me`: *Address*, `counterparty`: *Address*, `myTotal`: *Balance*, `theirTotal`: *Balance*) => *Promise*<string\> ; `getBalance`: (`address`: *Address*) => *Promise*<Balance\> ; `getChannels`: () => *HoprChannels* ; `getGenesisBlock`: () => *number* ; `getInfo`: () => *string* ; `getLatestBlockNumber`: () => *Promise*<number\> ; `getNativeBalance`: (`address`: *Address*) => *Promise*<NativeBalance\> ; `getPrivateKey`: () => *Uint8Array* ; `getPublicKey`: () => *PublicKey* ; `getWallet`: () => *Wallet* ; `initiateChannelClosure`: (`counterparty`: *Address*) => *Promise*<string\> ; `openChannel`: (`me`: *Address*, `counterparty`: *Address*, `amount`: *Balance*) => *Promise*<string\> ; `redeemTicket`: (`counterparty`: *Address*, `ackTicket`: *AcknowledgedTicket*, `ticket`: *Ticket*) => *Promise*<string\> ; `setCommitment`: (`comm`: *Hash*) => *Promise*<string\> ; `subscribeBlock`: (`cb`: *any*) => *JsonRpcProvider* \| *WebSocketProvider* ; `subscribeChannelEvents`: (`cb`: *any*) => *HoprChannels* ; `subscribeError`: (`cb`: *any*) => *void* ; `unsubscribe`: () => *void* ; `waitUntilReady`: () => *Promise*<Network\> ; `withdraw`: (`currency`: ``"NATIVE"`` \| ``"HOPR"``, `recipient`: *string*, `amount`: *string*) => *Promise*<string\>  }, `maxConfirmations`: *number*, `blockRange`: *number*): [*Indexer*](indexer.md)
 
 #### Parameters
 
@@ -81,20 +81,20 @@ Also keeps track of the latest block number.
 | `db` | *HoprDB* |
 | `chain` | *object* |
 | `chain.announce` | (`multiaddr`: Multiaddr) => *Promise*<string\> |
-| `chain.finalizeChannelClosure` | (`counterparty`: *any*) => *Promise*<string\> |
+| `chain.finalizeChannelClosure` | (`counterparty`: *Address*) => *Promise*<string\> |
 | `chain.fundChannel` | (`me`: *Address*, `counterparty`: *Address*, `myTotal`: *Balance*, `theirTotal`: *Balance*) => *Promise*<string\> |
 | `chain.getBalance` | (`address`: *Address*) => *Promise*<Balance\> |
 | `chain.getChannels` | () => *HoprChannels* |
 | `chain.getGenesisBlock` | () => *number* |
 | `chain.getInfo` | () => *string* |
 | `chain.getLatestBlockNumber` | () => *Promise*<number\> |
-| `chain.getNativeBalance` | (`address`: *any*) => *Promise*<NativeBalance\> |
+| `chain.getNativeBalance` | (`address`: *Address*) => *Promise*<NativeBalance\> |
 | `chain.getPrivateKey` | () => *Uint8Array* |
 | `chain.getPublicKey` | () => *PublicKey* |
 | `chain.getWallet` | () => *Wallet* |
-| `chain.initiateChannelClosure` | (`counterparty`: *any*) => *Promise*<string\> |
-| `chain.openChannel` | (`me`: *any*, `counterparty`: *any*, `amount`: *any*) => *Promise*<string\> |
-| `chain.redeemTicket` | (`counterparty`: *any*, `ackTicket`: *any*, `ticket`: *any*) => *Promise*<string\> |
+| `chain.initiateChannelClosure` | (`counterparty`: *Address*) => *Promise*<string\> |
+| `chain.openChannel` | (`me`: *Address*, `counterparty`: *Address*, `amount`: *Balance*) => *Promise*<string\> |
+| `chain.redeemTicket` | (`counterparty`: *Address*, `ackTicket`: *AcknowledgedTicket*, `ticket`: *Ticket*) => *Promise*<string\> |
 | `chain.setCommitment` | (`comm`: *Hash*) => *Promise*<string\> |
 | `chain.subscribeBlock` | (`cb`: *any*) => *JsonRpcProvider* \| *WebSocketProvider* |
 | `chain.subscribeChannelEvents` | (`cb`: *any*) => *HoprChannels* |

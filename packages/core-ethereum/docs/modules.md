@@ -21,7 +21,7 @@
 
 Ƭ **RedeemTicketResponse**: { `ackTicket`: AcknowledgedTicket ; `receipt`: *string* ; `status`: ``"SUCCESS"``  } \| { `message`: *string* ; `status`: ``"FAILURE"``  } \| { `error`: Error \| *string* ; `status`: ``"ERROR"``  }
 
-Defined in: [core-ethereum/src/index.ts:17](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L17)
+Defined in: [core-ethereum/src/index.ts:24](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L24)
 
 ___
 
