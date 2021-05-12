@@ -1,7 +1,8 @@
 import dgram from 'dgram'
 import type { Socket, RemoteInfo } from 'dgram'
 import { getExternalIp, handleStunRequest, DEFAULT_PARALLEL_STUN_CALLS, PUBLIC_STUN_SERVERS } from './stun'
-import Multiaddr from 'multiaddr'
+import { nodeToMultiaddr } from './utils'
+import { Multiaddr } from 'multiaddr'
 import assert from 'assert'
 import { once } from 'events'
 
@@ -27,7 +28,9 @@ describe('test STUN', function () {
       })
     )
 
-    const multiAddrs = servers.map((server: Socket) => Multiaddr.fromNodeAddress(server.address() as any, 'udp'))
+    const multiAddrs = servers.map((server: Socket) =>
+      Multiaddr.fromNodeAddress(nodeToMultiaddr(server.address()), 'udp')
+    )
 
     const result = await getExternalIp(multiAddrs, servers[0])
 
@@ -54,7 +57,7 @@ describe('test STUN', function () {
     const result = await getExternalIp(
       [
         ...PUBLIC_STUN_SERVERS.slice(0, Math.max(0, DEFAULT_PARALLEL_STUN_CALLS - 1)),
-        Multiaddr(`/ip4/127.0.0.1/udp/1`)
+        new Multiaddr(`/ip4/127.0.0.1/udp/1`)
       ],
       servers[0]
     )

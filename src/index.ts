@@ -4,7 +4,7 @@ import debug from 'debug'
 import Listener from './listener'
 import { CODE_IP4, CODE_IP6, CODE_P2P, DELIVERY, USE_WEBRTC } from './constants'
 import { AbortError } from 'abortable-iterator'
-import type Multiaddr from 'multiaddr'
+import type { Multiaddr } from 'multiaddr'
 import PeerId from 'peer-id'
 import type libp2p from 'libp2p'
 import type { Dialer, Upgrader, DialOptions, ConnHandler, Handler, ConnectionManager } from 'libp2p'
@@ -89,10 +89,10 @@ class HoprConnect implements Transport {
         }
 
         switch (cOpts.family) {
-          case 'ipv6':
+          case 6:
             // We do not use STUN for IPv6 for the moment
             break
-          case 'ipv4':
+          case 4:
             if (this.stunServers == undefined) {
               this.stunServers = [bs]
             } else {
@@ -170,7 +170,7 @@ class HoprConnect implements Transport {
     // This works because destination peerId is for both address
     // types at the third place.
     // Other addresses are not supported.
-    const destination = PeerId.createFromBytes(((maTuples[2][1] as unknown) as Uint8Array).slice(1))
+    const destination = PeerId.createFromBytes((maTuples[2][1] as unknown as Uint8Array).slice(1))
 
     if (destination.equals(this._peerId)) {
       throw new AbortError(`Cannot dial ourself`)
@@ -185,7 +185,7 @@ class HoprConnect implements Transport {
 
         return await this.dialDirectly(ma, options)
       case CODE_P2P:
-        const relay = PeerId.createFromBytes(((maTuples[0][1] as unknown) as Uint8Array).slice(1))
+        const relay = PeerId.createFromBytes((maTuples[0][1] as unknown as Uint8Array).slice(1))
 
         return await this.dialWithRelay(relay, destination, options)
       default:
@@ -219,8 +219,8 @@ class HoprConnect implements Transport {
   /**
    * Takes a list of Multiaddrs and returns those addrs that we can use.
    * @example
-   * Multiaddr(`/ip4/127.0.0.1/tcp/0/p2p/16Uiu2HAmCPgzWWQWNAn2E3UXx1G3CMzxbPfLr1SFzKqnFjDcbdwg`) // working
-   * Multiaddr(`/p2p/16Uiu2HAmCPgzWWQWNAn2E3UXx1G3CMzxbPfLr1SFzKqnFjDcbdwg/p2p-circuit/p2p/16Uiu2HAkyvdVZtG8btak5SLrxP31npfJo6maopj8xwx5XQhKfspb`) // working
+   * new Multiaddr(`/ip4/127.0.0.1/tcp/0/p2p/16Uiu2HAmCPgzWWQWNAn2E3UXx1G3CMzxbPfLr1SFzKqnFjDcbdwg`) // working
+   * new Multiaddr(`/p2p/16Uiu2HAmCPgzWWQWNAn2E3UXx1G3CMzxbPfLr1SFzKqnFjDcbdwg/p2p-circuit/p2p/16Uiu2HAkyvdVZtG8btak5SLrxP31npfJo6maopj8xwx5XQhKfspb`) // working
    * @param multiaddrs
    * @returns applicable Multiaddrs
    */

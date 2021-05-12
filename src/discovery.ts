@@ -1,6 +1,6 @@
 import { PeerDiscovery } from 'libp2p-interfaces'
 import { EventEmitter } from 'events'
-import Multiaddr from 'multiaddr'
+import type { Multiaddr } from 'multiaddr'
 import PeerId from 'peer-id'
 
 class Discovery extends EventEmitter implements PeerDiscovery {

@@ -2,7 +2,7 @@
 
 import assert from 'assert'
 import Listener from './listener'
-import Multiaddr from 'multiaddr'
+import { Multiaddr } from 'multiaddr'
 import type { MultiaddrConnection, Upgrader } from 'libp2p'
 import type { Connection } from 'libp2p'
 import dgram from 'dgram'
@@ -59,20 +59,20 @@ describe('check listening to sockets', function () {
     const peerId = await PeerId.create({ keyType: 'secp256k1' })
     const listener = new Listener(
       undefined,
-      ({
+      {
         upgradeInbound: async (conn: MultiaddrConnection) => {
           state.msgReceived.resolve()
           return conn
         },
         upgradeOutbound: async (conn: MultiaddrConnection) => conn
-      } as unknown) as Upgrader,
+      } as unknown as Upgrader,
       undefined,
       undefined,
       peerId,
       undefined
     )
 
-    await listener.listen(Multiaddr(`/ip4/127.0.0.1/tcp/0`))
+    await listener.listen(new Multiaddr(`/ip4/127.0.0.1/tcp/0`))
 
     return {
       peerId,
@@ -116,17 +116,17 @@ describe('check listening to sockets', function () {
     for (let i = 0; i < 2; i++) {
       listener = new Listener(
         () => {},
-        (undefined as unknown) as Upgrader,
+        undefined as unknown as Upgrader,
         [
-          Multiaddr(`/ip4/127.0.0.1/udp/${stunServers[0].address().port}`),
-          Multiaddr(`/ip4/127.0.0.1/udp/${stunServers[1].address().port}`)
+          new Multiaddr(`/ip4/127.0.0.1/udp/${stunServers[0].address().port}`),
+          new Multiaddr(`/ip4/127.0.0.1/udp/${stunServers[1].address().port}`)
         ],
         undefined,
         await PeerId.create({ keyType: 'secp256k1' }),
         undefined
       )
 
-      await waitUntilListening(listener, Multiaddr(`/ip4/127.0.0.1/tcp/9390/p2p/${peerId.toB58String()}`))
+      await waitUntilListening(listener, new Multiaddr(`/ip4/127.0.0.1/tcp/9390/p2p/${peerId.toB58String()}`))
       await stopListener(listener)
     }
 
@@ -158,16 +158,16 @@ describe('check listening to sockets', function () {
 
     const listener = new Listener(
       () => {},
-      ({
+      {
         upgradeOutbound: async (maConn: MultiaddrConnection) => maConn
-      } as unknown) as Upgrader,
-      [Multiaddr(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)],
-      [Multiaddr(`/ip4/127.0.0.1/tcp/${bootstrap.listener.getPort()}/p2p/${bootstrap.peerId.toB58String()}`)],
+      } as unknown as Upgrader,
+      [new Multiaddr(`/ip4/127.0.0.1/udp/${stunServer.address().port}`)],
+      [new Multiaddr(`/ip4/127.0.0.1/tcp/${bootstrap.listener.getPort()}/p2p/${bootstrap.peerId.toB58String()}`)],
       peerId,
       undefined
     )
 
-    await waitUntilListening(listener, Multiaddr(`/ip4/127.0.0.1/tcp/9390/p2p/${peerId.toB58String()}`))
+    await waitUntilListening(listener, new Multiaddr(`/ip4/127.0.0.1/tcp/9390/p2p/${peerId.toB58String()}`))
 
     // Checks that relay and STUN got contacted, otherwise timeout
     await Promise.all([stunContacted.msgReceived.promise, relayContacted.msgReceived.promise])
@@ -200,7 +200,7 @@ describe('check listening to sockets', function () {
 
         const stunServers = []
         for (let i = 0; i < AMOUNT_OF_NODES; i++) {
-          stunServers.push(Multiaddr(`/ip4/127.0.0.1/udp/${9390 + i}`))
+          stunServers.push(new Multiaddr(`/ip4/127.0.0.1/udp/${9390 + i}`))
         }
 
         const listener = new Listener(
@@ -209,16 +209,16 @@ describe('check listening to sockets', function () {
             conn.conn.end()
             msgReceived[index].received.resolve()
           },
-          ({
+          {
             upgradeInbound: async (conn: MultiaddrConnection) => conn
-          } as unknown) as Upgrader,
+          } as unknown as Upgrader,
           stunServers,
           undefined,
           await PeerId.create({ keyType: 'secp256k1' }),
           undefined
         )
 
-        await waitUntilListening(listener, Multiaddr(`/ip6/::/tcp/${9390 + index}/p2p/${peerId.toB58String()}`))
+        await waitUntilListening(listener, new Multiaddr(`/ip6/::/tcp/${9390 + index}/p2p/${peerId.toB58String()}`))
 
         return listener
       })
@@ -281,9 +281,9 @@ describe('check listening to sockets', function () {
         // @ts-ignore
         conn.conn.end()
       },
-      ({
+      {
         upgradeInbound: async (conn: MultiaddrConnection) => conn
-      } as unknown) as Upgrader,
+      } as unknown as Upgrader,
       undefined,
       undefined,
       peerId,
@@ -292,7 +292,7 @@ describe('check listening to sockets', function () {
 
     let errThrown = false
     try {
-      await waitUntilListening(listener, Multiaddr(`/ip4/0.0.0.1/tcp/0/p2p/${peerId.toB58String()}`))
+      await waitUntilListening(listener, new Multiaddr(`/ip4/0.0.0.1/tcp/0/p2p/${peerId.toB58String()}`))
     } catch {
       errThrown = true
     }
@@ -309,16 +309,16 @@ describe('check listening to sockets', function () {
         // @ts-ignore
         conn.conn.end()
       },
-      ({
+      {
         upgradeInbound: async (conn: MultiaddrConnection) => conn
-      } as unknown) as Upgrader,
+      } as unknown as Upgrader,
       undefined,
       undefined,
       await PeerId.create({ keyType: 'secp256k1' }),
       undefined
     )
 
-    await waitUntilListening(listener, Multiaddr(`/ip4/0.0.0.0/tcp/0`))
+    await waitUntilListening(listener, new Multiaddr(`/ip4/0.0.0.0/tcp/0`))
 
     const socket = dgram.createSocket({ type: 'udp4' })
     const tid = stun.generateTransactionId()

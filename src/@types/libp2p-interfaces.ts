@@ -1,6 +1,6 @@
 declare module 'libp2p-interfaces' {
   type EventEmitter = import('events').EventEmitter
-  type Multiaddr = import('multiaddr')
+  type Multiaddr = import('multiaddr').Multiaddr
   type PeerId = import('peer-id')
   type Upgrader = import('libp2p').Upgrader
   type LibP2P = import('libp2p').default
@@ -11,9 +11,7 @@ declare module 'libp2p-interfaces' {
     remoteAddr: Multiaddr
     localPeer: PeerId
     remotePeer: PeerId
-    newStream(
-      protocols?: string[]
-    ): Promise<{
+    newStream(protocols?: string[]): Promise<{
       protocol: string
       stream: Stream
     }>

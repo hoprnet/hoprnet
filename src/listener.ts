@@ -16,7 +16,7 @@ import { MultiaddrConnection, Upgrader } from 'libp2p'
 
 import type { Listener as InterfaceListener } from 'libp2p-interfaces'
 import type PeerId from 'peer-id'
-import Multiaddr from 'multiaddr'
+import { Multiaddr } from 'multiaddr'
 
 import { handleStunRequest, getExternalIp } from './stun'
 import { getAddrs } from './addrs'
@@ -95,11 +95,9 @@ class Listener extends EventEmitter implements InterfaceListener {
     })
 
     this.stunServers = stunServers?.filter((ma: Multiaddr) => {
-      let maPeerId: string
-      try {
-        maPeerId = ma.getPeerId()
-      } catch (err) {
-        // Allow STUN server without a PeerId
+      let maPeerId = ma.getPeerId()
+
+      if (maPeerId == null) {
         return true
       }
 
@@ -235,9 +233,9 @@ class Listener extends EventEmitter implements InterfaceListener {
       addrs.push(
         Multiaddr.fromNodeAddress(
           {
-            ...this.externalAddress,
-            family: 'IPv4',
-            port: this.externalAddress.port.toString()
+            address: this.externalAddress.address,
+            port: this.externalAddress.port,
+            family: 4
           },
           'tcp'
         ).encapsulate(`/p2p/${this.peerId}`)
@@ -245,7 +243,7 @@ class Listener extends EventEmitter implements InterfaceListener {
     }
 
     for (const res of this.relayConnectResults ?? []) {
-      addrs.push(Multiaddr(`/p2p/${res.id}/p2p-circuit/p2p/${this.peerId}`))
+      addrs.push(new Multiaddr(`/p2p/${res.id}/p2p-circuit/p2p/${this.peerId}`))
     }
 
     addrs.push(

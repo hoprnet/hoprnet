@@ -5,7 +5,7 @@ import { createServer, Socket } from 'net'
 import { TCPConnection } from './tcp'
 import Listener from './listener'
 import Defer from 'p-defer'
-import Multiaddr from 'multiaddr'
+import { Multiaddr } from 'multiaddr'
 import { u8aEquals } from '@hoprnet/hopr-utils'
 import type { Upgrader } from 'libp2p'
 import PeerId from 'peer-id'
@@ -34,7 +34,7 @@ describe('test TCP connection', function () {
 
     await bound.promise
 
-    const conn = await TCPConnection.create(Multiaddr('/ip4/127.0.0.1/tcp/9091'), peerId)
+    const conn = await TCPConnection.create(new Multiaddr('/ip4/127.0.0.1/tcp/9091'), peerId)
 
     conn.sink(
       (async function* () {
@@ -54,10 +54,10 @@ describe('test TCP connection', function () {
   })
 
   it('should test TCPConnection against Listener', async function () {
-    const upgrader = ({
+    const upgrader = {
       upgradeInbound: (arg: any) => Promise.resolve(arg),
       upgradeOutbound: (arg: any) => Promise.resolve(arg)
-    } as unknown) as Upgrader
+    } as unknown as Upgrader
 
     const peerId = await PeerId.create({ keyType: 'secp256k1' })
     const listener = new Listener(
@@ -71,9 +71,9 @@ describe('test TCP connection', function () {
       undefined
     )
 
-    await listener.listen(Multiaddr('/ip4/127.0.0.1/tcp/9091'))
+    await listener.listen(new Multiaddr('/ip4/127.0.0.1/tcp/9091'))
 
-    const tcpConn = await TCPConnection.create(Multiaddr('/ip4/127.0.0.1/tcp/9091'), peerId)
+    const tcpConn = await TCPConnection.create(new Multiaddr('/ip4/127.0.0.1/tcp/9091'), peerId)
 
     tcpConn.sink(
       (async function* () {
