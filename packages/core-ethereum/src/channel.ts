@@ -235,7 +235,7 @@ class Channel {
         }
       }
 
-      const receipt = await this.chain.redeemTicket(this.counterparty.toAddress().toHex(), ackTicket, ticket)
+      const receipt = await this.chain.redeemTicket(this.counterparty.toAddress(), ackTicket, ticket)
 
       // TODO delete ackTicket
       //this.commitment.updateChainState(ackTicket.preImage)
