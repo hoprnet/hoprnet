@@ -11,7 +11,8 @@ import {
   Hash,
   UINT256,
   HalfKey,
-  Response
+  Response,
+  HalfKeyChallenge
 } from './types'
 import BN from 'bn.js'
 
@@ -50,14 +51,16 @@ describe(`database tests`, function () {
   })
 
   it('ticket workflow', async function () {
+    // this comes from a Packet
+    const halfKeyChallenge = new HalfKeyChallenge(Uint8Array.from(randomBytes(HalfKeyChallenge.SIZE)))
     const unAck = new UnacknowledgedTicket(
       createMockedTicket(),
       new HalfKey(Uint8Array.from(randomBytes(HalfKey.SIZE)))
     )
-    await db.storeUnacknowledgedTicket(unAck)
+    await db.storeUnacknowledgedTicket(halfKeyChallenge, unAck)
     assert((await db.getTickets()).length == 1, `DB should find one ticket`)
 
-    const ticket = await db.getUnacknowledgedTicket(unAck.ticket)
+    const ticket = await db.getUnacknowledgedTicket(halfKeyChallenge)
     assert(ticket != null)
 
     const ack = new AcknowledgedTicket(
@@ -65,7 +68,7 @@ describe(`database tests`, function () {
       new Response(Uint8Array.from(randomBytes(Hash.SIZE))),
       new Hash(Uint8Array.from(randomBytes(Hash.SIZE)))
     )
-    await db.unAckToAckTicket(ack)
+    await db.replaceUnAckWithAck(halfKeyChallenge, ack)
 
     assert((await db.getTickets()).length == 1, `DB should find one ticket`)
     assert((await db.getUnacknowledgedTickets()).length === 0, `DB should not contain any unacknowledgedTicket`)

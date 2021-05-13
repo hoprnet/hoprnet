@@ -424,7 +424,7 @@ class Hopr extends EventEmitter {
             return reject(err)
           }
 
-          const key = unacknowledgedTicketKey(packet.ticket)
+          const key = unacknowledgedTicketKey(packet.ackChallenge)
 
           this.once('message-acknowledged:' + u8aToHex(key), () => {
             resolve()
@@ -670,7 +670,7 @@ class Hopr extends EventEmitter {
 
       const result = await channel.redeemTicket(ackTicket)
       // TODO look at result.status and actually do something
-      await this.db.delAcknowledgedTicket(ackTicket)
+      await this.db.delAcknowledgedTicket(ackTicket.ticket.challenge)
       return result
     } catch (err) {
       return {

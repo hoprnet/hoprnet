@@ -5,9 +5,18 @@ import { existsSync, mkdirSync } from 'fs'
 import path from 'path'
 import Debug from 'debug'
 import { Hash, u8aConcat, Address, Intermediate, Ticket } from '.'
-import { AcknowledgedTicket, UnacknowledgedTicket, AccountEntry, ChannelEntry, Snapshot, PublicKey } from './types'
+import {
+  AcknowledgedTicket,
+  UnacknowledgedTicket,
+  AccountEntry,
+  ChannelEntry,
+  Snapshot,
+  PublicKey,
+  HalfKeyChallenge,
+  EthereumChallenge
+} from './types'
 import BN from 'bn.js'
-import { u8aEquals } from './u8a'
+import { u8aEquals, u8aToHex } from './u8a'
 
 const log = Debug(`hopr-core:db`)
 const encoder = new TextEncoder()
@@ -15,11 +24,11 @@ const encoder = new TextEncoder()
 const TICKET_PREFIX = encoder.encode('tickets-')
 const UNACKNOWLEDGED_TICKETS_PREFIX = u8aConcat(TICKET_PREFIX, encoder.encode('unacknowledged-'))
 const ACKNOWLEDGED_TICKETS_PREFIX = u8aConcat(TICKET_PREFIX, encoder.encode('acknowledged-'))
-export const unacknowledgedTicketKey = (ticket: Ticket) => {
-  return u8aConcat(UNACKNOWLEDGED_TICKETS_PREFIX, ticket.getHash().serialize())
+export const unacknowledgedTicketKey = (halfKey: HalfKeyChallenge) => {
+  return u8aConcat(UNACKNOWLEDGED_TICKETS_PREFIX, halfKey.serialize())
 }
-const acknowledgedTicketKey = (ticket: Ticket) => {
-  return u8aConcat(ACKNOWLEDGED_TICKETS_PREFIX, ticket.getHash().serialize())
+const acknowledgedTicketKey = (challenge: EthereumChallenge) => {
+  return u8aConcat(ACKNOWLEDGED_TICKETS_PREFIX, challenge.serialize())
 }
 const PACKET_TAG_PREFIX: Uint8Array = encoder.encode('packets-tag-')
 const LATEST_BLOCK_NUMBER_KEY = encoder.encode('indexer-latestBlockNumber')
@@ -144,35 +153,15 @@ export class HoprDB {
     )
   }
 
-  /**
-   * Delete unacknowledged tickets
-   * @param filter optionally filter by signer
-   */
-  public async delUnacknowledgedTickets(filter?: { signer: Uint8Array }): Promise<void> {
-    const tickets = await this.getUnacknowledgedTickets(filter)
-
-    await this.db.batch(
-      await Promise.all(
-        tickets.map<any>(async (unAckTicket) => {
-          return {
-            type: 'del',
-            key: Buffer.from(this.keyOf(unacknowledgedTicketKey(unAckTicket.ticket)))
-          }
-        })
-      )
-    )
+  public async getUnacknowledgedTicket(halfKeyChallenge: HalfKeyChallenge): Promise<UnacknowledgedTicket> {
+    return UnacknowledgedTicket.deserialize(await this.get(unacknowledgedTicketKey(halfKeyChallenge)))
   }
 
-  public async getUnacknowledgedTicket(ticket: Ticket): Promise<UnacknowledgedTicket> {
-    return UnacknowledgedTicket.deserialize(await this.get(unacknowledgedTicketKey(ticket)))
-  }
-
-  public async storeUnacknowledgedTicket(unackTicket: UnacknowledgedTicket): Promise<void> {
-    await this.put(unacknowledgedTicketKey(unackTicket.ticket), unackTicket.serialize())
-  }
-
-  public async delUnacknowledgedTicket(unackTicket: UnacknowledgedTicket): Promise<void> {
-    await this.del(unacknowledgedTicketKey(unackTicket.ticket))
+  public async storeUnacknowledgedTicket(
+    halfKeyChallenge: HalfKeyChallenge,
+    unackTicket: UnacknowledgedTicket
+  ): Promise<void> {
+    await this.put(unacknowledgedTicketKey(halfKeyChallenge), unackTicket.serialize())
   }
 
   /**
@@ -193,43 +182,17 @@ export class HoprDB {
   }
 
   /**
-   * Delete acknowledged tickets
-   * @param filter optionally filter by signer
-   */
-  public async delAcknowledgedTickets(filter?: { signer: Uint8Array }): Promise<void> {
-    const acks = await this.getAcknowledgedTickets(filter)
-    await this.db.batch(
-      await Promise.all(
-        acks.map<any>(async (ackTicket) => {
-          return {
-            type: 'del',
-            key: Buffer.from(this.keyOf(acknowledgedTicketKey(ackTicket.ticket)))
-          }
-        })
-      )
-    )
-  }
-
-  /**
-   * Update acknowledged ticket in database
-   * @param ackTicket Uint8Array
-   * @param index Uint8Array
-   */
-  public async updateAcknowledgedTicket(ackTicket: AcknowledgedTicket): Promise<void> {
-    await this.put(acknowledgedTicketKey(ackTicket.ticket), ackTicket.serialize())
-  }
-
-  /**
    * Delete acknowledged ticket in database
    * @param index Uint8Array
    */
-  public async delAcknowledgedTicket(ackTicket: AcknowledgedTicket): Promise<void> {
-    await this.del(acknowledgedTicketKey(ackTicket.ticket))
+  public async delAcknowledgedTicket(challenge: EthereumChallenge): Promise<void> {
+    await this.del(acknowledgedTicketKey(challenge))
   }
 
-  public async unAckToAckTicket(ackTicket: AcknowledgedTicket): Promise<void> {
-    const unAcknowledgedDbKey = unacknowledgedTicketKey(ackTicket.ticket)
-    const acknowledgedDbKey = acknowledgedTicketKey(ackTicket.ticket)
+  public async replaceUnAckWithAck(halfKeyChallenge: HalfKeyChallenge, ackTicket: AcknowledgedTicket): Promise<void> {
+    const unAcknowledgedDbKey = unacknowledgedTicketKey(halfKeyChallenge)
+    const acknowledgedDbKey = acknowledgedTicketKey(ackTicket.ticket.challenge)
+
     try {
       await this.db
         .batch()
@@ -255,16 +218,6 @@ export class HoprDB {
         return [...unAckTickets, ...ackTickets]
       }
     )
-  }
-
-  /**
-   * Delete tickets, both unacknowledged and acknowledged
-   * @param node
-   * @param filter optionally filter by signer
-   * @returns an array of signed tickets
-   */
-  public async delTickets(filter?: { signer: Uint8Array }): Promise<void> {
-    await Promise.all([this.delUnacknowledgedTickets(filter), this.delAcknowledgedTickets(filter)])
   }
 
   async checkAndSetPacketTag(packetTag: Uint8Array) {
