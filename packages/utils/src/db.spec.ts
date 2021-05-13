@@ -12,7 +12,8 @@ import {
   UINT256,
   HalfKey,
   Response,
-  HalfKeyChallenge
+  HalfKeyChallenge,
+  ChannelEntry
 } from './types'
 import BN from 'bn.js'
 
@@ -28,6 +29,11 @@ function createMockedTicket() {
     randomBytes(32)
   )
 }
+
+function createMockedChannelEntry() {
+  return ChannelEntry.deserialize(new Uint8Array({ length: ChannelEntry.SIZE }).fill(1))
+}
+
 describe(`database tests`, function () {
   let db: HoprDB
 
@@ -86,5 +92,14 @@ describe(`database tests`, function () {
     const latestBlockNumber = await db.getLatestBlockNumber()
 
     assert(blockNumber.eqn(latestBlockNumber), `block number must be updated`)
+  })
+
+  it('should store ChannelEntry', async function () {
+    const channelEntry = createMockedChannelEntry()
+
+    await db.updateChannel(channelEntry.getId(), channelEntry)
+
+    assert(!!(await db.getChannel(channelEntry.getId())), 'did not find channel')
+    assert((await db.getChannels()).length === 1, 'did not find channel')
   })
 })

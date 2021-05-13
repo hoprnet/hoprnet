@@ -55,6 +55,7 @@ import { subscribeToAcknowledgements } from './interactions/packet/acknowledgeme
 import { PacketForwardInteraction } from './interactions/packet/forward'
 
 import { Packet } from './messages'
+import { TICKET_AMOUNT, TICKET_WIN_PROB } from './constants'
 
 const log = Debug(`hopr-core`)
 const verbose = Debug('hopr-core:verbose')
@@ -70,8 +71,6 @@ export type HoprOptions = {
   network: string
   provider: string
   announce?: boolean
-  ticketAmount?: number
-  ticketWinProb?: number
   dbPath?: string
   createDbIfNotExist?: boolean
   password?: string
@@ -416,8 +415,8 @@ class Hopr extends EventEmitter {
               this.getId(),
               await this.paymentChannels,
               {
-                value: new Balance(new BN(this.options.ticketAmount)),
-                winProb: this.options.ticketWinProb
+                value: new Balance(new BN(TICKET_AMOUNT)),
+                winProb: TICKET_WIN_PROB
               }
             )
           } catch (err) {

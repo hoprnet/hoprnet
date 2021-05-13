@@ -28,6 +28,7 @@ import BN from 'bn.js'
 import { Acknowledgement } from './acknowledgement'
 import { blue, green } from 'chalk'
 import Debug from 'debug'
+import { TICKET_AMOUNT, TICKET_WIN_PROB } from '../constants'
 
 export const MAX_HOPS = 3 // 3 relayers and 1 destination
 
@@ -239,7 +240,7 @@ export class Packet {
     if (isDirectMessage) {
       ticket = channel.createDummyTicket(ticketChallenge)
     } else {
-      ticket = await channel.createTicket(ticketOpts.value, ticketChallenge, ticketOpts.winProb)
+      ticket = await channel.createTicket(new Balance(new BN(TICKET_AMOUNT)), ticketChallenge, TICKET_WIN_PROB)
     }
 
     return new Packet(packet, challenge, ticket).setReadyToForward(ackChallenge)
@@ -337,10 +338,17 @@ export class Packet {
     const previousHop = pubKeyToPeerId(this.previousHop)
     const channel = chain.getChannel(new PublicKey(privKey.pubKey.marshal()), new PublicKey(this.previousHop))
 
-    return validateUnacknowledgedTicket(privKey, '', 0, previousHop, this.ticket, channel, () =>
-      db.getTickets({
-        signer: this.previousHop
-      })
+    return validateUnacknowledgedTicket(
+      privKey,
+      TICKET_AMOUNT,
+      TICKET_WIN_PROB,
+      previousHop,
+      this.ticket,
+      channel,
+      () =>
+        db.getTickets({
+          signer: this.previousHop
+        })
     )
   }
 
