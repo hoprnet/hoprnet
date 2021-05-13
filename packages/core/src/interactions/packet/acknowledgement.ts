@@ -21,11 +21,10 @@ export function subscribeToAcknowledgements(
     let unacknowledgedTicket = await db.getUnacknowledgedTicket(ackMsg.ackChallenge)
 
     if (!unacknowledgedTicket) {
-      // Could be dummy, could be error.
-      log('dropping unknown ticket')
-      // @ts-ignore
-      // @TODO: improve types
-      return await db.delAcknowledgement({ ticket: { challenge: ackMsg.ackChallenge.toAddress() } })
+      return
+      // // Could be dummy, could be error.
+      // log('dropping unknown ticket')
+      // return await db.delUnacknowledgedTicket(un)
     }
 
     const channel = chain.getChannel(new PublicKey(pubKey.pubKey.marshal()), new PublicKey(remotePeer.pubKey.marshal()))

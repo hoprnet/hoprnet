@@ -57,7 +57,7 @@ describe(`database tests`, function () {
     await db.storeUnacknowledgedTicket(unAck)
     assert((await db.getTickets()).length == 1, `DB should find one ticket`)
 
-    const ticket = await db.getUnacknowledgedTicket(unAck.getChallenge())
+    const ticket = await db.getUnacknowledgedTicket(unAck.ticket)
     assert(ticket != null)
 
     const ack = new AcknowledgedTicket(
@@ -68,10 +68,7 @@ describe(`database tests`, function () {
     await db.unAckToAckTicket(ack)
 
     assert((await db.getTickets()).length == 1, `DB should find one ticket`)
-    assert(
-      (await db.getUnacknowledgedTicket(unAck.getChallenge())) == undefined,
-      `DB should not contain any unacknowledgedTicket`
-    )
+    assert((await db.getUnacknowledgedTickets()).length === 0, `DB should not contain any unacknowledgedTicket`)
     assert((await db.getAcknowledgedTickets()).length == 1, `DB should contain exactly one acknowledged ticket`)
   })
 
