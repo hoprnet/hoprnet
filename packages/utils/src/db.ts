@@ -16,7 +16,7 @@ import {
   EthereumChallenge
 } from './types'
 import BN from 'bn.js'
-import { u8aEquals, u8aToHex } from './u8a'
+import { u8aEquals } from './u8a'
 
 const log = Debug(`hopr-core:db`)
 const encoder = new TextEncoder()
