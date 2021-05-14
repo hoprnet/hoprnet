@@ -54,7 +54,7 @@ $h:G^*\times G^*\rightarrow\mathbb{Z}^*_q$ where $\mathbb{Z}^*_q$ is the field o
     \\~\\Such that $Z$ is the destination address and $|Z|$ is its length.
     $v\leq r$ is the length of the path traversed by the packet where $|Z| \leq (2(r - v) + 2)$. $\phi$ is a filler string that is used to ensure the header packets remain constant in size as layers of encryption are added or removed.
     \\~\\$\beta_i$ is computed as the concatenation of $Z$ and a sequence of padding which is then encrypted by XORing with the output of a pseudo-random number generator seeded with shared key $s_{v-1}$ of node $v-1$. The result is finally concatenated with $\phi$ to ensure the header packets remain constant in size.
-    \\ In the original sphinx paper, $Z$ is concatenated with an identifier $I$ and $0$ padding sequence where $I$ is used for SURBs (Single-Use-Reply Blocks) such that $I \in \{0, 1\}^\kappa$. We don't use $I$ for the moment since we don't use SURBs.
+    In the original sphinx paper, $Z$ is concatenated with an identifier $I$ and $0$ padding sequence where $I$ is used for SURBs (Single-Use-Reply Blocks) such that $I \in \{0, 1\}^\kappa$. We don't use $I$ for the moment since we don't use SURBs.
     \\~\\Since $(A)$ has a shared secret with each of the nodes along the path, it is able to derive blindings for each of them.
     \newline Each node along the path receives an authentication tag $\gamma_i$ in the form of a message authentication code (MAC)
 which is encoded in the header.
