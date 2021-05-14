@@ -72,20 +72,20 @@ The unblinding works as follow:
 $$(\beta_0\|0_{2\kappa})\oplus PRNG(s_{0})$$
 (B) parses the routing instructions from $(A)$ in order to obtain the address of the next mix-node $(C)$, as well the new integrity tag $\gamma_1$ and $\beta_1$, which should be forwarded to the next hop.
 \paragraph{Delete and shift}
-After that $(B)$ extracts the public key of $(C)$, it deletes the routing information from the packet. Afterwards, it fills the empty space with its own blinding which is different from the one received from $(A)$ by setting the key share $\alpha_0$ to $\alpha_1=g^{xb_0}$. The process goes as follows:
+After that $(B)$ extracts the public key of $(C)$, it deletes the routing information from the packet. Afterwards, it fills the empty space with its own blinding which is different from the one received from $(A)$ by setting the key share $\alpha_0$ to $\alpha_1=g^{xb_0}$. $(B)$ also computes $\beta_1$ as follows:
 \begin{figure}[H]
     \centering
 
            \begin{tabular}{| m{0.1\textwidth} | m{0.1\textwidth} | m{0.45\textwidth} |}
             \hline
-            \multicolumn{3}{|c|}{\centering{$\beta_i$}}\\
+            \multicolumn{3}{|c|}{\centering{$\beta_0$}}\\
             \hline
-            $n_{i+1}$ & $\gamma_{i+1}$& $\beta_{i+1}$ \\
+            $n_{1}$ & $\gamma_{1}$& $\beta_{1}$ \\
            \hline
            \end{tabular}                   
     \end{figure}
-\hspace{-5mm}The first $\kappa$ bits of $\beta_i$ will be $n_{i+1}$ itself, the next $\kappa$ bits will be $\gamma_{i+1}$, and the remaining $(2r-1)\kappa$ bits of $\beta_i$ are shifted left to form the leftmost $(2r-1)\kappa$ bits of $\beta_{i+1}$; the rightmost $2\kappa$ bits of $\beta_{i+1}$ are simply a substring of an output of the PRNG function.
-
+\hspace{-5mm}The first $\kappa$ bits of $\beta_0$ will be $n_{1}$ itself, the next $\kappa$ bits will be $\gamma_{1}$, and the remaining $(2r-1)\kappa$ bits of $\beta_0$ are shifted left to form the leftmost $(2r-1)\kappa$ bits of $\beta_{1}$; the rightmost $2\kappa$ bits of $\beta_{1}$ are simply a substring of an output of the PRNG function.
+\\The new mix header is now ready to be sent to $(C)$ or as defined node $n_1$: $$M_1=(\alpha_1,\beta_1,\gamma_1)$$
 \paragraph{Encrypt \& Decrypt}
 The payload $\delta$ is where the actual message is hidden and is computed in different layers using a wide block cipher encryption algorithm and is decrypted at each stage of mixing.
 \\The payload is constructed as follow:
