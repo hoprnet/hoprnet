@@ -30,9 +30,11 @@ A can initiate the process by calling \textit{initiateChannelClosure()}. This ch
         \path (5,0)  node (open) [ellipse,draw] {$Open$};
         \path (2.5,-1)  node (pending) [ellipse,draw,align=left] {$Pending$\\$Timeout$};
 
-        \draw [->,draw](closed) to [bend left] node {$open()$} (open);
-        \draw [->,draw](open) to [bend left] node [align=left] {$initiate$\\$ChannelClosure()$} (pending);
-        \draw [->,draw](pending) to [bend left] node {$withdraw()$} (closed);
+        \draw [->,draw](closed) to [bend left] node {\textsf{open()}} (open);
+        \draw [->,draw](open) to [bend left] node [align=center] {\textsf{initiateChannelClosure()}} (pending);
+        \draw [->,draw](pending) to [bend left] node {\textsf{withdraw()}} (closed);
+
+        \path[->] (open) edge [out=+120,in=+60,distance=2em,below] node [align=center,above] {\textsf{redeemTicket()}}  (open);
     \end{tikzpicture}
     \label{fig:channel workflow}
     \caption{Channel workflow}
