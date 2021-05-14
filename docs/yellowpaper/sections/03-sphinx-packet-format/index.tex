@@ -24,7 +24,7 @@ HOPR uses the SPHINX packet format \cite{sphinxpaper} to encapsulate and route d
 \end{figure}
 
 \subsection{Construction}
-
+We will explain in the following all the steps a sphinx packet goes through in order to arrive to its final destination starting from the key derivation in order to extract new shared keys with all the relay nodes to unblinding the routing information using those shared keys in order to find the public key of the next relay node and checking the routing information's integrity before sending it. Each node then deletes that information and replaces it with their own blinding and decrypts one layer of the payload which has several layers of encryption similar to onion routing.
 \paragraph{Notation:}Let $\kappa=128$ be the security parameter. An adversary will have to do about $2^\kappa$ operations to break the security of Sphinx with non negligible probability.
 Let $r$ be the maximum number of nodes that a Sphinx mix message will traverse before being delivered to its destination.
 \\$G$ is a prime order cyclic group satisfying the Decisional Diffie-Hellman Assumption. The element $g$ is a generator of $G$ and $q$ is the (prime) order of $G$, with $q\approx2^{\kappa}$.
@@ -54,7 +54,7 @@ $h:G^*\times G^*\rightarrow\mathbb{Z}^*_q$ where $\mathbb{Z}^*_q$ is the field o
     \\~\\Such that $Z$ is the destination address and $|Z|$ is its length.
     $v\leq r$ is the length of the path traversed by the packet where $|Z| \leq (2(r - v) + 2)$. $\phi$ is a filler string that is used to ensure the header packets remain constant in size as layers of encryption are added or removed.
     \\~\\$\beta_i$ is computed as the concatenation of $Z$ and a sequence of padding which is then encrypted by XORing with the output of a pseudo-random number generator seeded with shared key $s_{v-1}$ of node $v-1$. The result is finally concatenated with $\phi$ to ensure the header packets remain constant in size.
-    \\In the original sphinx paper, $Z$ is concatenated with an identifier $I$ and $0$ padding sequence where $I$ is used for SURBs (Single-Use-Reply Blocks) such that $I \in \{0, 1\}^\kappa$. We don't use $I$ for the moment since we don't use SURBs.
+    \\In the original sphinx paper, $Z$ is concatenated with an identifier $I$ and $0$ padding sequence where $I$ is used for SURBs (Single-Use-Reply Blocks) such that $I \in \{0, 1\}^\kappa$. We don't use $I$ since we don't currently use SURBs .
     \\~\\Since $(A)$ has a shared secret with each of the nodes along the path, it is able to derive blindings for each of them.
     \newline Each node along the path receives an authentication tag $\gamma_i$ in the form of a message authentication code (MAC)
 which is encoded in the header.
