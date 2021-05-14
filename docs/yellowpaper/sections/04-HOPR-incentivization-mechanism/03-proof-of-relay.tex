@@ -8,7 +8,6 @@ This mechanism makes sure nodes relay services are verifiable.
     \item Each ticket contains a challenge.
     \item The validity of a ticket can only be checked on reception of the packet but the on-chain logic enforces a solution to the challenge stated in the ticket.
 \end{itemize}
-
 Since “Proof-Of-Relay” is used to make the relay services of nodes verifiable, it is the duty of each node to check that given challenges are derivable from the given and the expected information.
 Packets with inappropriate challenges should be dropped as they might not lead to winning tickets.
 Therefore, the sender of the packet also provides a hint of the expected value that a node is supposed to get from the next downstream node (as explained in the ticket section).
