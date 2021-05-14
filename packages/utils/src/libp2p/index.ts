@@ -214,10 +214,17 @@ export async function libp2pSendMessageAndExpectResponse(
   protocol: string,
   message: Uint8Array,
   opts?: DialOpts
-): Promise<Uint8Array> {
+): Promise<Uint8Array[]> {
   const r = await dial(libp2p, destination, protocol, opts)
   if (r.status === 'SUCCESS') {
-    return await pipe([message], r.resp.stream)
+    return await pipe([Buffer.from(message)], r.resp.stream, async function collect(source: AsyncIterable<any>) {
+      const vals = []
+      for await (const val of source) {
+        // Convert from BufferList to Uint8Array
+        vals.push(Uint8Array.from(val.slice()))
+      }
+      return vals
+    })
   }
   logError(r)
   throw new Error(r.status)
