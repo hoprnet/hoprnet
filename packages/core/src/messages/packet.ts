@@ -211,7 +211,19 @@ export class Packet {
     return this
   }
 
-  static async create(msg: Uint8Array, path: PeerId[], privKey: PeerId, chain: HoprCoreEthereum): Promise<Packet> {
+  static async create(
+    msg: Uint8Array,
+    path: PeerId[],
+    privKey: PeerId,
+    chain: HoprCoreEthereum,
+    ticketOpts: {
+      value: Balance
+      winProb: number
+    } = {
+      value: new Balance(new BN(TICKET_AMOUNT)),
+      winProb: TICKET_WIN_PROB
+    }
+  ): Promise<Packet> {
     const isDirectMessage = path.length === 1
     const { alpha, secrets } = generateKeyShares(path)
     const { ackChallenge, ticketChallenge } = createPoRValuesForSender(secrets[0], secrets[1])
@@ -231,7 +243,7 @@ export class Packet {
     if (isDirectMessage) {
       ticket = channel.createDummyTicket(ticketChallenge)
     } else {
-      ticket = await channel.createTicket(new Balance(new BN(TICKET_AMOUNT)), ticketChallenge, TICKET_WIN_PROB)
+      ticket = await channel.createTicket(ticketOpts.value, ticketChallenge, ticketOpts.winProb)
     }
 
     return new Packet(packet, challenge, ticket).setReadyToForward(ackChallenge)
