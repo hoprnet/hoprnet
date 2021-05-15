@@ -14,7 +14,7 @@ HOPR uses a commitment scheme to deposit values on-chain and reveal them once a 
 \subsubsection{Setup phase}
 
 Once a node engages with another node in a payment channel and locks funds within that channel, it derives a master key $comm_0$ from its private key and uses it to create an iterated commitment $comm_i$ such that for every $i \in \mathbb{N}_0$ and $i > 0$ it holds that $$ \mathsf{Open}(comm_{i}, comm_{i-1}) = \top $$
-The iterated commitment is computed as $$comm_n = hash^n(comm_0)$$ where $\mathsf{hash}$ is a preimage-resistant hash function and $comm_0$ is derived as 
+The iterated commitment is computed as $$comm_n = hash^n(comm_0)$$ where $\mathsf{hash}$ is a preimage-resistant hash function (we use keccak256 hash function which is used in Ethereum) and $comm_0$ is derived as 
 $$ comm_0 = \mathsf{hash}(privKey, chainId, contractAddr, channelId, channelEpoch)$$
 The master key is supposed to be pseudo-random such that all intermediate commitments $comm_{i}$ for $i \in \mathbb{N}_0$ and $0 < i \le n$ are indistinguishable for the ticket issuer from random numbers of the same length. This is necessary in order to ensure that the ticket issuer is unable to determine whether a ticket is a win or not when issuing the ticket. This makes it infeasible for the ticket issuer to tweak the challenge to such that it cannot be a win.
 \\~\\When dispatching a transaction that opens the payment channel, the commitment $comm_n$ is stored in the channel structure in the smart contract and the smart contract will force the ticket recipient to reveal $comm_{n-1}$ when redeeming a ticket issued in this channel.
