@@ -46,10 +46,20 @@ echo "Node 1: $NODE1 IP: $IP1, ETH: $ETH_ADDRESS1"
 echo "Node 2: $NODE2 IP: $IP2, ETH: $ETH_ADDRESS2"
 echo "Node 3: $NODE3 IP: $IP3, ETH: $ETH_ADDRESS3"
 
-echo "Query node-1"
+echo "- Query node-1"
 echo "$(run_command $IP1 'balance')"
 echo "$(run_command $IP1 'peers')"
+HOPR_ADDRESS1=$(run_command $IP1 'address')
+echo "HOPR_ADDRESS1: $HOPR_ADDRESS1"
 
+echo "- Query node-2"
+echo "$(run_command $IP2 'balance')"
+echo "$(run_command $IP2 'peers')"
+HOPR_ADDRESS2=$(run_command $IP2 'address')
+echo "HOPR_ADDRESS2: $HOPR_ADDRESS2"
+
+echo "- Node 1 ping node 2"
+run_command $IP1 "ping $HOPR_ADDRESS2"
 
 
 
