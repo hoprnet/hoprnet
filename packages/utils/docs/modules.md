@@ -74,7 +74,6 @@
 
 ### Functions
 
-- [UnAcknowledgedTickets](modules.md#unacknowledgedtickets)
 - [cacheNoArgAsyncFunction](modules.md#cachenoargasyncfunction)
 - [convertPubKeyFromB58String](modules.md#convertpubkeyfromb58string)
 - [convertPubKeyFromPeerId](modules.md#convertpubkeyfrompeerid)
@@ -127,6 +126,7 @@
 - [u8aToHex](modules.md#u8atohex)
 - [u8aToNumber](modules.md#u8atonumber)
 - [u8aXOR](modules.md#u8axor)
+- [unacknowledgedTicketKey](modules.md#unacknowledgedticketkey)
 - [validatePoRHalfKeys](modules.md#validateporhalfkeys)
 - [validatePoRHint](modules.md#validateporhint)
 - [validatePoRResponse](modules.md#validateporresponse)
@@ -190,7 +190,7 @@ ___
 | `protocol` | *string* |
 | `stream` | MuxedStream |
 
-Defined in: [libp2p/index.ts:231](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L231)
+Defined in: [libp2p/index.ts:238](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L238)
 
 ___
 
@@ -211,7 +211,7 @@ ___
 
 **Returns:** *any*
 
-Defined in: [libp2p/index.ts:232](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L232)
+Defined in: [libp2p/index.ts:239](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L239)
 
 ___
 
@@ -467,22 +467,6 @@ ___
 Defined in: [time.ts:1](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/time.ts#L1)
 
 ## Functions
-
-### UnAcknowledgedTickets
-
-▸ **UnAcknowledgedTickets**(`encodedAckChallenge`: [*HalfKeyChallenge*](classes/halfkeychallenge.md)): Uint8Array
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `encodedAckChallenge` | [*HalfKeyChallenge*](classes/halfkeychallenge.md) |
-
-**Returns:** Uint8Array
-
-Defined in: [db.ts:45](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L45)
-
-___
 
 ### cacheNoArgAsyncFunction
 
@@ -934,7 +918,7 @@ ___
 
 ### libp2pSendMessageAndExpectResponse
 
-▸ **libp2pSendMessageAndExpectResponse**(`libp2p`: LibP2P, `destination`: PeerId, `protocol`: *string*, `message`: Uint8Array, `opts?`: [*DialOpts*](modules.md#dialopts)): *Promise*<Uint8Array\>
+▸ **libp2pSendMessageAndExpectResponse**(`libp2p`: LibP2P, `destination`: PeerId, `protocol`: *string*, `message`: Uint8Array, `opts?`: [*DialOpts*](modules.md#dialopts)): *Promise*<Uint8Array[]\>
 
 #### Parameters
 
@@ -946,7 +930,7 @@ ___
 | `message` | Uint8Array |
 | `opts?` | [*DialOpts*](modules.md#dialopts) |
 
-**Returns:** *Promise*<Uint8Array\>
+**Returns:** *Promise*<Uint8Array[]\>
 
 Defined in: [libp2p/index.ts:211](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L211)
 
@@ -967,7 +951,7 @@ ___
 
 **Returns:** *void*
 
-Defined in: [libp2p/index.ts:251](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L251)
+Defined in: [libp2p/index.ts:258](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L258)
 
 ___
 
@@ -1581,6 +1565,22 @@ Apply an XOR on a list of arrays.
 **Returns:** Uint8Array
 
 Defined in: [u8a/xor.ts:7](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/xor.ts#L7)
+
+___
+
+### unacknowledgedTicketKey
+
+▸ `Const` **unacknowledgedTicketKey**(`halfKey`: [*HalfKeyChallenge*](classes/halfkeychallenge.md)): *Uint8Array*
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `halfKey` | [*HalfKeyChallenge*](classes/halfkeychallenge.md) |
+
+**Returns:** *Uint8Array*
+
+Defined in: [db.ts:27](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L27)
 
 ___
 

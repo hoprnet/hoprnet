@@ -125,7 +125,7 @@ Creates a ticket that is sent next to the packet to the last node.
 
 a ticket without any value
 
-Defined in: [core-ethereum/src/channel.ts:185](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L185)
+Defined in: [core-ethereum/src/channel.ts:186](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L186)
 
 ___
 
@@ -261,7 +261,7 @@ ___
 
 **Returns:** *Promise*<[*RedeemTicketResponse*](../modules.md#redeemticketresponse)\>
 
-Defined in: [core-ethereum/src/channel.ts:199](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L199)
+Defined in: [core-ethereum/src/channel.ts:200](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L200)
 
 ___
 
