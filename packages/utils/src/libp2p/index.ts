@@ -156,20 +156,18 @@ export async function dial(
   }
 
   // Try to get some fresh addresses from the DHT
-  let dhtAddresses: Multiaddr[]
-
+  let dhtResponse: { id: PeerId, multiaddrs: Multiaddr[] } | undefined
   try {
     // Let libp2p populate its internal peerStore with fresh addresses
-    dhtAddresses = (await libp2p._dht.findPeer(destination, { timeout: DEFAULT_DHT_QUERY_TIMEOUT })?.multiaddrs) ?? []
+    dhtResponse = await libp2p._dht.findPeer(destination, { timeout: DEFAULT_DHT_QUERY_TIMEOUT })
   } catch (err) {
     logError(`Querying the DHT for ${destination.toB58String()} failed. ${err.message}`)
-    return { status: 'E_DHT_QUERY', error: err, query: destination }
   }
 
-  const newAddresses = dhtAddresses.filter((addr) => addresses.includes(addr.toString()))
+  const newAddresses = (dhtResponse?.multiaddrs ?? []).filter((addr) => addresses.includes(addr.toString()))
 
   // Only start a dial attempt if we have received new addresses
-  if (signal.aborted || newAddresses.length > 0) {
+  if (signal.aborted || newAddresses.length == 0) {
     return { status: 'E_DIAL', error: new Error('No new addresses'), dht: true }
   }
 
