@@ -1,9 +1,8 @@
 import type Hopr from '@hoprnet/hopr-core'
-import { moveDecimalPoint, u8aEquals } from '@hoprnet/hopr-utils'
 import chalk from 'chalk'
 import { AbstractCommand } from './abstractCommand'
 import { getPaddingLength, styleValue } from './utils'
-import { PublicKey, Balance } from '@hoprnet/hopr-utils'
+import { PublicKey } from '@hoprnet/hopr-utils'
 
 export default class ListOpenChannels extends AbstractCommand {
   constructor(public node: Hopr) {
@@ -49,11 +48,11 @@ export default class ListOpenChannels extends AbstractCommand {
       },
       {
         name: 'Total Balance',
-        value: `${styleValue(totalBalance, 'number')} HOPR`
+        value: `${styleValue(totalBalance, 'number')}`
       },
       {
         name: 'My Balance',
-        value: `${styleValue(myBalance, 'number')} HOPR`
+        value: `${styleValue(myBalance, 'number')}`
       }
     ]
 
@@ -81,23 +80,20 @@ export default class ListOpenChannels extends AbstractCommand {
       // find counterpartys' peerIds
       for (const channel of channels) {
         const id = channel.getId()
-        const selfIsPartyA = u8aEquals(selfAddress.serialize(), channel.partyA.serialize())
+        const selfIsPartyA = channel.partyA.eq(selfAddress)
         const counterpartyPubKey = await this.node.getPublicKeyOf(selfIsPartyA ? channel.partyB : channel.partyA)
         // counterparty has not initialized
         if (!counterpartyPubKey) continue
 
-        const totalBalance = channel.partyABalance.toBN().add(channel.partyABalance.toBN())
-        const myBalance = moveDecimalPoint(
-          selfIsPartyA ? channel.partyABalance.toString() : totalBalance.sub(channel.partyABalance.toBN()).toString(),
-          Balance.DECIMALS * -1
-        )
+        const totalBalance = channel.totalBalance()
+        const myBalance = selfIsPartyA ? channel.partyABalance : channel.partyBBalance
         const peerId = counterpartyPubKey.toPeerId().toB58String()
 
         result.push(
           this.generateOutput({
             id: id.toHex(),
-            totalBalance: moveDecimalPoint(totalBalance.toString(), Balance.DECIMALS * -1),
-            myBalance,
+            totalBalance: totalBalance.toFormattedString(),
+            myBalance: myBalance.toFormattedString(),
             peerId,
             status: channel.status
           })

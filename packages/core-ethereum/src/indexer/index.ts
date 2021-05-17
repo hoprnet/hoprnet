@@ -329,7 +329,7 @@ class Indexer extends EventEmitter {
     const channels = await this.getChannels()
 
     if (channels.length === 0) {
-      log('no channels exist in indexer > hack')
+      log('no channels exist in indexer')
       return undefined
     }
 

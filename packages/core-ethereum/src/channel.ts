@@ -106,7 +106,7 @@ class Channel {
     const counterpartyAddress = this.counterparty.toAddress()
     const totalFund = myFund.toBN().add(counterpartyFund.toBN())
     const myBalance = await this.chain.getBalance(myAddress)
-    if (totalFund.gt(new BN(myBalance.toString()))) {
+    if (totalFund.gt(new BN(myBalance.toBN().toString()))) {
       throw Error('We do not have enough balance to fund the channel')
     }
     await this.chain.fundChannel(myAddress, counterpartyAddress, myFund, counterpartyFund)
@@ -125,7 +125,7 @@ class Channel {
     const myAddress = this.self.toAddress()
     const counterpartyAddress = this.counterparty.toAddress()
     const myBalance = await this.chain.getBalance(myAddress)
-    if (new BN(myBalance.toString()).lt(fundAmount.toBN())) {
+    if (new BN(myBalance.toBN().toString()).lt(fundAmount.toBN())) {
       throw Error('We do not have enough balance to open a channel')
     }
     await this.chain.openChannel(myAddress, counterpartyAddress, fundAmount)
@@ -163,15 +163,16 @@ class Channel {
    */
   async createTicket(amount: Balance, challenge: Challenge, winProb: number) {
     const counterpartyAddress = this.counterparty.toAddress()
-    const c = await this.getState()
+    const channelState = await this.getState()
+
     return Ticket.create(
       counterpartyAddress,
       challenge,
-      c.ticketEpochFor(this.counterparty.toAddress()),
+      channelState.ticketEpochFor(this.counterparty.toAddress()),
       new UINT256(new BN(this.index++)),
       amount,
       UINT256.fromProbability(winProb),
-      (await this.getState()).channelEpoch,
+      channelState.channelEpoch,
       this.privateKey
     )
   }

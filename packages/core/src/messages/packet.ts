@@ -28,6 +28,7 @@ import BN from 'bn.js'
 import { Acknowledgement } from './acknowledgement'
 import { blue, green } from 'chalk'
 import Debug from 'debug'
+import { TICKET_AMOUNT, TICKET_WIN_PROB } from '../constants'
 
 export const MAX_HOPS = 3 // 3 relayers and 1 destination
 
@@ -166,7 +167,7 @@ export class Packet {
   public nextChallenge: Challenge
   public ackChallenge: HalfKeyChallenge
 
-  public constructor(private packet: Uint8Array, private challenge: AcknowledgementChallenge, private ticket: Ticket) {}
+  public constructor(private packet: Uint8Array, private challenge: AcknowledgementChallenge, public ticket: Ticket) {}
 
   private setReadyToForward(ackChallenge: HalfKeyChallenge) {
     this.ackChallenge = ackChallenge
@@ -218,6 +219,9 @@ export class Packet {
     ticketOpts: {
       value: Balance
       winProb: number
+    } = {
+      value: new Balance(new BN(TICKET_AMOUNT)),
+      winProb: TICKET_WIN_PROB
     }
   ): Promise<Packet> {
     const isDirectMessage = path.length === 1
@@ -330,17 +334,24 @@ export class Packet {
       )} from ${blue(pubKeyToPeerId(this.nextHop).toB58String())}`
     )
 
-    await db.storeUnacknowledgedTickets(this.ackChallenge, unacknowledged)
+    await db.storeUnacknowledgedTicket(this.ackChallenge, unacknowledged)
   }
 
   async validateUnacknowledgedTicket(db: HoprDB, chain: HoprCoreEthereum, privKey: PeerId) {
     const previousHop = pubKeyToPeerId(this.previousHop)
     const channel = chain.getChannel(new PublicKey(privKey.pubKey.marshal()), new PublicKey(this.previousHop))
 
-    return validateUnacknowledgedTicket(privKey, '', 0, previousHop, this.ticket, channel, () =>
-      db.getTickets({
-        signer: this.previousHop
-      })
+    return validateUnacknowledgedTicket(
+      privKey,
+      TICKET_AMOUNT,
+      TICKET_WIN_PROB,
+      previousHop,
+      this.ticket,
+      channel,
+      () =>
+        db.getTickets({
+          signer: this.previousHop
+        })
     )
   }
 
