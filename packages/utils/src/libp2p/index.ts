@@ -235,13 +235,15 @@ export async function libp2pSendMessageAndExpectResponse(
  */
 export type LibP2PHandlerArgs = { connection: Connection; stream: MuxedStream; protocol: string }
 export type LibP2PHandlerFunction = (msg: Uint8Array, remotePeer: PeerId) => any
+
 function generateHandler(handlerFunction: LibP2PHandlerFunction, includeReply = false) {
   // Return a function to be consumed by Libp2p.handle()
-  return function libP2PHandler(args: LibP2PHandlerArgs) {
+  return function libP2PHandler(args: LibP2PHandlerArgs): void {
     // Create the async iterable that we will use in the pipeline
 
     if (includeReply) {
       pipe(
+        // prettier-ignore
         args.stream,
         async function* pipeToHandler(source: AsyncIterable<Uint8Array>) {
           for await (const msg of source) {
@@ -252,12 +254,16 @@ function generateHandler(handlerFunction: LibP2PHandlerFunction, includeReply = 
         args.stream
       )
     } else {
-      pipe(args.stream, async function collect(source: AsyncIterable<Uint8Array>) {
-        for await (const msg of source) {
-          // Convert from BufferList to Uint8Array
-          await handlerFunction(Uint8Array.from(msg.slice()), args.connection.remotePeer)
+      pipe(
+        // prettier-ignore
+        args.stream,
+        async function collect(source: AsyncIterable<Uint8Array>) {
+          for await (const msg of source) {
+            // Convert from BufferList to Uint8Array
+            await handlerFunction(Uint8Array.from(msg.slice()), args.connection.remotePeer)
+          }
         }
-      })
+      )
     }
   }
 }
