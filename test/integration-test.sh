@@ -81,8 +81,11 @@ echo "- Node 1 ping node 2: $(run_command $API1 "ping $HOPR_ADDRESS2")"
 
 echo "- Node 1 tickets: $(run_command $API1 'tickets')"
 
-echo "- Node 1 send 0-hop message to node 2"
-run_command $API1 "send ,$HOPR_ADDRESS2 'hello, world'"
+#echo "- Node 1 send 0-hop message to node 2"
+#run_command $API1 "send ,$HOPR_ADDRESS2 'hello, world'"
+
+echo "- Node 1 open channel to Node 2"
+run_command $API1 "open $HOPR_ADDRESS2 0.1" 
 
 echo "- Node 1 send 1 hop message to self via node 2"
 run_command $API1 "send $HOPR_ADDRESS2,$HOPR_ADDRESS1 'hello, world'"
