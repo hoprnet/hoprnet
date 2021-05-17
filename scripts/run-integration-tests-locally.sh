@@ -1,5 +1,6 @@
 #!/bin/bash
 hoprd="node packages/hoprd/lib/index.js --init --password='' --provider=ws://127.0.0.1:8545/"
+hardhat="yarn hardhat"
 
 # Funds a HOPR node with ETH + HOPR tokens
 # @param $1 - node API
@@ -30,26 +31,26 @@ trap cleanup EXIT
 
 # Running RPC
 echo "- Running hardhat local node"
-hardhat node --config packages/ethereum/hardhat.config.ts > "/tmp/$DATAFILE-rpc.txt" 2>&1 &
+$hardhat node --config packages/ethereum/hardhat.config.ts > "/tmp/$DATAFILE-rpc.txt" 2>&1 &
 PROVIDER_PID="$!"
 echo "- Hardhat node started (127.0.0.1:8545)"
 echo "- Waiting (5) seconds for hardhat node to deploy contracts"
 sleep 5
 
 echo "- Run node 1"
-API1="127.0.0.1:33001"
-DEBUG="hopr*" $hoprd --identity="/tmp/NODE1-id" --host=0.0.0.0:9091 --data="/tmp/NODE1" --rest --restPort 33001 > "/tmp/NODE1-log.txt" 2>&1 &
+API1="127.0.0.1:3301"
+DEBUG="hopr*" $hoprd --identity="/tmp/NODE1-id" --host=0.0.0.0:9091 --data="/tmp/NODE1" --rest --restPort 3301 > "/tmp/NODE1-log.txt" 2>&1 &
 NODE1_PID="$!"
 
 echo "- Run node 2"
-API2="127.0.0.1:33002"
-DEBUG="hopr*" $hoprd --identity="/tmp/NODE2-id" --host=0.0.0.0:9092 --data="/tmp/NODE2" --rest --restPort 33002 > "/tmp/NODE2-log.txt" 2>&1 &
+API2="127.0.0.1:3302"
+DEBUG="hopr*" $hoprd --identity="/tmp/NODE2-id" --host=0.0.0.0:9092 --data="/tmp/NODE2" --rest --restPort 3302 > "/tmp/NODE2-log.txt" 2>&1 &
 NODE2_PID="$!"
 
 echo "- Run node 3"
 # Run node 3
-API3="127.0.0.1:33003"
-DEBUG="hopr*" $hoprd --identity="/tmp/NODE3-id" --host=0.0.0.0:9093 --data="/tmp/NODE3" --rest --restPort 33003 > "/tmp/NODE3-log.txt" 2>&1 &
+API3="127.0.0.1:3303"
+DEBUG="hopr*" $hoprd --identity="/tmp/NODE3-id" --host=0.0.0.0:9093 --data="/tmp/NODE3" --rest --restPort 3303 > "/tmp/NODE3-log.txt" 2>&1 &
 NODE3_PID="$!"
 
 sleep 10
