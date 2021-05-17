@@ -62,7 +62,7 @@ echo "- Query node-1"
 BALANCE="$(run_command $API1 'balance')"
 ETH_BALANCE=$(echo -e "$BALANCE" | grep -c "1\ xDAI" || true)
 HOPR_BALANCE=$(echo -e "$BALANCE" | grep -c "1\ HOPR" || true)
-if [[ "$ETH_BALANCE" == "1" && "$HOPR_BALANCE" == "1" ]]; then
+if [[ "$ETH_BALANCE" != "0" && "$HOPR_BALANCE" != "0" ]]; then
   echo "- Node 1 is funded"
 else
   echo "⛔️ Node has an invalid balance:"

@@ -49,7 +49,7 @@ NODE2_PID="$!"
 echo "- Run node 3"
 # Run node 3
 API3="127.0.0.1:33003"
-DEBUG="hopr*" $hoprd --identity="/tmp/NODE2-id" --host=0.0.0.0:9093 --data="/tmp/NODE3" --rest --restPort 33003 > "/tmp/NODE3-log.txt" 2>&1 &
+DEBUG="hopr*" $hoprd --identity="/tmp/NODE3-id" --host=0.0.0.0:9093 --data="/tmp/NODE3" --rest --restPort 33003 > "/tmp/NODE3-log.txt" 2>&1 &
 NODE3_PID="$!"
 
 sleep 10
