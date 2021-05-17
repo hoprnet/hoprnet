@@ -60,12 +60,12 @@ fi
 
 echo "- Query node-1"
 BALANCE="$(run_command $API1 'balance')"
-ETH_BALANCE=$(echo -e "$BALANCE" | grep -c "1\ xDAI" || true)
-HOPR_BALANCE=$(echo -e "$BALANCE" | grep -c "1\ HOPR" || true)
-if [[ "$ETH_BALANCE" != "0" && "$HOPR_BALANCE" != "0" ]]; then
+ETH_BALANCE=$(echo -e "$BALANCE" | grep -c " xDAI" || true)
+HOPR_BALANCE=$(echo -e "$BALANCE" | grep -c " HOPR" || true)
+if [[ "$ETH_BALANCE" != "0" && "$HOPR_BALANCE" != "Hopr Balance: 0 HOPR" ]]; then
   echo "- Node 1 is funded"
 else
-  echo "⛔️ Node has an invalid balance:"
+  echo "⛔️ Node has an invalid balance: $ETH_BALANCE, $HOPR_BALANCE"
   echo -e "$BALANCE"
   exit 1
 fi
@@ -73,8 +73,7 @@ echo "$(run_command $API1 'peers')"
 HOPR_ADDRESS1=$(get_hopr_address $API1)
 echo "HOPR_ADDRESS1: $HOPR_ADDRESS1"
 
-
-HOPR_ADDRESS2=$(run_command $API2 'address')
+HOPR_ADDRESS2=$(get_hopr_address $API2)
 echo "HOPR_ADDRESS2: $HOPR_ADDRESS2"
 
 echo "- Node 1 ping node 2"
