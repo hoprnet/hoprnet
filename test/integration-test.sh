@@ -10,11 +10,35 @@ if [ -z "$NODE1" ]; then
   exit 1
 fi
 if [ -z "$NODE2" ]; then
-  echo "missing NODE1"
+  echo "missing NODE2"
   exit 1
 fi
 if [ -z "$NODE3" ]; then
-  echo "missing NODE1"
+  echo "missing NODE3"
+  exit 1
+fi
+if [ -z "$IP1" ]; then
+  echo "missing IP1"
+  exit 1
+fi
+if [ -z "$IP2" ]; then
+  echo "missing IP2"
+  exit 1
+fi
+if [ -z "$IP3" ]; then
+  echo "missing IP3"
+  exit 1
+fi
+if [ -z "$ETH_ADDRESS1" ]; then
+  echo "missing ETH_ADDRESS1"
+  exit 1
+fi
+if [ -z "$ETH_ADDRESS2" ]; then
+  echo "missing ETH_ADDRESS2"
+  exit 1
+fi
+if [ -z "$ETH_ADDRESS3" ]; then
+  echo "missing ETH_ADDRESS3"
   exit 1
 fi
 
