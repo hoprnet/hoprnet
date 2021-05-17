@@ -190,7 +190,7 @@ ___
 | `protocol` | *string* |
 | `stream` | MuxedStream |
 
-Defined in: [libp2p/index.ts:238](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L238)
+Defined in: [libp2p/index.ts:236](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L236)
 
 ___
 
@@ -211,7 +211,7 @@ ___
 
 **Returns:** *any*
 
-Defined in: [libp2p/index.ts:239](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L239)
+Defined in: [libp2p/index.ts:237](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L237)
 
 ___
 
@@ -912,7 +912,7 @@ ___
 
 **Returns:** *Promise*<void\>
 
-Defined in: [libp2p/index.ts:195](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L195)
+Defined in: [libp2p/index.ts:193](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L193)
 
 ___
 
@@ -932,7 +932,7 @@ ___
 
 **Returns:** *Promise*<Uint8Array[]\>
 
-Defined in: [libp2p/index.ts:211](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L211)
+Defined in: [libp2p/index.ts:209](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L209)
 
 ___
 
@@ -951,7 +951,7 @@ ___
 
 **Returns:** *void*
 
-Defined in: [libp2p/index.ts:258](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L258)
+Defined in: [libp2p/index.ts:266](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L266)
 
 ___
 

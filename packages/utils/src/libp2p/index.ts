@@ -156,20 +156,18 @@ export async function dial(
   }
 
   // Try to get some fresh addresses from the DHT
-  let dhtAddresses: Multiaddr[]
-
+  let dhtResponse: { id: PeerId; multiaddrs: Multiaddr[] } | undefined
   try {
     // Let libp2p populate its internal peerStore with fresh addresses
-    dhtAddresses = (await libp2p._dht.findPeer(destination, { timeout: DEFAULT_DHT_QUERY_TIMEOUT })?.multiaddrs) ?? []
+    dhtResponse = await libp2p._dht.findPeer(destination, { timeout: DEFAULT_DHT_QUERY_TIMEOUT })
   } catch (err) {
     logError(`Querying the DHT for ${destination.toB58String()} failed. ${err.message}`)
-    return { status: 'E_DHT_QUERY', error: err, query: destination }
   }
 
-  const newAddresses = dhtAddresses.filter((addr) => addresses.includes(addr.toString()))
+  const newAddresses = (dhtResponse?.multiaddrs ?? []).filter((addr) => addresses.includes(addr.toString()))
 
   // Only start a dial attempt if we have received new addresses
-  if (signal.aborted || newAddresses.length > 0) {
+  if (signal.aborted || newAddresses.length == 0) {
     return { status: 'E_DIAL', error: new Error('No new addresses'), dht: true }
   }
 
@@ -241,15 +239,25 @@ function generateHandler(handlerFunction: LibP2PHandlerFunction, includeReply = 
   // Return a function to be consumed by Libp2p.handle()
   return function libP2PHandler(args: LibP2PHandlerArgs) {
     // Create the async iterable that we will use in the pipeline
-    async function* pipeToHandler(source: AsyncIterable<Uint8Array>) {
-      for await (const msg of source) {
-        yield await handlerFunction(msg, args.connection.remotePeer)
-      }
-    }
+
     if (includeReply) {
-      pipe(args.stream, pipeToHandler, args.stream)
+      pipe(
+        args.stream,
+        async function* pipeToHandler(source: AsyncIterable<Uint8Array>) {
+          for await (const msg of source) {
+            // Convert from BufferList to Uint8Array
+            yield await handlerFunction(Uint8Array.from(msg.slice()), args.connection.remotePeer)
+          }
+        },
+        args.stream
+      )
     } else {
-      pipe(args.stream, pipeToHandler)
+      pipe(args.stream, async function collect(source: AsyncIterable<Uint8Array>) {
+        for await (const msg of source) {
+          // Convert from BufferList to Uint8Array
+          await handlerFunction(Uint8Array.from(msg.slice()), args.connection.remotePeer)
+        }
+      })
     }
   }
 }

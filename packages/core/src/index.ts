@@ -203,6 +203,12 @@ class Hopr extends EventEmitter {
       this.emit('hopr:peer:connection', conn.remotePeer)
       this.networkPeers.register(conn.remotePeer)
     })
+
+    // Feed previously announced addresses to DHT
+    for (const ma of publicNodes) {
+      this.libp2p.peerStore.addressBook.add(PeerId.createFromB58String(ma.getPeerId()), [ma])
+    }
+
     this.networkPeers = new NetworkPeers(Array.from(this.libp2p.peerStore.peers.values()).map((x) => x.id))
 
     const subscribe = (protocol: string, handler: LibP2PHandlerFunction, includeReply = false) =>
