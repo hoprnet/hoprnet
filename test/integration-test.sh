@@ -52,6 +52,16 @@ echo "$(run_command $IP1 'peers')"
 HOPR_ADDRESS1=$(run_command $IP1 'address')
 echo "HOPR_ADDRESS1: $HOPR_ADDRESS1"
 
+IS_VALID_ETH_ADDRESS=$(node -e \
+  "const ethers = require('ethers'); console.log(ethers.utils.isAddress('$ETH_ADDRESS'))")
+if [ "$IS_VALID_ETH_ADDRESS" == "true" ]; then
+  echo "✅ Node outputs a valid address: $IS_VALID_ETH_ADDRESS"
+  exit 0
+else
+  echo "⛔️ Node outputs an invalid address: $ETH_ADDRESS"
+  exit 1
+fi
+
 echo "- Query node-2"
 echo "$(run_command $IP2 'balance')"
 echo "$(run_command $IP2 'peers')"
