@@ -8,7 +8,7 @@ hardhat="yarn hardhat"
 function fund_node {
   ETH="$(curl $1/api/v1/address/hopr)"
   echo "- Funding 1 ETH and 1 HOPR to $ETH"
-  hardhat faucet --config packages/ethereum/hardhat.config.ts --address "$ETH" --network localhost --ishopraddress true
+  $hardhat faucet --config packages/ethereum/hardhat.config.ts --address "$ETH" --network localhost --ishopraddress true
   echo "- Waiting (2) seconds for node to catch-up w/balance"
   sleep 2
 }
@@ -16,7 +16,7 @@ function fund_node {
 function cleanup {
   # Cleaning up everything
   echo "Printing last 100 lines from logs"
-  tail -n 20 "/tmp/NODE1-log.txt" "/tmp/NODE2-log.txt" "/tmp/NODE3-log.txt" 
+  tail -n 40 "/tmp/NODE1-log.txt" "/tmp/NODE2-log.txt" "/tmp/NODE3-log.txt" 
   echo "Wiping databases"
   rm -rf /tmp/NODE1
   rm -rf /tmp/NODE2
