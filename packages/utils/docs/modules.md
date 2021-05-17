@@ -190,7 +190,7 @@ ___
 | `protocol` | *string* |
 | `stream` | MuxedStream |
 
-Defined in: [libp2p/index.ts:231](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L231)
+Defined in: [libp2p/index.ts:238](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L238)
 
 ___
 
@@ -211,7 +211,7 @@ ___
 
 **Returns:** *any*
 
-Defined in: [libp2p/index.ts:232](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L232)
+Defined in: [libp2p/index.ts:239](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L239)
 
 ___
 
@@ -918,7 +918,7 @@ ___
 
 ### libp2pSendMessageAndExpectResponse
 
-▸ **libp2pSendMessageAndExpectResponse**(`libp2p`: LibP2P, `destination`: PeerId, `protocol`: *string*, `message`: Uint8Array, `opts?`: [*DialOpts*](modules.md#dialopts)): *Promise*<Uint8Array\>
+▸ **libp2pSendMessageAndExpectResponse**(`libp2p`: LibP2P, `destination`: PeerId, `protocol`: *string*, `message`: Uint8Array, `opts?`: [*DialOpts*](modules.md#dialopts)): *Promise*<Uint8Array[]\>
 
 #### Parameters
 
@@ -930,7 +930,7 @@ ___
 | `message` | Uint8Array |
 | `opts?` | [*DialOpts*](modules.md#dialopts) |
 
-**Returns:** *Promise*<Uint8Array\>
+**Returns:** *Promise*<Uint8Array[]\>
 
 Defined in: [libp2p/index.ts:211](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L211)
 
@@ -951,7 +951,7 @@ ___
 
 **Returns:** *void*
 
-Defined in: [libp2p/index.ts:251](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L251)
+Defined in: [libp2p/index.ts:258](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L258)
 
 ___
 
