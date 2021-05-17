@@ -51,4 +51,3 @@ function fund_node {
 }
 
 DATAFILE=$(basename "$0")
-trap cleanup EXIT
