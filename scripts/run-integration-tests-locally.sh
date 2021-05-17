@@ -1,12 +1,17 @@
 #!/bin/bash
 
-source 'test/e2e/0_configuration.sh'
+alias hoprd="node packages/hoprd/lib/index.js --init --password=' --provider=ws://127.0.0.1:8545/"
 
-# Running RPC
-#rpc_network
-#  --provider=ws://127.0.0.1:8545/
-
-alias hoprd="node packages/hoprd/lib/index.js --init --password=''"
+# Funds a HOPR node with ETH + HOPR tokens
+# @param $1 - HOPR address for node
+# @dev Sleeps for 20 seconds after funding
+function fund_node {
+  echo "💰 Funding 1 ETH and 1 HOPR to $1"
+  hardhat faucet --config packages/ethereum/hardhat.config.ts --address "$1" --network localhost --ishopraddress true
+  echo "💰 $1 funded with 1 ETH and 1 HOPR"
+  echo "⏰ Waiting (20) seconds for node to catch-up w/balance"
+  sleep 20
+}
 
 function cleanup {
   # Cleaning up everything
@@ -23,6 +28,14 @@ function cleanup {
   test -n "$NODE3_PID" && kill "$NODE3_PID"
 }
 trap cleanup EXIT
+
+# Running RPC
+echo "⛑ Running hardhat local node"
+hardhat node --config packages/ethereum/hardhat.config.ts > "/tmp/$DATAFILE-rpc.txt" 2>&1 &
+PROVIDER_PID="$!"
+echo "⛑ Hardhat node started (127.0.0.1:8545)"
+echo "⏰ Waiting (20) seconds for hardhat node to deploy contracts"
+sleep 20
 
 echo "Run node 1"
 API1="127.0.0.1:33001"

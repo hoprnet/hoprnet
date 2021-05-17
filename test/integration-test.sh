@@ -29,18 +29,26 @@ echo "Node 1: $API1"
 echo "Node 2: $API2"
 echo "Node 3: $API3"
 
+# Validate Eth addr 1
 ETH_ADDRESS1="$(get_eth_address $API1)"
-ETH_ADDRESS2="$(get_eth_address $API2)"
-ETH_ADDRESS3="$(get_eth_address $API3)"
-
 if [ -z "$ETH_ADDRESS1" ]; then
   echo "missing ETH_ADDRESS1"
   exit 1
 fi
+IS_VALID_ETH_ADDRESS1=$(node -e \
+  "const ethers = require('ethers'); console.log(ethers.utils.isAddress('$ETH_ADDRESS1'))")
+if [ "$IS_VALID_ETH_ADDRESS1" == "false" ]; then
+  echo "⛔️ Node outputs an invalid address: $ETH_ADDRESS1"
+  exit 1
+fi
+
+ETH_ADDRESS2="$(get_eth_address $API2)"
 if [ -z "$ETH_ADDRESS2" ]; then
   echo "missing ETH_ADDRESS2"
   exit 1
 fi
+
+ETH_ADDRESS3="$(get_eth_address $API3)"
 if [ -z "$ETH_ADDRESS3" ]; then
   echo "missing ETH_ADDRESS3"
   exit 1
@@ -52,15 +60,6 @@ echo "$(run_command $API1 'peers')"
 HOPR_ADDRESS1=$(run_command $API1 'address')
 echo "HOPR_ADDRESS1: $HOPR_ADDRESS1"
 
-IS_VALID_ETH_ADDRESS=$(node -e \
-  "const ethers = require('ethers'); console.log(ethers.utils.isAddress('$ETH_ADDRESS'))")
-if [ "$IS_VALID_ETH_ADDRESS" == "true" ]; then
-  echo "✅ Node outputs a valid address: $IS_VALID_ETH_ADDRESS"
-  exit 0
-else
-  echo "⛔️ Node outputs an invalid address: $ETH_ADDRESS"
-  exit 1
-fi
 
 HOPR_ADDRESS2=$(run_command $API2 'address')
 echo "HOPR_ADDRESS2: $HOPR_ADDRESS2"
