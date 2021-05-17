@@ -69,6 +69,7 @@ else
   echo -e "$BALANCE"
   exit 1
 fi
+
 echo "$(run_command $API1 'peers')"
 HOPR_ADDRESS1=$(get_hopr_address $API1)
 echo "HOPR_ADDRESS1: $HOPR_ADDRESS1"
@@ -76,16 +77,15 @@ echo "HOPR_ADDRESS1: $HOPR_ADDRESS1"
 HOPR_ADDRESS2=$(get_hopr_address $API2)
 echo "HOPR_ADDRESS2: $HOPR_ADDRESS2"
 
-echo "- Node 1 ping node 2"
-run_command $API1 "ping $HOPR_ADDRESS2"
+echo "- Node 1 ping node 2: $(run_command $API1 "ping $HOPR_ADDRESS2")"
 
-echo "- Node 1 tickets"
-run_command $API1 "tickets"
+echo "- Node 1 tickets: $(run_command $API1 'tickets')"
 
 echo "- Node 1 send 0-hop message to node 2"
 run_command $API1 "send ,$HOPR_ADDRESS2 'hello, world'"
 
-
+echo "- Node 1 send 1 hop message to self via node 2"
+run_command $API1 "send $HOPR_ADDRESS2,$HOPR_ADDRESS1 'hello, world'"
 
 
 
