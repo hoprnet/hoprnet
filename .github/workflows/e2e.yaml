@@ -11,10 +11,6 @@ jobs:
     name: ${{ matrix.test }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    strategy:
-      fail-fast: true
-      matrix:
-        test: [1_nodes_have_valid_eth_address, 2_nodes_can_be_funded]
 
     steps:
       - uses: actions/checkout@v2
@@ -52,4 +48,4 @@ jobs:
 
       - name: Test
         shell: bash {0}
-        run: ./test/e2e/${{ matrix.test }}.sh 
+        run: ./scripts/run-integration-test-locally.sh 

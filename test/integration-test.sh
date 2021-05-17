@@ -12,6 +12,10 @@ get_eth_address(){
   echo $(curl $1/api/v1/address/eth)
 }
 
+get_hopr_address(){
+  echo $(curl $1/api/v1/address/hopr)
+}
+
 if [ -z "$API1" ]; then
   echo "missing API1"
   exit 1
@@ -55,9 +59,18 @@ if [ -z "$ETH_ADDRESS3" ]; then
 fi
 
 echo "- Query node-1"
-echo "$(run_command $API1 'balance')"
+BALANCE="$(run_command $API1 'balance')"
+ETH_BALANCE=$(echo -e "$BALANCE" | grep -c "1\ xDAI" || true)
+HOPR_BALANCE=$(echo -e "$BALANCE" | grep -c "1\ HOPR" || true)
+if [[ "$ETH_BALANCE" == "1" && "$HOPR_BALANCE" == "1" ]]; then
+  echo "- Node 1 is funded"
+else
+  echo "⛔️ Node has an invalid balance:"
+  echo -e "$BALANCE"
+  exit 1
+fi
 echo "$(run_command $API1 'peers')"
-HOPR_ADDRESS1=$(run_command $API1 'address')
+HOPR_ADDRESS1=$(get_hopr_address $API1)
 echo "HOPR_ADDRESS1: $HOPR_ADDRESS1"
 
 
