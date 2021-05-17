@@ -34,7 +34,7 @@ echo "- Running hardhat local node"
 $hardhat node --config packages/ethereum/hardhat.config.ts > "/tmp/$DATAFILE-rpc.txt" 2>&1 &
 PROVIDER_PID="$!"
 echo "- Hardhat node started (127.0.0.1:8545)"
-echo "- Waiting (5) seconds for hardhat node to deploy contracts"
+echo "- Waiting (20) seconds for hardhat node to deploy contracts"
 sleep 5
 
 echo "- Run node 1"
