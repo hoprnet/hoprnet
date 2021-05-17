@@ -239,15 +239,25 @@ function generateHandler(handlerFunction: LibP2PHandlerFunction, includeReply = 
   // Return a function to be consumed by Libp2p.handle()
   return function libP2PHandler(args: LibP2PHandlerArgs) {
     // Create the async iterable that we will use in the pipeline
-    async function* pipeToHandler(source: AsyncIterable<Uint8Array>) {
-      for await (const msg of source) {
-        yield await handlerFunction(msg, args.connection.remotePeer)
-      }
-    }
+
     if (includeReply) {
-      pipe(args.stream, pipeToHandler, args.stream)
+      pipe(
+        args.stream,
+        async function* pipeToHandler(source: AsyncIterable<Uint8Array>) {
+          for await (const msg of source) {
+            // Convert from BufferList to Uint8Array
+            yield await handlerFunction(Uint8Array.from(msg.slice()), args.connection.remotePeer)
+          }
+        },
+        args.stream
+      )
     } else {
-      pipe(args.stream, pipeToHandler)
+      pipe(args.stream, async function collect(source: AsyncIterable<Uint8Array>) {
+        for await (const msg of source) {
+          // Convert from BufferList to Uint8Array
+          await handlerFunction(Uint8Array.from(msg.slice()), args.connection.remotePeer)
+        }
+      })
     }
   }
 }

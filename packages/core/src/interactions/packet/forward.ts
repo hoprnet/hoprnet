@@ -30,7 +30,7 @@ export class PacketForwardInteraction {
   }
 
   async handlePacket(msg: Uint8Array, remotePeer: PeerId) {
-    const packet = Packet.deserialize(msg.slice(), this.privKey, remotePeer)
+    const packet = Packet.deserialize(msg, this.privKey, remotePeer)
 
     this.mixer.push(packet)
   }
