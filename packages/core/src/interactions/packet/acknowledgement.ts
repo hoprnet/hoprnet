@@ -19,25 +19,30 @@ export function subscribeToAcknowledgements(
   subscribe(PROTOCOL_ACKNOWLEDGEMENT, async function (msg: Uint8Array, remotePeer: PeerId) {
     const ackMsg = Acknowledgement.deserialize(msg, pubKey, remotePeer)
 
-    let unacknowledgedTicket: UnacknowledgedTicket
+    let unacknowledgedTicket: UnacknowledgedTicket | undefined
     try {
       unacknowledgedTicket = await db.getUnacknowledgedTicket(ackMsg.ackChallenge)
-    } catch {
-      // Could be dummy, could be error.
-      log('dropping unknown ticket')
-      return
+    } catch (err) {
+      if (!err.notFound) {
+        throw err
+      }
     }
 
-    const channel = chain.getChannel(new PublicKey(pubKey.pubKey.marshal()), new PublicKey(remotePeer.pubKey.marshal()))
+    if (unacknowledgedTicket != undefined) {
+      const channel = chain.getChannel(
+        new PublicKey(pubKey.pubKey.marshal()),
+        new PublicKey(remotePeer.pubKey.marshal())
+      )
 
-    const ackedTicket = await channel.acknowledge(unacknowledgedTicket, ackMsg.ackKeyShare)
+      const ackedTicket = await channel.acknowledge(unacknowledgedTicket, ackMsg.ackKeyShare)
 
-    if (ackedTicket === null) {
-      log(`Got a ticket that is not a win. Dropping ticket.`)
-      await db.delAcknowledgedTicket(ackedTicket.ticket.challenge)
-    } else {
-      log(`Storing winning ticket`)
-      await db.replaceUnAckWithAck(ackMsg.ackChallenge, ackedTicket)
+      if (ackedTicket === null) {
+        log(`Got a ticket that is not a win. Dropping ticket.`)
+        await db.delAcknowledgedTicket(ackedTicket.ticket.challenge)
+      } else {
+        log(`Storing winning ticket`)
+        await db.replaceUnAckWithAck(ackMsg.ackChallenge, ackedTicket)
+      }
     }
 
     onMessage(ackMsg)
