@@ -951,7 +951,7 @@ ___
 
 **Returns:** *void*
 
-Defined in: [libp2p/index.ts:256](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L256)
+Defined in: [libp2p/index.ts:266](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L266)
 
 ___
 
