@@ -15,6 +15,7 @@
 
 ### Methods
 
+- [getChallenge](unacknowledgedticket.md#getchallenge)
 - [getResponse](unacknowledgedticket.md#getresponse)
 - [serialize](unacknowledgedticket.md#serialize)
 - [verify](unacknowledgedticket.md#verify)
@@ -26,14 +27,14 @@
 
 ### constructor
 
-\+ **new UnacknowledgedTicket**(`ticket`: [*Ticket*](ticket.md), `ownKey`: [*Hash*](hash.md)): [*UnacknowledgedTicket*](unacknowledgedticket.md)
+\+ **new UnacknowledgedTicket**(`ticket`: [*Ticket*](ticket.md), `ownKey`: [*HalfKey*](halfkey.md)): [*UnacknowledgedTicket*](unacknowledgedticket.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
 | `ticket` | [*Ticket*](ticket.md) |
-| `ownKey` | [*Hash*](hash.md) |
+| `ownKey` | [*HalfKey*](halfkey.md) |
 
 **Returns:** [*UnacknowledgedTicket*](unacknowledgedticket.md)
 
@@ -43,7 +44,7 @@ Defined in: [types/unacknowledgedTicket.ts:4](https://github.com/hoprnet/hoprnet
 
 ### ownKey
 
-• `Readonly` **ownKey**: [*Hash*](hash.md)
+• `Readonly` **ownKey**: [*HalfKey*](halfkey.md)
 
 ___
 
@@ -53,17 +54,27 @@ ___
 
 ## Methods
 
+### getChallenge
+
+▸ **getChallenge**(): [*HalfKeyChallenge*](halfkeychallenge.md)
+
+**Returns:** [*HalfKeyChallenge*](halfkeychallenge.md)
+
+Defined in: [types/unacknowledgedTicket.ts:28](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/unacknowledgedTicket.ts#L28)
+
+___
+
 ### getResponse
 
-▸ **getResponse**(`acknowledgement`: [*Hash*](hash.md)): { `response`: *Uint8Array* ; `valid`: ``true``  } \| { `valid`: ``false``  }
+▸ **getResponse**(`acknowledgement`: [*HalfKey*](halfkey.md)): [*Response*](response.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `acknowledgement` | [*Hash*](hash.md) |
+| `acknowledgement` | [*HalfKey*](halfkey.md) |
 
-**Returns:** { `response`: *Uint8Array* ; `valid`: ``true``  } \| { `valid`: ``false``  }
+**Returns:** [*Response*](response.md)
 
 Defined in: [types/unacknowledgedTicket.ts:24](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/unacknowledgedTicket.ts#L24)
 
@@ -81,18 +92,18 @@ ___
 
 ### verify
 
-▸ **verify**(`signer`: [*PublicKey*](publickey.md), `acknowledgement`: [*Hash*](hash.md)): *boolean*
+▸ **verify**(`signer`: [*PublicKey*](publickey.md), `acknowledgement`: [*HalfKey*](halfkey.md)): *boolean*
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
 | `signer` | [*PublicKey*](publickey.md) |
-| `acknowledgement` | [*Hash*](hash.md) |
+| `acknowledgement` | [*HalfKey*](halfkey.md) |
 
 **Returns:** *boolean*
 
-Defined in: [types/unacknowledgedTicket.ts:28](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/unacknowledgedTicket.ts#L28)
+Defined in: [types/unacknowledgedTicket.ts:32](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/unacknowledgedTicket.ts#L32)
 
 ___
 
@@ -118,7 +129,7 @@ ___
 
 **Returns:** *number*
 
-Defined in: [types/unacknowledgedTicket.ts:35](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/unacknowledgedTicket.ts#L35)
+Defined in: [types/unacknowledgedTicket.ts:36](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/unacknowledgedTicket.ts#L36)
 
 ___
 

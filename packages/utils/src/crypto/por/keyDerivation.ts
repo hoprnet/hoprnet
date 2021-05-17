@@ -1,6 +1,7 @@
 import { expand } from 'futoin-hkdf'
 import { privateKeyVerify } from 'secp256k1'
 import { SECRET_LENGTH, HASH_ALGORITHM, HASH_LENGTH } from './constants'
+import { HalfKey } from '../../types'
 
 const HASH_KEY_OWN_KEY = 'HASH_KEY_OWN_KEY'
 const HASH_KEY_ACK_KEY = 'HASH_KEY_ACK_KEY'
@@ -12,7 +13,7 @@ const MAX_ITERATIONS = 1000
  * @param secret shared secret with the creator of the packet
  * @returns the key share
  */
-export function deriveOwnKeyShare(secret: Uint8Array) {
+export function deriveOwnKeyShare(secret: Uint8Array): HalfKey {
   if (secret.length != SECRET_LENGTH) {
     throw Error(`Invalid arguments`)
   }
@@ -27,7 +28,7 @@ export function deriveOwnKeyShare(secret: Uint8Array) {
  * @param secret shared secret with the creator of the packet
  * @returns
  */
-export function deriveAckKeyShare(secret: Uint8Array) {
+export function deriveAckKeyShare(secret: Uint8Array): HalfKey {
   if (secret.length != SECRET_LENGTH) {
     throw Error(`Invalid arguments`)
   }
@@ -49,14 +50,16 @@ export function sampleFieldElement(
   secret: Uint8Array,
   _hashKey: string,
   __fakeExpand?: (hashKey: string) => Uint8Array
-): Uint8Array {
+): HalfKey {
   let result: Uint8Array
   let done = false
   let hashKey = _hashKey
   let i = 0
 
   do {
-    result = __fakeExpand?.(hashKey) ?? expand(HASH_ALGORITHM, HASH_LENGTH, Buffer.from(secret), SECRET_LENGTH, hashKey)
+    result =
+      __fakeExpand?.(hashKey) ??
+      Uint8Array.from(expand(HASH_ALGORITHM, HASH_LENGTH, Buffer.from(secret), SECRET_LENGTH, hashKey))
 
     if (!privateKeyVerify(result)) {
       if (i == MAX_ITERATIONS) {
@@ -70,5 +73,5 @@ export function sampleFieldElement(
     }
   } while (!done)
 
-  return result
+  return new HalfKey(result)
 }

@@ -10,13 +10,19 @@
 - [AcknowledgedTicket](classes/acknowledgedticket.md)
 - [Address](classes/address.md)
 - [Balance](classes/balance.md)
+- [Challenge](classes/challenge.md)
 - [ChannelEntry](classes/channelentry.md)
+- [CurvePoint](classes/curvepoint.md)
+- [EthereumChallenge](classes/ethereumchallenge.md)
+- [HalfKey](classes/halfkey.md)
+- [HalfKeyChallenge](classes/halfkeychallenge.md)
 - [Hash](classes/hash.md)
 - [HoprDB](classes/hoprdb.md)
 - [NativeBalance](classes/nativebalance.md)
 - [PRG](classes/prg.md)
 - [PRP](classes/prp.md)
 - [PublicKey](classes/publickey.md)
+- [Response](classes/response.md)
 - [Signature](classes/signature.md)
 - [Snapshot](classes/snapshot.md)
 - [Ticket](classes/ticket.md)
@@ -72,9 +78,10 @@
 - [cacheNoArgAsyncFunction](modules.md#cachenoargasyncfunction)
 - [convertPubKeyFromB58String](modules.md#convertpubkeyfromb58string)
 - [convertPubKeyFromPeerId](modules.md#convertpubkeyfrompeerid)
-- [createFirstChallenge](modules.md#createfirstchallenge)
 - [createPacket](modules.md#createpacket)
 - [createPoRString](modules.md#createporstring)
+- [createPoRValuesForSender](modules.md#createporvaluesforsender)
+- [decodePoRBytes](modules.md#decodeporbytes)
 - [deriveAckKeyShare](modules.md#deriveackkeyshare)
 - [dial](modules.md#dial)
 - [forwardTransform](modules.md#forwardtransform)
@@ -120,7 +127,9 @@
 - [u8aToHex](modules.md#u8atohex)
 - [u8aToNumber](modules.md#u8atonumber)
 - [u8aXOR](modules.md#u8axor)
-- [validateAcknowledgement](modules.md#validateacknowledgement)
+- [validatePoRHalfKeys](modules.md#validateporhalfkeys)
+- [validatePoRHint](modules.md#validateporhint)
+- [validatePoRResponse](modules.md#validateporresponse)
 
 ## Type aliases
 
@@ -320,7 +329,7 @@ ___
 
 • `Const` **POR\_STRING\_LENGTH**: *number*
 
-Defined in: [crypto/por/index.ts:9](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L9)
+Defined in: [crypto/por/index.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L8)
 
 ___
 
@@ -461,17 +470,17 @@ Defined in: [time.ts:1](https://github.com/hoprnet/hoprnet/blob/master/packages/
 
 ### UnAcknowledgedTickets
 
-▸ **UnAcknowledgedTickets**(`encodedAckChallenge`: [*Address*](classes/address.md)): Uint8Array
+▸ **UnAcknowledgedTickets**(`encodedAckChallenge`: [*HalfKeyChallenge*](classes/halfkeychallenge.md)): Uint8Array
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `encodedAckChallenge` | [*Address*](classes/address.md) |
+| `encodedAckChallenge` | [*HalfKeyChallenge*](classes/halfkeychallenge.md) |
 
 **Returns:** Uint8Array
 
-Defined in: [db.ts:44](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L44)
+Defined in: [db.ts:45](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L45)
 
 ___
 
@@ -534,35 +543,6 @@ Defined in: [libp2p/index.ts:29](https://github.com/hoprnet/hoprnet/blob/master/
 
 ___
 
-### createFirstChallenge
-
-▸ **createFirstChallenge**(`secretB`: Uint8Array, `secretC?`: Uint8Array): *object*
-
-Takes the secrets which the first and the second relayer are able
-to derive from the packet header and computes the challenge for
-the first ticket.
-
-#### Parameters
-
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `secretB` | Uint8Array | shared secret with node +1 |
-| `secretC?` | Uint8Array | shared secret with node +2 |
-
-**Returns:** *object*
-
-| Name | Type |
-| :------ | :------ |
-| `ackChallenge` | [*PublicKey*](classes/publickey.md) |
-| `ownKey` | Uint8Array |
-| `ticketChallenge` | [*PublicKey*](classes/publickey.md) |
-
-the challenge for the first ticket sent to the first relayer
-
-Defined in: [crypto/por/index.ts:21](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L21)
-
-___
-
 ### createPacket
 
 ▸ **createPacket**(`secrets`: Uint8Array[], `alpha`: Uint8Array, `msg`: Uint8Array, `path`: PeerId[], `maxHops`: *number*, `additionalDataRelayerLength`: *number*, `additionalDataRelayer`: Uint8Array[], `additionalDataLastHop?`: Uint8Array): Uint8Array
@@ -610,13 +590,63 @@ challenge that is given to the relayer.
 the bitstring that is embedded next to the routing
 information for each relayer
 
-Defined in: [crypto/por/index.ts:47](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L47)
+Defined in: [crypto/por/index.ts:46](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L46)
+
+___
+
+### createPoRValuesForSender
+
+▸ **createPoRValuesForSender**(`secretB`: Uint8Array, `secretC?`: Uint8Array): *object*
+
+Takes the secrets which the first and the second relayer are able
+to derive from the packet header and computes the challenge for
+the first ticket.
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `secretB` | Uint8Array | shared secret with node +1 |
+| `secretC?` | Uint8Array | shared secret with node +2 |
+
+**Returns:** *object*
+
+| Name | Type |
+| :------ | :------ |
+| `ackChallenge` | [*HalfKeyChallenge*](classes/halfkeychallenge.md) |
+| `ownKey` | [*HalfKey*](classes/halfkey.md) |
+| `ticketChallenge` | [*Challenge*](classes/challenge.md) |
+
+the challenge for the first ticket sent to the first relayer
+
+Defined in: [crypto/por/index.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L20)
+
+___
+
+### decodePoRBytes
+
+▸ **decodePoRBytes**(`porBytes`: Uint8Array): *object*
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `porBytes` | Uint8Array |
+
+**Returns:** *object*
+
+| Name | Type |
+| :------ | :------ |
+| `ackChallenge` | [*HalfKeyChallenge*](classes/halfkeychallenge.md) |
+| `nextTicketChallenge` | [*Challenge*](classes/challenge.md) |
+
+Defined in: [crypto/por/index.ts:111](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L111)
 
 ___
 
 ### deriveAckKeyShare
 
-▸ **deriveAckKeyShare**(`secret`: Uint8Array): *Uint8Array*
+▸ **deriveAckKeyShare**(`secret`: Uint8Array): [*HalfKey*](classes/halfkey.md)
 
 Comutes the key share that is embedded in the acknowledgement
 for a packet and thereby unlocks the incentive for the previous
@@ -628,9 +658,9 @@ relayer for transforming and delivering the packet
 | :------ | :------ | :------ |
 | `secret` | Uint8Array | shared secret with the creator of the packet |
 
-**Returns:** *Uint8Array*
+**Returns:** [*HalfKey*](classes/halfkey.md)
 
-Defined in: [crypto/por/keyDerivation.ts:30](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/keyDerivation.ts#L30)
+Defined in: [crypto/por/keyDerivation.ts:31](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/keyDerivation.ts#L31)
 
 ___
 
@@ -1023,7 +1053,7 @@ ___
 
 ### preVerify
 
-▸ **preVerify**(`secret`: Uint8Array, `porBytes`: Uint8Array, `challenge`: [*Address*](classes/address.md)): ValidOutput \| InvalidOutput
+▸ **preVerify**(`secret`: Uint8Array, `porBytes`: Uint8Array, `challenge`: [*EthereumChallenge*](classes/ethereumchallenge.md)): ValidOutput \| InvalidOutput
 
 Verifies that an incoming packet contains all values that
 are necessary to reconstruct the response to redeem the
@@ -1035,7 +1065,7 @@ incentive for relaying the packet
 | :------ | :------ | :------ |
 | `secret` | Uint8Array | shared secret with the creator of the packet |
 | `porBytes` | Uint8Array | PoR bitstring as included within the packet |
-| `challenge` | [*Address*](classes/address.md) | ticket challenge of the incoming ticket |
+| `challenge` | [*EthereumChallenge*](classes/ethereumchallenge.md) | ticket challenge of the incoming ticket |
 
 **Returns:** ValidOutput \| InvalidOutput
 
@@ -1043,7 +1073,7 @@ whether the challenge is derivable, if yes, it returns
 the keyShare of the relayer as well as the secret that is used
 to create it and the challenge for the next relayer.
 
-Defined in: [crypto/por/index.ts:83](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L83)
+Defined in: [crypto/por/index.ts:82](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L82)
 
 ___
 
@@ -1554,27 +1584,53 @@ Defined in: [u8a/xor.ts:7](https://github.com/hoprnet/hoprnet/blob/master/packag
 
 ___
 
-### validateAcknowledgement
+### validatePoRHalfKeys
 
-▸ **validateAcknowledgement**(`ownKey`: Uint8Array \| *undefined*, `ack`: Uint8Array \| *undefined*, `challenge`: [*Address*](classes/address.md), `ownShare?`: Uint8Array, `response?`: Uint8Array): { `response`: Uint8Array ; `valid`: ``true``  } \| { `valid`: ``false``  }
-
-Takes an the second key share and reconstructs the secret
-that is necessary to redeem the incentive for relaying the
-packet.
+▸ **validatePoRHalfKeys**(`ethereumChallenge`: [*EthereumChallenge*](classes/ethereumchallenge.md), `ownKey`: [*HalfKey*](classes/halfkey.md), `ack`: [*HalfKey*](classes/halfkey.md)): *boolean*
 
 #### Parameters
 
-| Name | Type | Description |
-| :------ | :------ | :------ |
-| `ownKey` | Uint8Array \| *undefined* | key that as derived from the shared secret with the creator of the packet |
-| `ack` | Uint8Array \| *undefined* | second key share as given by the acknowledgement |
-| `challenge` | [*Address*](classes/address.md) | challenge of the ticket |
-| `ownShare?` | Uint8Array | own key share as computed from the packet |
-| `response?` | Uint8Array | - |
+| Name | Type |
+| :------ | :------ |
+| `ethereumChallenge` | [*EthereumChallenge*](classes/ethereumchallenge.md) |
+| `ownKey` | [*HalfKey*](classes/halfkey.md) |
+| `ack` | [*HalfKey*](classes/halfkey.md) |
 
-**Returns:** { `response`: Uint8Array ; `valid`: ``true``  } \| { `valid`: ``false``  }
+**Returns:** *boolean*
 
-whether the input values led to a valid response that
-can be used to redeem the incentive
+Defined in: [crypto/por/index.ts:129](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L129)
 
-Defined in: [crypto/por/index.ts:123](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L123)
+___
+
+### validatePoRHint
+
+▸ **validatePoRHint**(`ethereumChallenge`: [*EthereumChallenge*](classes/ethereumchallenge.md), `ownShare`: [*HalfKeyChallenge*](classes/halfkeychallenge.md), `ack`: [*HalfKey*](classes/halfkey.md)): *boolean*
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `ethereumChallenge` | [*EthereumChallenge*](classes/ethereumchallenge.md) |
+| `ownShare` | [*HalfKeyChallenge*](classes/halfkeychallenge.md) |
+| `ack` | [*HalfKey*](classes/halfkey.md) |
+
+**Returns:** *boolean*
+
+Defined in: [crypto/por/index.ts:139](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L139)
+
+___
+
+### validatePoRResponse
+
+▸ **validatePoRResponse**(`ethereumChallenge`: [*EthereumChallenge*](classes/ethereumchallenge.md), `response`: [*Response*](classes/response.md)): *boolean*
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `ethereumChallenge` | [*EthereumChallenge*](classes/ethereumchallenge.md) |
+| `response` | [*Response*](classes/response.md) |
+
+**Returns:** *boolean*
+
+Defined in: [crypto/por/index.ts:134](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/por/index.ts#L134)

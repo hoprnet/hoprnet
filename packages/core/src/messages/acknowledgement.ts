@@ -1,6 +1,6 @@
-import { Challenge } from './challenge'
-import { deriveAckKeyShare, SECP256K1_CONSTANTS, PublicKey, u8aSplit } from '@hoprnet/hopr-utils'
-import { ecdsaSign, ecdsaVerify, publicKeyCreate } from 'secp256k1'
+import { AcknowledgementChallenge } from './acknowledgementChallenge'
+import { SECP256K1_CONSTANTS, u8aSplit, HalfKey } from '@hoprnet/hopr-utils'
+import { ecdsaSign, ecdsaVerify } from 'secp256k1'
 import { SECRET_LENGTH, HASH_ALGORITHM } from './constants'
 import { createHash } from 'crypto'
 import type PeerId from 'peer-id'
@@ -9,20 +9,19 @@ export class Acknowledgement {
   private constructor(
     private ackSignature: Uint8Array,
     private challengeSignature: Uint8Array,
-    public ackKeyShare: Uint8Array
+    public ackKeyShare: HalfKey
   ) {}
 
   static get SIZE() {
-    return SECP256K1_CONSTANTS.SIGNATURE_LENGTH + Challenge.SIZE + SECRET_LENGTH
+    return SECP256K1_CONSTANTS.SIGNATURE_LENGTH + AcknowledgementChallenge.SIZE + SECRET_LENGTH
   }
 
-  static create(challenge: Challenge, derivedSecret: Uint8Array, privKey: PeerId) {
-    const ackKeyShare = deriveAckKeyShare(derivedSecret)
-    const toSign = Uint8Array.from([...challenge.serialize(), ...ackKeyShare])
+  static create(challenge: AcknowledgementChallenge, ackKey: HalfKey, privKey: PeerId) {
+    const toSign = Uint8Array.from([...challenge.serialize(), ...ackKey.serialize()])
 
     const signature = ecdsaSign(createHash(HASH_ALGORITHM).update(toSign).digest(), privKey.privKey.marshal())
 
-    return new Acknowledgement(signature.signature, challenge.serialize(), deriveAckKeyShare(derivedSecret))
+    return new Acknowledgement(signature.signature, challenge.serialize(), ackKey)
   }
 
   static deserialize(preArray: Uint8Array, ownPubKey: PeerId, senderPubKey: PeerId) {
@@ -37,38 +36,34 @@ export class Acknowledgement {
       arr = preArray
     }
 
-    const [ackSignature, challengeSignature, ackKeyShare] = u8aSplit(arr, [
+    const [ackSignature, challengeSignature, ackKey] = u8aSplit(arr, [
       SECP256K1_CONSTANTS.SIGNATURE_LENGTH,
       SECP256K1_CONSTANTS.SIGNATURE_LENGTH,
       SECRET_LENGTH
     ])
 
-    const challengeToVerify = createHash(HASH_ALGORITHM).update(getAckChallenge(ackKeyShare)).digest()
+    const challengeToVerify = createHash(HASH_ALGORITHM).update(new HalfKey(ackKey).toChallenge().serialize()).digest()
 
     if (!ecdsaVerify(challengeSignature, challengeToVerify, ownPubKey.pubKey.marshal())) {
       throw Error(`Challenge signature verification failed.`)
     }
 
     const ackToVerify = createHash(HASH_ALGORITHM)
-      .update(Uint8Array.from([...challengeSignature, ...ackKeyShare]))
+      .update(Uint8Array.from([...challengeSignature, ...ackKey]))
       .digest()
 
     if (!ecdsaVerify(ackSignature, ackToVerify, senderPubKey.pubKey.marshal())) {
       throw Error(`Acknowledgement signature verification failed.`)
     }
 
-    return new Acknowledgement(ackSignature, challengeSignature, ackKeyShare)
+    return new Acknowledgement(ackSignature, challengeSignature, new HalfKey(ackKey))
   }
 
   get ackChallenge() {
-    return new PublicKey(getAckChallenge(this.ackKeyShare))
+    return this.ackKeyShare.toChallenge()
   }
 
   serialize() {
-    return Uint8Array.from([...this.ackSignature, ...this.challengeSignature, ...this.ackKeyShare])
+    return Uint8Array.from([...this.ackSignature, ...this.challengeSignature, ...this.ackKeyShare.serialize()])
   }
-}
-
-function getAckChallenge(ackKeyShare: Uint8Array) {
-  return publicKeyCreate(ackKeyShare)
 }

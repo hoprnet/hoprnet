@@ -1,19 +1,19 @@
-import { u8aSplit, serializeToU8a, validateAcknowledgement } from '..'
-import { Hash, PublicKey, Ticket } from '..'
+import { u8aSplit, serializeToU8a, validatePoRHalfKeys } from '..'
+import { HalfKeyChallenge, HalfKey, PublicKey, Ticket, Response } from '.'
 
 export class UnacknowledgedTicket {
-  constructor(readonly ticket: Ticket, readonly ownKey: Hash) {}
+  constructor(readonly ticket: Ticket, readonly ownKey: HalfKey) {}
 
   static deserialize(arr: Uint8Array): UnacknowledgedTicket {
-    const components = u8aSplit(arr, [Ticket.SIZE, Hash.SIZE])
+    const components = u8aSplit(arr, [Ticket.SIZE, HalfKey.SIZE])
 
-    return new UnacknowledgedTicket(Ticket.deserialize(components[0]), new Hash(components[1]))
+    return new UnacknowledgedTicket(Ticket.deserialize(components[0]), new HalfKey(components[1]))
   }
 
   public serialize(): Uint8Array {
     return serializeToU8a([
       [this.ticket.serialize(), Ticket.SIZE],
-      [this.ownKey.serialize(), Hash.SIZE]
+      [this.ownKey.serialize(), HalfKey.SIZE]
     ])
   }
 
@@ -21,18 +21,19 @@ export class UnacknowledgedTicket {
     return this.ticket.verify(signer)
   }
 
-  public getResponse(acknowledgement: Hash) {
-    return validateAcknowledgement(this.ownKey.serialize(), acknowledgement.serialize(), this.ticket.challenge)
+  public getResponse(acknowledgement: HalfKey): Response {
+    return Response.fromHalfKeys(this.ownKey, acknowledgement)
   }
 
-  public verify(signer: PublicKey, acknowledgement: Hash): boolean {
-    return (
-      this.verifySignature(signer) &&
-      validateAcknowledgement(this.ownKey.serialize(), acknowledgement.serialize(), this.ticket.challenge).valid
-    )
+  public getChallenge(): HalfKeyChallenge {
+    return this.ownKey.toChallenge()
+  }
+
+  public verify(signer: PublicKey, acknowledgement: HalfKey): boolean {
+    return this.verifySignature(signer) && validatePoRHalfKeys(this.ticket.challenge, this.ownKey, acknowledgement)
   }
 
   static SIZE(): number {
-    return Ticket.SIZE + Hash.SIZE
+    return Ticket.SIZE + Response.SIZE
   }
 }

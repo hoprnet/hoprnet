@@ -28,19 +28,19 @@
 
 ### constructor
 
-\+ **new AcknowledgedTicket**(`ticket`: [*Ticket*](ticket.md), `response`: [*Hash*](hash.md), `preImage`: [*Hash*](hash.md)): [*AcknowledgedTicket*](acknowledgedticket.md)
+\+ **new AcknowledgedTicket**(`ticket`: [*Ticket*](ticket.md), `response`: [*Response*](response.md), `preImage`: [*Hash*](hash.md)): [*AcknowledgedTicket*](acknowledgedticket.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
 | `ticket` | [*Ticket*](ticket.md) |
-| `response` | [*Hash*](hash.md) |
+| `response` | [*Response*](response.md) |
 | `preImage` | [*Hash*](hash.md) |
 
 **Returns:** [*AcknowledgedTicket*](acknowledgedticket.md)
 
-Defined in: [types/acknowledgedTicket.ts:5](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/acknowledgedTicket.ts#L5)
+Defined in: [types/acknowledgedTicket.ts:4](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/acknowledgedTicket.ts#L4)
 
 ## Properties
 
@@ -52,7 +52,7 @@ ___
 
 ### response
 
-• `Readonly` **response**: [*Hash*](hash.md)
+• `Readonly` **response**: [*Response*](response.md)
 
 ___
 
@@ -78,7 +78,7 @@ Defined in: [types/acknowledgedTicket.ts:28](https://github.com/hoprnet/hoprnet/
 
 **Returns:** *Uint8Array*
 
-Defined in: [types/acknowledgedTicket.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/acknowledgedTicket.ts#L8)
+Defined in: [types/acknowledgedTicket.ts:7](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/acknowledgedTicket.ts#L7)
 
 ___
 
@@ -94,7 +94,7 @@ ___
 
 **Returns:** *boolean*
 
-Defined in: [types/acknowledgedTicket.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/acknowledgedTicket.ts#L16)
+Defined in: [types/acknowledgedTicket.ts:15](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/acknowledgedTicket.ts#L15)
 
 ___
 
@@ -110,4 +110,4 @@ ___
 
 **Returns:** [*AcknowledgedTicket*](acknowledgedticket.md)
 
-Defined in: [types/acknowledgedTicket.ts:23](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/acknowledgedTicket.ts#L23)
+Defined in: [types/acknowledgedTicket.ts:19](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/acknowledgedTicket.ts#L19)
