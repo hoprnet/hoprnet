@@ -74,7 +74,6 @@
 
 ### Functions
 
-- [UnAcknowledgedTickets](modules.md#unacknowledgedtickets)
 - [cacheNoArgAsyncFunction](modules.md#cachenoargasyncfunction)
 - [convertPubKeyFromB58String](modules.md#convertpubkeyfromb58string)
 - [convertPubKeyFromPeerId](modules.md#convertpubkeyfrompeerid)
@@ -127,6 +126,7 @@
 - [u8aToHex](modules.md#u8atohex)
 - [u8aToNumber](modules.md#u8atonumber)
 - [u8aXOR](modules.md#u8axor)
+- [unacknowledgedTicketKey](modules.md#unacknowledgedticketkey)
 - [validatePoRHalfKeys](modules.md#validateporhalfkeys)
 - [validatePoRHint](modules.md#validateporhint)
 - [validatePoRResponse](modules.md#validateporresponse)
@@ -467,22 +467,6 @@ ___
 Defined in: [time.ts:1](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/time.ts#L1)
 
 ## Functions
-
-### UnAcknowledgedTickets
-
-▸ **UnAcknowledgedTickets**(`encodedAckChallenge`: [*HalfKeyChallenge*](classes/halfkeychallenge.md)): Uint8Array
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `encodedAckChallenge` | [*HalfKeyChallenge*](classes/halfkeychallenge.md) |
-
-**Returns:** Uint8Array
-
-Defined in: [db.ts:45](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L45)
-
-___
 
 ### cacheNoArgAsyncFunction
 
@@ -1581,6 +1565,22 @@ Apply an XOR on a list of arrays.
 **Returns:** Uint8Array
 
 Defined in: [u8a/xor.ts:7](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/xor.ts#L7)
+
+___
+
+### unacknowledgedTicketKey
+
+▸ `Const` **unacknowledgedTicketKey**(`halfKey`: [*HalfKeyChallenge*](classes/halfkeychallenge.md)): *Uint8Array*
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `halfKey` | [*HalfKeyChallenge*](classes/halfkeychallenge.md) |
+
+**Returns:** *Uint8Array*
+
+Defined in: [db.ts:27](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L27)
 
 ___
 

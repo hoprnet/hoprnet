@@ -56,7 +56,7 @@
 
 Ƭ **ChannelStrategyNames**: ``"passive"`` \| ``"promiscuous"``
 
-Defined in: [packages/core/src/index.ts:66](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L66)
+Defined in: [packages/core/src/index.ts:68](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L68)
 
 ___
 
@@ -79,10 +79,8 @@ ___
 | `password?` | *string* |
 | `provider` | *string* |
 | `strategy?` | [*ChannelStrategyNames*](modules.md#channelstrategynames) |
-| `ticketAmount?` | *number* |
-| `ticketWinProb?` | *number* |
 
-Defined in: [packages/core/src/index.ts:68](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L68)
+Defined in: [packages/core/src/index.ts:70](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L70)
 
 ___
 

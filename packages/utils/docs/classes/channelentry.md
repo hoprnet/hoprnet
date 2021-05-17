@@ -36,6 +36,7 @@
 - [serialize](channelentry.md#serialize)
 - [ticketEpochFor](channelentry.md#ticketepochfor)
 - [ticketIndexFor](channelentry.md#ticketindexfor)
+- [totalBalance](channelentry.md#totalbalance)
 - [deserialize](channelentry.md#deserialize)
 - [fromSCEvent](channelentry.md#fromscevent)
 
@@ -176,7 +177,7 @@ Defined in: [types/channelEntry.ts:66](https://github.com/hoprnet/hoprnet/blob/m
 
 **Returns:** [*Hash*](hash.md)
 
-Defined in: [types/channelEntry.ts:144](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L144)
+Defined in: [types/channelEntry.ts:148](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L148)
 
 ___
 
@@ -212,7 +213,7 @@ ___
 
 **Returns:** [*UINT256*](uint256.md)
 
-Defined in: [types/channelEntry.ts:124](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L124)
+Defined in: [types/channelEntry.ts:128](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L128)
 
 ___
 
@@ -228,7 +229,17 @@ ___
 
 **Returns:** [*UINT256*](uint256.md)
 
-Defined in: [types/channelEntry.ts:134](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L134)
+Defined in: [types/channelEntry.ts:138](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L138)
+
+___
+
+### totalBalance
+
+▸ **totalBalance**(): [*Balance*](balance.md)
+
+**Returns:** [*Balance*](balance.md)
+
+Defined in: [types/channelEntry.ts:124](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L124)
 
 ___
 
