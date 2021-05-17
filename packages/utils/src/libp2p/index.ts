@@ -156,7 +156,7 @@ export async function dial(
   }
 
   // Try to get some fresh addresses from the DHT
-  let dhtResponse: { id: PeerId, multiaddrs: Multiaddr[] } | undefined
+  let dhtResponse: { id: PeerId; multiaddrs: Multiaddr[] } | undefined
   try {
     // Let libp2p populate its internal peerStore with fresh addresses
     dhtResponse = await libp2p._dht.findPeer(destination, { timeout: DEFAULT_DHT_QUERY_TIMEOUT })
