@@ -4,13 +4,16 @@ hardhat="yarn hardhat"
 
 # Funds a HOPR node with ETH + HOPR tokens
 # @param $1 - node API
-# @dev Sleeps for 20 seconds after funding
 function fund_node {
   ETH="$(curl $1/api/v1/address/hopr)"
+  if [ -z "$ETH" ]; then
+    echo "Can't fund node - couldn't load ETH address"
+    exit 1
+  fi
   echo "- Funding 1 ETH and 1 HOPR to $ETH"
   $hardhat faucet --config packages/ethereum/hardhat.config.ts --address "$ETH" --network localhost --ishopraddress true
   echo "- Waiting (2) seconds for node to catch-up w/balance"
-  sleep 2
+  sleep 20
 }
 
 function cleanup {
@@ -35,7 +38,7 @@ $hardhat node --config packages/ethereum/hardhat.config.ts > "/tmp/$DATAFILE-rpc
 PROVIDER_PID="$!"
 echo "- Hardhat node started (127.0.0.1:8545)"
 echo "- Waiting (20) seconds for hardhat node to deploy contracts"
-sleep 5
+sleep 20
 
 echo "- Run node 1"
 API1="127.0.0.1:3301"
@@ -53,7 +56,8 @@ API3="127.0.0.1:3303"
 DEBUG="hopr*" $hoprd --identity="/tmp/NODE3-id" --host=0.0.0.0:9093 --data="/tmp/NODE3" --rest --restPort 3303 > "/tmp/NODE3-log.txt" 2>&1 &
 NODE3_PID="$!"
 
-sleep 10
+sleep 20
+
 
 fund_node $API1
 fund_node $API2
