@@ -1,3 +1,4 @@
+\begin{comment}
 \section{Event propagation}
 HOPR uses a decentralized event propagation method (blockchain indexer) to allow information to be aggregated at many points in the network and shared with other nodes. 
 This method prevents single point of failure vulnerabilities that service providers like infura or Alchemy could create. 
@@ -21,7 +22,7 @@ The nodes then publish the update independently to the DHT and allow HOPR end us
 \\~Event logs are set to: $$log_i:=h( log_{i-1}|| Open) \quad or \quad log_i:=h( log_{i-1}|| Close )$$ where $log_0:=h(0)$.
 \\~When a node receives $log_i$ from another node, the validity can be checked by recreating the hash and comparing the value with the on-chain value.
 
-
+\end{comment}
 
 
 
