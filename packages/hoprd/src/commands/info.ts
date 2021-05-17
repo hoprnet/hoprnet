@@ -19,7 +19,7 @@ export class Info extends AbstractCommand {
     return [
       `Announcing to other nodes as: ${(await this.node.getAnnouncedAddresses()).map((ma) => ma.toString())}`,
       `Listening on: ${this.node.getListeningAddresses().map((ma) => ma.toString())}`,
-      `${this.node.smartContractInfo()}`
+      `${await this.node.smartContractInfo()}`
     ].join('\n')
   }
 }
