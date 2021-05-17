@@ -61,6 +61,12 @@ echo "HOPR_ADDRESS2: $HOPR_ADDRESS2"
 echo "- Node 1 ping node 2"
 run_command $IP1 "ping $HOPR_ADDRESS2"
 
+echo "- Node 1 tickets"
+run_command $IP1 "tickets"
+
+echo "- Node 1 send 0-hop message to node 2"
+run_command $IP1 "send ,$HOPR_ADDRESS2 'hello, world'"
+
 
 
 

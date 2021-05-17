@@ -8,7 +8,8 @@ source scripts/testnet.sh
 source scripts/cleanup.sh
 
 # Get version from package.json
-RELEASE='hoprd:1.71.0-next.149' #$(node -p -e "require('./packages/hoprd/package.json').version")
+#'hoprd:1.71.0-next.149'
+RELEASE=$(node -p -e "require('./packages/hoprd/package.json').version")
 
 TESTNET_NAME="integration-test$(echo "$VERSION_MAJ_MIN" | sed 's/\./-/g')"
 TESTNET_SIZE=3
