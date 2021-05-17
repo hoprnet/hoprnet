@@ -77,8 +77,15 @@ update_if_existing() {
 
 # $1 = vm name
 # $2 = docker image
+# $3 = OPTIONAL chain provider
 # NB: --run needs to be at the end or it will ignore the other arguments.
 start_testnode_vm() {
+  PROVIDER_ARG=''
+  if [ -z "$4"]; then
+    echo "using chain provider $4"
+    PROVIDER_ARG='--provider'
+
+  fi
   if [ "$(update_if_existing $1 $2)" = "no container" ]; then
     gcloud compute instances create-with-container $1 $GCLOUD_DEFAULTS \
       --create-disk name=$(disk_name $1),size=10GB,type=pd-standard,mode=rw \
@@ -94,17 +101,29 @@ start_testnode_vm() {
       --container-arg="--healthCheckHost" --container-arg="0.0.0.0" \
       --container-arg="--admin" --container-arg="true" \
       --container-arg="--adminHost" --container-arg="0.0.0.0" \
+      --container-arg="$PROVIDER_ARG" --container-arg="$3"
       --container-arg="--run" --container-arg="\"cover-traffic start;daemonize\"" \
       --container-restart-policy=always
   fi
 }
 
+# $1 = vm name
+# Run a VM with a hardhat instance
+start_chain_provider(){
+  gcloud compute instances create-with-container $1-provider $GCLOUD_DEFAULTS \
+      --create-disk name=$(disk_name $1),size=10GB,type=pd-standard,mode=rw \
+      --container-image='hopr-provider'
+
+  #hardhat node --config packages/ethereum/hardhat.config.ts
+} 
+
 # $1 network name
 # $2 docker image
 # $3 node number
+# $4 = OPTIONAL chain provider
 start_testnode() {
   local vm=$(vm_name "node-$3" $1)
-  echo "- Starting test node $vm with $2"
+  echo "- Starting test node $vm with $2 $4"
   start_testnode_vm $vm $2 $4
 }
 
@@ -128,11 +147,12 @@ add_keys() {
 # $1 network name
 # $2 number of nodes
 # $3 docker image
+# $4 = OPTIONAL chain provider
 start_testnet() {
   for i in $(seq 1 $2);
   do
     echo "Start node $i"
-    start_testnode $1 $3 $i
+    start_testnode $1 $3 $i $4
   done
   # @jose can you fix this pls.
   # add_keys scripts/keys/authorized_keys
