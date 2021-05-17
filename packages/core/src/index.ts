@@ -35,6 +35,7 @@ import {
   u8aToHex,
   DialOpts,
   HoprDB,
+  unacknowledgedTicketKey,
   libp2pSendMessageAndExpectResponse,
   libp2pSubscribe,
   libp2pSendMessage,
@@ -54,6 +55,7 @@ import { subscribeToAcknowledgements } from './interactions/packet/acknowledgeme
 import { PacketForwardInteraction } from './interactions/packet/forward'
 
 import { Packet } from './messages'
+import { TICKET_AMOUNT, TICKET_WIN_PROB } from './constants'
 
 const log = Debug(`hopr-core`)
 const verbose = Debug('hopr-core:verbose')
@@ -69,8 +71,6 @@ export type HoprOptions = {
   network: string
   provider: string
   announce?: boolean
-  ticketAmount?: number
-  ticketWinProb?: number
   dbPath?: string
   createDbIfNotExist?: boolean
   password?: string
@@ -416,17 +416,17 @@ class Hopr extends EventEmitter {
               this.getId(),
               await this.paymentChannels,
               {
-                value: new Balance(new BN(this.options.ticketAmount)),
-                winProb: this.options.ticketWinProb
+                value: new Balance(new BN(TICKET_AMOUNT)),
+                winProb: TICKET_WIN_PROB
               }
             )
           } catch (err) {
             return reject(err)
           }
 
-          let packetKey = await this.db.storeUnacknowledgedTicket(packet.ackChallenge)
+          const key = unacknowledgedTicketKey(packet.ackChallenge)
 
-          this.once('message-acknowledged:' + u8aToHex(packetKey), () => {
+          this.once('message-acknowledged:' + u8aToHex(key), () => {
             resolve()
           })
 
@@ -673,7 +673,7 @@ class Hopr extends EventEmitter {
 
       const result = await channel.redeemTicket(ackTicket)
       // TODO look at result.status and actually do something
-      await this.db.deleteAcknowledgement(ackTicket)
+      await this.db.delAcknowledgedTicket(ackTicket.ticket.challenge)
       return result
     } catch (err) {
       return {

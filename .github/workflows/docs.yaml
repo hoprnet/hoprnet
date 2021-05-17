@@ -15,11 +15,22 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
+      - name: Configure Git info
+        run: bash -x scripts/configure-git-info.sh
+
       - name: Use Node.js
         uses: actions/setup-node@v2
         with:
           node-version: 14
           registry-url: https://registry.npmjs.org/
+
+      - name: Install Yarn (only when using ACT)
+        if: env.ACT != ''
+        run: |
+          curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add -
+          echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list
+          apt update
+          apt install --no-install-recommends yarn
 
       - name: Restore cache of node modules.
         uses: actions/cache@v2
@@ -31,13 +42,13 @@ jobs:
           key: ${{ runner.os }}-lerna-${{ hashFiles('**/yarn.lock') }}
 
       - name: Install dependencies
-        if: steps.nodejs-cache.outputs.cache-hit != 'true'
         run: yarn
 
       - name: Generate docs
         run: bash -x scripts/regenerate-typedocs.sh
 
       - name: Commit docs changes
+        if: env.ACT == ''
         run: bash -x scripts/commit-and-push-all-changes.sh
         env:
           HOPR_GIT_MSG: "Re-generate API docs for packages"

@@ -4,8 +4,22 @@ import { EventEmitter } from 'events'
 import BN from 'bn.js'
 
 import { subscribeToAcknowledgements, sendAcknowledgement } from './acknowledgement'
-import { PublicKey, u8aEquals, Ticket, UINT256, HoprDB, Challenge, deriveAckKeyShare } from '@hoprnet/hopr-utils'
-import { Balance, createPoRValuesForSender } from '@hoprnet/hopr-utils'
+import {
+  PublicKey,
+  Ticket,
+  UINT256,
+  HoprDB,
+  Challenge,
+  deriveAckKeyShare,
+  UnacknowledgedTicket,
+  HalfKey,
+  AcknowledgedTicket,
+  Response,
+  Balance,
+  createPoRValuesForSender,
+  Hash,
+  u8aEquals
+} from '@hoprnet/hopr-utils'
 
 import { AcknowledgementChallenge, Packet } from '../../messages'
 import { PacketForwardInteraction } from './forward'
@@ -14,7 +28,13 @@ import Defer from 'p-defer'
 const SECRET_LENGTH = 32
 
 function createFakeChain(privKey: PeerId) {
-  const acknowledge = () => {}
+  const acknowledge = (unacknowledgedTicket: UnacknowledgedTicket, _ackKeyShare: HalfKey) => {
+    return new AcknowledgedTicket(
+      unacknowledgedTicket.ticket,
+      new Response(new Uint8Array({ length: Response.SIZE })),
+      new Hash(new Uint8Array({ length: Hash.SIZE }))
+    )
+  }
 
   const getChannel = (_self: PublicKey, counterparty: PublicKey) => ({
     acknowledge,
@@ -132,38 +152,11 @@ describe('packet interaction', function () {
       db
     )
 
-    // @ts-expect-error
-    const relay0Interaction = new PacketForwardInteraction(
-      libp2pRelay0.subscribe,
-      libp2pRelay0.send,
-      relay0,
-      chainRelay0 as any,
-      console.log,
-      db
-    )
-
-    // @ts-expect-error
-    const relay1Interaction = new PacketForwardInteraction(
-      libp2pRelay1.subscribe,
-      libp2pRelay1.send,
-      relay1,
-      chainRelay1 as any,
-      console.log,
-      db
-    )
-
-    // @ts-expect-error
-    const relay2Interaction = new PacketForwardInteraction(
-      libp2pRelay2.subscribe,
-      libp2pRelay2.send,
-      relay2,
-      chainRelay2 as any,
-      console.log,
-      db
-    )
-
-    // @ts-expect-error
-    const receiverInteraction = new PacketForwardInteraction(
+    // TODO: improve
+    new PacketForwardInteraction(libp2pRelay0.subscribe, libp2pRelay0.send, relay0, chainRelay0 as any, console.log, db)
+    new PacketForwardInteraction(libp2pRelay1.subscribe, libp2pRelay1.send, relay1, chainRelay1 as any, console.log, db)
+    new PacketForwardInteraction(libp2pRelay2.subscribe, libp2pRelay2.send, relay2, chainRelay2 as any, console.log, db)
+    new PacketForwardInteraction(
       libp2pReceiver.subscribe,
       libp2pReceiver.send,
       receiver,

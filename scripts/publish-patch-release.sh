@@ -10,7 +10,7 @@ test -z "${HOPR_GITHUB_REF:-}" && (echo "Missing environment variable HOPR_GITHU
 git pull origin "${HOPR_GITHUB_REF}"
 
 # create new version in each package, and tag in Git
-yarn lerna version patch --yes --exact --no-push --no-changelog
+npx lerna version patch --yes --exact --no-push --no-changelog
 
 # only make remote changes if running in CI
 if [ -n "${HOPR_IN_CI:-}" ]; then
@@ -18,5 +18,5 @@ if [ -n "${HOPR_IN_CI:-}" ]; then
   git push origin "${HOPR_GITHUB_REF}" --tags
 
   # publish version to npm
-  yarn lerna publish from-package --yes
+  npx lerna publish from-package --yes
 fi

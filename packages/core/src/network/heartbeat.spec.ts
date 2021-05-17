@@ -13,7 +13,7 @@ describe('unit test heartbeat', async () => {
   let peers: NetworkPeerStore
   let clock: any
 
-  let send = sinon.fake((_id: any, _proto: any, challenge: Uint8Array) => Hash.create(challenge).serialize())
+  let send = sinon.fake((_id: any, _proto: any, challenge: Uint8Array) => [Hash.create(challenge).serialize()])
   let subscribe = sinon.fake()
 
   beforeEach(async () => {
@@ -91,7 +91,7 @@ describe('unit test heartbeat', async () => {
       if (id.equals(chris.id)) {
         return Promise.reject()
       }
-      return Hash.create(challenge).serialize()
+      return [Hash.create(challenge).serialize()]
     })
 
     clock.tick(HEARTBEAT_INTERVAL * 2)

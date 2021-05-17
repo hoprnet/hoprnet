@@ -29,6 +29,9 @@ mkShell {
     ## python is required by node module bcrypto
     python3
 
+    # test Github automation
+    act
+
     # custom pkg groups
     macosPkgs
     linuxPkgs

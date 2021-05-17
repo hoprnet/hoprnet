@@ -21,7 +21,7 @@ npm_package=$(${mydir}/get-npm-package-info.sh)
 test -n "${npm_package}" && version_type="preminor" || version_type="prerelease"
 
 # create new version in each package, and tag in Git
-yarn lerna version "${version_type}" --yes --exact --no-push --no-changelog --preid next
+npx lerna version "${version_type}" --yes --exact --no-push --no-changelog --preid next
 
 # only make remote changes if running in CI
 if [ -n "${HOPR_IN_CI:-}" ]; then
@@ -29,5 +29,5 @@ if [ -n "${HOPR_IN_CI:-}" ]; then
   git push origin "${branch}" --tags
 
   # publish version to npm
-  yarn lerna publish from-package --yes
+  npx lerna publish from-package --yes
 fi

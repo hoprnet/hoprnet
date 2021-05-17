@@ -11,7 +11,9 @@ import {
   Hash,
   UINT256,
   HalfKey,
-  Response
+  Response,
+  HalfKeyChallenge,
+  ChannelEntry
 } from './types'
 import BN from 'bn.js'
 
@@ -27,6 +29,11 @@ function createMockedTicket() {
     randomBytes(32)
   )
 }
+
+function createMockedChannelEntry() {
+  return ChannelEntry.deserialize(new Uint8Array({ length: ChannelEntry.SIZE }).fill(1))
+}
+
 describe(`database tests`, function () {
   let db: HoprDB
 
@@ -50,33 +57,27 @@ describe(`database tests`, function () {
   })
 
   it('ticket workflow', async function () {
-    const keyChallenge = new HalfKey(Uint8Array.from(randomBytes(HalfKey.SIZE))).toChallenge()
-    await db.storeUnacknowledgedTickets(
-      keyChallenge,
-      new UnacknowledgedTicket(createMockedTicket(), new HalfKey(Uint8Array.from(randomBytes(HalfKey.SIZE))))
+    // this comes from a Packet
+    const halfKeyChallenge = new HalfKeyChallenge(Uint8Array.from(randomBytes(HalfKeyChallenge.SIZE)))
+    const unAck = new UnacknowledgedTicket(
+      createMockedTicket(),
+      new HalfKey(Uint8Array.from(randomBytes(HalfKey.SIZE)))
     )
-
+    await db.storeUnacknowledgedTicket(halfKeyChallenge, unAck)
     assert((await db.getTickets()).length == 1, `DB should find one ticket`)
 
-    const ticket = await db.getUnacknowledgedTicketsByKey(keyChallenge)
+    const ticket = await db.getUnacknowledgedTicket(halfKeyChallenge)
     assert(ticket != null)
 
-    await db.replaceTicketWithAcknowledgement(
-      keyChallenge,
-      new AcknowledgedTicket(
-        ticket.ticket,
-        new Response(Uint8Array.from(randomBytes(Hash.SIZE))),
-        new Hash(Uint8Array.from(randomBytes(Hash.SIZE)))
-      )
+    const ack = new AcknowledgedTicket(
+      ticket.ticket,
+      new Response(Uint8Array.from(randomBytes(Hash.SIZE))),
+      new Hash(Uint8Array.from(randomBytes(Hash.SIZE)))
     )
+    await db.replaceUnAckWithAck(halfKeyChallenge, ack)
 
     assert((await db.getTickets()).length == 1, `DB should find one ticket`)
-
-    assert(
-      (await db.getUnacknowledgedTicketsByKey(keyChallenge)) == undefined,
-      `DB should not contain any unacknowledgedTicket`
-    )
-
+    assert((await db.getUnacknowledgedTickets()).length === 0, `DB should not contain any unacknowledgedTicket`)
     assert((await db.getAcknowledgedTickets()).length == 1, `DB should contain exactly one acknowledged ticket`)
   })
 
@@ -91,5 +92,14 @@ describe(`database tests`, function () {
     const latestBlockNumber = await db.getLatestBlockNumber()
 
     assert(blockNumber.eqn(latestBlockNumber), `block number must be updated`)
+  })
+
+  it('should store ChannelEntry', async function () {
+    const channelEntry = createMockedChannelEntry()
+
+    await db.updateChannel(channelEntry.getId(), channelEntry)
+
+    assert(!!(await db.getChannel(channelEntry.getId())), 'did not find channel')
+    assert((await db.getChannels()).length === 1, 'did not find channel')
   })
 })

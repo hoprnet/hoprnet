@@ -121,6 +121,10 @@ export class ChannelEntry {
     return generateChannelId(this.partyA, this.partyB)
   }
 
+  public totalBalance(): Balance {
+    return new Balance(this.partyABalance.toBN().add(this.partyBBalance.toBN()))
+  }
+
   public ticketEpochFor(addr: Address): UINT256 {
     if (addr.eq(this.partyA)) {
       return this.partyATicketEpoch

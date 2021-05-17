@@ -20,7 +20,7 @@ export default class Heartbeat {
       proto: string,
       msg: Uint8Array,
       opts: DialOpts
-    ) => Promise<Uint8Array>,
+    ) => Promise<Uint8Array[]>,
     private hangUp: (addr: PeerId) => Promise<void>
   ) {
     subscribe(PROTOCOL_HEARTBEAT, this.handleHeartbeatRequest.bind(this), true)
@@ -43,7 +43,7 @@ export default class Heartbeat {
         timeout: HEARTBEAT_TIMEOUT
       })
 
-      if (pingResponse == null || !u8aEquals(expectedResponse, pingResponse)) {
+      if (pingResponse == null || pingResponse.length == 0 || !u8aEquals(expectedResponse, pingResponse[0])) {
         log(`Mismatched challenge. ${pingResponse}`)
         await this.hangUp(id)
         return false
