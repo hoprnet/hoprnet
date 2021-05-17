@@ -84,7 +84,7 @@ start_testnode_vm() {
   if [ -z "$4"]; then
     echo "using chain provider $4"
     PROVIDER_ARG='--provider'
-
+    #--container-arg="$PROVIDER_ARG" --container-arg="$3"
   fi
   if [ "$(update_if_existing $1 $2)" = "no container" ]; then
     gcloud compute instances create-with-container $1 $GCLOUD_DEFAULTS \
@@ -101,7 +101,6 @@ start_testnode_vm() {
       --container-arg="--healthCheckHost" --container-arg="0.0.0.0" \
       --container-arg="--admin" --container-arg="true" \
       --container-arg="--adminHost" --container-arg="0.0.0.0" \
-      --container-arg="$PROVIDER_ARG" --container-arg="$3"
       --container-arg="--run" --container-arg="\"cover-traffic start;daemonize\"" \
       --container-restart-policy=always
   fi
