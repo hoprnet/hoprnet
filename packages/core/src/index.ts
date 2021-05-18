@@ -525,9 +525,9 @@ class Hopr extends EventEmitter {
     // exit if we already announced
     //if (account.hasAnnounced()) return
 
-    // exit if we don't have enough ETH
-    const nativeBalance = await this.getNativeBalance()
-    if (nativeBalance.toBN().lte(MIN_NATIVE_BALANCE)) return
+    if ((await this.getNativeBalance()).toBN().lte(MIN_NATIVE_BALANCE)) {
+      throw new Error('Cannot announce without funds') 
+    }
 
     const multiaddrs = await this.getAnnouncedAddresses()
     const ip4 = multiaddrs.find((s) => s.toString().includes('/ip4/'))

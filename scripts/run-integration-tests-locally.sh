@@ -75,5 +75,9 @@ fund_node $API1
 fund_node $API2
 fund_node $API3
 
+
+sleep $DELAY
+sleep $DELAY
+
 source $(realpath test/integration-test.sh)
 
