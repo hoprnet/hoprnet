@@ -49,6 +49,18 @@ function createFakeChain(privKey: PeerId) {
         new UINT256(new BN(0)),
         privKey.privKey.marshal()
       )
+    },
+    createDummyTicket: (challenge: Challenge) => {
+      return Ticket.create(
+        counterparty.toAddress(),
+        challenge,
+        new UINT256(new BN(0)),
+        new UINT256(new BN(0)),
+        new Balance(new BN(0)),
+        UINT256.fromProbability(0),
+        new UINT256(new BN(0)),
+        privKey.privKey.marshal()
+      )
     }
   })
 
