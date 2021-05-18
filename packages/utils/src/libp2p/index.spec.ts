@@ -176,7 +176,9 @@ describe(`test libp2pSendMessageAndExpectResponse`, function () {
 
     const results = await Promise.all([
       msgReceived.promise,
-      libp2pSendMessageAndExpectResponse(fakeLibp2p as any, desintation, 'demo protocol', msgToReceive, { timeout: 5000 })
+      libp2pSendMessageAndExpectResponse(fakeLibp2p as any, desintation, 'demo protocol', msgToReceive, {
+        timeout: 5000
+      })
     ])
 
     assert(u8aEquals(results[1][0], msgToReplyWith), `Replied message should match the expected value`)
