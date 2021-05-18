@@ -52,10 +52,11 @@ the challenge is given together with the routing information by the packet.
 $(A)$ creates a shared secret $s_i$ with all the relay nodes in the channel (B-C-D-Z) by using an offline version of the Diffie-Hellman key exchange. This shared key is a session key that's generated from the master DH key sphinx key.
     \\~\\ The shared secret $s_i$ is used as a seed for a PRG (Pseudo Random Generator) to create secret shares $s_i^{(0)},s_i^{(1)}$ for each node along the route.
     Relayers compute $s_i^{(0)}$ and get $s_{i+1}^{(1)}$ from the next downstream node.
-    \newline The sender $(A)$ receives $s_{1}^{(1)}$ from $(B)$ and creates $$T_{c_0}:=(s_0^{(0)}+s_{1}^{(1)})*G$$ and a hint for $(B)$ of the expected value that $(B)$ is supposed to get from the next downstream node $(C)$.
-The value “hint” or $H$ is computed as $$H_0:=s_{1}^{(1)}*G$$ where $*$ is the curve multiplication operation and $G$ is a generator of the curve (the same used in the sphinx section).
-
-
+    \newline The sender $(A)$ provides a hint to the expected value $s_{i+1}^{(1)}$ that a node $n_i$ is expected to get from the next downstream node.
+    The value “hint” or $H$ is computed as $$H_i:=s_{i+1}^{(1)}*G$$ where $*$ is the curve multiplication operation and $G$ is a generator of the curve (the same used in the sphinx section). 
+    \newline The hint for party $n_i$ is used to check whether the returned value $s_{i+1}'^{(1)}$ matches the promised value $s_{i+1}^{(1)}$ by checking whether $hint_i$ equals $s_{i+1}'^{(1)}*G$. 
+   \\The sender $(A)$ also creates a challenge $$T_{c_i}:=(s_i^{(0)}+s_{i+1}^{(1)})*G$$ 
+   It is the duty of each node to check that the response for given challenges are derivable from the given and the expected information, otherwise the node should drop the packet.
 \subsection{Ticket validation}
 Tickets are received together with packets which means that the recipient and the next downstream node share a secret $s$ whose key shares $s_i$ and $s_{i+1}$ are derivable by those nodes.
 \newline Once $(A)$ receives $s_{i+1}^{(1)}$ from (B) by the secret sharing, it can compute $$r_i:=s_i^{(0)}+s_{i+1}^{(1)}$$ where $r_i$ is the response $r$ at iteration $i$ such that it verifies
