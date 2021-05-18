@@ -29,6 +29,7 @@ import { Acknowledgement } from './acknowledgement'
 import { blue, green } from 'chalk'
 import Debug from 'debug'
 import { TICKET_AMOUNT, TICKET_WIN_PROB } from '../constants'
+import { BigNumber } from 'bignumber.js'
 
 export const MAX_HOPS = 3 // 3 relayers and 1 destination
 
@@ -47,6 +48,8 @@ export function validateCreatedTicket(myBalance: BN, ticket: Ticket) {
     )
   }
 }
+
+const TICKET_BASE_UNIT = new BN(new BigNumber(TICKET_AMOUNT).div(TICKET_WIN_PROB).toString())
 
 /**
  * Validate unacknowledged tickets as we receive them
@@ -244,7 +247,11 @@ export class Packet {
     if (isDirectMessage) {
       ticket = channel.createDummyTicket(ticketChallenge)
     } else {
-      ticket = await channel.createTicket(ticketOpts.value, ticketChallenge, ticketOpts.winProb)
+      ticket = await channel.createTicket(
+        new Balance(new BN(TICKET_BASE_UNIT).muln(path.length - 1)),
+        ticketChallenge,
+        ticketOpts.winProb
+      )
     }
 
     return new Packet(packet, challenge, ticket).setReadyToForward(ackChallenge)
@@ -379,7 +386,16 @@ export class Packet {
 
     const channel = chain.getChannel(self, nextPeer)
 
-    this.ticket = await channel.createTicket(new Balance(new BN(0)), this.nextChallenge, 0)
+    const pathPosition = this.ticket.getPathPosition(new Balance(TICKET_BASE_UNIT))
+    if (pathPosition == 1) {
+      this.ticket = channel.createDummyTicket(this.nextChallenge)
+    } else {
+      this.ticket = await channel.createTicket(
+        new Balance(TICKET_BASE_UNIT.muln(pathPosition - 1)),
+        this.nextChallenge,
+        TICKET_WIN_PROB
+      )
+    }
 
     this.challenge = AcknowledgementChallenge.create(this.ackChallenge, privKey)
 

@@ -49,10 +49,7 @@ describe('packet creation and transformation', function () {
 
     const testMsg = new TextEncoder().encode('test')
 
-    let packet = await Packet.create(testMsg, path, self, chain as any, {
-      value: new Balance(new BN(0)),
-      winProb: 1
-    })
+    let packet = await Packet.create(testMsg, path, self, chain as any)
 
     assert(packet.ackChallenge != null, `ack challenge must be set to track if message was sent`)
 
@@ -89,10 +86,7 @@ describe('packet creation and transformation', function () {
 
     const testMsg = new TextEncoder().encode('test')
 
-    let packet = await Packet.create(testMsg, path, self, chain as any, {
-      value: new Balance(new BN(0)),
-      winProb: 1
-    })
+    let packet = await Packet.create(testMsg, path, self, chain as any)
 
     assert(packet.ackChallenge != null, `ack challenge must be set to track if message was sent`)
 
@@ -129,10 +123,7 @@ describe('packet creation and transformation', function () {
 
     const testMsg = new TextEncoder().encode('test')
 
-    let packet = await Packet.create(testMsg, path, self, chain as any, {
-      value: new Balance(new BN(0)),
-      winProb: 1
-    })
+    let packet = await Packet.create(testMsg, path, self, chain as any)
 
     assert(packet.ackChallenge != null, `ack challenge must be set to track if message was sent`)
 
@@ -169,10 +160,7 @@ describe('packet creation and transformation', function () {
 
     const testMsg = new TextEncoder().encode('test')
 
-    const packet = await Packet.create(testMsg, path, self, chain as any, {
-      value: new Balance(new BN(0)),
-      winProb: 1
-    })
+    const packet = await Packet.create(testMsg, path, self, chain as any)
 
     const transformedPacket = Packet.deserialize(packet.serialize(), path[0], self)
 

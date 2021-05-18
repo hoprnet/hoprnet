@@ -53,7 +53,6 @@ import { subscribeToAcknowledgements } from './interactions/packet/acknowledgeme
 import { PacketForwardInteraction } from './interactions/packet/forward'
 
 import { Packet } from './messages'
-import { TICKET_AMOUNT, TICKET_WIN_PROB } from './constants'
 
 const log = Debug(`hopr-core`)
 const verbose = Debug('hopr-core:verbose')
@@ -417,11 +416,7 @@ class Hopr extends EventEmitter {
               msg.slice(n * PACKET_SIZE, Math.min(msg.length, (n + 1) * PACKET_SIZE)),
               path,
               this.getId(),
-              await this.paymentChannels,
-              {
-                value: new Balance(new BN(TICKET_AMOUNT)),
-                winProb: TICKET_WIN_PROB
-              }
+              await this.paymentChannels
             )
           } catch (err) {
             return reject(err)
