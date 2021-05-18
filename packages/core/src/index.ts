@@ -540,7 +540,7 @@ class Hopr extends EventEmitter {
     //if (account.hasAnnounced()) return
 
     if ((await this.getNativeBalance()).toBN().lte(MIN_NATIVE_BALANCE)) {
-      throw new Error('Cannot announce without funds') 
+      throw new Error('Cannot announce without funds')
     }
 
     const multiaddrs = await this.getAnnouncedAddresses()
