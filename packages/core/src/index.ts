@@ -32,10 +32,8 @@ import {
   ChannelEntry,
   NativeBalance,
   Hash,
-  u8aToHex,
   DialOpts,
   HoprDB,
-  unacknowledgedTicketKey,
   libp2pSendMessageAndExpectResponse,
   libp2pSubscribe,
   libp2pSendMessage,
@@ -221,7 +219,7 @@ class Hopr extends EventEmitter {
     this.heartbeat = new Heartbeat(this.networkPeers, subscribe, sendMessageAndExpectResponse, hangup)
 
     subscribeToAcknowledgements(subscribe, this.db, await this.paymentChannels, this.getId(), (ack) =>
-      this.emit('message-acknowledged:' + ack.ackChallenge)
+      this.emit('message-acknowledged:' + ack.ackChallenge.toHex())
     )
     await this.announce(this.options.announce)
 
@@ -429,9 +427,7 @@ class Hopr extends EventEmitter {
             return reject(err)
           }
 
-          const key = unacknowledgedTicketKey(packet.ackChallenge)
-
-          this.once('message-acknowledged:' + u8aToHex(key), () => {
+          this.once('message-acknowledged:' + packet.ackChallenge.toHex(), () => {
             resolve()
           })
 

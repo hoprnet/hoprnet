@@ -176,12 +176,13 @@ export class Packet {
     return this
   }
 
-  private setFinal(plaintext: Uint8Array, packetTag: Uint8Array, ackKey: HalfKey) {
+  private setFinal(plaintext: Uint8Array, packetTag: Uint8Array, ackKey: HalfKey, previousHop: Uint8Array) {
     this.packetTag = packetTag
     this.ackKey = ackKey
     this.isReceiver = true
     this.isReadyToForward = false
     this.plaintext = plaintext
+    this.previousHop = previousHop
 
     return this
   }
@@ -287,7 +288,8 @@ export class Packet {
       return new Packet(packet, challenge, ticket).setFinal(
         transformedOutput.plaintext,
         transformedOutput.packetTag,
-        ackKey
+        ackKey,
+        pubKeySender.pubKey.marshal()
       )
     }
 

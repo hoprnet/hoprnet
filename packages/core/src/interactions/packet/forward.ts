@@ -40,7 +40,6 @@ export class PacketForwardInteraction {
 
     if (packet.isReceiver) {
       this.emitMessage(packet.plaintext)
-      return
     } else {
       await packet.storeUnacknowledgedTicket(this.db)
       await packet.forwardTransform(this.privKey, this.chain)
