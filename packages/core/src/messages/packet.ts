@@ -219,14 +219,7 @@ export class Packet {
     msg: Uint8Array,
     path: PeerId[],
     privKey: PeerId,
-    chain: HoprCoreEthereum,
-    ticketOpts: {
-      value: Balance
-      winProb: number
-    } = {
-      value: new Balance(new BN(TICKET_AMOUNT)),
-      winProb: TICKET_WIN_PROB
-    }
+    chain: HoprCoreEthereum
   ): Promise<Packet> {
     const isDirectMessage = path.length === 1
     const { alpha, secrets } = generateKeyShares(path)
@@ -250,7 +243,7 @@ export class Packet {
       ticket = await channel.createTicket(
         new Balance(new BN(TICKET_BASE_UNIT).muln(path.length - 1)),
         ticketChallenge,
-        ticketOpts.winProb
+        TICKET_WIN_PROB
       )
     }
 
