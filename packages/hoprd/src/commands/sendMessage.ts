@@ -1,11 +1,11 @@
 import type Hopr from '@hoprnet/hopr-core'
-import type { AutoCompleteResult, CommandResponse } from './abstractCommand'
+import type { CommandResponse } from './abstractCommand'
 import type PeerId from 'peer-id'
 import { MAX_HOPS } from '@hoprnet/hopr-core/lib/constants'
-import { checkPeerIdInput, encodeMessage, getPeerIdsAndAliases, styleValue } from './utils'
+import { checkPeerIdInput, encodeMessage, styleValue } from './utils'
 import { AbstractCommand, GlobalState } from './abstractCommand'
 
-export abstract class SendMessageBase extends AbstractCommand {
+export class SendMessage extends AbstractCommand {
   constructor(public node: Hopr) {
     super()
   }
@@ -27,28 +27,18 @@ export abstract class SendMessageBase extends AbstractCommand {
     state: GlobalState,
     recipient: PeerId,
     rawMessage: string,
-    getIntermediateNodes?: () => Promise<PeerId[]>
+    path?: PeerId[]
   ): Promise<string | void> {
     const message = state.includeRecipient ? this.insertMyAddress(rawMessage) : rawMessage
 
     try {
-      await this.node.sendMessage(encodeMessage(message), recipient, getIntermediateNodes)
+      await this.node.sendMessage(encodeMessage(message), recipient, path)
+      return 'Message sent'
     } catch (err) {
       return styleValue(`Could not send message. (${err})`, 'failure')
     }
   }
 
-  public async autocomplete(query: string = '', line: string = '', state: GlobalState): Promise<AutoCompleteResult> {
-    const allIds = getPeerIdsAndAliases(this.node, state, {
-      returnAlias: true,
-      mustBeOnline: true
-    })
-
-    return this._autocompleteByFiltering(query, allIds, line)
-  }
-}
-
-export class SendMessage extends SendMessageBase {
   public async execute(query: string, state: GlobalState): Promise<CommandResponse> {
     try {
       let [err, peerIdString, message] = this._assertUsage(query, ['PeerId', 'Message'], /([A-Za-z0-9_,]+)\s(.*)/)
@@ -74,9 +64,7 @@ export class SendMessage extends SendMessageBase {
             path.length - 1
           )} ...`
         )
-        return this.sendMessage(state, recipient, message, async () => {
-          return path.slice(0, path.length - 1)
-        })
+        return this.sendMessage(state, recipient, message, path.slice(0, path.length - 1))
       }
 
       let peerId = await checkPeerIdInput(peerIdString, state)

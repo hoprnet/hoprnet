@@ -371,33 +371,17 @@ class Hopr extends EventEmitter {
   }
 
   /**
-   * Sends a message.
-   *
-   * @notice THIS METHOD WILL SPEND YOUR ETHER.
-   * @notice This method will fail if there are not enough funds to open
-   * the required payment channels. Please make sure that there are enough
-   * funds controlled by the given key pair.
-   *
    * @param msg message to send
    * @param destination PeerId of the destination
    * @param intermediateNodes optional set path manually
-   * the acknowledgement of the first hop
    */
-  public async sendMessage(
-    msg: Uint8Array,
-    destination: PeerId,
-    getIntermediateNodesManually?: () => Promise<PeerId[]>
-  ): Promise<void> {
+  public async sendMessage(msg: Uint8Array, destination: PeerId, intermediatePath?: PeerId[]): Promise<void> {
     const promises: Promise<void>[] = []
 
     for (let n = 0; n < msg.length / PACKET_SIZE; n++) {
       promises.push(
         new Promise<void>(async (resolve, reject) => {
-          let intermediatePath: PeerId[]
-          if (getIntermediateNodesManually != undefined) {
-            verbose('manually creating intermediatePath')
-            intermediatePath = await getIntermediateNodesManually()
-          } else {
+          if (intermediatePath == undefined) {
             try {
               intermediatePath = await this.getIntermediateNodes(destination)
             } catch (e) {

@@ -1,6 +1,6 @@
 import type Hopr from '@hoprnet/hopr-core'
 import { moveDecimalPoint } from '@hoprnet/hopr-utils'
-import { AbstractCommand, AutoCompleteResult } from './abstractCommand'
+import { AbstractCommand } from './abstractCommand'
 import { styleValue } from './utils'
 import { Balance, NativeBalance } from '@hoprnet/hopr-utils'
 
@@ -60,10 +60,6 @@ export default class Withdraw extends AbstractCommand {
 
   public help(): string {
     return 'Withdraw native or hopr to a specified recipient'
-  }
-
-  public async autocomplete(query?: string): Promise<AutoCompleteResult> {
-    return [this.arguments, query ?? '']
   }
 
   /**
