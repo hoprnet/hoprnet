@@ -98,7 +98,7 @@ const argv = yargs
   })
   .option('testAnnounceLocalAddresses', {
     boolean: true,
-    describe: "For testing local testnets. Announce local addresses.",
+    describe: 'For testing local testnets. Announce local addresses.',
     default: false
   })
   .wrap(Math.min(120, yargs.terminalWidth())).argv
