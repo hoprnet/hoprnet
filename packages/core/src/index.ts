@@ -77,7 +77,10 @@ export type HoprOptions = {
   hosts?: {
     ip4?: NetOptions
     ip6?: NetOptions
-  }
+  },
+  // You almost certainly want this to be false, this is so we can test with
+  // local testnets, and announce 127.0.0.1 addresses.
+  announceLocalAddresses?: boolean
 }
 
 export type NodeStatus = 'UNINITIALIZED' | 'INITIALIZING' | 'RUNNING' | 'DESTROYED'
@@ -350,7 +353,18 @@ class Hopr extends EventEmitter {
    */
   public async getAnnouncedAddresses(peer: PeerId = this.getId()): Promise<Multiaddr[]> {
     if (peer.equals(this.getId())) {
-      return this.libp2p.multiaddrs
+      const addrs = this.libp2p.multiaddrs
+
+      // Most of the time we want to only return 'public' addresses, that is, 
+      // addresses that have a good chance of being reachable by other nodes,
+      // therefore only ones that include a public IP etc.
+      //
+      // We also have a setting announceLocalAddresses that inverts this so we
+      // can test on closed local networks.
+      if (this.options.announceLocalAddresses) {
+        return addrs.filter(ma => ma.toString().includes('127.0.0.1')) // TODO - proper filtering
+      }
+      return addrs.filter(ma => !ma.toString().includes('127.0.0.1')) // TODO - proper filtering
     }
 
     return (await this.libp2p.peerRouting.findPeer(peer))?.multiaddrs || []
