@@ -16,18 +16,17 @@ get_hopr_address(){
   echo $(curl $1/api/v1/address/hopr)
 }
 
-if [ -z "$API1" ]; then
+validate_ip() {
+if [ -z "$1" ]; then
   echo "missing API1"
   exit 1
 fi
-if [ -z "$API2" ]; then
-  echo "missing API2"
-  exit 1
-fi
-if [ -z "$API3" ]; then
-  echo "missing API3"
-  exit 1
-fi
+
+}
+
+validate_ip $API1
+validate_ip $API2
+validate_ip $AP13
 
 echo "Node 1: $API1"
 echo "Node 2: $API2"
