@@ -375,11 +375,7 @@ class Hopr extends EventEmitter {
    * @param destination PeerId of the destination
    * @param intermediateNodes optional set path manually
    */
-  public async sendMessage(
-    msg: Uint8Array,
-    destination: PeerId,
-    intermediatePath?: PeerId[]
-  ): Promise<void> {
+  public async sendMessage(msg: Uint8Array, destination: PeerId, intermediatePath?: PeerId[]): Promise<void> {
     const promises: Promise<void>[] = []
 
     for (let n = 0; n < msg.length / PACKET_SIZE; n++) {
