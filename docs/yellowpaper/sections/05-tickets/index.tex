@@ -62,10 +62,10 @@ Tickets are received together with packets which means that the recipient and th
 \newline Once $(A)$ receives $s_{i+1}^{(1)}$ from (B) by the secret sharing, it can compute $$r_i:=s_i^{(0)}+s_{i+1}^{(1)}$$ where $r_i$ is the response $r$ at iteration $i$ such that it verifies
 $$r_i*G=T_{c_i}$$
 Once the recipient transforms the packet, it is able to compute $s_i$. The recipient is now also able to extract the routing information from the packet.
-This includes a hint to the value $s_{i+1}$ given as $$H_i=s_{i+1}*G$$ which is stored in the sphinx packet header.
+This includes a hint to the value $s_{i+1}$ given as $$H_i=s_{i+1}^{(1)}*G$$ which is stored in the sphinx packet header.
 \\The unacknowledged ticket is stored in the database under the hint to the promised value to make sure that the acknowledgement can be afterwards linked to the unacknowledged ticket.
-\newline Together with $s_i$, the node can verify that $$T_{c_i}=s_i*G+H_i$$ with $$s_i*G+H_i=s_i*G+s_{i+1}*G=(s_i+s_{i+1})*G$$
-This allows the recipient to verify that the promised value $s_{i+1}$ indeed leads to a solution of the challenge given in the ticket.
+\newline Together with $s_i^{(0)}$, the node can verify that $$T_{c_i}=s_i^{(0)}*G+H_i$$ with $$s_i^{(0)}*G+H_i=s_i^{(0)}*G+s_{i+1}^{(1)}*G=(s_i^{(0)}+s_{i+1}^{(1)})*G$$
+This allows the recipient to verify that the promised value $s_{i+1}^{(1)}$ indeed leads to a solution of the challenge given in the ticket.
 If this is not the case, then the node should drop the packet.
 \newline Without this check, the sender is able to intentionally create falsy challenges that lead to unredeemable tickets.
 
@@ -77,7 +77,7 @@ In order to unlock the ticket, the node stores it within its database until it r
 The challenge can be computed from acknowledgement as $T_{c_i}=ack_i*G$.
 \newline Once it receives an acknowledgement, it checks whether it stores an unacknowledged ticket for the received acknowledgement.
 If this is not the case, the node should drop the acknowledgement.
-\newline The node then computes the response to the challenge given in the ticket as $$r_i=(s_i+s_{i+1})*G$$
+\newline The node then computes the response to the challenge given in the ticket as $$r_i=(s_i^{(0)}+s_{i+1}^{(1)})*G$$
 Additionally, the node retrieves the opening value $open$ to the current on-chain commitment (used to verify whether a ticket is a win) and checks whether $r$, $open$ leads to a winning ticket.
 This is the case if $$h(t_h, r_i, open ) <P_w$$ where $t_h=h(t)$ is the ticket hash and $h$ is a hash function.
 If this is not the case, the node should drop the ticket.
