@@ -86,7 +86,6 @@ The final recipient of the packet does not receive a ticket because message rece
 \\ The node also checks the following:
 \begin{itemize}
     \item Challenge check $$r*G=T_{c_i}$$
-    
     \item The ticket has been already redeemed (replay protection): $$C_I <I$$ where $C_I$ is the channel index and $I$ the ticket index.
     \item Channel \textbf{exists} and is \textbf{open}. The check happens locally and not on-chain using the blockchain indexer in order not to reveal any metadata. If the node does not have a record about the channel or considers the channel to be in a state different from \textbf{open}, the ticket is dropped and the reception of the accompanying packet is rejected.
     \item Channel balance towards the ticket recipient is sufficient to cover the costs for the ticket: $$ C_b>\sigma$$ where $\sigma$ is the ticket amount and $C_b$ is the channel balance.
