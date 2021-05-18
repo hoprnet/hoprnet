@@ -18,7 +18,7 @@ get_hopr_address(){
 
 validate_ip() {
 if [ -z "$1" ]; then
-  echo "missing API1"
+  echo "missing $1"
   exit 1
 fi
 }
@@ -38,6 +38,21 @@ fi
 echo $ETH_ADDRESS
 }
 
+
+// TODO better validation
+validate_node_balance_gt0() {
+BALANCE="$(run_command $1 'balance')"
+ETH_BALANCE=$(echo -e "$BALANCE" | grep -c " xDAI" || true)
+HOPR_BALANCE=$(echo -e "$BALANCE" | grep -c " HOPR" || true)
+if [[ "$ETH_BALANCE" != "0" && "$HOPR_BALANCE" != "Hopr Balance: 0 HOPR" ]]; then
+  echo "- $1 is funded"
+else
+  echo "⛔️ $1 Node has an invalid balance: $ETH_BALANCE, $HOPR_BALANCE"
+  echo -e "$BALANCE"
+  exit 1
+fi
+}
+
 validate_ip $API1
 validate_ip $API2
 validate_ip $AP13
@@ -50,17 +65,7 @@ ETH_ADDRESS1="$(validate_node_eth_address $API1)"
 ETH_ADDRESS2="$(validate_node_eth_address $API2)"
 ETH_ADDRESS3="$(validate_node_eth_address $API3)"
 
-echo "- Query node-1"
-BALANCE="$(run_command $API1 'balance')"
-ETH_BALANCE=$(echo -e "$BALANCE" | grep -c " xDAI" || true)
-HOPR_BALANCE=$(echo -e "$BALANCE" | grep -c " HOPR" || true)
-if [[ "$ETH_BALANCE" != "0" && "$HOPR_BALANCE" != "Hopr Balance: 0 HOPR" ]]; then
-  echo "- Node 1 is funded"
-else
-  echo "⛔️ Node has an invalid balance: $ETH_BALANCE, $HOPR_BALANCE"
-  echo -e "$BALANCE"
-  exit 1
-fi
+validate_node_balance_gt0 $API1
 
 echo "$(run_command $API1 'peers')"
 HOPR_ADDRESS1=$(get_hopr_address $API1)
