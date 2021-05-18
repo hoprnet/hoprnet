@@ -62,7 +62,6 @@ export default class Withdraw extends AbstractCommand {
     return 'Withdraw native or hopr to a specified recipient'
   }
 
-
   /**
    * Withdraws native or hopr balance.
    * @notice triggered by the CLI
