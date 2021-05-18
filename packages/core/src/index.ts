@@ -460,10 +460,14 @@ class Hopr extends EventEmitter {
     }
     let start = Date.now()
     try {
-      await this.heartbeat.pingNode(destination)
-      return { latency: Date.now() - start, info: '' }
+      const success = await this.heartbeat.pingNode(destination)
+      if (success) { 
+        return { latency: Date.now() - start, info: '' }
+      } else {
+        return { info: 'failure', latency: -1 }
+      }
     } catch (e) {
-      //TODO
+      log(e)
       return { latency: -1, info: 'error' }
     }
   }

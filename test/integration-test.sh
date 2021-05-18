@@ -52,8 +52,6 @@ else
 fi
 }
 
-
-
 echo "- Running full E2E test with $API1, $API2, $API3"
 validate_ip $API1
 validate_ip $API2
