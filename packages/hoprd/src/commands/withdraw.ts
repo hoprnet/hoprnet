@@ -28,10 +28,8 @@ export default class Withdraw extends AbstractCommand {
       throw new Error(err)
     }
 
-    let currency
-    if (['NATIVE', 'HOPR'].includes(currency)) {
-      currency = currencyRaw.toUpperCase()
-    } else {
+    const currency = currencyRaw.toUpperCase() as 'NATIVE' | 'HOPR'
+    if (!['NATIVE', 'HOPR'].includes(currency)) {
       throw new Error(`Incorrect currency provided: '${currency}', correct options are: 'native', 'hopr'.`)
     }
 
