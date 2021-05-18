@@ -21,7 +21,21 @@ if [ -z "$1" ]; then
   echo "missing API1"
   exit 1
 fi
+}
 
+validate_node_eth_address() {
+ETH_ADDRESS="$(get_eth_address $1)"
+if [ -z "$ETH_ADDRESS" ]; then
+  echo "missing ETH_ADDRESS $1"
+  exit 1
+fi
+IS_VALID_ETH_ADDRESS1=$(node -e \
+  "const ethers = require('ethers'); console.log(ethers.utils.isAddress('$ETH_ADDRESS'))")
+if [ "$IS_VALID_ETH_ADDRESS" == "false" ]; then
+  echo "⛔️ Node outputs an invalid address: $ETH_ADDRESS $1"
+  exit 1
+fi
+echo $ETH_ADDRESS
 }
 
 validate_ip $API1
@@ -32,30 +46,9 @@ echo "Node 1: $API1"
 echo "Node 2: $API2"
 echo "Node 3: $API3"
 
-# Validate Eth addr 1
-ETH_ADDRESS1="$(get_eth_address $API1)"
-if [ -z "$ETH_ADDRESS1" ]; then
-  echo "missing ETH_ADDRESS1"
-  exit 1
-fi
-IS_VALID_ETH_ADDRESS1=$(node -e \
-  "const ethers = require('ethers'); console.log(ethers.utils.isAddress('$ETH_ADDRESS1'))")
-if [ "$IS_VALID_ETH_ADDRESS1" == "false" ]; then
-  echo "⛔️ Node outputs an invalid address: $ETH_ADDRESS1"
-  exit 1
-fi
-
-ETH_ADDRESS2="$(get_eth_address $API2)"
-if [ -z "$ETH_ADDRESS2" ]; then
-  echo "missing ETH_ADDRESS2"
-  exit 1
-fi
-
-ETH_ADDRESS3="$(get_eth_address $API3)"
-if [ -z "$ETH_ADDRESS3" ]; then
-  echo "missing ETH_ADDRESS3"
-  exit 1
-fi
+ETH_ADDRESS1="$(validate_node_eth_address $API1)"
+ETH_ADDRESS2="$(validate_node_eth_address $API2)"
+ETH_ADDRESS3="$(validate_node_eth_address $API3)"
 
 echo "- Query node-1"
 BALANCE="$(run_command $API1 'balance')"
