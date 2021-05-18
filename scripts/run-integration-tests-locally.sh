@@ -11,7 +11,7 @@ fi
 # Funds a HOPR node with ETH + HOPR tokens
 # @param $1 - node API
 function fund_node {
-  ETH="$(curl $1/api/v1/address/hopr)"
+  ETH="$(curl --silent $1/api/v1/address/hopr)"
   if [ -z "$ETH" ]; then
     echo "Can't fund node - couldn't load ETH address"
     exit 1
@@ -23,9 +23,13 @@ function fund_node {
 }
 
 function cleanup {
+  EXIT_CODE=$?
   # Cleaning up everything
-  echo "Printing last 100 lines from logs"
-  tail -n 100 "/tmp/NODE1-log.txt" "/tmp/NODE2-log.txt" "/tmp/NODE3-log.txt" 
+  if [ "$EXIT_CODE" != "0" ]; then 
+    echo "Exited with fail"
+    echo "Printing last 100 lines from logs"
+    tail -n 100 "/tmp/NODE1-log.txt" "/tmp/NODE2-log.txt" "/tmp/NODE3-log.txt" 
+  fi
   echo "Wiping databases"
   rm -rf /tmp/NODE1
   rm -rf /tmp/NODE2
@@ -35,6 +39,7 @@ function cleanup {
   test -n "$NODE1_PID" && kill "$NODE1_PID"
   test -n "$NODE2_PID" && kill "$NODE2_PID"
   test -n "$NODE3_PID" && kill "$NODE3_PID"
+  exit $EXIT_CODE
 }
 trap cleanup EXIT
 

@@ -1,8 +1,7 @@
 # -- Integration test --
 # We assume the existence of a test network with three nodes:
 # API1, API2 API3.
-#
-#
+
 # $1 = IP
 # $2 = Hopr command
 run_command(){
@@ -18,7 +17,7 @@ get_hopr_address(){
 
 validate_ip() {
 if [ -z "$1" ]; then
-  echo "missing $1"
+  echo "missing ip $1"
   exit 1
 fi
 }
@@ -39,7 +38,7 @@ echo $ETH_ADDRESS
 }
 
 
-// TODO better validation
+# TODO better validation
 validate_node_balance_gt0() {
 BALANCE="$(run_command $1 'balance')"
 ETH_BALANCE=$(echo -e "$BALANCE" | grep -c " xDAI" || true)
@@ -53,19 +52,20 @@ else
 fi
 }
 
+
+
+echo "- Running full E2E test with $API1, $API2, $API3"
 validate_ip $API1
 validate_ip $API2
-validate_ip $AP13
-
-echo "Node 1: $API1"
-echo "Node 2: $API2"
-echo "Node 3: $API3"
+validate_ip $API3
 
 ETH_ADDRESS1="$(validate_node_eth_address $API1)"
 ETH_ADDRESS2="$(validate_node_eth_address $API2)"
 ETH_ADDRESS3="$(validate_node_eth_address $API3)"
 
 validate_node_balance_gt0 $API1
+validate_node_balance_gt0 $API2
+echo "- Nodes are funded"
 
 echo "$(run_command $API1 'peers')"
 HOPR_ADDRESS1=$(get_hopr_address $API1)
@@ -78,8 +78,8 @@ echo "- Node 1 ping node 2: $(run_command $API1 "ping $HOPR_ADDRESS2")"
 
 echo "- Node 1 tickets: $(run_command $API1 'tickets')"
 
-#echo "- Node 1 send 0-hop message to node 2"
-#run_command $API1 "send ,$HOPR_ADDRESS2 'hello, world'"
+echo "- Node 1 send 0-hop message to node 2"
+run_command $API1 "send ,$HOPR_ADDRESS2 'hello, world'"
 
 echo "- Node 1 open channel to Node 2"
 run_command $API1 "open $HOPR_ADDRESS2 0.1" 
@@ -87,6 +87,8 @@ run_command $API1 "open $HOPR_ADDRESS2 0.1"
 echo "- Node 1 send 1 hop message to self via node 2"
 run_command $API1 "send $HOPR_ADDRESS2,$HOPR_ADDRESS1 'hello, world'"
 
+echo "- Node 2 should now have a ticket"
+run_command $API2 "tickets"
 
 
 
