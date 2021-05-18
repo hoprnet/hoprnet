@@ -4,9 +4,9 @@ HOPR incentivizes packet transformation and delivery using a mechanism called �
 This mechanism guarantees that nodes relay services are verifiable.
 \paragraph{Construction}
 \begin{itemize}
-    \item Every packet is sent together with a ticket.
+    \item Every packet is sent together with a ticket (check ticket section).
     \item Each ticket contains a challenge.
-    \item The validity of a ticket can only be checked on reception of the packet but the on-chain logic enforces a solution to the challenge stated in the ticket.
+    \item The validity of a ticket can only be checked on reception of the packet but the on-chain logic enforces a solution to the challenge stated in the ticket (check ticket section).
 \end{itemize}
 
 \subsubsection{Challenge}
@@ -19,7 +19,6 @@ $(A)$ creates a shared secret $s_i$ with all the relay nodes in the channel (B-C
    \\The sender $(A)$ also creates a challenge $T_{c_i}$ such that $$T_{c_i}:=(s_i^{(0)}+s_{i+1}^{(1)})*G$$ 
    Since “Proof-Of-Relay” is used to make the relay services of nodes verifiable, it is the duty of each node to check that given challenges are derivable from the given and the expected information.
 Packets with inappropriate challenges should be dropped as they might not lead to winning tickets.
-Therefore, the sender of the packet also provides a hint of the expected value that a node is supposed to get from the next downstream node (as explained in the ticket section).
 \begin{comment}
  \begin{figure}[H]
     \centering
