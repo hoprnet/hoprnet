@@ -136,10 +136,7 @@ describe('packet interaction', function () {
     const libp2pReceiver = createFakeSendReceive(events, receiver)
 
     const testMsg = new TextEncoder().encode('testMsg')
-    const packet = await Packet.create(testMsg, [relay0, relay1, relay2, receiver], sender, chainSender as any, {
-      value: new Balance(new BN(0)),
-      winProb: 1
-    })
+    const packet = await Packet.create(testMsg, [relay0, relay1, relay2, receiver], sender, chainSender as any)
 
     const msgDefer = Defer()
 
