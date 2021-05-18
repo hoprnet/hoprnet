@@ -215,12 +215,7 @@ export class Packet {
     return this
   }
 
-  static async create(
-    msg: Uint8Array,
-    path: PeerId[],
-    privKey: PeerId,
-    chain: HoprCoreEthereum
-  ): Promise<Packet> {
+  static async create(msg: Uint8Array, path: PeerId[], privKey: PeerId, chain: HoprCoreEthereum): Promise<Packet> {
     const isDirectMessage = path.length === 1
     const { alpha, secrets } = generateKeyShares(path)
     const { ackChallenge, ticketChallenge } = createPoRValuesForSender(secrets[0], secrets[1])
