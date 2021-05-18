@@ -176,4 +176,12 @@ export class Ticket {
 
     return luck.lte(winProb.toBN())
   }
+
+  getPathPosition(baseUnit: Balance): number {
+    if (!this.amount.toBN().mod(baseUnit.toBN()).isZero()) {
+      throw Error(`Invalid balance`)
+    }
+
+    return this.amount.toBN().div(baseUnit.toBN()).toNumber()
+  }
 }
