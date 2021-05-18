@@ -6756,9 +6756,9 @@ hard-rejection@^2.1.0:
   integrity sha512-VIZB+ibDhx7ObhAe7OVtoEbuP4h/MuOTHJ+J8h/eBXotJYl0fBgR72xDFCKgIh22OJZIOVNxBMWuhAr10r8HdA==
 
 hardhat-deploy@^0.7.0-beta.57:
-  version "0.7.5"
-  resolved "https://registry.yarnpkg.com/hardhat-deploy/-/hardhat-deploy-0.7.5.tgz#d31edcca709e9a8314efeaecb9a35792c295bc77"
-  integrity sha512-b+raIZBhrlw3lzkj7La8wyfczgxRsSWo8IHQM4STY4VUw0I/zjjeMm1naIvtGuebdrW/63ADLsucXZUZ8yVLkQ==
+  version "0.7.6"
+  resolved "https://registry.yarnpkg.com/hardhat-deploy/-/hardhat-deploy-0.7.6.tgz#66cafacfb202e8cb44dfc2f3194f2c33c08993b4"
+  integrity sha512-oyhp9B1LvKpW6mTttDQ/gyxc+IpbMQi0Q76LcAlfygD+XRF0LUKTKEkPwYktfAruRrxe8Sap87Uma6a65TLR5A==
   dependencies:
     "@ethersproject/abi" "^5.0.0"
     "@ethersproject/abstract-signer" "^5.0.0"

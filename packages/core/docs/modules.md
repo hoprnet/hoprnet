@@ -56,7 +56,7 @@
 
 Ƭ **ChannelStrategyNames**: ``"passive"`` \| ``"promiscuous"``
 
-Defined in: [packages/core/src/index.ts:68](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L68)
+Defined in: [packages/core/src/index.ts:66](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L66)
 
 ___
 
@@ -80,7 +80,7 @@ ___
 | `provider` | *string* |
 | `strategy?` | [*ChannelStrategyNames*](modules.md#channelstrategynames) |
 
-Defined in: [packages/core/src/index.ts:70](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L70)
+Defined in: [packages/core/src/index.ts:68](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L68)
 
 ___
 
@@ -88,7 +88,7 @@ ___
 
 Ƭ **NodeStatus**: ``"UNINITIALIZED"`` \| ``"INITIALIZING"`` \| ``"RUNNING"`` \| ``"DESTROYED"``
 
-Defined in: [packages/core/src/index.ts:85](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L85)
+Defined in: [packages/core/src/index.ts:83](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L83)
 
 ## Variables
 

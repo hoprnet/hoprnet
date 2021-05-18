@@ -1,3 +1,4 @@
+import type { SolcUserConfig } from 'hardhat/types'
 // load env variables
 require('dotenv').config()
 // load hardhat plugins
@@ -58,23 +59,15 @@ const hardhatConfig: HardhatUserConfig = {
     deployer: 0
   },
   solidity: {
-    compilers: [
-      {
-        version: '0.8.3'
-      },
-      {
-        version: '0.6.6'
-      },
-      {
-        version: '0.4.24'
+    compilers: ['0.8.3', '0.6.6', '0.4.24'].map<SolcUserConfig>((version) => ({
+      version,
+      settings: {
+        optimizer: {
+          enabled: true,
+          runs: 200
+        }
       }
-    ],
-    settings: {
-      optimizer: {
-        enabled: true,
-        runs: 200
-      }
-    }
+    }))
   },
   paths: {
     sources: './contracts',
