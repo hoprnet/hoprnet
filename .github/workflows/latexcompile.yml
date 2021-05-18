@@ -15,7 +15,7 @@ jobs:
         with:
           run: |
             apk add make
-            tlmgr option repository http://mirror.ctan.org/systems/texlive/tlnet
+            tlmgr option repository https://mirror.ctan.org/systems/texlive/tlnet
             tlmgr update --self
             tlmgr install preprint blindtext makecell multirow float comment
             tlmgr install algorithm2e ifoddpage relsize # add algorithm2e
