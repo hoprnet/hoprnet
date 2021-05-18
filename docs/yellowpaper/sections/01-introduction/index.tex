@@ -4,7 +4,7 @@
 \end{abstract}
 \section{Introduction}
 Internet privacy, also commonly referred to as online privacy, is a subset of data privacy and a fundamental human right. We consider privacy to revolve around control, use and disclosure of one’s personally identifiable information.
-However, our increasingly technologically-driven world puts great pressure on privacy. 
+However, our increasingly technologically-driven world puts great pressure on privacy.
 This is why several actors in the space are continuously developing different solutions to achieve anonymous communication and thus leveraging internet privacy.
 
 
@@ -22,7 +22,7 @@ Another project based on onion routing is I2P peer-to-peer network \cite{i2p}. I
 
 \end{itemize}
 I2P are vulnerable to eclipse attacks since no I2P router has a full view of the global network (similar to other peer-to-peer networks) and they also protect against only local adversaries (like Tor) and thus vulnerable to timing, intersection and traffic analysis attacks. I2P have also showed to be vulnerable to sybil and predecessor attacks inspite of the different contermeasures implemented to defeat them.
-\\~\\Mixnets are overlay networks of mix nodes that route messages anonymously similarly to Tor. First mixnet paper in 1981 by David Chaum \cite{mixnets} used a cascade topology where each node receives a batch of encrypted messages, decrypts, randomly permutes packets, and transfers them in parallel. Cascade topology makes it easy to prove the anonymity properties of a given mixnet design for a particular mix, however, it does not scale well with respect to increasing mixnet traffic and is also susceptible to traffic and active attacks. Since then, research has evolved to provide solutions with low latency while still providing high anonymity by using a method called cover traffic. Cover Traffic is designed to hide communication messages among random noise. An external adversary able to observe the message flow should not be able to discriminate communication messages from random noise messages which increases privacy. 
+\\~\\Mixnets are overlay networks of mix nodes that route messages anonymously similarly to Tor. First mixnet paper in 1981 by David Chaum \cite{mixnets} used a cascade topology where each node receives a batch of encrypted messages, decrypts, randomly permutes packets, and transfers them in parallel. Cascade topology makes it easy to prove the anonymity properties of a given mixnet design for a particular mix, however, it does not scale well with respect to increasing mixnet traffic and is also susceptible to traffic and active attacks. Since then, research has evolved to provide solutions with low latency while still providing high anonymity by using a method called cover traffic. Cover Traffic is designed to hide communication messages among random noise. An external adversary able to observe the message flow should not be able to discriminate communication messages from random noise messages which increases privacy.
 What differentiates mixnets from Tor is that mixnets are designed to provide metadata protection from global network adversaries by using cover traffic. Because mixnets add extra latency to network traffic, they are better-suited to applications that are not as sensitive to increased latency, such as messaging or email applications while applications like real-time video streaming are better suited for Tor.
 \\ One of the well known projects is Loopix \cite{loopix}. Loopix leverages cover traffic to resist traffic analysis while still achieving low- to mid-latency. To this end Loopix employs a mixing strategy that we call a Poisson Mix that is based on the independent delaying of messages, which makes the timings of packets unlinkable.
 \\~\\ The goal of each one of these projects is to acheive low latency, low bandwidth overhead and strong anonymity or as we call it the anonymity trilemma. We present in the following a comparison table (from the Loopix paper) between different anonymous communication systems.
@@ -45,12 +45,12 @@ HOPR is a decentralized incentivized mixnet that leverages privacy by design pro
     \item \textit{Privacy by design:} is an approach to systems engineering and calls for privacy to be taken into account throughout the whole engineering process. HOPR believes that the Internet is a public good – a digital commons that should be safe and secure for all its users. However, it is impossible to provide such privacy using the current Internet infrastructure. What is needed is a new privacy infrastructure on top of the existing Internet. This is what HOPR has built using the sphinx packet format and packet mixing.
     \item \textit{Decentralization:} At the heart of HOPR, there is a global, decentralised network of nodes running the HOPR protocol. Decentralisation ensures that the network is independent, with no one single entity to influence its development or manipulate outcomes to their advantage. It also makes the network resilient, able to keep running even if a majority of nodes are damaged or compromised and very difficult, if not impossible, to shut down.
     \item \textit{Incentivization:} This is biggest innovation of the HOPR design. Previous privacy technologies like Tor didn't incentivize node runners to provide service which discouraged new users to join. By incentivising users, HOPR will lower the barrier to adoption. Incentivisation also encourages good behavior as the only way to earn token rewards is to behave correctly and follow the protocol.
-    
+
 \end{itemize}
 
 
 
- 
+
 
 
 
