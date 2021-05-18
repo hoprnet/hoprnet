@@ -8,11 +8,11 @@ run_command(){
   curl --silent -X POST --data "$2" $1/api/v1/command
 }
 get_eth_address(){
-  echo $(curl $1/api/v1/address/eth)
+  echo $(curl --silent $1/api/v1/address/eth)
 }
 
 get_hopr_address(){
-  echo $(curl $1/api/v1/address/hopr)
+  echo $(curl --silent $1/api/v1/address/hopr)
 }
 
 validate_ip() {

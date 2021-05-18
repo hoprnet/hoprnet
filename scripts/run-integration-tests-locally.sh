@@ -1,5 +1,5 @@
 #!/bin/bash
-hoprd="node packages/hoprd/lib/index.js --init --password='' --provider=ws://127.0.0.1:8545/"
+hoprd="node packages/hoprd/lib/index.js --init --password='' --provider=ws://127.0.0.1:8545/ --testAnnounceLocalAddresses"
 hardhat="yarn hardhat"
 
 if [ -z "$CI" ]; then 

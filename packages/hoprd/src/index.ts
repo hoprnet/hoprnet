@@ -96,6 +96,11 @@ const argv = yargs
     describe: 'Port to listen to for admin console',
     default: 3000
   })
+  .option('testAnnounceLocalAddresses', {
+    boolean: true,
+    describe: "For testing local testnets. Announce local addresses.",
+    default: false
+  })
   .wrap(Math.min(120, yargs.terminalWidth())).argv
 
 function parseHosts(): HoprOptions['hosts'] {
@@ -121,7 +126,8 @@ async function generateNodeOptions(): Promise<HoprOptions> {
     network: argv.network,
     provider: argv.provider,
     announce: argv.announce,
-    hosts: parseHosts()
+    hosts: parseHosts(),
+    announceLocalAddresses: argv.testAnnounceLocalAddresses
   }
 
   if (argv.password !== undefined) {
