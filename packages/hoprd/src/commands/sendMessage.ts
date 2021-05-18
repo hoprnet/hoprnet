@@ -33,6 +33,7 @@ export class SendMessage extends AbstractCommand {
 
     try {
       await this.node.sendMessage(encodeMessage(message), recipient, path)
+      return 'Message sent'
     } catch (err) {
       return styleValue(`Could not send message. (${err})`, 'failure')
     }
