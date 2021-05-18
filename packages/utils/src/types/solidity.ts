@@ -1,5 +1,5 @@
 import BN from 'bn.js'
-import { constants } from 'ethers'
+// import { constants } from 'ethers'
 
 class UINT256 {
   constructor(private bn: BN) {}
@@ -21,9 +21,13 @@ class UINT256 {
   }
 
   static fromProbability(n: number): UINT256 {
-    if (n > 1) throw Error('Probability input cannot be larger than 1')
-    const percent = Math.floor(n * 100)
-    return new UINT256(new BN(constants.MaxUint256.mul(percent).div(100).toString()))
+    if (n > 1) {
+      throw Error('Probability input cannot be larger than 1')
+    }
+
+    const exponent = 10 ** n.toString().replace(/[0]{0,}\./, '').length
+
+    return new UINT256(new BN(new Uint8Array(32).fill(0xff)).muln(n * exponent).divn(exponent))
   }
 
   static get SIZE(): number {
