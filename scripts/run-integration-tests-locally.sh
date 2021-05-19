@@ -1,9 +1,5 @@
 #!/usr/bin/env bash
 
-set -o errexit
-set -o nounset
-set -o pipefail
-
 declare hoprd="node packages/hoprd/lib/index.js --init --password='' --provider=ws://127.0.0.1:8545/ --testAnnounceLocalAddresses"
 declare hardhat="yarn hardhat"
 
@@ -103,7 +99,7 @@ echo -e "\t\tlog: ${node3_log}"
 echo -e "\t\tid: ${node3_id}"
 
 
-# Check all resources we need are freen
+# Check all resources we need are free
 check_port 8545
 check_port 3301 
 check_port 3302
@@ -117,7 +113,6 @@ echo "- Running hardhat local node"
 $hardhat node --config packages/ethereum/hardhat.config.ts > "${hardhat_rpc_log}" 2>&1 &
 #HARDHAT_PID="$(lsof -i :8545 | grep 'LISTEN' | awk '{ print $2 }')"  || true # FML
 HARDHAT_PID="$!"
-wait_for_port 8545
 echo "- Hardhat node started (127.0.0.1:8545) with PID $HARDHAT_PID"
 
 echo "- Run node 1"
