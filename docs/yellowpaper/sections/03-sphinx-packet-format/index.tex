@@ -107,11 +107,16 @@ Let $S_k$ be a pseudo random function (stream cipher) which given the input $m$ 
 \subparagraph{Encryption}
 The blocks $m_l$ and $m_r$ are transformed using a 4-round Feistel structure:
 $$m_r\leftarrow m_r \oplus S_{k1}(m_l), m_l\leftarrow m_l \oplus H_{k2}(m_r), m_r\leftarrow m_r\oplus S_{k3}(m_l), m_l\leftarrow m_l\oplus H_{k4}(m_r)$$
-The updated $m_l\|m_r$ constitutes the ciphertext $c$.
+The updated $m_l\|m_r$ constitutes the ciphertext.
 \subparagraph{Decryption} The decryption happens as follow:
+$$m_l\leftarrow m_l\oplus H_{k4}(m_r), m_r\leftarrow S_{k3}(m_l), m_l\leftarrow m_l\oplus H_{k2}(m_r), m_r\leftarrow m_r\oplus S_{k1}(m_l)$$
 \subparagraph{Integrity}
 Authentication of packet integrity is done by prepending a tag set to a known value to the plaintext prior to the first encrypt operation. By virtue of the fragile nature of the SPRP function, any alteration to the encrypted payload as it traverses the network will result in an irrecoverably corrupted plaintext when the payload is decrypted by the recipient.
-
+\\The payload is encrypted using a bidirectional error propagating block cipher
+and protected with an integrity check for the receiver, but not
+for processing relays. Further, Sphinx model considers the
+receiver to not be part of the anonymization protocol. The
+receiver’s address is included in the payload.
 \begin{figure}[H]
     \centering
     \includegraphics[width=11cm,height=11cm,keepaspectratio]{../yellowpaper/images/sphinx1.png}
@@ -125,7 +130,7 @@ Within HOPR, the following cryptographic primitives were used:
     \item \textbf{Cyclic group:} The cyclic group used in the HOPR Sphinx implementation is an elliptic curve group on the secp256k1 curve and thus operations will be done on the elliptic curve.
     \item \textbf{Hash function:} BLAKE2s hash function which is a cryptographic hash function faster than SHA-2 and SHA-3, yet is at least as secure as SHA-3 and produces digests of any size between 1 and 32 bytes.
     \item \textbf{MAC:} HMAC based on a hash function BLAKE2s.
-    \item \textbf{Encryption scheme:} LIONESS \cite{lionesspaper} implementation, using BLAKE2s as a hash function and ChaCha20 as a stream cipher. We use the LIONESS PRP to implement $\pi$.
+    \item \textbf{Encryption scheme:} LIONESS \cite{lionesspaper} implementation, using BLAKE2s as a hash function and ChaCha20 as a stream cipher.
     \item \textbf{Padding:} In the original SPHINX paper, a sequence of only 0s is used for padding, this allows the last mix-node in the path to infer information about the length of the path and the last destination, hence breaking one of the security properties promised by Sphinx. In order to prevent this attack, We replace the 0-padding by a randomized padding for the last exit-mix node and always take $v=r$. This way, the exit node can't identify where the padding starts and thus won't be able to find the path length that preceeds the padding.
 \end{itemize}
 
