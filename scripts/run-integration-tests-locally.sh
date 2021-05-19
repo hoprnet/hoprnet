@@ -5,8 +5,10 @@ declare hardhat="yarn hardhat"
 
 if [ -z "${CI:-}" ]; then
   DELAY=2
+  MAX_WAITS=1000
 else
   DELAY=10
+  MAX_WAITS=10
 fi
 
 declare node1_dir node2_dir node3_dir
@@ -35,10 +37,21 @@ function check_port() {
   fi
 }
 
+# $1 = Port to wait for
+# $2 = optional file to tail for debug info
 function wait_for_port() {
+  i=0
   until [ "$(lsof -i ":$1" | grep -c "LISTEN")" -gt 0  ]; do
     echo "Waiting ($DELAY) for port $1"
+    if [ -n "$2" ]; then
+      echo "Last 5 logs:"
+      tail -n 5 $2
+    fi
     sleep $DELAY
+    ((i=i+1))
+    if [ $i -gt $MAX_WAITS ]; then
+      exit 1
+    fi
   done
 }
 
@@ -116,6 +129,7 @@ $hardhat node --config packages/ethereum/hardhat.config.ts > "${hardhat_rpc_log}
 #HARDHAT_PID="$(lsof -i :8545 | grep 'LISTEN' | awk '{ print $2 }')"  || true # FML
 HARDHAT_PID="$!"
 echo "- Hardhat node started (127.0.0.1:8545) with PID $HARDHAT_PID"
+wait_for_port 8545
 # }}}
 
 #  --- Run nodes --- {{{
@@ -124,7 +138,7 @@ declare API1="127.0.0.1:3301"
 DEBUG="hopr*" $hoprd --identity="${node1_id}" --host=0.0.0.0:9091 --data="${node1_dir}" --rest --restPort 3301 --announce > \
   "${node1_log}" 2>&1 &
 node1_pid="$!"
-wait_for_port 3301
+wait_for_port 3301 "${node1_log}"
 
 echo "- Run node 2"
 declare API2="127.0.0.1:3302"
