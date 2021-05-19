@@ -2,7 +2,7 @@ import type { HardhatRuntimeEnvironment, RunSuperFunction } from 'hardhat/types'
 import { utils } from 'ethers'
 import { convertPubKeyFromB58String } from '@hoprnet/hopr-utils'
 import { HoprToken__factory } from '../types'
-import { getContract } from './utils/contracts'
+import { getContractData, Networks } from '..'
 
 const send = (signer, txparams) =>
   signer.sendTransaction(txparams, (error, transactionHash) => {
@@ -32,7 +32,7 @@ async function main(
 
   let hoprTokenAddress: string
   try {
-    const contract = await getContract(network.name, 'HoprToken')
+    const contract = await getContractData(network.name as Networks, 'HoprToken')
     hoprTokenAddress = contract.address
   } catch {
     console.error('⛓  You need to ensure the network deployed the contracts')

@@ -1,7 +1,6 @@
 import type { HardhatRuntimeEnvironment } from 'hardhat/types'
 import type { DeployFunction } from 'hardhat-deploy/types'
 import { HoprToken__factory } from '../types'
-import { storeContract } from '../tasks/utils/contracts'
 
 const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { ethers, deployments, network, getNamedAccounts } = hre
@@ -11,7 +10,6 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     from: deployer.address,
     log: true
   })
-  await storeContract(network.name, network.tags, 'HoprToken', result.address, result.receipt.blockNumber)
 
   if (network.tags.testing || network.tags.development) {
     const hoprToken = new HoprToken__factory(deployer).attach(result.address)

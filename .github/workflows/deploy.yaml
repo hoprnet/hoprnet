@@ -89,10 +89,24 @@ jobs:
         env:
           HOPR_PACKAGE: hoprd
 
+  deploy_smart_contracts:
+    name: Deploy HoprChannels
+    runs-on: ubuntu-latest
+    needs: [build]
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Configure Git info
+        run: bash -x scripts/configure-git-info.sh
+
+      - name: Update repo from latest pushes.
+        run: |
+          git pull origin ${{ github.ref }} # This should pull new packages with versions etc.
+
   release:
     name: Create Github Release
     runs-on: ubuntu-latest
-    needs: [build]
+    needs: [deploy_hopr_channels]
     if: startsWith(github.ref, 'refs/heads/release/')
     steps:
       - uses: actions/checkout@v2

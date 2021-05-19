@@ -8,8 +8,8 @@
   "main": "./lib/index.js",
   "scripts": {
     "clean": "rimraf ./lib && rimraf ./types",
-    "build": "yarn clean && yarn build:sol && tsc && cp -R ./chain/abis ./lib/chain/abis",
-    "build:sol": "hardhat compile && hardhat postCompile",
+    "build": "yarn clean && yarn build:sol && tsc && cp -R ./deployments ./lib/deployments",
+    "build:sol": "hardhat compile",
     "fund": "hardhat fund",
     "faucet": "hardhat faucet",
     "migrate": "hardhat deploy",

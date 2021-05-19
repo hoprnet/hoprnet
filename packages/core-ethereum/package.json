@@ -11,7 +11,7 @@
     "clean": "rimraf ./lib",
     "test": "mocha --exit",
     "dev": "yarn clean && yarn build:types && tsc -w",
-    "build:types": "typechain --target ethers-v5 --outDir './src/contracts' '../../node_modules/@hoprnet/hopr-ethereum/chain/abis/*.json'",
+    "build:types": "typechain --target ethers-v5 --outDir './src/contracts' '../../node_modules/@hoprnet/hopr-ethereum/deployments/goerli/*.json'",
     "build": "yarn clean && yarn build:types && mkdir -p ./lib/contracts && cp -R ./src/contracts ./lib/contracts && tsc",
     "prepublishOnly": "yarn build",
     "docs:generate": "yarn typedoc",
