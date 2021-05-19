@@ -93,13 +93,22 @@ After that $(B)$ extracts the public key of $(C)$, it deletes the routing inform
 \\The new mix header is now ready to be sent to $(C)$ or as defined node $n_1$: $$M_1=(\alpha_1,\beta_1,\gamma_1)$$
 \paragraph{Encrypt \& Decrypt}
 The payload $\delta$ is where the actual message is hidden and is computed in different layers using a wide block cipher encryption algorithm and is decrypted at each stage of mixing.
-\\The payload is constructed as follow:
+$\delta$ is repeatedly encrypted via keys derived from the Diffie-Hellman key exchange between the packet’s group element $\alpha_i$ and the public key of each node in the path $y_i$. 
+\begin{comment}
+
+The payload is constructed as follow:
 $$\delta= 0_{l} \|\tau\|\delta$$ where $\tau$ is the authentication tag string which is generated arbitrarily and $|\tau|=4$ is its length ($\tau=``HOPR "$ in ASCII). $l$ is the $0$ padding length where
-$0 <= l <= |\delta| - 4$
-\\~\\Let $m$ be the block size in bits, which will typically be large. Let $H_k(\tau)$ be a keyed hash function with the key $k$ for the payload $\tau$, $k$ consists of four independent keys $k_1$, $k_2$,$k_3$ and $k_4$ which $(A)$ derives from the master keys $s_0$, $s_1$, $s_2$ and $s_3$. The sphinx uses Lioness wide block cipher scheme for encryption and decryption purposes.
-Let $S(\tau)$ be a pseudo random function (stream cipher) which given the input $\tau$ will generate an output of arbitrary length. $\tau$ is divided into two parts left $L$ and right $R$ whose sizes are $|L|=w$ and $|R|=m-w$ so we get $\tau=R\|L$.
+$0 <= l <= |\delta| - 4$ 
+\end{comment}
+
+\paragraph{Notation}
+Let $j$ be the block size in bits, which will typically be large. Let $H_k$ be a keyed hash function with the key $k$ for the payload, $k$ consists of four independent keys $k_1$, $k_2$,$k_3$ and $k_4$ which $(A)$ derives from the master keys $s_0$, $s_1$, $s_2$ and $s_3$ where $k_1$, $k_3$ will be used to key the stream cipher and $k_2$, $k_4$ to key the hash function. The sphinx uses Lioness wide block cipher scheme for encryption and decryption purposes.
+Let $S_k$ be a pseudo random function (stream cipher) which given the input $m$ will generate an output of arbitrary length. $m$ is divided into two blocks left $m_l$ and right $m_r$ whose sizes are $|m_l|=w$ and $|m_r|=j-w$ so we get $m=m_r\|m_l$.
 \subparagraph{Encryption}
 \subparagraph{Decryption} The decryption happens as follow:
+\subparagraph{Integrity}
+Authentication of packet integrity is done by prepending a tag set to a known value to the plaintext prior to the first encrypt operation. By virtue of the fragile nature of the SPRP function, any alteration to the encrypted payload as it traverses the network will result in an irrecoverably corrupted plaintext when the payload is decrypted by the recipient.
+
 \begin{figure}[H]
     \centering
     \includegraphics[width=11cm,height=11cm,keepaspectratio]{../yellowpaper/images/sphinx1.png}
