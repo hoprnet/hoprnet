@@ -161,7 +161,7 @@ class Channel {
    * @param winProb the winning probability to use
    * @returns a signed ticket
    */
-  async createTicket(amount: Balance, challenge: Challenge, winProb: number) {
+  async createTicket(amount: Balance, challenge: Challenge, winProb: BN) {
     const counterpartyAddress = this.counterparty.toAddress()
     const channelState = await this.getState()
 
@@ -171,7 +171,7 @@ class Channel {
       channelState.ticketEpochFor(this.counterparty.toAddress()),
       new UINT256(new BN(this.index++)),
       amount,
-      UINT256.fromProbability(winProb),
+      UINT256.fromInverseProbability(winProb),
       channelState.channelEpoch,
       this.privateKey
     )
@@ -191,7 +191,7 @@ class Channel {
       UINT256.fromString('0'),
       new UINT256(new BN(this.index++)),
       new Balance(new BN(0)),
-      UINT256.fromProbability(1),
+      UINT256.fromInverseProbability(new BN(1)),
       UINT256.fromString('0'),
       this.privateKey
     )
