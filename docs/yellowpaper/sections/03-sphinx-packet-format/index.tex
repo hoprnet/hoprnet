@@ -92,7 +92,7 @@ After that $(B)$ extracts the public key of $(C)$, it deletes the routing inform
 \hspace{-5mm}The first $\kappa$ bits of $\beta_0$ will be $n_{1}$ itself, the next $\kappa$ bits will be $\gamma_{1}$, and the remaining $(2r-1)\kappa$ bits of $\beta_0$ are shifted left to form the leftmost $(2r-1)\kappa$ bits of $\beta_{1}$; the rightmost $2\kappa$ bits of $\beta_{1}$ are simply a substring of an output of the PRNG function.
 \\The new mix header is now ready to be sent to $(C)$ or as defined node $n_1$: $$M_1=(\alpha_1,\beta_1,\gamma_1)$$
 \paragraph{Encrypt \& Decrypt}
-The payload $\delta$ is where the actual message is hidden and is computed in different layers using a wide block cipher encryption algorithm and is decrypted at each stage of mixing.
+The encrypted payload $\delta$ is where the actual message is hidden and is computed in different layers using a wide block cipher encryption algorithm and is decrypted at each stage of mixing.
 $\delta$ is repeatedly encrypted via keys derived from the Diffie-Hellman key exchange between the packet’s group element $\alpha_i$ and the public key of each node in the path $y_i$. 
 \begin{comment}
 
@@ -111,12 +111,10 @@ The updated $m_l\|m_r$ constitutes the ciphertext.
 \subparagraph{Decryption} The decryption happens as follow:
 $$m_l\leftarrow m_l\oplus H_{k4}(m_r), m_r\leftarrow S_{k3}(m_l), m_l\leftarrow m_l\oplus H_{k2}(m_r), m_r\leftarrow m_r\oplus S_{k1}(m_l)$$
 \subparagraph{Integrity}
-Authentication of packet integrity is done by prepending a tag set to a known value to the plaintext prior to the first encrypt operation. By virtue of the fragile nature of the SPRP function, any alteration to the encrypted payload as it traverses the network will result in an irrecoverably corrupted plaintext when the payload is decrypted by the recipient.
-\\The payload is encrypted using a bidirectional error propagating block cipher
+The payload is encrypted using a bidirectional error propagating block cipher
 and protected with an integrity check for the receiver, but not
-for processing relays. Further, Sphinx model considers the
-receiver to not be part of the anonymization protocol. The
-receiver’s address is included in the payload.
+for processing relays. Authentication of packet integrity is done by prepending a tag set so that any alteration to the encrypted payload as it traverses the network will result in an irrecoverably corrupted plaintext when the payload is decrypted by the recipient.
+
 \begin{figure}[H]
     \centering
     \includegraphics[width=11cm,height=11cm,keepaspectratio]{../yellowpaper/images/sphinx1.png}
