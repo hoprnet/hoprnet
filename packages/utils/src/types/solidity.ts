@@ -1,5 +1,4 @@
 import BN from 'bn.js'
-// import { constants } from 'ethers'
 
 class UINT256 {
   constructor(private bn: BN) {}
