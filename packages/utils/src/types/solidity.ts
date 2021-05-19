@@ -24,9 +24,9 @@ class UINT256 {
       throw Error('Probability input cannot be larger than 1')
     }
 
-    const exponent = 10 ** n.toString().replace(/[0]{0,}\./, '').length
+    const divisor = 10 ** n.toString().replace(/[0]{0,}\./, '').length
 
-    return new UINT256(new BN(new Uint8Array(32).fill(0xff)).muln(n * exponent).divn(exponent))
+    return new UINT256(new BN(new Uint8Array(32).fill(0xff)).muln(n * divisor).divn(divisor))
   }
 
   static get SIZE(): number {
