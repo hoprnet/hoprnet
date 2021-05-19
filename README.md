@@ -31,6 +31,7 @@
 - [Develop](#develop)
 - [Test](#test)
   - [Github Actions CI](#github-actions-ci)
+  - [End-to-End Test](#end-to-end-test)
 - [Tooling](#tooling)
 - [Contact](#contact)
 - [License](#license)
@@ -135,6 +136,15 @@ act -j build
 ```
 
 For more information please refer to [act][8]'s documentation.
+
+### End-to-End Test
+
+End-to-end testing is usually performed by the CI, but can also be performed
+locally by executing:
+
+```sh
+./scripts/run-integration-tests-locally.sh
+```
 
 ## Tooling
 

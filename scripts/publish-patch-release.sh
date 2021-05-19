@@ -13,7 +13,7 @@ git pull origin "${HOPR_GITHUB_REF}"
 npx lerna version patch --yes --exact --no-push --no-changelog
 
 # only make remote changes if running in CI
-if [ -n "${HOPR_IN_CI:-}" ]; then
+if [ -n "${CI:-}" ]; then
   # push changes back onto origin including new tag
   git push origin "${HOPR_GITHUB_REF}" --tags
 

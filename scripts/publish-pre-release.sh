@@ -24,7 +24,7 @@ test -n "${npm_package}" && version_type="preminor" || version_type="prerelease"
 npx lerna version "${version_type}" --yes --exact --no-push --no-changelog --preid next
 
 # only make remote changes if running in CI
-if [ -n "${HOPR_IN_CI:-}" ]; then
+if [ -n "${CI:-}" ]; then
   # push changes back onto origin including new tag
   git push origin "${branch}" --tags
 
