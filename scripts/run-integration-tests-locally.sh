@@ -8,7 +8,7 @@ declare hoprd="node packages/hoprd/lib/index.js --init --password='' --provider=
 declare hardhat="yarn hardhat"
 
 if [ -z "${CI:-}" ]; then
-  DELAY=2
+  DELAY=5
 else
   DELAY=20
 fi
@@ -32,6 +32,8 @@ declare node1_pid node2_pid node3_pid
 declare hardhat_rpc_log
 hardhat_rpc_log="/tmp/hopr-hardhat-rpc-XXXXXX.log"
 
+declare HARDHAT_PID
+
 function check_port() {
   if [[ "$(lsof -i ":$1" | grep -c 'LISTEN')" -ge 1 ]]; then
     echo "Port is not free $1"
@@ -53,9 +55,6 @@ function fund_node {
 
   echo "- Funding 1 ETH and 1 HOPR to $ETH"
   $hardhat faucet --config packages/ethereum/hardhat.config.ts --address "$ETH" --network localhost --ishopraddress true
-
-  echo "- Waiting ($DELAY) seconds for node to catch-up w/balance"
-  sleep $DELAY
 }
 
 function cleanup {
@@ -101,14 +100,13 @@ echo -e "\t\tid: ${node3_id}"
 
 # Running RPC
 echo "- Running hardhat local node"
-declare HARDHAT_PID
 check_port 8545
-$hardhat node --config packages/ethereum/hardhat.config.ts --network hardhat > "${hardhat_rpc_log}" 2>&1 &
-HARDHAT_PID="$!"
-
+$hardhat node --config packages/ethereum/hardhat.config.ts > "${hardhat_rpc_log}" 2>&1 &
 echo "- Hardhat node started (127.0.0.1:8545)"
 echo "- Waiting ($DELAY) seconds for hardhat node to deploy contracts"
 sleep $DELAY
+HARDHAT_PID="$(lsof -i :8545 | grep 'LISTEN' | awk '{ print $2 }')"  || true # FML
+echo "PID: $HARDHAT_PID"
 
 echo "- Run node 1"
 declare API1="127.0.0.1:3301"
