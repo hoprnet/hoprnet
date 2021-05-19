@@ -1,5 +1,9 @@
 name: HOPR End-to-end tests
 
+env:
+  HOPR_IN_CI: 1
+  HOPR_GITHUB_REF: ${{ github.ref }}
+
 on:
   push:
     branches: ['**']
@@ -15,7 +19,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: Use Node.js 
+      - name: Use Node.js
         uses: actions/setup-node@v2
         with:
           node-version: 14
@@ -37,15 +41,10 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-nodejs-
 
-      - name: Install
-        if: steps.nodejs-cache.outputs.cache-hit != 'true'
-        run: |
-          yarn
-
       - name: Build
         run: |
+          yarn
           yarn build
 
       - name: Test
-        shell: bash {0}
-        run: ./scripts/run-integration-tests-locally.sh 
+        run: bash -x ./scripts/run-integration-tests-locally.sh

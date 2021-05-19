@@ -1,4 +1,8 @@
-#!/bin/bash
+#!/usr/bin/env bash
+
+set -o errexit
+set -o nounset
+set -o pipefail
 
 # Runs a testnet, and tests against it.
 # This relies on using GCloud as an environment for testing
@@ -9,7 +13,8 @@ source scripts/cleanup.sh
 
 # Get version from package.json
 #'hoprd:1.71.0-next.149'
-RELEASE=$(node -p -e "require('./packages/hoprd/package.json').version")
+declare RELEASE
+RELEASE=$(HOPR_PACKAGE=hoprd ./scripts/get-package-version.sh)
 
 TESTNET_NAME="integration-test$(echo "$VERSION_MAJ_MIN" | sed 's/\./-/g')"
 TESTNET_SIZE=3
