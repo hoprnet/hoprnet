@@ -16,7 +16,7 @@ function createMockTickets(privKey: Uint8Array) {
         new UINT256(new BN(0)),
         new UINT256(new BN(0)),
         amount,
-        UINT256.fromProbability(1),
+        UINT256.fromInverseProbability(new BN(1)),
         new UINT256(new BN(0)),
         privKey
       )
@@ -28,7 +28,7 @@ function createMockTickets(privKey: Uint8Array) {
         new UINT256(new BN(0)),
         new UINT256(new BN(0)),
         new Balance(new BN(0)),
-        UINT256.fromProbability(1),
+        UINT256.fromInverseProbability(new BN(new Uint8Array(UINT256.SIZE).fill(0xff))),
         new UINT256(new BN(0)),
         privKey
       )

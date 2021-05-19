@@ -28,8 +28,7 @@ import BN from 'bn.js'
 import { Acknowledgement } from './acknowledgement'
 import { blue, green } from 'chalk'
 import Debug from 'debug'
-import { TICKET_AMOUNT, TICKET_WIN_PROB } from '../constants'
-import { BigNumber } from 'bignumber.js'
+import { PRICE_PER_PACKET, INVERSE_TICKET_WIN_PROB } from '../constants'
 
 export const MAX_HOPS = 3 // 3 relayers and 1 destination
 
@@ -54,15 +53,14 @@ export function validateCreatedTicket(myBalance: BN, ticket: Ticket) {
 // Having this as a constant allows to channel rounding error when
 // dealing with probabilities != 1.0 and makes sure that ticket value
 // are always an integer multiple of the base unit.
-const TICKET_BASE_UNIT = new BN(new BigNumber(TICKET_AMOUNT).div(TICKET_WIN_PROB).toString())
 
 /**
  * Validate unacknowledged tickets as we receive them
  */
 export async function validateUnacknowledgedTicket(
   id: PeerId,
-  nodeTicketAmount: string,
-  nodeTicketWinProb: number,
+  nodeTicketAmount: BN,
+  nodeInverseTicketWinProb: BN,
   senderPeerId: PeerId,
   ticket: Ticket,
   channel: Channel,
@@ -79,6 +77,16 @@ export async function validateUnacknowledgedTicket(
   const ticketIndex = ticket.index.toBN()
   const ticketWinProb = ticket.winProb.toBN()
 
+  // ticket signer MUST be the sender
+  if (!ticket.verify(senderPubKey)) {
+    throw Error(`The signer of the ticket does not match the sender`)
+  }
+
+  if (ticketWinProb.eqn(1) && ticketAmount.eqn(0)) {
+    // Dummy ticket detected, ticket has no value and is therefore valid
+    return
+  }
+
   let channelState
   try {
     channelState = await channel.getState()
@@ -86,19 +94,14 @@ export async function validateUnacknowledgedTicket(
     throw Error(`Error while validating unacknowledged ticket, state not found: '${err.message}'`)
   }
 
-  // ticket signer MUST be the sender
-  if (!ticket.verify(senderPubKey)) {
-    throw Error(`The signer of the ticket does not match the sender`)
-  }
-
   // ticket MUST have at least X amount
-  if (ticketAmount.lt(new BN(nodeTicketAmount))) {
+  if (ticketAmount.lt(nodeTicketAmount)) {
     throw Error(`Ticket amount '${ticketAmount.toString()}' is lower than '${nodeTicketAmount}'`)
   }
 
   // ticket MUST have at least X winning probability
-  if (ticketWinProb.lt(UINT256.fromProbability(nodeTicketWinProb).toBN())) {
-    throw Error(`Ticket winning probability '${ticketWinProb}' is lower than '${nodeTicketWinProb}'`)
+  if (ticketWinProb.lt(UINT256.fromInverseProbability(nodeInverseTicketWinProb).toBN())) {
+    throw Error(`Ticket winning probability '${ticketWinProb}' is lower than '${nodeInverseTicketWinProb}'`)
   }
 
   // channel MUST be open or pending to close
@@ -241,9 +244,9 @@ export class Packet {
       ticket = channel.createDummyTicket(ticketChallenge)
     } else {
       ticket = await channel.createTicket(
-        new Balance(new BN(TICKET_BASE_UNIT).muln(path.length - 1)),
+        new Balance(new BN(PRICE_PER_PACKET).mul(new BN(INVERSE_TICKET_WIN_PROB)).muln(path.length - 1)),
         ticketChallenge,
-        TICKET_WIN_PROB
+        new BN(INVERSE_TICKET_WIN_PROB)
       )
     }
 
@@ -345,8 +348,8 @@ export class Packet {
 
     return validateUnacknowledgedTicket(
       privKey,
-      TICKET_AMOUNT,
-      TICKET_WIN_PROB,
+      new BN(PRICE_PER_PACKET),
+      new BN(INVERSE_TICKET_WIN_PROB),
       previousHop,
       this.ticket,
       channel,
@@ -379,14 +382,14 @@ export class Packet {
 
     const channel = chain.getChannel(self, nextPeer)
 
-    const pathPosition = this.ticket.getPathPosition(new Balance(TICKET_BASE_UNIT))
+    const pathPosition = this.ticket.getPathPosition(new BN(PRICE_PER_PACKET), new BN(INVERSE_TICKET_WIN_PROB))
     if (pathPosition == 1) {
       this.ticket = channel.createDummyTicket(this.nextChallenge)
     } else {
       this.ticket = await channel.createTicket(
-        new Balance(TICKET_BASE_UNIT.muln(pathPosition - 1)),
+        new Balance(new BN(PRICE_PER_PACKET).mul(new BN(INVERSE_TICKET_WIN_PROB)).muln(pathPosition - 1)),
         this.nextChallenge,
-        TICKET_WIN_PROB
+        new BN(INVERSE_TICKET_WIN_PROB)
       )
     }
 
