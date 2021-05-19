@@ -129,7 +129,7 @@ $hardhat node --config packages/ethereum/hardhat.config.ts > "${hardhat_rpc_log}
 #HARDHAT_PID="$(lsof -i :8545 | grep 'LISTEN' | awk '{ print $2 }')"  || true # FML
 HARDHAT_PID="$!"
 echo "- Hardhat node started (127.0.0.1:8545) with PID $HARDHAT_PID"
-wait_for_port 8545
+wait_for_port 8545 "${hardhat_rpc_log}"
 # }}}
 
 #  --- Run nodes --- {{{
@@ -145,14 +145,14 @@ declare API2="127.0.0.1:3302"
 DEBUG="hopr*" $hoprd --identity="${node2_id}" --host=0.0.0.0:9092 --data="${node2_dir}" --rest --restPort 3302 --announce > \
   "${node2_log}" 2>&1 &
 node2_pid="$!"
-wait_for_port 3302
+wait_for_port 3302 "${node2_log}"
 
 echo "- Run node 3"
 declare API3="127.0.0.1:3303"
 DEBUG="hopr*" $hoprd --identity="${node3_id}" --host=0.0.0.0:9093 --data="${node3_dir}" --rest --restPort 3303 --announce > \
   "${node3_log}" 2>&1 &
 node3_pid="$!"
-wait_for_port 3303
+wait_for_port 3303 "${node3_log}"
 # }}}
 
 # --- Fund Nodes --- {{{
