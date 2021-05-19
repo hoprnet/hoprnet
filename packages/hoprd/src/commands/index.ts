@@ -1,6 +1,5 @@
 import type Hopr from '@hoprnet/hopr-core'
 import type PeerId from 'peer-id'
-import { AutoCompleteResult } from './abstractCommand'
 import { AbstractCommand, GlobalState, CommandResponse } from './abstractCommand'
 import FundChannel from './fundChannel'
 import CloseChannel from './closeChannel'
@@ -96,32 +95,5 @@ export class Commands {
     }
 
     return `${cmd}: Unknown command!`
-  }
-
-  public async autocomplete(message: string): Promise<AutoCompleteResult> {
-    // If the line is empty, we show all possible commands as results.
-    if (!message) {
-      return [this.allCommands(), message]
-    }
-
-    const [command, query]: (string | undefined)[] = message.trim().split(/\s+/).slice(0)
-    const cmd = this.find(command)
-    if (cmd && typeof cmd.autocomplete !== 'undefined') {
-      return cmd.autocomplete(query, message, this.state)
-    }
-    // Command not found - try assuming it's an incomplete command
-    const hits = this.allCommands().reduce((acc: string[], name: string) => {
-      if (name.startsWith(message)) {
-        acc.push(name)
-      }
-      return acc
-    }, [])
-
-    if (hits.length > 0) {
-      return [hits, message]
-    }
-
-    // We did our best, lets just show all possible commands
-    return [this.allCommands(), message]
   }
 }

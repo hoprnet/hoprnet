@@ -67,19 +67,6 @@ describe('Commands', () => {
     assert(mockNode.sendMessage.callCount == 3, 'send message not called x3')
   })
 
-  it('autocomplete sendmessage', async () => {
-    let mockNode: any = sinon.fake()
-    mockNode.sendMessage = sinon.fake()
-    mockNode.getConnectedPeers = () => [{ toB58String: () => '16Uiu2HAmAJStiomwq27Kkvtat8KiEHLBSnAkkKCqZmLYKVLtkiB7' }]
-
-    let cmds = new mod.Commands(mockNode)
-    assertMatch((await cmds.autocomplete('send 16Ui'))[0][0], /send 16U/)
-    assert((await cmds.autocomplete('send foo'))[0][0] == '')
-
-    await cmds.execute('alias 16Uiu2HAmAJStiomwq27Kkvtat8KiEHLBSnAkkKCqZmLYKVLtkiB7 test')
-    assert((await cmds.autocomplete('send t'))[0][0] == 'send test')
-  })
-
   it('settings', async () => {
     let mockNode: any = sinon.fake()
     mockNode.getChannelStrategy = (): string => ''

@@ -1,8 +1,7 @@
 import type Hopr from '@hoprnet/hopr-core'
 import type PeerId from 'peer-id'
-import type { AutoCompleteResult } from './abstractCommand'
 import { AbstractCommand, GlobalState } from './abstractCommand'
-import { checkPeerIdInput, getPeerIdsAndAliases, styleValue } from './utils'
+import { checkPeerIdInput, styleValue } from './utils'
 
 export default class Ping extends AbstractCommand {
   constructor(public node: Hopr) {
@@ -52,14 +51,5 @@ export default class Ping extends AbstractCommand {
       return `${out}Could not ping node. Error was: ${styleValue(error.message, 'failure')}`
     }
     return `${out}Could not ping node. Timeout.`
-  }
-
-  public async autocomplete(query: string = '', line: string = '', state: GlobalState): Promise<AutoCompleteResult> {
-    const allIds = getPeerIdsAndAliases(this.node, state, {
-      returnAlias: true,
-      mustBeOnline: true
-    })
-
-    return this._autocompleteByFiltering(query, allIds, line)
   }
 }
