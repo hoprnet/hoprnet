@@ -47,10 +47,11 @@ $h_b:G^*\times G^*\rightarrow\mathbb{Z}^*_q$ where $\mathbb{Z}^*_q$ is the field
     \end{itemize}
     Where $y_B,y_C,y_D,y_Z$ are the public keys of the nodes $B,C, D$  which we assume to be available to $A$ .
     \paragraph{Routing information}
-    Each node on the path needs to know the next downstream node. Therefore, the sender $(A)$ generates routing information $\beta_i$ for $(B)$, $(C)$ and $(D)$ as well as message $END$ to tell $(Z)$ that it is the final receiver of the message. The END message is a distinguished prefix byte that's added to the final receiver's Ethereum address. The serialization concatenates the $x$ and $y$ coordinates of the public key as follow:
-    $$02 + x-coordinate (16\; bytes) + y-coordinate (16\; bytes) if\; y \;is \;even$$
-    or $$03 + x-coordinate (16\; bytes) + y-coordinate (16\; bytes) if\; y \;is \;odd$$
-The routing information looks as the following:
+    Each node on the path needs to know the next downstream node. Therefore, the sender $(A)$ generates routing information $\beta_i$ for $(B)$, $(C)$ and $(D)$ as well as message $END$ to tell $(Z)$ that it is the final receiver of the message. 
+    The END message is a distinguished prefix byte that's added to the final receiver's compressed public key.
+    For ECDSA public key compression, the $x$ coordinate would be the only one used and would be prepended by $02$. 
+    \\The $y$ coordinate will be extracted from $x$ by resolving the elliptic curve equation $Y^2=X^3+aX+b$, with two given $a$ and $b$ parameters. A square root extraction will yield $Y$ or $-Y$. The compressed point format includes the least significant bit of $Y$ in the first byte (the first byte is $0\times 02$ or $0\times 03$, depending on that bit).
+    \\The routing information looks as the following:
     $$\beta_{v-1}=(Z\|0_{(2(r-v)+2)\kappa-|Z|}\oplus \rho(h_{\rho}(s_{v-1}))_{[ \,0....(2(r-v)+3)\kappa-1\,]})\|\phi_{v-1}$$
     and
     $$\beta_i=n_{i+1}\|\gamma_{i+1}\|\beta_{{i+1}_{[ \,0....(2r-1)\kappa-1\,] }}\oplus \rho(h_{\rho}(s_{i}))_{[ \,0....(2r+1)\kappa-1\,]} $$ for $0\le i < v-1$ 
