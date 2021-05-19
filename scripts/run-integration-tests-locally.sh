@@ -82,6 +82,7 @@ function cleanup {
 
 trap cleanup EXIT
 
+# --- Log test info {{{
 echo "- Test files and directories"
 echo -e "\thardhat"
 echo -e "\t\tlog: ${hardhat_rpc_log}"
@@ -97,9 +98,9 @@ echo -e "\tnode3"
 echo -e "\t\tdata dir: ${node3_dir} (will be removed)"
 echo -e "\t\tlog: ${node3_log}"
 echo -e "\t\tid: ${node3_id}"
+# }}}
 
-
-# Check all resources we need are free
+# --- Check all resources we need are free {{{
 check_port 8545
 check_port 3301 
 check_port 3302
@@ -107,14 +108,17 @@ check_port 3303
 check_port 9091
 check_port 9092
 check_port 9093
+# }}}
 
-# Running RPC
+# --- Running Mock Blockchain --- {{{
 echo "- Running hardhat local node"
 $hardhat node --config packages/ethereum/hardhat.config.ts > "${hardhat_rpc_log}" 2>&1 &
 #HARDHAT_PID="$(lsof -i :8545 | grep 'LISTEN' | awk '{ print $2 }')"  || true # FML
 HARDHAT_PID="$!"
 echo "- Hardhat node started (127.0.0.1:8545) with PID $HARDHAT_PID"
+# }}}
 
+#  --- Run nodes --- {{{
 echo "- Run node 1"
 declare API1="127.0.0.1:3301"
 DEBUG="hopr*" $hoprd --identity="${node1_id}" --host=0.0.0.0:9091 --data="${node1_dir}" --rest --restPort 3301 --announce > \
@@ -135,13 +139,18 @@ DEBUG="hopr*" $hoprd --identity="${node3_id}" --host=0.0.0.0:9093 --data="${node
   "${node3_log}" 2>&1 &
 node3_pid="$!"
 wait_for_port 3303
+# }}}
 
+# --- Fund Nodes --- {{{
 fund_node "$API1"
 fund_node "$API2"
 fund_node "$API3"
+# }}}
 
+# --- Wait for everything to be ready, then run tests --- {{{
 wait_for_port 9091
 wait_for_port 9092
 wait_for_port 9093
 
 source $(realpath test/integration-test.sh)
+# }}}
