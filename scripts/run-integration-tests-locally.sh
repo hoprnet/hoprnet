@@ -8,7 +8,7 @@ declare hoprd="node packages/hoprd/lib/index.js --init --password='' --provider=
 declare hardhat="yarn hardhat"
 
 if [ -z "${CI:-}" ]; then
-  DELAY=5
+  DELAY=2
 else
   DELAY=20
 fi
@@ -40,6 +40,13 @@ function check_port() {
     echo "Process: $(lsof -i ":$1" | grep 'LISTEN')"
     exit 1
   fi
+}
+
+function wait_for_port() {
+  until [ "$(lsof -i ":$1" | grep -c "LISTEN")" -gt 0  ]; do
+    echo "Waiting ($DELAY) for port $1"
+    sleep $DELAY
+  done
 }
 
 # Funds a HOPR node with ETH + HOPR tokens
@@ -102,11 +109,10 @@ echo -e "\t\tid: ${node3_id}"
 echo "- Running hardhat local node"
 check_port 8545
 $hardhat node --config packages/ethereum/hardhat.config.ts > "${hardhat_rpc_log}" 2>&1 &
-echo "- Hardhat node started (127.0.0.1:8545)"
-echo "- Waiting ($DELAY) seconds for hardhat node to deploy contracts"
-sleep $DELAY
-HARDHAT_PID="$(lsof -i :8545 | grep 'LISTEN' | awk '{ print $2 }')"  || true # FML
-echo "PID: $HARDHAT_PID"
+#HARDHAT_PID="$(lsof -i :8545 | grep 'LISTEN' | awk '{ print $2 }')"  || true # FML
+HARDHAT_PID="$!"
+wait_for_port 8545
+echo "- Hardhat node started (127.0.0.1:8545) with PID $HARDHAT_PID"
 
 echo "- Run node 1"
 declare API1="127.0.0.1:3301"
