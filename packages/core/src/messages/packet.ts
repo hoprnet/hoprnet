@@ -49,6 +49,11 @@ export function validateCreatedTicket(myBalance: BN, ticket: Ticket) {
   }
 }
 
+// Precompute the base unit that is used for issuing and validating
+// the embedded value in tickets.
+// Having this as a constant allows to channel rounding error when
+// dealing with probabilities != 1.0 and makes sure that ticket value
+// are always an integer multiple of the base unit.
 const TICKET_BASE_UNIT = new BN(new BigNumber(TICKET_AMOUNT).div(TICKET_WIN_PROB).toString())
 
 /**

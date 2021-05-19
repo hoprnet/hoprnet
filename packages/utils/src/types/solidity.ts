@@ -24,7 +24,13 @@ class UINT256 {
       throw Error('Probability input cannot be larger than 1')
     }
 
-    const divisor = 10 ** n.toString().replace(/[0]{0,}\./, '').length
+    // Represent number as a decimal number string, then slice
+    // the integer part `0.` and compute the length of rational
+    // part which gives the number of decimal places required to
+    // represent the number.
+    const decimalPlaces = n.toString().replace(/[0]{0,}\./, '').length
+
+    const divisor = 10 ** decimalPlaces
 
     return new UINT256(new BN(new Uint8Array(32).fill(0xff)).muln(n * divisor).divn(divisor))
   }
