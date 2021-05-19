@@ -19,20 +19,12 @@ class UINT256 {
     return new UINT256(new BN(str))
   }
 
-  static fromProbability(n: number): UINT256 {
-    if (n > 1) {
-      throw Error('Probability input cannot be larger than 1')
+  static fromInverseProbability(inverseProb: BN): UINT256 {
+    if (inverseProb.isZero() || inverseProb.isNeg()) {
+      throw Error('Inverse probability must be strictly greater than zero')
     }
 
-    // Represent number as a decimal number string, then slice
-    // the integer part `0.` and compute the length of rational
-    // part which gives the number of decimal places required to
-    // represent the number.
-    const decimalPlaces = n.toString().replace(/[0]{0,}\./, '').length
-
-    const divisor = 10 ** decimalPlaces
-
-    return new UINT256(new BN(new Uint8Array(32).fill(0xff)).muln(n * divisor).divn(divisor))
+    return new UINT256(new BN(new Uint8Array(UINT256.SIZE).fill(0xff)).div(inverseProb))
   }
 
   static get SIZE(): number {

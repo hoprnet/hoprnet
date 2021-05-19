@@ -24,7 +24,7 @@ function createMockedTicket() {
     UINT256.fromString('0'),
     UINT256.fromString('0'),
     new Balance(new BN(0)),
-    UINT256.fromProbability(1),
+    UINT256.fromInverseProbability(new BN(1)),
     UINT256.fromString('1'),
     randomBytes(32)
   )
