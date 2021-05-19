@@ -32,6 +32,14 @@ declare node1_pid node2_pid node3_pid
 declare hardhat_rpc_log
 hardhat_rpc_log="/tmp/hopr-hardhat-rpc-XXXXXX.log"
 
+function check_port() {
+  if [[ "$(lsof -i ":$1" | grep -c 'LISTEN')" -ge 1 ]]; then
+    echo "Port is not free $1"
+    echo "Process: $(lsof -i ":$1" | grep 'LISTEN')"
+    exit 1
+  fi
+}
+
 # Funds a HOPR node with ETH + HOPR tokens
 # @param $1 - node API
 function fund_node {
@@ -93,7 +101,9 @@ echo -e "\t\tid: ${node3_id}"
 
 # Running RPC
 echo "- Running hardhat local node"
-$hardhat node --config packages/ethereum/hardhat.config.ts > "${hardhat_rpc_log}" 2>&1 &
+declare HARDHAT_PID
+check_port 8545
+$hardhat node --config packages/ethereum/hardhat.config.ts --network hardhat > "${hardhat_rpc_log}" 2>&1 &
 HARDHAT_PID="$!"
 
 echo "- Hardhat node started (127.0.0.1:8545)"
