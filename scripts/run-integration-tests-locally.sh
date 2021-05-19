@@ -68,6 +68,7 @@ function cleanup {
   test -n "${node1_pid:-}" && kill "${node1_pid}"
   test -n "${node2_pid:-}" && kill "${node2_pid}"
   test -n "${node3_pid:-}" && kill "${node3_pid}"
+  test -n "${HARDHAT_PID:-}" && kill "${HARDHAT_PID}"
 
   exit $EXIT_CODE
 }
@@ -93,6 +94,7 @@ echo -e "\t\tid: ${node3_id}"
 # Running RPC
 echo "- Running hardhat local node"
 $hardhat node --config packages/ethereum/hardhat.config.ts > "${hardhat_rpc_log}" 2>&1 &
+HARDHAT_PID="$!"
 
 echo "- Hardhat node started (127.0.0.1:8545)"
 echo "- Waiting ($DELAY) seconds for hardhat node to deploy contracts"
