@@ -46,4 +46,4 @@ jobs:
           yarn build
 
       - name: Test
-        run: bash -x ./scripts/run-integration-tests-locally.sh
+        run: bash ./scripts/run-integration-tests-locally.sh
