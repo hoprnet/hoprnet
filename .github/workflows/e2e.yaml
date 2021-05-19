@@ -1,7 +1,6 @@
 name: HOPR End-to-end tests
 
 env:
-  HOPR_IN_CI: 1
   HOPR_GITHUB_REF: ${{ github.ref }}
 
 on:

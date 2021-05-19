@@ -7,7 +7,7 @@ set -o pipefail
 declare hoprd="node packages/hoprd/lib/index.js --init --password='' --provider=ws://127.0.0.1:8545/ --testAnnounceLocalAddresses"
 declare hardhat="yarn hardhat"
 
-if [ -z "${HOPR_IN_CI:-}" ]; then
+if [ -z "${CI:-}" ]; then
   DELAY=2
 else
   DELAY=20
