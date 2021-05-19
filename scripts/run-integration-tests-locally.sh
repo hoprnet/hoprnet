@@ -15,9 +15,9 @@ fi
 
 declare node1_dir node2_dir node3_dir
 
-node1_dir="$(mktemp -d /tmp/hopr-node-XXXXXX)"
-node2_dir="$(mktemp -d /tmp/hopr-node-XXXXXX)"
-node3_dir="$(mktemp -d /tmp/hopr-node-XXXXXX)"
+node1_dir="/tmp/hopr-node-1"
+node2_dir="/tmp/hopr-node-2"
+node3_dir="/tmp/hopr-node-3"
 
 declare node1_log="${node1_dir}.log"
 declare node2_log="${node2_dir}.log"
@@ -30,7 +30,7 @@ declare node3_id="${node3_dir}.id"
 declare node1_pid node2_pid node3_pid
 
 declare hardhat_rpc_log
-hardhat_rpc_log="$(mktemp /tmp/hopr-hardhat-rpc-XXXXXX.log)"
+hardhat_rpc_log="/tmp/hopr-hardhat-rpc-XXXXXX.log"
 
 # Funds a HOPR node with ETH + HOPR tokens
 # @param $1 - node API
