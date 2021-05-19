@@ -1,8 +1,11 @@
-#!/bin/bash
-set -e #u
+#!/usr/bin/env bash
+
+set -o errexit
+set -o nounset
+set -o pipefail
 
 if [ -z "$GCLOUD_INCLUDED" ]; then
-  source scripts/gcloud.sh 
+  source scripts/gcloud.sh
   source scripts/dns.sh
 fi
 
@@ -41,18 +44,18 @@ fund_if_empty() {
 
 # $1 = IP
 get_eth_address(){
-  echo $(curl $1:3001/api/v1/address/eth)
+  curl "$1:3001/api/v1/address/eth"
 }
 
 # $1 = IP
 get_hopr_address() {
-  echo $(curl $1:3001/api/v1/address/hopr)
+  curl "$1:3001/api/v1/address/hopr"
 }
 
 # $1 = IP
 # $2 = Hopr command
 run_command(){
-  curl --silent -X POST --data "$2" $1:3001/api/v1/command
+  curl --silent -X POST --data "$2" "$1:3001/api/v1/command"
 }
 
 
@@ -62,7 +65,7 @@ update_if_existing() {
   if [[ $(gcloud_find_vm_with_name $1) ]]; then
     echo "Container exists, updating" 1>&2
     PREV=$(gcloud_get_image_running_on_vm $1)
-    if [ "$PREV" == "$2" ]; then 
+    if [ "$PREV" == "$2" ]; then
       echo "Same version of image is currently running. Skipping update to $PREV" 1>&2
       return 0
     fi
@@ -114,7 +117,7 @@ start_chain_provider(){
       --container-image='hopr-provider'
 
   #hardhat node --config packages/ethereum/hardhat.config.ts
-} 
+}
 
 # $1 network name
 # $2 docker image
@@ -126,7 +129,6 @@ start_testnode() {
   start_testnode_vm $vm $2 $4
 }
 
-# Usage 
 # $1 authorized keys file
 add_keys() {
   if test -f "$1"; then

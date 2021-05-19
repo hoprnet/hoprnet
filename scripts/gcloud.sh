@@ -1,5 +1,8 @@
-#!/bin/bash
-set -e #u
+#!/usr/bin/env bash
+
+set -o errexit
+set -o nounset
+set -o pipefail
 
 # ------ GCloud utilities ------
 #
@@ -23,7 +26,7 @@ alias gssh="gcloud compute ssh --ssh-flag='-t' $ZONE"
 # NB: This is useless for getting an IP of a VM
 # Get or create an IP address
 # $1 = name
-gcloud_get_address() { 
+gcloud_get_address() {
   local ip=$(gcloud compute addresses describe $1 $REGION 2>&1)
   # Google does not return an appropriate exit code :(
   if [ "$(echo "$ip" | grep 'ERROR')" ]; then
@@ -37,23 +40,23 @@ gcloud_get_address() {
 # Get external IP for running node or die
 # $1 - name
 gcloud_get_ip() {
-  echo $(gcloud compute instances list | grep "$1" | awk '{ print $5 }')
+  gcloud compute instances list | grep "$1" | awk '{ print $5 }'
 }
 
 # $1 = VM name
 gcloud_find_vm_with_name() {
-  echo $(gcloud compute instances list | grep "$1" | grep 'RUNNING')
+  gcloud compute instances list | grep "$1" | grep 'RUNNING'
 }
 
 # $1 - VM name
 # Warning, using `--format='value[](metadata*)` is an unsupported API by gcloud and can change any time.
 # More information on https://cloud.google.com/compute/docs/storing-retrieving-metadata
 gcloud_get_image_running_on_vm() {
-  echo $(gcloud compute instances describe $1 $ZONE \
+  gcloud compute instances describe $1 $ZONE \
     --format='value[](metadata.items.gce-container-declaration)' \
     | grep image \
     | tr -s ' ' \
-    | cut -f3 -d' ')
+    | cut -f3 -d' '
 }
 
 # $1 = vm name
@@ -67,7 +70,7 @@ gcloud_update_container_with_image() {
   sleep 30s
 }
 
-# $1 - vm name 
+# $1 - vm name
 # $2 - docker image
 gcloud_stop() {
   echo "Stopping docker image:$2 on vm $1"
