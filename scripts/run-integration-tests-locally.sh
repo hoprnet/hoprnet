@@ -10,19 +10,16 @@ declare hardhat="yarn hardhat"
 if [ -z "${CI:-}" ]; then
   DELAY=2
 else
-  DELAY=20
+  DELAY=10
 fi
 
 declare node1_dir node2_dir node3_dir
-
 node1_dir="/tmp/hopr-node-1"
 node2_dir="/tmp/hopr-node-2"
 node3_dir="/tmp/hopr-node-3"
-
 declare node1_log="${node1_dir}.log"
 declare node2_log="${node2_dir}.log"
 declare node3_log="${node3_dir}.log"
-
 declare node1_id="${node1_dir}.id"
 declare node2_id="${node2_dir}.id"
 declare node3_id="${node3_dir}.id"
@@ -105,9 +102,18 @@ echo -e "\t\tdata dir: ${node3_dir} (will be removed)"
 echo -e "\t\tlog: ${node3_log}"
 echo -e "\t\tid: ${node3_id}"
 
+
+# Check all resources we need are freen
+check_port 8545
+check_port 3301 
+check_port 3302
+check_port 3303
+check_port 9091
+check_port 9092
+check_port 9093
+
 # Running RPC
 echo "- Running hardhat local node"
-check_port 8545
 $hardhat node --config packages/ethereum/hardhat.config.ts > "${hardhat_rpc_log}" 2>&1 &
 #HARDHAT_PID="$(lsof -i :8545 | grep 'LISTEN' | awk '{ print $2 }')"  || true # FML
 HARDHAT_PID="$!"
@@ -119,27 +125,28 @@ declare API1="127.0.0.1:3301"
 DEBUG="hopr*" $hoprd --identity="${node1_id}" --host=0.0.0.0:9091 --data="${node1_dir}" --rest --restPort 3301 --announce > \
   "${node1_log}" 2>&1 &
 node1_pid="$!"
-sleep $DELAY
+wait_for_port 3301
 
 echo "- Run node 2"
 declare API2="127.0.0.1:3302"
 DEBUG="hopr*" $hoprd --identity="${node2_id}" --host=0.0.0.0:9092 --data="${node2_dir}" --rest --restPort 3302 --announce > \
   "${node2_log}" 2>&1 &
 node2_pid="$!"
-sleep $DELAY
+wait_for_port 3302
 
 echo "- Run node 3"
 declare API3="127.0.0.1:3303"
 DEBUG="hopr*" $hoprd --identity="${node3_id}" --host=0.0.0.0:9093 --data="${node3_dir}" --rest --restPort 3303 --announce > \
   "${node3_log}" 2>&1 &
 node3_pid="$!"
-sleep $DELAY
+wait_for_port 3303
 
 fund_node "$API1"
 fund_node "$API2"
 fund_node "$API3"
 
-sleep $DELAY
-sleep $DELAY
+wait_for_port 9091
+wait_for_port 9092
+wait_for_port 9093
 
 source $(realpath test/integration-test.sh)
