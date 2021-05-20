@@ -82,7 +82,7 @@ export async function validateUnacknowledgedTicket(
     throw Error(`The signer of the ticket does not match the sender`)
   }
 
-  if (ticketWinProb.eqn(1) && ticketAmount.eqn(0)) {
+  if (UINT256.DUMMY_INVERSE_PROBABILITY.toBN().eq(ticketWinProb) && ticketAmount.eqn(0)) {
     // Dummy ticket detected, ticket has no value and is therefore valid
     return
   }

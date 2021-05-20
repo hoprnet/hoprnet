@@ -27,6 +27,10 @@ class UINT256 {
     return new UINT256(new BN(new Uint8Array(UINT256.SIZE).fill(0xff)).div(inverseProb))
   }
 
+  static get DUMMY_INVERSE_PROBABILITY(): UINT256 {
+    return new UINT256(new BN(0))
+  }
+
   static get SIZE(): number {
     return 32
   }

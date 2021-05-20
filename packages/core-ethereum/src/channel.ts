@@ -196,7 +196,7 @@ class Channel {
       UINT256.fromString('0'),
       new UINT256(new BN(this.index++)),
       new Balance(new BN(0)),
-      UINT256.fromInverseProbability(new BN(new Uint8Array(UINT256.SIZE).fill(0xff))),
+      UINT256.DUMMY_INVERSE_PROBABILITY,
       UINT256.fromString('0'),
       this.privateKey
     )
