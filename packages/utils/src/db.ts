@@ -140,7 +140,7 @@ export class HoprDB {
   public async getUnacknowledgedTickets(filter?: { signer: PublicKey }): Promise<UnacknowledgedTicket[]> {
     const filterFunc = (u: UnacknowledgedTicket): boolean => {
       // if signer provided doesn't match our ticket's signer dont add it to the list
-      if (filter?.signer && u.counterparty.eq(filter.signer)) {
+      if (filter?.signer && u.signer.eq(filter.signer)) {
         return false
       }
       return true
@@ -172,7 +172,7 @@ export class HoprDB {
   public async getAcknowledgedTickets(filter?: { signer: PublicKey }): Promise<AcknowledgedTicket[]> {
     const filterFunc = (a: AcknowledgedTicket): boolean => {
       // if signer provided doesn't match our ticket's signer dont add it to the list
-      if (filter?.signer && a.counterparty.eq(filter.signer)) {
+      if (filter?.signer && a.signer.eq(filter.signer)) {
         return false
       }
       return true

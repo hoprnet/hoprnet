@@ -6,10 +6,10 @@ export class AcknowledgedTicket {
     readonly ticket: Ticket,
     readonly response: Response,
     readonly preImage: Hash,
-    readonly counterparty: PublicKey
+    readonly signer: PublicKey
   ) {
-    if (!counterparty.toAddress().eq(this.ticket.counterparty)) {
-      throw Error(`Given public key of counterparty does not fit to ticket data`)
+    if (signer.toAddress().eq(this.ticket.counterparty)) {
+      throw Error(`Given signer public key must be different from counterparty`)
     }
   }
 
@@ -18,7 +18,7 @@ export class AcknowledgedTicket {
       [this.ticket.serialize(), Ticket.SIZE],
       [this.response.serialize(), Response.SIZE],
       [this.preImage.serialize(), Hash.SIZE],
-      [this.counterparty.serialize(), PublicKey.SIZE]
+      [this.signer.serialize(), PublicKey.SIZE]
     ])
   }
 

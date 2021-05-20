@@ -2,9 +2,9 @@ import { u8aSplit, serializeToU8a, validatePoRHalfKeys } from '..'
 import { HalfKeyChallenge, HalfKey, PublicKey, Ticket, Response } from '.'
 
 export class UnacknowledgedTicket {
-  constructor(readonly ticket: Ticket, readonly ownKey: HalfKey, readonly counterparty: PublicKey) {
-    if (!counterparty.toAddress().eq(this.ticket.counterparty)) {
-      throw Error(`Given public key of counterparty does not fit to ticket data`)
+  constructor(readonly ticket: Ticket, readonly ownKey: HalfKey, readonly signer: PublicKey) {
+    if (signer.toAddress().eq(this.ticket.counterparty)) {
+      throw Error(`Given signer public key must be different from counterparty`)
     }
   }
 
@@ -22,7 +22,7 @@ export class UnacknowledgedTicket {
     return serializeToU8a([
       [this.ticket.serialize(), Ticket.SIZE],
       [this.ownKey.serialize(), HalfKey.SIZE],
-      [this.counterparty.serialize(), PublicKey.SIZE]
+      [this.signer.serialize(), PublicKey.SIZE]
     ])
   }
 
@@ -31,7 +31,7 @@ export class UnacknowledgedTicket {
   }
 
   public verifySignature(): boolean {
-    return this.ticket.verify(this.counterparty)
+    return this.ticket.verify(this.signer)
   }
 
   public getResponse(acknowledgement: HalfKey): Response {

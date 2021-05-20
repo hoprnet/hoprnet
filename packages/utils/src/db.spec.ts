@@ -13,14 +13,15 @@ import {
   Response,
   HalfKeyChallenge,
   ChannelEntry,
-  PublicKey
+  PublicKey,
+  Address
 } from './types'
 import BN from 'bn.js'
 import { SECP256K1_CONSTANTS } from './crypto'
 
-function createMockedTicket(signerPrivKey: Uint8Array) {
+function createMockedTicket(signerPrivKey: Uint8Array, counterparty: Address) {
   return Ticket.create(
-    PublicKey.fromPrivKey(signerPrivKey).toAddress(),
+    counterparty,
     new Response(Uint8Array.from(randomBytes(32))).toChallenge(),
     UINT256.fromString('0'),
     UINT256.fromString('0'),
@@ -63,7 +64,7 @@ describe(`database tests`, function () {
     // this comes from a Packet
     const halfKeyChallenge = new HalfKeyChallenge(Uint8Array.from(randomBytes(HalfKeyChallenge.SIZE)))
     const unAck = new UnacknowledgedTicket(
-      createMockedTicket(privKey),
+      createMockedTicket(privKey, new Address(randomBytes(Address.SIZE))),
       new HalfKey(Uint8Array.from(randomBytes(HalfKey.SIZE))),
       pubKey
     )

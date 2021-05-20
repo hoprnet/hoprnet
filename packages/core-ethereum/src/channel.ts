@@ -68,7 +68,7 @@ class Channel {
         ticket,
         response,
         await this.commitment.getCurrentCommitment(),
-        unacknowledgedTicket.counterparty
+        unacknowledgedTicket.signer
       )
       await this.commitment.bumpCommitment()
       return ack

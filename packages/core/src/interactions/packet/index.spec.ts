@@ -6,6 +6,7 @@ import BN from 'bn.js'
 import { subscribeToAcknowledgements, sendAcknowledgement } from './acknowledgement'
 import {
   PublicKey,
+  Address,
   Ticket,
   UINT256,
   HoprDB,
@@ -27,9 +28,9 @@ import Defer from 'p-defer'
 
 const SECRET_LENGTH = 32
 
-function createFakeTicket(privKey: PeerId, challenge: Challenge, amount: Balance) {
+function createFakeTicket(privKey: PeerId, challenge: Challenge, counterparty: Address, amount: Balance) {
   return Ticket.create(
-    PublicKey.fromPeerId(privKey).toAddress(),
+    counterparty,
     challenge,
     new UINT256(new BN(0)),
     new UINT256(new BN(0)),
@@ -46,14 +47,14 @@ function createFakeChain(privKey: PeerId) {
       unacknowledgedTicket.ticket,
       new Response(new Uint8Array({ length: Response.SIZE })),
       new Hash(new Uint8Array({ length: Hash.SIZE })),
-      unacknowledgedTicket.counterparty
+      unacknowledgedTicket.signer
     )
   }
 
   const getChannel = (_self: PublicKey, counterparty: PublicKey) => ({
     acknowledge,
     createTicket: (amount: Balance, challenge: Challenge, _winProb: number) => {
-      return createFakeTicket(privKey, challenge, amount)
+      return createFakeTicket(privKey, challenge, counterparty.toAddress(), amount)
     },
     createDummyTicket: (challenge: Challenge) => {
       return Ticket.create(
@@ -118,7 +119,7 @@ describe('packet interaction', function () {
     const fakePacket = new Packet(
       new Uint8Array(),
       challenge,
-      createFakeTicket(self, ticketChallenge, new Balance(new BN(1)))
+      createFakeTicket(self, ticketChallenge, PublicKey.fromPeerId(counterparty).toAddress(), new Balance(new BN(1)))
     )
 
     fakePacket.ownKey = ownKey
