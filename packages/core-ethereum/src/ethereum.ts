@@ -19,6 +19,7 @@ import NonceTracker from './nonce-tracker'
 import TransactionManager from './transaction-manager'
 import Debug from 'debug'
 import { HoprToken__factory, HoprChannels__factory } from './contracts'
+import { CONFIRMATIONS } from './constants'
 
 const log = Debug('hopr:core-ethereum:chain-operations')
 const abiCoder = new utils.AbiCoder()
@@ -62,6 +63,15 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
   )
 
   async function sendTransaction<T extends (...args: any) => Promise<ContractTransaction>>(
+    method: T,
+    ...rest: Parameters<T>
+  ): Promise<ContractTransaction> {
+    const transaction = await sendTransactionAndReturnWithoutConfirmation(method, ...rest) 
+    await transaction.wait(CONFIRMATIONS)
+    return transaction
+  }
+
+  async function sendTransactionAndReturnWithoutConfirmation<T extends (...args: any) => Promise<ContractTransaction>>(
     method: T,
     ...rest: Parameters<T>
   ): Promise<ContractTransaction> {
@@ -133,7 +143,6 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
 
   async function announce(multiaddr: Multiaddr): Promise<string> {
     const transaction = await sendTransaction(channels.announce, multiaddr.bytes)
-    await transaction.wait()
     return transaction.hash
   }
 
@@ -176,7 +185,6 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
         [me.toHex(), counterparty.toHex(), myFund.toBN().toString(), counterpartyFund.toBN().toString()]
       )
     )
-    await transaction.wait()
     return transaction.hash
   }
 
@@ -196,20 +204,17 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
         [me.toHex(), counterparty.toHex(), amount.toBN().toString(), '0']
       )
     )
-    await transaction.wait()
     return transaction.hash
   }
 
   async function finalizeChannelClosure(channels: HoprChannels, counterparty: Address): Promise<Receipt> {
     const transaction = await sendTransaction(channels.finalizeChannelClosure, counterparty.toHex())
-    await transaction.wait()
     return transaction.hash
     // TODO: catch race-condition
   }
 
   async function initiateChannelClosure(channels: HoprChannels, counterparty: Address): Promise<Receipt> {
     const transaction = await sendTransaction(channels.initiateChannelClosure, counterparty.toHex())
-    await transaction.wait()
     return transaction.hash
     // TODO: catch race-condition
   }
@@ -231,13 +236,11 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
       ticket.winProb.toBN().toString(),
       ticket.signature.serialize()
     )
-    await transaction.wait()
     return transaction.hash
   }
 
   async function setCommitment(channels: HoprChannels, commitment: Hash): Promise<Receipt> {
     const transaction = await sendTransaction(channels.bumpCommitment, commitment.toHex())
-    await transaction.wait()
     return transaction.hash
   }
 
