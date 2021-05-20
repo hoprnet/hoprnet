@@ -89,10 +89,44 @@ jobs:
         env:
           HOPR_PACKAGE: hoprd
 
+  deploy_smart_contracts:
+    name: Deploy Smart Contracts
+    runs-on: ubuntu-latest
+    needs: [build]
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Configure Git info
+        run: bash -x scripts/configure-git-info.sh
+
+      - name: Update repo from latest pushes.
+        run: |
+          git pull origin ${{ github.ref }} # This should pull new packages with versions etc.
+
+      - name: Deploy 
+        working-directory: packages/ethereum
+        run: /
+          npx hardhat deploy --network xdai
+          npx hardhat deploy --network goerli
+
+      - name: Check if changed
+        id: check-changed
+        run: |
+          echo "::set-output name=changed::$(git status --porcelain)"
+
+      - name: Commit changes
+        if: steps.check-changed.outputs.changed != ''
+        run: |
+          git config --global user.email "noreply@hoprnet.org"
+          git config --global user.name "HOPR Deploy robot"
+          git commit -a -m "Update smart contract artifacts" || true
+          git pull origin ${{ github.ref }}
+          git push origin ${{ github.ref }}
+
   release:
     name: Create Github Release
     runs-on: ubuntu-latest
-    needs: [build]
+    needs: [deploy_smart_contracts]
     if: startsWith(github.ref, 'refs/heads/release/')
     steps:
       - uses: actions/checkout@v2
@@ -178,7 +212,6 @@ jobs:
           HOPR_PACKAGE: hoprd
 
       - name: Build Avado
-        working-directory: packages/avado
         run: |
           docker-compose build
           sudo npm install -g git+https://github.com/AvadoDServer/AVADOSDK.git#c11c4bd
@@ -190,6 +223,7 @@ jobs:
           git add dappnode_package.json docker-compose.yml releases.json
           git commit -m "Avado CI: new release"
           git pull origin ${{ github.ref }}
+            working-directory: packages/avado
           git push origin ${{ github.ref }}
 
           # http://go.ava.do/install/<IPFS HASH>
