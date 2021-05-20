@@ -5,13 +5,13 @@ They are redeemable at most once and they lose their value when the channel is c
 \subsection{Ticket issuance}
 A ticket can be issued once two nodes have established a payment channel with each other which means that at least one of them has locked HOPR tokens.
 \newline The ticket issuer A (A could also be the packet creator) selects the winning probability of the ticket and the relay fee to use and sets amount to:
-$$\sigma:=\dfrac{L\times F}{P_w}$$
+$$\sigma=\dfrac{L\times F}{P_w}$$
 where $\sigma$ is the amount of HOPR tokens set in the ticket, $L$ is the path length, $F$ is the relay fee and $P_w$ is the ticket's winning probability.
 \\~\\The issuer $(A)$ issues a ticket for the next downstream node,
 the challenge is given together with the routing information by the packet.
 \\$(A)$ does not know whether the ticket is a win or not.
-    \\$(A)$ sets content of a ticket to: $$t:=(\sigma,P_w,R,I,T_c,\zeta,c_{Id},\tau,V)$$
-\\~\\$(A)$ then signs the ticket with its private key and sends $T:= (t, Sig_I(t))$ to the recipient together with a mixnet packet.
+    \\$(A)$ sets content of a ticket to: $$t=(\sigma,P_w,R,I,T_c,\zeta,c_{Id},\tau,V)$$
+\\~\\$(A)$ then signs the ticket with its private key and sends $T= (t, Sig_I(t))$ to the recipient together with a mixnet packet.
     \\~\\\textbf{Recipient's adress $R$:} is a unique identifier that is derived from the recipient's public key.
     \\\textbf{Ticket Index $I$:} is set by the ticket issuer and increases with every issued ticket. The recipient verifies that the index increases with every packet and drops packets if this is not the case. Redeeming a ticket with index $n$ invalidates all tickets with index $I<n$, hence the relayer has a strong incentive to not accept tickets with unchanged index.
     \\\textbf{Ticket challenge $T_c$:}  is set by the ticket issuer and used to ckeck whether a ticket is redeemable before the packet is been relayed. The packet is dropped if that's not the case.
@@ -51,7 +51,7 @@ the challenge is given together with the routing information by the packet.
 
 \subsection{Ticket validation}
 Tickets are received together with packets which means that the recipient and the next downstream node share a secret $s$ whose key shares $s_i$ and $s_{i+1}$ are derivable by those nodes.
-\newline Once $(A)$ receives $s_{i+1}^{(1)}$ from (B) by the secret sharing, it can compute $$r_i:=s_i^{(0)}+s_{i+1}^{(1)}$$ where $r_i$ is the response $r$ at iteration $i$ such that it verifies
+\newline Once $(A)$ receives $s_{i+1}^{(1)}$ from (B) by the secret sharing, it can compute $$r_i=s_i^{(0)}+s_{i+1}^{(1)}$$ where $r_i$ is the response $r$ at iteration $i$ such that it verifies
 $$r_i*G=T_{c_i}$$
 Once the recipient transforms the packet, it is able to compute $s_i$. The recipient is now also able to extract the routing information from the packet.
 This includes a hint to the value $s_{i+1}$ given as $$H_i=s_{i+1}^{(1)}*G$$ which is stored in the sphinx packet header.
