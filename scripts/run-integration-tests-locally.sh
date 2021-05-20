@@ -67,7 +67,7 @@ function fund_node {
   fi
 
   echo "- Funding 1 ETH and 1 HOPR to $ETH"
-  $hardhat faucet --config packages/ethereum/hardhat.config.ts --address "$ETH" --network hardhat --ishopraddress true
+  $hardhat faucet --config packages/ethereum/hardhat.config.ts --address "$ETH" --network localhost --ishopraddress true
 }
 
 function cleanup {
