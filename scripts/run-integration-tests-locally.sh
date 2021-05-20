@@ -125,7 +125,7 @@ check_port 9093
 
 # --- Running Mock Blockchain --- {{{
 echo "- Running hardhat local node"
-DEVELOPMENT=true $hardhat node --config packages/ethereum/hardhat.config.ts --show-stack-traces > "${hardhat_rpc_log}" 2>&1 &
+DEVELOPMENT=true $hardhat node --config packages/ethereum/hardhat.config.ts --as-network hardhat --show-stack-traces > "${hardhat_rpc_log}" 2>&1 &
 #HARDHAT_PID="$(lsof -i :8545 | grep 'LISTEN' | awk '{ print $2 }')"  || true # FML
 HARDHAT_PID="$!"
 echo "- Hardhat node started (127.0.0.1:8545) with PID $HARDHAT_PID"
