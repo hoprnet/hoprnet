@@ -35,7 +35,7 @@ class Channel {
   ) {
     this.index = 0 // TODO - bump channel epoch to make sure..
     this.commitment = new Commitment(
-      (commitment: Hash) => this.chain.setCommitment(commitment),
+      (commitment: Hash) => this.chain.setCommitment(counterparty.toAddress(), commitment),
       () => this.getChainCommitment(),
       this.db,
       this.getId()
