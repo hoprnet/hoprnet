@@ -55,7 +55,7 @@ class Channel {
     unacknowledgedTicket: UnacknowledgedTicket,
     acknowledgement: HalfKey
   ): Promise<AcknowledgedTicket | null> {
-    if (!unacknowledgedTicket.verify(this.counterparty, acknowledgement)) {
+    if (!unacknowledgedTicket.verifyChallenge(acknowledgement)) {
       throw Error(`The acknowledgement is not sufficient to solve the embedded challenge.`)
     }
 
@@ -64,7 +64,12 @@ class Channel {
     const ticket = unacknowledgedTicket.ticket
 
     if (ticket.isWinningTicket(await this.commitment.getCurrentCommitment(), response, ticket.winProb)) {
-      const ack = new AcknowledgedTicket(ticket, response, await this.commitment.getCurrentCommitment())
+      const ack = new AcknowledgedTicket(
+        ticket,
+        response,
+        await this.commitment.getCurrentCommitment(),
+        unacknowledgedTicket.counterparty
+      )
       await this.commitment.bumpCommitment()
       return ack
     } else {
