@@ -66,7 +66,7 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
     method: T,
     ...rest: Parameters<T>
   ): Promise<ContractTransaction> {
-    const transaction = await sendTransactionAndReturnWithoutConfirmation(method, ...rest) 
+    const transaction = await sendTransactionAndReturnWithoutConfirmation(method, ...rest)
     await transaction.wait(CONFIRMATIONS)
     return transaction
   }
