@@ -5,8 +5,7 @@ In traditional payment channels, two parties A and B lock some funds within a sm
 \begin{align}  
 value_(ACK_n) &=\sum_{i=1}^nfee_{packet_i}
      \end{align}
-
- where $n$ is the total number of mixnet packets transformed.
+where $n$ is the total number of mixnet packets transformed.
 \\~\\If B received $ACK_n$ before sending $packet_{n-1}$, it has no incentive to process $packet_{n-1}$ rather than $packet_{n-2}$.
 \\~\\To avoid this limitation of traditional payment channels, HOPR utilizes probabilistic payments
 \\~\\In probabilistic payments, the payouts use a concept called “tickets”, a ticket can be either a win or a loss with a certain winning probability. This means nodes are incentivized to continue relaying packets as they don’t know which ticket is a win.
@@ -14,7 +13,6 @@ value_(ACK_n) &=\sum_{i=1}^nfee_{packet_i}
 \begin{align}  
  value ( ACK_i )  &  =value ( ACK_j ) \quad for \quad i,j\in \{1,n\}
          \end{align}
-
 Hence, there is no added value in pretending packet loss or intentionally changing the order in which packets are processed.
 \subsubsection{Channel management}
 Initially, each payment channel in HOPR is \textit{closed} which means that in order to transfer packets, those channels have to be opened.
