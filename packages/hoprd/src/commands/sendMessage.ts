@@ -69,10 +69,10 @@ export class SendMessage extends SendMessageBase {
 
         const recipient = path[path.length - 1]
         console.log(
-          `Sending message to ${styleValue(recipient.toB58String(), 'peerId')} via ${path.slice(
-            0,
-            path.length - 1
-          )} ...`
+          `Sending message to ${styleValue(recipient.toB58String(), 'peerId')} via ${path
+            .slice(0, path.length - 1)
+            .map((current) => styleValue(current.toB58String(), 'peerId'))
+            .join(',')} ...`
         )
         return this.sendMessage(state, recipient, message, async () => {
           return path.slice(0, path.length - 1)
