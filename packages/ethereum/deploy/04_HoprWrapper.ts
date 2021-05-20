@@ -15,9 +15,10 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   })
 }
 
-// deploy this only on xdai
+// this smart contract should not be redeployed
+// in a live network
 main.skip = async (env) => {
-  return env.network.name !== 'xdai'
+  return env.network.live || env.network.name !== 'xdai'
 }
 
 export default main

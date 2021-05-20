@@ -40,4 +40,8 @@ const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   })
 }
 
+// this smart contract should not be redeployed
+// in a live network
+main.skip = async (env) => env.network.live
+
 export default main
