@@ -7,11 +7,11 @@ import assert from 'assert'
 function createMockTickets(privKey: Uint8Array) {
   const acknowledge = () => {}
 
-  const getChannel = (_self: PublicKey, counterparty: PublicKey) => ({
+  const getChannel = (self: PublicKey, counterparty: PublicKey) => ({
     acknowledge,
     createTicket: (amount: Balance, challenge: Challenge, _winProb: number) => {
       return Ticket.create(
-        counterparty.toAddress(),
+        self.toAddress(),
         challenge,
         new UINT256(new BN(0)),
         new UINT256(new BN(0)),

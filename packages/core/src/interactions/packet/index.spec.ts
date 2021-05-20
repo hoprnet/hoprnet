@@ -27,28 +27,33 @@ import Defer from 'p-defer'
 
 const SECRET_LENGTH = 32
 
+function createFakeTicket(privKey: PeerId, challenge: Challenge, amount: Balance) {
+  return Ticket.create(
+    PublicKey.fromPeerId(privKey).toAddress(),
+    challenge,
+    new UINT256(new BN(0)),
+    new UINT256(new BN(0)),
+    amount,
+    UINT256.fromInverseProbability(new BN(1)),
+    new UINT256(new BN(0)),
+    privKey.privKey.marshal()
+  )
+}
+
 function createFakeChain(privKey: PeerId) {
   const acknowledge = (unacknowledgedTicket: UnacknowledgedTicket, _ackKeyShare: HalfKey) => {
     return new AcknowledgedTicket(
       unacknowledgedTicket.ticket,
       new Response(new Uint8Array({ length: Response.SIZE })),
-      new Hash(new Uint8Array({ length: Hash.SIZE }))
+      new Hash(new Uint8Array({ length: Hash.SIZE })),
+      unacknowledgedTicket.counterparty
     )
   }
 
   const getChannel = (_self: PublicKey, counterparty: PublicKey) => ({
     acknowledge,
     createTicket: (amount: Balance, challenge: Challenge, _winProb: number) => {
-      return Ticket.create(
-        counterparty.toAddress(),
-        challenge,
-        new UINT256(new BN(0)),
-        new UINT256(new BN(0)),
-        amount,
-        UINT256.fromInverseProbability(new BN(1)),
-        new UINT256(new BN(0)),
-        privKey.privKey.marshal()
-      )
+      return createFakeTicket(privKey, challenge, amount)
     },
     createDummyTicket: (challenge: Challenge) => {
       return Ticket.create(
@@ -106,16 +111,21 @@ describe('packet interaction', function () {
 
     const secrets = Array.from({ length: 2 }, (_) => randomBytes(SECRET_LENGTH))
 
-    const { ackChallenge, ownKey } = createPoRValuesForSender(secrets[0], secrets[1])
+    const { ackChallenge, ownKey, ticketChallenge } = createPoRValuesForSender(secrets[0], secrets[1])
 
     const challenge = AcknowledgementChallenge.create(ackChallenge, self)
 
-    const fakePacket = new Packet(new Uint8Array(), challenge, { serialize: () => new Uint8Array(Ticket.SIZE) } as any)
+    const fakePacket = new Packet(
+      new Uint8Array(),
+      challenge,
+      createFakeTicket(self, ticketChallenge, new Balance(new BN(1)))
+    )
 
     fakePacket.ownKey = ownKey
     fakePacket.ackKey = deriveAckKeyShare(secrets[0])
     fakePacket.nextHop = counterparty.pubKey.marshal()
     fakePacket.ackChallenge = ackChallenge
+    fakePacket.previousHop = PublicKey.fromPeerId(self)
 
     fakePacket.storeUnacknowledgedTicket(db)
 
