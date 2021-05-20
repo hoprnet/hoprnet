@@ -77,6 +77,9 @@ export type HoprOptions = {
     ip4?: NetOptions
     ip6?: NetOptions
   }
+  // You almost certainly want this to be false, this is so we can test with
+  // local testnets, and announce 127.0.0.1 addresses.
+  announceLocalAddresses?: boolean
 }
 
 export type NodeStatus = 'UNINITIALIZED' | 'INITIALIZING' | 'RUNNING' | 'DESTROYED'
@@ -154,6 +157,7 @@ class Hopr extends EventEmitter {
     if (publicNodes.length == 0) {
       log('No public nodes have announced yet, we cannot rely on relay')
     }
+    verbose('Using public nodes:', publicNodes)
 
     const libp2p = await LibP2P.create({
       peerId: this.id,
@@ -348,7 +352,18 @@ class Hopr extends EventEmitter {
    */
   public async getAnnouncedAddresses(peer: PeerId = this.getId()): Promise<Multiaddr[]> {
     if (peer.equals(this.getId())) {
-      return this.libp2p.multiaddrs
+      const addrs = this.libp2p.multiaddrs
+
+      // Most of the time we want to only return 'public' addresses, that is,
+      // addresses that have a good chance of being reachable by other nodes,
+      // therefore only ones that include a public IP etc.
+      //
+      // We also have a setting announceLocalAddresses that inverts this so we
+      // can test on closed local networks.
+      if (this.options.announceLocalAddresses) {
+        return addrs.filter((ma) => ma.toString().includes('127.0.0.1')) // TODO - proper filtering
+      }
+      return addrs.filter((ma) => !ma.toString().includes('127.0.0.1')) // TODO - proper filtering
     }
 
     return (await this.libp2p.peerRouting.findPeer(peer))?.multiaddrs || []
@@ -370,33 +385,17 @@ class Hopr extends EventEmitter {
   }
 
   /**
-   * Sends a message.
-   *
-   * @notice THIS METHOD WILL SPEND YOUR ETHER.
-   * @notice This method will fail if there are not enough funds to open
-   * the required payment channels. Please make sure that there are enough
-   * funds controlled by the given key pair.
-   *
    * @param msg message to send
    * @param destination PeerId of the destination
    * @param intermediateNodes optional set path manually
-   * the acknowledgement of the first hop
    */
-  public async sendMessage(
-    msg: Uint8Array,
-    destination: PeerId,
-    getIntermediateNodesManually?: () => Promise<PeerId[]>
-  ): Promise<void> {
+  public async sendMessage(msg: Uint8Array, destination: PeerId, intermediatePath?: PeerId[]): Promise<void> {
     const promises: Promise<void>[] = []
 
     for (let n = 0; n < msg.length / PACKET_SIZE; n++) {
       promises.push(
         new Promise<void>(async (resolve, reject) => {
-          let intermediatePath: PeerId[]
-          if (getIntermediateNodesManually != undefined) {
-            verbose('manually creating intermediatePath')
-            intermediatePath = await getIntermediateNodesManually()
-          } else {
+          if (intermediatePath == undefined) {
             try {
               intermediatePath = await this.getIntermediateNodes(destination)
             } catch (e) {
@@ -454,10 +453,14 @@ class Hopr extends EventEmitter {
     }
     let start = Date.now()
     try {
-      await this.heartbeat.pingNode(destination)
-      return { latency: Date.now() - start, info: '' }
+      const success = await this.heartbeat.pingNode(destination)
+      if (success) {
+        return { latency: Date.now() - start, info: '' }
+      } else {
+        return { info: 'failure', latency: -1 }
+      }
     } catch (e) {
-      //TODO
+      log(e)
       return { latency: -1, info: 'error' }
     }
   }
@@ -470,6 +473,9 @@ class Hopr extends EventEmitter {
   }
 
   public async connectionReport(): Promise<string> {
+    if (!this.networkPeers) {
+      return 'Node has not started yet'
+    }
     const connected = this.networkPeers.debugLog()
     const announced = await (await this.paymentChannels).indexer.getAnnouncedAddresses()
     return `${connected}
@@ -512,9 +518,9 @@ class Hopr extends EventEmitter {
     // exit if we already announced
     //if (account.hasAnnounced()) return
 
-    // exit if we don't have enough ETH
-    const nativeBalance = await this.getNativeBalance()
-    if (nativeBalance.toBN().lte(MIN_NATIVE_BALANCE)) return
+    if ((await this.getNativeBalance()).toBN().lte(MIN_NATIVE_BALANCE)) {
+      throw new Error('Cannot announce without funds')
+    }
 
     const multiaddrs = await this.getAnnouncedAddresses()
     const ip4 = multiaddrs.find((s) => s.toString().includes('/ip4/'))

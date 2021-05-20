@@ -18,8 +18,8 @@
       "address": "0x566a5c774bb8ABE1A88B4f187e24d4cD55C207A5"
     },
     "HoprChannels": {
-      "address": "0xbb6de194eb4547993ce53eeE0226638fc9aE0C60",
-      "deployedAt": 4260231
+      "address": "0x1b7714DC1D40ef37F612967Bed94a6dF84a93b85",
+      "deployedAt": 4812124
     },
     "HoprDistributor": {
       "address": "0xf4Ff7E5bf2cC7eF89196c8086982F6f5Ec502685"
@@ -33,8 +33,8 @@
       "address": "0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1"
     },
     "HoprChannels": {
-      "address": "0x2da84C8cf3ce847Fb4C016e17576C660D77C36E1",
-      "deployedAt": 15877153
+      "address": "0x202FAFCF98f694831200Ca3CCa143f675B990a9b",
+      "deployedAt": 16112782
     },
     "HoprWrapper": {
       "address": "0x097707143e01318734535676cfe2e5cF8b656ae8"

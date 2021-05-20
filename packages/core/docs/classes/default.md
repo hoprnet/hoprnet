@@ -103,7 +103,7 @@ Create an uninitialized Hopr Node
 
 Overrides: EventEmitter.constructor
 
-Defined in: [packages/core/src/index.ts:95](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L95)
+Defined in: [packages/core/src/index.ts:98](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L98)
 
 ## Properties
 
@@ -111,7 +111,7 @@ Defined in: [packages/core/src/index.ts:95](https://github.com/hoprnet/hoprnet/b
 
 • `Private` **checkTimeout**: *Timeout*
 
-Defined in: [packages/core/src/index.ts:88](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L88)
+Defined in: [packages/core/src/index.ts:91](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L91)
 
 ___
 
@@ -119,7 +119,7 @@ ___
 
 • `Private` **db**: *HoprDB*
 
-Defined in: [packages/core/src/index.ts:94](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L94)
+Defined in: [packages/core/src/index.ts:97](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L97)
 
 ___
 
@@ -127,7 +127,7 @@ ___
 
 • `Private` **forward**: *PacketForwardInteraction*
 
-Defined in: [packages/core/src/index.ts:92](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L92)
+Defined in: [packages/core/src/index.ts:95](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L95)
 
 ___
 
@@ -135,7 +135,7 @@ ___
 
 • `Private` **heartbeat**: *default*
 
-Defined in: [packages/core/src/index.ts:91](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L91)
+Defined in: [packages/core/src/index.ts:94](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L94)
 
 ___
 
@@ -143,7 +143,7 @@ ___
 
 • `Private` **libp2p**: [*LibP2P*](libp2p.md)
 
-Defined in: [packages/core/src/index.ts:93](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L93)
+Defined in: [packages/core/src/index.ts:96](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L96)
 
 ___
 
@@ -151,7 +151,7 @@ ___
 
 • `Private` **networkPeers**: *NetworkPeers*
 
-Defined in: [packages/core/src/index.ts:90](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L90)
+Defined in: [packages/core/src/index.ts:93](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L93)
 
 ___
 
@@ -159,7 +159,7 @@ ___
 
 • `Private` **paymentChannels**: *Promise*<default\>
 
-Defined in: [packages/core/src/index.ts:95](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L95)
+Defined in: [packages/core/src/index.ts:98](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L98)
 
 ___
 
@@ -167,7 +167,7 @@ ___
 
 • **status**: [*NodeStatus*](../modules.md#nodestatus)= 'UNINITIALIZED'
 
-Defined in: [packages/core/src/index.ts:86](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L86)
+Defined in: [packages/core/src/index.ts:89](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L89)
 
 ___
 
@@ -175,7 +175,7 @@ ___
 
 • `Private` **strategy**: ChannelStrategy
 
-Defined in: [packages/core/src/index.ts:89](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L89)
+Defined in: [packages/core/src/index.ts:92](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L92)
 
 ___
 
@@ -260,7 +260,7 @@ ___
 
 **Returns:** *Promise*<void\>
 
-Defined in: [packages/core/src/index.ts:513](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L513)
+Defined in: [packages/core/src/index.ts:519](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L519)
 
 ___
 
@@ -270,7 +270,7 @@ ___
 
 **Returns:** *Promise*<void\>
 
-Defined in: [packages/core/src/index.ts:485](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L485)
+Defined in: [packages/core/src/index.ts:491](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L491)
 
 ___
 
@@ -286,7 +286,7 @@ ___
 
 **Returns:** *Promise*<{ `receipt`: *string* ; `status`: *string*  }\>
 
-Defined in: [packages/core/src/index.ts:643](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L643)
+Defined in: [packages/core/src/index.ts:649](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L649)
 
 ___
 
@@ -296,7 +296,7 @@ ___
 
 **Returns:** *Promise*<string\>
 
-Defined in: [packages/core/src/index.ts:477](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L477)
+Defined in: [packages/core/src/index.ts:480](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L480)
 
 ___
 
@@ -347,7 +347,7 @@ Fund a payment channel
 
 **Returns:** *Promise*<{ `channelId`: *Hash*  }\>
 
-Defined in: [packages/core/src/index.ts:615](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L615)
+Defined in: [packages/core/src/index.ts:621](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L621)
 
 ___
 
@@ -357,7 +357,7 @@ ___
 
 **Returns:** *Promise*<AcknowledgedTicket[]\>
 
-Defined in: [packages/core/src/index.ts:660](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L660)
+Defined in: [packages/core/src/index.ts:666](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L666)
 
 ___
 
@@ -375,7 +375,7 @@ Lists the addresses which the given node announces to other nodes
 
 **Returns:** *Promise*<Multiaddr[]\>
 
-Defined in: [packages/core/src/index.ts:350](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L350)
+Defined in: [packages/core/src/index.ts:354](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L354)
 
 ___
 
@@ -385,7 +385,7 @@ ___
 
 **Returns:** *Promise*<Balance\>
 
-Defined in: [packages/core/src/index.ts:561](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L561)
+Defined in: [packages/core/src/index.ts:567](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L567)
 
 ___
 
@@ -395,7 +395,7 @@ ___
 
 **Returns:** *string*
 
-Defined in: [packages/core/src/index.ts:557](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L557)
+Defined in: [packages/core/src/index.ts:563](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L563)
 
 ___
 
@@ -411,7 +411,7 @@ ___
 
 **Returns:** *Promise*<ChannelEntry[]\>
 
-Defined in: [packages/core/src/index.ts:684](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L684)
+Defined in: [packages/core/src/index.ts:690](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L690)
 
 ___
 
@@ -421,7 +421,7 @@ ___
 
 **Returns:** *PeerId*[]
 
-Defined in: [packages/core/src/index.ts:470](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L470)
+Defined in: [packages/core/src/index.ts:473](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L473)
 
 ___
 
@@ -431,7 +431,7 @@ ___
 
 **Returns:** *Promise*<Address\>
 
-Defined in: [packages/core/src/index.ts:694](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L694)
+Defined in: [packages/core/src/index.ts:700](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L700)
 
 ___
 
@@ -441,7 +441,7 @@ ___
 
 **Returns:** *PeerId*
 
-Defined in: [packages/core/src/index.ts:342](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L342)
+Defined in: [packages/core/src/index.ts:346](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L346)
 
 ___
 
@@ -460,7 +460,7 @@ that will relay that message before it reaches its destination.
 
 **Returns:** *Promise*<PeerId[]\>
 
-Defined in: [packages/core/src/index.ts:710](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L710)
+Defined in: [packages/core/src/index.ts:716](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L716)
 
 ___
 
@@ -472,7 +472,7 @@ List the addresses on which the node is listening
 
 **Returns:** *Multiaddr*[]
 
-Defined in: [packages/core/src/index.ts:361](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L361)
+Defined in: [packages/core/src/index.ts:376](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L376)
 
 ___
 
@@ -494,7 +494,7 @@ ___
 
 **Returns:** *Promise*<NativeBalance\>
 
-Defined in: [packages/core/src/index.ts:566](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L566)
+Defined in: [packages/core/src/index.ts:572](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L572)
 
 ___
 
@@ -512,7 +512,7 @@ Gets the observed addresses of a given peer.
 
 **Returns:** Address[]
 
-Defined in: [packages/core/src/index.ts:369](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L369)
+Defined in: [packages/core/src/index.ts:384](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L384)
 
 ___
 
@@ -522,7 +522,7 @@ ___
 
 **Returns:** *Promise*<RoutingChannel[]\>
 
-Defined in: [packages/core/src/index.ts:317](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L317)
+Defined in: [packages/core/src/index.ts:321](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L321)
 
 ___
 
@@ -538,7 +538,7 @@ ___
 
 **Returns:** *Promise*<PublicKey\>
 
-Defined in: [packages/core/src/index.ts:689](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L689)
+Defined in: [packages/core/src/index.ts:695](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L695)
 
 ___
 
@@ -550,7 +550,7 @@ Returns the version of hopr-core.
 
 **Returns:** *any*
 
-Defined in: [packages/core/src/index.ts:324](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L324)
+Defined in: [packages/core/src/index.ts:328](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L328)
 
 ___
 
@@ -596,7 +596,7 @@ ___
 
 **Returns:** *void*
 
-Defined in: [packages/core/src/index.ts:256](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L256)
+Defined in: [packages/core/src/index.ts:260](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L260)
 
 ___
 
@@ -672,7 +672,7 @@ Open a payment channel
 
 **Returns:** *Promise*<{ `channelId`: *Hash*  }\>
 
-Defined in: [packages/core/src/index.ts:582](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L582)
+Defined in: [packages/core/src/index.ts:588](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L588)
 
 ___
 
@@ -682,7 +682,7 @@ ___
 
 **Returns:** *Promise*<void\>
 
-Defined in: [packages/core/src/index.ts:499](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L499)
+Defined in: [packages/core/src/index.ts:505](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L505)
 
 ___
 
@@ -702,7 +702,7 @@ Ping a node.
 
 latency
 
-Defined in: [packages/core/src/index.ts:456](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L456)
+Defined in: [packages/core/src/index.ts:455](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L455)
 
 ___
 
@@ -801,15 +801,7 @@ ___
 
 ### sendMessage
 
-▸ **sendMessage**(`msg`: *Uint8Array*, `destination`: *PeerId*, `getIntermediateNodesManually?`: () => *Promise*<PeerId[]\>): *Promise*<void\>
-
-Sends a message.
-
-**`notice`** THIS METHOD WILL SPEND YOUR ETHER.
-
-**`notice`** This method will fail if there are not enough funds to open
-the required payment channels. Please make sure that there are enough
-funds controlled by the given key pair.
+▸ **sendMessage**(`msg`: *Uint8Array*, `destination`: *PeerId*, `intermediatePath?`: *PeerId*[]): *Promise*<void\>
 
 #### Parameters
 
@@ -817,11 +809,11 @@ funds controlled by the given key pair.
 | :------ | :------ | :------ |
 | `msg` | *Uint8Array* | message to send |
 | `destination` | *PeerId* | PeerId of the destination |
-| `getIntermediateNodesManually?` | () => *Promise*<PeerId[]\> | - |
+| `intermediatePath?` | *PeerId*[] | - |
 
 **Returns:** *Promise*<void\>
 
-Defined in: [packages/core/src/index.ts:386](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L386)
+Defined in: [packages/core/src/index.ts:393](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L393)
 
 ___
 
@@ -837,7 +829,7 @@ ___
 
 **Returns:** *void*
 
-Defined in: [packages/core/src/index.ts:545](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L545)
+Defined in: [packages/core/src/index.ts:551](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L551)
 
 ___
 
@@ -865,7 +857,7 @@ ___
 
 **Returns:** *Promise*<string\>
 
-Defined in: [packages/core/src/index.ts:571](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L571)
+Defined in: [packages/core/src/index.ts:577](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L577)
 
 ___
 
@@ -895,7 +887,7 @@ If the node is not funded, it will throw.
 
 **Returns:** *Promise*<void\>
 
-Defined in: [packages/core/src/index.ts:146](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L146)
+Defined in: [packages/core/src/index.ts:149](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L149)
 
 ___
 
@@ -907,7 +899,7 @@ Shuts down the node and saves keys and peerBook in the database
 
 **Returns:** *Promise*<void\>
 
-Defined in: [packages/core/src/index.ts:331](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L331)
+Defined in: [packages/core/src/index.ts:335](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L335)
 
 ___
 
@@ -923,7 +915,7 @@ ___
 
 **Returns:** *Promise*<{ `ackTicket`: *AcknowledgedTicket* ; `receipt`: *string* ; `status`: ``"SUCCESS"``  } \| { `message`: *string* ; `status`: ``"FAILURE"``  } \| { `error`: *any* ; `status`: *string* = 'ERROR' }\>
 
-Defined in: [packages/core/src/index.ts:664](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L664)
+Defined in: [packages/core/src/index.ts:670](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L670)
 
 ___
 
@@ -939,7 +931,7 @@ ___
 
 **Returns:** *Promise*<void\>
 
-Defined in: [packages/core/src/index.ts:275](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L275)
+Defined in: [packages/core/src/index.ts:279](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L279)
 
 ___
 
@@ -949,7 +941,7 @@ ___
 
 **Returns:** *Promise*<void\>
 
-Defined in: [packages/core/src/index.ts:723](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L723)
+Defined in: [packages/core/src/index.ts:729](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L729)
 
 ___
 
@@ -967,7 +959,7 @@ ___
 
 **Returns:** *Promise*<string\>
 
-Defined in: [packages/core/src/index.ts:699](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L699)
+Defined in: [packages/core/src/index.ts:705](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L705)
 
 ___
 

@@ -77,6 +77,14 @@ Ideally, we provide a way within the node to allow users to be able to on-ramp t
 
 Initially saw in #430.
 
+### Switch from BN.js to BigNumber.js
+
+#### Problem statement
+
+Currently, HOPR is using BN.js and BigNumber.js . BN.js was introduced by Web3.js which got replaced by Ethers.js, hence HOPR is using multiple libraries to work with "big numbera" (32 bytes (Ethereum) rather 4 bytes (Javascript)).
+
+Streamlining HOPR to use only library will make things easier and prevents from converting to one or the other representation of "big numbers".
+
 ## Ecosystem
 
 _These discussion relate to topics that involve the HOPR ecosystem as a whole, either on how people interact with the protocol, `hoprd`, its documentantion, or other principles around privacy._

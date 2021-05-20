@@ -69,6 +69,7 @@ ___
 | Name | Type |
 | :------ | :------ |
 | `announce?` | *boolean* |
+| `announceLocalAddresses?` | *boolean* |
 | `connector?` | HoprCoreEthereum |
 | `createDbIfNotExist?` | *boolean* |
 | `dbPath?` | *string* |
@@ -88,7 +89,7 @@ ___
 
 Ƭ **NodeStatus**: ``"UNINITIALIZED"`` \| ``"INITIALIZING"`` \| ``"RUNNING"`` \| ``"DESTROYED"``
 
-Defined in: [packages/core/src/index.ts:83](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L83)
+Defined in: [packages/core/src/index.ts:86](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L86)
 
 ## Variables
 
