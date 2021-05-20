@@ -1,5 +1,8 @@
 name: HOPR End-to-end tests
 
+env:
+  HOPR_GITHUB_REF: ${{ github.ref }}
+
 on:
   push:
     branches: ['**']
@@ -10,16 +13,12 @@ jobs:
   e2e:
     name: ${{ matrix.test }}
     runs-on: ubuntu-latest
-    timeout-minutes: 5
-    strategy:
-      fail-fast: true
-      matrix:
-        test: [1_nodes_have_valid_eth_address, 2_nodes_can_be_funded]
+    timeout-minutes: 15
 
     steps:
       - uses: actions/checkout@v2
 
-      - name: Use Node.js 
+      - name: Use Node.js
         uses: actions/setup-node@v2
         with:
           node-version: 14
@@ -41,15 +40,10 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-nodejs-
 
-      - name: Install
-        if: steps.nodejs-cache.outputs.cache-hit != 'true'
-        run: |
-          yarn
-
       - name: Build
         run: |
+          yarn
           yarn build
 
       - name: Test
-        shell: bash {0}
-        run: ./test/e2e/${{ matrix.test }}.sh 
+        run: bash ./scripts/run-integration-tests-locally.sh

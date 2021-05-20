@@ -1,7 +1,6 @@
 name: HOPR Generate API docs
 
 env:
-  HOPR_IN_CI: 1
   HOPR_GITHUB_REF: ${{ github.ref }}
 
 on:
