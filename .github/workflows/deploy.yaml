@@ -107,7 +107,7 @@ jobs:
         working-directory: packages/ethereum
         run: /
           npx hardhat deploy --network xdai
-          npx hardhat deploy --network goerli
+          # npx hardhat deploy --network goerli
 
       - name: Check if changed
         id: check-changed
