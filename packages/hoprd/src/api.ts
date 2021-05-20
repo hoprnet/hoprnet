@@ -13,6 +13,7 @@ export default function setupAPI(node: Hopr, logs: any, options: any) {
 
   const cmds = new Commands(node)
   service.post('/api/v1/command', async (req, res) => {
+    await node.waitForRunning()
     cmds.execute(req.body).then((resp: any) => {
       res.send(resp)
     })

@@ -247,6 +247,7 @@ class Hopr extends EventEmitter {
     this.periodicCheck()
     this.setChannelStrategy(this.options.strategy || 'passive')
     this.status = 'RUNNING'
+    this.emit('running')
 
     // Log information
     log('# STARTED NODE')
@@ -392,6 +393,9 @@ class Hopr extends EventEmitter {
    */
   public async sendMessage(msg: Uint8Array, destination: PeerId, intermediatePath?: PeerId[]): Promise<void> {
     const promises: Promise<void>[] = []
+    if (this.status != 'RUNNING') {
+      throw new Error('Cannot send message until the node is running')
+    }
 
     for (let n = 0; n < msg.length / PACKET_SIZE; n++) {
       promises.push(
@@ -740,6 +744,11 @@ class Hopr extends EventEmitter {
       }
       tick()
     })
+  }
+
+  // Utility method to wait until the node is running successfully
+  public async waitForRunning(): Promise<void> {
+    return new Promise(resolve => this.once('running', resolve))
   }
 }
 
