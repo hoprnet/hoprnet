@@ -39,6 +39,9 @@ export const storeContract = async (
 }
 
 export const getContract = async (network: string, name: string): Promise<ContractData> => {
+  // HACK: hardhat keeps using localhost internally - fix coming in https://github.com/hoprnet/hoprnet/pull/1676
+  if (network === 'hardhat') network = 'localhost'
+
   try {
     return require(OUTPUT_FILE)?.[network]?.[name]
   } catch {
