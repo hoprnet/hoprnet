@@ -1,21 +1,22 @@
 import { iterateHash, recoverIteratedHash, HoprDB, Hash } from '@hoprnet/hopr-utils'
 import { randomBytes } from 'crypto'
 import Debug from 'debug'
+import type { Receipt } from './ethereum'
 
 const log = Debug('hopr-core-ethereum:commitment')
 
 export const DB_ITERATION_BLOCK_SIZE = 10000
 export const TOTAL_ITERATIONS = 100000
 
-async function hashFunction(msg: Uint8Array): Promise<Uint8Array> {
+function hashFunction(msg: Uint8Array): Uint8Array {
   return Hash.create(msg).serialize().slice(0, Hash.SIZE)
 }
 
 export class Commitment {
   private initialized: boolean = false
- 
+
   constructor(
-    private setChainCommitment: (commitment: Hash) => Promise<void>,
+    private setChainCommitment: (commitment: Hash) => Promise<Receipt>,
     private getChainCommitment: () => Promise<Hash>,
     private db: HoprDB,
     private channelId: Hash // used in db key
@@ -43,7 +44,7 @@ export class Commitment {
     let result = await recoverIteratedHash(
       hash.serialize(),
       hashFunction,
-      async (x) => await this.searchDBFor(x),
+      this.searchDBFor.bind(this),
       TOTAL_ITERATIONS,
       DB_ITERATION_BLOCK_SIZE
     )
