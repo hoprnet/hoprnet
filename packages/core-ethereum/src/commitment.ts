@@ -13,7 +13,7 @@ async function hashFunction(msg: Uint8Array): Promise<Uint8Array> {
 
 export class Commitment {
   private initialized: boolean = false
- 
+
   constructor(
     private setChainCommitment: (commitment: Hash) => Promise<void>,
     private getChainCommitment: () => Promise<Hash>,
