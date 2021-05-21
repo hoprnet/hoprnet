@@ -26,6 +26,7 @@
 ### Methods
 
 - [getHash](ticket.md#gethash)
+- [getPathPosition](ticket.md#getpathposition)
 - [isWinningTicket](ticket.md#iswinningticket)
 - [recoverSigner](ticket.md#recoversigner)
 - [serialize](ticket.md#serialize)
@@ -123,6 +124,23 @@ Defined in: [types/ticket.ts:135](https://github.com/hoprnet/hoprnet/blob/master
 **Returns:** [*Hash*](hash.md)
 
 Defined in: [types/ticket.ts:119](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L119)
+
+___
+
+### getPathPosition
+
+▸ **getPathPosition**(`pricePerTicket`: *BN*, `inverseTicketWinProb`: *BN*): *number*
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `pricePerTicket` | *BN* |
+| `inverseTicketWinProb` | *BN* |
+
+**Returns:** *number*
+
+Defined in: [types/ticket.ts:180](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L180)
 
 ___
 
