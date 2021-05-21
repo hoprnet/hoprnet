@@ -153,7 +153,6 @@ class Indexer extends EventEmitter {
       try {
         // TODO: wildcard is supported but not properly typed
         events = await this.chain.getChannels().queryFilter('*' as any, fromBlock, toBlock)
-        console.log(`plain events`, events)
       } catch (error) {
         failedCount++
 

@@ -65,7 +65,7 @@ const useFixtures = (ops: { latestBlockNumber?: number; pastEvents?: Event<any>[
   const { hoprChannels, newEvent } = createHoprChannelsMock({ pastEvents })
   const chain = createChainMock(provider, hoprChannels)
 
-  const indexer = new Indexer(0, db, chain, 1, 5)
+  const indexer = new Indexer(0, db, chain, 1, 5, fixtures.PARTY_A.toAddress(), () => {})
 
   return {
     db,
