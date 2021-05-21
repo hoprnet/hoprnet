@@ -125,7 +125,9 @@ export default class HoprEthereum {
     return await this.indexer.getPublicNodes()
   }
 
-  public async onOwnChannel() {}
+  public async onOwnChannel(entry: ChannelEntry) {
+    onOwnChannel(this.chain.getPublicKey(), entry, this.getChannel.bind(this), this.getPublicKeyOf.bind(this))
+  }
 
   /**
    * Creates an uninitialised instance.
@@ -161,23 +163,38 @@ export default class HoprEthereum {
     log(`using blockchain address ${coreConnector.getAddress().toHex()}`)
     log(chalk.green('Connector started'))
 
-    for (const unfinished of unfinishedChannels) {
-      console.log(`found unfinished channel`, unfinished)
-      if (!unfinished.partyATicketEpoch.toBN().isZero()) {
-        continue
-      }
+    indexer.setOnOwnChannel(coreConnector.onOwnChannel.bind(coreConnector))
 
-      let channel: Channel
-      if (self.toAddress().eq(unfinished.partyA)) {
-        channel = coreConnector.getChannel(self, await indexer.getPublicKeyOf(unfinished.partyB))
-      } else {
-        channel = coreConnector.getChannel(await indexer.getPublicKeyOf(unfinished.partyB), self)
-      }
-      await channel.initCommitment()
+    for (const unfinished of unfinishedChannels) {
+      await onOwnChannel(
+        self,
+        unfinished,
+        coreConnector.getChannel.bind(coreConnector),
+        coreConnector.getPublicKeyOf.bind(coreConnector)
+      )
     }
 
     return coreConnector
   }
+}
+
+async function onOwnChannel(
+  self: PublicKey,
+  entry: ChannelEntry,
+  getChannel: InstanceType<typeof HoprEthereum>['getChannel'],
+  getPublicKeyOf: (addr: Address) => Promise<PublicKey>
+) {
+  if (!entry.partyATicketEpoch.toBN().isZero()) {
+    return
+  }
+
+  let channel: Channel
+  if (self.toAddress().eq(entry.partyA)) {
+    channel = getChannel(self, await getPublicKeyOf(entry.partyB))
+  } else {
+    channel = getChannel(await getPublicKeyOf(entry.partyB), self)
+  }
+  await channel.initCommitment()
 }
 
 export { Channel, Indexer, RoutingChannel }

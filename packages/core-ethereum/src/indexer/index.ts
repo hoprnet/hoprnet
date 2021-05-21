@@ -84,7 +84,6 @@ class Indexer extends EventEmitter {
       this.restart()
     })
     this.chain.subscribeChannelEvents((e) => {
-      console.log(`received event`, e)
       this.onNewEvents([e])
     })
 
@@ -121,6 +120,9 @@ class Indexer extends EventEmitter {
     }
   }
 
+  public setOnOwnChannel(fn: (event: ChannelEntry) => void): void {
+    this.onOwnChannel = fn
+  }
   /**
    * Query past events, this will loop until it gets all blocks from {toBlock} to {fromBlock}.
    * If we exceed response pull limit, we switch into quering smaller chunks.
