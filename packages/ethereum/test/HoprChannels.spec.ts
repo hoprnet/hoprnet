@@ -149,7 +149,7 @@ const useFixtures = deployments.createFixture(async () => {
     {
       recipient: ACCOUNT_B.address,
       proofOfRelaySecret: PROOF_OF_RELAY_SECRET_0,
-      ticketEpoch: '0',
+      ticketEpoch: '1',
       ticketIndex: '1',
       amount: '10',
       winProb: WIN_PROB_100.toString(),
@@ -390,7 +390,7 @@ describe('with a funded HoprChannel (A: 70, B: 30), secrets initialized', functi
       {
         recipient: ACCOUNT_B.address,
         proofOfRelaySecret: PROOF_OF_RELAY_SECRET_0,
-        ticketEpoch: '0',
+        ticketEpoch: '1',
         ticketIndex: '1',
         amount: '10',
         winProb: WIN_PROB_0.toString(),
@@ -543,7 +543,7 @@ describe('with a reopened channel', function () {
         recipient: ACCOUNT_B.address,
         proofOfRelaySecret: PROOF_OF_RELAY_SECRET_0,
         ticketIndex: '1',
-        ticketEpoch: '0',
+        ticketEpoch: '1',
         amount: '10',
         winProb: WIN_PROB_100.toString(),
         channelEpoch: '2'
@@ -556,7 +556,7 @@ describe('with a reopened channel', function () {
         recipient: ACCOUNT_A.address,
         proofOfRelaySecret: PROOF_OF_RELAY_SECRET_0,
         ticketIndex: '1',
-        ticketEpoch: '2',
+        ticketEpoch: '1',
         amount: '10',
         winProb: WIN_PROB_100.toString(),
         channelEpoch: '2'

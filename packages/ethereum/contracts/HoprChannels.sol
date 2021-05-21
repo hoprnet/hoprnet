@@ -196,8 +196,10 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
           channel.partyATicketEpoch = channel.partyATicketEpoch.add(1);
         } else {
           channel.partyBCommitment = newCommitment;
-          channel.partyATicketEpoch = channel.partyBTicketEpoch.add(1);
+          channel.partyBTicketEpoch = channel.partyBTicketEpoch.add(1);
         }
+
+        emit ChannelUpdate(msg.sender, counterparty, channel);
     }
 
     /**
