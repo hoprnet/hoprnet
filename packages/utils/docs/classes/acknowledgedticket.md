@@ -12,6 +12,7 @@
 
 - [preImage](acknowledgedticket.md#preimage)
 - [response](acknowledgedticket.md#response)
+- [signer](acknowledgedticket.md#signer)
 - [ticket](acknowledgedticket.md#ticket)
 
 ### Accessors
@@ -28,7 +29,7 @@
 
 ### constructor
 
-\+ **new AcknowledgedTicket**(`ticket`: [*Ticket*](ticket.md), `response`: [*Response*](response.md), `preImage`: [*Hash*](hash.md)): [*AcknowledgedTicket*](acknowledgedticket.md)
+\+ **new AcknowledgedTicket**(`ticket`: [*Ticket*](ticket.md), `response`: [*Response*](response.md), `preImage`: [*Hash*](hash.md), `signer`: [*PublicKey*](publickey.md)): [*AcknowledgedTicket*](acknowledgedticket.md)
 
 #### Parameters
 
@@ -37,6 +38,7 @@
 | `ticket` | [*Ticket*](ticket.md) |
 | `response` | [*Response*](response.md) |
 | `preImage` | [*Hash*](hash.md) |
+| `signer` | [*PublicKey*](publickey.md) |
 
 **Returns:** [*AcknowledgedTicket*](acknowledgedticket.md)
 
@@ -56,6 +58,12 @@ ___
 
 ___
 
+### signer
+
+• `Readonly` **signer**: [*PublicKey*](publickey.md)
+
+___
+
 ### ticket
 
 • `Readonly` **ticket**: [*Ticket*](ticket.md)
@@ -68,7 +76,7 @@ ___
 
 **Returns:** *number*
 
-Defined in: [types/acknowledgedTicket.ts:28](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/acknowledgedTicket.ts#L28)
+Defined in: [types/acknowledgedTicket.ts:39](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/acknowledgedTicket.ts#L39)
 
 ## Methods
 
@@ -78,7 +86,7 @@ Defined in: [types/acknowledgedTicket.ts:28](https://github.com/hoprnet/hoprnet/
 
 **Returns:** *Uint8Array*
 
-Defined in: [types/acknowledgedTicket.ts:7](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/acknowledgedTicket.ts#L7)
+Defined in: [types/acknowledgedTicket.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/acknowledgedTicket.ts#L16)
 
 ___
 
@@ -94,7 +102,7 @@ ___
 
 **Returns:** *boolean*
 
-Defined in: [types/acknowledgedTicket.ts:15](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/acknowledgedTicket.ts#L15)
+Defined in: [types/acknowledgedTicket.ts:25](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/acknowledgedTicket.ts#L25)
 
 ___
 
@@ -110,4 +118,4 @@ ___
 
 **Returns:** [*AcknowledgedTicket*](acknowledgedticket.md)
 
-Defined in: [types/acknowledgedTicket.ts:19](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/acknowledgedTicket.ts#L19)
+Defined in: [types/acknowledgedTicket.ts:29](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/acknowledgedTicket.ts#L29)
