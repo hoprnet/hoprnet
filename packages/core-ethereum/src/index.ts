@@ -147,7 +147,7 @@ export default class HoprEthereum {
 
     const self = chain.getPublicKey()
 
-    const unfinishedChannels: ChannelEntry[] = []
+    const ownChannels: ChannelEntry[] = []
     const indexer = new Indexer(
       chain.getGenesisBlock(),
       db,
@@ -155,7 +155,7 @@ export default class HoprEthereum {
       options.maxConfirmations ?? INDEXER_MAX_CONFIRMATIONS,
       INDEXER_BLOCK_RANGE,
       self.toAddress(),
-      (channel: ChannelEntry) => unfinishedChannels.push(channel)
+      (channel: ChannelEntry) => ownChannels.push(channel)
     )
     await indexer.start()
 
@@ -165,10 +165,10 @@ export default class HoprEthereum {
 
     indexer.setOnOwnChannel(coreConnector.onOwnChannel.bind(coreConnector))
 
-    for (const unfinished of unfinishedChannels) {
+    for (const ownChannel of ownChannels) {
       await onOwnChannel(
         self,
-        unfinished,
+        ownChannel,
         coreConnector.getChannel.bind(coreConnector),
         coreConnector.getPublicKeyOf.bind(coreConnector)
       )
