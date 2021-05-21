@@ -27,6 +27,7 @@
 - [HEARTBEAT\_INTERVAL](modules.md#heartbeat_interval)
 - [HEARTBEAT\_INTERVAL\_VARIANCE](modules.md#heartbeat_interval_variance)
 - [HEARTBEAT\_TIMEOUT](modules.md#heartbeat_timeout)
+- [INVERSE\_TICKET\_WIN\_PROB](modules.md#inverse_ticket_win_prob)
 - [MAX\_AUTO\_CHANNELS](modules.md#max_auto_channels)
 - [MAX\_HOPS](modules.md#max_hops)
 - [MAX\_NEW\_CHANNELS\_PER\_TICK](modules.md#max_new_channels_per_tick)
@@ -35,10 +36,10 @@
 - [MAX\_PATH\_ITERATIONS](modules.md#max_path_iterations)
 - [MINIMUM\_REASONABLE\_CHANNEL\_STAKE](modules.md#minimum_reasonable_channel_stake)
 - [MIN\_NATIVE\_BALANCE](modules.md#min_native_balance)
-- [NAME](modules.md#name)
 - [NETWORK\_QUALITY\_THRESHOLD](modules.md#network_quality_threshold)
 - [PACKET\_SIZE](modules.md#packet_size)
 - [PATH\_RANDOMNESS](modules.md#path_randomness)
+- [PRICE\_PER\_PACKET](modules.md#price_per_packet)
 - [PROTOCOL\_ACKNOWLEDGEMENT](modules.md#protocol_acknowledgement)
 - [PROTOCOL\_HEARTBEAT](modules.md#protocol_heartbeat)
 - [PROTOCOL\_ONCHAIN\_KEY](modules.md#protocol_onchain_key)
@@ -46,8 +47,6 @@
 - [PROTOCOL\_STRING](modules.md#protocol_string)
 - [SUGGESTED\_BALANCE](modules.md#suggested_balance)
 - [SUGGESTED\_NATIVE\_BALANCE](modules.md#suggested_native_balance)
-- [TICKET\_AMOUNT](modules.md#ticket_amount)
-- [TICKET\_WIN\_PROB](modules.md#ticket_win_prob)
 - [VERSION](modules.md#version)
 
 ## Type aliases
@@ -56,7 +55,7 @@
 
 Ƭ **ChannelStrategyNames**: ``"passive"`` \| ``"promiscuous"``
 
-Defined in: [packages/core/src/index.ts:66](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L66)
+Defined in: [packages/core/src/index.ts:65](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L65)
 
 ___
 
@@ -81,7 +80,7 @@ ___
 | `provider` | *string* |
 | `strategy?` | [*ChannelStrategyNames*](modules.md#channelstrategynames) |
 
-Defined in: [packages/core/src/index.ts:68](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L68)
+Defined in: [packages/core/src/index.ts:67](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L67)
 
 ___
 
@@ -89,7 +88,7 @@ ___
 
 Ƭ **NodeStatus**: ``"UNINITIALIZED"`` \| ``"INITIALIZING"`` \| ``"RUNNING"`` \| ``"DESTROYED"``
 
-Defined in: [packages/core/src/index.ts:86](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L86)
+Defined in: [packages/core/src/index.ts:85](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L85)
 
 ## Variables
 
@@ -138,6 +137,14 @@ ___
 • `Const` **HEARTBEAT\_TIMEOUT**: ``4000``= 4000
 
 Defined in: [packages/core/src/constants.ts:29](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L29)
+
+___
+
+### INVERSE\_TICKET\_WIN\_PROB
+
+• `Const` **INVERSE\_TICKET\_WIN\_PROB**: ``"1"``= '1'
+
+Defined in: [packages/core/src/constants.ts:7](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L7)
 
 ___
 
@@ -205,14 +212,6 @@ Defined in: [packages/core/src/constants.ts:40](https://github.com/hoprnet/hoprn
 
 ___
 
-### NAME
-
-• `Const` **NAME**: ``"ipfs"``= 'ipfs'
-
-Defined in: [packages/core/src/constants.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L8)
-
-___
-
 ### NETWORK\_QUALITY\_THRESHOLD
 
 • `Const` **NETWORK\_QUALITY\_THRESHOLD**: ``0.5``= 0.5
@@ -225,7 +224,7 @@ ___
 
 • `Const` **PACKET\_SIZE**: ``500``= 500
 
-Defined in: [packages/core/src/constants.ts:7](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L7)
+Defined in: [packages/core/src/constants.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L8)
 
 ___
 
@@ -234,6 +233,14 @@ ___
 • `Const` **PATH\_RANDOMNESS**: ``0.1``= 0.1
 
 Defined in: [packages/core/src/constants.ts:34](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L34)
+
+___
+
+### PRICE\_PER\_PACKET
+
+• `Const` **PRICE\_PER\_PACKET**: ``"10000000000000000"``= '10000000000000000'
+
+Defined in: [packages/core/src/constants.ts:5](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L5)
 
 ___
 
@@ -290,22 +297,6 @@ ___
 • `Const` **SUGGESTED\_NATIVE\_BALANCE**: *BN*
 
 Defined in: [packages/core/src/constants.ts:44](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L44)
-
-___
-
-### TICKET\_AMOUNT
-
-• `Const` **TICKET\_AMOUNT**: ``"10000000000000000"``= '10000000000000000'
-
-Defined in: [packages/core/src/constants.ts:5](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L5)
-
-___
-
-### TICKET\_WIN\_PROB
-
-• `Const` **TICKET\_WIN\_PROB**: ``1``= 1
-
-Defined in: [packages/core/src/constants.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/constants.ts#L6)
 
 ___
 

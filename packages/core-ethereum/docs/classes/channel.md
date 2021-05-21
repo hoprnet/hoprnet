@@ -131,7 +131,7 @@ ___
 
 ### createTicket
 
-▸ **createTicket**(`amount`: *Balance*, `challenge`: *Challenge*, `winProb`: *number*): *Promise*<Ticket\>
+▸ **createTicket**(`amount`: *Balance*, `challenge`: *Challenge*, `winProb`: *BN*): *Promise*<Ticket\>
 
 Creates a signed ticket that includes the given amount of
 tokens
@@ -146,7 +146,7 @@ recovery algorithm is used to perform an EC-point multiplication.
 | :------ | :------ | :------ |
 | `amount` | *Balance* | value of the ticket |
 | `challenge` | *Challenge* | challenge to solve in order to redeem the ticket |
-| `winProb` | *number* | the winning probability to use |
+| `winProb` | *BN* | the winning probability to use |
 
 **Returns:** *Promise*<Ticket\>
 
