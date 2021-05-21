@@ -6,27 +6,29 @@ import {
   UnacknowledgedTicket,
   Ticket,
   AcknowledgedTicket,
-  Address,
   Balance,
   Hash,
   UINT256,
   HalfKey,
   Response,
   HalfKeyChallenge,
-  ChannelEntry
+  ChannelEntry,
+  PublicKey,
+  Address
 } from './types'
 import BN from 'bn.js'
+import { SECP256K1_CONSTANTS } from './crypto'
 
-function createMockedTicket() {
+function createMockedTicket(signerPrivKey: Uint8Array, counterparty: Address) {
   return Ticket.create(
-    new Address(randomBytes(Address.SIZE)),
+    counterparty,
     new Response(Uint8Array.from(randomBytes(32))).toChallenge(),
     UINT256.fromString('0'),
     UINT256.fromString('0'),
     new Balance(new BN(0)),
     UINT256.fromInverseProbability(new BN(1)),
     UINT256.fromString('1'),
-    randomBytes(32)
+    signerPrivKey
   )
 }
 
@@ -57,11 +59,14 @@ describe(`database tests`, function () {
   })
 
   it('ticket workflow', async function () {
+    const privKey = randomBytes(SECP256K1_CONSTANTS.PRIVATE_KEY_LENGTH)
+    const pubKey = PublicKey.fromPrivKey(privKey)
     // this comes from a Packet
     const halfKeyChallenge = new HalfKeyChallenge(Uint8Array.from(randomBytes(HalfKeyChallenge.SIZE)))
     const unAck = new UnacknowledgedTicket(
-      createMockedTicket(),
-      new HalfKey(Uint8Array.from(randomBytes(HalfKey.SIZE)))
+      createMockedTicket(privKey, new Address(randomBytes(Address.SIZE))),
+      new HalfKey(Uint8Array.from(randomBytes(HalfKey.SIZE))),
+      pubKey
     )
     await db.storeUnacknowledgedTicket(halfKeyChallenge, unAck)
     assert((await db.getTickets()).length == 1, `DB should find one ticket`)
@@ -72,7 +77,8 @@ describe(`database tests`, function () {
     const ack = new AcknowledgedTicket(
       ticket.ticket,
       new Response(Uint8Array.from(randomBytes(Hash.SIZE))),
-      new Hash(Uint8Array.from(randomBytes(Hash.SIZE)))
+      new Hash(Uint8Array.from(randomBytes(Hash.SIZE))),
+      pubKey
     )
     await db.replaceUnAckWithAck(halfKeyChallenge, ack)
 
