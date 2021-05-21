@@ -77,6 +77,10 @@ class Channel {
     }
   }
 
+  async initCommitment() {
+    await this.commitment.bumpCommitment()
+  }
+
   getId() {
     return Channel.generateId(this.self.toAddress(), this.counterparty.toAddress())
   }

@@ -31,7 +31,9 @@ class Indexer extends EventEmitter {
     private db: HoprDB,
     private chain: ChainWrapper,
     private maxConfirmations: number,
-    private blockRange: number
+    private blockRange: number,
+    private self: Address,
+    private onOwnChannel: (event: ChannelEntry) => void
   ) {
     super()
   }
@@ -82,6 +84,7 @@ class Indexer extends EventEmitter {
       this.restart()
     })
     this.chain.subscribeChannelEvents((e) => {
+      console.log(`received event`, e)
       this.onNewEvents([e])
     })
 
@@ -148,6 +151,7 @@ class Indexer extends EventEmitter {
       try {
         // TODO: wildcard is supported but not properly typed
         events = await this.chain.getChannels().queryFilter('*' as any, fromBlock, toBlock)
+        console.log(`plain events`, events)
       } catch (error) {
         failedCount++
 
@@ -269,6 +273,9 @@ class Indexer extends EventEmitter {
 
   private async onChannelUpdated(event: Event<'ChannelUpdate'>): Promise<void> {
     const channel = ChannelEntry.fromSCEvent(event)
+    if (channel.partyA.eq(this.self) || channel.partyB.eq(this.self)) {
+      this.onOwnChannel(channel)
+    }
     await this.db.updateChannel(channel.getId(), channel)
   }
 

@@ -10,7 +10,8 @@ import {
   Address,
   NativeBalance,
   cacheNoArgAsyncFunction,
-  HoprDB
+  HoprDB,
+  ChannelEntry
 } from '@hoprnet/hopr-utils'
 import Indexer from './indexer'
 import { RoutingChannel } from './indexer'
@@ -124,6 +125,8 @@ export default class HoprEthereum {
     return await this.indexer.getPublicNodes()
   }
 
+  public async onOwnChannel() {}
+
   /**
    * Creates an uninitialised instance.
    *
@@ -140,18 +143,39 @@ export default class HoprEthereum {
     const chain = await createChainWrapper(options?.provider || PROVIDER_DEFAULT_URI, privateKey)
     await chain.waitUntilReady()
 
+    const self = chain.getPublicKey()
+
+    const unfinishedChannels: ChannelEntry[] = []
     const indexer = new Indexer(
       chain.getGenesisBlock(),
       db,
       chain,
       options.maxConfirmations ?? INDEXER_MAX_CONFIRMATIONS,
-      INDEXER_BLOCK_RANGE
+      INDEXER_BLOCK_RANGE,
+      self.toAddress(),
+      (channel: ChannelEntry) => unfinishedChannels.push(channel)
     )
     await indexer.start()
 
     const coreConnector = new HoprEthereum(chain, db, indexer)
-    log(`using blockchain address ${await coreConnector.getAddress().toHex()}`)
+    log(`using blockchain address ${coreConnector.getAddress().toHex()}`)
     log(chalk.green('Connector started'))
+
+    for (const unfinished of unfinishedChannels) {
+      console.log(`found unfinished channel`, unfinished)
+      if (!unfinished.partyATicketEpoch.toBN().isZero()) {
+        continue
+      }
+
+      let channel: Channel
+      if (self.toAddress().eq(unfinished.partyA)) {
+        channel = coreConnector.getChannel(self, await indexer.getPublicKeyOf(unfinished.partyB))
+      } else {
+        channel = coreConnector.getChannel(await indexer.getPublicKeyOf(unfinished.partyB), self)
+      }
+      await channel.initCommitment()
+    }
+
     return coreConnector
   }
 }
