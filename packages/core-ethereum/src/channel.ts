@@ -35,7 +35,7 @@ class Channel {
   ) {
     this.index = 0 // TODO - bump channel epoch to make sure..
     this.commitment = new Commitment(
-      (commitment: Hash) => this.chain.setCommitment(counterparty.toAddress(), commitment),
+      (commitment: Hash) => this.chain.setCommitment(commitment),
       () => this.getChainCommitment(),
       this.db,
       this.getId()
@@ -55,7 +55,7 @@ class Channel {
     unacknowledgedTicket: UnacknowledgedTicket,
     acknowledgement: HalfKey
   ): Promise<AcknowledgedTicket | null> {
-    if (!unacknowledgedTicket.verifyChallenge(acknowledgement)) {
+    if (!unacknowledgedTicket.verify(this.counterparty, acknowledgement)) {
       throw Error(`The acknowledgement is not sufficient to solve the embedded challenge.`)
     }
 
@@ -64,12 +64,7 @@ class Channel {
     const ticket = unacknowledgedTicket.ticket
 
     if (ticket.isWinningTicket(await this.commitment.getCurrentCommitment(), response, ticket.winProb)) {
-      const ack = new AcknowledgedTicket(
-        ticket,
-        response,
-        await this.commitment.getCurrentCommitment(),
-        unacknowledgedTicket.signer
-      )
+      const ack = new AcknowledgedTicket(ticket, response, await this.commitment.getCurrentCommitment())
       await this.commitment.bumpCommitment()
       return ack
     } else {
