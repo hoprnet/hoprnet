@@ -1,141 +1,147 @@
 #!/usr/bin/env bash
 
-set -o errexit
-set -o nounset
-set -o pipefail
+# exit on errors, undefined variables, ensure errors in pipes are not hidden
+set -euo pipefail
 
-if [ -z "${GCLOUD_INCLUDED:-}" ]; then
-  source scripts/gcloud.sh
-  source scripts/dns.sh
-fi
+# prevent execution of this script, only allow sourcing
+$(return >/dev/null 2>&1)
+test "$?" -eq "0" || (echo "This script should only be sourced."; exit 1)
 
-source scripts/utils.sh
+# don't source this file twice
+test -z "${TESTNET_SOURCED:-}" && TESTNET_SOURCED=1 || exit 0
 
-MIN_FUNDS=0.01291
-ZONE="--zone=europe-west6-a"
+# source functions to work with gcloud and dns
+source "$(dirname $(readlink -f $0))/gcloud.sh"
+source "$(dirname $(readlink -f $0))/dns.sh"
+
+# set log id and use shared log function for readable logs
+declare HOPR_LOG_ID="testnet"
+source "$(dirname $(readlink -f $0))/utils.sh"
 
 # $1 = role (ie. node-4)
 # $2 = network name
-vm_name() {
+testnet_vm_name() {
   echo "$2-$1"
 }
 
 # $1 = vm name
-disk_name() {
+testnet_disk_name() {
   echo "$1-dsk"
 }
 
 # $1=account (hex)
-balance() {
+testnet_balance() {
   ethers eval "new ethers.providers.JsonRpcProvider('$RPC').getBalance('$1').then(b => formatEther(b))"
 }
 
 # $1=account (hex)
-fund_if_empty() {
-  echo "Checking balance of $1"
+testnet_fund_if_empty() {
+  local MIN_FUNDS=0.01291
   local BALANCE="$(balance $1)"
-  echo "Balance is $BALANCE"
+
+  log "Checking balance of $1"
+  log "Balance is $BALANCE"
+
   if [ "$BALANCE" = '0.0' ]; then
-    echo "Funding account ... $RPC -> $1 $MIN_FUNDS"
+    log "Funding account ... $RPC -> $1 $MIN_FUNDS"
     ethers send --rpc "$RPC" --account "$FUNDING_PRIV_KEY" "$1" $MIN_FUNDS --yes
     sleep 60
   fi
 }
 
 # $1 = IP
-get_eth_address(){
+testnet_get_eth_address(){
   curl "$1:3001/api/v1/address/eth"
 }
 
 # $1 = IP
-get_hopr_address() {
+testnet_get_hopr_address() {
   curl "$1:3001/api/v1/address/hopr"
 }
 
 # $1 = IP
 # $2 = Hopr command
-run_command(){
-  curl --silent -X POST --data "$2" "$1:3001/api/v1/command"
+testnet_run_command(){
+  curl -gsilent -X POST --data "$2" "$1:3001/api/v1/command"
 }
-
 
 # $1 = vm name
 # $2 = docker image
-update_if_existing() {
+testnet_update_node_if_existing() {
   if [[ $(gcloud_find_vm_with_name $1) ]]; then
-    echo "Container exists, updating" 1>&2
+    log "Container exists, updating" 1>&2
     PREV=$(gcloud_get_image_running_on_vm $1)
     if [ "$PREV" == "$2" ]; then
-      echo "Same version of image is currently running. Skipping update to $PREV" 1>&2
+      log "Same version of image is currently running. Skipping update to $PREV" 1>&2
       return 0
     fi
-    echo "Previous GCloud VM Image: $PREV"
+    log "Previous GCloud VM Image: $PREV"
     gcloud_update_container_with_image $1 $2 "$(disk_name $1)" "/app/db"
     sleep 60
   else
     echo "no container"
   fi
-
 }
 
-# $1 = vm name
-# $2 = docker image
-# $3 = OPTIONAL chain provider
-# NB: --run needs to be at the end or it will ignore the other arguments.
-start_testnode_vm() {
-  PROVIDER_ARG=''
-  if [ -z "$4"]; then
-    echo "using chain provider $4"
-    PROVIDER_ARG='--provider'
-    #--container-arg="$PROVIDER_ARG" --container-arg="$3"
-  fi
-  if [ "$(update_if_existing $1 $2)" = "no container" ]; then
-    gcloud compute instances create-with-container $1 $GCLOUD_DEFAULTS \
-      --create-disk name=$(disk_name $1),size=10GB,type=pd-standard,mode=rw \
-      --container-mount-disk mount-path="/app/db" \
-      --container-env=^,@^DEBUG=hopr\*,@NODE_OPTIONS=--max-old-space-size=4096,@GCLOUD=1 \
-      --container-image=$2 \
-      --container-arg="--password" --container-arg="$BS_PASSWORD" \
-      --container-arg="--init" --container-arg="true" \
-      --container-arg="--announce" --container-arg="true" \
-      --container-arg="--rest" --container-arg="true" \
-      --container-arg="--restHost" --container-arg="0.0.0.0" \
-      --container-arg="--healthCheck" --container-arg="true" \
-      --container-arg="--healthCheckHost" --container-arg="0.0.0.0" \
-      --container-arg="--admin" --container-arg="true" \
-      --container-arg="--adminHost" --container-arg="0.0.0.0" \
-      --container-arg="--run" --container-arg="\"cover-traffic start;daemonize\"" \
-      --container-restart-policy=always
-  fi
-}
-
-# $1 = vm name
 # Run a VM with a hardhat instance
-start_chain_provider(){
-  gcloud compute instances create-with-container $1-provider $GCLOUD_DEFAULTS \
-      --create-disk name=$(disk_name $1),size=10GB,type=pd-standard,mode=rw \
-      --container-image='hopr-provider'
+# $1 - network name
+# $2 - docker image
+testnet_start_chain_provider() {
+  local name="${1}-chainprovider"
 
-  #hardhat node --config packages/ethereum/hardhat.config.ts
+  # start vm
+  gcloud_create_container_instance "${name}" "${2}" ""
+}
+
+# $1 - network name
+# $2 - docker image
+# $3 - node number
+# $4 - database password
+# $5 - OPTIONAL chain provider
+testnet_start_node() {
+  local name=$(testnet_vm_name "node-$3" $1)
+  local gcloud_args="\
+    --container-mount-disk mount-path=\"/app/db\" \
+    --container-env=^,@^DEBUG=hopr\*,@NODE_OPTIONS=--max-old-space-size=4096,@GCLOUD=1 \
+    --container-arg=\"--password\" --container-arg=\"$4\" \
+    --container-arg=\"--init\" --container-arg=\"true\" \
+    --container-arg=\"--announce\" --container-arg=\"true\" \
+    --container-arg=\"--rest\" --container-arg=\"true\" \
+    --container-arg=\"--restHost\" --container-arg=\"0.0.0.0\" \
+    --container-arg=\"--healthCheck\" --container-arg=\"true\" \
+    --container-arg=\"--healthCheckHost\" --container-arg=\"0.0.0.0\" \
+    --container-arg=\"--admin\" --container-arg=\"true\" \
+    --container-arg=\"--adminHost\" --container-arg=\"0.0.0.0\" \
+    --container-arg=\"--run\" --container-arg=\"\"cover-traffic start;daemonize\" \
+  "
+
+  if [ -n "$5" ]; then
+    log "using chain provider $5"
+    gcloud_args="${gcloud_args} --container-arg=\"--provider\" --container-arg=\"$5\""
+  fi
+
+  log "Starting test node $vm with $2 $5"
+  if [ "$(testnet_update_node_if_existing $1 $2)" = "no container" ]; then
+    gcloud_create_container_instance "${name}" "${2}" "${gcloud_args}"
+  fi
 }
 
 # $1 network name
-# $2 docker image
-# $3 node number
-# $4 = OPTIONAL chain provider
-start_testnode() {
-  local vm=$(vm_name "node-$3" $1)
-  echo "- Starting test node $vm with $2 $4"
-  start_testnode_vm $vm $2 $4
+# $2 node number
+testnet_destroy_node() {
+  local name=$(testnet_vm_name "node-$2" $1)
+
+  # delete disks as well since these are test nodes
+  gcloud_delete_instance "${name}" "" "true"
 }
 
 # $1 authorized keys file
-add_keys() {
+testnet_add_keys() {
   if test -f "$1"; then
-    echo "Reading keys from $1"
+    log "Reading keys from $1"
     cat $1 | xargs -I {} gcloud compute os-login ssh-keys add --key="{}"
   else
-    echo "Authorized keys file not found"
+    log "Authorized keys file not found"
   fi
 }
 
@@ -149,13 +155,22 @@ add_keys() {
 # $2 number of nodes
 # $3 docker image
 # $4 = OPTIONAL chain provider
-start_testnet() {
+testnet_start() {
   for i in $(seq 1 $2);
   do
-    echo "Start node $i"
-    start_testnode $1 $3 $i $4
+    log "Start node $i"
+    testnet_start_node $1 $3 $i $4
   done
   # @jose can you fix this pls.
   # add_keys scripts/keys/authorized_keys
 }
 
+# $1 network name
+# $2 number of nodes
+testnet_destroy() {
+  for i in $(seq 1 $2);
+  do
+    log "Destroy node $i"
+    testnet_destroy_node $1 $i
+  done
+}

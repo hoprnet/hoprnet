@@ -1,29 +1,27 @@
+#!/usr/bin/env bash
+
+# exit on errors, undefined variables, ensure errors in pipes are not hidden
+set -euo pipefail
+
+# prevent sourcing of this script, only allow execution
+$(return >/dev/null 2>&1)
+test "$?" -eq "0" && (echo "This script should only be executed."; exit 1)
+
 # Cleanup old gcloud resources.
 
-if [ -z "${GCLOUD_INCLUDED:-}" ]; then
-  source scripts/gcloud.sh 
-fi
+# don't source this file twice
+test -z "${CLEANUP_SOURCED:-}" && CLEANUP_SOURCED=1 || exit 0
 
-if [ -z "${OLD_RELEASES:-}" ]; then
-  source scripts/environments.sh 
-fi
+# set log id and use shared log function for readable logs
+declare HOPR_LOG_ID="cleanup"
+source "$(dirname $(readlink -f $0))/utils.sh"
 
-
-cleanup_ips() {
-  local IPS=$(gcloud compute addresses list)
-  for x in $OLD_RELEASES
-  do
-    local IP=$(echo "$IPS" | grep $x | awk '{ print $2 }')
-    if [ $IP ]; then
-      local NAME=$(echo "$IPS" | grep $x | awk '{ print $1 }')
-      echo "- releasing - $NAME ($IP)"
-      gcloud compute addresses delete $NAME $REGION --quiet
-    fi
-  done  
-}
+# source gcloud functions and environments info
+source "$(dirname $(readlink -f $0))/gcloud.sh"
+source "$(dirname $(readlink -f $0))/environments.sh"
 
 cleanup_instances() {
-  local INSTANCES=$(gcloud compute instances list)
+  local INSTANCES="$(gcloud_list_instances)"
   for old in $OLD_RELEASES
   do
     echo "$INSTANCES" | grep $old | grep 'RUNNING' | while read -r instance; do
@@ -36,16 +34,10 @@ cleanup_instances() {
       local name=$(echo "$instance" | awk '{ print $1 }')
       local zone=$(echo "$instance" | awk '{ print $2 }')
       echo "- deleting terminated instance $name"
-      gcloud compute instances delete $name --zone=$zone --keep-disks=data --quiet
+      gcloud_delete_instance "${name}" "${zone}"
     done
   done
 }
 
-cleanup () {
-  cleanup_ips
-  cleanup_instances
-}
-
-if [ "$0" = "./scripts/cleanup.sh" ]; then
-  cleanup
-fi
+gcloud_delete_addresses "${OLD_RELEASES}"
+gcloud_delete_instances "${OLD_RELEASES}"

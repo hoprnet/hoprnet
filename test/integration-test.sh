@@ -4,9 +4,17 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+# set log id and use shared log function for readable logs
+declare HOPR_LOG_ID="e2e-test"
+source "$(dirname $(readlink -f $0))/../scripts/utils.sh"
+
 # -- Integration test --
 # We assume the existence of a test network with three nodes:
-# API1, API2 API3.
+# api1, api2 api3.
+
+declare api1="${1}"
+declare api2="${2}"
+declare api3="${3}"
 
 # $1 = IP
 # $2 = Hopr command
@@ -24,7 +32,7 @@ get_hopr_address(){
 
 validate_ip() {
   if [ -z "$1" ]; then
-    echo "missing ip as first parameter"
+    log "missing ip as first parameter"
     exit 1
   fi
 }
@@ -35,13 +43,13 @@ validate_node_eth_address() {
 
   ETH_ADDRESS="$(get_eth_address $1)"
   if [ -z "$ETH_ADDRESS" ]; then
-    echo "could not derive ETH_ADDRESS from first parameter $1"
+    log "could not derive ETH_ADDRESS from first parameter $1"
     exit 1
   fi
 
   IS_VALID_ETH_ADDRESS="$(node -e "const ethers = require('ethers'); console.log(ethers.utils.isAddress('$ETH_ADDRESS'))")"
   if [ "$IS_VALID_ETH_ADDRESS" == "false" ]; then
-    echo "⛔️ Node returns an invalid address ETH_ADDRESS: $ETH_ADDRESS derived from $1"
+    log "⛔️ Node returns an invalid address ETH_ADDRESS: $ETH_ADDRESS derived from $1"
     exit 1
   fi
   echo "$ETH_ADDRESS"
@@ -58,55 +66,55 @@ validate_node_balance_gt0() {
   HOPR_BALANCE="$(echo -e "$BALANCE" | grep -c " HOPR" || true)"
 
   if [[ "$ETH_BALANCE" != "0" && "$HOPR_BALANCE" != "Hopr Balance: 0 HOPR" ]]; then
-    echo "- $1 is funded"
+    log "$1 is funded"
   else
-    echo "⛔️ $1 Node has an invalid balance: $ETH_BALANCE, $HOPR_BALANCE"
-    echo -e "$BALANCE"
+    log "⛔️ $1 Node has an invalid balance: $ETH_BALANCE, $HOPR_BALANCE"
+    log "$BALANCE"
     exit 1
   fi
 }
 
-echo "- Running full E2E test with $API1, $API2, $API3"
+log "Running full E2E test with $api1, $api2, $api3"
 
-validate_ip "$API1"
-validate_ip "$API2"
-validate_ip "$API3"
+validate_ip "$api1"
+validate_ip "$api2"
+validate_ip "$api3"
 
 declare ETH_ADDRESS1
 declare ETH_ADDRESS2
 declare ETH_ADDRESS3
 
-ETH_ADDRESS1="$(validate_node_eth_address "$API1")"
-ETH_ADDRESS2="$(validate_node_eth_address "$API2")"
-ETH_ADDRESS3="$(validate_node_eth_address "$API3")"
+ETH_ADDRESS1="$(validate_node_eth_address "$api1")"
+ETH_ADDRESS2="$(validate_node_eth_address "$api2")"
+ETH_ADDRESS3="$(validate_node_eth_address "$api3")"
 
-validate_node_balance_gt0 "$API1"
-validate_node_balance_gt0 "$API2"
+validate_node_balance_gt0 "$api1"
+validate_node_balance_gt0 "$api2"
 
-echo "- Nodes are funded"
+log "Nodes are funded"
 
-echo "$(run_command $API1 'peers')"
+log "$(run_command $api1 'peers')"
 
 declare HOPR_ADDRESS1
-HOPR_ADDRESS1="$(get_hopr_address "$API1")"
-echo "HOPR_ADDRESS1: $HOPR_ADDRESS1"
+HOPR_ADDRESS1="$(get_hopr_address "$api1")"
+log "HOPR_ADDRESS1: $HOPR_ADDRESS1"
 
 declare HOPR_ADDRESS2
-HOPR_ADDRESS2="$(get_hopr_address "$API2")"
-echo "HOPR_ADDRESS2: $HOPR_ADDRESS2"
+HOPR_ADDRESS2="$(get_hopr_address "$api2")"
+log "HOPR_ADDRESS2: $HOPR_ADDRESS2"
 
-echo "- Node 1 ping node 2: $(run_command $API1 "ping $HOPR_ADDRESS2")"
+log "Node 1 ping node 2: $(run_command $api1 "ping $HOPR_ADDRESS2")"
 
-echo "- Node 1 tickets: $(run_command $API1 'tickets')"
+log "Node 1 tickets: $(run_command $api1 'tickets')"
 
-echo "- Node 1 send 0-hop message to node 2"
-run_command "$API1" "send ,$HOPR_ADDRESS2 'hello, world'"
+log "Node 1 send 0-hop message to node 2"
+run_command "$api1" "send ,$HOPR_ADDRESS2 'hello, world'"
 
-echo "- Node 1 open channel to Node 2"
-run_command "$API1" "open $HOPR_ADDRESS2 0.1"
+log "Node 1 open channel to Node 2"
+run_command "$api1" "open $HOPR_ADDRESS2 0.1"
 
-echo "- Node 1 send 1 hop message to self via node 2"
-run_command "$API1" "send $HOPR_ADDRESS2,$HOPR_ADDRESS1 'hello, world'"
+log "Node 1 send 1 hop message to self via node 2"
+run_command "$api1" "send $HOPR_ADDRESS2,$HOPR_ADDRESS1 'hello, world'"
 
-echo "- Node 2 should now have a ticket"
-run_command "$API2" "tickets"
+log "Node 2 should now have a ticket"
+run_command "$api2" "tickets"

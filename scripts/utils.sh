@@ -1,9 +1,18 @@
-#!/bin/bash
-set -e #u
+#!/usr/bin/env bash
+
+# exit on errors, undefined variables, ensure errors in pipes are not hidden
+set -euo pipefail
+
+# prevent execution of this script, only allow sourcing
+$(return >/dev/null 2>&1)
+test "$?" -eq "0" || (echo "This script should only be sourced."; exit 1)
+
+# don't source this file twice
+test -z "${UTILS_SOURCED:-}" && UTILS_SOURCED=1 || exit 0
 
 # $1=version string, semver
 function get_version_maj_min() {
-  echo $(get_version_maj_min_pat $1 | cut -d. -f1,2)
+  get_version_maj_min_pat $1 | cut -d. -f1,2
 }
 
 # $1=version string, semver
@@ -15,4 +24,14 @@ function get_version_maj_min_pat() {
   local MIN=$(echo "$1" | sed -e "s#$RE#\2#")
   local PAT=$(echo "$1" | sed -e "s#$RE#\3#")
   echo "$MAJ.$MIN.$PAT"
+}
+
+# shared log function which adds a useful prefix to all messages
+# $1=msg
+function log() {
+  local prefix="HOPR-SCRIPT"
+  if [ -n "${HOPR_LOG_ID:-}" ]; then
+    prefix="${prefix}:${HOPR_LOG_ID}"
+  fi
+  echo -e "[${prefix}] ${1:-}"
 }

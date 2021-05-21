@@ -199,15 +199,18 @@ jobs:
           service_account_key: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
           export_default_credentials: true
 
-      - name: Building Docker image using Google Cloud Build
+      - name: Building Docker images using Google Cloud Build
         run: | # TODO - actually parse semver to tag v1
           export HOPR_PACKAGE_VERSION=$(./scripts/get-package-version.sh)
-          gcloud builds submit packages/hoprd --tag ${HOPR_DOCKER_IMAGE}:${HOPR_PACKAGE_VERSION}
+          source scripts/gcloud.sh
+          gcloud_build_image packages/hoprd ${HOPR_DOCKER_IMAGE} ${HOPR_PACKAGE_VERSION} "true"
           gcloud container images add-tag ${HOPR_DOCKER_IMAGE}:${HOPR_PACKAGE_VERSION} ${HOPR_DOCKER_IMAGE}:1
-          gcloud container images add-tag ${HOPR_DOCKER_IMAGE}:${HOPR_PACKAGE_VERSION} ${HOPR_DOCKER_IMAGE}:latest
+          # also build a harthat image which can later be used for testing
+          gcloud_build_image test/hardhat ${HOPR_HARDHAT_DOCKER_IMAGE} ${HOPR_PACKAGE_VERSION} "true"
         env:
           HOPR_PACKAGE: hoprd
           HOPR_DOCKER_IMAGE: gcr.io/hoprassociation/hoprd
+          HOPR_HARDHAT_DOCKER_IMAGE: gcr.io/hoprassociation/hoprd-chain-provider-hardhat
 
   avado:
     name: Build Avado (master or release pushes)

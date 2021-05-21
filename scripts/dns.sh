@@ -1,8 +1,21 @@
-#!/bin/bash
-set -e #u
+#!/usr/bin/env bash
+
+# exit on errors, undefined variables, ensure errors in pipes are not hidden
+set -euo pipefail
+
+# prevent execution of this script, only allow sourcing
+$(return >/dev/null 2>&1)
+test "$?" -eq "0" || (echo "This script should only be sourced."; exit 1)
+
+# don't source this file twice
+test -z "${DNS_SOURCED:-}" && DNS_SOURCED=1 || exit 0
+
+# set log id and use shared log function for readable logs
+declare HOPR_LOG_ID="dns"
+source "$(dirname $(readlink -f $0))/utils.sh"
 
 # Get dns entry for a release and node
-# e.g. gcloud_dns_entry master 
+# e.g. gcloud_dns_entry master
 # $1 = release name
 # $2 = role (eg. node-4)
 gcloud_dns_entry() {
@@ -25,7 +38,7 @@ gcloud_dns_txt_record() {
     if [ -z "$maybe_txt_record" ]; then
       # echo "log | Status: Not created, creating"
       gcloud dns record-sets transaction start --zone="hoprnet-link"
-      
+
       gcloud dns record-sets transaction add "dnsaddr=$3" \
         --name="$dns_entry" \
         --ttl="30" \
