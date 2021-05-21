@@ -184,7 +184,12 @@ async function onOwnChannel(
   getChannel: InstanceType<typeof HoprEthereum>['getChannel'],
   getPublicKeyOf: (addr: Address) => Promise<PublicKey>
 ) {
-  if (!entry.partyATicketEpoch.toBN().isZero()) {
+  const isPartyA = self.toAddress().eq(entry.partyA)
+
+  if (
+    (isPartyA && !entry.partyATicketEpoch.toBN().isZero()) ||
+    (!isPartyA && !entry.partyBTicketEpoch.toBN().isZero())
+  ) {
     return
   }
 
