@@ -57,7 +57,7 @@ function createFakeChain(privKey: PeerId) {
         new UINT256(new BN(0)),
         new UINT256(new BN(0)),
         new Balance(new BN(0)),
-        UINT256.fromInverseProbability(new BN(new Uint8Array(UINT256.SIZE).fill(0xff))),
+        UINT256.DUMMY_INVERSE_PROBABILITY,
         new UINT256(new BN(0)),
         privKey.privKey.marshal()
       )

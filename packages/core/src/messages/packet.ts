@@ -82,7 +82,7 @@ export async function validateUnacknowledgedTicket(
     throw Error(`The signer of the ticket does not match the sender`)
   }
 
-  if (ticketWinProb.eqn(1) && ticketAmount.eqn(0)) {
+  if (UINT256.DUMMY_INVERSE_PROBABILITY.toBN().eq(ticketWinProb) && ticketAmount.eqn(0)) {
     // Dummy ticket detected, ticket has no value and is therefore valid
     return
   }
@@ -170,7 +170,7 @@ export class Packet {
   public plaintext: Uint8Array
 
   public packetTag: Uint8Array
-  public previousHop: Uint8Array
+  public previousHop: PublicKey
   public nextHop: Uint8Array
   public ownShare: HalfKeyChallenge
   public ownKey: HalfKey
@@ -187,7 +187,7 @@ export class Packet {
     return this
   }
 
-  private setFinal(plaintext: Uint8Array, packetTag: Uint8Array, ackKey: HalfKey, previousHop: Uint8Array) {
+  private setFinal(plaintext: Uint8Array, packetTag: Uint8Array, ackKey: HalfKey, previousHop: PublicKey) {
     this.packetTag = packetTag
     this.ackKey = ackKey
     this.isReceiver = true
@@ -203,7 +203,7 @@ export class Packet {
     ownKey: HalfKey,
     ownShare: HalfKeyChallenge,
     nextHop: Uint8Array,
-    previousHop: Uint8Array,
+    previousHop: PublicKey,
     nextChallenge: Challenge,
     ackChallenge: HalfKeyChallenge,
     packetTag: Uint8Array
@@ -292,7 +292,7 @@ export class Packet {
         transformedOutput.plaintext,
         transformedOutput.packetTag,
         ackKey,
-        pubKeySender.pubKey.marshal()
+        PublicKey.fromPeerId(pubKeySender)
       )
     }
 
@@ -311,7 +311,7 @@ export class Packet {
       verificationOutput.ownKey,
       verificationOutput.ownShare,
       transformedOutput.nextHop,
-      pubKeySender.pubKey.marshal(),
+      PublicKey.fromPeerId(pubKeySender),
       verificationOutput.nextTicketChallenge,
       verificationOutput.ackChallenge,
       transformedOutput.packetTag
@@ -331,7 +331,7 @@ export class Packet {
       throw Error(`Invalid state`)
     }
 
-    const unacknowledged = new UnacknowledgedTicket(this.ticket, this.ownKey)
+    const unacknowledged = new UnacknowledgedTicket(this.ticket, this.ownKey, this.previousHop)
 
     log(
       `Storing unacknowledged ticket. Expecting to receive a preImage for ${green(
@@ -343,8 +343,8 @@ export class Packet {
   }
 
   async validateUnacknowledgedTicket(db: HoprDB, chain: HoprCoreEthereum, privKey: PeerId) {
-    const previousHop = pubKeyToPeerId(this.previousHop)
-    const channel = chain.getChannel(new PublicKey(privKey.pubKey.marshal()), new PublicKey(this.previousHop))
+    const previousHop = this.previousHop.toPeerId()
+    const channel = chain.getChannel(new PublicKey(privKey.pubKey.marshal()), this.previousHop)
 
     return validateUnacknowledgedTicket(
       privKey,

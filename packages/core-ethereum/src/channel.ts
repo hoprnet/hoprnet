@@ -35,7 +35,7 @@ class Channel {
   ) {
     this.index = 0 // TODO - bump channel epoch to make sure..
     this.commitment = new Commitment(
-      (commitment: Hash) => this.chain.setCommitment(commitment),
+      (commitment: Hash) => this.chain.setCommitment(counterparty.toAddress(), commitment),
       () => this.getChainCommitment(),
       this.db,
       this.getId()
@@ -55,7 +55,7 @@ class Channel {
     unacknowledgedTicket: UnacknowledgedTicket,
     acknowledgement: HalfKey
   ): Promise<AcknowledgedTicket | null> {
-    if (!unacknowledgedTicket.verify(this.counterparty, acknowledgement)) {
+    if (!unacknowledgedTicket.verifyChallenge(acknowledgement)) {
       throw Error(`The acknowledgement is not sufficient to solve the embedded challenge.`)
     }
 
@@ -64,7 +64,12 @@ class Channel {
     const ticket = unacknowledgedTicket.ticket
 
     if (ticket.isWinningTicket(await this.commitment.getCurrentCommitment(), response, ticket.winProb)) {
-      const ack = new AcknowledgedTicket(ticket, response, await this.commitment.getCurrentCommitment())
+      const ack = new AcknowledgedTicket(
+        ticket,
+        response,
+        await this.commitment.getCurrentCommitment(),
+        unacknowledgedTicket.signer
+      )
       await this.commitment.bumpCommitment()
       return ack
     } else {
@@ -191,7 +196,7 @@ class Channel {
       UINT256.fromString('0'),
       new UINT256(new BN(this.index++)),
       new Balance(new BN(0)),
-      UINT256.fromInverseProbability(new BN(new Uint8Array(UINT256.SIZE).fill(0xff))),
+      UINT256.DUMMY_INVERSE_PROBABILITY,
       UINT256.fromString('0'),
       this.privateKey
     )
