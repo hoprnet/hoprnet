@@ -186,7 +186,7 @@ ___
 
 ### getAcknowledgedTickets
 
-▸ **getAcknowledgedTickets**(`filter?`: { `signer`: *Uint8Array*  }): *Promise*<[*AcknowledgedTicket*](acknowledgedticket.md)[]\>
+▸ **getAcknowledgedTickets**(`filter?`: { `signer`: [*PublicKey*](publickey.md)  }): *Promise*<[*AcknowledgedTicket*](acknowledgedticket.md)[]\>
 
 Get acknowledged tickets
 
@@ -195,7 +195,7 @@ Get acknowledged tickets
 | Name | Type | Description |
 | :------ | :------ | :------ |
 | `filter?` | *object* | optionally filter by signer |
-| `filter.signer` | *Uint8Array* | - |
+| `filter.signer` | [*PublicKey*](publickey.md) | - |
 
 **Returns:** *Promise*<[*AcknowledgedTicket*](acknowledgedticket.md)[]\>
 
@@ -316,7 +316,7 @@ ___
 
 ### getTickets
 
-▸ **getTickets**(`filter?`: { `signer`: *Uint8Array*  }): *Promise*<[*Ticket*](ticket.md)[]\>
+▸ **getTickets**(`filter?`: { `signer`: [*PublicKey*](publickey.md)  }): *Promise*<[*Ticket*](ticket.md)[]\>
 
 Get tickets, both unacknowledged and acknowledged
 
@@ -325,7 +325,7 @@ Get tickets, both unacknowledged and acknowledged
 | Name | Type | Description |
 | :------ | :------ | :------ |
 | `filter?` | *object* | optionally filter by signer |
-| `filter.signer` | *Uint8Array* | - |
+| `filter.signer` | [*PublicKey*](publickey.md) | - |
 
 **Returns:** *Promise*<[*Ticket*](ticket.md)[]\>
 
@@ -353,7 +353,7 @@ ___
 
 ### getUnacknowledgedTickets
 
-▸ **getUnacknowledgedTickets**(`filter?`: { `signer`: *Uint8Array*  }): *Promise*<[*UnacknowledgedTicket*](unacknowledgedticket.md)[]\>
+▸ **getUnacknowledgedTickets**(`filter?`: { `signer`: [*PublicKey*](publickey.md)  }): *Promise*<[*UnacknowledgedTicket*](unacknowledgedticket.md)[]\>
 
 Get unacknowledged tickets.
 
@@ -362,7 +362,7 @@ Get unacknowledged tickets.
 | Name | Type | Description |
 | :------ | :------ | :------ |
 | `filter?` | *object* | optionally filter by signer |
-| `filter.signer` | *Uint8Array* | - |
+| `filter.signer` | [*PublicKey*](publickey.md) | - |
 
 **Returns:** *Promise*<[*UnacknowledgedTicket*](unacknowledgedticket.md)[]\>
 
