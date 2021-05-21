@@ -176,4 +176,14 @@ export class Ticket {
 
     return luck.lte(winProb.toBN())
   }
+
+  getPathPosition(pricePerTicket: BN, inverseTicketWinProb: BN): number {
+    const baseUnit = pricePerTicket.mul(inverseTicketWinProb)
+
+    if (!this.amount.toBN().mod(baseUnit).isZero()) {
+      throw Error(`Invalid balance`)
+    }
+
+    return this.amount.toBN().div(baseUnit).toNumber()
+  }
 }

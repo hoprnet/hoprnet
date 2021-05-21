@@ -28,7 +28,7 @@ import BN from 'bn.js'
 import { Acknowledgement } from './acknowledgement'
 import { blue, green } from 'chalk'
 import Debug from 'debug'
-import { TICKET_AMOUNT, TICKET_WIN_PROB } from '../constants'
+import { PRICE_PER_PACKET, INVERSE_TICKET_WIN_PROB } from '../constants'
 
 export const MAX_HOPS = 3 // 3 relayers and 1 destination
 
@@ -48,13 +48,19 @@ export function validateCreatedTicket(myBalance: BN, ticket: Ticket) {
   }
 }
 
+// Precompute the base unit that is used for issuing and validating
+// the embedded value in tickets.
+// Having this as a constant allows to channel rounding error when
+// dealing with probabilities != 1.0 and makes sure that ticket value
+// are always an integer multiple of the base unit.
+
 /**
  * Validate unacknowledged tickets as we receive them
  */
 export async function validateUnacknowledgedTicket(
   id: PeerId,
-  nodeTicketAmount: string,
-  nodeTicketWinProb: number,
+  nodeTicketAmount: BN,
+  nodeInverseTicketWinProb: BN,
   senderPeerId: PeerId,
   ticket: Ticket,
   channel: Channel,
@@ -71,6 +77,16 @@ export async function validateUnacknowledgedTicket(
   const ticketIndex = ticket.index.toBN()
   const ticketWinProb = ticket.winProb.toBN()
 
+  // ticket signer MUST be the sender
+  if (!ticket.verify(senderPubKey)) {
+    throw Error(`The signer of the ticket does not match the sender`)
+  }
+
+  if (UINT256.DUMMY_INVERSE_PROBABILITY.toBN().eq(ticketWinProb) && ticketAmount.eqn(0)) {
+    // Dummy ticket detected, ticket has no value and is therefore valid
+    return
+  }
+
   let channelState
   try {
     channelState = await channel.getState()
@@ -78,19 +94,14 @@ export async function validateUnacknowledgedTicket(
     throw Error(`Error while validating unacknowledged ticket, state not found: '${err.message}'`)
   }
 
-  // ticket signer MUST be the sender
-  if (!ticket.verify(senderPubKey)) {
-    throw Error(`The signer of the ticket does not match the sender`)
-  }
-
   // ticket MUST have at least X amount
-  if (ticketAmount.lt(new BN(nodeTicketAmount))) {
+  if (ticketAmount.lt(nodeTicketAmount)) {
     throw Error(`Ticket amount '${ticketAmount.toString()}' is lower than '${nodeTicketAmount}'`)
   }
 
   // ticket MUST have at least X winning probability
-  if (ticketWinProb.lt(UINT256.fromProbability(nodeTicketWinProb).toBN())) {
-    throw Error(`Ticket winning probability '${ticketWinProb}' is lower than '${nodeTicketWinProb}'`)
+  if (ticketWinProb.lt(UINT256.fromInverseProbability(nodeInverseTicketWinProb).toBN())) {
+    throw Error(`Ticket winning probability '${ticketWinProb}' is lower than '${nodeInverseTicketWinProb}'`)
   }
 
   // channel MUST be open or pending to close
@@ -212,20 +223,8 @@ export class Packet {
     return this
   }
 
-  static async create(
-    msg: Uint8Array,
-    path: PeerId[],
-    privKey: PeerId,
-    chain: HoprCoreEthereum,
-    ticketOpts: {
-      value: Balance
-      winProb: number
-    } = {
-      value: new Balance(new BN(TICKET_AMOUNT)),
-      winProb: TICKET_WIN_PROB
-    }
-  ): Promise<Packet> {
-    const isDirectMessage = path.length === 1
+  static async create(msg: Uint8Array, path: PeerId[], privKey: PeerId, chain: HoprCoreEthereum): Promise<Packet> {
+    const isDirectMessage = path.length == 1
     const { alpha, secrets } = generateKeyShares(path)
     const { ackChallenge, ticketChallenge } = createPoRValuesForSender(secrets[0], secrets[1])
     const porStrings: Uint8Array[] = []
@@ -244,7 +243,11 @@ export class Packet {
     if (isDirectMessage) {
       ticket = channel.createDummyTicket(ticketChallenge)
     } else {
-      ticket = await channel.createTicket(ticketOpts.value, ticketChallenge, ticketOpts.winProb)
+      ticket = await channel.createTicket(
+        new Balance(new BN(PRICE_PER_PACKET).mul(new BN(INVERSE_TICKET_WIN_PROB)).muln(path.length - 1)),
+        ticketChallenge,
+        new BN(INVERSE_TICKET_WIN_PROB)
+      )
     }
 
     return new Packet(packet, challenge, ticket).setReadyToForward(ackChallenge)
@@ -342,11 +345,10 @@ export class Packet {
   async validateUnacknowledgedTicket(db: HoprDB, chain: HoprCoreEthereum, privKey: PeerId) {
     const previousHop = pubKeyToPeerId(this.previousHop)
     const channel = chain.getChannel(new PublicKey(privKey.pubKey.marshal()), new PublicKey(this.previousHop))
-
     return validateUnacknowledgedTicket(
       privKey,
-      TICKET_AMOUNT,
-      TICKET_WIN_PROB,
+      new BN(PRICE_PER_PACKET),
+      new BN(INVERSE_TICKET_WIN_PROB),
       previousHop,
       this.ticket,
       channel,
@@ -379,7 +381,16 @@ export class Packet {
 
     const channel = chain.getChannel(self, nextPeer)
 
-    this.ticket = await channel.createTicket(new Balance(new BN(0)), this.nextChallenge, 0)
+    const pathPosition = this.ticket.getPathPosition(new BN(PRICE_PER_PACKET), new BN(INVERSE_TICKET_WIN_PROB))
+    if (pathPosition == 1) {
+      this.ticket = channel.createDummyTicket(this.nextChallenge)
+    } else {
+      this.ticket = await channel.createTicket(
+        new Balance(new BN(PRICE_PER_PACKET).mul(new BN(INVERSE_TICKET_WIN_PROB)).muln(pathPosition - 1)),
+        this.nextChallenge,
+        new BN(INVERSE_TICKET_WIN_PROB)
+      )
+    }
 
     this.challenge = AcknowledgementChallenge.create(this.ackChallenge, privKey)
 

@@ -45,7 +45,19 @@ function createFakeChain(privKey: PeerId) {
         new UINT256(new BN(0)),
         new UINT256(new BN(0)),
         amount,
-        UINT256.fromProbability(1),
+        UINT256.fromInverseProbability(new BN(1)),
+        new UINT256(new BN(0)),
+        privKey.privKey.marshal()
+      )
+    },
+    createDummyTicket: (challenge: Challenge) => {
+      return Ticket.create(
+        counterparty.toAddress(),
+        challenge,
+        new UINT256(new BN(0)),
+        new UINT256(new BN(0)),
+        new Balance(new BN(0)),
+        UINT256.DUMMY_INVERSE_PROBABILITY,
         new UINT256(new BN(0)),
         privKey.privKey.marshal()
       )
@@ -136,10 +148,7 @@ describe('packet interaction', function () {
     const libp2pReceiver = createFakeSendReceive(events, receiver)
 
     const testMsg = new TextEncoder().encode('testMsg')
-    const packet = await Packet.create(testMsg, [relay0, relay1, relay2, receiver], sender, chainSender as any, {
-      value: new Balance(new BN(0)),
-      winProb: 1
-    })
+    const packet = await Packet.create(testMsg, [relay0, relay1, relay2, receiver], sender, chainSender as any)
 
     const msgDefer = Defer()
 
