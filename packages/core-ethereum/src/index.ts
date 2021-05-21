@@ -125,8 +125,8 @@ export default class HoprEthereum {
     return await this.indexer.getPublicNodes()
   }
 
-  public async onOwnChannel(entry: ChannelEntry) {
-    onOwnChannel(this.chain.getPublicKey(), entry, this.getChannel.bind(this), this.getPublicKeyOf.bind(this))
+  public onOwnChannel(entry: ChannelEntry): Promise<void> {
+    return onOwnChannel(this.chain.getPublicKey(), entry, this.getChannel.bind(this), this.getPublicKeyOf.bind(this))
   }
 
   /**
