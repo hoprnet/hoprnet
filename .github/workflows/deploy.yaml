@@ -104,6 +104,9 @@ jobs:
 
       - name: Deploy 
         working-directory: packages/ethereum
+        env:
+          PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
+          QUIKNODE_KEY: ${{ secrets.QUIKNODE_KEY }}
         run: /
           npx hardhat deploy --network xdai
           # npx hardhat deploy --network goerli
@@ -211,6 +214,7 @@ jobs:
           HOPR_PACKAGE: hoprd
 
       - name: Build Avado
+        working-directory: packages/avado
         run: |
           docker-compose build
           sudo npm install -g git+https://github.com/AvadoDServer/AVADOSDK.git#c11c4bd
@@ -222,7 +226,6 @@ jobs:
           git add dappnode_package.json docker-compose.yml releases.json
           git commit -m "Avado CI: new release"
           git pull origin ${{ github.ref }}
-            working-directory: packages/avado
           git push origin ${{ github.ref }}
 
           # http://go.ava.do/install/<IPFS HASH>
