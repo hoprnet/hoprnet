@@ -1,10 +1,8 @@
 import type { Networks } from './deploy/constants'
 
-export type { HoprToken, HoprChannels } from './types'
-export type { TypedEvent, TypedEventFilter } from './types/commons'
-
 export * from './deploy/constants'
-export { HoprToken__factory, HoprChannels__factory } from './types'
+export * from './types'
+export * from './types/commons'
 
 export type ContractNames = 'HoprToken' | 'HoprChannels' | 'HoprDistributor'
 
