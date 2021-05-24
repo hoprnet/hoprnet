@@ -5,7 +5,10 @@ import { readdir, writeFile } from 'fs/promises'
 
 const DEPLOYMENTS_PATH = join(__dirname, '..', 'deployments')
 
-// will loop through deployments and remove optiona; data
+// deployments are done by `hardhat-deploy`
+// after a deployment, `hardhat-deploy` populates `deployments`
+// folder with various artifacts, this tas loops through `deployments`
+// folder and removes data that are optional & will end up being commited
 const main: DeployFunction = async function (_hre: HardhatRuntimeEnvironment) {
   const networks = await readdir(DEPLOYMENTS_PATH)
 
