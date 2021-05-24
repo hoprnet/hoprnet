@@ -1,8 +1,15 @@
 import type { ContractTransaction } from 'ethers'
 import type { Multiaddr } from 'multiaddr'
-import type { HoprToken, HoprChannels } from './contracts'
 import { providers, utils, errors, Wallet, BigNumber } from 'ethers'
-import { Networks, networks, getContractData } from '@hoprnet/hopr-ethereum'
+import {
+  Networks,
+  networks,
+  getContractData,
+  HoprToken,
+  HoprChannels,
+  HoprToken__factory,
+  HoprChannels__factory
+} from '@hoprnet/hopr-ethereum'
 import {
   Address,
   Ticket,
@@ -18,7 +25,6 @@ import BN from 'bn.js'
 import NonceTracker from './nonce-tracker'
 import TransactionManager from './transaction-manager'
 import Debug from 'debug'
-import { HoprToken__factory, HoprChannels__factory } from './contracts'
 
 const log = Debug('hopr:core-ethereum:chain-operations')
 const abiCoder = new utils.AbiCoder()

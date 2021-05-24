@@ -1,5 +1,4 @@
-import type { HoprChannels } from '../contracts'
-import type { TypedEventFilter, TypedEvent } from '../contracts/commons'
+import type { HoprChannels, TypedEventFilter, TypedEvent } from '@hoprnet/hopr-ethereum'
 
 /**
  * Typechain does not provide us with clean event types, in the lines below we infer

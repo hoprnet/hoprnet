@@ -1,24 +1,10 @@
-import { utils } from 'ethers'
+import type { Networks } from './deploy/constants'
 
-export type PublicNetworks = 'xdai' | 'goerli'
-export type Networks = 'hardhat' | 'localhost' | PublicNetworks
-export type DeploymentTypes = 'testing' | 'development' | 'staging' | 'production'
-export type NetworkTag = DeploymentTypes | 'etherscan'
+export type { HoprToken, HoprChannels } from './types'
+export type { TypedEvent, TypedEventFilter } from './types/commons'
 
-export const networks: {
-  [network in PublicNetworks]: {
-    chainId: number
-    gas?: number
-  }
-} = {
-  xdai: {
-    chainId: 100,
-    gas: Number(utils.parseUnits('1', 'gwei'))
-  },
-  goerli: {
-    chainId: 5
-  }
-}
+export * from './deploy/constants'
+export { HoprToken__factory, HoprChannels__factory } from './types'
 
 export type ContractNames = 'HoprToken' | 'HoprChannels' | 'HoprDistributor'
 

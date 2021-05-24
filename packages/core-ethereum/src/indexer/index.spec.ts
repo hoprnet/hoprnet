@@ -1,7 +1,6 @@
 import type { providers as Providers } from 'ethers'
-import type { HoprChannels } from '../contracts'
+import type { HoprChannels, TypedEvent } from '@hoprnet/hopr-ethereum'
 import type { Event } from './types'
-import type { TypedEvent } from '../contracts/commons'
 import type { ChainWrapper } from '../ethereum'
 import assert from 'assert'
 import EventEmitter from 'events'
