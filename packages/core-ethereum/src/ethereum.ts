@@ -51,6 +51,8 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
   const hoprChannelsArtifact = getContractData(network, 'HoprChannels')
 
   const channels = HoprChannels__factory.connect(hoprTokenArtifact.address, wallet)
+  const genesisBlock = (await provider.getTransaction(hoprChannelsArtifact.transactionHash)).blockNumber
+
   const token = HoprToken__factory.connect(hoprChannelsArtifact.address, wallet)
 
   const transactions = new TransactionManager()
@@ -259,7 +261,7 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
     initiateChannelClosure: (counterparty: Address) => initiateChannelClosure(channels, counterparty),
     redeemTicket: (counterparty: Address, ackTicket: AcknowledgedTicket, ticket: Ticket) =>
       redeemTicket(channels, counterparty, ackTicket, ticket),
-    getGenesisBlock: () => channels.deployTransaction.blockNumber ?? 0,
+    getGenesisBlock: () => genesisBlock,
     setCommitment: (counterparty: Address, comm: Hash) => setCommitment(channels, counterparty, comm),
     getWallet: () => wallet,
     waitUntilReady: async () => await provider.ready,
