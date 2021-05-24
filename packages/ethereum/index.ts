@@ -1,6 +1,6 @@
-import type { Networks } from './deploy/constants'
+import type { Networks } from './constants'
 
-export * from './deploy/constants'
+export * from './constants'
 export * from './types'
 export * from './types/commons'
 

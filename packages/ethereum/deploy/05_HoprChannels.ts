@@ -1,6 +1,6 @@
 import type { HardhatRuntimeEnvironment } from 'hardhat/types'
 import type { DeployFunction } from 'hardhat-deploy/types'
-import type { DeploymentTypes } from './constants'
+import type { DeploymentTypes } from '../constants'
 import { durations } from '@hoprnet/hopr-utils'
 
 const closures: {

@@ -12,7 +12,7 @@ import '@typechain/hardhat'
 // rest
 import { HardhatUserConfig, task, types } from 'hardhat/config'
 import { ethers } from 'ethers'
-import { networks, NetworkTag } from './deploy/constants'
+import { networks, NetworkTag } from './constants'
 
 const { PRIVATE_KEY, ETHERSCAN_KEY, POKT_KEY, QUIKNODE_KEY, DEVELOPMENT = false } = process.env
 const GAS_MULTIPLIER = 1.1
