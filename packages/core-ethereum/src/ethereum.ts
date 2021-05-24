@@ -50,13 +50,9 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
   const hoprTokenDeployment = getContractData(network, 'HoprToken')
   const hoprChannelsDeployment = getContractData(network, 'HoprChannels')
 
-  const channels = HoprChannels__factory.connect(hoprTokenDeployment.address, wallet)
-
-  console.log('hoprChannelsDeployment', hoprChannelsDeployment)
-  console.log('res', await provider.getTransaction(hoprChannelsDeployment.transactionHash))
+  const token = HoprToken__factory.connect(hoprTokenDeployment.address, wallet)
+  const channels = HoprChannels__factory.connect(hoprChannelsDeployment.address, wallet)
   const genesisBlock = (await provider.getTransaction(hoprChannelsDeployment.transactionHash)).blockNumber
-
-  const token = HoprToken__factory.connect(hoprChannelsDeployment.address, wallet)
 
   const transactions = new TransactionManager()
   const nonceTracker = new NonceTracker(
