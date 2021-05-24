@@ -29,10 +29,7 @@ export function subscribeToAcknowledgements(
     }
 
     if (unacknowledgedTicket != undefined) {
-      const channel = chain.getChannel(
-        new PublicKey(pubKey.pubKey.marshal()),
-        new PublicKey(remotePeer.pubKey.marshal())
-      )
+      const channel = chain.getChannel(new PublicKey(pubKey.pubKey.marshal()), unacknowledgedTicket.signer)
 
       const ackedTicket = await channel.acknowledge(unacknowledgedTicket, ackMsg.ackKeyShare)
 

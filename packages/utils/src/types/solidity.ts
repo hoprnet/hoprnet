@@ -1,5 +1,4 @@
 import BN from 'bn.js'
-import { constants } from 'ethers'
 
 class UINT256 {
   constructor(private bn: BN) {}
@@ -20,10 +19,16 @@ class UINT256 {
     return new UINT256(new BN(str))
   }
 
-  static fromProbability(n: number): UINT256 {
-    if (n > 1) throw Error('Probability input cannot be larger than 1')
-    const percent = Math.floor(n * 100)
-    return new UINT256(new BN(constants.MaxUint256.mul(percent).div(100).toString()))
+  static fromInverseProbability(inverseProb: BN): UINT256 {
+    if (inverseProb.isZero() || inverseProb.isNeg()) {
+      throw Error('Inverse probability must be strictly greater than zero')
+    }
+
+    return new UINT256(new BN(new Uint8Array(UINT256.SIZE).fill(0xff)).div(inverseProb))
+  }
+
+  static get DUMMY_INVERSE_PROBABILITY(): UINT256 {
+    return new UINT256(new BN(0))
   }
 
   static get SIZE(): number {

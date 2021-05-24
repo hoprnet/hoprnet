@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hopr-ethereum",
-  "version": "1.71.0-next.169",
+  "version": "1.71.0-next.175",
   "description": "On-chain logic for hoprnet.org",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "license": "GPL-3.0",
@@ -8,8 +8,9 @@
   "main": "./lib/index.js",
   "scripts": {
     "clean": "rimraf ./lib && rimraf ./types",
-    "build": "yarn clean && yarn build:sol && tsc && cp -R ./deployments ./lib/deployments",
+    "build": "yarn clean && yarn build:sol && yarn build:tsc",
     "build:sol": "hardhat compile",
+    "build:tsc": "tsc && cp -R ./types/*d.ts ./lib/types/$1 && cp -R ./deployments ./lib/deployments",
     "fund": "hardhat fund",
     "faucet": "hardhat faucet",
     "migrate": "hardhat deploy",
@@ -30,11 +31,11 @@
     "!**/*.test.js.map"
   ],
   "dependencies": {
-    "@openzeppelin/contracts": "4.0.0",
+    "@openzeppelin/contracts": "4.1.0",
     "@openzeppelin/contracts-v3-0-1": "npm:@openzeppelin/contracts@3.0.1"
   },
   "devDependencies": {
-    "@hoprnet/hopr-utils": "1.71.0-next.169",
+    "@hoprnet/hopr-utils": "1.71.0-next.175",
     "@nomiclabs/hardhat-ethers": "^2.0.2",
     "@nomiclabs/hardhat-etherscan": "^2.1.1",
     "@nomiclabs/hardhat-solhint": "^2.0.0",
@@ -46,9 +47,9 @@
     "@types/mocha": "^8.2.2",
     "@types/node": "14.14.37",
     "chai": "^4.3.4",
-    "dotenv": "^9.0.0",
+    "dotenv": "^10.0.0",
     "ethereum-waffle": "^3.3.0",
-    "ethers": "5.1.4",
+    "ethers": "5.2.0",
     "hardhat": "^2.1.2",
     "hardhat-deploy": "^0.7.0-beta.57",
     "hardhat-gas-reporter": "^1.0.4",

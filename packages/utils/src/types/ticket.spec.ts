@@ -1,7 +1,6 @@
 import assert from 'assert'
 import { expect } from 'chai'
 import { stringToU8a, SIGNATURE_LENGTH } from '..'
-import { ethers } from 'ethers'
 import { Address, Ticket, Hash, Balance, PublicKey, Signature, UINT256, Response, Challenge } from '.'
 import BN from 'bn.js'
 import { randomBytes } from 'crypto'
@@ -22,7 +21,7 @@ describe('test ticket construction', function () {
     const epoch = UINT256.fromString('1')
     const index = UINT256.fromString('1')
     const amount = new Balance(new BN(1))
-    const winProb = UINT256.fromProbability(1)
+    const winProb = UINT256.fromInverseProbability(new BN(1))
     const channelIteration = UINT256.fromString('1')
     const signature = new Signature(new Uint8Array({ length: SIGNATURE_LENGTH }), 0)
     const ticket = new Ticket(userA, challenge, epoch, index, amount, winProb, channelIteration, signature)
@@ -44,7 +43,7 @@ describe('test ticket construction', function () {
     const epoch = UINT256.fromString('1')
     const index = UINT256.fromString('1')
     const amount = new Balance(new BN('0000000002c68af0bb140000', 16))
-    const winProb = UINT256.fromProbability(1)
+    const winProb = UINT256.fromInverseProbability(new BN(1))
     const channelIteration = UINT256.fromString('1')
     const signature = new Signature(new Uint8Array({ length: SIGNATURE_LENGTH }), 0)
 
@@ -75,7 +74,7 @@ describe('test ticket construction', function () {
     const epoch = UINT256.fromString('2')
     const index = UINT256.fromString('1')
     const amount = new Balance(new BN('000000000de0b6b3a7640000', 16))
-    const winProb = UINT256.fromProbability(1)
+    const winProb = UINT256.fromInverseProbability(new BN(1))
     const channelIteration = UINT256.fromString('1')
     const signature = new Signature(new Uint8Array({ length: SIGNATURE_LENGTH }), 0)
 
@@ -99,13 +98,20 @@ describe('test ticket construction', function () {
 })
 
 describe('test ticket methods', function () {
-  it('should convert float to uint256', function () {
-    assert(UINT256.fromProbability(0).toBN().isZero())
-    assert(UINT256.fromProbability(1).toBN().eq(new BN(ethers.constants.MaxUint256.toString())))
+  it('probability generation - edge case', function () {
+    assert.throws(() => UINT256.fromInverseProbability(new BN(0)))
+
+    assert.throws(() => UINT256.fromInverseProbability(new BN(-1)))
+
+    const maxUint256 = new BN(new Uint8Array(UINT256.SIZE).fill(0xff))
+
+    assert(UINT256.fromInverseProbability(maxUint256).toBN().eqn(1))
+
+    assert(UINT256.fromInverseProbability(new BN(1)).toBN().eq(maxUint256))
   })
 })
 
-describe('test signedTicket construction', async function () {
+describe('test signedTicket construction', function () {
   const userB = PublicKey.fromPrivKey(stringToU8a(ACCOUNT_B.privateKey)).toAddress()
   const userAPrivKey = stringToU8a(ACCOUNT_A.privateKey)
   const userAPubKey = PublicKey.fromPrivKey(userAPrivKey)
@@ -117,7 +123,7 @@ describe('test signedTicket construction', async function () {
       UINT256.fromString('0'),
       UINT256.fromString('1'),
       new Balance(new BN(15)),
-      UINT256.fromProbability(1),
+      UINT256.fromInverseProbability(new BN(1)),
       UINT256.fromString('0'),
       userAPrivKey
     )
@@ -128,5 +134,30 @@ describe('test signedTicket construction', async function () {
     // @ts-ignore readonly
     ticket.amount = new Balance(new BN(123))
     assert(!ticket.verify(userAPubKey), 'Mutated ticket signatures should not work')
+  })
+})
+
+describe('test getPathPosition', function () {
+  const userB = PublicKey.fromPrivKey(stringToU8a(ACCOUNT_B.privateKey)).toAddress()
+  const userAPrivKey = stringToU8a(ACCOUNT_A.privateKey)
+
+  const INVERSE_TICKET_WIN_PROB = new BN(5)
+  const PRICE_PER_PACKET = new BN('10000000000000000')
+
+  it('check that path position detection works on multiple positions', function () {
+    for (let pathLength = 0; pathLength < 4; pathLength++) {
+      const ticket = Ticket.create(
+        userB,
+        new Response(Uint8Array.from(randomBytes(32))).toChallenge(),
+        UINT256.fromString('0'),
+        UINT256.fromString('1'),
+        new Balance(INVERSE_TICKET_WIN_PROB.mul(PRICE_PER_PACKET).muln(pathLength)),
+        UINT256.fromInverseProbability(INVERSE_TICKET_WIN_PROB),
+        UINT256.fromString('0'),
+        userAPrivKey
+      )
+
+      assert(ticket.getPathPosition(PRICE_PER_PACKET, INVERSE_TICKET_WIN_PROB) == pathLength)
+    }
   })
 })

@@ -21,7 +21,7 @@ const createMockTicket = ({
   sender = SENDER,
   targetAddress = TARGET_ADDRESS,
   amount = new Balance(new BN(1)),
-  winProb = UINT256.fromProbability(1),
+  winProb = UINT256.fromInverseProbability(new BN(1)),
   epoch = new UINT256(new BN(1)),
   index = new UINT256(new BN(1)),
   channelIteration = new UINT256(new BN(1))
@@ -121,7 +121,15 @@ describe('unit test validateUnacknowledgedTicket', function () {
     const signedTicket = createMockTicket({})
 
     return expect(
-      validateUnacknowledgedTicket(node.getId(), '1', 1, SENDER, signedTicket, createMockChannel({}), getTicketsMock)
+      validateUnacknowledgedTicket(
+        node.getId(),
+        new BN(1),
+        new BN(1),
+        SENDER,
+        signedTicket,
+        createMockChannel({}),
+        getTicketsMock
+      )
     ).to.not.eventually.rejected
   })
 
@@ -130,7 +138,15 @@ describe('unit test validateUnacknowledgedTicket', function () {
     const signedTicket = createMockTicket({})
 
     return expect(
-      validateUnacknowledgedTicket(node.getId(), '1', 1, TARGET, signedTicket, createMockChannel({}), getTicketsMock)
+      validateUnacknowledgedTicket(
+        node.getId(),
+        new BN(2),
+        new BN(1),
+        TARGET,
+        signedTicket,
+        createMockChannel({}),
+        getTicketsMock
+      )
     ).to.eventually.rejectedWith('The signer of the ticket does not match the sender')
   })
 
@@ -139,18 +155,34 @@ describe('unit test validateUnacknowledgedTicket', function () {
     const signedTicket = createMockTicket({})
 
     return expect(
-      validateUnacknowledgedTicket(node.getId(), '2', 1, SENDER, signedTicket, createMockChannel({}), getTicketsMock)
+      validateUnacknowledgedTicket(
+        node.getId(),
+        new BN(2),
+        new BN(1),
+        SENDER,
+        signedTicket,
+        createMockChannel({}),
+        getTicketsMock
+      )
     ).to.eventually.rejectedWith('Ticket amount')
   })
 
   it('should throw when ticket chance is low', async function () {
     const node = createMockNode({})
     const signedTicket = createMockTicket({
-      winProb: UINT256.fromProbability(0.5)
+      winProb: UINT256.fromInverseProbability(new BN(2))
     })
 
     return expect(
-      validateUnacknowledgedTicket(node.getId(), '1', 1, SENDER, signedTicket, createMockChannel({}), getTicketsMock)
+      validateUnacknowledgedTicket(
+        node.getId(),
+        new BN(1),
+        new BN(1),
+        SENDER,
+        signedTicket,
+        createMockChannel({}),
+        getTicketsMock
+      )
     ).to.eventually.rejectedWith('Ticket winning probability')
   })
 
@@ -161,8 +193,8 @@ describe('unit test validateUnacknowledgedTicket', function () {
     return expect(
       validateUnacknowledgedTicket(
         node.getId(),
-        '1',
-        1,
+        new BN(1),
+        new BN(1),
         SENDER,
         signedTicket,
         createMockChannel({
@@ -180,8 +212,8 @@ describe('unit test validateUnacknowledgedTicket', function () {
     return expect(
       validateUnacknowledgedTicket(
         node.getId(),
-        '1',
-        1,
+        new BN(1),
+        new BN(1),
         SENDER,
         signedTicket,
         createMockChannel({
@@ -198,7 +230,15 @@ describe('unit test validateUnacknowledgedTicket', function () {
     const mockChannel = createMockChannel({ ticketEpoch: new UINT256(new BN(2)) })
 
     return expect(
-      validateUnacknowledgedTicket(node.getId(), '1', 1, SENDER, signedTicket, mockChannel, getTicketsMock)
+      validateUnacknowledgedTicket(
+        node.getId(),
+        new BN(1),
+        new BN(1),
+        SENDER,
+        signedTicket,
+        mockChannel,
+        getTicketsMock
+      )
     ).to.eventually.rejectedWith('does not match our account epoch')
   })
 
@@ -208,7 +248,15 @@ describe('unit test validateUnacknowledgedTicket', function () {
     const mockChannel = createMockChannel({ ticketIndex: new UINT256(new BN(1)) })
 
     return expect(
-      validateUnacknowledgedTicket(node.getId(), '1', 1, SENDER, signedTicket, mockChannel, getTicketsMock)
+      validateUnacknowledgedTicket(
+        node.getId(),
+        new BN(1),
+        new BN(1),
+        SENDER,
+        signedTicket,
+        mockChannel,
+        getTicketsMock
+      )
     ).to.eventually.rejectedWith('must be higher than last ticket index')
   })
 
@@ -219,7 +267,15 @@ describe('unit test validateUnacknowledgedTicket', function () {
     })
 
     return expect(
-      validateUnacknowledgedTicket(node.getId(), '1', 1, SENDER, signedTicket, createMockChannel({}), getTicketsMock)
+      validateUnacknowledgedTicket(
+        node.getId(),
+        new BN(1),
+        new BN(1),
+        SENDER,
+        signedTicket,
+        createMockChannel({}),
+        getTicketsMock
+      )
     ).to.eventually.rejectedWith('Ticket was created for a different channel iteration')
   })
 
@@ -230,8 +286,8 @@ describe('unit test validateUnacknowledgedTicket', function () {
     return expect(
       validateUnacknowledgedTicket(
         node.getId(),
-        '1',
-        1,
+        new BN(1),
+        new BN(1),
         SENDER,
         signedTicket,
         createMockChannel({
@@ -255,8 +311,8 @@ describe('unit test validateUnacknowledgedTicket', function () {
     return expect(
       validateUnacknowledgedTicket(
         node.getId(),
-        '1',
-        1,
+        new BN(1),
+        new BN(1),
         SENDER,
         signedTicket,
         createMockChannel({}),

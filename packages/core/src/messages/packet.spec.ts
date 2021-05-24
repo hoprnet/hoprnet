@@ -16,7 +16,7 @@ function createMockTickets(privKey: Uint8Array) {
         new UINT256(new BN(0)),
         new UINT256(new BN(0)),
         amount,
-        UINT256.fromProbability(1),
+        UINT256.fromInverseProbability(new BN(1)),
         new UINT256(new BN(0)),
         privKey
       )
@@ -28,7 +28,7 @@ function createMockTickets(privKey: Uint8Array) {
         new UINT256(new BN(0)),
         new UINT256(new BN(0)),
         new Balance(new BN(0)),
-        UINT256.fromProbability(1),
+        UINT256.DUMMY_INVERSE_PROBABILITY,
         new UINT256(new BN(0)),
         privKey
       )
@@ -49,10 +49,7 @@ describe('packet creation and transformation', function () {
 
     const testMsg = new TextEncoder().encode('test')
 
-    let packet = await Packet.create(testMsg, path, self, chain as any, {
-      value: new Balance(new BN(0)),
-      winProb: 1
-    })
+    let packet = await Packet.create(testMsg, path, self, chain as any)
 
     assert(packet.ackChallenge != null, `ack challenge must be set to track if message was sent`)
 
@@ -89,10 +86,7 @@ describe('packet creation and transformation', function () {
 
     const testMsg = new TextEncoder().encode('test')
 
-    let packet = await Packet.create(testMsg, path, self, chain as any, {
-      value: new Balance(new BN(0)),
-      winProb: 1
-    })
+    let packet = await Packet.create(testMsg, path, self, chain as any)
 
     assert(packet.ackChallenge != null, `ack challenge must be set to track if message was sent`)
 
@@ -129,10 +123,7 @@ describe('packet creation and transformation', function () {
 
     const testMsg = new TextEncoder().encode('test')
 
-    let packet = await Packet.create(testMsg, path, self, chain as any, {
-      value: new Balance(new BN(0)),
-      winProb: 1
-    })
+    let packet = await Packet.create(testMsg, path, self, chain as any)
 
     assert(packet.ackChallenge != null, `ack challenge must be set to track if message was sent`)
 
@@ -169,10 +160,7 @@ describe('packet creation and transformation', function () {
 
     const testMsg = new TextEncoder().encode('test')
 
-    const packet = await Packet.create(testMsg, path, self, chain as any, {
-      value: new Balance(new BN(0)),
-      winProb: 1
-    })
+    const packet = await Packet.create(testMsg, path, self, chain as any)
 
     const transformedPacket = Packet.deserialize(packet.serialize(), path[0], self)
 
