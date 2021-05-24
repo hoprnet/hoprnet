@@ -47,13 +47,13 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
   // get network's name by looking into our known networks
   const network: Networks = networkInfo?.name || 'localhost'
 
-  const hoprTokenArtifact = getContractData(network, 'HoprToken')
-  const hoprChannelsArtifact = getContractData(network, 'HoprChannels')
+  const hoprTokenDeployment = getContractData(network, 'HoprToken')
+  const hoprChannelsDeployment = getContractData(network, 'HoprChannels')
 
-  const channels = HoprChannels__factory.connect(hoprTokenArtifact.address, wallet)
-  const genesisBlock = (await provider.getTransaction(hoprChannelsArtifact.transactionHash)).blockNumber
+  const channels = HoprChannels__factory.connect(hoprTokenDeployment.address, wallet)
+  const genesisBlock = (await provider.getTransaction(hoprChannelsDeployment.transactionHash)).blockNumber
 
-  const token = HoprToken__factory.connect(hoprChannelsArtifact.address, wallet)
+  const token = HoprToken__factory.connect(hoprChannelsDeployment.address, wallet)
 
   const transactions = new TransactionManager()
   const nonceTracker = new NonceTracker(
@@ -282,8 +282,8 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
     getInfo: () =>
       [
         `Running on: ${network}`,
-        `HOPR Token: ${hoprTokenArtifact.address}`,
-        `HOPR Channels: ${hoprChannelsArtifact.address}`
+        `HOPR Token: ${hoprTokenDeployment.address}`,
+        `HOPR Channels: ${hoprChannelsDeployment.address}`
       ].join('\n')
   }
 
