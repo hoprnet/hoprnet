@@ -47,6 +47,6 @@ export class PacketForwardInteraction {
       await this.interact(pubKeyToPeerId(packet.nextHop), packet)
     }
 
-    sendAcknowledgement(packet, pubKeyToPeerId(packet.previousHop), this.sendMessage, this.privKey)
+    sendAcknowledgement(packet, packet.previousHop.toPeerId(), this.sendMessage, this.privKey)
   }
 }
