@@ -1,10 +1,10 @@
 # Cleanup old gcloud resources.
 
-if [ -z "$GCLOUD_INCLUDED" ]; then
+if [ -z "${GCLOUD_INCLUDED:-}" ]; then
   source scripts/gcloud.sh 
 fi
 
-if [ -z "$OLD_RELEASES" ]; then
+if [ -z "${OLD_RELEASES:-}" ]; then
   source scripts/environments.sh 
 fi
 
