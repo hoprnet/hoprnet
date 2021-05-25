@@ -22,7 +22,6 @@ import type { HoprDB } from '@hoprnet/hopr-utils'
 const log = Debug('hopr-core-ethereum:channel')
 
 class Channel {
-  private ownTicketIndex: number
   private ownCommitment: Commitment
 
   constructor(
@@ -33,8 +32,6 @@ class Channel {
     private readonly indexer: Indexer,
     private readonly privateKey: Uint8Array
   ) {
-    // @TODO Fetch current value from indexer / db
-    this.ownTicketIndex = 0
     this.ownCommitment = new Commitment(
       (commitment: Hash) => this.chain.setCommitment(counterparty.toAddress(), commitment),
       () => this.getChainCommitment(),
@@ -160,6 +157,23 @@ class Channel {
     return await this.chain.finalizeChannelClosure(counterpartyAddress)
   }
 
+  private async bumpOwnTicketIndex(channelState: ChannelEntry): Promise<UINT256> {
+    const isPartyA = this.self.toAddress().eq(channelState.partyA)
+
+    let currentTicketIndex: UINT256
+
+    if (isPartyA) {
+      currentTicketIndex = channelState.partyATicketIndex
+      channelState.partyATicketIndex.toBN().iaddn(1)
+    } else {
+      currentTicketIndex = channelState.partyBTicketIndex
+      channelState.partyBTicketIndex.toBN().iaddn(1)
+    }
+
+    await this.db.updateChannel(this.getId(), channelState)
+
+    return currentTicketIndex
+  }
   /**
    * Creates a signed ticket that includes the given amount of
    * tokens
@@ -175,11 +189,13 @@ class Channel {
     const counterpartyAddress = this.counterparty.toAddress()
     const channelState = await this.getState()
 
+    const currentTicketIndex = await this.bumpOwnTicketIndex(channelState)
+
     return Ticket.create(
       counterpartyAddress,
       challenge,
-      channelState.ticketEpochFor(this.counterparty.toAddress()),
-      new UINT256(new BN(this.ownTicketIndex++)),
+      channelState.ticketEpochFor(counterpartyAddress),
+      currentTicketIndex,
       amount,
       UINT256.fromInverseProbability(winProb),
       channelState.channelEpoch,
@@ -193,13 +209,17 @@ class Channel {
    * @param challenge dummy challenge, potential no valid response known
    * @returns a ticket without any value
    */
-  createDummyTicket(challenge: Challenge): Ticket {
+  async createDummyTicket(challenge: Challenge): Promise<Ticket> {
     // TODO: document how dummy ticket works
+
+    const channelState = await this.getState()
+    const currentTicketIndex = await this.bumpOwnTicketIndex(channelState)
+
     return Ticket.create(
       this.counterparty.toAddress(),
       challenge,
       UINT256.fromString('0'),
-      new UINT256(new BN(this.ownTicketIndex++)),
+      currentTicketIndex,
       new Balance(new BN(0)),
       UINT256.DUMMY_INVERSE_PROBABILITY,
       UINT256.fromString('0'),

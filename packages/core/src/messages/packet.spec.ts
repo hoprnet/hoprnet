@@ -9,28 +9,32 @@ function createMockTickets(privKey: Uint8Array) {
 
   const getChannel = (_self: PublicKey, counterparty: PublicKey) => ({
     acknowledge,
-    createTicket: (amount: Balance, challenge: Challenge, _winProb: number) => {
-      return Ticket.create(
-        counterparty.toAddress(),
-        challenge,
-        new UINT256(new BN(0)),
-        new UINT256(new BN(0)),
-        amount,
-        UINT256.fromInverseProbability(new BN(1)),
-        new UINT256(new BN(0)),
-        privKey
+    createTicket: async (amount: Balance, challenge: Challenge, _winProb: number) => {
+      return Promise.resolve(
+        Ticket.create(
+          counterparty.toAddress(),
+          challenge,
+          new UINT256(new BN(0)),
+          new UINT256(new BN(0)),
+          amount,
+          UINT256.fromInverseProbability(new BN(1)),
+          new UINT256(new BN(0)),
+          privKey
+        )
       )
     },
-    createDummyTicket: (challenge: Challenge) => {
-      return Ticket.create(
-        counterparty.toAddress(),
-        challenge,
-        new UINT256(new BN(0)),
-        new UINT256(new BN(0)),
-        new Balance(new BN(0)),
-        UINT256.DUMMY_INVERSE_PROBABILITY,
-        new UINT256(new BN(0)),
-        privKey
+    createDummyTicket: async (challenge: Challenge) => {
+      return Promise.resolve(
+        Ticket.create(
+          counterparty.toAddress(),
+          challenge,
+          new UINT256(new BN(0)),
+          new UINT256(new BN(0)),
+          new Balance(new BN(0)),
+          UINT256.DUMMY_INVERSE_PROBABILITY,
+          new UINT256(new BN(0)),
+          privKey
+        )
       )
     }
   })

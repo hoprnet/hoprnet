@@ -241,7 +241,7 @@ export class Packet {
 
     let ticket: Ticket
     if (isDirectMessage) {
-      ticket = channel.createDummyTicket(ticketChallenge)
+      ticket = await channel.createDummyTicket(ticketChallenge)
     } else {
       ticket = await channel.createTicket(
         new Balance(new BN(PRICE_PER_PACKET).mul(new BN(INVERSE_TICKET_WIN_PROB)).muln(path.length - 1)),
