@@ -50,7 +50,7 @@ $h_b:G^*\times G^*\rightarrow\mathbb{Z}^*_q$ where $\mathbb{Z}^*_q$ is the field
     \label{eq:1}
 \end{equation}
 for $1\le i < r-1$. 
-\\Where $y_1, y_2,y_3$ and $y_4$ are the public keys of the nodes $B,C, D$ and $Z$  which we assume to be available to $A$ .
+\\~\\Where $y_1, y_2,y_3$ and $y_4$ are the public keys of the nodes $B,C, D$ and $Z$  which we assume to be available to $A$ .
     \paragraph{Routing information}
     Each node on the path needs to know the next downstream node. Therefore, the sender $(A)$ generates routing information $\beta_i$ for $(B)$, $(C)$ and $(D)$ as well as message $END$ to tell $(Z)$ that it is the final receiver of the message. 
     The END message is a distinguished prefix byte that's added to the final receiver's compressed public key.
@@ -130,8 +130,7 @@ Let $S_k$ be a pseudo random function (stream cipher) which given the input $m$ 
 \begin{align}  
    m &\leftarrow 0_{l} \|\tau\|m
     \end{align}
-
- where $\tau$ is generated arbitrarily and $|\tau|=4$ is its length ($\tau=``HOPR "$ in ASCII). $l$ is the $0$ padding length where
+where $\tau$ is generated arbitrarily and $|\tau|=4$ is its length ($\tau=``HOPR "$ in ASCII). $l$ is the $0$ padding length where
 $0 <= l <= |m| - 4$. 
 \\$m$ is divided into two blocks left $m_l$ and right $m_r$ whose sizes are $|m_l|=w$ and $|m_r|=j-w$ so we get $m=m_r\|m_l$.
 \subparagraph{Encryption}

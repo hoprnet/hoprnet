@@ -8,7 +8,7 @@ value_(ACK_n) &=\sum_{i=1}^nfee_{packet_i}
 where $n$ is the total number of mixnet packets transformed.
 \\~\\If B received $ACK_n$ before sending $packet_{n-1}$, it has no incentive to process $packet_{n-1}$ rather than $packet_{n-2}$.
 \\~\\To avoid this limitation of traditional payment channels, HOPR utilizes probabilistic payments
-\\~\\In probabilistic payments, the payouts use a concept called “tickets”, a ticket can be either a win or a loss with a certain winning probability. This means nodes are incentivized to continue relaying packets as they don’t know which ticket is a win.
+\\~\\In probabilistic payments, the payouts use a concept called “tickets” (see section \nameref{ticket}), a ticket can be either a win or a loss with a certain winning probability. This means nodes are incentivized to continue relaying packets as they don’t know which ticket is a win.
 \\~\\HOPR uses a custom-made layer 2 solution. It is inspired by payment channels and probabilistic payments where incentives can be claimed independently:
 \begin{align}  
  value ( ACK_i )  &  =value ( ACK_j ) \quad for \quad i,j\in \{1,n\}
