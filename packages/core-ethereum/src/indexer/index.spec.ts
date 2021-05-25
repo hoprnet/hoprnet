@@ -6,8 +6,9 @@ import type { ChainWrapper } from '../ethereum'
 import assert from 'assert'
 import EventEmitter from 'events'
 import Indexer from '.'
-import { HoprDB } from '@hoprnet/hopr-utils'
+import { ChannelEntry, HoprDB } from '@hoprnet/hopr-utils'
 import { expectAccountsToBeEqual, expectChannelsToBeEqual } from './fixtures'
+import Defer from 'p-defer'
 import * as fixtures from './fixtures'
 
 const createProviderMock = (ops: { latestBlockNumber?: number } = {}) => {
@@ -205,5 +206,33 @@ describe('test indexer', function () {
     setImmediate(async () => {
       assert.strictEqual(indexer.status, 'restarting')
     })
+  })
+
+  it('should emit events on updated channels', async function () {
+    const { indexer, newEvent, newBlock } = useFixtures({
+      latestBlockNumber: 3,
+      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.FUNDED_EVENT]
+    })
+    await indexer.start()
+
+    const firstUpdate = Defer()
+    const secondUpdate = Defer()
+
+    indexer.on('own-channel-updated', (channel: ChannelEntry) => {
+      if (channel.partyATicketEpoch.toBN().isZero()) {
+        firstUpdate.resolve()
+      }
+      if (channel.partyATicketEpoch.toBN().eqn(1)) {
+        secondUpdate.resolve()
+      }
+    })
+
+    newEvent(fixtures.OPENED_EVENT)
+    newBlock()
+
+    newEvent(fixtures.COMMITMENT_SET)
+    newBlock()
+
+    await Promise.all([firstUpdate.promise, secondUpdate.promise])
   })
 })
