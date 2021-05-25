@@ -391,6 +391,27 @@ class Hopr extends EventEmitter {
    */
   public async sendMessage(msg: Uint8Array, destination: PeerId, intermediatePath?: PeerId[]): Promise<void> {
     const promises: Promise<void>[] = []
+    const ethereum = await this.paymentChannels
+
+    if (intermediatePath != undefined) {
+      // checking if path makes sense
+      for (let i = 0; i < intermediatePath.length - 2; i++) {
+        const ticketIssuer = PublicKey.fromPeerId(intermediatePath[i])
+        const ticketReceiver = PublicKey.fromPeerId(intermediatePath[i + 1])
+
+        const channel = ethereum.getChannel(ticketIssuer, ticketReceiver)
+
+        const channelState = await channel.getState()
+
+        if (channelState.ticketEpochFor(ticketReceiver.toAddress()).toBN().isZero()) {
+          throw Error(
+            `Cannot use manually set path because apparently there is no commitment set for the channel between ${ticketIssuer
+              .toPeerId()
+              .toB58String()} and ${ticketReceiver.toPeerId().toB58String()}`
+          )
+        }
+      }
+    }
 
     for (let n = 0; n < msg.length / PACKET_SIZE; n++) {
       promises.push(
