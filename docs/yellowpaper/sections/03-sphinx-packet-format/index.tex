@@ -153,7 +153,7 @@ Within HOPR, the following cryptographic primitives were used:
     \item \textbf{Encryption scheme:} LIONESS \cite{lionesspaper} implementation, using BLAKE2s as a hash function and ChaCha20 as a stream cipher.
     \item \textbf{Padding:} In the original SPHINX paper, a sequence of only 0s is used for padding, this allows the last mix-node in the path to infer information about the length of the path and the last destination, hence breaking one of the security properties promised by Sphinx. In order to prevent this attack, We replace the 0-padding by a randomized padding for the last exit-mix node and always take $v=r$. This way, the exit node can't identify where the padding starts and thus won't be able to find the path length that preceeds the padding.
 \end{itemize}
-
+\subsection{Packet serialization}
 
 
 
