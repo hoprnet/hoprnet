@@ -8,4 +8,4 @@ test -z "${PRIVATE_KEY:-}" && (echo "Missing environment variable PRIVATE_KEY"; 
 test -z "${QUIKNODE_KEY:-}" && (echo "Missing environment variable QUIKNODE_KEY"; exit 1)
 test -z "${NETWORK:-}" && (echo "Missing environment variable NETWORK"; exit 1)
 
-lerna exec --scope @hoprnet/hopr-ethereum -- "PRIVATE_KEY=${PRIVATE_KEY}" "QUIKNODE_KEY=${QUIKNODE_KEY}" npx hardhat deploy --network "${NETWORK}"
+npx lerna exec --scope @hoprnet/hopr-ethereum -- "PRIVATE_KEY=${PRIVATE_KEY}" "QUIKNODE_KEY=${QUIKNODE_KEY}" npx hardhat deploy --network "${NETWORK}"
