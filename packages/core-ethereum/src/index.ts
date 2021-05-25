@@ -135,10 +135,7 @@ export default class HoprEthereum {
     const isPartyA = this.ownAddress.eq(channel.partyA)
     const counterparty = isPartyA ? channel.partyB : channel.partyA
 
-    if (
-      (isPartyA && !channel.partyATicketEpoch.toBN().isZero()) ||
-      (!isPartyA && !channel.partyBTicketEpoch.toBN().isZero())
-    ) {
+    if (!channel.ticketEpochFor(this.ownAddress).toBN().isZero()) {
       // Channel commitment is already set, nothing to do
       return
     }
