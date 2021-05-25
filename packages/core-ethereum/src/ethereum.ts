@@ -239,14 +239,8 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
     return transaction.hash
   }
 
-<<<<<<< HEAD
-  async function setCommitment(channels: HoprChannels, commitment: Hash): Promise<Receipt> {
-    const transaction = await sendTransaction(channels.bumpCommitment, commitment.toHex())
-=======
   async function setCommitment(channels: HoprChannels, counterparty: Address, commitment: Hash): Promise<Receipt> {
     const transaction = await sendTransaction(channels.bumpChannel, counterparty.toHex(), commitment.toHex())
-    await transaction.wait()
->>>>>>> 4ca0b180a9843bac0a7302a3c0e76c782f931b95
     return transaction.hash
   }
 
