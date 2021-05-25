@@ -384,7 +384,7 @@ export class Packet {
 
     const pathPosition = this.ticket.getPathPosition(new BN(PRICE_PER_PACKET), new BN(INVERSE_TICKET_WIN_PROB))
     if (pathPosition == 1) {
-      this.ticket = channel.createDummyTicket(this.nextChallenge)
+      this.ticket = await channel.createDummyTicket(this.nextChallenge)
     } else {
       this.ticket = await channel.createTicket(
         new Balance(new BN(PRICE_PER_PACKET).mul(new BN(INVERSE_TICKET_WIN_PROB)).muln(pathPosition - 1)),
