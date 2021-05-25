@@ -17,7 +17,7 @@ source scripts/cleanup.sh
 # - FUNDING_PRIV_KEY: funding private key, raw
 # - BS_PASSWORD: database password
 
-if [ -z "$RPC" ]; then
+if [ -z "${RPC:-}" ]; then
   RPC=https://eth-goerli.gateway.pokt.network/v1/6021a2b6928ff9002e6c7f2f
 fi
 
