@@ -17,9 +17,7 @@ export async function toSignedTickets(ackTickets: AcknowledgedTicket[]): Promise
  * @param signedTickets
  * @returns the total amount of tokens in the tickets & more
  */
-export function countSignedTickets(
-  signedTickets: Ticket[]
-): {
+export function countSignedTickets(signedTickets: Ticket[]): {
   tickets: {
     challange: string
     amount: string

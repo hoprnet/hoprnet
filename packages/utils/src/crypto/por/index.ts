@@ -108,9 +108,7 @@ export function preVerify(
   }
 }
 
-export function decodePoRBytes(
-  porBytes: Uint8Array
-): {
+export function decodePoRBytes(porBytes: Uint8Array): {
   nextTicketChallenge: Challenge
   ackChallenge: HalfKeyChallenge
 } {

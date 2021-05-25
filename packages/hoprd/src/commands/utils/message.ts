@@ -15,9 +15,7 @@ export function encodeMessage(msg: string): Uint8Array {
  * the measured latency.
  * @param encoded an encoded message
  */
-export function decodeMessage(
-  encoded: Uint8Array
-): {
+export function decodeMessage(encoded: Uint8Array): {
   latency: number
   msg: string
 } {

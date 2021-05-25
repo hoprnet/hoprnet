@@ -10,9 +10,8 @@
   "scripts": {
     "clean": "rimraf ./lib",
     "test": "mocha --exit",
-    "dev": "yarn clean && yarn build:types && tsc -w",
-    "build:types": "typechain --target ethers-v5 --outDir './src/contracts' '../../node_modules/@hoprnet/hopr-ethereum/chain/abis/*.json'",
-    "build": "yarn clean && yarn build:types && mkdir -p ./lib/contracts && cp -R ./src/contracts ./lib/contracts && tsc",
+    "dev": "yarn clean && tsc -w",
+    "build": "yarn clean && tsc",
     "prepublishOnly": "yarn build",
     "docs:generate": "yarn typedoc",
     "docs:watch": "yarn typedoc --watch"
@@ -42,7 +41,6 @@
     "secp256k1": "^4.0.2"
   },
   "devDependencies": {
-    "@typechain/ethers-v5": "^6.0.5",
     "@types/debug": "^4.1.5",
     "@types/levelup": "^4.3.0",
     "@types/memdown": "^3.0.0",
@@ -60,7 +58,6 @@
     "sinon": "^11.0.0",
     "ts-generator": "^0.1.1",
     "ts-node": "^9.0.0",
-    "typechain": "^4.0.0",
     "typescript": "^4.2"
   },
   "mocha": {

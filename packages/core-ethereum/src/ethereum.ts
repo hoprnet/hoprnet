@@ -1,8 +1,15 @@
 import type { ContractTransaction } from 'ethers'
 import type { Multiaddr } from 'multiaddr'
-import type { HoprToken, HoprChannels } from './contracts'
 import { providers, utils, errors, Wallet, BigNumber } from 'ethers'
-import { Networks, networks, getContracts } from '@hoprnet/hopr-ethereum'
+import {
+  Networks,
+  networks,
+  getContractData,
+  HoprToken,
+  HoprChannels,
+  HoprToken__factory,
+  HoprChannels__factory
+} from '@hoprnet/hopr-ethereum'
 import {
   Address,
   Ticket,
@@ -18,7 +25,6 @@ import BN from 'bn.js'
 import NonceTracker from './nonce-tracker'
 import TransactionManager from './transaction-manager'
 import Debug from 'debug'
-import { HoprToken__factory, HoprChannels__factory } from './contracts'
 
 const log = Debug('hopr:core-ethereum:chain-operations')
 const abiCoder = new utils.AbiCoder()
@@ -40,15 +46,13 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
   const networkInfo = knownNetworks.find((info) => info.chainId === chainId)
   // get network's name by looking into our known networks
   const network: Networks = networkInfo?.name || 'localhost'
-  const contracts = getContracts()?.[network]
 
-  if (!contracts?.HoprToken?.address) {
-    throw Error(`token contract address from network ${network} not found`)
-  } else if (!contracts?.HoprChannels?.address) {
-    throw Error(`channels contract address from network ${network} not found`)
-  }
-  const channels = HoprChannels__factory.connect(contracts.HoprChannels.address, wallet)
-  const token = HoprToken__factory.connect(contracts.HoprToken.address, wallet)
+  const hoprTokenDeployment = getContractData(network, 'HoprToken')
+  const hoprChannelsDeployment = getContractData(network, 'HoprChannels')
+
+  const token = HoprToken__factory.connect(hoprTokenDeployment.address, wallet)
+  const channels = HoprChannels__factory.connect(hoprChannelsDeployment.address, wallet)
+  const genesisBlock = (await provider.getTransaction(hoprChannelsDeployment.transactionHash)).blockNumber
 
   const transactions = new TransactionManager()
   const nonceTracker = new NonceTracker(
@@ -256,8 +260,8 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
     initiateChannelClosure: (counterparty: Address) => initiateChannelClosure(channels, counterparty),
     redeemTicket: (counterparty: Address, ackTicket: AcknowledgedTicket, ticket: Ticket) =>
       redeemTicket(channels, counterparty, ackTicket, ticket),
+    getGenesisBlock: () => genesisBlock,
     setCommitment: (counterparty: Address, comm: Hash) => setCommitment(channels, counterparty, comm),
-    getGenesisBlock: () => contracts?.HoprChannels?.deployedAt ?? 0,
     getWallet: () => wallet,
     waitUntilReady: async () => await provider.ready,
     getLatestBlockNumber: async () => provider.getBlockNumber(), // TODO: use indexer when it's done syncing
@@ -277,8 +281,8 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
     getInfo: () =>
       [
         `Running on: ${network}`,
-        `HOPR Token: ${contracts.HoprToken.address}`,
-        `HOPR Channels: ${contracts.HoprChannels.address}`
+        `HOPR Token: ${hoprTokenDeployment.address}`,
+        `HOPR Channels: ${hoprChannelsDeployment.address}`
       ].join('\n')
   }
 

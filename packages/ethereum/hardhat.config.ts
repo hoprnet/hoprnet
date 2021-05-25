@@ -12,7 +12,7 @@ import '@typechain/hardhat'
 // rest
 import { HardhatUserConfig, task, types } from 'hardhat/config'
 import { ethers } from 'ethers'
-import { networks, NetworkTag } from './chain/networks'
+import { networks, NetworkTag } from './constants'
 
 const { PRIVATE_KEY, ETHERSCAN_KEY, POKT_KEY, QUIKNODE_KEY, DEVELOPMENT = false } = process.env
 const GAS_MULTIPLIER = 1.1
@@ -30,7 +30,7 @@ const hardhatConfig: HardhatUserConfig = {
     hardhat: {
       live: false,
       tags: [DEVELOPMENT ? 'development' : 'testing'] as NetworkTag[],
-      saveDeployments: false,
+      saveDeployments: true,
       mining: DEVELOPMENT
         ? {
             auto: true, // every transaction will trigger a new block (without this deployments fail)
@@ -97,10 +97,6 @@ task('faucet', 'Faucets a local development HOPR node account with ETH and HOPR 
     false,
     types.boolean
   )
-
-task('postCompile', 'Use export task and then update abis folder', async (...args: any[]) => {
-  return (await import('./tasks/postCompile')).default(args[0], args[1], args[2])
-})
 
 task('accounts', 'View unlocked accounts', async (...args: any[]) => {
   return (await import('./tasks/getAccounts')).default(args[0], args[1], args[2])
