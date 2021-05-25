@@ -11,7 +11,7 @@ set -o pipefail
 # $1 = IP
 # $2 = Hopr command
 run_command(){
-  curl --silent --max-time 60 -X POST --data "$2" "$1/api/v1/command"
+  curl --silent --max-time 240 -X POST --data "$2" "$1/api/v1/command"
 }
 
 get_eth_address(){
