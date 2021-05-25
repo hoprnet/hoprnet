@@ -743,6 +743,9 @@ class Hopr extends EventEmitter {
 
   // Utility method to wait until the node is running successfully
   public async waitForRunning(): Promise<void> {
+    if (this.status == 'RUNNING') {
+      return Promise.resolve()
+    }
     return new Promise((resolve) => this.once('running', resolve))
   }
 }
