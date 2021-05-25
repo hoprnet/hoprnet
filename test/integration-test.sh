@@ -71,6 +71,7 @@ echo "- Running full E2E test with $API1, $API2, $API3"
 validate_ip "$API1"
 validate_ip "$API2"
 validate_ip "$API3"
+echo "- IP's exist"
 
 declare ETH_ADDRESS1
 declare ETH_ADDRESS2
@@ -79,10 +80,10 @@ declare ETH_ADDRESS3
 ETH_ADDRESS1="$(validate_node_eth_address "$API1")"
 ETH_ADDRESS2="$(validate_node_eth_address "$API2")"
 ETH_ADDRESS3="$(validate_node_eth_address "$API3")"
+echo "- ETH addresses exist"
 
 validate_node_balance_gt0 "$API1"
 validate_node_balance_gt0 "$API2"
-
 echo "- Nodes are funded"
 
 echo "$(run_command $API1 'peers')"
