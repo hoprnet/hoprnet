@@ -26,7 +26,7 @@ TESTNET_SIZE=3
 #start_chain_provider
 #exit 1
 
-#echo "Starting testnet '$TESTNET_NAME' with $TESTNET_SIZE nodeu and image hoprd:$RELEASE"
+#echo "Starting testnet '$TESTNET_NAME' with $TESTNET_SIZE nodes and image hoprd:$RELEASE"
 #start_testnet $TESTNET_NAME $TESTNET_SIZE "gcr.io/hoprassociation/hoprd:$RELEASE" 
 
 # TODO FUND ADDRESS
