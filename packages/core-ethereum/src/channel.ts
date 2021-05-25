@@ -22,8 +22,8 @@ import type { HoprDB } from '@hoprnet/hopr-utils'
 const log = Debug('hopr-core-ethereum:channel')
 
 class Channel {
-  private index: number
-  private commitment: Commitment
+  private ownTicketIndex: number
+  private ownCommitment: Commitment
 
   constructor(
     private readonly self: PublicKey,
@@ -33,8 +33,9 @@ class Channel {
     private readonly indexer: Indexer,
     private readonly privateKey: Uint8Array
   ) {
-    this.index = 0 // TODO - bump channel epoch to make sure..
-    this.commitment = new Commitment(
+    // @TODO Fetch current value from indexer / db
+    this.ownTicketIndex = 0
+    this.ownCommitment = new Commitment(
       (commitment: Hash) => this.chain.setCommitment(counterparty.toAddress(), commitment),
       () => this.getChainCommitment(),
       this.db,
@@ -63,22 +64,22 @@ class Channel {
 
     const ticket = unacknowledgedTicket.ticket
 
-    if (ticket.isWinningTicket(await this.commitment.getCurrentCommitment(), response, ticket.winProb)) {
+    if (ticket.isWinningTicket(await this.ownCommitment.getCurrentCommitment(), response, ticket.winProb)) {
       const ack = new AcknowledgedTicket(
         ticket,
         response,
-        await this.commitment.getCurrentCommitment(),
+        await this.ownCommitment.getCurrentCommitment(),
         unacknowledgedTicket.signer
       )
-      await this.commitment.bumpCommitment()
+      await this.ownCommitment.bumpCommitment()
       return ack
     } else {
       return null
     }
   }
 
-  async initCommitment() {
-    await this.commitment.bumpCommitment()
+  setOwnCommitment(): Promise<void> {
+    return this.ownCommitment.bumpCommitment()
   }
 
   getId() {
@@ -178,7 +179,7 @@ class Channel {
       counterpartyAddress,
       challenge,
       channelState.ticketEpochFor(this.counterparty.toAddress()),
-      new UINT256(new BN(this.index++)),
+      new UINT256(new BN(this.ownTicketIndex++)),
       amount,
       UINT256.fromInverseProbability(winProb),
       channelState.channelEpoch,
@@ -198,7 +199,7 @@ class Channel {
       this.counterparty.toAddress(),
       challenge,
       UINT256.fromString('0'),
-      new UINT256(new BN(this.index++)),
+      new UINT256(new BN(this.ownTicketIndex++)),
       new Balance(new BN(0)),
       UINT256.DUMMY_INVERSE_PROBABILITY,
       UINT256.fromString('0'),

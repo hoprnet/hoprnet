@@ -25,17 +25,18 @@ class Indexer extends EventEmitter {
   public status: 'started' | 'restarting' | 'stopped' = 'stopped'
   public latestBlock: number = 0 // latest known on-chain block number
   private unconfirmedEvents = new Heap<Event<any>>(snapshotComparator)
+  private ownAddress: Address
 
   constructor(
     private genesisBlock: number,
     private db: HoprDB,
     private chain: ChainWrapper,
     private maxConfirmations: number,
-    private blockRange: number,
-    private self: Address,
-    private onOwnChannel: (event: ChannelEntry) => void
+    private blockRange: number
   ) {
     super()
+
+    this.ownAddress = Address.fromString(this.chain.getWallet().address)
   }
 
   /**
@@ -120,9 +121,6 @@ class Indexer extends EventEmitter {
     }
   }
 
-  public setOnOwnChannel(fn: (event: ChannelEntry) => void): void {
-    this.onOwnChannel = fn
-  }
   /**
    * Query past events, this will loop until it gets all blocks from {toBlock} to {fromBlock}.
    * If we exceed response pull limit, we switch into quering smaller chunks.
@@ -274,10 +272,12 @@ class Indexer extends EventEmitter {
 
   private async onChannelUpdated(event: Event<'ChannelUpdate'>): Promise<void> {
     const channel = ChannelEntry.fromSCEvent(event)
-    if (channel.partyA.eq(this.self) || channel.partyB.eq(this.self)) {
-      this.onOwnChannel(channel)
-    }
+
     await this.db.updateChannel(channel.getId(), channel)
+
+    if (channel.partyA.eq(this.ownAddress) || channel.partyB.eq(this.ownAddress)) {
+      this.emit('own-channel-updated', channel)
+    }
   }
 
   public async getAccount(address: Address) {
@@ -295,6 +295,21 @@ class Indexer extends EventEmitter {
   public async getChannelsOf(address: Address) {
     return this.db.getChannels((channel) => {
       return address.eq(channel.partyA) || address.eq(channel.partyB)
+    })
+  }
+
+  public async getOwnChannelsWithoutCommitment(): Promise<ChannelEntry[]> {
+    return this.db.getChannels((channel) => {
+      if (!this.ownAddress.eq(channel.partyA) || !this.ownAddress.eq(channel.partyB)) {
+        return false
+      }
+
+      const isPartyA = channel.partyA.eq(channel.partyA)
+
+      return (
+        (isPartyA && channel.partyATicketEpoch.toBN().isZero()) ||
+        (!isPartyA && channel.partyBTicketEpoch.toBN().isZero())
+      )
     })
   }
 

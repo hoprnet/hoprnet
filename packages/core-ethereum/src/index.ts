@@ -39,9 +39,15 @@ export type RedeemTicketResponse =
 
 export default class HoprEthereum {
   private privateKey: Uint8Array
+  private publicKey: PublicKey
+  private ownAddress: Address
 
   constructor(private chain: ChainWrapper, private db: HoprDB, public indexer: Indexer) {
     this.privateKey = this.chain.getPrivateKey()
+    this.publicKey = this.chain.getPublicKey()
+    this.ownAddress = Address.fromString(this.chain.getWallet().address)
+
+    this.indexer.on('own-channel-updated', this.setInitialCommitmentIfNotSet.bind(this))
   }
 
   readonly CHAIN_NAME = 'HOPR on Ethereum'
@@ -70,7 +76,7 @@ export default class HoprEthereum {
     return this.indexer.getChannelsFromPeer(p)
   }
 
-  public getChannelsOf(addr: Address) {
+  public getChannelsOf(addr: Address): Promise<ChannelEntry[]> {
     return this.indexer.getChannelsOf(addr)
   }
 
@@ -86,7 +92,7 @@ export default class HoprEthereum {
     return this.indexer.getRandomChannel()
   }
 
-  private uncachedGetBalance = () => this.chain.getBalance(this.getAddress())
+  private uncachedGetBalance = () => this.chain.getBalance(this.ownAddress)
   private cachedGetBalance = cacheNoArgAsyncFunction<Balance>(this.uncachedGetBalance, PROVIDER_CACHE_TTL)
   /**
    * Retrieves HOPR balance, optionally uses the cache.
@@ -96,19 +102,19 @@ export default class HoprEthereum {
     return useCache ? this.cachedGetBalance() : this.uncachedGetBalance()
   }
 
-  getAddress(): Address {
-    return Address.fromString(this.chain.getWallet().address)
+  public getAddress(): Address {
+    return this.ownAddress
   }
 
-  getPublicKey() {
-    return this.chain.getPublicKey()
+  public getPublicKey() {
+    return this.publicKey
   }
 
   /**
    * Retrieves ETH balance, optionally uses the cache.
    * @returns ETH balance
    */
-  private uncachedGetNativeBalance = () => this.chain.getNativeBalance(this.getAddress())
+  private uncachedGetNativeBalance = () => this.chain.getNativeBalance(this.ownAddress)
   private cachedGetNativeBalance = cacheNoArgAsyncFunction<NativeBalance>(
     this.uncachedGetNativeBalance,
     PROVIDER_CACHE_TTL
@@ -125,8 +131,21 @@ export default class HoprEthereum {
     return await this.indexer.getPublicNodes()
   }
 
-  public onOwnChannel(entry: ChannelEntry): Promise<void> {
-    return onOwnChannel(this.chain.getPublicKey(), entry, this.getChannel.bind(this), this.getPublicKeyOf.bind(this))
+  private async setInitialCommitmentIfNotSet(channel: ChannelEntry): Promise<void> {
+    const isPartyA = this.ownAddress.eq(channel.partyA)
+    const counterparty = isPartyA ? channel.partyB : channel.partyA
+
+    if (
+      (isPartyA && !channel.partyATicketEpoch.toBN().isZero()) ||
+      (!isPartyA && !channel.partyBTicketEpoch.toBN().isZero())
+    ) {
+      // Channel commitment is already set, nothing to do
+      return
+    }
+
+    const counterpartyPubKey = await this.getPublicKeyOf(counterparty)
+
+    return this.getChannel(this.publicKey, counterpartyPubKey).setOwnCommitment()
   }
 
   /**
@@ -145,61 +164,28 @@ export default class HoprEthereum {
     const chain = await createChainWrapper(options?.provider || PROVIDER_DEFAULT_URI, privateKey)
     await chain.waitUntilReady()
 
-    const self = chain.getPublicKey()
-
-    const ownChannels: ChannelEntry[] = []
     const indexer = new Indexer(
       chain.getGenesisBlock(),
       db,
       chain,
       options.maxConfirmations ?? INDEXER_MAX_CONFIRMATIONS,
-      INDEXER_BLOCK_RANGE,
-      self.toAddress(),
-      (channel: ChannelEntry) => ownChannels.push(channel)
+      INDEXER_BLOCK_RANGE
     )
     await indexer.start()
 
+    const ownChannelsWithoutCommitment = await indexer.getOwnChannelsWithoutCommitment()
+
     const coreConnector = new HoprEthereum(chain, db, indexer)
+
+    for (const ownChannelWithoutCommitment of ownChannelsWithoutCommitment) {
+      await coreConnector.setInitialCommitmentIfNotSet(ownChannelWithoutCommitment)
+    }
+
     log(`using blockchain address ${coreConnector.getAddress().toHex()}`)
     log(chalk.green('Connector started'))
 
-    indexer.setOnOwnChannel(coreConnector.onOwnChannel.bind(coreConnector))
-
-    for (const ownChannel of ownChannels) {
-      await onOwnChannel(
-        self,
-        ownChannel,
-        coreConnector.getChannel.bind(coreConnector),
-        coreConnector.getPublicKeyOf.bind(coreConnector)
-      )
-    }
-
     return coreConnector
   }
-}
-
-async function onOwnChannel(
-  self: PublicKey,
-  entry: ChannelEntry,
-  getChannel: InstanceType<typeof HoprEthereum>['getChannel'],
-  getPublicKeyOf: (addr: Address) => Promise<PublicKey>
-) {
-  const isPartyA = self.toAddress().eq(entry.partyA)
-
-  if (
-    (isPartyA && !entry.partyATicketEpoch.toBN().isZero()) ||
-    (!isPartyA && !entry.partyBTicketEpoch.toBN().isZero())
-  ) {
-    return
-  }
-
-  let channel: Channel
-  if (self.toAddress().eq(entry.partyA)) {
-    channel = getChannel(self, await getPublicKeyOf(entry.partyB))
-  } else {
-    channel = getChannel(await getPublicKeyOf(entry.partyB), self)
-  }
-  await channel.initCommitment()
 }
 
 export { Channel, Indexer, RoutingChannel }
