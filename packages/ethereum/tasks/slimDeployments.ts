@@ -7,7 +7,7 @@ const DEPLOYMENTS_PATH = join(__dirname, '..', 'deployments')
 
 // deployments are done by `hardhat-deploy`
 // after a deployment, `hardhat-deploy` populates `deployments`
-// folder with various artifacts, this tas loops through `deployments`
+// folder with various artifacts, this task loops through `deployments`
 // folder and removes data that are optional & will end up being commited
 const main: DeployFunction = async function (_hre: HardhatRuntimeEnvironment) {
   const networks = await readdir(DEPLOYMENTS_PATH)
