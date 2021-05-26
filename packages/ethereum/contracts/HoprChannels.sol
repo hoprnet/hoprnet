@@ -24,31 +24,22 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     /**
      * @dev Possible channel statuses.
      */
-    enum ChannelStatus { CLOSED, OPEN, PENDING_TO_CLOSE }
+    enum ChannelStatus { CLOSED, WAITING_FOR_COMMITMENT, OPEN, PENDING_TO_CLOSE }
 
     /**
      * @dev A channel struct, used to represent a channel's state
      */
     struct Channel {
-        uint256 partyABalance;
-        uint256 partyBBalance;
-
-        bytes32 partyACommitment;
-        bytes32 partyBCommitment;
-        uint256 partyATicketEpoch;
-        uint256 partyBTicketEpoch;
-        uint256 partyATicketIndex;
-        uint256 partyBTicketIndex;
-
+        uint256 balance;
+        bytes32 commitment;
+        uint256 ticketEpoch;
+        uint256 ticketIndex;
         ChannelStatus status;
         uint channelEpoch; 
 
         // the time when the channel can be closed by either party
         // overloads at year >2105
         uint32 closureTime;
-
-        // channel closure was initiated by party A
-        bool closureByPartyA;
     }
 
     /**
@@ -73,8 +64,8 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     );
 
     event ChannelUpdate(
-        address indexed partyA,
-        address indexed partyB,
+        address indexed source,
+        address indexed destination,
         Channel newState
     );
 
@@ -184,21 +175,15 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     ) external {
         require(msg.sender != address(0), "sender must not be empty");
         require(counterparty != address(0), "counterparty must not be empty");
-        require(msg.sender != counterparty, "accountA and accountB must not be the same");
+        require(msg.sender != counterparty, "sender and destination must not be the same");
 
         (,,, Channel storage channel) = _getChannel(
             msg.sender,
             counterparty
         );
 
-        if (_isPartyA(msg.sender, counterparty)){
-          channel.partyACommitment = newCommitment;
-          channel.partyATicketEpoch = channel.partyATicketEpoch.add(1);
-        } else {
-          channel.partyBCommitment = newCommitment;
-          channel.partyBTicketEpoch = channel.partyBTicketEpoch.add(1);
-        }
-
+        channel.commitment = newCommitment;
+        channel.ticketEpoch = channel.ticketEpoch.add(1);
         emit ChannelUpdate(msg.sender, counterparty, channel);
     }
 
@@ -254,53 +239,32 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     /**
      * @dev Funds a channel, then emits
      * {ChannelUpdate} event.
-     * @param account1 the address of account1
-     * @param account2 the address of account2
-     * @param amount1 amount to fund account1
-     * @param amount2 amount to fund account2
+     * @param accountA the address of account1
+     * @param accountB the address of account2
+     * @param amount amount to fund account1
      */
     function _fundChannel(
-        address account1,
-        address account2,
-        uint256 amount1,
-        uint256 amount2
+        address accountA,
+        address accountB,
+        uint256 amount
     ) internal {
-        require(account1 != account2, "accountA and accountB must not be the same");
-        require(account1 != address(0), "accountA must not be empty");
-        require(account2 != address(0), "accountB must not be empty");
-        require(amount1 > 0 || amount2 > 0, "amountA or amountB must be greater than 0");
+        require(accountA != accountB, "accountA and accountB must not be the same");
+        require(accountA != address(0), "accountA must not be empty");
+        require(accountB != address(0), "accountB must not be empty");
+        require(amount > 0, "amount must be greater than 0");
 
-        address partyA;
-        address partyB;
-        uint256 amountA;
-        uint256 amountB;
-        
-        if (_isPartyA(account1, account2)){
-          partyA = account1;
-          partyB = account2;
-          amountA = amount1;
-          amountB = amount2;
-        } else {
-          partyA = account2;
-          partyB = account1;
-          amountA = amount2;
-          amountB = amount1;
-        }
-        (,,, Channel storage channel) = _getChannel(partyA, partyB);
-
-        require(channel.status != ChannelStatus.PENDING_TO_CLOSE, "Cannot fund a closing channel");
+        (,,, Channel storage channelAB) = _getChannel(accountA, accountB);
+        require(channelAB.status != ChannelStatus.PENDING_TO_CLOSE, "Cannot fund a closing channel");
         
         if (channel.status == ChannelStatus.CLOSED) {
           // We are reopening the channel
           channel.channelEpoch = channel.channelEpoch.add(1);
-          channel.status = ChannelStatus.OPEN;
-          channel.partyATicketIndex = 0;
-          channel.partyBTicketIndex = 0;
+          channel.status = ChannelStatus.WAITING_FOR_COMMITMENT;
+          channel.ticketIndex = 0;
         }
 
-        channel.partyABalance = channel.partyABalance.add(amountA);
-        channel.partyBBalance = channel.partyBBalance.add(amountB);
-        emit ChannelUpdate(partyA, partyB, channel);
+        channel.balance = channel.balance.add(amount);
+        emit ChannelUpdate(accountA, accountB, channel);
     }
 
     /**
