@@ -61,13 +61,11 @@ class Channel {
 
     const ticket = unacknowledgedTicket.ticket
 
-    if (ticket.isWinningTicket(await this.commitment.getCurrentCommitment(), response, ticket.winProb)) {
-      const ack = new AcknowledgedTicket(
-        ticket,
-        response,
-        await this.commitment.getCurrentCommitment(),
-        unacknowledgedTicket.signer
-      )
+    // @TODO use some caching to optimize execution time
+    const opening = await this.commitment.findPreImage(await this.commitment.getCurrentCommitment())
+
+    if (ticket.isWinningTicket(opening, response, ticket.winProb)) {
+      const ack = new AcknowledgedTicket(ticket, response, opening, unacknowledgedTicket.signer)
       await this.commitment.bumpCommitment()
       return ack
     } else {
@@ -84,7 +82,6 @@ class Channel {
   }
 
   async getChainCommitment(): Promise<Hash> {
-    console.log(`getChainCommitment`, this, this.self)
     return (await this.getState()).commitmentFor(this.self.toAddress())
   }
 

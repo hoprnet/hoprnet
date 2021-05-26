@@ -40,7 +40,7 @@ export class Commitment {
     )
   }
 
-  private async findPreImage(hash: Hash): Promise<Hash> {
+  async findPreImage(hash: Hash): Promise<Hash> {
     // TODO refactor after we move primitives
     let result = await recoverIteratedHash(
       hash.serialize(),
