@@ -28,10 +28,7 @@ lib
 
 # Hardhat
 hardhat
-deployments
-
-# exclude generated ABIs
-chain/abis
+deployments/**/solcInputs
 
 # typechain
 types

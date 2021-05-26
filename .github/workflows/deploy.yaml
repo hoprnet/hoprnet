@@ -88,10 +88,70 @@ jobs:
         env:
           HOPR_PACKAGE: hoprd
 
+  deploy_smart_contracts:
+    name: Deploy Smart Contracts
+    runs-on: ubuntu-latest
+    needs: [build]
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Configure Git info
+        run: bash -x scripts/configure-git-info.sh
+
+      - name: Use Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: 14
+          registry-url: https://registry.npmjs.org/
+
+      - name: Install Yarn (only when using ACT)
+        if: env.ACT != ''
+        run: |
+          curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add -
+          echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list
+          apt update
+          apt install --no-install-recommends yarn
+
+      - name: Get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "::set-output name=dir::$(yarn config get cacheFolder)"
+
+      - name: Restore cache of node modules and yarn cache
+        uses: actions/cache@v2
+        id: nodejs-cache
+        with:
+          path: |
+            node_modules
+            */*/node_modules
+            ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-nodejs-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-nodejs-
+
+      - name: Install & Build
+        run: |
+          yarn
+          yarn build
+
+      - name: Deploy 
+        env:
+          PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
+          QUIKNODE_KEY: ${{ secrets.QUIKNODE_KEY }}
+          NETWORK: xdai # only XDAI for now
+        run: |
+          bash scripts/deploy-smart-contracts.sh
+
+      - name: Commit & Push changes
+        env:
+          HOPR_GIT_MSG: "Update smart contract deployments"
+          HOPR_GITHUB_REF: ${{ github.ref }}
+        run: |
+          bash scripts/commit-and-push-all-changes.sh
+
   release:
     name: Create Github Release
     runs-on: ubuntu-latest
-    needs: [build]
+    needs: [build, deploy_smart_contracts]
     if: startsWith(github.ref, 'refs/heads/release/')
     steps:
       - uses: actions/checkout@v2
