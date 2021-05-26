@@ -23,20 +23,17 @@ function createMockTickets(privKey: Uint8Array) {
         )
       )
     },
-    createDummyTicket: async (challenge: Challenge) => {
-      return Promise.resolve(
-        Ticket.create(
-          counterparty.toAddress(),
-          challenge,
-          new UINT256(new BN(0)),
-          new UINT256(new BN(0)),
-          new Balance(new BN(0)),
-          UINT256.DUMMY_INVERSE_PROBABILITY,
-          new UINT256(new BN(0)),
-          privKey
-        )
+    createDummyTicket: (challenge: Challenge) =>
+      Ticket.create(
+        counterparty.toAddress(),
+        challenge,
+        new UINT256(new BN(0)),
+        new UINT256(new BN(0)),
+        new Balance(new BN(0)),
+        UINT256.DUMMY_INVERSE_PROBABILITY,
+        new UINT256(new BN(0)),
+        privKey
       )
-    }
   })
 
   return { getChannel }

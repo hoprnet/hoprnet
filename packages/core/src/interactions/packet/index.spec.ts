@@ -56,20 +56,17 @@ function createFakeChain(privKey: PeerId) {
     createTicket: async (amount: Balance, challenge: Challenge, _winProb: number) => {
       return Promise.resolve(createFakeTicket(privKey, challenge, counterparty.toAddress(), amount))
     },
-    createDummyTicket: (challenge: Challenge) => {
-      return Promise.resolve(
-        Ticket.create(
-          counterparty.toAddress(),
-          challenge,
-          new UINT256(new BN(0)),
-          new UINT256(new BN(0)),
-          new Balance(new BN(0)),
-          UINT256.DUMMY_INVERSE_PROBABILITY,
-          new UINT256(new BN(0)),
-          privKey.privKey.marshal()
-        )
+    createDummyTicket: (challenge: Challenge) =>
+      Ticket.create(
+        counterparty.toAddress(),
+        challenge,
+        new UINT256(new BN(0)),
+        new UINT256(new BN(0)),
+        new Balance(new BN(0)),
+        UINT256.DUMMY_INVERSE_PROBABILITY,
+        new UINT256(new BN(0)),
+        privKey.privKey.marshal()
       )
-    }
   })
 
   return { getChannel }
