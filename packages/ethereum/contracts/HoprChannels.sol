@@ -404,20 +404,14 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
             redeemer,
             counterparty
         );
+        require(channel.status != ChannelStatus.CLOSED, "channel must be open or pending to close");
         
         uint256 prevTicketEpoch;
-        if (_isPartyA(redeemer, counterparty)) {
-          require(channel.partyACommitment == keccak256(abi.encodePacked(nextCommitment)), "commitment must be hash of next commitment");
-          require(channel.partyATicketEpoch == ticketEpoch, "ticket epoch must match");
-          require(channel.partyATicketIndex < ticketIndex, "redemptions must be in order");
-          prevTicketEpoch = channel.partyATicketEpoch;
-        } else {
-          require(channel.partyBCommitment == keccak256(abi.encodePacked(nextCommitment)), "commitment must be hash of next commitment");
-          require(channel.partyBTicketEpoch == ticketEpoch, "ticket epoch must match");
-          require(channel.partyBTicketIndex < ticketIndex, "redemptions must be in order");
-          prevTicketEpoch = channel.partyBTicketEpoch;
-        }
-        require(channel.status != ChannelStatus.CLOSED, "channel must be open or pending to close");
+        require(channel.partyACommitment == keccak256(abi.encodePacked(nextCommitment)), "commitment must be hash of next commitment");
+        require(channel.partyATicketEpoch == ticketEpoch, "ticket epoch must match");
+        require(channel.partyATicketIndex < ticketIndex, "redemptions must be in order");
+        prevTicketEpoch = channel.partyATicketEpoch;
+
 
         bytes32 ticketHash = ECDSA.toEthSignedMessageHash(
             keccak256(
@@ -443,21 +437,12 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
             "ticket must be a win"
         );
 
-        if (_isPartyA(redeemer, counterparty)) {
-            channel.partyACommitment = nextCommitment;
-            channel.partyABalance = channel.partyABalance.add(amount);
-            channel.partyBBalance = channel.partyBBalance.sub(amount);
-            channel.partyATicketEpoch = channel.partyATicketEpoch.add(1);
-            channel.partyATicketIndex = ticketIndex;
-            emit ChannelUpdate(redeemer, counterparty, channel);
-        } else {
-            channel.partyABalance = channel.partyABalance.sub(amount);
-            channel.partyBBalance = channel.partyBBalance.add(amount);
-            channel.partyBCommitment = nextCommitment;
-            channel.partyBTicketEpoch = channel.partyBTicketEpoch.add(1);
-            channel.partyBTicketIndex = ticketIndex;
-            emit ChannelUpdate(counterparty, redeemer, channel);
-        }
+        channel.partyACommitment = nextCommitment;
+        channel.partyABalance = channel.partyABalance.add(amount);
+        channel.partyBBalance = channel.partyBBalance.sub(amount);
+        channel.partyATicketEpoch = channel.partyATicketEpoch.add(1);
+        channel.partyATicketIndex = ticketIndex;
+        emit ChannelUpdate(redeemer, counterparty, channel);
     }
 
     /**
