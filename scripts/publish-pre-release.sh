@@ -1,21 +1,39 @@
 #!/usr/bin/env bash
 
-set -o errexit
-set -o nounset
-set -o pipefail
+# prevent souring of this script, only allow execution
+$(return >/dev/null 2>&1)
+test "$?" -eq "0" && { echo "This script should only be executed." >&2; exit 1; }
 
-declare branch
+# exit on errors, undefined variables, ensure errors in pipes are not hidden
+set -euo pipefail
+
+usage() {
+  echo >&2
+  echo "Usage: $0 <package-name> <package-version>" >&2
+  echo >&2
+}
+
+# return early with help info when requested
+([ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]) && { usage; exit 0; }
+
+# verify and set parameters
+[ -z "${1:-}" ] && { echo "Missing parameter <package-name>" >&2; usage; exit 1; }
+[ -z "${2:-}" ] && { echo "Missing parameter <package-version>" >&2; usage; exit 1; }
+
 declare mydir
+declare package_name
+declare package_version
+declare branch
 declare npm_package
 declare version_type
 
-# ensure local copy is up-to-date with origin
-branch=$(git rev-parse --abbrev-ref HEAD)
-git pull origin "${branch}" --rebase
-
-# get package info
 mydir=$(dirname $(readlink -f $0))
-npm_package=$(${mydir}/get-npm-package-info.sh)
+package_name="$1"
+package_version="$2"
+branch=$(git rev-parse --abbrev-ref HEAD)
+npm_package="$(${mydir}/get-npm-package-info.sh ${package_name} ${package_version})"
+
+# do work
 
 # identify version type
 test -n "${npm_package}" && version_type="preminor" || version_type="prerelease"

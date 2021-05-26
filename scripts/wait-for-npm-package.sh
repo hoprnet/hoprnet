@@ -1,37 +1,47 @@
 #!/usr/bin/env bash
 
+# prevent souring of this script, only allow execution
+$(return >/dev/null 2>&1)
+test "$?" -eq "0" && { echo "This script should only be executed." >&2; exit 1; }
+
 # exit on errors, undefined variables, ensure errors in pipes are not hidden
 set -euo pipefail
 
-# prevent souring of this script, only allow execution
-$(return >/dev/null 2>&1)
-test "$?" -eq "0" && (echo "This script should only be executed."; exit 1)
-
 usage() {
-  echo "Usage: $0 <package-name> <package-version>" >&2
-  echo
-  exit 0
+  echo >&2
+  echo "Usage: $0 <package-name> <package-version> [<wait-interval>]" >&2
+  echo >&2
+  echo -e "\twhere <wait-interval> is in seconds, default is 5" >&2
+  echo >&2
 }
 
 # return early with help info when requested
-([ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]) && usage
+([ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]) && { usage; exit 0; }
 
-# verify parameters
-[ -z "${1:-}" ] && (echo "Missing first parameter <package-name>"; usage; exit 1)
-[ -z "${2:-}" ] && (echo "Missing second parameter <package-version>"; usage; exit 1)
+# verify and set parameters
+[ -z "${1:-}" ] && { echo "Missing parameter <package-name>" >&2; usage; exit 1; }
+[ -z "${2:-}" ] && { echo "Missing parameter <package-version>" >&2; usage; exit 1; }
 
-# do work
 declare mydir
-declare npm_package
+declare package_name
+declare package_version
+declare wait_interval
 
 mydir=$(dirname $(readlink -f $0))
+package_name="$1"
+package_version="$2"
+wait_interval="${3:-5}"
+
+# do work
+
+declare npm_package
 
 while : ; do
-  npm_package=$(${mydir}/get-npm-package-info.sh)
+  npm_package="$(${mydir}/get-npm-package-info.sh ${package_name} ${package_version})"
 
   # stop if we received a result
   test -n "${npm_package}" && break
 
   # sleep x seconds before the next run
-  sleep ${HOPR_WAIT_INTERVAL:-5}
+  sleep ${wait_interval}
 done

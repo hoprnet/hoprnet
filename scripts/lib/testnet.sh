@@ -135,16 +135,6 @@ testnet_destroy_node() {
   gcloud_delete_instance "${name}" "" "true"
 }
 
-# $1 authorized keys file
-testnet_add_keys() {
-  if test -f "$1"; then
-    log "Reading keys from $1"
-    cat $1 | xargs -I {} gcloud compute os-login ssh-keys add --key="{}"
-  else
-    log "Authorized keys file not found"
-  fi
-}
-
 # ----- Start Testnet -------
 #
 # Using a standard naming scheme, based on a name, we
@@ -161,8 +151,6 @@ testnet_start() {
     log "Start node $i"
     testnet_start_node $1 $3 $i $4
   done
-  # @jose can you fix this pls.
-  # add_keys scripts/keys/authorized_keys
 }
 
 # $1 network name

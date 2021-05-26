@@ -9,7 +9,7 @@ test "$?" -eq "0" && (echo "This script should only be executed."; exit 1)
 
 # set log id and use shared log function for readable logs
 declare HOPR_LOG_ID="e2e-test-run-local"
-source "$(dirname $(readlink -f $0))/utils.sh"
+source "$(dirname $(readlink -f $0))/lib/utils.sh"
 
 declare hoprd="node packages/hoprd/lib/index.js --init --password='' --provider=ws://127.0.0.1:8545/ --testAnnounceLocalAddresses"
 declare hardhat="yarn hardhat"
@@ -68,6 +68,7 @@ function wait_for_port() {
 # @param $1 - node API
 function fund_node {
   local ETH
+
   ETH="$(curl --silent $1/api/v1/address/hopr)"
 
   if [ -z "$ETH" ]; then
