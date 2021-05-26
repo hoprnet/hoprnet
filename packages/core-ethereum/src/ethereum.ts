@@ -67,7 +67,7 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
     ...rest: Parameters<T>
   ): Promise<ContractTransaction> {
     const transaction = await sendTransactionAndReturnWithoutConfirmation(method, ...rest)
-    await transaction.wait(CONFIRMATIONS)
+    //await transaction.wait()//await transaction.wait(CONFIRMATIONS)
     return transaction
   }
 
@@ -111,8 +111,8 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
     nonceLock.releaseLock()
 
     // monitor transaction, this is done asynchronously
-    transaction
-      .wait()
+    await transaction
+      .wait(CONFIRMATIONS)
       .then(() => {
         log('Transaction with nonce %d and hash %s confirmed', nonce, transaction.hash)
         transactions.moveToConfirmed(transaction.hash)

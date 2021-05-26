@@ -198,6 +198,7 @@ class Hopr extends EventEmitter {
     })
 
     await libp2p.start()
+    log('libp2p started')
     this.libp2p = libp2p
     this.libp2p.connectionManager.on('peer:connect', (conn: Connection) => {
       this.emit('hopr:peer:connection', conn.remotePeer)
@@ -224,16 +225,14 @@ class Hopr extends EventEmitter {
     subscribeToAcknowledgements(subscribe, this.db, await this.paymentChannels, this.getId(), (ack) =>
       this.emit('message-acknowledged:' + ack.ackChallenge.toHex())
     )
-    await this.announce(this.options.announce)
 
     const ethereum = await this.paymentChannels
-
     const onMessage = (msg: Uint8Array) => this.emit('hopr:message', msg)
     this.forward = new PacketForwardInteraction(
       subscribe,
       sendMessage,
       this.getId(),
-      await this.paymentChannels,
+      ethereum,
       onMessage,
       this.db
     )
@@ -242,12 +241,15 @@ class Hopr extends EventEmitter {
       this.libp2p.peerStore.addressBook.add(id, multiaddrs)
     })
 
+    log('announcing')
+    await this.announce(this.options.announce)
+    log('announced, starting heartbeat')
+
     this.heartbeat.start()
     this.periodicCheck()
     this.setChannelStrategy(this.options.strategy || 'passive')
     this.status = 'RUNNING'
     this.emit('running')
-
     // Log information
     log('# STARTED NODE')
     log('ID', this.getId().toB58String())
