@@ -66,15 +66,6 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
     method: T,
     ...rest: Parameters<T>
   ): Promise<ContractTransaction> {
-    const transaction = await sendTransactionAndReturnWithoutConfirmation(method, ...rest)
-    //await transaction.wait()//await transaction.wait(CONFIRMATIONS)
-    return transaction
-  }
-
-  async function sendTransactionAndReturnWithoutConfirmation<T extends (...args: any) => Promise<ContractTransaction>>(
-    method: T,
-    ...rest: Parameters<T>
-  ): Promise<ContractTransaction> {
     const gasLimit = 300e3
     const gasPrice = networkInfo?.gas
     const nonceLock = await nonceTracker.getNonceLock(address)
@@ -110,7 +101,6 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
     transactions.addToPending(transaction.hash, { nonce })
     nonceLock.releaseLock()
 
-    // monitor transaction, this is done asynchronously
     await transaction
       .wait(CONFIRMATIONS)
       .then(() => {
