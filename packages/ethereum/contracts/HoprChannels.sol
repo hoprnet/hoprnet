@@ -253,8 +253,8 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         require(accountB != address(0), "accountB must not be empty");
         require(amount > 0, "amount must be greater than 0");
 
-        (,,, Channel storage channelAB) = _getChannel(accountA, accountB);
-        require(channelAB.status != ChannelStatus.PENDING_TO_CLOSE, "Cannot fund a closing channel");
+        (,,, Channel storage channel) = _getChannel(accountA, accountB);
+        require(channel.status != ChannelStatus.PENDING_TO_CLOSE, "Cannot fund a closing channel");
         
         if (channel.status == ChannelStatus.CLOSED) {
           // We are reopening the channel
@@ -343,57 +343,30 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     }
 
     /**
-     * @param account1 the address of accountA
-     * @param account2 the address of accountB
-     * @return a tuple of partyA, partyB, channelId, channel
+     * @param source source
+     * @param destination destination
+     * @return a tuple of channelId, channel
      */
-    function _getChannel(address account1, address account2)
+    function _getChannel(address source, address destination)
         internal
         view
         returns (
-            address,
-            address,
             bytes32,
             Channel storage
         )
     {
-        (address partyA, address partyB) = _sortAddresses(account1, account2);
-        bytes32 channelId = _getChannelId(partyA, partyB);
+        bytes32 channelId = _getChannelId(source, destination);
         Channel storage channel = channels[channelId];
-
-        return (partyA, partyB, channelId, channel);
+        return (channelId, channel);
     }
 
     /**
-     * @param partyA the address of partyA
-     * @param partyB the address of partyB
-     * @return the channel id by hashing partyA and partyB
+     * @param source the address of source
+     * @param destination the address of destination
+     * @return the channel id 
      */
-    function _getChannelId(address partyA, address partyB) internal pure returns (bytes32) {
-        return keccak256(abi.encodePacked(partyA, partyB));
-    }
-
-    /**
-     * Parties are ordered - find the lower one.
-     * @param query the address of which we are asking 'is this party A'
-     * @param other the other address 
-     * @return query is partyA 
-     */
-    function _isPartyA(address query, address other) internal pure returns (bool) {
-        return uint160(query) < uint160(other);
-    }
-
-    /**
-     * @param accountA the address of accountA
-     * @param accountB the address of accountB
-     * @return a tuple representing partyA and partyB
-     */
-    function _sortAddresses(address accountA, address accountB) internal pure returns (address, address) {
-        if (_isPartyA(accountA, accountB)) {
-            return (accountA, accountB);
-        } else {
-            return (accountB, accountA);
-        }
+    function _getChannelId(address source, address destination) internal pure returns (bytes32) {
+        return keccak256(abi.encodePacked(source, destination));
     }
 
     /**
