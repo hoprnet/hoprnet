@@ -33,7 +33,8 @@ export class Commitment {
     if (!this.initialized) {
       await this.initialize()
     }
-    this.db.setCurrentCommitment(
+
+    await this.db.setCurrentCommitment(
       this.channelId,
       await this.findPreImage(await this.db.getCurrentCommitment(this.channelId))
     )
@@ -49,12 +50,12 @@ export class Commitment {
       DB_ITERATION_BLOCK_SIZE
     )
     if (result == undefined) {
-      throw Error(`Could not find preImage.`)
+      throw Error(`Could not find preImage. Searching for ${hash.toHex()}`)
     }
     return new Hash(Uint8Array.from(result.preImage))
   }
 
-  private async initialize(): Promise<void> {
+  async initialize(): Promise<void> {
     if (this.initialized) return
     const dbContains = await this.hasDBSecret()
     const chainCommitment = await this.getChainCommitment()
@@ -64,8 +65,8 @@ export class Commitment {
         await this.db.getCurrentCommitment(this.channelId) // Find out if we have one
         this.initialized = true
         return
-      } catch (_e) {
-        log(`Secret is found but failed to find preimage, reinitializing..`)
+      } catch (e) {
+        log(`Secret is found but failed to find preimage, reinitializing.. ${e.message}`)
       }
     }
     log(`reinitializing (db: ${dbContains}, chain: ${chainCommitment}})`)

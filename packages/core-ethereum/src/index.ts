@@ -38,6 +38,7 @@ export type RedeemTicketResponse =
     }
 
 export default class HoprEthereum {
+  private mutexes: Map<string, boolean>
   private privateKey: Uint8Array
   private publicKey: PublicKey
   private address: Address
@@ -47,6 +48,7 @@ export default class HoprEthereum {
     this.publicKey = this.chain.getPublicKey()
     this.address = Address.fromString(this.chain.getWallet().address)
 
+    this.mutexes = new Map()
     this.indexer.on('own-channel-updated', this.setInitialCommitmentIfNotSet.bind(this))
   }
 
@@ -132,8 +134,21 @@ export default class HoprEthereum {
   }
 
   private async setInitialCommitmentIfNotSet(channel: ChannelEntry): Promise<void> {
+    if (!this.address.eq(channel.partyA) && !this.address.eq(channel.partyB)) {
+      return
+    }
+
     const isPartyA = this.address.eq(channel.partyA)
     const counterparty = isPartyA ? channel.partyB : channel.partyA
+
+    const alreadySet = this.mutexes.get(Channel.generateId(this.address, counterparty).toHex())
+
+    if (alreadySet != undefined) {
+      log(`commitment already set, nothing to do`)
+      return
+    }
+
+    this.mutexes.set(Channel.generateId(this.address, counterparty).toHex(), true)
 
     if (!channel.ticketEpochFor(this.address).toBN().isZero()) {
       // Channel commitment is already set, nothing to do
@@ -172,6 +187,7 @@ export default class HoprEthereum {
 
     const ownChannelsWithoutCommitment = await indexer.getOwnChannelsWithoutCommitment()
 
+    log('own channels without commitment', ownChannelsWithoutCommitment)
     const coreConnector = new HoprEthereum(chain, db, indexer)
 
     for (const ownChannelWithoutCommitment of ownChannelsWithoutCommitment) {

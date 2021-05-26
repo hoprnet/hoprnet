@@ -76,7 +76,7 @@ class Channel {
   }
 
   setCommitment(): Promise<void> {
-    return this.commitment.bumpCommitment()
+    return this.commitment.initialize()
   }
 
   getId() {
@@ -84,6 +84,7 @@ class Channel {
   }
 
   async getChainCommitment(): Promise<Hash> {
+    console.log(`getChainCommitment`, this, this.self)
     return (await this.getState()).commitmentFor(this.self.toAddress())
   }
 
@@ -209,17 +210,13 @@ class Channel {
    * @param challenge dummy challenge, potential no valid response known
    * @returns a ticket without any value
    */
-  async createDummyTicket(challenge: Challenge): Promise<Ticket> {
+  createDummyTicket(challenge: Challenge): Ticket {
     // TODO: document how dummy ticket works
-
-    const channelState = await this.getState()
-    const currentTicketIndex = await this.bumpTicketIndex(channelState)
-
     return Ticket.create(
       this.counterparty.toAddress(),
       challenge,
       UINT256.fromString('0'),
-      currentTicketIndex,
+      UINT256.fromString('0'),
       new Balance(new BN(0)),
       UINT256.DUMMY_INVERSE_PROBABILITY,
       UINT256.fromString('0'),
