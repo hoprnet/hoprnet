@@ -1,4 +1,4 @@
-import type { ContractTransaction } from 'ethers'
+import { ContractTransaction } from 'ethers'
 import type { Multiaddr } from 'multiaddr'
 import type { HoprToken, HoprChannels } from './contracts'
 import { providers, utils, errors, Wallet, BigNumber } from 'ethers'
@@ -67,7 +67,7 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
     ...rest: Parameters<T>
   ): Promise<ContractTransaction> {
     const transaction = await sendTransactionAndReturnWithoutConfirmation(method, ...rest)
-    await transaction.wait(CONFIRMATIONS)
+    await provider.waitForTransaction(transaction.hash, CONFIRMATIONS, 500e3)
     return transaction
   }
 
@@ -112,7 +112,7 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
 
     // monitor transaction, this is done asynchronously
     transaction
-      .wait(CONFIRMATIONS)
+      .wait()
       .then(() => {
         log('Transaction with nonce %d and hash %s confirmed', nonce, transaction.hash)
         transactions.moveToConfirmed(transaction.hash)
