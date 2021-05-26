@@ -1,22 +1,25 @@
 #!/usr/bin/env bash
 
-# exit on errors, undefined variables, ensure errors in pipes are not hidden
-set -euo pipefail
-
 # prevent execution of this script, only allow sourcing
 $(return >/dev/null 2>&1)
-test "$?" -eq "0" || (echo "This script should only be sourced."; exit 1)
+test "$?" -eq "0" || { echo "This script should only be sourced."; exit 1; }
+
+# exit on errors, undefined variables, ensure errors in pipes are not hidden
+set -euo pipefail
 
 # don't source this file twice
 test -z "${TESTNET_SOURCED:-}" && TESTNET_SOURCED=1 || exit 0
 
-# source functions to work with gcloud and dns
-source "$(dirname $(readlink -f $0))/gcloud.sh"
-source "$(dirname $(readlink -f $0))/dns.sh"
-
 # set log id and use shared log function for readable logs
 declare HOPR_LOG_ID="testnet"
-source "$(dirname $(readlink -f $0))/utils.sh"
+declare mydir
+mydir=$(dirname $(readlink -f $0))
+source "${mydir}/utils.sh"
+
+# source functions to work with gcloud and dns
+source "${mydir}/gcloud.sh"
+source "${mydir}/dns.sh"
+
 
 # $1 = role (ie. node-4)
 # $2 = network name

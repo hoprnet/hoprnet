@@ -1,18 +1,20 @@
 #!/usr/bin/env bash
 
-# exit on errors, undefined variables, ensure errors in pipes are not hidden
-set -euo pipefail
-
 # prevent execution of this script, only allow sourcing
 $(return >/dev/null 2>&1)
-test "$?" -eq "0" || (echo "This script should only be sourced."; exit 1)
+test "$?" -eq "0" || { echo "This script should only be sourced."; exit 1; }
+
+# exit on errors, undefined variables, ensure errors in pipes are not hidden
+set -euo pipefail
 
 # don't source this file twice
 test -z "${DNS_SOURCED:-}" && DNS_SOURCED=1 || exit 0
 
 # set log id and use shared log function for readable logs
 declare HOPR_LOG_ID="dns"
-source "$(dirname $(readlink -f $0))/utils.sh"
+declare mydir
+mydir=$(dirname $(readlink -f $0))
+source "${mydir}/utils.sh"
 
 # Get dns entry for a release and node
 # e.g. gcloud_dns_entry master

@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 
-# exit on errors, undefined variables, ensure errors in pipes are not hidden
-set -euo pipefail
-
 # prevent execution of this script, only allow sourcing
 $(return >/dev/null 2>&1)
-test "$?" -eq "0" || (echo "This script should only be sourced."; exit 1)
+test "$?" -eq "0" || { echo "This script should only be sourced."; exit 1; }
+
+# exit on errors, undefined variables, ensure errors in pipes are not hidden
+set -euo pipefail
 
 # don't source this file twice
 test -z "${UTILS_SOURCED:-}" && UTILS_SOURCED=1 || exit 0
