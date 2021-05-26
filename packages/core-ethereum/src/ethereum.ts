@@ -25,6 +25,7 @@ import BN from 'bn.js'
 import NonceTracker from './nonce-tracker'
 import TransactionManager from './transaction-manager'
 import Debug from 'debug'
+import { CONFIRMATIONS } from './constants'
 
 const log = Debug('hopr:core-ethereum:chain-operations')
 const abiCoder = new utils.AbiCoder()
@@ -104,41 +105,47 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
     transactions.addToPending(transaction.hash, { nonce })
     nonceLock.releaseLock()
 
-    // monitor transaction, this is done asynchronously
-    transaction
-      .wait()
-      .then(() => {
-        log('Transaction with nonce %d and hash %s confirmed', nonce, transaction.hash)
-        transactions.moveToConfirmed(transaction.hash)
-      })
-      .catch((error) => {
-        const reverted = ([errors.CALL_EXCEPTION] as string[]).includes(error)
-
-        if (reverted) {
-          log('Transaction with nonce %d and hash %s reverted: %s', nonce, transaction.hash, error)
-
-          // this transaction failed but was confirmed as reverted
-          transactions.moveToConfirmed(transaction.hash)
-        } else {
-          log('Transaction with nonce %d failed to sent: %s', nonce, error)
-
-          const alreadyKnown = ([errors.NONCE_EXPIRED, errors.REPLACEMENT_UNDERPRICED] as string[]).includes(error)
-          // if this hash is already known and we already have it included in
-          // pending we can safely ignore this
-          if (alreadyKnown && transactions.pending.has(transaction.hash)) return
-
-          // this transaction was not confirmed so we just remove it
-          transactions.remove(transaction.hash)
+    try {
+      //await transaction.wait(CONFIRMATIONS) BROKEN DUE TO BUG EXPLAINED BELOW
+      await provider.waitForTransaction(transaction.hash, CONFIRMATIONS, 20000)
+      log('Transaction with nonce %d and hash %s confirmed', nonce, transaction.hash)
+      transactions.moveToConfirmed(transaction.hash)
+    } catch (error) {
+      if (error.code == 'TIMEOUT') {
+        const receipt = await provider.getTransaction(transaction.hash)
+        if (receipt.confirmations > CONFIRMATIONS) {
+          // Due to error in ether.js sometimes we timeout even if transaction is
+          // mined. See https://github.com/ethers-io/ethers.js/issues/1479
+          log('ethersjs bug - transaction is already mined')
+          return transaction
         }
-      })
+      }
+      const reverted = ([errors.CALL_EXCEPTION] as string[]).includes(error)
 
+      if (reverted) {
+        log('Transaction with nonce %d and hash %s reverted: %s', nonce, transaction.hash, error)
+
+        // this transaction failed but was confirmed as reverted
+        transactions.moveToConfirmed(transaction.hash)
+      } else {
+        log('Transaction with nonce %d failed to sent: %s', nonce, error)
+
+        const alreadyKnown = ([errors.NONCE_EXPIRED, errors.REPLACEMENT_UNDERPRICED] as string[]).includes(error)
+        // if this hash is already known and we already have it included in
+        // pending we can safely ignore this
+        if (alreadyKnown && transactions.pending.has(transaction.hash)) return
+
+        // this transaction was not confirmed so we just remove it
+        transactions.remove(transaction.hash)
+      }
+
+      throw error
+    }
     return transaction
   }
 
   async function announce(multiaddr: Multiaddr): Promise<string> {
-    const transaction = await sendTransaction(channels.announce, multiaddr.bytes)
-    await transaction.wait()
-    return transaction.hash
+    return (await sendTransaction(channels.announce, multiaddr.bytes)).hash
   }
 
   async function withdraw(currency: 'NATIVE' | 'HOPR', recipient: string, amount: string): Promise<string> {
@@ -157,8 +164,7 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
         throw err
       }
     } else {
-      const transaction = await sendTransaction(token.transfer, recipient, amount)
-      return transaction.hash
+      return (await sendTransaction(token.transfer, recipient, amount)).hash
     }
   }
 
@@ -180,7 +186,6 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
         [me.toHex(), counterparty.toHex(), myFund.toBN().toString(), counterpartyFund.toBN().toString()]
       )
     )
-    await transaction.wait()
     return transaction.hash
   }
 
@@ -200,20 +205,17 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
         [me.toHex(), counterparty.toHex(), amount.toBN().toString(), '0']
       )
     )
-    await transaction.wait()
     return transaction.hash
   }
 
   async function finalizeChannelClosure(channels: HoprChannels, counterparty: Address): Promise<Receipt> {
     const transaction = await sendTransaction(channels.finalizeChannelClosure, counterparty.toHex())
-    await transaction.wait()
     return transaction.hash
     // TODO: catch race-condition
   }
 
   async function initiateChannelClosure(channels: HoprChannels, counterparty: Address): Promise<Receipt> {
     const transaction = await sendTransaction(channels.initiateChannelClosure, counterparty.toHex())
-    await transaction.wait()
     return transaction.hash
     // TODO: catch race-condition
   }
@@ -235,13 +237,11 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
       ticket.winProb.toBN().toString(),
       ticket.signature.serialize()
     )
-    await transaction.wait()
     return transaction.hash
   }
 
   async function setCommitment(channels: HoprChannels, counterparty: Address, commitment: Hash): Promise<Receipt> {
     const transaction = await sendTransaction(channels.bumpChannel, counterparty.toHex(), commitment.toHex())
-    await transaction.wait()
     return transaction.hash
   }
 
