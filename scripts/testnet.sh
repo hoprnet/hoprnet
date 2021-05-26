@@ -4,7 +4,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-if [ -z "$GCLOUD_INCLUDED" ]; then
+if [ -z "${GCLOUD_INCLUDED:-}" ]; then
   source scripts/gcloud.sh
   source scripts/dns.sh
 fi

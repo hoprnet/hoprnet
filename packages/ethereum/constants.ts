@@ -1,4 +1,4 @@
-import { ethers } from 'ethers'
+import { utils } from 'ethers'
 
 export type PublicNetworks = 'xdai' | 'goerli'
 export type Networks = 'hardhat' | 'localhost' | PublicNetworks
@@ -13,7 +13,7 @@ export const networks: {
 } = {
   xdai: {
     chainId: 100,
-    gas: Number(ethers.utils.parseUnits('1', 'gwei'))
+    gas: Number(utils.parseUnits('1', 'gwei'))
   },
   goerli: {
     chainId: 5

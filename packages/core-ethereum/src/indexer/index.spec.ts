@@ -1,7 +1,6 @@
 import type { providers as Providers } from 'ethers'
-import type { HoprChannels } from '../contracts'
+import type { HoprChannels, TypedEvent } from '@hoprnet/hopr-ethereum'
 import type { Event } from './types'
-import type { TypedEvent } from '../contracts/commons'
 import type { ChainWrapper } from '../ethereum'
 import assert from 'assert'
 import EventEmitter from 'events'
@@ -13,7 +12,7 @@ import * as fixtures from './fixtures'
 const createProviderMock = (ops: { latestBlockNumber?: number } = {}) => {
   let latestBlockNumber = ops.latestBlockNumber ?? 0
 
-  const provider = (new EventEmitter() as unknown) as Providers.WebSocketProvider
+  const provider = new EventEmitter() as unknown as Providers.WebSocketProvider
   provider.getBlockNumber = async (): Promise<number> => latestBlockNumber
 
   return {
@@ -28,7 +27,7 @@ const createProviderMock = (ops: { latestBlockNumber?: number } = {}) => {
 const createHoprChannelsMock = (ops: { pastEvents?: Event<any>[] } = {}) => {
   const pastEvents = ops.pastEvents ?? []
 
-  const hoprChannels = (new EventEmitter() as unknown) as HoprChannels
+  const hoprChannels = new EventEmitter() as unknown as HoprChannels
   hoprChannels.queryFilter = async (): Promise<TypedEvent<any>[]> => pastEvents
 
   return {
@@ -40,7 +39,7 @@ const createHoprChannelsMock = (ops: { pastEvents?: Event<any>[] } = {}) => {
 }
 
 const createChainMock = (provider: Providers.WebSocketProvider, hoprChannels: HoprChannels): ChainWrapper => {
-  return ({
+  return {
     getLatestBlockNumber: () => provider.getBlockNumber(),
     subscribeBlock: (cb) => provider.on('block', cb),
     subscribeError: (cb) => {
@@ -53,7 +52,7 @@ const createChainMock = (provider: Providers.WebSocketProvider, hoprChannels: Ho
       hoprChannels.removeAllListeners()
     },
     getChannels: () => hoprChannels
-  } as unknown) as ChainWrapper
+  } as unknown as ChainWrapper
 }
 
 const useFixtures = (ops: { latestBlockNumber?: number; pastEvents?: Event<any>[] } = {}) => {
