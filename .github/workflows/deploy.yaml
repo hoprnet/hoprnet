@@ -133,11 +133,20 @@ jobs:
           yarn
           yarn build
 
-      - name: Deploy 
+      - name: Deploy on Goerli
         env:
-          PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
+          DEPLOYER_WALLET_PRIVATE_KEY: ${{ secrets.DEPLOYER_WALLET_PRIVATE_KEY }}
+          INFURA_KEY: ${{ secrets.INFURA_KEY }}
+          ETHERSCAN_KEY: ${{ secrets.ETHERSCAN }}
+          NETWORK: goerli
+        run: |
+          bash scripts/deploy-smart-contracts.sh
+
+      - name: Deploy on xDai
+        env:
+          DEPLOYER_WALLET_PRIVATE_KEY: ${{ secrets.DEPLOYER_WALLET_PRIVATE_KEY }}
           QUIKNODE_KEY: ${{ secrets.QUIKNODE_KEY }}
-          NETWORK: xdai # only XDAI for now
+          NETWORK: xdai
         run: |
           bash scripts/deploy-smart-contracts.sh
 
