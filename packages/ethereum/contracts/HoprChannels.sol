@@ -276,25 +276,19 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
      * @param counterparty the address of the counterparty
      */
     function _initiateChannelClosure(
-        address initiator,
-        address counterparty
+        address source,
+        address destination
     ) internal {
-        require(initiator != counterparty, "initiator and counterparty must not be the same");
-        require(initiator != address(0), "initiator must not be empty");
-        require(counterparty != address(0), "counterparty must not be empty");
+        require(source != destination, "source and destination must not be the same");
+        require(source != address(0), "source must not be empty");
+        require(destination != address(0), "destination must not be empty");
 
-        (,,, Channel storage channel) = _getChannel(initiator, counterparty);
+        (,,, Channel storage channel) = _getChannel(source, destination);
         require(channel.status == ChannelStatus.OPEN, "channel must be open");
 
         // @TODO: check with team, do we need SafeMath check here?
         channel.closureTime = _currentBlockTimestamp() + secsClosure;
         channel.status = ChannelStatus.PENDING_TO_CLOSE;
-
-        bool isPartyA = _isPartyA(initiator, counterparty);
-        if (isPartyA) {
-            channel.closureByPartyA = true;
-        }
-
         emit ChannelUpdate(initiator, counterparty, channel);
     }
 
