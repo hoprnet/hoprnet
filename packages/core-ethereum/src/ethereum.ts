@@ -106,11 +106,20 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
     nonceLock.releaseLock()
 
     try {
-      //await transaction.wait(CONFIRMATIONS)
-      await provider.waitForTransaction(transaction.hash, CONFIRMATIONS)
+      //await transaction.wait(CONFIRMATIONS) BROKEN DUE TO BUG EXPLAINED BELOW
+      await provider.waitForTransaction(transaction.hash, CONFIRMATIONS, 20000)
       log('Transaction with nonce %d and hash %s confirmed', nonce, transaction.hash)
       transactions.moveToConfirmed(transaction.hash)
     } catch (error) {
+      if (error.code == 'TIMEOUT') {
+        const receipt = await provider.getTransaction(transaction.hash)
+        if (receipt.confirmations > CONFIRMATIONS) {
+          // Due to error in ether.js sometimes we timeout even if transaction is
+          // mined. See https://github.com/ethers-io/ethers.js/issues/1479
+          log('ethersjs bug - transaction is already mined')
+          return transaction
+        }
+      }
       const reverted = ([errors.CALL_EXCEPTION] as string[]).includes(error)
 
       if (reverted) {
@@ -129,6 +138,8 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
         // this transaction was not confirmed so we just remove it
         transactions.remove(transaction.hash)
       }
+
+      throw error
     }
     return transaction
   }
