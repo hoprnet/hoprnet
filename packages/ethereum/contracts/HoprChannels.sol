@@ -107,7 +107,11 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
             account1,
             account2,
             amount1,
-            amount2
+        );
+        _fundChannel(
+            account2,
+            account1,
+            amount2,
         );
     }
 
