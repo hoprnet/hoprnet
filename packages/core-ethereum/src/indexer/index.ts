@@ -25,7 +25,7 @@ class Indexer extends EventEmitter {
   public status: 'started' | 'restarting' | 'stopped' = 'stopped'
   public latestBlock: number = 0 // latest known on-chain block number
   private unconfirmedEvents = new Heap<Event<any>>(snapshotComparator)
-  private ownAddress: Address
+  private address: Address
 
   constructor(
     private genesisBlock: number,
@@ -36,7 +36,7 @@ class Indexer extends EventEmitter {
   ) {
     super()
 
-    this.ownAddress = Address.fromString(this.chain.getWallet().address)
+    this.address = Address.fromString(this.chain.getWallet().address)
   }
 
   /**
@@ -275,7 +275,7 @@ class Indexer extends EventEmitter {
 
     await this.db.updateChannel(channel.getId(), channel)
 
-    if (channel.partyA.eq(this.ownAddress) || channel.partyB.eq(this.ownAddress)) {
+    if (channel.partyA.eq(this.address) || channel.partyB.eq(this.address)) {
       this.emit('own-channel-updated', channel)
     }
   }
@@ -300,7 +300,8 @@ class Indexer extends EventEmitter {
 
   public async getOwnChannelsWithoutCommitment(): Promise<ChannelEntry[]> {
     return this.db.getChannels((channel) => {
-      if (!this.ownAddress.eq(channel.partyA) || !this.ownAddress.eq(channel.partyB)) {
+      if (!this.address.eq(channel.partyA) || !this.address.eq(channel.partyB)) {
+        // We are only interested in our channels
         return false
       }
 
