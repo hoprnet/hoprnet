@@ -22,7 +22,7 @@ import type { HoprDB } from '@hoprnet/hopr-utils'
 const log = Debug('hopr-core-ethereum:channel')
 
 class Channel {
-  private ownCommitment: Commitment
+  private commitment: Commitment
 
   constructor(
     private readonly self: PublicKey,
@@ -32,7 +32,7 @@ class Channel {
     private readonly indexer: Indexer,
     private readonly privateKey: Uint8Array
   ) {
-    this.ownCommitment = new Commitment(
+    this.commitment = new Commitment(
       (commitment: Hash) => this.chain.setCommitment(counterparty.toAddress(), commitment),
       () => this.getChainCommitment(),
       this.db,
@@ -61,22 +61,22 @@ class Channel {
 
     const ticket = unacknowledgedTicket.ticket
 
-    if (ticket.isWinningTicket(await this.ownCommitment.getCurrentCommitment(), response, ticket.winProb)) {
+    if (ticket.isWinningTicket(await this.commitment.getCurrentCommitment(), response, ticket.winProb)) {
       const ack = new AcknowledgedTicket(
         ticket,
         response,
-        await this.ownCommitment.getCurrentCommitment(),
+        await this.commitment.getCurrentCommitment(),
         unacknowledgedTicket.signer
       )
-      await this.ownCommitment.bumpCommitment()
+      await this.commitment.bumpCommitment()
       return ack
     } else {
       return null
     }
   }
 
-  setOwnCommitment(): Promise<void> {
-    return this.ownCommitment.bumpCommitment()
+  setCommitment(): Promise<void> {
+    return this.commitment.bumpCommitment()
   }
 
   getId() {
@@ -157,7 +157,7 @@ class Channel {
     return await this.chain.finalizeChannelClosure(counterpartyAddress)
   }
 
-  private async bumpOwnTicketIndex(channelState: ChannelEntry): Promise<UINT256> {
+  private async bumpTicketIndex(channelState: ChannelEntry): Promise<UINT256> {
     const isPartyA = this.self.toAddress().eq(channelState.partyA)
 
     let currentTicketIndex: UINT256
@@ -189,7 +189,7 @@ class Channel {
     const counterpartyAddress = this.counterparty.toAddress()
     const channelState = await this.getState()
 
-    const currentTicketIndex = await this.bumpOwnTicketIndex(channelState)
+    const currentTicketIndex = await this.bumpTicketIndex(channelState)
 
     return Ticket.create(
       counterpartyAddress,
@@ -213,7 +213,7 @@ class Channel {
     // TODO: document how dummy ticket works
 
     const channelState = await this.getState()
-    const currentTicketIndex = await this.bumpOwnTicketIndex(channelState)
+    const currentTicketIndex = await this.bumpTicketIndex(channelState)
 
     return Ticket.create(
       this.counterparty.toAddress(),

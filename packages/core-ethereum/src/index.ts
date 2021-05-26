@@ -40,12 +40,12 @@ export type RedeemTicketResponse =
 export default class HoprEthereum {
   private privateKey: Uint8Array
   private publicKey: PublicKey
-  private ownAddress: Address
+  private address: Address
 
   constructor(private chain: ChainWrapper, private db: HoprDB, public indexer: Indexer) {
     this.privateKey = this.chain.getPrivateKey()
     this.publicKey = this.chain.getPublicKey()
-    this.ownAddress = Address.fromString(this.chain.getWallet().address)
+    this.address = Address.fromString(this.chain.getWallet().address)
 
     this.indexer.on('own-channel-updated', this.setInitialCommitmentIfNotSet.bind(this))
   }
@@ -92,7 +92,7 @@ export default class HoprEthereum {
     return this.indexer.getRandomChannel()
   }
 
-  private uncachedGetBalance = () => this.chain.getBalance(this.ownAddress)
+  private uncachedGetBalance = () => this.chain.getBalance(this.address)
   private cachedGetBalance = cacheNoArgAsyncFunction<Balance>(this.uncachedGetBalance, PROVIDER_CACHE_TTL)
   /**
    * Retrieves HOPR balance, optionally uses the cache.
@@ -103,7 +103,7 @@ export default class HoprEthereum {
   }
 
   public getAddress(): Address {
-    return this.ownAddress
+    return this.address
   }
 
   public getPublicKey() {
@@ -114,7 +114,7 @@ export default class HoprEthereum {
    * Retrieves ETH balance, optionally uses the cache.
    * @returns ETH balance
    */
-  private uncachedGetNativeBalance = () => this.chain.getNativeBalance(this.ownAddress)
+  private uncachedGetNativeBalance = () => this.chain.getNativeBalance(this.address)
   private cachedGetNativeBalance = cacheNoArgAsyncFunction<NativeBalance>(
     this.uncachedGetNativeBalance,
     PROVIDER_CACHE_TTL
@@ -132,17 +132,17 @@ export default class HoprEthereum {
   }
 
   private async setInitialCommitmentIfNotSet(channel: ChannelEntry): Promise<void> {
-    const isPartyA = this.ownAddress.eq(channel.partyA)
+    const isPartyA = this.address.eq(channel.partyA)
     const counterparty = isPartyA ? channel.partyB : channel.partyA
 
-    if (!channel.ticketEpochFor(this.ownAddress).toBN().isZero()) {
+    if (!channel.ticketEpochFor(this.address).toBN().isZero()) {
       // Channel commitment is already set, nothing to do
       return
     }
 
     const counterpartyPubKey = await this.getPublicKeyOf(counterparty)
 
-    return this.getChannel(this.publicKey, counterpartyPubKey).setOwnCommitment()
+    return this.getChannel(this.publicKey, counterpartyPubKey).setCommitment()
   }
 
   /**
