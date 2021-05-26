@@ -400,11 +400,15 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         require(counterparty != address(0), "counterparty must not be empty");
         require(nextCommitment != bytes32(0), "nextCommitment must not be empty");
         require(amount != uint256(0), "amount must not be empty");
-        (,,, Channel storage channel) = _getChannel(
+        (,,, Channel storage earningChannel) = _getChannel(
             redeemer,
             counterparty
         );
-        require(channel.status != ChannelStatus.CLOSED, "channel must be open or pending to close");
+        (,,, Channel storage spendingChannel) = _getChannel(
+            counterparty,
+            redeemer
+        );
+        require(earningChannel.status != ChannelStatus.CLOSED, "earning channel must be open or pending to close");
         
         uint256 prevTicketEpoch;
         require(channel.partyACommitment == keccak256(abi.encodePacked(nextCommitment)), "commitment must be hash of next commitment");
@@ -437,12 +441,12 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
             "ticket must be a win"
         );
 
-        channel.partyACommitment = nextCommitment;
-        channel.partyABalance = channel.partyABalance.add(amount);
-        channel.partyBBalance = channel.partyBBalance.sub(amount);
-        channel.partyATicketEpoch = channel.partyATicketEpoch.add(1);
-        channel.partyATicketIndex = ticketIndex;
-        emit ChannelUpdate(redeemer, counterparty, channel);
+          earningChannel.commitment = nextCommitment;
+          spendingChannel.balance = spendingChannel.balance.sub(amount);
+          earningChannel.balance = earningChannel.balance.add(amount);
+          earningChannel.ticketEpoch = earningChannel.ticketEpoch.add(1);
+          earnincChannel.ticketIndex = ticketIndex;
+          emit ChannelUpdate(redeemer, counterparty, earningChannel);
     }
 
     /**
