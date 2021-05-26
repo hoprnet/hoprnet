@@ -38,6 +38,7 @@ export type RedeemTicketResponse =
     }
 
 export default class HoprEthereum {
+  // @TODO find a better solution
   private mutexes: Map<string, boolean>
   private privateKey: Uint8Array
   private publicKey: PublicKey

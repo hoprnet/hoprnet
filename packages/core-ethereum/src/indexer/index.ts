@@ -298,10 +298,8 @@ class Indexer extends EventEmitter {
     })
   }
 
-  // not working @TODO
   public async getOwnChannelsWithoutCommitment(): Promise<ChannelEntry[]> {
     return this.db.getChannels((channel: ChannelEntry) => {
-      console.log(channel, !this.address.eq(channel.partyA) && !this.address.eq(channel.partyB))
       if (!this.address.eq(channel.partyA) && !this.address.eq(channel.partyB)) {
         // We are only interested in our channels
         return false
