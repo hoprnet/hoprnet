@@ -19,7 +19,7 @@ import NonceTracker from './nonce-tracker'
 import TransactionManager from './transaction-manager'
 import Debug from 'debug'
 import { HoprToken__factory, HoprChannels__factory } from './contracts'
-//import { CONFIRMATIONS } from './constants'
+import { CONFIRMATIONS } from './constants'
 
 const log = Debug('hopr:core-ethereum:chain-operations')
 const abiCoder = new utils.AbiCoder()
@@ -103,7 +103,7 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
 
     try {
       //await transaction.wait(CONFIRMATIONS)
-      await transaction.wait()
+      await provider.waitForTransaction(transaction.hash, CONFIRMATIONS)
       log('Transaction with nonce %d and hash %s confirmed', nonce, transaction.hash)
       transactions.moveToConfirmed(transaction.hash)
     } catch(error) {
