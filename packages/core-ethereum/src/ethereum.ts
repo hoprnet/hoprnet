@@ -106,7 +106,7 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
       await transaction.wait()
       log('Transaction with nonce %d and hash %s confirmed', nonce, transaction.hash)
       transactions.moveToConfirmed(transaction.hash)
-    } catch(error) {
+    } catch (error) {
       const reverted = ([errors.CALL_EXCEPTION] as string[]).includes(error)
 
       if (reverted) {
