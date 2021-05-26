@@ -19,7 +19,7 @@ import NonceTracker from './nonce-tracker'
 import TransactionManager from './transaction-manager'
 import Debug from 'debug'
 import { HoprToken__factory, HoprChannels__factory } from './contracts'
-import { CONFIRMATIONS } from './constants'
+//import { CONFIRMATIONS } from './constants'
 
 const log = Debug('hopr:core-ethereum:chain-operations')
 const abiCoder = new utils.AbiCoder()
@@ -101,39 +101,36 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
     transactions.addToPending(transaction.hash, { nonce })
     nonceLock.releaseLock()
 
-    await transaction
-      .wait(CONFIRMATIONS)
-      .then(() => {
-        log('Transaction with nonce %d and hash %s confirmed', nonce, transaction.hash)
+    try {
+      //await transaction.wait(CONFIRMATIONS)
+      await transaction.wait()
+      log('Transaction with nonce %d and hash %s confirmed', nonce, transaction.hash)
+      transactions.moveToConfirmed(transaction.hash)
+    } catch(error) {
+      const reverted = ([errors.CALL_EXCEPTION] as string[]).includes(error)
+
+      if (reverted) {
+        log('Transaction with nonce %d and hash %s reverted: %s', nonce, transaction.hash, error)
+
+        // this transaction failed but was confirmed as reverted
         transactions.moveToConfirmed(transaction.hash)
-      })
-      .catch((error) => {
-        const reverted = ([errors.CALL_EXCEPTION] as string[]).includes(error)
+      } else {
+        log('Transaction with nonce %d failed to sent: %s', nonce, error)
 
-        if (reverted) {
-          log('Transaction with nonce %d and hash %s reverted: %s', nonce, transaction.hash, error)
+        const alreadyKnown = ([errors.NONCE_EXPIRED, errors.REPLACEMENT_UNDERPRICED] as string[]).includes(error)
+        // if this hash is already known and we already have it included in
+        // pending we can safely ignore this
+        if (alreadyKnown && transactions.pending.has(transaction.hash)) return
 
-          // this transaction failed but was confirmed as reverted
-          transactions.moveToConfirmed(transaction.hash)
-        } else {
-          log('Transaction with nonce %d failed to sent: %s', nonce, error)
-
-          const alreadyKnown = ([errors.NONCE_EXPIRED, errors.REPLACEMENT_UNDERPRICED] as string[]).includes(error)
-          // if this hash is already known and we already have it included in
-          // pending we can safely ignore this
-          if (alreadyKnown && transactions.pending.has(transaction.hash)) return
-
-          // this transaction was not confirmed so we just remove it
-          transactions.remove(transaction.hash)
-        }
-      })
-
+        // this transaction was not confirmed so we just remove it
+        transactions.remove(transaction.hash)
+      }
+    }
     return transaction
   }
 
   async function announce(multiaddr: Multiaddr): Promise<string> {
-    const transaction = await sendTransaction(channels.announce, multiaddr.bytes)
-    return transaction.hash
+    return (await sendTransaction(channels.announce, multiaddr.bytes)).hash
   }
 
   async function withdraw(currency: 'NATIVE' | 'HOPR', recipient: string, amount: string): Promise<string> {
@@ -152,8 +149,7 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
         throw err
       }
     } else {
-      const transaction = await sendTransaction(token.transfer, recipient, amount)
-      return transaction.hash
+      return (await sendTransaction(token.transfer, recipient, amount)).hash
     }
   }
 

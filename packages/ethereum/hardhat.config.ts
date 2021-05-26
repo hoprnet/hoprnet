@@ -34,7 +34,7 @@ const hardhatConfig: HardhatUserConfig = {
       mining: DEVELOPMENT
         ? {
             auto: true, // every transaction will trigger a new block (without this deployments fail)
-            interval: [300, 600] // mine new block every .3s - .6s
+            interval: [1000, 3000] // mine new block every 1 - 3s
           }
         : undefined
     },
