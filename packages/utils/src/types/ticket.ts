@@ -83,7 +83,7 @@ export class Ticket {
 
     const message = toEthSignedMessageHash(hashedTicket)
     const sig = ecdsaSign(message.serialize(), signPriv)
-    const signature = new Signature(sig.signature, sig.recid + 27)
+    const signature = new Signature(sig.signature, sig.recid)
     return new Ticket(counterparty, encodedChallenge, epoch, index, amount, winProb, channelIteration, signature)
   }
 
