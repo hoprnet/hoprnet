@@ -1,9 +1,6 @@
 \section{Path Selection}
 HOPR uses a random selection algorithm to determine the identities of nodes participating in the network relaying service.
-\begin{comment}
-    
-
-\\For each round, a subset $k$-of-$n$ nodes will be chosen where $n$ is the total number of nodes in the HOPR network. The selection is divided into two steps:
+The selection is divided into two steps:
 \begin{enumerate}
     \item Pre-selection:
           During this phase, a subset $m<<n$ nodes will be selected based on different factors:
@@ -12,14 +9,11 @@ HOPR uses a random selection algorithm to determine the identities of nodes part
               \item Payment channel graph
               \item Stake
           \end{itemize}
-          Each node gets a score that is proportional to the previously mentioned factors.
-    \item Random selection:
-          Each edge (from node $a$ to $b$) within the subset $m$ is assigned a random number $r_i$. Edges are then sorted by $r_i*score(edge_i)$
+          Each node gets a weight that is proportional to the previously mentioned factors.
+          Once an edge is selected, it is added to the current path. All paths are then sorted according to their weight. 
+    \item Random selection: Each edge (from node $a$ to $b$) within the subset $m$ is assigned a random number $r_i$. Edges are then sorted by $$r_i*weight(edge_i)$$ The path with the largest weight is expanded next using a priority queue mechanism.
 \end{enumerate}
-\end{comment}
-\\Once an edge is selected, it is added to the current path. All paths are then sorted according to their weight and the path with the highest score is expanded next.
-
-\begin{algorithm}
+\begin{algorithm}[H]
     \SetAlgoNoLine
     \DontPrintSemicolon
     $ V := Nodes$\;
@@ -52,7 +46,7 @@ HOPR uses a random selection algorithm to determine the identities of nodes part
 
 \subsection{Availability}
 Availability is estimated using the heartbeat protocol.
-Each node maintains a list of neighbor nodes (logical neighbors in the heartbeat ring) in the network and either ping or passively listen to them in order to determine whether they are online or offline.
+Each node maintains a list of neighbor nodes in the network and either ping or passively listen to them in order to determine whether they are online or offline.
 A node is considered online if the ping response (“PONG”) comes back within a certain timeframe. Otherwise, the node is considered offline and its waiting time for the next PING attempt is doubled.
 
 
