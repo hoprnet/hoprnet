@@ -29,7 +29,7 @@ HOPR uses a random selection algorithm to determine the identities of nodes part
     $queue.addAll(\{ (x,y) \in E \ | \ x = self \})$\;
     $deadEnds \leftarrow \emptyset$\;
     $iterations \leftarrow 0$\;
-    \While{$queue.isEmpty() \land iterations < maxIterations$}{
+    \While{$(!queue.isEmpty())\land iterations < maxIterations$}{
         $current \leftarrow queue.pop()$\;
         $currentNode \leftarrow lastNode(current)$\;
 
