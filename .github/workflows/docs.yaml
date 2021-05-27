@@ -5,7 +5,7 @@ env:
 
 on:
   push:
-    branches: ['master', 'release/**', 'avado', 'debug-docs/**']
+    branches: ['**']
 
 jobs:
   docs:
@@ -47,7 +47,13 @@ jobs:
         run: bash -x scripts/regenerate-typedocs.sh
 
       - name: Commit docs changes
-        if: env.ACT == ''
+        # only commit changes when not running via act and when on final branch<Plug>_es
+        if: |
+          (github.ref == 'refs/heads/master' ||
+           github.ref == 'refs/heads/avado' ||
+           startsWith(github.ref, 'refs/heads/debug-docs/') ||
+           startsWith(github.ref, 'refs/heads/release/')
+          ) && env.ACT == ''
         run: bash -x scripts/commit-and-push-all-changes.sh
         env:
           HOPR_GIT_MSG: "Re-generate API docs for packages"
