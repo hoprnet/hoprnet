@@ -74,6 +74,7 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
     confimations: number,
     timeout: number
   ): Promise<providers.TransactionResponse> {
+    const wait = 1e3
     let started = 0
     let response: providers.TransactionResponse
 
@@ -81,7 +82,8 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
       response = await provider.getTransaction(transactionHash)
       if (response && response.confirmations >= confimations) break
       // wait 1 sec
-      await new Promise((resolve) => setTimeout(resolve, 1e3))
+      await new Promise((resolve) => setTimeout(resolve, wait))
+      started += wait
     }
 
     if (!response) throw Error(errors.TIMEOUT)
@@ -128,7 +130,7 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
     nonceLock.releaseLock()
 
     try {
-      await waitForConfirmations(transaction.hash, CONFIRMATIONS, 20e3)
+      await waitForConfirmations(transaction.hash, CONFIRMATIONS, 30e3)
       log('Transaction with nonce %d and hash %s confirmed', nonce, transaction.hash)
       transactions.moveToConfirmed(transaction.hash)
     } catch (error) {
