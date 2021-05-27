@@ -70,15 +70,15 @@ export class Ticket {
   ): Ticket {
     const encodedChallenge = challenge.toEthereumChallenge()
     const hashedTicket = Hash.create(
-      serializeToU8a([
-        [counterparty.serialize(), Address.SIZE],
-        [encodedChallenge.serialize(), EthereumChallenge.SIZE],
-        [epoch.serialize(), UINT256.SIZE],
-        [index.serialize(), UINT256.SIZE],
-        [amount.serialize(), Balance.SIZE],
-        [winProb.serialize(), Hash.SIZE],
-        [channelIteration.serialize(), UINT256.SIZE]
-      ])
+      serializeUnsigned({
+        counterparty,
+        challenge: encodedChallenge,
+        epoch,
+        index,
+        amount,
+        winProb,
+        channelIteration
+      })
     )
 
     const message = toEthSignedMessageHash(hashedTicket)
@@ -127,15 +127,15 @@ export class Ticket {
     })
 
     return Hash.create(
-      serializeToU8a([
-        [this.counterparty.serialize(), Address.SIZE],
-        [this.challenge.serialize(), EthereumChallenge.SIZE],
-        [this.epoch.serialize(), UINT256.SIZE],
-        [this.index.serialize(), UINT256.SIZE],
-        [this.amount.serialize(), Balance.SIZE],
-        [this.winProb.serialize(), Hash.SIZE],
-        [this.channelIteration.serialize(), UINT256.SIZE]
-      ])
+      serializeUnsigned({
+        counterparty: this.counterparty,
+        challenge: this.challenge,
+        epoch: this.epoch,
+        index: this.index,
+        amount: this.amount,
+        winProb: this.winProb,
+        channelIteration: this.channelIteration
+      })
     )
   }
 
