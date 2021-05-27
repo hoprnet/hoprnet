@@ -88,8 +88,11 @@ export class Ticket {
   }
 
   public serialize(): Uint8Array {
-    const unsigned = serializeUnsigned({ ...this })
-    return Uint8Array.from([...unsigned, ...this.signature.serialize()])
+    return Uint8Array.from([...this.serializeUnsigned(), ...this.signature.serialize()])
+  }
+
+  public serializeUnsigned(): Uint8Array {
+    return serializeUnsigned({ ...this })
   }
 
   static deserialize(arr: Uint8Array): Ticket {
@@ -116,7 +119,7 @@ export class Ticket {
   }
 
   getHash(): Hash {
-    return toEthSignedMessageHash(Hash.create(serializeUnsigned({ ...this })))
+    return toEthSignedMessageHash(Hash.create(this.serializeUnsigned()))
   }
 
   static get SIZE(): number {

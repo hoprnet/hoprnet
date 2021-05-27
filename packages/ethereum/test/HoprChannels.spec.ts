@@ -38,7 +38,7 @@ export const redeemArgs = (ticket: PromiseValue<ReturnType<typeof createTicket>>
   ticket.proofOfRelaySecret,
   u8aToHex(ticket.ticket.amount.serialize()),
   u8aToHex(ticket.ticket.winProb.serialize()),
-  u8aToHex(ticket.ticket.signature.serialize())
+  u8aToHex(ticket.ticket.signature.serializeEthereum())
 ]
 
 export const validateChannel = (actual, expected) => {
@@ -318,10 +318,9 @@ describe('with a funded HoprChannel (A: 70, B: 30), secrets initialized', functi
     expect(channel.partyBCommitment).to.equal(SECRET_1)
   })
 
-  it.only('should fail to redeem ticket when ticket has been already redeemed', async function () {
+  it('should fail to redeem ticket when ticket has been already redeemed', async function () {
     const TICKET_AB_WIN = fixtures.TICKET_AB_WIN
 
-    console.log(TICKET_AB_WIN, redeemArgs(TICKET_AB_WIN))
     await channels.connect(fixtures.accountB).redeemTicket(...redeemArgs(TICKET_AB_WIN))
 
     await expect(
@@ -333,7 +332,7 @@ describe('with a funded HoprChannel (A: 70, B: 30), secrets initialized', functi
         TICKET_AB_WIN.proofOfRelaySecret,
         TICKET_AB_WIN.amount,
         TICKET_AB_WIN.winProb,
-        TICKET_AB_WIN.ticket.signature.serialize()
+        TICKET_AB_WIN.ticket.signature.serializeEthereum()
       )
     ).to.be.revertedWith('ticket epoch must match')
 
@@ -346,7 +345,7 @@ describe('with a funded HoprChannel (A: 70, B: 30), secrets initialized', functi
         TICKET_AB_WIN.proofOfRelaySecret,
         TICKET_AB_WIN.amount,
         TICKET_AB_WIN.winProb,
-        TICKET_AB_WIN.ticket.signature.serialize()
+        TICKET_AB_WIN.ticket.signature.serializeEthereum()
       )
     ).to.be.revertedWith('redemptions must be in order')
   })
@@ -650,7 +649,7 @@ describe('test internals with mock', function () {
       TICKET_AB_WIN.winProb
     )
 
-    expect(Hash.create(stringToU8a(encoded)).toHex()).to.equal(TICKET_AB_WIN.ticket.getHash().toHex())
+    expect(Hash.create(stringToU8a(encoded)).toHex()).to.equal(Hash.create(TICKET_AB_WIN.ticket.serializeUnsigned()).toHex())
   })
 
   it('should correctly hash ticket', async function () {
@@ -665,7 +664,7 @@ describe('test internals with mock', function () {
       TICKET_AB_WIN.winProb
     )
 
-    expect(ticketHash).to.equal(TICKET_AB_WIN.ticket.toEthereumHash().toHex())
+    expect(ticketHash).to.equal(TICKET_AB_WIN.ticket.getHash().toHex())
   })
 
   it("should get ticket's luck", async function () {
