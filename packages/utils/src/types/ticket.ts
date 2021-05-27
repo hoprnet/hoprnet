@@ -8,10 +8,9 @@ import { EthereumChallenge } from './ethereumChallenge'
 
 // Prefix message with "\x19Ethereum Signed Message:\n {length} HOPRnet {message}" and return hash
 function toEthSignedMessageHash(message: Hash): Hash {
-  const withHOPR = ethers.utils.concat([ethers.utils.toUtf8Bytes('HOPRnet'), message.serialize()])
   const result = ethers.utils.solidityKeccak256(
-    ['string', 'string', 'bytes'],
-    ['\x19Ethereum Signed Message:\n', withHOPR.length.toString(), withHOPR]
+    ['string', 'bytes'],
+    ['\x19Ethereum Signed Message:\n32', message.serialize()]
   )
 
   return new Hash(stringToU8a(result))
@@ -39,9 +38,9 @@ function serializeUnsigned({
     [counterparty.serialize(), Address.SIZE],
     [challenge.serialize(), EthereumChallenge.SIZE],
     [epoch.serialize(), UINT256.SIZE],
-    [index.serialize(), UINT256.SIZE],
     [amount.serialize(), Balance.SIZE],
     [winProb.serialize(), UINT256.SIZE],
+    [index.serialize(), UINT256.SIZE],
     [channelIteration.serialize(), UINT256.SIZE]
   ])
 }
@@ -70,15 +69,15 @@ export class Ticket {
   ): Ticket {
     const encodedChallenge = challenge.toEthereumChallenge()
     const hashedTicket = Hash.create(
-      serializeToU8a([
-        [counterparty.serialize(), Address.SIZE],
-        [encodedChallenge.serialize(), EthereumChallenge.SIZE],
-        [epoch.serialize(), UINT256.SIZE],
-        [index.serialize(), UINT256.SIZE],
-        [amount.serialize(), Balance.SIZE],
-        [winProb.serialize(), Hash.SIZE],
-        [channelIteration.serialize(), UINT256.SIZE]
-      ])
+      serializeUnsigned({
+        counterparty,
+        challenge: challenge.toEthereumChallenge(),
+        epoch,
+        index,
+        amount,
+        winProb,
+        channelIteration
+      })
     )
 
     const message = toEthSignedMessageHash(hashedTicket)
@@ -116,27 +115,7 @@ export class Ticket {
   }
 
   getHash(): Hash {
-    console.log({
-      counterparty: this.counterparty.toHex(),
-      challenge: this.challenge.toHex(),
-      epoch: this.epoch.toBN().toString(),
-      index: this.index.toBN().toString(),
-      amount: this.amount.toBN().toString(),
-      winProb: this.winProb.toBN().toString(),
-      channelIteration: this.channelIteration.toBN().toString()
-    })
-
-    return Hash.create(
-      serializeToU8a([
-        [this.counterparty.serialize(), Address.SIZE],
-        [this.challenge.serialize(), EthereumChallenge.SIZE],
-        [this.epoch.serialize(), UINT256.SIZE],
-        [this.index.serialize(), UINT256.SIZE],
-        [this.amount.serialize(), Balance.SIZE],
-        [this.winProb.serialize(), Hash.SIZE],
-        [this.channelIteration.serialize(), UINT256.SIZE]
-      ])
-    )
+    return Hash.create(serializeUnsigned({ ...this }))
   }
 
   static get SIZE(): number {
