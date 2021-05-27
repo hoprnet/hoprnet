@@ -59,4 +59,8 @@ contract ChannelsMock is HoprChannels {
     ) external pure returns (bytes32) {
         return _getTicketLuck(ticketHash, secretPreImage, winProb);
     }
+
+    function computeChallengeInternal(bytes32 response) external pure returns (address) {
+        return _computeChallenge(response);
+    }
 }
