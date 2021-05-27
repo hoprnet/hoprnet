@@ -1,5 +1,5 @@
 import BN from 'bn.js'
-import { stringToU8a, u8aSplit, u8aToHex, serializeToU8a } from '..'
+import { stringToU8a, u8aSplit, serializeToU8a } from '..'
 import { Address, Balance, Hash, Signature, UINT256, PublicKey, Response } from '.'
 import { ecdsaRecover, ecdsaSign } from 'secp256k1'
 import { ethers } from 'ethers'
@@ -7,8 +7,8 @@ import { Challenge } from './challenge'
 import { EthereumChallenge } from './ethereumChallenge'
 
 // Prefix message with "\x19Ethereum Signed Message:\n {length} HOPRnet {message}" and return hash
-function toEthSignedMessageHash(message: string): Hash {
-  const withHOPR = ethers.utils.concat([ethers.utils.toUtf8Bytes('HOPRnet'), message])
+function toEthSignedMessageHash(message: Hash): Hash {
+  const withHOPR = ethers.utils.concat([ethers.utils.toUtf8Bytes('HOPRnet'), message.serialize()])
   const result = ethers.utils.solidityKeccak256(
     ['string', 'string', 'bytes'],
     ['\x19Ethereum Signed Message:\n', withHOPR.length.toString(), withHOPR]
@@ -69,22 +69,21 @@ export class Ticket {
     signPriv: Uint8Array
   ): Ticket {
     const encodedChallenge = challenge.toEthereumChallenge()
-
-    const hash = toEthSignedMessageHash(
-      u8aToHex(
-        serializeToU8a([
-          [counterparty.serialize(), Address.SIZE],
-          [encodedChallenge.serialize(), EthereumChallenge.SIZE],
-          [epoch.serialize(), UINT256.SIZE],
-          [index.serialize(), UINT256.SIZE],
-          [amount.serialize(), Balance.SIZE],
-          [winProb.serialize(), Hash.SIZE],
-          [channelIteration.serialize(), UINT256.SIZE]
-        ])
-      )
+    const hashedTicket = Hash.create(
+      serializeToU8a([
+        [counterparty.serialize(), Address.SIZE],
+        [encodedChallenge.serialize(), EthereumChallenge.SIZE],
+        [epoch.serialize(), UINT256.SIZE],
+        [index.serialize(), UINT256.SIZE],
+        [amount.serialize(), Balance.SIZE],
+        [winProb.serialize(), Hash.SIZE],
+        [channelIteration.serialize(), UINT256.SIZE]
+      ])
     )
-    const sig = ecdsaSign(hash.serialize(), signPriv)
-    const signature = new Signature(sig.signature, sig.recid)
+
+    const message = toEthSignedMessageHash(hashedTicket)
+    const sig = ecdsaSign(message.serialize(), signPriv)
+    const signature = new Signature(sig.signature, sig.recid + 27)
     return new Ticket(counterparty, encodedChallenge, epoch, index, amount, winProb, channelIteration, signature)
   }
 
@@ -117,18 +116,26 @@ export class Ticket {
   }
 
   getHash(): Hash {
-    return toEthSignedMessageHash(
-      u8aToHex(
-        serializeToU8a([
-          [this.counterparty.serialize(), Address.SIZE],
-          [this.challenge.serialize(), EthereumChallenge.SIZE],
-          [this.epoch.serialize(), UINT256.SIZE],
-          [this.index.serialize(), UINT256.SIZE],
-          [this.amount.serialize(), Balance.SIZE],
-          [this.winProb.serialize(), Hash.SIZE],
-          [this.channelIteration.serialize(), UINT256.SIZE]
-        ])
-      )
+    console.log({
+      counterparty: this.counterparty.toHex(),
+      challenge: this.challenge.toHex(),
+      epoch: this.epoch.toBN().toString(),
+      index: this.index.toBN().toString(),
+      amount: this.amount.toBN().toString(),
+      winProb: this.winProb.toBN().toString(),
+      channelIteration: this.channelIteration.toBN().toString()
+    })
+
+    return Hash.create(
+      serializeToU8a([
+        [this.counterparty.serialize(), Address.SIZE],
+        [this.challenge.serialize(), EthereumChallenge.SIZE],
+        [this.epoch.serialize(), UINT256.SIZE],
+        [this.index.serialize(), UINT256.SIZE],
+        [this.amount.serialize(), Balance.SIZE],
+        [this.winProb.serialize(), Hash.SIZE],
+        [this.channelIteration.serialize(), UINT256.SIZE]
+      ])
     )
   }
 
@@ -153,6 +160,19 @@ export class Ticket {
     return pubKey.eq(this.recoverSigner())
   }
 
+  getLuck(preImage: Hash, challengeResponse: Response, winProb: UINT256): BN {
+    return new BN(
+      Hash.create(
+        Uint8Array.from([
+          ...this.getHash().serialize(),
+          ...preImage.serialize(),
+          ...challengeResponse.serialize(),
+          ...winProb.serialize()
+        ])
+      ).serialize()
+    )
+  }
+
   /**
    * Decides whether a ticket is a win or not.
    * Note that this mimics the on-chain logic.
@@ -163,17 +183,7 @@ export class Ticket {
    * @param winProb winning probability of the ticket
    */
   isWinningTicket(preImage: Hash, challengeResponse: Response, winProb: UINT256): boolean {
-    const luck = new BN(
-      Hash.create(
-        Uint8Array.from([
-          ...this.getHash().serialize(),
-          ...preImage.serialize(),
-          ...challengeResponse.serialize(),
-          ...winProb.serialize()
-        ])
-      ).serialize()
-    )
-
+    const luck = this.getLuck(preImage, challengeResponse, winProb)
     return luck.lte(winProb.toBN())
   }
 

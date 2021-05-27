@@ -1,12 +1,24 @@
 import { deployments, ethers } from 'hardhat'
 import Multiaddr from 'multiaddr'
 import { expect } from 'chai'
+import BN from 'bn.js'
 import { HoprToken__factory, ChannelsMock__factory, HoprChannels__factory } from '../types'
-import { increaseTime, signMessage } from './utils'
+import { increaseTime } from './utils'
 import { ACCOUNT_A, ACCOUNT_B } from './constants'
-import { PublicKey, stringToU8a } from '@hoprnet/hopr-utils'
+import {
+  Address,
+  Challenge,
+  UINT256,
+  Balance,
+  stringToU8a,
+  Ticket,
+  Hash,
+  Response,
+  PromiseValue,
+  u8aToHex
+} from '@hoprnet/hopr-utils'
 
-type Ticket = {
+type TicketValues = {
   recipient: string
   proofOfRelaySecret: string
   amount: string
@@ -18,33 +30,7 @@ type Ticket = {
 
 const percentToUint256 = (percent: any) => ethers.constants.MaxUint256.mul(percent).div(100)
 
-const computeChallenge = (proofOfRelaySecret: string): string => {
-  return PublicKey.fromPrivKey(stringToU8a(proofOfRelaySecret)).toAddress().toHex()
-}
-
-const getEncodedTicket = (ticket: Ticket): string => {
-  const challenge = computeChallenge(ticket.proofOfRelaySecret)
-
-  return ethers.utils.solidityPack(
-    ['address', 'bytes20', 'uint256', 'uint256', 'uint256', 'uint256', 'uint256'],
-    [
-      ticket.recipient,
-      challenge,
-      ticket.ticketEpoch,
-      ticket.amount,
-      ticket.winProb,
-      ticket.ticketIndex,
-      ticket.channelEpoch
-    ]
-  )
-}
-
-export const getTicketLuck = (ticket: Ticket, hash: string, secret: string): string => {
-  const encoded = ethers.utils.solidityPack(['bytes32', 'bytes32', 'uint256'], [hash, secret, ticket.winProb])
-  return ethers.utils.solidityKeccak256(['bytes'], [encoded])
-}
-
-export const redeemArgs = (ticket) => [
+export const redeemArgs = (ticket: PromiseValue<ReturnType<typeof createTicket>>) => [
   ticket.counterparty,
   ticket.nextCommitment,
   ticket.ticketEpoch,
@@ -52,7 +38,7 @@ export const redeemArgs = (ticket) => [
   ticket.proofOfRelaySecret,
   ticket.amount,
   ticket.winProb,
-  ticket.signature
+  u8aToHex(ticket.ticket.signature.serialize())
 ]
 
 export const validateChannel = (actual, expected) => {
@@ -63,35 +49,36 @@ export const validateChannel = (actual, expected) => {
 }
 
 export const createTicket = async (
-  ticket: Ticket,
+  ticketValues: TicketValues,
   account: {
     privateKey: string
     address: string
   },
   nextCommitment: string
 ): Promise<
-  Ticket & {
+  TicketValues & {
     nextCommitment: string
     counterparty: string
-    encoded: string
-    hash: string
-    luck: string
-    signature: string
+    ticket: Ticket
   }
 > => {
-  const encoded = getEncodedTicket(ticket)
-  const hashMessage = ethers.utils.solidityKeccak256(['bytes'], [encoded])
-  const hash = ethers.utils.solidityKeccak256(['string', 'bytes'], ['\x19Ethereum Signed Message:\n32', hashMessage])
-  const luck = getTicketLuck(ticket, hash, nextCommitment)
-  const { signature } = await signMessage(hashMessage, account.privateKey)
+  const challenge = Challenge.fromExponent(stringToU8a(ticketValues.proofOfRelaySecret))
+
+  const ticket = Ticket.create(
+    Address.fromString(ticketValues.recipient),
+    challenge,
+    UINT256.fromString(ticketValues.ticketEpoch),
+    UINT256.fromString(ticketValues.ticketIndex),
+    new Balance(new BN(ticketValues.amount)),
+    UINT256.fromString(ticketValues.winProb),
+    UINT256.fromString(ticketValues.channelEpoch),
+    stringToU8a(account.privateKey)
+  )
 
   return {
-    ...ticket,
+    ...ticketValues,
+    ticket,
     nextCommitment,
-    encoded,
-    hash: hash,
-    luck,
-    signature,
     counterparty: account.address
   }
 }
@@ -653,7 +640,7 @@ describe('test internals with mock', function () {
     expect(parties[1]).to.be.equal(ACCOUNT_B.address)
   })
 
-  it('should pack ticket', async function () {
+  it.only('should pack ticket', async function () {
     const { TICKET_AB_WIN } = await useFixtures()
     const encoded = await channels.getEncodedTicketInternal(
       TICKET_AB_WIN.recipient,
@@ -664,16 +651,35 @@ describe('test internals with mock', function () {
       TICKET_AB_WIN.ticketIndex,
       TICKET_AB_WIN.winProb
     )
-    expect(encoded).to.equal(TICKET_AB_WIN.encoded)
+
+    console.log({
+      recipient: TICKET_AB_WIN.recipient,
+      ticketEpoch: TICKET_AB_WIN.ticketEpoch,
+      proofOfRelaySecret: TICKET_AB_WIN.proofOfRelaySecret,
+      channelEpoch: TICKET_AB_WIN.channelEpoch,
+      amount: TICKET_AB_WIN.amount,
+      ticketIndex: TICKET_AB_WIN.ticketIndex,
+      winProb: TICKET_AB_WIN.winProb
+    })
+
+    expect(Hash.create(stringToU8a(encoded)).toHex()).to.equal(TICKET_AB_WIN.ticket.getHash().toHex())
   })
 
   it("should get ticket's luck", async function () {
     const { TICKET_AB_WIN } = await useFixtures()
     const luck = await channels.getTicketLuckInternal(
-      TICKET_AB_WIN.hash,
+      TICKET_AB_WIN.ticket.getHash().toHex(),
       TICKET_AB_WIN.nextCommitment,
       TICKET_AB_WIN.winProb
     )
-    expect(luck).to.equal(TICKET_AB_WIN.luck)
+    expect(luck).to.equal(
+      TICKET_AB_WIN.ticket
+        .getLuck(
+          new Hash(stringToU8a(TICKET_AB_WIN.nextCommitment)),
+          Response.deserialize(stringToU8a(TICKET_AB_WIN.proofOfRelaySecret)),
+          UINT256.fromString(TICKET_AB_WIN.winProb)
+        )
+        .toString()
+    )
   })
 })
