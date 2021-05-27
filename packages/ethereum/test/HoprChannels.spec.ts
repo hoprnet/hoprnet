@@ -640,7 +640,7 @@ describe('test internals with mock', function () {
     expect(parties[1]).to.be.equal(ACCOUNT_B.address)
   })
 
-  it.only('should pack ticket', async function () {
+  it('should pack ticket', async function () {
     const { TICKET_AB_WIN } = await useFixtures()
     const encoded = await channels.getEncodedTicketInternal(
       TICKET_AB_WIN.recipient,
@@ -651,16 +651,6 @@ describe('test internals with mock', function () {
       TICKET_AB_WIN.ticketIndex,
       TICKET_AB_WIN.winProb
     )
-
-    console.log({
-      recipient: TICKET_AB_WIN.recipient,
-      ticketEpoch: TICKET_AB_WIN.ticketEpoch,
-      proofOfRelaySecret: TICKET_AB_WIN.proofOfRelaySecret,
-      channelEpoch: TICKET_AB_WIN.channelEpoch,
-      amount: TICKET_AB_WIN.amount,
-      ticketIndex: TICKET_AB_WIN.ticketIndex,
-      winProb: TICKET_AB_WIN.winProb
-    })
 
     expect(Hash.create(stringToU8a(encoded)).toHex()).to.equal(TICKET_AB_WIN.ticket.getHash().toHex())
   })

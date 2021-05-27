@@ -116,16 +116,6 @@ export class Ticket {
   }
 
   getHash(): Hash {
-    console.log({
-      counterparty: this.counterparty.toHex(),
-      challenge: this.challenge.toHex(),
-      epoch: this.epoch.toBN().toString(),
-      index: this.index.toBN().toString(),
-      amount: this.amount.toBN().toString(),
-      winProb: this.winProb.toBN().toString(),
-      channelIteration: this.channelIteration.toBN().toString()
-    })
-
     return Hash.create(
       serializeUnsigned({
         counterparty: this.counterparty,
