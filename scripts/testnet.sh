@@ -27,7 +27,7 @@ disk_name() {
 
 # $1=account (hex)
 balance() {
-  ethers eval "new ethers.providers.JsonRpcProvider('$RPC').getBalance('$1').then(b => formatEther(b))"
+  yarn ethers eval "new ethers.providers.JsonRpcProvider('$RPC').getBalance('$1').then(b => formatEther(b))"
 }
 
 # $1=account (hex)
@@ -37,7 +37,7 @@ fund_if_empty() {
   echo "Balance is $BALANCE"
   if [ "$BALANCE" = '0.0' ]; then
     echo "Funding account ... $RPC -> $1 $MIN_FUNDS"
-    ethers send --rpc "$RPC" --account "$FUNDING_PRIV_KEY" "$1" $MIN_FUNDS --yes
+    yarn ethers send --rpc "$RPC" --account "$FUNDING_PRIV_KEY" "$1" $MIN_FUNDS --yes
     sleep 60
   fi
 }
@@ -80,15 +80,8 @@ update_if_existing() {
 
 # $1 = vm name
 # $2 = docker image
-# $3 = OPTIONAL chain provider
 # NB: --run needs to be at the end or it will ignore the other arguments.
 start_testnode_vm() {
-  PROVIDER_ARG=''
-  if [ -z "$4"]; then
-    echo "using chain provider $4"
-    PROVIDER_ARG='--provider'
-    #--container-arg="$PROVIDER_ARG" --container-arg="$3"
-  fi
   if [ "$(update_if_existing $1 $2)" = "no container" ]; then
     gcloud compute instances create-with-container $1 $GCLOUD_DEFAULTS \
       --create-disk name=$(disk_name $1),size=10GB,type=pd-standard,mode=rw \
@@ -125,8 +118,8 @@ start_chain_provider(){
 # $4 = OPTIONAL chain provider
 start_testnode() {
   local vm=$(vm_name "node-$3" $1)
-  echo "- Starting test node $vm with $2 $4"
-  start_testnode_vm $vm $2 $4
+  echo "- Starting test node $vm with $2 ${4:-}"
+  start_testnode_vm $vm $2 ${4:-}
 }
 
 # $1 authorized keys file
@@ -153,7 +146,7 @@ start_testnet() {
   for i in $(seq 1 $2);
   do
     echo "Start node $i"
-    start_testnode $1 $3 $i $4
+    start_testnode $1 $3 $i ${4:-}
   done
   # @jose can you fix this pls.
   # add_keys scripts/keys/authorized_keys
