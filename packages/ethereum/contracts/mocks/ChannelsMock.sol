@@ -2,6 +2,7 @@
 pragma solidity ^0.8;
 
 import "../HoprChannels.sol";
+import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
 contract ChannelsMock is HoprChannels {
     constructor(address _token, uint32 _secsClosure)
@@ -48,7 +49,7 @@ contract ChannelsMock is HoprChannels {
         uint256 amount,
         uint256 ticketIndex,
         uint256 winProb
-    ) external pure returns (bytes memory) {
+    ) external pure returns (bytes32) {
         return _getEncodedTicket(recipient, recipientCounter, proofOfRelaySecret, channelIteration, amount, ticketIndex, winProb);
     }
 
@@ -58,5 +59,23 @@ contract ChannelsMock is HoprChannels {
         uint256 winProb
     ) external pure returns (bytes32) {
         return _getTicketLuck(ticketHash, secretPreImage, winProb);
+    }
+
+    function computeChallengeInternal(bytes32 response) external pure returns (address) {
+        return _computeChallenge(response);
+    }
+
+    function getTicketHash(
+        address recipient,
+        uint256 recipientCounter,
+        bytes32 proofOfRelaySecret,
+        uint256 channelIteration,
+        uint256 amount,
+        uint256 ticketIndex,
+        uint256 winProb
+    ) external pure returns (bytes32) {
+        return ECDSA.toEthSignedMessageHash(
+            keccak256(_getEncodedTicket(recipient, recipientCounter, proofOfRelaySecret, channelIteration, amount, ticketIndex, winProb))
+        );
     }
 }

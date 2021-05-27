@@ -4,7 +4,8 @@ import { expect } from 'chai'
 import { HoprToken__factory, ChannelsMock__factory, HoprChannels__factory } from '../types'
 import { increaseTime, signMessage } from './utils'
 import { ACCOUNT_A, ACCOUNT_B } from './constants'
-import { PublicKey, stringToU8a } from '@hoprnet/hopr-utils'
+import { PublicKey, stringToU8a, Response, Ticket as TicketType } from '@hoprnet/hopr-utils'
+import { randomBytes } from 'crypto'
 
 type Ticket = {
   recipient: string
@@ -675,5 +676,13 @@ describe('test internals with mock', function () {
       TICKET_AB_WIN.winProb
     )
     expect(luck).to.equal(TICKET_AB_WIN.luck)
+  })
+
+  it('should get the right challenge', async function () {
+    const response = new Response(Uint8Array.from(randomBytes(Response.SIZE)))
+
+    const challenge = await channels.computeChallengeInternal(response.toHex())
+
+    expect(challenge.toLowerCase()).to.equal(response.toChallenge().toEthereumChallenge().toHex())
   })
 })
