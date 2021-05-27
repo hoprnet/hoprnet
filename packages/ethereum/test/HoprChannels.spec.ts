@@ -649,7 +649,9 @@ describe('test internals with mock', function () {
       TICKET_AB_WIN.winProb
     )
 
-    expect(Hash.create(stringToU8a(encoded)).toHex()).to.equal(Hash.create(TICKET_AB_WIN.ticket.serializeUnsigned()).toHex())
+    expect(Hash.create(stringToU8a(encoded)).toHex()).to.equal(
+      Hash.create(TICKET_AB_WIN.ticket.serializeUnsigned()).toHex()
+    )
   })
 
   it('should correctly hash ticket', async function () {
