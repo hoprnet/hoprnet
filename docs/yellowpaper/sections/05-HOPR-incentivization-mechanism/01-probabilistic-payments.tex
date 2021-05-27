@@ -1,6 +1,6 @@
 \subsection{Probabilistic payments}
 In traditional payment channels, two parties A and B lock some funds within a smart contract, make multiple transactions off-chain and only commit the aggregation on-chain.
-\\~\\HOPR uses $acknowledgements$ which allows every node to creates a message that acknowledges the processing of the packet to the previous node. This acknowledgement contains the cryptographic material to unlock the payout for the previous node. Note that the acknowledgement is always sent to the previous node - even if there was no payment.
+\\~\\HOPR uses $acknowledgements$ which allow every node to create a message that acknowledges the processing of the packet to the previous node. This acknowledgement contains the cryptographic material to unlock the payout for the previous node. Note that acknowledgement is always sent to the previous node - even if there was no payment.
 \\The fact that we are using payment channels implies that the last HOPR acknowledgement contains all previous incentives plus the incentive for the most recent interaction
 \begin{align}  
 value_(ACK_n) &=\sum_{i=1}^nfee_{packet_i}
