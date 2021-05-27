@@ -38,6 +38,11 @@
     chalk "^2.0.0"
     js-tokens "^4.0.0"
 
+"@babel/parser@7.8.4":
+  version "7.8.4"
+  resolved "https://registry.yarnpkg.com/@babel/parser/-/parser-7.8.4.tgz#d1dbe64691d60358a974295fa53da074dd2ce8e8"
+  integrity sha512-0fKu/QqildpXmPVaRBoXOlyBb3MC+J0A66x97qEfLOMkn3u6nfY5esWogQwi/K0BjASYy4DbnsEWnpNL6qT5Mw==
+
 "@babel/runtime@7.12.5":
   version "7.12.5"
   resolved "https://registry.yarnpkg.com/@babel/runtime/-/runtime-7.12.5.tgz#410e7e487441e1b360c29be715d870d9b985882e"
@@ -273,6 +278,13 @@
     "@ethersproject/logger" "^5.2.0"
     "@ethersproject/rlp" "^5.2.0"
 
+"@ethersproject/asm@^5.2.0":
+  version "5.2.0"
+  resolved "https://registry.yarnpkg.com/@ethersproject/asm/-/asm-5.2.0.tgz#a1016aa04d3e6d1498eeb4cbee3937c2c7b40755"
+  integrity sha512-S/GZwneT81D/j2LDiQfgTKV3fFlF0cqXcep6ROe7weuIpnEQdZXTcC7gF2gUaNDkdlssjBts99hxG2BSYHgtuA==
+  dependencies:
+    ethers "^5.2.0"
+
 "@ethersproject/base64@5.2.0", "@ethersproject/base64@^5.2.0":
   version "5.2.0"
   resolved "https://registry.yarnpkg.com/@ethersproject/base64/-/base64-5.2.0.tgz#e01066d25e5b4e8a051545163bee5def47bd9534"
@@ -303,6 +315,19 @@
   integrity sha512-O1CRpvJDnRTB47vvW8vyqojUZxVookb4LJv/s06TotriU3Xje5WFvlvXJu1yTchtxTz9BbvJw0lFXKpyO6Dn7w==
   dependencies:
     "@ethersproject/logger" "^5.2.0"
+
+"@ethersproject/cli@^5.2.0":
+  version "5.2.0"
+  resolved "https://registry.yarnpkg.com/@ethersproject/cli/-/cli-5.2.0.tgz#fae8302f9119a89d4e1aa194e8ab41132a54e14b"
+  integrity sha512-FR/oAMdmK5fZFFZj09rRYRCfosOXRlFVYsX8vpPvEVUPOdTnaTbR7j9ZoJVLHB+KM8aaAkzQb/H29buC+ZL6QQ==
+  dependencies:
+    "@babel/parser" "7.8.4"
+    "@babel/types" "7.8.3"
+    "@ethersproject/asm" "^5.2.0"
+    "@ethersproject/basex" "^5.2.0"
+    ethers "^5.2.0"
+    scrypt-js "3.0.1"
+    solc "0.7.1"
 
 "@ethersproject/constants@5.2.0", "@ethersproject/constants@>=5.0.0-beta.128", "@ethersproject/constants@^5.0.4", "@ethersproject/constants@^5.2.0":
   version "5.2.0"
@@ -12478,6 +12503,21 @@ socks@^2.3.3:
   dependencies:
     ip "^1.1.5"
     smart-buffer "^4.1.0"
+
+solc@0.7.1:
+  version "0.7.1"
+  resolved "https://registry.yarnpkg.com/solc/-/solc-0.7.1.tgz#a8283af3406ada8919a35026ba7469c068c3f839"
+  integrity sha512-LepFVKDOcZ1O3OskOy45XTQ6G4rMRTmsGjn4gssaOrI9uyJI9LL6/X2MlYqeJx22UrpPUtCjQAb5IFWRoOSe+w==
+  dependencies:
+    command-exists "^1.2.8"
+    commander "3.0.2"
+    follow-redirects "^1.12.1"
+    fs-extra "^0.30.0"
+    js-sha3 "0.8.0"
+    memorystream "^0.3.1"
+    require-from-string "^2.0.0"
+    semver "^5.5.0"
+    tmp "0.0.33"
 
 solc@0.7.3:
   version "0.7.3"
