@@ -170,10 +170,34 @@ export class Signature {
   }
 
   static deserialize(arr: Uint8Array): Signature {
-    const [s, r] = u8aSplit(arr, [SIGNATURE_LENGTH, SIGNATURE_RECOVERY_LENGTH])
-    return new Signature(s, u8aToNumber(r) as number)
+    const [s, preRecovery] = u8aSplit(arr, [SIGNATURE_LENGTH, SIGNATURE_RECOVERY_LENGTH])
+
+    const r = u8aToNumber(preRecovery) as number
+
+    if (![0, 1].includes(r)) {
+      throw Error(`Expected recovery to be 0 or 1. Got ${r}`)
+    }
+
+    return new Signature(s, r)
   }
 
+  /**
+   * Deserializes Ethereum-specific signature with
+   * non-standard recovery values 27 and 28
+   * @param arr serialized Ethereum signature
+   * @returns deserialized Ethereum signature
+   */
+  static deserializeEthereum(arr: Uint8Array): Signature {
+    const [s, preRecovery] = u8aSplit(arr, [SIGNATURE_LENGTH, SIGNATURE_RECOVERY_LENGTH])
+
+    const r = u8aToNumber(preRecovery) as number
+
+    if (![27, 28].includes(r)) {
+      throw Error(`Expected recovery to be 27 or 28. Got ${r}`)
+    }
+
+    return new Signature(s, r - 27)
+  }
   static create(msg: Uint8Array, privKey: Uint8Array): Signature {
     const result = ecdsaSign(msg, privKey)
     return new Signature(result.signature, result.recid)
@@ -186,8 +210,23 @@ export class Signature {
     ])
   }
 
+  /**
+   * Replaces recovery value by Ethereum-specific values 27/28
+   * @returns serialized signature to use within Ethereum
+   */
+  serializeEthereum(): Uint8Array {
+    return serializeToU8a([
+      [this.signature, SIGNATURE_LENGTH],
+      [Uint8Array.of(this.recovery + 27), SIGNATURE_RECOVERY_LENGTH]
+    ])
+  }
+
   verify(msg: Uint8Array, pubKey: PublicKey): boolean {
     return ecdsaVerify(this.signature, msg, pubKey.serialize())
+  }
+
+  toHex(): string {
+    return u8aToHex(this.serialize())
   }
 
   static SIZE = SIGNATURE_LENGTH + SIGNATURE_RECOVERY_LENGTH
