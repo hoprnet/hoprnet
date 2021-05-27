@@ -68,10 +68,11 @@ export class Ticket {
     signPriv: Uint8Array
   ): Ticket {
     const encodedChallenge = challenge.toEthereumChallenge()
+    
     const hashedTicket = Hash.create(
       serializeUnsigned({
         counterparty,
-        challenge: challenge.toEthereumChallenge(),
+        challenge: encodedChallenge,
         epoch,
         index,
         amount,

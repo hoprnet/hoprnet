@@ -640,7 +640,7 @@ describe('test internals with mock', function () {
     expect(parties[1]).to.be.equal(ACCOUNT_B.address)
   })
 
-  it.only('should pack ticket', async function () {
+  it('should pack ticket', async function () {
     const { TICKET_AB_WIN } = await useFixtures()
     const encoded = await channels.getEncodedTicketInternal(
       TICKET_AB_WIN.recipient,
