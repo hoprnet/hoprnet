@@ -1,5 +1,8 @@
 \section{Path Selection}
 HOPR uses a random selection algorithm to determine the identities of nodes participating in the network relaying service.
+\begin{comment}
+    
+
 \\For each round, a subset $k$-of-$n$ nodes will be chosen where $n$ is the total number of nodes in the HOPR network. The selection is divided into two steps:
 \begin{enumerate}
     \item Pre-selection:
@@ -13,7 +16,8 @@ HOPR uses a random selection algorithm to determine the identities of nodes part
     \item Random selection:
           Each edge (from node $a$ to $b$) within the subset $m$ is assigned a random number $r_i$. Edges are then sorted by $r_i*score(edge_i)$
 \end{enumerate}
-Once an edge is selected, it is added to the current path. All paths are then sorted according to their weight and the path with the highest score is expanded next.
+\end{comment}
+\\Once an edge is selected, it is added to the current path. All paths are then sorted according to their weight and the path with the highest score is expanded next.
 
 \begin{algorithm}
     \SetAlgoNoLine
