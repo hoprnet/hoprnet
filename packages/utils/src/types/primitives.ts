@@ -164,14 +164,39 @@ export class Hash {
 
 export class Signature {
   constructor(readonly signature: Uint8Array, readonly recovery: number) {
-    if (signature.length !== SIGNATURE_LENGTH) {
+    if (signature.length != SIGNATURE_LENGTH) {
       throw new Error('Incorrect size Uint8Array for signature')
     }
   }
 
   static deserialize(arr: Uint8Array): Signature {
-    const [s, r] = u8aSplit(arr, [SIGNATURE_LENGTH, SIGNATURE_RECOVERY_LENGTH])
-    return new Signature(s, u8aToNumber(r) as number)
+    const [s, preRecovery] = u8aSplit(arr, [SIGNATURE_LENGTH, SIGNATURE_RECOVERY_LENGTH])
+
+    const r = u8aToNumber(preRecovery) as number
+
+    if (![0,1].includes(r)) {
+      throw Error(`v must be either 0 or 1. Got ${r}`)
+    }
+
+    return new Signature(s, r)
+  }
+
+  /**
+   * Deserializes a signature that can be used within Ethereum and uses
+   * non-standard values 27/28 as recovery parameter v.
+   * @param arr serialized Ethereum signature
+   * @returns Signature class
+   */
+  static deserializeEthereum(arr: Uint8Array): Signature {
+    const [s, preRecovery] = u8aSplit(arr, [SIGNATURE_LENGTH, SIGNATURE_RECOVERY_LENGTH])
+
+    const r = u8aToNumber(preRecovery) as number
+
+    if (![27, 28].includes(r)) {
+      throw Error(`v must be either 27 or 28. Got ${r}`)
+    }
+
+    return new Signature(s, r - 27)
   }
 
   static create(msg: Uint8Array, privKey: Uint8Array): Signature {
@@ -179,14 +204,30 @@ export class Signature {
     return new Signature(result.signature, result.recid)
   }
 
-  serialize(): Uint8Array {
+  public serialize(): Uint8Array {
     return serializeToU8a([
       [this.signature, SIGNATURE_LENGTH],
       [Uint8Array.of(this.recovery), SIGNATURE_RECOVERY_LENGTH]
     ])
   }
 
-  verify(msg: Uint8Array, pubKey: PublicKey): boolean {
+  public toHex(): string {
+    return u8aToHex(this.serialize())
+  }
+
+  /**
+   * Serializes the signature by using the non-standard recovery values v=27/28
+   * instead of v=0/1 used by Ethereum Ethereum.
+   * @returns serialized signature that is usable within Ethereum
+   */
+  public serializeEthereum(): Uint8Array {
+    return serializeToU8a([
+      [this.signature, SIGNATURE_LENGTH],
+      [Uint8Array.of(this.recovery + 27), SIGNATURE_RECOVERY_LENGTH]
+    ])
+  }
+
+  public verify(msg: Uint8Array, pubKey: PublicKey): boolean {
     return ecdsaVerify(this.signature, msg, pubKey.serialize())
   }
 
