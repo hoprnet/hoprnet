@@ -92,6 +92,10 @@ export class Ticket {
     return Uint8Array.from([...unsigned, ...this.signature.serialize()])
   }
 
+  public toEthereumHash(): Hash {
+    return toEthSignedMessageHash(this.getHash())
+  }
+
   static deserialize(arr: Uint8Array): Ticket {
     const components = u8aSplit(arr, [
       Address.SIZE,
