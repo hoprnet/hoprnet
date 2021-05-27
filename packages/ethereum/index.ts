@@ -14,7 +14,9 @@ export type ContractData = {
 }
 
 export const getContractData = (network: Networks, contract: ContractNames): ContractData => {
-  const deploymentsPath = __dirname === 'lib' ? join(__dirname, '..', 'deployments') : join(__dirname, 'deployments')
+  const deploymentsPath = __dirname.endsWith('lib')
+    ? join(__dirname, '..', 'deployments')
+    : join(__dirname, 'deployments')
 
   try {
     return require(join(deploymentsPath, network, `${contract}.json`))
