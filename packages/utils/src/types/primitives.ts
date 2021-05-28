@@ -247,6 +247,10 @@ export class Balance {
     return this.bn
   }
 
+  public toHex(): string {
+    return `0x${this.bn.toString('hex', 2 * Balance.SIZE)}`
+  }
+
   static deserialize(arr: Uint8Array) {
     return new Balance(new BN(arr))
   }
@@ -274,6 +278,10 @@ export class NativeBalance {
 
   static get DECIMALS(): number {
     return 18
+  }
+
+  public toHex(): string {
+    return `0x${this.bn.toString('hex', 2 * NativeBalance.SIZE)}`
   }
 
   static deserialize(arr: Uint8Array) {
