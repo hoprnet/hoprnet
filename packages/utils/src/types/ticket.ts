@@ -143,16 +143,17 @@ export class Ticket {
     return pubKey.eq(this.recoverSigner())
   }
 
-  getLuck(preImage: Hash, challengeResponse: Response, winProb: UINT256): BN {
-    return new BN(
-      Hash.create(
-        Uint8Array.from([
-          ...this.getHash().serialize(),
-          ...preImage.serialize(),
-          ...challengeResponse.serialize(),
-          ...winProb.serialize()
-        ])
-      ).serialize()
+  getLuck(preImage: Hash, challengeResponse: Response): UINT256 {
+    return new UINT256(
+      new BN(
+        Hash.create(
+          Uint8Array.from([
+            ...this.getHash().serialize(),
+            ...preImage.serialize(),
+            ...challengeResponse.serialize(),
+          ])
+        ).serialize()
+      )
     )
   }
 
@@ -166,8 +167,8 @@ export class Ticket {
    * @param winProb winning probability of the ticket
    */
   isWinningTicket(preImage: Hash, challengeResponse: Response, winProb: UINT256): boolean {
-    const luck = this.getLuck(preImage, challengeResponse, winProb)
-    return luck.lte(winProb.toBN())
+    const luck = this.getLuck(preImage, challengeResponse)
+    return luck.toBN().lte(winProb.toBN())
   }
 
   getPathPosition(pricePerTicket: BN, inverseTicketWinProb: BN): number {

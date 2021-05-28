@@ -649,7 +649,9 @@ describe('test internals with mock', function () {
       TICKET_AB_WIN.winProb
     )
 
-    expect(Hash.create(stringToU8a(encoded)).toHex()).to.equal(Hash.create(TICKET_AB_WIN.ticket.serializeUnsigned()).toHex())
+    expect(Hash.create(stringToU8a(encoded)).toHex()).to.equal(
+      Hash.create(TICKET_AB_WIN.ticket.serializeUnsigned()).toHex()
+    )
   })
 
   it('should correctly hash ticket', async function () {
@@ -669,19 +671,19 @@ describe('test internals with mock', function () {
 
   it("should get ticket's luck", async function () {
     const { TICKET_AB_WIN } = await useFixtures()
+
     const luck = await channels.getTicketLuckInternal(
       TICKET_AB_WIN.ticket.getHash().toHex(),
       TICKET_AB_WIN.nextCommitment,
-      TICKET_AB_WIN.winProb
+      TICKET_AB_WIN.proofOfRelaySecret
     )
     expect(luck).to.equal(
       TICKET_AB_WIN.ticket
         .getLuck(
           new Hash(stringToU8a(TICKET_AB_WIN.nextCommitment)),
-          Response.deserialize(stringToU8a(TICKET_AB_WIN.proofOfRelaySecret)),
-          UINT256.fromString(TICKET_AB_WIN.winProb)
+          Response.deserialize(stringToU8a(TICKET_AB_WIN.proofOfRelaySecret))
         )
-        .toString()
+        .toHex()
     )
   })
 })

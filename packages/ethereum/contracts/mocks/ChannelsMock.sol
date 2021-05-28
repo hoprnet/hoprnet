@@ -55,9 +55,9 @@ contract ChannelsMock is HoprChannels {
     function getTicketLuckInternal(
         bytes32 ticketHash,
         bytes32 secretPreImage,
-        uint256 winProb
-    ) external pure returns (bytes32) {
-        return _getTicketLuck(ticketHash, secretPreImage, winProb);
+        bytes32 proofOfRelaySecret
+    ) external pure returns (uint256) {
+        return _getTicketLuck(ticketHash, secretPreImage, proofOfRelaySecret);
     }
 
     function getTicketHashInternal(
