@@ -7,6 +7,7 @@ import Heap from 'heap-js'
 import { randomChoice, HoprDB, stringToU8a } from '@hoprnet/hopr-utils'
 import { Address, ChannelEntry, AccountEntry, Hash, PublicKey, Balance, Snapshot } from '@hoprnet/hopr-utils'
 import { isConfirmedBlock, snapshotComparator } from './utils'
+import { Commitment } from '../commitment'
 import Debug from 'debug'
 import { Multiaddr } from 'multiaddr'
 import { EventEmitter } from 'events'
@@ -277,7 +278,31 @@ class Indexer extends EventEmitter {
 
     if (channel.partyA.eq(this.address) || channel.partyB.eq(this.address)) {
       this.emit('own-channel-updated', channel)
+
+      const ticketEpoch = channel.ticketIndexFor(this.address)
+
+      if (ticketEpoch.toBN().isZero) {
+        await this.onOwnUnsetCommitment(channel)
+      } else if (ticketEpoch.toBN().eqn(1)) {
+        this.emit(`commitment-set-${channel.getId().toHex()}`)
+      }
     }
+  }
+
+  private async onOwnUnsetCommitment(channel: ChannelEntry) {
+    const isPartyA = channel.partyA.eq(channel.partyA)
+
+    const counterparty = isPartyA ? channel.partyB : channel.partyA
+
+    log(`No commitment set for channel ${channel.getId()}. Setting commitment`)
+
+    await new Commitment(
+      (comm: Hash) => this.chain.setCommitment(counterparty, comm),
+      async () => (await this.getChannel(channel.getId())).commitmentFor(this.address),
+      this.db,
+      channel.getId(),
+      this
+    ).initialize()
   }
 
   public async getAccount(address: Address) {

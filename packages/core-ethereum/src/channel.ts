@@ -36,7 +36,8 @@ class Channel {
       (commitment: Hash) => this.chain.setCommitment(counterparty.toAddress(), commitment),
       () => this.getChainCommitment(),
       this.db,
-      this.getId()
+      this.getId(),
+      indexer
     )
   }
 

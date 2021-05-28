@@ -2,6 +2,8 @@ import { iterateHash, recoverIteratedHash, HoprDB, Hash } from '@hoprnet/hopr-ut
 import { randomBytes } from 'crypto'
 import Debug from 'debug'
 import type { Receipt } from './ethereum'
+import Indexer from './indexer'
+import { once } from 'events'
 
 const log = Debug('hopr-core-ethereum:commitment')
 
@@ -19,7 +21,8 @@ export class Commitment {
     private setChainCommitment: (commitment: Hash) => Promise<Receipt>,
     private getChainCommitment: () => Promise<Hash>,
     private db: HoprDB,
-    private channelId: Hash // used in db key
+    private channelId: Hash, // used in db key
+    private indexer: Indexer
   ) {}
 
   public async getCurrentCommitment(): Promise<Hash> {
@@ -57,6 +60,20 @@ export class Commitment {
 
   async initialize(): Promise<void> {
     if (this.initialized) return
+
+    const pendingCommitment = await this.pendingCommitment()
+
+    if (pendingCommitment) {
+      log(`Found pending commitment, waiting until state appears in indexer`)
+      await once(this.indexer, `commitment-set-${this.channelId.toHex()}`)
+
+      log(`Commitment is set, commitment is now fully initialized.`)
+
+      this.initialized = true
+      return
+    }
+
+    await this.setPendingCommitment()
     const dbContains = await this.hasDBSecret()
     const chainCommitment = await this.getChainCommitment()
     if (chainCommitment && dbContains) {
@@ -82,6 +99,14 @@ export class Commitment {
     await this.db.setCurrentCommitment(this.channelId, current)
     await this.setChainCommitment(current)
     log('commitment chain initialized')
+  }
+
+  private pendingCommitment(): Promise<boolean> {
+    return this.db.isOwnChannelCommitmentSet(this.channelId)
+  }
+
+  private setPendingCommitment(): Promise<void> {
+    return this.db.setOwnChannelCommitmentSet(this.channelId)
   }
 
   private async hasDBSecret(): Promise<boolean> {

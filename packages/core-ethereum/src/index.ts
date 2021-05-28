@@ -39,7 +39,6 @@ export type RedeemTicketResponse =
 
 export default class HoprEthereum {
   // @TODO find a better solution
-  private setCommitments: Map<string, boolean>
   private privateKey: Uint8Array
   private publicKey: PublicKey
   private address: Address
@@ -48,9 +47,6 @@ export default class HoprEthereum {
     this.privateKey = this.chain.getPrivateKey()
     this.publicKey = this.chain.getPublicKey()
     this.address = Address.fromString(this.chain.getWallet().address)
-
-    this.setCommitments = new Map()
-    this.indexer.on('own-channel-updated', this.setInitialCommitmentIfNotSet.bind(this))
   }
 
   readonly CHAIN_NAME = 'HOPR on Ethereum'
@@ -134,33 +130,6 @@ export default class HoprEthereum {
     return await this.indexer.getPublicNodes()
   }
 
-  private async setInitialCommitmentIfNotSet(channel: ChannelEntry): Promise<void> {
-    if (!this.address.eq(channel.partyA) && !this.address.eq(channel.partyB)) {
-      return
-    }
-
-    const isPartyA = this.address.eq(channel.partyA)
-    const counterparty = isPartyA ? channel.partyB : channel.partyA
-
-    const alreadySet = this.setCommitments.get(Channel.generateId(this.address, counterparty).toHex())
-
-    if (alreadySet != undefined) {
-      log(`commitment already set, nothing to do`)
-      return
-    }
-
-    this.setCommitments.set(Channel.generateId(this.address, counterparty).toHex(), true)
-
-    if (!channel.ticketEpochFor(this.address).toBN().isZero()) {
-      // Channel commitment is already set, nothing to do
-      return
-    }
-
-    const counterpartyPubKey = await this.getPublicKeyOf(counterparty)
-
-    return this.getChannel(this.publicKey, counterpartyPubKey).setCommitment()
-  }
-
   /**
    * Creates an uninitialised instance.
    *
@@ -186,14 +155,7 @@ export default class HoprEthereum {
     )
     await indexer.start()
 
-    const ownChannelsWithoutCommitment = await indexer.getOwnChannelsWithoutCommitment()
-
-    log('own channels without commitment', ownChannelsWithoutCommitment)
     const coreConnector = new HoprEthereum(chain, db, indexer)
-
-    for (const ownChannelWithoutCommitment of ownChannelsWithoutCommitment) {
-      await coreConnector.setInitialCommitmentIfNotSet(ownChannelWithoutCommitment)
-    }
 
     log(`using blockchain address ${coreConnector.getAddress().toHex()}`)
     log(chalk.green('Connector started'))

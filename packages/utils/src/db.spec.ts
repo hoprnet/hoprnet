@@ -108,4 +108,16 @@ describe(`database tests`, function () {
     assert(!!(await db.getChannel(channelEntry.getId())), 'did not find channel')
     assert((await db.getChannels()).length === 1, 'did not find channel')
   })
+
+  it('should remember that commitment was set', async function () {
+    const channelId = new Hash(Uint8Array.from(randomBytes(32)))
+
+    let commitmentSet = await db.isOwnChannelCommitmentSet(channelId)
+    assert(commitmentSet == false)
+
+    await db.setOwnChannelCommitmentSet(channelId)
+
+    commitmentSet = await db.isOwnChannelCommitmentSet(channelId)
+    assert(commitmentSet == true)
+  })
 })
