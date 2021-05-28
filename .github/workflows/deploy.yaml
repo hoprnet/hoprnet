@@ -17,7 +17,7 @@ jobs:
       - uses: actions/checkout@v2
 
       - name: Configure Git info
-        run: bash -x scripts/configure-git-info.sh
+        run: ./scripts/configure-git-info.sh
 
       - name: Use Node.js
         uses: actions/setup-node@v2
@@ -62,7 +62,7 @@ jobs:
           # skip releasing for changes from our bots to prevent circular change propagation
           [ "noreply@hoprnet.org" = "$(git show -s --format='%ae' ${HOPR_GITHUB_REF})" ] && exit 0
           export HOPR_PACKAGE_VERSION=$(./scripts/get-package-version.sh)
-          bash -x scripts/publish-pre-release.sh
+          ./scripts/publish-pre-release.sh
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           HOPR_PACKAGE: hoprd
@@ -75,7 +75,7 @@ jobs:
         run: |
           # skip releasing for changes from our bots to prevent circular change propagation
           [ "noreply@hoprnet.org" = "$(git show -s --format='%ae' ${HOPR_GITHUB_REF})" ] && exit 0
-          bash -x scripts/publish-patch-release.sh
+          ./scripts/publish-patch-release.sh
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           HOPR_PACKAGE: hoprd
@@ -84,7 +84,7 @@ jobs:
         if: (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/release/')) && env.ACT == ''
         run: |
           export HOPR_PACKAGE_VERSION=$(./scripts/get-package-version.sh)
-          bash -x scripts/wait-for-npm-package.sh
+          ./scripts/wait-for-npm-package.sh
         env:
           HOPR_PACKAGE: hoprd
 
@@ -96,7 +96,7 @@ jobs:
       - uses: actions/checkout@v2
 
       - name: Configure Git info
-        run: bash -x scripts/configure-git-info.sh
+        run: ./scripts/configure-git-info.sh
 
       - name: Use Node.js
         uses: actions/setup-node@v2
@@ -133,11 +133,20 @@ jobs:
           yarn
           yarn build
 
-      - name: Deploy 
+      - name: Deploy on Goerli
         env:
-          PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
+          DEPLOYER_WALLET_PRIVATE_KEY: ${{ secrets.DEPLOYER_WALLET_PRIVATE_KEY }}
+          INFURA_KEY: ${{ secrets.INFURA_KEY }}
+          ETHERSCAN_KEY: ${{ secrets.ETHERSCAN }}
+          NETWORK: goerli
+        run: |
+          bash scripts/deploy-smart-contracts.sh
+
+      - name: Deploy on xDai
+        env:
+          DEPLOYER_WALLET_PRIVATE_KEY: ${{ secrets.DEPLOYER_WALLET_PRIVATE_KEY }}
           QUIKNODE_KEY: ${{ secrets.QUIKNODE_KEY }}
-          NETWORK: xdai # only XDAI for now
+          NETWORK: xdai
         run: |
           bash scripts/deploy-smart-contracts.sh
 
@@ -157,11 +166,7 @@ jobs:
       - uses: actions/checkout@v2
 
       - name: Configure Git info
-        run: bash -x scripts/configure-git-info.sh
-
-      - name: Update repo from latest pushes.
-        run: |
-          git pull origin ${{ github.ref }} # This should pull new packages with versions etc.
+        run: ./scripts/configure-git-info.sh
 
       - name: Get version from package.json
         id: get-package-version
@@ -186,11 +191,7 @@ jobs:
       - uses: actions/checkout@v2
 
       - name: Configure Git info
-        run: bash -x scripts/configure-git-info.sh
-
-      - name: Update repo from latest pushes.
-        run: |
-          git pull origin ${{ github.ref }} # This should pull new packages with versions etc.
+        run: ./scripts/configure-git-info.sh
 
       - name: Setup Google Cloud Credentials
         uses: google-github-actions/setup-gcloud@v0.2.1
@@ -217,11 +218,7 @@ jobs:
       - uses: actions/checkout@v2
 
       - name: Configure Git info
-        run: bash -x scripts/configure-git-info.sh
-
-      - name: Update repo from latest pushes.
-        run: |
-          git pull origin ${{ github.ref }} # This should pull new packages with versions etc.
+        run: ./scripts/configure-git-info.sh
 
       - name: Set Avado release version
         id: set-avado-release-version
@@ -248,7 +245,6 @@ jobs:
           sudo avadosdk build --provider http://80.208.229.228:5001
           git add dappnode_package.json docker-compose.yml releases.json
           git commit -m "Avado CI: new release"
-          git pull origin ${{ github.ref }}
           git push origin ${{ github.ref }}
 
           # http://go.ava.do/install/<IPFS HASH>
@@ -261,17 +257,13 @@ jobs:
       - uses: actions/checkout@v2
 
       - name: Configure Git info
-        run: bash -x scripts/configure-git-info.sh
+        run: ./scripts/configure-git-info.sh
 
       - name: Use Node.js 14
         uses: actions/setup-node@v2
         with:
           node-version: 14
           registry-url: https://registry.npmjs.org/
-
-      - name: Update repo from latest pushes.
-        run: |
-          git pull origin ${{ github.ref }} # This should pull new packages with versions etc.
 
       - name: Setup Google Cloud Credentials
         uses: google-github-actions/setup-gcloud@v0.2.1
@@ -281,7 +273,7 @@ jobs:
           export_default_credentials: true
 
       - name: Run start script
-        run: bash -x scripts/deploy.sh
+        run: ./scripts/deploy.sh
         env:
           FUNDING_PRIV_KEY: ${{ secrets.FUNDING_WALLET_PRIVATE_KEY }}
           GITHUB_REF: ${{ github.ref }}

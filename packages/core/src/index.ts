@@ -198,6 +198,7 @@ class Hopr extends EventEmitter {
     })
 
     await libp2p.start()
+    log('libp2p started')
     this.libp2p = libp2p
     this.libp2p.connectionManager.on('peer:connect', (conn: Connection) => {
       this.emit('hopr:peer:connection', conn.remotePeer)
@@ -224,29 +225,24 @@ class Hopr extends EventEmitter {
     subscribeToAcknowledgements(subscribe, this.db, await this.paymentChannels, this.getId(), (ack) =>
       this.emit('message-acknowledged:' + ack.ackChallenge.toHex())
     )
-    await this.announce(this.options.announce)
 
     const ethereum = await this.paymentChannels
-
     const onMessage = (msg: Uint8Array) => this.emit('hopr:message', msg)
-    this.forward = new PacketForwardInteraction(
-      subscribe,
-      sendMessage,
-      this.getId(),
-      await this.paymentChannels,
-      onMessage,
-      this.db
-    )
+    this.forward = new PacketForwardInteraction(subscribe, sendMessage, this.getId(), ethereum, onMessage, this.db)
 
     ethereum.indexer.on('peer', ({ id, multiaddrs }: { id: PeerId; multiaddrs: Multiaddr[] }) => {
       this.libp2p.peerStore.addressBook.add(id, multiaddrs)
     })
 
+    log('announcing')
+    await this.announce(this.options.announce)
+    log('announced, starting heartbeat')
+
     this.heartbeat.start()
     this.periodicCheck()
     this.setChannelStrategy(this.options.strategy || 'passive')
     this.status = 'RUNNING'
-
+    this.emit('running')
     // Log information
     log('# STARTED NODE')
     log('ID', this.getId().toB58String())
@@ -392,6 +388,10 @@ class Hopr extends EventEmitter {
   public async sendMessage(msg: Uint8Array, destination: PeerId, intermediatePath?: PeerId[]): Promise<void> {
     const promises: Promise<void>[] = []
     const ethereum = await this.paymentChannels
+
+    if (this.status != 'RUNNING') {
+      throw new Error('Cannot send message until the node is running')
+    }
 
     if (intermediatePath != undefined) {
       // checking if path makes sense
@@ -756,6 +756,14 @@ class Hopr extends EventEmitter {
       }
       tick()
     })
+  }
+
+  // Utility method to wait until the node is running successfully
+  public async waitForRunning(): Promise<void> {
+    if (this.status == 'RUNNING') {
+      return Promise.resolve()
+    }
+    return new Promise((resolve) => this.once('running', resolve))
   }
 }
 

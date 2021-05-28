@@ -15,7 +15,7 @@ import {
 } from '@hoprnet/hopr-utils'
 import Indexer from './indexer'
 import { RoutingChannel } from './indexer'
-import { PROVIDER_DEFAULT_URI, INDEXER_MAX_CONFIRMATIONS, INDEXER_BLOCK_RANGE } from './constants'
+import { PROVIDER_DEFAULT_URI, CONFIRMATIONS, INDEXER_BLOCK_RANGE } from './constants'
 import { Channel } from './channel'
 import { createChainWrapper } from './ethereum'
 import { PROVIDER_CACHE_TTL } from './constants'
@@ -150,7 +150,7 @@ export default class HoprEthereum {
       chain.getGenesisBlock(),
       db,
       chain,
-      options.maxConfirmations ?? INDEXER_MAX_CONFIRMATIONS,
+      options.maxConfirmations ?? CONFIRMATIONS,
       INDEXER_BLOCK_RANGE
     )
     await indexer.start()

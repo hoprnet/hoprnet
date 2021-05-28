@@ -14,7 +14,7 @@ import { HardhatUserConfig, task, types } from 'hardhat/config'
 import { ethers } from 'ethers'
 import { networks, NetworkTag } from './constants'
 
-const { PRIVATE_KEY, ETHERSCAN_KEY, POKT_KEY, QUIKNODE_KEY, DEVELOPMENT = false } = process.env
+const { DEPLOYER_WALLET_PRIVATE_KEY, ETHERSCAN_KEY, INFURA_KEY, QUIKNODE_KEY, DEVELOPMENT = false } = process.env
 const GAS_MULTIPLIER = 1.1
 
 // set 'ETHERSCAN_API_KEY' so 'hardhat-deploy' can read it
@@ -34,7 +34,7 @@ const hardhatConfig: HardhatUserConfig = {
       mining: DEVELOPMENT
         ? {
             auto: true, // every transaction will trigger a new block (without this deployments fail)
-            interval: [3000, 6000] // mine new block every 3s - 6s
+            interval: [1000, 3000] // mine new block every 1 - 3s
           }
         : undefined
     },
@@ -43,8 +43,8 @@ const hardhatConfig: HardhatUserConfig = {
       live: true,
       tags: ['staging'] as NetworkTag[],
       gasMultiplier: GAS_MULTIPLIER,
-      url: `https://eth-goerli.gateway.pokt.network/v1/${POKT_KEY}/`,
-      accounts: PRIVATE_KEY ? [PRIVATE_KEY] : []
+      url: `https://goerli.infura.io/v3/${INFURA_KEY}`,
+      accounts: DEPLOYER_WALLET_PRIVATE_KEY ? [DEPLOYER_WALLET_PRIVATE_KEY] : []
     },
     xdai: {
       ...networks.xdai,
@@ -52,7 +52,7 @@ const hardhatConfig: HardhatUserConfig = {
       tags: ['production'] as NetworkTag[],
       gasMultiplier: GAS_MULTIPLIER,
       url: `https://still-patient-forest.xdai.quiknode.pro/${QUIKNODE_KEY}/`,
-      accounts: PRIVATE_KEY ? [PRIVATE_KEY] : []
+      accounts: DEPLOYER_WALLET_PRIVATE_KEY ? [DEPLOYER_WALLET_PRIVATE_KEY] : []
     }
   },
   namedAccounts: {

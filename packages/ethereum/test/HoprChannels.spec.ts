@@ -1,13 +1,25 @@
 import { deployments, ethers } from 'hardhat'
 import Multiaddr from 'multiaddr'
 import { expect } from 'chai'
+import BN from 'bn.js'
 import { HoprToken__factory, ChannelsMock__factory, HoprChannels__factory } from '../types'
-import { increaseTime, signMessage } from './utils'
+import { increaseTime } from './utils'
 import { ACCOUNT_A, ACCOUNT_B } from './constants'
-import { PublicKey, stringToU8a, Response, Ticket as TicketType } from '@hoprnet/hopr-utils'
+import {
+  Address,
+  Challenge,
+  UINT256,
+  Balance,
+  stringToU8a,
+  Ticket,
+  Hash,
+  Response,
+  AcknowledgedTicket,
+  PublicKey
+} from '@hoprnet/hopr-utils'
 import { randomBytes } from 'crypto'
 
-type Ticket = {
+type TicketValues = {
   recipient: string
   proofOfRelaySecret: string
   amount: string
@@ -19,41 +31,15 @@ type Ticket = {
 
 const percentToUint256 = (percent: any) => ethers.constants.MaxUint256.mul(percent).div(100)
 
-const computeChallenge = (proofOfRelaySecret: string): string => {
-  return PublicKey.fromPrivKey(stringToU8a(proofOfRelaySecret)).toAddress().toHex()
-}
-
-const getEncodedTicket = (ticket: Ticket): string => {
-  const challenge = computeChallenge(ticket.proofOfRelaySecret)
-
-  return ethers.utils.solidityPack(
-    ['address', 'bytes20', 'uint256', 'uint256', 'uint256', 'uint256', 'uint256'],
-    [
-      ticket.recipient,
-      challenge,
-      ticket.ticketEpoch,
-      ticket.amount,
-      ticket.winProb,
-      ticket.ticketIndex,
-      ticket.channelEpoch
-    ]
-  )
-}
-
-export const getTicketLuck = (ticket: Ticket, hash: string, secret: string): string => {
-  const encoded = ethers.utils.solidityPack(['bytes32', 'bytes32', 'uint256'], [hash, secret, ticket.winProb])
-  return ethers.utils.solidityKeccak256(['bytes'], [encoded])
-}
-
-export const redeemArgs = (ticket) => [
-  ticket.counterparty,
-  ticket.nextCommitment,
-  ticket.ticketEpoch,
-  ticket.ticketIndex,
-  ticket.proofOfRelaySecret,
-  ticket.amount,
-  ticket.winProb,
-  ticket.signature
+export const redeemArgs = (ticket: AcknowledgedTicket) => [
+  ticket.signer.toAddress().toHex(),
+  ticket.preImage.toHex(),
+  ticket.ticket.epoch.toHex(),
+  ticket.ticket.index.toHex(),
+  ticket.response.toHex(),
+  ticket.ticket.amount.toHex(),
+  ticket.ticket.winProb.toHex(),
+  ticket.ticket.signature.serializeEthereum()
 ]
 
 export const validateChannel = (actual, expected) => {
@@ -64,35 +50,43 @@ export const validateChannel = (actual, expected) => {
 }
 
 export const createTicket = async (
-  ticket: Ticket,
+  ticketValues: TicketValues,
   account: {
     privateKey: string
     address: string
   },
   nextCommitment: string
 ): Promise<
-  Ticket & {
+  TicketValues & {
     nextCommitment: string
     counterparty: string
-    encoded: string
-    hash: string
-    luck: string
-    signature: string
+    ticket: AcknowledgedTicket
   }
 > => {
-  const encoded = getEncodedTicket(ticket)
-  const hashMessage = ethers.utils.solidityKeccak256(['bytes'], [encoded])
-  const hash = ethers.utils.solidityKeccak256(['string', 'bytes'], ['\x19Ethereum Signed Message:\n32', hashMessage])
-  const luck = getTicketLuck(ticket, hash, nextCommitment)
-  const { signature } = await signMessage(hashMessage, account.privateKey)
+  const challenge = Challenge.fromExponent(stringToU8a(ticketValues.proofOfRelaySecret))
+
+  const ticket = Ticket.create(
+    Address.fromString(ticketValues.recipient),
+    challenge,
+    UINT256.fromString(ticketValues.ticketEpoch),
+    UINT256.fromString(ticketValues.ticketIndex),
+    new Balance(new BN(ticketValues.amount)),
+    UINT256.fromString(ticketValues.winProb),
+    UINT256.fromString(ticketValues.channelEpoch),
+    stringToU8a(account.privateKey)
+  )
+
+  const ackedTicket = new AcknowledgedTicket(
+    ticket,
+    new Response(stringToU8a(ticketValues.proofOfRelaySecret, Response.SIZE)),
+    new Hash(stringToU8a(nextCommitment, Hash.SIZE)),
+    PublicKey.fromPrivKey(stringToU8a(account.privateKey))
+  )
 
   return {
-    ...ticket,
+    ...ticketValues,
+    ticket: ackedTicket,
     nextCommitment,
-    encoded,
-    hash: hash,
-    luck,
-    signature,
     counterparty: account.address
   }
 }
@@ -299,10 +293,7 @@ describe('with a funded HoprChannel (A: 70, B: 30), secrets initialized', functi
       SECRET_1
     )
 
-    await channels
-      .connect(fixtures.accountA)
-      //@ts-ignore
-      .redeemTicket(...redeemArgs(TICKET_BA_WIN))
+    await channels.connect(fixtures.accountA).redeemTicket(...redeemArgs(TICKET_BA_WIN.ticket))
 
     const channel = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
     validateChannel(channel, {
@@ -316,10 +307,7 @@ describe('with a funded HoprChannel (A: 70, B: 30), secrets initialized', functi
   })
 
   it('should reedem ticket for account B', async function () {
-    await channels
-      .connect(fixtures.accountB)
-      //@ts-ignore
-      .redeemTicket(...redeemArgs(fixtures.TICKET_AB_WIN))
+    await channels.connect(fixtures.accountB).redeemTicket(...redeemArgs(fixtures.TICKET_AB_WIN.ticket))
 
     const channel = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
     validateChannel(channel, {
@@ -335,34 +323,31 @@ describe('with a funded HoprChannel (A: 70, B: 30), secrets initialized', functi
   it('should fail to redeem ticket when ticket has been already redeemed', async function () {
     const TICKET_AB_WIN = fixtures.TICKET_AB_WIN
 
-    await channels
-      .connect(fixtures.accountB)
-      //@ts-ignore
-      .redeemTicket(...redeemArgs(TICKET_AB_WIN))
+    await channels.connect(fixtures.accountB).redeemTicket(...redeemArgs(TICKET_AB_WIN.ticket))
 
     await expect(
       channels.connect(fixtures.accountB).redeemTicket(
-        TICKET_AB_WIN.counterparty,
+        TICKET_AB_WIN.ticket.signer.toAddress().toHex(),
         SECRET_0, // give the next secret so this ticket becomes redeemable
-        TICKET_AB_WIN.ticketEpoch,
-        TICKET_AB_WIN.ticketIndex,
-        TICKET_AB_WIN.proofOfRelaySecret,
-        TICKET_AB_WIN.amount,
-        TICKET_AB_WIN.winProb,
-        TICKET_AB_WIN.signature
+        TICKET_AB_WIN.ticket.ticket.epoch.toHex(),
+        TICKET_AB_WIN.ticket.ticket.index.toHex(),
+        TICKET_AB_WIN.ticket.response.toHex(),
+        TICKET_AB_WIN.ticket.ticket.amount.toHex(),
+        TICKET_AB_WIN.ticket.ticket.winProb.toHex(),
+        TICKET_AB_WIN.ticket.ticket.signature.serializeEthereum()
       )
     ).to.be.revertedWith('ticket epoch must match')
 
     await expect(
       channels.connect(fixtures.accountB).redeemTicket(
-        TICKET_AB_WIN.counterparty,
+        TICKET_AB_WIN.ticket.signer.toAddress().toHex(),
         SECRET_0, // give the next secret so this ticket becomes redeemable
-        parseInt(TICKET_AB_WIN.ticketEpoch) + 1 + '',
-        TICKET_AB_WIN.ticketIndex,
-        TICKET_AB_WIN.proofOfRelaySecret,
-        TICKET_AB_WIN.amount,
-        TICKET_AB_WIN.winProb,
-        TICKET_AB_WIN.signature
+        UINT256.fromString(parseInt(TICKET_AB_WIN.ticketEpoch) + 1 + '').toHex(),
+        TICKET_AB_WIN.ticket.ticket.index.toHex(),
+        TICKET_AB_WIN.ticket.response.toHex(),
+        TICKET_AB_WIN.ticket.ticket.amount.toHex(),
+        TICKET_AB_WIN.ticket.ticket.winProb.toHex(),
+        TICKET_AB_WIN.ticket.ticket.signature.serializeEthereum()
       )
     ).to.be.revertedWith('redemptions must be in order')
   })
@@ -374,13 +359,13 @@ describe('with a funded HoprChannel (A: 70, B: 30), secrets initialized', functi
       channels
         .connect(fixtures.accountB)
         .redeemTicket(
-          TICKET_AB_WIN.counterparty,
-          TICKET_AB_WIN.nextCommitment,
-          TICKET_AB_WIN.ticketEpoch,
-          TICKET_AB_WIN.ticketIndex,
-          TICKET_AB_WIN.proofOfRelaySecret,
-          TICKET_AB_WIN.amount,
-          TICKET_AB_WIN.winProb,
+          TICKET_AB_WIN.ticket.signer.toAddress().toHex(),
+          TICKET_AB_WIN.ticket.preImage.toHex(),
+          TICKET_AB_WIN.ticket.ticket.epoch.toHex(),
+          TICKET_AB_WIN.ticket.ticket.index.toHex(),
+          TICKET_AB_WIN.ticket.response.toHex(),
+          TICKET_AB_WIN.ticket.ticket.amount.toHex(),
+          TICKET_AB_WIN.ticket.ticket.winProb.toHex(),
           FAKE_SIGNATURE
         )
     ).to.be.revertedWith('signer must match the counterparty')
@@ -401,10 +386,7 @@ describe('with a funded HoprChannel (A: 70, B: 30), secrets initialized', functi
       SECRET_1
     )
     await expect(
-      channels
-        .connect(fixtures.accountB)
-        //@ts-ignore
-        .redeemTicket(...redeemArgs(TICKET_AB_LOSS))
+      channels.connect(fixtures.accountB).redeemTicket(...redeemArgs(TICKET_AB_LOSS.ticket))
     ).to.be.revertedWith('ticket must be a win')
   })
 
@@ -508,8 +490,7 @@ describe('with a closed channel', function () {
 
   it('should fail to redeem ticket when channel in closed', async function () {
     await expect(
-      // @ts-ignore
-      channels.connect(fixtures.accountB).redeemTicket(...redeemArgs(fixtures.TICKET_AB_WIN))
+      channels.connect(fixtures.accountB).redeemTicket(...redeemArgs(fixtures.TICKET_AB_WIN.ticket))
     ).to.be.revertedWith('channel must be open or pending to close')
   })
 
@@ -569,18 +550,12 @@ describe('with a reopened channel', function () {
 
   it('should fail to redeem ticket when channel in in different channelEpoch', async function () {
     await expect(
-      channels
-        .connect(fixtures.accountB)
-        //@ts-ignore
-        .redeemTicket(...redeemArgs(fixtures.TICKET_AB_WIN))
+      channels.connect(fixtures.accountB).redeemTicket(...redeemArgs(fixtures.TICKET_AB_WIN.ticket))
     ).to.be.revertedWith('signer must match the counterparty')
   })
 
   it('should redeem ticket for account A', async function () {
-    await channels
-      .connect(fixtures.accountA)
-      //@ts-ignore
-      .redeemTicket(...redeemArgs(TICKET_BA_WIN_RECYCLED))
+    await channels.connect(fixtures.accountA).redeemTicket(...redeemArgs(TICKET_BA_WIN_RECYCLED.ticket))
 
     const channel = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
     validateChannel(channel, {
@@ -594,10 +569,7 @@ describe('with a reopened channel', function () {
   })
 
   it('should reedem ticket for account B', async function () {
-    await channels
-      .connect(fixtures.accountB)
-      //@ts-ignore
-      .redeemTicket(...redeemArgs(TICKET_AB_WIN_RECYCLED))
+    await channels.connect(fixtures.accountB).redeemTicket(...redeemArgs(TICKET_AB_WIN_RECYCLED.ticket))
 
     const channel = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
     validateChannel(channel, {
@@ -659,23 +631,52 @@ describe('test internals with mock', function () {
     const encoded = await channels.getEncodedTicketInternal(
       TICKET_AB_WIN.recipient,
       TICKET_AB_WIN.ticketEpoch,
-      TICKET_AB_WIN.proofOfRelaySecret,
+      TICKET_AB_WIN.ticket.response.toHex(),
       TICKET_AB_WIN.channelEpoch,
       TICKET_AB_WIN.amount,
       TICKET_AB_WIN.ticketIndex,
       TICKET_AB_WIN.winProb
     )
-    expect(encoded).to.equal(TICKET_AB_WIN.encoded)
+
+    expect(Hash.create(stringToU8a(encoded)).toHex()).to.equal(
+      Hash.create(TICKET_AB_WIN.ticket.ticket.serializeUnsigned()).toHex()
+    )
+  })
+
+  it('should correctly hash ticket', async function () {
+    const { TICKET_AB_WIN } = await useFixtures()
+    const ticketHash = await channels.getTicketHashInternal(
+      TICKET_AB_WIN.recipient,
+      TICKET_AB_WIN.ticketEpoch,
+      TICKET_AB_WIN.ticket.response.toHex(),
+      TICKET_AB_WIN.channelEpoch,
+      TICKET_AB_WIN.amount,
+      TICKET_AB_WIN.ticketIndex,
+      TICKET_AB_WIN.winProb
+    )
+
+    expect(ticketHash).to.equal(TICKET_AB_WIN.ticket.ticket.getHash().toHex())
   })
 
   it("should get ticket's luck", async function () {
     const { TICKET_AB_WIN } = await useFixtures()
+
     const luck = await channels.getTicketLuckInternal(
-      TICKET_AB_WIN.hash,
-      TICKET_AB_WIN.nextCommitment,
-      TICKET_AB_WIN.winProb
+      TICKET_AB_WIN.ticket.ticket.getHash().toHex(),
+      TICKET_AB_WIN.ticket.preImage.toHex(),
+      TICKET_AB_WIN.ticket.response.toHex()
     )
-    expect(luck).to.equal(TICKET_AB_WIN.luck)
+    expect(luck).to.equal(
+      TICKET_AB_WIN.ticket.ticket.getLuck(TICKET_AB_WIN.ticket.preImage, TICKET_AB_WIN.ticket.response).toHex()
+    )
+  })
+
+  it('should get the right challenge', async function () {
+    const response = new Response(Uint8Array.from(randomBytes(Response.SIZE)))
+
+    const challenge = await channels.computeChallengeInternal(response.toHex())
+
+    expect(challenge.toLowerCase()).to.equal(response.toChallenge().toEthereumChallenge().toHex())
   })
 
   it('should get the right challenge', async function () {

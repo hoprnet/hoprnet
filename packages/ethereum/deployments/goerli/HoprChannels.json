@@ -1,6 +1,6 @@
 {
-  "address": "0x1b7714DC1D40ef37F612967Bed94a6dF84a93b85",
-  "transactionHash": "0x08175df683485c6aada78bd09e02ad1edaa4decd59c736e6287336154d5e8248",
+  "address": "0xAE9083fC7FAa0e35F8c5b94A33B86eD6F587Ea51",
+  "transactionHash": "0x637ce3d96c8aaa264a32c06bff6f31def815ef3576c70b3bc1f3bea09ffb6330",
   "abi": [
     {
       "inputs": [
@@ -277,25 +277,6 @@
         }
       ],
       "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "bytes32",
-          "name": "response",
-          "type": "bytes32"
-        }
-      ],
-      "name": "computeChallenge",
-      "outputs": [
-        {
-          "internalType": "address",
-          "name": "",
-          "type": "address"
-        }
-      ],
-      "stateMutability": "pure",
       "type": "function"
     },
     {

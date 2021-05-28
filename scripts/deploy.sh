@@ -1,4 +1,5 @@
-#!/bin/bash
+#!/usr/bin/env bash
+
 set -e #u
 shopt -s expand_aliases
 #set -o xtrace
@@ -21,8 +22,6 @@ if [ -z "${RPC:-}" ]; then
   RPC=https://eth-goerli.gateway.pokt.network/v1/6021a2b6928ff9002e6c7f2f
 fi
 
-source scripts/dependencies.sh
-
 # Get version from package.json
 RELEASE=$(node -p -e "require('./packages/hoprd/package.json').version")
 
@@ -36,4 +35,4 @@ echo "Cleaning up before deploy"
 cleanup
 
 echo "Starting testnet '$TESTNET_NAME' with $TESTNET_SIZE nodes and image hoprd:$RELEASE"
-start_testnet $TESTNET_NAME $TESTNET_SIZE "gcr.io/hoprassociation/hoprd:$RELEASE" 
+start_testnet $TESTNET_NAME $TESTNET_SIZE "gcr.io/hoprassociation/hoprd:$RELEASE"
