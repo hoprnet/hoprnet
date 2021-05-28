@@ -15,6 +15,10 @@ class UINT256 {
     return new Uint8Array(this.bn.toBuffer('be', UINT256.SIZE))
   }
 
+  public toHex(): string {
+    return `0x${this.bn.toString('hex', 2 * UINT256.SIZE)}`
+  }
+
   static fromString(str: string): UINT256 {
     return new UINT256(new BN(str))
   }

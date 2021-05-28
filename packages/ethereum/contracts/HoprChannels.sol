@@ -500,11 +500,11 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
 
         require(ECDSA.recover(ticketHash, signature) == counterparty, "signer must match the counterparty");
         require(
-            uint256(_getTicketLuck(
+            _getTicketLuck(
                 ticketHash,
                 nextCommitment,
-                winProb
-            )) <= winProb,
+                proofOfRelaySecret
+            ) <= winProb,
             "ticket must be a win"
         );
 
@@ -583,8 +583,8 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     function _getTicketLuck(
         bytes32 ticketHash,
         bytes32 nextCommitment,
-        uint256 winProb
-    ) internal pure returns (bytes32) {
-        return keccak256(abi.encodePacked(ticketHash, nextCommitment, winProb));
+        bytes32 proofOfRelaySecret
+    ) internal pure returns (uint256) {
+        return uint256(keccak256(abi.encodePacked(ticketHash, nextCommitment, proofOfRelaySecret)));
     }
 }
