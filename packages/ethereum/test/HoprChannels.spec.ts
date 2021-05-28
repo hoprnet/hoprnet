@@ -17,6 +17,7 @@ import {
   PromiseValue,
   u8aToHex
 } from '@hoprnet/hopr-utils'
+import { randomBytes } from 'crypto'
 
 type TicketValues = {
   recipient: string
@@ -685,5 +686,13 @@ describe('test internals with mock', function () {
         )
         .toHex()
     )
+  })
+
+  it('should get the right challenge', async function () {
+    const response = new Response(Uint8Array.from(randomBytes(Response.SIZE)))
+
+    const challenge = await channels.computeChallengeInternal(response.toHex())
+
+    expect(challenge.toLowerCase()).to.equal(response.toChallenge().toEthereumChallenge().toHex())
   })
 })

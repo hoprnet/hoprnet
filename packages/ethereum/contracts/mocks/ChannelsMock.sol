@@ -74,4 +74,8 @@ contract ChannelsMock is HoprChannels {
             keccak256(_getEncodedTicket(recipient, recipientCounter, proofOfRelaySecret, channelIteration, amount, ticketIndex, winProb))
         );
     }
+
+    function computeChallengeInternal(bytes32 response) external pure returns (address) {
+        return _computeChallenge(response);
+    }
 }
