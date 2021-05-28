@@ -279,24 +279,31 @@ class Indexer extends EventEmitter {
     if (channel.partyA.eq(this.address) || channel.partyB.eq(this.address)) {
       this.emit('own-channel-updated', channel)
 
+      if (channel.status != 'OPEN') {
+        // Only handle open channels
+        return
+      }
+
       const ticketEpoch = channel.ticketIndexFor(this.address)
 
       if (ticketEpoch.toBN().isZero) {
         await this.onOwnUnsetCommitment(channel)
       } else if (ticketEpoch.toBN().eqn(1)) {
+        console.log(this.chain.getChannels().channels(channel.getId().toHex()))
+
         this.emit(`commitment-set-${channel.getId().toHex()}`)
       }
     }
   }
 
-  private async onOwnUnsetCommitment(channel: ChannelEntry) {
+  private onOwnUnsetCommitment(channel: ChannelEntry) {
     const isPartyA = channel.partyA.eq(channel.partyA)
 
     const counterparty = isPartyA ? channel.partyB : channel.partyA
 
     log(`No commitment set for channel ${channel.getId()}. Setting commitment`)
 
-    await new Commitment(
+    return new Commitment(
       (comm: Hash) => this.chain.setCommitment(counterparty, comm),
       async () => (await this.getChannel(channel.getId())).commitmentFor(this.address),
       this.db,

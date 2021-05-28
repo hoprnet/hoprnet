@@ -1,19 +1,20 @@
 import type { providers as Providers } from 'ethers'
-import type { HoprChannels, TypedEvent } from '@hoprnet/hopr-ethereum'
+import type { HoprChannels } from '@hoprnet/hopr-ethereum'
 import type { Event } from './types'
 import type { ChainWrapper } from '../ethereum'
 import assert from 'assert'
 import EventEmitter from 'events'
 import Indexer from '.'
-import { ChannelEntry, HoprDB } from '@hoprnet/hopr-utils'
+import { stringToU8a, Address, ChannelEntry, Hash, HoprDB } from '@hoprnet/hopr-utils'
 import { expectAccountsToBeEqual, expectChannelsToBeEqual } from './fixtures'
 import Defer from 'p-defer'
 import * as fixtures from './fixtures'
+import { Channel } from '..'
 
 const createProviderMock = (ops: { latestBlockNumber?: number } = {}) => {
   let latestBlockNumber = ops.latestBlockNumber ?? 0
 
-  const provider = new EventEmitter() as unknown as Providers.WebSocketProvider
+  const provider = (new EventEmitter() as unknown) as Providers.WebSocketProvider
   provider.getBlockNumber = async (): Promise<number> => latestBlockNumber
 
   return {
@@ -28,8 +29,41 @@ const createProviderMock = (ops: { latestBlockNumber?: number } = {}) => {
 const createHoprChannelsMock = (ops: { pastEvents?: Event<any>[] } = {}) => {
   const pastEvents = ops.pastEvents ?? []
 
-  const hoprChannels = new EventEmitter() as unknown as HoprChannels
-  hoprChannels.queryFilter = async (): Promise<TypedEvent<any>[]> => pastEvents
+  class FakeChannels extends EventEmitter {
+    async channels(channelId: string) {
+      return pastEvents.reduceRight((acc, event: Event<any>) => {
+        if (acc.length > 0) {
+          // Only take most recent event
+          return acc
+        }
+
+        if (event.event !== 'ChannelUpdate') {
+          return acc
+        }
+
+        const updateEvent = event as Event<'ChannelUpdate'>
+
+        const eventChannelId = Channel.generateId(
+          Address.fromString(updateEvent.args.partyA),
+          Address.fromString(updateEvent.args.partyB)
+        )
+
+        if (new Hash(stringToU8a(channelId)).eq(eventChannelId)) {
+          return [updateEvent.args.newState]
+        }
+      }, [])[0]
+    }
+
+    async bumpChannel(_counterparty: string, _comm: string) {
+      pastEvents.push(fixtures.COMMITMENT_SET)
+    }
+
+    async queryFilter() {
+      return pastEvents
+    }
+  }
+
+  const hoprChannels = (new FakeChannels() as unknown) as HoprChannels
 
   return {
     hoprChannels,
@@ -40,7 +74,7 @@ const createHoprChannelsMock = (ops: { pastEvents?: Event<any>[] } = {}) => {
 }
 
 const createChainMock = (provider: Providers.WebSocketProvider, hoprChannels: HoprChannels): ChainWrapper => {
-  return {
+  return ({
     getLatestBlockNumber: () => provider.getBlockNumber(),
     subscribeBlock: (cb) => provider.on('block', cb),
     subscribeError: (cb) => {
@@ -54,8 +88,8 @@ const createChainMock = (provider: Providers.WebSocketProvider, hoprChannels: Ho
     },
     getChannels: () => hoprChannels,
     getWallet: () => fixtures.ACCOUNT_A,
-    setCommitment: async () => {}
-  } as unknown as ChainWrapper
+    setCommitment: hoprChannels.bumpChannel.bind(hoprChannels)
+  } as unknown) as ChainWrapper
 }
 
 const useFixtures = (ops: { latestBlockNumber?: number; pastEvents?: Event<any>[] } = {}) => {
@@ -152,7 +186,7 @@ describe('test indexer', function () {
   })
 
   it('should get all data from DB', async function () {
-    const { indexer } = useFixtures({
+    const { indexer, hoprChannels } = useFixtures({
       latestBlockNumber: 4,
       pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.FUNDED_EVENT, fixtures.OPENED_EVENT]
     })
@@ -176,6 +210,10 @@ describe('test indexer', function () {
     const channelsOfPartyB = await indexer.getChannelsOf(fixtures.PARTY_B.toAddress())
     assert.strictEqual(channelsOfPartyB.length, 1)
     expectChannelsToBeEqual(channelsOfPartyB[0], fixtures.OPENED_CHANNEL)
+
+    const channelId = Channel.generateId(fixtures.PARTY_A.toAddress(), fixtures.PARTY_B.toAddress())
+    assert((await hoprChannels.channels(channelId.toHex())).partyATicketEpoch.eq(1)),
+      `OpenChannel event must have triggered bumpChannel()`
   })
 
   it('should handle provider error by restarting', async function () {
