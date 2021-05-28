@@ -8765,10 +8765,10 @@ libp2p@0.31.3:
     varint "^6.0.0"
     xsalsa20 "^1.1.0"
 
-libp2p@0.31.5:
-  version "0.31.5"
-  resolved "https://registry.yarnpkg.com/libp2p/-/libp2p-0.31.5.tgz#41419a786a6992b167d751968a7411e0615385cd"
-  integrity sha512-5GU0VSxMVV3tY3TFKVB9oRUHJPWv+wv4Z1n6vfgNKCvSIrfu/tm96fRuHMJuDduEe9hYPswb/7d/1BJxu94N8Q==
+libp2p@0.31.6:
+  version "0.31.6"
+  resolved "https://registry.yarnpkg.com/libp2p/-/libp2p-0.31.6.tgz#4f2c30ceba8f37302ef31d2e4b0619e16efdf8e7"
+  integrity sha512-fTxbE/vgrYeObZUICTGqKqW2E3qBctRZymT5kTVtBFxBKrOStgceCc0WSOtgbqN/QBzYYt66Tl5wjJ6Y3tSHYQ==
   dependencies:
     "@motrix/nat-api" "^0.3.1"
     "@vascosantos/moving-average" "^1.1.0"

@@ -43,7 +43,7 @@
     "heap-js": "^2.1.2",
     "leveldown": "~6.0.0",
     "levelup": "~5.0.0",
-    "libp2p": "0.31.5",
+    "libp2p": "0.31.6",
     "libp2p-crypto": "0.19.4",
     "libp2p-kad-dht": "0.22.0",
     "libp2p-mplex": "0.10.3",
