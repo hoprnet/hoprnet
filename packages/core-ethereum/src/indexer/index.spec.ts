@@ -53,7 +53,8 @@ const createChainMock = (provider: Providers.WebSocketProvider, hoprChannels: Ho
       hoprChannels.removeAllListeners()
     },
     getChannels: () => hoprChannels,
-    getWallet: () => fixtures.ACCOUNT_A
+    getWallet: () => fixtures.ACCOUNT_A,
+    setCommitment: async () => {}
   } as unknown as ChainWrapper
 }
 

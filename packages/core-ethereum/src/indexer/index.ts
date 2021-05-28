@@ -323,22 +323,6 @@ class Indexer extends EventEmitter {
     })
   }
 
-  public async getOwnChannelsWithoutCommitment(): Promise<ChannelEntry[]> {
-    return this.db.getChannels((channel: ChannelEntry) => {
-      if (!this.address.eq(channel.partyA) && !this.address.eq(channel.partyB)) {
-        // We are only interested in our channels
-        return false
-      }
-
-      const isPartyA = channel.partyA.eq(channel.partyA)
-
-      return (
-        (isPartyA && channel.partyATicketEpoch.toBN().isZero()) ||
-        (!isPartyA && channel.partyBTicketEpoch.toBN().isZero())
-      )
-    })
-  }
-
   // routing
   public async getPublicKeyOf(address: Address): Promise<PublicKey | undefined> {
     const account = await this.db.getAccount(address)

@@ -38,7 +38,6 @@ export type RedeemTicketResponse =
     }
 
 export default class HoprEthereum {
-  // @TODO find a better solution
   private privateKey: Uint8Array
   private publicKey: PublicKey
   private address: Address
