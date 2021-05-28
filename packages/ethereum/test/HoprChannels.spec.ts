@@ -678,12 +678,4 @@ describe('test internals with mock', function () {
 
     expect(challenge.toLowerCase()).to.equal(response.toChallenge().toEthereumChallenge().toHex())
   })
-
-  it('should get the right challenge', async function () {
-    const response = new Response(Uint8Array.from(randomBytes(Response.SIZE)))
-
-    const challenge = await channels.computeChallengeInternal(response.toHex())
-
-    expect(challenge.toLowerCase()).to.equal(response.toChallenge().toEthereumChallenge().toHex())
-  })
 })
