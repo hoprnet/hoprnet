@@ -66,6 +66,30 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
     durations.minutes(15)
   )
 
+  // naive implementation, assumes transaction is not replaced
+  // temporary used until https://github.com/ethers-io/ethers.js/issues/1479
+  // is fixed
+  async function waitForConfirmations(
+    transactionHash: string,
+    confimations: number,
+    timeout: number
+  ): Promise<providers.TransactionResponse> {
+    const wait = 1e3
+    let started = 0
+    let response: providers.TransactionResponse
+
+    while (started < timeout) {
+      response = await provider.getTransaction(transactionHash)
+      if (response && response.confirmations >= confimations) break
+      // wait 1 sec
+      await new Promise((resolve) => setTimeout(resolve, wait))
+      started += wait
+    }
+
+    if (!response) throw Error(errors.TIMEOUT)
+    return response
+  }
+
   async function sendTransaction<T extends (...args: any) => Promise<ContractTransaction>>(
     method: T,
     ...rest: Parameters<T>
@@ -106,20 +130,10 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
     nonceLock.releaseLock()
 
     try {
-      //await transaction.wait(CONFIRMATIONS) BROKEN DUE TO BUG EXPLAINED BELOW
-      await provider.waitForTransaction(transaction.hash, CONFIRMATIONS, 20000)
+      await waitForConfirmations(transaction.hash, CONFIRMATIONS, 30e3)
       log('Transaction with nonce %d and hash %s confirmed', nonce, transaction.hash)
       transactions.moveToConfirmed(transaction.hash)
     } catch (error) {
-      if (error.code == 'TIMEOUT') {
-        const receipt = await provider.getTransaction(transaction.hash)
-        if (receipt.confirmations > CONFIRMATIONS) {
-          // Due to error in ether.js sometimes we timeout even if transaction is
-          // mined. See https://github.com/ethers-io/ethers.js/issues/1479
-          log('ethersjs bug - transaction is already mined')
-          return transaction
-        }
-      }
       const reverted = ([errors.CALL_EXCEPTION] as string[]).includes(error)
 
       if (reverted) {
