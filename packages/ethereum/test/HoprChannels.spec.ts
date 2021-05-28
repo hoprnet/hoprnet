@@ -386,9 +386,7 @@ describe('with a funded HoprChannel (A: 70, B: 30), secrets initialized', functi
       SECRET_1
     )
     await expect(
-      channels
-        .connect(fixtures.accountB)
-        .redeemTicket(...redeemArgs(TICKET_AB_LOSS.ticket))
+      channels.connect(fixtures.accountB).redeemTicket(...redeemArgs(TICKET_AB_LOSS.ticket))
     ).to.be.revertedWith('ticket must be a win')
   })
 
@@ -552,16 +550,12 @@ describe('with a reopened channel', function () {
 
   it('should fail to redeem ticket when channel in in different channelEpoch', async function () {
     await expect(
-      channels
-        .connect(fixtures.accountB)
-        .redeemTicket(...redeemArgs(fixtures.TICKET_AB_WIN.ticket))
+      channels.connect(fixtures.accountB).redeemTicket(...redeemArgs(fixtures.TICKET_AB_WIN.ticket))
     ).to.be.revertedWith('signer must match the counterparty')
   })
 
   it('should redeem ticket for account A', async function () {
-    await channels
-      .connect(fixtures.accountA)
-      .redeemTicket(...redeemArgs(TICKET_BA_WIN_RECYCLED.ticket))
+    await channels.connect(fixtures.accountA).redeemTicket(...redeemArgs(TICKET_BA_WIN_RECYCLED.ticket))
 
     const channel = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
     validateChannel(channel, {
@@ -575,9 +569,7 @@ describe('with a reopened channel', function () {
   })
 
   it('should reedem ticket for account B', async function () {
-    await channels
-      .connect(fixtures.accountB)
-      .redeemTicket(...redeemArgs(TICKET_AB_WIN_RECYCLED.ticket))
+    await channels.connect(fixtures.accountB).redeemTicket(...redeemArgs(TICKET_AB_WIN_RECYCLED.ticket))
 
     const channel = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
     validateChannel(channel, {
