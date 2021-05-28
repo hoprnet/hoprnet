@@ -147,11 +147,7 @@ export class Ticket {
     return new UINT256(
       new BN(
         Hash.create(
-          Uint8Array.from([
-            ...this.getHash().serialize(),
-            ...preImage.serialize(),
-            ...challengeResponse.serialize(),
-          ])
+          Uint8Array.from([...this.getHash().serialize(), ...preImage.serialize(), ...challengeResponse.serialize()])
         ).serialize()
       )
     )
