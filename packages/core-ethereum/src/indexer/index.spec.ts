@@ -1,4 +1,4 @@
-import type { providers as Providers } from 'ethers'
+import type { providers as Providers, Wallet } from 'ethers'
 import type { HoprChannels } from '@hoprnet/hopr-ethereum'
 import type { Event } from './types'
 import type { ChainWrapper } from '../ethereum'
@@ -10,11 +10,12 @@ import { expectAccountsToBeEqual, expectChannelsToBeEqual } from './fixtures'
 import Defer from 'p-defer'
 import * as fixtures from './fixtures'
 import { Channel } from '..'
+import { CHANNEL_ID } from '../fixtures'
 
 const createProviderMock = (ops: { latestBlockNumber?: number } = {}) => {
   let latestBlockNumber = ops.latestBlockNumber ?? 0
 
-  const provider = new EventEmitter() as unknown as Providers.WebSocketProvider
+  const provider = (new EventEmitter() as unknown) as Providers.WebSocketProvider
   provider.getBlockNumber = async (): Promise<number> => latestBlockNumber
 
   return {
@@ -65,13 +66,13 @@ const createHoprChannelsMock = (ops: { pastEvents?: Event<any>[] } = {}) => {
       let newEvent: Event<'ChannelUpdate'>
 
       if (counterparty === fixtures.PARTY_A.toAddress().toHex()) {
-        if (currentState.partyBTicketIndex.eq(1)) {
+        if (currentState.partyBTicketEpoch.eq(1)) {
           newEvent = fixtures.COMMITMENT_SET_AB
         } else {
           newEvent = fixtures.COMMITMENT_SET_B
         }
       } else if (counterparty === fixtures.PARTY_B.toAddress().toHex()) {
-        if (currentState.partyATicketIndex.eq(1)) {
+        if (currentState.partyATicketEpoch.eq(1)) {
           newEvent = fixtures.COMMITMENT_SET_AB
         } else {
           newEvent = fixtures.COMMITMENT_SET_A
@@ -87,7 +88,7 @@ const createHoprChannelsMock = (ops: { pastEvents?: Event<any>[] } = {}) => {
     }
   }
 
-  const hoprChannels = new FakeChannels() as unknown as HoprChannels
+  const hoprChannels = (new FakeChannels() as unknown) as HoprChannels
 
   return {
     hoprChannels,
@@ -98,8 +99,12 @@ const createHoprChannelsMock = (ops: { pastEvents?: Event<any>[] } = {}) => {
   }
 }
 
-const createChainMock = (provider: Providers.WebSocketProvider, hoprChannels: HoprChannels): ChainWrapper => {
-  return {
+const createChainMock = (
+  provider: Providers.WebSocketProvider,
+  hoprChannels: HoprChannels,
+  account?: Wallet
+): ChainWrapper => {
+  return ({
     getLatestBlockNumber: () => provider.getBlockNumber(),
     subscribeBlock: (cb) => provider.on('block', cb),
     subscribeError: (cb) => {
@@ -112,10 +117,10 @@ const createChainMock = (provider: Providers.WebSocketProvider, hoprChannels: Ho
       hoprChannels.removeAllListeners()
     },
     getChannels: () => hoprChannels,
-    getWallet: () => fixtures.ACCOUNT_A,
+    getWallet: () => account ?? fixtures.ACCOUNT_A,
     setCommitment: (counterparty: Address, commitment: Hash) =>
       hoprChannels.bumpChannel(counterparty.toHex(), commitment.toHex())
-  } as unknown as ChainWrapper
+  } as unknown) as ChainWrapper
 }
 
 const useFixtures = (ops: { latestBlockNumber?: number; pastEvents?: Event<any>[] } = {}) => {
@@ -136,6 +141,35 @@ const useFixtures = (ops: { latestBlockNumber?: number; pastEvents?: Event<any>[
     hoprChannels,
     newEvent,
     indexer
+  }
+}
+
+const useMultiPartyFixtures = (ops: { latestBlockNumber?: number; pastEvents?: Event<any>[] } = {}) => {
+  const latestBlockNumber = ops.latestBlockNumber ?? 0
+  const pastEvents = ops.pastEvents ?? []
+
+  const db = HoprDB.createMock()
+  const { provider, newBlock } = createProviderMock({ latestBlockNumber })
+  const { hoprChannels, newEvent } = createHoprChannelsMock({ pastEvents })
+
+  const chainAlice = createChainMock(provider, hoprChannels, fixtures.ACCOUNT_A)
+  const chainBob = createChainMock(provider, hoprChannels, fixtures.ACCOUNT_B)
+
+  const indexerAlice = new Indexer(0, db, chainAlice, 1, 5)
+  const indexerBob = new Indexer(0, db, chainBob, 1, 5)
+
+  return {
+    db,
+    provider,
+    newBlock,
+    hoprChannels,
+    newEvent,
+    alice: {
+      indexer: indexerAlice
+    },
+    bob: {
+      indexer: indexerBob
+    }
   }
 }
 
@@ -318,7 +352,6 @@ describe('test indexer', function () {
     await pendingIniated.promise
     const channelsOfPartyA = await indexer.getChannelsOf(fixtures.PARTY_A.toAddress())
 
-    console.log(channelsOfPartyA)
     expectChannelsToBeEqual(channelsOfPartyA[0], fixtures.PENDING_CLOSURE_CHANNEL)
 
     newEvent(fixtures.CLOSED_EVENT)
@@ -329,5 +362,40 @@ describe('test indexer', function () {
     await closed.promise
     const channelsOfPartyAAfterClose = await indexer.getChannelsOf(fixtures.PARTY_A.toAddress())
     expectChannelsToBeEqual(channelsOfPartyAAfterClose[0], fixtures.CLOSED_CHANNEL)
+  })
+
+  it.only('should start two indexers and should set commitments only once', async function () {
+    this.timeout(6e3)
+
+    const commitmentSetA = Defer()
+    const commitmentSetB = Defer()
+    const { hoprChannels, alice, bob, newBlock } = useMultiPartyFixtures({
+      latestBlockNumber: 3,
+      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.PARTY_B_INITIALIZED_EVENT, fixtures.OPENED_EVENT]
+    })
+
+    alice.indexer.once(`commitment-set-${CHANNEL_ID}`, commitmentSetA.resolve)
+    bob.indexer.once(`commitment-set-${CHANNEL_ID}`, commitmentSetB.resolve)
+
+    await Promise.all([
+      // prettier-ignore
+      alice.indexer.start(),
+      bob.indexer.start()
+    ])
+
+    await new Promise((resolve) => setTimeout(resolve, 500))
+
+    newBlock()
+    newBlock()
+    newBlock()
+
+
+    await Promise.all([commitmentSetA.promise, commitmentSetB.promise])
+    // await Promise.all([
+    //   once(alice.indexer, `commitment-set-${CHANNEL_ID}`),
+    //   once(bob.indexer, `commitment-set-${CHANNEL_ID}`)
+    // ])
+
+    await new Promise((resolve) => setTimeout(resolve, 1000))
   })
 })

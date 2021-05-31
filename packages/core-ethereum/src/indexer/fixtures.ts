@@ -3,7 +3,7 @@ import BN from 'bn.js'
 import assert from 'assert'
 import { BigNumber } from 'ethers'
 import { Hash, AccountEntry, ChannelEntry, u8aToHex } from '@hoprnet/hopr-utils'
-import { PARTY_A, PARTY_B, PARTY_A_MULTIADDR } from '../fixtures'
+import { PARTY_A, PARTY_B, PARTY_A_MULTIADDR, PARTY_B_MULTIADDR } from '../fixtures'
 
 export * from '../fixtures'
 
@@ -54,6 +54,18 @@ export const PARTY_A_INITIALIZED_EVENT = {
   args: {
     account: PARTY_A.toAddress().toHex(),
     multiaddr: u8aToHex(PARTY_A_MULTIADDR.bytes)
+  }
+} as Event<'Announcement'>
+
+export const PARTY_B_INITIALIZED_EVENT = {
+  event: 'Announcement',
+  transactionHash: '',
+  blockNumber: 1,
+  transactionIndex: 0,
+  logIndex: 0,
+  args: {
+    account: PARTY_B.toAddress().toHex(),
+    multiaddr: u8aToHex(PARTY_B_MULTIADDR.bytes)
   }
 } as Event<'Announcement'>
 

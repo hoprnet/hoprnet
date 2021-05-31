@@ -72,12 +72,6 @@ class Indexer extends EventEmitter {
       getSyncPercentage(fromBlock - this.genesisBlock, latestOnChainBlock - this.genesisBlock)
     )
 
-    // get past events
-    const lastBlock = await this.processPastEvents(fromBlock, latestOnChainBlock, this.blockRange)
-    fromBlock = lastBlock
-
-    log('Subscribing to events from block %d', fromBlock)
-
     this.chain.subscribeBlock((b) => {
       this.onNewBlock(b)
     })
@@ -88,6 +82,12 @@ class Indexer extends EventEmitter {
     this.chain.subscribeChannelEvents((e) => {
       this.onNewEvents([e])
     })
+
+    // get past events
+    const lastBlock = await this.processPastEvents(fromBlock, latestOnChainBlock, this.blockRange)
+    fromBlock = lastBlock
+
+    log('Subscribing to events from block %d', fromBlock)
 
     this.status = 'started'
     log(chalk.green('Indexer started!'))
