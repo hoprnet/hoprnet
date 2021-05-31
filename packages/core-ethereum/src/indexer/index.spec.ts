@@ -58,7 +58,6 @@ const createHoprChannelsMock = (ops: { pastEvents?: Event<any>[] } = {}) => {
       const channelId = Channel.generateId(fixtures.PARTY_A.toAddress(), fixtures.PARTY_B.toAddress())
       const currentState = (await this.channels(channelId.toHex())) as Event<'ChannelUpdate'>['args']['newState']
 
-      console.log(`in bump channel`)
       if (currentState == undefined) {
         return
       }

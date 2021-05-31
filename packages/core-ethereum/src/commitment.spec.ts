@@ -4,10 +4,6 @@ import sinon from 'sinon'
 import { Hash, HoprDB } from '@hoprnet/hopr-utils'
 import EventEmitter from 'events'
 
-function getFakeIndexer() {
-  return new EventEmitter()
-}
-
 describe('test commitment', function () {
   let fakeSet, fakeGet, fakeDB, fakeId: Hash, fakeIndexer
   beforeEach(async function () {
