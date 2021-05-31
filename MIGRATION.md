@@ -20,7 +20,7 @@ access tokens that are locked in payment channels.
 ## Upgrading
 
 The standard upgrade procedure should be to withdraw all funds to an external
-wallet before upgrading and software.
+wallet before upgrading software.
 
 - Set your automatic channel strategy to `MANUAL`
 - Close all open payment channels.
