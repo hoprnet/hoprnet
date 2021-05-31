@@ -19,6 +19,7 @@
 - [serialize](balance.md#serialize)
 - [toBN](balance.md#tobn)
 - [toFormattedString](balance.md#toformattedstring)
+- [toHex](balance.md#tohex)
 - [deserialize](balance.md#deserialize)
 
 ## Constructors
@@ -35,7 +36,7 @@
 
 **Returns:** [*Balance*](balance.md)
 
-Defined in: [types/primitives.ts:196](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L196)
+Defined in: [types/primitives.ts:235](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L235)
 
 ## Accessors
 
@@ -45,7 +46,7 @@ Defined in: [types/primitives.ts:196](https://github.com/hoprnet/hoprnet/blob/ma
 
 **Returns:** *number*
 
-Defined in: [types/primitives.ts:203](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L203)
+Defined in: [types/primitives.ts:242](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L242)
 
 ___
 
@@ -55,7 +56,7 @@ ___
 
 **Returns:** *number*
 
-Defined in: [types/primitives.ts:223](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L223)
+Defined in: [types/primitives.ts:266](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L266)
 
 ___
 
@@ -65,7 +66,7 @@ ___
 
 **Returns:** *string*
 
-Defined in: [types/primitives.ts:199](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L199)
+Defined in: [types/primitives.ts:238](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L238)
 
 ## Methods
 
@@ -75,7 +76,7 @@ Defined in: [types/primitives.ts:199](https://github.com/hoprnet/hoprnet/blob/ma
 
 **Returns:** *Uint8Array*
 
-Defined in: [types/primitives.ts:215](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L215)
+Defined in: [types/primitives.ts:258](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L258)
 
 ___
 
@@ -85,7 +86,7 @@ ___
 
 **Returns:** *BN*
 
-Defined in: [types/primitives.ts:207](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L207)
+Defined in: [types/primitives.ts:246](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L246)
 
 ___
 
@@ -95,7 +96,17 @@ ___
 
 **Returns:** *string*
 
-Defined in: [types/primitives.ts:219](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L219)
+Defined in: [types/primitives.ts:262](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L262)
+
+___
+
+### toHex
+
+▸ **toHex**(): *string*
+
+**Returns:** *string*
+
+Defined in: [types/primitives.ts:250](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L250)
 
 ___
 
@@ -111,4 +122,4 @@ ___
 
 **Returns:** [*Balance*](balance.md)
 
-Defined in: [types/primitives.ts:211](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L211)
+Defined in: [types/primitives.ts:254](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L254)

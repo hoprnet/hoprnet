@@ -17,6 +17,7 @@
 
 - [serialize](uint256.md#serialize)
 - [toBN](uint256.md#tobn)
+- [toHex](uint256.md#tohex)
 - [deserialize](uint256.md#deserialize)
 - [fromInverseProbability](uint256.md#frominverseprobability)
 - [fromString](uint256.md#fromstring)
@@ -45,7 +46,7 @@ Defined in: [types/solidity.ts:3](https://github.com/hoprnet/hoprnet/blob/master
 
 **Returns:** [*UINT256*](uint256.md)
 
-Defined in: [types/solidity.ts:30](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L30)
+Defined in: [types/solidity.ts:34](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L34)
 
 ___
 
@@ -55,7 +56,7 @@ ___
 
 **Returns:** *number*
 
-Defined in: [types/solidity.ts:34](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L34)
+Defined in: [types/solidity.ts:38](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L38)
 
 ## Methods
 
@@ -76,6 +77,16 @@ ___
 **Returns:** *BN*
 
 Defined in: [types/solidity.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L6)
+
+___
+
+### toHex
+
+▸ **toHex**(): *string*
+
+**Returns:** *string*
+
+Defined in: [types/solidity.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L18)
 
 ___
 
@@ -107,7 +118,7 @@ ___
 
 **Returns:** [*UINT256*](uint256.md)
 
-Defined in: [types/solidity.ts:22](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L22)
+Defined in: [types/solidity.ts:26](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L26)
 
 ___
 
@@ -123,4 +134,4 @@ ___
 
 **Returns:** [*UINT256*](uint256.md)
 
-Defined in: [types/solidity.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L18)
+Defined in: [types/solidity.ts:22](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L22)

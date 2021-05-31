@@ -112,7 +112,7 @@ ___
 
 **Returns:** [*EthereumChallenge*](ethereumchallenge.md)
 
-Defined in: [types/challenge.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/challenge.ts#L16)
+Defined in: [types/challenge.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/challenge.ts#L20)
 
 ___
 
@@ -154,7 +154,7 @@ ___
 
 ### fromExponent
 
-▸ `Static` **fromExponent**(`exponent`: *Uint8Array*): [*CurvePoint*](curvepoint.md)
+▸ `Static` **fromExponent**(`exponent`: *Uint8Array*): [*Challenge*](challenge.md)
 
 #### Parameters
 
@@ -162,11 +162,11 @@ ___
 | :------ | :------ |
 | `exponent` | *Uint8Array* |
 
-**Returns:** [*CurvePoint*](curvepoint.md)
+**Returns:** [*Challenge*](challenge.md)
 
-Inherited from: [CurvePoint](curvepoint.md)
+Overrides: [CurvePoint](curvepoint.md)
 
-Defined in: [types/curvePoint.ts:17](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L17)
+Defined in: [types/challenge.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/challenge.ts#L8)
 
 ___
 
@@ -183,7 +183,7 @@ ___
 
 **Returns:** [*Challenge*](challenge.md)
 
-Defined in: [types/challenge.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/challenge.ts#L8)
+Defined in: [types/challenge.ts:12](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/challenge.ts#L12)
 
 ___
 
@@ -200,7 +200,7 @@ ___
 
 **Returns:** [*Challenge*](challenge.md)
 
-Defined in: [types/challenge.ts:12](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/challenge.ts#L12)
+Defined in: [types/challenge.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/challenge.ts#L16)
 
 ___
 

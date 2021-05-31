@@ -17,9 +17,12 @@
 ### Methods
 
 - [serialize](signature.md#serialize)
+- [serializeEthereum](signature.md#serializeethereum)
+- [toHex](signature.md#tohex)
 - [verify](signature.md#verify)
 - [create](signature.md#create)
 - [deserialize](signature.md#deserialize)
+- [deserializeEthereum](signature.md#deserializeethereum)
 
 ## Constructors
 
@@ -56,7 +59,7 @@ ___
 
 ▪ `Static` **SIZE**: *number*
 
-Defined in: [types/primitives.ts:193](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L193)
+Defined in: [types/primitives.ts:232](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L232)
 
 ## Methods
 
@@ -66,7 +69,31 @@ Defined in: [types/primitives.ts:193](https://github.com/hoprnet/hoprnet/blob/ma
 
 **Returns:** *Uint8Array*
 
-Defined in: [types/primitives.ts:182](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L182)
+Defined in: [types/primitives.ts:206](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L206)
+
+___
+
+### serializeEthereum
+
+▸ **serializeEthereum**(): *Uint8Array*
+
+Replaces recovery value by Ethereum-specific values 27/28
+
+**Returns:** *Uint8Array*
+
+serialized signature to use within Ethereum
+
+Defined in: [types/primitives.ts:217](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L217)
+
+___
+
+### toHex
+
+▸ **toHex**(): *string*
+
+**Returns:** *string*
+
+Defined in: [types/primitives.ts:228](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L228)
 
 ___
 
@@ -83,7 +110,7 @@ ___
 
 **Returns:** *boolean*
 
-Defined in: [types/primitives.ts:189](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L189)
+Defined in: [types/primitives.ts:224](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L224)
 
 ___
 
@@ -100,7 +127,7 @@ ___
 
 **Returns:** [*Signature*](signature.md)
 
-Defined in: [types/primitives.ts:177](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L177)
+Defined in: [types/primitives.ts:201](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L201)
 
 ___
 
@@ -117,3 +144,24 @@ ___
 **Returns:** [*Signature*](signature.md)
 
 Defined in: [types/primitives.ts:172](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L172)
+
+___
+
+### deserializeEthereum
+
+▸ `Static` **deserializeEthereum**(`arr`: *Uint8Array*): [*Signature*](signature.md)
+
+Deserializes Ethereum-specific signature with
+non-standard recovery values 27 and 28
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `arr` | *Uint8Array* | serialized Ethereum signature |
+
+**Returns:** [*Signature*](signature.md)
+
+deserialized Ethereum signature
+
+Defined in: [types/primitives.ts:190](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L190)

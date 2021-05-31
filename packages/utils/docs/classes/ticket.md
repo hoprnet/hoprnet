@@ -26,10 +26,12 @@
 ### Methods
 
 - [getHash](ticket.md#gethash)
+- [getLuck](ticket.md#getluck)
 - [getPathPosition](ticket.md#getpathposition)
 - [isWinningTicket](ticket.md#iswinningticket)
 - [recoverSigner](ticket.md#recoversigner)
 - [serialize](ticket.md#serialize)
+- [serializeUnsigned](ticket.md#serializeunsigned)
 - [verify](ticket.md#verify)
 - [create](ticket.md#create)
 - [deserialize](ticket.md#deserialize)
@@ -55,7 +57,7 @@
 
 **Returns:** [*Ticket*](ticket.md)
 
-Defined in: [types/ticket.ts:49](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L49)
+Defined in: [types/ticket.ts:48](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L48)
 
 ## Properties
 
@@ -113,7 +115,7 @@ ___
 
 **Returns:** *number*
 
-Defined in: [types/ticket.ts:135](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L135)
+Defined in: [types/ticket.ts:125](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L125)
 
 ## Methods
 
@@ -123,7 +125,24 @@ Defined in: [types/ticket.ts:135](https://github.com/hoprnet/hoprnet/blob/master
 
 **Returns:** [*Hash*](hash.md)
 
-Defined in: [types/ticket.ts:119](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L119)
+Defined in: [types/ticket.ts:121](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L121)
+
+___
+
+### getLuck
+
+▸ **getLuck**(`preImage`: [*Hash*](hash.md), `challengeResponse`: [*Response*](response.md)): [*UINT256*](uint256.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `preImage` | [*Hash*](hash.md) |
+| `challengeResponse` | [*Response*](response.md) |
+
+**Returns:** [*UINT256*](uint256.md)
+
+Defined in: [types/ticket.ts:146](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L146)
 
 ___
 
@@ -140,7 +159,7 @@ ___
 
 **Returns:** *number*
 
-Defined in: [types/ticket.ts:180](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L180)
+Defined in: [types/ticket.ts:170](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L170)
 
 ___
 
@@ -174,7 +193,7 @@ ___
 
 **Returns:** [*PublicKey*](publickey.md)
 
-Defined in: [types/ticket.ts:148](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L148)
+Defined in: [types/ticket.ts:138](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L138)
 
 ___
 
@@ -184,7 +203,17 @@ ___
 
 **Returns:** *Uint8Array*
 
-Defined in: [types/ticket.ts:91](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L91)
+Defined in: [types/ticket.ts:90](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L90)
+
+___
+
+### serializeUnsigned
+
+▸ **serializeUnsigned**(): *Uint8Array*
+
+**Returns:** *Uint8Array*
+
+Defined in: [types/ticket.ts:94](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L94)
 
 ___
 
@@ -200,7 +229,7 @@ ___
 
 **Returns:** *boolean*
 
-Defined in: [types/ticket.ts:152](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L152)
+Defined in: [types/ticket.ts:142](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L142)
 
 ___
 
@@ -223,7 +252,7 @@ ___
 
 **Returns:** [*Ticket*](ticket.md)
 
-Defined in: [types/ticket.ts:61](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L61)
+Defined in: [types/ticket.ts:60](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L60)
 
 ___
 
@@ -239,4 +268,4 @@ ___
 
 **Returns:** [*Ticket*](ticket.md)
 
-Defined in: [types/ticket.ts:96](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L96)
+Defined in: [types/ticket.ts:98](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L98)
