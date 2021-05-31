@@ -61,19 +61,20 @@ export class Commitment {
   async initialize(): Promise<void> {
     if (this.initialized) return
 
-    const pendingCommitment = await this.pendingCommitment()
+    // const pendingCommitment = await this.pendingCommitment()
 
-    if (pendingCommitment) {
-      log(`Found pending commitment, waiting until state appears in indexer`)
-      await once(this.indexer, `commitment-set-${this.channelId.toHex()}`)
+    // if (pendingCommitment) {
+    //   log(`Found pending commitment, waiting until state appears in indexer`)
+    //   await once(this.indexer, `commitment-set-${this.channelId.toHex()}`)
 
-      log(`Commitment is set, commitment is now fully initialized.`)
+    //   log(`Commitment is set, commitment is now fully initialized.`)
 
-      this.initialized = true
-      return
-    }
+    //   this.initialized = true
+    //   return
+    // }
 
     await this.setPendingCommitment()
+
     const dbContains = await this.hasDBSecret()
     const chainCommitment = await this.getChainCommitment()
     if (chainCommitment && dbContains) {
@@ -101,9 +102,9 @@ export class Commitment {
     log('commitment chain initialized')
   }
 
-  private pendingCommitment(): Promise<boolean> {
-    return this.db.isOwnChannelCommitmentSet(this.channelId)
-  }
+  // private pendingCommitment(): Promise<boolean> {
+  //   return this.db.isOwnChannelCommitmentSet(this.channelId)
+  // }
 
   private setPendingCommitment(): Promise<void> {
     return this.db.setOwnChannelCommitmentSet(this.channelId)

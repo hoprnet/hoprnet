@@ -4,7 +4,6 @@ import assert from 'assert'
 import { BigNumber } from 'ethers'
 import { Hash, AccountEntry, ChannelEntry, u8aToHex } from '@hoprnet/hopr-utils'
 import { PARTY_A, PARTY_B, PARTY_A_MULTIADDR } from '../fixtures'
-import { randomBytes } from 'crypto'
 
 export * from '../fixtures'
 
@@ -60,7 +59,7 @@ export const PARTY_A_INITIALIZED_EVENT = {
 
 export const PARTY_A_INITIALIZED_ACCOUNT = new AccountEntry(PARTY_A.toAddress(), PARTY_A_MULTIADDR, new BN(1))
 
-export const FUNDED_EVENT = {
+export const OPENED_EVENT = {
   event: 'ChannelUpdate',
   transactionHash: '',
   blockNumber: 2,
@@ -78,34 +77,6 @@ export const FUNDED_EVENT = {
       partyBTicketEpoch: BigNumber.from('0'),
       partyATicketIndex: BigNumber.from('0'),
       partyBTicketIndex: BigNumber.from('0'),
-      status: 0,
-      channelEpoch: BigNumber.from('0'),
-      closureTime: BigNumber.from('0'),
-      closureByPartyA: false
-    }
-  } as any
-} as Event<'ChannelUpdate'>
-
-export const FUNDED_CHANNEL = ChannelEntry.fromSCEvent(FUNDED_EVENT)
-
-export const OPENED_EVENT = {
-  event: 'ChannelUpdate',
-  transactionHash: '',
-  blockNumber: 3,
-  transactionIndex: 0,
-  logIndex: 0,
-  args: {
-    partyA: PARTY_A.toAddress().toHex(),
-    partyB: PARTY_B.toAddress().toHex(),
-    newState: {
-      partyABalance: BigNumber.from('3'),
-      partyBBalance: BigNumber.from('0'),
-      partyACommitment: new Hash(new Uint8Array({ length: Hash.SIZE })).toHex(),
-      partyBCommitment: new Hash(new Uint8Array({ length: Hash.SIZE })).toHex(),
-      partyATicketEpoch: BigNumber.from('0'),
-      partyBTicketEpoch: BigNumber.from('0'),
-      partyATicketIndex: BigNumber.from('0'),
-      partyBTicketIndex: BigNumber.from('0'),
       status: 1,
       channelEpoch: BigNumber.from('0'),
       closureTime: BigNumber.from('0'),
@@ -114,7 +85,9 @@ export const OPENED_EVENT = {
   } as any
 } as Event<'ChannelUpdate'>
 
-export const COMMITMENT_SET = {
+export const OPENED_CHANNEL = ChannelEntry.fromSCEvent(OPENED_EVENT)
+
+export const COMMITMENT_SET_A = {
   event: 'ChannelUpdate',
   transactionHash: '',
   blockNumber: 3,
@@ -126,7 +99,7 @@ export const COMMITMENT_SET = {
     newState: {
       partyABalance: BigNumber.from('3'),
       partyBBalance: BigNumber.from('0'),
-      partyACommitment: new Hash(Uint8Array.from(randomBytes(Hash.SIZE))).toHex(),
+      partyACommitment: Hash.create(new TextEncoder().encode('commA')).toHex(),
       partyBCommitment: new Hash(new Uint8Array({ length: Hash.SIZE })).toHex(),
       partyATicketEpoch: BigNumber.from('1'),
       partyBTicketEpoch: BigNumber.from('0'),
@@ -140,4 +113,110 @@ export const COMMITMENT_SET = {
   } as any
 } as Event<'ChannelUpdate'>
 
-export const OPENED_CHANNEL = ChannelEntry.fromSCEvent(OPENED_EVENT)
+export const COMMITMENT_SET_B = {
+  event: 'ChannelUpdate',
+  transactionHash: '',
+  blockNumber: 4,
+  transactionIndex: 0,
+  logIndex: 0,
+  args: {
+    partyA: PARTY_A.toAddress().toHex(),
+    partyB: PARTY_B.toAddress().toHex(),
+    newState: {
+      partyABalance: BigNumber.from('3'),
+      partyBBalance: BigNumber.from('0'),
+      partyACommitment: new Hash(new Uint8Array({ length: Hash.SIZE })).toHex(),
+      partyBCommitment: Hash.create(new TextEncoder().encode('commB')).toHex(),
+      partyATicketEpoch: BigNumber.from('0'),
+      partyBTicketEpoch: BigNumber.from('1'),
+      partyATicketIndex: BigNumber.from('0'),
+      partyBTicketIndex: BigNumber.from('0'),
+      status: 1,
+      channelEpoch: BigNumber.from('0'),
+      closureTime: BigNumber.from('0'),
+      closureByPartyA: false
+    }
+  } as any
+} as Event<'ChannelUpdate'>
+
+export const COMMITMENT_SET_AB = {
+  event: 'ChannelUpdate',
+  transactionHash: '',
+  blockNumber: 5,
+  transactionIndex: 0,
+  logIndex: 0,
+  args: {
+    partyA: PARTY_A.toAddress().toHex(),
+    partyB: PARTY_B.toAddress().toHex(),
+    newState: {
+      partyABalance: BigNumber.from('3'),
+      partyBBalance: BigNumber.from('0'),
+      partyACommitment: Hash.create(new TextEncoder().encode('commA')).toHex(),
+      partyBCommitment: Hash.create(new TextEncoder().encode('commB')).toHex(),
+      partyATicketEpoch: BigNumber.from('1'),
+      partyBTicketEpoch: BigNumber.from('1'),
+      partyATicketIndex: BigNumber.from('0'),
+      partyBTicketIndex: BigNumber.from('0'),
+      status: 1,
+      channelEpoch: BigNumber.from('0'),
+      closureTime: BigNumber.from('0'),
+      closureByPartyA: false
+    }
+  } as any
+} as Event<'ChannelUpdate'>
+
+export const PENDING_CLOSURE_EVENT = {
+  event: 'ChannelUpdate',
+  transactionHash: '',
+  blockNumber: 5,
+  transactionIndex: 0,
+  logIndex: 0,
+  args: {
+    partyA: PARTY_A.toAddress().toHex(),
+    partyB: PARTY_B.toAddress().toHex(),
+    newState: {
+      partyABalance: BigNumber.from('3'),
+      partyBBalance: BigNumber.from('0'),
+      partyACommitment: Hash.create(new TextEncoder().encode('commA')).toHex(),
+      partyBCommitment: Hash.create(new TextEncoder().encode('commB')).toHex(),
+      partyATicketEpoch: BigNumber.from('1'),
+      partyBTicketEpoch: BigNumber.from('1'),
+      partyATicketIndex: BigNumber.from('0'),
+      partyBTicketIndex: BigNumber.from('0'),
+      status: 2,
+      channelEpoch: BigNumber.from('0'),
+      closureTime: BigNumber.from('0'),
+      closureByPartyA: true
+    }
+  } as any
+} as Event<'ChannelUpdate'>
+
+export const PENDING_CLOSURE_CHANNEL = ChannelEntry.fromSCEvent(PENDING_CLOSURE_EVENT)
+
+export const CLOSED_EVENT = {
+  event: 'ChannelUpdate',
+  transactionHash: '',
+  blockNumber: 7,
+  transactionIndex: 0,
+  logIndex: 0,
+  args: {
+    partyA: PARTY_A.toAddress().toHex(),
+    partyB: PARTY_B.toAddress().toHex(),
+    newState: {
+      partyABalance: BigNumber.from('0'),
+      partyBBalance: BigNumber.from('0'),
+      partyACommitment: new Hash(new Uint8Array({ length: Hash.SIZE })).toHex(),
+      partyBCommitment: new Hash(new Uint8Array({ length: Hash.SIZE })).toHex(),
+      partyATicketEpoch: BigNumber.from('0'),
+      partyBTicketEpoch: BigNumber.from('0'),
+      partyATicketIndex: BigNumber.from('0'),
+      partyBTicketIndex: BigNumber.from('0'),
+      status: 0,
+      channelEpoch: BigNumber.from('0'),
+      closureTime: BigNumber.from('0'),
+      closureByPartyA: false
+    }
+  } as any
+} as Event<'ChannelUpdate'>
+
+export const CLOSED_CHANNEL = ChannelEntry.fromSCEvent(CLOSED_EVENT)

@@ -279,6 +279,10 @@ export class HoprDB {
     await this.touch(Uint8Array.from([...COMMITMENT_SET_PREFIX, ...channelId.serialize()]))
   }
 
+  async unsetOwnChannelCommitmentSet(channelId: Hash): Promise<void> {
+    await this.del(Uint8Array.from([...COMMITMENT_SET_PREFIX, ...channelId.serialize()]))
+  }
+
   async isOwnChannelCommitmentSet(channelId: Hash): Promise<boolean> {
     return await this.has(Uint8Array.from([...COMMITMENT_SET_PREFIX, ...channelId.serialize()]))
   }

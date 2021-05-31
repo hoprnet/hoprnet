@@ -54,8 +54,33 @@ const createHoprChannelsMock = (ops: { pastEvents?: Event<any>[] } = {}) => {
       }, [])[0]
     }
 
-    async bumpChannel(_counterparty: string, _comm: string) {
-      pastEvents.push(fixtures.COMMITMENT_SET)
+    async bumpChannel(counterparty: string, _comm: string) {
+      const channelId = Channel.generateId(fixtures.PARTY_A.toAddress(), fixtures.PARTY_B.toAddress())
+      const currentState = (await this.channels(channelId.toHex())) as Event<'ChannelUpdate'>['args']['newState']
+
+      console.log(`in bump channel`)
+      if (currentState == undefined) {
+        return
+      }
+
+      let newEvent: Event<'ChannelUpdate'>
+
+      if (counterparty === fixtures.PARTY_A.toAddress().toHex()) {
+        if (currentState.partyBTicketIndex.eq(1)) {
+          newEvent = fixtures.COMMITMENT_SET_AB
+        } else {
+          newEvent = fixtures.COMMITMENT_SET_B
+        }
+      } else if (counterparty === fixtures.PARTY_B.toAddress().toHex()) {
+        if (currentState.partyATicketIndex.eq(1)) {
+          newEvent = fixtures.COMMITMENT_SET_AB
+        } else {
+          newEvent = fixtures.COMMITMENT_SET_A
+        }
+      }
+
+      pastEvents.push(newEvent)
+      this.emit('*', newEvent)
     }
 
     async queryFilter() {
@@ -68,6 +93,7 @@ const createHoprChannelsMock = (ops: { pastEvents?: Event<any>[] } = {}) => {
   return {
     hoprChannels,
     newEvent(event: Event<any>) {
+      pastEvents.push(event)
       hoprChannels.emit('*', event)
     }
   }
@@ -88,7 +114,8 @@ const createChainMock = (provider: Providers.WebSocketProvider, hoprChannels: Ho
     },
     getChannels: () => hoprChannels,
     getWallet: () => fixtures.ACCOUNT_A,
-    setCommitment: hoprChannels.bumpChannel.bind(hoprChannels)
+    setCommitment: (counterparty: Address, commitment: Hash) =>
+      hoprChannels.bumpChannel(counterparty.toHex(), commitment.toHex())
   } as unknown) as ChainWrapper
 }
 
@@ -132,35 +159,35 @@ describe('test indexer', function () {
   it('should process 1 past event', async function () {
     const { indexer } = useFixtures({
       latestBlockNumber: 2,
-      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.FUNDED_EVENT]
+      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.OPENED_EVENT]
     })
     await indexer.start()
 
     const account = await indexer.getAccount(fixtures.PARTY_A.toAddress())
     expectAccountsToBeEqual(account, fixtures.PARTY_A_INITIALIZED_ACCOUNT)
 
-    const channel = await indexer.getChannel(fixtures.FUNDED_CHANNEL.getId())
+    const channel = await indexer.getChannel(fixtures.OPENED_CHANNEL.getId())
     assert.strictEqual(typeof channel, 'undefined')
   })
 
   it('should process all past events', async function () {
     const { indexer } = useFixtures({
       latestBlockNumber: 3,
-      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.FUNDED_EVENT]
+      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.OPENED_EVENT]
     })
     await indexer.start()
 
     const account = await indexer.getAccount(fixtures.PARTY_A.toAddress())
     expectAccountsToBeEqual(account, fixtures.PARTY_A_INITIALIZED_ACCOUNT)
 
-    const channel = await indexer.getChannel(fixtures.FUNDED_CHANNEL.getId())
-    expectChannelsToBeEqual(channel, fixtures.FUNDED_CHANNEL)
+    const channel = await indexer.getChannel(fixtures.OPENED_CHANNEL.getId())
+    expectChannelsToBeEqual(channel, fixtures.OPENED_CHANNEL)
   })
 
   it('should continue processing events', async function () {
     const { indexer, newEvent, newBlock } = useFixtures({
       latestBlockNumber: 3,
-      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.FUNDED_EVENT]
+      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.OPENED_EVENT]
     })
     await indexer.start()
 
@@ -186,9 +213,9 @@ describe('test indexer', function () {
   })
 
   it('should get all data from DB', async function () {
-    const { indexer, hoprChannels } = useFixtures({
+    const { indexer } = useFixtures({
       latestBlockNumber: 4,
-      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.FUNDED_EVENT, fixtures.OPENED_EVENT]
+      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.OPENED_EVENT]
     })
 
     await indexer.start()
@@ -210,16 +237,12 @@ describe('test indexer', function () {
     const channelsOfPartyB = await indexer.getChannelsOf(fixtures.PARTY_B.toAddress())
     assert.strictEqual(channelsOfPartyB.length, 1)
     expectChannelsToBeEqual(channelsOfPartyB[0], fixtures.OPENED_CHANNEL)
-
-    const channelId = Channel.generateId(fixtures.PARTY_A.toAddress(), fixtures.PARTY_B.toAddress())
-    assert((await hoprChannels.channels(channelId.toHex())).partyATicketEpoch.eq(1)),
-      `OpenChannel event must have triggered bumpChannel()`
   })
 
   it('should handle provider error by restarting', async function () {
     const { indexer, provider } = useFixtures({
       latestBlockNumber: 4,
-      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.FUNDED_EVENT, fixtures.OPENED_EVENT]
+      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.OPENED_EVENT]
     })
 
     await indexer.start()
@@ -234,7 +257,7 @@ describe('test indexer', function () {
   it('should contract error by restarting', async function () {
     const { indexer, hoprChannels } = useFixtures({
       latestBlockNumber: 4,
-      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.FUNDED_EVENT, fixtures.OPENED_EVENT]
+      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.OPENED_EVENT]
     })
 
     await indexer.start()
@@ -247,30 +270,65 @@ describe('test indexer', function () {
   })
 
   it('should emit events on updated channels', async function () {
-    const { indexer, newEvent, newBlock } = useFixtures({
+    const { indexer, newEvent, newBlock, hoprChannels } = useFixtures({
       latestBlockNumber: 3,
-      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.FUNDED_EVENT]
+      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT]
     })
-    await indexer.start()
 
-    const firstUpdate = Defer()
-    const secondUpdate = Defer()
+    const channelId = Channel.generateId(fixtures.PARTY_A.toAddress(), fixtures.PARTY_B.toAddress())
+
+    const opened = Defer()
+    const commitmentSet = Defer()
+    const commitmentUpdated = Defer()
+    const pendingIniated = Defer()
+    const closed = Defer()
+
+    indexer.on(`commitment-set-${channelId.toHex()}`, commitmentUpdated.resolve)
 
     indexer.on('own-channel-updated', (channel: ChannelEntry) => {
-      if (channel.partyATicketEpoch.toBN().isZero()) {
-        firstUpdate.resolve()
-      }
-      if (channel.partyATicketEpoch.toBN().eqn(1)) {
-        secondUpdate.resolve()
+      switch (channel.status) {
+        case 'OPEN':
+          if (channel.partyATicketEpoch.toBN().isZero()) {
+            opened.resolve()
+          }
+          if (channel.partyATicketEpoch.toBN().eqn(1)) {
+            commitmentSet.resolve()
+          }
+          break
+        case 'PENDING_TO_CLOSE':
+          pendingIniated.resolve()
+          break
+        case 'CLOSED':
+          closed.resolve()
+          break
       }
     })
+
+    await indexer.start()
 
     newEvent(fixtures.OPENED_EVENT)
     newBlock()
 
-    newEvent(fixtures.COMMITMENT_SET)
+    hoprChannels.once('*', newBlock)
+
+    await Promise.all([opened.promise, commitmentUpdated.promise, commitmentSet.promise])
+
+    newEvent(fixtures.PENDING_CLOSURE_EVENT)
     newBlock()
 
-    await Promise.all([firstUpdate.promise, secondUpdate.promise])
+    await pendingIniated.promise
+    const channelsOfPartyA = await indexer.getChannelsOf(fixtures.PARTY_A.toAddress())
+
+    console.log(channelsOfPartyA)
+    expectChannelsToBeEqual(channelsOfPartyA[0], fixtures.PENDING_CLOSURE_CHANNEL)
+
+    newEvent(fixtures.CLOSED_EVENT)
+
+    newBlock()
+    newBlock()
+
+    await closed.promise
+    const channelsOfPartyAAfterClose = await indexer.getChannelsOf(fixtures.PARTY_A.toAddress())
+    expectChannelsToBeEqual(channelsOfPartyAAfterClose[0], fixtures.CLOSED_CHANNEL)
   })
 })

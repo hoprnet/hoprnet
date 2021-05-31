@@ -11,10 +11,16 @@ export function generateChannelId(self: Address, counterparty: Address) {
 }
 
 function numberToChannelStatus(i: number): ChannelStatus {
-  if (i === 0) return 'CLOSED'
-  else if (i === 1) return 'OPEN'
-  else if (i === 2) return 'PENDING_TO_CLOSE'
-  throw Error(`Status at ${status} does not exist`)
+  switch (i) {
+    case 0:
+      return 'CLOSED'
+    case 1:
+      return 'OPEN'
+    case 2:
+      return 'PENDING_TO_CLOSE'
+    default:
+      throw Error(`Status at ${status} does not exist`)
+  }
 }
 
 function u8aToChannelStatus(arr: Uint8Array): ChannelStatus {
@@ -22,9 +28,16 @@ function u8aToChannelStatus(arr: Uint8Array): ChannelStatus {
 }
 
 function channelStatusToU8a(c: ChannelStatus): Uint8Array {
-  if (c == 'CLOSED') return Uint8Array.of(0)
-  if (c == 'OPEN') return Uint8Array.of(1)
-  return Uint8Array.of(2)
+  switch (c) {
+    case 'CLOSED':
+      return Uint8Array.of(0)
+    case 'OPEN':
+      return Uint8Array.of(1)
+    case 'PENDING_TO_CLOSE':
+      return Uint8Array.of(2)
+    default:
+      throw Error(`Invalid status. Got ${c}`)
+  }
 }
 
 // TODO, find a better way to do this.
