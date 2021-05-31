@@ -35,7 +35,7 @@ describe('test ticket construction', function () {
   })
 
   it('should generate the hash correctly #1', async function () {
-    const expectedHash = new Hash(stringToU8a('0xd74dbe2b69fbb48babd30ac1dadaad6d24f412ed287191c44adf932ea36415ab'))
+    const expectedHash = new Hash(stringToU8a('0x44b673afb0846f969a106fcbfcc178ce7c4f40e55134a2e6717f6738062756f7'))
     const counterparty = new Address(stringToU8a('0xb3aa2138de698597e2e3f84f60ef415d13731b6f'))
     const challenge = new Challenge(
       stringToU8a('0x03c2aa76d6837c51337001c8b5a60473726064fc35d0a40b8f0e1f068cc8e38e10')
@@ -66,7 +66,7 @@ describe('test ticket construction', function () {
   })
 
   it('should generate the hash correctly #2', async function () {
-    const expectedHash = new Hash(stringToU8a('0x3a7f4f551d68fbb2d093bcf1ec951fb27cae179aab20cb2390a453de1e79afde'))
+    const expectedHash = new Hash(stringToU8a('0x1ee41a36038629f6a098adff754b044d00716d58e60af6b7d0f92f4a8fea90d3'))
     const counterparty = new Address(stringToU8a('0x32c160a5008e517ce06df4f7d4a39ffc52e049cf'))
     const challenge = new Challenge(
       stringToU8a('0x03025fcceb8f338198b866e8bb3621f4cbba8cdcd77b72d95328a296049e9e1230')
