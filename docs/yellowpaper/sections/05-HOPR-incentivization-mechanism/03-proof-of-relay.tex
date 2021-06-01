@@ -14,8 +14,10 @@ $(A)$ creates a shared secret $s_i$ with all the relay nodes in the channel (B-C
     \paragraph{Key derivation}
     We first create a "session secret" $s_i$ then we use it as a seed to derive subkeys $s_i^{(0)},s_i^{(1)}$ for each node on the route. We do so using a HKDF (HMAC-based Key Derivation Function) which is a cryptographic hash function that derives one or more secret keys from a secret value using a pseudorandom function. The key derivation works as follows:
     \begin{itemize}
-        \item Extract: create a pseudo-random key from inputs keys and optional salt       
-        \item Expand: an output key material of a specific length is expanded from hashes of the pseudorandom key and an optional info message.
+        \item Extract: Creates a pseudo-random key $s_i$ and optional salt       
+        \item Expand: Creates an output key material $s_i^{(0)},s_i^{(1)}$ of a specific length which is expanded from hashes of the pseudorandom key $s_i$ and an optional info message (salt). The process goes as follows:
+        $$expand(h_b, |h_b|,s_i, |s_i|, hashKey)$$
+        where $h_b$ is blake2s256 hash algorithm, $|h_b|$ is its length, $s_i$ is the pseudo random key used as a seed and $|s_i|$ is its length and $hashKey$ is a string used as a salt.
 
     \end{itemize}
  Relayers compute $s_i^{(0)}$ and get $s_{i+1}^{(1)}$ from the next downstream node.
