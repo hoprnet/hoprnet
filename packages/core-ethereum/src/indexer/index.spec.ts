@@ -15,7 +15,7 @@ import { CHANNEL_ID } from '../fixtures'
 const createProviderMock = (ops: { latestBlockNumber?: number } = {}) => {
   let latestBlockNumber = ops.latestBlockNumber ?? 0
 
-  const provider = (new EventEmitter() as unknown) as Providers.WebSocketProvider
+  const provider = new EventEmitter() as unknown as Providers.WebSocketProvider
   provider.getBlockNumber = async (): Promise<number> => latestBlockNumber
 
   return {
@@ -88,7 +88,7 @@ const createHoprChannelsMock = (ops: { pastEvents?: Event<any>[] } = {}) => {
     }
   }
 
-  const hoprChannels = (new FakeChannels() as unknown) as HoprChannels
+  const hoprChannels = new FakeChannels() as unknown as HoprChannels
 
   return {
     hoprChannels,
@@ -104,7 +104,7 @@ const createChainMock = (
   hoprChannels: HoprChannels,
   account?: Wallet
 ): ChainWrapper => {
-  return ({
+  return {
     getLatestBlockNumber: () => provider.getBlockNumber(),
     subscribeBlock: (cb) => provider.on('block', cb),
     subscribeError: (cb) => {
@@ -120,7 +120,7 @@ const createChainMock = (
     getWallet: () => account ?? fixtures.ACCOUNT_A,
     setCommitment: (counterparty: Address, commitment: Hash) =>
       hoprChannels.bumpChannel(counterparty.toHex(), commitment.toHex())
-  } as unknown) as ChainWrapper
+  } as unknown as ChainWrapper
 }
 
 const useFixtures = (ops: { latestBlockNumber?: number; pastEvents?: Event<any>[] } = {}) => {
