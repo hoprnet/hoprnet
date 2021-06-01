@@ -1,6 +1,6 @@
 {
   "name": "@hoprnet/hoprd",
-  "version": "1.71.0-next.200",
+  "version": "1.71.0-next.201",
   "description": "",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
@@ -28,8 +28,8 @@
     "docs:watch": "yarn typedoc --watch"
   },
   "dependencies": {
-    "@hoprnet/hopr-core": "1.71.0-next.200",
-    "@hoprnet/hopr-utils": "1.71.0-next.200",
+    "@hoprnet/hopr-core": "1.71.0-next.201",
+    "@hoprnet/hopr-utils": "1.71.0-next.201",
     "body-parser": "^1.19.0",
     "bs58": "^4.0.1",
     "jazzicon": "^1.5.0",
