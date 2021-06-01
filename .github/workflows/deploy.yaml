@@ -245,9 +245,13 @@ jobs:
           sudo avadosdk build --provider http://80.208.229.228:5001
           git add dappnode_package.json docker-compose.yml releases.json
           git commit -m "Avado CI: new release"
-          ./scripts/commit-and-push-all-changes.sh
-
           # http://go.ava.do/install/<IPFS HASH>
+
+      - name: Commit & Push changes
+        env:
+          HOPR_GIT_MSG: "Avado CI: new release"
+          HOPR_GITHUB_REF: ${{ github.ref }}
+        run: ./scripts/commit-and-push-all-changes.sh
 
   deploy_instances:
     name: 'Continuous Deployment: Deploy instances'
