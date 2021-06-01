@@ -5,7 +5,6 @@ import {
   PublicKey,
   Balance,
   UnacknowledgedTicket,
-  Hash,
   HoprDB,
   getPacketLength,
   POR_STRING_LENGTH,
@@ -14,19 +13,22 @@ import {
   forwardTransform,
   generateKeyShares,
   createPoRString,
-  createFirstChallenge,
+  createPoRValuesForSender,
   preVerify,
   u8aSplit,
-  pubKeyToPeerId
+  pubKeyToPeerId,
+  HalfKeyChallenge,
+  HalfKey,
+  Challenge
 } from '@hoprnet/hopr-utils'
 import type HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
-import { Challenge } from './challenge'
+import { AcknowledgementChallenge } from './acknowledgementChallenge'
 import type PeerId from 'peer-id'
-import { publicKeyCreate } from 'secp256k1'
 import BN from 'bn.js'
 import { Acknowledgement } from './acknowledgement'
 import { blue, green } from 'chalk'
 import Debug from 'debug'
+import { PRICE_PER_PACKET, INVERSE_TICKET_WIN_PROB } from '../constants'
 
 export const MAX_HOPS = 3 // 3 relayers and 1 destination
 
@@ -46,13 +48,19 @@ export function validateCreatedTicket(myBalance: BN, ticket: Ticket) {
   }
 }
 
+// Precompute the base unit that is used for issuing and validating
+// the embedded value in tickets.
+// Having this as a constant allows to channel rounding error when
+// dealing with probabilities != 1.0 and makes sure that ticket value
+// are always an integer multiple of the base unit.
+
 /**
  * Validate unacknowledged tickets as we receive them
  */
 export async function validateUnacknowledgedTicket(
   id: PeerId,
-  nodeTicketAmount: string,
-  nodeTicketWinProb: number,
+  nodeTicketAmount: BN,
+  nodeInverseTicketWinProb: BN,
   senderPeerId: PeerId,
   ticket: Ticket,
   channel: Channel,
@@ -69,6 +77,16 @@ export async function validateUnacknowledgedTicket(
   const ticketIndex = ticket.index.toBN()
   const ticketWinProb = ticket.winProb.toBN()
 
+  // ticket signer MUST be the sender
+  if (!ticket.verify(senderPubKey)) {
+    throw Error(`The signer of the ticket does not match the sender`)
+  }
+
+  if (UINT256.DUMMY_INVERSE_PROBABILITY.toBN().eq(ticketWinProb) && ticketAmount.eqn(0)) {
+    // Dummy ticket detected, ticket has no value and is therefore valid
+    return
+  }
+
   let channelState
   try {
     channelState = await channel.getState()
@@ -76,19 +94,14 @@ export async function validateUnacknowledgedTicket(
     throw Error(`Error while validating unacknowledged ticket, state not found: '${err.message}'`)
   }
 
-  // ticket signer MUST be the sender
-  if (!ticket.verify(senderPubKey)) {
-    throw Error(`The signer of the ticket does not match the sender`)
-  }
-
   // ticket MUST have at least X amount
-  if (ticketAmount.lt(new BN(nodeTicketAmount))) {
+  if (ticketAmount.lt(nodeTicketAmount)) {
     throw Error(`Ticket amount '${ticketAmount.toString()}' is lower than '${nodeTicketAmount}'`)
   }
 
   // ticket MUST have at least X winning probability
-  if (ticketWinProb.lt(UINT256.fromProbability(nodeTicketWinProb).toBN())) {
-    throw Error(`Ticket winning probability '${ticketWinProb}' is lower than '${nodeTicketWinProb}'`)
+  if (ticketWinProb.lt(UINT256.fromInverseProbability(nodeInverseTicketWinProb).toBN())) {
+    throw Error(`Ticket winning probability '${ticketWinProb}' is lower than '${nodeInverseTicketWinProb}'`)
   }
 
   // channel MUST be open or pending to close
@@ -157,44 +170,48 @@ export class Packet {
   public plaintext: Uint8Array
 
   public packetTag: Uint8Array
-  public previousHop: Uint8Array
+  public previousHop: PublicKey
   public nextHop: Uint8Array
-  public ownShare: Uint8Array
-  public ownKey: Uint8Array
-  public nextChallenge: PublicKey
-  public ackChallenge: PublicKey
+  public ownShare: HalfKeyChallenge
+  public ownKey: HalfKey
+  public ackKey: HalfKey
+  public nextChallenge: Challenge
+  public ackChallenge: HalfKeyChallenge
 
-  public constructor(private packet: Uint8Array, private challenge: Challenge, private ticket: Ticket) {}
+  public constructor(private packet: Uint8Array, private challenge: AcknowledgementChallenge, public ticket: Ticket) {}
 
-  private setReadyToForward(ackChallenge: PublicKey) {
+  private setReadyToForward(ackChallenge: HalfKeyChallenge) {
     this.ackChallenge = ackChallenge
     this.isReadyToForward = true
 
     return this
   }
 
-  private setFinal(plaintext: Uint8Array, packetTag: Uint8Array, ownKey: Uint8Array) {
+  private setFinal(plaintext: Uint8Array, packetTag: Uint8Array, ackKey: HalfKey, previousHop: PublicKey) {
     this.packetTag = packetTag
-    this.ownKey = ownKey
+    this.ackKey = ackKey
     this.isReceiver = true
     this.isReadyToForward = false
     this.plaintext = plaintext
+    this.previousHop = previousHop
 
     return this
   }
 
   private setForward(
-    ownKey: Uint8Array,
-    ownShare: Uint8Array,
+    ackKey: HalfKey,
+    ownKey: HalfKey,
+    ownShare: HalfKeyChallenge,
     nextHop: Uint8Array,
-    previousHop: Uint8Array,
-    nextChallenge: PublicKey,
-    ackChallenge: PublicKey,
+    previousHop: PublicKey,
+    nextChallenge: Challenge,
+    ackChallenge: HalfKeyChallenge,
     packetTag: Uint8Array
   ) {
     this.isReceiver = false
     this.isReadyToForward = false
 
+    this.ackKey = ackKey
     this.ownKey = ownKey
     this.ownShare = ownShare
     this.previousHop = previousHop
@@ -206,26 +223,17 @@ export class Packet {
     return this
   }
 
-  static async create(
-    msg: Uint8Array,
-    path: PeerId[],
-    privKey: PeerId,
-    chain: HoprCoreEthereum,
-    ticketOpts: {
-      value: Balance
-      winProb: number
-    }
-  ): Promise<Packet> {
-    const isDirectMessage = path.length === 1
+  static async create(msg: Uint8Array, path: PeerId[], privKey: PeerId, chain: HoprCoreEthereum): Promise<Packet> {
+    const isDirectMessage = path.length == 1
     const { alpha, secrets } = generateKeyShares(path)
-    const { ackChallenge, ticketChallenge } = createFirstChallenge(secrets[0], secrets[1])
+    const { ackChallenge, ticketChallenge } = createPoRValuesForSender(secrets[0], secrets[1])
     const porStrings: Uint8Array[] = []
 
     for (let i = 0; i < path.length - 1; i++) {
       porStrings.push(createPoRString(secrets[i + 1], i + 2 < path.length ? secrets[i + 2] : undefined))
     }
 
-    const challenge = Challenge.create(ackChallenge, privKey)
+    const challenge = AcknowledgementChallenge.create(ackChallenge, privKey)
     const self = new PublicKey(privKey.pubKey.marshal())
     const nextPeer = new PublicKey(path[0].pubKey.marshal())
     const packet = createPacket(secrets, alpha, msg, path, MAX_HOPS + 1, POR_STRING_LENGTH, porStrings)
@@ -235,7 +243,11 @@ export class Packet {
     if (isDirectMessage) {
       ticket = channel.createDummyTicket(ticketChallenge)
     } else {
-      ticket = await channel.createTicket(ticketOpts.value, ticketChallenge, ticketOpts.winProb)
+      ticket = await channel.createTicket(
+        new Balance(new BN(PRICE_PER_PACKET).mul(new BN(INVERSE_TICKET_WIN_PROB)).muln(path.length - 1)),
+        ticketChallenge,
+        new BN(INVERSE_TICKET_WIN_PROB)
+      )
     }
 
     return new Packet(packet, challenge, ticket).setReadyToForward(ackChallenge)
@@ -246,7 +258,7 @@ export class Packet {
   }
 
   static get SIZE() {
-    return PACKET_LENGTH + Challenge.SIZE + Ticket.SIZE
+    return PACKET_LENGTH + AcknowledgementChallenge.SIZE + Ticket.SIZE
   }
 
   static deserialize(preArray: Uint8Array, privKey: PeerId, pubKeySender: PeerId): Packet {
@@ -265,13 +277,13 @@ export class Packet {
       arr = preArray
     }
 
-    const [packet, preChallenge, preTicket] = u8aSplit(arr, [PACKET_LENGTH, Challenge.SIZE, Ticket.SIZE])
+    const [packet, preChallenge, preTicket] = u8aSplit(arr, [PACKET_LENGTH, AcknowledgementChallenge.SIZE, Ticket.SIZE])
 
     const transformedOutput = forwardTransform(privKey, packet, POR_STRING_LENGTH, 0, MAX_HOPS + 1)
 
     const ackKey = deriveAckKeyShare(transformedOutput.derivedSecret)
 
-    const challenge = Challenge.deserialize(preChallenge, new PublicKey(publicKeyCreate(ackKey)), pubKeySender)
+    const challenge = AcknowledgementChallenge.deserialize(preChallenge, ackKey.toChallenge(), pubKeySender)
 
     const ticket = Ticket.deserialize(preTicket)
 
@@ -279,7 +291,8 @@ export class Packet {
       return new Packet(packet, challenge, ticket).setFinal(
         transformedOutput.plaintext,
         transformedOutput.packetTag,
-        transformedOutput.derivedSecret
+        ackKey,
+        PublicKey.fromPeerId(pubKeySender)
       )
     }
 
@@ -294,10 +307,11 @@ export class Packet {
     }
 
     return new Packet(transformedOutput.packet, challenge, ticket).setForward(
+      ackKey,
       verificationOutput.ownKey,
       verificationOutput.ownShare,
       transformedOutput.nextHop,
-      pubKeySender.pubKey.marshal(),
+      PublicKey.fromPeerId(pubKeySender),
       verificationOutput.nextTicketChallenge,
       verificationOutput.ackChallenge,
       transformedOutput.packetTag
@@ -317,7 +331,7 @@ export class Packet {
       throw Error(`Invalid state`)
     }
 
-    const unacknowledged = new UnacknowledgedTicket(this.ticket, new Hash(this.ownKey))
+    const unacknowledged = new UnacknowledgedTicket(this.ticket, this.ownKey, this.previousHop)
 
     log(
       `Storing unacknowledged ticket. Expecting to receive a preImage for ${green(
@@ -325,26 +339,33 @@ export class Packet {
       )} from ${blue(pubKeyToPeerId(this.nextHop).toB58String())}`
     )
 
-    await db.storeUnacknowledgedTickets(this.ackChallenge, unacknowledged)
+    await db.storeUnacknowledgedTicket(this.ackChallenge, unacknowledged)
   }
 
   async validateUnacknowledgedTicket(db: HoprDB, chain: HoprCoreEthereum, privKey: PeerId) {
-    const previousHop = pubKeyToPeerId(this.previousHop)
-    const channel = chain.getChannel(new PublicKey(privKey.pubKey.marshal()), new PublicKey(this.previousHop))
+    const previousHop = this.previousHop.toPeerId()
+    const channel = chain.getChannel(new PublicKey(privKey.pubKey.marshal()), this.previousHop)
 
-    return validateUnacknowledgedTicket(privKey, '', 0, previousHop, this.ticket, channel, () =>
-      db.getTickets({
-        signer: this.previousHop
-      })
+    return validateUnacknowledgedTicket(
+      privKey,
+      new BN(PRICE_PER_PACKET),
+      new BN(INVERSE_TICKET_WIN_PROB),
+      previousHop,
+      this.ticket,
+      channel,
+      () =>
+        db.getTickets({
+          signer: this.previousHop
+        })
     )
   }
 
   createAcknowledgement(privKey: PeerId) {
-    if (this.ownKey == undefined) {
+    if (this.ackKey == undefined) {
       throw Error(`Invalid state`)
     }
 
-    return Acknowledgement.create(this.challenge, this.ownKey, privKey)
+    return Acknowledgement.create(this.challenge, this.ackKey, privKey)
   }
 
   async forwardTransform(privKey: PeerId, chain: HoprCoreEthereum): Promise<void> {
@@ -361,9 +382,18 @@ export class Packet {
 
     const channel = chain.getChannel(self, nextPeer)
 
-    this.ticket = await channel.createTicket(new Balance(new BN(0)), this.nextChallenge, 0)
+    const pathPosition = this.ticket.getPathPosition(new BN(PRICE_PER_PACKET), new BN(INVERSE_TICKET_WIN_PROB))
+    if (pathPosition == 1) {
+      this.ticket = channel.createDummyTicket(this.nextChallenge)
+    } else {
+      this.ticket = await channel.createTicket(
+        new Balance(new BN(PRICE_PER_PACKET).mul(new BN(INVERSE_TICKET_WIN_PROB)).muln(pathPosition - 1)),
+        this.nextChallenge,
+        new BN(INVERSE_TICKET_WIN_PROB)
+      )
+    }
 
-    this.challenge = Challenge.create(this.ackChallenge, privKey)
+    this.challenge = AcknowledgementChallenge.create(this.ackChallenge, privKey)
 
     this.isReadyToForward = true
   }

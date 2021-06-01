@@ -11,13 +11,15 @@
 ### Properties
 
 - [ownKey](unacknowledgedticket.md#ownkey)
+- [signer](unacknowledgedticket.md#signer)
 - [ticket](unacknowledgedticket.md#ticket)
 
 ### Methods
 
+- [getChallenge](unacknowledgedticket.md#getchallenge)
 - [getResponse](unacknowledgedticket.md#getresponse)
 - [serialize](unacknowledgedticket.md#serialize)
-- [verify](unacknowledgedticket.md#verify)
+- [verifyChallenge](unacknowledgedticket.md#verifychallenge)
 - [verifySignature](unacknowledgedticket.md#verifysignature)
 - [SIZE](unacknowledgedticket.md#size)
 - [deserialize](unacknowledgedticket.md#deserialize)
@@ -26,16 +28,17 @@
 
 ### constructor
 
-\+ **new UnacknowledgedTicket**(`ticket`: [_Ticket_](ticket.md), `ownKey`: [_Hash_](hash.md)): [_UnacknowledgedTicket_](unacknowledgedticket.md)
+\+ **new UnacknowledgedTicket**(`ticket`: [*Ticket*](ticket.md), `ownKey`: [*HalfKey*](halfkey.md), `signer`: [*PublicKey*](publickey.md)): [*UnacknowledgedTicket*](unacknowledgedticket.md)
 
 #### Parameters
 
-| Name     | Type                  |
-| :------- | :-------------------- |
-| `ticket` | [_Ticket_](ticket.md) |
-| `ownKey` | [_Hash_](hash.md)     |
+| Name | Type |
+| :------ | :------ |
+| `ticket` | [*Ticket*](ticket.md) |
+| `ownKey` | [*HalfKey*](halfkey.md) |
+| `signer` | [*PublicKey*](publickey.md) |
 
-**Returns:** [_UnacknowledgedTicket_](unacknowledgedticket.md)
+**Returns:** [*UnacknowledgedTicket*](unacknowledgedticket.md)
 
 Defined in: [types/unacknowledgedTicket.ts:4](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/unacknowledgedTicket.ts#L4)
 
@@ -43,95 +46,104 @@ Defined in: [types/unacknowledgedTicket.ts:4](https://github.com/hoprnet/hoprnet
 
 ### ownKey
 
-• `Readonly` **ownKey**: [_Hash_](hash.md)
+• `Readonly` **ownKey**: [*HalfKey*](halfkey.md)
 
----
+___
+
+### signer
+
+• `Readonly` **signer**: [*PublicKey*](publickey.md)
+
+___
 
 ### ticket
 
-• `Readonly` **ticket**: [_Ticket_](ticket.md)
+• `Readonly` **ticket**: [*Ticket*](ticket.md)
 
 ## Methods
 
+### getChallenge
+
+▸ **getChallenge**(): [*HalfKeyChallenge*](halfkeychallenge.md)
+
+**Returns:** [*HalfKeyChallenge*](halfkeychallenge.md)
+
+Defined in: [types/unacknowledgedTicket.ts:41](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/unacknowledgedTicket.ts#L41)
+
+___
+
 ### getResponse
 
-▸ **getResponse**(`acknowledgement`: [_Hash_](hash.md)): { `response`: _Uint8Array_ ; `valid`: `true` } \| { `valid`: `false` }
+▸ **getResponse**(`acknowledgement`: [*HalfKey*](halfkey.md)): [*Response*](response.md)
 
 #### Parameters
 
-| Name              | Type              |
-| :---------------- | :---------------- |
-| `acknowledgement` | [_Hash_](hash.md) |
+| Name | Type |
+| :------ | :------ |
+| `acknowledgement` | [*HalfKey*](halfkey.md) |
 
-**Returns:** { `response`: _Uint8Array_ ; `valid`: `true` } \| { `valid`: `false` }
+**Returns:** [*Response*](response.md)
 
-Defined in: [types/unacknowledgedTicket.ts:24](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/unacknowledgedTicket.ts#L24)
+Defined in: [types/unacknowledgedTicket.ts:37](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/unacknowledgedTicket.ts#L37)
 
----
+___
 
 ### serialize
 
-▸ **serialize**(): _Uint8Array_
+▸ **serialize**(): *Uint8Array*
 
-**Returns:** _Uint8Array_
+**Returns:** *Uint8Array*
 
-Defined in: [types/unacknowledgedTicket.ts:13](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/unacknowledgedTicket.ts#L13)
+Defined in: [types/unacknowledgedTicket.ts:21](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/unacknowledgedTicket.ts#L21)
 
----
+___
 
-### verify
+### verifyChallenge
 
-▸ **verify**(`signer`: [_PublicKey_](publickey.md), `acknowledgement`: [_Hash_](hash.md)): _boolean_
+▸ **verifyChallenge**(`acknowledgement`: [*HalfKey*](halfkey.md)): *boolean*
 
 #### Parameters
 
-| Name              | Type                        |
-| :---------------- | :-------------------------- |
-| `signer`          | [_PublicKey_](publickey.md) |
-| `acknowledgement` | [_Hash_](hash.md)           |
+| Name | Type |
+| :------ | :------ |
+| `acknowledgement` | [*HalfKey*](halfkey.md) |
 
-**Returns:** _boolean_
+**Returns:** *boolean*
 
-Defined in: [types/unacknowledgedTicket.ts:28](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/unacknowledgedTicket.ts#L28)
+Defined in: [types/unacknowledgedTicket.ts:29](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/unacknowledgedTicket.ts#L29)
 
----
+___
 
 ### verifySignature
 
-▸ **verifySignature**(`signer`: [_PublicKey_](publickey.md)): _boolean_
+▸ **verifySignature**(): *boolean*
 
-#### Parameters
+**Returns:** *boolean*
 
-| Name     | Type                        |
-| :------- | :-------------------------- |
-| `signer` | [_PublicKey_](publickey.md) |
+Defined in: [types/unacknowledgedTicket.ts:33](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/unacknowledgedTicket.ts#L33)
 
-**Returns:** _boolean_
-
-Defined in: [types/unacknowledgedTicket.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/unacknowledgedTicket.ts#L20)
-
----
+___
 
 ### SIZE
 
-▸ `Static` **SIZE**(): _number_
+▸ `Static` **SIZE**(): *number*
 
-**Returns:** _number_
+**Returns:** *number*
 
-Defined in: [types/unacknowledgedTicket.ts:35](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/unacknowledgedTicket.ts#L35)
+Defined in: [types/unacknowledgedTicket.ts:45](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/unacknowledgedTicket.ts#L45)
 
----
+___
 
 ### deserialize
 
-▸ `Static` **deserialize**(`arr`: _Uint8Array_): [_UnacknowledgedTicket_](unacknowledgedticket.md)
+▸ `Static` **deserialize**(`arr`: *Uint8Array*): [*UnacknowledgedTicket*](unacknowledgedticket.md)
 
 #### Parameters
 
-| Name  | Type         |
-| :---- | :----------- |
-| `arr` | _Uint8Array_ |
+| Name | Type |
+| :------ | :------ |
+| `arr` | *Uint8Array* |
 
-**Returns:** [_UnacknowledgedTicket_](unacknowledgedticket.md)
+**Returns:** [*UnacknowledgedTicket*](unacknowledgedticket.md)
 
-Defined in: [types/unacknowledgedTicket.ts:7](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/unacknowledgedTicket.ts#L7)
+Defined in: [types/unacknowledgedTicket.ts:11](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/unacknowledgedTicket.ts#L11)

@@ -1,5 +1,8 @@
-#!/bin/bash
-set -e #u
+#!/usr/bin/env bash
+
+set -o errexit
+set -o nounset
+set -o pipefail
 
 # ------ GCloud utilities ------
 #
@@ -11,27 +14,19 @@ ZONE="--zone=europe-west6-a"
 REGION="--region=europe-west6"
 
 GCLOUD_MACHINE="--machine-type=e2-medium"
-GCLOUD_META="--metadata=google-logging-enabled=true,enable-oslogin=true --maintenance-policy=MIGRATE"
+GCLOUD_META="--metadata=google-logging-enabled=true,google-monitoring-enabled=true,enable-oslogin=true --maintenance-policy=MIGRATE"
 GCLOUD_TAGS="--tags=hopr-node,web-client,rest-client,portainer,healthcheck"
 GCLOUD_BOOTDISK="--boot-disk-size=20GB --boot-disk-type=pd-standard"
+GCLOUD_IMAGE="--image-family=cos-stable"
 
-GCLOUD_DEFAULTS="$ZONE $GCLOUD_MACHINE $GCLOUD_META $GCLOUD_TAGS $GCLOUD_BOOTDISK"
+GCLOUD_DEFAULTS="$ZONE $GCLOUD_MACHINE $GCLOUD_META $GCLOUD_TAGS $GCLOUD_BOOTDISK $GCLOUD_IMAGE"
 
 alias gssh="gcloud compute ssh --ssh-flag='-t' $ZONE"
 
-
-# $1 = name (ie. node-4) 
-# Requires:
-# - VERSION_MAJ_MIN
-# - RELEASE_NAME
-gcloud_vm_name() {
-  # For example, 1-57-larnaca-node-2, prerelease-master-node-4
-  echo "hopr-$(echo $VERSION_MAJ_MIN | sed 's/\./-/g')-$RELEASE_NAME-$1"
-}
-
+# NB: This is useless for getting an IP of a VM
 # Get or create an IP address
 # $1 = name
-gcloud_get_address() { 
+gcloud_get_address() {
   local ip=$(gcloud compute addresses describe $1 $REGION 2>&1)
   # Google does not return an appropriate exit code :(
   if [ "$(echo "$ip" | grep 'ERROR')" ]; then
@@ -42,20 +37,26 @@ gcloud_get_address() {
   echo $ip | awk '{ print $2 }'
 }
 
+# Get external IP for running node or die
+# $1 - name
+gcloud_get_ip() {
+  gcloud compute instances list | grep "$1" | awk '{ print $5 }'
+}
+
 # $1 = VM name
 gcloud_find_vm_with_name() {
-  echo $(gcloud compute instances list | grep "$1" | grep 'RUNNING')
+  gcloud compute instances list | grep "$1" | grep 'RUNNING'
 }
 
 # $1 - VM name
 # Warning, using `--format='value[](metadata*)` is an unsupported API by gcloud and can change any time.
 # More information on https://cloud.google.com/compute/docs/storing-retrieving-metadata
 gcloud_get_image_running_on_vm() {
-  echo $(gcloud compute instances describe $1 $ZONE \
+  gcloud compute instances describe $1 $ZONE \
     --format='value[](metadata.items.gce-container-declaration)' \
     | grep image \
     | tr -s ' ' \
-    | cut -f3 -d' ')
+    | cut -f3 -d' '
 }
 
 # $1 = vm name
@@ -69,7 +70,7 @@ gcloud_update_container_with_image() {
   sleep 30s
 }
 
-# $1 - vm name 
+# $1 - vm name
 # $2 - docker image
 gcloud_stop() {
   echo "Stopping docker image:$2 on vm $1"

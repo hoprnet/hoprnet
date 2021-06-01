@@ -1,7 +1,6 @@
 import type { providers as Providers } from 'ethers'
-import type { HoprChannels } from '../contracts'
+import type { HoprChannels, TypedEvent } from '@hoprnet/hopr-ethereum'
 import type { Event } from './types'
-import type { TypedEvent } from '../contracts/commons'
 import type { ChainWrapper } from '../ethereum'
 import assert from 'assert'
 import EventEmitter from 'events'
@@ -13,7 +12,7 @@ import * as fixtures from './fixtures'
 const createProviderMock = (ops: { latestBlockNumber?: number } = {}) => {
   let latestBlockNumber = ops.latestBlockNumber ?? 0
 
-  const provider = (new EventEmitter() as unknown) as Providers.WebSocketProvider
+  const provider = new EventEmitter() as unknown as Providers.WebSocketProvider
   provider.getBlockNumber = async (): Promise<number> => latestBlockNumber
 
   return {
@@ -28,7 +27,7 @@ const createProviderMock = (ops: { latestBlockNumber?: number } = {}) => {
 const createHoprChannelsMock = (ops: { pastEvents?: Event<any>[] } = {}) => {
   const pastEvents = ops.pastEvents ?? []
 
-  const hoprChannels = (new EventEmitter() as unknown) as HoprChannels
+  const hoprChannels = new EventEmitter() as unknown as HoprChannels
   hoprChannels.queryFilter = async (): Promise<TypedEvent<any>[]> => pastEvents
 
   return {
@@ -40,7 +39,7 @@ const createHoprChannelsMock = (ops: { pastEvents?: Event<any>[] } = {}) => {
 }
 
 const createChainMock = (provider: Providers.WebSocketProvider, hoprChannels: HoprChannels): ChainWrapper => {
-  return ({
+  return {
     getLatestBlockNumber: () => provider.getBlockNumber(),
     subscribeBlock: (cb) => provider.on('block', cb),
     subscribeError: (cb) => {
@@ -53,7 +52,7 @@ const createChainMock = (provider: Providers.WebSocketProvider, hoprChannels: Ho
       hoprChannels.removeAllListeners()
     },
     getChannels: () => hoprChannels
-  } as unknown) as ChainWrapper
+  } as unknown as ChainWrapper
 }
 
 const useFixtures = (ops: { latestBlockNumber?: number; pastEvents?: Event<any>[] } = {}) => {
@@ -100,7 +99,7 @@ describe('test indexer', function () {
     })
     await indexer.start()
 
-    const account = await indexer.getAccount(fixtures.partyA.toAddress())
+    const account = await indexer.getAccount(fixtures.PARTY_A.toAddress())
     expectAccountsToBeEqual(account, fixtures.PARTY_A_INITIALIZED_ACCOUNT)
 
     const channel = await indexer.getChannel(fixtures.FUNDED_CHANNEL.getId())
@@ -114,7 +113,7 @@ describe('test indexer', function () {
     })
     await indexer.start()
 
-    const account = await indexer.getAccount(fixtures.partyA.toAddress())
+    const account = await indexer.getAccount(fixtures.PARTY_A.toAddress())
     expectAccountsToBeEqual(account, fixtures.PARTY_A_INITIALIZED_ACCOUNT)
 
     const channel = await indexer.getChannel(fixtures.FUNDED_CHANNEL.getId())
@@ -145,8 +144,8 @@ describe('test indexer', function () {
 
     await indexer.start()
 
-    const pubKey = await indexer.getPublicKeyOf(fixtures.partyA.toAddress())
-    assert.strictEqual(pubKey.toHex(), fixtures.partyA.toHex())
+    const pubKey = await indexer.getPublicKeyOf(fixtures.PARTY_A.toAddress())
+    assert.strictEqual(pubKey.toHex(), fixtures.PARTY_A.toHex())
   })
 
   it('should get all data from DB', async function () {
@@ -157,7 +156,7 @@ describe('test indexer', function () {
 
     await indexer.start()
 
-    const account = await indexer.getAccount(fixtures.partyA.toAddress())
+    const account = await indexer.getAccount(fixtures.PARTY_A.toAddress())
     expectAccountsToBeEqual(account, fixtures.PARTY_A_INITIALIZED_ACCOUNT)
 
     const channel = await indexer.getChannel(fixtures.OPENED_CHANNEL.getId())
@@ -167,11 +166,11 @@ describe('test indexer', function () {
     assert.strictEqual(channels.length, 1, 'expected channels')
     expectChannelsToBeEqual(channels[0], fixtures.OPENED_CHANNEL)
 
-    const channelsOfPartyA = await indexer.getChannelsOf(fixtures.partyA.toAddress())
+    const channelsOfPartyA = await indexer.getChannelsOf(fixtures.PARTY_A.toAddress())
     assert.strictEqual(channelsOfPartyA.length, 1)
     expectChannelsToBeEqual(channelsOfPartyA[0], fixtures.OPENED_CHANNEL)
 
-    const channelsOfPartyB = await indexer.getChannelsOf(fixtures.partyB.toAddress())
+    const channelsOfPartyB = await indexer.getChannelsOf(fixtures.PARTY_B.toAddress())
     assert.strictEqual(channelsOfPartyB.length, 1)
     expectChannelsToBeEqual(channelsOfPartyB[0], fixtures.OPENED_CHANNEL)
   })

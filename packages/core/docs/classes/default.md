@@ -4,7 +4,7 @@
 
 ## Hierarchy
 
-- _EventEmitter_
+- *EventEmitter*
 
   ↳ **default**
 
@@ -79,6 +79,7 @@
 - [submitAcknowledgedTicket](default.md#submitacknowledgedticket)
 - [tickChannelStrategy](default.md#tickchannelstrategy)
 - [waitForFunds](default.md#waitforfunds)
+- [waitForRunning](default.md#waitforrunning)
 - [withdraw](default.md#withdraw)
 - [listenerCount](default.md#listenercount)
 - [on](default.md#on)
@@ -88,18 +89,18 @@
 
 ### constructor
 
-\+ **new default**(`id`: _PeerId_, `options`: [_HoprOptions_](../modules.md#hoproptions)): [_default_](default.md)
+\+ **new default**(`id`: *PeerId*, `options`: [*HoprOptions*](../modules.md#hoproptions)): [*default*](default.md)
 
 Create an uninitialized Hopr Node
 
 #### Parameters
 
-| Name      | Type                                       |
-| :-------- | :----------------------------------------- |
-| `id`      | _PeerId_                                   |
-| `options` | [_HoprOptions_](../modules.md#hoproptions) |
+| Name | Type |
+| :------ | :------ |
+| `id` | *PeerId* |
+| `options` | [*HoprOptions*](../modules.md#hoproptions) |
 
-**Returns:** [_default_](default.md)
+**Returns:** [*default*](default.md)
 
 Overrides: EventEmitter.constructor
 
@@ -109,67 +110,67 @@ Defined in: [packages/core/src/index.ts:97](https://github.com/hoprnet/hoprnet/b
 
 ### checkTimeout
 
-• `Private` **checkTimeout**: _Timeout_
+• `Private` **checkTimeout**: *Timeout*
 
 Defined in: [packages/core/src/index.ts:90](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L90)
 
----
+___
 
 ### db
 
-• `Private` **db**: _HoprDB_
+• `Private` **db**: *HoprDB*
 
 Defined in: [packages/core/src/index.ts:96](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L96)
 
----
+___
 
 ### forward
 
-• `Private` **forward**: _PacketForwardInteraction_
+• `Private` **forward**: *PacketForwardInteraction*
 
 Defined in: [packages/core/src/index.ts:94](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L94)
 
----
+___
 
 ### heartbeat
 
-• `Private` **heartbeat**: _default_
+• `Private` **heartbeat**: *default*
 
 Defined in: [packages/core/src/index.ts:93](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L93)
 
----
+___
 
 ### libp2p
 
-• `Private` **libp2p**: [_LibP2P_](libp2p.md)
+• `Private` **libp2p**: [*LibP2P*](libp2p.md)
 
 Defined in: [packages/core/src/index.ts:95](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L95)
 
----
+___
 
 ### networkPeers
 
-• `Private` **networkPeers**: _NetworkPeers_
+• `Private` **networkPeers**: *NetworkPeers*
 
 Defined in: [packages/core/src/index.ts:92](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L92)
 
----
+___
 
 ### paymentChannels
 
-• `Private` **paymentChannels**: _Promise_<default\>
+• `Private` **paymentChannels**: *Promise*<default\>
 
 Defined in: [packages/core/src/index.ts:97](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L97)
 
----
+___
 
 ### status
 
-• **status**: [_NodeStatus_](../modules.md#nodestatus)= 'UNINITIALIZED'
+• **status**: [*NodeStatus*](../modules.md#nodestatus)= 'UNINITIALIZED'
 
 Defined in: [packages/core/src/index.ts:88](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L88)
 
----
+___
 
 ### strategy
 
@@ -177,21 +178,21 @@ Defined in: [packages/core/src/index.ts:88](https://github.com/hoprnet/hoprnet/b
 
 Defined in: [packages/core/src/index.ts:91](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L91)
 
----
+___
 
 ### captureRejectionSymbol
 
-▪ `Static` `Readonly` **captureRejectionSymbol**: _typeof_ [_captureRejectionSymbol_](default.md#capturerejectionsymbol)
+▪ `Static` `Readonly` **captureRejectionSymbol**: *typeof* [*captureRejectionSymbol*](default.md#capturerejectionsymbol)
 
 Inherited from: EventEmitter.captureRejectionSymbol
 
 Defined in: packages/core/node_modules/@types/node/events.d.ts:43
 
----
+___
 
 ### captureRejections
 
-▪ `Static` **captureRejections**: _boolean_
+▪ `Static` **captureRejections**: *boolean*
 
 Sets or gets the default captureRejection value for all emitters.
 
@@ -199,21 +200,21 @@ Inherited from: EventEmitter.captureRejections
 
 Defined in: packages/core/node_modules/@types/node/events.d.ts:49
 
----
+___
 
 ### defaultMaxListeners
 
-▪ `Static` **defaultMaxListeners**: _number_
+▪ `Static` **defaultMaxListeners**: *number*
 
 Inherited from: EventEmitter.defaultMaxListeners
 
 Defined in: packages/core/node_modules/@types/node/events.d.ts:50
 
----
+___
 
 ### errorMonitor
 
-▪ `Static` `Readonly` **errorMonitor**: _typeof_ [_errorMonitor_](default.md#errormonitor)
+▪ `Static` `Readonly` **errorMonitor**: *typeof* [*errorMonitor*](default.md#errormonitor)
 
 This symbol shall be used to install a listener for only monitoring `'error'`
 events. Listeners installed using this symbol are called before the regular
@@ -231,356 +232,356 @@ Defined in: packages/core/node_modules/@types/node/events.d.ts:42
 
 ### addListener
 
-▸ **addListener**(`event`: _string_ \| _symbol_, `listener`: (...`args`: _any_[]) => _void_): [_default_](default.md)
+▸ **addListener**(`event`: *string* \| *symbol*, `listener`: (...`args`: *any*[]) => *void*): [*default*](default.md)
 
 #### Parameters
 
-| Name       | Type                           |
-| :--------- | :----------------------------- |
-| `event`    | _string_ \| _symbol_           |
-| `listener` | (...`args`: _any_[]) => _void_ |
+| Name | Type |
+| :------ | :------ |
+| `event` | *string* \| *symbol* |
+| `listener` | (...`args`: *any*[]) => *void* |
 
-**Returns:** [_default_](default.md)
+**Returns:** [*default*](default.md)
 
 Inherited from: EventEmitter.addListener
 
 Defined in: packages/core/node_modules/@types/node/events.d.ts:62
 
----
+___
 
 ### announce
 
-▸ `Private` **announce**(`includeRouting?`: _boolean_): _Promise_<void\>
+▸ `Private` **announce**(`includeRouting?`: *boolean*): *Promise*<void\>
 
 #### Parameters
 
-| Name             | Type      | Default value |
-| :--------------- | :-------- | :------------ |
-| `includeRouting` | _boolean_ | false         |
+| Name | Type | Default value |
+| :------ | :------ | :------ |
+| `includeRouting` | *boolean* | false |
 
-**Returns:** _Promise_<void\>
+**Returns:** *Promise*<void\>
 
-Defined in: [packages/core/src/index.ts:511](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L511)
+Defined in: [packages/core/src/index.ts:513](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L513)
 
----
+___
 
 ### checkBalances
 
-▸ `Private` **checkBalances**(): _Promise_<void\>
+▸ `Private` **checkBalances**(): *Promise*<void\>
 
-**Returns:** _Promise_<void\>
+**Returns:** *Promise*<void\>
 
-Defined in: [packages/core/src/index.ts:483](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L483)
+Defined in: [packages/core/src/index.ts:485](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L485)
 
----
+___
 
 ### closeChannel
 
-▸ **closeChannel**(`counterparty`: _PeerId_): _Promise_<{ `receipt`: _string_ ; `status`: _string_ }\>
+▸ **closeChannel**(`counterparty`: *PeerId*): *Promise*<{ `receipt`: *string* ; `status`: *string*  }\>
 
 #### Parameters
 
-| Name           | Type     |
-| :------------- | :------- |
-| `counterparty` | _PeerId_ |
+| Name | Type |
+| :------ | :------ |
+| `counterparty` | *PeerId* |
 
-**Returns:** _Promise_<{ `receipt`: _string_ ; `status`: _string_ }\>
+**Returns:** *Promise*<{ `receipt`: *string* ; `status`: *string*  }\>
 
-Defined in: [packages/core/src/index.ts:641](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L641)
+Defined in: [packages/core/src/index.ts:643](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L643)
 
----
+___
 
 ### connectionReport
 
-▸ **connectionReport**(): _Promise_<string\>
+▸ **connectionReport**(): *Promise*<string\>
 
-**Returns:** _Promise_<string\>
+**Returns:** *Promise*<string\>
 
-Defined in: [packages/core/src/index.ts:475](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L475)
+Defined in: [packages/core/src/index.ts:474](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L474)
 
----
+___
 
 ### emit
 
-▸ **emit**(`event`: _string_ \| _symbol_, ...`args`: _any_[]): _boolean_
+▸ **emit**(`event`: *string* \| *symbol*, ...`args`: *any*[]): *boolean*
 
 #### Parameters
 
-| Name      | Type                 |
-| :-------- | :------------------- |
-| `event`   | _string_ \| _symbol_ |
-| `...args` | _any_[]              |
+| Name | Type |
+| :------ | :------ |
+| `event` | *string* \| *symbol* |
+| `...args` | *any*[] |
 
-**Returns:** _boolean_
+**Returns:** *boolean*
 
 Inherited from: EventEmitter.emit
 
 Defined in: packages/core/node_modules/@types/node/events.d.ts:72
 
----
+___
 
 ### eventNames
 
-▸ **eventNames**(): (_string_ \| _symbol_)[]
+▸ **eventNames**(): (*string* \| *symbol*)[]
 
-**Returns:** (_string_ \| _symbol_)[]
+**Returns:** (*string* \| *symbol*)[]
 
 Inherited from: EventEmitter.eventNames
 
 Defined in: packages/core/node_modules/@types/node/events.d.ts:77
 
----
+___
 
 ### fundChannel
 
-▸ **fundChannel**(`counterparty`: _PeerId_, `myFund`: _BN_, `counterpartyFund`: _BN_): _Promise_<{ `channelId`: _Hash_ }\>
+▸ **fundChannel**(`counterparty`: *PeerId*, `myFund`: *BN*, `counterpartyFund`: *BN*): *Promise*<{ `channelId`: *Hash*  }\>
 
 Fund a payment channel
 
 #### Parameters
 
-| Name               | Type     | Description                                                      |
-| :----------------- | :------- | :--------------------------------------------------------------- |
-| `counterparty`     | _PeerId_ | the counter party's peerId                                       |
-| `myFund`           | _BN_     | the amount to fund the channel in my favor HOPR(wei)             |
-| `counterpartyFund` | _BN_     | the amount to fund the channel in counterparty's favor HOPR(wei) |
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `counterparty` | *PeerId* | the counter party's peerId |
+| `myFund` | *BN* | the amount to fund the channel in my favor HOPR(wei) |
+| `counterpartyFund` | *BN* | the amount to fund the channel in counterparty's favor HOPR(wei) |
 
-**Returns:** _Promise_<{ `channelId`: _Hash_ }\>
+**Returns:** *Promise*<{ `channelId`: *Hash*  }\>
 
-Defined in: [packages/core/src/index.ts:613](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L613)
+Defined in: [packages/core/src/index.ts:615](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L615)
 
----
+___
 
 ### getAcknowledgedTickets
 
-▸ **getAcknowledgedTickets**(): _Promise_<AcknowledgedTicket[]\>
+▸ **getAcknowledgedTickets**(): *Promise*<AcknowledgedTicket[]\>
 
-**Returns:** _Promise_<AcknowledgedTicket[]\>
+**Returns:** *Promise*<AcknowledgedTicket[]\>
 
-Defined in: [packages/core/src/index.ts:658](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L658)
+Defined in: [packages/core/src/index.ts:660](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L660)
 
----
+___
 
 ### getAnnouncedAddresses
 
-▸ **getAnnouncedAddresses**(`peer?`: _PeerId_): _Promise_<Multiaddr[]\>
+▸ **getAnnouncedAddresses**(`peer?`: *PeerId*): *Promise*<Multiaddr[]\>
 
 Lists the addresses which the given node announces to other nodes
 
 #### Parameters
 
-| Name   | Type     | Description                     |
-| :----- | :------- | :------------------------------ |
-| `peer` | _PeerId_ | peer to query for, default self |
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `peer` | *PeerId* | peer to query for, default self |
 
-**Returns:** _Promise_<Multiaddr[]\>
+**Returns:** *Promise*<Multiaddr[]\>
 
-Defined in: [packages/core/src/index.ts:346](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L346)
+Defined in: [packages/core/src/index.ts:349](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L349)
 
----
+___
 
 ### getBalance
 
-▸ **getBalance**(): _Promise_<Balance\>
+▸ **getBalance**(): *Promise*<Balance\>
 
-**Returns:** _Promise_<Balance\>
+**Returns:** *Promise*<Balance\>
 
-Defined in: [packages/core/src/index.ts:559](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L559)
+Defined in: [packages/core/src/index.ts:561](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L561)
 
----
+___
 
 ### getChannelStrategy
 
-▸ **getChannelStrategy**(): _string_
+▸ **getChannelStrategy**(): *string*
 
-**Returns:** _string_
+**Returns:** *string*
 
-Defined in: [packages/core/src/index.ts:555](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L555)
+Defined in: [packages/core/src/index.ts:557](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L557)
 
----
+___
 
 ### getChannelsOf
 
-▸ **getChannelsOf**(`addr`: _Address_): _Promise_<ChannelEntry[]\>
+▸ **getChannelsOf**(`addr`: *Address*): *Promise*<ChannelEntry[]\>
 
 #### Parameters
 
-| Name   | Type      |
-| :----- | :-------- |
-| `addr` | _Address_ |
+| Name | Type |
+| :------ | :------ |
+| `addr` | *Address* |
 
-**Returns:** _Promise_<ChannelEntry[]\>
+**Returns:** *Promise*<ChannelEntry[]\>
 
-Defined in: [packages/core/src/index.ts:682](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L682)
+Defined in: [packages/core/src/index.ts:684](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L684)
 
----
+___
 
 ### getConnectedPeers
 
-▸ **getConnectedPeers**(): _PeerId_[]
+▸ **getConnectedPeers**(): *PeerId*[]
 
-**Returns:** _PeerId_[]
+**Returns:** *PeerId*[]
 
-Defined in: [packages/core/src/index.ts:468](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L468)
+Defined in: [packages/core/src/index.ts:467](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L467)
 
----
+___
 
 ### getEthereumAddress
 
-▸ **getEthereumAddress**(): _Promise_<Address\>
+▸ **getEthereumAddress**(): *Promise*<Address\>
 
-**Returns:** _Promise_<Address\>
+**Returns:** *Promise*<Address\>
 
-Defined in: [packages/core/src/index.ts:692](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L692)
+Defined in: [packages/core/src/index.ts:694](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L694)
 
----
+___
 
 ### getId
 
-▸ **getId**(): _PeerId_
+▸ **getId**(): *PeerId*
 
-**Returns:** _PeerId_
+**Returns:** *PeerId*
 
-Defined in: [packages/core/src/index.ts:338](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L338)
+Defined in: [packages/core/src/index.ts:341](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L341)
 
----
+___
 
 ### getIntermediateNodes
 
-▸ `Private` **getIntermediateNodes**(`destination`: _PeerId_): _Promise_<PeerId[]\>
+▸ `Private` **getIntermediateNodes**(`destination`: *PeerId*): *Promise*<PeerId[]\>
 
 Takes a destination and samples randomly intermediate nodes
 that will relay that message before it reaches its destination.
 
 #### Parameters
 
-| Name          | Type     | Description                                                      |
-| :------------ | :------- | :--------------------------------------------------------------- |
-| `destination` | _PeerId_ | instance of peerInfo that contains the peerId of the destination |
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `destination` | *PeerId* | instance of peerInfo that contains the peerId of the destination |
 
-**Returns:** _Promise_<PeerId[]\>
+**Returns:** *Promise*<PeerId[]\>
 
-Defined in: [packages/core/src/index.ts:708](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L708)
+Defined in: [packages/core/src/index.ts:710](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L710)
 
----
+___
 
 ### getListeningAddresses
 
-▸ **getListeningAddresses**(): _Multiaddr_[]
+▸ **getListeningAddresses**(): *Multiaddr*[]
 
 List the addresses on which the node is listening
 
-**Returns:** _Multiaddr_[]
+**Returns:** *Multiaddr*[]
 
-Defined in: [packages/core/src/index.ts:357](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L357)
+Defined in: [packages/core/src/index.ts:371](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L371)
 
----
+___
 
 ### getMaxListeners
 
-▸ **getMaxListeners**(): _number_
+▸ **getMaxListeners**(): *number*
 
-**Returns:** _number_
+**Returns:** *number*
 
 Inherited from: EventEmitter.getMaxListeners
 
 Defined in: packages/core/node_modules/@types/node/events.d.ts:69
 
----
+___
 
 ### getNativeBalance
 
-▸ **getNativeBalance**(): _Promise_<NativeBalance\>
+▸ **getNativeBalance**(): *Promise*<NativeBalance\>
 
-**Returns:** _Promise_<NativeBalance\>
+**Returns:** *Promise*<NativeBalance\>
 
-Defined in: [packages/core/src/index.ts:564](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L564)
+Defined in: [packages/core/src/index.ts:566](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L566)
 
----
+___
 
 ### getObservedAddresses
 
-▸ **getObservedAddresses**(`peer`: _PeerId_): Address[]
+▸ **getObservedAddresses**(`peer`: *PeerId*): Address[]
 
 Gets the observed addresses of a given peer.
 
 #### Parameters
 
-| Name   | Type     | Description       |
-| :----- | :------- | :---------------- |
-| `peer` | _PeerId_ | peer to query for |
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `peer` | *PeerId* | peer to query for |
 
 **Returns:** Address[]
 
-Defined in: [packages/core/src/index.ts:365](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L365)
+Defined in: [packages/core/src/index.ts:379](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L379)
 
----
+___
 
 ### getOpenChannels
 
-▸ `Private` **getOpenChannels**(): _Promise_<RoutingChannel[]\>
+▸ `Private` **getOpenChannels**(): *Promise*<RoutingChannel[]\>
 
-**Returns:** _Promise_<RoutingChannel[]\>
+**Returns:** *Promise*<RoutingChannel[]\>
 
-Defined in: [packages/core/src/index.ts:313](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L313)
+Defined in: [packages/core/src/index.ts:316](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L316)
 
----
+___
 
 ### getPublicKeyOf
 
-▸ **getPublicKeyOf**(`addr`: _Address_): _Promise_<PublicKey\>
+▸ **getPublicKeyOf**(`addr`: *Address*): *Promise*<PublicKey\>
 
 #### Parameters
 
-| Name   | Type      |
-| :----- | :-------- |
-| `addr` | _Address_ |
+| Name | Type |
+| :------ | :------ |
+| `addr` | *Address* |
 
-**Returns:** _Promise_<PublicKey\>
+**Returns:** *Promise*<PublicKey\>
 
-Defined in: [packages/core/src/index.ts:687](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L687)
+Defined in: [packages/core/src/index.ts:689](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L689)
 
----
+___
 
 ### getVersion
 
-▸ **getVersion**(): _any_
+▸ **getVersion**(): *any*
 
 Returns the version of hopr-core.
 
-**Returns:** _any_
+**Returns:** *any*
 
-Defined in: [packages/core/src/index.ts:320](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L320)
+Defined in: [packages/core/src/index.ts:323](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L323)
 
----
+___
 
 ### listenerCount
 
-▸ **listenerCount**(`event`: _string_ \| _symbol_): _number_
+▸ **listenerCount**(`event`: *string* \| *symbol*): *number*
 
 #### Parameters
 
-| Name    | Type                 |
-| :------ | :------------------- |
-| `event` | _string_ \| _symbol_ |
+| Name | Type |
+| :------ | :------ |
+| `event` | *string* \| *symbol* |
 
-**Returns:** _number_
+**Returns:** *number*
 
 Inherited from: EventEmitter.listenerCount
 
 Defined in: packages/core/node_modules/@types/node/events.d.ts:73
 
----
+___
 
 ### listeners
 
-▸ **listeners**(`event`: _string_ \| _symbol_): Function[]
+▸ **listeners**(`event`: *string* \| *symbol*): Function[]
 
 #### Parameters
 
-| Name    | Type                 |
-| :------ | :------------------- |
-| `event` | _string_ \| _symbol_ |
+| Name | Type |
+| :------ | :------ |
+| `event` | *string* \| *symbol* |
 
 **Returns:** Function[]
 
@@ -588,171 +589,171 @@ Inherited from: EventEmitter.listeners
 
 Defined in: packages/core/node_modules/@types/node/events.d.ts:70
 
----
+___
 
 ### maybeLogProfilingToGCloud
 
-▸ `Private` **maybeLogProfilingToGCloud**(): _void_
+▸ `Private` **maybeLogProfilingToGCloud**(): *void*
 
-**Returns:** _void_
+**Returns:** *void*
 
-Defined in: [packages/core/src/index.ts:252](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L252)
+Defined in: [packages/core/src/index.ts:255](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L255)
 
----
+___
 
 ### off
 
-▸ **off**(`event`: _string_ \| _symbol_, `listener`: (...`args`: _any_[]) => _void_): [_default_](default.md)
+▸ **off**(`event`: *string* \| *symbol*, `listener`: (...`args`: *any*[]) => *void*): [*default*](default.md)
 
 #### Parameters
 
-| Name       | Type                           |
-| :--------- | :----------------------------- |
-| `event`    | _string_ \| _symbol_           |
-| `listener` | (...`args`: _any_[]) => _void_ |
+| Name | Type |
+| :------ | :------ |
+| `event` | *string* \| *symbol* |
+| `listener` | (...`args`: *any*[]) => *void* |
 
-**Returns:** [_default_](default.md)
+**Returns:** [*default*](default.md)
 
 Inherited from: EventEmitter.off
 
 Defined in: packages/core/node_modules/@types/node/events.d.ts:66
 
----
+___
 
 ### on
 
-▸ **on**(`event`: _string_ \| _symbol_, `listener`: (...`args`: _any_[]) => _void_): [_default_](default.md)
+▸ **on**(`event`: *string* \| *symbol*, `listener`: (...`args`: *any*[]) => *void*): [*default*](default.md)
 
 #### Parameters
 
-| Name       | Type                           |
-| :--------- | :----------------------------- |
-| `event`    | _string_ \| _symbol_           |
-| `listener` | (...`args`: _any_[]) => _void_ |
+| Name | Type |
+| :------ | :------ |
+| `event` | *string* \| *symbol* |
+| `listener` | (...`args`: *any*[]) => *void* |
 
-**Returns:** [_default_](default.md)
+**Returns:** [*default*](default.md)
 
 Inherited from: EventEmitter.on
 
 Defined in: packages/core/node_modules/@types/node/events.d.ts:63
 
----
+___
 
 ### once
 
-▸ **once**(`event`: _string_ \| _symbol_, `listener`: (...`args`: _any_[]) => _void_): [_default_](default.md)
+▸ **once**(`event`: *string* \| *symbol*, `listener`: (...`args`: *any*[]) => *void*): [*default*](default.md)
 
 #### Parameters
 
-| Name       | Type                           |
-| :--------- | :----------------------------- |
-| `event`    | _string_ \| _symbol_           |
-| `listener` | (...`args`: _any_[]) => _void_ |
+| Name | Type |
+| :------ | :------ |
+| `event` | *string* \| *symbol* |
+| `listener` | (...`args`: *any*[]) => *void* |
 
-**Returns:** [_default_](default.md)
+**Returns:** [*default*](default.md)
 
 Inherited from: EventEmitter.once
 
 Defined in: packages/core/node_modules/@types/node/events.d.ts:64
 
----
+___
 
 ### openChannel
 
-▸ **openChannel**(`counterparty`: _PeerId_, `amountToFund`: _BN_): _Promise_<{ `channelId`: _Hash_ }\>
+▸ **openChannel**(`counterparty`: *PeerId*, `amountToFund`: *BN*): *Promise*<{ `channelId`: *Hash*  }\>
 
 Open a payment channel
 
 #### Parameters
 
-| Name           | Type     | Description                     |
-| :------------- | :------- | :------------------------------ |
-| `counterparty` | _PeerId_ | the counter party's peerId      |
-| `amountToFund` | _BN_     | the amount to fund in HOPR(wei) |
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `counterparty` | *PeerId* | the counter party's peerId |
+| `amountToFund` | *BN* | the amount to fund in HOPR(wei) |
 
-**Returns:** _Promise_<{ `channelId`: _Hash_ }\>
+**Returns:** *Promise*<{ `channelId`: *Hash*  }\>
 
-Defined in: [packages/core/src/index.ts:580](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L580)
+Defined in: [packages/core/src/index.ts:582](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L582)
 
----
+___
 
 ### periodicCheck
 
-▸ `Private` **periodicCheck**(): _Promise_<void\>
+▸ `Private` **periodicCheck**(): *Promise*<void\>
 
-**Returns:** _Promise_<void\>
+**Returns:** *Promise*<void\>
 
-Defined in: [packages/core/src/index.ts:497](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L497)
+Defined in: [packages/core/src/index.ts:499](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L499)
 
----
+___
 
 ### ping
 
-▸ **ping**(`destination`: _PeerId_): _Promise_<{ `info`: _string_ ; `latency`: _number_ }\>
+▸ **ping**(`destination`: *PeerId*): *Promise*<{ `info`: *string* ; `latency`: *number*  }\>
 
 Ping a node.
 
 #### Parameters
 
-| Name          | Type     | Description        |
-| :------------ | :------- | :----------------- |
-| `destination` | _PeerId_ | PeerId of the node |
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `destination` | *PeerId* | PeerId of the node |
 
-**Returns:** _Promise_<{ `info`: _string_ ; `latency`: _number_ }\>
+**Returns:** *Promise*<{ `info`: *string* ; `latency`: *number*  }\>
 
 latency
 
-Defined in: [packages/core/src/index.ts:454](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L454)
+Defined in: [packages/core/src/index.ts:449](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L449)
 
----
+___
 
 ### prependListener
 
-▸ **prependListener**(`event`: _string_ \| _symbol_, `listener`: (...`args`: _any_[]) => _void_): [_default_](default.md)
+▸ **prependListener**(`event`: *string* \| *symbol*, `listener`: (...`args`: *any*[]) => *void*): [*default*](default.md)
 
 #### Parameters
 
-| Name       | Type                           |
-| :--------- | :----------------------------- |
-| `event`    | _string_ \| _symbol_           |
-| `listener` | (...`args`: _any_[]) => _void_ |
+| Name | Type |
+| :------ | :------ |
+| `event` | *string* \| *symbol* |
+| `listener` | (...`args`: *any*[]) => *void* |
 
-**Returns:** [_default_](default.md)
+**Returns:** [*default*](default.md)
 
 Inherited from: EventEmitter.prependListener
 
 Defined in: packages/core/node_modules/@types/node/events.d.ts:75
 
----
+___
 
 ### prependOnceListener
 
-▸ **prependOnceListener**(`event`: _string_ \| _symbol_, `listener`: (...`args`: _any_[]) => _void_): [_default_](default.md)
+▸ **prependOnceListener**(`event`: *string* \| *symbol*, `listener`: (...`args`: *any*[]) => *void*): [*default*](default.md)
 
 #### Parameters
 
-| Name       | Type                           |
-| :--------- | :----------------------------- |
-| `event`    | _string_ \| _symbol_           |
-| `listener` | (...`args`: _any_[]) => _void_ |
+| Name | Type |
+| :------ | :------ |
+| `event` | *string* \| *symbol* |
+| `listener` | (...`args`: *any*[]) => *void* |
 
-**Returns:** [_default_](default.md)
+**Returns:** [*default*](default.md)
 
 Inherited from: EventEmitter.prependOnceListener
 
 Defined in: packages/core/node_modules/@types/node/events.d.ts:76
 
----
+___
 
 ### rawListeners
 
-▸ **rawListeners**(`event`: _string_ \| _symbol_): Function[]
+▸ **rawListeners**(`event`: *string* \| *symbol*): Function[]
 
 #### Parameters
 
-| Name    | Type                 |
-| :------ | :------------------- |
-| `event` | _string_ \| _symbol_ |
+| Name | Type |
+| :------ | :------ |
+| `event` | *string* \| *symbol* |
 
 **Returns:** Function[]
 
@@ -760,118 +761,110 @@ Inherited from: EventEmitter.rawListeners
 
 Defined in: packages/core/node_modules/@types/node/events.d.ts:71
 
----
+___
 
 ### removeAllListeners
 
-▸ **removeAllListeners**(`event?`: _string_ \| _symbol_): [_default_](default.md)
+▸ **removeAllListeners**(`event?`: *string* \| *symbol*): [*default*](default.md)
 
 #### Parameters
 
-| Name     | Type                 |
-| :------- | :------------------- |
-| `event?` | _string_ \| _symbol_ |
+| Name | Type |
+| :------ | :------ |
+| `event?` | *string* \| *symbol* |
 
-**Returns:** [_default_](default.md)
+**Returns:** [*default*](default.md)
 
 Inherited from: EventEmitter.removeAllListeners
 
 Defined in: packages/core/node_modules/@types/node/events.d.ts:67
 
----
+___
 
 ### removeListener
 
-▸ **removeListener**(`event`: _string_ \| _symbol_, `listener`: (...`args`: _any_[]) => _void_): [_default_](default.md)
+▸ **removeListener**(`event`: *string* \| *symbol*, `listener`: (...`args`: *any*[]) => *void*): [*default*](default.md)
 
 #### Parameters
 
-| Name       | Type                           |
-| :--------- | :----------------------------- |
-| `event`    | _string_ \| _symbol_           |
-| `listener` | (...`args`: _any_[]) => _void_ |
+| Name | Type |
+| :------ | :------ |
+| `event` | *string* \| *symbol* |
+| `listener` | (...`args`: *any*[]) => *void* |
 
-**Returns:** [_default_](default.md)
+**Returns:** [*default*](default.md)
 
 Inherited from: EventEmitter.removeListener
 
 Defined in: packages/core/node_modules/@types/node/events.d.ts:65
 
----
+___
 
 ### sendMessage
 
-▸ **sendMessage**(`msg`: _Uint8Array_, `destination`: _PeerId_, `getIntermediateNodesManually?`: () => _Promise_<PeerId[]\>): _Promise_<void\>
-
-Sends a message.
-
-**`notice`** THIS METHOD WILL SPEND YOUR ETHER.
-
-**`notice`** This method will fail if there are not enough funds to open
-the required payment channels. Please make sure that there are enough
-funds controlled by the given key pair.
+▸ **sendMessage**(`msg`: *Uint8Array*, `destination`: *PeerId*, `intermediatePath?`: *PeerId*[]): *Promise*<void\>
 
 #### Parameters
 
-| Name                            | Type                       | Description               |
-| :------------------------------ | :------------------------- | :------------------------ |
-| `msg`                           | _Uint8Array_               | message to send           |
-| `destination`                   | _PeerId_                   | PeerId of the destination |
-| `getIntermediateNodesManually?` | () => _Promise_<PeerId[]\> | -                         |
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `msg` | *Uint8Array* | message to send |
+| `destination` | *PeerId* | PeerId of the destination |
+| `intermediatePath?` | *PeerId*[] | - |
 
-**Returns:** _Promise_<void\>
+**Returns:** *Promise*<void\>
 
-Defined in: [packages/core/src/index.ts:382](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L382)
+Defined in: [packages/core/src/index.ts:388](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L388)
 
----
+___
 
 ### setChannelStrategy
 
-▸ **setChannelStrategy**(`strategy`: [_ChannelStrategyNames_](../modules.md#channelstrategynames)): _void_
+▸ **setChannelStrategy**(`strategy`: [*ChannelStrategyNames*](../modules.md#channelstrategynames)): *void*
 
 #### Parameters
 
-| Name       | Type                                                         |
-| :--------- | :----------------------------------------------------------- |
-| `strategy` | [_ChannelStrategyNames_](../modules.md#channelstrategynames) |
+| Name | Type |
+| :------ | :------ |
+| `strategy` | [*ChannelStrategyNames*](../modules.md#channelstrategynames) |
 
-**Returns:** _void_
+**Returns:** *void*
 
-Defined in: [packages/core/src/index.ts:543](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L543)
+Defined in: [packages/core/src/index.ts:545](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L545)
 
----
+___
 
 ### setMaxListeners
 
-▸ **setMaxListeners**(`n`: _number_): [_default_](default.md)
+▸ **setMaxListeners**(`n`: *number*): [*default*](default.md)
 
 #### Parameters
 
-| Name | Type     |
-| :--- | :------- |
-| `n`  | _number_ |
+| Name | Type |
+| :------ | :------ |
+| `n` | *number* |
 
-**Returns:** [_default_](default.md)
+**Returns:** [*default*](default.md)
 
 Inherited from: EventEmitter.setMaxListeners
 
 Defined in: packages/core/node_modules/@types/node/events.d.ts:68
 
----
+___
 
 ### smartContractInfo
 
-▸ **smartContractInfo**(): _Promise_<string\>
+▸ **smartContractInfo**(): *Promise*<string\>
 
-**Returns:** _Promise_<string\>
+**Returns:** *Promise*<string\>
 
-Defined in: [packages/core/src/index.ts:569](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L569)
+Defined in: [packages/core/src/index.ts:571](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L571)
 
----
+___
 
 ### start
 
-▸ **start**(): _Promise_<void\>
+▸ **start**(): *Promise*<void\>
 
 Start node
 
@@ -881,12 +874,10 @@ required for a node to be functioning.
 If the node is not funded, it will throw.
 
 - Create a link to the ethereum blockchain
-
   - Finish indexing previous blocks [SLOW]
   - Find publicly accessible relays
 
 - Start LibP2P and work out our network configuration.
-
   - Pass the list of relays from the indexer
 
 - Wait for wallet to be funded with ETH [requires user interaction]
@@ -895,151 +886,161 @@ If the node is not funded, it will throw.
 
 - Start heartbeat, automatic strategies, etc..
 
-**Returns:** _Promise_<void\>
+**Returns:** *Promise*<void\>
 
 Defined in: [packages/core/src/index.ts:148](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L148)
 
----
+___
 
 ### stop
 
-▸ **stop**(): _Promise_<void\>
+▸ **stop**(): *Promise*<void\>
 
 Shuts down the node and saves keys and peerBook in the database
 
-**Returns:** _Promise_<void\>
+**Returns:** *Promise*<void\>
 
-Defined in: [packages/core/src/index.ts:327](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L327)
+Defined in: [packages/core/src/index.ts:330](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L330)
 
----
+___
 
 ### submitAcknowledgedTicket
 
-▸ **submitAcknowledgedTicket**(`ackTicket`: _AcknowledgedTicket_): _Promise_<{ `ackTicket`: _AcknowledgedTicket_ ; `receipt`: _string_ ; `status`: `"SUCCESS"` } \| { `message`: _string_ ; `status`: `"FAILURE"` } \| { `error`: _any_ ; `status`: _string_ = 'ERROR' }\>
+▸ **submitAcknowledgedTicket**(`ackTicket`: *AcknowledgedTicket*): *Promise*<{ `ackTicket`: *AcknowledgedTicket* ; `receipt`: *string* ; `status`: ``"SUCCESS"``  } \| { `message`: *string* ; `status`: ``"FAILURE"``  } \| { `error`: *any* ; `status`: *string* = 'ERROR' }\>
 
 #### Parameters
 
-| Name        | Type                 |
-| :---------- | :------------------- |
-| `ackTicket` | _AcknowledgedTicket_ |
+| Name | Type |
+| :------ | :------ |
+| `ackTicket` | *AcknowledgedTicket* |
 
-**Returns:** _Promise_<{ `ackTicket`: _AcknowledgedTicket_ ; `receipt`: _string_ ; `status`: `"SUCCESS"` } \| { `message`: _string_ ; `status`: `"FAILURE"` } \| { `error`: _any_ ; `status`: _string_ = 'ERROR' }\>
+**Returns:** *Promise*<{ `ackTicket`: *AcknowledgedTicket* ; `receipt`: *string* ; `status`: ``"SUCCESS"``  } \| { `message`: *string* ; `status`: ``"FAILURE"``  } \| { `error`: *any* ; `status`: *string* = 'ERROR' }\>
 
-Defined in: [packages/core/src/index.ts:662](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L662)
+Defined in: [packages/core/src/index.ts:664](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L664)
 
----
+___
 
 ### tickChannelStrategy
 
-▸ `Private` **tickChannelStrategy**(`newChannels`: RoutingChannel[]): _Promise_<void\>
+▸ `Private` **tickChannelStrategy**(`newChannels`: RoutingChannel[]): *Promise*<void\>
 
 #### Parameters
 
-| Name          | Type             |
-| :------------ | :--------------- |
+| Name | Type |
+| :------ | :------ |
 | `newChannels` | RoutingChannel[] |
 
-**Returns:** _Promise_<void\>
+**Returns:** *Promise*<void\>
 
-Defined in: [packages/core/src/index.ts:271](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L271)
+Defined in: [packages/core/src/index.ts:274](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L274)
 
----
+___
 
 ### waitForFunds
 
-▸ **waitForFunds**(): _Promise_<void\>
+▸ **waitForFunds**(): *Promise*<void\>
 
-**Returns:** _Promise_<void\>
+**Returns:** *Promise*<void\>
 
-Defined in: [packages/core/src/index.ts:721](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L721)
+Defined in: [packages/core/src/index.ts:723](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L723)
 
----
+___
+
+### waitForRunning
+
+▸ **waitForRunning**(): *Promise*<void\>
+
+**Returns:** *Promise*<void\>
+
+Defined in: [packages/core/src/index.ts:740](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L740)
+
+___
 
 ### withdraw
 
-▸ **withdraw**(`currency`: `"NATIVE"` \| `"HOPR"`, `recipient`: _string_, `amount`: _string_): _Promise_<string\>
+▸ **withdraw**(`currency`: ``"NATIVE"`` \| ``"HOPR"``, `recipient`: *string*, `amount`: *string*): *Promise*<string\>
 
 #### Parameters
 
-| Name        | Type                   |
-| :---------- | :--------------------- |
-| `currency`  | `"NATIVE"` \| `"HOPR"` |
-| `recipient` | _string_               |
-| `amount`    | _string_               |
+| Name | Type |
+| :------ | :------ |
+| `currency` | ``"NATIVE"`` \| ``"HOPR"`` |
+| `recipient` | *string* |
+| `amount` | *string* |
 
-**Returns:** _Promise_<string\>
+**Returns:** *Promise*<string\>
 
-Defined in: [packages/core/src/index.ts:697](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L697)
+Defined in: [packages/core/src/index.ts:699](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L699)
 
----
+___
 
 ### listenerCount
 
-▸ `Static` **listenerCount**(`emitter`: _EventEmitter_, `event`: _string_ \| _symbol_): _number_
+▸ `Static` **listenerCount**(`emitter`: *EventEmitter*, `event`: *string* \| *symbol*): *number*
 
 **`deprecated`** since v4.0.0
 
 #### Parameters
 
-| Name      | Type                 |
-| :-------- | :------------------- |
-| `emitter` | _EventEmitter_       |
-| `event`   | _string_ \| _symbol_ |
+| Name | Type |
+| :------ | :------ |
+| `emitter` | *EventEmitter* |
+| `event` | *string* \| *symbol* |
 
-**Returns:** _number_
+**Returns:** *number*
 
 Inherited from: EventEmitter.listenerCount
 
 Defined in: packages/core/node_modules/@types/node/events.d.ts:31
 
----
+___
 
 ### on
 
-▸ `Static` **on**(`emitter`: _EventEmitter_, `event`: _string_): _AsyncIterableIterator_<any\>
+▸ `Static` **on**(`emitter`: *EventEmitter*, `event`: *string*): *AsyncIterableIterator*<any\>
 
 #### Parameters
 
-| Name      | Type           |
-| :-------- | :------------- |
-| `emitter` | _EventEmitter_ |
-| `event`   | _string_       |
+| Name | Type |
+| :------ | :------ |
+| `emitter` | *EventEmitter* |
+| `event` | *string* |
 
-**Returns:** _AsyncIterableIterator_<any\>
+**Returns:** *AsyncIterableIterator*<any\>
 
 Inherited from: EventEmitter.on
 
 Defined in: packages/core/node_modules/@types/node/events.d.ts:28
 
----
+___
 
 ### once
 
-▸ `Static` **once**(`emitter`: _NodeEventTarget_, `event`: _string_ \| _symbol_): _Promise_<any[]\>
+▸ `Static` **once**(`emitter`: *NodeEventTarget*, `event`: *string* \| *symbol*): *Promise*<any[]\>
 
 #### Parameters
 
-| Name      | Type                 |
-| :-------- | :------------------- |
-| `emitter` | _NodeEventTarget_    |
-| `event`   | _string_ \| _symbol_ |
+| Name | Type |
+| :------ | :------ |
+| `emitter` | *NodeEventTarget* |
+| `event` | *string* \| *symbol* |
 
-**Returns:** _Promise_<any[]\>
+**Returns:** *Promise*<any[]\>
 
 Inherited from: EventEmitter.once
 
 Defined in: packages/core/node_modules/@types/node/events.d.ts:26
 
-▸ `Static` **once**(`emitter`: DOMEventTarget, `event`: _string_): _Promise_<any[]\>
+▸ `Static` **once**(`emitter`: DOMEventTarget, `event`: *string*): *Promise*<any[]\>
 
 #### Parameters
 
-| Name      | Type           |
-| :-------- | :------------- |
+| Name | Type |
+| :------ | :------ |
 | `emitter` | DOMEventTarget |
-| `event`   | _string_       |
+| `event` | *string* |
 
-**Returns:** _Promise_<any[]\>
+**Returns:** *Promise*<any[]\>
 
 Inherited from: EventEmitter.once
 

@@ -6,7 +6,7 @@ import sinon from 'sinon'
 
 let i = 0
 let fakePacket = () => {
-  return (i++ as unknown) as Packet
+  return i++ as unknown as Packet
 }
 
 describe('test mixer ', async function () {
@@ -77,7 +77,7 @@ describe('test mixer ', async function () {
     let ordered = true
     let prev = 0
     for (let x = 0; x < 1000; x++) {
-      let next = (out.pop() as unknown) as number // cast back to fake
+      let next = out.pop() as unknown as number // cast back to fake
       if (next <= prev) {
         ordered = false
       }

@@ -17,15 +17,11 @@
 - [checkAndSetPacketTag](hoprdb.md#checkandsetpackettag)
 - [close](hoprdb.md#close)
 - [del](hoprdb.md#del)
-- [deleteAcknowledgement](hoprdb.md#deleteacknowledgement)
-- [deleteAcknowledgements](hoprdb.md#deleteacknowledgements)
-- [deleteTicket](hoprdb.md#deleteticket)
-- [deleteTickets](hoprdb.md#deletetickets)
-- [deleteUnacknowledgedTickets](hoprdb.md#deleteunacknowledgedtickets)
+- [delAcknowledgedTicket](hoprdb.md#delacknowledgedticket)
 - [get](hoprdb.md#get)
 - [getAccount](hoprdb.md#getaccount)
 - [getAccounts](hoprdb.md#getaccounts)
-- [getAcknowledgements](hoprdb.md#getacknowledgements)
+- [getAcknowledgedTickets](hoprdb.md#getacknowledgedtickets)
 - [getAll](hoprdb.md#getall)
 - [getChannel](hoprdb.md#getchannel)
 - [getChannels](hoprdb.md#getchannels)
@@ -33,22 +29,19 @@
 - [getCurrentCommitment](hoprdb.md#getcurrentcommitment)
 - [getLatestBlockNumber](hoprdb.md#getlatestblocknumber)
 - [getLatestConfirmedSnapshot](hoprdb.md#getlatestconfirmedsnapshot)
-- [getTicketCounter](hoprdb.md#getticketcounter)
 - [getTickets](hoprdb.md#gettickets)
+- [getUnacknowledgedTicket](hoprdb.md#getunacknowledgedticket)
 - [getUnacknowledgedTickets](hoprdb.md#getunacknowledgedtickets)
-- [getUnacknowledgedTicketsByKey](hoprdb.md#getunacknowledgedticketsbykey)
 - [has](hoprdb.md#has)
 - [keyOf](hoprdb.md#keyof)
 - [maybeGet](hoprdb.md#maybeget)
 - [put](hoprdb.md#put)
-- [replaceTicketWithAcknowledgement](hoprdb.md#replaceticketwithacknowledgement)
+- [replaceUnAckWithAck](hoprdb.md#replaceunackwithack)
 - [setCurrentCommitment](hoprdb.md#setcurrentcommitment)
 - [storeHashIntermediaries](hoprdb.md#storehashintermediaries)
 - [storeUnacknowledgedTicket](hoprdb.md#storeunacknowledgedticket)
-- [storeUnacknowledgedTickets](hoprdb.md#storeunacknowledgedtickets)
 - [touch](hoprdb.md#touch)
 - [updateAccount](hoprdb.md#updateaccount)
-- [updateAcknowledgement](hoprdb.md#updateacknowledgement)
 - [updateChannel](hoprdb.md#updatechannel)
 - [updateLatestBlockNumber](hoprdb.md#updatelatestblocknumber)
 - [updateLatestConfirmedSnapshot](hoprdb.md#updatelatestconfirmedsnapshot)
@@ -58,665 +51,545 @@
 
 ### constructor
 
-\+ **new HoprDB**(`id`: [_Address_](address.md), `initialize`: _boolean_, `version`: _string_, `dbPath?`: _string_): [_HoprDB_](hoprdb.md)
+\+ **new HoprDB**(`id`: [*Address*](address.md), `initialize`: *boolean*, `version`: *string*, `dbPath?`: *string*): [*HoprDB*](hoprdb.md)
 
 #### Parameters
 
-| Name         | Type                    |
-| :----------- | :---------------------- |
-| `id`         | [_Address_](address.md) |
-| `initialize` | _boolean_               |
-| `version`    | _string_                |
-| `dbPath?`    | _string_                |
+| Name | Type |
+| :------ | :------ |
+| `id` | [*Address*](address.md) |
+| `initialize` | *boolean* |
+| `version` | *string* |
+| `dbPath?` | *string* |
 
-**Returns:** [_HoprDB_](hoprdb.md)
+**Returns:** [*HoprDB*](hoprdb.md)
 
-Defined in: [db.ts:49](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L49)
+Defined in: [db.ts:44](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L44)
 
 ## Properties
 
 ### db
 
-• `Private` **db**: _LevelUp_<AbstractLevelDOWN<any, any\>, AbstractIterator<any, any\>\>
+• `Private` **db**: *LevelUp*<AbstractLevelDOWN<any, any\>, AbstractIterator<any, any\>\>
 
-Defined in: [db.ts:49](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L49)
+Defined in: [db.ts:44](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L44)
 
 ## Methods
 
 ### checkAndSetPacketTag
 
-▸ **checkAndSetPacketTag**(`packetTag`: _Uint8Array_): _Promise_<boolean\>
+▸ **checkAndSetPacketTag**(`packetTag`: *Uint8Array*): *Promise*<boolean\>
 
 #### Parameters
 
-| Name        | Type         |
-| :---------- | :----------- |
-| `packetTag` | _Uint8Array_ |
+| Name | Type |
+| :------ | :------ |
+| `packetTag` | *Uint8Array* |
 
-**Returns:** _Promise_<boolean\>
+**Returns:** *Promise*<boolean\>
 
-Defined in: [db.ts:260](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L260)
+Defined in: [db.ts:223](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L223)
 
----
+___
 
 ### close
 
-▸ **close**(): _Promise_<void\>
+▸ **close**(): *Promise*<void\>
 
-**Returns:** _Promise_<void\>
+**Returns:** *Promise*<void\>
 
-Defined in: [db.ts:323](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L323)
+Defined in: [db.ts:233](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L233)
 
----
+___
 
 ### del
 
-▸ `Private` **del**(`key`: _Uint8Array_): _Promise_<void\>
+▸ `Private` **del**(`key`: *Uint8Array*): *Promise*<void\>
 
 #### Parameters
 
-| Name  | Type         |
-| :---- | :----------- |
-| `key` | _Uint8Array_ |
+| Name | Type |
+| :------ | :------ |
+| `key` | *Uint8Array* |
 
-**Returns:** _Promise_<void\>
+**Returns:** *Promise*<void\>
 
-Defined in: [db.ts:136](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L136)
+Defined in: [db.ts:131](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L131)
 
----
+___
 
-### deleteAcknowledgement
+### delAcknowledgedTicket
 
-▸ **deleteAcknowledgement**(`acknowledgement`: [_AcknowledgedTicket_](acknowledgedticket.md)): _Promise_<void\>
+▸ **delAcknowledgedTicket**(`challenge`: [*EthereumChallenge*](ethereumchallenge.md)): *Promise*<void\>
 
 Delete acknowledged ticket in database
 
 #### Parameters
 
-| Name              | Type                                          |
-| :---------------- | :-------------------------------------------- |
-| `acknowledgement` | [_AcknowledgedTicket_](acknowledgedticket.md) |
+| Name | Type |
+| :------ | :------ |
+| `challenge` | [*EthereumChallenge*](ethereumchallenge.md) |
 
-**Returns:** _Promise_<void\>
+**Returns:** *Promise*<void\>
 
-Defined in: [db.ts:226](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L226)
+Defined in: [db.ts:188](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L188)
 
----
-
-### deleteAcknowledgements
-
-▸ **deleteAcknowledgements**(`filter?`: { `signer`: _Uint8Array_ }): _Promise_<void\>
-
-Delete acknowledged tickets
-
-#### Parameters
-
-| Name            | Type         | Description                 |
-| :-------------- | :----------- | :-------------------------- |
-| `filter?`       | _object_     | optionally filter by signer |
-| `filter.signer` | _Uint8Array_ | -                           |
-
-**Returns:** _Promise_<void\>
-
-Defined in: [db.ts:199](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L199)
-
----
-
-### deleteTicket
-
-▸ **deleteTicket**(`key`: [_PublicKey_](publickey.md)): _Promise_<void\>
-
-#### Parameters
-
-| Name  | Type                        |
-| :---- | :-------------------------- |
-| `key` | [_PublicKey_](publickey.md) |
-
-**Returns:** _Promise_<void\>
-
-Defined in: [db.ts:287](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L287)
-
----
-
-### deleteTickets
-
-▸ **deleteTickets**(`filter?`: { `signer`: _Uint8Array_ }): _Promise_<void\>
-
-Get signed tickets, both unacknowledged and acknowledged
-
-#### Parameters
-
-| Name            | Type         | Description                 |
-| :-------------- | :----------- | :-------------------------- |
-| `filter?`       | _object_     | optionally filter by signer |
-| `filter.signer` | _Uint8Array_ | -                           |
-
-**Returns:** _Promise_<void\>
-
-an array of signed tickets
-
-Defined in: [db.ts:252](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L252)
-
----
-
-### deleteUnacknowledgedTickets
-
-▸ **deleteUnacknowledgedTickets**(`filter?`: { `signer`: _Uint8Array_ }): _Promise_<void\>
-
-Delete unacknowledged tickets
-
-#### Parameters
-
-| Name            | Type         | Description                 |
-| :-------------- | :----------- | :-------------------------- |
-| `filter?`       | _object_     | optionally filter by signer |
-| `filter.signer` | _Uint8Array_ | -                           |
-
-**Returns:** _Promise_<void\>
-
-Defined in: [db.ts:164](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L164)
-
----
+___
 
 ### get
 
-▸ `Private` **get**(`key`: _Uint8Array_): _Promise_<Uint8Array\>
+▸ `Private` **get**(`key`: *Uint8Array*): *Promise*<Uint8Array\>
 
 #### Parameters
 
-| Name  | Type         |
-| :---- | :----------- |
-| `key` | _Uint8Array_ |
+| Name | Type |
+| :------ | :------ |
+| `key` | *Uint8Array* |
 
-**Returns:** _Promise_<Uint8Array\>
+**Returns:** *Promise*<Uint8Array\>
 
-Defined in: [db.ts:97](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L97)
+Defined in: [db.ts:92](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L92)
 
----
+___
 
 ### getAccount
 
-▸ **getAccount**(`address`: [_Address_](address.md)): _Promise_<[_AccountEntry_](accountentry.md)\>
+▸ **getAccount**(`address`: [*Address*](address.md)): *Promise*<[*AccountEntry*](accountentry.md)\>
 
 #### Parameters
 
-| Name      | Type                    |
-| :-------- | :---------------------- |
-| `address` | [_Address_](address.md) |
+| Name | Type |
+| :------ | :------ |
+| `address` | [*Address*](address.md) |
 
-**Returns:** _Promise_<[_AccountEntry_](accountentry.md)\>
+**Returns:** *Promise*<[*AccountEntry*](accountentry.md)\>
 
-Defined in: [db.ts:381](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L381)
+Defined in: [db.ts:291](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L291)
 
----
+___
 
 ### getAccounts
 
-▸ **getAccounts**(`filter?`: (`account`: [_AccountEntry_](accountentry.md)) => _boolean_): _Promise_<[_AccountEntry_](accountentry.md)[]\>
+▸ **getAccounts**(`filter?`: (`account`: [*AccountEntry*](accountentry.md)) => *boolean*): *Promise*<[*AccountEntry*](accountentry.md)[]\>
 
 #### Parameters
 
-| Name      | Type                                                        |
-| :-------- | :---------------------------------------------------------- |
-| `filter?` | (`account`: [_AccountEntry_](accountentry.md)) => _boolean_ |
+| Name | Type |
+| :------ | :------ |
+| `filter?` | (`account`: [*AccountEntry*](accountentry.md)) => *boolean* |
 
-**Returns:** _Promise_<[_AccountEntry_](accountentry.md)[]\>
+**Returns:** *Promise*<[*AccountEntry*](accountentry.md)[]\>
 
-Defined in: [db.ts:390](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L390)
+Defined in: [db.ts:300](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L300)
 
----
+___
 
-### getAcknowledgements
+### getAcknowledgedTickets
 
-▸ **getAcknowledgements**(`filter?`: { `signer`: _Uint8Array_ }): _Promise_<[_AcknowledgedTicket_](acknowledgedticket.md)[]\>
+▸ **getAcknowledgedTickets**(`filter?`: { `signer`: [*PublicKey*](publickey.md)  }): *Promise*<[*AcknowledgedTicket*](acknowledgedticket.md)[]\>
 
-Get all acknowledged tickets
+Get acknowledged tickets
 
 #### Parameters
 
-| Name            | Type         | Description                 |
-| :-------------- | :----------- | :-------------------------- |
-| `filter?`       | _object_     | optionally filter by signer |
-| `filter.signer` | _Uint8Array_ | -                           |
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `filter?` | *object* | optionally filter by signer |
+| `filter.signer` | [*PublicKey*](publickey.md) | - |
 
-**Returns:** _Promise_<[_AcknowledgedTicket_](acknowledgedticket.md)[]\>
+**Returns:** *Promise*<[*AcknowledgedTicket*](acknowledgedticket.md)[]\>
 
 an array of all acknowledged tickets
 
-Defined in: [db.ts:184](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L184)
+Defined in: [db.ts:172](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L172)
 
----
+___
 
 ### getAll
 
-▸ `Private` **getAll**<T\>(`prefix`: _Uint8Array_, `deserialize`: (`u`: _Uint8Array_) => T, `filter`: (`o`: T) => _boolean_): _Promise_<T[]\>
+▸ `Private` **getAll**<T\>(`prefix`: *Uint8Array*, `deserialize`: (`u`: *Uint8Array*) => T, `filter`: (`o`: T) => *boolean*): *Promise*<T[]\>
 
 #### Type parameters
 
 | Name |
-| :--- |
-| `T`  |
+| :------ |
+| `T` |
 
 #### Parameters
 
-| Name          | Type                     |
-| :------------ | :----------------------- |
-| `prefix`      | _Uint8Array_             |
-| `deserialize` | (`u`: _Uint8Array_) => T |
-| `filter`      | (`o`: T) => _boolean_    |
+| Name | Type |
+| :------ | :------ |
+| `prefix` | *Uint8Array* |
+| `deserialize` | (`u`: *Uint8Array*) => T |
+| `filter` | (`o`: T) => *boolean* |
 
-**Returns:** _Promise_<T[]\>
+**Returns:** *Promise*<T[]\>
 
-Defined in: [db.ts:112](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L112)
+Defined in: [db.ts:107](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L107)
 
----
+___
 
 ### getChannel
 
-▸ **getChannel**(`channelId`: [_Hash_](hash.md)): _Promise_<[_ChannelEntry_](channelentry.md)\>
+▸ **getChannel**(`channelId`: [*Hash*](hash.md)): *Promise*<[*ChannelEntry*](channelentry.md)\>
 
 #### Parameters
 
-| Name        | Type              |
-| :---------- | :---------------- |
-| `channelId` | [_Hash_](hash.md) |
+| Name | Type |
+| :------ | :------ |
+| `channelId` | [*Hash*](hash.md) |
 
-**Returns:** _Promise_<[_ChannelEntry_](channelentry.md)\>
+**Returns:** *Promise*<[*ChannelEntry*](channelentry.md)\>
 
-Defined in: [db.ts:367](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L367)
+Defined in: [db.ts:277](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L277)
 
----
+___
 
 ### getChannels
 
-▸ **getChannels**(`filter?`: (`channel`: [_ChannelEntry_](channelentry.md)) => _boolean_): _Promise_<[_ChannelEntry_](channelentry.md)[]\>
+▸ **getChannels**(`filter?`: (`channel`: [*ChannelEntry*](channelentry.md)) => *boolean*): *Promise*<[*ChannelEntry*](channelentry.md)[]\>
 
 #### Parameters
 
-| Name      | Type                                                        |
-| :-------- | :---------------------------------------------------------- |
-| `filter?` | (`channel`: [_ChannelEntry_](channelentry.md)) => _boolean_ |
+| Name | Type |
+| :------ | :------ |
+| `filter?` | (`channel`: [*ChannelEntry*](channelentry.md)) => *boolean* |
 
-**Returns:** _Promise_<[_ChannelEntry_](channelentry.md)[]\>
+**Returns:** *Promise*<[*ChannelEntry*](channelentry.md)[]\>
 
-Defined in: [db.ts:372](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L372)
+Defined in: [db.ts:282](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L282)
 
----
+___
 
 ### getCommitment
 
-▸ **getCommitment**(`channelId`: [_Hash_](hash.md), `iteration`: _number_): _Promise_<Uint8Array\>
+▸ **getCommitment**(`channelId`: [*Hash*](hash.md), `iteration`: *number*): *Promise*<Uint8Array\>
 
 #### Parameters
 
-| Name        | Type              |
-| :---------- | :---------------- |
-| `channelId` | [_Hash_](hash.md) |
-| `iteration` | _number_          |
+| Name | Type |
+| :------ | :------ |
+| `channelId` | [*Hash*](hash.md) |
+| `iteration` | *number* |
 
-**Returns:** _Promise_<Uint8Array\>
+**Returns:** *Promise*<Uint8Array\>
 
-Defined in: [db.ts:337](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L337)
+Defined in: [db.ts:247](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L247)
 
----
+___
 
 ### getCurrentCommitment
 
-▸ **getCurrentCommitment**(`channelId`: [_Hash_](hash.md)): _Promise_<[_Hash_](hash.md)\>
+▸ **getCurrentCommitment**(`channelId`: [*Hash*](hash.md)): *Promise*<[*Hash*](hash.md)\>
 
 #### Parameters
 
-| Name        | Type              |
-| :---------- | :---------------- |
-| `channelId` | [_Hash_](hash.md) |
+| Name | Type |
+| :------ | :------ |
+| `channelId` | [*Hash*](hash.md) |
 
-**Returns:** _Promise_<[_Hash_](hash.md)\>
+**Returns:** *Promise*<[*Hash*](hash.md)\>
 
-Defined in: [db.ts:341](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L341)
+Defined in: [db.ts:251](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L251)
 
----
+___
 
 ### getLatestBlockNumber
 
-▸ **getLatestBlockNumber**(): _Promise_<number\>
+▸ **getLatestBlockNumber**(): *Promise*<number\>
 
-**Returns:** _Promise_<number\>
+**Returns:** *Promise*<number\>
 
-Defined in: [db.ts:349](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L349)
+Defined in: [db.ts:259](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L259)
 
----
+___
 
 ### getLatestConfirmedSnapshot
 
-▸ **getLatestConfirmedSnapshot**(): _Promise_<[_Snapshot_](snapshot.md)\>
+▸ **getLatestConfirmedSnapshot**(): *Promise*<[*Snapshot*](snapshot.md)\>
 
-**Returns:** _Promise_<[_Snapshot_](snapshot.md)\>
+**Returns:** *Promise*<[*Snapshot*](snapshot.md)\>
 
-Defined in: [db.ts:358](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L358)
+Defined in: [db.ts:268](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L268)
 
----
-
-### getTicketCounter
-
-▸ `Private` **getTicketCounter**(): _Promise_<Uint8Array\>
-
-**Returns:** _Promise_<Uint8Array\>
-
-Defined in: [db.ts:307](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L307)
-
----
+___
 
 ### getTickets
 
-▸ **getTickets**(`filter?`: { `signer`: _Uint8Array_ }): _Promise_<[_Ticket_](ticket.md)[]\>
+▸ **getTickets**(`filter?`: { `signer`: [*PublicKey*](publickey.md)  }): *Promise*<[*Ticket*](ticket.md)[]\>
 
-Get signed tickets, both unacknowledged and acknowledged
+Get tickets, both unacknowledged and acknowledged
 
 #### Parameters
 
-| Name            | Type         | Description                 |
-| :-------------- | :----------- | :-------------------------- |
-| `filter?`       | _object_     | optionally filter by signer |
-| `filter.signer` | _Uint8Array_ | -                           |
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `filter?` | *object* | optionally filter by signer |
+| `filter.signer` | [*PublicKey*](publickey.md) | - |
 
-**Returns:** _Promise_<[_Ticket_](ticket.md)[]\>
+**Returns:** *Promise*<[*Ticket*](ticket.md)[]\>
 
 an array of signed tickets
 
-Defined in: [db.ts:236](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L236)
+Defined in: [db.ts:213](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L213)
 
----
+___
+
+### getUnacknowledgedTicket
+
+▸ **getUnacknowledgedTicket**(`halfKeyChallenge`: [*HalfKeyChallenge*](halfkeychallenge.md)): *Promise*<[*UnacknowledgedTicket*](unacknowledgedticket.md)\>
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `halfKeyChallenge` | [*HalfKeyChallenge*](halfkeychallenge.md) |
+
+**Returns:** *Promise*<[*UnacknowledgedTicket*](unacknowledgedticket.md)\>
+
+Defined in: [db.ts:156](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L156)
+
+___
 
 ### getUnacknowledgedTickets
 
-▸ **getUnacknowledgedTickets**(`filter?`: { `signer`: _Uint8Array_ }): _Promise_<[_UnacknowledgedTicket_](unacknowledgedticket.md)[]\>
+▸ **getUnacknowledgedTickets**(`filter?`: { `signer`: [*PublicKey*](publickey.md)  }): *Promise*<[*UnacknowledgedTicket*](unacknowledgedticket.md)[]\>
 
-Get all unacknowledged tickets
+Get unacknowledged tickets.
 
 #### Parameters
 
-| Name            | Type         | Description                 |
-| :-------------- | :----------- | :-------------------------- |
-| `filter?`       | _object_     | optionally filter by signer |
-| `filter.signer` | _Uint8Array_ | -                           |
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `filter?` | *object* | optionally filter by signer |
+| `filter.signer` | [*PublicKey*](publickey.md) | - |
 
-**Returns:** _Promise_<[_UnacknowledgedTicket_](unacknowledgedticket.md)[]\>
+**Returns:** *Promise*<[*UnacknowledgedTicket*](unacknowledgedticket.md)[]\>
 
 an array of all unacknowledged tickets
 
-Defined in: [db.ts:145](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L145)
+Defined in: [db.ts:140](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L140)
 
----
-
-### getUnacknowledgedTicketsByKey
-
-▸ **getUnacknowledgedTicketsByKey**(`key`: [_PublicKey_](publickey.md)): _Promise_<[_UnacknowledgedTicket_](unacknowledgedticket.md)\>
-
-#### Parameters
-
-| Name  | Type                        |
-| :---- | :-------------------------- |
-| `key` | [_PublicKey_](publickey.md) |
-
-**Returns:** _Promise_<[_UnacknowledgedTicket_](unacknowledgedticket.md)\>
-
-Defined in: [db.ts:270](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L270)
-
----
+___
 
 ### has
 
-▸ `Private` **has**(`key`: _Uint8Array_): _Promise_<boolean\>
+▸ `Private` **has**(`key`: *Uint8Array*): *Promise*<boolean\>
 
 #### Parameters
 
-| Name  | Type         |
-| :---- | :----------- |
-| `key` | _Uint8Array_ |
+| Name | Type |
+| :------ | :------ |
+| `key` | *Uint8Array* |
 
-**Returns:** _Promise_<boolean\>
+**Returns:** *Promise*<boolean\>
 
-Defined in: [db.ts:75](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L75)
+Defined in: [db.ts:70](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L70)
 
----
+___
 
 ### keyOf
 
-▸ `Private` **keyOf**(...`segments`: _Uint8Array_[]): _Uint8Array_
+▸ `Private` **keyOf**(...`segments`: *Uint8Array*[]): *Uint8Array*
 
 #### Parameters
 
-| Name          | Type           |
-| :------------ | :------------- |
-| `...segments` | _Uint8Array_[] |
+| Name | Type |
+| :------ | :------ |
+| `...segments` | *Uint8Array*[] |
 
-**Returns:** _Uint8Array_
+**Returns:** *Uint8Array*
 
-Defined in: [db.ts:71](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L71)
+Defined in: [db.ts:66](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L66)
 
----
+___
 
 ### maybeGet
 
-▸ `Private` **maybeGet**(`key`: _Uint8Array_): _Promise_<Uint8Array\>
+▸ `Private` **maybeGet**(`key`: *Uint8Array*): *Promise*<Uint8Array\>
 
 #### Parameters
 
-| Name  | Type         |
-| :---- | :----------- |
-| `key` | _Uint8Array_ |
+| Name | Type |
+| :------ | :------ |
+| `key` | *Uint8Array* |
 
-**Returns:** _Promise_<Uint8Array\>
+**Returns:** *Promise*<Uint8Array\>
 
-Defined in: [db.ts:101](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L101)
+Defined in: [db.ts:96](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L96)
 
----
+___
 
 ### put
 
-▸ `Private` **put**(`key`: _Uint8Array_, `value`: _Uint8Array_): _Promise_<void\>
+▸ `Private` **put**(`key`: *Uint8Array*, `value`: *Uint8Array*): *Promise*<void\>
 
 #### Parameters
 
-| Name    | Type         |
-| :------ | :----------- |
-| `key`   | _Uint8Array_ |
-| `value` | _Uint8Array_ |
+| Name | Type |
+| :------ | :------ |
+| `key` | *Uint8Array* |
+| `value` | *Uint8Array* |
 
-**Returns:** _Promise_<void\>
+**Returns:** *Promise*<void\>
 
-Defined in: [db.ts:89](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L89)
+Defined in: [db.ts:84](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L84)
 
----
+___
 
-### replaceTicketWithAcknowledgement
+### replaceUnAckWithAck
 
-▸ **replaceTicketWithAcknowledgement**(`key`: [_PublicKey_](publickey.md), `acknowledgment`: [_AcknowledgedTicket_](acknowledgedticket.md)): _Promise_<void\>
+▸ **replaceUnAckWithAck**(`halfKeyChallenge`: [*HalfKeyChallenge*](halfkeychallenge.md), `ackTicket`: [*AcknowledgedTicket*](acknowledgedticket.md)): *Promise*<void\>
 
 #### Parameters
 
-| Name             | Type                                          |
-| :--------------- | :-------------------------------------------- |
-| `key`            | [_PublicKey_](publickey.md)                   |
-| `acknowledgment` | [_AcknowledgedTicket_](acknowledgedticket.md) |
+| Name | Type |
+| :------ | :------ |
+| `halfKeyChallenge` | [*HalfKeyChallenge*](halfkeychallenge.md) |
+| `ackTicket` | [*AcknowledgedTicket*](acknowledgedticket.md) |
 
-**Returns:** _Promise_<void\>
+**Returns:** *Promise*<void\>
 
-Defined in: [db.ts:291](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L291)
+Defined in: [db.ts:192](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L192)
 
----
+___
 
 ### setCurrentCommitment
 
-▸ **setCurrentCommitment**(`channelId`: [_Hash_](hash.md), `commitment`: [_Hash_](hash.md)): _Promise_<void\>
+▸ **setCurrentCommitment**(`channelId`: [*Hash*](hash.md), `commitment`: [*Hash*](hash.md)): *Promise*<void\>
 
 #### Parameters
 
-| Name         | Type              |
-| :----------- | :---------------- |
-| `channelId`  | [_Hash_](hash.md) |
-| `commitment` | [_Hash_](hash.md) |
+| Name | Type |
+| :------ | :------ |
+| `channelId` | [*Hash*](hash.md) |
+| `commitment` | [*Hash*](hash.md) |
 
-**Returns:** _Promise_<void\>
+**Returns:** *Promise*<void\>
 
-Defined in: [db.ts:345](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L345)
+Defined in: [db.ts:255](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L255)
 
----
+___
 
 ### storeHashIntermediaries
 
-▸ **storeHashIntermediaries**(`channelId`: [_Hash_](hash.md), `intermediates`: [_Intermediate_](../interfaces/intermediate.md)[]): _Promise_<void\>
+▸ **storeHashIntermediaries**(`channelId`: [*Hash*](hash.md), `intermediates`: [*Intermediate*](../interfaces/intermediate.md)[]): *Promise*<void\>
 
 #### Parameters
 
-| Name            | Type                                              |
-| :-------------- | :------------------------------------------------ |
-| `channelId`     | [_Hash_](hash.md)                                 |
-| `intermediates` | [_Intermediate_](../interfaces/intermediate.md)[] |
+| Name | Type |
+| :------ | :------ |
+| `channelId` | [*Hash*](hash.md) |
+| `intermediates` | [*Intermediate*](../interfaces/intermediate.md)[] |
 
-**Returns:** _Promise_<void\>
+**Returns:** *Promise*<void\>
 
-Defined in: [db.ts:327](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L327)
+Defined in: [db.ts:237](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L237)
 
----
+___
 
 ### storeUnacknowledgedTicket
 
-▸ **storeUnacknowledgedTicket**(`challenge`: [_PublicKey_](publickey.md)): _Promise_<Uint8Array\>
+▸ **storeUnacknowledgedTicket**(`halfKeyChallenge`: [*HalfKeyChallenge*](halfkeychallenge.md), `unackTicket`: [*UnacknowledgedTicket*](unacknowledgedticket.md)): *Promise*<void\>
 
 #### Parameters
 
-| Name        | Type                        |
-| :---------- | :-------------------------- |
-| `challenge` | [_PublicKey_](publickey.md) |
+| Name | Type |
+| :------ | :------ |
+| `halfKeyChallenge` | [*HalfKeyChallenge*](halfkeychallenge.md) |
+| `unackTicket` | [*UnacknowledgedTicket*](unacknowledgedticket.md) |
 
-**Returns:** _Promise_<Uint8Array\>
+**Returns:** *Promise*<void\>
 
-Defined in: [db.ts:317](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L317)
+Defined in: [db.ts:160](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L160)
 
----
-
-### storeUnacknowledgedTickets
-
-▸ **storeUnacknowledgedTickets**(`key`: [_PublicKey_](publickey.md), `unacknowledged`: [_UnacknowledgedTicket_](unacknowledgedticket.md)): _Promise_<void\>
-
-#### Parameters
-
-| Name             | Type                                              |
-| :--------------- | :------------------------------------------------ |
-| `key`            | [_PublicKey_](publickey.md)                       |
-| `unacknowledged` | [_UnacknowledgedTicket_](unacknowledgedticket.md) |
-
-**Returns:** _Promise_<void\>
-
-Defined in: [db.ts:256](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L256)
-
----
+___
 
 ### touch
 
-▸ `Private` **touch**(`key`: _Uint8Array_): _Promise_<void\>
+▸ `Private` **touch**(`key`: *Uint8Array*): *Promise*<void\>
 
 #### Parameters
 
-| Name  | Type         |
-| :---- | :----------- |
-| `key` | _Uint8Array_ |
+| Name | Type |
+| :------ | :------ |
+| `key` | *Uint8Array* |
 
-**Returns:** _Promise_<void\>
+**Returns:** *Promise*<void\>
 
-Defined in: [db.ts:93](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L93)
+Defined in: [db.ts:88](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L88)
 
----
+___
 
 ### updateAccount
 
-▸ **updateAccount**(`account`: [_AccountEntry_](accountentry.md)): _Promise_<void\>
+▸ **updateAccount**(`account`: [*AccountEntry*](accountentry.md)): *Promise*<void\>
 
 #### Parameters
 
-| Name      | Type                              |
-| :-------- | :-------------------------------- |
-| `account` | [_AccountEntry_](accountentry.md) |
+| Name | Type |
+| :------ | :------ |
+| `account` | [*AccountEntry*](accountentry.md) |
 
-**Returns:** _Promise_<void\>
+**Returns:** *Promise*<void\>
 
-Defined in: [db.ts:386](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L386)
+Defined in: [db.ts:296](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L296)
 
----
-
-### updateAcknowledgement
-
-▸ **updateAcknowledgement**(`ackTicket`: [_AcknowledgedTicket_](acknowledgedticket.md), `index`: _Uint8Array_): _Promise_<void\>
-
-Update acknowledged ticket in database
-
-#### Parameters
-
-| Name        | Type                                          | Description |
-| :---------- | :-------------------------------------------- | :---------- |
-| `ackTicket` | [_AcknowledgedTicket_](acknowledgedticket.md) | Uint8Array  |
-| `index`     | _Uint8Array_                                  | Uint8Array  |
-
-**Returns:** _Promise_<void\>
-
-Defined in: [db.ts:218](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L218)
-
----
+___
 
 ### updateChannel
 
-▸ **updateChannel**(`channelId`: [_Hash_](hash.md), `channel`: [_ChannelEntry_](channelentry.md)): _Promise_<void\>
+▸ **updateChannel**(`channelId`: [*Hash*](hash.md), `channel`: [*ChannelEntry*](channelentry.md)): *Promise*<void\>
 
 #### Parameters
 
-| Name        | Type                              |
-| :---------- | :-------------------------------- |
-| `channelId` | [_Hash_](hash.md)                 |
-| `channel`   | [_ChannelEntry_](channelentry.md) |
+| Name | Type |
+| :------ | :------ |
+| `channelId` | [*Hash*](hash.md) |
+| `channel` | [*ChannelEntry*](channelentry.md) |
 
-**Returns:** _Promise_<void\>
+**Returns:** *Promise*<void\>
 
-Defined in: [db.ts:377](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L377)
+Defined in: [db.ts:287](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L287)
 
----
+___
 
 ### updateLatestBlockNumber
 
-▸ **updateLatestBlockNumber**(`blockNumber`: _BN_): _Promise_<void\>
+▸ **updateLatestBlockNumber**(`blockNumber`: *BN*): *Promise*<void\>
 
 #### Parameters
 
-| Name          | Type |
-| :------------ | :--- |
-| `blockNumber` | _BN_ |
+| Name | Type |
+| :------ | :------ |
+| `blockNumber` | *BN* |
 
-**Returns:** _Promise_<void\>
+**Returns:** *Promise*<void\>
 
-Defined in: [db.ts:354](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L354)
+Defined in: [db.ts:264](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L264)
 
----
+___
 
 ### updateLatestConfirmedSnapshot
 
-▸ **updateLatestConfirmedSnapshot**(`snapshot`: [_Snapshot_](snapshot.md)): _Promise_<void\>
+▸ **updateLatestConfirmedSnapshot**(`snapshot`: [*Snapshot*](snapshot.md)): *Promise*<void\>
 
 #### Parameters
 
-| Name       | Type                      |
-| :--------- | :------------------------ |
-| `snapshot` | [_Snapshot_](snapshot.md) |
+| Name | Type |
+| :------ | :------ |
+| `snapshot` | [*Snapshot*](snapshot.md) |
 
-**Returns:** _Promise_<void\>
+**Returns:** *Promise*<void\>
 
-Defined in: [db.ts:363](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L363)
+Defined in: [db.ts:273](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L273)
 
----
+___
 
 ### createMock
 
-▸ `Static` **createMock**(): [_HoprDB_](hoprdb.md)
+▸ `Static` **createMock**(): [*HoprDB*](hoprdb.md)
 
-**Returns:** [_HoprDB_](hoprdb.md)
+**Returns:** [*HoprDB*](hoprdb.md)
 
-Defined in: [db.ts:395](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L395)
+Defined in: [db.ts:305](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L305)

@@ -30,7 +30,7 @@ export class PacketForwardInteraction {
   }
 
   async handlePacket(msg: Uint8Array, remotePeer: PeerId) {
-    const packet = Packet.deserialize(msg.slice(), this.privKey, remotePeer)
+    const packet = Packet.deserialize(msg, this.privKey, remotePeer)
 
     this.mixer.push(packet)
   }
@@ -40,7 +40,6 @@ export class PacketForwardInteraction {
 
     if (packet.isReceiver) {
       this.emitMessage(packet.plaintext)
-      return
     } else {
       await packet.storeUnacknowledgedTicket(this.db)
       await packet.forwardTransform(this.privKey, this.chain)
@@ -48,6 +47,6 @@ export class PacketForwardInteraction {
       await this.interact(pubKeyToPeerId(packet.nextHop), packet)
     }
 
-    sendAcknowledgement(packet, pubKeyToPeerId(packet.previousHop), this.sendMessage, this.privKey)
+    sendAcknowledgement(packet, packet.previousHop.toPeerId(), this.sendMessage, this.privKey)
   }
 }

@@ -1,15 +1,15 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 source scripts/utils.sh
 
 # These will be cleaned up and machines stopped
-OLD_RELEASES='zurich zug luzern larnaca queretaro basodino saentis debug-dbg nightly internal'
+OLD_RELEASES='zurich zug luzern larnaca queretaro basodino saentis debug-dbg nightly internal integration-test'
 
 # ===== Load env variables for the current github ref =====
 # Takes:
 # - GITHUB_REF
 # - RELEASE
-# Sets: 
+# Sets:
 # - RELEASE_NAME
 # - RELEASE_IP deprecated
 # - VERSION_MAJ_MIN
@@ -24,8 +24,8 @@ get_environment() {
   fi
 
   case "$BRANCH" in release/*)
-    VERSION_MAJ_MIN=$(get_version_maj_min $RELEASE) 
-    
+    VERSION_MAJ_MIN=$(get_version_maj_min $RELEASE)
+
     if [ "$VERSION_MAJ_MIN" == '1.70' ]; then
       RELEASE_NAME='jungfrau'
       return

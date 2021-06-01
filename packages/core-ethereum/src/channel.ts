@@ -4,11 +4,13 @@ import {
   Address,
   Balance,
   Hash,
+  HalfKey,
   UINT256,
   Ticket,
   AcknowledgedTicket,
   ChannelEntry,
-  UnacknowledgedTicket
+  UnacknowledgedTicket,
+  Challenge
 } from '@hoprnet/hopr-utils'
 import Debug from 'debug'
 import type { RedeemTicketResponse } from '.'
@@ -33,7 +35,7 @@ class Channel {
   ) {
     this.index = 0 // TODO - bump channel epoch to make sure..
     this.commitment = new Commitment(
-      (commitment: Hash) => this.chain.setCommitment(commitment),
+      (commitment: Hash) => this.chain.setCommitment(counterparty.toAddress(), commitment),
       () => this.getChainCommitment(),
       this.db,
       this.getId()
@@ -51,26 +53,22 @@ class Channel {
    */
   async acknowledge(
     unacknowledgedTicket: UnacknowledgedTicket,
-    acknowledgement: Hash
+    acknowledgement: HalfKey
   ): Promise<AcknowledgedTicket | null> {
-    if (!unacknowledgedTicket.verify(this.counterparty, acknowledgement)) {
+    if (!unacknowledgedTicket.verifyChallenge(acknowledgement)) {
       throw Error(`The acknowledgement is not sufficient to solve the embedded challenge.`)
     }
 
     const response = unacknowledgedTicket.getResponse(acknowledgement)
 
-    if (!response.valid) {
-      throw Error(`Could not determine a valid response.`)
-    }
-
     const ticket = unacknowledgedTicket.ticket
-    if (
-      ticket.isWinningTicket(new Hash(response.response), await this.commitment.getCurrentCommitment(), ticket.winProb)
-    ) {
+
+    if (ticket.isWinningTicket(await this.commitment.getCurrentCommitment(), response, ticket.winProb)) {
       const ack = new AcknowledgedTicket(
         ticket,
-        new Hash(response.response),
-        await this.commitment.getCurrentCommitment()
+        response,
+        await this.commitment.getCurrentCommitment(),
+        unacknowledgedTicket.signer
       )
       await this.commitment.bumpCommitment()
       return ack
@@ -113,7 +111,7 @@ class Channel {
     const counterpartyAddress = this.counterparty.toAddress()
     const totalFund = myFund.toBN().add(counterpartyFund.toBN())
     const myBalance = await this.chain.getBalance(myAddress)
-    if (totalFund.gt(new BN(myBalance.toString()))) {
+    if (totalFund.gt(new BN(myBalance.toBN().toString()))) {
       throw Error('We do not have enough balance to fund the channel')
     }
     await this.chain.fundChannel(myAddress, counterpartyAddress, myFund, counterpartyFund)
@@ -132,7 +130,7 @@ class Channel {
     const myAddress = this.self.toAddress()
     const counterpartyAddress = this.counterparty.toAddress()
     const myBalance = await this.chain.getBalance(myAddress)
-    if (new BN(myBalance.toString()).lt(fundAmount.toBN())) {
+    if (new BN(myBalance.toBN().toString()).lt(fundAmount.toBN())) {
       throw Error('We do not have enough balance to open a channel')
     }
     await this.chain.openChannel(myAddress, counterpartyAddress, fundAmount)
@@ -168,17 +166,18 @@ class Channel {
    * @param winProb the winning probability to use
    * @returns a signed ticket
    */
-  async createTicket(amount: Balance, challenge: PublicKey, winProb: number) {
+  async createTicket(amount: Balance, challenge: Challenge, winProb: BN) {
     const counterpartyAddress = this.counterparty.toAddress()
-    const c = await this.getState()
+    const channelState = await this.getState()
+
     return Ticket.create(
       counterpartyAddress,
       challenge,
-      c.ticketEpochFor(this.counterparty.toAddress()),
+      channelState.ticketEpochFor(this.counterparty.toAddress()),
       new UINT256(new BN(this.index++)),
       amount,
-      UINT256.fromProbability(winProb),
-      (await this.getState()).channelEpoch,
+      UINT256.fromInverseProbability(winProb),
+      channelState.channelEpoch,
       this.privateKey
     )
   }
@@ -189,7 +188,7 @@ class Channel {
    * @param challenge dummy challenge, potential no valid response known
    * @returns a ticket without any value
    */
-  createDummyTicket(challenge: PublicKey): Ticket {
+  createDummyTicket(challenge: Challenge): Ticket {
     // TODO: document how dummy ticket works
     return Ticket.create(
       this.counterparty.toAddress(),
@@ -197,7 +196,7 @@ class Channel {
       UINT256.fromString('0'),
       new UINT256(new BN(this.index++)),
       new Balance(new BN(0)),
-      UINT256.fromProbability(1),
+      UINT256.DUMMY_INVERSE_PROBABILITY,
       UINT256.fromString('0'),
       this.privateKey
     )
@@ -225,7 +224,7 @@ class Channel {
         }
       }
 
-      const isWinning = ticket.isWinningTicket(ackTicket.response, ackTicket.preImage, ticket.winProb)
+      const isWinning = ticket.isWinningTicket(ackTicket.preImage, ackTicket.response, ticket.winProb)
 
       if (!isWinning) {
         log(`Failed to submit ticket ${ackTicket.response.toHex()}:  'Not a winning ticket.'`)
@@ -235,7 +234,7 @@ class Channel {
         }
       }
 
-      const receipt = await this.chain.redeemTicket(this.counterparty.toAddress().toHex(), ackTicket, ticket)
+      const receipt = await this.chain.redeemTicket(this.counterparty.toAddress(), ackTicket, ticket)
 
       // TODO delete ackTicket
       //this.commitment.updateChainState(ackTicket.preImage)

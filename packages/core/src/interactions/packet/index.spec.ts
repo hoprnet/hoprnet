@@ -4,28 +4,66 @@ import { EventEmitter } from 'events'
 import BN from 'bn.js'
 
 import { subscribeToAcknowledgements, sendAcknowledgement } from './acknowledgement'
-import { PublicKey, u8aEquals, Ticket, UINT256, HoprDB } from '@hoprnet/hopr-utils'
-import { Balance, createFirstChallenge } from '@hoprnet/hopr-utils'
+import {
+  PublicKey,
+  Address,
+  Ticket,
+  UINT256,
+  HoprDB,
+  Challenge,
+  deriveAckKeyShare,
+  UnacknowledgedTicket,
+  HalfKey,
+  AcknowledgedTicket,
+  Response,
+  Balance,
+  createPoRValuesForSender,
+  Hash,
+  u8aEquals
+} from '@hoprnet/hopr-utils'
 
-import { Challenge, Packet } from '../../messages'
+import { AcknowledgementChallenge, Packet } from '../../messages'
 import { PacketForwardInteraction } from './forward'
 import Defer from 'p-defer'
 
 const SECRET_LENGTH = 32
 
+function createFakeTicket(privKey: PeerId, challenge: Challenge, counterparty: Address, amount: Balance) {
+  return Ticket.create(
+    counterparty,
+    challenge,
+    new UINT256(new BN(0)),
+    new UINT256(new BN(0)),
+    amount,
+    UINT256.fromInverseProbability(new BN(1)),
+    new UINT256(new BN(0)),
+    privKey.privKey.marshal()
+  )
+}
+
 function createFakeChain(privKey: PeerId) {
-  const acknowledge = () => {}
+  const acknowledge = (unacknowledgedTicket: UnacknowledgedTicket, _ackKeyShare: HalfKey) => {
+    return new AcknowledgedTicket(
+      unacknowledgedTicket.ticket,
+      new Response(new Uint8Array({ length: Response.SIZE })),
+      new Hash(new Uint8Array({ length: Hash.SIZE })),
+      unacknowledgedTicket.signer
+    )
+  }
 
   const getChannel = (_self: PublicKey, counterparty: PublicKey) => ({
     acknowledge,
-    createTicket: (amount: Balance, challenge: PublicKey, _winProb: number) => {
+    createTicket: (amount: Balance, challenge: Challenge, _winProb: number) => {
+      return createFakeTicket(privKey, challenge, counterparty.toAddress(), amount)
+    },
+    createDummyTicket: (challenge: Challenge) => {
       return Ticket.create(
         counterparty.toAddress(),
         challenge,
         new UINT256(new BN(0)),
         new UINT256(new BN(0)),
-        amount,
-        UINT256.fromProbability(1),
+        new Balance(new BN(0)),
+        UINT256.DUMMY_INVERSE_PROBABILITY,
         new UINT256(new BN(0)),
         privKey.privKey.marshal()
       )
@@ -74,15 +112,21 @@ describe('packet interaction', function () {
 
     const secrets = Array.from({ length: 2 }, (_) => randomBytes(SECRET_LENGTH))
 
-    const { ackChallenge } = createFirstChallenge(secrets[0], secrets[1])
+    const { ackChallenge, ownKey, ticketChallenge } = createPoRValuesForSender(secrets[0], secrets[1])
 
-    const challenge = Challenge.create(ackChallenge, self)
+    const challenge = AcknowledgementChallenge.create(ackChallenge, self)
 
-    const fakePacket = new Packet(new Uint8Array(), challenge, { serialize: () => new Uint8Array(Ticket.SIZE) } as any)
+    const fakePacket = new Packet(
+      new Uint8Array(),
+      challenge,
+      createFakeTicket(self, ticketChallenge, PublicKey.fromPeerId(counterparty).toAddress(), new Balance(new BN(1)))
+    )
 
-    fakePacket.ownKey = secrets[0]
+    fakePacket.ownKey = ownKey
+    fakePacket.ackKey = deriveAckKeyShare(secrets[0])
     fakePacket.nextHop = counterparty.pubKey.marshal()
     fakePacket.ackChallenge = ackChallenge
+    fakePacket.previousHop = PublicKey.fromPeerId(self)
 
     fakePacket.storeUnacknowledgedTicket(db)
 
@@ -115,10 +159,7 @@ describe('packet interaction', function () {
     const libp2pReceiver = createFakeSendReceive(events, receiver)
 
     const testMsg = new TextEncoder().encode('testMsg')
-    const packet = await Packet.create(testMsg, [relay0, relay1, relay2, receiver], sender, chainSender as any, {
-      value: new Balance(new BN(0)),
-      winProb: 1
-    })
+    const packet = await Packet.create(testMsg, [relay0, relay1, relay2, receiver], sender, chainSender as any)
 
     const msgDefer = Defer()
 
@@ -131,38 +172,11 @@ describe('packet interaction', function () {
       db
     )
 
-    // @ts-expect-error
-    const relay0Interaction = new PacketForwardInteraction(
-      libp2pRelay0.subscribe,
-      libp2pRelay0.send,
-      relay0,
-      chainRelay0 as any,
-      console.log,
-      db
-    )
-
-    // @ts-expect-error
-    const relay1Interaction = new PacketForwardInteraction(
-      libp2pRelay1.subscribe,
-      libp2pRelay1.send,
-      relay1,
-      chainRelay1 as any,
-      console.log,
-      db
-    )
-
-    // @ts-expect-error
-    const relay2Interaction = new PacketForwardInteraction(
-      libp2pRelay2.subscribe,
-      libp2pRelay2.send,
-      relay2,
-      chainRelay2 as any,
-      console.log,
-      db
-    )
-
-    // @ts-expect-error
-    const receiverInteraction = new PacketForwardInteraction(
+    // TODO: improve
+    new PacketForwardInteraction(libp2pRelay0.subscribe, libp2pRelay0.send, relay0, chainRelay0 as any, console.log, db)
+    new PacketForwardInteraction(libp2pRelay1.subscribe, libp2pRelay1.send, relay1, chainRelay1 as any, console.log, db)
+    new PacketForwardInteraction(libp2pRelay2.subscribe, libp2pRelay2.send, relay2, chainRelay2 as any, console.log, db)
+    new PacketForwardInteraction(
       libp2pReceiver.subscribe,
       libp2pReceiver.send,
       receiver,

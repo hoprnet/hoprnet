@@ -22,16 +22,16 @@
 
 ### constructor
 
-\+ `Private` **new PRG**(`key`: _Uint8Array_, `iv`: _Uint8Array_): [_PRG_](prg.md)
+\+ `Private` **new PRG**(`key`: *Uint8Array*, `iv`: *Uint8Array*): [*PRG*](prg.md)
 
 #### Parameters
 
-| Name  | Type         |
-| :---- | :----------- |
-| `key` | _Uint8Array_ |
-| `iv`  | _Uint8Array_ |
+| Name | Type |
+| :------ | :------ |
+| `key` | *Uint8Array* |
+| `iv` | *Uint8Array* |
 
-**Returns:** [_PRG_](prg.md)
+**Returns:** [*PRG*](prg.md)
 
 Defined in: [crypto/prg.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prg.ts#L18)
 
@@ -39,15 +39,15 @@ Defined in: [crypto/prg.ts:18](https://github.com/hoprnet/hoprnet/blob/master/pa
 
 ### iv
 
-• `Private` `Readonly` **iv**: _Uint8Array_
+• `Private` `Readonly` **iv**: *Uint8Array*
 
 Defined in: [crypto/prg.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prg.ts#L18)
 
----
+___
 
 ### key
 
-• `Private` `Readonly` **key**: _Uint8Array_
+• `Private` `Readonly` **key**: *Uint8Array*
 
 Defined in: [crypto/prg.ts:17](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prg.ts#L17)
 
@@ -55,31 +55,31 @@ Defined in: [crypto/prg.ts:17](https://github.com/hoprnet/hoprnet/blob/master/pa
 
 ### digest
 
-▸ **digest**(`start`: _number_, `end`: _number_): _Uint8Array_
+▸ **digest**(`start`: *number*, `end`: *number*): *Uint8Array*
 
 #### Parameters
 
-| Name    | Type     |
-| :------ | :------- |
-| `start` | _number_ |
-| `end`   | _number_ |
+| Name | Type |
+| :------ | :------ |
+| `start` | *number* |
+| `end` | *number* |
 
-**Returns:** _Uint8Array_
+**Returns:** *Uint8Array*
 
 Defined in: [crypto/prg.ts:35](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prg.ts#L35)
 
----
+___
 
 ### createPRG
 
-▸ `Static` **createPRG**(`params`: [_PRGParameters_](../modules.md#prgparameters)): [_PRG_](prg.md)
+▸ `Static` **createPRG**(`params`: [*PRGParameters*](../modules.md#prgparameters)): [*PRG*](prg.md)
 
 #### Parameters
 
-| Name     | Type                                           |
-| :------- | :--------------------------------------------- |
-| `params` | [_PRGParameters_](../modules.md#prgparameters) |
+| Name | Type |
+| :------ | :------ |
+| `params` | [*PRGParameters*](../modules.md#prgparameters) |
 
-**Returns:** [_PRG_](prg.md)
+**Returns:** [*PRG*](prg.md)
 
 Defined in: [crypto/prg.ts:25](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prg.ts#L25)

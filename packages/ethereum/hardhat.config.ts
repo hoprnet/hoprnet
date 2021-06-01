@@ -1,3 +1,4 @@
+import type { SolcUserConfig } from 'hardhat/types'
 // load env variables
 require('dotenv').config()
 // load hardhat plugins
@@ -11,9 +12,9 @@ import '@typechain/hardhat'
 // rest
 import { HardhatUserConfig, task, types } from 'hardhat/config'
 import { ethers } from 'ethers'
-import { networks, NetworkTag } from './chain/networks'
+import { networks, NetworkTag } from './constants'
 
-const { PRIVATE_KEY, ETHERSCAN_KEY, POKT_KEY, QUIKNODE_KEY, DEVELOPMENT = false } = process.env
+const { DEPLOYER_WALLET_PRIVATE_KEY, ETHERSCAN_KEY, INFURA_KEY, QUIKNODE_KEY, DEVELOPMENT = false } = process.env
 const GAS_MULTIPLIER = 1.1
 
 // set 'ETHERSCAN_API_KEY' so 'hardhat-deploy' can read it
@@ -29,11 +30,11 @@ const hardhatConfig: HardhatUserConfig = {
     hardhat: {
       live: false,
       tags: [DEVELOPMENT ? 'development' : 'testing'] as NetworkTag[],
-      saveDeployments: false,
+      saveDeployments: true,
       mining: DEVELOPMENT
         ? {
             auto: true, // every transaction will trigger a new block (without this deployments fail)
-            interval: [3000, 6000] // mine new block every 3s - 6s
+            interval: [1000, 3000] // mine new block every 1 - 3s
           }
         : undefined
     },
@@ -42,8 +43,8 @@ const hardhatConfig: HardhatUserConfig = {
       live: true,
       tags: ['staging'] as NetworkTag[],
       gasMultiplier: GAS_MULTIPLIER,
-      url: `https://eth-goerli.gateway.pokt.network/v1/${POKT_KEY}/`,
-      accounts: PRIVATE_KEY ? [PRIVATE_KEY] : []
+      url: `https://goerli.infura.io/v3/${INFURA_KEY}`,
+      accounts: DEPLOYER_WALLET_PRIVATE_KEY ? [DEPLOYER_WALLET_PRIVATE_KEY] : []
     },
     xdai: {
       ...networks.xdai,
@@ -51,30 +52,22 @@ const hardhatConfig: HardhatUserConfig = {
       tags: ['production'] as NetworkTag[],
       gasMultiplier: GAS_MULTIPLIER,
       url: `https://still-patient-forest.xdai.quiknode.pro/${QUIKNODE_KEY}/`,
-      accounts: PRIVATE_KEY ? [PRIVATE_KEY] : []
+      accounts: DEPLOYER_WALLET_PRIVATE_KEY ? [DEPLOYER_WALLET_PRIVATE_KEY] : []
     }
   },
   namedAccounts: {
     deployer: 0
   },
   solidity: {
-    compilers: [
-      {
-        version: '0.8.3'
-      },
-      {
-        version: '0.6.6'
-      },
-      {
-        version: '0.4.24'
+    compilers: ['0.8.3', '0.6.6', '0.4.24'].map<SolcUserConfig>((version) => ({
+      version,
+      settings: {
+        optimizer: {
+          enabled: true,
+          runs: 200
+        }
       }
-    ],
-    settings: {
-      optimizer: {
-        enabled: true,
-        runs: 200
-      }
-    }
+    }))
   },
   paths: {
     sources: './contracts',
@@ -104,10 +97,6 @@ task('faucet', 'Faucets a local development HOPR node account with ETH and HOPR 
     false,
     types.boolean
   )
-
-task('postCompile', 'Use export task and then update abis folder', async (...args: any[]) => {
-  return (await import('./tasks/postCompile')).default(args[0], args[1], args[2])
-})
 
 task('accounts', 'View unlocked accounts', async (...args: any[]) => {
   return (await import('./tasks/getAccounts')).default(args[0], args[1], args[2])

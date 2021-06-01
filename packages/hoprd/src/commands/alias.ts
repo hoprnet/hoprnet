@@ -1,6 +1,6 @@
 import type Hopr from '@hoprnet/hopr-core'
-import { AbstractCommand, GlobalState, AutoCompleteResult } from './abstractCommand'
-import { checkPeerIdInput, getPaddingLength, getPeerIdsAndAliases, styleValue } from './utils'
+import { AbstractCommand, GlobalState } from './abstractCommand'
+import { checkPeerIdInput, getPaddingLength, styleValue } from './utils'
 
 export class Alias extends AbstractCommand {
   private parameters = ['PeerId', 'Name']
@@ -48,10 +48,5 @@ export class Alias extends AbstractCommand {
     } catch (error) {
       return styleValue(error.message, 'failure')
     }
-  }
-
-  async autocomplete(query: string, line: string, state: GlobalState): Promise<AutoCompleteResult> {
-    const allIds = getPeerIdsAndAliases(this.node, state)
-    return this._autocompleteByFiltering(query, allIds, line)
   }
 }

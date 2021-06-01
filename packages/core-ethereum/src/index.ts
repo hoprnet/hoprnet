@@ -1,16 +1,23 @@
-import type Multiaddr from 'multiaddr'
+import type { Multiaddr } from 'multiaddr'
 import type PeerId from 'peer-id'
 import type { ChainWrapper } from './ethereum'
 import chalk from 'chalk'
 import debug from 'debug'
-import { AcknowledgedTicket, PublicKey, Balance, Address, NativeBalance } from '@hoprnet/hopr-utils'
+import {
+  AcknowledgedTicket,
+  PublicKey,
+  Balance,
+  Address,
+  NativeBalance,
+  cacheNoArgAsyncFunction,
+  HoprDB
+} from '@hoprnet/hopr-utils'
 import Indexer from './indexer'
 import { RoutingChannel } from './indexer'
-import { PROVIDER_DEFAULT_URI, INDEXER_MAX_CONFIRMATIONS, INDEXER_BLOCK_RANGE } from './constants'
+import { PROVIDER_DEFAULT_URI, CONFIRMATIONS, INDEXER_BLOCK_RANGE } from './constants'
 import { Channel } from './channel'
 import { createChainWrapper } from './ethereum'
 import { PROVIDER_CACHE_TTL } from './constants'
-import { cacheNoArgAsyncFunction, HoprDB } from '@hoprnet/hopr-utils'
 
 const log = debug('hopr-core-ethereum')
 
@@ -137,7 +144,7 @@ export default class HoprEthereum {
       chain.getGenesisBlock(),
       db,
       chain,
-      options.maxConfirmations ?? INDEXER_MAX_CONFIRMATIONS,
+      options.maxConfirmations ?? CONFIRMATIONS,
       INDEXER_BLOCK_RANGE
     )
     await indexer.start()

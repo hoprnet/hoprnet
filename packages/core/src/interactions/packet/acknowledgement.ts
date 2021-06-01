@@ -1,5 +1,5 @@
 import debug from 'debug'
-import { PublicKey, Hash, durations } from '@hoprnet/hopr-utils'
+import { PublicKey, durations, UnacknowledgedTicket } from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 import { PROTOCOL_ACKNOWLEDGEMENT } from '../../constants'
@@ -18,24 +18,28 @@ export function subscribeToAcknowledgements(
 ) {
   subscribe(PROTOCOL_ACKNOWLEDGEMENT, async function (msg: Uint8Array, remotePeer: PeerId) {
     const ackMsg = Acknowledgement.deserialize(msg, pubKey, remotePeer)
-    let unacknowledgedTicket = await db.getUnacknowledgedTicketsByKey(ackMsg.ackChallenge)
 
-    if (!unacknowledgedTicket) {
-      // Could be dummy, could be error.
-      log('dropping unknown ticket')
-      return await db.deleteTicket(ackMsg.ackChallenge)
+    let unacknowledgedTicket: UnacknowledgedTicket | undefined
+    try {
+      unacknowledgedTicket = await db.getUnacknowledgedTicket(ackMsg.ackChallenge)
+    } catch (err) {
+      if (!err.notFound) {
+        throw err
+      }
     }
 
-    const channel = chain.getChannel(new PublicKey(pubKey.pubKey.marshal()), new PublicKey(remotePeer.pubKey.marshal()))
+    if (unacknowledgedTicket != undefined) {
+      const channel = chain.getChannel(new PublicKey(pubKey.pubKey.marshal()), unacknowledgedTicket.signer)
 
-    const ackedTicket = await channel.acknowledge(unacknowledgedTicket, new Hash(ackMsg.ackKeyShare))
+      const ackedTicket = await channel.acknowledge(unacknowledgedTicket, ackMsg.ackKeyShare)
 
-    if (ackedTicket === null) {
-      log(`Got a ticket that is not a win. Dropping ticket.`)
-      await db.deleteTicket(ackMsg.ackChallenge)
-    } else {
-      log(`Storing winning ticket`)
-      await db.replaceTicketWithAcknowledgement(ackMsg.ackChallenge, ackedTicket)
+      if (ackedTicket === null) {
+        log(`Got a ticket that is not a win. Dropping ticket.`)
+        await db.delAcknowledgedTicket(ackedTicket.ticket.challenge)
+      } else {
+        log(`Storing winning ticket`)
+        await db.replaceUnAckWithAck(ackMsg.ackChallenge, ackedTicket)
+      }
     }
 
     onMessage(ackMsg)

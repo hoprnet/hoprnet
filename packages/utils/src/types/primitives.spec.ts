@@ -199,4 +199,14 @@ describe('test Signature primitive', function () {
 
     assert(s.verify(utils.arrayify(message), PublicKey.fromString(publicKey)))
   })
+
+  it('should serialize and deserialize for Ethereum', function () {
+    const s = Signature.deserialize(new Signature(utils.arrayify(signature), recovery).serialize())
+
+    assert(Signature.deserializeEthereum(s.serializeEthereum()).toHex() === s.toHex())
+
+    assert.throws(() => Signature.deserialize(s.serializeEthereum()))
+
+    assert.throws(() => Signature.deserializeEthereum(s.serialize()))
+  })
 })

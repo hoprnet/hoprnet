@@ -1,8 +1,7 @@
 import { SECRET_LENGTH } from './constants'
-import { publicKeyCreate, privateKeyTweakAdd, publicKeyCombine, publicKeyTweakAdd } from 'secp256k1'
 import { deriveAckKeyShare, deriveOwnKeyShare } from './keyDerivation'
 import { SECP256K1_CONSTANTS } from '../constants'
-import { Address, PublicKey } from '../../types'
+import { HalfKeyChallenge, HalfKey, Challenge, Response, EthereumChallenge } from '../../types'
 import { u8aSplit } from '../../u8a'
 import { randomBytes } from 'crypto'
 
@@ -18,10 +17,10 @@ export { deriveAckKeyShare }
  * @param secretC shared secret with node +2
  * @returns the challenge for the first ticket sent to the first relayer
  */
-export function createFirstChallenge(
+export function createPoRValuesForSender(
   secretB: Uint8Array,
   secretC?: Uint8Array
-): { ackChallenge: PublicKey; ticketChallenge: PublicKey; ownKey: Uint8Array } {
+): { ackChallenge: HalfKeyChallenge; ticketChallenge: Challenge; ownKey: HalfKey } {
   if (secretB.length != SECRET_LENGTH || (secretC != undefined && secretC.length != SECRET_LENGTH)) {
     throw Error(`Invalid arguments`)
   }
@@ -29,8 +28,8 @@ export function createFirstChallenge(
   const s0 = deriveOwnKeyShare(secretB)
   const s1 = deriveAckKeyShare(secretC ?? randomBytes(SECRET_LENGTH))
 
-  const ackChallenge = new PublicKey(publicKeyCreate(deriveAckKeyShare(secretB)))
-  const ticketChallenge = new PublicKey(createChallenge(s0, s1))
+  const ackChallenge = deriveAckKeyShare(secretB).toChallenge()
+  const ticketChallenge = Response.fromHalfKeys(s0, s1).toChallenge()
 
   return { ackChallenge, ticketChallenge, ownKey: s0 }
 }
@@ -54,15 +53,15 @@ export function createPoRString(secretC: Uint8Array, secretD?: Uint8Array): Uint
   const s1 = deriveOwnKeyShare(secretC)
   const s2 = deriveAckKeyShare(secretD ?? randomBytes(SECRET_LENGTH))
 
-  return Uint8Array.from([...createChallenge(s1, s2), ...publicKeyCreate(s0)])
+  return Uint8Array.from([...createChallenge(s1, s2).serialize(), ...s0.toChallenge().serialize()])
 }
 
 type ValidOutput = {
   valid: true
-  ownKey: Uint8Array
-  ownShare: Uint8Array
-  nextTicketChallenge: PublicKey
-  ackChallenge: PublicKey
+  ownKey: HalfKey
+  ownShare: HalfKeyChallenge
+  nextTicketChallenge: Challenge
+  ackChallenge: HalfKeyChallenge
 }
 
 type InvalidOutput = {
@@ -80,72 +79,69 @@ type InvalidOutput = {
  * the keyShare of the relayer as well as the secret that is used
  * to create it and the challenge for the next relayer.
  */
-export function preVerify(secret: Uint8Array, porBytes: Uint8Array, challenge: Address): ValidOutput | InvalidOutput {
+export function preVerify(
+  secret: Uint8Array,
+  porBytes: Uint8Array,
+  challenge: EthereumChallenge
+): ValidOutput | InvalidOutput {
   if (secret.length != SECRET_LENGTH || porBytes.length != POR_STRING_LENGTH) {
     throw Error(`Invalid arguments`)
   }
 
-  const [nextTicketChallenge, hint] = u8aSplit(porBytes, [
-    SECP256K1_CONSTANTS.COMPRESSED_PUBLIC_KEY_LENGTH,
-    SECP256K1_CONSTANTS.COMPRESSED_PUBLIC_KEY_LENGTH
-  ])
+  const { nextTicketChallenge, ackChallenge } = decodePoRBytes(porBytes)
 
   const ownKey = deriveOwnKeyShare(secret)
-  const ownShare = publicKeyCreate(ownKey)
+  const ownShare = ownKey.toChallenge()
 
-  const valid = new PublicKey(publicKeyCombine([ownShare, hint])).toAddress().eq(challenge)
+  const valid = Challenge.fromHintAndShare(ownShare, ackChallenge).toEthereumChallenge().eq(challenge)
 
   if (valid) {
     return {
       valid: true,
       ownKey,
       ownShare,
-      nextTicketChallenge: new PublicKey(nextTicketChallenge),
-      ackChallenge: new PublicKey(hint)
+      nextTicketChallenge,
+      ackChallenge
     }
   } else {
     return { valid: false }
   }
 }
 
-/**
- * Takes an the second key share and reconstructs the secret
- * that is necessary to redeem the incentive for relaying the
- * packet.
- * @param ownShare own key share as computed from the packet
- * @param ownKey key that as derived from the shared secret with
- * the creator of the packet
- * @param ack second key share as given by the acknowledgement
- * @param challenge challenge of the ticket
- * @returns whether the input values led to a valid response that
- * can be used to redeem the incentive
- */
-export function validateAcknowledgement(
-  ownKey: Uint8Array | undefined,
-  ack: Uint8Array | undefined,
-  challenge: Address,
-  ownShare?: Uint8Array | undefined,
-  response?: Uint8Array
-): { valid: true; response: Uint8Array } | { valid: false } {
-  // clone ownKey before adding a tweak to it
-  response = response ?? privateKeyTweakAdd(Uint8Array.from(ownKey), ack)
+export function decodePoRBytes(porBytes: Uint8Array): {
+  nextTicketChallenge: Challenge
+  ackChallenge: HalfKeyChallenge
+} {
+  const [nextTicketChallenge, hint] = u8aSplit(porBytes, [
+    SECP256K1_CONSTANTS.COMPRESSED_PUBLIC_KEY_LENGTH,
+    SECP256K1_CONSTANTS.COMPRESSED_PUBLIC_KEY_LENGTH
+  ])
 
-  let valid: boolean
-
-  if (ownShare == undefined || ack == undefined) {
-    valid = new PublicKey(publicKeyCreate(response)).toAddress().eq(challenge)
-  } else {
-    valid = new PublicKey(publicKeyTweakAdd(ownShare, ack)).toAddress().eq(challenge)
-  }
-
-  if (valid) {
-    return { valid: true, response }
-  } else {
-    return { valid: false }
+  return {
+    nextTicketChallenge: new Challenge(nextTicketChallenge),
+    ackChallenge: new HalfKeyChallenge(hint)
   }
 }
 
-function createChallenge(s0: Uint8Array, s1: Uint8Array) {
-  // Clone s0 before adding tweak to it
-  return publicKeyCreate(privateKeyTweakAdd(Uint8Array.from(s0), s1))
+// @TODO add description
+export function validatePoRHalfKeys(ethereumChallenge: EthereumChallenge, ownKey: HalfKey, ack: HalfKey): boolean {
+  return Response.fromHalfKeys(ownKey, ack).toChallenge().toEthereumChallenge().eq(ethereumChallenge)
+}
+
+// @TODO add description
+export function validatePoRResponse(ethereumChallenge: EthereumChallenge, response: Response): boolean {
+  return response.toChallenge().toEthereumChallenge().eq(ethereumChallenge)
+}
+
+// @TODO add description
+export function validatePoRHint(
+  ethereumChallenge: EthereumChallenge,
+  ownShare: HalfKeyChallenge,
+  ack: HalfKey
+): boolean {
+  return Challenge.fromOwnShareAndHalfKey(ownShare, ack).toEthereumChallenge().eq(ethereumChallenge)
+}
+
+function createChallenge(s0: HalfKey, s1: HalfKey): Challenge {
+  return Response.fromHalfKeys(s0, s1).toChallenge()
 }

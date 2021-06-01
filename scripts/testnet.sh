@@ -1,8 +1,11 @@
-#!/bin/bash
-set -e #u
+#!/usr/bin/env bash
 
-if [ -z "$GCLOUD_INCLUDED" ]; then
-  source scripts/gcloud.sh 
+set -o errexit
+set -o nounset
+set -o pipefail
+
+if [ -z "${GCLOUD_INCLUDED:-}" ]; then
+  source scripts/gcloud.sh
   source scripts/dns.sh
 fi
 
@@ -24,7 +27,7 @@ disk_name() {
 
 # $1=account (hex)
 balance() {
-  ethers eval "new ethers.providers.JsonRpcProvider('$RPC').getBalance('$1').then(b => formatEther(b))"
+  yarn ethers eval "new ethers.providers.JsonRpcProvider('$RPC').getBalance('$1').then(b => formatEther(b))"
 }
 
 # $1=account (hex)
@@ -34,19 +37,25 @@ fund_if_empty() {
   echo "Balance is $BALANCE"
   if [ "$BALANCE" = '0.0' ]; then
     echo "Funding account ... $RPC -> $1 $MIN_FUNDS"
-    ethers send --rpc "$RPC" --account "$FUNDING_PRIV_KEY" "$1" $MIN_FUNDS --yes
+    yarn ethers send --rpc "$RPC" --account "$FUNDING_PRIV_KEY" "$1" $MIN_FUNDS --yes
     sleep 60
   fi
 }
 
 # $1 = IP
 get_eth_address(){
-  echo $(curl $1:3001/api/v1/address/eth)
+  curl "$1:3001/api/v1/address/eth"
 }
 
 # $1 = IP
 get_hopr_address() {
-  echo $(curl $1:3001/api/v1/address/hopr)
+  curl "$1:3001/api/v1/address/hopr"
+}
+
+# $1 = IP
+# $2 = Hopr command
+run_command(){
+  curl --silent -X POST --data "$2" "$1:3001/api/v1/command"
 }
 
 
@@ -56,7 +65,7 @@ update_if_existing() {
   if [[ $(gcloud_find_vm_with_name $1) ]]; then
     echo "Container exists, updating" 1>&2
     PREV=$(gcloud_get_image_running_on_vm $1)
-    if [ "$PREV" == "$2" ]; then 
+    if [ "$PREV" == "$2" ]; then
       echo "Same version of image is currently running. Skipping update to $PREV" 1>&2
       return 0
     fi
@@ -93,24 +102,33 @@ start_testnode_vm() {
   fi
 }
 
+# $1 = vm name
+# Run a VM with a hardhat instance
+start_chain_provider(){
+  gcloud compute instances create-with-container $1-provider $GCLOUD_DEFAULTS \
+      --create-disk name=$(disk_name $1),size=10GB,type=pd-standard,mode=rw \
+      --container-image='hopr-provider'
+
+  #hardhat node --config packages/ethereum/hardhat.config.ts
+}
+
 # $1 network name
 # $2 docker image
 # $3 node number
+# $4 = OPTIONAL chain provider
 start_testnode() {
   local vm=$(vm_name "node-$3" $1)
-  echo "- Starting test node $vm with $2"
-  start_testnode_vm $vm $2 $4
+  echo "- Starting test node $vm with $2 ${4:-}"
+  start_testnode_vm $vm $2 ${4:-}
 }
 
-# Usage 
 # $1 authorized keys file
 add_keys() {
   if test -f "$1"; then
     echo "Reading keys from $1"
-    xargs -a $1 -I {} gcloud compute os-login ssh-keys add --key="{}"
+    cat $1 | xargs -I {} gcloud compute os-login ssh-keys add --key="{}"
   else
     echo "Authorized keys file not found"
-    exit 1
   fi
 }
 
@@ -123,12 +141,14 @@ add_keys() {
 # $1 network name
 # $2 number of nodes
 # $3 docker image
+# $4 = OPTIONAL chain provider
 start_testnet() {
   for i in $(seq 1 $2);
   do
     echo "Start node $i"
-    start_testnode $1 $3 $i
+    start_testnode $1 $3 $i ${4:-}
   done
-  add_keys scripts/keys/authorized_keys
+  # @jose can you fix this pls.
+  # add_keys scripts/keys/authorized_keys
 }
 

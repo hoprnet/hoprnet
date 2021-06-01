@@ -19,6 +19,7 @@
 
 ## Table of Contents
 
+- [Table of Contents](#table-of-contents)
 - [Getting Started](#getting-started)
 - [Install](#install)
   - [Using NPM](#using-npm)
@@ -28,6 +29,9 @@
   - [Starting database](#starting-database)
   - [Starting node with custom port](#starting-node-with-custom-port)
 - [Develop](#develop)
+- [Test](#test)
+  - [Github Actions CI](#github-actions-ci)
+  - [End-to-End Test](#end-to-end-test)
 - [Tooling](#tooling)
 - [Contact](#contact)
 - [License](#license)
@@ -107,9 +111,6 @@ yarn build    # Builds contracts, clients, etc
 # starting network
 yarn run:network
 
-# running bootstrap node (separate terminal)
-DEBUG=hopr* yarn run:hoprd:bootstrap
-
 # running normal node alice (separate terminal)
 DEBUG=hopr* yarn run:hoprd:alice
 
@@ -118,6 +119,31 @@ DEBUG=hopr* yarn run:hoprd:bob
 
 # fund all your nodes to get started
 yarn run:faucet:all
+```
+
+## Test
+
+### Github Actions CI
+
+We run a fair amount of automation using Github Actions. To ease development
+of these workflows one can use [act][8] to run workflows locally in a
+Docker environment.
+
+E.g. running the build workflow:
+
+```sh
+act -j build
+```
+
+For more information please refer to [act][8]'s documentation.
+
+### End-to-End Test
+
+End-to-end testing is usually performed by the CI, but can also be performed
+locally by executing:
+
+```sh
+./scripts/run-integration-tests-locally.sh
 ```
 
 ## Tooling
@@ -151,3 +177,4 @@ whenever you need an issue about a particular tool.
 [5]: https://hub.docker.com/u/hopr
 [6]: https://www.npmjs.com/package/@hoprnet/hoprd
 [7]: https://www.youtube.com/watch?v=d0Eb6haIUu4
+[8]: https://github.com/nektos/act
