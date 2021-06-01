@@ -191,8 +191,6 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
             counterparty
         );
 
-        require(channel.status == ChannelStatus.OPEN, "Channel must be open");
-
         if (_isPartyA(msg.sender, counterparty)){
           channel.partyACommitment = newCommitment;
           channel.partyATicketEpoch = channel.partyATicketEpoch.add(1);
