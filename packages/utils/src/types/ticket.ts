@@ -125,7 +125,10 @@ export class Ticket {
       `  challenge:        ${this.challenge.toHex()}\n` +
       `  epoch:            ${this.epoch.toBN().toString(10)}\n` +
       `  amount:           ${this.amount.toFormattedString()}\n` +
-      `  winProb:          ${this.winProb.toBN().div(new BN(new Uint8Array(UINT256.SIZE).fill(0xff))).muln(100)} %\n` +
+      `  winProb:          ${this.winProb
+        .toBN()
+        .div(new BN(new Uint8Array(UINT256.SIZE).fill(0xff)))
+        .muln(100)} %\n` +
       `  channelIteration: ${this.channelIteration.toBN().toString(10)}`
     )
   }
