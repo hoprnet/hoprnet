@@ -139,23 +139,20 @@ jobs:
           INFURA_KEY: ${{ secrets.INFURA_KEY }}
           ETHERSCAN_KEY: ${{ secrets.ETHERSCAN }}
           NETWORK: goerli
-        run: |
-          bash scripts/deploy-smart-contracts.sh
+        run: ./scripts/deploy-smart-contracts.sh
 
       - name: Deploy on xDai
         env:
           DEPLOYER_WALLET_PRIVATE_KEY: ${{ secrets.DEPLOYER_WALLET_PRIVATE_KEY }}
           QUIKNODE_KEY: ${{ secrets.QUIKNODE_KEY }}
           NETWORK: xdai
-        run: |
-          bash scripts/deploy-smart-contracts.sh
+        run: ./scripts/deploy-smart-contracts.sh
 
       - name: Commit & Push changes
         env:
           HOPR_GIT_MSG: "Update smart contract deployments"
           HOPR_GITHUB_REF: ${{ github.ref }}
-        run: |
-          bash scripts/commit-and-push-all-changes.sh
+        run: ./scripts/commit-and-push-all-changes.sh
 
   release:
     name: Create Github Release
@@ -235,6 +232,9 @@ jobs:
 
       - name: Build Avado
         working-directory: packages/avado
+        env:
+          HOPR_GIT_MSG: "placeholder"
+          HOPR_GITHUB_REF: ${{ github.ref }}
         run: |
           docker-compose build
           sudo npm install -g git+https://github.com/AvadoDServer/AVADOSDK.git#c11c4bd
@@ -245,7 +245,7 @@ jobs:
           sudo avadosdk build --provider http://80.208.229.228:5001
           git add dappnode_package.json docker-compose.yml releases.json
           git commit -m "Avado CI: new release"
-          git push origin ${{ github.ref }}
+          ./scripts/commit-and-push-all-changes.sh
 
           # http://go.ava.do/install/<IPFS HASH>
 
