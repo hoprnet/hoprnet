@@ -61,7 +61,6 @@ class Channel {
 
     const ticket = unacknowledgedTicket.ticket
 
-    // @TODO use some caching to optimize execution time
     const opening = await this.commitment.findPreImage(await this.commitment.getCurrentCommitment())
 
     if (ticket.isWinningTicket(opening, response, ticket.winProb)) {
