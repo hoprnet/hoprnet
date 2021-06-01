@@ -174,7 +174,7 @@ export class Signature {
 
     const r = u8aToNumber(preRecovery) as number
 
-    if (![0,1].includes(r)) {
+    if (![0, 1].includes(r)) {
       throw Error(`v must be either 0 or 1. Got ${r}`)
     }
 
