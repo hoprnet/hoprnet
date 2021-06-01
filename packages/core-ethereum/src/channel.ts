@@ -154,7 +154,11 @@ class Channel {
   }
 
   private async bumpTicketIndex(channelId: Hash): Promise<UINT256> {
-    const currentTicketIndex = await this.db.getCurrentTicketIndex(channelId)
+    let currentTicketIndex = await this.db.getCurrentTicketIndex(channelId)
+
+    if (currentTicketIndex == undefined) {
+      currentTicketIndex = new UINT256(new BN(0))
+    }
 
     await this.db.setCurrentTicketIndex(channelId, new UINT256(currentTicketIndex.toBN().addn(1)))
 
