@@ -4,13 +4,17 @@ import sinon from 'sinon'
 import { Hash, HoprDB } from '@hoprnet/hopr-utils'
 import EventEmitter from 'events'
 
+class FakeIndexer extends EventEmitter {
+  hasPendingCommitment() {
+    return false
+  }
+}
+
 describe('test commitment', function () {
   let fakeSet, fakeGet, fakeDB, fakeId: Hash, fakeIndexer
   beforeEach(async function () {
-    fakeIndexer = new EventEmitter()
-    fakeSet = sinon.fake(async () => {
-      fakeIndexer.emit(`commitment-set-${fakeId.toHex()}`)
-    })
+    fakeIndexer = new FakeIndexer()
+    fakeSet = sinon.fake.resolves(undefined)
     fakeGet = sinon.fake.resolves(undefined)
     fakeDB = HoprDB.createMock()
     fakeId = new Hash(new Uint8Array({ length: Hash.SIZE }).fill(1))
