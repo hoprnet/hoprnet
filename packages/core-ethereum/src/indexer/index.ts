@@ -298,11 +298,18 @@ class Indexer extends EventEmitter {
   }
 
   private onOwnUnsetCommitment(channel: ChannelEntry) {
-    const isPartyA = channel.partyA.eq(channel.partyA)
+    const isPartyA = channel.partyA.eq(this.address)
 
     const counterparty = isPartyA ? channel.partyB : channel.partyA
 
-    log(`Found channel ${chalk.yellow(channel.getId().toHex())} with unset commitment. Setting commitment`)
+    log(channel)
+    log(
+      `Found channel ${chalk.yellow(
+        channel.getId().toHex()
+      )} with unset commitment. Setting commitment. Self: ${chalk.yellow(this.address)} Counterparty: ${chalk.yellow(
+        this.address
+      )}`
+    )
 
     return new Commitment(
       (comm: Hash) => this.chain.setCommitment(counterparty, comm),
