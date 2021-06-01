@@ -13,7 +13,8 @@ import {
   Snapshot,
   PublicKey,
   HalfKeyChallenge,
-  EthereumChallenge
+  EthereumChallenge,
+  UINT256
 } from './types'
 import BN from 'bn.js'
 import { u8aEquals } from './u8a'
@@ -38,6 +39,7 @@ const CHANNEL_PREFIX = encoder.encode('indexer-channel-')
 const createChannelKey = (channelId: Hash): Uint8Array => u8aConcat(CHANNEL_PREFIX, encoder.encode(channelId.toHex()))
 const createAccountKey = (address: Address): Uint8Array => u8aConcat(ACCOUNT_PREFIX, encoder.encode(address.toHex()))
 const COMMITMENT_PREFIX = encoder.encode('commitment:')
+const TICKET_INDEX_PREFIX = encoder.encode('ticketIndex:')
 const CURRENT = encoder.encode('current')
 
 export class HoprDB {
@@ -253,7 +255,27 @@ export class HoprDB {
   }
 
   async setCurrentCommitment(channelId: Hash, commitment: Hash) {
-    return this.put(u8aConcat(COMMITMENT_PREFIX, CURRENT, channelId.serialize()), commitment.serialize())
+    return this.put(
+      Uint8Array.from([...COMMITMENT_PREFIX, ...CURRENT, ...channelId.serialize()]),
+      commitment.serialize()
+    )
+  }
+
+  async getCurrentTicketIndex(channelId: Hash): Promise<UINT256> {
+    const currentTicketIndex = await this.maybeGet(u8aConcat(TICKET_INDEX_PREFIX, channelId.serialize()))
+
+    if (currentTicketIndex == undefined) {
+      return undefined
+    }
+
+    return UINT256.deserialize(currentTicketIndex)
+  }
+
+  setCurrentTicketIndex(channelId: Hash, ticketIndex: UINT256): Promise<void> {
+    return this.put(
+      Uint8Array.from([...TICKET_INDEX_PREFIX, ...CURRENT, ...channelId.serialize()]),
+      ticketIndex.serialize()
+    )
   }
 
   async getLatestBlockNumber(): Promise<number> {
