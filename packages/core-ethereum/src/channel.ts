@@ -76,10 +76,6 @@ class Channel {
     }
   }
 
-  setCommitment(): Promise<void> {
-    return this.commitment.initialize()
-  }
-
   getId() {
     return Channel.generateId(this.self.toAddress(), this.counterparty.toAddress())
   }
