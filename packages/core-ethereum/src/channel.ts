@@ -81,7 +81,6 @@ class Channel {
   }
 
   async getChainCommitment(): Promise<Hash> {
-    console.log(`getChainCommitment`, this, this.self)
     return (await this.getState()).commitmentFor(this.self.toAddress())
   }
 
