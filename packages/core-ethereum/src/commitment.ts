@@ -1,13 +1,15 @@
 import { iterateHash, recoverIteratedHash, HoprDB, Hash } from '@hoprnet/hopr-utils'
 import { randomBytes } from 'crypto'
 import Debug from 'debug'
+import type { Receipt } from './ethereum'
+import Indexer from './indexer'
 
 const log = Debug('hopr-core-ethereum:commitment')
 
 export const DB_ITERATION_BLOCK_SIZE = 10000
 export const TOTAL_ITERATIONS = 100000
 
-async function hashFunction(msg: Uint8Array): Promise<Uint8Array> {
+function hashFunction(msg: Uint8Array): Uint8Array {
   return Hash.create(msg).serialize().slice(0, Hash.SIZE)
 }
 
@@ -15,10 +17,11 @@ export class Commitment {
   private initialized: boolean = false
 
   constructor(
-    private setChainCommitment,
-    private getChainCommitment,
+    private setChainCommitment: (commitment: Hash) => Promise<Receipt>,
+    private getChainCommitment: () => Promise<Hash>,
     private db: HoprDB,
-    private channelId: Hash // used in db key
+    private channelId: Hash, // used in db key
+    private indexer: Indexer
   ) {}
 
   public async getCurrentCommitment(): Promise<Hash> {
@@ -32,29 +35,42 @@ export class Commitment {
     if (!this.initialized) {
       await this.initialize()
     }
-    this.db.setCurrentCommitment(
+
+    await this.db.setCurrentCommitment(
       this.channelId,
       await this.findPreImage(await this.db.getCurrentCommitment(this.channelId))
     )
   }
 
-  private async findPreImage(hash: Hash): Promise<Hash> {
+  public async findPreImage(hash: Hash): Promise<Hash> {
     // TODO refactor after we move primitives
     let result = await recoverIteratedHash(
       hash.serialize(),
       hashFunction,
-      async (x) => await this.searchDBFor(x),
+      this.searchDBFor.bind(this),
       TOTAL_ITERATIONS,
       DB_ITERATION_BLOCK_SIZE
     )
     if (result == undefined) {
-      throw Error(`Could not find preImage.`)
+      throw Error(`Could not find preImage. Searching for ${hash.toHex()}`)
     }
     return new Hash(Uint8Array.from(result.preImage))
   }
 
-  private async initialize(): Promise<void> {
+  public async initialize(): Promise<void> {
     if (this.initialized) return
+
+    if (this.indexer.hasPendingCommitment(this.channelId)) {
+      log(`Found pending commitment, waiting until state appears in indexer`)
+
+      await this.indexer.waitForCommitment(this.channelId)
+
+      log(`Commitment is set, commitment is now fully initialized.`)
+
+      this.initialized = true
+      return
+    }
+
     const dbContains = await this.hasDBSecret()
     const chainCommitment = await this.getChainCommitment()
     if (chainCommitment && dbContains) {
@@ -63,8 +79,8 @@ export class Commitment {
         await this.db.getCurrentCommitment(this.channelId) // Find out if we have one
         this.initialized = true
         return
-      } catch (_e) {
-        log(`Secret is found but failed to find preimage, reinitializing..`)
+      } catch (e) {
+        log(`Secret is found but failed to find preimage, reinitializing.. ${e.message}`)
       }
     }
     log(`reinitializing (db: ${dbContains}, chain: ${chainCommitment}})`)
