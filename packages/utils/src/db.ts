@@ -35,7 +35,6 @@ const LATEST_BLOCK_NUMBER_KEY = encoder.encode('indexer-latestBlockNumber')
 const LATEST_CONFIRMED_SNAPSHOT_KEY = encoder.encode('indexer-latestConfirmedSnapshot')
 const ACCOUNT_PREFIX = encoder.encode('indexer-account-')
 const CHANNEL_PREFIX = encoder.encode('indexer-channel-')
-const COMMITMENT_SET_PREFIX = encoder.encode('indexer-commitment-set-')
 const createChannelKey = (channelId: Hash): Uint8Array => u8aConcat(CHANNEL_PREFIX, encoder.encode(channelId.toHex()))
 const createAccountKey = (address: Address): Uint8Array => u8aConcat(ACCOUNT_PREFIX, encoder.encode(address.toHex()))
 const COMMITMENT_PREFIX = encoder.encode('commitment:')
@@ -273,18 +272,6 @@ export class HoprDB {
 
   async updateLatestConfirmedSnapshot(snapshot: Snapshot): Promise<void> {
     await this.put(LATEST_CONFIRMED_SNAPSHOT_KEY, snapshot.serialize())
-  }
-
-  async setOwnChannelCommitmentSet(channelId: Hash): Promise<void> {
-    await this.touch(Uint8Array.from([...COMMITMENT_SET_PREFIX, ...channelId.serialize()]))
-  }
-
-  async unsetOwnChannelCommitmentSet(channelId: Hash): Promise<void> {
-    await this.del(Uint8Array.from([...COMMITMENT_SET_PREFIX, ...channelId.serialize()]))
-  }
-
-  async isOwnChannelCommitmentSet(channelId: Hash): Promise<boolean> {
-    return await this.has(Uint8Array.from([...COMMITMENT_SET_PREFIX, ...channelId.serialize()]))
   }
 
   async getChannel(channelId: Hash): Promise<ChannelEntry | undefined> {
