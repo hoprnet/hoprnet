@@ -120,11 +120,13 @@ export class Ticket {
 
   toString() {
     return (
+      // prettier-ignore
       `Ticket:\n` +
       `  counterparty:     ${this.counterparty.toHex()}\n` +
       `  challenge:        ${this.challenge.toHex()}\n` +
       `  epoch:            ${this.epoch.toBN().toString(10)}\n` +
       `  amount:           ${this.amount.toFormattedString()}\n` +
+      `  index:            ${this.index.toBN().toString(10)}\n` +
       `  winProb:          ${this.winProb.toBN().div(new BN(new Uint8Array(UINT256.SIZE).fill(0xff))).muln(100)} %\n` +
       `  channelIteration: ${this.channelIteration.toBN().toString(10)}`
     )
