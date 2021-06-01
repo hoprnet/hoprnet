@@ -11,11 +11,11 @@
 ### Properties
 
 - [commitment](channel.md#commitment)
-- [index](channel.md#index)
 
 ### Methods
 
 - [acknowledge](channel.md#acknowledge)
+- [bumpTicketIndex](channel.md#bumpticketindex)
 - [createDummyTicket](channel.md#createdummyticket)
 - [createTicket](channel.md#createticket)
 - [finalizeClosure](channel.md#finalizeclosure)
@@ -70,21 +70,13 @@
 
 **Returns:** [*Channel*](channel.md)
 
-Defined in: [core-ethereum/src/channel.ts:26](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L26)
+Defined in: [core-ethereum/src/channel.ts:25](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L25)
 
 ## Properties
 
 ### commitment
 
 • `Private` **commitment**: *Commitment*
-
-Defined in: [core-ethereum/src/channel.ts:26](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L26)
-
-___
-
-### index
-
-• `Private` **index**: *number*
 
 Defined in: [core-ethereum/src/channel.ts:25](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L25)
 
@@ -105,7 +97,23 @@ Reserve a preImage for the given ticket if it is a winning ticket.
 
 **Returns:** *Promise*<AcknowledgedTicket\>
 
-Defined in: [core-ethereum/src/channel.ts:54](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L54)
+Defined in: [core-ethereum/src/channel.ts:53](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L53)
+
+___
+
+### bumpTicketIndex
+
+▸ `Private` **bumpTicketIndex**(`channelState`: *ChannelEntry*): *Promise*<UINT256\>
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `channelState` | *ChannelEntry* |
+
+**Returns:** *Promise*<UINT256\>
+
+Defined in: [core-ethereum/src/channel.ts:155](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L155)
 
 ___
 
@@ -125,7 +133,7 @@ Creates a ticket that is sent next to the packet to the last node.
 
 a ticket without any value
 
-Defined in: [core-ethereum/src/channel.ts:191](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L191)
+Defined in: [core-ethereum/src/channel.ts:207](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L207)
 
 ___
 
@@ -152,7 +160,7 @@ recovery algorithm is used to perform an EC-point multiplication.
 
 a signed ticket
 
-Defined in: [core-ethereum/src/channel.ts:169](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L169)
+Defined in: [core-ethereum/src/channel.ts:183](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L183)
 
 ___
 
@@ -162,7 +170,7 @@ ___
 
 **Returns:** *Promise*<string\>
 
-Defined in: [core-ethereum/src/channel.ts:148](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L148)
+Defined in: [core-ethereum/src/channel.ts:145](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L145)
 
 ___
 
@@ -179,7 +187,7 @@ ___
 
 **Returns:** *Promise*<void\>
 
-Defined in: [core-ethereum/src/channel.ts:109](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L109)
+Defined in: [core-ethereum/src/channel.ts:106](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L106)
 
 ___
 
@@ -189,7 +197,7 @@ ___
 
 **Returns:** *Promise*<{ `counterparty`: *Balance* ; `self`: *Balance*  }\>
 
-Defined in: [core-ethereum/src/channel.ts:97](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L97)
+Defined in: [core-ethereum/src/channel.ts:94](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L94)
 
 ___
 
@@ -199,7 +207,7 @@ ___
 
 **Returns:** *Promise*<Hash\>
 
-Defined in: [core-ethereum/src/channel.ts:84](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L84)
+Defined in: [core-ethereum/src/channel.ts:81](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L81)
 
 ___
 
@@ -209,7 +217,7 @@ ___
 
 **Returns:** *Hash*
 
-Defined in: [core-ethereum/src/channel.ts:80](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L80)
+Defined in: [core-ethereum/src/channel.ts:77](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L77)
 
 ___
 
@@ -219,7 +227,7 @@ ___
 
 **Returns:** *Promise*<ChannelEntry\>
 
-Defined in: [core-ethereum/src/channel.ts:88](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L88)
+Defined in: [core-ethereum/src/channel.ts:85](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L85)
 
 ___
 
@@ -229,7 +237,7 @@ ___
 
 **Returns:** *Promise*<string\>
 
-Defined in: [core-ethereum/src/channel.ts:139](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L139)
+Defined in: [core-ethereum/src/channel.ts:136](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L136)
 
 ___
 
@@ -245,7 +253,7 @@ ___
 
 **Returns:** *Promise*<void\>
 
-Defined in: [core-ethereum/src/channel.ts:120](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L120)
+Defined in: [core-ethereum/src/channel.ts:117](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L117)
 
 ___
 
@@ -261,7 +269,7 @@ ___
 
 **Returns:** *Promise*<[*RedeemTicketResponse*](../modules.md#redeemticketresponse)\>
 
-Defined in: [core-ethereum/src/channel.ts:205](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L205)
+Defined in: [core-ethereum/src/channel.ts:221](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L221)
 
 ___
 
@@ -278,4 +286,4 @@ ___
 
 **Returns:** *Hash*
 
-Defined in: [core-ethereum/src/channel.ts:45](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L45)
+Defined in: [core-ethereum/src/channel.ts:44](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L44)
