@@ -62,13 +62,11 @@ class Channel {
 
     const ticket = unacknowledgedTicket.ticket
 
-    if (ticket.isWinningTicket(await this.commitment.getCurrentCommitment(), response, ticket.winProb)) {
-      const ack = new AcknowledgedTicket(
-        ticket,
-        response,
-        await this.commitment.getCurrentCommitment(),
-        unacknowledgedTicket.signer
-      )
+    const opening = await this.commitment.findPreImage(await this.commitment.getCurrentCommitment())
+
+    if (ticket.isWinningTicket(opening, response, ticket.winProb)) {
+      const ack = new AcknowledgedTicket(ticket, response, opening, unacknowledgedTicket.signer)
+
       await this.commitment.bumpCommitment()
       return ack
     } else {

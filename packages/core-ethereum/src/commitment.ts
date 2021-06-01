@@ -42,7 +42,7 @@ export class Commitment {
     )
   }
 
-  private async findPreImage(hash: Hash): Promise<Hash> {
+  public async findPreImage(hash: Hash): Promise<Hash> {
     // TODO refactor after we move primitives
     let result = await recoverIteratedHash(
       hash.serialize(),
@@ -57,7 +57,7 @@ export class Commitment {
     return new Hash(Uint8Array.from(result.preImage))
   }
 
-  async initialize(): Promise<void> {
+  public async initialize(): Promise<void> {
     if (this.initialized) return
 
     if (this.indexer.hasPendingCommitment(this.channelId)) {
