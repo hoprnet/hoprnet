@@ -54,10 +54,10 @@ function createFakeChain(privKey: PeerId) {
   const getChannel = (_self: PublicKey, counterparty: PublicKey) => ({
     acknowledge,
     createTicket: (amount: Balance, challenge: Challenge, _winProb: number) => {
-      return createFakeTicket(privKey, challenge, counterparty.toAddress(), amount)
+      return Promise.resolve(createFakeTicket(privKey, challenge, counterparty.toAddress(), amount))
     },
-    createDummyTicket: (challenge: Challenge) => {
-      return Ticket.create(
+    createDummyTicket: (challenge: Challenge) =>
+      Ticket.create(
         counterparty.toAddress(),
         challenge,
         new UINT256(new BN(0)),
@@ -67,7 +67,6 @@ function createFakeChain(privKey: PeerId) {
         new UINT256(new BN(0)),
         privKey.privKey.marshal()
       )
-    }
   })
 
   return { getChannel }

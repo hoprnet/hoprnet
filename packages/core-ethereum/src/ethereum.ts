@@ -249,7 +249,7 @@ export async function createChainWrapper(providerURI: string, privateKey: Uint8A
       ackTicket.response.toHex(),
       ticket.amount.toBN().toString(),
       ticket.winProb.toBN().toString(),
-      ticket.signature.serialize()
+      ticket.signature.serializeEthereum()
     )
     return transaction.hash
   }

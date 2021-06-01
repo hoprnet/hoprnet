@@ -7,9 +7,11 @@ import Heap from 'heap-js'
 import { randomChoice, HoprDB, stringToU8a } from '@hoprnet/hopr-utils'
 import { Address, ChannelEntry, AccountEntry, Hash, PublicKey, Balance, Snapshot } from '@hoprnet/hopr-utils'
 import { isConfirmedBlock, snapshotComparator } from './utils'
+import { Commitment } from '../commitment'
 import Debug from 'debug'
 import { Multiaddr } from 'multiaddr'
 import { EventEmitter } from 'events'
+import Defer, { DeferredPromise } from 'p-defer'
 
 export type RoutingChannel = [source: PeerId, destination: PeerId, stake: Balance]
 
@@ -25,6 +27,8 @@ class Indexer extends EventEmitter {
   public status: 'started' | 'restarting' | 'stopped' = 'stopped'
   public latestBlock: number = 0 // latest known on-chain block number
   private unconfirmedEvents = new Heap<Event<any>>(snapshotComparator)
+  private address: Address
+  private pendingCommitments: Map<string, DeferredPromise<void>>
 
   constructor(
     private genesisBlock: number,
@@ -34,6 +38,9 @@ class Indexer extends EventEmitter {
     private blockRange: number
   ) {
     super()
+
+    this.address = Address.fromString(this.chain.getWallet().address)
+    this.pendingCommitments = new Map<string, DeferredPromise<void>>()
   }
 
   /**
@@ -68,12 +75,6 @@ class Indexer extends EventEmitter {
       getSyncPercentage(fromBlock - this.genesisBlock, latestOnChainBlock - this.genesisBlock)
     )
 
-    // get past events
-    const lastBlock = await this.processPastEvents(fromBlock, latestOnChainBlock, this.blockRange)
-    fromBlock = lastBlock
-
-    log('Subscribing to events from block %d', fromBlock)
-
     this.chain.subscribeBlock((b) => {
       this.onNewBlock(b)
     })
@@ -84,6 +85,12 @@ class Indexer extends EventEmitter {
     this.chain.subscribeChannelEvents((e) => {
       this.onNewEvents([e])
     })
+
+    // get past events
+    const lastBlock = await this.processPastEvents(fromBlock, latestOnChainBlock, this.blockRange)
+    fromBlock = lastBlock
+
+    log('Subscribing to events from block %d', fromBlock)
 
     this.status = 'started'
     log(chalk.green('Indexer started!'))
@@ -269,7 +276,70 @@ class Indexer extends EventEmitter {
 
   private async onChannelUpdated(event: Event<'ChannelUpdate'>): Promise<void> {
     const channel = ChannelEntry.fromSCEvent(event)
+
     await this.db.updateChannel(channel.getId(), channel)
+
+    if (channel.partyA.eq(this.address) || channel.partyB.eq(this.address)) {
+      this.emit('own-channel-updated', channel)
+
+      if (channel.status !== 'OPEN') {
+        // Only handle open channels
+        return
+      }
+
+      const ticketEpoch = channel.ticketEpochFor(this.address)
+
+      if (ticketEpoch.toBN().isZero()) {
+        await this.onOwnUnsetCommitment(channel)
+      } else if (ticketEpoch.toBN().gten(1)) {
+        this.resolveCommitmentPromise(channel.getId())
+      }
+    }
+  }
+
+  private onOwnUnsetCommitment(channel: ChannelEntry) {
+    const isPartyA = channel.partyA.eq(this.address)
+
+    const counterparty = isPartyA ? channel.partyB : channel.partyA
+
+    log(channel)
+    log(
+      `Found channel ${chalk.yellow(
+        channel.getId().toHex()
+      )} with unset commitment. Setting commitment. Self: ${chalk.yellow(this.address)} Counterparty: ${chalk.yellow(
+        this.address
+      )}`
+    )
+
+    return new Commitment(
+      (comm: Hash) => this.chain.setCommitment(counterparty, comm),
+      async () => (await this.getChannel(channel.getId())).commitmentFor(this.address),
+      this.db,
+      channel.getId(),
+      this
+    ).initialize()
+  }
+
+  public hasPendingCommitment(channelId: Hash): boolean {
+    return this.pendingCommitments.get(channelId.toHex()) != undefined
+  }
+
+  public waitForCommitment(channelId: Hash): Promise<void> {
+    let waiting = this.pendingCommitments.get(channelId.toHex())
+
+    if (waiting != undefined) {
+      return waiting.promise
+    }
+
+    waiting = Defer()
+
+    this.pendingCommitments.set(channelId.toHex(), waiting)
+
+    return waiting.promise
+  }
+
+  private resolveCommitmentPromise(channelId: Hash) {
+    this.pendingCommitments.get(channelId.toHex())?.resolve()
   }
 
   public async getAccount(address: Address) {

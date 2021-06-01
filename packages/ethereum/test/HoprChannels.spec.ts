@@ -336,7 +336,7 @@ describe('with a funded HoprChannel (A: 70, B: 30), secrets initialized', functi
         TICKET_AB_WIN.ticket.ticket.winProb.toHex(),
         TICKET_AB_WIN.ticket.ticket.signature.serializeEthereum()
       )
-    ).to.be.revertedWith('ticket epoch must match')
+    ).to.be.revertedWith('redemptions must be in order')
 
     await expect(
       channels.connect(fixtures.accountB).redeemTicket(
@@ -349,7 +349,7 @@ describe('with a funded HoprChannel (A: 70, B: 30), secrets initialized', functi
         TICKET_AB_WIN.ticket.ticket.winProb.toHex(),
         TICKET_AB_WIN.ticket.ticket.signature.serializeEthereum()
       )
-    ).to.be.revertedWith('redemptions must be in order')
+    ).to.be.revertedWith('revert ticket epoch must match')
   })
 
   it('should fail to redeem ticket when signer is not the issuer', async function () {

@@ -9,8 +9,11 @@ test -z "${HOPR_GITHUB_REF:-}" && (echo "Missing environment variable HOPR_GITHU
 
 # only do work when there are actual changes
 if [ -n "$(git status --porcelain)" ]; then
-  git pull origin "${HOPR_GITHUB_REF}"
   git add .
   git commit -m "${HOPR_GIT_MSG}"
-  git push origin "${HOPR_GITHUB_REF}"
 fi
+
+# must get the latest version of the branch from origin before pushing
+git pull origin "${HOPR_GITHUB_REF}" --rebase
+
+git push origin "${HOPR_GITHUB_REF}"

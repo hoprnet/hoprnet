@@ -858,14 +858,14 @@ ___
 
 ### iterateHash
 
-▸ **iterateHash**(`seed`: Uint8Array \| *undefined*, `hashFunc`: (`preImage`: Uint8Array) => *Promise*<Uint8Array\> \| Uint8Array, `iterations`: *number*, `stepSize`: *number*, `hint?`: (`index`: *number*) => Uint8Array \| *undefined* \| *Promise*<Uint8Array \| undefined\>): *Promise*<{ `hash`: Uint8Array ; `intermediates`: [*Intermediate*](interfaces/intermediate.md)[]  }\>
+▸ **iterateHash**(`seed`: Uint8Array \| *undefined*, `hashFunc`: (`preImage`: Uint8Array) => Uint8Array, `iterations`: *number*, `stepSize`: *number*, `hint?`: (`index`: *number*) => Uint8Array \| *undefined* \| *Promise*<Uint8Array \| undefined\>): *Promise*<{ `hash`: Uint8Array ; `intermediates`: [*Intermediate*](interfaces/intermediate.md)[]  }\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
 | `seed` | Uint8Array \| *undefined* |
-| `hashFunc` | (`preImage`: Uint8Array) => *Promise*<Uint8Array\> \| Uint8Array |
+| `hashFunc` | (`preImage`: Uint8Array) => Uint8Array |
 | `iterations` | *number* |
 | `stepSize` | *number* |
 | `hint?` | (`index`: *number*) => Uint8Array \| *undefined* \| *Promise*<Uint8Array \| undefined\> |
@@ -1235,14 +1235,14 @@ ___
 
 ### recoverIteratedHash
 
-▸ **recoverIteratedHash**(`hashValue`: Uint8Array, `hashFunc`: (`preImage`: Uint8Array) => *Promise*<Uint8Array\> \| Uint8Array, `hint`: (`index`: *number*) => *Promise*<Uint8Array\>, `maxIterations`: *number*, `stepSize?`: *number*, `indexHint?`: *number*): *Promise*<[*Intermediate*](interfaces/intermediate.md) \| undefined\>
+▸ **recoverIteratedHash**(`hashValue`: Uint8Array, `hashFunc`: (`preImage`: Uint8Array) => Uint8Array, `hint`: (`index`: *number*) => *Promise*<Uint8Array\>, `maxIterations`: *number*, `stepSize?`: *number*, `indexHint?`: *number*): *Promise*<[*Intermediate*](interfaces/intermediate.md) \| undefined\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
 | `hashValue` | Uint8Array |
-| `hashFunc` | (`preImage`: Uint8Array) => *Promise*<Uint8Array\> \| Uint8Array |
+| `hashFunc` | (`preImage`: Uint8Array) => Uint8Array |
 | `hint` | (`index`: *number*) => *Promise*<Uint8Array\> |
 | `maxIterations` | *number* |
 | `stepSize?` | *number* |

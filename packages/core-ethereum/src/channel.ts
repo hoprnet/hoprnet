@@ -22,7 +22,6 @@ import type { HoprDB } from '@hoprnet/hopr-utils'
 const log = Debug('hopr-core-ethereum:channel')
 
 class Channel {
-  private index: number
   private commitment: Commitment
 
   constructor(
@@ -33,12 +32,12 @@ class Channel {
     private readonly indexer: Indexer,
     private readonly privateKey: Uint8Array
   ) {
-    this.index = 0 // TODO - bump channel epoch to make sure..
     this.commitment = new Commitment(
       (commitment: Hash) => this.chain.setCommitment(counterparty.toAddress(), commitment),
       () => this.getChainCommitment(),
       this.db,
-      this.getId()
+      this.getId(),
+      indexer
     )
   }
 
@@ -63,13 +62,11 @@ class Channel {
 
     const ticket = unacknowledgedTicket.ticket
 
-    if (ticket.isWinningTicket(await this.commitment.getCurrentCommitment(), response, ticket.winProb)) {
-      const ack = new AcknowledgedTicket(
-        ticket,
-        response,
-        await this.commitment.getCurrentCommitment(),
-        unacknowledgedTicket.signer
-      )
+    const opening = await this.commitment.findPreImage(await this.commitment.getCurrentCommitment())
+
+    if (ticket.isWinningTicket(opening, response, ticket.winProb)) {
+      const ack = new AcknowledgedTicket(ticket, response, opening, unacknowledgedTicket.signer)
+
       await this.commitment.bumpCommitment()
       return ack
     } else {
@@ -155,6 +152,23 @@ class Channel {
     return await this.chain.finalizeChannelClosure(counterpartyAddress)
   }
 
+  private async bumpTicketIndex(channelState: ChannelEntry): Promise<UINT256> {
+    const isPartyA = this.self.toAddress().eq(channelState.partyA)
+
+    let currentTicketIndex: UINT256
+
+    if (isPartyA) {
+      currentTicketIndex = channelState.partyATicketIndex
+      channelState.partyATicketIndex.toBN().iaddn(1)
+    } else {
+      currentTicketIndex = channelState.partyBTicketIndex
+      channelState.partyBTicketIndex.toBN().iaddn(1)
+    }
+
+    await this.db.updateChannel(this.getId(), channelState)
+
+    return currentTicketIndex
+  }
   /**
    * Creates a signed ticket that includes the given amount of
    * tokens
@@ -170,11 +184,13 @@ class Channel {
     const counterpartyAddress = this.counterparty.toAddress()
     const channelState = await this.getState()
 
+    const currentTicketIndex = await this.bumpTicketIndex(channelState)
+
     return Ticket.create(
       counterpartyAddress,
       challenge,
-      channelState.ticketEpochFor(this.counterparty.toAddress()),
-      new UINT256(new BN(this.index++)),
+      channelState.ticketEpochFor(counterpartyAddress),
+      currentTicketIndex,
       amount,
       UINT256.fromInverseProbability(winProb),
       channelState.channelEpoch,
@@ -194,7 +210,7 @@ class Channel {
       this.counterparty.toAddress(),
       challenge,
       UINT256.fromString('0'),
-      new UINT256(new BN(this.index++)),
+      UINT256.fromString('0'),
       new Balance(new BN(0)),
       UINT256.DUMMY_INVERSE_PROBABILITY,
       UINT256.fromString('0'),
