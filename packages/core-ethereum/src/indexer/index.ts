@@ -11,6 +11,7 @@ import { Commitment } from '../commitment'
 import Debug from 'debug'
 import { Multiaddr } from 'multiaddr'
 import { EventEmitter } from 'events'
+import Defer, { DeferredPromise } from 'p-defer'
 
 export type RoutingChannel = [source: PeerId, destination: PeerId, stake: Balance]
 
@@ -27,6 +28,7 @@ class Indexer extends EventEmitter {
   public latestBlock: number = 0 // latest known on-chain block number
   private unconfirmedEvents = new Heap<Event<any>>(snapshotComparator)
   private address: Address
+  private pendingCommitments: Map<string, DeferredPromise<void>>
 
   constructor(
     private genesisBlock: number,
@@ -38,6 +40,7 @@ class Indexer extends EventEmitter {
     super()
 
     this.address = Address.fromString(this.chain.getWallet().address)
+    this.pendingCommitments = new Map<string, DeferredPromise<void>>()
   }
 
   /**
@@ -289,7 +292,7 @@ class Indexer extends EventEmitter {
       if (ticketEpoch.toBN().isZero()) {
         await this.onOwnUnsetCommitment(channel)
       } else if (ticketEpoch.toBN().gten(1)) {
-        this.emit(`commitment-set-${channel.getId().toHex()}`)
+        this.resolveCommitmentPromise(channel.getId())
       }
     }
   }
@@ -299,7 +302,7 @@ class Indexer extends EventEmitter {
 
     const counterparty = isPartyA ? channel.partyB : channel.partyA
 
-    log(`No commitment set for channel ${chalk.yellow(channel.getId().toHex())}. Setting commitment`)
+    log(`Found channel ${chalk.yellow(channel.getId().toHex())} with unset commitment. Setting commitment`)
 
     return new Commitment(
       (comm: Hash) => this.chain.setCommitment(counterparty, comm),
@@ -308,6 +311,28 @@ class Indexer extends EventEmitter {
       channel.getId(),
       this
     ).initialize()
+  }
+
+  public hasPendingCommitment(channelId: Hash): boolean {
+    return this.pendingCommitments.get(channelId.toHex()) != undefined
+  }
+
+  public waitForCommitment(channelId: Hash): Promise<void> {
+    let waiting = this.pendingCommitments.get(channelId.toHex())
+
+    if (waiting != undefined) {
+      return waiting.promise
+    }
+
+    waiting = Defer()
+
+    this.pendingCommitments.set(channelId.toHex(), waiting)
+
+    return waiting.promise
+  }
+
+  private resolveCommitmentPromise(channelId: Hash) {
+    this.pendingCommitments.get(channelId.toHex())?.resolve()
   }
 
   public async getAccount(address: Address) {

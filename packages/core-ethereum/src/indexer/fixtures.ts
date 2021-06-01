@@ -125,6 +125,8 @@ export const COMMITMENT_SET_A = {
   } as any
 } as Event<'ChannelUpdate'>
 
+export const COMMITMENT_SET_A_CHANNEL = ChannelEntry.fromSCEvent(COMMITMENT_SET_A)
+
 export const COMMITMENT_SET_B = {
   event: 'ChannelUpdate',
   transactionHash: '',

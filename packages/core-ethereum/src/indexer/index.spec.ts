@@ -257,19 +257,19 @@ describe('test indexer', function () {
     expectAccountsToBeEqual(account, fixtures.PARTY_A_INITIALIZED_ACCOUNT)
 
     const channel = await indexer.getChannel(fixtures.OPENED_CHANNEL.getId())
-    expectChannelsToBeEqual(channel, fixtures.OPENED_CHANNEL)
+    expectChannelsToBeEqual(channel, fixtures.COMMITMENT_SET_A_CHANNEL)
 
     const channels = await indexer.getChannels()
     assert.strictEqual(channels.length, 1, 'expected channels')
-    expectChannelsToBeEqual(channels[0], fixtures.OPENED_CHANNEL)
+    expectChannelsToBeEqual(channels[0], fixtures.COMMITMENT_SET_A_CHANNEL)
 
     const channelsOfPartyA = await indexer.getChannelsOf(fixtures.PARTY_A.toAddress())
     assert.strictEqual(channelsOfPartyA.length, 1)
-    expectChannelsToBeEqual(channelsOfPartyA[0], fixtures.OPENED_CHANNEL)
+    expectChannelsToBeEqual(channelsOfPartyA[0], fixtures.COMMITMENT_SET_A_CHANNEL)
 
     const channelsOfPartyB = await indexer.getChannelsOf(fixtures.PARTY_B.toAddress())
     assert.strictEqual(channelsOfPartyB.length, 1)
-    expectChannelsToBeEqual(channelsOfPartyB[0], fixtures.OPENED_CHANNEL)
+    expectChannelsToBeEqual(channelsOfPartyB[0], fixtures.COMMITMENT_SET_A_CHANNEL)
   })
 
   it('should handle provider error by restarting', async function () {
@@ -303,20 +303,15 @@ describe('test indexer', function () {
   })
 
   it('should emit events on updated channels', async function () {
-    const { indexer, newEvent, newBlock, hoprChannels } = useFixtures({
+    const { indexer, newEvent, newBlock } = useFixtures({
       latestBlockNumber: 3,
       pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT]
     })
 
-    const channelId = Channel.generateId(fixtures.PARTY_A.toAddress(), fixtures.PARTY_B.toAddress())
-
     const opened = Defer()
     const commitmentSet = Defer()
-    const commitmentUpdated = Defer()
     const pendingIniated = Defer()
     const closed = Defer()
-
-    indexer.on(`commitment-set-${channelId.toHex()}`, commitmentUpdated.resolve)
 
     indexer.on('own-channel-updated', (channel: ChannelEntry) => {
       switch (channel.status) {
@@ -340,11 +335,11 @@ describe('test indexer', function () {
     await indexer.start()
 
     newEvent(fixtures.OPENED_EVENT)
+
+    newBlock()
     newBlock()
 
-    hoprChannels.once('*', newBlock)
-
-    await Promise.all([opened.promise, commitmentUpdated.promise, commitmentSet.promise])
+    await Promise.all([opened.promise, commitmentSet.promise])
 
     newEvent(fixtures.PENDING_CLOSURE_EVENT)
     newBlock()
@@ -364,18 +359,11 @@ describe('test indexer', function () {
     expectChannelsToBeEqual(channelsOfPartyAAfterClose[0], fixtures.CLOSED_CHANNEL)
   })
 
-  it.only('should start two indexers and should set commitments only once', async function () {
-    this.timeout(6e3)
-
-    const commitmentSetA = Defer()
-    const commitmentSetB = Defer()
-    const { hoprChannels, alice, bob, newBlock } = useMultiPartyFixtures({
+  it('should start two indexers and should set commitments only once', async function () {
+    const { alice, bob, newBlock } = useMultiPartyFixtures({
       latestBlockNumber: 3,
       pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.PARTY_B_INITIALIZED_EVENT, fixtures.OPENED_EVENT]
     })
-
-    alice.indexer.once(`commitment-set-${CHANNEL_ID}`, commitmentSetA.resolve)
-    bob.indexer.once(`commitment-set-${CHANNEL_ID}`, commitmentSetB.resolve)
 
     await Promise.all([
       // prettier-ignore
@@ -383,19 +371,13 @@ describe('test indexer', function () {
       bob.indexer.start()
     ])
 
-    await new Promise((resolve) => setTimeout(resolve, 500))
-
     newBlock()
     newBlock()
     newBlock()
 
-
-    await Promise.all([commitmentSetA.promise, commitmentSetB.promise])
-    // await Promise.all([
-    //   once(alice.indexer, `commitment-set-${CHANNEL_ID}`),
-    //   once(bob.indexer, `commitment-set-${CHANNEL_ID}`)
-    // ])
-
-    await new Promise((resolve) => setTimeout(resolve, 1000))
+    await Promise.all([
+      alice.indexer.waitForCommitment(new Hash(stringToU8a(CHANNEL_ID))),
+      bob.indexer.waitForCommitment(new Hash(stringToU8a(CHANNEL_ID)))
+    ])
   })
 })
