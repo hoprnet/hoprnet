@@ -68,6 +68,12 @@ class Channel {
     if (ticket.isWinningTicket(opening, response, ticket.winProb)) {
       const ack = new AcknowledgedTicket(ticket, response, opening, unacknowledgedTicket.signer)
 
+      log(
+        `Acknowledging ticket. Using opening ${chalk.yellow(opening.toHex())} and response ${chalk.green(
+          response.toHex()
+        )}`
+      )
+
       await this.commitment.bumpCommitment()
       return ack
     } else {
