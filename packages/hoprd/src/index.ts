@@ -149,9 +149,9 @@ function addUnhandledPromiseRejectionHandler() {
 }
 
 async function main() {
-  // Starting with Node.js 15, undhandled promise rejection terminate the
+  // Starting with Node.js 15, undhandled promise rejections terminate the
   // process with a non-zero exit code, which makes debugging quite difficult.
-  // Therefore adding a promise rejection handler to make that the origin of
+  // Therefore adding a promise rejection handler to make sure that the origin of
   // the rejected promise can be detected.
   addUnhandledPromiseRejectionHandler()
 
