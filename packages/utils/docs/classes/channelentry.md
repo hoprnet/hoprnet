@@ -36,6 +36,7 @@
 - [serialize](channelentry.md#serialize)
 - [ticketEpochFor](channelentry.md#ticketepochfor)
 - [ticketIndexFor](channelentry.md#ticketindexfor)
+- [toString](channelentry.md#tostring)
 - [totalBalance](channelentry.md#totalbalance)
 - [deserialize](channelentry.md#deserialize)
 - [fromSCEvent](channelentry.md#fromscevent)
@@ -67,7 +68,7 @@
 
 #### Defined in
 
-[types/channelEntry.ts:61](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L61)
+[types/channelEntry.ts:62](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L62)
 
 ## Properties
 
@@ -165,7 +166,7 @@ ___
 
 #### Defined in
 
-[types/channelEntry.ts:79](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L79)
+[types/channelEntry.ts:80](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L80)
 
 ## Methods
 
@@ -185,7 +186,7 @@ ___
 
 #### Defined in
 
-[types/channelEntry.ts:161](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L161)
+[types/channelEntry.ts:183](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L183)
 
 ___
 
@@ -199,7 +200,7 @@ ___
 
 #### Defined in
 
-[types/channelEntry.ts:133](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L133)
+[types/channelEntry.ts:155](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L155)
 
 ___
 
@@ -213,7 +214,7 @@ ___
 
 #### Defined in
 
-[types/channelEntry.ts:114](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L114)
+[types/channelEntry.ts:115](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L115)
 
 ___
 
@@ -233,7 +234,7 @@ ___
 
 #### Defined in
 
-[types/channelEntry.ts:141](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L141)
+[types/channelEntry.ts:163](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L163)
 
 ___
 
@@ -253,7 +254,21 @@ ___
 
 #### Defined in
 
-[types/channelEntry.ts:151](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L151)
+[types/channelEntry.ts:173](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L173)
+
+___
+
+### toString
+
+▸ **toString**(): `string`
+
+#### Returns
+
+`string`
+
+#### Defined in
+
+[types/channelEntry.ts:134](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L134)
 
 ___
 
@@ -267,7 +282,7 @@ ___
 
 #### Defined in
 
-[types/channelEntry.ts:137](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L137)
+[types/channelEntry.ts:159](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L159)
 
 ___
 
@@ -287,7 +302,7 @@ ___
 
 #### Defined in
 
-[types/channelEntry.ts:83](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L83)
+[types/channelEntry.ts:84](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L84)
 
 ___
 
@@ -307,4 +322,4 @@ ___
 
 #### Defined in
 
-[types/channelEntry.ts:93](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L93)
+[types/channelEntry.ts:94](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L94)

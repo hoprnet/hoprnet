@@ -139,7 +139,7 @@
 
 #### Defined in
 
-[types/channelEntry.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L6)
+[types/channelEntry.ts:7](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L7)
 
 ___
 
@@ -851,7 +851,7 @@ ___
 
 #### Defined in
 
-[types/channelEntry.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L8)
+[types/channelEntry.ts:9](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L9)
 
 ___
 
@@ -1876,7 +1876,7 @@ ___
 
 #### Defined in
 
-[db.ts:27](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L27)
+[db.ts:28](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L28)
 
 ___
 

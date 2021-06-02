@@ -32,6 +32,7 @@
 - [recoverSigner](ticket.md#recoversigner)
 - [serialize](ticket.md#serialize)
 - [serializeUnsigned](ticket.md#serializeunsigned)
+- [toString](ticket.md#tostring)
 - [verify](ticket.md#verify)
 - [create](ticket.md#create)
 - [deserialize](ticket.md#deserialize)
@@ -119,7 +120,7 @@ ___
 
 #### Defined in
 
-[types/ticket.ts:125](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L125)
+[types/ticket.ts:139](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L139)
 
 ## Methods
 
@@ -133,7 +134,7 @@ ___
 
 #### Defined in
 
-[types/ticket.ts:121](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L121)
+[types/ticket.ts:135](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L135)
 
 ___
 
@@ -154,7 +155,7 @@ ___
 
 #### Defined in
 
-[types/ticket.ts:146](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L146)
+[types/ticket.ts:160](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L160)
 
 ___
 
@@ -175,7 +176,7 @@ ___
 
 #### Defined in
 
-[types/ticket.ts:170](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L170)
+[types/ticket.ts:184](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L184)
 
 ___
 
@@ -203,7 +204,7 @@ a ticket before we submit it to the blockchain.
 
 #### Defined in
 
-[types/ticket.ts:165](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L165)
+[types/ticket.ts:179](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L179)
 
 ___
 
@@ -217,7 +218,7 @@ ___
 
 #### Defined in
 
-[types/ticket.ts:138](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L138)
+[types/ticket.ts:152](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L152)
 
 ___
 
@@ -249,6 +250,20 @@ ___
 
 ___
 
+### toString
+
+▸ **toString**(): `string`
+
+#### Returns
+
+`string`
+
+#### Defined in
+
+[types/ticket.ts:121](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L121)
+
+___
+
 ### verify
 
 ▸ **verify**(`pubKey`): `boolean`
@@ -265,7 +280,7 @@ ___
 
 #### Defined in
 
-[types/ticket.ts:142](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L142)
+[types/ticket.ts:156](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ticket.ts#L156)
 
 ___
 

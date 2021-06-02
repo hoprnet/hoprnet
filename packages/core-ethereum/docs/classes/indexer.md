@@ -45,7 +45,6 @@ Also keeps track of the latest block number.
 - [getPublicKeyOf](indexer.md#getpublickeyof)
 - [getPublicNodes](indexer.md#getpublicnodes)
 - [getRandomChannel](indexer.md#getrandomchannel)
-- [hasPendingCommitment](indexer.md#haspendingcommitment)
 - [listenerCount](indexer.md#listenercount)
 - [listeners](indexer.md#listeners)
 - [off](indexer.md#off)
@@ -321,7 +320,7 @@ ___
 
 #### Defined in
 
-[core-ethereum/src/indexer/index.ts:345](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L345)
+[core-ethereum/src/indexer/index.ts:334](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L334)
 
 ___
 
@@ -335,7 +334,7 @@ ___
 
 #### Defined in
 
-[core-ethereum/src/indexer/index.ts:388](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L388)
+[core-ethereum/src/indexer/index.ts:377](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L377)
 
 ___
 
@@ -355,7 +354,7 @@ ___
 
 #### Defined in
 
-[core-ethereum/src/indexer/index.ts:349](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L349)
+[core-ethereum/src/indexer/index.ts:338](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L338)
 
 ___
 
@@ -375,7 +374,7 @@ ___
 
 #### Defined in
 
-[core-ethereum/src/indexer/index.ts:353](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L353)
+[core-ethereum/src/indexer/index.ts:342](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L342)
 
 ___
 
@@ -395,7 +394,7 @@ ___
 
 #### Defined in
 
-[core-ethereum/src/indexer/index.ts:412](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L412)
+[core-ethereum/src/indexer/index.ts:401](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L401)
 
 ___
 
@@ -415,7 +414,7 @@ ___
 
 #### Defined in
 
-[core-ethereum/src/indexer/index.ts:357](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L357)
+[core-ethereum/src/indexer/index.ts:346](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L346)
 
 ___
 
@@ -453,7 +452,7 @@ ___
 
 #### Defined in
 
-[core-ethereum/src/indexer/index.ts:364](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L364)
+[core-ethereum/src/indexer/index.ts:353](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L353)
 
 ___
 
@@ -467,7 +466,7 @@ ___
 
 #### Defined in
 
-[core-ethereum/src/indexer/index.ts:392](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L392)
+[core-ethereum/src/indexer/index.ts:381](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L381)
 
 ___
 
@@ -481,27 +480,7 @@ ___
 
 #### Defined in
 
-[core-ethereum/src/indexer/index.ts:398](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L398)
-
-___
-
-### hasPendingCommitment
-
-▸ **hasPendingCommitment**(`channelId`): `boolean`
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `channelId` | `Hash` |
-
-#### Returns
-
-`boolean`
-
-#### Defined in
-
-[core-ethereum/src/indexer/index.ts:323](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L323)
+[core-ethereum/src/indexer/index.ts:387](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L387)
 
 ___
 
@@ -707,7 +686,7 @@ ___
 
 #### Defined in
 
-[core-ethereum/src/indexer/index.ts:300](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L300)
+[core-ethereum/src/indexer/index.ts:302](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L302)
 
 ___
 
@@ -903,7 +882,7 @@ ___
 
 #### Defined in
 
-[core-ethereum/src/indexer/index.ts:341](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L341)
+[core-ethereum/src/indexer/index.ts:330](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L330)
 
 ___
 
@@ -994,7 +973,7 @@ ___
 
 #### Defined in
 
-[core-ethereum/src/indexer/index.ts:373](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L373)
+[core-ethereum/src/indexer/index.ts:362](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L362)
 
 ___
 
@@ -1014,7 +993,7 @@ ___
 
 #### Defined in
 
-[core-ethereum/src/indexer/index.ts:327](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L327)
+[core-ethereum/src/indexer/index.ts:318](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L318)
 
 ___
 
