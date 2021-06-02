@@ -314,7 +314,7 @@ class Indexer extends EventEmitter {
       this
     ).initialize()
   }
-  
+
   public waitForCommitment(channelId: Hash): Promise<void> {
     let waiting = this.pendingCommitments.get(channelId.toHex())
 
