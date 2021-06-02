@@ -193,7 +193,7 @@ class Channel {
       this.privateKey
     )
 
-    log(`creating ticket in channel ${chalk.yellow(channelState.getId().toHex())}. Ticket data: \n${ticket.toString()}`)
+    log(`Creating ticket in channel ${chalk.yellow(channelState.getId().toHex())}. Ticket data: \n${ticket.toString()}`)
 
     return ticket
   }
