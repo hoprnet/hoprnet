@@ -4,7 +4,7 @@
 
 ## Hierarchy
 
-- *Contract*
+- `Contract`
 
   ↳ **StandardToken**
 
@@ -73,1021 +73,1297 @@
 
 ### constructor
 
-\+ **new StandardToken**(`addressOrName`: *string*, `contractInterface`: ContractInterface, `signerOrProvider?`: *Signer* \| *Provider*): [*StandardToken*](standardtoken.md)
+• **new StandardToken**(`addressOrName`, `contractInterface`, `signerOrProvider?`)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `addressOrName` | *string* |
-| `contractInterface` | ContractInterface |
-| `signerOrProvider?` | *Signer* \| *Provider* |
+| `addressOrName` | `string` |
+| `contractInterface` | `ContractInterface` |
+| `signerOrProvider?` | `Signer` \| `Provider` |
 
-**Returns:** [*StandardToken*](standardtoken.md)
+#### Inherited from
 
-Inherited from: Contract.constructor
+Contract.constructor
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:98
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:98
 
 ## Properties
 
 ### \_deployedPromise
 
-• **\_deployedPromise**: *Promise*<Contract\>
+• **\_deployedPromise**: `Promise`<Contract\>
 
-Inherited from: Contract.\_deployedPromise
+#### Inherited from
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:92
+Contract.\_deployedPromise
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:92
 
 ___
 
 ### \_runningEvents
 
-• **\_runningEvents**: *object*
+• **\_runningEvents**: `Object`
 
-#### Type declaration
+#### Index signature
 
-Inherited from: Contract.\_runningEvents
+▪ [eventTag: `string`]: `RunningEvent`
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:93
+#### Inherited from
+
+Contract.\_runningEvents
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:93
 
 ___
 
 ### \_wrappedEmits
 
-• **\_wrappedEmits**: *object*
+• **\_wrappedEmits**: `Object`
 
-#### Type declaration
+#### Index signature
 
-Inherited from: Contract.\_wrappedEmits
+▪ [eventTag: `string`]: (...`args`: `any`[]) => `void`
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:96
+#### Inherited from
+
+Contract.\_wrappedEmits
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:96
 
 ___
 
 ### address
 
-• `Readonly` **address**: *string*
+• `Readonly` **address**: `string`
 
-Inherited from: Contract.address
+#### Inherited from
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:71
+Contract.address
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:71
 
 ___
 
 ### callStatic
 
-• **callStatic**: *object*
+• **callStatic**: `Object`
 
 #### Type declaration
 
 | Name | Type |
 | :------ | :------ |
-| `allowance` | (`_owner`: *string*, `_spender`: *string*, `overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `allowance(address,address)` | (`_owner`: *string*, `_spender`: *string*, `overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `approve` | (`_spender`: *string*, `_value`: BigNumberish, `overrides?`: CallOverrides) => *Promise*<boolean\> |
-| `approve(address,uint256)` | (`_spender`: *string*, `_value`: BigNumberish, `overrides?`: CallOverrides) => *Promise*<boolean\> |
-| `balanceOf` | (`_owner`: *string*, `overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `balanceOf(address)` | (`_owner`: *string*, `overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `decreaseApproval` | (`_spender`: *string*, `_subtractedValue`: BigNumberish, `overrides?`: CallOverrides) => *Promise*<boolean\> |
-| `decreaseApproval(address,uint256)` | (`_spender`: *string*, `_subtractedValue`: BigNumberish, `overrides?`: CallOverrides) => *Promise*<boolean\> |
-| `increaseApproval` | (`_spender`: *string*, `_addedValue`: BigNumberish, `overrides?`: CallOverrides) => *Promise*<boolean\> |
-| `increaseApproval(address,uint256)` | (`_spender`: *string*, `_addedValue`: BigNumberish, `overrides?`: CallOverrides) => *Promise*<boolean\> |
-| `totalSupply` | (`overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `totalSupply()` | (`overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `transfer` | (`_to`: *string*, `_value`: BigNumberish, `overrides?`: CallOverrides) => *Promise*<boolean\> |
-| `transfer(address,uint256)` | (`_to`: *string*, `_value`: BigNumberish, `overrides?`: CallOverrides) => *Promise*<boolean\> |
-| `transferFrom` | (`_from`: *string*, `_to`: *string*, `_value`: BigNumberish, `overrides?`: CallOverrides) => *Promise*<boolean\> |
-| `transferFrom(address,address,uint256)` | (`_from`: *string*, `_to`: *string*, `_value`: BigNumberish, `overrides?`: CallOverrides) => *Promise*<boolean\> |
+| `allowance` | (`_owner`: `string`, `_spender`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `allowance(address,address)` | (`_owner`: `string`, `_spender`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `approve` | (`_spender`: `string`, `_value`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<boolean\> |
+| `approve(address,uint256)` | (`_spender`: `string`, `_value`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<boolean\> |
+| `balanceOf` | (`_owner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `balanceOf(address)` | (`_owner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `decreaseApproval` | (`_spender`: `string`, `_subtractedValue`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<boolean\> |
+| `decreaseApproval(address,uint256)` | (`_spender`: `string`, `_subtractedValue`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<boolean\> |
+| `increaseApproval` | (`_spender`: `string`, `_addedValue`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<boolean\> |
+| `increaseApproval(address,uint256)` | (`_spender`: `string`, `_addedValue`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<boolean\> |
+| `totalSupply` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `totalSupply()` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `transfer` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<boolean\> |
+| `transfer(address,uint256)` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<boolean\> |
+| `transferFrom` | (`_from`: `string`, `_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<boolean\> |
+| `transferFrom(address,address,uint256)` | (`_from`: `string`, `_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<boolean\> |
 
-Overrides: Contract.callStatic
+#### Overrides
 
-Defined in: packages/ethereum/types/StandardToken.d.ts:309
+Contract.callStatic
+
+#### Defined in
+
+packages/ethereum/types/StandardToken.d.ts:309
 
 ___
 
 ### deployTransaction
 
-• `Readonly` **deployTransaction**: TransactionResponse
+• `Readonly` **deployTransaction**: `TransactionResponse`
 
-Inherited from: Contract.deployTransaction
+#### Inherited from
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:91
+Contract.deployTransaction
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:91
 
 ___
 
 ### estimateGas
 
-• **estimateGas**: *object*
+• **estimateGas**: `Object`
 
 #### Type declaration
 
 | Name | Type |
 | :------ | :------ |
-| `allowance` | (`_owner`: *string*, `_spender`: *string*, `overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `allowance(address,address)` | (`_owner`: *string*, `_spender`: *string*, `overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `approve` | (`_spender`: *string*, `_value`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<BigNumber\> |
-| `approve(address,uint256)` | (`_spender`: *string*, `_value`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<BigNumber\> |
-| `balanceOf` | (`_owner`: *string*, `overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `balanceOf(address)` | (`_owner`: *string*, `overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `decreaseApproval` | (`_spender`: *string*, `_subtractedValue`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<BigNumber\> |
-| `decreaseApproval(address,uint256)` | (`_spender`: *string*, `_subtractedValue`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<BigNumber\> |
-| `increaseApproval` | (`_spender`: *string*, `_addedValue`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<BigNumber\> |
-| `increaseApproval(address,uint256)` | (`_spender`: *string*, `_addedValue`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<BigNumber\> |
-| `totalSupply` | (`overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `totalSupply()` | (`overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `transfer` | (`_to`: *string*, `_value`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<BigNumber\> |
-| `transfer(address,uint256)` | (`_to`: *string*, `_value`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<BigNumber\> |
-| `transferFrom` | (`_from`: *string*, `_to`: *string*, `_value`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<BigNumber\> |
-| `transferFrom(address,address,uint256)` | (`_from`: *string*, `_to`: *string*, `_value`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<BigNumber\> |
+| `allowance` | (`_owner`: `string`, `_spender`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `allowance(address,address)` | (`_owner`: `string`, `_spender`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `approve` | (`_spender`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `approve(address,uint256)` | (`_spender`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `balanceOf` | (`_owner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `balanceOf(address)` | (`_owner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `decreaseApproval` | (`_spender`: `string`, `_subtractedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `decreaseApproval(address,uint256)` | (`_spender`: `string`, `_subtractedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `increaseApproval` | (`_spender`: `string`, `_addedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `increaseApproval(address,uint256)` | (`_spender`: `string`, `_addedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `totalSupply` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `totalSupply()` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `transfer` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `transfer(address,uint256)` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `transferFrom` | (`_from`: `string`, `_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `transferFrom(address,address,uint256)` | (`_from`: `string`, `_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
 
-Overrides: Contract.estimateGas
+#### Overrides
 
-Defined in: packages/ethereum/types/StandardToken.d.ts:416
+Contract.estimateGas
+
+#### Defined in
+
+packages/ethereum/types/StandardToken.d.ts:416
 
 ___
 
 ### filters
 
-• **filters**: *object*
+• **filters**: `Object`
 
 #### Type declaration
 
 | Name | Type |
 | :------ | :------ |
-| `Approval` | (`owner`: *string*, `spender`: *string*, `value`: ``null``) => [*TypedEventFilter*](../interfaces/typedeventfilter.md)<[*string*, *string*, *BigNumber*], { `owner`: *string* ; `spender`: *string* ; `value`: *BigNumber*  }\> |
-| `Transfer` | (`from`: *string*, `to`: *string*, `value`: ``null``) => [*TypedEventFilter*](../interfaces/typedeventfilter.md)<[*string*, *string*, *BigNumber*], { `from`: *string* ; `to`: *string* ; `value`: *BigNumber*  }\> |
+| `Approval` | (`owner`: `string`, `spender`: `string`, `value`: ``null``) => [TypedEventFilter](../interfaces/typedeventfilter.md)<[`string`, `string`, `BigNumber`], `Object`\> |
+| `Transfer` | (`from`: `string`, `to`: `string`, `value`: ``null``) => [TypedEventFilter](../interfaces/typedeventfilter.md)<[`string`, `string`, `BigNumber`], `Object`\> |
 
-Overrides: Contract.filters
+#### Overrides
 
-Defined in: packages/ethereum/types/StandardToken.d.ts:396
+Contract.filters
+
+#### Defined in
+
+packages/ethereum/types/StandardToken.d.ts:396
 
 ___
 
 ### functions
 
-• **functions**: *object*
+• **functions**: `Object`
 
 #### Type declaration
 
 | Name | Type |
 | :------ | :------ |
-| `allowance` | (`_owner`: *string*, `_spender`: *string*, `overrides?`: CallOverrides) => *Promise*<[*BigNumber*]\> |
-| `allowance(address,address)` | (`_owner`: *string*, `_spender`: *string*, `overrides?`: CallOverrides) => *Promise*<[*BigNumber*]\> |
-| `approve` | (`_spender`: *string*, `_value`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<ContractTransaction\> |
-| `approve(address,uint256)` | (`_spender`: *string*, `_value`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<ContractTransaction\> |
-| `balanceOf` | (`_owner`: *string*, `overrides?`: CallOverrides) => *Promise*<[*BigNumber*]\> |
-| `balanceOf(address)` | (`_owner`: *string*, `overrides?`: CallOverrides) => *Promise*<[*BigNumber*]\> |
-| `decreaseApproval` | (`_spender`: *string*, `_subtractedValue`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<ContractTransaction\> |
-| `decreaseApproval(address,uint256)` | (`_spender`: *string*, `_subtractedValue`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<ContractTransaction\> |
-| `increaseApproval` | (`_spender`: *string*, `_addedValue`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<ContractTransaction\> |
-| `increaseApproval(address,uint256)` | (`_spender`: *string*, `_addedValue`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<ContractTransaction\> |
-| `totalSupply` | (`overrides?`: CallOverrides) => *Promise*<[*BigNumber*]\> |
-| `totalSupply()` | (`overrides?`: CallOverrides) => *Promise*<[*BigNumber*]\> |
-| `transfer` | (`_to`: *string*, `_value`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<ContractTransaction\> |
-| `transfer(address,uint256)` | (`_to`: *string*, `_value`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<ContractTransaction\> |
-| `transferFrom` | (`_from`: *string*, `_to`: *string*, `_value`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<ContractTransaction\> |
-| `transferFrom(address,address,uint256)` | (`_from`: *string*, `_to`: *string*, `_value`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<ContractTransaction\> |
+| `allowance` | (`_owner`: `string`, `_spender`: `string`, `overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
+| `allowance(address,address)` | (`_owner`: `string`, `_spender`: `string`, `overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
+| `approve` | (`_spender`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `approve(address,uint256)` | (`_spender`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `balanceOf` | (`_owner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
+| `balanceOf(address)` | (`_owner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
+| `decreaseApproval` | (`_spender`: `string`, `_subtractedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `decreaseApproval(address,uint256)` | (`_spender`: `string`, `_subtractedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `increaseApproval` | (`_spender`: `string`, `_addedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `increaseApproval(address,uint256)` | (`_spender`: `string`, `_addedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `totalSupply` | (`overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
+| `totalSupply()` | (`overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
+| `transfer` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `transfer(address,uint256)` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `transferFrom` | (`_from`: `string`, `_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `transferFrom(address,address,uint256)` | (`_from`: `string`, `_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
 
-Overrides: Contract.functions
+#### Overrides
 
-Defined in: packages/ethereum/types/StandardToken.d.ts:137
+Contract.functions
+
+#### Defined in
+
+packages/ethereum/types/StandardToken.d.ts:137
 
 ___
 
 ### interface
 
-• **interface**: *StandardTokenInterface*
+• **interface**: `StandardTokenInterface`
 
-Overrides: Contract.interface
+#### Overrides
 
-Defined in: packages/ethereum/types/StandardToken.d.ts:135
+Contract.interface
+
+#### Defined in
+
+packages/ethereum/types/StandardToken.d.ts:135
 
 ___
 
 ### populateTransaction
 
-• **populateTransaction**: *object*
+• **populateTransaction**: `Object`
 
 #### Type declaration
 
 | Name | Type |
 | :------ | :------ |
-| `allowance` | (`_owner`: *string*, `_spender`: *string*, `overrides?`: CallOverrides) => *Promise*<PopulatedTransaction\> |
-| `allowance(address,address)` | (`_owner`: *string*, `_spender`: *string*, `overrides?`: CallOverrides) => *Promise*<PopulatedTransaction\> |
-| `approve` | (`_spender`: *string*, `_value`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<PopulatedTransaction\> |
-| `approve(address,uint256)` | (`_spender`: *string*, `_value`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<PopulatedTransaction\> |
-| `balanceOf` | (`_owner`: *string*, `overrides?`: CallOverrides) => *Promise*<PopulatedTransaction\> |
-| `balanceOf(address)` | (`_owner`: *string*, `overrides?`: CallOverrides) => *Promise*<PopulatedTransaction\> |
-| `decreaseApproval` | (`_spender`: *string*, `_subtractedValue`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<PopulatedTransaction\> |
-| `decreaseApproval(address,uint256)` | (`_spender`: *string*, `_subtractedValue`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<PopulatedTransaction\> |
-| `increaseApproval` | (`_spender`: *string*, `_addedValue`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<PopulatedTransaction\> |
-| `increaseApproval(address,uint256)` | (`_spender`: *string*, `_addedValue`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<PopulatedTransaction\> |
-| `totalSupply` | (`overrides?`: CallOverrides) => *Promise*<PopulatedTransaction\> |
-| `totalSupply()` | (`overrides?`: CallOverrides) => *Promise*<PopulatedTransaction\> |
-| `transfer` | (`_to`: *string*, `_value`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<PopulatedTransaction\> |
-| `transfer(address,uint256)` | (`_to`: *string*, `_value`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<PopulatedTransaction\> |
-| `transferFrom` | (`_from`: *string*, `_to`: *string*, `_value`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<PopulatedTransaction\> |
-| `transferFrom(address,address,uint256)` | (`_from`: *string*, `_to`: *string*, `_value`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<PopulatedTransaction\> |
+| `allowance` | (`_owner`: `string`, `_spender`: `string`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
+| `allowance(address,address)` | (`_owner`: `string`, `_spender`: `string`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
+| `approve` | (`_spender`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `approve(address,uint256)` | (`_spender`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `balanceOf` | (`_owner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
+| `balanceOf(address)` | (`_owner`: `string`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
+| `decreaseApproval` | (`_spender`: `string`, `_subtractedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `decreaseApproval(address,uint256)` | (`_spender`: `string`, `_subtractedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `increaseApproval` | (`_spender`: `string`, `_addedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `increaseApproval(address,uint256)` | (`_spender`: `string`, `_addedValue`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `totalSupply` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
+| `totalSupply()` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
+| `transfer` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `transfer(address,uint256)` | (`_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `transferFrom` | (`_from`: `string`, `_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `transferFrom(address,address,uint256)` | (`_from`: `string`, `_to`: `string`, `_value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
 
-Overrides: Contract.populateTransaction
+#### Overrides
 
-Defined in: packages/ethereum/types/StandardToken.d.ts:503
+Contract.populateTransaction
+
+#### Defined in
+
+packages/ethereum/types/StandardToken.d.ts:503
 
 ___
 
 ### provider
 
-• `Readonly` **provider**: *Provider*
+• `Readonly` **provider**: `Provider`
 
-Inherited from: Contract.provider
+#### Inherited from
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:74
+Contract.provider
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:74
 
 ___
 
 ### resolvedAddress
 
-• `Readonly` **resolvedAddress**: *Promise*<string\>
+• `Readonly` **resolvedAddress**: `Promise`<string\>
 
-Inherited from: Contract.resolvedAddress
+#### Inherited from
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:90
+Contract.resolvedAddress
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:90
 
 ___
 
 ### signer
 
-• `Readonly` **signer**: *Signer*
+• `Readonly` **signer**: `Signer`
 
-Inherited from: Contract.signer
+#### Inherited from
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:73
+Contract.signer
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:73
 
 ## Methods
 
 ### \_checkRunningEvents
 
-▸ **_checkRunningEvents**(`runningEvent`: *RunningEvent*): *void*
+▸ **_checkRunningEvents**(`runningEvent`): `void`
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `runningEvent` | *RunningEvent* |
+| `runningEvent` | `RunningEvent` |
 
-**Returns:** *void*
+#### Returns
 
-Inherited from: Contract.\_checkRunningEvents
+`void`
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:113
+#### Inherited from
+
+Contract.\_checkRunningEvents
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:113
 
 ___
 
 ### \_deployed
 
-▸ **_deployed**(`blockTag?`: BlockTag): *Promise*<Contract\>
+▸ **_deployed**(`blockTag?`): `Promise`<Contract\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `blockTag?` | BlockTag |
+| `blockTag?` | `BlockTag` |
 
-**Returns:** *Promise*<Contract\>
+#### Returns
 
-Inherited from: Contract.\_deployed
+`Promise`<Contract\>
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:106
+#### Inherited from
+
+Contract.\_deployed
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:106
 
 ___
 
 ### \_wrapEvent
 
-▸ **_wrapEvent**(`runningEvent`: *RunningEvent*, `log`: Log, `listener`: Listener): Event
+▸ **_wrapEvent**(`runningEvent`, `log`, `listener`): `Event`
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `runningEvent` | *RunningEvent* |
-| `log` | Log |
-| `listener` | Listener |
+| `runningEvent` | `RunningEvent` |
+| `log` | `Log` |
+| `listener` | `Listener` |
 
-**Returns:** Event
+#### Returns
 
-Inherited from: Contract.\_wrapEvent
+`Event`
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:114
+#### Inherited from
+
+Contract.\_wrapEvent
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:114
 
 ___
 
 ### allowance
 
-▸ **allowance**(`_owner`: *string*, `_spender`: *string*, `overrides?`: CallOverrides): *Promise*<BigNumber\>
+▸ **allowance**(`_owner`, `_spender`, `overrides?`): `Promise`<BigNumber\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `_owner` | *string* |
-| `_spender` | *string* |
-| `overrides?` | CallOverrides |
+| `_owner` | `string` |
+| `_spender` | `string` |
+| `overrides?` | `CallOverrides` |
 
-**Returns:** *Promise*<BigNumber\>
+#### Returns
 
-Defined in: packages/ethereum/types/StandardToken.d.ts:297
+`Promise`<BigNumber\>
+
+#### Defined in
+
+packages/ethereum/types/StandardToken.d.ts:297
 
 ___
 
 ### allowance(address,address)
 
-▸ **allowance(address,address)**(`_owner`: *string*, `_spender`: *string*, `overrides?`: CallOverrides): *Promise*<BigNumber\>
+▸ **allowance(address,address)**(`_owner`, `_spender`, `overrides?`): `Promise`<BigNumber\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `_owner` | *string* |
-| `_spender` | *string* |
-| `overrides?` | CallOverrides |
+| `_owner` | `string` |
+| `_spender` | `string` |
+| `overrides?` | `CallOverrides` |
 
-**Returns:** *Promise*<BigNumber\>
+#### Returns
 
-Defined in: packages/ethereum/types/StandardToken.d.ts:301
+`Promise`<BigNumber\>
+
+#### Defined in
+
+packages/ethereum/types/StandardToken.d.ts:301
 
 ___
 
 ### approve
 
-▸ **approve**(`_spender`: *string*, `_value`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): *Promise*<ContractTransaction\>
+▸ **approve**(`_spender`, `_value`, `overrides?`): `Promise`<ContractTransaction\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `_spender` | *string* |
-| `_value` | BigNumberish |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `_spender` | `string` |
+| `_value` | `BigNumberish` |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** *Promise*<ContractTransaction\>
+#### Returns
 
-Defined in: packages/ethereum/types/StandardToken.d.ts:224
+`Promise`<ContractTransaction\>
+
+#### Defined in
+
+packages/ethereum/types/StandardToken.d.ts:224
 
 ___
 
 ### approve(address,uint256)
 
-▸ **approve(address,uint256)**(`_spender`: *string*, `_value`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): *Promise*<ContractTransaction\>
+▸ **approve(address,uint256)**(`_spender`, `_value`, `overrides?`): `Promise`<ContractTransaction\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `_spender` | *string* |
-| `_value` | BigNumberish |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `_spender` | `string` |
+| `_value` | `BigNumberish` |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** *Promise*<ContractTransaction\>
+#### Returns
 
-Defined in: packages/ethereum/types/StandardToken.d.ts:228
+`Promise`<ContractTransaction\>
+
+#### Defined in
+
+packages/ethereum/types/StandardToken.d.ts:228
 
 ___
 
 ### attach
 
-▸ **attach**(`addressOrName`: *string*): [*StandardToken*](standardtoken.md)
+▸ **attach**(`addressOrName`): [StandardToken](standardtoken.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `addressOrName` | *string* |
+| `addressOrName` | `string` |
 
-**Returns:** [*StandardToken*](standardtoken.md)
+#### Returns
 
-Overrides: Contract.attach
+[StandardToken](standardtoken.md)
 
-Defined in: packages/ethereum/types/StandardToken.d.ts:96
+#### Overrides
+
+Contract.attach
+
+#### Defined in
+
+packages/ethereum/types/StandardToken.d.ts:96
 
 ___
 
 ### balanceOf
 
-▸ **balanceOf**(`_owner`: *string*, `overrides?`: CallOverrides): *Promise*<BigNumber\>
+▸ **balanceOf**(`_owner`, `overrides?`): `Promise`<BigNumber\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `_owner` | *string* |
-| `overrides?` | CallOverrides |
+| `_owner` | `string` |
+| `overrides?` | `CallOverrides` |
 
-**Returns:** *Promise*<BigNumber\>
+#### Returns
 
-Defined in: packages/ethereum/types/StandardToken.d.ts:266
+`Promise`<BigNumber\>
+
+#### Defined in
+
+packages/ethereum/types/StandardToken.d.ts:266
 
 ___
 
 ### balanceOf(address)
 
-▸ **balanceOf(address)**(`_owner`: *string*, `overrides?`: CallOverrides): *Promise*<BigNumber\>
+▸ **balanceOf(address)**(`_owner`, `overrides?`): `Promise`<BigNumber\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `_owner` | *string* |
-| `overrides?` | CallOverrides |
+| `_owner` | `string` |
+| `overrides?` | `CallOverrides` |
 
-**Returns:** *Promise*<BigNumber\>
+#### Returns
 
-Defined in: packages/ethereum/types/StandardToken.d.ts:266
+`Promise`<BigNumber\>
+
+#### Defined in
+
+packages/ethereum/types/StandardToken.d.ts:266
 
 ___
 
 ### connect
 
-▸ **connect**(`signerOrProvider`: *string* \| *Signer* \| *Provider*): [*StandardToken*](standardtoken.md)
+▸ **connect**(`signerOrProvider`): [StandardToken](standardtoken.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `signerOrProvider` | *string* \| *Signer* \| *Provider* |
+| `signerOrProvider` | `string` \| `Signer` \| `Provider` |
 
-**Returns:** [*StandardToken*](standardtoken.md)
+#### Returns
 
-Overrides: Contract.connect
+[StandardToken](standardtoken.md)
 
-Defined in: packages/ethereum/types/StandardToken.d.ts:95
+#### Overrides
+
+Contract.connect
+
+#### Defined in
+
+packages/ethereum/types/StandardToken.d.ts:95
 
 ___
 
 ### decreaseApproval
 
-▸ **decreaseApproval**(`_spender`: *string*, `_subtractedValue`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): *Promise*<ContractTransaction\>
+▸ **decreaseApproval**(`_spender`, `_subtractedValue`, `overrides?`): `Promise`<ContractTransaction\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `_spender` | *string* |
-| `_subtractedValue` | BigNumberish |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `_spender` | `string` |
+| `_subtractedValue` | `BigNumberish` |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** *Promise*<ContractTransaction\>
+#### Returns
 
-Defined in: packages/ethereum/types/StandardToken.d.ts:254
+`Promise`<ContractTransaction\>
+
+#### Defined in
+
+packages/ethereum/types/StandardToken.d.ts:254
 
 ___
 
 ### decreaseApproval(address,uint256)
 
-▸ **decreaseApproval(address,uint256)**(`_spender`: *string*, `_subtractedValue`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): *Promise*<ContractTransaction\>
+▸ **decreaseApproval(address,uint256)**(`_spender`, `_subtractedValue`, `overrides?`): `Promise`<ContractTransaction\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `_spender` | *string* |
-| `_subtractedValue` | BigNumberish |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `_spender` | `string` |
+| `_subtractedValue` | `BigNumberish` |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** *Promise*<ContractTransaction\>
+#### Returns
 
-Defined in: packages/ethereum/types/StandardToken.d.ts:258
+`Promise`<ContractTransaction\>
+
+#### Defined in
+
+packages/ethereum/types/StandardToken.d.ts:258
 
 ___
 
 ### deployed
 
-▸ **deployed**(): *Promise*<[*StandardToken*](standardtoken.md)\>
+▸ **deployed**(): `Promise`<[StandardToken](standardtoken.md)\>
 
-**Returns:** *Promise*<[*StandardToken*](standardtoken.md)\>
+#### Returns
 
-Overrides: Contract.deployed
+`Promise`<[StandardToken](standardtoken.md)\>
 
-Defined in: packages/ethereum/types/StandardToken.d.ts:97
+#### Overrides
+
+Contract.deployed
+
+#### Defined in
+
+packages/ethereum/types/StandardToken.d.ts:97
 
 ___
 
 ### emit
 
-▸ **emit**(`eventName`: *string* \| EventFilter, ...`args`: *any*[]): *boolean*
+▸ **emit**(`eventName`, ...`args`): `boolean`
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventName` | *string* \| EventFilter |
-| `...args` | *any*[] |
+| `eventName` | `string` \| `EventFilter` |
+| `...args` | `any`[] |
 
-**Returns:** *boolean*
+#### Returns
 
-Inherited from: Contract.emit
+`boolean`
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:119
+#### Inherited from
+
+Contract.emit
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:119
 
 ___
 
 ### fallback
 
-▸ **fallback**(`overrides?`: TransactionRequest): *Promise*<TransactionResponse\>
+▸ **fallback**(`overrides?`): `Promise`<TransactionResponse\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `overrides?` | TransactionRequest |
+| `overrides?` | `TransactionRequest` |
 
-**Returns:** *Promise*<TransactionResponse\>
+#### Returns
 
-Inherited from: Contract.fallback
+`Promise`<TransactionResponse\>
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:107
+#### Inherited from
+
+Contract.fallback
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:107
 
 ___
 
 ### increaseApproval
 
-▸ **increaseApproval**(`_spender`: *string*, `_addedValue`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): *Promise*<ContractTransaction\>
+▸ **increaseApproval**(`_spender`, `_addedValue`, `overrides?`): `Promise`<ContractTransaction\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `_spender` | *string* |
-| `_addedValue` | BigNumberish |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `_spender` | `string` |
+| `_addedValue` | `BigNumberish` |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** *Promise*<ContractTransaction\>
+#### Returns
 
-Defined in: packages/ethereum/types/StandardToken.d.ts:285
+`Promise`<ContractTransaction\>
+
+#### Defined in
+
+packages/ethereum/types/StandardToken.d.ts:285
 
 ___
 
 ### increaseApproval(address,uint256)
 
-▸ **increaseApproval(address,uint256)**(`_spender`: *string*, `_addedValue`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): *Promise*<ContractTransaction\>
+▸ **increaseApproval(address,uint256)**(`_spender`, `_addedValue`, `overrides?`): `Promise`<ContractTransaction\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `_spender` | *string* |
-| `_addedValue` | BigNumberish |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `_spender` | `string` |
+| `_addedValue` | `BigNumberish` |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** *Promise*<ContractTransaction\>
+#### Returns
 
-Defined in: packages/ethereum/types/StandardToken.d.ts:289
+`Promise`<ContractTransaction\>
+
+#### Defined in
+
+packages/ethereum/types/StandardToken.d.ts:289
 
 ___
 
 ### listenerCount
 
-▸ **listenerCount**(`eventName?`: *string* \| EventFilter): *number*
+▸ **listenerCount**(`eventName?`): `number`
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventName?` | *string* \| EventFilter |
+| `eventName?` | `string` \| `EventFilter` |
 
-**Returns:** *number*
+#### Returns
 
-Inherited from: Contract.listenerCount
+`number`
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:120
+#### Inherited from
+
+Contract.listenerCount
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:120
 
 ___
 
 ### listeners
 
-▸ **listeners**<EventArgsArray, EventArgsObject\>(`eventFilter?`: [*TypedEventFilter*](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\>): [*TypedListener*](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\>[]
+▸ **listeners**<EventArgsArray, EventArgsObject\>(`eventFilter?`): [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\>[]
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | *any*[] |
-| `EventArgsObject` | - |
+| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter?` | [*TypedEventFilter*](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
+| `eventFilter?` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
 
-**Returns:** [*TypedListener*](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\>[]
+#### Returns
 
-Overrides: Contract.listeners
+[TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\>[]
 
-Defined in: packages/ethereum/types/StandardToken.d.ts:99
+#### Overrides
 
-▸ **listeners**(`eventName?`: *string*): Listener[]
+Contract.listeners
+
+#### Defined in
+
+packages/ethereum/types/StandardToken.d.ts:99
+
+▸ **listeners**(`eventName?`): `Listener`[]
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventName?` | *string* |
+| `eventName?` | `string` |
 
-**Returns:** Listener[]
+#### Returns
 
-Overrides: Contract.listeners
+`Listener`[]
 
-Defined in: packages/ethereum/types/StandardToken.d.ts:122
+#### Overrides
+
+Contract.listeners
+
+#### Defined in
+
+packages/ethereum/types/StandardToken.d.ts:122
 
 ___
 
 ### off
 
-▸ **off**<EventArgsArray, EventArgsObject\>(`eventFilter`: [*TypedEventFilter*](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\>, `listener`: [*TypedListener*](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\>): [*StandardToken*](standardtoken.md)
+▸ **off**<EventArgsArray, EventArgsObject\>(`eventFilter`, `listener`): [StandardToken](standardtoken.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | *any*[] |
-| `EventArgsObject` | - |
+| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [*TypedEventFilter*](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `listener` | [*TypedListener*](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
+| `listener` | [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
 
-**Returns:** [*StandardToken*](standardtoken.md)
+#### Returns
 
-Overrides: Contract.off
+[StandardToken](standardtoken.md)
 
-Defined in: packages/ethereum/types/StandardToken.d.ts:102
+#### Overrides
 
-▸ **off**(`eventName`: *string*, `listener`: Listener): [*StandardToken*](standardtoken.md)
+Contract.off
+
+#### Defined in
+
+packages/ethereum/types/StandardToken.d.ts:102
+
+▸ **off**(`eventName`, `listener`): [StandardToken](standardtoken.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventName` | *string* |
-| `listener` | Listener |
+| `eventName` | `string` |
+| `listener` | `Listener` |
 
-**Returns:** [*StandardToken*](standardtoken.md)
+#### Returns
 
-Overrides: Contract.off
+[StandardToken](standardtoken.md)
 
-Defined in: packages/ethereum/types/StandardToken.d.ts:123
+#### Overrides
+
+Contract.off
+
+#### Defined in
+
+packages/ethereum/types/StandardToken.d.ts:123
 
 ___
 
 ### on
 
-▸ **on**<EventArgsArray, EventArgsObject\>(`eventFilter`: [*TypedEventFilter*](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\>, `listener`: [*TypedListener*](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\>): [*StandardToken*](standardtoken.md)
+▸ **on**<EventArgsArray, EventArgsObject\>(`eventFilter`, `listener`): [StandardToken](standardtoken.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | *any*[] |
-| `EventArgsObject` | - |
+| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [*TypedEventFilter*](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `listener` | [*TypedListener*](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
+| `listener` | [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
 
-**Returns:** [*StandardToken*](standardtoken.md)
+#### Returns
 
-Overrides: Contract.on
+[StandardToken](standardtoken.md)
 
-Defined in: packages/ethereum/types/StandardToken.d.ts:106
+#### Overrides
 
-▸ **on**(`eventName`: *string*, `listener`: Listener): [*StandardToken*](standardtoken.md)
+Contract.on
+
+#### Defined in
+
+packages/ethereum/types/StandardToken.d.ts:106
+
+▸ **on**(`eventName`, `listener`): [StandardToken](standardtoken.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventName` | *string* |
-| `listener` | Listener |
+| `eventName` | `string` |
+| `listener` | `Listener` |
 
-**Returns:** [*StandardToken*](standardtoken.md)
+#### Returns
 
-Overrides: Contract.on
+[StandardToken](standardtoken.md)
 
-Defined in: packages/ethereum/types/StandardToken.d.ts:124
+#### Overrides
+
+Contract.on
+
+#### Defined in
+
+packages/ethereum/types/StandardToken.d.ts:124
 
 ___
 
 ### once
 
-▸ **once**<EventArgsArray, EventArgsObject\>(`eventFilter`: [*TypedEventFilter*](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\>, `listener`: [*TypedListener*](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\>): [*StandardToken*](standardtoken.md)
+▸ **once**<EventArgsArray, EventArgsObject\>(`eventFilter`, `listener`): [StandardToken](standardtoken.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | *any*[] |
-| `EventArgsObject` | - |
+| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [*TypedEventFilter*](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `listener` | [*TypedListener*](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
+| `listener` | [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
 
-**Returns:** [*StandardToken*](standardtoken.md)
+#### Returns
 
-Overrides: Contract.once
+[StandardToken](standardtoken.md)
 
-Defined in: packages/ethereum/types/StandardToken.d.ts:110
+#### Overrides
 
-▸ **once**(`eventName`: *string*, `listener`: Listener): [*StandardToken*](standardtoken.md)
+Contract.once
+
+#### Defined in
+
+packages/ethereum/types/StandardToken.d.ts:110
+
+▸ **once**(`eventName`, `listener`): [StandardToken](standardtoken.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventName` | *string* |
-| `listener` | Listener |
+| `eventName` | `string` |
+| `listener` | `Listener` |
 
-**Returns:** [*StandardToken*](standardtoken.md)
+#### Returns
 
-Overrides: Contract.once
+[StandardToken](standardtoken.md)
 
-Defined in: packages/ethereum/types/StandardToken.d.ts:125
+#### Overrides
+
+Contract.once
+
+#### Defined in
+
+packages/ethereum/types/StandardToken.d.ts:125
 
 ___
 
 ### queryFilter
 
-▸ **queryFilter**<EventArgsArray, EventArgsObject\>(`event`: [*TypedEventFilter*](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\>, `fromBlockOrBlockhash?`: *string* \| *number*, `toBlock?`: *string* \| *number*): *Promise*<[*TypedEvent*](../interfaces/typedevent.md)<EventArgsArray & EventArgsObject\>[]\>
+▸ **queryFilter**<EventArgsArray, EventArgsObject\>(`event`, `fromBlockOrBlockhash?`, `toBlock?`): `Promise`<[TypedEvent](../interfaces/typedevent.md)<`EventArgsArray` & `EventArgsObject`\>[]\>
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | *any*[] |
-| `EventArgsObject` | - |
+| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `event` | [*TypedEventFilter*](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `fromBlockOrBlockhash?` | *string* \| *number* |
-| `toBlock?` | *string* \| *number* |
+| `event` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
+| `fromBlockOrBlockhash?` | `string` \| `number` |
+| `toBlock?` | `string` \| `number` |
 
-**Returns:** *Promise*<[*TypedEvent*](../interfaces/typedevent.md)<EventArgsArray & EventArgsObject\>[]\>
+#### Returns
 
-Overrides: Contract.queryFilter
+`Promise`<[TypedEvent](../interfaces/typedevent.md)<`EventArgsArray` & `EventArgsObject`\>[]\>
 
-Defined in: packages/ethereum/types/StandardToken.d.ts:129
+#### Overrides
+
+Contract.queryFilter
+
+#### Defined in
+
+packages/ethereum/types/StandardToken.d.ts:129
 
 ___
 
 ### removeAllListeners
 
-▸ **removeAllListeners**<EventArgsArray, EventArgsObject\>(`eventFilter`: [*TypedEventFilter*](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\>): [*StandardToken*](standardtoken.md)
+▸ **removeAllListeners**<EventArgsArray, EventArgsObject\>(`eventFilter`): [StandardToken](standardtoken.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | *any*[] |
-| `EventArgsObject` | - |
+| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [*TypedEventFilter*](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
 
-**Returns:** [*StandardToken*](standardtoken.md)
+#### Returns
 
-Overrides: Contract.removeAllListeners
+[StandardToken](standardtoken.md)
 
-Defined in: packages/ethereum/types/StandardToken.d.ts:118
+#### Overrides
 
-▸ **removeAllListeners**(`eventName?`: *string*): [*StandardToken*](standardtoken.md)
+Contract.removeAllListeners
+
+#### Defined in
+
+packages/ethereum/types/StandardToken.d.ts:118
+
+▸ **removeAllListeners**(`eventName?`): [StandardToken](standardtoken.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventName?` | *string* |
+| `eventName?` | `string` |
 
-**Returns:** [*StandardToken*](standardtoken.md)
+#### Returns
 
-Overrides: Contract.removeAllListeners
+[StandardToken](standardtoken.md)
 
-Defined in: packages/ethereum/types/StandardToken.d.ts:127
+#### Overrides
+
+Contract.removeAllListeners
+
+#### Defined in
+
+packages/ethereum/types/StandardToken.d.ts:127
 
 ___
 
 ### removeListener
 
-▸ **removeListener**<EventArgsArray, EventArgsObject\>(`eventFilter`: [*TypedEventFilter*](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\>, `listener`: [*TypedListener*](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\>): [*StandardToken*](standardtoken.md)
+▸ **removeListener**<EventArgsArray, EventArgsObject\>(`eventFilter`, `listener`): [StandardToken](standardtoken.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | *any*[] |
-| `EventArgsObject` | - |
+| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [*TypedEventFilter*](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `listener` | [*TypedListener*](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
+| `listener` | [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
 
-**Returns:** [*StandardToken*](standardtoken.md)
+#### Returns
 
-Overrides: Contract.removeListener
+[StandardToken](standardtoken.md)
 
-Defined in: packages/ethereum/types/StandardToken.d.ts:114
+#### Overrides
 
-▸ **removeListener**(`eventName`: *string*, `listener`: Listener): [*StandardToken*](standardtoken.md)
+Contract.removeListener
+
+#### Defined in
+
+packages/ethereum/types/StandardToken.d.ts:114
+
+▸ **removeListener**(`eventName`, `listener`): [StandardToken](standardtoken.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventName` | *string* |
-| `listener` | Listener |
+| `eventName` | `string` |
+| `listener` | `Listener` |
 
-**Returns:** [*StandardToken*](standardtoken.md)
+#### Returns
 
-Overrides: Contract.removeListener
+[StandardToken](standardtoken.md)
 
-Defined in: packages/ethereum/types/StandardToken.d.ts:126
+#### Overrides
+
+Contract.removeListener
+
+#### Defined in
+
+packages/ethereum/types/StandardToken.d.ts:126
 
 ___
 
 ### totalSupply
 
-▸ **totalSupply**(`overrides?`: CallOverrides): *Promise*<BigNumber\>
+▸ **totalSupply**(`overrides?`): `Promise`<BigNumber\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `overrides?` | CallOverrides |
+| `overrides?` | `CallOverrides` |
 
-**Returns:** *Promise*<BigNumber\>
+#### Returns
 
-Defined in: packages/ethereum/types/StandardToken.d.ts:236
+`Promise`<BigNumber\>
+
+#### Defined in
+
+packages/ethereum/types/StandardToken.d.ts:236
 
 ___
 
 ### totalSupply()
 
-▸ **totalSupply()**(`overrides?`: CallOverrides): *Promise*<BigNumber\>
+▸ **totalSupply()**(`overrides?`): `Promise`<BigNumber\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `overrides?` | CallOverrides |
+| `overrides?` | `CallOverrides` |
 
-**Returns:** *Promise*<BigNumber\>
+#### Returns
 
-Defined in: packages/ethereum/types/StandardToken.d.ts:236
+`Promise`<BigNumber\>
+
+#### Defined in
+
+packages/ethereum/types/StandardToken.d.ts:236
 
 ___
 
 ### transfer
 
-▸ **transfer**(`_to`: *string*, `_value`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): *Promise*<ContractTransaction\>
+▸ **transfer**(`_to`, `_value`, `overrides?`): `Promise`<ContractTransaction\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `_to` | *string* |
-| `_value` | BigNumberish |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `_to` | `string` |
+| `_value` | `BigNumberish` |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** *Promise*<ContractTransaction\>
+#### Returns
 
-Defined in: packages/ethereum/types/StandardToken.d.ts:273
+`Promise`<ContractTransaction\>
+
+#### Defined in
+
+packages/ethereum/types/StandardToken.d.ts:273
 
 ___
 
 ### transfer(address,uint256)
 
-▸ **transfer(address,uint256)**(`_to`: *string*, `_value`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): *Promise*<ContractTransaction\>
+▸ **transfer(address,uint256)**(`_to`, `_value`, `overrides?`): `Promise`<ContractTransaction\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `_to` | *string* |
-| `_value` | BigNumberish |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `_to` | `string` |
+| `_value` | `BigNumberish` |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** *Promise*<ContractTransaction\>
+#### Returns
 
-Defined in: packages/ethereum/types/StandardToken.d.ts:277
+`Promise`<ContractTransaction\>
+
+#### Defined in
+
+packages/ethereum/types/StandardToken.d.ts:277
 
 ___
 
 ### transferFrom
 
-▸ **transferFrom**(`_from`: *string*, `_to`: *string*, `_value`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): *Promise*<ContractTransaction\>
+▸ **transferFrom**(`_from`, `_to`, `_value`, `overrides?`): `Promise`<ContractTransaction\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `_from` | *string* |
-| `_to` | *string* |
-| `_value` | BigNumberish |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `_from` | `string` |
+| `_to` | `string` |
+| `_value` | `BigNumberish` |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** *Promise*<ContractTransaction\>
+#### Returns
 
-Defined in: packages/ethereum/types/StandardToken.d.ts:240
+`Promise`<ContractTransaction\>
+
+#### Defined in
+
+packages/ethereum/types/StandardToken.d.ts:240
 
 ___
 
 ### transferFrom(address,address,uint256)
 
-▸ **transferFrom(address,address,uint256)**(`_from`: *string*, `_to`: *string*, `_value`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): *Promise*<ContractTransaction\>
+▸ **transferFrom(address,address,uint256)**(`_from`, `_to`, `_value`, `overrides?`): `Promise`<ContractTransaction\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `_from` | *string* |
-| `_to` | *string* |
-| `_value` | BigNumberish |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `_from` | `string` |
+| `_to` | `string` |
+| `_value` | `BigNumberish` |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** *Promise*<ContractTransaction\>
+#### Returns
 
-Defined in: packages/ethereum/types/StandardToken.d.ts:245
+`Promise`<ContractTransaction\>
+
+#### Defined in
+
+packages/ethereum/types/StandardToken.d.ts:245
 
 ___
 
 ### getContractAddress
 
-▸ `Static` **getContractAddress**(`transaction`: { `from`: *string* ; `nonce`: BigNumberish  }): *string*
+▸ `Static` **getContractAddress**(`transaction`): `string`
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `transaction` | *object* |
-| `transaction.from` | *string* |
-| `transaction.nonce` | BigNumberish |
+| `transaction` | `Object` |
+| `transaction.from` | `string` |
+| `transaction.nonce` | `BigNumberish` |
 
-**Returns:** *string*
+#### Returns
 
-Inherited from: Contract.getContractAddress
+`string`
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:100
+#### Inherited from
+
+Contract.getContractAddress
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:100
 
 ___
 
 ### getInterface
 
-▸ `Static` **getInterface**(`contractInterface`: ContractInterface): *Interface*
+▸ `Static` **getInterface**(`contractInterface`): `Interface`
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `contractInterface` | ContractInterface |
+| `contractInterface` | `ContractInterface` |
 
-**Returns:** *Interface*
+#### Returns
 
-Inherited from: Contract.getInterface
+`Interface`
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:104
+#### Inherited from
+
+Contract.getInterface
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:104
 
 ___
 
 ### isIndexed
 
-▸ `Static` **isIndexed**(`value`: *any*): value is Indexed
+▸ `Static` **isIndexed**(`value`): value is Indexed
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `value` | *any* |
+| `value` | `any` |
 
-**Returns:** value is Indexed
+#### Returns
 
-Inherited from: Contract.isIndexed
+value is Indexed
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:110
+#### Inherited from
+
+Contract.isIndexed
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:110

@@ -26,100 +26,132 @@
 
 ### constructor
 
-\+ **new Balance**(`bn`: *BN*): [*Balance*](balance.md)
+• **new Balance**(`bn`)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `bn` | *BN* |
+| `bn` | `BN` |
 
-**Returns:** [*Balance*](balance.md)
+#### Defined in
 
-Defined in: [types/primitives.ts:235](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L235)
+[types/primitives.ts:235](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L235)
 
 ## Accessors
 
 ### DECIMALS
 
-• `Static` get **DECIMALS**(): *number*
+• `Static` `get` **DECIMALS**(): `number`
 
-**Returns:** *number*
+#### Returns
 
-Defined in: [types/primitives.ts:242](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L242)
+`number`
+
+#### Defined in
+
+[types/primitives.ts:242](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L242)
 
 ___
 
 ### SIZE
 
-• `Static` get **SIZE**(): *number*
+• `Static` `get` **SIZE**(): `number`
 
-**Returns:** *number*
+#### Returns
 
-Defined in: [types/primitives.ts:266](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L266)
+`number`
+
+#### Defined in
+
+[types/primitives.ts:266](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L266)
 
 ___
 
 ### SYMBOL
 
-• `Static` get **SYMBOL**(): *string*
+• `Static` `get` **SYMBOL**(): `string`
 
-**Returns:** *string*
+#### Returns
 
-Defined in: [types/primitives.ts:238](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L238)
+`string`
+
+#### Defined in
+
+[types/primitives.ts:238](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L238)
 
 ## Methods
 
 ### serialize
 
-▸ **serialize**(): *Uint8Array*
+▸ **serialize**(): `Uint8Array`
 
-**Returns:** *Uint8Array*
+#### Returns
 
-Defined in: [types/primitives.ts:258](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L258)
+`Uint8Array`
+
+#### Defined in
+
+[types/primitives.ts:258](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L258)
 
 ___
 
 ### toBN
 
-▸ **toBN**(): *BN*
+▸ **toBN**(): `BN`
 
-**Returns:** *BN*
+#### Returns
 
-Defined in: [types/primitives.ts:246](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L246)
+`BN`
+
+#### Defined in
+
+[types/primitives.ts:246](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L246)
 
 ___
 
 ### toFormattedString
 
-▸ **toFormattedString**(): *string*
+▸ **toFormattedString**(): `string`
 
-**Returns:** *string*
+#### Returns
 
-Defined in: [types/primitives.ts:262](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L262)
+`string`
+
+#### Defined in
+
+[types/primitives.ts:262](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L262)
 
 ___
 
 ### toHex
 
-▸ **toHex**(): *string*
+▸ **toHex**(): `string`
 
-**Returns:** *string*
+#### Returns
 
-Defined in: [types/primitives.ts:250](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L250)
+`string`
+
+#### Defined in
+
+[types/primitives.ts:250](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L250)
 
 ___
 
 ### deserialize
 
-▸ `Static` **deserialize**(`arr`: *Uint8Array*): [*Balance*](balance.md)
+▸ `Static` **deserialize**(`arr`): [Balance](balance.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `arr` | *Uint8Array* |
+| `arr` | `Uint8Array` |
 
-**Returns:** [*Balance*](balance.md)
+#### Returns
 
-Defined in: [types/primitives.ts:254](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L254)
+[Balance](balance.md)
+
+#### Defined in
+
+[types/primitives.ts:254](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L254)

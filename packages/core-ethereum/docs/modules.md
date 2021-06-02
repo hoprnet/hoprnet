@@ -19,9 +19,11 @@
 
 ### RedeemTicketResponse
 
-Ƭ **RedeemTicketResponse**: { `ackTicket`: AcknowledgedTicket ; `receipt`: *string* ; `status`: ``"SUCCESS"``  } \| { `message`: *string* ; `status`: ``"FAILURE"``  } \| { `error`: Error \| *string* ; `status`: ``"ERROR"``  }
+Ƭ **RedeemTicketResponse**: { `ackTicket`: `AcknowledgedTicket` ; `receipt`: `string` ; `status`: ``"SUCCESS"``  } \| { `message`: `string` ; `status`: ``"FAILURE"``  } \| { `error`: `Error` \| `string` ; `status`: ``"ERROR"``  }
 
-Defined in: [core-ethereum/src/index.ts:25](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L25)
+#### Defined in
+
+[core-ethereum/src/index.ts:25](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L25)
 
 ___
 
@@ -29,4 +31,6 @@ ___
 
 Ƭ **RoutingChannel**: [source: PeerId, destination: PeerId, stake: Balance]
 
-Defined in: [core-ethereum/src/indexer/index.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L16)
+#### Defined in
+
+[core-ethereum/src/indexer/index.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L16)

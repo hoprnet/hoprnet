@@ -104,17 +104,19 @@
 
 ### ContractData
 
-Ƭ **ContractData**: *object*
+Ƭ **ContractData**: `Object`
 
 #### Type declaration
 
 | Name | Type |
 | :------ | :------ |
-| `abi` | *any* |
-| `address` | *string* |
-| `transactionHash` | *string* |
+| `abi` | `any` |
+| `address` | `string` |
+| `transactionHash` | `string` |
 
-Defined in: [packages/ethereum/index.ts:10](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/index.ts#L10)
+#### Defined in
+
+[packages/ethereum/index.ts:10](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/index.ts#L10)
 
 ___
 
@@ -122,7 +124,9 @@ ___
 
 Ƭ **ContractNames**: ``"HoprToken"`` \| ``"HoprChannels"`` \| ``"HoprDistributor"``
 
-Defined in: [packages/ethereum/index.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/index.ts#L8)
+#### Defined in
+
+[packages/ethereum/index.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/index.ts#L8)
 
 ___
 
@@ -130,23 +134,29 @@ ___
 
 Ƭ **DeploymentTypes**: ``"testing"`` \| ``"development"`` \| ``"staging"`` \| ``"production"``
 
-Defined in: [packages/ethereum/constants.ts:5](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/constants.ts#L5)
+#### Defined in
+
+[packages/ethereum/constants.ts:5](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/constants.ts#L5)
 
 ___
 
 ### NetworkTag
 
-Ƭ **NetworkTag**: [*DeploymentTypes*](modules.md#deploymenttypes) \| ``"etherscan"``
+Ƭ **NetworkTag**: [DeploymentTypes](modules.md#deploymenttypes) \| ``"etherscan"``
 
-Defined in: [packages/ethereum/constants.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/constants.ts#L6)
+#### Defined in
+
+[packages/ethereum/constants.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/constants.ts#L6)
 
 ___
 
 ### Networks
 
-Ƭ **Networks**: ``"hardhat"`` \| ``"localhost"`` \| [*PublicNetworks*](modules.md#publicnetworks)
+Ƭ **Networks**: ``"hardhat"`` \| ``"localhost"`` \| [PublicNetworks](modules.md#publicnetworks)
 
-Defined in: [packages/ethereum/constants.ts:4](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/constants.ts#L4)
+#### Defined in
+
+[packages/ethereum/constants.ts:4](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/constants.ts#L4)
 
 ___
 
@@ -154,34 +164,40 @@ ___
 
 Ƭ **PublicNetworks**: ``"xdai"`` \| ``"goerli"``
 
-Defined in: [packages/ethereum/constants.ts:3](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/constants.ts#L3)
+#### Defined in
+
+[packages/ethereum/constants.ts:3](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/constants.ts#L3)
 
 ___
 
 ### TypedListener
 
-Ƭ **TypedListener**<EventArgsArray, EventArgsObject\>: (...`listenerArg`: [...EventArgsArray, [*TypedEvent*](interfaces/typedevent.md)<EventArgsArray & EventArgsObject\>]) => *void*
+Ƭ **TypedListener**<EventArgsArray, EventArgsObject\>: (...`listenerArg`: [...EventArgsArray, [TypedEvent](interfaces/typedevent.md)<`EventArgsArray` & `EventArgsObject`\>]) => `void`
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | *any*[] |
-| `EventArgsObject` | - |
+| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsObject` | `EventArgsObject` |
 
 #### Type declaration
 
-▸ (...`listenerArg`: [...EventArgsArray, [*TypedEvent*](interfaces/typedevent.md)<EventArgsArray & EventArgsObject\>]): *void*
+▸ (...`listenerArg`): `void`
 
-#### Parameters
+##### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `...listenerArg` | [...EventArgsArray, [*TypedEvent*](interfaces/typedevent.md)<EventArgsArray & EventArgsObject\>] |
+| `...listenerArg` | [...EventArgsArray, [TypedEvent](interfaces/typedevent.md)<`EventArgsArray` & `EventArgsObject`\>] |
 
-**Returns:** *void*
+##### Returns
 
-Defined in: packages/ethereum/types/commons.ts:15
+`void`
+
+#### Defined in
+
+packages/ethereum/types/commons.ts:15
 
 ## Variables
 
@@ -189,21 +205,27 @@ Defined in: packages/ethereum/types/commons.ts:15
 
 • `Const` **networks**: { [network in PublicNetworks]: object}
 
-Defined in: [packages/ethereum/constants.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/constants.ts#L8)
+#### Defined in
+
+[packages/ethereum/constants.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/constants.ts#L8)
 
 ## Functions
 
 ### getContractData
 
-▸ `Const` **getContractData**(`network`: [*Networks*](modules.md#networks), `contract`: [*ContractNames*](modules.md#contractnames)): [*ContractData*](modules.md#contractdata)
+▸ `Const` **getContractData**(`network`, `contract`): [ContractData](modules.md#contractdata)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `network` | [*Networks*](modules.md#networks) |
-| `contract` | [*ContractNames*](modules.md#contractnames) |
+| `network` | [Networks](modules.md#networks) |
+| `contract` | [ContractNames](modules.md#contractnames) |
 
-**Returns:** [*ContractData*](modules.md#contractdata)
+#### Returns
 
-Defined in: [packages/ethereum/index.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/index.ts#L16)
+[ContractData](modules.md#contractdata)
+
+#### Defined in
+
+[packages/ethereum/index.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/ethereum/index.ts#L16)

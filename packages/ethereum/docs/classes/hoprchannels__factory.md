@@ -4,7 +4,7 @@
 
 ## Hierarchy
 
-- *ContractFactory*
+- `ContractFactory`
 
   ↳ **HoprChannels__factory**
 
@@ -36,216 +36,282 @@
 
 ### constructor
 
-\+ **new HoprChannels__factory**(`signer?`: *Signer*): [*HoprChannels\_\_factory*](hoprchannels__factory.md)
+• **new HoprChannels__factory**(`signer?`)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `signer?` | *Signer* |
+| `signer?` | `Signer` |
 
-**Returns:** [*HoprChannels\_\_factory*](hoprchannels__factory.md)
+#### Overrides
 
-Overrides: ContractFactory.constructor
+ContractFactory.constructor
 
-Defined in: packages/ethereum/types/factories/HoprChannels__factory.ts:16
+#### Defined in
+
+packages/ethereum/types/factories/HoprChannels__factory.ts:16
 
 ## Properties
 
 ### bytecode
 
-• `Readonly` **bytecode**: *string*
+• `Readonly` **bytecode**: `string`
 
-Inherited from: ContractFactory.bytecode
+#### Inherited from
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:131
+ContractFactory.bytecode
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:131
 
 ___
 
 ### interface
 
-• `Readonly` **interface**: *Interface*
+• `Readonly` **interface**: `Interface`
 
-Inherited from: ContractFactory.interface
+#### Inherited from
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:130
+ContractFactory.interface
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:130
 
 ___
 
 ### signer
 
-• `Readonly` **signer**: *Signer*
+• `Readonly` **signer**: `Signer`
 
-Inherited from: ContractFactory.signer
+#### Inherited from
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:132
+ContractFactory.signer
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:132
 
 ## Methods
 
 ### attach
 
-▸ **attach**(`address`: *string*): [*HoprChannels*](hoprchannels.md)
+▸ **attach**(`address`): [HoprChannels](hoprchannels.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `address` | *string* |
+| `address` | `string` |
 
-**Returns:** [*HoprChannels*](hoprchannels.md)
+#### Returns
 
-Overrides: ContractFactory.attach
+[HoprChannels](hoprchannels.md)
 
-Defined in: packages/ethereum/types/factories/HoprChannels__factory.ts:39
+#### Overrides
+
+ContractFactory.attach
+
+#### Defined in
+
+packages/ethereum/types/factories/HoprChannels__factory.ts:39
 
 ___
 
 ### connect
 
-▸ **connect**(`signer`: *Signer*): [*HoprChannels\_\_factory*](hoprchannels__factory.md)
+▸ **connect**(`signer`): [HoprChannels\_\_factory](hoprchannels__factory.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `signer` | *Signer* |
+| `signer` | `Signer` |
 
-**Returns:** [*HoprChannels\_\_factory*](hoprchannels__factory.md)
+#### Returns
 
-Overrides: ContractFactory.connect
+[HoprChannels\_\_factory](hoprchannels__factory.md)
 
-Defined in: packages/ethereum/types/factories/HoprChannels__factory.ts:42
+#### Overrides
+
+ContractFactory.connect
+
+#### Defined in
+
+packages/ethereum/types/factories/HoprChannels__factory.ts:42
 
 ___
 
 ### deploy
 
-▸ **deploy**(`_token`: *string*, `_secsClosure`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): *Promise*<[*HoprChannels*](hoprchannels.md)\>
+▸ **deploy**(`_token`, `_secsClosure`, `overrides?`): `Promise`<[HoprChannels](hoprchannels.md)\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `_token` | *string* |
-| `_secsClosure` | BigNumberish |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `_token` | `string` |
+| `_secsClosure` | `BigNumberish` |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** *Promise*<[*HoprChannels*](hoprchannels.md)\>
+#### Returns
 
-Overrides: ContractFactory.deploy
+`Promise`<[HoprChannels](hoprchannels.md)\>
 
-Defined in: packages/ethereum/types/factories/HoprChannels__factory.ts:21
+#### Overrides
+
+ContractFactory.deploy
+
+#### Defined in
+
+packages/ethereum/types/factories/HoprChannels__factory.ts:21
 
 ___
 
 ### getDeployTransaction
 
-▸ **getDeployTransaction**(`_token`: *string*, `_secsClosure`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): TransactionRequest
+▸ **getDeployTransaction**(`_token`, `_secsClosure`, `overrides?`): `TransactionRequest`
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `_token` | *string* |
-| `_secsClosure` | BigNumberish |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `_token` | `string` |
+| `_secsClosure` | `BigNumberish` |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** TransactionRequest
+#### Returns
 
-Overrides: ContractFactory.getDeployTransaction
+`TransactionRequest`
 
-Defined in: packages/ethereum/types/factories/HoprChannels__factory.ts:32
+#### Overrides
+
+ContractFactory.getDeployTransaction
+
+#### Defined in
+
+packages/ethereum/types/factories/HoprChannels__factory.ts:32
 
 ___
 
 ### connect
 
-▸ `Static` **connect**(`address`: *string*, `signerOrProvider`: *Signer* \| *Provider*): [*HoprChannels*](hoprchannels.md)
+▸ `Static` **connect**(`address`, `signerOrProvider`): [HoprChannels](hoprchannels.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `address` | *string* |
-| `signerOrProvider` | *Signer* \| *Provider* |
+| `address` | `string` |
+| `signerOrProvider` | `Signer` \| `Provider` |
 
-**Returns:** [*HoprChannels*](hoprchannels.md)
+#### Returns
 
-Defined in: packages/ethereum/types/factories/HoprChannels__factory.ts:45
+[HoprChannels](hoprchannels.md)
+
+#### Defined in
+
+packages/ethereum/types/factories/HoprChannels__factory.ts:45
 
 ___
 
 ### fromSolidity
 
-▸ `Static` **fromSolidity**(`compilerOutput`: *any*, `signer?`: *Signer*): *ContractFactory*
+▸ `Static` **fromSolidity**(`compilerOutput`, `signer?`): `ContractFactory`
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `compilerOutput` | *any* |
-| `signer?` | *Signer* |
+| `compilerOutput` | `any` |
+| `signer?` | `Signer` |
 
-**Returns:** *ContractFactory*
+#### Returns
 
-Inherited from: ContractFactory.fromSolidity
+`ContractFactory`
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:140
+#### Inherited from
+
+ContractFactory.fromSolidity
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:140
 
 ___
 
 ### getContract
 
-▸ `Static` **getContract**(`address`: *string*, `contractInterface`: ContractInterface, `signer?`: *Signer*): *Contract*
+▸ `Static` **getContract**(`address`, `contractInterface`, `signer?`): `Contract`
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `address` | *string* |
-| `contractInterface` | ContractInterface |
-| `signer?` | *Signer* |
+| `address` | `string` |
+| `contractInterface` | `ContractInterface` |
+| `signer?` | `Signer` |
 
-**Returns:** *Contract*
+#### Returns
 
-Inherited from: ContractFactory.getContract
+`Contract`
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:146
+#### Inherited from
+
+ContractFactory.getContract
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:146
 
 ___
 
 ### getContractAddress
 
-▸ `Static` **getContractAddress**(`tx`: { `from`: *string* ; `nonce`: *number* \| *BigNumber* \| BytesLike  }): *string*
+▸ `Static` **getContractAddress**(`tx`): `string`
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `tx` | *object* |
-| `tx.from` | *string* |
-| `tx.nonce` | *number* \| *BigNumber* \| BytesLike |
+| `tx` | `Object` |
+| `tx.from` | `string` |
+| `tx.nonce` | `number` \| `BigNumber` \| `BytesLike` |
 
-**Returns:** *string*
+#### Returns
 
-Inherited from: ContractFactory.getContractAddress
+`string`
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:142
+#### Inherited from
+
+ContractFactory.getContractAddress
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:142
 
 ___
 
 ### getInterface
 
-▸ `Static` **getInterface**(`contractInterface`: ContractInterface): *Interface*
+▸ `Static` **getInterface**(`contractInterface`): `Interface`
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `contractInterface` | ContractInterface |
+| `contractInterface` | `ContractInterface` |
 
-**Returns:** *Interface*
+#### Returns
 
-Inherited from: ContractFactory.getInterface
+`Interface`
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:141
+#### Inherited from
+
+ContractFactory.getInterface
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:141

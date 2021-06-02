@@ -25,94 +25,120 @@
 
 ### constructor
 
-\+ **new HalfKey**(`arr`: *Uint8Array*): [*HalfKey*](halfkey.md)
+• **new HalfKey**(`arr`)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `arr` | *Uint8Array* |
+| `arr` | `Uint8Array` |
 
-**Returns:** [*HalfKey*](halfkey.md)
+#### Defined in
 
-Defined in: [types/halfKey.ts:5](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKey.ts#L5)
+[types/halfKey.ts:5](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKey.ts#L5)
 
 ## Properties
 
 ### SIZE
 
-▪ `Static` **SIZE**: *number*= 32
+▪ `Static` **SIZE**: `number` = 32
 
-Defined in: [types/halfKey.ts:41](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKey.ts#L41)
+#### Defined in
+
+[types/halfKey.ts:41](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKey.ts#L41)
 
 ## Methods
 
 ### clone
 
-▸ **clone**(): [*HalfKey*](halfkey.md)
+▸ **clone**(): [HalfKey](halfkey.md)
 
-**Returns:** [*HalfKey*](halfkey.md)
+#### Returns
 
-Defined in: [types/halfKey.ts:36](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKey.ts#L36)
+[HalfKey](halfkey.md)
+
+#### Defined in
+
+[types/halfKey.ts:36](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKey.ts#L36)
 
 ___
 
 ### eq
 
-▸ **eq**(`halfKey`: [*HalfKey*](halfkey.md)): *boolean*
+▸ **eq**(`halfKey`): `boolean`
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `halfKey` | [*HalfKey*](halfkey.md) |
+| `halfKey` | [HalfKey](halfkey.md) |
 
-**Returns:** *boolean*
+#### Returns
 
-Defined in: [types/halfKey.ts:28](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKey.ts#L28)
+`boolean`
+
+#### Defined in
+
+[types/halfKey.ts:28](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKey.ts#L28)
 
 ___
 
 ### serialize
 
-▸ **serialize**(): *Uint8Array*
+▸ **serialize**(): `Uint8Array`
 
-**Returns:** *Uint8Array*
+#### Returns
 
-Defined in: [types/halfKey.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKey.ts#L20)
+`Uint8Array`
+
+#### Defined in
+
+[types/halfKey.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKey.ts#L20)
 
 ___
 
 ### toChallenge
 
-▸ **toChallenge**(): [*HalfKeyChallenge*](halfkeychallenge.md)
+▸ **toChallenge**(): [HalfKeyChallenge](halfkeychallenge.md)
 
-**Returns:** [*HalfKeyChallenge*](halfkeychallenge.md)
+#### Returns
 
-Defined in: [types/halfKey.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKey.ts#L16)
+[HalfKeyChallenge](halfkeychallenge.md)
+
+#### Defined in
+
+[types/halfKey.ts:16](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKey.ts#L16)
 
 ___
 
 ### toHex
 
-▸ **toHex**(): *string*
+▸ **toHex**(): `string`
 
-**Returns:** *string*
+#### Returns
 
-Defined in: [types/halfKey.ts:24](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKey.ts#L24)
+`string`
+
+#### Defined in
+
+[types/halfKey.ts:24](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKey.ts#L24)
 
 ___
 
 ### deserialize
 
-▸ `Static` **deserialize**(`arr`: *Uint8Array*): [*HalfKey*](halfkey.md)
+▸ `Static` **deserialize**(`arr`): [HalfKey](halfkey.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `arr` | *Uint8Array* |
+| `arr` | `Uint8Array` |
 
-**Returns:** [*HalfKey*](halfkey.md)
+#### Returns
 
-Defined in: [types/halfKey.ts:32](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKey.ts#L32)
+[HalfKey](halfkey.md)
+
+#### Defined in
+
+[types/halfKey.ts:32](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKey.ts#L32)

@@ -26,100 +26,132 @@
 
 ### constructor
 
-\+ **new NativeBalance**(`bn`: *BN*): [*NativeBalance*](nativebalance.md)
+• **new NativeBalance**(`bn`)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `bn` | *BN* |
+| `bn` | `BN` |
 
-**Returns:** [*NativeBalance*](nativebalance.md)
+#### Defined in
 
-Defined in: [types/primitives.ts:272](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L272)
+[types/primitives.ts:272](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L272)
 
 ## Accessors
 
 ### DECIMALS
 
-• `Static` get **DECIMALS**(): *number*
+• `Static` `get` **DECIMALS**(): `number`
 
-**Returns:** *number*
+#### Returns
 
-Defined in: [types/primitives.ts:279](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L279)
+`number`
+
+#### Defined in
+
+[types/primitives.ts:279](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L279)
 
 ___
 
 ### SIZE
 
-• `Static` get **SIZE**(): *number*
+• `Static` `get` **SIZE**(): `number`
 
-**Returns:** *number*
+#### Returns
 
-Defined in: [types/primitives.ts:303](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L303)
+`number`
+
+#### Defined in
+
+[types/primitives.ts:303](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L303)
 
 ___
 
 ### SYMBOL
 
-• `Static` get **SYMBOL**(): *string*
+• `Static` `get` **SYMBOL**(): `string`
 
-**Returns:** *string*
+#### Returns
 
-Defined in: [types/primitives.ts:275](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L275)
+`string`
+
+#### Defined in
+
+[types/primitives.ts:275](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L275)
 
 ## Methods
 
 ### serialize
 
-▸ **serialize**(): *Uint8Array*
+▸ **serialize**(): `Uint8Array`
 
-**Returns:** *Uint8Array*
+#### Returns
 
-Defined in: [types/primitives.ts:295](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L295)
+`Uint8Array`
+
+#### Defined in
+
+[types/primitives.ts:295](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L295)
 
 ___
 
 ### toBN
 
-▸ **toBN**(): *BN*
+▸ **toBN**(): `BN`
 
-**Returns:** *BN*
+#### Returns
 
-Defined in: [types/primitives.ts:291](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L291)
+`BN`
+
+#### Defined in
+
+[types/primitives.ts:291](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L291)
 
 ___
 
 ### toFormattedString
 
-▸ **toFormattedString**(): *string*
+▸ **toFormattedString**(): `string`
 
-**Returns:** *string*
+#### Returns
 
-Defined in: [types/primitives.ts:299](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L299)
+`string`
+
+#### Defined in
+
+[types/primitives.ts:299](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L299)
 
 ___
 
 ### toHex
 
-▸ **toHex**(): *string*
+▸ **toHex**(): `string`
 
-**Returns:** *string*
+#### Returns
 
-Defined in: [types/primitives.ts:283](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L283)
+`string`
+
+#### Defined in
+
+[types/primitives.ts:283](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L283)
 
 ___
 
 ### deserialize
 
-▸ `Static` **deserialize**(`arr`: *Uint8Array*): [*NativeBalance*](nativebalance.md)
+▸ `Static` **deserialize**(`arr`): [NativeBalance](nativebalance.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `arr` | *Uint8Array* |
+| `arr` | `Uint8Array` |
 
-**Returns:** [*NativeBalance*](nativebalance.md)
+#### Returns
 
-Defined in: [types/primitives.ts:287](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L287)
+[NativeBalance](nativebalance.md)
+
+#### Defined in
+
+[types/primitives.ts:287](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L287)

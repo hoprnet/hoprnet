@@ -11,7 +11,7 @@
 
 ## Hierarchy
 
-- *EventFilter*
+- `EventFilter`
 
   ↳ **TypedEventFilter**
 
@@ -26,18 +26,26 @@
 
 ### address
 
-• `Optional` **address**: *string*
+• `Optional` **address**: `string`
 
-Inherited from: EventFilter.address
+#### Inherited from
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:34
+EventFilter.address
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:34
 
 ___
 
 ### topics
 
-• `Optional` **topics**: (*string* \| *string*[])[]
+• `Optional` **topics**: (`string` \| `string`[])[]
 
-Inherited from: EventFilter.topics
+#### Inherited from
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:35
+EventFilter.topics
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:35

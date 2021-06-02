@@ -6,11 +6,11 @@
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgs` | Result |
+| `EventArgs` | `EventArgs`: `Result` |
 
 ## Hierarchy
 
-- *Event*
+- `Event`
 
   ↳ **TypedEvent**
 
@@ -41,215 +41,297 @@
 
 ### address
 
-• **address**: *string*
+• **address**: `string`
 
-Inherited from: Event.address
+#### Inherited from
 
-Defined in: node_modules/@ethersproject/abstract-provider/lib/index.d.ts:53
+Event.address
+
+#### Defined in
+
+node_modules/@ethersproject/abstract-provider/lib/index.d.ts:53
 
 ___
 
 ### args
 
-• **args**: EventArgs
+• **args**: `EventArgs`
 
-Overrides: Event.args
+#### Overrides
 
-Defined in: packages/ethereum/types/commons.ts:12
+Event.args
+
+#### Defined in
+
+packages/ethereum/types/commons.ts:12
 
 ___
 
 ### blockHash
 
-• **blockHash**: *string*
+• **blockHash**: `string`
 
-Inherited from: Event.blockHash
+#### Inherited from
 
-Defined in: node_modules/@ethersproject/abstract-provider/lib/index.d.ts:50
+Event.blockHash
+
+#### Defined in
+
+node_modules/@ethersproject/abstract-provider/lib/index.d.ts:50
 
 ___
 
 ### blockNumber
 
-• **blockNumber**: *number*
+• **blockNumber**: `number`
 
-Inherited from: Event.blockNumber
+#### Inherited from
 
-Defined in: node_modules/@ethersproject/abstract-provider/lib/index.d.ts:49
+Event.blockNumber
+
+#### Defined in
+
+node_modules/@ethersproject/abstract-provider/lib/index.d.ts:49
 
 ___
 
 ### data
 
-• **data**: *string*
+• **data**: `string`
 
-Inherited from: Event.data
+#### Inherited from
 
-Defined in: node_modules/@ethersproject/abstract-provider/lib/index.d.ts:54
+Event.data
+
+#### Defined in
+
+node_modules/@ethersproject/abstract-provider/lib/index.d.ts:54
 
 ___
 
 ### decode
 
-• `Optional` **decode**: (`data`: *string*, `topics?`: *string*[]) => *any*
+• `Optional` **decode**: (`data`: `string`, `topics?`: `string`[]) => `any`
 
 #### Type declaration
 
-▸ (`data`: *string*, `topics?`: *string*[]): *any*
+▸ (`data`, `topics?`): `any`
 
-#### Parameters
+##### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `data` | *string* |
-| `topics?` | *string*[] |
+| `data` | `string` |
+| `topics?` | `string`[] |
 
-**Returns:** *any*
+##### Returns
 
-Inherited from: Event.decode
+`any`
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:43
+#### Inherited from
+
+Event.decode
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:43
 
 ___
 
 ### decodeError
 
-• `Optional` **decodeError**: Error
+• `Optional` **decodeError**: `Error`
 
-Inherited from: Event.decodeError
+#### Inherited from
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:42
+Event.decodeError
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:42
 
 ___
 
 ### event
 
-• `Optional` **event**: *string*
+• `Optional` **event**: `string`
 
-Inherited from: Event.event
+#### Inherited from
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:39
+Event.event
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:39
 
 ___
 
 ### eventSignature
 
-• `Optional` **eventSignature**: *string*
+• `Optional` **eventSignature**: `string`
 
-Inherited from: Event.eventSignature
+#### Inherited from
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:40
+Event.eventSignature
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:40
 
 ___
 
 ### getBlock
 
-• **getBlock**: () => *Promise*<Block\>
+• **getBlock**: () => `Promise`<Block\>
 
 #### Type declaration
 
-▸ (): *Promise*<Block\>
+▸ (): `Promise`<Block\>
 
-**Returns:** *Promise*<Block\>
+##### Returns
 
-Inherited from: Event.getBlock
+`Promise`<Block\>
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:45
+#### Inherited from
+
+Event.getBlock
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:45
 
 ___
 
 ### getTransaction
 
-• **getTransaction**: () => *Promise*<TransactionResponse\>
+• **getTransaction**: () => `Promise`<TransactionResponse\>
 
 #### Type declaration
 
-▸ (): *Promise*<TransactionResponse\>
+▸ (): `Promise`<TransactionResponse\>
 
-**Returns:** *Promise*<TransactionResponse\>
+##### Returns
 
-Inherited from: Event.getTransaction
+`Promise`<TransactionResponse\>
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:46
+#### Inherited from
+
+Event.getTransaction
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:46
 
 ___
 
 ### getTransactionReceipt
 
-• **getTransactionReceipt**: () => *Promise*<TransactionReceipt\>
+• **getTransactionReceipt**: () => `Promise`<TransactionReceipt\>
 
 #### Type declaration
 
-▸ (): *Promise*<TransactionReceipt\>
+▸ (): `Promise`<TransactionReceipt\>
 
-**Returns:** *Promise*<TransactionReceipt\>
+##### Returns
 
-Inherited from: Event.getTransactionReceipt
+`Promise`<TransactionReceipt\>
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:47
+#### Inherited from
+
+Event.getTransactionReceipt
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:47
 
 ___
 
 ### logIndex
 
-• **logIndex**: *number*
+• **logIndex**: `number`
 
-Inherited from: Event.logIndex
+#### Inherited from
 
-Defined in: node_modules/@ethersproject/abstract-provider/lib/index.d.ts:57
+Event.logIndex
+
+#### Defined in
+
+node_modules/@ethersproject/abstract-provider/lib/index.d.ts:57
 
 ___
 
 ### removeListener
 
-• **removeListener**: () => *void*
+• **removeListener**: () => `void`
 
 #### Type declaration
 
-▸ (): *void*
+▸ (): `void`
 
-**Returns:** *void*
+##### Returns
 
-Inherited from: Event.removeListener
+`void`
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:44
+#### Inherited from
+
+Event.removeListener
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:44
 
 ___
 
 ### removed
 
-• **removed**: *boolean*
+• **removed**: `boolean`
 
-Inherited from: Event.removed
+#### Inherited from
 
-Defined in: node_modules/@ethersproject/abstract-provider/lib/index.d.ts:52
+Event.removed
+
+#### Defined in
+
+node_modules/@ethersproject/abstract-provider/lib/index.d.ts:52
 
 ___
 
 ### topics
 
-• **topics**: *string*[]
+• **topics**: `string`[]
 
-Inherited from: Event.topics
+#### Inherited from
 
-Defined in: node_modules/@ethersproject/abstract-provider/lib/index.d.ts:55
+Event.topics
+
+#### Defined in
+
+node_modules/@ethersproject/abstract-provider/lib/index.d.ts:55
 
 ___
 
 ### transactionHash
 
-• **transactionHash**: *string*
+• **transactionHash**: `string`
 
-Inherited from: Event.transactionHash
+#### Inherited from
 
-Defined in: node_modules/@ethersproject/abstract-provider/lib/index.d.ts:56
+Event.transactionHash
+
+#### Defined in
+
+node_modules/@ethersproject/abstract-provider/lib/index.d.ts:56
 
 ___
 
 ### transactionIndex
 
-• **transactionIndex**: *number*
+• **transactionIndex**: `number`
 
-Inherited from: Event.transactionIndex
+#### Inherited from
 
-Defined in: node_modules/@ethersproject/abstract-provider/lib/index.d.ts:51
+Event.transactionIndex
+
+#### Defined in
+
+node_modules/@ethersproject/abstract-provider/lib/index.d.ts:51

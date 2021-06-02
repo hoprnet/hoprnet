@@ -16,23 +16,25 @@
 
 ### constructor
 
-\+ **new ERC777Snapshot__factory**(): [*ERC777Snapshot\_\_factory*](erc777snapshot__factory.md)
-
-**Returns:** [*ERC777Snapshot\_\_factory*](erc777snapshot__factory.md)
+• **new ERC777Snapshot__factory**()
 
 ## Methods
 
 ### connect
 
-▸ `Static` **connect**(`address`: *string*, `signerOrProvider`: *Signer* \| *Provider*): [*ERC777Snapshot*](erc777snapshot.md)
+▸ `Static` **connect**(`address`, `signerOrProvider`): [ERC777Snapshot](erc777snapshot.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `address` | *string* |
-| `signerOrProvider` | *Signer* \| *Provider* |
+| `address` | `string` |
+| `signerOrProvider` | `Signer` \| `Provider` |
 
-**Returns:** [*ERC777Snapshot*](erc777snapshot.md)
+#### Returns
 
-Defined in: packages/ethereum/types/factories/ERC777Snapshot__factory.ts:11
+[ERC777Snapshot](erc777snapshot.md)
+
+#### Defined in
+
+packages/ethereum/types/factories/ERC777Snapshot__factory.ts:11

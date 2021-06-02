@@ -16,23 +16,25 @@
 
 ### constructor
 
-\+ **new AccessControl__factory**(): [*AccessControl\_\_factory*](accesscontrol__factory.md)
-
-**Returns:** [*AccessControl\_\_factory*](accesscontrol__factory.md)
+• **new AccessControl__factory**()
 
 ## Methods
 
 ### connect
 
-▸ `Static` **connect**(`address`: *string*, `signerOrProvider`: *Signer* \| *Provider*): [*AccessControl*](accesscontrol.md)
+▸ `Static` **connect**(`address`, `signerOrProvider`): [AccessControl](accesscontrol.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `address` | *string* |
-| `signerOrProvider` | *Signer* \| *Provider* |
+| `address` | `string` |
+| `signerOrProvider` | `Signer` \| `Provider` |
 
-**Returns:** [*AccessControl*](accesscontrol.md)
+#### Returns
 
-Defined in: packages/ethereum/types/factories/AccessControl__factory.ts:11
+[AccessControl](accesscontrol.md)
+
+#### Defined in
+
+packages/ethereum/types/factories/AccessControl__factory.ts:11

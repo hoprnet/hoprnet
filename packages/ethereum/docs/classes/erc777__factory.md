@@ -4,7 +4,7 @@
 
 ## Hierarchy
 
-- *ContractFactory*
+- `ContractFactory`
 
   ↳ **ERC777__factory**
 
@@ -36,218 +36,284 @@
 
 ### constructor
 
-\+ **new ERC777__factory**(`signer?`: *Signer*): [*ERC777\_\_factory*](erc777__factory.md)
+• **new ERC777__factory**(`signer?`)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `signer?` | *Signer* |
+| `signer?` | `Signer` |
 
-**Returns:** [*ERC777\_\_factory*](erc777__factory.md)
+#### Overrides
 
-Overrides: ContractFactory.constructor
+ContractFactory.constructor
 
-Defined in: packages/ethereum/types/factories/ERC777__factory.ts:10
+#### Defined in
+
+packages/ethereum/types/factories/ERC777__factory.ts:10
 
 ## Properties
 
 ### bytecode
 
-• `Readonly` **bytecode**: *string*
+• `Readonly` **bytecode**: `string`
 
-Inherited from: ContractFactory.bytecode
+#### Inherited from
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:131
+ContractFactory.bytecode
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:131
 
 ___
 
 ### interface
 
-• `Readonly` **interface**: *Interface*
+• `Readonly` **interface**: `Interface`
 
-Inherited from: ContractFactory.interface
+#### Inherited from
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:130
+ContractFactory.interface
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:130
 
 ___
 
 ### signer
 
-• `Readonly` **signer**: *Signer*
+• `Readonly` **signer**: `Signer`
 
-Inherited from: ContractFactory.signer
+#### Inherited from
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:132
+ContractFactory.signer
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:132
 
 ## Methods
 
 ### attach
 
-▸ **attach**(`address`: *string*): [*ERC777*](erc777.md)
+▸ **attach**(`address`): [ERC777](erc777.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `address` | *string* |
+| `address` | `string` |
 
-**Returns:** [*ERC777*](erc777.md)
+#### Returns
 
-Overrides: ContractFactory.attach
+[ERC777](erc777.md)
 
-Defined in: packages/ethereum/types/factories/ERC777__factory.ts:41
+#### Overrides
+
+ContractFactory.attach
+
+#### Defined in
+
+packages/ethereum/types/factories/ERC777__factory.ts:41
 
 ___
 
 ### connect
 
-▸ **connect**(`signer`: *Signer*): [*ERC777\_\_factory*](erc777__factory.md)
+▸ **connect**(`signer`): [ERC777\_\_factory](erc777__factory.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `signer` | *Signer* |
+| `signer` | `Signer` |
 
-**Returns:** [*ERC777\_\_factory*](erc777__factory.md)
+#### Returns
 
-Overrides: ContractFactory.connect
+[ERC777\_\_factory](erc777__factory.md)
 
-Defined in: packages/ethereum/types/factories/ERC777__factory.ts:44
+#### Overrides
+
+ContractFactory.connect
+
+#### Defined in
+
+packages/ethereum/types/factories/ERC777__factory.ts:44
 
 ___
 
 ### deploy
 
-▸ **deploy**(`name_`: *string*, `symbol_`: *string*, `defaultOperators_`: *string*[], `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): *Promise*<[*ERC777*](erc777.md)\>
+▸ **deploy**(`name_`, `symbol_`, `defaultOperators_`, `overrides?`): `Promise`<[ERC777](erc777.md)\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `name_` | *string* |
-| `symbol_` | *string* |
-| `defaultOperators_` | *string*[] |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `name_` | `string` |
+| `symbol_` | `string` |
+| `defaultOperators_` | `string`[] |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** *Promise*<[*ERC777*](erc777.md)\>
+#### Returns
 
-Overrides: ContractFactory.deploy
+`Promise`<[ERC777](erc777.md)\>
 
-Defined in: packages/ethereum/types/factories/ERC777__factory.ts:15
+#### Overrides
+
+ContractFactory.deploy
+
+#### Defined in
+
+packages/ethereum/types/factories/ERC777__factory.ts:15
 
 ___
 
 ### getDeployTransaction
 
-▸ **getDeployTransaction**(`name_`: *string*, `symbol_`: *string*, `defaultOperators_`: *string*[], `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): TransactionRequest
+▸ **getDeployTransaction**(`name_`, `symbol_`, `defaultOperators_`, `overrides?`): `TransactionRequest`
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `name_` | *string* |
-| `symbol_` | *string* |
-| `defaultOperators_` | *string*[] |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `name_` | `string` |
+| `symbol_` | `string` |
+| `defaultOperators_` | `string`[] |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** TransactionRequest
+#### Returns
 
-Overrides: ContractFactory.getDeployTransaction
+`TransactionRequest`
 
-Defined in: packages/ethereum/types/factories/ERC777__factory.ts:28
+#### Overrides
+
+ContractFactory.getDeployTransaction
+
+#### Defined in
+
+packages/ethereum/types/factories/ERC777__factory.ts:28
 
 ___
 
 ### connect
 
-▸ `Static` **connect**(`address`: *string*, `signerOrProvider`: *Signer* \| *Provider*): [*ERC777*](erc777.md)
+▸ `Static` **connect**(`address`, `signerOrProvider`): [ERC777](erc777.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `address` | *string* |
-| `signerOrProvider` | *Signer* \| *Provider* |
+| `address` | `string` |
+| `signerOrProvider` | `Signer` \| `Provider` |
 
-**Returns:** [*ERC777*](erc777.md)
+#### Returns
 
-Defined in: packages/ethereum/types/factories/ERC777__factory.ts:47
+[ERC777](erc777.md)
+
+#### Defined in
+
+packages/ethereum/types/factories/ERC777__factory.ts:47
 
 ___
 
 ### fromSolidity
 
-▸ `Static` **fromSolidity**(`compilerOutput`: *any*, `signer?`: *Signer*): *ContractFactory*
+▸ `Static` **fromSolidity**(`compilerOutput`, `signer?`): `ContractFactory`
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `compilerOutput` | *any* |
-| `signer?` | *Signer* |
+| `compilerOutput` | `any` |
+| `signer?` | `Signer` |
 
-**Returns:** *ContractFactory*
+#### Returns
 
-Inherited from: ContractFactory.fromSolidity
+`ContractFactory`
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:140
+#### Inherited from
+
+ContractFactory.fromSolidity
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:140
 
 ___
 
 ### getContract
 
-▸ `Static` **getContract**(`address`: *string*, `contractInterface`: ContractInterface, `signer?`: *Signer*): *Contract*
+▸ `Static` **getContract**(`address`, `contractInterface`, `signer?`): `Contract`
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `address` | *string* |
-| `contractInterface` | ContractInterface |
-| `signer?` | *Signer* |
+| `address` | `string` |
+| `contractInterface` | `ContractInterface` |
+| `signer?` | `Signer` |
 
-**Returns:** *Contract*
+#### Returns
 
-Inherited from: ContractFactory.getContract
+`Contract`
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:146
+#### Inherited from
+
+ContractFactory.getContract
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:146
 
 ___
 
 ### getContractAddress
 
-▸ `Static` **getContractAddress**(`tx`: { `from`: *string* ; `nonce`: *number* \| *BigNumber* \| BytesLike  }): *string*
+▸ `Static` **getContractAddress**(`tx`): `string`
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `tx` | *object* |
-| `tx.from` | *string* |
-| `tx.nonce` | *number* \| *BigNumber* \| BytesLike |
+| `tx` | `Object` |
+| `tx.from` | `string` |
+| `tx.nonce` | `number` \| `BigNumber` \| `BytesLike` |
 
-**Returns:** *string*
+#### Returns
 
-Inherited from: ContractFactory.getContractAddress
+`string`
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:142
+#### Inherited from
+
+ContractFactory.getContractAddress
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:142
 
 ___
 
 ### getInterface
 
-▸ `Static` **getInterface**(`contractInterface`: ContractInterface): *Interface*
+▸ `Static` **getInterface**(`contractInterface`): `Interface`
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `contractInterface` | ContractInterface |
+| `contractInterface` | `ContractInterface` |
 
-**Returns:** *Interface*
+#### Returns
 
-Inherited from: ContractFactory.getInterface
+`Interface`
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:141
+#### Inherited from
+
+ContractFactory.getInterface
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:141

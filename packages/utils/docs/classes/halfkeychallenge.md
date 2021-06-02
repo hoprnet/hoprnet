@@ -4,7 +4,7 @@
 
 ## Hierarchy
 
-- [*CurvePoint*](curvepoint.md)
+- [CurvePoint](curvepoint.md)
 
   ↳ **HalfKeyChallenge**
 
@@ -35,176 +35,242 @@
 
 ### constructor
 
-\+ **new HalfKeyChallenge**(`arr`: *Uint8Array*): [*HalfKeyChallenge*](halfkeychallenge.md)
+• **new HalfKeyChallenge**(`arr`)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `arr` | *Uint8Array* |
+| `arr` | `Uint8Array` |
 
-**Returns:** [*HalfKeyChallenge*](halfkeychallenge.md)
+#### Inherited from
 
-Inherited from: [CurvePoint](curvepoint.md)
+[CurvePoint](curvepoint.md).[constructor](curvepoint.md#constructor)
 
-Defined in: [types/curvePoint.ts:9](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L9)
+#### Defined in
+
+[types/curvePoint.ts:9](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L9)
 
 ## Accessors
 
 ### SIZE
 
-• `Static` get **SIZE**(): *number*
+• `Static` `get` **SIZE**(): `number`
 
-**Returns:** *number*
+#### Returns
 
-Defined in: [types/curvePoint.ts:54](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L54)
+`number`
+
+#### Defined in
+
+[types/curvePoint.ts:54](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L54)
 
 ## Methods
 
 ### eq
 
-▸ **eq**(`b`: [*CurvePoint*](curvepoint.md)): *boolean*
+▸ **eq**(`b`): `boolean`
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `b` | [*CurvePoint*](curvepoint.md) |
+| `b` | [CurvePoint](curvepoint.md) |
 
-**Returns:** *boolean*
+#### Returns
 
-Inherited from: [CurvePoint](curvepoint.md)
+`boolean`
 
-Defined in: [types/curvePoint.ts:66](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L66)
+#### Inherited from
+
+[CurvePoint](curvepoint.md).[eq](curvepoint.md#eq)
+
+#### Defined in
+
+[types/curvePoint.ts:66](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L66)
 
 ___
 
 ### serialize
 
-▸ **serialize**(): *Uint8Array*
+▸ **serialize**(): `Uint8Array`
 
-**Returns:** *Uint8Array*
+#### Returns
 
-Inherited from: [CurvePoint](curvepoint.md)
+`Uint8Array`
 
-Defined in: [types/curvePoint.ts:58](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L58)
+#### Inherited from
+
+[CurvePoint](curvepoint.md).[serialize](curvepoint.md#serialize)
+
+#### Defined in
+
+[types/curvePoint.ts:58](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L58)
 
 ___
 
 ### toAddress
 
-▸ **toAddress**(): [*Address*](address.md)
+▸ **toAddress**(): [Address](address.md)
 
-**Returns:** [*Address*](address.md)
+#### Returns
 
-Inherited from: [CurvePoint](curvepoint.md)
+[Address](address.md)
 
-Defined in: [types/curvePoint.ts:37](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L37)
+#### Inherited from
+
+[CurvePoint](curvepoint.md).[toAddress](curvepoint.md#toaddress)
+
+#### Defined in
+
+[types/curvePoint.ts:37](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L37)
 
 ___
 
 ### toHex
 
-▸ **toHex**(): *string*
+▸ **toHex**(): `string`
 
-**Returns:** *string*
+#### Returns
 
-Inherited from: [CurvePoint](curvepoint.md)
+`string`
 
-Defined in: [types/curvePoint.ts:62](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L62)
+#### Inherited from
+
+[CurvePoint](curvepoint.md).[toHex](curvepoint.md#tohex)
+
+#### Defined in
+
+[types/curvePoint.ts:62](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L62)
 
 ___
 
 ### toPeerId
 
-▸ **toPeerId**(): *PeerId*
+▸ **toPeerId**(): `PeerId`
 
-**Returns:** *PeerId*
+#### Returns
 
-Inherited from: [CurvePoint](curvepoint.md)
+`PeerId`
 
-Defined in: [types/curvePoint.ts:46](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L46)
+#### Inherited from
+
+[CurvePoint](curvepoint.md).[toPeerId](curvepoint.md#topeerid)
+
+#### Defined in
+
+[types/curvePoint.ts:46](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L46)
 
 ___
 
 ### toUncompressedCurvePoint
 
-▸ **toUncompressedCurvePoint**(): *string*
+▸ **toUncompressedCurvePoint**(): `string`
 
-**Returns:** *string*
+#### Returns
 
-Inherited from: [CurvePoint](curvepoint.md)
+`string`
 
-Defined in: [types/curvePoint.ts:41](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L41)
+#### Inherited from
+
+[CurvePoint](curvepoint.md).[toUncompressedCurvePoint](curvepoint.md#touncompressedcurvepoint)
+
+#### Defined in
+
+[types/curvePoint.ts:41](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L41)
 
 ___
 
 ### fromExponent
 
-▸ `Static` **fromExponent**(`exponent`: *Uint8Array*): [*CurvePoint*](curvepoint.md)
+▸ `Static` **fromExponent**(`exponent`): [CurvePoint](curvepoint.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `exponent` | *Uint8Array* |
+| `exponent` | `Uint8Array` |
 
-**Returns:** [*CurvePoint*](curvepoint.md)
+#### Returns
 
-Inherited from: [CurvePoint](curvepoint.md)
+[CurvePoint](curvepoint.md)
 
-Defined in: [types/curvePoint.ts:17](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L17)
+#### Inherited from
+
+[CurvePoint](curvepoint.md).[fromExponent](curvepoint.md#fromexponent)
+
+#### Defined in
+
+[types/curvePoint.ts:17](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L17)
 
 ___
 
 ### fromPeerId
 
-▸ `Static` **fromPeerId**(`peerId`: *PeerId*): [*CurvePoint*](curvepoint.md)
+▸ `Static` **fromPeerId**(`peerId`): [CurvePoint](curvepoint.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `peerId` | *PeerId* |
+| `peerId` | `PeerId` |
 
-**Returns:** [*CurvePoint*](curvepoint.md)
+#### Returns
 
-Inherited from: [CurvePoint](curvepoint.md)
+[CurvePoint](curvepoint.md)
 
-Defined in: [types/curvePoint.ts:33](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L33)
+#### Inherited from
+
+[CurvePoint](curvepoint.md).[fromPeerId](curvepoint.md#frompeerid)
+
+#### Defined in
+
+[types/curvePoint.ts:33](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L33)
 
 ___
 
 ### fromString
 
-▸ `Static` **fromString**(`str`: *string*): [*CurvePoint*](curvepoint.md)
+▸ `Static` **fromString**(`str`): [CurvePoint](curvepoint.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `str` | *string* |
+| `str` | `string` |
 
-**Returns:** [*CurvePoint*](curvepoint.md)
+#### Returns
 
-Inherited from: [CurvePoint](curvepoint.md)
+[CurvePoint](curvepoint.md)
 
-Defined in: [types/curvePoint.ts:50](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L50)
+#### Inherited from
+
+[CurvePoint](curvepoint.md).[fromString](curvepoint.md#fromstring)
+
+#### Defined in
+
+[types/curvePoint.ts:50](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L50)
 
 ___
 
 ### fromUncompressedUncompressedCurvePoint
 
-▸ `Static` **fromUncompressedUncompressedCurvePoint**(`arr`: *Uint8Array*): [*CurvePoint*](curvepoint.md)
+▸ `Static` **fromUncompressedUncompressedCurvePoint**(`arr`): [CurvePoint](curvepoint.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `arr` | *Uint8Array* |
+| `arr` | `Uint8Array` |
 
-**Returns:** [*CurvePoint*](curvepoint.md)
+#### Returns
 
-Inherited from: [CurvePoint](curvepoint.md)
+[CurvePoint](curvepoint.md)
 
-Defined in: [types/curvePoint.ts:25](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L25)
+#### Inherited from
+
+[CurvePoint](curvepoint.md).[fromUncompressedUncompressedCurvePoint](curvepoint.md#fromuncompresseduncompressedcurvepoint)
+
+#### Defined in
+
+[types/curvePoint.ts:25](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L25)

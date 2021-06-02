@@ -16,23 +16,25 @@
 
 ### constructor
 
-\+ **new LegacyERC20__factory**(): [*LegacyERC20\_\_factory*](legacyerc20__factory.md)
-
-**Returns:** [*LegacyERC20\_\_factory*](legacyerc20__factory.md)
+• **new LegacyERC20__factory**()
 
 ## Methods
 
 ### connect
 
-▸ `Static` **connect**(`address`: *string*, `signerOrProvider`: *Signer* \| *Provider*): [*LegacyERC20*](legacyerc20.md)
+▸ `Static` **connect**(`address`, `signerOrProvider`): [LegacyERC20](legacyerc20.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `address` | *string* |
-| `signerOrProvider` | *Signer* \| *Provider* |
+| `address` | `string` |
+| `signerOrProvider` | `Signer` \| `Provider` |
 
-**Returns:** [*LegacyERC20*](legacyerc20.md)
+#### Returns
 
-Defined in: packages/ethereum/types/factories/LegacyERC20__factory.ts:11
+[LegacyERC20](legacyerc20.md)
+
+#### Defined in
+
+packages/ethereum/types/factories/LegacyERC20__factory.ts:11

@@ -16,23 +16,25 @@
 
 ### constructor
 
-\+ **new Context__factory**(): [*Context\_\_factory*](context__factory.md)
-
-**Returns:** [*Context\_\_factory*](context__factory.md)
+• **new Context__factory**()
 
 ## Methods
 
 ### connect
 
-▸ `Static` **connect**(`address`: *string*, `signerOrProvider`: *Signer* \| *Provider*): [*Context*](context.md)
+▸ `Static` **connect**(`address`, `signerOrProvider`): [Context](context.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `address` | *string* |
-| `signerOrProvider` | *Signer* \| *Provider* |
+| `address` | `string` |
+| `signerOrProvider` | `Signer` \| `Provider` |
 
-**Returns:** [*Context*](context.md)
+#### Returns
 
-Defined in: packages/ethereum/types/factories/Context__factory.ts:11
+[Context](context.md)
+
+#### Defined in
+
+packages/ethereum/types/factories/Context__factory.ts:11
