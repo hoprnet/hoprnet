@@ -25,6 +25,10 @@ get_environment() {
 
   case "$BRANCH" in release/*)
     VERSION_MAJ_MIN=$(get_version_maj_min $RELEASE)
+    if [ "$VERSION_MAJ_MIN" == '1.71' ]; then
+      RELEASE_NAME='stirling'
+      return
+    fi
 
     if [ "$VERSION_MAJ_MIN" == '1.70' ]; then
       RELEASE_NAME='jungfrau'
