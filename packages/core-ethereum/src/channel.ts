@@ -157,7 +157,7 @@ class Channel {
     let currentTicketIndex = await this.db.getCurrentTicketIndex(channelId)
 
     if (currentTicketIndex == undefined) {
-      currentTicketIndex = new UINT256(new BN(0))
+      currentTicketIndex = new UINT256(new BN(1))
     }
 
     await this.db.setCurrentTicketIndex(channelId, new UINT256(currentTicketIndex.toBN().addn(1)))

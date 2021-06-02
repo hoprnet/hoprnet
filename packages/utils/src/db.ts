@@ -251,10 +251,10 @@ export class HoprDB {
   }
 
   async getCurrentCommitment(channelId: Hash): Promise<Hash> {
-    return new Hash(await this.get(u8aConcat(COMMITMENT_PREFIX, CURRENT, channelId.serialize())))
+    return new Hash(await this.get(Uint8Array.from([...COMMITMENT_PREFIX, ...CURRENT, ...channelId.serialize()])))
   }
 
-  async setCurrentCommitment(channelId: Hash, commitment: Hash) {
+  setCurrentCommitment(channelId: Hash, commitment: Hash): Promise<void> {
     return this.put(
       Uint8Array.from([...COMMITMENT_PREFIX, ...CURRENT, ...channelId.serialize()]),
       commitment.serialize()
@@ -262,7 +262,9 @@ export class HoprDB {
   }
 
   async getCurrentTicketIndex(channelId: Hash): Promise<UINT256> {
-    const currentTicketIndex = await this.maybeGet(u8aConcat(TICKET_INDEX_PREFIX, channelId.serialize()))
+    const currentTicketIndex = await this.maybeGet(
+      Uint8Array.from([...TICKET_INDEX_PREFIX, ...CURRENT, ...channelId.serialize()])
+    )
 
     if (currentTicketIndex == undefined) {
       return undefined

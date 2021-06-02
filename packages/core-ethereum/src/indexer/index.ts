@@ -314,11 +314,7 @@ class Indexer extends EventEmitter {
       this
     ).initialize()
   }
-
-  public hasPendingCommitment(channelId: Hash): boolean {
-    return this.pendingCommitments.get(channelId.toHex()) != undefined
-  }
-
+  
   public waitForCommitment(channelId: Hash): Promise<void> {
     let waiting = this.pendingCommitments.get(channelId.toHex())
 
@@ -329,8 +325,6 @@ class Indexer extends EventEmitter {
     waiting = Defer()
 
     this.pendingCommitments.set(channelId.toHex(), waiting)
-
-    return waiting.promise
   }
 
   private resolveCommitmentPromise(channelId: Hash) {
