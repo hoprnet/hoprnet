@@ -18,6 +18,7 @@ import { Commitment } from './commitment'
 import type { ChainWrapper } from './ethereum'
 import type Indexer from './indexer'
 import type { HoprDB } from '@hoprnet/hopr-utils'
+import chalk from 'chalk'
 
 const log = Debug('hopr-core-ethereum:channel')
 
@@ -152,23 +153,18 @@ class Channel {
     return await this.chain.finalizeChannelClosure(counterpartyAddress)
   }
 
-  private async bumpTicketIndex(channelState: ChannelEntry): Promise<UINT256> {
-    const isPartyA = this.self.toAddress().eq(channelState.partyA)
+  private async bumpTicketIndex(channelId: Hash): Promise<UINT256> {
+    let currentTicketIndex = await this.db.getCurrentTicketIndex(channelId)
 
-    let currentTicketIndex: UINT256
-
-    if (isPartyA) {
-      currentTicketIndex = channelState.partyATicketIndex
-      channelState.partyATicketIndex.toBN().iaddn(1)
-    } else {
-      currentTicketIndex = channelState.partyBTicketIndex
-      channelState.partyBTicketIndex.toBN().iaddn(1)
+    if (currentTicketIndex == undefined) {
+      currentTicketIndex = new UINT256(new BN(1))
     }
 
-    await this.db.updateChannel(this.getId(), channelState)
+    await this.db.setCurrentTicketIndex(channelId, new UINT256(currentTicketIndex.toBN().addn(1)))
 
     return currentTicketIndex
   }
+
   /**
    * Creates a signed ticket that includes the given amount of
    * tokens
@@ -184,9 +180,9 @@ class Channel {
     const counterpartyAddress = this.counterparty.toAddress()
     const channelState = await this.getState()
 
-    const currentTicketIndex = await this.bumpTicketIndex(channelState)
+    const currentTicketIndex = await this.bumpTicketIndex(channelState.getId())
 
-    return Ticket.create(
+    const ticket = Ticket.create(
       counterpartyAddress,
       challenge,
       channelState.ticketEpochFor(counterpartyAddress),
@@ -196,6 +192,10 @@ class Channel {
       channelState.channelEpoch,
       this.privateKey
     )
+
+    log(`Creating ticket in channel ${chalk.yellow(channelState.getId().toHex())}. Ticket data: \n${ticket.toString()}`)
+
+    return ticket
   }
 
   // @TODO Replace this with (truely) random data

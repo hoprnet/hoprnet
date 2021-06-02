@@ -2,6 +2,7 @@ import { u8aSplit, serializeToU8a, u8aToNumber, stringToU8a } from '..'
 import { Address, Balance, Hash } from './primitives'
 import { UINT256 } from './solidity'
 import BN from 'bn.js'
+import chalk from 'chalk'
 
 export type ChannelStatus = 'CLOSED' | 'OPEN' | 'PENDING_TO_CLOSE'
 
@@ -128,6 +129,27 @@ export class ChannelEntry {
       [this.closureTime.serialize(), UINT256.SIZE],
       [Uint8Array.of(Number(this.closureByPartyA)), 1]
     ])
+  }
+
+  toString() {
+    return (
+      // prettier-ignore
+      `ChannelEntry (${chalk.yellow(this.getId().toHex())}):\n` +
+      `  partyA:            ${chalk.yellow(this.partyA.toHex())}\n` +
+      `  partyB:            ${chalk.yellow(this.partyB.toHex())}\n` +
+      `  balanceA:          ${this.partyABalance.toFormattedString()}\n` +
+      `  balanceB:          ${this.partyBBalance.toFormattedString()}\n` +
+      `  commitmentA:       ${this.commitmentPartyA.toHex()}\n` +
+      `  commitmentB:       ${this.commitmentPartyB.toHex()}\n` +
+      `  partyATicketEpoch: ${this.partyATicketEpoch.toBN().toString(10)}\n` +
+      `  partyBTicketEpoch: ${this.partyBTicketEpoch.toBN().toString(10)}\n` +
+      `  partyBTicketIndex: ${this.partyATicketIndex.toBN().toString(10)}\n` +
+      `  partyBTicketIndex: ${this.partyBTicketIndex.toBN().toString(10)}\n` +
+      `  status:            ${chalk.green(this.status)}\n` +
+      `  channelEpoch:      ${this.channelEpoch.toBN().toString(10)}\n` +
+      `  closureTime:       ${this.closureTime.toBN().toString(10)}\n` +
+      `  closedByA:         ${chalk.blue(this.closureByPartyA.toString())}\n`
+    )
   }
 
   public getId() {
