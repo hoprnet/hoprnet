@@ -668,14 +668,17 @@ class Hopr extends EventEmitter {
     const counterpartyPubKey = new PublicKey(counterparty.pubKey.marshal())
     const channel = ethereum.getChannel(selfPubKey, counterpartyPubKey)
     const channelState = await channel.getState()
-
-    // TODO: should we wait for confirmation?
     if (channelState.status === 'CLOSED') {
       throw new Error('Channel is already closed')
     }
-
-    const txHash = await (channelState.status === 'OPEN' ? channel.initializeClosure() : channel.finalizeClosure())
-
+    let txHash
+    if (channelState.status === 'OPEN') {
+      log('initiating closure')
+      txHash = await channel.initializeClosure()
+      await channel.waitForClosable()
+    } else {
+      txHash = await channel.finalizeClosure()
+    }
     return { receipt: txHash, status: channelState.status }
   }
 

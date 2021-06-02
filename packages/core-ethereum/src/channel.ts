@@ -142,6 +142,17 @@ class Channel {
     return await this.chain.initiateChannelClosure(counterpartyAddress)
   }
 
+  async waitForClosable() {
+    const c = await this.getState()
+    if (c.status !== 'PENDING_TO_CLOSE') {
+      throw Error('Channel status is not PENDING_TO_CLOSE')
+    }
+    const closureTime = c.closureTime
+    const delay = c.closureTime.toBN().toNumber() - new Date().getTime() 
+    log(`Channel can be closed at ${closureTime}, waiting ${delay}`)
+    await new Promise(resolve => setTimeout(resolve, delay))
+  }
+
   async finalizeClosure() {
     const c = await this.getState()
     const counterpartyAddress = this.counterparty.toAddress()
