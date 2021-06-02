@@ -17,7 +17,7 @@ GCLOUD_MACHINE="--machine-type=e2-medium"
 GCLOUD_META="--metadata=google-logging-enabled=true,google-monitoring-enabled=true,enable-oslogin=true --maintenance-policy=MIGRATE"
 GCLOUD_TAGS="--tags=hopr-node,web-client,rest-client,portainer,healthcheck"
 GCLOUD_BOOTDISK="--boot-disk-size=20GB --boot-disk-type=pd-standard"
-GCLOUD_IMAGE="--image-family=cos-stable"
+GCLOUD_IMAGE="--image-family=cos-stable --image-project=cos-cloud"
 
 GCLOUD_DEFAULTS="$ZONE $GCLOUD_MACHINE $GCLOUD_META $GCLOUD_TAGS $GCLOUD_BOOTDISK $GCLOUD_IMAGE"
 
