@@ -1,5 +1,5 @@
 import debug from 'debug'
-import { PublicKey, durations, UnacknowledgedTicket } from '@hoprnet/hopr-utils'
+import { PublicKey, durations, UnacknowledgedTicket, oneAtATime } from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 import { PROTOCOL_ACKNOWLEDGEMENT } from '../../constants'
@@ -16,7 +16,7 @@ export function subscribeToAcknowledgements(
   pubKey: PeerId,
   onMessage: (ackMessage: Acknowledgement) => void
 ) {
-  subscribe(PROTOCOL_ACKNOWLEDGEMENT, async function (msg: Uint8Array, remotePeer: PeerId) {
+  async function handleAcknowledgement(msg: Uint8Array, remotePeer: PeerId) {
     const ackMsg = Acknowledgement.deserialize(msg, pubKey, remotePeer)
 
     let unacknowledgedTicket: UnacknowledgedTicket | undefined
@@ -43,7 +43,11 @@ export function subscribeToAcknowledgements(
     }
 
     onMessage(ackMsg)
-  })
+  }
+  const limitConcurrency = oneAtATime()
+  subscribe(PROTOCOL_ACKNOWLEDGEMENT, (msg: Uint8Array, remotePeer: PeerId) =>
+    limitConcurrency(() => handleAcknowledgement(msg, remotePeer))
+  )
 }
 
 export function sendAcknowledgement(packet: Packet, destination: PeerId, sendMessage: any, privKey: PeerId): void {
