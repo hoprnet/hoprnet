@@ -19,12 +19,12 @@ export default class FundChannel extends AbstractCommand {
     return 'Fund a channel, if channel is closed it will open it'
   }
 
-  async execute(query: string, state: GlobalState): Promise<string | void> {
+  async execute(log, query: string, state: GlobalState): Promise<void> {
     if (query == null) {
-      return styleValue(
+      return log(styleValue(
         `Invalid arguments. Expected 'fund <peerId> <myFund> <counterpartyFund>'. Received '${query}'`,
         'failure'
-      )
+      ))
     }
 
     const [error, peerIdInput, myFundInput, counterpartyFundInput] = this._assertUsage(query, [
@@ -32,7 +32,7 @@ export default class FundChannel extends AbstractCommand {
       'myFund',
       'counterpartyFund'
     ])
-    if (error) return styleValue(error, 'failure')
+    if (error) return log(styleValue(error, 'failure'))
 
     let peerId: PeerId
     let myFund: BN
@@ -45,14 +45,14 @@ export default class FundChannel extends AbstractCommand {
       if (isNaN(Number(counterpartyFundInput))) throw Error('Argument <counterpartyFund> is not a number')
       counterpartyFund = new BN(moveDecimalPoint(counterpartyFundInput, Balance.DECIMALS))
     } catch (err) {
-      return styleValue(err.message, 'failure')
+      return log(styleValue(err.message, 'failure'))
     }
 
     try {
       const { channelId } = await this.node.fundChannel(peerId, myFund, counterpartyFund)
-      return `${chalk.green(`Successfully funded channel`)} ${styleValue(channelId.toHex(), 'hash')}`
+      return log(`${chalk.green(`Successfully funded channel`)} ${styleValue(channelId.toHex(), 'hash')}`)
     } catch (err) {
-      return styleValue(err.message, 'failure')
+      return log(styleValue(err.message, 'failure'))
     }
   }
 }

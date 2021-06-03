@@ -1,10 +1,9 @@
 import type Hopr from '@hoprnet/hopr-core'
 import type PeerId from 'peer-id'
-import { AbstractCommand, GlobalState, CommandResponse } from './abstractCommand'
+import { AbstractCommand, GlobalState } from './abstractCommand'
 import FundChannel from './fundChannel'
 import CloseChannel from './closeChannel'
 import ListCommands from './listCommands'
-// import ListConnectors from './listConnectors'
 import ListOpenChannels from './listOpenChannels'
 import ListConnectedPeers from './listConnected'
 import { OpenChannel } from './openChannel'
@@ -43,7 +42,6 @@ export class Commands {
       new ListConnectedPeers(node),
       new ListCommands(() => this.commands),
       new ListOpenChannels(node),
-      // new ListConnectors(),
       new Ping(node),
       new PrintAddress(node),
       new PrintBalance(node),
@@ -79,7 +77,7 @@ export class Commands {
     return this.commandMap.get(command.trim())
   }
 
-  public async execute(message: string): Promise<CommandResponse> {
+  public async execute(log, message: string): Promise<void> {
     const split: (string | undefined)[] = message.trim().split(/\s+/)
     const command = split[0]
     const query = split.slice(1).join(' ')
@@ -91,9 +89,9 @@ export class Commands {
     let cmd = this.find(command)
 
     if (cmd) {
-      return await cmd.execute(query || '', this.state)
+      return await cmd.execute(log, query || '', this.state)
     }
 
-    return `${cmd}: Unknown command!`
+    return log(`${cmd}: Unknown command!`)
   }
 }

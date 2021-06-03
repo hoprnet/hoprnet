@@ -12,6 +12,7 @@ import stripAnsi from 'strip-ansi'
 import { LogStream } from './logs'
 import { NODE_ENV } from './env'
 import { Balance, NativeBalance } from '@hoprnet/hopr-utils'
+import { Commands } from './commands'
 
 let debugLog = debug('hoprd:admin')
 
@@ -20,7 +21,7 @@ export class AdminServer {
   private server: Server | undefined
   private node: Hopr | undefined
   private wsServer: any
-  private cmds: any
+  private cmds: Commands
 
   constructor(private logs: LogStream, private host: string, private port: number) {}
 
@@ -60,13 +61,13 @@ export class AdminServer {
         debugLog('Message from client', message)
         this.logs.logFullLine(`admin > ${message}`)
         if (this.cmds) {
-          this.cmds.execute(message.toString()).then((resp: any) => {
+          this.cmds.execute((resp: string) => {
             if (resp) {
               // Strings may have ansi stuff in it, get rid of it:
               resp = stripAnsi(resp)
               this.logs.logFullLine(resp)
             }
-          })
+          }, message.toString())
         }
         // TODO
       })
@@ -119,7 +120,7 @@ export class AdminServer {
 
     process.env.NODE_ENV == 'production' && showDisclaimer(this.logs)
 
-    this.cmds.execute(`alias ${node.getId().toB58String()} me`)
+    this.cmds.execute(() => {}, `alias ${node.getId().toB58String()} me`)
   }
 }
 

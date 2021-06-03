@@ -1,5 +1,4 @@
 import type Hopr from '@hoprnet/hopr-core'
-import type { CommandResponse } from './abstractCommand'
 import type PeerId from 'peer-id'
 import { MAX_HOPS } from '@hoprnet/hopr-core/lib/constants'
 import { checkPeerIdInput, encodeMessage, styleValue } from './utils'
@@ -39,7 +38,7 @@ export class SendMessage extends AbstractCommand {
     }
   }
 
-  public async execute(query: string, state: GlobalState): Promise<CommandResponse> {
+  public async execute(log, query: string, state: GlobalState): Promise<void> {
     try {
       let [err, peerIdString, message] = this._assertUsage(query, ['PeerId', 'Message'], /([A-Za-z0-9_,]+)\s(.*)/)
       if (err) throw Error(err)
@@ -64,15 +63,16 @@ export class SendMessage extends AbstractCommand {
             .map((current) => styleValue(current.toB58String(), 'peerId'))
             .join(',')} ...`
         )
-        return this.sendMessage(state, recipient, message, path.slice(0, path.length - 1))
+        log(this.sendMessage(state, recipient, message, path.slice(0, path.length - 1)))
+        return
       }
 
       let peerId = await checkPeerIdInput(peerIdString, state)
 
       console.log(`Sending message to ${styleValue(peerId.toB58String(), 'peerId')} ...`)
-      return this.sendMessage(state, peerId, message)
+      log(this.sendMessage(state, peerId, message))
     } catch (err) {
-      return styleValue(err.message, 'failure')
+      log(styleValue(err.message, 'failure'))
     }
   }
 }

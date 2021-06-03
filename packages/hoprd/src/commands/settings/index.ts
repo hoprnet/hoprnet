@@ -74,16 +74,18 @@ export default class Settings extends AbstractCommand {
     return state[setting]
   }
 
-  public async execute(query: string, state: GlobalState): Promise<string | void> {
+  public async execute(log, query: string, state: GlobalState): Promise<void> {
     if (!query) {
-      return this.listSettings(state)
+      log(this.listSettings(state))
+      return
     }
 
     const [setting, ...optionArray] = query.split(' ')
     const option = optionArray.join(' ')
 
     if (!option) {
-      return setting + ': ' + this.getState(setting, state)
+      log(setting + ': ' + this.getState(setting, state))
+      return
     }
 
     // found an exact match, run the setting's execute
@@ -94,6 +96,6 @@ export default class Settings extends AbstractCommand {
       return this.settings[matchesASetting][1](option, state)
     }
 
-    return styleValue(`Setting “${styleValue(setting)}” does not exist.`, 'failure')
+    return log(styleValue(`Setting “${styleValue(setting)}” does not exist.`, 'failure'))
   }
 }

@@ -19,11 +19,11 @@ export default class RedeemTickets extends AbstractCommand {
   /**
    * @param query a ticket challange
    */
-  public async execute(): Promise<string | void> {
+  public async execute(log): Promise<void> {
     try {
       const results = await this.node.getAcknowledgedTickets()
       if (results.length === 0) {
-        return 'No unredeemed tickets found.'
+        return log('No unredeemed tickets found.')
       }
 
       console.log(`Redeeming ${styleValue(results.length)} tickets..`)
@@ -47,11 +47,11 @@ export default class RedeemTickets extends AbstractCommand {
       const result = countSignedTickets(signedTickets)
       const total = moveDecimalPoint(result.total, Balance.DECIMALS * -1)
 
-      return `Redeemed ${styleValue(redeemedTickets.length)} out of ${styleValue(
+      return log(`Redeemed ${styleValue(redeemedTickets.length)} out of ${styleValue(
         results.length
-      )} tickets with a sum of ${styleValue(total, 'number')} HOPR.`
+      )} tickets with a sum of ${styleValue(total, 'number')} HOPR.`)
     } catch (err) {
-      return styleValue(err.message, 'failure')
+      return log(styleValue(err.message, 'failure'))
     }
   }
 }

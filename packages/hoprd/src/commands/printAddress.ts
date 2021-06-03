@@ -21,12 +21,12 @@ export default class PrintAddress extends AbstractCommand {
    * identity that we have on that chain.
    * @notice triggered by the CLI
    */
-  public async execute(query: string): Promise<string> {
+  public async execute(log, query: string): Promise<void> {
     const hoprPrefix = 'HOPR Address:'
     const hoprAddress = this.node.getId().toB58String()
 
     if (query.trim() === 'hopr') {
-      return hoprAddress
+      return log(hoprAddress)
     }
 
     // @TODO: use 'NativeBalance' and 'Balance' to display currencies
@@ -34,14 +34,14 @@ export default class PrintAddress extends AbstractCommand {
     const nativeAddress = new PublicKey(this.node.getId().pubKey.marshal()).toAddress().toHex()
 
     if (query.trim() === 'native') {
-      return nativeAddress
+      return log(nativeAddress)
     }
 
     const prefixLength = Math.max(hoprPrefix.length, nativePrefix.length) + 2
 
-    return [
+    return log([
       `${hoprPrefix.padEnd(prefixLength, ' ')}${styleValue(hoprAddress, 'peerId')}`,
       `${nativePrefix.padEnd(prefixLength, ' ')}${styleValue(nativeAddress, 'peerId')}`
-    ].join('\n')
+    ].join('\n'))
   }
 }

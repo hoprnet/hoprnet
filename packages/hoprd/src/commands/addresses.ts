@@ -18,19 +18,19 @@ export default class Addresses extends AbstractCommand {
     return 'Get the known addresses of other nodes'
   }
 
-  public async execute(query: string, state: GlobalState): Promise<string | void> {
+  public async execute(log, query: string, state: GlobalState): Promise<void> {
     if (!query) {
-      return `Invalid arguments. Expected 'addresses <peerId>'. Received '${query}'`
+      return log(`Invalid arguments. Expected 'addresses <peerId>'. Received '${query}'`)
     }
 
     let peerId: PeerId
     try {
       peerId = await checkPeerIdInput(query, state)
     } catch (err) {
-      return styleValue(err.message, 'failure')
+      return log(styleValue(err.message, 'failure'))
     }
 
-    return (
+    return log(
       `Announced addresses for ${query}:\n- ${(await this.node.getAnnouncedAddresses(peerId))
         .map((ma) => ma.toString())
         .join('\n- ')}` +

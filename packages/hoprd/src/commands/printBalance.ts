@@ -19,7 +19,7 @@ export default class PrintBalance extends AbstractCommand {
    * Prints the balance of our account.
    * @notice triggered by the CLI
    */
-  public async execute(): Promise<string> {
+  public async execute(log): Promise<void> {
     const hoprPrefix = 'HOPR Balance:'
     const hoprBalance = (await this.node.getBalance()).toFormattedString()
 
@@ -29,9 +29,9 @@ export default class PrintBalance extends AbstractCommand {
     const prefixLength = Math.max(hoprPrefix.length, nativePrefix.length) + 2
 
     // TODO: use 'NativeBalance' and 'Balance' to display currencies
-    return [
+    return log([
       `${hoprPrefix.padEnd(prefixLength, ' ')}${styleValue(hoprBalance, 'number')}`,
       `${nativePrefix.padEnd(prefixLength, ' ')}${styleValue(nativeBalance, 'number')}`
-    ].join('\n')
+    ].join('\n'))
   }
 }
