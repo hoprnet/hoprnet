@@ -14,18 +14,20 @@ export default class ListCommands extends AbstractCommand {
     return 'Displays all the command options'
   }
 
-  public execute(): string {
-    return getOptions(
-      this.getCommands()
-        .filter((command) => !command.hidden)
-        .map((command) => ({
-          value: command.name(),
-          description: command.help()
-        }))
-        .sort((a, b) => {
-          return String(a.value).localeCompare(String(b.value))
-        }),
-      'vertical'
-    ).join('')
+  public execute(log) {
+    return log(
+      getOptions(
+        this.getCommands()
+          .filter((command) => !command.hidden)
+          .map((command) => ({
+            value: command.name(),
+            description: command.help()
+          }))
+          .sort((a, b) => {
+            return String(a.value).localeCompare(String(b.value))
+          }),
+        'vertical'
+      ).join('')
+    )
   }
 }

@@ -140,7 +140,21 @@ async function generateNodeOptions(): Promise<HoprOptions> {
   return options
 }
 
+function addUnhandledPromiseRejectionHandler() {
+  process.on('unhandledRejection', (reason: any, promise: Promise<any>) => {
+    console.error('Unhandled Rejection at:', promise, 'reason:', reason)
+    // @TODO uncomment next line
+    // process.exit(1)
+  })
+}
+
 async function main() {
+  // Starting with Node.js 15, undhandled promise rejections terminate the
+  // process with a non-zero exit code, which makes debugging quite difficult.
+  // Therefore adding a promise rejection handler to make sure that the origin of
+  // the rejected promise can be detected.
+  addUnhandledPromiseRejectionHandler()
+
   let node: Hopr
   let logs = new LogStream()
   let adminServer = undefined

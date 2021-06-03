@@ -17,7 +17,7 @@ export default class StopNode extends AbstractCommand {
   /**
    * Stops the node and kills the process in case it does not quit by itself.
    */
-  public async execute(): Promise<string | void> {
+  public async execute(log): Promise<void> {
     const timeout = setTimeout(() => {
       console.log(`Ungracefully stopping node after timeout.`)
       process.exit(0)
@@ -28,7 +28,8 @@ export default class StopNode extends AbstractCommand {
       clearTimeout(timeout)
       process.exit(0)
     } catch (error) {
-      return styleValue(error.message, 'failure')
+      log(styleValue(error.message, 'failure'))
+      process.exit(1)
     }
   }
 }
