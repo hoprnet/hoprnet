@@ -64,7 +64,7 @@ export default class ListOpenChannels extends AbstractCommand {
   /**
    * Lists all channels that we have with other nodes. Triggered from the CLI.
    */
-  async execute(): Promise<string | void> {
+  async execute(log): Promise<void> {
     try {
       const selfPubKey = new PublicKey(this.node.getId().pubKey.marshal())
       const selfAddress = selfPubKey.toAddress()
@@ -74,7 +74,7 @@ export default class ListOpenChannels extends AbstractCommand {
       const result: string[] = []
 
       if (channels.length === 0) {
-        return `\nNo open channels found.`
+        return log(`\nNo open channels found.`)
       }
 
       // find counterpartys' peerIds
@@ -100,9 +100,9 @@ export default class ListOpenChannels extends AbstractCommand {
         )
       }
 
-      return result.join('\n\n')
+      return log(result.join('\n\n'))
     } catch (err) {
-      return styleValue(err.message, 'failure')
+      return log(styleValue(err.message, 'failure'))
     }
   }
 }

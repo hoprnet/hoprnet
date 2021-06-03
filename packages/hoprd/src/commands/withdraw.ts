@@ -62,18 +62,20 @@ export default class Withdraw extends AbstractCommand {
    * Withdraws native or hopr balance.
    * @notice triggered by the CLI
    */
-  public async execute(query?: string): Promise<string> {
+  public async execute(log, query: string): Promise<void> {
     try {
       const { amount, weiAmount, currency, recipient } = await this.checkArgs(query ?? '')
       const symbol = currency === 'NATIVE' ? NativeBalance.SYMBOL : Balance.SYMBOL
 
       const receipt = await this.node.withdraw(currency, recipient, weiAmount)
-      return `Withdrawing ${styleValue(amount, 'number')} ${symbol} to ${styleValue(
-        recipient,
-        'peerId'
-      )}, receipt ${styleValue(receipt, 'hash')}.`
+      log(
+        `Withdrawing ${styleValue(amount, 'number')} ${symbol} to ${styleValue(
+          recipient,
+          'peerId'
+        )}, receipt ${styleValue(receipt, 'hash')}.`
+      )
     } catch (err) {
-      return styleValue(err.message, 'failure')
+      log(styleValue(err.message, 'failure'))
     }
   }
 }
