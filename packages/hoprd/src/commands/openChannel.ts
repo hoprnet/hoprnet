@@ -42,6 +42,7 @@ export class OpenChannel extends AbstractCommand {
     } else if (amountToFund.gt(myAvailableTokens.toBN())) {
       return log(`You don't have enough tokens: ${amountToFund.toString(10)}<${myAvailableTokens.toBN().toString(10)}`)
     }
+    log('Opening channel...')
     try {
       const { channelId } = await this.node.openChannel(counterparty, amountToFund)
       return log(`${chalk.green(`Successfully opened channel`)} ${styleValue(channelId.toHex(), 'hash')}`)
