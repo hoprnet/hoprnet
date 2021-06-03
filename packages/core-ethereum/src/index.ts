@@ -121,7 +121,7 @@ export default class HoprEthereum {
     return useCache ? this.cachedGetNativeBalance() : this.uncachedGetNativeBalance()
   }
 
-  public smartContractInfo(): string {
+  public smartContractInfo() {
     return this.chain.getInfo()
   }
 
