@@ -21,7 +21,13 @@ describe(`test localAddressesFirst`, function () {
         ]
     
         const sortedAddresses = localAddressesFirst(addresses)
-        expect(sortedAddresses[0].multiaddr.equals(new Multiaddr('/ip4/127.0.0.1/tcp/4000'))).to.eql(true)
+        expect(sortedAddresses).to.eql(
+          [
+            { multiaddr: new Multiaddr('/ip4/127.0.0.1/tcp/4000'), isCertified: true },
+            { multiaddr: new Multiaddr('/ip4/30.0.0.1/tcp/4000'), isCertified: true },
+            { multiaddr: new Multiaddr('/ip4/31.0.0.1/tcp/4000'), isCertified: true },
+          ]
+        )
     })
 
     it('should sort public certified addresses first', () => {
