@@ -3,12 +3,12 @@ import assert from 'assert'
 // @ts-ignore
 import sinon from 'sinon'
 
-const assertMatch = async(cmds, command, pattern: RegExp) => {
+const assertMatch = async (cmds, command, pattern: RegExp) => {
   if (!test) {
     throw new Error('cannot match empty string')
   }
   let response = ''
-  await cmds.execute((l) => response += l, command)
+  await cmds.execute((l) => (response += l), command)
   assert(response.match(pattern), `executing: (${command}) => ${response} should match ${pattern}`)
 }
 

@@ -34,10 +34,10 @@ export default class Addresses extends AbstractCommand {
       `Announced addresses for ${query}:\n- ${(await this.node.getAnnouncedAddresses(peerId))
         .map((ma) => ma.toString())
         .join('\n- ')}` +
-      `\nObserved addresses for ${query}:\n- ${this.node
-        .getObservedAddresses(peerId)
-        .map((addr) => `${addr.multiaddr.toString()}, certified: ${addr.isCertified}`)
-        .join(`\n- `)}`
+        `\nObserved addresses for ${query}:\n- ${this.node
+          .getObservedAddresses(peerId)
+          .map((addr) => `${addr.multiaddr.toString()}, certified: ${addr.isCertified}`)
+          .join(`\n- `)}`
     )
   }
 }

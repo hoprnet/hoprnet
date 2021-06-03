@@ -21,10 +21,12 @@ export default class FundChannel extends AbstractCommand {
 
   async execute(log, query: string, state: GlobalState): Promise<void> {
     if (query == null) {
-      return log(styleValue(
-        `Invalid arguments. Expected 'fund <peerId> <myFund> <counterpartyFund>'. Received '${query}'`,
-        'failure'
-      ))
+      return log(
+        styleValue(
+          `Invalid arguments. Expected 'fund <peerId> <myFund> <counterpartyFund>'. Received '${query}'`,
+          'failure'
+        )
+      )
     }
 
     const [error, peerIdInput, myFundInput, counterpartyFundInput] = this._assertUsage(query, [

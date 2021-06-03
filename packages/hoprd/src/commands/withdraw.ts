@@ -68,10 +68,12 @@ export default class Withdraw extends AbstractCommand {
       const symbol = currency === 'NATIVE' ? NativeBalance.SYMBOL : Balance.SYMBOL
 
       const receipt = await this.node.withdraw(currency, recipient, weiAmount)
-      log(`Withdrawing ${styleValue(amount, 'number')} ${symbol} to ${styleValue(
-        recipient,
-        'peerId'
-      )}, receipt ${styleValue(receipt, 'hash')}.`)
+      log(
+        `Withdrawing ${styleValue(amount, 'number')} ${symbol} to ${styleValue(
+          recipient,
+          'peerId'
+        )}, receipt ${styleValue(receipt, 'hash')}.`
+      )
     } catch (err) {
       log(styleValue(err.message, 'failure'))
     }

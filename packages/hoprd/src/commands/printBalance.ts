@@ -29,9 +29,11 @@ export default class PrintBalance extends AbstractCommand {
     const prefixLength = Math.max(hoprPrefix.length, nativePrefix.length) + 2
 
     // TODO: use 'NativeBalance' and 'Balance' to display currencies
-    return log([
-      `${hoprPrefix.padEnd(prefixLength, ' ')}${styleValue(hoprBalance, 'number')}`,
-      `${nativePrefix.padEnd(prefixLength, ' ')}${styleValue(nativeBalance, 'number')}`
-    ].join('\n'))
+    return log(
+      [
+        `${hoprPrefix.padEnd(prefixLength, ' ')}${styleValue(hoprBalance, 'number')}`,
+        `${nativePrefix.padEnd(prefixLength, ' ')}${styleValue(nativeBalance, 'number')}`
+      ].join('\n')
+    )
   }
 }

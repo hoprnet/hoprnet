@@ -30,11 +30,13 @@ export class Alias extends AbstractCommand {
       const peerIds = Array.from(state.aliases.values())
       const paddingLength = getPaddingLength(names, false)
 
-      return log(names
-        .map((name, index) => {
-          return name.padEnd(paddingLength) + styleValue(peerIds[index].toB58String(), 'peerId')
-        })
-        .join('\n'))
+      return log(
+        names
+          .map((name, index) => {
+            return name.padEnd(paddingLength) + styleValue(peerIds[index].toB58String(), 'peerId')
+          })
+          .join('\n')
+      )
     }
 
     const [error, id, name] = this._assertUsage(query, this.parameters)

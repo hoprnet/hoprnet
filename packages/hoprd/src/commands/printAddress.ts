@@ -39,9 +39,11 @@ export default class PrintAddress extends AbstractCommand {
 
     const prefixLength = Math.max(hoprPrefix.length, nativePrefix.length) + 2
 
-    return log([
-      `${hoprPrefix.padEnd(prefixLength, ' ')}${styleValue(hoprAddress, 'peerId')}`,
-      `${nativePrefix.padEnd(prefixLength, ' ')}${styleValue(nativeAddress, 'peerId')}`
-    ].join('\n'))
+    return log(
+      [
+        `${hoprPrefix.padEnd(prefixLength, ' ')}${styleValue(hoprAddress, 'peerId')}`,
+        `${nativePrefix.padEnd(prefixLength, ' ')}${styleValue(nativeAddress, 'peerId')}`
+      ].join('\n')
+    )
   }
 }

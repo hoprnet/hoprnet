@@ -28,10 +28,12 @@ export default class Tickets extends AbstractCommand {
       const unredeemedResults = countSignedTickets(await toSignedTickets(ackTickets))
       const unredeemedAmount = moveDecimalPoint(unredeemedResults.total.toString(), Balance.DECIMALS * -1)
 
-      log(`Found ${styleValue(unredeemedResults.tickets.length)} unredeemed tickets with a sum of ${styleValue(
-        unredeemedAmount,
-        'number'
-      )} HOPR.`)
+      log(
+        `Found ${styleValue(unredeemedResults.tickets.length)} unredeemed tickets with a sum of ${styleValue(
+          unredeemedAmount,
+          'number'
+        )} HOPR.`
+      )
     } catch (err) {
       log(styleValue(err.message, 'failure'))
     }

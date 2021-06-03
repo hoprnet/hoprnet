@@ -47,9 +47,11 @@ export default class RedeemTickets extends AbstractCommand {
       const result = countSignedTickets(signedTickets)
       const total = moveDecimalPoint(result.total, Balance.DECIMALS * -1)
 
-      return log(`Redeemed ${styleValue(redeemedTickets.length)} out of ${styleValue(
-        results.length
-      )} tickets with a sum of ${styleValue(total, 'number')} HOPR.`)
+      return log(
+        `Redeemed ${styleValue(redeemedTickets.length)} out of ${styleValue(
+          results.length
+        )} tickets with a sum of ${styleValue(total, 'number')} HOPR.`
+      )
     } catch (err) {
       return log(styleValue(err.message, 'failure'))
     }

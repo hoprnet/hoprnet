@@ -15,7 +15,8 @@ export default class ListCommands extends AbstractCommand {
   }
 
   public execute(log) {
-    return log(getOptions(
+    return log(
+      getOptions(
         this.getCommands()
           .filter((command) => !command.hidden)
           .map((command) => ({

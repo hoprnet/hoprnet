@@ -35,12 +35,14 @@ export default class CloseChannel extends AbstractCommand {
       if (status === 'PENDING') {
         return log(`${chalk.green(`Closing channel. Receipt: ${styleValue(receipt, 'hash')}`)}.`)
       } else {
-        return log(`${chalk.green(
-          `Initiated channel closure, the channel must remain open for at least 2 minutes. Please send the close command again once the cool-off has passed. Receipt: ${styleValue(
-            receipt,
-            'hash'
-          )}`
-        )}.`)
+        return log(
+          `${chalk.green(
+            `Initiated channel closure, the channel must remain open for at least 2 minutes. Please send the close command again once the cool-off has passed. Receipt: ${styleValue(
+              receipt,
+              'hash'
+            )}`
+          )}.`
+        )
       }
     } catch (err) {
       return log(styleValue(err.message, 'failure'))
