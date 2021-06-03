@@ -6,9 +6,6 @@ import sinon from 'sinon'
 const assertMatch = async (cmds, command, pattern: RegExp) => {
   let response = ''
   await cmds.execute((l) => (response += l), command)
-  if (!response) {
-    throw new Error('cannot match empty string')
-  }
   assert(response.match(pattern), `executing: (${command}) => ${response} should match ${pattern}`)
 }
 
