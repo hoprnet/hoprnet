@@ -590,7 +590,12 @@ class Hopr extends EventEmitter {
     return await chain.getNativeBalance(true)
   }
 
-  public async smartContractInfo() {
+  public async smartContractInfo(): Promise<{
+    network: string
+    hoprTokenAddress: string
+    hoprChannelsAddress: string
+    channelClosureTime: number
+  }> {
     const chain = await this.paymentChannels
     return chain.smartContractInfo()
   }
