@@ -40,7 +40,7 @@ import {
   LibP2PHandlerFunction,
   AcknowledgedTicket
 } from '@hoprnet/hopr-utils'
-import HoprCoreEthereum, { RoutingChannel } from '@hoprnet/hopr-core-ethereum'
+import HoprCoreEthereum, { RoutingChannel, Channel } from '@hoprnet/hopr-core-ethereum'
 import BN from 'bn.js'
 import { getAddrs } from './identity'
 
@@ -662,24 +662,32 @@ class Hopr extends EventEmitter {
     }
   }
 
-  public async closeChannel(counterparty: PeerId): Promise<{ receipt: string; status: string }> {
+  
+  private async getChannel(counterparty: PeerId): Promise<Channel>{
     const ethereum = await this.paymentChannels
     const selfPubKey = new PublicKey(this.getId().pubKey.marshal())
     const counterpartyPubKey = new PublicKey(counterparty.pubKey.marshal())
-    const channel = ethereum.getChannel(selfPubKey, counterpartyPubKey)
-    const channelState = await channel.getState()
-    if (channelState.status === 'CLOSED') {
-      throw new Error('Channel is already closed')
-    }
-    let txHash
-    if (channelState.status === 'OPEN') {
-      log('initiating closure')
-      txHash = await channel.initializeClosure()
+    return ethereum.getChannel(selfPubKey, counterpartyPubKey)
+  }
+
+  public async initializeChannelClosure(counterparty: PeerId): Promise<string> {
+    return (await this.getChannel(counterparty)).initializeClosure()
+  }
+
+  public async finalizeChannelClosure(counterparty: PeerId): Promise<string> {
+    return (await this.getChannel(counterparty)).finalizeClosure()
+  }
+
+  // Initiates closure, then waits for entire closure cooldown, or immediately
+  // closes if it is pending.
+  public async closeChannel(counterparty: PeerId): Promise<{ receipt: string; status: string }> {
+    let txHash = await this.initializeChannelClosure(counterparty)
+    const channel = await this.getChannel(counterparty)
+    if ((await channel.getState()).status !== 'CLOSED') {
       await channel.waitForClosable()
-    } else {
       txHash = await channel.finalizeClosure()
     }
-    return { receipt: txHash, status: channelState.status }
+    return { receipt: txHash, status: (await channel.getState()).status }
   }
 
   public async getAcknowledgedTickets() {
