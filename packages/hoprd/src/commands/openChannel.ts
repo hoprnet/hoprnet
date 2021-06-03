@@ -19,47 +19,37 @@ export class OpenChannel extends AbstractCommand {
     return 'Opens a payment channel between you and the counter party provided'
   }
 
-  protected async validateAmountToFund(amountToFund: BN): Promise<void> {
-    const myAvailableTokens = await this.node.getBalance()
-
-    if (amountToFund.lten(0)) {
-      throw Error(`Invalid 'amountToFund' provided: ${amountToFund.toString(10)}`)
-    } else if (amountToFund.gt(myAvailableTokens.toBN())) {
-      throw Error(`You don't have enough tokens: ${amountToFund.toString(10)}<${myAvailableTokens.toBN().toString(10)}`)
-    }
-  }
-
-  public async open(state: GlobalState, counterpartyStr: string, amountToFundStr: string): Promise<string> {
-    let counterparty: PeerId
-    try {
-      counterparty = await checkPeerIdInput(counterpartyStr, state)
-    } catch (err) {
-      return styleValue(err.message, 'failure')
-    }
-
-    const amountToFund = new BN(moveDecimalPoint(amountToFundStr, Balance.DECIMALS))
-    await this.validateAmountToFund(amountToFund)
-
-    try {
-      const { channelId } = await this.node.openChannel(counterparty, amountToFund)
-      return `${chalk.green(`Successfully opened channel`)} ${styleValue(channelId.toHex(), 'hash')}`
-    } catch (err) {
-      return styleValue(err.message, 'failure')
-    }
-  }
-
   /**
    * Encapsulates the functionality that is executed once the user decides to open a payment channel
    * with another party.
    * @param query peerId string to send message to
    */
   public async execute(log, query: string, state: GlobalState): Promise<void> {
-    const [err, counterPartyB58Str, amountToFundStr] = this._assertUsage(query, [
+    const [err, counterpartyStr, amountToFundStr] = this._assertUsage(query, [
       "counterParty's PeerId",
       'amountToFund'
     ])
     if (err) return log(styleValue(err, 'failure'))
 
-    return log(this.open(state, counterPartyB58Str, amountToFundStr))
+    let counterparty: PeerId
+    try {
+      counterparty = await checkPeerIdInput(counterpartyStr, state)
+    } catch (err) {
+      return log(styleValue(err.message, 'failure'))
+    }
+
+    const amountToFund = new BN(moveDecimalPoint(amountToFundStr, Balance.DECIMALS))
+    const myAvailableTokens = await this.node.getBalance()
+    if (amountToFund.lten(0)) {
+      return log(`Invalid 'amountToFund' provided: ${amountToFund.toString(10)}`)
+    } else if (amountToFund.gt(myAvailableTokens.toBN())) {
+      return log(`You don't have enough tokens: ${amountToFund.toString(10)}<${myAvailableTokens.toBN().toString(10)}`)
+    }
+    try {
+      const { channelId } = await this.node.openChannel(counterparty, amountToFund)
+      return log(`${chalk.green(`Successfully opened channel`)} ${styleValue(channelId.toHex(), 'hash')}`)
+    } catch (err) {
+      return log(styleValue(err.message, 'failure'))
+    }
   }
 }
