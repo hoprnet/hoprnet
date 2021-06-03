@@ -1,7 +1,6 @@
 import type Hopr from '@hoprnet/hopr-core'
-import chalk from 'chalk'
 import { AbstractCommand } from './abstractCommand'
-import { getPaddingLength, styleValue } from './utils'
+import { styleValue } from './utils'
 import { PublicKey } from '@hoprnet/hopr-utils'
 
 export default class ListOpenChannels extends AbstractCommand {
@@ -17,87 +16,44 @@ export default class ListOpenChannels extends AbstractCommand {
     return 'Lists your currently open channels'
   }
 
-  private generateOutput({
-    id,
-    myBalance,
-    totalBalance,
-    peerId,
-    status
-  }: {
-    id: string
-    myBalance: string
-    totalBalance: string
-    peerId?: string
-    status?: string
-  }): string {
-    const toDisplay: {
-      name: string
-      value: string
-    }[] = [
-      {
-        name: 'Channel',
-        value: styleValue(id, 'hash')
-      },
-      {
-        name: 'CounterParty',
-        value: peerId ? styleValue(peerId, 'peerId') : chalk.gray('pre-opened')
-      },
-      {
-        name: 'Status',
-        value: status ? styleValue(status, 'highlight') : chalk.gray('UNKNOWN')
-      },
-      {
-        name: 'Total Balance',
-        value: `${styleValue(totalBalance, 'number')}`
-      },
-      {
-        name: 'My Balance',
-        value: `${styleValue(myBalance, 'number')}`
-      }
-    ]
+  private generateOutput(
+    id: string,
+    channel: any,
+    selfAddress
+  ): string {
+    const selfIsPartyA = channel.partyA.eq(selfAddress)
+    const totalBalance = channel.totalBalance()
+    const myBalance = selfIsPartyA ? channel.partyABalance : channel.partyBBalance
+    const peerId = selfIsPartyA ? channel.partyB.toPeerId(): channel.partyA.toPeerId()
 
-    const paddingLength = getPaddingLength(toDisplay.map((o) => o.name))
-
-    return toDisplay.map((o) => `\n${o.name.padEnd(paddingLength)}:  ${o.value}`).join('')
+    return `
+Channel:       ${styleValue(id, 'hash')}
+CounterParty:  ${styleValue(peerId.toB58String(), 'peerId')}
+Status:        ${styleValue(channel.status, 'highlight')}
+Total Balance: ${styleValue(totalBalance, 'number')}
+My Balance:    ${styleValue(myBalance, 'number')}
+`
   }
 
   /**
    * Lists all channels that we have with other nodes. Triggered from the CLI.
    */
   async execute(log): Promise<void> {
+    log('fetching channels...')
     try {
       const selfPubKey = new PublicKey(this.node.getId().pubKey.marshal())
       const selfAddress = selfPubKey.toAddress()
-      const channels = (await this.node.getChannelsOf(selfAddress))
-        // do not print CLOSED channels
-        .filter((channel) => channel.status !== 'CLOSED')
-      const result: string[] = []
+      const channels = (await this.node.getChannelsOf(selfAddress)).filter((channel) => channel.status !== 'CLOSED')
 
       if (channels.length === 0) {
         return log(`\nNo open channels found.`)
       }
 
+      const result: string[] = []
       // find counterpartys' peerIds
       for (const channel of channels) {
         const id = channel.getId()
-        const selfIsPartyA = channel.partyA.eq(selfAddress)
-        const counterpartyPubKey = await this.node.getPublicKeyOf(selfIsPartyA ? channel.partyB : channel.partyA)
-        // counterparty has not initialized
-        if (!counterpartyPubKey) continue
-
-        const totalBalance = channel.totalBalance()
-        const myBalance = selfIsPartyA ? channel.partyABalance : channel.partyBBalance
-        const peerId = counterpartyPubKey.toPeerId().toB58String()
-
-        result.push(
-          this.generateOutput({
-            id: id.toHex(),
-            totalBalance: totalBalance.toFormattedString(),
-            myBalance: myBalance.toFormattedString(),
-            peerId,
-            status: channel.status
-          })
-        )
+        result.push(this.generateOutput(id.toHex(), channel, selfAddress))
       }
 
       return log(result.join('\n\n'))
