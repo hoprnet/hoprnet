@@ -16,15 +16,11 @@ export default class ListOpenChannels extends AbstractCommand {
     return 'Lists your currently open channels'
   }
 
-  private generateOutput(
-    id: string,
-    channel: any,
-    selfAddress
-  ): string {
+  private generateOutput(id: string, channel: any, selfAddress): string {
     const selfIsPartyA = channel.partyA.eq(selfAddress)
     const totalBalance = channel.totalBalance()
     const myBalance = selfIsPartyA ? channel.partyABalance : channel.partyBBalance
-    const peerId = selfIsPartyA ? channel.partyB.toPeerId(): channel.partyA.toPeerId()
+    const peerId = selfIsPartyA ? channel.partyB.toPeerId() : channel.partyA.toPeerId()
 
     return `
 Channel:       ${styleValue(id, 'hash')}
