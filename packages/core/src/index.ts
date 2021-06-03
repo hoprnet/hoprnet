@@ -662,8 +662,7 @@ class Hopr extends EventEmitter {
     }
   }
 
-  
-  private async getChannel(counterparty: PeerId): Promise<Channel>{
+  private async getChannel(counterparty: PeerId): Promise<Channel> {
     const ethereum = await this.paymentChannels
     const selfPubKey = new PublicKey(this.getId().pubKey.marshal())
     const counterpartyPubKey = new PublicKey(counterparty.pubKey.marshal())

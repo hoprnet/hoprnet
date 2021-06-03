@@ -137,7 +137,7 @@ class Channel {
     const c = await this.getState()
     const counterpartyAddress = this.counterparty.toAddress()
     if (c.status == 'PENDING_TO_CLOSE') {
-      return await this.finalizeClosure()  
+      return await this.finalizeClosure()
     }
     if (c.status !== 'OPEN') {
       throw Error('Channel status is not OPEN')
@@ -160,7 +160,7 @@ class Channel {
     const c = await this.getState()
     const counterpartyAddress = this.counterparty.toAddress()
     if (c.status == 'CLOSED') {
-      return  
+      return
     }
     if (c.status !== 'PENDING_TO_CLOSE') {
       throw Error('Channel status is not PENDING_TO_CLOSE')
