@@ -25,10 +25,7 @@ export class OpenChannel extends AbstractCommand {
    * @param query peerId string to send message to
    */
   public async execute(log, query: string, state: GlobalState): Promise<void> {
-    const [err, counterpartyStr, amountToFundStr] = this._assertUsage(query, [
-      "counterParty's PeerId",
-      'amountToFund'
-    ])
+    const [err, counterpartyStr, amountToFundStr] = this._assertUsage(query, ["counterParty's PeerId", 'amountToFund'])
     if (err) return log(styleValue(err, 'failure'))
 
     let counterparty: PeerId
