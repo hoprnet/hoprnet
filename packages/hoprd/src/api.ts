@@ -18,7 +18,7 @@ export default function setupAPI(node: Hopr, logs: any, options: any) {
     logs.log('Node is running')
     let response = ''
     let log = (s) => {
-      response += 's'
+      response += s
       logs.log(s)
     }
     await cmds.execute(log, req.body)

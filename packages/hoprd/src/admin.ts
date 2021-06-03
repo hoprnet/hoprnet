@@ -69,7 +69,6 @@ export class AdminServer {
             }
           }, message.toString())
         }
-        // TODO
       })
       socket.on('error', (err: string) => {
         debugLog('Error', err)

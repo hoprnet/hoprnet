@@ -15,6 +15,6 @@ export default class ListConnectedPeers extends AbstractCommand {
   }
 
   public async execute(log): Promise<void> {
-    return log(this.node.connectionReport())
+    return log(await this.node.connectionReport())
   }
 }
