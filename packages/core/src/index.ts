@@ -84,7 +84,7 @@ export type HoprOptions = {
   announceLocalAddresses?: boolean
 
   // when true, addresses will be sorted local first
-  // when false, addresses will be sorted public first  
+  // when false, addresses will be sorted public first
   preferLocalAddresses?: boolean
 }
 
