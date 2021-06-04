@@ -82,6 +82,9 @@ export type HoprOptions = {
   // You almost certainly want this to be false, this is so we can test with
   // local testnets, and announce 127.0.0.1 addresses.
   announceLocalAddresses?: boolean,
+
+  // when true, addresses will be sorted local first
+  // when false, addresses will be sorted public first
   preferLocalAddresses?: boolean,
 }
 
