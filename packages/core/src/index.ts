@@ -127,8 +127,10 @@ class Hopr extends EventEmitter {
 
     if(this.options.preferLocalAddresses) {
       this.addressSorter = localAddressesFirst
+      log('Preferring local addresses')
     } else {
       this.addressSorter = publicAddressesFirst
+      log('Preferring public addresses')
     }
     
   }
