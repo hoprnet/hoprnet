@@ -81,8 +81,8 @@ export type HoprOptions = {
   }
   // You almost certainly want this to be false, this is so we can test with
   // local testnets, and announce 127.0.0.1 addresses.
-  announceLocalAddresses?: boolean,
-  preferLocalAddresses?: boolean,
+  announceLocalAddresses?: boolean
+  preferLocalAddresses?: boolean
 }
 
 export type NodeStatus = 'UNINITIALIZED' | 'INITIALIZING' | 'RUNNING' | 'DESTROYED'
@@ -125,14 +125,13 @@ class Hopr extends EventEmitter {
       provider: this.options.provider
     })
 
-    if(this.options.preferLocalAddresses) {
+    if (this.options.preferLocalAddresses) {
       this.addressSorter = localAddressesFirst
       log('Preferring local addresses')
     } else {
       this.addressSorter = publicAddressesFirst
       log('Preferring public addresses')
     }
-    
   }
 
   /**
