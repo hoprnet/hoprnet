@@ -101,6 +101,11 @@ const argv = yargs
     describe: 'For testing local testnets. Announce local addresses.',
     default: false
   })
+  .option('testPreferLocalAddresses', {
+    boolean: true,
+    describe: 'For testing local testnets. Prefer local peers to remote.',
+    default: false
+  })
   .wrap(Math.min(120, yargs.terminalWidth())).argv
 
 function parseHosts(): HoprOptions['hosts'] {
@@ -127,7 +132,8 @@ async function generateNodeOptions(): Promise<HoprOptions> {
     provider: argv.provider,
     announce: argv.announce,
     hosts: parseHosts(),
-    announceLocalAddresses: argv.testAnnounceLocalAddresses
+    announceLocalAddresses: argv.testAnnounceLocalAddresses,
+    preferLocalAddresses: argv.testPreferLocalAddresses,
   }
 
   if (argv.password !== undefined) {

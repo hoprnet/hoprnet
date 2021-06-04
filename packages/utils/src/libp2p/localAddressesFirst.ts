@@ -20,6 +20,8 @@ function addressesLocalFirstCompareFunction (a: Address, b: Address) {
     return 0
   }
   
-export function localAddressesFirst (addresses: Address[]) {
+export function localAddressesFirst (addresses: Address[]): Address[] {
     return [...addresses].sort(addressesLocalFirstCompareFunction)
   }
+
+export declare type AddressSorter = (input: Address[]) => Address[]
