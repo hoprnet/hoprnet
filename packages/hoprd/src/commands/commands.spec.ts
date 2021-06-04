@@ -112,7 +112,7 @@ describe('Commands', () => {
   it('close channel', async () => {
     let mockNode: any = sinon.fake()
     mockNode.smartContractInfo = async () => ({
-      channelClosureTime: 300
+      channelClosureSecs: 300
     })
     mockNode.closeChannel = sinon.fake(async () => ({
       status: undefined

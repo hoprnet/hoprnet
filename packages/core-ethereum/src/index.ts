@@ -125,7 +125,7 @@ export default class HoprEthereum {
     network: string
     hoprTokenAddress: string
     hoprChannelsAddress: string
-    channelClosureTime: number
+    channelClosureSecs: number
   } {
     return this.chain.getInfo()
   }

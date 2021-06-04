@@ -594,7 +594,7 @@ class Hopr extends EventEmitter {
     network: string
     hoprTokenAddress: string
     hoprChannelsAddress: string
-    channelClosureTime: number
+    channelClosureSecs: number
   }> {
     const chain = await this.paymentChannels
     return chain.smartContractInfo()
