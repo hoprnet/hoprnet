@@ -32,14 +32,14 @@ export default class CloseChannel extends AbstractCommand {
     try {
       const { status, receipt } = await this.node.closeChannel(peerId)
       const smartContractInfo = await this.node.smartContractInfo()
-      const channelClosureSecs = Math.ceil(smartContractInfo.channelClosureSecs / 60) // convert to minutes
+      const channelClosureMins = Math.ceil(smartContractInfo.channelClosureSecs / 60) // convert to minutes
 
       if (status === 'PENDING_TO_CLOSE') {
         return log(`${chalk.green(`Closing channel. Receipt: ${styleValue(receipt, 'hash')}`)}.`)
       } else {
         return log(
           `${chalk.green(
-            `Initiated channel closure, the channel must remain open for at least ${channelClosureSecs} minutes. Please send the close command again once the cool-off has passed. Receipt: ${styleValue(
+            `Initiated channel closure, the channel must remain open for at least ${channelClosureMins} minutes. Please send the close command again once the cool-off has passed. Receipt: ${styleValue(
               receipt,
               'hash'
             )}`
