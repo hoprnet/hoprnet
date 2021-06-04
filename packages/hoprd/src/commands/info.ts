@@ -16,6 +16,7 @@ export class Info extends AbstractCommand {
 
   public async execute(log): Promise<void> {
     const smartContractInfo = await this.node.smartContractInfo()
+    const channelClosureSecs = Math.ceil(smartContractInfo.channelClosureSecs / 60) // convert to minutes
 
     // @TODO Add connector info etc.
     return log(
@@ -24,7 +25,8 @@ export class Info extends AbstractCommand {
         `Listening on: ${this.node.getListeningAddresses().map((ma) => ma.toString())}`,
         `Running on: ${smartContractInfo.network}`,
         `HOPR Token: ${smartContractInfo.hoprTokenAddress}`,
-        `HOPR Channels: ${smartContractInfo.hoprChannelsAddress}`
+        `HOPR Channels: ${smartContractInfo.hoprChannelsAddress}`,
+        `Channel closure period: ${channelClosureSecs} minutes`
       ].join('\n')
     )
   }
