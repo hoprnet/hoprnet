@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-declare hoprd="node packages/hoprd/lib/index.js --init --password='' --provider=ws://127.0.0.1:8545/ --testAnnounceLocalAddresses"
+declare hoprd="node packages/hoprd/lib/index.js --init --password='' --provider=ws://127.0.0.1:8545/ --testAnnounceLocalAddresses --testPreferLocalAddresses"
 declare hardhat="yarn hardhat"
 
 if [ -z "${CI:-}" ]; then

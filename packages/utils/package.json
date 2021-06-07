@@ -42,6 +42,7 @@
     "multiaddr": "9.0.1",
     "multihashes": "~4.0.1",
     "peer-id": "0.14.8",
+    "private-ip": "^2.2.1",
     "secp256k1": "^4.0.2"
   },
   "devDependencies": {
