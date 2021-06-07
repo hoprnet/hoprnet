@@ -338,7 +338,7 @@ export class HoprDB {
   }
 
   public async getPendingTicketCount(): Promise<number> {
-    return 0 // TODO
+    return (await this.getUnacknowledgedTickets()).length
   }
 
   static createMock(): HoprDB {
