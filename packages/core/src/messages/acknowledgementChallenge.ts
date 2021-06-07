@@ -1,4 +1,4 @@
-import { SECP256K1_CONSTANTS, HalfKeyChallenge, HalfKey, u8aToHex } from '@hoprnet/hopr-utils'
+import { SECP256K1_CONSTANTS, HalfKeyChallenge, HalfKey } from '@hoprnet/hopr-utils'
 import { HASH_ALGORITHM } from './constants'
 import { ecdsaSign, ecdsaVerify } from 'secp256k1'
 import { createHash } from 'crypto'
