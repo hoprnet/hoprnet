@@ -1,7 +1,7 @@
 import { Multiaddr } from 'multiaddr'
 import { expect } from 'chai'
 
-import { localAddressesFirst } from './localAddressesFirst'
+import { localAddressesFirst } from './addressSorters'
 
 describe(`test localAddressesFirst`, function () {
   it(`should put local addresses first`, async function () {
