@@ -3,8 +3,8 @@ import { expect } from 'chai'
 
 import { localAddressesFirst, publicAddressesFirst, isMultiaddrPrivate } from './addressSorters'
 
-describe(`test isMultiaddrPrivate`, function() {
-  it(`should detect private multiaddrs`, function() {
+describe(`test isMultiaddrPrivate`, function () {
+  it(`should detect private multiaddrs`, function () {
     expect(isMultiaddrPrivate(new Multiaddr('/ip4/30.0.0.1/tcp/4000'))).to.eql(false)
     expect(isMultiaddrPrivate(new Multiaddr('/ip4/31.0.0.1/tcp/4000'))).to.eql(false)
     expect(isMultiaddrPrivate(new Multiaddr('/ip4/127.0.0.1/tcp/4000'))).to.eql(true)
@@ -88,7 +88,7 @@ describe(`test publicAddressesFirst`, function () {
     expect(sortedAddresses).to.eql([
       { multiaddr: new Multiaddr('/ip4/30.0.0.1/tcp/4000'), isCertified: true },
       { multiaddr: new Multiaddr('/ip4/31.0.0.1/tcp/4000'), isCertified: true },
-      { multiaddr: new Multiaddr('/ip4/127.0.0.1/tcp/4000'), isCertified: true }      
+      { multiaddr: new Multiaddr('/ip4/127.0.0.1/tcp/4000'), isCertified: true }
     ])
   })
 
