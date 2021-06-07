@@ -111,11 +111,15 @@ describe('Commands', () => {
 
   it('close channel', async () => {
     let mockNode: any = sinon.fake()
+    mockNode.smartContractInfo = async () => ({
+      channelClosureSecs: 300
+    })
     mockNode.closeChannel = sinon.fake(async () => ({
       status: undefined
     }))
     let cmds = new mod.Commands(mockNode)
     await assertMatch(cmds, 'close 16Uiu2HAmAJStiomwq27Kkvtat8KiEHLBSnAkkKCqZmLYKVLtkiB7', /Initiated channel closure/)
+    await assertMatch(cmds, 'close 16Uiu2HAmAJStiomwq27Kkvtat8KiEHLBSnAkkKCqZmLYKVLtkiB7', /5 minutes/)
   })
 
   it('cover traffic', async () => {
@@ -141,5 +145,16 @@ describe('Commands', () => {
     await assertMatch(cmds, 'covertraffic stats', /reliability/)
 
     clock.restore()
+  })
+
+  it('info', async () => {
+    let mockNode: any = sinon.fake()
+    mockNode.getAnnouncedAddresses = async () => []
+    mockNode.getListeningAddresses = () => []
+    mockNode.smartContractInfo = async () => ({
+      channelClosureSecs: 300
+    })
+    let cmds = new mod.Commands(mockNode)
+    await assertMatch(cmds, 'info', /Channel closure period: 5 minutes/)
   })
 })
