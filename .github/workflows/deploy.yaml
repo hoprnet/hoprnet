@@ -148,6 +148,12 @@ jobs:
           NETWORK: xdai
         run: ./scripts/deploy-smart-contracts.sh
 
+      - name: Deploy on hardhat localhost
+        env:
+          DEVELOPMENT: true
+          NETWORK: hardhat
+        run: ./scripts/deploy-smart-contracts.sh
+
       - name: Commit & Push changes
         env:
           HOPR_GIT_MSG: "Update smart contract deployments"
