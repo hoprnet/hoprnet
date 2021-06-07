@@ -177,6 +177,7 @@ export class Packet {
   public ackKey: HalfKey
   public nextChallenge: Challenge
   public ackChallenge: HalfKeyChallenge
+  public oldChallenge: AcknowledgementChallenge
 
   public constructor(private packet: Uint8Array, private challenge: AcknowledgementChallenge, public ticket: Ticket) {}
 
@@ -365,7 +366,7 @@ export class Packet {
       throw Error(`Invalid state`)
     }
 
-    return Acknowledgement.create(this.challenge, this.ackKey, privKey)
+    return Acknowledgement.create(this.oldChallenge ?? this.challenge, this.ackKey, privKey)
   }
 
   async forwardTransform(privKey: PeerId, chain: HoprCoreEthereum): Promise<void> {
@@ -392,7 +393,7 @@ export class Packet {
         new BN(INVERSE_TICKET_WIN_PROB)
       )
     }
-
+    this.oldChallenge = this.challenge.clone()
     this.challenge = AcknowledgementChallenge.create(this.ackChallenge, privKey)
 
     this.isReadyToForward = true
