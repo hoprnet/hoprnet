@@ -697,14 +697,16 @@ class Hopr extends EventEmitter {
   }
 
   public async redeemAllTickets() {
-    let count = 0, redeemed = 0, total = 0
+    let count = 0,
+      redeemed = 0,
+      total = 0
 
     for (const ackTicket of await this.getAcknowledgedTickets()) {
       count++
       const result = await this.submitAcknowledgedTicket(ackTicket)
 
       if (result.status === 'SUCCESS') {
-        redeemed ++
+        redeemed++
         total += ackTicket.ticket.amount.toBN().toNumber()
         console.log(`Redeemed ticket ${count}`)
       } else {
@@ -712,7 +714,9 @@ class Hopr extends EventEmitter {
       }
     }
     return {
-      count, redeemed, total
+      count,
+      redeemed,
+      total
     }
   }
 
