@@ -13,7 +13,6 @@
     "build:tsc": "tsc && cp -R ./types/*d.ts ./lib/types/$1",
     "fund": "hardhat fund",
     "faucet": "hardhat faucet",
-    "deploy": "hardhat deploy",
     "network": "DEVELOPMENT=true hardhat node",
     "test": "hardhat test",
     "coverage": "hardhat coverage",
