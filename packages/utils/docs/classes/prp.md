@@ -29,127 +29,155 @@
 
 ### constructor
 
-\+ `Private` **new PRP**(`iv`: *Uint8Array*, `key`: *Uint8Array*): [*PRP*](prp.md)
+• `Private` **new PRP**(`iv`, `key`)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `iv` | *Uint8Array* |
-| `key` | *Uint8Array* |
+| `iv` | `Uint8Array` |
+| `key` | `Uint8Array` |
 
-**Returns:** [*PRP*](prp.md)
+#### Defined in
 
-Defined in: [crypto/prp.ts:30](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L30)
+[crypto/prp.ts:30](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L30)
 
 ## Properties
 
 ### iv1
 
-• `Private` `Readonly` **iv1**: *Uint8Array*
+• `Private` `Readonly` **iv1**: `Uint8Array`
 
-Defined in: [crypto/prp.ts:27](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L27)
+#### Defined in
+
+[crypto/prp.ts:27](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L27)
 
 ___
 
 ### iv2
 
-• `Private` `Readonly` **iv2**: *Uint8Array*
+• `Private` `Readonly` **iv2**: `Uint8Array`
 
-Defined in: [crypto/prp.ts:28](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L28)
+#### Defined in
+
+[crypto/prp.ts:28](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L28)
 
 ___
 
 ### iv3
 
-• `Private` `Readonly` **iv3**: *Uint8Array*
+• `Private` `Readonly` **iv3**: `Uint8Array`
 
-Defined in: [crypto/prp.ts:29](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L29)
+#### Defined in
+
+[crypto/prp.ts:29](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L29)
 
 ___
 
 ### iv4
 
-• `Private` `Readonly` **iv4**: *Uint8Array*
+• `Private` `Readonly` **iv4**: `Uint8Array`
 
-Defined in: [crypto/prp.ts:30](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L30)
+#### Defined in
+
+[crypto/prp.ts:30](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L30)
 
 ___
 
 ### k1
 
-• `Private` `Readonly` **k1**: *Uint8Array*
+• `Private` `Readonly` **k1**: `Uint8Array`
 
-Defined in: [crypto/prp.ts:22](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L22)
+#### Defined in
+
+[crypto/prp.ts:22](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L22)
 
 ___
 
 ### k2
 
-• `Private` `Readonly` **k2**: *Uint8Array*
+• `Private` `Readonly` **k2**: `Uint8Array`
 
-Defined in: [crypto/prp.ts:23](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L23)
+#### Defined in
+
+[crypto/prp.ts:23](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L23)
 
 ___
 
 ### k3
 
-• `Private` `Readonly` **k3**: *Uint8Array*
+• `Private` `Readonly` **k3**: `Uint8Array`
 
-Defined in: [crypto/prp.ts:24](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L24)
+#### Defined in
+
+[crypto/prp.ts:24](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L24)
 
 ___
 
 ### k4
 
-• `Private` `Readonly` **k4**: *Uint8Array*
+• `Private` `Readonly` **k4**: `Uint8Array`
 
-Defined in: [crypto/prp.ts:25](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L25)
+#### Defined in
+
+[crypto/prp.ts:25](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L25)
 
 ## Methods
 
 ### inverse
 
-▸ **inverse**(`ciphertext`: *Uint8Array*): *Uint8Array*
+▸ **inverse**(`ciphertext`): `Uint8Array`
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `ciphertext` | *Uint8Array* |
+| `ciphertext` | `Uint8Array` |
 
-**Returns:** *Uint8Array*
+#### Returns
 
-Defined in: [crypto/prp.ts:79](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L79)
+`Uint8Array`
+
+#### Defined in
+
+[crypto/prp.ts:79](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L79)
 
 ___
 
 ### permutate
 
-▸ **permutate**(`plaintext`: *Uint8Array*): *Uint8Array*
+▸ **permutate**(`plaintext`): `Uint8Array`
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `plaintext` | *Uint8Array* |
+| `plaintext` | `Uint8Array` |
 
-**Returns:** *Uint8Array*
+#### Returns
 
-Defined in: [crypto/prp.ts:64](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L64)
+`Uint8Array`
+
+#### Defined in
+
+[crypto/prp.ts:64](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L64)
 
 ___
 
 ### createPRP
 
-▸ `Static` **createPRP**(`params`: [*PRPParameters*](../modules.md#prpparameters)): [*PRP*](prp.md)
+▸ `Static` **createPRP**(`params`): [PRP](prp.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `params` | [*PRPParameters*](../modules.md#prpparameters) |
+| `params` | [PRPParameters](../modules.md#prpparameters) |
 
-**Returns:** [*PRP*](prp.md)
+#### Returns
 
-Defined in: [crypto/prp.ts:44](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L44)
+[PRP](prp.md)
+
+#### Defined in
+
+[crypto/prp.ts:44](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/crypto/prp.ts#L44)

@@ -16,23 +16,25 @@
 
 ### constructor
 
-\+ **new IERC777Sender__factory**(): [*IERC777Sender\_\_factory*](ierc777sender__factory.md)
-
-**Returns:** [*IERC777Sender\_\_factory*](ierc777sender__factory.md)
+• **new IERC777Sender__factory**()
 
 ## Methods
 
 ### connect
 
-▸ `Static` **connect**(`address`: *string*, `signerOrProvider`: *Signer* \| *Provider*): [*IERC777Sender*](ierc777sender.md)
+▸ `Static` **connect**(`address`, `signerOrProvider`): [IERC777Sender](ierc777sender.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `address` | *string* |
-| `signerOrProvider` | *Signer* \| *Provider* |
+| `address` | `string` |
+| `signerOrProvider` | `Signer` \| `Provider` |
 
-**Returns:** [*IERC777Sender*](ierc777sender.md)
+#### Returns
 
-Defined in: packages/ethereum/types/factories/IERC777Sender__factory.ts:11
+[IERC777Sender](ierc777sender.md)
+
+#### Defined in
+
+packages/ethereum/types/factories/IERC777Sender__factory.ts:11

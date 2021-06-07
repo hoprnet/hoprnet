@@ -16,23 +16,25 @@
 
 ### constructor
 
-\+ **new ReentrancyGuard__factory**(): [*ReentrancyGuard\_\_factory*](reentrancyguard__factory.md)
-
-**Returns:** [*ReentrancyGuard\_\_factory*](reentrancyguard__factory.md)
+• **new ReentrancyGuard__factory**()
 
 ## Methods
 
 ### connect
 
-▸ `Static` **connect**(`address`: *string*, `signerOrProvider`: *Signer* \| *Provider*): [*ReentrancyGuard*](reentrancyguard.md)
+▸ `Static` **connect**(`address`, `signerOrProvider`): [ReentrancyGuard](reentrancyguard.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `address` | *string* |
-| `signerOrProvider` | *Signer* \| *Provider* |
+| `address` | `string` |
+| `signerOrProvider` | `Signer` \| `Provider` |
 
-**Returns:** [*ReentrancyGuard*](reentrancyguard.md)
+#### Returns
 
-Defined in: packages/ethereum/types/factories/ReentrancyGuard__factory.ts:11
+[ReentrancyGuard](reentrancyguard.md)
+
+#### Defined in
+
+packages/ethereum/types/factories/ReentrancyGuard__factory.ts:11

@@ -16,23 +16,25 @@
 
 ### constructor
 
-\+ **new IBurnableMintableERC677Token__factory**(): [*IBurnableMintableERC677Token\_\_factory*](iburnablemintableerc677token__factory.md)
-
-**Returns:** [*IBurnableMintableERC677Token\_\_factory*](iburnablemintableerc677token__factory.md)
+• **new IBurnableMintableERC677Token__factory**()
 
 ## Methods
 
 ### connect
 
-▸ `Static` **connect**(`address`: *string*, `signerOrProvider`: *Signer* \| *Provider*): [*IBurnableMintableERC677Token*](iburnablemintableerc677token.md)
+▸ `Static` **connect**(`address`, `signerOrProvider`): [IBurnableMintableERC677Token](iburnablemintableerc677token.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `address` | *string* |
-| `signerOrProvider` | *Signer* \| *Provider* |
+| `address` | `string` |
+| `signerOrProvider` | `Signer` \| `Provider` |
 
-**Returns:** [*IBurnableMintableERC677Token*](iburnablemintableerc677token.md)
+#### Returns
 
-Defined in: packages/ethereum/types/factories/IBurnableMintableERC677Token__factory.ts:11
+[IBurnableMintableERC677Token](iburnablemintableerc677token.md)
+
+#### Defined in
+
+packages/ethereum/types/factories/IBurnableMintableERC677Token__factory.ts:11

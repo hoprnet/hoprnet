@@ -29,70 +29,82 @@ Represents a snapshot in the blockchain.
 
 ### constructor
 
-\+ **new Snapshot**(`blockNumber`: *BN*, `transactionIndex`: *BN*, `logIndex`: *BN*): [*Snapshot*](snapshot.md)
+• **new Snapshot**(`blockNumber`, `transactionIndex`, `logIndex`)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `blockNumber` | *BN* |
-| `transactionIndex` | *BN* |
-| `logIndex` | *BN* |
+| `blockNumber` | `BN` |
+| `transactionIndex` | `BN` |
+| `logIndex` | `BN` |
 
-**Returns:** [*Snapshot*](snapshot.md)
+#### Defined in
 
-Defined in: [types/snapshot.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/snapshot.ts#L8)
+[types/snapshot.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/snapshot.ts#L8)
 
 ## Properties
 
 ### blockNumber
 
-• `Readonly` **blockNumber**: *BN*
+• `Readonly` **blockNumber**: `BN`
 
 ___
 
 ### logIndex
 
-• `Readonly` **logIndex**: *BN*
+• `Readonly` **logIndex**: `BN`
 
 ___
 
 ### transactionIndex
 
-• `Readonly` **transactionIndex**: *BN*
+• `Readonly` **transactionIndex**: `BN`
 
 ## Accessors
 
 ### SIZE
 
-• `Static` get **SIZE**(): *number*
+• `Static` `get` **SIZE**(): `number`
 
-**Returns:** *number*
+#### Returns
 
-Defined in: [types/snapshot.ts:28](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/snapshot.ts#L28)
+`number`
+
+#### Defined in
+
+[types/snapshot.ts:28](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/snapshot.ts#L28)
 
 ## Methods
 
 ### serialize
 
-▸ **serialize**(): *Uint8Array*
+▸ **serialize**(): `Uint8Array`
 
-**Returns:** *Uint8Array*
+#### Returns
 
-Defined in: [types/snapshot.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/snapshot.ts#L20)
+`Uint8Array`
+
+#### Defined in
+
+[types/snapshot.ts:20](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/snapshot.ts#L20)
 
 ___
 
 ### deserialize
 
-▸ `Static` **deserialize**(`arr`: *Uint8Array*): [*Snapshot*](snapshot.md)
+▸ `Static` **deserialize**(`arr`): [Snapshot](snapshot.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `arr` | *Uint8Array* |
+| `arr` | `Uint8Array` |
 
-**Returns:** [*Snapshot*](snapshot.md)
+#### Returns
 
-Defined in: [types/snapshot.ts:11](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/snapshot.ts#L11)
+[Snapshot](snapshot.md)
+
+#### Defined in
+
+[types/snapshot.ts:11](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/snapshot.ts#L11)

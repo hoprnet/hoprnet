@@ -16,23 +16,25 @@
 
 ### constructor
 
-\+ **new ERC20__factory**(): [*ERC20\_\_factory*](erc20__factory.md)
-
-**Returns:** [*ERC20\_\_factory*](erc20__factory.md)
+• **new ERC20__factory**()
 
 ## Methods
 
 ### connect
 
-▸ `Static` **connect**(`address`: *string*, `signerOrProvider`: *Signer* \| *Provider*): [*ERC20*](erc20.md)
+▸ `Static` **connect**(`address`, `signerOrProvider`): [ERC20](erc20.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `address` | *string* |
-| `signerOrProvider` | *Signer* \| *Provider* |
+| `address` | `string` |
+| `signerOrProvider` | `Signer` \| `Provider` |
 
-**Returns:** [*ERC20*](erc20.md)
+#### Returns
 
-Defined in: packages/ethereum/types/factories/ERC20__factory.ts:11
+[ERC20](erc20.md)
+
+#### Defined in
+
+packages/ethereum/types/factories/ERC20__factory.ts:11

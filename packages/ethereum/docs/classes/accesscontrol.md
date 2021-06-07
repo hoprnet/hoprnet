@@ -4,7 +4,7 @@
 
 ## Hierarchy
 
-- *Contract*
+- `Contract`
 
   ↳ **AccessControl**
 
@@ -73,1017 +73,1293 @@
 
 ### constructor
 
-\+ **new AccessControl**(`addressOrName`: *string*, `contractInterface`: ContractInterface, `signerOrProvider?`: *Signer* \| *Provider*): [*AccessControl*](accesscontrol.md)
+• **new AccessControl**(`addressOrName`, `contractInterface`, `signerOrProvider?`)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `addressOrName` | *string* |
-| `contractInterface` | ContractInterface |
-| `signerOrProvider?` | *Signer* \| *Provider* |
+| `addressOrName` | `string` |
+| `contractInterface` | `ContractInterface` |
+| `signerOrProvider?` | `Signer` \| `Provider` |
 
-**Returns:** [*AccessControl*](accesscontrol.md)
+#### Inherited from
 
-Inherited from: Contract.constructor
+Contract.constructor
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:98
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:98
 
 ## Properties
 
 ### \_deployedPromise
 
-• **\_deployedPromise**: *Promise*<Contract\>
+• **\_deployedPromise**: `Promise`<Contract\>
 
-Inherited from: Contract.\_deployedPromise
+#### Inherited from
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:92
+Contract.\_deployedPromise
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:92
 
 ___
 
 ### \_runningEvents
 
-• **\_runningEvents**: *object*
+• **\_runningEvents**: `Object`
 
-#### Type declaration
+#### Index signature
 
-Inherited from: Contract.\_runningEvents
+▪ [eventTag: `string`]: `RunningEvent`
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:93
+#### Inherited from
+
+Contract.\_runningEvents
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:93
 
 ___
 
 ### \_wrappedEmits
 
-• **\_wrappedEmits**: *object*
+• **\_wrappedEmits**: `Object`
 
-#### Type declaration
+#### Index signature
 
-Inherited from: Contract.\_wrappedEmits
+▪ [eventTag: `string`]: (...`args`: `any`[]) => `void`
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:96
+#### Inherited from
+
+Contract.\_wrappedEmits
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:96
 
 ___
 
 ### address
 
-• `Readonly` **address**: *string*
+• `Readonly` **address**: `string`
 
-Inherited from: Contract.address
+#### Inherited from
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:71
+Contract.address
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:71
 
 ___
 
 ### callStatic
 
-• **callStatic**: *object*
+• **callStatic**: `Object`
 
 #### Type declaration
 
 | Name | Type |
 | :------ | :------ |
-| `DEFAULT_ADMIN_ROLE` | (`overrides?`: CallOverrides) => *Promise*<string\> |
-| `DEFAULT_ADMIN_ROLE()` | (`overrides?`: CallOverrides) => *Promise*<string\> |
-| `getRoleAdmin` | (`role`: BytesLike, `overrides?`: CallOverrides) => *Promise*<string\> |
-| `getRoleAdmin(bytes32)` | (`role`: BytesLike, `overrides?`: CallOverrides) => *Promise*<string\> |
-| `getRoleMember` | (`role`: BytesLike, `index`: BigNumberish, `overrides?`: CallOverrides) => *Promise*<string\> |
-| `getRoleMember(bytes32,uint256)` | (`role`: BytesLike, `index`: BigNumberish, `overrides?`: CallOverrides) => *Promise*<string\> |
-| `getRoleMemberCount` | (`role`: BytesLike, `overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `getRoleMemberCount(bytes32)` | (`role`: BytesLike, `overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `grantRole` | (`role`: BytesLike, `account`: *string*, `overrides?`: CallOverrides) => *Promise*<void\> |
-| `grantRole(bytes32,address)` | (`role`: BytesLike, `account`: *string*, `overrides?`: CallOverrides) => *Promise*<void\> |
-| `hasRole` | (`role`: BytesLike, `account`: *string*, `overrides?`: CallOverrides) => *Promise*<boolean\> |
-| `hasRole(bytes32,address)` | (`role`: BytesLike, `account`: *string*, `overrides?`: CallOverrides) => *Promise*<boolean\> |
-| `renounceRole` | (`role`: BytesLike, `account`: *string*, `overrides?`: CallOverrides) => *Promise*<void\> |
-| `renounceRole(bytes32,address)` | (`role`: BytesLike, `account`: *string*, `overrides?`: CallOverrides) => *Promise*<void\> |
-| `revokeRole` | (`role`: BytesLike, `account`: *string*, `overrides?`: CallOverrides) => *Promise*<void\> |
-| `revokeRole(bytes32,address)` | (`role`: BytesLike, `account`: *string*, `overrides?`: CallOverrides) => *Promise*<void\> |
+| `DEFAULT_ADMIN_ROLE` | (`overrides?`: `CallOverrides`) => `Promise`<string\> |
+| `DEFAULT_ADMIN_ROLE()` | (`overrides?`: `CallOverrides`) => `Promise`<string\> |
+| `getRoleAdmin` | (`role`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<string\> |
+| `getRoleAdmin(bytes32)` | (`role`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<string\> |
+| `getRoleMember` | (`role`: `BytesLike`, `index`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<string\> |
+| `getRoleMember(bytes32,uint256)` | (`role`: `BytesLike`, `index`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<string\> |
+| `getRoleMemberCount` | (`role`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `getRoleMemberCount(bytes32)` | (`role`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `grantRole` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
+| `grantRole(bytes32,address)` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
+| `hasRole` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<boolean\> |
+| `hasRole(bytes32,address)` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<boolean\> |
+| `renounceRole` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
+| `renounceRole(bytes32,address)` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
+| `revokeRole` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
+| `revokeRole(bytes32,address)` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
 
-Overrides: Contract.callStatic
+#### Overrides
 
-Defined in: packages/ethereum/types/AccessControl.d.ts:307
+Contract.callStatic
+
+#### Defined in
+
+packages/ethereum/types/AccessControl.d.ts:307
 
 ___
 
 ### deployTransaction
 
-• `Readonly` **deployTransaction**: TransactionResponse
+• `Readonly` **deployTransaction**: `TransactionResponse`
 
-Inherited from: Contract.deployTransaction
+#### Inherited from
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:91
+Contract.deployTransaction
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:91
 
 ___
 
 ### estimateGas
 
-• **estimateGas**: *object*
+• **estimateGas**: `Object`
 
 #### Type declaration
 
 | Name | Type |
 | :------ | :------ |
-| `DEFAULT_ADMIN_ROLE` | (`overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `DEFAULT_ADMIN_ROLE()` | (`overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `getRoleAdmin` | (`role`: BytesLike, `overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `getRoleAdmin(bytes32)` | (`role`: BytesLike, `overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `getRoleMember` | (`role`: BytesLike, `index`: BigNumberish, `overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `getRoleMember(bytes32,uint256)` | (`role`: BytesLike, `index`: BigNumberish, `overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `getRoleMemberCount` | (`role`: BytesLike, `overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `getRoleMemberCount(bytes32)` | (`role`: BytesLike, `overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `grantRole` | (`role`: BytesLike, `account`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<BigNumber\> |
-| `grantRole(bytes32,address)` | (`role`: BytesLike, `account`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<BigNumber\> |
-| `hasRole` | (`role`: BytesLike, `account`: *string*, `overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `hasRole(bytes32,address)` | (`role`: BytesLike, `account`: *string*, `overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `renounceRole` | (`role`: BytesLike, `account`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<BigNumber\> |
-| `renounceRole(bytes32,address)` | (`role`: BytesLike, `account`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<BigNumber\> |
-| `revokeRole` | (`role`: BytesLike, `account`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<BigNumber\> |
-| `revokeRole(bytes32,address)` | (`role`: BytesLike, `account`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<BigNumber\> |
+| `DEFAULT_ADMIN_ROLE` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `DEFAULT_ADMIN_ROLE()` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `getRoleAdmin` | (`role`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `getRoleAdmin(bytes32)` | (`role`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `getRoleMember` | (`role`: `BytesLike`, `index`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `getRoleMember(bytes32,uint256)` | (`role`: `BytesLike`, `index`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `getRoleMemberCount` | (`role`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `getRoleMemberCount(bytes32)` | (`role`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `grantRole` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `grantRole(bytes32,address)` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `hasRole` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `hasRole(bytes32,address)` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `renounceRole` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `renounceRole(bytes32,address)` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `revokeRole` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `revokeRole(bytes32,address)` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
 
-Overrides: Contract.estimateGas
+#### Overrides
 
-Defined in: packages/ethereum/types/AccessControl.d.ts:410
+Contract.estimateGas
+
+#### Defined in
+
+packages/ethereum/types/AccessControl.d.ts:410
 
 ___
 
 ### filters
 
-• **filters**: *object*
+• **filters**: `Object`
 
 #### Type declaration
 
 | Name | Type |
 | :------ | :------ |
-| `RoleGranted` | (`role`: BytesLike, `account`: *string*, `sender`: *string*) => [*TypedEventFilter*](../interfaces/typedeventfilter.md)<[*string*, *string*, *string*], { `account`: *string* ; `role`: *string* ; `sender`: *string*  }\> |
-| `RoleRevoked` | (`role`: BytesLike, `account`: *string*, `sender`: *string*) => [*TypedEventFilter*](../interfaces/typedeventfilter.md)<[*string*, *string*, *string*], { `account`: *string* ; `role`: *string* ; `sender`: *string*  }\> |
+| `RoleGranted` | (`role`: `BytesLike`, `account`: `string`, `sender`: `string`) => [TypedEventFilter](../interfaces/typedeventfilter.md)<[`string`, `string`, `string`], `Object`\> |
+| `RoleRevoked` | (`role`: `BytesLike`, `account`: `string`, `sender`: `string`) => [TypedEventFilter](../interfaces/typedeventfilter.md)<[`string`, `string`, `string`], `Object`\> |
 
-Overrides: Contract.filters
+#### Overrides
 
-Defined in: packages/ethereum/types/AccessControl.d.ts:390
+Contract.filters
+
+#### Defined in
+
+packages/ethereum/types/AccessControl.d.ts:390
 
 ___
 
 ### functions
 
-• **functions**: *object*
+• **functions**: `Object`
 
 #### Type declaration
 
 | Name | Type |
 | :------ | :------ |
-| `DEFAULT_ADMIN_ROLE` | (`overrides?`: CallOverrides) => *Promise*<[*string*]\> |
-| `DEFAULT_ADMIN_ROLE()` | (`overrides?`: CallOverrides) => *Promise*<[*string*]\> |
-| `getRoleAdmin` | (`role`: BytesLike, `overrides?`: CallOverrides) => *Promise*<[*string*]\> |
-| `getRoleAdmin(bytes32)` | (`role`: BytesLike, `overrides?`: CallOverrides) => *Promise*<[*string*]\> |
-| `getRoleMember` | (`role`: BytesLike, `index`: BigNumberish, `overrides?`: CallOverrides) => *Promise*<[*string*]\> |
-| `getRoleMember(bytes32,uint256)` | (`role`: BytesLike, `index`: BigNumberish, `overrides?`: CallOverrides) => *Promise*<[*string*]\> |
-| `getRoleMemberCount` | (`role`: BytesLike, `overrides?`: CallOverrides) => *Promise*<[*BigNumber*]\> |
-| `getRoleMemberCount(bytes32)` | (`role`: BytesLike, `overrides?`: CallOverrides) => *Promise*<[*BigNumber*]\> |
-| `grantRole` | (`role`: BytesLike, `account`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<ContractTransaction\> |
-| `grantRole(bytes32,address)` | (`role`: BytesLike, `account`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<ContractTransaction\> |
-| `hasRole` | (`role`: BytesLike, `account`: *string*, `overrides?`: CallOverrides) => *Promise*<[*boolean*]\> |
-| `hasRole(bytes32,address)` | (`role`: BytesLike, `account`: *string*, `overrides?`: CallOverrides) => *Promise*<[*boolean*]\> |
-| `renounceRole` | (`role`: BytesLike, `account`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<ContractTransaction\> |
-| `renounceRole(bytes32,address)` | (`role`: BytesLike, `account`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<ContractTransaction\> |
-| `revokeRole` | (`role`: BytesLike, `account`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<ContractTransaction\> |
-| `revokeRole(bytes32,address)` | (`role`: BytesLike, `account`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<ContractTransaction\> |
+| `DEFAULT_ADMIN_ROLE` | (`overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
+| `DEFAULT_ADMIN_ROLE()` | (`overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
+| `getRoleAdmin` | (`role`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
+| `getRoleAdmin(bytes32)` | (`role`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
+| `getRoleMember` | (`role`: `BytesLike`, `index`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
+| `getRoleMember(bytes32,uint256)` | (`role`: `BytesLike`, `index`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
+| `getRoleMemberCount` | (`role`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
+| `getRoleMemberCount(bytes32)` | (`role`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
+| `grantRole` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `grantRole(bytes32,address)` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `hasRole` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<[`boolean`]\> |
+| `hasRole(bytes32,address)` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<[`boolean`]\> |
+| `renounceRole` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `renounceRole(bytes32,address)` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `revokeRole` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `revokeRole(bytes32,address)` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
 
-Overrides: Contract.functions
+#### Overrides
 
-Defined in: packages/ethereum/types/AccessControl.d.ts:143
+Contract.functions
+
+#### Defined in
+
+packages/ethereum/types/AccessControl.d.ts:143
 
 ___
 
 ### interface
 
-• **interface**: *AccessControlInterface*
+• **interface**: `AccessControlInterface`
 
-Overrides: Contract.interface
+#### Overrides
 
-Defined in: packages/ethereum/types/AccessControl.d.ts:141
+Contract.interface
+
+#### Defined in
+
+packages/ethereum/types/AccessControl.d.ts:141
 
 ___
 
 ### populateTransaction
 
-• **populateTransaction**: *object*
+• **populateTransaction**: `Object`
 
 #### Type declaration
 
 | Name | Type |
 | :------ | :------ |
-| `DEFAULT_ADMIN_ROLE` | (`overrides?`: CallOverrides) => *Promise*<PopulatedTransaction\> |
-| `DEFAULT_ADMIN_ROLE()` | (`overrides?`: CallOverrides) => *Promise*<PopulatedTransaction\> |
-| `getRoleAdmin` | (`role`: BytesLike, `overrides?`: CallOverrides) => *Promise*<PopulatedTransaction\> |
-| `getRoleAdmin(bytes32)` | (`role`: BytesLike, `overrides?`: CallOverrides) => *Promise*<PopulatedTransaction\> |
-| `getRoleMember` | (`role`: BytesLike, `index`: BigNumberish, `overrides?`: CallOverrides) => *Promise*<PopulatedTransaction\> |
-| `getRoleMember(bytes32,uint256)` | (`role`: BytesLike, `index`: BigNumberish, `overrides?`: CallOverrides) => *Promise*<PopulatedTransaction\> |
-| `getRoleMemberCount` | (`role`: BytesLike, `overrides?`: CallOverrides) => *Promise*<PopulatedTransaction\> |
-| `getRoleMemberCount(bytes32)` | (`role`: BytesLike, `overrides?`: CallOverrides) => *Promise*<PopulatedTransaction\> |
-| `grantRole` | (`role`: BytesLike, `account`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<PopulatedTransaction\> |
-| `grantRole(bytes32,address)` | (`role`: BytesLike, `account`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<PopulatedTransaction\> |
-| `hasRole` | (`role`: BytesLike, `account`: *string*, `overrides?`: CallOverrides) => *Promise*<PopulatedTransaction\> |
-| `hasRole(bytes32,address)` | (`role`: BytesLike, `account`: *string*, `overrides?`: CallOverrides) => *Promise*<PopulatedTransaction\> |
-| `renounceRole` | (`role`: BytesLike, `account`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<PopulatedTransaction\> |
-| `renounceRole(bytes32,address)` | (`role`: BytesLike, `account`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<PopulatedTransaction\> |
-| `revokeRole` | (`role`: BytesLike, `account`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<PopulatedTransaction\> |
-| `revokeRole(bytes32,address)` | (`role`: BytesLike, `account`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<PopulatedTransaction\> |
+| `DEFAULT_ADMIN_ROLE` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
+| `DEFAULT_ADMIN_ROLE()` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
+| `getRoleAdmin` | (`role`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
+| `getRoleAdmin(bytes32)` | (`role`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
+| `getRoleMember` | (`role`: `BytesLike`, `index`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
+| `getRoleMember(bytes32,uint256)` | (`role`: `BytesLike`, `index`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
+| `getRoleMemberCount` | (`role`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
+| `getRoleMemberCount(bytes32)` | (`role`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
+| `grantRole` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `grantRole(bytes32,address)` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `hasRole` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
+| `hasRole(bytes32,address)` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
+| `renounceRole` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `renounceRole(bytes32,address)` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `revokeRole` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `revokeRole(bytes32,address)` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
 
-Overrides: Contract.populateTransaction
+#### Overrides
 
-Defined in: packages/ethereum/types/AccessControl.d.ts:496
+Contract.populateTransaction
+
+#### Defined in
+
+packages/ethereum/types/AccessControl.d.ts:496
 
 ___
 
 ### provider
 
-• `Readonly` **provider**: *Provider*
+• `Readonly` **provider**: `Provider`
 
-Inherited from: Contract.provider
+#### Inherited from
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:74
+Contract.provider
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:74
 
 ___
 
 ### resolvedAddress
 
-• `Readonly` **resolvedAddress**: *Promise*<string\>
+• `Readonly` **resolvedAddress**: `Promise`<string\>
 
-Inherited from: Contract.resolvedAddress
+#### Inherited from
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:90
+Contract.resolvedAddress
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:90
 
 ___
 
 ### signer
 
-• `Readonly` **signer**: *Signer*
+• `Readonly` **signer**: `Signer`
 
-Inherited from: Contract.signer
+#### Inherited from
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:73
+Contract.signer
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:73
 
 ## Methods
 
 ### DEFAULT\_ADMIN\_ROLE
 
-▸ **DEFAULT_ADMIN_ROLE**(`overrides?`: CallOverrides): *Promise*<string\>
+▸ **DEFAULT_ADMIN_ROLE**(`overrides?`): `Promise`<string\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `overrides?` | CallOverrides |
+| `overrides?` | `CallOverrides` |
 
-**Returns:** *Promise*<string\>
+#### Returns
 
-Defined in: packages/ethereum/types/AccessControl.d.ts:226
+`Promise`<string\>
+
+#### Defined in
+
+packages/ethereum/types/AccessControl.d.ts:226
 
 ___
 
 ### DEFAULT\_ADMIN\_ROLE()
 
-▸ **DEFAULT_ADMIN_ROLE()**(`overrides?`: CallOverrides): *Promise*<string\>
+▸ **DEFAULT_ADMIN_ROLE()**(`overrides?`): `Promise`<string\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `overrides?` | CallOverrides |
+| `overrides?` | `CallOverrides` |
 
-**Returns:** *Promise*<string\>
+#### Returns
 
-Defined in: packages/ethereum/types/AccessControl.d.ts:226
+`Promise`<string\>
+
+#### Defined in
+
+packages/ethereum/types/AccessControl.d.ts:226
 
 ___
 
 ### \_checkRunningEvents
 
-▸ **_checkRunningEvents**(`runningEvent`: *RunningEvent*): *void*
+▸ **_checkRunningEvents**(`runningEvent`): `void`
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `runningEvent` | *RunningEvent* |
+| `runningEvent` | `RunningEvent` |
 
-**Returns:** *void*
+#### Returns
 
-Inherited from: Contract.\_checkRunningEvents
+`void`
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:113
+#### Inherited from
+
+Contract.\_checkRunningEvents
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:113
 
 ___
 
 ### \_deployed
 
-▸ **_deployed**(`blockTag?`: BlockTag): *Promise*<Contract\>
+▸ **_deployed**(`blockTag?`): `Promise`<Contract\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `blockTag?` | BlockTag |
+| `blockTag?` | `BlockTag` |
 
-**Returns:** *Promise*<Contract\>
+#### Returns
 
-Inherited from: Contract.\_deployed
+`Promise`<Contract\>
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:106
+#### Inherited from
+
+Contract.\_deployed
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:106
 
 ___
 
 ### \_wrapEvent
 
-▸ **_wrapEvent**(`runningEvent`: *RunningEvent*, `log`: Log, `listener`: Listener): Event
+▸ **_wrapEvent**(`runningEvent`, `log`, `listener`): `Event`
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `runningEvent` | *RunningEvent* |
-| `log` | Log |
-| `listener` | Listener |
+| `runningEvent` | `RunningEvent` |
+| `log` | `Log` |
+| `listener` | `Listener` |
 
-**Returns:** Event
+#### Returns
 
-Inherited from: Contract.\_wrapEvent
+`Event`
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:114
+#### Inherited from
+
+Contract.\_wrapEvent
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:114
 
 ___
 
 ### attach
 
-▸ **attach**(`addressOrName`: *string*): [*AccessControl*](accesscontrol.md)
+▸ **attach**(`addressOrName`): [AccessControl](accesscontrol.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `addressOrName` | *string* |
+| `addressOrName` | `string` |
 
-**Returns:** [*AccessControl*](accesscontrol.md)
+#### Returns
 
-Overrides: Contract.attach
+[AccessControl](accesscontrol.md)
 
-Defined in: packages/ethereum/types/AccessControl.d.ts:102
+#### Overrides
+
+Contract.attach
+
+#### Defined in
+
+packages/ethereum/types/AccessControl.d.ts:102
 
 ___
 
 ### connect
 
-▸ **connect**(`signerOrProvider`: *string* \| *Signer* \| *Provider*): [*AccessControl*](accesscontrol.md)
+▸ **connect**(`signerOrProvider`): [AccessControl](accesscontrol.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `signerOrProvider` | *string* \| *Signer* \| *Provider* |
+| `signerOrProvider` | `string` \| `Signer` \| `Provider` |
 
-**Returns:** [*AccessControl*](accesscontrol.md)
+#### Returns
 
-Overrides: Contract.connect
+[AccessControl](accesscontrol.md)
 
-Defined in: packages/ethereum/types/AccessControl.d.ts:101
+#### Overrides
+
+Contract.connect
+
+#### Defined in
+
+packages/ethereum/types/AccessControl.d.ts:101
 
 ___
 
 ### deployed
 
-▸ **deployed**(): *Promise*<[*AccessControl*](accesscontrol.md)\>
+▸ **deployed**(): `Promise`<[AccessControl](accesscontrol.md)\>
 
-**Returns:** *Promise*<[*AccessControl*](accesscontrol.md)\>
+#### Returns
 
-Overrides: Contract.deployed
+`Promise`<[AccessControl](accesscontrol.md)\>
 
-Defined in: packages/ethereum/types/AccessControl.d.ts:103
+#### Overrides
+
+Contract.deployed
+
+#### Defined in
+
+packages/ethereum/types/AccessControl.d.ts:103
 
 ___
 
 ### emit
 
-▸ **emit**(`eventName`: *string* \| EventFilter, ...`args`: *any*[]): *boolean*
+▸ **emit**(`eventName`, ...`args`): `boolean`
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventName` | *string* \| EventFilter |
-| `...args` | *any*[] |
+| `eventName` | `string` \| `EventFilter` |
+| `...args` | `any`[] |
 
-**Returns:** *boolean*
+#### Returns
 
-Inherited from: Contract.emit
+`boolean`
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:119
+#### Inherited from
+
+Contract.emit
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:119
 
 ___
 
 ### fallback
 
-▸ **fallback**(`overrides?`: TransactionRequest): *Promise*<TransactionResponse\>
+▸ **fallback**(`overrides?`): `Promise`<TransactionResponse\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `overrides?` | TransactionRequest |
+| `overrides?` | `TransactionRequest` |
 
-**Returns:** *Promise*<TransactionResponse\>
+#### Returns
 
-Inherited from: Contract.fallback
+`Promise`<TransactionResponse\>
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:107
+#### Inherited from
+
+Contract.fallback
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:107
 
 ___
 
 ### getRoleAdmin
 
-▸ **getRoleAdmin**(`role`: BytesLike, `overrides?`: CallOverrides): *Promise*<string\>
+▸ **getRoleAdmin**(`role`, `overrides?`): `Promise`<string\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `role` | BytesLike |
-| `overrides?` | CallOverrides |
+| `role` | `BytesLike` |
+| `overrides?` | `CallOverrides` |
 
-**Returns:** *Promise*<string\>
+#### Returns
 
-Defined in: packages/ethereum/types/AccessControl.d.ts:230
+`Promise`<string\>
+
+#### Defined in
+
+packages/ethereum/types/AccessControl.d.ts:230
 
 ___
 
 ### getRoleAdmin(bytes32)
 
-▸ **getRoleAdmin(bytes32)**(`role`: BytesLike, `overrides?`: CallOverrides): *Promise*<string\>
+▸ **getRoleAdmin(bytes32)**(`role`, `overrides?`): `Promise`<string\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `role` | BytesLike |
-| `overrides?` | CallOverrides |
+| `role` | `BytesLike` |
+| `overrides?` | `CallOverrides` |
 
-**Returns:** *Promise*<string\>
+#### Returns
 
-Defined in: packages/ethereum/types/AccessControl.d.ts:230
+`Promise`<string\>
+
+#### Defined in
+
+packages/ethereum/types/AccessControl.d.ts:230
 
 ___
 
 ### getRoleMember
 
-▸ **getRoleMember**(`role`: BytesLike, `index`: BigNumberish, `overrides?`: CallOverrides): *Promise*<string\>
+▸ **getRoleMember**(`role`, `index`, `overrides?`): `Promise`<string\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `role` | BytesLike |
-| `index` | BigNumberish |
-| `overrides?` | CallOverrides |
+| `role` | `BytesLike` |
+| `index` | `BigNumberish` |
+| `overrides?` | `CallOverrides` |
 
-**Returns:** *Promise*<string\>
+#### Returns
 
-Defined in: packages/ethereum/types/AccessControl.d.ts:237
+`Promise`<string\>
+
+#### Defined in
+
+packages/ethereum/types/AccessControl.d.ts:237
 
 ___
 
 ### getRoleMember(bytes32,uint256)
 
-▸ **getRoleMember(bytes32,uint256)**(`role`: BytesLike, `index`: BigNumberish, `overrides?`: CallOverrides): *Promise*<string\>
+▸ **getRoleMember(bytes32,uint256)**(`role`, `index`, `overrides?`): `Promise`<string\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `role` | BytesLike |
-| `index` | BigNumberish |
-| `overrides?` | CallOverrides |
+| `role` | `BytesLike` |
+| `index` | `BigNumberish` |
+| `overrides?` | `CallOverrides` |
 
-**Returns:** *Promise*<string\>
+#### Returns
 
-Defined in: packages/ethereum/types/AccessControl.d.ts:241
+`Promise`<string\>
+
+#### Defined in
+
+packages/ethereum/types/AccessControl.d.ts:241
 
 ___
 
 ### getRoleMemberCount
 
-▸ **getRoleMemberCount**(`role`: BytesLike, `overrides?`: CallOverrides): *Promise*<BigNumber\>
+▸ **getRoleMemberCount**(`role`, `overrides?`): `Promise`<BigNumber\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `role` | BytesLike |
-| `overrides?` | CallOverrides |
+| `role` | `BytesLike` |
+| `overrides?` | `CallOverrides` |
 
-**Returns:** *Promise*<BigNumber\>
+#### Returns
 
-Defined in: packages/ethereum/types/AccessControl.d.ts:249
+`Promise`<BigNumber\>
+
+#### Defined in
+
+packages/ethereum/types/AccessControl.d.ts:249
 
 ___
 
 ### getRoleMemberCount(bytes32)
 
-▸ **getRoleMemberCount(bytes32)**(`role`: BytesLike, `overrides?`: CallOverrides): *Promise*<BigNumber\>
+▸ **getRoleMemberCount(bytes32)**(`role`, `overrides?`): `Promise`<BigNumber\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `role` | BytesLike |
-| `overrides?` | CallOverrides |
+| `role` | `BytesLike` |
+| `overrides?` | `CallOverrides` |
 
-**Returns:** *Promise*<BigNumber\>
+#### Returns
 
-Defined in: packages/ethereum/types/AccessControl.d.ts:252
+`Promise`<BigNumber\>
+
+#### Defined in
+
+packages/ethereum/types/AccessControl.d.ts:252
 
 ___
 
 ### grantRole
 
-▸ **grantRole**(`role`: BytesLike, `account`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): *Promise*<ContractTransaction\>
+▸ **grantRole**(`role`, `account`, `overrides?`): `Promise`<ContractTransaction\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `role` | BytesLike |
-| `account` | *string* |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `role` | `BytesLike` |
+| `account` | `string` |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** *Promise*<ContractTransaction\>
+#### Returns
 
-Defined in: packages/ethereum/types/AccessControl.d.ts:259
+`Promise`<ContractTransaction\>
+
+#### Defined in
+
+packages/ethereum/types/AccessControl.d.ts:259
 
 ___
 
 ### grantRole(bytes32,address)
 
-▸ **grantRole(bytes32,address)**(`role`: BytesLike, `account`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): *Promise*<ContractTransaction\>
+▸ **grantRole(bytes32,address)**(`role`, `account`, `overrides?`): `Promise`<ContractTransaction\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `role` | BytesLike |
-| `account` | *string* |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `role` | `BytesLike` |
+| `account` | `string` |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** *Promise*<ContractTransaction\>
+#### Returns
 
-Defined in: packages/ethereum/types/AccessControl.d.ts:263
+`Promise`<ContractTransaction\>
+
+#### Defined in
+
+packages/ethereum/types/AccessControl.d.ts:263
 
 ___
 
 ### hasRole
 
-▸ **hasRole**(`role`: BytesLike, `account`: *string*, `overrides?`: CallOverrides): *Promise*<boolean\>
+▸ **hasRole**(`role`, `account`, `overrides?`): `Promise`<boolean\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `role` | BytesLike |
-| `account` | *string* |
-| `overrides?` | CallOverrides |
+| `role` | `BytesLike` |
+| `account` | `string` |
+| `overrides?` | `CallOverrides` |
 
-**Returns:** *Promise*<boolean\>
+#### Returns
 
-Defined in: packages/ethereum/types/AccessControl.d.ts:271
+`Promise`<boolean\>
+
+#### Defined in
+
+packages/ethereum/types/AccessControl.d.ts:271
 
 ___
 
 ### hasRole(bytes32,address)
 
-▸ **hasRole(bytes32,address)**(`role`: BytesLike, `account`: *string*, `overrides?`: CallOverrides): *Promise*<boolean\>
+▸ **hasRole(bytes32,address)**(`role`, `account`, `overrides?`): `Promise`<boolean\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `role` | BytesLike |
-| `account` | *string* |
-| `overrides?` | CallOverrides |
+| `role` | `BytesLike` |
+| `account` | `string` |
+| `overrides?` | `CallOverrides` |
 
-**Returns:** *Promise*<boolean\>
+#### Returns
 
-Defined in: packages/ethereum/types/AccessControl.d.ts:275
+`Promise`<boolean\>
+
+#### Defined in
+
+packages/ethereum/types/AccessControl.d.ts:275
 
 ___
 
 ### listenerCount
 
-▸ **listenerCount**(`eventName?`: *string* \| EventFilter): *number*
+▸ **listenerCount**(`eventName?`): `number`
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventName?` | *string* \| EventFilter |
+| `eventName?` | `string` \| `EventFilter` |
 
-**Returns:** *number*
+#### Returns
 
-Inherited from: Contract.listenerCount
+`number`
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:120
+#### Inherited from
+
+Contract.listenerCount
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:120
 
 ___
 
 ### listeners
 
-▸ **listeners**<EventArgsArray, EventArgsObject\>(`eventFilter?`: [*TypedEventFilter*](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\>): [*TypedListener*](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\>[]
+▸ **listeners**<EventArgsArray, EventArgsObject\>(`eventFilter?`): [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\>[]
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | *any*[] |
-| `EventArgsObject` | - |
+| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter?` | [*TypedEventFilter*](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
+| `eventFilter?` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
 
-**Returns:** [*TypedListener*](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\>[]
+#### Returns
 
-Overrides: Contract.listeners
+[TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\>[]
 
-Defined in: packages/ethereum/types/AccessControl.d.ts:105
+#### Overrides
 
-▸ **listeners**(`eventName?`: *string*): Listener[]
+Contract.listeners
+
+#### Defined in
+
+packages/ethereum/types/AccessControl.d.ts:105
+
+▸ **listeners**(`eventName?`): `Listener`[]
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventName?` | *string* |
+| `eventName?` | `string` |
 
-**Returns:** Listener[]
+#### Returns
 
-Overrides: Contract.listeners
+`Listener`[]
 
-Defined in: packages/ethereum/types/AccessControl.d.ts:128
+#### Overrides
+
+Contract.listeners
+
+#### Defined in
+
+packages/ethereum/types/AccessControl.d.ts:128
 
 ___
 
 ### off
 
-▸ **off**<EventArgsArray, EventArgsObject\>(`eventFilter`: [*TypedEventFilter*](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\>, `listener`: [*TypedListener*](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\>): [*AccessControl*](accesscontrol.md)
+▸ **off**<EventArgsArray, EventArgsObject\>(`eventFilter`, `listener`): [AccessControl](accesscontrol.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | *any*[] |
-| `EventArgsObject` | - |
+| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [*TypedEventFilter*](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `listener` | [*TypedListener*](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
+| `listener` | [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
 
-**Returns:** [*AccessControl*](accesscontrol.md)
+#### Returns
 
-Overrides: Contract.off
+[AccessControl](accesscontrol.md)
 
-Defined in: packages/ethereum/types/AccessControl.d.ts:108
+#### Overrides
 
-▸ **off**(`eventName`: *string*, `listener`: Listener): [*AccessControl*](accesscontrol.md)
+Contract.off
+
+#### Defined in
+
+packages/ethereum/types/AccessControl.d.ts:108
+
+▸ **off**(`eventName`, `listener`): [AccessControl](accesscontrol.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventName` | *string* |
-| `listener` | Listener |
+| `eventName` | `string` |
+| `listener` | `Listener` |
 
-**Returns:** [*AccessControl*](accesscontrol.md)
+#### Returns
 
-Overrides: Contract.off
+[AccessControl](accesscontrol.md)
 
-Defined in: packages/ethereum/types/AccessControl.d.ts:129
+#### Overrides
+
+Contract.off
+
+#### Defined in
+
+packages/ethereum/types/AccessControl.d.ts:129
 
 ___
 
 ### on
 
-▸ **on**<EventArgsArray, EventArgsObject\>(`eventFilter`: [*TypedEventFilter*](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\>, `listener`: [*TypedListener*](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\>): [*AccessControl*](accesscontrol.md)
+▸ **on**<EventArgsArray, EventArgsObject\>(`eventFilter`, `listener`): [AccessControl](accesscontrol.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | *any*[] |
-| `EventArgsObject` | - |
+| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [*TypedEventFilter*](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `listener` | [*TypedListener*](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
+| `listener` | [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
 
-**Returns:** [*AccessControl*](accesscontrol.md)
+#### Returns
 
-Overrides: Contract.on
+[AccessControl](accesscontrol.md)
 
-Defined in: packages/ethereum/types/AccessControl.d.ts:112
+#### Overrides
 
-▸ **on**(`eventName`: *string*, `listener`: Listener): [*AccessControl*](accesscontrol.md)
+Contract.on
+
+#### Defined in
+
+packages/ethereum/types/AccessControl.d.ts:112
+
+▸ **on**(`eventName`, `listener`): [AccessControl](accesscontrol.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventName` | *string* |
-| `listener` | Listener |
+| `eventName` | `string` |
+| `listener` | `Listener` |
 
-**Returns:** [*AccessControl*](accesscontrol.md)
+#### Returns
 
-Overrides: Contract.on
+[AccessControl](accesscontrol.md)
 
-Defined in: packages/ethereum/types/AccessControl.d.ts:130
+#### Overrides
+
+Contract.on
+
+#### Defined in
+
+packages/ethereum/types/AccessControl.d.ts:130
 
 ___
 
 ### once
 
-▸ **once**<EventArgsArray, EventArgsObject\>(`eventFilter`: [*TypedEventFilter*](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\>, `listener`: [*TypedListener*](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\>): [*AccessControl*](accesscontrol.md)
+▸ **once**<EventArgsArray, EventArgsObject\>(`eventFilter`, `listener`): [AccessControl](accesscontrol.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | *any*[] |
-| `EventArgsObject` | - |
+| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [*TypedEventFilter*](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `listener` | [*TypedListener*](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
+| `listener` | [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
 
-**Returns:** [*AccessControl*](accesscontrol.md)
+#### Returns
 
-Overrides: Contract.once
+[AccessControl](accesscontrol.md)
 
-Defined in: packages/ethereum/types/AccessControl.d.ts:116
+#### Overrides
 
-▸ **once**(`eventName`: *string*, `listener`: Listener): [*AccessControl*](accesscontrol.md)
+Contract.once
+
+#### Defined in
+
+packages/ethereum/types/AccessControl.d.ts:116
+
+▸ **once**(`eventName`, `listener`): [AccessControl](accesscontrol.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventName` | *string* |
-| `listener` | Listener |
+| `eventName` | `string` |
+| `listener` | `Listener` |
 
-**Returns:** [*AccessControl*](accesscontrol.md)
+#### Returns
 
-Overrides: Contract.once
+[AccessControl](accesscontrol.md)
 
-Defined in: packages/ethereum/types/AccessControl.d.ts:131
+#### Overrides
+
+Contract.once
+
+#### Defined in
+
+packages/ethereum/types/AccessControl.d.ts:131
 
 ___
 
 ### queryFilter
 
-▸ **queryFilter**<EventArgsArray, EventArgsObject\>(`event`: [*TypedEventFilter*](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\>, `fromBlockOrBlockhash?`: *string* \| *number*, `toBlock?`: *string* \| *number*): *Promise*<[*TypedEvent*](../interfaces/typedevent.md)<EventArgsArray & EventArgsObject\>[]\>
+▸ **queryFilter**<EventArgsArray, EventArgsObject\>(`event`, `fromBlockOrBlockhash?`, `toBlock?`): `Promise`<[TypedEvent](../interfaces/typedevent.md)<`EventArgsArray` & `EventArgsObject`\>[]\>
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | *any*[] |
-| `EventArgsObject` | - |
+| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `event` | [*TypedEventFilter*](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `fromBlockOrBlockhash?` | *string* \| *number* |
-| `toBlock?` | *string* \| *number* |
+| `event` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
+| `fromBlockOrBlockhash?` | `string` \| `number` |
+| `toBlock?` | `string` \| `number` |
 
-**Returns:** *Promise*<[*TypedEvent*](../interfaces/typedevent.md)<EventArgsArray & EventArgsObject\>[]\>
+#### Returns
 
-Overrides: Contract.queryFilter
+`Promise`<[TypedEvent](../interfaces/typedevent.md)<`EventArgsArray` & `EventArgsObject`\>[]\>
 
-Defined in: packages/ethereum/types/AccessControl.d.ts:135
+#### Overrides
+
+Contract.queryFilter
+
+#### Defined in
+
+packages/ethereum/types/AccessControl.d.ts:135
 
 ___
 
 ### removeAllListeners
 
-▸ **removeAllListeners**<EventArgsArray, EventArgsObject\>(`eventFilter`: [*TypedEventFilter*](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\>): [*AccessControl*](accesscontrol.md)
+▸ **removeAllListeners**<EventArgsArray, EventArgsObject\>(`eventFilter`): [AccessControl](accesscontrol.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | *any*[] |
-| `EventArgsObject` | - |
+| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [*TypedEventFilter*](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
 
-**Returns:** [*AccessControl*](accesscontrol.md)
+#### Returns
 
-Overrides: Contract.removeAllListeners
+[AccessControl](accesscontrol.md)
 
-Defined in: packages/ethereum/types/AccessControl.d.ts:124
+#### Overrides
 
-▸ **removeAllListeners**(`eventName?`: *string*): [*AccessControl*](accesscontrol.md)
+Contract.removeAllListeners
+
+#### Defined in
+
+packages/ethereum/types/AccessControl.d.ts:124
+
+▸ **removeAllListeners**(`eventName?`): [AccessControl](accesscontrol.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventName?` | *string* |
+| `eventName?` | `string` |
 
-**Returns:** [*AccessControl*](accesscontrol.md)
+#### Returns
 
-Overrides: Contract.removeAllListeners
+[AccessControl](accesscontrol.md)
 
-Defined in: packages/ethereum/types/AccessControl.d.ts:133
+#### Overrides
+
+Contract.removeAllListeners
+
+#### Defined in
+
+packages/ethereum/types/AccessControl.d.ts:133
 
 ___
 
 ### removeListener
 
-▸ **removeListener**<EventArgsArray, EventArgsObject\>(`eventFilter`: [*TypedEventFilter*](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\>, `listener`: [*TypedListener*](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\>): [*AccessControl*](accesscontrol.md)
+▸ **removeListener**<EventArgsArray, EventArgsObject\>(`eventFilter`, `listener`): [AccessControl](accesscontrol.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | *any*[] |
-| `EventArgsObject` | - |
+| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [*TypedEventFilter*](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `listener` | [*TypedListener*](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
+| `listener` | [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
 
-**Returns:** [*AccessControl*](accesscontrol.md)
+#### Returns
 
-Overrides: Contract.removeListener
+[AccessControl](accesscontrol.md)
 
-Defined in: packages/ethereum/types/AccessControl.d.ts:120
+#### Overrides
 
-▸ **removeListener**(`eventName`: *string*, `listener`: Listener): [*AccessControl*](accesscontrol.md)
+Contract.removeListener
+
+#### Defined in
+
+packages/ethereum/types/AccessControl.d.ts:120
+
+▸ **removeListener**(`eventName`, `listener`): [AccessControl](accesscontrol.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventName` | *string* |
-| `listener` | Listener |
+| `eventName` | `string` |
+| `listener` | `Listener` |
 
-**Returns:** [*AccessControl*](accesscontrol.md)
+#### Returns
 
-Overrides: Contract.removeListener
+[AccessControl](accesscontrol.md)
 
-Defined in: packages/ethereum/types/AccessControl.d.ts:132
+#### Overrides
+
+Contract.removeListener
+
+#### Defined in
+
+packages/ethereum/types/AccessControl.d.ts:132
 
 ___
 
 ### renounceRole
 
-▸ **renounceRole**(`role`: BytesLike, `account`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): *Promise*<ContractTransaction\>
+▸ **renounceRole**(`role`, `account`, `overrides?`): `Promise`<ContractTransaction\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `role` | BytesLike |
-| `account` | *string* |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `role` | `BytesLike` |
+| `account` | `string` |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** *Promise*<ContractTransaction\>
+#### Returns
 
-Defined in: packages/ethereum/types/AccessControl.d.ts:283
+`Promise`<ContractTransaction\>
+
+#### Defined in
+
+packages/ethereum/types/AccessControl.d.ts:283
 
 ___
 
 ### renounceRole(bytes32,address)
 
-▸ **renounceRole(bytes32,address)**(`role`: BytesLike, `account`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): *Promise*<ContractTransaction\>
+▸ **renounceRole(bytes32,address)**(`role`, `account`, `overrides?`): `Promise`<ContractTransaction\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `role` | BytesLike |
-| `account` | *string* |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `role` | `BytesLike` |
+| `account` | `string` |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** *Promise*<ContractTransaction\>
+#### Returns
 
-Defined in: packages/ethereum/types/AccessControl.d.ts:287
+`Promise`<ContractTransaction\>
+
+#### Defined in
+
+packages/ethereum/types/AccessControl.d.ts:287
 
 ___
 
 ### revokeRole
 
-▸ **revokeRole**(`role`: BytesLike, `account`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): *Promise*<ContractTransaction\>
+▸ **revokeRole**(`role`, `account`, `overrides?`): `Promise`<ContractTransaction\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `role` | BytesLike |
-| `account` | *string* |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `role` | `BytesLike` |
+| `account` | `string` |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** *Promise*<ContractTransaction\>
+#### Returns
 
-Defined in: packages/ethereum/types/AccessControl.d.ts:295
+`Promise`<ContractTransaction\>
+
+#### Defined in
+
+packages/ethereum/types/AccessControl.d.ts:295
 
 ___
 
 ### revokeRole(bytes32,address)
 
-▸ **revokeRole(bytes32,address)**(`role`: BytesLike, `account`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): *Promise*<ContractTransaction\>
+▸ **revokeRole(bytes32,address)**(`role`, `account`, `overrides?`): `Promise`<ContractTransaction\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `role` | BytesLike |
-| `account` | *string* |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `role` | `BytesLike` |
+| `account` | `string` |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** *Promise*<ContractTransaction\>
+#### Returns
 
-Defined in: packages/ethereum/types/AccessControl.d.ts:299
+`Promise`<ContractTransaction\>
+
+#### Defined in
+
+packages/ethereum/types/AccessControl.d.ts:299
 
 ___
 
 ### getContractAddress
 
-▸ `Static` **getContractAddress**(`transaction`: { `from`: *string* ; `nonce`: BigNumberish  }): *string*
+▸ `Static` **getContractAddress**(`transaction`): `string`
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `transaction` | *object* |
-| `transaction.from` | *string* |
-| `transaction.nonce` | BigNumberish |
+| `transaction` | `Object` |
+| `transaction.from` | `string` |
+| `transaction.nonce` | `BigNumberish` |
 
-**Returns:** *string*
+#### Returns
 
-Inherited from: Contract.getContractAddress
+`string`
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:100
+#### Inherited from
+
+Contract.getContractAddress
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:100
 
 ___
 
 ### getInterface
 
-▸ `Static` **getInterface**(`contractInterface`: ContractInterface): *Interface*
+▸ `Static` **getInterface**(`contractInterface`): `Interface`
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `contractInterface` | ContractInterface |
+| `contractInterface` | `ContractInterface` |
 
-**Returns:** *Interface*
+#### Returns
 
-Inherited from: Contract.getInterface
+`Interface`
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:104
+#### Inherited from
+
+Contract.getInterface
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:104
 
 ___
 
 ### isIndexed
 
-▸ `Static` **isIndexed**(`value`: *any*): value is Indexed
+▸ `Static` **isIndexed**(`value`): value is Indexed
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `value` | *any* |
+| `value` | `any` |
 
-**Returns:** value is Indexed
+#### Returns
 
-Inherited from: Contract.isIndexed
+value is Indexed
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:110
+#### Inherited from
+
+Contract.isIndexed
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:110

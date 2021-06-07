@@ -16,23 +16,25 @@
 
 ### constructor
 
-\+ **new Ownable__factory**(): [*Ownable\_\_factory*](ownable__factory.md)
-
-**Returns:** [*Ownable\_\_factory*](ownable__factory.md)
+• **new Ownable__factory**()
 
 ## Methods
 
 ### connect
 
-▸ `Static` **connect**(`address`: *string*, `signerOrProvider`: *Signer* \| *Provider*): [*Ownable*](ownable.md)
+▸ `Static` **connect**(`address`, `signerOrProvider`): [Ownable](ownable.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `address` | *string* |
-| `signerOrProvider` | *Signer* \| *Provider* |
+| `address` | `string` |
+| `signerOrProvider` | `Signer` \| `Provider` |
 
-**Returns:** [*Ownable*](ownable.md)
+#### Returns
 
-Defined in: packages/ethereum/types/factories/Ownable__factory.ts:11
+[Ownable](ownable.md)
+
+#### Defined in
+
+packages/ethereum/types/factories/Ownable__factory.ts:11

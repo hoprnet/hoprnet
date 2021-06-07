@@ -16,23 +16,25 @@
 
 ### constructor
 
-\+ **new IERC1820Registry__factory**(): [*IERC1820Registry\_\_factory*](ierc1820registry__factory.md)
-
-**Returns:** [*IERC1820Registry\_\_factory*](ierc1820registry__factory.md)
+• **new IERC1820Registry__factory**()
 
 ## Methods
 
 ### connect
 
-▸ `Static` **connect**(`address`: *string*, `signerOrProvider`: *Signer* \| *Provider*): [*IERC1820Registry*](ierc1820registry.md)
+▸ `Static` **connect**(`address`, `signerOrProvider`): [IERC1820Registry](ierc1820registry.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `address` | *string* |
-| `signerOrProvider` | *Signer* \| *Provider* |
+| `address` | `string` |
+| `signerOrProvider` | `Signer` \| `Provider` |
 
-**Returns:** [*IERC1820Registry*](ierc1820registry.md)
+#### Returns
 
-Defined in: packages/ethereum/types/factories/IERC1820Registry__factory.ts:11
+[IERC1820Registry](ierc1820registry.md)
+
+#### Defined in
+
+packages/ethereum/types/factories/IERC1820Registry__factory.ts:11

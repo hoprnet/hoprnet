@@ -26,112 +26,144 @@
 
 ### constructor
 
-\+ **new UINT256**(`bn`: *BN*): [*UINT256*](uint256.md)
+• **new UINT256**(`bn`)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `bn` | *BN* |
+| `bn` | `BN` |
 
-**Returns:** [*UINT256*](uint256.md)
+#### Defined in
 
-Defined in: [types/solidity.ts:3](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L3)
+[types/solidity.ts:3](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L3)
 
 ## Accessors
 
 ### DUMMY\_INVERSE\_PROBABILITY
 
-• `Static` get **DUMMY_INVERSE_PROBABILITY**(): [*UINT256*](uint256.md)
+• `Static` `get` **DUMMY_INVERSE_PROBABILITY**(): [UINT256](uint256.md)
 
-**Returns:** [*UINT256*](uint256.md)
+#### Returns
 
-Defined in: [types/solidity.ts:34](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L34)
+[UINT256](uint256.md)
+
+#### Defined in
+
+[types/solidity.ts:34](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L34)
 
 ___
 
 ### SIZE
 
-• `Static` get **SIZE**(): *number*
+• `Static` `get` **SIZE**(): `number`
 
-**Returns:** *number*
+#### Returns
 
-Defined in: [types/solidity.ts:38](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L38)
+`number`
+
+#### Defined in
+
+[types/solidity.ts:38](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L38)
 
 ## Methods
 
 ### serialize
 
-▸ **serialize**(): *Uint8Array*
+▸ **serialize**(): `Uint8Array`
 
-**Returns:** *Uint8Array*
+#### Returns
 
-Defined in: [types/solidity.ts:14](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L14)
+`Uint8Array`
+
+#### Defined in
+
+[types/solidity.ts:14](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L14)
 
 ___
 
 ### toBN
 
-▸ **toBN**(): *BN*
+▸ **toBN**(): `BN`
 
-**Returns:** *BN*
+#### Returns
 
-Defined in: [types/solidity.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L6)
+`BN`
+
+#### Defined in
+
+[types/solidity.ts:6](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L6)
 
 ___
 
 ### toHex
 
-▸ **toHex**(): *string*
+▸ **toHex**(): `string`
 
-**Returns:** *string*
+#### Returns
 
-Defined in: [types/solidity.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L18)
+`string`
+
+#### Defined in
+
+[types/solidity.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L18)
 
 ___
 
 ### deserialize
 
-▸ `Static` **deserialize**(`arr`: *Uint8Array*): [*UINT256*](uint256.md)
+▸ `Static` **deserialize**(`arr`): [UINT256](uint256.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `arr` | *Uint8Array* |
+| `arr` | `Uint8Array` |
 
-**Returns:** [*UINT256*](uint256.md)
+#### Returns
 
-Defined in: [types/solidity.ts:10](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L10)
+[UINT256](uint256.md)
+
+#### Defined in
+
+[types/solidity.ts:10](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L10)
 
 ___
 
 ### fromInverseProbability
 
-▸ `Static` **fromInverseProbability**(`inverseProb`: *BN*): [*UINT256*](uint256.md)
+▸ `Static` **fromInverseProbability**(`inverseProb`): [UINT256](uint256.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `inverseProb` | *BN* |
+| `inverseProb` | `BN` |
 
-**Returns:** [*UINT256*](uint256.md)
+#### Returns
 
-Defined in: [types/solidity.ts:26](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L26)
+[UINT256](uint256.md)
+
+#### Defined in
+
+[types/solidity.ts:26](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L26)
 
 ___
 
 ### fromString
 
-▸ `Static` **fromString**(`str`: *string*): [*UINT256*](uint256.md)
+▸ `Static` **fromString**(`str`): [UINT256](uint256.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `str` | *string* |
+| `str` | `string` |
 
-**Returns:** [*UINT256*](uint256.md)
+#### Returns
 
-Defined in: [types/solidity.ts:22](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L22)
+[UINT256](uint256.md)
+
+#### Defined in
+
+[types/solidity.ts:22](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/solidity.ts#L22)

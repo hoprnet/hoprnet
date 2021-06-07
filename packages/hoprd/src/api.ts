@@ -16,10 +16,14 @@ export default function setupAPI(node: Hopr, logs: any, options: any) {
     logs.log('executing API command', req.body, node.status)
     await node.waitForRunning()
     logs.log('Node is running')
-    cmds.execute(req.body).then((resp: any) => {
-      logs.log('command complete', resp)
-      res.send(resp)
-    })
+    let response = ''
+    let log = (s) => {
+      response += s
+      logs.log(s)
+    }
+    await cmds.execute(log, req.body)
+    logs.log('command complete')
+    res.send(response)
   })
 
   const hostname = options.restHost

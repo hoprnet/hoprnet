@@ -14,12 +14,14 @@ export class Info extends AbstractCommand {
     return 'Information about the HOPR Node, including any options it started with'
   }
 
-  public async execute(): Promise<string> {
+  public async execute(log): Promise<void> {
     // @TODO Add connector info etc.
-    return [
-      `Announcing to other nodes as: ${(await this.node.getAnnouncedAddresses()).map((ma) => ma.toString())}`,
-      `Listening on: ${this.node.getListeningAddresses().map((ma) => ma.toString())}`,
-      `${await this.node.smartContractInfo()}`
-    ].join('\n')
+    return log(
+      [
+        `Announcing to other nodes as: ${(await this.node.getAnnouncedAddresses()).map((ma) => ma.toString())}`,
+        `Listening on: ${this.node.getListeningAddresses().map((ma) => ma.toString())}`,
+        `${await this.node.smartContractInfo()}`
+      ].join('\n')
+    )
   }
 }

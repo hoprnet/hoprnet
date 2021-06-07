@@ -60,10 +60,13 @@ export class Commitment {
   public async initialize(): Promise<void> {
     if (this.initialized) return
 
-    if (this.indexer.hasPendingCommitment(this.channelId)) {
+    // @FIXME only works for first iteration
+    const isWaiting = this.indexer.waitForCommitment(this.channelId)
+
+    if (isWaiting != undefined) {
       log(`Found pending commitment, waiting until state appears in indexer`)
 
-      await this.indexer.waitForCommitment(this.channelId)
+      await isWaiting
 
       log(`Commitment is set, commitment is now fully initialized.`)
 

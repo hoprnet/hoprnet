@@ -16,23 +16,25 @@
 
 ### constructor
 
-\+ **new IERC20__factory**(): [*IERC20\_\_factory*](ierc20__factory.md)
-
-**Returns:** [*IERC20\_\_factory*](ierc20__factory.md)
+• **new IERC20__factory**()
 
 ## Methods
 
 ### connect
 
-▸ `Static` **connect**(`address`: *string*, `signerOrProvider`: *Signer* \| *Provider*): [*IERC20*](ierc20.md)
+▸ `Static` **connect**(`address`, `signerOrProvider`): [IERC20](ierc20.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `address` | *string* |
-| `signerOrProvider` | *Signer* \| *Provider* |
+| `address` | `string` |
+| `signerOrProvider` | `Signer` \| `Provider` |
 
-**Returns:** [*IERC20*](ierc20.md)
+#### Returns
 
-Defined in: packages/ethereum/types/factories/IERC20__factory.ts:11
+[IERC20](ierc20.md)
+
+#### Defined in
+
+packages/ethereum/types/factories/IERC20__factory.ts:11

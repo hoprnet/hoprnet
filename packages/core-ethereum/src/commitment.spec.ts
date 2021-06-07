@@ -5,8 +5,8 @@ import { Hash, HoprDB } from '@hoprnet/hopr-utils'
 import EventEmitter from 'events'
 
 class FakeIndexer extends EventEmitter {
-  hasPendingCommitment() {
-    return false
+  waitForCommitment() {
+    return undefined
   }
 }
 

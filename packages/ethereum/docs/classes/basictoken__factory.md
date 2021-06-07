@@ -4,7 +4,7 @@
 
 ## Hierarchy
 
-- *ContractFactory*
+- `ContractFactory`
 
   ↳ **BasicToken__factory**
 
@@ -36,212 +36,278 @@
 
 ### constructor
 
-\+ **new BasicToken__factory**(`signer?`: *Signer*): [*BasicToken\_\_factory*](basictoken__factory.md)
+• **new BasicToken__factory**(`signer?`)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `signer?` | *Signer* |
+| `signer?` | `Signer` |
 
-**Returns:** [*BasicToken\_\_factory*](basictoken__factory.md)
+#### Overrides
 
-Overrides: ContractFactory.constructor
+ContractFactory.constructor
 
-Defined in: packages/ethereum/types/factories/BasicToken__factory.ts:10
+#### Defined in
+
+packages/ethereum/types/factories/BasicToken__factory.ts:10
 
 ## Properties
 
 ### bytecode
 
-• `Readonly` **bytecode**: *string*
+• `Readonly` **bytecode**: `string`
 
-Inherited from: ContractFactory.bytecode
+#### Inherited from
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:131
+ContractFactory.bytecode
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:131
 
 ___
 
 ### interface
 
-• `Readonly` **interface**: *Interface*
+• `Readonly` **interface**: `Interface`
 
-Inherited from: ContractFactory.interface
+#### Inherited from
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:130
+ContractFactory.interface
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:130
 
 ___
 
 ### signer
 
-• `Readonly` **signer**: *Signer*
+• `Readonly` **signer**: `Signer`
 
-Inherited from: ContractFactory.signer
+#### Inherited from
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:132
+ContractFactory.signer
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:132
 
 ## Methods
 
 ### attach
 
-▸ **attach**(`address`: *string*): [*BasicToken*](basictoken.md)
+▸ **attach**(`address`): [BasicToken](basictoken.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `address` | *string* |
+| `address` | `string` |
 
-**Returns:** [*BasicToken*](basictoken.md)
+#### Returns
 
-Overrides: ContractFactory.attach
+[BasicToken](basictoken.md)
 
-Defined in: packages/ethereum/types/factories/BasicToken__factory.ts:25
+#### Overrides
+
+ContractFactory.attach
+
+#### Defined in
+
+packages/ethereum/types/factories/BasicToken__factory.ts:25
 
 ___
 
 ### connect
 
-▸ **connect**(`signer`: *Signer*): [*BasicToken\_\_factory*](basictoken__factory.md)
+▸ **connect**(`signer`): [BasicToken\_\_factory](basictoken__factory.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `signer` | *Signer* |
+| `signer` | `Signer` |
 
-**Returns:** [*BasicToken\_\_factory*](basictoken__factory.md)
+#### Returns
 
-Overrides: ContractFactory.connect
+[BasicToken\_\_factory](basictoken__factory.md)
 
-Defined in: packages/ethereum/types/factories/BasicToken__factory.ts:28
+#### Overrides
+
+ContractFactory.connect
+
+#### Defined in
+
+packages/ethereum/types/factories/BasicToken__factory.ts:28
 
 ___
 
 ### deploy
 
-▸ **deploy**(`overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): *Promise*<[*BasicToken*](basictoken.md)\>
+▸ **deploy**(`overrides?`): `Promise`<[BasicToken](basictoken.md)\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** *Promise*<[*BasicToken*](basictoken.md)\>
+#### Returns
 
-Overrides: ContractFactory.deploy
+`Promise`<[BasicToken](basictoken.md)\>
 
-Defined in: packages/ethereum/types/factories/BasicToken__factory.ts:15
+#### Overrides
+
+ContractFactory.deploy
+
+#### Defined in
+
+packages/ethereum/types/factories/BasicToken__factory.ts:15
 
 ___
 
 ### getDeployTransaction
 
-▸ **getDeployTransaction**(`overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): TransactionRequest
+▸ **getDeployTransaction**(`overrides?`): `TransactionRequest`
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** TransactionRequest
+#### Returns
 
-Overrides: ContractFactory.getDeployTransaction
+`TransactionRequest`
 
-Defined in: packages/ethereum/types/factories/BasicToken__factory.ts:20
+#### Overrides
+
+ContractFactory.getDeployTransaction
+
+#### Defined in
+
+packages/ethereum/types/factories/BasicToken__factory.ts:20
 
 ___
 
 ### connect
 
-▸ `Static` **connect**(`address`: *string*, `signerOrProvider`: *Signer* \| *Provider*): [*BasicToken*](basictoken.md)
+▸ `Static` **connect**(`address`, `signerOrProvider`): [BasicToken](basictoken.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `address` | *string* |
-| `signerOrProvider` | *Signer* \| *Provider* |
+| `address` | `string` |
+| `signerOrProvider` | `Signer` \| `Provider` |
 
-**Returns:** [*BasicToken*](basictoken.md)
+#### Returns
 
-Defined in: packages/ethereum/types/factories/BasicToken__factory.ts:31
+[BasicToken](basictoken.md)
+
+#### Defined in
+
+packages/ethereum/types/factories/BasicToken__factory.ts:31
 
 ___
 
 ### fromSolidity
 
-▸ `Static` **fromSolidity**(`compilerOutput`: *any*, `signer?`: *Signer*): *ContractFactory*
+▸ `Static` **fromSolidity**(`compilerOutput`, `signer?`): `ContractFactory`
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `compilerOutput` | *any* |
-| `signer?` | *Signer* |
+| `compilerOutput` | `any` |
+| `signer?` | `Signer` |
 
-**Returns:** *ContractFactory*
+#### Returns
 
-Inherited from: ContractFactory.fromSolidity
+`ContractFactory`
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:140
+#### Inherited from
+
+ContractFactory.fromSolidity
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:140
 
 ___
 
 ### getContract
 
-▸ `Static` **getContract**(`address`: *string*, `contractInterface`: ContractInterface, `signer?`: *Signer*): *Contract*
+▸ `Static` **getContract**(`address`, `contractInterface`, `signer?`): `Contract`
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `address` | *string* |
-| `contractInterface` | ContractInterface |
-| `signer?` | *Signer* |
+| `address` | `string` |
+| `contractInterface` | `ContractInterface` |
+| `signer?` | `Signer` |
 
-**Returns:** *Contract*
+#### Returns
 
-Inherited from: ContractFactory.getContract
+`Contract`
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:146
+#### Inherited from
+
+ContractFactory.getContract
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:146
 
 ___
 
 ### getContractAddress
 
-▸ `Static` **getContractAddress**(`tx`: { `from`: *string* ; `nonce`: *number* \| *BigNumber* \| BytesLike  }): *string*
+▸ `Static` **getContractAddress**(`tx`): `string`
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `tx` | *object* |
-| `tx.from` | *string* |
-| `tx.nonce` | *number* \| *BigNumber* \| BytesLike |
+| `tx` | `Object` |
+| `tx.from` | `string` |
+| `tx.nonce` | `number` \| `BigNumber` \| `BytesLike` |
 
-**Returns:** *string*
+#### Returns
 
-Inherited from: ContractFactory.getContractAddress
+`string`
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:142
+#### Inherited from
+
+ContractFactory.getContractAddress
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:142
 
 ___
 
 ### getInterface
 
-▸ `Static` **getInterface**(`contractInterface`: ContractInterface): *Interface*
+▸ `Static` **getInterface**(`contractInterface`): `Interface`
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `contractInterface` | ContractInterface |
+| `contractInterface` | `ContractInterface` |
 
-**Returns:** *Interface*
+#### Returns
 
-Inherited from: ContractFactory.getInterface
+`Interface`
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:141
+#### Inherited from
+
+ContractFactory.getInterface
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:141

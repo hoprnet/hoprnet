@@ -277,6 +277,8 @@ class Indexer extends EventEmitter {
   private async onChannelUpdated(event: Event<'ChannelUpdate'>): Promise<void> {
     const channel = ChannelEntry.fromSCEvent(event)
 
+    log(channel.toString())
+
     await this.db.updateChannel(channel.getId(), channel)
 
     if (channel.partyA.eq(this.address) || channel.partyB.eq(this.address)) {
@@ -302,14 +304,7 @@ class Indexer extends EventEmitter {
 
     const counterparty = isPartyA ? channel.partyB : channel.partyA
 
-    log(channel)
-    log(
-      `Found channel ${chalk.yellow(
-        channel.getId().toHex()
-      )} with unset commitment. Setting commitment. Self: ${chalk.yellow(this.address)} Counterparty: ${chalk.yellow(
-        this.address
-      )}`
-    )
+    log(`Found channel ${chalk.yellow(channel.getId().toHex())} with unset commitment. Setting commitment`)
 
     return new Commitment(
       (comm: Hash) => this.chain.setCommitment(counterparty, comm),
@@ -318,10 +313,6 @@ class Indexer extends EventEmitter {
       channel.getId(),
       this
     ).initialize()
-  }
-
-  public hasPendingCommitment(channelId: Hash): boolean {
-    return this.pendingCommitments.get(channelId.toHex()) != undefined
   }
 
   public waitForCommitment(channelId: Hash): Promise<void> {
@@ -334,8 +325,6 @@ class Indexer extends EventEmitter {
     waiting = Defer()
 
     this.pendingCommitments.set(channelId.toHex(), waiting)
-
-    return waiting.promise
   }
 
   private resolveCommitmentPromise(channelId: Hash) {

@@ -108,4 +108,26 @@ describe(`database tests`, function () {
     assert(!!(await db.getChannel(channelEntry.getId())), 'did not find channel')
     assert((await db.getChannels()).length === 1, 'did not find channel')
   })
+
+  it('should store ticketIndex', async function () {
+    const DUMMY_CHANNEL = new Hash(new Uint8Array(Hash.SIZE).fill(0xff))
+    const DUMMY_INDEX = new UINT256(new BN(1))
+
+    await db.setCurrentTicketIndex(DUMMY_CHANNEL, DUMMY_INDEX)
+
+    const fromDb = await db.getCurrentTicketIndex(DUMMY_CHANNEL)
+
+    assert(fromDb.toBN().eq(DUMMY_INDEX.toBN()))
+  })
+
+  it('should store current commitment', async function () {
+    const DUMMY_CHANNEL = new Hash(new Uint8Array(Hash.SIZE).fill(0xff))
+    const DUMMY_COMMITMENT = new Hash(new Uint8Array(Hash.SIZE).fill(0xbb))
+
+    await db.setCurrentCommitment(DUMMY_CHANNEL, DUMMY_COMMITMENT)
+
+    const fromDb = await db.getCurrentCommitment(DUMMY_CHANNEL)
+
+    assert(fromDb.eq(DUMMY_COMMITMENT))
+  })
 })

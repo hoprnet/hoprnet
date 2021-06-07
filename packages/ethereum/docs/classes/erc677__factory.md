@@ -16,23 +16,25 @@
 
 ### constructor
 
-\+ **new ERC677__factory**(): [*ERC677\_\_factory*](erc677__factory.md)
-
-**Returns:** [*ERC677\_\_factory*](erc677__factory.md)
+• **new ERC677__factory**()
 
 ## Methods
 
 ### connect
 
-▸ `Static` **connect**(`address`: *string*, `signerOrProvider`: *Signer* \| *Provider*): [*ERC677*](erc677.md)
+▸ `Static` **connect**(`address`, `signerOrProvider`): [ERC677](erc677.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `address` | *string* |
-| `signerOrProvider` | *Signer* \| *Provider* |
+| `address` | `string` |
+| `signerOrProvider` | `Signer` \| `Provider` |
 
-**Returns:** [*ERC677*](erc677.md)
+#### Returns
 
-Defined in: packages/ethereum/types/factories/ERC677__factory.ts:11
+[ERC677](erc677.md)
+
+#### Defined in
+
+packages/ethereum/types/factories/ERC677__factory.ts:11

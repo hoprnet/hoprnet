@@ -24,85 +24,107 @@
 
 ### constructor
 
-\+ **new Response**(`arr`: *Uint8Array*): [*Response*](response.md)
+• **new Response**(`arr`)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `arr` | *Uint8Array* |
+| `arr` | `Uint8Array` |
 
-**Returns:** [*Response*](response.md)
+#### Defined in
 
-Defined in: [types/response.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/response.ts#L8)
+[types/response.ts:8](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/response.ts#L8)
 
 ## Properties
 
 ### SIZE
 
-▪ `Static` **SIZE**: *number*
+▪ `Static` **SIZE**: `number`
 
-Defined in: [types/response.ts:39](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/response.ts#L39)
+#### Defined in
+
+[types/response.ts:39](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/response.ts#L39)
 
 ## Methods
 
 ### serialize
 
-▸ **serialize**(): *Uint8Array*
+▸ **serialize**(): `Uint8Array`
 
-**Returns:** *Uint8Array*
+#### Returns
 
-Defined in: [types/response.ts:31](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/response.ts#L31)
+`Uint8Array`
+
+#### Defined in
+
+[types/response.ts:31](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/response.ts#L31)
 
 ___
 
 ### toChallenge
 
-▸ **toChallenge**(): [*Challenge*](challenge.md)
+▸ **toChallenge**(): [Challenge](challenge.md)
 
-**Returns:** [*Challenge*](challenge.md)
+#### Returns
 
-Defined in: [types/response.ts:35](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/response.ts#L35)
+[Challenge](challenge.md)
+
+#### Defined in
+
+[types/response.ts:35](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/response.ts#L35)
 
 ___
 
 ### toHex
 
-▸ **toHex**(): *string*
+▸ **toHex**(): `string`
 
-**Returns:** *string*
+#### Returns
 
-Defined in: [types/response.ts:27](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/response.ts#L27)
+`string`
+
+#### Defined in
+
+[types/response.ts:27](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/response.ts#L27)
 
 ___
 
 ### deserialize
 
-▸ `Static` **deserialize**(`arr`: *Uint8Array*): [*Response*](response.md)
+▸ `Static` **deserialize**(`arr`): [Response](response.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `arr` | *Uint8Array* |
+| `arr` | `Uint8Array` |
 
-**Returns:** [*Response*](response.md)
+#### Returns
 
-Defined in: [types/response.ts:23](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/response.ts#L23)
+[Response](response.md)
+
+#### Defined in
+
+[types/response.ts:23](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/response.ts#L23)
 
 ___
 
 ### fromHalfKeys
 
-▸ `Static` **fromHalfKeys**(`firstHalfKey`: [*HalfKey*](halfkey.md), `secondHalfKey`: [*HalfKey*](halfkey.md)): [*Response*](response.md)
+▸ `Static` **fromHalfKeys**(`firstHalfKey`, `secondHalfKey`): [Response](response.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `firstHalfKey` | [*HalfKey*](halfkey.md) |
-| `secondHalfKey` | [*HalfKey*](halfkey.md) |
+| `firstHalfKey` | [HalfKey](halfkey.md) |
+| `secondHalfKey` | [HalfKey](halfkey.md) |
 
-**Returns:** [*Response*](response.md)
+#### Returns
 
-Defined in: [types/response.ts:19](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/response.ts#L19)
+[Response](response.md)
+
+#### Defined in
+
+[types/response.ts:19](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/response.ts#L19)

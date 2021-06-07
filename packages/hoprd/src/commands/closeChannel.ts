@@ -17,33 +17,35 @@ export default class CloseChannel extends AbstractCommand {
     return 'Close an open channel'
   }
 
-  async execute(query: string, state: GlobalState): Promise<string | void> {
+  async execute(log, query: string, state: GlobalState): Promise<void> {
     if (query == null) {
-      return styleValue(`Invalid arguments. Expected 'close <peerId>'. Received '${query}'`, 'failure')
+      return log(styleValue(`Invalid arguments. Expected 'close <peerId>'. Received '${query}'`, 'failure'))
     }
 
     let peerId: PeerId
     try {
       peerId = await checkPeerIdInput(query, state)
     } catch (err) {
-      return styleValue(err.message, 'failure')
+      return log(styleValue(err.message, 'failure'))
     }
 
     try {
       const { status, receipt } = await this.node.closeChannel(peerId)
 
-      if (status === 'PENDING') {
-        return `${chalk.green(`Closing channel. Receipt: ${styleValue(receipt, 'hash')}`)}.`
+      if (status === 'PENDING_TO_CLOSE') {
+        return log(`${chalk.green(`Closing channel. Receipt: ${styleValue(receipt, 'hash')}`)}.`)
       } else {
-        return `${chalk.green(
-          `Initiated channel closure, the channel must remain open for at least 2 minutes. Please send the close command again once the cool-off has passed. Receipt: ${styleValue(
-            receipt,
-            'hash'
-          )}`
-        )}.`
+        return log(
+          `${chalk.green(
+            `Initiated channel closure, the channel must remain open for at least 2 minutes. Please send the close command again once the cool-off has passed. Receipt: ${styleValue(
+              receipt,
+              'hash'
+            )}`
+          )}.`
+        )
       }
     } catch (err) {
-      return styleValue(err.message, 'failure')
+      return log(styleValue(err.message, 'failure'))
     }
   }
 }

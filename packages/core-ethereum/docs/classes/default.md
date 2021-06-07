@@ -43,155 +43,183 @@
 
 ### constructor
 
-\+ **new default**(`chain`: { `announce`: (`multiaddr`: Multiaddr) => *Promise*<string\> ; `finalizeChannelClosure`: (`counterparty`: *Address*) => *Promise*<string\> ; `fundChannel`: (`me`: *Address*, `counterparty`: *Address*, `myTotal`: *Balance*, `theirTotal`: *Balance*) => *Promise*<string\> ; `getBalance`: (`address`: *Address*) => *Promise*<Balance\> ; `getChannels`: () => *HoprChannels* ; `getGenesisBlock`: () => *number* ; `getInfo`: () => *string* ; `getLatestBlockNumber`: () => *Promise*<number\> ; `getNativeBalance`: (`address`: *Address*) => *Promise*<NativeBalance\> ; `getPrivateKey`: () => *Uint8Array* ; `getPublicKey`: () => *PublicKey* ; `getWallet`: () => *Wallet* ; `initiateChannelClosure`: (`counterparty`: *Address*) => *Promise*<string\> ; `openChannel`: (`me`: *Address*, `counterparty`: *Address*, `amount`: *Balance*) => *Promise*<string\> ; `redeemTicket`: (`counterparty`: *Address*, `ackTicket`: *AcknowledgedTicket*, `ticket`: *Ticket*) => *Promise*<string\> ; `setCommitment`: (`counterparty`: *Address*, `comm`: *Hash*) => *Promise*<string\> ; `subscribeBlock`: (`cb`: *any*) => *JsonRpcProvider* \| *WebSocketProvider* ; `subscribeChannelEvents`: (`cb`: *any*) => *HoprChannels* ; `subscribeError`: (`cb`: *any*) => *void* ; `unsubscribe`: () => *void* ; `waitUntilReady`: () => *Promise*<Network\> ; `withdraw`: (`currency`: ``"NATIVE"`` \| ``"HOPR"``, `recipient`: *string*, `amount`: *string*) => *Promise*<string\>  }, `db`: *HoprDB*, `indexer`: [*Indexer*](indexer.md)): [*default*](default.md)
+• **new default**(`chain`, `db`, `indexer`)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `chain` | *object* |
-| `chain.announce` | (`multiaddr`: Multiaddr) => *Promise*<string\> |
-| `chain.finalizeChannelClosure` | (`counterparty`: *Address*) => *Promise*<string\> |
-| `chain.fundChannel` | (`me`: *Address*, `counterparty`: *Address*, `myTotal`: *Balance*, `theirTotal`: *Balance*) => *Promise*<string\> |
-| `chain.getBalance` | (`address`: *Address*) => *Promise*<Balance\> |
-| `chain.getChannels` | () => *HoprChannels* |
-| `chain.getGenesisBlock` | () => *number* |
-| `chain.getInfo` | () => *string* |
-| `chain.getLatestBlockNumber` | () => *Promise*<number\> |
-| `chain.getNativeBalance` | (`address`: *Address*) => *Promise*<NativeBalance\> |
-| `chain.getPrivateKey` | () => *Uint8Array* |
-| `chain.getPublicKey` | () => *PublicKey* |
-| `chain.getWallet` | () => *Wallet* |
-| `chain.initiateChannelClosure` | (`counterparty`: *Address*) => *Promise*<string\> |
-| `chain.openChannel` | (`me`: *Address*, `counterparty`: *Address*, `amount`: *Balance*) => *Promise*<string\> |
-| `chain.redeemTicket` | (`counterparty`: *Address*, `ackTicket`: *AcknowledgedTicket*, `ticket`: *Ticket*) => *Promise*<string\> |
-| `chain.setCommitment` | (`counterparty`: *Address*, `comm`: *Hash*) => *Promise*<string\> |
-| `chain.subscribeBlock` | (`cb`: *any*) => *JsonRpcProvider* \| *WebSocketProvider* |
-| `chain.subscribeChannelEvents` | (`cb`: *any*) => *HoprChannels* |
-| `chain.subscribeError` | (`cb`: *any*) => *void* |
-| `chain.unsubscribe` | () => *void* |
-| `chain.waitUntilReady` | () => *Promise*<Network\> |
-| `chain.withdraw` | (`currency`: ``"NATIVE"`` \| ``"HOPR"``, `recipient`: *string*, `amount`: *string*) => *Promise*<string\> |
-| `db` | *HoprDB* |
-| `indexer` | [*Indexer*](indexer.md) |
+| `chain` | `Object` |
+| `chain.announce` | (`multiaddr`: `Multiaddr`) => `Promise`<string\> |
+| `chain.finalizeChannelClosure` | (`counterparty`: `Address`) => `Promise`<string\> |
+| `chain.fundChannel` | (`me`: `Address`, `counterparty`: `Address`, `myTotal`: `Balance`, `theirTotal`: `Balance`) => `Promise`<string\> |
+| `chain.getBalance` | (`address`: `Address`) => `Promise`<Balance\> |
+| `chain.getChannels` | () => `HoprChannels` |
+| `chain.getGenesisBlock` | () => `number` |
+| `chain.getInfo` | () => `string` |
+| `chain.getLatestBlockNumber` | () => `Promise`<number\> |
+| `chain.getNativeBalance` | (`address`: `Address`) => `Promise`<NativeBalance\> |
+| `chain.getPrivateKey` | () => `Uint8Array` |
+| `chain.getPublicKey` | () => `PublicKey` |
+| `chain.getWallet` | () => `Wallet` |
+| `chain.initiateChannelClosure` | (`counterparty`: `Address`) => `Promise`<string\> |
+| `chain.openChannel` | (`me`: `Address`, `counterparty`: `Address`, `amount`: `Balance`) => `Promise`<string\> |
+| `chain.redeemTicket` | (`counterparty`: `Address`, `ackTicket`: `AcknowledgedTicket`, `ticket`: `Ticket`) => `Promise`<string\> |
+| `chain.setCommitment` | (`counterparty`: `Address`, `comm`: `Hash`) => `Promise`<string\> |
+| `chain.subscribeBlock` | (`cb`: `any`) => `JsonRpcProvider` \| `WebSocketProvider` |
+| `chain.subscribeChannelEvents` | (`cb`: `any`) => `HoprChannels` |
+| `chain.subscribeError` | (`cb`: `any`) => `void` |
+| `chain.unsubscribe` | () => `void` |
+| `chain.waitUntilReady` | () => `Promise`<Network\> |
+| `chain.withdraw` | (`currency`: ``"NATIVE"`` \| ``"HOPR"``, `recipient`: `string`, `amount`: `string`) => `Promise`<string\> |
+| `db` | `HoprDB` |
+| `indexer` | [Indexer](indexer.md) |
 
-**Returns:** [*default*](default.md)
+#### Defined in
 
-Defined in: [core-ethereum/src/index.ts:43](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L43)
+[core-ethereum/src/index.ts:43](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L43)
 
 ## Properties
 
 ### CHAIN\_NAME
 
-• `Readonly` **CHAIN\_NAME**: ``"HOPR on Ethereum"``= 'HOPR on Ethereum'
+• `Readonly` **CHAIN\_NAME**: ``"HOPR on Ethereum"``
 
-Defined in: [core-ethereum/src/index.ts:51](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L51)
+#### Defined in
+
+[core-ethereum/src/index.ts:51](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L51)
 
 ___
 
 ### address
 
-• `Private` **address**: *Address*
+• `Private` **address**: `Address`
 
-Defined in: [core-ethereum/src/index.ts:43](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L43)
+#### Defined in
+
+[core-ethereum/src/index.ts:43](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L43)
 
 ___
 
 ### cachedGetBalance
 
-• `Private` **cachedGetBalance**: () => *Promise*<Balance\>
+• `Private` **cachedGetBalance**: () => `Promise`<Balance\>
 
 #### Type declaration
 
-▸ (): *Promise*<Balance\>
+▸ (): `Promise`<Balance\>
 
-**Returns:** *Promise*<Balance\>
+##### Returns
 
-Defined in: [core-ethereum/src/index.ts:94](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L94)
+`Promise`<Balance\>
+
+#### Defined in
+
+[core-ethereum/src/index.ts:94](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L94)
 
 ___
 
 ### cachedGetNativeBalance
 
-• `Private` **cachedGetNativeBalance**: () => *Promise*<NativeBalance\>
+• `Private` **cachedGetNativeBalance**: () => `Promise`<NativeBalance\>
 
 #### Type declaration
 
-▸ (): *Promise*<NativeBalance\>
+▸ (): `Promise`<NativeBalance\>
 
-**Returns:** *Promise*<NativeBalance\>
+##### Returns
 
-Defined in: [core-ethereum/src/index.ts:116](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L116)
+`Promise`<NativeBalance\>
+
+#### Defined in
+
+[core-ethereum/src/index.ts:116](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L116)
 
 ___
 
 ### indexer
 
-• **indexer**: [*Indexer*](indexer.md)
+• **indexer**: [Indexer](indexer.md)
 
 ___
 
 ### privateKey
 
-• `Private` **privateKey**: *Uint8Array*
+• `Private` **privateKey**: `Uint8Array`
 
-Defined in: [core-ethereum/src/index.ts:41](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L41)
+#### Defined in
+
+[core-ethereum/src/index.ts:41](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L41)
 
 ___
 
 ### publicKey
 
-• `Private` **publicKey**: *PublicKey*
+• `Private` **publicKey**: `PublicKey`
 
-Defined in: [core-ethereum/src/index.ts:42](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L42)
+#### Defined in
+
+[core-ethereum/src/index.ts:42](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L42)
 
 ## Methods
 
 ### announce
 
-▸ **announce**(`multiaddr`: *Multiaddr*): *Promise*<string\>
+▸ **announce**(`multiaddr`): `Promise`<string\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `multiaddr` | *Multiaddr* |
+| `multiaddr` | `Multiaddr` |
 
-**Returns:** *Promise*<string\>
+#### Returns
 
-Defined in: [core-ethereum/src/index.ts:65](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L65)
+`Promise`<string\>
+
+#### Defined in
+
+[core-ethereum/src/index.ts:65](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L65)
 
 ___
 
 ### getAccount
 
-▸ **getAccount**(`addr`: *Address*): *Promise*<AccountEntry\>
+▸ **getAccount**(`addr`): `Promise`<AccountEntry\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `addr` | *Address* |
+| `addr` | `Address` |
 
-**Returns:** *Promise*<AccountEntry\>
+#### Returns
 
-Defined in: [core-ethereum/src/index.ts:81](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L81)
+`Promise`<AccountEntry\>
+
+#### Defined in
+
+[core-ethereum/src/index.ts:81](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L81)
 
 ___
 
 ### getAddress
 
-▸ **getAddress**(): *Address*
+▸ **getAddress**(): `Address`
 
-**Returns:** *Address*
+#### Returns
 
-Defined in: [core-ethereum/src/index.ts:103](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L103)
+`Address`
+
+#### Defined in
+
+[core-ethereum/src/index.ts:103](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L103)
 
 ___
 
 ### getBalance
 
-▸ **getBalance**(`useCache?`: *boolean*): *Promise*<Balance\>
+▸ **getBalance**(`useCache?`): `Promise`<Balance\>
 
 Retrieves HOPR balance, optionally uses the cache.
 
@@ -199,194 +227,250 @@ Retrieves HOPR balance, optionally uses the cache.
 
 | Name | Type | Default value |
 | :------ | :------ | :------ |
-| `useCache` | *boolean* | false |
+| `useCache` | `boolean` | false |
 
-**Returns:** *Promise*<Balance\>
+#### Returns
+
+`Promise`<Balance\>
 
 HOPR balance
 
-Defined in: [core-ethereum/src/index.ts:99](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L99)
+#### Defined in
+
+[core-ethereum/src/index.ts:99](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L99)
 
 ___
 
 ### getChannel
 
-▸ **getChannel**(`src`: *PublicKey*, `counterparty`: *PublicKey*): [*Channel*](channel.md)
+▸ **getChannel**(`src`, `counterparty`): [Channel](channel.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `src` | *PublicKey* |
-| `counterparty` | *PublicKey* |
+| `src` | `PublicKey` |
+| `counterparty` | `PublicKey` |
 
-**Returns:** [*Channel*](channel.md)
+#### Returns
 
-Defined in: [core-ethereum/src/index.ts:61](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L61)
+[Channel](channel.md)
+
+#### Defined in
+
+[core-ethereum/src/index.ts:61](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L61)
 
 ___
 
 ### getChannelsFromPeer
 
-▸ **getChannelsFromPeer**(`p`: *PeerId*): *Promise*<[*RoutingChannel*](../modules.md#routingchannel)[]\>
+▸ **getChannelsFromPeer**(`p`): `Promise`<[RoutingChannel](../modules.md#routingchannel)[]\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `p` | *PeerId* |
+| `p` | `PeerId` |
 
-**Returns:** *Promise*<[*RoutingChannel*](../modules.md#routingchannel)[]\>
+#### Returns
 
-Defined in: [core-ethereum/src/index.ts:73](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L73)
+`Promise`<[RoutingChannel](../modules.md#routingchannel)[]\>
+
+#### Defined in
+
+[core-ethereum/src/index.ts:73](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L73)
 
 ___
 
 ### getChannelsOf
 
-▸ **getChannelsOf**(`addr`: *Address*): *Promise*<ChannelEntry[]\>
+▸ **getChannelsOf**(`addr`): `Promise`<ChannelEntry[]\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `addr` | *Address* |
+| `addr` | `Address` |
 
-**Returns:** *Promise*<ChannelEntry[]\>
+#### Returns
 
-Defined in: [core-ethereum/src/index.ts:77](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L77)
+`Promise`<ChannelEntry[]\>
+
+#### Defined in
+
+[core-ethereum/src/index.ts:77](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L77)
 
 ___
 
 ### getNativeBalance
 
-▸ **getNativeBalance**(`useCache?`: *boolean*): *Promise*<NativeBalance\>
+▸ **getNativeBalance**(`useCache?`): `Promise`<NativeBalance\>
 
 #### Parameters
 
 | Name | Type | Default value |
 | :------ | :------ | :------ |
-| `useCache` | *boolean* | false |
+| `useCache` | `boolean` | false |
 
-**Returns:** *Promise*<NativeBalance\>
+#### Returns
 
-Defined in: [core-ethereum/src/index.ts:120](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L120)
+`Promise`<NativeBalance\>
+
+#### Defined in
+
+[core-ethereum/src/index.ts:120](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L120)
 
 ___
 
 ### getPublicKey
 
-▸ **getPublicKey**(): *PublicKey*
+▸ **getPublicKey**(): `PublicKey`
 
-**Returns:** *PublicKey*
+#### Returns
 
-Defined in: [core-ethereum/src/index.ts:107](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L107)
+`PublicKey`
+
+#### Defined in
+
+[core-ethereum/src/index.ts:107](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L107)
 
 ___
 
 ### getPublicKeyOf
 
-▸ **getPublicKeyOf**(`addr`: *Address*): *Promise*<PublicKey\>
+▸ **getPublicKeyOf**(`addr`): `Promise`<PublicKey\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `addr` | *Address* |
+| `addr` | `Address` |
 
-**Returns:** *Promise*<PublicKey\>
+#### Returns
 
-Defined in: [core-ethereum/src/index.ts:85](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L85)
+`Promise`<PublicKey\>
+
+#### Defined in
+
+[core-ethereum/src/index.ts:85](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L85)
 
 ___
 
 ### getRandomChannel
 
-▸ **getRandomChannel**(): *Promise*<[*RoutingChannel*](../modules.md#routingchannel)\>
+▸ **getRandomChannel**(): `Promise`<[RoutingChannel](../modules.md#routingchannel)\>
 
-**Returns:** *Promise*<[*RoutingChannel*](../modules.md#routingchannel)\>
+#### Returns
 
-Defined in: [core-ethereum/src/index.ts:89](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L89)
+`Promise`<[RoutingChannel](../modules.md#routingchannel)\>
+
+#### Defined in
+
+[core-ethereum/src/index.ts:89](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L89)
 
 ___
 
 ### smartContractInfo
 
-▸ **smartContractInfo**(): *string*
+▸ **smartContractInfo**(): `string`
 
-**Returns:** *string*
+#### Returns
 
-Defined in: [core-ethereum/src/index.ts:124](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L124)
+`string`
+
+#### Defined in
+
+[core-ethereum/src/index.ts:124](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L124)
 
 ___
 
 ### stop
 
-▸ **stop**(): *Promise*<void\>
+▸ **stop**(): `Promise`<void\>
 
 Stops the connector.
 
-**Returns:** *Promise*<void\>
+#### Returns
 
-Defined in: [core-ethereum/src/index.ts:56](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L56)
+`Promise`<void\>
+
+#### Defined in
+
+[core-ethereum/src/index.ts:56](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L56)
 
 ___
 
 ### uncachedGetBalance
 
-▸ `Private` **uncachedGetBalance**(): *Promise*<Balance\>
+▸ `Private` **uncachedGetBalance**(): `Promise`<Balance\>
 
-**Returns:** *Promise*<Balance\>
+#### Returns
 
-Defined in: [core-ethereum/src/index.ts:93](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L93)
+`Promise`<Balance\>
+
+#### Defined in
+
+[core-ethereum/src/index.ts:93](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L93)
 
 ___
 
 ### uncachedGetNativeBalance
 
-▸ `Private` **uncachedGetNativeBalance**(): *Promise*<NativeBalance\>
+▸ `Private` **uncachedGetNativeBalance**(): `Promise`<NativeBalance\>
 
 Retrieves ETH balance, optionally uses the cache.
 
-**Returns:** *Promise*<NativeBalance\>
+#### Returns
+
+`Promise`<NativeBalance\>
 
 ETH balance
 
-Defined in: [core-ethereum/src/index.ts:115](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L115)
+#### Defined in
+
+[core-ethereum/src/index.ts:115](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L115)
 
 ___
 
 ### waitForPublicNodes
 
-▸ **waitForPublicNodes**(): *Promise*<Multiaddr[]\>
+▸ **waitForPublicNodes**(): `Promise`<Multiaddr[]\>
 
-**Returns:** *Promise*<Multiaddr[]\>
+#### Returns
 
-Defined in: [core-ethereum/src/index.ts:128](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L128)
+`Promise`<Multiaddr[]\>
+
+#### Defined in
+
+[core-ethereum/src/index.ts:128](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L128)
 
 ___
 
 ### withdraw
 
-▸ **withdraw**(`currency`: ``"NATIVE"`` \| ``"HOPR"``, `recipient`: *string*, `amount`: *string*): *Promise*<string\>
+▸ **withdraw**(`currency`, `recipient`, `amount`): `Promise`<string\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
 | `currency` | ``"NATIVE"`` \| ``"HOPR"`` |
-| `recipient` | *string* |
-| `amount` | *string* |
+| `recipient` | `string` |
+| `amount` | `string` |
 
-**Returns:** *Promise*<string\>
+#### Returns
 
-Defined in: [core-ethereum/src/index.ts:69](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L69)
+`Promise`<string\>
+
+#### Defined in
+
+[core-ethereum/src/index.ts:69](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L69)
 
 ___
 
 ### create
 
-▸ `Static` **create**(`db`: *HoprDB*, `privateKey`: *Uint8Array*, `options?`: { `maxConfirmations?`: *number* ; `provider?`: *string*  }): *Promise*<[*default*](default.md)\>
+▸ `Static` **create**(`db`, `privateKey`, `options?`): `Promise`<[default](default.md)\>
 
 Creates an uninitialised instance.
 
@@ -394,14 +478,18 @@ Creates an uninitialised instance.
 
 | Name | Type | Description |
 | :------ | :------ | :------ |
-| `db` | *HoprDB* | database instance |
-| `privateKey` | *Uint8Array* | that is used to derive that on-chain identity |
-| `options?` | *object* | - |
-| `options.maxConfirmations?` | *number* | - |
-| `options.provider?` | *string* | provider URI that is used to connect to the blockchain |
+| `db` | `HoprDB` | database instance |
+| `privateKey` | `Uint8Array` | that is used to derive that on-chain identity |
+| `options?` | `Object` | - |
+| `options.maxConfirmations?` | `number` | - |
+| `options.provider?` | `string` | provider URI that is used to connect to the blockchain |
 
-**Returns:** *Promise*<[*default*](default.md)\>
+#### Returns
+
+`Promise`<[default](default.md)\>
 
 a promise resolved to the connector
 
-Defined in: [core-ethereum/src/index.ts:140](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L140)
+#### Defined in
+
+[core-ethereum/src/index.ts:140](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L140)

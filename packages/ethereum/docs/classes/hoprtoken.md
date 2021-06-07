@@ -4,7 +4,7 @@
 
 ## Hierarchy
 
-- *Contract*
+- `Contract`
 
   ↳ **HoprToken**
 
@@ -121,2060 +121,2528 @@
 
 ### constructor
 
-\+ **new HoprToken**(`addressOrName`: *string*, `contractInterface`: ContractInterface, `signerOrProvider?`: *Signer* \| *Provider*): [*HoprToken*](hoprtoken.md)
+• **new HoprToken**(`addressOrName`, `contractInterface`, `signerOrProvider?`)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `addressOrName` | *string* |
-| `contractInterface` | ContractInterface |
-| `signerOrProvider?` | *Signer* \| *Provider* |
+| `addressOrName` | `string` |
+| `contractInterface` | `ContractInterface` |
+| `signerOrProvider?` | `Signer` \| `Provider` |
 
-**Returns:** [*HoprToken*](hoprtoken.md)
+#### Inherited from
 
-Inherited from: Contract.constructor
+Contract.constructor
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:98
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:98
 
 ## Properties
 
 ### \_deployedPromise
 
-• **\_deployedPromise**: *Promise*<Contract\>
+• **\_deployedPromise**: `Promise`<Contract\>
 
-Inherited from: Contract.\_deployedPromise
+#### Inherited from
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:92
+Contract.\_deployedPromise
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:92
 
 ___
 
 ### \_runningEvents
 
-• **\_runningEvents**: *object*
+• **\_runningEvents**: `Object`
 
-#### Type declaration
+#### Index signature
 
-Inherited from: Contract.\_runningEvents
+▪ [eventTag: `string`]: `RunningEvent`
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:93
+#### Inherited from
+
+Contract.\_runningEvents
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:93
 
 ___
 
 ### \_wrappedEmits
 
-• **\_wrappedEmits**: *object*
+• **\_wrappedEmits**: `Object`
 
-#### Type declaration
+#### Index signature
 
-Inherited from: Contract.\_wrappedEmits
+▪ [eventTag: `string`]: (...`args`: `any`[]) => `void`
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:96
+#### Inherited from
+
+Contract.\_wrappedEmits
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:96
 
 ___
 
 ### address
 
-• `Readonly` **address**: *string*
+• `Readonly` **address**: `string`
 
-Inherited from: Contract.address
+#### Inherited from
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:71
+Contract.address
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:71
 
 ___
 
 ### callStatic
 
-• **callStatic**: *object*
+• **callStatic**: `Object`
 
 #### Type declaration
 
 | Name | Type |
 | :------ | :------ |
-| `DEFAULT_ADMIN_ROLE` | (`overrides?`: CallOverrides) => *Promise*<string\> |
-| `DEFAULT_ADMIN_ROLE()` | (`overrides?`: CallOverrides) => *Promise*<string\> |
-| `MINTER_ROLE` | (`overrides?`: CallOverrides) => *Promise*<string\> |
-| `MINTER_ROLE()` | (`overrides?`: CallOverrides) => *Promise*<string\> |
-| `accountSnapshots` | (`arg0`: *string*, `arg1`: BigNumberish, `overrides?`: CallOverrides) => *Promise*<[*BigNumber*, *BigNumber*] & { `fromBlock`: *BigNumber* ; `value`: *BigNumber*  }\> |
-| `accountSnapshots(address,uint256)` | (`arg0`: *string*, `arg1`: BigNumberish, `overrides?`: CallOverrides) => *Promise*<[*BigNumber*, *BigNumber*] & { `fromBlock`: *BigNumber* ; `value`: *BigNumber*  }\> |
-| `allowance` | (`holder`: *string*, `spender`: *string*, `overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `allowance(address,address)` | (`holder`: *string*, `spender`: *string*, `overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `approve` | (`spender`: *string*, `value`: BigNumberish, `overrides?`: CallOverrides) => *Promise*<boolean\> |
-| `approve(address,uint256)` | (`spender`: *string*, `value`: BigNumberish, `overrides?`: CallOverrides) => *Promise*<boolean\> |
-| `authorizeOperator` | (`operator`: *string*, `overrides?`: CallOverrides) => *Promise*<void\> |
-| `authorizeOperator(address)` | (`operator`: *string*, `overrides?`: CallOverrides) => *Promise*<void\> |
-| `balanceOf` | (`tokenHolder`: *string*, `overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `balanceOf(address)` | (`tokenHolder`: *string*, `overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `balanceOfAt` | (`_owner`: *string*, `_blockNumber`: BigNumberish, `overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `balanceOfAt(address,uint128)` | (`_owner`: *string*, `_blockNumber`: BigNumberish, `overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `burn` | (`amount`: BigNumberish, `data`: BytesLike, `overrides?`: CallOverrides) => *Promise*<void\> |
-| `burn(uint256,bytes)` | (`amount`: BigNumberish, `data`: BytesLike, `overrides?`: CallOverrides) => *Promise*<void\> |
-| `decimals` | (`overrides?`: CallOverrides) => *Promise*<number\> |
-| `decimals()` | (`overrides?`: CallOverrides) => *Promise*<number\> |
-| `defaultOperators` | (`overrides?`: CallOverrides) => *Promise*<string[]\> |
-| `defaultOperators()` | (`overrides?`: CallOverrides) => *Promise*<string[]\> |
-| `getRoleAdmin` | (`role`: BytesLike, `overrides?`: CallOverrides) => *Promise*<string\> |
-| `getRoleAdmin(bytes32)` | (`role`: BytesLike, `overrides?`: CallOverrides) => *Promise*<string\> |
-| `getRoleMember` | (`role`: BytesLike, `index`: BigNumberish, `overrides?`: CallOverrides) => *Promise*<string\> |
-| `getRoleMember(bytes32,uint256)` | (`role`: BytesLike, `index`: BigNumberish, `overrides?`: CallOverrides) => *Promise*<string\> |
-| `getRoleMemberCount` | (`role`: BytesLike, `overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `getRoleMemberCount(bytes32)` | (`role`: BytesLike, `overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `grantRole` | (`role`: BytesLike, `account`: *string*, `overrides?`: CallOverrides) => *Promise*<void\> |
-| `grantRole(bytes32,address)` | (`role`: BytesLike, `account`: *string*, `overrides?`: CallOverrides) => *Promise*<void\> |
-| `granularity` | (`overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `granularity()` | (`overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `hasRole` | (`role`: BytesLike, `account`: *string*, `overrides?`: CallOverrides) => *Promise*<boolean\> |
-| `hasRole(bytes32,address)` | (`role`: BytesLike, `account`: *string*, `overrides?`: CallOverrides) => *Promise*<boolean\> |
-| `isOperatorFor` | (`operator`: *string*, `tokenHolder`: *string*, `overrides?`: CallOverrides) => *Promise*<boolean\> |
-| `isOperatorFor(address,address)` | (`operator`: *string*, `tokenHolder`: *string*, `overrides?`: CallOverrides) => *Promise*<boolean\> |
-| `mint` | (`account`: *string*, `amount`: BigNumberish, `userData`: BytesLike, `operatorData`: BytesLike, `overrides?`: CallOverrides) => *Promise*<void\> |
-| `mint(address,uint256,bytes,bytes)` | (`account`: *string*, `amount`: BigNumberish, `userData`: BytesLike, `operatorData`: BytesLike, `overrides?`: CallOverrides) => *Promise*<void\> |
-| `name` | (`overrides?`: CallOverrides) => *Promise*<string\> |
-| `name()` | (`overrides?`: CallOverrides) => *Promise*<string\> |
-| `operatorBurn` | (`account`: *string*, `amount`: BigNumberish, `data`: BytesLike, `operatorData`: BytesLike, `overrides?`: CallOverrides) => *Promise*<void\> |
-| `operatorBurn(address,uint256,bytes,bytes)` | (`account`: *string*, `amount`: BigNumberish, `data`: BytesLike, `operatorData`: BytesLike, `overrides?`: CallOverrides) => *Promise*<void\> |
-| `operatorSend` | (`sender`: *string*, `recipient`: *string*, `amount`: BigNumberish, `data`: BytesLike, `operatorData`: BytesLike, `overrides?`: CallOverrides) => *Promise*<void\> |
-| `operatorSend(address,address,uint256,bytes,bytes)` | (`sender`: *string*, `recipient`: *string*, `amount`: BigNumberish, `data`: BytesLike, `operatorData`: BytesLike, `overrides?`: CallOverrides) => *Promise*<void\> |
-| `renounceRole` | (`role`: BytesLike, `account`: *string*, `overrides?`: CallOverrides) => *Promise*<void\> |
-| `renounceRole(bytes32,address)` | (`role`: BytesLike, `account`: *string*, `overrides?`: CallOverrides) => *Promise*<void\> |
-| `revokeOperator` | (`operator`: *string*, `overrides?`: CallOverrides) => *Promise*<void\> |
-| `revokeOperator(address)` | (`operator`: *string*, `overrides?`: CallOverrides) => *Promise*<void\> |
-| `revokeRole` | (`role`: BytesLike, `account`: *string*, `overrides?`: CallOverrides) => *Promise*<void\> |
-| `revokeRole(bytes32,address)` | (`role`: BytesLike, `account`: *string*, `overrides?`: CallOverrides) => *Promise*<void\> |
-| `send` | (`recipient`: *string*, `amount`: BigNumberish, `data`: BytesLike, `overrides?`: CallOverrides) => *Promise*<void\> |
-| `send(address,uint256,bytes)` | (`recipient`: *string*, `amount`: BigNumberish, `data`: BytesLike, `overrides?`: CallOverrides) => *Promise*<void\> |
-| `symbol` | (`overrides?`: CallOverrides) => *Promise*<string\> |
-| `symbol()` | (`overrides?`: CallOverrides) => *Promise*<string\> |
-| `totalSupply` | (`overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `totalSupply()` | (`overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `totalSupplyAt` | (`_blockNumber`: BigNumberish, `overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `totalSupplyAt(uint128)` | (`_blockNumber`: BigNumberish, `overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `totalSupplySnapshots` | (`arg0`: BigNumberish, `overrides?`: CallOverrides) => *Promise*<[*BigNumber*, *BigNumber*] & { `fromBlock`: *BigNumber* ; `value`: *BigNumber*  }\> |
-| `totalSupplySnapshots(uint256)` | (`arg0`: BigNumberish, `overrides?`: CallOverrides) => *Promise*<[*BigNumber*, *BigNumber*] & { `fromBlock`: *BigNumber* ; `value`: *BigNumber*  }\> |
-| `transfer` | (`recipient`: *string*, `amount`: BigNumberish, `overrides?`: CallOverrides) => *Promise*<boolean\> |
-| `transfer(address,uint256)` | (`recipient`: *string*, `amount`: BigNumberish, `overrides?`: CallOverrides) => *Promise*<boolean\> |
-| `transferFrom` | (`holder`: *string*, `recipient`: *string*, `amount`: BigNumberish, `overrides?`: CallOverrides) => *Promise*<boolean\> |
-| `transferFrom(address,address,uint256)` | (`holder`: *string*, `recipient`: *string*, `amount`: BigNumberish, `overrides?`: CallOverrides) => *Promise*<boolean\> |
+| `DEFAULT_ADMIN_ROLE` | (`overrides?`: `CallOverrides`) => `Promise`<string\> |
+| `DEFAULT_ADMIN_ROLE()` | (`overrides?`: `CallOverrides`) => `Promise`<string\> |
+| `MINTER_ROLE` | (`overrides?`: `CallOverrides`) => `Promise`<string\> |
+| `MINTER_ROLE()` | (`overrides?`: `CallOverrides`) => `Promise`<string\> |
+| `accountSnapshots` | (`arg0`: `string`, `arg1`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`, `BigNumber`] & { `fromBlock`: `BigNumber` ; `value`: `BigNumber`  }\> |
+| `accountSnapshots(address,uint256)` | (`arg0`: `string`, `arg1`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`, `BigNumber`] & { `fromBlock`: `BigNumber` ; `value`: `BigNumber`  }\> |
+| `allowance` | (`holder`: `string`, `spender`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `allowance(address,address)` | (`holder`: `string`, `spender`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `approve` | (`spender`: `string`, `value`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<boolean\> |
+| `approve(address,uint256)` | (`spender`: `string`, `value`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<boolean\> |
+| `authorizeOperator` | (`operator`: `string`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
+| `authorizeOperator(address)` | (`operator`: `string`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
+| `balanceOf` | (`tokenHolder`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `balanceOf(address)` | (`tokenHolder`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `balanceOfAt` | (`_owner`: `string`, `_blockNumber`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `balanceOfAt(address,uint128)` | (`_owner`: `string`, `_blockNumber`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `burn` | (`amount`: `BigNumberish`, `data`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
+| `burn(uint256,bytes)` | (`amount`: `BigNumberish`, `data`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
+| `decimals` | (`overrides?`: `CallOverrides`) => `Promise`<number\> |
+| `decimals()` | (`overrides?`: `CallOverrides`) => `Promise`<number\> |
+| `defaultOperators` | (`overrides?`: `CallOverrides`) => `Promise`<string[]\> |
+| `defaultOperators()` | (`overrides?`: `CallOverrides`) => `Promise`<string[]\> |
+| `getRoleAdmin` | (`role`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<string\> |
+| `getRoleAdmin(bytes32)` | (`role`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<string\> |
+| `getRoleMember` | (`role`: `BytesLike`, `index`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<string\> |
+| `getRoleMember(bytes32,uint256)` | (`role`: `BytesLike`, `index`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<string\> |
+| `getRoleMemberCount` | (`role`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `getRoleMemberCount(bytes32)` | (`role`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `grantRole` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
+| `grantRole(bytes32,address)` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
+| `granularity` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `granularity()` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `hasRole` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<boolean\> |
+| `hasRole(bytes32,address)` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<boolean\> |
+| `isOperatorFor` | (`operator`: `string`, `tokenHolder`: `string`, `overrides?`: `CallOverrides`) => `Promise`<boolean\> |
+| `isOperatorFor(address,address)` | (`operator`: `string`, `tokenHolder`: `string`, `overrides?`: `CallOverrides`) => `Promise`<boolean\> |
+| `mint` | (`account`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
+| `mint(address,uint256,bytes,bytes)` | (`account`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
+| `name` | (`overrides?`: `CallOverrides`) => `Promise`<string\> |
+| `name()` | (`overrides?`: `CallOverrides`) => `Promise`<string\> |
+| `operatorBurn` | (`account`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
+| `operatorBurn(address,uint256,bytes,bytes)` | (`account`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
+| `operatorSend` | (`sender`: `string`, `recipient`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
+| `operatorSend(address,address,uint256,bytes,bytes)` | (`sender`: `string`, `recipient`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
+| `renounceRole` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
+| `renounceRole(bytes32,address)` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
+| `revokeOperator` | (`operator`: `string`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
+| `revokeOperator(address)` | (`operator`: `string`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
+| `revokeRole` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
+| `revokeRole(bytes32,address)` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
+| `send` | (`recipient`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
+| `send(address,uint256,bytes)` | (`recipient`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
+| `symbol` | (`overrides?`: `CallOverrides`) => `Promise`<string\> |
+| `symbol()` | (`overrides?`: `CallOverrides`) => `Promise`<string\> |
+| `totalSupply` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `totalSupply()` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `totalSupplyAt` | (`_blockNumber`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `totalSupplyAt(uint128)` | (`_blockNumber`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `totalSupplySnapshots` | (`arg0`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`, `BigNumber`] & { `fromBlock`: `BigNumber` ; `value`: `BigNumber`  }\> |
+| `totalSupplySnapshots(uint256)` | (`arg0`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`, `BigNumber`] & { `fromBlock`: `BigNumber` ; `value`: `BigNumber`  }\> |
+| `transfer` | (`recipient`: `string`, `amount`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<boolean\> |
+| `transfer(address,uint256)` | (`recipient`: `string`, `amount`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<boolean\> |
+| `transferFrom` | (`holder`: `string`, `recipient`: `string`, `amount`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<boolean\> |
+| `transferFrom(address,address,uint256)` | (`holder`: `string`, `recipient`: `string`, `amount`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<boolean\> |
 
-Overrides: Contract.callStatic
+#### Overrides
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:988
+Contract.callStatic
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:988
 
 ___
 
 ### deployTransaction
 
-• `Readonly` **deployTransaction**: TransactionResponse
+• `Readonly` **deployTransaction**: `TransactionResponse`
 
-Inherited from: Contract.deployTransaction
+#### Inherited from
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:91
+Contract.deployTransaction
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:91
 
 ___
 
 ### estimateGas
 
-• **estimateGas**: *object*
+• **estimateGas**: `Object`
 
 #### Type declaration
 
 | Name | Type |
 | :------ | :------ |
-| `DEFAULT_ADMIN_ROLE` | (`overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `DEFAULT_ADMIN_ROLE()` | (`overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `MINTER_ROLE` | (`overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `MINTER_ROLE()` | (`overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `accountSnapshots` | (`arg0`: *string*, `arg1`: BigNumberish, `overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `accountSnapshots(address,uint256)` | (`arg0`: *string*, `arg1`: BigNumberish, `overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `allowance` | (`holder`: *string*, `spender`: *string*, `overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `allowance(address,address)` | (`holder`: *string*, `spender`: *string*, `overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `approve` | (`spender`: *string*, `value`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<BigNumber\> |
-| `approve(address,uint256)` | (`spender`: *string*, `value`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<BigNumber\> |
-| `authorizeOperator` | (`operator`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<BigNumber\> |
-| `authorizeOperator(address)` | (`operator`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<BigNumber\> |
-| `balanceOf` | (`tokenHolder`: *string*, `overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `balanceOf(address)` | (`tokenHolder`: *string*, `overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `balanceOfAt` | (`_owner`: *string*, `_blockNumber`: BigNumberish, `overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `balanceOfAt(address,uint128)` | (`_owner`: *string*, `_blockNumber`: BigNumberish, `overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `burn` | (`amount`: BigNumberish, `data`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<BigNumber\> |
-| `burn(uint256,bytes)` | (`amount`: BigNumberish, `data`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<BigNumber\> |
-| `decimals` | (`overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `decimals()` | (`overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `defaultOperators` | (`overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `defaultOperators()` | (`overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `getRoleAdmin` | (`role`: BytesLike, `overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `getRoleAdmin(bytes32)` | (`role`: BytesLike, `overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `getRoleMember` | (`role`: BytesLike, `index`: BigNumberish, `overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `getRoleMember(bytes32,uint256)` | (`role`: BytesLike, `index`: BigNumberish, `overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `getRoleMemberCount` | (`role`: BytesLike, `overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `getRoleMemberCount(bytes32)` | (`role`: BytesLike, `overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `grantRole` | (`role`: BytesLike, `account`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<BigNumber\> |
-| `grantRole(bytes32,address)` | (`role`: BytesLike, `account`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<BigNumber\> |
-| `granularity` | (`overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `granularity()` | (`overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `hasRole` | (`role`: BytesLike, `account`: *string*, `overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `hasRole(bytes32,address)` | (`role`: BytesLike, `account`: *string*, `overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `isOperatorFor` | (`operator`: *string*, `tokenHolder`: *string*, `overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `isOperatorFor(address,address)` | (`operator`: *string*, `tokenHolder`: *string*, `overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `mint` | (`account`: *string*, `amount`: BigNumberish, `userData`: BytesLike, `operatorData`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<BigNumber\> |
-| `mint(address,uint256,bytes,bytes)` | (`account`: *string*, `amount`: BigNumberish, `userData`: BytesLike, `operatorData`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<BigNumber\> |
-| `name` | (`overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `name()` | (`overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `operatorBurn` | (`account`: *string*, `amount`: BigNumberish, `data`: BytesLike, `operatorData`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<BigNumber\> |
-| `operatorBurn(address,uint256,bytes,bytes)` | (`account`: *string*, `amount`: BigNumberish, `data`: BytesLike, `operatorData`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<BigNumber\> |
-| `operatorSend` | (`sender`: *string*, `recipient`: *string*, `amount`: BigNumberish, `data`: BytesLike, `operatorData`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<BigNumber\> |
-| `operatorSend(address,address,uint256,bytes,bytes)` | (`sender`: *string*, `recipient`: *string*, `amount`: BigNumberish, `data`: BytesLike, `operatorData`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<BigNumber\> |
-| `renounceRole` | (`role`: BytesLike, `account`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<BigNumber\> |
-| `renounceRole(bytes32,address)` | (`role`: BytesLike, `account`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<BigNumber\> |
-| `revokeOperator` | (`operator`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<BigNumber\> |
-| `revokeOperator(address)` | (`operator`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<BigNumber\> |
-| `revokeRole` | (`role`: BytesLike, `account`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<BigNumber\> |
-| `revokeRole(bytes32,address)` | (`role`: BytesLike, `account`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<BigNumber\> |
-| `send` | (`recipient`: *string*, `amount`: BigNumberish, `data`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<BigNumber\> |
-| `send(address,uint256,bytes)` | (`recipient`: *string*, `amount`: BigNumberish, `data`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<BigNumber\> |
-| `symbol` | (`overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `symbol()` | (`overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `totalSupply` | (`overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `totalSupply()` | (`overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `totalSupplyAt` | (`_blockNumber`: BigNumberish, `overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `totalSupplyAt(uint128)` | (`_blockNumber`: BigNumberish, `overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `totalSupplySnapshots` | (`arg0`: BigNumberish, `overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `totalSupplySnapshots(uint256)` | (`arg0`: BigNumberish, `overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `transfer` | (`recipient`: *string*, `amount`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<BigNumber\> |
-| `transfer(address,uint256)` | (`recipient`: *string*, `amount`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<BigNumber\> |
-| `transferFrom` | (`holder`: *string*, `recipient`: *string*, `amount`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<BigNumber\> |
-| `transferFrom(address,address,uint256)` | (`holder`: *string*, `recipient`: *string*, `amount`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<BigNumber\> |
+| `DEFAULT_ADMIN_ROLE` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `DEFAULT_ADMIN_ROLE()` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `MINTER_ROLE` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `MINTER_ROLE()` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `accountSnapshots` | (`arg0`: `string`, `arg1`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `accountSnapshots(address,uint256)` | (`arg0`: `string`, `arg1`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `allowance` | (`holder`: `string`, `spender`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `allowance(address,address)` | (`holder`: `string`, `spender`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `approve` | (`spender`: `string`, `value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `approve(address,uint256)` | (`spender`: `string`, `value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `authorizeOperator` | (`operator`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `authorizeOperator(address)` | (`operator`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `balanceOf` | (`tokenHolder`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `balanceOf(address)` | (`tokenHolder`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `balanceOfAt` | (`_owner`: `string`, `_blockNumber`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `balanceOfAt(address,uint128)` | (`_owner`: `string`, `_blockNumber`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `burn` | (`amount`: `BigNumberish`, `data`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `burn(uint256,bytes)` | (`amount`: `BigNumberish`, `data`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `decimals` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `decimals()` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `defaultOperators` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `defaultOperators()` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `getRoleAdmin` | (`role`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `getRoleAdmin(bytes32)` | (`role`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `getRoleMember` | (`role`: `BytesLike`, `index`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `getRoleMember(bytes32,uint256)` | (`role`: `BytesLike`, `index`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `getRoleMemberCount` | (`role`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `getRoleMemberCount(bytes32)` | (`role`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `grantRole` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `grantRole(bytes32,address)` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `granularity` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `granularity()` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `hasRole` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `hasRole(bytes32,address)` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `isOperatorFor` | (`operator`: `string`, `tokenHolder`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `isOperatorFor(address,address)` | (`operator`: `string`, `tokenHolder`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `mint` | (`account`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `mint(address,uint256,bytes,bytes)` | (`account`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `name` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `name()` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `operatorBurn` | (`account`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `operatorBurn(address,uint256,bytes,bytes)` | (`account`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `operatorSend` | (`sender`: `string`, `recipient`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `operatorSend(address,address,uint256,bytes,bytes)` | (`sender`: `string`, `recipient`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `renounceRole` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `renounceRole(bytes32,address)` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `revokeOperator` | (`operator`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `revokeOperator(address)` | (`operator`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `revokeRole` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `revokeRole(bytes32,address)` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `send` | (`recipient`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `send(address,uint256,bytes)` | (`recipient`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `symbol` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `symbol()` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `totalSupply` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `totalSupply()` | (`overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `totalSupplyAt` | (`_blockNumber`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `totalSupplyAt(uint128)` | (`_blockNumber`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `totalSupplySnapshots` | (`arg0`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `totalSupplySnapshots(uint256)` | (`arg0`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `transfer` | (`recipient`: `string`, `amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `transfer(address,uint256)` | (`recipient`: `string`, `amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `transferFrom` | (`holder`: `string`, `recipient`: `string`, `amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `transferFrom(address,address,uint256)` | (`holder`: `string`, `recipient`: `string`, `amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
 
-Overrides: Contract.estimateGas
+#### Overrides
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:1423
+Contract.estimateGas
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:1423
 
 ___
 
 ### filters
 
-• **filters**: *object*
+• **filters**: `Object`
 
 #### Type declaration
 
 | Name | Type |
 | :------ | :------ |
-| `Approval` | (`owner`: *string*, `spender`: *string*, `value`: ``null``) => [*TypedEventFilter*](../interfaces/typedeventfilter.md)<[*string*, *string*, *BigNumber*], { `owner`: *string* ; `spender`: *string* ; `value`: *BigNumber*  }\> |
-| `AuthorizedOperator` | (`operator`: *string*, `tokenHolder`: *string*) => [*TypedEventFilter*](../interfaces/typedeventfilter.md)<[*string*, *string*], { `operator`: *string* ; `tokenHolder`: *string*  }\> |
-| `Burned` | (`operator`: *string*, `from`: *string*, `amount`: ``null``, `data`: ``null``, `operatorData`: ``null``) => [*TypedEventFilter*](../interfaces/typedeventfilter.md)<[*string*, *string*, *BigNumber*, *string*, *string*], { `amount`: *BigNumber* ; `data`: *string* ; `from`: *string* ; `operator`: *string* ; `operatorData`: *string*  }\> |
-| `Minted` | (`operator`: *string*, `to`: *string*, `amount`: ``null``, `data`: ``null``, `operatorData`: ``null``) => [*TypedEventFilter*](../interfaces/typedeventfilter.md)<[*string*, *string*, *BigNumber*, *string*, *string*], { `amount`: *BigNumber* ; `data`: *string* ; `operator`: *string* ; `operatorData`: *string* ; `to`: *string*  }\> |
-| `RevokedOperator` | (`operator`: *string*, `tokenHolder`: *string*) => [*TypedEventFilter*](../interfaces/typedeventfilter.md)<[*string*, *string*], { `operator`: *string* ; `tokenHolder`: *string*  }\> |
-| `RoleGranted` | (`role`: BytesLike, `account`: *string*, `sender`: *string*) => [*TypedEventFilter*](../interfaces/typedeventfilter.md)<[*string*, *string*, *string*], { `account`: *string* ; `role`: *string* ; `sender`: *string*  }\> |
-| `RoleRevoked` | (`role`: BytesLike, `account`: *string*, `sender`: *string*) => [*TypedEventFilter*](../interfaces/typedeventfilter.md)<[*string*, *string*, *string*], { `account`: *string* ; `role`: *string* ; `sender`: *string*  }\> |
-| `Sent` | (`operator`: *string*, `from`: *string*, `to`: *string*, `amount`: ``null``, `data`: ``null``, `operatorData`: ``null``) => [*TypedEventFilter*](../interfaces/typedeventfilter.md)<[*string*, *string*, *string*, *BigNumber*, *string*, *string*], { `amount`: *BigNumber* ; `data`: *string* ; `from`: *string* ; `operator`: *string* ; `operatorData`: *string* ; `to`: *string*  }\> |
-| `Transfer` | (`from`: *string*, `to`: *string*, `value`: ``null``) => [*TypedEventFilter*](../interfaces/typedeventfilter.md)<[*string*, *string*, *BigNumber*], { `from`: *string* ; `to`: *string* ; `value`: *BigNumber*  }\> |
+| `Approval` | (`owner`: `string`, `spender`: `string`, `value`: ``null``) => [TypedEventFilter](../interfaces/typedeventfilter.md)<[`string`, `string`, `BigNumber`], `Object`\> |
+| `AuthorizedOperator` | (`operator`: `string`, `tokenHolder`: `string`) => [TypedEventFilter](../interfaces/typedeventfilter.md)<[`string`, `string`], `Object`\> |
+| `Burned` | (`operator`: `string`, `from`: `string`, `amount`: ``null``, `data`: ``null``, `operatorData`: ``null``) => [TypedEventFilter](../interfaces/typedeventfilter.md)<[`string`, `string`, `BigNumber`, `string`, `string`], `Object`\> |
+| `Minted` | (`operator`: `string`, `to`: `string`, `amount`: ``null``, `data`: ``null``, `operatorData`: ``null``) => [TypedEventFilter](../interfaces/typedeventfilter.md)<[`string`, `string`, `BigNumber`, `string`, `string`], `Object`\> |
+| `RevokedOperator` | (`operator`: `string`, `tokenHolder`: `string`) => [TypedEventFilter](../interfaces/typedeventfilter.md)<[`string`, `string`], `Object`\> |
+| `RoleGranted` | (`role`: `BytesLike`, `account`: `string`, `sender`: `string`) => [TypedEventFilter](../interfaces/typedeventfilter.md)<[`string`, `string`, `string`], `Object`\> |
+| `RoleRevoked` | (`role`: `BytesLike`, `account`: `string`, `sender`: `string`) => [TypedEventFilter](../interfaces/typedeventfilter.md)<[`string`, `string`, `string`], `Object`\> |
+| `Sent` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: ``null``, `data`: ``null``, `operatorData`: ``null``) => [TypedEventFilter](../interfaces/typedeventfilter.md)<[`string`, `string`, `string`, `BigNumber`, `string`, `string`], `Object`\> |
+| `Transfer` | (`from`: `string`, `to`: `string`, `value`: ``null``) => [TypedEventFilter](../interfaces/typedeventfilter.md)<[`string`, `string`, `BigNumber`], `Object`\> |
 
-Overrides: Contract.filters
+#### Overrides
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:1316
+Contract.filters
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:1316
 
 ___
 
 ### functions
 
-• **functions**: *object*
+• **functions**: `Object`
 
 #### Type declaration
 
 | Name | Type |
 | :------ | :------ |
-| `DEFAULT_ADMIN_ROLE` | (`overrides?`: CallOverrides) => *Promise*<[*string*]\> |
-| `DEFAULT_ADMIN_ROLE()` | (`overrides?`: CallOverrides) => *Promise*<[*string*]\> |
-| `MINTER_ROLE` | (`overrides?`: CallOverrides) => *Promise*<[*string*]\> |
-| `MINTER_ROLE()` | (`overrides?`: CallOverrides) => *Promise*<[*string*]\> |
-| `accountSnapshots` | (`arg0`: *string*, `arg1`: BigNumberish, `overrides?`: CallOverrides) => *Promise*<[*BigNumber*, *BigNumber*] & { `fromBlock`: *BigNumber* ; `value`: *BigNumber*  }\> |
-| `accountSnapshots(address,uint256)` | (`arg0`: *string*, `arg1`: BigNumberish, `overrides?`: CallOverrides) => *Promise*<[*BigNumber*, *BigNumber*] & { `fromBlock`: *BigNumber* ; `value`: *BigNumber*  }\> |
-| `allowance` | (`holder`: *string*, `spender`: *string*, `overrides?`: CallOverrides) => *Promise*<[*BigNumber*]\> |
-| `allowance(address,address)` | (`holder`: *string*, `spender`: *string*, `overrides?`: CallOverrides) => *Promise*<[*BigNumber*]\> |
-| `approve` | (`spender`: *string*, `value`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<ContractTransaction\> |
-| `approve(address,uint256)` | (`spender`: *string*, `value`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<ContractTransaction\> |
-| `authorizeOperator` | (`operator`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<ContractTransaction\> |
-| `authorizeOperator(address)` | (`operator`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<ContractTransaction\> |
-| `balanceOf` | (`tokenHolder`: *string*, `overrides?`: CallOverrides) => *Promise*<[*BigNumber*]\> |
-| `balanceOf(address)` | (`tokenHolder`: *string*, `overrides?`: CallOverrides) => *Promise*<[*BigNumber*]\> |
-| `balanceOfAt` | (`_owner`: *string*, `_blockNumber`: BigNumberish, `overrides?`: CallOverrides) => *Promise*<[*BigNumber*]\> |
-| `balanceOfAt(address,uint128)` | (`_owner`: *string*, `_blockNumber`: BigNumberish, `overrides?`: CallOverrides) => *Promise*<[*BigNumber*]\> |
-| `burn` | (`amount`: BigNumberish, `data`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<ContractTransaction\> |
-| `burn(uint256,bytes)` | (`amount`: BigNumberish, `data`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<ContractTransaction\> |
-| `decimals` | (`overrides?`: CallOverrides) => *Promise*<[*number*]\> |
-| `decimals()` | (`overrides?`: CallOverrides) => *Promise*<[*number*]\> |
-| `defaultOperators` | (`overrides?`: CallOverrides) => *Promise*<[*string*[]]\> |
-| `defaultOperators()` | (`overrides?`: CallOverrides) => *Promise*<[*string*[]]\> |
-| `getRoleAdmin` | (`role`: BytesLike, `overrides?`: CallOverrides) => *Promise*<[*string*]\> |
-| `getRoleAdmin(bytes32)` | (`role`: BytesLike, `overrides?`: CallOverrides) => *Promise*<[*string*]\> |
-| `getRoleMember` | (`role`: BytesLike, `index`: BigNumberish, `overrides?`: CallOverrides) => *Promise*<[*string*]\> |
-| `getRoleMember(bytes32,uint256)` | (`role`: BytesLike, `index`: BigNumberish, `overrides?`: CallOverrides) => *Promise*<[*string*]\> |
-| `getRoleMemberCount` | (`role`: BytesLike, `overrides?`: CallOverrides) => *Promise*<[*BigNumber*]\> |
-| `getRoleMemberCount(bytes32)` | (`role`: BytesLike, `overrides?`: CallOverrides) => *Promise*<[*BigNumber*]\> |
-| `grantRole` | (`role`: BytesLike, `account`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<ContractTransaction\> |
-| `grantRole(bytes32,address)` | (`role`: BytesLike, `account`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<ContractTransaction\> |
-| `granularity` | (`overrides?`: CallOverrides) => *Promise*<[*BigNumber*]\> |
-| `granularity()` | (`overrides?`: CallOverrides) => *Promise*<[*BigNumber*]\> |
-| `hasRole` | (`role`: BytesLike, `account`: *string*, `overrides?`: CallOverrides) => *Promise*<[*boolean*]\> |
-| `hasRole(bytes32,address)` | (`role`: BytesLike, `account`: *string*, `overrides?`: CallOverrides) => *Promise*<[*boolean*]\> |
-| `isOperatorFor` | (`operator`: *string*, `tokenHolder`: *string*, `overrides?`: CallOverrides) => *Promise*<[*boolean*]\> |
-| `isOperatorFor(address,address)` | (`operator`: *string*, `tokenHolder`: *string*, `overrides?`: CallOverrides) => *Promise*<[*boolean*]\> |
-| `mint` | (`account`: *string*, `amount`: BigNumberish, `userData`: BytesLike, `operatorData`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<ContractTransaction\> |
-| `mint(address,uint256,bytes,bytes)` | (`account`: *string*, `amount`: BigNumberish, `userData`: BytesLike, `operatorData`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<ContractTransaction\> |
-| `name` | (`overrides?`: CallOverrides) => *Promise*<[*string*]\> |
-| `name()` | (`overrides?`: CallOverrides) => *Promise*<[*string*]\> |
-| `operatorBurn` | (`account`: *string*, `amount`: BigNumberish, `data`: BytesLike, `operatorData`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<ContractTransaction\> |
-| `operatorBurn(address,uint256,bytes,bytes)` | (`account`: *string*, `amount`: BigNumberish, `data`: BytesLike, `operatorData`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<ContractTransaction\> |
-| `operatorSend` | (`sender`: *string*, `recipient`: *string*, `amount`: BigNumberish, `data`: BytesLike, `operatorData`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<ContractTransaction\> |
-| `operatorSend(address,address,uint256,bytes,bytes)` | (`sender`: *string*, `recipient`: *string*, `amount`: BigNumberish, `data`: BytesLike, `operatorData`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<ContractTransaction\> |
-| `renounceRole` | (`role`: BytesLike, `account`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<ContractTransaction\> |
-| `renounceRole(bytes32,address)` | (`role`: BytesLike, `account`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<ContractTransaction\> |
-| `revokeOperator` | (`operator`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<ContractTransaction\> |
-| `revokeOperator(address)` | (`operator`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<ContractTransaction\> |
-| `revokeRole` | (`role`: BytesLike, `account`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<ContractTransaction\> |
-| `revokeRole(bytes32,address)` | (`role`: BytesLike, `account`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<ContractTransaction\> |
-| `send` | (`recipient`: *string*, `amount`: BigNumberish, `data`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<ContractTransaction\> |
-| `send(address,uint256,bytes)` | (`recipient`: *string*, `amount`: BigNumberish, `data`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<ContractTransaction\> |
-| `symbol` | (`overrides?`: CallOverrides) => *Promise*<[*string*]\> |
-| `symbol()` | (`overrides?`: CallOverrides) => *Promise*<[*string*]\> |
-| `totalSupply` | (`overrides?`: CallOverrides) => *Promise*<[*BigNumber*]\> |
-| `totalSupply()` | (`overrides?`: CallOverrides) => *Promise*<[*BigNumber*]\> |
-| `totalSupplyAt` | (`_blockNumber`: BigNumberish, `overrides?`: CallOverrides) => *Promise*<[*BigNumber*]\> |
-| `totalSupplyAt(uint128)` | (`_blockNumber`: BigNumberish, `overrides?`: CallOverrides) => *Promise*<[*BigNumber*]\> |
-| `totalSupplySnapshots` | (`arg0`: BigNumberish, `overrides?`: CallOverrides) => *Promise*<[*BigNumber*, *BigNumber*] & { `fromBlock`: *BigNumber* ; `value`: *BigNumber*  }\> |
-| `totalSupplySnapshots(uint256)` | (`arg0`: BigNumberish, `overrides?`: CallOverrides) => *Promise*<[*BigNumber*, *BigNumber*] & { `fromBlock`: *BigNumber* ; `value`: *BigNumber*  }\> |
-| `transfer` | (`recipient`: *string*, `amount`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<ContractTransaction\> |
-| `transfer(address,uint256)` | (`recipient`: *string*, `amount`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<ContractTransaction\> |
-| `transferFrom` | (`holder`: *string*, `recipient`: *string*, `amount`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<ContractTransaction\> |
-| `transferFrom(address,address,uint256)` | (`holder`: *string*, `recipient`: *string*, `amount`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<ContractTransaction\> |
+| `DEFAULT_ADMIN_ROLE` | (`overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
+| `DEFAULT_ADMIN_ROLE()` | (`overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
+| `MINTER_ROLE` | (`overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
+| `MINTER_ROLE()` | (`overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
+| `accountSnapshots` | (`arg0`: `string`, `arg1`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`, `BigNumber`] & { `fromBlock`: `BigNumber` ; `value`: `BigNumber`  }\> |
+| `accountSnapshots(address,uint256)` | (`arg0`: `string`, `arg1`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`, `BigNumber`] & { `fromBlock`: `BigNumber` ; `value`: `BigNumber`  }\> |
+| `allowance` | (`holder`: `string`, `spender`: `string`, `overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
+| `allowance(address,address)` | (`holder`: `string`, `spender`: `string`, `overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
+| `approve` | (`spender`: `string`, `value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `approve(address,uint256)` | (`spender`: `string`, `value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `authorizeOperator` | (`operator`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `authorizeOperator(address)` | (`operator`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `balanceOf` | (`tokenHolder`: `string`, `overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
+| `balanceOf(address)` | (`tokenHolder`: `string`, `overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
+| `balanceOfAt` | (`_owner`: `string`, `_blockNumber`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
+| `balanceOfAt(address,uint128)` | (`_owner`: `string`, `_blockNumber`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
+| `burn` | (`amount`: `BigNumberish`, `data`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `burn(uint256,bytes)` | (`amount`: `BigNumberish`, `data`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `decimals` | (`overrides?`: `CallOverrides`) => `Promise`<[`number`]\> |
+| `decimals()` | (`overrides?`: `CallOverrides`) => `Promise`<[`number`]\> |
+| `defaultOperators` | (`overrides?`: `CallOverrides`) => `Promise`<[`string`[]]\> |
+| `defaultOperators()` | (`overrides?`: `CallOverrides`) => `Promise`<[`string`[]]\> |
+| `getRoleAdmin` | (`role`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
+| `getRoleAdmin(bytes32)` | (`role`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
+| `getRoleMember` | (`role`: `BytesLike`, `index`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
+| `getRoleMember(bytes32,uint256)` | (`role`: `BytesLike`, `index`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
+| `getRoleMemberCount` | (`role`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
+| `getRoleMemberCount(bytes32)` | (`role`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
+| `grantRole` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `grantRole(bytes32,address)` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `granularity` | (`overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
+| `granularity()` | (`overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
+| `hasRole` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<[`boolean`]\> |
+| `hasRole(bytes32,address)` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<[`boolean`]\> |
+| `isOperatorFor` | (`operator`: `string`, `tokenHolder`: `string`, `overrides?`: `CallOverrides`) => `Promise`<[`boolean`]\> |
+| `isOperatorFor(address,address)` | (`operator`: `string`, `tokenHolder`: `string`, `overrides?`: `CallOverrides`) => `Promise`<[`boolean`]\> |
+| `mint` | (`account`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `mint(address,uint256,bytes,bytes)` | (`account`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `name` | (`overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
+| `name()` | (`overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
+| `operatorBurn` | (`account`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `operatorBurn(address,uint256,bytes,bytes)` | (`account`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `operatorSend` | (`sender`: `string`, `recipient`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `operatorSend(address,address,uint256,bytes,bytes)` | (`sender`: `string`, `recipient`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `renounceRole` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `renounceRole(bytes32,address)` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `revokeOperator` | (`operator`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `revokeOperator(address)` | (`operator`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `revokeRole` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `revokeRole(bytes32,address)` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `send` | (`recipient`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `send(address,uint256,bytes)` | (`recipient`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `symbol` | (`overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
+| `symbol()` | (`overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
+| `totalSupply` | (`overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
+| `totalSupply()` | (`overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
+| `totalSupplyAt` | (`_blockNumber`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
+| `totalSupplyAt(uint128)` | (`_blockNumber`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`]\> |
+| `totalSupplySnapshots` | (`arg0`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`, `BigNumber`] & { `fromBlock`: `BigNumber` ; `value`: `BigNumber`  }\> |
+| `totalSupplySnapshots(uint256)` | (`arg0`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<[`BigNumber`, `BigNumber`] & { `fromBlock`: `BigNumber` ; `value`: `BigNumber`  }\> |
+| `transfer` | (`recipient`: `string`, `amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `transfer(address,uint256)` | (`recipient`: `string`, `amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `transferFrom` | (`holder`: `string`, `recipient`: `string`, `amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `transferFrom(address,address,uint256)` | (`holder`: `string`, `recipient`: `string`, `amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
 
-Overrides: Contract.functions
+#### Overrides
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:331
+Contract.functions
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:331
 
 ___
 
 ### interface
 
-• **interface**: *HoprTokenInterface*
+• **interface**: `HoprTokenInterface`
 
-Overrides: Contract.interface
+#### Overrides
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:329
+Contract.interface
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:329
 
 ___
 
 ### populateTransaction
 
-• **populateTransaction**: *object*
+• **populateTransaction**: `Object`
 
 #### Type declaration
 
 | Name | Type |
 | :------ | :------ |
-| `DEFAULT_ADMIN_ROLE` | (`overrides?`: CallOverrides) => *Promise*<PopulatedTransaction\> |
-| `DEFAULT_ADMIN_ROLE()` | (`overrides?`: CallOverrides) => *Promise*<PopulatedTransaction\> |
-| `MINTER_ROLE` | (`overrides?`: CallOverrides) => *Promise*<PopulatedTransaction\> |
-| `MINTER_ROLE()` | (`overrides?`: CallOverrides) => *Promise*<PopulatedTransaction\> |
-| `accountSnapshots` | (`arg0`: *string*, `arg1`: BigNumberish, `overrides?`: CallOverrides) => *Promise*<PopulatedTransaction\> |
-| `accountSnapshots(address,uint256)` | (`arg0`: *string*, `arg1`: BigNumberish, `overrides?`: CallOverrides) => *Promise*<PopulatedTransaction\> |
-| `allowance` | (`holder`: *string*, `spender`: *string*, `overrides?`: CallOverrides) => *Promise*<PopulatedTransaction\> |
-| `allowance(address,address)` | (`holder`: *string*, `spender`: *string*, `overrides?`: CallOverrides) => *Promise*<PopulatedTransaction\> |
-| `approve` | (`spender`: *string*, `value`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<PopulatedTransaction\> |
-| `approve(address,uint256)` | (`spender`: *string*, `value`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<PopulatedTransaction\> |
-| `authorizeOperator` | (`operator`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<PopulatedTransaction\> |
-| `authorizeOperator(address)` | (`operator`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<PopulatedTransaction\> |
-| `balanceOf` | (`tokenHolder`: *string*, `overrides?`: CallOverrides) => *Promise*<PopulatedTransaction\> |
-| `balanceOf(address)` | (`tokenHolder`: *string*, `overrides?`: CallOverrides) => *Promise*<PopulatedTransaction\> |
-| `balanceOfAt` | (`_owner`: *string*, `_blockNumber`: BigNumberish, `overrides?`: CallOverrides) => *Promise*<PopulatedTransaction\> |
-| `balanceOfAt(address,uint128)` | (`_owner`: *string*, `_blockNumber`: BigNumberish, `overrides?`: CallOverrides) => *Promise*<PopulatedTransaction\> |
-| `burn` | (`amount`: BigNumberish, `data`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<PopulatedTransaction\> |
-| `burn(uint256,bytes)` | (`amount`: BigNumberish, `data`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<PopulatedTransaction\> |
-| `decimals` | (`overrides?`: CallOverrides) => *Promise*<PopulatedTransaction\> |
-| `decimals()` | (`overrides?`: CallOverrides) => *Promise*<PopulatedTransaction\> |
-| `defaultOperators` | (`overrides?`: CallOverrides) => *Promise*<PopulatedTransaction\> |
-| `defaultOperators()` | (`overrides?`: CallOverrides) => *Promise*<PopulatedTransaction\> |
-| `getRoleAdmin` | (`role`: BytesLike, `overrides?`: CallOverrides) => *Promise*<PopulatedTransaction\> |
-| `getRoleAdmin(bytes32)` | (`role`: BytesLike, `overrides?`: CallOverrides) => *Promise*<PopulatedTransaction\> |
-| `getRoleMember` | (`role`: BytesLike, `index`: BigNumberish, `overrides?`: CallOverrides) => *Promise*<PopulatedTransaction\> |
-| `getRoleMember(bytes32,uint256)` | (`role`: BytesLike, `index`: BigNumberish, `overrides?`: CallOverrides) => *Promise*<PopulatedTransaction\> |
-| `getRoleMemberCount` | (`role`: BytesLike, `overrides?`: CallOverrides) => *Promise*<PopulatedTransaction\> |
-| `getRoleMemberCount(bytes32)` | (`role`: BytesLike, `overrides?`: CallOverrides) => *Promise*<PopulatedTransaction\> |
-| `grantRole` | (`role`: BytesLike, `account`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<PopulatedTransaction\> |
-| `grantRole(bytes32,address)` | (`role`: BytesLike, `account`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<PopulatedTransaction\> |
-| `granularity` | (`overrides?`: CallOverrides) => *Promise*<PopulatedTransaction\> |
-| `granularity()` | (`overrides?`: CallOverrides) => *Promise*<PopulatedTransaction\> |
-| `hasRole` | (`role`: BytesLike, `account`: *string*, `overrides?`: CallOverrides) => *Promise*<PopulatedTransaction\> |
-| `hasRole(bytes32,address)` | (`role`: BytesLike, `account`: *string*, `overrides?`: CallOverrides) => *Promise*<PopulatedTransaction\> |
-| `isOperatorFor` | (`operator`: *string*, `tokenHolder`: *string*, `overrides?`: CallOverrides) => *Promise*<PopulatedTransaction\> |
-| `isOperatorFor(address,address)` | (`operator`: *string*, `tokenHolder`: *string*, `overrides?`: CallOverrides) => *Promise*<PopulatedTransaction\> |
-| `mint` | (`account`: *string*, `amount`: BigNumberish, `userData`: BytesLike, `operatorData`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<PopulatedTransaction\> |
-| `mint(address,uint256,bytes,bytes)` | (`account`: *string*, `amount`: BigNumberish, `userData`: BytesLike, `operatorData`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<PopulatedTransaction\> |
-| `name` | (`overrides?`: CallOverrides) => *Promise*<PopulatedTransaction\> |
-| `name()` | (`overrides?`: CallOverrides) => *Promise*<PopulatedTransaction\> |
-| `operatorBurn` | (`account`: *string*, `amount`: BigNumberish, `data`: BytesLike, `operatorData`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<PopulatedTransaction\> |
-| `operatorBurn(address,uint256,bytes,bytes)` | (`account`: *string*, `amount`: BigNumberish, `data`: BytesLike, `operatorData`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<PopulatedTransaction\> |
-| `operatorSend` | (`sender`: *string*, `recipient`: *string*, `amount`: BigNumberish, `data`: BytesLike, `operatorData`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<PopulatedTransaction\> |
-| `operatorSend(address,address,uint256,bytes,bytes)` | (`sender`: *string*, `recipient`: *string*, `amount`: BigNumberish, `data`: BytesLike, `operatorData`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<PopulatedTransaction\> |
-| `renounceRole` | (`role`: BytesLike, `account`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<PopulatedTransaction\> |
-| `renounceRole(bytes32,address)` | (`role`: BytesLike, `account`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<PopulatedTransaction\> |
-| `revokeOperator` | (`operator`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<PopulatedTransaction\> |
-| `revokeOperator(address)` | (`operator`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<PopulatedTransaction\> |
-| `revokeRole` | (`role`: BytesLike, `account`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<PopulatedTransaction\> |
-| `revokeRole(bytes32,address)` | (`role`: BytesLike, `account`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<PopulatedTransaction\> |
-| `send` | (`recipient`: *string*, `amount`: BigNumberish, `data`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<PopulatedTransaction\> |
-| `send(address,uint256,bytes)` | (`recipient`: *string*, `amount`: BigNumberish, `data`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<PopulatedTransaction\> |
-| `symbol` | (`overrides?`: CallOverrides) => *Promise*<PopulatedTransaction\> |
-| `symbol()` | (`overrides?`: CallOverrides) => *Promise*<PopulatedTransaction\> |
-| `totalSupply` | (`overrides?`: CallOverrides) => *Promise*<PopulatedTransaction\> |
-| `totalSupply()` | (`overrides?`: CallOverrides) => *Promise*<PopulatedTransaction\> |
-| `totalSupplyAt` | (`_blockNumber`: BigNumberish, `overrides?`: CallOverrides) => *Promise*<PopulatedTransaction\> |
-| `totalSupplyAt(uint128)` | (`_blockNumber`: BigNumberish, `overrides?`: CallOverrides) => *Promise*<PopulatedTransaction\> |
-| `totalSupplySnapshots` | (`arg0`: BigNumberish, `overrides?`: CallOverrides) => *Promise*<PopulatedTransaction\> |
-| `totalSupplySnapshots(uint256)` | (`arg0`: BigNumberish, `overrides?`: CallOverrides) => *Promise*<PopulatedTransaction\> |
-| `transfer` | (`recipient`: *string*, `amount`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<PopulatedTransaction\> |
-| `transfer(address,uint256)` | (`recipient`: *string*, `amount`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<PopulatedTransaction\> |
-| `transferFrom` | (`holder`: *string*, `recipient`: *string*, `amount`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<PopulatedTransaction\> |
-| `transferFrom(address,address,uint256)` | (`holder`: *string*, `recipient`: *string*, `amount`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<PopulatedTransaction\> |
+| `DEFAULT_ADMIN_ROLE` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
+| `DEFAULT_ADMIN_ROLE()` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
+| `MINTER_ROLE` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
+| `MINTER_ROLE()` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
+| `accountSnapshots` | (`arg0`: `string`, `arg1`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
+| `accountSnapshots(address,uint256)` | (`arg0`: `string`, `arg1`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
+| `allowance` | (`holder`: `string`, `spender`: `string`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
+| `allowance(address,address)` | (`holder`: `string`, `spender`: `string`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
+| `approve` | (`spender`: `string`, `value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `approve(address,uint256)` | (`spender`: `string`, `value`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `authorizeOperator` | (`operator`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `authorizeOperator(address)` | (`operator`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `balanceOf` | (`tokenHolder`: `string`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
+| `balanceOf(address)` | (`tokenHolder`: `string`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
+| `balanceOfAt` | (`_owner`: `string`, `_blockNumber`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
+| `balanceOfAt(address,uint128)` | (`_owner`: `string`, `_blockNumber`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
+| `burn` | (`amount`: `BigNumberish`, `data`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `burn(uint256,bytes)` | (`amount`: `BigNumberish`, `data`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `decimals` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
+| `decimals()` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
+| `defaultOperators` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
+| `defaultOperators()` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
+| `getRoleAdmin` | (`role`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
+| `getRoleAdmin(bytes32)` | (`role`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
+| `getRoleMember` | (`role`: `BytesLike`, `index`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
+| `getRoleMember(bytes32,uint256)` | (`role`: `BytesLike`, `index`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
+| `getRoleMemberCount` | (`role`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
+| `getRoleMemberCount(bytes32)` | (`role`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
+| `grantRole` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `grantRole(bytes32,address)` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `granularity` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
+| `granularity()` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
+| `hasRole` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
+| `hasRole(bytes32,address)` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
+| `isOperatorFor` | (`operator`: `string`, `tokenHolder`: `string`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
+| `isOperatorFor(address,address)` | (`operator`: `string`, `tokenHolder`: `string`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
+| `mint` | (`account`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `mint(address,uint256,bytes,bytes)` | (`account`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `name` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
+| `name()` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
+| `operatorBurn` | (`account`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `operatorBurn(address,uint256,bytes,bytes)` | (`account`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `operatorSend` | (`sender`: `string`, `recipient`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `operatorSend(address,address,uint256,bytes,bytes)` | (`sender`: `string`, `recipient`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `renounceRole` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `renounceRole(bytes32,address)` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `revokeOperator` | (`operator`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `revokeOperator(address)` | (`operator`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `revokeRole` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `revokeRole(bytes32,address)` | (`role`: `BytesLike`, `account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `send` | (`recipient`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `send(address,uint256,bytes)` | (`recipient`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `symbol` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
+| `symbol()` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
+| `totalSupply` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
+| `totalSupply()` | (`overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
+| `totalSupplyAt` | (`_blockNumber`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
+| `totalSupplyAt(uint128)` | (`_blockNumber`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
+| `totalSupplySnapshots` | (`arg0`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
+| `totalSupplySnapshots(uint256)` | (`arg0`: `BigNumberish`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
+| `transfer` | (`recipient`: `string`, `amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `transfer(address,uint256)` | (`recipient`: `string`, `amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `transferFrom` | (`holder`: `string`, `recipient`: `string`, `amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `transferFrom(address,address,uint256)` | (`holder`: `string`, `recipient`: `string`, `amount`: `BigNumberish`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
 
-Overrides: Contract.populateTransaction
+#### Overrides
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:1749
+Contract.populateTransaction
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:1749
 
 ___
 
 ### provider
 
-• `Readonly` **provider**: *Provider*
+• `Readonly` **provider**: `Provider`
 
-Inherited from: Contract.provider
+#### Inherited from
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:74
+Contract.provider
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:74
 
 ___
 
 ### resolvedAddress
 
-• `Readonly` **resolvedAddress**: *Promise*<string\>
+• `Readonly` **resolvedAddress**: `Promise`<string\>
 
-Inherited from: Contract.resolvedAddress
+#### Inherited from
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:90
+Contract.resolvedAddress
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:90
 
 ___
 
 ### signer
 
-• `Readonly` **signer**: *Signer*
+• `Readonly` **signer**: `Signer`
 
-Inherited from: Contract.signer
+#### Inherited from
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:73
+Contract.signer
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:73
 
 ## Methods
 
 ### DEFAULT\_ADMIN\_ROLE
 
-▸ **DEFAULT_ADMIN_ROLE**(`overrides?`: CallOverrides): *Promise*<string\>
+▸ **DEFAULT_ADMIN_ROLE**(`overrides?`): `Promise`<string\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `overrides?` | CallOverrides |
+| `overrides?` | `CallOverrides` |
 
-**Returns:** *Promise*<string\>
+#### Returns
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:662
+`Promise`<string\>
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:662
 
 ___
 
 ### DEFAULT\_ADMIN\_ROLE()
 
-▸ **DEFAULT_ADMIN_ROLE()**(`overrides?`: CallOverrides): *Promise*<string\>
+▸ **DEFAULT_ADMIN_ROLE()**(`overrides?`): `Promise`<string\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `overrides?` | CallOverrides |
+| `overrides?` | `CallOverrides` |
 
-**Returns:** *Promise*<string\>
+#### Returns
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:662
+`Promise`<string\>
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:662
 
 ___
 
 ### MINTER\_ROLE
 
-▸ **MINTER_ROLE**(`overrides?`: CallOverrides): *Promise*<string\>
+▸ **MINTER_ROLE**(`overrides?`): `Promise`<string\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `overrides?` | CallOverrides |
+| `overrides?` | `CallOverrides` |
 
-**Returns:** *Promise*<string\>
+#### Returns
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:666
+`Promise`<string\>
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:666
 
 ___
 
 ### MINTER\_ROLE()
 
-▸ **MINTER_ROLE()**(`overrides?`: CallOverrides): *Promise*<string\>
+▸ **MINTER_ROLE()**(`overrides?`): `Promise`<string\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `overrides?` | CallOverrides |
+| `overrides?` | `CallOverrides` |
 
-**Returns:** *Promise*<string\>
+#### Returns
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:666
+`Promise`<string\>
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:666
 
 ___
 
 ### \_checkRunningEvents
 
-▸ **_checkRunningEvents**(`runningEvent`: *RunningEvent*): *void*
+▸ **_checkRunningEvents**(`runningEvent`): `void`
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `runningEvent` | *RunningEvent* |
+| `runningEvent` | `RunningEvent` |
 
-**Returns:** *void*
+#### Returns
 
-Inherited from: Contract.\_checkRunningEvents
+`void`
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:113
+#### Inherited from
+
+Contract.\_checkRunningEvents
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:113
 
 ___
 
 ### \_deployed
 
-▸ **_deployed**(`blockTag?`: BlockTag): *Promise*<Contract\>
+▸ **_deployed**(`blockTag?`): `Promise`<Contract\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `blockTag?` | BlockTag |
+| `blockTag?` | `BlockTag` |
 
-**Returns:** *Promise*<Contract\>
+#### Returns
 
-Inherited from: Contract.\_deployed
+`Promise`<Contract\>
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:106
+#### Inherited from
+
+Contract.\_deployed
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:106
 
 ___
 
 ### \_wrapEvent
 
-▸ **_wrapEvent**(`runningEvent`: *RunningEvent*, `log`: Log, `listener`: Listener): Event
+▸ **_wrapEvent**(`runningEvent`, `log`, `listener`): `Event`
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `runningEvent` | *RunningEvent* |
-| `log` | Log |
-| `listener` | Listener |
+| `runningEvent` | `RunningEvent` |
+| `log` | `Log` |
+| `listener` | `Listener` |
 
-**Returns:** Event
+#### Returns
 
-Inherited from: Contract.\_wrapEvent
+`Event`
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:114
+#### Inherited from
+
+Contract.\_wrapEvent
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:114
 
 ___
 
 ### accountSnapshots
 
-▸ **accountSnapshots**(`arg0`: *string*, `arg1`: BigNumberish, `overrides?`: CallOverrides): *Promise*<[*BigNumber*, *BigNumber*] & { `fromBlock`: *BigNumber* ; `value`: *BigNumber*  }\>
+▸ **accountSnapshots**(`arg0`, `arg1`, `overrides?`): `Promise`<[`BigNumber`, `BigNumber`] & { `fromBlock`: `BigNumber` ; `value`: `BigNumber`  }\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `arg0` | *string* |
-| `arg1` | BigNumberish |
-| `overrides?` | CallOverrides |
+| `arg0` | `string` |
+| `arg1` | `BigNumberish` |
+| `overrides?` | `CallOverrides` |
 
-**Returns:** *Promise*<[*BigNumber*, *BigNumber*] & { `fromBlock`: *BigNumber* ; `value`: *BigNumber*  }\>
+#### Returns
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:670
+`Promise`<[`BigNumber`, `BigNumber`] & { `fromBlock`: `BigNumber` ; `value`: `BigNumber`  }\>
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:670
 
 ___
 
 ### accountSnapshots(address,uint256)
 
-▸ **accountSnapshots(address,uint256)**(`arg0`: *string*, `arg1`: BigNumberish, `overrides?`: CallOverrides): *Promise*<[*BigNumber*, *BigNumber*] & { `fromBlock`: *BigNumber* ; `value`: *BigNumber*  }\>
+▸ **accountSnapshots(address,uint256)**(`arg0`, `arg1`, `overrides?`): `Promise`<[`BigNumber`, `BigNumber`] & { `fromBlock`: `BigNumber` ; `value`: `BigNumber`  }\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `arg0` | *string* |
-| `arg1` | BigNumberish |
-| `overrides?` | CallOverrides |
+| `arg0` | `string` |
+| `arg1` | `BigNumberish` |
+| `overrides?` | `CallOverrides` |
 
-**Returns:** *Promise*<[*BigNumber*, *BigNumber*] & { `fromBlock`: *BigNumber* ; `value`: *BigNumber*  }\>
+#### Returns
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:676
+`Promise`<[`BigNumber`, `BigNumber`] & { `fromBlock`: `BigNumber` ; `value`: `BigNumber`  }\>
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:676
 
 ___
 
 ### allowance
 
-▸ **allowance**(`holder`: *string*, `spender`: *string*, `overrides?`: CallOverrides): *Promise*<BigNumber\>
+▸ **allowance**(`holder`, `spender`, `overrides?`): `Promise`<BigNumber\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `holder` | *string* |
-| `spender` | *string* |
-| `overrides?` | CallOverrides |
+| `holder` | `string` |
+| `spender` | `string` |
+| `overrides?` | `CallOverrides` |
 
-**Returns:** *Promise*<BigNumber\>
+#### Returns
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:686
+`Promise`<BigNumber\>
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:686
 
 ___
 
 ### allowance(address,address)
 
-▸ **allowance(address,address)**(`holder`: *string*, `spender`: *string*, `overrides?`: CallOverrides): *Promise*<BigNumber\>
+▸ **allowance(address,address)**(`holder`, `spender`, `overrides?`): `Promise`<BigNumber\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `holder` | *string* |
-| `spender` | *string* |
-| `overrides?` | CallOverrides |
+| `holder` | `string` |
+| `spender` | `string` |
+| `overrides?` | `CallOverrides` |
 
-**Returns:** *Promise*<BigNumber\>
+#### Returns
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:690
+`Promise`<BigNumber\>
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:690
 
 ___
 
 ### approve
 
-▸ **approve**(`spender`: *string*, `value`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): *Promise*<ContractTransaction\>
+▸ **approve**(`spender`, `value`, `overrides?`): `Promise`<ContractTransaction\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `spender` | *string* |
-| `value` | BigNumberish |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `spender` | `string` |
+| `value` | `BigNumberish` |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** *Promise*<ContractTransaction\>
+#### Returns
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:698
+`Promise`<ContractTransaction\>
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:698
 
 ___
 
 ### approve(address,uint256)
 
-▸ **approve(address,uint256)**(`spender`: *string*, `value`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): *Promise*<ContractTransaction\>
+▸ **approve(address,uint256)**(`spender`, `value`, `overrides?`): `Promise`<ContractTransaction\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `spender` | *string* |
-| `value` | BigNumberish |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `spender` | `string` |
+| `value` | `BigNumberish` |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** *Promise*<ContractTransaction\>
+#### Returns
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:702
+`Promise`<ContractTransaction\>
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:702
 
 ___
 
 ### attach
 
-▸ **attach**(`addressOrName`: *string*): [*HoprToken*](hoprtoken.md)
+▸ **attach**(`addressOrName`): [HoprToken](hoprtoken.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `addressOrName` | *string* |
+| `addressOrName` | `string` |
 
-**Returns:** [*HoprToken*](hoprtoken.md)
+#### Returns
 
-Overrides: Contract.attach
+[HoprToken](hoprtoken.md)
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:290
+#### Overrides
+
+Contract.attach
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:290
 
 ___
 
 ### authorizeOperator
 
-▸ **authorizeOperator**(`operator`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): *Promise*<ContractTransaction\>
+▸ **authorizeOperator**(`operator`, `overrides?`): `Promise`<ContractTransaction\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `operator` | *string* |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `operator` | `string` |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** *Promise*<ContractTransaction\>
+#### Returns
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:710
+`Promise`<ContractTransaction\>
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:710
 
 ___
 
 ### authorizeOperator(address)
 
-▸ **authorizeOperator(address)**(`operator`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): *Promise*<ContractTransaction\>
+▸ **authorizeOperator(address)**(`operator`, `overrides?`): `Promise`<ContractTransaction\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `operator` | *string* |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `operator` | `string` |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** *Promise*<ContractTransaction\>
+#### Returns
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:713
+`Promise`<ContractTransaction\>
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:713
 
 ___
 
 ### balanceOf
 
-▸ **balanceOf**(`tokenHolder`: *string*, `overrides?`: CallOverrides): *Promise*<BigNumber\>
+▸ **balanceOf**(`tokenHolder`, `overrides?`): `Promise`<BigNumber\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `tokenHolder` | *string* |
-| `overrides?` | CallOverrides |
+| `tokenHolder` | `string` |
+| `overrides?` | `CallOverrides` |
 
-**Returns:** *Promise*<BigNumber\>
+#### Returns
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:720
+`Promise`<BigNumber\>
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:720
 
 ___
 
 ### balanceOf(address)
 
-▸ **balanceOf(address)**(`tokenHolder`: *string*, `overrides?`: CallOverrides): *Promise*<BigNumber\>
+▸ **balanceOf(address)**(`tokenHolder`, `overrides?`): `Promise`<BigNumber\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `tokenHolder` | *string* |
-| `overrides?` | CallOverrides |
+| `tokenHolder` | `string` |
+| `overrides?` | `CallOverrides` |
 
-**Returns:** *Promise*<BigNumber\>
+#### Returns
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:720
+`Promise`<BigNumber\>
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:720
 
 ___
 
 ### balanceOfAt
 
-▸ **balanceOfAt**(`_owner`: *string*, `_blockNumber`: BigNumberish, `overrides?`: CallOverrides): *Promise*<BigNumber\>
+▸ **balanceOfAt**(`_owner`, `_blockNumber`, `overrides?`): `Promise`<BigNumber\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `_owner` | *string* |
-| `_blockNumber` | BigNumberish |
-| `overrides?` | CallOverrides |
+| `_owner` | `string` |
+| `_blockNumber` | `BigNumberish` |
+| `overrides?` | `CallOverrides` |
 
-**Returns:** *Promise*<BigNumber\>
+#### Returns
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:727
+`Promise`<BigNumber\>
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:727
 
 ___
 
 ### balanceOfAt(address,uint128)
 
-▸ **balanceOfAt(address,uint128)**(`_owner`: *string*, `_blockNumber`: BigNumberish, `overrides?`: CallOverrides): *Promise*<BigNumber\>
+▸ **balanceOfAt(address,uint128)**(`_owner`, `_blockNumber`, `overrides?`): `Promise`<BigNumber\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `_owner` | *string* |
-| `_blockNumber` | BigNumberish |
-| `overrides?` | CallOverrides |
+| `_owner` | `string` |
+| `_blockNumber` | `BigNumberish` |
+| `overrides?` | `CallOverrides` |
 
-**Returns:** *Promise*<BigNumber\>
+#### Returns
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:731
+`Promise`<BigNumber\>
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:731
 
 ___
 
 ### burn
 
-▸ **burn**(`amount`: BigNumberish, `data`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): *Promise*<ContractTransaction\>
+▸ **burn**(`amount`, `data`, `overrides?`): `Promise`<ContractTransaction\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `amount` | BigNumberish |
-| `data` | BytesLike |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `amount` | `BigNumberish` |
+| `data` | `BytesLike` |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** *Promise*<ContractTransaction\>
+#### Returns
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:739
+`Promise`<ContractTransaction\>
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:739
 
 ___
 
 ### burn(uint256,bytes)
 
-▸ **burn(uint256,bytes)**(`amount`: BigNumberish, `data`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): *Promise*<ContractTransaction\>
+▸ **burn(uint256,bytes)**(`amount`, `data`, `overrides?`): `Promise`<ContractTransaction\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `amount` | BigNumberish |
-| `data` | BytesLike |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `amount` | `BigNumberish` |
+| `data` | `BytesLike` |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** *Promise*<ContractTransaction\>
+#### Returns
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:743
+`Promise`<ContractTransaction\>
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:743
 
 ___
 
 ### connect
 
-▸ **connect**(`signerOrProvider`: *string* \| *Signer* \| *Provider*): [*HoprToken*](hoprtoken.md)
+▸ **connect**(`signerOrProvider`): [HoprToken](hoprtoken.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `signerOrProvider` | *string* \| *Signer* \| *Provider* |
+| `signerOrProvider` | `string` \| `Signer` \| `Provider` |
 
-**Returns:** [*HoprToken*](hoprtoken.md)
+#### Returns
 
-Overrides: Contract.connect
+[HoprToken](hoprtoken.md)
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:289
+#### Overrides
+
+Contract.connect
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:289
 
 ___
 
 ### decimals
 
-▸ **decimals**(`overrides?`: CallOverrides): *Promise*<number\>
+▸ **decimals**(`overrides?`): `Promise`<number\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `overrides?` | CallOverrides |
+| `overrides?` | `CallOverrides` |
 
-**Returns:** *Promise*<number\>
+#### Returns
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:751
+`Promise`<number\>
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:751
 
 ___
 
 ### decimals()
 
-▸ **decimals()**(`overrides?`: CallOverrides): *Promise*<number\>
+▸ **decimals()**(`overrides?`): `Promise`<number\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `overrides?` | CallOverrides |
+| `overrides?` | `CallOverrides` |
 
-**Returns:** *Promise*<number\>
+#### Returns
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:751
+`Promise`<number\>
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:751
 
 ___
 
 ### defaultOperators
 
-▸ **defaultOperators**(`overrides?`: CallOverrides): *Promise*<string[]\>
+▸ **defaultOperators**(`overrides?`): `Promise`<string[]\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `overrides?` | CallOverrides |
+| `overrides?` | `CallOverrides` |
 
-**Returns:** *Promise*<string[]\>
+#### Returns
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:755
+`Promise`<string[]\>
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:755
 
 ___
 
 ### defaultOperators()
 
-▸ **defaultOperators()**(`overrides?`: CallOverrides): *Promise*<string[]\>
+▸ **defaultOperators()**(`overrides?`): `Promise`<string[]\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `overrides?` | CallOverrides |
+| `overrides?` | `CallOverrides` |
 
-**Returns:** *Promise*<string[]\>
+#### Returns
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:755
+`Promise`<string[]\>
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:755
 
 ___
 
 ### deployed
 
-▸ **deployed**(): *Promise*<[*HoprToken*](hoprtoken.md)\>
+▸ **deployed**(): `Promise`<[HoprToken](hoprtoken.md)\>
 
-**Returns:** *Promise*<[*HoprToken*](hoprtoken.md)\>
+#### Returns
 
-Overrides: Contract.deployed
+`Promise`<[HoprToken](hoprtoken.md)\>
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:291
+#### Overrides
+
+Contract.deployed
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:291
 
 ___
 
 ### emit
 
-▸ **emit**(`eventName`: *string* \| EventFilter, ...`args`: *any*[]): *boolean*
+▸ **emit**(`eventName`, ...`args`): `boolean`
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventName` | *string* \| EventFilter |
-| `...args` | *any*[] |
+| `eventName` | `string` \| `EventFilter` |
+| `...args` | `any`[] |
 
-**Returns:** *boolean*
+#### Returns
 
-Inherited from: Contract.emit
+`boolean`
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:119
+#### Inherited from
+
+Contract.emit
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:119
 
 ___
 
 ### fallback
 
-▸ **fallback**(`overrides?`: TransactionRequest): *Promise*<TransactionResponse\>
+▸ **fallback**(`overrides?`): `Promise`<TransactionResponse\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `overrides?` | TransactionRequest |
+| `overrides?` | `TransactionRequest` |
 
-**Returns:** *Promise*<TransactionResponse\>
+#### Returns
 
-Inherited from: Contract.fallback
+`Promise`<TransactionResponse\>
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:107
+#### Inherited from
+
+Contract.fallback
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:107
 
 ___
 
 ### getRoleAdmin
 
-▸ **getRoleAdmin**(`role`: BytesLike, `overrides?`: CallOverrides): *Promise*<string\>
+▸ **getRoleAdmin**(`role`, `overrides?`): `Promise`<string\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `role` | BytesLike |
-| `overrides?` | CallOverrides |
+| `role` | `BytesLike` |
+| `overrides?` | `CallOverrides` |
 
-**Returns:** *Promise*<string\>
+#### Returns
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:759
+`Promise`<string\>
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:759
 
 ___
 
 ### getRoleAdmin(bytes32)
 
-▸ **getRoleAdmin(bytes32)**(`role`: BytesLike, `overrides?`: CallOverrides): *Promise*<string\>
+▸ **getRoleAdmin(bytes32)**(`role`, `overrides?`): `Promise`<string\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `role` | BytesLike |
-| `overrides?` | CallOverrides |
+| `role` | `BytesLike` |
+| `overrides?` | `CallOverrides` |
 
-**Returns:** *Promise*<string\>
+#### Returns
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:759
+`Promise`<string\>
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:759
 
 ___
 
 ### getRoleMember
 
-▸ **getRoleMember**(`role`: BytesLike, `index`: BigNumberish, `overrides?`: CallOverrides): *Promise*<string\>
+▸ **getRoleMember**(`role`, `index`, `overrides?`): `Promise`<string\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `role` | BytesLike |
-| `index` | BigNumberish |
-| `overrides?` | CallOverrides |
+| `role` | `BytesLike` |
+| `index` | `BigNumberish` |
+| `overrides?` | `CallOverrides` |
 
-**Returns:** *Promise*<string\>
+#### Returns
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:766
+`Promise`<string\>
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:766
 
 ___
 
 ### getRoleMember(bytes32,uint256)
 
-▸ **getRoleMember(bytes32,uint256)**(`role`: BytesLike, `index`: BigNumberish, `overrides?`: CallOverrides): *Promise*<string\>
+▸ **getRoleMember(bytes32,uint256)**(`role`, `index`, `overrides?`): `Promise`<string\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `role` | BytesLike |
-| `index` | BigNumberish |
-| `overrides?` | CallOverrides |
+| `role` | `BytesLike` |
+| `index` | `BigNumberish` |
+| `overrides?` | `CallOverrides` |
 
-**Returns:** *Promise*<string\>
+#### Returns
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:770
+`Promise`<string\>
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:770
 
 ___
 
 ### getRoleMemberCount
 
-▸ **getRoleMemberCount**(`role`: BytesLike, `overrides?`: CallOverrides): *Promise*<BigNumber\>
+▸ **getRoleMemberCount**(`role`, `overrides?`): `Promise`<BigNumber\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `role` | BytesLike |
-| `overrides?` | CallOverrides |
+| `role` | `BytesLike` |
+| `overrides?` | `CallOverrides` |
 
-**Returns:** *Promise*<BigNumber\>
+#### Returns
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:778
+`Promise`<BigNumber\>
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:778
 
 ___
 
 ### getRoleMemberCount(bytes32)
 
-▸ **getRoleMemberCount(bytes32)**(`role`: BytesLike, `overrides?`: CallOverrides): *Promise*<BigNumber\>
+▸ **getRoleMemberCount(bytes32)**(`role`, `overrides?`): `Promise`<BigNumber\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `role` | BytesLike |
-| `overrides?` | CallOverrides |
+| `role` | `BytesLike` |
+| `overrides?` | `CallOverrides` |
 
-**Returns:** *Promise*<BigNumber\>
+#### Returns
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:781
+`Promise`<BigNumber\>
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:781
 
 ___
 
 ### grantRole
 
-▸ **grantRole**(`role`: BytesLike, `account`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): *Promise*<ContractTransaction\>
+▸ **grantRole**(`role`, `account`, `overrides?`): `Promise`<ContractTransaction\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `role` | BytesLike |
-| `account` | *string* |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `role` | `BytesLike` |
+| `account` | `string` |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** *Promise*<ContractTransaction\>
+#### Returns
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:788
+`Promise`<ContractTransaction\>
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:788
 
 ___
 
 ### grantRole(bytes32,address)
 
-▸ **grantRole(bytes32,address)**(`role`: BytesLike, `account`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): *Promise*<ContractTransaction\>
+▸ **grantRole(bytes32,address)**(`role`, `account`, `overrides?`): `Promise`<ContractTransaction\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `role` | BytesLike |
-| `account` | *string* |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `role` | `BytesLike` |
+| `account` | `string` |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** *Promise*<ContractTransaction\>
+#### Returns
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:792
+`Promise`<ContractTransaction\>
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:792
 
 ___
 
 ### granularity
 
-▸ **granularity**(`overrides?`: CallOverrides): *Promise*<BigNumber\>
+▸ **granularity**(`overrides?`): `Promise`<BigNumber\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `overrides?` | CallOverrides |
+| `overrides?` | `CallOverrides` |
 
-**Returns:** *Promise*<BigNumber\>
+#### Returns
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:800
+`Promise`<BigNumber\>
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:800
 
 ___
 
 ### granularity()
 
-▸ **granularity()**(`overrides?`: CallOverrides): *Promise*<BigNumber\>
+▸ **granularity()**(`overrides?`): `Promise`<BigNumber\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `overrides?` | CallOverrides |
+| `overrides?` | `CallOverrides` |
 
-**Returns:** *Promise*<BigNumber\>
+#### Returns
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:800
+`Promise`<BigNumber\>
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:800
 
 ___
 
 ### hasRole
 
-▸ **hasRole**(`role`: BytesLike, `account`: *string*, `overrides?`: CallOverrides): *Promise*<boolean\>
+▸ **hasRole**(`role`, `account`, `overrides?`): `Promise`<boolean\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `role` | BytesLike |
-| `account` | *string* |
-| `overrides?` | CallOverrides |
+| `role` | `BytesLike` |
+| `account` | `string` |
+| `overrides?` | `CallOverrides` |
 
-**Returns:** *Promise*<boolean\>
+#### Returns
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:804
+`Promise`<boolean\>
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:804
 
 ___
 
 ### hasRole(bytes32,address)
 
-▸ **hasRole(bytes32,address)**(`role`: BytesLike, `account`: *string*, `overrides?`: CallOverrides): *Promise*<boolean\>
+▸ **hasRole(bytes32,address)**(`role`, `account`, `overrides?`): `Promise`<boolean\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `role` | BytesLike |
-| `account` | *string* |
-| `overrides?` | CallOverrides |
+| `role` | `BytesLike` |
+| `account` | `string` |
+| `overrides?` | `CallOverrides` |
 
-**Returns:** *Promise*<boolean\>
+#### Returns
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:808
+`Promise`<boolean\>
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:808
 
 ___
 
 ### isOperatorFor
 
-▸ **isOperatorFor**(`operator`: *string*, `tokenHolder`: *string*, `overrides?`: CallOverrides): *Promise*<boolean\>
+▸ **isOperatorFor**(`operator`, `tokenHolder`, `overrides?`): `Promise`<boolean\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `operator` | *string* |
-| `tokenHolder` | *string* |
-| `overrides?` | CallOverrides |
+| `operator` | `string` |
+| `tokenHolder` | `string` |
+| `overrides?` | `CallOverrides` |
 
-**Returns:** *Promise*<boolean\>
+#### Returns
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:816
+`Promise`<boolean\>
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:816
 
 ___
 
 ### isOperatorFor(address,address)
 
-▸ **isOperatorFor(address,address)**(`operator`: *string*, `tokenHolder`: *string*, `overrides?`: CallOverrides): *Promise*<boolean\>
+▸ **isOperatorFor(address,address)**(`operator`, `tokenHolder`, `overrides?`): `Promise`<boolean\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `operator` | *string* |
-| `tokenHolder` | *string* |
-| `overrides?` | CallOverrides |
+| `operator` | `string` |
+| `tokenHolder` | `string` |
+| `overrides?` | `CallOverrides` |
 
-**Returns:** *Promise*<boolean\>
+#### Returns
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:820
+`Promise`<boolean\>
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:820
 
 ___
 
 ### listenerCount
 
-▸ **listenerCount**(`eventName?`: *string* \| EventFilter): *number*
+▸ **listenerCount**(`eventName?`): `number`
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventName?` | *string* \| EventFilter |
+| `eventName?` | `string` \| `EventFilter` |
 
-**Returns:** *number*
+#### Returns
 
-Inherited from: Contract.listenerCount
+`number`
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:120
+#### Inherited from
+
+Contract.listenerCount
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:120
 
 ___
 
 ### listeners
 
-▸ **listeners**<EventArgsArray, EventArgsObject\>(`eventFilter?`: [*TypedEventFilter*](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\>): [*TypedListener*](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\>[]
+▸ **listeners**<EventArgsArray, EventArgsObject\>(`eventFilter?`): [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\>[]
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | *any*[] |
-| `EventArgsObject` | - |
+| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter?` | [*TypedEventFilter*](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
+| `eventFilter?` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
 
-**Returns:** [*TypedListener*](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\>[]
+#### Returns
 
-Overrides: Contract.listeners
+[TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\>[]
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:293
+#### Overrides
 
-▸ **listeners**(`eventName?`: *string*): Listener[]
+Contract.listeners
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:293
+
+▸ **listeners**(`eventName?`): `Listener`[]
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventName?` | *string* |
+| `eventName?` | `string` |
 
-**Returns:** Listener[]
+#### Returns
 
-Overrides: Contract.listeners
+`Listener`[]
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:316
+#### Overrides
+
+Contract.listeners
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:316
 
 ___
 
 ### mint
 
-▸ **mint**(`account`: *string*, `amount`: BigNumberish, `userData`: BytesLike, `operatorData`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): *Promise*<ContractTransaction\>
+▸ **mint**(`account`, `amount`, `userData`, `operatorData`, `overrides?`): `Promise`<ContractTransaction\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `account` | *string* |
-| `amount` | BigNumberish |
-| `userData` | BytesLike |
-| `operatorData` | BytesLike |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `account` | `string` |
+| `amount` | `BigNumberish` |
+| `userData` | `BytesLike` |
+| `operatorData` | `BytesLike` |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** *Promise*<ContractTransaction\>
+#### Returns
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:828
+`Promise`<ContractTransaction\>
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:828
 
 ___
 
 ### mint(address,uint256,bytes,bytes)
 
-▸ **mint(address,uint256,bytes,bytes)**(`account`: *string*, `amount`: BigNumberish, `userData`: BytesLike, `operatorData`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): *Promise*<ContractTransaction\>
+▸ **mint(address,uint256,bytes,bytes)**(`account`, `amount`, `userData`, `operatorData`, `overrides?`): `Promise`<ContractTransaction\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `account` | *string* |
-| `amount` | BigNumberish |
-| `userData` | BytesLike |
-| `operatorData` | BytesLike |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `account` | `string` |
+| `amount` | `BigNumberish` |
+| `userData` | `BytesLike` |
+| `operatorData` | `BytesLike` |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** *Promise*<ContractTransaction\>
+#### Returns
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:834
+`Promise`<ContractTransaction\>
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:834
 
 ___
 
 ### name
 
-▸ **name**(`overrides?`: CallOverrides): *Promise*<string\>
+▸ **name**(`overrides?`): `Promise`<string\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `overrides?` | CallOverrides |
+| `overrides?` | `CallOverrides` |
 
-**Returns:** *Promise*<string\>
+#### Returns
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:844
+`Promise`<string\>
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:844
 
 ___
 
 ### name()
 
-▸ **name()**(`overrides?`: CallOverrides): *Promise*<string\>
+▸ **name()**(`overrides?`): `Promise`<string\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `overrides?` | CallOverrides |
+| `overrides?` | `CallOverrides` |
 
-**Returns:** *Promise*<string\>
+#### Returns
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:844
+`Promise`<string\>
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:844
 
 ___
 
 ### off
 
-▸ **off**<EventArgsArray, EventArgsObject\>(`eventFilter`: [*TypedEventFilter*](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\>, `listener`: [*TypedListener*](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\>): [*HoprToken*](hoprtoken.md)
+▸ **off**<EventArgsArray, EventArgsObject\>(`eventFilter`, `listener`): [HoprToken](hoprtoken.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | *any*[] |
-| `EventArgsObject` | - |
+| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [*TypedEventFilter*](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `listener` | [*TypedListener*](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
+| `listener` | [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
 
-**Returns:** [*HoprToken*](hoprtoken.md)
+#### Returns
 
-Overrides: Contract.off
+[HoprToken](hoprtoken.md)
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:296
+#### Overrides
 
-▸ **off**(`eventName`: *string*, `listener`: Listener): [*HoprToken*](hoprtoken.md)
+Contract.off
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:296
+
+▸ **off**(`eventName`, `listener`): [HoprToken](hoprtoken.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventName` | *string* |
-| `listener` | Listener |
+| `eventName` | `string` |
+| `listener` | `Listener` |
 
-**Returns:** [*HoprToken*](hoprtoken.md)
+#### Returns
 
-Overrides: Contract.off
+[HoprToken](hoprtoken.md)
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:317
+#### Overrides
+
+Contract.off
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:317
 
 ___
 
 ### on
 
-▸ **on**<EventArgsArray, EventArgsObject\>(`eventFilter`: [*TypedEventFilter*](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\>, `listener`: [*TypedListener*](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\>): [*HoprToken*](hoprtoken.md)
+▸ **on**<EventArgsArray, EventArgsObject\>(`eventFilter`, `listener`): [HoprToken](hoprtoken.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | *any*[] |
-| `EventArgsObject` | - |
+| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [*TypedEventFilter*](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `listener` | [*TypedListener*](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
+| `listener` | [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
 
-**Returns:** [*HoprToken*](hoprtoken.md)
+#### Returns
 
-Overrides: Contract.on
+[HoprToken](hoprtoken.md)
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:300
+#### Overrides
 
-▸ **on**(`eventName`: *string*, `listener`: Listener): [*HoprToken*](hoprtoken.md)
+Contract.on
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:300
+
+▸ **on**(`eventName`, `listener`): [HoprToken](hoprtoken.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventName` | *string* |
-| `listener` | Listener |
+| `eventName` | `string` |
+| `listener` | `Listener` |
 
-**Returns:** [*HoprToken*](hoprtoken.md)
+#### Returns
 
-Overrides: Contract.on
+[HoprToken](hoprtoken.md)
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:318
+#### Overrides
+
+Contract.on
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:318
 
 ___
 
 ### once
 
-▸ **once**<EventArgsArray, EventArgsObject\>(`eventFilter`: [*TypedEventFilter*](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\>, `listener`: [*TypedListener*](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\>): [*HoprToken*](hoprtoken.md)
+▸ **once**<EventArgsArray, EventArgsObject\>(`eventFilter`, `listener`): [HoprToken](hoprtoken.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | *any*[] |
-| `EventArgsObject` | - |
+| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [*TypedEventFilter*](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `listener` | [*TypedListener*](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
+| `listener` | [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
 
-**Returns:** [*HoprToken*](hoprtoken.md)
+#### Returns
 
-Overrides: Contract.once
+[HoprToken](hoprtoken.md)
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:304
+#### Overrides
 
-▸ **once**(`eventName`: *string*, `listener`: Listener): [*HoprToken*](hoprtoken.md)
+Contract.once
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:304
+
+▸ **once**(`eventName`, `listener`): [HoprToken](hoprtoken.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventName` | *string* |
-| `listener` | Listener |
+| `eventName` | `string` |
+| `listener` | `Listener` |
 
-**Returns:** [*HoprToken*](hoprtoken.md)
+#### Returns
 
-Overrides: Contract.once
+[HoprToken](hoprtoken.md)
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:319
+#### Overrides
+
+Contract.once
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:319
 
 ___
 
 ### operatorBurn
 
-▸ **operatorBurn**(`account`: *string*, `amount`: BigNumberish, `data`: BytesLike, `operatorData`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): *Promise*<ContractTransaction\>
+▸ **operatorBurn**(`account`, `amount`, `data`, `operatorData`, `overrides?`): `Promise`<ContractTransaction\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `account` | *string* |
-| `amount` | BigNumberish |
-| `data` | BytesLike |
-| `operatorData` | BytesLike |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `account` | `string` |
+| `amount` | `BigNumberish` |
+| `data` | `BytesLike` |
+| `operatorData` | `BytesLike` |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** *Promise*<ContractTransaction\>
+#### Returns
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:848
+`Promise`<ContractTransaction\>
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:848
 
 ___
 
 ### operatorBurn(address,uint256,bytes,bytes)
 
-▸ **operatorBurn(address,uint256,bytes,bytes)**(`account`: *string*, `amount`: BigNumberish, `data`: BytesLike, `operatorData`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): *Promise*<ContractTransaction\>
+▸ **operatorBurn(address,uint256,bytes,bytes)**(`account`, `amount`, `data`, `operatorData`, `overrides?`): `Promise`<ContractTransaction\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `account` | *string* |
-| `amount` | BigNumberish |
-| `data` | BytesLike |
-| `operatorData` | BytesLike |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `account` | `string` |
+| `amount` | `BigNumberish` |
+| `data` | `BytesLike` |
+| `operatorData` | `BytesLike` |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** *Promise*<ContractTransaction\>
+#### Returns
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:854
+`Promise`<ContractTransaction\>
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:854
 
 ___
 
 ### operatorSend
 
-▸ **operatorSend**(`sender`: *string*, `recipient`: *string*, `amount`: BigNumberish, `data`: BytesLike, `operatorData`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): *Promise*<ContractTransaction\>
+▸ **operatorSend**(`sender`, `recipient`, `amount`, `data`, `operatorData`, `overrides?`): `Promise`<ContractTransaction\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `sender` | *string* |
-| `recipient` | *string* |
-| `amount` | BigNumberish |
-| `data` | BytesLike |
-| `operatorData` | BytesLike |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `sender` | `string` |
+| `recipient` | `string` |
+| `amount` | `BigNumberish` |
+| `data` | `BytesLike` |
+| `operatorData` | `BytesLike` |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** *Promise*<ContractTransaction\>
+#### Returns
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:864
+`Promise`<ContractTransaction\>
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:864
 
 ___
 
 ### operatorSend(address,address,uint256,bytes,bytes)
 
-▸ **operatorSend(address,address,uint256,bytes,bytes)**(`sender`: *string*, `recipient`: *string*, `amount`: BigNumberish, `data`: BytesLike, `operatorData`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): *Promise*<ContractTransaction\>
+▸ **operatorSend(address,address,uint256,bytes,bytes)**(`sender`, `recipient`, `amount`, `data`, `operatorData`, `overrides?`): `Promise`<ContractTransaction\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `sender` | *string* |
-| `recipient` | *string* |
-| `amount` | BigNumberish |
-| `data` | BytesLike |
-| `operatorData` | BytesLike |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `sender` | `string` |
+| `recipient` | `string` |
+| `amount` | `BigNumberish` |
+| `data` | `BytesLike` |
+| `operatorData` | `BytesLike` |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** *Promise*<ContractTransaction\>
+#### Returns
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:871
+`Promise`<ContractTransaction\>
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:871
 
 ___
 
 ### queryFilter
 
-▸ **queryFilter**<EventArgsArray, EventArgsObject\>(`event`: [*TypedEventFilter*](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\>, `fromBlockOrBlockhash?`: *string* \| *number*, `toBlock?`: *string* \| *number*): *Promise*<[*TypedEvent*](../interfaces/typedevent.md)<EventArgsArray & EventArgsObject\>[]\>
+▸ **queryFilter**<EventArgsArray, EventArgsObject\>(`event`, `fromBlockOrBlockhash?`, `toBlock?`): `Promise`<[TypedEvent](../interfaces/typedevent.md)<`EventArgsArray` & `EventArgsObject`\>[]\>
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | *any*[] |
-| `EventArgsObject` | - |
+| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `event` | [*TypedEventFilter*](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `fromBlockOrBlockhash?` | *string* \| *number* |
-| `toBlock?` | *string* \| *number* |
+| `event` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
+| `fromBlockOrBlockhash?` | `string` \| `number` |
+| `toBlock?` | `string` \| `number` |
 
-**Returns:** *Promise*<[*TypedEvent*](../interfaces/typedevent.md)<EventArgsArray & EventArgsObject\>[]\>
+#### Returns
 
-Overrides: Contract.queryFilter
+`Promise`<[TypedEvent](../interfaces/typedevent.md)<`EventArgsArray` & `EventArgsObject`\>[]\>
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:323
+#### Overrides
+
+Contract.queryFilter
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:323
 
 ___
 
 ### removeAllListeners
 
-▸ **removeAllListeners**<EventArgsArray, EventArgsObject\>(`eventFilter`: [*TypedEventFilter*](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\>): [*HoprToken*](hoprtoken.md)
+▸ **removeAllListeners**<EventArgsArray, EventArgsObject\>(`eventFilter`): [HoprToken](hoprtoken.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | *any*[] |
-| `EventArgsObject` | - |
+| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [*TypedEventFilter*](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
 
-**Returns:** [*HoprToken*](hoprtoken.md)
+#### Returns
 
-Overrides: Contract.removeAllListeners
+[HoprToken](hoprtoken.md)
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:312
+#### Overrides
 
-▸ **removeAllListeners**(`eventName?`: *string*): [*HoprToken*](hoprtoken.md)
+Contract.removeAllListeners
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:312
+
+▸ **removeAllListeners**(`eventName?`): [HoprToken](hoprtoken.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventName?` | *string* |
+| `eventName?` | `string` |
 
-**Returns:** [*HoprToken*](hoprtoken.md)
+#### Returns
 
-Overrides: Contract.removeAllListeners
+[HoprToken](hoprtoken.md)
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:321
+#### Overrides
+
+Contract.removeAllListeners
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:321
 
 ___
 
 ### removeListener
 
-▸ **removeListener**<EventArgsArray, EventArgsObject\>(`eventFilter`: [*TypedEventFilter*](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\>, `listener`: [*TypedListener*](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\>): [*HoprToken*](hoprtoken.md)
+▸ **removeListener**<EventArgsArray, EventArgsObject\>(`eventFilter`, `listener`): [HoprToken](hoprtoken.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | *any*[] |
-| `EventArgsObject` | - |
+| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [*TypedEventFilter*](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `listener` | [*TypedListener*](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
+| `listener` | [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
 
-**Returns:** [*HoprToken*](hoprtoken.md)
+#### Returns
 
-Overrides: Contract.removeListener
+[HoprToken](hoprtoken.md)
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:308
+#### Overrides
 
-▸ **removeListener**(`eventName`: *string*, `listener`: Listener): [*HoprToken*](hoprtoken.md)
+Contract.removeListener
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:308
+
+▸ **removeListener**(`eventName`, `listener`): [HoprToken](hoprtoken.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventName` | *string* |
-| `listener` | Listener |
+| `eventName` | `string` |
+| `listener` | `Listener` |
 
-**Returns:** [*HoprToken*](hoprtoken.md)
+#### Returns
 
-Overrides: Contract.removeListener
+[HoprToken](hoprtoken.md)
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:320
+#### Overrides
+
+Contract.removeListener
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:320
 
 ___
 
 ### renounceRole
 
-▸ **renounceRole**(`role`: BytesLike, `account`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): *Promise*<ContractTransaction\>
+▸ **renounceRole**(`role`, `account`, `overrides?`): `Promise`<ContractTransaction\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `role` | BytesLike |
-| `account` | *string* |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `role` | `BytesLike` |
+| `account` | `string` |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** *Promise*<ContractTransaction\>
+#### Returns
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:882
+`Promise`<ContractTransaction\>
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:882
 
 ___
 
 ### renounceRole(bytes32,address)
 
-▸ **renounceRole(bytes32,address)**(`role`: BytesLike, `account`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): *Promise*<ContractTransaction\>
+▸ **renounceRole(bytes32,address)**(`role`, `account`, `overrides?`): `Promise`<ContractTransaction\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `role` | BytesLike |
-| `account` | *string* |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `role` | `BytesLike` |
+| `account` | `string` |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** *Promise*<ContractTransaction\>
+#### Returns
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:886
+`Promise`<ContractTransaction\>
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:886
 
 ___
 
 ### revokeOperator
 
-▸ **revokeOperator**(`operator`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): *Promise*<ContractTransaction\>
+▸ **revokeOperator**(`operator`, `overrides?`): `Promise`<ContractTransaction\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `operator` | *string* |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `operator` | `string` |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** *Promise*<ContractTransaction\>
+#### Returns
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:894
+`Promise`<ContractTransaction\>
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:894
 
 ___
 
 ### revokeOperator(address)
 
-▸ **revokeOperator(address)**(`operator`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): *Promise*<ContractTransaction\>
+▸ **revokeOperator(address)**(`operator`, `overrides?`): `Promise`<ContractTransaction\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `operator` | *string* |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `operator` | `string` |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** *Promise*<ContractTransaction\>
+#### Returns
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:897
+`Promise`<ContractTransaction\>
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:897
 
 ___
 
 ### revokeRole
 
-▸ **revokeRole**(`role`: BytesLike, `account`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): *Promise*<ContractTransaction\>
+▸ **revokeRole**(`role`, `account`, `overrides?`): `Promise`<ContractTransaction\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `role` | BytesLike |
-| `account` | *string* |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `role` | `BytesLike` |
+| `account` | `string` |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** *Promise*<ContractTransaction\>
+#### Returns
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:904
+`Promise`<ContractTransaction\>
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:904
 
 ___
 
 ### revokeRole(bytes32,address)
 
-▸ **revokeRole(bytes32,address)**(`role`: BytesLike, `account`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): *Promise*<ContractTransaction\>
+▸ **revokeRole(bytes32,address)**(`role`, `account`, `overrides?`): `Promise`<ContractTransaction\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `role` | BytesLike |
-| `account` | *string* |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `role` | `BytesLike` |
+| `account` | `string` |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** *Promise*<ContractTransaction\>
+#### Returns
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:908
+`Promise`<ContractTransaction\>
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:908
 
 ___
 
 ### send
 
-▸ **send**(`recipient`: *string*, `amount`: BigNumberish, `data`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): *Promise*<ContractTransaction\>
+▸ **send**(`recipient`, `amount`, `data`, `overrides?`): `Promise`<ContractTransaction\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `recipient` | *string* |
-| `amount` | BigNumberish |
-| `data` | BytesLike |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `recipient` | `string` |
+| `amount` | `BigNumberish` |
+| `data` | `BytesLike` |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** *Promise*<ContractTransaction\>
+#### Returns
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:916
+`Promise`<ContractTransaction\>
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:916
 
 ___
 
 ### send(address,uint256,bytes)
 
-▸ **send(address,uint256,bytes)**(`recipient`: *string*, `amount`: BigNumberish, `data`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): *Promise*<ContractTransaction\>
+▸ **send(address,uint256,bytes)**(`recipient`, `amount`, `data`, `overrides?`): `Promise`<ContractTransaction\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `recipient` | *string* |
-| `amount` | BigNumberish |
-| `data` | BytesLike |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `recipient` | `string` |
+| `amount` | `BigNumberish` |
+| `data` | `BytesLike` |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** *Promise*<ContractTransaction\>
+#### Returns
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:921
+`Promise`<ContractTransaction\>
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:921
 
 ___
 
 ### symbol
 
-▸ **symbol**(`overrides?`: CallOverrides): *Promise*<string\>
+▸ **symbol**(`overrides?`): `Promise`<string\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `overrides?` | CallOverrides |
+| `overrides?` | `CallOverrides` |
 
-**Returns:** *Promise*<string\>
+#### Returns
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:930
+`Promise`<string\>
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:930
 
 ___
 
 ### symbol()
 
-▸ **symbol()**(`overrides?`: CallOverrides): *Promise*<string\>
+▸ **symbol()**(`overrides?`): `Promise`<string\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `overrides?` | CallOverrides |
+| `overrides?` | `CallOverrides` |
 
-**Returns:** *Promise*<string\>
+#### Returns
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:930
+`Promise`<string\>
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:930
 
 ___
 
 ### totalSupply
 
-▸ **totalSupply**(`overrides?`: CallOverrides): *Promise*<BigNumber\>
+▸ **totalSupply**(`overrides?`): `Promise`<BigNumber\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `overrides?` | CallOverrides |
+| `overrides?` | `CallOverrides` |
 
-**Returns:** *Promise*<BigNumber\>
+#### Returns
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:934
+`Promise`<BigNumber\>
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:934
 
 ___
 
 ### totalSupply()
 
-▸ **totalSupply()**(`overrides?`: CallOverrides): *Promise*<BigNumber\>
+▸ **totalSupply()**(`overrides?`): `Promise`<BigNumber\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `overrides?` | CallOverrides |
+| `overrides?` | `CallOverrides` |
 
-**Returns:** *Promise*<BigNumber\>
+#### Returns
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:934
+`Promise`<BigNumber\>
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:934
 
 ___
 
 ### totalSupplyAt
 
-▸ **totalSupplyAt**(`_blockNumber`: BigNumberish, `overrides?`: CallOverrides): *Promise*<BigNumber\>
+▸ **totalSupplyAt**(`_blockNumber`, `overrides?`): `Promise`<BigNumber\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `_blockNumber` | BigNumberish |
-| `overrides?` | CallOverrides |
+| `_blockNumber` | `BigNumberish` |
+| `overrides?` | `CallOverrides` |
 
-**Returns:** *Promise*<BigNumber\>
+#### Returns
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:938
+`Promise`<BigNumber\>
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:938
 
 ___
 
 ### totalSupplyAt(uint128)
 
-▸ **totalSupplyAt(uint128)**(`_blockNumber`: BigNumberish, `overrides?`: CallOverrides): *Promise*<BigNumber\>
+▸ **totalSupplyAt(uint128)**(`_blockNumber`, `overrides?`): `Promise`<BigNumber\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `_blockNumber` | BigNumberish |
-| `overrides?` | CallOverrides |
+| `_blockNumber` | `BigNumberish` |
+| `overrides?` | `CallOverrides` |
 
-**Returns:** *Promise*<BigNumber\>
+#### Returns
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:941
+`Promise`<BigNumber\>
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:941
 
 ___
 
 ### totalSupplySnapshots
 
-▸ **totalSupplySnapshots**(`arg0`: BigNumberish, `overrides?`: CallOverrides): *Promise*<[*BigNumber*, *BigNumber*] & { `fromBlock`: *BigNumber* ; `value`: *BigNumber*  }\>
+▸ **totalSupplySnapshots**(`arg0`, `overrides?`): `Promise`<[`BigNumber`, `BigNumber`] & { `fromBlock`: `BigNumber` ; `value`: `BigNumber`  }\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `arg0` | BigNumberish |
-| `overrides?` | CallOverrides |
+| `arg0` | `BigNumberish` |
+| `overrides?` | `CallOverrides` |
 
-**Returns:** *Promise*<[*BigNumber*, *BigNumber*] & { `fromBlock`: *BigNumber* ; `value`: *BigNumber*  }\>
+#### Returns
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:948
+`Promise`<[`BigNumber`, `BigNumber`] & { `fromBlock`: `BigNumber` ; `value`: `BigNumber`  }\>
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:948
 
 ___
 
 ### totalSupplySnapshots(uint256)
 
-▸ **totalSupplySnapshots(uint256)**(`arg0`: BigNumberish, `overrides?`: CallOverrides): *Promise*<[*BigNumber*, *BigNumber*] & { `fromBlock`: *BigNumber* ; `value`: *BigNumber*  }\>
+▸ **totalSupplySnapshots(uint256)**(`arg0`, `overrides?`): `Promise`<[`BigNumber`, `BigNumber`] & { `fromBlock`: `BigNumber` ; `value`: `BigNumber`  }\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `arg0` | BigNumberish |
-| `overrides?` | CallOverrides |
+| `arg0` | `BigNumberish` |
+| `overrides?` | `CallOverrides` |
 
-**Returns:** *Promise*<[*BigNumber*, *BigNumber*] & { `fromBlock`: *BigNumber* ; `value`: *BigNumber*  }\>
+#### Returns
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:953
+`Promise`<[`BigNumber`, `BigNumber`] & { `fromBlock`: `BigNumber` ; `value`: `BigNumber`  }\>
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:953
 
 ___
 
 ### transfer
 
-▸ **transfer**(`recipient`: *string*, `amount`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): *Promise*<ContractTransaction\>
+▸ **transfer**(`recipient`, `amount`, `overrides?`): `Promise`<ContractTransaction\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `recipient` | *string* |
-| `amount` | BigNumberish |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `recipient` | `string` |
+| `amount` | `BigNumberish` |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** *Promise*<ContractTransaction\>
+#### Returns
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:962
+`Promise`<ContractTransaction\>
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:962
 
 ___
 
 ### transfer(address,uint256)
 
-▸ **transfer(address,uint256)**(`recipient`: *string*, `amount`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): *Promise*<ContractTransaction\>
+▸ **transfer(address,uint256)**(`recipient`, `amount`, `overrides?`): `Promise`<ContractTransaction\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `recipient` | *string* |
-| `amount` | BigNumberish |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `recipient` | `string` |
+| `amount` | `BigNumberish` |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** *Promise*<ContractTransaction\>
+#### Returns
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:966
+`Promise`<ContractTransaction\>
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:966
 
 ___
 
 ### transferFrom
 
-▸ **transferFrom**(`holder`: *string*, `recipient`: *string*, `amount`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): *Promise*<ContractTransaction\>
+▸ **transferFrom**(`holder`, `recipient`, `amount`, `overrides?`): `Promise`<ContractTransaction\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `holder` | *string* |
-| `recipient` | *string* |
-| `amount` | BigNumberish |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `holder` | `string` |
+| `recipient` | `string` |
+| `amount` | `BigNumberish` |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** *Promise*<ContractTransaction\>
+#### Returns
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:974
+`Promise`<ContractTransaction\>
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:974
 
 ___
 
 ### transferFrom(address,address,uint256)
 
-▸ **transferFrom(address,address,uint256)**(`holder`: *string*, `recipient`: *string*, `amount`: BigNumberish, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): *Promise*<ContractTransaction\>
+▸ **transferFrom(address,address,uint256)**(`holder`, `recipient`, `amount`, `overrides?`): `Promise`<ContractTransaction\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `holder` | *string* |
-| `recipient` | *string* |
-| `amount` | BigNumberish |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `holder` | `string` |
+| `recipient` | `string` |
+| `amount` | `BigNumberish` |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** *Promise*<ContractTransaction\>
+#### Returns
 
-Defined in: packages/ethereum/types/HoprToken.d.ts:979
+`Promise`<ContractTransaction\>
+
+#### Defined in
+
+packages/ethereum/types/HoprToken.d.ts:979
 
 ___
 
 ### getContractAddress
 
-▸ `Static` **getContractAddress**(`transaction`: { `from`: *string* ; `nonce`: BigNumberish  }): *string*
+▸ `Static` **getContractAddress**(`transaction`): `string`
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `transaction` | *object* |
-| `transaction.from` | *string* |
-| `transaction.nonce` | BigNumberish |
+| `transaction` | `Object` |
+| `transaction.from` | `string` |
+| `transaction.nonce` | `BigNumberish` |
 
-**Returns:** *string*
+#### Returns
 
-Inherited from: Contract.getContractAddress
+`string`
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:100
+#### Inherited from
+
+Contract.getContractAddress
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:100
 
 ___
 
 ### getInterface
 
-▸ `Static` **getInterface**(`contractInterface`: ContractInterface): *Interface*
+▸ `Static` **getInterface**(`contractInterface`): `Interface`
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `contractInterface` | ContractInterface |
+| `contractInterface` | `ContractInterface` |
 
-**Returns:** *Interface*
+#### Returns
 
-Inherited from: Contract.getInterface
+`Interface`
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:104
+#### Inherited from
+
+Contract.getInterface
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:104
 
 ___
 
 ### isIndexed
 
-▸ `Static` **isIndexed**(`value`: *any*): value is Indexed
+▸ `Static` **isIndexed**(`value`): value is Indexed
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `value` | *any* |
+| `value` | `any` |
 
-**Returns:** value is Indexed
+#### Returns
 
-Inherited from: Contract.isIndexed
+value is Indexed
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:110
+#### Inherited from
+
+Contract.isIndexed
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:110

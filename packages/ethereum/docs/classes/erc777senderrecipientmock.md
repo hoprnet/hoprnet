@@ -4,7 +4,7 @@
 
 ## Hierarchy
 
-- *Contract*
+- `Contract`
 
   ↳ **ERC777SenderRecipientMock**
 
@@ -79,1167 +79,1467 @@
 
 ### constructor
 
-\+ **new ERC777SenderRecipientMock**(`addressOrName`: *string*, `contractInterface`: ContractInterface, `signerOrProvider?`: *Signer* \| *Provider*): [*ERC777SenderRecipientMock*](erc777senderrecipientmock.md)
+• **new ERC777SenderRecipientMock**(`addressOrName`, `contractInterface`, `signerOrProvider?`)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `addressOrName` | *string* |
-| `contractInterface` | ContractInterface |
-| `signerOrProvider?` | *Signer* \| *Provider* |
+| `addressOrName` | `string` |
+| `contractInterface` | `ContractInterface` |
+| `signerOrProvider?` | `Signer` \| `Provider` |
 
-**Returns:** [*ERC777SenderRecipientMock*](erc777senderrecipientmock.md)
+#### Inherited from
 
-Inherited from: Contract.constructor
+Contract.constructor
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:98
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:98
 
 ## Properties
 
 ### \_deployedPromise
 
-• **\_deployedPromise**: *Promise*<Contract\>
+• **\_deployedPromise**: `Promise`<Contract\>
 
-Inherited from: Contract.\_deployedPromise
+#### Inherited from
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:92
+Contract.\_deployedPromise
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:92
 
 ___
 
 ### \_runningEvents
 
-• **\_runningEvents**: *object*
+• **\_runningEvents**: `Object`
 
-#### Type declaration
+#### Index signature
 
-Inherited from: Contract.\_runningEvents
+▪ [eventTag: `string`]: `RunningEvent`
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:93
+#### Inherited from
+
+Contract.\_runningEvents
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:93
 
 ___
 
 ### \_wrappedEmits
 
-• **\_wrappedEmits**: *object*
+• **\_wrappedEmits**: `Object`
 
-#### Type declaration
+#### Index signature
 
-Inherited from: Contract.\_wrappedEmits
+▪ [eventTag: `string`]: (...`args`: `any`[]) => `void`
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:96
+#### Inherited from
+
+Contract.\_wrappedEmits
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:96
 
 ___
 
 ### address
 
-• `Readonly` **address**: *string*
+• `Readonly` **address**: `string`
 
-Inherited from: Contract.address
+#### Inherited from
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:71
+Contract.address
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:71
 
 ___
 
 ### callStatic
 
-• **callStatic**: *object*
+• **callStatic**: `Object`
 
 #### Type declaration
 
 | Name | Type |
 | :------ | :------ |
-| `burn` | (`token`: *string*, `amount`: BigNumberish, `data`: BytesLike, `overrides?`: CallOverrides) => *Promise*<void\> |
-| `burn(address,uint256,bytes)` | (`token`: *string*, `amount`: BigNumberish, `data`: BytesLike, `overrides?`: CallOverrides) => *Promise*<void\> |
-| `canImplementInterfaceForAddress` | (`interfaceHash`: BytesLike, `account`: *string*, `overrides?`: CallOverrides) => *Promise*<string\> |
-| `canImplementInterfaceForAddress(bytes32,address)` | (`interfaceHash`: BytesLike, `account`: *string*, `overrides?`: CallOverrides) => *Promise*<string\> |
-| `recipientFor` | (`account`: *string*, `overrides?`: CallOverrides) => *Promise*<void\> |
-| `recipientFor(address)` | (`account`: *string*, `overrides?`: CallOverrides) => *Promise*<void\> |
-| `registerRecipient` | (`recipient`: *string*, `overrides?`: CallOverrides) => *Promise*<void\> |
-| `registerRecipient(address)` | (`recipient`: *string*, `overrides?`: CallOverrides) => *Promise*<void\> |
-| `registerSender` | (`sender`: *string*, `overrides?`: CallOverrides) => *Promise*<void\> |
-| `registerSender(address)` | (`sender`: *string*, `overrides?`: CallOverrides) => *Promise*<void\> |
-| `send` | (`token`: *string*, `to`: *string*, `amount`: BigNumberish, `data`: BytesLike, `overrides?`: CallOverrides) => *Promise*<void\> |
-| `send(address,address,uint256,bytes)` | (`token`: *string*, `to`: *string*, `amount`: BigNumberish, `data`: BytesLike, `overrides?`: CallOverrides) => *Promise*<void\> |
-| `senderFor` | (`account`: *string*, `overrides?`: CallOverrides) => *Promise*<void\> |
-| `senderFor(address)` | (`account`: *string*, `overrides?`: CallOverrides) => *Promise*<void\> |
-| `setShouldRevertReceive` | (`shouldRevert`: *boolean*, `overrides?`: CallOverrides) => *Promise*<void\> |
-| `setShouldRevertReceive(bool)` | (`shouldRevert`: *boolean*, `overrides?`: CallOverrides) => *Promise*<void\> |
-| `setShouldRevertSend` | (`shouldRevert`: *boolean*, `overrides?`: CallOverrides) => *Promise*<void\> |
-| `setShouldRevertSend(bool)` | (`shouldRevert`: *boolean*, `overrides?`: CallOverrides) => *Promise*<void\> |
-| `tokensReceived` | (`operator`: *string*, `from`: *string*, `to`: *string*, `amount`: BigNumberish, `userData`: BytesLike, `operatorData`: BytesLike, `overrides?`: CallOverrides) => *Promise*<void\> |
-| `tokensReceived(address,address,address,uint256,bytes,bytes)` | (`operator`: *string*, `from`: *string*, `to`: *string*, `amount`: BigNumberish, `userData`: BytesLike, `operatorData`: BytesLike, `overrides?`: CallOverrides) => *Promise*<void\> |
-| `tokensToSend` | (`operator`: *string*, `from`: *string*, `to`: *string*, `amount`: BigNumberish, `userData`: BytesLike, `operatorData`: BytesLike, `overrides?`: CallOverrides) => *Promise*<void\> |
-| `tokensToSend(address,address,address,uint256,bytes,bytes)` | (`operator`: *string*, `from`: *string*, `to`: *string*, `amount`: BigNumberish, `userData`: BytesLike, `operatorData`: BytesLike, `overrides?`: CallOverrides) => *Promise*<void\> |
+| `burn` | (`token`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
+| `burn(address,uint256,bytes)` | (`token`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
+| `canImplementInterfaceForAddress` | (`interfaceHash`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<string\> |
+| `canImplementInterfaceForAddress(bytes32,address)` | (`interfaceHash`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<string\> |
+| `recipientFor` | (`account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
+| `recipientFor(address)` | (`account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
+| `registerRecipient` | (`recipient`: `string`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
+| `registerRecipient(address)` | (`recipient`: `string`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
+| `registerSender` | (`sender`: `string`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
+| `registerSender(address)` | (`sender`: `string`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
+| `send` | (`token`: `string`, `to`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
+| `send(address,address,uint256,bytes)` | (`token`: `string`, `to`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
+| `senderFor` | (`account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
+| `senderFor(address)` | (`account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
+| `setShouldRevertReceive` | (`shouldRevert`: `boolean`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
+| `setShouldRevertReceive(bool)` | (`shouldRevert`: `boolean`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
+| `setShouldRevertSend` | (`shouldRevert`: `boolean`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
+| `setShouldRevertSend(bool)` | (`shouldRevert`: `boolean`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
+| `tokensReceived` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
+| `tokensReceived(address,address,address,uint256,bytes,bytes)` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
+| `tokensToSend` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
+| `tokensToSend(address,address,address,uint256,bytes,bytes)` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `CallOverrides`) => `Promise`<void\> |
 
-Overrides: Contract.callStatic
+#### Overrides
 
-Defined in: packages/ethereum/types/ERC777SenderRecipientMock.d.ts:453
+Contract.callStatic
+
+#### Defined in
+
+packages/ethereum/types/ERC777SenderRecipientMock.d.ts:453
 
 ___
 
 ### deployTransaction
 
-• `Readonly` **deployTransaction**: TransactionResponse
+• `Readonly` **deployTransaction**: `TransactionResponse`
 
-Inherited from: Contract.deployTransaction
+#### Inherited from
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:91
+Contract.deployTransaction
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:91
 
 ___
 
 ### estimateGas
 
-• **estimateGas**: *object*
+• **estimateGas**: `Object`
 
 #### Type declaration
 
 | Name | Type |
 | :------ | :------ |
-| `burn` | (`token`: *string*, `amount`: BigNumberish, `data`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<BigNumber\> |
-| `burn(address,uint256,bytes)` | (`token`: *string*, `amount`: BigNumberish, `data`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<BigNumber\> |
-| `canImplementInterfaceForAddress` | (`interfaceHash`: BytesLike, `account`: *string*, `overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `canImplementInterfaceForAddress(bytes32,address)` | (`interfaceHash`: BytesLike, `account`: *string*, `overrides?`: CallOverrides) => *Promise*<BigNumber\> |
-| `recipientFor` | (`account`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<BigNumber\> |
-| `recipientFor(address)` | (`account`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<BigNumber\> |
-| `registerRecipient` | (`recipient`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<BigNumber\> |
-| `registerRecipient(address)` | (`recipient`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<BigNumber\> |
-| `registerSender` | (`sender`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<BigNumber\> |
-| `registerSender(address)` | (`sender`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<BigNumber\> |
-| `send` | (`token`: *string*, `to`: *string*, `amount`: BigNumberish, `data`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<BigNumber\> |
-| `send(address,address,uint256,bytes)` | (`token`: *string*, `to`: *string*, `amount`: BigNumberish, `data`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<BigNumber\> |
-| `senderFor` | (`account`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<BigNumber\> |
-| `senderFor(address)` | (`account`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<BigNumber\> |
-| `setShouldRevertReceive` | (`shouldRevert`: *boolean*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<BigNumber\> |
-| `setShouldRevertReceive(bool)` | (`shouldRevert`: *boolean*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<BigNumber\> |
-| `setShouldRevertSend` | (`shouldRevert`: *boolean*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<BigNumber\> |
-| `setShouldRevertSend(bool)` | (`shouldRevert`: *boolean*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<BigNumber\> |
-| `tokensReceived` | (`operator`: *string*, `from`: *string*, `to`: *string*, `amount`: BigNumberish, `userData`: BytesLike, `operatorData`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<BigNumber\> |
-| `tokensReceived(address,address,address,uint256,bytes,bytes)` | (`operator`: *string*, `from`: *string*, `to`: *string*, `amount`: BigNumberish, `userData`: BytesLike, `operatorData`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<BigNumber\> |
-| `tokensToSend` | (`operator`: *string*, `from`: *string*, `to`: *string*, `amount`: BigNumberish, `userData`: BytesLike, `operatorData`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<BigNumber\> |
-| `tokensToSend(address,address,address,uint256,bytes,bytes)` | (`operator`: *string*, `from`: *string*, `to`: *string*, `amount`: BigNumberish, `userData`: BytesLike, `operatorData`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<BigNumber\> |
+| `burn` | (`token`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `burn(address,uint256,bytes)` | (`token`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `canImplementInterfaceForAddress` | (`interfaceHash`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `canImplementInterfaceForAddress(bytes32,address)` | (`interfaceHash`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<BigNumber\> |
+| `recipientFor` | (`account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `recipientFor(address)` | (`account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `registerRecipient` | (`recipient`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `registerRecipient(address)` | (`recipient`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `registerSender` | (`sender`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `registerSender(address)` | (`sender`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `send` | (`token`: `string`, `to`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `send(address,address,uint256,bytes)` | (`token`: `string`, `to`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `senderFor` | (`account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `senderFor(address)` | (`account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `setShouldRevertReceive` | (`shouldRevert`: `boolean`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `setShouldRevertReceive(bool)` | (`shouldRevert`: `boolean`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `setShouldRevertSend` | (`shouldRevert`: `boolean`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `setShouldRevertSend(bool)` | (`shouldRevert`: `boolean`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `tokensReceived` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `tokensReceived(address,address,address,uint256,bytes,bytes)` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `tokensToSend` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
+| `tokensToSend(address,address,address,uint256,bytes,bytes)` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<BigNumber\> |
 
-Overrides: Contract.estimateGas
+#### Overrides
 
-Defined in: packages/ethereum/types/ERC777SenderRecipientMock.d.ts:660
+Contract.estimateGas
+
+#### Defined in
+
+packages/ethereum/types/ERC777SenderRecipientMock.d.ts:660
 
 ___
 
 ### filters
 
-• **filters**: *object*
+• **filters**: `Object`
 
 #### Type declaration
 
 | Name | Type |
 | :------ | :------ |
-| `TokensReceivedCalled` | (`operator`: ``null``, `from`: ``null``, `to`: ``null``, `amount`: ``null``, `data`: ``null``, `operatorData`: ``null``, `token`: ``null``, `fromBalance`: ``null``, `toBalance`: ``null``) => [*TypedEventFilter*](../interfaces/typedeventfilter.md)<[*string*, *string*, *string*, *BigNumber*, *string*, *string*, *string*, *BigNumber*, *BigNumber*], { `amount`: *BigNumber* ; `data`: *string* ; `from`: *string* ; `fromBalance`: *BigNumber* ; `operator`: *string* ; `operatorData`: *string* ; `to`: *string* ; `toBalance`: *BigNumber* ; `token`: *string*  }\> |
-| `TokensToSendCalled` | (`operator`: ``null``, `from`: ``null``, `to`: ``null``, `amount`: ``null``, `data`: ``null``, `operatorData`: ``null``, `token`: ``null``, `fromBalance`: ``null``, `toBalance`: ``null``) => [*TypedEventFilter*](../interfaces/typedeventfilter.md)<[*string*, *string*, *string*, *BigNumber*, *string*, *string*, *string*, *BigNumber*, *BigNumber*], { `amount`: *BigNumber* ; `data`: *string* ; `from`: *string* ; `fromBalance`: *BigNumber* ; `operator`: *string* ; `operatorData`: *string* ; `to`: *string* ; `toBalance`: *BigNumber* ; `token`: *string*  }\> |
+| `TokensReceivedCalled` | (`operator`: ``null``, `from`: ``null``, `to`: ``null``, `amount`: ``null``, `data`: ``null``, `operatorData`: ``null``, `token`: ``null``, `fromBalance`: ``null``, `toBalance`: ``null``) => [TypedEventFilter](../interfaces/typedeventfilter.md)<[`string`, `string`, `string`, `BigNumber`, `string`, `string`, `string`, `BigNumber`, `BigNumber`], `Object`\> |
+| `TokensToSendCalled` | (`operator`: ``null``, `from`: ``null``, `to`: ``null``, `amount`: ``null``, `data`: ``null``, `operatorData`: ``null``, `token`: ``null``, `fromBalance`: ``null``, `toBalance`: ``null``) => [TypedEventFilter](../interfaces/typedeventfilter.md)<[`string`, `string`, `string`, `BigNumber`, `string`, `string`, `string`, `BigNumber`, `BigNumber`], `Object`\> |
 
-Overrides: Contract.filters
+#### Overrides
 
-Defined in: packages/ethereum/types/ERC777SenderRecipientMock.d.ts:588
+Contract.filters
+
+#### Defined in
+
+packages/ethereum/types/ERC777SenderRecipientMock.d.ts:588
 
 ___
 
 ### functions
 
-• **functions**: *object*
+• **functions**: `Object`
 
 #### Type declaration
 
 | Name | Type |
 | :------ | :------ |
-| `burn` | (`token`: *string*, `amount`: BigNumberish, `data`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<ContractTransaction\> |
-| `burn(address,uint256,bytes)` | (`token`: *string*, `amount`: BigNumberish, `data`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<ContractTransaction\> |
-| `canImplementInterfaceForAddress` | (`interfaceHash`: BytesLike, `account`: *string*, `overrides?`: CallOverrides) => *Promise*<[*string*]\> |
-| `canImplementInterfaceForAddress(bytes32,address)` | (`interfaceHash`: BytesLike, `account`: *string*, `overrides?`: CallOverrides) => *Promise*<[*string*]\> |
-| `recipientFor` | (`account`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<ContractTransaction\> |
-| `recipientFor(address)` | (`account`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<ContractTransaction\> |
-| `registerRecipient` | (`recipient`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<ContractTransaction\> |
-| `registerRecipient(address)` | (`recipient`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<ContractTransaction\> |
-| `registerSender` | (`sender`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<ContractTransaction\> |
-| `registerSender(address)` | (`sender`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<ContractTransaction\> |
-| `send` | (`token`: *string*, `to`: *string*, `amount`: BigNumberish, `data`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<ContractTransaction\> |
-| `send(address,address,uint256,bytes)` | (`token`: *string*, `to`: *string*, `amount`: BigNumberish, `data`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<ContractTransaction\> |
-| `senderFor` | (`account`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<ContractTransaction\> |
-| `senderFor(address)` | (`account`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<ContractTransaction\> |
-| `setShouldRevertReceive` | (`shouldRevert`: *boolean*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<ContractTransaction\> |
-| `setShouldRevertReceive(bool)` | (`shouldRevert`: *boolean*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<ContractTransaction\> |
-| `setShouldRevertSend` | (`shouldRevert`: *boolean*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<ContractTransaction\> |
-| `setShouldRevertSend(bool)` | (`shouldRevert`: *boolean*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<ContractTransaction\> |
-| `tokensReceived` | (`operator`: *string*, `from`: *string*, `to`: *string*, `amount`: BigNumberish, `userData`: BytesLike, `operatorData`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<ContractTransaction\> |
-| `tokensReceived(address,address,address,uint256,bytes,bytes)` | (`operator`: *string*, `from`: *string*, `to`: *string*, `amount`: BigNumberish, `userData`: BytesLike, `operatorData`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<ContractTransaction\> |
-| `tokensToSend` | (`operator`: *string*, `from`: *string*, `to`: *string*, `amount`: BigNumberish, `userData`: BytesLike, `operatorData`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<ContractTransaction\> |
-| `tokensToSend(address,address,address,uint256,bytes,bytes)` | (`operator`: *string*, `from`: *string*, `to`: *string*, `amount`: BigNumberish, `userData`: BytesLike, `operatorData`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<ContractTransaction\> |
+| `burn` | (`token`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `burn(address,uint256,bytes)` | (`token`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `canImplementInterfaceForAddress` | (`interfaceHash`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
+| `canImplementInterfaceForAddress(bytes32,address)` | (`interfaceHash`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<[`string`]\> |
+| `recipientFor` | (`account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `recipientFor(address)` | (`account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `registerRecipient` | (`recipient`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `registerRecipient(address)` | (`recipient`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `registerSender` | (`sender`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `registerSender(address)` | (`sender`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `send` | (`token`: `string`, `to`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `send(address,address,uint256,bytes)` | (`token`: `string`, `to`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `senderFor` | (`account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `senderFor(address)` | (`account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `setShouldRevertReceive` | (`shouldRevert`: `boolean`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `setShouldRevertReceive(bool)` | (`shouldRevert`: `boolean`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `setShouldRevertSend` | (`shouldRevert`: `boolean`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `setShouldRevertSend(bool)` | (`shouldRevert`: `boolean`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `tokensReceived` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `tokensReceived(address,address,address,uint256,bytes,bytes)` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `tokensToSend` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
+| `tokensToSend(address,address,address,uint256,bytes,bytes)` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<ContractTransaction\> |
 
-Overrides: Contract.functions
+#### Overrides
 
-Defined in: packages/ethereum/types/ERC777SenderRecipientMock.d.ts:167
+Contract.functions
+
+#### Defined in
+
+packages/ethereum/types/ERC777SenderRecipientMock.d.ts:167
 
 ___
 
 ### interface
 
-• **interface**: *ERC777SenderRecipientMockInterface*
+• **interface**: `ERC777SenderRecipientMockInterface`
 
-Overrides: Contract.interface
+#### Overrides
 
-Defined in: packages/ethereum/types/ERC777SenderRecipientMock.d.ts:165
+Contract.interface
+
+#### Defined in
+
+packages/ethereum/types/ERC777SenderRecipientMock.d.ts:165
 
 ___
 
 ### populateTransaction
 
-• **populateTransaction**: *object*
+• **populateTransaction**: `Object`
 
 #### Type declaration
 
 | Name | Type |
 | :------ | :------ |
-| `burn` | (`token`: *string*, `amount`: BigNumberish, `data`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<PopulatedTransaction\> |
-| `burn(address,uint256,bytes)` | (`token`: *string*, `amount`: BigNumberish, `data`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<PopulatedTransaction\> |
-| `canImplementInterfaceForAddress` | (`interfaceHash`: BytesLike, `account`: *string*, `overrides?`: CallOverrides) => *Promise*<PopulatedTransaction\> |
-| `canImplementInterfaceForAddress(bytes32,address)` | (`interfaceHash`: BytesLike, `account`: *string*, `overrides?`: CallOverrides) => *Promise*<PopulatedTransaction\> |
-| `recipientFor` | (`account`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<PopulatedTransaction\> |
-| `recipientFor(address)` | (`account`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<PopulatedTransaction\> |
-| `registerRecipient` | (`recipient`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<PopulatedTransaction\> |
-| `registerRecipient(address)` | (`recipient`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<PopulatedTransaction\> |
-| `registerSender` | (`sender`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<PopulatedTransaction\> |
-| `registerSender(address)` | (`sender`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<PopulatedTransaction\> |
-| `send` | (`token`: *string*, `to`: *string*, `amount`: BigNumberish, `data`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<PopulatedTransaction\> |
-| `send(address,address,uint256,bytes)` | (`token`: *string*, `to`: *string*, `amount`: BigNumberish, `data`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<PopulatedTransaction\> |
-| `senderFor` | (`account`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<PopulatedTransaction\> |
-| `senderFor(address)` | (`account`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<PopulatedTransaction\> |
-| `setShouldRevertReceive` | (`shouldRevert`: *boolean*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<PopulatedTransaction\> |
-| `setShouldRevertReceive(bool)` | (`shouldRevert`: *boolean*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<PopulatedTransaction\> |
-| `setShouldRevertSend` | (`shouldRevert`: *boolean*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<PopulatedTransaction\> |
-| `setShouldRevertSend(bool)` | (`shouldRevert`: *boolean*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<PopulatedTransaction\> |
-| `tokensReceived` | (`operator`: *string*, `from`: *string*, `to`: *string*, `amount`: BigNumberish, `userData`: BytesLike, `operatorData`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<PopulatedTransaction\> |
-| `tokensReceived(address,address,address,uint256,bytes,bytes)` | (`operator`: *string*, `from`: *string*, `to`: *string*, `amount`: BigNumberish, `userData`: BytesLike, `operatorData`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<PopulatedTransaction\> |
-| `tokensToSend` | (`operator`: *string*, `from`: *string*, `to`: *string*, `amount`: BigNumberish, `userData`: BytesLike, `operatorData`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<PopulatedTransaction\> |
-| `tokensToSend(address,address,address,uint256,bytes,bytes)` | (`operator`: *string*, `from`: *string*, `to`: *string*, `amount`: BigNumberish, `userData`: BytesLike, `operatorData`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }) => *Promise*<PopulatedTransaction\> |
+| `burn` | (`token`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `burn(address,uint256,bytes)` | (`token`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `canImplementInterfaceForAddress` | (`interfaceHash`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
+| `canImplementInterfaceForAddress(bytes32,address)` | (`interfaceHash`: `BytesLike`, `account`: `string`, `overrides?`: `CallOverrides`) => `Promise`<PopulatedTransaction\> |
+| `recipientFor` | (`account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `recipientFor(address)` | (`account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `registerRecipient` | (`recipient`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `registerRecipient(address)` | (`recipient`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `registerSender` | (`sender`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `registerSender(address)` | (`sender`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `send` | (`token`: `string`, `to`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `send(address,address,uint256,bytes)` | (`token`: `string`, `to`: `string`, `amount`: `BigNumberish`, `data`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `senderFor` | (`account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `senderFor(address)` | (`account`: `string`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `setShouldRevertReceive` | (`shouldRevert`: `boolean`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `setShouldRevertReceive(bool)` | (`shouldRevert`: `boolean`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `setShouldRevertSend` | (`shouldRevert`: `boolean`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `setShouldRevertSend(bool)` | (`shouldRevert`: `boolean`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `tokensReceived` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `tokensReceived(address,address,address,uint256,bytes,bytes)` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `tokensToSend` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
+| `tokensToSend(address,address,address,uint256,bytes,bytes)` | (`operator`: `string`, `from`: `string`, `to`: `string`, `amount`: `BigNumberish`, `userData`: `BytesLike`, `operatorData`: `BytesLike`, `overrides?`: `Overrides` & { `from?`: `string` \| `Promise`<string\>  }) => `Promise`<PopulatedTransaction\> |
 
-Overrides: Contract.populateTransaction
+#### Overrides
 
-Defined in: packages/ethereum/types/ERC777SenderRecipientMock.d.ts:804
+Contract.populateTransaction
+
+#### Defined in
+
+packages/ethereum/types/ERC777SenderRecipientMock.d.ts:804
 
 ___
 
 ### provider
 
-• `Readonly` **provider**: *Provider*
+• `Readonly` **provider**: `Provider`
 
-Inherited from: Contract.provider
+#### Inherited from
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:74
+Contract.provider
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:74
 
 ___
 
 ### resolvedAddress
 
-• `Readonly` **resolvedAddress**: *Promise*<string\>
+• `Readonly` **resolvedAddress**: `Promise`<string\>
 
-Inherited from: Contract.resolvedAddress
+#### Inherited from
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:90
+Contract.resolvedAddress
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:90
 
 ___
 
 ### signer
 
-• `Readonly` **signer**: *Signer*
+• `Readonly` **signer**: `Signer`
 
-Inherited from: Contract.signer
+#### Inherited from
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:73
+Contract.signer
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:73
 
 ## Methods
 
 ### \_checkRunningEvents
 
-▸ **_checkRunningEvents**(`runningEvent`: *RunningEvent*): *void*
+▸ **_checkRunningEvents**(`runningEvent`): `void`
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `runningEvent` | *RunningEvent* |
+| `runningEvent` | `RunningEvent` |
 
-**Returns:** *void*
+#### Returns
 
-Inherited from: Contract.\_checkRunningEvents
+`void`
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:113
+#### Inherited from
+
+Contract.\_checkRunningEvents
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:113
 
 ___
 
 ### \_deployed
 
-▸ **_deployed**(`blockTag?`: BlockTag): *Promise*<Contract\>
+▸ **_deployed**(`blockTag?`): `Promise`<Contract\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `blockTag?` | BlockTag |
+| `blockTag?` | `BlockTag` |
 
-**Returns:** *Promise*<Contract\>
+#### Returns
 
-Inherited from: Contract.\_deployed
+`Promise`<Contract\>
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:106
+#### Inherited from
+
+Contract.\_deployed
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:106
 
 ___
 
 ### \_wrapEvent
 
-▸ **_wrapEvent**(`runningEvent`: *RunningEvent*, `log`: Log, `listener`: Listener): Event
+▸ **_wrapEvent**(`runningEvent`, `log`, `listener`): `Event`
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `runningEvent` | *RunningEvent* |
-| `log` | Log |
-| `listener` | Listener |
+| `runningEvent` | `RunningEvent` |
+| `log` | `Log` |
+| `listener` | `Listener` |
 
-**Returns:** Event
+#### Returns
 
-Inherited from: Contract.\_wrapEvent
+`Event`
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:114
+#### Inherited from
+
+Contract.\_wrapEvent
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:114
 
 ___
 
 ### attach
 
-▸ **attach**(`addressOrName`: *string*): [*ERC777SenderRecipientMock*](erc777senderrecipientmock.md)
+▸ **attach**(`addressOrName`): [ERC777SenderRecipientMock](erc777senderrecipientmock.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `addressOrName` | *string* |
+| `addressOrName` | `string` |
 
-**Returns:** [*ERC777SenderRecipientMock*](erc777senderrecipientmock.md)
+#### Returns
 
-Overrides: Contract.attach
+[ERC777SenderRecipientMock](erc777senderrecipientmock.md)
 
-Defined in: packages/ethereum/types/ERC777SenderRecipientMock.d.ts:126
+#### Overrides
+
+Contract.attach
+
+#### Defined in
+
+packages/ethereum/types/ERC777SenderRecipientMock.d.ts:126
 
 ___
 
 ### burn
 
-▸ **burn**(`token`: *string*, `amount`: BigNumberish, `data`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): *Promise*<ContractTransaction\>
+▸ **burn**(`token`, `amount`, `data`, `overrides?`): `Promise`<ContractTransaction\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `token` | *string* |
-| `amount` | BigNumberish |
-| `data` | BytesLike |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `token` | `string` |
+| `amount` | `BigNumberish` |
+| `data` | `BytesLike` |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** *Promise*<ContractTransaction\>
+#### Returns
 
-Defined in: packages/ethereum/types/ERC777SenderRecipientMock.d.ts:311
+`Promise`<ContractTransaction\>
+
+#### Defined in
+
+packages/ethereum/types/ERC777SenderRecipientMock.d.ts:311
 
 ___
 
 ### burn(address,uint256,bytes)
 
-▸ **burn(address,uint256,bytes)**(`token`: *string*, `amount`: BigNumberish, `data`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): *Promise*<ContractTransaction\>
+▸ **burn(address,uint256,bytes)**(`token`, `amount`, `data`, `overrides?`): `Promise`<ContractTransaction\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `token` | *string* |
-| `amount` | BigNumberish |
-| `data` | BytesLike |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `token` | `string` |
+| `amount` | `BigNumberish` |
+| `data` | `BytesLike` |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** *Promise*<ContractTransaction\>
+#### Returns
 
-Defined in: packages/ethereum/types/ERC777SenderRecipientMock.d.ts:316
+`Promise`<ContractTransaction\>
+
+#### Defined in
+
+packages/ethereum/types/ERC777SenderRecipientMock.d.ts:316
 
 ___
 
 ### canImplementInterfaceForAddress
 
-▸ **canImplementInterfaceForAddress**(`interfaceHash`: BytesLike, `account`: *string*, `overrides?`: CallOverrides): *Promise*<string\>
+▸ **canImplementInterfaceForAddress**(`interfaceHash`, `account`, `overrides?`): `Promise`<string\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `interfaceHash` | BytesLike |
-| `account` | *string* |
-| `overrides?` | CallOverrides |
+| `interfaceHash` | `BytesLike` |
+| `account` | `string` |
+| `overrides?` | `CallOverrides` |
 
-**Returns:** *Promise*<string\>
+#### Returns
 
-Defined in: packages/ethereum/types/ERC777SenderRecipientMock.d.ts:325
+`Promise`<string\>
+
+#### Defined in
+
+packages/ethereum/types/ERC777SenderRecipientMock.d.ts:325
 
 ___
 
 ### canImplementInterfaceForAddress(bytes32,address)
 
-▸ **canImplementInterfaceForAddress(bytes32,address)**(`interfaceHash`: BytesLike, `account`: *string*, `overrides?`: CallOverrides): *Promise*<string\>
+▸ **canImplementInterfaceForAddress(bytes32,address)**(`interfaceHash`, `account`, `overrides?`): `Promise`<string\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `interfaceHash` | BytesLike |
-| `account` | *string* |
-| `overrides?` | CallOverrides |
+| `interfaceHash` | `BytesLike` |
+| `account` | `string` |
+| `overrides?` | `CallOverrides` |
 
-**Returns:** *Promise*<string\>
+#### Returns
 
-Defined in: packages/ethereum/types/ERC777SenderRecipientMock.d.ts:329
+`Promise`<string\>
+
+#### Defined in
+
+packages/ethereum/types/ERC777SenderRecipientMock.d.ts:329
 
 ___
 
 ### connect
 
-▸ **connect**(`signerOrProvider`: *string* \| *Signer* \| *Provider*): [*ERC777SenderRecipientMock*](erc777senderrecipientmock.md)
+▸ **connect**(`signerOrProvider`): [ERC777SenderRecipientMock](erc777senderrecipientmock.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `signerOrProvider` | *string* \| *Signer* \| *Provider* |
+| `signerOrProvider` | `string` \| `Signer` \| `Provider` |
 
-**Returns:** [*ERC777SenderRecipientMock*](erc777senderrecipientmock.md)
+#### Returns
 
-Overrides: Contract.connect
+[ERC777SenderRecipientMock](erc777senderrecipientmock.md)
 
-Defined in: packages/ethereum/types/ERC777SenderRecipientMock.d.ts:125
+#### Overrides
+
+Contract.connect
+
+#### Defined in
+
+packages/ethereum/types/ERC777SenderRecipientMock.d.ts:125
 
 ___
 
 ### deployed
 
-▸ **deployed**(): *Promise*<[*ERC777SenderRecipientMock*](erc777senderrecipientmock.md)\>
+▸ **deployed**(): `Promise`<[ERC777SenderRecipientMock](erc777senderrecipientmock.md)\>
 
-**Returns:** *Promise*<[*ERC777SenderRecipientMock*](erc777senderrecipientmock.md)\>
+#### Returns
 
-Overrides: Contract.deployed
+`Promise`<[ERC777SenderRecipientMock](erc777senderrecipientmock.md)\>
 
-Defined in: packages/ethereum/types/ERC777SenderRecipientMock.d.ts:127
+#### Overrides
+
+Contract.deployed
+
+#### Defined in
+
+packages/ethereum/types/ERC777SenderRecipientMock.d.ts:127
 
 ___
 
 ### emit
 
-▸ **emit**(`eventName`: *string* \| EventFilter, ...`args`: *any*[]): *boolean*
+▸ **emit**(`eventName`, ...`args`): `boolean`
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventName` | *string* \| EventFilter |
-| `...args` | *any*[] |
+| `eventName` | `string` \| `EventFilter` |
+| `...args` | `any`[] |
 
-**Returns:** *boolean*
+#### Returns
 
-Inherited from: Contract.emit
+`boolean`
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:119
+#### Inherited from
+
+Contract.emit
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:119
 
 ___
 
 ### fallback
 
-▸ **fallback**(`overrides?`: TransactionRequest): *Promise*<TransactionResponse\>
+▸ **fallback**(`overrides?`): `Promise`<TransactionResponse\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `overrides?` | TransactionRequest |
+| `overrides?` | `TransactionRequest` |
 
-**Returns:** *Promise*<TransactionResponse\>
+#### Returns
 
-Inherited from: Contract.fallback
+`Promise`<TransactionResponse\>
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:107
+#### Inherited from
+
+Contract.fallback
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:107
 
 ___
 
 ### listenerCount
 
-▸ **listenerCount**(`eventName?`: *string* \| EventFilter): *number*
+▸ **listenerCount**(`eventName?`): `number`
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventName?` | *string* \| EventFilter |
+| `eventName?` | `string` \| `EventFilter` |
 
-**Returns:** *number*
+#### Returns
 
-Inherited from: Contract.listenerCount
+`number`
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:120
+#### Inherited from
+
+Contract.listenerCount
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:120
 
 ___
 
 ### listeners
 
-▸ **listeners**<EventArgsArray, EventArgsObject\>(`eventFilter?`: [*TypedEventFilter*](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\>): [*TypedListener*](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\>[]
+▸ **listeners**<EventArgsArray, EventArgsObject\>(`eventFilter?`): [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\>[]
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | *any*[] |
-| `EventArgsObject` | - |
+| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter?` | [*TypedEventFilter*](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
+| `eventFilter?` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
 
-**Returns:** [*TypedListener*](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\>[]
+#### Returns
 
-Overrides: Contract.listeners
+[TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\>[]
 
-Defined in: packages/ethereum/types/ERC777SenderRecipientMock.d.ts:129
+#### Overrides
 
-▸ **listeners**(`eventName?`: *string*): Listener[]
+Contract.listeners
+
+#### Defined in
+
+packages/ethereum/types/ERC777SenderRecipientMock.d.ts:129
+
+▸ **listeners**(`eventName?`): `Listener`[]
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventName?` | *string* |
+| `eventName?` | `string` |
 
-**Returns:** Listener[]
+#### Returns
 
-Overrides: Contract.listeners
+`Listener`[]
 
-Defined in: packages/ethereum/types/ERC777SenderRecipientMock.d.ts:152
+#### Overrides
+
+Contract.listeners
+
+#### Defined in
+
+packages/ethereum/types/ERC777SenderRecipientMock.d.ts:152
 
 ___
 
 ### off
 
-▸ **off**<EventArgsArray, EventArgsObject\>(`eventFilter`: [*TypedEventFilter*](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\>, `listener`: [*TypedListener*](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\>): [*ERC777SenderRecipientMock*](erc777senderrecipientmock.md)
+▸ **off**<EventArgsArray, EventArgsObject\>(`eventFilter`, `listener`): [ERC777SenderRecipientMock](erc777senderrecipientmock.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | *any*[] |
-| `EventArgsObject` | - |
+| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [*TypedEventFilter*](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `listener` | [*TypedListener*](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
+| `listener` | [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
 
-**Returns:** [*ERC777SenderRecipientMock*](erc777senderrecipientmock.md)
+#### Returns
 
-Overrides: Contract.off
+[ERC777SenderRecipientMock](erc777senderrecipientmock.md)
 
-Defined in: packages/ethereum/types/ERC777SenderRecipientMock.d.ts:132
+#### Overrides
 
-▸ **off**(`eventName`: *string*, `listener`: Listener): [*ERC777SenderRecipientMock*](erc777senderrecipientmock.md)
+Contract.off
+
+#### Defined in
+
+packages/ethereum/types/ERC777SenderRecipientMock.d.ts:132
+
+▸ **off**(`eventName`, `listener`): [ERC777SenderRecipientMock](erc777senderrecipientmock.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventName` | *string* |
-| `listener` | Listener |
+| `eventName` | `string` |
+| `listener` | `Listener` |
 
-**Returns:** [*ERC777SenderRecipientMock*](erc777senderrecipientmock.md)
+#### Returns
 
-Overrides: Contract.off
+[ERC777SenderRecipientMock](erc777senderrecipientmock.md)
 
-Defined in: packages/ethereum/types/ERC777SenderRecipientMock.d.ts:153
+#### Overrides
+
+Contract.off
+
+#### Defined in
+
+packages/ethereum/types/ERC777SenderRecipientMock.d.ts:153
 
 ___
 
 ### on
 
-▸ **on**<EventArgsArray, EventArgsObject\>(`eventFilter`: [*TypedEventFilter*](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\>, `listener`: [*TypedListener*](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\>): [*ERC777SenderRecipientMock*](erc777senderrecipientmock.md)
+▸ **on**<EventArgsArray, EventArgsObject\>(`eventFilter`, `listener`): [ERC777SenderRecipientMock](erc777senderrecipientmock.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | *any*[] |
-| `EventArgsObject` | - |
+| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [*TypedEventFilter*](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `listener` | [*TypedListener*](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
+| `listener` | [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
 
-**Returns:** [*ERC777SenderRecipientMock*](erc777senderrecipientmock.md)
+#### Returns
 
-Overrides: Contract.on
+[ERC777SenderRecipientMock](erc777senderrecipientmock.md)
 
-Defined in: packages/ethereum/types/ERC777SenderRecipientMock.d.ts:136
+#### Overrides
 
-▸ **on**(`eventName`: *string*, `listener`: Listener): [*ERC777SenderRecipientMock*](erc777senderrecipientmock.md)
+Contract.on
+
+#### Defined in
+
+packages/ethereum/types/ERC777SenderRecipientMock.d.ts:136
+
+▸ **on**(`eventName`, `listener`): [ERC777SenderRecipientMock](erc777senderrecipientmock.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventName` | *string* |
-| `listener` | Listener |
+| `eventName` | `string` |
+| `listener` | `Listener` |
 
-**Returns:** [*ERC777SenderRecipientMock*](erc777senderrecipientmock.md)
+#### Returns
 
-Overrides: Contract.on
+[ERC777SenderRecipientMock](erc777senderrecipientmock.md)
 
-Defined in: packages/ethereum/types/ERC777SenderRecipientMock.d.ts:154
+#### Overrides
+
+Contract.on
+
+#### Defined in
+
+packages/ethereum/types/ERC777SenderRecipientMock.d.ts:154
 
 ___
 
 ### once
 
-▸ **once**<EventArgsArray, EventArgsObject\>(`eventFilter`: [*TypedEventFilter*](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\>, `listener`: [*TypedListener*](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\>): [*ERC777SenderRecipientMock*](erc777senderrecipientmock.md)
+▸ **once**<EventArgsArray, EventArgsObject\>(`eventFilter`, `listener`): [ERC777SenderRecipientMock](erc777senderrecipientmock.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | *any*[] |
-| `EventArgsObject` | - |
+| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [*TypedEventFilter*](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `listener` | [*TypedListener*](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
+| `listener` | [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
 
-**Returns:** [*ERC777SenderRecipientMock*](erc777senderrecipientmock.md)
+#### Returns
 
-Overrides: Contract.once
+[ERC777SenderRecipientMock](erc777senderrecipientmock.md)
 
-Defined in: packages/ethereum/types/ERC777SenderRecipientMock.d.ts:140
+#### Overrides
 
-▸ **once**(`eventName`: *string*, `listener`: Listener): [*ERC777SenderRecipientMock*](erc777senderrecipientmock.md)
+Contract.once
+
+#### Defined in
+
+packages/ethereum/types/ERC777SenderRecipientMock.d.ts:140
+
+▸ **once**(`eventName`, `listener`): [ERC777SenderRecipientMock](erc777senderrecipientmock.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventName` | *string* |
-| `listener` | Listener |
+| `eventName` | `string` |
+| `listener` | `Listener` |
 
-**Returns:** [*ERC777SenderRecipientMock*](erc777senderrecipientmock.md)
+#### Returns
 
-Overrides: Contract.once
+[ERC777SenderRecipientMock](erc777senderrecipientmock.md)
 
-Defined in: packages/ethereum/types/ERC777SenderRecipientMock.d.ts:155
+#### Overrides
+
+Contract.once
+
+#### Defined in
+
+packages/ethereum/types/ERC777SenderRecipientMock.d.ts:155
 
 ___
 
 ### queryFilter
 
-▸ **queryFilter**<EventArgsArray, EventArgsObject\>(`event`: [*TypedEventFilter*](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\>, `fromBlockOrBlockhash?`: *string* \| *number*, `toBlock?`: *string* \| *number*): *Promise*<[*TypedEvent*](../interfaces/typedevent.md)<EventArgsArray & EventArgsObject\>[]\>
+▸ **queryFilter**<EventArgsArray, EventArgsObject\>(`event`, `fromBlockOrBlockhash?`, `toBlock?`): `Promise`<[TypedEvent](../interfaces/typedevent.md)<`EventArgsArray` & `EventArgsObject`\>[]\>
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | *any*[] |
-| `EventArgsObject` | - |
+| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `event` | [*TypedEventFilter*](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `fromBlockOrBlockhash?` | *string* \| *number* |
-| `toBlock?` | *string* \| *number* |
+| `event` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
+| `fromBlockOrBlockhash?` | `string` \| `number` |
+| `toBlock?` | `string` \| `number` |
 
-**Returns:** *Promise*<[*TypedEvent*](../interfaces/typedevent.md)<EventArgsArray & EventArgsObject\>[]\>
+#### Returns
 
-Overrides: Contract.queryFilter
+`Promise`<[TypedEvent](../interfaces/typedevent.md)<`EventArgsArray` & `EventArgsObject`\>[]\>
 
-Defined in: packages/ethereum/types/ERC777SenderRecipientMock.d.ts:159
+#### Overrides
+
+Contract.queryFilter
+
+#### Defined in
+
+packages/ethereum/types/ERC777SenderRecipientMock.d.ts:159
 
 ___
 
 ### recipientFor
 
-▸ **recipientFor**(`account`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): *Promise*<ContractTransaction\>
+▸ **recipientFor**(`account`, `overrides?`): `Promise`<ContractTransaction\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `account` | *string* |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `account` | `string` |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** *Promise*<ContractTransaction\>
+#### Returns
 
-Defined in: packages/ethereum/types/ERC777SenderRecipientMock.d.ts:337
+`Promise`<ContractTransaction\>
+
+#### Defined in
+
+packages/ethereum/types/ERC777SenderRecipientMock.d.ts:337
 
 ___
 
 ### recipientFor(address)
 
-▸ **recipientFor(address)**(`account`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): *Promise*<ContractTransaction\>
+▸ **recipientFor(address)**(`account`, `overrides?`): `Promise`<ContractTransaction\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `account` | *string* |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `account` | `string` |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** *Promise*<ContractTransaction\>
+#### Returns
 
-Defined in: packages/ethereum/types/ERC777SenderRecipientMock.d.ts:340
+`Promise`<ContractTransaction\>
+
+#### Defined in
+
+packages/ethereum/types/ERC777SenderRecipientMock.d.ts:340
 
 ___
 
 ### registerRecipient
 
-▸ **registerRecipient**(`recipient`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): *Promise*<ContractTransaction\>
+▸ **registerRecipient**(`recipient`, `overrides?`): `Promise`<ContractTransaction\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `recipient` | *string* |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `recipient` | `string` |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** *Promise*<ContractTransaction\>
+#### Returns
 
-Defined in: packages/ethereum/types/ERC777SenderRecipientMock.d.ts:347
+`Promise`<ContractTransaction\>
+
+#### Defined in
+
+packages/ethereum/types/ERC777SenderRecipientMock.d.ts:347
 
 ___
 
 ### registerRecipient(address)
 
-▸ **registerRecipient(address)**(`recipient`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): *Promise*<ContractTransaction\>
+▸ **registerRecipient(address)**(`recipient`, `overrides?`): `Promise`<ContractTransaction\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `recipient` | *string* |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `recipient` | `string` |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** *Promise*<ContractTransaction\>
+#### Returns
 
-Defined in: packages/ethereum/types/ERC777SenderRecipientMock.d.ts:350
+`Promise`<ContractTransaction\>
+
+#### Defined in
+
+packages/ethereum/types/ERC777SenderRecipientMock.d.ts:350
 
 ___
 
 ### registerSender
 
-▸ **registerSender**(`sender`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): *Promise*<ContractTransaction\>
+▸ **registerSender**(`sender`, `overrides?`): `Promise`<ContractTransaction\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `sender` | *string* |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `sender` | `string` |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** *Promise*<ContractTransaction\>
+#### Returns
 
-Defined in: packages/ethereum/types/ERC777SenderRecipientMock.d.ts:357
+`Promise`<ContractTransaction\>
+
+#### Defined in
+
+packages/ethereum/types/ERC777SenderRecipientMock.d.ts:357
 
 ___
 
 ### registerSender(address)
 
-▸ **registerSender(address)**(`sender`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): *Promise*<ContractTransaction\>
+▸ **registerSender(address)**(`sender`, `overrides?`): `Promise`<ContractTransaction\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `sender` | *string* |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `sender` | `string` |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** *Promise*<ContractTransaction\>
+#### Returns
 
-Defined in: packages/ethereum/types/ERC777SenderRecipientMock.d.ts:360
+`Promise`<ContractTransaction\>
+
+#### Defined in
+
+packages/ethereum/types/ERC777SenderRecipientMock.d.ts:360
 
 ___
 
 ### removeAllListeners
 
-▸ **removeAllListeners**<EventArgsArray, EventArgsObject\>(`eventFilter`: [*TypedEventFilter*](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\>): [*ERC777SenderRecipientMock*](erc777senderrecipientmock.md)
+▸ **removeAllListeners**<EventArgsArray, EventArgsObject\>(`eventFilter`): [ERC777SenderRecipientMock](erc777senderrecipientmock.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | *any*[] |
-| `EventArgsObject` | - |
+| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [*TypedEventFilter*](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
 
-**Returns:** [*ERC777SenderRecipientMock*](erc777senderrecipientmock.md)
+#### Returns
 
-Overrides: Contract.removeAllListeners
+[ERC777SenderRecipientMock](erc777senderrecipientmock.md)
 
-Defined in: packages/ethereum/types/ERC777SenderRecipientMock.d.ts:148
+#### Overrides
 
-▸ **removeAllListeners**(`eventName?`: *string*): [*ERC777SenderRecipientMock*](erc777senderrecipientmock.md)
+Contract.removeAllListeners
+
+#### Defined in
+
+packages/ethereum/types/ERC777SenderRecipientMock.d.ts:148
+
+▸ **removeAllListeners**(`eventName?`): [ERC777SenderRecipientMock](erc777senderrecipientmock.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventName?` | *string* |
+| `eventName?` | `string` |
 
-**Returns:** [*ERC777SenderRecipientMock*](erc777senderrecipientmock.md)
+#### Returns
 
-Overrides: Contract.removeAllListeners
+[ERC777SenderRecipientMock](erc777senderrecipientmock.md)
 
-Defined in: packages/ethereum/types/ERC777SenderRecipientMock.d.ts:157
+#### Overrides
+
+Contract.removeAllListeners
+
+#### Defined in
+
+packages/ethereum/types/ERC777SenderRecipientMock.d.ts:157
 
 ___
 
 ### removeListener
 
-▸ **removeListener**<EventArgsArray, EventArgsObject\>(`eventFilter`: [*TypedEventFilter*](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\>, `listener`: [*TypedListener*](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\>): [*ERC777SenderRecipientMock*](erc777senderrecipientmock.md)
+▸ **removeListener**<EventArgsArray, EventArgsObject\>(`eventFilter`, `listener`): [ERC777SenderRecipientMock](erc777senderrecipientmock.md)
 
 #### Type parameters
 
 | Name | Type |
 | :------ | :------ |
-| `EventArgsArray` | *any*[] |
-| `EventArgsObject` | - |
+| `EventArgsArray` | `EventArgsArray`: `any`[] |
+| `EventArgsObject` | `EventArgsObject` |
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventFilter` | [*TypedEventFilter*](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
-| `listener` | [*TypedListener*](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
+| `eventFilter` | [TypedEventFilter](../interfaces/typedeventfilter.md)<EventArgsArray, EventArgsObject\> |
+| `listener` | [TypedListener](../modules.md#typedlistener)<EventArgsArray, EventArgsObject\> |
 
-**Returns:** [*ERC777SenderRecipientMock*](erc777senderrecipientmock.md)
+#### Returns
 
-Overrides: Contract.removeListener
+[ERC777SenderRecipientMock](erc777senderrecipientmock.md)
 
-Defined in: packages/ethereum/types/ERC777SenderRecipientMock.d.ts:144
+#### Overrides
 
-▸ **removeListener**(`eventName`: *string*, `listener`: Listener): [*ERC777SenderRecipientMock*](erc777senderrecipientmock.md)
+Contract.removeListener
+
+#### Defined in
+
+packages/ethereum/types/ERC777SenderRecipientMock.d.ts:144
+
+▸ **removeListener**(`eventName`, `listener`): [ERC777SenderRecipientMock](erc777senderrecipientmock.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `eventName` | *string* |
-| `listener` | Listener |
+| `eventName` | `string` |
+| `listener` | `Listener` |
 
-**Returns:** [*ERC777SenderRecipientMock*](erc777senderrecipientmock.md)
+#### Returns
 
-Overrides: Contract.removeListener
+[ERC777SenderRecipientMock](erc777senderrecipientmock.md)
 
-Defined in: packages/ethereum/types/ERC777SenderRecipientMock.d.ts:156
+#### Overrides
+
+Contract.removeListener
+
+#### Defined in
+
+packages/ethereum/types/ERC777SenderRecipientMock.d.ts:156
 
 ___
 
 ### send
 
-▸ **send**(`token`: *string*, `to`: *string*, `amount`: BigNumberish, `data`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): *Promise*<ContractTransaction\>
+▸ **send**(`token`, `to`, `amount`, `data`, `overrides?`): `Promise`<ContractTransaction\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `token` | *string* |
-| `to` | *string* |
-| `amount` | BigNumberish |
-| `data` | BytesLike |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `token` | `string` |
+| `to` | `string` |
+| `amount` | `BigNumberish` |
+| `data` | `BytesLike` |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** *Promise*<ContractTransaction\>
+#### Returns
 
-Defined in: packages/ethereum/types/ERC777SenderRecipientMock.d.ts:367
+`Promise`<ContractTransaction\>
+
+#### Defined in
+
+packages/ethereum/types/ERC777SenderRecipientMock.d.ts:367
 
 ___
 
 ### send(address,address,uint256,bytes)
 
-▸ **send(address,address,uint256,bytes)**(`token`: *string*, `to`: *string*, `amount`: BigNumberish, `data`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): *Promise*<ContractTransaction\>
+▸ **send(address,address,uint256,bytes)**(`token`, `to`, `amount`, `data`, `overrides?`): `Promise`<ContractTransaction\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `token` | *string* |
-| `to` | *string* |
-| `amount` | BigNumberish |
-| `data` | BytesLike |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `token` | `string` |
+| `to` | `string` |
+| `amount` | `BigNumberish` |
+| `data` | `BytesLike` |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** *Promise*<ContractTransaction\>
+#### Returns
 
-Defined in: packages/ethereum/types/ERC777SenderRecipientMock.d.ts:373
+`Promise`<ContractTransaction\>
+
+#### Defined in
+
+packages/ethereum/types/ERC777SenderRecipientMock.d.ts:373
 
 ___
 
 ### senderFor
 
-▸ **senderFor**(`account`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): *Promise*<ContractTransaction\>
+▸ **senderFor**(`account`, `overrides?`): `Promise`<ContractTransaction\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `account` | *string* |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `account` | `string` |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** *Promise*<ContractTransaction\>
+#### Returns
 
-Defined in: packages/ethereum/types/ERC777SenderRecipientMock.d.ts:383
+`Promise`<ContractTransaction\>
+
+#### Defined in
+
+packages/ethereum/types/ERC777SenderRecipientMock.d.ts:383
 
 ___
 
 ### senderFor(address)
 
-▸ **senderFor(address)**(`account`: *string*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): *Promise*<ContractTransaction\>
+▸ **senderFor(address)**(`account`, `overrides?`): `Promise`<ContractTransaction\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `account` | *string* |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `account` | `string` |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** *Promise*<ContractTransaction\>
+#### Returns
 
-Defined in: packages/ethereum/types/ERC777SenderRecipientMock.d.ts:386
+`Promise`<ContractTransaction\>
+
+#### Defined in
+
+packages/ethereum/types/ERC777SenderRecipientMock.d.ts:386
 
 ___
 
 ### setShouldRevertReceive
 
-▸ **setShouldRevertReceive**(`shouldRevert`: *boolean*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): *Promise*<ContractTransaction\>
+▸ **setShouldRevertReceive**(`shouldRevert`, `overrides?`): `Promise`<ContractTransaction\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `shouldRevert` | *boolean* |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `shouldRevert` | `boolean` |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** *Promise*<ContractTransaction\>
+#### Returns
 
-Defined in: packages/ethereum/types/ERC777SenderRecipientMock.d.ts:393
+`Promise`<ContractTransaction\>
+
+#### Defined in
+
+packages/ethereum/types/ERC777SenderRecipientMock.d.ts:393
 
 ___
 
 ### setShouldRevertReceive(bool)
 
-▸ **setShouldRevertReceive(bool)**(`shouldRevert`: *boolean*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): *Promise*<ContractTransaction\>
+▸ **setShouldRevertReceive(bool)**(`shouldRevert`, `overrides?`): `Promise`<ContractTransaction\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `shouldRevert` | *boolean* |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `shouldRevert` | `boolean` |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** *Promise*<ContractTransaction\>
+#### Returns
 
-Defined in: packages/ethereum/types/ERC777SenderRecipientMock.d.ts:396
+`Promise`<ContractTransaction\>
+
+#### Defined in
+
+packages/ethereum/types/ERC777SenderRecipientMock.d.ts:396
 
 ___
 
 ### setShouldRevertSend
 
-▸ **setShouldRevertSend**(`shouldRevert`: *boolean*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): *Promise*<ContractTransaction\>
+▸ **setShouldRevertSend**(`shouldRevert`, `overrides?`): `Promise`<ContractTransaction\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `shouldRevert` | *boolean* |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `shouldRevert` | `boolean` |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** *Promise*<ContractTransaction\>
+#### Returns
 
-Defined in: packages/ethereum/types/ERC777SenderRecipientMock.d.ts:403
+`Promise`<ContractTransaction\>
+
+#### Defined in
+
+packages/ethereum/types/ERC777SenderRecipientMock.d.ts:403
 
 ___
 
 ### setShouldRevertSend(bool)
 
-▸ **setShouldRevertSend(bool)**(`shouldRevert`: *boolean*, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): *Promise*<ContractTransaction\>
+▸ **setShouldRevertSend(bool)**(`shouldRevert`, `overrides?`): `Promise`<ContractTransaction\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `shouldRevert` | *boolean* |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `shouldRevert` | `boolean` |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** *Promise*<ContractTransaction\>
+#### Returns
 
-Defined in: packages/ethereum/types/ERC777SenderRecipientMock.d.ts:406
+`Promise`<ContractTransaction\>
+
+#### Defined in
+
+packages/ethereum/types/ERC777SenderRecipientMock.d.ts:406
 
 ___
 
 ### tokensReceived
 
-▸ **tokensReceived**(`operator`: *string*, `from`: *string*, `to`: *string*, `amount`: BigNumberish, `userData`: BytesLike, `operatorData`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): *Promise*<ContractTransaction\>
+▸ **tokensReceived**(`operator`, `from`, `to`, `amount`, `userData`, `operatorData`, `overrides?`): `Promise`<ContractTransaction\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `operator` | *string* |
-| `from` | *string* |
-| `to` | *string* |
-| `amount` | BigNumberish |
-| `userData` | BytesLike |
-| `operatorData` | BytesLike |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `operator` | `string` |
+| `from` | `string` |
+| `to` | `string` |
+| `amount` | `BigNumberish` |
+| `userData` | `BytesLike` |
+| `operatorData` | `BytesLike` |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** *Promise*<ContractTransaction\>
+#### Returns
 
-Defined in: packages/ethereum/types/ERC777SenderRecipientMock.d.ts:413
+`Promise`<ContractTransaction\>
+
+#### Defined in
+
+packages/ethereum/types/ERC777SenderRecipientMock.d.ts:413
 
 ___
 
 ### tokensReceived(address,address,address,uint256,bytes,bytes)
 
-▸ **tokensReceived(address,address,address,uint256,bytes,bytes)**(`operator`: *string*, `from`: *string*, `to`: *string*, `amount`: BigNumberish, `userData`: BytesLike, `operatorData`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): *Promise*<ContractTransaction\>
+▸ **tokensReceived(address,address,address,uint256,bytes,bytes)**(`operator`, `from`, `to`, `amount`, `userData`, `operatorData`, `overrides?`): `Promise`<ContractTransaction\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `operator` | *string* |
-| `from` | *string* |
-| `to` | *string* |
-| `amount` | BigNumberish |
-| `userData` | BytesLike |
-| `operatorData` | BytesLike |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `operator` | `string` |
+| `from` | `string` |
+| `to` | `string` |
+| `amount` | `BigNumberish` |
+| `userData` | `BytesLike` |
+| `operatorData` | `BytesLike` |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** *Promise*<ContractTransaction\>
+#### Returns
 
-Defined in: packages/ethereum/types/ERC777SenderRecipientMock.d.ts:421
+`Promise`<ContractTransaction\>
+
+#### Defined in
+
+packages/ethereum/types/ERC777SenderRecipientMock.d.ts:421
 
 ___
 
 ### tokensToSend
 
-▸ **tokensToSend**(`operator`: *string*, `from`: *string*, `to`: *string*, `amount`: BigNumberish, `userData`: BytesLike, `operatorData`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): *Promise*<ContractTransaction\>
+▸ **tokensToSend**(`operator`, `from`, `to`, `amount`, `userData`, `operatorData`, `overrides?`): `Promise`<ContractTransaction\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `operator` | *string* |
-| `from` | *string* |
-| `to` | *string* |
-| `amount` | BigNumberish |
-| `userData` | BytesLike |
-| `operatorData` | BytesLike |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `operator` | `string` |
+| `from` | `string` |
+| `to` | `string` |
+| `amount` | `BigNumberish` |
+| `userData` | `BytesLike` |
+| `operatorData` | `BytesLike` |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** *Promise*<ContractTransaction\>
+#### Returns
 
-Defined in: packages/ethereum/types/ERC777SenderRecipientMock.d.ts:433
+`Promise`<ContractTransaction\>
+
+#### Defined in
+
+packages/ethereum/types/ERC777SenderRecipientMock.d.ts:433
 
 ___
 
 ### tokensToSend(address,address,address,uint256,bytes,bytes)
 
-▸ **tokensToSend(address,address,address,uint256,bytes,bytes)**(`operator`: *string*, `from`: *string*, `to`: *string*, `amount`: BigNumberish, `userData`: BytesLike, `operatorData`: BytesLike, `overrides?`: Overrides & { `from?`: *string* \| *Promise*<string\>  }): *Promise*<ContractTransaction\>
+▸ **tokensToSend(address,address,address,uint256,bytes,bytes)**(`operator`, `from`, `to`, `amount`, `userData`, `operatorData`, `overrides?`): `Promise`<ContractTransaction\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `operator` | *string* |
-| `from` | *string* |
-| `to` | *string* |
-| `amount` | BigNumberish |
-| `userData` | BytesLike |
-| `operatorData` | BytesLike |
-| `overrides?` | Overrides & { `from?`: *string* \| *Promise*<string\>  } |
+| `operator` | `string` |
+| `from` | `string` |
+| `to` | `string` |
+| `amount` | `BigNumberish` |
+| `userData` | `BytesLike` |
+| `operatorData` | `BytesLike` |
+| `overrides?` | `Overrides` & { `from?`: `string` \| `Promise`<string\>  } |
 
-**Returns:** *Promise*<ContractTransaction\>
+#### Returns
 
-Defined in: packages/ethereum/types/ERC777SenderRecipientMock.d.ts:441
+`Promise`<ContractTransaction\>
+
+#### Defined in
+
+packages/ethereum/types/ERC777SenderRecipientMock.d.ts:441
 
 ___
 
 ### getContractAddress
 
-▸ `Static` **getContractAddress**(`transaction`: { `from`: *string* ; `nonce`: BigNumberish  }): *string*
+▸ `Static` **getContractAddress**(`transaction`): `string`
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `transaction` | *object* |
-| `transaction.from` | *string* |
-| `transaction.nonce` | BigNumberish |
+| `transaction` | `Object` |
+| `transaction.from` | `string` |
+| `transaction.nonce` | `BigNumberish` |
 
-**Returns:** *string*
+#### Returns
 
-Inherited from: Contract.getContractAddress
+`string`
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:100
+#### Inherited from
+
+Contract.getContractAddress
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:100
 
 ___
 
 ### getInterface
 
-▸ `Static` **getInterface**(`contractInterface`: ContractInterface): *Interface*
+▸ `Static` **getInterface**(`contractInterface`): `Interface`
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `contractInterface` | ContractInterface |
+| `contractInterface` | `ContractInterface` |
 
-**Returns:** *Interface*
+#### Returns
 
-Inherited from: Contract.getInterface
+`Interface`
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:104
+#### Inherited from
+
+Contract.getInterface
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:104
 
 ___
 
 ### isIndexed
 
-▸ `Static` **isIndexed**(`value`: *any*): value is Indexed
+▸ `Static` **isIndexed**(`value`): value is Indexed
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `value` | *any* |
+| `value` | `any` |
 
-**Returns:** value is Indexed
+#### Returns
 
-Inherited from: Contract.isIndexed
+value is Indexed
 
-Defined in: node_modules/@ethersproject/contracts/lib/index.d.ts:110
+#### Inherited from
+
+Contract.isIndexed
+
+#### Defined in
+
+node_modules/@ethersproject/contracts/lib/index.d.ts:110
