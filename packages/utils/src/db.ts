@@ -329,11 +329,10 @@ export class HoprDB {
     return this.getAll<AccountEntry>(ACCOUNT_PREFIX, AccountEntry.deserialize, filter)
   }
 
-  public async getRedeemedTicketsValue(): Promise<Balance>{
+  public async getRedeemedTicketsValue(): Promise<Balance> {
     return Balance.deserialize(await this.get(REDEEMED_TICKETS_VALUE))
-
   }
-  public async getRedeemedTicketsCount(): Promise<number>{
+  public async getRedeemedTicketsCount(): Promise<number> {
     return u8aToNumber(await this.get(REDEEMED_TICKETS_COUNT))
   }
 
