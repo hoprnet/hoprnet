@@ -1,5 +1,5 @@
 import { AcknowledgementChallenge } from './acknowledgementChallenge'
-import { SECP256K1_CONSTANTS, u8aSplit, HalfKey } from '@hoprnet/hopr-utils'
+import { SECP256K1_CONSTANTS, u8aSplit, HalfKey, u8aToHex } from '@hoprnet/hopr-utils'
 import { ecdsaSign, ecdsaVerify } from 'secp256k1'
 import { SECRET_LENGTH, HASH_ALGORITHM } from './constants'
 import { createHash } from 'crypto'

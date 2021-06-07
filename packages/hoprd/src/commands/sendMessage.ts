@@ -38,7 +38,7 @@ export class SendMessage extends AbstractCommand {
     }
   }
 
-  public async execute(log, query: string, state: GlobalState): Promise<void> {
+  public async execute(log: (str: string) => void, query: string, state: GlobalState): Promise<void> {
     try {
       let [err, peerIdString, message] = this._assertUsage(query, ['PeerId', 'Message'], /([A-Za-z0-9_,]+)\s(.*)/)
       if (err) throw Error(err)
@@ -63,14 +63,24 @@ export class SendMessage extends AbstractCommand {
             .map((current) => styleValue(current.toB58String(), 'peerId'))
             .join(',')} ...`
         )
-        log(this.sendMessage(state, recipient, message, path.slice(0, path.length - 1)))
+        try {
+          await this.sendMessage(state, recipient, message, path.slice(0, path.length - 1))
+          log(`Successfully sent message `)
+        } catch (err) {
+          log(`Could not send message. ${err.message}`)
+        }
         return
       }
 
       let peerId = await checkPeerIdInput(peerIdString, state)
 
       console.log(`Sending message to ${styleValue(peerId.toB58String(), 'peerId')} ...`)
-      log(this.sendMessage(state, peerId, message))
+      try {
+        await this.sendMessage(state, peerId, message)
+        log(`Successfully sent message `)
+      } catch (err) {
+        log(`Could not send message. ${err.message}`)
+      }
     } catch (err) {
       log(styleValue(err.message, 'failure'))
     }

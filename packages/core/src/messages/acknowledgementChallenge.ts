@@ -1,4 +1,4 @@
-import { SECP256K1_CONSTANTS, HalfKeyChallenge, HalfKey } from '@hoprnet/hopr-utils'
+import { SECP256K1_CONSTANTS, HalfKeyChallenge, HalfKey, u8aToHex } from '@hoprnet/hopr-utils'
 import { HASH_ALGORITHM } from './constants'
 import { ecdsaSign, ecdsaVerify } from 'secp256k1'
 import { createHash } from 'crypto'
@@ -53,6 +53,10 @@ export class AcknowledgementChallenge {
 
   solve(secret: Uint8Array): boolean {
     return this.ackChallenge.eq(new HalfKey(secret).toChallenge())
+  }
+
+  clone(): AcknowledgementChallenge {
+    return new AcknowledgementChallenge(this.ackChallenge.clone(), this.signature.slice())
   }
 }
 
