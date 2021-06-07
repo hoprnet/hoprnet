@@ -723,23 +723,9 @@ class Hopr extends EventEmitter {
   }
 
   public async submitAcknowledgedTicket(ackTicket: AcknowledgedTicket) {
-    try {
-      const ethereum = await this.paymentChannels
-      const signedTicket = ackTicket.ticket
-      const self = ethereum.getPublicKey()
-      const counterparty = signedTicket.recoverSigner()
-      const channel = ethereum.getChannel(self, counterparty)
-
-      const result = await channel.redeemTicket(ackTicket)
-      // TODO look at result.status and actually do something
-      await this.db.delAcknowledgedTicket(ackTicket.ticket.challenge)
-      return result
-    } catch (err) {
-      return {
-        status: 'ERROR',
-        error: err
-      }
-    }
+    const ethereum = await this.paymentChannels
+    const channel = ethereum.getChannel(ethereum.getPublicKey(), ackTicket.ticket.recoverSigner())
+    return await channel.redeemTicket(ackTicket)
   }
 
   public async getChannelsOf(addr: Address): Promise<ChannelEntry[]> {

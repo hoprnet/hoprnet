@@ -258,16 +258,17 @@ class Channel {
 
       const receipt = await this.chain.redeemTicket(this.counterparty.toAddress(), ackTicket, ticket)
 
-      // TODO delete ackTicket
       //this.commitment.updateChainState(ackTicket.preImage)
 
       log('Successfully submitted ticket', ackTicket.response.toHex())
+      await this.db.markRedeemeed(ackTicket)
       return {
         status: 'SUCCESS',
         receipt,
         ackTicket
       }
     } catch (err) {
+      // TODO delete ackTicket
       log('Unexpected error when submitting ticket', ackTicket.response.toHex(), err)
       return {
         status: 'ERROR',

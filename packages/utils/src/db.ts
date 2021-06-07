@@ -137,6 +137,13 @@ export class HoprDB {
     await this.db.del(Buffer.from(this.keyOf(key)))
   }
 
+  private async increment(key: Uint8Array): Promise<number> {
+    let u8a = await this.maybeGet(key)
+    let val = u8a ? u8aToNumber(u8a) : 0
+    await this.put(key, Uint8Array.of(val))
+    return val
+  }
+
   /**
    * Get unacknowledged tickets.
    * @param filter optionally filter by signer
@@ -190,8 +197,8 @@ export class HoprDB {
    * Delete acknowledged ticket in database
    * @param index Uint8Array
    */
-  public async delAcknowledgedTicket(challenge: EthereumChallenge): Promise<void> {
-    await this.del(acknowledgedTicketKey(challenge))
+  public async delAcknowledgedTicket(ack: AcknowledgedTicket): Promise<void> {
+    await this.del(acknowledgedTicketKey(ack.ticket.challenge))
   }
 
   public async replaceUnAckWithAck(halfKeyChallenge: HalfKeyChallenge, ackTicket: AcknowledgedTicket): Promise<void> {
@@ -338,6 +345,12 @@ export class HoprDB {
 
   public async getPendingTicketCount(): Promise<number> {
     return (await this.getUnacknowledgedTickets()).length
+  }
+
+  public async markRedeemeed(a: AcknowledgedTicket): Promise<void> {
+    await this.increment(REDEEMED_TICKETS_COUNT)
+    await this.delAcknowledgedTicket(a)
+
   }
 
   static createMock(): HoprDB {
