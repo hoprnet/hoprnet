@@ -178,7 +178,7 @@ const useMultiPartyFixtures = (ops: { latestBlockNumber?: number; pastEvents?: E
   }
 }
 
-describe.only('test indexer', function () {
+describe('test indexer', function () {
   it('should start indexer', async function () {
     const { indexer } = useFixtures()
 
