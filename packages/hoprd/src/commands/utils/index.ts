@@ -1,5 +1,2 @@
 export * from './checkPeerId'
-export * from './displayHelp'
 export * from './message'
-export * from './cliOptions'
-export * from './knownConnectors'
