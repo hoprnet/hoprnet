@@ -66,6 +66,7 @@ export default class Tickets extends AbstractCommand {
   }
 
   public async execute(log): Promise<void> {
+    log('finding information about tickets...')
     try {
       const ackTickets = await this.node.getAcknowledgedTickets()
 

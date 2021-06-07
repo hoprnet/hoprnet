@@ -268,8 +268,8 @@ class Channel {
         ackTicket
       }
     } catch (err) {
-      // TODO delete ackTicket
-      log('Unexpected error when submitting ticket', ackTicket.response.toHex(), err)
+      // TODO delete ackTicket -- check if it's due to gas!
+      log('Unexpected error when redeeming ticket', ackTicket.response.toHex(), err)
       return {
         status: 'ERROR',
         error: err
