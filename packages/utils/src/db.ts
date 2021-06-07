@@ -350,7 +350,6 @@ export class HoprDB {
   public async markRedeemeed(a: AcknowledgedTicket): Promise<void> {
     await this.increment(REDEEMED_TICKETS_COUNT)
     await this.delAcknowledgedTicket(a)
-
   }
 
   static createMock(): HoprDB {
