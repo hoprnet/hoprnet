@@ -53,8 +53,7 @@ import { subscribeToAcknowledgements } from './interactions/packet/acknowledgeme
 import { PacketForwardInteraction } from './interactions/packet/forward'
 
 import { Packet } from './messages'
-import { localAddressesFirst, AddressSorter } from '@hoprnet/hopr-utils'
-import { publicAddressesFirst } from 'libp2p-utils/src/address-sort'
+import { localAddressesFirst, publicAddressesFirst, AddressSorter } from '@hoprnet/hopr-utils'
 
 const log = Debug(`hopr-core`)
 const verbose = Debug('hopr-core:verbose')
