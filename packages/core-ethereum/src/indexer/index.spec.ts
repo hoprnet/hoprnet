@@ -123,6 +123,11 @@ const createChainMock = (
   } as unknown as ChainWrapper
 }
 
+const assertLater = async (assertion: () => any, delay: number) => {
+  await new Promise((resolve) => setTimeout(resolve, delay))
+  return assertion()
+}
+
 const useFixtures = (ops: { latestBlockNumber?: number; pastEvents?: Event<any>[] } = {}) => {
   const latestBlockNumber = ops.latestBlockNumber ?? 0
   const pastEvents = ops.pastEvents ?? []
@@ -173,7 +178,7 @@ const useMultiPartyFixtures = (ops: { latestBlockNumber?: number; pastEvents?: E
   }
 }
 
-describe('test indexer', function () {
+describe.only('test indexer', function () {
   it('should start indexer', async function () {
     const { indexer } = useFixtures()
 
@@ -218,6 +223,8 @@ describe('test indexer', function () {
   })
 
   it('should continue processing events', async function () {
+    this.timeout(3000)
+
     const { indexer, newEvent, newBlock } = useFixtures({
       latestBlockNumber: 3,
       pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.OPENED_EVENT]
@@ -227,10 +234,10 @@ describe('test indexer', function () {
     newEvent(fixtures.OPENED_EVENT)
     newBlock()
 
-    setImmediate(async () => {
+    await assertLater(async () => {
       const channel = await indexer.getChannel(fixtures.OPENED_CHANNEL.getId())
       expectChannelsToBeEqual(channel, fixtures.OPENED_CHANNEL)
-    })
+    }, 1000)
   })
 
   it('should get public key of addresses', async function () {
@@ -273,6 +280,8 @@ describe('test indexer', function () {
   })
 
   it('should handle provider error by restarting', async function () {
+    this.timeout(3000)
+
     const { indexer, provider } = useFixtures({
       latestBlockNumber: 4,
       pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.OPENED_EVENT]
@@ -282,12 +291,15 @@ describe('test indexer', function () {
 
     provider.emit('error', new Error('MOCK'))
 
-    setImmediate(async () => {
-      assert.strictEqual(indexer.status, 'restarting')
-    })
+    assert.strictEqual(indexer.status, 'stopped')
+    await assertLater(async () => {
+      assert.strictEqual(indexer.status, 'started')
+    }, 1000)
   })
 
   it('should contract error by restarting', async function () {
+    this.timeout(3000)
+
     const { indexer, hoprChannels } = useFixtures({
       latestBlockNumber: 4,
       pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.OPENED_EVENT]
@@ -297,12 +309,15 @@ describe('test indexer', function () {
 
     hoprChannels.emit('error', new Error('MOCK'))
 
-    setImmediate(async () => {
-      assert.strictEqual(indexer.status, 'restarting')
-    })
+    assert.strictEqual(indexer.status, 'stopped')
+    await assertLater(async () => {
+      assert.strictEqual(indexer.status, 'started')
+    }, 1000)
   })
 
   it('should emit events on updated channels', async function () {
+    this.timeout(5000)
+
     const { indexer, newEvent, newBlock } = useFixtures({
       latestBlockNumber: 3,
       pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT]
@@ -315,20 +330,21 @@ describe('test indexer', function () {
 
     indexer.on('own-channel-updated', (channel: ChannelEntry) => {
       switch (channel.status) {
-        case 'OPEN':
-          if (channel.partyATicketEpoch.toBN().isZero()) {
-            opened.resolve()
-          }
+        case 'OPEN': {
           if (channel.partyATicketEpoch.toBN().eqn(1)) {
+            opened.resolve()
             commitmentSet.resolve()
           }
           break
-        case 'PENDING_TO_CLOSE':
+        }
+        case 'PENDING_TO_CLOSE': {
           pendingIniated.resolve()
           break
-        case 'CLOSED':
+        }
+        case 'CLOSED': {
           closed.resolve()
           break
+        }
       }
     })
 
@@ -360,7 +376,7 @@ describe('test indexer', function () {
   })
 
   it('should start two indexers and should set commitments only once', async function () {
-    this.timeout(4e3)
+    this.timeout(5000)
 
     const { alice, bob, newBlock } = useMultiPartyFixtures({
       latestBlockNumber: 3,

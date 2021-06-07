@@ -83,9 +83,9 @@ export const OPENED_EVENT = {
     newState: {
       partyABalance: BigNumber.from('3'),
       partyBBalance: BigNumber.from('0'),
-      partyACommitment: new Hash(new Uint8Array({ length: Hash.SIZE })).toHex(),
+      partyACommitment: Hash.create(new TextEncoder().encode('commA')).toHex(),
       partyBCommitment: new Hash(new Uint8Array({ length: Hash.SIZE })).toHex(),
-      partyATicketEpoch: BigNumber.from('0'),
+      partyATicketEpoch: BigNumber.from('1'),
       partyBTicketEpoch: BigNumber.from('0'),
       partyATicketIndex: BigNumber.from('0'),
       partyBTicketIndex: BigNumber.from('0'),
