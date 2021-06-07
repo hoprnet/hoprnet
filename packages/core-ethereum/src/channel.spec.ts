@@ -8,7 +8,8 @@ import {
   Balance,
   UINT256,
   HoprDB,
-  createPoRValuesForSender
+  createPoRValuesForSender,
+  ChannelStatus
 } from '@hoprnet/hopr-utils'
 import assert from 'assert'
 import BN from 'bn.js'
@@ -21,7 +22,7 @@ const createChallenge = (secret1: Uint8Array, secret2: Uint8Array): Challenge =>
 }
 
 const createChainMock = (_channelEntry: ChannelEntry): ChainWrapper => {
-  return {
+  return ({
     async setCommitment() {},
     async getBalance() {},
     async fundChannel() {},
@@ -29,7 +30,7 @@ const createChainMock = (_channelEntry: ChannelEntry): ChainWrapper => {
     async initiateChannelClosure() {},
     async finalizeChannelClosure() {},
     async redeemTicket() {}
-  } as unknown as ChainWrapper
+  } as unknown) as ChainWrapper
 }
 
 const createIndexerMock = (channelEntry: ChannelEntry): Indexer => {
@@ -62,7 +63,7 @@ const createMocks = () => {
     new UINT256(new BN(1)),
     new UINT256(new BN(1)),
     new UINT256(new BN(1)),
-    'CLOSED',
+    ChannelStatus.Closed,
     new UINT256(new BN(1)),
     new UINT256(new BN(0)),
     false

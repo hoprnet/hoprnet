@@ -38,7 +38,8 @@ import {
   libp2pSubscribe,
   libp2pSendMessage,
   LibP2PHandlerFunction,
-  AcknowledgedTicket
+  AcknowledgedTicket,
+  ChannelStatus
 } from '@hoprnet/hopr-utils'
 import HoprCoreEthereum, { RoutingChannel } from '@hoprnet/hopr-core-ethereum'
 import BN from 'bn.js'
@@ -408,13 +409,17 @@ class Hopr extends EventEmitter {
 
     if (intermediatePath != undefined) {
       // checking if path makes sense
-      for (let i = 0; i < intermediatePath.length - 2; i++) {
+      for (let i = 0; i < intermediatePath.length - 1; i++) {
         const ticketIssuer = PublicKey.fromPeerId(intermediatePath[i])
         const ticketReceiver = PublicKey.fromPeerId(intermediatePath[i + 1])
 
         const channel = ethereum.getChannel(ticketIssuer, ticketReceiver)
 
         const channelState = await channel.getState()
+
+        if (channelState.status !== ChannelStatus.Open) {
+          throw Error(`Channel ${channelState.getId()}`)
+        }
 
         if (channelState.ticketEpochFor(ticketReceiver.toAddress()).toBN().isZero()) {
           throw Error(

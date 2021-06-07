@@ -4,7 +4,11 @@ import { UINT256 } from './solidity'
 import BN from 'bn.js'
 import chalk from 'chalk'
 
-export type ChannelStatus = 'CLOSED' | 'OPEN' | 'PENDING_TO_CLOSE'
+export enum ChannelStatus {
+  Closed = 'CLOSED',
+  Open = 'OPEN',
+  PendingToClose = 'PENDING_TO_CLOSE'
+}
 
 export function generateChannelId(self: Address, counterparty: Address) {
   let parties = self.sortPair(counterparty)
@@ -14,11 +18,11 @@ export function generateChannelId(self: Address, counterparty: Address) {
 function numberToChannelStatus(i: number): ChannelStatus {
   switch (i) {
     case 0:
-      return 'CLOSED'
+      return ChannelStatus.Closed
     case 1:
-      return 'OPEN'
+      return ChannelStatus.Open
     case 2:
-      return 'PENDING_TO_CLOSE'
+      return ChannelStatus.PendingToClose
     default:
       throw Error(`Status at ${status} does not exist`)
   }

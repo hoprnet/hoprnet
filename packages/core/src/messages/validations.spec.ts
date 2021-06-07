@@ -6,7 +6,7 @@ import chaiAsPromised from 'chai-as-promised'
 import chai, { expect } from 'chai'
 import sinon from 'sinon'
 import { Channel } from '@hoprnet/hopr-core-ethereum'
-import { Address, Balance, PublicKey, UINT256, Ticket, ChannelEntry } from '@hoprnet/hopr-utils'
+import { Address, Balance, PublicKey, UINT256, Ticket, ChannelEntry, ChannelStatus } from '@hoprnet/hopr-utils'
 import { validateUnacknowledgedTicket, validateCreatedTicket } from '.'
 
 chai.use(chaiAsPromised)
@@ -34,7 +34,7 @@ const createMockTicket = ({
   index?: UINT256
   channelIteration?: UINT256
 }) => {
-  return {
+  return ({
     counterparty: targetAddress,
     challenge: new Uint8Array(),
     amount,
@@ -43,7 +43,7 @@ const createMockTicket = ({
     index,
     channelIteration,
     verify: (pubKey: PublicKey) => pubKey.eq(new PublicKey(sender.pubKey.marshal()))
-  } as unknown as Ticket
+  } as unknown) as Ticket
 }
 
 const mockChannelEntry = (isChannelOpen: boolean, ticketEpoch: UINT256, ticketIndex: UINT256) =>
@@ -59,7 +59,7 @@ const mockChannelEntry = (isChannelOpen: boolean, ticketEpoch: UINT256, ticketIn
       null,
       ticketIndex,
       null,
-      isChannelOpen ? 'OPEN' : 'CLOSED',
+      isChannelOpen ? ChannelStatus.Open : ChannelStatus.Closed,
       new UINT256(new BN(1)),
       null,
       false
@@ -81,7 +81,7 @@ const createMockChannel = ({
   ticketEpoch?: UINT256
   ticketIndex?: UINT256
 }) => {
-  return {
+  return ({
     getBalances: sinon.stub().returns(
       Promise.resolve({
         self,
@@ -93,7 +93,7 @@ const createMockChannel = ({
       throw new Error('state not found')
     },
     channelEpoch: new BN(1)
-  } as unknown as Channel
+  } as unknown) as Channel
 }
 
 const createMockNode = ({
@@ -105,12 +105,12 @@ const createMockNode = ({
   senderAddress?: Address
   target?: PeerId
 }) => {
-  return {
+  return ({
     getId: sinon.stub().returns(target),
     paymentChannels: {
       types: { PublicKey }
     }
-  } as unknown as Hopr
+  } as unknown) as Hopr
 }
 
 const getTicketsMock = async (): Promise<Ticket[]> => []
