@@ -685,8 +685,8 @@ class Hopr extends EventEmitter {
 
   public async getTicketStatistics() {
     const ack = await this.getAcknowledgedTickets()
-    const totalValue = (ackTickets: AcknowledgedTicket[]): Balance =>
-      ackTickets.map((a) => a.ticket.amount).reduce((x, y) => x.add(y), Balance.ZERO())
+    const totalValue = (ackTickets: AcknowledgedTicket[]): Balance => 
+      ackTickets.map(a => a.ticket.amount).reduce((x, y) => x.add(y), Balance.ZERO())
 
     return {
       pending: await this.db.getPendingTicketCount(),
@@ -705,7 +705,7 @@ class Hopr extends EventEmitter {
 
     for (const ackTicket of await this.getAcknowledgedTickets()) {
       count++
-      const result = await this.submitAcknowledgedTicket(ackTicket)
+      const result = await this.redeemAcknowledgedTicket(ackTicket)
 
       if (result.status === 'SUCCESS') {
         redeemed++
@@ -722,7 +722,7 @@ class Hopr extends EventEmitter {
     }
   }
 
-  public async submitAcknowledgedTicket(ackTicket: AcknowledgedTicket) {
+  public async redeemAcknowledgedTicket(ackTicket: AcknowledgedTicket) {
     const ethereum = await this.paymentChannels
     const channel = ethereum.getChannel(ethereum.getPublicKey(), ackTicket.ticket.recoverSigner())
     return await channel.redeemTicket(ackTicket)
