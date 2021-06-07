@@ -12,12 +12,13 @@ import {
   ChannelEntry,
   Snapshot,
   PublicKey,
+  Balance,
   HalfKeyChallenge,
   EthereumChallenge,
   UINT256
 } from './types'
 import BN from 'bn.js'
-import { u8aEquals } from './u8a'
+import { u8aEquals, u8aToNumber } from './u8a'
 
 const log = Debug(`hopr-core:db`)
 const encoder = new TextEncoder()
@@ -41,6 +42,8 @@ const createAccountKey = (address: Address): Uint8Array => u8aConcat(ACCOUNT_PRE
 const COMMITMENT_PREFIX = encoder.encode('commitment:')
 const TICKET_INDEX_PREFIX = encoder.encode('ticketIndex:')
 const CURRENT = encoder.encode('current')
+const REDEEMED_TICKETS_COUNT = encoder.encode('statistics:redeemed:count')
+const REDEEMED_TICKETS_VALUE = encoder.encode('statistics:redeemed:value')
 
 export class HoprDB {
   private db: LevelUp
@@ -324,6 +327,18 @@ export class HoprDB {
   async getAccounts(filter?: (account: AccountEntry) => boolean) {
     filter = filter || (() => true)
     return this.getAll<AccountEntry>(ACCOUNT_PREFIX, AccountEntry.deserialize, filter)
+  }
+
+  public async getRedeemedTicketsValue(): Promise<Balance>{
+    return Balance.deserialize(await this.get(REDEEMED_TICKETS_VALUE))
+
+  }
+  public async getRedeemedTicketsCount(): Promise<number>{
+    return u8aToNumber(await this.get(REDEEMED_TICKETS_COUNT))
+  }
+
+  public async getPendingTicketCount(): Promise<number> {
+    return 0 // TODO
   }
 
   static createMock(): HoprDB {
