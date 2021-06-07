@@ -91,7 +91,7 @@ Also keeps track of the latest block number.
 | `chain.getBalance` | (`address`: `Address`) => `Promise`<Balance\> |
 | `chain.getChannels` | () => `HoprChannels` |
 | `chain.getGenesisBlock` | () => `number` |
-| `chain.getInfo` | () => `string` |
+| `chain.getInfo` | () => { `channelClosureSecs`: `number` ; `hoprChannelsAddress`: `string` ; `hoprTokenAddress`: `string` ; `network`: `Networks`  } |
 | `chain.getLatestBlockNumber` | () => `Promise`<number\> |
 | `chain.getNativeBalance` | (`address`: `Address`) => `Promise`<NativeBalance\> |
 | `chain.getPrivateKey` | () => `Uint8Array` |

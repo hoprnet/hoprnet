@@ -341,7 +341,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:665](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L665)
+[packages/core/src/index.ts:670](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L670)
 
 ___
 
@@ -422,7 +422,7 @@ Fund a payment channel
 
 #### Defined in
 
-[packages/core/src/index.ts:637](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L637)
+[packages/core/src/index.ts:642](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L642)
 
 ___
 
@@ -436,7 +436,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:682](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L682)
+[packages/core/src/index.ts:687](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L687)
 
 ___
 
@@ -506,7 +506,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:706](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L706)
+[packages/core/src/index.ts:711](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L711)
 
 ___
 
@@ -534,7 +534,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:716](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L716)
+[packages/core/src/index.ts:721](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L721)
 
 ___
 
@@ -571,7 +571,7 @@ that will relay that message before it reaches its destination.
 
 #### Defined in
 
-[packages/core/src/index.ts:732](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L732)
+[packages/core/src/index.ts:737](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L737)
 
 ___
 
@@ -675,7 +675,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:711](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L711)
+[packages/core/src/index.ts:716](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L716)
 
 ___
 
@@ -851,7 +851,7 @@ Open a payment channel
 
 #### Defined in
 
-[packages/core/src/index.ts:604](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L604)
+[packages/core/src/index.ts:609](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L609)
 
 ___
 
@@ -1084,11 +1084,11 @@ ___
 
 ### smartContractInfo
 
-▸ **smartContractInfo**(): `Promise`<string\>
+▸ **smartContractInfo**(): `Promise`<`Object`\>
 
 #### Returns
 
-`Promise`<string\>
+`Promise`<`Object`\>
 
 #### Defined in
 
@@ -1162,7 +1162,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:686](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L686)
+[packages/core/src/index.ts:691](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L691)
 
 ___
 
@@ -1196,7 +1196,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:745](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L745)
+[packages/core/src/index.ts:750](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L750)
 
 ___
 
@@ -1210,7 +1210,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:762](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L762)
+[packages/core/src/index.ts:767](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L767)
 
 ___
 
@@ -1232,7 +1232,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:721](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L721)
+[packages/core/src/index.ts:726](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L726)
 
 ___
 
