@@ -48,7 +48,8 @@ describe('test pathfinder with some simple topologies', function () {
 
   function fakeIndexer(edges: Map<PeerId, PeerId[]>, stakes: (i: PeerId) => Balance): Indexer {
     return {
-      getChannelsFromPeer: (a: PeerId) => Promise.resolve((edges.get(a) || []).map((b) => [a, b, stakes(b) as any]))
+      getOpenRoutingChannelsFromPeer: (a: PeerId) =>
+        Promise.resolve((edges.get(a) || []).map((b) => [a, b, stakes(b) as any]))
     } as Indexer
   }
 
@@ -58,7 +59,7 @@ describe('test pathfinder with some simple topologies', function () {
       fakePeerId(6),
       2,
       RELIABLE_NETWORK,
-      fakeIndexer(STAR, STAKE_1).getChannelsFromPeer,
+      fakeIndexer(STAR, STAKE_1).getOpenRoutingChannelsFromPeer,
       0
     )
     checkPath(path, STAR)
@@ -71,7 +72,7 @@ describe('test pathfinder with some simple topologies', function () {
       fakePeerId(6),
       2,
       RELIABLE_NETWORK,
-      fakeIndexer(STAR, STAKE_N).getChannelsFromPeer,
+      fakeIndexer(STAR, STAKE_N).getOpenRoutingChannelsFromPeer,
       0
     )
     checkPath(path, STAR)
@@ -86,7 +87,7 @@ describe('test pathfinder with some simple topologies', function () {
         fakePeerId(6),
         4,
         RELIABLE_NETWORK,
-        fakeIndexer(STAR, STAKE_1).getChannelsFromPeer,
+        fakeIndexer(STAR, STAKE_1).getOpenRoutingChannelsFromPeer,
         0
       )
     } catch (e) {
@@ -101,7 +102,7 @@ describe('test pathfinder with some simple topologies', function () {
       fakePeerId(6),
       4,
       RELIABLE_NETWORK,
-      fakeIndexer(ARROW, STAKE_1).getChannelsFromPeer,
+      fakeIndexer(ARROW, STAKE_1).getOpenRoutingChannelsFromPeer,
       0
     )
     checkPath(path, ARROW)
@@ -116,7 +117,7 @@ describe('test pathfinder with some simple topologies', function () {
         fakePeerId(6),
         4,
         UNRELIABLE_NETWORK,
-        fakeIndexer(ARROW, STAKE_1).getChannelsFromPeer,
+        fakeIndexer(ARROW, STAKE_1).getOpenRoutingChannelsFromPeer,
         0
       )
     } catch (e) {

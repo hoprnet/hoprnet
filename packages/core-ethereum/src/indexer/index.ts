@@ -398,9 +398,17 @@ class Indexer extends EventEmitter {
     return this.toIndexerChannel(partyA.toPeerId(), random) // TODO: why do we pick partyA?
   }
 
-  public async getChannelsFromPeer(source: PeerId): Promise<RoutingChannel[]> {
+  /**
+   * Returns peer's open channels.
+   * NOTE: channels with status 'PENDING_TO_CLOSE' are not included
+   * @param source peer
+   * @returns peer's open channels
+   */
+  public async getOpenRoutingChannelsFromPeer(source: PeerId): Promise<RoutingChannel[]> {
     const sourcePubKey = new PublicKey(source.pubKey.marshal())
-    const channels = await this.getChannelsOf(sourcePubKey.toAddress())
+    const channels = await this.getChannelsOf(sourcePubKey.toAddress()).then((channels) =>
+      channels.filter((channel) => channel.status === 'OPEN')
+    )
 
     let cout: RoutingChannel[] = []
     for (let channel of channels) {

@@ -70,8 +70,8 @@ export default class HoprEthereum {
     return this.chain.withdraw(currency, recipient, amount)
   }
 
-  public getChannelsFromPeer(p: PeerId) {
-    return this.indexer.getChannelsFromPeer(p)
+  public getOpenRoutingChannelsFromPeer(p: PeerId) {
+    return this.indexer.getOpenRoutingChannelsFromPeer(p)
   }
 
   public getChannelsOf(addr: Address): Promise<ChannelEntry[]> {

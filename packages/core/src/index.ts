@@ -328,7 +328,7 @@ class Hopr extends EventEmitter {
   }
 
   private async getOpenChannels(): Promise<RoutingChannel[]> {
-    return (await this.paymentChannels).getChannelsFromPeer(this.getId())
+    return (await this.paymentChannels).getOpenRoutingChannelsFromPeer(this.getId())
   }
 
   /**
@@ -790,7 +790,7 @@ class Hopr extends EventEmitter {
       destination,
       MAX_HOPS - 1,
       this.networkPeers,
-      ethereum.getChannelsFromPeer.bind(ethereum),
+      ethereum.getOpenRoutingChannelsFromPeer.bind(ethereum),
       PATH_RANDOMNESS
     )
   }
