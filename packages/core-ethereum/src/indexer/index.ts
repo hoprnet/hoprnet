@@ -281,7 +281,7 @@ class Indexer extends EventEmitter {
 
     await this.db.updateChannel(channel.getId(), channel)
 
-    if (channel.partyA.eq(this.address) || channel.partyB.eq(this.address)) {
+    if (channel.source.eq(this.address) || channel.destination.eq(this.address)) {
       this.emit('own-channel-updated', channel)
 
       if (channel.status !== 'OPEN') {
@@ -289,26 +289,26 @@ class Indexer extends EventEmitter {
         return
       }
 
-      const ticketEpoch = channel.ticketEpochFor(this.address)
-
-      if (ticketEpoch.toBN().isZero()) {
-        await this.onOwnUnsetCommitment(channel)
-      } else if (ticketEpoch.toBN().gten(1)) {
-        this.resolveCommitmentPromise(channel.getId())
+      if (channel.destination.eq(this.address)) { // Channel _to_ us
+        const ticketEpoch = channel.ticketEpoch
+        if (ticketEpoch.toBN().isZero()) {
+          await this.onOwnUnsetCommitment(channel)
+        } else if (ticketEpoch.toBN().gten(1)) {
+          this.resolveCommitmentPromise(channel.getId())
+        }
       }
     }
   }
 
   private onOwnUnsetCommitment(channel: ChannelEntry) {
-    const isPartyA = channel.partyA.eq(this.address)
-
-    const counterparty = isPartyA ? channel.partyB : channel.partyA
-
-    log(`Found channel ${chalk.yellow(channel.getId().toHex())} with unset commitment. Setting commitment`)
+    if (!channel.destination.eq(this.address)) {
+      throw new Error('shouldnt be called unless we are the destination')
+    }
+    log(`Found channel ${chalk.yellow(channel.getId().toHex())} to us with unset commitment. Setting commitment`)
 
     return new Commitment(
-      (comm: Hash) => this.chain.setCommitment(counterparty, comm),
-      async () => (await this.getChannel(channel.getId())).commitmentFor(this.address),
+      (comm: Hash) => this.chain.setCommitment(channel.source, comm),
+      async () => (await this.getChannel(channel.getId())).commitment,
       this.db,
       channel.getId(),
       this

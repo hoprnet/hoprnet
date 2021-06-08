@@ -74,8 +74,8 @@ export default class HoprEthereum {
     return this.indexer.getOpenRoutingChannelsFromPeer(p)
   }
 
-  public getChannelsOf(addr: Address): Promise<ChannelEntry[]> {
-    return this.indexer.getChannelsOf(addr)
+  public getChannelsFrom(addr: Address): Promise<ChannelEntry[]> {
+    return this.indexer.getChannelsFrom(addr)
   }
 
   public async getAccount(addr: Address) {

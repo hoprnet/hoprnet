@@ -5,11 +5,10 @@ import type { ChainWrapper } from '../ethereum'
 import assert from 'assert'
 import EventEmitter from 'events'
 import Indexer from '.'
-import { stringToU8a, Address, ChannelEntry, Hash, HoprDB } from '@hoprnet/hopr-utils'
+import { stringToU8a, Address, ChannelEntry, Hash, HoprDB, generateChannelId } from '@hoprnet/hopr-utils'
 import { expectAccountsToBeEqual, expectChannelsToBeEqual } from './fixtures'
 import Defer from 'p-defer'
 import * as fixtures from './fixtures'
-import { Channel } from '..'
 import { CHANNEL_ID } from '../fixtures'
 
 const createProviderMock = (ops: { latestBlockNumber?: number } = {}) => {
@@ -44,7 +43,7 @@ const createHoprChannelsMock = (ops: { pastEvents?: Event<any>[] } = {}) => {
 
         const updateEvent = event as Event<'ChannelUpdate'>
 
-        const eventChannelId = Channel.generateId(
+        const eventChannelId = generateChannelId(
           Address.fromString(updateEvent.args.source),
           Address.fromString(updateEvent.args.destination)
         )
@@ -56,7 +55,7 @@ const createHoprChannelsMock = (ops: { pastEvents?: Event<any>[] } = {}) => {
     }
 
     async bumpChannel(_counterparty: string, _comm: string) {
-      const channelId = Channel.generateId(fixtures.PARTY_A.toAddress(), fixtures.PARTY_B.toAddress())
+      const channelId = generateChannelId(fixtures.PARTY_A.toAddress(), fixtures.PARTY_B.toAddress())
       const currentState = (await this.channels(channelId.toHex())) as Event<'ChannelUpdate'>['args']['newState']
 
       if (currentState == undefined) {
@@ -255,11 +254,11 @@ describe('test indexer', function () {
     assert.strictEqual(channels.length, 1, 'expected channels')
     expectChannelsToBeEqual(channels[0], fixtures.COMMITMENT_SET_A_CHANNEL)
 
-    const channelsOfPartyA = await indexer.getChannelsOf(fixtures.PARTY_A.toAddress())
-    assert.strictEqual(channelsOfPartyA.length, 1)
-    expectChannelsToBeEqual(channelsOfPartyA[0], fixtures.COMMITMENT_SET_A_CHANNEL)
+    const channelsFromPartyA = await indexer.getChannelsFrom(fixtures.PARTY_A.toAddress())
+    assert.strictEqual(channelsFromPartyA.length, 1)
+    expectChannelsToBeEqual(channelsFromPartyA[0], fixtures.COMMITMENT_SET_A_CHANNEL)
 
-    const channelsOfPartyB = await indexer.getChannelsOf(fixtures.PARTY_B.toAddress())
+    const channelsOfPartyB = await indexer.getChannelsFrom(fixtures.PARTY_B.toAddress())
     assert.strictEqual(channelsOfPartyB.length, 1)
     expectChannelsToBeEqual(channelsOfPartyB[0], fixtures.COMMITMENT_SET_A_CHANNEL)
   })
@@ -308,10 +307,10 @@ describe('test indexer', function () {
     indexer.on('own-channel-updated', (channel: ChannelEntry) => {
       switch (channel.status) {
         case 'OPEN':
-          if (channel.partyATicketEpoch.toBN().isZero()) {
+          if (channel.ticketEpoch.toBN().isZero()) {
             opened.resolve()
           }
-          if (channel.partyATicketEpoch.toBN().eqn(1)) {
+          if (channel.ticketEpoch.toBN().eqn(1)) {
             commitmentSet.resolve()
           }
           break
@@ -337,9 +336,9 @@ describe('test indexer', function () {
     newBlock()
 
     await pendingIniated.promise
-    const channelsOfPartyA = await indexer.getChannelsOf(fixtures.PARTY_A.toAddress())
+    const channelsFromPartyA = await indexer.getChannelsFrom(fixtures.PARTY_A.toAddress())
 
-    expectChannelsToBeEqual(channelsOfPartyA[0], fixtures.PENDING_CLOSURE_CHANNEL)
+    expectChannelsToBeEqual(channelsFromPartyA[0], fixtures.PENDING_CLOSURE_CHANNEL)
 
     newEvent(fixtures.CLOSED_EVENT)
 
@@ -347,8 +346,8 @@ describe('test indexer', function () {
     newBlock()
 
     await closed.promise
-    const channelsOfPartyAAfterClose = await indexer.getChannelsOf(fixtures.PARTY_A.toAddress())
-    expectChannelsToBeEqual(channelsOfPartyAAfterClose[0], fixtures.CLOSED_CHANNEL)
+    const channelsFromPartyAAfterClose = await indexer.getChannelsFrom(fixtures.PARTY_A.toAddress())
+    expectChannelsToBeEqual(channelsFromPartyAAfterClose[0], fixtures.CLOSED_CHANNEL)
   })
 
   it('should start two indexers and should set commitments only once', async function () {

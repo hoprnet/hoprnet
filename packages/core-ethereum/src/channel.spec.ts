@@ -9,19 +9,19 @@ import {
   UINT256,
   HoprDB,
   createPoRValuesForSender,
-  ChannelStatus
+  ChannelStatus,
+  generateChannelId
 } from '@hoprnet/hopr-utils'
 import assert from 'assert'
 import BN from 'bn.js'
 import { utils } from 'ethers'
-import { Channel } from './channel'
 import * as fixtures from './fixtures'
 
 const createChallenge = (secret1: Uint8Array, secret2: Uint8Array): Challenge => {
   return createPoRValuesForSender(secret1, secret2).ticketChallenge
 }
 
-const createChainMock = (_channelEntry: ChannelEntry): ChainWrapper => {
+const createChainMock = (): ChainWrapper => {
   return {
     async setCommitment() {},
     async getBalance() {},
@@ -33,10 +33,10 @@ const createChainMock = (_channelEntry: ChannelEntry): ChainWrapper => {
   } as unknown as ChainWrapper
 }
 
-const createIndexerMock = (channelEntry: ChannelEntry): Indexer => {
+const createIndexerMock = (channelUsThem: ChannelEntry, channelThemUs: ChannelEntry): Indexer => {
   return {
-    async getChannel(_id: Hash) {
-      return channelEntry
+    async getChannel(id: Hash) {
+      return id.eq(channelUsThem.getId()) ? channelUsThem : channelThemUs
     }
   } as Indexer
 }
@@ -52,29 +52,35 @@ const createMocks = () => {
   const nextCommitmentPartyB = Hash.create(new Uint8Array([1]))
   const commitmentPartyB = nextCommitmentPartyB.hash()
 
-  const channelEntry = new ChannelEntry(
+  const channelUsThem = new ChannelEntry(
     self.toAddress(),
     counterparty.toAddress(),
     new Balance(new BN(7)),
-    new Balance(new BN(3)),
     commitmentPartyA,
-    commitmentPartyB,
-    new UINT256(new BN(1)),
-    new UINT256(new BN(1)),
     new UINT256(new BN(1)),
     new UINT256(new BN(1)),
     ChannelStatus.Closed,
     new UINT256(new BN(1)),
+    new UINT256(new BN(0))
+  )
+  const channelThemUs = new ChannelEntry(
+    counterparty.toAddress(),
+    self.toAddress(),
+    new Balance(new BN(3)),
+    commitmentPartyB,
+    new UINT256(new BN(1)),
+    new UINT256(new BN(1)),
+    ChannelStatus.Closed,
     new UINT256(new BN(0)),
-    false
+    new UINT256(new BN(0))
   )
   const challange = createChallenge(
     Hash.create(new Uint8Array([1])).serialize(),
     Hash.create(new Uint8Array([2])).serialize()
   )
 
-  const indexer = createIndexerMock(channelEntry)
-  const chain = createChainMock(channelEntry)
+  const indexer = createIndexerMock(channelUsThem, channelThemUs)
+  const chain = createChainMock()
 
   return {
     self,
@@ -83,7 +89,8 @@ const createMocks = () => {
     db,
     indexer,
     chain,
-    channelEntry,
+    channelUsThem,
+    channelThemUs,
     challange,
     nextCommitmentPartyA,
     nextCommitmentPartyB
@@ -92,22 +99,15 @@ const createMocks = () => {
 
 describe('test channel', function () {
   let mocks: ReturnType<typeof createMocks>
-  let channel: Channel
 
   beforeEach(function () {
     mocks = createMocks()
-    channel = new Channel(mocks.self, mocks.counterparty, mocks.db, mocks.chain, mocks.indexer, mocks.privateKey)
   })
 
   it('should create channel', async function () {
-    assert.strictEqual(channel.getId().toHex(), fixtures.CHANNEL_ID)
     assert.strictEqual(
-      Channel.generateId(mocks.self.toAddress(), mocks.counterparty.toAddress()).toHex(),
+      generateChannelId(mocks.self.toAddress(), mocks.counterparty.toAddress()).toHex(),
       fixtures.CHANNEL_ID
-    )
-    assert.strictEqual(
-      utils.hexlify((await channel.getState()).serialize()),
-      utils.hexlify(mocks.channelEntry.serialize())
     )
   })
 })
