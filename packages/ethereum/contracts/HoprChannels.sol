@@ -139,11 +139,18 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     }
 
     /**
-     * @dev Initialize channel closure, updates channel
-     * closure time, when the cool-off period is over,
-     * initiator may finalize closure, then emits
-     * {ChannelUpdate} event.
-     * @param counterparty the address of the counterparty
+     * @dev Initialize channel closure.
+     * When a channel owner (the 'source' of the channel) wants to 'cash out',
+     * they must notify the counterparty (the 'destination') that they will do
+     * so, and provide enough time for them to redeem any outstanding tickets
+     * before-hand. This notice period is called the 'cool-off' period.
+     * The channel 'destination' should be monitoring blockchain events, thus
+     * they should be aware that the closure has been triggered, as this
+     * method triggers a {ChannelUpdate} event.
+     * After the cool-off period expires, the 'source' can call
+     * 'finalizeChannelClosure' which puts the channel in a state where the
+     * balance can be withdrawn.
+     * @param destination the address of the destination
      */
     function initiateChannelClosure(
         address counterparty
