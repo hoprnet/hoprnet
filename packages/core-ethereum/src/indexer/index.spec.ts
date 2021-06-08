@@ -317,8 +317,6 @@ describe('test indexer', function () {
   })
 
   it('should emit events on updated channels', async function () {
-    this.timeout(5000)
-
     const { indexer, newEvent, newBlock } = useFixtures({
       latestBlockNumber: 3,
       pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT]
@@ -377,18 +375,12 @@ describe('test indexer', function () {
   })
 
   it('should start two indexers and should set commitments only once', async function () {
-    this.timeout(5000)
-
     const { alice, bob, newBlock } = useMultiPartyFixtures({
       latestBlockNumber: 3,
       pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.PARTY_B_INITIALIZED_EVENT, fixtures.OPENED_EVENT]
     })
 
-    await Promise.all([
-      // prettier-ignore
-      alice.indexer.start(),
-      bob.indexer.start()
-    ])
+    await Promise.all([alice.indexer.start(), bob.indexer.start()])
 
     newBlock()
     newBlock()
