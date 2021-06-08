@@ -132,6 +132,7 @@
 - [u8aSplit](modules.md#u8asplit)
 - [u8aToHex](modules.md#u8atohex)
 - [u8aToNumber](modules.md#u8atonumber)
+- [u8aToNumberOrBigInt](modules.md#u8atonumberorbigint)
 - [u8aXOR](modules.md#u8axor)
 - [unacknowledgedTicketKey](modules.md#unacknowledgedticketkey)
 - [validatePoRHalfKeys](modules.md#validateporhalfkeys)
@@ -1898,7 +1899,27 @@ ___
 
 ### u8aToNumber
 
-▸ **u8aToNumber**(`arr`): `number` \| `bigint`
+▸ **u8aToNumber**(`arr`): `number`
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `arr` | `Uint8Array` |
+
+#### Returns
+
+`number`
+
+#### Defined in
+
+[u8a/u8aToNumber.ts:41](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/u8aToNumber.ts#L41)
+
+___
+
+### u8aToNumberOrBigInt
+
+▸ **u8aToNumberOrBigInt**(`arr`): `number` \| `bigint`
 
 Converts a Uint8Array to number.
 
@@ -1957,7 +1978,7 @@ ___
 
 #### Defined in
 
-[db.ts:28](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L28)
+[db.ts:29](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L29)
 
 ___
 

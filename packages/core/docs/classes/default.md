@@ -56,6 +56,7 @@
 - [getObservedAddresses](default.md#getobservedaddresses)
 - [getOpenChannels](default.md#getopenchannels)
 - [getPublicKeyOf](default.md#getpublickeyof)
+- [getTicketStatistics](default.md#getticketstatistics)
 - [getVersion](default.md#getversion)
 - [listenerCount](default.md#listenercount)
 - [listeners](default.md#listeners)
@@ -69,6 +70,8 @@
 - [prependListener](default.md#prependlistener)
 - [prependOnceListener](default.md#prependoncelistener)
 - [rawListeners](default.md#rawlisteners)
+- [redeemAcknowledgedTicket](default.md#redeemacknowledgedticket)
+- [redeemAllTickets](default.md#redeemalltickets)
 - [removeAllListeners](default.md#removealllisteners)
 - [removeListener](default.md#removelistener)
 - [sendMessage](default.md#sendmessage)
@@ -77,7 +80,6 @@
 - [smartContractInfo](default.md#smartcontractinfo)
 - [start](default.md#start)
 - [stop](default.md#stop)
-- [submitAcknowledgedTicket](default.md#submitacknowledgedticket)
 - [tickChannelStrategy](default.md#tickchannelstrategy)
 - [waitForFunds](default.md#waitforfunds)
 - [waitForRunning](default.md#waitforrunning)
@@ -517,7 +519,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:732](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L732)
+[packages/core/src/index.ts:760](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L760)
 
 ___
 
@@ -545,7 +547,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:742](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L742)
+[packages/core/src/index.ts:770](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L770)
 
 ___
 
@@ -582,7 +584,7 @@ that will relay that message before it reaches its destination.
 
 #### Defined in
 
-[packages/core/src/index.ts:758](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L758)
+[packages/core/src/index.ts:786](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L786)
 
 ___
 
@@ -686,7 +688,21 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:737](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L737)
+[packages/core/src/index.ts:765](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L765)
+
+___
+
+### getTicketStatistics
+
+▸ **getTicketStatistics**(): `Promise`<`Object`\>
+
+#### Returns
+
+`Promise`<`Object`\>
+
+#### Defined in
+
+[packages/core/src/index.ts:712](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L712)
 
 ___
 
@@ -978,6 +994,40 @@ packages/core/node_modules/@types/node/events.d.ts:71
 
 ___
 
+### redeemAcknowledgedTicket
+
+▸ **redeemAcknowledgedTicket**(`ackTicket`): `Promise`<RedeemTicketResponse\>
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `ackTicket` | `AcknowledgedTicket` |
+
+#### Returns
+
+`Promise`<RedeemTicketResponse\>
+
+#### Defined in
+
+[packages/core/src/index.ts:754](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L754)
+
+___
+
+### redeemAllTickets
+
+▸ **redeemAllTickets**(): `Promise`<`Object`\>
+
+#### Returns
+
+`Promise`<`Object`\>
+
+#### Defined in
+
+[packages/core/src/index.ts:730](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L730)
+
+___
+
 ### removeAllListeners
 
 ▸ **removeAllListeners**(`event?`): [default](default.md)
@@ -1157,26 +1207,6 @@ Shuts down the node and saves keys and peerBook in the database
 
 ___
 
-### submitAcknowledgedTicket
-
-▸ **submitAcknowledgedTicket**(`ackTicket`): `Promise`<{ `ackTicket`: `AcknowledgedTicket` ; `receipt`: `string` ; `status`: ``"SUCCESS"``  } \| { `message`: `string` ; `status`: ``"FAILURE"``  } \| { `error`: `any` ; `status`: `string` = 'ERROR' }\>
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `ackTicket` | `AcknowledgedTicket` |
-
-#### Returns
-
-`Promise`<{ `ackTicket`: `AcknowledgedTicket` ; `receipt`: `string` ; `status`: ``"SUCCESS"``  } \| { `message`: `string` ; `status`: ``"FAILURE"``  } \| { `error`: `any` ; `status`: `string` = 'ERROR' }\>
-
-#### Defined in
-
-[packages/core/src/index.ts:712](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L712)
-
-___
-
 ### tickChannelStrategy
 
 ▸ `Private` **tickChannelStrategy**(`newChannels`): `Promise`<void\>
@@ -1207,7 +1237,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:771](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L771)
+[packages/core/src/index.ts:799](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L799)
 
 ___
 
@@ -1221,7 +1251,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:788](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L788)
+[packages/core/src/index.ts:816](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L816)
 
 ___
 
@@ -1243,7 +1273,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:747](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L747)
+[packages/core/src/index.ts:775](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L775)
 
 ___
 
