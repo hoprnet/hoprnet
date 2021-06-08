@@ -33,11 +33,12 @@ export default class Tickets extends AbstractCommand {
       log(`
 Tickets:
 - Pending:          ${stats.pending}
-- Win Proportion:   ${stats.winProportion * 100}% 
 - Unredeemed:       ${stats.unredeemed}
-- Unredeemed Value: ${stats.unredeemedValue}
+- Unredeemed Value: ${stats.unredeemedValue.toFormattedString()}
 - Redeemed:         ${stats.redeemed}
-- Redeemed Value:   ${stats.redeemedValue}
+- Redeemed Value:   ${stats.redeemedValue.toFormattedString()}
+- Losing Tickets:   ${stats.losing}
+- Win Proportion:   ${stats.winProportion * 100}% 
           `)
     } catch (err) {
       log(styleValue(err.message, 'failure'))

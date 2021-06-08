@@ -110,8 +110,8 @@ export class HoprDB {
     }
   }
 
-  private async getCoercedOrDefault<T>(key: Uint8Array, coerce: (Uint8Array)=>T, defaultVal: T){
-    let u8a = this.maybeGet(key)
+  private async getCoercedOrDefault<T>(key: Uint8Array, coerce: (u: Uint8Array) => T, defaultVal: T){
+    let u8a = await this.maybeGet(key)
     if (u8a === undefined){
       return defaultVal
     }
@@ -339,7 +339,7 @@ export class HoprDB {
   }
 
   public async getRedeemedTicketsValue(): Promise<Balance> {
-    return Balance.deserialize(await this.get(REDEEMED_TICKETS_VALUE))
+    return await this.getCoercedOrDefault(REDEEMED_TICKETS_VALUE, Balance.deserialize, Balance.ZERO())
   }
   public async getRedeemedTicketsCount(): Promise<number> {
     return this.getCoercedOrDefault(REDEEMED_TICKETS_COUNT, u8aToNumber, 0)

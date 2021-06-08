@@ -698,12 +698,14 @@ class Hopr extends EventEmitter {
 
   public async getTicketStatistics() {
     const ack = await this.getAcknowledgedTickets()
+    const pending = await this.db.getPendingTicketCount()
+    const losing = await this.db.getLosingTicketCount()
     const totalValue = (ackTickets: AcknowledgedTicket[]): Balance => 
       ackTickets.map(a => a.ticket.amount).reduce((x, y) => x.add(y), Balance.ZERO())
 
     return {
-      pending: await this.db.getPendingTicketCount(),
-      winProportion: ack.length / (ack.length + (await this.db.getLosingTicketCount())),
+      pending, losing, 
+      winProportion: ack.length / (ack.length + losing),
       unredeemed: ack.length,
       unredeemedValue: totalValue(ack),
       redeemed: await this.db.getRedeemedTicketsCount(),
