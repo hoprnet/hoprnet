@@ -1,8 +1,6 @@
 import type PeerId from 'peer-id'
 import { styleValue } from './utils'
 
-export type CommandResponse = string | void
-
 export type GlobalState = {
   aliases: Map<string, PeerId>
   includeRecipient: boolean
@@ -19,7 +17,7 @@ export abstract class AbstractCommand {
   abstract help(): string
 
   // Run the command with optional argument
-  abstract execute(query: string, state: GlobalState): CommandResponse | Promise<CommandResponse>
+  abstract execute(log: (string) => void, query: string, state: GlobalState): Promise<void>
 
   protected usage(parameters: string[]): string {
     return `usage: ${parameters.map((x) => `<${x}>`).join(' ')}`

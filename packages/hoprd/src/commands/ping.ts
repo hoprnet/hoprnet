@@ -16,16 +16,16 @@ export default class Ping extends AbstractCommand {
     return 'Pings another node to check its availability'
   }
 
-  public async execute(query: string, state: GlobalState): Promise<string> {
+  public async execute(log, query: string, state: GlobalState): Promise<void> {
     if (!query) {
-      return `Invalid arguments. Expected 'ping <peerId>'. Received '${query}'`
+      return log(`Invalid arguments. Expected 'ping <peerId>'. Received '${query}'`)
     }
 
     let peerId: PeerId
     try {
       peerId = await checkPeerIdInput(query, state)
     } catch (err) {
-      return styleValue(err.message, 'failure')
+      return log(styleValue(err.message, 'failure'))
     }
 
     let out = ''
@@ -44,12 +44,12 @@ export default class Ping extends AbstractCommand {
     }
 
     if (pingResult.latency >= 0) {
-      return `${out}Pong received in: ${styleValue(pingResult.latency)} ms ${pingResult.info}`
+      return log(`${out}Pong received in: ${styleValue(pingResult.latency)} ms ${pingResult.info}`)
     }
 
     if (error && error.message) {
-      return `${out}Could not ping node. Error was: ${styleValue(error.message, 'failure')}`
+      return log(`${out}Could not ping node. Error was: ${styleValue(error.message, 'failure')}`)
     }
-    return `${out}Could not ping node. Timeout.`
+    return log(`${out}Could not ping node. Timeout.`)
   }
 }

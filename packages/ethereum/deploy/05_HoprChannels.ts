@@ -8,8 +8,8 @@ const closures: {
 } = {
   testing: durations.minutes(1),
   development: durations.minutes(1),
-  staging: durations.minutes(10),
-  production: durations.minutes(60)
+  staging: durations.minutes(5),
+  production: durations.minutes(5)
 }
 
 const main: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {

@@ -10,7 +10,8 @@ import {
   Address,
   NativeBalance,
   cacheNoArgAsyncFunction,
-  HoprDB
+  HoprDB,
+  ChannelEntry
 } from '@hoprnet/hopr-utils'
 import Indexer from './indexer'
 import { RoutingChannel } from './indexer'
@@ -38,9 +39,13 @@ export type RedeemTicketResponse =
 
 export default class HoprEthereum {
   private privateKey: Uint8Array
+  private publicKey: PublicKey
+  private address: Address
 
   constructor(private chain: ChainWrapper, private db: HoprDB, public indexer: Indexer) {
     this.privateKey = this.chain.getPrivateKey()
+    this.publicKey = this.chain.getPublicKey()
+    this.address = Address.fromString(this.chain.getWallet().address)
   }
 
   readonly CHAIN_NAME = 'HOPR on Ethereum'
@@ -65,11 +70,11 @@ export default class HoprEthereum {
     return this.chain.withdraw(currency, recipient, amount)
   }
 
-  public getChannelsFromPeer(p: PeerId) {
-    return this.indexer.getChannelsFromPeer(p)
+  public getOpenRoutingChannelsFromPeer(p: PeerId) {
+    return this.indexer.getOpenRoutingChannelsFromPeer(p)
   }
 
-  public getChannelsOf(addr: Address) {
+  public getChannelsOf(addr: Address): Promise<ChannelEntry[]> {
     return this.indexer.getChannelsOf(addr)
   }
 
@@ -85,7 +90,7 @@ export default class HoprEthereum {
     return this.indexer.getRandomChannel()
   }
 
-  private uncachedGetBalance = () => this.chain.getBalance(this.getAddress())
+  private uncachedGetBalance = () => this.chain.getBalance(this.address)
   private cachedGetBalance = cacheNoArgAsyncFunction<Balance>(this.uncachedGetBalance, PROVIDER_CACHE_TTL)
   /**
    * Retrieves HOPR balance, optionally uses the cache.
@@ -95,19 +100,19 @@ export default class HoprEthereum {
     return useCache ? this.cachedGetBalance() : this.uncachedGetBalance()
   }
 
-  getAddress(): Address {
-    return Address.fromString(this.chain.getWallet().address)
+  public getAddress(): Address {
+    return this.address
   }
 
-  getPublicKey() {
-    return this.chain.getPublicKey()
+  public getPublicKey() {
+    return this.publicKey
   }
 
   /**
    * Retrieves ETH balance, optionally uses the cache.
    * @returns ETH balance
    */
-  private uncachedGetNativeBalance = () => this.chain.getNativeBalance(this.getAddress())
+  private uncachedGetNativeBalance = () => this.chain.getNativeBalance(this.address)
   private cachedGetNativeBalance = cacheNoArgAsyncFunction<NativeBalance>(
     this.uncachedGetNativeBalance,
     PROVIDER_CACHE_TTL
@@ -150,8 +155,10 @@ export default class HoprEthereum {
     await indexer.start()
 
     const coreConnector = new HoprEthereum(chain, db, indexer)
-    log(`using blockchain address ${await coreConnector.getAddress().toHex()}`)
+
+    log(`using blockchain address ${coreConnector.getAddress().toHex()}`)
     log(chalk.green('Connector started'))
+
     return coreConnector
   }
 }

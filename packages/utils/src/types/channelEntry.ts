@@ -2,8 +2,13 @@ import { u8aSplit, serializeToU8a, u8aToNumber, stringToU8a } from '..'
 import { Address, Balance, Hash } from './primitives'
 import { UINT256 } from './solidity'
 import BN from 'bn.js'
+import chalk from 'chalk'
 
-export type ChannelStatus = 'CLOSED' | 'OPEN' | 'PENDING_TO_CLOSE'
+export enum ChannelStatus {
+  Closed = 'CLOSED',
+  Open = 'OPEN',
+  PendingToClose = 'PENDING_TO_CLOSE'
+}
 
 export function generateChannelId(self: Address, counterparty: Address) {
   let parties = self.sortPair(counterparty)
@@ -11,10 +16,16 @@ export function generateChannelId(self: Address, counterparty: Address) {
 }
 
 function numberToChannelStatus(i: number): ChannelStatus {
-  if (i === 0) return 'CLOSED'
-  else if (i === 1) return 'OPEN'
-  else if (i === 2) return 'PENDING_TO_CLOSE'
-  throw Error(`Status at ${status} does not exist`)
+  switch (i) {
+    case 0:
+      return ChannelStatus.Closed
+    case 1:
+      return ChannelStatus.Open
+    case 2:
+      return ChannelStatus.PendingToClose
+    default:
+      throw Error(`Status at ${status} does not exist`)
+  }
 }
 
 function u8aToChannelStatus(arr: Uint8Array): ChannelStatus {
@@ -22,9 +33,16 @@ function u8aToChannelStatus(arr: Uint8Array): ChannelStatus {
 }
 
 function channelStatusToU8a(c: ChannelStatus): Uint8Array {
-  if (c == 'CLOSED') return Uint8Array.of(0)
-  if (c == 'OPEN') return Uint8Array.of(1)
-  return Uint8Array.of(2)
+  switch (c) {
+    case 'CLOSED':
+      return Uint8Array.of(0)
+    case 'OPEN':
+      return Uint8Array.of(1)
+    case 'PENDING_TO_CLOSE':
+      return Uint8Array.of(2)
+    default:
+      throw Error(`Invalid status. Got ${c}`)
+  }
 }
 
 // TODO, find a better way to do this.
@@ -115,6 +133,27 @@ export class ChannelEntry {
       [this.closureTime.serialize(), UINT256.SIZE],
       [Uint8Array.of(Number(this.closureByPartyA)), 1]
     ])
+  }
+
+  toString() {
+    return (
+      // prettier-ignore
+      `ChannelEntry (${chalk.yellow(this.getId().toHex())}):\n` +
+      `  partyA:            ${chalk.yellow(this.partyA.toHex())}\n` +
+      `  partyB:            ${chalk.yellow(this.partyB.toHex())}\n` +
+      `  balanceA:          ${this.partyABalance.toFormattedString()}\n` +
+      `  balanceB:          ${this.partyBBalance.toFormattedString()}\n` +
+      `  commitmentA:       ${this.commitmentPartyA.toHex()}\n` +
+      `  commitmentB:       ${this.commitmentPartyB.toHex()}\n` +
+      `  partyATicketEpoch: ${this.partyATicketEpoch.toBN().toString(10)}\n` +
+      `  partyBTicketEpoch: ${this.partyBTicketEpoch.toBN().toString(10)}\n` +
+      `  partyBTicketIndex: ${this.partyATicketIndex.toBN().toString(10)}\n` +
+      `  partyBTicketIndex: ${this.partyBTicketIndex.toBN().toString(10)}\n` +
+      `  status:            ${chalk.green(this.status)}\n` +
+      `  channelEpoch:      ${this.channelEpoch.toBN().toString(10)}\n` +
+      `  closureTime:       ${this.closureTime.toBN().toString(10)}\n` +
+      `  closedByA:         ${chalk.blue(this.closureByPartyA.toString())}\n`
+    )
   }
 
   public getId() {

@@ -5,7 +5,7 @@ env:
 
 on:
   push:
-    branches: ['master', 'release/**', 'avado', 'debug-docs/**']
+    branches: ['**']
 
 jobs:
   docs:
@@ -15,7 +15,7 @@ jobs:
       - uses: actions/checkout@v2
 
       - name: Configure Git info
-        run: bash -x scripts/configure-git-info.sh
+        run: ./scripts/configure-git-info.sh
 
       - name: Use Node.js
         uses: actions/setup-node@v2
@@ -44,10 +44,16 @@ jobs:
         run: yarn
 
       - name: Generate docs
-        run: bash -x scripts/regenerate-typedocs.sh
+        run: ./scripts/regenerate-typedocs.sh
 
       - name: Commit docs changes
-        if: env.ACT == ''
-        run: bash -x scripts/commit-and-push-all-changes.sh
+        # only commit changes when not running via act and when on final branch<Plug>_es
+        if: |
+          (github.ref == 'refs/heads/master' ||
+           github.ref == 'refs/heads/avado' ||
+           startsWith(github.ref, 'refs/heads/debug-docs/') ||
+           startsWith(github.ref, 'refs/heads/release/')
+          ) && env.ACT == ''
+        run: ./scripts/commit-and-push-all-changes.sh
         env:
           HOPR_GIT_MSG: "Re-generate API docs for packages"

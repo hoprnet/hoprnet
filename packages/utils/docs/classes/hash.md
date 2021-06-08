@@ -26,110 +26,140 @@
 
 ### constructor
 
-\+ **new Hash**(`arr`: *Uint8Array*): [*Hash*](hash.md)
+• **new Hash**(`arr`)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `arr` | *Uint8Array* |
+| `arr` | `Uint8Array` |
 
-**Returns:** [*Hash*](hash.md)
+#### Defined in
 
-Defined in: [types/primitives.ts:122](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L122)
+[types/primitives.ts:122](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L122)
 
 ## Properties
 
 ### SIZE
 
-▪ `Static` **SIZE**: *number*
+▪ `Static` **SIZE**: `number`
 
-Defined in: [types/primitives.ts:133](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L133)
+#### Defined in
+
+[types/primitives.ts:133](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L133)
 
 ## Methods
 
 ### clone
 
-▸ **clone**(): [*Hash*](hash.md)
+▸ **clone**(): [Hash](hash.md)
 
-**Returns:** [*Hash*](hash.md)
+#### Returns
 
-Defined in: [types/primitives.ts:155](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L155)
+[Hash](hash.md)
+
+#### Defined in
+
+[types/primitives.ts:155](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L155)
 
 ___
 
 ### eq
 
-▸ **eq**(`b`: [*Hash*](hash.md)): *boolean*
+▸ **eq**(`b`): `boolean`
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `b` | [*Hash*](hash.md) |
+| `b` | [Hash](hash.md) |
 
-**Returns:** *boolean*
+#### Returns
 
-Defined in: [types/primitives.ts:147](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L147)
+`boolean`
+
+#### Defined in
+
+[types/primitives.ts:147](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L147)
 
 ___
 
 ### hash
 
-▸ **hash**(): [*Hash*](hash.md)
+▸ **hash**(): [Hash](hash.md)
 
-**Returns:** [*Hash*](hash.md)
+#### Returns
 
-Defined in: [types/primitives.ts:159](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L159)
+[Hash](hash.md)
+
+#### Defined in
+
+[types/primitives.ts:159](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L159)
 
 ___
 
 ### serialize
 
-▸ **serialize**(): *Uint8Array*
+▸ **serialize**(): `Uint8Array`
 
-**Returns:** *Uint8Array*
+#### Returns
 
-Defined in: [types/primitives.ts:143](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L143)
+`Uint8Array`
+
+#### Defined in
+
+[types/primitives.ts:143](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L143)
 
 ___
 
 ### toHex
 
-▸ **toHex**(): *string*
+▸ **toHex**(): `string`
 
-**Returns:** *string*
+#### Returns
 
-Defined in: [types/primitives.ts:151](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L151)
+`string`
+
+#### Defined in
+
+[types/primitives.ts:151](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L151)
 
 ___
 
 ### create
 
-▸ `Static` **create**(...`inputs`: *Uint8Array*[]): [*Hash*](hash.md)
+▸ `Static` **create**(...`inputs`): [Hash](hash.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `...inputs` | *Uint8Array*[] |
+| `...inputs` | `Uint8Array`[] |
 
-**Returns:** [*Hash*](hash.md)
+#### Returns
 
-Defined in: [types/primitives.ts:135](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L135)
+[Hash](hash.md)
+
+#### Defined in
+
+[types/primitives.ts:135](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L135)
 
 ___
 
 ### deserialize
 
-▸ `Static` **deserialize**(`arr`: *Uint8Array*): [*Hash*](hash.md)
+▸ `Static` **deserialize**(`arr`): [Hash](hash.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `arr` | *Uint8Array* |
+| `arr` | `Uint8Array` |
 
-**Returns:** [*Hash*](hash.md)
+#### Returns
 
-Defined in: [types/primitives.ts:139](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L139)
+[Hash](hash.md)
+
+#### Defined in
+
+[types/primitives.ts:139](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L139)

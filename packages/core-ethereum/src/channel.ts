@@ -18,11 +18,11 @@ import { Commitment } from './commitment'
 import type { ChainWrapper } from './ethereum'
 import type Indexer from './indexer'
 import type { HoprDB } from '@hoprnet/hopr-utils'
+import chalk from 'chalk'
 
 const log = Debug('hopr-core-ethereum:channel')
 
 class Channel {
-  private index: number
   private commitment: Commitment
 
   constructor(
@@ -33,12 +33,12 @@ class Channel {
     private readonly indexer: Indexer,
     private readonly privateKey: Uint8Array
   ) {
-    this.index = 0 // TODO - bump channel epoch to make sure..
     this.commitment = new Commitment(
       (commitment: Hash) => this.chain.setCommitment(counterparty.toAddress(), commitment),
       () => this.getChainCommitment(),
       this.db,
-      this.getId()
+      this.getId(),
+      indexer
     )
   }
 
@@ -63,16 +63,22 @@ class Channel {
 
     const ticket = unacknowledgedTicket.ticket
 
-    if (ticket.isWinningTicket(await this.commitment.getCurrentCommitment(), response, ticket.winProb)) {
-      const ack = new AcknowledgedTicket(
-        ticket,
-        response,
-        await this.commitment.getCurrentCommitment(),
-        unacknowledgedTicket.signer
+    const opening = await this.commitment.findPreImage(await this.commitment.getCurrentCommitment())
+
+    if (ticket.isWinningTicket(opening, response, ticket.winProb)) {
+      const ack = new AcknowledgedTicket(ticket, response, opening, unacknowledgedTicket.signer)
+
+      log(
+        `Acknowledging ticket. Using opening ${chalk.yellow(opening.toHex())} and response ${chalk.green(
+          response.toHex()
+        )}`
       )
+
       await this.commitment.bumpCommitment()
       return ack
     } else {
+      log(`Got a ticket that is not a win. Dropping ticket.`)
+      await this.db.markLosing(unacknowledgedTicket)
       return null
     }
   }
@@ -155,6 +161,18 @@ class Channel {
     return await this.chain.finalizeChannelClosure(counterpartyAddress)
   }
 
+  private async bumpTicketIndex(channelId: Hash): Promise<UINT256> {
+    let currentTicketIndex = await this.db.getCurrentTicketIndex(channelId)
+
+    if (currentTicketIndex == undefined) {
+      currentTicketIndex = new UINT256(new BN(1))
+    }
+
+    await this.db.setCurrentTicketIndex(channelId, new UINT256(currentTicketIndex.toBN().addn(1)))
+
+    return currentTicketIndex
+  }
+
   /**
    * Creates a signed ticket that includes the given amount of
    * tokens
@@ -170,16 +188,22 @@ class Channel {
     const counterpartyAddress = this.counterparty.toAddress()
     const channelState = await this.getState()
 
-    return Ticket.create(
+    const currentTicketIndex = await this.bumpTicketIndex(channelState.getId())
+
+    const ticket = Ticket.create(
       counterpartyAddress,
       challenge,
-      channelState.ticketEpochFor(this.counterparty.toAddress()),
-      new UINT256(new BN(this.index++)),
+      channelState.ticketEpochFor(counterpartyAddress),
+      currentTicketIndex,
       amount,
       UINT256.fromInverseProbability(winProb),
       channelState.channelEpoch,
       this.privateKey
     )
+
+    log(`Creating ticket in channel ${chalk.yellow(channelState.getId().toHex())}. Ticket data: \n${ticket.toString()}`)
+
+    return ticket
   }
 
   // @TODO Replace this with (truely) random data
@@ -194,7 +218,7 @@ class Channel {
       this.counterparty.toAddress(),
       challenge,
       UINT256.fromString('0'),
-      new UINT256(new BN(this.index++)),
+      UINT256.fromString('0'),
       new Balance(new BN(0)),
       UINT256.DUMMY_INVERSE_PROBABILITY,
       UINT256.fromString('0'),
@@ -236,17 +260,18 @@ class Channel {
 
       const receipt = await this.chain.redeemTicket(this.counterparty.toAddress(), ackTicket, ticket)
 
-      // TODO delete ackTicket
       //this.commitment.updateChainState(ackTicket.preImage)
 
       log('Successfully submitted ticket', ackTicket.response.toHex())
+      await this.db.markRedeemeed(ackTicket)
       return {
         status: 'SUCCESS',
         receipt,
         ackTicket
       }
     } catch (err) {
-      log('Unexpected error when submitting ticket', ackTicket.response.toHex(), err)
+      // TODO delete ackTicket -- check if it's due to gas!
+      log('Unexpected error when redeeming ticket', ackTicket.response.toHex(), err)
       return {
         status: 'ERROR',
         error: err

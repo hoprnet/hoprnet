@@ -11,11 +11,11 @@
 ### Properties
 
 - [commitment](channel.md#commitment)
-- [index](channel.md#index)
 
 ### Methods
 
 - [acknowledge](channel.md#acknowledge)
+- [bumpTicketIndex](channel.md#bumpticketindex)
 - [createDummyTicket](channel.md#createdummyticket)
 - [createTicket](channel.md#createticket)
 - [finalizeClosure](channel.md#finalizeclosure)
@@ -33,66 +33,60 @@
 
 ### constructor
 
-\+ **new Channel**(`self`: *PublicKey*, `counterparty`: *PublicKey*, `db`: *HoprDB*, `chain`: { `announce`: (`multiaddr`: Multiaddr) => *Promise*<string\> ; `finalizeChannelClosure`: (`counterparty`: *Address*) => *Promise*<string\> ; `fundChannel`: (`me`: *Address*, `counterparty`: *Address*, `myTotal`: *Balance*, `theirTotal`: *Balance*) => *Promise*<string\> ; `getBalance`: (`address`: *Address*) => *Promise*<Balance\> ; `getChannels`: () => *HoprChannels* ; `getGenesisBlock`: () => *number* ; `getInfo`: () => *string* ; `getLatestBlockNumber`: () => *Promise*<number\> ; `getNativeBalance`: (`address`: *Address*) => *Promise*<NativeBalance\> ; `getPrivateKey`: () => *Uint8Array* ; `getPublicKey`: () => *PublicKey* ; `getWallet`: () => *Wallet* ; `initiateChannelClosure`: (`counterparty`: *Address*) => *Promise*<string\> ; `openChannel`: (`me`: *Address*, `counterparty`: *Address*, `amount`: *Balance*) => *Promise*<string\> ; `redeemTicket`: (`counterparty`: *Address*, `ackTicket`: *AcknowledgedTicket*, `ticket`: *Ticket*) => *Promise*<string\> ; `setCommitment`: (`counterparty`: *Address*, `comm`: *Hash*) => *Promise*<string\> ; `subscribeBlock`: (`cb`: *any*) => *JsonRpcProvider* \| *WebSocketProvider* ; `subscribeChannelEvents`: (`cb`: *any*) => *HoprChannels* ; `subscribeError`: (`cb`: *any*) => *void* ; `unsubscribe`: () => *void* ; `waitUntilReady`: () => *Promise*<Network\> ; `withdraw`: (`currency`: ``"NATIVE"`` \| ``"HOPR"``, `recipient`: *string*, `amount`: *string*) => *Promise*<string\>  }, `indexer`: [*Indexer*](indexer.md), `privateKey`: *Uint8Array*): [*Channel*](channel.md)
+• **new Channel**(`self`, `counterparty`, `db`, `chain`, `indexer`, `privateKey`)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `self` | *PublicKey* |
-| `counterparty` | *PublicKey* |
-| `db` | *HoprDB* |
-| `chain` | *object* |
-| `chain.announce` | (`multiaddr`: Multiaddr) => *Promise*<string\> |
-| `chain.finalizeChannelClosure` | (`counterparty`: *Address*) => *Promise*<string\> |
-| `chain.fundChannel` | (`me`: *Address*, `counterparty`: *Address*, `myTotal`: *Balance*, `theirTotal`: *Balance*) => *Promise*<string\> |
-| `chain.getBalance` | (`address`: *Address*) => *Promise*<Balance\> |
-| `chain.getChannels` | () => *HoprChannels* |
-| `chain.getGenesisBlock` | () => *number* |
-| `chain.getInfo` | () => *string* |
-| `chain.getLatestBlockNumber` | () => *Promise*<number\> |
-| `chain.getNativeBalance` | (`address`: *Address*) => *Promise*<NativeBalance\> |
-| `chain.getPrivateKey` | () => *Uint8Array* |
-| `chain.getPublicKey` | () => *PublicKey* |
-| `chain.getWallet` | () => *Wallet* |
-| `chain.initiateChannelClosure` | (`counterparty`: *Address*) => *Promise*<string\> |
-| `chain.openChannel` | (`me`: *Address*, `counterparty`: *Address*, `amount`: *Balance*) => *Promise*<string\> |
-| `chain.redeemTicket` | (`counterparty`: *Address*, `ackTicket`: *AcknowledgedTicket*, `ticket`: *Ticket*) => *Promise*<string\> |
-| `chain.setCommitment` | (`counterparty`: *Address*, `comm`: *Hash*) => *Promise*<string\> |
-| `chain.subscribeBlock` | (`cb`: *any*) => *JsonRpcProvider* \| *WebSocketProvider* |
-| `chain.subscribeChannelEvents` | (`cb`: *any*) => *HoprChannels* |
-| `chain.subscribeError` | (`cb`: *any*) => *void* |
-| `chain.unsubscribe` | () => *void* |
-| `chain.waitUntilReady` | () => *Promise*<Network\> |
-| `chain.withdraw` | (`currency`: ``"NATIVE"`` \| ``"HOPR"``, `recipient`: *string*, `amount`: *string*) => *Promise*<string\> |
-| `indexer` | [*Indexer*](indexer.md) |
-| `privateKey` | *Uint8Array* |
+| `self` | `PublicKey` |
+| `counterparty` | `PublicKey` |
+| `db` | `HoprDB` |
+| `chain` | `Object` |
+| `chain.announce` | (`multiaddr`: `Multiaddr`) => `Promise`<string\> |
+| `chain.finalizeChannelClosure` | (`counterparty`: `Address`) => `Promise`<string\> |
+| `chain.fundChannel` | (`me`: `Address`, `counterparty`: `Address`, `myTotal`: `Balance`, `theirTotal`: `Balance`) => `Promise`<string\> |
+| `chain.getBalance` | (`address`: `Address`) => `Promise`<Balance\> |
+| `chain.getChannels` | () => `HoprChannels` |
+| `chain.getGenesisBlock` | () => `number` |
+| `chain.getInfo` | () => `string` |
+| `chain.getLatestBlockNumber` | () => `Promise`<number\> |
+| `chain.getNativeBalance` | (`address`: `Address`) => `Promise`<NativeBalance\> |
+| `chain.getPrivateKey` | () => `Uint8Array` |
+| `chain.getPublicKey` | () => `PublicKey` |
+| `chain.getWallet` | () => `Wallet` |
+| `chain.initiateChannelClosure` | (`counterparty`: `Address`) => `Promise`<string\> |
+| `chain.openChannel` | (`me`: `Address`, `counterparty`: `Address`, `amount`: `Balance`) => `Promise`<string\> |
+| `chain.redeemTicket` | (`counterparty`: `Address`, `ackTicket`: `AcknowledgedTicket`, `ticket`: `Ticket`) => `Promise`<string\> |
+| `chain.setCommitment` | (`counterparty`: `Address`, `comm`: `Hash`) => `Promise`<string\> |
+| `chain.subscribeBlock` | (`cb`: `any`) => `JsonRpcProvider` \| `WebSocketProvider` |
+| `chain.subscribeChannelEvents` | (`cb`: `any`) => `HoprChannels` |
+| `chain.subscribeError` | (`cb`: `any`) => `void` |
+| `chain.unsubscribe` | () => `void` |
+| `chain.waitUntilReady` | () => `Promise`<Network\> |
+| `chain.withdraw` | (`currency`: ``"NATIVE"`` \| ``"HOPR"``, `recipient`: `string`, `amount`: `string`) => `Promise`<string\> |
+| `indexer` | [Indexer](indexer.md) |
+| `privateKey` | `Uint8Array` |
 
-**Returns:** [*Channel*](channel.md)
+#### Defined in
 
-Defined in: [core-ethereum/src/channel.ts:26](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L26)
+[core-ethereum/src/channel.ts:26](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L26)
 
 ## Properties
 
 ### commitment
 
-• `Private` **commitment**: *Commitment*
+• `Private` **commitment**: `Commitment`
 
-Defined in: [core-ethereum/src/channel.ts:26](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L26)
+#### Defined in
 
-___
-
-### index
-
-• `Private` **index**: *number*
-
-Defined in: [core-ethereum/src/channel.ts:25](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L25)
+[core-ethereum/src/channel.ts:26](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L26)
 
 ## Methods
 
 ### acknowledge
 
-▸ **acknowledge**(`unacknowledgedTicket`: *UnacknowledgedTicket*, `acknowledgement`: *HalfKey*): *Promise*<AcknowledgedTicket\>
+▸ **acknowledge**(`unacknowledgedTicket`, `acknowledgement`): `Promise`<AcknowledgedTicket\>
 
 Reserve a preImage for the given ticket if it is a winning ticket.
 
@@ -100,18 +94,42 @@ Reserve a preImage for the given ticket if it is a winning ticket.
 
 | Name | Type |
 | :------ | :------ |
-| `unacknowledgedTicket` | *UnacknowledgedTicket* |
-| `acknowledgement` | *HalfKey* |
+| `unacknowledgedTicket` | `UnacknowledgedTicket` |
+| `acknowledgement` | `HalfKey` |
 
-**Returns:** *Promise*<AcknowledgedTicket\>
+#### Returns
 
-Defined in: [core-ethereum/src/channel.ts:54](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L54)
+`Promise`<AcknowledgedTicket\>
+
+#### Defined in
+
+[core-ethereum/src/channel.ts:54](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L54)
+
+___
+
+### bumpTicketIndex
+
+▸ `Private` **bumpTicketIndex**(`channelId`): `Promise`<UINT256\>
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `channelId` | `Hash` |
+
+#### Returns
+
+`Promise`<UINT256\>
+
+#### Defined in
+
+[core-ethereum/src/channel.ts:164](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L164)
 
 ___
 
 ### createDummyTicket
 
-▸ **createDummyTicket**(`challenge`: *Challenge*): *Ticket*
+▸ **createDummyTicket**(`challenge`): `Ticket`
 
 Creates a ticket that is sent next to the packet to the last node.
 
@@ -119,19 +137,23 @@ Creates a ticket that is sent next to the packet to the last node.
 
 | Name | Type | Description |
 | :------ | :------ | :------ |
-| `challenge` | *Challenge* | dummy challenge, potential no valid response known |
+| `challenge` | `Challenge` | dummy challenge, potential no valid response known |
 
-**Returns:** *Ticket*
+#### Returns
+
+`Ticket`
 
 a ticket without any value
 
-Defined in: [core-ethereum/src/channel.ts:191](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L191)
+#### Defined in
+
+[core-ethereum/src/channel.ts:215](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L215)
 
 ___
 
 ### createTicket
 
-▸ **createTicket**(`amount`: *Balance*, `challenge`: *Challenge*, `winProb`: *BN*): *Promise*<Ticket\>
+▸ **createTicket**(`amount`, `challenge`, `winProb`): `Promise`<Ticket\>
 
 Creates a signed ticket that includes the given amount of
 tokens
@@ -144,138 +166,182 @@ recovery algorithm is used to perform an EC-point multiplication.
 
 | Name | Type | Description |
 | :------ | :------ | :------ |
-| `amount` | *Balance* | value of the ticket |
-| `challenge` | *Challenge* | challenge to solve in order to redeem the ticket |
-| `winProb` | *BN* | the winning probability to use |
+| `amount` | `Balance` | value of the ticket |
+| `challenge` | `Challenge` | challenge to solve in order to redeem the ticket |
+| `winProb` | `BN` | the winning probability to use |
 
-**Returns:** *Promise*<Ticket\>
+#### Returns
+
+`Promise`<Ticket\>
 
 a signed ticket
 
-Defined in: [core-ethereum/src/channel.ts:169](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L169)
+#### Defined in
+
+[core-ethereum/src/channel.ts:187](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L187)
 
 ___
 
 ### finalizeClosure
 
-▸ **finalizeClosure**(): *Promise*<string\>
+▸ **finalizeClosure**(): `Promise`<string\>
 
-**Returns:** *Promise*<string\>
+#### Returns
 
-Defined in: [core-ethereum/src/channel.ts:148](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L148)
+`Promise`<string\>
+
+#### Defined in
+
+[core-ethereum/src/channel.ts:154](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L154)
 
 ___
 
 ### fund
 
-▸ **fund**(`myFund`: *Balance*, `counterpartyFund`: *Balance*): *Promise*<void\>
+▸ **fund**(`myFund`, `counterpartyFund`): `Promise`<void\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `myFund` | *Balance* |
-| `counterpartyFund` | *Balance* |
+| `myFund` | `Balance` |
+| `counterpartyFund` | `Balance` |
 
-**Returns:** *Promise*<void\>
+#### Returns
 
-Defined in: [core-ethereum/src/channel.ts:109](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L109)
+`Promise`<void\>
+
+#### Defined in
+
+[core-ethereum/src/channel.ts:115](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L115)
 
 ___
 
 ### getBalances
 
-▸ **getBalances**(): *Promise*<{ `counterparty`: *Balance* ; `self`: *Balance*  }\>
+▸ **getBalances**(): `Promise`<`Object`\>
 
-**Returns:** *Promise*<{ `counterparty`: *Balance* ; `self`: *Balance*  }\>
+#### Returns
 
-Defined in: [core-ethereum/src/channel.ts:97](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L97)
+`Promise`<`Object`\>
+
+#### Defined in
+
+[core-ethereum/src/channel.ts:103](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L103)
 
 ___
 
 ### getChainCommitment
 
-▸ **getChainCommitment**(): *Promise*<Hash\>
+▸ **getChainCommitment**(): `Promise`<Hash\>
 
-**Returns:** *Promise*<Hash\>
+#### Returns
 
-Defined in: [core-ethereum/src/channel.ts:84](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L84)
+`Promise`<Hash\>
+
+#### Defined in
+
+[core-ethereum/src/channel.ts:90](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L90)
 
 ___
 
 ### getId
 
-▸ **getId**(): *Hash*
+▸ **getId**(): `Hash`
 
-**Returns:** *Hash*
+#### Returns
 
-Defined in: [core-ethereum/src/channel.ts:80](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L80)
+`Hash`
+
+#### Defined in
+
+[core-ethereum/src/channel.ts:86](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L86)
 
 ___
 
 ### getState
 
-▸ **getState**(): *Promise*<ChannelEntry\>
+▸ **getState**(): `Promise`<ChannelEntry\>
 
-**Returns:** *Promise*<ChannelEntry\>
+#### Returns
 
-Defined in: [core-ethereum/src/channel.ts:88](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L88)
+`Promise`<ChannelEntry\>
+
+#### Defined in
+
+[core-ethereum/src/channel.ts:94](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L94)
 
 ___
 
 ### initializeClosure
 
-▸ **initializeClosure**(): *Promise*<string\>
+▸ **initializeClosure**(): `Promise`<string\>
 
-**Returns:** *Promise*<string\>
+#### Returns
 
-Defined in: [core-ethereum/src/channel.ts:139](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L139)
+`Promise`<string\>
+
+#### Defined in
+
+[core-ethereum/src/channel.ts:145](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L145)
 
 ___
 
 ### open
 
-▸ **open**(`fundAmount`: *Balance*): *Promise*<void\>
+▸ **open**(`fundAmount`): `Promise`<void\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `fundAmount` | *Balance* |
+| `fundAmount` | `Balance` |
 
-**Returns:** *Promise*<void\>
+#### Returns
 
-Defined in: [core-ethereum/src/channel.ts:120](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L120)
+`Promise`<void\>
+
+#### Defined in
+
+[core-ethereum/src/channel.ts:126](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L126)
 
 ___
 
 ### redeemTicket
 
-▸ **redeemTicket**(`ackTicket`: *AcknowledgedTicket*): *Promise*<[*RedeemTicketResponse*](../modules.md#redeemticketresponse)\>
+▸ **redeemTicket**(`ackTicket`): `Promise`<[RedeemTicketResponse](../modules.md#redeemticketresponse)\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `ackTicket` | *AcknowledgedTicket* |
+| `ackTicket` | `AcknowledgedTicket` |
 
-**Returns:** *Promise*<[*RedeemTicketResponse*](../modules.md#redeemticketresponse)\>
+#### Returns
 
-Defined in: [core-ethereum/src/channel.ts:205](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L205)
+`Promise`<[RedeemTicketResponse](../modules.md#redeemticketresponse)\>
+
+#### Defined in
+
+[core-ethereum/src/channel.ts:229](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L229)
 
 ___
 
 ### generateId
 
-▸ `Static` **generateId**(`self`: *Address*, `counterparty`: *Address*): *Hash*
+▸ `Static` **generateId**(`self`, `counterparty`): `Hash`
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `self` | *Address* |
-| `counterparty` | *Address* |
+| `self` | `Address` |
+| `counterparty` | `Address` |
 
-**Returns:** *Hash*
+#### Returns
 
-Defined in: [core-ethereum/src/channel.ts:45](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L45)
+`Hash`
+
+#### Defined in
+
+[core-ethereum/src/channel.ts:45](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L45)

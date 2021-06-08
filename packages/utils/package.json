@@ -1,7 +1,7 @@
 {
   "name": "@hoprnet/hopr-utils",
   "description": "HOPR-based utilities to process multiple data structures",
-  "version": "1.71.0-next.184",
+  "version": "1.72.0-next.10",
   "repository": "https://github.com/hoprnet/hoprnet.git",
   "homepage": "https://hoprnet.org",
   "license": "GPL-3.0",
@@ -36,26 +36,27 @@
     "it-pipe": "^1.1.0",
     "leveldown": "^6.0.0",
     "levelup": "^5.0.0",
-    "libp2p": "0.31.5",
+    "libp2p": "0.31.6",
     "libp2p-crypto": "0.19.4",
     "memdown": "^6.0.0",
     "multiaddr": "9.0.1",
     "multihashes": "~4.0.1",
     "peer-id": "0.14.8",
-    "secp256k1": "^4.0.2",
-    "strip-ansi": "^7.0.0"
+    "private-ip": "^2.2.1",
+    "secp256k1": "^4.0.2"
   },
   "devDependencies": {
     "@types/mocha": "^8.2.0",
     "@types/node": "14",
     "bl": "^5.0.0",
     "chai": "^4.3.0",
-    "mocha": "^8.2.0",
+    "mocha": "^9.0.0",
     "rewiremock": "^3.14.3",
     "rimraf": "^3.0.2",
     "sinon": "^11.0.0",
     "ts-node": "^9.0.0",
-    "typescript": "^4.2"
+    "typedoc": "^0.20.36",
+    "typescript": "4.2.4"
   },
   "mocha": {
     "extension": [

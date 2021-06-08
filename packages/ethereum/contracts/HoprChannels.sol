@@ -433,18 +433,17 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
 
         require(ECDSA.recover(ticketHash, signature) == counterparty, "signer must match the counterparty");
         require(
-            uint256(_getTicketLuck(
+            _getTicketLuck(
                 ticketHash,
                 nextCommitment,
-                winProb
-            )) <= winProb,
+                proofOfRelaySecret
+            ) <= winProb,
             "ticket must be a win"
         );
 
           earningChannel.commitment = nextCommitment;
           spendingChannel.balance = spendingChannel.balance.sub(amount);
           earningChannel.balance = earningChannel.balance.add(amount);
-          earningChannel.ticketEpoch = earningChannel.ticketEpoch.add(1);
           earnincChannel.ticketIndex = ticketIndex;
           emit ChannelUpdate(redeemer, counterparty, earningChannel);
     }
@@ -460,7 +459,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
      * See https://ethresear.ch/t/you-can-kinda-abuse-ecrecover-to-do-ecmul-in-secp256k1-today/2384
      * @param response response that is used to recompute the challenge
      */
-    function computeChallenge(bytes32 response) public pure returns (address)  {
+    function _computeChallenge(bytes32 response) internal pure returns (address)  {
         // Field order of the base field
         uint256 FIELD_ORDER = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141;
 
@@ -486,7 +485,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         uint256 ticketIndex,
         uint256 winProb
     ) internal pure returns (bytes memory) {
-        address challenge = computeChallenge(proofOfRelaySecret);
+        address challenge = _computeChallenge(proofOfRelaySecret);
 
         return abi.encodePacked(
             recipient,
@@ -507,8 +506,8 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     function _getTicketLuck(
         bytes32 ticketHash,
         bytes32 nextCommitment,
-        uint256 winProb
-    ) internal pure returns (bytes32) {
-        return keccak256(abi.encodePacked(ticketHash, nextCommitment, winProb));
+        bytes32 proofOfRelaySecret
+    ) internal pure returns (uint256) {
+        return uint256(keccak256(abi.encodePacked(ticketHash, nextCommitment, proofOfRelaySecret)));
     }
 }

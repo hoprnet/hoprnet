@@ -23,74 +23,92 @@
 
 ### constructor
 
-\+ **new EthereumChallenge**(`arr`: *Uint8Array*): [*EthereumChallenge*](ethereumchallenge.md)
+• **new EthereumChallenge**(`arr`)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `arr` | *Uint8Array* |
+| `arr` | `Uint8Array` |
 
-**Returns:** [*EthereumChallenge*](ethereumchallenge.md)
+#### Defined in
 
-Defined in: [types/ethereumChallenge.ts:3](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ethereumChallenge.ts#L3)
+[types/ethereumChallenge.ts:3](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ethereumChallenge.ts#L3)
 
 ## Properties
 
 ### SIZE
 
-▪ `Static` **SIZE**: *number*= 20
+▪ `Static` **SIZE**: `number` = 20
 
-Defined in: [types/ethereumChallenge.ts:30](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ethereumChallenge.ts#L30)
+#### Defined in
+
+[types/ethereumChallenge.ts:30](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ethereumChallenge.ts#L30)
 
 ## Methods
 
 ### eq
 
-▸ **eq**(`ethCallenge`: [*EthereumChallenge*](ethereumchallenge.md)): *boolean*
+▸ **eq**(`ethCallenge`): `boolean`
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `ethCallenge` | [*EthereumChallenge*](ethereumchallenge.md) |
+| `ethCallenge` | [EthereumChallenge](ethereumchallenge.md) |
 
-**Returns:** *boolean*
+#### Returns
 
-Defined in: [types/ethereumChallenge.ts:26](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ethereumChallenge.ts#L26)
+`boolean`
+
+#### Defined in
+
+[types/ethereumChallenge.ts:26](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ethereumChallenge.ts#L26)
 
 ___
 
 ### serialize
 
-▸ **serialize**(): *Uint8Array*
+▸ **serialize**(): `Uint8Array`
 
-**Returns:** *Uint8Array*
+#### Returns
 
-Defined in: [types/ethereumChallenge.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ethereumChallenge.ts#L18)
+`Uint8Array`
+
+#### Defined in
+
+[types/ethereumChallenge.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ethereumChallenge.ts#L18)
 
 ___
 
 ### toHex
 
-▸ **toHex**(): *string*
+▸ **toHex**(): `string`
 
-**Returns:** *string*
+#### Returns
 
-Defined in: [types/ethereumChallenge.ts:22](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ethereumChallenge.ts#L22)
+`string`
+
+#### Defined in
+
+[types/ethereumChallenge.ts:22](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ethereumChallenge.ts#L22)
 
 ___
 
 ### deserialize
 
-▸ `Static` **deserialize**(`arr`: *Uint8Array*): [*EthereumChallenge*](ethereumchallenge.md)
+▸ `Static` **deserialize**(`arr`): [EthereumChallenge](ethereumchallenge.md)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `arr` | *Uint8Array* |
+| `arr` | `Uint8Array` |
 
-**Returns:** [*EthereumChallenge*](ethereumchallenge.md)
+#### Returns
 
-Defined in: [types/ethereumChallenge.ts:14](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ethereumChallenge.ts#L14)
+[EthereumChallenge](ethereumchallenge.md)
+
+#### Defined in
+
+[types/ethereumChallenge.ts:14](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/ethereumChallenge.ts#L14)
