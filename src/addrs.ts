@@ -15,7 +15,7 @@ type AddrOptions = {
   includeLocalhostIPv6?: boolean
 }
 
-function validateOptions(opts?: AddrOptions) {
+function validateOptions(opts: AddrOptions) {
   if (opts == undefined) {
     return
   }
@@ -54,7 +54,9 @@ export function getAddrs(
   options?: AddrOptions,
   __fakeInterfaces?: ReturnType<typeof networkInterfaces>
 ) {
-  validateOptions(options)
+  if (options) {
+    validateOptions(options)
+  }
 
   let interfaces: (NetworkInterfaceInfo[] | undefined)[]
 
