@@ -1,4 +1,4 @@
-import { u8aSplit, serializeToU8a, u8aToNumber, stringToU8a } from '..'
+import { u8aSplit, serializeToU8a, u8aToNumber, stringToU8a, u8aConcat } from '..'
 import { Address, Balance, Hash } from './primitives'
 import { UINT256 } from './solidity'
 import BN from 'bn.js'
@@ -12,7 +12,7 @@ export enum ChannelStatus {
 
 export function generateChannelId(self: Address, counterparty: Address) {
   let parties = self.sortPair(counterparty)
-  return Hash.create(Buffer.concat(parties.map((x) => x.serialize())))
+  return Hash.create(u8aConcat(...parties.map((x) => x.serialize())))
 }
 
 function numberToChannelStatus(i: number): ChannelStatus {
@@ -90,17 +90,21 @@ export class ChannelEntry {
       arr,
       components.map((x) => x.SIZE)
     )
-    const params = items.map((x, i) => components[i].deserialize(x))
-    // @ts-ignore //TODO
+
+    const params = items.map((x, i) => components[i].deserialize(x)) as ConstructorParameters<typeof ChannelEntry>
+
     return new ChannelEntry(...params)
   }
 
   static fromSCEvent(event: any): ChannelEntry {
-    // TODO type
-    const { partyA, partyB, newState } = event.args
+    // Apparently we cannot trust in smart contract to always emits event that satisfy
+    // uint160(event.args.partyA) < uint160(event.args.partyB)
+    const [partyA, partyB] = Address.fromString(event.args.partyA).sortPair(Address.fromString(event.args.partyB))
+    const { newState } = event.args
+
     return new ChannelEntry(
-      Address.fromString(partyA),
-      Address.fromString(partyB),
+      partyA,
+      partyB,
       new Balance(new BN(newState.partyABalance.toString())),
       new Balance(new BN(newState.partyBBalance.toString())),
       new Hash(stringToU8a(newState.partyACommitment)),
