@@ -343,9 +343,9 @@ class Indexer extends EventEmitter {
     return this.db.getChannels(filter)
   }
 
-  public async getChannelsOf(address: Address) {
+  public async getChannelsFrom(address: Address) {
     return this.db.getChannels((channel) => {
-      return address.eq(channel.partyA) || address.eq(channel.partyB)
+      return address.eq(channel.source)
     })
   }
 
@@ -359,19 +359,12 @@ class Indexer extends EventEmitter {
     return undefined
   }
 
-  private async toIndexerChannel(source: PeerId, channel: ChannelEntry): Promise<RoutingChannel> {
-    const sourcePubKey = new PublicKey(source.pubKey.marshal())
-    const [partyAPubKey, partyBPubKey] = await Promise.all([
-      this.getPublicKeyOf(channel.partyA),
-      this.getPublicKeyOf(channel.partyB)
+  private async toIndexerChannel(channel: ChannelEntry): Promise<RoutingChannel> {
+    const [sourcePubKey, destPubKey] = await Promise.all([
+      this.getPublicKeyOf(channel.source),
+      this.getPublicKeyOf(channel.destination)
     ])
-
-    if (sourcePubKey.eq(partyAPubKey)) {
-      return [source, partyBPubKey.toPeerId(), channel.partyABalance]
-    } else {
-      const partyBBalance = channel.partyBBalance
-      return [source, partyAPubKey.toPeerId(), partyBBalance]
-    }
+    return [sourcePubKey.toPeerId(), destPubKey.toPeerId(), channel.balance]
   }
 
   public async getAnnouncedAddresses(): Promise<Multiaddr[]> {
@@ -393,9 +386,7 @@ class Indexer extends EventEmitter {
     }
 
     log('picking random from %d channels', channels.length)
-    const random = randomChoice(channels)
-    const partyA = await this.getPublicKeyOf(random.partyA)
-    return this.toIndexerChannel(partyA.toPeerId(), random) // TODO: why do we pick partyA?
+    return this.toIndexerChannel(randomChoice(channels))
   }
 
   /**
@@ -406,13 +397,13 @@ class Indexer extends EventEmitter {
    */
   public async getOpenRoutingChannelsFromPeer(source: PeerId): Promise<RoutingChannel[]> {
     const sourcePubKey = new PublicKey(source.pubKey.marshal())
-    const channels = await this.getChannelsOf(sourcePubKey.toAddress()).then((channels) =>
+    const channels = await this.getChannelsFrom(sourcePubKey.toAddress()).then((channels) =>
       channels.filter((channel) => channel.status === 'OPEN')
     )
 
     let cout: RoutingChannel[] = []
     for (let channel of channels) {
-      let directed = await this.toIndexerChannel(source, channel)
+      let directed = await this.toIndexerChannel(channel)
       if (directed[2].toBN().gtn(0)) {
         cout.push(directed)
       }
