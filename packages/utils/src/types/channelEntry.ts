@@ -6,6 +6,7 @@ import chalk from 'chalk'
 
 export enum ChannelStatus {
   Closed = 'CLOSED',
+  WaitingForCommitment = 'WAITING_FOR_COMMITMENT',
   Open = 'OPEN',
   PendingToClose = 'PENDING_TO_CLOSE'
 }
@@ -19,9 +20,11 @@ function numberToChannelStatus(i: number): ChannelStatus {
   switch (i) {
     case 0:
       return ChannelStatus.Closed
-    case 1:
-      return ChannelStatus.Open
+    case 1: 
+      return ChannelStatus.WaitingForCommitment
     case 2:
+      return ChannelStatus.Open
+    case 3:
       return ChannelStatus.PendingToClose
     default:
       throw Error(`Status at ${status} does not exist`)
@@ -36,10 +39,12 @@ function channelStatusToU8a(c: ChannelStatus): Uint8Array {
   switch (c) {
     case 'CLOSED':
       return Uint8Array.of(0)
-    case 'OPEN':
+    case 'WAITING_FOR_COMMITMENT':
       return Uint8Array.of(1)
-    case 'PENDING_TO_CLOSE':
+    case 'OPEN':
       return Uint8Array.of(2)
+    case 'PENDING_TO_CLOSE':
+      return Uint8Array.of(3)
     default:
       throw Error(`Invalid status. Got ${c}`)
   }
@@ -50,35 +55,25 @@ const components = [
   Address,
   Address,
   Balance,
-  Balance,
   Hash,
-  Hash,
-  UINT256,
-  UINT256,
   UINT256,
   UINT256,
   { name: 'channelStatus', SIZE: 1, deserialize: u8aToChannelStatus },
   UINT256,
   UINT256,
-  { name: 'closureByPartyA', SIZE: 1, deserialize: (x) => x[0] == 1 }
 ]
 
 export class ChannelEntry {
   constructor(
-    public readonly partyA: Address,
-    public readonly partyB: Address,
-    public readonly partyABalance: Balance,
-    public readonly partyBBalance: Balance,
-    public readonly commitmentPartyA: Hash,
-    public readonly commitmentPartyB: Hash,
-    public readonly partyATicketEpoch: UINT256,
-    public readonly partyBTicketEpoch: UINT256,
-    public readonly partyATicketIndex: UINT256,
-    public readonly partyBTicketIndex: UINT256,
+    public readonly source: Address,
+    public readonly destination: Address,
+    public readonly balance: Balance,
+    public readonly commitment: Hash,
+    public readonly ticketEpoch: UINT256,
+    public readonly ticketIndex: UINT256,
     public readonly status: ChannelStatus,
     public readonly channelEpoch: UINT256,
     public readonly closureTime: UINT256,
-    public readonly closureByPartyA: boolean
   ) {}
 
   static get SIZE(): number {
@@ -97,31 +92,25 @@ export class ChannelEntry {
 
   static fromSCEvent(event: any): ChannelEntry {
     // TODO type
-    const { partyA, partyB, newState } = event.args
+    const { source, destination, newState } = event.args
     return new ChannelEntry(
-      Address.fromString(partyA),
-      Address.fromString(partyB),
-      new Balance(new BN(newState.partyABalance.toString())),
-      new Balance(new BN(newState.partyBBalance.toString())),
-      new Hash(stringToU8a(newState.partyACommitment)),
-      new Hash(stringToU8a(newState.partyBCommitment)),
-      new UINT256(new BN(newState.partyATicketEpoch.toString())),
-      new UINT256(new BN(newState.partyBTicketEpoch.toString())),
-      new UINT256(new BN(newState.partyATicketIndex.toString())),
-      new UINT256(new BN(newState.partyBTicketIndex.toString())),
+      Address.fromString(source),
+      Address.fromString(destination),
+      new Balance(new BN(newState.balance.toString())),
+      new Hash(stringToU8a(newState.commitment)),
+      new UINT256(new BN(newState.ticketEpoch.toString())),
+      new UINT256(new BN(newState.ticketIndex.toString())),
       numberToChannelStatus(newState.status),
       new UINT256(new BN(newState.channelEpoch.toString())),
-      new UINT256(new BN(newState.closureTime.toString())),
-      newState.closureByPartyA
+      new UINT256(new BN(newState.closureTime.toString()))
     )
   }
 
   public serialize(): Uint8Array {
     return serializeToU8a([
-      [this.partyA.serialize(), Address.SIZE],
-      [this.partyB.serialize(), Address.SIZE],
-      [this.partyABalance.serialize(), Balance.SIZE],
-      [this.partyBBalance.serialize(), Balance.SIZE],
+      [this.source.serialize(), Address.SIZE],
+      [this.destination.serialize(), Address.SIZE],
+      [this.balance.serialize(), Balance.SIZE],
       [this.commitmentPartyA.serialize(), Hash.SIZE],
       [this.commitmentPartyB.serialize(), Hash.SIZE],
       [this.partyATicketEpoch.serialize(), UINT256.SIZE],
