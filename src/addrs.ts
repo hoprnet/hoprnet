@@ -29,7 +29,7 @@ function validateOptions(opts: AddrOptions) {
   }
 
   if (opts.useIPv6 == false && opts.includeLocalhostIPv6) {
-    throw Error(`Contradiction in opts. Cannot add private or local IPv4 address if IPv4 is disabled.`)
+    throw Error(`Contradiction in opts. Cannot add private or local IPv6 address if IPv6 is disabled.`)
   }
 }
 
