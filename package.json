@@ -68,10 +68,12 @@
       "ts"
     ],
     "spec": [
+      "src/addrs.spec.ts",
       "src/filter.spec.ts",
       "src/webRTCConnection.spec.ts",
       "src/stun.spec.ts",
-      "src/listener.spec.ts"
+      "src/listener.spec.ts",
+      "src/utils/*.spec.ts"
     ],
     "require": [
       "ts-node/register"
