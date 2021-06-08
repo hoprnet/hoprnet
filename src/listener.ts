@@ -248,7 +248,7 @@ class Listener extends EventEmitter implements InterfaceListener {
 
     addrs.push(
       ...getAddrs(address.port, this.peerId.toB58String(), {
-        includeLocalIPv4: true,
+        includePrivateIPv4: true,
         includeLocalhostIPv4: true,
         useIPv6: false
       })
