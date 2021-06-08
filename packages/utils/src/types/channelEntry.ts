@@ -11,9 +11,8 @@ export enum ChannelStatus {
   PendingToClose = 'PENDING_TO_CLOSE'
 }
 
-export function generateChannelId(self: Address, counterparty: Address) {
-  let parties = self.sortPair(counterparty)
-  return Hash.create(Buffer.concat(parties.map((x) => x.serialize())))
+export function generateChannelId(source: Address, destination: Address) {
+  return Hash.create(Buffer.concat([source.serialize(), destination.serialize()]))
 }
 
 function numberToChannelStatus(i: number): ChannelStatus {
@@ -111,16 +110,12 @@ export class ChannelEntry {
       [this.source.serialize(), Address.SIZE],
       [this.destination.serialize(), Address.SIZE],
       [this.balance.serialize(), Balance.SIZE],
-      [this.commitmentPartyA.serialize(), Hash.SIZE],
-      [this.commitmentPartyB.serialize(), Hash.SIZE],
-      [this.partyATicketEpoch.serialize(), UINT256.SIZE],
-      [this.partyBTicketEpoch.serialize(), UINT256.SIZE],
-      [this.partyATicketIndex.serialize(), UINT256.SIZE],
-      [this.partyBTicketIndex.serialize(), UINT256.SIZE],
+      [this.commitment.serialize(), Hash.SIZE],
+      [this.ticketEpoch.serialize(), UINT256.SIZE],
+      [this.ticketIndex.serialize(), UINT256.SIZE],
       [channelStatusToU8a(this.status), 1],
       [this.channelEpoch.serialize(), UINT256.SIZE],
-      [this.closureTime.serialize(), UINT256.SIZE],
-      [Uint8Array.of(Number(this.closureByPartyA)), 1]
+      [this.closureTime.serialize(), UINT256.SIZE]
     ])
   }
 
@@ -128,29 +123,20 @@ export class ChannelEntry {
     return (
       // prettier-ignore
       `ChannelEntry (${chalk.yellow(this.getId().toHex())}):\n` +
-      `  partyA:            ${chalk.yellow(this.partyA.toHex())}\n` +
-      `  partyB:            ${chalk.yellow(this.partyB.toHex())}\n` +
-      `  balanceA:          ${this.partyABalance.toFormattedString()}\n` +
-      `  balanceB:          ${this.partyBBalance.toFormattedString()}\n` +
-      `  commitmentA:       ${this.commitmentPartyA.toHex()}\n` +
-      `  commitmentB:       ${this.commitmentPartyB.toHex()}\n` +
-      `  partyATicketEpoch: ${this.partyATicketEpoch.toBN().toString(10)}\n` +
-      `  partyBTicketEpoch: ${this.partyBTicketEpoch.toBN().toString(10)}\n` +
-      `  partyBTicketIndex: ${this.partyATicketIndex.toBN().toString(10)}\n` +
-      `  partyBTicketIndex: ${this.partyBTicketIndex.toBN().toString(10)}\n` +
+      `  source:            ${chalk.yellow(this.source.toHex())}\n` +
+      `  destination:       ${chalk.yellow(this.destination.toHex())}\n` +
+      `  balance:           ${this.balance.toFormattedString()}\n` +
+      `  commitment:        ${this.commitment.toHex()}\n` +
+      `  ticketEpoch:       ${this.ticketEpoch.toBN().toString(10)}\n` +
+      `  ticketIndex:       ${this.ticketIndex.toBN().toString(10)}\n` +
       `  status:            ${chalk.green(this.status)}\n` +
       `  channelEpoch:      ${this.channelEpoch.toBN().toString(10)}\n` +
-      `  closureTime:       ${this.closureTime.toBN().toString(10)}\n` +
-      `  closedByA:         ${chalk.blue(this.closureByPartyA.toString())}\n`
+      `  closureTime:       ${this.closureTime.toBN().toString(10)}\n`
     )
   }
 
   public getId() {
-    return generateChannelId(this.partyA, this.partyB)
-  }
-
-  public totalBalance(): Balance {
-    return new Balance(this.partyABalance.toBN().add(this.partyBBalance.toBN()))
+    return generateChannelId(this.source, this.destination)
   }
 
   public ticketEpochFor(addr: Address): UINT256 {
