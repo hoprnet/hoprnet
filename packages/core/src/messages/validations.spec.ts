@@ -53,16 +53,11 @@ const mockChannelEntry = (isChannelOpen: boolean, ticketEpoch: UINT256, ticketIn
       TARGET_ADDRESS,
       null,
       null,
-      null,
-      null,
       ticketEpoch,
-      null,
       ticketIndex,
-      null,
       isChannelOpen ? ChannelStatus.Open : ChannelStatus.Closed,
       new UINT256(new BN(1)),
-      null,
-      false
+      null
     )
   )
 

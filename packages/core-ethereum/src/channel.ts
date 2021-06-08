@@ -83,11 +83,11 @@ class Channel {
     return (await this.themToUs()).commitment
   }
 
-  private async usToThem(): Promise<ChannelEntry> {
+  async usToThem(): Promise<ChannelEntry> {
     return await this.indexer.getChannel(generateChannelId(this.self.toAddress(), this.counterparty.toAddress()))
   }
 
-  private async themToUs(): Promise<ChannelEntry> {
+  async themToUs(): Promise<ChannelEntry> {
     return await this.indexer.getChannel(generateChannelId(this.counterparty.toAddress(), this.self.toAddress()))
   }
 
@@ -125,6 +125,7 @@ class Channel {
       throw Error('We do not have enough balance to open a channel')
     }
     await this.chain.openChannel(myAddress, counterpartyAddress, fundAmount)
+    return generateChannelId(myAddress, counterpartyAddress)
   }
 
   async initializeClosure() {

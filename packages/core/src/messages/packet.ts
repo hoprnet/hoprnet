@@ -89,7 +89,7 @@ export async function validateUnacknowledgedTicket(
 
   let channelState
   try {
-    channelState = await channel.getState()
+    channelState = await channel.usToThem()
   } catch (err) {
     throw Error(`Error while validating unacknowledged ticket, state not found: '${err.message}'`)
   }
@@ -110,7 +110,7 @@ export async function validateUnacknowledgedTicket(
   }
 
   // ticket's epoch MUST match our account nonce
-  const channelTicketEpoch = (await channel.getState()).ticketEpochFor(selfAddress).toBN()
+  const channelTicketEpoch = channelState.ticketEpoch.toBN()
   if (!ticketEpoch.eq(channelTicketEpoch)) {
     throw Error(
       `Ticket epoch '${ticketEpoch.toString()}' does not match our account epoch ${channelTicketEpoch.toString()}`
@@ -119,7 +119,7 @@ export async function validateUnacknowledgedTicket(
 
   // ticket's index MUST be higher than our account nonce
   // TODO: keep track of uncommited tickets
-  const channelTicketIndex = (await channel.getState()).ticketIndexFor(selfAddress).toBN()
+  const channelTicketIndex = channelState.ticketIndex.toBN()
   if (!ticketIndex.gt(channelTicketIndex)) {
     throw Error(
       `Ticket index '${ticketIndex.toString()}' must be higher than last ticket index ${channelTicketIndex.toString()}`
@@ -137,7 +137,7 @@ export async function validateUnacknowledgedTicket(
 
   // channel MUST have enough funds
   // (performance) we are making a request to blockchain
-  const senderBalance = (await channel.getBalances()).counterparty
+  const senderBalance = channelState.balance 
   if (senderBalance.toBN().lt(ticket.amount.toBN())) {
     throw Error(`Payment channel does not have enough funds`)
   }

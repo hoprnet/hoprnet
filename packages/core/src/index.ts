@@ -423,13 +423,13 @@ class Hopr extends EventEmitter {
 
         const channel = ethereum.getChannel(ticketIssuer, ticketReceiver)
 
-        const channelState = await channel.getState()
+        const channelState = await channel.usToThem()
 
         if (channelState.status !== ChannelStatus.Open) {
           throw Error(`Channel ${channelState.getId().toHex()} is not open`)
         }
 
-        if (channelState.ticketEpochFor(ticketReceiver.toAddress()).toBN().isZero()) {
+        if (channelState.ticketEpoch.toBN().isZero()) {
           throw Error(
             `Cannot use manually set path because apparently there is no commitment set for the channel between ${ticketIssuer
               .toPeerId()
@@ -646,10 +646,8 @@ class Hopr extends EventEmitter {
     }
 
     const channel = ethereum.getChannel(selfPubKey, counterpartyPubKey)
-    await channel.open(new Balance(amountToFund))
-
     return {
-      channelId: channel.getId()
+      channelId: await channel.open(new Balance(amountToFund))
     }
   }
 
@@ -684,7 +682,7 @@ class Hopr extends EventEmitter {
     await channel.fund(new Balance(myFund), new Balance(counterpartyFund))
 
     return {
-      channelId: channel.getId()
+      channelId: (await channel.usToThem()).getId()
     }
   }
 
@@ -693,7 +691,7 @@ class Hopr extends EventEmitter {
     const selfPubKey = new PublicKey(this.getId().pubKey.marshal())
     const counterpartyPubKey = new PublicKey(counterparty.pubKey.marshal())
     const channel = ethereum.getChannel(selfPubKey, counterpartyPubKey)
-    const channelState = await channel.getState()
+    const channelState = await channel.usToThem()
 
     // TODO: should we wait for confirmation?
     if (channelState.status === 'CLOSED') {
@@ -757,9 +755,9 @@ class Hopr extends EventEmitter {
     return await channel.redeemTicket(ackTicket)
   }
 
-  public async getChannelsOf(addr: Address): Promise<ChannelEntry[]> {
+  public async getChannelsFrom(addr: Address): Promise<ChannelEntry[]> {
     const ethereum = await this.paymentChannels
-    return await ethereum.getChannelsOf(addr)
+    return await ethereum.getChannelsFrom(addr)
   }
 
   public async getPublicKeyOf(addr: Address): Promise<PublicKey> {
