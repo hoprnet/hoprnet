@@ -137,7 +137,7 @@ export async function validateUnacknowledgedTicket(
 
   // channel MUST have enough funds
   // (performance) we are making a request to blockchain
-  const senderBalance = channelState.balance 
+  const senderBalance = channelState.balance
   if (senderBalance.toBN().lt(ticket.amount.toBN())) {
     throw Error(`Payment channel does not have enough funds`)
   }

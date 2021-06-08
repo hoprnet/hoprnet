@@ -22,7 +22,7 @@ import chalk from 'chalk'
 
 const log = Debug('hopr-core-ethereum:channel')
 
-// TODO - legacy, models bidirectional channel. 
+// TODO - legacy, models bidirectional channel.
 class Channel {
   private commitment: Commitment
 
@@ -78,7 +78,7 @@ class Channel {
       return null
     }
   }
-  
+
   async getChainCommitment(): Promise<Hash> {
     return (await this.themToUs()).commitment
   }
@@ -93,8 +93,7 @@ class Channel {
 
   // TODO kill
   async getBalances() {
-    return ([await this.usToThem(), await this.themToUs()]).map(x => x.balance) 
-
+    return [await this.usToThem(), await this.themToUs()].map((x) => x.balance)
   }
 
   async fund(myFund: Balance, counterpartyFund: Balance) {
