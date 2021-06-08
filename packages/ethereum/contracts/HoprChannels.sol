@@ -178,9 +178,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
       address source,
       bytes32 newCommitment
     ) external {
-        require(msg.sender != address(0), "sender must not be empty");
-        require(source != address(0), "counterparty must not be empty");
-        require(msg.sender != counterparty, "sender and destination must not be the same");
+        _validateSourceAndDest(source, msg.sender);
 
         (, Channel storage channel) = _getChannel(
             source,
@@ -254,9 +252,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         address dest,
         uint256 amount
     ) internal {
-        require(source != dest, "source and dest must not be the same");
-        require(source != address(0), "source must not be empty");
-        require(dest != address(0), "dest must not be empty");
+        _validateSourceAndDest(source, dest);
         require(amount > 0, "amount must be greater than 0");
 
         (, Channel storage channel) = _getChannel(source, dest);
@@ -284,9 +280,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         address source,
         address destination
     ) internal {
-        require(source != destination, "source and destination must not be the same");
-        require(source != address(0), "source must not be empty");
-        require(destination != address(0), "destination must not be empty");
+        _validateSourceAndDest(source, destination);
 
         (, Channel storage channel) = _getChannel(source, destination);
         require(channel.status == ChannelStatus.OPEN, "channel must be open");
@@ -309,10 +303,8 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         address initiator,
         address counterparty
     ) internal {
+        _validateSourceAndDest(initiator, counterparty);
         require(address(token) != address(0), "token must not be empty");
-        require(initiator != counterparty, "initiator and counterparty must not be the same");
-        require(initiator != address(0), "initiator must not be empty");
-        require(counterparty != address(0), "counterparty must not be empty");
 
         (, Channel storage channel) = _getChannel(initiator, counterparty);
         require(channel.status == ChannelStatus.PENDING_TO_CLOSE, "channel must be pending to close");
@@ -445,6 +437,16 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
           earningChannel.balance = earningChannel.balance.add(amount);
           earningChannel.ticketIndex = ticketIndex;
           emit ChannelUpdate(redeemer, counterparty, earningChannel);
+    }
+
+
+    /**
+    * Assert that source and dest are good addresses, and distinct.
+    */
+    function _validateSourceAndDest (address source, address dest) internal {
+      require(source != dest, "source and dest must not be the same");
+      require(source != address(0), "source must not be empty");
+      require(dest != address(0), "dest must not be empty");
     }
 
     /**
