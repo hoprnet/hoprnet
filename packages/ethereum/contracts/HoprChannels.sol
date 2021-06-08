@@ -35,10 +35,8 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         uint256 ticketEpoch;
         uint256 ticketIndex;
         ChannelStatus status;
-        uint channelEpoch; 
-
-        // the time when the channel can be closed by either party
-        // overloads at year >2105
+        uint channelEpoch;
+        // the time when the channel can be closed - NB: overloads at year >2105
         uint32 closureTime;
     }
 
@@ -148,8 +146,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
      * they should be aware that the closure has been triggered, as this
      * method triggers a {ChannelUpdate} event.
      * After the cool-off period expires, the 'source' can call
-     * 'finalizeChannelClosure' which puts the channel in a state where the
-     * balance can be withdrawn.
+     * 'finalizeChannelClosure' which withdraws the stake.
      * @param destination the address of the destination
      */
     function initiateChannelClosure(
@@ -157,7 +154,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     ) external {
         _validateSourceAndDest(msg.sender, destination);
         (, Channel storage channel) = _getChannel(msg.sender, destination);
-        require(channel.status == ChannelStatus.OPEN, "channel must be open");
+        require(channel.status == ChannelStatus.OPEN || channel.status == ChannelStatus.WAITING_FOR_COMMITMENT, "channel must be open or waiting for commitment");
         // @TODO: check with team, do we need SafeMath check here?
         channel.closureTime = _currentBlockTimestamp() + secsClosure;
         channel.status = ChannelStatus.PENDING_TO_CLOSE;

@@ -8,18 +8,6 @@ contract ChannelsMock is HoprChannels {
     constructor(address _token, uint32 _secsClosure)
     HoprChannels(_token, _secsClosure) {}
 
-    function getChannelInternal(
-        address accountA,
-        address accountB
-    ) external view returns (
-        address,
-        address,
-        bytes32
-    ) {
-        (address partyA, address partyB, bytes32 channelId,) = _getChannel(accountA, accountB);
-        return (partyA, partyB, channelId);
-    }
-
     function getChannelIdInternal(
         address partyA,
         address partyB
