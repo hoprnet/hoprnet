@@ -700,7 +700,7 @@ class Hopr extends EventEmitter {
       throw new Error('Channel is already closed')
     }
 
-    if (channelState.status === 'OPEN'){
+    if (channelState.status === 'OPEN') {
       await this.strategy.onChannelWillClose(channel)
     }
 

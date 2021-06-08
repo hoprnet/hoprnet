@@ -227,11 +227,11 @@ class Channel {
   }
 
   async getAcknowledgedTickets(): Promise<AcknowledgedTicket[]> {
-    return (await this.db.getAcknowledgedTickets({ signer: this.counterparty }))
+    return await this.db.getAcknowledgedTickets({ signer: this.counterparty })
   }
 
   async redeemAllTickets(): Promise<RedeemTicketResponse[]> {
-    return await Promise.all((await this.getAcknowledgedTickets()).map(a => this.redeemTicket(a)))
+    return await Promise.all((await this.getAcknowledgedTickets()).map((a) => this.redeemTicket(a)))
   }
 
   async redeemTicket(ackTicket: AcknowledgedTicket): Promise<RedeemTicketResponse> {

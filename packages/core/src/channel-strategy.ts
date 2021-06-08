@@ -38,7 +38,7 @@ export interface ChannelStrategy {
     getRandomChannel: () => Promise<RoutingChannel>
   ): Promise<[ChannelsToOpen[], ChannelsToClose[]]>
   // TBD: Include ChannelsToClose as well.
-  
+
   onChannelWillClose(c: Channel): Promise<void> // Before a channel closes
 }
 
