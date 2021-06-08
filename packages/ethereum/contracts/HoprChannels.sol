@@ -392,6 +392,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
           earningChannel.balance = earningChannel.balance.add(amount);
           earningChannel.ticketIndex = ticketIndex;
           emit ChannelUpdate(redeemer, counterparty, earningChannel);
+          emit ChannelUpdate(counterparty, redeemer, spendingChannel);
     }
 
 

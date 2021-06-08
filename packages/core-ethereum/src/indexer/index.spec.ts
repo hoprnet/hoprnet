@@ -45,8 +45,8 @@ const createHoprChannelsMock = (ops: { pastEvents?: Event<any>[] } = {}) => {
         const updateEvent = event as Event<'ChannelUpdate'>
 
         const eventChannelId = Channel.generateId(
-          Address.fromString(updateEvent.args.partyA),
-          Address.fromString(updateEvent.args.partyB)
+          Address.fromString(updateEvent.args.source),
+          Address.fromString(updateEvent.args.destination)
         )
 
         if (new Hash(stringToU8a(channelId)).eq(eventChannelId)) {
@@ -55,7 +55,7 @@ const createHoprChannelsMock = (ops: { pastEvents?: Event<any>[] } = {}) => {
       }, [])[0]
     }
 
-    async bumpChannel(counterparty: string, _comm: string) {
+    async bumpChannel(_counterparty: string, _comm: string) {
       const channelId = Channel.generateId(fixtures.PARTY_A.toAddress(), fixtures.PARTY_B.toAddress())
       const currentState = (await this.channels(channelId.toHex())) as Event<'ChannelUpdate'>['args']['newState']
 
@@ -65,18 +65,10 @@ const createHoprChannelsMock = (ops: { pastEvents?: Event<any>[] } = {}) => {
 
       let newEvent: Event<'ChannelUpdate'>
 
-      if (counterparty === fixtures.PARTY_A.toAddress().toHex()) {
-        if (currentState.partyBTicketEpoch.eq(1)) {
-          newEvent = fixtures.COMMITMENT_SET_AB
-        } else {
-          newEvent = fixtures.COMMITMENT_SET_B
-        }
-      } else if (counterparty === fixtures.PARTY_B.toAddress().toHex()) {
-        if (currentState.partyATicketEpoch.eq(1)) {
-          newEvent = fixtures.COMMITMENT_SET_AB
-        } else {
-          newEvent = fixtures.COMMITMENT_SET_A
-        }
+      if (currentState.ticketEpoch.eq(1)) {
+        newEvent = fixtures.COMMITMENT_SET_AB
+      } else {
+        newEvent = fixtures.COMMITMENT_SET_A
       }
 
       pastEvents.push(newEvent)

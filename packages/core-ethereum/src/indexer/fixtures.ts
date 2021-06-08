@@ -78,21 +78,16 @@ export const OPENED_EVENT = {
   transactionIndex: 0,
   logIndex: 0,
   args: {
-    partyA: PARTY_A.toAddress().toHex(),
-    partyB: PARTY_B.toAddress().toHex(),
+    source: PARTY_A.toAddress().toHex(),
+    destination: PARTY_B.toAddress().toHex(),
     newState: {
-      partyABalance: BigNumber.from('3'),
-      partyBBalance: BigNumber.from('0'),
-      partyACommitment: new Hash(new Uint8Array({ length: Hash.SIZE })).toHex(),
-      partyBCommitment: new Hash(new Uint8Array({ length: Hash.SIZE })).toHex(),
-      partyATicketEpoch: BigNumber.from('0'),
-      partyBTicketEpoch: BigNumber.from('0'),
-      partyATicketIndex: BigNumber.from('0'),
-      partyBTicketIndex: BigNumber.from('0'),
+      balance: BigNumber.from('3'),
+      commitment: new Hash(new Uint8Array({ length: Hash.SIZE })).toHex(),
+      ticketEpoch: BigNumber.from('0'),
+      ticketIndex: BigNumber.from('0'),
       status: 1,
       channelEpoch: BigNumber.from('0'),
       closureTime: BigNumber.from('0'),
-      closureByPartyA: false
     }
   } as any
 } as Event<'ChannelUpdate'>
