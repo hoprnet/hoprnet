@@ -87,7 +87,7 @@ export const OPENED_EVENT = {
       ticketIndex: BigNumber.from('0'),
       status: 1,
       channelEpoch: BigNumber.from('0'),
-      closureTime: BigNumber.from('0'),
+      closureTime: BigNumber.from('0')
     }
   } as any
 } as Event<'ChannelUpdate'>
