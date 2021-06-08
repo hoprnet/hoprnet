@@ -1,17 +1,6 @@
 import type Hopr from '@hoprnet/hopr-core'
 import { AbstractCommand } from './abstractCommand'
 import { styleValue } from './utils'
-import type { AcknowledgedTicket, Ticket } from '@hoprnet/hopr-utils'
-
-/**
- * Retrieves all signed tickets from the given acknowledged tickets.
- *
- * @param ackTickets
- * @returns a promise that resolves into an array of signed tickets
- */
-export async function toSignedTickets(ackTickets: AcknowledgedTicket[]): Promise<Ticket[]> {
-  return Promise.all(ackTickets.map((ackTicket) => ackTicket.ticket))
-}
 
 export default class Tickets extends AbstractCommand {
   constructor(public node: Hopr) {
