@@ -59,9 +59,8 @@ export class PassiveStrategy implements ChannelStrategy {
     return [[], []]
   }
 
-  async onChannelWillClose(c: Channel) {
-    log('auto redeeming')
-    await c.redeemAllTickets()
+  async onChannelWillClose(_c: Channel) {
+    // Passive strategy does nothing.
   }
 }
 

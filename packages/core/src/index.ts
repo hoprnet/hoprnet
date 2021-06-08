@@ -700,6 +700,10 @@ class Hopr extends EventEmitter {
       throw new Error('Channel is already closed')
     }
 
+    if (channelState.status === 'OPEN'){
+      await this.strategy.onChannelWillClose(channel)
+    }
+
     const txHash = await (channelState.status === 'OPEN' ? channel.initializeClosure() : channel.finalizeClosure())
 
     return { receipt: txHash, status: channelState.status }
