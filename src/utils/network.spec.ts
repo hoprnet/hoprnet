@@ -2,14 +2,22 @@ import {
   ipToU8aAddress,
   getNetworkPrefix,
   inSameNetwork,
-  u8aAddrToString
-  // getLocalAddresses, getLocalHosts, getPublicAddresses
+  u8aAddrToString,
+  getPrivateAddresses,
+  isPrivateAddress,
+  getLocalAddresses,
+  getLocalHosts,
+  isLinkLocaleAddress,
+  isLocalhost,
+  getPublicAddresses
 } from '.'
+import type { Network } from './constants'
 import { u8aEquals } from '@hoprnet/hopr-utils'
 import assert from 'assert'
+import {} from './network'
 
 describe('test utils', function () {
-  it.skip('should convert ip addresses', function () {
+  it('should convert ip addresses', function () {
     assert(u8aEquals(Uint8Array.from([1, 1, 1, 1]), ipToU8aAddress('1.1.1.1', 'IPv4')))
 
     assert(u8aEquals(Uint8Array.from([1, 1, 0, 1]), ipToU8aAddress('1.1.0.1', 'IPv4')))
@@ -55,7 +63,7 @@ describe('test utils', function () {
     )
   })
 
-  it.skip('should return a network prefix', function () {
+  it('should return a network prefix', function () {
     const address4 = ipToU8aAddress('192.168.1.23', 'IPv4')
 
     const subnet4_1 = ipToU8aAddress('255.255.255.0', 'IPv4')
@@ -85,7 +93,7 @@ describe('test utils', function () {
     )
   })
 
-  it.skip('should be in subnet', function () {
+  it('should be in subnet', function () {
     const address = ipToU8aAddress('192.0.2.130', 'IPv4')
     const subnet = ipToU8aAddress('255.255.255.0', 'IPv4')
 
@@ -108,7 +116,7 @@ describe('test utils', function () {
     )
 
     assert(
-      'ffff:ffff:ffff::ffff:ffff:ffff:0000' ===
+      'ffff:ffff:ffff:ffff:ffff:ffff:ffff:0000' ===
         u8aAddrToString(
           Uint8Array.from([255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0]),
           'IPv6'
@@ -116,9 +124,23 @@ describe('test utils', function () {
     )
   })
 
-  //   it('should get my addresses in a structured way', function () {
-  //     console.log(`localHost`, getLocalHosts())
-  //     console.log(`localAddresses`, getLocalAddresses())
-  //     console.log(`public addresses`, getPublicAddresses())
-  //   })
+  it('should detect private networks', function () {
+    assert(isPrivateAddress(ipToU8aAddress('192.168.1.131', 'IPv4'), 'IPv4'))
+    assert(isPrivateAddress(ipToU8aAddress('10.0.27.191', 'IPv4'), 'IPv4'))
+    assert(!isPrivateAddress(ipToU8aAddress('172.15.0.131', 'IPv4'), 'IPv4'))
+  })
+
+  it('should detect local addresses as local', function () {
+    assert(getLocalHosts().every((network: Network) => isLocalhost(network.networkPrefix, network.family)))
+    assert(getPrivateAddresses().every((network: Network) => isPrivateAddress(network.networkPrefix, network.family)))
+    assert(getLocalAddresses().every((network: Network) => isLinkLocaleAddress(network.networkPrefix, network.family)))
+    assert(
+      getPublicAddresses().every(
+        (network: Network) =>
+          !isLocalhost(network.networkPrefix, network.family) &&
+          !isPrivateAddress(network.networkPrefix, network.family) &&
+          !isLinkLocaleAddress(network.networkPrefix, network.family)
+      )
+    )
+  })
 })

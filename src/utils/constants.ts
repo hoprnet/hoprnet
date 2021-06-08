@@ -51,13 +51,15 @@ export const LINK_LOCAL_NETWORKS: Network[] = [
 ]
 
 // Only useful when running > 1 instances on the same host
-export const LOCALHOST_ADDRS: Address[] = [
+export const LOCALHOST_ADDRS: Network[] = [
   {
-    address: Uint8Array.from([127, 0, 0, 1]),
+    subnet: Uint8Array.from([255, 0, 0, 0]),
+    networkPrefix: Uint8Array.from([127, 0, 0, 0]),
     family: 'IPv4'
   },
   {
-    address: Uint8Array.from([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
+    subnet: Uint8Array.from([255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 254]),
+    networkPrefix: Uint8Array.from([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
     family: 'IPv6'
   }
 ]
