@@ -26,7 +26,7 @@ declare npm_package_version
 mydir=$(dirname $(readlink -f $0))
 
 # we rely on Git tags so need to fetch the tags in case they are not present
-git fetch --tags
+git fetch --unshallow --tags || :
 npm_package_version=${1:-$(git describe --abbrev=0)}
 
 # set log id and use shared log function for readable logs
