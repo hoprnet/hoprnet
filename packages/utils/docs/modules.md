@@ -4,6 +4,10 @@
 
 ## Table of contents
 
+### Enumerations
+
+- [ChannelStatus](enums/channelstatus.md)
+
 ### Classes
 
 - [AccountEntry](classes/accountentry.md)
@@ -37,7 +41,6 @@
 ### Type aliases
 
 - [AddressSorter](modules.md#addresssorter)
-- [ChannelStatus](modules.md#channelstatus)
 - [DialOpts](modules.md#dialopts)
 - [DialResponse](modules.md#dialresponse)
 - [Hosts](modules.md#hosts)
@@ -158,16 +161,6 @@
 #### Defined in
 
 [libp2p/addressSorters.ts:56](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/addressSorters.ts#L56)
-
-___
-
-### ChannelStatus
-
-Ƭ **ChannelStatus**: ``"CLOSED"`` \| ``"OPEN"`` \| ``"PENDING_TO_CLOSE"``
-
-#### Defined in
-
-[types/channelEntry.ts:7](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L7)
 
 ___
 
@@ -879,7 +872,7 @@ ___
 
 #### Defined in
 
-[types/channelEntry.ts:9](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L9)
+[types/channelEntry.ts:13](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L13)
 
 ___
 

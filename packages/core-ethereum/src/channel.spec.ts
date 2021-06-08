@@ -8,7 +8,8 @@ import {
   Balance,
   UINT256,
   HoprDB,
-  createPoRValuesForSender
+  createPoRValuesForSender,
+  ChannelStatus
 } from '@hoprnet/hopr-utils'
 import assert from 'assert'
 import BN from 'bn.js'
@@ -62,7 +63,7 @@ const createMocks = () => {
     new UINT256(new BN(1)),
     new UINT256(new BN(1)),
     new UINT256(new BN(1)),
-    'CLOSED',
+    ChannelStatus.Closed,
     new UINT256(new BN(1)),
     new UINT256(new BN(0)),
     false

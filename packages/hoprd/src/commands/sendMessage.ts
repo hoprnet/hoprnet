@@ -27,14 +27,14 @@ export class SendMessage extends AbstractCommand {
     recipient: PeerId,
     rawMessage: string,
     path?: PeerId[]
-  ): Promise<string | void> {
+  ): Promise<string> {
     const message = state.includeRecipient ? this.insertMyAddress(rawMessage) : rawMessage
 
     try {
       await this.node.sendMessage(encodeMessage(message), recipient, path)
       return 'Message sent'
     } catch (err) {
-      return styleValue(`Could not send message. (${err})`, 'failure')
+      return styleValue(`Could not send message. (${err.message})`, 'failure')
     }
   }
 
@@ -56,31 +56,22 @@ export class SendMessage extends AbstractCommand {
           throw new Error('Cannot create path longer than MAX_HOPS')
         }
 
-        const recipient = path[path.length - 1]
+        const [intermediateNodes, recipient] = [path.slice(0, path.length - 1), path[path.length - 1]]
         console.log(
           `Sending message to ${styleValue(recipient.toB58String(), 'peerId')} via ${path
             .slice(0, path.length - 1)
             .map((current) => styleValue(current.toB58String(), 'peerId'))
             .join(',')} ...`
         )
-        try {
-          await this.sendMessage(state, recipient, message, path.slice(0, path.length - 1))
-          log(`Successfully sent message `)
-        } catch (err) {
-          log(`Could not send message. ${err.message}`)
-        }
+        log(await this.sendMessage(state, recipient, message, intermediateNodes))
+
         return
       }
 
       let peerId = await checkPeerIdInput(peerIdString, state)
 
       console.log(`Sending message to ${styleValue(peerId.toB58String(), 'peerId')} ...`)
-      try {
-        await this.sendMessage(state, peerId, message)
-        log(`Successfully sent message `)
-      } catch (err) {
-        log(`Could not send message. ${err.message}`)
-      }
+      log(await this.sendMessage(state, peerId, message))
     } catch (err) {
       log(styleValue(err.message, 'failure'))
     }
