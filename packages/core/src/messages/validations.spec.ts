@@ -6,7 +6,7 @@ import chaiAsPromised from 'chai-as-promised'
 import chai, { expect } from 'chai'
 import sinon from 'sinon'
 import { Channel } from '@hoprnet/hopr-core-ethereum'
-import { Address, Balance, PublicKey, UINT256, Ticket, ChannelEntry } from '@hoprnet/hopr-utils'
+import { Address, Balance, PublicKey, UINT256, Ticket, ChannelEntry, ChannelStatus } from '@hoprnet/hopr-utils'
 import { validateUnacknowledgedTicket, validateCreatedTicket } from '.'
 
 chai.use(chaiAsPromised)
@@ -59,7 +59,7 @@ const mockChannelEntry = (isChannelOpen: boolean, ticketEpoch: UINT256, ticketIn
       null,
       ticketIndex,
       null,
-      isChannelOpen ? 'OPEN' : 'CLOSED',
+      isChannelOpen ? ChannelStatus.Open : ChannelStatus.Closed,
       new UINT256(new BN(1)),
       null,
       false
