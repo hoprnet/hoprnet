@@ -35,7 +35,7 @@ export function subscribeToAcknowledgements(
 
       if (ackedTicket === null) {
         log(`Got a ticket that is not a win. Dropping ticket.`)
-        await db.markLosing(ackedTicket)
+        await db.markLosing(unacknowledgedTicket)
       } else {
         log(`Storing winning ticket`)
         await db.replaceUnAckWithAck(ackMsg.ackChallenge, ackedTicket)

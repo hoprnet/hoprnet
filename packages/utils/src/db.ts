@@ -145,7 +145,7 @@ export class HoprDB {
   private async del(key: Uint8Array): Promise<void> {
     await this.db.del(Buffer.from(this.keyOf(key)))
   }
-  
+
   private async increment(key: Uint8Array): Promise<number> {
     let val = await this.getCoercedOrDefault<number>(key, u8aToNumber, 0)
     await this.put(key, Uint8Array.of(val + 1))
@@ -359,9 +359,9 @@ export class HoprDB {
     //await this.addBalance(REDEEMED_TICKETS_VALUE, a.ticket.amount)
   }
 
-  public async markLosing(a: AcknowledgedTicket): Promise<void>{
+  public async markLosing(_a: UnacknowledgedTicket): Promise<void>{
     await this.increment(LOSING_TICKET_COUNT)
-    await this.delAcknowledgedTicket(a)
+    //await this.delAcknowledgedTicket(a)
   }
 
   static createMock(): HoprDB {
