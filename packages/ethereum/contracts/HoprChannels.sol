@@ -153,25 +153,40 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
      * @param destination the address of the destination
      */
     function initiateChannelClosure(
-        address counterparty
+        address destination
     ) external {
-        _initiateChannelClosure(msg.sender, counterparty);
+        _validateSourceAndDest(msg.sender, destination);
+        (, Channel storage channel) = _getChannel(msg.sender, destination);
+        require(channel.status == ChannelStatus.OPEN, "channel must be open");
+        // @TODO: check with team, do we need SafeMath check here?
+        channel.closureTime = _currentBlockTimestamp() + secsClosure;
+        channel.status = ChannelStatus.PENDING_TO_CLOSE;
+        emit ChannelUpdate(msg.sender, destination, channel);
     }
 
     /**
-     * @dev Finalize channel closure, if cool-off period
+     * @dev Finalize the channel closure, if cool-off period
      * is over it will close the channel and transfer funds
-     * to the parties involved, then emits
-     * {ChannelUpdate} event.
-     * @param counterparty the address of the counterparty
+     * to the sender. Then emits {ChannelUpdate} event.
+     * @param destination the address of the counterparty
      */
     function finalizeChannelClosure(
-        address counterparty
+        address destination
     ) external {
-        _finalizeChannelClosure(
-            msg.sender,
-            counterparty
-        );
+        _validateSourceAndDest(msg.sender, destination);
+        require(address(token) != address(0), "token must not be empty");
+        (, Channel storage channel) = _getChannel(msg.sender, destination);
+        require(channel.status == ChannelStatus.PENDING_TO_CLOSE, "channel must be pending to close");
+        require(channel.closureTime < _currentBlockTimestamp(), "closureTime must be before now");
+
+        if (channel.balance > 0) {
+          token.transfer(msg.sender, channel.balance);
+        }
+
+        delete channel.balance;
+        delete channel.closureTime; // channel.closureTime = 0
+        channel.status = ChannelStatus.CLOSED;
+        emit ChannelUpdate(msg.sender, destination, channel);
     }
 
     /**
@@ -275,70 +290,6 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         emit ChannelUpdate(source, dest, channel);
     }
 
-    /**
-     * @dev Initialize channel closure, updates channel's
-     * closure time, when the cool-off period is over,
-     * user may finalize closure, then emits
-     * {ChannelUpdate} event.
-     * @param source the address of the initiator
-     * @param destination the address of the counterparty
-     */
-    function _initiateChannelClosure(
-        address source,
-        address destination
-    ) internal {
-        _validateSourceAndDest(source, destination);
-
-        (, Channel storage channel) = _getChannel(source, destination);
-        require(channel.status == ChannelStatus.OPEN, "channel must be open");
-
-        // @TODO: check with team, do we need SafeMath check here?
-        channel.closureTime = _currentBlockTimestamp() + secsClosure;
-        channel.status = ChannelStatus.PENDING_TO_CLOSE;
-        emit ChannelUpdate(source, destination, channel);
-    }
-
-    /**
-     * @dev Finalize channel closure, if cool-off period
-     * is over it will close the channel and transfer funds
-     * to the parties involved, then emits
-     * {ChannelUpdate} event.
-     * @param initiator the address of the initiator
-     * @param counterparty the address of the counterparty
-     */
-    function _finalizeChannelClosure(
-        address initiator,
-        address counterparty
-    ) internal {
-        _validateSourceAndDest(initiator, counterparty);
-        require(address(token) != address(0), "token must not be empty");
-
-        (, Channel storage channel) = _getChannel(initiator, counterparty);
-        require(channel.status == ChannelStatus.PENDING_TO_CLOSE, "channel must be pending to close");
-
-        if (
-            channel.closureByPartyA && (initiator == partyA) ||
-            !channel.closureByPartyA && (initiator == partyB)
-        ) {
-            require(channel.closureTime < _currentBlockTimestamp(), "closureTime must be before now");
-        }
-
-        // settle balances
-        if (channel.partyABalance > 0) {
-            token.transfer(partyA, channel.partyABalance);
-        }
-        if (channel.partyBBalance > 0) {
-            token.transfer(partyB, channel.partyBBalance);
-        }
-
-        delete channel.partyABalance; // channel.partyABalance = 0
-        delete channel.partyBBalance; 
-        delete channel.closureTime; // channel.closureTime = 0
-        delete channel.closureByPartyA; // channel.closureByPartyA = false
-        channel.status = ChannelStatus.CLOSED;
-
-        emit ChannelUpdate(initiator, counterparty, channel);
-    }
 
     /**
      * @param source source
