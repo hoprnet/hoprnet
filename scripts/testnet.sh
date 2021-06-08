@@ -75,7 +75,6 @@ update_if_existing() {
   else
     echo "no container"
   fi
-
 }
 
 # $1 = vm name
