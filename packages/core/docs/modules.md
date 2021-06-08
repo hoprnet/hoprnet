@@ -57,7 +57,7 @@
 
 #### Defined in
 
-[packages/core/src/index.ts:65](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L65)
+[packages/core/src/index.ts:66](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L66)
 
 ___
 
@@ -79,12 +79,13 @@ ___
 | `hosts.ip6?` | `NetOptions` |
 | `network` | `string` |
 | `password?` | `string` |
+| `preferLocalAddresses?` | `boolean` |
 | `provider` | `string` |
 | `strategy?` | [ChannelStrategyNames](modules.md#channelstrategynames) |
 
 #### Defined in
 
-[packages/core/src/index.ts:67](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L67)
+[packages/core/src/index.ts:68](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L68)
 
 ___
 
@@ -94,7 +95,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:85](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L85)
+[packages/core/src/index.ts:90](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L90)
 
 ## Variables
 

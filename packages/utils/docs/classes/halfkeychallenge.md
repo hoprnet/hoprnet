@@ -2,12 +2,6 @@
 
 # Class: HalfKeyChallenge
 
-## Hierarchy
-
-- [CurvePoint](curvepoint.md)
-
-  ↳ **HalfKeyChallenge**
-
 ## Table of contents
 
 ### Constructors
@@ -20,6 +14,7 @@
 
 ### Methods
 
+- [clone](halfkeychallenge.md#clone)
 - [eq](halfkeychallenge.md#eq)
 - [serialize](halfkeychallenge.md#serialize)
 - [toAddress](halfkeychallenge.md#toaddress)
@@ -43,13 +38,9 @@
 | :------ | :------ |
 | `arr` | `Uint8Array` |
 
-#### Inherited from
-
-[CurvePoint](curvepoint.md).[constructor](curvepoint.md#constructor)
-
 #### Defined in
 
-[types/curvePoint.ts:9](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L9)
+[types/halfKeyChallenge.ts:10](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L10)
 
 ## Accessors
 
@@ -63,9 +54,23 @@
 
 #### Defined in
 
-[types/curvePoint.ts:54](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L54)
+[types/halfKeyChallenge.ts:55](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L55)
 
 ## Methods
+
+### clone
+
+▸ **clone**(): [HalfKeyChallenge](halfkeychallenge.md)
+
+#### Returns
+
+[HalfKeyChallenge](halfkeychallenge.md)
+
+#### Defined in
+
+[types/halfKeyChallenge.ts:67](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L67)
+
+___
 
 ### eq
 
@@ -75,19 +80,15 @@
 
 | Name | Type |
 | :------ | :------ |
-| `b` | [CurvePoint](curvepoint.md) |
+| `b` | [HalfKeyChallenge](halfkeychallenge.md) |
 
 #### Returns
 
 `boolean`
 
-#### Inherited from
-
-[CurvePoint](curvepoint.md).[eq](curvepoint.md#eq)
-
 #### Defined in
 
-[types/curvePoint.ts:66](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L66)
+[types/halfKeyChallenge.ts:71](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L71)
 
 ___
 
@@ -99,13 +100,9 @@ ___
 
 `Uint8Array`
 
-#### Inherited from
-
-[CurvePoint](curvepoint.md).[serialize](curvepoint.md#serialize)
-
 #### Defined in
 
-[types/curvePoint.ts:58](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L58)
+[types/halfKeyChallenge.ts:59](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L59)
 
 ___
 
@@ -117,13 +114,9 @@ ___
 
 [Address](address.md)
 
-#### Inherited from
-
-[CurvePoint](curvepoint.md).[toAddress](curvepoint.md#toaddress)
-
 #### Defined in
 
-[types/curvePoint.ts:37](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L37)
+[types/halfKeyChallenge.ts:38](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L38)
 
 ___
 
@@ -135,13 +128,9 @@ ___
 
 `string`
 
-#### Inherited from
-
-[CurvePoint](curvepoint.md).[toHex](curvepoint.md#tohex)
-
 #### Defined in
 
-[types/curvePoint.ts:62](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L62)
+[types/halfKeyChallenge.ts:63](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L63)
 
 ___
 
@@ -153,13 +142,9 @@ ___
 
 `PeerId`
 
-#### Inherited from
-
-[CurvePoint](curvepoint.md).[toPeerId](curvepoint.md#topeerid)
-
 #### Defined in
 
-[types/curvePoint.ts:46](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L46)
+[types/halfKeyChallenge.ts:47](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L47)
 
 ___
 
@@ -171,19 +156,15 @@ ___
 
 `string`
 
-#### Inherited from
-
-[CurvePoint](curvepoint.md).[toUncompressedCurvePoint](curvepoint.md#touncompressedcurvepoint)
-
 #### Defined in
 
-[types/curvePoint.ts:41](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L41)
+[types/halfKeyChallenge.ts:42](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L42)
 
 ___
 
 ### fromExponent
 
-▸ `Static` **fromExponent**(`exponent`): [CurvePoint](curvepoint.md)
+▸ `Static` **fromExponent**(`exponent`): [HalfKeyChallenge](halfkeychallenge.md)
 
 #### Parameters
 
@@ -193,21 +174,17 @@ ___
 
 #### Returns
 
-[CurvePoint](curvepoint.md)
-
-#### Inherited from
-
-[CurvePoint](curvepoint.md).[fromExponent](curvepoint.md#fromexponent)
+[HalfKeyChallenge](halfkeychallenge.md)
 
 #### Defined in
 
-[types/curvePoint.ts:17](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L17)
+[types/halfKeyChallenge.ts:18](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L18)
 
 ___
 
 ### fromPeerId
 
-▸ `Static` **fromPeerId**(`peerId`): [CurvePoint](curvepoint.md)
+▸ `Static` **fromPeerId**(`peerId`): [HalfKeyChallenge](halfkeychallenge.md)
 
 #### Parameters
 
@@ -217,21 +194,17 @@ ___
 
 #### Returns
 
-[CurvePoint](curvepoint.md)
-
-#### Inherited from
-
-[CurvePoint](curvepoint.md).[fromPeerId](curvepoint.md#frompeerid)
+[HalfKeyChallenge](halfkeychallenge.md)
 
 #### Defined in
 
-[types/curvePoint.ts:33](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L33)
+[types/halfKeyChallenge.ts:34](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L34)
 
 ___
 
 ### fromString
 
-▸ `Static` **fromString**(`str`): [CurvePoint](curvepoint.md)
+▸ `Static` **fromString**(`str`): [HalfKeyChallenge](halfkeychallenge.md)
 
 #### Parameters
 
@@ -241,21 +214,17 @@ ___
 
 #### Returns
 
-[CurvePoint](curvepoint.md)
-
-#### Inherited from
-
-[CurvePoint](curvepoint.md).[fromString](curvepoint.md#fromstring)
+[HalfKeyChallenge](halfkeychallenge.md)
 
 #### Defined in
 
-[types/curvePoint.ts:50](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L50)
+[types/halfKeyChallenge.ts:51](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L51)
 
 ___
 
 ### fromUncompressedUncompressedCurvePoint
 
-▸ `Static` **fromUncompressedUncompressedCurvePoint**(`arr`): [CurvePoint](curvepoint.md)
+▸ `Static` **fromUncompressedUncompressedCurvePoint**(`arr`): [HalfKeyChallenge](halfkeychallenge.md)
 
 #### Parameters
 
@@ -265,12 +234,8 @@ ___
 
 #### Returns
 
-[CurvePoint](curvepoint.md)
-
-#### Inherited from
-
-[CurvePoint](curvepoint.md).[fromUncompressedUncompressedCurvePoint](curvepoint.md#fromuncompresseduncompressedcurvepoint)
+[HalfKeyChallenge](halfkeychallenge.md)
 
 #### Defined in
 
-[types/curvePoint.ts:25](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/curvePoint.ts#L25)
+[types/halfKeyChallenge.ts:26](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/halfKeyChallenge.ts#L26)

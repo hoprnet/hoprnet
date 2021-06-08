@@ -53,6 +53,7 @@ import { subscribeToAcknowledgements } from './interactions/packet/acknowledgeme
 import { PacketForwardInteraction } from './interactions/packet/forward'
 
 import { Packet } from './messages'
+import { localAddressesFirst, publicAddressesFirst, AddressSorter } from '@hoprnet/hopr-utils'
 
 const log = Debug(`hopr-core`)
 const verbose = Debug('hopr-core:verbose')
@@ -80,6 +81,10 @@ export type HoprOptions = {
   // You almost certainly want this to be false, this is so we can test with
   // local testnets, and announce 127.0.0.1 addresses.
   announceLocalAddresses?: boolean
+
+  // when true, addresses will be sorted local first
+  // when false, addresses will be sorted public first
+  preferLocalAddresses?: boolean
 }
 
 export type NodeStatus = 'UNINITIALIZED' | 'INITIALIZING' | 'RUNNING' | 'DESTROYED'
@@ -95,6 +100,7 @@ class Hopr extends EventEmitter {
   private libp2p: LibP2P
   private db: HoprDB
   private paymentChannels: Promise<HoprCoreEthereum>
+  private addressSorter: AddressSorter
 
   /**
    * Create an uninitialized Hopr Node
@@ -120,6 +126,14 @@ class Hopr extends EventEmitter {
     this.paymentChannels = HoprCoreEthereum.create(this.db, this.id.privKey.marshal(), {
       provider: this.options.provider
     })
+
+    if (this.options.preferLocalAddresses) {
+      this.addressSorter = localAddressesFirst
+      log('Preferring local addresses')
+    } else {
+      this.addressSorter = publicAddressesFirst
+      log('Preferring public addresses')
+    }
   }
 
   /**
@@ -191,8 +205,7 @@ class Hopr extends EventEmitter {
         }
       },
       dialer: {
-        // Temporary fix, see https://github.com/hoprnet/hopr-connect/issues/77
-        addressSorter: (a) => a,
+        addressSorter: this.addressSorter,
         maxDialsPerPeer: 100
       }
     })

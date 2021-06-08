@@ -6,8 +6,6 @@
 
 - **CurvePoint**
 
-  ↳ [HalfKeyChallenge](halfkeychallenge.md)
-
   ↳ [Challenge](challenge.md)
 
 ## Table of contents
