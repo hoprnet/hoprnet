@@ -72,6 +72,9 @@ update_if_existing() {
     echo "Previous GCloud VM Image: $PREV"
     gcloud_update_container_with_image $1 $2 "$(disk_name $1)" "/app/db"
     sleep 60
+
+    # prevent docker images overloading the disk space
+    gcloud_cleanup_docker_images "$1"
   else
     echo "no container"
   fi

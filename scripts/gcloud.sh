@@ -84,3 +84,8 @@ gcloud_get_logs() {
   local id=$(gcloud compute ssh $ZONE $1 --command "docker ps -q --filter ancestor='$2' | xargs docker inspect --format='{{.Id}}'" | grep -v 'warning')
   gcloud compute ssh $ZONE $1 --command "docker logs $id"
 }
+
+# $1 - vm name
+gcloud_cleanup_docker_images() {
+  gcloud compute ssh $ZONE "$1" --command "sudo docker system prune -a -f"
+}
