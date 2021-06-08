@@ -106,12 +106,12 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         _fundChannel(
             account1,
             account2,
-            amount1,
+            amount1
         );
         _fundChannel(
             account2,
             account1,
-            amount2,
+            amount2
         );
     }
 
@@ -181,7 +181,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         require(counterparty != address(0), "counterparty must not be empty");
         require(msg.sender != counterparty, "sender and destination must not be the same");
 
-        (,,, Channel storage channel) = _getChannel(
+        (, Channel storage channel) = _getChannel(
             msg.sender,
             counterparty
         );
@@ -235,7 +235,8 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         require(amount == amount1.add(amount2), "amount sent must be equal to amount specified");
 
         //require(from == account1 || from == account2, "funder must be either account1 or account2");
-        _fundChannel(account1, account2, amount1, amount2);
+        _fundChannel(account1, account2, amount1);
+        _fundChannel(account2, account1, amount2);
     }
 
     // internal code
@@ -257,7 +258,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         require(accountB != address(0), "accountB must not be empty");
         require(amount > 0, "amount must be greater than 0");
 
-        (,,, Channel storage channel) = _getChannel(accountA, accountB);
+        (, Channel storage channel) = _getChannel(accountA, accountB);
         require(channel.status != ChannelStatus.PENDING_TO_CLOSE, "Cannot fund a closing channel");
         
         if (channel.status == ChannelStatus.CLOSED) {
@@ -276,8 +277,8 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
      * closure time, when the cool-off period is over,
      * user may finalize closure, then emits
      * {ChannelUpdate} event.
-     * @param initiator the address of the initiator
-     * @param counterparty the address of the counterparty
+     * @param source the address of the initiator
+     * @param destination the address of the counterparty
      */
     function _initiateChannelClosure(
         address source,
@@ -287,13 +288,13 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         require(source != address(0), "source must not be empty");
         require(destination != address(0), "destination must not be empty");
 
-        (,,, Channel storage channel) = _getChannel(source, destination);
+        (, Channel storage channel) = _getChannel(source, destination);
         require(channel.status == ChannelStatus.OPEN, "channel must be open");
 
         // @TODO: check with team, do we need SafeMath check here?
         channel.closureTime = _currentBlockTimestamp() + secsClosure;
         channel.status = ChannelStatus.PENDING_TO_CLOSE;
-        emit ChannelUpdate(initiator, counterparty, channel);
+        emit ChannelUpdate(source, destination, channel);
     }
 
     /**
@@ -313,7 +314,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         require(initiator != address(0), "initiator must not be empty");
         require(counterparty != address(0), "counterparty must not be empty");
 
-        (address partyA, address partyB,, Channel storage channel) = _getChannel(initiator, counterparty);
+        (, Channel storage channel) = _getChannel(initiator, counterparty);
         require(channel.status == ChannelStatus.PENDING_TO_CLOSE, "channel must be pending to close");
 
         if (
@@ -400,22 +401,20 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         require(counterparty != address(0), "counterparty must not be empty");
         require(nextCommitment != bytes32(0), "nextCommitment must not be empty");
         require(amount != uint256(0), "amount must not be empty");
-        (,,, Channel storage earningChannel) = _getChannel(
+        (, Channel storage earningChannel) = _getChannel(
             redeemer,
             counterparty
         );
-        (,,, Channel storage spendingChannel) = _getChannel(
+        (, Channel storage spendingChannel) = _getChannel(
             counterparty,
             redeemer
         );
         require(earningChannel.status != ChannelStatus.CLOSED, "earning channel must be open or pending to close");
-        
         uint256 prevTicketEpoch;
-        require(channel.partyACommitment == keccak256(abi.encodePacked(nextCommitment)), "commitment must be hash of next commitment");
-        require(channel.partyATicketEpoch == ticketEpoch, "ticket epoch must match");
-        require(channel.partyATicketIndex < ticketIndex, "redemptions must be in order");
-        prevTicketEpoch = channel.partyATicketEpoch;
-
+        require(earningChannel.commitment == keccak256(abi.encodePacked(nextCommitment)), "commitment must be hash of next commitment");
+        require(earningChannel.ticketEpoch == ticketEpoch, "ticket epoch must match");
+        require(earningChannel.ticketIndex < ticketIndex, "redemptions must be in order");
+        prevTicketEpoch = earningChannel.ticketEpoch;
 
         bytes32 ticketHash = ECDSA.toEthSignedMessageHash(
             keccak256(
@@ -423,7 +422,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
                   redeemer,
                   prevTicketEpoch,
                   proofOfRelaySecret,
-                  channel.channelEpoch,
+                  earningChannel.channelEpoch,
                   amount,
                   ticketIndex,
                   winProb
@@ -444,7 +443,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
           earningChannel.commitment = nextCommitment;
           spendingChannel.balance = spendingChannel.balance.sub(amount);
           earningChannel.balance = earningChannel.balance.add(amount);
-          earnincChannel.ticketIndex = ticketIndex;
+          earningChannel.ticketIndex = ticketIndex;
           emit ChannelUpdate(redeemer, counterparty, earningChannel);
     }
 

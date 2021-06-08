@@ -27,20 +27,6 @@ contract ChannelsMock is HoprChannels {
         return _getChannelId(partyA, partyB);
     }
 
-    function isPartyAInternal(
-        address accountA,
-        address accountB
-    ) external pure returns (bool) {
-        return _isPartyA(accountA, accountB);
-    }
-
-    function getPartiesInternal(
-        address account1,
-        address account2
-    ) external pure returns (address, address) {
-        return _sortAddresses(account1,account2);
-    }
-
     function getEncodedTicketInternal(
         address recipient,
         uint256 recipientCounter,
