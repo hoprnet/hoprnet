@@ -77,6 +77,8 @@ class Channel {
       await this.commitment.bumpCommitment()
       return ack
     } else {
+      log(`Got a ticket that is not a win. Dropping ticket.`)
+      await this.db.markLosing(unacknowledgedTicket)
       return null
     }
   }
@@ -258,17 +260,18 @@ class Channel {
 
       const receipt = await this.chain.redeemTicket(this.counterparty.toAddress(), ackTicket, ticket)
 
-      // TODO delete ackTicket
       //this.commitment.updateChainState(ackTicket.preImage)
 
       log('Successfully submitted ticket', ackTicket.response.toHex())
+      await this.db.markRedeemeed(ackTicket)
       return {
         status: 'SUCCESS',
         receipt,
         ackTicket
       }
     } catch (err) {
-      log('Unexpected error when submitting ticket', ackTicket.response.toHex(), err)
+      // TODO delete ackTicket -- check if it's due to gas!
+      log('Unexpected error when redeeming ticket', ackTicket.response.toHex(), err)
       return {
         status: 'ERROR',
         error: err

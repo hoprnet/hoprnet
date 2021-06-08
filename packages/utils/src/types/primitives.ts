@@ -251,6 +251,10 @@ export class Balance {
     return `0x${this.bn.toString('hex', 2 * Balance.SIZE)}`
   }
 
+  public add(b: Balance): Balance {
+    return new Balance(this.bn.add(b.toBN()))
+  }
+
   static deserialize(arr: Uint8Array) {
     return new Balance(new BN(arr))
   }
@@ -266,6 +270,10 @@ export class Balance {
   static get SIZE(): number {
     // Uint256
     return 32
+  }
+
+  static ZERO(): Balance {
+    return new Balance(new BN('0'))
   }
 }
 

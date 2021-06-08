@@ -709,24 +709,52 @@ class Hopr extends EventEmitter {
     return this.db.getAcknowledgedTickets()
   }
 
-  public async submitAcknowledgedTicket(ackTicket: AcknowledgedTicket) {
-    try {
-      const ethereum = await this.paymentChannels
-      const signedTicket = ackTicket.ticket
-      const self = ethereum.getPublicKey()
-      const counterparty = signedTicket.recoverSigner()
-      const channel = ethereum.getChannel(self, counterparty)
+  public async getTicketStatistics() {
+    const ack = await this.getAcknowledgedTickets()
+    const pending = await this.db.getPendingTicketCount()
+    const losing = await this.db.getLosingTicketCount()
+    const totalValue = (ackTickets: AcknowledgedTicket[]): Balance =>
+      ackTickets.map((a) => a.ticket.amount).reduce((x, y) => x.add(y), Balance.ZERO())
 
-      const result = await channel.redeemTicket(ackTicket)
-      // TODO look at result.status and actually do something
-      await this.db.delAcknowledgedTicket(ackTicket.ticket.challenge)
-      return result
-    } catch (err) {
-      return {
-        status: 'ERROR',
-        error: err
+    return {
+      pending,
+      losing,
+      winProportion: ack.length / (ack.length + losing) || 0,
+      unredeemed: ack.length,
+      unredeemedValue: totalValue(ack),
+      redeemed: await this.db.getRedeemedTicketsCount(),
+      redeemedValue: await this.db.getRedeemedTicketsValue()
+    }
+  }
+
+  public async redeemAllTickets() {
+    let count = 0,
+      redeemed = 0,
+      total = 0
+
+    for (const ackTicket of await this.getAcknowledgedTickets()) {
+      count++
+      const result = await this.redeemAcknowledgedTicket(ackTicket)
+
+      if (result.status === 'SUCCESS') {
+        redeemed++
+        total += ackTicket.ticket.amount.toBN().toNumber()
+        console.log(`Redeemed ticket ${count}`)
+      } else {
+        console.log(`Failed to redeem ticket ${count}`)
       }
     }
+    return {
+      count,
+      redeemed,
+      total
+    }
+  }
+
+  public async redeemAcknowledgedTicket(ackTicket: AcknowledgedTicket) {
+    const ethereum = await this.paymentChannels
+    const channel = ethereum.getChannel(ethereum.getPublicKey(), ackTicket.signer)
+    return await channel.redeemTicket(ackTicket)
   }
 
   public async getChannelsOf(addr: Address): Promise<ChannelEntry[]> {
