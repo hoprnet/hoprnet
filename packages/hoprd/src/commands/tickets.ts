@@ -1,8 +1,6 @@
 import type Hopr from '@hoprnet/hopr-core'
-import { moveDecimalPoint, Balance } from '@hoprnet/hopr-utils'
 import { AbstractCommand } from './abstractCommand'
 import { styleValue } from './utils'
-import BN from 'bn.js'
 import type { AcknowledgedTicket, Ticket } from '@hoprnet/hopr-utils'
 
 /**
@@ -13,43 +11,6 @@ import type { AcknowledgedTicket, Ticket } from '@hoprnet/hopr-utils'
  */
 export async function toSignedTickets(ackTickets: AcknowledgedTicket[]): Promise<Ticket[]> {
   return Promise.all(ackTickets.map((ackTicket) => ackTicket.ticket))
-}
-/**
- * Derive various data from the given signed tickets.
- *
- * @param signedTickets
- * @returns the total amount of tokens in the tickets & more
- */
-function countSignedTickets(signedTickets: Ticket[]): {
-  tickets: {
-    challange: string
-    amount: string
-  }[]
-  total: string
-} {
-  const { tickets, total } = signedTickets.reduce(
-    (result, signedTicket) => {
-      result.tickets.push({
-        challange: signedTicket.challenge.toHex(),
-        amount: signedTicket.amount.toBN().toString(10)
-      })
-      result.total = result.total.add(signedTicket.amount.toBN())
-
-      return result
-    },
-    {
-      tickets: [] as {
-        challange: string
-        amount: string
-      }[],
-      total: new BN(0)
-    }
-  )
-
-  return {
-    tickets,
-    total: total.toString(10)
-  }
 }
 
 export default class Tickets extends AbstractCommand {
@@ -68,22 +29,16 @@ export default class Tickets extends AbstractCommand {
   public async execute(log): Promise<void> {
     log('finding information about tickets...')
     try {
-      const ackTickets = await this.node.getAcknowledgedTickets()
-
-      if (ackTickets.length === 0) {
-        log('No tickets found.')
-        return
-      }
-
-      const unredeemedResults = countSignedTickets(await toSignedTickets(ackTickets))
-      const unredeemedAmount = moveDecimalPoint(unredeemedResults.total.toString(), Balance.DECIMALS * -1)
-
-      log(
-        `Found ${styleValue(unredeemedResults.tickets.length)} unredeemed tickets with a sum of ${styleValue(
-          unredeemedAmount,
-          'number'
-        )} HOPR.`
-      )
+      const stats = await this.node.getTicketStatistics()
+      log(`
+Tickets:
+- Pending:          ${stats.pending}
+- Win Proportion:   ${stats.winProportion * 100}% 
+- Unredeemed:       ${stats.unredeemed}
+- Unredeemed Value: ${stats.unredeemedValue}
+- Redeemed:         ${stats.redeemed}
+- Redeemed Value:   ${stats.redeemedValue}
+          `)
     } catch (err) {
       log(styleValue(err.message, 'failure'))
     }

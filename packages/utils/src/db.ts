@@ -44,6 +44,7 @@ const TICKET_INDEX_PREFIX = encoder.encode('ticketIndex:')
 const CURRENT = encoder.encode('current')
 const REDEEMED_TICKETS_COUNT = encoder.encode('statistics:redeemed:count')
 const REDEEMED_TICKETS_VALUE = encoder.encode('statistics:redeemed:value')
+const LOSING_TICKET_COUNT = encoder.encode('statistics:losing:count')
 
 export class HoprDB {
   private db: LevelUp
@@ -109,6 +110,14 @@ export class HoprDB {
     }
   }
 
+  private async getCoercedOrDefault<T>(key: Uint8Array, coerce: (Uint8Array)=>T, defaultVal: T){
+    let u8a = this.maybeGet(key)
+    if (u8a === undefined){
+      return defaultVal
+    }
+    return coerce(u8a)
+  }
+
   private async getAll<T>(
     prefix: Uint8Array,
     deserialize: (u: Uint8Array) => T,
@@ -138,11 +147,9 @@ export class HoprDB {
   }
   
   private async increment(key: Uint8Array): Promise<number> {
-    let u8a = await this.maybeGet(key)
-    let val = u8a ? u8aToNumber(u8a) : 0
-    val += 1 
-    await this.put(key, Uint8Array.of(val))
-    return val
+    let val = await this.getCoercedOrDefault<number>(key, u8aToNumber, 0)
+    await this.put(key, Uint8Array.of(val + 1))
+    return val + 1
   }
 
   /**
@@ -272,16 +279,12 @@ export class HoprDB {
     )
   }
 
-  async getCurrentTicketIndex(channelId: Hash): Promise<UINT256> {
-    const currentTicketIndex = await this.maybeGet(
-      Uint8Array.from([...TICKET_INDEX_PREFIX, ...CURRENT, ...channelId.serialize()])
+  async getCurrentTicketIndex(channelId: Hash): Promise<UINT256 | undefined> {
+     return await this.getCoercedOrDefault(
+        Uint8Array.from([...TICKET_INDEX_PREFIX, ...CURRENT, ...channelId.serialize()])
+      , UINT256.deserialize
+      , undefined
     )
-
-    if (currentTicketIndex == undefined) {
-      return undefined
-    }
-
-    return UINT256.deserialize(currentTicketIndex)
   }
 
   setCurrentTicketIndex(channelId: Hash, ticketIndex: UINT256): Promise<void> {
@@ -301,8 +304,7 @@ export class HoprDB {
   }
 
   async getLatestConfirmedSnapshot(): Promise<Snapshot | undefined> {
-    const data = await this.maybeGet(LATEST_CONFIRMED_SNAPSHOT_KEY)
-    return data ? Snapshot.deserialize(data) : undefined
+    return await this.getCoercedOrDefault(LATEST_CONFIRMED_SNAPSHOT_KEY, Snapshot.deserialize, undefined)
   }
 
   async updateLatestConfirmedSnapshot(snapshot: Snapshot): Promise<void> {
@@ -310,8 +312,7 @@ export class HoprDB {
   }
 
   async getChannel(channelId: Hash): Promise<ChannelEntry | undefined> {
-    const data = await this.maybeGet(createChannelKey(channelId))
-    return data ? ChannelEntry.deserialize(data) : undefined
+    return await this.getCoercedOrDefault(createChannelKey(channelId), ChannelEntry.deserialize, undefined)
   }
 
   async getChannels(filter?: (channel: ChannelEntry) => boolean): Promise<ChannelEntry[]> {
@@ -341,17 +342,26 @@ export class HoprDB {
     return Balance.deserialize(await this.get(REDEEMED_TICKETS_VALUE))
   }
   public async getRedeemedTicketsCount(): Promise<number> {
-    return u8aToNumber(await this.get(REDEEMED_TICKETS_COUNT))
+    return this.getCoercedOrDefault(REDEEMED_TICKETS_COUNT, u8aToNumber, 0)
   }
 
   public async getPendingTicketCount(): Promise<number> {
     return (await this.getUnacknowledgedTickets()).length
   }
 
+  public async getLosingTicketCount(): Promise<number> {
+    return this.getCoercedOrDefault(LOSING_TICKET_COUNT, u8aToNumber, 0)
+  }
+
   public async markRedeemeed(a: AcknowledgedTicket): Promise<void> {
     await this.increment(REDEEMED_TICKETS_COUNT)
     await this.delAcknowledgedTicket(a)
     //await this.addBalance(REDEEMED_TICKETS_VALUE, a.ticket.amount)
+  }
+
+  public async markLosing(a: AcknowledgedTicket): Promise<void>{
+    await this.increment(LOSING_TICKET_COUNT)
+    await this.delAcknowledgedTicket(a)
   }
 
   static createMock(): HoprDB {

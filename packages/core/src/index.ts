@@ -703,7 +703,7 @@ class Hopr extends EventEmitter {
 
     return {
       pending: await this.db.getPendingTicketCount(),
-      winProportion: 0,
+      winProportion: ack.length / (ack.length + (await this.db.getLosingTicketCount())),
       unredeemed: ack.length,
       unredeemedValue: totalValue(ack),
       redeemed: await this.db.getRedeemedTicketsCount(),
