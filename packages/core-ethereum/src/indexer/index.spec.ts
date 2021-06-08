@@ -123,11 +123,6 @@ const createChainMock = (
   } as unknown as ChainWrapper
 }
 
-const assertLater = async (assertion: () => any, delay: number) => {
-  await new Promise((resolve) => setTimeout(resolve, delay))
-  return assertion()
-}
-
 const useFixtures = (ops: { latestBlockNumber?: number; pastEvents?: Event<any>[] } = {}) => {
   const latestBlockNumber = ops.latestBlockNumber ?? 0
   const pastEvents = ops.pastEvents ?? []
@@ -178,7 +173,7 @@ const useMultiPartyFixtures = (ops: { latestBlockNumber?: number; pastEvents?: E
   }
 }
 
-describe('test indexer', function () {
+describe.only('test indexer', function () {
   it('should start indexer', async function () {
     const { indexer } = useFixtures()
 
@@ -223,8 +218,6 @@ describe('test indexer', function () {
   })
 
   it('should continue processing events', async function () {
-    this.timeout(3000)
-
     const { indexer, newEvent, newBlock } = useFixtures({
       latestBlockNumber: 3,
       pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.OPENED_EVENT]
@@ -234,10 +227,16 @@ describe('test indexer', function () {
     newEvent(fixtures.OPENED_EVENT)
     newBlock()
 
-    await assertLater(async () => {
-      const channel = await indexer.getChannel(fixtures.OPENED_CHANNEL.getId())
-      expectChannelsToBeEqual(channel, fixtures.OPENED_CHANNEL)
-    }, 1000)
+    const blockMined = Defer()
+
+    indexer.on('block-processed', (blockNumber: number) => {
+      if (blockNumber === 4) blockMined.resolve()
+    })
+
+    await blockMined.promise
+
+    const channel = await indexer.getChannel(fixtures.OPENED_CHANNEL.getId())
+    expectChannelsToBeEqual(channel, fixtures.OPENED_CHANNEL)
   })
 
   it('should get public key of addresses', async function () {
@@ -280,8 +279,6 @@ describe('test indexer', function () {
   })
 
   it('should handle provider error by restarting', async function () {
-    this.timeout(3000)
-
     const { indexer, provider } = useFixtures({
       latestBlockNumber: 4,
       pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.OPENED_EVENT]
@@ -292,14 +289,16 @@ describe('test indexer', function () {
     provider.emit('error', new Error('MOCK'))
 
     assert.strictEqual(indexer.status, 'stopped')
-    await assertLater(async () => {
-      assert.strictEqual(indexer.status, 'started')
-    }, 1000)
+
+    const started = Defer()
+    indexer.on('status', (status: string) => {
+      if (status === 'started') started.resolve()
+    })
+    await started.promise
+    assert.strictEqual(indexer.status, 'started')
   })
 
   it('should contract error by restarting', async function () {
-    this.timeout(3000)
-
     const { indexer, hoprChannels } = useFixtures({
       latestBlockNumber: 4,
       pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.OPENED_EVENT]
@@ -309,10 +308,12 @@ describe('test indexer', function () {
 
     hoprChannels.emit('error', new Error('MOCK'))
 
-    assert.strictEqual(indexer.status, 'stopped')
-    await assertLater(async () => {
-      assert.strictEqual(indexer.status, 'started')
-    }, 1000)
+    const started = Defer()
+    indexer.on('status', (status: string) => {
+      if (status === 'started') started.resolve()
+    })
+    await started.promise
+    assert.strictEqual(indexer.status, 'started')
   })
 
   it('should emit events on updated channels', async function () {
