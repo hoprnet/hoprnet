@@ -61,14 +61,14 @@
 | `partyBTicketEpoch` | [UINT256](uint256.md) |
 | `partyATicketIndex` | [UINT256](uint256.md) |
 | `partyBTicketIndex` | [UINT256](uint256.md) |
-| `status` | [ChannelStatus](../modules.md#channelstatus) |
+| `status` | [ChannelStatus](../enums/channelstatus.md) |
 | `channelEpoch` | [UINT256](uint256.md) |
 | `closureTime` | [UINT256](uint256.md) |
 | `closureByPartyA` | `boolean` |
 
 #### Defined in
 
-[types/channelEntry.ts:62](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L62)
+[types/channelEntry.ts:66](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L66)
 
 ## Properties
 
@@ -152,7 +152,7 @@ ___
 
 ### status
 
-• `Readonly` **status**: [ChannelStatus](../modules.md#channelstatus)
+• `Readonly` **status**: [ChannelStatus](../enums/channelstatus.md)
 
 ## Accessors
 
@@ -166,7 +166,7 @@ ___
 
 #### Defined in
 
-[types/channelEntry.ts:80](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L80)
+[types/channelEntry.ts:84](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L84)
 
 ## Methods
 
@@ -186,7 +186,7 @@ ___
 
 #### Defined in
 
-[types/channelEntry.ts:183](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L183)
+[types/channelEntry.ts:187](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L187)
 
 ___
 
@@ -200,7 +200,7 @@ ___
 
 #### Defined in
 
-[types/channelEntry.ts:155](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L155)
+[types/channelEntry.ts:159](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L159)
 
 ___
 
@@ -214,7 +214,7 @@ ___
 
 #### Defined in
 
-[types/channelEntry.ts:115](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L115)
+[types/channelEntry.ts:119](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L119)
 
 ___
 
@@ -234,7 +234,7 @@ ___
 
 #### Defined in
 
-[types/channelEntry.ts:163](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L163)
+[types/channelEntry.ts:167](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L167)
 
 ___
 
@@ -254,7 +254,7 @@ ___
 
 #### Defined in
 
-[types/channelEntry.ts:173](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L173)
+[types/channelEntry.ts:177](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L177)
 
 ___
 
@@ -268,7 +268,7 @@ ___
 
 #### Defined in
 
-[types/channelEntry.ts:134](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L134)
+[types/channelEntry.ts:138](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L138)
 
 ___
 
@@ -282,7 +282,7 @@ ___
 
 #### Defined in
 
-[types/channelEntry.ts:159](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L159)
+[types/channelEntry.ts:163](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L163)
 
 ___
 
@@ -302,7 +302,7 @@ ___
 
 #### Defined in
 
-[types/channelEntry.ts:84](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L84)
+[types/channelEntry.ts:88](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L88)
 
 ___
 
@@ -322,4 +322,4 @@ ___
 
 #### Defined in
 
-[types/channelEntry.ts:94](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L94)
+[types/channelEntry.ts:98](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L98)

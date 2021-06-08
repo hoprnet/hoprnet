@@ -93,6 +93,7 @@ class Indexer extends EventEmitter {
     log('Subscribing to events from block %d', fromBlock)
 
     this.status = 'started'
+    this.emit('status', 'started')
     log(chalk.green('Indexer started!'))
   }
 
@@ -106,6 +107,7 @@ class Indexer extends EventEmitter {
     this.chain.unsubscribe()
 
     this.status = 'stopped'
+    this.emit('status', 'stopped')
     log(chalk.green('Indexer stopped!'))
   }
 
@@ -120,6 +122,7 @@ class Indexer extends EventEmitter {
       await this.start()
     } catch (err) {
       this.status = 'stopped'
+      this.emit('status', 'stopped')
 
       log(chalk.red('Failed to restart: %s', err.message))
     }
@@ -240,6 +243,7 @@ class Indexer extends EventEmitter {
     }
 
     await this.db.updateLatestBlockNumber(new BN(blockNumber))
+    this.emit('block-processed', blockNumber)
   }
 
   /**
@@ -398,9 +402,17 @@ class Indexer extends EventEmitter {
     return this.toIndexerChannel(partyA.toPeerId(), random) // TODO: why do we pick partyA?
   }
 
-  public async getChannelsFromPeer(source: PeerId): Promise<RoutingChannel[]> {
+  /**
+   * Returns peer's open channels.
+   * NOTE: channels with status 'PENDING_TO_CLOSE' are not included
+   * @param source peer
+   * @returns peer's open channels
+   */
+  public async getOpenRoutingChannelsFromPeer(source: PeerId): Promise<RoutingChannel[]> {
     const sourcePubKey = new PublicKey(source.pubKey.marshal())
-    const channels = await this.getChannelsOf(sourcePubKey.toAddress())
+    const channels = await this.getChannelsOf(sourcePubKey.toAddress()).then((channels) =>
+      channels.filter((channel) => channel.status === 'OPEN')
+    )
 
     let cout: RoutingChannel[] = []
     for (let channel of channels) {

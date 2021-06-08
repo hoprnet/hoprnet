@@ -13,6 +13,7 @@ import pipe from 'it-pipe'
 
 export * from './privKeyToPeerId'
 export * from './pubKeyToPeerId'
+export * from './addressSorters'
 
 /**
  * Regular expresion used to match b58Strings

@@ -4,6 +4,10 @@
 
 ## Table of contents
 
+### Enumerations
+
+- [ChannelStatus](enums/channelstatus.md)
+
 ### Classes
 
 - [AccountEntry](classes/accountentry.md)
@@ -36,7 +40,7 @@
 
 ### Type aliases
 
-- [ChannelStatus](modules.md#channelstatus)
+- [AddressSorter](modules.md#addresssorter)
 - [DialOpts](modules.md#dialopts)
 - [DialResponse](modules.md#dialresponse)
 - [Hosts](modules.md#hosts)
@@ -92,12 +96,14 @@
 - [getPacketLength](modules.md#getpacketlength)
 - [hasB58String](modules.md#hasb58string)
 - [isExpired](modules.md#isexpired)
+- [isMultiaddrPrivate](modules.md#ismultiaddrprivate)
 - [iterateHash](modules.md#iteratehash)
 - [lengthPrefixedToU8a](modules.md#lengthprefixedtou8a)
 - [libp2pSendMessage](modules.md#libp2psendmessage)
 - [libp2pSendMessageAndExpectResponse](modules.md#libp2psendmessageandexpectresponse)
 - [libp2pSubscribe](modules.md#libp2psubscribe)
 - [limitConcurrency](modules.md#limitconcurrency)
+- [localAddressesFirst](modules.md#localaddressesfirst)
 - [moveDecimalPoint](modules.md#movedecimalpoint)
 - [oneAtATime](modules.md#oneatatime)
 - [parseHosts](modules.md#parsehosts)
@@ -105,6 +111,7 @@
 - [preVerify](modules.md#preverify)
 - [privKeyToPeerId](modules.md#privkeytopeerid)
 - [pubKeyToPeerId](modules.md#pubkeytopeerid)
+- [publicAddressesFirst](modules.md#publicaddressesfirst)
 - [randomChoice](modules.md#randomchoice)
 - [randomFloat](modules.md#randomfloat)
 - [randomInteger](modules.md#randominteger)
@@ -125,6 +132,7 @@
 - [u8aSplit](modules.md#u8asplit)
 - [u8aToHex](modules.md#u8atohex)
 - [u8aToNumber](modules.md#u8atonumber)
+- [u8aToNumberOrBigInt](modules.md#u8atonumberorbigint)
 - [u8aXOR](modules.md#u8axor)
 - [unacknowledgedTicketKey](modules.md#unacknowledgedticketkey)
 - [validatePoRHalfKeys](modules.md#validateporhalfkeys)
@@ -133,13 +141,27 @@
 
 ## Type aliases
 
-### ChannelStatus
+### AddressSorter
 
-Ƭ **ChannelStatus**: ``"CLOSED"`` \| ``"OPEN"`` \| ``"PENDING_TO_CLOSE"``
+Ƭ **AddressSorter**: (`input`: `Address`[]) => `Address`[]
+
+#### Type declaration
+
+▸ (`input`): `Address`[]
+
+##### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `input` | `Address`[] |
+
+##### Returns
+
+`Address`[]
 
 #### Defined in
 
-[types/channelEntry.ts:7](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L7)
+[libp2p/addressSorters.ts:56](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/addressSorters.ts#L56)
 
 ___
 
@@ -155,7 +177,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:82](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L82)
+[libp2p/index.ts:83](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L83)
 
 ___
 
@@ -165,7 +187,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:86](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L86)
+[libp2p/index.ts:87](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L87)
 
 ___
 
@@ -200,7 +222,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:236](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L236)
+[libp2p/index.ts:237](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L237)
 
 ___
 
@@ -225,7 +247,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:237](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L237)
+[libp2p/index.ts:238](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L238)
 
 ___
 
@@ -511,7 +533,7 @@ Regular expresion used to match b58Strings
 
 #### Defined in
 
-[libp2p/index.ts:22](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L22)
+[libp2p/index.ts:23](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L23)
 
 ___
 
@@ -585,7 +607,7 @@ Takes a B58String and converts them to a PublicKey
 
 #### Defined in
 
-[libp2p/index.ts:39](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L39)
+[libp2p/index.ts:40](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L40)
 
 ___
 
@@ -607,7 +629,7 @@ Takes a peerId and returns its corresponding public key.
 
 #### Defined in
 
-[libp2p/index.ts:29](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L29)
+[libp2p/index.ts:30](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L30)
 
 ___
 
@@ -775,7 +797,7 @@ Contains a baseline protection against dialing same addresses twice.
 
 #### Defined in
 
-[libp2p/index.ts:114](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L114)
+[libp2p/index.ts:115](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L115)
 
 ___
 
@@ -851,7 +873,7 @@ ___
 
 #### Defined in
 
-[types/channelEntry.ts:9](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L9)
+[types/channelEntry.ts:13](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L13)
 
 ___
 
@@ -904,7 +926,7 @@ Returns the b58String within a given content. Returns empty string if none is fo
 
 #### Defined in
 
-[libp2p/index.ts:66](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L66)
+[libp2p/index.ts:67](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L67)
 
 ___
 
@@ -970,7 +992,7 @@ Returns true or false if given string does not contain a b58string
 
 #### Defined in
 
-[libp2p/index.ts:49](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L49)
+[libp2p/index.ts:50](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L50)
 
 ___
 
@@ -997,6 +1019,26 @@ true if it's expired
 #### Defined in
 
 [time.ts:23](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/time.ts#L23)
+
+___
+
+### isMultiaddrPrivate
+
+▸ **isMultiaddrPrivate**(`multiaddr`): `boolean`
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `multiaddr` | `Multiaddr` |
+
+#### Returns
+
+`boolean`
+
+#### Defined in
+
+[libp2p/addressSorters.ts:5](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/addressSorters.ts#L5)
 
 ___
 
@@ -1068,7 +1110,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:193](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L193)
+[libp2p/index.ts:194](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L194)
 
 ___
 
@@ -1092,7 +1134,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:209](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L209)
+[libp2p/index.ts:210](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L210)
 
 ___
 
@@ -1115,7 +1157,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:272](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L272)
+[libp2p/index.ts:273](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L273)
 
 ___
 
@@ -1145,6 +1187,26 @@ ___
 #### Defined in
 
 [collection/promise-pool.ts:1](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/collection/promise-pool.ts#L1)
+
+___
+
+### localAddressesFirst
+
+▸ **localAddressesFirst**(`addresses`): `Address`[]
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `addresses` | `Address`[] |
+
+#### Returns
+
+`Address`[]
+
+#### Defined in
+
+[libp2p/addressSorters.ts:48](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/addressSorters.ts#L48)
 
 ___
 
@@ -1308,6 +1370,26 @@ Using `libsecp256k1` directly does not work.
 #### Defined in
 
 [libp2p/pubKeyToPeerId.ts:17](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/pubKeyToPeerId.ts#L17)
+
+___
+
+### publicAddressesFirst
+
+▸ **publicAddressesFirst**(`addresses`): `Address`[]
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `addresses` | `Address`[] |
+
+#### Returns
+
+`Address`[]
+
+#### Defined in
+
+[libp2p/addressSorters.ts:52](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/addressSorters.ts#L52)
 
 ___
 
@@ -1817,7 +1899,27 @@ ___
 
 ### u8aToNumber
 
-▸ **u8aToNumber**(`arr`): `number` \| `bigint`
+▸ **u8aToNumber**(`arr`): `number`
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `arr` | `Uint8Array` |
+
+#### Returns
+
+`number`
+
+#### Defined in
+
+[u8a/u8aToNumber.ts:41](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/u8a/u8aToNumber.ts#L41)
+
+___
+
+### u8aToNumberOrBigInt
+
+▸ **u8aToNumberOrBigInt**(`arr`): `number` \| `bigint`
 
 Converts a Uint8Array to number.
 
@@ -1876,7 +1978,7 @@ ___
 
 #### Defined in
 
-[db.ts:28](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L28)
+[db.ts:29](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/db.ts#L29)
 
 ___
 

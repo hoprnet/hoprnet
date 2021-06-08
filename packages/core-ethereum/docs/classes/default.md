@@ -25,9 +25,9 @@
 - [getAddress](default.md#getaddress)
 - [getBalance](default.md#getbalance)
 - [getChannel](default.md#getchannel)
-- [getChannelsFromPeer](default.md#getchannelsfrompeer)
 - [getChannelsOf](default.md#getchannelsof)
 - [getNativeBalance](default.md#getnativebalance)
+- [getOpenRoutingChannelsFromPeer](default.md#getopenroutingchannelsfrompeer)
 - [getPublicKey](default.md#getpublickey)
 - [getPublicKeyOf](default.md#getpublickeyof)
 - [getRandomChannel](default.md#getrandomchannel)
@@ -262,26 +262,6 @@ ___
 
 ___
 
-### getChannelsFromPeer
-
-▸ **getChannelsFromPeer**(`p`): `Promise`<[RoutingChannel](../modules.md#routingchannel)[]\>
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `p` | `PeerId` |
-
-#### Returns
-
-`Promise`<[RoutingChannel](../modules.md#routingchannel)[]\>
-
-#### Defined in
-
-[core-ethereum/src/index.ts:73](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L73)
-
-___
-
 ### getChannelsOf
 
 ▸ **getChannelsOf**(`addr`): `Promise`<ChannelEntry[]\>
@@ -319,6 +299,26 @@ ___
 #### Defined in
 
 [core-ethereum/src/index.ts:120](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L120)
+
+___
+
+### getOpenRoutingChannelsFromPeer
+
+▸ **getOpenRoutingChannelsFromPeer**(`p`): `Promise`<[RoutingChannel](../modules.md#routingchannel)[]\>
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `p` | `PeerId` |
+
+#### Returns
+
+`Promise`<[RoutingChannel](../modules.md#routingchannel)[]\>
+
+#### Defined in
+
+[core-ethereum/src/index.ts:73](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L73)
 
 ___
 

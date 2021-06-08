@@ -16,10 +16,12 @@
 
 ### Methods
 
+- [add](balance.md#add)
 - [serialize](balance.md#serialize)
 - [toBN](balance.md#tobn)
 - [toFormattedString](balance.md#toformattedstring)
 - [toHex](balance.md#tohex)
+- [ZERO](balance.md#zero)
 - [deserialize](balance.md#deserialize)
 
 ## Constructors
@@ -64,7 +66,7 @@ ___
 
 #### Defined in
 
-[types/primitives.ts:266](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L266)
+[types/primitives.ts:270](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L270)
 
 ___
 
@@ -82,6 +84,26 @@ ___
 
 ## Methods
 
+### add
+
+▸ **add**(`b`): [Balance](balance.md)
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `b` | [Balance](balance.md) |
+
+#### Returns
+
+[Balance](balance.md)
+
+#### Defined in
+
+[types/primitives.ts:254](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L254)
+
+___
+
 ### serialize
 
 ▸ **serialize**(): `Uint8Array`
@@ -92,7 +114,7 @@ ___
 
 #### Defined in
 
-[types/primitives.ts:258](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L258)
+[types/primitives.ts:262](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L262)
 
 ___
 
@@ -120,7 +142,7 @@ ___
 
 #### Defined in
 
-[types/primitives.ts:262](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L262)
+[types/primitives.ts:266](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L266)
 
 ___
 
@@ -135,6 +157,20 @@ ___
 #### Defined in
 
 [types/primitives.ts:250](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L250)
+
+___
+
+### ZERO
+
+▸ `Static` **ZERO**(): [Balance](balance.md)
+
+#### Returns
+
+[Balance](balance.md)
+
+#### Defined in
+
+[types/primitives.ts:275](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L275)
 
 ___
 
@@ -154,4 +190,4 @@ ___
 
 #### Defined in
 
-[types/primitives.ts:254](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L254)
+[types/primitives.ts:258](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/primitives.ts#L258)

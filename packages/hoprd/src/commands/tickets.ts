@@ -1,7 +1,6 @@
 import type Hopr from '@hoprnet/hopr-core'
-import { moveDecimalPoint, Balance } from '@hoprnet/hopr-utils'
 import { AbstractCommand } from './abstractCommand'
-import { countSignedTickets, toSignedTickets, styleValue } from './utils'
+import { styleValue } from './utils'
 
 export default class Tickets extends AbstractCommand {
   constructor(public node: Hopr) {
@@ -17,23 +16,19 @@ export default class Tickets extends AbstractCommand {
   }
 
   public async execute(log): Promise<void> {
+    log('finding information about tickets...')
     try {
-      const ackTickets = await this.node.getAcknowledgedTickets()
-
-      if (ackTickets.length === 0) {
-        log('No tickets found.')
-        return
-      }
-
-      const unredeemedResults = countSignedTickets(await toSignedTickets(ackTickets))
-      const unredeemedAmount = moveDecimalPoint(unredeemedResults.total.toString(), Balance.DECIMALS * -1)
-
-      log(
-        `Found ${styleValue(unredeemedResults.tickets.length)} unredeemed tickets with a sum of ${styleValue(
-          unredeemedAmount,
-          'number'
-        )} HOPR.`
-      )
+      const stats = await this.node.getTicketStatistics()
+      log(`
+Tickets:
+- Pending:          ${stats.pending}
+- Unredeemed:       ${stats.unredeemed}
+- Unredeemed Value: ${stats.unredeemedValue.toFormattedString()}
+- Redeemed:         ${stats.redeemed}
+- Redeemed Value:   ${stats.redeemedValue.toFormattedString()}
+- Losing Tickets:   ${stats.losing}
+- Win Proportion:   ${stats.winProportion * 100}% 
+          `)
     } catch (err) {
       log(styleValue(err.message, 'failure'))
     }

@@ -27,18 +27,18 @@ export class SendMessage extends AbstractCommand {
     recipient: PeerId,
     rawMessage: string,
     path?: PeerId[]
-  ): Promise<string | void> {
+  ): Promise<string> {
     const message = state.includeRecipient ? this.insertMyAddress(rawMessage) : rawMessage
 
     try {
       await this.node.sendMessage(encodeMessage(message), recipient, path)
       return 'Message sent'
     } catch (err) {
-      return styleValue(`Could not send message. (${err})`, 'failure')
+      return styleValue(`Could not send message. (${err.message})`, 'failure')
     }
   }
 
-  public async execute(log, query: string, state: GlobalState): Promise<void> {
+  public async execute(log: (str: string) => void, query: string, state: GlobalState): Promise<void> {
     try {
       let [err, peerIdString, message] = this._assertUsage(query, ['PeerId', 'Message'], /([A-Za-z0-9_,]+)\s(.*)/)
       if (err) throw Error(err)
@@ -56,21 +56,22 @@ export class SendMessage extends AbstractCommand {
           throw new Error('Cannot create path longer than MAX_HOPS')
         }
 
-        const recipient = path[path.length - 1]
+        const [intermediateNodes, recipient] = [path.slice(0, path.length - 1), path[path.length - 1]]
         console.log(
           `Sending message to ${styleValue(recipient.toB58String(), 'peerId')} via ${path
             .slice(0, path.length - 1)
             .map((current) => styleValue(current.toB58String(), 'peerId'))
             .join(',')} ...`
         )
-        log(this.sendMessage(state, recipient, message, path.slice(0, path.length - 1)))
+        log(await this.sendMessage(state, recipient, message, intermediateNodes))
+
         return
       }
 
       let peerId = await checkPeerIdInput(peerIdString, state)
 
       console.log(`Sending message to ${styleValue(peerId.toB58String(), 'peerId')} ...`)
-      log(this.sendMessage(state, peerId, message))
+      log(await this.sendMessage(state, peerId, message))
     } catch (err) {
       log(styleValue(err.message, 'failure'))
     }

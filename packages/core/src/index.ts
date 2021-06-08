@@ -38,7 +38,8 @@ import {
   libp2pSubscribe,
   libp2pSendMessage,
   LibP2PHandlerFunction,
-  AcknowledgedTicket
+  AcknowledgedTicket,
+  ChannelStatus
 } from '@hoprnet/hopr-utils'
 import HoprCoreEthereum, { RoutingChannel } from '@hoprnet/hopr-core-ethereum'
 import BN from 'bn.js'
@@ -53,6 +54,7 @@ import { subscribeToAcknowledgements } from './interactions/packet/acknowledgeme
 import { PacketForwardInteraction } from './interactions/packet/forward'
 
 import { Packet } from './messages'
+import { localAddressesFirst, publicAddressesFirst, AddressSorter } from '@hoprnet/hopr-utils'
 
 const log = Debug(`hopr-core`)
 const verbose = Debug('hopr-core:verbose')
@@ -80,6 +82,10 @@ export type HoprOptions = {
   // You almost certainly want this to be false, this is so we can test with
   // local testnets, and announce 127.0.0.1 addresses.
   announceLocalAddresses?: boolean
+
+  // when true, addresses will be sorted local first
+  // when false, addresses will be sorted public first
+  preferLocalAddresses?: boolean
 }
 
 export type NodeStatus = 'UNINITIALIZED' | 'INITIALIZING' | 'RUNNING' | 'DESTROYED'
@@ -95,6 +101,7 @@ class Hopr extends EventEmitter {
   private libp2p: LibP2P
   private db: HoprDB
   private paymentChannels: Promise<HoprCoreEthereum>
+  private addressSorter: AddressSorter
 
   /**
    * Create an uninitialized Hopr Node
@@ -120,6 +127,14 @@ class Hopr extends EventEmitter {
     this.paymentChannels = HoprCoreEthereum.create(this.db, this.id.privKey.marshal(), {
       provider: this.options.provider
     })
+
+    if (this.options.preferLocalAddresses) {
+      this.addressSorter = localAddressesFirst
+      log('Preferring local addresses')
+    } else {
+      this.addressSorter = publicAddressesFirst
+      log('Preferring public addresses')
+    }
   }
 
   /**
@@ -191,8 +206,7 @@ class Hopr extends EventEmitter {
         }
       },
       dialer: {
-        // Temporary fix, see https://github.com/hoprnet/hopr-connect/issues/77
-        addressSorter: (a) => a,
+        addressSorter: this.addressSorter,
         maxDialsPerPeer: 100
       }
     })
@@ -314,7 +328,7 @@ class Hopr extends EventEmitter {
   }
 
   private async getOpenChannels(): Promise<RoutingChannel[]> {
-    return (await this.paymentChannels).getChannelsFromPeer(this.getId())
+    return (await this.paymentChannels).getOpenRoutingChannelsFromPeer(this.getId())
   }
 
   /**
@@ -395,13 +409,25 @@ class Hopr extends EventEmitter {
 
     if (intermediatePath != undefined) {
       // checking if path makes sense
-      for (let i = 0; i < intermediatePath.length - 2; i++) {
-        const ticketIssuer = PublicKey.fromPeerId(intermediatePath[i])
-        const ticketReceiver = PublicKey.fromPeerId(intermediatePath[i + 1])
+      for (let i = 0; i < intermediatePath.length; i++) {
+        let ticketIssuer: PublicKey
+        let ticketReceiver: PublicKey
+
+        if (i == 0) {
+          ticketIssuer = PublicKey.fromPeerId(this.getId())
+          ticketReceiver = PublicKey.fromPeerId(intermediatePath[0])
+        } else {
+          ticketIssuer = PublicKey.fromPeerId(intermediatePath[i - 1])
+          ticketReceiver = PublicKey.fromPeerId(intermediatePath[i])
+        }
 
         const channel = ethereum.getChannel(ticketIssuer, ticketReceiver)
 
         const channelState = await channel.getState()
+
+        if (channelState.status !== ChannelStatus.Open) {
+          throw Error(`Channel ${channelState.getId().toHex()} is not open`)
+        }
 
         if (channelState.ticketEpochFor(ticketReceiver.toAddress()).toBN().isZero()) {
           throw Error(
@@ -688,24 +714,52 @@ class Hopr extends EventEmitter {
     return this.db.getAcknowledgedTickets()
   }
 
-  public async submitAcknowledgedTicket(ackTicket: AcknowledgedTicket) {
-    try {
-      const ethereum = await this.paymentChannels
-      const signedTicket = ackTicket.ticket
-      const self = ethereum.getPublicKey()
-      const counterparty = signedTicket.recoverSigner()
-      const channel = ethereum.getChannel(self, counterparty)
+  public async getTicketStatistics() {
+    const ack = await this.getAcknowledgedTickets()
+    const pending = await this.db.getPendingTicketCount()
+    const losing = await this.db.getLosingTicketCount()
+    const totalValue = (ackTickets: AcknowledgedTicket[]): Balance =>
+      ackTickets.map((a) => a.ticket.amount).reduce((x, y) => x.add(y), Balance.ZERO())
 
-      const result = await channel.redeemTicket(ackTicket)
-      // TODO look at result.status and actually do something
-      await this.db.delAcknowledgedTicket(ackTicket.ticket.challenge)
-      return result
-    } catch (err) {
-      return {
-        status: 'ERROR',
-        error: err
+    return {
+      pending,
+      losing,
+      winProportion: ack.length / (ack.length + losing) || 0,
+      unredeemed: ack.length,
+      unredeemedValue: totalValue(ack),
+      redeemed: await this.db.getRedeemedTicketsCount(),
+      redeemedValue: await this.db.getRedeemedTicketsValue()
+    }
+  }
+
+  public async redeemAllTickets() {
+    let count = 0,
+      redeemed = 0,
+      total = 0
+
+    for (const ackTicket of await this.getAcknowledgedTickets()) {
+      count++
+      const result = await this.redeemAcknowledgedTicket(ackTicket)
+
+      if (result.status === 'SUCCESS') {
+        redeemed++
+        total += ackTicket.ticket.amount.toBN().toNumber()
+        console.log(`Redeemed ticket ${count}`)
+      } else {
+        console.log(`Failed to redeem ticket ${count}`)
       }
     }
+    return {
+      count,
+      redeemed,
+      total
+    }
+  }
+
+  public async redeemAcknowledgedTicket(ackTicket: AcknowledgedTicket) {
+    const ethereum = await this.paymentChannels
+    const channel = ethereum.getChannel(ethereum.getPublicKey(), ackTicket.signer)
+    return await channel.redeemTicket(ackTicket)
   }
 
   public async getChannelsOf(addr: Address): Promise<ChannelEntry[]> {
@@ -741,7 +795,7 @@ class Hopr extends EventEmitter {
       destination,
       MAX_HOPS - 1,
       this.networkPeers,
-      ethereum.getChannelsFromPeer.bind(ethereum),
+      ethereum.getOpenRoutingChannelsFromPeer.bind(ethereum),
       PATH_RANDOMNESS
     )
   }

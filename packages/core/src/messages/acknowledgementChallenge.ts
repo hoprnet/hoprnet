@@ -54,6 +54,10 @@ export class AcknowledgementChallenge {
   solve(secret: Uint8Array): boolean {
     return this.ackChallenge.eq(new HalfKey(secret).toChallenge())
   }
+
+  clone(): AcknowledgementChallenge {
+    return new AcknowledgementChallenge(this.ackChallenge.clone(), this.signature.slice())
+  }
 }
 
 function verifyChallenge(pubKey: PeerId, signature: Uint8Array, challenge: HalfKeyChallenge): boolean {
