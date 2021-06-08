@@ -39,9 +39,9 @@ Also keeps track of the latest block number.
 - [getAnnouncedAddresses](indexer.md#getannouncedaddresses)
 - [getChannel](indexer.md#getchannel)
 - [getChannels](indexer.md#getchannels)
-- [getChannelsFromPeer](indexer.md#getchannelsfrompeer)
 - [getChannelsOf](indexer.md#getchannelsof)
 - [getMaxListeners](indexer.md#getmaxlisteners)
+- [getOpenRoutingChannelsFromPeer](indexer.md#getopenroutingchannelsfrompeer)
 - [getPublicKeyOf](indexer.md#getpublickeyof)
 - [getPublicNodes](indexer.md#getpublicnodes)
 - [getRandomChannel](indexer.md#getrandomchannel)
@@ -378,26 +378,6 @@ ___
 
 ___
 
-### getChannelsFromPeer
-
-▸ **getChannelsFromPeer**(`source`): `Promise`<[RoutingChannel](../modules.md#routingchannel)[]\>
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `source` | `PeerId` |
-
-#### Returns
-
-`Promise`<[RoutingChannel](../modules.md#routingchannel)[]\>
-
-#### Defined in
-
-[core-ethereum/src/indexer/index.ts:401](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L401)
-
-___
-
 ### getChannelsOf
 
 ▸ **getChannelsOf**(`address`): `Promise`<ChannelEntry[]\>
@@ -433,6 +413,31 @@ EventEmitter.getMaxListeners
 #### Defined in
 
 core-ethereum/node_modules/@types/node/events.d.ts:69
+
+___
+
+### getOpenRoutingChannelsFromPeer
+
+▸ **getOpenRoutingChannelsFromPeer**(`source`): `Promise`<[RoutingChannel](../modules.md#routingchannel)[]\>
+
+Returns peer's open channels.
+NOTE: channels with status 'PENDING_TO_CLOSE' are not included
+
+#### Parameters
+
+| Name | Type | Description |
+| :------ | :------ | :------ |
+| `source` | `PeerId` | peer |
+
+#### Returns
+
+`Promise`<[RoutingChannel](../modules.md#routingchannel)[]\>
+
+peer's open channels
+
+#### Defined in
+
+[core-ethereum/src/indexer/index.ts:407](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/indexer/index.ts#L407)
 
 ___
 
