@@ -19,6 +19,11 @@ function validateOptions(opts?: AddrOptions) {
   if (opts == undefined) {
     return
   }
+
+  if (opts.useIPv4 != true && opts.useIPv6 != true) {
+    throw Error(`Must use either IPv4 or IPv6 but cannot use none.`)
+  }
+
   if (opts.useIPv4 == false && (opts.includePrivateIPv4 || opts.includeLocalhostIPv4)) {
     throw Error(`Contradiction in opts. Cannot add private or local IPv4 address if IPv4 is disabled.`)
   }

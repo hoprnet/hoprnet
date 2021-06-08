@@ -80,4 +80,20 @@ describe('addrs', function () {
       `Should not include private IPv4 addresses`
     )
   })
+
+  it('try configuration edge case', function () {
+    assert.throws(() =>
+      getAddrs(12345, pId.toB58String(), {
+        useIPv4: false,
+        includeLocalhostIPv4: true
+      })
+    )
+
+    assert.throws(() =>
+      getAddrs(12345, pId.toB58String(), {
+        useIPv6: false,
+        includeLocalhostIPv6: true
+      })
+    )
+  })
 })
