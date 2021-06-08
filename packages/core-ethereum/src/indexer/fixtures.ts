@@ -13,36 +13,23 @@ export const expectAccountsToBeEqual = (actual: AccountEntry, expected: AccountE
 }
 
 export const expectChannelsToBeEqual = (actual: ChannelEntry, expected: ChannelEntry) => {
-  assert.strictEqual(actual.partyA.toHex(), expected.partyA.toHex(), 'partyA')
-  assert.strictEqual(actual.partyB.toHex(), expected.partyB.toHex(), 'partyB')
-  assert.strictEqual(actual.partyABalance.toBN().toString(), expected.partyABalance.toBN().toString(), 'partyABalance')
-  assert.strictEqual(actual.partyBBalance.toBN().toString(), expected.partyBBalance.toBN().toString(), 'partyBBalance')
-  assert.strictEqual(actual.commitmentPartyA.toHex(), expected.commitmentPartyA.toHex(), 'commitmentPartyA')
-  assert.strictEqual(actual.commitmentPartyB.toHex(), expected.commitmentPartyB.toHex(), 'commitmentPartyB')
+  assert.strictEqual(actual.source.toHex(), expected.source.toHex(), 'source')
+  assert.strictEqual(actual.destination.toHex(), expected.destination.toHex(), 'destination')
+  assert.strictEqual(actual.balance.toBN().toString(), expected.balance.toBN().toString(), 'balance')
+  assert.strictEqual(actual.commitment.toHex(), expected.commitment.toHex(), 'commitment')
   assert.strictEqual(
-    actual.partyATicketEpoch.toBN().toString(),
-    expected.partyATicketEpoch.toBN().toString(),
-    'partyATicketEpoch'
+    actual.ticketEpoch.toBN().toString(),
+    expected.ticketEpoch.toBN().toString(),
+    'ticketEpoch'
   )
   assert.strictEqual(
-    actual.partyBTicketEpoch.toBN().toString(),
-    expected.partyBTicketEpoch.toBN().toString(),
-    'partyBTicketEpoch'
-  )
-  assert.strictEqual(
-    actual.partyATicketIndex.toBN().toString(),
-    expected.partyATicketIndex.toBN().toString(),
-    'partyATicketIndex'
-  )
-  assert.strictEqual(
-    actual.partyBTicketIndex.toBN().toString(),
-    expected.partyBTicketIndex.toBN().toString(),
-    'partyBTicketIndex'
+    actual.ticketIndex.toBN().toString(),
+    expected.ticketIndex.toBN().toString(),
+    'ticketIndex'
   )
   assert.strictEqual(actual.status, expected.status, 'status')
   assert.strictEqual(actual.channelEpoch.toBN().toString(), expected.channelEpoch.toBN().toString(), 'channelEpoch')
   assert.strictEqual(actual.closureTime.toBN().toString(), expected.closureTime.toBN().toString(), 'closureTime')
-  assert.strictEqual(actual.closureByPartyA, expected.closureByPartyA, 'closureByPartyA')
 }
 
 export const PARTY_A_INITIALIZED_EVENT = {
