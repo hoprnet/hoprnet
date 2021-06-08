@@ -110,9 +110,9 @@ export class HoprDB {
     }
   }
 
-  private async getCoercedOrDefault<T>(key: Uint8Array, coerce: (u: Uint8Array) => T, defaultVal: T){
+  private async getCoercedOrDefault<T>(key: Uint8Array, coerce: (u: Uint8Array) => T, defaultVal: T) {
     let u8a = await this.maybeGet(key)
-    if (u8a === undefined){
+    if (u8a === undefined) {
       return defaultVal
     }
     return coerce(u8a)
@@ -280,10 +280,10 @@ export class HoprDB {
   }
 
   async getCurrentTicketIndex(channelId: Hash): Promise<UINT256 | undefined> {
-     return await this.getCoercedOrDefault(
-        Uint8Array.from([...TICKET_INDEX_PREFIX, ...CURRENT, ...channelId.serialize()])
-      , UINT256.deserialize
-      , undefined
+    return await this.getCoercedOrDefault(
+      Uint8Array.from([...TICKET_INDEX_PREFIX, ...CURRENT, ...channelId.serialize()]),
+      UINT256.deserialize,
+      undefined
     )
   }
 
@@ -359,7 +359,7 @@ export class HoprDB {
     //await this.addBalance(REDEEMED_TICKETS_VALUE, a.ticket.amount)
   }
 
-  public async markLosing(_a: UnacknowledgedTicket): Promise<void>{
+  public async markLosing(_a: UnacknowledgedTicket): Promise<void> {
     await this.increment(LOSING_TICKET_COUNT)
     //await this.delAcknowledgedTicket(a)
   }
