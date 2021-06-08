@@ -35,7 +35,7 @@ describe('addrs', function () {
     )
   })
 
-  it('should get IPv4 address', function () {
+  it('should get ip address', function () {
     assert(
       getAddrs(
         9091,
@@ -79,9 +79,29 @@ describe('addrs', function () {
       ).length == 0,
       `Should not include private IPv4 addresses`
     )
+
+    assert(
+      getAddrs(
+        9091,
+        pId.toB58String(),
+        {
+          useIPv4: true
+        },
+        {
+          myFakeInterface: [
+            {
+              address: '2001:db8:0:0:0:0:1428:57ab',
+              netmask: 'ffff:ffff:ffff:ffff::',
+              family: 'IPv6'
+            } as any
+          ]
+        }
+      ).length == 0,
+      `Should not include IPv6 addresses when searching for IPv4 addresses`
+    )
   })
 
-  it('try configuration edge case', function () {
+  it('try configuration edge cases', function () {
     assert.throws(() =>
       getAddrs(12345, pId.toB58String(), {
         useIPv4: false,
@@ -95,5 +115,7 @@ describe('addrs', function () {
         includeLocalhostIPv6: true
       })
     )
+
+    assert.throws(() => getAddrs(12345, pId.toB58String(), {}))
   })
 })
