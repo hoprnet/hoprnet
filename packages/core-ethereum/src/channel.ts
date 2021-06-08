@@ -77,6 +77,8 @@ class Channel {
       await this.commitment.bumpCommitment()
       return ack
     } else {
+      log(`Got a ticket that is not a win. Dropping ticket.`)
+      await this.db.markLosing(unacknowledgedTicket)
       return null
     }
   }

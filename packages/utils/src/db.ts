@@ -359,9 +359,9 @@ export class HoprDB {
     //await this.addBalance(REDEEMED_TICKETS_VALUE, a.ticket.amount)
   }
 
-  public async markLosing(_a: UnacknowledgedTicket): Promise<void>{
+  public async markLosing(t: UnacknowledgedTicket): Promise<void>{
     await this.increment(LOSING_TICKET_COUNT)
-    //await this.delAcknowledgedTicket(a)
+    await this.del(unacknowledgedTicketKey(t.getChallenge()))
   }
 
   static createMock(): HoprDB {

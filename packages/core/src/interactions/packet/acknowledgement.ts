@@ -1,5 +1,5 @@
 import debug from 'debug'
-import { PublicKey, durations, UnacknowledgedTicket, oneAtATime } from '@hoprnet/hopr-utils'
+import { PublicKey, durations, oneAtATime } from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'
 import HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 import { PROTOCOL_ACKNOWLEDGEMENT } from '../../constants'
@@ -19,31 +19,22 @@ export function subscribeToAcknowledgements(
   async function handleAcknowledgement(msg: Uint8Array, remotePeer: PeerId) {
     const ackMsg = Acknowledgement.deserialize(msg, pubKey, remotePeer)
 
-    let unacknowledgedTicket: UnacknowledgedTicket | undefined
     try {
-      unacknowledgedTicket = await db.getUnacknowledgedTicket(ackMsg.ackChallenge)
+      let unacknowledgedTicket = await db.getUnacknowledgedTicket(ackMsg.ackChallenge)
+      const channel = chain.getChannel(new PublicKey(pubKey.pubKey.marshal()), unacknowledgedTicket.signer)
+      const ackedTicket = await channel.acknowledge(unacknowledgedTicket, ackMsg.ackKeyShare)
+      if (ackedTicket) {
+        log(`Storing winning ticket`)
+        await db.replaceUnAckWithAck(ackMsg.ackChallenge, ackedTicket)
+      }
     } catch (err) {
       if (!err.notFound) {
         throw err
       }
     }
-
-    if (unacknowledgedTicket != undefined) {
-      const channel = chain.getChannel(new PublicKey(pubKey.pubKey.marshal()), unacknowledgedTicket.signer)
-
-      const ackedTicket = await channel.acknowledge(unacknowledgedTicket, ackMsg.ackKeyShare)
-
-      if (ackedTicket === null) {
-        log(`Got a ticket that is not a win. Dropping ticket.`)
-        await db.markLosing(unacknowledgedTicket)
-      } else {
-        log(`Storing winning ticket`)
-        await db.replaceUnAckWithAck(ackMsg.ackChallenge, ackedTicket)
-      }
-    }
-
     onMessage(ackMsg)
   }
+
   const limitConcurrency = oneAtATime()
   subscribe(PROTOCOL_ACKNOWLEDGEMENT, (msg: Uint8Array, remotePeer: PeerId) =>
     limitConcurrency(() => handleAcknowledgement(msg, remotePeer))
