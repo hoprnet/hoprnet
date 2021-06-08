@@ -700,11 +700,12 @@ class Hopr extends EventEmitter {
     const ack = await this.getAcknowledgedTickets()
     const pending = await this.db.getPendingTicketCount()
     const losing = await this.db.getLosingTicketCount()
-    const totalValue = (ackTickets: AcknowledgedTicket[]): Balance => 
-      ackTickets.map(a => a.ticket.amount).reduce((x, y) => x.add(y), Balance.ZERO())
+    const totalValue = (ackTickets: AcknowledgedTicket[]): Balance =>
+      ackTickets.map((a) => a.ticket.amount).reduce((x, y) => x.add(y), Balance.ZERO())
 
     return {
-      pending, losing, 
+      pending,
+      losing,
       winProportion: ack.length / (ack.length + losing),
       unredeemed: ack.length,
       unredeemedValue: totalValue(ack),
