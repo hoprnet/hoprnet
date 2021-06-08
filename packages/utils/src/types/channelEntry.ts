@@ -97,7 +97,7 @@ export class ChannelEntry {
   }
 
   static fromSCEvent(event: any): ChannelEntry {
-    // Apparently we cannot trust in smart contract to always emits event that satisfy
+    // Apparently we cannot trust in smart contract to always emit event that satisfy
     // uint160(event.args.partyA) < uint160(event.args.partyB)
     const [partyA, partyB] = Address.fromString(event.args.partyA).sortPair(Address.fromString(event.args.partyB))
     const { newState } = event.args
