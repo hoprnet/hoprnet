@@ -89,8 +89,8 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     }
 
     /**
-     * @dev Funds a channel, in both directions,
-     * then emits {ChannelUpdate} event.
+     * @dev Funds channels, in both directions, between 2 parties.
+     * then emits {ChannelUpdate} event, for each channel.
      * @param account1 the address of account1
      * @param account2 the address of account2
      * @param amount1 amount to fund account1
@@ -139,9 +139,9 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     }
 
     /**
-     * @dev Initialize channel closure, updates channel'r
+     * @dev Initialize channel closure, updates channel
      * closure time, when the cool-off period is over,
-     * user may finalize closure, then emits
+     * initiator may finalize closure, then emits
      * {ChannelUpdate} event.
      * @param counterparty the address of the counterparty
      */
@@ -170,25 +170,26 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     /**
     * @dev Request a channelIteration bump, so we can make a new set of
     * commitments
-    * @param counterparty the address of the counterparty
+    * Implies that msg.sender is the destination of the channel.
+    * @param source the address of the channel source
     * @param newCommitment, a secret derived from this new commitment
     */
     function bumpChannel(
-      address counterparty,
+      address source,
       bytes32 newCommitment
     ) external {
         require(msg.sender != address(0), "sender must not be empty");
-        require(counterparty != address(0), "counterparty must not be empty");
+        require(source != address(0), "counterparty must not be empty");
         require(msg.sender != counterparty, "sender and destination must not be the same");
 
         (, Channel storage channel) = _getChannel(
-            msg.sender,
-            counterparty
+            source,
+            msg.sender
         );
 
         channel.commitment = newCommitment;
         channel.ticketEpoch = channel.ticketEpoch.add(1);
-        emit ChannelUpdate(msg.sender, counterparty, channel);
+        emit ChannelUpdate(source, msg.sender, channel);
     }
 
     /**
@@ -244,23 +245,22 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     /**
      * @dev Funds a channel, then emits
      * {ChannelUpdate} event.
-     * @param accountA the address of account1
-     * @param accountB the address of account2
+     * @param source the address of the channel source
+     * @param dest the address of the channel destination
      * @param amount amount to fund account1
      */
     function _fundChannel(
-        address accountA,
-        address accountB,
+        address source,
+        address dest,
         uint256 amount
     ) internal {
-        require(accountA != accountB, "accountA and accountB must not be the same");
-        require(accountA != address(0), "accountA must not be empty");
-        require(accountB != address(0), "accountB must not be empty");
+        require(source != dest, "source and dest must not be the same");
+        require(source != address(0), "source must not be empty");
+        require(dest != address(0), "dest must not be empty");
         require(amount > 0, "amount must be greater than 0");
 
-        (, Channel storage channel) = _getChannel(accountA, accountB);
-        require(channel.status != ChannelStatus.PENDING_TO_CLOSE, "Cannot fund a closing channel");
-        
+        (, Channel storage channel) = _getChannel(source, dest);
+        require(channel.status != ChannelStatus.PENDING_TO_CLOSE, "Cannot fund a closing channel"); 
         if (channel.status == ChannelStatus.CLOSED) {
           // We are reopening the channel
           channel.channelEpoch = channel.channelEpoch.add(1);
@@ -269,7 +269,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         }
 
         channel.balance = channel.balance.add(amount);
-        emit ChannelUpdate(accountA, accountB, channel);
+        emit ChannelUpdate(source, dest, channel);
     }
 
     /**
