@@ -186,7 +186,7 @@ ___
 
 #### Defined in
 
-[types/channelEntry.ts:187](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L187)
+[types/channelEntry.ts:191](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L191)
 
 ___
 
@@ -200,7 +200,7 @@ ___
 
 #### Defined in
 
-[types/channelEntry.ts:159](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L159)
+[types/channelEntry.ts:163](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L163)
 
 ___
 
@@ -214,7 +214,7 @@ ___
 
 #### Defined in
 
-[types/channelEntry.ts:119](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L119)
+[types/channelEntry.ts:123](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L123)
 
 ___
 
@@ -234,7 +234,7 @@ ___
 
 #### Defined in
 
-[types/channelEntry.ts:167](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L167)
+[types/channelEntry.ts:171](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L171)
 
 ___
 
@@ -254,7 +254,7 @@ ___
 
 #### Defined in
 
-[types/channelEntry.ts:177](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L177)
+[types/channelEntry.ts:181](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L181)
 
 ___
 
@@ -268,7 +268,7 @@ ___
 
 #### Defined in
 
-[types/channelEntry.ts:138](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L138)
+[types/channelEntry.ts:142](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L142)
 
 ___
 
@@ -282,7 +282,7 @@ ___
 
 #### Defined in
 
-[types/channelEntry.ts:163](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L163)
+[types/channelEntry.ts:167](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L167)
 
 ___
 
@@ -322,4 +322,4 @@ ___
 
 #### Defined in
 
-[types/channelEntry.ts:98](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L98)
+[types/channelEntry.ts:99](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L99)
