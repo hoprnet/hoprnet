@@ -1,4 +1,4 @@
-import { stringToU8a, u8aEquals, u8aToHex } from '@hoprnet/hopr-utils'
+import { stringToU8a, u8aToHex } from '@hoprnet/hopr-utils'
 import type { Network } from './constants'
 import { PRIVATE_NETWORK, LINK_LOCAL_NETWORKS, LOCALHOST_ADDRS } from './constants'
 
@@ -16,12 +16,7 @@ export function isAnyAddress(address: string, family: NetworkInterfaceInfo['fami
 }
 
 export function isLocalhost(address: Uint8Array, family: NetworkInterfaceInfo['family']) {
-  for (const addr of LOCALHOST_ADDRS) {
-    if (addr.family === family && u8aEquals(address, addr.address)) {
-      return true
-    }
-  }
-  return false
+  return checkNetworks(LOCALHOST_ADDRS, address, family)
 }
 
 export function isPrivateAddress(address: Uint8Array, family: NetworkInterfaceInfo['family']) {
@@ -169,6 +164,9 @@ function getAddresses(cond: (address: Uint8Array, family: 'IPv4' | 'IPv6') => bo
   return result
 }
 
+export function getPrivateAddresses(_iface?: string) {
+  return getAddresses(isPrivateAddress)
+}
 export function getLocalAddresses(_iface?: string): Network[] {
   return getAddresses(isLinkLocaleAddress)
 }
@@ -176,7 +174,7 @@ export function getLocalAddresses(_iface?: string): Network[] {
 export function getPublicAddresses(_iface?: string): Network[] {
   return getAddresses(
     (address: Uint8Array, family: 'IPv4' | 'IPv6') =>
-      !isLinkLocaleAddress(address, family) && !isLocalhost(address, family)
+      !isPrivateAddress(address, family) && !isLinkLocaleAddress(address, family) && !isLocalhost(address, family)
   )
 }
 
