@@ -56,7 +56,7 @@
 | `chain.getBalance` | (`address`: `Address`) => `Promise`<Balance\> |
 | `chain.getChannels` | () => `HoprChannels` |
 | `chain.getGenesisBlock` | () => `number` |
-| `chain.getInfo` | () => `string` |
+| `chain.getInfo` | () => { `channelClosureSecs`: `number` ; `hoprChannelsAddress`: `string` ; `hoprTokenAddress`: `string` ; `network`: `Networks`  } |
 | `chain.getLatestBlockNumber` | () => `Promise`<number\> |
 | `chain.getNativeBalance` | (`address`: `Address`) => `Promise`<NativeBalance\> |
 | `chain.getPrivateKey` | () => `Uint8Array` |
@@ -372,11 +372,18 @@ ___
 
 ### smartContractInfo
 
-▸ **smartContractInfo**(): `string`
+▸ **smartContractInfo**(): `Object`
 
 #### Returns
 
-`string`
+`Object`
+
+| Name | Type |
+| :------ | :------ |
+| `channelClosureSecs` | `number` |
+| `hoprChannelsAddress` | `string` |
+| `hoprTokenAddress` | `string` |
+| `network` | `string` |
 
 #### Defined in
 
@@ -442,7 +449,7 @@ ___
 
 #### Defined in
 
-[core-ethereum/src/index.ts:128](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L128)
+[core-ethereum/src/index.ts:133](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L133)
 
 ___
 
@@ -492,4 +499,4 @@ a promise resolved to the connector
 
 #### Defined in
 
-[core-ethereum/src/index.ts:140](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L140)
+[core-ethereum/src/index.ts:145](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/index.ts#L145)
