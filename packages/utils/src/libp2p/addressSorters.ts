@@ -2,7 +2,7 @@ import { Address } from 'libp2p/src/peer-store'
 import isIpPrivate from 'private-ip'
 import { Multiaddr } from 'multiaddr'
 
-export function isMultiaddrPrivate(multiaddr: Multiaddr): boolean {
+export function isMultiaddrLocal(multiaddr: Multiaddr): boolean {
   try {
     const { address } = multiaddr.nodeAddress()
     return isIpPrivate(address)
@@ -12,8 +12,8 @@ export function isMultiaddrPrivate(multiaddr: Multiaddr): boolean {
 }
 
 function addressesLocalFirstCompareFunction(a: Address, b: Address) {
-  const isAPrivate = isMultiaddrPrivate(a.multiaddr)
-  const isBPrivate = isMultiaddrPrivate(b.multiaddr)
+  const isAPrivate = isMultiaddrLocal(a.multiaddr)
+  const isBPrivate = isMultiaddrLocal(b.multiaddr)
 
   if (isAPrivate && !isBPrivate) {
     return -1
@@ -30,9 +30,9 @@ function addressesLocalFirstCompareFunction(a: Address, b: Address) {
   return 0
 }
 
-function addressesPublicFirstCompareFunction(a: Address, b: Address) {
-  const isAPrivate = isMultiaddrPrivate(a.multiaddr)
-  const isBPrivate = isMultiaddrPrivate(b.multiaddr)
+function addressesNonLocalFirstCompareFunction(a: Address, b: Address) {
+  const isAPrivate = isMultiaddrLocal(a.multiaddr)
+  const isBPrivate = isMultiaddrLocal(b.multiaddr)
 
   if (isAPrivate && !isBPrivate) {
     return 1
@@ -53,8 +53,8 @@ export function localAddressesFirst(addresses: Address[]): Address[] {
   return [...addresses].sort(addressesLocalFirstCompareFunction)
 }
 
-export function publicAddressesFirst(addresses: Address[]): Address[] {
-  return [...addresses].sort(addressesPublicFirstCompareFunction)
+export function nonLocalAddressesFirst(addresses: Address[]): Address[] {
+  return [...addresses].sort(addressesNonLocalFirstCompareFunction)
 }
 
 export declare type AddressSorter = (input: Address[]) => Address[]
