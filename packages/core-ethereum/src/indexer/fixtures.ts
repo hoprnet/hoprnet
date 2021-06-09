@@ -17,16 +17,8 @@ export const expectChannelsToBeEqual = (actual: ChannelEntry, expected: ChannelE
   assert.strictEqual(actual.destination.toHex(), expected.destination.toHex(), 'destination')
   assert.strictEqual(actual.balance.toBN().toString(), expected.balance.toBN().toString(), 'balance')
   assert.strictEqual(actual.commitment.toHex(), expected.commitment.toHex(), 'commitment')
-  assert.strictEqual(
-    actual.ticketEpoch.toBN().toString(),
-    expected.ticketEpoch.toBN().toString(),
-    'ticketEpoch'
-  )
-  assert.strictEqual(
-    actual.ticketIndex.toBN().toString(),
-    expected.ticketIndex.toBN().toString(),
-    'ticketIndex'
-  )
+  assert.strictEqual(actual.ticketEpoch.toBN().toString(), expected.ticketEpoch.toBN().toString(), 'ticketEpoch')
+  assert.strictEqual(actual.ticketIndex.toBN().toString(), expected.ticketIndex.toBN().toString(), 'ticketIndex')
   assert.strictEqual(actual.status, expected.status, 'status')
   assert.strictEqual(actual.channelEpoch.toBN().toString(), expected.channelEpoch.toBN().toString(), 'channelEpoch')
   assert.strictEqual(actual.closureTime.toBN().toString(), expected.closureTime.toBN().toString(), 'closureTime')

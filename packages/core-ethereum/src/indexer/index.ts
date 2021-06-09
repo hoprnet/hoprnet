@@ -289,7 +289,8 @@ class Indexer extends EventEmitter {
         return
       }
 
-      if (channel.destination.eq(this.address)) { // Channel _to_ us
+      if (channel.destination.eq(this.address)) {
+        // Channel _to_ us
         const ticketEpoch = channel.ticketEpoch
         if (ticketEpoch.toBN().isZero()) {
           await this.onOwnUnsetCommitment(channel)

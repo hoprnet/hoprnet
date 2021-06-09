@@ -19,7 +19,7 @@ function numberToChannelStatus(i: number): ChannelStatus {
   switch (i) {
     case 0:
       return ChannelStatus.Closed
-    case 1: 
+    case 1:
       return ChannelStatus.WaitingForCommitment
     case 2:
       return ChannelStatus.Open
@@ -59,7 +59,7 @@ const components = [
   UINT256,
   { name: 'channelStatus', SIZE: 1, deserialize: u8aToChannelStatus },
   UINT256,
-  UINT256,
+  UINT256
 ]
 
 export class ChannelEntry {
@@ -72,7 +72,7 @@ export class ChannelEntry {
     public readonly ticketIndex: UINT256,
     public readonly status: ChannelStatus,
     public readonly channelEpoch: UINT256,
-    public readonly closureTime: UINT256,
+    public readonly closureTime: UINT256
   ) {}
 
   static get SIZE(): number {
