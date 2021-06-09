@@ -32,7 +32,7 @@ type TicketValues = {
 
 const WAITING_FOR_COMMITMENT = '1'
 const OPEN = '2'
-const CLOSED = '0' 
+const CLOSED = '0'
 const PENDING_CLOSURE = '3'
 
 const percentToUint256 = (percent: any) => ethers.constants.MaxUint256.mul(percent).div(100)
@@ -98,8 +98,14 @@ export const createTicket = async (
 /**
  * Channel id of account A and B
  */
-export const ACCOUNT_AB_CHANNEL_ID = generateChannelId(Address.fromString(ACCOUNT_A.address), Address.fromString(ACCOUNT_B.address)).toHex()
-export const ACCOUNT_BA_CHANNEL_ID = generateChannelId(Address.fromString(ACCOUNT_B.address), Address.fromString(ACCOUNT_A.address)).toHex()
+export const ACCOUNT_AB_CHANNEL_ID = generateChannelId(
+  Address.fromString(ACCOUNT_A.address),
+  Address.fromString(ACCOUNT_B.address)
+).toHex()
+export const ACCOUNT_BA_CHANNEL_ID = generateChannelId(
+  Address.fromString(ACCOUNT_B.address),
+  Address.fromString(ACCOUNT_A.address)
+).toHex()
 
 export const PROOF_OF_RELAY_SECRET_0 = ethers.utils.solidityKeccak256(['string'], ['PROOF_OF_RELAY_SECRET_0'])
 export const PROOF_OF_RELAY_SECRET_1 = ethers.utils.solidityKeccak256(['string'], ['PROOF_OF_RELAY_SECRET_1'])
