@@ -80,21 +80,16 @@ export const COMMITMENT_SET_A = {
   transactionIndex: 0,
   logIndex: 0,
   args: {
-    partyA: PARTY_A.toAddress().toHex(),
-    partyB: PARTY_B.toAddress().toHex(),
+    source: PARTY_A.toAddress().toHex(),
+    destination: PARTY_B.toAddress().toHex(),
     newState: {
-      partyABalance: BigNumber.from('3'),
-      partyBBalance: BigNumber.from('0'),
-      partyACommitment: Hash.create(new TextEncoder().encode('commA')).toHex(),
-      partyBCommitment: new Hash(new Uint8Array({ length: Hash.SIZE })).toHex(),
-      partyATicketEpoch: BigNumber.from('1'),
-      partyBTicketEpoch: BigNumber.from('0'),
-      partyATicketIndex: BigNumber.from('0'),
-      partyBTicketIndex: BigNumber.from('0'),
+      balance: BigNumber.from('3'),
+      commitment: Hash.create(new TextEncoder().encode('commA')).toHex(),
+      ticketEpoch: BigNumber.from('1'),
+      ticketIndex: BigNumber.from('0'),
       status: 1,
       channelEpoch: BigNumber.from('0'),
       closureTime: BigNumber.from('0'),
-      closureByPartyA: false
     }
   } as any
 } as Event<'ChannelUpdate'>
@@ -108,47 +103,16 @@ export const COMMITMENT_SET_B = {
   transactionIndex: 0,
   logIndex: 0,
   args: {
-    partyA: PARTY_A.toAddress().toHex(),
-    partyB: PARTY_B.toAddress().toHex(),
+    source: PARTY_B.toAddress().toHex(),
+    destination: PARTY_A.toAddress().toHex(),
     newState: {
-      partyABalance: BigNumber.from('3'),
-      partyBBalance: BigNumber.from('0'),
-      partyACommitment: new Hash(new Uint8Array({ length: Hash.SIZE })).toHex(),
-      partyBCommitment: Hash.create(new TextEncoder().encode('commB')).toHex(),
-      partyATicketEpoch: BigNumber.from('0'),
-      partyBTicketEpoch: BigNumber.from('1'),
-      partyATicketIndex: BigNumber.from('0'),
-      partyBTicketIndex: BigNumber.from('0'),
+      balance: BigNumber.from('0'),
+      commitment: Hash.create(new TextEncoder().encode('commB')).toHex(),
+      ticketEpoch: BigNumber.from('1'),
+      ticketIndex: BigNumber.from('0'),
       status: 1,
       channelEpoch: BigNumber.from('0'),
       closureTime: BigNumber.from('0'),
-      closureByPartyA: false
-    }
-  } as any
-} as Event<'ChannelUpdate'>
-
-export const COMMITMENT_SET_AB = {
-  event: 'ChannelUpdate',
-  transactionHash: '',
-  blockNumber: 5,
-  transactionIndex: 0,
-  logIndex: 0,
-  args: {
-    partyA: PARTY_A.toAddress().toHex(),
-    partyB: PARTY_B.toAddress().toHex(),
-    newState: {
-      partyABalance: BigNumber.from('3'),
-      partyBBalance: BigNumber.from('0'),
-      partyACommitment: Hash.create(new TextEncoder().encode('commA')).toHex(),
-      partyBCommitment: Hash.create(new TextEncoder().encode('commB')).toHex(),
-      partyATicketEpoch: BigNumber.from('1'),
-      partyBTicketEpoch: BigNumber.from('1'),
-      partyATicketIndex: BigNumber.from('0'),
-      partyBTicketIndex: BigNumber.from('0'),
-      status: 1,
-      channelEpoch: BigNumber.from('0'),
-      closureTime: BigNumber.from('0'),
-      closureByPartyA: false
     }
   } as any
 } as Event<'ChannelUpdate'>
@@ -160,17 +124,13 @@ export const PENDING_CLOSURE_EVENT = {
   transactionIndex: 0,
   logIndex: 0,
   args: {
-    partyA: PARTY_A.toAddress().toHex(),
-    partyB: PARTY_B.toAddress().toHex(),
+    source: PARTY_A.toAddress().toHex(),
+    destination: PARTY_B.toAddress().toHex(),
     newState: {
-      partyABalance: BigNumber.from('3'),
-      partyBBalance: BigNumber.from('0'),
-      partyACommitment: Hash.create(new TextEncoder().encode('commA')).toHex(),
-      partyBCommitment: Hash.create(new TextEncoder().encode('commB')).toHex(),
-      partyATicketEpoch: BigNumber.from('1'),
-      partyBTicketEpoch: BigNumber.from('1'),
-      partyATicketIndex: BigNumber.from('0'),
-      partyBTicketIndex: BigNumber.from('0'),
+      balance: BigNumber.from('3'),
+      commitment: Hash.create(new TextEncoder().encode('commA')).toHex(),
+      ticketEpoch: BigNumber.from('1'),
+      ticketIndex: BigNumber.from('0'),
       status: 2,
       channelEpoch: BigNumber.from('0'),
       closureTime: BigNumber.from('0'),
@@ -188,17 +148,13 @@ export const CLOSED_EVENT = {
   transactionIndex: 0,
   logIndex: 0,
   args: {
-    partyA: PARTY_A.toAddress().toHex(),
-    partyB: PARTY_B.toAddress().toHex(),
+    source: PARTY_A.toAddress().toHex(),
+    destination: PARTY_B.toAddress().toHex(),
     newState: {
-      partyABalance: BigNumber.from('0'),
-      partyBBalance: BigNumber.from('0'),
-      partyACommitment: new Hash(new Uint8Array({ length: Hash.SIZE })).toHex(),
-      partyBCommitment: new Hash(new Uint8Array({ length: Hash.SIZE })).toHex(),
-      partyATicketEpoch: BigNumber.from('0'),
-      partyBTicketEpoch: BigNumber.from('0'),
-      partyATicketIndex: BigNumber.from('0'),
-      partyBTicketIndex: BigNumber.from('0'),
+      balance: BigNumber.from('0'),
+      commitment: new Hash(new Uint8Array({ length: Hash.SIZE })).toHex(),
+      ticketEpoch: BigNumber.from('0'),
+      ticketIndex: BigNumber.from('0'),
       status: 0,
       channelEpoch: BigNumber.from('0'),
       closureTime: BigNumber.from('0'),
