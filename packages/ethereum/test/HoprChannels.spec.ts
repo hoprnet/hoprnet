@@ -193,25 +193,25 @@ describe('funding HoprChannel catches failures', function () {
   it('should fail to fund channel A->A', async function () {
     await expect(
       channels.connect(accountA).fundChannelMulti(ACCOUNT_A.address, ACCOUNT_A.address, '70', '30')
-    ).to.be.revertedWith('accountA and accountB must not be the same')
+    ).to.be.revertedWith('source and destination must not be the same')
   })
 
   it('should fail to fund channel 0->A', async function () {
     await expect(
       channels.connect(accountA).fundChannelMulti(ethers.constants.AddressZero, ACCOUNT_B.address, '70', '30')
-    ).to.be.revertedWith('accountA must not be empty')
+    ).to.be.revertedWith('source must not be empty')
   })
 
   it('should fail to fund channel A->0', async function () {
     await expect(
       channels.connect(accountA).fundChannelMulti(ACCOUNT_A.address, ethers.constants.AddressZero, '70', '30')
-    ).to.be.revertedWith('accountB must not be empty')
+    ).to.be.revertedWith('destination must not be empty')
   })
 
   it('should fail to fund a channel with 0 amount', async function () {
     await expect(
       channels.connect(accountA).fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '0', '0')
-    ).to.be.revertedWith('amountA or amountB must be greater than 0')
+    ).to.be.revertedWith('amount must be greater than 0')
   })
 })
 
@@ -383,8 +383,8 @@ describe('with a funded HoprChannel (A: 70, B: 30), secrets initialized', functi
       channels,
       'ChannelUpdate'
     )
-    const channel = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
-    validateChannel(channel, { partyABalance: '70', partyBBalance: '30', status: '2', closureByPartyA: true })
+    validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: '70', status: '2' })
+    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '30', status: '1' })
   })
 
   it('B can initialize channel closure', async function () {
@@ -392,8 +392,8 @@ describe('with a funded HoprChannel (A: 70, B: 30), secrets initialized', functi
       channels,
       'ChannelUpdate'
     )
-    const channel = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
-    validateChannel(channel, { partyABalance: '70', partyBBalance: '30', status: '2', closureByPartyA: false })
+    validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: '70', status: '1' })
+    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '30', status: '2' })
   })
 
   it('should fail to initialize channel closure A->A', async function () {
@@ -598,20 +598,6 @@ describe('test internals with mock', function () {
 
   it('should get channel id', async function () {
     expect(await channels.getChannelIdInternal(ACCOUNT_A.address, ACCOUNT_B.address)).to.be.equal(ACCOUNT_AB_CHANNEL_ID)
-  })
-
-  it('should be partyA', async function () {
-    expect(await channels.isPartyAInternal(ACCOUNT_A.address, ACCOUNT_B.address)).to.be.true
-  })
-
-  it('should not be partyA', async function () {
-    expect(await channels.isPartyAInternal(ACCOUNT_B.address, ACCOUNT_A.address)).to.be.false
-  })
-
-  it('should get partyA and partyB', async function () {
-    const parties = await channels.getPartiesInternal(ACCOUNT_A.address, ACCOUNT_B.address)
-    expect(parties[0]).to.be.equal(ACCOUNT_A.address)
-    expect(parties[1]).to.be.equal(ACCOUNT_B.address)
   })
 
   it('should pack ticket', async function () {

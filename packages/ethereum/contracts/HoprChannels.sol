@@ -253,8 +253,13 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         require(amount == amount1.add(amount2), "amount sent must be equal to amount specified");
 
         //require(from == account1 || from == account2, "funder must be either account1 or account2");
-        _fundChannel(account1, account2, amount1);
-        _fundChannel(account2, account1, amount2);
+
+        if (amount1 > 0){
+          _fundChannel(account1, account2, amount1);
+        }
+        if (amount2 > 0){
+          _fundChannel(account2, account1, amount2);
+        }
     }
 
     // internal code
@@ -397,12 +402,12 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
 
 
     /**
-    * Assert that source and dest are good addresses, and distinct.
+    * Assert that source and destination are good addresses, and distinct.
     */
-    function _validateSourceAndDest (address source, address dest) internal {
-      require(source != dest, "source and dest must not be the same");
+    function _validateSourceAndDest (address source, address destination) internal {
+      require(source != destination, "source and destination must not be the same");
       require(source != address(0), "source must not be empty");
-      require(dest != address(0), "dest must not be empty");
+      require(destination != address(0), "destination must not be empty");
     }
 
     /**
