@@ -457,7 +457,7 @@ describe('with a pending_to_close HoprChannel (A:70, B:30)', function () {
     )
 
     validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: '0', status: CLOSED })
-    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '30', status: OPEN })
+    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '30', status: WAITING_FOR_COMMITMENT })
     expect((await token.balanceOf(ACCOUNT_A.address)).toString()).to.equal('70')
     expect((await token.balanceOf(ACCOUNT_B.address)).toString()).to.equal('0')
   })
