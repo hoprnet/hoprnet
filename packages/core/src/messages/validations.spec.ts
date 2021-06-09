@@ -110,7 +110,7 @@ const createMockNode = ({
 
 const getTicketsMock = async (): Promise<Ticket[]> => []
 
-describe('unit test validateUnacknowledgedTicket', function () {
+describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket', function () {
   it('should pass if ticket is okay', async function () {
     const node = createMockNode({})
     const signedTicket = createMockTicket({})
@@ -317,7 +317,7 @@ describe('unit test validateUnacknowledgedTicket', function () {
   })
 })
 
-describe('unit test validateCreatedTicket', function () {
+describe('messages/validations.spec.ts unit test validateCreatedTicket', function () {
   it('should pass if ticket is okay', async function () {
     const ticket = createMockTicket({})
     validateCreatedTicket(new BN(1), ticket)
