@@ -21,7 +21,7 @@ import NetworkPeers from './network/network-peers'
 import Heartbeat from './network/heartbeat'
 import { findPath } from './path'
 
-import { Multiaddr } from 'multiaddr'
+import { protocols, Multiaddr } from 'multiaddr'
 import chalk from 'chalk'
 
 import PeerId from 'peer-id'
@@ -245,7 +245,17 @@ class Hopr extends EventEmitter {
     this.forward = new PacketForwardInteraction(subscribe, sendMessage, this.getId(), ethereum, onMessage, this.db)
 
     ethereum.indexer.on('peer', ({ id, multiaddrs }: { id: PeerId; multiaddrs: Multiaddr[] }) => {
-      this.libp2p.peerStore.addressBook.add(id, multiaddrs)
+      const dialables = multiaddrs.filter((ma: Multiaddr) => {
+        const tuples = ma.tuples()
+        return tuples.length > 1 || tuples[0][0] != protocols.names['p2p'].code
+      })
+
+      // @ts-ignore
+      this.libp2p.peerStore.keyBook.set(id)
+
+      if (dialables.length > 0) {
+        this.libp2p.peerStore.addressBook.add(id, multiaddrs)
+      }
     })
 
     log('announcing')
