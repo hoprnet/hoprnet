@@ -30,31 +30,8 @@ function addressesLocalFirstCompareFunction(a: Address, b: Address) {
   return 0
 }
 
-function addressesNonLocalFirstCompareFunction(a: Address, b: Address) {
-  const isAPrivate = isMultiaddrLocal(a.multiaddr)
-  const isBPrivate = isMultiaddrLocal(b.multiaddr)
-
-  if (isAPrivate && !isBPrivate) {
-    return 1
-  } else if (!isAPrivate && isBPrivate) {
-    return -1
-  }
-
-  if (a.isCertified && !b.isCertified) {
-    return -1
-  } else if (!a.isCertified && b.isCertified) {
-    return 1
-  }
-
-  return 0
-}
-
 export function localAddressesFirst(addresses: Address[]): Address[] {
   return [...addresses].sort(addressesLocalFirstCompareFunction)
-}
-
-export function nonLocalAddressesFirst(addresses: Address[]): Address[] {
-  return [...addresses].sort(addressesNonLocalFirstCompareFunction)
 }
 
 export declare type AddressSorter = (input: Address[]) => Address[]
