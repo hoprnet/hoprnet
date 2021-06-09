@@ -411,7 +411,7 @@ __metadata:
     "@types/debug": ^4.1.5
     "@types/mocha": ^8.2.2
     "@types/node": 14
-    "@types/simple-peer": ^9.6.2
+    "@types/simple-peer": ^9.11
     abort-controller: 3.0.0
     abortable-iterator: ^3.0.0
     bl: ^5.0
@@ -419,16 +419,16 @@ __metadata:
     it-handshake: ^2.0.0
     it-pair: ^1.0.0
     it-pipe: ^1.1.0
-    libp2p: ^0.31.3
-    libp2p-interfaces: ^0.10
+    libp2p: ^0.31.6
+    libp2p-interfaces: ^0.11
     libp2p-mplex: 0.10
     libp2p-noise: ^3.0
-    mocha: ^8.4.0
+    mocha: ^9.0
     multiaddr: ~9.0.1
     multihashes: ^4.0.2
     p-defer: 3
     peer-id: ~0.14.8
-    prettier: ~2.3
+    prettier: ~2.3.1
     simple-peer: 9.11
     stream-to-it: ^0.2.3
     ts-node: ~9.1.1
@@ -660,12 +660,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/simple-peer@npm:^9.6.2":
-  version: 9.6.2
-  resolution: "@types/simple-peer@npm:9.6.2"
+"@types/simple-peer@npm:^9.11":
+  version: 9.11.0
+  resolution: "@types/simple-peer@npm:9.11.0"
   dependencies:
     "@types/node": "*"
-  checksum: 6ab2c21108ca121307a4e263fb4f06dc6c643fa3ba87ed58af2015d06ce32217af8291d1266cd0887efb7bd93ef212476d0ff13ccf0e704ef4af91b72bd70c38
+  checksum: ab05e2373fe48faa59cc0d7795bfdea3c7e7a93f7af2683cfdd2a311035ce4dd2a948c950886f48d662db503e8af2d930b9d51b53c0eef8c90ba86287864d4f7
   languageName: node
   linkType: hard
 
@@ -1145,17 +1145,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"chalk@npm:^4.0.0":
-  version: 4.1.0
-  resolution: "chalk@npm:4.1.0"
-  dependencies:
-    ansi-styles: ^4.1.0
-    supports-color: ^7.1.0
-  checksum: f860285b419f9e925c2db0f45ffa88aa8794c14b80cc5d01ff30930bcfc384996606362706f0829cf557f6d36152a5fb2d227ad63c4bc90e2ec9e9dbed4a3c07
-  languageName: node
-  linkType: hard
-
-"chalk@npm:^4.1.1":
+"chalk@npm:^4.1.0, chalk@npm:^4.1.1":
   version: 4.1.1
   resolution: "chalk@npm:4.1.1"
   dependencies:
@@ -1882,7 +1872,21 @@ fsevents@~2.3.1:
   languageName: node
   linkType: hard
 
-"glob@npm:7.1.6, glob@npm:^7.1.3, glob@npm:^7.1.4":
+"glob@npm:7.1.7":
+  version: 7.1.7
+  resolution: "glob@npm:7.1.7"
+  dependencies:
+    fs.realpath: ^1.0.0
+    inflight: ^1.0.4
+    inherits: 2
+    minimatch: ^3.0.4
+    once: ^1.3.0
+    path-is-absolute: ^1.0.0
+  checksum: 352f74f08247db5420161a2f68f2bd84b53228b5fcfc9dcc37cd54d3f19ec0232495d84aeff1286d0727059e9fdc1031400e00b971bdc59e30f8f82b199c9d02
+  languageName: node
+  linkType: hard
+
+"glob@npm:^7.1.3, glob@npm:^7.1.4":
   version: 7.1.6
   resolution: "glob@npm:7.1.6"
   dependencies:
@@ -2241,6 +2245,13 @@ fsevents@~2.3.1:
   languageName: node
   linkType: hard
 
+"is-unicode-supported@npm:^0.1.0":
+  version: 0.1.0
+  resolution: "is-unicode-supported@npm:0.1.0"
+  checksum: 00ca6f5581b81d55c567d259175cb1af08c60ae95f6aad69adadfdfbe098c60ef5617ad440770d821f1710773987c0b13ed6dd375cd9ab1bd7b7dd8f9a42625c
+  languageName: node
+  linkType: hard
+
 "isarray@npm:0.0.1":
   version: 0.0.1
   resolution: "isarray@npm:0.0.1"
@@ -2510,14 +2521,14 @@ fsevents@~2.3.1:
   languageName: node
   linkType: hard
 
-"js-yaml@npm:4.0.0":
-  version: 4.0.0
-  resolution: "js-yaml@npm:4.0.0"
+"js-yaml@npm:4.1.0":
+  version: 4.1.0
+  resolution: "js-yaml@npm:4.1.0"
   dependencies:
     argparse: ^2.0.1
   bin:
     js-yaml: bin/js-yaml.js
-  checksum: ee9b16cdbba690ec70f46d61737b28b35e26e6d51606c466de7fa876d3517de0cfdffd2e1ef21263d5ca3b32659d2e4c65255f50d6e236f022305bce72242d46
+  checksum: 8973cf4296c944cc2551d1e3d3d064e7de0d0a6db3f7bafe40339ee9e5e0329560b52c4b8492b9b22365404c9be0822b62340ab49884e1dedfcc7ff80158abe0
   languageName: node
   linkType: hard
 
@@ -2697,7 +2708,7 @@ fsevents@~2.3.1:
   languageName: node
   linkType: hard
 
-"libp2p-interfaces@npm:^0.10, libp2p-interfaces@npm:^0.10.4":
+"libp2p-interfaces@npm:^0.10.4":
   version: 0.10.4
   resolution: "libp2p-interfaces@npm:0.10.4"
   dependencies:
@@ -2730,6 +2741,42 @@ fsevents@~2.3.1:
     streaming-iterables: ^5.0.4
     uint8arrays: ^2.1.3
   checksum: 1cf992d5862a68e83433927bbda808d412d79e459a9cd235e32a27d155f8328f1d8e7b8fdf4098f188726672632ef59e036fc7fb0680624ffb44f3889edd8f23
+  languageName: node
+  linkType: hard
+
+"libp2p-interfaces@npm:^0.11":
+  version: 0.11.0
+  resolution: "libp2p-interfaces@npm:0.11.0"
+  dependencies:
+    "@types/bl": ^4.1.0
+    abort-controller: ^3.0.0
+    abortable-iterator: ^3.0.0
+    chai: ^4.3.4
+    chai-checkmark: ^1.0.1
+    debug: ^4.3.1
+    delay: ^5.0.0
+    detect-node: ^2.0.4
+    dirty-chai: ^2.0.1
+    err-code: ^3.0.1
+    it-goodbye: ^3.0.0
+    it-length-prefixed: ^5.0.2
+    it-pair: ^1.0.0
+    it-pipe: ^1.1.0
+    it-pushable: ^1.4.2
+    libp2p-crypto: ^0.19.0
+    libp2p-tcp: ^0.15.3
+    multiaddr: ^9.0.1
+    multibase: ^4.0.2
+    multihashes: ^4.0.2
+    p-defer: ^3.0.0
+    p-limit: ^3.1.0
+    p-wait-for: ^3.2.0
+    peer-id: ^0.14.2
+    protobufjs: ^6.10.2
+    sinon: ^10.0.0
+    streaming-iterables: ^5.0.4
+    uint8arrays: ^2.1.3
+  checksum: e8b190eec4680cefcf0f16459b73b7829f55eb87e419f3de5f8c1ccb60fe64dbd71b6279911bc218591f22d43f62dc01616907f01d531b52412192b90261c4bc
   languageName: node
   linkType: hard
 
@@ -2799,7 +2846,7 @@ fsevents@~2.3.1:
   languageName: node
   linkType: hard
 
-"libp2p@npm:0.31.3, libp2p@npm:^0.31.3":
+"libp2p@npm:0.31.3":
   version: 0.31.3
   resolution: "libp2p@npm:0.31.3"
   dependencies:
@@ -2858,6 +2905,65 @@ fsevents@~2.3.1:
   languageName: node
   linkType: hard
 
+"libp2p@npm:^0.31.6":
+  version: 0.31.6
+  resolution: "libp2p@npm:0.31.6"
+  dependencies:
+    "@motrix/nat-api": ^0.3.1
+    "@vascosantos/moving-average": ^1.1.0
+    abort-controller: ^3.0.0
+    aggregate-error: ^3.1.0
+    any-signal: ^2.1.1
+    bignumber.js: ^9.0.1
+    cids: ^1.1.5
+    class-is: ^1.1.0
+    debug: ^4.3.1
+    err-code: ^3.0.0
+    es6-promisify: ^6.1.1
+    events: ^3.3.0
+    hashlru: ^2.3.0
+    interface-datastore: ^4.0.0
+    ipfs-utils: ^7.0.0
+    it-all: ^1.0.4
+    it-buffer: ^0.1.2
+    it-drain: ^1.0.3
+    it-filter: ^1.0.1
+    it-first: ^1.0.4
+    it-handshake: ^2.0.0
+    it-length-prefixed: ^5.0.2
+    it-map: ^1.0.4
+    it-merge: 1.0.0
+    it-pipe: ^1.1.0
+    it-take: 1.0.0
+    libp2p-crypto: ^0.19.4
+    libp2p-interfaces: ^0.10.4
+    libp2p-utils: ^0.3.1
+    mafmt: ^9.0.0
+    merge-options: ^3.0.4
+    multiaddr: ^9.0.1
+    multicodec: ^3.0.1
+    multihashing-async: ^2.1.2
+    multistream-select: ^2.0.0
+    mutable-proxy: ^1.0.0
+    node-forge: ^0.10.0
+    p-any: ^3.0.0
+    p-fifo: ^1.0.0
+    p-retry: ^4.4.0
+    p-settle: ^4.1.1
+    peer-id: ^0.14.2
+    private-ip: ^2.1.0
+    protobufjs: ^6.10.2
+    retimer: ^3.0.0
+    sanitize-filename: ^1.6.3
+    set-delayed-interval: ^1.0.0
+    streaming-iterables: ^5.0.2
+    timeout-abort-controller: ^1.1.1
+    varint: ^6.0.0
+    xsalsa20: ^1.1.0
+  checksum: de7ffd5bae343dbdf40899200a06b96e73f0168ea9f172c5ac17d747efec319df81fe4bbf3ba08aa882bdbf0a774014e38a7354c81a94b541080f9a25881361b
+  languageName: node
+  linkType: hard
+
 "loady@npm:~0.0.5":
   version: 0.0.5
   resolution: "loady@npm:0.0.5"
@@ -2881,12 +2987,13 @@ fsevents@~2.3.1:
   languageName: node
   linkType: hard
 
-"log-symbols@npm:4.0.0":
-  version: 4.0.0
-  resolution: "log-symbols@npm:4.0.0"
+"log-symbols@npm:4.1.0":
+  version: 4.1.0
+  resolution: "log-symbols@npm:4.1.0"
   dependencies:
-    chalk: ^4.0.0
-  checksum: 2cbdb0427d1853f2bd36645bff42aaca200902284f28aadacb3c0fa4c8c43fe6bfb71b5d61ab08b67063d066d7c55b8bf5fbb43b03e4a150dbcdd643e9cd1dbf
+    chalk: ^4.1.0
+    is-unicode-supported: ^0.1.0
+  checksum: 57be4aeb6a6ecb81d8267600836f81928da1d846ad13384a9a22d179e27590fdb680946edbd15642a31735183adaa3dc6aae2d20e619a19fa0d54e1aee945915
   languageName: node
   linkType: hard
 
@@ -3069,9 +3176,9 @@ fsevents@~2.3.1:
   languageName: node
   linkType: hard
 
-"mocha@npm:^8.4.0":
-  version: 8.4.0
-  resolution: "mocha@npm:8.4.0"
+"mocha@npm:^9.0":
+  version: 9.0.0
+  resolution: "mocha@npm:9.0.0"
   dependencies:
     "@ungap/promise-all-settled": 1.1.2
     ansi-colors: 4.1.1
@@ -3081,27 +3188,27 @@ fsevents@~2.3.1:
     diff: 5.0.0
     escape-string-regexp: 4.0.0
     find-up: 5.0.0
-    glob: 7.1.6
+    glob: 7.1.7
     growl: 1.10.5
     he: 1.2.0
-    js-yaml: 4.0.0
-    log-symbols: 4.0.0
+    js-yaml: 4.1.0
+    log-symbols: 4.1.0
     minimatch: 3.0.4
     ms: 2.1.3
-    nanoid: 3.1.20
+    nanoid: 3.1.23
     serialize-javascript: 5.0.1
     strip-json-comments: 3.1.1
     supports-color: 8.1.1
     which: 2.0.2
     wide-align: 1.1.3
-    workerpool: 6.1.0
+    workerpool: 6.1.4
     yargs: 16.2.0
     yargs-parser: 20.2.4
     yargs-unparser: 2.0.0
   bin:
     _mocha: bin/_mocha
     mocha: bin/mocha
-  checksum: 51744733d86b4a629846f0cb5f8e2aa3d9c901712f5fb4e3fb5ad49954c3322178abb56854e158456a38828762e0f6192c09ccfc5235650c486493ed2f77a20c
+  checksum: 5429a9ed5da8f10466c7a967b8adc9359d43d57039116f135680fea4aca0f4e4629fc70aa3fe5b12c9a3651c5d4745d078534f31d793af71d95f2f7a13d5da50
   languageName: node
   linkType: hard
 
@@ -3264,7 +3371,16 @@ fsevents@~2.3.1:
   languageName: node
   linkType: hard
 
-"nanoid@npm:3.1.20, nanoid@npm:^3.0.2, nanoid@npm:^3.1.20":
+"nanoid@npm:3.1.23":
+  version: 3.1.23
+  resolution: "nanoid@npm:3.1.23"
+  bin:
+    nanoid: bin/nanoid.cjs
+  checksum: e6dea1da5a593ffdc8cf2676d1d02f0626f07a54a5947a7a1f5ff1fd07901b2f53044c285e98b87eb367f016fde285fd8785d54a2dceeab9c3721f4e618f8326
+  languageName: node
+  linkType: hard
+
+"nanoid@npm:^3.0.2, nanoid@npm:^3.1.20":
   version: 3.1.20
   resolution: "nanoid@npm:3.1.20"
   bin:
@@ -3779,12 +3895,12 @@ fsevents@~2.3.1:
   languageName: node
   linkType: hard
 
-"prettier@npm:~2.3":
-  version: 2.3.0
-  resolution: "prettier@npm:2.3.0"
+"prettier@npm:~2.3.1":
+  version: 2.3.1
+  resolution: "prettier@npm:2.3.1"
   bin:
     prettier: bin-prettier.js
-  checksum: 652640cc8b71bc5277cfb8bf6f161783ca588efcf683c3d630837b39da8d57fef35c9e00ae5855a8e3c75136c42274046c913cc2b2d2968558315f31c6a26981
+  checksum: 9b4a695b87ce5f510fc20feec01cce7371f0fa0b92ffe79d543f6be52e2004c532861629de4d7ab1c577e1f649dce3cfccd62cb2ca6526b1da8d9c63eb84bf36
   languageName: node
   linkType: hard
 
@@ -4708,10 +4824,10 @@ typescript@^4.2:
   languageName: node
   linkType: hard
 
-"workerpool@npm:6.1.0":
-  version: 6.1.0
-  resolution: "workerpool@npm:6.1.0"
-  checksum: c4295cacc2c8e4b19c608499fb61d9f831052b141b2bef5515c4862712a3fdc4110606beeaaacf3c48b00d930a5b396757bda3490694a7683fc3cb5142537d12
+"workerpool@npm:6.1.4":
+  version: 6.1.4
+  resolution: "workerpool@npm:6.1.4"
+  checksum: e5e708d634d7634dadca64a61ce7aa58642b1751f00ee24402d7af471175e699616781f62f556ddb15661e373a2636f5982a8abc50b279c6b65aa98134a5a3e2
   languageName: node
   linkType: hard
 
