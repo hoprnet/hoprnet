@@ -51,12 +51,10 @@ function getAddrsOfInterface(iface: string) {
 export function getAddrs(
   port: number,
   peerId: string,
-  options?: AddrOptions,
+  options: AddrOptions,
   __fakeInterfaces?: ReturnType<typeof networkInterfaces>
 ) {
-  if (options) {
-    validateOptions(options)
-  }
+  validateOptions(options)
 
   let interfaces: (NetworkInterfaceInfo[] | undefined)[]
 
@@ -81,25 +79,25 @@ export function getAddrs(
       }
 
       if (isPrivateAddress(u8aAddr, address.family)) {
-        if (address.family === 'IPv4' && (options == undefined || options.includePrivateIPv4 != true)) {
+        if (address.family === 'IPv4' && options.includePrivateIPv4 != true) {
           continue
         }
       }
 
       if (isLocalhost(u8aAddr, address.family)) {
-        if (address.family === 'IPv4' && (options == undefined || options.includeLocalhostIPv4 != true)) {
+        if (address.family === 'IPv4' && options.includeLocalhostIPv4 != true) {
           continue
         }
-        if (address.family === 'IPv6' && (options == undefined || options.includeLocalhostIPv6 != true)) {
+        if (address.family === 'IPv6' && options.includeLocalhostIPv6 != true) {
           continue
         }
       }
 
-      if (address.family === 'IPv4' && options != undefined && options.useIPv4 != true) {
+      if (address.family === 'IPv4' && options.useIPv4 != true) {
         continue
       }
 
-      if (address.family === 'IPv6' && options != undefined && options.useIPv6 != true) {
+      if (address.family === 'IPv6' && options.useIPv6 != true) {
         continue
       }
 
