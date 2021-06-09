@@ -1,3 +1,11 @@
+<a name="0.2.26"></a>
+
+## [0.2.25](https://github.com/hoprnet/hopr-connect/compare/v0.2.25...v0.2.26) (2021-06-09)
+
+- package upgrades
+- correctly distinguish private and link-locale addresses from public addresses
+- minor refactoring
+
 <a name="0.2.25"></a>
 
 ## [0.2.25](https://github.com/hoprnet/hopr-connect/compare/v0.2.23...v0.2.25) (2021-05-11)
