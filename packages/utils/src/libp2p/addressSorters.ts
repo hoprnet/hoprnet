@@ -6,7 +6,7 @@ export function isMultiaddrLocal(multiaddr: Multiaddr): boolean {
   try {
     const { address } = multiaddr.nodeAddress()
     return isIpPrivate(address)
-  } catch(e: any) {
+  } catch (e: any) {
     return false
   }
 }
