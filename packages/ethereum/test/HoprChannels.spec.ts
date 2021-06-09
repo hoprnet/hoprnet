@@ -15,7 +15,8 @@ import {
   Hash,
   Response,
   AcknowledgedTicket,
-  PublicKey
+  PublicKey,
+  generateChannelId
 } from '@hoprnet/hopr-utils'
 import { randomBytes } from 'crypto'
 
@@ -43,10 +44,8 @@ export const redeemArgs = (ticket: AcknowledgedTicket) => [
 ]
 
 export const validateChannel = (actual, expected) => {
-  expect(actual.partyABalance.toString()).to.equal(expected.partyABalance)
-  expect(actual.partyBBalance.toString()).to.equal(expected.partyBBalance)
+  expect(actual.balance.toString()).to.equal(expected.balance)
   expect(actual.status.toString()).to.equal(expected.status)
-  expect(actual.closureByPartyA).to.equal(!!expected.closureByPartyA)
 }
 
 export const createTicket = async (
@@ -90,12 +89,12 @@ export const createTicket = async (
     counterparty: account.address
   }
 }
-// accountA == partyA
-// accountB == partyB
+
 /**
  * Channel id of account A and B
  */
-export const ACCOUNT_AB_CHANNEL_ID = '0xa5bc13ae60ec79a8babc6d0d4074c1cefd5d5fc19fafe71457214d46c90714d8'
+export const ACCOUNT_AB_CHANNEL_ID = generateChannelId(Address.fromString(ACCOUNT_A.address), Address.fromString(ACCOUNT_B.address)).toHex()
+export const ACCOUNT_BA_CHANNEL_ID = generateChannelId(Address.fromString(ACCOUNT_B.address), Address.fromString(ACCOUNT_A.address)).toHex()
 
 export const PROOF_OF_RELAY_SECRET_0 = ethers.utils.solidityKeccak256(['string'], ['PROOF_OF_RELAY_SECRET_0'])
 export const PROOF_OF_RELAY_SECRET_1 = ethers.utils.solidityKeccak256(['string'], ['PROOF_OF_RELAY_SECRET_1'])
@@ -225,8 +224,10 @@ describe('funding a HoprChannel success', function () {
       channels,
       'ChannelUpdate'
     )
-    const channel = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
-    validateChannel(channel, { partyABalance: '70', partyBBalance: '30', status: '1' })
+    const ab = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
+    const ba = await channels.channels(ACCOUNT_BA_CHANNEL_ID)
+    validateChannel(ab, { balance: '70', status: '1' })
+    validateChannel(ba, { balance: '30', status: '1' })
     const accountABalance = await token.balanceOf(ACCOUNT_A.address)
     expect(accountABalance.toString()).to.equal('0')
   })
@@ -238,8 +239,8 @@ describe('funding a HoprChannel success', function () {
       channels,
       'ChannelUpdate'
     )
-    const channel = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
-    validateChannel(channel, { partyABalance: '70', partyBBalance: '30', status: '1' })
+    validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: '70', status: '1' })
+    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '30', status: '1' })
   })
 
   it('should fund A->B using send', async function () {
@@ -257,11 +258,8 @@ describe('funding a HoprChannel success', function () {
           )
         )
     ).to.emit(channels, 'ChannelUpdate')
-    validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), {
-      partyABalance: '0',
-      partyBBalance: '30',
-      status: '1'
-    })
+    validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: '0', status: '0' })
+    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '30', status: '1' })
   })
 })
 
@@ -295,29 +293,19 @@ describe('with a funded HoprChannel (A: 70, B: 30), secrets initialized', functi
 
     await channels.connect(fixtures.accountA).redeemTicket(...redeemArgs(TICKET_BA_WIN.ticket))
 
+    validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: '80', status: '1' })
+    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '20', status: '1' })
     const channel = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
-    validateChannel(channel, {
-      partyABalance: '80',
-      partyBBalance: '20',
-      closureTime: '0',
-      status: '1',
-      closureByPartyA: false
-    })
     expect(channel.partyACommitment).to.equal(SECRET_1)
   })
 
   it('should reedem ticket for account B', async function () {
     await channels.connect(fixtures.accountB).redeemTicket(...redeemArgs(fixtures.TICKET_AB_WIN.ticket))
 
-    const channel = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
-    validateChannel(channel, {
-      partyABalance: '60',
-      partyBBalance: '40',
-      closureTime: '0',
-      status: '1',
-      closureByPartyA: false
-    })
-    expect(channel.partyBCommitment).to.equal(SECRET_1)
+    const ab = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
+    validateChannel(ab, { balance: '60', status: '1' })
+    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '40', status: '1' })
+    expect(ab.partyBCommitment).to.equal(SECRET_1)
   })
 
   it('should fail to redeem ticket when ticket has been already redeemed', async function () {
