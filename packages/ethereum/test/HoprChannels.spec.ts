@@ -266,6 +266,19 @@ describe('funding a HoprChannel success', function () {
     validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '30', status: OPEN })
   })
 
+  it('should multi fund and open channel B->A, commit both', async function () {
+    const { channels, accountA, accountB, fundAndApprove } = await useFixtures()
+    await fundAndApprove(accountB, 100)
+    await channels.connect(accountA).bumpChannel(ACCOUNT_B.address, SECRET_2)
+    await channels.connect(accountB).bumpChannel(ACCOUNT_A.address, SECRET_2)
+    await expect(channels.connect(accountB).fundChannelMulti(ACCOUNT_B.address, ACCOUNT_A.address, '30', '70')).to.emit(
+      channels,
+      'ChannelUpdate'
+    )
+    validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: '70', status: OPEN })
+    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '30', status: OPEN })
+  })
+
   it('should fund A->B using send', async function () {
     const { token, accountB, channels, fund } = await useFixtures()
     await fund(accountB.address, '30')
@@ -526,6 +539,7 @@ describe('with a reopened channel', function () {
     await channels.connect(fixtures.accountA).initiateChannelClosure(ACCOUNT_B.address)
     await channels.connect(fixtures.accountB).bumpChannel(ACCOUNT_A.address, SECRET_2)
     await channels.connect(fixtures.accountA).bumpChannel(ACCOUNT_B.address, SECRET_2)
+    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '30', status: OPEN }) // WHY THE FUCK ISNT THIS OPEN
     await increaseTime(ethers.provider, ENOUGH_TIME_FOR_CLOSURE)
     await channels.connect(fixtures.accountA).finalizeChannelClosure(ACCOUNT_B.address)
     await fixtures.fundAndApprove(fixtures.accountA, 100)
@@ -556,6 +570,11 @@ describe('with a reopened channel', function () {
       ACCOUNT_B,
       SECRET_1
     )
+  })
+
+  it('sanity check', async function(){
+    validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: '70', status: OPEN })
+    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '60', status: OPEN }) // 30 + 30
   })
 
   it('should fail to redeem ticket when channel in in different channelEpoch', async function () {
