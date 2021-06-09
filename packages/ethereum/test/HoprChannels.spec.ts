@@ -326,9 +326,10 @@ describe('with funded HoprChannels: AB: 70, BA: 30, secrets initialized', functi
     await channels.connect(fixtures.accountB).redeemTicket(...redeemArgs(fixtures.TICKET_AB_WIN.ticket))
 
     const ab = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
+    const ba = await channels.channels(ACCOUNT_BA_CHANNEL_ID)
     validateChannel(ab, { balance: '60', status: OPEN })
-    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '40', status: OPEN })
-    expect(ab.commitment).to.equal(SECRET_1)
+    validateChannel(ba, { balance: '40', status: OPEN })
+    expect(ba.commitment).to.equal(SECRET_1)
   })
 
   it('should fail to redeem ticket when ticket has been already redeemed', async function () {
@@ -570,8 +571,8 @@ describe('with a reopened channel', function () {
     await channels.connect(fixtures.accountB).redeemTicket(...redeemArgs(TICKET_AB_WIN_RECYCLED.ticket))
     const ab = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
     validateChannel(ab, { balance: '60', status: OPEN })
-    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '40', status: CLOSED })
-    expect(ab.partyBCommitment).to.equal(SECRET_1)
+    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '70', status: WAITING_FOR_COMMITMENT }) // 30 + 30 + 10
+    expect(ab.commitment).to.equal(SECRET_1)
   })
 
   it('should allow closure', async function () {
