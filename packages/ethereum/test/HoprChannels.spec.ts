@@ -254,6 +254,18 @@ describe('funding a HoprChannel success', function () {
     validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '30', status: WAITING_FOR_COMMITMENT })
   })
 
+  it('should multi fund and open channel B->A, commit afterwards', async function () {
+    const { channels, accountA, accountB, fundAndApprove } = await useFixtures()
+    await fundAndApprove(accountB, 100)
+    await expect(channels.connect(accountB).fundChannelMulti(ACCOUNT_B.address, ACCOUNT_A.address, '30', '70')).to.emit(
+      channels,
+      'ChannelUpdate'
+    )
+    await channels.connect(accountA).bumpChannel(ACCOUNT_B.address, SECRET_2)
+    validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: '70', status: WAITING_FOR_COMMITMENT })
+    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '30', status: OPEN })
+  })
+
   it('should multi fund and open channel B->A, pre-commitment', async function () {
     const { channels, accountA, accountB, fundAndApprove } = await useFixtures()
     await fundAndApprove(accountB, 100)
@@ -334,7 +346,7 @@ describe('with funded HoprChannels: AB: 70, BA: 30, secrets initialized', functi
 
     validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: '80', status: OPEN })
     validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '20', status: OPEN })
-    const channel = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
+    const channel = await channels.channels(ACCOUNT_BA_CHANNEL_ID)
     expect(channel.commitment).to.equal(SECRET_1)
   })
 
@@ -347,7 +359,7 @@ describe('with funded HoprChannels: AB: 70, BA: 30, secrets initialized', functi
     const ba = await channels.channels(ACCOUNT_BA_CHANNEL_ID)
     validateChannel(ab, { balance: '60', status: OPEN })
     validateChannel(ba, { balance: '40', status: OPEN })
-    expect(ba.commitment).to.equal(SECRET_1)
+    expect(ab.commitment).to.equal(SECRET_1)
   })
 
   it('should fail to redeem ticket when ticket has been already redeemed', async function () {
@@ -536,10 +548,9 @@ describe('with a reopened channel', function () {
     channels = fixtures.channels
     await fixtures.fundAndApprove(fixtures.accountA, 100)
     await channels.connect(fixtures.accountA).fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
-    await channels.connect(fixtures.accountA).initiateChannelClosure(ACCOUNT_B.address)
     await channels.connect(fixtures.accountB).bumpChannel(ACCOUNT_A.address, SECRET_2)
     await channels.connect(fixtures.accountA).bumpChannel(ACCOUNT_B.address, SECRET_2)
-    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '30', status: OPEN }) // WHY THE FUCK ISNT THIS OPEN
+    await channels.connect(fixtures.accountA).initiateChannelClosure(ACCOUNT_B.address)
     await increaseTime(ethers.provider, ENOUGH_TIME_FOR_CLOSURE)
     await channels.connect(fixtures.accountA).finalizeChannelClosure(ACCOUNT_B.address)
     await fixtures.fundAndApprove(fixtures.accountA, 100)
@@ -596,7 +607,7 @@ describe('with a reopened channel', function () {
     await channels.connect(fixtures.accountB).redeemTicket(...redeemArgs(TICKET_AB_WIN_RECYCLED.ticket))
     const ab = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
     validateChannel(ab, { balance: '60', status: OPEN })
-    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '70', status: WAITING_FOR_COMMITMENT }) // 30 + 30 + 10
+    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '70', status: OPEN }) // 30 + 30 + 10
     expect(ab.commitment).to.equal(SECRET_1)
   })
 
@@ -605,7 +616,7 @@ describe('with a reopened channel', function () {
     await increaseTime(ethers.provider, ENOUGH_TIME_FOR_CLOSURE)
     await channels.connect(fixtures.accountA).finalizeChannelClosure(ACCOUNT_B.address)
     validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: '0', status: CLOSED })
-    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '60', status: WAITING_FOR_COMMITMENT })
+    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '60', status: OPEN })
   })
 })
 
