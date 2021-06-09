@@ -544,42 +544,26 @@ describe('with a reopened channel', function () {
 
   it('should redeem ticket for account A', async function () {
     await channels.connect(fixtures.accountA).redeemTicket(...redeemArgs(TICKET_BA_WIN_RECYCLED.ticket))
-
-    const channel = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
-    validateChannel(channel, {
-      partyABalance: '80',
-      partyBBalance: '20',
-      closureTime: '0',
-      status: '1',
-      closureByPartyA: false
-    })
-    expect(channel.partyACommitment).to.equal(SECRET_1)
+    const ab = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
+    validateChannel(ab, { balance: '80', status: '1' })
+    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '20', status: '0' })
+    expect(ab.commitment).to.equal(SECRET_1)
   })
 
   it('should reedem ticket for account B', async function () {
     await channels.connect(fixtures.accountB).redeemTicket(...redeemArgs(TICKET_AB_WIN_RECYCLED.ticket))
-
-    const channel = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
-    validateChannel(channel, {
-      partyABalance: '60',
-      partyBBalance: '40',
-      closureTime: '0',
-      status: '1',
-      closureByPartyA: false
-    })
-    expect(channel.partyBCommitment).to.equal(SECRET_1)
+    const ab = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
+    validateChannel(ab, { balance: '60', status: '1' })
+    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '40', status: '0' })
+    expect(ab.partyBCommitment).to.equal(SECRET_1)
   })
 
   it('should allow closure', async function () {
     await channels.connect(fixtures.accountA).initiateChannelClosure(ACCOUNT_B.address)
     await increaseTime(ethers.provider, ENOUGH_TIME_FOR_CLOSURE)
     await channels.connect(fixtures.accountA).finalizeChannelClosure(ACCOUNT_B.address)
-    validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), {
-      partyABalance: '0',
-      partyBBalance: '0',
-      status: '0',
-      closureByPartyA: false
-    })
+    validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: '0', status: '0' })
+    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '0', status: '0' })
   })
 })
 
@@ -587,13 +571,6 @@ describe('test internals with mock', function () {
   let channels
   beforeEach(async function () {
     channels = (await useFixtures()).mockChannels
-  })
-
-  it('should get channel data', async function () {
-    const channelData = await channels.getChannelInternal(ACCOUNT_A.address, ACCOUNT_B.address)
-    expect(channelData[0]).to.be.equal(ACCOUNT_A.address)
-    expect(channelData[1]).to.be.equal(ACCOUNT_B.address)
-    expect(channelData[2]).to.be.equal(ACCOUNT_AB_CHANNEL_ID)
   })
 
   it('should get channel id', async function () {
