@@ -349,8 +349,8 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
 
     /**
      * @dev Redeem a ticket
-     * @param redeemer the redeemer address
-     * @param counterparty the counterparty address
+     * @param destination - redeemer the redeemer address
+     * @param source - counterparty the counterparty address
      * @param nextCommitment the commitment that hashes to the redeemers previous commitment
      * @param proofOfRelaySecret the proof of relay secret
      * @param winProb the winning probability of the ticket
@@ -358,8 +358,8 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
      * @param signature signature
      */
     function _redeemTicket(
-        address redeemer,
-        address counterparty,
+        address destination,
+        address source,
         bytes32 nextCommitment,
         uint256 ticketEpoch,
         uint256 ticketIndex,
@@ -368,29 +368,28 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         uint256 winProb,
         bytes memory signature
     ) internal {
-        require(redeemer != address(0), "redeemer must not be empty");
-        require(counterparty != address(0), "counterparty must not be empty");
+        _validateSourceAndDest(source, destination);
         require(nextCommitment != bytes32(0), "nextCommitment must not be empty");
         require(amount != uint256(0), "amount must not be empty");
         (, Channel storage earningChannel) = _getChannel(
-            redeemer,
-            counterparty
+            destination,
+            source
         );
         (, Channel storage spendingChannel) = _getChannel(
-            counterparty,
-            redeemer
+            source,
+            destination
         );
-        require(earningChannel.status != ChannelStatus.CLOSED, "earning channel must be open or pending to close");
+        require(spendingChannel.status == ChannelStatus.OPEN || spendingChannel.status == ChannelStatus.PENDING_TO_CLOSE, "spending channel must be open or pending to close");
         uint256 prevTicketEpoch;
-        require(earningChannel.commitment == keccak256(abi.encodePacked(nextCommitment)), "commitment must be hash of next commitment");
-        require(earningChannel.ticketEpoch == ticketEpoch, "ticket epoch must match");
-        require(earningChannel.ticketIndex < ticketIndex, "redemptions must be in order");
+        require(spendingChannel.commitment == keccak256(abi.encodePacked(nextCommitment)), "commitment must be hash of next commitment");
+        require(spendingChannel.ticketEpoch == ticketEpoch, "ticket epoch must match");
+        require(spendingChannel.ticketIndex < ticketIndex, "redemptions must be in order");
         prevTicketEpoch = earningChannel.ticketEpoch;
 
         bytes32 ticketHash = ECDSA.toEthSignedMessageHash(
             keccak256(
               _getEncodedTicket(
-                  redeemer,
+                  destination,
                   prevTicketEpoch,
                   proofOfRelaySecret,
                   spendingChannel.channelEpoch,
@@ -401,7 +400,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
             )
         );
 
-        require(ECDSA.recover(ticketHash, signature) == counterparty, "signer must match the counterparty");
+        require(ECDSA.recover(ticketHash, signature) == source, "signer must match the counterparty");
         require(
             _getTicketLuck(
                 ticketHash,
@@ -411,12 +410,12 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
             "ticket must be a win"
         );
 
-          earningChannel.commitment = nextCommitment;
+          spendingChannel.commitment = nextCommitment;
           spendingChannel.balance = spendingChannel.balance.sub(amount);
           earningChannel.balance = earningChannel.balance.add(amount);
           earningChannel.ticketIndex = ticketIndex;
-          emit ChannelUpdate(redeemer, counterparty, earningChannel);
-          emit ChannelUpdate(counterparty, redeemer, spendingChannel);
+          emit ChannelUpdate(destination, source, earningChannel);
+          emit ChannelUpdate(source, destination, spendingChannel);
     }
 
 

@@ -55,7 +55,7 @@ export const validateChannel = (actual, expected) => {
 
 export const createTicket = async (
   ticketValues: TicketValues,
-  account: {
+  counterparty: {
     privateKey: string
     address: string
   },
@@ -77,21 +77,21 @@ export const createTicket = async (
     new Balance(new BN(ticketValues.amount)),
     UINT256.fromString(ticketValues.winProb),
     UINT256.fromString(ticketValues.channelEpoch),
-    stringToU8a(account.privateKey)
+    stringToU8a(counterparty.privateKey)
   )
 
   const ackedTicket = new AcknowledgedTicket(
     ticket,
     new Response(stringToU8a(ticketValues.proofOfRelaySecret, Response.SIZE)),
     new Hash(stringToU8a(nextCommitment, Hash.SIZE)),
-    PublicKey.fromPrivKey(stringToU8a(account.privateKey))
+    PublicKey.fromPrivKey(stringToU8a(counterparty.privateKey))
   )
 
   return {
     ...ticketValues,
     ticket: ackedTicket,
     nextCommitment,
-    counterparty: account.address
+    counterparty: counterparty.address
   }
 }
 
@@ -314,6 +314,9 @@ describe('with funded HoprChannels: AB: 70, BA: 30, secrets initialized', functi
       SECRET_1
     )
 
+    validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: '70', status: OPEN })
+    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '30', status: OPEN })
+
     await channels.connect(fixtures.accountA).redeemTicket(...redeemArgs(TICKET_BA_WIN.ticket))
 
     validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: '80', status: OPEN })
@@ -323,6 +326,8 @@ describe('with funded HoprChannels: AB: 70, BA: 30, secrets initialized', functi
   })
 
   it('should reedem ticket for account B', async function () {
+    validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: '70', status: OPEN })
+    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '30', status: OPEN })
     await channels.connect(fixtures.accountB).redeemTicket(...redeemArgs(fixtures.TICKET_AB_WIN.ticket))
 
     const ab = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
@@ -560,10 +565,11 @@ describe('with a reopened channel', function () {
   })
 
   it('should redeem ticket for account A', async function () {
+    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '60', status: OPEN })
     await channels.connect(fixtures.accountA).redeemTicket(...redeemArgs(TICKET_BA_WIN_RECYCLED.ticket))
     const ab = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
     validateChannel(ab, { balance: '80', status: OPEN })
-    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '20', status: CLOSED })
+    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '20', status: OPEN })
     expect(ab.commitment).to.equal(SECRET_1)
   })
 
