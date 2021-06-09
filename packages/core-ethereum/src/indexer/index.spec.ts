@@ -61,15 +61,7 @@ const createHoprChannelsMock = (ops: { pastEvents?: Event<any>[] } = {}) => {
       if (currentState == undefined) {
         return
       }
-
-      let newEvent: Event<'ChannelUpdate'>
-
-      if (currentState.ticketEpoch.eq(1)) {
-        newEvent = fixtures.COMMITMENT_SET_AB
-      } else {
-        newEvent = fixtures.COMMITMENT_SET_A
-      }
-
+      let newEvent = fixtures.COMMITMENT_SET_A
       pastEvents.push(newEvent)
       this.emit('*', newEvent)
     }
