@@ -105,9 +105,9 @@ function setup_node() {
   DEBUG="hopr*" node packages/hoprd/lib/index.js \
     --init --provider=ws://127.0.0.1:8545/ \
     --testAnnounceLocalAddresses --identity="${id}" \
-    --host="0.0.0.0:${host_port}" \
+    --host="0.0.0.0:${host_port}" --testPreferLocalAddresses \
     --data="${dir}" --rest --restPort "${port}" --announce \
-    --password="e2e-test" --testUseWeakCrypto \
+    --password="e2e-test" \
     ${additional_args} \
     > "${log}" 2>&1 &
 
