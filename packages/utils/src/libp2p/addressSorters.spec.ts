@@ -9,7 +9,9 @@ describe(`test isMultiaddrPrivate`, function () {
     expect(isMultiaddrPrivate(new Multiaddr('/ip4/31.0.0.1/tcp/4000'))).to.eql(false)
     expect(isMultiaddrPrivate(new Multiaddr('/ip4/127.0.0.1/tcp/4000'))).to.eql(true)
     expect(isMultiaddrPrivate(new Multiaddr('/ip6/::1/tcp/4000'))).to.eql(true)
-    expect(isMultiaddrPrivate(new Multiaddr('/p2p-circuit/p2p/QmYyQSo1c1Ym7orWxLYvCrM2EmxFTANf8wXmmE7DWjhx5N'))).to.eql(false)
+    expect(isMultiaddrPrivate(new Multiaddr('/p2p-circuit/p2p/QmYyQSo1c1Ym7orWxLYvCrM2EmxFTANf8wXmmE7DWjhx5N'))).to.eql(
+      false
+    )
   })
 })
 
