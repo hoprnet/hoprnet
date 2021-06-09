@@ -9,7 +9,8 @@ describe(`test isMultiaddrLocal`, function () {
     expect(isMultiaddrLocal(new Multiaddr('/ip4/31.0.0.1/tcp/4000'))).to.eql(false)
     expect(isMultiaddrLocal(new Multiaddr('/ip4/127.0.0.1/tcp/4000'))).to.eql(true)
     expect(isMultiaddrLocal(new Multiaddr('/ip6/::1/tcp/4000'))).to.eql(true)
-    expect(isMultiaddrLocal(new Multiaddr('/p2p-circuit/p2p/QmYyQSo1c1Ym7orWxLYvCrM2EmxFTANf8wXmmE7DWjhx5N'))).to.eql(false)
+    expect(isMultiaddrLocal(new Multiaddr('/ip4/127.0.0.1/tcp/0/p2p/16Uiu2HAmCPgzWWQWNAn2E3UXx1G3CMzxbPfLr1SFzKqnFjDcbdwg'))).to.eql(false)
+    expect(isMultiaddrLocal(new Multiaddr('/p2p/16Uiu2HAkyvdVZtG8btak5SLrxP31npfJo6maopj8xwx5XQhKfspb/p2p-circuit/p2p/16Uiu2HAmCPgzWWQWNAn2E3UXx1G3CMzxbPfLr1SFzKqnFjDcbdwg'))).to.eql(false)
   })
 })
 
