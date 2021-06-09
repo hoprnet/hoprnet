@@ -240,19 +240,18 @@ describe('test indexer', function () {
     expectAccountsToBeEqual(account, fixtures.PARTY_A_INITIALIZED_ACCOUNT)
 
     const channel = await indexer.getChannel(fixtures.OPENED_CHANNEL.getId())
-    expectChannelsToBeEqual(channel, fixtures.COMMITMENT_SET_A_CHANNEL)
+    expectChannelsToBeEqual(channel, fixtures.OPENED_CHANNEL)
 
     const channels = await indexer.getChannels()
     assert.strictEqual(channels.length, 1, 'expected channels')
-    expectChannelsToBeEqual(channels[0], fixtures.COMMITMENT_SET_A_CHANNEL)
+    expectChannelsToBeEqual(channels[0], fixtures.OPENED_CHANNEL)
 
     const channelsFromPartyA = await indexer.getChannelsFrom(fixtures.PARTY_A.toAddress())
     assert.strictEqual(channelsFromPartyA.length, 1)
-    expectChannelsToBeEqual(channelsFromPartyA[0], fixtures.COMMITMENT_SET_A_CHANNEL)
+    expectChannelsToBeEqual(channelsFromPartyA[0], fixtures.OPENED_CHANNEL)
 
     const channelsOfPartyB = await indexer.getChannelsFrom(fixtures.PARTY_B.toAddress())
-    assert.strictEqual(channelsOfPartyB.length, 1)
-    expectChannelsToBeEqual(channelsOfPartyB[0], fixtures.COMMITMENT_SET_A_CHANNEL)
+    assert.strictEqual(channelsOfPartyB.length, 0)
   })
 
   it('should handle provider error by restarting', async function () {
