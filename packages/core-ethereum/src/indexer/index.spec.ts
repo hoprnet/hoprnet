@@ -210,10 +210,16 @@ describe('test indexer', function () {
     newEvent(fixtures.OPENED_EVENT)
     newBlock()
 
-    setImmediate(async () => {
-      const channel = await indexer.getChannel(fixtures.OPENED_CHANNEL.getId())
-      expectChannelsToBeEqual(channel, fixtures.OPENED_CHANNEL)
+    const blockMined = Defer()
+
+    indexer.on('block-processed', (blockNumber: number) => {
+      if (blockNumber === 4) blockMined.resolve()
     })
+
+    await blockMined.promise
+
+    const channel = await indexer.getChannel(fixtures.OPENED_CHANNEL.getId())
+    expectChannelsToBeEqual(channel, fixtures.OPENED_CHANNEL)
   })
 
   it('should get public key of addresses', async function () {
@@ -264,9 +270,14 @@ describe('test indexer', function () {
 
     provider.emit('error', new Error('MOCK'))
 
-    setImmediate(async () => {
-      assert.strictEqual(indexer.status, 'restarting')
+    assert.strictEqual(indexer.status, 'stopped')
+
+    const started = Defer()
+    indexer.on('status', (status: string) => {
+      if (status === 'started') started.resolve()
     })
+    await started.promise
+    assert.strictEqual(indexer.status, 'started')
   })
 
   it('should contract error by restarting', async function () {
@@ -279,9 +290,12 @@ describe('test indexer', function () {
 
     hoprChannels.emit('error', new Error('MOCK'))
 
-    setImmediate(async () => {
-      assert.strictEqual(indexer.status, 'restarting')
+    const started = Defer()
+    indexer.on('status', (status: string) => {
+      if (status === 'started') started.resolve()
     })
+    await started.promise
+    assert.strictEqual(indexer.status, 'started')
   })
 
   it('should emit events on updated channels', async function () {
@@ -305,12 +319,14 @@ describe('test indexer', function () {
             commitmentSet.resolve()
           }
           break
-        case 'PENDING_TO_CLOSE':
+        case 'PENDING_TO_CLOSE': {
           pendingIniated.resolve()
           break
-        case 'CLOSED':
+        }
+        case 'CLOSED': {
           closed.resolve()
           break
+        }
       }
     })
 
@@ -342,18 +358,12 @@ describe('test indexer', function () {
   })
 
   it('should start two indexers and should set commitments only once', async function () {
-    this.timeout(4e3)
-
     const { alice, bob, newBlock } = useMultiPartyFixtures({
       latestBlockNumber: 3,
       pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.PARTY_B_INITIALIZED_EVENT, fixtures.OPENED_EVENT]
     })
 
-    await Promise.all([
-      // prettier-ignore
-      alice.indexer.start(),
-      bob.indexer.start()
-    ])
+    await Promise.all([alice.indexer.start(), bob.indexer.start()])
 
     newBlock()
     newBlock()

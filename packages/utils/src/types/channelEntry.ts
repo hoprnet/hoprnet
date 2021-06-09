@@ -84,8 +84,9 @@ export class ChannelEntry {
       arr,
       components.map((x) => x.SIZE)
     )
-    const params = items.map((x, i) => components[i].deserialize(x))
-    // @ts-ignore //TODO
+
+    const params = items.map((x, i) => components[i].deserialize(x)) as ConstructorParameters<typeof ChannelEntry>
+
     return new ChannelEntry(...params)
   }
 

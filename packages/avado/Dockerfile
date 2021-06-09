@@ -9,4 +9,4 @@ EXPOSE 3001
 # Healthcheck server
 EXPOSE 8080
 
-ENTRYPOINT ["node", "/app/index.js", "--password='open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0'", "--init", "--admin", "--adminHost", "0.0.0.0"]
+ENTRYPOINT ["node", "/app/index.js", "--password='open-sesame-iTwnsPNg0hpagP+o6T0KOwiH9RQ0'", "--init", "--admin", "--adminHost", "0.0.0.0", "--identity", "/app/db/.hopr-identity"]

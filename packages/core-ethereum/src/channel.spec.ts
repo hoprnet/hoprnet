@@ -4,22 +4,20 @@ import {
   ChannelEntry,
   Hash,
   PublicKey,
-  Challenge,
   Balance,
   UINT256,
   HoprDB,
-  createPoRValuesForSender,
   ChannelStatus,
-  generateChannelId
+  AcknowledgedTicket,
+  Response,
+  generateChannelId,
+  HalfKey
 } from '@hoprnet/hopr-utils'
 import assert from 'assert'
 import BN from 'bn.js'
 import { utils } from 'ethers'
+import { Channel } from '..'
 import * as fixtures from './fixtures'
-
-const createChallenge = (secret1: Uint8Array, secret2: Uint8Array): Challenge => {
-  return createPoRValuesForSender(secret1, secret2).ticketChallenge
-}
 
 const createChainMock = (): ChainWrapper => {
   return {
@@ -41,10 +39,10 @@ const createIndexerMock = (channelUsThem: ChannelEntry, channelThemUs: ChannelEn
   } as Indexer
 }
 
-const createMocks = () => {
-  const selfPrivateKey = utils.arrayify(fixtures.ACCOUNT_A.privateKey)
+const createMocks = (from: string, to: string) => {
+  const selfPrivateKey = utils.arrayify(from)
   const self = PublicKey.fromPrivKey(selfPrivateKey)
-  const counterparty = PublicKey.fromPrivKey(utils.arrayify(fixtures.ACCOUNT_B.privateKey))
+  const counterparty = PublicKey.fromPrivKey(utils.arrayify(to))
   const db = HoprDB.createMock()
 
   const nextCommitmentPartyA = Hash.create(new Uint8Array([0]))
@@ -74,13 +72,14 @@ const createMocks = () => {
     new UINT256(new BN(0)),
     new UINT256(new BN(0))
   )
-  const challange = createChallenge(
-    Hash.create(new Uint8Array([1])).serialize(),
-    Hash.create(new Uint8Array([2])).serialize()
-  )
+
+  const secret1 = new HalfKey(Hash.create(new Uint8Array([1])).serialize())
+  const secret2 = new HalfKey(Hash.create(new Uint8Array([2])).serialize())
+  const response = Response.fromHalfKeys(secret1, secret2)
 
   const indexer = createIndexerMock(channelUsThem, channelThemUs)
   const chain = createChainMock()
+  const channel = new Channel(self, counterparty, db, chain, indexer, selfPrivateKey)
 
   return {
     self,
@@ -91,23 +90,82 @@ const createMocks = () => {
     chain,
     channelUsThem,
     channelThemUs,
-    challange,
+    response,
     nextCommitmentPartyA,
-    nextCommitmentPartyB
+    nextCommitmentPartyB,
+    secret1,
+    secret2,
+    channel
   }
 }
 
 describe('test channel', function () {
-  let mocks: ReturnType<typeof createMocks>
+  const alicePrivKey = fixtures.ACCOUNT_A.privateKey
+  const bobPrivKey = fixtures.ACCOUNT_B.privateKey
+
+  let aliceMocks: ReturnType<typeof createMocks>
+  let bobMocks: ReturnType<typeof createMocks>
 
   beforeEach(function () {
-    mocks = createMocks()
+    aliceMocks = createMocks(alicePrivKey, bobPrivKey)
+    bobMocks = createMocks(bobPrivKey, alicePrivKey)
   })
 
   it('should create channel', async function () {
+    assert.strictEqual((await aliceMocks.channel.usToThem()).getId().toHex(), fixtures.CHANNEL_ID)
     assert.strictEqual(
-      generateChannelId(mocks.self.toAddress(), mocks.counterparty.toAddress()).toHex(),
+      generateChannelId(aliceMocks.self.toAddress(), aliceMocks.counterparty.toAddress()).toHex(),
       fixtures.CHANNEL_ID
     )
+    assert.strictEqual(
+      utils.hexlify((await aliceMocks.channel.usToThem()).serialize()),
+      utils.hexlify(aliceMocks.channelUsThem.serialize())
+    )
+  })
+
+  it("should validate ticket's response", async function () {
+    const ticket = await aliceMocks.channel.createTicket(
+      new Balance(new BN(1)),
+      aliceMocks.response.toChallenge(),
+      new BN(1)
+    )
+
+    const goodAck = new AcknowledgedTicket(
+      ticket,
+      aliceMocks.response,
+      aliceMocks.nextCommitmentPartyA,
+      aliceMocks.self
+    )
+
+    const badAck = new AcknowledgedTicket(
+      ticket,
+      Response.fromHalfKeys(aliceMocks.secret1, aliceMocks.secret1), // incorrect response
+      aliceMocks.nextCommitmentPartyA,
+      aliceMocks.self
+    )
+
+    const goodResponse = await bobMocks.channel.redeemTicket(goodAck)
+    assert(goodResponse.status === 'SUCCESS')
+
+    const badResponse = await bobMocks.channel.redeemTicket(badAck)
+    assert(badResponse.status === 'FAILURE' && badResponse.message === 'Invalid response to acknowledgement')
+  })
+
+  it("should validate ticket's preimage", async function () {
+    const ticket = await aliceMocks.channel.createTicket(
+      new Balance(new BN(1)),
+      aliceMocks.response.toChallenge(),
+      new BN(1)
+    )
+
+    const acknowledgement = new AcknowledgedTicket(
+      ticket,
+      aliceMocks.response,
+      new Hash(new Uint8Array({ length: Hash.SIZE })), // empty preimage
+      aliceMocks.self
+    )
+
+    const response = await bobMocks.channel.redeemTicket(acknowledgement)
+    assert(response.status === 'FAILURE' && response.message === 'PreImage is empty.')
   })
 })

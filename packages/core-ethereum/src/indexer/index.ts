@@ -93,6 +93,7 @@ class Indexer extends EventEmitter {
     log('Subscribing to events from block %d', fromBlock)
 
     this.status = 'started'
+    this.emit('status', 'started')
     log(chalk.green('Indexer started!'))
   }
 
@@ -106,6 +107,7 @@ class Indexer extends EventEmitter {
     this.chain.unsubscribe()
 
     this.status = 'stopped'
+    this.emit('status', 'stopped')
     log(chalk.green('Indexer stopped!'))
   }
 
@@ -120,6 +122,7 @@ class Indexer extends EventEmitter {
       await this.start()
     } catch (err) {
       this.status = 'stopped'
+      this.emit('status', 'stopped')
 
       log(chalk.red('Failed to restart: %s', err.message))
     }
@@ -240,6 +243,7 @@ class Indexer extends EventEmitter {
     }
 
     await this.db.updateLatestBlockNumber(new BN(blockNumber))
+    this.emit('block-processed', blockNumber)
   }
 
   /**
