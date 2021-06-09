@@ -5,8 +5,10 @@ env:
 
 on:
   push:
-    branches: ['**']
-    
+    branches: ['master', 'release/**', 'avado', 'debug-deploy/**']
+    paths-ignore:
+      - '**/docs/**/*'
+
 jobs:
   build:
     name: Build, Publish etc
