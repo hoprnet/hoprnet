@@ -383,17 +383,15 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
             destination
         );
         require(spendingChannel.status == ChannelStatus.OPEN || spendingChannel.status == ChannelStatus.PENDING_TO_CLOSE, "spending channel must be open or pending to close");
-        uint256 prevTicketEpoch;
         require(spendingChannel.commitment == keccak256(abi.encodePacked(nextCommitment)), "commitment must be hash of next commitment");
         require(spendingChannel.ticketEpoch == ticketEpoch, "ticket epoch must match");
         require(spendingChannel.ticketIndex < ticketIndex, "redemptions must be in order");
-        prevTicketEpoch = earningChannel.ticketEpoch;
 
         bytes32 ticketHash = ECDSA.toEthSignedMessageHash(
             keccak256(
               _getEncodedTicket(
                   destination,
-                  prevTicketEpoch,
+                  spendingChannel.ticketEpoch,
                   proofOfRelaySecret,
                   spendingChannel.channelEpoch,
                   amount,
@@ -413,10 +411,10 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
             "ticket must be a win"
         );
 
+          spendingChannel.ticketIndex = ticketIndex;
           spendingChannel.commitment = nextCommitment;
           spendingChannel.balance = spendingChannel.balance.sub(amount);
           earningChannel.balance = earningChannel.balance.add(amount);
-          earningChannel.ticketIndex = ticketIndex;
           emit ChannelUpdate(destination, source, earningChannel);
           emit ChannelUpdate(source, destination, spendingChannel);
     }
@@ -425,7 +423,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     /**
     * Assert that source and destination are good addresses, and distinct.
     */
-    function _validateSourceAndDest (address source, address destination) internal {
+    function _validateSourceAndDest (address source, address destination) internal pure {
       require(source != destination, "source and destination must not be the same");
       require(source != address(0), "source must not be empty");
       require(destination != address(0), "destination must not be empty");
