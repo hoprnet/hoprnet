@@ -148,11 +148,11 @@ const useFixtures = deployments.createFixture(async () => {
     {
       recipient: ACCOUNT_B.address,
       proofOfRelaySecret: PROOF_OF_RELAY_SECRET_0,
-      ticketEpoch: OPEN,
-      ticketIndex: OPEN,
+      ticketEpoch: '1',
+      ticketIndex: '1',
       amount: '10',
       winProb: WIN_PROB_100.toString(),
-      channelEpoch: OPEN
+      channelEpoch: '1'
     },
     ACCOUNT_A,
     SECRET_1
@@ -298,11 +298,11 @@ describe('with funded HoprChannels: AB: 70, BA: 30, secrets initialized', functi
       {
         recipient: ACCOUNT_A.address,
         proofOfRelaySecret: PROOF_OF_RELAY_SECRET_0,
-        ticketEpoch: OPEN,
-        ticketIndex: OPEN,
+        ticketEpoch: '1',
+        ticketIndex: '1',
         amount: '10',
         winProb: WIN_PROB_100.toString(),
-        channelEpoch: OPEN
+        channelEpoch: '1'
       },
       ACCOUNT_B,
       SECRET_1
@@ -381,11 +381,11 @@ describe('with funded HoprChannels: AB: 70, BA: 30, secrets initialized', functi
       {
         recipient: ACCOUNT_B.address,
         proofOfRelaySecret: PROOF_OF_RELAY_SECRET_0,
-        ticketEpoch: OPEN,
-        ticketIndex: OPEN,
+        ticketEpoch: '1',
+        ticketIndex: '1',
         amount: '10',
         winProb: WIN_PROB_0.toString(),
-        channelEpoch: OPEN
+        channelEpoch: '1'
       },
       ACCOUNT_A,
       SECRET_1
@@ -522,8 +522,8 @@ describe('with a reopened channel', function () {
       {
         recipient: ACCOUNT_B.address,
         proofOfRelaySecret: PROOF_OF_RELAY_SECRET_0,
-        ticketIndex: OPEN,
-        ticketEpoch: OPEN,
+        ticketIndex: '1',
+        ticketEpoch: '1',
         amount: '10',
         winProb: WIN_PROB_100.toString(),
         channelEpoch: '2'
@@ -535,8 +535,8 @@ describe('with a reopened channel', function () {
       {
         recipient: ACCOUNT_A.address,
         proofOfRelaySecret: PROOF_OF_RELAY_SECRET_0,
-        ticketIndex: OPEN,
-        ticketEpoch: OPEN,
+        ticketIndex: '1',
+        ticketEpoch: '1',
         amount: '10',
         winProb: WIN_PROB_100.toString(),
         channelEpoch: '2'

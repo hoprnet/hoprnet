@@ -23,6 +23,21 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
 
     /**
      * @dev Possible channel statuses.
+
+            Finalize Closure
+            (After delay)+----------------+   Initiate Closure
+                 +-------+Pending To Close| <---------+
+                 |       +----------------+           |
+                 |                                    |
+              +--v---+                             +--+-+
+              |Closed+---------------------------->+Open|
+              +---+--+ Fund (If already committed) +--+-+
+                  |                                   ^
+             Fund |                                   | Bump Commitment
+                  |       +----------------------+    |
+                  +------>+Waiting For Commitment+----+
+                          +----------------------+
+
      */
     enum ChannelStatus { CLOSED, WAITING_FOR_COMMITMENT, OPEN, PENDING_TO_CLOSE }
 
@@ -378,7 +393,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
                   redeemer,
                   prevTicketEpoch,
                   proofOfRelaySecret,
-                  earningChannel.channelEpoch,
+                  spendingChannel.channelEpoch,
                   amount,
                   ticketIndex,
                   winProb
