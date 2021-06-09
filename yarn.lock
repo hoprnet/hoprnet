@@ -607,10 +607,10 @@
   resolved "https://registry.yarnpkg.com/@hapi/hoek/-/hoek-9.2.0.tgz#f3933a44e365864f4dad5db94158106d511e8131"
   integrity sha512-sqKVVVOe5ivCaXDWivIJYVSaEgdQK9ul7a4Kity5Iw7u9+wBAPbX1RMSnLLmp7O4Vzj0WOWwMAJsTL00xwaNug==
 
-"@hoprnet/hopr-connect@~0.2.25":
-  version "0.2.25"
-  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-connect/-/hopr-connect-0.2.25.tgz#87e55bba714e0f22ffb97609b2d1d69150f20f95"
-  integrity sha512-CKj5CcpGKKtGEjyRsFUE1CQRQYcbd2DxFxGKZJE7cRqR5Om+iXq+J1M/+Vw0XT3NkYfheL/ppdhs4yWRLiRmpg==
+"@hoprnet/hopr-connect@0.2.26":
+  version "0.2.26"
+  resolved "https://registry.yarnpkg.com/@hoprnet/hopr-connect/-/hopr-connect-0.2.26.tgz#059dfef0e63d698c88e5143dbeb36374d9cfd6ff"
+  integrity sha512-7VrslmD1lTqbhyYM7s9Wvh/mpZJKT7atFpu3KWLvb3MZdZmRlvX/xvQ3hxm320Tlj8ULrZ4mtpSCTfHYx7J80A==
   dependencies:
     "@hoprnet/hopr-utils" "1.71.0-next.145"
     abortable-iterator "^3.0.0"
