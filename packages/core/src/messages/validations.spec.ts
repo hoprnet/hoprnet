@@ -83,7 +83,7 @@ const createMockChannel = ({
         counterparty
       })
     ),
-    getState: () => {
+    usToThem: () => {
       if (isChannelStored) return mockChannelEntry(isChannelOpen, ticketEpoch, ticketIndex)
       throw new Error('state not found')
     },
