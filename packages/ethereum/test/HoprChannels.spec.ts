@@ -30,10 +30,10 @@ type TicketValues = {
   ticketEpoch: string
 }
 
-
 const WAITING_FOR_COMMITMENT = '1'
 const OPEN = '2'
 const CLOSED = '0' 
+const PENDING_CLOSURE = '3'
 
 const percentToUint256 = (percent: any) => ethers.constants.MaxUint256.mul(percent).div(100)
 
@@ -410,19 +410,19 @@ describe('with funded HoprChannels: AB: 70, BA: 30, secrets initialized', functi
       'ChannelUpdate'
     )
     validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: '70', status: OPEN })
-    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '30', status: '2' })
+    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '30', status: PENDING_CLOSURE })
   })
 
   it('should fail to initialize channel closure A->A', async function () {
     await expect(channels.connect(fixtures.accountA).initiateChannelClosure(ACCOUNT_A.address)).to.be.revertedWith(
-      'initiator and counterparty must not be the same'
+      'source and destination must not be the same'
     )
   })
 
   it('should fail to initialize channel closure A->0', async function () {
     await expect(
       channels.connect(ACCOUNT_A.address).initiateChannelClosure(ethers.constants.AddressZero)
-    ).to.be.revertedWith('counterparty must not be empty')
+    ).to.be.revertedWith('destination must not be empty')
   })
 
   it('should fail to finalize channel closure when is not pending', async function () {
@@ -456,20 +456,20 @@ describe('with a pending_to_close HoprChannel (A:70, B:30)', function () {
       'ChannelUpdate'
     )
 
-    validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: CLOSED, status: CLOSED })
-    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: CLOSED, status: CLOSED })
+    validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: '0', status: CLOSED })
+    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '30', status: OPEN })
     expect((await token.balanceOf(ACCOUNT_A.address)).toString()).to.equal('70')
-    expect((await token.balanceOf(ACCOUNT_B.address)).toString()).to.equal('30')
+    expect((await token.balanceOf(ACCOUNT_B.address)).toString()).to.equal('0')
   })
 
   it('should fail to finalize channel closure', async function () {
     await expect(channels.connect(ACCOUNT_A.address).finalizeChannelClosure(ACCOUNT_A.address)).to.be.revertedWith(
-      'initiator and counterparty must not be the same'
+      'source and destination must not be the same'
     )
 
     await expect(
       channels.connect(ACCOUNT_A.address).finalizeChannelClosure(ethers.constants.AddressZero)
-    ).to.be.revertedWith('counterparty must not be empty')
+    ).to.be.revertedWith('destination must not be empty')
 
     await expect(channels.connect(ACCOUNT_A.address).finalizeChannelClosure(ACCOUNT_B.address)).to.be.revertedWith(
       'closureTime must be before now'
@@ -500,7 +500,7 @@ describe('with a closed channel', function () {
     await fixtures.fundAndApprove(fixtures.accountA, 100)
     await channels.connect(fixtures.accountA).fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')
     validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: '70', status: OPEN })
-    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '30', status: OPEN })
+    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '60', status: WAITING_FOR_COMMITMENT }) // 30 + 30
   })
 })
 
