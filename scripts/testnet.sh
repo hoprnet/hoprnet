@@ -151,7 +151,6 @@ start_testnet() {
     echo "Start node $i"
     start_testnode $1 $3 $i ${4:-}
   done
-  # @jose can you fix this pls.
-  # add_keys scripts/keys/authorized_keys
+  add_keys scripts/keys/authorized_keys
 }
 
