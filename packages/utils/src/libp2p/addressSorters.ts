@@ -3,8 +3,12 @@ import isIpPrivate from 'private-ip'
 import { Multiaddr } from 'multiaddr'
 
 export function isMultiaddrPrivate(multiaddr: Multiaddr): boolean {
-  const { address } = multiaddr.nodeAddress()
-  return isIpPrivate(address)
+  try {
+    const { address } = multiaddr.nodeAddress()
+    return isIpPrivate(address)
+  } catch(e: any) {
+    return false
+  }
 }
 
 function addressesLocalFirstCompareFunction(a: Address, b: Address) {
