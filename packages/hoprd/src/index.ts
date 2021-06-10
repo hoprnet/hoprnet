@@ -249,7 +249,7 @@ async function main() {
         if (c === 'daemonize') {
           return
         }
-        let resp = await cmds.execute(logs.log, c)
+        let resp = await cmds.execute(console.log, c)
         console.log(resp)
       }
       await node.stop()
