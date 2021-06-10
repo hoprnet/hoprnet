@@ -89,7 +89,7 @@ export async function validateUnacknowledgedTicket(
 
   let channelState
   try {
-    channelState = await channel.usToThem()
+    channelState = await channel.themToUs()
   } catch (err) {
     throw Error(`Error while validating unacknowledged ticket, state not found: '${err.message}'`)
   }

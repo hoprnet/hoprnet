@@ -46,12 +46,12 @@ const createMockTicket = ({
   } as unknown as Ticket
 }
 
-const mockChannelEntry = (isChannelOpen: boolean, ticketEpoch: UINT256, ticketIndex: UINT256) =>
+const mockChannelEntry = (isChannelOpen: boolean, balance: Balance, ticketEpoch: UINT256, ticketIndex: UINT256) =>
   Promise.resolve(
     new ChannelEntry(
       TARGET_ADDRESS,
       TARGET_ADDRESS,
-      null,
+      balance,
       null,
       ticketEpoch,
       ticketIndex,
@@ -77,14 +77,12 @@ const createMockChannel = ({
   ticketIndex?: UINT256
 }) => {
   return {
-    getBalances: sinon.stub().returns(
-      Promise.resolve({
-        self,
-        counterparty
-      })
-    ),
     usToThem: () => {
-      if (isChannelStored) return mockChannelEntry(isChannelOpen, ticketEpoch, ticketIndex)
+      if (isChannelStored) return mockChannelEntry(isChannelOpen, self, ticketEpoch, ticketIndex)
+      throw new Error('state not found')
+    },
+    themToUs: () => {
+      if (isChannelStored) return mockChannelEntry(isChannelOpen, counterparty, ticketEpoch, ticketIndex)
       throw new Error('state not found')
     },
     channelEpoch: new BN(1)
