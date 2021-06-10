@@ -89,10 +89,12 @@ export async function dialHelper(
   let addresses = (libp2p.peerStore.get(destination)?.addresses ?? []).map((addr: any) => addr.multiaddr.toString())
 
   // Try to get some fresh addresses from the DHT
-  let dhtResponse: {
-    id: PeerId
-    multiaddrs: Multiaddr[]
-  } | undefined
+  let dhtResponse:
+    | {
+        id: PeerId
+        multiaddrs: Multiaddr[]
+      }
+    | undefined
 
   try {
     // Let libp2p populate its internal peerStore with fresh addresses
