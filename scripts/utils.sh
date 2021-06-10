@@ -1,5 +1,11 @@
-#!/bin/bash
-set -e #u
+#!/usr/bin/env bash
+
+# prevent execution of this script, only allow execution
+$(return >/dev/null 2>&1)
+test "$?" -eq "0" || { echo "This script should only be sourced." >&2; exit 1; }
+
+# exit on errors, undefined variables, ensure errors in pipes are not hidden
+set -Eeuo pipefail
 
 # $1=version string, semver
 function get_version_maj_min() {
@@ -22,8 +28,8 @@ function ensure_port_is_free() {
   local port=${1}
 
   if lsof -i ":${port}" -s TCP:LISTEN; then
-    echo "Port is not free $1"
-    echo "Process: $(lsof -i ":${port}" -s TCP:LISTEN || :)"
+    log "Port is not free $1"
+    log "Process: $(lsof -i ":${port}" -s TCP:LISTEN || :)"
     exit 1
   fi
 }
@@ -57,9 +63,9 @@ function wait_for_port() {
 
   i=0
   until ${cmd}; do
-    echo "Waiting (${delay}) seconds for port ${port}"
+    log "Waiting (${delay}) seconds for port ${port}"
     if [ -n "${log_file}" ] && [ -f "${log_file}" ]; then
-      echo "Last 5 logs:"
+      log "Last 5 logs:"
       tail -n 5 "${log_file}" | sed "s/^/\t/"
     fi
     sleep ${delay}
