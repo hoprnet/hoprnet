@@ -14,7 +14,7 @@ branch=$(git rev-parse --abbrev-ref HEAD)
 git pull origin "${branch}" --rebase
 
 # get package info
-mydir=$(dirname $(readlink -f $0))
+mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 npm_package=$(${mydir}/get-npm-package-info.sh)
 
 # identify version type
