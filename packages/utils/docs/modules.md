@@ -96,7 +96,7 @@
 - [getPacketLength](modules.md#getpacketlength)
 - [hasB58String](modules.md#hasb58string)
 - [isExpired](modules.md#isexpired)
-- [isMultiaddrLocal](modules.md#isMultiaddrLocal)
+- [isMultiaddrLocal](modules.md#ismultiaddrlocal)
 - [iterateHash](modules.md#iteratehash)
 - [lengthPrefixedToU8a](modules.md#lengthprefixedtou8a)
 - [libp2pSendMessage](modules.md#libp2psendmessage)
@@ -111,7 +111,6 @@
 - [preVerify](modules.md#preverify)
 - [privKeyToPeerId](modules.md#privkeytopeerid)
 - [pubKeyToPeerId](modules.md#pubkeytopeerid)
-- [publicAddressesFirst](modules.md#publicaddressesfirst)
 - [randomChoice](modules.md#randomchoice)
 - [randomFloat](modules.md#randomfloat)
 - [randomInteger](modules.md#randominteger)
@@ -161,7 +160,7 @@
 
 #### Defined in
 
-[libp2p/addressSorters.ts:56](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/addressSorters.ts#L56)
+[libp2p/addressSorters.ts:37](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/addressSorters.ts#L37)
 
 ___
 
@@ -1206,7 +1205,7 @@ ___
 
 #### Defined in
 
-[libp2p/addressSorters.ts:48](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/addressSorters.ts#L48)
+[libp2p/addressSorters.ts:33](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/addressSorters.ts#L33)
 
 ___
 
@@ -1370,26 +1369,6 @@ Using `libsecp256k1` directly does not work.
 #### Defined in
 
 [libp2p/pubKeyToPeerId.ts:17](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/pubKeyToPeerId.ts#L17)
-
-___
-
-### publicAddressesFirst
-
-▸ **publicAddressesFirst**(`addresses`): `Address`[]
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `addresses` | `Address`[] |
-
-#### Returns
-
-`Address`[]
-
-#### Defined in
-
-[libp2p/addressSorters.ts:52](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/addressSorters.ts#L52)
 
 ___
 
