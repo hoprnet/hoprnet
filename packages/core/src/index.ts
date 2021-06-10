@@ -738,7 +738,7 @@ class Hopr extends EventEmitter {
   public async redeemAllTickets() {
     let count = 0,
       redeemed = 0,
-      total = 0
+      total = new BN(0)
 
     for (const ackTicket of await this.getAcknowledgedTickets()) {
       count++
@@ -746,7 +746,7 @@ class Hopr extends EventEmitter {
 
       if (result.status === 'SUCCESS') {
         redeemed++
-        total += ackTicket.ticket.amount.toBN().toNumber()
+        total.iadd(ackTicket.ticket.amount.toBN())
         console.log(`Redeemed ticket ${count}`)
       } else {
         console.log(`Failed to redeem ticket ${count}`)
@@ -755,7 +755,7 @@ class Hopr extends EventEmitter {
     return {
       count,
       redeemed,
-      total
+      total: new Balance(total)
     }
   }
 
