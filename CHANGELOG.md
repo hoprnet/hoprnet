@@ -1,3 +1,10 @@
+<a name="0.2.27"></a>
+
+## [0.2.27](https://github.com/hoprnet/hopr-connect/compare/v0.2.26...v0.2.27) (2021-06-10)
+
+- control-flow fixes
+- remove console.log and console.trace
+
 <a name="0.2.26"></a>
 
 ## [0.2.26](https://github.com/hoprnet/hopr-connect/compare/v0.2.25...v0.2.26) (2021-06-09)
