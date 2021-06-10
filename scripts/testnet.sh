@@ -91,6 +91,7 @@ start_testnode_vm() {
       --container-mount-disk mount-path="/app/db" \
       --container-env=^,@^DEBUG=hopr\*,@NODE_OPTIONS=--max-old-space-size=4096,@GCLOUD=1 \
       --container-image=$2 \
+      --container-arg="--identity" --container-arg="/app/db/.hopr-identity" \
       --container-arg="--password" --container-arg="$BS_PASSWORD" \
       --container-arg="--init" --container-arg="true" \
       --container-arg="--announce" --container-arg="true" \
