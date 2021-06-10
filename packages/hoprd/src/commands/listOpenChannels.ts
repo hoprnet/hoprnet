@@ -24,7 +24,9 @@ export default class ListOpenChannels extends AbstractCommand {
     try {
       const selfPubKey = new PublicKey(this.node.getId().pubKey.marshal())
       const selfAddress = selfPubKey.toAddress()
-      const channelsFrom = (await this.node.getChannelsFrom(selfAddress)).filter((channel) => channel.status !== 'CLOSED')
+      const channelsFrom = (await this.node.getChannelsFrom(selfAddress)).filter(
+        (channel) => channel.status !== 'CLOSED'
+      )
       if (channelsFrom.length == 0) {
         log(`\nNo open channels from node.`)
       }
