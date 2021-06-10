@@ -449,7 +449,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:713](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L713)
+[packages/core/src/index.ts:717](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L717)
 
 ___
 
@@ -519,7 +519,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:765](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L765)
+[packages/core/src/index.ts:769](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L769)
 
 ___
 
@@ -547,7 +547,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:775](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L775)
+[packages/core/src/index.ts:779](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L779)
 
 ___
 
@@ -584,7 +584,7 @@ that will relay that message before it reaches its destination.
 
 #### Defined in
 
-[packages/core/src/index.ts:791](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L791)
+[packages/core/src/index.ts:795](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L795)
 
 ___
 
@@ -688,7 +688,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:770](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L770)
+[packages/core/src/index.ts:774](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L774)
 
 ___
 
@@ -702,7 +702,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:717](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L717)
+[packages/core/src/index.ts:721](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L721)
 
 ___
 
@@ -1010,7 +1010,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:759](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L759)
+[packages/core/src/index.ts:763](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L763)
 
 ___
 
@@ -1024,7 +1024,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:735](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L735)
+[packages/core/src/index.ts:739](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L739)
 
 ___
 
@@ -1237,7 +1237,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:804](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L804)
+[packages/core/src/index.ts:808](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L808)
 
 ___
 
@@ -1251,7 +1251,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:821](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L821)
+[packages/core/src/index.ts:825](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L825)
 
 ___
 
@@ -1273,7 +1273,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:780](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L780)
+[packages/core/src/index.ts:784](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L784)
 
 ___
 
