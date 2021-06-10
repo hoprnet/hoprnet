@@ -55,7 +55,7 @@ const createHoprChannelsMock = (ops: { pastEvents?: Event<any>[] } = {}) => {
       }, [])[0]
     }
 
-  async bumpChannel(_counterparty: string, _comm: string) {
+    async bumpChannel(_counterparty: string, _comm: string) {
       let newEvent = {
         event: 'ChannelUpdate',
         transactionHash: '',
@@ -344,7 +344,7 @@ describe('test indexer', function () {
     })
 
     await indexer.start()
-    const ev =  {
+    const ev = {
       event: 'ChannelUpdate',
       transactionHash: '',
       blockNumber: 2,
@@ -402,7 +402,7 @@ describe('test indexer', function () {
 
     await pendingIniated.promise
 
-    const evClosed  = {
+    const evClosed = {
       event: 'ChannelUpdate',
       transactionHash: '',
       blockNumber: 7,

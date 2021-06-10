@@ -72,4 +72,3 @@ export const OPENED_EVENT = {
 } as Event<'ChannelUpdate'>
 
 export const OPENED_CHANNEL = ChannelEntry.fromSCEvent(OPENED_EVENT)
-
