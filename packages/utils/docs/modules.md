@@ -176,17 +176,17 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:83](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L83)
+[libp2p/index.ts:84](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L84)
 
 ___
 
 ### DialResponse
 
-Ƭ **DialResponse**: { `resp`: { `protocol`: `string` ; `stream`: `MuxedStream`  } ; `status`: ``"SUCCESS"``  } \| { `status`: ``"E_TIMEOUT"``  } \| { `dht`: `boolean` ; `error`: `Error` ; `status`: ``"E_DIAL"``  } \| { `error`: `Error` ; `query`: `PeerId` ; `status`: ``"E_DHT_QUERY"``  }
+Ƭ **DialResponse**: { `resp`: [PromiseValue](modules.md#promisevalue)<ReturnType<`LibP2P`[``"dialProtocol"``]\>\> ; `status`: ``"SUCCESS"``  } \| { `status`: ``"E_TIMEOUT"``  } \| { `dht`: `boolean` ; `error`: `Error` ; `status`: ``"E_DIAL"``  } \| { `error`: `Error` ; `query`: `PeerId` ; `status`: ``"E_DHT_QUERY"``  }
 
 #### Defined in
 
-[libp2p/index.ts:87](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L87)
+[libp2p/index.ts:88](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L88)
 
 ___
 
@@ -221,7 +221,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:237](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L237)
+[libp2p/index.ts:246](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L246)
 
 ___
 
@@ -246,7 +246,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:238](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L238)
+[libp2p/index.ts:247](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L247)
 
 ___
 
@@ -532,7 +532,7 @@ Regular expresion used to match b58Strings
 
 #### Defined in
 
-[libp2p/index.ts:23](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L23)
+[libp2p/index.ts:24](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L24)
 
 ___
 
@@ -606,7 +606,7 @@ Takes a B58String and converts them to a PublicKey
 
 #### Defined in
 
-[libp2p/index.ts:40](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L40)
+[libp2p/index.ts:41](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L41)
 
 ___
 
@@ -628,7 +628,7 @@ Takes a peerId and returns its corresponding public key.
 
 #### Defined in
 
-[libp2p/index.ts:30](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L30)
+[libp2p/index.ts:31](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L31)
 
 ___
 
@@ -796,7 +796,7 @@ Contains a baseline protection against dialing same addresses twice.
 
 #### Defined in
 
-[libp2p/index.ts:115](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L115)
+[libp2p/index.ts:116](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L116)
 
 ___
 
@@ -925,7 +925,7 @@ Returns the b58String within a given content. Returns empty string if none is fo
 
 #### Defined in
 
-[libp2p/index.ts:67](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L67)
+[libp2p/index.ts:68](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L68)
 
 ___
 
@@ -991,7 +991,7 @@ Returns true or false if given string does not contain a b58string
 
 #### Defined in
 
-[libp2p/index.ts:50](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L50)
+[libp2p/index.ts:51](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L51)
 
 ___
 
@@ -1109,7 +1109,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:194](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L194)
+[libp2p/index.ts:203](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L203)
 
 ___
 
@@ -1133,7 +1133,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:210](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L210)
+[libp2p/index.ts:219](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L219)
 
 ___
 
@@ -1156,7 +1156,7 @@ ___
 
 #### Defined in
 
-[libp2p/index.ts:273](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L273)
+[libp2p/index.ts:282](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/libp2p/index.ts#L282)
 
 ___
 
