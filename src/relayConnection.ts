@@ -127,7 +127,6 @@ class RelayConnection extends EventEmitter implements MultiaddrConnection {
 
   public close(_err?: Error): Promise<void> {
     this.verbose(`close called`)
-    console.trace(`Trace RelayConnection close call`)
 
     if (this._destroyed) {
       return Promise.resolve()

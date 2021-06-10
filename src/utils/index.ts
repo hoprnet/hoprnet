@@ -68,36 +68,55 @@ export async function dialHelper(
   }
 
   if (struct != null) {
-    clearTimeout(timeout as NodeJS.Timeout)
+    if (timeout != undefined) {
+      clearTimeout(timeout)
+    }
     return struct
   }
 
-  if (signal.aborted || ((err != null || struct == null) && libp2p._dht == undefined)) {
+  if (signal.aborted) {
+    return
+  }
+
+  if ((err != null || struct == null) && libp2p._dht == undefined) {
+    if (timeout != undefined) {
+      clearTimeout(timeout)
+    }
     error(`Could not dial ${destination.toB58String()} directly and libp2p was started without a DHT.`)
-    return undefined
+    return
   }
 
   let addresses = (libp2p.peerStore.get(destination)?.addresses ?? []).map((addr: any) => addr.multiaddr.toString())
 
   // Try to get some fresh addresses from the DHT
-  let dhtAddresses: Multiaddr[]
+  let dhtResponse:
+    | {
+        id: PeerId
+        multiaddrs: Multiaddr[]
+      }
+    | undefined
 
   try {
     // Let libp2p populate its internal peerStore with fresh addresses
-    dhtAddresses =
-      (await (libp2p._dht as any)?.findPeer(destination, { timeout: DEFAULT_DHT_QUERY_TIMEOUT })?.multiaddrs) ?? []
+    dhtResponse = await (libp2p._dht as any).findPeer(destination, { timeout: DEFAULT_DHT_QUERY_TIMEOUT })
   } catch (err) {
     error(
       `Querying the DHT as peer ${libp2p.peerId.toB58String()} for ${destination.toB58String()} failed. ${err.message}`
     )
-    return undefined
   }
 
-  const newAddresses = dhtAddresses.filter((addr) => addresses.includes(addr.toString()))
+  const newAddresses = (dhtResponse?.multiaddrs ?? []).filter((addr) => addresses.includes(addr.toString()))
+
+  if (signal.aborted) {
+    return
+  }
 
   // Only start a dial attempt if we have received new addresses
-  if (signal.aborted || newAddresses.length > 0) {
-    return undefined
+  if (newAddresses.length == 0) {
+    if (timeout != undefined) {
+      clearTimeout(timeout)
+    }
+    return
   }
 
   try {
@@ -105,15 +124,18 @@ export async function dialHelper(
     verbose(`Dial after DHT request successful`, struct)
   } catch (err) {
     error(`Using new addresses after querying the DHT did not lead to a connection. Cannot connect. ${err.message}`)
-    return undefined
+    return
   }
 
   if (struct != null) {
-    clearTimeout(timeout as NodeJS.Timeout)
+    if (timeout != undefined) {
+      clearTimeout(timeout)
+    }
     return struct
   }
 
-  return undefined
+  // Let Typescript figure out the correct type
+  return
 }
 
 export function nodeToMultiaddr(addr: AddressInfo): Parameters<typeof Multiaddr.fromNodeAddress>[0] {
