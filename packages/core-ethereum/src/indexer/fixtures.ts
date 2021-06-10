@@ -87,7 +87,7 @@ export const COMMITMENT_SET_A = {
       commitment: Hash.create(new TextEncoder().encode('commA')).toHex(),
       ticketEpoch: BigNumber.from('1'),
       ticketIndex: BigNumber.from('0'),
-      status: 1,
+      status: 2,
       channelEpoch: BigNumber.from('0'),
       closureTime: BigNumber.from('0')
     }
@@ -116,51 +116,3 @@ export const COMMITMENT_SET_B = {
     }
   } as any
 } as Event<'ChannelUpdate'>
-
-export const PENDING_CLOSURE_EVENT = {
-  event: 'ChannelUpdate',
-  transactionHash: '',
-  blockNumber: 5,
-  transactionIndex: 0,
-  logIndex: 0,
-  args: {
-    source: PARTY_A.toAddress().toHex(),
-    destination: PARTY_B.toAddress().toHex(),
-    newState: {
-      balance: BigNumber.from('3'),
-      commitment: Hash.create(new TextEncoder().encode('commA')).toHex(),
-      ticketEpoch: BigNumber.from('1'),
-      ticketIndex: BigNumber.from('0'),
-      status: 2,
-      channelEpoch: BigNumber.from('0'),
-      closureTime: BigNumber.from('0'),
-      closureByPartyA: true
-    }
-  } as any
-} as Event<'ChannelUpdate'>
-
-export const PENDING_CLOSURE_CHANNEL = ChannelEntry.fromSCEvent(PENDING_CLOSURE_EVENT)
-
-export const CLOSED_EVENT = {
-  event: 'ChannelUpdate',
-  transactionHash: '',
-  blockNumber: 7,
-  transactionIndex: 0,
-  logIndex: 0,
-  args: {
-    source: PARTY_A.toAddress().toHex(),
-    destination: PARTY_B.toAddress().toHex(),
-    newState: {
-      balance: BigNumber.from('0'),
-      commitment: new Hash(new Uint8Array({ length: Hash.SIZE })).toHex(),
-      ticketEpoch: BigNumber.from('0'),
-      ticketIndex: BigNumber.from('0'),
-      status: 0,
-      channelEpoch: BigNumber.from('0'),
-      closureTime: BigNumber.from('0'),
-      closureByPartyA: false
-    }
-  } as any
-} as Event<'ChannelUpdate'>
-
-export const CLOSED_CHANNEL = ChannelEntry.fromSCEvent(CLOSED_EVENT)

@@ -16,7 +16,7 @@ import {
 import assert from 'assert'
 import BN from 'bn.js'
 import { utils } from 'ethers'
-import { Channel } from '..'
+import { Channel } from './channel'
 import * as fixtures from './fixtures'
 
 const createChainMock = (): ChainWrapper => {

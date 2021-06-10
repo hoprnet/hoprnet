@@ -4,7 +4,7 @@ import type { ChainWrapper } from '../ethereum'
 import chalk from 'chalk'
 import BN from 'bn.js'
 import Heap from 'heap-js'
-import { randomChoice, HoprDB, stringToU8a } from '@hoprnet/hopr-utils'
+import { randomChoice, HoprDB, stringToU8a, ChannelStatus } from '@hoprnet/hopr-utils'
 import { Address, ChannelEntry, AccountEntry, Hash, PublicKey, Balance, Snapshot } from '@hoprnet/hopr-utils'
 import { isConfirmedBlock, snapshotComparator } from './utils'
 import { Commitment } from '../commitment'
@@ -162,7 +162,6 @@ class Indexer extends EventEmitter {
         failedCount++
 
         if (failedCount > 5) {
-          console.error(error)
           throw error
         }
 
@@ -282,23 +281,16 @@ class Indexer extends EventEmitter {
     const channel = ChannelEntry.fromSCEvent(event)
 
     log(channel.toString())
-
     await this.db.updateChannel(channel.getId(), channel)
 
     if (channel.source.eq(this.address) || channel.destination.eq(this.address)) {
       this.emit('own-channel-updated', channel)
 
-      if (channel.status !== 'OPEN') {
-        // Only handle open channels
-        return
-      }
-
       if (channel.destination.eq(this.address)) {
         // Channel _to_ us
-        const ticketEpoch = channel.ticketEpoch
-        if (ticketEpoch.toBN().isZero()) {
+        if (channel.status === ChannelStatus.WaitingForCommitment) {
           await this.onOwnUnsetCommitment(channel)
-        } else if (ticketEpoch.toBN().gten(1)) {
+        } else if (channel.status === ChannelStatus.Open) {
           this.resolveCommitmentPromise(channel.getId())
         }
       }
