@@ -4,12 +4,13 @@
 import PeerId from 'peer-id'
 import { keys, PublicKey } from 'libp2p-crypto'
 import multihashes from 'multihashes'
-import LibP2P from 'libp2p'
+import type { PeerRoutingModule, Connection, MuxedStream } from 'libp2p'
+import type LibP2P from 'libp2p'
+
 import AbortController from 'abort-controller'
-import { Multiaddr } from 'multiaddr'
 import Debug from 'debug'
-import type { Connection, MuxedStream } from 'libp2p'
 import pipe from 'it-pipe'
+import type { PromiseValue } from '../typescript'
 
 export * from './privKeyToPeerId'
 export * from './pubKeyToPeerId'
@@ -87,7 +88,7 @@ export type DialOpts = {
 export type DialResponse =
   | {
       status: 'SUCCESS'
-      resp: { stream: MuxedStream; protocol: string }
+      resp: PromiseValue<ReturnType<LibP2P['dialProtocol']>>
     }
   | {
       status: 'E_TIMEOUT'
@@ -119,19 +120,19 @@ export async function dial(
   opts?: DialOpts
 ): Promise<DialResponse> {
   let signal: AbortSignal
-  let timeout: NodeJS.Timeout | undefined
+  let timeout: NodeJS.Timeout
 
   const abort = new AbortController()
   signal = abort.signal
   timeout = setTimeout(() => {
     abort.abort()
-    verbose(`timeout while querying ${destination.toB58String()}`)
+    verbose(`timeout while trying to dial ${destination.toB58String()}`)
   }, opts.timeout || DEFAULT_DHT_QUERY_TIMEOUT)
 
   let err: any
-  let struct: any
+  let struct: PromiseValue<ReturnType<LibP2P['dialProtocol']>> | null
 
-  let addresses = (libp2p.peerStore.get(destination)?.addresses ?? []).map((addr: any) => addr.multiaddr.toString())
+  let addresses = (libp2p.peerStore.get(destination)?.addresses ?? []).map((addr) => addr.multiaddr.toString())
 
   // Try to use known addresses
   if (addresses.length > 0) {
@@ -153,11 +154,12 @@ export async function dial(
 
   if ((err != null || struct == null) && libp2p._dht == undefined) {
     logError(`Could not dial ${destination.toB58String()} directly and libp2p was started without a DHT.`)
+    clearTimeout(timeout)
     return { status: 'E_DIAL', error: err, dht: false }
   }
 
   // Try to get some fresh addresses from the DHT
-  let dhtResponse: { id: PeerId; multiaddrs: Multiaddr[] } | undefined
+  let dhtResponse: PromiseValue<ReturnType<PeerRoutingModule['findPeer']>>
   try {
     // Let libp2p populate its internal peerStore with fresh addresses
     dhtResponse = await libp2p._dht.findPeer(destination, { timeout: DEFAULT_DHT_QUERY_TIMEOUT })
@@ -167,8 +169,13 @@ export async function dial(
 
   const newAddresses = (dhtResponse?.multiaddrs ?? []).filter((addr) => addresses.includes(addr.toString()))
 
+  if (signal.aborted) {
+    return { status: 'E_TIMEOUT' }
+  }
+
   // Only start a dial attempt if we have received new addresses
-  if (signal.aborted || newAddresses.length == 0) {
+  if (newAddresses.length == 0) {
+    clearTimeout(timeout)
     return { status: 'E_DIAL', error: new Error('No new addresses'), dht: true }
   }
 
@@ -177,6 +184,7 @@ export async function dial(
     verbose(`Dial after DHT request successful`, struct)
   } catch (err) {
     logError(`Using new addresses after querying the DHT did not lead to a connection. Cannot connect. ${err.message}`)
+    clearTimeout(timeout)
     return { status: 'E_DIAL', error: err, dht: true }
   }
 
@@ -188,6 +196,7 @@ export async function dial(
     clearTimeout(timeout)
     return { status: 'SUCCESS', resp: struct }
   }
+
   throw new Error('Missing error case in dial')
 }
 
