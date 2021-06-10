@@ -1,4 +1,4 @@
-import type { RoutingChannel } from '@hoprnet/hopr-core-ethereum'
+import type { RoutingChannel, Channel } from '@hoprnet/hopr-core-ethereum'
 import PeerId from 'peer-id'
 import BN from 'bn.js'
 import {
@@ -38,6 +38,8 @@ export interface ChannelStrategy {
     getRandomChannel: () => Promise<RoutingChannel>
   ): Promise<[ChannelsToOpen[], ChannelsToClose[]]>
   // TBD: Include ChannelsToClose as well.
+
+  onChannelWillClose(c: Channel): Promise<void> // Before a channel closes
 }
 
 const logChannels = (c: ChannelsToOpen[]): string => c.map((x) => x[0].toB58String() + ':' + x[1].toString()).join(', ')
@@ -55,6 +57,10 @@ export class PassiveStrategy implements ChannelStrategy {
     _p: NetworkPeers
   ): Promise<[ChannelsToOpen[], ChannelsToClose[]]> {
     return [[], []]
+  }
+
+  async onChannelWillClose(_c: Channel) {
+    // Passive strategy does nothing.
   }
 }
 
@@ -115,5 +121,10 @@ export class PromiscuousStrategy implements ChannelStrategy {
     }
     log('Promiscuous toOpen: ', logChannels(toOpen))
     return [toOpen, toClose]
+  }
+
+  async onChannelWillClose(c: Channel) {
+    log('auto redeeming')
+    await c.redeemAllTickets()
   }
 }

@@ -16,8 +16,10 @@ elif [ $NETWORK == "goerli" ]; then
 fi
 
 # go to ethereum package
-dir=$(dirname $(readlink -f $0))
-cd "${dir}/../packages/ethereum"
+declare mydir
+mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
+
+cd "${mydir}/../packages/ethereum"
 
 # deploy smart contracts
 yarn hardhat deploy --network "${NETWORK}"

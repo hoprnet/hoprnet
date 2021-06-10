@@ -17,8 +17,8 @@
       "3001:3001/tcp"
     ],
     "path": "hopr.avado.dnp.dappnode.eth_0.100.0.tar.xz",
-    "hash": "/ipfs/Qmaj86iKYbZe3MhsCL5i5eKdyyxHYnLfWLp5BwrwxRyzYj",
-    "size": 222366412,
+    "hash": "/ipfs/QmXv7cHnv9G8uaFZrK1TnmmzvduBwERZJ19NZ4Y5gGx7R6",
+    "size": 224227896,
     "restart": "always"
   },
   "author": "HOPR",

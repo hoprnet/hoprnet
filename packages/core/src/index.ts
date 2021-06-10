@@ -54,7 +54,7 @@ import { subscribeToAcknowledgements } from './interactions/packet/acknowledgeme
 import { PacketForwardInteraction } from './interactions/packet/forward'
 
 import { Packet } from './messages'
-import { localAddressesFirst, publicAddressesFirst, AddressSorter } from '@hoprnet/hopr-utils'
+import { localAddressesFirst, AddressSorter } from '@hoprnet/hopr-utils'
 
 const log = Debug(`hopr-core`)
 const verbose = Debug('hopr-core:verbose')
@@ -132,8 +132,7 @@ class Hopr extends EventEmitter {
       this.addressSorter = localAddressesFirst
       log('Preferring local addresses')
     } else {
-      this.addressSorter = publicAddressesFirst
-      log('Preferring public addresses')
+      log('Addresses are sorted by default')
     }
   }
 
@@ -701,6 +700,10 @@ class Hopr extends EventEmitter {
     // TODO: should we wait for confirmation?
     if (channelState.status === 'CLOSED') {
       throw new Error('Channel is already closed')
+    }
+
+    if (channelState.status === 'OPEN') {
+      await this.strategy.onChannelWillClose(channel)
     }
 
     const txHash = await (channelState.status === 'OPEN' ? channel.initializeClosure() : channel.finalizeClosure())
