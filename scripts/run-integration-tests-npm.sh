@@ -23,7 +23,7 @@ usage() {
 declare mydir
 declare npm_package_version
 
-mydir=$(dirname $(readlink -f $0))
+mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 
 # we rely on Git tags so need to fetch the tags in case they are not present
 git fetch --unshallow --tags || :

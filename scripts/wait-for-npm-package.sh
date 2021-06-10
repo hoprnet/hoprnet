@@ -10,7 +10,7 @@ declare npm_package
 test -z "${HOPR_PACKAGE:-}" && (echo "Missing environment variable HOPR_PACKAGE"; exit 1)
 test -z "${HOPR_PACKAGE_VERSION:-}" && (echo "Missing environment variable HOPR_PACKAGE_VERSION"; exit 1)
 
-mydir=$(dirname $(readlink -f $0))
+mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 
 while : ; do
   npm_package=$(${mydir}/get-npm-package-info.sh)
