@@ -31,7 +31,7 @@ function checkCircuitAddress(maTuples: [code: number, addr: Uint8Array][], peerI
     Multihash.validate(firstAddress) // throws if invalid
   } catch (err) {
     // Could not decode address
-    console.log(`first address not valid`, err)
+    log(`first address not valid`, err)
     return false
   }
 

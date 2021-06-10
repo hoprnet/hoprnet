@@ -489,7 +489,7 @@ class Listener extends EventEmitter implements InterfaceListener {
       conn = await this.upgrader.upgradeOutbound(maConn)
       latency = Date.now() - start
     } catch (err) {
-      console.log(err)
+      error(err)
       attemptClose(maConn)
 
       return {
