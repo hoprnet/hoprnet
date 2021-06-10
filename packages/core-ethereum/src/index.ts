@@ -78,6 +78,10 @@ export default class HoprEthereum {
     return this.indexer.getChannelsFrom(addr)
   }
 
+  public getChannelsTo(addr: Address): Promise<ChannelEntry[]> {
+    return this.indexer.getChannelsTo(addr)
+  }
+
   public async getAccount(addr: Address) {
     return this.indexer.getAccount(addr)
   }

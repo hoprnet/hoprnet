@@ -346,6 +346,12 @@ class Indexer extends EventEmitter {
     })
   }
 
+  public async getChannelsTo(address: Address) {
+    return this.db.getChannels((channel) => {
+      return address.eq(channel.destination)
+    })
+  }
+
   // routing
   public async getPublicKeyOf(address: Address): Promise<PublicKey | undefined> {
     const account = await this.db.getAccount(address)

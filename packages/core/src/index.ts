@@ -765,6 +765,11 @@ class Hopr extends EventEmitter {
     return await ethereum.getChannelsFrom(addr)
   }
 
+  public async getChannelsTo(addr: Address): Promise<ChannelEntry[]> {
+    const ethereum = await this.paymentChannels
+    return await ethereum.getChannelsTo(addr)
+  }
+
   public async getPublicKeyOf(addr: Address): Promise<PublicKey> {
     const ethereum = await this.paymentChannels
     return await ethereum.getPublicKeyOf(addr)
