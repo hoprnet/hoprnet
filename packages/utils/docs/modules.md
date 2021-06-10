@@ -96,7 +96,7 @@
 - [getPacketLength](modules.md#getpacketlength)
 - [hasB58String](modules.md#hasb58string)
 - [isExpired](modules.md#isexpired)
-- [isMultiaddrPrivate](modules.md#ismultiaddrprivate)
+- [isMultiaddrLocal](modules.md#isMultiaddrLocal)
 - [iterateHash](modules.md#iteratehash)
 - [lengthPrefixedToU8a](modules.md#lengthprefixedtou8a)
 - [libp2pSendMessage](modules.md#libp2psendmessage)
@@ -1022,9 +1022,9 @@ true if it's expired
 
 ___
 
-### isMultiaddrPrivate
+### isMultiaddrLocal
 
-▸ **isMultiaddrPrivate**(`multiaddr`): `boolean`
+▸ **isMultiaddrLocal**(`multiaddr`): `boolean`
 
 #### Parameters
 

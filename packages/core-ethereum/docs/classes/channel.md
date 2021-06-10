@@ -20,12 +20,14 @@
 - [createTicket](channel.md#createticket)
 - [finalizeClosure](channel.md#finalizeclosure)
 - [fund](channel.md#fund)
+- [getAcknowledgedTickets](channel.md#getacknowledgedtickets)
 - [getBalances](channel.md#getbalances)
 - [getChainCommitment](channel.md#getchaincommitment)
 - [getId](channel.md#getid)
 - [getState](channel.md#getstate)
 - [initializeClosure](channel.md#initializeclosure)
 - [open](channel.md#open)
+- [redeemAllTickets](channel.md#redeemalltickets)
 - [redeemTicket](channel.md#redeemticket)
 - [generateId](channel.md#generateid)
 
@@ -217,6 +219,20 @@ ___
 
 ___
 
+### getAcknowledgedTickets
+
+▸ **getAcknowledgedTickets**(): `Promise`<AcknowledgedTicket[]\>
+
+#### Returns
+
+`Promise`<AcknowledgedTicket[]\>
+
+#### Defined in
+
+[core-ethereum/src/channel.ts:229](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L229)
+
+___
+
 ### getBalances
 
 ▸ **getBalances**(): `Promise`<`Object`\>
@@ -307,6 +323,20 @@ ___
 
 ___
 
+### redeemAllTickets
+
+▸ **redeemAllTickets**(): `Promise`<[RedeemTicketResponse](../modules.md#redeemticketresponse)[]\>
+
+#### Returns
+
+`Promise`<[RedeemTicketResponse](../modules.md#redeemticketresponse)[]\>
+
+#### Defined in
+
+[core-ethereum/src/channel.ts:233](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L233)
+
+___
+
 ### redeemTicket
 
 ▸ **redeemTicket**(`ackTicket`): `Promise`<[RedeemTicketResponse](../modules.md#redeemticketresponse)\>
@@ -323,7 +353,7 @@ ___
 
 #### Defined in
 
-[core-ethereum/src/channel.ts:229](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L229)
+[core-ethereum/src/channel.ts:237](https://github.com/hoprnet/hoprnet/blob/master/packages/core-ethereum/src/channel.ts#L237)
 
 ___
 

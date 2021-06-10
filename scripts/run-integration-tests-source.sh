@@ -21,7 +21,7 @@ usage() {
 # verify and set parameters
 declare mydir
 
-mydir=$(dirname $(readlink -f $0))
+mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 
 # set log id and use shared log function for readable logs
 declare HOPR_LOG_ID="e2e-source-test"
