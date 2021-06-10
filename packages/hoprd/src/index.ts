@@ -164,7 +164,7 @@ async function main() {
   let node: Hopr
   let logs = new LogStream()
   let adminServer = undefined
-  let cmds
+  let cmds: Commands
 
   function logMessageToNode(msg: Uint8Array) {
     logs.log(`#### NODE RECEIVED MESSAGE [${new Date().toISOString()}] ####`)
@@ -249,7 +249,7 @@ async function main() {
         if (c === 'daemonize') {
           return
         }
-        let resp = await cmds.execute(c)
+        let resp = await cmds.execute(logs.log, c)
         console.log(resp)
       }
       await node.stop()
