@@ -249,7 +249,10 @@ async function main() {
         if (c === 'daemonize') {
           return
         }
-        await cmds.execute((msg) => {logs.log(msg); console.log(msg)}, c)        
+        await cmds.execute((msg) => {
+          logs.log(msg)
+          console.log(msg)
+        }, c)
       }
       await node.stop()
       process.exit(0)
