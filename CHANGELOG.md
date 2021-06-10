@@ -1,3 +1,10 @@
+<a name="0.2.28"></a>
+
+## [0.2.28](https://github.com/hoprnet/hopr-connect/compare/v0.2.27...v0.2.28) (2021-06-10)
+
+- adds `node-pre-gyp` as dependency to make sure that `hopr-connect` includes all necessary dependencies for a standalone install
+- fixes `wrtc` missing dependency `node-pre-gyp`
+
 <a name="0.2.27"></a>
 
 ## [0.2.27](https://github.com/hoprnet/hopr-connect/compare/v0.2.26...v0.2.27) (2021-06-10)
