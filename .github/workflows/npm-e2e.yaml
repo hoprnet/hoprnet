@@ -1,16 +1,16 @@
-name: HOPR End-to-end tests
+name: HOPR End-to-end tests (NPM)
 
 env:
   HOPR_GITHUB_REF: ${{ github.ref }}
 
 on:
   push:
-    branches: ['**']
+    branches: ['master']
     paths-ignore:
       - '**/docs/**/*'
 
 jobs:
-  source-e2e:
+  npm-e2e:
     name: ${{ matrix.test }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -46,4 +46,4 @@ jobs:
           yarn build
 
       - name: Test
-        run: ./scripts/run-integration-tests-source.sh
+        run: ./scripts/run-integration-tests-npm.sh
