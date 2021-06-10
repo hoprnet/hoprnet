@@ -61,7 +61,8 @@ function cleanup {
     for log_file in "${node1_log}" "${node2_log}" "${node3_log}" "${node4_log}"; do
       if [ -n "${log_file}" ] && [ -f "${log_file}" ]; then
         echo "- Printing last 100 lines from logs"
-        tail -n 100 "${node1_log}" "${node2_log}" "${node3_log}" "${node4_log}"
+        tail -n 100 "${node1_log}" "${node2_log}" "${node3_log}" \
+          "${node4_log}" | sed "s/^/\t/" || :
         echo "- Printing last 100 lines from logs DONE"
       fi
     done

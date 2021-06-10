@@ -60,7 +60,7 @@ function wait_for_port() {
     echo "Waiting (${delay}) seconds for port ${port}"
     if [ -n "${log_file}" ] && [ -f "${log_file}" ]; then
       echo "Last 5 logs:"
-      tail -n 5 "${log_file}"
+      tail -n 5 "${log_file}" | sed "s/^/\t/"
     fi
     sleep ${delay}
     ((i=i+1))
