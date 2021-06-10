@@ -55,8 +55,27 @@ const createHoprChannelsMock = (ops: { pastEvents?: Event<any>[] } = {}) => {
       }, [])[0]
     }
 
-    async bumpChannel(_counterparty: string, _comm: string) {
-      let newEvent = fixtures.COMMITMENT_SET_A
+  async bumpChannel(_counterparty: string, _comm: string) {
+      let newEvent = {
+        event: 'ChannelUpdate',
+        transactionHash: '',
+        blockNumber: 3,
+        transactionIndex: 0,
+        logIndex: 0,
+        args: {
+          source: PARTY_A.toAddress().toHex(),
+          destination: PARTY_B.toAddress().toHex(),
+          newState: {
+            balance: BigNumber.from('3'),
+            commitment: Hash.create(new TextEncoder().encode('commA')).toHex(),
+            ticketEpoch: BigNumber.from('1'),
+            ticketIndex: BigNumber.from('0'),
+            status: 2,
+            channelEpoch: BigNumber.from('0'),
+            closureTime: BigNumber.from('0')
+          }
+        } as any
+      } as Event<'ChannelUpdate'>
       pastEvents.push(newEvent)
       this.emit('*', newEvent)
     }
