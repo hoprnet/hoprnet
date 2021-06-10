@@ -583,7 +583,7 @@ describe('with a reopened channel', function () {
     )
   })
 
-  it('sanity check', async function(){
+  it('sanity check', async function () {
     validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: '70', status: OPEN })
     validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '60', status: OPEN }) // 30 + 30
   })
