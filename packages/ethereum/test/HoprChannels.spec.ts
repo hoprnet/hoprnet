@@ -221,7 +221,7 @@ describe('funding HoprChannel catches failures', function () {
 
   it('should fail to fund a channel with 0 amount', async function () {
     await expect(
-      channels.connect(accountA).fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, CLOSED, CLOSED)
+      channels.connect(accountA).fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '0', '0')
     ).to.be.revertedWith('amount must be greater than 0')
   })
 })
@@ -311,6 +311,34 @@ describe('funding a HoprChannel success', function () {
   })
 })
 
+
+describe('with single funded HoprChannels: AB: 70', function () {
+  let channels
+  let fixtures
+
+  beforeEach(async function () {
+    fixtures = await useFixtures()
+    channels = fixtures.channels
+    await fixtures.fundAndApprove(fixtures.accountA, 100)
+    await channels.connect(fixtures.accountB).bumpChannel(ACCOUNT_A.address, SECRET_2)
+    await channels.connect(fixtures.accountA).fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '100', '0')
+  })
+
+  it('should reedem ticket for account B -> directly to wallet', async function () {
+    validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: '100', status: OPEN })
+    validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '0', status: CLOSED })
+    await channels.connect(fixtures.accountB).redeemTicket(...redeemArgs(fixtures.TICKET_AB_WIN.ticket))
+    const ab = await channels.channels(ACCOUNT_AB_CHANNEL_ID)
+    const ba = await channels.channels(ACCOUNT_BA_CHANNEL_ID)
+    validateChannel(ab, { balance: '90', status: OPEN })
+    validateChannel(ba, { balance: '0', status: CLOSED })
+    expect(ab.commitment).to.equal(SECRET_1)
+    expect((await fixtures.token.balanceOf(ACCOUNT_A.address)).toString()).to.equal('0')
+    expect((await fixtures.token.balanceOf(ACCOUNT_B.address)).toString()).to.equal('10')
+  })
+})
+
+
 describe('with funded HoprChannels: AB: 70, BA: 30, secrets initialized', function () {
   let channels
   let fixtures
@@ -318,7 +346,7 @@ describe('with funded HoprChannels: AB: 70, BA: 30, secrets initialized', functi
   beforeEach(async function () {
     fixtures = await useFixtures()
     channels = fixtures.channels
-    fixtures.fundAndApprove(fixtures.accountA, 100)
+    await fixtures.fundAndApprove(fixtures.accountA, 100)
     await channels.connect(fixtures.accountA).bumpChannel(ACCOUNT_B.address, SECRET_2)
     await channels.connect(fixtures.accountB).bumpChannel(ACCOUNT_A.address, SECRET_2) // TODO secret per account
     await channels.connect(fixtures.accountA).fundChannelMulti(ACCOUNT_A.address, ACCOUNT_B.address, '70', '30')

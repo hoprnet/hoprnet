@@ -115,21 +115,29 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         uint256 amount1,
         uint256 amount2
     ) external {
+        require(amount1.add(amount2) > 0, "amount must be greater than 0");
         token.safeTransferFrom(msg.sender, address(this), amount1.add(amount2));
-        _fundChannel(
-            account1,
-            account2,
-            amount1
-        );
-        _fundChannel(
-            account2,
-            account1,
-            amount2
-        );
+        if (amount1 > 0){
+          _fundChannel(account1, account2, amount1);
+        }
+        if (amount2 > 0){
+          _fundChannel(account2, account1, amount2);
+        }
     }
 
+    /**
+    * @dev redeem a ticket.
+    * If the sender has a channel to the source, the amount will be transferred
+    * to that channel, otherwise it will be sent to their address directly.
+    * @param source the source of the ticket
+    * @param nextCommitment the commitment that hashes to the redeemers previous commitment
+    * @param proofOfRelaySecret the proof of relay secret
+    * @param winProb the winning probability of the ticket
+    * @param amount the amount in the ticket
+    * @param signature signature
+    */
     function redeemTicket(
-        address counterparty,
+        address source,
         bytes32 nextCommitment,
         uint256 ticketEpoch,
         uint256 ticketIndex,
@@ -138,18 +146,59 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
         uint256 winProb,
         bytes memory signature
     ) external {
-        _redeemTicket(
-            msg.sender,
-            counterparty,
-            nextCommitment,
-            ticketEpoch,
-            ticketIndex,
-            proofOfRelaySecret,
-            amount,
-            winProb,
-            signature
+        address destination = msg.sender;
+        _validateSourceAndDest(source, destination);
+        require(nextCommitment != bytes32(0), "nextCommitment must not be empty");
+        require(amount != uint256(0), "amount must not be empty");
+        (, Channel storage spendingChannel) = _getChannel(
+            source,
+            destination
         );
+        require(spendingChannel.status == ChannelStatus.OPEN || spendingChannel.status == ChannelStatus.PENDING_TO_CLOSE, "spending channel must be open or pending to close");
+        require(spendingChannel.commitment == keccak256(abi.encodePacked(nextCommitment)), "commitment must be hash of next commitment");
+        require(spendingChannel.ticketEpoch == ticketEpoch, "ticket epoch must match");
+        require(spendingChannel.ticketIndex < ticketIndex, "redemptions must be in order");
+
+        bytes32 ticketHash = ECDSA.toEthSignedMessageHash(
+            keccak256(
+              _getEncodedTicket(
+                  destination,
+                  spendingChannel.ticketEpoch,
+                  proofOfRelaySecret,
+                  spendingChannel.channelEpoch,
+                  amount,
+                  ticketIndex,
+                  winProb
+              )
+            )
+        );
+
+        require(ECDSA.recover(ticketHash, signature) == source, "signer must match the counterparty");
+        require(
+            _getTicketLuck(
+                ticketHash,
+                nextCommitment,
+                proofOfRelaySecret
+            ) <= winProb,
+            "ticket must be a win"
+        );
+
+          spendingChannel.ticketIndex = ticketIndex;
+          spendingChannel.commitment = nextCommitment;
+          spendingChannel.balance = spendingChannel.balance.sub(amount);
+          (, Channel storage earningChannel) = _getChannel(
+              destination,
+              source
+          );
+          if (earningChannel.status == ChannelStatus.OPEN) {
+            earningChannel.balance = earningChannel.balance.add(amount);
+            emit ChannelUpdate(destination, source, earningChannel);
+          } else {
+            token.transfer(msg.sender, amount);
+          }
+          emit ChannelUpdate(source, destination, spendingChannel);
     }
+
 
     /**
      * @dev Initialize channel closure.
@@ -348,75 +397,6 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
     function _currentBlockTimestamp() internal view returns (uint32) {
         // solhint-disable-next-line
         return uint32(block.timestamp % 2 ** 32);
-    }
-
-    /**
-     * @dev Redeem a ticket
-     * @param destination - redeemer the redeemer address
-     * @param source - counterparty the counterparty address
-     * @param nextCommitment the commitment that hashes to the redeemers previous commitment
-     * @param proofOfRelaySecret the proof of relay secret
-     * @param winProb the winning probability of the ticket
-     * @param amount the amount in the ticket
-     * @param signature signature
-     */
-    function _redeemTicket(
-        address destination,
-        address source,
-        bytes32 nextCommitment,
-        uint256 ticketEpoch,
-        uint256 ticketIndex,
-        bytes32 proofOfRelaySecret,
-        uint256 amount,
-        uint256 winProb,
-        bytes memory signature
-    ) internal {
-        _validateSourceAndDest(source, destination);
-        require(nextCommitment != bytes32(0), "nextCommitment must not be empty");
-        require(amount != uint256(0), "amount must not be empty");
-        (, Channel storage earningChannel) = _getChannel(
-            destination,
-            source
-        );
-        (, Channel storage spendingChannel) = _getChannel(
-            source,
-            destination
-        );
-        require(spendingChannel.status == ChannelStatus.OPEN || spendingChannel.status == ChannelStatus.PENDING_TO_CLOSE, "spending channel must be open or pending to close");
-        require(spendingChannel.commitment == keccak256(abi.encodePacked(nextCommitment)), "commitment must be hash of next commitment");
-        require(spendingChannel.ticketEpoch == ticketEpoch, "ticket epoch must match");
-        require(spendingChannel.ticketIndex < ticketIndex, "redemptions must be in order");
-
-        bytes32 ticketHash = ECDSA.toEthSignedMessageHash(
-            keccak256(
-              _getEncodedTicket(
-                  destination,
-                  spendingChannel.ticketEpoch,
-                  proofOfRelaySecret,
-                  spendingChannel.channelEpoch,
-                  amount,
-                  ticketIndex,
-                  winProb
-              )
-            )
-        );
-
-        require(ECDSA.recover(ticketHash, signature) == source, "signer must match the counterparty");
-        require(
-            _getTicketLuck(
-                ticketHash,
-                nextCommitment,
-                proofOfRelaySecret
-            ) <= winProb,
-            "ticket must be a win"
-        );
-
-          spendingChannel.ticketIndex = ticketIndex;
-          spendingChannel.commitment = nextCommitment;
-          spendingChannel.balance = spendingChannel.balance.sub(amount);
-          earningChannel.balance = earningChannel.balance.add(amount);
-          emit ChannelUpdate(destination, source, earningChannel);
-          emit ChannelUpdate(source, destination, spendingChannel);
     }
 
 
