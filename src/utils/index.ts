@@ -96,7 +96,7 @@ export async function dialHelper(
 
   try {
     // Let libp2p populate its internal peerStore with fresh addresses
-    dhtResponse = await (libp2p._dht as any)?.findPeer(destination, { timeout: DEFAULT_DHT_QUERY_TIMEOUT })
+    dhtResponse = await (libp2p._dht as any).findPeer(destination, { timeout: DEFAULT_DHT_QUERY_TIMEOUT })
   } catch (err) {
     error(
       `Querying the DHT as peer ${libp2p.peerId.toB58String()} for ${destination.toB58String()} failed. ${err.message}`
