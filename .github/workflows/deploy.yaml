@@ -11,7 +11,7 @@ on:
 
 jobs:
   build:
-    name: Build, Publish etc
+    name: Build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -56,11 +56,66 @@ jobs:
           yarn util:link
           yarn build
 
+  publish_npm:
+    name: Publish to NPM
+    runs-on: ubuntu-latest
+    # we must wait for the possible commit changes from the smart contract
+    # deployment for a full version
+    needs: [build, deploy_smart_contracts]
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          # we use a custom PAT to allow our workflows to run on this commit,
+          # which is not the case normally
+          token: ${{ secrets.COMMIT_BOT_ACCESS_TOKEN }}
+
+      - name: Configure Git info
+        run: ./scripts/configure-git-info.sh
+
+      - name: Use Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: 14
+          registry-url: https://registry.npmjs.org/
+
+      - name: Install Yarn (only when using ACT)
+        if: env.ACT != ''
+        run: |
+          curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add -
+          echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list
+          apt update
+          apt install --no-install-recommends yarn
+
+      - name: Get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "::set-output name=dir::$(yarn config get cacheFolder)"
+
+      - name: Restore cache of node modules and yarn cache
+        uses: actions/cache@v2
+        id: nodejs-cache
+        with:
+          path: |
+            node_modules
+            */*/node_modules
+            ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-nodejs-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-nodejs-
+
+      - name: Install dependencies / link / build
+        run: |
+          yarn
+          yarn setup
+          yarn util:link
+          yarn build
+
       - name: Publish prerelease version (On pushes to master)
         if: github.ref == 'refs/heads/master'
         run: |
-          # skip releasing for changes from our bots to prevent circular change propagation
-          [ "noreply@hoprnet.org" = "$(git show -s --format='%ae' ${HOPR_GITHUB_REF})" ] && exit 0
+          # skip releasing for changes which we committed here before to
+          # prevent circular change propagation
+          [[ "chore(release): publish "* = "$(git show -s --format='%B' ${HOPR_GITHUB_REF})" ]] && exit 0
+
           export HOPR_PACKAGE_VERSION=$(./scripts/get-package-version.sh)
           ./scripts/publish-pre-release.sh
         env:
@@ -73,8 +128,10 @@ jobs:
       - name: Publish patch version (On pushes to release branches)
         if: startsWith(github.ref, 'refs/heads/release/')
         run: |
-          # skip releasing for changes from our bots to prevent circular change propagation
-          [ "noreply@hoprnet.org" = "$(git show -s --format='%ae' ${HOPR_GITHUB_REF})" ] && exit 0
+          # skip releasing for changes which we committed here before to
+          # prevent circular change propagation
+          [[ "chore(release): publish "* = "$(git show -s --format='%B' ${HOPR_GITHUB_REF})" ]] && exit 0
+
           ./scripts/publish-patch-release.sh
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -157,13 +214,12 @@ jobs:
       - name: Commit & Push changes
         env:
           HOPR_GIT_MSG: "Update smart contract deployments"
-          HOPR_GITHUB_REF: ${{ github.ref }}
         run: ./scripts/commit-and-push-all-changes.sh
 
   release:
     name: Create Github Release
     runs-on: ubuntu-latest
-    needs: [build, deploy_smart_contracts]
+    needs: [build, deploy_smart_contracts, publish_npm]
     if: startsWith(github.ref, 'refs/heads/release/')
     steps:
       - uses: actions/checkout@v2
@@ -189,7 +245,7 @@ jobs:
   build_hoprd_docker:
     name: Build HOPRD Docker
     runs-on: ubuntu-latest
-    needs: [build]
+    needs: [build, deploy_smart_contracts, publish_npm]
     steps:
       - uses: actions/checkout@v2
 
@@ -205,6 +261,10 @@ jobs:
 
       - name: Building Docker image using Google Cloud Build
         run: | # TODO - actually parse semver to tag v1
+          # skip building docker unless this is a new published version where we
+          # can be sure that all dependencies are in sync
+          [[ "chore(release): publish "* = "$(git show -s --format='%B' ${HOPR_GITHUB_REF})" ]] && exit 0
+
           export HOPR_PACKAGE_VERSION=$(./scripts/get-package-version.sh)
           gcloud builds submit packages/hoprd --tag ${HOPR_DOCKER_IMAGE}:${HOPR_PACKAGE_VERSION}
           gcloud container images add-tag ${HOPR_DOCKER_IMAGE}:${HOPR_PACKAGE_VERSION} ${HOPR_DOCKER_IMAGE}:1
@@ -230,12 +290,6 @@ jobs:
           HOPR_GITHUB_REF: ${{ github.ref }}
           HOPR_PACKAGE: hoprd
         run: |
-          # only release on version updates from our versioning bot to prevent
-          # duplicate releases
-          [ "noreply@hoprnet.org" != "$(git show -s --format='%ae' ${HOPR_GITHUB_REF})" ] && exit 0
-          # only release on commits with messages starting with the prefix 'v'
-          # which determines version commits
-          [[ "v"* != "$(git show -s --format='%B' ${HOPR_GITHUB_REF})" ]] && exit 0
           # Hack version if we are in master (they don't support prerelease versions)
           # Set this to an arbitrary number less than 1
           local version="0.100.0"
