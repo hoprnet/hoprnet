@@ -99,15 +99,20 @@ trap cleanup EXIT
 # $3 = node data directory
 # $4 = node log file
 # $5 = node id file
+# $6 = commands to run at startup
 function setup_node() {
   local port=${1}
   local host_port=${2}
   local dir=${3}
   local log=${4}
   local id=${5}
-  local cmds=${6}
+  local cmds=${6:-""}
 
   echo "- Run node ${id} on rest port ${port}"
+
+  if [ -n "$cmds" ]; then
+    echo "- Executing '${cmds}' and exiting"
+  fi
 
   DEBUG="hopr*" node packages/hoprd/lib/index.js \
     --init --provider=ws://127.0.0.1:8545/ \
@@ -189,9 +194,9 @@ wait_for_http_port 8545 "${hardhat_rpc_log}" "${wait_delay}" "${wait_max_wait}"
 # }}}
 
 #  --- Run nodes --- {{{
-setup_node 3301 9091 "${node1_dir}" "${node1_log}" "${node1_id}" ""
-setup_node 3302 9092 "${node2_dir}" "${node2_log}" "${node2_id}" ""
-setup_node 3303 9093 "${node3_dir}" "${node3_log}" "${node3_id}" ""
+setup_node 3301 9091 "${node1_dir}" "${node1_log}" "${node1_id}"
+setup_node 3302 9092 "${node2_dir}" "${node2_log}" "${node2_id}"
+setup_node 3303 9093 "${node3_dir}" "${node3_log}" "${node3_id}"
 setup_node 3304 9094 "${node4_dir}" "${node4_log}" "${node4_id}" "info;balance"
 # }}}
 
