@@ -78,7 +78,10 @@ async function createIdentity(idPath: string, password: string, dev = false) {
 export async function getIdentity(options: IdentityOptions): Promise<PeerId> {
   try {
     return await loadIdentity(options.idPath, options.password, options.dev)
-  } catch {
+  } catch (err) {
+    if (err.code !== 'ENOENT') {
+      throw err
+    }
     log('Could not load identity', options.idPath)
   }
 

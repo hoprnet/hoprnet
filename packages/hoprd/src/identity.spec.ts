@@ -6,6 +6,7 @@ import assert from 'assert'
 describe('identity generation and serialization', function () {
   const DUMMY_PATH = resolve(__dirname, './hopr-test-identity')
   const DUMMY_PASSWORD = 'hopr-unit-test-password'
+  const WRONG_DUMMY_PASSWORD = 'hopr-unit-test-wrong-password'
 
   before(function () {
     if (existsSync(DUMMY_PATH)) {
@@ -45,6 +46,21 @@ describe('identity generation and serialization', function () {
     })
 
     assert(testIdentity.equals(deserializedIdentity))
+
+    let rejectsWithWrongPassword: boolean
+    try {
+      await getIdentity({
+        initialize: true,
+        idPath: DUMMY_PATH,
+        password: WRONG_DUMMY_PASSWORD,
+        dev: true
+      })
+      rejectsWithWrongPassword = false
+    } catch {
+      rejectsWithWrongPassword = true
+    }
+
+    assert(rejectsWithWrongPassword)
 
     let rejectsWhenUsingDevSecret: boolean
     try {
