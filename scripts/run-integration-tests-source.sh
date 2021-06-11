@@ -217,3 +217,9 @@ wait_for_port 9093 "${node3_log}"
 ${mydir}/../test/integration-test.sh \
   "localhost:3301" "localhost:3302" "localhost:3303"
 # }}}
+
+# -- Verify node4 has executed the commands {{{
+echo "- Verifying node4 log output"
+grep -q "^HOPR Balance:" "${node4_log}" 
+grep -q "^Running on: localhost" "${node4_log}" 
+#}}}
