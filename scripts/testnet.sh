@@ -41,9 +41,9 @@ funding_wallet_address() {
 # $1=account (hex)
 fund_if_empty() {
   echo "Starting funding wallet process"
-  FUNDING_WALLET_ADDRESS=$(funding_wallet_address)
+  local FUNDING_WALLET_ADDRESS=$(funding_wallet_address)
   echo "Checking balance of funding wallet $FUNDING_WALLET_ADDRESS using RPC $RPC"
-  FUNDING_WALLET_BALANCE="$(funding_wallet_balance)"
+  local FUNDING_WALLET_BALANCE="$(funding_wallet_balance)"
   if [ "$FUNDING_WALLET_BALANCE" = '0.0' ]; then
     echo "Wallet $FUNDING_WALLET_ADDRESS has zero balance and cannot fund node $1"
   else
