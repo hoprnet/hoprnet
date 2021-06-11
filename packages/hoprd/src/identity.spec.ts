@@ -82,6 +82,22 @@ describe('Identity', function () {
     assert(rejectsWhenUsingDevSecret)
   })
 
+  it('fail on empty password', async function () {
+    let rejectsOnEmptyPassword: boolean
+    try {
+      await getIdentity({
+        initialize: false,
+        idPath: DUMMY_PATH,
+        password: ''
+      })
+      rejectsOnEmptyPassword = false
+    } catch {
+      rejectsOnEmptyPassword = true
+    }
+
+    assert(rejectsOnEmptyPassword)
+  })
+
   it('store and restore identity', async function () {
     const testIdentity = await getIdentity({
       initialize: true,
