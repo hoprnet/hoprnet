@@ -103,7 +103,8 @@ update_if_existing() {
 # $3 = OPTIONAL chain provider
 # NB: --run needs to be at the end or it will ignore the other arguments.
 start_testnode_vm() {
-  if [ ! -z "${3:-}" ]; then
+  local additional_flags=""
+  if [ -n "${3:-}" ]; then
     additional_flags="--container-arg=--provider --container-arg=$RPC"
   fi
   if [ "$(update_if_existing $1 $2)" = "no container" ]; then
@@ -112,7 +113,6 @@ start_testnode_vm() {
       --container-mount-disk mount-path="/app/db" \
       --container-env=^,@^DEBUG=hopr\*,@NODE_OPTIONS=--max-old-space-size=4096,@GCLOUD=1 \
       --container-image=$2 \
-      $additional_flags \
       --container-arg="--identity" --container-arg="/app/db/.hopr-identity" \
       --container-arg="--password" --container-arg="$BS_PASSWORD" \
       --container-arg="--init" --container-arg="true" \
@@ -124,7 +124,8 @@ start_testnode_vm() {
       --container-arg="--admin" --container-arg="true" \
       --container-arg="--adminHost" --container-arg="0.0.0.0" \
       --container-arg="--run" --container-arg="\"cover-traffic start;daemonize\"" \
-      --container-restart-policy=always
+      --container-restart-policy=always \
+      ${additional_flags}
   fi
 }
 
