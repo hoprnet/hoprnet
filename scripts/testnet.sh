@@ -27,26 +27,28 @@ disk_name() {
 
 # $1=account (hex)
 balance() {
-  yarn ethers eval "new ethers.providers.JsonRpcProvider('$RPC').getBalance('$1').then(b => formatEther(b))"
+  yarn run --silent ethers eval "new ethers.providers.JsonRpcProvider('$RPC').getBalance('$1').then(b => formatEther(b))"
 }
 
 funding_wallet_balance() {
-  yarn ethers --rpc "$RPC" --account "$FUNDING_PRIV_KEY" eval 'accounts[0].getBalance().then(b => formatEther(b))'
+  yarn run --silent ethers --rpc "$RPC" --account "$FUNDING_PRIV_KEY" eval 'accounts[0].getBalance().then(b => formatEther(b))'
 }
 
 funding_wallet_address() {
-  yarn ethers --rpc "$RPC" --account "$FUNDING_PRIV_KEY" eval 'accounts[0].getAddress().then(a => a)'
+  yarn run --silent ethers --rpc "$RPC" --account "$FUNDING_PRIV_KEY" eval 'accounts[0].getAddress().then(a => a)'
 }
 
 # $1=account (hex)
 fund_if_empty() {
-  local FUNDING_WALLET_ADDRESS="$(funding_wallet_address)"
+  echo "Starting funding wallet process"
+  FUNDING_WALLET_ADDRESS=$(funding_wallet_address)
   echo "Checking balance of funding wallet $FUNDING_WALLET_ADDRESS using RPC $RPC"
-  local FUNDING_WALLET_BALANCE="$(funding_wallet_balance)"
+  FUNDING_WALLET_BALANCE="$(funding_wallet_balance)"
   if [ "$FUNDING_WALLET_BALANCE" = '0.0' ]; then
     echo "Wallet $FUNDING_WALLET_ADDRESS has zero balance and cannot fund node $1"
   else
-    echo "Checking balance of $1"
+    echo "Funding wallet $FUNDING_WALLET_ADDRESS has enough: $FUNDING_WALLET_BALANCE"
+    echo "Checking balance of the wallet $1 to be funded"
     local BALANCE="$(balance $1)"
     echo "Balance of $1 is $BALANCE"
     if [ "$BALANCE" = '0.0' ]; then
@@ -98,14 +100,19 @@ update_if_existing() {
 
 # $1 = vm name
 # $2 = docker image
+# $3 = OPTIONAL chain provider
 # NB: --run needs to be at the end or it will ignore the other arguments.
 start_testnode_vm() {
+  if [ ! -z "${3:-}" ]; then
+    additional_flags="--container-arg=--provider --container-arg=$RPC"
+  fi
   if [ "$(update_if_existing $1 $2)" = "no container" ]; then
     gcloud compute instances create-with-container $1 $GCLOUD_DEFAULTS \
       --create-disk name=$(disk_name $1),size=10GB,type=pd-standard,mode=rw \
       --container-mount-disk mount-path="/app/db" \
       --container-env=^,@^DEBUG=hopr\*,@NODE_OPTIONS=--max-old-space-size=4096,@GCLOUD=1 \
       --container-image=$2 \
+      $additional_flags \
       --container-arg="--identity" --container-arg="/app/db/.hopr-identity" \
       --container-arg="--password" --container-arg="$BS_PASSWORD" \
       --container-arg="--init" --container-arg="true" \
