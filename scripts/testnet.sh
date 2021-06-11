@@ -91,6 +91,7 @@ start_testnode_vm() {
       --container-mount-disk mount-path="/app/db" \
       --container-env=^,@^DEBUG=hopr\*,@NODE_OPTIONS=--max-old-space-size=4096,@GCLOUD=1 \
       --container-image=$2 \
+      --container-arg="--identity" --container-arg="/app/db/.hopr-identity" \
       --container-arg="--password" --container-arg="$BS_PASSWORD" \
       --container-arg="--init" --container-arg="true" \
       --container-arg="--announce" --container-arg="true" \
@@ -120,9 +121,17 @@ start_chain_provider(){
 # $3 node number
 # $4 = OPTIONAL chain provider
 start_testnode() {
-  local vm=$(vm_name "node-$3" $1)
+  local vm ip eth_address
+
+  # start or update vm
+  vm=$(vm_name "node-$3" $1)
   echo "- Starting test node $vm with $2 ${4:-}"
   start_testnode_vm $vm $2 ${4:-}
+
+  # ensure node has funds, even after just updating a release
+  ip=$(gcloud_get_ip "${vm}")
+  eth_address=$(get_eth_address "${ip}")
+  fund_if_empty "${eth_address}"
 }
 
 # $1 authorized keys file

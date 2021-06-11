@@ -77,19 +77,19 @@ particular branch to deploy on every change.
 
    hotfix/patch-paphos    release/paphos          master
 
-         x                   x                       x 1.70.0-next.44
+         x                   x                       x 1.71.0-next.44
          x                   │ ◄─────────────────────x
          x                   │                       x
-         x                   │ 1.70.0                x
+         x                   │ 1.71.0                x
          x                   │                       x
          x                   ▼                       x
          ┌◄──────────────────x                       x
          │                   x                       x
          │                   x                       x
          │                   x                       x
-         ▼──────────────────►┐ 1.70.1                x
+         ▼──────────────────►┐ 1.71.1                x
          x                   │                       x
-         x                   ▼──────────────────────►x 1.71.0-next.0
+         x                   ▼──────────────────────►x 1.72.0-next.0
          x                   x                       x
          x                   x                       x
 

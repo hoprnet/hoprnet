@@ -223,29 +223,29 @@ jobs:
       - name: Configure Git info
         run: ./scripts/configure-git-info.sh
 
-      - name: Set Avado release version
-        id: set-avado-release-version
-        run: |
-          if [ "${{ github.ref }}" = "refs/heads/master" ]; then
-            # Hack version if we are in master (they don't support prerelease versions)
-            # Set this to an arbitrary number less than 1
-            echo "::set-output name=version::0.100.0"
-          else
-            echo "::set-output name=version::$(./scripts/get-package-version.sh)"
-          fi
-        env:
-          HOPR_PACKAGE: hoprd
-
       - name: Build Avado
         working-directory: packages/avado
         env:
           HOPR_GIT_MSG: "placeholder"
           HOPR_GITHUB_REF: ${{ github.ref }}
+          HOPR_PACKAGE: hoprd
         run: |
+          # only release on version updates from our versioning bot to prevent
+          # duplicate releases
+          [ "noreply@hoprnet.org" != "$(git show -s --format='%ae' ${HOPR_GITHUB_REF})" ] && exit 0
+          # only release on commits with messages starting with the prefix 'v'
+          # which determines version commits
+          [[ "v"* != "$(git show -s --format='%B' ${HOPR_GITHUB_REF})" ]] && exit 0
+          # Hack version if we are in master (they don't support prerelease versions)
+          # Set this to an arbitrary number less than 1
+          local version="0.100.0"
+          if [ "${HOPR_GITHUB_REF}" != "refs/heads/master" ]; then
+            version="$(scripts/get-package-version.sh)"
+          fi
           docker-compose build
           sudo npm install -g git+https://github.com/AvadoDServer/AVADOSDK.git#c11c4bd
           avadosdk increase minor
-          sed -i 's/version"[ ]*:[ ]*"[0-9]*\.[0-9]*\.[0-9]*"/version": "${{ steps.set-avado-release-version.outputs.version }}"/' \
+          sed -i 's/version"[ ]*:[ ]*"[0-9]*\.[0-9]*\.[0-9]*"/version": "${version}"/' \
             ./dappnode_package.json
           cat ./dappnode_package.json | grep 'version'
           sudo avadosdk build --provider http://80.208.229.228:5001
@@ -283,7 +283,10 @@ jobs:
           export_default_credentials: true
 
       - name: Run start script
-        run: ./scripts/deploy.sh
+        run: |
+          # need to install tools first which may be used during deployment
+          yarn
+          ./scripts/deploy.sh
         env:
           FUNDING_PRIV_KEY: ${{ secrets.FUNDING_WALLET_PRIVATE_KEY }}
           GITHUB_REF: ${{ github.ref }}
