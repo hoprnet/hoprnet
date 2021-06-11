@@ -86,6 +86,9 @@ export async function getIdentity(options: IdentityOptions): Promise<PeerId> {
     log('Could not load identity', options.idPath)
   }
 
+  log(storedIdentity)
+  console.log(storedIdentity)
+
   if (options.useWeakCrypto) {
     log(`Using weaker key protection to accelerate node startup`)
   }
