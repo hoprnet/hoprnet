@@ -30,15 +30,30 @@ balance() {
   yarn ethers eval "new ethers.providers.JsonRpcProvider('$RPC').getBalance('$1').then(b => formatEther(b))"
 }
 
+funding_wallet_balance() {
+  yarn ethers --rpc "$RPC" --account "$FUNDING_PRIV_KEY" eval 'accounts[0].getBalance().then(b => formatEther(b))'
+}
+
+funding_wallet_address() {
+  yarn ethers --rpc "$RPC" --account "$FUNDING_PRIV_KEY" eval 'accounts[0].getAddress().then(a => a)'
+}
+
 # $1=account (hex)
 fund_if_empty() {
-  echo "Checking balance of $1"
-  local BALANCE="$(balance $1)"
-  echo "Balance is $BALANCE"
-  if [ "$BALANCE" = '0.0' ]; then
-    echo "Funding account ... $RPC -> $1 $MIN_FUNDS"
-    yarn ethers send --rpc "$RPC" --account "$FUNDING_PRIV_KEY" "$1" $MIN_FUNDS --yes
-    sleep 60
+  local FUNDING_WALLET_ADDRESS="$(funding_wallet_address)"
+  echo "Checking balance of funding wallet $FUNDING_WALLET_ADDRESS using RPC $RPC"
+  local FUNDING_WALLET_BALANCE="$(funding_wallet_balance)"
+  if [ "$FUNDING_WALLET_BALANCE" = '0.0' ]; then
+    echo "Wallet $FUNDING_WALLET_ADDRESS has zero balance and cannot fund node $1"
+  else
+    echo "Checking balance of $1"
+    local BALANCE="$(balance $1)"
+    echo "Balance of $1 is $BALANCE"
+    if [ "$BALANCE" = '0.0' ]; then
+      echo "Funding account ... $RPC -> $1 $MIN_FUNDS"
+      yarn ethers send --rpc "$RPC" --account "$FUNDING_PRIV_KEY" "$1" $MIN_FUNDS --yes
+      sleep 60
+    fi
   fi
 }
 
