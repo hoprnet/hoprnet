@@ -64,10 +64,6 @@ jobs:
     needs: [build, deploy_smart_contracts]
     steps:
       - uses: actions/checkout@v2
-        with:
-          # we use a custom PAT to allow our workflows to run on this commit,
-          # which is not the case normally
-          token: ${{ secrets.COMMIT_BOT_ACCESS_TOKEN }}
 
       - name: Configure Git info
         run: ./scripts/configure-git-info.sh
@@ -112,10 +108,6 @@ jobs:
       - name: Publish prerelease version (On pushes to master)
         if: github.ref == 'refs/heads/master'
         run: |
-          # skip releasing for changes which we committed here before to
-          # prevent circular change propagation
-          [[ "chore(release): publish "* = "$(git show -s --format='%B' ${HOPR_GITHUB_REF})" ]] && exit 0
-
           export HOPR_PACKAGE_VERSION=$(./scripts/get-package-version.sh)
           ./scripts/publish-pre-release.sh
         env:
@@ -128,10 +120,6 @@ jobs:
       - name: Publish patch version (On pushes to release branches)
         if: startsWith(github.ref, 'refs/heads/release/')
         run: |
-          # skip releasing for changes which we committed here before to
-          # prevent circular change propagation
-          [[ "chore(release): publish "* = "$(git show -s --format='%B' ${HOPR_GITHUB_REF})" ]] && exit 0
-
           ./scripts/publish-patch-release.sh
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -261,12 +249,8 @@ jobs:
 
       - name: Building Docker image using Google Cloud Build
         run: | # TODO - actually parse semver to tag v1
-          # skip building docker unless this is a new published version where we
-          # can be sure that all dependencies are in sync
-          [[ "chore(release): publish "* = "$(git show -s --format='%B' ${HOPR_GITHUB_REF})" ]] && exit 0
-
           export HOPR_PACKAGE_VERSION=$(./scripts/get-package-version.sh)
-          gcloud builds submit packages/hoprd --tag ${HOPR_DOCKER_IMAGE}:${HOPR_PACKAGE_VERSION}
+          gcloud builds submit --config packages/hoprd/cloudbuild.yml
           gcloud container images add-tag ${HOPR_DOCKER_IMAGE}:${HOPR_PACKAGE_VERSION} ${HOPR_DOCKER_IMAGE}:1
           gcloud container images add-tag ${HOPR_DOCKER_IMAGE}:${HOPR_PACKAGE_VERSION} ${HOPR_DOCKER_IMAGE}:latest
         env:

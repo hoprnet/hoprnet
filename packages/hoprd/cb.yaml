@@ -1,0 +1,11 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '--file=Dockerfile'
+      - '--tag=gcr.io/$PROJECT_ID/hoprd:$HOPR_PACKAGE_VERSION'
+options:
+  env:
+    - 'HOPRD_VERSION=$HOPR_PACKAGE_VERSION'
+images:
+  - 'gcr.io/$PROJECT_ID/hoprd'
