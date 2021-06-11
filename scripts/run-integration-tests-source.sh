@@ -79,6 +79,24 @@ function cleanup {
 
 trap cleanup EXIT
 
+function node_run_cmd() {
+  local host_port=${1}
+  local dir=${2}
+  local log=${3}
+  local id=${4}
+  local cmds=${5}
+
+  echo "- Run cmd ${cmds} on node ${id}"
+
+  DEBUG="hopr*" node packages/hoprd/lib/index.js \
+    --init --password='' --provider=ws://127.0.0.1:8545/ \
+    --identity="${id}" \
+    --host="0.0.0.0:${host_port}" \
+    --data="${dir}" > "${log}" \
+    --run "${cmds}" \
+    2>&1
+}
+
 # $1 = rest port
 # $2 = host port
 # $3 = node data directory
@@ -160,6 +178,10 @@ DEVELOPMENT=true yarn hardhat node --config packages/ethereum/hardhat.config.ts 
 
 echo "- Hardhat node started (127.0.0.1:8545)"
 wait_for_http_port 8545 "${hardhat_rpc_log}" "${wait_delay}" "${wait_max_wait}"
+# }}}
+
+# -- Test single-command runs {{{
+node_run_cmd 3301 "${node1_dir}" "${node1_log}" "${node1_id}" "info"
 # }}}
 
 #  --- Run nodes --- {{{
