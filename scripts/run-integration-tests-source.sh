@@ -94,6 +94,7 @@ function setup_node() {
     --testAnnounceLocalAddresses --identity="${id}" \
     --host="0.0.0.0:${host_port}" \
     --data="${dir}" --rest --restPort "${port}" --announce > \
+    --password="e2e-test" \
     "${log}" 2>&1 &
 
   wait_for_http_port "${port}" "${wait_delay}" "${wait_max_wait}" "${log}"
