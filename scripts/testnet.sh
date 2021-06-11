@@ -130,6 +130,7 @@ start_testnode() {
 
   # ensure node has funds, even after just updating a release
   ip=$(gcloud_get_ip "${vm}")
+  wait_until_node_is_ready $ip
   eth_address=$(get_eth_address "${ip}")
   fund_if_empty "${eth_address}"
 }
