@@ -8657,7 +8657,21 @@ libp2p-record@^0.10.0:
     protobufjs "^6.10.2"
     uint8arrays "^2.0.5"
 
-libp2p-tcp@0.15, libp2p-tcp@^0.15.3:
+libp2p-tcp@0.16:
+  version "0.16.0"
+  resolved "https://registry.yarnpkg.com/libp2p-tcp/-/libp2p-tcp-0.16.0.tgz#ba32514cd4c15cd1dbc60986bf80455ee31a5106"
+  integrity sha512-ULmJPt+MWofhL+htRpjJuVcFxIPAPkD6xCYHobSfQkrEOVFZ8vNv1XTBz8PDQ6u+GIvDahpDZta7TTh9KrbgAw==
+  dependencies:
+    abortable-iterator "^3.0.0"
+    class-is "^1.1.0"
+    debug "^4.3.1"
+    err-code "^3.0.1"
+    libp2p-utils "^0.3.0"
+    mafmt "^9.0.0"
+    multiaddr "^9.0.1"
+    stream-to-it "^0.2.2"
+
+libp2p-tcp@^0.15.3:
   version "0.15.4"
   resolved "https://registry.yarnpkg.com/libp2p-tcp/-/libp2p-tcp-0.15.4.tgz#571c57dae60e6118162228abfa28700e86d47dca"
   integrity sha512-MqXIlqV7t9z0A1Ww9Omd2XIlndcYOAh5R6kWRZ8Vo/CITazKUC5ZGNoj23hq/aEPaX8p5XmJs2BKESg/OuhGhQ==
