@@ -32,6 +32,7 @@
     "@hoprnet/hopr-utils": "1.72.0-next.29",
     "body-parser": "^1.19.0",
     "bs58": "^4.0.1",
+    "ethereumjs-wallet": "^1.0.1",
     "jazzicon": "^1.5.0",
     "next": "^10.0.9",
     "peer-id": "0",

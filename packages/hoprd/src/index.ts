@@ -106,6 +106,11 @@ const argv = yargs
     describe: 'For testing local testnets. Prefer local peers to remote.',
     default: false
   })
+  .option('dev', {
+    boolean: true,
+    describe: 'weaker crypto for faster node startup',
+    default: false
+  })
   .wrap(Math.min(120, yargs.terminalWidth())).argv
 
 function parseHosts(): HoprOptions['hosts'] {
@@ -196,7 +201,8 @@ async function main() {
   const peerId = await getIdentity({
     initialize: argv.init,
     idPath: argv.identity,
-    password: argv.password
+    password: argv.password,
+    dev: argv.dev
   })
 
   // 2. Create node instance
