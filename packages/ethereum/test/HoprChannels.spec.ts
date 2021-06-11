@@ -311,7 +311,6 @@ describe('funding a HoprChannel success', function () {
   })
 })
 
-
 describe('with single funded HoprChannels: AB: 70', function () {
   let channels
   let fixtures
@@ -337,7 +336,6 @@ describe('with single funded HoprChannels: AB: 70', function () {
     expect((await fixtures.token.balanceOf(ACCOUNT_B.address)).toString()).to.equal('10')
   })
 })
-
 
 describe('with funded HoprChannels: AB: 70, BA: 30, secrets initialized', function () {
   let channels

@@ -18,7 +18,7 @@ import BN from 'bn.js'
 import { utils } from 'ethers'
 import { Channel } from './channel'
 import * as fixtures from './fixtures'
-import { EventEmitter } from 'events' 
+import { EventEmitter } from 'events'
 
 const createChainMock = (): ChainWrapper => {
   return {

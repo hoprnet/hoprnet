@@ -67,7 +67,7 @@ export class PassiveStrategy implements ChannelStrategy {
 
   async onWinningTicket(ack: AcknowledgedTicket, c: Channel) {
     log('auto redeeming')
-    await c.redeemTicket(ack);
+    await c.redeemTicket(ack)
   }
 }
 
@@ -137,6 +137,6 @@ export class PromiscuousStrategy implements ChannelStrategy {
 
   async onWinningTicket(ack: AcknowledgedTicket, c: Channel) {
     log('auto redeeming')
-    await c.redeemTicket(ack);
+    await c.redeemTicket(ack)
   }
 }
