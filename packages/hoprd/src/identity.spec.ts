@@ -3,7 +3,7 @@ import { unlinkSync, existsSync } from 'fs'
 import { resolve } from 'path'
 import assert from 'assert'
 
-describe('identity generation and serialization', function () {
+describe('Identity', function () {
   const DUMMY_PATH = resolve(__dirname, './hopr-test-identity')
   const DUMMY_PASSWORD = 'hopr-unit-test-password'
   const WRONG_DUMMY_PASSWORD = 'hopr-unit-test-wrong-password'
@@ -17,7 +17,8 @@ describe('identity generation and serialization', function () {
   after(function () {
     unlinkSync(DUMMY_PATH)
   })
-  it('create identity', async function () {
+
+  it('fail to load non-existing key', async function () {
     let rejectsWhenNotExisting: boolean
     try {
       await getIdentity({
@@ -30,22 +31,16 @@ describe('identity generation and serialization', function () {
       rejectsWhenNotExisting = true
     }
     assert(rejectsWhenNotExisting)
+  })
 
-    const testIdentity = await getIdentity({
+  it('fail to load non-existing key', async function () {
+    // Store dummy identity
+    await getIdentity({
       initialize: true,
       idPath: DUMMY_PATH,
       password: DUMMY_PASSWORD,
-      dev: true
+      useWeakCrypto: true
     })
-
-    const deserializedIdentity = await getIdentity({
-      initialize: false,
-      idPath: DUMMY_PATH,
-      password: DUMMY_PASSWORD,
-      dev: true
-    })
-
-    assert(testIdentity.equals(deserializedIdentity))
 
     let rejectsWithWrongPassword: boolean
     try {
@@ -53,7 +48,7 @@ describe('identity generation and serialization', function () {
         initialize: true,
         idPath: DUMMY_PATH,
         password: WRONG_DUMMY_PASSWORD,
-        dev: true
+        useWeakCrypto: true
       })
       rejectsWithWrongPassword = false
     } catch {
@@ -61,6 +56,16 @@ describe('identity generation and serialization', function () {
     }
 
     assert(rejectsWithWrongPassword)
+  })
+
+  it('fail to unintentionally load weakly encrypted secret', async function () {
+    // Store dummy identity
+    await getIdentity({
+      initialize: true,
+      idPath: DUMMY_PATH,
+      password: DUMMY_PASSWORD,
+      useWeakCrypto: true
+    })
 
     let rejectsWhenUsingDevSecret: boolean
     try {
@@ -75,5 +80,23 @@ describe('identity generation and serialization', function () {
     }
 
     assert(rejectsWhenUsingDevSecret)
+  })
+
+  it('store and restore identity', async function () {
+    const testIdentity = await getIdentity({
+      initialize: true,
+      idPath: DUMMY_PATH,
+      password: DUMMY_PASSWORD,
+      useWeakCrypto: true
+    })
+
+    const deserializedIdentity = await getIdentity({
+      initialize: false,
+      idPath: DUMMY_PATH,
+      password: DUMMY_PASSWORD,
+      useWeakCrypto: true
+    })
+
+    assert(testIdentity.equals(deserializedIdentity))
   })
 })

@@ -2,7 +2,7 @@
 import PeerId from 'peer-id'
 import { privKeyToPeerId } from '@hoprnet/hopr-utils'
 import fs from 'fs'
-import path from 'path'
+import { resolve } from 'path'
 import Debug from 'debug'
 const log = Debug(`hoprd:identity`)
 
@@ -13,11 +13,11 @@ import Wallet from 'ethereumjs-wallet'
  *
  * @param peerId the peerId that should be serialized
  */
-export async function serializeKeyPair(peerId: PeerId, password: string, dev: boolean): Promise<Uint8Array> {
+export async function serializeKeyPair(peerId: PeerId, password: string, useWeakCrypto = false): Promise<Uint8Array> {
   const w = new Wallet(peerId.privKey.marshal() as Buffer)
 
   let serialized: string
-  if (dev) {
+  if (useWeakCrypto) {
     // Use weak settings during development for quicker
     // node startup
     serialized = await w.toV3String(password, {
@@ -40,10 +40,10 @@ export async function serializeKeyPair(peerId: PeerId, password: string, dev: bo
  *
  * @param encryptedSerializedKeyPair the encoded and encrypted key pair
  */
-export async function deserializeKeyPair(serialized: Uint8Array, password: string, dev = false) {
+export async function deserializeKeyPair(serialized: Uint8Array, password: string, useWeakCrypto = false) {
   const decoded = JSON.parse(new TextDecoder().decode(serialized))
 
-  if (decoded.crypto.kdfparams.n == 1 && dev != true) {
+  if (decoded.crypto.kdfparams.n == 1 && useWeakCrypto != true) {
     throw Error(`Attempting to use a development key while not being in development mode`)
   }
 
@@ -56,38 +56,40 @@ export type IdentityOptions = {
   initialize: boolean
   idPath: string
   password: string
-  dev?: boolean
+  useWeakCrypto?: boolean
 }
 
-async function loadIdentity(pth: string, password: string, dev = false): Promise<PeerId> {
-  const serialized: Uint8Array = fs.readFileSync(path.resolve(pth))
-  return await deserializeKeyPair(serialized, password, dev)
+function loadIdentity(path: string): Uint8Array {
+  return fs.readFileSync(resolve(path))
 }
 
-async function storeIdentity(pth: string, id: Uint8Array) {
-  fs.writeFileSync(path.resolve(pth), id)
+async function storeIdentity(path: string, id: Uint8Array) {
+  fs.writeFileSync(resolve(path), id)
 }
 
-async function createIdentity(idPath: string, password: string, dev = false) {
+async function createIdentity(idPath: string, password: string, useWeakCrypto = false) {
   const peerId = await PeerId.create({ keyType: 'secp256k1' })
-  const serializedKeyPair = await serializeKeyPair(peerId, password, dev)
+  const serializedKeyPair = await serializeKeyPair(peerId, password, useWeakCrypto)
   await storeIdentity(idPath, serializedKeyPair)
   return peerId
 }
 
 export async function getIdentity(options: IdentityOptions): Promise<PeerId> {
+  let storedIdentity: Uint8Array | undefined
   try {
-    return await loadIdentity(options.idPath, options.password, options.dev)
-  } catch (err) {
-    if (err.code !== 'ENOENT') {
-      throw err
-    }
+    storedIdentity = loadIdentity(options.idPath)
+  } catch {
     log('Could not load identity', options.idPath)
+  }
+
+  if (storedIdentity != undefined) {
+    return await deserializeKeyPair(storedIdentity, options.password, options.useWeakCrypto)
   }
 
   if (options.initialize) {
     log('Creating new identity', options.idPath)
-    return await createIdentity(options.idPath, options.password, options.dev)
+    return await createIdentity(options.idPath, options.password, options.useWeakCrypto)
   }
+
   throw new Error('Cannot load identity')
 }

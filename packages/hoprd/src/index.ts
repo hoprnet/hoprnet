@@ -106,7 +106,7 @@ const argv = yargs
     describe: 'For testing local testnets. Prefer local peers to remote.',
     default: false
   })
-  .option('dev', {
+  .option('testUseWeakCrypto', {
     boolean: true,
     describe: 'weaker crypto for faster node startup',
     default: false
@@ -202,7 +202,7 @@ async function main() {
     initialize: argv.init,
     idPath: argv.identity,
     password: argv.password,
-    dev: argv.dev
+    useWeakCrypto: argv.testUseWeakCrypto
   })
 
   // 2. Create node instance
