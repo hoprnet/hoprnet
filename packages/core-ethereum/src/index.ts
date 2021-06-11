@@ -19,6 +19,7 @@ import { PROVIDER_DEFAULT_URI, CONFIRMATIONS, INDEXER_BLOCK_RANGE } from './cons
 import { Channel } from './channel'
 import { createChainWrapper } from './ethereum'
 import { PROVIDER_CACHE_TTL } from './constants'
+import { EventEmitter } from 'events'
 
 const log = debug('hopr-core-ethereum')
 
@@ -37,12 +38,13 @@ export type RedeemTicketResponse =
       error: Error | string
     }
 
-export default class HoprEthereum {
+export default class HoprEthereum extends EventEmitter {
   private privateKey: Uint8Array
   private publicKey: PublicKey
   private address: Address
 
   constructor(private chain: ChainWrapper, private db: HoprDB, public indexer: Indexer) {
+    super()
     this.privateKey = this.chain.getPrivateKey()
     this.publicKey = this.chain.getPublicKey()
     this.address = Address.fromString(this.chain.getWallet().address)
@@ -59,7 +61,7 @@ export default class HoprEthereum {
   }
 
   public getChannel(src: PublicKey, counterparty: PublicKey) {
-    return new Channel(src, counterparty, this.db, this.chain, this.indexer, this.privateKey)
+    return new Channel(src, counterparty, this.db, this.chain, this.indexer, this.privateKey, this)
   }
 
   async announce(multiaddr: Multiaddr): Promise<string> {

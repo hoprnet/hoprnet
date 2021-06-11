@@ -18,6 +18,7 @@ import BN from 'bn.js'
 import { utils } from 'ethers'
 import { Channel } from './channel'
 import * as fixtures from './fixtures'
+import { EventEmitter } from 'events' 
 
 const createChainMock = (): ChainWrapper => {
   return {
@@ -79,7 +80,8 @@ const createMocks = (from: string, to: string) => {
 
   const indexer = createIndexerMock(channelUsThem, channelThemUs)
   const chain = createChainMock()
-  const channel = new Channel(self, counterparty, db, chain, indexer, selfPrivateKey)
+  const ev = new EventEmitter()
+  const channel = new Channel(self, counterparty, db, chain, indexer, selfPrivateKey, ev)
 
   return {
     self,

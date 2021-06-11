@@ -19,6 +19,7 @@ import type { ChainWrapper } from './ethereum'
 import type Indexer from './indexer'
 import type { HoprDB } from '@hoprnet/hopr-utils'
 import chalk from 'chalk'
+import { EventEmitter } from 'events'
 
 const log = Debug('hopr-core-ethereum:channel')
 
@@ -32,7 +33,8 @@ class Channel {
     private readonly db: HoprDB,
     private readonly chain: ChainWrapper,
     private readonly indexer: Indexer,
-    private readonly privateKey: Uint8Array
+    private readonly privateKey: Uint8Array,
+    private readonly events: EventEmitter
   ) {
     this.commitment = new Commitment(
       (commitment: Hash) => this.chain.setCommitment(counterparty.toAddress(), commitment),
@@ -71,6 +73,7 @@ class Channel {
       )
 
       await this.commitment.bumpCommitment()
+      this.events.emit('ticket:win', ack)
       return ack
     } else {
       log(`Got a ticket that is not a win. Dropping ticket.`)
@@ -254,9 +257,9 @@ class Channel {
       const receipt = await this.chain.redeemTicket(this.counterparty.toAddress(), ackTicket, ticket)
 
       //this.commitment.updateChainState(ackTicket.preImage)
-
       log('Successfully submitted ticket', ackTicket.response.toHex())
       await this.db.markRedeemeed(ackTicket)
+      this.events.emit('ticket:redeemed', ackTicket)
       return {
         status: 'SUCCESS',
         receipt,

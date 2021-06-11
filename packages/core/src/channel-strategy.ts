@@ -1,4 +1,5 @@
 import type { RoutingChannel, Channel } from '@hoprnet/hopr-core-ethereum'
+import { AcknowledgedTicket } from '@hoprnet/hopr-utils'
 import PeerId from 'peer-id'
 import BN from 'bn.js'
 import {
@@ -40,6 +41,7 @@ export interface ChannelStrategy {
   // TBD: Include ChannelsToClose as well.
 
   onChannelWillClose(c: Channel): Promise<void> // Before a channel closes
+  onWinningTicket(t: AcknowledgedTicket, channel: Channel): Promise<void>
 }
 
 const logChannels = (c: ChannelsToOpen[]): string => c.map((x) => x[0].toB58String() + ':' + x[1].toString()).join(', ')
@@ -61,6 +63,11 @@ export class PassiveStrategy implements ChannelStrategy {
 
   async onChannelWillClose(_c: Channel) {
     // Passive strategy does nothing.
+  }
+
+  async onWinningTicket(ack: AcknowledgedTicket, c: Channel) {
+    log('auto redeeming')
+    await c.redeemTicket(ack);
   }
 }
 
@@ -126,5 +133,10 @@ export class PromiscuousStrategy implements ChannelStrategy {
   async onChannelWillClose(c: Channel) {
     log('auto redeeming')
     await c.redeemAllTickets()
+  }
+
+  async onWinningTicket(ack: AcknowledgedTicket, c: Channel) {
+    log('auto redeeming')
+    await c.redeemTicket(ack);
   }
 }
