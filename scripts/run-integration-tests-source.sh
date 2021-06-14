@@ -58,7 +58,6 @@ function cleanup {
   # Cleaning up everything
   if [ "$EXIT_CODE" != "0" ]; then
     echo "- Exited with fail, code $EXIT_CODE"
-<<<<<<< HEAD
     for log_file in "${node1_log}" "${node2_log}" "${node3_log}"; do
       if [ -n "${log_file}" ] && [ -f "${log_file}" ]; then
         echo "- Printing last 100 lines from logs"
@@ -66,26 +65,15 @@ function cleanup {
         echo "- Printing last 100 lines from logs DONE"
       fi
     done
-=======
-    # echo "- Printing last 100 lines from logs"
-    # tail -n 100 "${node1_log}" "${node2_log}" "${node3_log}" || :
-    # echo "- Printing last 100 lines from logs DONE"
->>>>>>> 47d098493 (refactored tests)
   fi
 
   echo -e "\n- Wiping databases"
   rm -rf "${node1_dir}" "${node2_dir}" "${node3_dir}"
 
   echo "- Cleaning up processes"
-<<<<<<< HEAD
-  for port in 8545 3301 3302 3303 9091 9092 9093; do
+  for port in 8545 3301 3302 3303 3304 9091 9092 9093 9094; do
     if lsof -i ":${port}" -s TCP:LISTEN; then
       kill $(lsof -i ":${port}" -s TCP:LISTEN | awk '{print $2}')
-=======
-  for port in 8545 3301 3302 3303 3304 9091 9092 9093; do
-    if lsof -i ":${port}" | grep -q 'LISTEN' && true || false; then
-      kill $(lsof -i ":${port}" | grep 'LISTEN' | awk '{print $2}')
->>>>>>> 47d098493 (refactored tests)
     fi
   done
 
@@ -106,26 +94,22 @@ function setup_node() {
   local dir=${3}
   local log=${4}
   local id=${5}
-  local cmds=${6:-""}
+  local additional_args=${6:-""}
 
   echo "- Run node ${id} on rest port ${port}"
 
-  if [ -n "$cmds" ]; then
-    echo "- Executing '${cmds}' and exiting"
+  if [ -n "$additional_args" ]; then
+    echo "- Additional args: \"${additional-args}\""
   fi
 
   DEBUG="hopr*" node packages/hoprd/lib/index.js \
     --init --provider=ws://127.0.0.1:8545/ \
     --testAnnounceLocalAddresses --identity="${id}" \
     --host="0.0.0.0:${host_port}" \
-<<<<<<< HEAD
     --data="${dir}" --rest --restPort "${port}" --announce \
-    --password="e2e-test" --testUseWeakCrypto > \
-=======
-    --run "${cmds}" \
-    --data="${dir}" --rest --restPort "${port}" --announce > \
->>>>>>> 47d098493 (refactored tests)
-    "${log}" 2>&1 &
+    --password="e2e-test" --testUseWeakCrypto \
+    ${additional_args} \
+    > "${log}" 2>&1 &
 
   wait_for_http_port "${port}" "${log}" "${wait_delay}" "${wait_max_wait}"
 }
@@ -197,7 +181,7 @@ wait_for_http_port 8545 "${hardhat_rpc_log}" "${wait_delay}" "${wait_max_wait}"
 setup_node 3301 9091 "${node1_dir}" "${node1_log}" "${node1_id}"
 setup_node 3302 9092 "${node2_dir}" "${node2_log}" "${node2_id}"
 setup_node 3303 9093 "${node3_dir}" "${node3_log}" "${node3_id}"
-setup_node 3304 9094 "${node4_dir}" "${node4_log}" "${node4_id}" "info;balance"
+setup_node 3304 9094 "${node4_dir}" "${node4_log}" "${node4_id}" "--run \"info;balance\""
 # }}}
 
 #  --- Fund nodes --- {{{
