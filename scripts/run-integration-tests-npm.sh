@@ -56,7 +56,7 @@ declare node4_log="${node4_dir}.log"
 declare node1_id="${node1_dir}.id"
 declare node2_id="${node2_dir}.id"
 declare node3_id="${node3_dir}.id"
-declare node4_id="${node3_dir}.id"
+declare node4_id="${node4_dir}.id"
 
 declare hardhat_rpc_log="/tmp/hopr-npm-hardhat-rpc.log"
 
