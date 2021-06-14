@@ -599,7 +599,9 @@ class Hopr extends EventEmitter {
       return
     }
 
-    ethereum.on('ticket:win', (ack, channel) => { this.strategy.onWinningTicket(ack, channel) })
+    ethereum.on('ticket:win', (ack, channel) => {
+      this.strategy.onWinningTicket(ack, channel)
+    })
     throw new Error('Unknown strategy')
   }
 
