@@ -352,21 +352,19 @@ class Indexer extends EventEmitter {
     })
   }
 
-  // routing
-  public async getPublicKeyOf(address: Address): Promise<PublicKey | undefined> {
+  public async getPublicKeyOf(address: Address): Promise<PublicKey> {
     const account = await this.db.getAccount(address)
     if (account && account.hasAnnounced()) {
       return account.getPublicKey()
     }
-
-    return undefined
+    throw new Error('Could not find public key for address - have they announced?') 
   }
 
   private async toIndexerChannel(channel: ChannelEntry): Promise<RoutingChannel> {
     return [channel.source.toPeerId(), channel.destination.toPeerId(), channel.balance]
   }
 
-  public async getAnnouncedAddresses(): Promise<Multiaddr[]> {
+  public async getAnnouncdAddresses(): Promise<Multiaddr[]> {
     return (await this.db.getAccounts()).map((account: AccountEntry) => account.multiAddr)
   }
 

@@ -150,7 +150,7 @@ export class ChannelEntry {
       new UINT256(new BN(1)),
       ChannelStatus.Closed,
       new UINT256(new BN(1)),
-      null
+      new UINT256(new BN(1))
     )
   }
 }

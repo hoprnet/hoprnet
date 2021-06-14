@@ -29,30 +29,33 @@ const createProviderMock = (ops: { latestBlockNumber?: number } = {}) => {
 
 const createHoprChannelsMock = (ops: { pastEvents?: Event<any>[] } = {}) => {
   const pastEvents = ops.pastEvents ?? []
+  const channels: any = {}
+  const pubkeys: any = {}
+
+  const handleEvent = (ev) => {
+    if (ev.event == 'ChannelUpdate') {
+      const updateEvent = ev as Event<'ChannelUpdate'>
+
+      const eventChannelId = generateChannelId(
+        Address.fromString(updateEvent.args.source),
+        Address.fromString(updateEvent.args.destination)
+      )
+      channels[eventChannelId.toHex()] = updateEvent.args.newState
+    } else if (ev.event == 'Announce') {
+      pubkeys[ev.args.account] = ev.args.multiaddr
+    } else {
+      console.log('MISSING', ev)
+      //throw new Error("MISSING EV HANDLER IN TEST")
+    }
+  }
+
+  for (let ev of pastEvents) {
+    handleEvent(ev)
+  }
 
   class FakeChannels extends EventEmitter {
     async channels(channelId: string) {
-      return pastEvents.reduceRight((acc, event: Event<any>) => {
-        if (acc.length > 0) {
-          // Only take most recent event
-          return acc
-        }
-
-        if (event.event !== 'ChannelUpdate') {
-          return acc
-        }
-
-        const updateEvent = event as Event<'ChannelUpdate'>
-
-        const eventChannelId = generateChannelId(
-          Address.fromString(updateEvent.args.source),
-          Address.fromString(updateEvent.args.destination)
-        )
-
-        if (new Hash(stringToU8a(channelId)).eq(eventChannelId)) {
-          return [updateEvent.args.newState]
-        }
-      }, [])[0]
+      return channels[channelId]
     }
 
     async bumpChannel(_counterparty: string, _comm: string) {
@@ -76,7 +79,7 @@ const createHoprChannelsMock = (ops: { pastEvents?: Event<any>[] } = {}) => {
           }
         } as any
       } as Event<'ChannelUpdate'>
-      pastEvents.push(newEvent)
+      handleEvent(newEvent)
       this.emit('*', newEvent)
     }
 
@@ -89,6 +92,7 @@ const createHoprChannelsMock = (ops: { pastEvents?: Event<any>[] } = {}) => {
 
   return {
     hoprChannels,
+    pubkeys,
     newEvent(event: Event<any>) {
       pastEvents.push(event)
       hoprChannels.emit('*', event)
@@ -430,12 +434,13 @@ describe('test indexer', function () {
   })
 
   it('should start two indexers and should set commitments only once', async function () {
-    const { alice, bob, newBlock } = useMultiPartyFixtures({
+    const { alice, bob, newBlock, newEvent } = useMultiPartyFixtures({
       latestBlockNumber: 3,
-      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.PARTY_B_INITIALIZED_EVENT, fixtures.OPENED_EVENT]
+      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.PARTY_B_INITIALIZED_EVENT]
     })
 
     await Promise.all([alice.indexer.start(), bob.indexer.start()])
+    newEvent(fixtures.OPENED_EVENT)
 
     newBlock()
     newBlock()
