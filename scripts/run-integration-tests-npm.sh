@@ -63,9 +63,13 @@ function cleanup {
   # Cleaning up everything
   if [ "$EXIT_CODE" != "0" ]; then
     echo "- Exited with fail, code $EXIT_CODE"
-    echo "- Printing last 100 lines from logs"
-    tail -n 100 "${node1_log}" "${node2_log}" "${node3_log}" || :
-    echo "- Printing last 100 lines from logs DONE"
+    for log_file in "${node1_log}" "${node2_log}" "${node3_log}"; do
+      if [ -n "${log_file}" ] && [ -f "${log_file}" ]; then
+        echo "- Printing last 100 lines from logs"
+        tail -n 100 "${node1_log}" "${node2_log}" "${node3_log}"
+        echo "- Printing last 100 lines from logs DONE"
+      fi
+    done
   fi
 
   echo -e "\n- Wiping databases"
@@ -73,8 +77,8 @@ function cleanup {
 
   echo "- Cleaning up processes"
   for port in 8545 3301 3302 3303 9091 9092 9093; do
-    if lsof -i ":${port}" | grep -q 'LISTEN' && true || false; then
-      kill $(lsof -i ":${port}" | grep 'LISTEN' | awk '{print $2}')
+    if lsof -i ":${port}" -s TCP:LISTEN; then
+      kill $(lsof -i ":${port}" -s TCP:LISTEN | awk '{print $2}')
     fi
   done
 
@@ -102,13 +106,14 @@ function setup_node() {
 
   echo "- Run node ${id} on rest port ${port}"
   DEBUG="hopr*" yarn --cwd "${npm_install_dir}" hoprd \
-    --init --password='' --provider=ws://127.0.0.1:8545/ \
+    --init --provider=ws://127.0.0.1:8545/ \
     --testAnnounceLocalAddresses --identity="${id}" \
     --host="0.0.0.0:${host_port}" \
-    --data="${dir}" --rest --restPort "${port}" --announce > \
+    --data="${dir}" --rest --restPort "${port}" --announce \
+    --password="e2e-test" --testUseWeakCrypto > \
     "${log}" 2>&1 &
 
-  wait_for_http_port "${port}" "${wait_delay}" "${wait_max_wait}" "${log}"
+  wait_for_http_port "${port}" "${log}" "${wait_delay}" "${wait_max_wait}"
 }
 
 # $1 = port
@@ -129,8 +134,6 @@ function fund_node() {
   echo "- Funding 1 ETH and 1 HOPR to ${eth_address}"
   yarn hardhat faucet --config packages/ethereum/hardhat.config.ts \
     --address "${eth_address}" --network localhost --ishopraddress true
-
-  wait_for_http_port "${port}" "${wait_delay}" "${wait_max_wait}" "${log}"
 }
 
 # --- Log test info {{{
@@ -170,7 +173,7 @@ DEVELOPMENT=true yarn hardhat node --config packages/ethereum/hardhat.config.ts 
   "${hardhat_rpc_log}" 2>&1 &
 
 echo "- Hardhat node started (127.0.0.1:8545)"
-wait_for_http_port 8545 "${wait_delay}" "${wait_max_wait}" "${hardhat_rpc_log}"
+wait_for_http_port 8545 "${hardhat_rpc_log}" "${wait_delay}" "${wait_max_wait}"
 # }}}
 
 #  --- Run nodes --- {{{
@@ -183,6 +186,12 @@ setup_node 3303 9093 "${node3_dir}" "${node3_log}" "${node3_id}" "${npm_package_
 fund_node 3301 "${node1_log}"
 fund_node 3302 "${node2_log}"
 fund_node 3303 "${node3_log}"
+# }}}
+
+#  --- Wait for ports to be bound --- {{{
+wait_for_port 9091 "${node1_log}"
+wait_for_port 9092 "${node2_log}"
+wait_for_port 9093 "${node3_log}"
 # }}}
 
 # --- Run test --- {{{
