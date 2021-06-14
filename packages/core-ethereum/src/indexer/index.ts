@@ -234,7 +234,8 @@ class Indexer extends EventEmitter {
       } else if (eventName === 'ChannelUpdate') {
         await this.onChannelUpdated(event as Event<'ChannelUpdate'>)
       } else {
-        throw new Error('bad event name')
+        log('skipping event: ', eventName, ' as it isnt recognized')
+        //throw new Error('bad event name: ' + eventName)
       }
 
       lastSnapshot = new Snapshot(new BN(event.blockNumber), new BN(event.transactionIndex), new BN(event.logIndex))
