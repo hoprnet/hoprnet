@@ -90,11 +90,11 @@ function setup_node() {
   echo "- Run node ${id} on rest port ${port}"
 
   DEBUG="hopr*" node packages/hoprd/lib/index.js \
-    --init --password='' --provider=ws://127.0.0.1:8545/ \
+    --init --provider=ws://127.0.0.1:8545/ \
     --testAnnounceLocalAddresses --identity="${id}" \
     --host="0.0.0.0:${host_port}" \
-    --data="${dir}" --rest --restPort "${port}" --announce > \
-    --password="e2e-test" --testUseWeakCrypto \
+    --data="${dir}" --rest --restPort "${port}" --announce \
+    --password="e2e-test" --testUseWeakCrypto > \
     "${log}" 2>&1 &
 
   wait_for_http_port "${port}" "${wait_delay}" "${wait_max_wait}" "${log}"
