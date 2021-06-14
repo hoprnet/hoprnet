@@ -1,6 +1,6 @@
 {
-  "address": "0x6FEeB8d37497CaFFb34f58A155cE69f90c57a766",
-  "transactionHash": "0x27f38c044269b3b9abe713c639f46312b78d54293e70ae4df2e4086d880147a6",
+  "address": "0x8519AF82a336205EfD978D66caE2b0102e594A16",
+  "transactionHash": "0x122b1168858352a9c5ce74003a0f78cb89ef92787c1c086345d76ad7f4327823",
   "abi": [
     {
       "inputs": [
@@ -43,55 +43,35 @@
         {
           "indexed": true,
           "internalType": "address",
-          "name": "partyA",
+          "name": "source",
           "type": "address"
         },
         {
           "indexed": true,
           "internalType": "address",
-          "name": "partyB",
+          "name": "destination",
           "type": "address"
         },
         {
           "components": [
             {
               "internalType": "uint256",
-              "name": "partyABalance",
-              "type": "uint256"
-            },
-            {
-              "internalType": "uint256",
-              "name": "partyBBalance",
+              "name": "balance",
               "type": "uint256"
             },
             {
               "internalType": "bytes32",
-              "name": "partyACommitment",
-              "type": "bytes32"
-            },
-            {
-              "internalType": "bytes32",
-              "name": "partyBCommitment",
+              "name": "commitment",
               "type": "bytes32"
             },
             {
               "internalType": "uint256",
-              "name": "partyATicketEpoch",
+              "name": "ticketEpoch",
               "type": "uint256"
             },
             {
               "internalType": "uint256",
-              "name": "partyBTicketEpoch",
-              "type": "uint256"
-            },
-            {
-              "internalType": "uint256",
-              "name": "partyATicketIndex",
-              "type": "uint256"
-            },
-            {
-              "internalType": "uint256",
-              "name": "partyBTicketIndex",
+              "name": "ticketIndex",
               "type": "uint256"
             },
             {
@@ -108,11 +88,6 @@
               "internalType": "uint32",
               "name": "closureTime",
               "type": "uint32"
-            },
-            {
-              "internalType": "bool",
-              "name": "closureByPartyA",
-              "type": "bool"
             }
           ],
           "indexed": false,
@@ -167,7 +142,7 @@
       "inputs": [
         {
           "internalType": "address",
-          "name": "counterparty",
+          "name": "source",
           "type": "address"
         },
         {
@@ -217,42 +192,22 @@
       "outputs": [
         {
           "internalType": "uint256",
-          "name": "partyABalance",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "partyBBalance",
+          "name": "balance",
           "type": "uint256"
         },
         {
           "internalType": "bytes32",
-          "name": "partyACommitment",
-          "type": "bytes32"
-        },
-        {
-          "internalType": "bytes32",
-          "name": "partyBCommitment",
+          "name": "commitment",
           "type": "bytes32"
         },
         {
           "internalType": "uint256",
-          "name": "partyATicketEpoch",
+          "name": "ticketEpoch",
           "type": "uint256"
         },
         {
           "internalType": "uint256",
-          "name": "partyBTicketEpoch",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "partyATicketIndex",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "partyBTicketIndex",
+          "name": "ticketIndex",
           "type": "uint256"
         },
         {
@@ -269,11 +224,6 @@
           "internalType": "uint32",
           "name": "closureTime",
           "type": "uint32"
-        },
-        {
-          "internalType": "bool",
-          "name": "closureByPartyA",
-          "type": "bool"
         }
       ],
       "stateMutability": "view",
@@ -283,7 +233,7 @@
       "inputs": [
         {
           "internalType": "address",
-          "name": "counterparty",
+          "name": "destination",
           "type": "address"
         }
       ],
@@ -324,7 +274,7 @@
       "inputs": [
         {
           "internalType": "address",
-          "name": "counterparty",
+          "name": "destination",
           "type": "address"
         }
       ],
@@ -337,7 +287,7 @@
       "inputs": [
         {
           "internalType": "address",
-          "name": "counterparty",
+          "name": "source",
           "type": "address"
         },
         {
