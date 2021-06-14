@@ -41,7 +41,6 @@ export interface ChannelStrategy {
   onWinningTicket(t: AcknowledgedTicket, channel: Channel): Promise<void>
 }
 
-
 /*
  * Saves duplication of 'normal' behaviour.
  *
@@ -50,7 +49,7 @@ export interface ChannelStrategy {
 abstract class SaneDefaults {
   async onWinningTicket(ack: AcknowledgedTicket, c: Channel) {
     log('auto redeeming')
-    await c.redeemTicket(ack);
+    await c.redeemTicket(ack)
   }
 
   async onChannelWillClose(c: Channel) {
