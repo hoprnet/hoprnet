@@ -72,13 +72,8 @@ function cleanup {
 
   echo "- Cleaning up processes"
   for port in 8545 3301 3302 3303 3304 9091 9092 9093 9094; do
-<<<<<<< HEAD
     if lsof -i ":${port}" -s TCP:LISTEN; then
       kill $(lsof -i ":${port}" -s TCP:LISTEN | awk '{print $2}')
-=======
-    if lsof -i ":${port}" | grep -q 'LISTEN' && true || false; then
-      kill $(lsof -i ":${port}" | grep 'LISTEN' | awk '{print $2}')
->>>>>>> a80a86de5 (added --run arg test to run-integration-tests-npm)
     fi
   done
 
