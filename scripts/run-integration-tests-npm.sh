@@ -46,14 +46,17 @@ declare npm_install_dir="/tmp/hopr-npm"
 declare node1_dir="/tmp/hopr-npm-node-1"
 declare node2_dir="/tmp/hopr-npm-node-2"
 declare node3_dir="/tmp/hopr-npm-node-3"
+declare node4_dir="/tmp/hopr-npm-node-4"
 
 declare node1_log="${node1_dir}.log"
 declare node2_log="${node2_dir}.log"
 declare node3_log="${node3_dir}.log"
+declare node4_log="${node4_dir}.log"
 
 declare node1_id="${node1_dir}.id"
 declare node2_id="${node2_dir}.id"
 declare node3_id="${node3_dir}.id"
+declare node4_id="${node3_dir}.id"
 
 declare hardhat_rpc_log="/tmp/hopr-npm-hardhat-rpc.log"
 
@@ -76,7 +79,7 @@ function cleanup {
   rm -rf "${node1_dir}" "${node2_dir}" "${node3_dir}" "${npm_install_dir}"
 
   echo "- Cleaning up processes"
-  for port in 8545 3301 3302 3303 9091 9092 9093; do
+  for port in 8545 3301 3302 3303 3304 9091 9092 9093 9094; do
     if lsof -i ":${port}" -s TCP:LISTEN; then
       kill $(lsof -i ":${port}" -s TCP:LISTEN | awk '{print $2}')
     fi
@@ -93,6 +96,7 @@ trap cleanup EXIT
 # $4 = node log file
 # $5 = node id file
 # $6 = npm package version
+# $7 = additions args to hoprd
 function setup_node() {
   local port=${1}
   local host_port=${2}
@@ -100,6 +104,7 @@ function setup_node() {
   local log=${4}
   local id=${5}
   local version=${6}
+  local additional_args=${7:-""}
 
   mkdir -p "${npm_install_dir}"
   yarn --cwd "${npm_install_dir}" add @hoprnet/hoprd@${version}
@@ -110,8 +115,9 @@ function setup_node() {
     --testAnnounceLocalAddresses --identity="${id}" \
     --host="0.0.0.0:${host_port}" \
     --data="${dir}" --rest --restPort "${port}" --announce \
-    --password="e2e-test" --testUseWeakCrypto > \
-    "${log}" 2>&1 &
+    --password="e2e-test" --testUseWeakCrypto \
+    ${additional_args} \
+    > "${log}" 2>&1 &
 
   wait_for_http_port "${port}" "${log}" "${wait_delay}" "${wait_max_wait}"
 }
@@ -164,6 +170,7 @@ ensure_port_is_free 3303
 ensure_port_is_free 9091
 ensure_port_is_free 9092
 ensure_port_is_free 9093
+ensure_port_is_free 9094
 # }}}
 
 # --- Running Mock Blockchain --- {{{
@@ -180,12 +187,14 @@ wait_for_http_port 8545 "${hardhat_rpc_log}" "${wait_delay}" "${wait_max_wait}"
 setup_node 3301 9091 "${node1_dir}" "${node1_log}" "${node1_id}" "${npm_package_version}"
 setup_node 3302 9092 "${node2_dir}" "${node2_log}" "${node2_id}" "${npm_package_version}"
 setup_node 3303 9093 "${node3_dir}" "${node3_log}" "${node3_id}" "${npm_package_version}"
+setup_node 3304 9094 "${node4_dir}" "${node4_log}" "${node4_id}" "${npm_package_version}" "--run \"info;balance\""
 # }}}
 
 #  --- Fund nodes --- {{{
 fund_node 3301 "${node1_log}"
 fund_node 3302 "${node2_log}"
 fund_node 3303 "${node3_log}"
+fund_node 3304 "${node4_log}"
 # }}}
 
 #  --- Wait for ports to be bound --- {{{
@@ -198,3 +207,9 @@ wait_for_port 9093 "${node3_log}"
 ${mydir}/../test/integration-test.sh \
   "localhost:3301" "localhost:3302" "localhost:3303"
 # }}}
+
+# -- Verify node4 has executed the commands {{{
+echo "- Verifying node4 log output"
+grep -q "^HOPR Balance:" "${node4_log}" 
+grep -q "^Running on: localhost" "${node4_log}" 
+#}}}

@@ -72,8 +72,13 @@ function cleanup {
 
   echo "- Cleaning up processes"
   for port in 8545 3301 3302 3303 3304 9091 9092 9093 9094; do
+<<<<<<< HEAD
     if lsof -i ":${port}" -s TCP:LISTEN; then
       kill $(lsof -i ":${port}" -s TCP:LISTEN | awk '{print $2}')
+=======
+    if lsof -i ":${port}" | grep -q 'LISTEN' && true || false; then
+      kill $(lsof -i ":${port}" | grep 'LISTEN' | awk '{print $2}')
+>>>>>>> a80a86de5 (added --run arg test to run-integration-tests-npm)
     fi
   done
 
@@ -87,7 +92,7 @@ trap cleanup EXIT
 # $3 = node data directory
 # $4 = node log file
 # $5 = node id file
-# $6 = commands to run at startup
+# $6 = additional args to hoprd
 function setup_node() {
   local port=${1}
   local host_port=${2}
@@ -165,6 +170,7 @@ ensure_port_is_free 3304
 ensure_port_is_free 9091
 ensure_port_is_free 9092
 ensure_port_is_free 9093
+ensure_port_is_free 9094
 # }}}
 
 # --- Running Mock Blockchain --- {{{
