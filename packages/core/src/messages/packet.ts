@@ -19,7 +19,8 @@ import {
   pubKeyToPeerId,
   HalfKeyChallenge,
   HalfKey,
-  Challenge
+  Challenge,
+  ChannelStatus
 } from '@hoprnet/hopr-utils'
 import type HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 import { AcknowledgementChallenge } from './acknowledgementChallenge'
@@ -105,7 +106,7 @@ export async function validateUnacknowledgedTicket(
   }
 
   // channel MUST be open or pending to close
-  if (channelState.status === 'CLOSED') {
+  if (channelState.status === ChannelStatus.Closed) {
     throw Error(`Payment channel with '${senderB58}' is not open or pending to close`)
   }
 
