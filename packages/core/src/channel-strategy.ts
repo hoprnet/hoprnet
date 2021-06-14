@@ -26,7 +26,6 @@ const indexerDest = (c: RoutingChannel): PeerId => c[1]
  * Implementors should bear in mind:
  * - Churn is expensive
  * - Path finding will prefer high stakes, and high availability of nodes.
- *
  */
 export interface ChannelStrategy {
   name: string
@@ -44,12 +43,30 @@ export interface ChannelStrategy {
   onWinningTicket(t: AcknowledgedTicket, channel: Channel): Promise<void>
 }
 
+
+/*
+ * Saves duplication of 'normal' behaviour.
+ *
+ * At present this does not take gas into consideration.
+ */
+abstract class SaneDefaults {
+  async onWinningTicket(ack: AcknowledgedTicket, c: Channel) {
+    log('auto redeeming')
+    await c.redeemTicket(ack);
+  }
+
+  async onChannelWillClose(c: Channel) {
+    log('auto redeeming')
+    await c.redeemAllTickets()
+  }
+}
+
 const logChannels = (c: ChannelsToOpen[]): string => c.map((x) => x[0].toB58String() + ':' + x[1].toString()).join(', ')
 const logIndexerChannels = (c: RoutingChannel[]): string =>
   c.map((x) => x[1].toB58String() + ':' + x[2].toString()).join(', ')
 
 // Don't auto open any channels
-export class PassiveStrategy implements ChannelStrategy {
+export class PassiveStrategy extends SaneDefaults implements ChannelStrategy {
   name = 'passive'
 
   async tick(
@@ -60,19 +77,10 @@ export class PassiveStrategy implements ChannelStrategy {
   ): Promise<[ChannelsToOpen[], ChannelsToClose[]]> {
     return [[], []]
   }
-
-  async onChannelWillClose(_c: Channel) {
-    // Passive strategy does nothing.
-  }
-
-  async onWinningTicket(ack: AcknowledgedTicket, c: Channel) {
-    log('auto redeeming')
-    await c.redeemTicket(ack);
-  }
 }
 
 // Open channel to as many peers as possible
-export class PromiscuousStrategy implements ChannelStrategy {
+export class PromiscuousStrategy extends SaneDefaults implements ChannelStrategy {
   name = 'promiscuous'
 
   async tick(
@@ -128,15 +136,5 @@ export class PromiscuousStrategy implements ChannelStrategy {
     }
     log('Promiscuous toOpen: ', logChannels(toOpen))
     return [toOpen, toClose]
-  }
-
-  async onChannelWillClose(c: Channel) {
-    log('auto redeeming')
-    await c.redeemAllTickets()
-  }
-
-  async onWinningTicket(ack: AcknowledgedTicket, c: Channel) {
-    log('auto redeeming')
-    await c.redeemTicket(ack);
   }
 }
