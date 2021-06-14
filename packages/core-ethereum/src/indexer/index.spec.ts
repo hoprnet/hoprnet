@@ -49,12 +49,12 @@ const createHoprChannelsMock = (ops: { pastEvents?: Event<any>[] } = {}) => {
     }
   }
 
-  for (let ev of pastEvents) {
-    handleEvent(ev)
-  }
 
   class FakeChannels extends EventEmitter {
     async channels(channelId: string) {
+      for (let ev of pastEvents) {
+        handleEvent(ev)
+      }
       return channels[channelId]
     }
 
@@ -205,23 +205,23 @@ describe('test indexer', function () {
   })
 
   it('should process all past events', async function () {
-    const { indexer, OPENED_CHANNEL } = await useFixtures({
+    const { indexer } = await useFixtures({
       latestBlockNumber: 3,
-      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.OPENED_EVENT]
+      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.PARTY_B_INITIALIZED_EVENT]
     })
     await indexer.start()
 
     const account = await indexer.getAccount(fixtures.PARTY_A.toAddress())
     expectAccountsToBeEqual(account, fixtures.PARTY_A_INITIALIZED_ACCOUNT)
 
-    const channel = await indexer.getChannel(OPENED_CHANNEL.getId())
-    expectChannelsToBeEqual(channel, OPENED_CHANNEL)
+    const account2 = await indexer.getAccount(fixtures.PARTY_B.toAddress())
+    expectAccountsToBeEqual(account2, fixtures.PARTY_B_INITIALIZED_ACCOUNT)
   })
 
   it('should continue processing events', async function () {
     const { indexer, newEvent, newBlock, OPENED_CHANNEL } = await useFixtures({
       latestBlockNumber: 3,
-      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.OPENED_EVENT]
+      pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT]
     })
     await indexer.start()
 

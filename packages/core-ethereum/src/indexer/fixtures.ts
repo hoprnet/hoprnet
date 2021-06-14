@@ -50,6 +50,8 @@ export const PARTY_B_INITIALIZED_EVENT = {
 
 export const PARTY_A_INITIALIZED_ACCOUNT = new AccountEntry(PARTY_A.toAddress(), PARTY_A_MULTIADDR, new BN(1))
 
+export const PARTY_B_INITIALIZED_ACCOUNT = new AccountEntry(PARTY_B.toAddress(), PARTY_B_MULTIADDR, new BN(1))
+
 export const OPENED_EVENT = {
   event: 'ChannelUpdate',
   transactionHash: '',
