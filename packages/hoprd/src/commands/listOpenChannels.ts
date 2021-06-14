@@ -41,7 +41,9 @@ Balance:                ${styleValue(channel.balance.toFormattedString(), 'numbe
 `)
       }
 
-      const channelsTo = (await this.node.getChannelsTo(selfAddress)).filter((channel) => channel.status !== ChannelStatus.Closed)
+      const channelsTo = (await this.node.getChannelsTo(selfAddress)).filter(
+        (channel) => channel.status !== ChannelStatus.Closed
+      )
       if (channelsTo.length == 0) {
         log(`\nNo open channels to node.`)
       }

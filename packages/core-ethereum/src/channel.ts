@@ -114,7 +114,7 @@ class Channel {
     try {
       c = await this.usToThem()
     } catch {}
-    if (c && c.status !== ChannelStatus.Closed ) {
+    if (c && c.status !== ChannelStatus.Closed) {
       throw Error('Channel is already opened')
     }
 

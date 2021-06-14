@@ -5,7 +5,6 @@ import { AbstractCommand, GlobalState } from './abstractCommand'
 import { checkPeerIdInput, styleValue } from './utils'
 import { ChannelStatus } from '@hoprnet/hopr-utils'
 
-
 export default class CloseChannel extends AbstractCommand {
   constructor(public node: Hopr) {
     super()
