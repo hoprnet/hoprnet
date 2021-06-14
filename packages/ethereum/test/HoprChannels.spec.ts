@@ -459,7 +459,7 @@ describe('with funded HoprChannels: AB: 70, BA: 30, secrets initialized', functi
       channels,
       'ChannelUpdate'
     )
-    validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: '70', status: '3' })
+    validateChannel(await channels.channels(ACCOUNT_AB_CHANNEL_ID), { balance: '70', status: ChannelStatus.PendingToClose})
     validateChannel(await channels.channels(ACCOUNT_BA_CHANNEL_ID), { balance: '30', status: ChannelStatus.Open + '' })
   })
 
