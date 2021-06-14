@@ -1,5 +1,5 @@
 import { u8aSplit, serializeToU8a, u8aToNumber, stringToU8a } from '..'
-import { Address, Balance, Hash } from './primitives'
+import { Address, Balance, Hash, PublicKey } from './primitives'
 import { UINT256 } from './solidity'
 import BN from 'bn.js'
 import chalk from 'chalk'
@@ -64,8 +64,8 @@ const components = [
 
 export class ChannelEntry {
   constructor(
-    public readonly source: Address,
-    public readonly destination: Address,
+    public readonly source: PublicKey,
+    public readonly destination: PublicKey,
     public readonly balance: Balance,
     public readonly commitment: Hash,
     public readonly ticketEpoch: UINT256,
@@ -90,12 +90,12 @@ export class ChannelEntry {
     return new ChannelEntry(...params)
   }
 
-  static fromSCEvent(event: any): ChannelEntry {
+  static async fromSCEvent(event: any, keyFor: (a: Address) => Promise<PublicKey>): Promise<ChannelEntry> {
     // TODO type
     const { source, destination, newState } = event.args
     return new ChannelEntry(
-      Address.fromString(source),
-      Address.fromString(destination),
+      await keyFor(Address.fromString(source)),
+      await keyFor(Address.fromString(destination)),
       new Balance(new BN(newState.balance.toString())),
       new Hash(stringToU8a(newState.commitment)),
       new UINT256(new BN(newState.ticketEpoch.toString())),
@@ -137,6 +137,6 @@ export class ChannelEntry {
   }
 
   public getId() {
-    return generateChannelId(this.source, this.destination)
+    return generateChannelId(this.source.toAddress(), this.destination.toAddress())
   }
 }

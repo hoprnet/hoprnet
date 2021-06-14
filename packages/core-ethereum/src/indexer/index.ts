@@ -278,15 +278,15 @@ class Indexer extends EventEmitter {
   }
 
   private async onChannelUpdated(event: Event<'ChannelUpdate'>): Promise<void> {
-    const channel = ChannelEntry.fromSCEvent(event)
+    const channel = await ChannelEntry.fromSCEvent(event, (a: Address) => this.getPublicKeyOf(a))
 
     log(channel.toString())
     await this.db.updateChannel(channel.getId(), channel)
 
-    if (channel.source.eq(this.address) || channel.destination.eq(this.address)) {
+    if (channel.source.toAddress().eq(this.address) || channel.destination.toAddress().eq(this.address)) {
       this.emit('own-channel-updated', channel)
 
-      if (channel.destination.eq(this.address)) {
+      if (channel.destination.toAddress().eq(this.address)) {
         // Channel _to_ us
         if (channel.status === ChannelStatus.WaitingForCommitment) {
           await this.onOwnUnsetCommitment(channel)
@@ -298,13 +298,13 @@ class Indexer extends EventEmitter {
   }
 
   private onOwnUnsetCommitment(channel: ChannelEntry) {
-    if (!channel.destination.eq(this.address)) {
+    if (!channel.destination.toAddress().eq(this.address)) {
       throw new Error('shouldnt be called unless we are the destination')
     }
     log(`Found channel ${chalk.yellow(channel.getId().toHex())} to us with unset commitment. Setting commitment`)
 
     return new Commitment(
-      (comm: Hash) => this.chain.setCommitment(channel.source, comm),
+      (comm: Hash) => this.chain.setCommitment(channel.source.toAddress(), comm),
       async () => (await this.getChannel(channel.getId())).commitment,
       this.db,
       channel.getId(),
@@ -342,13 +342,13 @@ class Indexer extends EventEmitter {
 
   public async getChannelsFrom(address: Address) {
     return this.db.getChannels((channel) => {
-      return address.eq(channel.source)
+      return address.eq(channel.source.toAddress())
     })
   }
 
   public async getChannelsTo(address: Address) {
     return this.db.getChannels((channel) => {
-      return address.eq(channel.destination)
+      return address.eq(channel.destination.toAddress())
     })
   }
 
@@ -363,11 +363,7 @@ class Indexer extends EventEmitter {
   }
 
   private async toIndexerChannel(channel: ChannelEntry): Promise<RoutingChannel> {
-    const [sourcePubKey, destPubKey] = await Promise.all([
-      this.getPublicKeyOf(channel.source),
-      this.getPublicKeyOf(channel.destination)
-    ])
-    return [sourcePubKey.toPeerId(), destPubKey.toPeerId(), channel.balance]
+    return [channel.source.toPeerId(), channel.destination.toPeerId(), channel.balance]
   }
 
   public async getAnnouncedAddresses(): Promise<Multiaddr[]> {

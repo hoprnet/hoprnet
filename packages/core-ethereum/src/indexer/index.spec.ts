@@ -120,7 +120,7 @@ const createChainMock = (
   } as unknown as ChainWrapper
 }
 
-const useFixtures = (ops: { latestBlockNumber?: number; pastEvents?: Event<any>[] } = {}) => {
+const useFixtures = async (ops: { latestBlockNumber?: number; pastEvents?: Event<any>[] } = {}) => {
   const latestBlockNumber = ops.latestBlockNumber ?? 0
   const pastEvents = ops.pastEvents ?? []
 
@@ -137,6 +137,7 @@ const useFixtures = (ops: { latestBlockNumber?: number; pastEvents?: Event<any>[
     newBlock,
     hoprChannels,
     newEvent,
+    OPENED_CHANNEL: await ChannelEntry.fromSCEvent(fixtures.OPENED_EVENT, (a: Address) => Promise.resolve(a.eq(PARTY_A.toAddress()) ? PARTY_A : PARTY_B)),
     indexer
   }
 }
@@ -172,14 +173,14 @@ const useMultiPartyFixtures = (ops: { latestBlockNumber?: number; pastEvents?: E
 
 describe('test indexer', function () {
   it('should start indexer', async function () {
-    const { indexer } = useFixtures()
+    const { indexer } = await useFixtures()
 
     await indexer.start()
     assert.strictEqual(indexer.status, 'started')
   })
 
   it('should stop indexer', async function () {
-    const { indexer } = useFixtures()
+    const { indexer } = await useFixtures()
 
     await indexer.start()
     await indexer.stop()
@@ -187,7 +188,7 @@ describe('test indexer', function () {
   })
 
   it('should process 1 past event', async function () {
-    const { indexer } = useFixtures({
+    const { indexer, OPENED_CHANNEL } = await useFixtures({
       latestBlockNumber: 2,
       pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.OPENED_EVENT]
     })
@@ -196,12 +197,12 @@ describe('test indexer', function () {
     const account = await indexer.getAccount(fixtures.PARTY_A.toAddress())
     expectAccountsToBeEqual(account, fixtures.PARTY_A_INITIALIZED_ACCOUNT)
 
-    const channel = await indexer.getChannel(fixtures.OPENED_CHANNEL.getId())
+    const channel = await indexer.getChannel(OPENED_CHANNEL.getId())
     assert.strictEqual(typeof channel, 'undefined')
   })
 
   it('should process all past events', async function () {
-    const { indexer } = useFixtures({
+    const { indexer, OPENED_CHANNEL } = await useFixtures({
       latestBlockNumber: 3,
       pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.OPENED_EVENT]
     })
@@ -210,12 +211,12 @@ describe('test indexer', function () {
     const account = await indexer.getAccount(fixtures.PARTY_A.toAddress())
     expectAccountsToBeEqual(account, fixtures.PARTY_A_INITIALIZED_ACCOUNT)
 
-    const channel = await indexer.getChannel(fixtures.OPENED_CHANNEL.getId())
-    expectChannelsToBeEqual(channel, fixtures.OPENED_CHANNEL)
+    const channel = await indexer.getChannel(OPENED_CHANNEL.getId())
+    expectChannelsToBeEqual(channel, OPENED_CHANNEL)
   })
 
   it('should continue processing events', async function () {
-    const { indexer, newEvent, newBlock } = useFixtures({
+    const { indexer, newEvent, newBlock, OPENED_CHANNEL } = await useFixtures({
       latestBlockNumber: 3,
       pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.OPENED_EVENT]
     })
@@ -232,12 +233,12 @@ describe('test indexer', function () {
 
     await blockMined.promise
 
-    const channel = await indexer.getChannel(fixtures.OPENED_CHANNEL.getId())
-    expectChannelsToBeEqual(channel, fixtures.OPENED_CHANNEL)
+    const channel = await indexer.getChannel(OPENED_CHANNEL.getId())
+    expectChannelsToBeEqual(channel, OPENED_CHANNEL)
   })
 
   it('should get public key of addresses', async function () {
-    const { indexer } = useFixtures({
+    const { indexer } = await useFixtures({
       latestBlockNumber: 2,
       pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT]
     })
@@ -249,7 +250,7 @@ describe('test indexer', function () {
   })
 
   it('should get all data from DB', async function () {
-    const { indexer } = useFixtures({
+    const { indexer, OPENED_CHANNEL } = await useFixtures({
       latestBlockNumber: 4,
       pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.OPENED_EVENT]
     })
@@ -259,23 +260,23 @@ describe('test indexer', function () {
     const account = await indexer.getAccount(fixtures.PARTY_A.toAddress())
     expectAccountsToBeEqual(account, fixtures.PARTY_A_INITIALIZED_ACCOUNT)
 
-    const channel = await indexer.getChannel(fixtures.OPENED_CHANNEL.getId())
-    expectChannelsToBeEqual(channel, fixtures.OPENED_CHANNEL)
+    const channel = await indexer.getChannel(OPENED_CHANNEL.getId())
+    expectChannelsToBeEqual(channel, OPENED_CHANNEL)
 
     const channels = await indexer.getChannels()
     assert.strictEqual(channels.length, 1, 'expected channels')
-    expectChannelsToBeEqual(channels[0], fixtures.OPENED_CHANNEL)
+    expectChannelsToBeEqual(channels[0], OPENED_CHANNEL)
 
     const channelsFromPartyA = await indexer.getChannelsFrom(fixtures.PARTY_A.toAddress())
     assert.strictEqual(channelsFromPartyA.length, 1)
-    expectChannelsToBeEqual(channelsFromPartyA[0], fixtures.OPENED_CHANNEL)
+    expectChannelsToBeEqual(channelsFromPartyA[0], OPENED_CHANNEL)
 
     const channelsOfPartyB = await indexer.getChannelsFrom(fixtures.PARTY_B.toAddress())
     assert.strictEqual(channelsOfPartyB.length, 0)
   })
 
   it('should handle provider error by restarting', async function () {
-    const { indexer, provider } = useFixtures({
+    const { indexer, provider } = await useFixtures({
       latestBlockNumber: 4,
       pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.OPENED_EVENT]
     })
@@ -295,7 +296,7 @@ describe('test indexer', function () {
   })
 
   it('should contract error by restarting', async function () {
-    const { indexer, hoprChannels } = useFixtures({
+    const { indexer, hoprChannels } = await useFixtures({
       latestBlockNumber: 4,
       pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT, fixtures.OPENED_EVENT]
     })
@@ -314,7 +315,7 @@ describe('test indexer', function () {
 
   it('should emit events on updated channels', async function () {
     this.timeout(5000)
-    const { indexer, newEvent, newBlock } = useFixtures({
+    const { indexer, newEvent, newBlock } = await useFixtures({
       latestBlockNumber: 3,
       pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT]
     })

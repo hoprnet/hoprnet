@@ -51,8 +51,8 @@ const createMocks = (from: string, to: string) => {
   const commitmentPartyB = nextCommitmentPartyB.hash()
 
   const channelUsThem = new ChannelEntry(
-    self.toAddress(),
-    counterparty.toAddress(),
+    self,
+    counterparty,
     new Balance(new BN(7)),
     commitmentPartyA,
     new UINT256(new BN(1)),
@@ -62,8 +62,8 @@ const createMocks = (from: string, to: string) => {
     new UINT256(new BN(0))
   )
   const channelThemUs = new ChannelEntry(
-    counterparty.toAddress(),
-    self.toAddress(),
+    counterparty,
+    self,
     new Balance(new BN(3)),
     commitmentPartyB,
     new UINT256(new BN(1)),
