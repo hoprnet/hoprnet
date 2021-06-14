@@ -51,8 +51,8 @@ function channelStatusToU8a(c: ChannelStatus): Uint8Array {
 
 // TODO, find a better way to do this.
 const components = [
-  Address,
-  Address,
+  PublicKey,
+  PublicKey,
   Balance,
   Hash,
   UINT256,
@@ -108,8 +108,8 @@ export class ChannelEntry {
 
   public serialize(): Uint8Array {
     return serializeToU8a([
-      [this.source.serialize(), Address.SIZE],
-      [this.destination.serialize(), Address.SIZE],
+      [this.source.serialize(), PublicKey.SIZE],
+      [this.destination.serialize(), PublicKey.SIZE],
       [this.balance.serialize(), Balance.SIZE],
       [this.commitment.serialize(), Hash.SIZE],
       [this.ticketEpoch.serialize(), UINT256.SIZE],
@@ -138,5 +138,19 @@ export class ChannelEntry {
 
   public getId() {
     return generateChannelId(this.source.toAddress(), this.destination.toAddress())
+  }
+
+  public static createMock(): ChannelEntry {
+    const pub = PublicKey.createMock()
+    return new ChannelEntry(
+      pub, pub,
+      new Balance(new BN(1)),
+      Hash.create(),
+      new UINT256(new BN(1)),
+      new UINT256(new BN(1)),
+      ChannelStatus.Closed,
+      new UINT256(new BN(1)),
+      null
+    )
   }
 }

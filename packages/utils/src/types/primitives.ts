@@ -70,6 +70,14 @@ export class PublicKey {
   eq(b: PublicKey) {
     return u8aEquals(this.arr, b.serialize())
   }
+
+  static deserialize(arr: Uint8Array) {
+    return new PublicKey(arr)
+  }
+
+  static createMock(): PublicKey {
+    return PublicKey.fromString('0x021464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8')
+  }
 }
 
 export class Address {
