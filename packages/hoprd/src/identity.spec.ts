@@ -8,29 +8,32 @@ describe('Identity', function () {
   const DUMMY_PASSWORD = 'hopr-unit-test-password'
   const WRONG_DUMMY_PASSWORD = 'hopr-unit-test-wrong-password'
 
-  before(function () {
+  beforeEach(function () {
     if (existsSync(DUMMY_PATH)) {
       unlinkSync(DUMMY_PATH)
     }
   })
 
-  after(function () {
-    unlinkSync(DUMMY_PATH)
+  afterEach(function () {
+    if (existsSync(DUMMY_PATH)) {
+      unlinkSync(DUMMY_PATH)
+    }
   })
 
   it('fail to load non-existing key', async function () {
-    let rejectsWhenNotExisting: boolean
-    try {
-      await getIdentity({
-        initialize: false,
-        idPath: DUMMY_PATH,
-        password: DUMMY_PASSWORD
-      })
-      rejectsWhenNotExisting = false
-    } catch {
-      rejectsWhenNotExisting = true
-    }
-    assert(rejectsWhenNotExisting)
+    await assert.rejects(
+      async () => {
+        await getIdentity({
+          initialize: false,
+          idPath: DUMMY_PATH,
+          password: DUMMY_PASSWORD
+        })
+      },
+      {
+        name: 'Error',
+        message: 'Cannot load identity'
+      }
+    )
   })
 
   it('fail to load non-existing key', async function () {
@@ -42,24 +45,24 @@ describe('Identity', function () {
       useWeakCrypto: true
     })
 
-    let rejectsWithWrongPassword: boolean
-    try {
-      await getIdentity({
-        initialize: true,
-        idPath: DUMMY_PATH,
-        password: WRONG_DUMMY_PASSWORD,
-        useWeakCrypto: true
-      })
-      rejectsWithWrongPassword = false
-    } catch {
-      rejectsWithWrongPassword = true
-    }
-
-    assert(rejectsWithWrongPassword)
+    await assert.rejects(
+      async () => {
+        await getIdentity({
+          initialize: true,
+          idPath: DUMMY_PATH,
+          password: WRONG_DUMMY_PASSWORD,
+          useWeakCrypto: true
+        })
+      },
+      {
+        name: 'Error',
+        message: 'Key derivation failed - possibly wrong passphrase'
+      }
+    )
   })
 
   it('fail to unintentionally load weakly encrypted secret', async function () {
-    // Store dummy identity
+    // Store dummy development identity
     await getIdentity({
       initialize: true,
       idPath: DUMMY_PATH,
@@ -67,35 +70,35 @@ describe('Identity', function () {
       useWeakCrypto: true
     })
 
-    let rejectsWhenUsingDevSecret: boolean
-    try {
-      await getIdentity({
-        initialize: false,
-        idPath: DUMMY_PATH,
-        password: DUMMY_PASSWORD
-      })
-      rejectsWhenUsingDevSecret = false
-    } catch {
-      rejectsWhenUsingDevSecret = true
-    }
-
-    assert(rejectsWhenUsingDevSecret)
+    await assert.rejects(
+      async () => {
+        await getIdentity({
+          initialize: false,
+          idPath: DUMMY_PATH,
+          password: DUMMY_PASSWORD
+        })
+      },
+      {
+        name: 'Error',
+        message: 'Attempting to use a development key while not being in development mode'
+      }
+    )
   })
 
   it('fail on empty password', async function () {
-    let rejectsOnEmptyPassword: boolean
-    try {
-      await getIdentity({
-        initialize: false,
-        idPath: DUMMY_PATH,
-        password: ''
-      })
-      rejectsOnEmptyPassword = false
-    } catch {
-      rejectsOnEmptyPassword = true
-    }
-
-    assert(rejectsOnEmptyPassword)
+    await assert.rejects(
+      async () => {
+        await getIdentity({
+          initialize: true,
+          idPath: DUMMY_PATH,
+          password: ''
+        })
+      },
+      {
+        name: 'Error',
+        message: 'Password must not be empty'
+      }
+    )
   })
 
   it('store and restore identity', async function () {

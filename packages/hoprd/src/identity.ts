@@ -76,7 +76,7 @@ async function createIdentity(idPath: string, password: string, useWeakCrypto = 
 
 export async function getIdentity(options: IdentityOptions): Promise<PeerId> {
   if (typeof options.password !== 'string' || options.password.length == 0) {
-    throw Error(`Password must not be empty`)
+    throw new Error(`Password must not be empty`)
   }
 
   let storedIdentity: Uint8Array | undefined
@@ -85,9 +85,6 @@ export async function getIdentity(options: IdentityOptions): Promise<PeerId> {
   } catch {
     log('Could not load identity', options.idPath)
   }
-
-  log(storedIdentity)
-  console.log(storedIdentity)
 
   if (options.useWeakCrypto) {
     log(`Using weaker key protection to accelerate node startup`)
