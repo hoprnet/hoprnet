@@ -357,7 +357,7 @@ class Indexer extends EventEmitter {
     if (account && account.hasAnnounced()) {
       return account.getPublicKey()
     }
-    throw new Error('Could not find public key for address - have they announced?') 
+    throw new Error('Could not find public key for address - have they announced?')
   }
 
   private async toIndexerChannel(channel: ChannelEntry): Promise<RoutingChannel> {

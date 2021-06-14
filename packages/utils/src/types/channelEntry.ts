@@ -143,7 +143,8 @@ export class ChannelEntry {
   public static createMock(): ChannelEntry {
     const pub = PublicKey.createMock()
     return new ChannelEntry(
-      pub, pub,
+      pub,
+      pub,
       new Balance(new BN(1)),
       Hash.create(),
       new UINT256(new BN(1)),
