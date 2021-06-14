@@ -5,12 +5,12 @@ import type { ChainWrapper } from '../ethereum'
 import assert from 'assert'
 import EventEmitter from 'events'
 import Indexer from '.'
-import { stringToU8a, Address, ChannelEntry, Hash, HoprDB } from '@hoprnet/hopr-utils'
+import { stringToU8a, Address, ChannelEntry, Hash, HoprDB, generateChannelId, ChannelStatus } from '@hoprnet/hopr-utils'
 import { expectAccountsToBeEqual, expectChannelsToBeEqual } from './fixtures'
 import Defer from 'p-defer'
 import * as fixtures from './fixtures'
-import { Channel } from '..'
-import { CHANNEL_ID } from '../fixtures'
+import { CHANNEL_ID, PARTY_A, PARTY_B } from '../fixtures'
+import { BigNumber } from 'ethers'
 
 const createProviderMock = (ops: { latestBlockNumber?: number } = {}) => {
   let latestBlockNumber = ops.latestBlockNumber ?? 0
@@ -44,9 +44,9 @@ const createHoprChannelsMock = (ops: { pastEvents?: Event<any>[] } = {}) => {
 
         const updateEvent = event as Event<'ChannelUpdate'>
 
-        const eventChannelId = Channel.generateId(
-          Address.fromString(updateEvent.args.partyA),
-          Address.fromString(updateEvent.args.partyB)
+        const eventChannelId = generateChannelId(
+          Address.fromString(updateEvent.args.source),
+          Address.fromString(updateEvent.args.destination)
         )
 
         if (new Hash(stringToU8a(channelId)).eq(eventChannelId)) {
@@ -55,30 +55,27 @@ const createHoprChannelsMock = (ops: { pastEvents?: Event<any>[] } = {}) => {
       }, [])[0]
     }
 
-    async bumpChannel(counterparty: string, _comm: string) {
-      const channelId = Channel.generateId(fixtures.PARTY_A.toAddress(), fixtures.PARTY_B.toAddress())
-      const currentState = (await this.channels(channelId.toHex())) as Event<'ChannelUpdate'>['args']['newState']
-
-      if (currentState == undefined) {
-        return
-      }
-
-      let newEvent: Event<'ChannelUpdate'>
-
-      if (counterparty === fixtures.PARTY_A.toAddress().toHex()) {
-        if (currentState.partyBTicketEpoch.eq(1)) {
-          newEvent = fixtures.COMMITMENT_SET_AB
-        } else {
-          newEvent = fixtures.COMMITMENT_SET_B
-        }
-      } else if (counterparty === fixtures.PARTY_B.toAddress().toHex()) {
-        if (currentState.partyATicketEpoch.eq(1)) {
-          newEvent = fixtures.COMMITMENT_SET_AB
-        } else {
-          newEvent = fixtures.COMMITMENT_SET_A
-        }
-      }
-
+    async bumpChannel(_counterparty: string, _comm: string) {
+      let newEvent = {
+        event: 'ChannelUpdate',
+        transactionHash: '',
+        blockNumber: 3,
+        transactionIndex: 0,
+        logIndex: 0,
+        args: {
+          source: PARTY_A.toAddress().toHex(),
+          destination: PARTY_B.toAddress().toHex(),
+          newState: {
+            balance: BigNumber.from('3'),
+            commitment: Hash.create(new TextEncoder().encode('commA')).toHex(),
+            ticketEpoch: BigNumber.from('1'),
+            ticketIndex: BigNumber.from('0'),
+            status: 2,
+            channelEpoch: BigNumber.from('0'),
+            closureTime: BigNumber.from('0')
+          }
+        } as any
+      } as Event<'ChannelUpdate'>
       pastEvents.push(newEvent)
       this.emit('*', newEvent)
     }
@@ -263,19 +260,18 @@ describe('test indexer', function () {
     expectAccountsToBeEqual(account, fixtures.PARTY_A_INITIALIZED_ACCOUNT)
 
     const channel = await indexer.getChannel(fixtures.OPENED_CHANNEL.getId())
-    expectChannelsToBeEqual(channel, fixtures.COMMITMENT_SET_A_CHANNEL)
+    expectChannelsToBeEqual(channel, fixtures.OPENED_CHANNEL)
 
     const channels = await indexer.getChannels()
     assert.strictEqual(channels.length, 1, 'expected channels')
-    expectChannelsToBeEqual(channels[0], fixtures.COMMITMENT_SET_A_CHANNEL)
+    expectChannelsToBeEqual(channels[0], fixtures.OPENED_CHANNEL)
 
-    const channelsOfPartyA = await indexer.getChannelsOf(fixtures.PARTY_A.toAddress())
-    assert.strictEqual(channelsOfPartyA.length, 1)
-    expectChannelsToBeEqual(channelsOfPartyA[0], fixtures.COMMITMENT_SET_A_CHANNEL)
+    const channelsFromPartyA = await indexer.getChannelsFrom(fixtures.PARTY_A.toAddress())
+    assert.strictEqual(channelsFromPartyA.length, 1)
+    expectChannelsToBeEqual(channelsFromPartyA[0], fixtures.OPENED_CHANNEL)
 
-    const channelsOfPartyB = await indexer.getChannelsOf(fixtures.PARTY_B.toAddress())
-    assert.strictEqual(channelsOfPartyB.length, 1)
-    expectChannelsToBeEqual(channelsOfPartyB[0], fixtures.COMMITMENT_SET_A_CHANNEL)
+    const channelsOfPartyB = await indexer.getChannelsFrom(fixtures.PARTY_B.toAddress())
+    assert.strictEqual(channelsOfPartyB.length, 0)
   })
 
   it('should handle provider error by restarting', async function () {
@@ -317,6 +313,7 @@ describe('test indexer', function () {
   })
 
   it('should emit events on updated channels', async function () {
+    this.timeout(8000)
     const { indexer, newEvent, newBlock } = useFixtures({
       latestBlockNumber: 3,
       pastEvents: [fixtures.PARTY_A_INITIALIZED_EVENT]
@@ -329,18 +326,17 @@ describe('test indexer', function () {
 
     indexer.on('own-channel-updated', (channel: ChannelEntry) => {
       switch (channel.status) {
-        case 'OPEN': {
-          if (channel.partyATicketEpoch.toBN().eqn(1)) {
-            opened.resolve()
-            commitmentSet.resolve()
-          }
+        case ChannelStatus.WaitingForCommitment:
+          opened.resolve()
           break
-        }
-        case 'PENDING_TO_CLOSE': {
+        case ChannelStatus.Open:
+          commitmentSet.resolve()
+          break
+        case ChannelStatus.PendingToClose: {
           pendingIniated.resolve()
           break
         }
-        case 'CLOSED': {
+        case ChannelStatus.Closed: {
           closed.resolve()
           break
         }
@@ -348,30 +344,91 @@ describe('test indexer', function () {
     })
 
     await indexer.start()
-
-    newEvent(fixtures.OPENED_EVENT)
+    const ev = {
+      event: 'ChannelUpdate',
+      transactionHash: '',
+      blockNumber: 2,
+      transactionIndex: 0,
+      logIndex: 0,
+      args: {
+        source: PARTY_B.toAddress().toHex(),
+        destination: PARTY_A.toAddress().toHex(),
+        newState: {
+          balance: BigNumber.from('3'),
+          commitment: new Hash(new Uint8Array({ length: Hash.SIZE })).toHex(),
+          ticketEpoch: BigNumber.from('0'),
+          ticketIndex: BigNumber.from('0'),
+          status: 1,
+          channelEpoch: BigNumber.from('0'),
+          closureTime: BigNumber.from('0')
+        }
+      } as any
+    } as Event<'ChannelUpdate'>
+    // We are ACCOUNT_A - if B opens a channel to us, we should automatically
+    // commit.
+    newEvent(ev)
 
     newBlock()
     newBlock()
+    await opened.promise
+    newBlock()
+    newBlock()
+    await commitmentSet.promise
 
-    await Promise.all([opened.promise, commitmentSet.promise])
-
-    newEvent(fixtures.PENDING_CLOSURE_EVENT)
+    const evClose = {
+      event: 'ChannelUpdate',
+      transactionHash: '',
+      blockNumber: 5,
+      transactionIndex: 0,
+      logIndex: 0,
+      args: {
+        source: PARTY_B.toAddress().toHex(),
+        destination: PARTY_A.toAddress().toHex(),
+        newState: {
+          balance: BigNumber.from('3'),
+          commitment: Hash.create(new TextEncoder().encode('commA')).toHex(),
+          ticketEpoch: BigNumber.from('1'),
+          ticketIndex: BigNumber.from('0'),
+          status: 3,
+          channelEpoch: BigNumber.from('0'),
+          closureTime: BigNumber.from('0'),
+          closureByPartyA: true
+        }
+      } as any
+    } as Event<'ChannelUpdate'>
+    newEvent(evClose)
+    newBlock()
     newBlock()
 
     await pendingIniated.promise
-    const channelsOfPartyA = await indexer.getChannelsOf(fixtures.PARTY_A.toAddress())
 
-    expectChannelsToBeEqual(channelsOfPartyA[0], fixtures.PENDING_CLOSURE_CHANNEL)
+    const evClosed = {
+      event: 'ChannelUpdate',
+      transactionHash: '',
+      blockNumber: 7,
+      transactionIndex: 0,
+      logIndex: 0,
+      args: {
+        source: PARTY_B.toAddress().toHex(),
+        destination: PARTY_A.toAddress().toHex(),
+        newState: {
+          balance: BigNumber.from('0'),
+          commitment: new Hash(new Uint8Array({ length: Hash.SIZE })).toHex(),
+          ticketEpoch: BigNumber.from('0'),
+          ticketIndex: BigNumber.from('0'),
+          status: 0,
+          channelEpoch: BigNumber.from('0'),
+          closureTime: BigNumber.from('0'),
+          closureByPartyA: false
+        }
+      } as any
+    } as Event<'ChannelUpdate'>
 
-    newEvent(fixtures.CLOSED_EVENT)
-
+    newEvent(evClosed)
     newBlock()
     newBlock()
 
     await closed.promise
-    const channelsOfPartyAAfterClose = await indexer.getChannelsOf(fixtures.PARTY_A.toAddress())
-    expectChannelsToBeEqual(channelsOfPartyAAfterClose[0], fixtures.CLOSED_CHANNEL)
   })
 
   it('should start two indexers and should set commitments only once', async function () {

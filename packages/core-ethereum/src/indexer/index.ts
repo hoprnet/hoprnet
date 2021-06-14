@@ -4,7 +4,7 @@ import type { ChainWrapper } from '../ethereum'
 import chalk from 'chalk'
 import BN from 'bn.js'
 import Heap from 'heap-js'
-import { randomChoice, HoprDB, stringToU8a } from '@hoprnet/hopr-utils'
+import { randomChoice, HoprDB, stringToU8a, ChannelStatus } from '@hoprnet/hopr-utils'
 import { Address, ChannelEntry, AccountEntry, Hash, PublicKey, Balance, Snapshot } from '@hoprnet/hopr-utils'
 import { isConfirmedBlock, snapshotComparator } from './utils'
 import { Commitment } from '../commitment'
@@ -162,7 +162,6 @@ class Indexer extends EventEmitter {
         failedCount++
 
         if (failedCount > 5) {
-          console.error(error)
           throw error
         }
 
@@ -282,37 +281,31 @@ class Indexer extends EventEmitter {
     const channel = ChannelEntry.fromSCEvent(event)
 
     log(channel.toString())
-
     await this.db.updateChannel(channel.getId(), channel)
 
-    if (channel.partyA.eq(this.address) || channel.partyB.eq(this.address)) {
+    if (channel.source.eq(this.address) || channel.destination.eq(this.address)) {
       this.emit('own-channel-updated', channel)
 
-      if (channel.status !== 'OPEN') {
-        // Only handle open channels
-        return
-      }
-
-      const ticketEpoch = channel.ticketEpochFor(this.address)
-
-      if (ticketEpoch.toBN().isZero()) {
-        await this.onOwnUnsetCommitment(channel)
-      } else if (ticketEpoch.toBN().gten(1)) {
-        this.resolveCommitmentPromise(channel.getId())
+      if (channel.destination.eq(this.address)) {
+        // Channel _to_ us
+        if (channel.status === ChannelStatus.WaitingForCommitment) {
+          await this.onOwnUnsetCommitment(channel)
+        } else if (channel.status === ChannelStatus.Open) {
+          this.resolveCommitmentPromise(channel.getId())
+        }
       }
     }
   }
 
   private onOwnUnsetCommitment(channel: ChannelEntry) {
-    const isPartyA = channel.partyA.eq(this.address)
-
-    const counterparty = isPartyA ? channel.partyB : channel.partyA
-
-    log(`Found channel ${chalk.yellow(channel.getId().toHex())} with unset commitment. Setting commitment`)
+    if (!channel.destination.eq(this.address)) {
+      throw new Error('shouldnt be called unless we are the destination')
+    }
+    log(`Found channel ${chalk.yellow(channel.getId().toHex())} to us with unset commitment. Setting commitment`)
 
     return new Commitment(
-      (comm: Hash) => this.chain.setCommitment(counterparty, comm),
-      async () => (await this.getChannel(channel.getId())).commitmentFor(this.address),
+      (comm: Hash) => this.chain.setCommitment(channel.source, comm),
+      async () => (await this.getChannel(channel.getId())).commitment,
       this.db,
       channel.getId(),
       this
@@ -347,9 +340,15 @@ class Indexer extends EventEmitter {
     return this.db.getChannels(filter)
   }
 
-  public async getChannelsOf(address: Address) {
+  public async getChannelsFrom(address: Address) {
     return this.db.getChannels((channel) => {
-      return address.eq(channel.partyA) || address.eq(channel.partyB)
+      return address.eq(channel.source)
+    })
+  }
+
+  public async getChannelsTo(address: Address) {
+    return this.db.getChannels((channel) => {
+      return address.eq(channel.destination)
     })
   }
 
@@ -363,19 +362,12 @@ class Indexer extends EventEmitter {
     return undefined
   }
 
-  private async toIndexerChannel(source: PeerId, channel: ChannelEntry): Promise<RoutingChannel> {
-    const sourcePubKey = new PublicKey(source.pubKey.marshal())
-    const [partyAPubKey, partyBPubKey] = await Promise.all([
-      this.getPublicKeyOf(channel.partyA),
-      this.getPublicKeyOf(channel.partyB)
+  private async toIndexerChannel(channel: ChannelEntry): Promise<RoutingChannel> {
+    const [sourcePubKey, destPubKey] = await Promise.all([
+      this.getPublicKeyOf(channel.source),
+      this.getPublicKeyOf(channel.destination)
     ])
-
-    if (sourcePubKey.eq(partyAPubKey)) {
-      return [source, partyBPubKey.toPeerId(), channel.partyABalance]
-    } else {
-      const partyBBalance = channel.partyBBalance
-      return [source, partyAPubKey.toPeerId(), partyBBalance]
-    }
+    return [sourcePubKey.toPeerId(), destPubKey.toPeerId(), channel.balance]
   }
 
   public async getAnnouncedAddresses(): Promise<Multiaddr[]> {
@@ -397,9 +389,7 @@ class Indexer extends EventEmitter {
     }
 
     log('picking random from %d channels', channels.length)
-    const random = randomChoice(channels)
-    const partyA = await this.getPublicKeyOf(random.partyA)
-    return this.toIndexerChannel(partyA.toPeerId(), random) // TODO: why do we pick partyA?
+    return this.toIndexerChannel(randomChoice(channels))
   }
 
   /**
@@ -410,13 +400,13 @@ class Indexer extends EventEmitter {
    */
   public async getOpenRoutingChannelsFromPeer(source: PeerId): Promise<RoutingChannel[]> {
     const sourcePubKey = new PublicKey(source.pubKey.marshal())
-    const channels = await this.getChannelsOf(sourcePubKey.toAddress()).then((channels) =>
-      channels.filter((channel) => channel.status === 'OPEN')
+    const channels = await this.getChannelsFrom(sourcePubKey.toAddress()).then((channels) =>
+      channels.filter((channel) => channel.status === ChannelStatus.Open)
     )
 
     let cout: RoutingChannel[] = []
     for (let channel of channels) {
-      let directed = await this.toIndexerChannel(source, channel)
+      let directed = await this.toIndexerChannel(channel)
       if (directed[2].toBN().gtn(0)) {
         cout.push(directed)
       }

@@ -46,23 +46,18 @@ const createMockTicket = ({
   } as unknown as Ticket
 }
 
-const mockChannelEntry = (isChannelOpen: boolean, ticketEpoch: UINT256, ticketIndex: UINT256) =>
+const mockChannelEntry = (isChannelOpen: boolean, balance: Balance, ticketEpoch: UINT256, ticketIndex: UINT256) =>
   Promise.resolve(
     new ChannelEntry(
       TARGET_ADDRESS,
       TARGET_ADDRESS,
-      null,
-      null,
-      null,
+      balance,
       null,
       ticketEpoch,
-      null,
       ticketIndex,
-      null,
       isChannelOpen ? ChannelStatus.Open : ChannelStatus.Closed,
       new UINT256(new BN(1)),
-      null,
-      false
+      null
     )
   )
 
@@ -82,14 +77,12 @@ const createMockChannel = ({
   ticketIndex?: UINT256
 }) => {
   return {
-    getBalances: sinon.stub().returns(
-      Promise.resolve({
-        self,
-        counterparty
-      })
-    ),
-    getState: () => {
-      if (isChannelStored) return mockChannelEntry(isChannelOpen, ticketEpoch, ticketIndex)
+    usToThem: () => {
+      if (isChannelStored) return mockChannelEntry(isChannelOpen, self, ticketEpoch, ticketIndex)
+      throw new Error('state not found')
+    },
+    themToUs: () => {
+      if (isChannelStored) return mockChannelEntry(isChannelOpen, counterparty, ticketEpoch, ticketIndex)
       throw new Error('state not found')
     },
     channelEpoch: new BN(1)
@@ -115,7 +108,7 @@ const createMockNode = ({
 
 const getTicketsMock = async (): Promise<Ticket[]> => []
 
-describe('unit test validateUnacknowledgedTicket', function () {
+describe('messages/validations.spec.ts - unit test validateUnacknowledgedTicket', function () {
   it('should pass if ticket is okay', async function () {
     const node = createMockNode({})
     const signedTicket = createMockTicket({})
@@ -322,7 +315,7 @@ describe('unit test validateUnacknowledgedTicket', function () {
   })
 })
 
-describe('unit test validateCreatedTicket', function () {
+describe('messages/validations.spec.ts unit test validateCreatedTicket', function () {
   it('should pass if ticket is okay', async function () {
     const ticket = createMockTicket({})
     validateCreatedTicket(new BN(1), ticket)

@@ -19,7 +19,8 @@ import {
   pubKeyToPeerId,
   HalfKeyChallenge,
   HalfKey,
-  Challenge
+  Challenge,
+  ChannelStatus
 } from '@hoprnet/hopr-utils'
 import type HoprCoreEthereum from '@hoprnet/hopr-core-ethereum'
 import { AcknowledgementChallenge } from './acknowledgementChallenge'
@@ -89,7 +90,7 @@ export async function validateUnacknowledgedTicket(
 
   let channelState
   try {
-    channelState = await channel.getState()
+    channelState = await channel.themToUs()
   } catch (err) {
     throw Error(`Error while validating unacknowledged ticket, state not found: '${err.message}'`)
   }
@@ -105,12 +106,12 @@ export async function validateUnacknowledgedTicket(
   }
 
   // channel MUST be open or pending to close
-  if (channelState.status === 'CLOSED') {
+  if (channelState.status === ChannelStatus.Closed) {
     throw Error(`Payment channel with '${senderB58}' is not open or pending to close`)
   }
 
   // ticket's epoch MUST match our account nonce
-  const channelTicketEpoch = (await channel.getState()).ticketEpochFor(selfAddress).toBN()
+  const channelTicketEpoch = channelState.ticketEpoch.toBN()
   if (!ticketEpoch.eq(channelTicketEpoch)) {
     throw Error(
       `Ticket epoch '${ticketEpoch.toString()}' does not match our account epoch ${channelTicketEpoch.toString()}`
@@ -119,7 +120,7 @@ export async function validateUnacknowledgedTicket(
 
   // ticket's index MUST be higher than our account nonce
   // TODO: keep track of uncommited tickets
-  const channelTicketIndex = (await channel.getState()).ticketIndexFor(selfAddress).toBN()
+  const channelTicketIndex = channelState.ticketIndex.toBN()
   if (!ticketIndex.gt(channelTicketIndex)) {
     throw Error(
       `Ticket index '${ticketIndex.toString()}' must be higher than last ticket index ${channelTicketIndex.toString()}`
@@ -137,7 +138,7 @@ export async function validateUnacknowledgedTicket(
 
   // channel MUST have enough funds
   // (performance) we are making a request to blockchain
-  const senderBalance = (await channel.getBalances()).counterparty
+  const senderBalance = channelState.balance
   if (senderBalance.toBN().lt(ticket.amount.toBN())) {
     throw Error(`Payment channel does not have enough funds`)
   }

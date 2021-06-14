@@ -10,6 +10,7 @@ import {
   ChannelStatus,
   AcknowledgedTicket,
   Response,
+  generateChannelId,
   HalfKey
 } from '@hoprnet/hopr-utils'
 import assert from 'assert'
@@ -18,7 +19,7 @@ import { utils } from 'ethers'
 import { Channel } from './channel'
 import * as fixtures from './fixtures'
 
-const createChainMock = (_channelEntry: ChannelEntry): ChainWrapper => {
+const createChainMock = (): ChainWrapper => {
   return {
     async setCommitment() {},
     async getBalance() {},
@@ -30,10 +31,10 @@ const createChainMock = (_channelEntry: ChannelEntry): ChainWrapper => {
   } as unknown as ChainWrapper
 }
 
-const createIndexerMock = (channelEntry: ChannelEntry): Indexer => {
+const createIndexerMock = (channelUsThem: ChannelEntry, channelThemUs: ChannelEntry): Indexer => {
   return {
-    async getChannel(_id: Hash) {
-      return channelEntry
+    async getChannel(id: Hash) {
+      return id.eq(channelUsThem.getId()) ? channelUsThem : channelThemUs
     }
   } as Indexer
 }
@@ -49,29 +50,35 @@ const createMocks = (from: string, to: string) => {
   const nextCommitmentPartyB = Hash.create(new Uint8Array([1]))
   const commitmentPartyB = nextCommitmentPartyB.hash()
 
-  const channelEntry = new ChannelEntry(
+  const channelUsThem = new ChannelEntry(
     self.toAddress(),
     counterparty.toAddress(),
     new Balance(new BN(7)),
-    new Balance(new BN(3)),
     commitmentPartyA,
-    commitmentPartyB,
-    new UINT256(new BN(1)),
-    new UINT256(new BN(1)),
     new UINT256(new BN(1)),
     new UINT256(new BN(1)),
     ChannelStatus.Closed,
     new UINT256(new BN(1)),
+    new UINT256(new BN(0))
+  )
+  const channelThemUs = new ChannelEntry(
+    counterparty.toAddress(),
+    self.toAddress(),
+    new Balance(new BN(3)),
+    commitmentPartyB,
+    new UINT256(new BN(1)),
+    new UINT256(new BN(1)),
+    ChannelStatus.Closed,
     new UINT256(new BN(0)),
-    false
+    new UINT256(new BN(0))
   )
 
   const secret1 = new HalfKey(Hash.create(new Uint8Array([1])).serialize())
   const secret2 = new HalfKey(Hash.create(new Uint8Array([2])).serialize())
   const response = Response.fromHalfKeys(secret1, secret2)
 
-  const indexer = createIndexerMock(channelEntry)
-  const chain = createChainMock(channelEntry)
+  const indexer = createIndexerMock(channelUsThem, channelThemUs)
+  const chain = createChainMock()
   const channel = new Channel(self, counterparty, db, chain, indexer, selfPrivateKey)
 
   return {
@@ -81,7 +88,8 @@ const createMocks = (from: string, to: string) => {
     db,
     indexer,
     chain,
-    channelEntry,
+    channelUsThem,
+    channelThemUs,
     response,
     nextCommitmentPartyA,
     nextCommitmentPartyB,
@@ -104,14 +112,14 @@ describe('test channel', function () {
   })
 
   it('should create channel', async function () {
-    assert.strictEqual(aliceMocks.channel.getId().toHex(), fixtures.CHANNEL_ID)
+    assert.strictEqual((await aliceMocks.channel.usToThem()).getId().toHex(), fixtures.CHANNEL_ID)
     assert.strictEqual(
-      Channel.generateId(aliceMocks.self.toAddress(), aliceMocks.counterparty.toAddress()).toHex(),
+      generateChannelId(aliceMocks.self.toAddress(), aliceMocks.counterparty.toAddress()).toHex(),
       fixtures.CHANNEL_ID
     )
     assert.strictEqual(
-      utils.hexlify((await aliceMocks.channel.getState()).serialize()),
-      utils.hexlify(aliceMocks.channelEntry.serialize())
+      utils.hexlify((await aliceMocks.channel.usToThem()).serialize()),
+      utils.hexlify(aliceMocks.channelUsThem.serialize())
     )
   })
 

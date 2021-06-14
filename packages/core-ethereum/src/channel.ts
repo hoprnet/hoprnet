@@ -1,7 +1,6 @@
 import BN from 'bn.js'
 import {
   PublicKey,
-  Address,
   Balance,
   Hash,
   HalfKey,
@@ -10,7 +9,9 @@ import {
   AcknowledgedTicket,
   ChannelEntry,
   UnacknowledgedTicket,
-  Challenge
+  Challenge,
+  generateChannelId,
+  ChannelStatus
 } from '@hoprnet/hopr-utils'
 import Debug from 'debug'
 import type { RedeemTicketResponse } from '.'
@@ -22,6 +23,7 @@ import chalk from 'chalk'
 
 const log = Debug('hopr-core-ethereum:channel')
 
+// TODO - legacy, models bidirectional channel.
 class Channel {
   private commitment: Commitment
 
@@ -37,14 +39,9 @@ class Channel {
       (commitment: Hash) => this.chain.setCommitment(counterparty.toAddress(), commitment),
       () => this.getChainCommitment(),
       this.db,
-      this.getId(),
+      generateChannelId(counterparty.toAddress(), self.toAddress()), // Counterparty to us
       indexer
     )
-  }
-
-  static generateId(self: Address, counterparty: Address) {
-    let parties = self.sortPair(counterparty)
-    return Hash.create(Buffer.concat(parties.map((x) => x.serialize())))
   }
 
   /**
@@ -83,33 +80,21 @@ class Channel {
     }
   }
 
-  getId() {
-    return Channel.generateId(this.self.toAddress(), this.counterparty.toAddress())
-  }
-
   async getChainCommitment(): Promise<Hash> {
-    return (await this.getState()).commitmentFor(this.self.toAddress())
+    return (await this.themToUs()).commitment
   }
 
-  async getState(): Promise<ChannelEntry> {
-    const channelId = this.getId()
-    const state = await this.indexer.getChannel(channelId)
-    if (state) return state
+  async usToThem(): Promise<ChannelEntry> {
+    return await this.indexer.getChannel(generateChannelId(this.self.toAddress(), this.counterparty.toAddress()))
+  }
 
-    throw Error(`Channel state for ${channelId.toHex()} not found`)
+  async themToUs(): Promise<ChannelEntry> {
+    return await this.indexer.getChannel(generateChannelId(this.counterparty.toAddress(), this.self.toAddress()))
   }
 
   // TODO kill
   async getBalances() {
-    const state = await this.getState()
-    const a = state.partyABalance
-    const b = state.partyBBalance
-    const [self, counterparty] = state.partyA.eq(this.self.toAddress()) ? [a, b] : [b, a]
-
-    return {
-      self,
-      counterparty
-    }
+    return [await this.usToThem(), await this.themToUs()].map((x) => x.balance)
   }
 
   async fund(myFund: Balance, counterpartyFund: Balance) {
@@ -127,9 +112,9 @@ class Channel {
     // channel may not exist, we can still open it
     let c: ChannelEntry
     try {
-      c = await this.getState()
+      c = await this.usToThem()
     } catch {}
-    if (c && c.status !== 'CLOSED') {
+    if (c && c.status !== ChannelStatus.Closed) {
       throw Error('Channel is already opened')
     }
 
@@ -140,22 +125,23 @@ class Channel {
       throw Error('We do not have enough balance to open a channel')
     }
     await this.chain.openChannel(myAddress, counterpartyAddress, fundAmount)
+    return generateChannelId(myAddress, counterpartyAddress)
   }
 
   async initializeClosure() {
-    const c = await this.getState()
+    const c = await this.usToThem()
     const counterpartyAddress = this.counterparty.toAddress()
-    if (c.status !== 'OPEN') {
+    if (c.status !== ChannelStatus.Open) {
       throw Error('Channel status is not OPEN')
     }
     return await this.chain.initiateChannelClosure(counterpartyAddress)
   }
 
   async finalizeClosure() {
-    const c = await this.getState()
+    const c = await this.usToThem()
     const counterpartyAddress = this.counterparty.toAddress()
 
-    if (c.status !== 'PENDING_TO_CLOSE') {
+    if (c.status !== ChannelStatus.PendingToClose) {
       throw Error('Channel status is not PENDING_TO_CLOSE')
     }
     return await this.chain.finalizeChannelClosure(counterpartyAddress)
@@ -186,14 +172,14 @@ class Channel {
    */
   async createTicket(amount: Balance, challenge: Challenge, winProb: BN) {
     const counterpartyAddress = this.counterparty.toAddress()
-    const channelState = await this.getState()
-
-    const currentTicketIndex = await this.bumpTicketIndex(channelState.getId())
+    const channelState = await this.usToThem()
+    const id = generateChannelId(this.self.toAddress(), this.counterparty.toAddress())
+    const currentTicketIndex = await this.bumpTicketIndex(id)
 
     const ticket = Ticket.create(
       counterpartyAddress,
       challenge,
-      channelState.ticketEpochFor(counterpartyAddress),
+      channelState.ticketEpoch,
       currentTicketIndex,
       amount,
       UINT256.fromInverseProbability(winProb),

@@ -49,6 +49,9 @@ export class PublicKey {
   }
 
   static fromString(str: string): PublicKey {
+    if (!str) {
+      throw new Error('Cannot make address from empty string')
+    }
     return new PublicKey(stringToU8a(str))
   }
 

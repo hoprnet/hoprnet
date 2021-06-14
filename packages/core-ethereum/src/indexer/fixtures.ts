@@ -13,36 +13,15 @@ export const expectAccountsToBeEqual = (actual: AccountEntry, expected: AccountE
 }
 
 export const expectChannelsToBeEqual = (actual: ChannelEntry, expected: ChannelEntry) => {
-  assert.strictEqual(actual.partyA.toHex(), expected.partyA.toHex(), 'partyA')
-  assert.strictEqual(actual.partyB.toHex(), expected.partyB.toHex(), 'partyB')
-  assert.strictEqual(actual.partyABalance.toBN().toString(), expected.partyABalance.toBN().toString(), 'partyABalance')
-  assert.strictEqual(actual.partyBBalance.toBN().toString(), expected.partyBBalance.toBN().toString(), 'partyBBalance')
-  assert.strictEqual(actual.commitmentPartyA.toHex(), expected.commitmentPartyA.toHex(), 'commitmentPartyA')
-  assert.strictEqual(actual.commitmentPartyB.toHex(), expected.commitmentPartyB.toHex(), 'commitmentPartyB')
-  assert.strictEqual(
-    actual.partyATicketEpoch.toBN().toString(),
-    expected.partyATicketEpoch.toBN().toString(),
-    'partyATicketEpoch'
-  )
-  assert.strictEqual(
-    actual.partyBTicketEpoch.toBN().toString(),
-    expected.partyBTicketEpoch.toBN().toString(),
-    'partyBTicketEpoch'
-  )
-  assert.strictEqual(
-    actual.partyATicketIndex.toBN().toString(),
-    expected.partyATicketIndex.toBN().toString(),
-    'partyATicketIndex'
-  )
-  assert.strictEqual(
-    actual.partyBTicketIndex.toBN().toString(),
-    expected.partyBTicketIndex.toBN().toString(),
-    'partyBTicketIndex'
-  )
+  assert.strictEqual(actual.source.toHex(), expected.source.toHex(), 'source')
+  assert.strictEqual(actual.destination.toHex(), expected.destination.toHex(), 'destination')
+  assert.strictEqual(actual.balance.toBN().toString(), expected.balance.toBN().toString(), 'balance')
+  assert.strictEqual(actual.commitment.toHex(), expected.commitment.toHex(), 'commitment')
+  assert.strictEqual(actual.ticketEpoch.toBN().toString(), expected.ticketEpoch.toBN().toString(), 'ticketEpoch')
+  assert.strictEqual(actual.ticketIndex.toBN().toString(), expected.ticketIndex.toBN().toString(), 'ticketIndex')
   assert.strictEqual(actual.status, expected.status, 'status')
   assert.strictEqual(actual.channelEpoch.toBN().toString(), expected.channelEpoch.toBN().toString(), 'channelEpoch')
   assert.strictEqual(actual.closureTime.toBN().toString(), expected.closureTime.toBN().toString(), 'closureTime')
-  assert.strictEqual(actual.closureByPartyA, expected.closureByPartyA, 'closureByPartyA')
 }
 
 export const PARTY_A_INITIALIZED_EVENT = {
@@ -78,159 +57,18 @@ export const OPENED_EVENT = {
   transactionIndex: 0,
   logIndex: 0,
   args: {
-    partyA: PARTY_A.toAddress().toHex(),
-    partyB: PARTY_B.toAddress().toHex(),
+    source: PARTY_A.toAddress().toHex(),
+    destination: PARTY_B.toAddress().toHex(),
     newState: {
-      partyABalance: BigNumber.from('3'),
-      partyBBalance: BigNumber.from('0'),
-      partyACommitment: Hash.create(new TextEncoder().encode('commA')).toHex(),
-      partyBCommitment: new Hash(new Uint8Array({ length: Hash.SIZE })).toHex(),
-      partyATicketEpoch: BigNumber.from('1'),
-      partyBTicketEpoch: BigNumber.from('0'),
-      partyATicketIndex: BigNumber.from('0'),
-      partyBTicketIndex: BigNumber.from('0'),
+      balance: BigNumber.from('3'),
+      commitment: new Hash(new Uint8Array({ length: Hash.SIZE })).toHex(),
+      ticketEpoch: BigNumber.from('0'),
+      ticketIndex: BigNumber.from('0'),
       status: 1,
       channelEpoch: BigNumber.from('0'),
-      closureTime: BigNumber.from('0'),
-      closureByPartyA: false
+      closureTime: BigNumber.from('0')
     }
   } as any
 } as Event<'ChannelUpdate'>
 
 export const OPENED_CHANNEL = ChannelEntry.fromSCEvent(OPENED_EVENT)
-
-export const COMMITMENT_SET_A = {
-  event: 'ChannelUpdate',
-  transactionHash: '',
-  blockNumber: 3,
-  transactionIndex: 0,
-  logIndex: 0,
-  args: {
-    partyA: PARTY_A.toAddress().toHex(),
-    partyB: PARTY_B.toAddress().toHex(),
-    newState: {
-      partyABalance: BigNumber.from('3'),
-      partyBBalance: BigNumber.from('0'),
-      partyACommitment: Hash.create(new TextEncoder().encode('commA')).toHex(),
-      partyBCommitment: new Hash(new Uint8Array({ length: Hash.SIZE })).toHex(),
-      partyATicketEpoch: BigNumber.from('1'),
-      partyBTicketEpoch: BigNumber.from('0'),
-      partyATicketIndex: BigNumber.from('0'),
-      partyBTicketIndex: BigNumber.from('0'),
-      status: 1,
-      channelEpoch: BigNumber.from('0'),
-      closureTime: BigNumber.from('0'),
-      closureByPartyA: false
-    }
-  } as any
-} as Event<'ChannelUpdate'>
-
-export const COMMITMENT_SET_A_CHANNEL = ChannelEntry.fromSCEvent(COMMITMENT_SET_A)
-
-export const COMMITMENT_SET_B = {
-  event: 'ChannelUpdate',
-  transactionHash: '',
-  blockNumber: 4,
-  transactionIndex: 0,
-  logIndex: 0,
-  args: {
-    partyA: PARTY_A.toAddress().toHex(),
-    partyB: PARTY_B.toAddress().toHex(),
-    newState: {
-      partyABalance: BigNumber.from('3'),
-      partyBBalance: BigNumber.from('0'),
-      partyACommitment: new Hash(new Uint8Array({ length: Hash.SIZE })).toHex(),
-      partyBCommitment: Hash.create(new TextEncoder().encode('commB')).toHex(),
-      partyATicketEpoch: BigNumber.from('0'),
-      partyBTicketEpoch: BigNumber.from('1'),
-      partyATicketIndex: BigNumber.from('0'),
-      partyBTicketIndex: BigNumber.from('0'),
-      status: 1,
-      channelEpoch: BigNumber.from('0'),
-      closureTime: BigNumber.from('0'),
-      closureByPartyA: false
-    }
-  } as any
-} as Event<'ChannelUpdate'>
-
-export const COMMITMENT_SET_AB = {
-  event: 'ChannelUpdate',
-  transactionHash: '',
-  blockNumber: 5,
-  transactionIndex: 0,
-  logIndex: 0,
-  args: {
-    partyA: PARTY_A.toAddress().toHex(),
-    partyB: PARTY_B.toAddress().toHex(),
-    newState: {
-      partyABalance: BigNumber.from('3'),
-      partyBBalance: BigNumber.from('0'),
-      partyACommitment: Hash.create(new TextEncoder().encode('commA')).toHex(),
-      partyBCommitment: Hash.create(new TextEncoder().encode('commB')).toHex(),
-      partyATicketEpoch: BigNumber.from('1'),
-      partyBTicketEpoch: BigNumber.from('1'),
-      partyATicketIndex: BigNumber.from('0'),
-      partyBTicketIndex: BigNumber.from('0'),
-      status: 1,
-      channelEpoch: BigNumber.from('0'),
-      closureTime: BigNumber.from('0'),
-      closureByPartyA: false
-    }
-  } as any
-} as Event<'ChannelUpdate'>
-
-export const PENDING_CLOSURE_EVENT = {
-  event: 'ChannelUpdate',
-  transactionHash: '',
-  blockNumber: 5,
-  transactionIndex: 0,
-  logIndex: 0,
-  args: {
-    partyA: PARTY_A.toAddress().toHex(),
-    partyB: PARTY_B.toAddress().toHex(),
-    newState: {
-      partyABalance: BigNumber.from('3'),
-      partyBBalance: BigNumber.from('0'),
-      partyACommitment: Hash.create(new TextEncoder().encode('commA')).toHex(),
-      partyBCommitment: Hash.create(new TextEncoder().encode('commB')).toHex(),
-      partyATicketEpoch: BigNumber.from('1'),
-      partyBTicketEpoch: BigNumber.from('1'),
-      partyATicketIndex: BigNumber.from('0'),
-      partyBTicketIndex: BigNumber.from('0'),
-      status: 2,
-      channelEpoch: BigNumber.from('0'),
-      closureTime: BigNumber.from('0'),
-      closureByPartyA: true
-    }
-  } as any
-} as Event<'ChannelUpdate'>
-
-export const PENDING_CLOSURE_CHANNEL = ChannelEntry.fromSCEvent(PENDING_CLOSURE_EVENT)
-
-export const CLOSED_EVENT = {
-  event: 'ChannelUpdate',
-  transactionHash: '',
-  blockNumber: 7,
-  transactionIndex: 0,
-  logIndex: 0,
-  args: {
-    partyA: PARTY_A.toAddress().toHex(),
-    partyB: PARTY_B.toAddress().toHex(),
-    newState: {
-      partyABalance: BigNumber.from('0'),
-      partyBBalance: BigNumber.from('0'),
-      partyACommitment: new Hash(new Uint8Array({ length: Hash.SIZE })).toHex(),
-      partyBCommitment: new Hash(new Uint8Array({ length: Hash.SIZE })).toHex(),
-      partyATicketEpoch: BigNumber.from('0'),
-      partyBTicketEpoch: BigNumber.from('0'),
-      partyATicketIndex: BigNumber.from('0'),
-      partyBTicketIndex: BigNumber.from('0'),
-      status: 0,
-      channelEpoch: BigNumber.from('0'),
-      closureTime: BigNumber.from('0'),
-      closureByPartyA: false
-    }
-  } as any
-} as Event<'ChannelUpdate'>
-
-export const CLOSED_CHANNEL = ChannelEntry.fromSCEvent(CLOSED_EVENT)
