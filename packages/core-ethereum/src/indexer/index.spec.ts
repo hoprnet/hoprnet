@@ -137,7 +137,9 @@ const useFixtures = async (ops: { latestBlockNumber?: number; pastEvents?: Event
     newBlock,
     hoprChannels,
     newEvent,
-    OPENED_CHANNEL: await ChannelEntry.fromSCEvent(fixtures.OPENED_EVENT, (a: Address) => Promise.resolve(a.eq(PARTY_A.toAddress()) ? PARTY_A : PARTY_B)),
+    OPENED_CHANNEL: await ChannelEntry.fromSCEvent(fixtures.OPENED_EVENT, (a: Address) =>
+      Promise.resolve(a.eq(PARTY_A.toAddress()) ? PARTY_A : PARTY_B)
+    ),
     indexer
   }
 }
