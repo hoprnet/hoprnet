@@ -268,6 +268,7 @@ contract HoprChannels is IERC777Recipient, ERC1820Implementer {
             msg.sender
         );
 
+        require(newCommitment != bytes32(0), "Cannot set empty commitment");
         channel.commitment = newCommitment;
         channel.ticketEpoch = channel.ticketEpoch.add(1);
         if (channel.status == ChannelStatus.WAITING_FOR_COMMITMENT){
