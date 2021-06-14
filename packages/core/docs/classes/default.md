@@ -45,7 +45,8 @@
 - [getAnnouncedAddresses](default.md#getannouncedaddresses)
 - [getBalance](default.md#getbalance)
 - [getChannelStrategy](default.md#getchannelstrategy)
-- [getChannelsOf](default.md#getchannelsof)
+- [getChannelsFrom](default.md#getchannelsfrom)
+- [getChannelsTo](default.md#getchannelsto)
 - [getConnectedPeers](default.md#getconnectedpeers)
 - [getEthereumAddress](default.md#getethereumaddress)
 - [getId](default.md#getid)
@@ -354,7 +355,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:695](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L695)
+[packages/core/src/index.ts:693](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L693)
 
 ___
 
@@ -435,7 +436,7 @@ Fund a payment channel
 
 #### Defined in
 
-[packages/core/src/index.ts:667](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L667)
+[packages/core/src/index.ts:665](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L665)
 
 ___
 
@@ -503,9 +504,9 @@ ___
 
 ___
 
-### getChannelsOf
+### getChannelsFrom
 
-▸ **getChannelsOf**(`addr`): `Promise`<ChannelEntry[]\>
+▸ **getChannelsFrom**(`addr`): `Promise`<ChannelEntry[]\>
 
 #### Parameters
 
@@ -520,6 +521,26 @@ ___
 #### Defined in
 
 [packages/core/src/index.ts:768](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L768)
+
+___
+
+### getChannelsTo
+
+▸ **getChannelsTo**(`addr`): `Promise`<ChannelEntry[]\>
+
+#### Parameters
+
+| Name | Type |
+| :------ | :------ |
+| `addr` | `Address` |
+
+#### Returns
+
+`Promise`<ChannelEntry[]\>
+
+#### Defined in
+
+[packages/core/src/index.ts:773](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L773)
 
 ___
 
@@ -547,7 +568,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:778](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L778)
+[packages/core/src/index.ts:783](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L783)
 
 ___
 
@@ -584,7 +605,7 @@ that will relay that message before it reaches its destination.
 
 #### Defined in
 
-[packages/core/src/index.ts:794](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L794)
+[packages/core/src/index.ts:799](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L799)
 
 ___
 
@@ -688,7 +709,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:773](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L773)
+[packages/core/src/index.ts:778](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L778)
 
 ___
 
@@ -1237,7 +1258,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:807](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L807)
+[packages/core/src/index.ts:812](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L812)
 
 ___
 
@@ -1251,7 +1272,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:824](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L824)
+[packages/core/src/index.ts:829](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L829)
 
 ___
 
@@ -1273,7 +1294,7 @@ ___
 
 #### Defined in
 
-[packages/core/src/index.ts:783](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L783)
+[packages/core/src/index.ts:788](https://github.com/hoprnet/hoprnet/blob/master/packages/core/src/index.ts#L788)
 
 ___
 

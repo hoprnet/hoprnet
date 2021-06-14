@@ -10,20 +10,15 @@
 
 ### Properties
 
+- [balance](channelentry.md#balance)
 - [channelEpoch](channelentry.md#channelepoch)
-- [closureByPartyA](channelentry.md#closurebypartya)
 - [closureTime](channelentry.md#closuretime)
-- [commitmentPartyA](channelentry.md#commitmentpartya)
-- [commitmentPartyB](channelentry.md#commitmentpartyb)
-- [partyA](channelentry.md#partya)
-- [partyABalance](channelentry.md#partyabalance)
-- [partyATicketEpoch](channelentry.md#partyaticketepoch)
-- [partyATicketIndex](channelentry.md#partyaticketindex)
-- [partyB](channelentry.md#partyb)
-- [partyBBalance](channelentry.md#partybbalance)
-- [partyBTicketEpoch](channelentry.md#partybticketepoch)
-- [partyBTicketIndex](channelentry.md#partybticketindex)
+- [commitment](channelentry.md#commitment)
+- [destination](channelentry.md#destination)
+- [source](channelentry.md#source)
 - [status](channelentry.md#status)
+- [ticketEpoch](channelentry.md#ticketepoch)
+- [ticketIndex](channelentry.md#ticketindex)
 
 ### Accessors
 
@@ -31,13 +26,9 @@
 
 ### Methods
 
-- [commitmentFor](channelentry.md#commitmentfor)
 - [getId](channelentry.md#getid)
 - [serialize](channelentry.md#serialize)
-- [ticketEpochFor](channelentry.md#ticketepochfor)
-- [ticketIndexFor](channelentry.md#ticketindexfor)
 - [toString](channelentry.md#tostring)
-- [totalBalance](channelentry.md#totalbalance)
 - [deserialize](channelentry.md#deserialize)
 - [fromSCEvent](channelentry.md#fromscevent)
 
@@ -45,42 +36,37 @@
 
 ### constructor
 
-• **new ChannelEntry**(`partyA`, `partyB`, `partyABalance`, `partyBBalance`, `commitmentPartyA`, `commitmentPartyB`, `partyATicketEpoch`, `partyBTicketEpoch`, `partyATicketIndex`, `partyBTicketIndex`, `status`, `channelEpoch`, `closureTime`, `closureByPartyA`)
+• **new ChannelEntry**(`source`, `destination`, `balance`, `commitment`, `ticketEpoch`, `ticketIndex`, `status`, `channelEpoch`, `closureTime`)
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
-| `partyA` | [Address](address.md) |
-| `partyB` | [Address](address.md) |
-| `partyABalance` | [Balance](balance.md) |
-| `partyBBalance` | [Balance](balance.md) |
-| `commitmentPartyA` | [Hash](hash.md) |
-| `commitmentPartyB` | [Hash](hash.md) |
-| `partyATicketEpoch` | [UINT256](uint256.md) |
-| `partyBTicketEpoch` | [UINT256](uint256.md) |
-| `partyATicketIndex` | [UINT256](uint256.md) |
-| `partyBTicketIndex` | [UINT256](uint256.md) |
+| `source` | [Address](address.md) |
+| `destination` | [Address](address.md) |
+| `balance` | [Balance](balance.md) |
+| `commitment` | [Hash](hash.md) |
+| `ticketEpoch` | [UINT256](uint256.md) |
+| `ticketIndex` | [UINT256](uint256.md) |
 | `status` | [ChannelStatus](../enums/channelstatus.md) |
 | `channelEpoch` | [UINT256](uint256.md) |
 | `closureTime` | [UINT256](uint256.md) |
-| `closureByPartyA` | `boolean` |
 
 #### Defined in
 
-[types/channelEntry.ts:66](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L66)
+[types/channelEntry.ts:54](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L54)
 
 ## Properties
+
+### balance
+
+• `Readonly` **balance**: [Balance](balance.md)
+
+___
 
 ### channelEpoch
 
 • `Readonly` **channelEpoch**: [UINT256](uint256.md)
-
-___
-
-### closureByPartyA
-
-• `Readonly` **closureByPartyA**: `boolean`
 
 ___
 
@@ -90,69 +76,39 @@ ___
 
 ___
 
-### commitmentPartyA
+### commitment
 
-• `Readonly` **commitmentPartyA**: [Hash](hash.md)
-
-___
-
-### commitmentPartyB
-
-• `Readonly` **commitmentPartyB**: [Hash](hash.md)
+• `Readonly` **commitment**: [Hash](hash.md)
 
 ___
 
-### partyA
+### destination
 
-• `Readonly` **partyA**: [Address](address.md)
-
-___
-
-### partyABalance
-
-• `Readonly` **partyABalance**: [Balance](balance.md)
+• `Readonly` **destination**: [Address](address.md)
 
 ___
 
-### partyATicketEpoch
+### source
 
-• `Readonly` **partyATicketEpoch**: [UINT256](uint256.md)
-
-___
-
-### partyATicketIndex
-
-• `Readonly` **partyATicketIndex**: [UINT256](uint256.md)
-
-___
-
-### partyB
-
-• `Readonly` **partyB**: [Address](address.md)
-
-___
-
-### partyBBalance
-
-• `Readonly` **partyBBalance**: [Balance](balance.md)
-
-___
-
-### partyBTicketEpoch
-
-• `Readonly` **partyBTicketEpoch**: [UINT256](uint256.md)
-
-___
-
-### partyBTicketIndex
-
-• `Readonly` **partyBTicketIndex**: [UINT256](uint256.md)
+• `Readonly` **source**: [Address](address.md)
 
 ___
 
 ### status
 
 • `Readonly` **status**: [ChannelStatus](../enums/channelstatus.md)
+
+___
+
+### ticketEpoch
+
+• `Readonly` **ticketEpoch**: [UINT256](uint256.md)
+
+___
+
+### ticketIndex
+
+• `Readonly` **ticketIndex**: [UINT256](uint256.md)
 
 ## Accessors
 
@@ -166,29 +122,9 @@ ___
 
 #### Defined in
 
-[types/channelEntry.ts:84](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L84)
+[types/channelEntry.ts:67](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L67)
 
 ## Methods
-
-### commitmentFor
-
-▸ **commitmentFor**(`addr`): [Hash](hash.md)
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `addr` | [Address](address.md) |
-
-#### Returns
-
-[Hash](hash.md)
-
-#### Defined in
-
-[types/channelEntry.ts:191](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L191)
-
-___
 
 ### getId
 
@@ -200,7 +136,7 @@ ___
 
 #### Defined in
 
-[types/channelEntry.ts:163](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L163)
+[types/channelEntry.ts:128](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L128)
 
 ___
 
@@ -214,47 +150,7 @@ ___
 
 #### Defined in
 
-[types/channelEntry.ts:123](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L123)
-
-___
-
-### ticketEpochFor
-
-▸ **ticketEpochFor**(`addr`): [UINT256](uint256.md)
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `addr` | [Address](address.md) |
-
-#### Returns
-
-[UINT256](uint256.md)
-
-#### Defined in
-
-[types/channelEntry.ts:171](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L171)
-
-___
-
-### ticketIndexFor
-
-▸ **ticketIndexFor**(`addr`): [UINT256](uint256.md)
-
-#### Parameters
-
-| Name | Type |
-| :------ | :------ |
-| `addr` | [Address](address.md) |
-
-#### Returns
-
-[UINT256](uint256.md)
-
-#### Defined in
-
-[types/channelEntry.ts:181](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L181)
+[types/channelEntry.ts:98](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L98)
 
 ___
 
@@ -268,21 +164,7 @@ ___
 
 #### Defined in
 
-[types/channelEntry.ts:142](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L142)
-
-___
-
-### totalBalance
-
-▸ **totalBalance**(): [Balance](balance.md)
-
-#### Returns
-
-[Balance](balance.md)
-
-#### Defined in
-
-[types/channelEntry.ts:167](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L167)
+[types/channelEntry.ts:112](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L112)
 
 ___
 
@@ -302,7 +184,7 @@ ___
 
 #### Defined in
 
-[types/channelEntry.ts:88](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L88)
+[types/channelEntry.ts:71](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L71)
 
 ___
 
@@ -322,4 +204,4 @@ ___
 
 #### Defined in
 
-[types/channelEntry.ts:99](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L99)
+[types/channelEntry.ts:82](https://github.com/hoprnet/hoprnet/blob/master/packages/utils/src/types/channelEntry.ts#L82)
