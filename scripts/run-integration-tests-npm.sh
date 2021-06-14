@@ -106,6 +106,10 @@ function setup_node() {
   local version=${6}
   local additional_args=${7:-""}
 
+  if [ -n "$additional_args" ]; then
+    echo "- Additional args: \"${additional-args}\""
+  fi
+
   mkdir -p "${npm_install_dir}"
   yarn --cwd "${npm_install_dir}" add @hoprnet/hoprd@${version}
 
