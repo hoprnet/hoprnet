@@ -283,16 +283,13 @@ class Indexer extends EventEmitter {
     log(channel.toString())
     await this.db.updateChannel(channel.getId(), channel)
 
-    if (channel.source.eq(this.address) || channel.destination.eq(this.address)) {
+    if (channel.destination.eq(this.address)) {
       this.emit('own-channel-updated', channel)
-
-      if (channel.destination.eq(this.address)) {
-        // Channel _to_ us
-        if (channel.status === ChannelStatus.WaitingForCommitment) {
-          await this.onOwnUnsetCommitment(channel)
-        } else if (channel.status === ChannelStatus.Open) {
-          this.resolveCommitmentPromise(channel.getId())
-        }
+      // Channel _to_ us
+      if (channel.status === ChannelStatus.WaitingForCommitment) {
+        await this.onOwnUnsetCommitment(channel)
+      } else if (channel.status === ChannelStatus.Open) {
+        this.resolveCommitmentPromise(channel.getId())
       }
     }
   }
